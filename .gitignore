@@ -1,0 +1,14 @@
+# 本地运行数据（任务库 / 成片 / 上传素材）
+data/
+
+# 环境相关配置（从 config.example.json 复制后按需修改）
+config.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 生成产物
+*.mp4
+*_frame.png
+projects/**/submissions.json
