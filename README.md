@@ -6,7 +6,7 @@
 
 **不用学节点图，也能用 MiniMax H3 在本地出片。**
 
-本地 Web 工作台，驱动本机 ComfyUI 生成视频与图片。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。零额外依赖，直接复用 ComfyUI 自带的 Python 运行。UI 灵感来源：[zxcHolmes/minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio)。
+本地 Web 工作台，驱动本机 ComfyUI 生成视频与图片，并提供 Windows 本机离线 TTS。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。直接复用 ComfyUI 自带的 Python 运行。UI 灵感来源：[zxcHolmes/minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio)。
 
 </div>
 
@@ -23,16 +23,18 @@
 ## 功能一览
 
 - **文生视频 / 首尾帧 / 参考生成** — MiniMax H3，Turbo LoRA 加速（默认 6 步）或标准 H3（20 步）
-- **Z-IMAGE 文生图**
-- **任务队列与卡片流** — 进度与 ComfyUI 实时同步，进行中 / 已完成 / 长片 / 失败 / 已取消分类管理
+- **PIKA H3 Flex** — 本机 PIKA LoRA + LCM 固定 6 步，支持纯文本及可选首帧/尾帧
+- **Z-IMAGE / Qwen Image 2.1 文生图**
+- **中文文字转语音** — Windows SAPI 本机离线合成，支持慧慧、康康、瑶瑶及语速/音量调节
+- **任务队列与卡片流** — 进度与 ComfyUI 实时同步，进行中 / 已完成 / 长片 / 失败 / 已取消分类管理；视频、图片、音频可分别筛选
 - **长片拼接** — 片段拖入、一键成片（ffmpeg）
 - **硬件参数页** — GPU / CPU / 内存 / 硬盘 / 软件环境 / 模型库六项实时状态，附一键释放显存
 
 ## 界面
 
 - **顶栏**：`PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00`，右侧实时显示「Generating, N 排队 / 空闲 / ComfyUI 未连接」
-- **左侧栏**：视频（文生视频 / 首尾帧 / 参考生成 / 长片拼接）· 图像（Z-IMAGE 文生图）· 系统（硬件参数）· 释放显存
-- **参数面板**：分辨率 544p/768p、模型卡（H3+LoRA / 标准 H3）、LoRA 选择与强度、步数 4~20、画面比例、时长 5~15s、种子
+- **左侧栏**：视频（文生视频 / 首尾帧 / 参考生成 / PIKA H3 Flex / 长片拼接）· 图像（Z-IMAGE / Qwen Image 2.1）· 音频（中文文字转语音）· 系统（硬件参数）
+- **参数面板**：分辨率 544p/768p、模型卡（H3+LoRA / 标准 H3）、LoRA 选择与强度、步数 4~20、画面比例、时长 5~15s、种子；PIKA 可拖入首尾帧；TTS 可选择声音、语速和音量
 - **任务卡片**：排队/生成中进度条、可播放预览、Cancel、下载、复用参数、删除；可按提示词与任务 ID 搜索，按类型、比例、时长筛选
 - **硬件参数页**：GPU（显存/利用率/温度/功耗/驱动）、CPU、内存、磁盘、软件环境（ComfyUI/PyTorch/Python/OS）、模型库分类统计，3 秒自动刷新
 
@@ -43,13 +45,17 @@
 | 文生视频 t2v | `MiniMaxH3ImageToVideo` | 纯提示词，带原生音频 |
 | 首尾帧 flf | `MiniMaxH3ImageToVideo` | first_frame / last_frame（尾帧可省略=图生视频） |
 | 参考生成 r2v | `MiniMaxH3ReferenceToVideo` | 1~3 张参考图，主体一致性 |
+| PIKA `pika` | `MiniMaxH3ImageToVideo` + PIKA Flex LoRA | LCM 固定 6 步；纯文本、仅首帧或首尾帧均可 |
 | 文生图 t2i | Z-IMAGE-turbo | 8 步出图 |
+| 文生图 qwen_t2i | Qwen Image 2.1 INT8 | 25 步出图 |
+| 文字转语音 tts | Windows SAPI | 本机离线中文语音 |
 
 **模型档位**（需已就位 MiniMax-H3 权重，见下方「前置准备：ComfyUI 与模型权重」）：
 
 | 选项 | unet | clip | 步数 |
 |---|---|---|---|
-| H3 + LoRA（ckpt850 / v4-step600） | `minimax_h3_*_pruned_int8_convrot` 或 nvfp4 | qwen3vl（随精度切换） | 4 |
+| H3 + LoRA（ckpt850 / v4-step600） | `minimax_h3_*_pruned_int8_convrot` 或 nvfp4 | qwen3vl（随精度切换） | 默认 6，可调 4~20 |
+| PIKA H3 Flex LoRA | `minimax_h3_fl2va_pruned_int8_convrot` | MiniMax H3 qwen3vl | 固定 6（LCM） |
 | 标准 MiniMax-H3 | 同上 | 同上 | 20 |
 | 精度切换 | int8 convrot（质量）/ nvfp4（省显存） | — | — |
 
@@ -67,7 +73,13 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
    - `diffusion_models/` — `z_image_turbo_bf16.safetensors`
    - `text_encoders/` — `qwen_3_4b.safetensors`
    - `vae/` — `ae.safetensors`
-5. **ffmpeg**：仅长片拼接需要，装好并加入 PATH。
+5. **Qwen Image 2.1 权重**：
+   - `diffusion_models/` — `qwen_image_2.1_int8_convrot.safetensors`
+   - `text_encoders/` — `qwen3vl_8b_int8_convrot.safetensors`
+   - `vae/` — `qwen_image_2.1_vae_bf16.safetensors`
+6. **PIKA LoRA**：`models/loras/pika_h3_flex_fl2va_v1_bf16.safetensors`；还需复用第 2 项的 H3 FL2VA、文本编码器及音视频 VAE。
+7. **Windows 中文语音**：TTS 使用 Windows SAPI，不需要下载 AI 模型。应用会使用系统中已安装的慧慧、康康、瑶瑶等声音；如果列表中的声音在系统里被移除，需先在 Windows 中安装对应语音。
+8. **ffmpeg**：仅长片拼接需要，装好并加入 PATH。
 
 > H3 权重从哪下、总控参数怎么调，见配套仓库 [ComfyUI-MiniMax-H3-Workflow](https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Workflow)：那边是同一套 H3 生产的 ComfyUI 节点工作流，附 H3 权重文件的官方下载链接与目录表；本仓库是它的可视化工作台，两边配合使用。
 
@@ -93,7 +105,7 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
    仓库地址：https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio
    要求：
    1) 先检查本机 ComfyUI 的安装目录和运行状态（默认 127.0.0.1:8188），再克隆仓库到 D:\h3s（目录已存在则先确认里面是什么，不要直接覆盖）；
-   2) 按仓库 README 的「前置准备」逐项核对 MiniMax H3、Z-IMAGE 权重与 Turbo LoRA 是否已在 ComfyUI 的 models 对应目录中，缺哪个明确告诉我，不要未经我同意就下载大文件；
+   2) 按仓库 README 的「前置准备」逐项核对 MiniMax H3、Z-IMAGE、Qwen Image 2.1、Turbo LoRA 与 PIKA LoRA 是否已在 ComfyUI 的 models 对应目录中，缺哪个明确告诉我，不要未经我同意就下载大文件；
    3) 把 config.example.json 复制为 config.json，models_dir 填我本机的实际路径；如果我的 ComfyUI 不在 D:\ComfyUI，把 启动.bat 里的 COMFY_DIR 改成实际目录；
    4) 检查 ffmpeg 是否已安装并在 PATH 中（长片拼接要用），没有就告诉我怎么装；
    5) 最后先启动 ComfyUI，再双击 D:\h3s\启动.bat，确认浏览器能打开 http://127.0.0.1:8190，并向我报告每一步的结果和还缺什么。
@@ -113,18 +125,48 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
 
 > `models_dir` 仅用于「硬件参数」页的模型库统计，留空则跳过。
 
-3. **先启动 ComfyUI**：确认它已在 `127.0.0.1:8188` 运行，且上面的 H3 / Z-IMAGE 权重都已就位。Studio 顶栏会实时显示 ComfyUI 的连接状态，连不上先解决这边。
-4. **双击仓库目录下的 `启动.bat`**：脚本会自动探测 ComfyUI 自带的 Python 运行 `server.py`（零额外依赖）。如果你的 ComfyUI 不在脚本默认的 `D:\ComfyUI`，先用记事本把 `启动.bat` 里的 `COMFY_DIR` 改成你的实际目录；没启动 ComfyUI 时脚本会先提醒，并询问是否仍要启动 Studio。
+3. **先启动 ComfyUI**：确认它已在 `127.0.0.1:8188` 运行，且准备使用的 H3 / Z-IMAGE / Qwen Image / PIKA 权重已经就位。Studio 顶栏会实时显示 ComfyUI 的连接状态，连不上先解决这边。离线 TTS 不经过 ComfyUI，但仍从同一个 Studio 服务提交和管理。
+4. **双击仓库目录下的 `启动.bat`**：脚本会自动探测 ComfyUI 自带的 Python，并在这个命令窗口中以前台方式运行 `server.py`。**Studio 使用期间必须保持这个启动窗口打开；关闭窗口就会停止 Studio。** 如果你的 ComfyUI 不在脚本默认的 `D:\ComfyUI`，先用记事本把 `启动.bat` 里的 `COMFY_DIR` 改成实际目录；没启动 ComfyUI 时脚本会先提醒，并询问是否仍要启动 Studio。
 5. **浏览器打开 `http://127.0.0.1:8190`** 即可使用；局域网内的手机也可以访问 `http://<本机IP>:8190`。
 
-**关闭 Studio**：服务是在后台独立运行的，关掉浏览器页面、关掉启动窗口都不会停它（启动窗口按任意键消失后，服务照样在跑）。要真正关闭，先查 8190 端口的进程号，再结束它：
+## PIKA H3 Flex：纯文本、首帧与首尾帧
+
+左侧选择「PIKA H3 Flex」后，工作流固定使用本机 PIKA Flex LoRA、LCM 采样和 6 步。图片输入均为可选：
+
+- 不放图片：纯提示词生成；
+- 只放首帧：以首帧为起点生成；
+- 同时放首帧和尾帧：在两张图片之间生成连续运动。
+
+首帧、尾帧既可以从电脑上传，也可以把右侧「已完成」里的图片直接拖入。重复使用相同图片时，上传目录会按文件内容复用已有文件，避免产生大量重复副本。PIKA 仍可设置 544p/768p、5~15 秒、画面比例和种子；采样步数与 LoRA 强度由该模式固定，不在界面重复显示。
+
+## Qwen Image 2.1 与 Z-IMAGE
+
+- **Z-IMAGE**：8 步快速文生图，输出文件使用 `i-zimage-` 前缀；
+- **Qwen Image 2.1 INT8**：25 步文生图，对中文语义和画面文字更友好，输出文件使用 `i-qwen-` 前缀。
+
+两种模式生成的图片都会进入「已完成」，可下载，也可直接拖到首尾帧、PIKA 或参考生成的图片位置。
+
+## 中文文字转语音
+
+左侧选择「中文文字转语音」，输入朗读内容后，可选择本机已经安装的慧慧、康康、瑶瑶声音，并调节语速和音量。该模式调用 Windows SAPI 在本机离线生成 WAV：不上传文本、不需要 ComfyUI 云端登录，也不消耗 Fish Audio、HeyGen 或 ElevenLabs 的额度。完成页提供在线播放、下载、复用参数和音频筛选。
+
+## 关闭 Studio
+
+按正常方式双击 `启动.bat` 后，命令窗口就是 Studio 服务窗口：
+
+- 只关闭浏览器页面不会停止 Studio；
+- 在启动窗口按 `Ctrl+C`，确认终止批处理，便可正常停止 Studio；
+- 直接关闭启动窗口，也会同时停止 Studio；
+- Studio 与 ComfyUI 是两个独立程序：停止 Studio 不会停止 ComfyUI，反之亦然。
+
+如果 Studio 是由其他工具以隐藏或后台方式启动、找不到启动窗口，可按端口查出进程号后结束：
 
 ```bat
 netstat -ano | findstr :8190
 taskkill /PID <LISTENING 那一行的进程号> /F
 ```
 
-认准 `LISTENING` 那行的 PID，别误杀 `ESTABLISHED` 另一端的号码（那是浏览器）。也可以在任务管理器里结束对应的 python 进程。注意这只关 Studio，ComfyUI（8188）是另一个程序，要单独关闭。
+认准 `LISTENING` 那行的 PID，不要使用 `ESTABLISHED` 连接另一端的号码（通常是浏览器）。也可以在任务管理器里结束对应的 Python 进程。以上操作只关闭 Studio（8190），ComfyUI（8188）需要单独关闭。
 
 ## 数据与输出目录
 
@@ -135,7 +177,9 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | 生成的视频 | `D:\h3s\data\outputs\videos\` | `v-h3-studio-000001.mp4`（顺序编号） |
 | 长片拼接的成片 | `D:\h3s\data\outputs\videos\` | `v-l-000001.mp4` |
 | 生成的图片（Z-IMAGE） | `D:\h3s\data\outputs\images\` | `i-zimage-000001.png`（顺序编号） |
-| 上传的首尾帧 / 参考图 | `D:\h3s\data\uploads\` | — |
+| 生成的图片（Qwen Image） | `D:\h3s\data\outputs\images\` | `i-qwen-000001.png`（顺序编号） |
+| 生成的语音 | `D:\h3s\data\outputs\audio\` | `a-tts-000001.wav`（顺序编号） |
+| 上传的首尾帧 / PIKA 帧 / 参考图 | `D:\h3s\data\uploads\` | 按内容去重复用 |
 | 任务记录（提示词、参数、状态） | `D:\h3s\data\jobs.db` | SQLite 数据库 |
 
 在界面里删任务卡片，对应文件会一并删除；直接去上面目录里取文件也行，拷走不影响任务记录。
@@ -144,7 +188,7 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/jobs` | multipart 提交任务（mode + params JSON + 图片文件） |
+| POST | `/api/jobs` | multipart 提交任务（`mode` + `params` JSON + 可选图片文件） |
 | POST | `/api/longfilms` | 长片拼接：提交已生成片段，ffmpeg 拼接为一条长片 |
 | GET | `/api/jobs?status=` | 任务列表（queued/running/done/failed/canceled/all） |
 | POST | `/api/jobs/{id}/cancel` | 取消（排队从队列删，运行中触发 interrupt） |
@@ -152,6 +196,8 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | GET | `/api/system` | 队列与 ComfyUI 状态 |
 | GET | `/api/hardware` | 本机硬件参数（GPU/CPU/内存/磁盘/软件/模型库） |
 | POST | `/api/unload` | 释放 ComfyUI 显存 |
+
+`/api/jobs` 当前支持的 `mode`：`t2v`、`flf`、`r2v`、`pika`、`t2i`、`qwen_t2i`、`tts`。其中 `flf` 和 `pika` 的图片字段为 `file_first` / `file_last`，`r2v` 使用一个或多个 `file_ref`；PIKA 的两个图片字段都可以省略。
 
 ## 时长→帧数
 

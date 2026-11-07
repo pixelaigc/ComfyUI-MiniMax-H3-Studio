@@ -32,6 +32,11 @@ LORAS = {
     "v4step600": "minimax_h3_turbo_v4_step600_ema .safetensors",
 }
 
+PIKA_LORA = "pika_h3_flex_fl2va_v1_bf16.safetensors"
+QWEN_IMAGE_UNET = "qwen_image_2.1_int8_convrot.safetensors"
+QWEN_IMAGE_CLIP = "qwen3vl_8b_int8_convrot.safetensors"
+QWEN_IMAGE_VAE = "qwen_image_2.1_vae_bf16.safetensors"
+
 Z_IMAGE_UNET = "z_image_turbo_bf16.safetensors"
 Z_IMAGE_CLIP = "qwen_3_4b.safetensors"
 Z_IMAGE_VAE = "ae.safetensors"
@@ -293,7 +298,95 @@ def build_t2i(params):
     }
 
 
-BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i}
+def build_pika(params):
+    """PIKA H3 Flex LoRA：支持纯文生视频，也支持可选首帧/尾帧。"""
+    job_id = params["job_id"]
+    seed = int(params.get("seed") or random.randint(0, 2**48))
+    aspect = ASPECT_MAP.get(params.get("aspect", "16:9"), ASPECT_MAP["16:9"])
+    mp = RES_MP.get(params.get("resolution", "544p"), 0.4)
+    duration = float(params.get("duration", 5))
+    prefix = f"h3studio/pika_{job_id}"
+    condition_inputs = {"prompt": params.get("prompt", ""), "width": ["115", 0],
+                        "height": ["115", 1], "clip": ["13", 0], "vae": ["11", 0]}
+    p = {
+        "115": {"inputs": {"aspect_ratio": aspect, "megapixels": mp, "multiple": 32},
+                "class_type": "ResolutionSelector"},
+        "6": {"inputs": {"unet_name": UNET["fl2va"]["int8"], "weight_dtype": "default"},
+              "class_type": "UNETLoader"},
+        "7": {"inputs": {"model": ["6", 0], "lora_name": PIKA_LORA, "strength_model": 1.0},
+              "class_type": "LoraLoaderModelOnly"},
+        "13": {"inputs": {"clip_name": CLIP["int8"], "type": "minimax", "device": "default"},
+               "class_type": "CLIPLoader"},
+        "11": {"inputs": {"vae_name": VAE_VIDEO}, "class_type": "VAELoader"},
+        "24": {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader"},
+        "104": {"inputs": condition_inputs,
+                "class_type": "MiniMaxH3ImageToVideo"},
+        "9": {"inputs": {"sigmas": "1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0"},
+              "class_type": "ManualSigmas"},
+        "17": {"inputs": {"sampler_name": "lcm"}, "class_type": "KSamplerSelect"},
+        "15": {"inputs": {"noise_seed": seed}, "class_type": "RandomNoise"},
+        "16": {"inputs": {"model": ["7", 0], "conditioning": ["104", 0]},
+               "class_type": "BasicGuider"},
+        "14": {"inputs": {"noise": ["15", 0], "guider": ["16", 0], "sampler": ["17", 0],
+                            "sigmas": ["9", 0], "latent_image": ["104", 1]},
+               "class_type": "SamplerCustomAdvanced"},
+        "10": {"inputs": {"samples": ["14", 0], "vae": ["11", 0]}, "class_type": "VAEDecode"},
+        "23": {"inputs": {"samples": ["14", 0], "vae": ["24", 0]}, "class_type": "VAEDecodeAudio"},
+        "91": {"inputs": {"fps": 24, "bit_depth": 8, "images": ["10", 0], "audio": ["23", 0]},
+               "class_type": "CreateVideo"},
+        "92": {"inputs": {"filename_prefix": prefix, "format": "auto", "codec": "auto",
+                            "video": ["91", 0]}, "class_type": "SaveVideo"},
+    }
+    expr = _frame_expr_node("107", "111")
+    expr["111"]["inputs"]["value"] = duration
+    p.update(expr)
+    p["104"]["inputs"]["length"] = ["107", 1]
+    if params.get("first_frame"):
+        p["201"] = {"inputs": {"image": params["first_frame"]}, "class_type": "LoadImage",
+                    "_meta": {"title": "加载首帧"}}
+        condition_inputs["first_frame"] = ["201", 0]
+    if params.get("last_frame"):
+        p["202"] = {"inputs": {"image": params["last_frame"]}, "class_type": "LoadImage",
+                    "_meta": {"title": "加载尾帧"}}
+        condition_inputs["last_frame"] = ["202", 0]
+    return p
+
+
+def build_qwen_t2i(params):
+    """Qwen Image 2.1 INT8 文生图。"""
+    job_id = params["job_id"]
+    seed = int(params.get("seed") or random.randint(0, 2**48))
+    aspect = params.get("aspect", "16:9")
+    dimensions = {
+        "16:9": (1344, 768), "9:16": (768, 1344), "4:3": (1152, 864),
+        "3:4": (864, 1152), "1:1": (1024, 1024),
+    }
+    width, height = dimensions.get(aspect, dimensions["16:9"])
+    if params.get("resolution") == "544p":
+        width, height = round(width * .75 / 32) * 32, round(height * .75 / 32) * 32
+    return {
+        "1": {"inputs": {"unet_name": QWEN_IMAGE_UNET, "weight_dtype": "default"},
+              "class_type": "UNETLoader"},
+        "2": {"inputs": {"clip_name": QWEN_IMAGE_CLIP, "type": "qwen_image", "device": "default"},
+              "class_type": "CLIPLoader"},
+        "3": {"inputs": {"vae_name": QWEN_IMAGE_VAE}, "class_type": "VAELoader"},
+        "4": {"inputs": {"clip": ["2", 0], "prompt": params.get("prompt", ""),
+                          "negative_prompt": "", "resolution": 1024},
+              "class_type": "TextEncodeQwenImage21"},
+        "5": {"inputs": {"width": width, "height": height, "batch_size": 1},
+              "class_type": "EmptyLatentImage"},
+        "6": {"inputs": {"seed": seed, "steps": 25, "cfg": 1, "sampler_name": "euler",
+                          "scheduler": "simple", "denoise": 1, "model": ["1", 0],
+                          "positive": ["4", 0], "negative": ["4", 1], "latent_image": ["5", 0]},
+              "class_type": "KSampler"},
+        "7": {"inputs": {"samples": ["6", 0], "vae": ["3", 0]}, "class_type": "VAEDecode"},
+        "8": {"inputs": {"filename_prefix": f"h3studio/qwen_{job_id}", "images": ["7", 0]},
+              "class_type": "SaveImage"},
+    }
+
+
+BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i,
+            "pika": build_pika, "qwen_t2i": build_qwen_t2i}
 
 
 def build_workflow(mode, params):

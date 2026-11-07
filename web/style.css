@@ -88,6 +88,9 @@ body {
   display: flex; flex-direction: column; gap: 18px;
 }
 .field-label { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.mode-note { margin-bottom: 12px; padding: 9px 10px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; line-height: 1.5; }
+.tts-fields select { width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); }
+.tts-pair { margin-top: 10px; }
 .muted { color: var(--muted); font-weight: 400; font-size: 11.5px; }
 
 .seg { display: flex; gap: 8px; }
@@ -255,6 +258,8 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
   justify-content: center; position: relative;
 }
 .job-preview video { width: 100%; height: 100%; object-fit: contain; }
+.job-preview audio { width: calc(100% - 24px); }
+.job-card:has(.job-preview audio) .job-preview { min-height: 92px; height: 92px; background: linear-gradient(145deg,#f7f8fb,#eef1f6); }
 .job-card:has(.job-preview video) .job-preview { cursor: grab; }
 .job-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .job-card:has(.job-preview img) .job-preview { cursor: grab; }

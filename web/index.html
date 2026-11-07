@@ -46,6 +46,10 @@
       <svg viewBox="0 0 16 16" width="15" height="15"><circle cx="5" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 13.5c0-2 1.5-3 3-3s3 1 3 3M8 13.5c0-2 1.5-3 3-3s3 1 3 3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
       参考生成
     </a>
+    <a class="nav-item" data-mode="pika">
+      <svg viewBox="0 0 16 16" width="15" height="15"><path d="M3 2.5h6a4 4 0 0 1 0 8H6v3H3z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 5.5h3a1 1 0 0 1 0 2H6z" fill="currentColor"/></svg>
+      PIKA H3 Flex
+    </a>
     <a class="nav-item" id="navStitch">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6.7 8h2.6M8 6.7V9.3" stroke="currentColor" stroke-width="1.3"/></svg>
       长片拼接
@@ -54,6 +58,15 @@
     <a class="nav-item" data-mode="t2i">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
       Z-IMAGE 文生图
+    </a>
+    <a class="nav-item" data-mode="qwen_t2i">
+      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 10.5 8 5l3 5.5M6.2 8.5h3.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      Qwen Image 2.1
+    </a>
+    <div class="nav-group">音频</div>
+    <a class="nav-item" data-mode="tts">
+      <svg viewBox="0 0 16 16" width="15" height="15"><path d="M3 6h2l3-3v10l-3-3H3z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10 6c1 .8 1 3.2 0 4M12 4.5c2 1.8 2 5.2 0 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      中文文字转语音
     </a>
     <div class="nav-group">系统</div>
     <a class="nav-item" id="navSystem">
@@ -78,7 +91,8 @@
 
   <!-- 参数面板 -->
   <aside class="panel" id="panel">
-    <div class="field">
+    <div class="mode-note" id="modeNote" hidden></div>
+    <div class="field" id="resField">
       <div class="field-label">分辨率</div>
       <div class="seg" id="resSeg">
         <button data-v="544p" class="active"><b>544p</b><small>快速</small></button>
@@ -91,7 +105,7 @@
       <input type="range" id="duration" min="5" max="15" step="1" value="5">
     </div>
 
-    <div class="field">
+    <div class="field" id="aspectField">
       <div class="field-label">画面比例</div>
       <div class="chips" id="aspectChips">
         <button data-v="16:9" class="active">16:9</button>
@@ -102,13 +116,33 @@
       </div>
     </div>
 
-    <div class="field">
-      <div class="field-label">提示词</div>
+    <div class="field" id="promptField">
+      <div class="field-label" id="promptLabel">提示词</div>
       <textarea id="prompt" rows="6" placeholder="描述画面…支持多镜头分镜写法">integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia period film. At night in a moonlit bamboo forest, a tight close-up frames an adult swordsman in black robes (S1) from the white-robed swordsman’s shoulder, forming the first angle of a shot–reverse-shot sequence. Cold mist drifts behind him; his tied long hair moves slightly in the wind, and one hand rests on the hilt at his waist. The camera slowly pushes in with small amplitude as the black-robed swordsman, speaking in a low, restrained male voice, fixes his opponent with an unwavering stare and says: &lt;d&gt;[Chinese] 你终于来了。&lt;/d&gt; [Shot 2] At 00:02.300, the camera cuts to the exact reverse angle: a tight close-up of the adult white-robed swordsman (S2) over the black-robed swordsman’s shoulder. Moonlight traces the edge of his face while swaying bamboo shadows cross his calm expression. Without drawing his sword, the white-robed swordsman replies in a quiet, firm male voice: &lt;d&gt;[Chinese] 今夜，做个了断。&lt;/d&gt; His thumb slowly pushes the sword guard forward, exposing a narrow glint of steel before the video ends at 5.00 seconds.
 
 overall_soundscape: Night wind rustles dense bamboo leaves while insects call faintly in the distance. Robe fabric shifts softly, followed by the subtle metallic scrape of a sword beginning to leave its scabbard.
 
 non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, ending on a single deep drumbeat as the blade is exposed.</textarea>
+    </div>
+
+    <div class="field tts-fields" id="ttsFields" hidden>
+      <div class="field-label">中文声音 <span class="muted">Windows 本机离线引擎</span></div>
+      <select id="ttsVoice">
+        <option value="Microsoft Huihui Desktop">慧慧 Desktop（女声）</option>
+        <option value="Microsoft Huihui">慧慧（女声）</option>
+        <option value="Microsoft Kangkang">康康（男声）</option>
+        <option value="Microsoft Yaoyao">瑶瑶（女声）</option>
+      </select>
+      <div class="compact-pair tts-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>语速</span><b id="ttsSpeedVal">1.00×</b></div>
+          <input type="range" id="ttsSpeed" min="0.5" max="2" step="0.05" value="1">
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>音量</span><b id="ttsVolumeVal">100%</b></div>
+          <input type="range" id="ttsVolume" min="0" max="100" step="5" value="100">
+        </div>
+      </div>
     </div>
 
     <button class="gen-btn" id="genBtn">生成</button>
@@ -194,6 +228,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <option value="">全部类型</option>
           <option value="video">视频</option>
           <option value="image">图片</option>
+          <option value="audio">音频</option>
         </select>
         <select id="doneAspect" aria-label="画面比例">
           <option value="">全部比例</option>
@@ -251,6 +286,6 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
-<script src="/static/app.js?v=compact-seed1"></script>
+<script src="/static/app.js?v=pika-flf2"></script>
 </body>
 </html>

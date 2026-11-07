@@ -12,3 +12,8 @@ __pycache__/
 *.mp4
 *_frame.png
 projects/**/submissions.json
+
+# 本机临时打包与后台运行日志
+/h3s.rar
+/studio-stdout.log
+/studio-stderr.log

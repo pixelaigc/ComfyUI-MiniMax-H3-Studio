@@ -58,8 +58,9 @@ OUT_DIR = DATA / "outputs"
 UPLOAD_DIR = DATA / "uploads"
 VIDEO_DIR = OUT_DIR / "videos"
 IMAGE_DIR = OUT_DIR / "images"
+AUDIO_DIR = OUT_DIR / "audio"
 DB_PATH = DATA / "jobs.db"
-for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR):
+for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # ------------------------------------------------------------------ DB
@@ -114,6 +115,7 @@ FFPROBE = shutil.which("ffprobe")
 LONGFILM_LOCK = asyncio.Lock()
 LONGFILM_TASKS = set()
 LONGFILM_PROCESSES = {}
+TTS_PROCESSES = {}
 
 
 async def comfy_upload_image(session: ClientSession, path: Path) -> str:
@@ -145,7 +147,8 @@ def _extract_outputs(history_entry):
     """从 history 条目提取输出文件列表 [{kind,filename,subfolder}]"""
     outs = []
     for node_out in (history_entry.get("outputs") or {}).values():
-        for key, kind in (("videos", "video"), ("gifs", "video"), ("images", "image")):
+        for key, kind in (("videos", "video"), ("gifs", "video"), ("images", "image"),
+                          ("audio", "audio"), ("audios", "audio")):
             val = node_out.get(key)
             items = val if isinstance(val, list) else ([val] if val else [])
             for item in items:
@@ -156,6 +159,8 @@ def _extract_outputs(history_entry):
                         kind = "video"
                     elif fname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                         kind = "image"
+                    elif fname.lower().endswith((".wav", ".flac", ".mp3", ".ogg", ".m4a")):
+                        kind = "audio"
                     outs.append({"kind": kind, "filename": fname,
                                  "subfolder": item.get("subfolder", ""),
                                  "type": item.get("type", "output")})
@@ -166,6 +171,10 @@ def _next_output_path(kind: str, suffix: str) -> Path:
     """为新输出分配稳定、易检索的顺序文件名。"""
     if kind == "image":
         dest_dir, prefix = IMAGE_DIR, "i-zimage-"
+    elif kind == "qwen_image":
+        dest_dir, prefix = IMAGE_DIR, "i-qwen-"
+    elif kind == "audio":
+        dest_dir, prefix = AUDIO_DIR, "a-tts-"
     elif kind == "longfilm":
         dest_dir, prefix = VIDEO_DIR, "v-l-"
     else:
@@ -181,14 +190,45 @@ def _next_output_path(kind: str, suffix: str) -> Path:
     return dest_dir / f"{prefix}{highest + 1:06d}{suffix.lower()}"
 
 
-async def comfy_download_output(session: ClientSession, item: dict) -> str:
+async def comfy_download_output(session: ClientSession, item: dict, mode: str = "") -> str:
     params = {"filename": item["filename"], "subfolder": item["subfolder"], "type": item["type"]}
     suffix = Path(item["filename"]).suffix or (".png" if item["kind"] == "image" else ".mp4")
-    dest = _next_output_path(item["kind"], suffix)
+    output_kind = "qwen_image" if item["kind"] == "image" and mode == "qwen_t2i" else item["kind"]
+    dest = _next_output_path(output_kind, suffix)
     async with session.get(f"{COMFY}/view", params=params) as resp:
         resp.raise_for_status()
         dest.write_bytes(await resp.read())
     return dest.relative_to(OUT_DIR).as_posix()
+
+
+async def run_local_tts(job_id: str, params: dict):
+    """使用 Windows 自带 SAPI 离线合成中文语音。"""
+    dest = _next_output_path("audio", ".wav")
+    voice = str(params.get("voice") or "Microsoft Huihui Desktop")
+    allowed = {"Microsoft Huihui Desktop", "Microsoft Huihui", "Microsoft Kangkang", "Microsoft Yaoyao"}
+    if voice not in allowed:
+        voice = "Microsoft Huihui Desktop"
+    speed = max(.5, min(2.0, float(params.get("speed") or 1.0)))
+    rate = round((speed - 1.0) * 8)
+    volume = max(0, min(100, int(params.get("volume") or 100)))
+    script = BASE / "h3studio" / "tts_sapi.ps1"
+    process = await asyncio.create_subprocess_exec(
+        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+        "-Output", str(dest), "-Text", str(params.get("prompt") or ""), "-Voice", voice,
+        "-Rate", str(rate), "-Volume", str(volume),
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    TTS_PROCESSES[job_id] = process
+    try:
+        stdout, stderr = await process.communicate()
+    finally:
+        TTS_PROCESSES.pop(job_id, None)
+    if process.returncode != 0 or not dest.exists():
+        raise RuntimeError((stderr or stdout).decode("utf-8", "replace")[-500:] or "离线语音合成失败")
+    output = {"kind": "audio", "file": dest.relative_to(OUT_DIR).as_posix(), "name": dest.name}
+    with db() as conn:
+        conn.execute("UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
+                     (json.dumps([output], ensure_ascii=False), time.time(), job_id))
 
 
 def _file_sha256(path: Path) -> str:
@@ -328,10 +368,14 @@ class Worker:
         mode = job_row["mode"]
         print(f"[worker] 开始任务 {job_id} ({mode})")
         try:
+            if mode == "tts":
+                await run_local_tts(job_id, params)
+                print(f"[worker] 任务 {job_id} 完成: 离线语音")
+                return
             async with ClientSession(timeout=HTTP_TIMEOUT) as session:
                 # 上传图片素材
                 image_inputs = {}
-                if mode == "flf":
+                if mode in ("flf", "pika"):
                     for key in ("first_frame", "last_frame"):
                         up = params.get(key)
                         if up:
@@ -383,7 +427,7 @@ class Worker:
                                 outs = _extract_outputs(hist)
                                 saved = []
                                 for item in outs:
-                                    fname = await comfy_download_output(session, item)
+                                    fname = await comfy_download_output(session, item, mode)
                                     saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
                                 with db() as conn:
                                     conn.execute(
@@ -442,15 +486,15 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i"):
+    if mode not in ("t2v", "flf", "r2v", "t2i", "pika", "qwen_t2i", "tts"):
         return web.json_response({"error": f"未知模式 {mode}"}, status=400)
 
-    if mode == "flf":
+    if mode in ("flf", "pika"):
         if saved_files.get("file_first"):
             params["first_frame"] = saved_files["file_first"][0]
         if saved_files.get("file_last"):
             params["last_frame"] = saved_files["file_last"][0]
-        if not params.get("first_frame"):
+        if mode == "flf" and not params.get("first_frame"):
             return web.json_response({"error": "首尾帧模式需要至少上传首帧图片"}, status=400)
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
@@ -612,13 +656,15 @@ async def api_list(request):
         args.append(status)
     media = request.query.get("media", "").strip()
     if media == "image":
-        conditions.append("mode='t2i'")
+        conditions.append("mode IN ('t2i','qwen_t2i')")
     elif media == "video":
-        conditions.append("mode NOT IN ('t2i','longfilm')")
+        conditions.append("mode IN ('t2v','flf','r2v','pika')")
+    elif media == "audio":
+        conditions.append("mode='tts'")
     elif media == "longfilm":
         conditions.append("mode='longfilm'")
     elif media:
-        return web.json_response({"error": "media 只能是 image、video 或 longfilm"}, status=400)
+        return web.json_response({"error": "media 只能是 image、video、audio 或 longfilm"}, status=400)
     aspect = request.query.get("aspect", "").strip()
     if aspect:
         if aspect not in ("16:9", "9:16", "4:3", "3:4", "1:1"):
@@ -677,6 +723,14 @@ async def api_cancel(request):
         pid = r["prompt_id"]
         if r["mode"] == "longfilm":
             process = LONGFILM_PROCESSES.get(jid)
+            if process and process.returncode is None:
+                process.terminate()
+            with db() as conn:
+                conn.execute("UPDATE jobs SET status='canceled', finished_at=? WHERE id=? AND status IN ('queued','running')",
+                             (time.time(), jid))
+            return json_ok({"status": "canceled"})
+        if r["mode"] == "tts":
+            process = TTS_PROCESSES.get(jid)
             if process and process.returncode is None:
                 process.terminate()
             with db() as conn:
@@ -886,7 +940,9 @@ async def api_hardware(request):
 
 # ------------------------------------------------------------------ static
 MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
-               ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+               ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+               ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg",
+               ".ogg": "audio/ogg", ".m4a": "audio/mp4"}
 
 
 async def files_handler(request):

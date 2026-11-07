@@ -6,7 +6,10 @@ const MODE_INFO = {
   t2v: { name: "文生视频", kind: "video" },
   flf: { name: "首尾帧", kind: "video" },
   r2v: { name: "参考生成", kind: "video" },
+  pika: { name: "PIKA H3 Flex", kind: "video" },
   t2i: { name: "Z-IMAGE 文生图", kind: "image" },
+  qwen_t2i: { name: "Qwen Image 2.1", kind: "image" },
+  tts: { name: "中文文字转语音", kind: "audio" },
   longfilm: { name: "长片", kind: "video" },
 };
 
@@ -95,8 +98,10 @@ function renderMode() {
     slot.addEventListener("click", () => inp.click());
     row.appendChild(slot);
   };
-  if (mode === "flf") {
-    $("#uploadTitle").textContent = "上传首帧与尾帧，或从已完成图片拖入（尾帧可省略）";
+  if (mode === "flf" || mode === "pika") {
+    $("#uploadTitle").textContent = mode === "pika"
+      ? "可选：上传或拖入 PIKA 首帧与尾帧（两者都可省略）"
+      : "上传首帧与尾帧，或从已完成图片拖入（尾帧可省略）";
     zone.style.display = "block";
     mk("first", "首帧"); mk("last", "尾帧");
   } else if (mode === "r2v") {
@@ -106,11 +111,29 @@ function renderMode() {
   } else {
     zone.style.display = "none";
   }
-  // 文生图隐藏时长 / 模型 / 步数
+  const isTts = mode === "tts";
+  const isPika = mode === "pika";
+  const isQwen = mode === "qwen_t2i";
+  const note = $("#modeNote");
+  const notes = {
+    pika: "PIKA H3 Flex LoRA · LCM 固定 6 步 · 支持纯文本或可选首帧/尾帧",
+    qwen_t2i: "Qwen Image 2.1 INT8 · 25 步，适合中文语义与画面文字",
+    tts: "本机 Windows SAPI 离线合成 · 无需联网、不消耗云服务额度",
+  };
+  note.hidden = !notes[mode];
+  note.textContent = notes[mode] || "";
+  $("#resField").style.display = isTts ? "none" : "";
+  $("#aspectField").style.display = isTts ? "none" : "";
+  $("#ttsFields").hidden = !isTts;
+  $("#promptLabel").textContent = isTts ? "朗读文本" : "提示词";
+  $("#prompt").placeholder = isTts ? "输入需要朗读的中文内容…" : "描述画面…支持多镜头分镜写法";
+  $("#genBtn").textContent = isTts ? "生成语音" : (info.kind === "image" ? "生成图片" : "生成视频");
+  // 文生图、PIKA 固定工作流及 TTS 隐藏不适用参数
   const isVideo = info.kind === "video";
   $("#durField").style.display = isVideo ? "" : "none";
-  $("#modelField").style.display = isVideo ? "" : "none";
-  $("#stepsField").style.display = isVideo ? "" : "none";
+  $("#modelField").style.display = isVideo && !isPika ? "" : "none";
+  $("#stepsField").style.display = isVideo && !isPika ? "" : "none";
+  $("#seedStrengthPair").style.display = isTts ? "none" : "";
   updateSeedStrengthLayout();
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
@@ -148,7 +171,7 @@ function setDefaultSteps() {
   $("#stepsVal").textContent = def;
 }
 function updateSeedStrengthLayout() {
-  const showStrength = MODE_INFO[state.mode].kind === "video" && state.model === "lora";
+  const showStrength = ["t2v", "flf", "r2v"].includes(state.mode) && state.model === "lora";
   $("#loraStrengthField").style.display = showStrength ? "" : "none";
   $("#seedStrengthPair").classList.toggle("seed-only", !showStrength);
 }
@@ -156,6 +179,8 @@ $("#duration").addEventListener("input", e => {
   state.duration = parseInt(e.target.value);
   $("#durVal").textContent = state.duration + "s";
 });
+$("#ttsSpeed").addEventListener("input", e => { $("#ttsSpeedVal").textContent = Number(e.target.value).toFixed(2) + "×"; });
+$("#ttsVolume").addEventListener("input", e => { $("#ttsVolumeVal").textContent = e.target.value + "%"; });
 
 // ---------- 提交 ----------
 $("#genBtn").addEventListener("click", async () => {
@@ -175,11 +200,16 @@ $("#genBtn").addEventListener("click", async () => {
     lora_strength: state.loraStrength,
     seed: $("#seed").value.trim() || null,
   };
+  if (mode === "tts") {
+    params.voice = $("#ttsVoice").value;
+    params.speed = Number($("#ttsSpeed").value);
+    params.volume = Number($("#ttsVolume").value);
+  }
   fd.append("params", JSON.stringify(params));
   try {
-    if (mode === "flf") {
-      if (!state.files.first) { alert("首尾帧模式需要上传首帧"); return; }
-      fd.append("file_first", state.files.first);
+    if (mode === "flf" || mode === "pika") {
+      if (mode === "flf" && !state.files.first) { alert("首尾帧模式需要上传首帧"); return; }
+      if (state.files.first) fd.append("file_first", state.files.first);
       if (state.files.last) fd.append("file_last", state.files.last);
     } else if (mode === "r2v") {
       const refs = [state.files.ref0, state.files.ref1, state.files.ref2].filter(Boolean);
@@ -230,6 +260,12 @@ function modelLabel(p) {
   return `H3 + ${p.lora === "ckpt850" ? "ckpt850" : "v4-step600"} · ${steps}步`;
 }
 
+function jobModelLabel(job, p) {
+  if (job.mode === "pika") return "PIKA Flex LoRA · 6步";
+  if (job.mode === "qwen_t2i") return "Qwen Image 2.1 · 25步";
+  return modelLabel(p);
+}
+
 function outputUrl(job, output) {
   const relative = String(output.file || "").replace(/\\/g, "/");
   const path = relative.includes("/") ? relative : `${job.id}/${relative}`;
@@ -249,10 +285,13 @@ function jobCard(job) {
   let preview = "";
   const video = (job.outputs || []).find(o => o.kind === "video");
   const image = (job.outputs || []).find(o => o.kind === "image");
+  const audio = (job.outputs || []).find(o => o.kind === "audio");
   if (video) {
     preview = `<video src="${outputUrl(job, video)}" controls preload="metadata"></video>`;
   } else if (image) {
     preview = `<img src="${outputUrl(job, image)}">`;
+  } else if (audio) {
+    preview = `<audio src="${outputUrl(job, audio)}" controls preload="metadata"></audio>`;
   } else if (runningOrQueued) {
     preview = `<div class="progress-wrap">
       <div class="progress-bar"><div style="width:${Math.round(prog * 100)}%"></div></div>
@@ -278,15 +317,16 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
-      <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
+      ${info.kind !== "audio" ? `<div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>` : `
+      <div class="row"><span>声音</span><b>${escapeHtml((p.voice || "Microsoft Huihui Desktop").replace("Microsoft ", ""))}</b></div>`}
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
-      <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}
-      <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
+      <div class="row"><span>模型</span><b>${jobModelLabel(job, p)}</b></div>` : ""}
+      ${info.kind === "audio" ? `<div class="row"><span>语速 / 音量</span><b>${Number(p.speed || 1).toFixed(2)}× · ${p.volume ?? 100}%</b></div>` : `<div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : ""}
     </div>`}
     <div class="job-actions">
-      ${video || image ? `<button data-act="download">⬇ 下载</button>` : ""}
+      ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
@@ -346,7 +386,7 @@ function jobCard(job) {
     refreshJobs();
   });
   card.querySelector('[data-act="download"]')?.addEventListener("click", () => {
-    const f = video || image;
+    const f = video || image || audio;
     const a = document.createElement("a");
     a.href = outputUrl(job, f);
     a.download = f.file.split(/[\\/]/).pop();
@@ -364,6 +404,9 @@ function jobCard(job) {
     if (p.seed) $("#seed").value = p.seed;
     if (p.model) { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; updateSeedStrengthLayout(); }
     if (p.lora) { setSeg("#loraCards", p.lora); state.lora = p.lora; }
+    if (p.voice) $("#ttsVoice").value = p.voice;
+    if (p.speed) { $("#ttsSpeed").value = p.speed; $("#ttsSpeedVal").textContent = Number(p.speed).toFixed(2) + "×"; }
+    if (p.volume != null) { $("#ttsVolume").value = p.volume; $("#ttsVolumeVal").textContent = p.volume + "%"; }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
   return card;
