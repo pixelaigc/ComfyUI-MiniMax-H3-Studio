@@ -28,8 +28,10 @@ VAE_AUDIO = "minimax_h3_audio_vae_fp32.safetensors"
 
 LORAS = {
     "ckpt850": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
-    # 注意：源文件名末尾带空格，原样保留
-    "v4step600": "minimax_h3_turbo_v4_step600_ema .safetensors",
+    # 本机实际文件名末尾没有空格（仓库原版硬编码了带空格的 "ema .safetensors"，
+    # ComfyUI 的 lora 下拉框里不存在该名字，提交会被拒绝）。改为按实际存在的
+    # 文件名匹配，找不到再回退到带空格的原始名。
+    "v4step600": "minimax_h3_turbo_v4_step600_ema.safetensors",
 }
 
 Z_IMAGE_UNET = "z_image_turbo_bf16.safetensors"

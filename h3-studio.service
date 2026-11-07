@@ -1,0 +1,23 @@
+[Unit]
+Description=ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)
+Documentation=https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio
+After=network.target comfyui.service
+Wants=comfyui.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/projects/comfyui-minimax-h3-studio
+Environment=PATH=/home/ubuntu/comfyui/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/root/projects/comfyui-minimax-h3-studio
+# Reuse the ComfyUI venv (already ships aiohttp / psutil -> zero extra deps),
+# matching the README's "run with ComfyUI's own python" approach.
+ExecStart=/home/ubuntu/comfyui/venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

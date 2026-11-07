@@ -15,6 +15,12 @@ import re
 import shutil
 import sqlite3
 import subprocess
+
+# --- 平台兼容补丁（Linux/macOS）---
+# 原仓库为 Windows 专用：subprocess.CREATE_NO_WINDOW 是 Windows 专有属性，
+# 在 POSIX 上访问即 AttributeError，会让 /api/hardware、/api/longfilms 直接 500。
+# POSIX 下 creationflags=0 是合法的（等价于不传），所以统一替换为常量 0。
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 import time
 import uuid
 from pathlib import Path
@@ -496,7 +502,7 @@ def _probe_video_size(path: Path) -> tuple[int, int]:
     raw = subprocess.check_output(
         [FFPROBE, "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height", "-of", "json", str(path)],
-        encoding="utf-8", timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
+        encoding="utf-8", timeout=15, creationflags=CREATE_NO_WINDOW)
     stream = (json.loads(raw).get("streams") or [{}])[0]
     width = max(2, int(stream.get("width") or 864)) // 2 * 2
     height = max(2, int(stream.get("height") or 480)) // 2 * 2
@@ -542,7 +548,7 @@ async def run_longfilm(job_id: str):
                              (0.25, f"正在合成 {len(paths)} 个片段", job_id))
             process = await asyncio.create_subprocess_exec(
                 *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW)
+                creationflags=CREATE_NO_WINDOW)
             LONGFILM_PROCESSES[job_id] = process
             _, stderr = await process.communicate()
             LONGFILM_PROCESSES.pop(job_id, None)
@@ -774,7 +780,7 @@ def _gpu_info():
              "--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu,"
              "temperature.gpu,power.draw,power.limit,driver_version,clocks.current.graphics",
              "--format=csv,noheader,nounits"],
-            encoding="utf-8", timeout=4, creationflags=subprocess.CREATE_NO_WINDOW)
+            encoding="utf-8", timeout=4, creationflags=CREATE_NO_WINDOW)
         gpus = []
         for line in out.strip().splitlines():
             p = [x.strip() for x in line.split(",")]
