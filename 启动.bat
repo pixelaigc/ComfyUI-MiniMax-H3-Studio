@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title H3 Studio
+title ComfyUI-MiniMax-H3 Studio
 cd /d %~dp0
 
 echo ============================================
-echo   H3 Studio - 本地视频生成工作台
+echo   ComfyUI-MiniMax-H3 Studio - 本地视频生成工作台
 echo ============================================
 
 REM ====== 按需修改：你的 ComfyUI 安装目录（含 python_embeded 的那层） ======

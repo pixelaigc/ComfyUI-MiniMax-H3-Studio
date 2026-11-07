@@ -1,4 +1,4 @@
-# H3 Studio — 本地视频生成工作台
+# ComfyUI-MiniMax-H3 Studio — 本地视频生成工作台
 
 仿 [minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio) 的本地 Web 工作台，驱动本机 ComfyUI 出片。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。零额外依赖：直接复用 ComfyUI 自带的 Python 运行。
 
@@ -18,13 +18,13 @@ ComfyUI 能力很强，但它是一张给工程师用的节点图，直接拿来
 
 ## 界面
 
-![H3 Studio v1.00 — 主界面：左侧模式与参数面板，右侧已完成任务卡片流](docs/images/h3-studio-v1.00.png)
+![ComfyUI-MiniMax-H3 Studio v1.00 — 主界面：左侧模式与参数面板，右侧已完成任务卡片流](docs/images/h3-studio-v1.00.png)
 
-*H3 Studio v1.00 实机截图（作者本地生产环境）。左：模式与参数面板；右：已完成任务卡片流（此页为文生视频作品），可直接播放、下载、复用参数或删除。*
+*ComfyUI-MiniMax-H3 Studio v1.00 实机截图（作者本地生产环境）。左：模式与参数面板；右：已完成任务卡片流（此页为文生视频作品），可直接播放、下载、复用参数或删除。*
 
 截图里可以看到：
 
-- **顶栏**：`PixelAIGC MiniMax-H3 Studio v1.00`，右侧状态点显示「空闲」
+- **顶栏**：`PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00`，右侧状态点显示「空闲」
 - **任务区**：进行中 / 已完成 / 长片 / 失败 / 已取消分页，可按提示词与任务 ID 搜索，并按类型、比例、时长筛选
 
 - **顶栏**：右侧实时显示「Generating, N 排队 / 空闲 / ComfyUI 未连接」
@@ -86,7 +86,7 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
    把下面这段原样粘贴给你的 AI 智能体（如 Muse、Cursor 等），它会按你这台电脑的实际情况完成安装：
 
    ```text
-   请根据我本地电脑的实际情况，把 H3 Studio 安装到 D:\h3s：
+   请根据我本地电脑的实际情况，把 ComfyUI-MiniMax-H3 Studio 安装到 D:\h3s：
    仓库地址：https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio
    要求：
    1) 先检查本机 ComfyUI 的安装目录和运行状态（默认 127.0.0.1:8188），再克隆仓库到 D:\h3s（目录已存在则先确认里面是什么，不要直接覆盖）；

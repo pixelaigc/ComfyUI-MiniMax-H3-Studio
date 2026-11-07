@@ -679,7 +679,7 @@ async def main():
     await site.start()
     print(f"""
 ==============================================
-  H3 Studio 已启动
+  ComfyUI-MiniMax-H3 Studio 已启动
   本机访问:   http://127.0.0.1:{CFG['port']}
   局域网访问: http://<本机IP>:{CFG['port']}
   ComfyUI:    {COMFY}
