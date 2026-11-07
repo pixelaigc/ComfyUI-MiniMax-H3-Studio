@@ -114,6 +114,15 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
 4. **双击仓库目录下的 `启动.bat`**：脚本会自动探测 ComfyUI 自带的 Python 运行 `server.py`（零额外依赖）。如果你的 ComfyUI 不在脚本默认的 `D:\ComfyUI`，先用记事本把 `启动.bat` 里的 `COMFY_DIR` 改成你的实际目录；没启动 ComfyUI 时脚本会先提醒，并询问是否仍要启动 Studio。
 5. **浏览器打开 `http://127.0.0.1:8190`** 即可使用；局域网内的手机也可以访问 `http://<本机IP>:8190`。
 
+**关闭 Studio**：服务是在后台独立运行的，关掉浏览器页面、关掉启动窗口都不会停它（启动窗口按任意键消失后，服务照样在跑）。要真正关闭，先查 8190 端口的进程号，再结束它：
+
+```bat
+netstat -ano | findstr :8190
+taskkill /PID <LISTENING 那一行的进程号> /F
+```
+
+认准 `LISTENING` 那行的 PID，别误杀 `ESTABLISHED` 另一端的号码（那是浏览器）。也可以在任务管理器里结束对应的 python 进程。注意这只关 Studio，ComfyUI（8188）是另一个程序，要单独关闭。
+
 ## 数据
 
 - `data/jobs.db` — 任务队列与历史（SQLite）
