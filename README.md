@@ -134,6 +134,7 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | `/api/jobs` | multipart 提交任务（mode + params JSON + 图片文件） |
+| POST | `/api/longfilms` | 长片拼接：提交已生成片段，ffmpeg 拼接为一条长片 |
 | GET | `/api/jobs?status=` | 任务列表（queued/running/done/failed/canceled/all） |
 | POST | `/api/jobs/{id}/cancel` | 取消（排队从队列删，运行中触发 interrupt） |
 | DELETE | `/api/jobs/{id}` | 删除已完成记录及输出 |

@@ -21,7 +21,7 @@ UNET = {
     "ref2va": {"int8": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
                "nvfp4": "MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors"},
 }
-CLIP = {"int8": "qwen3vl_32b_minimax_h3_int4_convrot.safetensors",
+CLIP = {"int8": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
         "nvfp4": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"}
 VAE_VIDEO = "minimax_h3_video_vae_fp16.safetensors"
 VAE_AUDIO = "minimax_h3_audio_vae_fp32.safetensors"
@@ -146,9 +146,19 @@ def _h3_video_workflow(params, image_inputs=None):
     }
     if image_inputs:
         if image_inputs.get("first_frame"):
-            img_node_inputs["first_frame"] = [image_inputs["first_frame"], 0]
+            p["105:201"] = {
+                "inputs": {"image": image_inputs["first_frame"]},
+                "class_type": "LoadImage",
+                "_meta": {"title": "加载首帧"},
+            }
+            img_node_inputs["first_frame"] = ["105:201", 0]
         if image_inputs.get("last_frame"):
-            img_node_inputs["last_frame"] = [image_inputs["last_frame"], 0]
+            p["105:202"] = {
+                "inputs": {"image": image_inputs["last_frame"]},
+                "class_type": "LoadImage",
+                "_meta": {"title": "加载尾帧"},
+            }
+            img_node_inputs["last_frame"] = ["105:202", 0]
 
     p["105:104"] = {"inputs": img_node_inputs, "class_type": "MiniMaxH3ImageToVideo",
                     "_meta": {"title": "H3 条件"}}
@@ -212,11 +222,15 @@ def build_r2v(params):
     p["119"] = {"inputs": {"vae_name": VAE_VIDEO}, "class_type": "VAELoader"}
     p["120"] = {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader"}
 
-    ref_inputs = {"ref_image_0": params["ref_images"][0]}
-    if len(params["ref_images"]) > 1:
-        ref_inputs["ref_image_1"] = params["ref_images"][1]
-    if len(params["ref_images"]) > 2:
-        ref_inputs["ref_image_2"] = params["ref_images"][2]
+    ref_inputs = {}
+    for index, filename in enumerate(params["ref_images"][:3]):
+        node_id = f"136:{201 + index}"
+        p[node_id] = {
+            "inputs": {"image": filename},
+            "class_type": "LoadImage",
+            "_meta": {"title": f"加载参考图 {index + 1}"},
+        }
+        ref_inputs[f"ref_image_{index}"] = [node_id, 0]
 
     p["136"] = {
         "inputs": {
@@ -224,7 +238,7 @@ def build_r2v(params):
             "prompt": params.get("prompt", ""),
             "width": ["115", 0], "height": ["115", 1],
             "ref_image_size": "match",
-            **{f"ref_images.{k}": [v, 0] for k, v in ref_inputs.items()},
+            **{f"ref_images.{k}": v for k, v in ref_inputs.items()},
         },
         "class_type": "MiniMaxH3ReferenceToVideo",
         "_meta": {"title": "H3 参考生成"},

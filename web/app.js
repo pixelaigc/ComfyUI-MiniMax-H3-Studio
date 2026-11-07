@@ -7,19 +7,23 @@ const MODE_INFO = {
   flf: { name: "首尾帧", kind: "video" },
   r2v: { name: "参考生成", kind: "video" },
   t2i: { name: "Z-IMAGE 文生图", kind: "image" },
+  longfilm: { name: "长片", kind: "video" },
 };
 
 const state = {
   mode: "t2v",
-  tab: "active",
+  tab: "done",
   page: "create",
-  res: "768p",
+  res: "544p",
   model: "lora",
-  lora: "v4step600",
+  lora: "ckpt850",
   loraStrength: 1.0,
   aspect: "16:9",
   duration: 5,
-  steps: 4,
+  steps: 6,
+  donePage: 1,
+  doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
+  stitchClips: [],
   files: { first: null, last: null, refs: [] },
   timer: null,
 };
@@ -39,30 +43,64 @@ function renderMode() {
   // 上传区
   const zone = $("#uploadZone"), row = $("#uploadRow");
   row.innerHTML = "";
-  const mk = (key, label, multi) => {
+  const mk = (key, label) => {
     const slot = document.createElement("div");
     slot.className = "up-slot";
     slot.innerHTML = `+<span class="tag">${label}</span>`;
     const inp = document.createElement("input");
     inp.type = "file"; inp.accept = "image/*";
-    inp.addEventListener("change", e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const url = URL.createObjectURL(f);
-      slot.innerHTML = `<img src="${url}"><span class="tag">${label}</span>`;
+    const fillSlot = (file, previewUrl) => {
+      const url = previewUrl || URL.createObjectURL(file);
+      slot.replaceChildren();
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = label;
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = label;
+      slot.append(image, tag);
       slot.classList.add("filled");
-      state.files[key] = f;
+      state.files[key] = file;
+    };
+    inp.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (file) fillSlot(file);
     });
-    slot.appendChild(inp);
+    slot.addEventListener("dragover", event => {
+      if (!event.dataTransfer.types.includes("application/x-h3-image")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      slot.classList.add("drag-over");
+    });
+    slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
+    slot.addEventListener("drop", async event => {
+      const raw = event.dataTransfer.getData("application/x-h3-image");
+      if (!raw) return;
+      event.preventDefault();
+      slot.classList.remove("drag-over");
+      slot.classList.add("loading");
+      try {
+        const source = JSON.parse(raw);
+        const response = await fetch(source.url, {cache: "no-store"});
+        if (!response.ok) throw new Error("图片读取失败");
+        const blob = await response.blob();
+        const file = new File([blob], source.name || "completed-image.png", {type: blob.type || "image/png"});
+        fillSlot(file, source.url);
+      } catch (error) {
+        alert("无法引用这张图片：" + error.message);
+      } finally {
+        slot.classList.remove("loading");
+      }
+    });
     slot.addEventListener("click", () => inp.click());
     row.appendChild(slot);
   };
   if (mode === "flf") {
-    $("#uploadTitle").textContent = "上传首帧与尾帧（尾帧可省略）";
+    $("#uploadTitle").textContent = "上传首帧与尾帧，或从已完成图片拖入（尾帧可省略）";
     zone.style.display = "block";
     mk("first", "首帧"); mk("last", "尾帧");
   } else if (mode === "r2v") {
-    $("#uploadTitle").textContent = "上传参考图（1~3 张，保持主体一致）";
+    $("#uploadTitle").textContent = "上传参考图，或从已完成图片拖入（1~3 张）";
     zone.style.display = "block";
     mk("ref0", "参考 1"); mk("ref1", "参考 2"); mk("ref2", "参考 3");
   } else {
@@ -73,6 +111,7 @@ function renderMode() {
   $("#durField").style.display = isVideo ? "" : "none";
   $("#modelField").style.display = isVideo ? "" : "none";
   $("#stepsField").style.display = isVideo ? "" : "none";
+  updateSeedStrengthLayout();
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
 }
@@ -90,6 +129,7 @@ bindSeg("#resSeg", "res");
 bindSeg("#aspectChips", "aspect");
 bindSeg("#modelCards", "model", () => {
   $("#loraField").style.display = state.model === "lora" ? "" : "none";
+  updateSeedStrengthLayout();
   setDefaultSteps();
 });
 bindSeg("#loraCards", "lora");
@@ -102,10 +142,15 @@ $("#steps").addEventListener("input", e => {
   $("#stepsVal").textContent = state.steps;
 });
 function setDefaultSteps() {
-  const def = state.model === "lora" ? 4 : 20;
+  const def = state.model === "lora" ? 6 : 20;
   state.steps = def;
   $("#steps").value = def;
   $("#stepsVal").textContent = def;
+}
+function updateSeedStrengthLayout() {
+  const showStrength = MODE_INFO[state.mode].kind === "video" && state.model === "lora";
+  $("#loraStrengthField").style.display = showStrength ? "" : "none";
+  $("#seedStrengthPair").classList.toggle("seed-only", !showStrength);
 }
 $("#duration").addEventListener("input", e => {
   state.duration = parseInt(e.target.value);
@@ -158,9 +203,11 @@ $("#genBtn").addEventListener("click", async () => {
 // ---------- 任务列表 ----------
 function renderTabs() {
   $$(".jobs-tabs button").forEach(b => b.classList.toggle("active", b.dataset.st === state.tab));
+  $("#doneFilters").hidden = state.tab !== "done";
 }
 $$(".jobs-tabs button").forEach(b => b.addEventListener("click", () => {
   state.tab = b.dataset.st;
+  if (["done", "longfilm"].includes(state.tab)) state.donePage = 1;
   showCreate();
   renderTabs();
   refreshJobs();
@@ -183,6 +230,12 @@ function modelLabel(p) {
   return `H3 + ${p.lora === "ckpt850" ? "ckpt850" : "v4-step600"} · ${steps}步`;
 }
 
+function outputUrl(job, output) {
+  const relative = String(output.file || "").replace(/\\/g, "/");
+  const path = relative.includes("/") ? relative : `${job.id}/${relative}`;
+  return "/files/" + path.split("/").map(encodeURIComponent).join("/");
+}
+
 function jobCard(job) {
   const p = job.params || {};
   const info = MODE_INFO[job.mode] || { name: job.mode };
@@ -197,9 +250,9 @@ function jobCard(job) {
   const video = (job.outputs || []).find(o => o.kind === "video");
   const image = (job.outputs || []).find(o => o.kind === "image");
   if (video) {
-    preview = `<video src="/files/${job.id}/${video.file}" controls preload="metadata"></video>`;
+    preview = `<video src="${outputUrl(job, video)}" controls preload="metadata"></video>`;
   } else if (image) {
-    preview = `<img src="/files/${job.id}/${image.file}">`;
+    preview = `<img src="${outputUrl(job, image)}">`;
   } else if (runningOrQueued) {
     preview = `<div class="progress-wrap">
       <div class="progress-bar"><div style="width:${Math.round(prog * 100)}%"></div></div>
@@ -212,31 +265,80 @@ function jobCard(job) {
   }
 
   const topRight = runningOrQueued
-    ? `<button class="cancel-btn" data-act="cancel">✕ Cancel</button>`
+    ? `<button class="cancel-btn" data-act="cancel">取消</button>`
     : `<span>${fmtTime(job.created_at)}</span>`;
 
   card.dataset.jid = job.id;
   card.innerHTML = `
-    <div class="job-top"><span>${info.name} · ${fmtTime(job.created_at)}</span>${topRight}</div>
+    <div class="job-top"><span>${job.mode === "longfilm" ? "长片 · " + escapeHtml(p.title || "未命名") : info.name} · ${fmtTime(job.created_at)}</span>${topRight}</div>
     <div class="job-preview">${preview}</div>
     ${job.status === "failed" ? "" : `<div class="job-meta">
+      ${job.mode === "longfilm" ? `
+      <div class="row"><span>标题</span><b>${escapeHtml(p.title || "未命名")}</b></div>
+      <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
+      <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
       <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
       <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}
-      <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>
+      <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
-      <div class="row" style="max-width:100%"><span style="flex:0 0 auto">提示词</span><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((p.prompt || "").slice(0, 60))}</b></div>
+      ${job.mode !== "longfilm" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : ""}
     </div>`}
     <div class="job-actions">
       ${video || image ? `<button data-act="download">⬇ 下载</button>` : ""}
-      <button data-act="reuse">复用参数</button>
+      ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
+      ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
 
-  card.querySelector('[data-act="cancel"]')?.addEventListener("click", async () => {
-    await fetch(`/api/jobs/${job.id}/cancel`, { method: "POST" });
-    refreshJobs();
+  if (image) {
+    const dragImage = card.querySelector(".job-preview img");
+    const source = {url: outputUrl(job, image), name: String(image.file || "completed-image.png").split(/[\\/]/).pop()};
+    dragImage.draggable = true;
+    dragImage.title = "拖到左侧参考图、首帧或尾帧位置";
+    dragImage.addEventListener("dragstart", event => {
+      event.dataTransfer.effectAllowed = "copy";
+      event.dataTransfer.setData("application/x-h3-image", JSON.stringify(source));
+      event.dataTransfer.setData("text/uri-list", new URL(source.url, location.href).href);
+      card.classList.add("dragging-image");
+    });
+    dragImage.addEventListener("dragend", () => card.classList.remove("dragging-image"));
+  }
+  if (video && job.status === "done") {
+    const source = {jobId: job.id, file: video.file, name: String(video.file || "video.mp4").split(/[\\/]/).pop(),
+      url: outputUrl(job, video), duration: Number(p.duration || 0), title: p.title || info.name};
+    const dragVideo = card.querySelector(".job-preview video");
+    dragVideo.draggable = false;
+    card.draggable = true;
+    card.title = "整张卡片可拖到左侧长片拼接区";
+    card.addEventListener("dragstart", event => {
+      if (event.target.closest("button")) { event.preventDefault(); return; }
+      event.dataTransfer.effectAllowed = "copy";
+      event.dataTransfer.setData("application/x-h3-video", JSON.stringify(source));
+      card.classList.add("dragging-image");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging-image"));
+    card.querySelector('[data-act="add-stitch"]')?.addEventListener("click", () => {
+      state.stitchClips.push(source);
+      renderStitchClips();
+      $("#stitchPanel").scrollTo({top: $("#stitchPanel").scrollHeight, behavior: "smooth"});
+    });
+  }
+
+  card.querySelector('[data-act="cancel"]')?.addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "正在取消…";
+    try {
+      const resp = await fetch(`/api/jobs/${job.id}/cancel`, {method:"POST"});
+      if (!resp.ok) throw new Error((await resp.json()).error || "取消失败");
+      await refreshJobs();
+    } catch (err) {
+      button.disabled = false;
+      button.textContent = "取消";
+      alert(err.message);
+    }
   });
   card.querySelector('[data-act="delete"]')?.addEventListener("click", async () => {
     if (!confirm("删除该记录及输出文件？")) return;
@@ -246,10 +348,11 @@ function jobCard(job) {
   card.querySelector('[data-act="download"]')?.addEventListener("click", () => {
     const f = video || image;
     const a = document.createElement("a");
-    a.href = `/files/${job.id}/${f.file}`;
-    a.download = f.name;
+    a.href = outputUrl(job, f);
+    a.download = f.file.split(/[\\/]/).pop();
     a.click();
   });
+  card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => openPromptModal(p.prompt || ""));
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
     // 找到对应模式侧栏项并切换
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
@@ -259,12 +362,44 @@ function jobCard(job) {
     if (p.duration) { state.duration = p.duration; $("#duration").value = p.duration; $("#durVal").textContent = p.duration + "s"; }
     if (p.steps) { state.steps = p.steps; $("#steps").value = p.steps; $("#stepsVal").textContent = p.steps; }
     if (p.seed) $("#seed").value = p.seed;
-    if (p.model) { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; }
+    if (p.model) { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; updateSeedStrengthLayout(); }
     if (p.lora) { setSeg("#loraCards", p.lora); state.lora = p.lora; }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
   return card;
 }
+
+function openPromptModal(prompt) {
+  $("#promptModalText").value = prompt;
+  $("#promptModal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closePromptModal() {
+  $("#promptModal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+$("#promptModalClose").addEventListener("click", closePromptModal);
+$("#promptModal").addEventListener("click", event => {
+  if (event.target === $("#promptModal")) closePromptModal();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !$("#promptModal").hidden) closePromptModal();
+});
+$("#promptCopy").addEventListener("click", async () => {
+  const textArea = $("#promptModalText");
+  const button = $("#promptCopy");
+  try {
+    await navigator.clipboard.writeText(textArea.value);
+  } catch (_) {
+    textArea.focus();
+    textArea.select();
+    document.execCommand("copy");
+  }
+  button.textContent = "已复制";
+  setTimeout(() => { button.textContent = "复制提示词"; }, 1200);
+});
 
 function setSeg(sel, val) {
   $$(sel + " button").forEach(b => b.classList.toggle("active", b.dataset.v === val));
@@ -279,27 +414,106 @@ function jobSig(j) {
     (j.outputs || []).map(o => o.file).join(",")].join("|");
 }
 
+let jobsRequest = 0;
+let displayedTab = null;
+const DONE_PAGE_SIZE = 8;
+let filterDebounce = null;
+
+function applyDoneFilters() {
+  state.doneFilters = {
+    keyword: $("#doneSearch").value.trim(),
+    media: $("#doneMedia").value,
+    aspect: $("#doneAspect").value,
+    duration: $("#doneDuration").value,
+  };
+  state.donePage = 1;
+  refreshJobs();
+}
+
+$("#doneSearch").addEventListener("input", () => {
+  clearTimeout(filterDebounce);
+  filterDebounce = setTimeout(applyDoneFilters, 280);
+});
+["#doneMedia", "#doneAspect", "#doneDuration"].forEach(selector => {
+  $(selector).addEventListener("change", applyDoneFilters);
+});
+$("#doneFilterReset").addEventListener("click", () => {
+  $("#doneSearch").value = "";
+  $("#doneMedia").value = "";
+  $("#doneAspect").value = "";
+  $("#doneDuration").value = "";
+  applyDoneFilters();
+});
+
+function renderDonePagination(total, currentPage) {
+  const pager = $("#jobsPagination");
+  if (!["done", "longfilm"].includes(state.tab) || total <= DONE_PAGE_SIZE) {
+    pager.hidden = true;
+    pager.innerHTML = "";
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(total / DONE_PAGE_SIZE));
+  const pages = [];
+  for (let page = 1; page <= totalPages; page++) {
+    if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1) pages.push(page);
+  }
+  const controls = [`<button data-page="${currentPage - 1}" ${currentPage === 1 ? "disabled" : ""}>上一页</button>`];
+  let previous = 0;
+  pages.forEach(page => {
+    if (previous && page - previous > 1) controls.push('<span class="page-summary">…</span>');
+    controls.push(`<button data-page="${page}" class="${page === currentPage ? "active" : ""}">${page}</button>`);
+    previous = page;
+  });
+  controls.push(`<button data-page="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>下一页</button>`);
+  controls.push(`<span class="page-summary">共 ${total} 个作品</span>`);
+  pager.innerHTML = controls.join("");
+  pager.hidden = false;
+  pager.querySelectorAll("button[data-page]").forEach(button => button.addEventListener("click", () => {
+    if (button.disabled) return;
+    state.donePage = Number(button.dataset.page);
+    refreshJobs();
+    $("#jobsArea").scrollTo({top: 0, behavior: "smooth"});
+  }));
+}
+
 async function refreshJobs() {
   if (state.page === "system") return;
+  const tab = state.tab;
+  const ticket = ++jobsRequest;
+  const grid = $("#jobsGrid");
+  if (displayedTab !== tab) {
+    grid.textContent = "正在读取任务…";
+    displayedTab = tab;
+  }
   try {
-    let url = state.tab === "active" ? "/api/jobs?status=all" : `/api/jobs?status=${state.tab}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    let jobs = data.jobs || [];
-    if (state.tab === "active") jobs = jobs.filter(j => ["queued", "running"].includes(j.status));
-    const grid = $("#jobsGrid");
-
-    if (!jobs.length) {
-      const hint = `<div class="empty-hint">${
-        state.tab === "active" ? "暂无进行中的任务，左侧选个模式开始创作吧" :
-        state.tab === "done" ? "还没有已完成的生成记录" : "没有失败记录，一切正常 🎉"}</div>`;
-      if (grid.firstElementChild?.classList?.contains("empty-hint")) {
-        if (grid.firstElementChild.textContent !== hint.replace(/<[^>]+>/g, "")) grid.innerHTML = hint;
-      } else {
-        grid.innerHTML = hint;
+    const statuses = tab === "active" ? ["queued", "running"] : [tab === "longfilm" ? "done" : tab];
+    const groups = await Promise.all(statuses.map(async status => {
+      const query = new URLSearchParams({status});
+      if (status === "done") {
+        query.set("page", state.donePage);
+        query.set("page_size", DONE_PAGE_SIZE);
+        if (tab === "longfilm") query.set("media", "longfilm");
+        else Object.entries(state.doneFilters).forEach(([key, value]) => { if (value) query.set(key, value); });
       }
+      const response = await fetch("/api/jobs?" + query.toString(), {cache: "no-store"});
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      return {jobs: data.jobs.filter(job => job.status === status), total: data.total ?? data.jobs.length, page: data.page ?? 1};
+    }));
+    if (ticket !== jobsRequest || tab !== state.tab) return;
+    if (["done", "longfilm"].includes(tab)) {
+      state.donePage = groups[0].page;
+      renderDonePagination(groups[0].total, state.donePage);
+    } else {
+      renderDonePagination(0, 1);
+    }
+    const jobs = [...new Map(groups.flatMap(group => group.jobs).map(job => [job.id, job])).values()]
+      .sort((a,b) => (b.status === "running") - (a.status === "running") || b.created_at - a.created_at);
+    if (!jobs.length) {
+      grid.innerHTML = '<div class="empty-hint">' + ({active:"当前没有排队或生成中的任务", done:"暂无已完成的任务", longfilm:"暂无已合成的长片", failed:"暂无失败的任务", canceled:"暂无已取消的任务"}[tab]) + '</div>';
       return;
     }
+    for (const node of [...grid.childNodes]) if (!node.dataset?.jid) node.remove();
 
     // 增量更新：数据未变化的卡片不重建，避免打断视频播放
     const existing = new Map();
@@ -321,8 +535,109 @@ async function refreshJobs() {
       grid.appendChild(el);
     });
     existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
-  } catch (e) { /* 静默重试 */ }
+  } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
+
+// ---------- 长片拼接 ----------
+function renderStitchClips() {
+  const list = $("#stitchList");
+  list.innerHTML = "";
+  state.stitchClips.forEach((clip, index) => {
+    const item = document.createElement("div");
+    item.className = "stitch-clip";
+    item.draggable = true;
+    item.dataset.index = index;
+    item.innerHTML = `<span class="stitch-index">${index + 1}</span>
+      <video class="stitch-thumb" src="${clip.url}" muted preload="metadata"></video>
+      <span class="stitch-clip-info"><b>${escapeHtml(clip.title || clip.name)}</b><span>${clip.duration ? clip.duration + " 秒" : "视频片段"}</span></span>
+      <button class="stitch-remove" title="移除">×</button>`;
+    item.querySelector("video").draggable = false;
+    item.querySelector(".stitch-remove").addEventListener("click", () => {
+      state.stitchClips.splice(index, 1);
+      renderStitchClips();
+    });
+    item.addEventListener("dragstart", event => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/x-h3-clip-index", String(index));
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", event => {
+      if (!event.dataTransfer.types.includes("application/x-h3-clip-index")) return;
+      event.preventDefault();
+      item.classList.add("drag-target");
+    });
+    item.addEventListener("dragleave", () => item.classList.remove("drag-target"));
+    item.addEventListener("drop", event => {
+      const from = Number(event.dataTransfer.getData("application/x-h3-clip-index"));
+      if (!Number.isInteger(from)) return;
+      event.preventDefault();
+      item.classList.remove("drag-target");
+      const [moved] = state.stitchClips.splice(from, 1);
+      state.stitchClips.splice(index, 0, moved);
+      renderStitchClips();
+    });
+    list.appendChild(item);
+  });
+  const total = state.stitchClips.reduce((sum, clip) => sum + Number(clip.duration || 0), 0);
+  $("#stitchSummary").textContent = state.stitchClips.length
+    ? `已选择 ${state.stitchClips.length} 个片段${total ? ` · 预计 ${total} 秒` : ""}`
+    : "尚未选择片段";
+  $("#stitchBtn").disabled = state.stitchClips.length < 2;
+}
+
+const stitchDrop = $("#stitchDrop");
+stitchDrop.addEventListener("dragover", event => {
+  if (!event.dataTransfer.types.includes("application/x-h3-video")) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+  stitchDrop.classList.add("drag-over");
+});
+stitchDrop.addEventListener("dragleave", () => stitchDrop.classList.remove("drag-over"));
+stitchDrop.addEventListener("drop", event => {
+  const raw = event.dataTransfer.getData("application/x-h3-video");
+  if (!raw) return;
+  event.preventDefault();
+  stitchDrop.classList.remove("drag-over");
+  try {
+    state.stitchClips.push(JSON.parse(raw));
+    renderStitchClips();
+  } catch (_) {
+    alert("无法读取这个视频片段");
+  }
+});
+
+$("#stitchBtn").addEventListener("click", async () => {
+  const title = $("#longfilmTitle").value.trim();
+  const intro = $("#longfilmIntro").value.trim();
+  if (!title) { alert("请填写长片标题"); return; }
+  if (state.stitchClips.length < 2) { alert("至少拖入 2 个视频片段"); return; }
+  const button = $("#stitchBtn");
+  button.disabled = true;
+  button.textContent = "正在提交…";
+  try {
+    const response = await fetch("/api/longfilms", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({title, intro,
+        duration: state.stitchClips.reduce((sum, clip) => sum + Number(clip.duration || 0), 0),
+        clips: state.stitchClips.map(clip => ({job_id: clip.jobId, file: clip.file, name: clip.name}))})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "提交失败");
+    state.stitchClips = [];
+    $("#longfilmTitle").value = "";
+    $("#longfilmIntro").value = "";
+    renderStitchClips();
+    state.tab = "longfilm";
+    renderTabs();
+    refreshJobs();
+  } catch (error) {
+    alert("长片合成提交失败：" + error.message);
+  } finally {
+    button.textContent = "合成长片";
+    button.disabled = state.stitchClips.length < 2;
+  }
+});
 
 // ---------- 状态栏 ----------
 async function refreshSystem() {
@@ -359,7 +674,24 @@ function showCreate() {
   state.page = "create";
   $("#jobsArea").style.display = "";
   $("#panel").style.display = "";
+  $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "none";
+}
+
+function showStitch() {
+  state.page = "stitch";
+  $$(".nav-item").forEach(x => x.classList.remove("active"));
+  $("#navStitch").classList.add("active");
+  $("#jobsArea").style.display = "";
+  $("#panel").style.display = "none";
+  $("#stitchPanel").style.display = "";
+  $("#systemPage").style.display = "none";
+  state.tab = "done";
+  state.doneFilters.media = "video";
+  $("#doneMedia").value = "video";
+  renderTabs();
+  renderStitchClips();
+  refreshJobs();
 }
 
 function showSystem() {
@@ -368,11 +700,13 @@ function showSystem() {
   $("#navSystem").classList.add("active");
   $("#jobsArea").style.display = "none";
   $("#panel").style.display = "none";
+  $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "block";
   refreshHardware();
 }
 
 $("#navSystem").addEventListener("click", showSystem);
+$("#navStitch").addEventListener("click", showStitch);
 $("#sysRefresh").addEventListener("click", () => { refreshHardware(true); });
 
 function fmtBytes(b) {
@@ -485,6 +819,7 @@ setInterval(() => { if (state.page === "system") refreshHardware(); }, 3000);
 // ---------- 启动 ----------
 renderMode();
 renderTabs();
+renderStitchClips();
 refreshJobs();
 refreshSystem();
 setInterval(refreshJobs, 2000);

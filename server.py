@@ -7,6 +7,7 @@ aiohttp 常驻服务 + SQLite FIFO 队列，通过 HTTP API 驱动本机 ComfyUI
   d:\\cfup\\python_embeded\\python.exe server.py
 """
 import asyncio
+import hashlib
 import json
 import os
 import platform
@@ -55,8 +56,10 @@ CFG = load_config()
 DATA = Path(CFG["data_dir"])
 OUT_DIR = DATA / "outputs"
 UPLOAD_DIR = DATA / "uploads"
+VIDEO_DIR = OUT_DIR / "videos"
+IMAGE_DIR = OUT_DIR / "images"
 DB_PATH = DATA / "jobs.db"
-for d in (DATA, OUT_DIR, UPLOAD_DIR):
+for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # ------------------------------------------------------------------ DB
@@ -106,6 +109,11 @@ def row_to_job(r):
 # ------------------------------------------------------------------ ComfyUI client
 COMFY = CFG["comfyui_url"].rstrip("/")
 HTTP_TIMEOUT = ClientTimeout(total=600)
+FFMPEG = shutil.which("ffmpeg")
+FFPROBE = shutil.which("ffprobe")
+LONGFILM_LOCK = asyncio.Lock()
+LONGFILM_TASKS = set()
+LONGFILM_PROCESSES = {}
 
 
 async def comfy_upload_image(session: ClientSession, path: Path) -> str:
@@ -154,14 +162,74 @@ def _extract_outputs(history_entry):
     return outs
 
 
-async def comfy_download_output(session: ClientSession, job_id: str, item: dict) -> str:
+def _next_output_path(kind: str, suffix: str) -> Path:
+    """为新输出分配稳定、易检索的顺序文件名。"""
+    if kind == "image":
+        dest_dir, prefix = IMAGE_DIR, "i-zimage-"
+    elif kind == "longfilm":
+        dest_dir, prefix = VIDEO_DIR, "v-l-"
+    else:
+        dest_dir, prefix = VIDEO_DIR, "v-h3-studio-"
+    pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$", re.IGNORECASE)
+    highest = 0
+    for path in dest_dir.iterdir():
+        if not path.is_file():
+            continue
+        match = pattern.match(path.stem)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return dest_dir / f"{prefix}{highest + 1:06d}{suffix.lower()}"
+
+
+async def comfy_download_output(session: ClientSession, item: dict) -> str:
     params = {"filename": item["filename"], "subfolder": item["subfolder"], "type": item["type"]}
-    dest_dir = OUT_DIR / job_id
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / item["filename"]
+    suffix = Path(item["filename"]).suffix or (".png" if item["kind"] == "image" else ".mp4")
+    dest = _next_output_path(item["kind"], suffix)
     async with session.get(f"{COMFY}/view", params=params) as resp:
+        resp.raise_for_status()
         dest.write_bytes(await resp.read())
-    return dest.name
+    return dest.relative_to(OUT_DIR).as_posix()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+async def save_uploaded_image(part) -> str:
+    """保存上传图片；内容相同则复用 uploads 中已有文件。"""
+    suffix = Path(part.filename or "image.png").suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".bmp"}:
+        suffix = ".png"
+    temp = UPLOAD_DIR / f".upload-{uuid.uuid4().hex}.tmp"
+    digest = hashlib.sha256()
+    with temp.open("wb") as handle:
+        while True:
+            chunk = await part.read_chunk(1024 * 256)
+            if not chunk:
+                break
+            digest.update(chunk)
+            handle.write(chunk)
+    fingerprint = digest.hexdigest()
+    canonical = UPLOAD_DIR / f"img-{fingerprint[:20]}{suffix}"
+    if canonical.exists():
+        temp.unlink(missing_ok=True)
+        return canonical.name
+    # 兼容升级前的随机命名：若内容已经存在，直接复用旧文件。
+    for existing in UPLOAD_DIR.iterdir():
+        if not existing.is_file() or existing == temp or existing.name.startswith(".upload-"):
+            continue
+        try:
+            if existing.stat().st_size == temp.stat().st_size and _file_sha256(existing) == fingerprint:
+                temp.unlink(missing_ok=True)
+                return existing.name
+        except OSError:
+            continue
+    temp.replace(canonical)
+    return canonical.name
 
 
 async def comfy_history(session: ClientSession, prompt_id: str):
@@ -225,6 +293,7 @@ class Worker:
     def __init__(self):
         self.current = None  # 当前运行 job id
         self._task = None
+        self.submit_lock = asyncio.Lock()
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
@@ -245,7 +314,7 @@ class Worker:
 
     def _next_queued(self):
         with db() as conn:
-            r = conn.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created_at LIMIT 1").fetchone()
+            r = conn.execute("SELECT * FROM jobs WHERE status='queued' AND mode!='longfilm' ORDER BY created_at LIMIT 1").fetchone()
             if not r:
                 return None
             conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
@@ -285,9 +354,14 @@ class Worker:
                 params["mode"] = mode
                 workflow = build_workflow(mode, params)
                 client_id = f"h3studio-{job_id}"
-                prompt_id = await comfy_submit(session, workflow, client_id)
-                with db() as conn:
-                    conn.execute("UPDATE jobs SET prompt_id=? WHERE id=?", (prompt_id, job_id))
+                async with self.submit_lock:
+                    with db() as conn:
+                        row = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
+                    if not row or row["status"] != "running":
+                        return
+                    prompt_id = await comfy_submit(session, workflow, client_id)
+                    with db() as conn:
+                        conn.execute("UPDATE jobs SET prompt_id=? WHERE id=?", (prompt_id, job_id))
                 ws_task = asyncio.create_task(
                     ws_progress_listener(session, client_id, prompt_id, job_id, len(workflow)))
 
@@ -299,11 +373,6 @@ class Worker:
                         with db() as conn:
                             st = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
                         if st and st["status"] == "canceled":
-                            try:
-                                await session.post(f"{COMFY}/interrupt")
-                                await session.post(f"{COMFY}/queue", json={"delete": [prompt_id]})
-                            except Exception:
-                                pass
                             print(f"[worker] 任务 {job_id} 已取消")
                             return
 
@@ -314,11 +383,11 @@ class Worker:
                                 outs = _extract_outputs(hist)
                                 saved = []
                                 for item in outs:
-                                    fname = await comfy_download_output(session, job_id, item)
+                                    fname = await comfy_download_output(session, item)
                                     saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
                                 with db() as conn:
                                     conn.execute(
-                                        "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=?",
+                                        "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
                                         (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
                                 print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
                                 return
@@ -339,7 +408,7 @@ class Worker:
         except Exception as e:
             print(f"[worker] 任务 {job_id} 失败: {e}")
             with db() as conn:
-                conn.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=?",
+                conn.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=? AND status='running'",
                              (str(e)[:800], time.time(), job_id))
         finally:
             if self.current == job_id:
@@ -370,14 +439,7 @@ async def api_create(request):
             except Exception:
                 params = {}
         elif part.name in ("file_first", "file_last", "file_ref"):
-            fname = f"{uuid.uuid4().hex[:8]}_{part.filename}"
-            dest = UPLOAD_DIR / fname
-            with open(dest, "wb") as f:
-                while True:
-                    chunk = await part.read_chunk(1024 * 256)
-                    if not chunk:
-                        break
-                    f.write(chunk)
+            fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
     if mode not in ("t2v", "flf", "r2v", "t2i"):
@@ -408,17 +470,189 @@ async def api_create(request):
     return json_ok({"id": job_id, "status": "queued"})
 
 
+def _verified_video_path(job_id: str, relative: str) -> Path | None:
+    """只允许引用已完成任务登记过的视频输出。"""
+    with db() as conn:
+        row = conn.execute("SELECT status, outputs FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row or row["status"] != "done":
+        return None
+    matched = any(
+        output.get("kind") == "video" and output.get("file") == relative
+        for output in json.loads(row["outputs"] or "[]")
+    )
+    if not matched:
+        return None
+    candidate = (OUT_DIR / (relative if "/" in relative else f"{job_id}/{relative}")).resolve()
+    try:
+        candidate.relative_to(OUT_DIR.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def _probe_video_size(path: Path) -> tuple[int, int]:
+    if not FFPROBE:
+        return 864, 480
+    raw = subprocess.check_output(
+        [FFPROBE, "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "json", str(path)],
+        encoding="utf-8", timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
+    stream = (json.loads(raw).get("streams") or [{}])[0]
+    width = max(2, int(stream.get("width") or 864)) // 2 * 2
+    height = max(2, int(stream.get("height") or 480)) // 2 * 2
+    return width, height
+
+
+async def run_longfilm(job_id: str):
+    output_path = None
+    list_path = None
+    try:
+        async with LONGFILM_LOCK:
+            with db() as conn:
+                row = conn.execute("SELECT params, status FROM jobs WHERE id=?", (job_id,)).fetchone()
+                if not row or row["status"] != "queued":
+                    return
+                conn.execute("UPDATE jobs SET status='running', started_at=?, progress=?, progress_text=? WHERE id=?",
+                             (time.time(), 0.05, "准备片段", job_id))
+            if not FFMPEG:
+                raise RuntimeError("未找到 FFmpeg，无法合成长片")
+            params = json.loads(row["params"] or "{}")
+            paths = []
+            for clip in params.get("clips", []):
+                path = _verified_video_path(str(clip.get("job_id", "")), str(clip.get("file", "")))
+                if not path:
+                    raise RuntimeError("有片段已被删除或无法读取")
+                paths.append(path)
+            if len(paths) < 2:
+                raise RuntimeError("长片至少需要 2 个视频片段")
+            width, height = await asyncio.to_thread(_probe_video_size, paths[0])
+            list_path = DATA / f"concat-{job_id}.txt"
+            def quote_concat(path):
+                return str(path).replace("'", "'\\''")
+            list_path.write_text("\n".join(f"file '{quote_concat(path)}'" for path in paths), encoding="utf-8")
+            output_path = _next_output_path("longfilm", ".mp4")
+            vf = (f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2,"
+                  f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,format=yuv420p")
+            command = [FFMPEG, "-y", "-f", "concat", "-safe", "0", "-i", str(list_path),
+                       "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                       "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
+                       str(output_path)]
+            with db() as conn:
+                conn.execute("UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
+                             (0.25, f"正在合成 {len(paths)} 个片段", job_id))
+            process = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+            LONGFILM_PROCESSES[job_id] = process
+            _, stderr = await process.communicate()
+            LONGFILM_PROCESSES.pop(job_id, None)
+            with db() as conn:
+                current = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
+            if current and current["status"] == "canceled":
+                if output_path.exists():
+                    output_path.unlink()
+                return
+            if process.returncode != 0:
+                message = stderr.decode("utf-8", errors="replace")[-1200:]
+                raise RuntimeError("FFmpeg 合成失败：" + message)
+            relative = output_path.relative_to(OUT_DIR).as_posix()
+            outputs = [{"kind": "video", "file": relative, "name": output_path.name}]
+            with db() as conn:
+                conn.execute("UPDATE jobs SET status='done', progress=1, progress_text='合成完成', outputs=?, finished_at=? WHERE id=? AND status='running'",
+                             (json.dumps(outputs, ensure_ascii=False), time.time(), job_id))
+    except Exception as exc:
+        if output_path and output_path.exists():
+            output_path.unlink()
+        with db() as conn:
+            conn.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=? AND status IN ('queued','running')",
+                         (str(exc)[:1200], time.time(), job_id))
+    finally:
+        LONGFILM_PROCESSES.pop(job_id, None)
+        if list_path and list_path.exists():
+            list_path.unlink()
+
+
+async def api_longfilm_create(request):
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    title = str(payload.get("title") or "").strip()
+    intro = str(payload.get("intro") or "").strip()
+    clips = payload.get("clips") or []
+    if not title:
+        return web.json_response({"error": "请填写长片标题"}, status=400)
+    if len(clips) < 2:
+        return web.json_response({"error": "至少选择 2 个视频片段"}, status=400)
+    verified = []
+    for clip in clips[:100]:
+        job_id = str(clip.get("job_id") or "")
+        relative = str(clip.get("file") or "")
+        if not _verified_video_path(job_id, relative):
+            return web.json_response({"error": "所选视频中有文件已失效"}, status=400)
+        verified.append({"job_id": job_id, "file": relative, "name": str(clip.get("name") or "")})
+    job_id = uuid.uuid4().hex[:12]
+    params = {"title": title[:120], "intro": intro[:1000], "clips": verified,
+              "duration": payload.get("duration")}
+    with db() as conn:
+        conn.execute("INSERT INTO jobs (id, created_at, mode, params, status, progress_text) VALUES (?,?,?,?, 'queued', '等待合成')",
+                     (job_id, time.time(), "longfilm", json.dumps(params, ensure_ascii=False)))
+    task = asyncio.create_task(run_longfilm(job_id))
+    LONGFILM_TASKS.add(task)
+    task.add_done_callback(LONGFILM_TASKS.discard)
+    return json_ok({"id": job_id, "status": "queued"})
+
+
 async def api_list(request):
     status = request.query.get("status")
-    q = "SELECT * FROM jobs"
+    conditions = []
     args = []
     if status and status != "all":
-        q += " WHERE status=?"
+        conditions.append("status=?")
         args.append(status)
-    q += " ORDER BY created_at DESC LIMIT 200"
+    media = request.query.get("media", "").strip()
+    if media == "image":
+        conditions.append("mode='t2i'")
+    elif media == "video":
+        conditions.append("mode NOT IN ('t2i','longfilm')")
+    elif media == "longfilm":
+        conditions.append("mode='longfilm'")
+    elif media:
+        return web.json_response({"error": "media 只能是 image、video 或 longfilm"}, status=400)
+    aspect = request.query.get("aspect", "").strip()
+    if aspect:
+        if aspect not in ("16:9", "9:16", "4:3", "3:4", "1:1"):
+            return web.json_response({"error": "不支持的画面比例"}, status=400)
+        conditions.append("json_extract(params, '$.aspect')=?")
+        args.append(aspect)
+    duration = request.query.get("duration", "").strip()
+    if duration:
+        try:
+            duration_value = float(duration)
+        except ValueError:
+            return web.json_response({"error": "duration 必须是数字"}, status=400)
+        conditions.append("CAST(json_extract(params, '$.duration') AS REAL)=?")
+        args.append(duration_value)
+    keyword = request.query.get("keyword", "").strip()
+    if keyword:
+        like = f"%{keyword}%"
+        conditions.append("(params LIKE ? OR id LIKE ? OR outputs LIKE ?)")
+        args.extend((like, like, like))
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    try:
+        page = max(1, int(request.query.get("page", "1")))
+        page_size = min(100, max(1, int(request.query.get("page_size", "200"))))
+    except ValueError:
+        return web.json_response({"error": "page 和 page_size 必须是整数"}, status=400)
+    offset = (page - 1) * page_size
     with db() as conn:
-        rows = conn.execute(q, args).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM jobs" + where, args).fetchone()[0]
+        rows = conn.execute(
+            "SELECT * FROM jobs" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            [*args, page_size, offset],
+        ).fetchall()
     return json_ok({"jobs": [row_to_job(r) for r in rows],
+                    "total": total, "page": page, "page_size": page_size,
                     "running": WORKER.current})
 
 
@@ -433,39 +667,53 @@ async def api_get(request):
 
 async def api_cancel(request):
     jid = request.match_info["id"]
-    with db() as conn:
-        r = conn.execute("SELECT status, prompt_id FROM jobs WHERE id=?", (jid,)).fetchone()
+    async with WORKER.submit_lock:
+        with db() as conn:
+            r = conn.execute("SELECT status, prompt_id, mode FROM jobs WHERE id=?", (jid,)).fetchone()
         if not r:
             return web.json_response({"error": "not found"}, status=404)
-        if r["status"] in ("done", "failed", "canceled"):
+        if r["status"] not in ("running", "queued"):
             return json_ok({"status": r["status"]})
-        conn.execute("UPDATE jobs SET status='canceled', finished_at=? WHERE id=?", (time.time(), jid))
-    # 排队中的从 ComfyUI 队列删除
-    if r["status"] == "queued" and r["prompt_id"]:
-        try:
-            async with ClientSession() as s:
-                await s.post(f"{COMFY}/queue", json={"delete": [r["prompt_id"]]})
-        except Exception:
-            pass
-    if r["status"] == "running":
-        try:  # 运行中的触发 interrupt，worker 轮询时发现取消状态即停
-            async with ClientSession() as s:
-                await s.post(f"{COMFY}/interrupt")
-        except Exception:
-            pass
-    return json_ok({"status": "canceled"})
+        pid = r["prompt_id"]
+        if r["mode"] == "longfilm":
+            process = LONGFILM_PROCESSES.get(jid)
+            if process and process.returncode is None:
+                process.terminate()
+            with db() as conn:
+                conn.execute("UPDATE jobs SET status='canceled', finished_at=? WHERE id=? AND status IN ('queued','running')",
+                             (time.time(), jid))
+            return json_ok({"status": "canceled"})
+        if pid:
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=6)) as session:
+                    for endpoint, payload in (("queue", {"delete": [pid]}), ("interrupt", {"prompt_id": pid})):
+                        async with session.post(f"{COMFY}/{endpoint}", json=payload) as resp:
+                            resp.raise_for_status()
+            except Exception as exc:
+                return web.json_response({"error": f"无法确认停止请求，请重试：{exc}"}, status=502)
+        with db() as conn:
+            conn.execute("UPDATE jobs SET status='canceled', finished_at=? WHERE id=? AND status IN ('queued','running','failed')", (time.time(), jid))
+            status = conn.execute("SELECT status FROM jobs WHERE id=?", (jid,)).fetchone()["status"]
+        return json_ok({"status": status})
+
 
 
 async def api_delete(request):
     jid = request.match_info["id"]
     with db() as conn:
-        r = conn.execute("SELECT status FROM jobs WHERE id=?", (jid,)).fetchone()
+        r = conn.execute("SELECT status, outputs FROM jobs WHERE id=?", (jid,)).fetchone()
         if not r:
             return web.json_response({"error": "not found"}, status=404)
         if r["status"] in ("queued", "running"):
             return web.json_response({"error": "请先取消再删除"}, status=400)
         conn.execute("DELETE FROM jobs WHERE id=?", (jid,))
-    import shutil
+    for output in json.loads(r["outputs"] or "[]"):
+        relative = output.get("file", "")
+        if "/" not in relative:
+            continue
+        target = (OUT_DIR / relative).resolve()
+        if str(target).startswith(str(OUT_DIR.resolve())) and target.is_file():
+            target.unlink()
     shutil.rmtree(OUT_DIR / jid, ignore_errors=True)
     return json_ok({"deleted": jid})
 
@@ -482,9 +730,10 @@ async def api_system(request):
                     sysinfo = await resp.json()
     except Exception:
         pass
+    longfilm_running = next(iter(LONGFILM_PROCESSES), None)
     return json_ok({
         "queued": queued,
-        "running": WORKER.current,
+        "running": WORKER.current or longfilm_running,
         "comfyui_ok": sysinfo is not None,
         "comfyui": (sysinfo or {}).get("system") or {},
         "devices": (sysinfo or {}).get("devices") or [],
@@ -656,6 +905,7 @@ async def index_handler(request):
 def make_app():
     app = web.Application(client_max_size=200 * 1024 * 1024)
     app.router.add_post("/api/jobs", api_create)
+    app.router.add_post("/api/longfilms", api_longfilm_create)
     app.router.add_get("/api/jobs", api_list)
     app.router.add_get("/api/jobs/{id}", api_get)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
