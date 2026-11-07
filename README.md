@@ -30,7 +30,7 @@
 | 参考生成 r2v | `MiniMaxH3ReferenceToVideo` | 1~3 张参考图，主体一致性 |
 | 文生图 t2i | Z-IMAGE-turbo | 8 步出图 |
 
-**模型档位**（需已就位 MiniMax-H3 权重，见下方「模型准备」）：
+**模型档位**（需已就位 MiniMax-H3 权重，见下方「前置准备：ComfyUI 与模型权重」）：
 
 | 选项 | unet | clip | 步数 |
 |---|---|---|---|
@@ -38,13 +38,38 @@
 | 标准 MiniMax-H3 | 同上 | 同上 | 20 |
 | 精度切换 | int8 convrot（质量）/ nvfp4（省显存） | — | — |
 
-## 运行
+## 长片拼接
 
-1. 先启动 ComfyUI（默认监听 `127.0.0.1:8188`）
-2. 双击 **启动.bat**（自动探测 ComfyUI 自带 Python，找不到则回退系统 `python`，需 `aiohttp`）
-3. 浏览器打开 `http://127.0.0.1:8190`（局域网手机也可访问 `http://<本机IP>:8190`）
+把已经生成的片段接成一条长片，不用再开剪辑软件：
 
-首次使用先把 `config.example.json` 复制为 `config.json`，按你的环境修改：
+1. 左侧栏进入「长片拼接」
+2. 把要拼接的视频片段拖入左侧的框中，按先后顺序排好
+3. 一键拼接，输出一条完整的长片
+
+拼接在本机由 ffmpeg 完成，不经过 ComfyUI，也不重新生成画面。**前提：本机已安装 ffmpeg 并加入系统 PATH**（命令行输入 `ffmpeg -version` 能显示版本号即可）。没装 ffmpeg 只是拼接不可用，其他生成模式不受影响。
+
+## 前置准备：ComfyUI 与模型权重
+
+H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI 出片。开始前备齐下面几样：
+
+1. **ComfyUI**：已安装、能正常启动（默认监听 `127.0.0.1:8188`），且带有 MiniMax H3 相关节点（`MiniMaxH3ImageToVideo` / `MiniMaxH3ReferenceToVideo`）；缺节点时先更新 ComfyUI。
+2. **MiniMax H3 权重**（放入 ComfyUI 的 `models/` 对应目录）：
+   - `diffusion_models/` — `minimax_h3_fl2va_*`、`minimax_h3_ref2va_*`（int8 convrot 或 nvfp4 二选一，与文本编码器精度配套）
+   - `text_encoders/` — `qwen3vl_32b_minimax_h3_*`（int4 convrot 或 nvfp4 awq）
+   - `vae/` — `minimax_h3_video_vae_fp16.safetensors`、`minimax_h3_audio_vae_fp32.safetensors`
+3. **Turbo LoRA**（放入 `models/loras/`）：`minimax_h3_turbo_4step_ema_ckpt850.safetensors`、`minimax_h3_turbo_v4_step600_ema.safetensors`；选「H3 + LoRA」档位时要用，只用标准 H3 档位可暂缺。
+4. **Z-IMAGE 权重**（文生图模式要用，同样放入 `models/` 对应目录）：
+   - `diffusion_models/` — `z_image_turbo_bf16.safetensors`
+   - `text_encoders/` — `qwen_3_4b.safetensors`
+   - `vae/` — `ae.safetensors`
+5. **ffmpeg**：仅长片拼接需要，装好并加入 PATH。
+
+> H3 权重从哪下、总控参数怎么调，见配套仓库 [ComfyUI-MiniMax-H3-Workflow](https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Workflow)：那边是同一套 H3 生产的 ComfyUI 节点工作流，附 H3 权重文件的官方下载链接与目录表；本仓库是它的可视化工作台，两边配合使用。
+
+## 安装与运行
+
+1. **把本仓库放到任意目录**：克隆或下载 ZIP 解压都行，路径不限，例如 `D:\h3s`。
+2. **首次使用先建配置**：把 `config.example.json` 复制一份、改名为 `config.json`，按你的环境修改：
 
 ```json
 {
@@ -59,14 +84,9 @@
 
 > `models_dir` 仅用于「硬件参数」页的模型库统计，留空则跳过。
 
-## 模型准备
-
-下载 [Comfy-Org MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) 权重并放入对应目录：
-
-- `diffusion_models/` — `minimax_h3_fl2va` / `minimax_h3_ref2va`（int8 convrot 或 nvfp4 精度）
-- `text_encoders/` — qwen3vl（随精度切换）
-- `loras/` — Turbo LoRA（如 ckpt850、v4-step600）
-- `diffusion_models/` — Z-IMAGE-turbo（文生图模式）
+3. **先启动 ComfyUI**：确认它已在 `127.0.0.1:8188` 运行，且上面的 H3 / Z-IMAGE 权重都已就位。Studio 顶栏会实时显示 ComfyUI 的连接状态，连不上先解决这边。
+4. **双击仓库目录下的 `启动.bat`**：脚本会自动探测 ComfyUI 自带的 Python 运行 `server.py`（零额外依赖）。如果你的 ComfyUI 不在脚本默认的 `D:\ComfyUI`，先用记事本把 `启动.bat` 里的 `COMFY_DIR` 改成你的实际目录；没启动 ComfyUI 时脚本会先提醒，并询问是否仍要启动 Studio。
+5. **浏览器打开 `http://127.0.0.1:8190`** 即可使用；局域网内的手机也可以访问 `http://<本机IP>:8190`。
 
 ## 数据
 
