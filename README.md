@@ -68,7 +68,31 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
 
 ## 安装与运行
 
-1. **把本仓库放到任意目录**：克隆或下载 ZIP 解压都行，路径不限，例如 `D:\h3s`。
+1. **把本仓库放到任意目录**，路径不限，例如 `D:\h3s`。两种办法任选：
+
+   **办法一：git 克隆（复制即用）**
+
+   ```bat
+   git clone https://github.com/pixelaigc/h3-studio.git D:\h3s
+   cd D:\h3s
+   ```
+
+   以后更新只需在该目录执行 `git pull`。没装 git 也可以在仓库页面点 Code → Download ZIP，解压到 `D:\h3s`，效果一样。
+
+   **办法二：交给 AI 智能体个性化安装**
+
+   把下面这段原样粘贴给你的 AI 智能体（如 Muse、Cursor 等），它会按你这台电脑的实际情况完成安装：
+
+   ```text
+   请根据我本地电脑的实际情况，把 H3 Studio 安装到 D:\h3s：
+   仓库地址：https://github.com/pixelaigc/h3-studio
+   要求：
+   1) 先检查本机 ComfyUI 的安装目录和运行状态（默认 127.0.0.1:8188），再克隆仓库到 D:\h3s（目录已存在则先确认里面是什么，不要直接覆盖）；
+   2) 按仓库 README 的「前置准备」逐项核对 MiniMax H3、Z-IMAGE 权重与 Turbo LoRA 是否已在 ComfyUI 的 models 对应目录中，缺哪个明确告诉我，不要未经我同意就下载大文件；
+   3) 把 config.example.json 复制为 config.json，models_dir 填我本机的实际路径；如果我的 ComfyUI 不在 D:\ComfyUI，把 启动.bat 里的 COMFY_DIR 改成实际目录；
+   4) 检查 ffmpeg 是否已安装并在 PATH 中（长片拼接要用），没有就告诉我怎么装；
+   5) 最后先启动 ComfyUI，再双击 D:\h3s\启动.bat，确认浏览器能打开 http://127.0.0.1:8190，并向我报告每一步的结果和还缺什么。
+   ```
 2. **首次使用先建配置**：把 `config.example.json` 复制一份、改名为 `config.json`，按你的环境修改：
 
 ```json
