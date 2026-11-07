@@ -126,11 +126,19 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 
 认准 `LISTENING` 那行的 PID，别误杀 `ESTABLISHED` 另一端的号码（那是浏览器）。也可以在任务管理器里结束对应的 python 进程。注意这只关 Studio，ComfyUI（8188）是另一个程序，要单独关闭。
 
-## 数据
+## 数据与输出目录
 
-- `data/jobs.db` — 任务队列与历史（SQLite）
-- `data/outputs/<job_id>/` — 成片 / 成图
-- `data/uploads/` — 上传的首尾帧 / 参考图
+所有数据都在安装目录的 `data\` 下（`config.json` 的 `data_dir`，默认即仓库目录下的 `data`）。生成完成后，成片会从 ComfyUI 复制到这里统一管理，以 `D:\h3s` 为例：
+
+| 内容 | 目录 | 文件名 |
+|---|---|---|
+| 生成的视频 | `D:\h3s\data\outputs\videos\` | `v-h3-studio-000001.mp4`（顺序编号） |
+| 长片拼接的成片 | `D:\h3s\data\outputs\videos\` | `v-l-000001.mp4` |
+| 生成的图片（Z-IMAGE） | `D:\h3s\data\outputs\images\` | `i-zimage-000001.png`（顺序编号） |
+| 上传的首尾帧 / 参考图 | `D:\h3s\data\uploads\` | — |
+| 任务记录（提示词、参数、状态） | `D:\h3s\data\jobs.db` | SQLite 数据库 |
+
+在界面里删任务卡片，对应文件会一并删除；直接去上面目录里取文件也行，拷走不影响任务记录。
 
 ## HTTP API
 
