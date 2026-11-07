@@ -1,36 +1,39 @@
+<div align="center">
+
 # ComfyUI-MiniMax-H3 Studio — 本地视频生成工作台
 
-仿 [minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio) 的本地 Web 工作台，驱动本机 ComfyUI 出片。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。零额外依赖：直接复用 ComfyUI 自带的 Python 运行。
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) ![Platform: Windows](https://img.shields.io/badge/Platform-Windows-blue.svg) ![Model: MiniMax H3](https://img.shields.io/badge/Model-MiniMax%20H3-purple.svg) ![Version: v1.00](https://img.shields.io/badge/Version-v1.00-orange.svg)
 
-> 仓库：https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio · License: MIT
+**不用学节点图，也能用 MiniMax H3 在本地出片。**
+
+本地 Web 工作台，驱动本机 ComfyUI 生成视频与图片。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。零额外依赖，直接复用 ComfyUI 自带的 Python 运行。UI 灵感来源：[zxcHolmes/minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio)。
+
+</div>
+
+![ComfyUI-MiniMax-H3 Studio v1.00 主界面](docs/images/h3-studio-v1.00.png)
+
+<p align="center"><sub>v1.00 实机截图（作者本地生产环境）· 左：模式与参数面板 · 右：已完成任务卡片流</sub></p>
 
 ## 它解决什么痛点
 
-ComfyUI 能力很强，但它是一张给工程师用的节点图，直接拿来日常生产有三个坎。这个工作台就是为跨过这三个坎做的：
+- **界面门槛高** — ComfyUI 节点图对新手不友好，参数散落在十几个节点里；这里把已验证的工作流藏到后台，只留选模式、写提示词、调参数、点生成。
+- **生产资产难管** — 成片不再散落在输出目录里找不回：每次生成都是任务卡片，带提示词与参数，可搜索、筛选、播放、下载、一键复用参数。
+- **长片合成麻烦** — 分段生成后不必再进剪辑软件：内置长片拼接一键成片，还能让 AI 智能体一句话生成整条长片（见文末）。
 
-**1. 界面不友好，入门门槛高。** 节点连线密密麻麻，参数散落在十几个节点里，改错一个地方整条链就报错；新手光是把工作流跑通就要先学半天节点图。H3 Studio 把作者生产中已验证的工作流藏到后台，界面上只留真正要动的东西：选模式、写提示词、选分辨率 / 比例 / 时长、点生成。参数都是现成的生产档位，不懂节点也能出第一条片；老手要调节点，随时可以回到 ComfyUI 和配套的工作流仓库。
+## 功能一览
 
-**2. 生成的视频、图片资产没法管。** 用 ComfyUI 出片，文件全堆在输出目录里，找一条旧片只能按文件名猜，当时用的提示词和参数更是无从查起。Studio 把每一次生成都做成任务卡片：按进行中 / 已完成 / 长片 / 失败 / 已取消分类，可按提示词和任务 ID 搜索、按类型 / 比例 / 时长筛选；每张卡都带着当时的提示词与参数，能直接播放、下载、一键复用参数重做一条、或删除。出的片越多，这套管理越省事。
-
-**3. 分段出片之后，还要开剪辑软件拼接。** H3 做长片是几段、几十段分别生成，以前生成完还要把文件导进剪辑软件接起来。Studio 内置长片拼接：片段拖进去、一键接成整片（见文末「长片拼接」）；再进一步，还可以让 AI 智能体把拆段、生成、拼接一次做完（见「进阶：一句话让智能体生成整条长片」）。
-
-一句话：**ComfyUI 继续在后台干活，H3 Studio 给它配了一个人人能用的驾驶舱。**
+- **文生视频 / 首尾帧 / 参考生成** — MiniMax H3，Turbo LoRA 加速（默认 6 步）或标准 H3（20 步）
+- **Z-IMAGE 文生图**
+- **任务队列与卡片流** — 进度与 ComfyUI 实时同步，进行中 / 已完成 / 长片 / 失败 / 已取消分类管理
+- **长片拼接** — 片段拖入、一键成片（ffmpeg）
+- **硬件参数页** — GPU / CPU / 内存 / 硬盘 / 软件环境 / 模型库六项实时状态，附一键释放显存
 
 ## 界面
 
-![ComfyUI-MiniMax-H3 Studio v1.00 — 主界面：左侧模式与参数面板，右侧已完成任务卡片流](docs/images/h3-studio-v1.00.png)
-
-*ComfyUI-MiniMax-H3 Studio v1.00 实机截图（作者本地生产环境）。左：模式与参数面板；右：已完成任务卡片流（此页为文生视频作品），可直接播放、下载、复用参数或删除。*
-
-截图里可以看到：
-
-- **顶栏**：`PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00`，右侧状态点显示「空闲」
-- **任务区**：进行中 / 已完成 / 长片 / 失败 / 已取消分页，可按提示词与任务 ID 搜索，并按类型、比例、时长筛选
-
-- **顶栏**：右侧实时显示「Generating, N 排队 / 空闲 / ComfyUI 未连接」
+- **顶栏**：`PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00`，右侧实时显示「Generating, N 排队 / 空闲 / ComfyUI 未连接」
 - **左侧栏**：视频（文生视频 / 首尾帧 / 参考生成 / 长片拼接）· 图像（Z-IMAGE 文生图）· 系统（硬件参数）· 释放显存
 - **参数面板**：分辨率 544p/768p、模型卡（H3+LoRA / 标准 H3）、LoRA 选择与强度、步数 4~20、画面比例、时长 5~15s、种子
-- **任务卡片**：排队/生成中进度条（与 ComfyUI 逐节点/逐采样步实时同步）、可播放预览、Cancel、下载、复用参数、删除
+- **任务卡片**：排队/生成中进度条、可播放预览、Cancel、下载、复用参数、删除；可按提示词与任务 ID 搜索，按类型、比例、时长筛选
 - **硬件参数页**：GPU（显存/利用率/温度/功耗/驱动）、CPU、内存、磁盘、软件环境（ComfyUI/PyTorch/Python/OS）、模型库分类统计，3 秒自动刷新
 
 ## 模式与模型映射
