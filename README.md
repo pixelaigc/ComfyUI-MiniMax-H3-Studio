@@ -2,7 +2,7 @@
 
 仿 [minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio) 的本地 Web 工作台，驱动本机 ComfyUI 出片。左侧选模式 → 中间调参数 → 右侧看任务卡片流，队列自动 FIFO 执行。零额外依赖：直接复用 ComfyUI 自带的 Python 运行。
 
-> 仓库：https://github.com/pixelaigc/h3-studio · License: MIT
+> 仓库：https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio · License: MIT
 
 ## 它解决什么痛点
 
@@ -75,7 +75,7 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
    **办法一：git 克隆（复制即用）**
 
    ```bat
-   git clone https://github.com/pixelaigc/h3-studio.git D:\h3s
+   git clone https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio.git D:\h3s
    cd D:\h3s
    ```
 
@@ -87,7 +87,7 @@ H3 Studio 不是独立的生成引擎，它驱动本机已经装好的 ComfyUI �
 
    ```text
    请根据我本地电脑的实际情况，把 H3 Studio 安装到 D:\h3s：
-   仓库地址：https://github.com/pixelaigc/h3-studio
+   仓库地址：https://github.com/pixelaigc/ComfyUI-MiniMax-H3-Studio
    要求：
    1) 先检查本机 ComfyUI 的安装目录和运行状态（默认 127.0.0.1:8188），再克隆仓库到 D:\h3s（目录已存在则先确认里面是什么，不要直接覆盖）；
    2) 按仓库 README 的「前置准备」逐项核对 MiniMax H3、Z-IMAGE 权重与 Turbo LoRA 是否已在 ComfyUI 的 models 对应目录中，缺哪个明确告诉我，不要未经我同意就下载大文件；
