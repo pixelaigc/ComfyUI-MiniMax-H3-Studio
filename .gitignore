@@ -1,14 +1,74 @@
-# 本地运行数据（任务库 / 成片 / 上传素材）
+# ── 本地运行数据（任务库 / 成片 / 上传素材）────────────────────────
 data/
+outputs/
+*.db
+*.sqlite
+*.sqlite3
 
-# 环境相关配置（从 config.example.json 复制后按需修改）
+# ── 环境相关配置（从 config.example.json 复制后按需修改）───────────
 config.json
+.env
+.env.*
+!.env.example
 
-# Python
+# ── Python ──────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
 
-# 生成产物
+# ── Node ────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── 生成产物（媒体 / 帧 / 提交记录）─────────────────────────────────
 *.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.m4a
+*.flac
 *_frame.png
 projects/**/submissions.json
+
+# ── 日志与临时文件 ──────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+.temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# ── 模型权重与大文件（可由 ComfyUI models_dir 重新获取，不入库）─────
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.tflite
+*.engine
+*.npy
+*.npz
+*.parquet
+models/
+weights/
+
+# ── IDE / OS ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
