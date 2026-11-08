@@ -16,6 +16,7 @@ import random
 
 from . import loras as lora_registry
 from . import lora_damping
+from . import enhancer
 
 # ------------------------------------------------------------------
 # 模型清单（与 d:\cfup\ComfyUI\models 实际文件一致）
@@ -794,6 +795,15 @@ def build_t2i(params):
 #     C 加 ModelSamplingFlux(base=max=0.69) -> 正常橘猫窗台（与 A 等价）
 QWEN_IMAGE_UNET = "qwen_image_2.1_bf16.safetensors"
 QWEN_IMAGE_VAE = "qwen_image_2.1_vae_bf16.safetensors"
+# Turbo（8 步蒸馏版）：官方单独发的 checkpoint，同架构、蒸馏到 8 步。
+# 官方 Turbo 模板用 ManualSigmas 固定 schedule —— 步数必须与 schedule 一起用，
+# 不能只把 KSampler 的 steps 改成 8（那样会按 simple 调度重新分配 sigma，
+# 与蒸馏时固化的时间表不符，出图会明显劣化）。
+QWEN_IMAGE_UNET_TURBO = "qwen_image_2.1_turbo_bf16.safetensors"
+# 官方 Turbo 模板的 8 步 sigma 表（image_qwen_image_2_1_turbo_t2i.json 的
+# ManualSigmas 节点，标题 "Manual Sigmas (Qwen-Image-2.1-Turbo 8-step schedule)"）
+QWEN_IMAGE_TURBO_SIGMAS = ("1.0, 0.978453, 0.95418, 0.926626, 0.89508, "
+                            "0.845148, 0.704534, 0.414568, 0")
 # PE 文本编码器（带官方提示词扩写能力，Qwen3.5 9B）：
 #   PE 编码器接 **TextGenerateLTX2Prompt**（扩写节点），扩写后的文本
 #   再喂给 TextEncodeQwenImage21 的 prompt 输入。
@@ -813,9 +823,20 @@ QWEN_IMAGE_CLIP_PLAIN = "qwen3vl_8b_bf16.safetensors"
 # 模型版本：只列本机 ComfyUI UNETLoader 下拉里真实存在的 Qwen-Image 2.1 权重。
 # 2.1 本体只有一个 bf16 版本；其余是 Qwen-Image 2509/2511/2512（不同代，
 # 不是 2.1），不混进来 —— 混进来会让「2.1 的推荐参数」套到别的代上。
+#
+# 【模型版本 -> 默认步数联动】
+#   基座 (base)  = 40 步（官方 README 默认 num_inference_steps=40）
+#   Turbo       = 8 步（官方蒸馏 schedule，ManualSigmas 固定）
+# 切换模型版本时前端必须把步数同步成该版本的推荐值 —— 否则会出现
+# 「Turbo 跑 40 步」这种和蒸馏 schedule 不匹配的组合。
+#
+# 【PE 双档：presence_penalty 不可互换】
+#   PE-T2I（文生图）：presence_penalty=1.5, max_new_tokens=16256
+#   PE-I2I（编辑）  ：presence_penalty=0,   max_new_tokens=24000
+# 填错不报错，只会让采样分布悄悄变 —— 所以档位写死随模式走，UI 只显示不乱改。
 QWEN_IMAGE_MODELS = {
     "qwen_image_2.1_bf16": {
-        "label": "Qwen-Image 2.1 · 官方完整版（含 PE 提示词扩写）",
+        "label": "Qwen-Image 2.1 · 官方基座版（40 步）",
         "unet": QWEN_IMAGE_UNET,
         "weight_dtype": "default",
         # PE 文本编码器：文生图用 pe_t2i、参考图生图用 pe_i2i
@@ -824,9 +845,9 @@ QWEN_IMAGE_MODELS = {
         "clip_i2i": QWEN_IMAGE_CLIP_PE_I2I,
         "sampler": "euler",
         "scheduler": "simple",
-        # 官方模板 note：「steps: Qwen Image 2.1 official pipeline uses about
-        # 40-50 with euler. This template starts at 25.」—— 取 40-50 区间的上沿。
-        "steps": 50,
+        # 官方 README 默认参数表：num_inference_steps=40。
+        # （ComfyUI 官方模板取 25 作折中；README 默认表是 40 —— 本面板取 40。）
+        "steps": 40,
         # 官方模板 note：「cfg: keep 1 for the Qwen Image 2.1 official path.
         # Raise it only if you use a negative prompt.」
         # 注意：cfg=1 时 ComfyUI 会跳过 uncond 分支（samplers.py:609-627），
@@ -844,12 +865,63 @@ QWEN_IMAGE_MODELS = {
                      "dpmpp_2m_sde", "dpmpp_3m_sde", "dpm_2", "heun", "uni_pc"],
         "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras",
                        "exponential", "linear_quadratic"],
-        "note": "官方工作流 Qwen+image+2.1+文生图.json：50 步 / cfg 1 / euler / simple。",
+        "note": "官方 README 默认参数：40 步 / cfg 1 / euler / simple。",
         "warn": "官方 PE 文本编码器自带提示词扩写（提示词会被重写得更详细）；"
                 "想完全控制提示词，可在面板里关掉 PE 编码器。",
     },
+    "qwen_image_2.1_turbo_bf16": {
+        "label": "Qwen-Image 2.1 Turbo · 8 步蒸馏版",
+        "unet": QWEN_IMAGE_UNET_TURBO,
+        "weight_dtype": "default",
+        "clip_t2i": QWEN_IMAGE_CLIP_PE_T2I,
+        "clip_i2i": QWEN_IMAGE_CLIP_PE_I2I,
+        "sampler": "euler",
+        "scheduler": "simple",
+        # Turbo 是 8 步蒸馏版：步数与 ManualSigmas 的固定 schedule 绑定，
+        # 不能当普通 KSampler 步数处理。
+        "steps": 8,
+        "cfg": 1.0,
+        # Turbo 的 scheduler 配置是 use_dynamic_shifting=false（固定 shift=1.0），
+        # 因为 8 步 schedule 已蒸馏固化 —— 但 ComfyUI 侧模型内置仍是 0.69，
+        # 沿用同一个值可保持与基座一致的 sigma 起点。
+        "shift": 0.69,
+        "supports_negative": True,
+        "negative_effective_only_above_cfg1": True,
+        # Turbo 走固定 sigma 表，采样器/调度器由 ManualSigmas + KSamplerSelect 决定
+        "samplers": ["euler"],
+        "schedulers": ["simple"],
+        # Turbo 专用：固定 8 步 sigma 表（官方 Turbo 模板的 ManualSigmas 节点）
+        "manual_sigmas": QWEN_IMAGE_TURBO_SIGMAS,
+        "manual_sigmas_steps": 8,
+        "note": "官方 Turbo 模板：8 步固定 sigma 表 + euler + cfg 1。",
+        "warn": "Turbo 是 8 步蒸馏版：步数与固定 sigma 表绑定，改步数会破坏蒸馏 schedule。",
+    },
 }
 QWEN_IMAGE_DEFAULT_MODEL = "qwen_image_2.1_bf16"
+
+# 官方 PE 两个 checkpoint 的采样参数（官方 prompt_rewrite/README + HF model card）：
+#   T2I: presence_penalty=1.5, max_new_tokens=16256
+#   I2I: presence_penalty=0,   max_new_tokens=24000
+# 【关键坑】官方 ComfyUI 模板把 max_length 压到 4096（防跑几分钟），
+# 而模型卡值是 16256/24000。官方文档原文警告：
+#   "When the reasoning block uses up the 4096 budget, it never closes and
+#    the enhancer returns an empty string."
+# -> 开 thinking 前必须先调高 max_length，否则 PE 静默返回空串，
+#    表现为「编辑几乎原样返回」「文生图丢掉需求」。
+# 所以本面板默认用官方卡值（不压低），并把 max_length 做成可调。
+QWEN_IMAGE_PE_PARAMS = {
+    "t2i": {
+        "label": "PE-T2I（文生图）",
+        "presence_penalty": 1.5,
+        "max_new_tokens": 16256,
+    },
+    "i2i": {
+        "label": "PE-I2I（图片编辑）",
+        "presence_penalty": 0.0,
+        "max_new_tokens": 24000,
+    },
+}
+QWEN_IMAGE_PE_DEFAULT_MAX_LENGTH = 4096
 
 # Qwen-Image 2.1 的分辨率档位：同样是「总像素（megapixels）」语义。
 # 与 Z-Image 的区别：Qwen-Image 2.1 的 VAE 是 16 倍下采样
@@ -877,11 +949,19 @@ QWEN_IMAGE_SIZE_MULTIPLE = 16
 # 超过这个总像素就不该直出（2.1 原生上限约 4MP / 2K）
 QWEN_IMAGE_MAX_DIRECT_MP = 4.2
 
-# 参考图数量上限：TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，
-# 节点本身支持 image_1..image_16（comfy_extras/nodes_qwen.py:125-133），
-# 但官方图片编辑工作流只接了 9 张参考图 —— 本面板按官方取 9。
-QWEN_IMAGE_MAX_REF_IMAGES = 9
+# 参考图数量上限 —— 三个口径必须分清（官方 Blog / README / ComfyUI 官方文档）：
+#   模型官方能力  = 10 张（官方 Blog "Up to 10 Input Images"、README
+#                    "Support up to 10 reference images"）
+#   ComfyUI 节点槽 = 16 个（nodes_qwen.py 的 io.Autogrow names=image_1..image_16）
+#   官方模板接线  = 10 张（"the two edit templates wire the first 10"）
+#   vLLM-Omni 服务 = 4 张（在线服务限制，本地 ComfyUI 不适用）
+# 落地上限取「模型官方 10 张」与「ComfyUI 实际可用 16 槽」的较小者 = 10。
+# 注意：需求原文说「最大 9 张」，那是官方图片编辑工作流模板里的接线数，
+# 不是模型能力上限 —— 按官方 10 张实现。
+QWEN_IMAGE_MAX_REF_IMAGES = 10
 QWEN_IMAGE_MIN_REF_IMAGES = 1
+# ComfyUI 节点侧的物理槽位上限（comfy_extras/nodes_qwen.py:125-133）
+QWEN_IMAGE_NODE_REF_SLOTS = 16
 
 
 def qwen_image_dimensions(aspect, tier, width=None, height=None):
@@ -953,10 +1033,42 @@ def _qwen_lora_chain(lora_items, base_model_ref, base_clip_ref):
     return nodes, current_model, current_clip
 
 
+# 官方 PE 的 system prompt 落盘在 skill 的 assets 目录（用户可在
+# 「本地模型配置 -> 提示词增强 Agent」里编辑并持久化）。
+#   qwen21-pe-t2i.txt = PE-T2I 官方 system prompt（文生图）
+#   qwen21-pe-i2i.txt = PE-I2I 官方 system prompt（图片编辑）
+# 来源：ComfyUI 官方工作流模板
+#   image_qwen_image_2_1_t2i.json / image_qwen_image_2_1_image_edit.json
+#   里的 PrimitiveStringMultiline 节点（标题 "Text (System Prompt)"）。
+QWEN_PE_PROMPT_FILES = {
+    "t2i": "qwen21-pe-t2i.txt",
+    "i2i": "qwen21-pe-i2i.txt",
+}
+_QWEN_PE_PROMPT_CACHE: dict[str, str] = {}
+
+
+def _qwen_pe_system_prompt(is_edit: bool) -> str:
+    """读官方 PE 的 system prompt；文件缺失时返回空串（节点退回模型内置模板）。"""
+    key = "i2i" if is_edit else "t2i"
+    if key in _QWEN_PE_PROMPT_CACHE:
+        return _QWEN_PE_PROMPT_CACHE[key]
+    filename = QWEN_PE_PROMPT_FILES.get(key, "")
+    text = ""
+    if filename:
+        try:
+            path = enhancer.ASSETS_DIR / filename
+            if path.exists():
+                text = path.read_text(encoding="utf-8").strip()
+        except Exception:
+            text = ""
+    _QWEN_PE_PROMPT_CACHE[key] = text
+    return text
+
+
 def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                        sampler, scheduler, steps, cfg, shift, negative_text, prompt,
                        job_id, filename_prefix=None, loras=None, is_edit=False,
-                       use_pe=True):
+                       use_pe=True, pe_params=None):
     """Qwen-Image 2.1 公共链路。
 
     文生图与参考图生图共用同一套节点，区别只在：
@@ -964,16 +1076,26 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
       - KSampler 的 latent_image 用 EmptyLatentImage 还是 TextEncode 输出的 latent
 
     链路：
-        UNETLoader -> [加速 LoRA] -> ModelSamplingSD3(shift) -> [效果 LoRA]
-                   -> QwenImage21Cache -> KSampler
-        CLIPLoader(PE) -> [效果 LoRA 的 clip 侧] -> TextEncodeQwenImage21
+        UNETLoader -> ModelSamplingFlux(shift) -> [效果 LoRA] -> QwenImage21Cache
+                   -> KSampler（基座：40 步）
+                   -> RandomNoise -> CFGGuider -> KSamplerSelect
+                   -> ManualSigmas -> SamplerCustomAdvanced（Turbo：固定 8 步）
+        CLIPLoader(PE) -> TextGenerate（官方 PE 扩写）-> TextEncodeQwenImage21
+        CLIPLoader(条件) -> TextEncodeQwenImage21 的 clip 输入
         VAELoader -> TextEncodeQwenImage21 的 vae 输入（参考图编码成 ref_latents）
 
-    ModelSamplingSD3 的作用：Qwen-Image 2.1 在
-    comfy/supported_models.py:2080 内置了 shift=0.69（经
-    ModelSamplingDiscreteFlow 的 time_snr_shift 应用）。要暴露用户可调的
-    SHIFT，必须用继承自同一个 ModelSamplingDiscreteFlow 的节点覆盖它
-    （comfy_extras/nodes_model_advanced.py:120）—— sigma 公式同源。
+    SHIFT 说明（实测踩过坑）：Qwen-Image 2.1 走 model_type=FLUX
+    （comfy/model_base.py:2672），采样类是 ModelSamplingFlux，sigma 公式
+    flux_time_shift(shift, 1.0, t)，**没有 multiplier 这一层**。
+    要让用户可调 SHIFT，必须用 ModelSamplingFlux 且令 base_shift = max_shift
+    = 用户值 —— 它的 shift 计算是
+        mm = (max_shift - base_shift) / (4096 - 256)
+        b  = base_shift - mm*256
+        shift = (w*h/32)*mm + b
+    base=max=S 时 mm=0、b=S -> shift 恒等于 S（与分辨率无关）。
+    **不能用 ModelSamplingSD3**：它继承 ModelSamplingDiscreteFlow，patch() 里
+    multiplier 写死 1000（comfy_extras/nodes_model_advanced.py:127），
+    而 flux_time_shift 没有这一层 -> sigma 表被放大 1000 倍，出图退化成噪点。
     """
     p = {}
     # PE 编码器（Qwen3.5 9B）—— 接提示词扩写节点
@@ -1010,27 +1132,60 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                   "class_type": "QwenImage21Cache"}
     model_ref = ["qw:12", 0]
 
-    # 提示词扩写（官方 PE）：PE 编码器 -> TextGenerateLTX2Prompt -> 文本
-    # 关掉 PE 时不建这个节点，提示词原样进 TextEncodeQwenImage21。
+    # 提示词扩写（官方 PE）：PE 编码器 -> TextGenerate -> 文本
+    #
+    # 【为什么是 TextGenerate 而不是 TextGenerateLTX2Prompt】
+    #   TextGenerateLTX2Prompt 是 LTX2 视频用的节点：它会强制套 Gemma 的
+    #   <|turn|system / <|turn|>user / <|turn|>model 对话模板，
+    #   并在 system 为空时塞入 LTX2 的视频提示词 system prompt
+    #   （comfy_extras/nodes_textgen.py:238-265）。
+    #   官方 Qwen PE 工作流用的是 **TextGenerate** + 官方 PE 自己的
+    #   system prompt（PrimitiveStringMultiline 节点接 system_prompt 输入），
+    #   见 image_qwen_image_2_1_t2i.json / image_qwen_image_2_1_image_edit.json。
+    #   两者混用会得到「用视频提示词规则改写图像提示词」的结果。
+    #
+    # 【PE 双档参数】官方 prompt_rewrite/README + HF model card：
+    #   PE-T2I: presence_penalty=1.5, max_new_tokens=16256
+    #   PE-I2I: presence_penalty=0,   max_new_tokens=24000
+    #   填错不报错，只会让采样分布悄悄变 —— 所以档位随模式写死。
+    #
+    # 【max_length 的坑】官方 ComfyUI 模板把 max_length 压到 4096，
+    #   而模型卡值是 16256/24000。官方文档原文警告：
+    #     "When the reasoning block uses up the 4096 budget, it never closes
+    #      and the enhancer returns an empty string."
+    #   -> 开 thinking 前必须调高 max_length，否则 PE 静默返回空串，
+    #      表现为「编辑几乎原样返回」「文生图丢掉需求」。
+    #   所以这里默认取官方卡值（不压低），并允许用户按需下调换速度。
     if use_pe:
-        p["qw:26"] = {"inputs": {
+        pe = pe_params or QWEN_IMAGE_PE_PARAMS["i2i" if is_edit else "t2i"]
+        pe_inputs = {
             "clip": ["qw:30", 0],
             "prompt": prompt,
-            "max_length": 512,
+            # max_length 上限 32768（TextGenerate 节点 schema），官方卡值 16256/24000 都在范围内
+            "max_length": int(pe.get("max_new_tokens") or 4096),
             # COMFY_DYNAMICCOMBO_V3 在 API 格式下：主字段是选项 key，
             # 子输入扁平化成 sampling_mode.xxx
             "sampling_mode": "on",
-            "sampling_mode.temperature": 0.7,
-            "sampling_mode.top_k": 64,
+            "sampling_mode.temperature": 1.0,
+            "sampling_mode.top_k": 20,
             "sampling_mode.top_p": 0.95,
-            "sampling_mode.min_p": 0.05,
-            "sampling_mode.repetition_penalty": 1.05,
+            "sampling_mode.min_p": 0,
+            "sampling_mode.repetition_penalty": 1,
             "sampling_mode.seed": 0,
-            "sampling_mode.presence_penalty": 0.0,
-            "thinking": False,
+            # 官方 PE 的 presence_penalty：T2I=1.5 / I2I=0
+            "sampling_mode.presence_penalty": float(pe.get("presence_penalty", 0.0)),
+            # thinking 必须开（官方 PE 模型卡：thinking 必开）
+            "thinking": True,
             "use_default_template": True,
             "mtp": "auto",
-        }, "class_type": "TextGenerateLTX2Prompt"}
+        }
+        # 官方 PE 的 system prompt：让 PE 节点用官方那套「观察者式描述」规则，
+        # 而不是模型内置的默认 system prompt。
+        # 文生图档 = PE-T2I 的 system prompt；编辑档 = PE-I2I 的。
+        system_prompt = _qwen_pe_system_prompt(is_edit)
+        if system_prompt:
+            pe_inputs["system_prompt"] = system_prompt
+        p["qw:26"] = {"inputs": pe_inputs, "class_type": "TextGenerate"}
         prompt_ref = ["qw:26", 0]
     else:
         prompt_ref = prompt
@@ -1060,14 +1215,47 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                       "class_type": "EmptyLatentImage"}
         latent_ref = ["qw:13", 0]
 
-    p["qw:3"] = {"inputs": {
-        "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
-        "sampler_name": sampler, "scheduler": scheduler, "denoise": 1,
-        "model": model_ref,
-        "positive": ["qw:27", 0],
-        "negative": ["qw:27", 1],
-        "latent_image": latent_ref,
-    }, "class_type": "KSampler"}
+    # 采样：基座走 KSampler，Turbo 走固定 sigma 表 + SamplerCustomAdvanced。
+    #
+    # 【为什么 Turbo 不能只用 KSampler(steps=8)】
+    #   Turbo 是 8 步蒸馏版，官方模板用 ManualSigmas 节点写死 8 步 sigma 表
+    #   （1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534,
+    #     0.414568, 0），再经 SamplerCustomAdvanced 采样。
+    #   如果只把 KSampler 的 steps 改成 8，调度器会按 simple 重新分配 sigma，
+    #   与蒸馏时固化的 schedule 不符 —— 出图会明显劣化（细节糊 / 构图漂）。
+    #   官方文档也明确：步数必须与 schedule 一起用。
+    manual_sigmas = model.get("manual_sigmas")
+    if manual_sigmas:
+        # RandomNoise（种子）-> CFGGuider（模型 + 正负条件 + cfg）
+        p["qw:20"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise"}
+        p["qw:21"] = {"inputs": {
+            "model": model_ref,
+            "positive": ["qw:27", 0],
+            "negative": ["qw:27", 1],
+            "cfg": float(cfg),
+        }, "class_type": "CFGGuider"}
+        # 采样器（官方 Turbo 模板固定 euler）
+        p["qw:22"] = {"inputs": {"sampler_name": sampler},
+                      "class_type": "KSamplerSelect"}
+        # 固定 sigma 表
+        p["qw:23"] = {"inputs": {"sigmas": manual_sigmas},
+                      "class_type": "ManualSigmas"}
+        p["qw:3"] = {"inputs": {
+            "noise": ["qw:20", 0],
+            "guider": ["qw:21", 0],
+            "sampler": ["qw:22", 0],
+            "sigmas": ["qw:23", 0],
+            "latent_image": latent_ref,
+        }, "class_type": "SamplerCustomAdvanced"}
+    else:
+        p["qw:3"] = {"inputs": {
+            "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
+            "sampler_name": sampler, "scheduler": scheduler, "denoise": 1,
+            "model": model_ref,
+            "positive": ["qw:27", 0],
+            "negative": ["qw:27", 1],
+            "latent_image": latent_ref,
+        }, "class_type": "KSampler"}
 
     p["qw:8"] = {"inputs": {"samples": ["qw:3", 0], "vae": ["qw:29", 0]},
                  "class_type": "VAEDecode"}
@@ -1111,6 +1299,78 @@ def _qwen_collect_loras(params):
     return loras
 
 
+def qwen_unet_available(unet_name: str) -> bool:
+    """权重文件在本机是否存在（对应加载器的下拉里能不能选到）。
+
+    Turbo 权重可能没下载 —— 这时前端要把该版本标成「不可用」，
+    后端也要在选到它时给出明确错误，而不是让 ComfyUI 报
+    "value not in list" 这种看不懂的错。
+    """
+    if not unet_name:
+        return False
+    try:
+        roots = lora_registry._model_dirs()
+    except Exception:
+        roots = []
+    for root in roots:
+        # ComfyUI 的模型目录都放 models/ 下，UNET/VAE/文本编码器各一个子目录；
+        # 名字给全是为了这个检查函数能同时用于 unet / vae / 文本编码器。
+        for sub in ("diffusion_models", "unet", "checkpoints", "vae",
+                    "text_encoders", "clip"):
+            try:
+                path = root / sub / unet_name
+                if not path.exists():
+                    continue
+                # 下载中断会留下半截文件 —— 用 safetensors 头判断是否完整，
+                # 否则会「文件在但跑起来才炸」。
+                if _safetensors_complete(path):
+                    return True
+            except OSError:
+                continue
+    return False
+
+
+# 官方权重文件的权威字节数（HF Comfy-Org/Qwen-Image-2.1 的 blobs 实测值）。
+# 下载中断会留下「头完整但数据没下完」的半截文件 —— 只看 safetensors 头
+# 判定不出来（头在最前面），必须比对总字节数。
+QWEN_IMAGE_EXPECTED_SIZES = {
+    "qwen_image_2.1_bf16.safetensors": 14230280616,
+    "qwen_image_2.1_turbo_bf16.safetensors": 14230280616,
+    "qwen_image_2.1_vae_bf16.safetensors": 675509688,
+    "qwen3vl_8b_bf16.safetensors": 17534334616,
+    "qwen3.5_qwen_image_2.1_pe_t2i.int8_convrot.safetensors": 9471072252,
+    "qwen3.5_qwen_image_2.1_pe_i2i.int8_convrot.safetensors": 9471072252,
+}
+
+
+def _safetensors_complete(path) -> bool:
+    """safetensors 文件是否完整。
+
+    两条判据都要过：
+      1. safetensors 头自洽：前 8 字节 little-endian uint64 = 头部长度 N，
+         紧接着 N 字节是 JSON 头，剩下是张量数据。
+      2. 字节数与官方权威值一致（已知文件）—— 这条能识破
+         「头完整但数据没下完」的半截文件（头在最前面，只查头会漏判）。
+    """
+    try:
+        size = path.stat().st_size
+        if size < 16:
+            return False
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+        if len(head) < 8:
+            return False
+        header_len = int.from_bytes(head, "little")
+        if header_len <= 0 or header_len > size - 8:
+            return False
+        expected = QWEN_IMAGE_EXPECTED_SIZES.get(path.name)
+        if expected is not None and size != expected:
+            return False
+        return True
+    except OSError:
+        return False
+
+
 def build_qwen_t2i(params):
     """Qwen-Image 2.1 文生图。"""
     job_id = params["job_id"]
@@ -1118,6 +1378,12 @@ def build_qwen_t2i(params):
     if model_key not in QWEN_IMAGE_MODELS:
         model_key = QWEN_IMAGE_DEFAULT_MODEL
     model = QWEN_IMAGE_MODELS[model_key]
+    # 权重缺失保护：Turbo 权重可能没下载 —— 给明确中文错误，
+    # 而不是让 ComfyUI 报 "value not in list"
+    if not qwen_unet_available(model["unet"]):
+        raise ValueError(
+            f"本机缺少该模型版本的权重文件：{model['unet']}。"
+            f"请先下载到 ComfyUI 的 models/diffusion_models/ 后再使用")
 
     seed = params.get("seed") or random.randint(0, 2**48)
     aspect = params.get("aspect", "16:9")
@@ -1144,10 +1410,13 @@ def build_qwen_t2i(params):
     use_pe = bool(params.get("use_pe", True))
     pe_clip = model["clip_t2i"]
     cond_clip = QWEN_IMAGE_CLIP_COND
+    # PE-T2I 档（presence_penalty=1.5 / max_new_tokens=16256）
+    pe_params = dict(QWEN_IMAGE_PE_PARAMS["t2i"])
 
     return _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
                                scheduler, steps, cfg, shift, negative_text,
-                               prompt, job_id, loras=loras, use_pe=use_pe)
+                               prompt, job_id, loras=loras, use_pe=use_pe,
+                               pe_params=pe_params)
 
 
 def build_qwen_i2i(params):
@@ -1164,6 +1433,12 @@ def build_qwen_i2i(params):
     if model_key not in QWEN_IMAGE_MODELS:
         model_key = QWEN_IMAGE_DEFAULT_MODEL
     model = QWEN_IMAGE_MODELS[model_key]
+    # 权重缺失保护：Turbo 权重可能没下载 —— 给明确中文错误，
+    # 而不是让 ComfyUI 报 "value not in list"
+    if not qwen_unet_available(model["unet"]):
+        raise ValueError(
+            f"本机缺少该模型版本的权重文件：{model['unet']}。"
+            f"请先下载到 ComfyUI 的 models/diffusion_models/ 后再使用")
 
     refs = params.get("ref_images") or []
     if not isinstance(refs, list):
@@ -1174,7 +1449,8 @@ def build_qwen_i2i(params):
     if len(refs) > QWEN_IMAGE_MAX_REF_IMAGES:
         raise ValueError(
             f"参考图最多 {QWEN_IMAGE_MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
-            f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张）")
+            f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张，"
+            f"模型官方能力上限 10 张）")
 
     seed = params.get("seed") or random.randint(0, 2**48)
     aspect = params.get("aspect", "16:9")
@@ -1201,11 +1477,14 @@ def build_qwen_i2i(params):
     use_pe = bool(params.get("use_pe", True))
     pe_clip = model["clip_i2i"]
     cond_clip = QWEN_IMAGE_CLIP_COND
+    # PE-I2I 档（presence_penalty=0 / max_new_tokens=24000）
+    pe_params = dict(QWEN_IMAGE_PE_PARAMS["i2i"])
 
     # 参考图 -> LoadImage 节点（只允许引用本机已存在的文件）
     p = _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
                             scheduler, steps, cfg, shift, negative_text,
-                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe)
+                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
+                            pe_params=pe_params)
     # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
     # （COMFY_AUTOGROW_V3，按 image_1..image_N 命名）
     te_inputs = p["qw:27"]["inputs"]

@@ -80,7 +80,9 @@ const state = {
     width: null,
     height: null,
     model: "qwen_image_2.1_bf16",
-    steps: 50,
+    // 步数随「模型版本」联动：基座 40 步 / Turbo 8 步（蒸馏）
+    // 初始值对齐默认模型（基座）的推荐步数
+    steps: 40,
     cfg: 1,
     shift: 0.69,
     sampler: "euler",
@@ -90,7 +92,8 @@ const state = {
     // 官方 PE 提示词扩写（默认开 —— 官方最佳实践）
     usePe: true,
     loras: [],
-    // 参考图（图片编辑用，最多 9 张）：[{file, name, url}]
+    // 参考图（图片编辑用，最多 10 张 —— 模型官方能力上限）：
+    // [{file, name, url}]
     refs: [],
   },
   // 图像模式（Z-Image 文生图）专属状态
@@ -123,7 +126,10 @@ const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxD
 const QWEN_OPTIONS = {
   tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 4,
   defaultTier: "1mp", defaultModel: "qwen_image_2.1_bf16",
-  maxRefImages: 9, minRefImages: 1,
+  // 参考图上限：模型官方能力 10 张（ComfyUI 节点 16 槽 -> 取 10）
+  maxRefImages: 10, minRefImages: 1, nodeRefSlots: 16,
+  // 官方 PE 双档参数（presence_penalty 不可互换）
+  peParams: {}, peDefaultMaxLength: 4096,
 };
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
 // available = 效果类 LoRA（用户可选）
@@ -689,9 +695,24 @@ function updateNegativeNote() {
   const negIgnoredAtCfg1 = isQwenMode() && Math.abs(cfg - 1) < 1e-6;
   const note = $("#imgNegNote");
   if (!note) return;
+  // 【cfg=1 时负面提示词在数学上无效】
+  //   ComfyUI 的 samplers.py:609-627 在 cfg==1 时直接跳过 uncond 分支，
+  //   negative_prompt 不会参与采样。diffusers 侧同理：
+  //   do_true_cfg = true_cfg_scale > 1 and has_neg_prompt。
+  //   官方 Qwen 路径默认就是 cfg=1（官方 note: "unused while cfg is 1"）。
+  //   -> 界面把输入框置灰并说明，别让用户填了无效参数还以为生效了。
+  const textarea = $("#imgNegative");
+  if (textarea) {
+    const disabled = !negSupported || negIgnoredAtCfg1;
+    textarea.disabled = disabled;
+    textarea.style.opacity = disabled ? "0.55" : "";
+    textarea.placeholder = disabled
+      ? "当前设置下负面提示词不生效（见下方说明）"
+      : "extra fingers, poorly drawn hands, deformed, disfigured";
+  }
   note.textContent = negSupported
     ? (negIgnoredAtCfg1
-        ? "当前 CFG=1：ComfyUI 会跳过 uncond 分支，负面提示词数学上无效。"
+        ? "当前 CFG=1：ComfyUI 会跳过 uncond 分支，负面提示词数学上无效（已置灰）。"
           + "官方路径就是 cfg=1；要启用负面提示词请把 CFG 调到 1 以上。"
         : (isQwenMode()
             ? "Qwen-Image 2.1 非蒸馏，CFG>1 时负面提示词生效。"
@@ -735,15 +756,27 @@ function renderImagePanel() {
   });
 
   // 模型
+  // 权重不在本机的版本（Turbo 权重可能没下载）—— 标「不可用」并禁选，
+  // 避免用户选完才在跑图时炸掉。
   const modelSel = $("#imgModelSelect");
   modelSel.innerHTML = "";
   Object.entries(ctx.models).forEach(([key, m]) => {
     const opt = document.createElement("option");
     opt.value = key;
-    opt.textContent = m.label;
+    const unavailable = m.available === false;
+    opt.textContent = unavailable ? m.label + "（权重缺失，不可用）" : m.label;
+    opt.disabled = unavailable;
     opt.selected = key === s.model;
     modelSel.appendChild(opt);
   });
+  // 当前选中的模型不可用时（权重被删了），回落到默认模型
+  if (model && model.available === false) {
+    const fallback = ctx.models[ctx.opts.defaultModel];
+    if (fallback) {
+      s.model = ctx.opts.defaultModel;
+      applyModelDefaults(ctx.opts.defaultModel);
+    }
+  }
 
   // 采样器 / 调度器：列表按模型版本区分（Turbo 不给 karras/exponential 调度器）
   const fillSelect = (sel, values, current) => {
@@ -831,6 +864,13 @@ function updateImageSizeFields() {
 }
 
 // 切模型时把该版本的官方推荐值同步到各控件（推荐值来自服务端下发的清单）
+// 切模型版本时把该版本的官方推荐值同步到各控件（推荐值来自服务端下发的清单）
+//
+// 【步数随模型版本联动】
+//   基座 = 40 步（官方 README 默认 num_inference_steps=40）
+//   Turbo = 8 步（8 步蒸馏版，步数与固定 sigma 表绑定）
+// 这里直接取该模型的 steps —— 切版本时步数自动跟着变，
+// 不会出现「Turbo 跑 40 步」这种与蒸馏 schedule 不匹配的组合。
 function applyModelDefaults(modelKey) {
   const ctx = imgCtx();
   const m = ctx.models[modelKey];
@@ -856,7 +896,25 @@ function updateImageModelNote() {
   $("#imgSchedulerHint").textContent = s.scheduler === m.scheduler ? "推荐" : "已改";
   $("#imgStepsHint").textContent = s.steps === m.steps ? "推荐" : "已改";
   $("#imgCfgHint").textContent = Number(s.cfg) === Number(m.cfg) ? "推荐" : "已改";
-  $("#imgShiftHint").textContent = Number(s.shift) === Number(m.shift) ? "推荐" : "已改";
+  // SHIFT 的说明比别的参数多一层：官方是 dynamic shifting，由图像 token 数
+  // 自动算 mu（base_shift 0.5 → max_shift 0.9，1024×1024 对应 mu≈0.69）。
+  // ComfyUI 侧把它固化成了 1024×1024 拟合的常数 0.69 —— 非 1024 分辨率下
+  // 是近似值。所以标「推荐/自动」并说明。
+  const shiftHint = $("#imgShiftHint");
+  if (shiftHint) {
+    if (Number(s.shift) !== Number(m.shift)) {
+      shiftHint.textContent = "已改";
+      shiftHint.title = "";
+    } else if (isQwenMode()) {
+      shiftHint.textContent = "推荐/自动";
+      shiftHint.title = "官方用 dynamic shifting 按图像 token 数自动算 mu"
+        + "（base_shift 0.5 → max_shift 0.9，1024×1024 对应 mu≈0.69）。"
+        + "ComfyUI 固化的是 1024×1024 拟合值，非 1024 分辨率下为近似值。";
+    } else {
+      shiftHint.textContent = "推荐";
+      shiftHint.title = "";
+    }
+  }
 }
 
 $("#imgResSelect").addEventListener("change", e => {
@@ -927,9 +985,9 @@ $("#imgUsePe").addEventListener("change", e => {
   updateQwenPeNote();
 });
 
-// ---------- Qwen-Image 2.1：参考图（最多 9 张） ----------
+// ---------- Qwen-Image 2.1：参考图（最多 10 张 —— 模型官方能力上限） ----------
 function qwenRefLimit() {
-  return QWEN_OPTIONS.maxRefImages || 9;
+  return QWEN_OPTIONS.maxRefImages || 10;
 }
 
 function renderQwenRefs() {
@@ -937,9 +995,12 @@ function renderQwenRefs() {
   if (!box) return;
   const refs = state.imgQwen.refs;
   const max = qwenRefLimit();
+  // 每张缩略图带序号（<imageN> 语义）：官方 PE 按顺序引用参考图，
+  // 顺序即语义 —— 用户必须能看到并调整顺序。
   box.innerHTML = refs.map((r, i) => `
-    <div class="img-ref-item" data-idx="${i}">
+    <div class="img-ref-item" data-idx="${i}" draggable="true" title="${esc(r.name || "")} — 拖动可排序（序号即 &lt;image${i + 1}&gt; 引用顺序）">
       <img src="${r.url}" alt="参考图 ${i + 1}">
+      <span class="img-ref-idx">${i + 1}</span>
       <button type="button" class="img-ref-del" data-del="${i}" title="移除">×</button>
     </div>`).join("");
   box.querySelectorAll("[data-del]").forEach(btn => {
@@ -951,16 +1012,48 @@ function renderQwenRefs() {
       renderQwenRefs();
     });
   });
+  // 拖动排序：图序即语义（官方 PE 按 <imageN> 引用）
+  box.querySelectorAll(".img-ref-item").forEach(item => {
+    item.addEventListener("dragstart", e => {
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", item.dataset.idx);
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      box.querySelectorAll(".img-ref-item").forEach(x => x.classList.remove("drag-over"));
+    });
+    item.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      item.classList.add("drag-over");
+    });
+    item.addEventListener("dragleave", () => item.classList.remove("drag-over"));
+    item.addEventListener("drop", e => {
+      e.preventDefault();
+      item.classList.remove("drag-over");
+      const from = Number(e.dataTransfer.getData("text/plain"));
+      const to = Number(item.dataset.idx);
+      if (Number.isNaN(from) || from === to) return;
+      const list = state.imgQwen.refs;
+      const moved = list.splice(from, 1)[0];
+      list.splice(to, 0, moved);
+      renderQwenRefs();
+    });
+  });
   $("#imgRefHint").textContent = refs.length
     ? `${refs.length} / ${max} 张`
     : `最多 ${max} 张`;
   const note = $("#imgRefNote");
+  const slots = QWEN_OPTIONS.nodeRefSlots || 16;
   if (refs.length >= max) {
-    note.textContent = `已达上限 ${max} 张。官方图片编辑工作流就是 ${max} 张参考图。`;
+    note.textContent = `已达上限 ${max} 张（模型官方能力上限 10 张；`
+      + `ComfyUI 节点侧有 ${slots} 个 image 插槽，本面板取两者较小值 ${max}）。`;
   } else if (refs.length) {
-    note.textContent = `还可以再加 ${max - refs.length} 张。`;
+    note.textContent = `还可以再加 ${max - refs.length} 张（上限 ${max} 张，模型官方能力 10 张）。`;
   } else {
-    note.textContent = `至少 1 张、最多 ${max} 张。多图可做换头/换装/融合等编辑。`;
+    note.textContent = `至少 1 张、最多 ${max} 张（模型官方能力上限 10 张）。`
+      + `多图可做换头/换装/融合等编辑；图序即语义，顺序变了引用会错位。`;
   }
   $("#imgRefAdd").disabled = refs.length >= max;
 }
@@ -984,14 +1077,36 @@ $("#imgRefInput").addEventListener("change", e => {
   }
 });
 
+// 官方 PE 有两个独立 checkpoint，**不可互换**：
+//   PE-T2I（文生图）：presence_penalty=1.5, max_new_tokens=16256
+//   PE-I2I（编辑）  ：presence_penalty=0,   max_new_tokens=24000
+// 填错不报错，只会悄悄改采样分布 —— 所以档位随模式写死，UI 明确标出来。
+function qwenPeTierKey() {
+  return state.mode === "i2i_qwen" ? "i2i" : "t2i";
+}
+
 function updateQwenPeNote() {
   const note = $("#imgPeNote");
   if (!note) return;
   const m = QWEN_OPTIONS.models[state.imgQwen.model];
-  const peClip = m ? (m.clip_t2i || "") : "";
-  note.textContent = state.imgQwen.usePe
-    ? `已启用：提示词会先经官方 PE 编码器（${peClip.split("/").pop()}）结构化扩写再送入模型。关掉则提示词原样使用。`
-    : "已关闭：提示词原样送入模型，不做官方扩写。";
+  const tierKey = qwenPeTierKey();
+  const tier = (QWEN_OPTIONS.peParams || {})[tierKey] || {};
+  const peClip = m ? ((tierKey === "i2i" ? m.clip_i2i : m.clip_t2i) || "") : "";
+  const tierLabel = tier.label || (tierKey === "i2i" ? "PE-I2I（图片编辑）" : "PE-T2I（文生图）");
+  // 标题旁的档位徽标：明确当前用的是 T2I 档还是 I2I 档
+  const badge = $("#imgPeTier");
+  if (badge) badge.textContent = `当前：${tierLabel}`;
+  if (state.imgQwen.usePe) {
+    note.innerHTML = `已启用：当前用 <b>${tierLabel}</b> 档`
+      + `（presence_penalty=${tier.presence_penalty ?? "-"}，max_new_tokens=${tier.max_new_tokens ?? "-"}）。`
+      + `提示词先经官方 PE 编码器（${peClip.split("/").pop()}）结构化扩写再送入模型。`
+      + `<br>两个 PE checkpoint 不可互换（填错不报错，只会让采样分布悄悄变），`
+      + `当前档位由「文生图 / 图片编辑」自动决定。`
+      + `<br>官方 ComfyUI 模板把 max_length 压到 4096，而模型卡值是 16256/24000 —— `
+      + `开 thinking 前若压得太低，PE 会静默返回空串（编辑表现为「几乎原样返回」）。`;
+  } else {
+    note.textContent = "已关闭：提示词原样送入模型，不做官方扩写。";
+  }
 }
 
 // 拉取服务端下发的档位 / 比例 / 模型清单
@@ -1014,8 +1129,11 @@ async function loadImageOptions() {
     QWEN_OPTIONS.maxDirectMp = q.max_direct_mp || 4;
     QWEN_OPTIONS.defaultTier = q.default_tier || "1mp";
     QWEN_OPTIONS.defaultModel = q.default_model || "qwen_image_2.1_bf16";
-    QWEN_OPTIONS.maxRefImages = q.max_ref_images || 9;
+    QWEN_OPTIONS.maxRefImages = q.max_ref_images || 10;
     QWEN_OPTIONS.minRefImages = q.min_ref_images || 1;
+    QWEN_OPTIONS.nodeRefSlots = q.node_ref_slots || 16;
+    QWEN_OPTIONS.peParams = q.pe_params || {};
+    QWEN_OPTIONS.peDefaultMaxLength = q.pe_default_max_length || 4096;
     // Qwen 默认值对齐服务端推荐（首次进入该模式时用）
     // Qwen-Image 2.1 的默认值：以服务端下发的推荐值为准（步数/CFG/SHIFT…）
     const qm = QWEN_OPTIONS.models[QWEN_OPTIONS.defaultModel];

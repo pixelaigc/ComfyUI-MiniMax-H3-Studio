@@ -11,9 +11,13 @@
    （mm=0、b=S -> shift 恒等于 S）。
 
 2. **PE 编码器接错位置**
-   PE 编码器（qwen3.5_qwen_image_2.1_pe_*）接的是 **TextGenerateLTX2Prompt**
+   PE 编码器（qwen3.5_qwen_image_2.1_pe_*）接的是 **TextGenerate**
    （提示词扩写节点），扩写后的文本再喂给 TextEncodeQwenImage21 的 prompt；
    TextEncodeQwenImage21 的 clip 输入接的是普通编码器 qwen3vl_8b_bf16。
+
+   注意：不能用 TextGenerateLTX2Prompt —— 那是 LTX2 **视频**用的节点，
+   它会强制套 Gemma 对话模板并塞入 LTX2 的视频提示词 system prompt，
+   官方 Qwen PE 工作流用的是 TextGenerate + 官方 PE 自己的 system prompt。
 
 3. **参考图的 COMFY_AUTOGROW_V3 API 格式**
    必须写成嵌套的 `"images": {"image_1": <值>, ...}`。写成扁平的顶层
@@ -69,7 +73,7 @@ def seed_jobs(data_dir, count=6):
 
 
 class TestQwenBackend(unittest.TestCase):
-    """后端：构建器结构 / 参数落到请求 / 9 图校验（不依赖浏览器）。"""
+    """后端：构建器结构 / 参数落到请求 / 10 图校验（不依赖浏览器）。"""
 
     @classmethod
     def setUpClass(cls):
@@ -82,7 +86,7 @@ class TestQwenBackend(unittest.TestCase):
         params.update(over)
         return self.W.build_qwen_t2i(params)
 
-    def build_i2i(self, n=9, **over):
+    def build_i2i(self, n=10, **over):
         params = {"job_id": "probe", "prompt": "换头", "model": "qwen_image_2.1_bf16",
                   "aspect": "1:1", "resolution": "1mp", "seed": 42,
                   "ref_images": [f"h3studio/ref{i}.png" for i in range(n)]}
@@ -134,8 +138,8 @@ class TestQwenBackend(unittest.TestCase):
         # PE 编码器 -> 扩写节点
         pe_id = next(k for k, n in p.items() if n is pe_loader)
         expand = next((k for k, n in p.items()
-                       if n["class_type"] == "TextGenerateLTX2Prompt"), None)
-        self.assertIsNotNone(expand, "缺少 TextGenerateLTX2Prompt（PE 扩写节点）")
+                       if n["class_type"] == "TextGenerate"), None)
+        self.assertIsNotNone(expand, "缺少 TextGenerate（PE 扩写节点）")
         self.assertEqual(p[expand]["inputs"]["clip"], [pe_id, 0],
                          "PE 编码器应接扩写节点的 clip")
         # 条件编码器 -> TextEncodeQwenImage21.clip
@@ -160,9 +164,9 @@ class TestQwenBackend(unittest.TestCase):
         self.assertNotEqual(t2i_clip, i2i_clip)
 
     def test_prompt_expansion_node_api_shape(self):
-        """TextGenerateLTX2Prompt 的 API 格式：sampling_mode 是选项 key 字符串。"""
+        """TextGenerate 的 API 格式：sampling_mode 是选项 key 字符串。"""
         p = self.build_t2i()
-        expand = next(n for n in p.values() if n["class_type"] == "TextGenerateLTX2Prompt")
+        expand = next(n for n in p.values() if n["class_type"] == "TextGenerate")
         self.assertEqual(expand["inputs"]["sampling_mode"], "on")
         for key in ("sampling_mode.temperature", "sampling_mode.top_k",
                     "sampling_mode.top_p", "sampling_mode.min_p",
@@ -173,7 +177,7 @@ class TestQwenBackend(unittest.TestCase):
         """关掉 PE 开关 -> 不建扩写节点，提示词原样进模型。"""
         p = self.build_t2i(use_pe=False)
         classes = {n["class_type"] for n in p.values()}
-        self.assertNotIn("TextGenerateLTX2Prompt", classes,
+        self.assertNotIn("TextGenerate", classes,
                          "关掉 PE 后不该有扩写节点")
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
         self.assertIsInstance(te["inputs"]["prompt"], str,
@@ -222,16 +226,80 @@ class TestQwenBackend(unittest.TestCase):
         self.assertAlmostEqual(m["cfg"], 1.0, places=3,
                                msg="官方路径默认 cfg=1")
 
+    # ---------------------------------------------- PE 双档参数
+    def test_pe_presence_penalty_differs_by_tier(self):
+        """PE-T2I 与 PE-I2I 的 presence_penalty 不可互换。
+
+        官方 PE model card：
+          PE-T2I  presence_penalty=1.5  max_new_tokens=16256
+          PE-I2I  presence_penalty=0    max_new_tokens=24000
+        填错不报错，只会让采样分布悄悄变 —— 所以档位必须随模式走。
+        """
+        t2i = self.build_t2i()
+        i2i = self.build_i2i(n=2)
+        pe_t2i = next(n for n in t2i.values() if n["class_type"] == "TextGenerate")
+        pe_i2i = next(n for n in i2i.values() if n["class_type"] == "TextGenerate")
+        self.assertAlmostEqual(pe_t2i["inputs"]["sampling_mode.presence_penalty"],
+                               1.5, places=3)
+        self.assertAlmostEqual(pe_i2i["inputs"]["sampling_mode.presence_penalty"],
+                               0.0, places=3)
+        self.assertEqual(pe_t2i["inputs"]["max_length"], 16256)
+        self.assertEqual(pe_i2i["inputs"]["max_length"], 24000)
+
+    def test_pe_max_length_uses_official_card_value(self):
+        """max_length 不能压到 4096（官方模板的做法）—— 会让 PE 静默返回空串。
+
+        官方文档原文警告：
+          "When the reasoning block uses up the 4096 budget, it never closes
+           and the enhancer returns an empty string."
+        官方 ComfyUI 模板把 max_length 压到 4096，本面板用官方卡值。
+        """
+        params = self.W.QWEN_IMAGE_PE_PARAMS
+        self.assertEqual(params["t2i"]["max_new_tokens"], 16256)
+        self.assertEqual(params["i2i"]["max_new_tokens"], 24000)
+        p = self.build_t2i()
+        pe = next(n for n in p.values() if n["class_type"] == "TextGenerate")
+        self.assertGreater(pe["inputs"]["max_length"], 4096,
+                           "max_length 必须大于 4096，否则开 thinking 会静默返回空串")
+        # thinking 必须开（官方 PE model card: thinking 必开）
+        self.assertTrue(pe["inputs"]["thinking"], "官方 PE 的 thinking 必须开")
+
+    def test_pe_uses_official_system_prompt(self):
+        """PE 节点要带官方 PE 的 system prompt（不是模型内置模板）。
+
+        官方工作流用 TextGenerate + PrimitiveStringMultiline 接的官方
+        system prompt；本面板把两份官方 prompt 落盘到 skill assets 里。
+        """
+        p = self.build_t2i()
+        pe = next(n for n in p.values() if n["class_type"] == "TextGenerate")
+        sp = pe["inputs"].get("system_prompt", "")
+        self.assertGreater(len(sp), 5000,
+                           f"PE system prompt 长度异常：{len(sp)}（应为官方 PE 原文）")
+        self.assertIn("Image Prompt Rewriting Expert", sp,
+                      "应是官方 PE-T2I 的 system prompt")
+        p2 = self.build_i2i(n=2)
+        pe2 = next(n for n in p2.values() if n["class_type"] == "TextGenerate")
+        sp2 = pe2["inputs"].get("system_prompt", "")
+        self.assertNotEqual(sp, sp2, "文生图与编辑档的 system prompt 必须不同")
+
+    def test_pe_node_is_textgenerate_not_ltx2(self):
+        """不能用 TextGenerateLTX2Prompt —— 那是 LTX2 视频节点，会套错模板。"""
+        p = self.build_t2i()
+        classes = {n["class_type"] for n in p.values()}
+        self.assertIn("TextGenerate", classes)
+        self.assertNotIn("TextGenerateLTX2Prompt", classes,
+                         "TextGenerateLTX2Prompt 会塞入 LTX2 视频提示词 system prompt")
+
     # ---------------------------------------------- 缺陷 3：参考图 API 格式
     def test_reference_images_use_nested_images_dict(self):
         """参考图必须写成嵌套的 images 字典（COMFY_AUTOGROW_V3 的 API 格式）。"""
-        p = self.build_i2i(n=9)
+        p = self.build_i2i(n=10)
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
         self.assertIn("images", te["inputs"], "缺少 images 输入")
         images = te["inputs"]["images"]
         self.assertIsInstance(images, dict, "images 应是字典")
-        self.assertEqual(len(images), 9)
-        for i in range(9):
+        self.assertEqual(len(images), 10)
+        for i in range(10):
             self.assertIn(f"image_{i + 1}", images)
         # 顶层不能有扁平的 image_N 键（会被当成 execute() 的关键字参数）
         flat = [k for k in te["inputs"] if k.startswith("image_")]
@@ -266,14 +334,33 @@ class TestQwenBackend(unittest.TestCase):
             self.build_i2i(n=0)
         self.assertIn("至少", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            self.build_i2i(n=10)
+            self.build_i2i(n=11)
         msg = str(ctx.exception)
-        self.assertIn("9", msg)
+        self.assertIn("10", msg)
         self.assertIn("最多", msg)
 
-    def test_max_ref_images_is_nine(self):
-        self.assertEqual(self.W.QWEN_IMAGE_MAX_REF_IMAGES, 9)
+    def test_max_ref_images_is_official_ten(self):
+        """上限取 10 张：模型官方能力上限 10（官方 Blog / README）。
+
+        ComfyUI 节点侧有 16 个 image 插槽（nodes_qwen.py 的 io.Autogrow），
+        官方模板接前 10 个 —— 三者取「模型能力 10」与「节点 16 槽」的较小者 = 10。
+        需求原文说「最大 9 张」，那是官方图片编辑模板的接线数，不是能力上限。
+        """
+        self.assertEqual(self.W.QWEN_IMAGE_MAX_REF_IMAGES, 10)
         self.assertEqual(self.W.QWEN_IMAGE_MIN_REF_IMAGES, 1)
+        self.assertEqual(self.W.QWEN_IMAGE_NODE_REF_SLOTS, 16)
+        self.assertLessEqual(self.W.QWEN_IMAGE_MAX_REF_IMAGES,
+                             self.W.QWEN_IMAGE_NODE_REF_SLOTS,
+                             "落地上限不能超过 ComfyUI 节点的实际槽位数")
+
+    def test_ten_ref_images_are_wired(self):
+        """10 张参考图要全部接进 images 字典（image_1..image_10）。"""
+        p = self.build_i2i(n=10)
+        te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
+        keys = sorted(te["inputs"]["images"].keys(),
+                      key=lambda n: int(n.rsplit("_", 1)[-1]))
+        self.assertEqual(keys, [f"image_{i}" for i in range(1, 11)],
+                         f"10 张参考图应接成 image_1..image_10，实际 {keys}")
 
     # ---------------------------------------------- 参数落到请求
     def test_all_params_reach_the_workflow(self):
@@ -308,13 +395,74 @@ class TestQwenBackend(unittest.TestCase):
         self.assertEqual(ks["inputs"]["latent_image"], [lat_id, 0])
 
     def test_official_defaults(self):
-        """官方推荐默认值：50 步 / cfg 1 / euler / simple / shift 0.69。"""
+        """官方推荐默认值：40 步 / cfg 1 / euler / simple / shift 0.69。
+
+        步数取 40 的依据是官方 README 的 Default Parameters 表
+        （num_inference_steps=40）；ComfyUI 官方模板取 25 是折中值。
+        """
         p = self.build_t2i()
         ks = next(n for n in p.values() if n["class_type"] == "KSampler")
-        self.assertEqual(ks["inputs"]["steps"], 50)
+        self.assertEqual(ks["inputs"]["steps"], 40)
         self.assertAlmostEqual(ks["inputs"]["cfg"], 1.0, places=3)
         self.assertEqual(ks["inputs"]["sampler_name"], "euler")
         self.assertEqual(ks["inputs"]["scheduler"], "simple")
+
+    # ---------------------------------------------- 模型版本 -> 步数联动
+    def test_model_versions_have_linked_default_steps(self):
+        """模型版本 -> 默认步数：基座 40 / Turbo 8（蒸馏）。
+
+        Turbo 是 8 步蒸馏版，步数与固定 sigma 表绑定 —— 前端切版本时
+        必须把步数同步成该版本的值，否则会出现「Turbo 跑 40 步」。
+        """
+        base = self.W.QWEN_IMAGE_MODELS["qwen_image_2.1_bf16"]
+        turbo = self.W.QWEN_IMAGE_MODELS["qwen_image_2.1_turbo_bf16"]
+        self.assertEqual(base["steps"], 40)
+        self.assertEqual(turbo["steps"], 8)
+        # 两档的其它推荐参数一致
+        for key in ("cfg", "shift", "sampler", "scheduler"):
+            self.assertEqual(base[key], turbo[key], f"{key} 两档应一致")
+
+    def test_turbo_uses_manual_sigmas_not_plain_ksampler(self):
+        """Turbo 必须走 ManualSigmas + SamplerCustomAdvanced。
+
+        官方 Turbo 模板（image_qwen_image_2_1_turbo_t2i.json）用
+        ManualSigmas 写死 8 步 sigma 表；只用 KSampler(steps=8) 会让
+        调度器按 simple 重新分配 sigma，与蒸馏固化的 schedule 不符。
+        """
+        turbo = self.W.QWEN_IMAGE_MODELS["qwen_image_2.1_turbo_bf16"]
+        if not self.W.qwen_unet_available(turbo["unet"]):
+            self.skipTest("本机没有 Turbo 权重，无法构建 Turbo 工作流")
+        p = self.build_t2i(model="qwen_image_2.1_turbo_bf16")
+        classes = {n["class_type"] for n in p.values()}
+        self.assertIn("ManualSigmas", classes, "Turbo 缺固定 sigma 表")
+        self.assertIn("SamplerCustomAdvanced", classes, "Turbo 缺自定义采样节点")
+        self.assertNotIn("KSampler", classes,
+                         "Turbo 不该用普通 KSampler（步数与 sigma 表绑定）")
+        sigmas = next(n for n in p.values() if n["class_type"] == "ManualSigmas")
+        self.assertEqual(sigmas["inputs"]["sigmas"], self.W.QWEN_IMAGE_TURBO_SIGMAS)
+        # 8 步 schedule = 9 个 sigma 点（首尾各一个）
+        values = [v.strip() for v in sigmas["inputs"]["sigmas"].split(",")]
+        self.assertEqual(len(values), 9, f"8 步应有 9 个 sigma，实际 {len(values)}")
+        self.assertEqual(values[-1], "0", "最后一个 sigma 应为 0")
+        # guider 必须接模型 + 正负条件 + cfg
+        guider = next(n for n in p.values() if n["class_type"] == "CFGGuider")
+        self.assertIn("model", guider["inputs"])
+        self.assertIn("positive", guider["inputs"])
+        self.assertIn("negative", guider["inputs"])
+        self.assertAlmostEqual(guider["inputs"]["cfg"], 1.0, places=3)
+        # 噪声节点带种子
+        noise = next(n for n in p.values() if n["class_type"] == "RandomNoise")
+        self.assertIn("noise_seed", noise["inputs"])
+
+    def test_turbo_refuses_when_weight_missing(self):
+        """Turbo 权重缺失时要给明确中文错误，而不是让 ComfyUI 报看不懂的错。"""
+        turbo = self.W.QWEN_IMAGE_MODELS["qwen_image_2.1_turbo_bf16"]
+        if self.W.qwen_unet_available(turbo["unet"]):
+            self.skipTest("本机已有 Turbo 权重，跳过缺失分支")
+        with self.assertRaises(ValueError) as ctx:
+            self.build_t2i(model="qwen_image_2.1_turbo_bf16")
+        self.assertIn("缺少", str(ctx.exception))
+        self.assertIn(turbo["unet"], str(ctx.exception))
 
     def test_builders_registered(self):
         """两个模式都要注册进 BUILDERS（否则前端有入口但后端不认识）。"""

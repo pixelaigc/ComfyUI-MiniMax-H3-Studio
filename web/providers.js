@@ -24,11 +24,17 @@ function enhanceCurrentMode() {
   return state.mode || "";
 }
 
-// 当前选中的模型 key（图像模式用 Z-Image 模型，视频模式用 MiniMax-H3 两档）
+// 当前选中的模型 key（图像模式用各自的图像模型，视频模式用 MiniMax-H3 两档）
+// 注意：Qwen-Image 2.1 的两个模式（t2i_qwen / i2i_qwen）用的是
+// state.imgQwen.model，不是 state.img.model —— 取错会让模型族过滤失效，
+// 于是 Qwen 模式下也会列出 Z-Image 专属模板。
 function enhanceCurrentModelKey() {
   if (typeof state === "undefined" || !state) return "";
   const mode = state.mode || "";
   if (mode === "t2i") return (state.img && state.img.model) || "";
+  if (mode === "t2i_qwen" || mode === "i2i_qwen") {
+    return (state.imgQwen && state.imgQwen.model) || "";
+  }
   return state.model || "";
 }
 

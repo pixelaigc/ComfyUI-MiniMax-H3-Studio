@@ -45,6 +45,10 @@ from h3studio.workflows import (
     QWEN_IMAGE_MODELS,
     QWEN_IMAGE_RES_TIERS,
     QWEN_IMAGE_SIZE_MULTIPLE,
+    QWEN_IMAGE_NODE_REF_SLOTS,
+    QWEN_IMAGE_PE_PARAMS,
+    QWEN_IMAGE_PE_DEFAULT_MAX_LENGTH,
+    qwen_unet_available,
     ASPECT_MAP,
     ASPECT_NUM,
     Z_IMAGE_MODELS,
@@ -835,7 +839,8 @@ async def api_create(request):
         if len(refs) > QWEN_IMAGE_MAX_REF_IMAGES:
             return web.json_response(
                 {"error": f"参考图最多 {QWEN_IMAGE_MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
-                          f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张）"},
+                          f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张，"
+                          f"模型官方能力上限 10 张）"},
                 status=400)
         params["ref_images"] = refs[:QWEN_IMAGE_MAX_REF_IMAGES]
 
@@ -1328,6 +1333,9 @@ async def api_image_options(request):
         })
     qwen_models = {}
     for key, m in QWEN_IMAGE_MODELS.items():
+        # 权重是否在本机 —— 前端据此把该版本标成「不可用」并给出说明，
+        # 而不是让用户选完才在跑图时炸掉。
+        available = qwen_unet_available(m["unet"])
         qwen_models[key] = {
             "label": m["label"],
             "unet": m["unet"],
@@ -1339,8 +1347,13 @@ async def api_image_options(request):
             "cfg": m["cfg"],
             "shift": m["shift"],
             "supports_negative": m["supports_negative"],
+            "negative_effective_only_above_cfg1": m.get("negative_effective_only_above_cfg1", False),
             "samplers": m["samplers"],
             "schedulers": m["schedulers"],
+            # 权重是否就位（False 时前端置灰该版本）
+            "available": available,
+            # Turbo 走固定 sigma 表（前端据此提示「步数与 schedule 绑定」）
+            "manual_sigmas_steps": m.get("manual_sigmas_steps"),
             # PE 开关涉及的编码器（供前端显示当前用哪个）
             "clip_t2i": m["clip_t2i"],          # PE 编码器（文生图）
             "clip_i2i": m["clip_i2i"],          # PE 编码器（图片编辑）
@@ -1364,9 +1377,13 @@ async def api_image_options(request):
             "max_direct_mp": QWEN_IMAGE_MAX_DIRECT_MP,
             "default_tier": QWEN_IMAGE_DEFAULT_TIER,
             "default_model": QWEN_IMAGE_DEFAULT_MODEL,
-            # 参考图数量限制（官方图片编辑工作流就是 9 张）
+            # 参考图数量限制（模型官方能力上限 10 张 / ComfyUI 节点 16 槽 -> 取 10）
             "max_ref_images": QWEN_IMAGE_MAX_REF_IMAGES,
             "min_ref_images": QWEN_IMAGE_MIN_REF_IMAGES,
+            "node_ref_slots": QWEN_IMAGE_NODE_REF_SLOTS,
+            # 官方 PE 两个 checkpoint 的参数（前端显示当前档位，不可互换）
+            "pe_params": QWEN_IMAGE_PE_PARAMS,
+            "pe_default_max_length": QWEN_IMAGE_PE_DEFAULT_MAX_LENGTH,
         },
     })
 

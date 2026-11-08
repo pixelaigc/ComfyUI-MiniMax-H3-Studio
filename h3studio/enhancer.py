@@ -106,6 +106,43 @@ TEMPLATE_SPECS = {
         "dimensions": ["caption", "id", "bbox", "desc"],
         "source": "BFL FLUX 3 官方 t2i_bbox system prompt",
     },
+    # Qwen-Image 2.1 官方 PE 两档（文生图 / 图片编辑）。
+    # 正文取自 ComfyUI 官方工作流模板里的官方 PE system prompt：
+    #   image_qwen_image_2_1_t2i.json       -> assets/qwen21-pe-t2i.txt
+    #   image_qwen_image_2_1_image_edit.json -> assets/qwen21-pe-i2i.txt
+    # 两者是官方给两种场景各配的 system prompt，**不可互换**：
+    # PE-T2I 走「观察者式结构化描述」（含比例决策），
+    # PE-I2I 走「属性解耦 + 保真锁定」的编辑指令写法（<imageN> 引用）。
+    "qwen21-pe-t2i": {
+        "id": "qwen21-pe-t2i",
+        "label": "Qwen-Image 2.1 官方 PE·文生图（结构化描述）",
+        "media": "image",
+        "families": ["qwen_image21"],
+        "template": "qwen21-pe-t2i.txt",
+        # 官方 PE 的 system prompt 自己定义了「用户请求」的角色，
+        # user 消息直接放原始提示词，不加「用户输入 prompt:」前缀
+        "user_template": "{prompt}",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["开头句", "背景面", "顶带", "主体区", "底带",
+                        "方位短语", "文字块", "光照", "收尾"],
+        "source": "官方 Qwen-Image-2.1-PE-T2I system prompt（ComfyUI 官方模板）",
+    },
+    "qwen21-pe-i2i": {
+        "id": "qwen21-pe-i2i",
+        "label": "Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y）",
+        "media": "image",
+        "families": ["qwen_image21"],
+        "template": "qwen21-pe-i2i.txt",
+        "user_template": "{prompt}",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["操作动词", "保持不变", "不要顺手改", "外观细节",
+                        "图内文字", "多图 <imageN> 引用"],
+        "source": "官方 Qwen-Image-2.1-PE-I2I system prompt（ComfyUI 官方模板）",
+    },
     "video": {
         "id": "video",
         "label": "视频提示词（MiniMax-H3）",
@@ -135,6 +172,9 @@ TEMPLATE_SPECS = {
 # 模式 -> 媒体类型（决定候选模板的 media 维度）
 MODE_MEDIA = {
     "t2i": "image",
+    # Qwen-Image 2.1 的两个模式都是图像媒体
+    "t2i_qwen": "image",
+    "i2i_qwen": "image",
     "t2v": "video",
     "flf": "video",
     "r2v": "video",
@@ -148,6 +188,9 @@ MODEL_FAMILY = {
     "z_image_turbo_bf16": "z_image",
     "z_image_bf16": "z_image",
     "darkbeast_z6_blitz_fp8": "z_image",
+    # Qwen-Image 2.1 的两个模型版本
+    "qwen_image_2.1_bf16": "qwen_image21",
+    "qwen_image_2.1_turbo_bf16": "qwen_image21",
     # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
     "lora": "minimax_h3",
     "standard": "minimax_h3",
@@ -166,6 +209,9 @@ MODE_DEFAULT_MODEL = {
 # 找不到就用该模式过滤结果里的第一个。
 MODE_DEFAULT_SPEC = {
     "t2i": "image",
+    # Qwen 两个模式各用自己的官方 PE 档
+    "t2i_qwen": "qwen21-pe-t2i",
+    "i2i_qwen": "qwen21-pe-i2i",
     "t2v": "video",
     "flf": "video",
     "r2v": "video",
@@ -383,14 +429,19 @@ def get_spec(spec_id: str, overrides: dict | None = None) -> dict:
         base = TEMPLATE_SPECS["image"]
     spec = dict(base)
     spec["system_prompt"] = _read_template_file(base["template"])
-    spec["user_template"] = "用户输入 prompt: {prompt}"
+    # user_template 默认「用户输入 prompt: {prompt}」；
+    # 官方 PE 两档的 system prompt 自己就定义了「用户请求」的角色，
+    # 所以 user 消息直接放原始提示词（不加前缀），否则 PE 会把
+    # 「用户输入 prompt:」这行字当成画面内容描述的一部分。
+    default_user_template = base.get("user_template", "用户输入 prompt: {prompt}")
+    spec["user_template"] = default_user_template
     if isinstance(custom, dict):
         for key in ("system_prompt", "user_template"):
             if isinstance(custom.get(key), str) and custom[key].strip():
                 spec[key] = custom[key]
         # 只有真正覆盖了内容才算自定义；两字段都空 = 用内置模板
         if spec["system_prompt"] != _read_template_file(base["template"]) \
-                or spec["user_template"] != "用户输入 prompt: {prompt}":
+                or spec["user_template"] != default_user_template:
             spec["builtin"] = False
     return spec
 

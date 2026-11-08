@@ -1021,6 +1021,17 @@ body.modal-open { overflow: hidden; }
   border: 1px solid var(--border); background: #0d0f12;
 }
 .img-ref-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 参考图序号：官方 PE 按 <imageN> 引用，图序即语义 —— 序号必须可见 */
+.img-ref-idx {
+  position: absolute; left: 3px; top: 3px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 8px; background: rgba(0, 0, 0, .62);
+  color: #fff; font-size: 10px; line-height: 16px; text-align: center;
+  pointer-events: none; font-variant-numeric: tabular-nums;
+}
+/* 拖动排序的视觉反馈 */
+.img-ref-item[draggable="true"] { cursor: grab; }
+.img-ref-item.dragging { opacity: .45; }
+.img-ref-item.drag-over { outline: 2px solid var(--accent); outline-offset: -2px; }
 .img-ref-del {
   position: absolute; top: 3px; right: 3px; width: 19px; height: 19px;
   border: 0; border-radius: 50%; background: rgba(0, 0, 0, .62); color: #fff;

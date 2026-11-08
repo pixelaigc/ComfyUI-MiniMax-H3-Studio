@@ -26,6 +26,7 @@ import sqlite3
 import sys
 import time
 import unittest
+import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -176,20 +177,79 @@ class TestStatusRealtime(unittest.TestCase):
         self.assertTrue(seen, "页面加载后应用自己应建立 SSE 连接 /api/status/stream")
 
     def test_sse_update_reaches_the_ui(self):
-        """SSE 推来的状态帧会真正驱动界面（不是只在后台连着）。"""
-        # 让应用自己连上 SSE
+        """SSE 推来的状态帧会真正驱动界面（不是只在后台连着）。
+
+        三个坑要避开（都是这轮真踩到的）：
+
+        1. **SSE 只在内容变化时推帧**（server.py 的 api_status_stream 里
+           `if payload != last`）。「手工改 UI -> 等下一帧覆盖」依赖一帧
+           可能根本不会来的帧 —— 队列一直空，payload 就不变。
+        2. 界面上显示什么取决于**此刻 ComfyUI 真实队列**（本机可能正有别的
+           任务在跑），不能写死文案。
+        3. 塞的 queued 任务如果用 worker 认识的 mode，会被**立刻领走**，
+           queued 归零 —— 测的是竞态不是 SSE。用 worker 不认识的 mode 才稳。
+
+        关键：要断言的是「**状态确实变了并且界面跟着变了**」，
+        所以先记下变化前的状态，再要求界面出现一个**新的**状态。
+        """
         self.page.wait_for_timeout(1500)
-        # 手工把 UI 置为「生成中」，再让 SSE 推一帧「空闲」，
-        # 若 SSE 真正驱动界面，文案会被改回「空闲」
-        self.page.evaluate(
-            "() => renderStatus({comfyui_ok:true, comfy_running:1, "
-            "comfy_pending:0, running:'x', queued:0})")
-        self.page.wait_for_timeout(120)
-        self.assertEqual(self.status_text(), "生成中")
-        # 真实队列现在是空的，SSE 推来的空闲帧应覆盖掉上面的手工状态
-        self.page.wait_for_function(
-            "() => document.querySelector('#statusText').textContent === '空闲'",
-            timeout=15000)
+
+        # 变化前：记下界面当前**完整状态**（文案 + title）。
+        # 用 title 而不是文案做区分度：ComfyUI 在跑时文案恒为「生成中」，
+        # 但 title 会带真实数量（"ComfyUI 正在生成（N 个在执行）"）。
+        before = self.page.evaluate(
+            "() => { const el = document.querySelector('#statusText');"
+            " return (el ? el.textContent.trim() : '') + '|' + (el ? (el.title||'') : ''); }")
+
+        # 塞一条排队中的任务（worker 不认识的 mode -> 一直留在 queued）
+        conn = sqlite3.connect(self.server.data_dir / "jobs.db")
+        conn.execute(
+            "INSERT OR REPLACE INTO jobs (id, created_at, mode, params, status) "
+            "VALUES (?,?,?,?,?)",
+            ("sseprobe01", time.time(), "probe", "{}", "queued"))
+        conn.commit()
+        conn.close()
+
+        # 界面必须变成一个**与变化前不同**的状态，且与此刻 /api/system 一致
+        self.page.wait_for_function("""
+            async (before) => {
+              const el = document.querySelector('#statusText');
+              if (!el) return false;
+              const now = (el.textContent.trim()) + '|' + (el.title || '');
+              if (now === before) return false;          // 还没变，不算
+              const r = await fetch('/api/system', {cache: 'no-store'});
+              const live = await r.json();
+              const lab = statusLabel(live);
+              window.__sseExpected = lab.text + '|' + lab.title;
+              return now === (lab.text + '|' + lab.title);
+            }
+        """, arg=before, timeout=15000)
+        after = self.page.evaluate(
+            "() => { const el = document.querySelector('#statusText');"
+            " return (el ? el.textContent.trim() : '') + '|' + (el ? (el.title||'') : ''); }")
+        expected = self.page.evaluate("() => window.__sseExpected")
+        self.assertNotEqual(after, before,
+                            "界面状态没有变化 —— SSE 没把新帧推到界面上")
+        self.assertEqual(after, expected,
+                         "界面状态应与 /api/system 一致")
+
+        # 状态再变回去 -> SSE 再推一帧 -> 界面跟着更新
+        conn = sqlite3.connect(self.server.data_dir / "jobs.db")
+        conn.execute("DELETE FROM jobs WHERE id='sseprobe01'")
+        conn.commit()
+        conn.close()
+        self.page.wait_for_function("""
+            async (prev) => {
+              const el = document.querySelector('#statusText');
+              if (!el) return false;
+              const now = (el.textContent.trim()) + '|' + (el.title || '');
+              if (now === prev) return false;
+              const r = await fetch('/api/system', {cache: 'no-store'});
+              const live = await r.json();
+              const lab = statusLabel(live);
+              return now === (lab.text + '|' + lab.title);
+            }
+        """, arg=after, timeout=15000)
 
     def test_status_reflects_comfyui_real_queue(self):
         """ComfyUI 真实队列在跑时，/api/system 的 comfy_running 必须 > 0。
