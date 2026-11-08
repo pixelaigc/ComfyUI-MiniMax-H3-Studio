@@ -311,6 +311,58 @@ class TestStatusRealtime(unittest.TestCase):
             "() => document.querySelector('#jobsGrid').innerHTML")
         self.assertIn("progress-bar", html, "生成中的卡片应有进度条")
 
+    def test_batch_status_labels_are_chinese(self):
+        """批次卡片上的状态文案也要是中文（完成/失败/生成中/排队中/已取消）。
+
+        批次状态是另一张独立的映射表（renderJobBatches 里的 statusText），
+        与顶栏 STATUS_TEXT 不是同一处 —— 改一处不会影响另一处。
+        """
+        app_js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        for label in ("完成", "失败", "生成中", "排队中", "已取消"):
+            self.assertIn(f'"{label}"', app_js,
+                          "批次状态映射里应含中文 %r" % label)
+
+    def test_batch_card_shows_chinese_status(self):
+        """批次网格渲染出的状态文字是中文。"""
+        # 造一个带批次的任务，卡片展开后应显示批次状态
+        conn = sqlite3.connect(self.server.data_dir / "jobs.db")
+        conn.execute(
+            "INSERT INTO jobs (id, created_at, mode, params, status, progress,"
+            " progress_text, outputs) VALUES (?,?,?,?,?,?,?,?)",
+            ("batchjob1", time.time(), "t2i",
+             json.dumps({"title": "批次任务", "prompt": "批次探针",
+                         "aspect": "16:9"}, ensure_ascii=False),
+             "done", 1.0, "", "[]"))
+        conn.execute(
+            "INSERT INTO job_batches (id, job_id, idx, seed, status, progress,"
+            " progress_text, outputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            ("b1", "batchjob1", 0, 1, "done", 1.0, "", "[]", time.time()))
+        conn.execute(
+            "INSERT INTO job_batches (id, job_id, idx, seed, status, progress,"
+            " progress_text, outputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            ("b2", "batchjob1", 1, 2, "failed", 0.0, "boom", "[]", time.time()))
+        conn.commit()
+        conn.close()
+
+        self.page.wait_for_function(
+            "() => document.body.innerText.includes('批次探针')", timeout=15000)
+        # 展开批次
+        self.page.evaluate("""
+            const btn = Array.from(document.querySelectorAll('#jobsGrid [data-act="toggle-batches"]'))[0];
+            if (btn) btn.click();
+        """)
+        self.page.wait_for_timeout(700)
+        labels = self.page.evaluate(
+            "() => Array.from(document.querySelectorAll('#jobsGrid .st'))"
+            ".map(e => e.textContent.trim())")
+        self.assertTrue(labels, "应有批次状态标签")
+        for label in labels:
+            self.assertRegex(label, r"[\u4e00-\u9fff]",
+                             "批次状态应为中文: %r" % label)
+            self.assertNotIn("Queued", label)
+            self.assertNotIn("Done", label)
+            self.assertNotIn("Failed", label)
+
     def test_no_console_errors(self):
         """首屏无 JS 报错。"""
         self.assertEqual([e for e in self.errors if e.strip()], [])
