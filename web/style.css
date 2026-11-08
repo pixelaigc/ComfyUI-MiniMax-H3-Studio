@@ -644,14 +644,17 @@ body.modal-open { overflow: hidden; }
   font-family: inherit; text-align: left;
 }
 .job-batches-toggle:hover { background: #f2f4f7; color: var(--text); }
-.job-batches-toggle .caret { transition: transform .16s; display: inline-block; font-size: 10px; }
-.job-batches-toggle.open .caret { transform: rotate(90deg); }
+.job-batches-toggle .caret { display: inline-block; font-size: 10px; }
 
 .job-batches {
   padding: 10px 12px; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   gap: 9px; background: #f7f8fa;
 }
+/* hidden 属性必须真的隐藏网格：.job-batches 的 display:grid 会盖掉
+   浏览器默认的 [hidden]{display:none}（作者样式优先于 UA 样式），
+   少了这一条，收纳状态只是加了属性、界面照旧铺开。 */
+.job-batches[hidden] { display: none; }
 .job-batches:empty { display: none; }
 .job-batch {
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden;

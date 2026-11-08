@@ -1336,11 +1336,32 @@ window.addEventListener("resize", () => {
 });
 
 // 单条任务内的批次结果：可展开/折叠的缩略图网格 + 每批次状态
+// 折叠状态按 job.id 记忆，卡片被重建（实时刷新 / 批次状态变化）后依然保持。
 const expandedBatches = new Set();
+
+// 折叠三角朝向：展开 ▼ / 收纳 ▶。用显式字形而不是 CSS 旋转，
+// 这样朝向和状态永远一一对应，读屏软件也能读出正确方向。
+function batchCaret(open) {
+  return open ? "▼" : "▶";
+}
+
+// 把折叠状态落到 DOM：标题行 class/aria + 网格 hidden
+function applyBatchesState(card, open) {
+  const btn = card.querySelector('[data-act="toggle-batches"]');
+  if (btn) {
+    btn.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    const caret = btn.querySelector(".caret");
+    if (caret) caret.textContent = batchCaret(open);
+  }
+  const grid = card.querySelector("[data-batches]");
+  if (grid) grid.hidden = !open;
+}
 
 function renderJobBatches(job) {
   const batches = job.batches || [];
   if (!batches.length) return "";
+  const p = job.params || {};
   const doneCount = batches.filter(b => b.status === "done").length;
   const failedCount = batches.filter(b => b.status === "failed").length;
   const open = expandedBatches.has(job.id);
@@ -1368,8 +1389,10 @@ function renderJobBatches(job) {
       </div>
     </div>`;
   }).join("");
-  return `<button type="button" class="job-batches-toggle ${open ? "open" : ""}" data-act="toggle-batches">
-      <span class="caret">▶</span> 批次结果（${summary}）
+  // 标题行摘要：完成/失败数 + 出图尺寸 —— 折叠时也能一眼看出里面是什么
+  const size = p.width && p.height ? ` · ${p.width}×${p.height}` : "";
+  return `<button type="button" class="job-batches-toggle ${open ? "open" : ""}" data-act="toggle-batches" aria-expanded="${open ? "true" : "false"}">
+      <span class="caret">${batchCaret(open)}</span> 批次结果（${summary}${size}）
     </button>
     <div class="job-batches" data-batches ${open ? "" : "hidden"}>${cells}</div>`;
 }
@@ -1521,15 +1544,12 @@ function jobCard(job) {
     a.click();
   });
   card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => openPromptModal(p.prompt || ""));
-  // 批次结果展开/折叠
+  // 批次结果展开/折叠（点标题行任意位置或三角都可以）
   card.querySelector('[data-act="toggle-batches"]')?.addEventListener("click", event => {
     event.stopPropagation();
     const open = !expandedBatches.has(job.id);
     if (open) expandedBatches.add(job.id); else expandedBatches.delete(job.id);
-    const btn = event.currentTarget;
-    btn.classList.toggle("open", open);
-    const grid = card.querySelector("[data-batches]");
-    if (grid) grid.hidden = !open;
+    applyBatchesState(card, open);
   });
   // 批次缩略图点击放大
   card.querySelectorAll(".job-batch-thumb img").forEach(el => {
