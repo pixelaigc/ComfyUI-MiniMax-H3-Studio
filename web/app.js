@@ -678,6 +678,27 @@ async function loadImageLoras() {
   } catch (e) { /* 静默：不阻断出图 */ }
 }
 
+// 负面提示词说明：区分「模型不支持」和「当前 CFG 值下不生效」。
+// 单独抽出来是因为它依赖 CFG 值，而 CFG 滑块在拖动时不能重渲染整个面板
+// （那会把滑块重建掉，拖到一半就断了）。
+function updateNegativeNote() {
+  const ctx = imgCtx();
+  const model = ctx.models[ctx.st.model];
+  const negSupported = !!(model && model.supports_negative);
+  const cfg = Number(ctx.st.cfg);
+  const negIgnoredAtCfg1 = isQwenMode() && Math.abs(cfg - 1) < 1e-6;
+  const note = $("#imgNegNote");
+  if (!note) return;
+  note.textContent = negSupported
+    ? (negIgnoredAtCfg1
+        ? "当前 CFG=1：ComfyUI 会跳过 uncond 分支，负面提示词数学上无效。"
+          + "官方路径就是 cfg=1；要启用负面提示词请把 CFG 调到 1 以上。"
+        : (isQwenMode()
+            ? "Qwen-Image 2.1 非蒸馏，CFG>1 时负面提示词生效。"
+            : "Base 非蒸馏，负面提示词生效（官方强烈建议）"))
+    : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
+}
+
 function renderImagePanel() {
   const ctx = imgCtx();
   const s = ctx.st;
@@ -770,11 +791,7 @@ function renderImagePanel() {
   // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
   const negSupported = !!(model && model.supports_negative);
   $("#imgNegField").style.display = negSupported ? "" : "none";
-  $("#imgNegNote").textContent = negSupported
-    ? (isQwenMode()
-        ? "Qwen-Image 2.1 非蒸馏，负面提示词生效。"
-        : "Base 非蒸馏，负面提示词生效（官方强烈建议）")
-    : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
+  updateNegativeNote();
   if (negSupported) $("#imgNegative").value = s.negative || "";
 
   // Qwen-Image 2.1 专属：PE 开关 + 参考图区
@@ -873,6 +890,9 @@ $("#imgCfg").addEventListener("input", e => {
   s.cfg = parseFloat(e.target.value);
   $("#imgCfgVal").textContent = s.cfg.toFixed(1);
   updateImageModelNote();
+  // 负面提示词的说明依赖 CFG 值（cfg=1 时它无效）——
+  // 只刷那一句，不能重渲染整个面板（会把正在拖的滑块重建掉）
+  updateNegativeNote();
 });
 $("#imgShift").addEventListener("input", e => {
   const s = imgCtx().st;

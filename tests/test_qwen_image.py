@@ -179,6 +179,49 @@ class TestQwenBackend(unittest.TestCase):
         self.assertIsInstance(te["inputs"]["prompt"], str,
                               "关掉 PE 后 prompt 应是原字符串")
 
+    # ---------------------------------------------- 官方事实核对
+    def test_tiers_stop_at_native_2k(self):
+        """档位只到 2K —— 官方说 2.1 原生只支持到 2048×2048 直出。
+
+        官方模板 note 原文：
+          "Qwen Image 2.1 has native 2K (2048*2048) support for direct output."
+        4K（8.3MP）超出原生能力，官方没有对应路径，列出来会崩图。
+        """
+        self.assertNotIn("4k", self.W.QWEN_IMAGE_RES_TIERS,
+                         "2.1 原生只到 2K，不该列 4K 档")
+        self.assertIn("2k", self.W.QWEN_IMAGE_RES_TIERS)
+        self.assertLessEqual(self.W.QWEN_IMAGE_MAX_DIRECT_MP, 4.2,
+                             "直出上限应对应 2K（1:1 时 2048×2048）")
+        # 2K 档 1:1 应当正好是 2048×2048
+        w, h = self.W.qwen_image_dimensions("1:1", "2k")
+        self.assertEqual((w, h), (2048, 2048),
+                         f"2K 档 1:1 应是 2048×2048，实际 {w}×{h}")
+
+    def test_ref_image_resolution_matches_official(self):
+        """参考图重采样目标边长：文生图 1024 / 图片编辑 2048（官方工作流的值）。"""
+        t2i = self.build_t2i()
+        te = next(n for n in t2i.values() if n["class_type"] == "TextEncodeQwenImage21")
+        self.assertEqual(te["inputs"]["resolution"], 1024,
+                         "文生图的参考图分辨率官方是 1024")
+        i2i = self.build_i2i(n=1)
+        te2 = next(n for n in i2i.values() if n["class_type"] == "TextEncodeQwenImage21")
+        self.assertEqual(te2["inputs"]["resolution"], 2048,
+                         "图片编辑的参考图分辨率官方是 2048（用 1024 会把参考图降采样过多）")
+
+    def test_negative_prompt_only_effective_above_cfg1(self):
+        """cfg=1 时负面提示词无效 —— 界面必须提示这一点。
+
+        ComfyUI samplers.py:609-627：cfg=1 时 uncond 分支被跳过，
+        negative_prompt 数学上无效。官方模板 note 也写着
+        "negative_prompt: unused while cfg is 1."
+        """
+        m = self.W.QWEN_IMAGE_MODELS["qwen_image_2.1_bf16"]
+        self.assertTrue(m["supports_negative"], "Qwen 非蒸馏，负面提示词本身是支持的")
+        self.assertTrue(m.get("negative_effective_only_above_cfg1"),
+                        "应标记「负面提示词只在 cfg>1 时生效」，界面据此提示")
+        self.assertAlmostEqual(m["cfg"], 1.0, places=3,
+                               msg="官方路径默认 cfg=1")
+
     # ---------------------------------------------- 缺陷 3：参考图 API 格式
     def test_reference_images_use_nested_images_dict(self):
         """参考图必须写成嵌套的 images 字典（COMFY_AUTOGROW_V3 的 API 格式）。"""

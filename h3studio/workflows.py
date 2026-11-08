@@ -824,12 +824,22 @@ QWEN_IMAGE_MODELS = {
         "clip_i2i": QWEN_IMAGE_CLIP_PE_I2I,
         "sampler": "euler",
         "scheduler": "simple",
+        # 官方模板 note：「steps: Qwen Image 2.1 official pipeline uses about
+        # 40-50 with euler. This template starts at 25.」—— 取 40-50 区间的上沿。
         "steps": 50,
+        # 官方模板 note：「cfg: keep 1 for the Qwen Image 2.1 official path.
+        # Raise it only if you use a negative prompt.」
+        # 注意：cfg=1 时 ComfyUI 会跳过 uncond 分支（samplers.py:609-627），
+        # 负面提示词数学上无效 —— 界面会据此提示用户。
         "cfg": 1.0,
-        # 内置 shift 是 0.69（supported_models.py:2080）；这里暴露给用户的
-        # 覆盖值默认取同一个数 —— 即「不覆盖」，行为与官方工作流一致。
+        # 内置 shift 是 0.69（supported_models.py:2080，按 1024×1024 标定）；
+        # 这里暴露给用户的覆盖值默认取同一个数 —— 即「不覆盖」，
+        # 行为与官方工作流一致。
         "shift": 0.69,
+        # 负面提示词本身是支持的（官方 note 也说「Raise cfg only if you use
+        # a negative prompt」），但默认 cfg=1 时不生效，界面要提示清楚。
         "supports_negative": True,
+        "negative_effective_only_above_cfg1": True,
         "samplers": ["euler", "euler_cfg_pp", "res_multistep", "dpmpp_2m",
                      "dpmpp_2m_sde", "dpmpp_3m_sde", "dpm_2", "heun", "uni_pc"],
         "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras",
@@ -846,19 +856,26 @@ QWEN_IMAGE_DEFAULT_MODEL = "qwen_image_2.1_bf16"
 # （comfy_extras/nodes_qwen.py:181 -> torch.zeros([1, 64, H//16, W//16])），
 # 所以宽高必须是 16 的倍数。
 # 官方默认 1024x1024（1MP），官方工作流 ResolutionSelector megapixels=2。
+# 档位只到 2K —— 官方模板原文：
+#   "Qwen Image 2.1 has native 2K (2048*2048) support for direct output."
+#   "For native 2K, set 1:1 and 4 megapixels (2048*2048)."
+# 4K（8.3MP）超出原生能力，官方没有对应路径，所以这里**不列 4K**
+# （Z-Image 那样走放大链需要额外实现一套 Qwen 的放大流程，本轮不做，
+#  列一个会崩图的档位比不列更糟）。
 QWEN_IMAGE_RES_TIERS = {
     "1mp": 1.0,        # 官方默认 1024×1024
     "480p": 0.4,
     "720p": 0.9,
     "1080p": 2.0,
     "1440p": 3.5,
-    "2k": 4.2,
-    "4k": 8.3,
+    "2k": 4.0,         # 2K 原生直出上限（1:1 时正好 2048×2048 = 4.0MP）
 }
 QWEN_IMAGE_DEFAULT_TIER = "1mp"
+# VAE 是 16 倍下采样（latent_formats.QwenImage21.spacial_downscale_ratio = 16），
+# 宽高必须是 16 的倍数；官方模板 further 建议 32 的倍数。
 QWEN_IMAGE_SIZE_MULTIPLE = 16
-# 超过这个总像素走放大路径（与 Z-Image 同策略）
-QWEN_IMAGE_MAX_DIRECT_MP = 4.0
+# 超过这个总像素就不该直出（2.1 原生上限约 4MP / 2K）
+QWEN_IMAGE_MAX_DIRECT_MP = 4.2
 
 # 参考图数量上限：TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，
 # 节点本身支持 image_1..image_16（comfy_extras/nodes_qwen.py:125-133），
@@ -1024,8 +1041,10 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
         "prompt": prompt_ref,
         "negative_prompt": negative_text,
         "vae": ["qw:29", 0],
-        # 参考图按 1024 边长重采样（官方工作流图片编辑用 2048，文生图无图）
-        "resolution": 1024,
+        # 参考图重采样目标边长（comfy_extras/nodes_qwen.py:155-160）。
+        # 官方工作流：文生图用 1024，图片编辑用 2048 —— 编辑要保留参考图
+        # 的细节，用 1024 会把参考图降采样过多。
+        "resolution": 2048 if is_edit else 1024,
     }
     p["qw:27"] = {"inputs": te_inputs, "class_type": "TextEncodeQwenImage21"}
 
