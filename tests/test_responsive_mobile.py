@@ -103,9 +103,13 @@ FACT = """
 class TestResponsiveMobile(unittest.TestCase):
     """真实浏览器 + 真实 Studio：锁死窄屏下的布局契约。"""
 
+    #: 预置任务数 —— 必须 > 每页作品数（12），否则分页条不渲染，
+    #: 「FAB 遮挡分页」那条断言就成了永远绿的空转（pager.hidden 时直接返回 []）。
+    SEED_JOBS = 40
+
     @classmethod
     def setUpClass(cls):
-        cls.server = StudioServer(seed_jobs=12)
+        cls.server = StudioServer(seed_jobs=cls.SEED_JOBS)
         assert cls.server.start(), "Studio 实例启动失败"
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(args=["--no-sandbox"])
@@ -300,7 +304,186 @@ class TestResponsiveMobile(unittest.TestCase):
         """)
         self.assertTrue(loaded, "responsive.css 未被加载或不含 --bp-phone 变量")
 
-    # ---------------------------------------------- 7. 不回归
+    # ---------------------------------------------- 7. 深层溢出与遮挡
+    # 以下三条来自独立窄屏审计的实测发现，首版测试没覆盖到 ——
+    # 因为它们都不在「视口右边界」这个判据下：
+    #   缺陷 A Provider 页：页面**容器自身**横向溢出（不是元素溢出视口）
+    #   缺陷 B FAB 遮挡：FAB 是 fixed 定位，遮挡的是**页面内元素**
+    #   缺陷 C 弹窗关闭按钮：宽度 12.9px < 32px，但不在初始页面 DOM 里
+
+    def _open_nav(self, page):
+        """窄屏下侧栏在抽屉里，先拉出来。"""
+        self.page.click("#navToggle")
+        self.page.wait_for_timeout(500)
+
+    def test_provider_page_has_no_internal_horizontal_scroll(self):
+        """缺陷 A：本地模型配置页的 <select> 把整行撑破视口。
+
+        根因：.agent-field 是 flex item，min-width:auto 使它拒绝收缩到
+        内容宽度以下；而 <select> 的最长 option 文本有 566px 宽
+        （「Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y）」）。
+        结果：375px 视口下该页 scrollWidth=597，出现 207px 横向滚动。
+
+        判据落在**页面容器自身**的 scrollWidth vs clientWidth ——
+        这与「元素溢出视口」是两条不同的判据（元素仍能落在视口内，
+        但页面容器内部被撑出滚动条）。
+        """
+        for width in PHONE_WIDTHS:
+            self.resize(width)
+            self._open_nav(self.page)
+            self.page.click("#navProviders")
+            self.page.wait_for_timeout(1500)
+            info = self.page.evaluate("""
+              () => {
+                const page = document.querySelector('#providersPage');
+                const culprits = [];
+                page.querySelectorAll('*').forEach(el => {
+                  const r = el.getBoundingClientRect();
+                  if (r.width > page.clientWidth + 1) {
+                    culprits.push((el.tagName + '.' + (el.className || '')).slice(0, 46));
+                  }
+                });
+                return {
+                  clientW: page.clientWidth,
+                  scrollW: page.scrollWidth,
+                  hasHScroll: page.scrollWidth > page.clientWidth + 1,
+                  culprits: culprits.slice(0, 5),
+                };
+              }
+            """)
+            self.assertFalse(
+                info["hasHScroll"],
+                "%dpx 下 Provider 页内部横向滚动：scrollWidth=%d > clientWidth=%d"
+                "（撑破元素：%r）" % (width, info["scrollW"], info["clientW"],
+                                     info["culprits"]))
+            self.resize(390)
+            self._open_nav(self.page)
+            self.page.click('.nav-item[data-mode="t2i"]')
+            self.page.wait_for_timeout(1200)
+
+    def test_fab_does_not_cover_pagination(self):
+        """缺陷 B：「参数」浮动按钮不得压住分页条。
+
+        FAB 是 position:fixed（44px 高 + 16px 底边距 = 60px），
+        而 .jobs-area 的 padding-bottom 原本只有 24px —— 分页条排到底时
+        「下一页」按钮和「共 N 个作品」会被 FAB 盖住（375px 下实测
+        盖住「下一页」右侧 6×30px、盖住计数文字 67×16px 全宽）。
+
+        判据：FAB 的矩形与分页条内每个 button/span 的矩形**不得有交集**。
+        """
+        for width in PHONE_WIDTHS:
+            self.resize(width)
+            # 切到「全部」标签 —— 分页条在 done/all 下才渲染。
+            # 必须点真实按钮：app.js 里的 `state` 是模块级 const，**不在 window 上**，
+            # 写 `state.tab = 'all'` 在页面上下文里会静默失败（state 未定义 → 抛错
+            # 被 evaluate 吞掉），标签根本没切，分页条位置也不对 ——
+            # 那样这条断言就成了「永远绿」的哑测试。
+            clicked = self.page.evaluate(
+                "() => { const btn = document.querySelector(\""
+                ".jobs-tabs button[data-st='all']\");"
+                " if (!btn) return false; btn.click(); return true; }")
+            self.assertTrue(clicked, "找不到「全部」状态标签按钮")
+            self.page.wait_for_timeout(2500)
+            # 滚到网格底部，让分页条落到 FAB 所在的高度
+            self.page.evaluate("""
+              () => {
+                const area = document.querySelector('#jobsArea');
+                area.scrollTop = area.scrollHeight;
+              }
+            """)
+            self.page.wait_for_timeout(800)
+            # 分页条必须真的渲染出来了 —— 没渲染就说明前置没满足
+            # （任务数不足 / 还没到「全部」标签），此时直接失败，
+            # 不能让判据变成「pager.hidden 就返回 []」的空转。
+            self.assertFalse(
+                self.page.evaluate(
+                    "() => document.querySelector('#jobsPagination').hidden"),
+                "分页条没有渲染 —— 无法验证 FAB 是否遮挡它"
+                "（检查：任务数是否 > 每页作品数、是否已切到「全部」标签）")
+            hits = self.page.evaluate("""
+              () => {
+                const fab = document.querySelector('#panelFab');
+                const pager = document.querySelector('#jobsPagination');
+                if (!fab || !pager || pager.hidden) return [];
+                const fr = fab.getBoundingClientRect();
+                const out = [];
+                pager.querySelectorAll('button, span').forEach(el => {
+                  const r = el.getBoundingClientRect();
+                  if (r.width === 0 || r.height === 0) return;
+                  const ovw = Math.min(fr.right, r.right) - Math.max(fr.left, r.left);
+                  const ovh = Math.min(fr.bottom, r.bottom) - Math.max(fr.top, r.top);
+                  if (ovw > 0 && ovh > 0) {
+                    out.push({text: (el.textContent || '').trim().slice(0, 16),
+                              overlapW: Math.round(ovw), overlapH: Math.round(ovh)});
+                  }
+                });
+                return out;
+              }
+            """)
+            self.assertEqual(
+                hits, [],
+                "%dpx 下「参数」浮动按钮压住了分页控件：%r" % (width, hits))
+
+    def test_modal_close_button_is_touch_sized(self):
+        """缺陷 C：弹窗右上角的「×」只有 12.9×26px，触屏点不准。
+
+        首版测试只查了初始页面 DOM 里的元素，而弹窗默认 hidden ——
+        所以这条漏掉了。现在逐个打开弹窗再量。
+        """
+        MODALS = [
+            ("#promptModal", "#promptModalClose"),
+            ("#enhanceModal", "#enhanceModalClose"),
+            ("#promptVersionModal", "#promptVersionClose"),
+            ("#loraInfoModal", "#loraInfoClose"),
+            ("#enhanceGateModal", "#enhanceGateClose"),
+        ]
+        for width in PHONE_WIDTHS:
+            self.resize(width)
+            for modal, close_btn in MODALS:
+                self.page.evaluate(
+                    "(id) => { document.querySelector(id).hidden = false; }", modal)
+                self.page.wait_for_timeout(250)
+                size = self.page.evaluate(
+                    "(sel) => { const el = document.querySelector(sel);"
+                    " if (!el) return null;"
+                    " const r = el.getBoundingClientRect();"
+                    " return {w: Math.round(r.width), h: Math.round(r.height)}; }",
+                    close_btn)
+                self.page.evaluate(
+                    "(id) => { document.querySelector(id).hidden = true; }", modal)
+                self.assertIsNotNone(size, "%s 的关闭按钮不存在" % close_btn)
+                self.assertGreaterEqual(
+                    size["h"], 32,
+                    "%dpx 下 %s 的关闭按钮只有 %dx%d —— 触屏点不准"
+                    % (width, close_btn, size["w"], size["h"]))
+                self.assertGreaterEqual(
+                    size["w"], 32,
+                    "%dpx 下 %s 的关闭按钮只有 %dx%d —— 触屏点不准"
+                    % (width, close_btn, size["w"], size["h"]))
+
+    def test_hardware_power_controls_are_touch_sized(self):
+        """硬件页功耗上限的 select / 应用按钮 ≥ 32px。"""
+        self.resize(390)
+        self._open_nav(self.page)
+        self.page.click("#navSystem")
+        self.page.wait_for_timeout(2500)
+        small = self.page.evaluate("""
+          () => {
+            const out = [];
+            document.querySelectorAll('.sys-pl-select, .sys-pl-btn').forEach(el => {
+              const r = el.getBoundingClientRect();
+              if (r.width === 0 || r.height === 0) return;
+              if (r.height < 32) out.push({
+                sel: (el.tagName + '.' + (el.className || '')).slice(0, 40),
+                h: Math.round(r.height), w: Math.round(r.width)});
+            });
+            return out;
+          }
+        """)
+        self.assertEqual(small, [],
+                         "硬件页功耗控件小于 32px：%r" % small)
+
+    # ---------------------------------------------- 8. 不回归
     def test_no_console_errors(self):
         """没有 JS 报错。"""
         self.assertEqual([e for e in self.errors if e.strip()], [])

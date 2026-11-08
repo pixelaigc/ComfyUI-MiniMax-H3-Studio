@@ -255,6 +255,13 @@
   }
   .jobs-pagination { flex-wrap: wrap; gap: 4px; padding: 14px 0 6px; }
   .jobs-pagination button { min-width: 38px; height: 38px; }
+  /* 分页条底边要给「参数」浮动按钮让位 ——
+     FAB 是 position:fixed（高 44px + 底边距 16px = 60px），
+     不留空位它会直接压在「下一页」按钮和「共 N 个作品」上（实测 375px
+     下 FAB 盖住「下一页」右侧 6×30px、盖住计数文字 67×16px 全宽）。
+     .jobs-area 的 padding-bottom 从 24px 加到 76px。 */
+  .jobs-area { padding-bottom: 76px; }
+  .jobs-pagination .page-summary { margin-left: 0; }
 
   /* ---------- 4.6 输入框：16px 起，避免 iOS 自动放大 ---------- */
   .panel textarea, .panel input[type=text], .panel input[type=number] {
@@ -269,6 +276,11 @@
   .search-box input { min-height: 36px; }
   .compact-field input[type=text] { height: 38px; font-size: 16px; }
 
+  /* ---------- 4.6c 硬件页功耗控件 ----------
+     实测 select.sys-pl-select 250×26px、button.sys-pl-btn 50×27px，
+     都低于 32px 触控标准。 */
+  .sys-pl-select, .sys-pl-btn { min-height: 34px; }
+
   /* ---------- 4.7 素材库 ---------- */
   .al-head { flex-direction: column; align-items: stretch; gap: 10px; }
   .al-actions { width: 100%; }
@@ -280,6 +292,8 @@
   .al-tagpick-menu { min-width: min(280px, calc(100vw - 24px)); max-height: 50vh; }
   .al-drop { padding: 14px 10px; font-size: 12px; }
   .al-upload-opts .al-input { flex: 1 1 100%; min-width: 0; }
+  /* 素材库输入框实测 30px（差 2px 到 32px 标准），抽屉里的名称/标签框同理 */
+  .al-input, .al-textarea { min-height: 34px; }
   .al-card-body { padding: 7px 8px; }
   .al-name { font-size: 12px; }
   /* 详情抽屉：手机上占满整屏。
@@ -296,6 +310,13 @@
 
   /* ---------- 4.8 弹窗：手机上改为底部抽屉形态 ---------- */
   .prompt-modal { padding: 0; align-items: flex-end; }
+  /* 弹窗右上角的「×」实测只有 12.9×26px —— 触屏几乎点不准。
+     （之前只给 .al-drawer-close 放大了，弹窗这组漏了。） */
+  .prompt-dialog-head button {
+    min-width: 40px; min-height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; line-height: 1;
+  }
   .prompt-dialog {
     width: 100vw; max-width: 100vw;
     max-height: 92vh; border-radius: 16px 16px 0 0;
@@ -318,7 +339,8 @@
   .al-picker-tools { padding: 9px 12px; }
   .al-picker-tools .search-box { flex: 1 1 100% !important; }
   .al-picker-body { padding: 10px; }
-  .al-picker-foot { padding: 9px 12px; }
+  /* 素材选择器底部操作条实测仅 19px 高 —— 低于任何触控标准 */
+  .al-picker-foot { padding: 9px 12px; min-height: 44px; align-items: center; }
 
   /* ---------- 4.9 大图查看器 ---------- */
   .lightbox-bar { padding: 8px 10px; gap: 8px; }
@@ -333,6 +355,12 @@
 
   /* ---------- 4.10 系统页 / Provider 页 ---------- */
   .sys-grid { grid-template-columns: 1fr; gap: 10px; }
+  /* .agent-field 是 flex item，默认 min-width:auto —— 它拒绝收缩到内容宽度以下，
+     而 <select> 的最长 option 文本（「Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y）」）
+     有 566px 宽，于是整行被撑破视口（375px 下页面出现 207px 横向滚动）。
+     min-width:0 让 flex item 可以收缩，select 再按容器宽度裁切。 */
+  .agent-field { min-width: 0; }
+  .agent-field select { max-width: 100%; }
   .sys-head { flex-direction: column; align-items: stretch; gap: 10px; }
   .sys-refresh { min-height: 40px; }
   .providers-page { max-width: none; }
