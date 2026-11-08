@@ -97,9 +97,63 @@ Z-Image 文本上限本地 `max_sequence_length=1024`，官方换算 **0.75 word
 新增一档模板只需两步，**不需要改动本模块的调用逻辑**：
 
 1. 在 `assets/` 放一个新模板文件（如 `video-official.txt`），用 `{prompt}` 占位用户原文。
-2. 在 `h3studio/enhancer.py` 的 `TEMPLATES` 注册该模板（id / 模板文件 / 档位参数）。
+2. 在 `h3studio/enhancer.py` 的 `TEMPLATE_SPECS` 注册该模板
+   （id / 模板文件 / 档位参数 / `media` / `families`）。
 
 Provider 调用、校验、落地策略（replace / append）全部复用。
+
+---
+
+## 模板按模型/模式过滤
+
+下拉候选项不是全量列表 —— 按当前上下文（工作模式 + 当前模型）过滤，
+避免在 Z-Image 图像页出现「视频提示词」这类无关条目。
+
+两个维度匹配，**都要过**才算候选：
+
+| 维度 | 来源 | 含义 |
+|---|---|---|
+| `media` | `MODE_MEDIA[mode]` | 媒体类型：image / video / audio / 3d |
+| `families` | `MODEL_FAMILY[model_key]` | 模型族：z_image / minimax_h3 / flux … |
+
+匹配规则（`enhancer.spec_matches_context`）：
+
+- 模板 `media` 与当前媒体类型不一致 → 排除
+- 模板 `families` 含 `*` 或含当前模型族 → 保留；不含 → 排除
+- 模板没声明 `media` / `families` → 视为通用模板，保留（保守不隐藏）
+- 当前模式未知 → 不过滤，显示全部
+
+配置表在 `h3studio/enhancer.py`：
+
+| 表 | 作用 | 何时改 |
+|---|---|---|
+| `MODE_MEDIA` | 模式 → 媒体类型 | 新增工作模式 |
+| `MODEL_FAMILY` | 模型 key → 模型族 | 装了新模型 / 换了模型 key |
+| `TEMPLATE_SPECS[].families` | 模板适配哪些模型族 | 新增模板 |
+| `MODE_DEFAULT_SPEC` | 各模式的默认模板 | 改了默认档 |
+
+服务端把这三张表下发给前端（`GET /api/enhancer` 的 `mode_filters` /
+`mode_media` / `model_families` / `mode_defaults`），前端据此过滤，
+**前端不硬编码任何模板清单**。
+
+### 回落规则
+
+当前模板在新上下文里不适用时：
+
+1. 优先回到该模式**上次用过**的模板（`specIdByMode`）
+2. 否则用 `MODE_DEFAULT_SPEC[mode]`
+3. 否则用过滤结果的第一个
+
+回落时界面提示可见（`已切换到「xxx」模式，模板自动回落到「yyy」`）。
+
+### 显示与执行的一致性
+
+两层保证「下拉显示的模板」==「实际执行的模板」：
+
+1. 前端过滤后若当前 id 不在候选里，立刻回落到候选默认并刷新 `select.value`
+2. `POST /api/enhance` 带 `mode_ctx` + `model_key`，服务端用
+   `resolve_spec_for_mode` 再兜一次底；响应回传实际使用的 `spec_id`，
+   前端据此同步下拉
 
 ---
 

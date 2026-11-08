@@ -140,6 +140,8 @@ function renderMode() {
   $("#aspectField").style.display = isVideo ? "" : "none";
   $("#imagePanel").style.display = isVideo ? "none" : "";
   if (!isVideo) renderImagePanel();
+  // 模式变了 -> 增强模板下拉按新模式过滤，当前模板不适用则自动回落
+  if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
   updateSeedStrengthLayout();
   updateActionButtons();
   // 时长标签
@@ -316,6 +318,8 @@ $("#imgResSelect").addEventListener("change", e => {
 $("#imgModelSelect").addEventListener("change", e => {
   applyModelDefaults(e.target.value);
   renderImagePanel();
+  // 模型换了 -> 增强模板按新模型的模型族重新过滤
+  if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
 $("#imgSamplerSelect").addEventListener("change", e => {
   state.img.sampler = e.target.value;
@@ -395,6 +399,8 @@ bindSeg("#modelCards", "model", () => {
   $("#loraField").style.display = state.model === "lora" ? "" : "none";
   updateSeedStrengthLayout();
   setDefaultSteps();
+  // 视频模型换了 -> 增强模板按新模型的模型族重新过滤
+  if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
 bindSeg("#loraCards", "lora");
 $("#loraStrength").addEventListener("input", e => {

@@ -10,7 +10,89 @@ const provState = {
   agent: { specs: [], params: {}, lengthPresets: {} },
   specId: "image",
   lastEnhance: null,      // 最近一次增强结果，供回填用
+  // 模板过滤上下文（服务端下发规则，前端只负责按当前上下文取用）
+  modeFilters: {},        // { t2i: ["image","image-scalist",...], t2v: ["video"], ... }
+  modeDefaults: {},       // { t2i: "image", t2v: "video", ... }
+  modelFamilies: {},      // { z_image_turbo_bf16: "z_image", lora: "minimax_h3", ... }
+  modeMedia: {},          // { t2i: "image", t2v: "video", ... } 模式 -> 媒体类型
+  specIdByMode: {},       // { t2i: "image", ... } 各模式下用户最后选中的模板
 };
+
+// 当前工作模式
+function enhanceCurrentMode() {
+  if (typeof state === "undefined" || !state) return "";
+  return state.mode || "";
+}
+
+// 当前选中的模型 key（图像模式用 Z-Image 模型，视频模式用 MiniMax-H3 两档）
+function enhanceCurrentModelKey() {
+  if (typeof state === "undefined" || !state) return "";
+  const mode = state.mode || "";
+  if (mode === "t2i") return (state.img && state.img.model) || "";
+  return state.model || "";
+}
+
+/**
+ * 按「媒体类型 + 模型族」过滤模板（与服务端 h3studio/enhancer.py 同规则）。
+ * 媒体类型由模式决定，模型族由当前模型决定 —— 两条都匹配才算候选。
+ */
+function enhanceSpecsForContext(mode, modelKey) {
+  const all = provState.agent.specs || [];
+  if (!mode) return all;
+  const ids = provState.modeFilters[mode];
+  if (!Array.isArray(ids) || !ids.length) return all;
+  const byId = {};
+  all.forEach(s => { byId[s.id] = s; });
+  let list = ids.map(id => byId[id]).filter(Boolean);
+  // 媒体类型过滤：模板 media 必须与当前模式的媒体一致
+  const media = provState.modeMedia[mode];
+  if (media) list = list.filter(s => !s.media || s.media === media);
+  // 模型族过滤：模板 families 含 "*" 或含当前模型族
+  const family = provState.modelFamilies[modelKey];
+  if (family) {
+    list = list.filter(s => {
+      const fams = s.families || [];
+      if (!fams.length) return true;      // 未声明 = 通用模板
+      if (fams.indexOf("*") >= 0) return true;
+      return fams.indexOf(family) >= 0;
+    });
+  }
+  return list;
+}
+
+// 该上下文下的默认模板：优先 modeDefaults，其次候选列表第一个
+function enhanceDefaultSpecForContext(mode, modelKey, available) {
+  const list = available || enhanceSpecsForContext(mode, modelKey);
+  if (!list.length) return null;
+  const preferred = provState.modeDefaults[mode];
+  if (preferred && list.some(s => s.id === preferred)) return preferred;
+  return list[0].id;
+}
+
+/**
+ * 切换模式 / 模型后重新对齐模板：
+ *   - 当前模板仍适用 -> 保持
+ *   - 当前模板不适用 -> 回落到该上下文的默认 / 首个可用模板
+ * 返回 { changed, specId }，changed 表示是否发生了回落。
+ */
+function alignSpecWithContext(mode, modelKey) {
+  const available = enhanceSpecsForContext(mode, modelKey);
+  if (!available.length) return { changed: false, specId: provState.specId };
+  const ids = available.map(s => s.id);
+  if (ids.includes(provState.specId)) {
+    provState.specIdByMode[mode] = provState.specId;
+    return { changed: false, specId: provState.specId };
+  }
+  // 优先回到该模式上次用过的模板，其次模式默认
+  const remembered = provState.specIdByMode[mode];
+  let next = (remembered && ids.includes(remembered)) ? remembered : null;
+  if (!next) next = enhanceDefaultSpecForContext(mode, modelKey, available);
+  if (!next) return { changed: false, specId: provState.specId };
+  const changed = next !== provState.specId;
+  provState.specId = next;
+  provState.specIdByMode[mode] = next;
+  return { changed, specId: next };
+}
 
 const PROVIDER_TYPE_LABELS = {
   openai: "OpenAI 兼容 API",
@@ -262,10 +344,17 @@ async function loadAgentConfig() {
       samplingPresets: d.sampling_presets || {},
       skillDir: d.skill_dir || "",
     };
+    // 服务端下发的过滤规则（通用机制，新增模式/模型只改服务端）
+    provState.modeFilters = d.mode_filters || {};
+    provState.modeDefaults = d.mode_defaults || {};
+    provState.modeMedia = d.mode_media || {};
+    provState.modelFamilies = d.model_families || {};
     // 默认选官方 PE 档（image）
     if (!provState.specId || !provState.agent.specs.find(s => s.id === provState.specId)) {
       provState.specId = "image";
     }
+    // 当前上下文下若模板不适用则回落 —— 保证下拉显示值与实际生效值一致
+    alignSpecWithContext(enhanceCurrentMode(), enhanceCurrentModelKey());
     renderAgentConfig();
     renderEnhanceSpecSelect();
   } catch (e) {
@@ -386,20 +475,49 @@ function setEnhanceHint(text, kind) {
 }
 
 // 图像页的模板下拉 —— 与「本地模型配置」页共用同一份 provState.specId
+// 候选项按当前上下文（模式 + 模型）过滤：
+//   图像模式只显示图像模板，视频模式只显示视频模板，音频模式只显示音频模板
 function renderEnhanceSpecSelect() {
   const sel = $("#enhanceSpec");
   if (!sel) return;
-  const specs = provState.agent.specs || [];
+  const mode = enhanceCurrentMode();
+  const modelKey = enhanceCurrentModelKey();
+  const specs = enhanceSpecsForContext(mode, modelKey);
   if (!specs.length) { sel.innerHTML = ""; sel.style.display = "none"; return; }
   sel.style.display = "";
   sel.innerHTML = specs.map(s =>
     `<option value="${esc(s.id)}"${s.id === provState.specId ? " selected" : ""}>${esc(s.label)}</option>`
   ).join("");
+  // 下拉显示值必须与实际生效值一致：不在候选里的 id 一律回落到上下文默认
+  const ids = specs.map(s => s.id);
+  if (!ids.includes(provState.specId)) {
+    const fallback = enhanceDefaultSpecForContext(mode, modelKey, specs);
+    if (fallback) provState.specId = fallback;
+  }
   sel.value = provState.specId;
+  sel.setAttribute("data-mode", mode || "");
+  sel.setAttribute("data-model", modelKey || "");
+}
+
+// 模式切换 / 模型切换后调用：重新过滤下拉 + 回落不适用模板
+function refreshEnhanceSpecForMode() {
+  const mode = enhanceCurrentMode();
+  const modelKey = enhanceCurrentModelKey();
+  const before = provState.specId;
+  const { changed, specId } = alignSpecWithContext(mode, modelKey);
+  renderEnhanceSpecSelect();
+  if (changed) {
+    const spec = (provState.agent.specs || []).find(s => s.id === specId);
+    setEnhanceHint(
+      `已切换到「${mode || "当前"}」模式，模板自动回落到「${spec ? spec.label : specId}」`, "ok");
+  }
+  return before !== provState.specId;
 }
 
 $("#enhanceSpec").addEventListener("change", e => {
   provState.specId = e.target.value;
+  const mode = enhanceCurrentMode();
+  provState.specIdByMode[mode] = e.target.value;
   setEnhanceHint("已切换模板：" + e.target.selectedOptions[0].textContent, "ok");
 });
 
@@ -424,8 +542,16 @@ $("#enhanceBtn").addEventListener("click", async () => {
       prompt,
       mode: "replace",
       spec_id: provState.specId || "image",
+      // 当前上下文：后端用它做模板适用性兜底，保证执行模板与下拉显示一致
+      mode_ctx: enhanceCurrentMode(),
+      model_key: enhanceCurrentModelKey(),
     });
     provState.lastEnhance = d;
+    // 服务端可能因模式回落换了模板 —— 同步下拉显示，避免「显示 A 实际用 B」
+    if (d.spec_id && d.spec_id !== provState.specId) {
+      provState.specId = d.spec_id;
+      renderEnhanceSpecSelect();
+    }
     $("#enhanceResult").value = d.enhanced || "";
     $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
     $("#enhanceModal").hidden = false;

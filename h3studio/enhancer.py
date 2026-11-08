@@ -36,12 +36,24 @@ SCRIPTS_DIR = SKILL_DIR / "scripts"
 
 # ------------------------------------------------------------------ 模板档位
 
-# 每档 = 一个模板文件 + 校验模式 + 长度档
+# 每档 = 一个模板文件 + 校验模式 + 长度档 + 适用模型族
+#
+# 过滤机制（通用，不硬编码删选项）：
+#   两个维度匹配 —— media（媒体类型）+ families（模型族）
+#   - media：image / video / audio / 3d ... 决定模板属于哪类媒体
+#   - families：该模板适配哪些模型族；含 "*" 表示该 media 下通用
+#   - 上下文（当前模式 + 当前模型）解出 media 与 family，模板必须同时匹配
+#   新增模型或新增模板只需改这两张表，不用动过滤代码。
+#
+# 为什么按「模型族」而不是按「模式」过滤：
+#   同一模式下可能有多个模型（如 Z-Image Turbo / Base / DarkBeast），
+#   将来加入 FLUX 等其它图像模型时，只有 Z-Image 专属模板才需要被排除。
 TEMPLATE_SPECS = {
     "image": {
         "id": "image",
         "label": "图像提示词（Z-Image 官方 PE）",
         "media": "image",
+        "families": ["z_image"],
         "template": "pe-zimage-official.txt",
         "validate_mode": "pe",
         "default_length": "medium",
@@ -55,6 +67,7 @@ TEMPLATE_SPECS = {
         "id": "image-scalist",
         "label": "图像提示词（SCALIST 结构化）",
         "media": "image",
+        "families": ["*"],
         "template": "scalist-structured.txt",
         "validate_mode": "scalist",
         "default_length": "medium",
@@ -67,6 +80,7 @@ TEMPLATE_SPECS = {
         "id": "image-bbox",
         "label": "图像提示词 + bbox 元素表（FLUX 3 官方格式）",
         "media": "image",
+        "families": ["*"],
         "template": "bbox-elements.txt",
         "validate_mode": "bbox",
         # caption + JSON 元素表比纯 caption 长，默认给 long 档预算
@@ -79,6 +93,7 @@ TEMPLATE_SPECS = {
         "id": "video",
         "label": "视频提示词（MiniMax-H3）",
         "media": "video",
+        "families": ["minimax_h3"],
         "template": "video-official.txt",
         "validate_mode": "pe",
         "default_length": "medium",
@@ -90,6 +105,7 @@ TEMPLATE_SPECS = {
         "id": "audio",
         "label": "音频提示词（BGM / 音效）",
         "media": "audio",
+        "families": ["*"],
         "template": "audio-official.txt",
         "validate_mode": "pe",
         "default_length": "short",
@@ -97,6 +113,47 @@ TEMPLATE_SPECS = {
         "dimensions": ["体裁", "节奏", "乐器", "音色情绪", "动态", "混音质感"],
         "source": "预留复用位（沿用同一套 Agent 边界）",
     },
+}
+
+# 模式 -> 媒体类型（决定候选模板的 media 维度）
+MODE_MEDIA = {
+    "t2i": "image",
+    "t2v": "video",
+    "flf": "video",
+    "r2v": "video",
+    "longfilm": "video",
+    "audio": "audio",
+}
+
+# 模型 key -> 模型族（决定候选模板的 families 维度）。
+# 新装一个模型就往这里加一行；模板侧不用动。
+MODEL_FAMILY = {
+    "z_image_turbo_bf16": "z_image",
+    "z_image_bf16": "z_image",
+    "darkbeast_z6_blitz_fp8": "z_image",
+    # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
+    "lora": "minimax_h3",
+    "standard": "minimax_h3",
+}
+
+# 模式 -> 默认模型 key（用于解上下文；前端会传实际选中的模型）
+MODE_DEFAULT_MODEL = {
+    "t2i": "z_image_turbo_bf16",
+    "t2v": "lora",
+    "flf": "lora",
+    "r2v": "lora",
+    "longfilm": "lora",
+}
+
+# 各模式的默认模板（当前模板不适用时的回落目标）。
+# 找不到就用该模式过滤结果里的第一个。
+MODE_DEFAULT_SPEC = {
+    "t2i": "image",
+    "t2v": "video",
+    "flf": "video",
+    "r2v": "video",
+    "longfilm": "video",
+    "audio": "audio",
 }
 
 # 视频 / 音频模板（占位实现，便于后续直接换官方原文）
@@ -197,11 +254,100 @@ def list_specs() -> list:
             "label": spec["label"],
             "media": spec["media"],
             "builtin": True,
+            "families": list(spec.get("families") or []),
             "dimensions": spec["dimensions"],
             "source": spec["source"],
             "validate_mode": spec["validate_mode"],
         })
     return specs
+
+
+def mode_media(mode: str) -> str:
+    """某模式对应的媒体类型；未知模式返回空字符串（= 不过滤 media）。"""
+    return MODE_MEDIA.get(mode or "") or ""
+
+
+def model_family(model_key: str) -> str:
+    """模型 key -> 模型族；未知模型返回空字符串。"""
+    return MODEL_FAMILY.get(model_key or "") or ""
+
+
+def spec_matches_context(spec: dict, media: str = "", family: str = "") -> bool:
+    """
+    模板是否适用于当前上下文（媒体类型 + 模型族）。
+
+    规则（两条都过才算适用）：
+      - media：模板的 media 必须等于当前媒体类型；模板没声明 media 则视为通用
+      - families：模板的 families 含 "*" 或含当前模型族才算适用；
+                  模板没声明 families 则视为通用
+    上下文任一维度为空 -> 该维度不参与过滤（保守不隐藏）。
+    """
+    spec_media = spec.get("media") or ""
+    if media and spec_media and spec_media != media:
+        return False
+    families = spec.get("families")
+    if isinstance(families, str):
+        families = [families]
+    if not families:
+        return True          # 未声明模型族 = 通用模板
+    if not family:
+        return True          # 上下文里没有模型族 -> 不按族过滤
+    if "*" in families:
+        return True
+    return family in families
+
+
+def filter_specs(specs: list, mode: str = "", model_key: str = "") -> list:
+    """
+    按当前上下文（模式 + 模型）过滤模板列表。
+
+    前端下拉与后端校验共用同一套规则。
+    mode 为空 / 未知模式 -> 原样返回（不过滤）。
+    """
+    media = mode_media(mode)
+    if not media:
+        return list(specs)
+    family = model_family(model_key)
+    return [s for s in specs if spec_matches_context(s, media, family)]
+
+
+def default_spec_for_mode(mode: str, specs: list | None = None,
+                          model_key: str = "") -> str | None:
+    """
+    该模式下的默认模板 id。
+
+    优先用 MODE_DEFAULT_SPEC 指定的；它若不在过滤结果里（模板被删/改名），
+    退回过滤结果里的第一个。全空则返回 None。
+    """
+    available = filter_specs(specs if specs is not None else list_specs(),
+                             mode, model_key)
+    if not available:
+        return None
+    preferred = MODE_DEFAULT_SPEC.get(mode)
+    for s in available:
+        if s.get("id") == preferred:
+            return preferred
+    return available[0].get("id")
+
+
+def resolve_spec_for_mode(spec_id: str, mode: str = "", specs: list | None = None,
+                          model_key: str = "") -> str:
+    """
+    保证传入的 spec_id 在当前模式下适用。
+
+    - 适用 -> 原样返回
+    - 不适用 / 不存在 -> 回落到该模式的默认模板
+    这样「下拉显示的模板」与「实际执行的模板」永远一致。
+    """
+    available = filter_specs(specs if specs is not None else list_specs(),
+                             mode, model_key)
+    if not available:
+        return spec_id
+    ids = [s.get("id") for s in available]
+    if spec_id in ids:
+        return spec_id
+    fallback = default_spec_for_mode(mode, available, model_key)
+    return fallback if fallback else spec_id
 
 
 def get_spec(spec_id: str, overrides: dict | None = None) -> dict:

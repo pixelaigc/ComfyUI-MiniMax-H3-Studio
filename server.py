@@ -1083,7 +1083,15 @@ async def api_providers_test(request):
 
 # ------------------------------------------------------------------ 提示词增强 Agent
 async def api_enhancer_config(request):
-    """GET /api/enhancer —— 读取增强 Agent 的模板清单与参数"""
+    """
+    GET /api/enhancer —— 读取增强 Agent 的模板清单与参数
+
+    可选查询参数 ?mode=t2i&model=z_image_turbo_bf16：
+      返回该上下文下适用的模板（filter_specs），并带上 default_spec_id。
+      不带 mode 时返回全部模板 + 各模式的过滤结果，前端可自行切换。
+    """
+    mode = (request.query.get("mode") or "").strip()
+    model_key = (request.query.get("model") or "").strip()
     with db() as conn:
         row = conn.execute(
             "SELECT value FROM model_provider_prefs WHERE key=?",
@@ -1106,14 +1114,32 @@ async def api_enhancer_config(request):
             full = enh.get_spec(spec["id"], saved)
             spec["builtin_system_prompt"] = full["system_prompt"]
             spec["builtin_user_template"] = full["user_template"]
-    return json_ok({
+
+    payload = {
         "specs": specs,
         "params": enh.resolve_params(None, saved),
         "default_params": enh.DEFAULT_PARAMS,
         "length_presets": enh.LENGTH_PRESETS,
         "sampling_presets": enh.SAMPLING_PRESETS,
         "skill_dir": str(enh.SKILL_DIR),
-    })
+        # 上下文 -> 适用模板 id 列表（前端按当前模式/模型取用；新增模型只改服务端这两张表）
+        "mode_filters": {
+            m: [s["id"] for s in enh.filter_specs(specs, m)]
+            for m in enh.MODE_MEDIA
+        },
+        "mode_defaults": dict(enh.MODE_DEFAULT_SPEC),
+        # 模式 -> 媒体类型（前端据此做 media 维度过滤）
+        "mode_media": dict(enh.MODE_MEDIA),
+        # 模型族映射（前端据此判断当前模型属于哪一族）
+        "model_families": dict(enh.MODEL_FAMILY),
+    }
+    if mode:
+        filtered = enh.filter_specs(specs, mode, model_key)
+        payload["mode"] = mode
+        payload["model"] = model_key
+        payload["mode_specs"] = filtered
+        payload["default_spec_id"] = enh.default_spec_for_mode(mode, specs, model_key)
+    return json_ok(payload)
 
 async def api_enhancer_save(request):
     """PUT /api/enhancer —— 保存用户可编辑的模板覆盖 + 参数"""
@@ -1183,6 +1209,12 @@ async def api_enhance(request):
         return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
 
     spec_id = payload.get("spec_id") or "image"
+    # 上下文一致性：若请求带了 mode，而 spec_id 在该模式下不适用，
+    # 则回落到该模式的默认模板 —— 保证「下拉显示」与「实际执行」一致。
+    mode_ctx = str(payload.get("mode_ctx") or payload.get("mode_kind") or "").strip()
+    model_key = str(payload.get("model_key") or "").strip()
+    if mode_ctx:
+        spec_id = enh.resolve_spec_for_mode(spec_id, mode_ctx, model_key=model_key)
     images = payload.get("images") or []
     if not isinstance(images, list):
         images = []
