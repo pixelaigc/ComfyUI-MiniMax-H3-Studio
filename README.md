@@ -341,6 +341,9 @@ LoRA 这套图像参数。手动切到文生视频、首尾帧、参考生成、
 
 # 前端默认态（需要 playwright + chromium）
 /usr/local/lib/hermes-agent/venv/bin/python -m pytest tests/test_frontend_defaults.py -q
+
+# 状态栏实时性 + 素材库自动刷新（需要 playwright + chromium）
+/usr/local/lib/hermes-agent/venv/bin/python -m pytest tests/test_status_realtime.py -q
 ```
 
 `tests/test_frontend_defaults.py` 用真实浏览器打开真实 Studio 实例，断言：
@@ -354,6 +357,24 @@ LoRA 这套图像参数。手动切到文生视频、首尾帧、参考生成、
 连带 `refreshJobs()` 与 `setInterval(refreshJobs, 2000)` 都没注册 —— 表现为标签显示
 「全部 / 全部类型」但列表空白，点一次才恢复。现在每个启动步骤单独 `try/catch`，
 单点异常不再拖垮整页。
+
+## 状态栏与素材库实时刷新
+
+右上角状态栏与 ComfyUI 的**真实队列**保持一致，状态一变就通过 SSE 推给前端：
+
+| 状态 | 显示 | 触发条件 |
+|---|---|---|
+| 空闲 | `空闲`（绿点） | ComfyUI 队列全空 |
+| 生成中 | `生成中`（红点 pulsing） | ComfyUI 正在执行任务 |
+| 排队中 | `排队中（N）` | 队列里有待执行的任务 |
+| 断连 | `ComfyUI 未连接`（灰点） | 连不上 ComfyUI |
+
+注意状态反映的是 ComfyUI 实际在跑什么 —— 不只是 Studio 自己提交的任务，
+用户直接在 ComfyUI 页面提交的任务，Studio 也会显示「生成中」。
+
+右侧历史/素材库每 2 秒自动增量刷新：生成完成的新条目（缩略图、状态、
+参数）会自动出现在列表里，不需要手动刷新页面。未变化的卡片不会重建，
+因此正在播放的视频不会被打断。
 
 ## 致谢
 
