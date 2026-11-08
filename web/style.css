@@ -356,6 +356,37 @@ body.modal-open { overflow: hidden; }
 .bar.warn > div { background: #f0a020; }
 .bar.danger > div { background: var(--danger); }
 .bar-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+/* ---------- 显卡功耗上限控件 ---------- */
+.sys-pl {
+  margin-top: 10px; padding: 9px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fafbfc;
+}
+.sys-pl-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12.5px; color: var(--muted); margin-bottom: 6px;
+}
+.sys-pl-cur { color: var(--text); font-weight: 600; font-size: 13px; }
+.sys-pl-na { color: var(--muted); font-weight: 500; font-size: 12px; }
+.sys-pl-range { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
+.sys-pl-ctl { display: flex; gap: 6px; align-items: center; }
+.sys-pl-select {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 6px; font-size: 12px; font-family: inherit;
+  background: #fff; color: var(--text);
+}
+.sys-pl-btn {
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  border-radius: 6px; padding: 4px 12px; font-size: 12px;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.sys-pl-btn:hover { filter: brightness(1.08); }
+.sys-pl-btn:active { filter: brightness(0.94); }
+.sys-pl-note { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.sys-pl-msg { font-size: 11px; margin-top: 6px; line-height: 1.5; }
+.sys-pl-msg.ok { color: #1f8a52; }
+.sys-pl-msg.err { color: var(--danger); }
 .model-line { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
 .model-line span:first-child { color: var(--muted); }
 .model-line b { font-weight: 500; }

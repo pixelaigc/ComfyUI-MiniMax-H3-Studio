@@ -1950,9 +1950,138 @@ function card(title, badge, body) {
   </div>`;
 }
 
+// ---------- 显卡功耗上限（Power Limit）----------
+// 硬件面板每 3 秒自动刷新会整块重绘，用户在下拉框里选好的目标值必须保留，
+// 否则永远点不到「应用」。
+const PL_PENDING = {};
+// 结果提示同样要跨重绘存活：硬件面板每 3 秒重绘一次，提示写在 DOM 上会被抹掉。
+const PL_MSG = {};
+// 每张卡一个控件：读出当前值、显示可调范围、下拉选择目标值 + 应用。
+// 安全约束：默认只允许下调；提高功耗需要二次确认。
+function powerLimitOptions(g) {
+  const info = g.power_limit_info || {};
+  if (!info.supported) return [];
+  const lo = Number(info.min), hi = Number(info.max);
+  if (!isFinite(lo) || !isFinite(hi) || hi <= 0) return [];
+  const cur = Number(info.current);
+  // 步进 5W；小于 100W 的卡用 10W 步进，避免下拉项过长
+  const step = hi - lo > 200 ? 5 : 10;
+  const opts = [];
+  for (let v = hi; v >= lo - 0.001; v -= step) {
+    const val = Math.round(v);
+    if (opts.length && Math.abs(opts[opts.length - 1].val - val) < 0.001) continue;
+    opts.push({ val: val, cur: Math.abs(val - cur) < 0.001 });
+  }
+  if (!opts.length) opts.push({ val: Math.round(cur), cur: true });
+  return opts;
+}
+
+function renderPowerLimitControl(g, cap) {
+  const info = g.power_limit_info || {};
+  const idx = g.index;
+  if (!cap || !cap.available) {
+    const reason = (cap && cap.reason) || "未检测到可调功耗上限能力";
+    return `<div class="sys-pl">
+      <div class="sys-pl-head"><span>功耗上限</span><b class="sys-pl-na">不可用</b></div>
+      <div class="sys-pl-note">${escapeHtml(reason)}</div>
+    </div>`;
+  }
+  if (!info.supported) {
+    const reason = info.reason || "该显卡或当前驱动不支持修改功耗上限";
+    return `<div class="sys-pl">
+      <div class="sys-pl-head"><span>功耗上限</span><b class="sys-pl-na">不可用</b></div>
+      <div class="sys-pl-note">${escapeHtml(reason)}</div>
+    </div>`;
+  }
+  const opts = powerLimitOptions(g);
+  const cur = Number(info.current);
+  const sel = opts.find(o => o.cur);
+  const curVal = sel ? sel.val : Math.round(cur);
+  const pending = PL_PENDING[idx];
+  const pendingVal = (pending != null && opts.some(o => o.val === pending)) ? pending : null;
+  return `<div class="sys-pl" data-gpu-index="${idx}">
+    <div class="sys-pl-head"><span>功耗上限</span><b class="sys-pl-cur" data-pl-cur="${idx}">${curVal} W</b></div>
+    <div class="sys-pl-range">可调范围 ${Math.round(info.min)} – ${Math.round(info.max)} W（默认 ${Math.round(info.default)} W）</div>
+    <div class="sys-pl-ctl">
+      <select class="sys-pl-select" data-pl-select="${idx}" aria-label="GPU ${idx} 功耗上限">
+        ${opts.map(o => `<option value="${o.val}"${(pendingVal != null ? o.val === pendingVal : o.cur) ? " selected" : ""}>${o.val} W</option>`).join("")}
+      </select>
+      <button type="button" class="sys-pl-btn" data-pl-apply="${idx}">应用</button>
+    </div>
+    <div class="sys-pl-msg${PL_MSG[idx] ? " " + PL_MSG[idx].kind : ""}" data-pl-msg="${idx}">${PL_MSG[idx] ? escapeHtml(PL_MSG[idx].text) : ""}</div>
+  </div>`;
+}
+
+async function applyPowerLimit(index, watts, allowRaise) {
+  const curEl = document.querySelector(`[data-pl-cur="${index}"]`);
+  // 提示写进状态，随后重绘时由 renderPowerLimitControl 还原
+  const setMsg = (text, kind) => {
+    PL_MSG[index] = { text: text, kind: kind || "" };
+    const el = document.querySelector(`[data-pl-msg="${index}"]`);
+    if (el) {
+      el.textContent = text;
+      el.className = "sys-pl-msg" + (kind ? " " + kind : "");
+    }
+  };
+  try {
+    const resp = await fetch("/api/gpu/power-limit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: index, watts: watts, allow_raise: !!allowRaise }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      setMsg(data.message || data.error || `设置失败（HTTP ${resp.status}）`, "err");
+      return;
+    }
+    delete PL_PENDING[index];
+    if (curEl && data.current != null) curEl.textContent = `${Math.round(data.current)} W`;
+    // 回读校验已由后端完成；刷新面板让范围/当前值同步。
+    // 提示存在 PL_MSG 里，重绘后仍可见。
+    setMsg(data.message || "已生效", "ok");
+    await refreshHardware(true);
+  } catch (e) {
+    setMsg("请求失败：" + (e && e.message ? e.message : e), "err");
+  }
+}
+
+// 事件委托：下拉框选择变化 → 记住目标值（防止自动刷新重置）
+document.addEventListener("change", event => {
+  const sel = event.target.closest("[data-pl-select]");
+  if (!sel) return;
+  const index = Number(sel.getAttribute("data-pl-select"));
+  const val = Number(sel.value);
+  if (isFinite(val)) {
+    PL_PENDING[index] = val;
+    delete PL_MSG[index];
+  }
+});
+
+// 事件委托：应用按钮
+document.addEventListener("click", event => {
+  const btn = event.target.closest("[data-pl-apply]");
+  if (!btn) return;
+  const index = Number(btn.getAttribute("data-pl-apply"));
+  const sel = document.querySelector(`[data-pl-select="${index}"]`);
+  if (!sel) return;
+  const watts = Number(sel.value);
+  if (!isFinite(watts)) return;
+  const curEl = document.querySelector(`[data-pl-cur="${index}"]`);
+  const cur = curEl ? parseFloat(String(curEl.textContent)) : NaN;
+  if (isFinite(cur) && watts > cur) {
+    // 提高功耗上限：必须二次确认（安全约束）
+    if (!confirm(`确认提高 GPU ${index} 的功耗上限？\n\n${cur} W → ${watts} W\n\n提高功耗会提升整机发热与供电压力，确认继续？`)) return;
+    applyPowerLimit(index, watts, true);
+  } else {
+    applyPowerLimit(index, watts, false);
+  }
+});
+
 function renderHardware(d) {
   const grid = $("#sysGrid");
   const cards = [];
+  // 功耗上限整体能力（nvidia-smi 缺失 / 驱动不支持时 available=false）
+  const plCap = d.power_limit || { available: false, reason: "未返回功耗上限能力信息" };
 
   // GPU
   (d.gpus || []).forEach(g => {
@@ -1966,7 +2095,8 @@ function renderHardware(d) {
       <div class="sys-row"><span>温度</span><b>${Math.round(g.temp)} °C</b></div>
       <div class="sys-row"><span>功耗</span><b>${Math.round(g.power)} W / ${Math.round(g.power_limit)} W</b></div>
       <div class="sys-row"><span>核心频率</span><b>${g.clock || "—"} MHz</b></div>
-      <div class="sys-row"><span>驱动版本</span><b>${g.driver}</b></div>`));
+      <div class="sys-row"><span>驱动版本</span><b>${g.driver}</b></div>
+      ${renderPowerLimitControl(g, plCap)}`));
   });
   if (!(d.gpus || []).length) {
     cards.push(card("GPU 显卡", "未检测", `<div class="sys-main">nvidia-smi 不可用</div>
@@ -1975,12 +2105,18 @@ function renderHardware(d) {
 
   // CPU
   const c = d.cpu || {};
+  const cpuName = c.name || c.model || "—";
+  const hetero = c.heterogeneous && (c.models || []).length > 1;
   cards.push(card("CPU 处理器", c.percent != null ? Math.round(c.percent) + "%" : "", `
-    <div class="sys-main">${c.name || "—"}</div>
+    <div class="sys-main">${escapeHtml(cpuName)}</div>
     <div class="${barClass(c.percent || 0)}"><div style="width:${c.percent || 0}%"></div></div>
     <div class="bar-label"><span>当前占用</span><span>${Math.round(c.percent || 0)}%</span></div>
     <div class="sys-row"><span>核心 / 线程</span><b>${c.cores} 核 / ${c.threads} 线程</b></div>
-    <div class="sys-row"><span>当前频率</span><b>${c.freq ? c.freq + " MHz" : "—"}</b></div>`));
+    <div class="sys-row"><span>当前频率</span><b>${c.freq ? c.freq + " MHz" : "—"}</b></div>
+    ${c.architecture ? `<div class="sys-row"><span>架构</span><b>${escapeHtml(c.architecture)}</b></div>` : ""}
+    ${c.vendor ? `<div class="sys-row"><span>厂商</span><b>${escapeHtml(c.vendor)}</b></div>` : ""}
+    ${hetero ? (c.models || []).map(m => `<div class="sys-row"><span>${escapeHtml(m.name)}</span><b>${m.logical} 线程</b></div>`).join("") : ""}
+    ${c.source ? `<div class="sys-row"><span>型号来源</span><b>${escapeHtml(c.source)}</b></div>` : ""}`));
 
   // 内存
   const r = d.ram || {};

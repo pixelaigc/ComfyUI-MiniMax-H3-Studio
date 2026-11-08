@@ -52,6 +52,7 @@ from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import loras as lora_registry
 from h3studio import gen_types
+from h3studio import hardware as hw
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -1198,43 +1199,23 @@ psutil.cpu_percent(interval=None)  # 预热，避免首次全 0
 
 
 def _cpu_name():
-    try:
-        import winreg
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                             r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
-        name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
-        return name.strip()
-    except Exception:
-        return platform.processor() or "未知 CPU"
+    """CPU 型号名。
+
+    旧实现只读 Windows 注册表，Linux 上必然失败；回退到 platform.processor()
+    在 Linux 上返回空串，于是页面上显示「未知 CPU」。
+    现在统一走 h3studio.hardware.detect_cpu()，多级来源降级，
+    最差也返回「架构 · 核心数」的可辨识兜底。
+    """
+    return hw.detect_cpu()["name"]
 
 
 def _gpu_info():
-    """优先 nvidia-smi，取不到则回退 torch/ComfyUI 信息"""
+    """优先 nvidia-smi，取不到则回退 torch/ComfyUI 信息。
+
+    每张卡附带 power_limit_info（可调范围 + 是否支持 + 不可用原因）。
+    """
     try:
-        out = subprocess.check_output(
-            ["nvidia-smi",
-             "--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu,"
-             "temperature.gpu,power.draw,power.limit,driver_version,clocks.current.graphics",
-             "--format=csv,noheader,nounits"],
-            encoding="utf-8", timeout=4, creationflags=CREATE_NO_WINDOW)
-        gpus = []
-        for line in out.strip().splitlines():
-            p = [x.strip() for x in line.split(",")]
-            if len(p) < 9:
-                continue
-            gpus.append({
-                "name": p[0],
-                "vram_total": float(p[1]) * 1024 * 1024,
-                "vram_used": float(p[2]) * 1024 * 1024,
-                "vram_free": float(p[3]) * 1024 * 1024,
-                "util": float(p[4]),
-                "temp": float(p[5]),
-                "power": float(p[6]),
-                "power_limit": float(p[7]),
-                "driver": p[8],
-                "clock": p[9] if len(p) > 9 else "",
-            })
-        return gpus
+        return hw.query_gpus()
     except Exception:
         return []
 
@@ -1289,17 +1270,32 @@ async def api_hardware(request):
     except Exception:
         pass
 
+    cpu_info = hw.detect_cpu()
+    power_caps = hw.query_power_limits()
+
     data = {
         "cpu": {
-            "name": _cpu_name(),
-            "cores": psutil.cpu_count(logical=False),
-            "threads": psutil.cpu_count(logical=True),
+            # name: 显示名（异构时形如 "A x12 + B x12"）
+            "name": cpu_info["name"],
+            "model": cpu_info["model"],
+            "cores": cpu_info["cores"],
+            "threads": cpu_info["threads"],
             "percent": psutil.cpu_percent(interval=None),
             "freq": round(psutil.cpu_freq().current) if psutil.cpu_freq() else None,
+            "architecture": cpu_info["architecture"],
+            "vendor": cpu_info["vendor"],
+            "source": cpu_info["source"],
+            "heterogeneous": cpu_info["heterogeneous"],
+            "models": cpu_info["models"],
         },
         "ram": {"total": vm.total, "used": vm.used, "available": vm.available,
                 "percent": vm.percent, "swap_total": sm.total, "swap_used": sm.used},
         "gpus": _gpu_info(),
+        # 功耗上限整体能力（nvidia-smi 缺失 / 驱动不支持时 available=false + reason）
+        "power_limit": {
+            "available": power_caps["available"],
+            "reason": power_caps["reason"],
+        },
         "disks": disks,
         "os": {"platform": platform.platform(), "machine": platform.machine(),
                "hostname": platform.node(), "boot": psutil.boot_time()},
@@ -1327,6 +1323,42 @@ async def api_hardware(request):
 
 
 # ------------------------------------------------------------------ 本地模型 Provider
+async def api_gpu_power_limit(request):
+    """POST /api/gpu/power-limit —— 修改单张显卡的功耗上限（Power Limit）。
+
+    body: {"index": 0, "watts": 200, "allow_raise": false}
+      - index  : 显卡序号（nvidia-smi 的 GPU index）
+      - watts  : 目标功耗上限（W）
+      - allow_raise: 是否允许**提高**功耗上限。默认 false —— 安全约束：
+        默认只允许下调；提高必须由调用方显式确认。
+
+    返回 {ok, index, requested, previous, current, verified, message}
+    失败时 ok=false 且 message 说明原因（不支持 / 超范围 / 拒绝提高 / 回读不一致）。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "请求格式错误"}, status=400)
+    if not isinstance(payload, dict):
+        return web.json_response({"ok": False, "error": "请求格式错误"}, status=400)
+
+    index = payload.get("index")
+    watts = payload.get("watts")
+    allow_raise = bool(payload.get("allow_raise", False))
+    if index is None or watts is None:
+        return web.json_response(
+            {"ok": False, "error": "缺少参数 index / watts"}, status=400)
+
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, hw.set_power_limit, index, watts, allow_raise)
+    if not result.get("ok"):
+        return web.json_response(result, status=400)
+    # 功耗上限已变，硬件面板缓存必须失效，否则前端仍读到旧值
+    _HW_CACHE.update(t=0, data=None)
+    return json_ok(result)
+
+
 async def api_providers_list(request):
     """GET /api/providers —— 列出全部 Provider + 默认项设置"""
     with db() as conn:
@@ -1814,6 +1846,7 @@ def make_app():
     app.router.add_delete("/api/jobs/{id}", api_delete)
     app.router.add_get("/api/system", api_system)
     app.router.add_get("/api/hardware", api_hardware)
+    app.router.add_post("/api/gpu/power-limit", api_gpu_power_limit)
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
     app.router.add_get("/api/generation-types", api_generation_types)
