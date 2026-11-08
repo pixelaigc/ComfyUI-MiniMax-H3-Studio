@@ -523,7 +523,7 @@ class Worker:
         mode = job_row["mode"]
         print(f"[worker] 开始任务 {job_id} ({mode})")
         # 批次任务：逐个批次独立跑，单个批次失败不影响其它批次
-        if mode == "t2i" and self._has_batches(job_id):
+        if mode in ("t2i", "t2i_qwen", "i2i_qwen") and self._has_batches(job_id):
             await self._run_batches(job_row)
             return
         try:
@@ -543,6 +543,18 @@ class Worker:
                 elif mode == "r2v":
                     names = []
                     for up in params.get("ref_images", []):
+                        lp = UPLOAD_DIR / up
+                        if not lp.exists():
+                            raise RuntimeError(f"找不到上传文件: {up}")
+                        names.append(await comfy_upload_image(session, lp))
+                    params["ref_images"] = names
+                elif mode == "i2i_qwen":
+                    # Qwen 图片编辑：参考图（1-9 张）上传到 ComfyUI input，
+                    # LoadImage 节点按返回的 'subfolder/name' 引用
+                    names = []
+                    for up in params.get("ref_images", []):
+                        if isinstance(up, dict):
+                            up = up.get("file") or ""
                         lp = UPLOAD_DIR / up
                         if not lp.exists():
                             raise RuntimeError(f"找不到上传文件: {up}")
@@ -693,9 +705,20 @@ class Worker:
         batch_params["seed"] = int(seed)
         batch_params["job_id"] = f"{job_id}_{batch_id}"
         batch_params["mode"] = mode
-        workflow = build_workflow(mode, batch_params)
         client_id = f"h3studio-{batch_id}"
         async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+            # 参考图要上传到 ComfyUI input，LoadImage 才能引用
+            if mode == "i2i_qwen":
+                names = []
+                for up in batch_params.get("ref_images", []):
+                    if isinstance(up, dict):
+                        up = up.get("file") or ""
+                    lp = UPLOAD_DIR / up
+                    if not lp.exists():
+                        raise RuntimeError(f"找不到上传文件: {up}")
+                    names.append(await comfy_upload_image(session, lp))
+                batch_params["ref_images"] = names
+            workflow = build_workflow(mode, batch_params)
             async with self.submit_lock:
                 with db() as conn:
                     row = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()

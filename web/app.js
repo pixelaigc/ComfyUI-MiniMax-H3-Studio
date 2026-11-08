@@ -384,19 +384,20 @@ const IMG_BATCH_OPTIONS = [1, 2, 3, 4, 5];
 function renderBatchChips() {
   const box = $("#imgBatchChips");
   if (!box) return;
+  const s = imgCtx().st;
   box.innerHTML = IMG_BATCH_OPTIONS.map(n =>
-    `<button type="button" data-n="${n}" class="${n === state.img.batchCount ? "active" : ""}">${n} 张</button>`
+    `<button type="button" data-n="${n}" class="${n === s.batchCount ? "active" : ""}">${n} 张</button>`
   ).join("");
   box.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", () => {
-      state.img.batchCount = Number(btn.dataset.n);
+      imgCtx().st.batchCount = Number(btn.dataset.n);
       renderBatchChips();
     });
   });
   const hint = $("#imgBatchHint");
   if (hint) {
-    hint.textContent = state.img.batchCount > 1
-      ? `一次出 ${state.img.batchCount} 张 · 独立种子`
+    hint.textContent = s.batchCount > 1
+      ? `一次出 ${s.batchCount} 张 · 独立种子`
       : "一次出几张";
   }
 }
@@ -450,20 +451,21 @@ function renderExcludedLoras() {
 function renderLoraList() {
   const box = $("#imgLoraList");
   if (!box) return;
+  const ctx = imgLoraCtx();
   renderExcludedLoras();
-  if (!state.img.loras.length) {
+  if (!ctx.list.length) {
     box.innerHTML = "";
-    const accel = (IMG_LORAS.acceleration || []).length;
-    const bad = (IMG_LORAS.incompatible || []).length;
-    $("#imgLoraNote").textContent = IMG_LORAS.available.length
-      ? `未添加效果 LoRA。可选本机已安装的效果类 Z-Image LoRA（${IMG_LORAS.available.length} 个）` +
+    const accel = (ctx.store.acceleration || []).length;
+    const bad = (ctx.store.incompatible || []).length;
+    $("#imgLoraNote").textContent = ctx.store.available.length
+      ? `未添加效果 LoRA。可选本机已安装的效果类 ${ctx.label} LoRA（${ctx.store.available.length} 个）` +
         (accel ? `；另有 ${accel} 个加速/蒸馏类 LoRA 由工作流固定使用，不在此列表。` : "。") +
         (bad ? ` ${bad} 个 LoRA 因与底模不兼容被排除（见下方说明）。` : "") +
         " 强度 0 表示关闭。"
-      : "本机未检测到可用的效果类 Z-Image LoRA 文件。";
+      : `本机未检测到可用的效果类 ${ctx.label} LoRA 文件。`;
     return;
   }
-  box.innerHTML = state.img.loras.map((item, index) => {
+  box.innerHTML = ctx.list.map((item, index) => {
     const meta = imgLoraMeta(item.name);
     const missing = !meta && !item.excluded;
     // 被排除（不兼容）—— 明确标出原因，避免用户以为能正常用
@@ -590,7 +592,9 @@ function saveLoraConfig() {
         await loadImageLoras();
         return;
       }
-      state.img.loras = (data.loras || []).map(l => ({
+      // 回写服务端实际保存的状态（按当前底模族回写，别写串了）
+      const list = imgLoraCtx().list;
+      list.splice(0, list.length, ...(data.loras || []).map(l => ({
         name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
         excluded: !!l.excluded,
@@ -599,8 +603,8 @@ function saveLoraConfig() {
         strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
         ctx_damping: l.ctx_damping !== undefined ? l.ctx_damping : null,
         ctx_perturbation: l.ctx_perturbation !== undefined ? l.ctx_perturbation : null,
-      }));
-    renderLoraList();
+      })));
+      renderLoraList();
       renderLoraSelect();
     } catch (e) {
       setEnhanceHint(`LoRA 配置保存失败：${e.message}`, "error");
@@ -993,8 +997,9 @@ async function loadImageOptions() {
     QWEN_OPTIONS.maxRefImages = q.max_ref_images || 9;
     QWEN_OPTIONS.minRefImages = q.min_ref_images || 1;
     // Qwen 默认值对齐服务端推荐（首次进入该模式时用）
+    // Qwen-Image 2.1 的默认值：以服务端下发的推荐值为准（步数/CFG/SHIFT…）
     const qm = QWEN_OPTIONS.models[QWEN_OPTIONS.defaultModel];
-    if (qm && !state.imgQwen.model) {
+    if (qm) {
       state.imgQwen.model = QWEN_OPTIONS.defaultModel;
       state.imgQwen.steps = qm.steps;
       state.imgQwen.cfg = qm.cfg;
@@ -1002,6 +1007,10 @@ async function loadImageOptions() {
       state.imgQwen.sampler = qm.sampler;
       state.imgQwen.scheduler = qm.scheduler;
       state.imgQwen.tier = QWEN_OPTIONS.defaultTier;
+      const qKnown = QWEN_OPTIONS.aspects.some(a => a.key === state.imgQwen.aspect);
+      if (!qKnown && QWEN_OPTIONS.aspects.length) {
+        state.imgQwen.aspect = QWEN_OPTIONS.aspects[0].key;
+      }
     }
     if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
       state.img.model = data.default_model;
@@ -1010,7 +1019,7 @@ async function loadImageOptions() {
     const known = IMG_OPTIONS.aspects.some(a => a.key === state.img.aspect);
     if (!known && IMG_OPTIONS.aspects.length) state.img.aspect = IMG_OPTIONS.aspects[0].key;
     applyModelDefaults(state.img.model);
-    if (state.mode === "t2i") renderImagePanel();
+    if (IMAGE_MODES.includes(state.mode)) renderImagePanel();
   } catch (e) { /* 忽略：保持内置默认值 */ }
 }
 
@@ -2793,11 +2802,12 @@ $("#imgLoraAdd")?.addEventListener("click", () => {
   const name = $("#imgLoraSelect").value;
   if (!name) return;
   const meta = imgLoraMeta(name);
-  if (state.img.loras.length >= 8) {
+  const list = imgLoraCtx().list;
+  if (list.length >= 8) {
     setEnhanceHint("最多 8 个 LoRA", "error");
     return;
   }
-  state.img.loras.push({
+  list.push({
     name,
     // 推荐强度自动应用（用户之后可手动改，上限由服务端按权重封顶）
     strength: meta ? Number(meta.recommended_strength) : 1.0,

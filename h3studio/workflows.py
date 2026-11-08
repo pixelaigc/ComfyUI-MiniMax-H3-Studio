@@ -1190,13 +1190,28 @@ def build_qwen_i2i(params):
     # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
     # （COMFY_AUTOGROW_V3，按 image_1..image_N 命名）
     te_inputs = p["qw:27"]["inputs"]
+    # TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，在 API 格式下
+    # **必须写成嵌套的 images 字典**：{"image_1": <值>, "image_2": ...}
+    # 写成扁平的 "image_1" 顶层键时，ComfyUI 会把它当成 execute() 的
+    # 关键字参数传进去，报
+    #   TypeError: TextEncodeQwenImage21.execute() got an unexpected
+    #              keyword argument 'image_1'
+    # （值可以是文件名字符串，也可以是 ["节点id", 槽位] 的连线引用）
+    images_input: dict = {}
     for index, ref in enumerate(refs[:QWEN_IMAGE_MAX_REF_IMAGES]):
         node_id = f"qw:ref{index}"
-        filename = (ref or {}).get("file") or ""
+        # ref_images 两种形态都收：
+        #   服务端上传后是文件名列表（["images/x.png", ...]）
+        #   也接受字典列表（[{"file": "images/x.png"}, ...]）
+        if isinstance(ref, dict):
+            filename = ref.get("file") or ""
+        else:
+            filename = str(ref or "")
         if not filename:
             raise ValueError(f"第 {index + 1} 张参考图缺少文件名")
         p[node_id] = {"inputs": {"image": filename}, "class_type": "LoadImage"}
-        te_inputs[f"image_{index + 1}"] = [node_id, 0]
+        images_input[f"image_{index + 1}"] = [node_id, 0]
+    te_inputs["images"] = images_input
     return p
 
 
