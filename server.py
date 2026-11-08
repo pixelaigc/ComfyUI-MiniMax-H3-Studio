@@ -33,7 +33,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aiohttp import web, ClientSession, ClientTimeout
 import aiohttp
 
-from h3studio.workflows import build_workflow
+from h3studio.workflows import (
+    build_workflow,
+    ASPECT_MAP,
+    ASPECT_NUM,
+    Z_IMAGE_MODELS,
+    Z_IMAGE_DEFAULT_MODEL,
+    Z_IMAGE_RES_TIERS,
+    Z_IMAGE_DEFAULT_TIER,
+    z_image_dimensions,
+)
 from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
@@ -632,7 +641,7 @@ async def api_list(request):
         return web.json_response({"error": "media 只能是 image、video 或 longfilm"}, status=400)
     aspect = request.query.get("aspect", "").strip()
     if aspect:
-        if aspect not in ("16:9", "9:16", "4:3", "3:4", "1:1"):
+        if aspect not in ASPECT_NUM:
             return web.json_response({"error": "不支持的画面比例"}, status=400)
         conditions.append("json_extract(params, '$.aspect')=?")
         args.append(aspect)
@@ -758,6 +767,60 @@ async def api_unload(request):
         return json_ok({"ok": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+
+# ------------------------------------------------------------------ 图像模式参数清单
+# 图像面板的档位 / 比例 / 模型 / 采样器 / 调度器清单。
+# 模型只列本机 ComfyUI 实测存在的权重（见 h3studio.workflows.Z_IMAGE_MODELS）。
+_Z_IMAGE_SAMPLERS = [
+    "res_multistep", "euler", "dpmpp_2m_sde", "dpmpp_2m", "dpmpp_3m_sde",
+    "euler_ancestral", "dpm_2", "ddim", "heun", "uni_pc",
+]
+_Z_IMAGE_SCHEDULERS = ["simple", "beta", "sgm_uniform", "karras", "normal", "ddim_uniform"]
+
+_Z_IMAGE_TIER_LABELS = {
+    "480p": "480P",
+    "720p": "720P",
+    "1080p": "1080P",
+    "1440p": "1440P",
+    "2k": "2K",
+    "4k": "4K",
+}
+
+
+async def api_image_options(request):
+    """GET /api/image-options —— 图像面板可选项（含每个模型版本的推荐参数）"""
+    tiers = []
+    for key, short_side in Z_IMAGE_RES_TIERS.items():
+        tiers.append({
+            "key": key,
+            "label": _Z_IMAGE_TIER_LABELS.get(key, key.upper()),
+            "short_side": short_side,
+        })
+    aspects = []
+    for key, label in ASPECT_MAP.items():
+        w, h = ASPECT_NUM[key]
+        aspects.append({"key": key, "label": label, "ratio": [w, h]})
+    models = {}
+    for key, m in Z_IMAGE_MODELS.items():
+        models[key] = {
+            "label": m["label"],
+            "unet": m["unet"],
+            "note": m["note"],
+            "sampler": m["sampler"],
+            "scheduler": m["scheduler"],
+            "steps": m["steps"],
+            "cfg": m["cfg"],
+        }
+    return json_ok({
+        "tiers": tiers,
+        "aspects": aspects,
+        "models": models,
+        "samplers": _Z_IMAGE_SAMPLERS,
+        "schedulers": _Z_IMAGE_SCHEDULERS,
+        "default_tier": Z_IMAGE_DEFAULT_TIER,
+        "default_model": Z_IMAGE_DEFAULT_MODEL,
+    })
 
 
 # ------------------------------------------------------------------ 硬件信息
@@ -919,6 +982,13 @@ async def api_providers_create(request):
     with db() as conn:
         if prov.get_provider(conn, data["id"]):
             return web.json_response({"error": "该 ID 已存在"}, status=409)
+        # ComfyUI 类型默认开启代理：节点自己关不掉 thinking 模型，
+        # 走 H3 Studio 的 OpenAI 兼容代理才能拿到干净结果。
+        # 代理地址指向本服务自己的 /api/llm/p/{id}/v1
+        if data["type"] == "comfyui" and not payload.get("use_proxy"):
+            data["use_proxy"] = 1
+        if data["type"] == "comfyui" and data["use_proxy"] and not data["proxy_base_url"]:
+            data["proxy_base_url"] = f"{_studio_self_url()}{LLM_PROXY_PREFIX}/{data['id']}/v1"
         item = prov.insert_provider(conn, data)
         # 第一个 Provider 自动成为默认，避免用户必须先手动设置
         prefs = prov.prefs_snapshot(conn)
@@ -1021,13 +1091,19 @@ async def api_enhancer_config(request):
             spec["customized"] = True
             spec["custom_system_prompt"] = custom.get("system_prompt", "")
             spec["custom_user_template"] = custom.get("user_template", "")
+        else:
+            # 未自定义时，把内置模板正文回给前端，让用户能在界面里编辑
+            full = enh.get_spec(spec["id"], saved)
+            spec["builtin_system_prompt"] = full["system_prompt"]
+            spec["builtin_user_template"] = full["user_template"]
     return json_ok({
         "specs": specs,
         "params": enh.resolve_params(None, saved),
         "default_params": enh.DEFAULT_PARAMS,
         "length_presets": enh.LENGTH_PRESETS,
+        "sampling_presets": enh.SAMPLING_PRESETS,
+        "skill_dir": str(enh.SKILL_DIR),
     })
-
 
 async def api_enhancer_save(request):
     """PUT /api/enhancer —— 保存用户可编辑的模板覆盖 + 参数"""
@@ -1049,13 +1125,18 @@ async def api_enhancer_save(request):
         for spec_id, custom in (payload.get("specs") or {}).items():
             if not isinstance(custom, dict):
                 continue
-            if spec_id not in enh.BUILTIN_SPECS:
+            if spec_id not in enh.TEMPLATE_SPECS:
                 return web.json_response({"error": f"未知模板 {spec_id}"}, status=400)
             system_prompt = str(custom.get("system_prompt") or "").strip()
             user_template = str(custom.get("user_template") or "").strip()
-            if user_template and "{original}" not in user_template:
+            if user_template and "{prompt}" not in user_template \
+                    and "{original}" not in user_template:
                 return web.json_response(
-                    {"error": "用户模板必须包含 {original} 占位符"}, status=400)
+                    {"error": "用户模板必须包含 {prompt} 或 {original} 占位符"}, status=400)
+            if not system_prompt and not user_template:
+                # 两个字段都空 = 恢复内置模板，删掉覆盖项
+                specs.pop(spec_id, None)
+                continue
             specs[spec_id] = {"system_prompt": system_prompt, "user_template": user_template}
         saved["specs"] = specs
         if payload.get("params"):
@@ -1108,8 +1189,8 @@ async def api_enhance(request):
         except Exception:
             saved = {}
 
-    params = enh.resolve_params(payload.get("params"), saved)
     spec = enh.get_spec(spec_id, saved)
+    params = enh.resolve_params(payload.get("params"), saved, spec)
 
     # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
     with db() as conn:
@@ -1141,13 +1222,16 @@ async def api_enhance(request):
             item, messages, images=images or None,
             options={"temperature": params["temperature"],
                      "top_p": params["top_p"],
-                     "max_tokens": params["max_tokens"]})
+                     "max_tokens": params["max_tokens"],
+                     "do_sample": params.get("do_sample", True)})
     except llm_client.ProviderError as exc:
         # 本地模型不可达 —— 明确报错，不静默失败
         return web.json_response(
             {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
+    raw = enh.strip_thinking(raw)
     enhanced = enh.strip_wrapping(raw)
     if not enhanced:
         return web.json_response(
@@ -1161,6 +1245,27 @@ async def api_enhance(request):
              "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    # 硬约束校验（质量词 / 权重语法 / think 段 / bbox 结构）
+    validation = enh.validate_output(enhanced, original,
+                                     spec.get("validate_mode", "pe"))
+    if not validation.get("ok", True):
+        return web.json_response(
+            {"error": "扩写结果违反 Z-Image 提示词硬约束："
+                      + "；".join(validation.get("errors", [])),
+             "errors": validation.get("errors", []),
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    # bbox 档：额外抽出 JSON 数组，前端可单独渲染/复制
+    elements = None
+    if spec.get("validate_mode") == "bbox":
+        blob = enh.extract_json_block(enhanced)
+        if blob:
+            try:
+                elements = json.loads(blob)
+            except Exception:
+                elements = None
+
     merged = enh.merge_result(original, enhanced, mode)
     return json_ok({
         "original": original,
@@ -1171,7 +1276,114 @@ async def api_enhance(request):
         "provider_id": item["id"],
         "spec_id": spec["id"],
         "used_multimodal": bool(images),
+        "validation": validation,
+        "elements": elements,
+        "params": {"temperature": params["temperature"], "top_p": params["top_p"],
+                   "max_tokens": params["max_tokens"],
+                   "sampling": params.get("sampling", "sample"),
+                   "length": params.get("length", "medium")},
     })
+
+
+# ------------------------------------------------------------------ LLM 代理
+# ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload（没有 chat_template_kwargs），
+# 对 Qwen3 这类 thinking 模型关不掉思考，接口返回 content=null，节点再
+# str(None) 变成字符串 "None" —— 提示词彻底丢失。
+#
+# 解决办法：H3 Studio 暴露一个 OpenAI 兼容代理，转发时强制带上
+# enable_thinking=false，并把 reasoning_content 兜底成 content。
+# ComfyUI 节点指向这个代理即可。
+LLM_PROXY_PREFIX = "/api/llm/p"
+
+
+def _studio_self_url() -> str:
+    """本服务自己的可访问地址（供 ComfyUI 节点回连）。"""
+    host = CFG.get("host") or "127.0.0.1"
+    if host in ("0.0.0.0", "::", ""):
+        host = "127.0.0.1"
+    return f"http://{host}:{CFG['port']}"
+
+
+async def api_llm_proxy_models(request):
+    """GET /api/llm/p/{id}/v1/models —— 代理模型列表（供节点探测）"""
+    pid = request.match_info["id"]
+    with db() as conn:
+        item = prov.get_provider_full(conn, pid)
+    if not item:
+        return web.json_response({"error": "Provider 不存在"}, status=404)
+    target = (item.get("llm_base_url") or item["base_url"]).rstrip("/")
+    if not target.endswith("/v1"):
+        target += "/v1"
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=15)) as session:
+            async with session.get(f"{target}/models",
+                                   headers=llm_client._auth_headers(item)) as resp:
+                body = await resp.text()
+        return web.Response(text=body, status=200,
+                            content_type="application/json")
+    except Exception as exc:
+        return web.json_response(
+            {"error": f"代理请求失败：{type(exc).__name__} {exc}"[:200]}, status=502)
+
+
+async def api_llm_proxy_chat(request):
+    """
+    POST /api/llm/p/{id}/v1/chat/completions —— OpenAI 兼容代理。
+
+    转发到该 Provider 的 LLM 服务，强制关闭 thinking，
+    并把 reasoning_content 兜底成 content（thinking 模型 content 常为 null）。
+    """
+    pid = request.match_info["id"]
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    with db() as conn:
+        item = prov.get_provider_full(conn, pid)
+    if not item:
+        return web.json_response({"error": "Provider 不存在"}, status=404)
+
+    target = (item.get("llm_base_url") or item["base_url"]).rstrip("/")
+    if not target.endswith("/v1"):
+        target += "/v1"
+
+    forward = dict(payload)
+    # 强制关闭 thinking（不支持时由下游忽略）
+    forward["chat_template_kwargs"] = {"enable_thinking": False}
+    forward.setdefault("stream", False)
+
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=300)) as session:
+            async with session.post(f"{target}/chat/completions", json=forward,
+                                    headers=llm_client._auth_headers(item)) as resp:
+                raw = await resp.text()
+                status = resp.status
+    except Exception as exc:
+        return web.json_response(
+            {"error": f"代理请求失败：{type(exc).__name__} {exc}"[:200]}, status=502)
+
+    if status != 200:
+        return web.Response(text=raw, status=status, content_type="application/json")
+
+    try:
+        body = json.loads(raw)
+    except Exception:
+        return web.Response(text=raw, status=200, content_type="application/json")
+
+    # thinking 模型：content 为 null 时用 reasoning_content 兜底
+    choices = body.get("choices") or []
+    if choices:
+        message = choices[0].get("message") or {}
+        content = message.get("content")
+        if content is None or (isinstance(content, str) and not content.strip()):
+            reasoning = message.get("reasoning_content")
+            if isinstance(reasoning, str) and reasoning.strip():
+                message["content"] = reasoning
+                choices[0]["message"] = message
+                body["choices"] = choices
+                raw = json.dumps(body, ensure_ascii=False)
+    return web.Response(text=raw, status=200, content_type="application/json")
 
 
 # ------------------------------------------------------------------ static
@@ -1203,6 +1415,7 @@ def make_app():
     app.router.add_get("/api/system", api_system)
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/unload", api_unload)
+    app.router.add_get("/api/image-options", api_image_options)
     # 本地模型 Provider 配置
     app.router.add_get("/api/providers", api_providers_list)
     app.router.add_post("/api/providers", api_providers_create)
@@ -1214,6 +1427,9 @@ def make_app():
     app.router.add_get("/api/enhancer", api_enhancer_config)
     app.router.add_put("/api/enhancer", api_enhancer_save)
     app.router.add_post("/api/enhance", api_enhance)
+    # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
+    app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
+    app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
     app.router.add_get("/files/{path:.+}", files_handler)
     app.router.add_static("/static", BASE / "web")
     app.router.add_get("/", index_handler)

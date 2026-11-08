@@ -9,7 +9,6 @@ H3 Studio 工作流生成器
   r2v   参考生成      MiniMaxH3ReferenceToVideo（1~3 张参考图）
   t2i   文生图        Z-IMAGE-turbo
 """
-import math
 import random
 
 # ------------------------------------------------------------------
@@ -34,22 +33,81 @@ LORAS = {
     "v4step600": "minimax_h3_turbo_v4_step600_ema.safetensors",
 }
 
-Z_IMAGE_UNET = "z_image_turbo_bf16.safetensors"
 Z_IMAGE_CLIP = "qwen_3_4b.safetensors"
 Z_IMAGE_VAE = "ae.safetensors"
 
+# 画面比例：取值与 ComfyUI ResolutionSelector 的下拉项一一对应
+# （实测 object_info/ResolutionSelector.aspect_ratio.options）
 ASPECT_MAP = {
-    "16:9": "16:9 (Widescreen)",
-    "9:16": "9:16 (Portrait Widescreen)",
-    "4:3": "4:3 (Standard)",
-    "3:4": "3:4 (Portrait Standard)",
     "1:1": "1:1 (Square)",
+    "2:3": "2:3 (Portrait Photo)",
+    "3:2": "3:2 (Photo)",
+    "3:4": "3:4 (Portrait Standard)",
+    "4:3": "4:3 (Standard)",
+    "9:16": "9:16 (Portrait Widescreen)",
+    "16:9": "16:9 (Widescreen)",
+    "21:9": "21:9 (Ultrawide)",
 }
-ASPECT_NUM = {"16:9": (16, 9), "9:16": (9, 16), "4:3": (4, 3),
-              "3:4": (3, 4), "1:1": (1, 1)}
+ASPECT_NUM = {"1:1": (1, 1), "2:3": (2, 3), "3:2": (3, 2), "3:4": (3, 4),
+              "4:3": (4, 3), "9:16": (9, 16), "16:9": (16, 9), "21:9": (21, 9)}
 
 # 分辨率档位 -> megapixels（ResolutionSelector 用）
 RES_MP = {"544p": 0.4, "768p": 0.8}
+
+# ------------------------------------------------------------------
+# Z-Image 文生图：模型版本 / 分辨率档位 / 画面比例 / 采样参数
+# ------------------------------------------------------------------
+# 模型目录只列本机 ComfyUI 实测存在的权重（UNETLoader 下拉项），
+# 不列编造的选项。三个文件都落在 /mnt/nvme1t_colorful 外接盘上。
+# 推荐参数来源见每个条目的 note 字段。
+Z_IMAGE_MODELS = {
+    "z_image_turbo_bf16": {
+        "label": "Z-Image-Turbo · 官方加速版",
+        "unet": "z_image_turbo_bf16.safetensors",
+        "weight_dtype": "default",
+        "sampler": "res_multistep",
+        "scheduler": "simple",
+        "steps": 8,
+        "cfg": 1.0,
+        "negative": "zero",
+        "note": "官方模板 image_z_image_turbo.json：8 步 / cfg 1 / res_multistep / simple，速度最快",
+    },
+    "z_image_bf16": {
+        "label": "Z-Image Base · 官方完整版",
+        "unet": "z_image_bf16.safetensors",
+        "weight_dtype": "default",
+        "sampler": "res_multistep",
+        "scheduler": "simple",
+        "steps": 25,
+        "cfg": 4.0,
+        "negative": "encode",
+        "note": "官方模板 image_z_image.json：25 步 / cfg 4（建议 30~50 步、cfg 3~5），质量优先",
+    },
+    "darkbeast_z6_blitz_fp8": {
+        "label": "DarkBeast Z6 BlitZ · FP8 混精版",
+        "unet": "DarkBeastZ6-BlitZ-Scaled-Fp8-Mixed-ComfyUI.safetensors",
+        "weight_dtype": "fp8_e4m3fn",
+        "sampler": "euler",
+        "scheduler": "simple",
+        "steps": 15,
+        "cfg": 1.0,
+        "negative": "zero",
+        "note": "本机工作流 z-image-fast.json：15 步 / cfg 1 / euler / simple，显存占用约为 BF16 的一半",
+    },
+}
+Z_IMAGE_DEFAULT_MODEL = "z_image_turbo_bf16"
+
+# 图像面板分辨率档位：按 16:9 横图的高度定义，比例联动后宽度 = 高度 × 比例。
+# 高度全部是 8 的倍数（VAE 8 倍下采样的硬要求），宽度会对齐到 8 的倍数。
+Z_IMAGE_RES_TIERS = {
+    "480p": 480,
+    "720p": 720,
+    "1080p": 1080,
+    "1440p": 1440,
+    "2k": 2048,
+    "4k": 2160,
+}
+Z_IMAGE_DEFAULT_TIER = "1080p"
 
 
 def _frame_expr_node(length_node_id, dur_node_id):
@@ -260,39 +318,89 @@ def build_r2v(params):
     return p
 
 
+def z_image_dimensions(aspect, tier, width=None, height=None):
+    """比例 + 分辨率档位 -> 实际像素宽高。
+
+    档位按**短边**定义（1080P 在 16:9 下是 1920×1080，在 1:1 下是
+    1080×1080，在 9:16 下是 1080×1920），所以同一档位换比例时清晰度一致。
+    用户手动填了宽高就以手填的为准（微调优先）。
+    宽高都对齐到 8 的倍数（VAE 8 倍下采样要求）。
+    """
+    w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
+    short_side = Z_IMAGE_RES_TIERS.get(tier, Z_IMAGE_RES_TIERS[Z_IMAGE_DEFAULT_TIER])
+
+    if width and height:
+        final_w, final_h = int(width), int(height)
+    else:
+        if w_ratio >= h_ratio:      # 横图 / 方形：档位值给到高度
+            final_h = short_side
+            final_w = short_side * w_ratio / h_ratio
+        else:                       # 竖图：档位值给到宽度
+            final_w = short_side
+            final_h = short_side * h_ratio / w_ratio
+    final_w = max(64, int(round(final_w / 8)) * 8)
+    final_h = max(64, int(round(final_h / 8)) * 8)
+    return final_w, final_h
+
+
 def build_t2i(params):
-    """Z-IMAGE-turbo 文生图"""
+    """Z-IMAGE 文生图
+
+    模型版本 / 采样器 / 调度器 / 步数 / CFG / 分辨率 / 比例全部来自
+    前端 params，缺省时回落到该模型版本的官方推荐值。
+    """
     job_id = params["job_id"]
+    model_key = params.get("model") or Z_IMAGE_DEFAULT_MODEL
+    if model_key not in Z_IMAGE_MODELS:
+        model_key = Z_IMAGE_DEFAULT_MODEL
+    model = Z_IMAGE_MODELS[model_key]
+
     seed = params.get("seed") or random.randint(0, 2**48)
     aspect = params.get("aspect", "16:9")
-    w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
-    mp = {"544p": 1.0, "768p": 2.0}.get(params.get("resolution", "768p"), 2.0)
-    total = mp * 1024 * 1024
-    scale = math.sqrt(total / (w_ratio * h_ratio))
-    width = round(w_ratio * scale / 16) * 16
-    height = round(h_ratio * scale / 16) * 16
+    if aspect not in ASPECT_NUM:
+        aspect = "16:9"
+    tier = params.get("resolution")
+    if tier not in Z_IMAGE_RES_TIERS:
+        tier = Z_IMAGE_DEFAULT_TIER
+    width, height = z_image_dimensions(aspect, tier, params.get("width"), params.get("height"))
 
-    return {
+    sampler = params.get("sampler") or model["sampler"]
+    scheduler = params.get("scheduler") or model["scheduler"]
+    steps = int(params.get("steps") or model["steps"])
+    cfg = float(params.get("cfg") if params.get("cfg") is not None else model["cfg"])
+    shift = float(params.get("shift") or 3)
+    # 负向条件：turbo / FP8 蒸馏版按官方模板走 ConditioningZeroOut，
+    # base 完整版用真实负向提示词（官方模板 image_z_image.json 的 CLIPTextEncode）。
+    negative_mode = params.get("negative_mode") or model["negative"]
+    negative_text = params.get("negative_prompt", "") or ""
+
+    p = {
         "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8", 0]},
               "class_type": "SaveImage"},
         "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
                   "class_type": "CLIPLoader"},
         "57:29": {"inputs": {"vae_name": Z_IMAGE_VAE}, "class_type": "VAELoader"},
-        "57:33": {"inputs": {"conditioning": ["57:27", 0]}, "class_type": "ConditioningZeroOut"},
         "57:8": {"inputs": {"samples": ["57:3", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
-        "57:28": {"inputs": {"unet_name": Z_IMAGE_UNET, "weight_dtype": "default"},
+        "57:28": {"inputs": {"unet_name": model["unet"], "weight_dtype": model["weight_dtype"]},
                   "class_type": "UNETLoader"},
         "57:27": {"inputs": {"text": params.get("prompt", ""), "clip": ["57:30", 0]},
                   "class_type": "CLIPTextEncode"},
         "57:13": {"inputs": {"width": width, "height": height, "batch_size": 1},
                   "class_type": "EmptySD3LatentImage"},
-        "57:11": {"inputs": {"shift": 3, "model": ["57:28", 0]}, "class_type": "ModelSamplingAuraFlow"},
-        "57:3": {"inputs": {"seed": int(seed), "steps": 8, "cfg": 1, "sampler_name": "res_multistep",
-                            "scheduler": "simple", "denoise": 1, "model": ["57:11", 0],
-                            "positive": ["57:27", 0], "negative": ["57:33", 0],
-                            "latent_image": ["57:13", 0]},
+        "57:11": {"inputs": {"shift": shift, "model": ["57:28", 0]}, "class_type": "ModelSamplingAuraFlow"},
+        "57:3": {"inputs": {"seed": int(seed), "steps": steps, "cfg": cfg, "sampler_name": sampler,
+                            "scheduler": scheduler, "denoise": 1, "model": ["57:11", 0],
+                            "positive": ["57:27", 0], "latent_image": ["57:13", 0]},
                  "class_type": "KSampler"},
     }
+
+    if negative_mode == "encode":
+        p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
+                      "class_type": "CLIPTextEncode"}
+    else:
+        p["57:33"] = {"inputs": {"conditioning": ["57:27", 0]}, "class_type": "ConditioningZeroOut"}
+    p["57:3"]["inputs"]["negative"] = ["57:33", 0]
+    return p
 
 
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i}

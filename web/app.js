@@ -26,6 +26,26 @@ const state = {
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
   timer: null,
+  // 图像模式（Z-Image 文生图）专属状态
+  img: {
+    tier: "1080p",
+    aspect: "16:9",
+    width: null,
+    height: null,
+    model: "z_image_turbo_bf16",
+    steps: 8,
+    cfg: 1,
+    sampler: "res_multistep",
+    scheduler: "simple",
+  },
+};
+
+// 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
+// ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
+const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, samplers: [], schedulers: [] };
+const IMG_ASPECT_NUM = {
+  "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
+  "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
 };
 
 // ---------- 侧栏切换 ----------
@@ -111,9 +131,201 @@ function renderMode() {
   $("#durField").style.display = isVideo ? "" : "none";
   $("#modelField").style.display = isVideo ? "" : "none";
   $("#stepsField").style.display = isVideo ? "" : "none";
+  // 图像模式用自己的一套比例/分辨率控件，隐藏视频模式的那套
+  $("#aspectField").style.display = isVideo ? "" : "none";
+  $("#imagePanel").style.display = isVideo ? "none" : "";
+  if (!isVideo) renderImagePanel();
   updateSeedStrengthLayout();
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
+}
+
+// ---------- 图像模式（Z-Image 文生图） ----------
+// 档位 + 比例 -> 像素宽高。规则与后端 z_image_dimensions 一致：
+// 档位值给到**短边**，横图给高度、竖图给宽度，宽高对齐到 8 的倍数。
+function imgAutoSize(tier, aspect) {
+  const tierOpt = IMG_OPTIONS.tiers.find(t => t.key === tier);
+  const short = (tierOpt && tierOpt.short_side) || 1080;
+  const [wr, hr] = IMG_ASPECT_NUM[aspect] || [16, 9];
+  let w, h;
+  if (wr >= hr) { h = short; w = short * wr / hr; }
+  else { w = short; h = short * hr / wr; }
+  w = Math.max(64, Math.round(w / 8) * 8);
+  h = Math.max(64, Math.round(h / 8) * 8);
+  return [w, h];
+}
+
+function imgCurrentSize() {
+  const s = state.img;
+  if (s.width && s.height) return [s.width, s.height];
+  return imgAutoSize(s.tier, s.aspect);
+}
+
+// 档位下拉：显示具体像素，例如 "1080P · 1920×1080 (16:9)"
+function imgTierLabel(tier) {
+  const [w, h] = imgAutoSize(tier.key, state.img.aspect);
+  return `${tier.label} · ${w}×${h}`;
+}
+
+function renderImagePanel() {
+  const s = state.img;
+
+  // 分辨率档位
+  const resSel = $("#imgResSelect");
+  resSel.innerHTML = "";
+  IMG_OPTIONS.tiers.forEach(tier => {
+    const opt = document.createElement("option");
+    opt.value = tier.key;
+    opt.textContent = imgTierLabel(tier);
+    opt.selected = tier.key === s.tier;
+    resSel.appendChild(opt);
+  });
+
+  // 比例
+  const chips = $("#imgAspectChips");
+  chips.innerHTML = "";
+  IMG_OPTIONS.aspects.forEach(aspect => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.v = aspect.key;
+    b.textContent = aspect.key;
+    b.title = aspect.label;
+    if (aspect.key === s.aspect) b.classList.add("active");
+    b.addEventListener("click", () => {
+      s.aspect = aspect.key;
+      // 换比例后旧的自动尺寸作废，回到档位自动值
+      s.width = null; s.height = null;
+      renderImagePanel();
+    });
+    chips.appendChild(b);
+  });
+
+  // 模型
+  const modelSel = $("#imgModelSelect");
+  modelSel.innerHTML = "";
+  Object.entries(IMG_OPTIONS.models).forEach(([key, m]) => {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = m.label;
+    opt.selected = key === s.model;
+    modelSel.appendChild(opt);
+  });
+
+  // 采样器 / 调度器
+  const fillSelect = (sel, values, current) => {
+    sel.innerHTML = "";
+    values.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      opt.selected = v === current;
+      sel.appendChild(opt);
+    });
+  };
+  fillSelect($("#imgSamplerSelect"), IMG_OPTIONS.samplers, s.sampler);
+  fillSelect($("#imgSchedulerSelect"), IMG_OPTIONS.schedulers, s.scheduler);
+
+  // 步数 / CFG
+  $("#imgSteps").value = s.steps;
+  $("#imgStepsVal").textContent = s.steps;
+  $("#imgCfg").value = s.cfg;
+  $("#imgCfgVal").textContent = Number(s.cfg).toFixed(1);
+
+  updateImageSizeFields();
+  updateImageModelNote();
+}
+
+function updateImageSizeFields() {
+  const [w, h] = imgCurrentSize();
+  $("#imgWidth").value = w;
+  $("#imgHeight").value = h;
+  $("#imgSizeHint").textContent = `${w}×${h}`;
+  const manual = state.img.width && state.img.height;
+  $("#imgSizeNote").textContent = manual
+    ? "已手动微调宽高；点「自动」可恢复档位计算值"
+    : `档位 ${state.img.tier} × 比例 ${state.img.aspect} 自动换算`;
+}
+
+function updateImageModelNote() {
+  const m = IMG_OPTIONS.models[state.img.model];
+  if (!m) return;
+  $("#imgModelNote").textContent = m.note;
+  // 推荐值高亮：当前值等于该模型推荐值时打「推荐」标记
+  $("#imgSamplerHint").textContent = state.img.sampler === m.sampler ? "推荐" : "已改";
+  $("#imgSchedulerHint").textContent = state.img.scheduler === m.scheduler ? "推荐" : "已改";
+}
+
+function applyModelDefaults(modelKey) {
+  const m = IMG_OPTIONS.models[modelKey];
+  if (!m) return;
+  const s = state.img;
+  s.model = modelKey;
+  s.steps = m.steps;
+  s.cfg = m.cfg;
+  s.sampler = m.sampler;
+  s.scheduler = m.scheduler;
+}
+
+$("#imgResSelect").addEventListener("change", e => {
+  state.img.tier = e.target.value;
+  state.img.width = null; state.img.height = null;
+  renderImagePanel();
+});
+$("#imgModelSelect").addEventListener("change", e => {
+  applyModelDefaults(e.target.value);
+  renderImagePanel();
+});
+$("#imgSamplerSelect").addEventListener("change", e => {
+  state.img.sampler = e.target.value;
+  updateImageModelNote();
+});
+$("#imgSchedulerSelect").addEventListener("change", e => {
+  state.img.scheduler = e.target.value;
+  updateImageModelNote();
+});
+$("#imgSteps").addEventListener("input", e => {
+  state.img.steps = parseInt(e.target.value);
+  $("#imgStepsVal").textContent = state.img.steps;
+});
+$("#imgCfg").addEventListener("input", e => {
+  state.img.cfg = parseFloat(e.target.value);
+  $("#imgCfgVal").textContent = state.img.cfg.toFixed(1);
+});
+$("#imgWidth").addEventListener("input", e => {
+  const v = parseInt(e.target.value);
+  state.img.width = Number.isFinite(v) && v > 0 ? v : null;
+  updateImageSizeFields();
+});
+$("#imgHeight").addEventListener("input", e => {
+  const v = parseInt(e.target.value);
+  state.img.height = Number.isFinite(v) && v > 0 ? v : null;
+  updateImageSizeFields();
+});
+$("#imgSizeReset").addEventListener("click", () => {
+  state.img.width = null; state.img.height = null;
+  renderImagePanel();
+});
+
+// 拉取服务端下发的档位 / 比例 / 模型清单
+async function loadImageOptions() {
+  try {
+    const resp = await fetch("/api/image-options", {cache: "no-store"});
+    if (!resp.ok) return;
+    const data = await resp.json();
+    IMG_OPTIONS.tiers = data.tiers || [];
+    IMG_OPTIONS.aspects = data.aspects || [];
+    IMG_OPTIONS.models = data.models || {};
+    IMG_OPTIONS.samplers = data.samplers || [];
+    IMG_OPTIONS.schedulers = data.schedulers || [];
+    if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
+      state.img.model = data.default_model;
+    }
+    if (data.default_tier) state.img.tier = data.default_tier;
+    const known = IMG_OPTIONS.aspects.some(a => a.key === state.img.aspect);
+    if (!known && IMG_OPTIONS.aspects.length) state.img.aspect = IMG_OPTIONS.aspects[0].key;
+    applyModelDefaults(state.img.model);
+    if (state.mode === "t2i") renderImagePanel();
+  } catch (e) { /* 忽略：保持内置默认值 */ }
 }
 
 // ---------- 通用分段选择 ----------
@@ -175,6 +387,20 @@ $("#genBtn").addEventListener("click", async () => {
     lora_strength: state.loraStrength,
     seed: $("#seed").value.trim() || null,
   };
+  if (mode === "t2i") {
+    // 图像模式：把档位 / 比例 / 实际宽高 / Z-Image 采样参数一起带上去。
+    // resolution 复用同一个字段，图像模式的值是分辨率档位（480p…4k）。
+    const [w, h] = imgCurrentSize();
+    params.resolution = state.img.tier;
+    params.aspect = state.img.aspect;
+    params.width = w;
+    params.height = h;
+    params.model = state.img.model;
+    params.sampler = state.img.sampler;
+    params.scheduler = state.img.scheduler;
+    params.steps = state.img.steps;
+    params.cfg = state.img.cfg;
+  }
   fd.append("params", JSON.stringify(params));
   try {
     if (mode === "flf") {
@@ -230,6 +456,12 @@ function modelLabel(p) {
   return `H3 + ${p.lora === "ckpt850" ? "ckpt850" : "v4-step600"} · ${steps}步`;
 }
 
+// 图像模式：模型版本的可读名（清单来自 /api/image-options）
+function imgModelLabel(key) {
+  const m = IMG_OPTIONS.models[key];
+  return m ? m.label : (key || "—");
+}
+
 function outputUrl(job, output) {
   const relative = String(output.file || "").replace(/\\/g, "/");
   const path = relative.includes("/") ? relative : `${job.id}/${relative}`;
@@ -278,9 +510,13 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
+      ${job.mode === "t2i" ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
+      <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
+      <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
+      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
-      <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}
+      <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : ""}
@@ -357,12 +593,26 @@ function jobCard(job) {
     // 找到对应模式侧栏项并切换
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
     $("#prompt").value = p.prompt || "";
-    if (p.resolution) setSeg("#resSeg", p.resolution), state.res = p.resolution;
-    if (p.aspect) setSeg("#aspectChips", p.aspect), state.aspect = p.aspect;
+    if (job.mode === "t2i") {
+      // 图像模式：还原分辨率档位 / 比例 / 实际宽高 / Z-Image 采样参数
+      const s = state.img;
+      if (p.resolution) s.tier = p.resolution;
+      if (p.aspect) s.aspect = p.aspect;
+      if (p.width && p.height) { s.width = p.width; s.height = p.height; }
+      if (p.model && IMG_OPTIONS.models[p.model]) applyModelDefaults(p.model);
+      if (p.sampler) s.sampler = p.sampler;
+      if (p.scheduler) s.scheduler = p.scheduler;
+      if (p.steps) s.steps = p.steps;
+      if (p.cfg != null) s.cfg = p.cfg;
+      renderImagePanel();
+    } else {
+      if (p.resolution) setSeg("#resSeg", p.resolution), state.res = p.resolution;
+      if (p.aspect) setSeg("#aspectChips", p.aspect), state.aspect = p.aspect;
+    }
     if (p.duration) { state.duration = p.duration; $("#duration").value = p.duration; $("#durVal").textContent = p.duration + "s"; }
-    if (p.steps) { state.steps = p.steps; $("#steps").value = p.steps; $("#stepsVal").textContent = p.steps; }
+    if (p.steps && job.mode !== "t2i") { state.steps = p.steps; $("#steps").value = p.steps; $("#stepsVal").textContent = p.steps; }
     if (p.seed) $("#seed").value = p.seed;
-    if (p.model) { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; updateSeedStrengthLayout(); }
+    if (p.model && job.mode !== "t2i") { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; updateSeedStrengthLayout(); }
     if (p.lora) { setSeg("#loraCards", p.lora); state.lora = p.lora; }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -834,6 +1084,7 @@ async function refreshHardware(force) {
 setInterval(() => { if (state.page === "system") refreshHardware(); }, 3000);
 
 // ---------- 启动 ----------
+loadImageOptions();
 renderMode();
 renderTabs();
 renderStitchClips();
