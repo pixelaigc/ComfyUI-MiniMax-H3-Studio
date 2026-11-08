@@ -359,6 +359,29 @@ def build_r2v(params):
         }
         ref_inputs[f"ref_image_{index}"] = [node_id, 0]
 
+    # 参考视频 / 参考音频（素材库引用）。
+    # H3 节点 MiniMaxH3ReferenceToVideo 的真实槽位上限（实测 /object_info）：
+    #   ref_images 0~9 / ref_videos 0~3 / ref_video_audios 0~3 / ref_audios 0~3
+    ref_video_inputs = {}
+    for index, filename in enumerate(params.get("ref_videos", [])[:3]):
+        node_id = f"136:{301 + index}"
+        p[node_id] = {
+            "inputs": {"video": filename, "format": "None"},
+            "class_type": "VHS_LoadVideo",
+            "_meta": {"title": f"加载参考视频 {index + 1}"},
+        }
+        ref_video_inputs[f"ref_video_{index}"] = [node_id, 0]
+
+    ref_audio_inputs = {}
+    for index, filename in enumerate(params.get("ref_audios", [])[:3]):
+        node_id = f"136:{401 + index}"
+        p[node_id] = {
+            "inputs": {"audio": filename},
+            "class_type": "VHS_LoadAudioUpload",
+            "_meta": {"title": f"加载参考音频 {index + 1}"},
+        }
+        ref_audio_inputs[f"ref_audio_{index}"] = [node_id, 0]
+
     p["136"] = {
         "inputs": {
             "clip": ["128", 0], "vae": ["119", 0], "audio_vae": ["120", 0],
@@ -366,6 +389,8 @@ def build_r2v(params):
             "width": ["115", 0], "height": ["115", 1],
             "ref_image_size": "match",
             **{f"ref_images.{k}": v for k, v in ref_inputs.items()},
+            **{f"ref_videos.{k}": v for k, v in ref_video_inputs.items()},
+            **{f"ref_audios.{k}": v for k, v in ref_audio_inputs.items()},
         },
         "class_type": "MiniMaxH3ReferenceToVideo",
         "_meta": {"title": "H3 参考生成"},
