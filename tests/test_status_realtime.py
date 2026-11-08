@@ -58,6 +58,66 @@ def comfy_queue():
         return (None, None)
 
 
+class FakeComfy:
+    """可控的假 ComfyUI：只实现 Studio 用到的两个端点。
+
+    /system_stats -> 200（让 Studio 认为 ComfyUI 连着）
+    /queue        -> 测试自己设定的 running / pending 数量
+
+    为什么要它：真 ComfyUI 的队列是全机共享的，随时可能有别人的任务在跑；
+    busy 优先于 pending，一忙起来就盖住 Studio 自己 queued 的变化。
+    """
+
+    def __init__(self):
+        self.running = 0
+        self.pending = 0
+        self.server = None
+        self.thread = None
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.port}"
+
+    def start(self):
+        import http.server
+        import threading
+
+        outer = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def _json(self, payload):
+                body = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                if self.path.startswith("/queue"):
+                    self._json({"queue_running": [{}] * outer.running,
+                                "queue_pending": [{}] * outer.pending})
+                elif self.path.startswith("/system_stats"):
+                    self._json({"system": {"comfyui_version": "0.37.0"},
+                                "devices": []})
+                else:
+                    self._json({})
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.server.server_address[1]
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        return self
+
+    def stop(self):
+        if self.server:
+            self.server.shutdown()
+            self.server.server_close()
+
+
 def comfy_ok():
     import urllib.request
     try:
@@ -73,7 +133,14 @@ class TestStatusRealtime(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.server = StudioServer(seed_jobs=12)
+        # 用**可控的假 ComfyUI**（而不是真的 127.0.0.1:8188）。
+        # 原因：真 ComfyUI 的队列是全机共享的 —— 本机随时可能有别人的任务在跑，
+        # statusLabel 里 busy 优先于 pending，ComfyUI 一忙起来就盖住
+        # Studio 自己 queued 的变化，这个用例根本没法稳定测。
+        # 假 ComfyUI 让「队列状态」变成测试自己能控的变量。
+        cls.fake_comfy = FakeComfy()
+        cls.fake_comfy.start()
+        cls.server = StudioServer(seed_jobs=12, comfyui_url=cls.fake_comfy.url)
         assert cls.server.start(), "Studio 实例启动失败"
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(args=["--no-sandbox"])
@@ -97,6 +164,7 @@ class TestStatusRealtime(unittest.TestCase):
         cls.browser.close()
         cls.playwright.stop()
         cls.server.stop()
+        cls.fake_comfy.stop()
 
     def status_text(self):
         return self.page.evaluate("document.querySelector('#statusText').textContent")
@@ -186,13 +254,41 @@ class TestStatusRealtime(unittest.TestCase):
            可能根本不会来的帧 —— 队列一直空，payload 就不变。
         2. 界面上显示什么取决于**此刻 ComfyUI 真实队列**（本机可能正有别的
            任务在跑），不能写死文案。
-        3. 塞的 queued 任务如果用 worker 认识的 mode，会被**立刻领走**，
-           queued 归零 —— 测的是竞态不是 SSE。用 worker 不认识的 mode 才稳。
+        3. 塞的 queued 任务会被 worker **立刻领走**（queued 归零）——
+           测的是竞态不是 SSE。必须用 mode='longfilm'：
+           worker 的领任务 SQL 带 `AND mode!='longfilm'`，longfilm 永远不会被领走。
 
         关键：要断言的是「**状态确实变了并且界面跟着变了**」，
         所以先记下变化前的状态，再要求界面出现一个**新的**状态。
         """
         self.page.wait_for_timeout(1500)
+
+        # **关键：把轮询这条路堵死**，否则测的就不是 SSE 而是 3 秒轮询。
+        # 前端 setInterval(refreshSystem, 3000) 每 3 秒拉一次 /api/system，
+        # SSE 一坏轮询照样能把界面更新对 —— 那样这个用例就算 SSE 完全失效也照样通过。
+        #
+        # 为什么堵 fetch 而不是替换 window.refreshSystem：
+        # setInterval 在注册时就按引用记住了那个函数，之后替换 window 上的
+        # 属性对它无效（实测仍在发请求）。拦 fetch 是从「数据入口」堵，
+        # 无论谁调都堵得住；SSE 不走 fetch，所以不受影响。
+        self.page.evaluate("""
+            () => {
+              window.__sysCalls = 0;
+              if (window.__realFetch) return;
+              window.__realFetch = window.fetch;
+              window.fetch = function (u, o) {
+                if (String(u).indexOf('/api/system') >= 0) {
+                  window.__sysCalls++;
+                  return new Promise(() => {});   // 永不 resolve -> 界面不会被轮询更新
+                }
+                return window.__realFetch.apply(this, arguments);
+              };
+            }
+        """)
+        # 等一个轮询周期，确认轮询确实在调（但被堵住了）
+        self.page.wait_for_timeout(3600)
+        self.assertGreater(self.page.evaluate("() => window.__sysCalls"), 0,
+                           "前置条件：轮询应该在调 /api/system（被堵住后界面不会因轮询改变）")
 
         # 变化前：记下界面当前**完整状态**（文案 + title）。
         # 用 title 而不是文案做区分度：ComfyUI 在跑时文案恒为「生成中」，
@@ -201,33 +297,53 @@ class TestStatusRealtime(unittest.TestCase):
             "() => { const el = document.querySelector('#statusText');"
             " return (el ? el.textContent.trim() : '') + '|' + (el ? (el.title||'') : ''); }")
 
-        # 塞一条排队中的任务（worker 不认识的 mode -> 一直留在 queued）
+        # 假 ComfyUI 的队列现在是空的 -> 界面应为「空闲」
+        self.assertEqual(self.status_text(), "空闲",
+                         "前置条件：ComfyUI 队列为空时应显示空闲")
+
+        # 塞一条排队中的任务。
+        # mode 必须用 **longfilm** —— worker 的领任务 SQL 是
+        #   WHERE status='queued' AND mode!='longfilm'
+        # 即 longfilm 任务**永远不会被 worker 领走**（长片自己起子进程），
+        # 所以 queued 计数能稳定保持 >0。
+        # 用别的 mode（包括 worker 不认识的）都会被领走并标 failed，测的是竞态。
         conn = sqlite3.connect(self.server.data_dir / "jobs.db")
         conn.execute(
             "INSERT OR REPLACE INTO jobs (id, created_at, mode, params, status) "
             "VALUES (?,?,?,?,?)",
-            ("sseprobe01", time.time(), "probe", "{}", "queued"))
+            ("sseprobe01", time.time(), "longfilm", "{}", "queued"))
         conn.commit()
         conn.close()
 
-        # 界面必须变成一个**与变化前不同**的状态，且与此刻 /api/system 一致
-        self.page.wait_for_function("""
-            async (before) => {
-              const el = document.querySelector('#statusText');
-              if (!el) return false;
-              const now = (el.textContent.trim()) + '|' + (el.title || '');
-              if (now === before) return false;          // 还没变，不算
-              const r = await fetch('/api/system', {cache: 'no-store'});
-              const live = await r.json();
-              const lab = statusLabel(live);
-              window.__sseExpected = lab.text + '|' + lab.title;
-              return now === (lab.text + '|' + lab.title);
-            }
-        """, arg=before, timeout=15000)
+        # 等 SSE 把界面更新成「排队中」。
+        # 期望值先在 Python 侧算好（用浏览器里的 statusLabel，保证同一套判定），
+        # 再用**同步**的 wait_for_function 等界面变成它 ——
+        # wait_for_function 里放 async 谓词不可靠（它不 await Promise）。
+        # 顺便等 /api/system 也变成排队中（避免读到旧值）。
+        deadline = time.time() + 20
+        expected = None
+        while time.time() < deadline:
+            with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.server.port}/api/system", timeout=10) as r:
+                live = json.loads(r.read().decode())
+            expected = self.page.evaluate("d => statusLabel(d).text + '|' + statusLabel(d).title", live)
+            if live.get("queued", 0) > 0:
+                break
+            time.sleep(0.5)
+        self.assertTrue(live.get("queued", 0) > 0,
+                        "前置条件：Studio 队列里应有 1 条排队任务")
+        self.assertNotEqual(expected, before,
+                            "真实状态应与变化前不同（queued 变了）")
+
+        # 界面必须变成那个状态 —— 这一步靠 SSE（没有轮询帮忙）
+        self.page.wait_for_function(
+            "(exp) => { const el = document.querySelector('#statusText');"
+            " if (!el) return false;"
+            " return (el.textContent.trim()) + '|' + (el.title || '') === exp; }",
+            arg=expected, timeout=15000)
         after = self.page.evaluate(
             "() => { const el = document.querySelector('#statusText');"
             " return (el ? el.textContent.trim() : '') + '|' + (el ? (el.title||'') : ''); }")
-        expected = self.page.evaluate("() => window.__sseExpected")
         self.assertNotEqual(after, before,
                             "界面状态没有变化 —— SSE 没把新帧推到界面上")
         self.assertEqual(after, expected,
@@ -238,18 +354,23 @@ class TestStatusRealtime(unittest.TestCase):
         conn.execute("DELETE FROM jobs WHERE id='sseprobe01'")
         conn.commit()
         conn.close()
-        self.page.wait_for_function("""
-            async (prev) => {
-              const el = document.querySelector('#statusText');
-              if (!el) return false;
-              const now = (el.textContent.trim()) + '|' + (el.title || '');
-              if (now === prev) return false;
-              const r = await fetch('/api/system', {cache: 'no-store'});
-              const live = await r.json();
-              const lab = statusLabel(live);
-              return now === (lab.text + '|' + lab.title);
-            }
-        """, arg=after, timeout=15000)
+        # 状态再变回去 -> SSE 再推一帧 -> 界面跟着更新
+        deadline = time.time() + 20
+        expected2 = None
+        while time.time() < deadline:
+            with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.server.port}/api/system", timeout=10) as r:
+                live2 = json.loads(r.read().decode())
+            expected2 = self.page.evaluate(
+                "d => statusLabel(d).text + '|' + statusLabel(d).title", live2)
+            if live2.get("queued", 0) == 0:
+                break
+            time.sleep(0.5)
+        self.page.wait_for_function(
+            "(exp) => { const el = document.querySelector('#statusText');"
+            " if (!el) return false;"
+            " return (el.textContent.trim()) + '|' + (el.title || '') === exp; }",
+            arg=expected2, timeout=15000)
 
     def test_status_reflects_comfyui_real_queue(self):
         """ComfyUI 真实队列在跑时，/api/system 的 comfy_running 必须 > 0。
@@ -266,13 +387,13 @@ class TestStatusRealtime(unittest.TestCase):
                               "comfy_running 应为整数（恒 0 说明没真读队列）")
         self.assertIsInstance(data["comfy_pending"], int,
                               "comfy_pending 应为整数（恒 0 说明没真读队列）")
-        if comfy_ok():
-            running, pending = comfy_queue()
-            if running is not None:
-                self.assertEqual(data["comfy_running"], running,
-                                 "comfy_running 应与 ComfyUI 真实队列一致")
-                self.assertEqual(data["comfy_pending"], pending,
-                                 "comfy_pending 应与 ComfyUI 真实队列一致")
+        # 本类跑在**假 ComfyUI** 上（见 FakeComfy：真 ComfyUI 的队列全机共享，
+        # 随时可能有别人的任务在跑，断言没法稳定）。
+        # 意图不变：comfy_running 必须**真的读队列**，而不是恒 0。
+        self.assertEqual(data["comfy_running"], self.fake_comfy.running,
+                         "comfy_running 应与 ComfyUI 队列一致")
+        self.assertEqual(data["comfy_pending"], self.fake_comfy.pending,
+                         "comfy_pending 应与 ComfyUI 队列一致")
 
     def test_status_shows_generating_when_comfyui_busy(self):
         """ComfyUI 在跑 -> 界面显示「生成中」（中文）。"""

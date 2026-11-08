@@ -20,8 +20,10 @@
    官方 Qwen PE 工作流用的是 TextGenerate + 官方 PE 自己的 system prompt。
 
 3. **参考图的 COMFY_AUTOGROW_V3 API 格式**
-   必须写成嵌套的 `"images": {"image_1": <值>, ...}`。写成扁平的顶层
-   `"image_1"` 键时，ComfyUI 会当成 execute() 的关键字参数传进去，报
+   必须写成**扁平点号键** `"images.image_1": <值>, "images.image_2": ...`。
+   写成嵌套的 `"images": {"image_1": <值>}` 不会报错，只会把参考图**静默丢弃**
+   （实测出图尺寸 1024×1024，说明参考图没生效）；写成顶层扁平的 `"image_1"`
+   则会被当成 execute() 的关键字参数，报
    TypeError: TextEncodeQwenImage21.execute() got an unexpected keyword
    argument 'image_1'。
 
@@ -291,26 +293,46 @@ class TestQwenBackend(unittest.TestCase):
                          "TextGenerateLTX2Prompt 会塞入 LTX2 视频提示词 system prompt")
 
     # ---------------------------------------------- 缺陷 3：参考图 API 格式
-    def test_reference_images_use_nested_images_dict(self):
-        """参考图必须写成嵌套的 images 字典（COMFY_AUTOGROW_V3 的 API 格式）。"""
+    def test_reference_images_use_flat_dotted_keys(self):
+        """参考图必须写成**扁平点号键** "images.image_N"（COMFY_AUTOGROW_V3 的 API 格式）。
+
+        实测结论（2026-11-08，同一张参考图 + resolution=1024，参考图 1360×768）：
+          写法 A  "images.image_1": ["node",0]  -> 出图 1376×768（参考图生效）
+          写法 B  "images": {"image_1": [...]} -> 出图 1024×1024（参考图被静默丢弃）
+
+        ComfyUI 在 execution.py:296 用 build_nested_inputs() 依据 schema 算出的
+        dynamic_paths，把**扁平点号键**还原成嵌套 dict 传给 execute()。
+        写成嵌套字典不会报错、只会把参考图悄悄丢掉 —— 表现为「编辑结果与
+        输入图无关、输出尺寸变成方图」。
+
+        这条断言就是为了防止再退回嵌套字典写法（上一版就是栽在这里）。
+        """
         p = self.build_i2i(n=10)
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
-        self.assertIn("images", te["inputs"], "缺少 images 输入")
-        images = te["inputs"]["images"]
-        self.assertIsInstance(images, dict, "images 应是字典")
-        self.assertEqual(len(images), 10)
-        for i in range(10):
-            self.assertIn(f"image_{i + 1}", images)
-        # 顶层不能有扁平的 image_N 键（会被当成 execute() 的关键字参数）
+        # 必须是扁平的点号键
+        # 按槽位号排序（image_10 要排在 image_9 之后，不能用字符串排序）
+        dotted = sorted([k for k in te["inputs"] if k.startswith("images.image_")],
+                        key=lambda n: int(n.rsplit("_", 1)[-1]))
+        self.assertEqual(dotted, [f"images.image_{i}" for i in range(1, 11)],
+                         f"参考图应接成 images.image_1..images.image_10，实际 {dotted}")
+        # 不能是嵌套字典（会被静默丢弃）
+        self.assertNotIn("images", te["inputs"],
+                         "不能用嵌套的 images 字典 —— 参考图会被静默丢弃")
+        # 顶层也不能有扁平的 image_N（会被当成 execute() 的关键字参数）
         flat = [k for k in te["inputs"] if k.startswith("image_")]
         self.assertEqual(flat, [],
                          f"顶层不能有扁平的 {flat} —— ComfyUI 会报 unexpected keyword argument")
+        # 每个点号键的值都要指向真正的 LoadImage 节点
+        for i in range(1, 11):
+            node_id = te["inputs"][f"images.image_{i}"][0]
+            self.assertEqual(p[node_id]["class_type"], "LoadImage")
 
     def test_reference_images_are_wired_to_loadimage_nodes(self):
-        """images 字典的值要指向真正的 LoadImage 节点。"""
+        """每个参考图槽位的值都要指向真正的 LoadImage 节点。"""
         p = self.build_i2i(n=3)
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
-        for key, ref in te["inputs"]["images"].items():
+        for key in [k for k in te["inputs"] if k.startswith("images.image_")]:
+            ref = te["inputs"][key]
             self.assertIsInstance(ref, list)
             node_id = ref[0]
             self.assertIn(node_id, p, f"{key} 指向了不存在的节点")
@@ -324,12 +346,12 @@ class TestQwenBackend(unittest.TestCase):
             "ref_images": [{"file": "a.png"}, {"file": "b.png"}]})
         te1 = next(n for n in p1.values() if n["class_type"] == "TextEncodeQwenImage21")
         te2 = next(n for n in p2.values() if n["class_type"] == "TextEncodeQwenImage21")
-        self.assertEqual(len(te1["inputs"]["images"]), 2)
-        self.assertEqual(len(te2["inputs"]["images"]), 2)
+        self.assertEqual(len([k for k in te1["inputs"] if k.startswith("images.image_")]), 2)
+        self.assertEqual(len([k for k in te2["inputs"] if k.startswith("images.image_")]), 2)
 
     # ---------------------------------------------- 数量校验
     def test_ref_image_count_bounds(self):
-        """参考图 1-9 张之外必须报错，且提示要说清上限。"""
+        """参考图 1-10 张之外必须报错，且提示要说清上限。"""
         with self.assertRaises(ValueError) as ctx:
             self.build_i2i(n=0)
         self.assertIn("至少", str(ctx.exception))
@@ -354,13 +376,13 @@ class TestQwenBackend(unittest.TestCase):
                              "落地上限不能超过 ComfyUI 节点的实际槽位数")
 
     def test_ten_ref_images_are_wired(self):
-        """10 张参考图要全部接进 images 字典（image_1..image_10）。"""
+        """10 张参考图要全部接进 images.image_1..images.image_10。"""
         p = self.build_i2i(n=10)
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
-        keys = sorted(te["inputs"]["images"].keys(),
+        keys = sorted([k for k in te["inputs"] if k.startswith("images.image_")],
                       key=lambda n: int(n.rsplit("_", 1)[-1]))
-        self.assertEqual(keys, [f"image_{i}" for i in range(1, 11)],
-                         f"10 张参考图应接成 image_1..image_10，实际 {keys}")
+        self.assertEqual(keys, [f"images.image_{i}" for i in range(1, 11)],
+                         f"10 张参考图应接成 images.image_1..images.image_10，实际 {keys}")
 
     # ---------------------------------------------- 参数落到请求
     def test_all_params_reach_the_workflow(self):

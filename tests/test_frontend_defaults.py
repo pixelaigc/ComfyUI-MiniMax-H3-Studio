@@ -57,11 +57,15 @@ class StudioServer:
     必须有数据才有意义，且不能依赖真实库的内容。
     """
 
-    def __init__(self, app_js_override: bytes | None = None, seed_jobs: int = 0):
+    def __init__(self, app_js_override: bytes | None = None, seed_jobs: int = 0,
+                 comfyui_url: str | None = None):
         self.port = free_port()
         self.tmp = Path(tempfile.mkdtemp(prefix="h3studio-ui-"))
         self.app_js_override = app_js_override
         self.seed_jobs = seed_jobs
+        # comfyui_url 可指向可控的假 ComfyUI（测试自己控队列状态），
+        # 默认仍用真实的 127.0.0.1:8188
+        self.comfyui_url = comfyui_url or "http://127.0.0.1:8188"
         self.data_dir = self.tmp / "data"
         self.proc = None
 
@@ -111,7 +115,7 @@ class StudioServer:
         cfg = {
             "host": "127.0.0.1",
             "port": self.port,
-            "comfyui_url": "http://127.0.0.1:8188",
+            "comfyui_url": self.comfyui_url,
             "data_dir": str(self.data_dir),
             "models_dir": "/home/ubuntu/comfyui/models",
             "poll_interval": 1.5,

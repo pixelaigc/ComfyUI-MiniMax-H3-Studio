@@ -1486,21 +1486,27 @@ def build_qwen_i2i(params):
                             prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
                             pe_params=pe_params)
     # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
-    # （COMFY_AUTOGROW_V3，按 image_1..image_N 命名）
+    # （COMFY_AUTOGROW_V3，槽位名 image_1..image_N）
     te_inputs = p["qw:27"]["inputs"]
-    # TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，在 API 格式下
-    # **必须写成嵌套的 images 字典**：{"image_1": <值>, "image_2": ...}
-    # 写成扁平的 "image_1" 顶层键时，ComfyUI 会把它当成 execute() 的
-    # 关键字参数传进去，报
-    #   TypeError: TextEncodeQwenImage21.execute() got an unexpected
-    #              keyword argument 'image_1'
-    # （值可以是文件名字符串，也可以是 ["节点id", 槽位] 的连线引用）
-    images_input: dict = {}
+    #
+    # 【API 格式：必须用扁平点号键，不能用嵌套字典】—— 实测结论（2026-11-08）
+    #   TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，ComfyUI 在
+    #   execution.py:296 用 build_nested_inputs() 依据 schema 算出的
+    #   dynamic_paths 把**扁平点号键**还原成嵌套 dict 传给 execute()。
+    #   实测（同一张参考图 + resolution=1024，参考图是 1360×768）：
+    #     写法 A  "images.image_1": ["node",0]  -> 出图 1376×768（参考图生效）
+    #     写法 B  "images": {"image_1": [...]} -> 出图 1024×1024（参考图被静默丢弃）
+    #   写法 B 不报错、不告警，只是参考图根本没进模型 —— 表现为
+    #   「编辑结果与输入图无关 / 输出尺寸变成方图」。
+    #   所以这里用写法 A：扁平点号键。
+    #
+    #   （另：顶层扁平的 "image_1" 也不行 —— 那会被当成 execute() 的
+    #     关键字参数，报 unexpected keyword argument 'image_1'。）
     for index, ref in enumerate(refs[:QWEN_IMAGE_MAX_REF_IMAGES]):
         node_id = f"qw:ref{index}"
         # ref_images 两种形态都收：
-        #   服务端上传后是文件名列表（["images/x.png", ...]）
-        #   也接受字典列表（[{"file": "images/x.png"}, ...]）
+        #   服务端上传后是文件名列表（["h3studio/x.png", ...]）
+        #   也接受字典列表（[{"file": "h3studio/x.png"}, ...]）
         if isinstance(ref, dict):
             filename = ref.get("file") or ""
         else:
@@ -1508,8 +1514,7 @@ def build_qwen_i2i(params):
         if not filename:
             raise ValueError(f"第 {index + 1} 张参考图缺少文件名")
         p[node_id] = {"inputs": {"image": filename}, "class_type": "LoadImage"}
-        images_input[f"image_{index + 1}"] = [node_id, 0]
-    te_inputs["images"] = images_input
+        te_inputs[f"images.image_{index + 1}"] = [node_id, 0]
     return p
 
 
