@@ -320,6 +320,41 @@ http://127.0.0.1:8190/ 以这里为制作平台，根据H3提示词的写作规�
 
 **释放显存**：左侧栏底部的「释放显存」按钮，点击后向 ComfyUI 发送卸载请求，把常驻显存的模型卸掉、释放显存占用。暂时不生成、要把显卡让给其他软件时点一下即可；下次生成时模型会自动重新加载，只是第一段会稍慢。
 
+## 默认面板与任务列表
+
+打开工作台默认停在 **Z-IMAGE 文生图**：左侧「CREATE → 图像 → Z-IMAGE 文生图」默认高亮，
+中间参数区直接显示分辨率档位 / 画面比例 / 输出尺寸 / 模型 / 采样器 / 调度器 / 步数 / CFG / seed /
+LoRA 这套图像参数。手动切到文生视频、首尾帧、参考生成、长片拼接时，导航高亮与参数区内容始终同步。
+
+右侧任务区默认是「全部状态 + 全部类型」，首屏直接拉出已有任务，不需要再点一次「全部」。
+「全部」标签带分页，所以「全部类型」下每一类（文生视频 / Z-IMAGE / 首尾帧 / 参考生成 / 长片拼接）
+都能翻到。
+
+前端资源用 `?v=` 版本号做缓存失效，首页 `index.html` 每次都回源校验（`Cache-Control: no-cache`），
+升级后无需手动清缓存即可拿到新前端。
+
+## 自动化测试
+
+```bash
+# 后端 + LoRA + 工作流（需要 ComfyUI 的 Python 环境：torch / safetensors）
+/home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q
+
+# 前端默认态（需要 playwright + chromium）
+/usr/local/lib/hermes-agent/venv/bin/python -m pytest tests/test_frontend_defaults.py -q
+```
+
+`tests/test_frontend_defaults.py` 用真实浏览器打开真实 Studio 实例，断言：
+
+- 默认高亮项是「Z-IMAGE 文生图」，参数区是图像面板（视频专属控件隐藏）；
+- 手动切换模式时导航高亮与面板内容同步；
+- 默认「全部 + 全部类型」下任务列表非空、可翻页、覆盖多种生成类型；
+- 启动脚本**逐项隔离**：即便某个启动步骤抛异常，任务列表仍会自动加载（不依赖用户手动点一次）。
+
+最后一条对应一个真实缺陷：`app.js` 顶层启动脚本里任何一处抛异常都会中断整段脚本，
+连带 `refreshJobs()` 与 `setInterval(refreshJobs, 2000)` 都没注册 —— 表现为标签显示
+「全部 / 全部类型」但列表空白，点一次才恢复。现在每个启动步骤单独 `try/catch`，
+单点异常不再拖垮整页。
+
 ## 致谢
 
 - [zxcHolmes/minimax-h3-studio](https://github.com/zxcHolmes/minimax-h3-studio)（UI 灵感来源）

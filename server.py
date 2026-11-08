@@ -1838,7 +1838,12 @@ async def files_handler(request):
 
 
 async def index_handler(request):
-    return web.FileResponse(BASE / "web" / "index.html")
+    # index.html 必须每次回源校验：它是前端资源的「版本清单」，
+    # 一旦被浏览器缓存，app.js 的 ?v= 版本号就再也传不出去 ——
+    # 用户会一直用着旧 app.js（曾经因此出现 esc() 未定义 -> 任务列表空白）。
+    resp = web.FileResponse(BASE / "web" / "index.html")
+    resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
 
 
 # ------------------------------------------------------------------ app

@@ -10,8 +10,13 @@ const MODE_INFO = {
   longfilm: { name: "长片", kind: "video" },
 };
 
+// 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
+const DEFAULT_MODE = "t2i";
+
 const state = {
-  mode: "t2v",
+  // 默认进入「Z-IMAGE 文生图」。这里只是兜底初值 —— 启动时 activateMode()
+  // 会用 DEFAULT_MODE 再赋一次，避免两处各写一份字面量后走偏。
+  mode: DEFAULT_MODE,
   tab: "all",
   genType: "",
   page: "create",
@@ -67,12 +72,18 @@ const IMG_ASPECT_NUM = {
 };
 
 // ---------- 侧栏切换 ----------
-$$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
+// 选中态与面板内容始终保持一致：同一个入口负责「打高亮 + 切面板」，
+// 启动时、手动点击时都走它，避免两者不同步。
+function activateMode(mode, navEl) {
   $$(".nav-item").forEach(x => x.classList.remove("active"));
-  el.classList.add("active");
-  state.mode = el.dataset.mode;
+  if (navEl) navEl.classList.add("active");
+  state.mode = mode;
   showCreate();
   renderMode();
+}
+
+$$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
+  activateMode(el.dataset.mode, el);
 }));
 
 function renderMode() {
@@ -1664,7 +1675,9 @@ $("#doneFilterReset").addEventListener("click", () => {
 
 function renderDonePagination(total, currentPage) {
   const pager = $("#jobsPagination");
-  if (!["done", "longfilm"].includes(state.tab) || total <= DONE_PAGE_SIZE) {
+  // 「全部」也要分页：否则「全部类型」名义下只显示最新 8 条（可能全是同一类），
+  // 其余分类翻不到，与「全部类型」的语义不符。
+  if (!["done", "longfilm", "all"].includes(state.tab) || total <= DONE_PAGE_SIZE) {
     pager.hidden = true;
     pager.innerHTML = "";
     return;
@@ -2227,14 +2240,33 @@ document.addEventListener("keydown", event => {
 });
 
 // ---------- 启动 ----------
-loadImageOptions();
-loadImageLoras();
-loadGenerationTypes();
-renderMode();
-renderTabs();
-renderPromptVersions();   // 初始化二次增强「作用对象」切换（原始 / 一次增强后）
-renderStitchClips();
-refreshJobs();
-refreshSystem();
+// 启动脚本必须「逐项隔离」：任何一项抛异常都不能中断后面的项。
+// 之前 esc() 未定义抛 ReferenceError 会中断整个顶层脚本，连带
+// refreshJobs() / setInterval(refreshJobs, 2000) 都没注册 —— 表现是
+// 标签显示「全部 / 全部类型」但任务列表空白，点一次才恢复。
+// 这里每个步骤单独 try/catch，失败只记日志不阻断其余步骤。
+function boot(step, fn) {
+  try {
+    fn();
+  } catch (e) {
+    console.error(`[启动] ${step} 失败:`, e);
+  }
+}
+
+// 默认进入「Z-IMAGE 文生图」：导航高亮 + 参数面板 + 首屏任务列表
+boot("默认模式", () => {
+  const nav = $(`.nav-item[data-mode="${DEFAULT_MODE}"]`);
+  if (nav) activateMode(DEFAULT_MODE, nav);
+  else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
+});
+boot("图像参数清单", loadImageOptions);
+boot("图像 LoRA 清单", loadImageLoras);
+boot("生成类型清单", loadGenerationTypes);
+boot("模式面板", renderMode);
+boot("状态标签", renderTabs);
+boot("提示词版本", renderPromptVersions);   // 初始化二次增强「作用对象」切换（原始 / 一次增强后）
+boot("长片片段", renderStitchClips);
+boot("任务列表", refreshJobs);
+boot("系统状态", refreshSystem);
 setInterval(refreshJobs, 2000);
 setInterval(refreshSystem, 3000);
