@@ -1593,6 +1593,15 @@ function setSeg(sel, val) {
   $$(sel + " button").forEach(b => b.classList.toggle("active", b.dataset.v === val));
 }
 
+// esc() 的正式定义在 providers.js（脚本顺序在后）。但 app.js 在启动阶段
+// (renderPromptVersions -> renderRefineTargets) 就会调用它，若此处没有定义就会抛
+// ReferenceError 并中断整个 app.js 顶层脚本（含末尾的 setInterval 注册）。
+// 这里给一个与 providers.js 同语义的兜底定义，providers.js 加载后会被它覆盖。
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
