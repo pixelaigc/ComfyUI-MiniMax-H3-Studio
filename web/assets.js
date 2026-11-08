@@ -596,6 +596,13 @@
   async function uploadFiles(fileList) {
     const files = [...fileList];
     if (!files.length) return;
+    // 上传时的标签/备注（页面上那两个输入框）
+    const tagInput = $("#alUploadTags");
+    const noteInput = $("#alUploadNote");
+    const options = {
+      tags: tagInput ? tagInput.value.trim() : "",
+      note: noteInput ? noteInput.value.trim() : "",
+    };
     const box = $("#alUploads");
     const ids = [];
     files.forEach(file => {
@@ -610,6 +617,14 @@
       const entry = state.uploads.get(id);
       try {
         const body = new FormData();
+        // 选项字段必须**先于**文件提交：
+        // 服务端第一遍读完整表单再统一入库，选项在文件之后也能生效；
+        // 但放在前面更符合「先说清参数、再传文件」的语义，也便于排查。
+        if (options.name) body.append("name", options.name);
+        if (options.category) body.append("category", options.category);
+        if (options.subtype) body.append("subtype", options.subtype);
+        if (options.tags) body.append("tags", options.tags);
+        if (options.note) body.append("note", options.note);
         body.append("file", file, file.name);
         const resp = await fetch("/api/assets", { method: "POST", body });
         const data = await resp.json();

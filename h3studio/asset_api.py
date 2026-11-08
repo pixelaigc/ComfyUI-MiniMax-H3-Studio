@@ -143,12 +143,14 @@ async def api_assets_picker(request):
         where += " AND a.category=?"
         args.append(category)
     with _library_conn() as conn:
+        # duration_sec / preview_path 都在 asset_versions 上，不在 assets 表 ——
+        # 这里用子查询取当前版本的值。
         rows = conn.execute(
-            f"SELECT a.id, a.name, a.category, a.subtype, a.duration_sec, "
-            f"(SELECT v.preview_path FROM asset_versions v WHERE v.asset_id=a.id "
-            f" ORDER BY v.version DESC LIMIT 1) AS preview_path, "
+            f"SELECT a.id, a.name, a.category, a.subtype, "
             f"(SELECT v.duration_sec FROM asset_versions v WHERE v.asset_id=a.id "
-            f" ORDER BY v.version DESC LIMIT 1) AS duration_sec "
+            f" ORDER BY v.version DESC LIMIT 1) AS duration_sec, "
+            f"(SELECT v.preview_path FROM asset_versions v WHERE v.asset_id=a.id "
+            f" ORDER BY v.version DESC LIMIT 1) AS preview_path "
             f"FROM assets a WHERE {where} ORDER BY a.updated_at DESC LIMIT ?",
             [*args, limit]).fetchall()
     items = [{
@@ -210,6 +212,14 @@ async def api_assets_upload(request):
     tmp_dir = root / A.DIR_TMP
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
+    # 第一遍：把文件流式落到临时区，把选项字段读出来。
+    #
+    # 为什么分两遍：multipart 的字段顺序由客户端决定。前端按
+    # 「文件先、选项后」提交时，若在读文件的同时就用 options，
+    # 此刻 options 还是空的 —— 标签会静默丢失。
+    # 所以先把文件全部落盘（流式，不进内存），等整个表单读完、
+    # options 齐全后再统一入库。
+    staged: list[dict] = []
     async for part in reader:
         if part.name in ("name", "category", "subtype", "tags", "note"):
             options[part.name] = (await part.text()).strip()
@@ -249,8 +259,19 @@ async def api_assets_upload(request):
                 errors.append({"filename": part.filename, "error": "文件为空"})
                 tmp.unlink(missing_ok=True)
                 continue
+            staged.append({"tmp": tmp, "filename": part.filename,
+                           "sha256": digest.hexdigest(), "bytes": total})
+        except Exception as exc:
+            tmp.unlink(missing_ok=True)
+            errors.append({"filename": part.filename,
+                           "error": f"{type(exc).__name__}: {exc}"[:200]})
 
-            fingerprint = digest.hexdigest()
+    # 第二遍：options 已齐全，逐个入库（一个失败不影响其他）
+    tags = [t.strip() for t in options["tags"].replace(",", "，").split("，") if t.strip()]
+    for item in staged:
+        tmp = item["tmp"]
+        fingerprint = item["sha256"]
+        try:
             with _library_conn() as conn:
                 dup = conn.execute(
                     "SELECT asset_id FROM asset_versions WHERE sha256=? "
@@ -259,17 +280,16 @@ async def api_assets_upload(request):
                     existing = asset_repo.get_asset(conn, dup["asset_id"], include_deleted=True)
                     if existing and not existing["deleted_at"]:
                         tmp.unlink(missing_ok=True)
-                        results.append({"filename": part.filename, "ok": True,
+                        results.append({"filename": item["filename"], "ok": True,
                                         "duplicated": True, "asset_id": existing["id"],
                                         "name": existing["name"],
                                         "message": "素材已存在，已复用原记录"})
                         continue
 
-                tags = [t for t in options["tags"].replace(",", "，").split("，") if t.strip()]
                 result = asset_service.register_asset(
                     conn,
                     source_path=tmp,
-                    filename=part.filename,
+                    filename=item["filename"],
                     name=options["name"] or None,
                     category=options["category"] or None,
                     subtype=options["subtype"] or None,
@@ -280,7 +300,7 @@ async def api_assets_upload(request):
                 tmp.unlink(missing_ok=True)   # register_asset 已把它移走，这里是兜底
                 asset = result["asset"]
                 results.append({
-                    "filename": part.filename, "ok": True, "duplicated": False,
+                    "filename": item["filename"], "ok": True, "duplicated": False,
                     "asset_id": asset["id"], "name": asset["name"],
                     "category": asset["category"], "subtype": asset["subtype"],
                     "bytes": result.get("version", {}).get("bytes"),
@@ -289,10 +309,10 @@ async def api_assets_upload(request):
                 })
         except LibraryError as exc:
             tmp.unlink(missing_ok=True)
-            errors.append({"filename": part.filename, "error": exc.message})
+            errors.append({"filename": item["filename"], "error": exc.message})
         except Exception as exc:
             tmp.unlink(missing_ok=True)
-            errors.append({"filename": part.filename,
+            errors.append({"filename": item["filename"],
                            "error": f"{type(exc).__name__}: {exc}"[:200]})
 
     return web.json_response({
@@ -716,12 +736,24 @@ async def api_job_assets(request):
 
 
 def db_conn():
-    """任务库连接（server.py 注入，避免这里 import server 造成循环）。"""
+    """任务库连接。
+
+    优先用注入的 server 模块（避免 import server 造成循环依赖）；
+    注入的模块上有 db 就用它，否则回退到延迟 import。
+    """
+    if _SERVER is not None:
+        getter = getattr(_SERVER, "db", None)
+        if getter is not None:
+            return getter()
     from server import db
     return db()
 
 
 def outputs_root():
+    if _SERVER is not None:
+        out_dir = getattr(_SERVER, "OUT_DIR", None)
+        if out_dir is not None:
+            return out_dir
     from server import OUT_DIR
     return OUT_DIR
 

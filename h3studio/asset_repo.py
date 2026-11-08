@@ -170,6 +170,22 @@ _SORTS = {
 }
 
 
+def _split_tags(value) -> list[str]:
+    """
+    把 tags_all / tags_any 的入参拆成标签列表。
+
+    入参是逗号分隔的字符串（中英文逗号都收）。
+    不能直接迭代字符串本身 —— 那样拿到的是单个字符。
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        raw = list(value)
+    else:
+        raw = str(value).replace("，", ",").split(",")
+    return [str(item).strip() for item in raw if str(item).strip()]
+
+
 def search_assets(conn, filters: dict) -> dict:
     """
     列表 + 筛选 + 搜索。
@@ -222,12 +238,15 @@ def search_assets(conn, filters: dict) -> dict:
         where.append("EXISTS (SELECT 1 FROM asset_tags t WHERE t.asset_id=a.id AND t.tag=?)")
         args.append(tag)
 
-    tags_all = [t for t in (filters.get("tags_all") or "") if t]
+    # tags_all / tags_any 传进来是逗号分隔的字符串。
+    # 注意：不能直接 `[t for t in value]` —— 那样迭代的是**字符**，
+    # "原神" 会变成 ['原','神']，查出来永远是 0 条。
+    tags_all = _split_tags(filters.get("tags_all"))
     for item in tags_all:
         where.append("EXISTS (SELECT 1 FROM asset_tags t WHERE t.asset_id=a.id AND t.tag=?)")
         args.append(item)
 
-    tags_any = [t for t in (filters.get("tags_any") or "") if t]
+    tags_any = _split_tags(filters.get("tags_any"))
     if tags_any:
         marks = ",".join("?" * len(tags_any))
         where.append(

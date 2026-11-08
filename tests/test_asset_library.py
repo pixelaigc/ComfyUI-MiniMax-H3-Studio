@@ -269,6 +269,30 @@ class TestTagsAndSearch(AssetLibraryTestBase):
             miss = asset_repo.search_assets(conn, {"tag": "不存在的标签"})
             self.assertEqual(miss["total"], 0)
 
+    def test_search_by_tags_any_and_all(self):
+        """tags_any / tags_all 是逗号分隔的字符串。
+
+        回归：如果直接迭代字符串会拿到单个字符（「原神」-> ['原','神']），
+        查询结果永远是 0 条。这里锁死多字标签必须能查出来。
+        """
+        asset_id = self._seed()
+        with self.conn() as conn:
+            hit = asset_repo.search_assets(conn, {"tags_any": "原神"})
+            self.assertEqual(hit["total"], 1, "多字标签的 tags_any 查询必须命中")
+            self.assertEqual(hit["assets"][0]["id"], asset_id)
+
+            both = asset_repo.search_assets(conn, {"tags_all": "原神,角色"})
+            self.assertEqual(both["total"], 1, "tags_all 多标签必须同时命中")
+
+            mixed = asset_repo.search_assets(conn, {"tags_any": "原神,不存在的标签"})
+            self.assertEqual(mixed["total"], 1, "tags_any 命中其一即可")
+
+            none = asset_repo.search_assets(conn, {"tags_all": "原神,不存在的标签"})
+            self.assertEqual(none["total"], 0, "tags_all 必须全部命中")
+
+            empty = asset_repo.search_assets(conn, {"tags_any": ""})
+            self.assertEqual(empty["total"], 1, "空 tags_any 不应过滤")
+
     def test_search_by_name_and_note(self):
         self._seed()
         with self.conn() as conn:

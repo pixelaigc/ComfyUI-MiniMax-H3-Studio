@@ -72,6 +72,10 @@
 .al-drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .al-drop strong { color: var(--text); font-weight: 600; }
 
+/* 上传时的标签 / 备注输入 */
+.al-upload-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.al-upload-opts .al-input { flex: 1 1 220px; min-width: 180px; }
+
 /* 上传进度列表 */
 .al-uploads { display: flex; flex-direction: column; gap: 6px; }
 .al-upload {
