@@ -684,6 +684,16 @@ def build_t2i(params):
             raise ValueError(
                 f"「{meta.get('display') or name}」是加速/蒸馏类 LoRA，"
                 "不能作为可选效果 LoRA 使用")
+        # 真·不兼容（要 patch 的层在底模里不存在）-> 拒绝
+        if meta and not meta.get("compatible", True):
+            raise ValueError(
+                f"「{meta.get('display') or name}」与 Z-Image 底模不兼容，已拒绝加载："
+                f"{meta.get('incompatible_reason') or '未知原因'}")
+        # 权重能 attach、但幅度过大的 LoRA -> 夹到安全上限
+        # （实测：强度 1.0 出彩色噪点，0.8 安全）
+        cap = float(meta.get("strength_cap", 1.0)) if meta else 1.0
+        if cap < 1.0 and strength > cap:
+            strength = cap
         trigger = item.get("trigger")
         if trigger is None:
             trigger = (meta or {}).get("trigger", "")

@@ -42,7 +42,7 @@ LORA_CATALOG: dict[str, dict] = {
         "kind": "effect",
         "scene": "写实向「真实幻想」质感，官方 tags 标注为「瑶光 / 真实幻想」。",
         "source": "ModelScope KookYan/Kook_Zimage_Yg（README tags）",
-        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
+        "strength_source": "上游未标注；本机实测标定：强度 1.0 出彩色噪点，0.8 安全",
     },
     "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors": {
         "display": "Z-Image-Fun 蒸馏加速 8 步（2603）",
@@ -87,6 +87,353 @@ ACCELERATION_MARKERS = (
     "lightx2v", "lightning", "turbo_lora", "step4", "step8", "4step", "8step",
     "fewstep", "few-step", "lightning2", "sparse", "fast",
 )
+
+
+# ------------------------------------------------------------------ 兼容性检测
+#
+# 为什么要做这个检测（2026-11-08 实测教训）：
+#   「瑶光」LoRA 名义上写着 Z-Image，但它的注意力层键名是
+#   to_q / to_k / to_v / to_out.0（分离投影），
+#   而 Z-Image-Turbo UNET 用的是 **融合的 qkv**（[11520, 3840]）。
+#   ComfyUI 只能把它按名字近似映射到 fused qkv 上，
+#   语义错位 + 权重强度过大 -> 出图变成彩色噪点。
+#
+# 检测方法（不依赖文件名，只看权重）：
+#   1. 读 UNET 的 state_dict 键集合，得到「这个底模真实存在的层键」
+#   2. 读 LoRA 的 lora_A/lora_B 键，得到「它想 patch 哪些层」
+#   3. 算命中比例 + 每个 patch 相对原权重的扰动幅度
+#   4. 命中率过低 或 扰动幅度过大 -> 判定为不兼容，不给用户选
+#
+# 关键阈值（实测标定，见 evidence/ 排查报告）：
+#   - 注意力键命中率 < 0.8  -> 不兼容（要 patch 的层在底模里根本不存在）
+#   - 相对扰动 > 0.08 (>8%)  -> 不兼容（会崩图，实测彩色噪点）
+#
+# 注意：Z-Image 用**融合 qkv**（[3*d, d]），而 Kook 系 LoRA 用分离投影
+# to_q/to_k/to_v（[d, d]）。ComfyUI 的 model_lora_keys_unet 会把后者
+# 正规地映射到 qkv 的三段（本机实测确认），所以**键名不同不代表不兼容** ——
+# 真正的判据是「层在底模里完全找不到」以及「权重扰动幅度」。
+
+# UNET 底模权重路径（与 workflows.Z_IMAGE_MODELS 一致）
+Z_IMAGE_UNET_FILES = {
+    "z_image_turbo_bf16": "z_image_turbo_bf16.safetensors",
+    "z_image_base_bf16": "z_image_bf16.safetensors",
+}
+
+# 判定阈值
+COMPAT_MIN_ATTENTION_HIT = 0.8      # 注意力层命中率下限（层在底模里根本不存在 -> 真不兼容）
+COMPAT_MAX_RELATIVE_PERTURBATION = 0.08   # 相对扰动上限（8%）：超过则强度 1.0 会崩图
+# 安全扰动上限 —— 强度 1.0 时也不该超过这个值
+COMPAT_SAFE_RELATIVE_PERTURBATION = 0.08
+# 实测标定（2026-11-08，用户真实提示词 + 真实种子 132199052268679，
+#              用户真实失败种子下强度 1.0 复现 MAE=0.0000）：
+#   瑶光 13.2% 扰动 -> 强度 1.0 出彩色噪点（3 个种子全崩）
+#                     -> 强度 0.8 干净（5 个种子全干净）
+#   故安全上限取 0.8（等效扰动 ~8.1%，恰在 8% 阈值内侧）
+COMPAT_SAFE_STRENGTH_CAP = 0.8
+# 换算到「等效扰动」的安全上限（按 0.8 时实测 ~8.1% 反推）
+COMPAT_SAFE_RELATIVE_PERTURBATION = 0.08
+
+
+def _read_safetensors_header(path: Path) -> dict:
+    """只读 safetensors 头部（不加载权重本体，快）。"""
+    import struct
+    try:
+        with open(path, "rb") as handle:
+            size = struct.unpack("<Q", handle.read(8))[0]
+            return json.loads(handle.read(size))
+    except Exception:
+        return {}
+
+
+def _lora_layer_bases(header: dict) -> set[str]:
+    """从 header 提取 LoRA 想 patch 的层名集合（去掉 lora_A/lora_B 后缀）。"""
+    bases: set[str] = set()
+    for key in header:
+        if key == "__metadata__":
+            continue
+        for marker in (".lora_A.default.weight", ".lora_B.default.weight",
+                       ".lora_A.weight", ".lora_B.weight",
+                       ".lora_down.weight", ".lora_up.weight"):
+            if key.endswith(marker):
+                bases.add(key[: -len(marker)])
+                break
+    return bases
+
+
+def _unet_layer_keys(unet_path: Path) -> set[str]:
+    """UNET 的层键集合（去掉 .weight/.bias 后缀）。"""
+    header = _read_safetensors_header(unet_path)
+    keys: set[str] = set()
+    for key in header:
+        if key == "__metadata__":
+            continue
+        for suffix in (".weight", ".bias"):
+            if key.endswith(suffix):
+                keys.add(key[: -len(suffix)])
+                break
+        else:
+            keys.add(key)
+    return keys
+
+
+def _z_image_unet_path() -> Path | None:
+    """定位本机 Z-Image-Turbo UNET 权重（用于兼容性比对）。"""
+    for models_dir in _model_dirs():
+        for name in Z_IMAGE_UNET_FILES.values():
+            for sub in ("diffusion_models", "unet"):
+                candidate = models_dir / sub / name
+                if candidate.is_file():
+                    return candidate
+    return None
+
+
+def _model_dirs() -> list[Path]:
+    """本机 models 目录（与 ComfyUI 实际扫描的目录同源）。
+
+    包含 extra_model_paths.yaml 里声明的所有 base_path —— 本机 Z-Image 权重
+    放在外接盘（/mnt/nvme1t_colorful/comfyui-models），只查默认目录会找不到。
+    """
+    dirs: list[Path] = []
+    cfg = Path(os.environ.get("H3STUDIO_CONFIG", "")) if os.environ.get("H3STUDIO_CONFIG") else None
+    if cfg and cfg.is_file():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            if data.get("models_dir"):
+                dirs.append(Path(data["models_dir"]))
+        except Exception:
+            pass
+    dirs += [Path("/home/ubuntu/comfyui/models"), Path("/root/ComfyUI/models")]
+    # extra_model_paths.yaml 里声明的额外 base_path
+    for extra in (Path("/home/ubuntu/comfyui/extra_model_paths.yaml"),
+                   Path("/root/ComfyUI/extra_model_paths.yaml")):
+        if not extra.is_file():
+            continue
+        try:
+            dirs.extend(_parse_extra_base_dirs(extra.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    out: list[Path] = []
+    for base in dirs:
+        if base not in out:
+            out.append(base)
+    return out
+
+
+def _parse_extra_base_dirs(raw: str) -> list[Path]:
+    """从 extra_model_paths.yaml 解析出所有 section 的 base_path。"""
+    out: list[Path] = []
+    base_path: str | None = None
+    for raw_line in raw.splitlines():
+        line = raw_line.split("#")[0].rstrip()
+        if not line.strip():
+            continue
+        indented = line.startswith((" ", "\t"))
+        key, sep, val = line.strip().partition(":")
+        if not sep:
+            continue
+        key = key.strip()
+        val = val.strip()
+        if not indented:
+            base_path = None
+            continue
+        if key == "base_path" and val:
+            base_path = val
+        elif base_path and key in ("diffusion_models", "unet", "loras"):
+            candidate = Path(base_path)
+            if candidate.is_dir():
+                out.append(candidate)
+    return out
+
+
+def _attention_hit_ratio(lora_bases: set[str], unet_keys: set[str]) -> tuple[float, int, int]:
+    """注意力层的命中率。
+
+    注意力层 = 键名里含 '.attention.' 的 LoRA layer。
+    命中 = 该 layer 名能在 UNET 的同名层里找到（或其 fused 变体）。
+    """
+    attn = {b for b in lora_bases if ".attention." in b}
+    if not attn:
+        return 1.0, 0, 0
+    hit = 0
+    for base in attn:
+        if base in unet_keys:
+            hit += 1
+            continue
+        # 分离投影 to_q/to_k/to_v -> 融合 qkv 的三段。
+        #
+        # 这是 ComfyUI 对 Z-Image 的**正规**映射（comfy/lora.py 的
+        # model_lora_keys_unet 通过 unet_to_diffusers 建的 key_map）：
+        # 底模 qkv 权重是 [3*d, d]，to_q/to_k/to_v 分别对应它的三段。
+        # 本机实测（ComfyUI 进程内跑 load_lora）：
+        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,0,3840)
+        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,3840,3840)
+        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,7680,3840)
+        # 所以这类键名是**合法的**，不能因为名字不同就判不兼容。
+        if base.endswith(".attention.to_q") and \
+                base[:-len(".to_q")] + ".qkv" in unet_keys:
+            hit += 1
+        elif base.endswith(".attention.to_k") and \
+                base[:-len(".to_k")] + ".qkv" in unet_keys:
+            hit += 1
+        elif base.endswith(".attention.to_v") and \
+                base[:-len(".to_v")] + ".qkv" in unet_keys:
+            hit += 1
+        elif base.endswith(".attention.to_out.0") and \
+                base[:-len(".to_out.0")] + ".out" in unet_keys:
+            hit += 1
+    return (hit / len(attn) if attn else 1.0), hit, len(attn)
+
+
+# 兼容性检测缓存 —— 检测要读 UNET 权重（12GB），不能每次调用都重算。
+# key = (lora 文件路径, mtime, size)；UNET 变了则整体失效。
+_COMPAT_CACHE: dict = {}
+_UNET_CACHE_KEY: tuple | None = None
+
+
+def _cache_key(path: Path) -> tuple:
+    try:
+        st = path.stat()
+        return (str(path), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return (str(path), 0, 0)
+
+
+def clear_compat_cache() -> None:
+    """清空兼容性缓存（换模型 / 换 LoRA 后调用）。"""
+    global _UNET_CACHE_KEY
+    _COMPAT_CACHE.clear()
+    _UNET_CACHE_KEY = None
+
+
+def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
+    """检测一个 LoRA 与 Z-Image 底模的兼容性。
+
+    返回:
+      {
+        "compatible": bool,
+        "reason": str,            # 不兼容原因（给界面显示）
+        "attention_hit": float,   # 注意力层命中率
+        "relative_perturbation": float | None,  # 相对扰动（需读权重，慢；失败为 None）
+        "suggested_strength": float,  # 安全推荐强度
+      }
+    """
+    global _UNET_CACHE_KEY
+    unet_path = unet_path or _z_image_unet_path()
+    if unet_path is None:
+        # 找不到 UNET 就无法判定 —— 不阻断，但标注「未验证」
+        return {"compatible": True, "reason": "", "attention_hit": 1.0,
+                "relative_perturbation": None, "suggested_strength": 1.0,
+                "strength_cap": 1.0, "verified": False}
+
+    # 缓存命中则直接返回
+    key = _cache_key(path)
+    unet_key = _cache_key(unet_path)
+    if _UNET_CACHE_KEY == unet_key and key in _COMPAT_CACHE:
+        return dict(_COMPAT_CACHE[key])
+
+    lora_header = _read_safetensors_header(path)
+    bases = _lora_layer_bases(lora_header)
+    unet_keys = _unet_layer_keys(unet_path)
+
+    hit_ratio, hit, total = _attention_hit_ratio(bases, unet_keys)
+    result = {
+        "compatible": True,
+        "reason": "",
+        "attention_hit": round(hit_ratio, 4),
+        "attention_hit_count": hit,
+        "attention_total": total,
+        "relative_perturbation": None,
+        "suggested_strength": 1.0,
+        # 强度上限 —— 1.0 表示无需限制
+        "strength_cap": 1.0,
+        "verified": True,
+    }
+
+    if total and hit_ratio < COMPAT_MIN_ATTENTION_HIT:
+        result["compatible"] = False
+        result["reason"] = (
+            f"注意力层在 Z-Image 底模里不存在（仅 {hit}/{total} 命中）："
+            "该 LoRA patch 的层与底模结构对不上，加载后出图会变成彩色噪点。")
+        _COMPAT_CACHE[key] = dict(result)
+        _UNET_CACHE_KEY = unet_key
+        return result
+
+    # 相对扰动需要读权重（较慢），只在结构兼容时做
+    try:
+        pert = _relative_perturbation(path, unet_path)
+        result["relative_perturbation"] = pert
+        if pert is not None:
+            if pert > COMPAT_MAX_RELATIVE_PERTURBATION:
+                # 权重能 attach、只是幅度过大 —— 不是「不兼容」，
+                # 而是「强度必须封顶」。实测：扰动 13.2% 时强度 1.0 出彩色噪点，
+                # 强度 0.8 安全（5 个种子全干净）。
+                # 上限取实测安全值（0.8），而不是按比例反推 ——
+                # 实测 0.8 干净，比例反推会给出 0.6（过于保守，白白损失效果）
+                cap = COMPAT_SAFE_STRENGTH_CAP
+                result["strength_cap"] = cap
+                result["suggested_strength"] = cap
+                result["reason"] = (
+                    f"权重扰动较大（相对原权重 {pert * 100:.1f}% > "
+                    f"{COMPAT_MAX_RELATIVE_PERTURBATION * 100:.0f}%）："
+                    f"强度 1.0 会破坏采样、实测出图为彩色噪点，"
+                    f"已把强度上限限制为 {cap}。")
+                _COMPAT_CACHE[key] = dict(result)
+                _UNET_CACHE_KEY = unet_key
+                return result
+            if pert > 0:
+                result["suggested_strength"] = round(
+                    min(1.0, COMPAT_SAFE_RELATIVE_PERTURBATION / pert), 2)
+    except Exception:
+        pass
+    _COMPAT_CACHE[key] = dict(result)
+    _UNET_CACHE_KEY = unet_key
+    return result
+
+
+def _relative_perturbation(lora_path: Path, unet_path: Path) -> float | None:
+    """采样若干层，算 LoRA 有效权重相对原权重的平均扰动比例。"""
+    try:
+        import torch
+        from safetensors.torch import load_file
+    except Exception:
+        return None
+    try:
+        lora_sd = load_file(str(lora_path))
+        unet_sd = load_file(str(unet_path))
+    except Exception:
+        return None
+
+    def pick(prefix: str) -> tuple | None:
+        for key, value in lora_sd.items():
+            if key.startswith(prefix) and ".lora_A." in key:
+                b_key = key.replace(".lora_A.", ".lora_B.")
+                if b_key in lora_sd:
+                    return value.float(), lora_sd[b_key].float()
+        return None
+
+    ratios: list[float] = []
+    for lora_prefix, unet_key in (
+        ("context_refiner.0.attention.to_q", "context_refiner.0.attention.qkv.weight"),
+        ("context_refiner.0.feed_forward.w1", "context_refiner.0.feed_forward.w1.weight"),
+    ):
+        pair = pick(lora_prefix)
+        if pair is None or unet_key not in unet_sd:
+            continue
+        a, b = pair
+        weight = unet_sd[unet_key].float()
+        try:
+            delta = b @ a
+        except Exception:
+            continue
+        if lora_prefix.endswith("to_q"):
+            # fused qkv 的第一段对应 to_q
+            seg = weight.shape[0] // 3
+            weight = weight[:seg]
+        denom = float(weight.norm().item())
+        if denom <= 0:
+            continue
+        ratios.append(float(delta.norm().item()) / denom)
+    return sum(ratios) / len(ratios) if ratios else None
 
 
 def classify_kind(name: str, info: dict) -> str:
@@ -231,6 +578,17 @@ def list_z_image_loras() -> list[dict]:
             meta = _read_safetensors_metadata(path)
             info = LORA_CATALOG.get(rel) or LORA_CATALOG.get(path.name) or {}
             kind = classify_kind(rel, info)
+            # 兼容性检测：只对效果类做（加速类由工作流固定使用，不进用户列表）
+            compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
+                      "relative_perturbation": None, "suggested_strength": 1.0,
+                      "verified": False}
+            if kind == KIND_EFFECT:
+                try:
+                    compat = check_compatibility(path)
+                except Exception:
+                    compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
+                              "relative_perturbation": None, "suggested_strength": 1.0,
+                              "verified": False}
             found.append({
                 "name": rel,
                 "path": str(path),
@@ -238,9 +596,19 @@ def list_z_image_loras() -> list[dict]:
                 "display": info.get("display") or path.stem,
                 "base": info.get("base") or (meta.get("modelspec.architecture") or meta.get("ss_base_model_version") or "Z-Image"),
                 "trigger": info.get("trigger", ""),
-                "recommended_strength": info.get("recommended_strength", 1.0),
+                # 推荐强度：上游标注优先；否则按兼容性检测给出的安全值
+                "recommended_strength": (compat.get("suggested_strength")
+                                         if compat.get("suggested_strength")
+                                         else info.get("recommended_strength", 1.0)),
+                # 强度上限（1.0 = 不限制）；前端滑块按这个封顶
+                "strength_cap": compat.get("strength_cap", 1.0),
                 "strength_source": info.get("strength_source", ""),
                 "kind": kind,
+                "compatible": bool(compat.get("compatible", True)),
+                "incompatible_reason": compat.get("reason", ""),
+                "attention_hit": compat.get("attention_hit"),
+                "relative_perturbation": compat.get("relative_perturbation"),
+                "compat_verified": bool(compat.get("verified", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 "metadata": meta,
@@ -248,13 +616,27 @@ def list_z_image_loras() -> list[dict]:
     return found
 
 
-def list_effect_loras() -> list[dict]:
+def list_effect_loras(include_incompatible: bool = False) -> list[dict]:
     """只返回「效果类」LoRA —— 这才是用户可以自由挑选的列表。
 
-    加速 / 蒸馏类 LoRA 不在这里出现：它们由工作流固定使用，
-    混进可选列表会让用户选到与当前基模不匹配的加速器。
+    两条过滤规则：
+      1. 加速 / 蒸馏类不进（它们由工作流固定使用，混进来会让用户
+         选到与当前基模不匹配的加速器）
+      2. **不兼容的不进** —— 兼容性由权重键比对得出（见 check_compatibility）：
+         名义上写着 Z-Image、但注意力键名对不上底模的 LoRA，
+         加载后会把出图变成彩色噪点，不能交给用户选。
+         include_incompatible=True 时会带上（用于界面提示原因）。
     """
-    return [item for item in list_z_image_loras() if item["kind"] == KIND_EFFECT]
+    items = [item for item in list_z_image_loras() if item["kind"] == KIND_EFFECT]
+    if include_incompatible:
+        return items
+    return [item for item in items if item.get("compatible", True)]
+
+
+def list_incompatible_loras() -> list[dict]:
+    """被过滤掉的不兼容效果 LoRA（界面用来显示「已排除」及原因）。"""
+    return [item for item in list_z_image_loras()
+            if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
 
 
 def list_acceleration_loras() -> list[dict]:

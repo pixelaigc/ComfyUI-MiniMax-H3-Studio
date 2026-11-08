@@ -67,7 +67,9 @@ class TestWorkflowLoRA(unittest.TestCase):
     }
 
     def _available(self):
-        return lora_registry.list_z_image_loras()
+        """用户可选的 LoRA（效果类 + 兼容）。不兼容的会被工作流拒绝，
+        不能拿来做串联/注入类的正向断言。"""
+        return lora_registry.list_effect_loras()
 
     def test_lora_injects_loader_node(self):
         available = self._available()
@@ -90,9 +92,10 @@ class TestWorkflowLoRA(unittest.TestCase):
         self.assertEqual(wf["57:27"]["inputs"]["clip"], [lora_id, 1])
 
     def test_multiple_loras_chain_in_order(self):
+        # 只用「兼容且可选」的 LoRA（不兼容的会被工作流拒绝）
         available = self._available()
         if len(available) < 2:
-            self.skipTest("本机 LoRA 不足 2 个")
+            self.skipTest("本机可用 LoRA 不足 2 个")
         items = [{"name": available[0]["name"], "strength": 0.5},
                  {"name": available[1]["name"], "strength": 0.9}]
         wf = workflows.build_t2i({**self.BASE, "loras": items})
@@ -254,8 +257,11 @@ class TestLoRASemantics(unittest.TestCase):
             "model": "z_image_turbo_bf16"}
 
     def test_effect_and_acceleration_are_disjoint(self):
-        """效果类与加速类必须互斥，且两者合起来 = 本机全部 z-image LoRA。"""
-        effect = lora_registry.list_effect_loras()
+        """效果类与加速类必须互斥，且两者合起来 = 本机全部 z-image LoRA。
+
+        效果类取「全部效果（含被排除的）」—— 用户可选列表还会再过滤不兼容项。
+        """
+        effect = lora_registry.list_effect_loras(include_incompatible=True)
         accel = lora_registry.list_acceleration_loras()
         all_loras = lora_registry.list_z_image_loras()
         effect_names = {i["name"] for i in effect}
@@ -336,3 +342,135 @@ class TestLoRASemantics(unittest.TestCase):
         # 两段 KSampler 都用 LoRA 后的 model
         self.assertEqual(wf["57:3"]["inputs"]["model"], [lora_ids[0], 0])
         self.assertEqual(wf["57:75"]["inputs"]["model"], [lora_ids[0], 0])
+
+class TestLoRACompatibility(unittest.TestCase):
+    """LoRA 与 Z-Image 底模的兼容性 —— 不兼容的必须被拒绝。
+
+    背景（2026-11-08 实测）：「瑶光」LoRA 名义上写着 Z-Image，
+    但它的注意力层键名是 to_q/to_k/to_v（分离投影），
+    而 Z-Image-Turbo UNET 用融合 qkv；且其有效权重扰动达 13%，
+    实测出图为彩色噪点。兼容性必须由权重键比对得出，不能靠文件名。
+    """
+
+    BASE = {"job_id": "testjob", "mode": "t2i", "prompt": "a cat", "seed": 42,
+            "model": "z_image_turbo_bf16"}
+
+    def test_compat_checker_reports_verdict(self):
+        """每个效果类 LoRA 都要有兼容性结论（能判定时 verified=True）。"""
+        for item in lora_registry.list_z_image_loras():
+            if item["kind"] != lora_registry.KIND_EFFECT:
+                continue
+            self.assertIn("compatible", item)
+            self.assertIn("incompatible_reason", item)
+            if item["compat_verified"]:
+                self.assertIsInstance(item["attention_hit"], float)
+
+    def test_effect_list_excludes_incompatible(self):
+        """用户可选列表里不能有被判为不兼容的 LoRA。"""
+        available = {i["name"] for i in lora_registry.list_effect_loras()}
+        for item in lora_registry.list_incompatible_loras():
+            self.assertNotIn(item["name"], available)
+            self.assertFalse(item["compatible"])
+
+    def test_incompatible_and_effect_partition_all(self):
+        """效果类 = 可选 + 被排除，两部分不重叠且并集完整。"""
+        all_effect = {i["name"] for i in lora_registry.list_effect_loras(include_incompatible=True)}
+        ok = {i["name"] for i in lora_registry.list_effect_loras()}
+        bad = {i["name"] for i in lora_registry.list_incompatible_loras()}
+        self.assertEqual(ok & bad, set())
+        self.assertEqual(ok | bad, all_effect)
+
+    def test_incompatible_lora_rejected_by_workflow(self):
+        """把不兼容 LoRA 塞进工作流 -> 直接拒绝（不能静默出噪点图）。"""
+        bad = lora_registry.list_incompatible_loras()
+        if not bad:
+            self.skipTest("本机无不兼容 Z-Image LoRA")
+        with self.assertRaises(ValueError) as ctx:
+            workflows.build_t2i({**self.BASE, "loras": [
+                {"name": bad[0]["name"], "strength": 1.0}]})
+        self.assertIn("不兼容", str(ctx.exception))
+
+    def test_incompatible_has_reason(self):
+        """被排除的 LoRA 必须带可展示的原因（界面要显示为什么）。"""
+        for item in lora_registry.list_incompatible_loras():
+            self.assertTrue(item["incompatible_reason"].strip(),
+                            f"{item['name']} 缺少排除原因")
+
+    def test_perturbation_threshold_triggers_strength_cap(self):
+        """扰动超过阈值 -> 不是「排除」，而是「限制强度上限」。
+
+        实测（2026-11-08，用户真实提示词 + 种子 132199052268679）：
+          瑶光 13.2% 扰动 -> 强度 1.0 出彩色噪点，强度 0.8 干净（5 种子全干净）
+        所以幅度过大的 LoRA 仍然可用，只是强度必须封顶。
+        """
+        for item in lora_registry.list_z_image_loras():
+            pert = item.get("relative_perturbation")
+            if pert is None:
+                continue
+            cap = item.get("strength_cap", 1.0)
+            if pert > lora_registry.COMPAT_MAX_RELATIVE_PERTURBATION:
+                self.assertLess(cap, 1.0,
+                                 f"{item['name']} 扰动 {pert} 超阈值却没限强度")
+                self.assertTrue(item["compatible"],
+                                f"{item['name']} 扰动过大但能 attach，不该判为不兼容")
+                # 推荐强度不得超过上限
+                self.assertLessEqual(item["recommended_strength"], cap)
+            else:
+                self.assertEqual(cap, 1.0,
+                                 f"{item['name']} 扰动 {pert} 未超阈值却限了强度")
+
+    def test_strength_cap_is_enforced_by_workflow(self):
+        """强度超上限 -> 工作流夹到上限（而不是放行到崩图）。"""
+        capped = [i for i in lora_registry.list_z_image_loras()
+                  if i.get("strength_cap", 1.0) < 1.0]
+        if not capped:
+            self.skipTest("本机无需要限强度的 LoRA")
+        item = capped[0]
+        wf = workflows.build_t2i({**self.BASE, "loras": [
+            {"name": item["name"], "strength": 1.0}]})
+        lora_nodes = [n for n in wf.values() if "Lora" in n["class_type"]]
+        self.assertEqual(len(lora_nodes), 1)
+        self.assertAlmostEqual(lora_nodes[0]["inputs"]["strength_model"],
+                               item["strength_cap"], places=3)
+
+    def test_attention_key_mismatch_is_detected(self):
+        """要 patch 的注意力层在底模里根本不存在 -> 必须判为不命中。
+
+        用合成夹具，不依赖本机文件。
+        """
+        # LoRA 想 patch 一套底模里没有的注意力实现
+        lora_bases = {"context_refiner.0.attention.wq",       # 底模没有 wq
+                      "context_refiner.0.attention.wk",
+                      "context_refiner.0.attention.wv"}
+        unet_keys = {"context_refiner.0.attention.qkv",
+                     "context_refiner.0.feed_forward.w1"}
+        ratio, hit, total = lora_registry._attention_hit_ratio(lora_bases, unet_keys)
+        self.assertEqual(total, 3)
+        self.assertEqual(hit, 0)
+        self.assertLess(ratio, lora_registry.COMPAT_MIN_ATTENTION_HIT,
+                        "底模里不存在的层必须判为不命中")
+
+    def test_fused_qkv_mapping_counts_as_hit(self):
+        """分离投影 to_q/to_k/to_v -> 融合 qkv 是 ComfyUI 的正规映射，必须算命中。
+
+        本机 ComfyUI 进程内实测：load_lora 会把这类 LoRA 打到
+        diffusion_model.layers.N.attention.qkv.weight 的三段上。
+        """
+        lora_bases = {"context_refiner.0.attention.to_q",
+                      "context_refiner.0.attention.to_k",
+                      "context_refiner.0.attention.to_v",
+                      "context_refiner.0.attention.to_out.0"}
+        unet_keys = {"context_refiner.0.attention.qkv",
+                     "context_refiner.0.attention.out"}
+        ratio, hit, total = lora_registry._attention_hit_ratio(lora_bases, unet_keys)
+        self.assertEqual(total, 4)
+        self.assertEqual(hit, 4)
+        self.assertEqual(ratio, 1.0)
+
+    def test_direct_qkv_keys_count_as_hit(self):
+        """键名直接叫 qkv 的 LoRA 必须命中。"""
+        lora_bases = {"layers.0.attention.qkv", "layers.0.attention.out"}
+        unet_keys = {"layers.0.attention.qkv", "layers.0.attention.out"}
+        ratio, hit, total = lora_registry._attention_hit_ratio(lora_bases, unet_keys)
+        self.assertEqual(ratio, 1.0)
+        self.assertEqual(hit, 2)

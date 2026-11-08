@@ -57,7 +57,10 @@ const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxD
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
 // available = 效果类 LoRA（用户可选）
 // acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
-const IMG_LORAS = { available: [], acceleration: [], config: [] };
+// available = 效果类 LoRA（用户可选，且已通过兼容性检测）
+// acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
+// incompatible = 效果类但与 Z-Image 底模不兼容（会出噪点，已排除）
+const IMG_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -237,24 +240,52 @@ function renderLoraSelect() {
   $("#imgLoraAdd").disabled = !options.length;
 }
 
+// 被排除的 LoRA：显示名称 + 排除原因（让用户知道为什么少了它）
+function renderExcludedLoras() {
+  const box = $("#imgLoraExcluded");
+  if (!box) return;
+  const items = IMG_LORAS.incompatible || [];
+  if (!items.length) {
+    box.innerHTML = "";
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `<div class="img-lora-excluded-title">已排除（与 Z-Image 底模不兼容）</div>` +
+    items.map(it => `<div class="img-lora-excluded-item" title="${esc(it.incompatible_reason || "")}">
+        <span class="img-lora-excluded-name">${esc(it.display)}</span>
+        <span class="img-lora-excluded-reason">${esc(it.incompatible_reason || "兼容性检测未通过")}</span>
+      </div>`).join("");
+}
+
 function renderLoraList() {
   const box = $("#imgLoraList");
   if (!box) return;
+  renderExcludedLoras();
   if (!state.img.loras.length) {
     box.innerHTML = "";
     const accel = (IMG_LORAS.acceleration || []).length;
+    const bad = (IMG_LORAS.incompatible || []).length;
     $("#imgLoraNote").textContent = IMG_LORAS.available.length
       ? `未添加效果 LoRA。可选本机已安装的效果类 Z-Image LoRA（${IMG_LORAS.available.length} 个）` +
         (accel ? `；另有 ${accel} 个加速/蒸馏类 LoRA 由工作流固定使用，不在此列表。` : "。") +
+        (bad ? ` ${bad} 个 LoRA 因与底模不兼容被排除（见下方说明）。` : "") +
         " 强度 0 表示关闭。"
-      : "本机未检测到效果类 Z-Image LoRA 文件。";
+      : "本机未检测到可用的效果类 Z-Image LoRA 文件。";
     return;
   }
   box.innerHTML = state.img.loras.map((item, index) => {
     const meta = imgLoraMeta(item.name);
-    const missing = !meta;
+    const missing = !meta && !item.excluded;
+    // 被排除（不兼容）—— 明确标出原因，避免用户以为能正常用
+    const excluded = !!item.excluded;
     const rec = meta && Number(item.strength) === Number(meta.recommended_strength);
-    const disabled = item.enabled === false || Number(item.strength) <= 0;
+    const disabled = item.enabled === false || Number(item.strength) <= 0 || excluded;
+    // 强度上限：权重过大的 LoRA 必须封顶（实测 1.0 出噪点、0.8 安全）
+    const cap = Number(meta && meta.strength_cap !== undefined
+                       ? meta.strength_cap
+                       : (item.strength_cap !== undefined ? item.strength_cap : 1.5));
+    const capVal = cap < 1.5 ? cap : 1.5;
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
       ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
@@ -265,10 +296,11 @@ function renderLoraList() {
                placeholder="${meta && meta.trigger ? esc(meta.trigger) : "（上游未标注触发词）"}"
                title="自动追加到最终提示词；可编辑或删除">
       </div>`;
-    return `<div class="img-lora-item ${disabled ? "disabled" : ""} ${missing ? "missing" : ""}" data-idx="${index}">
+    return `<div class="img-lora-item ${disabled ? "disabled" : ""} ${missing ? "missing" : ""} ${excluded ? "excluded" : ""}" data-idx="${index}">
       <div class="img-lora-head">
-        <button type="button" class="img-lora-btn toggle" title="${disabled ? "启用" : "停用"}">${disabled ? "○" : "●"}</button>
-        <span class="img-lora-name" title="${esc(item.name)}">${esc(meta ? meta.display : item.name)}</span>
+        <button type="button" class="img-lora-btn toggle" title="${excluded ? "该 LoRA 与底模不兼容，不能使用" : (disabled ? "启用" : "停用")}" ${excluded ? "disabled" : ""}>${disabled ? "○" : "●"}</button>
+        <span class="img-lora-name" title="${esc(item.name)}">${esc(meta ? meta.display : (item.display || item.name))}</span>
+        ${excluded ? `<span class="img-lora-tag excl">不兼容</span>` : ""}
         ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
@@ -276,9 +308,11 @@ function renderLoraList() {
         <button type="button" class="img-lora-btn del" title="删除">×</button>
       </div>
       <div class="img-lora-slider">
-        <input type="range" class="strength" min="0" max="1.5" step="0.05" value="${Number(item.strength)}" title="强度 0-1.5，0 表示关闭">
+        <input type="range" class="strength" min="0" max="${capVal}" step="0.05" value="${Math.min(Number(item.strength), capVal)}" ${excluded ? "disabled" : ""} title="${cap < 1.5 ? `强度上限 ${cap}（该 LoRA 权重较大，强度过高会出彩色噪点）` : '强度 0-1.5，0 表示关闭'}">
         <span class="img-lora-strength">${Number(item.strength).toFixed(2)}</span>
+        ${cap < 1.5 ? `<span class="img-lora-cap" title="该 LoRA 权重相对原权重过大，强度过高会破坏采样、实测出图为彩色噪点">上限 ${cap.toFixed(2)}</span>` : ""}
       </div>
+      ${excluded ? `<div class="img-lora-excl-reason">${esc(item.incompatible_reason || "与 Z-Image 底模不兼容")}</div>` : ""}
       ${triggerBlock}
       <div class="img-lora-meta">基础：${esc(meta ? meta.base : "—")}${meta && meta.strength_source ? " · " + esc(meta.strength_source) : ""}</div>
       <div class="img-lora-meta"><button type="button" class="img-lora-info-btn" style="background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:10px;font-family:inherit">查看简易说明 ›</button></div>
@@ -325,8 +359,10 @@ function renderLoraList() {
   });
   const accelNote = (IMG_LORAS.acceleration || []).length
     ? ` 加速/蒸馏类 ${IMG_LORAS.acceleration.length} 个由工作流固定使用（不列出）。` : "";
+  const badNote = (IMG_LORAS.incompatible || []).length
+    ? ` ${IMG_LORAS.incompatible.length} 个不兼容 LoRA 已排除。` : "";
   $("#imgLoraNote").textContent =
-    `已添加 ${state.img.loras.length} 个效果 LoRA（配置存在服务端，局域网共用）。${accelNote}`;
+    `已添加 ${state.img.loras.length} 个效果 LoRA（配置存在服务端，局域网共用）。${accelNote}${badNote}`;
 }
 
 // LoRA 配置持久化到服务端
@@ -344,12 +380,20 @@ function saveLoraConfig() {
       });
       const data = await resp.json();
       if (!resp.ok) {
+        // 不兼容的 LoRA 会被服务端拒绝 —— 必须让用户看到原因
         setEnhanceHint(`LoRA 配置保存失败：${data.error || resp.status}`, "error");
+        alert(`LoRA 配置保存失败\n\n${data.error || resp.status}`);
+        // 回滚到服务端实际保存的状态，避免界面与服务端不一致
+        await loadImageLoras();
         return;
       }
       state.img.loras = (data.loras || []).map(l => ({
         name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
+        excluded: !!l.excluded,
+        incompatible_reason: l.incompatible_reason || "",
+        display: l.display || l.name,
+        strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
       }));
       renderLoraList();
       renderLoraSelect();
@@ -397,9 +441,15 @@ async function loadImageLoras() {
     const data = await resp.json();
     IMG_LORAS.available = data.available || [];
     IMG_LORAS.acceleration = data.acceleration || [];
+    IMG_LORAS.incompatible = data.incompatible || [];
     state.img.loras = (data.config || []).map(l => ({
       name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
       trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
+      // 被排除的（不兼容）也要显示出来并说明原因
+      excluded: !!l.excluded,
+      incompatible_reason: l.incompatible_reason || "",
+      display: l.display || l.name,
+      strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
     }));
     const hint = $("#imgLoraHint");
     if (hint) hint.textContent = `本机 ${IMG_LORAS.available.length} 个可用`;
@@ -1994,8 +2044,9 @@ $("#imgLoraAdd")?.addEventListener("click", () => {
   }
   state.img.loras.push({
     name,
-    // 推荐强度自动应用（用户之后可手动改）
+    // 推荐强度自动应用（用户之后可手动改，上限由服务端按权重封顶）
     strength: meta ? Number(meta.recommended_strength) : 1.0,
+    strength_cap: meta ? Number(meta.strength_cap !== undefined ? meta.strength_cap : 1.5) : 1.5,
     enabled: true,
     // 触发词自动带上上游标注的那个（用户可编辑 / 删除）
     trigger: meta && meta.trigger ? meta.trigger : "",

@@ -1096,31 +1096,40 @@ async def api_image_loras(request):
     # 只下发「效果类」LoRA —— 加速/蒸馏类由工作流固定使用，
     # 不进用户可选列表（用户自选加速器会与 Turbo 自身蒸馏冲突）。
     available = lora_registry.list_effect_loras()
+    incompatible = lora_registry.list_incompatible_loras()
     acceleration = lora_registry.list_acceleration_loras()
     with db() as conn:
         config = lora_registry.load_config(conn)
     # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
     by_name = {item["name"]: item for item in available}
+    # 已被排除的（不兼容）也要能对上 —— 前端要显示「为什么被排除」
+    excluded_by_name = {item["name"]: item for item in incompatible}
     resolved = []
     for item in config:
         name = item.get("name") or ""
         meta = by_name.get(name)
+        excluded = excluded_by_name.get(name)
         # 触发词：以前端保存的为准（用户可能改过），否则用注册表里的
         trigger = item.get("trigger")
         if trigger is None:
-            trigger = (meta or {}).get("trigger", "")
+            trigger = (meta or excluded or {}).get("trigger", "")
         resolved.append({
             "name": name,
             "strength": float(item.get("strength", 1.0)),
             "enabled": bool(item.get("enabled", True)),
-            "missing": meta is None,
-            "display": (meta or {}).get("display") or item.get("display") or name,
+            # missing = 文件不在了；excluded = 文件在但不兼容（前端要区别对待）
+            "missing": meta is None and excluded is None,
+            "excluded": excluded is not None,
+            "incompatible_reason": (excluded or {}).get("incompatible_reason", ""),
+            "display": (meta or excluded or {}).get("display") or item.get("display") or name,
             "trigger": trigger or "",
-            "recommended_strength": (meta or {}).get("recommended_strength", 1.0),
-            "kind": (meta or {}).get("kind", lora_registry.KIND_EFFECT),
+            "recommended_strength": (meta or excluded or {}).get("recommended_strength", 1.0),
+            "strength_cap": (meta or excluded or {}).get("strength_cap", 1.0),
+            "kind": (meta or excluded or {}).get("kind", lora_registry.KIND_EFFECT),
         })
     return json_ok({"available": available,
                     "acceleration": acceleration,
+                    "incompatible": incompatible,
                     "config": resolved})
 
 
@@ -1149,14 +1158,22 @@ async def api_image_loras_save(request):
         if not resolved or path is None:
             return web.json_response(
                 {"error": f"本机不存在该 LoRA 文件：{name}"}, status=400)
+        # 真·不兼容的 LoRA 拒绝保存（要 patch 的层在底模里根本不存在）
+        meta = next((m for m in lora_registry.list_effect_loras(include_incompatible=True)
+                     if m["name"] == resolved), {})
+        if meta and not meta.get("compatible", True):
+            return web.json_response({
+                "error": f"「{meta.get('display') or name}」与 Z-Image 底模不兼容，"
+                          f"不能加入 LoRA 列表：{meta.get('incompatible_reason') or '未知原因'}"
+            }, status=400)
         try:
             strength = float(item.get("strength", 1.0))
         except (TypeError, ValueError):
             return web.json_response({"error": f"strength 必须是数字：{name}"}, status=400)
-        strength = min(1.5, max(0.0, strength))
+        # 幅度过大的 LoRA -> 夹到安全上限（实测 1.0 出噪点、0.8 安全）
+        cap = float(meta.get("strength_cap", 1.0)) if meta else 1.0
+        strength = min(cap, max(0.0, strength))
         # 触发词：用户改过的以用户为准（留空 = 不追加）；没传就用注册表里的
-        meta = next((m for m in lora_registry.list_effect_loras()
-                     if m["name"] == resolved), {})
         trigger = item.get("trigger")
         if trigger is None:
             trigger = meta.get("trigger", "")
@@ -1166,6 +1183,7 @@ async def api_image_loras_save(request):
             "enabled": bool(item.get("enabled", True)),
             "trigger": str(trigger or ""),
             "recommended_strength": meta.get("recommended_strength", 1.0),
+            "strength_cap": meta.get("strength_cap", 1.0),
             "kind": meta.get("kind", lora_registry.KIND_EFFECT),
         })
     with db() as conn:

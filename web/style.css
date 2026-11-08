@@ -927,3 +927,51 @@ body.modal-open { overflow: hidden; }
   font-size: 10px;
   padding: 2px 8px;
 }
+
+/* ---------- 被排除的不兼容 LoRA ---------- */
+.img-lora-excluded {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(255, 255, 255, .1);
+}
+.img-lora-excluded-title {
+  font-size: 10px;
+  color: #ff9f6b;
+  margin-bottom: 4px;
+}
+.img-lora-excluded-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
+  border-radius: 5px;
+  background: rgba(255, 120, 60, .06);
+  border: 1px solid rgba(255, 140, 80, .18);
+}
+.img-lora-excluded-name {
+  font-size: 11px;
+  color: #ffc9a8;
+}
+.img-lora-excluded-reason {
+  font-size: 10px;
+  color: var(--muted, #8a8a9a);
+  line-height: 1.45;
+}
+
+/* ---------- 不兼容 LoRA（已排除）在列表中的呈现 ---------- */
+.img-lora-item.excluded {
+  opacity: .92;
+  border-color: rgba(255, 140, 80, .3);
+  background: rgba(255, 120, 60, .05);
+}
+.img-lora-tag.excl {
+  background: rgba(255, 120, 60, .18);
+  color: #ffb08a;
+}
+.img-lora-excl-reason {
+  font-size: 10px;
+  line-height: 1.45;
+  color: #ffb08a;
+  margin: 3px 0 2px;
+}
