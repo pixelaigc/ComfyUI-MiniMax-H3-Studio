@@ -634,3 +634,79 @@ def stats(conn) -> dict:
         "trash_bytes": int(trash["b"]),
         "analyzed_count": int(analyzed["c"] if analyzed else 0),
     }
+
+
+# ------------------------------------------------------------------ 异步分析任务
+
+
+def _row_to_job(row) -> dict:
+    data = dict(row)
+    data["options"] = A.jload(row["options"], {}) or {}
+    data["progress"] = float(row["progress"] or 0)
+    return data
+
+
+def create_job(conn, asset_id: str, kind: str, mode: str = "analyze",
+               question: str = "", options: dict | None = None) -> dict:
+    """登记一个异步分析任务（queued）。"""
+    stamp = A.now()
+    cur = conn.execute(
+        "INSERT INTO asset_analysis_jobs (asset_id, kind, mode, status, stage, "
+        "progress, message, question, options, created_at) "
+        "VALUES (?,?,?,'queued',?,0,?,?,?,?)",
+        (asset_id, kind, mode, "排队中", "", question or "",
+         A.jdump(options or {}), stamp))
+    conn.commit()
+    row = conn.execute("SELECT * FROM asset_analysis_jobs WHERE id=?",
+                       (cur.lastrowid,)).fetchone()
+    return _row_to_job(row)
+
+
+def update_job(conn, job_id: int, **fields) -> dict | None:
+    """更新任务状态。允许的字段：status/stage/progress/message/revision/
+    started_at/finished_at。"""
+    allowed = ("status", "stage", "progress", "message", "revision",
+               "started_at", "finished_at")
+    sets, vals = [], []
+    for key, value in fields.items():
+        if key in allowed:
+            sets.append(f"{key}=?")
+            vals.append(value)
+    if not sets:
+        return None
+    vals.append(job_id)
+    conn.execute(f"UPDATE asset_analysis_jobs SET {', '.join(sets)} WHERE id=?",
+                 vals)
+    conn.commit()
+    row = conn.execute("SELECT * FROM asset_analysis_jobs WHERE id=?",
+                       (job_id,)).fetchone()
+    return _row_to_job(row) if row else None
+
+
+def get_job(conn, job_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM asset_analysis_jobs WHERE id=?",
+                       (job_id,)).fetchone()
+    return _row_to_job(row) if row else None
+
+
+def jobs_of(conn, asset_id: str, limit: int = 20) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM asset_analysis_jobs WHERE asset_id=? "
+        "ORDER BY id DESC LIMIT ?", (asset_id, int(limit))).fetchall()
+    return [_row_to_job(r) for r in rows]
+
+
+def active_job_of(conn, asset_id: str) -> dict | None:
+    """该素材当前是否还有在跑的分析任务（避免重复触发叠加 CPU 负载）。"""
+    row = conn.execute(
+        "SELECT * FROM asset_analysis_jobs WHERE asset_id=? "
+        "AND status IN ('queued','running') ORDER BY id DESC LIMIT 1",
+        (asset_id,)).fetchone()
+    return _row_to_job(row) if row else None
+
+
+def running_jobs(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM asset_analysis_jobs WHERE status IN ('queued','running') "
+        "ORDER BY id").fetchall()
+    return [_row_to_job(r) for r in rows]

@@ -368,6 +368,15 @@
             : "尚未分析"}</span>
           <button class="al-btn" id="alAnalyzeBtn">深度分析</button>
         </div>
+        ${asset.category === "audio" ? `
+        <div class="al-inline" style="margin-top:6px;gap:8px;align-items:center">
+          <label class="al-inline" style="gap:5px;cursor:pointer">
+            <input type="checkbox" id="alDeepAudio">
+            <span style="font-size:12px">深度音频管线（BPM/乐器/人声/ASR）</span>
+          </label>
+          <span style="font-size:11px;color:var(--muted)" id="alDeepHint"></span>
+        </div>` : ""}
+        <div id="alAnalysisStatus" hidden></div>
         <div class="al-analysis" id="alAnalysisText">${esc(analysis ? analysis.text : "")}</div>
         <div class="al-inline" style="margin-top:8px">
           <textarea class="al-textarea" id="alCorrectionInput" rows="2"
@@ -392,6 +401,79 @@
       </div>`;
 
     bindDrawer(asset);
+  }
+
+  // ---------------------------------------------------------------- 分析状态轮询
+
+  //: 当前正在轮询的任务（同一时刻只盯一个抽屉）
+  let _pollTimer = null;
+
+  function renderAnalysisStatus(data) {
+    const box = $("#alAnalysisStatus");
+    if (!box) return;
+    const status = data.status || "idle";
+    if (status === "idle" || !status) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    const pct = Math.round((data.progress || 0) * 100);
+    const stage = data.stage || "";
+    const msg = data.message || "";
+    const cls = status === "failed" ? "err" : (status === "done" ? "ok" : "run");
+    box.hidden = false;
+    box.className = "al-anstatus " + cls;
+    box.innerHTML = `
+      <div class="al-anstatus-row">
+        <span>${esc(statusLabel(status))}${stage ? " · " + esc(stage) : ""}</span>
+        <span>${pct}%</span>
+      </div>
+      <div class="al-anstatus-bar"><i style="width:${pct}%"></i></div>
+      ${msg ? `<div class="al-anstatus-msg">${esc(msg)}</div>` : ""}`;
+  }
+
+  function statusLabel(status) {
+    return ({ queued: "排队中", running: "分析中", done: "已完成",
+              failed: "失败" })[status] || status;
+  }
+
+  /**
+   * 轮询分析任务状态。
+   * 深度音频分析要跑几分钟，所以这里轮询而不是等接口返回。
+   */
+  function startStatusPolling(assetId, jobId) {
+    stopStatusPolling();
+    const tick = async () => {
+      try {
+        const q = jobId ? `?job_id=${encodeURIComponent(jobId)}` : "";
+        const data = await api(
+          `/api/assets/${encodeURIComponent(assetId)}/analysis-status${q}`);
+        if (state.current && state.current.id !== assetId) return; // 抽屉换了
+        renderAnalysisStatus(data);
+        const status = data.status || "idle";
+        if (status === "done") {
+          toast("分析完成", "ok");
+          loadAssets();
+          openDrawer(assetId);
+          return;
+        }
+        if (status === "failed") {
+          toast(data.message || "分析失败", "err");
+          loadAssets();
+          openDrawer(assetId);
+          return;
+        }
+        _pollTimer = setTimeout(tick, 2000);
+      } catch (e) {
+        // 轮询失败不打断任务，只是这次不更新
+        _pollTimer = setTimeout(tick, 3000);
+      }
+    };
+    tick();
+  }
+
+  function stopStatusPolling() {
+    if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
   }
 
   function bindDrawer(asset) {
@@ -447,16 +529,21 @@
 
     on("#alAnalyzeBtn", "click", async () => {
       const btn = $("#alAnalyzeBtn");
+      const deepBox = $("#alDeepAudio");
+      const deep = !!(deepBox && deepBox.checked);
       btn.disabled = true;
-      btn.textContent = "分析中…";
+      btn.textContent = "提交中…";
       try {
         const result = await api(`/api/assets/${encodeURIComponent(asset.id)}/analyze`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ deep }),
         });
-        toast("分析完成", "ok");
-        loadAssets();
-        openDrawer(asset.id);
+        if (result.already_running) {
+          toast("该素材已有分析任务在进行中", "");
+        } else {
+          toast("分析任务已提交，后台执行中", "ok");
+        }
+        startStatusPolling(asset.id, result.job_id);
       } catch (e) {
         toast(e.message, "err");
         btn.disabled = false;
@@ -469,15 +556,18 @@
       if (!question) { toast("请填写要纠正或追问的内容", "err"); return; }
       const btn = $("#alCorrectBtn");
       btn.disabled = true;
-      btn.textContent = "修正中…";
+      btn.textContent = "提交中…";
       try {
         const result = await api(`/api/assets/${encodeURIComponent(asset.id)}/corrections`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question }),
         });
-        toast(`已生成第 ${result.revision} 版`, "ok");
-        loadAssets();
-        openDrawer(asset.id);
+        if (result.already_running) {
+          toast("该素材已有分析任务在进行中", "");
+        } else {
+          toast("纠错任务已提交，后台执行中", "ok");
+        }
+        startStatusPolling(asset.id, result.job_id);
       } catch (e) {
         toast(e.message, "err");
         btn.disabled = false;

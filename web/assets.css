@@ -280,3 +280,43 @@
 .al-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .al-toast.err { background: rgba(200,50,55,.96); }
 .al-toast.ok { background: rgba(38,150,90,.96); }
+
+/* ---------------------------------------------------------------- 分析状态条 */
+.al-anstatus {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line, rgba(255, 255, 255, .12));
+  background: rgba(255, 255, 255, .04);
+  font-size: 12px;
+}
+.al-anstatus-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.al-anstatus-bar {
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .1);
+  overflow: hidden;
+}
+.al-anstatus-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent, #4c9aff);
+  transition: width .4s ease;
+}
+.al-anstatus-msg {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+.al-anstatus.ok .al-anstatus-bar i { background: #3ecf8e; }
+.al-anstatus.err { border-color: rgba(200, 50, 55, .5); }
+.al-anstatus.err .al-anstatus-bar i { background: #c83237; }
+.al-anstatus.err .al-anstatus-msg { color: #e57373; }

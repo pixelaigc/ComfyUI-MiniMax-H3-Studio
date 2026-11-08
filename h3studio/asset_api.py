@@ -37,7 +37,7 @@ from pathlib import Path
 
 from aiohttp import web
 
-from h3studio import analysis, asset_repo, asset_service
+from h3studio import analysis, analysis_jobs, asset_repo, asset_service
 from h3studio import assets as A
 from h3studio.assets import LibraryError
 
@@ -490,10 +490,18 @@ async def api_asset_analyze(request):
     """
     POST /api/assets/{id}/analyze —— 触发模型深度分析。
 
+    **异步**：立刻返回 job 记录，分析在后台跑，前端轮询
+    /api/assets/{id}/analysis-status 拿进度。
+
     body（可选）：
       provider_id      指定 Provider；不给则用默认多模态模型
       frame_interval   视频抽帧间隔（秒），默认 2.0
       max_frames       视频抽帧上限，默认 24
+      deep             true = 走深度音频管线（analyze_audio.py：BPM/乐器/人声/
+                       ASR/语义），仅对音频生效。默认 false = 多模态模型描述。
+      stages           深度管线的阶段子集，默认全跑
+      asr_model        faster-whisper 模型，默认 medium
+      use_llm          深度管线是否启用大模型语义补充，默认 true
     """
     asset_id = request.match_info["id"]
     try:
@@ -505,6 +513,15 @@ async def api_asset_analyze(request):
         "frame_interval": payload.get("frame_interval"),
         "max_frames": payload.get("max_frames"),
         "derived_dir": None,
+        "provider_id": payload.get("provider_id"),
+        "deep": bool(payload.get("deep")),
+        "stages": payload.get("stages"),
+        "asr_model": payload.get("asr_model") or "medium",
+        "device": payload.get("device") or "auto",
+        "use_llm": payload.get("use_llm", True),
+        "max_seconds": payload.get("max_seconds"),
+        "no_separation": bool(payload.get("no_separation", False)),
+        "studio_url": payload.get("studio_url"),
     }
     provider_id = payload.get("provider_id")
 
@@ -521,35 +538,69 @@ async def api_asset_analyze(request):
             return web.json_response({"error": "素材文件已丢失"}, status=404)
         options["derived_dir"] = str(derived)
 
-        revision = asset_repo.next_revision(conn, asset_id)
-        try:
-            result = await analysis.run_analysis(conn, asset, version, source,
-                                                 options, provider_id)
-        except LibraryError as exc:
-            asset_repo.save_analysis(conn, asset_id, asset["category"], "", revision,
-                                     provider=None, prompt="", error=exc.message)
-            return _err(exc)
+        # 深度音频分析要走 ComfyUI venv 的编排脚本，先自检环境
+        if options["deep"] and asset.get("category") == "audio":
+            from h3studio import audio_deep
+            env = audio_deep.check_environment()
+            if not env["ok"]:
+                return web.json_response(
+                    {"error": env["reason"], "code": "audio_env_unavailable"},
+                    status=503)
 
-        record = asset_repo.save_analysis(
-            conn, asset_id, result["kind"], result["text"], revision,
-            provider=result["provider"], prompt=result["prompt"],
-            frames=result["frames"], extra=result["extra"])
-        analysis_text = record["text"]
+        # 同一素材已有在跑的分析就不重复排队（深度分析很吃 CPU）
+        active = asset_repo.active_job_of(conn, asset_id)
+        if active:
+            return web.json_response({
+                "asset_id": asset_id,
+                "job": active,
+                "status": active["status"],
+                "stage": active["stage"],
+                "progress": active["progress"],
+                "message": "该素材已有分析任务在进行中",
+                "already_running": True,
+            })
+
+    try:
+        job = analysis_jobs.start_analysis(
+            asset_id, asset.get("category") or "audio",
+            mode="analyze", options=options)
+    except LibraryError as exc:
+        return _err(exc)
 
     return web.json_response({
         "asset_id": asset_id,
-        "revision": record["revision"],
-        "text": analysis_text,
-        "provider": record["provider_name"],
-        "model": record["model"],
-        "frames": record["frames"],
-        "extra": record["extra"],
+        "job": job,
+        "job_id": job["id"],
+        "status": job["status"],
+        "stage": job["stage"],
+        "progress": job["progress"],
+        "message": "分析任务已提交，正在后台执行",
     })
+
+
+async def api_asset_analysis_status(request):
+    """
+    GET /api/assets/{id}/analysis-status —— 轮询分析进度。
+
+    返回 status: idle | queued | running | done | failed
+    """
+    asset_id = request.match_info["id"]
+    job_id = request.query.get("job_id")
+    with _library_conn() as conn:
+        if not asset_repo.get_asset(conn, asset_id):
+            return web.json_response({"error": "素材不存在", "code": "asset_not_found"},
+                                      status=404)
+        data = analysis_jobs.job_status(
+            conn, asset_id, int(job_id) if job_id else None)
+    return web.json_response(data)
 
 
 async def api_asset_correction(request):
     """
     POST /api/assets/{id}/corrections —— 追加交互纠错（多轮）。
+
+    **异步**：立刻返回 job 记录，模型在后台重跑，前端轮询
+    /api/assets/{id}/analysis-status。
 
     body:
       question     用户的追问/纠正内容（必填）
@@ -568,7 +619,8 @@ async def api_asset_correction(request):
     provider_id = payload.get("provider_id")
     options = {"derived_dir": None,
                "frame_interval": payload.get("frame_interval"),
-               "max_frames": payload.get("max_frames")}
+               "max_frames": payload.get("max_frames"),
+               "provider_id": provider_id}
 
     with _library_conn() as conn:
         asset = asset_repo.get_asset(conn, asset_id)
@@ -583,29 +635,33 @@ async def api_asset_correction(request):
             return web.json_response({"error": "素材文件已丢失"}, status=404)
         options["derived_dir"] = str(derived)
 
-        revision = asset_repo.next_revision(conn, asset_id)
-        try:
-            result = await analysis.run_correction(conn, asset, version, source,
-                                                  question, options, provider_id)
-        except LibraryError as exc:
-            asset_repo.save_analysis(conn, asset_id, asset["category"], "", revision,
-                                     provider=None, prompt=question, error=exc.message)
-            return _err(exc)
+        active = asset_repo.active_job_of(conn, asset_id)
+        if active:
+            return web.json_response({
+                "asset_id": asset_id,
+                "job": active,
+                "status": active["status"],
+                "stage": active["stage"],
+                "progress": active["progress"],
+                "message": "该素材已有分析任务在进行中",
+                "already_running": True,
+            })
 
-        record = asset_repo.save_analysis(
-            conn, asset_id, result["kind"], result["text"], revision,
-            provider=result["provider"], prompt=question,
-            frames=result["frames"], extra=result["extra"])
+    try:
+        job = analysis_jobs.start_analysis(
+            asset_id, asset.get("category") or "audio",
+            mode="correction", question=question, options=options)
+    except LibraryError as exc:
+        return _err(exc)
 
     return web.json_response({
         "asset_id": asset_id,
-        "revision": record["revision"],
-        "text": record["text"],
-        "provider": record["provider_name"],
-        "model": record["model"],
-        "history": [{"revision": r["revision"], "prompt": r["prompt"],
-                     "text": r["text"], "created_at": r["created_at"]}
-                    for r in asset_repo.analyses_of(conn, asset_id)][:20],
+        "job": job,
+        "job_id": job["id"],
+        "status": job["status"],
+        "stage": job["stage"],
+        "progress": job["progress"],
+        "message": "纠错任务已提交，正在后台执行",
     })
 
 
@@ -785,6 +841,7 @@ def register(app, server_module=None):
     app.router.add_post("/api/assets/{id}/tags", api_asset_tags_add)
     app.router.add_delete("/api/assets/{id}/tags/{tag}", api_asset_tag_delete)
     app.router.add_post("/api/assets/{id}/analyze", api_asset_analyze)
+    app.router.add_get("/api/assets/{id}/analysis-status", api_asset_analysis_status)
     app.router.add_post("/api/assets/{id}/corrections", api_asset_correction)
     app.router.add_get("/api/assets/{id}/analyses", api_asset_analyses)
     app.router.add_post("/api/assets/import/from-media", api_asset_from_media)

@@ -414,6 +414,26 @@ CREATE TABLE IF NOT EXISTS asset_analyses (
     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
 );
 
+-- 异步分析任务（深度音频分析耗时很长，不能阻塞上传/触发接口）
+-- status: queued | running | done | failed
+CREATE TABLE IF NOT EXISTS asset_analysis_jobs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id      TEXT NOT NULL,
+    kind          TEXT NOT NULL,              -- image|video|audio
+    mode          TEXT NOT NULL DEFAULT 'analyze',  -- analyze|correction
+    status        TEXT NOT NULL DEFAULT 'queued',
+    stage         TEXT,                       -- 当前阶段提示（给 UI 显示进度）
+    progress      REAL NOT NULL DEFAULT 0,    -- 0..1
+    message       TEXT,                       -- 失败原因 / 完成说明
+    question      TEXT,                       -- 纠错模式下的用户问题
+    options       TEXT,                       -- JSON：本次分析选项
+    revision      INTEGER,                    -- 完成后写入的版本号
+    created_at    REAL NOT NULL,
+    started_at    REAL,
+    finished_at   REAL,
+    FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_cat_created ON assets(category, subtype, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_assets_deleted ON assets(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_assets_source ON assets(source, created_at DESC);

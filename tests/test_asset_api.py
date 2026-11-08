@@ -319,22 +319,47 @@ class TestAssetApi(AssetApiTestBase):
         self.assertIn("orphans", data)
 
     def test_10_analyze_returns_result_or_readable_error(self):
-        """分析接口：要么给出分析结果，要么给出可读错误 —— 不能 500。
+        """分析接口：要么给出可读错误，要么提交一个异步任务 —— 不能 500。
 
-        本机若配有多模态 Provider，会真的跑一次模型（慢）；
-        没配则返回 400 并说明原因。两种都算通过。
+        分析改成异步后：触发接口立刻返回 job（200），
+        模型没配则返回 400/503 并说明原因。两种都算通过。
         """
         asset_id = self._seed_one()
         status, data = self.post_json(f"/api/assets/{asset_id}/analyze", {})
-        self.assertIn(status, (200, 400, 502),
+        self.assertIn(status, (200, 400, 502, 503),
                       f"不应是 5xx 崩溃，实际 {status}: {data}")
         if status == 200:
-            self.assertIn("text", data)
-            self.assertTrue(data["text"], "分析结果应有文本")
-            self.assertEqual(data["revision"], 1)
+            # 异步契约：返回 job，不直接返回分析文本
+            self.assertIn("job_id", data)
+            self.assertIn(data["status"], ("queued", "running", "done"))
+            self.assertIn("progress", data)
         else:
             self.assertIn("error", data)
             self.assertTrue(data["error"])
+
+    def test_10b_analysis_status_endpoint(self):
+        """轮询接口：没有任务时返回 idle，且带 history 字段。"""
+        asset_id = self._seed_one()
+        status, data = self.get(f"/api/assets/{asset_id}/analysis-status")
+        self.assertEqual(status, 200)
+        self.assertIn("status", data)
+        self.assertIn(data["status"], ("idle", "queued", "running", "done", "failed"))
+        self.assertIsInstance(data["history"], list)
+
+    def test_10c_analysis_status_404_for_unknown_asset(self):
+        status, data = self.get("/api/assets/nope/analysis-status")
+        self.assertEqual(status, 404)
+
+    def test_10d_deep_audio_env_check(self):
+        """深度音频分析：环境不可用时给 503 + 明确原因，不是 500。"""
+        asset_id = self._seed_one()
+        status, data = self.post_json(
+            f"/api/assets/{asset_id}/analyze", {"deep": True})
+        self.assertIn(status, (200, 503),
+                      f"实际 {status}: {data}")
+        if status == 503:
+            self.assertEqual(data.get("code"), "audio_env_unavailable")
+            self.assertTrue(data.get("error"))
 
     def test_11_correction_requires_question(self):
         asset_id = self._seed_one()
