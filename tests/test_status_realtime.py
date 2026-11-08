@@ -316,11 +316,23 @@ class TestStatusRealtime(unittest.TestCase):
 
         批次状态是另一张独立的映射表（renderJobBatches 里的 statusText），
         与顶栏 STATUS_TEXT 不是同一处 —— 改一处不会影响另一处。
+        因此必须**只在这张表的范围内**检查，不能在整份文件里搜字符串
+        （「排队中」在顶栏也有，整份搜会误判为已覆盖）。
         """
         app_js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        start = app_js.index("const statusText = {done:")
+        end = app_js.index("[batch.status]", start)
+        mapping = app_js[start:end]          # 结束标记本身不含在切片里
+        self.assertTrue(mapping.strip().endswith("}"),
+                        "批次状态表范围定位失败: %r" % mapping)
+        self.assertIn("const statusText = {done:", mapping)
         for label in ("完成", "失败", "生成中", "排队中", "已取消"):
-            self.assertIn(f'"{label}"', app_js,
-                          "批次状态映射里应含中文 %r" % label)
+            self.assertIn(f'"{label}"', mapping,
+                          "批次状态映射里应含中文 %r，实际表=%r" % (label, mapping))
+        # 表里不应出现英文状态名
+        for english in ("Queued", "Done", "Failed", "Running", "Canceled"):
+            self.assertNotIn(f'"{english}"', mapping,
+                             "批次状态映射里出现英文 %r: %r" % (english, mapping))
 
     def test_batch_card_shows_chinese_status(self):
         """批次网格渲染出的状态文字是中文。"""
@@ -341,6 +353,11 @@ class TestStatusRealtime(unittest.TestCase):
             "INSERT INTO job_batches (id, job_id, idx, seed, status, progress,"
             " progress_text, outputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
             ("b2", "batchjob1", 1, 2, "failed", 0.0, "boom", "[]", time.time()))
+        # 再加一个排队中的批次 —— 这样「排队中」这条文案真的会被渲染出来
+        conn.execute(
+            "INSERT INTO job_batches (id, job_id, idx, seed, status, progress,"
+            " progress_text, outputs, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            ("b3", "batchjob1", 2, 3, "queued", 0.0, "", "[]", time.time()))
         conn.commit()
         conn.close()
 
@@ -359,9 +376,14 @@ class TestStatusRealtime(unittest.TestCase):
         for label in labels:
             self.assertRegex(label, r"[\u4e00-\u9fff]",
                              "批次状态应为中文: %r" % label)
-            self.assertNotIn("Queued", label)
-            self.assertNotIn("Done", label)
-            self.assertNotIn("Failed", label)
+            for english in ("Queued", "Done", "Failed", "Running", "Canceled"):
+                self.assertNotIn(english, label,
+                                 "批次状态含英文 %r: %r" % (english, label))
+        # 三个批次（done / failed / queued）都要出现，且「排队中」必须是中文
+        joined = " ".join(labels)
+        for want in ("完成", "失败", "排队中"):
+            self.assertIn(want, joined,
+                          "批次状态应含 %r，实际渲染: %r" % (want, labels))
 
     def test_no_console_errors(self):
         """首屏无 JS 报错。"""
