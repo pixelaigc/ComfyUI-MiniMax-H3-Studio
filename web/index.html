@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=topbar44">
+<link rel="stylesheet" href="/static/style.css?v=prompt-gate1">
 </head>
 <body>
 <header class="topbar">
@@ -82,7 +82,7 @@
 
   <!-- 参数面板 -->
   <aside class="panel" id="panel">
-    <div class="field">
+    <div class="field" id="resField">
       <div class="field-label">分辨率</div>
       <div class="seg" id="resSeg">
         <button data-v="544p" class="active"><b>544p</b><small>快速</small></button>
@@ -174,21 +174,21 @@
       </div>
     </div>
 
-    <div class="field">
-      <div class="field-label">提示词</div>
-      <div class="prompt-enhance-bar">
-        <button class="enhance-btn" id="enhanceBtn" title="调用本地模型把这句话扩写成完整的 Z-IMAGE 提示词">
-          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5l1.6 3.9 4.4.4-3.3 2.9 1 4.3L8 10.9l-3.7 2.1 1-4.3L2 5.8l4.4-.4z" fill="currentColor"/></svg>
-          增强
-        </button>
-        <select class="enhance-spec" id="enhanceSpec" title="增强模板"></select>
-        <span class="enhance-hint" id="enhanceHint">用本地模型扩写提示词</span>
-      </div>
+    <div class="field prompt-field" id="promptField">
+      <div class="field-label">提示词 <span class="prompt-badge" id="promptEnhancedBadge" hidden>已增强</span></div>
       <textarea id="prompt" rows="6" placeholder="描述画面…支持多镜头分镜写法">integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia period film. At night in a moonlit bamboo forest, a tight close-up frames an adult swordsman in black robes (S1) from the white-robed swordsman’s shoulder, forming the first angle of a shot–reverse-shot sequence. Cold mist drifts behind him; his tied long hair moves slightly in the wind, and one hand rests on the hilt at his waist. The camera slowly pushes in with small amplitude as the black-robed swordsman, speaking in a low, restrained male voice, fixes his opponent with an unwavering stare and says: &lt;d&gt;[Chinese] 你终于来了。&lt;/d&gt; [Shot 2] At 00:02.300, the camera cuts to the exact reverse angle: a tight close-up of the adult white-robed swordsman (S2) over the black-robed swordsman’s shoulder. Moonlight traces the edge of his face while swaying bamboo shadows cross his calm expression. Without drawing his sword, the white-robed swordsman replies in a quiet, firm male voice: &lt;d&gt;[Chinese] 今夜，做个了断。&lt;/d&gt; His thumb slowly pushes the sword guard forward, exposing a narrow glint of steel before the video ends at 5.00 seconds.
 
 overall_soundscape: Night wind rustles dense bamboo leaves while insects call faintly in the distance. Robe fabric shifts softly, followed by the subtle metallic scrape of a sword beginning to leave its scabbard.
 
 non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, ending on a single deep drumbeat as the blade is exposed.</textarea>
+      <div class="prompt-enhance-bar">
+        <button class="enhance-btn" id="enhanceBtn" title="调用本地模型把这句话扩写成完整的 Z-IMAGE 提示词">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5l1.6 3.9 4.4.4-3.3 2.9 1 4.3L8 10.9l-3.7 2.1 1-4.3L2 5.8l4.4-.4z" fill="currentColor"/></svg>
+          <span id="enhanceBtnText">增强</span>
+        </button>
+        <select class="enhance-spec" id="enhanceSpec" title="增强模板"></select>
+        <span class="enhance-hint" id="enhanceHint">用本地模型扩写提示词</span>
+      </div>
     </div>
 
     <button class="gen-btn" id="genBtn">生成</button>
@@ -411,6 +411,21 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 未增强提示词生成确认 -->
+<div class="prompt-modal" id="enhanceGateModal" hidden>
+  <div class="prompt-dialog gate-dialog" role="dialog" aria-modal="true" aria-labelledby="enhanceGateTitle">
+    <div class="prompt-dialog-head">
+      <b id="enhanceGateTitle">提示词尚未增强</b>
+      <button id="enhanceGateClose" aria-label="关闭">×</button>
+    </div>
+    <div class="gate-body">当前提示词尚未增强，是否直接用原始提示词生成？<br><span class="muted">取消将中止本次生成，且不会自动开始增强。</span></div>
+    <div class="prompt-dialog-actions">
+      <button id="enhanceGateCancel">取消</button>
+      <button class="primary" id="enhanceGateConfirm">确认生成</button>
+    </div>
+  </div>
+</div>
+
 <div class="prompt-modal" id="promptModal" hidden>
   <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="promptModalTitle">
     <div class="prompt-dialog-head">
@@ -425,7 +440,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
-<script src="/static/app.js?v=compact-seed1"></script>
-<script src="/static/providers.js?v=providers1"></script>
+<script src="/static/app.js?v=prompt-gate1"></script>
+<script src="/static/providers.js?v=prompt-gate1"></script>
 </body>
 </html>

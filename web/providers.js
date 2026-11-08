@@ -416,7 +416,9 @@ $("#enhanceBtn").addEventListener("click", async () => {
   }
   btn.disabled = true;
   btn.classList.add("busy");
-  setEnhanceHint("正在调用本地模型扩写…", "busy");
+  promptEnhance.busy = true;
+  updateActionButtons();
+  setEnhanceHint("正在增强…", "busy");
   try {
     const d = await apiJSON("POST", "/api/enhance", {
       prompt,
@@ -437,6 +439,8 @@ $("#enhanceBtn").addEventListener("click", async () => {
   } finally {
     btn.disabled = false;
     btn.classList.remove("busy");
+    promptEnhance.busy = false;
+    updateActionButtons();
   }
 });
 
@@ -473,7 +477,9 @@ $("#enhanceReplace").addEventListener("click", () => {
   if (!text) return;
   $("#prompt").value = text;
   $("#enhanceModal").hidden = true;
-  setEnhanceHint("已替换提示词框内容", "ok");
+  // 回填后的内容即「已增强」版本：标记它，让生成时不再弹未增强确认
+  markPromptEnhanced();
+  setEnhanceHint("已替换提示词框内容（已标记为已增强）", "ok");
 });
 
 $("#enhanceAppend").addEventListener("click", () => {
@@ -482,5 +488,6 @@ $("#enhanceAppend").addEventListener("click", () => {
   const original = $("#prompt").value.trim();
   $("#prompt").value = original ? `${original}\n\n${text}` : text;
   $("#enhanceModal").hidden = true;
-  setEnhanceHint("已追加到原提示词（原文保留）", "ok");
+  markPromptEnhanced();
+  setEnhanceHint("已追加到原提示词（原文保留，已标记为已增强）", "ok");
 });

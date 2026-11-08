@@ -26,6 +26,7 @@ const state = {
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
   timer: null,
+  genBusy: false,
   // 图像模式（Z-Image 文生图）专属状态
   img: {
     tier: "1mp",
@@ -131,6 +132,8 @@ function renderMode() {
   // 文生图隐藏时长 / 模型 / 步数
   const isVideo = info.kind === "video";
   $("#durField").style.display = isVideo ? "" : "none";
+  // 图像页用自己的「分辨率档位 + 画面比例」联动控件，顶部快捷分辨率卡片不显示
+  $("#resField").style.display = isVideo ? "" : "none";
   $("#modelField").style.display = isVideo ? "" : "none";
   $("#stepsField").style.display = isVideo ? "" : "none";
   // 图像模式用自己的一套比例/分辨率控件，隐藏视频模式的那套
@@ -138,6 +141,7 @@ function renderMode() {
   $("#imagePanel").style.display = isVideo ? "none" : "";
   if (!isVideo) renderImagePanel();
   updateSeedStrengthLayout();
+  updateActionButtons();
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
 }
@@ -417,11 +421,139 @@ $("#duration").addEventListener("input", e => {
   $("#durVal").textContent = state.duration + "s";
 });
 
+// ---------- 提示词增强状态（图像页未增强拦截） ----------
+// 记录「当前提示词已被增强」的时刻：用户手动编辑过就视为未增强。
+const promptEnhance = { text: null, busy: false };
+
+function promptIsEnhanced() {
+  return promptEnhance.text !== null && $("#prompt").value === promptEnhance.text;
+}
+
+function markPromptEnhanced() {
+  promptEnhance.text = $("#prompt").value;
+  updatePromptBadge();
+}
+
+function clearPromptEnhanced() {
+  promptEnhance.text = null;
+  updatePromptBadge();
+}
+
+function updatePromptBadge() {
+  const badge = $("#promptEnhancedBadge");
+  if (badge) badge.hidden = !promptIsEnhanced();
+}
+
+// 手动编辑提示词 -> 增强标记立即失效
+$("#prompt").addEventListener("input", () => {
+  promptEnhance.text = null;
+  updatePromptBadge();
+});
+
+// 增强中 / 生成中互斥：避免并发重复提交
+function updateActionButtons() {
+  const busy = promptEnhance.busy || state.genBusy;
+  const genBtn = $("#genBtn");
+  const enhBtn = $("#enhanceBtn");
+  const enhText = $("#enhanceBtnText");
+  if (genBtn) {
+    genBtn.disabled = busy;
+    genBtn.classList.toggle("busy", state.genBusy);
+    genBtn.textContent = state.genBusy ? "生成中…" : "生成";
+  }
+  if (enhBtn) {
+    enhBtn.disabled = busy;
+    enhBtn.classList.toggle("busy", promptEnhance.busy);
+  }
+  if (enhText) enhText.textContent = promptEnhance.busy ? "正在增强…" : "增强";
+}
+
+// ---------- 未增强拦截：确认用原始提示词生成 / 取消中止 ----------
+let gateResolve = null;
+
+function askEnhanceGate() {
+  const modal = $("#enhanceGateModal");
+  if (!modal) return Promise.resolve(true);
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  return new Promise(resolve => { gateResolve = resolve; });
+}
+
+function closeEnhanceGate(confirmed) {
+  const modal = $("#enhanceGateModal");
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  document.body.classList.remove("modal-open");
+  const fn = gateResolve;
+  gateResolve = null;
+  if (fn) fn(!!confirmed);
+}
+
+$("#enhanceGateConfirm").addEventListener("click", () => closeEnhanceGate(true));
+$("#enhanceGateCancel").addEventListener("click", () => closeEnhanceGate(false));
+$("#enhanceGateClose").addEventListener("click", () => closeEnhanceGate(false));
+$("#enhanceGateModal").addEventListener("click", event => {
+  if (event.target === $("#enhanceGateModal")) closeEnhanceGate(false);
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !$("#enhanceGateModal").hidden) closeEnhanceGate(false);
+});
+
+// ---------- 生成中跟踪：任务到达终态后恢复按钮 ----------
+const pendingJobs = new Set();
+const JOB_POLL_MAX_MS = 30 * 60 * 1000;
+let jobPollStartedAt = 0;
+
+function trackJob(jobId) {
+  if (!jobId) return;
+  pendingJobs.add(jobId);
+  if (!jobPollStartedAt) jobPollStartedAt = Date.now();
+  state.genBusy = true;
+  updateActionButtons();
+  pollPendingJobs();
+}
+
+async function pollPendingJobs() {
+  if (!pendingJobs.size) {
+    state.genBusy = false;
+    jobPollStartedAt = 0;
+    updateActionButtons();
+    return;
+  }
+  // 安全上限：极端情况下（后端不回写状态）也不要永久锁死按钮
+  if (Date.now() - jobPollStartedAt > JOB_POLL_MAX_MS) {
+    pendingJobs.clear();
+    state.genBusy = false;
+    jobPollStartedAt = 0;
+    updateActionButtons();
+    return;
+  }
+  for (const id of [...pendingJobs]) {
+    try {
+      const resp = await fetch(`/api/jobs/${id}`, {cache: "no-store"});
+      if (!resp.ok) continue;
+      const job = await resp.json();
+      if (!["queued", "running"].includes(job.status)) pendingJobs.delete(id);
+    } catch (e) { /* 网络抖动则下一轮再试 */ }
+  }
+  state.genBusy = pendingJobs.size > 0;
+  if (!state.genBusy) jobPollStartedAt = 0;
+  updateActionButtons();
+  if (pendingJobs.size) setTimeout(pollPendingJobs, 1500);
+}
+
 // ---------- 提交 ----------
 $("#genBtn").addEventListener("click", async () => {
+  if (state.genBusy || promptEnhance.busy) return;
   const prompt = $("#prompt").value.trim();
   if (!prompt) { alert("请填写提示词"); return; }
   const mode = state.mode;
+  // 图像模式：提示词未增强时先确认
+  //   确认 -> 用用户原始提示词继续生成；取消/关闭 -> 中止本次生成（不自动开始增强）
+  if (mode === "t2i" && !promptIsEnhanced()) {
+    const ok = await askEnhanceGate();
+    if (!ok) return;
+  }
   const fd = new FormData();
   fd.append("mode", mode);
   const params = {
@@ -465,6 +597,7 @@ $("#genBtn").addEventListener("click", async () => {
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
     const data = await resp.json();
     if (!resp.ok) { alert(data.error || "提交失败"); return; }
+    trackJob(data.id);
     // 清空文件选择（保留提示词便于连做）
     state.files = { first: null, last: null, refs: [] };
     renderMode();
@@ -643,6 +776,7 @@ function jobCard(job) {
     // 找到对应模式侧栏项并切换
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
     $("#prompt").value = p.prompt || "";
+    clearPromptEnhanced();
     if (job.mode === "t2i") {
       // 图像模式：还原分辨率档位 / 比例 / 实际宽高 / Z-Image 采样参数
       const s = state.img;
