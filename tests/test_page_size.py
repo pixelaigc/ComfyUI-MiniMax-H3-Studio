@@ -87,7 +87,7 @@ class TestPageSize(unittest.TestCase):
         cls.page.goto("http://127.0.0.1:%d/" % cls.server.port,
                       wait_until="domcontentloaded")
         cls.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
 
     def setUp(self):
@@ -99,7 +99,7 @@ class TestPageSize(unittest.TestCase):
         self.page.evaluate("() => localStorage.removeItem('%s')" % PAGE_SIZE_KEY)
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
         self.page.evaluate("() => { state.donePage = 1; }")
 
@@ -111,9 +111,20 @@ class TestPageSize(unittest.TestCase):
 
     # ------------------------------------------------------------ 工具
     def set_size(self, size):
-        """通过界面选择器改每页数量（和用户操作一致）。"""
+        """通过界面选择器改每页数量（和用户操作一致）。
+
+        等「每页数量真的生效」而不是固定等 900ms —— 切筛选时会先铺骨架占位，
+        固定等待可能在骨架阶段就返回，测到的是中间态。
+        """
         self.page.select_option("#pageSizeSelect", str(size))
-        self.page.wait_for_timeout(900)
+        # 等**真实**卡片 —— 骨架占位卡也带 .job-card 类，必须排除，
+        # 否则骨架阶段（数量恰好等于每页数）会「提前满足」，测到的是中间态。
+        self.page.wait_for_function(
+            "n => { const sel = document.querySelector('#pageSizeSelect');"
+            " return sel && Number(sel.value) === n"
+            " && document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length === n"
+            " && document.querySelectorAll('#jobsGrid .job-skeleton').length === 0; }",
+            arg=size, timeout=15000)
 
     def layout(self):
         """读取网格布局事实：列数、每行卡片数、溢出、末行右侧空白。"""
@@ -173,7 +184,7 @@ class TestPageSize(unittest.TestCase):
         self.assertEqual(self.page_size_value(), "24")
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
         self.assertEqual(self.page.evaluate("() => state.pageSize"), 24,
                          "刷新后每页数量应保持 24")
@@ -194,7 +205,7 @@ class TestPageSize(unittest.TestCase):
             "() => localStorage.setItem('%s', 'abc')" % PAGE_SIZE_KEY)
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
         self.assertEqual(self.page.evaluate("() => state.pageSize"), 12,
                          "非法存储值应退回默认 12")
@@ -367,7 +378,7 @@ class TestPageSize(unittest.TestCase):
         首页/次页/末页（中间的用省略号），直接点一个没渲染出来的页码是点不到的。
         """
         self.set_size(8)
-        for _ in range(2):
+        for expected_page in (2, 3):
             self.page.evaluate("""
                 () => {
                   const btn = Array.from(document.querySelectorAll(
@@ -376,7 +387,11 @@ class TestPageSize(unittest.TestCase):
                   if (btn) btn.click();
                 }
             """)
-            self.page.wait_for_timeout(900)
+            # 等 active 真的落到目标页（切页会先铺骨架，固定等待会测到中间态）
+            self.page.wait_for_function(
+                "n => { const el = document.querySelector('#jobsPagination button.active');"
+                " return el && Number(el.dataset.page) === n; }",
+                arg=expected_page, timeout=15000)
         active = self.page.evaluate("""
             () => {
               const el = document.querySelector('#jobsPagination button.active');
@@ -390,7 +405,9 @@ class TestPageSize(unittest.TestCase):
         self.set_size(8)
         self.page.evaluate(
             "() => { state.donePage = 1; refreshJobs(); }")
-        self.page.wait_for_timeout(900)
+        self.page.wait_for_function(
+            "() => { const el = document.querySelector('#jobsPagination button.active');"
+            " return el && Number(el.dataset.page) === 1; }", timeout=15000)
         first = self.page.evaluate("""
             () => {
               const btns = Array.from(document.querySelectorAll(
@@ -450,7 +467,7 @@ class TestPageSize(unittest.TestCase):
         conn.close()
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
         self.page.wait_for_function(
             "() => !!document.querySelector('#jobsGrid [data-act=\"toggle-batches\"]')",
@@ -526,7 +543,7 @@ class TestPageSize(unittest.TestCase):
         self.page.reload(wait_until="domcontentloaded")
         # 若没修好，这里会因列表为空而超时
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
             timeout=20000)
         self.assertEqual(self.page.evaluate("() => state.pageSize"), 12,
                          "NaN 应退回默认 12")

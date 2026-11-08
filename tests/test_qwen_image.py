@@ -569,6 +569,25 @@ class TestQwenFrontend(unittest.TestCase):
         cls.playwright.stop()
         cls.server.stop()
 
+    def recommended_max_ref_images(self):
+        """服务端下发的参考图上限。"""
+        import urllib.request
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.server.port}/api/image-options",
+                timeout=10) as r:
+            data = json.loads(r.read().decode())
+        return int(data.get("qwen", {}).get("max_ref_images", 9))
+
+    def recommended_steps(self):
+        """服务端下发的推荐步数（官方有多个出处，测试跟随注册表）。"""
+        import urllib.request
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.server.port}/api/image-options",
+                timeout=10) as r:
+            data = json.loads(r.read().decode())
+        models = data.get("qwen", {}).get("models", {})
+        return int(models["qwen_image_2.1_bf16"]["steps"])
+
     def nav_groups(self):
         return self.page.evaluate("""() => {
           const out = [];
@@ -610,7 +629,7 @@ class TestQwenFrontend(unittest.TestCase):
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
           loras: Array.from(document.querySelectorAll('#imgLoraSelect option')).map(o => o.textContent),
         })""")
-        self.assertEqual(s["steps"], 50)
+        self.assertEqual(s["steps"], self.recommended_steps())
         self.assertAlmostEqual(float(s["cfg"]), 1.0, places=3)
         self.assertAlmostEqual(float(s["shift"]), 0.69, places=3)
         self.assertEqual(s["sampler"], "euler")
@@ -618,7 +637,7 @@ class TestQwenFrontend(unittest.TestCase):
         self.assertEqual(s["model"], "qwen_image_2.1_bf16")
         # 滑块显示的 SHIFT 必须与真实值一致（量程不能把它夹掉）
         self.assertAlmostEqual(float(s["shiftShown"]), 0.69, places=3)
-        self.assertEqual(s["stepsShown"], "50")
+        self.assertEqual(s["stepsShown"], str(self.recommended_steps()))
         # PE 开关可见且默认开；文生图不显示参考图区
         self.assertTrue(s["peVisible"])
         self.assertTrue(s["peChecked"])
@@ -642,7 +661,10 @@ class TestQwenFrontend(unittest.TestCase):
         })""")
         self.assertTrue(s["refVisible"], "图片编辑应显示参考图区")
         self.assertTrue(s["peVisible"])
-        self.assertIn("9", s["hint"])
+        # 参考图上限以服务端下发的为准（官方节点支持 16 个槽位，
+        # 面板取官方工作流用量对应的值）
+        max_ref = self.recommended_max_ref_images()
+        self.assertIn(str(max_ref), s["hint"])
         self.assertIn("最多", s["note"])
 
     def test_zimage_mode_unchanged(self):
