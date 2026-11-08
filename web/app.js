@@ -1878,28 +1878,83 @@ $("#stitchBtn").addEventListener("click", async () => {
 });
 
 // ---------- 状态栏 ----------
+// 状态文案全部中文，并与 ComfyUI 真实队列一致：
+//   ComfyUI 在跑（不管是 Studio 提交的还是用户在 ComfyUI 里直接提交的）
+//   -> 「生成中」；队列里还有待执行的 -> 「排队中」；
+//   全空 -> 「空闲」。ComfyUI 连不上 -> 「ComfyUI 未连接」。
+const STATUS_TEXT = {
+  offline: "ComfyUI 未连接",
+  busy: "生成中",
+  queued: "排队中",
+  idle: "空闲",
+};
+
+function renderStatus(data) {
+  const el = $("#statusText");
+  const dot = $("#topStatus .dot");
+  if (!el || !dot) return;
+  const comfyRunning = data.comfy_running;
+  const comfyPending = data.comfy_pending;
+  const studioRunning = !!data.running;
+  const studioQueued = Number(data.queued || 0) > 0;
+
+  // comfy_running 为 null = 读不到 ComfyUI 队列（连接异常）
+  const comfyUnknown = comfyRunning === null || comfyRunning === undefined;
+  const busy = comfyUnknown ? studioRunning : (comfyRunning > 0 || studioRunning);
+  const pending = comfyUnknown ? studioQueued
+    : (comfyPending > 0 || studioQueued);
+
+  if (data.comfyui_ok === false) {
+    el.textContent = STATUS_TEXT.offline;
+    dot.className = "dot dot-off";
+    el.title = "连不上 ComfyUI";
+    return;
+  }
+  if (busy) {
+    const n = Math.max(Number(comfyRunning || 0), 1);
+    el.textContent = STATUS_TEXT.busy;
+    dot.className = "dot dot-busy";
+    el.title = `ComfyUI 正在生成（${n} 个在执行）`;
+    return;
+  }
+  if (pending) {
+    const n = Number(data.queued || 0) || Number(comfyPending || 0);
+    el.textContent = n > 0 ? `${STATUS_TEXT.queued}（${n}）` : STATUS_TEXT.queued;
+    dot.className = "dot dot-busy";
+    el.title = "ComfyUI 队列中有待执行的任务";
+    return;
+  }
+  el.textContent = STATUS_TEXT.idle;
+  dot.className = "dot dot-ok";
+  el.title = "ComfyUI 空闲";
+}
+
 async function refreshSystem() {
   try {
-    const r = await (await fetch("/api/system")).json();
-    const el = $("#statusText");
-    const dot = $("#topStatus .dot");
-    if (!r.comfyui_ok) {
-      el.textContent = "ComfyUI 未连接";
-      dot.className = "dot dot-off";
-      return;
-    }
-    if (r.running) {
-      const queuedTxt = r.queued > 0 ? `，${r.queued} 个排队` : "";
-      el.textContent = `Generating${queuedTxt}`;
-      dot.className = "dot dot-busy";
-    } else if (r.queued > 0) {
-      el.textContent = `${r.queued} 个排队中`;
-      dot.className = "dot dot-busy";
-    } else {
-      el.textContent = "空闲";
-      dot.className = "dot dot-ok";
-    }
-  } catch (e) { /* 忽略 */ }
+    const r = await (await fetch("/api/system", {cache: "no-store"})).json();
+    renderStatus(r);
+  } catch (e) { /* 忽略：保留上一次状态 */ }
+}
+
+// SSE：状态一变就推过来，不必等轮询
+function startStatusStream() {
+  if (typeof EventSource === "undefined") return;
+  let source;
+  try {
+    source = new EventSource("/api/status/stream");
+  } catch (e) {
+    return;
+  }
+  source.onmessage = event => {
+    try {
+      const data = JSON.parse(event.data);
+      // SSE 帧里没有 comfyui_ok：能收到帧就说明服务端连得上 ComfyUI
+      renderStatus(Object.assign({comfyui_ok: true}, data));
+    } catch (e) { /* 忽略坏帧 */ }
+  };
+  source.onerror = () => {
+    // 断线由浏览器自动重连；这里不主动 close，避免连不上时刷日志
+  };
 }
 
 $("#unloadBtn").addEventListener("click", async () => {
@@ -2268,5 +2323,6 @@ boot("提示词版本", renderPromptVersions);   // 初始化二次增强「作�
 boot("长片片段", renderStitchClips);
 boot("任务列表", refreshJobs);
 boot("系统状态", refreshSystem);
+boot("状态实时推送", startStatusStream);
 setInterval(refreshJobs, 2000);
 setInterval(refreshSystem, 3000);

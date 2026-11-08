@@ -984,26 +984,113 @@ async def api_delete(request):
     return json_ok({"deleted": jid})
 
 
+async def fetch_comfy_queue(session):
+    """读 ComfyUI 的真实队列：{running: n, pending: n}。
+
+    状态栏必须反映 ComfyUI 实际在跑什么，而不只是 Studio 自己的 worker ——
+    用户可以直接在 ComfyUI 里提交任务，那边在跑，Studio 也该显示「生成中」。
+    读不到就返回 None（表示未知，不当成空闲）。
+    """
+    try:
+        async with session.get(f"{COMFY}/queue") as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+        return {
+            "running": len(data.get("queue_running") or []),
+            "pending": len(data.get("queue_pending") or []),
+        }
+    except Exception:
+        return None
+
+
+async def status_snapshot(session=None):
+    """状态栏所需的全部信息（一次算完，轮询与 SSE 共用）。
+
+    running_job: Studio 自己正在跑的任务 id（没有则 None）
+    comfy_running / comfy_pending: ComfyUI 真实队列（未知时为 None）
+    queued: Studio 库里排队中的任务数
+    """
+    with db() as conn:
+        queued = conn.execute(
+            "SELECT COUNT(*) c FROM jobs WHERE status='queued'").fetchone()["c"]
+    longfilm_running = next(iter(LONGFILM_PROCESSES), None)
+    running_job = WORKER.current or longfilm_running
+    queue = await fetch_comfy_queue(session) if session else None
+    return {
+        "queued": queued,
+        "running": running_job,
+        "comfy_running": queue["running"] if queue else None,
+        "comfy_pending": queue["pending"] if queue else None,
+    }
+
+
 async def api_system(request):
     """队列状态 + ComfyUI 状态"""
-    with db() as conn:
-        queued = conn.execute("SELECT COUNT(*) c FROM jobs WHERE status='queued'").fetchone()["c"]
     sysinfo = None
+    snap = None
     try:
         async with ClientSession(timeout=ClientTimeout(total=3)) as s:
             async with s.get(f"{COMFY}/system_stats") as resp:
                 if resp.status == 200:
                     sysinfo = await resp.json()
+            snap = await status_snapshot(s)
     except Exception:
         pass
-    longfilm_running = next(iter(LONGFILM_PROCESSES), None)
+    if snap is None:
+        snap = await status_snapshot(None)
     return json_ok({
-        "queued": queued,
-        "running": WORKER.current or longfilm_running,
+        "queued": snap["queued"],
+        "running": snap["running"],
+        "comfy_running": snap["comfy_running"],
+        "comfy_pending": snap["comfy_pending"],
         "comfyui_ok": sysinfo is not None,
         "comfyui": (sysinfo or {}).get("system") or {},
         "devices": (sysinfo or {}).get("devices") or [],
     })
+
+
+async def api_status_stream(request):
+    """SSE：把状态快照实时推给前端。
+
+    前端用 EventSource 订阅，状态一变就重绘，不必等下一次轮询。
+    每 1 秒推一次（只在内容变化时真正写出），连接断开自动收尾。
+    """
+    resp = web.StreamResponse(
+        headers={"Content-Type": "text/event-stream",
+                 "Cache-Control": "no-cache",
+                 "Connection": "keep-alive",
+                 "X-Accel-Buffering": "no"})
+    await resp.prepare(request)
+    last = None
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=3)) as s:
+            while True:
+                try:
+                    snap = await status_snapshot(s)
+                    payload = json.dumps({
+                        "queued": snap["queued"],
+                        "running": snap["running"],
+                        "comfy_running": snap["comfy_running"],
+                        "comfy_pending": snap["comfy_pending"],
+                    }, ensure_ascii=False)
+                    # 只在内容变化时推，避免前端无谓重绘
+                    if payload != last:
+                        last = payload
+                        await resp.write(f"data: {payload}\n\n".encode("utf-8"))
+                except (ConnectionResetError, asyncio.CancelledError):
+                    break
+                except Exception:
+                    pass
+                await asyncio.sleep(1.0)
+    except (ConnectionResetError, asyncio.CancelledError):
+        pass
+    finally:
+        try:
+            await resp.write_eof()
+        except Exception:
+            pass
+    return resp
 
 
 async def api_unload(request):
@@ -1856,6 +1943,7 @@ def make_app():
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
     app.router.add_get("/api/system", api_system)
+    app.router.add_get("/api/status/stream", api_status_stream)
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/gpu/power-limit", api_gpu_power_limit)
     app.router.add_post("/api/unload", api_unload)
