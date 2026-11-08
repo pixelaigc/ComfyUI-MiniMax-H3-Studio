@@ -23,6 +23,35 @@ from . import lora_damping
 # trigger 为上游 README tags 中明确标出的触发词；上游未标注的一律留空，
 # 不用「猜测」填满。
 LORA_CATALOG: dict[str, dict] = {
+    # ---- Qwen-Image 2.1 ----
+    # 元数据实读：ss_base_model_version=qwen_image_2 / ss_output_name=bfs_qwen_2.1，
+    # ss_tag_frequency 里带 "1_head_swap: start with <image1> as the base image..."
+    # -> 这是「换头」效果 LoRA，不是加速器。官方图片编辑工作流把它固定在强度 1.0，
+    #    配合 <image1>/<image2> 做头部替换。
+    "qwen21/bfs_head_v1_qwen_2.1.safetensors": {
+        "display": "换头（Head Swap，Qwen-Image 2.1）",
+        "base": "Qwen-Image 2.1",
+        "trigger": "1_head_swap: start with <image1> as the base image, keeping its "
+                   "lighting, environment, and background. remove the head from <image1> "
+                   "completely and replace it with the head from <image2>, strictly "
+                   "preserving the hair, eye color, nose structure from <image2>.",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "多图编辑：把 <image2> 的头部替换到 <image1> 上，保留图1的光线/环境/"
+                 "背景与头部朝向、表情。官方图片编辑工作流固定用强度 1.0。",
+        "source": "safetensors 元数据（ss_tag_frequency / ss_base_model_version）",
+        "strength_source": "官方图片编辑工作流 Qwen+image+2.1图片编辑.json 固定强度 1.0",
+    },
+    "qwen21/RadianceChromeVoluptuous_QwenImage2.1_v1.0.safetensors": {
+        "display": "Radiance Chrome Voluptuous（Qwen-Image 2.1 风格）",
+        "base": "Qwen-Image 2.1",
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "风格 LoRA（体积感/光泽向风格）。上游 metadata 里没有触发词标注。",
+        "source": "本机 /mnt/usb2t/comfyui-models/loras/qwen21/",
+        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
+    },
     "Kook_Zimage_如梦似幻.safetensors": {
         "display": "如梦似幻（Kook Z-Image 滤镜）",
         "base": "Tongyi-MAI/Z-Image（Z_IMAGE_TURBO）",
@@ -74,6 +103,9 @@ LORA_CATALOG: dict[str, dict] = {
 
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
 Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
+# Qwen-Image 2.1 家族的 marker（文件名里带这些字样的才可能是 2.1 的 LoRA）
+QWEN_IMAGE_MARKERS = ("qwen_image_2.1", "qwen_image2.1", "qwenimage2.1",
+                      "qwen_2.1", "qwen21")
 
 # LoRA 分类
 #   effect       —— 效果类（滤镜 / 写实风格 / 人像增强）：用户可自行挑选
@@ -204,6 +236,16 @@ def _z_image_unet_path() -> Path | None:
                 candidate = models_dir / sub / name
                 if candidate.is_file():
                     return candidate
+    return None
+
+
+def _qwen_image_unet_path() -> Path | None:
+    """定位本机 Qwen-Image 2.1 UNET 权重（用于兼容性比对）。"""
+    for models_dir in _model_dirs():
+        for sub in ("diffusion_models", "unet"):
+            candidate = models_dir / sub / "qwen_image_2.1_bf16.safetensors"
+            if candidate.is_file():
+                return candidate
     return None
 
 
@@ -585,6 +627,83 @@ def _rel_to_lora_dir(name: str, dirs: list[Path]) -> tuple[str, str]:
     return "", ""
 
 
+def _list_loras_for_base(markers, unet_path, base_label):
+    """扫描本机，返回某一底模族下真实存在的 LoRA 清单。
+
+    markers: 文件名里出现即视为该族的 marker
+    unet_path: 兼容性比对用的底模 UNET 权重（找不到则跳过校验）
+    base_label: 底模名（写进条目的 base 字段）
+    """
+    dirs = comfyui_lora_dirs()
+    found: list[dict] = []
+    seen: set[str] = set()
+    for d in dirs:
+        try:
+            candidates = sorted(d.rglob("*.safetensors"))
+        except Exception:
+            continue
+        for path in candidates:
+            rel = path.relative_to(d).as_posix()
+            lowered = rel.lower()
+            if lowered.startswith(lora_damping.DERIVED_PREFIX):
+                continue
+            if not any(marker in lowered for marker in markers):
+                continue
+            if rel in seen:
+                continue
+            seen.add(rel)
+            meta = _read_safetensors_metadata(path)
+            info = LORA_CATALOG.get(rel) or LORA_CATALOG.get(path.name) or {}
+            kind = classify_kind(rel, info)
+            compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
+                      "relative_perturbation": None, "suggested_strength": 1.0,
+                      "ctx_perturbation": None, "ctx_damping": None,
+                      "verified": False}
+            if kind == KIND_EFFECT:
+                try:
+                    compat = check_compatibility(path, unet_path)
+                except Exception:
+                    compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
+                              "relative_perturbation": None, "suggested_strength": 1.0,
+                              "ctx_perturbation": None, "ctx_damping": None,
+                              "verified": False}
+            found.append({
+                "name": rel,
+                "path": str(path),
+                "size_mb": round(path.stat().st_size / (1024 * 1024), 1),
+                "display": info.get("display") or path.stem,
+                "base": info.get("base") or base_label,
+                "trigger": info.get("trigger", ""),
+                "recommended_strength": (compat.get("suggested_strength")
+                                         if compat.get("suggested_strength")
+                                         else info.get("recommended_strength", 1.0)),
+                "strength_cap": compat.get("strength_cap", 1.0),
+                "ctx_perturbation": compat.get("ctx_perturbation"),
+                "ctx_damping": compat.get("ctx_damping"),
+                "strength_source": info.get("strength_source", ""),
+                "kind": kind,
+                "compatible": bool(compat.get("compatible", True)),
+                "incompatible_reason": compat.get("reason", ""),
+                "attention_hit": compat.get("attention_hit"),
+                "relative_perturbation": compat.get("relative_perturbation"),
+                "compat_verified": bool(compat.get("verified", False)),
+                "scene": info.get("scene", ""),
+                "source": info.get("source", ""),
+                "metadata": meta,
+            })
+    return found
+
+
+def list_qwen_image_loras() -> list[dict]:
+    """本机真实存在的 Qwen-Image 2.1 LoRA 清单。
+
+    与 Z-Image 清单分开返回 —— 两者的底模结构不同，兼容性要各自比对，
+    把 2.1 的 LoRA 混进 Z-Image 的下拉会让用户选到不匹配的权重。
+    """
+    return _list_loras_for_base(QWEN_IMAGE_MARKERS, _qwen_image_unet_path(),
+                                "Qwen-Image 2.1")
+
+
 def list_z_image_loras() -> list[dict]:
     """扫描本机，返回真实存在的 Z-Image LoRA 清单。"""
     dirs = comfyui_lora_dirs()
@@ -656,6 +775,24 @@ def list_z_image_loras() -> list[dict]:
                 "metadata": meta,
             })
     return found
+
+
+def list_qwen_effect_loras(include_incompatible: bool = False) -> list[dict]:
+    """Qwen-Image 2.1 的「效果类」LoRA —— 用户可自由挑选的列表。
+
+    与 Z-Image 同语义：加速/蒸馏类不进（由工作流固定使用），
+    不兼容的不进（权重键与 2.1 底模对不上）。
+    """
+    items = [item for item in list_qwen_image_loras() if item["kind"] == KIND_EFFECT]
+    if include_incompatible:
+        return items
+    return [item for item in items if item.get("compatible", True)]
+
+
+def list_qwen_incompatible_loras() -> list[dict]:
+    """Qwen-Image 2.1 下被过滤掉的不兼容效果 LoRA（界面显示原因用）。"""
+    return [item for item in list_qwen_image_loras()
+            if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
 
 
 def list_effect_loras(include_incompatible: bool = False) -> list[dict]:

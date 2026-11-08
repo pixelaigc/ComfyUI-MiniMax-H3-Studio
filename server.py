@@ -36,6 +36,15 @@ import aiohttp
 
 from h3studio.workflows import (
     build_workflow,
+    QWEN_IMAGE_CLIP_PLAIN,
+    QWEN_IMAGE_DEFAULT_MODEL,
+    QWEN_IMAGE_DEFAULT_TIER,
+    QWEN_IMAGE_MAX_DIRECT_MP,
+    QWEN_IMAGE_MAX_REF_IMAGES,
+    QWEN_IMAGE_MIN_REF_IMAGES,
+    QWEN_IMAGE_MODELS,
+    QWEN_IMAGE_RES_TIERS,
+    QWEN_IMAGE_SIZE_MULTIPLE,
     ASPECT_MAP,
     ASPECT_NUM,
     Z_IMAGE_MODELS,
@@ -778,7 +787,7 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i"):
+    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen"):
         return web.json_response({"error": f"未知模式 {mode}"}, status=400)
 
     if mode == "flf":
@@ -793,6 +802,19 @@ async def api_create(request):
         if not refs:
             return web.json_response({"error": "参考模式需要至少 1 张参考图"}, status=400)
         params["ref_images"] = refs[:3]
+    elif mode == "i2i_qwen":
+        # Qwen-Image 2.1 参考图生图：1–9 张，超出给明确提示
+        refs = saved_files.get("file_ref", [])
+        if len(refs) < QWEN_IMAGE_MIN_REF_IMAGES:
+            return web.json_response(
+                {"error": f"图片编辑至少需要 {QWEN_IMAGE_MIN_REF_IMAGES} 张参考图，"
+                          f"当前 {len(refs)} 张"}, status=400)
+        if len(refs) > QWEN_IMAGE_MAX_REF_IMAGES:
+            return web.json_response(
+                {"error": f"参考图最多 {QWEN_IMAGE_MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
+                          f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张）"},
+                status=400)
+        params["ref_images"] = refs[:QWEN_IMAGE_MAX_REF_IMAGES]
 
     prompt = (params.get("prompt") or "").strip()
     if not prompt:
@@ -800,7 +822,7 @@ async def api_create(request):
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
-    if mode == "t2i":
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen"):
         try:
             batch_count = int(params.get("batch_count") or 1)
         except (TypeError, ValueError):
@@ -1271,6 +1293,37 @@ async def api_image_options(request):
             "samplers": m["samplers"],
             "schedulers": m["schedulers"],
         }
+    # Qwen-Image 2.1 的档位/比例与 Z-Image 共用同一套 ResolutionSelector 语义，
+    # 但档位表与倍数不同（VAE 16 倍下采样 -> 宽高取 16 的倍数）。
+    qwen_tiers = []
+    for key, megapixels in QWEN_IMAGE_RES_TIERS.items():
+        qwen_tiers.append({
+            "key": key,
+            "label": _Z_IMAGE_TIER_LABELS.get(key, key.upper()),
+            "megapixels": megapixels,
+            "max_direct_mp": QWEN_IMAGE_MAX_DIRECT_MP,
+        })
+    qwen_models = {}
+    for key, m in QWEN_IMAGE_MODELS.items():
+        qwen_models[key] = {
+            "label": m["label"],
+            "unet": m["unet"],
+            "note": m["note"],
+            "warn": m["warn"],
+            "sampler": m["sampler"],
+            "scheduler": m["scheduler"],
+            "steps": m["steps"],
+            "cfg": m["cfg"],
+            "shift": m["shift"],
+            "supports_negative": m["supports_negative"],
+            "samplers": m["samplers"],
+            "schedulers": m["schedulers"],
+            # PE 开关的两种编码器（供前端显示当前用哪个）
+            "clip_t2i": m["clip_t2i"],
+            "clip_i2i": m["clip_i2i"],
+            "clip_plain": QWEN_IMAGE_CLIP_PLAIN,
+            # Qwen-Image 2.1 没有加速 LoRA（bfs_head 是换头效果类）
+        }
     return json_ok({
         "tiers": tiers,
         "aspects": aspects,
@@ -1279,6 +1332,19 @@ async def api_image_options(request):
         "max_direct_mp": Z_IMAGE_MAX_DIRECT_MP,
         "default_tier": Z_IMAGE_DEFAULT_TIER,
         "default_model": Z_IMAGE_DEFAULT_MODEL,
+        # Qwen-Image 2.1 独立的一套（文生图 + 图片编辑共用）
+        "qwen": {
+            "tiers": qwen_tiers,
+            "aspects": aspects,
+            "models": qwen_models,
+            "size_multiple": QWEN_IMAGE_SIZE_MULTIPLE,
+            "max_direct_mp": QWEN_IMAGE_MAX_DIRECT_MP,
+            "default_tier": QWEN_IMAGE_DEFAULT_TIER,
+            "default_model": QWEN_IMAGE_DEFAULT_MODEL,
+            # 参考图数量限制（官方图片编辑工作流就是 9 张）
+            "max_ref_images": QWEN_IMAGE_MAX_REF_IMAGES,
+            "min_ref_images": QWEN_IMAGE_MIN_REF_IMAGES,
+        },
     })
 
 
@@ -1291,6 +1357,8 @@ async def api_generation_types(request):
     return json_ok({
         "types": gen_types.list_types(),
         "registered_modes": gen_types.registered_modes(),
+        # 界面分类（文生图 / 图片编辑 / 视频）—— 前端左侧入口按这个分组
+        "categories": gen_types.list_categories(),
     })
 
 

@@ -750,7 +750,408 @@ def build_t2i(params):
                               loras=loras)
 
 
-BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i}
+
+# ------------------------------------------------------------------
+# Qwen-Image 2.1：文生图（t2i_qwen）/ 参考图生图（i2i_qwen）
+# ------------------------------------------------------------------
+# 权重与工作流全部来自本机实测存在的文件，**不列编造的选项**：
+#   UNET       /home/ubuntu/comfyui/models/diffusion_models/qwen_image_2.1_bf16.safetensors (14G)
+#   VAE        /home/ubuntu/comfyui/models/vae/qwen_image_2.1_vae_bf16.safetensors (645M)
+#   PE 文本编码器（带官方提示词扩写能力）
+#              text_encoders/qwen3.5_qwen_image_2.1_pe_t2i.int8_convrot.safetensors (8.9G)
+#              text_encoders/qwen3.5_qwen_image_2.1_pe_i2i.int8_convrot.safetensors (8.9G)
+#   必需加速 LoRA（官方工作流固定内置，不进用户可选列表）
+#              loras/qwen21/bfs_head_v1_qwen_2.1.safetensors
+#
+# 官方工作流（本机）：
+#   user/default/workflows/Qwen+image+2.1+文生图.json
+#   user/default/workflows/Qwen+image+2.1图片编辑.json
+#
+# 官方推荐参数来源：上面两个官方工作流的 KSampler
+#   steps=50 / cfg=1 / sampler=euler / scheduler=simple / denoise=1
+#   文生图工作流的 KSampler id=476；图片编辑工作流的 KSampler id=482
+#
+# SHIFT 语义（重要）：
+#   comfy/supported_models.py 的 class QwenImage21 自带
+#   sampling_settings = {"multiplier": 1.0, "shift": 0.69}，
+#   经 ModelSamplingDiscreteFlow.sigma() = time_snr_shift(shift, t) 应用。
+#   要让用户可调，必须用 **ModelSamplingSD3** 覆盖 —— 它继承自
+#   ModelSamplingDiscreteFlow（comfy_extras/nodes_model_advanced.py:120），
+#   sigma 公式与 Qwen-Image 2.1 内置的完全同源，只是把 shift 换成用户值。
+#   （ModelSamplingAuraFlow / ModelSamplingFlux 走的是别的公式，不能用。）
+QWEN_IMAGE_UNET = "qwen_image_2.1_bf16.safetensors"
+QWEN_IMAGE_VAE = "qwen_image_2.1_vae_bf16.safetensors"
+# PE 文本编码器：t2i 用于文生图、i2i 用于参考图生图
+QWEN_IMAGE_CLIP_PE_T2I = "qwen3.5_qwen_image_2.1_pe_t2i.int8_convrot.safetensors"
+QWEN_IMAGE_CLIP_PE_I2I = "qwen3.5_qwen_image_2.1_pe_i2i.int8_convrot.safetensors"
+# 不带 PE 的普通文本编码器（官方工作流用的就是这个）：
+# 关掉 PE 开关时改用它 -> 提示词原样进模型，不做官方扩写
+QWEN_IMAGE_CLIP_PLAIN = "qwen3vl_8b_bf16.safetensors"
+# Qwen-Image 2.1 **没有**加速/蒸馏 LoRA —— 官方工作流里那个
+# qwen21/bfs_head_v1_qwen_2.1.safetensors 实测是「换头」效果 LoRA
+# （元数据 ss_tag_frequency = {"1_head_swap: start with <image1> ..."}），
+# 不是加速器。所以它和其它效果 LoRA 一样由用户自己选，不固定内置。
+
+# 模型版本：只列本机 ComfyUI UNETLoader 下拉里真实存在的 Qwen-Image 2.1 权重。
+# 2.1 本体只有一个 bf16 版本；其余是 Qwen-Image 2509/2511/2512（不同代，
+# 不是 2.1），不混进来 —— 混进来会让「2.1 的推荐参数」套到别的代上。
+QWEN_IMAGE_MODELS = {
+    "qwen_image_2.1_bf16": {
+        "label": "Qwen-Image 2.1 · 官方完整版（含 PE 提示词扩写）",
+        "unet": QWEN_IMAGE_UNET,
+        "weight_dtype": "default",
+        # PE 文本编码器：文生图用 pe_t2i、参考图生图用 pe_i2i
+        # （两者是官方给两种场景各配的扩写权重，不能混用）
+        "clip_t2i": QWEN_IMAGE_CLIP_PE_T2I,
+        "clip_i2i": QWEN_IMAGE_CLIP_PE_I2I,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "steps": 50,
+        "cfg": 1.0,
+        # 内置 shift 是 0.69（supported_models.py:2080）；这里暴露给用户的
+        # 覆盖值默认取同一个数 —— 即「不覆盖」，行为与官方工作流一致。
+        "shift": 0.69,
+        "supports_negative": True,
+        "samplers": ["euler", "euler_cfg_pp", "res_multistep", "dpmpp_2m",
+                     "dpmpp_2m_sde", "dpmpp_3m_sde", "dpm_2", "heun", "uni_pc"],
+        "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras",
+                       "exponential", "linear_quadratic"],
+        "note": "官方工作流 Qwen+image+2.1+文生图.json：50 步 / cfg 1 / euler / simple。",
+        "warn": "官方 PE 文本编码器自带提示词扩写（提示词会被重写得更详细）；"
+                "想完全控制提示词，可在面板里关掉 PE 编码器。",
+    },
+}
+QWEN_IMAGE_DEFAULT_MODEL = "qwen_image_2.1_bf16"
+
+# Qwen-Image 2.1 的分辨率档位：同样是「总像素（megapixels）」语义。
+# 与 Z-Image 的区别：Qwen-Image 2.1 的 VAE 是 16 倍下采样
+# （comfy_extras/nodes_qwen.py:181 -> torch.zeros([1, 64, H//16, W//16])），
+# 所以宽高必须是 16 的倍数。
+# 官方默认 1024x1024（1MP），官方工作流 ResolutionSelector megapixels=2。
+QWEN_IMAGE_RES_TIERS = {
+    "1mp": 1.0,        # 官方默认 1024×1024
+    "480p": 0.4,
+    "720p": 0.9,
+    "1080p": 2.0,
+    "1440p": 3.5,
+    "2k": 4.2,
+    "4k": 8.3,
+}
+QWEN_IMAGE_DEFAULT_TIER = "1mp"
+QWEN_IMAGE_SIZE_MULTIPLE = 16
+# 超过这个总像素走放大路径（与 Z-Image 同策略）
+QWEN_IMAGE_MAX_DIRECT_MP = 4.0
+
+# 参考图数量上限：TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，
+# 节点本身支持 image_1..image_16（comfy_extras/nodes_qwen.py:125-133），
+# 但官方图片编辑工作流只接了 9 张参考图 —— 本面板按官方取 9。
+QWEN_IMAGE_MAX_REF_IMAGES = 9
+QWEN_IMAGE_MIN_REF_IMAGES = 1
+
+
+def qwen_image_dimensions(aspect, tier, width=None, height=None):
+    """比例 + 分辨率档位 -> 实际像素宽高（Qwen-Image 2.1）。
+
+    算法与 z_image_dimensions 完全一致（同一套 ResolutionSelector 语义），
+    只是档位表与倍数换成 Qwen-Image 2.1 的：
+      - VAE 是 16 倍下采样 -> 宽高取 16 的倍数
+      - 默认档位 1MP（官方 1024x1024）
+    """
+    w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
+    megapixels = QWEN_IMAGE_RES_TIERS.get(tier,
+                                            QWEN_IMAGE_RES_TIERS[QWEN_IMAGE_DEFAULT_TIER])
+    mult = QWEN_IMAGE_SIZE_MULTIPLE
+
+    if width and height:
+        final_w, final_h = int(width), int(height)
+    else:
+        total_pixels = megapixels * 1024 * 1024
+        scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
+        final_w = w_ratio * scale
+        final_h = h_ratio * scale
+    final_w = max(mult, int(round(final_w / mult)) * mult)
+    final_h = max(mult, int(round(final_h / mult)) * mult)
+    return final_w, final_h
+
+
+def _qwen_lora_chain(lora_items, base_model_ref, base_clip_ref):
+    """把选中的效果 LoRA 串到 Qwen-Image 2.1 的模型链上。
+
+    与 Z-Image 的 _z_image_lora_chain 同语义：
+      - 用 **LoraLoader**（不是 LoraLoaderModelOnly）：model 与 clip 都接，
+        否则文本编码器那半边的 patch 会被 ComfyUI 记为 "NOT LOADED" 丢掉。
+      - clip 强度跟随 model 强度。
+
+    Qwen-Image 2.1 的官方工作流用的是 rgthree 的 "Lora Loader Stack"，
+    但它的输入输出与 LoraLoader 一致（model + clip -> model + clip），
+    这里用核心节点 LoraLoader，避免依赖 rgthree 插件。
+    """
+    nodes: dict = {}
+    current_model = base_model_ref
+    current_clip = base_clip_ref
+    for index, item in enumerate(lora_items):
+        name = item.get("name") or ""
+        if not name:
+            raise ValueError("LoRA 配置缺少 name")
+        resolved, path = lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            raise ValueError(f"本机不存在该 LoRA 文件：{name}")
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength <= 0:
+            continue
+        node_id = f"qw:40{index}"
+        inputs = {
+            "lora_name": resolved,
+            "strength_model": strength,
+            "strength_clip": strength,
+            "model": current_model,
+        }
+        if current_clip is not None:
+            inputs["clip"] = current_clip
+        nodes[node_id] = {"inputs": inputs, "class_type": "LoraLoader"}
+        current_model = [node_id, 0]
+        if current_clip is not None:
+            current_clip = [node_id, 1]
+    return nodes, current_model, current_clip
+
+
+def _qwen_common_nodes(model, clip_name, width, height, seed, sampler, scheduler,
+                       steps, cfg, shift, negative_text, prompt, job_id,
+                       filename_prefix=None, loras=None, is_edit=False):
+    """Qwen-Image 2.1 公共链路。
+
+    文生图与参考图生图共用同一套节点，区别只在：
+      - TextEncodeQwenImage21 的 images 输入接不接参考图
+      - KSampler 的 latent_image 用 EmptyLatentImage 还是 TextEncode 输出的 latent
+
+    链路：
+        UNETLoader -> [加速 LoRA] -> ModelSamplingSD3(shift) -> [效果 LoRA]
+                   -> QwenImage21Cache -> KSampler
+        CLIPLoader(PE) -> [效果 LoRA 的 clip 侧] -> TextEncodeQwenImage21
+        VAELoader -> TextEncodeQwenImage21 的 vae 输入（参考图编码成 ref_latents）
+
+    ModelSamplingSD3 的作用：Qwen-Image 2.1 在
+    comfy/supported_models.py:2080 内置了 shift=0.69（经
+    ModelSamplingDiscreteFlow 的 time_snr_shift 应用）。要暴露用户可调的
+    SHIFT，必须用继承自同一个 ModelSamplingDiscreteFlow 的节点覆盖它
+    （comfy_extras/nodes_model_advanced.py:120）—— sigma 公式同源。
+    """
+    p = {}
+    # 文本编码器（PE 版自带官方提示词扩写）
+    p["qw:30"] = {"inputs": {"clip_name": clip_name, "type": "qwen_image",
+                             "device": "default"},
+                  "class_type": "CLIPLoader"}
+    # VAE
+    p["qw:29"] = {"inputs": {"vae_name": QWEN_IMAGE_VAE}, "class_type": "VAELoader"}
+    # UNET
+    p["qw:28"] = {"inputs": {"unet_name": model["unet"],
+                             "weight_dtype": model["weight_dtype"]},
+                  "class_type": "UNETLoader"}
+
+    model_ref = ["qw:28", 0]
+    clip_ref = ["qw:30", 0]
+
+    # SHIFT 覆盖（ModelSamplingSD3 继承 ModelSamplingDiscreteFlow）
+    p["qw:11"] = {"inputs": {"shift": shift, "model": model_ref},
+                  "class_type": "ModelSamplingSD3"}
+    model_ref = ["qw:11", 0]
+
+    # 用户选的效果 LoRA
+    if loras:
+        lora_nodes, model_ref, clip_ref = _qwen_lora_chain(loras, model_ref, clip_ref)
+        p.update(lora_nodes)
+
+    # KV cache（编辑类工作流必带；文生图带上也不影响，且能省显存）
+    p["qw:12"] = {"inputs": {"model": model_ref, "device": "auto", "dtype": "default"},
+                  "class_type": "QwenImage21Cache"}
+    model_ref = ["qw:12", 0]
+
+    # 文本编码
+    te_inputs = {
+        "clip": clip_ref,
+        "prompt": prompt,
+        "negative_prompt": negative_text,
+        "vae": ["qw:29", 0],
+        # 参考图按 1024 边长重采样（官方工作流图片编辑用 2048，文生图无图）
+        "resolution": 1024,
+    }
+    p["qw:27"] = {"inputs": te_inputs, "class_type": "TextEncodeQwenImage21"}
+
+    # 采样
+    if is_edit:
+        # 编辑：latent 用 TextEncode 输出的（尺寸跟随第一张参考图）。
+        # 官方工作流用 ComfySwitchNode 在 EmptyLatentImage 和这个 latent 之间切，
+        # 但 ComfySwitchNode 的两个输入类型不同（LATENT vs COMFY_MATCHTYPE_V3），
+        # 直接按场景接更简单也等效：编辑场景永远走 TextEncode 的 latent。
+        latent_ref = ["qw:27", 2]
+    else:
+        p["qw:13"] = {"inputs": {"width": width, "height": height, "batch_size": 1},
+                      "class_type": "EmptyLatentImage"}
+        latent_ref = ["qw:13", 0]
+
+    p["qw:3"] = {"inputs": {
+        "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
+        "sampler_name": sampler, "scheduler": scheduler, "denoise": 1,
+        "model": model_ref,
+        "positive": ["qw:27", 0],
+        "negative": ["qw:27", 1],
+        "latent_image": latent_ref,
+    }, "class_type": "KSampler"}
+
+    p["qw:8"] = {"inputs": {"samples": ["qw:3", 0], "vae": ["qw:29", 0]},
+                 "class_type": "VAEDecode"}
+    p["qw:9"] = {"inputs": {"filename_prefix": filename_prefix or f"h3studio/qwen_{job_id}",
+                            "images": ["qw:8", 0]},
+                 "class_type": "SaveImage"}
+    return p
+
+
+def _qwen_collect_loras(params):
+    """收集用户选中的效果 LoRA（沿用 Z-Image 的语义与校验）。"""
+    loras = []
+    for item in (params.get("loras") or []):
+        if not isinstance(item, dict):
+            continue
+        if not item.get("enabled", True):
+            continue
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength <= 0:
+            continue
+        name = item.get("name") or ""
+        meta = _lookup_lora_meta(name)
+        if meta and meta.get("kind") == lora_registry.KIND_ACCELERATION:
+            raise ValueError(
+                f"「{meta.get('display') or name}」是加速/蒸馏类 LoRA，"
+                "不能作为可选效果 LoRA 使用")
+        if meta and not meta.get("compatible", True):
+            raise ValueError(
+                f"「{meta.get('display') or name}」与 Qwen-Image 2.1 底模不兼容，已拒绝加载："
+                f"{meta.get('incompatible_reason') or '未知原因'}")
+        cap = float(meta.get("strength_cap", 1.0)) if meta else 1.0
+        if cap < 1.0 and strength > cap:
+            strength = cap
+        trigger = item.get("trigger")
+        if trigger is None:
+            trigger = (meta or {}).get("trigger", "")
+        loras.append({"name": name, "strength": strength, "trigger": trigger or ""})
+    return loras
+
+
+def build_qwen_t2i(params):
+    """Qwen-Image 2.1 文生图。"""
+    job_id = params["job_id"]
+    model_key = params.get("model") or QWEN_IMAGE_DEFAULT_MODEL
+    if model_key not in QWEN_IMAGE_MODELS:
+        model_key = QWEN_IMAGE_DEFAULT_MODEL
+    model = QWEN_IMAGE_MODELS[model_key]
+
+    seed = params.get("seed") or random.randint(0, 2**48)
+    aspect = params.get("aspect", "16:9")
+    if aspect not in ASPECT_NUM:
+        aspect = "16:9"
+    tier = params.get("resolution")
+    if tier not in QWEN_IMAGE_RES_TIERS:
+        tier = QWEN_IMAGE_DEFAULT_TIER
+    width, height = qwen_image_dimensions(aspect, tier, params.get("width"),
+                                           params.get("height"))
+
+    sampler = params.get("sampler") or model["sampler"]
+    scheduler = params.get("scheduler") or model["scheduler"]
+    steps = int(params.get("steps") or model["steps"])
+    cfg = float(params.get("cfg") if params.get("cfg") is not None else model["cfg"])
+    shift = float(params.get("shift") if params.get("shift") is not None else model["shift"])
+    negative_text = params.get("negative_prompt", "") or ""
+    prompt = params.get("prompt", "")
+
+    loras = _qwen_collect_loras(params)
+    prompt = merge_lora_triggers(prompt, loras)
+
+    # PE 开关：关掉 PE 就退回官方工作流用的普通 qwen3vl_8b 编码器
+    clip_name = model["clip_t2i"]
+    if not params.get("use_pe", True):
+        clip_name = params.get("clip_plain") or QWEN_IMAGE_CLIP_PLAIN
+
+    return _qwen_common_nodes(model, clip_name, width, height, seed, sampler,
+                               scheduler, steps, cfg, shift, negative_text,
+                               prompt, job_id, loras=loras)
+
+
+def build_qwen_i2i(params):
+    """Qwen-Image 2.1 参考图生图（图片编辑）。
+
+    参考图最多 9 张（官方图片编辑工作流 Qwen+image+2.1图片编辑.json
+    接的就是 9 张）。数量必须在 1–9 之间，超出给明确错误。
+
+    参考图来源：params["ref_images"] = [{"file": "xxx.png"}, ...]
+    文件必须已存在于本机输出目录（走 _verified_video_path 同类的白名单校验）。
+    """
+    job_id = params["job_id"]
+    model_key = params.get("model") or QWEN_IMAGE_DEFAULT_MODEL
+    if model_key not in QWEN_IMAGE_MODELS:
+        model_key = QWEN_IMAGE_DEFAULT_MODEL
+    model = QWEN_IMAGE_MODELS[model_key]
+
+    refs = params.get("ref_images") or []
+    if not isinstance(refs, list):
+        refs = []
+    if len(refs) < QWEN_IMAGE_MIN_REF_IMAGES:
+        raise ValueError(
+            f"参考图生图至少需要 {QWEN_IMAGE_MIN_REF_IMAGES} 张参考图，当前 {len(refs)} 张")
+    if len(refs) > QWEN_IMAGE_MAX_REF_IMAGES:
+        raise ValueError(
+            f"参考图最多 {QWEN_IMAGE_MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
+            f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张）")
+
+    seed = params.get("seed") or random.randint(0, 2**48)
+    aspect = params.get("aspect", "16:9")
+    if aspect not in ASPECT_NUM:
+        aspect = "16:9"
+    tier = params.get("resolution")
+    if tier not in QWEN_IMAGE_RES_TIERS:
+        tier = QWEN_IMAGE_DEFAULT_TIER
+    width, height = qwen_image_dimensions(aspect, tier, params.get("width"),
+                                           params.get("height"))
+
+    sampler = params.get("sampler") or model["sampler"]
+    scheduler = params.get("scheduler") or model["scheduler"]
+    steps = int(params.get("steps") or model["steps"])
+    cfg = float(params.get("cfg") if params.get("cfg") is not None else model["cfg"])
+    shift = float(params.get("shift") if params.get("shift") is not None else model["shift"])
+    negative_text = params.get("negative_prompt", "") or ""
+    prompt = params.get("prompt", "")
+
+    loras = _qwen_collect_loras(params)
+    prompt = merge_lora_triggers(prompt, loras)
+
+    clip_name = model["clip_i2i"]
+    if not params.get("use_pe", True):
+        clip_name = params.get("clip_plain") or QWEN_IMAGE_CLIP_PLAIN
+
+    # 参考图 -> LoadImage 节点（只允许引用本机已存在的文件）
+    p = _qwen_common_nodes(model, clip_name, width, height, seed, sampler,
+                            scheduler, steps, cfg, shift, negative_text,
+                            prompt, job_id, loras=loras, is_edit=True)
+    # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
+    # （COMFY_AUTOGROW_V3，按 image_1..image_N 命名）
+    te_inputs = p["qw:27"]["inputs"]
+    for index, ref in enumerate(refs[:QWEN_IMAGE_MAX_REF_IMAGES]):
+        node_id = f"qw:ref{index}"
+        filename = (ref or {}).get("file") or ""
+        if not filename:
+            raise ValueError(f"第 {index + 1} 张参考图缺少文件名")
+        p[node_id] = {"inputs": {"image": filename}, "class_type": "LoadImage"}
+        te_inputs[f"image_{index + 1}"] = [node_id, 0]
+    return p
+
+
+BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i,
+             "t2i_qwen": build_qwen_t2i, "i2i_qwen": build_qwen_i2i}
 
 
 def build_workflow(mode, params):

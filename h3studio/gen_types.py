@@ -16,11 +16,30 @@ from __future__ import annotations
 # label：类型标签显示名
 # group：同组标签互斥（一组里只能选一个）
 GENERATION_TYPES: dict[str, dict] = {
-    "t2i": {"label": "Z-IMAGE 文生图", "media": "image", "group": "generation_type"},
-    "t2v": {"label": "文生视频", "media": "video", "group": "generation_type"},
-    "flf": {"label": "首尾帧生成", "media": "video", "group": "generation_type"},
-    "r2v": {"label": "参考图生成", "media": "video", "group": "generation_type"},
-    "longfilm": {"label": "长片拼接", "media": "video", "group": "generation_type"},
+    # 「图像」分类拆成「文生图」+「图片编辑」两个分类。
+    # category 字段用于在界面上分组显示（同 category 的排在一起）。
+    "t2i": {"label": "Z-IMAGE 文生图", "media": "image",
+            "group": "generation_type", "category": "t2i"},
+    "t2i_qwen": {"label": "Qwen-Image 2.1 文生图", "media": "image",
+                 "group": "generation_type", "category": "t2i"},
+    "i2i_qwen": {"label": "Qwen-Image 2.1 图片编辑", "media": "image",
+                 "group": "generation_type", "category": "i2i"},
+    "t2v": {"label": "文生视频", "media": "video", "group": "generation_type",
+            "category": "video"},
+    "flf": {"label": "首尾帧生成", "media": "video", "group": "generation_type",
+            "category": "video"},
+    "r2v": {"label": "参考图生成", "media": "video", "group": "generation_type",
+            "category": "video"},
+    "longfilm": {"label": "长片拼接", "media": "video", "group": "generation_type",
+                 "category": "video"},
+}
+
+# 界面分类（左侧导航 / 面板分区）。键是 category，值是显示名。
+# 前端从 GET /api/generation-types 拿这份清单，不在前端硬编码。
+GENERATION_CATEGORIES: dict[str, str] = {
+    "t2i": "文生图",
+    "i2i": "图片编辑",
+    "video": "视频",
 }
 
 # 兜底：mode 未登记时的归类（保证不出现空白 / 全部归到未知）
@@ -77,6 +96,14 @@ def type_key_for_mode(mode: str) -> str:
     return type_for_mode(mode)["key"]
 
 
+def list_categories() -> list[dict]:
+    """界面分类清单（前端左侧「文生图 / 图片编辑 / 视频」入口）。"""
+    out = []
+    for key, label in GENERATION_CATEGORIES.items():
+        out.append({"key": key, "label": label})
+    return out
+
+
 def list_types() -> list[dict]:
     """前端类型标签清单（按注册顺序 + 兜底项补在最后）。"""
     out: list[dict] = []
@@ -91,6 +118,7 @@ def list_types() -> list[dict]:
             "label": info["label"],
             "media": info["media"],
             "group": info["group"],
+            "category": info.get("category", ""),
         })
     # 兜底项：始终提供，保证老任务/未知 mode 有归类可显示
     out.append({
