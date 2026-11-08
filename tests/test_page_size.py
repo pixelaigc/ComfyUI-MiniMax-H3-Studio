@@ -534,6 +534,44 @@ class TestPageSize(unittest.TestCase):
             "() => Number.isInteger(state.pageSize)"),
             "pageSize 必须是整数，不能是 NaN")
 
+    def test_card_contents_stay_inside_card(self):
+        """卡片内部任何内容都不得超出卡片边框。
+
+        覆盖「窄屏下不溢出」这条要求：把窗口压到很窄、每页数量调大，
+        列会被压得极窄 —— 这时最容易破版的是底部那排操作按钮
+        （4 个 flex:1 按钮挤在窄卡片里）。
+        """
+        for width in (1000, 1280):
+            self.page.set_viewport_size({"width": width, "height": 900})
+            self.page.wait_for_timeout(500)
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(700)
+            for size in (8, 12, 16, 24):
+                self.set_size(size)
+                overflow = self.page.evaluate("""
+                    () => {
+                      const bad = [];
+                      document.querySelectorAll('#jobsGrid .job-card').forEach(card => {
+                        const cb = card.getBoundingClientRect();
+                        card.querySelectorAll('.job-meta, .job-actions, .job-top, .job-preview')
+                          .forEach(el => {
+                            const b = el.getBoundingClientRect();
+                            if (b.right > cb.right + 1 || b.left < cb.left - 1) {
+                              bad.push(el.className);
+                            }
+                          });
+                      });
+                      return bad;
+                    }
+                """)
+                self.assertEqual(overflow, [],
+                                 "%dpx 宽 / 每页 %d 时有 %d 处内容溢出卡片"
+                                 % (width, size, len(overflow)))
+        self.page.set_viewport_size({"width": 2560, "height": 1080})
+        self.page.wait_for_timeout(500)
+        self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+        self.page.wait_for_timeout(700)
+
     def test_no_console_errors(self):
         """没有 JS 报错。"""
         self.assertEqual([e for e in self.errors if e.strip()], [])
