@@ -3,26 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00</title>
+<title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/style.css?v=qwen21-1">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
+<link rel="stylesheet" href="/static/responsive.css?v=rs1">
 </head>
 <body>
 <header class="topbar">
+  <button class="nav-toggle" id="navToggle" type="button" aria-label="打开导航菜单" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
   <div class="brand">
-    <span class="logo">H3</span>
-    <span class="brand-name"><strong>PixelAIGC ComfyUI-MiniMax-H3 Studio</strong> <span class="brand-version">v1.00</span></span>
-    <span class="brand-links" aria-label="PixelAIGC 官方链接">
-      <a href="https://github.com/pixelaigc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC GitHub" title="GitHub · pixelaigc">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.88c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 6.82a9.55 9.55 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
-      </a>
-      <a href="https://pixelaigc.cc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC 官网" title="pixelaigc.cc">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.3 2.47 3.5 5.47 3.5 9S14.3 18.53 12 21M12 3C9.7 5.47 8.5 8.47 8.5 12S9.7 18.53 12 21"/></svg>
-      </a>
-      <a href="https://x.com/pixelaigc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC X" title="X · @pixelaigc">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4.2l3.6 5.1L17.2 4H19l-5.4 6.4L19.8 20h-4.2l-4-5.7L6.8 20H5l5.8-7L5 4Zm3.3 1.5 8.1 13h1.1l-8.1-13H8.3Z"/></svg>
-      </a>
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 64 64" focusable="false">
+        <path d="M21 14 L21 50 L40 32 Z" fill="#fff" fill-opacity=".95"/>
+        <path d="M40 32 L56 19" fill="none" stroke="#fff" stroke-opacity=".92" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M40 32 L56 32" fill="none" stroke="#fff" stroke-opacity=".72" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M40 32 L56 45" fill="none" stroke="#fff" stroke-opacity=".52" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="brand-name">
+      <strong>OmniStudio</strong>
+      <span class="brand-tagline">多模型图像 / 视频 / 音频创作工作台</span>
+      <span class="brand-version">v1.00</span>
     </span>
   </div>
   <div class="top-status" id="topStatus">
@@ -31,8 +35,9 @@
 </header>
 
 <div class="layout">
-  <!-- 左侧导航 -->
-  <nav class="sidebar">
+  <!-- 左侧导航（窄屏折叠为抽屉，见 responsive.css） -->
+  <div class="sidebar-mask" id="sidebarMask"></div>
+  <nav class="sidebar" id="sidebar">
     <div class="nav-label">CREATE</div>
     <div class="nav-group">视频</div>
     <a class="nav-item" data-mode="t2v">
@@ -80,22 +85,12 @@
       硬件参数
     </a>
     <div class="sidebar-foot">
-      <div class="sidebar-links" aria-label="PixelAIGC 官方链接">
-        <a href="https://github.com/pixelaigc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC GitHub" title="GitHub · pixelaigc">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.88c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 6.82a9.55 9.55 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
-        </a>
-        <a href="https://pixelaigc.cc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC 官网" title="pixelaigc.cc">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.3 2.47 3.5 5.47 3.5 9S14.3 18.53 12 21M12 3C9.7 5.47 8.5 8.47 8.5 12S9.7 18.53 12 21"/></svg>
-        </a>
-        <a href="https://x.com/pixelaigc" target="_blank" rel="noopener noreferrer" aria-label="PixelAIGC X" title="X · @pixelaigc">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4.2l3.6 5.1L17.2 4H19l-5.4 6.4L19.8 20h-4.2l-4-5.7L6.8 20H5l5.8-7L5 4Zm3.3 1.5 8.1 13h1.1l-8.1-13H8.3Z"/></svg>
-        </a>
-      </div>
       <button id="unloadBtn" title="释放 GPU 显存">释放显存</button>
     </div>
   </nav>
 
-  <!-- 参数面板 -->
+  <!-- 参数面板（窄屏从底部抽屉弹出，见 responsive.css） -->
+  <div class="panel-mask" id="panelMask"></div>
   <aside class="panel" id="panel">
     <div class="field" id="resField">
       <div class="field-label">分辨率</div>
@@ -375,7 +370,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   <main class="assets-page" id="assetsPage" style="display:none">
     <div class="al-head">
       <div>
-        <div class="al-title">资产素材库</div>
+        <div class="al-title">资产素材库 <span class="al-title-sub">OmniStudio · 多模型创作工作台</span></div>
         <div class="al-sub" id="alStats">加载中…</div>
       </div>
       <div class="al-actions">
@@ -497,6 +492,12 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     </div>
   </main>
 </div>
+
+<!-- 窄屏：打开参数抽屉的浮动按钮（桌面端由 CSS 隐藏） -->
+<button class="panel-fab" id="panelFab" type="button" aria-label="打开参数面板">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg>
+  <span>参数</span>
+</button>
 
 <!-- 本地模型 Provider 编辑弹窗 -->
 <div class="prompt-modal" id="provModal" hidden>

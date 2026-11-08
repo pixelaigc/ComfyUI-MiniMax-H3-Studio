@@ -7,5 +7,8 @@
   </defs>
   <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#g)"/>
   <rect x="3.75" y="3.75" width="56.5" height="56.5" rx="14.25" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.5"/>
-  <text x="32" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="29" font-weight="800" letter-spacing="-2" fill="#fff">H3</text>
+  <path d="M21 14 L21 50 L40 32 Z" fill="#fff" fill-opacity=".95"/>
+  <path d="M40 32 L56 19" fill="none" stroke="#fff" stroke-opacity=".92" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M40 32 L56 32" fill="none" stroke="#fff" stroke-opacity=".72" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M40 32 L56 45" fill="none" stroke="#fff" stroke-opacity=".52" stroke-width="4.5" stroke-linecap="round"/>
 </svg>

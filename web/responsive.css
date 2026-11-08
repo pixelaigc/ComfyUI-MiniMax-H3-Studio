@@ -1,0 +1,380 @@
+/* ============================================================
+   OmniStudio · 统一响应式适配（web/responsive.css）
+   ------------------------------------------------------------
+   本文件是项目里**唯一的断点真源**。所有窄屏适配规则都写在这里，
+   不散落到 style.css / assets.css —— 改断点只改这一处。
+
+   断点表（CSS 用 max-width，JS 用同值的 --bp-* 变量）
+   ┌────────────────┬───────────┬────────────────────────────────────┐
+   │ 区间            │ 层级      │ 布局策略                            │
+   ├────────────────┼───────────┼────────────────────────────────────┤
+   │ ≤ 700px        │ phone     │ 侧栏→抽屉 / 参数→底部抽屉 / 单列     │
+   │ 701–1100px     │ tablet    │ 侧栏常驻但收窄 / 参数→底部抽屉      │
+   │ ≥ 1101px       │ desktop   │ 三栏（侧栏 + 参数 + 内容）原样      │
+   └────────────────┴───────────┴────────────────────────────────────┘
+   覆盖机型：375 / 390 / 414（phone）· 768（tablet）· 1280（desktop）
+
+   配套 JS（web/app.js）：
+     BREAKPOINTS.phone = 700，与本文件的 --bp-phone 同值；
+     网格卡片最小宽度通过 CSS 变量 --card-min-width 传给 JS，
+     避免 CSS 与 JS 两处各写一份数字而走偏。
+   ============================================================ */
+
+/* ---------- 断点变量（与 app.js 的 BREAKPOINTS 保持同值） ---------- */
+:root {
+  --bp-phone: 700px;    /* ≤ 此宽度：手机布局（侧栏抽屉 + 参数抽屉） */
+  --bp-tablet: 1100px;  /* ≤ 此宽度：平板布局（参数抽屉） */
+
+  --sidebar-w: 190px;
+  --panel-w: 330px;
+  --touch-min: 40px;    /* 触屏最小点击高度 */
+}
+
+/* ============================================================
+   1. 通用 —— 所有视口都生效的健壮性底线
+   ============================================================ */
+
+/* 长路径 / 长文件名不撑破视口：
+   任何包含长串无空格文本的元素都允许在词内断行。
+   （只对「可能很长」的容器生效，不动全局，避免破坏按钮排版） */
+.job-meta .row b,
+.al-kv .kv b,
+.sys-row b,
+.prov-item-meta code,
+.enhance-warn,
+.enhance-elems,
+.lora-info dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 网格列宽的取值来源 —— JS 通过 getComputedStyle 读这两个变量，
+   这样「卡片最小宽度」只需在 CSS 里改一处，JS 自动跟上。 */
+.jobs-grid {
+  --card-min-width: 260px;
+  --grid-gap: 14px;
+}
+
+/* 卡片底部操作按钮：flex 子项默认 min-width:auto，内容长于分配宽度时
+   会把按钮顶出卡片（375px 实测「删除」按钮右溢出 5px）。 */
+.job-actions button,
+.job-actions a { min-width: 0; }
+
+/* ============================================================
+   1.5 窄屏专用控件在桌面端隐藏
+   ------------------------------------------------------------
+   必须写在媒体查询**之前** —— 同优先级时后写的规则赢，
+   放在媒体查询后面会把窄屏的 display:flex 覆盖掉。
+   ============================================================ */
+.nav-toggle,
+.sidebar-mask,
+.panel-mask,
+.panel-fab {
+  display: none;
+}
+
+/* ============================================================
+   2. ≤ 1100px —— 平板：侧栏收窄 + 参数面板改底部抽屉
+   ============================================================ */
+@media (max-width: 1100px) {
+  .panel { width: 280px; flex-basis: 280px; }
+  .sidebar { width: 160px; flex-basis: 160px; }
+  #doneFilters { width: 100%; margin-left: 0; flex-wrap: wrap; }
+
+  /* 平板档网格：卡片最小宽度 170px ——
+     768px 视口下内容区约 568px，170px 起步能排 3 列，
+     用 260px（桌面档）只能排 2 列，一屏看到的东西少一半。 */
+  .jobs-grid { --card-min-width: 170px; --grid-gap: 12px; gap: 12px; }
+
+  /* 平板上标签按钮 31px / 搜索 input 14px —— 同样补到可点高度 */
+  .jobs-tabs button { min-height: 36px; }
+  .jobs-type-tabs button { min-height: 34px; }
+  .search-box input { min-height: 34px; }
+  .job-meta button.prompt-row { min-height: 32px; padding: 4px 0; }
+  .al-drawer-close { width: 38px; height: 38px; }
+}
+
+/* ============================================================
+   3. ≤ 1100px 覆盖层 —— 参数面板统一走「底部抽屉」
+   ------------------------------------------------------------
+   平板（768px）上三栏并排会把内容区压到不足 400px，网格没法看；
+   所以 ≤1100px 一律把参数面板收进底部抽屉，由浮动按钮唤起。
+   侧栏在平板上仍然常驻（160px），只在手机上变抽屉。
+   ============================================================ */
+@media (max-width: 1100px) {
+  /* ---------- 3.1 参数面板 → 底部抽屉 ---------- */
+  .panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: auto; flex-basis: auto;
+    max-height: 88vh;
+    border-right: none; border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform .22s ease;
+    z-index: 950;
+    padding: 6px 16px calc(18px + env(safe-area-inset-bottom));
+    box-shadow: 0 -6px 28px rgba(20, 26, 38, .16);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .panel.open { transform: translateY(0); }
+  /* 抽屉把手（CSS 绘制，无需额外 DOM） */
+  .panel::before {
+    content: ""; display: block;
+    width: 38px; height: 4px; border-radius: 2px;
+    background: #d3d7de; margin: 2px auto 10px;
+    flex: 0 0 auto;
+  }
+  .panel-mask {
+    position: fixed; inset: 0; background: rgba(18, 22, 30, .42);
+    z-index: 949; display: none;
+  }
+  .panel-mask.open { display: block; }
+
+  /* 打开参数抽屉的浮动按钮（平板同样需要 —— 参数区已收进抽屉） */
+  .panel-fab {
+    display: flex; align-items: center; gap: 6px;
+    position: fixed; right: 14px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 930;
+    height: 44px; padding: 0 18px;
+    border: none; border-radius: 22px;
+    background: var(--accent); color: #fff;
+    font-size: 13.5px; font-weight: 600; font-family: inherit;
+    cursor: pointer; box-shadow: 0 6px 18px rgba(79, 110, 247, .35);
+  }
+  .panel-fab:active { filter: brightness(.94); }
+  .panel-fab svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+  /* 抽屉内部：多列改单列 */
+  .compact-pair { grid-template-columns: 1fr; }
+  .cards2 { grid-template-columns: 1fr; }
+  .panel .field { min-width: 0; }
+  .seg button { min-height: 50px; }
+  .chips button { min-height: 38px; padding: 8px 14px; }
+  .prompt-enhance-bar { gap: 8px; }
+  .enhance-btn { min-height: 40px; padding: 8px 14px; }
+  .enhance-spec { max-width: 100%; width: 100%; min-height: 38px; }
+  .refine-history-btn { min-height: 38px; }
+  .gen-btn { height: 48px; font-size: 15px; }
+  .img-lora-btn { width: 34px; height: 34px; }
+  .img-lora-slider input[type=range] { height: 30px; }
+  .stitch-list { grid-template-columns: 1fr; }
+
+  /* 抽屉里的表单控件：高度统一到 38px（触屏可点），
+     字号 16px（iOS 低于 16px 会自动放大整个页面） */
+  .panel .img-select,
+  .panel .compact-field .img-select {
+    height: 38px; font-size: 16px; padding: 6px 9px;
+  }
+  .panel input[type=range] { height: 32px; }
+  .panel .lora-trigger-input { min-height: 38px; font-size: 16px; }
+  .panel .img-lora-info-btn {
+    font-size: 12px !important; min-height: 32px; padding: 4px 0 !important;
+  }
+}
+
+/* ============================================================
+   4. ≤ 700px —— 手机：侧栏也变抽屉 + 内容单列
+   ============================================================ */
+@media (max-width: 700px) {
+  /* ---------- 4.1 顶栏 ---------- */
+  .topbar { padding: 0 10px; gap: 8px; }
+  .brand { gap: 8px; flex: 1 1 auto; min-width: 0; }
+  /* 副标题在窄屏收起 —— 顶栏宽度留给状态与按钮 */
+  .brand-tagline { display: none; }
+  .brand-name { font-size: 14px; gap: 6px; }
+  .brand-version { font-size: 11px; }
+  .top-status { font-size: 12px; flex: 0 0 auto; }
+
+  /* 汉堡按钮（仅窄屏可见） */
+  .nav-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; flex: 0 0 36px;
+    border: 1px solid var(--border); background: #fff; border-radius: 9px;
+    cursor: pointer; color: var(--text); padding: 0;
+  }
+  .nav-toggle:active { background: #f2f3f6; }
+  .nav-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+
+  /* ---------- 4.2 侧栏 → 抽屉 ---------- */
+  .sidebar {
+    position: fixed; top: 44px; left: 0; bottom: 0;
+    width: min(300px, 84vw); flex-basis: auto;
+    z-index: 940;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 0 6px 28px rgba(20, 26, 38, .18);
+    overflow-y: auto;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-mask {
+    position: fixed; inset: 44px 0 0 0;
+    background: rgba(18, 22, 30, .42);
+    z-index: 939; display: none;
+  }
+  .sidebar-mask.open { display: block; }
+
+  /* 抽屉里的导航项要够大才好点 */
+  .nav-item { min-height: var(--touch-min); padding: 10px 12px; font-size: 14px; }
+  .nav-group { padding-top: 14px; }
+
+  /* ---------- 4.3 内容区：单列全宽 ---------- */
+  .layout { flex-direction: column; }
+  .jobs-area,
+  .assets-page,
+  .system-page {
+    width: 100%; min-width: 0; flex: 1 1 auto;
+    padding: 12px 12px 24px;
+  }
+
+  /* ---------- 4.4 网格：手机上卡片更小，列数自适应 ---------- */
+  .jobs-grid {
+    --card-min-width: 150px;
+    --grid-gap: 10px;
+    gap: 10px;
+  }
+  .al-grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 9px;
+  }
+
+  /* ---------- 4.5 任务区头部：标签换行、筛选器整行 ---------- */
+  .jobs-head { gap: 8px; margin-bottom: 10px; }
+  .jobs-tabs { flex-wrap: wrap; }
+  .jobs-tabs button {
+    padding: 8px 12px; font-size: 13px; min-height: 36px;
+  }
+  .jobs-type-tabs { width: 100%; margin-top: 2px; }
+  .jobs-type-tabs button { padding: 7px 10px; font-size: 12px; min-height: 34px; }
+  .jobs-tools { width: 100%; flex-wrap: wrap; gap: 6px; }
+  .page-size-tools { margin-left: 0; }
+  .search-box { flex: 1 1 140px; width: auto; min-width: 120px; height: 38px; }
+  .jobs-tools select, .filter-reset, .page-size-tools select {
+    height: 38px; min-height: 38px; flex: 1 1 auto; min-width: 0;
+  }
+  .jobs-pagination { flex-wrap: wrap; gap: 4px; padding: 14px 0 6px; }
+  .jobs-pagination button { min-width: 38px; height: 38px; }
+
+  /* ---------- 4.6 输入框：16px 起，避免 iOS 自动放大 ---------- */
+  .panel textarea, .panel input[type=text], .panel input[type=number] {
+    font-size: 16px;
+  }
+
+  /* ---------- 4.6b 触控目标补足 32px ----------
+     卡片里的「提示词」行是 button，实测只有 20px 高 —— 触屏点不准；
+     搜索框里的 input 只有 14px（父级 .search-box 已是 38px，
+     但 input 自己没撑开）；种子输入框 30px。 */
+  .job-meta button.prompt-row { min-height: 34px; padding: 5px 0; }
+  .search-box input { min-height: 36px; }
+  .compact-field input[type=text] { height: 38px; font-size: 16px; }
+
+  /* ---------- 4.7 素材库 ---------- */
+  .al-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .al-actions { width: 100%; }
+  .al-actions .al-btn { flex: 1 1 auto; justify-content: center; min-height: 40px; }
+  .al-toolbar { padding: 9px 10px; gap: 6px; }
+  .al-toolbar .search-box { flex: 1 1 100%; min-width: 0; }
+  .al-toolbar select { flex: 1 1 auto; min-width: 0; min-height: 38px; }
+  .al-chip { padding: 7px 12px; min-height: 36px; display: inline-flex; align-items: center; }
+  .al-tagpick-menu { min-width: min(280px, calc(100vw - 24px)); max-height: 50vh; }
+  .al-drop { padding: 14px 10px; font-size: 12px; }
+  .al-upload-opts .al-input { flex: 1 1 100%; min-width: 0; }
+  .al-card-body { padding: 7px 8px; }
+  .al-name { font-size: 12px; }
+  /* 详情抽屉：手机上占满整屏。
+     关闭态靠 transform:translateX(100%) 移到视口右外侧 ——
+     它本来就该在视口外，这不是「溢出」，但要保证宽度确实是 100vw，
+     不能因为 body 的滚动宽度把它算进来造成横向滚动条。 */
+  .al-drawer {
+    width: 100vw; max-width: 100vw;
+    right: 0; left: auto;
+  }
+  .al-drawer:not(.open) { visibility: hidden; }
+  .al-drawer.open { visibility: visible; }
+  .al-drawer-close { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+
+  /* ---------- 4.8 弹窗：手机上改为底部抽屉形态 ---------- */
+  .prompt-modal { padding: 0; align-items: flex-end; }
+  .prompt-dialog {
+    width: 100vw; max-width: 100vw;
+    max-height: 92vh; border-radius: 16px 16px 0 0;
+  }
+  .prompt-dialog-head { padding: 12px 14px; }
+  .prompt-dialog-actions { flex-wrap: wrap; padding: 0 14px 14px; }
+  .prompt-dialog-actions button { flex: 1 1 auto; min-height: 42px; }
+  #promptModalText { margin: 12px; min-height: 200px; max-height: 46vh; font-size: 16px; }
+  #enhanceResult { margin: 12px; min-height: 180px; max-height: 44vh; font-size: 16px; }
+  .prov-form { padding: 12px; }
+  .prov-field input, .prov-field select { font-size: 16px; min-height: 42px; }
+  .prov-check { min-height: 40px; }
+
+  /* 素材选择器：手机上占满整屏 */
+  .al-picker-mask { padding: 0; }
+  .al-picker {
+    width: 100vw; max-width: 100vw; max-height: 100vh; height: 100vh;
+    border-radius: 0;
+  }
+  .al-picker-tools { padding: 9px 12px; }
+  .al-picker-tools .search-box { flex: 1 1 100% !important; }
+  .al-picker-body { padding: 10px; }
+  .al-picker-foot { padding: 9px 12px; }
+
+  /* ---------- 4.9 大图查看器 ---------- */
+  .lightbox-bar { padding: 8px 10px; gap: 8px; }
+  .lightbox-title { max-width: 100%; }
+  .lightbox-info { width: 100%; }
+  .lightbox-tools { width: 100%; }
+  .lightbox-tools button, .lightbox-tools a {
+    flex: 1 1 auto; text-align: center; min-height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .lightbox-x { flex: 0 0 44px !important; }
+
+  /* ---------- 4.10 系统页 / Provider 页 ---------- */
+  .sys-grid { grid-template-columns: 1fr; gap: 10px; }
+  .sys-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .sys-refresh { min-height: 40px; }
+  .providers-page { max-width: none; }
+  .prov-item { padding: 12px; }
+  .prov-item-main { min-width: 0; flex: 1 1 100%; }
+  .prov-item-actions button { min-height: 38px; }
+  .prov-add-btn, .agent-save { min-height: 42px; }
+  .agent-field select, .agent-field textarea, .agent-field input { font-size: 16px; }
+
+  /* ---------- 4.11 长片拼接 ---------- */
+  .stitch-heading b { font-size: 16px; }
+}
+
+/* ============================================================
+   5. 触屏设备额外加大点击目标
+   ------------------------------------------------------------
+   与断点无关，只在真触屏（pointer: coarse）生效，桌面鼠标不受影响。
+   ============================================================ */
+@media (pointer: coarse) {
+  .jobs-tabs button,
+  .jobs-type-tabs button,
+  .chips button,
+  .al-chip,
+  .al-btn,
+  .jobs-pagination button,
+  .nav-item,
+  .seg button,
+  .job-actions button,
+  .job-actions a,
+  .card-actions button,
+  .prov-item-actions button,
+  .filter-reset,
+  .jobs-tools select,
+  .page-size-tools select,
+  .enhance-btn,
+  .refine-history-btn,
+  .img-lora-info-btn {
+    min-height: var(--touch-min);
+  }
+  /* 卡片操作按钮在触屏上横向排 4 个会挤成一团 —— 改成两行两列 */
+  .job-actions { flex-wrap: wrap; }
+  .job-actions button,
+  .job-actions a { flex: 1 1 45%; }
+  .al-drawer-close { width: 40px; height: 40px; }
+}
