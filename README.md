@@ -34,6 +34,9 @@
 - **左侧栏**：视频（文生视频 / 首尾帧 / 参考生成 / 长片拼接）· 图像（Z-IMAGE 文生图）· 系统（硬件参数）· 释放显存
 - **参数面板**：分辨率 544p/768p、模型卡（H3+LoRA / 标准 H3）、LoRA 选择与强度、步数 4~20、画面比例、时长 5~15s、种子
 - **任务卡片**：排队/生成中进度条、可播放预览、Cancel、下载、复用参数、删除；可按提示词与任务 ID 搜索，按类型、比例、时长筛选
+- **任务标签**：`全部`（默认，不按状态过滤）/ 进行中 / 已完成 / 长片 / 失败 / 已取消
+- **生成批次**：文生图可一次出 1~5 张，各批次独立种子、独立状态，单批次失败不影响其余批次；单条任务卡内可展开「批次结果」缩略图网格，逐批次看状态并点开大图
+- **LoRA 配置**：文生图面板可挂多个本机已安装的 Z-Image LoRA，逐个调强度（0~1，0=关闭）、排序、启停、删除，并可查看每个 LoRA 的显示名 / 路径 / 触发词 / 推荐强度 / 适用场景；配置存服务端，局域网共用
 - **图片查看器**：生成结果缩略图点击即开大图（hover 显示放大图标、光标变 `zoom-in`），支持缩放 / 适应屏幕 / 原始尺寸 / 滚轮 / 方向键 / 拖拽平移 / Esc 关闭，并可直接下载原图或在新窗口打开；纯前端实现，局域网所有客户端一致生效
 - **硬件参数页**：GPU（显存/利用率/温度/功耗/驱动）、CPU、内存、磁盘、软件环境（ComfyUI/PyTorch/Python/OS）、模型库分类统计，3 秒自动刷新
 
@@ -86,6 +89,37 @@
 | 生成进行中 | 增强按钮与生成按钮同时禁用，文案变为「生成中…」，避免并发重复提交 |
 
 > 拦截只在文生图模式生效，视频模式流程不变。
+
+### 4）生成批次（1~5 张）
+
+文生图面板可设置「生成批次」（1~5，默认 1）。一次提交 N 张时，服务端会拆成 N 个**独立批次**：
+
+- 每批次有独立的种子（基准种子 + 批次序号，或完全随机），出图互不相同
+- 每批次有独立的 `status` / `progress` / `error` / 产物，**单个批次失败只标记该批次 `failed`，其余批次照常跑完**
+- 任务整体状态 = 有任一批次成功即 `done`（产物为所有成功批次的合集），全部失败才 `failed`
+- 任务卡内点「批次结果」可展开缩略图网格，逐批次看状态，点缩略图可直接放大
+
+### 5）Z-Image LoRA
+
+文生图面板底部有 LoRA 配置区，可添加多个 LoRA、逐个调强度、排序、启停、删除。
+
+**清单只列本机实际存在的文件**（与 ComfyUI 自己的 lora 下拉同源，扫描 `extra_model_paths.yaml` 声明的所有 loras 目录）。本机当前有 4 个 Z-Image LoRA：
+
+| 显示名 | 文件 | 基础模型 | 触发词 | 推荐强度 |
+|---|---|---|---|---|
+| 如梦似幻（滤镜） | `Kook_Zimage_如梦似幻.safetensors` | Z-Image（Turbo） | `如梦似幻` | 1.0 |
+| 瑶光（真实幻想） | `Kook_Zimage_瑶光.safetensors` | Z-Image（Turbo） | `瑶光` / `真实幻想` | 1.0 |
+| 蒸馏加速 8 步（2603） | `Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors` | Z-Image Base | 上游未标注 | 1.0 |
+| 蒸馏 LoRA（本地抽取版 rank64） | `z-image/Z-Image-Fun-Distill-Lora.safetensors` | Z-Image | 上游未标注 | 1.0 |
+
+> 「如梦似幻」「瑶光」的触发词来自上游 ModelScope README 的 tags（`KookYan/Kook_Zimage_Rmsh` / `KookYan/Kook_Zimage_Yg`）；
+> 蒸馏 LoRA 的 baseModel=**ZImageBase**、推荐 8 步 CFG 1（来自 Civitai 2362961 / HF `alibaba-pai/Z-Image-Fun-Lora-Distill`）。
+> 上游没写触发词的就留空，不编造。
+
+**保存配置时会校验文件是否真实存在**，不存在直接返回 400 报错，不静默忽略。配置存在服务端（`model_provider_prefs` 表），局域网所有客户端共用同一份。
+
+工作流注入：`UNETLoader → ModelSamplingAuraFlow → LoraLoaderModelOnly × N → KSampler`。
+用 `LoraLoaderModelOnly`（只改 model 不动 clip）是因为 Z-Image 的文本编码走独立的 `CLIPLoader(lumina2)`，风格 LoRA 应当只作用在 UNet 侧。
 
 ### 3）生成结果图片可放大查看
 
@@ -208,6 +242,8 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | DELETE | `/api/providers/{id}` | 删除 Provider（同时清掉指向它的默认项） |
 | POST | `/api/providers/{id}/default` | 设为默认 Provider；body `{"multimodal":true}` 设为默认多模态模型 |
 | POST | `/api/providers/{id}/test` | 连通性探测（不生成内容） |
+| GET | `/api/image-loras` | 本机实际存在的 Z-Image LoRA 清单 + 当前配置 |
+| PUT | `/api/image-loras` | 保存 LoRA 配置（校验文件存在，存服务端） |
 | GET | `/api/enhancer` | 提示词增强 Agent 的模板清单与参数 |
 | PUT | `/api/enhancer` | 保存用户可编辑的模板覆盖与参数 |
 | POST | `/api/enhance` | 提示词增强（`prompt` + `mode`=replace/append + `spec_id` + `provider_id`） |

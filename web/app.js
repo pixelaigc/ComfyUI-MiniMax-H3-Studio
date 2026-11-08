@@ -12,7 +12,7 @@ const MODE_INFO = {
 
 const state = {
   mode: "t2v",
-  tab: "done",
+  tab: "all",
   page: "create",
   res: "544p",
   model: "lora",
@@ -40,12 +40,17 @@ const state = {
     sampler: "res_multistep",
     scheduler: "simple",
     negative: "",
+    batchCount: 1,
+    // LoRA 配置：[{name, strength, enabled}]，服务端持久化
+    loras: [],
   },
 };
 
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
 const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 3 };
+// 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
+const IMG_LORAS = { available: [], config: [] };
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -183,6 +188,190 @@ function imgTierLabel(tier) {
   return `${tier.label} · ${w}×${h} (${mp.toFixed(1)}MP)${up ? " · 放大" : ""}`;
 }
 
+// ---------- 生成批次（1-5） ----------
+const IMG_BATCH_OPTIONS = [1, 2, 3, 4, 5];
+
+function renderBatchChips() {
+  const box = $("#imgBatchChips");
+  if (!box) return;
+  box.innerHTML = IMG_BATCH_OPTIONS.map(n =>
+    `<button type="button" data-n="${n}" class="${n === state.img.batchCount ? "active" : ""}">${n} 张</button>`
+  ).join("");
+  box.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.img.batchCount = Number(btn.dataset.n);
+      renderBatchChips();
+    });
+  });
+  const hint = $("#imgBatchHint");
+  if (hint) {
+    hint.textContent = state.img.batchCount > 1
+      ? `一次出 ${state.img.batchCount} 张 · 独立种子`
+      : "一次出几张";
+  }
+}
+
+// ---------- LoRA 面板 ----------
+function imgLoraMeta(name) {
+  return IMG_LORAS.available.find(l => l.name === name) || null;
+}
+
+function renderLoraSelect() {
+  const sel = $("#imgLoraSelect");
+  if (!sel) return;
+  const used = new Set(state.img.loras.map(l => l.name));
+  const options = IMG_LORAS.available.filter(l => !used.has(l.name));
+  sel.innerHTML = options.length
+    ? options.map(l => `<option value="${esc(l.name)}">${esc(l.display)}</option>`).join("")
+    : `<option value="">${IMG_LORAS.available.length ? "全部已添加" : "本机未找到 Z-Image LoRA"}</option>`;
+  sel.disabled = !options.length;
+  $("#imgLoraAdd").disabled = !options.length;
+}
+
+function renderLoraList() {
+  const box = $("#imgLoraList");
+  if (!box) return;
+  if (!state.img.loras.length) {
+    box.innerHTML = "";
+    $("#imgLoraNote").textContent = IMG_LORAS.available.length
+      ? "未添加 LoRA。可选本机已安装的 Z-Image LoRA，强度 0 表示关闭。"
+      : "本机未检测到 Z-Image LoRA 文件。";
+    return;
+  }
+  box.innerHTML = state.img.loras.map((item, index) => {
+    const meta = imgLoraMeta(item.name);
+    const missing = !meta;
+    const rec = meta && Number(item.strength) === Number(meta.recommended_strength);
+    const disabled = item.enabled === false || Number(item.strength) <= 0;
+    const trigger = meta && meta.trigger
+      ? `<span class="lora-trigger">${esc(meta.trigger)}</span>` : "（上游未标注触发词）";
+    return `<div class="img-lora-item ${disabled ? "disabled" : ""} ${missing ? "missing" : ""}" data-idx="${index}">
+      <div class="img-lora-head">
+        <button type="button" class="img-lora-btn toggle" title="${disabled ? "启用" : "停用"}">${disabled ? "○" : "●"}</button>
+        <span class="img-lora-name" title="${esc(item.name)}">${esc(meta ? meta.display : item.name)}</span>
+        ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
+        ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
+        <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
+        <button type="button" class="img-lora-btn down" title="下移" ${index === state.img.loras.length - 1 ? "disabled" : ""}>↓</button>
+        <button type="button" class="img-lora-btn del" title="删除">×</button>
+      </div>
+      <div class="img-lora-slider">
+        <input type="range" class="strength" min="0" max="1" step="0.05" value="${Number(item.strength)}" title="强度 0-1，0 表示关闭">
+        <span class="img-lora-strength">${Number(item.strength).toFixed(2)}</span>
+      </div>
+      <div class="img-lora-meta">触发词：${trigger} · 基础：${esc(meta ? meta.base : "—")}</div>
+      <div class="img-lora-meta"><button type="button" class="img-lora-info-btn" style="background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:10px;font-family:inherit">查看简易说明 ›</button></div>
+    </div>`;
+  }).join("");
+
+  box.querySelectorAll(".img-lora-item").forEach(el => {
+    const index = Number(el.dataset.idx);
+    const item = state.img.loras[index];
+    el.querySelector(".toggle").addEventListener("click", () => {
+      item.enabled = item.enabled === false;
+      saveLoraConfig();
+    });
+    el.querySelector(".up").addEventListener("click", () => {
+      if (index === 0) return;
+      [state.img.loras[index - 1], state.img.loras[index]] = [state.img.loras[index], state.img.loras[index - 1]];
+      saveLoraConfig();
+    });
+    el.querySelector(".down").addEventListener("click", () => {
+      if (index === state.img.loras.length - 1) return;
+      [state.img.loras[index + 1], state.img.loras[index]] = [state.img.loras[index], state.img.loras[index + 1]];
+      saveLoraConfig();
+    });
+    el.querySelector(".del").addEventListener("click", () => {
+      state.img.loras.splice(index, 1);
+      saveLoraConfig();
+    });
+    const slider = el.querySelector("input.strength");
+    slider.addEventListener("input", () => {
+      item.strength = Number(slider.value);
+      el.querySelector(".img-lora-strength").textContent = item.strength.toFixed(2);
+      el.classList.toggle("disabled", item.enabled === false || item.strength <= 0);
+    });
+    slider.addEventListener("change", () => saveLoraConfig());
+    el.querySelector(".img-lora-info-btn").addEventListener("click", () => openLoraInfo(item.name));
+  });
+  $("#imgLoraNote").textContent = `已添加 ${state.img.loras.length} 个 LoRA（配置存在服务端，局域网共用）。`;
+}
+
+// LoRA 配置持久化到服务端
+let loraSaveTimer = null;
+function saveLoraConfig() {
+  renderLoraList();
+  renderLoraSelect();
+  clearTimeout(loraSaveTimer);
+  loraSaveTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch("/api/image-loras", {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({loras: state.img.loras}),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setEnhanceHint(`LoRA 配置保存失败：${data.error || resp.status}`, "error");
+        return;
+      }
+      state.img.loras = (data.loras || []).map(l => ({
+        name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
+      }));
+      renderLoraList();
+      renderLoraSelect();
+    } catch (e) {
+      setEnhanceHint(`LoRA 配置保存失败：${e.message}`, "error");
+    }
+  }, 250);
+}
+
+function openLoraInfo(name) {
+  const meta = imgLoraMeta(name);
+  const body = $("#loraInfoBody");
+  if (!meta) {
+    body.innerHTML = `<div class="lora-scene">本机未找到该 LoRA 文件：<b>${esc(name)}</b>。请检查文件是否仍在原路径。</div>`;
+  } else {
+    const trigger = meta.trigger
+      ? `<span class="lora-trigger">${esc(meta.trigger)}</span>` : "上游未标注触发词";
+    body.innerHTML = `<dl>
+      <dt>显示名</dt><dd>${esc(meta.display)}</dd>
+      <dt>文件名</dt><dd>${esc(meta.name)}</dd>
+      <dt>文件路径</dt><dd>${esc(meta.path)}</dd>
+      <dt>大小</dt><dd>${meta.size_mb} MB</dd>
+      <dt>基础模型</dt><dd>${esc(meta.base)}</dd>
+      <dt>触发词</dt><dd>${trigger}</dd>
+      <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}</dd>
+      <dt>说明来源</dt><dd>${esc(meta.source || "—")}</dd>
+    </dl>
+    <div class="lora-scene">${esc(meta.scene || "（上游未提供场景说明）")}</div>`;
+  }
+  $("#loraInfoModal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeLoraInfo() {
+  $("#loraInfoModal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+// 载入本机 LoRA 清单 + 已保存配置
+async function loadImageLoras() {
+  try {
+    const resp = await fetch("/api/image-loras", {cache: "no-store"});
+    if (!resp.ok) return;
+    const data = await resp.json();
+    IMG_LORAS.available = data.available || [];
+    state.img.loras = (data.config || []).map(l => ({
+      name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
+    }));
+    const hint = $("#imgLoraHint");
+    if (hint) hint.textContent = `本机 ${IMG_LORAS.available.length} 个可用`;
+    renderLoraSelect();
+    renderLoraList();
+  } catch (e) { /* 静默：不阻断出图 */ }
+}
+
 function renderImagePanel() {
   const s = state.img;
   const model = IMG_OPTIONS.models[s.model];
@@ -265,6 +454,10 @@ function renderImagePanel() {
     ? "Base 非蒸馏，负面提示词生效（官方强烈建议）"
     : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
   if (negSupported) $("#imgNegative").value = s.negative || "";
+
+  renderBatchChips();
+  renderLoraSelect();
+  renderLoraList();
 
   updateImageSizeFields();
   updateImageModelNote();
@@ -588,6 +781,12 @@ $("#genBtn").addEventListener("click", async () => {
     params.cfg = state.img.cfg;
     params.shift = state.img.shift;
     params.negative_prompt = state.img.negative || "";
+    // 生成批次：一次提交 N 张（服务端拆成 N 个独立批次）
+    params.batch_count = state.img.batchCount;
+    // LoRA：只提交启用且强度 > 0 的（服务端会再校验文件是否存在）
+    params.loras = state.img.loras
+      .filter(l => l.enabled !== false && Number(l.strength) > 0)
+      .map(l => ({name: l.name, strength: Number(l.strength)}));
   }
   fd.append("params", JSON.stringify(params));
   try {
@@ -618,11 +817,11 @@ $("#genBtn").addEventListener("click", async () => {
 // ---------- 任务列表 ----------
 function renderTabs() {
   $$(".jobs-tabs button").forEach(b => b.classList.toggle("active", b.dataset.st === state.tab));
-  $("#doneFilters").hidden = state.tab !== "done";
+  $("#doneFilters").hidden = !["done", "all"].includes(state.tab);
 }
 $$(".jobs-tabs button").forEach(b => b.addEventListener("click", () => {
   state.tab = b.dataset.st;
-  if (["done", "longfilm"].includes(state.tab)) state.donePage = 1;
+  if (["done", "longfilm", "all"].includes(state.tab)) state.donePage = 1;
   showCreate();
   renderTabs();
   refreshJobs();
@@ -846,6 +1045,45 @@ window.addEventListener("resize", () => {
   if (lightbox.open) lightboxFit();
 });
 
+// 单条任务内的批次结果：可展开/折叠的缩略图网格 + 每批次状态
+const expandedBatches = new Set();
+
+function renderJobBatches(job) {
+  const batches = job.batches || [];
+  if (!batches.length) return "";
+  const doneCount = batches.filter(b => b.status === "done").length;
+  const failedCount = batches.filter(b => b.status === "failed").length;
+  const open = expandedBatches.has(job.id);
+  const summary = failedCount
+    ? `${doneCount}/${batches.length} 成功 · ${failedCount} 失败`
+    : `${doneCount}/${batches.length} 完成`;
+  const cells = batches.map(batch => {
+    const out = (batch.outputs || []).find(o => o.kind === "image");
+    const statusText = {done: "完成", failed: "失败", running: "生成中",
+                        queued: "排队中", canceled: "已取消"}[batch.status] || batch.status;
+    // 批次失败时即使残留了旧产物也不展示图 —— 状态优先，避免「失败却显示成图」
+    const failed = batch.status === "failed";
+    const thumb = out && !failed
+      ? `<div class="job-batch-thumb"><img src="${outputUrl(job, out)}" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
+      : `<div class="job-batch-thumb ${failed ? "failed" : ""}">${
+          failed ? (batch.error || "失败").slice(0, 60)
+          : batch.status === "running" ? `${Math.round((batch.progress || 0) * 100)}%`
+          : batch.status === "canceled" ? "已取消"
+          : "排队中"}</div>`;
+    return `<div class="job-batch" data-batch="${batch.id}">
+      ${thumb}
+      <div class="job-batch-foot">
+        <span class="st ${batch.status}">#${batch.idx + 1} ${statusText}</span>
+        <span class="seed" title="该批次种子">${batch.seed ?? "—"}</span>
+      </div>
+    </div>`;
+  }).join("");
+  return `<button type="button" class="job-batches-toggle ${open ? "open" : ""}" data-act="toggle-batches">
+      <span class="caret">▶</span> 批次结果（${summary}）
+    </button>
+    <div class="job-batches" data-batches ${open ? "" : "hidden"}>${cells}</div>`;
+}
+
 function jobCard(job) {
   const p = job.params || {};
   const info = MODE_INFO[job.mode] || { name: job.mode };
@@ -900,6 +1138,7 @@ function jobCard(job) {
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : ""}
     </div>`}
+    ${renderJobBatches(job)}
     <div class="job-actions">
       ${video || image ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
@@ -992,6 +1231,26 @@ function jobCard(job) {
     a.click();
   });
   card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => openPromptModal(p.prompt || ""));
+  // 批次结果展开/折叠
+  card.querySelector('[data-act="toggle-batches"]')?.addEventListener("click", event => {
+    event.stopPropagation();
+    const open = !expandedBatches.has(job.id);
+    if (open) expandedBatches.add(job.id); else expandedBatches.delete(job.id);
+    const btn = event.currentTarget;
+    btn.classList.toggle("open", open);
+    const grid = card.querySelector("[data-batches]");
+    if (grid) grid.hidden = !open;
+  });
+  // 批次缩略图点击放大
+  card.querySelectorAll(".job-batch-thumb img").forEach(el => {
+    el.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const url = el.getAttribute("src");
+      const name = url.split("/").pop();
+      lightboxShow(url, name, el.naturalWidth, el.naturalHeight);
+    });
+  });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
     // 找到对应模式侧栏项并切换
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
@@ -1010,6 +1269,10 @@ function jobCard(job) {
       if (p.cfg != null) s.cfg = p.cfg;
       if (p.shift != null) s.shift = p.shift;
       if (p.negative_prompt != null) s.negative = p.negative_prompt;
+      if (p.batch_count) s.batchCount = Number(p.batch_count);
+      if (Array.isArray(p.loras)) {
+        s.loras = p.loras.map(l => ({name: l.name, strength: Number(l.strength), enabled: true}));
+      }
       renderImagePanel();
     } else {
       if (p.resolution) setSeg("#resSeg", p.resolution), state.res = p.resolution;
@@ -1066,8 +1329,12 @@ function escapeHtml(s) {
 }
 
 function jobSig(j) {
+  // 批次状态/产物变化时也要重建卡片，否则批次网格不会刷新
+  const batchSig = (j.batches || [])
+    .map(b => `${b.idx}:${b.status}:${Math.round((b.progress || 0) * 100)}:${(b.outputs || []).length}:${b.error || ""}`)
+    .join(",");
   return [j.id, j.status, Math.round((j.progress || 0) * 100), j.progress_text || "",
-    (j.outputs || []).map(o => o.file).join(",")].join("|");
+    (j.outputs || []).map(o => o.file).join(","), batchSig].join("|");
 }
 
 let jobsRequest = 0;
@@ -1142,10 +1409,14 @@ async function refreshJobs() {
     displayedTab = tab;
   }
   try {
-    const statuses = tab === "active" ? ["queued", "running"] : [tab === "longfilm" ? "done" : tab];
+    // 「全部」= 不按状态过滤；其余标签各自过滤
+    const statuses = tab === "all" ? ["all"]
+      : tab === "active" ? ["queued", "running"]
+      : [tab === "longfilm" ? "done" : tab];
     const groups = await Promise.all(statuses.map(async status => {
       const query = new URLSearchParams({status});
-      if (status === "done") {
+      // 「已完成」「全部」都走服务端筛选 + 分页；「全部」不按状态过滤但保留筛选条件
+      if (["done", "all"].includes(status)) {
         query.set("page", state.donePage);
         query.set("page_size", DONE_PAGE_SIZE);
         if (tab === "longfilm") query.set("media", "longfilm");
@@ -1154,10 +1425,12 @@ async function refreshJobs() {
       const response = await fetch("/api/jobs?" + query.toString(), {cache: "no-store"});
       if (!response.ok) throw new Error("HTTP " + response.status);
       const data = await response.json();
-      return {jobs: data.jobs.filter(job => job.status === status), total: data.total ?? data.jobs.length, page: data.page ?? 1};
+      // status=all 时服务端不按状态过滤，前端也不做二次过滤
+      const jobs = status === "all" ? data.jobs : data.jobs.filter(job => job.status === status);
+      return {jobs, total: data.total ?? jobs.length, page: data.page ?? 1};
     }));
     if (ticket !== jobsRequest || tab !== state.tab) return;
-    if (["done", "longfilm"].includes(tab)) {
+    if (["done", "longfilm", "all"].includes(tab)) {
       state.donePage = groups[0].page;
       renderDonePagination(groups[0].total, state.donePage);
     } else {
@@ -1489,8 +1762,35 @@ async function refreshHardware(force) {
 }
 setInterval(() => { if (state.page === "system") refreshHardware(); }, 3000);
 
+// ---------- LoRA 面板交互 ----------
+$("#imgLoraAdd")?.addEventListener("click", () => {
+  const name = $("#imgLoraSelect").value;
+  if (!name) return;
+  const meta = imgLoraMeta(name);
+  if (state.img.loras.length >= 8) {
+    setEnhanceHint("最多 8 个 LoRA", "error");
+    return;
+  }
+  state.img.loras.push({
+    name,
+    strength: meta ? Number(meta.recommended_strength) : 1.0,
+    enabled: true,
+  });
+  saveLoraConfig();
+});
+
+$("#loraInfoClose")?.addEventListener("click", closeLoraInfo);
+$("#loraInfoDone")?.addEventListener("click", closeLoraInfo);
+$("#loraInfoModal")?.addEventListener("click", event => {
+  if (event.target === $("#loraInfoModal")) closeLoraInfo();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !$("#loraInfoModal").hidden) closeLoraInfo();
+});
+
 // ---------- 启动 ----------
 loadImageOptions();
+loadImageLoras();
 renderMode();
 renderTabs();
 renderStitchClips();

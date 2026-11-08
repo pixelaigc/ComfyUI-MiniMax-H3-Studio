@@ -12,6 +12,8 @@ H3 Studio 工作流生成器
 import math
 import random
 
+from . import loras as lora_registry
+
 # ------------------------------------------------------------------
 # 模型清单（与 d:\cfup\ComfyUI\models 实际文件一致）
 # ------------------------------------------------------------------
@@ -412,10 +414,47 @@ def z_image_megapixels(width, height):
     return (width * height) / (1024.0 * 1024.0)
 
 
+def _z_image_lora_chain(lora_items, base_model_ref):
+    """把选中的 LoRA 串成模型链，返回 (节点字典, 最终模型引用)。
+
+    链路：UNETLoader -> ModelSamplingAuraFlow -> LoraLoaderModelOnly x N
+
+    LoraLoaderModelOnly 只作用在 model 上（不动 clip），这正是 Z-Image
+    需要的 —— Z-Image 的文本编码走独立的 CLIPLoader(lumina2)，
+    风格 LoRA 应当只改 UNet 侧。
+
+    找不到文件时抛错（不静默忽略）。
+    """
+    nodes: dict = {}
+    current = base_model_ref
+    for index, item in enumerate(lora_items):
+        name = item.get("name") or ""
+        if not name:
+            raise ValueError("LoRA 配置缺少 name")
+        resolved, path = lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            raise ValueError(f"本机不存在该 LoRA 文件：{name}")
+        strength = float(item.get("strength", 1.0))
+        if strength <= 0:
+            # 强度 0 = 关闭该 LoRA，但仍然校验文件存在，避免静默吞掉错名
+            continue
+        node_id = f"57:40{index}"
+        nodes[node_id] = {
+            "inputs": {"lora_name": resolved, "strength_model": strength,
+                       "model": current},
+            "class_type": "LoraLoaderModelOnly",
+        }
+        current = [node_id, 0]
+    return nodes, current
+
+
 def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
                        cfg, shift, negative_mode, negative_text, prompt,
-                       job_id, filename_prefix=None):
-    """Z-Image 主链节点（文生图 / 放大二次采样共用）。"""
+                       job_id, filename_prefix=None, loras=None):
+    """Z-Image 主链节点（文生图 / 放大二次采样共用）。
+
+    loras: [{name, strength}] —— 按顺序串联到 model 链上。
+    """
     p = {
         "9": {"inputs": {"filename_prefix": filename_prefix or f"h3studio/t2i_{job_id}",
                          "images": ["57:8", 0]},
@@ -438,6 +477,11 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
                             "latent_image": ["57:13", 0]},
                  "class_type": "KSampler"},
     }
+    # LoRA 串在 ModelSamplingAuraFlow 之后、KSampler 之前
+    if loras:
+        lora_nodes, model_ref = _z_image_lora_chain(loras, ["57:11", 0])
+        p.update(lora_nodes)
+        p["57:3"]["inputs"]["model"] = model_ref
     if negative_mode == "encode":
         p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
                       "class_type": "CLIPTextEncode"}
@@ -448,7 +492,8 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
     return p
 
 
-def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, prompt, job_id):
+def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, prompt, job_id,
+                            loras=None):
     """官方 2K 放大路径（utility_z_image_turbo_2k_upscaler.app.json 的做法）。
 
     链路：T2I 出图 -> ImageScaleToTotalPixels(lanczos) -> ImageUpscaleWithModel
@@ -503,6 +548,12 @@ def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, promp
                   "class_type": "KSampler"},
         "57:8b": {"inputs": {"samples": ["57:75", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
     }
+    # 放大路径的 LoRA 同样串在 ModelSamplingAuraFlow 之后
+    if loras:
+        lora_nodes, model_ref = _z_image_lora_chain(loras, ["57:11", 0])
+        p.update(lora_nodes)
+        p["57:3"]["inputs"]["model"] = model_ref
+        p["57:75"]["inputs"]["model"] = model_ref
 
 
 def build_t2i(params):
@@ -538,16 +589,33 @@ def build_t2i(params):
     negative_text = params.get("negative_prompt", "") or ""
     prompt = params.get("prompt", "")
 
+    # LoRA：[{name, strength}]，只接受启用且强度 > 0 的项
+    loras = []
+    for item in (params.get("loras") or []):
+        if not isinstance(item, dict):
+            continue
+        if not item.get("enabled", True):
+            continue
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength <= 0:
+            continue
+        loras.append({"name": item.get("name") or "", "strength": strength})
+
     # 目标过大 -> 走官方 2K 放大路径（生成端固定用官方 Turbo 推荐参数）
     if z_image_megapixels(width, height) > Z_IMAGE_MAX_DIRECT_MP:
         base_w, base_h = z_image_dimensions(aspect, "1mp")
-        p = _z_image_upscale_nodes(model, base_w, base_h, width, height, seed, prompt, job_id)
+        p = _z_image_upscale_nodes(model, base_w, base_h, width, height, seed, prompt,
+                                   job_id, loras=loras)
         # 放大链输出接回最终 SaveImage
         p["9"]["inputs"]["images"] = ["57:8b", 0]
         return p
 
     return _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
-                              cfg, shift, negative_mode, negative_text, prompt, job_id)
+                              cfg, shift, negative_mode, negative_text, prompt, job_id,
+                              loras=loras)
 
 
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i}

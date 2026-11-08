@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import platform
+import random
 import re
 import shutil
 import sqlite3
@@ -49,6 +50,7 @@ from h3studio.workflows import (
 from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
+from h3studio import loras as lora_registry
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -108,6 +110,24 @@ def init_db():
                 started_at REAL,
                 finished_at REAL
             );
+
+            -- 生成批次：一次提交 N 张时，每个批次独立的状态/种子/产物
+            CREATE TABLE IF NOT EXISTS job_batches (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                idx INTEGER NOT NULL,
+                seed INTEGER,
+                status TEXT,          -- queued|running|done|failed|canceled
+                prompt_id TEXT,
+                progress REAL DEFAULT 0,
+                progress_text TEXT,
+                error TEXT,
+                outputs TEXT,         -- JSON [{kind,file,name}]
+                created_at REAL,
+                started_at REAL,
+                finished_at REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_job_batches_job ON job_batches(job_id, idx);
             """
         )
     # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
@@ -127,6 +147,24 @@ def row_to_job(r):
         "outputs": json.loads(r["outputs"] or "[]"),
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
     }
+
+
+def batches_of(job_id: str) -> list[dict]:
+    """取某个任务的全部批次（按 idx 排序）。没有批次时返回空列表。"""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM job_batches WHERE job_id=? ORDER BY idx", (job_id,)).fetchall()
+    return [{
+        "id": r["id"],
+        "idx": r["idx"],
+        "seed": r["seed"],
+        "status": r["status"],
+        "progress": r["progress"],
+        "progress_text": r["progress_text"],
+        "error": r["error"],
+        "outputs": json.loads(r["outputs"] or "[]"),
+        "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
+    } for r in rows]
 
 
 # ------------------------------------------------------------------ ComfyUI client
@@ -262,8 +300,11 @@ async def comfy_history(session: ClientSession, prompt_id: str):
 
 
 async def ws_progress_listener(session: ClientSession, client_id: str, prompt_id: str,
-                               job_id: str, total_nodes: int):
-    """监听 ComfyUI WebSocket 的 progress_state 事件，把真实百分比写入 DB"""
+                               job_id: str, total_nodes: int, batch_id: str | None = None):
+    """监听 ComfyUI WebSocket 的 progress_state 事件，把真实百分比写入 DB
+
+    batch_id 非空时写 job_batches（批次进度），否则写 jobs（任务进度）。
+    """
     try:
         async with session.ws_connect(f"{COMFY}/ws?clientId={client_id}", heartbeat=30) as ws:
             async for msg in ws:
@@ -299,12 +340,20 @@ async def ws_progress_listener(session: ClientSession, client_id: str, prompt_id
                     done_cnt = sum(1 for n in nodes.values() if n.get("state") == "finished")
                     text = f"节点 {done_cnt}/{total_nodes}" + (f" · 步 {step_label}" if step_label else "")
                     with db() as conn:
-                        conn.execute("UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
-                                     (frac, text, job_id))
+                        if batch_id:
+                            conn.execute(
+                                "UPDATE job_batches SET progress=?, progress_text=? WHERE id=?",
+                                (frac, text, batch_id))
+                        else:
+                            conn.execute("UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
+                                         (frac, text, job_id))
                 elif etype == "execution_error":
                     err = str(d.get("exception_message") or d.get("exception_type") or "执行出错")[:400]
                     with db() as conn:
-                        conn.execute("UPDATE jobs SET error=? WHERE id=?", (err, job_id))
+                        if batch_id:
+                            conn.execute("UPDATE job_batches SET error=? WHERE id=?", (err, batch_id))
+                        else:
+                            conn.execute("UPDATE jobs SET error=? WHERE id=?", (err, job_id))
     except asyncio.CancelledError:
         raise
     except Exception as e:
@@ -350,6 +399,10 @@ class Worker:
         params = json.loads(job_row["params"])
         mode = job_row["mode"]
         print(f"[worker] 开始任务 {job_id} ({mode})")
+        # 批次任务：逐个批次独立跑，单个批次失败不影响其它批次
+        if mode == "t2i" and self._has_batches(job_id):
+            await self._run_batches(job_row)
+            return
         try:
             async with ClientSession(timeout=HTTP_TIMEOUT) as session:
                 # 上传图片素材
@@ -438,7 +491,136 @@ class Worker:
                 self.current = None
 
 
+    def _has_batches(self, job_id: str) -> bool:
+        with db() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) c FROM job_batches WHERE job_id=?", (job_id,)).fetchone()
+        return bool(row and row["c"] > 1)
+
+    async def _run_batches(self, job_row):
+        """逐批次执行：每个批次有独立的种子、状态、进度与产物。
+
+        任何一个批次失败只标记该批次 failed，其余批次继续跑；
+        任务整体状态 = done（至少一个成功）/ failed（全部失败）。
+        """
+        job_id = job_row["id"]
+        params = json.loads(job_row["params"])
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM job_batches WHERE job_id=? ORDER BY idx", (job_id,)).fetchall()
+        total = len(rows)
+        done_count = 0
+        for row in rows:
+            batch_id = row["id"]
+            with db() as conn:
+                conn.execute(
+                    "UPDATE job_batches SET status='running', started_at=? WHERE id=?",
+                    (time.time(), batch_id))
+            try:
+                outputs = await self._run_one_batch(job_id, batch_id, params, row["seed"])
+                done_count += 1
+                with db() as conn:
+                    conn.execute(
+                        "UPDATE job_batches SET status='done', progress=1, outputs=?, "
+                        "finished_at=? WHERE id=?",
+                        (json.dumps(outputs, ensure_ascii=False), time.time(), batch_id))
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                print(f"[worker] 批次 {batch_id} 失败: {e}")
+                with db() as conn:
+                    conn.execute(
+                        "UPDATE job_batches SET status='failed', error=?, finished_at=? WHERE id=?",
+                        (str(e)[:800], time.time(), batch_id))
+            # 更新任务级进度
+            with db() as conn:
+                conn.execute(
+                    "UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
+                    (done_count / total, f"批次 {done_count}/{total}", job_id))
+        # 汇总
+        with db() as conn:
+            rows2 = conn.execute(
+                "SELECT status, outputs FROM job_batches WHERE job_id=?", (job_id,)).fetchall()
+        succeeded = [r for r in rows2 if r["status"] == "done"]
+        merged = []
+        for r in succeeded:
+            merged.extend(json.loads(r["outputs"] or "[]"))
+        if succeeded:
+            with db() as conn:
+                conn.execute(
+                    "UPDATE jobs SET status='done', progress=1, outputs=?, progress_text=?, "
+                    "finished_at=? WHERE id=?",
+                    (json.dumps(merged, ensure_ascii=False), f"{len(succeeded)}/{total} 批次成功",
+                     time.time(), job_id))
+        else:
+            with db() as conn:
+                conn.execute(
+                    "UPDATE jobs SET status='failed', error=?, progress_text=?, finished_at=? WHERE id=?",
+                    ("所有批次均失败", f"0/{total} 批次成功", time.time(), job_id))
+
+    async def _run_one_batch(self, job_id: str, batch_id: str, params: dict, seed):
+        """跑单个批次并返回产物列表（文件已落盘）。"""
+        mode = params.get("mode") or "t2i"
+        batch_params = dict(params)
+        batch_params["seed"] = int(seed)
+        batch_params["job_id"] = f"{job_id}_{batch_id}"
+        batch_params["mode"] = mode
+        workflow = build_workflow(mode, batch_params)
+        client_id = f"h3studio-{batch_id}"
+        async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+            async with self.submit_lock:
+                with db() as conn:
+                    row = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
+                if not row or row["status"] not in ("running", "queued"):
+                    raise RuntimeError("任务已取消")
+                prompt_id = await comfy_submit(session, workflow, client_id)
+                with db() as conn:
+                    conn.execute("UPDATE job_batches SET prompt_id=? WHERE id=?",
+                                 (prompt_id, batch_id))
+            ws_task = asyncio.create_task(
+                ws_progress_listener(session, client_id, prompt_id, batch_id, len(workflow),
+                                     batch_id=batch_id))
+            try:
+                while True:
+                    await asyncio.sleep(CFG["poll_interval"])
+                    with db() as conn:
+                        st = conn.execute("SELECT status FROM jobs WHERE id=?",
+                                          (job_id,)).fetchone()
+                        bst = conn.execute("SELECT status FROM job_batches WHERE id=?",
+                                           (batch_id,)).fetchone()
+                    if st and st["status"] == "canceled":
+                        raise RuntimeError("任务已取消")
+                    if bst and bst["status"] == "canceled":
+                        raise RuntimeError("批次已取消")
+                    hist = await comfy_history(session, prompt_id)
+                    if hist:
+                        if hist.get("outputs"):
+                            outs = _extract_outputs(hist)
+                            saved = []
+                            for item in outs:
+                                fname = await comfy_download_output(session, item)
+                                saved.append({"kind": item["kind"], "file": fname,
+                                              "name": item["filename"]})
+                            return saved
+                        status_info = hist.get("status") or {}
+                        if status_info.get("status_str") == "error":
+                            msgs = "; ".join(
+                                (m or [{}])[0].get("x", "") if isinstance(m, list) else str(m)
+                                for m in status_info.get("messages", []) if m and m[0] == "execution_error"
+                            ) or "执行出错"
+                            raise RuntimeError(msgs[:400])
+            finally:
+                ws_task.cancel()
+                try:
+                    await ws_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
 WORKER = Worker()
+
+# 一次提交最多几个批次
+MAX_BATCH_COUNT = 5
 
 # ------------------------------------------------------------------ Routes
 def json_ok(payload=None, **kw):
@@ -485,12 +667,34 @@ async def api_create(request):
     if not prompt:
         return web.json_response({"error": "提示词不能为空"}, status=400)
 
+    # 生成批次：文生图支持一次出 N 张（各自独立种子）
+    batch_count = 1
+    if mode == "t2i":
+        try:
+            batch_count = int(params.get("batch_count") or 1)
+        except (TypeError, ValueError):
+            batch_count = 1
+        batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
+
     job_id = uuid.uuid4().hex[:12]
+    now = time.time()
     with db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
-            (job_id, time.time(), mode, json.dumps(params, ensure_ascii=False)))
-    return json_ok({"id": job_id, "status": "queued"})
+            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
+        if batch_count > 1:
+            base_seed = params.get("seed")
+            for index in range(batch_count):
+                # 种子递推：同参数批量出图但每张可区分
+                if base_seed:
+                    seed = int(base_seed) + index
+                else:
+                    seed = random.randint(0, 2**48)
+                conn.execute(
+                    "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
+                    "VALUES (?,?,?,?, 'queued', ?)",
+                    (uuid.uuid4().hex[:12], job_id, index, seed, now))
+    return json_ok({"id": job_id, "status": "queued", "batch_count": batch_count})
 
 
 def _verified_video_path(job_id: str, relative: str) -> Path | None:
@@ -674,7 +878,12 @@ async def api_list(request):
             "SELECT * FROM jobs" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
             [*args, page_size, offset],
         ).fetchall()
-    return json_ok({"jobs": [row_to_job(r) for r in rows],
+    jobs = []
+    for r in rows:
+        job = row_to_job(r)
+        job["batches"] = batches_of(r["id"])
+        jobs.append(job)
+    return json_ok({"jobs": jobs,
                     "total": total, "page": page, "page_size": page_size,
                     "running": WORKER.current})
 
@@ -685,7 +894,9 @@ async def api_get(request):
         r = conn.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone()
     if not r:
         return web.json_response({"error": "not found"}, status=404)
-    return json_ok(row_to_job(r))
+    job = row_to_job(r)
+    job["batches"] = batches_of(jid)
+    return json_ok(job)
 
 
 async def api_cancel(request):
@@ -831,6 +1042,71 @@ async def api_image_options(request):
         "default_tier": Z_IMAGE_DEFAULT_TIER,
         "default_model": Z_IMAGE_DEFAULT_MODEL,
     })
+
+
+async def api_image_loras(request):
+    """GET /api/image-loras —— 本机实际存在的 Z-Image LoRA 清单 + 当前配置
+
+    清单只列本机真实存在的文件（跟 ComfyUI 自己的 lora 下拉同源），
+    配置存服务端（局域网所有客户端共用同一份）。
+    """
+    available = lora_registry.list_z_image_loras()
+    with db() as conn:
+        config = lora_registry.load_config(conn)
+    # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
+    by_name = {item["name"]: item for item in available}
+    resolved = []
+    for item in config:
+        name = item.get("name") or ""
+        meta = by_name.get(name)
+        resolved.append({
+            "name": name,
+            "strength": float(item.get("strength", 1.0)),
+            "enabled": bool(item.get("enabled", True)),
+            "missing": meta is None,
+            "display": (meta or {}).get("display") or item.get("display") or name,
+        })
+    return json_ok({"available": available, "config": resolved})
+
+
+async def api_image_loras_save(request):
+    """PUT /api/image-loras —— 保存 LoRA 配置（服务端持久化）
+
+    每一项都会校验文件是否真实存在，不存在直接 400 报错，不静默忽略。
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求体必须是 JSON"}, status=400)
+    items = body.get("loras")
+    if not isinstance(items, list):
+        return web.json_response({"error": "loras 必须是数组"}, status=400)
+    if len(items) > 8:
+        return web.json_response({"error": "最多 8 个 LoRA"}, status=400)
+    cleaned = []
+    for item in items:
+        if not isinstance(item, dict):
+            return web.json_response({"error": "每个 LoRA 必须是对象"}, status=400)
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        resolved, path = lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            return web.json_response(
+                {"error": f"本机不存在该 LoRA 文件：{name}"}, status=400)
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            return web.json_response({"error": f"strength 必须是数字：{name}"}, status=400)
+        strength = min(1.0, max(0.0, strength))
+        cleaned.append({
+            "name": resolved,
+            "strength": strength,
+            "enabled": bool(item.get("enabled", True)),
+        })
+    with db() as conn:
+        lora_registry.save_config(conn, cleaned)
+    return json_ok({"loras": cleaned})
 
 
 # ------------------------------------------------------------------ 硬件信息
@@ -1458,6 +1734,8 @@ def make_app():
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
+    app.router.add_get("/api/image-loras", api_image_loras)
+    app.router.add_put("/api/image-loras", api_image_loras_save)
     # 本地模型 Provider 配置
     app.router.add_get("/api/providers", api_providers_list)
     app.router.add_post("/api/providers", api_providers_create)
