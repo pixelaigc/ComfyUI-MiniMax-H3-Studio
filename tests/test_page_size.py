@@ -215,6 +215,81 @@ class TestPageSize(unittest.TestCase):
                                  "列数不应超过每页数量: cols=%s size=%d"
                                  % (layout["cols"], size))
 
+    def test_columns_never_exceed_page_size_on_wide_viewport(self):
+        """超宽屏下列数不得多于每页数量。
+
+        这条是「7+1 大片空白」的直接防线：3440px 下 auto-fill 能排 9 列，
+        而每页只有 8 个 —— 列数多于每页数量时，最后一行必然只剩 1 张、
+        右侧空掉整整一列。列数被每页数量钳住，这个现象就不会出现。
+        """
+        # 用比测试数据更多的列来暴露问题：先把窗口拉到很宽，
+        # 再逐档检查「列数 <= 每页数量」。
+        self.page.set_viewport_size({"width": 3440, "height": 1080})
+        self.page.wait_for_timeout(600)
+        self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+        self.page.wait_for_timeout(800)
+        for size in (8, 12, 16, 24):
+            self.set_size(size)
+            cols = self.page.evaluate(
+                "() => Number(document.querySelector('#jobsGrid').dataset.cols)")
+            self.assertLessEqual(
+                cols, size,
+                "每页 %d 时列数不应超过 %d，实际 %d"
+                % (size, size, cols))
+        self.page.set_viewport_size({"width": 2560, "height": 1080})
+        self.page.wait_for_timeout(600)
+        self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+        self.page.wait_for_timeout(800)
+
+    def test_every_row_is_full_at_every_width(self):
+        """任何宽度 × 任何每页数量下，每一行的卡片数都必须相同。
+
+        这是「末行只有 1 个 + 大片空白」的直接判定 —— 与列数算法无关，
+        只看实际排布。列数一旦多于每页数量（auto-fill 的老行为），
+        末行必然不齐，这条断言就会变红。
+        """
+        for width in (1400, 2560, 3440):
+            self.page.set_viewport_size({"width": width, "height": 1080})
+            self.page.wait_for_timeout(500)
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(700)
+            for size in (8, 12, 16, 24):
+                self.set_size(size)
+                layout = self.layout()
+                rows = layout["rows"]
+                self.assertTrue(
+                    all(r == rows[0] for r in rows),
+                    "%dpx 宽 / 每页 %d 时行分布不齐: %r（列数 %s）"
+                    % (width, size, rows, layout["cols"]))
+        self.page.set_viewport_size({"width": 2560, "height": 1080})
+        self.page.wait_for_timeout(500)
+        self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+        self.page.wait_for_timeout(700)
+
+    def test_rows_fill_container_width(self):
+        """每一行都要铺满容器宽度，右侧不能留大片空白。
+
+        这是 M11 型缺陷的防线：列宽若写死成固定 px（而不是 1fr），
+        行短了容器，右侧就会空出一大片 —— 和「末行只有 1 张」是同一种
+        视觉问题，只是方向反过来。
+        """
+        for width in (2560, 3440):
+            self.page.set_viewport_size({"width": width, "height": 1080})
+            self.page.wait_for_timeout(500)
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(700)
+            for size in (8, 12, 16, 24):
+                self.set_size(size)
+                layout = self.layout()
+                self.assertLessEqual(
+                    layout["lastRowBlank"], 2,
+                    "%dpx 宽 / 每页 %d 时末行右侧留了 %dpx 空白（容器 %dpx）"
+                    % (width, size, layout["lastRowBlank"], layout["gridWidth"]))
+        self.page.set_viewport_size({"width": 2560, "height": 1080})
+        self.page.wait_for_timeout(500)
+        self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+        self.page.wait_for_timeout(700)
+
     def test_no_card_overflow(self):
         """卡片不能溢出网格容器（窄列下不破版）。"""
         for size in (8, 12, 16, 24):
