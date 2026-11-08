@@ -651,6 +651,195 @@ function outputUrl(job, output) {
   return "/files/" + path.split("/").map(encodeURIComponent).join("/");
 }
 
+// ---------- 生成结果图片查看器（lightbox） ----------
+// 纯前端 + 现有 /files 路由，局域网所有客户端一致生效，历史图片同样适用。
+const LIGHTBOX_MIN_SCALE = 0.05;
+const LIGHTBOX_MAX_SCALE = 16;
+
+const lightbox = {
+  open: false,
+  src: "",
+  name: "",
+  naturalWidth: 0,
+  naturalHeight: 0,
+  scale: 1,
+  fitScale: 1,
+  dragging: false,
+  dragX: 0,
+  dragY: 0,
+  scrollX: 0,
+  scrollY: 0,
+};
+
+// 按原始尺寸显示，但不超出视口；即：先适应屏幕，超过原始尺寸时不再放大
+function lightboxComputeFitScale() {
+  const stage = $("#lightboxStage");
+  const pad = 36;
+  const availW = Math.max(1, stage.clientWidth - pad);
+  const availH = Math.max(1, stage.clientHeight - pad);
+  const w = lightbox.naturalWidth || 1;
+  const h = lightbox.naturalHeight || 1;
+  return Math.min(availW / w, availH / h, 1);
+}
+
+function lightboxApplyScale(animate) {
+  const img = $("#lightboxImage");
+  if (animate) {
+    img.classList.add("zooming");
+    requestAnimationFrame(() => requestAnimationFrame(() => img.classList.remove("zooming")));
+  }
+  // 直接改 width/height（而不是 transform）：布局盒与视觉盒一致，
+  // 滚动区域正确，且缩放后图片空白处的点击不会误判为「点遮罩」
+  const w = Math.max(1, Math.round(lightbox.naturalWidth * lightbox.scale));
+  const h = Math.max(1, Math.round(lightbox.naturalHeight * lightbox.scale));
+  img.style.width = `${w}px`;
+  img.style.height = `${h}px`;
+  $("#lightboxZoom").textContent = `${Math.round(lightbox.scale * 100)}%`;
+  $("#lightboxZoomOut").disabled = lightbox.scale <= LIGHTBOX_MIN_SCALE + 1e-6;
+  $("#lightboxZoomIn").disabled = lightbox.scale >= LIGHTBOX_MAX_SCALE - 1e-6;
+}
+
+function lightboxSetScale(next, anchorClientX, anchorClientY) {
+  const stage = $("#lightboxStage");
+  const prev = lightbox.scale;
+  const clamped = Math.min(LIGHTBOX_MAX_SCALE, Math.max(LIGHTBOX_MIN_SCALE, next));
+  if (clamped === prev) return;
+
+  // 以鼠标/按键为锚点缩放：保持锚点下的图内容位置不变
+  if (anchorClientX != null && anchorClientY != null) {
+    const rect = stage.getBoundingClientRect();
+    const img = $("#lightboxImage");
+    // 锚点在图片坐标系里的位置（缩放前后保持不变 -> 鼠标下的内容不跳动）
+    const px = anchorClientX - rect.left - img.offsetLeft;
+    const py = anchorClientY - rect.top - img.offsetTop;
+    const ratio = clamped / prev;
+    lightbox.scale = clamped;
+    lightboxApplyScale(false);
+    stage.scrollLeft = px * ratio + img.offsetLeft - (anchorClientX - rect.left);
+    stage.scrollTop = py * ratio + img.offsetTop - (anchorClientY - rect.top);
+  } else {
+    lightbox.scale = clamped;
+    lightboxApplyScale(true);
+  }
+}
+
+function lightboxFit() {
+  lightbox.scale = lightboxComputeFitScale();
+  lightboxApplyScale(true);
+  const stage = $("#lightboxStage");
+  stage.scrollLeft = 0;
+  stage.scrollTop = 0;
+}
+
+function lightboxActual() {
+  lightbox.scale = 1;
+  lightboxApplyScale(true);
+}
+
+function lightboxClose() {
+  if (!lightbox.open) return;
+  lightbox.open = false;
+  $("#lightbox").hidden = true;
+  document.body.classList.remove("modal-open");
+  $("#lightboxImage").removeAttribute("src");
+}
+
+function lightboxShow(src, name, naturalWidth, naturalHeight) {
+  lightbox.open = true;
+  lightbox.src = src;
+  lightbox.name = name || "图片";
+  lightbox.naturalWidth = naturalWidth || 0;
+  lightbox.naturalHeight = naturalHeight || 0;
+  const modal = $("#lightbox");
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  $("#lightboxTitle").textContent = lightbox.name;
+  $("#lightboxDownload").href = src;
+  $("#lightboxDownload").setAttribute("download", lightbox.name);
+  $("#lightboxOpenNew").href = src;
+  const img = $("#lightboxImage");
+  img.src = src;
+  // 图片尺寸就绪后再按原始尺寸铺开
+  const onLoad = () => {
+    if (!lightbox.open) return;
+    lightbox.naturalWidth = img.naturalWidth || naturalWidth || 0;
+    lightbox.naturalHeight = img.naturalHeight || naturalHeight || 0;
+    $("#lightboxDim").textContent = lightbox.naturalWidth && lightbox.naturalHeight
+      ? `${lightbox.naturalWidth}×${lightbox.naturalHeight}` : "";
+    lightboxFit();
+  };
+  if (img.complete && img.naturalWidth) onLoad();
+  else img.addEventListener("load", onLoad, {once: true});
+  img.removeEventListener("error", onLoad, {once: true});
+}
+
+$("#lightboxClose").addEventListener("click", lightboxClose);
+$("#lightboxZoomIn").addEventListener("click", () => lightboxSetScale(lightbox.scale * 1.25));
+$("#lightboxZoomOut").addEventListener("click", () => lightboxSetScale(lightbox.scale / 1.25));
+$("#lightboxFit").addEventListener("click", lightboxFit);
+$("#lightboxActual").addEventListener("click", lightboxActual);
+
+// 点击遮罩关闭：只认「点到 lightbox 根或 stage 空白处」，
+// 点到图片本身（含缩放后的空白）不关
+$("#lightbox").addEventListener("click", event => {
+  if (event.target === $("#lightbox") || event.target === $("#lightboxStage")) lightboxClose();
+});
+
+// 滚轮缩放
+$("#lightboxStage").addEventListener("wheel", event => {
+  if (!lightbox.open) return;
+  event.preventDefault();
+  const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+  lightboxSetScale(lightbox.scale * factor, event.clientX, event.clientY);
+}, {passive: false});
+
+// 拖拽平移（图片大于视口时）
+(() => {
+  const stage = $("#lightboxStage");
+  stage.addEventListener("mousedown", event => {
+    if (!lightbox.open) return;
+    if (event.button !== 0) return;
+    lightbox.dragging = true;
+    lightbox.dragX = event.clientX;
+    lightbox.dragY = event.clientY;
+    lightbox.scrollX = stage.scrollLeft;
+    lightbox.scrollY = stage.scrollTop;
+    stage.classList.add("dragging");
+    event.preventDefault();
+  });
+  window.addEventListener("mousemove", event => {
+    if (!lightbox.dragging) return;
+    stage.scrollLeft = lightbox.scrollX - (event.clientX - lightbox.dragX);
+    stage.scrollTop = lightbox.scrollY - (event.clientY - lightbox.dragY);
+  });
+  window.addEventListener("mouseup", () => {
+    lightbox.dragging = false;
+    stage.classList.remove("dragging");
+  });
+})();
+
+// 键盘：Esc 关闭，+/- 缩放，0 适应屏幕，1 原始尺寸，方向键平移
+document.addEventListener("keydown", event => {
+  if (!lightbox.open) return;
+  const stage = $("#lightboxStage");
+  switch (event.key) {
+    case "Escape": lightboxClose(); event.preventDefault(); break;
+    case "+": case "=": lightboxSetScale(lightbox.scale * 1.25); event.preventDefault(); break;
+    case "-": case "_": lightboxSetScale(lightbox.scale / 1.25); event.preventDefault(); break;
+    case "0": lightboxFit(); event.preventDefault(); break;
+    case "1": lightboxActual(); event.preventDefault(); break;
+    case "ArrowLeft": stage.scrollLeft -= 60; event.preventDefault(); break;
+    case "ArrowRight": stage.scrollLeft += 60; event.preventDefault(); break;
+    case "ArrowUp": stage.scrollTop -= 60; event.preventDefault(); break;
+    case "ArrowDown": stage.scrollTop += 60; event.preventDefault(); break;
+    default: break;
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (lightbox.open) lightboxFit();
+});
+
 function jobCard(job) {
   const p = job.params || {};
   const info = MODE_INFO[job.mode] || { name: job.mode };
@@ -667,7 +856,8 @@ function jobCard(job) {
   if (video) {
     preview = `<video src="${outputUrl(job, video)}" controls preload="metadata"></video>`;
   } else if (image) {
-    preview = `<img src="${outputUrl(job, image)}">`;
+    preview = `<img src="${outputUrl(job, image)}">
+      <span class="zoom-hint" title="点击查看大图"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2H2v5M9 2h5v5M9 14h5V9M7 14H2V9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`;
   } else if (runningOrQueued) {
     preview = `<div class="progress-wrap">
       <div class="progress-bar"><div style="width:${Math.round(prog * 100)}%"></div></div>
@@ -706,16 +896,40 @@ function jobCard(job) {
     </div>`}
     <div class="job-actions">
       ${video || image ? `<button data-act="download">⬇ 下载</button>` : ""}
+      ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
 
   if (image) {
+    const previewBox = card.querySelector(".job-preview");
+    previewBox.classList.add("has-image");
     const dragImage = card.querySelector(".job-preview img");
     const source = {url: outputUrl(job, image), name: String(image.file || "completed-image.png").split(/[\\/]/).pop()};
     dragImage.draggable = true;
-    dragImage.title = "拖到左侧参考图、首帧或尾帧位置";
+    dragImage.title = "点击查看大图；也可拖到左侧参考图、首帧或尾帧位置";
+    // 可聚焦 + 键盘可达：Enter / Space 同样能打开大图
+    dragImage.tabIndex = 0;
+    dragImage.setAttribute("role", "button");
+    dragImage.setAttribute("aria-label", `查看大图：${source.name}`);
+    const openLightbox = () =>
+      lightboxShow(source.url, source.name, dragImage.naturalWidth, dragImage.naturalHeight);
+    // 点击缩略图 -> 打开大图查看器
+    dragImage.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openLightbox();
+    });
+    dragImage.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openLightbox();
+    });
+    previewBox.addEventListener("click", event => {
+      if (event.target !== previewBox) return;
+      openLightbox();
+    });
     dragImage.addEventListener("dragstart", event => {
       event.dataTransfer.effectAllowed = "copy";
       event.dataTransfer.setData("application/x-h3-image", JSON.stringify(source));

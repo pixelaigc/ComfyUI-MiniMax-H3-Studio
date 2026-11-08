@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=prompt-gate1">
+<link rel="stylesheet" href="/static/style.css?v=lightbox1">
 </head>
 <body>
 <header class="topbar">
@@ -411,6 +411,29 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 生成结果图片查看器（lightbox） -->
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lightbox-bar">
+    <div class="lightbox-info">
+      <span class="lightbox-title" id="lightboxTitle">图片预览</span>
+      <span class="lightbox-dim" id="lightboxDim"></span>
+      <span class="lightbox-zoom" id="lightboxZoom">100%</span>
+    </div>
+    <div class="lightbox-tools">
+      <button id="lightboxZoomOut" title="缩小（- 键）" aria-label="缩小">－</button>
+      <button id="lightboxZoomIn" title="放大（+ 键）" aria-label="放大">＋</button>
+      <button id="lightboxFit" title="适应屏幕（0 键）">适应屏幕</button>
+      <button id="lightboxActual" title="原始尺寸（1 键）">原始尺寸</button>
+      <a id="lightboxDownload" download title="下载原图">下载原图</a>
+      <a id="lightboxOpenNew" target="_blank" rel="noopener" title="在新窗口打开原图">新窗口打开</a>
+      <button id="lightboxClose" class="lightbox-x" title="关闭（Esc）" aria-label="关闭">×</button>
+    </div>
+  </div>
+  <div class="lightbox-stage" id="lightboxStage">
+    <img id="lightboxImage" alt="生成结果大图">
+  </div>
+</div>
+
 <!-- 未增强提示词生成确认 -->
 <div class="prompt-modal" id="enhanceGateModal" hidden>
   <div class="prompt-dialog gate-dialog" role="dialog" aria-modal="true" aria-labelledby="enhanceGateTitle">
@@ -440,7 +463,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
-<script src="/static/app.js?v=prompt-gate1"></script>
-<script src="/static/providers.js?v=prompt-gate1"></script>
+<script src="/static/app.js?v=lightbox1"></script>
+<script src="/static/providers.js?v=lightbox1"></script>
 </body>
 </html>

@@ -257,7 +257,7 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-preview video { width: 100%; height: 100%; object-fit: contain; }
 .job-card:has(.job-preview video) .job-preview { cursor: grab; }
 .job-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.job-card:has(.job-preview img) .job-preview { cursor: grab; }
+.job-card:has(.job-preview img) .job-preview { cursor: zoom-in; }
 .job-card.dragging-image { opacity: .55; }
 .progress-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .progress-bar { width: 60%; height: 4px; background: rgba(255,255,255,.15); border-radius: 4px; overflow: hidden; }
@@ -528,6 +528,78 @@ body.modal-open { overflow: hidden; }
 .gen-btn.busy { background: var(--accent); opacity: .72; cursor: progress; }
 .enhance-btn.busy { opacity: .8; cursor: progress; }
 .prompt-field textarea[readonly] { background: #f7f8fa; }
+
+/* ---------- 生成结果图片查看器（lightbox） ---------- */
+.lightbox {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(10, 12, 16, .93);
+  display: flex; flex-direction: column;
+}
+.lightbox[hidden] { display: none; }
+
+.lightbox-bar {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 10px 14px; background: rgba(20, 24, 30, .92);
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: #e8ecf1; flex-wrap: wrap;
+}
+.lightbox-info { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.lightbox-title {
+  font-size: 13px; font-weight: 600; color: #fff;
+  max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lightbox-dim, .lightbox-zoom { font-size: 11.5px; color: #9aa3ad; }
+.lightbox-zoom { color: var(--accent); font-weight: 600; }
+
+.lightbox-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lightbox-tools button, .lightbox-tools a {
+  border: 1px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .07);
+  color: #e8ecf1; border-radius: 8px; padding: 6px 11px; font-size: 12px;
+  cursor: pointer; font-family: inherit; text-decoration: none; white-space: nowrap;
+}
+.lightbox-tools button:hover, .lightbox-tools a:hover {
+  background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .34);
+}
+.lightbox-tools button:disabled { opacity: .4; cursor: default; }
+.lightbox-x { font-size: 18px !important; line-height: 1; padding: 4px 12px !important; }
+
+.lightbox-stage {
+  flex: 1 1 auto; overflow: auto; position: relative;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 18px; cursor: grab;
+}
+.lightbox-stage.dragging { cursor: grabbing; }
+.lightbox-stage img {
+  display: block; flex: 0 0 auto;
+  max-width: none;              /* 缩放由 JS 控制，不用浏览器 max-width 干扰 */
+  width: auto; height: auto;    /* 初始按原始尺寸；JS 打开时按缩放写 px */
+  user-select: none; -webkit-user-drag: none;
+}
+.lightbox-stage img.zooming { transition: width .08s linear, height .08s linear; }
+
+/* 缩略图：明确的可点击提示 */
+.job-preview.has-image { cursor: zoom-in; }
+.job-preview.has-image img { cursor: zoom-in; }
+.job-preview .zoom-hint {
+  position: absolute; right: 8px; bottom: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0, 0, 0, .55); color: #fff; font-size: 15px; line-height: 1;
+  opacity: 0; transform: scale(.86); transition: opacity .16s, transform .16s;
+  pointer-events: none; border: 1px solid rgba(255, 255, 255, .3);
+}
+.job-preview.has-image:hover .zoom-hint { opacity: 1; transform: scale(1); }
+.job-preview .zoom-hint svg { width: 15px; height: 15px; }
+
+/* 图像卡片的下载/新窗口入口 */
+.job-actions a {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px; cursor: pointer; font-size: 12px; color: var(--muted);
+  text-decoration: none; white-space: nowrap;
+  border-right: 1px solid var(--border);
+}
+.job-actions a:last-child { border-right: none; }
+.job-actions a:hover { background: #f6f7f9; color: var(--accent); }
 
 /* ---------- 图像模式（Z-Image 文生图）面板 ---------- */
 .img-select {
