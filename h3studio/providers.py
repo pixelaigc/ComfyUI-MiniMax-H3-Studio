@@ -82,6 +82,15 @@ def normalize_provider(payload: dict) -> dict:
             raise ValueError("LLM 服务地址必须以 http:// 或 https:// 开头")
         llm_base_url = llm_base_url.rstrip("/")
 
+    # ComfyUI 类型专用：是否走 H3 Studio 的 OpenAI 兼容代理
+    # （thinking 模型必须走代理 —— 节点自己关不掉 thinking）
+    use_proxy = 1 if payload.get("use_proxy") in (True, 1, "1", "true", "yes") else 0
+    proxy_base_url = _clean(payload.get("proxy_base_url"), MAX_URL)
+    if proxy_base_url:
+        if not proxy_base_url.startswith(("http://", "https://")):
+            raise ValueError("代理地址必须以 http:// 或 https:// 开头")
+        proxy_base_url = proxy_base_url.rstrip("/")
+
     multimodal = payload.get("multimodal")
     multimodal = 1 if multimodal in (True, 1, "1", "true", "yes") else 0
 
@@ -94,6 +103,8 @@ def normalize_provider(payload: dict) -> dict:
         "type": ptype,
         "base_url": base_url,
         "llm_base_url": llm_base_url,
+        "use_proxy": use_proxy,
+        "proxy_base_url": proxy_base_url,
         "model": model,
         "api_key": api_key,
         "multimodal": multimodal,
@@ -118,6 +129,8 @@ def _row_to_provider(row) -> dict:
         "type_label": PROVIDER_TYPE_LABELS.get(row["type"], row["type"]),
         "base_url": row["base_url"],
         "llm_base_url": row["llm_base_url"] or "",
+        "use_proxy": bool(row["use_proxy"]),
+        "proxy_base_url": row["proxy_base_url"] or "",
         "model": row["model"],
         "has_api_key": bool(key),
         "api_key_masked": masked,
@@ -136,6 +149,8 @@ def ensure_tables(conn: sqlite3.Connection):
             type TEXT NOT NULL,
             base_url TEXT NOT NULL,
             llm_base_url TEXT DEFAULT '',
+            use_proxy INTEGER DEFAULT 0,
+            proxy_base_url TEXT DEFAULT '',
             model TEXT NOT NULL,
             api_key TEXT DEFAULT '',
             multimodal INTEGER DEFAULT 0,
@@ -154,6 +169,12 @@ def ensure_tables(conn: sqlite3.Connection):
     if "llm_base_url" not in columns:
         conn.execute("ALTER TABLE model_providers "
                      "ADD COLUMN llm_base_url TEXT DEFAULT ''")
+    if "use_proxy" not in columns:
+        conn.execute("ALTER TABLE model_providers "
+                     "ADD COLUMN use_proxy INTEGER DEFAULT 0")
+    if "proxy_base_url" not in columns:
+        conn.execute("ALTER TABLE model_providers "
+                     "ADD COLUMN proxy_base_url TEXT DEFAULT ''")
 
 
 def list_providers(conn: sqlite3.Connection) -> list:
@@ -179,6 +200,8 @@ def get_provider_full(conn: sqlite3.Connection, provider_id: str):
         "type": row["type"],
         "base_url": row["base_url"],
         "llm_base_url": row["llm_base_url"] or "",
+        "use_proxy": bool(row["use_proxy"]),
+        "proxy_base_url": row["proxy_base_url"] or "",
         "model": row["model"],
         "api_key": row["api_key"] or "",
         "multimodal": bool(row["multimodal"]),
@@ -189,10 +212,12 @@ def get_provider_full(conn: sqlite3.Connection, provider_id: str):
 def insert_provider(conn: sqlite3.Connection, data: dict) -> dict:
     conn.execute(
         "INSERT INTO model_providers "
-        "(id,name,type,base_url,llm_base_url,model,api_key,multimodal,enabled,created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "(id,name,type,base_url,llm_base_url,use_proxy,proxy_base_url,"
+        "model,api_key,multimodal,enabled,created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (data["id"], data["name"], data["type"], data["base_url"],
-         data.get("llm_base_url", ""), data["model"],
+         data.get("llm_base_url", ""), data.get("use_proxy", 0),
+         data.get("proxy_base_url", ""), data["model"],
          data["api_key"], data["multimodal"], data["enabled"], data["created_at"]))
     return _row_to_provider(get_provider(conn, data["id"]))
 
@@ -205,9 +230,11 @@ def update_provider(conn: sqlite3.Connection, provider_id: str, data: dict) -> d
     api_key = current["api_key"] if data["api_key"] is None else data["api_key"]
     conn.execute(
         "UPDATE model_providers SET name=?, type=?, base_url=?, llm_base_url=?, "
-        "model=?, api_key=?, multimodal=?, enabled=? WHERE id=?",
+        "use_proxy=?, proxy_base_url=?, model=?, api_key=?, multimodal=?, enabled=? "
+        "WHERE id=?",
         (data["name"], data["type"], data["base_url"],
-         data.get("llm_base_url", "") or "", data["model"], api_key,
+         data.get("llm_base_url", "") or "", data.get("use_proxy", 0),
+         data.get("proxy_base_url", "") or "", data["model"], api_key,
          data["multimodal"], data["enabled"], provider_id))
     return _row_to_provider(get_provider(conn, provider_id))
 

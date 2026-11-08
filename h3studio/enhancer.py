@@ -6,169 +6,240 @@
   "增强能力要独立设计成一个迷你 Agent（独立模块/独立服务边界，具备自己的
    提示词模板、参数与调用封装），以便后续复用到视频/音频提示词。"
 
-所以本模块的边界是：
-  - 自己管模板（可编辑、可持久化）
-  - 自己管参数（temperature / max_tokens / 语言 / 长度档位）
-  - 自己封装调用（不关心 Provider 细节，只认 provider 字典）
-  - 自己管输出（原文保留 / 替换 / 追加 三种落地策略）
+模块边界：
+  - 自己管模板（Skill 目录 assets/ 下的模板文件，用户可覆盖并持久化）
+  - 自己管参数（采样档 / 长度档 / 语言）
+  - 自己封装调用（只认 provider 字典，不关心具体协议）
+  - 自己管校验（scripts/validate.py 的规则）
+  - 自己管输出（replace / append 两种落地策略）
 
-复用方式：新增 "video" 或 "audio" 模板即可，无需改动本模块。
-每个模板是一个独立的 PromptSpec，自带 system prompt + 维度清单 + 输出格式要求。
+与 Provider 配置解耦：
+  增强模块不持有任何 Provider 配置，一律通过调用方传入的 provider 字典工作。
+  provider 字典来自「本地模型配置」页里设定的默认多模态 Provider，
+  该配置持久化在服务端 SQLite，供局域网全部客户端共用。
+
+Skill 目录（遵循 Agent Skills 规范的渐进式披露）：
+  h3studio/skills/prompt-enhancer/
+    SKILL.md              导航层（<500 行）
+    references/           约束与字段定义（按需加载）
+    assets/               模板与示例（按需加载）
+    scripts/validate.py   校验器（只跑不读）
 """
 import json
+import re
+from pathlib import Path
 
-# ------------------------------------------------------------------ 模板
+# Skill 根目录
+SKILL_DIR = Path(__file__).resolve().parent / "skills" / "prompt-enhancer"
+ASSETS_DIR = SKILL_DIR / "assets"
+SCRIPTS_DIR = SKILL_DIR / "scripts"
 
-# 图像提示词增强模板 —— 参考社区成熟的图像提示词扩写实践：
-#   主体(subject) / 场景(environment) / 构图(composition) / 光线(lighting)
-#   / 风格(style) / 镜头(camera+lens) 六个维度
-# 关键约束（社区实践共识）：
-#   1. 主体放最前（模型对开头最敏感）
-#   2. 一个主风格 + 一个质感参考，不要堆砌互相冲突的风格
-#   3. 用具体可视元素代替"高级感/氛围感"这类评价词
-#   4. 词数控制在 40-120 词（Z-IMAGE 吃自然语言整段，不吃标签堆）
-IMAGE_SPEC = {
-    "id": "image",
-    "label": "图像提示词（Z-IMAGE）",
-    "media": "image",
-    "system_prompt": (
-        "你是一位专业的 AI 图像提示词工程师，"
-        "专精为 Z-IMAGE / Flux / SDXL 一类的扩散模型撰写结构化图像提示词。\n"
-        "你的任务是把用户的一句粗略描述扩写成一段可直接投喂给图像模型的完整提示词。\n"
-        "\n"
-        "扩写必须覆盖以下六个维度，每一类都要落到具体可视的元素上：\n"
-        "1. 主体（subject）：谁/什么、外观特征、服装、表情、动作、姿态。主体放最前面。\n"
-        "2. 场景（environment）：地点、时间、天气、周边物件、空间纵深。\n"
-        "3. 构图（composition）：景别（特写/半身/全身/远景）、机位角度、主体在画面中的位置、留白。\n"
-        "4. 光线（lighting）：光源方向、软硬、色温、明暗关系、氛围。\n"
-        "5. 风格（style）：一个主风格 + 一个质感参考（如胶片摄影 + 柯达 Portra 色调）。\n"
-        "6. 镜头（camera）：焦段（35mm/85mm/微距/广角）、光圈与景深。\n"
-        "\n"
-        "硬性规则：\n"
-        "- 只输出扩写后的提示词本身，不要任何解释、前言、标题、编号或 markdown 标记。\n"
-        "- 不要堆砌互相冲突的风格（如同时写写实+二次元+油画），一个主风格 + 一个质感参考。\n"
-        "- 用具体可视元素替代主观评价词；不要写「高级感」「氛围感」这类无信息的词。\n"
-        "- 保留用户原文里已经写明的意图和限定条件，不要替换掉它们。\n"
-        "- 输出语言与用户原文一致（用户写中文就输出中文）。\n"
-        "- 长度控制在 40-120 词的中文描述（或等量英文），单段连贯自然语言，"
-        "不要用逗号标签堆砌。\n"
-        "- 不要输出负面提示词，负面词由用户单独维护。"
-    ),
-    "user_template": "请把下面这句描述扩写成一段完整的图像生成提示词：\n\n{original}",
-    "dimensions": ["主体", "场景", "构图", "光线", "风格", "镜头"],
+# ------------------------------------------------------------------ 模板档位
+
+# 每档 = 一个模板文件 + 校验模式 + 长度档
+TEMPLATE_SPECS = {
+    "image": {
+        "id": "image",
+        "label": "图像提示词（Z-Image 官方 PE）",
+        "media": "image",
+        "template": "pe-zimage-official.txt",
+        "validate_mode": "pe",
+        "default_length": "medium",
+        "builtin": True,
+        "dimensions": ["主体", "数量", "动作", "状态", "专有名词/颜色/文字",
+                        "生成式推理", "构图", "光影氛围", "材质质感", "色彩方案",
+                        "层次空间", "文字排版"],
+        "source": "Z-Image 官方 HF Space pe.py（实测 2371 bytes）",
+    },
+    "image-scalist": {
+        "id": "image-scalist",
+        "label": "图像提示词（SCALIST 结构化）",
+        "media": "image",
+        "template": "scalist-structured.txt",
+        "validate_mode": "scalist",
+        "default_length": "medium",
+        "builtin": True,
+        "dimensions": ["subject", "action", "location", "composition",
+                        "lighting", "style"],
+        "source": "HiDream-O1 官方 SCALIST 字段划分",
+    },
+    "image-bbox": {
+        "id": "image-bbox",
+        "label": "图像提示词 + bbox 元素表（FLUX 3 官方格式）",
+        "media": "image",
+        "template": "bbox-elements.txt",
+        "validate_mode": "bbox",
+        # caption + JSON 元素表比纯 caption 长，默认给 long 档预算
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["caption", "id", "bbox", "desc"],
+        "source": "BFL FLUX 3 官方 t2i_bbox system prompt",
+    },
+    "video": {
+        "id": "video",
+        "label": "视频提示词（MiniMax-H3）",
+        "media": "video",
+        "template": "video-official.txt",
+        "validate_mode": "pe",
+        "default_length": "medium",
+        "builtin": True,
+        "dimensions": ["主体", "环境", "运镜", "光线", "风格", "声音"],
+        "source": "预留复用位（沿用同一套 Agent 边界）",
+    },
+    "audio": {
+        "id": "audio",
+        "label": "音频提示词（BGM / 音效）",
+        "media": "audio",
+        "template": "audio-official.txt",
+        "validate_mode": "pe",
+        "default_length": "short",
+        "builtin": True,
+        "dimensions": ["体裁", "节奏", "乐器", "音色情绪", "动态", "混音质感"],
+        "source": "预留复用位（沿用同一套 Agent 边界）",
+    },
 }
 
-# 视频提示词增强模板 —— 预留复用位（复用同一套 Agent 边界）
-VIDEO_SPEC = {
-    "id": "video",
-    "label": "视频提示词（MiniMax-H3）",
-    "media": "video",
-    "system_prompt": (
-        "你是一位专业的 AI 视频提示词工程师，专精为 MiniMax-H3 等视频生成模型撰写提示词。\n"
-        "请把用户的粗略描述扩写成包含镜头、动作、环境与声音的完整视频提示词。\n"
-        "\n"
-        "扩写必须覆盖：\n"
-        "1. 主体：外观、服装、动作、情绪。\n"
-        "2. 环境：地点、时间、天气、周边元素。\n"
-        "3. 镜头与运镜：景别、机位、运动方式（推/拉/摇/移/跟）、运动幅度。\n"
-        "4. 光线与氛围：光源方向、色温、明暗。\n"
-        "5. 风格：一个主风格 + 一个质感参考。\n"
-        "6. 声音（可选）：环境音与配乐描述。\n"
-        "\n"
-        "硬性规则：\n"
-        "- 只输出扩写后的提示词本身，不要解释、前言、编号或 markdown 标记。\n"
-        "- 不要堆砌互相冲突的风格，一个主风格 + 一个质感参考。\n"
-        "- 保留用户原文里已写明的意图。\n"
-        "- 输出语言与用户原文一致。\n"
-        "- 控制在 60-160 词的中文描述。"
-    ),
-    "user_template": "请把下面这句描述扩写成一段完整的视频生成提示词：\n\n{original}",
-    "dimensions": ["主体", "环境", "运镜", "光线", "风格", "声音"],
+# 视频 / 音频模板（占位实现，便于后续直接换官方原文）
+VIDEO_TEMPLATE = """你是一位专业的 AI 视频提示词工程师，专精为 MiniMax-H3 等视频生成模型撰写提示词。
+
+请把用户的粗略描述扩写成一段包含镜头、动作、环境与声音的完整视频提示词。
+
+工作流程：首先锁定用户提示词中不可变更的核心要素（主体、数量、动作、状态、专有名词、颜色）；
+接着判断是否需要"生成式推理"；然后注入专业级的画面细节（环境、时间、天气、空间层次）；
+最后精确处理画面文字元素（一字不差转录并用英文双引号括起来）。
+
+你的最终描述必须客观、具象，严禁使用比喻、情感化修辞，也绝不包含"8K"、"masterpiece"等质量元标签或绘制指令。
+
+仅严格输出最终的提示词，不要输出任何其他内容。
+
+用户输入 prompt: {prompt}
+"""
+
+AUDIO_TEMPLATE = """你是一位专业的 AI 音乐与音效提示词工程师。
+
+请把用户的粗略描述扩写成一段可用于音乐/音效生成的完整提示词。
+
+需要覆盖：体裁、节奏、乐器、音色情绪、动态变化、混音质感、参考风格。
+
+你的最终描述必须客观、具象，严禁使用比喻、情感化修辞，也绝不包含"8K"、"masterpiece"等质量元标签或绘制指令。
+
+仅严格输出最终的提示词，不要输出任何其他内容。
+
+用户输入 prompt: {prompt}
+"""
+
+# 内置模板正文（文件优先，缺文件时用这里的兜底）
+_BUILTIN_FALLBACK = {
+    "video-official.txt": VIDEO_TEMPLATE,
+    "audio-official.txt": AUDIO_TEMPLATE,
 }
 
-# 音频提示词增强模板 —— 预留复用位
-AUDIO_SPEC = {
-    "id": "audio",
-    "label": "音频提示词（BGM / 音效）",
-    "media": "audio",
-    "system_prompt": (
-        "你是一位专业的 AI 音乐与音效提示词工程师。\n"
-        "请把用户的粗略描述扩写成一段可用于音乐/音效生成的完整提示词。\n"
-        "\n"
-        "扩写必须覆盖：体裁、节奏、乐器、音色情绪、动态变化、混音质感、参考风格。\n"
-        "\n"
-        "硬性规则：\n"
-        "- 只输出扩写后的提示词本身，不要解释、前言、编号或 markdown 标记。\n"
-        "- 输出语言与用户原文一致。\n"
-        "- 控制在 30-80 词。"
-    ),
-    "user_template": "请把下面这句描述扩写成一段完整的音频生成提示词：\n\n{original}",
-    "dimensions": ["体裁", "节奏", "乐器", "音色情绪", "动态", "混音质感"],
+# ------------------------------------------------------------------ 采样与长度
+
+# 【官方】InvokeAI 采样口径：temperature=0.7, top_p=0.9, do_sample=True
+# 【官方】BFL 官方 upsampler 用 greedy decoding
+SAMPLING_PRESETS = {
+    "sample": {
+        "label": "采样（InvokeAI 口径）",
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "do_sample": True,
+        "hint": "temperature 0.7 / top_p 0.9，每次扩写略有不同",
+    },
+    "greedy": {
+        "label": "贪心（BFL 官方口径）",
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "do_sample": False,
+        "hint": "同输入必得同输出，可复现",
+    },
 }
 
-# 内置模板表（可被用户覆盖 / 编辑）
-BUILTIN_SPECS = {
-    "image": IMAGE_SPEC,
-    "video": VIDEO_SPEC,
-    "audio": AUDIO_SPEC,
-}
-
-# ------------------------------------------------------------------ 参数
-
-
-# 长度档位 -> max_tokens
+# 【官方】InvokeAI 官方口径：扩写 max_new_tokens = 300
+# 【官方】Z-Image 本地 max_sequence_length=1024，官方换算 0.75 word/token
 LENGTH_PRESETS = {
-    "short": {"label": "精简", "max_tokens": 320, "hint": "约 30-60 词"},
-    "medium": {"label": "标准", "max_tokens": 768, "hint": "约 60-120 词"},
-    "long": {"label": "详尽", "max_tokens": 1536, "hint": "约 120-200 词"},
+    "short": {"label": "精简", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
+    "medium": {"label": "标准", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
+    "long": {"label": "详尽", "max_tokens": 512, "hint": "512 tokens ≈ 384 词（上限 1024）"},
 }
 
-# 默认参数
 DEFAULT_PARAMS = {
     "temperature": 0.7,
-    "top_p": 0.95,
-    "max_tokens": 768,
+    "top_p": 0.9,
+    "max_tokens": 300,
     "length": "medium",
+    "sampling": "sample",
     "language": "auto",
 }
 
+# ------------------------------------------------------------------ 模板装载
+
+
+def _read_template_file(filename: str) -> str:
+    """从 assets/ 读模板正文；缺文件则回退到内置兜底。"""
+    path = ASSETS_DIR / filename
+    if path.exists():
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+            if text:
+                return text
+        except Exception:
+            pass
+    return _BUILTIN_FALLBACK.get(filename, "")
+
 
 def list_specs() -> list:
-    """列出全部可用模板（内置 + 用户自定义），供前端展示。"""
+    """列出全部可用模板（供前端展示）。"""
     specs = []
-    for key, spec in BUILTIN_SPECS.items():
+    for key, spec in TEMPLATE_SPECS.items():
         specs.append({
             "id": spec["id"],
             "label": spec["label"],
             "media": spec["media"],
             "builtin": True,
             "dimensions": spec["dimensions"],
+            "source": spec["source"],
+            "validate_mode": spec["validate_mode"],
         })
     return specs
 
 
 def get_spec(spec_id: str, overrides: dict | None = None) -> dict:
     """
-    取模板。overrides 来自用户持久化的自定义模板（可编辑 system_prompt 等）。
-    找不到就回落到 image 模板 —— 保证任何调用都有模板可用。
+    取模板。overrides 来自用户持久化的自定义模板（可编辑正文）。
+    找不到模板就回落到 image 官方 PE 档 —— 保证任何调用都有模板可用。
+
+    overrides 可以是整个 enhancer 保存结构（{"specs": {...}, "params": {...}}），
+    也可以直接是 specs 字典 —— 两种形状都支持。
     """
     overrides = overrides or {}
-    custom = overrides.get(spec_id)
-    base = BUILTIN_SPECS.get(spec_id) or BUILTIN_SPECS["image"]
-    if not isinstance(custom, dict):
-        return dict(base)
-    merged = dict(base)
-    for key in ("system_prompt", "user_template", "label", "dimensions"):
-        if isinstance(custom.get(key), str) and custom[key].strip():
-            merged[key] = custom[key]
-    merged["builtin"] = False
-    return merged
+    specs = overrides.get("specs") if isinstance(overrides.get("specs"), dict) else overrides
+    custom = specs.get(spec_id) if isinstance(specs, dict) else None
+    base = TEMPLATE_SPECS.get(spec_id)
+    if base is None:
+        base = TEMPLATE_SPECS["image"]
+    spec = dict(base)
+    spec["system_prompt"] = _read_template_file(base["template"])
+    spec["user_template"] = "用户输入 prompt: {prompt}"
+    if isinstance(custom, dict):
+        for key in ("system_prompt", "user_template"):
+            if isinstance(custom.get(key), str) and custom[key].strip():
+                spec[key] = custom[key]
+        # 只有真正覆盖了内容才算自定义；两字段都空 = 用内置模板
+        if spec["system_prompt"] != _read_template_file(base["template"]) \
+                or spec["user_template"] != "用户输入 prompt: {prompt}":
+            spec["builtin"] = False
+    return spec
 
 
-def resolve_params(params: dict | None, overrides: dict | None = None) -> dict:
+def resolve_params(params: dict | None, overrides: dict | None = None,
+                   spec: dict | None = None) -> dict:
     """
     合并参数：内置默认 <- 用户保存的覆盖 <- 本次请求传入。
-    模板 id 存在 overrides["params"] 里。
+    采样档优先于裸 temperature/top_p；长度档优先于裸 max_tokens。
+
+    spec 给了的话，用它的 default_length 作为长度档的起点
+    （bbox 档要输出 caption + JSON，比纯 caption 长，默认给 longer 的预算）。
     """
     params = params or {}
     overrides = overrides or {}
@@ -176,14 +247,40 @@ def resolve_params(params: dict | None, overrides: dict | None = None) -> dict:
     merged = dict(DEFAULT_PARAMS)
     merged.update({k: v for k, v in saved.items() if k in DEFAULT_PARAMS})
     merged.update({k: v for k, v in params.items() if k in DEFAULT_PARAMS})
-    # 长度档位优先于裸 max_tokens
-    length = merged.get("length", "medium")
+
+    # 采样档
+    sampling = merged.get("sampling", "sample")
+    if sampling in SAMPLING_PRESETS:
+        preset = SAMPLING_PRESETS[sampling]
+        merged["temperature"] = preset["temperature"]
+        merged["top_p"] = preset["top_p"]
+        merged["do_sample"] = preset["do_sample"]
+    else:
+        merged["temperature"] = float(merged.get("temperature", 0.7))
+        merged["top_p"] = float(merged.get("top_p", 0.9))
+        merged["do_sample"] = True
+
+    # 长度档优先级：
+    #   本次请求 > 该模板单独保存的长度 > 模板默认 > 全局保存 > 内置默认
+    length = params.get("length")
+    if not length:
+        spec_lengths = saved.get("spec_lengths") or {}
+        length = spec_lengths.get((spec or {}).get("id")) if isinstance(spec_lengths, dict) else None
+    if not length:
+        length = (spec or {}).get("default_length")
+    if not length:
+        length = saved.get("length")
+    if not length:
+        length = merged.get("length", "medium")
+    merged["length"] = length
     if length in LENGTH_PRESETS:
         merged["max_tokens"] = LENGTH_PRESETS[length]["max_tokens"]
     else:
-        merged["max_tokens"] = int(merged.get("max_tokens") or 768)
-    merged["temperature"] = float(merged.get("temperature", 0.7))
-    merged["top_p"] = float(merged.get("top_p", 0.95))
+        merged["max_tokens"] = int(merged.get("max_tokens") or 300)
+    merged["max_tokens"] = min(int(merged["max_tokens"]), 1024)
+
+    if merged.get("language") not in ("auto", "zh", "en"):
+        merged["language"] = "auto"
     return merged
 
 
@@ -191,6 +288,7 @@ def build_messages(spec: dict, original: str, language: str = "auto") -> list:
     """构造统一消息格式（system + user）。"""
     original = (original or "").strip()
     user_text = spec["user_template"].replace("{original}", original)
+    user_text = user_text.replace("{prompt}", original)
     if language and language != "auto":
         user_text += f"\n\n请用{language}输出。"
     return [
@@ -199,20 +297,7 @@ def build_messages(spec: dict, original: str, language: str = "auto") -> list:
     ]
 
 
-def looks_like_echo(output: str, system_prompt: str) -> bool:
-    """
-    检测模型是不是把 system prompt 原样吐了回来。
-
-    小参数量模型（135M 之类）经常不干活，直接复读系统提示词。
-    这种输出必须当成失败处理 —— 否则用户会拿到一段系统提示词冒充提示词。
-    判据：输出与系统提示词存在长度 >= 40 字符的公共子块。
-    """
-    if not output or not system_prompt:
-        return False
-    import difflib
-    matcher = difflib.SequenceMatcher(None, system_prompt, output, autojunk=False)
-    block = matcher.find_longest_match(0, len(system_prompt), 0, len(output))
-    return block.size >= 40
+# ------------------------------------------------------------------ 输出处理
 
 
 def strip_wrapping(text: str) -> str:
@@ -223,7 +308,6 @@ def strip_wrapping(text: str) -> str:
     if not text:
         return ""
     result = text.strip()
-    # 去掉 ```lang ... ``` 围栏
     if result.startswith("```"):
         lines = result.splitlines()
         if lines and lines[0].startswith("```"):
@@ -231,14 +315,107 @@ def strip_wrapping(text: str) -> str:
         if lines and lines[-1].strip().startswith("```"):
             lines = lines[:-1]
         result = "\n".join(lines).strip()
-    # 去掉常见前缀
     for prefix in ("扩写后的提示词：", "扩写结果：", "提示词：", "Prompt:", "prompt:"):
         if result.startswith(prefix):
             result = result[len(prefix):].strip()
-    # 去掉成对包裹引号
     if len(result) >= 2 and result[0] in "\"'“" and result[-1] in "\"'”":
         result = result[1:-1].strip()
     return result
+
+
+def strip_thinking(text: str) -> str:
+    """
+    去掉 reasoning 模型混进 content 的思考痕迹。
+    与 llm.py 里的同名函数保持一致 —— 这里独立一份，避免 enhancer 对 llm 的耦合。
+    """
+    if not text:
+        return ""
+    result = text
+    for tag in ("think", "thinking", "reasoning"):
+        open_tag, close_tag = f"<{tag}>", f"</{tag}>"
+        while open_tag in result.lower():
+            lower = result.lower()
+            start = lower.find(open_tag)
+            end = lower.find(close_tag, start)
+            if end == -1:
+                result = result[:start]
+                break
+            result = result[:start] + result[end + len(close_tag):]
+    return result.strip()
+
+
+def extract_json_block(text: str) -> str:
+    """
+    从 bbox 档输出里抽出 JSON 数组片段。
+    优先匹配 ```json 围栏，其次匹配最外层 [ ... ]。
+
+    注意：max_new_tokens 有限时模型输出可能被截断，JSON 会不完整。
+    这种情况下做「尽力修复」：补齐未闭合的字符串与括号，
+    并去掉末尾多余的逗号 —— 让尽可能多的元素仍然可用。
+    """
+    if not text:
+        return ""
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    if fence:
+        blob = fence.group(1).strip()
+    else:
+        start = text.find("[")
+        if start == -1:
+            return ""
+        depth = 0
+        blob = ""
+        for i in range(start, len(text)):
+            blob += text[i]
+            if text[i] == "[":
+                depth += 1
+            elif text[i] == "]":
+                depth -= 1
+                if depth == 0:
+                    break
+    blob = _repair_truncated_json(blob)
+    return blob
+
+
+def _repair_truncated_json(blob: str) -> str:
+    """修复被 max_tokens 截断的 JSON 数组。"""
+    blob = blob.strip()
+    if not blob:
+        return blob
+    # 去掉末尾多余的逗号
+    blob = re.sub(r",\s*$", "", blob)
+    # 统计未闭合的字符串与括号
+    in_string = False
+    escape = False
+    brackets = []
+    for ch in blob:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in "[{":
+            brackets.append(ch)
+        elif ch in "]}":
+            if brackets:
+                brackets.pop()
+    # 补齐未闭合的字符串
+    if in_string:
+        blob += '"'
+    # 补齐未闭合的括号
+    for ch in reversed(brackets):
+        blob += "]" if ch == "[" else "}"
+    # 去掉截断留下的「键名半截」（如 "desc": "A small white te）
+    blob = re.sub(r',?\s*"[a-zA-Z_]+"\s*:\s*"[^"]*$', "", blob)
+    # 去掉截断留下的孤立的半个元素
+    blob = re.sub(r",\s*\{\s*$", "", blob)
+    blob = re.sub(r",\s*$", "", blob)
+    return blob
 
 
 def merge_result(original: str, enhanced: str, mode: str) -> str:
@@ -256,3 +433,62 @@ def merge_result(original: str, enhanced: str, mode: str) -> str:
             return original
         return f"{original}\n\n{enhanced}"
     return enhanced or original
+
+
+# ------------------------------------------------------------------ 校验
+
+_VALIDATOR = None
+
+
+def _load_validator():
+    """加载 scripts/validate.py（只跑不读 —— 不把校验源码塞进内存上下文）。"""
+    global _VALIDATOR
+    if _VALIDATOR is not None:
+        return _VALIDATOR
+    path = SCRIPTS_DIR / "validate.py"
+    if not path.exists():
+        _VALIDATOR = None
+        return None
+    import importlib.util
+    try:
+        spec = importlib.util.spec_from_file_location("h3_prompt_validator", path)
+        if spec is None or spec.loader is None:
+            _VALIDATOR = None
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _VALIDATOR = module
+    except Exception:
+        _VALIDATOR = None
+    return _VALIDATOR
+
+
+def validate_output(text: str, original: str = "", mode: str = "pe") -> dict:
+    """
+    调用校验器。返回 {"ok", "errors", "warnings", "stats"}。
+    校验器缺失时降级为「只做 think 段检查」，不因此让整个增强失败。
+    """
+    module = _load_validator()
+    if module is None:
+        leaked = strip_thinking(text)
+        if leaked != (text or "").strip():
+            return {"ok": False, "errors": ["出现 thinking/思考痕迹"], "warnings": [],
+                    "stats": {}}
+        return {"ok": True, "errors": [], "warnings": [], "stats": {}}
+    return module.validate(text, original, mode)
+
+
+def looks_like_echo(output: str, system_prompt: str) -> bool:
+    """
+    检测模型是不是把 system prompt 原样吐了回来。
+
+    小参数量模型（135M 之类）经常不干活，直接复读系统提示词。
+    这种输出必须当成失败处理 —— 否则用户会拿到一段系统提示词冒充提示词。
+    判据：输出与系统提示词存在长度 >= 40 字符的公共子块。
+    """
+    if not output or not system_prompt:
+        return False
+    import difflib
+    matcher = difflib.SequenceMatcher(None, system_prompt, output, autojunk=False)
+    block = matcher.find_longest_match(0, len(system_prompt), 0, len(output))
+    return block.size >= 40

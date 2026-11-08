@@ -1,0 +1,556 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+提示词增强结果校验器。
+
+每条检查对应 references/constraints.md 的一节。
+被 h3studio/enhancer.py 复用，也可在命令行单独跑：
+
+    python3 validate.py --text "一段提示词" --original "一个女孩"
+    python3 validate.py --text "..." --original "..." --mode bbox
+
+输出 JSON：
+    {"ok": bool, "errors": [...], "warnings": [...], "stats": {...}}
+
+判定分两级：
+    errors   —— 硬约束违反（拒收）
+    warnings —— 软约束违反（放行但提示）
+"""
+import argparse
+import json
+import re
+import sys
+
+# ------------------------------------------------------------------ 词表
+
+# 【官方】Z-Image 官方 PE：「绝不包含"8K"、"杰作"等元标签或绘制指令」
+# 【官方】InvokeAI：长串通用质量词是常见错误
+QUALITY_WORDS = [
+    "masterpiece", "best quality", "8k", "4k", "uhd", "high quality",
+    "highest quality", "ultra hd", "hyperdetailed", "insanely detailed",
+    "超清", "高清", "杰作", "最佳质量", "极致细节", "顶级画质", "大师级",
+]
+
+# 【官方】官方 PE：「严禁使用比喻、情感化修辞」
+SUBJECTIVE_WORDS = [
+    "beautiful", "stunning", "gorgeous", "amazing", "spectacular",
+    "breathtaking", "perfect", "striking", "mesmerizing",
+    "漂亮", "惊艳", "绝美", "震撼", "完美",
+]
+
+# 【官方】InvokeAI：Z-Image 不支持 Compel 权重语法
+# 覆盖 (word:1.2) / (word) / ((word)) / [word] / word++ / word---
+# 注意：方括号/圆括号里的内容若是「纯数字列表」（bbox 的 [y_min, x_min, y_max, x_max]）
+# 或「JSON 数组」（["cat", "animal", ...]），不是权重语法 —— 用否定前瞻排除。
+_WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))[^()]{1,80}?\s*\)")
+def _is_json_like(inner: str) -> bool:
+    """
+    判断方括号里的内容是不是「结构化数据」而不是权重语法。
+
+    权重语法形如 [word] / [a word] / [some words]；
+    结构化数据形如 ["cat", "animal"] / [500, 350, 950, 650] / ["key": "value"]
+    """
+    stripped = inner.strip()
+    if not stripped:
+        return False
+    # 纯数字列表
+    if re.fullmatch(r"[\d\s.,\-]+", stripped):
+        return True
+    # JSON 数组：引号包裹的字符串列表
+    if re.fullmatch(r'"[^"]*"\s*(,\s*"[^"]*")*', stripped):
+        return True
+    # JSON 对象条目："key": value
+    if re.search(r'"[^"]+"\s*:', stripped):
+        return True
+    return False
+
+
+_WEIGHT_BRACKET = re.compile(r"\[\s*([^\[\]]{1,120}?)\s*\]")
+_WEIGHT_DOUBLE_PAREN = re.compile(r"\(\([^()]{1,80}?\)\)")
+_WEIGHT_INC_DEC = re.compile(r"(?<![+\-])\b[A-Za-z\u4e00-\u9fff]{2,}\s*(\+\+|--)(?![+\-])")
+
+WEIGHT_PATTERNS = [
+    _WEIGHT_PAREN,        # (word:1.2) / (word)
+    _WEIGHT_DOUBLE_PAREN,  # ((word))
+    _WEIGHT_BRACKET,       # [word]
+    _WEIGHT_INC_DEC,       # word++ / word--
+]
+
+# thinking 残留
+THINK_PATTERNS = [
+    re.compile(r"<\s*think\s*>", re.I),
+    re.compile(r"<\s*/\s*think\s*>", re.I),
+    re.compile(r"<\s*thinking\s*>", re.I),
+    re.compile(r"<\s*reasoning\s*>", re.I),
+]
+
+# 中文正文里常见的「思考独白」开场（Qwen3 thinking 模型的特征泄漏）
+NARRATION_MARKERS = [
+    "我们需要回答", "用户要求", "用户输入", "首先，", "接下来，",
+    "让我思考", "根据用户的要求", "分析用户",
+]
+
+# ------------------------------------------------------------------ 检查
+
+
+def _norm(text: str) -> str:
+    return (text or "").strip()
+
+
+def check_quality_words(text: str):
+    """质量元标签 —— 拒收。"""
+    hits = []
+    low = text.lower()
+    for word in QUALITY_WORDS:
+        # 用词边界匹配，避免 "8k" 命中 "18k" 之类的误伤
+        pattern = r"(?<![a-z0-9])" + re.escape(word.lower()) + r"(?![a-z0-9])"
+        if re.search(pattern, low):
+            hits.append(word)
+    return hits
+
+
+def check_weight_syntax(text: str, mode: str = "pe"):
+    """权重语法 —— 拒收。"""
+    hits = []
+    # bbox 档的 JSON 数组里全是 [数字, 数字, ...]，不是权重语法 —— 先剥掉再查
+    scoped = text
+    if mode == "bbox":
+        scoped = re.sub(r"\[\s*\{.*\}\s*\]", " ", text, flags=re.S)
+        scoped = re.sub(r'"bbox"\s*:\s*\[[^\]]*\]', '"bbox": []', scoped)
+    for pattern in WEIGHT_PATTERNS:
+        for match in pattern.finditer(scoped):
+            if pattern is _WEIGHT_BRACKET:
+                # 方括号：区分权重语法 [word] 与结构化数据 ["a","b"] / [1,2]
+                inner = match.group(1)
+                if _is_json_like(inner):
+                    continue
+            snippet = match.group(0).strip()
+            if snippet and snippet not in hits:
+                hits.append(snippet)
+    return hits
+
+
+def check_thinking(text: str):
+    """thinking 段残留 —— 拒收。"""
+    hits = []
+    for pattern in THINK_PATTERNS:
+        if pattern.search(text):
+            hits.append(pattern.pattern.replace("\\s*", ""))
+    for marker in NARRATION_MARKERS:
+        if marker in text[:120]:
+            hits.append(f"疑似思考独白：{marker}")
+            break
+    return hits
+
+
+def check_subjective(text: str):
+    """主观评价词 —— 警告。"""
+    hits = []
+    low = text.lower()
+    for word in SUBJECTIVE_WORDS:
+        pattern = r"(?<![a-z0-9])" + re.escape(word.lower()) + r"(?![a-z0-9])"
+        if re.search(pattern, low):
+            hits.append(word)
+    return hits
+
+
+# 中文分词不可靠，用「原文里较长的名词片段」做保留检查
+def _candidate_terms(original: str):
+    """
+    从用户原文里挑出可能是核心要素的词：
+      - 英文：长度 >= 3 的单词（去掉停用词）
+      - 中文：长度 >= 2 的连续汉字片段
+
+    中文里要特别处理「量词 + 名词」的组合（如「一个女孩」）：
+    「一个」是量词不是核心要素，真正的核心是「女孩」。
+
+    另外，中文没有词边界，「女人坐在长椅上抱着狗」是一整串。
+    这里额外切出「2 字组合」作为候选，让核心名词（女人/长椅/狗）能被检出，
+    而不是把整句当成一个词去匹配。
+    """
+    out = []
+    for token in re.findall(r"[A-Za-z][A-Za-z\-']{2,}", original or ""):
+        if token.lower() in _STOPWORDS:
+            continue
+        out.append(token)
+    for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", original or ""):
+        # 剥掉开头的中文量词/代词，只留名词部分
+        stripped = chunk
+        for quant in _CJK_QUANTIFIERS:
+            if stripped.startswith(quant) and len(stripped) > len(quant):
+                stripped = stripped[len(quant):]
+                break
+        if len(stripped) >= 2:
+            out.append(stripped)
+        # 长句额外切 2 字窗口，作为「核心名词候选」
+        if len(stripped) > 4:
+            for i in range(len(stripped) - 1):
+                window = stripped[i:i + 2]
+                if window not in _CJK_STOP_BIGRAMS:
+                    out.append(window)
+    return out
+
+
+# 常见的非核心 2 字组合（切窗口时跳过，避免制造噪声候选）
+_CJK_STOP_BIGRAMS = {
+    "坐在", "抱着", "长着", "站在", "拿着", "看着", "是个", "是一", "有的",
+    "这个", "那个", "什么", "可以", "应该", "一种", "一些", "进行", "出现",
+}
+
+# 中文量词与代词（剥掉后剩下的才是核心名词）
+_CJK_QUANTIFIERS = [
+    "一个", "一只", "一条", "一张", "一幅", "一颗", "一束", "一堆", "一群",
+    "这位", "那个", "这个", "一些", "很多", "几个",
+]
+
+_STOPWORDS = {
+    "the", "and", "with", "for", "that", "this", "from", "into", "your", "you",
+    "are", "was", "has", "have", "his", "her", "its", "not", "but", "all",
+    "can", "will", "one", "two", "out", "who", "what", "when", "where",
+    "image", "photo", "picture", "shot", "view", "style", "make", "create",
+    "一个", "一只", "一条", "一张", "这个", "那个", "可以",
+    "生成", "创建", "图片", "图像", "风格", "画",
+}
+
+
+# 语义等价词组：扩写后换了一种说法，但核心要素没丢 —— 不算丢失
+# （官方 PE 允许「保留核心要素」而不是「逐字保留」）
+_CJK_SYNONYM_GROUPS = [
+    ("女孩", "女子", "女性", "少女", "姑娘", "女生", "女人"),
+    ("男孩", "男子", "男性", "少年", "男生", "男人"),
+    ("猫", "猫咪"),
+    ("狗", "犬", "小狗"),
+    ("孩子", "儿童", "孩童", "小孩"),
+    ("老人", "长者", "老者"),
+    ("车", "汽车", "轿车"),
+    ("房子", "屋", "建筑"),
+    ("花", "花朵", "花卉"),
+    ("树", "树木"),
+    ("山", "山脉", "群山"),
+    ("海", "海洋", "大海"),
+    ("城市", "都市", "城区"),
+    ("街道", "街道", "马路", "路面"),
+]
+
+_EN_SYNONYM_GROUPS = [
+    ("girl", "woman", "lady", "female", "young", "she"),
+    ("boy", "man", "male", "he"),
+    ("cat", "kitten", "feline"),
+    ("dog", "puppy", "canine"),
+    ("child", "kid", "children", "boy", "girl"),
+    ("car", "vehicle", "automobile"),
+    ("house", "home", "building"),
+    ("tree", "forest"),
+    ("mountain", "mountains", "peak"),
+    ("city", "urban", "town"),
+]
+
+
+def _is_semantically_preserved(term: str, enhanced_low: str) -> bool:
+    """判断原文核心词是否以同义说法出现在扩写结果里。"""
+    groups = _CJK_SYNONYM_GROUPS if re.search(r"[\u4e00-\u9fff]", term) else _EN_SYNONYM_GROUPS
+    for group in groups:
+        if term in group or term.lower() in group:
+            for word in group:
+                if _term_present(word, enhanced_low):
+                    return True
+    return False
+
+
+def _is_cjk(text: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
+
+
+def _term_present(term: str, enhanced_low: str) -> bool:
+    """
+    原文核心词是否出现在扩写结果里。
+    英文按词边界匹配（避免 "car" 命中 "carpet"）；
+    中文直接子串匹配（中文没有词边界）。
+    """
+    if re.search(r"[\u4e00-\u9fff]", term):
+        return term in enhanced_low
+    pattern = r"(?<![a-z0-9])" + re.escape(term.lower()) + r"(?![a-z0-9])"
+    return bool(re.search(pattern, enhanced_low))
+
+
+def check_subject_preserved(original: str, enhanced: str):
+    """
+    用户原文的核心词是否保留 —— 警告。
+
+    中文长句会切出很多 2 字窗口候选，只要其中**大部分**能在扩写结果里
+    找到（或找到同义说法），就认为核心要素保留了。
+
+    跨语言时（SCALIST / bbox 档输出英文、输入是中文）：
+    中文词不可能在英文结果里逐字出现，所以不做逐字比对。
+    但如果结果**很短**，说明模型其实什么都没扩写 —— 这时仍要报。
+    """
+    if not original or not enhanced:
+        return []
+    low = enhanced.lower()
+    # 跨语言：结果够长就认为核心要素被语义保留；结果太短说明没真扩写
+    if _is_cjk(original) != _is_cjk(enhanced):
+        words = len(re.findall(r"[A-Za-z0-9']+", enhanced))
+        if words >= 25:
+            return []
+        return ["扩写结果过短（跨语言扩写应输出完整段落），核心要素可能未保留"]
+    candidates = _candidate_terms(original)
+    lost = []
+    for term in candidates:
+        if _term_present(term, low):
+            continue
+        if _is_semantically_preserved(term, low):
+            continue
+        lost.append(term)
+    if not candidates:
+        return []
+    # 丢失比例过高才提示（个别词被自然改写是正常的）
+    if len(lost) / len(candidates) > 0.5:
+        return lost
+    return []
+
+
+# 画面文字线索词（只在这些词出现时才要求双引号）
+# 用词边界匹配，避免 "textured"/"context" 之类误伤
+TEXT_MARKERS = ["海报", "菜单", "招牌", "路标", "屏幕", "标题", "logo", "文字",
+                "poster", "menu", "sign", "screen", "title", "text", "banner"]
+
+# 否定语境：说了「画面里没有文字」时不需要双引号
+NEGATION_MARKERS = ["无任何文字", "没有任何文字", "不含文字", "没有文字", "无文字",
+                     "no text", "without text", "no lettering", "no signage",
+                     "without any text"]
+
+
+def _has_text_marker(text: str) -> str | None:
+    """找出画面文字线索词（英文按词边界匹配，避免 textured/context 误伤）。"""
+    low = text.lower()
+    for marker in TEXT_MARKERS:
+        if re.search(r"[\u4e00-\u9fff]", marker):
+            if marker in low:
+                return marker
+        else:
+            pattern = r"(?<![a-z0-9])" + re.escape(marker) + r"(?![a-z0-9])"
+            if re.search(pattern, low):
+                return marker
+    return None
+
+
+def check_quoted_text(text: str):
+    """
+    画面文字是否用双引号包裹 —— 警告。
+    只在文本里出现明显的「要出现在画面上的文字」线索时才提示，
+    避免对纯视觉描述误报；命中否定语境（「画面中无任何文字」）时不提示。
+    """
+    low = text.lower()
+    for neg in NEGATION_MARKERS:
+        if neg in low:
+            return []
+    marker = _has_text_marker(text)
+    if marker:
+        # 文本里应该至少有一对双引号
+        if '"' not in text:
+            return [f"提到「{marker}」但没有用双引号逐字转录画面文字"]
+    return []
+
+
+def check_length(text: str, mode: str):
+    """长度区间 —— 警告。"""
+    words = len(re.findall(r"[A-Za-z0-9']+", text))
+    cjk = len(re.findall(r"[\u4e00-\u9fff]", text))
+    # 中文按 1 词 ≈ 1.5 英文词 的粗略口径折算
+    est = words + cjk / 1.5
+    if mode == "bbox":
+        lo, hi = 100, 350
+    elif mode == "scalist":
+        lo, hi = 80, 220
+    else:
+        lo, hi = 60, 350
+    if est < lo:
+        return [f"长度偏短（约 {int(est)} 词，建议 {lo}-{hi} 词）"], int(est)
+    if est > hi:
+        return [f"长度偏长（约 {int(est)} 词，建议 {lo}-{hi} 词）"], int(est)
+    return [], int(est)
+
+
+def check_bbox(text: str):
+    """bbox 档专用：id/bbox/desc 结构与 y 在 x 之前的规则 —— 错误。"""
+    errors = []
+    warnings = []
+    blob = _extract_json_array(text)
+    if not blob:
+        return ["bbox 档没有找到 JSON 数组"], []
+    try:
+        items = json.loads(blob)
+    except Exception as exc:
+        return [f"JSON 数组解析失败：{exc}"], []
+    if not isinstance(items, list) or not items:
+        return ["JSON 数组为空或格式不对"], []
+    ids = set()
+    for item in items:
+        if not isinstance(item, dict):
+            errors.append("数组元素不是对象")
+            continue
+        pid = item.get("id")
+        if not pid:
+            errors.append("元素缺少 id")
+        elif pid in ids:
+            errors.append(f"id 重复：{pid}")
+        else:
+            ids.add(pid)
+        bbox = item.get("bbox")
+        if not (isinstance(bbox, list) and len(bbox) == 4):
+            errors.append(f"{pid} 的 bbox 不是 4 元组")
+            continue
+        if not all(isinstance(v, (int, float)) for v in bbox):
+            errors.append(f"{pid} 的 bbox 含非数值")
+            continue
+        if not all(0 <= v <= 1000 for v in bbox):
+            errors.append(f"{pid} 的 bbox 超出 0-1000 归一化范围")
+        if bbox[0] > bbox[2] or bbox[1] > bbox[3]:
+            errors.append(f"{pid} 的 bbox 顺序异常（应为 [y_min, x_min, y_max, x_max]）")
+        if not item.get("desc"):
+            errors.append(f"{pid} 缺少 desc")
+    # caption 里应能用尖括号引用到 id —— 官方格式要求，但漏引不影响 bbox 本身可用
+    for pid in ids:
+        if f"<{pid}>" not in text:
+            warnings.append(f"caption 里没有用尖括号引用 <{pid}>（官方格式要求）")
+    return errors, warnings
+
+
+def _extract_json_array(text: str) -> str:
+    """
+    抽出 JSON 数组并尽力修复被 max_tokens 截断的输出。
+    与 h3studio/enhancer.py 的 extract_json_block 保持同一套修复规则。
+    """
+    if not text:
+        return ""
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    if fence:
+        blob = fence.group(1).strip()
+    else:
+        start = text.find("[")
+        if start == -1:
+            return ""
+        depth = 0
+        blob = ""
+        for i in range(start, len(text)):
+            blob += text[i]
+            if text[i] == "[":
+                depth += 1
+            elif text[i] == "]":
+                depth -= 1
+                if depth == 0:
+                    break
+    return _repair_truncated_json(blob)
+
+
+def _repair_truncated_json(blob: str) -> str:
+    """修复被 max_new_tokens 截断的 JSON 数组。"""
+    blob = blob.strip()
+    if not blob:
+        return blob
+    blob = re.sub(r",\s*$", "", blob)
+    in_string = False
+    escape = False
+    brackets = []
+    for ch in blob:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in "[{":
+            brackets.append(ch)
+        elif ch in "]}":
+            if brackets:
+                brackets.pop()
+    if in_string:
+        blob += '"'
+    for ch in reversed(brackets):
+        blob += "]" if ch == "[" else "}"
+    blob = re.sub(r',?\s*"[a-zA-Z_]+"\s*:\s*"[^"]*$', "", blob)
+    blob = re.sub(r",\s*\{\s*$", "", blob)
+    blob = re.sub(r",\s*$", "", blob)
+    return blob
+
+
+# ------------------------------------------------------------------ 主入口
+
+
+def validate(text: str, original: str = "", mode: str = "pe"):
+    """
+    校验扩写结果。
+
+    返回 {"ok", "errors", "warnings", "stats"}
+    ok = 无 errors（warnings 不影响 ok）
+    """
+    text = _norm(text)
+    errors = []
+    warnings = []
+
+    if not text:
+        return {"ok": False, "errors": ["结果为空"], "warnings": [],
+                "stats": {"words": 0, "chars": 0}}
+
+    hits = check_quality_words(text)
+    if hits:
+        errors.append("出现质量元标签（Z-Image 官方 PE 明令禁止）："
+                      + "、".join(hits))
+
+    hits = check_weight_syntax(text, mode)
+    if hits:
+        errors.append("出现提示词权重语法（Z-Image 不支持 Compel 语法）："
+                      + "、".join(hits))
+
+    hits = check_thinking(text)
+    if hits:
+        errors.append("出现 thinking/思考痕迹（thinking 模型不适合做扩写）："
+                      + "、".join(hits))
+
+    if mode == "bbox":
+        bbox_errors, bbox_warnings = check_bbox(text)
+        errors.extend(bbox_errors)
+        warnings.extend(bbox_warnings)
+
+    hits = check_subjective(text)
+    if hits:
+        warnings.append("出现主观评价词（官方 PE 要求客观具象）："
+                        + "、".join(hits))
+
+    lost = check_subject_preserved(original, text)
+    if lost:
+        warnings.append("用户原文的核心要素可能丢失：" + "、".join(lost))
+
+    hits = check_quoted_text(text)
+    warnings.extend(hits)
+
+    length_msg, est = check_length(text, mode)
+    warnings.extend(length_msg)
+
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "stats": {"words": est, "chars": len(text)},
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="提示词增强结果校验器")
+    parser.add_argument("--text", required=True, help="要校验的扩写结果")
+    parser.add_argument("--original", default="", help="用户原始输入（用于主体保留检查）")
+    parser.add_argument("--mode", default="pe", choices=["pe", "scalist", "bbox"],
+                        help="模板档位")
+    args = parser.parse_args()
+    result = validate(args.text, args.original, args.mode)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

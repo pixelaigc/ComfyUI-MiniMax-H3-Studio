@@ -273,6 +273,10 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
                 "max_tokens": max_tokens,
                 "stream": False,
             }
+            # greedy 档：复刻 BFL 官方 upsampler 的贪心解码行为
+            if not options.get("do_sample", True):
+                payload["temperature"] = 0.0
+                payload["top_p"] = 1.0
             # reasoning 模型（如 Qwen3 thinking）会把思考过程混进 content，
             # 提示词增强场景必须拿到纯净结果，所以优先关掉 thinking。
             # 部分服务不认识这个参数，报错就退回不带参数重试一次。
@@ -313,6 +317,48 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
 # ------------------------------------------------------------------ ComfyUI 节点
 
 
+def _comfy_thinking_safe_prompts(user_prompt: str, system_prompt: str):
+    """
+    为 VRGDG_LocalLLM 节点改写提示词，规避 thinking 模型的问题。
+
+    背景：该节点自己拼 payload（没有 chat_template_kwargs），所以关不掉 thinking。
+    对 Qwen3 这类模型，一旦模板诱发推理链，OpenAI 兼容接口返回的
+    `content` 就是 null，节点再 `str(None)` 变成字符串 "None" ——
+    提示词彻底丢失。
+
+    两个手段：
+      1. 在 system 末尾追加显式的「不要输出思考过程，直接给最终结果」指令
+      2. 把会诱发推理链的模板措辞（首先/接着/然后/最后 的工作流式描述）
+         换成直接的执行式描述
+
+    返回 (prompt, system_prompt)。
+    """
+    system = system_prompt or ""
+    # 把推理链诱因的顺序措辞改成直接执行式
+    for src, dst in (
+        ("首先，你会分析并锁定", "直接锁定"),
+        ("接着，你会判断提示词是否需要", "若需要，先在脑中构思，然后"),
+        ("然后，当核心画面确立后", "在核心画面确立后"),
+        ("最后，是对所有文字元素的精确处理", "对所有文字元素做精确处理"),
+        ("你的工作流程严格遵循一个逻辑序列：", "你的工作方式："),
+    ):
+        system = system.replace(src, dst)
+
+    guard = (
+        "\n\n【输出纪律】不要输出任何思考过程、分析步骤或推理说明，"
+        "不要以任何前缀开场。直接输出最终的提示词正文，"
+        "第一个字符就是提示词的第一个字。"
+    )
+    if "【输出纪律】" not in system:
+        system += guard
+
+    prompt = user_prompt or ""
+    prompt_guard = "\n\n（直接输出扩写后的提示词，不要解释，不要思考过程。）"
+    if "不要解释" not in prompt:
+        prompt += prompt_guard
+    return prompt, system
+
+
 async def _call_via_comfyui(session: ClientSession, provider: dict, messages: list,
                             images: list | None, temperature: float, top_p: float,
                             max_tokens: int) -> str:
@@ -337,6 +383,11 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
         # 所以这里必须给出带 /v1 的地址，否则节点会打到 404 并返回空文本。
         if not llm_base.rstrip("/").endswith("/v1"):
             llm_base = llm_base.rstrip("/") + "/v1"
+        # thinking 模型（Qwen3 等）：节点无法关 thinking，会拿到 content=null。
+        # 若配置了 use_proxy，走 H3 Studio 自己的 OpenAI 兼容代理转发，
+        # 由代理强制 enable_thinking=false 并兜底 reasoning_content。
+        if provider.get("use_proxy"):
+            llm_base = provider.get("proxy_base_url") or llm_base
 
     system_prompt = ""
     user_prompt = ""
@@ -345,6 +396,16 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
             system_prompt = message.get("content", "")
         elif message.get("role") == "user":
             user_prompt = message.get("content", "")
+
+    # VRGDG_LocalLLM 节点有自己的 payload（不含 chat_template_kwargs），
+    # 遇到 thinking 模型时它拿到的 content 会是 null -> 节点把 Python 的
+    # None 转成字符串 "None"。官方 PE 模板正好会触发 thinking。
+    # 解决：把 system/user 消息改写成「非 thinking 也能听懂的」形式 ——
+    # 用更强的指令前缀显式要求「不要输出思考过程」，并去掉会诱发
+    # 推理链的模板措辞（官方模板里的「首先/接着/然后/最后」工作流描述
+    # 本身就是推理诱因）。
+    node_prompt, node_system = _comfy_thinking_safe_prompts(
+        user_prompt, system_prompt)
 
     node_id = "10"
     workflow = {
@@ -355,8 +416,8 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
                 "api_key": api_key,
                 "model": model,
                 "custom_model": "",
-                "prompt": user_prompt,
-                "system_prompt": system_prompt,
+                "prompt": node_prompt,
+                "system_prompt": node_system,
                 "temperature": temperature,
                 "top_p": top_p,
                 "max_tokens": max_tokens,
@@ -370,6 +431,13 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
             "inputs": {"source": [node_id, 0]},
             "class_type": "PreviewAny",
             "_meta": {"title": "输出"},
+        },
+        # 节点第 4 个返回值是 status（"ok" 或具体错误原因）——
+        # 节点自己会吞掉异常并返回空 text，靠这个输出才能诊断
+        "21": {
+            "inputs": {"source": [node_id, 3]},
+            "class_type": "PreviewAny",
+            "_meta": {"title": "状态"},
         },
     }
 
@@ -407,34 +475,93 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
                 if isinstance(message, list) and message and message[0] == "execution_error":
                     messages.append(str((message[1] or {}).get("exception_message", "")))
             raise ProviderError("ComfyUI 节点执行失败：" + ("; ".join(messages) or "未知错误")[:300])
-        for output in (entry.get("outputs") or {}).values():
-            for value in output.values():
-                if isinstance(value, list):
-                    for item in value:
-                        if isinstance(item, str) and item.strip():
-                            return item.strip()
-        # 节点跑完了但文本是空的 —— 常见于 LLM 服务地址不对（节点会静默吞掉 404）
+        # VRGDG_LocalLLM 有 5 个输出（text/used_backend/used_model/status/image），
+        # PreviewAny 会把它们都带进 outputs。必须精确取 text 那个，
+        # 否则会拿到 "None" 之类的其它返回值。
+        text_value = _comfy_extract_text(entry.get("outputs") or {})
+        if text_value:
+            return text_value
+        # 节点跑完了但文本是空的 —— 节点自己会吞掉异常，真实原因在 status 里
         if status.get("completed") and not empty_reported:
             empty_reported = True
             node_status = await _comfy_node_status(session, base, prompt_id)
-            detail = f"（节点状态：{node_status}）" if node_status else ""
+            if node_status and node_status.lower() not in ("ok", ""):
+                raise ProviderError(f"ComfyUI 节点执行失败：{node_status}"[:300])
             raise ProviderError(
-                f"ComfyUI 节点返回了空文本{detail}。"
-                f"请检查「LLM 服务地址」是否正确（openai_compatible 后端需要以 /v1 结尾）。")
+                "ComfyUI 节点返回了空文本。"
+                "请检查「LLM 服务地址」是否正确（openai_compatible 后端需要以 /v1 结尾）。")
     raise ProviderError("ComfyUI 节点执行超时（300 秒）")
 
 
+def _comfy_extract_text(outputs: dict) -> str:
+    """
+    从 ComfyUI history 的 outputs 里精确取出 LLM 节点的文本输出。
+
+    VRGDG_LocalLLM 有 5 个输出：text / used_backend / used_model / status / image。
+    工作流里：
+      "20" 接的是 text   —— 要的就是它
+      "21" 接的是 status —— 是诊断信息，不是提示词
+    所以必须按节点 id 取，不能遍历所有输出（会拿到 "ok" 或 "None"）。
+    """
+    outputs = outputs or {}
+    # 优先按已知节点 id 取
+    for node_id in ("20",):
+        node_outputs = outputs.get(node_id)
+        if isinstance(node_outputs, dict):
+            texts = node_outputs.get("text")
+            if isinstance(texts, list):
+                for item in texts:
+                    if isinstance(item, str) and item.strip():
+                        return item.strip()
+            elif isinstance(texts, str) and texts.strip():
+                return texts.strip()
+    # 回退：取所有节点里最长的字符串（提示词一定比 status/None 长）
+    candidates = []
+    for node_outputs in outputs.values():
+        if not isinstance(node_outputs, dict):
+            continue
+        for value in node_outputs.values():
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.strip():
+                        candidates.append(item.strip())
+            elif isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+    if not candidates:
+        return ""
+    good = [c for c in candidates
+            if len(c) >= 20 and c.lower() not in ("none", "null", "ok", "true", "false")]
+    if good:
+        return max(good, key=len)
+    return ""
+
+
 async def _comfy_node_status(session: ClientSession, base: str, prompt_id: str) -> str:
-    """取 VRGDG_LocalLLM 节点的 status 输出（第 4 个返回值），用于诊断。"""
+    """
+    取 VRGDG_LocalLLM 节点的 status 输出（第 4 个返回值），用于诊断。
+    节点会吞掉异常并把错误原因放在 status 里（text 则为空）。
+    """
     async with session.get(f"{base}/history/{prompt_id}") as resp:
         if resp.status != 200:
             return ""
         body = await resp.json()
     entry = body.get(prompt_id) or {}
-    for output in (entry.get("outputs") or {}).values():
-        texts = output.get("text")
+    outputs = entry.get("outputs") or {}
+    # 节点 "21" 接的是 status（第 4 个返回值）
+    node21 = outputs.get("21")
+    if isinstance(node21, dict):
+        texts = node21.get("text")
         if isinstance(texts, list) and texts and isinstance(texts[0], str):
             return texts[0]
+    # 回退：扫描所有输出，找看起来像状态的那个
+    for node_outputs in outputs.values():
+        if not isinstance(node_outputs, dict):
+            continue
+        texts = node_outputs.get("text")
+        if isinstance(texts, list) and texts and isinstance(texts[0], str):
+            value = texts[0].strip()
+            if value.lower() in ("ok", "error") or value.startswith("error:"):
+                return value
     return ""
 
 

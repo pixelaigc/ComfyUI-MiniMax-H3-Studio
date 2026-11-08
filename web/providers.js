@@ -259,8 +259,15 @@ async function loadAgentConfig() {
       specs: d.specs || [],
       params: d.params || {},
       lengthPresets: d.length_presets || {},
+      samplingPresets: d.sampling_presets || {},
+      skillDir: d.skill_dir || "",
     };
+    // 默认选官方 PE 档（image）
+    if (!provState.specId || !provState.agent.specs.find(s => s.id === provState.specId)) {
+      provState.specId = "image";
+    }
     renderAgentConfig();
+    renderEnhanceSpecSelect();
   } catch (e) {
     box.innerHTML = `<div class="prov-empty error">读取增强 Agent 配置失败：${esc(e.message)}</div>`;
   }
@@ -271,6 +278,7 @@ function renderAgentConfig() {
   const specs = provState.agent.specs || [];
   const params = provState.agent.params || {};
   const presets = provState.agent.lengthPresets || {};
+  const sampling = provState.agent.samplingPresets || {};
   const spec = specs.find(s => s.id === provState.specId) || specs[0];
   if (!spec) { box.innerHTML = `<div class="prov-empty">没有可用的增强模板</div>`; return; }
   provState.specId = spec.id;
@@ -278,6 +286,18 @@ function renderAgentConfig() {
   const lengthOpts = Object.entries(presets).map(([k, v]) =>
     `<option value="${esc(k)}"${params.length === k ? " selected" : ""}>${esc(v.label)}（${esc(v.hint || "")}）</option>`
   ).join("");
+
+  const samplingOpts = Object.entries(sampling).map(([k, v]) =>
+    `<option value="${esc(k)}"${params.sampling === k ? " selected" : ""}>${esc(v.label)}（${esc(v.hint || "")}）</option>`
+  ).join("");
+
+  // 已自定义的模板优先显示自定义正文，否则显示内置模板正文（都可编辑）
+  const sysText = spec.customized
+    ? (spec.custom_system_prompt || "")
+    : (spec.builtin_system_prompt || "");
+  const userText = spec.customized
+    ? (spec.custom_user_template || "")
+    : (spec.builtin_user_template || "");
 
   box.innerHTML = `
     <div class="agent-row">
@@ -291,28 +311,26 @@ function renderAgentConfig() {
         <select id="agentLength">${lengthOpts}</select>
       </label>
       <label class="agent-field">
-        <span>温度 <b id="agentTempVal">${Number(params.temperature ?? 0.7).toFixed(2)}</b></span>
-        <input type="range" id="agentTemp" min="0" max="1.5" step="0.05" value="${Number(params.temperature ?? 0.7)}">
+        <span>采样</span>
+        <select id="agentSampling">${samplingOpts}</select>
       </label>
       <button class="agent-save" id="agentSave">保存模板与参数</button>
     </div>
-    <div class="agent-dims">覆盖维度：${(spec.dimensions || []).map(d =>
+    <div class="agent-dims">${esc(spec.source || "")} · 覆盖维度：${(spec.dimensions || []).map(d =>
       `<span class="agent-dim">${esc(d)}</span>`).join("")}</div>
     <label class="agent-field block">
       <span>System 提示词模板（可编辑）</span>
-      <textarea id="agentSys" rows="10">${esc(spec.custom_system_prompt || "")}</textarea>
+      <textarea id="agentSys" rows="10">${esc(sysText)}</textarea>
     </label>
     <label class="agent-field block">
-      <span>User 模板（必须包含 {original}）</span>
-      <textarea id="agentUser" rows="3">${esc(spec.custom_user_template || "")}</textarea>
-    </label>`;
+      <span>User 模板（必须包含 {prompt} 或 {original}）</span>
+      <textarea id="agentUser" rows="3">${esc(userText)}</textarea>
+    </label>
+    <div class="agent-hint">硬约束由服务端校验器强制：禁止质量词（masterpiece/8k/best quality）、禁止权重语法（(word:1.2)）、禁止 thinking 残留。</div>`;
 
   $("#agentSpec").addEventListener("change", e => {
     provState.specId = e.target.value;
     renderAgentConfig();
-  });
-  $("#agentTemp").addEventListener("input", e => {
-    $("#agentTempVal").textContent = Number(e.target.value).toFixed(2);
   });
   $("#agentSave").addEventListener("click", saveAgentConfig);
 }
@@ -321,8 +339,8 @@ async function saveAgentConfig() {
   const btn = $("#agentSave");
   const sysVal = $("#agentSys").value;
   const userVal = $("#agentUser").value;
-  if (userVal.trim() && !userVal.includes("{original}")) {
-    alert("User 模板必须包含 {original} 占位符");
+  if (userVal.trim() && !userVal.includes("{prompt}") && !userVal.includes("{original}")) {
+    alert("User 模板必须包含 {prompt} 或 {original} 占位符");
     return;
   }
   btn.disabled = true;
@@ -336,8 +354,8 @@ async function saveAgentConfig() {
         },
       },
       params: {
-        temperature: Number($("#agentTemp").value),
         length: $("#agentLength").value,
+        sampling: $("#agentSampling").value,
       },
     });
     btn.textContent = "已保存 ✓";
@@ -367,6 +385,27 @@ function setEnhanceHint(text, kind) {
   hint.className = "enhance-hint" + (kind ? " " + kind : "");
 }
 
+// 图像页的模板下拉 —— 与「本地模型配置」页共用同一份 provState.specId
+function renderEnhanceSpecSelect() {
+  const sel = $("#enhanceSpec");
+  if (!sel) return;
+  const specs = provState.agent.specs || [];
+  if (!specs.length) { sel.innerHTML = ""; sel.style.display = "none"; return; }
+  sel.style.display = "";
+  sel.innerHTML = specs.map(s =>
+    `<option value="${esc(s.id)}"${s.id === provState.specId ? " selected" : ""}>${esc(s.label)}</option>`
+  ).join("");
+  sel.value = provState.specId;
+}
+
+$("#enhanceSpec").addEventListener("change", e => {
+  provState.specId = e.target.value;
+  setEnhanceHint("已切换模板：" + e.target.selectedOptions[0].textContent, "ok");
+});
+
+// 首次进入时拉一次 Agent 配置，把模板清单喂给下拉框
+loadAgentConfig().then(renderEnhanceSpecSelect);
+
 $("#enhanceBtn").addEventListener("click", async () => {
   const btn = $("#enhanceBtn");
   const prompt = $("#prompt").value.trim();
@@ -386,9 +425,7 @@ $("#enhanceBtn").addEventListener("click", async () => {
     });
     provState.lastEnhance = d;
     $("#enhanceResult").value = d.enhanced || "";
-    $("#enhanceMeta").innerHTML =
-      `模型：<b>${esc(d.provider || "—")}</b> · 模板：${esc(d.spec_id || "—")} · ` +
-      `原文 ${d.original ? d.original.length : 0} 字 → 扩写 ${d.enhanced ? d.enhanced.length : 0} 字`;
+    $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
     $("#enhanceModal").hidden = false;
     setEnhanceHint(`已用「${d.provider}」扩写，${d.enhanced ? d.enhanced.length : 0} 字`, "ok");
   } catch (e) {
@@ -402,6 +439,31 @@ $("#enhanceBtn").addEventListener("click", async () => {
     btn.classList.remove("busy");
   }
 });
+
+// 结果弹窗的元信息：模型 / 模板 / 采样参数 / 校验结果
+function buildEnhanceMeta(d) {
+  const p = d.params || {};
+  const v = d.validation || {};
+  const bits = [
+    `模型：<b>${esc(d.provider || "—")}</b>`,
+    `模板：${esc(d.spec_id || "—")}`,
+    `采样：${esc(p.sampling || "—")} / ${esc(p.temperature ?? "—")} / top_p ${esc(p.top_p ?? "—")}`,
+    `max_new_tokens：${esc(p.max_tokens ?? "—")}`,
+    `原文 ${d.original ? d.original.length : 0} 字 → 扩写 ${d.enhanced ? d.enhanced.length : 0} 字`,
+  ];
+  let html = bits.join(" · ");
+  if (v.warnings && v.warnings.length) {
+    html += `<div class="enhance-warn">⚠ ${v.warnings.map(esc).join("；")}</div>`;
+  }
+  if (v.stats && v.stats.words) {
+    html += `<div class="enhance-warn">词数约 ${v.stats.words}</div>`;
+  }
+  if (d.elements && d.elements.length) {
+    html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>
+      esc(e.id) + " " + esc(JSON.stringify(e.bbox))).join(" · ")}</div>`;
+  }
+  return html;
+}
 
 $("#enhanceModalClose").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
 $("#enhanceCancel").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
