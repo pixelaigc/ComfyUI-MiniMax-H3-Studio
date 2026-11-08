@@ -514,6 +514,26 @@ class TestPageSize(unittest.TestCase):
             "() => document.querySelectorAll('#jobsGrid .job-card').length")
         self.assertEqual(count, 24, "清除筛选后应恢复每页数量对应的数量")
 
+    def test_nan_stored_value_does_not_break_the_list(self):
+        """localStorage 里是 NaN 时，列表仍要能渲染出来。
+
+        变异测试发现的问题：page_size=NaN 会让服务端返回 400，
+        refreshJobs 走 catch 分支，整个列表一条卡片都渲染不出来。
+        防御点在 loadPageSize() 的整数校验。
+        """
+        self.page.evaluate(
+            "() => localStorage.setItem('%s', 'NaN')" % PAGE_SIZE_KEY)
+        self.page.reload(wait_until="domcontentloaded")
+        # 若没修好，这里会因列表为空而超时
+        self.page.wait_for_function(
+            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
+            timeout=20000)
+        self.assertEqual(self.page.evaluate("() => state.pageSize"), 12,
+                         "NaN 应退回默认 12")
+        self.assertTrue(self.page.evaluate(
+            "() => Number.isInteger(state.pageSize)"),
+            "pageSize 必须是整数，不能是 NaN")
+
     def test_no_console_errors(self):
         """没有 JS 报错。"""
         self.assertEqual([e for e in self.errors if e.strip()], [])

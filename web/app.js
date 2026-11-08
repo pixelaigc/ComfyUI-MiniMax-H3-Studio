@@ -25,7 +25,9 @@ function loadPageSize() {
   try {
     const raw = localStorage.getItem(PAGE_SIZE_KEY);
     const value = Number(raw);
-    if (PAGE_SIZE_OPTIONS.includes(value)) return value;
+    // 只接受重定义列。NaN/Infinity 之类的值不能当数字字面量用，
+    // page_size=NaN 会让服务端返回 400，整个列表都渲染不出来。
+    if (Number.isInteger(value) && PAGE_SIZE_OPTIONS.includes(value)) return value;
   } catch (e) { /* 存储不可用，用默认值 */ }
   return PAGE_SIZE_DEFAULT;
 }
@@ -1911,7 +1913,7 @@ function initPageSizeSelect() {
   select.value = String(state.pageSize);
   select.addEventListener("change", () => {
     const size = Number(select.value);
-    if (!PAGE_SIZE_OPTIONS.includes(size)) return;
+    if (!Number.isInteger(size) || !PAGE_SIZE_OPTIONS.includes(size)) return;
     state.pageSize = size;
     savePageSize(size);
     state.donePage = 1;          // 改每页数量后回到第 1 页
