@@ -771,21 +771,39 @@ def build_t2i(params):
 #   steps=50 / cfg=1 / sampler=euler / scheduler=simple / denoise=1
 #   文生图工作流的 KSampler id=476；图片编辑工作流的 KSampler id=482
 #
-# SHIFT 语义（重要）：
-#   comfy/supported_models.py 的 class QwenImage21 自带
-#   sampling_settings = {"multiplier": 1.0, "shift": 0.69}，
-#   经 ModelSamplingDiscreteFlow.sigma() = time_snr_shift(shift, t) 应用。
-#   要让用户可调，必须用 **ModelSamplingSD3** 覆盖 —— 它继承自
-#   ModelSamplingDiscreteFlow（comfy_extras/nodes_model_advanced.py:120），
-#   sigma 公式与 Qwen-Image 2.1 内置的完全同源，只是把 shift 换成用户值。
-#   （ModelSamplingAuraFlow / ModelSamplingFlux 走的是别的公式，不能用。）
+# SHIFT 语义（重要，实测踩过坑）：
+#   Qwen-Image 2.1 走 model_type=FLUX（comfy/model_base.py:2673），
+#   采样类 **ModelSamplingFlux**（不是 DiscreteFlow），
+#   sigma 公式 = flux_time_shift(shift, 1.0, t)（comfy/model_sampling.py:413）。
+#   模型内置 sampling_settings 的 shift=0.69（supported_models.py:2080）。
+#
+#   要让用户可调 SHIFT，必须用 **ModelSamplingFlux** 节点，并且令
+#   base_shift = max_shift = 用户值 —— 它的 shift 计算是
+#       mm = (max_shift - base_shift) / (4096 - 256)
+#       b  = base_shift - mm*256
+#       shift = (w*h/32)*mm + b
+#   base=max=S 时 mm=0、b=S -> shift 恒等于 S（与分辨率无关）。
+#
+#   **不能用 ModelSamplingSD3**：它继承 ModelSamplingDiscreteFlow，
+#   patch() 里 multiplier 写死 1000（comfy_extras/nodes_model_advanced.py:127），
+#   而 Qwen-Image 2.1 的 flux_time_shift 没有这一层 -> sigma 表被放大 1000 倍，
+#   出图退化成紫底绿斑的噪点。
+#   实测 A/B（同种子同提示词）：
+#     A 不加 sampling 节点（用模型内置 0.69） -> 正常橘猫窗台
+#     B 加 ModelSamplingSD3(0.69)          -> 噪点
+#     C 加 ModelSamplingFlux(base=max=0.69) -> 正常橘猫窗台（与 A 等价）
 QWEN_IMAGE_UNET = "qwen_image_2.1_bf16.safetensors"
 QWEN_IMAGE_VAE = "qwen_image_2.1_vae_bf16.safetensors"
-# PE 文本编码器：t2i 用于文生图、i2i 用于参考图生图
+# PE 文本编码器（带官方提示词扩写能力，Qwen3.5 9B）：
+#   PE 编码器接 **TextGenerateLTX2Prompt**（扩写节点），扩写后的文本
+#   再喂给 TextEncodeQwenImage21 的 prompt 输入。
+#   条件编码器（TextEncodeQwenImage21 的 clip 输入）是另一个文件。
+#   官方工作流依据：Qwen+image+2.1+文生图.json / Qwen+image+2.1图片编辑.json
 QWEN_IMAGE_CLIP_PE_T2I = "qwen3.5_qwen_image_2.1_pe_t2i.int8_convrot.safetensors"
 QWEN_IMAGE_CLIP_PE_I2I = "qwen3.5_qwen_image_2.1_pe_i2i.int8_convrot.safetensors"
-# 不带 PE 的普通文本编码器（官方工作流用的就是这个）：
-# 关掉 PE 开关时改用它 -> 提示词原样进模型，不做官方扩写
+# 条件编码器（TextEncodeQwenImage21 的 clip 输入）—— 官方工作流用的就是这个
+QWEN_IMAGE_CLIP_COND = "qwen3vl_8b_bf16.safetensors"
+# 不带 PE 的普通文本编码器（关掉 PE 开关时，提示词原样进模型，不做官方扩写）
 QWEN_IMAGE_CLIP_PLAIN = "qwen3vl_8b_bf16.safetensors"
 # Qwen-Image 2.1 **没有**加速/蒸馏 LoRA —— 官方工作流里那个
 # qwen21/bfs_head_v1_qwen_2.1.safetensors 实测是「换头」效果 LoRA
@@ -918,9 +936,10 @@ def _qwen_lora_chain(lora_items, base_model_ref, base_clip_ref):
     return nodes, current_model, current_clip
 
 
-def _qwen_common_nodes(model, clip_name, width, height, seed, sampler, scheduler,
-                       steps, cfg, shift, negative_text, prompt, job_id,
-                       filename_prefix=None, loras=None, is_edit=False):
+def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
+                       sampler, scheduler, steps, cfg, shift, negative_text, prompt,
+                       job_id, filename_prefix=None, loras=None, is_edit=False,
+                       use_pe=True):
     """Qwen-Image 2.1 公共链路。
 
     文生图与参考图生图共用同一套节点，区别只在：
@@ -940,8 +959,12 @@ def _qwen_common_nodes(model, clip_name, width, height, seed, sampler, scheduler
     （comfy_extras/nodes_model_advanced.py:120）—— sigma 公式同源。
     """
     p = {}
-    # 文本编码器（PE 版自带官方提示词扩写）
-    p["qw:30"] = {"inputs": {"clip_name": clip_name, "type": "qwen_image",
+    # PE 编码器（Qwen3.5 9B）—— 接提示词扩写节点
+    p["qw:30"] = {"inputs": {"clip_name": pe_clip_name, "type": "qwen_image",
+                             "device": "default"},
+                  "class_type": "CLIPLoader"}
+    # 条件编码器 —— 接 TextEncodeQwenImage21 的 clip 输入
+    p["qw:31"] = {"inputs": {"clip_name": cond_clip_name, "type": "qwen_image",
                              "device": "default"},
                   "class_type": "CLIPLoader"}
     # VAE
@@ -952,11 +975,12 @@ def _qwen_common_nodes(model, clip_name, width, height, seed, sampler, scheduler
                   "class_type": "UNETLoader"}
 
     model_ref = ["qw:28", 0]
-    clip_ref = ["qw:30", 0]
+    clip_ref = ["qw:31", 0]
 
-    # SHIFT 覆盖（ModelSamplingSD3 继承 ModelSamplingDiscreteFlow）
-    p["qw:11"] = {"inputs": {"shift": shift, "model": model_ref},
-                  "class_type": "ModelSamplingSD3"}
+    # SHIFT 覆盖：ModelSamplingFlux，base=max=用户值 -> shift 恒等于该值
+    p["qw:11"] = {"inputs": {"model": model_ref, "max_shift": shift,
+                             "base_shift": shift, "width": width, "height": height},
+                  "class_type": "ModelSamplingFlux"}
     model_ref = ["qw:11", 0]
 
     # 用户选的效果 LoRA
@@ -969,10 +993,35 @@ def _qwen_common_nodes(model, clip_name, width, height, seed, sampler, scheduler
                   "class_type": "QwenImage21Cache"}
     model_ref = ["qw:12", 0]
 
+    # 提示词扩写（官方 PE）：PE 编码器 -> TextGenerateLTX2Prompt -> 文本
+    # 关掉 PE 时不建这个节点，提示词原样进 TextEncodeQwenImage21。
+    if use_pe:
+        p["qw:26"] = {"inputs": {
+            "clip": ["qw:30", 0],
+            "prompt": prompt,
+            "max_length": 512,
+            # COMFY_DYNAMICCOMBO_V3 在 API 格式下：主字段是选项 key，
+            # 子输入扁平化成 sampling_mode.xxx
+            "sampling_mode": "on",
+            "sampling_mode.temperature": 0.7,
+            "sampling_mode.top_k": 64,
+            "sampling_mode.top_p": 0.95,
+            "sampling_mode.min_p": 0.05,
+            "sampling_mode.repetition_penalty": 1.05,
+            "sampling_mode.seed": 0,
+            "sampling_mode.presence_penalty": 0.0,
+            "thinking": False,
+            "use_default_template": True,
+            "mtp": "auto",
+        }, "class_type": "TextGenerateLTX2Prompt"}
+        prompt_ref = ["qw:26", 0]
+    else:
+        prompt_ref = prompt
+
     # 文本编码
     te_inputs = {
         "clip": clip_ref,
-        "prompt": prompt,
+        "prompt": prompt_ref,
         "negative_prompt": negative_text,
         "vae": ["qw:29", 0],
         # 参考图按 1024 边长重采样（官方工作流图片编辑用 2048，文生图无图）
@@ -1072,14 +1121,14 @@ def build_qwen_t2i(params):
     loras = _qwen_collect_loras(params)
     prompt = merge_lora_triggers(prompt, loras)
 
-    # PE 开关：关掉 PE 就退回官方工作流用的普通 qwen3vl_8b 编码器
-    clip_name = model["clip_t2i"]
-    if not params.get("use_pe", True):
-        clip_name = params.get("clip_plain") or QWEN_IMAGE_CLIP_PLAIN
+    # PE 开关：关掉 PE 就跳过提示词扩写，提示词原样进模型
+    use_pe = bool(params.get("use_pe", True))
+    pe_clip = model["clip_t2i"]
+    cond_clip = QWEN_IMAGE_CLIP_COND
 
-    return _qwen_common_nodes(model, clip_name, width, height, seed, sampler,
+    return _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
                                scheduler, steps, cfg, shift, negative_text,
-                               prompt, job_id, loras=loras)
+                               prompt, job_id, loras=loras, use_pe=use_pe)
 
 
 def build_qwen_i2i(params):
@@ -1129,14 +1178,15 @@ def build_qwen_i2i(params):
     loras = _qwen_collect_loras(params)
     prompt = merge_lora_triggers(prompt, loras)
 
-    clip_name = model["clip_i2i"]
-    if not params.get("use_pe", True):
-        clip_name = params.get("clip_plain") or QWEN_IMAGE_CLIP_PLAIN
+    # PE 开关：关掉 PE 就跳过提示词扩写，提示词原样进模型
+    use_pe = bool(params.get("use_pe", True))
+    pe_clip = model["clip_i2i"]
+    cond_clip = QWEN_IMAGE_CLIP_COND
 
     # 参考图 -> LoadImage 节点（只允许引用本机已存在的文件）
-    p = _qwen_common_nodes(model, clip_name, width, height, seed, sampler,
+    p = _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
                             scheduler, steps, cfg, shift, negative_text,
-                            prompt, job_id, loras=loras, is_edit=True)
+                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe)
     # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
     # （COMFY_AUTOGROW_V3，按 image_1..image_N 命名）
     te_inputs = p["qw:27"]["inputs"]

@@ -36,7 +36,7 @@ import aiohttp
 
 from h3studio.workflows import (
     build_workflow,
-    QWEN_IMAGE_CLIP_PLAIN,
+    QWEN_IMAGE_CLIP_COND,
     QWEN_IMAGE_DEFAULT_MODEL,
     QWEN_IMAGE_DEFAULT_TIER,
     QWEN_IMAGE_MAX_DIRECT_MP,
@@ -1318,10 +1318,10 @@ async def api_image_options(request):
             "supports_negative": m["supports_negative"],
             "samplers": m["samplers"],
             "schedulers": m["schedulers"],
-            # PE 开关的两种编码器（供前端显示当前用哪个）
-            "clip_t2i": m["clip_t2i"],
-            "clip_i2i": m["clip_i2i"],
-            "clip_plain": QWEN_IMAGE_CLIP_PLAIN,
+            # PE 开关涉及的编码器（供前端显示当前用哪个）
+            "clip_t2i": m["clip_t2i"],          # PE 编码器（文生图）
+            "clip_i2i": m["clip_i2i"],          # PE 编码器（图片编辑）
+            "clip_cond": QWEN_IMAGE_CLIP_COND,  # 条件编码器（TextEncode 的 clip 输入）
             # Qwen-Image 2.1 没有加速 LoRA（bfs_head 是换头效果类）
         }
     return json_ok({
