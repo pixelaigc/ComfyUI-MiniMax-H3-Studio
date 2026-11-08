@@ -597,6 +597,12 @@ body.modal-open { overflow: hidden; }
 }
 .img-lora-tag.rec { background: #e8f6ee; color: #1f8a52; }
 .img-lora-tag.miss { background: #fbeaea; color: var(--danger); }
+.img-lora-tag.damp { background: #e8f0fb; color: #2f6fd0; }
+.img-lora-cap {
+  font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+  background: #eef1f5; color: var(--muted); white-space: nowrap;
+}
+.img-lora-cap.damped { background: #e8f0fb; color: #2f6fd0; }
 .img-lora-btn {
   border: 1px solid var(--border); background: #fff; border-radius: 6px;
   width: 24px; height: 24px; line-height: 1; cursor: pointer;

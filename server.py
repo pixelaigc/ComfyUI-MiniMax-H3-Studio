@@ -1126,6 +1126,9 @@ async def api_image_loras(request):
             "trigger": trigger or "",
             "recommended_strength": (meta or excluded or {}).get("recommended_strength", 1.0),
             "strength_cap": (meta or excluded or {}).get("strength_cap", 1.0),
+            # context_refiner 阻尼信息（界面提示用；服务端会自动应用）
+            "ctx_damping": (meta or excluded or {}).get("ctx_damping"),
+            "ctx_perturbation": (meta or excluded or {}).get("ctx_perturbation"),
             "kind": (meta or excluded or {}).get("kind", lora_registry.KIND_EFFECT),
         })
     return json_ok({"available": available,
@@ -1185,6 +1188,9 @@ async def api_image_loras_save(request):
             "trigger": str(trigger or ""),
             "recommended_strength": meta.get("recommended_strength", 1.0),
             "strength_cap": meta.get("strength_cap", 1.0),
+            # context_refiner 阻尼信息 —— 工作流侧会自动套用阻尼后的派生 LoRA
+            "ctx_damping": meta.get("ctx_damping"),
+            "ctx_perturbation": meta.get("ctx_perturbation"),
             "kind": meta.get("kind", lora_registry.KIND_EFFECT),
         })
     with db() as conn:

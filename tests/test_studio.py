@@ -13,6 +13,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from h3studio import loras as lora_registry  # noqa: E402
+from h3studio import lora_damping  # noqa: E402
 from h3studio import workflows  # noqa: E402
 
 
@@ -397,24 +398,41 @@ class TestLoRACompatibility(unittest.TestCase):
                             f"{item['name']} 缺少排除原因")
 
     def test_perturbation_threshold_triggers_strength_cap(self):
-        """扰动超过阈值 -> 不是「排除」，而是「限制强度上限」。
+        """扰动超过阈值 -> 不是「排除」，而是**自动阻尼 context_refiner**。
 
         实测（2026-11-08，用户真实提示词 + 种子 132199052268679）：
-          瑶光 13.2% 扰动 -> 强度 1.0 出彩色噪点，强度 0.8 干净（5 种子全干净）
-        所以幅度过大的 LoRA 仍然可用，只是强度必须封顶。
+          瑶光整体扰动 13.2%，其中 context_refiner 高达 12.85%
+          （如梦似幻只有 1.36%）-> 强度 1.0 出彩色噪点。
+        消融实验：只把 context_refiner 乘 0.8，6 个提示词 x 5 个种子全部干净，
+        且 LoRA 效果保留（MAE 与无 LoRA 相差 38）。
+        而「全局封顶 0.8」在同样的矩阵里仍有 2/6 提示词出噪点 —— 说明
+        根因修法是阻尼 context_refiner，而不是全局降强度。
+
+        所以：扰动超阈值的 LoRA 必须（a）保持可选、（b）自动阻尼、
+        （c）强度不再被封顶（阻尼后 1.0 是安全的）。
         """
         for item in lora_registry.list_z_image_loras():
             pert = item.get("relative_perturbation")
             if pert is None:
                 continue
             cap = item.get("strength_cap", 1.0)
-            if pert > lora_registry.COMPAT_MAX_RELATIVE_PERTURBATION:
-                self.assertLess(cap, 1.0,
-                                 f"{item['name']} 扰动 {pert} 超阈值却没限强度")
+            ctx_pert = item.get("ctx_perturbation")
+            damping = item.get("ctx_damping")
+            if ctx_pert is not None and ctx_pert >= lora_registry.COMPAT_CTX_DAMPING_THRESHOLD:
+                # context_refiner 扰动大 -> 必须阻尼，且强度可以保持 1.0
+                self.assertIsNotNone(damping,
+                                     f"{item['name']} ctx 扰动 {ctx_pert} 却没阻尼")
+                self.assertLess(damping, 1.0,
+                                f"{item['name']} 阻尼系数 {damping} 应 < 1.0")
+                self.assertEqual(cap, 1.0,
+                                 f"{item['name']} 已阻尼，不该再封强度")
                 self.assertTrue(item["compatible"],
                                 f"{item['name']} 扰动过大但能 attach，不该判为不兼容")
-                # 推荐强度不得超过上限
-                self.assertLessEqual(item["recommended_strength"], cap)
+            elif pert > lora_registry.COMPAT_MAX_RELATIVE_PERTURBATION:
+                # 整体扰动大但 context_refiner 正常 -> 保守给个推荐强度
+                self.assertTrue(item["compatible"],
+                                f"{item['name']} 扰动过大但能 attach，不该判为不兼容")
+                self.assertLessEqual(item["recommended_strength"], max(cap, 1.0))
             else:
                 self.assertEqual(cap, 1.0,
                                  f"{item['name']} 扰动 {pert} 未超阈值却限了强度")
@@ -474,3 +492,144 @@ class TestLoRACompatibility(unittest.TestCase):
         ratio, hit, total = lora_registry._attention_hit_ratio(lora_bases, unet_keys)
         self.assertEqual(ratio, 1.0)
         self.assertEqual(hit, 2)
+
+
+class TestLoRAContextDamping(unittest.TestCase):
+    """context_refiner 阻尼（2026-11-08 根因修复）。
+
+    实测结论：Z-Image 的 context_refiner 是**联合处理文本条件 + 潜变量**的模块。
+    某些 LoRA（瑶光：context_refiner 相对扰动 12.85%）对这个模块扰动过大，
+    在长中文结构化提示词下会把采样推到发散 -> 出图为彩色噪点。
+
+    消融（同一提示词 / 同一种子 / 强度 1.0）：
+        原始            base 14.5(噪) tmpl 14.6(噪) tmpl+瑶光 14.6(噪)
+        ctx x0.5         base  8.6(ok) tmpl  8.5(ok) tmpl+瑶光  8.4(ok)
+        去掉 ctx         base  8.2(ok) tmpl  7.8(ok) tmpl+瑶光  7.7(ok)
+
+    端到端对比（6 提示词 x 5 种子）：
+        原样 瑶光1.0            -> 5/6 提示词出噪点
+        全局封顶0.8             -> 2/6 提示词出噪点（不够）
+        ctx阻尼0.8 强度1.0      -> 0/6 出噪点，且 LoRA 效果保留
+    """
+
+    def test_derived_files_hidden_from_user_list(self):
+        """服务端生成的派生 LoRA 不能出现在用户可选列表里。"""
+        for item in lora_registry.list_z_image_loras():
+            self.assertFalse(
+                item["name"].lower().startswith(lora_damping.DERIVED_PREFIX),
+                f"派生文件 {item['name']} 不该出现在用户可选列表")
+
+    def test_damping_name_is_deterministic(self):
+        """派生文件名必须稳定（同样的输入 -> 同样的名字，避免重复生成）。"""
+        a = lora_damping._damped_name("Kook_Zimage_瑶光.safetensors", 0.8)
+        b = lora_damping._damped_name("Kook_Zimage_瑶光.safetensors", 0.8)
+        self.assertEqual(a, b)
+        self.assertTrue(a.startswith(lora_damping.DERIVED_PREFIX))
+        self.assertIn("80", a)
+        c = lora_damping._damped_name("Kook_Zimage_瑶光.safetensors", 0.5)
+        self.assertNotEqual(a, c)
+
+    def test_damped_name_keeps_subdirectory_flat(self):
+        """带子目录的 LoRA 名不能产生路径穿越。"""
+        name = lora_damping._damped_name("z-image/Some.safetensors", 0.8)
+        self.assertNotIn("/", name)
+        self.assertNotIn("..", name)
+
+    def test_measured_ctx_perturbation_matches_real_measurement(self):
+        """实测扰动值必须与独立测量脚本一致（瑶光 ~12.8%）。"""
+        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        yao = found.get("Kook_Zimage_瑶光.safetensors")
+        if not yao:
+            self.skipTest("本机无瑶光 LoRA")
+        ctx = yao.get("ctx_perturbation")
+        self.assertIsNotNone(ctx, "瑶光必须测得出 context_refiner 扰动")
+        self.assertGreater(ctx, 0.1, "瑶光的 context_refiner 扰动应 >10%")
+        self.assertGreater(ctx, lora_registry.COMPAT_CTX_DAMPING_THRESHOLD)
+
+    def test_low_ctx_perturbation_lora_is_not_damped(self):
+        """context_refiner 扰动小的 LoRA（如梦似幻 1.36%）不该被阻尼。"""
+        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        rms = found.get("Kook_Zimage_如梦似幻.safetensors")
+        if not rms:
+            self.skipTest("本机无如梦似幻 LoRA")
+        self.assertLess(rms["ctx_perturbation"],
+                        lora_registry.COMPAT_CTX_DAMPING_THRESHOLD)
+        self.assertIsNone(rms.get("ctx_damping"))
+
+    def test_workflow_uses_damped_lora_when_needed(self):
+        """context_refiner 扰动大的 LoRA -> 工作流引用阻尼后的派生文件。"""
+        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        yao = found.get("Kook_Zimage_瑶光.safetensors")
+        if not yao or not yao.get("ctx_damping"):
+            self.skipTest("本机瑶光未触发阻尼")
+        wf = workflows.build_t2i({
+            "prompt": "test", "model": "z_image_turbo_bf16", "aspect": "16:9",
+            "tier": "1mp", "sampler": "res_multistep", "scheduler": "simple",
+            "steps": 8, "cfg": 1.0, "shift": 3.0, "seed": 1,
+            "negative_mode": "zero", "job_id": "damp1",
+            "loras": [{"name": "Kook_Zimage_瑶光.safetensors", "strength": 1.0}]})
+        loaders = [n for n in wf.values()
+                   if n["class_type"].startswith("LoraLoader")]
+        self.assertEqual(len(loaders), 1)
+        self.assertTrue(loaders[0]["inputs"]["lora_name"].startswith(
+            lora_damping.DERIVED_PREFIX),
+            "工作流必须引用阻尼后的派生 LoRA")
+        self.assertEqual(loaders[0]["inputs"]["strength_model"], 1.0)
+
+    def test_damping_does_not_change_other_lora(self):
+        """阻尼只影响触发的那个 LoRA，其它 LoRA 仍用原文件。"""
+        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        yao = found.get("Kook_Zimage_瑶光.safetensors")
+        rms = found.get("Kook_Zimage_如梦似幻.safetensors")
+        if not yao or not yao.get("ctx_damping") or not rms:
+            self.skipTest("本机缺少触发阻尼的 LoRA 对")
+        wf = workflows.build_t2i({
+            "prompt": "test", "model": "z_image_turbo_bf16", "aspect": "16:9",
+            "tier": "1mp", "sampler": "res_multistep", "scheduler": "simple",
+            "steps": 8, "cfg": 1.0, "shift": 3.0, "seed": 1,
+            "negative_mode": "zero", "job_id": "damp2",
+            "loras": [{"name": "Kook_Zimage_瑶光.safetensors", "strength": 1.0},
+                      {"name": "Kook_Zimage_如梦似幻.safetensors", "strength": 1.0}]})
+        names = [n["inputs"]["lora_name"] for n in wf.values()
+                 if n["class_type"].startswith("LoraLoader")]
+        self.assertEqual(len(names), 2)
+        damped = [n for n in names if n.startswith(lora_damping.DERIVED_PREFIX)]
+        plain = [n for n in names if not n.startswith(lora_damping.DERIVED_PREFIX)]
+        self.assertEqual(len(damped), 1, "只有瑶光该被阻尼")
+        self.assertEqual(len(plain), 1, "如梦似幻不该被阻尼")
+
+    def test_damped_derived_file_content_scales_ctx_only(self):
+        """派生文件：context_refiner 被缩放，其它张量原样保留。"""
+        try:
+            import torch
+            from safetensors.torch import load_file
+        except Exception:
+            self.skipTest("本机无 torch")
+        import tempfile
+        from pathlib import Path
+        yao = Path("/mnt/usb2t/comfyui-models/loras/Kook_Zimage_瑶光.safetensors")
+        if not yao.is_file():
+            self.skipTest("本机无瑶光 LoRA 文件")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = load_file(str(yao))
+            dst_path = Path(tmp) / "damped.safetensors"
+            self.assertTrue(lora_damping._write_damped(
+                yao, dst_path, lora_damping.DEFAULT_CTX_DAMPING))
+            dst = load_file(str(dst_path))
+            self.assertEqual(set(src.keys()), set(dst.keys()))
+            factor = lora_damping.DEFAULT_CTX_DAMPING
+            # 阻尼系数必须是「真正在衰减」的值 —— 不能是 1.0（等于没阻尼）
+            self.assertLess(factor, 1.0, "阻尼系数必须 < 1.0，否则等于没阻尼")
+            self.assertGreater(factor, 0.0, "阻尼系数必须 > 0")
+            checked = 0
+            for key in src:
+                if key.startswith("context_refiner."):
+                    ratio = (dst[key].float().norm()
+                             / src[key].float().norm().clamp(min=1e-9)).item()
+                    self.assertAlmostEqual(ratio, factor, places=3,
+                                           msg=f"{key} 缩放系数不对")
+                    checked += 1
+                else:
+                    self.assertTrue(torch.equal(dst[key], src[key]),
+                                    f"{key} 不该被改动")
+            self.assertGreater(checked, 0, "没有比对到 context_refiner 张量")

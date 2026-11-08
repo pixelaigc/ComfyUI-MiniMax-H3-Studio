@@ -286,6 +286,15 @@ function renderLoraList() {
                        ? meta.strength_cap
                        : (item.strength_cap !== undefined ? item.strength_cap : 1.5));
     const capVal = cap < 1.5 ? cap : 1.5;
+    // context_refiner 阻尼：服务端会自动用阻尼后的派生 LoRA，
+    // 强度可以保持 1.0（这是根因修复，比全局降强度更稳）
+    const damp = meta && meta.ctx_damping !== undefined && meta.ctx_damping !== null
+      ? Number(meta.ctx_damping) : 0;
+    const ctxPert = meta && meta.ctx_perturbation !== undefined && meta.ctx_perturbation !== null
+      ? Number(meta.ctx_perturbation) : 0;
+    const dampNote = damp > 0
+      ? `<span class="img-lora-tag damp" title="该 LoRA 对 context_refiner 的权重扰动较大（${(ctxPert * 100).toFixed(1)}%），该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散。服务端已自动对 context_refiner 做 ${damp.toFixed(2)} 阻尼，强度可保持 1.0">已阻尼 ×${damp.toFixed(2)}</span>`
+      : "";
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
       ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
@@ -303,18 +312,21 @@ function renderLoraList() {
         ${excluded ? `<span class="img-lora-tag excl">不兼容</span>` : ""}
         ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
+        ${dampNote}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
         <button type="button" class="img-lora-btn down" title="下移" ${index === state.img.loras.length - 1 ? "disabled" : ""}>↓</button>
         <button type="button" class="img-lora-btn del" title="删除">×</button>
       </div>
       <div class="img-lora-slider">
-        <input type="range" class="strength" min="0" max="${capVal}" step="0.05" value="${Math.min(Number(item.strength), capVal)}" ${excluded ? "disabled" : ""} title="${cap < 1.5 ? `强度上限 ${cap}（该 LoRA 权重较大，强度过高会出彩色噪点）` : '强度 0-1.5，0 表示关闭'}">
+        <input type="range" class="strength" min="0" max="${capVal}" step="0.05" value="${Math.min(Number(item.strength), capVal)}" ${excluded ? "disabled" : ""} title="${cap < 1.0 ? `强度上限 ${cap}（该 LoRA 权重较大，强度过高会出彩色噪点）` : '强度 0-1.5，0 表示关闭'}">
         <span class="img-lora-strength">${Number(item.strength).toFixed(2)}</span>
-        ${cap < 1.5 ? `<span class="img-lora-cap" title="该 LoRA 权重相对原权重过大，强度过高会破坏采样、实测出图为彩色噪点">上限 ${cap.toFixed(2)}</span>` : ""}
+        ${cap < 1.0 ? `<span class="img-lora-cap" title="该 LoRA 权重相对原权重过大，强度过高会破坏采样、实测出图为彩色噪点">上限 ${cap.toFixed(2)}</span>` : ""}
+        ${damp > 0 ? `<span class="img-lora-cap damped" title="context_refiner 阻尼系数 ${damp.toFixed(2)}（服务端自动应用，强度不打折）">ctx 阻尼 ${damp.toFixed(2)}</span>` : ""}
       </div>
       ${excluded ? `<div class="img-lora-excl-reason">${esc(item.incompatible_reason || "与 Z-Image 底模不兼容")}</div>` : ""}
       ${triggerBlock}
       <div class="img-lora-meta">基础：${esc(meta ? meta.base : "—")}${meta && meta.strength_source ? " · " + esc(meta.strength_source) : ""}</div>
+      ${damp > 0 ? `<div class="img-lora-meta">context_refiner 扰动 ${(ctxPert * 100).toFixed(1)}%，已自动阻尼至 ×${damp.toFixed(2)}（长提示词下避免彩色噪点，强度不打折）</div>` : ""}
       <div class="img-lora-meta"><button type="button" class="img-lora-info-btn" style="background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:10px;font-family:inherit">查看简易说明 ›</button></div>
     </div>`;
   }).join("");
@@ -394,8 +406,10 @@ function saveLoraConfig() {
         incompatible_reason: l.incompatible_reason || "",
         display: l.display || l.name,
         strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
+        ctx_damping: l.ctx_damping !== undefined ? l.ctx_damping : null,
+        ctx_perturbation: l.ctx_perturbation !== undefined ? l.ctx_perturbation : null,
       }));
-      renderLoraList();
+    renderLoraList();
       renderLoraSelect();
     } catch (e) {
       setEnhanceHint(`LoRA 配置保存失败：${e.message}`, "error");
@@ -450,6 +464,8 @@ async function loadImageLoras() {
       incompatible_reason: l.incompatible_reason || "",
       display: l.display || l.name,
       strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
+      ctx_damping: l.ctx_damping !== undefined ? l.ctx_damping : null,
+      ctx_perturbation: l.ctx_perturbation !== undefined ? l.ctx_perturbation : null,
     }));
     const hint = $("#imgLoraHint");
     if (hint) hint.textContent = `本机 ${IMG_LORAS.available.length} 个可用`;
@@ -2192,6 +2208,8 @@ $("#imgLoraAdd")?.addEventListener("click", () => {
     // 推荐强度自动应用（用户之后可手动改，上限由服务端按权重封顶）
     strength: meta ? Number(meta.recommended_strength) : 1.0,
     strength_cap: meta ? Number(meta.strength_cap !== undefined ? meta.strength_cap : 1.5) : 1.5,
+    ctx_damping: meta ? (meta.ctx_damping !== undefined ? meta.ctx_damping : null) : null,
+    ctx_perturbation: meta ? (meta.ctx_perturbation !== undefined ? meta.ctx_perturbation : null) : null,
     enabled: true,
     // 触发词自动带上上游标注的那个（用户可编辑 / 删除）
     trigger: meta && meta.trigger ? meta.trigger : "",

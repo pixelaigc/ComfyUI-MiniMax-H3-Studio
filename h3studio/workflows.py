@@ -15,6 +15,7 @@ from pathlib import Path
 import random
 
 from . import loras as lora_registry
+from . import lora_damping
 
 # ------------------------------------------------------------------
 # 模型清单（与 d:\cfup\ComfyUI\models 实际文件一致）
@@ -487,6 +488,14 @@ def _z_image_lora_chain(lora_items, base_model_ref, base_clip_ref=None):
         resolved, path = lora_registry.resolve_lora(name)
         if not resolved or path is None:
             raise ValueError(f"本机不存在该 LoRA 文件：{name}")
+        # context_refiner 阻尼：部分 Z-Image LoRA（如「瑶光」）对
+        # context_refiner 的扰动达 10% 量级，而该模块正是联合处理
+        # 「文本条件 + 潜变量」的地方 —— 长提示词下会把采样推到发散，
+        # 出图为彩色噪点。改用阻尼后的派生 LoRA（强度不变）。
+        # 详见 h3studio/lora_damping.py 的消融实验记录。
+        damped_name, _ = lora_damping.ensure_damped_lora(resolved)
+        if damped_name:
+            resolved = damped_name
         strength = float(item.get("strength", 1.0))
         if strength <= 0:
             # 强度 0 = 关闭该 LoRA，但仍然校验文件存在，避免静默吞掉错名

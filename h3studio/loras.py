@@ -16,6 +16,8 @@ import os
 import sqlite3
 from pathlib import Path
 
+from . import lora_damping
+
 # ------------------------------------------------------------------ 已知说明
 # 说明来源全部标注在 source 字段里，界面上可展开查看。
 # trigger 为上游 README tags 中明确标出的触发词；上游未标注的一律留空，
@@ -42,7 +44,8 @@ LORA_CATALOG: dict[str, dict] = {
         "kind": "effect",
         "scene": "写实向「真实幻想」质感，官方 tags 标注为「瑶光 / 真实幻想」。",
         "source": "ModelScope KookYan/Kook_Zimage_Yg（README tags）",
-        "strength_source": "上游未标注；本机实测标定：强度 1.0 出彩色噪点，0.8 安全",
+        "strength_source": "上游未标注；本机实测：强度 1.0 出彩色噪点，"
+                           "根因是 context_refiner 扰动过大，已自动做 0.8 阻尼",
     },
     "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors": {
         "display": "Z-Image-Fun 蒸馏加速 8 步（2603）",
@@ -126,12 +129,29 @@ COMPAT_MAX_RELATIVE_PERTURBATION = 0.08   # 相对扰动上限（8%）：超过�
 COMPAT_SAFE_RELATIVE_PERTURBATION = 0.08
 # 实测标定（2026-11-08，用户真实提示词 + 真实种子 132199052268679，
 #              用户真实失败种子下强度 1.0 复现 MAE=0.0000）：
-#   瑶光 13.2% 扰动 -> 强度 1.0 出彩色噪点（3 个种子全崩）
-#                     -> 强度 0.8 干净（5 个种子全干净）
-#   故安全上限取 0.8（等效扰动 ~8.1%，恰在 8% 阈值内侧）
-COMPAT_SAFE_STRENGTH_CAP = 0.8
-# 换算到「等效扰动」的安全上限（按 0.8 时实测 ~8.1% 反推）
+#   瑶光整体扰动 13.2% -> 强度 1.0 出彩色噪点
+#
+# 2026-11-08 进一步定位（模块消融实验，见 h3studio/lora_damping.py）：
+#   真正的问题不在「整体扰动」，而在 **context_refiner** 这一组模块：
+#     瑶光     context_refiner  max 12.85% / median 9.62%
+#     如梦似幻 context_refiner  max  1.36% / median 0.74%
+#   context_refiner 是 Z-Image 里**联合处理文本条件 + 潜变量**的模块，
+#   长提示词下它的输入本来就偏离训练分布，再叠 10% 量级扰动 -> 采样发散。
+#
+#   消融（同一提示词 / 同一种子 / 强度 1.0）：
+#     原始            base 14.5(噪) tmpl 14.6(噪) tmpl+瑶光 14.6(噪)
+#     ctx x0.5         base  8.6(ok) tmpl  8.5(ok) tmpl+瑶光  8.4(ok)
+#     去掉 ctx         base  8.2(ok) tmpl  7.8(ok) tmpl+瑶光  7.7(ok)
+#
+#   => 修复手段是**对 context_refiner 做阻尼**（派生 LoRA），
+#      而不是全局降强度：全局降到 0.8 只是把阈值挪个位置，
+#      崩不崩仍取决于提示词文本条件复杂度（实测存在刀刃效应）。
+#      因此这里**不再对这类 LoRA 封顶强度**，改由阻尼保证稳定。
+COMPAT_SAFE_STRENGTH_CAP = 1.0
+# 换算到「等效扰动」的安全上限
 COMPAT_SAFE_RELATIVE_PERTURBATION = 0.08
+# context_refiner 相对扰动超过这个值 -> 需要做阻尼派生
+COMPAT_CTX_DAMPING_THRESHOLD = 0.03
 
 
 def _read_safetensors_header(path: Path) -> dict:
@@ -346,6 +366,9 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
         "suggested_strength": 1.0,
         # 强度上限 —— 1.0 表示无需限制
         "strength_cap": 1.0,
+        # context_refiner 相对扰动 —— 决定是否需要阻尼派生
+        "ctx_perturbation": None,
+        "ctx_damping": None,
         "verified": True,
     }
 
@@ -362,29 +385,34 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
     try:
         pert = _relative_perturbation(path, unet_path)
         result["relative_perturbation"] = pert
-        if pert is not None:
-            if pert > COMPAT_MAX_RELATIVE_PERTURBATION:
-                # 权重能 attach、只是幅度过大 —— 不是「不兼容」，
-                # 而是「强度必须封顶」。实测：扰动 13.2% 时强度 1.0 出彩色噪点，
-                # 强度 0.8 安全（5 个种子全干净）。
-                # 上限取实测安全值（0.8），而不是按比例反推 ——
-                # 实测 0.8 干净，比例反推会给出 0.6（过于保守，白白损失效果）
-                cap = COMPAT_SAFE_STRENGTH_CAP
-                result["strength_cap"] = cap
-                result["suggested_strength"] = cap
-                result["reason"] = (
-                    f"权重扰动较大（相对原权重 {pert * 100:.1f}% > "
-                    f"{COMPAT_MAX_RELATIVE_PERTURBATION * 100:.0f}%）："
-                    f"强度 1.0 会破坏采样、实测出图为彩色噪点，"
-                    f"已把强度上限限制为 {cap}。")
-                _COMPAT_CACHE[key] = dict(result)
-                _UNET_CACHE_KEY = unet_key
-                return result
-            if pert > 0:
-                result["suggested_strength"] = round(
-                    min(1.0, COMPAT_SAFE_RELATIVE_PERTURBATION / pert), 2)
+    except Exception:
+        pert = None
+
+    # context_refiner 扰动 —— 这是「出彩色噪点」的决定性指标
+    try:
+        from . import lora_damping
+        ctx = lora_damping._ctx_damping_needed(path, unet_path)
+        result["ctx_perturbation"] = ctx
+        if ctx is not None and ctx >= COMPAT_CTX_DAMPING_THRESHOLD:
+            factor = lora_damping.DEFAULT_CTX_DAMPING
+            result["ctx_damping"] = factor
+            result["strength_cap"] = 1.0
+            result["suggested_strength"] = 1.0
+            result["reason"] = (
+                f"context_refiner 权重扰动较大（相对原权重 {ctx * 100:.1f}%）："
+                f"该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散、"
+                f"出图为彩色噪点。已自动对 context_refiner 做 {factor:.2f} 阻尼，"
+                f"强度可保持 1.0。")
     except Exception:
         pass
+
+    if pert is not None and pert > 0 and not result.get("ctx_damping"):
+        # 整体扰动大但 context_refiner 正常 -> 仍按比例给个保守推荐强度
+        try:
+            result["suggested_strength"] = round(
+                min(1.0, COMPAT_SAFE_RELATIVE_PERTURBATION / pert), 2)
+        except Exception:
+            pass
     _COMPAT_CACHE[key] = dict(result)
     _UNET_CACHE_KEY = unet_key
     return result
@@ -560,6 +588,11 @@ def _rel_to_lora_dir(name: str, dirs: list[Path]) -> tuple[str, str]:
 def list_z_image_loras() -> list[dict]:
     """扫描本机，返回真实存在的 Z-Image LoRA 清单。"""
     dirs = comfyui_lora_dirs()
+    # 清掉阻尼系数变更后遗留的旧派生文件（避免 ComfyUI 下拉里出现多份副本）
+    try:
+        lora_damping.cleanup_stale_derived(dirs)
+    except Exception:
+        pass
     found: list[dict] = []
     seen: set[str] = set()
     for d in dirs:
@@ -570,6 +603,10 @@ def list_z_image_loras() -> list[dict]:
         for path in candidates:
             rel = path.relative_to(d).as_posix()
             lowered = rel.lower()
+            # 服务端自己生成的 context_refiner 阻尼派生文件不是用户可选的
+            # LoRA（它只是原 LoRA 的工作流内部副本），不能出现在列表里
+            if lowered.startswith(lora_damping.DERIVED_PREFIX):
+                continue
             if not any(marker in lowered for marker in Z_IMAGE_MARKERS):
                 continue
             if rel in seen:
@@ -581,6 +618,7 @@ def list_z_image_loras() -> list[dict]:
             # 兼容性检测：只对效果类做（加速类由工作流固定使用，不进用户列表）
             compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                       "relative_perturbation": None, "suggested_strength": 1.0,
+                      "ctx_perturbation": None, "ctx_damping": None,
                       "verified": False}
             if kind == KIND_EFFECT:
                 try:
@@ -588,6 +626,7 @@ def list_z_image_loras() -> list[dict]:
                 except Exception:
                     compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                               "relative_perturbation": None, "suggested_strength": 1.0,
+                              "ctx_perturbation": None, "ctx_damping": None,
                               "verified": False}
             found.append({
                 "name": rel,
@@ -602,6 +641,9 @@ def list_z_image_loras() -> list[dict]:
                                          else info.get("recommended_strength", 1.0)),
                 # 强度上限（1.0 = 不限制）；前端滑块按这个封顶
                 "strength_cap": compat.get("strength_cap", 1.0),
+                # context_refiner 阻尼信息（界面提示用）
+                "ctx_perturbation": compat.get("ctx_perturbation"),
+                "ctx_damping": compat.get("ctx_damping"),
                 "strength_source": info.get("strength_source", ""),
                 "kind": kind,
                 "compatible": bool(compat.get("compatible", True)),
