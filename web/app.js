@@ -13,6 +13,27 @@ const MODE_INFO = {
 // 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
 const DEFAULT_MODE = "t2i";
 
+// ---------- 生成库：每页作品数 ----------
+// 可选值刻意覆盖「宽屏一行能铺满」的档位：22:9 超宽屏下单行常能放 8~12 张，
+// 每页 12/16/24 才能把宽度用起来；8 是窄屏/16:9 下的保守档。
+const PAGE_SIZE_OPTIONS = [8, 12, 16, 24, 32, 48];
+const PAGE_SIZE_DEFAULT = 12;
+const PAGE_SIZE_KEY = "h3studio.pageSize";
+
+// localStorage 在隐私模式 / 禁用存储时会抛错，读取失败一律退回默认值。
+function loadPageSize() {
+  try {
+    const raw = localStorage.getItem(PAGE_SIZE_KEY);
+    const value = Number(raw);
+    if (PAGE_SIZE_OPTIONS.includes(value)) return value;
+  } catch (e) { /* 存储不可用，用默认值 */ }
+  return PAGE_SIZE_DEFAULT;
+}
+
+function savePageSize(value) {
+  try { localStorage.setItem(PAGE_SIZE_KEY, String(value)); } catch (e) { /* 忽略 */ }
+}
+
 const state = {
   // 默认进入「Z-IMAGE 文生图」。这里只是兜底初值 —— 启动时 activateMode()
   // 会用 DEFAULT_MODE 再赋一次，避免两处各写一份字面量后走偏。
@@ -28,6 +49,8 @@ const state = {
   duration: 5,
   steps: 6,
   donePage: 1,
+  // 每页作品数（可配置，持久化在 localStorage）
+  pageSize: loadPageSize(),
   doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
@@ -1425,6 +1448,8 @@ document.addEventListener("keydown", event => {
 
 window.addEventListener("resize", () => {
   if (lightbox.open) lightboxFit();
+  // 窗口宽度变了，网格列数要跟着重算（每页作品数不变）
+  applyGridColumns(state.pageSize);
 });
 
 // 单条任务内的批次结果：可展开/折叠的缩略图网格 + 每批次状态
@@ -1835,8 +1860,65 @@ function jobSig(j) {
 
 let jobsRequest = 0;
 let displayedTab = null;
-const DONE_PAGE_SIZE = 8;
 let filterDebounce = null;
+
+// 网格列数由「每页作品数 + 容器宽度」共同决定，目标是一页排成整行：
+//   1. 列数不超过每页作品数 —— 每页 8 张时排出 9 列，最后一行只有 1 张、
+//      右侧空一大片（这正是 22:9 超宽屏上的问题）；
+//   2. 列数尽量贴近宽度能放下的上限，但优先选「能整除每页作品数」的列数，
+//      这样每一行都是满的，不会出现「最后一行只有 1 个」；
+//   3. 找不到合适的因数时保留原列数（宁可最后一行少几张，也不要整行浪费宽度）。
+// 列用 1fr —— 行始终铺满容器宽度，不会出现右侧空白。
+const CARD_MIN_WIDTH = 260;   // 卡片最小可读宽度（低于此宽度内部信息会破版）
+const GRID_GAP = 14;
+
+function gridColumnCount(pageSize, containerWidth) {
+  const width = containerWidth || 0;
+  if (width <= 0) return 1;
+  const maxByWidth = Math.floor((width + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP));
+  const maxCols = Math.max(1, Math.min(maxByWidth, pageSize));
+  // 优先「数量能整除」的列数，使每一行都是满的 —— 既不浪费宽度，又不留空行：
+  //   数量能放下时，取最大的整除列数；反之规则的列数变得很少，
+  //   例如 2560px 宽库宽可以放 7 列，但 7 不整除 8 和 16，
+  //   取 6 列（数、完整、宽度也摊得到）。
+  const divisors = [];
+  for (let d = 1; d <= maxCols; d++) {
+    if (pageSize % d === 0) divisors.push(d);
+  }
+  if (!divisors.length) return maxCols;
+  // 从大到小取第一个整除列数
+  divisors.sort((a, b) => b - a);
+  return divisors[0];
+}
+
+// 把列数写到网格上：inline style 覆盖 CSS 里的 auto-fill
+function applyGridColumns(pageSize) {
+  const grid = $("#jobsGrid");
+  if (!grid) return;
+  const width = grid.getBoundingClientRect().width;
+  const cols = gridColumnCount(pageSize, width);
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  grid.dataset.cols = String(cols);
+}
+
+// 每页作品数选择器：选项来自 PAGE_SIZE_OPTIONS，值从 localStorage 恢复。
+function initPageSizeSelect() {
+  const select = $("#pageSizeSelect");
+  if (!select) return;
+  select.innerHTML = PAGE_SIZE_OPTIONS
+    .map(size => `<option value="${size}">${size} 个</option>`)
+    .join("");
+  select.value = String(state.pageSize);
+  select.addEventListener("change", () => {
+    const size = Number(select.value);
+    if (!PAGE_SIZE_OPTIONS.includes(size)) return;
+    state.pageSize = size;
+    savePageSize(size);
+    state.donePage = 1;          // 改每页数量后回到第 1 页
+    applyGridColumns(size);
+    refreshJobs();
+  });
+}
 
 function applyDoneFilters() {
   state.doneFilters = {
@@ -1868,12 +1950,13 @@ function renderDonePagination(total, currentPage) {
   const pager = $("#jobsPagination");
   // 「全部」也要分页：否则「全部类型」名义下只显示最新 8 条（可能全是同一类），
   // 其余分类翻不到，与「全部类型」的语义不符。
-  if (!["done", "longfilm", "all"].includes(state.tab) || total <= DONE_PAGE_SIZE) {
+  const pageSize = state.pageSize;
+  if (!["done", "longfilm", "all"].includes(state.tab) || total <= pageSize) {
     pager.hidden = true;
     pager.innerHTML = "";
     return;
   }
-  const totalPages = Math.max(1, Math.ceil(total / DONE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pages = [];
   for (let page = 1; page <= totalPages; page++) {
     if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1) pages.push(page);
@@ -1918,7 +2001,7 @@ async function refreshJobs() {
       // 「已完成」「全部」都走服务端筛选 + 分页；「全部」不按状态过滤但保留筛选条件
       if (["done", "all"].includes(status)) {
         query.set("page", state.donePage);
-        query.set("page_size", DONE_PAGE_SIZE);
+        query.set("page_size", state.pageSize);
         if (tab === "longfilm") query.set("media", "longfilm");
         else Object.entries(state.doneFilters).forEach(([key, value]) => { if (value) query.set(key, value); });
       }
@@ -1964,6 +2047,8 @@ async function refreshJobs() {
       grid.appendChild(el);
     });
     existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
+    // 列数跟着「每页作品数」走；实时刮新也走这里，所以每页数量不会被刷掉
+    applyGridColumns(state.pageSize);
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
 
@@ -2513,6 +2598,7 @@ boot("图像 LoRA 清单", loadImageLoras);
 boot("生成类型清单", loadGenerationTypes);
 boot("模式面板", renderMode);
 boot("状态标签", renderTabs);
+boot("每页数量", initPageSizeSelect);
 boot("提示词版本", renderPromptVersions);   // 初始化二次增强「作用对象」切换（原始 / 一次增强后）
 boot("长片片段", renderStitchClips);
 boot("任务列表", refreshJobs);

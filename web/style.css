@@ -228,7 +228,18 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
   cursor: pointer; font-size: 13px; color: var(--muted);
 }
 .jobs-tabs button.active { background: #fff; color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-.jobs-tools { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.jobs-tools { display: flex; align-items: center; gap: 7px; }
+/* 每页数量：独立于筛选组，任何标签下都可用。
+   它用 margin-left:auto 永远贴右，筛选组不抢这个外边距 ——
+   否则筛选组隐藏时（.jobs-tools[hidden]）每页数量会跑到左边。 */
+.page-size-tools { gap: 6px; margin-left: auto; flex: 0 0 auto; }
+# 筛选组紧跟类型标签，不推右侧
+# （.page-size-tools 的 auto 外边距负责把整行推到右边）
+.page-size-label { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.page-size-tools select {
+  height: 34px; border: 1px solid var(--border); background: #fff; border-radius: 8px;
+  padding: 0 9px; color: var(--text); font-family: inherit; font-size: 12px; cursor: pointer;
+}
 .jobs-tools[hidden] { display: none; }
 .jobs-tools select, .filter-reset {
   height: 34px; border: 1px solid var(--border); background: #fff; border-radius: 8px;
@@ -245,7 +256,9 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .filter-reset { color: var(--muted); }
 .filter-reset:hover { border-color: var(--accent); color: var(--accent); }
 
-.jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+/* 列数由 applyGridColumns() 按「每页作品数」写到 inline style；
+   这里的 auto-fill 只是 JS 尚未执行时的兜底。 */
+.jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .empty-hint { color: var(--muted); text-align: center; padding: 60px 0; grid-column: 1/-1; }
 .jobs-pagination {
   display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -264,6 +277,8 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-card {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; display: flex; flex-direction: column;
+  min-width: 0;   /* 窄列下不撑破网格列宽 */
+  container-type: inline-size;   /* 卡片自身是容器：窄卡片内部布局可自适应 */
 }
 .job-card[draggable="true"] { cursor: grab; }
 .job-card[draggable="true"]:active { cursor: grabbing; }
@@ -293,6 +308,10 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-meta {
   padding: 10px 12px; font-size: 11.5px; color: var(--muted); flex: 1;
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px;
+}
+/* 卡片变窄时，元信息从 3 列降到 2 列，避免文字挤成一团或溢出 */
+@container (max-width: 340px) {
+  .job-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .job-meta .row { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 0; }
 .job-meta .row span { font-size: 10px; line-height: 1.1; }
@@ -333,7 +352,7 @@ body.modal-open { overflow: hidden; }
 @media (max-width: 1100px) {
   .panel { width: 280px; flex-basis: 280px; }
   .sidebar { width: 160px; flex-basis: 160px; }
-  .jobs-tools { width: 100%; margin-left: 0; flex-wrap: wrap; }
+  #doneFilters { width: 100%; margin-left: 0; flex-wrap: wrap; }
 }
 
 /* ---------- 硬件参数页 ---------- */
