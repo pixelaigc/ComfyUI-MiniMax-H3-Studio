@@ -77,8 +77,12 @@ const state = {
   imgQwen: {
     tier: "1mp",
     aspect: "16:9",
+    // 自定义宽高（与 Z-Image 同一套逻辑）
+    custom: false,
     width: null,
     height: null,
+    rawWidth: null,
+    rawHeight: null,
     model: "qwen_image_2.1_bf16",
     // 步数随「模型版本」联动：基座 40 步 / Turbo 8 步（蒸馏）
     // 初始值对齐默认模型（基座）的推荐步数
@@ -100,8 +104,14 @@ const state = {
   img: {
     tier: "1mp",
     aspect: "16:9",
+    // 自定义宽高：custom=true 表示用户手填过（哪怕只填了一边）
+    custom: false,
     width: null,
     height: null,
+    // 用户**原始输入**（未经吸附）—— 用来算「原始值 vs 生效值」的差异说明。
+    // 吸附后的值存在 width/height 里。
+    rawWidth: null,
+    rawHeight: null,
     model: "z_image_turbo_bf16",
     steps: 8,
     cfg: 1,
@@ -753,6 +763,9 @@ function renderImagePanel() {
       // 换比例后旧的自动尺寸作废，回到档位自动值
       // （手填的自定义尺寸也一并清掉 —— 比例和手填尺寸不能同时成立）
       s.width = null; s.height = null;
+      s.rawWidth = null; s.rawHeight = null;
+      s.custom = false;
+      imgSizeTyping = false;   // 退出输入态，保证预设尺寸写回输入框
       renderImagePanel();
     });
     chips.appendChild(b);
@@ -871,22 +884,41 @@ function normalizeImgSize(w, h) {
   return [nw, nh, reasons];
 }
 
+// 「正在输入」标记 —— 用户敲键盘的过程中不能把吸附后的值写回输入框，
+// 否则会打断输入（经典 controlled-input bug）：
+//   字段显示 "136" -> 用户敲 "5" -> 字段变成 "1365" -> 吸附成 1360 ->
+//   写回字段 -> 字段又变回 "1360" -> 用户继续敲 "5" -> "13605" -> 越敲越离谱。
+// 所以：input 事件里只算不写；change 事件（失焦/回车）才吸附并写回。
+let imgSizeTyping = false;
+
 function updateImageSizeFields() {
   const ctx = imgCtx();
   const s = ctx.st;
-  const manual = !!(s.width && s.height);
+  const manual = !!s.custom;
   let w, h, reasons = [];
   if (manual) {
-    // 手填值 -> 吸附到合法倍数，并把「原始值 / 生效值 / 原因」都算出来
-    const snapped = normalizeImgSize(Number(s.width), Number(s.height));
+    // 手填值 -> 每一边各自吸附到合法倍数，并把「原始值 / 生效值 / 原因」算出来。
+    // 注意：**不能**用「两边都填了才算自定义」的判定 —— 用户先填宽再填高时，
+    // 第一步就会因为 height 还是 null 而回落到预设，把刚填的宽冲掉。
+    //
+    // 用 rawWidth/rawHeight 存**用户原始输入**：吸附结果写回 width/height 后，
+    // 再拿 raw 跟 width 比才能算出「原始 2559 -> 生效 2560」的差异说明；
+    // 否则第二次重绘时两边已经相等，说明就消失了。
+    const base = imgAutoSize(s.tier, s.aspect);
+    const rawW = (s.rawWidth !== null && s.rawWidth !== undefined) ? Number(s.rawWidth) : base[0];
+    const rawH = (s.rawHeight !== null && s.rawHeight !== undefined) ? Number(s.rawHeight) : base[1];
+    const snapped = normalizeImgSize(rawW, rawH);
     w = snapped[0]; h = snapped[1]; reasons = snapped[2];
     // 吸附结果写回 state —— 提交给 ComfyUI 的必须是吸附后的值
     s.width = w; s.height = h;
   } else {
     [w, h] = imgAutoSize(s.tier, s.aspect);
   }
-  $("#imgWidth").value = w;
-  $("#imgHeight").value = h;
+  // 用户正在输入时不要覆盖输入框里的原始文本（否则输入会被打断）
+  if (!imgSizeTyping) {
+    $("#imgWidth").value = w;
+    $("#imgHeight").value = h;
+  }
   $("#imgSizeHint").textContent = `${w}×${h}`;
   const mp = (w * h) / (1024 * 1024);
   const up = mp > (ctx.maxMp || 3);
@@ -896,9 +928,12 @@ function updateImageSizeFields() {
   $("#imgSizeManualNote").textContent = parts.join(" · ");
 
   // 「自定义」标记
+  // 用 class 切换而不是 hidden 属性 —— .img-tag 是 inline-block，
+  // hidden 会被 CSS 的 display 盖掉（与历史踩过的「hidden 被 display:grid
+  // 盖掉」同类问题）。
   const modeTag = $("#imgSizeMode");
   if (modeTag) {
-    modeTag.hidden = !manual;
+    modeTag.classList.toggle("hidden", !manual);
     modeTag.textContent = manual ? "自定义" : "";
   }
   // 吸附说明：原始值 / 生效值 / 调整原因
@@ -1001,6 +1036,10 @@ $("#imgResSelect").addEventListener("change", e => {
   s.tier = e.target.value;
   // 切档位 -> 回到预设尺寸（自定义值失效）
   s.width = null; s.height = null;
+  s.rawWidth = null; s.rawHeight = null;
+  s.custom = false;
+  // 退出「正在输入」状态，否则重渲染时不会把预设尺寸写回输入框
+  imgSizeTyping = false;
   renderImagePanel();
 });
 $("#imgModelSelect").addEventListener("change", e => {
@@ -1047,17 +1086,38 @@ $("#imgWidth").addEventListener("input", e => {
   const s = imgCtx().st;
   const v = parseInt(e.target.value);
   s.width = Number.isFinite(v) && v > 0 ? v : null;
+  s.rawWidth = s.width;          // 留原始输入，用于算调整原因
+  // 用户一旦手填 -> 进入自定义模式（哪怕只填了一边）
+  if (s.width !== null) s.custom = true;
+  imgSizeTyping = true;
   updateImageSizeFields();
 });
 $("#imgHeight").addEventListener("input", e => {
   const s = imgCtx().st;
   const v = parseInt(e.target.value);
   s.height = Number.isFinite(v) && v > 0 ? v : null;
+  s.rawHeight = s.height;
+  if (s.height !== null) s.custom = true;
+  imgSizeTyping = true;
   updateImageSizeFields();
+});
+// 失焦 / 回车：这时才把吸附后的值写回输入框
+["#imgWidth", "#imgHeight"].forEach(sel => {
+  const el = $(sel);
+  if (!el) return;
+  const commit = () => {
+    imgSizeTyping = false;
+    updateImageSizeFields();
+  };
+  el.addEventListener("change", commit);
+  el.addEventListener("blur", commit);
 });
 $("#imgSizeReset").addEventListener("click", () => {
   const s = imgCtx().st;
   s.width = null; s.height = null;
+  s.rawWidth = null; s.rawHeight = null;
+  s.custom = false;          // 回到预设档位 -> 「自定义」标记也要清掉
+  imgSizeTyping = false;     // 退出输入态，保证预设尺寸写回输入框
   renderImagePanel();
 });
 
@@ -2169,7 +2229,11 @@ function jobCard(job) {
       const s = state.img;
       if (p.resolution) s.tier = p.resolution;
       if (p.aspect) s.aspect = p.aspect;
-      if (p.width && p.height) { s.width = p.width; s.height = p.height; }
+      if (p.width && p.height) {
+        s.width = p.width; s.height = p.height;
+        s.rawWidth = p.width; s.rawHeight = p.height;
+        s.custom = true;      // 复用旧任务的尺寸 -> 也是自定义模式
+      }
       if (p.model && IMG_OPTIONS.models[p.model]) applyModelDefaults(p.model);
       if (p.sampler) s.sampler = p.sampler;
       if (p.scheduler) s.scheduler = p.scheduler;
@@ -3087,4 +3151,4 @@ boot("任务列表", refreshJobs);
 boot("系统状态", refreshSystem);
 boot("状态实时推送", startStatusStream);
 setInterval(refreshJobs, 2000);
-setInterval(refreshSystem, 3000);
+setInterval(refreshSystem, 3000);

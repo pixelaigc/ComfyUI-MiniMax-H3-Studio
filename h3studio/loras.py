@@ -805,6 +805,9 @@ def _list_loras_for_base(markers, unet_path, base_label):
                 "compat_verified": bool(compat.get("verified", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
+                # 认定方式：filename（文件名含 z-image 字样）或
+                # layer_structure（靠层结构比对认出来的）
+                "discovered_by": info.get("discovered_by", "filename"),
                 "metadata": meta,
             })
     return found
@@ -914,6 +917,9 @@ def list_z_image_loras() -> list[dict]:
                 "compat_verified": bool(compat.get("verified", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
+                # 认定方式：filename（文件名含 z-image 字样）或
+                # layer_structure（靠层结构比对认出来的）
+                "discovered_by": info.get("discovered_by", "filename"),
                 "metadata": meta,
             })
     return found

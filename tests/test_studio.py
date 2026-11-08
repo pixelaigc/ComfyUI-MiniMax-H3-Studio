@@ -31,11 +31,33 @@ class TestLoRARegistry(unittest.TestCase):
             self.assertTrue(item["name"].endswith(".safetensors"))
 
     def test_scanner_only_returns_z_image_loras(self):
-        """不能把 285 个 LoRA 全塞进来，只返回 Z-Image 相关的。"""
-        for item in lora_registry.list_z_image_loras():
+        """不能把 285 个 LoRA 全塞进来，只返回 Z-Image 相关的。
+
+        判据有两条（2026-11-08 实测扩了一条）：
+          1. 文件名含 z-image 字样（Z_IMAGE_MARKERS）
+          2. **或** 层结构与 Z-Image 完全对应 —— 实测 `dejpeg_v3.safetensors`
+             文件名毫无 z-image 痕迹，但层结构 100% 命中 Z-Image 底模，
+             实测在 ComfyUI 里 attach 出 180 patches、真实生效。
+             只按文件名过滤会把它整个漏掉（用户根本选不到）。
+
+        真正的「不把 285 个都塞进来」由**数量上限**兜底断言。
+        """
+        items = lora_registry.list_z_image_loras()
+        for item in items:
             lowered = item["name"].lower()
-            self.assertTrue(any(m in lowered for m in lora_registry.Z_IMAGE_MARKERS),
-                            f"{item['name']} 不像 Z-Image LoRA")
+            by_name = any(m in lowered for m in lora_registry.Z_IMAGE_MARKERS)
+            by_structure = item.get("discovered_by") == "layer_structure"
+            self.assertTrue(by_name or by_structure,
+                            f"{item['name']} 既不靠文件名也不靠层结构认定，"
+                            "说明判定条件有漏洞")
+            # 结构兜底找到的，层命中率必须 100%
+            if by_structure and not by_name:
+                self.assertEqual(float(item.get("attention_hit") or 0), 1.0,
+                                 f"{item['name']} 靠层结构认定，注意力命中率必须 100%")
+        # 数量兜底：本机总共有 264 个 LoRA，Z-Image 相关的只有个位数
+        self.assertLess(len(items), 30,
+                        f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
+                        "结构兜底的判据放太宽了")
 
     def test_resolve_existing_and_missing(self):
         found = lora_registry.list_z_image_loras()
