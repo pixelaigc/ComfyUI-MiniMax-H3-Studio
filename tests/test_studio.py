@@ -665,6 +665,15 @@ class TestLoRAContextDamping(unittest.TestCase):
             self.assertFalse(
                 lora_damping._is_damped(tmpdir / "nope.safetensors", factor, source=yao),
                 "文件不存在必须被拒绝")
+            # 5) 根本没有 context_refiner 张量的文件 -> 必须判为不合格
+            #    （阻尼对它本来就是空操作 = 没阻尼，不能当成合格）
+            no_ctx = tmpdir / "no_ctx.safetensors"
+            only_other = {k: v for k, v in load_file(str(yao)).items()
+                          if "context_refiner." not in k}
+            save_file(only_other, str(no_ctx), metadata={"format": "pt"})
+            self.assertFalse(
+                lora_damping._is_damped(no_ctx, factor, source=yao),
+                "没有 context_refiner 张量必须被拒绝（阻尼对它是空操作）")
 
     def test_ensure_damped_lora_rebuilds_stale_file(self):
         """ensure_damped_lora 遇到陈旧（未阻尼）派生文件必须重建它。
