@@ -825,6 +825,22 @@ body.modal-open { overflow: hidden; }
 .img-note {
   margin-top: 6px; font-size: 10.5px; color: var(--muted); line-height: 1.5;
 }
+/* 自定义分辨率的「已自动调整」说明 —— 原始值 / 生效值 / 调整原因 */
+.img-size-adjust {
+  margin-top: 4px; padding: 5px 8px; border-radius: 7px;
+  background: #fff8ec; border: 1px solid #f3e2c4; color: #a8690f;
+}
+/* 「自定义」标记（手填宽高后档位显示为自定义） */
+.img-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  border-radius: 999px; font-size: 9.5px; font-weight: 600;
+  background: #e8f0fb; color: #2f6fd0; vertical-align: middle;
+}
+/* 加速 LoRA 固定内置的提示条 */
+.img-accel-note {
+  margin-top: 6px; padding: 5px 8px; border-radius: 7px; font-size: 10px;
+  line-height: 1.5; background: #eef4fd; border: 1px solid #cfdff7; color: #2f6fd0;
+}
 .img-warn {
   margin-top: 6px; font-size: 10.5px; line-height: 1.5;
   color: #b46a10; background: #fff8ec; border: 1px solid #f3e2c4;

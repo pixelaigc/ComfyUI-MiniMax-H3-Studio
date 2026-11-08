@@ -76,6 +76,20 @@ LORA_CATALOG: dict[str, dict] = {
         "strength_source": "上游未标注；本机实测：强度 1.0 出彩色噪点，"
                            "根因是 context_refiner 扰动过大，已自动做 0.8 阻尼",
     },
+    "dejpeg_v3.safetensors": {
+        "display": "去压缩伪影（DeJPEG v3）",
+        "base": "Z-Image",
+        # 上游元数据为空（safetensors __metadata__ 是 {}）—— 没有触发词标注，
+        # 不编造。实测它 patch 的是 diffusion_model.layers.*（UNet 主干），
+        # 与 Z-Image-Turbo 的层结构 100% 对上（attention_hit=1.0），
+        # 实测在 ComfyUI 里 attach 出 180 patches、真实生效。
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "针对 JPEG 压缩伪影的修复型效果 LoRA（patch UNet 主干层）。",
+        "source": "本机 safetensors 层结构比对（上游未提供仓库/README）",
+        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
+    },
     "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors": {
         "display": "Z-Image-Fun 蒸馏加速 8 步（2603）",
         "base": "Z-Image Base（ZImageBase）",
@@ -197,6 +211,68 @@ def _read_safetensors_header(path: Path) -> dict:
         return {}
 
 
+# Z-Image 底模独有的模块前缀（实测 z_image_turbo / z_image_bf16 的键集）
+#   context_refiner.* / noise_refiner.* / layers.N.attention.qkv
+# SDXL / Flux / H3 的 LoRA 都不含这些前缀 —— 这是区分它们的关键。
+_Z_IMAGE_MODULE_PREFIXES = ("context_refiner.", "noise_refiner.", "layers.")
+
+
+def _looks_like_z_image_layers(path: Path) -> bool:
+    """判断一个 LoRA 的层结构是不是 Z-Image 家族的。
+
+    只在「文件名不含 z-image 字样、但可能是这一族的 LoRA」时用
+    （实测 `dejpeg_v3.safetensors` 就是这种：文件名毫无线索，但层结构
+    与 Z-Image 完全对应，真实 attach 出 180 patches）。
+
+    判据（实测标定）：
+      1. LoRA patch 的层里必须出现 Z-Image 底模独有的模块前缀
+         （context_refiner / noise_refiner / layers.）
+      2. 必须含 Z-Image 的**融合 qkv** 层（`layers.N.attention.qkv`），
+         或分离投影 to_q/to_k/to_v（ComfyUI 会映射到融合 qkv）
+      3. 必须含 context_refiner —— 这是 Z-Image/Lumina2 系最独特的模块，
+         SDXL / Flux / H3 都没有
+    """
+    try:
+        header = _read_safetensors_header(path)
+    except Exception:
+        return False
+    bases = _lora_layer_bases(header)
+    if not bases:
+        return False
+    # Z-Image 底模的层结构（实测 z_image_turbo / z_image_bf16）：
+    #   context_refiner.N.attention.{qkv,k_norm,q_norm,out}
+    #   noise_refiner.N.attention.{...}
+    #   layers.N.attention.{qkv,...}
+    # LoRA 侧可以是这三类中的任意子集 —— 实测：
+    #   Kook_Zimage_*      只 patch context_refiner + noise_refiner + layers
+    #   dejpeg_v3          只 patch layers.*（**没有** context_refiner）
+    #   官方蒸馏 LoRA      只 patch diffusion_model.context_refiner.*
+    # 所以「有没有 context_refiner」不能作为硬条件（会漏掉 dejpeg_v3）。
+    #
+    # 真正的判据是「层名能不能在 Z-Image 底模里 100% 命中」——
+    # 这由 check_compatibility() 的 attention_hit 负责（要求 == 1.0）。
+    # 这里只做**结构形状**的粗筛：必须出现 Z-Image 独有的模块前缀。
+    # 注意：LoRA 层名可能带 `diffusion_model.` 前缀（实测 dejpeg_v3 与官方
+    # 蒸馏 LoRA 都带），所以要先剥掉前缀再判断模块名。
+    def _module_of(base: str) -> str:
+        for pre in ("diffusion_model.", "lora_unet_"):
+            if base.startswith(pre):
+                base = base[len(pre):]
+                break
+        return base.split(".")[0]
+
+    has_zimg_module = any(
+        _module_of(b) in ("context_refiner", "noise_refiner", "layers")
+        for b in bases)
+    if not has_zimg_module:
+        return False
+    # 必须含 Z-Image 的注意力层（融合 qkv，或分离投影 to_q/to_k/to_v）
+    has_fused = any(".attention.qkv" in b for b in bases)
+    has_split = any(b.endswith((".attention.to_q", ".attention.to_k",
+                                ".attention.to_v")) for b in bases)
+    return has_fused or has_split
+
+
 def _lora_layer_bases(header: dict) -> set[str]:
     """从 header 提取 LoRA 想 patch 的层名集合（去掉 lora_A/lora_B 后缀）。"""
     bases: set[str] = set()
@@ -213,7 +289,24 @@ def _lora_layer_bases(header: dict) -> set[str]:
 
 
 def _unet_layer_keys(unet_path: Path) -> set[str]:
-    """UNET 的层键集合（去掉 .weight/.bias 后缀）。"""
+    """UNET 的层键集合（去掉 .weight/.bias 后缀）。
+
+    ⚠️ **必须带 `diffusion_model.` 前缀**（2026-11-08 实测教训）。
+
+    ComfyUI 加载 UNET 后，模型 state_dict 的键**统一带 `diffusion_model.` 前缀**
+    （comfy/lora.py:192-196 的 `model_lora_keys_unet()` 就是按这个前缀建映射的）。
+    而 LoRA 权重文件里的层名**带或不带**这个前缀都实测存在：
+      * `dejpeg_v3.safetensors` / `Z-Image-Fun-Lora-Distill-8-Steps-2603`
+        -> 带 `diffusion_model.` 前缀
+      * `Kook_Zimage_*` -> 不带前缀（`context_refiner.0.attention.to_q`）
+
+    之前这里返回**裸键**（无前缀），跟带前缀的 LoRA 一比全是 0 命中，
+    导致 `dejpeg_v3` 和官方蒸馏 LoRA 被**误判为「不兼容」** ——
+    而实测它们在 ComfyUI 里明明 attach 成功（180 / 136 patches attached）。
+
+    所以这里返回**带前缀**的键集（跟 ComfyUI 运行时一致），
+    由 `_layer_hit()` 负责把 LoRA 侧的多种前缀写法都试一遍。
+    """
     header = _read_safetensors_header(unet_path)
     keys: set[str] = set()
     for key in header:
@@ -221,11 +314,53 @@ def _unet_layer_keys(unet_path: Path) -> set[str]:
             continue
         for suffix in (".weight", ".bias"):
             if key.endswith(suffix):
-                keys.add(key[: -len(suffix)])
+                keys.add("diffusion_model." + key[: -len(suffix)])
                 break
         else:
-            keys.add(key)
+            keys.add("diffusion_model." + key)
     return keys
+
+
+# LoRA 层名可能带的前缀写法（实测三种都存在）
+_LORA_KEY_PREFIXES = ("diffusion_model.", "lora_unet_", "")
+
+
+def _lora_key_variants(base: str) -> set[str]:
+    """把一个 LoRA 层名展开成所有可能的等价写法。
+
+    ComfyUI 的 `model_lora_keys_unet()` 同时登记多种别名（comfy/lora.py:192-212）：
+      * `diffusion_model.<层名>`                （通用格式）
+      * `lora_unet_<层名把点换成下划线>`          （diffusers 风格）
+      * diffusers 的 to_q/to_k/to_v -> 融合 qkv 的映射
+    比对时必须把 LoRA 侧的层名展开成全部候选再命中。
+    """
+    out: set[str] = set()
+    for prefix in _LORA_KEY_PREFIXES:
+        if prefix == "lora_unet_":
+            out.add("lora_unet_" + base.replace(".", "_"))
+            continue
+        out.add(prefix + base)
+    return out
+
+
+def _layer_hit(base: str, unet_keys: set[str]) -> bool:
+    """LoRA 的某个层能否在底模里找到（尝试全部前缀 / 别名写法）。"""
+    if base in unet_keys:
+        return True
+    for cand in _lora_key_variants(base):
+        if cand in unet_keys:
+            return True
+    # 分离投影 to_q/to_k/to_v -> 融合 qkv 的三段（ComfyUI 的正规映射）
+    for suffix, fused in ((".attention.to_q", ".attention.qkv"),
+                          (".attention.to_k", ".attention.qkv"),
+                          (".attention.to_v", ".attention.qkv"),
+                          (".attention.to_out.0", ".attention.out")):
+        if base.endswith(suffix):
+            stem = base[: -len(suffix)]
+            for pre in ("diffusion_model.", ""):
+                if pre + stem + fused in unet_keys:
+                    return True
+    return False
 
 
 def _z_image_unet_path() -> Path | None:
@@ -311,37 +446,18 @@ def _attention_hit_ratio(lora_bases: set[str], unet_keys: set[str]) -> tuple[flo
     """注意力层的命中率。
 
     注意力层 = 键名里含 '.attention.' 的 LoRA layer。
-    命中 = 该 layer 名能在 UNET 的同名层里找到（或其 fused 变体）。
+    命中 = 该 layer 名能在 UNET 的同名层里找到（或其 fused / 前缀变体）。
+
+    命中判定统一走 `_layer_hit()` —— 它把 LoRA 侧层名的三种前缀写法
+    （`diffusion_model.` / `lora_unet_` / 无前缀）与 to_q/to_k/to_v
+    -> 融合 qkv 的映射都试一遍。
     """
     attn = {b for b in lora_bases if ".attention." in b}
     if not attn:
         return 1.0, 0, 0
     hit = 0
     for base in attn:
-        if base in unet_keys:
-            hit += 1
-            continue
-        # 分离投影 to_q/to_k/to_v -> 融合 qkv 的三段。
-        #
-        # 这是 ComfyUI 对 Z-Image 的**正规**映射（comfy/lora.py 的
-        # model_lora_keys_unet 通过 unet_to_diffusers 建的 key_map）：
-        # 底模 qkv 权重是 [3*d, d]，to_q/to_k/to_v 分别对应它的三段。
-        # 本机实测（ComfyUI 进程内跑 load_lora）：
-        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,0,3840)
-        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,3840,3840)
-        #   patch -> diffusion_model.layers.0.attention.qkv.weight (0,7680,3840)
-        # 所以这类键名是**合法的**，不能因为名字不同就判不兼容。
-        if base.endswith(".attention.to_q") and \
-                base[:-len(".to_q")] + ".qkv" in unet_keys:
-            hit += 1
-        elif base.endswith(".attention.to_k") and \
-                base[:-len(".to_k")] + ".qkv" in unet_keys:
-            hit += 1
-        elif base.endswith(".attention.to_v") and \
-                base[:-len(".to_v")] + ".qkv" in unet_keys:
-            hit += 1
-        elif base.endswith(".attention.to_out.0") and \
-                base[:-len(".to_out.0")] + ".out" in unet_keys:
+        if _layer_hit(base, unet_keys):
             hit += 1
     return (hit / len(attn) if attn else 1.0), hit, len(attn)
 
@@ -723,17 +839,36 @@ def list_z_image_loras() -> list[dict]:
             rel = path.relative_to(d).as_posix()
             lowered = rel.lower()
             # 服务端自己生成的 context_refiner 阻尼派生文件不是用户可选的
-            # LoRA（它只是原 LoRA 的工作流内部副本），不能出现在列表里
-            if lowered.startswith(lora_damping.DERIVED_PREFIX):
+            # LoRA（它只是原 LoRA 的工作流内部副本），不能出现在列表里。
+            # 两种命名都要排：lora_damping 写的 `h3studio_ctx_*`，
+            # 以及旧版本写出的 `__p14_*`（同一条线的早期产物）。
+            if (lowered.startswith(lora_damping.DERIVED_PREFIX)
+                    or lowered.startswith("__p14_")):
                 continue
-            if not any(marker in lowered for marker in Z_IMAGE_MARKERS):
-                continue
+            name_hit = any(marker in lowered for marker in Z_IMAGE_MARKERS)
             if rel in seen:
                 continue
             seen.add(rel)
             meta = _read_safetensors_metadata(path)
             info = LORA_CATALOG.get(rel) or LORA_CATALOG.get(path.name) or {}
             kind = classify_kind(rel, info)
+            # 【结构兜底】文件名不含 z-image 字样的 LoRA 也可能是 Z-Image 的。
+            # 实测：`dejpeg_v3.safetensors` 文件名毫无 z-image 痕迹，
+            # 但层结构与 Z-Image 完全对应 —— 实测在 ComfyUI 里 attach 出
+            # 180 patches，真实生效；只按文件名 marker 过滤会把它整个漏掉。
+            #
+            # 判据必须**足够严**，否则 SDXL / Flux / H3 的 LoRA 会全部混进来
+            # （实测按「注意力命中率」判会放进 218 个 —— 毫无意义）。
+            #
+            # ⚠️ 顺序很重要：`_looks_like_z_image_layers()` 只读 safetensors
+            # 头部（毫秒级），而 `check_compatibility()` 要读 12GB 的 UNET +
+            # LoRA 权重（几十秒）。所以**先用便宜的粗筛**，粗筛过了再做
+            # 昂贵的精确检测 —— 否则每次打开面板都要扫 264 个 LoRA 的权重。
+            if not name_hit:
+                if kind != KIND_EFFECT:
+                    continue
+                if not _looks_like_z_image_layers(path):
+                    continue
             # 兼容性检测：只对效果类做（加速类由工作流固定使用，不进用户列表）
             compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                       "relative_perturbation": None, "suggested_strength": 1.0,
@@ -747,6 +882,13 @@ def list_z_image_loras() -> list[dict]:
                               "relative_perturbation": None, "suggested_strength": 1.0,
                               "ctx_perturbation": None, "ctx_damping": None,
                               "verified": False}
+            if not name_hit:
+                # 粗筛过了还要精确验证：注意力层必须 100% 命中
+                if float(compat.get("attention_hit") or 0) < 1.0:
+                    continue
+                info = dict(info)
+                info.setdefault("display", path.stem)
+                info["discovered_by"] = "layer_structure"
             found.append({
                 "name": rel,
                 "path": str(path),

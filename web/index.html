@@ -135,14 +135,16 @@
       </div>
 
       <div class="field">
-        <div class="field-label">输出尺寸 <span class="muted" id="imgSizeHint">—</span></div>
+        <div class="field-label">输出尺寸 <span class="muted" id="imgSizeHint">—</span>
+          <span class="img-tag" id="imgSizeMode" hidden>自定义</span></div>
         <div class="img-size-row">
-          <input type="number" id="imgWidth" min="64" step="16" title="宽度（像素，16 的倍数）">
+          <input type="number" id="imgWidth" min="16" step="16" title="宽度（像素，必须是 16 的倍数）">
           <span class="img-x">×</span>
-          <input type="number" id="imgHeight" min="64" step="16" title="高度（像素，16 的倍数）">
+          <input type="number" id="imgHeight" min="16" step="16" title="高度（像素，必须是 16 的倍数）">
           <button type="button" class="img-reset" id="imgSizeReset" title="恢复为档位自动计算的尺寸">自动</button>
         </div>
         <div class="img-note" id="imgSizeManualNote"></div>
+        <div class="img-note img-size-adjust" id="imgSizeAdjust" hidden></div>
       </div>
 
       <div class="field">
@@ -156,6 +158,7 @@
         <select class="img-select" id="imgModelSelect"></select>
         <div class="img-note" id="imgModelNote"></div>
         <div class="img-warn" id="imgModelWarn"></div>
+        <div class="img-accel-note" id="imgAccelNote" hidden></div>
       </div>
 
       <div class="compact-pair">

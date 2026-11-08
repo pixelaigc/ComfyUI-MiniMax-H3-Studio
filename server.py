@@ -57,6 +57,8 @@ from h3studio.workflows import (
     Z_IMAGE_DEFAULT_TIER,
     Z_IMAGE_MAX_DIRECT_MP,
     Z_IMAGE_SIZE_MULTIPLE,
+    Z_IMAGE_SIZE_MIN,
+    Z_IMAGE_SIZE_MAX,
     z_image_dimensions,
     z_image_megapixels,
 )
@@ -1331,6 +1333,11 @@ async def api_image_options(request):
             "supports_negative": m["supports_negative"],
             "samplers": m["samplers"],
             "schedulers": m["schedulers"],
+            # 【加速 LoRA 固定在工作流里】—— 只告诉界面「这个版本内置了
+            # 加速 LoRA」以便在说明里显示，**名字本身不下发到可选列表**。
+            "has_accel_lora": bool(m.get("accel_lora")),
+            # 步数/CFG 与加速 LoRA 绑定 -> 界面要锁定这几个控件
+            "params_locked_by_accel": bool(m.get("params_locked_by_accel")),
         }
     # Qwen-Image 2.1 的档位/比例与 Z-Image 共用同一套 ResolutionSelector 语义，
     # 但档位表与倍数不同（VAE 16 倍下采样 -> 宽高取 16 的倍数）。
@@ -1379,6 +1386,10 @@ async def api_image_options(request):
         "max_direct_mp": Z_IMAGE_MAX_DIRECT_MP,
         "default_tier": Z_IMAGE_DEFAULT_TIER,
         "default_model": Z_IMAGE_DEFAULT_MODEL,
+        # 自定义宽高的合法范围（ComfyUI EmptySD3LatentImage 节点 schema：
+        # min=16 max=16384 step=16）
+        "size_min": Z_IMAGE_SIZE_MIN,
+        "size_max": Z_IMAGE_SIZE_MAX,
         # Qwen-Image 2.1 独立的一套（文生图 + 图片编辑共用）
         "qwen": {
             "tiers": qwen_tiers,

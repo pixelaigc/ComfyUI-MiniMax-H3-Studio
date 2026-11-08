@@ -117,6 +117,34 @@ Z_IMAGE_MODELS = {
         "warn": "Base 支持负面提示词（官方强烈建议）。Base 上 exponential 采样器可用，"
                 "与 Turbo 相反。",
     },
+    "z_image_base_distill": {
+        "label": "Z-Image Base + 蒸馏加速 · 8 步",
+        # 与 Base 同一个 UNET 权重 —— 加速靠的是工作流里**固定挂**的
+        # 官方蒸馏 LoRA（Z-Image-Fun-Lora-Distill-8-Steps-2603），
+        # 不是换一个底模。
+        "unet": "z_image_bf16.safetensors",
+        "weight_dtype": "default",
+        # 蒸馏 LoRA 是在 8 步 schedule 上训的，所以这组参数是**绑定的**：
+        # 步数/CFG/采样器/调度器都按蒸馏档走。
+        "sampler": "dpmpp_2m_sde",
+        "scheduler": "beta",
+        "steps": 8,
+        "cfg": 1.0,
+        "shift": 3.0,
+        # 蒸馏模型：CFG=1 时 ComfyUI 跳过 uncond，负面提示词数学上无效
+        "negative": "zero",
+        "supports_negative": False,
+        "samplers": ["dpmpp_2m_sde", "dpmpp_2m", "euler", "res_multistep",
+                     "dpmpp_3m_sde", "dpm_2", "heun"],
+        "schedulers": ["beta", "simple", "sgm_uniform", "normal", "karras"],
+        # 加速 LoRA 固定接在工作流里（界面不暴露）
+        "accel_lora": "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors",
+        # 步数/CFG 与加速 LoRA 绑定 —— 界面要锁定这几个控件
+        "params_locked_by_accel": True,
+        "note": "Base 底模 + 工作流固定挂官方蒸馏 LoRA：8 步出图（比 Base 的 25 步快 3 倍）。",
+        "warn": "加速 LoRA 固定内置于工作流，不在 LoRA 列表里；"
+                "步数/CFG/采样器已绑定蒸馏档，改动会破坏蒸馏 schedule。",
+    },
     "darkbeast_z6_blitz_fp8": {
         "label": "DarkBeast Z6 BlitZ · FP8 混精版",
         "unet": "DarkBeastZ6-BlitZ-Scaled-Fp8-Mixed-ComfyUI.safetensors",
@@ -136,6 +164,54 @@ Z_IMAGE_MODELS = {
     },
 }
 Z_IMAGE_DEFAULT_MODEL = "z_image_turbo_bf16"
+
+# ------------------------------------------------------------------
+# 加速 / 蒸馏 LoRA：**固定接在工作流里，界面不暴露**
+# ------------------------------------------------------------------
+# 【实测事实，2026-11-08】官方 Z-Image 工作流里**一个 LoRA 节点都没有**：
+#   image_z_image_turbo.json   -> 无 LoRA
+#   image_z_image.json (Base)  -> 无 LoRA
+#   utility_z_image_turbo_2k_upscaler.app.json -> 无 LoRA
+#   => **Z-Image-Turbo 是「原生蒸馏」**，不需要加速 LoRA，它本身就是最快路径。
+#
+# 所以「加速 LoRA 固定在工作流里」这件事只对 **Z-Image Base** 有意义：
+# Base 官方推荐 25 步 / cfg 4（模板 MarkdownNote 原文「Steps: 30～50, cfg: 3～5」），
+# 挂上蒸馏 LoRA 后可以 8 步出图 —— 实测在 ComfyUI 里 attach 出 136 patches，
+# 真实生效（不是空挂）。
+#
+# 下面这张表就是「工作流固定用哪个加速 LoRA」的唯一真相源：
+#   * Turbo / DarkBeast -> 空（原生蒸馏，不需要）
+#   * Base               -> 蒸馏 LoRA（固定，界面不可选、不出现在下拉里）
+#
+# 用户侧：LoRA 下拉只列**效果类**；加速类的由 build_t2i() 自动挂上。
+Z_IMAGE_ACCEL_LORA = {
+    # Z-Image-Turbo：原生 8 步蒸馏，不需要额外加速 LoRA
+    # （官方 image_z_image_turbo.json 子图里一个 LoRA 节点都没有）
+    "z_image_turbo_bf16": None,
+    # DarkBeast BlitZ：本身已是 15 步 cfg1 的加速混合版
+    "darkbeast_z6_blitz_fp8": None,
+    # Z-Image Base（完整版）：官方 25 步，不加速
+    "z_image_bf16": None,
+    # Z-Image Base + 蒸馏加速：**工作流固定挂**官方蒸馏 LoRA，
+    # 8 步出图。加速 LoRA 固定接在工作流里，界面不暴露。
+    "z_image_base_distill": "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors",
+}
+
+# 挂了加速 LoRA 后必须配套的采样参数（蒸馏 LoRA 改变了步数/CFG 语义）
+Z_IMAGE_ACCEL_PARAMS = {
+    "steps": 8,
+    "sampler": "dpmpp_2m_sde",
+    "scheduler": "beta",
+    "cfg": 1.0,
+}
+
+
+def accel_lora_for(model_key: str) -> str | None:
+    """该模型版本固定使用的加速 / 蒸馏 LoRA 文件名（没有则 None）。
+
+    这些 LoRA 由工作流自动挂上，**不在界面的可选列表里**。
+    """
+    return Z_IMAGE_ACCEL_LORA.get(model_key)
 
 # 图像面板分辨率档位：**总像素（megapixels）**语义，与 ComfyUI 自带的
 # ResolutionSelector 完全一致（aspect_ratio + megapixels + multiple），
@@ -411,6 +487,76 @@ def build_r2v(params):
     return p
 
 
+# 自定义分辨率：宽高的合法范围
+# （ComfyUI EmptySD3LatentImage 的节点 schema：min=16 max=16384 step=16）
+Z_IMAGE_SIZE_MIN = 16
+Z_IMAGE_SIZE_MAX = 16384
+
+
+def normalize_z_image_size(width, height, multiple=Z_IMAGE_SIZE_MULTIPLE,
+                            max_pixels=None):
+    """把用户手填的宽高吸附到 ComfyUI 能接受的值。
+
+    返回 (生效宽, 生效高, 调整原因列表)。**不抛异常** —— 界面要拿
+    「原始值 / 生效值 / 调整原因」三样东西一起显示，抛异常就没法提示了。
+
+    吸附规则（实测依据）：
+      1. 宽高必须是 16 的倍数
+         （EmptySD3LatentImage schema step=16；latent 尺寸 = H//8, W//8，
+          再经 UNET patch_size=2 -> 有效网格步长 16）
+      2. 单边不能超过 16384（nodes.MAX_RESOLUTION）
+      3. 单边不能小于 16（节点 min）
+      4. 总像素超过 max_pixels 时按比例缩到刚好不超过
+
+    原因列表是给人看的短句，直接显示在界面上。
+    """
+    reasons: list[str] = []
+    try:
+        w = int(round(float(width)))
+        h = int(round(float(height)))
+    except (TypeError, ValueError):
+        return 0, 0, ["宽高必须是数字"]
+
+    if w <= 0 or h <= 0:
+        return 0, 0, ["宽高必须大于 0"]
+
+    # -- 1. 倍数吸附 --
+    adj_w = max(multiple, int(round(w / multiple)) * multiple)
+    adj_h = max(multiple, int(round(h / multiple)) * multiple)
+    if adj_w != w:
+        reasons.append(f"宽度 {w} 不是 {multiple} 的倍数 -> {adj_w}")
+    if adj_h != h:
+        reasons.append(f"高度 {h} 不是 {multiple} 的倍数 -> {adj_h}")
+    w, h = adj_w, adj_h
+
+    # -- 2/3. 范围钳制 --
+    if w > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"宽度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        w = Z_IMAGE_SIZE_MAX
+    if h > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"高度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        h = Z_IMAGE_SIZE_MAX
+    if w < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"宽度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        w = Z_IMAGE_SIZE_MIN
+    if h < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"高度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        h = Z_IMAGE_SIZE_MIN
+
+    # -- 4. 总像素上限 --
+    if max_pixels:
+        limit = max_pixels * 1024 * 1024
+        if w * h > limit:
+            scale = (limit / float(w * h)) ** 0.5
+            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
+            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            reasons.append(
+                f"总像素 {w * h / (1024 * 1024):.2f}MP 超过上限 {max_pixels}MP "
+                f"-> 按比例缩到 {nw}×{nh}")
+            w, h = nw, nh
+    return w, h, reasons
+
+
 def z_image_dimensions(aspect, tier, width=None, height=None):
     """比例 + 分辨率档位 -> 实际像素宽高。
 
@@ -428,12 +574,14 @@ def z_image_dimensions(aspect, tier, width=None, height=None):
     mult = Z_IMAGE_SIZE_MULTIPLE
 
     if width and height:
-        final_w, final_h = int(width), int(height)
-    else:
-        total_pixels = megapixels * 1024 * 1024
-        scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
-        final_w = w_ratio * scale
-        final_h = h_ratio * scale
+        # 用户手填了宽高 -> 以手填的为准（但仍要吸附到合法倍数）
+        final_w, final_h, _ = normalize_z_image_size(width, height, mult)
+        return final_w, final_h
+
+    total_pixels = megapixels * 1024 * 1024
+    scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
+    final_w = w_ratio * scale
+    final_h = h_ratio * scale
     final_w = max(mult, int(round(final_w / mult)) * mult)
     final_h = max(mult, int(round(final_h / mult)) * mult)
     return final_w, final_h
@@ -548,10 +696,13 @@ def _z_image_lora_chain(lora_items, base_model_ref, base_clip_ref=None):
 
 def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
                        cfg, shift, negative_mode, negative_text, prompt,
-                       job_id, filename_prefix=None, loras=None):
+                       job_id, filename_prefix=None, loras=None, accel_lora=None):
     """Z-Image 主链节点（文生图 / 放大二次采样共用）。
 
-    loras: [{name, strength}] —— 按顺序串联到 model 链上。
+    loras: [{name, strength}] —— 按顺序串联到 model 链上（用户选的效果 LoRA）。
+    accel_lora: str | None —— 工作流**固定**的加速 / 蒸馏 LoRA 文件名。
+      它排在用户效果 LoRA 之前（加速先改基模语义，效果再叠上去），
+      且不经过界面，完全由 accel_lora_for() 决定。
     """
     p = {
         "9": {"inputs": {"filename_prefix": filename_prefix or f"h3studio/t2i_{job_id}",
@@ -577,15 +728,23 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
     }
     # LoRA 串在 ModelSamplingAuraFlow 之后、KSampler 之前
     # clip 侧也一起接上（LoraLoader 的 clip 输入），文本编码器才能吃到 patch
-    if loras:
+    #
+    # 顺序：**加速 LoRA 在前，用户效果 LoRA 在后** ——
+    # 加速 LoRA 改的是基模的采样语义，效果 LoRA 是在改完之后再叠风格。
+    chain = list(loras or [])
+    if accel_lora:
+        chain = [{"name": accel_lora, "strength": 1.0, "trigger": ""}] + chain
+    if chain:
         lora_nodes, model_ref, clip_ref = _z_image_lora_chain(
-            loras, ["57:11", 0], ["57:30", 0])
+            chain, ["57:11", 0], ["57:30", 0])
         p.update(lora_nodes)
         p["57:3"]["inputs"]["model"] = model_ref
         # CLIPTextEncode（正向）与 ConditioningZeroOut（负向）都用 LoRA 后的 clip
         p["57:27"]["inputs"]["clip"] = clip_ref
     if negative_mode == "encode":
-        p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
+        # 负面编码器也用 LoRA 后的 clip（与正向保持同一套 patch）
+        neg_clip = p["57:27"]["inputs"]["clip"]
+        p["57:33"] = {"inputs": {"text": negative_text, "clip": neg_clip},
                       "class_type": "CLIPTextEncode"}
     else:
         p["57:33"] = {"inputs": {"conditioning": ["57:27", 0]},
@@ -595,7 +754,7 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
 
 
 def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, prompt, job_id,
-                            loras=None):
+                            loras=None, accel_lora=None):
     """官方 2K 放大路径（utility_z_image_turbo_2k_upscaler.app.json 的做法）。
 
     链路：T2I 出图 -> ImageScaleToTotalPixels(lanczos) -> ImageUpscaleWithModel
@@ -652,9 +811,12 @@ def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, promp
     }
     # 放大路径的 LoRA 同样串在 ModelSamplingAuraFlow 之后
     # （两段 KSampler 都用 LoRA 后的 model；clip 也要接到 LoRA 后的 CLIP）
-    if loras:
+    chain = list(loras or [])
+    if accel_lora:
+        chain = [{"name": accel_lora, "strength": 1.0, "trigger": ""}] + chain
+    if chain:
         lora_nodes, model_ref, clip_ref = _z_image_lora_chain(
-            loras, ["57:11", 0], ["57:30", 0])
+            chain, ["57:11", 0], ["57:30", 0])
         p.update(lora_nodes)
         p["57:3"]["inputs"]["model"] = model_ref
         p["57:75"]["inputs"]["model"] = model_ref
@@ -685,6 +847,19 @@ def build_t2i(params):
     if tier not in Z_IMAGE_RES_TIERS:
         tier = Z_IMAGE_DEFAULT_TIER
     width, height = z_image_dimensions(aspect, tier, params.get("width"), params.get("height"))
+
+    # 【加速 LoRA 固定在工作流里】—— 该模型版本是否需要挂蒸馏 LoRA。
+    #
+    # 实测事实：官方 Z-Image-Turbo 工作流里**没有任何 LoRA 节点** ——
+    # Turbo 是原生蒸馏，本身就是 8 步最快路径，不需要额外加速 LoRA。
+    # 只有 Z-Image **Base** 需要：官方 25 步 -> 挂蒸馏 LoRA 走 8 步。
+    #
+    # 为什么不「Base 一律自动挂」：蒸馏 LoRA 是在 8 步 schedule 上训的，
+    # 强行把用户的步数/CFG 改掉会静默吞掉用户的设置。
+    # 所以加速做成**独立的模型版本**（z_image_base_distill），
+    # 由用户在下拉里显式选；选中后步数/CFG 自动切到蒸馏档并标注「推荐」。
+    # 加速 LoRA 本身**永远不出现在 LoRA 下拉里**。
+    accel_lora = accel_lora_for(model_key)
 
     sampler = params.get("sampler") or model["sampler"]
     scheduler = params.get("scheduler") or model["scheduler"]
@@ -741,14 +916,14 @@ def build_t2i(params):
     if z_image_megapixels(width, height) > Z_IMAGE_MAX_DIRECT_MP:
         base_w, base_h = z_image_dimensions(aspect, "1mp")
         p = _z_image_upscale_nodes(model, base_w, base_h, width, height, seed, prompt,
-                                   job_id, loras=loras)
+                                   job_id, loras=loras, accel_lora=accel_lora)
         # 放大链输出接回最终 SaveImage
         p["9"]["inputs"]["images"] = ["57:8b", 0]
         return p
 
     return _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
                               cfg, shift, negative_mode, negative_text, prompt, job_id,
-                              loras=loras)
+                              loras=loras, accel_lora=accel_lora_for(model_key))
 
 
 

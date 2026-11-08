@@ -121,10 +121,12 @@ const GEN_TYPES = { types: [], registeredModes: [] };
 
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
-const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 3 };
+const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16,
+                    maxDirectMp: 3, sizeMin: 16, sizeMax: 16384 };
 // Qwen-Image 2.1 的独立一套清单（服务端 /api/image-options 的 qwen 字段）
 const QWEN_OPTIONS = {
   tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 4,
+  sizeMin: 16, sizeMax: 16384,
   defaultTier: "1mp", defaultModel: "qwen_image_2.1_bf16",
   // 参考图上限：模型官方能力 10 张（ComfyUI 节点 16 槽 -> 取 10）
   maxRefImages: 10, minRefImages: 1, nodeRefSlots: 16,
@@ -749,6 +751,7 @@ function renderImagePanel() {
     b.addEventListener("click", () => {
       s.aspect = aspect.key;
       // 换比例后旧的自动尺寸作废，回到档位自动值
+      // （手填的自定义尺寸也一并清掉 —— 比例和手填尺寸不能同时成立）
       s.width = null; s.height = null;
       renderImagePanel();
     });
@@ -848,19 +851,67 @@ function renderImagePanel() {
   updateImageModelNote();
 }
 
+// 宽高吸附：与后端 workflows.normalize_z_image_size() 同一套规则。
+// 16 的倍数来自 EmptySD3LatentImage 的节点 schema（step=16），
+// 上限 16384 来自 nodes.MAX_RESOLUTION。
+function normalizeImgSize(w, h) {
+  const ctx = imgCtx();
+  const mult = ctx.multiple || 16;
+  const min = (ctx.opts.sizeMin !== undefined ? ctx.opts.sizeMin : 16);
+  const max = (ctx.opts.sizeMax !== undefined ? ctx.opts.sizeMax : 16384);
+  const reasons = [];
+  let nw = Math.max(mult, Math.round(w / mult) * mult);
+  let nh = Math.max(mult, Math.round(h / mult) * mult);
+  if (nw !== w) reasons.push(`宽度 ${w} 不是 ${mult} 的倍数 → ${nw}`);
+  if (nh !== h) reasons.push(`高度 ${h} 不是 ${mult} 的倍数 → ${nh}`);
+  if (nw > max) { reasons.push(`宽度超过上限 ${max} → 已钳到上限`); nw = max; }
+  if (nh > max) { reasons.push(`高度超过上限 ${max} → 已钳到上限`); nh = max; }
+  if (nw < min) { reasons.push(`宽度低于下限 ${min} → 已抬到下限`); nw = min; }
+  if (nh < min) { reasons.push(`高度低于下限 ${min} → 已抬到下限`); nh = min; }
+  return [nw, nh, reasons];
+}
+
 function updateImageSizeFields() {
   const ctx = imgCtx();
-  const [w, h] = imgCurrentSize();
+  const s = ctx.st;
+  const manual = !!(s.width && s.height);
+  let w, h, reasons = [];
+  if (manual) {
+    // 手填值 -> 吸附到合法倍数，并把「原始值 / 生效值 / 原因」都算出来
+    const snapped = normalizeImgSize(Number(s.width), Number(s.height));
+    w = snapped[0]; h = snapped[1]; reasons = snapped[2];
+    // 吸附结果写回 state —— 提交给 ComfyUI 的必须是吸附后的值
+    s.width = w; s.height = h;
+  } else {
+    [w, h] = imgAutoSize(s.tier, s.aspect);
+  }
   $("#imgWidth").value = w;
   $("#imgHeight").value = h;
   $("#imgSizeHint").textContent = `${w}×${h}`;
   const mp = (w * h) / (1024 * 1024);
   const up = mp > (ctx.maxMp || 3);
-  const manual = ctx.st.width && ctx.st.height;
   const parts = [`${mp.toFixed(2)} MP`];
-  if (up) parts.push(`超过 ${ctx.maxMp}MP，改走「生成 + 官方放大」路径`);
-  if (manual) parts.push("已手动微调宽高，点「自动」可恢复档位计算值");
+  if (up) parts.push(`超过 ${ctx.maxMp}MP，改走「生成 + 官方放大」路径（输出像素为近似值）`);
+  if (manual) parts.push("自定义尺寸，点「自动」可恢复档位计算值");
   $("#imgSizeManualNote").textContent = parts.join(" · ");
+
+  // 「自定义」标记
+  const modeTag = $("#imgSizeMode");
+  if (modeTag) {
+    modeTag.hidden = !manual;
+    modeTag.textContent = manual ? "自定义" : "";
+  }
+  // 吸附说明：原始值 / 生效值 / 调整原因
+  const adj = $("#imgSizeAdjust");
+  if (adj) {
+    if (reasons.length) {
+      adj.hidden = false;
+      adj.textContent = "已自动调整：" + reasons.join("；");
+    } else {
+      adj.hidden = true;
+      adj.textContent = "";
+    }
+  }
 }
 
 // 切模型时把该版本的官方推荐值同步到各控件（推荐值来自服务端下发的清单）
@@ -891,11 +942,39 @@ function updateImageModelNote() {
   if (!m) return;
   $("#imgModelNote").textContent = m.note;
   if (m.warn) $("#imgModelWarn").textContent = m.warn;
+  // 加速 / 蒸馏 LoRA 固定内置于工作流 —— 明确告诉用户它不在下拉列表里
+  const accelBox = $("#imgAccelNote");
+  if (accelBox) {
+    if (m.has_accel_lora) {
+      accelBox.hidden = false;
+      accelBox.textContent =
+        "本版本已内置加速/蒸馏 LoRA（固定接在工作流里，不在 LoRA 下拉列表中）。"
+        + "步数/CFG/采样器已按蒸馏档锁定。";
+    } else {
+      accelBox.hidden = true;
+      accelBox.textContent = "";
+    }
+  }
   // 推荐值高亮：当前值等于该模型推荐值时打「推荐」标记
   $("#imgSamplerHint").textContent = s.sampler === m.sampler ? "推荐" : "已改";
   $("#imgSchedulerHint").textContent = s.scheduler === m.scheduler ? "推荐" : "已改";
   $("#imgStepsHint").textContent = s.steps === m.steps ? "推荐" : "已改";
   $("#imgCfgHint").textContent = Number(s.cfg) === Number(m.cfg) ? "推荐" : "已改";
+  // 加速 LoRA 绑定的模型版本：步数/CFG/采样器/调度器锁定
+  // （蒸馏 LoRA 是在 8 步 schedule 上训的，改了会破坏 schedule 出噪点）
+  const locked = !!m.params_locked_by_accel;
+  ["#imgSteps", "#imgCfg", "#imgSamplerSelect", "#imgSchedulerSelect"].forEach(sel => {
+    const el = $(sel);
+    if (!el) return;
+    el.disabled = locked;
+    el.title = locked ? "已绑定加速 LoRA 的蒸馏档，不能修改" : "";
+  });
+  if (locked) {
+    $("#imgStepsHint").textContent = "锁定";
+    $("#imgCfgHint").textContent = "锁定";
+    $("#imgSamplerHint").textContent = "锁定";
+    $("#imgSchedulerHint").textContent = "锁定";
+  }
   // SHIFT 的说明比别的参数多一层：官方是 dynamic shifting，由图像 token 数
   // 自动算 mu（base_shift 0.5 → max_shift 0.9，1024×1024 对应 mu≈0.69）。
   // ComfyUI 侧把它固化成了 1024×1024 拟合的常数 0.69 —— 非 1024 分辨率下
@@ -920,6 +999,7 @@ function updateImageModelNote() {
 $("#imgResSelect").addEventListener("change", e => {
   const s = imgCtx().st;
   s.tier = e.target.value;
+  // 切档位 -> 回到预设尺寸（自定义值失效）
   s.width = null; s.height = null;
   renderImagePanel();
 });
@@ -961,6 +1041,8 @@ $("#imgShift").addEventListener("input", e => {
 $("#imgNegative").addEventListener("input", e => {
   imgCtx().st.negative = e.target.value;
 });
+// 手填宽高：先原样存进 state，吸附交给 updateImageSizeFields()
+// （那里会把「原始值 / 生效值 / 调整原因」一起显示出来）
 $("#imgWidth").addEventListener("input", e => {
   const s = imgCtx().st;
   const v = parseInt(e.target.value);
@@ -1120,6 +1202,9 @@ async function loadImageOptions() {
     IMG_OPTIONS.models = data.models || {};
     IMG_OPTIONS.sizeMultiple = data.size_multiple || 16;
     IMG_OPTIONS.maxDirectMp = data.max_direct_mp || 3;
+    // 自定义宽高的合法范围（服务端从 ComfyUI 节点 schema 下发）
+    IMG_OPTIONS.sizeMin = data.size_min || 16;
+    IMG_OPTIONS.sizeMax = data.size_max || 16384;
     // Qwen-Image 2.1 的独立一套清单（服务端 qwen 字段）
     const q = data.qwen || {};
     QWEN_OPTIONS.tiers = q.tiers || [];
@@ -1127,6 +1212,8 @@ async function loadImageOptions() {
     QWEN_OPTIONS.models = q.models || {};
     QWEN_OPTIONS.sizeMultiple = q.size_multiple || 16;
     QWEN_OPTIONS.maxDirectMp = q.max_direct_mp || 4;
+    QWEN_OPTIONS.sizeMin = 16;
+    QWEN_OPTIONS.sizeMax = 16384;
     QWEN_OPTIONS.defaultTier = q.default_tier || "1mp";
     QWEN_OPTIONS.defaultModel = q.default_model || "qwen_image_2.1_bf16";
     QWEN_OPTIONS.maxRefImages = q.max_ref_images || 10;
