@@ -120,18 +120,22 @@ class TestStatusRealtime(unittest.TestCase):
               "running": None, "queued": 0}, "空闲"),
             ({"comfyui_ok": True, "comfy_running": 1, "comfy_pending": 0,
               "running": None, "queued": 0}, "生成中"),
-            # 排队中会带上数量后缀，断言前缀即可
+            # 排队中带数量后缀，这里断言完整形态（精确匹配，不放行英文变体）
             ({"comfyui_ok": True, "comfy_running": 0, "comfy_pending": 2,
-              "running": None, "queued": 0}, "排队中"),
+              "running": None, "queued": 0}, "排队中（2）"),
+            ({"comfyui_ok": True, "comfy_running": 0, "comfy_pending": 0,
+              "running": None, "queued": 3}, "排队中（3）"),
             ({"comfyui_ok": False, "comfy_running": None, "comfy_pending": None,
               "running": None, "queued": 0}, "ComfyUI 未连接"),
         ]
         for payload, expected in cases:
-            actual = self.page.evaluate(
-                "d => statusLabel(d).text", payload)
-            self.assertTrue(actual.startswith(expected),
-                            "payload=%r 期望以 %r 开头，实际 %r"
-                            % (payload, expected, actual))
+            actual = self.page.evaluate("d => statusLabel(d).text", payload)
+            self.assertEqual(actual, expected,
+                             "payload=%r 期望 %r，实际 %r"
+                             % (payload, expected, actual))
+            # 任何一种状态都不得是纯英文
+            self.assertNotRegex(actual, r"^[A-Za-z]+$",
+                                "状态文案应为中文: %r" % actual)
 
     def test_no_english_in_status_labels(self):
         """源码里不应再有英文的 Generating / Generating 等文案。"""
@@ -157,15 +161,35 @@ class TestStatusRealtime(unittest.TestCase):
             self.assertIn(key, payload, "SSE 帧缺字段 %s: %r" % (key, payload))
 
     def test_frontend_subscribes_to_sse(self):
-        """前端已订阅 SSE（EventSource 存在且连上）。"""
-        self.page.evaluate("""
-            window.__sseOk = false;
-            try {
-                const es = new EventSource('/api/status/stream');
-                es.onopen = () => { window.__sseOk = true; };
-            } catch (e) {}
-        """)
-        self.page.wait_for_function("() => window.__sseOk === true", timeout=10000)
+        """前端启动时**自己**订阅了 SSE（不能只是手工 new 一个 EventSource）。
+
+        用请求拦截来判定：页面一加载就应当自己发起 /api/status/stream 连接。
+        """
+        self.assertEqual(
+            self.page.evaluate("() => typeof startStatusStream"),
+            "function", "app.js 里应有 startStatusStream()")
+        seen = []
+        self.page.on("request", lambda r: seen.append(r.url)
+                     if "/api/status/stream" in r.url else None)
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_timeout(2500)
+        self.assertTrue(seen, "页面加载后应用自己应建立 SSE 连接 /api/status/stream")
+
+    def test_sse_update_reaches_the_ui(self):
+        """SSE 推来的状态帧会真正驱动界面（不是只在后台连着）。"""
+        # 让应用自己连上 SSE
+        self.page.wait_for_timeout(1500)
+        # 手工把 UI 置为「生成中」，再让 SSE 推一帧「空闲」，
+        # 若 SSE 真正驱动界面，文案会被改回「空闲」
+        self.page.evaluate(
+            "() => renderStatus({comfyui_ok:true, comfy_running:1, "
+            "comfy_pending:0, running:'x', queued:0})")
+        self.page.wait_for_timeout(120)
+        self.assertEqual(self.status_text(), "生成中")
+        # 真实队列现在是空的，SSE 推来的空闲帧应覆盖掉上面的手工状态
+        self.page.wait_for_function(
+            "() => document.querySelector('#statusText').textContent === '空闲'",
+            timeout=15000)
 
     def test_status_reflects_comfyui_real_queue(self):
         """ComfyUI 真实队列在跑时，/api/system 的 comfy_running 必须 > 0。
@@ -178,6 +202,10 @@ class TestStatusRealtime(unittest.TestCase):
             "fetch('/api/system',{cache:'no-store'}).then(r=>r.json()).then(d=>JSON.stringify(d))"))
         self.assertIn("comfy_running", data, "/api/system 缺 comfy_running 字段")
         self.assertIn("comfy_pending", data, "/api/system 缺 comfy_pending 字段")
+        self.assertIsInstance(data["comfy_running"], int,
+                              "comfy_running 应为整数（恒 0 说明没真读队列）")
+        self.assertIsInstance(data["comfy_pending"], int,
+                              "comfy_pending 应为整数（恒 0 说明没真读队列）")
         if comfy_ok():
             running, pending = comfy_queue()
             if running is not None:
