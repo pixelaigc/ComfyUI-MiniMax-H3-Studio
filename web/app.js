@@ -2405,6 +2405,7 @@ function jobSig(j) {
 
 let jobsRequest = 0;
 let displayedTab = null;
+let displayedFilterKey = null;
 let filterDebounce = null;
 
 // 网格列数由「每页作品数 + 容器宽度」共同决定，目标是一页排成整行：
@@ -2437,13 +2438,69 @@ function gridColumnCount(pageSize, containerWidth) {
 }
 
 // 把列数写到网格上：inline style 覆盖 CSS 里的 auto-fill
+//
+// 关键：容器不可见时（width === 0）**必须原样返回，不写 inline style**。
+// 素材库页会把 #jobsArea 设成 display:none，此时容器宽度是 0，
+// gridColumnCount(0) 会返回 1 —— 一旦把这个「1 列」写进 inline style，
+// 切回生成页时网格就会先按 1 列铺满整行渲染一帧：
+//   · 首张卡片被拉到整个容器宽（实测 1040px）；
+//   · 卡片里的原图按自身像素尺寸渲染（实测 1024×1024）；
+//   · 于是用户看到「先出一张原始尺寸巨图，再跳成网格」。
+// 保持上一次的正确列数，等容器重新可见时由 ResizeObserver 同帧修正。
 function applyGridColumns(pageSize) {
   const grid = $("#jobsGrid");
   if (!grid) return;
   const width = grid.getBoundingClientRect().width;
+  if (width <= 0) return;                 // 容器不可见：不动列数
   const cols = gridColumnCount(pageSize, width);
   grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   grid.dataset.cols = String(cols);
+}
+
+// 网格容器尺寸变化时重算列数。
+//
+// 为什么必须有它：素材库页把 #jobsArea 隐藏（display:none），
+// 此时容器宽度 0；切回生成页时容器重新获得宽度，但 refreshJobs 里
+// 的 applyGridColumns 要等数据返回（约 1.5s）才跑 —— 这中间的空窗期
+// 正是「首图巨大闪现」的窗口。ResizeObserver 的回调在同帧的
+// 「布局之后、绘制之前」触发，列数在第一帧绘制前就修正了。
+let gridResizeObserver = null;
+function initGridResizeObserver() {
+  const grid = $("#jobsGrid");
+  if (!grid || gridResizeObserver) return;
+  if (typeof ResizeObserver === "undefined") return;
+  gridResizeObserver = new ResizeObserver(() => applyGridColumns(state.pageSize));
+  gridResizeObserver.observe(grid);
+}
+
+// ---------- 骨架占位 ----------
+// 切换筛选（状态标签 / 生成类型 / 分页）时先铺一组固定尺寸的骨架卡，
+// 让网格的列宽与行高在数据到达前就稳定下来 —— 数据到达瞬间不再有
+// 「图片从无到有」引起的布局抖动。
+const SKELETON_MAX = 12;
+function renderGridSkeleton(grid, count) {
+  const n = Math.max(1, Math.min(count || SKELETON_MAX, SKELETON_MAX));
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) {
+    const sk = document.createElement("div");
+    sk.className = "job-card job-skeleton";
+    sk.setAttribute("aria-hidden", "true");
+    sk.innerHTML =
+      '<div class="sk sk-top"></div>' +
+      '<div class="sk sk-preview"><span class="sk-spin"></span></div>' +
+      '<div class="sk sk-meta">' +
+      '<i></i><i></i><i></i><i></i><i></i><i></i>' +
+      '</div>' +
+      '<div class="sk sk-actions"></div>';
+    frag.appendChild(sk);
+  }
+  grid.replaceChildren(frag);
+}
+
+// 网格「筛选态」签名：任何一项变了都要重新铺骨架。
+function jobsFilterKey(tab) {
+  return [tab, state.genType, state.donePage, state.pageSize,
+          JSON.stringify(state.doneFilters)].join("|");
 }
 
 // 每页作品数选择器：选项来自 PAGE_SIZE_OPTIONS，值从 localStorage 恢复。
@@ -2530,9 +2587,23 @@ async function refreshJobs() {
   const tab = state.tab;
   const ticket = ++jobsRequest;
   const grid = $("#jobsGrid");
-  if (displayedTab !== tab) {
-    grid.textContent = "正在读取任务…";
-    displayedTab = tab;
+  const filterKey = jobsFilterKey(tab);
+  // 筛选态变了（切状态标签 / 生成类型 / 翻页 / 改筛选条件 / 改每页数量）
+  // —— 先铺骨架占位，再去取数据。
+  //
+  // 为什么必须先铺骨架：数据到达前后网格的列宽与行高必须一致。
+  // 旧实现是「清空 -> 插入真实卡片」，插入瞬间图片还没解码，
+  // 卡片高度按图片自然尺寸撑开 —— 于是首帧出现一张原尺寸巨图，
+  // 随后图片解码完成才跳回网格（就是用户看到的「首图巨大闪现」）。
+  // 骨架卡有固定的 aspect-ratio 与高度，数据到达时网格尺寸不变，无抖动。
+  if (displayedFilterKey !== filterKey) {
+    displayedFilterKey = filterKey;
+    // 骨架数量按当前每页数量铺（但不超过 SKELETON_MAX），
+    // 这样骨架行数与最终行数尽量一致，切换时不会「先 3 行后 4 行」。
+    renderGridSkeleton(grid, state.pageSize);
+    // 容器此刻可能不可见（素材库页把 #jobsArea 隐藏了）——
+    // 此时宽度是 0，不能据此算列数，否则会写进一个错误的「1 列」。
+    applyGridColumns(state.pageSize);
   }
   try {
     // 「全部」= 不按状态过滤；其余标签各自过滤
@@ -2570,6 +2641,8 @@ async function refreshJobs() {
       grid.innerHTML = '<div class="empty-hint">' + ({active:"当前没有排队或生成中的任务", done:"暂无已完成的任务", longfilm:"暂无已合成的长片", failed:"暂无失败的任务", canceled:"暂无已取消的任务"}[tab]) + '</div>';
       return;
     }
+    // 骨架不是卡片节点（没有 data-jid），直接清掉；
+    // 真正的卡片会被下面的增量逻辑复用，不会被重建。
     for (const node of [...grid.childNodes]) if (!node.dataset?.jid) node.remove();
 
     // 增量更新：数据未变化的卡片不重建，避免打断视频播放
@@ -3151,4 +3224,4 @@ boot("任务列表", refreshJobs);
 boot("系统状态", refreshSystem);
 boot("状态实时推送", startStatusStream);
 setInterval(refreshJobs, 2000);
-setInterval(refreshSystem, 3000);
+setInterval(refreshSystem, 3000);

@@ -372,6 +372,21 @@ class TestStatusRealtime(unittest.TestCase):
             " return (el.textContent.trim()) + '|' + (el.title || '') === exp; }",
             arg=expected2, timeout=15000)
 
+        # 恢复 fetch —— 这个类共用一个 page，堵着会让后面的用例全废
+        self.addCleanup(self.restore_fetch)
+        self.restore_fetch()
+
+    def restore_fetch(self):
+        """把 fetch 拦截撤掉（这个类共用一个 page）。"""
+        try:
+            self.page.evaluate("""
+                () => {
+                  if (window.__realFetch) { window.fetch = window.__realFetch; window.__realFetch = null; }
+                }
+            """)
+        except Exception:
+            pass
+
     def test_status_reflects_comfyui_real_queue(self):
         """ComfyUI 真实队列在跑时，/api/system 的 comfy_running 必须 > 0。
 
