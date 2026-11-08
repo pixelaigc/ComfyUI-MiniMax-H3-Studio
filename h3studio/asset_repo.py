@@ -61,6 +61,7 @@ def _row_to_version(row) -> dict:
         "transcode_reason": row["transcode_reason"],
         "extracted_json": A.jload(row["extracted_json"], {}) or {},
         "preview_path": row["preview_path"],
+        "trash_path": row["trash_path"],
         "origin": row["origin"],
         "origin_note": row["origin_note"],
         "created_at": row["created_at"],
@@ -493,13 +494,16 @@ def soft_delete(conn, asset_id: str) -> dict:
         source = A.resolve_inside(root, version["storage_path"])
         if not source or not source.is_file():
             continue
+        # 回收站文件名带上 asset_id 与版本号，但**保留原扩展名**；
+        # 原文件名记录在 trash_path 之外无法还原，所以这里额外存一份
+        # 「回收站时的相对路径」到 trash_path，还原时按它反推原路径。
         target = root / A.DIR_TRASH / f"{asset_id}_v{version['version']}{source.suffix}"
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
             A.atomic_move(source, target)
             conn.execute(
                 "UPDATE asset_versions SET storage_path=?, trash_path=? WHERE id=?",
-                (f"{A.DIR_TRASH}/{target.name}", f"{A.DIR_TRASH}/{target.name}",
+                (f"{A.DIR_TRASH}/{target.name}", version["storage_path"],
                  version["id"]))
         except OSError:
             pass
@@ -519,15 +523,20 @@ def restore(conn, asset_id: str) -> dict:
 
     root = A.library_root()
     for version in versions_of(conn, asset_id):
+        # trash_path 存的是「进回收站前的原相对路径」；老数据可能是回收站路径
         trash_rel = version["trash_path"] or (
             version["storage_path"] if version["storage_path"].startswith(A.DIR_TRASH + "/") else None)
         if not trash_rel:
             continue
-        source = A.resolve_inside(root, trash_rel)
+        source = A.resolve_inside(root, version["storage_path"])
         if not source or not source.is_file():
-            continue
-        # 还原到原来的相对路径：原件按 sha256 分层，反推回 original_relpath
-        original = A.original_relpath(version["sha256"], source.name)
+            source = A.resolve_inside(root, trash_rel)
+            if not source or not source.is_file():
+                continue
+        original = trash_rel
+        if original.startswith(A.DIR_TRASH + "/"):
+            # 老数据：按 sha256 反推
+            original = A.original_relpath(version["sha256"], source.name)
         target = A.resolve_inside(root, original)
         if target is None:
             continue

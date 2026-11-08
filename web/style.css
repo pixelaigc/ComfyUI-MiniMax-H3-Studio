@@ -193,6 +193,18 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
   justify-content: center; background: rgba(255,255,255,.8); color: var(--accent); font-size: 11px;
 }
 
+/* 上传槽里的「素材库」按钮（从素材库选素材填入该槽位） */
+.up-slot .pick-asset {
+  position: absolute; top: 3px; right: 3px; z-index: 2;
+  border: 1px solid rgba(255,255,255,.6); background: rgba(0,0,0,.55); color: #fff;
+  border-radius: 5px; padding: 1px 5px; font-size: 9.5px; cursor: pointer; line-height: 1.5;
+}
+.up-slot .pick-asset:hover { background: var(--accent); border-color: var(--accent); }
+.up-slot .tag.asset-badge {
+  left: auto; right: 0; width: auto; background: rgba(79,110,247,.85); padding: 1px 5px;
+  border-radius: 5px 0 0 0;
+}
+
 /* ---------- 任务区 ---------- */
 .jobs-area { flex: 1; overflow-y: auto; padding: 16px 20px; }
 .jobs-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }

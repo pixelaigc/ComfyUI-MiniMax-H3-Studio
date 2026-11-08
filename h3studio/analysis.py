@@ -261,24 +261,33 @@ async def pick_provider(conn, provider_id: str | None, require_multimodal: bool 
 
     复用 h3studio.providers（工作台已有的本地模型 Provider 配置面板），
     不另起一套配置。
+
+    **Provider 表在 jobs.db 里**（server.py:138 用 jobs.db 建表），
+    而素材库自己的库在 /mnt/usb2t/asset_library —— 两者不是同一个库。
+    所以这里用延迟 import 拿 server.db()，而不是复用传进来的素材库连接。
     """
     from . import providers as prov
 
-    if provider_id:
-        provider = prov.get_provider_full(conn, provider_id)
-        if not provider:
-            raise LibraryError(f"指定的 Provider 不存在：{provider_id}", status=400)
-        if not provider.get("enabled"):
-            raise LibraryError(f"Provider「{provider['name']}」已停用", status=400)
-        if require_multimodal and not provider.get("multimodal"):
-            raise LibraryError(
-                f"Provider「{provider['name']}」未标记多模态能力，无法读图。"
-                "请在本地模型配置里勾选「多模态」，或改用默认多模态模型。", status=400)
-        return provider
+    from server import db as jobs_db
 
-    provider = prov.resolve_default(conn, "default_multimodal", require_multimodal=True)
-    if provider is None:
-        provider = prov.resolve_default(conn, "default", require_multimodal=False)
+    with jobs_db() as provider_conn:
+        if provider_id:
+            provider = prov.get_provider_full(provider_conn, provider_id)
+            if not provider:
+                raise LibraryError(f"指定的 Provider 不存在：{provider_id}", status=400)
+            if not provider.get("enabled"):
+                raise LibraryError(f"Provider「{provider['name']}」已停用", status=400)
+            if require_multimodal and not provider.get("multimodal"):
+                raise LibraryError(
+                    f"Provider「{provider['name']}」未标记多模态能力，无法读图。"
+                    "请在本地模型配置里勾选「多模态」，或改用默认多模态模型。", status=400)
+            return provider
+
+        provider = prov.resolve_default(provider_conn, "default_multimodal",
+                                         require_multimodal=True)
+        if provider is None:
+            provider = prov.resolve_default(provider_conn, "default",
+                                             require_multimodal=False)
     if provider is None:
         raise LibraryError(
             "还没有可用的本地模型 Provider。请到「本地模型配置」里添加一个"

@@ -444,8 +444,40 @@ def init_db() -> dict:
         return report
     with connect() as conn:
         conn.executescript(SCHEMA)
+        _migrate_columns(conn)
     report["db"] = str(db_path())
     return report
+
+
+#: 新增列的迁移表：列名 -> DDL 片段
+_COLUMN_MIGRATIONS = (
+    ("asset_versions", "trash_path", "TEXT"),
+    ("asset_versions", "extracted_json", "TEXT"),
+    ("asset_versions", "transcode_reason", "TEXT"),
+    ("asset_versions", "container", "TEXT"),
+    ("asset_versions", "audio_codec", "TEXT"),
+    ("asset_versions", "sample_rate", "INTEGER"),
+    ("asset_versions", "channels", "INTEGER"),
+)
+
+
+def _migrate_columns(conn: sqlite3.Connection) -> None:
+    """
+    补齐新增列。
+
+    SQLite 的 CREATE TABLE IF NOT EXISTS 不会给已存在的表加列，
+    所以老库升级后必须显式 ALTER TABLE ADD COLUMN。
+    """
+    for table, column, decl in _COLUMN_MIGRATIONS:
+        try:
+            rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        except sqlite3.Error:
+            continue
+        if not rows:
+            continue
+        names = {row[1] for row in rows}
+        if column not in names:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 # ------------------------------------------------------------------ 工具

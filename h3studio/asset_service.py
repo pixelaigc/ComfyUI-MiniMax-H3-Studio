@@ -78,6 +78,8 @@ def _build_preview(asset_id: str, version: dict, source: Path, root: Path,
         frames = media_probe.extract_frames(source, frames_dir, prefix="thumb",
                                             interval=1.0, max_frames=1, width=640)
         if frames:
+            # 目标目录可能还没建（预览区按 id 前两位分目录）
+            dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(frames[0]["path"], dest)
             return rel
         return None

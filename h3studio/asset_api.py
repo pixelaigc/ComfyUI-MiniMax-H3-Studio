@@ -26,7 +26,7 @@ H3 Studio 资产素材库 —— HTTP 接口层。
   DELETE /api/assets/{id}/tags/{tag}  删标签
   POST   /api/assets/{id}/analyze     触发模型深度分析
   POST   /api/assets/{id}/corrections 追加交互纠错（多轮）
-  POST   /api/assets/{id}/from-media  从媒体库（生成结果）右键入库
+  POST   /api/assets/import/from-media  从媒体库（生成结果）右键入库
   GET    /api/assets/{id}/analyses    分析修订历史
 """
 import hashlib
@@ -602,7 +602,11 @@ async def api_asset_analyses(request):
 
 async def api_asset_from_media(request):
     """
-    POST /api/assets/{id}/from-media —— 从媒体库（生成结果）右键入库。
+    POST /api/assets/import/from-media —— 从媒体库（生成结果）右键入库。
+
+    注意路由：这里用 /api/assets/import/from-media（4 段）而不是
+    /api/assets/{id}/from-media。后者与 /api/assets/{id} 冲突时，
+    aiohttp 会把 "from-media" 当成 {id} 匹配，导致 405。实测确认。
 
     body:
       job_id     任务 id（必填）
@@ -751,7 +755,7 @@ def register(app, server_module=None):
     app.router.add_post("/api/assets/{id}/analyze", api_asset_analyze)
     app.router.add_post("/api/assets/{id}/corrections", api_asset_correction)
     app.router.add_get("/api/assets/{id}/analyses", api_asset_analyses)
-    app.router.add_post("/api/assets/{id}/from-media", api_asset_from_media)
+    app.router.add_post("/api/assets/import/from-media", api_asset_from_media)
     app.router.add_get("/api/jobs/{id}/assets", api_job_assets)
 
 

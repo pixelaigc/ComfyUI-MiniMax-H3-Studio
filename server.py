@@ -53,6 +53,8 @@ from h3studio import enhancer as enh
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
+from h3studio import assets as asset_store
+from h3studio import asset_api
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -203,6 +205,33 @@ async def comfy_upload_image(session: ClientSession, path: Path) -> str:
     return f"{sub}/{name}" if sub else name
 
 
+async def comfy_upload_media(session: ClientSession, path: Path) -> str:
+    """
+    上传视频 / 音频到 ComfyUI input，返回 'subfolder/name'。
+
+    ComfyUI 的 /upload/image 端点只接受图片；视频与音频要走
+    /upload/image 的通用 multipart 端点（ComfyUI 允许任意文件类型走同一端点，
+    由节点侧 VHS_LoadVideo / VHS_LoadAudioUpload 读取）。
+    """
+    data = aiohttp.FormData()
+    data.add_field("image", open(path, "rb"),
+                   filename=path.name, content_type="application/octet-stream")
+    data.add_field("subfolder", "h3studio")
+    data.add_field("overwrite", "true")
+    data.add_field("type", "input")
+    async with session.post(f"{COMFY}/upload/image", data=data) as resp:
+        raw = await resp.text()
+    try:
+        r = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"ComfyUI 上传失败：{raw[:200]}") from exc
+    if not r.get("name"):
+        raise RuntimeError(f"ComfyUI 上传失败：{raw[:200]}")
+    sub = r.get("subfolder", "")
+    name = r["name"]
+    return f"{sub}/{name}" if sub else name
+
+
 async def comfy_submit(session: ClientSession, workflow: dict, client_id: str | None = None) -> str:
     payload = {"prompt": workflow}
     if client_id:
@@ -270,6 +299,79 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# 素材库槽位 -> ComfyUI 参数键
+_ASSET_SLOT_PARAM = {
+    "first_frame": "first_frame",
+    "last_frame": "last_frame",
+    "ref_image": "ref_images",
+    "character_ref": "ref_images",
+    "ref_video": "ref_videos",
+    "source_video": "ref_videos",
+    "ref_audio": "ref_audios",
+    "bgm": "ref_audios",
+    "voice": "ref_audios",
+}
+
+
+async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
+    """
+    把任务里的素材库引用解析成 ComfyUI 能用的文件名。
+
+    params["asset_refs"] = [{"asset_id":..., "slot":"first_frame"|"ref_image"|..., "ordinal":0}]
+
+    规则：
+      * 图片槽位 -> 走 comfy_upload_image
+      * 视频/音频槽位 -> 走 comfy_upload_media
+      * 结果按槽位分组写回 params（ref_images / ref_videos / ref_audios / first_frame ...）
+      * 同时在素材库里登记引用关系（被引用次数 +1）
+    """
+    from h3studio import asset_repo as _repo
+    from h3studio import assets as _assets
+
+    refs = params.get("asset_refs") or []
+    if not isinstance(refs, list) or not refs:
+        return
+
+    grouped: dict[str, list] = {}
+    with _assets.connect() as conn:
+        for item in refs:
+            if not isinstance(item, dict):
+                continue
+            asset_id = str(item.get("asset_id") or "").strip()
+            slot = str(item.get("slot") or "ref_image").strip()
+            if not asset_id:
+                continue
+            version = _repo.current_version(conn, asset_id)
+            if not version:
+                raise RuntimeError(f"素材不存在或已删除：{asset_id}")
+            path = _assets.resolve_inside(_assets.library_root(), version["storage_path"])
+            if not path or not path.is_file():
+                raise RuntimeError(f"素材文件已丢失：{asset_id}")
+
+            category = version.get("mime") or ""
+            is_video = "video" in category
+            is_audio = "audio" in category
+            if is_video:
+                uploaded = await comfy_upload_media(session, path)
+            elif is_audio:
+                uploaded = await comfy_upload_media(session, path)
+            else:
+                uploaded = await comfy_upload_image(session, path)
+
+            key = _ASSET_SLOT_PARAM.get(slot, "ref_images")
+            grouped.setdefault(key, []).append(uploaded)
+            # 登记引用关系（引用次数因此 +1；删除素材时会被 409 保护）
+            _repo.add_ref(conn, asset_id, "job", job_id, slot=slot,
+                          ordinal=int(item.get("ordinal") or 0),
+                          label=f"任务 {job_id} 的 {slot} 输入")
+
+    for key, values in grouped.items():
+        if key in ("first_frame", "last_frame"):
+            params[key] = values[0]
+        else:
+            params[key] = values
 
 
 async def save_uploaded_image(part) -> str:
@@ -437,6 +539,11 @@ class Worker:
                             raise RuntimeError(f"找不到上传文件: {up}")
                         names.append(await comfy_upload_image(session, lp))
                     params["ref_images"] = names
+
+                # 素材库引用：把素材库里的文件按槽位上传到 ComfyUI，
+                # 并在 params 里落成 ref_images / ref_videos / ref_audios。
+                if params.get("asset_refs"):
+                    await _apply_asset_refs(session, job_id, params)
 
                 params["job_id"] = job_id
                 params["mode"] = mode
@@ -650,6 +757,7 @@ async def api_create(request):
     mode = None
     params = {}
     saved_files = {}
+    asset_refs = []
     async for part in reader:
         if part.name == "mode":
             mode = (await part.text()).strip()
@@ -658,6 +766,14 @@ async def api_create(request):
                 params = json.loads(await part.text())
             except Exception:
                 params = {}
+        elif part.name == "asset_refs":
+            # 素材库引用：[{"asset_id":"asset_xxx","slot":"first_frame","ordinal":0}]
+            try:
+                loaded = json.loads(await part.text())
+                if isinstance(loaded, list):
+                    asset_refs = loaded
+            except Exception:
+                asset_refs = []
         elif part.name in ("file_first", "file_last", "file_ref"):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
@@ -695,6 +811,9 @@ async def api_create(request):
     now = time.time()
     # 生成类型写进任务 meta（真实记录，不靠读时推断）
     params["gen_type"] = gen_types.type_key_for_mode(mode)
+    # 素材库引用写进 params：worker 跑的时候据此把素材上传到 ComfyUI
+    if asset_refs:
+        params["asset_refs"] = asset_refs
     with db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
@@ -1965,6 +2084,8 @@ def make_app():
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
+    # 资产素材库（/api/assets/*）
+    asset_api.register(app, server_module=sys.modules[__name__])
     app.router.add_get("/files/{path:.+}", files_handler)
     app.router.add_static("/static", BASE / "web")
     app.router.add_get("/", index_handler)
@@ -1973,6 +2094,16 @@ def make_app():
 
 async def main():
     init_db()
+    # 资产素材库自检：磁盘是否挂载可用、目录是否可写。
+    # 不可用时只打印明确错误，**不破坏既有数据**（不删目录、不清库）。
+    lib_report = asset_store.init_db()
+    if lib_report.get("ok"):
+        free_gb = lib_report.get("free_bytes", 0) / (1024 ** 3)
+        print(f"[素材库] 已就绪: {lib_report['root']}（可用 {free_gb:.1f} GB）")
+    else:
+        print("[素材库] 不可用，素材库相关接口将返回 503：")
+        for item in lib_report.get("errors", []):
+            print(f"  - {item}")
     app = make_app()
     await WORKER.start()
     runner = web.AppRunner(app)

@@ -31,6 +31,8 @@ const state = {
   doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
+  // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
+  assetRefs: {},
   timer: null,
   genBusy: false,
   // 图像模式（Z-Image 文生图）专属状态
@@ -112,19 +114,59 @@ function renderMode() {
       slot.append(image, tag);
       slot.classList.add("filled");
       state.files[key] = file;
+      delete state.assetRefs[key];
+    };
+    // 用素材库里的素材填这个槽位：只存 asset_id，不复制文件
+    const fillFromAsset = (asset) => {
+      slot.replaceChildren();
+      const image = document.createElement("img");
+      image.src = asset.preview_url || asset.content_url;
+      image.alt = label;
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = label;
+      const badge = document.createElement("span");
+      badge.className = "tag asset-badge";
+      badge.textContent = "素材库";
+      slot.append(image, tag, badge);
+      slot.classList.add("filled");
+      state.files[key] = null;
+      state.assetRefs[key] = {asset_id: asset.id, name: asset.name, category: asset.category};
     };
     inp.addEventListener("change", e => {
       const file = e.target.files[0];
       if (file) fillSlot(file);
     });
     slot.addEventListener("dragover", event => {
-      if (!event.dataTransfer.types.includes("application/x-h3-image")) return;
+      const types = event.dataTransfer.types;
+      if (!types.includes("application/x-h3-image") && !types.includes("application/x-h3-asset")) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
       slot.classList.add("drag-over");
     });
     slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
     slot.addEventListener("drop", async event => {
+      // 优先按 asset_id 引用（素材库拖过来的），无 asset_id 时回退旧的 blob 路径
+      const assetRaw = event.dataTransfer.getData("application/x-h3-asset");
+      if (assetRaw) {
+        event.preventDefault();
+        slot.classList.remove("drag-over");
+        try {
+          const payload = JSON.parse(assetRaw);
+          const resp = await fetch(`/api/assets/${encodeURIComponent(payload.asset_id)}`);
+          if (!resp.ok) throw new Error("素材不存在或已删除");
+          const asset = await resp.json();
+          const version = asset.current_version || {};
+          fillFromAsset({
+            id: asset.id, name: asset.name, category: asset.category,
+            preview_url: asset.preview_url,
+            content_url: asset.content_url || `/api/assets/${asset.id}/content`,
+          });
+        } catch (error) {
+          alert("无法引用这个素材：" + error.message);
+        }
+        return;
+      }
       const raw = event.dataTransfer.getData("application/x-h3-image");
       if (!raw) return;
       event.preventDefault();
@@ -143,7 +185,38 @@ function renderMode() {
         slot.classList.remove("loading");
       }
     });
-    slot.addEventListener("click", () => inp.click());
+    slot.addEventListener("click", event => {
+      if (event.target.closest(".pick-asset")) return;
+      inp.click();
+    });
+    // 「从素材库选」按钮
+    const pickBtn = document.createElement("button");
+    pickBtn.type = "button";
+    pickBtn.className = "pick-asset";
+    pickBtn.textContent = "素材库";
+    pickBtn.title = "从素材库选择一个素材填入这个位置";
+    pickBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      if (!window.ASSETLIB || !window.ASSETLIB.openPicker) {
+        alert("素材库模块未加载");
+        return;
+      }
+      window.ASSETLIB.openPicker({
+        categories: ["image"], multiple: false, limit: 1,
+        onDone: (ids) => {
+          if (!ids.length) return;
+          const assetId = ids[0];
+          fetch(`/api/assets/${encodeURIComponent(assetId)}`).then(r => r.json()).then(asset => {
+            fillFromAsset({
+              id: asset.id, name: asset.name, category: asset.category,
+              preview_url: asset.preview_url,
+              content_url: `/api/assets/${asset.id}/content`,
+            });
+          }).catch(err => alert("读取素材失败：" + err.message));
+        },
+      });
+    });
+    slot.appendChild(pickBtn);
     row.appendChild(slot);
   };
   if (mode === "flf") {
@@ -1038,13 +1111,31 @@ $("#genBtn").addEventListener("click", async () => {
   }
   fd.append("params", JSON.stringify(params));
   try {
+    // 素材库引用：槽位 -> asset_id，随任务一起提交（服务端按槽位上传到 ComfyUI）
+    const assetRefs = [];
+    const SLOT_FOR_KEY = {
+      first: "first_frame", last: "last_frame",
+      ref0: "ref_image", ref1: "ref_image", ref2: "ref_image",
+    };
+    Object.entries(state.assetRefs || {}).forEach(([key, item], index) => {
+      if (!item || !item.asset_id) return;
+      assetRefs.push({
+        asset_id: item.asset_id,
+        slot: SLOT_FOR_KEY[key] || "ref_image",
+        ordinal: index,
+      });
+    });
+    if (assetRefs.length) fd.append("asset_refs", JSON.stringify(assetRefs));
+
     if (mode === "flf") {
-      if (!state.files.first) { alert("首尾帧模式需要上传首帧"); return; }
-      fd.append("file_first", state.files.first);
+      const hasFirst = state.files.first || (state.assetRefs && state.assetRefs.first);
+      if (!hasFirst) { alert("首尾帧模式需要上传首帧图片"); return; }
+      if (state.files.first) fd.append("file_first", state.files.first);
       if (state.files.last) fd.append("file_last", state.files.last);
     } else if (mode === "r2v") {
       const refs = [state.files.ref0, state.files.ref1, state.files.ref2].filter(Boolean);
-      if (!refs.length) { alert("参考模式至少上传 1 张参考图"); return; }
+      const assetCount = Object.keys(state.assetRefs || {}).filter(k => k.startsWith("ref")).length;
+      if (!refs.length && !assetCount) { alert("参考模式至少需要 1 张参考图"); return; }
       refs.forEach(f => fd.append("file_ref", f));
     }
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
@@ -1053,6 +1144,7 @@ $("#genBtn").addEventListener("click", async () => {
     trackJob(data.id);
     // 清空文件选择（保留提示词便于连做）
     state.files = { first: null, last: null, refs: [] };
+    state.assetRefs = {};
     renderMode();
     state.tab = "active";
     renderTabs();
@@ -1601,7 +1693,86 @@ function jobCard(job) {
     if (p.lora) { setSeg("#loraCards", p.lora); state.lora = p.lora; }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
+  bindMediaContextMenu(card, job);
   return card;
+}
+
+// ---------- 媒体库右键菜单：添加到素材库 ----------
+// 覆盖两种来源：
+//   * 有批次：产物挂在 job_batches 上（批次缩略图）
+//   * 无批次：产物直接挂在 job 上（卡片预览图 / 视频）
+function bindMediaContextMenu(card, job) {
+  const openMenu = (event, payload) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = $("#mediaContext");
+    if (!menu) return;
+    const label = payload.batch_id
+      ? `批次 #${(payload.batch_index ?? 0) + 1} 的结果`
+      : "这个结果";
+    menu.innerHTML = `
+      <button data-act="add-asset">添加到素材库（${label}）</button>
+      <div class="ctx-sep"></div>
+      <button data-act="download">下载原文件</button>`;
+    menu.classList.add("open");
+    // 定位到鼠标处，并防止贴边溢出
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(event.clientX, window.innerWidth - rect.width - 8)) + "px";
+    menu.style.top = Math.max(4, Math.min(event.clientY, window.innerHeight - rect.height - 8)) + "px";
+
+    menu.querySelectorAll("button[data-act]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        menu.classList.remove("open");
+        if (btn.dataset.act === "add-asset") {
+          if (window.ASSETLIB && window.ASSETLIB.addFromMedia) {
+            await window.ASSETLIB.addFromMedia({
+              job_id: job.id,
+              batch_id: payload.batch_id || null,
+              file: payload.file || null,
+            });
+          } else {
+            alert("素材库模块未加载");
+          }
+        } else if (btn.dataset.act === "download" && payload.file) {
+          const a = document.createElement("a");
+          a.href = outputUrl(job, { file: payload.file, kind: payload.kind || "image" });
+          a.download = String(payload.file).split(/[\\/]/).pop();
+          a.click();
+        }
+      });
+    });
+  };
+
+  // 无批次：卡片上的图片 / 视频
+  const image = (job.outputs || []).find(o => o.kind === "image");
+  const video = (job.outputs || []).find(o => o.kind === "video");
+  const previewImg = card.querySelector(".job-preview img");
+  if (previewImg && image) {
+    previewImg.addEventListener("contextmenu", event => openMenu(event, {
+      file: image.file, kind: "image", batch_id: null,
+    }));
+  }
+  const previewVideo = card.querySelector(".job-preview video");
+  if (previewVideo && video) {
+    previewVideo.addEventListener("contextmenu", event => openMenu(event, {
+      file: video.file, kind: "video", batch_id: null,
+    }));
+  }
+
+  // 有批次：批次缩略图
+  card.querySelectorAll(".job-batch-thumb img").forEach(el => {
+    const batchId = el.closest(".job-batch")?.dataset.batch;
+    const batch = (job.batches || []).find(b => b.id === batchId);
+    const out = (batch?.outputs || []).find(o => o.kind === "image")
+      || (batch?.outputs || [])[0];
+    if (!out) return;
+    el.addEventListener("contextmenu", event => openMenu(event, {
+      file: out.file, kind: out.kind || "image",
+      batch_id: batchId, batch_index: batch?.idx ?? 0,
+    }));
+  });
 }
 
 function openPromptModal(prompt) {
@@ -1989,6 +2160,7 @@ function showCreate() {
   $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "none";
+  $("#assetsPage").style.display = "none";
 }
 
 function showStitch() {
@@ -2000,6 +2172,7 @@ function showStitch() {
   $("#stitchPanel").style.display = "";
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "none";
+  $("#assetsPage").style.display = "none";
   state.tab = "done";
   state.doneFilters.media = "video";
   $("#doneMedia").value = "video";
@@ -2017,6 +2190,7 @@ function showSystem() {
   $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "block";
   $("#providersPage").style.display = "none";
+  $("#assetsPage").style.display = "none";
   refreshHardware();
 }
 
@@ -2030,6 +2204,7 @@ function showProviders() {
   $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "block";
+  $("#assetsPage").style.display = "none";
   loadProviders();
   loadAgentConfig();
 }
