@@ -539,5 +539,12 @@ body.modal-open { overflow: hidden; }
 .img-note {
   margin-top: 6px; font-size: 10.5px; color: var(--muted); line-height: 1.5;
 }
+.img-warn {
+  margin-top: 6px; font-size: 10.5px; line-height: 1.5;
+  color: #b46a10; background: #fff8ec; border: 1px solid #f3e2c4;
+  border-radius: 7px; padding: 5px 8px;
+}
+.compact-field small.muted { display: block; margin-top: 2px; font-size: 9px; }
+#imagePanel textarea { font-size: 12px; padding: 8px; border-radius: 9px; }
 #imagePanel .compact-pair { margin-bottom: 9px; }
 #imagePanel .chips button { font-size: 12px; padding: 5px 11px; }

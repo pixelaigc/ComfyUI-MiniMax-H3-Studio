@@ -28,21 +28,23 @@ const state = {
   timer: null,
   // 图像模式（Z-Image 文生图）专属状态
   img: {
-    tier: "1080p",
+    tier: "1mp",
     aspect: "16:9",
     width: null,
     height: null,
     model: "z_image_turbo_bf16",
     steps: 8,
     cfg: 1,
+    shift: 3,
     sampler: "res_multistep",
     scheduler: "simple",
+    negative: "",
   },
 };
 
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
-const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, samplers: [], schedulers: [] };
+const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 3 };
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -144,14 +146,20 @@ function renderMode() {
 // 档位 + 比例 -> 像素宽高。规则与后端 z_image_dimensions 一致：
 // 档位值给到**短边**，横图给高度、竖图给宽度，宽高对齐到 8 的倍数。
 function imgAutoSize(tier, aspect) {
+  // 与后端 z_image_dimensions / ComfyUI ResolutionSelector 同一算法：
+  //   total = megapixels * 1024^2; scale = sqrt(total / (wr*hr))
+  //   w = round(wr*scale/mult)*mult;  h = round(hr*scale/mult)*mult
+  // multiple 用 16（Z-Image 要求宽高是 16 的倍数）。
   const tierOpt = IMG_OPTIONS.tiers.find(t => t.key === tier);
-  const short = (tierOpt && tierOpt.short_side) || 1080;
+  const megapixels = (tierOpt && tierOpt.megapixels) || 1.0;
+  const mult = IMG_OPTIONS.sizeMultiple || 16;
   const [wr, hr] = IMG_ASPECT_NUM[aspect] || [16, 9];
-  let w, h;
-  if (wr >= hr) { h = short; w = short * wr / hr; }
-  else { w = short; h = short * hr / wr; }
-  w = Math.max(64, Math.round(w / 8) * 8);
-  h = Math.max(64, Math.round(h / 8) * 8);
+  const total = megapixels * 1024 * 1024;
+  const scale = Math.sqrt(total / (wr * hr));
+  let w = Math.round(wr * scale / mult) * mult;
+  let h = Math.round(hr * scale / mult) * mult;
+  w = Math.max(mult, w);
+  h = Math.max(mult, h);
   return [w, h];
 }
 
@@ -161,14 +169,17 @@ function imgCurrentSize() {
   return imgAutoSize(s.tier, s.aspect);
 }
 
-// 档位下拉：显示具体像素，例如 "1080P · 1920×1080 (16:9)"
+// 档位下拉：显示具体像素，例如 "1080P · 1920×1088 (2.0MP)"
 function imgTierLabel(tier) {
   const [w, h] = imgAutoSize(tier.key, state.img.aspect);
-  return `${tier.label} · ${w}×${h}`;
+  const mp = (w * h) / (1024 * 1024);
+  const up = mp > (IMG_OPTIONS.maxDirectMp || 3);
+  return `${tier.label} · ${w}×${h} (${mp.toFixed(1)}MP)${up ? " · 放大" : ""}`;
 }
 
 function renderImagePanel() {
   const s = state.img;
+  const model = IMG_OPTIONS.models[s.model];
 
   // 分辨率档位
   const resSel = $("#imgResSelect");
@@ -211,25 +222,43 @@ function renderImagePanel() {
     modelSel.appendChild(opt);
   });
 
-  // 采样器 / 调度器
+  // 采样器 / 调度器：列表按模型版本区分（Turbo 不给 karras/exponential 调度器）
   const fillSelect = (sel, values, current) => {
     sel.innerHTML = "";
-    values.forEach(v => {
+    (values || []).forEach(v => {
       const opt = document.createElement("option");
       opt.value = v;
       opt.textContent = v;
       opt.selected = v === current;
       sel.appendChild(opt);
     });
+    if (current && !(values || []).includes(current)) {
+      // 当前值不在该版本的推荐列表里（比如换了模型），补上并保持选中
+      const opt = document.createElement("option");
+      opt.value = current;
+      opt.textContent = current + "（自定义）";
+      opt.selected = true;
+      sel.appendChild(opt);
+    }
   };
-  fillSelect($("#imgSamplerSelect"), IMG_OPTIONS.samplers, s.sampler);
-  fillSelect($("#imgSchedulerSelect"), IMG_OPTIONS.schedulers, s.scheduler);
+  fillSelect($("#imgSamplerSelect"), model && model.samplers, s.sampler);
+  fillSelect($("#imgSchedulerSelect"), model && model.schedulers, s.scheduler);
 
-  // 步数 / CFG
+  // 步数 / CFG / shift
   $("#imgSteps").value = s.steps;
   $("#imgStepsVal").textContent = s.steps;
   $("#imgCfg").value = s.cfg;
   $("#imgCfgVal").textContent = Number(s.cfg).toFixed(1);
+  $("#imgShift").value = s.shift;
+  $("#imgShiftVal").textContent = s.shift;
+
+  // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
+  const negSupported = !!(model && model.supports_negative);
+  $("#imgNegField").style.display = negSupported ? "" : "none";
+  $("#imgNegNote").textContent = negSupported
+    ? "Base 非蒸馏，负面提示词生效（官方强烈建议）"
+    : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
+  if (negSupported) $("#imgNegative").value = s.negative || "";
 
   updateImageSizeFields();
   updateImageModelNote();
@@ -240,21 +269,16 @@ function updateImageSizeFields() {
   $("#imgWidth").value = w;
   $("#imgHeight").value = h;
   $("#imgSizeHint").textContent = `${w}×${h}`;
+  const mp = (w * h) / (1024 * 1024);
+  const up = mp > (IMG_OPTIONS.maxDirectMp || 3);
   const manual = state.img.width && state.img.height;
-  $("#imgSizeNote").textContent = manual
-    ? "已手动微调宽高；点「自动」可恢复档位计算值"
-    : `档位 ${state.img.tier} × 比例 ${state.img.aspect} 自动换算`;
+  const parts = [`${mp.toFixed(2)} MP`];
+  if (up) parts.push("超过 3MP，改走「生成 + 官方 2K 放大」路径");
+  if (manual) parts.push("已手动微调宽高，点「自动」可恢复档位计算值");
+  $("#imgSizeManualNote").textContent = parts.join(" · ");
 }
 
-function updateImageModelNote() {
-  const m = IMG_OPTIONS.models[state.img.model];
-  if (!m) return;
-  $("#imgModelNote").textContent = m.note;
-  // 推荐值高亮：当前值等于该模型推荐值时打「推荐」标记
-  $("#imgSamplerHint").textContent = state.img.sampler === m.sampler ? "推荐" : "已改";
-  $("#imgSchedulerHint").textContent = state.img.scheduler === m.scheduler ? "推荐" : "已改";
-}
-
+// 切模型时把该版本的官方推荐值同步到各控件（推荐值来自服务端下发的清单）
 function applyModelDefaults(modelKey) {
   const m = IMG_OPTIONS.models[modelKey];
   if (!m) return;
@@ -262,8 +286,22 @@ function applyModelDefaults(modelKey) {
   s.model = modelKey;
   s.steps = m.steps;
   s.cfg = m.cfg;
+  s.shift = m.shift;
   s.sampler = m.sampler;
   s.scheduler = m.scheduler;
+}
+
+function updateImageModelNote() {
+  const m = IMG_OPTIONS.models[state.img.model];
+  if (!m) return;
+  $("#imgModelNote").textContent = m.note;
+  if (m.warn) $("#imgModelWarn").textContent = m.warn;
+  // 推荐值高亮：当前值等于该模型推荐值时打「推荐」标记
+  $("#imgSamplerHint").textContent = state.img.sampler === m.sampler ? "推荐" : "已改";
+  $("#imgSchedulerHint").textContent = state.img.scheduler === m.scheduler ? "推荐" : "已改";
+  $("#imgStepsHint").textContent = state.img.steps === m.steps ? "推荐" : "已改";
+  $("#imgCfgHint").textContent = Number(state.img.cfg) === Number(m.cfg) ? "推荐" : "已改";
+  $("#imgShiftHint").textContent = Number(state.img.shift) === Number(m.shift) ? "推荐" : "已改";
 }
 
 $("#imgResSelect").addEventListener("change", e => {
@@ -286,10 +324,20 @@ $("#imgSchedulerSelect").addEventListener("change", e => {
 $("#imgSteps").addEventListener("input", e => {
   state.img.steps = parseInt(e.target.value);
   $("#imgStepsVal").textContent = state.img.steps;
+  updateImageModelNote();
 });
 $("#imgCfg").addEventListener("input", e => {
   state.img.cfg = parseFloat(e.target.value);
   $("#imgCfgVal").textContent = state.img.cfg.toFixed(1);
+  updateImageModelNote();
+});
+$("#imgShift").addEventListener("input", e => {
+  state.img.shift = parseFloat(e.target.value);
+  $("#imgShiftVal").textContent = state.img.shift;
+  updateImageModelNote();
+});
+$("#imgNegative").addEventListener("input", e => {
+  state.img.negative = e.target.value;
 });
 $("#imgWidth").addEventListener("input", e => {
   const v = parseInt(e.target.value);
@@ -315,8 +363,8 @@ async function loadImageOptions() {
     IMG_OPTIONS.tiers = data.tiers || [];
     IMG_OPTIONS.aspects = data.aspects || [];
     IMG_OPTIONS.models = data.models || {};
-    IMG_OPTIONS.samplers = data.samplers || [];
-    IMG_OPTIONS.schedulers = data.schedulers || [];
+    IMG_OPTIONS.sizeMultiple = data.size_multiple || 16;
+    IMG_OPTIONS.maxDirectMp = data.max_direct_mp || 3;
     if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
       state.img.model = data.default_model;
     }
@@ -389,7 +437,7 @@ $("#genBtn").addEventListener("click", async () => {
   };
   if (mode === "t2i") {
     // 图像模式：把档位 / 比例 / 实际宽高 / Z-Image 采样参数一起带上去。
-    // resolution 复用同一个字段，图像模式的值是分辨率档位（480p…4k）。
+    // resolution 复用同一个字段，图像模式的值是分辨率档位（1mp / 480p…4k）。
     const [w, h] = imgCurrentSize();
     params.resolution = state.img.tier;
     params.aspect = state.img.aspect;
@@ -400,6 +448,8 @@ $("#genBtn").addEventListener("click", async () => {
     params.scheduler = state.img.scheduler;
     params.steps = state.img.steps;
     params.cfg = state.img.cfg;
+    params.shift = state.img.shift;
+    params.negative_prompt = state.img.negative || "";
   }
   fd.append("params", JSON.stringify(params));
   try {
@@ -604,6 +654,8 @@ function jobCard(job) {
       if (p.scheduler) s.scheduler = p.scheduler;
       if (p.steps) s.steps = p.steps;
       if (p.cfg != null) s.cfg = p.cfg;
+      if (p.shift != null) s.shift = p.shift;
+      if (p.negative_prompt != null) s.negative = p.negative_prompt;
       renderImagePanel();
     } else {
       if (p.resolution) setSeg("#resSeg", p.resolution), state.res = p.resolution;

@@ -43,7 +43,7 @@
 | 文生视频 t2v | `MiniMaxH3ImageToVideo` | 纯提示词，带原生音频 |
 | 首尾帧 flf | `MiniMaxH3ImageToVideo` | first_frame / last_frame（尾帧可省略=图生视频） |
 | 参考生成 r2v | `MiniMaxH3ReferenceToVideo` | 1~3 张参考图，主体一致性 |
-| 文生图 t2i | Z-IMAGE-turbo | 8 步出图 |
+| 文生图 t2i | Z-IMAGE-Turbo / Z-Image Base / DarkBeast Z6 FP8 | 分辨率档位 + 画面比例 + 采样参数可选，默认值对齐 ComfyUI 官方模板 |
 
 **模型档位**（需已就位 MiniMax-H3 权重，见下方「前置准备：ComfyUI 与模型权重」）：
 
@@ -52,6 +52,23 @@
 | H3 + LoRA（ckpt850 / v4-step600） | `minimax_h3_*_pruned_int8_convrot` 或 nvfp4 | qwen3vl（随精度切换） | 4 |
 | 标准 MiniMax-H3 | 同上 | 同上 | 20 |
 | 精度切换 | int8 convrot（质量）/ nvfp4（省显存） | — | — |
+
+**图像面板档位**（文生图模式，`/api/image-options` 下发，可选项只列本机实际存在的权重）：
+
+| 模型版本 | unet | 采样器 / 调度器 / 步数 / CFG / shift | 负面提示词 |
+|---|---|---|---|
+| Z-Image-Turbo（默认） | `z_image_turbo_bf16.safetensors` | `res_multistep` / `simple` / 8 / 1.0 / 3 | 不提供（CFG=1 时被跳过） |
+| Z-Image Base | `z_image_bf16.safetensors` | `res_multistep` / `simple` / 25 / 4.0 / 3 | 提供（官方强烈建议） |
+| DarkBeast Z6 BlitZ | `DarkBeastZ6-BlitZ-Scaled-Fp8-Mixed-ComfyUI.safetensors` | `euler` / `simple` / 15 / 1.0 / 3 | 不提供 |
+
+分辨率档位按**总像素**定义（与 ComfyUI `ResolutionSelector` 同算法，宽高对齐到 16 的倍数）：
+`1MP`（官方默认 1024×1024）/ `480P` / `720P` / `1080P` / `1440P` / `2K` / `4K`，
+可配 `1:1` `2:3` `3:2` `3:4` `4:3` `9:16` `16:9` `21:9` 八种比例，宽高可手动微调。
+
+三个需要注意的约束（面板上已标注）：
+- **Turbo 的 CFG 必须 = 1**：ComfyUI 在 CFG≈1 时把 uncond 置空、不跑第二遍前向，负面提示词数学上无效，故 Turbo 档位下该输入框被禁用。
+- **Turbo 不要用 `karras` / `exponential` 调度器**（8 步下会崩图）；Base 非蒸馏，`exponential` 采样器反而可用 —— 所以采样器/调度器下拉列表按模型版本区分。
+- **≥3MP 不直出**：Z-Image 原生超过约 4MP 会崩图，`1440P` 以上的档位自动改走官方 2K 放大路径（低分辨率生成 → RealESRGAN 放大 → `dpmpp_2m_sde`+`beta` 5 步 denoise 0.33 二次细化）。
 
 ## 前置准备：ComfyUI 与模型权重
 

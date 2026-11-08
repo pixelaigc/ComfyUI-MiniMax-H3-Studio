@@ -9,6 +9,7 @@ H3 Studio 工作流生成器
   r2v   参考生成      MiniMaxH3ReferenceToVideo（1~3 张参考图）
   t2i   文生图        Z-IMAGE-turbo
 """
+import math
 import random
 
 # ------------------------------------------------------------------
@@ -59,7 +60,12 @@ RES_MP = {"544p": 0.4, "768p": 0.8}
 # ------------------------------------------------------------------
 # 模型目录只列本机 ComfyUI 实测存在的权重（UNETLoader 下拉项），
 # 不列编造的选项。三个文件都落在 /mnt/nvme1t_colorful 外接盘上。
-# 推荐参数来源见每个条目的 note 字段。
+#
+# 默认值来源（见《Z-Image 最佳参数与提示词增强 Skill 范式_技术调研.md》）：
+#   - ComfyUI 官方模板 image_z_image_turbo.json / image_z_image.json
+#   - 官方 2K 放大模板 utility_z_image_turbo_2k_upscaler.app.json
+#   - 本机 comfy/samplers.py:610（CFG=1 时 uncond 被置空 -> 负面提示词无效）
+#   - 本机 comfy/supported_models.py:1206（ZImage 内置 shift=3.0）
 Z_IMAGE_MODELS = {
     "z_image_turbo_bf16": {
         "label": "Z-Image-Turbo · 官方加速版",
@@ -69,8 +75,18 @@ Z_IMAGE_MODELS = {
         "scheduler": "simple",
         "steps": 8,
         "cfg": 1.0,
+        "shift": 3.0,
+        # "zero" = ConditioningZeroOut（官方模板做法）；Turbo 在 CFG=1 下
+        # 负面提示词数学上无效（samplers.py:610），所以不提供输入槽。
         "negative": "zero",
-        "note": "官方模板 image_z_image_turbo.json：8 步 / cfg 1 / res_multistep / simple，速度最快",
+        "supports_negative": False,
+        # Turbo 8 步下 karras / exponential 会崩图（社区 76 图实测）。
+        "samplers": ["res_multistep", "euler", "dpmpp_2m", "dpmpp_2m_sde",
+                     "dpmpp_3m_sde", "dpm_2", "heun"],
+        "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras"],
+        "note": "官方模板 image_z_image_turbo.json：8 步 / cfg 1 / res_multistep / simple / shift 3。",
+        "warn": "Turbo 的 CFG 必须=1（此时负面提示词被跳过、不跑第二遍前向），"
+                "且不要用 karras / exponential 调度器（8 步下会崩图）。",
     },
     "z_image_bf16": {
         "label": "Z-Image Base · 官方完整版",
@@ -80,8 +96,20 @@ Z_IMAGE_MODELS = {
         "scheduler": "simple",
         "steps": 25,
         "cfg": 4.0,
+        "shift": 3.0,
+        # Base 非蒸馏，官方模板有独立的负面 CLIPTextEncode 槽。
         "negative": "encode",
-        "note": "官方模板 image_z_image.json：25 步 / cfg 4（建议 30~50 步、cfg 3~5），质量优先",
+        "supports_negative": True,
+        # Base 非蒸馏，走的调度假设不同：exponential 采样器在这里可用
+        # （与 Turbo 上 exponential 调度器有害方向相反）。
+        "samplers": ["res_multistep", "euler", "exponential", "res_2s", "res_3s",
+                     "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_3m_sde", "ddim", "heun"],
+        "schedulers": ["simple", "beta", "normal", "sgm_uniform", "karras",
+                       "exponential", "linear_quadratic"],
+        "note": "官方模板 image_z_image.json：25 步 / cfg 4 / res_multistep / simple / shift 3"
+                "（模板批注建议 30~50 步、cfg 3~5）。",
+        "warn": "Base 支持负面提示词（官方强烈建议）。Base 上 exponential 采样器可用，"
+                "与 Turbo 相反。",
     },
     "darkbeast_z6_blitz_fp8": {
         "label": "DarkBeast Z6 BlitZ · FP8 混精版",
@@ -91,23 +119,57 @@ Z_IMAGE_MODELS = {
         "scheduler": "simple",
         "steps": 15,
         "cfg": 1.0,
+        "shift": 3.0,
         "negative": "zero",
-        "note": "本机工作流 z-image-fast.json：15 步 / cfg 1 / euler / simple，显存占用约为 BF16 的一半",
+        "supports_negative": False,
+        "samplers": ["euler", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde",
+                     "dpmpp_3m_sde", "dpm_2", "heun"],
+        "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras"],
+        "note": "本机工作流 z-image-fast.json：15 步 / cfg 1 / euler / simple。",
+        "warn": "Turbo 蒸馏系：CFG 建议保持 1，负面提示词无效。",
     },
 }
 Z_IMAGE_DEFAULT_MODEL = "z_image_turbo_bf16"
 
-# 图像面板分辨率档位：按 16:9 横图的高度定义，比例联动后宽度 = 高度 × 比例。
-# 高度全部是 8 的倍数（VAE 8 倍下采样的硬要求），宽度会对齐到 8 的倍数。
+# 图像面板分辨率档位：**总像素（megapixels）**语义，与 ComfyUI 自带的
+# ResolutionSelector 完全一致（aspect_ratio + megapixels + multiple），
+# 只是 multiple 用 16 而不是 8（Z-Image 要求宽高是 16 的倍数）。
+#
+# 取值依据：
+#   - 1MP = 官方默认（模板 EmptySD3LatentImage 1024×1024，ResolutionSelector
+#     megapixels=1），社区公认的原生甜点
+#   - 480P / 720P / 1080P / 1440P 按视频行业的竖直分辨率惯例命名，换算成
+#     总像素后对应约 0.4 / 0.9 / 2.0 / 3.5 MP
+#   - 2K / 4K 按短边命名（2048 / 3840x2160）
+#   - 社区明确 >=4MP「对本模型原生过高质量」，所以超过 3MP 的档位走放大路径
 Z_IMAGE_RES_TIERS = {
-    "480p": 480,
-    "720p": 720,
-    "1080p": 1080,
-    "1440p": 1440,
-    "2k": 2048,
-    "4k": 2160,
+    "1mp": 1.0,       # 官方默认 1024×1024
+    "480p": 0.4,
+    "720p": 0.9,
+    "1080p": 2.0,
+    "1440p": 3.5,
+    "2k": 4.2,
+    "4k": 8.3,
 }
-Z_IMAGE_DEFAULT_TIER = "1080p"
+Z_IMAGE_DEFAULT_TIER = "1mp"
+
+# 超过这个总像素（MP）就不要再直出了：社区明确 >=4MP 对本模型原生过高质量，
+# 直出会构图崩坏 / 出伪影。超出的档位改走官方 2K 放大路径。
+Z_IMAGE_MAX_DIRECT_MP = 3.0
+
+Z_IMAGE_SIZE_MULTIPLE = 16
+
+# 官方 2K 放大模板 utility_z_image_turbo_2k_upscaler.app.json 的参数
+Z_IMAGE_UPSCALE = {
+    "sampler": "dpmpp_2m_sde",
+    "scheduler": "beta",
+    "steps": 5,
+    "cfg": 1.0,
+    "denoise": 0.33,
+    "upscale_model": "RealESRGAN_x4plus.pth",
+    "upscale_method": "lanczos",
+    "scale_by": 0.5,
+}
 
 
 def _frame_expr_node(length_node_id, dur_node_id):
@@ -321,33 +383,136 @@ def build_r2v(params):
 def z_image_dimensions(aspect, tier, width=None, height=None):
     """比例 + 分辨率档位 -> 实际像素宽高。
 
-    档位按**短边**定义（1080P 在 16:9 下是 1920×1080，在 1:1 下是
-    1080×1080，在 9:16 下是 1080×1920），所以同一档位换比例时清晰度一致。
+    算法与 ComfyUI 自带的 ResolutionSelector 完全一致：
+        total = megapixels * 1024 * 1024
+        scale = sqrt(total / (w_ratio * h_ratio))
+        width  = round(w_ratio * scale / multiple) * multiple
+        height = round(h_ratio * scale / multiple) * multiple
+    multiple 用 16 而不是 8（Z-Image 要求宽高是 16 的倍数）。
+
     用户手动填了宽高就以手填的为准（微调优先）。
-    宽高都对齐到 8 的倍数（VAE 8 倍下采样要求）。
     """
     w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
-    short_side = Z_IMAGE_RES_TIERS.get(tier, Z_IMAGE_RES_TIERS[Z_IMAGE_DEFAULT_TIER])
+    megapixels = Z_IMAGE_RES_TIERS.get(tier, Z_IMAGE_RES_TIERS[Z_IMAGE_DEFAULT_TIER])
+    mult = Z_IMAGE_SIZE_MULTIPLE
 
     if width and height:
         final_w, final_h = int(width), int(height)
     else:
-        if w_ratio >= h_ratio:      # 横图 / 方形：档位值给到高度
-            final_h = short_side
-            final_w = short_side * w_ratio / h_ratio
-        else:                       # 竖图：档位值给到宽度
-            final_w = short_side
-            final_h = short_side * h_ratio / w_ratio
-    final_w = max(64, int(round(final_w / 8)) * 8)
-    final_h = max(64, int(round(final_h / 8)) * 8)
+        total_pixels = megapixels * 1024 * 1024
+        scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
+        final_w = w_ratio * scale
+        final_h = h_ratio * scale
+    final_w = max(mult, int(round(final_w / mult)) * mult)
+    final_h = max(mult, int(round(final_h / mult)) * mult)
     return final_w, final_h
+
+
+def z_image_megapixels(width, height):
+    return (width * height) / (1024.0 * 1024.0)
+
+
+def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
+                       cfg, shift, negative_mode, negative_text, prompt,
+                       job_id, filename_prefix=None):
+    """Z-Image 主链节点（文生图 / 放大二次采样共用）。"""
+    p = {
+        "9": {"inputs": {"filename_prefix": filename_prefix or f"h3studio/t2i_{job_id}",
+                         "images": ["57:8", 0]},
+              "class_type": "SaveImage"},
+        "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
+                  "class_type": "CLIPLoader"},
+        "57:29": {"inputs": {"vae_name": Z_IMAGE_VAE}, "class_type": "VAELoader"},
+        "57:8": {"inputs": {"samples": ["57:3", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
+        "57:28": {"inputs": {"unet_name": model["unet"], "weight_dtype": model["weight_dtype"]},
+                  "class_type": "UNETLoader"},
+        "57:27": {"inputs": {"text": prompt, "clip": ["57:30", 0]},
+                  "class_type": "CLIPTextEncode"},
+        "57:13": {"inputs": {"width": width, "height": height, "batch_size": 1},
+                  "class_type": "EmptySD3LatentImage"},
+        "57:11": {"inputs": {"shift": shift, "model": ["57:28", 0]},
+                  "class_type": "ModelSamplingAuraFlow"},
+        "57:3": {"inputs": {"seed": int(seed), "steps": steps, "cfg": cfg,
+                            "sampler_name": sampler, "scheduler": scheduler, "denoise": 1,
+                            "model": ["57:11", 0], "positive": ["57:27", 0],
+                            "latent_image": ["57:13", 0]},
+                 "class_type": "KSampler"},
+    }
+    if negative_mode == "encode":
+        p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
+                      "class_type": "CLIPTextEncode"}
+    else:
+        p["57:33"] = {"inputs": {"conditioning": ["57:27", 0]},
+                      "class_type": "ConditioningZeroOut"}
+    p["57:3"]["inputs"]["negative"] = ["57:33", 0]
+    return p
+
+
+def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, prompt, job_id):
+    """官方 2K 放大路径（utility_z_image_turbo_2k_upscaler.app.json 的做法）。
+
+    链路：T2I 出图 -> ImageScaleToTotalPixels(lanczos) -> ImageUpscaleWithModel
+    (RealESRGAN x4) -> ImageScaleBy(lanczos 0.5) -> VAEEncode
+    -> KSampler(dpmpp_2m_sde / beta / 5 步 / cfg 1 / denoise 0.33) -> VAEDecode。
+
+    用途：4K 这类 >=4MP 的目标尺寸直出会崩（社区实测「too high for this
+    model natively」），所以改成「低分辨率生成 + 放大 + 二次细化」。
+    """
+    up = Z_IMAGE_UPSCALE
+    return {
+        "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8", 0]},
+              "class_type": "SaveImage"},
+        "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
+                  "class_type": "CLIPLoader"},
+        "57:29": {"inputs": {"vae_name": Z_IMAGE_VAE}, "class_type": "VAELoader"},
+        "57:28": {"inputs": {"unet_name": model["unet"], "weight_dtype": model["weight_dtype"]},
+                  "class_type": "UNETLoader"},
+        "57:11": {"inputs": {"shift": 3.0, "model": ["57:28", 0]},
+                  "class_type": "ModelSamplingAuraFlow"},
+        "57:27": {"inputs": {"text": prompt, "clip": ["57:30", 0]},
+                  "class_type": "CLIPTextEncode"},
+        "57:33": {"inputs": {"conditioning": ["57:27", 0]}, "class_type": "ConditioningZeroOut"},
+        # 第一段：低分辨率生成
+        "57:13": {"inputs": {"width": width, "height": height, "batch_size": 1},
+                  "class_type": "EmptySD3LatentImage"},
+        "57:3": {"inputs": {"seed": int(seed), "steps": 8, "cfg": 1.0,
+                            "sampler_name": "res_multistep", "scheduler": "simple", "denoise": 1,
+                            "model": ["57:11", 0], "positive": ["57:27", 0],
+                            "negative": ["57:33", 0], "latent_image": ["57:13", 0]},
+                 "class_type": "KSampler"},
+        "57:8": {"inputs": {"samples": ["57:3", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
+        # 放大链：先按目标像素面积缩放，再用 RealESRGAN x4 提细节，
+        # 然后 ImageScaleBy 回到目标尺寸，最后低 denoise 二次细化。
+        "57:70": {"inputs": {"upscale_method": up["upscale_method"], "megapixels": 4.0,
+                             "resolution_steps": 1, "image": ["57:8", 0]},
+                  "class_type": "ImageScaleToTotalPixels"},
+        "57:71": {"inputs": {"model_name": up["upscale_model"]}, "class_type": "UpscaleModelLoader"},
+        "57:72": {"inputs": {"upscale_model": ["57:71", 0], "image": ["57:70", 0]},
+                  "class_type": "ImageUpscaleWithModel"},
+        "57:76": {"inputs": {"upscale_method": up["upscale_method"], "width": target_w,
+                             "height": target_h, "crop": "disabled", "image": ["57:72", 0]},
+                  "class_type": "ImageScale"},
+        "57:73": {"inputs": {"pixels": ["57:76", 0], "vae": ["57:29", 0]},
+                  "class_type": "VAEEncode"},
+        # 第二段：低 denoise 二次细化
+        "57:75": {"inputs": {"seed": int(seed), "steps": up["steps"], "cfg": up["cfg"],
+                             "sampler_name": up["sampler"], "scheduler": up["scheduler"],
+                             "denoise": up["denoise"], "model": ["57:11", 0],
+                             "positive": ["57:27", 0], "negative": ["57:33", 0],
+                             "latent_image": ["57:73", 0]},
+                  "class_type": "KSampler"},
+        "57:8b": {"inputs": {"samples": ["57:75", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
+    }
 
 
 def build_t2i(params):
     """Z-IMAGE 文生图
 
-    模型版本 / 采样器 / 调度器 / 步数 / CFG / 分辨率 / 比例全部来自
+    模型版本 / 采样器 / 调度器 / 步数 / CFG / shift / 分辨率 / 比例全部来自
     前端 params，缺省时回落到该模型版本的官方推荐值。
+
+    目标尺寸 >= Z_IMAGE_MAX_DIRECT_MP 时自动切到官方 2K 放大路径
+    （低分辨率生成 + RealESRGAN 放大 + 低 denoise 二次细化）。
     """
     job_id = params["job_id"]
     model_key = params.get("model") or Z_IMAGE_DEFAULT_MODEL
@@ -368,39 +533,21 @@ def build_t2i(params):
     scheduler = params.get("scheduler") or model["scheduler"]
     steps = int(params.get("steps") or model["steps"])
     cfg = float(params.get("cfg") if params.get("cfg") is not None else model["cfg"])
-    shift = float(params.get("shift") or 3)
-    # 负向条件：turbo / FP8 蒸馏版按官方模板走 ConditioningZeroOut，
-    # base 完整版用真实负向提示词（官方模板 image_z_image.json 的 CLIPTextEncode）。
+    shift = float(params.get("shift") if params.get("shift") is not None else model["shift"])
     negative_mode = params.get("negative_mode") or model["negative"]
     negative_text = params.get("negative_prompt", "") or ""
+    prompt = params.get("prompt", "")
 
-    p = {
-        "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8", 0]},
-              "class_type": "SaveImage"},
-        "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
-                  "class_type": "CLIPLoader"},
-        "57:29": {"inputs": {"vae_name": Z_IMAGE_VAE}, "class_type": "VAELoader"},
-        "57:8": {"inputs": {"samples": ["57:3", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
-        "57:28": {"inputs": {"unet_name": model["unet"], "weight_dtype": model["weight_dtype"]},
-                  "class_type": "UNETLoader"},
-        "57:27": {"inputs": {"text": params.get("prompt", ""), "clip": ["57:30", 0]},
-                  "class_type": "CLIPTextEncode"},
-        "57:13": {"inputs": {"width": width, "height": height, "batch_size": 1},
-                  "class_type": "EmptySD3LatentImage"},
-        "57:11": {"inputs": {"shift": shift, "model": ["57:28", 0]}, "class_type": "ModelSamplingAuraFlow"},
-        "57:3": {"inputs": {"seed": int(seed), "steps": steps, "cfg": cfg, "sampler_name": sampler,
-                            "scheduler": scheduler, "denoise": 1, "model": ["57:11", 0],
-                            "positive": ["57:27", 0], "latent_image": ["57:13", 0]},
-                 "class_type": "KSampler"},
-    }
+    # 目标过大 -> 走官方 2K 放大路径（生成端固定用官方 Turbo 推荐参数）
+    if z_image_megapixels(width, height) > Z_IMAGE_MAX_DIRECT_MP:
+        base_w, base_h = z_image_dimensions(aspect, "1mp")
+        p = _z_image_upscale_nodes(model, base_w, base_h, width, height, seed, prompt, job_id)
+        # 放大链输出接回最终 SaveImage
+        p["9"]["inputs"]["images"] = ["57:8b", 0]
+        return p
 
-    if negative_mode == "encode":
-        p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
-                      "class_type": "CLIPTextEncode"}
-    else:
-        p["57:33"] = {"inputs": {"conditioning": ["57:27", 0]}, "class_type": "ConditioningZeroOut"}
-    p["57:3"]["inputs"]["negative"] = ["57:33", 0]
-    return p
+    return _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
+                              cfg, shift, negative_mode, negative_text, prompt, job_id)
 
 
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i}

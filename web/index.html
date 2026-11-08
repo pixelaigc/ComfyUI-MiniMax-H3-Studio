@@ -109,8 +109,9 @@
     <!-- 图像模式专属：分辨率档位 / 比例 / Z-Image 参数 -->
     <div id="imagePanel" style="display:none">
       <div class="field">
-        <div class="field-label">分辨率档位 <span class="muted" id="imgResHint">短边像素</span></div>
+        <div class="field-label">分辨率档位 <span class="muted" id="imgResHint">总像素</span></div>
         <select class="img-select" id="imgResSelect"></select>
+        <div class="img-note" id="imgSizeNote"></div>
       </div>
 
       <div class="field">
@@ -121,40 +122,55 @@
       <div class="field">
         <div class="field-label">输出尺寸 <span class="muted" id="imgSizeHint">—</span></div>
         <div class="img-size-row">
-          <input type="number" id="imgWidth" min="64" step="8" title="宽度（像素）">
+          <input type="number" id="imgWidth" min="64" step="16" title="宽度（像素，16 的倍数）">
           <span class="img-x">×</span>
-          <input type="number" id="imgHeight" min="64" step="8" title="高度（像素）">
+          <input type="number" id="imgHeight" min="64" step="16" title="高度（像素，16 的倍数）">
           <button type="button" class="img-reset" id="imgSizeReset" title="恢复为档位自动计算的尺寸">自动</button>
         </div>
-        <div class="img-note" id="imgSizeNote"></div>
+        <div class="img-note" id="imgSizeManualNote"></div>
       </div>
 
       <div class="field">
         <div class="field-label">Z-Image 模型 <span class="muted">本机已安装</span></div>
         <select class="img-select" id="imgModelSelect"></select>
         <div class="img-note" id="imgModelNote"></div>
+        <div class="img-warn" id="imgModelWarn"></div>
       </div>
 
       <div class="compact-pair">
         <div class="compact-field">
           <div class="compact-label"><span>采样步数</span><b id="imgStepsVal">8</b></div>
           <input type="range" id="imgSteps" min="1" max="60" step="1" value="8">
+          <small class="muted" id="imgStepsHint">推荐</small>
         </div>
         <div class="compact-field">
           <div class="compact-label"><span>CFG</span><b id="imgCfgVal">1.0</b></div>
           <input type="range" id="imgCfg" min="1" max="8" step="0.5" value="1">
+          <small class="muted" id="imgCfgHint">推荐</small>
         </div>
       </div>
 
       <div class="compact-pair">
         <div class="compact-field">
+          <div class="compact-label"><span>shift</span><b id="imgShiftVal">3</b></div>
+          <input type="range" id="imgShift" min="1" max="7" step="0.5" value="3">
+          <small class="muted" id="imgShiftHint">推荐</small>
+        </div>
+        <div class="compact-field">
           <div class="compact-label"><span>采样器</span><small id="imgSamplerHint">推荐</small></div>
           <select class="img-select" id="imgSamplerSelect"></select>
         </div>
-        <div class="compact-field">
-          <div class="compact-label"><span>调度器</span><small id="imgSchedulerHint">推荐</small></div>
-          <select class="img-select" id="imgSchedulerSelect"></select>
-        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">调度器 <span class="muted" id="imgSchedulerHint">推荐</span></div>
+        <select class="img-select" id="imgSchedulerSelect"></select>
+      </div>
+
+      <div class="field" id="imgNegField" style="display:none">
+        <div class="field-label">负面提示词 <span class="muted">Base 建议填写</span></div>
+        <textarea id="imgNegative" rows="2" placeholder="extra fingers, poorly drawn hands, deformed, disfigured"></textarea>
+        <div class="img-note" id="imgNegNote"></div>
       </div>
     </div>
 

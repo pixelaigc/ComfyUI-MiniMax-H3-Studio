@@ -41,7 +41,10 @@ from h3studio.workflows import (
     Z_IMAGE_DEFAULT_MODEL,
     Z_IMAGE_RES_TIERS,
     Z_IMAGE_DEFAULT_TIER,
+    Z_IMAGE_MAX_DIRECT_MP,
+    Z_IMAGE_SIZE_MULTIPLE,
     z_image_dimensions,
+    z_image_megapixels,
 )
 from h3studio import providers as prov
 from h3studio import llm as llm_client
@@ -772,13 +775,14 @@ async def api_unload(request):
 # ------------------------------------------------------------------ 图像模式参数清单
 # 图像面板的档位 / 比例 / 模型 / 采样器 / 调度器清单。
 # 模型只列本机 ComfyUI 实测存在的权重（见 h3studio.workflows.Z_IMAGE_MODELS）。
-_Z_IMAGE_SAMPLERS = [
-    "res_multistep", "euler", "dpmpp_2m_sde", "dpmpp_2m", "dpmpp_3m_sde",
-    "euler_ancestral", "dpm_2", "ddim", "heun", "uni_pc",
-]
-_Z_IMAGE_SCHEDULERS = ["simple", "beta", "sgm_uniform", "karras", "normal", "ddim_uniform"]
+#
+# 采样器 / 调度器列表**按模型版本区分**：
+#   - Turbo 系（蒸馏）：karras / exponential 调度器在 8 步下会崩图 -> 不给
+#   - Base（非蒸馏）：exponential 采样器反而可用 -> 给
+# 依据见《Z-Image 最佳参数与提示词增强 Skill 范式_技术调研.md》§1.5 / §1.6。
 
 _Z_IMAGE_TIER_LABELS = {
+    "1mp": "1MP（官方默认）",
     "480p": "480P",
     "720p": "720P",
     "1080p": "1080P",
@@ -791,11 +795,12 @@ _Z_IMAGE_TIER_LABELS = {
 async def api_image_options(request):
     """GET /api/image-options —— 图像面板可选项（含每个模型版本的推荐参数）"""
     tiers = []
-    for key, short_side in Z_IMAGE_RES_TIERS.items():
+    for key, megapixels in Z_IMAGE_RES_TIERS.items():
         tiers.append({
             "key": key,
             "label": _Z_IMAGE_TIER_LABELS.get(key, key.upper()),
-            "short_side": short_side,
+            "megapixels": megapixels,
+            "max_direct_mp": Z_IMAGE_MAX_DIRECT_MP,
         })
     aspects = []
     for key, label in ASPECT_MAP.items():
@@ -807,17 +812,22 @@ async def api_image_options(request):
             "label": m["label"],
             "unet": m["unet"],
             "note": m["note"],
+            "warn": m["warn"],
             "sampler": m["sampler"],
             "scheduler": m["scheduler"],
             "steps": m["steps"],
             "cfg": m["cfg"],
+            "shift": m["shift"],
+            "supports_negative": m["supports_negative"],
+            "samplers": m["samplers"],
+            "schedulers": m["schedulers"],
         }
     return json_ok({
         "tiers": tiers,
         "aspects": aspects,
         "models": models,
-        "samplers": _Z_IMAGE_SAMPLERS,
-        "schedulers": _Z_IMAGE_SCHEDULERS,
+        "size_multiple": Z_IMAGE_SIZE_MULTIPLE,
+        "max_direct_mp": Z_IMAGE_MAX_DIRECT_MP,
         "default_tier": Z_IMAGE_DEFAULT_TIER,
         "default_model": Z_IMAGE_DEFAULT_MODEL,
     })
