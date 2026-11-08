@@ -384,6 +384,31 @@ class TestQwenBackend(unittest.TestCase):
         self.assertEqual(keys, [f"images.image_{i}" for i in range(1, 11)],
                          f"10 张参考图应接成 images.image_1..images.image_10，实际 {keys}")
 
+    # ---------------------------------------------- 媒体库分类筛选
+    def test_media_filter_includes_all_image_modes(self):
+        """生成库「作品类型=图片」必须包含所有图像模式的记录。
+
+        实测踩过的坑：服务端把 media=image 硬编码成 mode='t2i'，
+        导致 t2i_qwen / i2i_qwen 的 9 条出图记录在「图片」筛选里一条都看不到。
+        现在改成按生成类型注册表推导 —— 新增图像模式自动被纳入。
+        """
+        from h3studio import gen_types as G
+        image_modes = {m for m in G.registered_modes()
+                       if G.type_for_mode(m).get("media") == "image"}
+        self.assertIn("t2i", image_modes)
+        self.assertIn("t2i_qwen", image_modes)
+        self.assertIn("i2i_qwen", image_modes)
+        # 视频模式不该混进图片
+        for m in G.registered_modes():
+            if m.startswith(("t2v", "flf", "r2v", "longfilm")):
+                self.assertNotIn(m, image_modes, f"{m} 是视频模式，不该算图片")
+
+    def test_server_media_filter_is_not_hardcoded_to_t2i(self):
+        """服务端不能再把 media=image 写死成 mode='t2i'。"""
+        src = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertNotIn('conditions.append("mode=\'t2i\'")', src,
+                         "media=image 不能写死 mode='t2i' —— 会漏掉 Qwen 的出图记录")
+
     # ---------------------------------------------- 参数落到请求
     def test_all_params_reach_the_workflow(self):
         """分辨率/比例/步数/CFG/SHIFT/采样器/调度器 都要落到真实节点输入。"""

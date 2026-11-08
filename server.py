@@ -1025,9 +1025,20 @@ async def api_list(request):
         args.append(status)
     media = request.query.get("media", "").strip()
     if media == "image":
-        conditions.append("mode='t2i'")
+        # 媒体维度按「生成类型注册表」的 media 字段推导，而不是硬编码 mode 列表 ——
+        # 硬编码会把 t2i_qwen / i2i_qwen 这类新增的图像模式漏掉
+        # （实测漏了 9 条 Qwen 出图记录：生成库「图片」筛选里一条都看不到）。
+        image_modes = [m for m in gen_types.registered_modes()
+                       if gen_types.type_for_mode(m).get("media") == "image"]
+        if not image_modes:
+            image_modes = ["t2i"]
+        conditions.append("mode IN (%s)" % ",".join("?" * len(image_modes)))
+        args.extend(image_modes)
     elif media == "video":
-        conditions.append("mode NOT IN ('t2i','longfilm')")
+        video_modes = [m for m in gen_types.registered_modes()
+                       if gen_types.type_for_mode(m).get("media") == "video"]
+        conditions.append("mode IN (%s)" % ",".join("?" * len(video_modes)))
+        args.extend(video_modes)
     elif media == "longfilm":
         conditions.append("mode='longfilm'")
     elif media:
