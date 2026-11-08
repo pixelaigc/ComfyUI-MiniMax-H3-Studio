@@ -207,16 +207,18 @@ def _run_multimodal(job_id: int, asset_id: str, source: Path,
         asset = asset_repo.get_asset(conn, asset_id)
         version = asset_repo.current_version(conn, asset_id)
         provider_id = (options or {}).get("provider_id")
-        conn.close()
         if not asset or not version:
             raise LibraryError("素材或版本不存在", status=404)
 
         asset_repo.update_job(conn, job_id, status="running",
                               stage="调用多模态模型", progress=0.3,
                               started_at=A.now())
+        conn.close()
+        conn = None
 
         result = asyncio.run(analysis_mod.run_analysis(
-            conn, asset, version, source, options or {}, provider_id))
+            conn or _library_conn(), asset, version, source,
+            options or {}, provider_id))
 
         conn = _library_conn()
         try:
@@ -249,16 +251,18 @@ def _run_correction(job_id: int, asset_id: str, source: Path,
         asset = asset_repo.get_asset(conn, asset_id)
         version = asset_repo.current_version(conn, asset_id)
         provider_id = (options or {}).get("provider_id")
-        conn.close()
         if not asset or not version:
             raise LibraryError("素材或版本不存在", status=404)
 
         asset_repo.update_job(conn, job_id, status="running",
                               stage="调用多模态模型纠错", progress=0.3,
                               started_at=A.now())
+        conn.close()
+        conn = None
 
         result = asyncio.run(analysis_mod.run_correction(
-            conn, asset, version, source, question, options or {}, provider_id))
+            conn or _library_conn(), asset, version, source, question,
+            options or {}, provider_id))
 
         conn = _library_conn()
         try:

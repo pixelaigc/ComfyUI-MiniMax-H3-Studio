@@ -582,6 +582,69 @@ class TestAsyncAnalysisJob(DeepAudioTestBase):
         self.assertIsInstance(data["history"], list)
 
 
+# ------------------------------------------------------------------ 6. 连接生命周期
+
+
+class TestJobConnectionLifecycle(DeepAudioTestBase):
+    """
+    回归：后台任务里不能 close 连接后继续用。
+
+    实测踩过：_run_multimodal / _run_correction 里先 conn.close()，
+    后面又用同一个 conn 调 update_job -> "Cannot operate on a closed database"，
+    前端弹「提交纠错」失败。
+    """
+
+    def _run_job_until_done(self, job_id, timeout=60):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self.conn() as conn:
+                current = asset_repo.get_job(conn, job_id)
+            if current and current["status"] in ("done", "failed"):
+                return current
+            time.sleep(0.2)
+        return current
+
+    def test_multimodal_job_does_not_use_closed_connection(self):
+        """多模态任务（图片）必须能跑完，不能撞 closed database。"""
+        from PIL import Image
+        src = self.src / "pic.png"
+        Image.new("RGB", (32, 24), (10, 20, 30)).save(src, "PNG")
+        asset = self.register(src)
+
+        # 没有 Provider 时任务应失败，但**失败原因不能是 closed database**
+        job = analysis_jobs.start_analysis(asset["id"], "image",
+                                           options={"deep": False})
+        current = self._run_job_until_done(job["id"])
+        self.assertIn(current["status"], ("done", "failed"))
+        message = current.get("message") or ""
+        self.assertNotIn("closed database", message,
+                         f"不能用已关闭的连接：{message}")
+
+    def test_correction_job_does_not_use_closed_connection(self):
+        """纠错任务同样不能撞 closed database。"""
+        src = self.make_wav()
+        asset = self.register(src)
+        job = analysis_jobs.start_analysis(
+            asset["id"], "audio", mode="correction",
+            question="这段是女声独唱，不是合唱",
+            options={"deep": False})
+        current = self._run_job_until_done(job["id"])
+        self.assertIn(current["status"], ("done", "failed"))
+        message = current.get("message") or ""
+        self.assertNotIn("closed database", message,
+                         f"不能用已关闭的连接：{message}")
+
+    def test_deep_audio_job_completes_without_closed_db(self):
+        """深度音频任务（走真实子进程路径）要能写成功。"""
+        src = self.make_wav()
+        asset = self.register(src)
+        job = analysis_jobs.start_analysis(
+            asset["id"], "audio", options={"deep": True, "stages": ["bpm"]})
+        current = self._run_job_until_done(job["id"])
+        self.assertEqual(current["status"], "done",
+                         f"应完成，实际：{current.get('message')}")
+
+
 # ------------------------------------------------------------------ 6. 接口级
 
 
