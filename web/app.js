@@ -1889,10 +1889,8 @@ const STATUS_TEXT = {
   idle: "空闲",
 };
 
-function renderStatus(data) {
-  const el = $("#statusText");
-  const dot = $("#topStatus .dot");
-  if (!el || !dot) return;
+// 把状态数据映射成 {text, dot, title}（纯函数，便于单独断言）
+function statusLabel(data) {
   const comfyRunning = data.comfy_running;
   const comfyPending = data.comfy_pending;
   const studioRunning = !!data.running;
@@ -1905,28 +1903,29 @@ function renderStatus(data) {
     : (comfyPending > 0 || studioQueued);
 
   if (data.comfyui_ok === false) {
-    el.textContent = STATUS_TEXT.offline;
-    dot.className = "dot dot-off";
-    el.title = "连不上 ComfyUI";
-    return;
+    return {text: STATUS_TEXT.offline, dot: "dot dot-off", title: "连不上 ComfyUI"};
   }
   if (busy) {
     const n = Math.max(Number(comfyRunning || 0), 1);
-    el.textContent = STATUS_TEXT.busy;
-    dot.className = "dot dot-busy";
-    el.title = `ComfyUI 正在生成（${n} 个在执行）`;
-    return;
+    return {text: STATUS_TEXT.busy, dot: "dot dot-busy",
+            title: `ComfyUI 正在生成（${n} 个在执行）`};
   }
   if (pending) {
     const n = Number(data.queued || 0) || Number(comfyPending || 0);
-    el.textContent = n > 0 ? `${STATUS_TEXT.queued}（${n}）` : STATUS_TEXT.queued;
-    dot.className = "dot dot-busy";
-    el.title = "ComfyUI 队列中有待执行的任务";
-    return;
+    return {text: n > 0 ? `${STATUS_TEXT.queued}（${n}）` : STATUS_TEXT.queued,
+            dot: "dot dot-busy", title: "ComfyUI 队列中有待执行的任务"};
   }
-  el.textContent = STATUS_TEXT.idle;
-  dot.className = "dot dot-ok";
-  el.title = "ComfyUI 空闲";
+  return {text: STATUS_TEXT.idle, dot: "dot dot-ok", title: "ComfyUI 空闲"};
+}
+
+function renderStatus(data) {
+  const el = $("#statusText");
+  const dot = $("#topStatus .dot");
+  if (!el || !dot) return;
+  const label = statusLabel(data);
+  el.textContent = label.text;
+  dot.className = label.dot;
+  el.title = label.title;
 }
 
 async function refreshSystem() {

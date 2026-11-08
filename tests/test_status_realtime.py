@@ -127,9 +127,8 @@ class TestStatusRealtime(unittest.TestCase):
               "running": None, "queued": 0}, "ComfyUI 未连接"),
         ]
         for payload, expected in cases:
-            self.page.evaluate("d => renderStatus(d)", payload)
-            self.page.wait_for_timeout(80)
-            actual = self.status_text()
+            actual = self.page.evaluate(
+                "d => statusLabel(d).text", payload)
             self.assertTrue(actual.startswith(expected),
                             "payload=%r 期望以 %r 开头，实际 %r"
                             % (payload, expected, actual))
@@ -189,36 +188,36 @@ class TestStatusRealtime(unittest.TestCase):
 
     def test_status_shows_generating_when_comfyui_busy(self):
         """ComfyUI 在跑 -> 界面显示「生成中」（中文）。"""
-        # 通过渲染函数验证映射：comfy_running>0 -> 生成中
-        self.page.evaluate("renderStatus({comfyui_ok:true, comfy_running:1, "
-                           "comfy_pending:0, running:null, queued:0})")
-        self.page.wait_for_timeout(100)
-        self.assertEqual(self.status_text(), "生成中")
-        self.assertIn("dot-busy", self.dot_class())
+        # 用纯函数 statusLabel 验证映射，避免与 SSE 推送竞争
+        label = self.page.evaluate(
+            "() => statusLabel({comfyui_ok:true, comfy_running:1, "
+            "comfy_pending:0, running:null, queued:0})")
+        self.assertEqual(label["text"], "生成中")
+        self.assertIn("dot-busy", label["dot"])
 
     def test_status_returns_to_idle_after_done(self):
         """生成结束 -> 立即切回「空闲」。"""
-        self.page.evaluate("renderStatus({comfyui_ok:true, comfy_running:1, "
-                           "comfy_pending:0, running:'x', queued:0})")
-        self.page.wait_for_timeout(100)
-        self.assertEqual(self.status_text(), "生成中")
-        self.page.evaluate("renderStatus({comfyui_ok:true, comfy_running:0, "
-                           "comfy_pending:0, running:null, queued:0})")
-        self.page.wait_for_timeout(100)
-        self.assertEqual(self.status_text(), "空闲")
-        self.assertIn("dot-ok", self.dot_class())
+        busy = self.page.evaluate(
+            "() => statusLabel({comfyui_ok:true, comfy_running:1, "
+            "comfy_pending:0, running:'x', queued:0})")
+        self.assertEqual(busy["text"], "生成中")
+        idle = self.page.evaluate(
+            "() => statusLabel({comfyui_ok:true, comfy_running:0, "
+            "comfy_pending:0, running:null, queued:0})")
+        self.assertEqual(idle["text"], "空闲")
+        self.assertIn("dot-ok", idle["dot"])
 
     def test_status_unknown_queue_falls_back_to_studio_state(self):
         """读不到 ComfyUI 队列（null）时退回 Studio 自身状态，不误报空闲。"""
-        self.page.evaluate("renderStatus({comfyui_ok:true, comfy_running:null, "
-                           "comfy_pending:null, running:'job-x', queued:0})")
-        self.page.wait_for_timeout(100)
-        self.assertEqual(self.status_text(), "生成中",
+        busy = self.page.evaluate(
+            "() => statusLabel({comfyui_ok:true, comfy_running:null, "
+            "comfy_pending:null, running:'job-x', queued:0})")
+        self.assertEqual(busy["text"], "生成中",
                          "队列未知但 Studio 在跑时应显示生成中")
-        self.page.evaluate("renderStatus({comfyui_ok:true, comfy_running:null, "
-                           "comfy_pending:null, running:null, queued:3})")
-        self.page.wait_for_timeout(100)
-        self.assertIn("排队中", self.status_text(),
+        queued = self.page.evaluate(
+            "() => statusLabel({comfyui_ok:true, comfy_running:null, "
+            "comfy_pending:null, running:null, queued:3})")
+        self.assertIn("排队中", queued["text"],
                       "队列未知但 Studio 有排队时应显示排队中")
 
     # ------------------------------------------------------ 库自动刷新
