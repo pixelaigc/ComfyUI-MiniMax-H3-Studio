@@ -277,7 +277,11 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-card {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; display: flex; flex-direction: column;
-  min-width: 0;   /* 窄列下不撑破网格列宽 */
+  /* 宽度兜底：不会自动开下来。目前内部结构（minmax(0,1fr) + 行级 min-width:0 +
+       文本 ellipsis）已维持不破版，这条属于从今往后防回归的兜底 ——
+       若有人把 .job-meta 的列改成 repeat(3, 1fr)（去掉 minmax(0,...)），
+       它就是最后一道防线。 */
+  min-width: 0;
   container-type: inline-size;   /* 卡片自身是容器：窄卡片内部布局可自适应 */
 }
 .job-card[draggable="true"] { cursor: grab; }
