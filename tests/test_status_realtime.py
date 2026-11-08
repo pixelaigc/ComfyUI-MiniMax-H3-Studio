@@ -316,5 +316,101 @@ class TestStatusRealtime(unittest.TestCase):
         self.assertEqual([e for e in self.errors if e.strip()], [])
 
 
+class TestComfyQueueReporting(unittest.TestCase):
+    """后端：ComfyUI 真实队列必须被读到并如实上报（不依赖浏览器）。
+
+    这一组是 S10 变异（「后端 comfy_running 恒为 0」）的防线 ——
+    之前只在浏览器里断言「与真实队列相等」，当本机队列恰好为空时
+    「恒 0」也满足断言，变异存活。这里用假 session 喂非空队列。
+    """
+
+    class _FakeResp:
+        def __init__(self, payload, status=200):
+            self._payload = payload
+            self.status = status
+
+        async def json(self):
+            return self._payload
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    class _FakeSession:
+        """模拟 aiohttp ClientSession：只实现 session.get(...)."""
+
+        def __init__(self, payload, status=200):
+            self.payload = payload
+            self.status = status
+            self.calls = []
+
+        def get(self, url, **kw):
+            self.calls.append(url)
+            if "queue" in url:
+                return TestComfyQueueReporting._FakeResp(self.payload, self.status)
+            return TestComfyQueueReporting._FakeResp({"system": {}, "devices": []})
+
+    def _load_server(self):
+        import importlib
+        sys.path.insert(0, str(REPO))
+        import server as server_mod
+        importlib.reload(server_mod)
+        return server_mod
+
+    def test_fetch_comfy_queue_reports_nonempty_queue(self):
+        """/queue 有 3 个在跑 2 个排队时，必须如实读出来。"""
+        server = self._load_server()
+        payload = {"queue_running": [1, 2, 3], "queue_pending": [4, 5]}
+        session = self._FakeSession(payload)
+        import asyncio
+        got = asyncio.run(server.fetch_comfy_queue(session))
+        self.assertIsNotNone(got, "应成功读到队列")
+        self.assertEqual(got["running"], 3, "running 必须等于真实队列数")
+        self.assertEqual(got["pending"], 2, "pending 必须等于真实队列数")
+        self.assertTrue(any("/queue" in c for c in session.calls),
+                        "必须真的请求了 /queue")
+
+    def test_fetch_comfy_queue_returns_none_on_failure(self):
+        """读不到队列时返回 None（未知），不能当成 0。"""
+        server = self._load_server()
+
+        class _Boom:
+            def get(self, url, **kw):
+                raise OSError("connection refused")
+
+        got = asyncio_run(server.fetch_comfy_queue(_Boom()))
+        self.assertIsNone(got, "读不到队列应返回 None（未知）而不是 0")
+
+    def test_status_snapshot_passes_queue_through(self):
+        """status_snapshot 必须把队列数字原样透出（不能吞成 0）。"""
+        server = self._load_server()
+        payload = {"queue_running": [1, 2], "queue_pending": []}
+        session = self._FakeSession(payload)
+        import asyncio
+        snap = asyncio.run(server.status_snapshot(session))
+        self.assertEqual(snap["comfy_running"], 2,
+                         "status_snapshot 必须透出 comfy_running=2")
+        self.assertEqual(snap["comfy_pending"], 0)
+
+    def test_status_snapshot_marks_unknown_when_unreachable(self):
+        """ComfyUI 不可达时 comfy_running 为 None（未知），不是 0。"""
+        server = self._load_server()
+
+        class _Boom:
+            def get(self, url, **kw):
+                raise OSError("connection refused")
+
+        snap = asyncio_run(server.status_snapshot(_Boom()))
+        self.assertIsNone(snap["comfy_running"],
+                          "读不到时应为 None（未知），0 会被误当成空闲")
+
+
+def asyncio_run(coro):
+    import asyncio
+    return asyncio.run(coro)
+
+
 if __name__ == "__main__":
     unittest.main()
