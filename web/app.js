@@ -676,6 +676,7 @@ function showCreate() {
   $("#panel").style.display = "";
   $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "none";
+  $("#providersPage").style.display = "none";
 }
 
 function showStitch() {
@@ -686,6 +687,7 @@ function showStitch() {
   $("#panel").style.display = "none";
   $("#stitchPanel").style.display = "";
   $("#systemPage").style.display = "none";
+  $("#providersPage").style.display = "none";
   state.tab = "done";
   state.doneFilters.media = "video";
   $("#doneMedia").value = "video";
@@ -702,7 +704,22 @@ function showSystem() {
   $("#panel").style.display = "none";
   $("#stitchPanel").style.display = "none";
   $("#systemPage").style.display = "block";
+  $("#providersPage").style.display = "none";
   refreshHardware();
+}
+
+// 本地模型配置页（实现见 providers.js）
+function showProviders() {
+  state.page = "providers";
+  $$(".nav-item").forEach(x => x.classList.remove("active"));
+  $("#navProviders").classList.add("active");
+  $("#jobsArea").style.display = "none";
+  $("#panel").style.display = "none";
+  $("#stitchPanel").style.display = "none";
+  $("#systemPage").style.display = "none";
+  $("#providersPage").style.display = "block";
+  loadProviders();
+  loadAgentConfig();
 }
 
 $("#navSystem").addEventListener("click", showSystem);

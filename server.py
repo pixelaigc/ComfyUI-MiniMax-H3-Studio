@@ -34,6 +34,9 @@ from aiohttp import web, ClientSession, ClientTimeout
 import aiohttp
 
 from h3studio.workflows import build_workflow
+from h3studio import providers as prov
+from h3studio import llm as llm_client
+from h3studio import enhancer as enh
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -95,6 +98,8 @@ def init_db():
             );
             """
         )
+    # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
+    prov.ensure_tables(conn)
 
 
 def row_to_job(r):
@@ -890,6 +895,285 @@ async def api_hardware(request):
     return json_ok(data)
 
 
+# ------------------------------------------------------------------ 本地模型 Provider
+async def api_providers_list(request):
+    """GET /api/providers —— 列出全部 Provider + 默认项设置"""
+    with db() as conn:
+        items = prov.list_providers(conn)
+        prefs = prov.prefs_snapshot(conn)
+    return json_ok({"providers": items, **prefs,
+                    "types": [{"value": k, "label": v}
+                              for k, v in prov.PROVIDER_TYPE_LABELS.items()]})
+
+
+async def api_providers_create(request):
+    """POST /api/providers —— 新增 Provider"""
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    try:
+        data = prov.normalize_provider(payload)
+    except ValueError as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+    with db() as conn:
+        if prov.get_provider(conn, data["id"]):
+            return web.json_response({"error": "该 ID 已存在"}, status=409)
+        item = prov.insert_provider(conn, data)
+        # 第一个 Provider 自动成为默认，避免用户必须先手动设置
+        prefs = prov.prefs_snapshot(conn)
+        if not prefs.get("default_provider_id"):
+            prov.set_pref(conn, "default", item["id"])
+            prefs["default_provider_id"] = item["id"]
+        if item["multimodal"] and not prefs.get("default_multimodal_provider_id"):
+            prov.set_pref(conn, "default_multimodal", item["id"])
+            prefs["default_multimodal_provider_id"] = item["id"]
+    return json_ok({"provider": item, **prefs})
+
+
+async def api_providers_update(request):
+    """PUT /api/providers/{id} —— 修改 Provider"""
+    pid = request.match_info["id"]
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    payload = dict(payload)
+    payload["id"] = pid
+    try:
+        data = prov.normalize_provider(payload)
+    except ValueError as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+    with db() as conn:
+        current = prov.get_provider_full(conn, pid)
+        if not current:
+            return web.json_response({"error": "Provider 不存在"}, status=404)
+        # 前端不回显 API Key 明文：没带 api_key 字段就保持原值
+        if not payload.get("api_key"):
+            data["api_key"] = None
+        item = prov.update_provider(conn, pid, data)
+        prefs = prov.prefs_snapshot(conn)
+    return json_ok({"provider": item, **prefs})
+
+
+async def api_providers_delete(request):
+    """DELETE /api/providers/{id} —— 删除 Provider"""
+    pid = request.match_info["id"]
+    with db() as conn:
+        if not prov.delete_provider(conn, pid):
+            return web.json_response({"error": "Provider 不存在"}, status=404)
+        prefs = prov.prefs_snapshot(conn)
+    return json_ok({"deleted": pid, **prefs})
+
+
+async def api_providers_default(request):
+    """POST /api/providers/{id}/default —— 设为默认 Provider
+    body: {"multimodal": true} 表示设为「默认多模态模型」"""
+    pid = request.match_info["id"]
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    want_multimodal = bool(payload.get("multimodal"))
+    with db() as conn:
+        item = prov.get_provider_full(conn, pid)
+        if not item:
+            return web.json_response({"error": "Provider 不存在"}, status=404)
+        if not item["enabled"]:
+            return web.json_response({"error": "该 Provider 已停用，无法设为默认"}, status=400)
+        if want_multimodal and not item["multimodal"]:
+            return web.json_response(
+                {"error": "该 Provider 未标记多模态能力，无法设为默认多模态模型"}, status=400)
+        prov.set_pref(conn, "default_multimodal" if want_multimodal else "default", pid)
+        prefs = prov.prefs_snapshot(conn)
+    return json_ok({"ok": True, **prefs})
+
+
+async def api_providers_test(request):
+    """POST /api/providers/{id}/test —— 连通性探测（不生成内容）"""
+    pid = request.match_info["id"]
+    with db() as conn:
+        item = prov.get_provider_full(conn, pid)
+    if not item:
+        return web.json_response({"error": "Provider 不存在"}, status=404)
+    result = await llm_client.check_provider(item)
+    return json_ok({"ok": result["ok"], "detail": result["detail"],
+                    "models": result["models"], "provider_id": pid})
+
+
+# ------------------------------------------------------------------ 提示词增强 Agent
+async def api_enhancer_config(request):
+    """GET /api/enhancer —— 读取增强 Agent 的模板清单与参数"""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+    specs = enh.list_specs()
+    for spec in specs:
+        custom = saved.get("specs", {}).get(spec["id"])
+        if custom:
+            spec["customized"] = True
+            spec["custom_system_prompt"] = custom.get("system_prompt", "")
+            spec["custom_user_template"] = custom.get("user_template", "")
+    return json_ok({
+        "specs": specs,
+        "params": enh.resolve_params(None, saved),
+        "default_params": enh.DEFAULT_PARAMS,
+        "length_presets": enh.LENGTH_PRESETS,
+    })
+
+
+async def api_enhancer_save(request):
+    """PUT /api/enhancer —— 保存用户可编辑的模板覆盖 + 参数"""
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+        saved = {}
+        if row:
+            try:
+                saved = json.loads(row["value"] or "{}")
+            except Exception:
+                saved = {}
+        specs = saved.get("specs") or {}
+        for spec_id, custom in (payload.get("specs") or {}).items():
+            if not isinstance(custom, dict):
+                continue
+            if spec_id not in enh.BUILTIN_SPECS:
+                return web.json_response({"error": f"未知模板 {spec_id}"}, status=400)
+            system_prompt = str(custom.get("system_prompt") or "").strip()
+            user_template = str(custom.get("user_template") or "").strip()
+            if user_template and "{original}" not in user_template:
+                return web.json_response(
+                    {"error": "用户模板必须包含 {original} 占位符"}, status=400)
+            specs[spec_id] = {"system_prompt": system_prompt, "user_template": user_template}
+        saved["specs"] = specs
+        if payload.get("params"):
+            saved["params"] = {k: v for k, v in payload["params"].items()
+                               if k in enh.DEFAULT_PARAMS}
+        prov.set_pref(conn, "enhancer", json.dumps(saved, ensure_ascii=False))
+    return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
+
+
+async def api_enhance(request):
+    """
+    POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
+
+    body:
+      prompt      要扩写的原文
+      mode        replace | append（落地策略，默认 replace）
+      spec_id     模板 id，默认 image
+      provider_id 指定 Provider；不给则用默认（要读图则用默认多模态）
+      images      可选，本地图片路径列表（需要读图的场景）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+
+    mode = payload.get("mode") or "replace"
+    if mode not in ("replace", "append"):
+        return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
+
+    spec_id = payload.get("spec_id") or "image"
+    images = payload.get("images") or []
+    if not isinstance(images, list):
+        images = []
+    images = [str(p) for p in images[:4]]
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+
+    params = enh.resolve_params(payload.get("params"), saved)
+    spec = enh.get_spec(spec_id, saved)
+
+    # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
+    with db() as conn:
+        provider_id = payload.get("provider_id")
+        item = None
+        if provider_id:
+            item = prov.get_provider_full(conn, provider_id)
+            if not item:
+                return web.json_response({"error": "指定的 Provider 不存在"}, status=404)
+            if not item["enabled"]:
+                return web.json_response({"error": "该 Provider 已停用"}, status=400)
+        else:
+            if images:
+                item = prov.resolve_default(conn, "default_multimodal", require_multimodal=True)
+                if not item:
+                    return web.json_response(
+                        {"error": "需要读图，但未找到可用的多模态 Provider。"
+                                 "请在「本地模型」页配置并设为默认多模态模型。"}, status=400)
+            else:
+                item = prov.resolve_default(conn, "default")
+                if not item:
+                    return web.json_response(
+                        {"error": "尚未配置可用的本地模型 Provider。"
+                                 "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    messages = enh.build_messages(spec, original, params.get("language", "auto"))
+    try:
+        raw = await llm_client.call_provider(
+            item, messages, images=images or None,
+            options={"temperature": params["temperature"],
+                     "top_p": params["top_p"],
+                     "max_tokens": params["max_tokens"]})
+    except llm_client.ProviderError as exc:
+        # 本地模型不可达 —— 明确报错，不静默失败
+        return web.json_response(
+            {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    enhanced = enh.strip_wrapping(raw)
+    if not enhanced:
+        return web.json_response(
+            {"error": "模型返回了空内容，未做修改", "provider": item["name"],
+             "degraded": True}, status=502)
+    # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
+    if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+        return web.json_response(
+            {"error": f"Provider「{item['name']}」返回的是系统提示词复读，不是有效的提示词。"
+                      "该模型可能太小或未按指令输出，请换用更强的模型。",
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    merged = enh.merge_result(original, enhanced, mode)
+    return json_ok({
+        "original": original,
+        "enhanced": enhanced,
+        "merged": merged,
+        "mode": mode,
+        "provider": item["name"],
+        "provider_id": item["id"],
+        "spec_id": spec["id"],
+        "used_multimodal": bool(images),
+    })
+
+
 # ------------------------------------------------------------------ static
 MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
                ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
@@ -919,6 +1203,17 @@ def make_app():
     app.router.add_get("/api/system", api_system)
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/unload", api_unload)
+    # 本地模型 Provider 配置
+    app.router.add_get("/api/providers", api_providers_list)
+    app.router.add_post("/api/providers", api_providers_create)
+    app.router.add_put("/api/providers/{id}", api_providers_update)
+    app.router.add_delete("/api/providers/{id}", api_providers_delete)
+    app.router.add_post("/api/providers/{id}/default", api_providers_default)
+    app.router.add_post("/api/providers/{id}/test", api_providers_test)
+    # 提示词增强迷你 Agent
+    app.router.add_get("/api/enhancer", api_enhancer_config)
+    app.router.add_put("/api/enhancer", api_enhancer_save)
+    app.router.add_post("/api/enhance", api_enhance)
     app.router.add_get("/files/{path:.+}", files_handler)
     app.router.add_static("/static", BASE / "web")
     app.router.add_get("/", index_handler)

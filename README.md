@@ -152,6 +152,40 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | GET | `/api/system` | 队列与 ComfyUI 状态 |
 | GET | `/api/hardware` | 本机硬件参数（GPU/CPU/内存/磁盘/软件/模型库） |
 | POST | `/api/unload` | 释放 ComfyUI 显存 |
+| GET | `/api/providers` | 本地模型 Provider 列表 + 默认项设置 |
+| POST | `/api/providers` | 新增 Provider（显示名/类型/Base URL/模型名/API Key/多模态/启用） |
+| PUT | `/api/providers/{id}` | 修改 Provider（`api_key` 留空表示保持原值） |
+| DELETE | `/api/providers/{id}` | 删除 Provider（同时清掉指向它的默认项） |
+| POST | `/api/providers/{id}/default` | 设为默认 Provider；body `{"multimodal":true}` 设为默认多模态模型 |
+| POST | `/api/providers/{id}/test` | 连通性探测（不生成内容） |
+| GET | `/api/enhancer` | 提示词增强 Agent 的模板清单与参数 |
+| PUT | `/api/enhancer` | 保存用户可编辑的模板覆盖与参数 |
+| POST | `/api/enhance` | 提示词增强（`prompt` + `mode`=replace/append + `spec_id` + `provider_id`） |
+
+## 本地模型 Provider
+
+侧边栏「本地模型配置」页可管理本机运行的 LLM 服务，配置存在服务端 SQLite（`data/jobs.db`），
+所有局域网客户端共用同一份，不是浏览器 localStorage。
+
+支持的类型：
+
+| 类型 | 端点 | 备注 |
+|---|---|---|
+| `openai` | `{base_url}/v1/chat/completions` | OpenAI 兼容 API（vLLM / SGLang / llama.cpp server / LM Studio 等） |
+| `ollama` | `{base_url}/api/chat` | Ollama 原生协议 |
+| `llamacpp` | `{base_url}/v1/chat/completions` | llama.cpp server |
+| `comfyui` | ComfyUI 工作流 | 走 `VRGDG_LocalLLM` 节点，支持图片输入 |
+
+「默认 Provider」用于一般文本调用；「默认多模态模型」单独指定，用于提示词增强等需要读图的场景。
+
+## 提示词增强迷你 Agent
+
+`h3studio/enhancer.py` 是独立模块，自带模板、参数与调用封装，后续复用到视频/音频提示词只需新增模板。
+
+- 图像模板覆盖六个维度：主体 / 场景 / 构图 / 光线 / 风格 / 镜头
+- 模板与参数可在「本地模型配置」页编辑并持久化（API Key 不回显明文）
+- 图像页提示词框旁有「增强」按钮，结果可一键替换或追加（追加时保留原文）
+- 本地模型不可达时返回明确错误并在界面提示，不会静默失败
 
 ## 时长→帧数
 
