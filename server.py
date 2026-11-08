@@ -1370,11 +1370,22 @@ async def api_image_loras(request):
     """
     # 只下发「效果类」LoRA —— 加速/蒸馏类由工作流固定使用，
     # 不进用户可选列表（用户自选加速器会与 Turbo 自身蒸馏冲突）。
-    available = lora_registry.list_effect_loras()
-    incompatible = lora_registry.list_incompatible_loras()
-    acceleration = lora_registry.list_acceleration_loras()
+    #
+    # base 决定用哪一族：Z-Image 与 Qwen-Image 2.1 的底模结构不同，
+    # 兼容性要各自比对、配置也要分开存，混在一起会让用户选到不匹配的权重。
+    base = request.query.get("base", "") or ""
+    qwen = lora_registry.is_qwen_base(base)
+    if qwen:
+        available = lora_registry.list_qwen_effect_loras()
+        incompatible = lora_registry.list_qwen_incompatible_loras()
+        acceleration = [item for item in lora_registry.list_qwen_image_loras()
+                        if item["kind"] == lora_registry.KIND_ACCELERATION]
+    else:
+        available = lora_registry.list_effect_loras()
+        incompatible = lora_registry.list_incompatible_loras()
+        acceleration = lora_registry.list_acceleration_loras()
     with db() as conn:
-        config = lora_registry.load_config(conn)
+        config = lora_registry.load_config(conn, lora_registry.pref_key_for_base(base))
     # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
     by_name = {item["name"]: item for item in available}
     # 已被排除的（不兼容）也要能对上 —— 前端要显示「为什么被排除」
@@ -1425,6 +1436,13 @@ async def api_image_loras_save(request):
         return web.json_response({"error": "loras 必须是数组"}, status=400)
     if len(items) > 8:
         return web.json_response({"error": "最多 8 个 LoRA"}, status=400)
+    # 配置按底模族分开存
+    base = body.get("base", "") or ""
+    pref_key = lora_registry.pref_key_for_base(base)
+    qwen = lora_registry.is_qwen_base(base)
+    all_effect = (lora_registry.list_qwen_effect_loras(include_incompatible=True)
+                  if qwen else
+                  lora_registry.list_effect_loras(include_incompatible=True))
     cleaned = []
     for item in items:
         if not isinstance(item, dict):
@@ -1437,11 +1455,11 @@ async def api_image_loras_save(request):
             return web.json_response(
                 {"error": f"本机不存在该 LoRA 文件：{name}"}, status=400)
         # 真·不兼容的 LoRA 拒绝保存（要 patch 的层在底模里根本不存在）
-        meta = next((m for m in lora_registry.list_effect_loras(include_incompatible=True)
-                     if m["name"] == resolved), {})
+        meta = next((m for m in all_effect if m["name"] == resolved), {})
         if meta and not meta.get("compatible", True):
+            base_label = "Qwen-Image 2.1" if qwen else "Z-Image"
             return web.json_response({
-                "error": f"「{meta.get('display') or name}」与 Z-Image 底模不兼容，"
+                "error": f"「{meta.get('display') or name}」与 {base_label} 底模不兼容，"
                           f"不能加入 LoRA 列表：{meta.get('incompatible_reason') or '未知原因'}"
             }, status=400)
         try:
@@ -1468,7 +1486,7 @@ async def api_image_loras_save(request):
             "kind": meta.get("kind", lora_registry.KIND_EFFECT),
         })
     with db() as conn:
-        lora_registry.save_config(conn, cleaned)
+        lora_registry.save_config(conn, cleaned, pref_key)
     return json_ok({"loras": cleaned})
 
 

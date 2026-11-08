@@ -1003,6 +1003,39 @@ body.modal-open { overflow: hidden; }
   padding: 2px 8px;
 }
 
+/* ---------- Qwen-Image 2.1：PE 开关 + 参考图区 ---------- */
+.img-toggle {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 12.5px; color: var(--text); user-select: none;
+}
+.img-toggle input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.img-toggle:hover span { color: var(--accent); }
+
+.img-ref-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 7px; margin-bottom: 8px;
+}
+.img-ref-list:empty { display: none; }
+.img-ref-item {
+  position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); background: #0d0f12;
+}
+.img-ref-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-ref-del {
+  position: absolute; top: 3px; right: 3px; width: 19px; height: 19px;
+  border: 0; border-radius: 50%; background: rgba(0, 0, 0, .62); color: #fff;
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.img-ref-del:hover { background: var(--danger); }
+.img-ref-add {
+  width: 100%; height: 32px; border: 1px dashed var(--border); border-radius: 8px;
+  background: #fafbfc; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: 12px;
+}
+.img-ref-add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.img-ref-add:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ---------- 被排除的不兼容 LoRA ---------- */
 .img-lora-excluded {
   margin-top: 8px;

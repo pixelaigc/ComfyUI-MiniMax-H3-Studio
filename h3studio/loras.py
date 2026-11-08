@@ -847,6 +847,22 @@ def resolve_lora(name: str) -> tuple[str, Path | None]:
 
 # ------------------------------------------------------------------ 持久化
 DEFAULT_PREF_KEY = "z_image_loras"
+# Qwen-Image 2.1 的 LoRA 配置单独存一份（底模不同，不能混）
+QWEN_PREF_KEY = "qwen_image_2.1_loras"
+# 界面上的底模族名 -> (配置 key, 清单函数)
+LORA_BASES = {
+    "Z-Image": (DEFAULT_PREF_KEY, None),
+    "Qwen-Image 2.1": (QWEN_PREF_KEY, None),
+}
+
+
+def pref_key_for_base(base: str) -> str:
+    """底模族名 -> 配置 key。未知族一律退回 Z-Image 的 key。"""
+    return LORA_BASES.get(base or "", (DEFAULT_PREF_KEY, None))[0]
+
+
+def is_qwen_base(base: str) -> bool:
+    return (base or "") in ("Qwen-Image 2.1", "Qwen-Image 2.1 ") or         (base or "").startswith("Qwen-Image 2.1")
 
 
 def load_config(conn: sqlite3.Connection, key: str = DEFAULT_PREF_KEY) -> list[dict]:

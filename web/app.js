@@ -7,8 +7,21 @@ const MODE_INFO = {
   flf: { name: "首尾帧", kind: "video" },
   r2v: { name: "参考生成", kind: "video" },
   t2i: { name: "Z-IMAGE 文生图", kind: "image" },
+  // Qwen-Image 2.1：文生图与图片编辑共用一套参数面板，
+  // 差别在「有没有参考图」和「PE 编码器用 t2i 还是 i2i 版」
+  t2i_qwen: { name: "Qwen-Image 2.1 文生图", kind: "image", engine: "qwen" },
+  i2i_qwen: { name: "Qwen-Image 2.1 图片编辑", kind: "image", engine: "qwen" },
   longfilm: { name: "长片", kind: "video" },
 };
+
+// 图像类模式：共用「图像」参数面板
+const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen"];
+// Qwen-Image 2.1 专用模式（参数清单与 Z-Image 不同）
+const QWEN_MODES = ["t2i_qwen", "i2i_qwen"];
+
+function isQwenMode(mode) {
+  return QWEN_MODES.includes(mode || state.mode);
+}
 
 // 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
 const DEFAULT_MODE = "t2i";
@@ -60,6 +73,26 @@ const state = {
   assetRefs: {},
   timer: null,
   genBusy: false,
+  // Qwen-Image 2.1 专属状态（与 Z-Image 分开，避免两个模型的参数互相污染）
+  imgQwen: {
+    tier: "1mp",
+    aspect: "16:9",
+    width: null,
+    height: null,
+    model: "qwen_image_2.1_bf16",
+    steps: 50,
+    cfg: 1,
+    shift: 0.69,
+    sampler: "euler",
+    scheduler: "simple",
+    negative: "",
+    batchCount: 1,
+    // 官方 PE 提示词扩写（默认开 —— 官方最佳实践）
+    usePe: true,
+    loras: [],
+    // 参考图（图片编辑用，最多 9 张）：[{file, name, url}]
+    refs: [],
+  },
   // 图像模式（Z-Image 文生图）专属状态
   img: {
     tier: "1mp",
@@ -86,6 +119,12 @@ const GEN_TYPES = { types: [], registeredModes: [] };
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
 const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 3 };
+// Qwen-Image 2.1 的独立一套清单（服务端 /api/image-options 的 qwen 字段）
+const QWEN_OPTIONS = {
+  tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 4,
+  defaultTier: "1mp", defaultModel: "qwen_image_2.1_bf16",
+  maxRefImages: 9, minRefImages: 1,
+};
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
 // available = 效果类 LoRA（用户可选）
 // acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
@@ -93,6 +132,9 @@ const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxD
 // acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
 // incompatible = 效果类但与 Z-Image 底模不兼容（会出噪点，已排除）
 const IMG_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
+// Qwen-Image 2.1 的 LoRA 清单（与 Z-Image 分开：底模结构不同，
+// 兼容性要各自比对，混在一起会让用户选到不匹配的权重）
+const QWEN_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -278,13 +320,16 @@ function renderMode() {
 // 档位 + 比例 -> 像素宽高。规则与后端 z_image_dimensions 一致：
 // 档位值给到**短边**，横图给高度、竖图给宽度，宽高对齐到 8 的倍数。
 function imgAutoSize(tier, aspect) {
-  // 与后端 z_image_dimensions / ComfyUI ResolutionSelector 同一算法：
+  // 与后端 z_image_dimensions / qwen_image_dimensions / ComfyUI
+  // ResolutionSelector 同一算法：
   //   total = megapixels * 1024^2; scale = sqrt(total / (wr*hr))
   //   w = round(wr*scale/mult)*mult;  h = round(hr*scale/mult)*mult
-  // multiple 用 16（Z-Image 要求宽高是 16 的倍数）。
-  const tierOpt = IMG_OPTIONS.tiers.find(t => t.key === tier);
+  // multiple 用 16（Z-Image / Qwen-Image 2.1 都要求宽高是 16 的倍数：
+  // Qwen-Image 2.1 的 VAE 是 16 倍下采样）。
+  const ctx = imgCtx();
+  const tierOpt = ctx.tiers.find(t => t.key === tier);
   const megapixels = (tierOpt && tierOpt.megapixels) || 1.0;
-  const mult = IMG_OPTIONS.sizeMultiple || 16;
+  const mult = ctx.multiple || 16;
   const [wr, hr] = IMG_ASPECT_NUM[aspect] || [16, 9];
   const total = megapixels * 1024 * 1024;
   const scale = Math.sqrt(total / (wr * hr));
@@ -295,17 +340,41 @@ function imgAutoSize(tier, aspect) {
   return [w, h];
 }
 
+// 当前图像模式的「参数上下文」：Z-Image 与 Qwen-Image 2.1 两套清单 + 两份状态。
+// 面板所有控件都从这里取当前该用的那一套，避免两套参数互相污染。
+function imgCtx() {
+  if (isQwenMode()) {
+    return {
+      opts: QWEN_OPTIONS,
+      st: state.imgQwen,
+      tiers: QWEN_OPTIONS.tiers,
+      models: QWEN_OPTIONS.models,
+      multiple: QWEN_OPTIONS.sizeMultiple,
+      maxMp: QWEN_OPTIONS.maxDirectMp,
+    };
+  }
+  return {
+    opts: IMG_OPTIONS,
+    st: state.img,
+    tiers: IMG_OPTIONS.tiers,
+    models: IMG_OPTIONS.models,
+    multiple: IMG_OPTIONS.sizeMultiple,
+    maxMp: IMG_OPTIONS.maxDirectMp,
+  };
+}
+
 function imgCurrentSize() {
-  const s = state.img;
+  const s = imgCtx().st;
   if (s.width && s.height) return [s.width, s.height];
   return imgAutoSize(s.tier, s.aspect);
 }
 
 // 档位下拉：显示具体像素，例如 "1080P · 1920×1088 (2.0MP)"
 function imgTierLabel(tier) {
-  const [w, h] = imgAutoSize(tier.key, state.img.aspect);
+  const ctx = imgCtx();
+  const [w, h] = imgAutoSize(tier.key, ctx.st.aspect);
   const mp = (w * h) / (1024 * 1024);
-  const up = mp > (IMG_OPTIONS.maxDirectMp || 3);
+  const up = mp > (ctx.maxMp || 3);
   return `${tier.label} · ${w}×${h} (${mp.toFixed(1)}MP)${up ? " · 放大" : ""}`;
 }
 
@@ -333,18 +402,29 @@ function renderBatchChips() {
 }
 
 // ---------- LoRA 面板 ----------
+// LoRA 面板上下文：Z-Image 与 Qwen-Image 2.1 是两套清单 + 两份已选列表。
+// 底模结构不同，兼容性要各自比对，不能混用。
+function imgLoraCtx() {
+  if (isQwenMode()) {
+    return {store: QWEN_LORAS, list: state.imgQwen.loras, label: "Qwen-Image 2.1"};
+  }
+  return {store: IMG_LORAS, list: state.img.loras, label: "Z-Image"};
+}
+
 function imgLoraMeta(name) {
-  return IMG_LORAS.available.find(l => l.name === name) || null;
+  const ctx = imgLoraCtx();
+  return ctx.store.available.find(l => l.name === name) || null;
 }
 
 function renderLoraSelect() {
   const sel = $("#imgLoraSelect");
   if (!sel) return;
-  const used = new Set(state.img.loras.map(l => l.name));
-  const options = IMG_LORAS.available.filter(l => !used.has(l.name));
+  const ctx = imgLoraCtx();
+  const used = new Set(ctx.list.map(l => l.name));
+  const options = ctx.store.available.filter(l => !used.has(l.name));
   sel.innerHTML = options.length
     ? options.map(l => `<option value="${esc(l.name)}">${esc(l.display)}</option>`).join("")
-    : `<option value="">${IMG_LORAS.available.length ? "全部已添加" : "本机未找到 Z-Image LoRA"}</option>`;
+    : `<option value="">${ctx.store.available.length ? "全部已添加" : `本机未找到 ${ctx.label} LoRA`}</option>`;
   sel.disabled = !options.length;
   $("#imgLoraAdd").disabled = !options.length;
 }
@@ -353,7 +433,7 @@ function renderLoraSelect() {
 function renderExcludedLoras() {
   const box = $("#imgLoraExcluded");
   if (!box) return;
-  const items = IMG_LORAS.incompatible || [];
+  const items = imgLoraCtx().store.incompatible || [];
   if (!items.length) {
     box.innerHTML = "";
     box.hidden = true;
@@ -423,7 +503,7 @@ function renderLoraList() {
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
         ${dampNote}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
-        <button type="button" class="img-lora-btn down" title="下移" ${index === state.img.loras.length - 1 ? "disabled" : ""}>↓</button>
+        <button type="button" class="img-lora-btn down" title="下移" ${index === ctx.list.length - 1 ? "disabled" : ""}>↓</button>
         <button type="button" class="img-lora-btn del" title="删除">×</button>
       </div>
       <div class="img-lora-slider">
@@ -432,7 +512,7 @@ function renderLoraList() {
         ${cap < 1.0 ? `<span class="img-lora-cap" title="该 LoRA 权重相对原权重过大，强度过高会破坏采样、实测出图为彩色噪点">上限 ${cap.toFixed(2)}</span>` : ""}
         ${damp > 0 ? `<span class="img-lora-cap damped" title="context_refiner 阻尼系数 ${damp.toFixed(2)}（服务端自动应用，强度不打折）">ctx 阻尼 ${damp.toFixed(2)}</span>` : ""}
       </div>
-      ${excluded ? `<div class="img-lora-excl-reason">${esc(item.incompatible_reason || "与 Z-Image 底模不兼容")}</div>` : ""}
+      ${excluded ? `<div class="img-lora-excl-reason">${esc(item.incompatible_reason || `与 ${ctx.label} 底模不兼容`)}</div>` : ""}
       ${triggerBlock}
       <div class="img-lora-meta">基础：${esc(meta ? meta.base : "—")}${meta && meta.strength_source ? " · " + esc(meta.strength_source) : ""}</div>
       ${damp > 0 ? `<div class="img-lora-meta">context_refiner 扰动 ${(ctxPert * 100).toFixed(1)}%，已自动阻尼至 ×${damp.toFixed(2)}（长提示词下避免彩色噪点，强度不打折）</div>` : ""}
@@ -442,23 +522,24 @@ function renderLoraList() {
 
   box.querySelectorAll(".img-lora-item").forEach(el => {
     const index = Number(el.dataset.idx);
-    const item = state.img.loras[index];
+    const list = imgLoraCtx().list;
+    const item = list[index];
     el.querySelector(".toggle").addEventListener("click", () => {
       item.enabled = item.enabled === false;
       saveLoraConfig();
     });
     el.querySelector(".up").addEventListener("click", () => {
       if (index === 0) return;
-      [state.img.loras[index - 1], state.img.loras[index]] = [state.img.loras[index], state.img.loras[index - 1]];
+      [list[index - 1], list[index]] = [list[index], list[index - 1]];
       saveLoraConfig();
     });
     el.querySelector(".down").addEventListener("click", () => {
-      if (index === state.img.loras.length - 1) return;
-      [state.img.loras[index + 1], state.img.loras[index]] = [state.img.loras[index], state.img.loras[index + 1]];
+      if (index === list.length - 1) return;
+      [list[index + 1], list[index]] = [list[index], list[index + 1]];
       saveLoraConfig();
     });
     el.querySelector(".del").addEventListener("click", () => {
-      state.img.loras.splice(index, 1);
+      list.splice(index, 1);
       saveLoraConfig();
     });
     const slider = el.querySelector("input.strength");
@@ -478,12 +559,12 @@ function renderLoraList() {
     }
     el.querySelector(".img-lora-info-btn").addEventListener("click", () => openLoraInfo(item.name));
   });
-  const accelNote = (IMG_LORAS.acceleration || []).length
-    ? ` 加速/蒸馏类 ${IMG_LORAS.acceleration.length} 个由工作流固定使用（不列出）。` : "";
-  const badNote = (IMG_LORAS.incompatible || []).length
-    ? ` ${IMG_LORAS.incompatible.length} 个不兼容 LoRA 已排除。` : "";
+  const accelNote = (ctx.store.acceleration || []).length
+    ? ` 加速/蒸馏类 ${ctx.store.acceleration.length} 个由工作流固定使用（不列出）。` : "";
+  const badNote = (ctx.store.incompatible || []).length
+    ? ` ${ctx.store.incompatible.length} 个不兼容 LoRA 已排除。` : "";
   $("#imgLoraNote").textContent =
-    `已添加 ${state.img.loras.length} 个效果 LoRA（配置存在服务端，局域网共用）。${accelNote}${badNote}`;
+    `已添加 ${ctx.list.length} 个效果 LoRA（配置存在服务端，局域网共用）。${accelNote}${badNote}`;
 }
 
 // LoRA 配置持久化到服务端
@@ -494,10 +575,11 @@ function saveLoraConfig() {
   clearTimeout(loraSaveTimer);
   loraSaveTimer = setTimeout(async () => {
     try {
+      const ctx = imgLoraCtx();
       const resp = await fetch("/api/image-loras", {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({loras: state.img.loras}),
+        body: JSON.stringify({loras: ctx.list, base: ctx.label}),
       });
       const data = await resp.json();
       if (!resp.ok) {
@@ -559,38 +641,48 @@ function closeLoraInfo() {
 // 载入本机 LoRA 清单 + 已保存配置
 async function loadImageLoras() {
   try {
-    const resp = await fetch("/api/image-loras", {cache: "no-store"});
-    if (!resp.ok) return;
-    const data = await resp.json();
-    IMG_LORAS.available = data.available || [];
-    IMG_LORAS.acceleration = data.acceleration || [];
-    IMG_LORAS.incompatible = data.incompatible || [];
-    state.img.loras = (data.config || []).map(l => ({
-      name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
-      trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
-      // 被排除的（不兼容）也要显示出来并说明原因
-      excluded: !!l.excluded,
-      incompatible_reason: l.incompatible_reason || "",
-      display: l.display || l.name,
-      strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
-      ctx_damping: l.ctx_damping !== undefined ? l.ctx_damping : null,
-      ctx_perturbation: l.ctx_perturbation !== undefined ? l.ctx_perturbation : null,
-    }));
-    const hint = $("#imgLoraHint");
-    if (hint) hint.textContent = `本机 ${IMG_LORAS.available.length} 个可用`;
+    // 两族底模的 LoRA 清单与配置是分开的（底模结构不同，兼容性各自比对，
+    // 混在一起会让用户选到不匹配的权重）。
+    const bases = [
+      {name: "Z-Image", store: IMG_LORAS,
+       set: v => { state.img.loras = v; }},
+      {name: "Qwen-Image 2.1", store: QWEN_LORAS,
+       set: v => { state.imgQwen.loras = v; }},
+    ];
+    for (const base of bases) {
+      const resp = await fetch("/api/image-loras?base=" + encodeURIComponent(base.name),
+                              {cache: "no-store"});
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      base.store.available = data.available || [];
+      base.store.acceleration = data.acceleration || [];
+      base.store.incompatible = data.incompatible || [];
+      base.set((data.config || []).map(l => ({
+        name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
+        trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
+        // 被排除的（不兼容）也要显示出来并说明原因
+        excluded: !!l.excluded,
+        incompatible_reason: l.incompatible_reason || "",
+        display: l.display || l.name,
+        strength_cap: l.strength_cap !== undefined ? l.strength_cap : 1.5,
+        ctx_damping: l.ctx_damping !== undefined ? l.ctx_damping : null,
+        ctx_perturbation: l.ctx_perturbation !== undefined ? l.ctx_perturbation : null,
+      })));
+    }
     renderLoraSelect();
     renderLoraList();
   } catch (e) { /* 静默：不阻断出图 */ }
 }
 
 function renderImagePanel() {
-  const s = state.img;
-  const model = IMG_OPTIONS.models[s.model];
+  const ctx = imgCtx();
+  const s = ctx.st;
+  const model = ctx.models[s.model];
 
   // 分辨率档位
   const resSel = $("#imgResSelect");
   resSel.innerHTML = "";
-  IMG_OPTIONS.tiers.forEach(tier => {
+  ctx.tiers.forEach(tier => {
     const opt = document.createElement("option");
     opt.value = tier.key;
     opt.textContent = imgTierLabel(tier);
@@ -601,7 +693,7 @@ function renderImagePanel() {
   // 比例
   const chips = $("#imgAspectChips");
   chips.innerHTML = "";
-  IMG_OPTIONS.aspects.forEach(aspect => {
+  ctx.opts.aspects.forEach(aspect => {
     const b = document.createElement("button");
     b.type = "button";
     b.dataset.v = aspect.key;
@@ -620,7 +712,7 @@ function renderImagePanel() {
   // 模型
   const modelSel = $("#imgModelSelect");
   modelSel.innerHTML = "";
-  Object.entries(IMG_OPTIONS.models).forEach(([key, m]) => {
+  Object.entries(ctx.models).forEach(([key, m]) => {
     const opt = document.createElement("option");
     opt.value = key;
     opt.textContent = m.label;
@@ -651,20 +743,48 @@ function renderImagePanel() {
   fillSelect($("#imgSchedulerSelect"), model && model.schedulers, s.scheduler);
 
   // 步数 / CFG / shift
-  $("#imgSteps").value = s.steps;
+  // 滑块量程按模式切换：Z-Image 的 SHIFT 是 3（min=1），
+  // Qwen-Image 2.1 的 SHIFT 是 0.69 —— 用同一套量程会把 0.69 夹成 1，
+  // 界面显示的值就和真正送出去的不一致。
+  const stepsEl = $("#imgSteps"), cfgEl = $("#imgCfg"), shiftEl = $("#imgShift");
+  if (isQwenMode()) {
+    stepsEl.min = "1"; stepsEl.max = "60"; stepsEl.step = "1";
+    cfgEl.min = "0"; cfgEl.max = "8"; cfgEl.step = "0.1";
+    shiftEl.min = "0"; shiftEl.max = "3"; shiftEl.step = "0.01";
+  } else {
+    stepsEl.min = "1"; stepsEl.max = "60"; stepsEl.step = "1";
+    cfgEl.min = "1"; cfgEl.max = "8"; cfgEl.step = "0.5";
+    shiftEl.min = "1"; shiftEl.max = "7"; shiftEl.step = "0.5";
+  }
+  stepsEl.value = s.steps;
   $("#imgStepsVal").textContent = s.steps;
-  $("#imgCfg").value = s.cfg;
-  $("#imgCfgVal").textContent = Number(s.cfg).toFixed(1);
-  $("#imgShift").value = s.shift;
-  $("#imgShiftVal").textContent = s.shift;
+  cfgEl.value = s.cfg;
+  $("#imgCfgVal").textContent = Number(s.cfg).toFixed(isQwenMode() ? 1 : 1);
+  shiftEl.value = s.shift;
+  $("#imgShiftVal").textContent = Number(s.shift).toFixed(isQwenMode() ? 2 : 1);
 
   // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
   const negSupported = !!(model && model.supports_negative);
   $("#imgNegField").style.display = negSupported ? "" : "none";
   $("#imgNegNote").textContent = negSupported
-    ? "Base 非蒸馏，负面提示词生效（官方强烈建议）"
+    ? (isQwenMode()
+        ? "Qwen-Image 2.1 非蒸馏，负面提示词生效。"
+        : "Base 非蒸馏，负面提示词生效（官方强烈建议）")
     : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
   if (negSupported) $("#imgNegative").value = s.negative || "";
+
+  // Qwen-Image 2.1 专属：PE 开关 + 参考图区
+  const qwen = isQwenMode();
+  const peField = $("#imgPeField");
+  const refField = $("#imgRefField");
+  if (peField) peField.style.display = qwen ? "" : "none";
+  if (refField) refField.style.display = (qwen && state.mode === "i2i_qwen") ? "" : "none";
+  if (qwen) {
+    const peBox = $("#imgUsePe");
+    if (peBox) peBox.checked = !!state.imgQwen.usePe;
+    updateQwenPeNote();
+    renderQwenRefs();
+  }
 
   renderBatchChips();
   renderLoraSelect();
@@ -675,24 +795,26 @@ function renderImagePanel() {
 }
 
 function updateImageSizeFields() {
+  const ctx = imgCtx();
   const [w, h] = imgCurrentSize();
   $("#imgWidth").value = w;
   $("#imgHeight").value = h;
   $("#imgSizeHint").textContent = `${w}×${h}`;
   const mp = (w * h) / (1024 * 1024);
-  const up = mp > (IMG_OPTIONS.maxDirectMp || 3);
-  const manual = state.img.width && state.img.height;
+  const up = mp > (ctx.maxMp || 3);
+  const manual = ctx.st.width && ctx.st.height;
   const parts = [`${mp.toFixed(2)} MP`];
-  if (up) parts.push("超过 3MP，改走「生成 + 官方 2K 放大」路径");
+  if (up) parts.push(`超过 ${ctx.maxMp}MP，改走「生成 + 官方放大」路径`);
   if (manual) parts.push("已手动微调宽高，点「自动」可恢复档位计算值");
   $("#imgSizeManualNote").textContent = parts.join(" · ");
 }
 
 // 切模型时把该版本的官方推荐值同步到各控件（推荐值来自服务端下发的清单）
 function applyModelDefaults(modelKey) {
-  const m = IMG_OPTIONS.models[modelKey];
+  const ctx = imgCtx();
+  const m = ctx.models[modelKey];
   if (!m) return;
-  const s = state.img;
+  const s = ctx.st;
   s.model = modelKey;
   s.steps = m.steps;
   s.cfg = m.cfg;
@@ -702,21 +824,24 @@ function applyModelDefaults(modelKey) {
 }
 
 function updateImageModelNote() {
-  const m = IMG_OPTIONS.models[state.img.model];
+  const ctx = imgCtx();
+  const s = ctx.st;
+  const m = ctx.models[s.model];
   if (!m) return;
   $("#imgModelNote").textContent = m.note;
   if (m.warn) $("#imgModelWarn").textContent = m.warn;
   // 推荐值高亮：当前值等于该模型推荐值时打「推荐」标记
-  $("#imgSamplerHint").textContent = state.img.sampler === m.sampler ? "推荐" : "已改";
-  $("#imgSchedulerHint").textContent = state.img.scheduler === m.scheduler ? "推荐" : "已改";
-  $("#imgStepsHint").textContent = state.img.steps === m.steps ? "推荐" : "已改";
-  $("#imgCfgHint").textContent = Number(state.img.cfg) === Number(m.cfg) ? "推荐" : "已改";
-  $("#imgShiftHint").textContent = Number(state.img.shift) === Number(m.shift) ? "推荐" : "已改";
+  $("#imgSamplerHint").textContent = s.sampler === m.sampler ? "推荐" : "已改";
+  $("#imgSchedulerHint").textContent = s.scheduler === m.scheduler ? "推荐" : "已改";
+  $("#imgStepsHint").textContent = s.steps === m.steps ? "推荐" : "已改";
+  $("#imgCfgHint").textContent = Number(s.cfg) === Number(m.cfg) ? "推荐" : "已改";
+  $("#imgShiftHint").textContent = Number(s.shift) === Number(m.shift) ? "推荐" : "已改";
 }
 
 $("#imgResSelect").addEventListener("change", e => {
-  state.img.tier = e.target.value;
-  state.img.width = null; state.img.height = null;
+  const s = imgCtx().st;
+  s.tier = e.target.value;
+  s.width = null; s.height = null;
   renderImagePanel();
 });
 $("#imgModelSelect").addEventListener("change", e => {
@@ -726,45 +851,124 @@ $("#imgModelSelect").addEventListener("change", e => {
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
 $("#imgSamplerSelect").addEventListener("change", e => {
-  state.img.sampler = e.target.value;
+  imgCtx().st.sampler = e.target.value;
   updateImageModelNote();
 });
 $("#imgSchedulerSelect").addEventListener("change", e => {
-  state.img.scheduler = e.target.value;
+  imgCtx().st.scheduler = e.target.value;
   updateImageModelNote();
 });
 $("#imgSteps").addEventListener("input", e => {
-  state.img.steps = parseInt(e.target.value);
-  $("#imgStepsVal").textContent = state.img.steps;
+  const s = imgCtx().st;
+  s.steps = parseInt(e.target.value);
+  $("#imgStepsVal").textContent = s.steps;
   updateImageModelNote();
 });
 $("#imgCfg").addEventListener("input", e => {
-  state.img.cfg = parseFloat(e.target.value);
-  $("#imgCfgVal").textContent = state.img.cfg.toFixed(1);
+  const s = imgCtx().st;
+  s.cfg = parseFloat(e.target.value);
+  $("#imgCfgVal").textContent = s.cfg.toFixed(1);
   updateImageModelNote();
 });
 $("#imgShift").addEventListener("input", e => {
-  state.img.shift = parseFloat(e.target.value);
-  $("#imgShiftVal").textContent = state.img.shift;
+  const s = imgCtx().st;
+  s.shift = parseFloat(e.target.value);
+  $("#imgShiftVal").textContent = Number(s.shift).toFixed(isQwenMode() ? 2 : 1);
   updateImageModelNote();
 });
 $("#imgNegative").addEventListener("input", e => {
-  state.img.negative = e.target.value;
+  imgCtx().st.negative = e.target.value;
 });
 $("#imgWidth").addEventListener("input", e => {
+  const s = imgCtx().st;
   const v = parseInt(e.target.value);
-  state.img.width = Number.isFinite(v) && v > 0 ? v : null;
+  s.width = Number.isFinite(v) && v > 0 ? v : null;
   updateImageSizeFields();
 });
 $("#imgHeight").addEventListener("input", e => {
+  const s = imgCtx().st;
   const v = parseInt(e.target.value);
-  state.img.height = Number.isFinite(v) && v > 0 ? v : null;
+  s.height = Number.isFinite(v) && v > 0 ? v : null;
   updateImageSizeFields();
 });
 $("#imgSizeReset").addEventListener("click", () => {
-  state.img.width = null; state.img.height = null;
+  const s = imgCtx().st;
+  s.width = null; s.height = null;
   renderImagePanel();
 });
+
+// ---------- Qwen-Image 2.1：官方 PE 提示词扩写开关 ----------
+$("#imgUsePe").addEventListener("change", e => {
+  state.imgQwen.usePe = !!e.target.checked;
+  updateQwenPeNote();
+});
+
+// ---------- Qwen-Image 2.1：参考图（最多 9 张） ----------
+function qwenRefLimit() {
+  return QWEN_OPTIONS.maxRefImages || 9;
+}
+
+function renderQwenRefs() {
+  const box = $("#imgRefList");
+  if (!box) return;
+  const refs = state.imgQwen.refs;
+  const max = qwenRefLimit();
+  box.innerHTML = refs.map((r, i) => `
+    <div class="img-ref-item" data-idx="${i}">
+      <img src="${r.url}" alt="参考图 ${i + 1}">
+      <button type="button" class="img-ref-del" data-del="${i}" title="移除">×</button>
+    </div>`).join("");
+  box.querySelectorAll("[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.del);
+      const r = state.imgQwen.refs[idx];
+      if (r && r.url && r.url.startsWith("blob:")) URL.revokeObjectURL(r.url);
+      state.imgQwen.refs.splice(idx, 1);
+      renderQwenRefs();
+    });
+  });
+  $("#imgRefHint").textContent = refs.length
+    ? `${refs.length} / ${max} 张`
+    : `最多 ${max} 张`;
+  const note = $("#imgRefNote");
+  if (refs.length >= max) {
+    note.textContent = `已达上限 ${max} 张。官方图片编辑工作流就是 ${max} 张参考图。`;
+  } else if (refs.length) {
+    note.textContent = `还可以再加 ${max - refs.length} 张。`;
+  } else {
+    note.textContent = `至少 1 张、最多 ${max} 张。多图可做换头/换装/融合等编辑。`;
+  }
+  $("#imgRefAdd").disabled = refs.length >= max;
+}
+
+$("#imgRefAdd").addEventListener("click", () => $("#imgRefInput").click());
+$("#imgRefInput").addEventListener("change", e => {
+  const files = Array.from(e.target.files || []);
+  const max = qwenRefLimit();
+  const cur = state.imgQwen.refs;
+  let added = 0;
+  let overflow = 0;
+  for (const file of files) {
+    if (cur.length >= max) { overflow++; continue; }
+    cur.push({file, name: file.name, url: URL.createObjectURL(file)});
+    added++;
+  }
+  e.target.value = "";
+  renderQwenRefs();
+  if (overflow) {
+    alert(`参考图最多 ${max} 张，超出的 ${overflow} 张未添加。`);
+  }
+});
+
+function updateQwenPeNote() {
+  const note = $("#imgPeNote");
+  if (!note) return;
+  const m = QWEN_OPTIONS.models[state.imgQwen.model];
+  const peClip = m ? (m.clip_t2i || "") : "";
+  note.textContent = state.imgQwen.usePe
+    ? `已启用：提示词会先经官方 PE 编码器（${peClip.split("/").pop()}）结构化扩写再送入模型。关掉则提示词原样使用。`
+    : "已关闭：提示词原样送入模型，不做官方扩写。";
+}
 
 // 拉取服务端下发的档位 / 比例 / 模型清单
 async function loadImageOptions() {
@@ -777,6 +981,28 @@ async function loadImageOptions() {
     IMG_OPTIONS.models = data.models || {};
     IMG_OPTIONS.sizeMultiple = data.size_multiple || 16;
     IMG_OPTIONS.maxDirectMp = data.max_direct_mp || 3;
+    // Qwen-Image 2.1 的独立一套清单（服务端 qwen 字段）
+    const q = data.qwen || {};
+    QWEN_OPTIONS.tiers = q.tiers || [];
+    QWEN_OPTIONS.aspects = q.aspects || [];
+    QWEN_OPTIONS.models = q.models || {};
+    QWEN_OPTIONS.sizeMultiple = q.size_multiple || 16;
+    QWEN_OPTIONS.maxDirectMp = q.max_direct_mp || 4;
+    QWEN_OPTIONS.defaultTier = q.default_tier || "1mp";
+    QWEN_OPTIONS.defaultModel = q.default_model || "qwen_image_2.1_bf16";
+    QWEN_OPTIONS.maxRefImages = q.max_ref_images || 9;
+    QWEN_OPTIONS.minRefImages = q.min_ref_images || 1;
+    // Qwen 默认值对齐服务端推荐（首次进入该模式时用）
+    const qm = QWEN_OPTIONS.models[QWEN_OPTIONS.defaultModel];
+    if (qm && !state.imgQwen.model) {
+      state.imgQwen.model = QWEN_OPTIONS.defaultModel;
+      state.imgQwen.steps = qm.steps;
+      state.imgQwen.cfg = qm.cfg;
+      state.imgQwen.shift = qm.shift;
+      state.imgQwen.sampler = qm.sampler;
+      state.imgQwen.scheduler = qm.scheduler;
+      state.imgQwen.tier = QWEN_OPTIONS.defaultTier;
+    }
     if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
       state.img.model = data.default_model;
     }
@@ -1090,7 +1316,7 @@ $("#genBtn").addEventListener("click", async () => {
   const mode = state.mode;
   // 图像模式：提示词未增强时先确认
   //   确认 -> 用用户原始提示词继续生成；取消/关闭 -> 中止本次生成（不自动开始增强）
-  if (mode === "t2i" && currentPromptLevel() === 0) {
+  if (IMAGE_MODES.includes(mode) && currentPromptLevel() === 0) {
     const ok = await askEnhanceGate();
     if (!ok) return;
   }
@@ -1107,32 +1333,38 @@ $("#genBtn").addEventListener("click", async () => {
     lora_strength: state.loraStrength,
     seed: $("#seed").value.trim() || null,
   };
-  if (mode === "t2i") {
-    // 图像模式：把档位 / 比例 / 实际宽高 / Z-Image 采样参数一起带上去。
+  if (IMAGE_MODES.includes(mode)) {
+    // 图像模式：把档位 / 比例 / 实际宽高 / 采样参数一起带上去。
     // resolution 复用同一个字段，图像模式的值是分辨率档位（1mp / 480p…4k）。
+    const ctx = imgCtx();
+    const s = ctx.st;
     const [w, h] = imgCurrentSize();
-    params.resolution = state.img.tier;
-    params.aspect = state.img.aspect;
+    params.resolution = s.tier;
+    params.aspect = s.aspect;
     params.width = w;
     params.height = h;
-    params.model = state.img.model;
-    params.sampler = state.img.sampler;
-    params.scheduler = state.img.scheduler;
-    params.steps = state.img.steps;
-    params.cfg = state.img.cfg;
-    params.shift = state.img.shift;
-    params.negative_prompt = state.img.negative || "";
+    params.model = s.model;
+    params.sampler = s.sampler;
+    params.scheduler = s.scheduler;
+    params.steps = s.steps;
+    params.cfg = s.cfg;
+    params.shift = s.shift;
+    params.negative_prompt = s.negative || "";
     // 生成批次：一次提交 N 张（服务端拆成 N 个独立批次）
-    params.batch_count = state.img.batchCount;
+    params.batch_count = s.batchCount;
     // LoRA：只提交启用且强度 > 0 的（服务端会再校验文件是否存在）
     // trigger 一起带上 —— 服务端据此把触发词追加进最终提示词
-    params.loras = state.img.loras
+    params.loras = s.loras
       .filter(l => l.enabled !== false && Number(l.strength) > 0)
       .map(l => ({
         name: l.name,
         strength: Number(l.strength),
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
       }));
+    if (isQwenMode()) {
+      // Qwen-Image 2.1：官方 PE 提示词扩写开关
+      params.use_pe = !!state.imgQwen.usePe;
+    }
   }
   fd.append("params", JSON.stringify(params));
   try {
@@ -1161,6 +1393,19 @@ $("#genBtn").addEventListener("click", async () => {
       const refs = [state.files.ref0, state.files.ref1, state.files.ref2].filter(Boolean);
       const assetCount = Object.keys(state.assetRefs || {}).filter(k => k.startsWith("ref")).length;
       if (!refs.length && !assetCount) { alert("参考模式至少需要 1 张参考图"); return; }
+      refs.forEach(f => fd.append("file_ref", f));
+    } else if (mode === "i2i_qwen") {
+      // Qwen 图片编辑：参考图 1-9 张（上限由服务端再校验一次）
+      const max = QWEN_OPTIONS.maxRefImages || 9;
+      const refs = state.imgQwen.refs.map(r => r.file).filter(Boolean);
+      if (!refs.length) {
+        alert(`图片编辑至少需要 1 张参考图（最多 ${max} 张）`);
+        return;
+      }
+      if (refs.length > max) {
+        alert(`参考图最多 ${max} 张，当前 ${refs.length} 张。`);
+        return;
+      }
       refs.forEach(f => fd.append("file_ref", f));
     }
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
