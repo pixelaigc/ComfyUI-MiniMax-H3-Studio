@@ -332,8 +332,10 @@ class TestGpuSelection(DeepAudioTestBase):
 
     def test_pick_gpu_skips_busy_cards(self):
         gpus = [
-            {"index": 0, "uuid": "GPU-busy", "free_mb": 500.0, "total_mb": 49140.0},
-            {"index": 1, "uuid": "GPU-free", "free_mb": 19000.0, "total_mb": 23040.0},
+            {"index": 0, "uuid": "GPU-busy", "free_mb": 500.0, "total_mb": 49140.0,
+             "compute_cap": "8.9"},
+            {"index": 1, "uuid": "GPU-free", "free_mb": 19000.0, "total_mb": 23040.0,
+             "compute_cap": "8.9"},
         ]
         old = audio_deep.list_gpus
         try:
@@ -345,6 +347,88 @@ class TestGpuSelection(DeepAudioTestBase):
             self.assertEqual(picked["index"], 1)
         finally:
             audio_deep.list_gpus = old
+
+    def test_pick_gpu_skips_pascal_cards(self):
+        """回归：cuDNN 9.x 在 Pascal（sm_61）上会 SIGABRT，必须跳过。
+
+        实测：P40（算力 6.1）上跑 demucs/ASR 直接 abort（退出码 -6），
+        报 "Invalid handle. Cannot load symbol cudnnCreateTensorDescriptor"。
+        """
+        gpus = [
+            {"index": 0, "uuid": "GPU-p40", "free_mb": 19000.0, "total_mb": 23040.0,
+             "compute_cap": "6.1"},
+            {"index": 1, "uuid": "GPU-new", "free_mb": 19000.0, "total_mb": 49140.0,
+             "compute_cap": "8.9"},
+        ]
+        old = audio_deep.list_gpus
+        try:
+            audio_deep.list_gpus = lambda: gpus
+            picked = audio_deep.pick_gpu(["asr"])
+            self.assertIsNotNone(picked)
+            self.assertEqual(picked["uuid"], "GPU-new",
+                             "必须跳过算力不足的 Pascal 卡")
+        finally:
+            audio_deep.list_gpus = old
+
+    def test_only_pascal_gpu_falls_back_to_cpu(self):
+        """只有 Pascal 卡时退回 CPU，并在提示里说明原因。"""
+        gpus = [{"index": 0, "uuid": "GPU-p40", "free_mb": 19000.0,
+                 "total_mb": 23040.0, "compute_cap": "6.1"}]
+        old = audio_deep.list_gpus
+        try:
+            audio_deep.list_gpus = lambda: gpus
+            self.assertIsNone(audio_deep.pick_gpu(["asr"]))
+            hint = audio_deep.gpu_selection_hint(["asr"])
+            self.assertIn("算力", hint)
+            self.assertIn("CPU", hint)
+        finally:
+            audio_deep.list_gpus = old
+
+    def test_cap_gate_threshold(self):
+        self.assertTrue(audio_deep._cap_ok("7.0"))
+        self.assertTrue(audio_deep._cap_ok("8.9"))
+        self.assertTrue(audio_deep._cap_ok("7.5"))
+        self.assertFalse(audio_deep._cap_ok("6.1"))
+        self.assertFalse(audio_deep._cap_ok("6.0"))
+        # 拿不到算力时放行（不误杀）
+        self.assertTrue(audio_deep._cap_ok(""))
+        self.assertTrue(audio_deep._cap_ok("N/A"))
+
+    def test_parse_stage_progress(self):
+        """脚本 stderr 的阶段标记要能解析出阶段名与进度。"""
+        stage, frac = audio_deep.parse_stage_progress(
+            "[analyze] stage bpm ...\n")
+        self.assertEqual(stage, "bpm")
+        self.assertGreater(frac, 0)
+        # 后面的阶段覆盖前面的
+        stage, frac = audio_deep.parse_stage_progress(
+            "[analyze] stage bpm ...\n[analyze] stage asr ...\n")
+        self.assertEqual(stage, "asr")
+        self.assertGreater(frac, 0.5)
+        # 认不出来
+        stage, frac = audio_deep.parse_stage_progress("随便什么输出")
+        self.assertIsNone(stage)
+        self.assertEqual(frac, 0.0)
+        stage, frac = audio_deep.parse_stage_progress("")
+        self.assertIsNone(stage)
+
+    def test_progress_callback_is_invoked(self):
+        """进度回调要真的被调用（否则 UI 进度条永远不动）。"""
+        src = self.make_wav()
+        seen = []
+        # 让假脚本打印阶段标记
+        script = self.script
+        original = script.read_text(encoding="utf-8")
+        script.write_text(
+            "import sys\n"
+            "print('[analyze] stage bpm ...', file=sys.stderr, flush=True)\n"
+            "print('[analyze] stage asr ...', file=sys.stderr, flush=True)\n"
+            + original, encoding="utf-8")
+        self.addCleanup(script.write_text, original, encoding="utf-8")
+        audio_deep.run_analyzer(src, stages=["bpm", "asr"],
+                                progress_cb=lambda s, f: seen.append((s, f)))
+        self.assertTrue(seen, "进度回调应被触发")
+        self.assertEqual([s for s, _ in seen], ["bpm", "asr"])
 
     def test_pick_gpu_returns_none_when_all_busy(self):
         gpus = [{"index": 0, "uuid": "GPU-x", "free_mb": 100.0, "total_mb": 49140.0}]

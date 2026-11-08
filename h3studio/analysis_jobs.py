@@ -81,6 +81,13 @@ AUDIO_STAGES = [
 ]
 
 
+def _audio_progress_for(stage: str) -> tuple[float, str]:
+    """阶段名 -> (进度基准, 中文提示)。"""
+    idx = next((i for i, (k, _, _) in enumerate(AUDIO_STAGES) if k == stage), 0)
+    _, label, base = AUDIO_STAGES[idx]
+    return base, label
+
+
 def _audio_progress(stage_index: int, frac: float = 0.5) -> tuple[float, str]:
     """按阶段推进进度条。"""
     if stage_index < 0:
@@ -131,12 +138,11 @@ def _run_audio_deep(job_id: int, asset_id: str, source: Path,
 
         # 分阶段回调 -> 更新进度条
         def progress_cb(stage: str, frac: float):
+            """脚本每进入一个新阶段回调一次。"""
             try:
                 c = _library_conn()
-                idx = next((i for i, (k, _, _) in enumerate(AUDIO_STAGES)
-                            if k == stage), 0)
-                prog, label = _audio_progress(idx, frac)
-                asset_repo.update_job(c, job_id, stage=label, progress=prog)
+                _, label = _audio_progress_for(stage)
+                asset_repo.update_job(c, job_id, stage=label, progress=frac)
                 c.close()
             except Exception:
                 pass

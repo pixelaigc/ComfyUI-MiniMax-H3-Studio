@@ -70,6 +70,12 @@ STAGE_VRAM_MB = {
     "llm": 0,          # 走 H3 Studio 的 HTTP 代理，不占本地 GPU
 }
 
+#: 最低 compute capability。cuDNN 9.x 要求 sm_70+；
+#: Pascal 卡（P40 sm_61 / 2080Ti 是 sm_75 没问题）跑 cuDNN 算子会
+#: "Invalid handle. Cannot load symbol cudnnCreateTensorDescriptor" 然后 SIGABRT。
+#: 实测：P40 上 demucs/ASR 直接 abort（退出码 -6）。
+MIN_COMPUTE_CAPABILITY = (7, 0)
+
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
@@ -122,7 +128,7 @@ def check_environment() -> dict:
 
 def list_gpus() -> list[dict]:
     """
-    列出本机 GPU 的 uuid / 空闲显存 / 总量。
+    列出本机 GPU 的 uuid / 空闲显存 / 总量 / compute capability。
 
     用 nvidia-smi 查。查不到就返回空列表（调用方退回 CPU）。
     """
@@ -130,8 +136,8 @@ def list_gpus() -> list[dict]:
         return []
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=index,uuid,memory.free,memory.total",
-             "--format=csv,noheader,nounits"],
+            ["nvidia-smi", "--query-gpu=index,uuid,memory.free,memory.total,"
+             "compute_cap", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=20,
             creationflags=CREATE_NO_WINDOW)
     except (OSError, subprocess.SubprocessError):
@@ -149,10 +155,22 @@ def list_gpus() -> list[dict]:
                 "uuid": parts[1],
                 "free_mb": float(parts[2]),
                 "total_mb": float(parts[3]),
+                "compute_cap": parts[4] if len(parts) > 4 else "",
             })
         except ValueError:
             continue
     return gpus
+
+
+def _cap_ok(cap: str) -> bool:
+    """compute capability 是否满足 cuDNN 要求。拿不到就放行（保守起见不误杀）。"""
+    if not cap:
+        return True
+    try:
+        major, minor = cap.split(".")
+        return (int(major), int(minor)) >= MIN_COMPUTE_CAPABILITY
+    except (ValueError, AttributeError):
+        return True
 
 
 def pick_gpu(stages=None, min_free_mb: int = 0) -> dict | None:
@@ -165,9 +183,10 @@ def pick_gpu(stages=None, min_free_mb: int = 0) -> dict | None:
       直接用 cuda:0 会 OOM。
 
     规则：
-      1. 需要跑 GPU 的阶段（clap/ast/asr/separation）才挑卡；
-      2. 只在 free >= 需求 + 余量 的卡里选空闲最多的；
-      3. 一张都不够 -> 返回 None，调用方退回 CPU（慢但不会失败）。
+      1. 需要跑 GPU 的阶段（instruments/vocals/asr）才挑卡；
+      2. 跳过 compute capability < 7.0 的卡（cuDNN 9.x 在 Pascal 上会 SIGABRT）；
+      3. 只在 free >= 需求 + 余量 的卡里选空闲最多的；
+      4. 一张都不够 -> 返回 None，调用方退回 CPU（慢但不会失败）。
     """
     stages = list(stages or ALL_STAGES)
     need = 0
@@ -182,12 +201,14 @@ def pick_gpu(stages=None, min_free_mb: int = 0) -> dict | None:
 
     # 留 2G 余量，避免刚好卡在临界点上被别的进程挤爆
     threshold = need + 2048
-    candidates = [g for g in gpus if g["free_mb"] >= threshold]
+    candidates = [g for g in gpus
+                  if g["free_mb"] >= threshold and _cap_ok(g.get("compute_cap", ""))]
     if not candidates:
         return None
     best = max(candidates, key=lambda g: g["free_mb"])
     return {"uuid": best["uuid"], "index": best["index"],
-            "free_mb": best["free_mb"], "need_mb": need}
+            "free_mb": best["free_mb"], "need_mb": need,
+            "compute_cap": best.get("compute_cap", "")}
 
 
 def gpu_selection_hint(stages=None) -> str:
@@ -201,6 +222,15 @@ def gpu_selection_hint(stages=None) -> str:
     if picked:
         return (f"选用 GPU {picked['index']}（{picked['uuid']}，"
                 f"空闲 {picked['free_mb'] / 1024:.1f}G，需求约 {need} MiB）")
+    # 说明为什么没选到卡
+    too_old = [g for g in gpus
+               if g["free_mb"] >= need + 2048
+               and not _cap_ok(g.get("compute_cap", ""))]
+    if too_old:
+        desc = "，".join(f"GPU{g['index']}(算力 {g.get('compute_cap', '?')})"
+                         for g in too_old)
+        return (f"空闲显存足够的卡算力不足 cuDNN 要求（需 sm_70+，现有 {desc}），"
+                "本次退回 CPU 执行（更慢但结果一致）")
     free_desc = "，".join(f"GPU{g['index']} 空闲 {g['free_mb'] / 1024:.1f}G"
                           for g in gpus)
     return (f"没有空闲显存足够的 GPU（需要约 {need + 2048} MiB；当前 {free_desc}），"
@@ -225,15 +255,54 @@ def file_signature(path: Path) -> dict:
 # ------------------------------------------------------------------ 调用编排脚本
 
 
+#: 编排脚本 stderr 里各阶段的开始标记 -> 素材库侧的阶段名
+STAGE_MARKERS = (
+    ("stage bpm", "bpm"),
+    ("stage instruments", "instruments"),
+    ("stage vocals", "vocals"),
+    ("stage asr", "asr"),
+    ("stage llm", "llm"),
+)
+
+
+def parse_stage_progress(stderr_text: str) -> tuple[str | None, float]:
+    """
+    从脚本 stderr 里解析「当前跑到哪个阶段」。
+
+    analyze_audio.py 每个阶段开始时打一行 "[analyze] stage xxx ..."，
+    结束时有 "xxx done in Ns"。这里取**最后一个开始的阶段**，
+    并按已完成阶段数估算进度。
+
+    返回 (stage_name, progress 0..1)；解析不出来返回 (None, 0)。
+    """
+    if not stderr_text:
+        return None, 0.0
+    stage = None
+    for marker, name in STAGE_MARKERS:
+        if marker in stderr_text:
+            stage = name
+    if stage is None:
+        return None, 0.0
+    order = [name for _, name in STAGE_MARKERS]
+    idx = order.index(stage)
+    # 阶段开始 = 进入该阶段；用 (idx + 0.5) / 总数 作为粗略进度
+    total = len(order)
+    return stage, round((idx + 0.5) / total, 3)
+
+
 def run_analyzer(audio_path: Path, stages=None, asr_model="medium",
                  device="auto", use_llm=True, studio_url=None,
                  timeout=DEFAULT_TIMEOUT, max_seconds=None,
-                 no_separation=False, extra_args=None) -> dict:
+                 no_separation=False, extra_args=None,
+                 progress_cb=None) -> dict:
     """
     调用 analyze_audio.py，返回它输出的 JSON dict。
 
     **只读原文件**：脚本的重采样全在内存里做，demucs 只统计不落盘。
     本函数在调用前后各取一次源文件指纹做比对，不一致就报错。
+
+    progress_cb(stage_name, progress) —— 进度回调（可选），
+    在脚本 stderr 里检测到新阶段时触发。
 
     失败抛 DeepAudioError（带可读原因）。
     """
@@ -290,19 +359,57 @@ def run_analyzer(audio_path: Path, stages=None, asr_model="medium",
             gpu_note = f"GPU{picked['index']} {picked['uuid']}（按空闲显存选择）"
 
     t0 = time.time()
+    stderr_parts: list[str] = []
+    seen_stage: str | None = None
+
+    def _on_stderr_line(line: str) -> None:
+        """边读 stderr 边检测阶段变化 -> 进度回调。"""
+        nonlocal seen_stage
+        if not progress_cb:
+            return
+        stage, frac = parse_stage_progress(line)
+        if stage and stage != seen_stage:
+            seen_stage = stage
+            try:
+                progress_cb(stage, frac)
+            except Exception:
+                pass  # 进度回调失败不影响分析本身
+
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             env=run_env, creationflags=CREATE_NO_WINDOW)
-        stderr_log.write_text(proc.stderr or "", encoding="utf-8")
+        # 同时读 stdout/stderr，避免管道写满导致死锁
+        import threading
+
+        def _drain(stream, sink, notify=False):
+            for line in iter(stream.readline, ""):
+                sink.append(line)
+                if notify:
+                    _on_stderr_line(line)
+
+        out_parts: list[str] = []
+        t_out = threading.Thread(target=_drain, args=(proc.stdout, out_parts),
+                                 daemon=True)
+        t_err = threading.Thread(target=_drain,
+                                 args=(proc.stderr, stderr_parts, True),
+                                 daemon=True)
+        t_out.start()
+        t_err.start()
+        proc.wait(timeout=timeout)
+        t_out.join(timeout=10)
+        t_err.join(timeout=10)
+        stderr_text = "".join(stderr_parts)
+        stdout_text = "".join(out_parts)
+        stderr_log.write_text(stderr_text, encoding="utf-8")
+        returncode = proc.returncode
     except subprocess.TimeoutExpired as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise DeepAudioError(
             f"音频深度分析超时（>{timeout}s）。可减少分析阶段或缩短音频。",
             code="audio_analysis_timeout",
             detail={"timeout": timeout,
-                    "stderr": (exc.stderr or "")[-2000:]
-                    if isinstance(exc.stderr, str) else ""}) from exc
+                    "stderr": "".join(stderr_parts)[-2000:]}) from exc
     except OSError as exc:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise DeepAudioError(f"无法启动音频分析进程：{exc}",
@@ -310,19 +417,19 @@ def run_analyzer(audio_path: Path, stages=None, asr_model="medium",
 
     elapsed = round(time.time() - t0, 2)
 
-    if proc.returncode != 0 and not out_json.is_file():
+    if returncode != 0 and not out_json.is_file():
         shutil.rmtree(tmpdir, ignore_errors=True)
-        tail = (proc.stderr or "")[-1500:]
+        tail = stderr_text[-1500:]
         raise DeepAudioError(
-            f"音频分析脚本执行失败（退出码 {proc.returncode}）：{tail.strip()[-500:]}",
+            f"音频分析脚本执行失败（退出码 {returncode}）：{tail.strip()[-500:]}",
             code="audio_analysis_failed",
-            detail={"returncode": proc.returncode, "stderr": tail})
+            detail={"returncode": returncode, "stderr": tail})
 
     if not out_json.is_file():
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise DeepAudioError("音频分析脚本没有产出 JSON 结果",
                              code="audio_analysis_no_output",
-                             detail={"stderr": (proc.stderr or "")[-2000:]})
+                             detail={"stderr": stderr_text[-2000:]})
 
     try:
         payload = json.loads(out_json.read_text(encoding="utf-8"))
@@ -331,9 +438,6 @@ def run_analyzer(audio_path: Path, stages=None, asr_model="medium",
         raise DeepAudioError(f"音频分析结果不是合法 JSON：{exc}",
                              code="audio_analysis_bad_json") from exc
     finally:
-        stderr_text = ""
-        if stderr_log.is_file():
-            stderr_text = stderr_log.read_text(encoding="utf-8", errors="replace")
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     # ---- 源文件未被改动的硬校验
@@ -695,6 +799,9 @@ def analyze(audio_path: Path, options: dict | None = None) -> dict:
     素材库调用的统一入口。返回
       {"text": 中文分析文本, "extra": 结构化数据, "raw": 原始 JSON}
 
+    options["progress"] —— 可选回调 progress_cb(stage_name, progress)，
+    用于把分析进度实时反馈到 UI。
+
     失败抛 DeepAudioError。
     """
     options = options or {}
@@ -708,6 +815,7 @@ def analyze(audio_path: Path, options: dict | None = None) -> dict:
         timeout=options.get("timeout") or DEFAULT_TIMEOUT,
         max_seconds=options.get("max_seconds"),
         no_separation=bool(options.get("no_separation", False)),
+        progress_cb=options.get("progress"),
     )
     return {
         "text": render_text(payload),
