@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -597,6 +598,107 @@ class TestLoRAContextDamping(unittest.TestCase):
         plain = [n for n in names if not n.startswith(lora_damping.DERIVED_PREFIX)]
         self.assertEqual(len(damped), 1, "只有瑶光该被阻尼")
         self.assertEqual(len(plain), 1, "如梦似幻不该被阻尼")
+
+    def test_stale_undamped_file_is_regenerated(self):
+        """陈旧的「名字对但内容没阻尼」的派生文件必须被重建。
+
+        真实踩过：14:47 留下的 h3studio_ctx_80__*.safetensors 内容 ratio=1.0
+        （根本没阻尼），ComfyUI 照常加载它 -> 出图仍是彩色噪点。
+        所以复用已有派生文件前必须校验内容。
+        """
+        try:
+            from safetensors.torch import load_file, save_file
+        except Exception:
+            self.skipTest("本机无 torch")
+        import tempfile
+        from pathlib import Path as _Path
+        yao = _Path("/mnt/usb2t/comfyui-models/loras/Kook_Zimage_瑶光.safetensors")
+        if not yao.is_file():
+            self.skipTest("本机无瑶光 LoRA 文件")
+        with tempfile.TemporaryDirectory() as tmp:
+            # 造一个「名字对但没阻尼」的陈旧文件
+            stale = _Path(tmp) / lora_damping._damped_name(yao.name, 0.8)
+            save_file(load_file(str(yao)), str(stale), metadata={"format": "pt"})
+            self.assertFalse(
+                lora_damping._is_damped(stale, 0.8, source=yao),
+                "没阻尼的文件必须被 _is_damped 判为不合格")
+            # 正确阻尼过的文件必须通过
+            good = _Path(tmp) / "good.safetensors"
+            self.assertTrue(lora_damping._write_damped(yao, good, 0.8))
+            self.assertTrue(lora_damping._is_damped(good, 0.8, source=yao),
+                            "正确阻尼的文件必须通过 _is_damped")
+            # 系数不匹配 -> 不通过
+            self.assertFalse(lora_damping._is_damped(good, 0.5, source=yao),
+                             "系数不匹配必须判为不合格")
+
+    def test_is_damped_rejects_undamped_and_wrong_factor(self):
+        """_is_damped 必须真的在做判断（不能恒返回 True）。
+
+        恒返回 True 的变异会让「陈旧文件复用」这条路径失去保护，
+        而只测「重建成功」的断言抓不到它 —— 必须直接断言它会拒绝。
+        """
+        yao = Path("/mnt/usb2t/comfyui-models/loras/Kook_Zimage_瑶光.safetensors")
+        if not yao.is_file():
+            self.skipTest("本机无瑶光 LoRA 文件")
+        try:
+            from safetensors.torch import load_file, save_file
+        except Exception:
+            self.skipTest("本机无 torch")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            factor = lora_damping.DEFAULT_CTX_DAMPING
+            # 1) 根本没阻尼的源文件副本 -> 必须判为不合格
+            undamped = tmpdir / "undamped.safetensors"
+            save_file(load_file(str(yao)), str(undamped), metadata={"format": "pt"})
+            self.assertFalse(lora_damping._is_damped(undamped, factor, source=yao),
+                             "未阻尼的文件必须被拒绝")
+            # 2) 正确阻尼 -> 必须判为合格
+            good = tmpdir / "good.safetensors"
+            self.assertTrue(lora_damping._write_damped(yao, good, factor))
+            self.assertTrue(lora_damping._is_damped(good, factor, source=yao),
+                            "正确阻尼的文件必须被接受")
+            # 3) 用错误的系数去问同一个文件 -> 必须判为不合格
+            self.assertFalse(lora_damping._is_damped(good, factor + 0.3, source=yao),
+                             "系数不匹配必须被拒绝")
+            # 4) 文件不存在 -> 必须判为不合格
+            self.assertFalse(
+                lora_damping._is_damped(tmpdir / "nope.safetensors", factor, source=yao),
+                "文件不存在必须被拒绝")
+
+    def test_ensure_damped_lora_rebuilds_stale_file(self):
+        """ensure_damped_lora 遇到陈旧（未阻尼）派生文件必须重建它。
+
+        这是真实回归点：14:47 的派生文件 ratio=1.0（没阻尼），
+        ensure_damped_lora 只看文件名直接复用 -> ComfyUI 照常加载 -> 噪点回归。
+        """
+        yao = Path("/mnt/usb2t/comfyui-models/loras/Kook_Zimage_瑶光.safetensors")
+        if not yao.is_file():
+            self.skipTest("本机无瑶光 LoRA 文件")
+        try:
+            from safetensors.torch import load_file, save_file
+        except Exception:
+            self.skipTest("本机无 torch")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            derived_name = lora_damping._damped_name(yao.name,
+                                                     lora_damping.DEFAULT_CTX_DAMPING)
+            stale = tmpdir / derived_name
+            # 造一个「名字对但没阻尼」的陈旧文件
+            save_file(load_file(str(yao)), str(stale), metadata={"format": "pt"})
+            self.assertFalse(
+                lora_damping._is_damped(stale, lora_damping.DEFAULT_CTX_DAMPING,
+                                        source=yao))
+            # ensure_damped_lora 必须重建（而不是直接复用陈旧文件）
+            name, path = lora_damping.ensure_damped_lora(
+                yao.name, lora_damping.DEFAULT_CTX_DAMPING, lora_dirs=[tmpdir])
+            self.assertTrue(name, "应该返回派生 LoRA 名")
+            self.assertIsNotNone(path)
+            self.assertTrue(
+                lora_damping._is_damped(path, lora_damping.DEFAULT_CTX_DAMPING,
+                                        source=yao),
+                "ensure_damped_lora 必须把陈旧文件重建为真正阻尼过的版本")
 
     def test_damped_derived_file_content_scales_ctx_only(self):
         """派生文件：context_refiner 被缩放，其它张量原样保留。"""

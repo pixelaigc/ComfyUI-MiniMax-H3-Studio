@@ -176,6 +176,48 @@ def cleanup_stale_derived(lora_dirs: list[Path] | None = None) -> int:
     return removed
 
 
+def _is_damped(path: Path, factor: float, source: Path | None = None) -> bool:
+    """校验派生文件确实做了阻尼。
+
+    只看文件名不够 —— 早期版本或中断的写入会留下「名字对、内容没阻尼」的
+    陈旧文件，ComfyUI 会照常加载它，结果就是噪点回归（真实踩过：
+    14:47 留下的派生文件 ratio=1.0，出图仍是彩色噪点）。
+
+    判定：抽查若干 context_refiner 的 lora_A / lora_B，
+    它们的范数应约等于源文件的 factor 倍。
+    """
+    try:
+        from safetensors.torch import load_file
+    except Exception:
+        return False
+    if source is None:
+        return False
+    try:
+        dst = load_file(str(path))
+        src = load_file(str(source))
+    except Exception:
+        return False
+
+    checked = 0
+    for key in dst:
+        # 注意：LoRA 键名是 context_refiner.N.*（无前导点）
+        if "context_refiner." not in key:
+            continue
+        if key not in src:
+            return False
+        try:
+            dn = dst[key].float().norm().item()
+            sn = src[key].float().norm().item()
+        except Exception:
+            return False
+        if sn <= 0:
+            continue
+        if abs(dn / sn - factor) > 0.02:
+            return False
+        checked += 1
+    return checked > 0
+
+
 def ensure_damped_lora(name: str, factor: float = DEFAULT_CTX_DAMPING,
                        lora_dirs: list[Path] | None = None) -> tuple[str, Path | None]:
     """确保存在一份 context_refiner 已阻尼的派生 LoRA。
@@ -213,7 +255,16 @@ def ensure_damped_lora(name: str, factor: float = DEFAULT_CTX_DAMPING,
     for d in lora_dirs:
         candidate = d / derived_name
         if candidate.exists():
-            return derived_name, candidate
+            # 已存在的派生文件**必须校验内容**：早期版本 / 系数变更会留下
+            # 「名字对但没真正阻尼」的陈旧文件，直接复用会导致噪点回归。
+            if _is_damped(candidate, factor, source=path):
+                return derived_name, candidate
+            try:
+                candidate.unlink()
+            except OSError:
+                pass
+            target = candidate
+            break
         try:
             if os.access(d, os.W_OK):
                 target = candidate
