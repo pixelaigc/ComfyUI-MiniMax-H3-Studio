@@ -197,6 +197,20 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .jobs-area { flex: 1; overflow-y: auto; padding: 16px 20px; }
 .jobs-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .jobs-tabs { display: flex; gap: 4px; background: #eceef1; padding: 4px; border-radius: 10px; }
+
+/* 生成类型标签组（与状态标签组并列，可叠加筛选） */
+.jobs-type-tabs {
+  margin-top: 8px; flex-wrap: wrap; align-items: center;
+  background: #f4f6f8; border: 1px solid var(--border);
+}
+.jobs-type-tabs .tabs-label {
+  font-size: 11px; color: var(--muted); padding: 0 8px 0 6px;
+  white-space: nowrap; font-weight: 600;
+}
+.jobs-type-tabs button { padding: 5px 12px; font-size: 12px; }
+.jobs-type-tabs button.active {
+  background: var(--accent); color: #fff; font-weight: 600;
+}
 .jobs-tabs button {
   border: none; background: transparent; padding: 6px 16px; border-radius: 8px;
   cursor: pointer; font-size: 13px; color: var(--muted);
@@ -745,3 +759,171 @@ body.modal-open { overflow: hidden; }
 #imagePanel textarea { font-size: 12px; padding: 8px; border-radius: 9px; }
 #imagePanel .compact-pair { margin-bottom: 9px; }
 #imagePanel .chips button { font-size: 12px; padding: 5px 11px; }
+
+/* ---------- Z-Image 效果 LoRA：可编辑触发词 ---------- */
+.img-lora-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+.img-lora-trigger .lora-trigger-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--muted, #8a8a9a);
+  letter-spacing: .02em;
+}
+.img-lora-trigger .lora-trigger-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 5px;
+  color: var(--text, #e8e8ef);
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.img-lora-trigger .lora-trigger-input:focus {
+  outline: none;
+  border-color: var(--accent, #6a8cff);
+  background: rgba(106, 140, 255, .08);
+}
+.img-lora-trigger .lora-trigger-input::placeholder {
+  color: rgba(255, 255, 255, .28);
+}
+
+/* ---------- 二次增强：作用对象切换 + 版本历史 ---------- */
+.prompt-refine-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.prompt-refine-bar .refine-label {
+  font-size: 10px;
+  color: var(--muted, #8a8a9a);
+}
+.prompt-refine-bar .chips {
+  display: inline-flex;
+  gap: 4px;
+}
+.prompt-refine-bar .chips button {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 999px;
+  color: var(--text, #e8e8ef);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+.prompt-refine-bar .chips button.active {
+  background: rgba(106, 140, 255, .18);
+  border-color: var(--accent, #6a8cff);
+  color: #cfd9ff;
+}
+.prompt-refine-bar .chips button:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}
+.prompt-refine-bar .refine-history-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 5px;
+  color: var(--muted, #8a8a9a);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.prompt-refine-bar .refine-history-btn:hover {
+  border-color: var(--accent, #6a8cff);
+  color: var(--text, #e8e8ef);
+}
+.enhance-btn-2 {
+  border-style: dashed;
+}
+.promptEnhancedBadge.lv2 {
+  background: rgba(255, 176, 32, .16);
+  color: #ffc46b;
+}
+
+/* ---------- 提示词版本历史 ---------- */
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow: auto;
+  padding: 4px 2px;
+}
+.version-item {
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, .03);
+}
+.version-item.current {
+  border-color: var(--accent, #6a8cff);
+  background: rgba(106, 140, 255, .07);
+}
+.version-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.version-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .1);
+}
+.version-badge.lv1 { background: rgba(106, 140, 255, .2); color: #cfd9ff; }
+.version-badge.lv2 { background: rgba(255, 176, 32, .18); color: #ffc46b; }
+.version-source, .version-current {
+  font-size: 10px;
+  color: var(--muted, #8a8a9a);
+}
+.version-current { color: var(--accent, #6a8cff); }
+.version-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(232, 232, 239, .82);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 116px;
+  overflow: hidden;
+}
+.version-actions { margin-top: 6px; }
+.version-actions button {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 5px;
+  color: var(--text, #e8e8ef);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.version-actions button:hover {
+  border-color: var(--accent, #6a8cff);
+}
+.version-empty {
+  font-size: 11px;
+  color: var(--muted, #8a8a9a);
+  padding: 12px 4px;
+  text-align: center;
+}
+
+/* ---------- 右侧任务「按生成类型」标签 ---------- */
+.jobs-type-tabs {
+  margin-top: 4px;
+}
+.jobs-type-tabs button {
+  font-size: 10px;
+  padding: 2px 8px;
+}

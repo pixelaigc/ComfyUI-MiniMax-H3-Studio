@@ -352,6 +352,31 @@ def check_quoted_text(text: str):
     return []
 
 
+def check_refine_structure(text: str):
+    """二次增强（细化）档专用：物体分级结构是否齐全 —— 错误。
+
+    要求至少出现物体分级标题，且每个 L1/L2 物件条目都带上了
+    「外观/材质/状态」这类细化字段 —— 否则等于没细化。
+    """
+    errors = []
+    warnings = []
+    if not re.search(r"【\s*L1\s*", text):
+        errors.append("二次增强结果缺少 L1 特写分级标题（逐物体枚举结构不完整）")
+    if not (re.search(r"【\s*L[123]\s*", text)
+            or re.search(r"【\s*主体细化\s*】", text)):
+        errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或主体细化）")
+    # 至少要有若干个物件条目，每个带冒号字段
+    entries = re.findall(r"^[^\n:：]{1,40}[：:].{0,80}$", text, flags=re.M)
+    if len(entries) < 3:
+        warnings.append("细化字段偏少，可能没有真正逐个物体展开")
+    # 每个物件应至少有一项材质或状态描述
+    for key in ("材质", "表面", "状态", "磨损", "外观", "轮廓"):
+        if key not in text:
+            warnings.append(f"未见「{key}」类细化字段")
+            break
+    return errors, warnings
+
+
 def check_length(text: str, mode: str):
     """长度区间 —— 警告。"""
     words = len(re.findall(r"[A-Za-z0-9']+", text))
@@ -362,6 +387,9 @@ def check_length(text: str, mode: str):
         lo, hi = 100, 350
     elif mode == "scalist":
         lo, hi = 80, 220
+    elif mode == "refine":
+        # 逐物体枚举天然更长，但也不该无限长
+        lo, hi = 80, 600
     else:
         lo, hi = 60, 350
     if est < lo:
@@ -506,6 +534,11 @@ def validate(text: str, original: str = "", mode: str = "pe"):
     if hits:
         errors.append("出现提示词权重语法（Z-Image 不支持 Compel 语法）："
                       + "、".join(hits))
+
+    if mode == "refine":
+        refine_errors, refine_warnings = check_refine_structure(text)
+        errors.extend(refine_errors)
+        warnings.extend(refine_warnings)
 
     hits = check_thinking(text)
     if hits:

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PixelAIGC ComfyUI-MiniMax-H3 Studio v1.00</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=batch-lora1">
+<link rel="stylesheet" href="/static/style.css?v=lora-semantic2">
 </head>
 <body>
 <header class="topbar">
@@ -202,8 +202,17 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5l1.6 3.9 4.4.4-3.3 2.9 1 4.3L8 10.9l-3.7 2.1 1-4.3L2 5.8l4.4-.4z" fill="currentColor"/></svg>
           <span id="enhanceBtnText">增强</span>
         </button>
+        <button class="enhance-btn enhance-btn-2" id="refineBtn" title="二次增强：把提示词里的物体逐个枚举并逐个细化（可作用于原始或一次增强后的提示词）">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span id="refineBtnText">二次增强</span>
+        </button>
         <select class="enhance-spec" id="enhanceSpec" title="增强模板"></select>
         <span class="enhance-hint" id="enhanceHint">用本地模型扩写提示词</span>
+      </div>
+      <div class="prompt-refine-bar" id="refineBar">
+        <span class="refine-label">二次增强作用对象</span>
+        <div class="chips" id="refineTargetChips"></div>
+        <button type="button" class="refine-history-btn" id="promptVersionBtn" title="查看原始 / 一次增强 / 二次增强 各版本">版本历史</button>
       </div>
     </div>
 
@@ -281,6 +290,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <button data-st="longfilm">长片</button>
         <button data-st="failed">失败</button>
         <button data-st="canceled">已取消</button>
+      </div>
+      <div class="jobs-tabs jobs-type-tabs" id="genTypeTabs">
+        <span class="tabs-label">生成类型</span>
       </div>
       <div class="jobs-tools" id="doneFilters" hidden>
         <label class="search-box">
@@ -428,6 +440,20 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 提示词版本历史（原始 / 一次增强 / 二次增强） -->
+<div class="prompt-modal" id="promptVersionModal" hidden>
+  <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="promptVersionTitle">
+    <div class="prompt-dialog-head">
+      <b id="promptVersionTitle">提示词版本</b>
+      <button id="promptVersionClose" aria-label="关闭">×</button>
+    </div>
+    <div class="version-list" id="promptVersionList"></div>
+    <div class="prompt-dialog-actions">
+      <button id="promptVersionDone">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- LoRA 简易说明 -->
 <div class="prompt-modal" id="loraInfoModal" hidden>
   <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="loraInfoTitle">
@@ -494,7 +520,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
-<script src="/static/app.js?v=batch-lora1"></script>
-<script src="/static/providers.js?v=batch-lora1"></script>
+<script src="/static/app.js?v=lora-semantic2"></script>
+<script src="/static/providers.js?v=lora-semantic2"></script>
 </body>
 </html>

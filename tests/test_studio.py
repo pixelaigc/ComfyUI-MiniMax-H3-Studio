@@ -78,11 +78,16 @@ class TestWorkflowLoRA(unittest.TestCase):
         lora_nodes = [n for n in wf.values() if "Lora" in n["class_type"]]
         self.assertEqual(len(lora_nodes), 1)
         node = lora_nodes[0]
-        self.assertEqual(node["class_type"], "LoraLoaderModelOnly")
+        # 用 LoraLoader（不是 ModelOnly）—— clip 侧也要接，文本编码器才能吃到 patch
+        self.assertEqual(node["class_type"], "LoraLoader")
         self.assertAlmostEqual(node["inputs"]["strength_model"], 0.8)
+        self.assertAlmostEqual(node["inputs"]["strength_clip"], 0.8)
         # KSampler 的 model 必须指向该 LoRA 节点
         lora_id = next(nid for nid, n in wf.items() if "Lora" in n["class_type"])
         self.assertEqual(wf["57:3"]["inputs"]["model"], [lora_id, 0])
+        # clip 输入必须接上 CLIPLoader，且 CLIPTextEncode 用的是 LoRA 后的 clip
+        self.assertEqual(node["inputs"]["clip"], ["57:30", 0])
+        self.assertEqual(wf["57:27"]["inputs"]["clip"], [lora_id, 1])
 
     def test_multiple_loras_chain_in_order(self):
         available = self._available()
@@ -96,6 +101,10 @@ class TestWorkflowLoRA(unittest.TestCase):
         # 第二 LoRA 的 model 输入指向第一个 LoRA（串成链）
         first, second = lora_ids
         self.assertEqual(wf[second]["inputs"]["model"], [first, 0])
+        # clip 侧同样串成链：第二个 LoRA 的 clip 接第一个 LoRA 的 clip 输出
+        self.assertEqual(wf[second]["inputs"]["clip"], [first, 1])
+        # 最终 CLIPTextEncode 用的是链尾的 clip
+        self.assertEqual(wf["57:27"]["inputs"]["clip"], [second, 1])
 
     def test_strength_zero_disables_lora(self):
         available = self._available()
@@ -114,15 +123,17 @@ class TestWorkflowLoRA(unittest.TestCase):
         available = self._available()
         if not available:
             self.skipTest("本机无 Z-Image LoRA")
-        nodes, ref = workflows._z_image_lora_chain(
-            [{"name": available[0]["name"], "strength": 0.0}], ["57:11", 0])
+        nodes, ref, cref = workflows._z_image_lora_chain(
+            [{"name": available[0]["name"], "strength": 0.0}], ["57:11", 0], ["57:30", 0])
         self.assertEqual(nodes, {})
         self.assertEqual(ref, ["57:11", 0])
+        self.assertEqual(cref, ["57:30", 0])
         # 强度 > 0 时才建节点
-        nodes2, ref2 = workflows._z_image_lora_chain(
-            [{"name": available[0]["name"], "strength": 0.6}], ["57:11", 0])
+        nodes2, ref2, cref2 = workflows._z_image_lora_chain(
+            [{"name": available[0]["name"], "strength": 0.6}], ["57:11", 0], ["57:30", 0])
         self.assertEqual(len(nodes2), 1)
         self.assertNotEqual(ref2, ["57:11", 0])
+        self.assertNotEqual(cref2, ["57:30", 0])
 
     def test_missing_lora_raises(self):
         with self.assertRaises(ValueError):
@@ -235,3 +246,93 @@ class TestLoRAPersistence(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestLoRASemantics(unittest.TestCase):
+    """LoRA 语义：效果类可选 / 加速类不可选 / 触发词自动追加。"""
+
+    BASE = {"job_id": "testjob", "mode": "t2i", "prompt": "a cat", "seed": 42,
+            "model": "z_image_turbo_bf16"}
+
+    def test_effect_and_acceleration_are_disjoint(self):
+        """效果类与加速类必须互斥，且两者合起来 = 本机全部 z-image LoRA。"""
+        effect = lora_registry.list_effect_loras()
+        accel = lora_registry.list_acceleration_loras()
+        all_loras = lora_registry.list_z_image_loras()
+        effect_names = {i["name"] for i in effect}
+        accel_names = {i["name"] for i in accel}
+        self.assertEqual(effect_names & accel_names, set())
+        self.assertEqual(effect_names | accel_names, {i["name"] for i in all_loras})
+
+    def test_acceleration_loras_not_in_effect_list(self):
+        """已知的加速/蒸馏 LoRA 不能出现在用户可选列表里。"""
+        effect_names = {i["name"] for i in lora_registry.list_effect_loras()}
+        for accel in lora_registry.list_acceleration_loras():
+            self.assertNotIn(accel["name"], effect_names)
+
+    def test_acceleration_lora_rejected_by_workflow(self):
+        """把加速 LoRA 当效果 LoRA 用 -> 工作流直接拒绝（不静默出图）。"""
+        accel = lora_registry.list_acceleration_loras()
+        if not accel:
+            self.skipTest("本机无加速类 Z-Image LoRA")
+        with self.assertRaises(ValueError) as ctx:
+            workflows.build_t2i({**self.BASE, "loras": [
+                {"name": accel[0]["name"], "strength": 1.0}]})
+        self.assertIn("加速", str(ctx.exception))
+
+    def test_trigger_appended_to_prompt(self):
+        """效果 LoRA 的触发词自动追加到最终提示词。"""
+        effect = lora_registry.list_effect_loras()
+        target = next((i for i in effect if i.get("trigger")), None)
+        if not target:
+            self.skipTest("本机无带触发词的效果 LoRA")
+        wf = workflows.build_t2i({**self.BASE, "loras": [
+            {"name": target["name"], "strength": 1.0}]})
+        text = wf["57:27"]["inputs"]["text"]
+        self.assertTrue(text.startswith("a cat"))
+        for token in [t.strip() for t in target["trigger"].replace("/", ",").split(",") if t.strip()]:
+            self.assertIn(token, text)
+
+    def test_user_trigger_overrides_upstream(self):
+        """用户改过的触发词以用户为准。"""
+        effect = lora_registry.list_effect_loras()
+        if not effect:
+            self.skipTest("本机无效果 LoRA")
+        wf = workflows.build_t2i({**self.BASE, "loras": [
+            {"name": effect[0]["name"], "strength": 1.0, "trigger": "我的自定义词"}]})
+        self.assertIn("我的自定义词", wf["57:27"]["inputs"]["text"])
+
+    def test_user_can_clear_trigger(self):
+        """用户清空触发词 -> 不追加任何触发词。"""
+        effect = lora_registry.list_effect_loras()
+        if not effect:
+            self.skipTest("本机无效果 LoRA")
+        wf = workflows.build_t2i({**self.BASE, "loras": [
+            {"name": effect[0]["name"], "strength": 1.0, "trigger": ""}]})
+        self.assertEqual(wf["57:27"]["inputs"]["text"], "a cat")
+
+    def test_multiple_loras_merge_triggers(self):
+        """多个 LoRA 的触发词合并追加，不重复。"""
+        effect = [i for i in lora_registry.list_effect_loras() if i.get("trigger")]
+        if len(effect) < 2:
+            self.skipTest("本机带触发词的效果 LoRA 不足 2 个")
+        wf = workflows.build_t2i({**self.BASE, "loras": [
+            {"name": effect[0]["name"], "strength": 1.0},
+            {"name": effect[1]["name"], "strength": 1.0}]})
+        text = wf["57:27"]["inputs"]["text"]
+        for item in effect[:2]:
+            for token in [t.strip() for t in item["trigger"].replace("/", ",").split(",") if t.strip()]:
+                self.assertEqual(text.count(token), 1, f"触发词 {token} 重复出现")
+
+    def test_upscale_path_also_wires_lora_clip(self):
+        """4K 放大路径同样挂 LoRA（含 clip），且不是死代码。"""
+        effect = lora_registry.list_effect_loras()
+        if not effect:
+            self.skipTest("本机无效果 LoRA")
+        wf = workflows.build_t2i({**self.BASE, "resolution": "4k", "loras": [
+            {"name": effect[0]["name"], "strength": 1.0}]})
+        lora_ids = [nid for nid, n in wf.items() if n["class_type"] == "LoraLoader"]
+        self.assertEqual(len(lora_ids), 1)
+        self.assertEqual(wf["57:27"]["inputs"]["clip"], [lora_ids[0], 1])
+        # 两段 KSampler 都用 LoRA 后的 model
+        self.assertEqual(wf["57:3"]["inputs"]["model"], [lora_ids[0], 0])
+        self.assertEqual(wf["57:75"]["inputs"]["model"], [lora_ids[0], 0])

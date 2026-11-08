@@ -13,6 +13,7 @@ const MODE_INFO = {
 const state = {
   mode: "t2v",
   tab: "all",
+  genType: "",
   page: "create",
   res: "544p",
   model: "lora",
@@ -46,11 +47,17 @@ const state = {
   },
 };
 
+// 生成类型清单，由 /api/generation-types 下发（后端真实注册的模式），
+// 前端不硬编码任何类型名。
+const GEN_TYPES = { types: [], registeredModes: [] };
+
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
 const IMG_OPTIONS = { tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 3 };
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
-const IMG_LORAS = { available: [], config: [] };
+// available = 效果类 LoRA（用户可选）
+// acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
+const IMG_LORAS = { available: [], acceleration: [], config: [] };
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -66,6 +73,8 @@ $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
 }));
 
 function renderMode() {
+  // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
+  queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
   const mode = state.mode;
   const info = MODE_INFO[mode];
   // 上传区
@@ -233,9 +242,12 @@ function renderLoraList() {
   if (!box) return;
   if (!state.img.loras.length) {
     box.innerHTML = "";
+    const accel = (IMG_LORAS.acceleration || []).length;
     $("#imgLoraNote").textContent = IMG_LORAS.available.length
-      ? "未添加 LoRA。可选本机已安装的 Z-Image LoRA，强度 0 表示关闭。"
-      : "本机未检测到 Z-Image LoRA 文件。";
+      ? `未添加效果 LoRA。可选本机已安装的效果类 Z-Image LoRA（${IMG_LORAS.available.length} 个）` +
+        (accel ? `；另有 ${accel} 个加速/蒸馏类 LoRA 由工作流固定使用，不在此列表。` : "。") +
+        " 强度 0 表示关闭。"
+      : "本机未检测到效果类 Z-Image LoRA 文件。";
     return;
   }
   box.innerHTML = state.img.loras.map((item, index) => {
@@ -243,8 +255,16 @@ function renderLoraList() {
     const missing = !meta;
     const rec = meta && Number(item.strength) === Number(meta.recommended_strength);
     const disabled = item.enabled === false || Number(item.strength) <= 0;
-    const trigger = meta && meta.trigger
-      ? `<span class="lora-trigger">${esc(meta.trigger)}</span>` : "（上游未标注触发词）";
+    // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
+    const triggerText = item.trigger !== undefined && item.trigger !== null
+      ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
+    const triggerBlock = `
+      <div class="img-lora-trigger">
+        <span class="lora-trigger-label" title="该 LoRA 贡献的触发词，会自动追加到提示词末尾">触发词</span>
+        <input type="text" class="lora-trigger-input" value="${esc(triggerText)}"
+               placeholder="${meta && meta.trigger ? esc(meta.trigger) : "（上游未标注触发词）"}"
+               title="自动追加到最终提示词；可编辑或删除">
+      </div>`;
     return `<div class="img-lora-item ${disabled ? "disabled" : ""} ${missing ? "missing" : ""}" data-idx="${index}">
       <div class="img-lora-head">
         <button type="button" class="img-lora-btn toggle" title="${disabled ? "启用" : "停用"}">${disabled ? "○" : "●"}</button>
@@ -256,10 +276,11 @@ function renderLoraList() {
         <button type="button" class="img-lora-btn del" title="删除">×</button>
       </div>
       <div class="img-lora-slider">
-        <input type="range" class="strength" min="0" max="1" step="0.05" value="${Number(item.strength)}" title="强度 0-1，0 表示关闭">
+        <input type="range" class="strength" min="0" max="1.5" step="0.05" value="${Number(item.strength)}" title="强度 0-1.5，0 表示关闭">
         <span class="img-lora-strength">${Number(item.strength).toFixed(2)}</span>
       </div>
-      <div class="img-lora-meta">触发词：${trigger} · 基础：${esc(meta ? meta.base : "—")}</div>
+      ${triggerBlock}
+      <div class="img-lora-meta">基础：${esc(meta ? meta.base : "—")}${meta && meta.strength_source ? " · " + esc(meta.strength_source) : ""}</div>
       <div class="img-lora-meta"><button type="button" class="img-lora-info-btn" style="background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:10px;font-family:inherit">查看简易说明 ›</button></div>
     </div>`;
   }).join("");
@@ -292,9 +313,20 @@ function renderLoraList() {
       el.classList.toggle("disabled", item.enabled === false || item.strength <= 0);
     });
     slider.addEventListener("change", () => saveLoraConfig());
+    // 触发词可编辑：改动即写回 state（保存时发给服务端 + 生成时进提示词）
+    const trigInput = el.querySelector("input.lora-trigger-input");
+    if (trigInput) {
+      trigInput.addEventListener("input", () => {
+        item.trigger = trigInput.value;
+      });
+      trigInput.addEventListener("change", () => saveLoraConfig());
+    }
     el.querySelector(".img-lora-info-btn").addEventListener("click", () => openLoraInfo(item.name));
   });
-  $("#imgLoraNote").textContent = `已添加 ${state.img.loras.length} 个 LoRA（配置存在服务端，局域网共用）。`;
+  const accelNote = (IMG_LORAS.acceleration || []).length
+    ? ` 加速/蒸馏类 ${IMG_LORAS.acceleration.length} 个由工作流固定使用（不列出）。` : "";
+  $("#imgLoraNote").textContent =
+    `已添加 ${state.img.loras.length} 个效果 LoRA（配置存在服务端，局域网共用）。${accelNote}`;
 }
 
 // LoRA 配置持久化到服务端
@@ -317,6 +349,7 @@ function saveLoraConfig() {
       }
       state.img.loras = (data.loras || []).map(l => ({
         name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
+        trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
       }));
       renderLoraList();
       renderLoraSelect();
@@ -341,7 +374,8 @@ function openLoraInfo(name) {
       <dt>大小</dt><dd>${meta.size_mb} MB</dd>
       <dt>基础模型</dt><dd>${esc(meta.base)}</dd>
       <dt>触发词</dt><dd>${trigger}</dd>
-      <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}</dd>
+      <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}${meta.strength_source ? "（" + esc(meta.strength_source) + "）" : ""}</dd>
+      <dt>类型</dt><dd>${meta.kind === "acceleration" ? "加速 / 蒸馏类（工作流固定使用，不可选）" : "效果类（可自行选用）"}</dd>
       <dt>说明来源</dt><dd>${esc(meta.source || "—")}</dd>
     </dl>
     <div class="lora-scene">${esc(meta.scene || "（上游未提供场景说明）")}</div>`;
@@ -362,8 +396,10 @@ async function loadImageLoras() {
     if (!resp.ok) return;
     const data = await resp.json();
     IMG_LORAS.available = data.available || [];
+    IMG_LORAS.acceleration = data.acceleration || [];
     state.img.loras = (data.config || []).map(l => ({
       name: l.name, strength: Number(l.strength), enabled: l.enabled !== false,
+      trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
     }));
     const hint = $("#imgLoraHint");
     if (hint) hint.textContent = `本机 ${IMG_LORAS.available.length} 个可用`;
@@ -624,6 +660,18 @@ $("#duration").addEventListener("input", e => {
 // 记录「当前提示词已被增强」的时刻：用户手动编辑过就视为未增强。
 const promptEnhance = { text: null, busy: false };
 
+// 提示词版本谱系：原始 / 一次增强 / 二次增强
+//   versions[] 保留每一级的文本与产生方式，可查看、可回退、可再增强
+const promptVersions = {
+  // [{level: 0|1|2, label, text, source, specId, at}]
+  versions: [],
+  // 二次增强的作用对象：0=原始 / 1=一次增强
+  refineTarget: 0,
+  busy: false,
+};
+
+const PROMPT_LEVEL_LABEL = {0: "原始", 1: "一次增强", 2: "二次增强"};
+
 function promptIsEnhanced() {
   return promptEnhance.text !== null && $("#prompt").value === promptEnhance.text;
 }
@@ -640,7 +688,116 @@ function clearPromptEnhanced() {
 
 function updatePromptBadge() {
   const badge = $("#promptEnhancedBadge");
-  if (badge) badge.hidden = !promptIsEnhanced();
+  if (!badge) return;
+  const level = currentPromptLevel();
+  badge.hidden = level === 0;
+  if (level > 0) {
+    badge.textContent = PROMPT_LEVEL_LABEL[level] || "已增强";
+    badge.classList.toggle("lv2", level === 2);
+  }
+}
+
+// 当前提示词处于第几级增强（0=原始）
+function currentPromptLevel() {
+  const current = $("#prompt").value;
+  let level = 0;
+  for (const v of promptVersions.versions) {
+    if (v.text === current) level = Math.max(level, v.level);
+  }
+  // 手动编辑过 -> 视为回到原始级
+  if (promptEnhance.text !== null && promptEnhance.text !== current) level = 0;
+  if (promptVersions.busy) return level;
+  return level;
+}
+
+// 记录一个版本
+function pushPromptVersion(level, text, source, specId) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return;
+  const existing = promptVersions.versions.findIndex(v => v.level === level && v.text === trimmed);
+  const entry = {level, label: PROMPT_LEVEL_LABEL[level] || `第${level}级`,
+                 text: trimmed, source: source || "", specId: specId || "",
+                 at: Date.now()};
+  if (existing >= 0) promptVersions.versions[existing] = entry;
+  else promptVersions.versions.push(entry);
+  renderPromptVersions();
+}
+
+// 恢复某个版本到输入框
+function restorePromptVersion(index) {
+  const v = promptVersions.versions[index];
+  if (!v) return;
+  $("#prompt").value = v.text;
+  // 恢复到该版本 = 该版本已被「采用」，标记为已增强（level>0）
+  if (v.level > 0) markPromptEnhanced();
+  else clearPromptEnhanced();
+  updatePromptBadge();
+  closePromptVersionModal();
+}
+
+// 版本历史弹窗
+function openPromptVersionModal() {
+  const box = $("#promptVersionList");
+  if (!box) return;
+  if (!promptVersions.versions.length) {
+    box.innerHTML = `<div class="version-empty">还没有增强记录。先做一次「增强」或「二次增强」。</div>`;
+  } else {
+    const current = $("#prompt").value;
+    box.innerHTML = promptVersions.versions.map((v, i) => `
+      <div class="version-item ${v.text === current ? "current" : ""}">
+        <div class="version-head">
+          <span class="version-badge lv${v.level}">${esc(v.label)}</span>
+          ${v.source ? `<span class="version-source">${esc(v.source)}</span>` : ""}
+          ${v.text === current ? `<span class="version-current">当前</span>` : ""}
+        </div>
+        <div class="version-text">${esc(v.text.slice(0, 400))}${v.text.length > 400 ? "…" : ""}</div>
+        <div class="version-actions">
+          <button type="button" data-restore="${i}">恢复到输入框</button>
+        </div>
+      </div>`).join("");
+    box.querySelectorAll("[data-restore]").forEach(btn => {
+      btn.addEventListener("click", () => restorePromptVersion(Number(btn.dataset.restore)));
+    });
+  }
+  $("#promptVersionModal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closePromptVersionModal() {
+  const modal = $("#promptVersionModal");
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+// 二次增强作用对象（原始 / 一次增强）
+function renderRefineTargets() {
+  const box = $("#refineTargetChips");
+  if (!box) return;
+  const hasL1 = promptVersions.versions.some(v => v.level === 1);
+  const options = [
+    {level: 0, label: "原始提示词", enabled: true},
+    {level: 1, label: "一次增强后", enabled: hasL1},
+  ];
+  // 目标级别被删掉后回落
+  if (!options.some(o => o.level === promptVersions.refineTarget && o.enabled)) {
+    promptVersions.refineTarget = 0;
+  }
+  box.innerHTML = options.map(o =>
+    `<button type="button" data-level="${o.level}" class="${promptVersions.refineTarget === o.level ? "active" : ""}" ${o.enabled ? "" : 'disabled title="还没有一次增强的结果"'}>${esc(o.label)}</button>`
+  ).join("");
+  box.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      promptVersions.refineTarget = Number(btn.dataset.level);
+      renderRefineTargets();
+    });
+  });
+}
+
+function renderPromptVersions() {
+  updatePromptBadge();
+  renderRefineTargets();
 }
 
 // 手动编辑提示词 -> 增强标记立即失效
@@ -650,11 +807,15 @@ $("#prompt").addEventListener("input", () => {
 });
 
 // 增强中 / 生成中互斥：避免并发重复提交
+// 注意：一次增强与二次增强期间，生成按钮都必须禁用。
 function updateActionButtons() {
-  const busy = promptEnhance.busy || state.genBusy;
+  const enhanceBusy = promptEnhance.busy || promptVersions.busy;
+  const busy = enhanceBusy || state.genBusy;
   const genBtn = $("#genBtn");
   const enhBtn = $("#enhanceBtn");
   const enhText = $("#enhanceBtnText");
+  const refBtn = $("#refineBtn");
+  const refText = $("#refineBtnText");
   if (genBtn) {
     genBtn.disabled = busy;
     genBtn.classList.toggle("busy", state.genBusy);
@@ -665,6 +826,11 @@ function updateActionButtons() {
     enhBtn.classList.toggle("busy", promptEnhance.busy);
   }
   if (enhText) enhText.textContent = promptEnhance.busy ? "正在增强…" : "增强";
+  if (refBtn) {
+    refBtn.disabled = busy;
+    refBtn.classList.toggle("busy", promptVersions.busy);
+  }
+  if (refText) refText.textContent = promptVersions.busy ? "正在细化…" : "二次增强";
 }
 
 // ---------- 未增强拦截：确认用原始提示词生成 / 取消中止 ----------
@@ -749,7 +915,7 @@ $("#genBtn").addEventListener("click", async () => {
   const mode = state.mode;
   // 图像模式：提示词未增强时先确认
   //   确认 -> 用用户原始提示词继续生成；取消/关闭 -> 中止本次生成（不自动开始增强）
-  if (mode === "t2i" && !promptIsEnhanced()) {
+  if (mode === "t2i" && currentPromptLevel() === 0) {
     const ok = await askEnhanceGate();
     if (!ok) return;
   }
@@ -784,9 +950,14 @@ $("#genBtn").addEventListener("click", async () => {
     // 生成批次：一次提交 N 张（服务端拆成 N 个独立批次）
     params.batch_count = state.img.batchCount;
     // LoRA：只提交启用且强度 > 0 的（服务端会再校验文件是否存在）
+    // trigger 一起带上 —— 服务端据此把触发词追加进最终提示词
     params.loras = state.img.loras
       .filter(l => l.enabled !== false && Number(l.strength) > 0)
-      .map(l => ({name: l.name, strength: Number(l.strength)}));
+      .map(l => ({
+        name: l.name,
+        strength: Number(l.strength),
+        trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
+      }));
   }
   fd.append("params", JSON.stringify(params));
   try {
@@ -815,11 +986,53 @@ $("#genBtn").addEventListener("click", async () => {
 });
 
 // ---------- 任务列表 ----------
+// ---------- 生成类型标签（服务端下发，可与状态标签叠加） ----------
+function renderGenTypeTabs() {
+  const box = $("#genTypeTabs");
+  if (!box) return;
+  const label = box.querySelector(".tabs-label");
+  const buttons = [
+    `<button data-type="" class="${state.genType ? "" : "active"}">全部类型</button>`,
+    ...GEN_TYPES.types.map(t =>
+      `<button data-type="${esc(t.key)}" class="${state.genType === t.key ? "active" : ""}" title="${esc(t.label)}">${esc(t.label)}</button>`
+    ),
+  ];
+  box.innerHTML = "";
+  if (label) box.appendChild(label);
+  buttons.forEach(html => {
+    const wrap = document.createElement("span");
+    wrap.innerHTML = html;
+    box.appendChild(wrap.firstElementChild);
+  });
+  box.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.genType = btn.dataset.type || "";
+      renderGenTypeTabs();
+      refreshJobs();
+    });
+  });
+}
+
+async function loadGenerationTypes() {
+  try {
+    const resp = await fetch("/api/generation-types", {cache: "no-store"});
+    if (!resp.ok) return;
+    const data = await resp.json();
+    GEN_TYPES.types = data.types || [];
+    GEN_TYPES.registeredModes = data.registered_modes || [];
+    renderGenTypeTabs();
+  } catch (e) { /* 静默：不阻断任务列表 */ }
+}
+
+// 状态标签组：只取带 data-st 的按钮
+// 注意：类型标签组也带 .jobs-tabs class，不能用 `.jobs-tabs button`，
+// 否则 renderTabs 会把类型标签的 active 状态一起清掉。
 function renderTabs() {
-  $$(".jobs-tabs button").forEach(b => b.classList.toggle("active", b.dataset.st === state.tab));
+  $$(".jobs-tabs button[data-st]").forEach(b =>
+    b.classList.toggle("active", b.dataset.st === state.tab));
   $("#doneFilters").hidden = !["done", "all"].includes(state.tab);
 }
-$$(".jobs-tabs button").forEach(b => b.addEventListener("click", () => {
+$$(".jobs-tabs button[data-st]").forEach(b => b.addEventListener("click", () => {
   state.tab = b.dataset.st;
   if (["done", "longfilm", "all"].includes(state.tab)) state.donePage = 1;
   showCreate();
@@ -1271,7 +1484,13 @@ function jobCard(job) {
       if (p.negative_prompt != null) s.negative = p.negative_prompt;
       if (p.batch_count) s.batchCount = Number(p.batch_count);
       if (Array.isArray(p.loras)) {
-        s.loras = p.loras.map(l => ({name: l.name, strength: Number(l.strength), enabled: true}));
+        s.loras = p.loras.map(l => ({
+          name: l.name,
+          strength: Number(l.strength),
+          enabled: true,
+          // 触发词沿用任务记录里的版本（用户可能改过）
+          trigger: l.trigger !== undefined ? l.trigger : "",
+        }));
       }
       renderImagePanel();
     } else {
@@ -1415,6 +1634,8 @@ async function refreshJobs() {
       : [tab === "longfilm" ? "done" : tab];
     const groups = await Promise.all(statuses.map(async status => {
       const query = new URLSearchParams({status});
+      // 生成类型筛选（与状态叠加，服务端按 mode 过滤）
+      if (state.genType) query.set("gen_type", state.genType);
       // 「已完成」「全部」都走服务端筛选 + 分页；「全部」不按状态过滤但保留筛选条件
       if (["done", "all"].includes(status)) {
         query.set("page", state.donePage);
@@ -1773,8 +1994,11 @@ $("#imgLoraAdd")?.addEventListener("click", () => {
   }
   state.img.loras.push({
     name,
+    // 推荐强度自动应用（用户之后可手动改）
     strength: meta ? Number(meta.recommended_strength) : 1.0,
     enabled: true,
+    // 触发词自动带上上游标注的那个（用户可编辑 / 删除）
+    trigger: meta && meta.trigger ? meta.trigger : "",
   });
   saveLoraConfig();
 });
@@ -1791,8 +2015,10 @@ document.addEventListener("keydown", event => {
 // ---------- 启动 ----------
 loadImageOptions();
 loadImageLoras();
+loadGenerationTypes();
 renderMode();
 renderTabs();
+renderPromptVersions();   // 初始化二次增强「作用对象」切换（原始 / 一次增强后）
 renderStitchClips();
 refreshJobs();
 refreshSystem();

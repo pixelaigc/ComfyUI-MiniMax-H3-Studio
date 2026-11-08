@@ -26,39 +26,85 @@ LORA_CATALOG: dict[str, dict] = {
         "base": "Tongyi-MAI/Z-Image（Z_IMAGE_TURBO）",
         "trigger": "如梦似幻",
         "recommended_strength": 1.0,
+        # effect = 效果类（人像/风格/特效），可作为用户可选项
+        # acceleration = 加速/蒸馏类（改变步数/CFG 语义），固定内置于工作流
+        "kind": "effect",
         "scene": "梦幻朦胧/柔光滤镜风格，官方 tags 标注为「滤镜lora」。",
         "source": "ModelScope KookYan/Kook_Zimage_Rmsh（README tags）",
+        # 上游 README 未给出推荐强度，1.0 = LoRA 默认强度（无 alpha 缩放）
+        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
     },
     "Kook_Zimage_瑶光.safetensors": {
         "display": "瑶光（Kook Z-Image 真实幻想）",
         "base": "Tongyi-MAI/Z-Image（Z_IMAGE_TURBO）",
         "trigger": "瑶光 / 真实幻想",
         "recommended_strength": 1.0,
+        "kind": "effect",
         "scene": "写实向「真实幻想」质感，官方 tags 标注为「瑶光 / 真实幻想」。",
         "source": "ModelScope KookYan/Kook_Zimage_Yg（README tags）",
+        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
     },
     "Z-Image-Fun-Lora-Distill-8-Steps-2603-ComfyUI.safetensors": {
         "display": "Z-Image-Fun 蒸馏加速 8 步（2603）",
         "base": "Z-Image Base（ZImageBase）",
         "trigger": "",
         "recommended_strength": 1.0,
+        # 蒸馏加速：改变步数/CFG 的语义，不能当效果 LoRA 让用户随便挑
+        "kind": "acceleration",
         "scene": "步数+CFG 双蒸馏加速：8 步出图，比 Base 的 25 步快 3 倍；"
                  "2603 版新增随机时间步策略，sigma<0.5 区间不再糊。",
         "source": "Civitai 2362961 / HF alibaba-pai/Z-Image-Fun-Lora-Distill",
+        "strength_source": "上游默认强度 1.0",
     },
     "z-image/Z-Image-Fun-Distill-Lora.safetensors": {
         "display": "Z-Image 蒸馏 LoRA（本地抽取版 rank64）",
         "base": "Z-Image（zimage）",
         "trigger": "",
         "recommended_strength": 1.0,
+        "kind": "acceleration",
         "scene": "从 Z-Image 权重抽出的 rank64 蒸馏 LoRA（ModelDiffToLoRA 抽取），"
                  "用于低步数加速，本地无上游训练参数说明。",
         "source": "本地 safetensors __metadata__（extracted_by: comfyui-zimage-realtime-lora）",
+        "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
     },
 }
 
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
 Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
+
+# LoRA 分类
+#   effect       —— 效果类（滤镜 / 写实风格 / 人像增强）：用户可自行挑选
+#   acceleration —— 加速 / 蒸馏类：改变步数、CFG、调度语义，
+#                   必须与特定基模搭配，由工作流固定使用，**不作为用户可选项**
+#                   （用户自行选择会与 Turbo 自身的蒸馏冲突，出图质量不可控）
+KIND_EFFECT = "effect"
+KIND_ACCELERATION = "acceleration"
+
+# 加速/蒸馏类 LoRA 的判定关键词 —— 命中即排除出用户可选列表。
+# 只对「上游目录里没登记过 kind」的 LoRA 生效（已登记的以登记为准）。
+ACCELERATION_MARKERS = (
+    "distill", "distillation", "accel", "speedup", "speed-up",
+    "lightx2v", "lightning", "turbo_lora", "step4", "step8", "4step", "8step",
+    "fewstep", "few-step", "lightning2", "sparse", "fast",
+)
+
+
+def classify_kind(name: str, info: dict) -> str:
+    """判定 LoRA 属于「效果类」还是「加速/蒸馏类」。
+
+    1. 上游目录已登记 kind -> 直接采信（人工核对过）
+    2. 否则按文件名 / 说明里的关键词判定
+    3. 判不出来 -> 按效果类处理（保守：让用户自己决定，但会给出提示）
+    """
+    declared = (info.get("kind") or "").strip()
+    if declared in (KIND_EFFECT, KIND_ACCELERATION):
+        return declared
+    blob = " ".join([name, info.get("display", ""), info.get("scene", ""),
+                      info.get("source", "")]).lower()
+    for marker in ACCELERATION_MARKERS:
+        if marker in blob:
+            return KIND_ACCELERATION
+    return KIND_EFFECT
 
 
 # ------------------------------------------------------------------ 扫描本机
@@ -184,6 +230,7 @@ def list_z_image_loras() -> list[dict]:
             seen.add(rel)
             meta = _read_safetensors_metadata(path)
             info = LORA_CATALOG.get(rel) or LORA_CATALOG.get(path.name) or {}
+            kind = classify_kind(rel, info)
             found.append({
                 "name": rel,
                 "path": str(path),
@@ -192,11 +239,27 @@ def list_z_image_loras() -> list[dict]:
                 "base": info.get("base") or (meta.get("modelspec.architecture") or meta.get("ss_base_model_version") or "Z-Image"),
                 "trigger": info.get("trigger", ""),
                 "recommended_strength": info.get("recommended_strength", 1.0),
+                "strength_source": info.get("strength_source", ""),
+                "kind": kind,
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 "metadata": meta,
             })
     return found
+
+
+def list_effect_loras() -> list[dict]:
+    """只返回「效果类」LoRA —— 这才是用户可以自由挑选的列表。
+
+    加速 / 蒸馏类 LoRA 不在这里出现：它们由工作流固定使用，
+    混进可选列表会让用户选到与当前基模不匹配的加速器。
+    """
+    return [item for item in list_z_image_loras() if item["kind"] == KIND_EFFECT]
+
+
+def list_acceleration_loras() -> list[dict]:
+    """加速 / 蒸馏类 LoRA（工作流固定使用，不进用户下拉）。"""
+    return [item for item in list_z_image_loras() if item["kind"] == KIND_ACCELERATION]
 
 
 def _read_safetensors_metadata(path: Path) -> dict:

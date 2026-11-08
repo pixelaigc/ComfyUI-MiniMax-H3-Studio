@@ -51,6 +51,7 @@ from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import loras as lora_registry
+from h3studio import gen_types
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -135,11 +136,21 @@ def init_db():
 
 
 def row_to_job(r):
+    mode = r["mode"]
+    job_params = json.loads(r["params"] or "{}")
+    # 生成类型：优先读任务 meta 里记录的 gen_type；
+    # 老任务没有该字段时，按 mode 一致兜底归类（不出现空白 / 全归未知）
+    stored_type = str(job_params.get("gen_type") or "").strip()
+    gen_type = (gen_types.type_for_mode(stored_type) if stored_type
+                else gen_types.type_for_mode(mode))
     return {
         "id": r["id"],
         "created_at": r["created_at"],
-        "mode": r["mode"],
-        "params": json.loads(r["params"] or "{}"),
+        "mode": mode,
+        "gen_type": gen_type["key"],
+        "gen_type_label": gen_type["label"],
+        "gen_type_media": gen_type["media"],
+        "params": job_params,
         "status": r["status"],
         "progress": r["progress"],
         "progress_text": r["progress_text"],
@@ -622,6 +633,9 @@ WORKER = Worker()
 # 一次提交最多几个批次
 MAX_BATCH_COUNT = 5
 
+# 历史上出现、但已不在当前注册表里的 mode —— 有独立类型标签，不进兜底类
+LEGACY_UNKNOWN_MODES = list(gen_types.LEGACY_MODE_LABELS.keys())
+
 # ------------------------------------------------------------------ Routes
 def json_ok(payload=None, **kw):
     payload = payload or {}
@@ -678,6 +692,8 @@ async def api_create(request):
 
     job_id = uuid.uuid4().hex[:12]
     now = time.time()
+    # 生成类型写进任务 meta（真实记录，不靠读时推断）
+    params["gen_type"] = gen_types.type_key_for_mode(mode)
     with db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
@@ -846,6 +862,21 @@ async def api_list(request):
         conditions.append("mode='longfilm'")
     elif media:
         return web.json_response({"error": "media 只能是 image、video 或 longfilm"}, status=400)
+    # 生成类型筛选（与 status 叠加）：type key -> 对应的 mode 列表
+    gen_type = request.query.get("gen_type", "").strip()
+    if gen_type:
+        if gen_type == "__other__":
+            # 兜底类：既不是当前注册的模式，也不是已知历史 mode 的那些
+            known = list(gen_types.registered_modes()) + list(LEGACY_UNKNOWN_MODES)
+            conditions.append("mode NOT IN (%s)" % ",".join("?" * len(known)))
+            args.extend(known)
+        else:
+            mapping = gen_types.type_filter_keys()
+            modes = mapping.get(gen_type)
+            if not modes:
+                return web.json_response({"error": f"未知的生成类型 {gen_type}"}, status=400)
+            conditions.append("mode IN (%s)" % ",".join("?" * len(modes)))
+            args.extend(modes)
     aspect = request.query.get("aspect", "").strip()
     if aspect:
         if aspect not in ASPECT_NUM:
@@ -1044,13 +1075,28 @@ async def api_image_options(request):
     })
 
 
+async def api_generation_types(request):
+    """GET /api/generation-types —— 右侧任务「按生成类型」标签的清单
+
+    清单来自后端真实注册的生成模式（workflows.BUILDERS + longfilm），
+    前端不硬编码任何类型名。
+    """
+    return json_ok({
+        "types": gen_types.list_types(),
+        "registered_modes": gen_types.registered_modes(),
+    })
+
+
 async def api_image_loras(request):
     """GET /api/image-loras —— 本机实际存在的 Z-Image LoRA 清单 + 当前配置
 
     清单只列本机真实存在的文件（跟 ComfyUI 自己的 lora 下拉同源），
     配置存服务端（局域网所有客户端共用同一份）。
     """
-    available = lora_registry.list_z_image_loras()
+    # 只下发「效果类」LoRA —— 加速/蒸馏类由工作流固定使用，
+    # 不进用户可选列表（用户自选加速器会与 Turbo 自身蒸馏冲突）。
+    available = lora_registry.list_effect_loras()
+    acceleration = lora_registry.list_acceleration_loras()
     with db() as conn:
         config = lora_registry.load_config(conn)
     # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
@@ -1059,14 +1105,23 @@ async def api_image_loras(request):
     for item in config:
         name = item.get("name") or ""
         meta = by_name.get(name)
+        # 触发词：以前端保存的为准（用户可能改过），否则用注册表里的
+        trigger = item.get("trigger")
+        if trigger is None:
+            trigger = (meta or {}).get("trigger", "")
         resolved.append({
             "name": name,
             "strength": float(item.get("strength", 1.0)),
             "enabled": bool(item.get("enabled", True)),
             "missing": meta is None,
             "display": (meta or {}).get("display") or item.get("display") or name,
+            "trigger": trigger or "",
+            "recommended_strength": (meta or {}).get("recommended_strength", 1.0),
+            "kind": (meta or {}).get("kind", lora_registry.KIND_EFFECT),
         })
-    return json_ok({"available": available, "config": resolved})
+    return json_ok({"available": available,
+                    "acceleration": acceleration,
+                    "config": resolved})
 
 
 async def api_image_loras_save(request):
@@ -1098,11 +1153,20 @@ async def api_image_loras_save(request):
             strength = float(item.get("strength", 1.0))
         except (TypeError, ValueError):
             return web.json_response({"error": f"strength 必须是数字：{name}"}, status=400)
-        strength = min(1.0, max(0.0, strength))
+        strength = min(1.5, max(0.0, strength))
+        # 触发词：用户改过的以用户为准（留空 = 不追加）；没传就用注册表里的
+        meta = next((m for m in lora_registry.list_effect_loras()
+                     if m["name"] == resolved), {})
+        trigger = item.get("trigger")
+        if trigger is None:
+            trigger = meta.get("trigger", "")
         cleaned.append({
             "name": resolved,
             "strength": strength,
             "enabled": bool(item.get("enabled", True)),
+            "trigger": str(trigger or ""),
+            "recommended_strength": meta.get("recommended_strength", 1.0),
+            "kind": meta.get("kind", lora_registry.KIND_EFFECT),
         })
     with db() as conn:
         lora_registry.save_config(conn, cleaned)
@@ -1734,6 +1798,7 @@ def make_app():
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
+    app.router.add_get("/api/generation-types", api_generation_types)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)
     # 本地模型 Provider 配置

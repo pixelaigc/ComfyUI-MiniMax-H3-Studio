@@ -10,6 +10,8 @@ H3 Studio 工作流生成器
   t2i   文生图        Z-IMAGE-turbo
 """
 import math
+import re
+from pathlib import Path
 import random
 
 from . import loras as lora_registry
@@ -414,19 +416,70 @@ def z_image_megapixels(width, height):
     return (width * height) / (1024.0 * 1024.0)
 
 
-def _z_image_lora_chain(lora_items, base_model_ref):
-    """把选中的 LoRA 串成模型链，返回 (节点字典, 最终模型引用)。
+def _lookup_lora_meta(name: str) -> dict:
+    """按界面上的 LoRA 名查本机注册表（拿到 kind / trigger 等元信息）。
 
-    链路：UNETLoader -> ModelSamplingAuraFlow -> LoraLoaderModelOnly x N
+    查不到就返回空 dict —— 调用方据此回落到前端传值，不报错。
+    """
+    if not name:
+        return {}
+    for item in lora_registry.list_z_image_loras():
+        if item["name"] == name or Path(item["name"]).name == Path(name).name:
+            return item
+    return {}
 
-    LoraLoaderModelOnly 只作用在 model 上（不动 clip），这正是 Z-Image
-    需要的 —— Z-Image 的文本编码走独立的 CLIPLoader(lumina2)，
-    风格 LoRA 应当只改 UNet 侧。
+
+def merge_lora_triggers(prompt: str, lora_items) -> str:
+    """把各 LoRA 自带的触发词合并追加到提示词末尾。
+
+    规则：
+      * 每个 LoRA 的 trigger 字段可能含多个词，用 " / " 或 "," 分隔
+      * 已存在于提示词中的触发词不重复追加
+      * 多个 LoRA 的触发词按 LoRA 顺序依次追加
+    返回合并后的提示词（没有触发词时原样返回）。
+    """
+    triggers: list[str] = []
+    seen: set[str] = set()
+    for item in lora_items:
+        raw = str((item or {}).get("trigger") or "").strip()
+        if not raw:
+            continue
+        for token in re.split(r"[/,，、]", raw):
+            token = token.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            triggers.append(token)
+    if not triggers:
+        return prompt
+    base = (prompt or "").strip()
+    missing = [t for t in triggers if t not in base]
+    if not missing:
+        return base
+    suffix = ", ".join(missing)
+    return f"{base}, {suffix}" if base else suffix
+
+
+def _z_image_lora_chain(lora_items, base_model_ref, base_clip_ref=None):
+    """把选中的效果 LoRA 串成模型链，返回 (节点字典, 最终模型引用, 最终 clip 引用)。
+
+    链路：UNETLoader -> ModelSamplingAuraFlow -> LoraLoader x N
+                                CLIPLoader(lumina2) -^
+
+    用 **LoraLoader**（而非 LoraLoaderModelOnly）：它的 model 与 clip
+    两个输入都接上 —— model 接 UNet 侧，clip 接 CLIPLoader(lumina2)。
+    原因是 LoRA 权重里同时包含 UNet 与文本编码器两组键；只接 model 的话，
+    文本编码器那部分 patch 会被 ComfyUI 记为 "NOT LOADED" 而丢弃。
+
+    实测（见本轮验证记录）：Z-Image 的 lumina2 文本编码器
+    （ZImageTEModel_）**能**接受 LoRA patch，日志显示
+    "Model Lumina2 prepared ... 170 patches attached"。
 
     找不到文件时抛错（不静默忽略）。
     """
     nodes: dict = {}
-    current = base_model_ref
+    current_model = base_model_ref
+    current_clip = base_clip_ref
     for index, item in enumerate(lora_items):
         name = item.get("name") or ""
         if not name:
@@ -439,13 +492,23 @@ def _z_image_lora_chain(lora_items, base_model_ref):
             # 强度 0 = 关闭该 LoRA，但仍然校验文件存在，避免静默吞掉错名
             continue
         node_id = f"57:40{index}"
-        nodes[node_id] = {
-            "inputs": {"lora_name": resolved, "strength_model": strength,
-                       "model": current},
-            "class_type": "LoraLoaderModelOnly",
+        inputs = {
+            "lora_name": resolved,
+            "strength_model": strength,
+            # clip 强度跟随 model 强度（风格 LoRA 的两侧语义一致）
+            "strength_clip": strength,
+            "model": current_model,
         }
-        current = [node_id, 0]
-    return nodes, current
+        if current_clip is not None:
+            inputs["clip"] = current_clip
+        nodes[node_id] = {
+            "inputs": inputs,
+            "class_type": "LoraLoader",
+        }
+        current_model = [node_id, 0]
+        if current_clip is not None:
+            current_clip = [node_id, 1]
+    return nodes, current_model, current_clip
 
 
 def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
@@ -478,10 +541,14 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
                  "class_type": "KSampler"},
     }
     # LoRA 串在 ModelSamplingAuraFlow 之后、KSampler 之前
+    # clip 侧也一起接上（LoraLoader 的 clip 输入），文本编码器才能吃到 patch
     if loras:
-        lora_nodes, model_ref = _z_image_lora_chain(loras, ["57:11", 0])
+        lora_nodes, model_ref, clip_ref = _z_image_lora_chain(
+            loras, ["57:11", 0], ["57:30", 0])
         p.update(lora_nodes)
         p["57:3"]["inputs"]["model"] = model_ref
+        # CLIPTextEncode（正向）与 ConditioningZeroOut（负向）都用 LoRA 后的 clip
+        p["57:27"]["inputs"]["clip"] = clip_ref
     if negative_mode == "encode":
         p["57:33"] = {"inputs": {"text": negative_text, "clip": ["57:30", 0]},
                       "class_type": "CLIPTextEncode"}
@@ -504,7 +571,7 @@ def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, promp
     model natively」），所以改成「低分辨率生成 + 放大 + 二次细化」。
     """
     up = Z_IMAGE_UPSCALE
-    return {
+    p = {
         "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8", 0]},
               "class_type": "SaveImage"},
         "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
@@ -549,11 +616,15 @@ def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, promp
         "57:8b": {"inputs": {"samples": ["57:75", 0], "vae": ["57:29", 0]}, "class_type": "VAEDecode"},
     }
     # 放大路径的 LoRA 同样串在 ModelSamplingAuraFlow 之后
+    # （两段 KSampler 都用 LoRA 后的 model；clip 也要接到 LoRA 后的 CLIP）
     if loras:
-        lora_nodes, model_ref = _z_image_lora_chain(loras, ["57:11", 0])
+        lora_nodes, model_ref, clip_ref = _z_image_lora_chain(
+            loras, ["57:11", 0], ["57:30", 0])
         p.update(lora_nodes)
         p["57:3"]["inputs"]["model"] = model_ref
         p["57:75"]["inputs"]["model"] = model_ref
+        p["57:27"]["inputs"]["clip"] = clip_ref
+    return p
 
 
 def build_t2i(params):
@@ -589,7 +660,12 @@ def build_t2i(params):
     negative_text = params.get("negative_prompt", "") or ""
     prompt = params.get("prompt", "")
 
-    # LoRA：[{name, strength}]，只接受启用且强度 > 0 的项
+    # LoRA：[{name, strength, trigger?}]，只接受启用且强度 > 0 的项
+    #
+    # 触发词来源优先级：
+    #   1. 前端显式传来的 trigger（用户改过就以用户的为准）
+    #   2. 本机 LoRA 注册表里的 trigger（上游标注的效果触发词）
+    # 加速/蒸馏类 LoRA 不允许作为用户可选项 —— 下面直接拒绝。
     loras = []
     for item in (params.get("loras") or []):
         if not isinstance(item, dict):
@@ -602,7 +678,19 @@ def build_t2i(params):
             strength = 0.0
         if strength <= 0:
             continue
-        loras.append({"name": item.get("name") or "", "strength": strength})
+        name = item.get("name") or ""
+        meta = _lookup_lora_meta(name)
+        if meta and meta.get("kind") == lora_registry.KIND_ACCELERATION:
+            raise ValueError(
+                f"「{meta.get('display') or name}」是加速/蒸馏类 LoRA，"
+                "不能作为可选效果 LoRA 使用")
+        trigger = item.get("trigger")
+        if trigger is None:
+            trigger = (meta or {}).get("trigger", "")
+        loras.append({"name": name, "strength": strength, "trigger": trigger or ""})
+
+    # 触发词自动追加到最终提示词（用户可在界面上编辑/删除）
+    prompt = merge_lora_triggers(prompt, loras)
 
     # 目标过大 -> 走官方 2K 放大路径（生成端固定用官方 Turbo 推荐参数）
     if z_image_megapixels(width, height) > Z_IMAGE_MAX_DIRECT_MP:

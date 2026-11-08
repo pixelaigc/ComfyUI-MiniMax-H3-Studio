@@ -63,6 +63,23 @@ TEMPLATE_SPECS = {
                         "层次空间", "文字排版"],
         "source": "Z-Image 官方 HF Space pe.py（实测 2371 bytes）",
     },
+    # 二次增强（细化）：把提示词里的物体逐个枚举 + 逐个精细化。
+    # 可作用于「原始提示词」或「一次增强后的提示词」。
+    "image-refine": {
+        "id": "image-refine",
+        "label": "图像提示词·物体细化（二次增强）",
+        "media": "image",
+        "families": ["*"],
+        "template": "refine-objects.txt",
+        "validate_mode": "refine",
+        # 逐物体枚举需要更长预算
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["L1 特写", "L2 中景", "L3 远景", "环境现象", "主体细化"],
+        "source": "本机 skill: scene-object-inventory（物体逐个枚举 + L1/L2/L3 分级）",
+        # 标记为「二次增强」档：前端据此区分一次/二次增强
+        "refine": True,
+    },
     "image-scalist": {
         "id": "image-scalist",
         "label": "图像提示词（SCALIST 结构化）",

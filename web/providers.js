@@ -555,6 +555,11 @@ $("#enhanceBtn").addEventListener("click", async () => {
     $("#enhanceResult").value = d.enhanced || "";
     $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
     $("#enhanceModal").hidden = false;
+    // 记录版本谱系：原始(0) -> 一次增强(1)，供「版本历史」查看与再增强
+    if (d.enhanced) {
+      pushPromptVersion(0, prompt, "原始提示词");
+      pushPromptVersion(1, d.enhanced, `模板：${d.spec_id || "image"}`, d.spec_id);
+    }
     setEnhanceHint(`已用「${d.provider}」扩写，${d.enhanced ? d.enhanced.length : 0} 字`, "ok");
   } catch (e) {
     // 失败必须可见 —— 本地模型不可达时不静默
@@ -568,6 +573,79 @@ $("#enhanceBtn").addEventListener("click", async () => {
     promptEnhance.busy = false;
     updateActionButtons();
   }
+});
+
+// ---------- 二次增强（物体逐个枚举 + 逐个细化） ----------
+// 作用对象由 promptVersions.refineTarget 决定：0=原始提示词 / 1=一次增强后的提示词
+function refineSourcePrompt() {
+  const target = promptVersions.refineTarget;
+  if (target === 1) {
+    // 取最近一次「一次增强」版本
+    const l1 = promptVersions.versions.filter(v => v.level === 1);
+    if (l1.length) return l1[l1.length - 1].text;
+  }
+  return $("#prompt").value.trim();
+}
+
+$("#refineBtn")?.addEventListener("click", async () => {
+  const btn = $("#refineBtn");
+  const text = $("#refineBtnText");
+  const source = refineSourcePrompt();
+  if (!source) {
+    setEnhanceHint("请先输入要细化的提示词", "error");
+    $("#prompt").focus();
+    return;
+  }
+  const targetLevel = promptVersions.refineTarget === 1 ? 1 : 0;
+  btn.disabled = true;
+  text.textContent = "正在细化…";
+  promptVersions.busy = true;
+  updateActionButtons();
+  setEnhanceHint("正在逐个物体细化…", "busy");
+  try {
+    const d = await apiJSON("POST", "/api/enhance", {
+      prompt: source,
+      mode: "replace",
+      // 二次增强固定走「物体细化」模板；服务端仍会按 media/families 过滤校验
+      spec_id: "image-refine",
+      mode_ctx: enhanceCurrentMode(),
+      model_key: enhanceCurrentModelKey(),
+    });
+    if (d.spec_id) { provState.specId = d.spec_id; renderEnhanceSpecSelect(); }
+    const refined = d.enhanced || "";
+    if (!refined) throw new Error("本地模型返回了空结果");
+    // 回填到输入框
+    $("#prompt").value = refined;
+    // 记录为第 2 级版本；保留原始 / 一次增强版本
+    pushPromptVersion(2, refined, `模板：${d.spec_id || "image-refine"}`, d.spec_id);
+    markPromptEnhanced();
+    updatePromptBadge();
+    renderPromptVersions();
+    // 来源版本也要留在谱系里（供「版本历史」查看）
+    pushPromptVersion(targetLevel, source, targetLevel === 1 ? "一次增强（本次二次增强的输入）" : "原始提示词（本次二次增强的输入）");
+    $("#enhanceResult").value = refined;
+    $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
+    $("#enhanceModal").hidden = false;
+    setEnhanceHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字`, "ok");
+  } catch (e) {
+    const detail = e.payload && e.payload.error ? e.payload.error : e.message;
+    const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
+    setEnhanceHint(`二次增强失败：${detail}`, "error");
+    alert(`二次增强失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
+  } finally {
+    promptVersions.busy = false;
+    btn.disabled = false;
+    text.textContent = "二次增强";
+    updateActionButtons();
+  }
+});
+
+// ---------- 版本历史弹窗 ----------
+$("#promptVersionBtn")?.addEventListener("click", openPromptVersionModal);
+$("#promptVersionClose")?.addEventListener("click", closePromptVersionModal);
+$("#promptVersionDone")?.addEventListener("click", closePromptVersionModal);
+$("#promptVersionModal")?.addEventListener("click", e => {
+  if (e.target.id === "promptVersionModal") closePromptVersionModal();
 });
 
 // 结果弹窗的元信息：模型 / 模板 / 采样参数 / 校验结果
