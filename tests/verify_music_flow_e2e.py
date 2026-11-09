@@ -17,6 +17,7 @@ import json
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -82,9 +83,12 @@ def main():
         # 3) 点「增强」-> 结构化风格 + 歌词
         page.click("#musicEnhanceBtn")
         print("[3] 等待增强（本地模型出结构化风格 + 歌词）…")
+        # 【关键】等提示栏出现「已生成」—— **不能**等 #musicSF_language 非空：
+        # 那个下拉一上来就有**默认值**（English），增强还没回来就已经满足，
+        # 于是会在「先提交、后增强」的时序下点生成，提交的任务里没有风格字段。
         page.wait_for_function(
-            "() => { const s = document.querySelector('#musicSF_language');"
-            " return s && s.value && s.value !== ''; }",
+            "() => { const h = document.querySelector('#musicEnhanceHint');"
+            " return h && h.textContent.includes('已生成'); }",
             timeout=300_000)
         page.wait_for_timeout(800)
 
@@ -127,8 +131,11 @@ def main():
 
     # 6) 下载产物并核对音频参数
     out = job["outputs"][0]
+    # job.outputs[].file 已经是**相对 OUT_DIR** 的路径（如 audio/xxx.flac），
+    # 直接挂到 /files/ 后面即可（不要再拼 job id —— 那是 outputUrl() 的前端逻辑，
+    # 服务端 /files/ 路由认的是相对 OUT_DIR 的路径）。
     url = BASE + "/files/" + "/".join(
-        urllib.parse.quote(p) for p in out["file"].split("/"))
+        urllib.parse.quote(seg) for seg in out["file"].split("/"))
     dest = OUT / "music-e2e-output.flac"
     with urllib.request.urlopen(url, timeout=300) as r:
         dest.write_bytes(r.read())
@@ -159,5 +166,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import urllib.parse     # noqa: E402  (放在这里避免顶部未用告警)
     sys.exit(main())

@@ -267,7 +267,13 @@ class TestMusicFlowBrowser(unittest.TestCase):
         self.open_param_panel()
         self.page.fill("#musicPrompt", "一首关于雨夜告别的日语慢歌")
         self.page.click("#musicEnhanceBtn")
-        self.page.wait_for_timeout(2000)
+        # 等提示栏出现「已生成」—— 不能等 #musicSF_language 非空：
+        # 那个下拉一上来就有默认值（English），增强还没回来就已经满足。
+        self.page.wait_for_function(
+            "() => { const h = document.querySelector('#musicEnhanceHint');"
+            " return h && h.textContent.includes('已生成'); }",
+            timeout=60_000)
+        self.page.wait_for_timeout(600)
 
         calls = self.page.evaluate("() => window.__calls || []")
         self.assertTrue(any("/api/music-enhance" in c for c in calls),
