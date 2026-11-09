@@ -59,6 +59,15 @@
       busyFlag: "layout",
       buttonText: "结构化增强",
     },
+    {
+      id: "qwen_pe",
+      label: "qwen21图片官方增强PE",
+      hint: "用 Qwen-Image 2.1 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑各一档）",
+      // 只对 Qwen-Image 2.1 开放：官方 PE checkpoint 是 Qwen-Image 2.1 专用的
+      modes: ["t2i_qwen", "i2i_qwen"],
+      busyFlag: "enhance",
+      buttonText: "官方PE扩写",
+    },
   ];
 
   // 当前选中的增强方式（默认普通增强）
@@ -136,6 +145,20 @@
     }
   }
 
+  /**
+   * 当前选中的方式在当前模式下是否仍可用；不可用则回落到普通增强。
+   *
+   * 模式切换时必须做这件事 —— 否则主按钮会停在一个「当前模式不可用」的
+   * 方式上（比如在 Qwen 面板选了官方 PE 扩写，切到 Z-Image），
+   * 用户点「增强」却什么都没发生（run() 直接 return）。
+   */
+  function ensureAvailable() {
+    const method = currentMethod();
+    if (isAvailable(method)) return false;
+    selectMethod("basic", true);
+    return true;
+  }
+
   /** 主按钮的文字随当前方式变化。 */
   function updateButton() {
     const text = document.querySelector("#enhanceBtnText");
@@ -159,8 +182,10 @@
     if (layoutBar) layoutBar.hidden = currentId !== "layout";
     const specSel = document.querySelector("#enhanceSpec");
     if (specSel) {
-      // 模板下拉对结构化增强无意义（那条链路不走模板）
-      specSel.style.display = currentId === "layout" ? "none" : "";
+      // 模板下拉对结构化增强无意义（那条链路不走模板），
+      // 官方 PE 扩写同理（走官方 checkpoint + 官方 system prompt，不走模板）
+      specSel.style.display =
+        (currentId === "layout" || currentId === "qwen_pe") ? "none" : "";
     }
     const targetGroup = document.querySelector("#refineTargetGroup");
     if (targetGroup) targetGroup.hidden = currentId !== "refine";
@@ -245,6 +270,9 @@
     if (method.id === "layout") {
       return runLayout(method);
     }
+    if (method.id === "qwen_pe") {
+      return runQwenPe(method);
+    }
     if (method.id === "refine") {
       return runRefine(method);
     }
@@ -274,6 +302,7 @@
         model_key: enhanceCurrentModelKey(),
       });
       provState.lastEnhance = d;
+      provState.lastEnhanceKind = "";   // 普通增强，不是官方 PE
       if (d.spec_id && d.spec_id !== provState.specId) {
         provState.specId = d.spec_id;
         renderEnhanceSpecSelect();
@@ -324,6 +353,7 @@
         model_key: enhanceCurrentModelKey(),
       });
       if (d.spec_id) { provState.specId = d.spec_id; renderEnhanceSpecSelect(); }
+      provState.lastEnhanceKind = "";   // 二次增强，不是官方 PE
       const refined = d.enhanced || "";
       if (!refined) throw new Error("本地模型返回了空结果");
       document.querySelector("#prompt").value = refined;
@@ -395,6 +425,95 @@
     }
   }
 
+  // ---- Qwen-Image 2.1 官方 PE 扩写 —— 调 /api/qwen-pe/expand ----
+  //
+  // 与其它增强方式的**回填语义完全一致**：
+  //   结果进同一个弹窗（#enhanceResult）+ 同一个「替换/追加」按钮组，
+  //   替换后标记为「已增强」并进版本历史，用户可继续编辑提示词。
+  //
+  // 差异只有两点：
+  //   1. 不走 Provider 配置，走官方 PE checkpoint（ComfyUI TextGenerate）；
+  //   2. 图片编辑模式下要把参考图一起送去 —— 官方 PE-I2I 工作流就是这么接的
+  //      （BatchImagesNode -> TextGenerate.image），PE 才能「看着图」改写，
+  //      并在输出里写 <image1>/<image2>。
+  async function runQwenPe(method) {
+    const btn = document.querySelector("#enhanceBtn");
+    const text = document.querySelector("#enhanceBtnText");
+    const prompt = document.querySelector("#prompt").value.trim();
+    if (!prompt) {
+      setHint("请先输入要增强的提示词", "error");
+      document.querySelector("#prompt").focus();
+      return;
+    }
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    if (mode !== "t2i_qwen" && mode !== "i2i_qwen") {
+      setHint("官方 PE 扩写只在 Qwen-Image 2.1 的文生图 / 图片编辑模式下可用", "error");
+      return;
+    }
+    // 参考图：素材库来源，顺序即 <imageN> 顺序（与出图链路同一份 payload）
+    let refs = [];
+    if (mode === "i2i_qwen" && window.QwenRefs
+        && typeof window.QwenRefs.toPayload === "function") {
+      refs = window.QwenRefs.toPayload();
+    }
+    btn.disabled = true;
+    text.textContent = "官方PE扩写中…";
+    promptEnhance.busy = true;
+    updateActionButtons();
+    setHint("官方 PE 扩写中（9B 模型 + thinking，约需半分钟）…", "busy");
+    try {
+      const d = await apiJSON("POST", "/api/qwen-pe/expand", {
+        prompt, mode, refs,
+      });
+      const expanded = d.expanded || "";
+      if (!expanded) throw new Error("官方 PE 返回了空结果");
+      // 回填到弹窗（与其它增强方式同一个弹窗 / 同一组按钮）
+      document.querySelector("#enhanceResult").value = expanded;
+      document.querySelector("#enhanceMeta").innerHTML = buildQwenPeMeta(d);
+      document.querySelector("#enhanceModal").hidden = false;
+      // 记录「这次结果是官方 PE 的」—— 真正**写回提示词框**时
+      // （用户在弹窗里点「替换提示词框 / 追加到原提示词」）
+      // 才把出图时的二次扩写关掉。providers.js 那边消费这个标记。
+      // （不能在拿到结果时就关：那只是弹窗里的预览，用户可能直接取消。）
+      if (typeof provState !== "undefined") {
+        provState.lastEnhanceKind = "qwen_pe";
+      }
+      // 进版本历史（与普通增强一致）：
+      //   level 0 = 原始提示词，level 1 = 官方 PE 扩写结果。
+      // 不做这一步的话，写回提示词框后「已增强」徽标不会出现
+      // （徽标靠版本谱系判定级别，不是靠 markPromptEnhanced）。
+      if (expanded) {
+        pushPromptVersion(0, prompt, "原始提示词");
+        pushPromptVersion(1, expanded,
+          `官方 PE：${d.tier_label || d.tier || ""}`.trim(), "qwen21-pe");
+      }
+      setHint(`官方 PE 扩写完成（${d.tier_label || d.tier}）：${expanded.length} 字；`
+        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+    } catch (e) {
+      const detail = e.payload && e.payload.error ? e.payload.error : e.message;
+      setHint(`官方 PE 扩写失败：${detail}`, "error");
+      alert(`Qwen 官方 PE 扩写失败\n\n${detail}\n\n`
+        + `请确认 ComfyUI 正在运行，且官方 PE 权重（qwen3.5_qwen_image_2.1_pe_*.safetensors）已就位。`);
+    } finally {
+      promptEnhance.busy = false;
+      btn.disabled = false;
+      text.textContent = currentMethod().buttonText;
+      updateActionButtons();
+    }
+  }
+
+  /** 官方 PE 扩写结果的 meta 行（与其它增强方式同一块区域）。 */
+  function buildQwenPeMeta(d) {
+    const parts = [];
+    parts.push(`<b>官方 PE</b>：${esc(d.tier_label || d.tier || "-")}`);
+    if (d.clip_name) {
+      parts.push(`checkpoint：<code>${esc(d.clip_name)}</code>`);
+    }
+    if (d.ref_count) parts.push(`参考图：${Number(d.ref_count)} 张`);
+    parts.push(`字数：${(d.expanded || "").length}`);
+    return parts.join(" · ");
+  }
+
   function setHint(text, kind) {
     const hint = document.querySelector("#enhanceHint");
     if (!hint) return;
@@ -449,6 +568,7 @@
         run: run,
         renderMenu: renderMenu,
         updatePanelVisibility: updatePanelVisibility,
+        ensureAvailable: ensureAvailable,
       };
     }
   }

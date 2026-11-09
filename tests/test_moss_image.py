@@ -530,7 +530,7 @@ class TestMossFrontend(unittest.TestCase):
           cfgMax: document.querySelector('#imgCfg').max,
           slgVisible: getComputedStyle(document.querySelector('#imgSlgField')).display !== 'none',
           slgNote: document.querySelector('#imgSlgNote').textContent,
-          peVisible: getComputedStyle(document.querySelector('#imgPeField')).display !== 'none',
+          peFieldExists: !!document.querySelector('#imgPeField'),
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
           loras: Array.from(document.querySelectorAll('#imgLoraSelect option')).map(o => o.textContent),
         })""")
@@ -552,8 +552,10 @@ class TestMossFrontend(unittest.TestCase):
         # SLG 区块只在 MOSS 可见
         self.assertTrue(s["slgVisible"], "MOSS 应显示 SLG skip layer 设置")
         self.assertIn("22", s["slgNote"])
-        # PE / 参考图是 Qwen 专属，MOSS 不显示
-        self.assertFalse(s["peVisible"], "MOSS 不该显示 PE 开关")
+        # 官方 PE 已并入「增强」下拉菜单，**不再有独立的 PE 区块**
+        # （连 DOM 都不存在了），参考图是 Qwen 专属，MOSS 不显示
+        self.assertFalse(s["peFieldExists"],
+                         "官方 PE 已并入增强下拉，不该再有独立 PE 区块")
         self.assertFalse(s["refVisible"], "MOSS 不该显示参考图区")
         # LoRA 列表是 MOSS 的那批
         self.assertTrue(any("MOSS" in t for t in s["loras"]),

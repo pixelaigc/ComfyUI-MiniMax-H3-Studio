@@ -10,6 +10,9 @@ const provState = {
   agent: { specs: [], params: {}, lengthPresets: {} },
   specId: "image",
   lastEnhance: null,      // 最近一次增强结果，供回填用
+  // 最近一次增强结果的**种类**（"qwen_pe" = 官方 PE 扩写）。
+  // 写回提示词框时据此决定要不要关掉出图时的二次官方 PE 扩写。
+  lastEnhanceKind: "",
   // 模板过滤上下文（服务端下发规则，前端只负责按当前上下文取用）
   modeFilters: {},        // { t2i: ["image","image-scalist",...], t2v: ["video"], ... }
   modeDefaults: {},       // { t2i: "image", t2v: "video", ... }
@@ -590,6 +593,19 @@ function buildEnhanceMeta(d) {
 $("#enhanceModalClose").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
 $("#enhanceCancel").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
 
+// 回填后如果这次结果是**官方 PE 扩写**（Qwen-Image 2.1），
+// 就要关掉出图时的二次扩写 ——
+//   提示词框里已经是官方 PE 的结果了，再扩一遍会：
+//     1) 白花一次 9B 推理（约 30~60 秒）；
+//     2) 把用户基于官方 PE 结果做的后续编辑冲掉。
+// 标记由 enhance-menu.js 在拿到官方 PE 结果时打上。
+function applyQwenPeWritebackFlag() {
+  if (provState.lastEnhanceKind !== "qwen_pe") return;
+  if (typeof state === "undefined" || !state || !state.imgQwen) return;
+  state.imgQwen.usePe = false;
+  provState.lastEnhanceKind = "";
+}
+
 $("#enhanceReplace").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
@@ -597,6 +613,7 @@ $("#enhanceReplace").addEventListener("click", () => {
   $("#enhanceModal").hidden = true;
   // 回填后的内容即「已增强」版本：标记它，让生成时不再弹未增强确认
   markPromptEnhanced();
+  applyQwenPeWritebackFlag();
   setEnhanceHint("已替换提示词框内容（已标记为已增强）", "ok");
 });
 
@@ -607,5 +624,6 @@ $("#enhanceAppend").addEventListener("click", () => {
   $("#prompt").value = original ? `${original}\n\n${text}` : text;
   $("#enhanceModal").hidden = true;
   markPromptEnhanced();
+  applyQwenPeWritebackFlag();
   setEnhanceHint("已追加到原提示词（原文保留，已标记为已增强）", "ok");
 });

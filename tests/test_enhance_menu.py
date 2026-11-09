@@ -49,7 +49,12 @@ class TestEnhanceMenuSource(unittest.TestCase):
         return (WEB / name).read_text(encoding="utf-8")
 
     def test_registry_lists_all_three_methods(self):
-        """增强方式注册表必须同时含普通 / 二次 / 结构化三条。"""
+        """
+        增强方式注册表必须同时含普通 / 二次 / 结构化三条。
+
+        【Qwen 官方 PE 也在这个注册表里】（tests/test_qwen_pe_enhance.py 覆盖）
+        这里断言「至少含这三条」，避免每加一种增强方式都改这条用例。
+        """
         src = self.read("enhance-menu.js")
         for method_id in ("basic", "refine", "layout"):
             self.assertRegex(src, rf'id:\s*"{method_id}"',
@@ -186,6 +191,15 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
     # ---- 下拉选项 ----
 
     def test_dropdown_contains_all_three_methods(self):
+        """
+        下拉里至少有：普通增强 / 二次增强 / 结构化增强。
+
+        【为什么是「至少」】Qwen 官方 PE 扩写后来也并进了同一个下拉
+        （见 tests/test_qwen_pe_enhance.py），所以这里不再断言下拉项
+        **恰好**是三个 —— 那样每加一种增强方式都要改这条用例。
+        改成「至少包含这三个」，本用例守住的是
+        「已有的三种增强方式没被改坏」。
+        """
         self.switch_mode("t2i_moss")
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(400)
@@ -195,7 +209,8 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
             " e.querySelector('.enhance-menu-label').textContent.trim(),"
             " disabled: e.disabled}))")
         ids = [i["id"] for i in items]
-        self.assertEqual(ids, ["basic", "refine", "layout"])
+        for required in ("basic", "refine", "layout"):
+            self.assertIn(required, ids, f"下拉缺少 {required}")
         labels = [i["label"] for i in items]
         self.assertIn("普通增强", labels)
         self.assertIn("二次增强", labels)

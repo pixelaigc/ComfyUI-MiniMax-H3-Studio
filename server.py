@@ -76,6 +76,7 @@ from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import moss_layout
+from h3studio import qwen_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
@@ -528,13 +529,35 @@ async def _upload_asset_refs(session: ClientSession, job_id: str, params: dict) 
         （静默跳过会让占位号与实际插槽错位，图1 变成图2 —— 很难查）。
       * 登记引用关系（asset_refs），素材被删时 409 保护。
     """
+    names = await _upload_ref_images(session, params.get("ref_images") or [])
+    if not names:
+        raise RuntimeError("图片编辑没有参考图（参考图必须来自素材库）")
+    from h3studio import asset_repo as _repo
+    from h3studio import assets as _assets
+    refs = ref_imgs.normalize_refs(params.get("ref_images") or [])
+    with _assets.connect() as conn:
+        for index, ref in enumerate(refs):
+            _repo.add_ref(conn, ref["asset_id"], "job", job_id, slot="ref_image",
+                          ordinal=index,
+                          label=f"任务 {job_id} 的参考图 {index + 1}")
+    return names
+
+
+async def _upload_ref_images(session: ClientSession, raw_refs) -> list[str]:
+    """
+    把素材库参考图上传到 ComfyUI input，返回文件名列表（**不登记引用关系**）。
+
+    与 _upload_asset_refs 的区别：那个是出图任务用的，会在 asset_refs 里
+    登记「任务引用了哪些素材」（素材被删时 409 保护）。
+    官方 PE 扩写只是**读一次图**，不是出图任务 —— 登记引用会让素材的
+    ref_count 被无意义地抬高，还会挡住素材删除。所以这里走独立的一条路。
+
+    顺序仍然严格保持入参顺序（占位语义）。
+    """
     from h3studio import asset_repo as _repo
     from h3studio import assets as _assets
 
-    refs = ref_imgs.normalize_refs(params.get("ref_images") or [])
-    if not refs:
-        raise RuntimeError("图片编辑没有参考图（参考图必须来自素材库）")
-
+    refs = ref_imgs.normalize_refs(raw_refs)
     names: list[str] = []
     with _assets.connect() as conn:
         for index, ref in enumerate(refs):
@@ -544,16 +567,12 @@ async def _upload_asset_refs(session: ClientSession, job_id: str, params: dict) 
                 asset = _repo.get_asset(conn, asset_id, include_deleted=True)
                 state = "已从素材库删除" if asset else "不存在"
                 raise RuntimeError(
-                    f"第 {index + 1} 张参考图的素材{state}：{asset_id}。"
-                    f"请在参考图列表里移除它后再生成")
+                    f"第 {index + 1} 张参考图的素材{state}：{asset_id}。")
             path = _assets.resolve_inside(_assets.library_root(), version["storage_path"])
             if not path or not path.is_file():
                 raise RuntimeError(
                     f"第 {index + 1} 张参考图的素材文件已丢失：{asset_id}")
             names.append(await comfy_upload_image(session, path))
-            _repo.add_ref(conn, asset_id, "job", job_id, slot="ref_image",
-                          ordinal=index,
-                          label=f"任务 {job_id} 的参考图 {index + 1}")
     return names
 
 
@@ -2486,6 +2505,86 @@ async def api_moss_layout(request):
     })
 
 
+# ------------------------------------------------------------------ Qwen 官方 PE 扩写
+async def api_qwen_pe_expand(request):
+    """
+    POST /api/qwen-pe/expand —— Qwen-Image 2.1 官方 PE 提示词扩写
+
+    「增强」下拉里的「qwen21图片官方增强PE」走这个接口。
+    与 /api/enhance 的区别：那个走本项目配置的 Provider + 文本 system prompt；
+    这个走**官方 PE checkpoint 本身**（ComfyUI TextGenerate + 官方 PE 权重
+    + 官方 system prompt + 官方采样参数）。
+
+    body:
+      prompt      要扩写的原始提示词
+      mode        t2i_qwen（文生图）| i2i_qwen（图片编辑）—— 决定 PE 档位
+      refs        可选，图片编辑的参考图（素材库条目列表）；顺序即 <imageN> 顺序
+
+    返回:
+      expanded    扩写后的提示词（前端写回提示词框，可继续编辑）
+      tier        实际用的 PE 档位（t2i / i2i）
+      tier_label  档位中文名
+      clip_name   实际用的官方 PE checkpoint 文件名
+      ref_count   参考图数量
+
+    失败一律 4xx/5xx + 可读原因，**不返回半成品**。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+
+    mode = str(payload.get("mode") or "t2i_qwen").strip()
+    if mode not in ("t2i_qwen", "i2i_qwen"):
+        return web.json_response(
+            {"error": "官方 PE 扩写只适用于 Qwen-Image 2.1 的文生图 / 图片编辑模式"}, status=400)
+    is_edit = mode == "i2i_qwen"
+
+    # 参考图：素材库来源，与出图链路同一套约束（顺序即 <imageN> 顺序）。
+    # 这里要的是**能直接喂给 ComfyUI LoadImage 的文件名**，
+    # 所以走 _upload_ref_images（按入参顺序上传，顺序严格保持）。
+    # 注意：它**不登记** asset_refs —— 扩写只是读一次图，不是出图任务。
+    ref_images: list[str] = []
+    raw_refs = payload.get("refs") or []
+    if is_edit and raw_refs:
+        try:
+            async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+                names = await _upload_ref_images(session, raw_refs)
+                ref_images = names
+        except Exception as exc:
+            return web.json_response(
+                {"error": f"参考图上传失败：{exc}"[:300], "degraded": True}, status=502)
+
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
+            result = await qwen_pe.run_pe_expansion(
+                session, COMFY, original, is_edit, ref_images or None)
+    except qwen_pe.PEError as exc:
+        return web.json_response(
+            {"error": str(exc), "degraded": True}, status=502)
+    except Exception as exc:
+        return web.json_response(
+            {"error": f"官方 PE 扩写失败：{type(exc).__name__} {exc}"[:300],
+             "degraded": True}, status=502)
+
+    return json_ok({
+        "ok": True,
+        "original": original,
+        "expanded": result["expanded"],
+        "tier": result["tier"],
+        "tier_label": result["tier_label"],
+        "clip_name": result["clip_name"],
+        "ref_count": result["ref_count"],
+        "mode": mode,
+    })
+
+
 # ------------------------------------------------------------------ LLM 代理
 # ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload（没有 chat_template_kwargs），
 # 对 Qwen3 这类 thinking 模型关不掉思考，接口返回 content=null，节点再
@@ -2650,6 +2749,8 @@ def make_app():
     app.router.add_post("/api/enhance", api_enhance)
     # MOSS-Image 结构化（layout）增强 —— 外部复现 MossPrompt 节点的能力
     app.router.add_post("/api/moss-layout", api_moss_layout)
+    # Qwen-Image 2.1 官方 PE 扩写（「增强」下拉里的 qwen21图片官方增强PE）
+    app.router.add_post("/api/qwen-pe/expand", api_qwen_pe_expand)
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
