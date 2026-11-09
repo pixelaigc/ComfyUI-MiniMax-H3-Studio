@@ -85,6 +85,8 @@ from h3studio import asset_api
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
+from h3studio import agent as agent_mod
+from h3studio import agent_sessions
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -988,6 +990,169 @@ def json_ok(payload=None, **kw):
     return web.json_response(payload)
 
 
+def create_job_record(mode: str, params: dict) -> str:
+    """
+    建一条生成任务记录，返回 job_id。
+
+    【为什么要抽成独立函数】
+    POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
+    必须是**同一套**建任务逻辑 —— 两份实现必然漂移：
+      * 生成类型（gen_type）写不进去 -> 任务列表标签变成「其它生成」
+      * 批次拆分逻辑不同 -> 面板出 3 张、Agent 出 1 张
+      * 素材引用（asset_refs）漏写 -> worker 拿不到参考图
+    所以这里抽出唯一的实现，两边都调它。
+
+    params 会被就地写入（补 gen_type / asset_refs），调用方按需自取。
+    """
+    job_id = uuid.uuid4().hex[:12]
+    now = time.time()
+    # 生成类型写进任务 meta（真实记录，不靠读时推断）
+    params["gen_type"] = gen_types.type_key_for_mode(mode)
+    asset_refs = params.get("asset_refs")
+    if asset_refs:
+        params["asset_refs"] = asset_refs
+    # 生成批次：文生图支持一次出 N 张（各自独立种子）
+    batch_count = 1
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+        try:
+            batch_count = int(params.get("batch_count") or 1)
+        except (TypeError, ValueError):
+            batch_count = 1
+        batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
+            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
+        if batch_count > 1:
+            base_seed = params.get("seed")
+            for index in range(batch_count):
+                # 种子递推：同参数批量出图但每张可区分
+                if base_seed:
+                    seed = int(base_seed) + index
+                else:
+                    seed = random.randint(0, 2**48)
+                conn.execute(
+                    "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
+                    "VALUES (?,?,?,?, 'queued', ?)",
+                    (uuid.uuid4().hex[:12], job_id, index, seed, now))
+    return job_id
+
+
+class JobValidationError(ValueError):
+    """建任务前的参数校验失败。message 面向用户，直接可读。"""
+
+    def __init__(self, message, code="bad_request", extra=None):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.extra = extra or {}
+
+
+#: 允许的生成模式（与 workflows.BUILDERS 一致 —— 后端真实注册的模式）
+JOB_MODES = ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+             "t2a", "a2a")
+
+
+def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
+                       saved_files: dict | None = None) -> list:
+    """
+    校验并补全一个任务的参数。**就地修改 params**，返回最终的 asset_refs。
+
+    【为什么要抽成独立函数】
+    POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
+    必须是**同一套**校验 —— 各写一份必然漂移：
+      * Agent 允许 i2i_qwen 不带参考图 -> 提交后才炸
+      * Agent 允许 a2a 带 3 段音频 -> worker 报错
+      * Agent 漏掉 <imageN> 占位注入 -> 图1 变成图2（极难查）
+    所以这里抽出唯一的实现，两边都调它。
+
+    失败一律抛 JobValidationError（带可读原因 + code）。
+    """
+    asset_refs = list(asset_refs or [])
+    saved_files = saved_files or {}
+
+    if mode not in JOB_MODES:
+        raise JobValidationError(f"未知模式 {mode}")
+
+    if mode == "flf":
+        if saved_files.get("file_first"):
+            params["first_frame"] = saved_files["file_first"][0]
+        if saved_files.get("file_last"):
+            params["last_frame"] = saved_files["file_last"][0]
+        if not params.get("first_frame"):
+            raise JobValidationError("首尾帧模式需要至少上传首帧图片")
+    elif mode == "r2v":
+        refs = saved_files.get("file_ref", [])
+        if not refs:
+            # 素材库来源的参考图也算（worker 会按 asset_refs 上传）
+            if not [r for r in asset_refs
+                    if isinstance(r, dict) and r.get("slot") == "ref_image"]:
+                raise JobValidationError("参考模式需要至少 1 张参考图")
+        else:
+            params["ref_images"] = refs[:3]
+    elif mode == "i2i_qwen":
+        # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
+        #
+        # 需求原文：「编辑里的参考图，强制要求必须走素材库」。
+        # 所以这里**不接受**本地上传通道（file_ref）作为图片编辑的参考图 ——
+        # 走本地上传的会被明确拒绝，并提示改从素材库选择。
+        # （上传到素材库本身仍然可用：素材库页有上传入口，
+        #   入库后的条目带 asset_id，才能作为参考图。）
+        uploaded = saved_files.get("file_ref", [])
+        if uploaded:
+            raise JobValidationError(
+                "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
+                "请先在「素材库」页上传并入库，再从素材库选择参考图。",
+                code="ref_must_come_from_library")
+
+        # 参考图元数据（asset_id + 描述 + 标签 + 顺序）由前端提交
+        ref_specs = params.get("ref_images") or []
+        if not isinstance(ref_specs, list):
+            ref_specs = []
+        refs = ref_imgs.normalize_refs(ref_specs)
+        if len(refs) < ref_imgs.MIN_REF_IMAGES:
+            raise JobValidationError(
+                f"图片编辑至少需要 {ref_imgs.MIN_REF_IMAGES} 张参考图，"
+                f"当前 {len(refs)} 张（参考图必须来自素材库）",
+                code="ref_required")
+        if len(refs) > ref_imgs.MAX_REF_IMAGES:
+            raise JobValidationError(
+                f"参考图最多 {ref_imgs.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
+                f"请删除多余参考图（上限 {ref_imgs.MAX_REF_IMAGES} 张，"
+                f"模型官方能力上限 10 张）",
+                code="ref_too_many")
+
+        # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
+        prompt_text = (params.get("prompt") or "").strip()
+        check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
+        if not check["ok"]:
+            raise JobValidationError(
+                "参考图校验未通过：" + "；".join(check["errors"]),
+                code="ref_invalid", extra={"errors": check["errors"]})
+
+        # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
+        params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
+        params["ref_images"] = refs
+
+    # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
+    if mode == "a2a":
+        audio_refs = [r for r in (asset_refs or [])
+                      if isinstance(r, dict) and r.get("slot") == "ref_audio"]
+        if not audio_refs:
+            raise JobValidationError(
+                "参考生音乐需要选择一段参考音频（从素材库选择）。",
+                code="ref_audio_required")
+        if len(audio_refs) > 1:
+            raise JobValidationError(
+                f"参考生音乐只能选 1 段参考音频，当前 {len(audio_refs)} 段。",
+                code="ref_audio_too_many")
+        asset_refs = audio_refs
+
+    if not (params.get("prompt") or "").strip():
+        raise JobValidationError("提示词不能为空")
+    return asset_refs
+
+
 async def api_create(request):
     """POST /api/jobs  (multipart: mode, params(JSON), files[])"""
     reader = await request.multipart()
@@ -1015,83 +1180,13 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
-                    "t2a", "a2a"):
-        return web.json_response({"error": f"未知模式 {mode}"}, status=400)
-
-    if mode == "flf":
-        if saved_files.get("file_first"):
-            params["first_frame"] = saved_files["file_first"][0]
-        if saved_files.get("file_last"):
-            params["last_frame"] = saved_files["file_last"][0]
-        if not params.get("first_frame"):
-            return web.json_response({"error": "首尾帧模式需要至少上传首帧图片"}, status=400)
-    elif mode == "r2v":
-        refs = saved_files.get("file_ref", [])
-        if not refs:
-            return web.json_response({"error": "参考模式需要至少 1 张参考图"}, status=400)
-        params["ref_images"] = refs[:3]
-    elif mode == "i2i_qwen":
-        # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
-        #
-        # 需求原文：「编辑里的参考图，强制要求必须走素材库」。
-        # 所以这里**不接受**本地上传通道（file_ref）作为图片编辑的参考图 ——
-        # 走本地上传的会被明确拒绝，并提示改从素材库选择。
-        # （上传到素材库本身仍然可用：素材库页有上传入口，
-        #   入库后的条目带 asset_id，才能作为参考图。）
-        uploaded = saved_files.get("file_ref", [])
-        if uploaded:
-            return web.json_response(
-                {"error": "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
-                          "请先在「素材库」页上传并入库，再从素材库选择参考图。",
-                 "code": "ref_must_come_from_library"}, status=400)
-
-        # 参考图元数据（asset_id + 描述 + 标签 + 顺序）由前端提交
-        ref_specs = params.get("ref_images") or []
-        if not isinstance(ref_specs, list):
-            ref_specs = []
-        refs = ref_imgs.normalize_refs(ref_specs)
-        if len(refs) < ref_imgs.MIN_REF_IMAGES:
-            return web.json_response(
-                {"error": f"图片编辑至少需要 {ref_imgs.MIN_REF_IMAGES} 张参考图，"
-                          f"当前 {len(refs)} 张（参考图必须来自素材库）",
-                 "code": "ref_required"}, status=400)
-        if len(refs) > ref_imgs.MAX_REF_IMAGES:
-            return web.json_response(
-                {"error": f"参考图最多 {ref_imgs.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
-                          f"请删除多余参考图（上限 {ref_imgs.MAX_REF_IMAGES} 张，"
-                          f"模型官方能力上限 10 张）",
-                 "code": "ref_too_many"}, status=400)
-
-        # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
-        prompt_text = (params.get("prompt") or "").strip()
-        check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
-        if not check["ok"]:
-            return web.json_response(
-                {"error": "参考图校验未通过：" + "；".join(check["errors"]),
-                 "code": "ref_invalid", "errors": check["errors"]}, status=400)
-
-        # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
-        params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
-        params["ref_images"] = refs
-
-    # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
-    if mode == "a2a":
-        audio_refs = [r for r in (asset_refs or [])
-                      if isinstance(r, dict) and r.get("slot") == "ref_audio"]
-        if not audio_refs:
-            return web.json_response(
-                {"error": "参考生音乐需要选择一段参考音频（从素材库选择）。",
-                 "code": "ref_audio_required"}, status=400)
-        if len(audio_refs) > 1:
-            return web.json_response(
-                {"error": f"参考生音乐只能选 1 段参考音频，当前 {len(audio_refs)} 段。",
-                 "code": "ref_audio_too_many"}, status=400)
-        asset_refs = audio_refs
-
-    prompt = (params.get("prompt") or "").strip()
-    if not prompt:
-        return web.json_response({"error": "提示词不能为空"}, status=400)
+    try:
+        asset_refs = prepare_job_params(str(mode or ""), params, asset_refs,
+                                        saved_files)
+    except JobValidationError as exc:
+        payload = {"error": exc.message, "code": exc.code}
+        payload.update(exc.extra or {})
+        return web.json_response(payload, status=400)
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -1102,29 +1197,11 @@ async def api_create(request):
             batch_count = 1
         batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
 
-    job_id = uuid.uuid4().hex[:12]
-    now = time.time()
-    # 生成类型写进任务 meta（真实记录，不靠读时推断）
-    params["gen_type"] = gen_types.type_key_for_mode(mode)
     # 素材库引用写进 params：worker 跑的时候据此把素材上传到 ComfyUI
     if asset_refs:
         params["asset_refs"] = asset_refs
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
-            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
-        if batch_count > 1:
-            base_seed = params.get("seed")
-            for index in range(batch_count):
-                # 种子递推：同参数批量出图但每张可区分
-                if base_seed:
-                    seed = int(base_seed) + index
-                else:
-                    seed = random.randint(0, 2**48)
-                conn.execute(
-                    "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
-                    "VALUES (?,?,?,?, 'queued', ?)",
-                    (uuid.uuid4().hex[:12], job_id, index, seed, now))
+    # 建任务记录走共享实现（与内置 Agent 的 create_job 工具同一条路）
+    job_id = create_job_record(str(mode or ""), params)
     return json_ok({"id": job_id, "status": "queued", "batch_count": batch_count})
 
 
@@ -2719,6 +2796,165 @@ async def api_llm_proxy_chat(request):
     return web.Response(text=raw, status=200, content_type="application/json")
 
 
+# ------------------------------------------------------------------ 内置多模态 Agent
+#
+# Agent 的能力边界与设计见 docs/内置多模态Agent-架构设计.md。
+# 这里只做 HTTP 适配层：解析请求 -> 调 h3studio.agent.run_agent -> 返回结构化结果。
+
+#: 同时运行的 Agent 会话数上限（本地模型单卡，并发只会互相拖慢）
+AGENT_CONCURRENCY = agent_mod.MAX_CONCURRENT
+#: 并发闸门（惰性创建，避免 import 期就占住事件循环）
+AGENT_GATE: asyncio.Semaphore | None = None
+
+
+def _agent_gate() -> asyncio.Semaphore:
+    global AGENT_GATE
+    if AGENT_GATE is None:
+        AGENT_GATE = asyncio.Semaphore(AGENT_CONCURRENCY)
+    return AGENT_GATE
+
+
+def _agent_store():
+    return agent_sessions.get_store()
+
+
+def _agent_error(exc: agent_mod.AgentError) -> web.Response:
+    payload = {"error": exc.message, "code": exc.code}
+    payload.update(exc.extra or {})
+    return web.json_response(payload, status=exc.status)
+
+
+async def api_agent_chat(request):
+    """
+    POST /api/agent/chat —— 内置多模态 Agent 主入口。
+
+    body:
+      message       用户意图（必填，上限 4000 字）
+      session_id    会话 ID（可选；不给则新建，多轮对话靠它串联）
+      provider_id   指定本地模型 Provider（可选；不给则用「本地模型配置」里的默认）
+      max_steps     最大步骤数（可选，默认 6，上限 6）
+
+    返回结构化结果（见 h3studio.agent.run_agent 的 docstring）：
+      status / answer / jobs / assets / prompt / steps / usage / provider / error
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        return web.json_response({"error": "请输入要处理的内容",
+                                  "code": "bad_request"}, status=400)
+
+    session_id = str(payload.get("session_id") or "").strip()
+    provider_id = str(payload.get("provider_id") or "").strip() or None
+    try:
+        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
+    except (TypeError, ValueError):
+        max_steps = agent_mod.MAX_STEPS
+
+    store = _agent_store()
+    session_id = store.create(session_id or None)
+    # 存用户消息（在跑 Agent 之前存 —— 即使 Agent 挂了，历史也不丢）
+    store.add_message(session_id, "user", message)
+
+    history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
+    # history 末尾那条就是本次刚存的 user 消息 —— 去掉，避免重复喂给模型
+    if history and history[-1].get("role") == "user" \
+            and history[-1].get("content") == message:
+        history = history[:-1]
+
+    # 并发闸门：抢不到就立刻 429，**不排队**。
+    #
+    # 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
+    # 实测（50 并发 × 20 轮）wait_for(acquire(), timeout=0) **一次都抢不到**
+    # —— timeout=0 会在 acquire 真正执行前就取消它，结果是所有请求都 429。
+    # locked() 判据则实测 peak 并发恰好等于上限，无超发。
+    # （asyncio.Semaphore.acquire 内部是「先减计数再 await」，本身是原子的。）
+    gate = _agent_gate()
+    if gate.locked():
+        return web.json_response(
+            {"error": f"当前已有 {AGENT_CONCURRENCY} 个 Agent 任务在运行，"
+                      "请稍候再试。",
+             "code": "too_many_requests"}, status=429)
+
+    async with gate:
+        try:
+            result = await agent_mod.run_agent(
+                sys.modules[__name__], message, session_id=session_id,
+                provider_id=provider_id, max_steps=max_steps, history=history)
+        except agent_mod.AgentError as exc:
+            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
+            return _agent_error(exc)
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            store.add_message(session_id, "assistant", f"[请求失败] {detail}")
+            return web.json_response(
+                {"error": f"Agent 执行失败：{detail}", "code": "agent_internal_error"},
+                status=500)
+    # 落库：模型结论 + 工具调用轨迹（下一轮对话时作为上下文）
+    if result.get("answer"):
+        store.add_message(session_id, "assistant", result["answer"])
+    for step in result.get("steps") or []:
+        tool_name = step.get("tool")
+        if not tool_name:
+            continue
+        note = step.get("error") or "ok"
+        store.add_message(session_id, "tool", f"{tool_name}: {note}",
+                           tool_name=tool_name)
+
+    result["session_id"] = session_id
+    result["provider_name"] = (result.get("provider") or {}).get("name") or ""
+    return json_ok(result)
+
+
+async def api_agent_sessions(request):
+    """GET /api/agent/sessions —— 会话清单（最近 50 条）。"""
+    store = _agent_store()
+    return json_ok({"sessions": store.list_sessions(limit=50)})
+
+
+async def api_agent_session_get(request):
+    """GET /api/agent/sessions/{id} —— 取某个会话的完整消息历史。"""
+    sid = request.match_info["id"]
+    store = _agent_store()
+    if not store.exists(sid):
+        return web.json_response({"error": "会话不存在", "code": "not_found"},
+                                 status=404)
+    return json_ok({"session_id": sid, "messages": store.raw_history(sid)})
+
+
+async def api_agent_session_delete(request):
+    """DELETE /api/agent/sessions/{id} —— 清空会话。"""
+    sid = request.match_info["id"]
+    store = _agent_store()
+    deleted = store.delete(sid)
+    return json_ok({"deleted": sid, "ok": deleted})
+
+
+async def api_agent_tools(request):
+    """GET /api/agent/tools —— 列出 Agent 的工具清单（调试 / 前端展示用）。"""
+    specs = []
+    for name, spec in agent_mod.TOOLS.items():
+        specs.append({
+            "name": name,
+            "description": spec["description"],
+            "parameters": spec["parameters"],
+        })
+    return json_ok({
+        "tools": specs,
+        "limits": {
+            "max_steps": agent_mod.MAX_STEPS,
+            "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
+            "total_timeout": agent_mod.TOTAL_TIMEOUT,
+            "step_timeout": agent_mod.STEP_TIMEOUT,
+            "max_concurrent": agent_mod.MAX_CONCURRENT,
+        },
+    })
+
+
 # ------------------------------------------------------------------ static
 MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
                ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
@@ -2787,6 +3023,12 @@ def make_app():
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
+    # 内置多模态 Agent
+    app.router.add_post("/api/agent/chat", api_agent_chat)
+    app.router.add_get("/api/agent/tools", api_agent_tools)
+    app.router.add_get("/api/agent/sessions", api_agent_sessions)
+    app.router.add_get("/api/agent/sessions/{id}", api_agent_session_get)
+    app.router.add_delete("/api/agent/sessions/{id}", api_agent_session_delete)
     # 资产素材库（/api/assets/*）
     asset_api.register(app, server_module=sys.modules[__name__])
     # Qwen 图片编辑的参考图（/api/refs/*）—— 素材库来源约束

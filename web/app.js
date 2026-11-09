@@ -3371,6 +3371,7 @@ function showCreate() {
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "none";
   $("#assetsPage").style.display = "none";
+  $("#agentPage").style.display = "none";
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
 }
@@ -3385,6 +3386,7 @@ function showStitch() {
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "none";
   $("#assetsPage").style.display = "none";
+  $("#agentPage").style.display = "none";
   state.tab = "done";
   state.doneFilters.media = "video";
   $("#doneMedia").value = "video";
@@ -3405,6 +3407,7 @@ function showSystem() {
   $("#systemPage").style.display = "block";
   $("#providersPage").style.display = "none";
   $("#assetsPage").style.display = "none";
+  $("#agentPage").style.display = "none";
   refreshHardware();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
@@ -3421,10 +3424,31 @@ function showProviders() {
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "block";
   $("#assetsPage").style.display = "none";
+  $("#agentPage").style.display = "none";
   loadProviders();
   loadAgentConfig();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
+}
+
+// 内置多模态 Agent 页（实现见 agent.js）
+function showAgent() {
+  state.page = "agent";
+  $$(".nav-item").forEach(x => x.classList.remove("active"));
+  const nav = $("#navAgent");
+  if (nav) nav.classList.add("active");
+  $("#jobsArea").style.display = "none";
+  $("#panel").style.display = "none";
+  $("#stitchPanel").style.display = "none";
+  $("#systemPage").style.display = "none";
+  $("#providersPage").style.display = "none";
+  $("#assetsPage").style.display = "none";
+  $("#agentPage").style.display = "block";
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
+  if (window.AgentUI && typeof window.AgentUI.renderMessages === "function") {
+    window.AgentUI.renderMessages();
+  }
 }
 
 $("#navSystem").addEventListener("click", showSystem);

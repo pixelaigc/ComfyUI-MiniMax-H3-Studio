@@ -406,3 +406,30 @@
   .job-actions a { flex: 1 1 45%; }
   .al-drawer-close { width: 40px; height: 40px; }
 }
+
+/* ============================================================
+   内置多模态 Agent 面板 —— 窄屏适配
+   断点真源仍是 web/responsive.css 顶部的 --bp-phone / --bp-tablet。
+   ============================================================ */
+
+/* 手机：消息区与输入区都要能滚动，输入区不能被键盘顶出屏幕 */
+@media (max-width: 700px) {
+  .ag-head { padding: 12px 14px 10px; }
+  .ag-title { font-size: 15px; }
+  .ag-sub { font-size: 11.5px; }
+  .ag-messages { padding: 14px; gap: 12px; }
+  .ag-msg { flex-direction: column; gap: 4px; }
+  .ag-msg-role { width: auto; text-align: left; padding-top: 0; font-size: 10.5px; }
+  .ag-msg-body { width: 100%; }
+  .ag-composer { padding: 8px 14px 10px; }
+  .ag-input-row { flex-direction: column; }
+  .ag-send { align-self: stretch; width: 100%; }
+  .ag-hint-line { font-size: 10.5px; }
+}
+
+/* 平板：输入区改为上下两行，发送按钮不撑满 */
+@media (max-width: 1100px) {
+  .ag-head { padding: 14px 18px 11px; }
+  .ag-messages { padding: 16px 18px; }
+  .ag-composer { padding: 9px 18px 11px; }
+}

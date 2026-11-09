@@ -967,6 +967,8 @@
     if (system) system.style.display = "none";
     const providers = $("#providersPage");
     if (providers) providers.style.display = "none";
+    const agentPage = $("#agentPage");
+    if (agentPage) agentPage.style.display = "none";
     $$(".nav-item").forEach(x => x.classList.remove("active"));
     const nav = $("#navAssets");
     if (nav) nav.classList.add("active");

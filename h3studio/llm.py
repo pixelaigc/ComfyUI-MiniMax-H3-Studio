@@ -314,6 +314,201 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
                 f"调用 Provider「{name}」失败：{type(exc).__name__} {exc}"[:300])
 
 
+# ------------------------------------------------------------------ 工具调用（tools 协议）
+#
+# 为什么单独一个函数而不是给 call_provider 加参数：
+#   call_provider 的契约是「发消息拿一段文本」，增强 / 分析链路全都依赖这个契约。
+#   Agent 需要的是「模型可能返回 tool_calls 而不是文本」—— 两种返回结构完全不同，
+#   混在一个函数里会让调用方到处 if/else 判断「这次是不是工具调用」。
+#   所以这里新增一个平行的函数，原 call_provider **一行不动**。
+
+
+def _extract_openai_tool_calls(body: dict) -> list[dict]:
+    """
+    从 OpenAI 兼容响应里取出 tool_calls。
+
+    返回统一结构：[
+        {"id": "call_x", "name": "search_assets", "arguments": {...}},
+    ]
+    arguments 解析失败时返回 {"_raw": "<原始字符串>"} —— 不静默丢弃，
+    上层可以把它当工具错误回给模型，让模型自己重试。
+    """
+    choices = body.get("choices") or []
+    if not choices:
+        return []
+    message = choices[0].get("message") or {}
+    raw_calls = message.get("tool_calls") or []
+    out = []
+    for item in raw_calls:
+        if not isinstance(item, dict):
+            continue
+        fn = item.get("function") or {}
+        name = fn.get("name") or ""
+        if not name:
+            continue
+        raw_args = fn.get("arguments")
+        if isinstance(raw_args, dict):
+            args = raw_args
+        else:
+            try:
+                args = json.loads(raw_args) if raw_args else {}
+            except (json.JSONDecodeError, TypeError):
+                args = {"_raw": str(raw_args or "")[:400]}
+        if not isinstance(args, dict):
+            args = {"_raw": str(args)[:400]}
+        out.append({
+            "id": item.get("id") or f"call_{len(out)}",
+            "name": name,
+            "arguments": args,
+        })
+    return out
+
+
+async def call_provider_with_tools(provider: dict, messages: list,
+                                   tools: list, options: dict | None = None,
+                                   images: list | None = None) -> dict:
+    """
+    调用 Provider 并支持 OpenAI 原生 tools 协议。
+
+    返回 {"content": str|None, "tool_calls": [...], "raw": dict}
+      content     模型这轮的文本内容（可能为 None —— 纯工具调用轮就是这样）
+      tool_calls  统一结构的工具调用列表（见 _extract_openai_tool_calls）
+      raw         原始响应体（调试用）
+
+    失败一律抛 ProviderError（带可读原因），与 call_provider 语义一致。
+    """
+    options = options or {}
+    ptype = provider.get("type")
+    base = (provider.get("base_url") or "").rstrip("/")
+    model = provider.get("model") or ""
+    name = provider.get("name") or provider.get("id") or "本地模型"
+
+    if not base:
+        raise ProviderError(f"Provider「{name}」的 Base URL 为空")
+    if not model:
+        raise ProviderError(f"Provider「{name}」的模型名为空")
+    if not tools:
+        raise ProviderError("call_provider_with_tools 需要至少一个工具定义")
+    if ptype == "comfyui":
+        # ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload，只支持「一次问一次答」，
+        # 没有 tools 协议。明确报错，不静默降级成纯文本调用
+        # （降级的话模型永远看不到工具，Agent 会变成一问一答 —— 正是要解决的问题）。
+        raise ProviderError(
+            f"Provider「{name}」是 ComfyUI 本地节点类型，不支持工具调用协议。"
+            "请在「本地模型配置」里改用 OpenAI 兼容 / Ollama / llama.cpp 类型的 Provider。")
+
+    temperature = float(options.get("temperature", 0.2))
+    max_tokens = int(options.get("max_tokens", 1024))
+    top_p = float(options.get("top_p", 0.95))
+
+    if images and not provider.get("multimodal"):
+        raise ProviderError(
+            f"Provider「{name}」未标记多模态能力，无法读图。")
+
+    timeout = ClientTimeout(total=float(options.get("timeout", 180)), connect=10)
+    async with ClientSession(timeout=timeout) as session:
+        try:
+            if ptype == "ollama":
+                payload = {
+                    "model": model,
+                    "messages": _messages_to_ollama(messages, images),
+                    "tools": tools,
+                    "stream": False,
+                    "options": {"temperature": temperature, "top_p": top_p,
+                                "num_predict": max_tokens},
+                }
+                async with session.post(f"{base}/api/chat", json=payload,
+                                        headers=_auth_headers(provider)) as resp:
+                    raw = await resp.text()
+                    if resp.status != 200:
+                        raise ProviderError(
+                            f"Ollama 返回 HTTP {resp.status}：{raw[:300]}")
+                    body = json.loads(raw)
+                message = body.get("message") or {}
+                text = message.get("content")
+                if not isinstance(text, str):
+                    text = text or None
+                # Ollama 原生协议的 tool_calls 在 message.tool_calls 里
+                raw_calls = message.get("tool_calls") or []
+                calls = []
+                for index, item in enumerate(raw_calls):
+                    fn = (item.get("function") or {}) if isinstance(item, dict) else {}
+                    fn_name = fn.get("name") or ""
+                    if not fn_name:
+                        continue
+                    raw_args = fn.get("arguments")
+                    if isinstance(raw_args, dict):
+                        args = raw_args
+                    else:
+                        try:
+                            args = json.loads(raw_args) if raw_args else {}
+                        except (json.JSONDecodeError, TypeError):
+                            args = {"_raw": str(raw_args or "")[:400]}
+                    calls.append({"id": f"call_{index}", "name": fn_name,
+                                  "arguments": args if isinstance(args, dict)
+                                  else {"_raw": str(args)[:400]}})
+                if text is None and not calls:
+                    raise ProviderError("模型返回了空内容")
+                return {"content": (text or "").strip() or None,
+                        "tool_calls": calls, "raw": body}
+
+            # openai / llamacpp
+            payload = {
+                "model": model,
+                "messages": _messages_to_openai(messages, images),
+                "tools": tools,
+                "temperature": temperature,
+                "top_p": top_p,
+                "max_tokens": max_tokens,
+                "stream": False,
+            }
+            # 与 call_provider 保持一致：thinking 模型会污染 content，优先关掉。
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
+            async with session.post(f"{base}/v1/chat/completions", json=payload,
+                                    headers=_auth_headers(provider)) as resp:
+                raw = await resp.text()
+                if resp.status != 200:
+                    if "chat_template_kwargs" in raw or "enable_thinking" in raw:
+                        payload.pop("chat_template_kwargs", None)
+                        async with session.post(f"{base}/v1/chat/completions",
+                                                json=payload,
+                                                headers=_auth_headers(provider)) as resp2:
+                            raw = await resp2.text()
+                            if resp2.status != 200:
+                                raise ProviderError(
+                                    f"模型返回 HTTP {resp2.status}：{raw[:300]}")
+                            body = json.loads(raw)
+                    else:
+                        raise ProviderError(
+                            f"模型返回 HTTP {resp.status}：{raw[:300]}")
+                else:
+                    body = json.loads(raw)
+
+            calls = _extract_openai_tool_calls(body)
+            choices = body.get("choices") or []
+            message = (choices[0].get("message") or {}) if choices else {}
+            text = message.get("content")
+            if text is None:
+                text = message.get("reasoning_content")
+            if not isinstance(text, str):
+                text = None
+            text = _strip_thinking(text).strip() if text else None
+            if not text and not calls:
+                raise ProviderError("模型返回了空内容")
+            return {"content": text, "tool_calls": calls, "raw": body}
+        except ProviderError:
+            raise
+        except asyncio.TimeoutError:
+            raise ProviderError(
+                f"调用 Provider「{name}」超时（{max_tokens} tokens 上限，"
+                f"模型可能未加载或过慢）")
+        except json.JSONDecodeError as exc:
+            raise ProviderError(f"Provider「{name}」返回的不是合法 JSON：{exc}")
+        except Exception as exc:
+            raise ProviderError(
+                f"调用 Provider「{name}」失败：{type(exc).__name__} {exc}"[:300])
+
+
 # ------------------------------------------------------------------ ComfyUI 节点
 
 
