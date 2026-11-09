@@ -682,9 +682,18 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
 
     def test_real_weight_syntax_still_rejected(self):
         v = self._validator()
-        for case in ("(word:1.2)", "(word)", "((word))", "[word]", "word++"):
+        for case in ("(word:1.2)", "((word))", "[word]", "word++"):
             self.assertTrue(v.check_weight_syntax("x %s y" % case, "pe"),
                             "真正的权重语法必须被拒：%s" % case)
+
+    def test_bare_single_word_needs_repetition(self):
+        """
+        裸单词 (word) 是 Compel 强调语法 —— 但判据是「这个词在括号外也出现」
+        （强调的是已有的词）。只出现一次 -> 是注释。
+        """
+        v = self._validator()
+        self.assertTrue(v.check_weight_syntax("a word here, (word) there", "pe"))
+        self.assertFalse(v.check_weight_syntax("a (word) here", "pe"))
 
     def test_multiword_gloss_not_rejected(self):
         v = self._validator()
@@ -695,9 +704,20 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
                              "普通注释不该被判权重语法：%s" % case)
 
     def test_single_word_still_rejected(self):
-        """diffusers 的 (cat) 形式仍要拦。"""
+        """
+        diffusers 的 (cat) 形式仍要拦 ——
+        但只有当这个词在括号**外也出现过**时（Compel 强调的是已有的词）。
+        """
         v = self._validator()
-        self.assertTrue(v.check_weight_syntax("a (cat) b", "pe"))
+        self.assertTrue(v.check_weight_syntax("a cat sitting, (cat) nearby", "pe"))
+
+    def test_emphatic_single_word_not_repeated_is_not_weight(self):
+        """
+        括号里新引入一个只出现一次的词 -> 是注释，不是强调。
+        （实测上下文："Tong lau (arcade) buildings" —— arcade 只出现一次。）
+        """
+        v = self._validator()
+        self.assertFalse(v.check_weight_syntax("Tong lau (arcade) buildings", "pe"))
 
     def test_numeric_weight_still_rejected(self):
         v = self._validator()
@@ -727,7 +747,7 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
         """
         v = self._validator()
         for case in ("arcade buildings (tong lau)", "骑楼 (tong lau)",
-                     "混凝土墙 (concrete wall)"):
+                     "T-tong lau (shophouse) buildings"):
             self.assertFalse(v.check_weight_syntax(case, "pe"),
                              "术语转写不该被判权重语法：%s" % case)
 

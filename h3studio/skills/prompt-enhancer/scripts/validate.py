@@ -86,6 +86,17 @@ def _is_weight_paren(inner: str, scoped: str = "") -> bool:
         return False
     # 剩下的：单个英文词
     #
+    # 【语义判据 · 比上下文匹配更根本】
+    # Compel 的 (cat) 是「**强调**这个已有的词」——
+    # 官方写法必然是 "a (cat) sitting" 这种：**括号里的词在别处也出现**。
+    # 而模型写的说明性注释是「这个词只出现在括号里」：
+    #     "Tong lau (arcade) buildings"   -> arcade 只在这里出现
+    #     "a (cat) b"                     -> cat 在括号外也出现 -> 真权重语法
+    #
+    # 所以：单个词只有在**括号外也出现**时才判权重语法。
+    # 这一条把三类注释（逐字注音 / 术语转写 / 术语英文名）统一覆盖掉了，
+    # 不需要逐个匹配上下文 —— 也不用追着模型的新写法跑。
+    #
     # 官方口径是「(cat) = 1.1 倍」，所以单个词**按字面**就是权重语法。
     # 但实测发现模型会用括号做**两种说明性注释**（都不是倍率）：
     #
@@ -98,14 +109,59 @@ def _is_weight_paren(inner: str, scoped: str = "") -> bool:
     # 「所有画面文字用双引号括起来」，模型顺手就给术语加了注音），
     # 不是 Compel 倍率 —— 当成权重语法拒掉会整单 502，输出本身是好的。
     #
-    # 判据（能覆盖上面两种）：
-    #   - 括号紧跟在**被引号包住的画面文字**后面 -> 逐字注音
-    #   - 括号紧跟在**中文词**后面 -> 术语转写
+    # 判据（覆盖模型实际会写的三类说明性注释）：
+    #   a) 逐字注音：  "金" (gold)
+    #   b) 术语转写：  骑楼 (tong lau)
+    #   c) 术语英文：  T-tong lau (shophouse) buildings
+    #      —— 括号跟着一个**连字符/斜杠分隔的复合术语**，
+    #         是给它标英文名，不是倍率。
     if _is_transliteration_gloss(text, scoped):
         return False
     if _is_term_transliteration(text, scoped):
         return False
+    if _is_compound_term_gloss(text, scoped):
+        return False
+    # 单个词：Compel 强调语法会**重复**这个词（"(cat)" 强调前面已有的 cat），
+    # 而说明性注释里的词只出现一次。
+    #   真权重语法："a cat sitting, (cat) nearby"  -> cat 出现 2 次
+    #   说明性注释："Tong lau (arcade) buildings"    -> arcade 只出现 1 次
+    if _count_word_occurrences(text, scoped) < 2:
+        return False
     return True
+
+
+def _count_word_occurrences(word: str, scoped: str) -> int:
+    """
+    这个词在整段文本里出现了几次（按词边界计数）。
+
+    Compel 强调：同一个词在括号内外都出现 -> >= 2
+    说明性注释：括号里新引入的词 -> == 1
+    """
+    target = (word or "").strip().lower()
+    if not target:
+        return 0
+    pattern = r"(?<![a-z0-9])" + re.escape(target) + r"(?![a-z0-9])"
+    return len(re.findall(pattern, (scoped or "").lower()))
+
+
+# 「T-tong lau (shophouse) buildings」这类：复合术语 + 括号英文名
+_COMPOUND_GLOSS_PATTERN = re.compile(
+    r"[A-Za-z][A-Za-z\-]{2,}(?:\s+[A-Za-z][A-Za-z\-]{2,}){0,2}\s*\(([^()]{1,40})\)")
+
+
+def _is_compound_term_gloss(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给一个**复合术语**标英文名。
+
+    实测上下文：
+        "a row of cramped T-tong lau (shophouse) buildings featuring rusty iron window bars"
+    括号里 (shophouse) 是「唐楼」的英文名，不是倍率。
+    判据：括号前紧邻的词含有连字符/下划线/斜杠（复合术语特征）。
+    """
+    for m in _COMPOUND_GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
+    return False
 
 
 # 「骑楼 (tong lau)」这类结构：中文词 + 紧跟的括号转写
