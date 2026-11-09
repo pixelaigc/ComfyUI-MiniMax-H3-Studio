@@ -105,7 +105,9 @@ const state = {
     scheduler: "simple",
     negative: "",
     batchCount: 1,
-    // 官方 PE 提示词扩写（默认开 —— 官方最佳实践）
+    // 官方 PE 提示词扩写：出图时**始终**走官方 PE 接线（官方最佳实践）。
+    // 「手动扩写」入口已并入「增强」下拉菜单（「qwen21图片官方增强PE」），
+    // 不再是面板上的独立勾选框 —— 避免两处开关语义打架。
     usePe: true,
     loras: [],
     // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
@@ -239,12 +241,18 @@ function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
   queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
   // 模式切换后「增强」下拉菜单的可用性要跟着刷新
-  // （结构化增强只在 MOSS-Image 面板可用 —— 切走时该选项自动禁用，
-  //   当前方式若不可用则回落到普通增强）
+  // （结构化增强只在 MOSS-Image 面板可用、官方 PE 扩写只在 Qwen 面板可用 ——
+  //   切走时该选项自动禁用，当前方式若不可用则回落到普通增强）
   queueMicrotask(() => {
     try {
       if (window.enhanceMethods) {
         window.enhanceMethods.renderMenu();
+        // 当前方式在新模式下不可用 -> 回落普通增强
+        // （否则主按钮会停在一个「当前模式不可用」的方式上，
+        //   用户点「增强」却什么都没发生）
+        if (typeof window.enhanceMethods.ensureAvailable === "function") {
+          window.enhanceMethods.ensureAvailable();
+        }
         window.enhanceMethods.updatePanelVisibility();
       }
     } catch (e) { /* 忽略 */ }
@@ -982,16 +990,15 @@ function renderImagePanel() {
   updateNegativeNote();
   if (negSupported) $("#imgNegative").value = s.negative || "";
 
-  // Qwen-Image 2.1 专属：PE 开关 + 参考图区
+  // Qwen-Image 2.1 专属：参考图区
+  //
+  // 【官方 PE 提示词扩写不再有独立勾选框】——
+  // 它已并入「增强」按钮的下拉菜单（「qwen21图片官方增强PE」）。
+  // 这里只保留参考图区（图片编辑模式）。
   const qwen = isQwenMode();
-  const peField = $("#imgPeField");
   const refField = $("#imgRefField");
-  if (peField) peField.style.display = qwen ? "" : "none";
   if (refField) refField.style.display = (qwen && state.mode === "i2i_qwen") ? "" : "none";
   if (qwen) {
-    const peBox = $("#imgUsePe");
-    if (peBox) peBox.checked = !!state.imgQwen.usePe;
-    updateQwenPeNote();
     renderQwenRefs();
   }
 
@@ -1369,12 +1376,6 @@ $("#imgSizeReset").addEventListener("click", () => {
   renderImagePanel();
 });
 
-// ---------- Qwen-Image 2.1：官方 PE 提示词扩写开关 ----------
-$("#imgUsePe").addEventListener("change", e => {
-  state.imgQwen.usePe = !!e.target.checked;
-  updateQwenPeNote();
-});
-
 // ---------- Qwen-Image 2.1：参考图（素材库来源，最多 10 张） ----------
 //
 // 参考图的完整逻辑搬到 web/qwen-refs.js（window.QwenRefs）——
@@ -1403,36 +1404,31 @@ $("#imgRefSort")?.addEventListener("click", () => {
   if (window.QwenRefs) window.QwenRefs.smartSort($("#prompt")?.value || "");
 });
 
+// 【官方 PE 扩写的档位说明】
 // 官方 PE 有两个独立 checkpoint，**不可互换**：
 //   PE-T2I（文生图）：presence_penalty=1.5, max_new_tokens=16256
 //   PE-I2I（编辑）  ：presence_penalty=0,   max_new_tokens=24000
-// 填错不报错，只会悄悄改采样分布 —— 所以档位随模式写死，UI 明确标出来。
-function qwenPeTierKey() {
-  return state.mode === "i2i_qwen" ? "i2i" : "t2i";
-}
-
-function updateQwenPeNote() {
-  const note = $("#imgPeNote");
-  if (!note) return;
+// 填错不报错，只会悄悄改采样分布 —— 所以档位随模式写死。
+//
+// 【为什么没有独立的 PE 勾选框】
+// 官方 PE 扩写已并入「增强」按钮的下拉菜单（「qwen21图片官方增强PE」）。
+// 面板上再放一个同名勾选框会出现两个入口、两种语义 —— 用户会问
+// 「这两个哪个算数」。所以这里**只保留出图时的官方 PE 接线**，
+// 手动扩写统一从「增强」下拉进。
+//
+// 【出图时到底扩不扩 —— 两态，与「普通增强」同语义】
+//   默认（没做过手动官方 PE 扩写）：usePe=true -> 出图时链路内部再扩写一次
+//     （官方最佳实践：Qwen-Image 2.1 官方工作流就是这么走的）
+//   做过手动官方 PE 扩写后：usePe=false -> 提示词框里**已经是**官方 PE 结果，
+//     出图时不再二次扩写（否则会把用户的编辑冲掉、白白多花一次 9B 推理）
+//   两条路都能拿到官方 PE 效果，区别只在「谁来扩写」。
+function qwenPeTierInfo() {
   const m = QWEN_OPTIONS.models[state.imgQwen.model];
-  const tierKey = qwenPeTierKey();
+  const tierKey = state.mode === "i2i_qwen" ? "i2i" : "t2i";
   const tier = (QWEN_OPTIONS.peParams || {})[tierKey] || {};
   const peClip = m ? ((tierKey === "i2i" ? m.clip_i2i : m.clip_t2i) || "") : "";
   const tierLabel = tier.label || (tierKey === "i2i" ? "PE-I2I（图片编辑）" : "PE-T2I（文生图）");
-  // 标题旁的档位徽标：明确当前用的是 T2I 档还是 I2I 档
-  const badge = $("#imgPeTier");
-  if (badge) badge.textContent = `当前：${tierLabel}`;
-  if (state.imgQwen.usePe) {
-    note.innerHTML = `已启用：当前用 <b>${tierLabel}</b> 档`
-      + `（presence_penalty=${tier.presence_penalty ?? "-"}，max_new_tokens=${tier.max_new_tokens ?? "-"}）。`
-      + `提示词先经官方 PE 编码器（${peClip.split("/").pop()}）结构化扩写再送入模型。`
-      + `<br>两个 PE checkpoint 不可互换（填错不报错，只会让采样分布悄悄变），`
-      + `当前档位由「文生图 / 图片编辑」自动决定。`
-      + `<br>官方 ComfyUI 模板把 max_length 压到 4096，而模型卡值是 16256/24000 —— `
-      + `开 thinking 前若压得太低，PE 会静默返回空串（编辑表现为「几乎原样返回」）。`;
-  } else {
-    note.textContent = "已关闭：提示词原样送入模型，不做官方扩写。";
-  }
+  return { tierKey, tierLabel, peClip, tier };
 }
 
 // 拉取服务端下发的档位 / 比例 / 模型清单
@@ -1919,7 +1915,10 @@ $("#genBtn").addEventListener("click", async () => {
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
       }));
     if (isQwenMode()) {
-      // Qwen-Image 2.1：官方 PE 提示词扩写开关
+      // Qwen-Image 2.1：出图时是否再走一次官方 PE 扩写。
+      // 默认 true（官方最佳实践，官方工作流就是这么走的）；
+      // 用户在「增强」下拉里手动跑过「qwen21图片官方增强PE」后变 false ——
+      // 此时提示词框里已经是官方 PE 结果，再扩一次会冲掉用户的编辑。
       params.use_pe = !!state.imgQwen.usePe;
     }
     if (isMossMode()) {
