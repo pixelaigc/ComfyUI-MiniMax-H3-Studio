@@ -22,6 +22,12 @@ GENERATION_TYPES: dict[str, dict] = {
             "group": "generation_type", "category": "t2i"},
     "t2i_qwen": {"label": "Qwen-Image 2.1 文生图", "media": "image",
                  "group": "generation_type", "category": "t2i"},
+    # MOSS-Image: OpenMOSS dense text-to-image transformer.
+    # Base model is a diffusers dir (transformer/ + text_encoder/ +
+    # tokenizer/ + vae/), loaded by the ComfyUI moss-image plugin
+    # (custom_nodes/moss-image).
+    "t2i_moss": {"label": "MOSS-Image 文生图", "media": "image",
+                 "group": "generation_type", "category": "t2i"},
     "i2i_qwen": {"label": "Qwen-Image 2.1 图片编辑", "media": "image",
                  "group": "generation_type", "category": "i2i"},
     "t2v": {"label": "文生视频", "media": "video", "group": "generation_type",

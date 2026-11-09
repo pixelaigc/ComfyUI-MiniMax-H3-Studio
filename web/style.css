@@ -874,6 +874,17 @@ body.modal-open { overflow: hidden; }
 .img-note {
   margin-top: 6px; font-size: 10.5px; color: var(--muted); line-height: 1.5;
 }
+/* 后端版本错配告警条（前端新 / 后端旧）—— 红底，必须一眼看见 */
+.stale-backend-banner {
+  margin: 0 0 10px; padding: 9px 11px; border-radius: 9px;
+  background: #fdecec; border: 1px solid #f3c2c2; color: #a32020;
+  font-size: 11px; line-height: 1.6;
+}
+.stale-backend-banner b { color: #8c1616; }
+.stale-backend-banner code {
+  background: #fff; border: 1px solid #f0d3d3; border-radius: 4px;
+  padding: 0 4px; font-size: 10.5px;
+}
 /* 自定义分辨率的「已自动调整」说明 —— 原始值 / 生效值 / 调整原因 */
 .img-size-adjust {
   margin-top: 4px; padding: 5px 8px; border-radius: 7px;
@@ -944,6 +955,21 @@ body.modal-open { overflow: hidden; }
   margin-top: 6px;
   flex-wrap: wrap;
 }
+/* 二次增强专属的作用对象切换（只有选中「二次增强」时显示） */
+.prompt-refine-bar .refine-target-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.prompt-refine-bar .refine-target-group[hidden] { display: none; }
+
+/* hidden 属性必须真的隐藏整条栏：.prompt-refine-bar 的 display:flex 会盖掉
+   浏览器默认的 [hidden]{display:none}（作者样式优先于 UA 样式）。
+   少了这一条，切走增强方式后该栏只是加了属性、界面照旧铺开 ——
+   与 .job-batches[hidden] 是同一类坑。 */
+.prompt-refine-bar[hidden] { display: none; }
+
 .prompt-refine-bar .refine-label {
   font-size: 10px;
   color: var(--muted, #8a8a9a);
@@ -986,8 +1012,142 @@ body.modal-open { overflow: hidden; }
   border-color: var(--accent, #6a8cff);
   color: var(--text, #e8e8ef);
 }
-.enhance-btn-2 {
-  border-style: dashed;
+/* ---------- 增强：分裂按钮 + 增强方式下拉菜单 ---------- */
+.enhance-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 8px;
+}
+.enhance-split .enhance-btn { border-radius: 0; }
+.enhance-btn-main {
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 10px;
+}
+.enhance-btn-caret {
+  padding: 5px 7px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(255, 255, 255, .28);
+}
+.enhance-btn-caret:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.enhance-menu {
+  position: fixed;
+  z-index: 1250;
+  min-width: 268px;
+  max-width: min(340px, calc(100vw - 16px));
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(20, 26, 38, .2);
+  padding: 5px;
+}
+.enhance-menu[hidden] { display: none; }
+.enhance-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.enhance-menu button:hover:not(:disabled) { background: var(--accent-soft); }
+.enhance-menu button.active { background: var(--accent-soft); }
+.enhance-menu button:disabled { opacity: .45; cursor: default; }
+.enhance-menu-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.enhance-menu button.active .enhance-menu-label { color: var(--accent); }
+.enhance-menu-hint {
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.enhance-menu-badge {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(180, 106, 16, .14);
+  color: #b46a10;
+}
+
+
+/* ---------- MOSS 结构化增强（layout） ---------- */
+.moss-layout-bar {
+  padding: 7px 9px;
+  border: 1px solid rgba(106, 140, 255, .22);
+  border-radius: 8px;
+  background: rgba(106, 140, 255, .05);
+}
+.moss-layout-bar .refine-label {
+  color: var(--accent, #6a8cff);
+  font-weight: 600;
+}
+.moss-layout-intent {
+  flex: 1 1 180px;
+  min-width: 140px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 6px;
+  color: var(--text, #e8e8ef);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.moss-layout-intent:focus {
+  outline: none;
+  border-color: var(--accent, #6a8cff);
+}
+.moss-layout-intent::placeholder {
+  color: rgba(255, 255, 255, .28);
+}
+.prompt-dialog-wide {
+  width: min(920px, 94vw);
+}
+.moss-layout-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px 0;
+}
+.moss-layout-tabs button {
+  background: rgba(0, 0, 0, .04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted, #6a6a7a);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.moss-layout-tabs button.active {
+  background: var(--accent, #6a8cff);
+  border-color: var(--accent, #6a8cff);
+  color: #fff;
+}
+#mossLayoutModal textarea {
+  margin: 10px 16px 0;
+  width: calc(100% - 32px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.moss-layout-hint {
+  padding: 8px 16px 0;
+  font-size: 11px;
+  color: var(--muted, #6a6a7a);
 }
 .promptEnhancedBadge.lv2 {
   background: rgba(255, 176, 32, .16);
@@ -1202,4 +1362,4 @@ body.modal-open { overflow: hidden; }
   line-height: 1.45;
   color: #ffb08a;
   margin: 3px 0 2px;
-}
+}

@@ -113,6 +113,78 @@ LORA_CATALOG: dict[str, dict] = {
         "source": "本地 safetensors __metadata__（extracted_by: comfyui-zimage-realtime-lora）",
         "strength_source": "上游未标注，按 LoRA 默认强度 1.0",
     },
+    # ---- MOSS-Image ----
+    # 元数据实读（moss_xvstyle 的 safetensors __metadata__）：
+    #   base_model = "OpenMOSS-Team/MOSS-Image-SFT (train parent: MOSS-Image-Base)"
+    #   trigger_word = moss_xvstyle / lora_alpha=16 / lora_rank=16
+    #   recommended_strength = 0.7 / recommended_steps = 30 / recommended_cfg = 3.0
+    #   source = https://huggingface.co/axiomofmind/Moss-image-nsfw-uncensored-lora
+    "moss/moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors": {
+        "display": "XV 风格 · 人体质感（MOSS-Image）",
+        "base": "MOSS-Image-Base / MOSS-Image-SFT",
+        "trigger": "moss_xvstyle",
+        "recommended_strength": 0.7,
+        "kind": "effect",
+        "scene": "成人写真 / 人体与皮肤细节质感风格 LoRA。上游标注 trigger=moss_xvstyle、"
+                 "recommended_strength=0.7 / steps=30 / cfg=3.0 / 1024×1024。"
+                 "⚠️ 单独使用触发词时底模会把 moss 理解成苔藓（英文 moss = 苔藓），"
+                 "必须搭配画面描述使用。",
+        "source": "safetensors __metadata__（axiomofmind/Moss-image-nsfw-uncensored-lora）",
+        "strength_source": "上游 __metadata__ recommended_strength = 0.7",
+    },
+    # hires LoHa 系列：ComfyUI 作者本人训的 4MP+ 高分辨率 LoHa。
+    # 本机做过逐位无损的 qkv 拆分（上游融合 qkv vs 本机 diffusers 分离 q/k/v，
+    # 不拆会静默丢 42 个 target）—— 见 loras/moss/_INDEX.md §2.3。
+    "moss/moss_hires_lora_v0.1_qkv_split.safetensors": {
+        "display": "4MP+ 高分辨率增强 LoHa v0.1（MOSS-Image · 全 42 层覆盖）",
+        "base": "MOSS-Image-Base / MOSS-Image-SFT",
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "ComfyUI 作者训的 4 兆像素以上高分辨率 LoHa。v0.1 覆盖最广"
+                 "（全 42 层 × 全 4 target，本机实测 252 patches 全命中）。"
+                 "作者配方：er_sde / simple / 25 步 / CFG 4.0 / shift 5 / SLG 关闭。",
+        "source": "https://huggingface.co/comfyanonymous/MOSS_image_MAX_ULTRA_hires_lora_test"
+                  "（本机做了 qkv 拆分转换）",
+        "strength_source": "上游默认强度 1.0",
+    },
+    "moss/moss_hires_lora_v0.2_qkv_split.safetensors": {
+        "display": "4MP+ 高分辨率增强 LoHa v0.2（MOSS-Image）",
+        "base": "MOSS-Image-Base / MOSS-Image-SFT",
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "4 兆像素以上高分辨率 LoHa（204 targets：ffn_up_gate 全 42 层 + "
+                 "qkv 全 42 层 + o 21 层 + ffn_down 15 层，本机实测 204 patches 命中）。"
+                 "与 v0.3 同 target 集但权重不同。",
+        "source": "https://huggingface.co/comfyanonymous/MOSS_image_MAX_ULTRA_hires_lora_test"
+                  "（本机做了 qkv 拆分转换）",
+        "strength_source": "上游默认强度 1.0",
+    },
+    "moss/moss_hires_lora_v0.3_qkv_split.safetensors": {
+        "display": "4MP+ 高分辨率增强 LoHa v0.3（MOSS-Image · 官方 Space 同款）",
+        "base": "MOSS-Image-Base / MOSS-Image-SFT",
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "4 兆像素以上高分辨率 LoHa，官方 Space（hugging-apps/moss-image-hires-lora）"
+                 "用的就是这版，默认首选。204 targets，本机实测 204 patches 命中。",
+        "source": "https://huggingface.co/comfyanonymous/MOSS_image_MAX_ULTRA_hires_lora_test"
+                  "（本机做了 qkv 拆分转换）",
+        "strength_source": "上游默认强度 1.0",
+    },
+    "moss/moss_hires_lora_v0.4_qkv_split.safetensors": {
+        "display": "4MP+ 高分辨率增强 LoHa v0.4（MOSS-Image · 上游最新）",
+        "base": "MOSS-Image-Base / MOSS-Image-SFT",
+        "trigger": "",
+        "recommended_strength": 1.0,
+        "kind": "effect",
+        "scene": "4 兆像素以上高分辨率 LoHa，上游最新版本（204 targets，"
+                 "本机实测 204 patches 命中）。上游未提供示例图。",
+        "source": "https://huggingface.co/comfyanonymous/MOSS_image_MAX_ULTRA_hires_lora_test"
+                  "（本机做了 qkv 拆分转换）",
+        "strength_source": "上游默认强度 1.0",
+    },
 }
 
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
@@ -120,6 +192,9 @@ Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
 # Qwen-Image 2.1 家族的 marker（文件名里带这些字样的才可能是 2.1 的 LoRA）
 QWEN_IMAGE_MARKERS = ("qwen_image_2.1", "qwen_image2.1", "qwenimage2.1",
                       "qwen_2.1", "qwen21")
+# MOSS-Image 家族的 marker（文件名里带这些字样的才可能是 MOSS 的 LoRA）
+MOSS_IMAGE_MARKERS = ("moss_image", "moss-image", "mossimage", "moss_hires",
+                      "moss_xvstyle")
 
 # LoRA 分类
 #   effect       —— 效果类（滤镜 / 写实风格 / 人像增强）：用户可自行挑选
@@ -749,6 +824,13 @@ def _list_loras_for_base(markers, unet_path, base_label):
     markers: 文件名里出现即视为该族的 marker
     unet_path: 兼容性比对用的底模 UNET 权重（找不到则跳过校验）
     base_label: 底模名（写进条目的 base 字段）
+
+    ⚠️ **unet_path=None 表示「这一族不做权重比对」**（MOSS-Image 的底模是
+    diffusers 目录，没有单文件 UNET 可读）。
+    之前这个 None 会一路传到 check_compatibility()，而那里的默认参数是
+    `unet_path or _z_image_unet_path()` —— 于是 MOSS 的 LoRA 被拿去和
+    **Z-Image 的 UNET** 比键集，结论毫无意义（verified=True 但数据是错的）。
+    这里显式分流：None -> 不调用 check_compatibility()。
     """
     dirs = comfyui_lora_dirs()
     found: list[dict] = []
@@ -775,7 +857,7 @@ def _list_loras_for_base(markers, unet_path, base_label):
                       "relative_perturbation": None, "suggested_strength": 1.0,
                       "ctx_perturbation": None, "ctx_damping": None,
                       "verified": False}
-            if kind == KIND_EFFECT:
+            if kind == KIND_EFFECT and unet_path is not None:
                 try:
                     compat = check_compatibility(path, unet_path)
                 except Exception:
@@ -790,8 +872,15 @@ def _list_loras_for_base(markers, unet_path, base_label):
                 "display": info.get("display") or path.stem,
                 "base": info.get("base") or base_label,
                 "trigger": info.get("trigger", ""),
+                # 推荐强度：只有**真的做过权重比对**（verified=True）时，
+                # 兼容性检测算出的安全值才优先；否则用目录里人工核对的
+                # recommended_strength。
+                # 为什么：底模是 diffusers 目录的模型（MOSS）没有单文件 UNET
+                # 可比对，check_compatibility() 会返回「未验证 + 1.0」，
+                # 若无条件采纳就会把上游标注的 0.7 覆盖成 1.0。
                 "recommended_strength": (compat.get("suggested_strength")
-                                         if compat.get("suggested_strength")
+                                         if compat.get("verified")
+                                         and compat.get("suggested_strength")
                                          else info.get("recommended_strength", 1.0)),
                 "strength_cap": compat.get("strength_cap", 1.0),
                 "ctx_perturbation": compat.get("ctx_perturbation"),
@@ -821,6 +910,67 @@ def list_qwen_image_loras() -> list[dict]:
     """
     return _list_loras_for_base(QWEN_IMAGE_MARKERS, _qwen_image_unet_path(),
                                 "Qwen-Image 2.1")
+
+
+def list_moss_image_loras() -> list[dict]:
+    """本机真实存在的 MOSS-Image LoRA 清单。
+
+    与 Z-Image / Qwen-Image 分开返回 —— MOSS 的底模是 diffusers 目录
+    （transformer/ + text_encoder/ + tokenizer/ + vae/），不是单文件 safetensors，
+    所以**不能**用 check_compatibility() 那种「读 UNET 权重比键集」的办法
+    做兼容性判定（键集要跨 3 个 transformer 分片拼起来，成本高且易错）。
+
+    MOSS 的兼容性靠两点保证：
+      1. 键名前缀：MOSS LoRA 的键是 diffusion_model.layers.N.proj.*，
+         与本机 diffusers 版 MOSS 底模的层名一一对应（见 moss/_INDEX.md
+         的 204/252 patch 实测记录）
+      2. 本机已把上游的「融合 qkv」版本转成「分离 q/k/v」版（逐位无损），
+         所以能 100% 命中
+
+    因此这里只做「文件名 marker 命中 + 元数据」两步，不做权重比对。
+    """
+    return _list_loras_for_base(MOSS_IMAGE_MARKERS, None, "MOSS-Image")
+
+
+def list_moss_effect_loras(include_incompatible: bool = False) -> list[dict]:
+    """MOSS-Image 的「效果类」LoRA —— 用户可自由挑选的列表。"""
+    items = [item for item in list_moss_image_loras()
+             if item["kind"] == KIND_EFFECT]
+    if include_incompatible:
+        return items
+    return [item for item in items if item.get("compatible", True)]
+
+
+def list_moss_incompatible_loras() -> list[dict]:
+    """MOSS-Image 下被过滤掉的不兼容效果 LoRA（界面显示原因用）。"""
+    return [item for item in list_moss_image_loras()
+            if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
+
+
+def is_moss_family_lora(name: str) -> bool:
+    """这个 LoRA 文件是不是 MOSS-Image 家族的。
+
+    用途：**挡住跨底模族误用**。底模结构不同，Z-Image 的 LoRA 挂到 MOSS 上
+    时键名对不上 —— ComfyUI 只会打一串 "lora key not loaded" 的 WARNING，
+    出图照跑但效果 LoRA 根本没生效（静默失效，比报错更难查）。
+
+    判定依据（任一命中即算 MOSS 家族）：
+      1. 在 MOSS 清单里（文件名 marker 命中）
+      2. 文件实际放在名为 `moss` 的目录下（本机的归档习惯）
+    """
+    if not name:
+        return False
+    for item in list_moss_image_loras():
+        if item["name"] == name or Path(item["name"]).name == Path(name).name:
+            return True
+    # 没进清单的，看它是不是放在 moss/ 目录下
+    resolved, path = resolve_lora(name)
+    if path is None:
+        return False
+    for part in path.parts:
+        if part.lower() == "moss":
+            return True
+    return False
 
 
 def list_z_image_loras() -> list[dict]:
@@ -997,10 +1147,13 @@ def resolve_lora(name: str) -> tuple[str, Path | None]:
 DEFAULT_PREF_KEY = "z_image_loras"
 # Qwen-Image 2.1 的 LoRA 配置单独存一份（底模不同，不能混）
 QWEN_PREF_KEY = "qwen_image_2.1_loras"
+# MOSS-Image 的 LoRA 配置单独存一份（底模不同，不能混）
+MOSS_PREF_KEY = "moss_image_loras"
 # 界面上的底模族名 -> (配置 key, 清单函数)
 LORA_BASES = {
     "Z-Image": (DEFAULT_PREF_KEY, None),
     "Qwen-Image 2.1": (QWEN_PREF_KEY, None),
+    "MOSS-Image": (MOSS_PREF_KEY, None),
 }
 
 
@@ -1011,6 +1164,11 @@ def pref_key_for_base(base: str) -> str:
 
 def is_qwen_base(base: str) -> bool:
     return (base or "") in ("Qwen-Image 2.1", "Qwen-Image 2.1 ") or         (base or "").startswith("Qwen-Image 2.1")
+
+
+def is_moss_base(base: str) -> bool:
+    """MOSS-Image 底模族判定（MOSS 的配置与清单都与其它族分开）。"""
+    return (base or "") == "MOSS-Image" or (base or "").startswith("MOSS-Image")
 
 
 def load_config(conn: sqlite3.Connection, key: str = DEFAULT_PREF_KEY) -> list[dict]:

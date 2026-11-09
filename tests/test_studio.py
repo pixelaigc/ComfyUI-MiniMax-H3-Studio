@@ -76,11 +76,12 @@ class TestLoRARegistry(unittest.TestCase):
     def test_catalog_entries_are_not_invented(self):
         """说明表里的每个 LoRA 都必须在本机真实存在。
 
-        说明表现在覆盖两个底模族（Z-Image 与 Qwen-Image 2.1），所以两族的
-        清单都要查 —— 只查一族会把另一族的真实条目误判成「编造」。
+        说明表现在覆盖三个底模族（Z-Image、Qwen-Image 2.1、MOSS-Image），
+        所以三族的清单都要查 —— 只查一族会把另一族的真实条目误判成「编造」。
         """
         available = {item["name"] for item in lora_registry.list_z_image_loras()}
         available |= {item["name"] for item in lora_registry.list_qwen_image_loras()}
+        available |= {item["name"] for item in lora_registry.list_moss_image_loras()}
         for name in lora_registry.LORA_CATALOG:
             base = name.split("/")[-1]
             self.assertTrue(name in available or base in available,

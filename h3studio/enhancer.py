@@ -143,6 +143,22 @@ TEMPLATE_SPECS = {
                         "图内文字", "多图 <imageN> 引用"],
         "source": "官方 Qwen-Image-2.1-PE-I2I system prompt（ComfyUI 官方模板）",
     },
+    # MOSS-Image：官方 ComfyUI-Moss 插件内置的 MOSS Skill（defaults/SKILL.md）
+    # 规则改写成「只出正向提示词」的形态 —— 本项目的增强 Agent 不跑
+    # ComfyUI-Moss 的 layout 编译器，只做描述式扩写。
+    "moss-image": {
+        "id": "moss-image",
+        "label": "MOSS-Image 提示词（官方 MOSS Skill 描述式扩写）",
+        "media": "image",
+        "families": ["moss_image"],
+        "template": "moss-image.txt",
+        "validate_mode": "pe",
+        "default_length": "medium",
+        "builtin": True,
+        "dimensions": ["主体与动作", "外观", "场景", "镜头与取景", "媒介",
+                        "光线", "材质", "配色", "氛围", "图内文字（逐字）"],
+        "source": "ComfyUI-Moss 插件内置官方 MOSS Skill（defaults/SKILL.md）",
+    },
     "video": {
         "id": "video",
         "label": "视频提示词（MiniMax-H3）",
@@ -175,6 +191,8 @@ MODE_MEDIA = {
     # Qwen-Image 2.1 的两个模式都是图像媒体
     "t2i_qwen": "image",
     "i2i_qwen": "image",
+    # MOSS-Image 文生图也是图像媒体
+    "t2i_moss": "image",
     "t2v": "video",
     "flf": "video",
     "r2v": "video",
@@ -191,6 +209,9 @@ MODEL_FAMILY = {
     # Qwen-Image 2.1 的两个模型版本
     "qwen_image_2.1_bf16": "qwen_image21",
     "qwen_image_2.1_turbo_bf16": "qwen_image21",
+    # MOSS-Image 的两个底模版本（Base / SFT）
+    "moss_image_base": "moss_image",
+    "moss_image_sft": "moss_image",
     # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
     "lora": "minimax_h3",
     "standard": "minimax_h3",
@@ -199,6 +220,7 @@ MODEL_FAMILY = {
 # 模式 -> 默认模型 key（用于解上下文；前端会传实际选中的模型）
 MODE_DEFAULT_MODEL = {
     "t2i": "z_image_turbo_bf16",
+    "t2i_moss": "moss_image_base",
     "t2v": "lora",
     "flf": "lora",
     "r2v": "lora",
@@ -212,6 +234,8 @@ MODE_DEFAULT_SPEC = {
     # Qwen 两个模式各用自己的官方 PE 档
     "t2i_qwen": "qwen21-pe-t2i",
     "i2i_qwen": "qwen21-pe-i2i",
+    # MOSS 用官方 Skill 的描述式扩写模板
+    "t2i_moss": "moss-image",
     "t2v": "video",
     "flf": "video",
     "r2v": "video",

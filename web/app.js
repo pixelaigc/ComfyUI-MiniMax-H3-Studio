@@ -11,16 +11,25 @@ const MODE_INFO = {
   // 差别在「有没有参考图」和「PE 编码器用 t2i 还是 i2i 版」
   t2i_qwen: { name: "Qwen-Image 2.1 文生图", kind: "image", engine: "qwen" },
   i2i_qwen: { name: "Qwen-Image 2.1 图片编辑", kind: "image", engine: "qwen" },
+  // MOSS-Image：OpenMOSS 的 dense text-to-image transformer，底模是
+  // diffusers 目录（transformer/ + text_encoder/ + tokenizer/ + vae/）。
+  t2i_moss: { name: "MOSS-Image 文生图", kind: "image", engine: "moss" },
   longfilm: { name: "长片", kind: "video" },
 };
 
 // 图像类模式：共用「图像」参数面板
-const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen"];
+const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"];
 // Qwen-Image 2.1 专用模式（参数清单与 Z-Image 不同）
 const QWEN_MODES = ["t2i_qwen", "i2i_qwen"];
+// MOSS-Image 专用模式（参数清单与 Z-Image / Qwen 都不同）
+const MOSS_MODES = ["t2i_moss"];
 
 function isQwenMode(mode) {
   return QWEN_MODES.includes(mode || state.mode);
+}
+
+function isMossMode(mode) {
+  return MOSS_MODES.includes(mode || state.mode);
 }
 
 // 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
@@ -99,6 +108,32 @@ const state = {
     // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
     // 参考图强制来自素材库，状态由那个模块自己管。
   },
+  // MOSS-Image 文生图专属状态（与 Z-Image / Qwen 分开，避免参数互相污染）
+  imgMoss: {
+    tier: "1mp",
+    aspect: "16:9",
+    // 自定义宽高：custom=true 表示用户手填过（哪怕只填了一边）
+    custom: false,
+    width: null,
+    height: null,
+    // 用户**原始输入**（未经吸附）—— 用来算「原始值 vs 生效值」的差异说明
+    rawWidth: null,
+    rawHeight: null,
+    model: "moss_image_base",
+    // 官方 USERGUIDE：50 步 / cfg 3 / euler / sgm_uniform / shift 5
+    steps: 50,
+    cfg: 3,
+    shift: 5,
+    sampler: "euler",
+    scheduler: "sgm_uniform",
+    // 官方推荐的负面提示词（首次进入时由服务端默认值预填）
+    negative: "",
+    batchCount: 1,
+    // 效果 LoRA 配置：[{name, strength, enabled}]，服务端持久化
+    loras: [],
+    // SLG（SkipLayerGuidance）skip layer —— 官方推荐 22；空 = 关
+    slgSingle: "22",
+  },
   // 图像模式（Z-Image 文生图）专属状态
   img: {
     tier: "1mp",
@@ -142,6 +177,14 @@ const QWEN_OPTIONS = {
   // 官方 PE 双档参数（presence_penalty 不可互换）
   peParams: {}, peDefaultMaxLength: 4096,
 };
+// MOSS-Image 的独立一套清单（服务端 /api/image-options 的 moss 字段）
+const MOSS_OPTIONS = {
+  tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 4,
+  minMp: 0.25, sizeMin: 16, sizeMax: 16384,
+  defaultTier: "1mp", defaultModel: "moss_image_base",
+  // 官方推荐的负面提示词（首次进入该模式时预填）
+  defaultNegative: "",
+};
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
 // available = 效果类 LoRA（用户可选）
 // acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
@@ -152,6 +195,14 @@ const IMG_LORAS = { available: [], acceleration: [], incompatible: [], config: [
 // Qwen-Image 2.1 的 LoRA 清单（与 Z-Image 分开：底模结构不同，
 // 兼容性要各自比对，混在一起会让用户选到不匹配的权重）
 const QWEN_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
+// MOSS-Image 的 LoRA 清单（与其它族分开：底模结构不同，不能混用）
+const MOSS_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
+// 服务端下发的功能位（后端重启后才有新位）
+let SERVER_FEATURES = {};
+// 后端是否已支持 MOSS-Image（/api/image-options 有 moss 字段才算）
+let MOSS_BACKEND_READY = false;
+// 后端代码指纹（用于提示「后端没重启」）
+let SERVER_FINGERPRINT = "";
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -175,6 +226,17 @@ $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
 function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
   queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
+  // 模式切换后「增强」下拉菜单的可用性要跟着刷新
+  // （结构化增强只在 MOSS-Image 面板可用 —— 切走时该选项自动禁用，
+  //   当前方式若不可用则回落到普通增强）
+  queueMicrotask(() => {
+    try {
+      if (window.enhanceMethods) {
+        window.enhanceMethods.renderMenu();
+        window.enhanceMethods.updatePanelVisibility();
+      }
+    } catch (e) { /* 忽略 */ }
+  });
   const mode = state.mode;
   const info = MODE_INFO[mode];
   // 上传区
@@ -360,6 +422,17 @@ function imgAutoSize(tier, aspect) {
 // 当前图像模式的「参数上下文」：Z-Image 与 Qwen-Image 2.1 两套清单 + 两份状态。
 // 面板所有控件都从这里取当前该用的那一套，避免两套参数互相污染。
 function imgCtx() {
+  if (isMossMode()) {
+    return {
+      opts: MOSS_OPTIONS,
+      st: state.imgMoss,
+      tiers: MOSS_OPTIONS.tiers,
+      models: MOSS_OPTIONS.models,
+      multiple: MOSS_OPTIONS.sizeMultiple,
+      maxMp: MOSS_OPTIONS.maxDirectMp,
+      minMp: MOSS_OPTIONS.minMp,
+    };
+  }
   if (isQwenMode()) {
     return {
       opts: QWEN_OPTIONS,
@@ -423,6 +496,9 @@ function renderBatchChips() {
 // LoRA 面板上下文：Z-Image 与 Qwen-Image 2.1 是两套清单 + 两份已选列表。
 // 底模结构不同，兼容性要各自比对，不能混用。
 function imgLoraCtx() {
+  if (isMossMode()) {
+    return {store: MOSS_LORAS, list: state.imgMoss.loras, label: "MOSS-Image"};
+  }
   if (isQwenMode()) {
     return {store: QWEN_LORAS, list: state.imgQwen.loras, label: "Qwen-Image 2.1"};
   }
@@ -458,7 +534,10 @@ function renderExcludedLoras() {
     return;
   }
   box.hidden = false;
-  box.innerHTML = `<div class="img-lora-excluded-title">已排除（与 Z-Image 底模不兼容）</div>` +
+  // 标题里的底模族名随模式切换（原来写死「Z-Image 底模」，
+  // 在 MOSS / Qwen 面板下会把「为什么被排除」解释错族）。
+  const famLabel = imgLoraCtx().label;
+  box.innerHTML = `<div class="img-lora-excluded-title">已排除（与 ${esc(famLabel)} 底模不兼容）</div>` +
     items.map(it => `<div class="img-lora-excluded-item" title="${esc(it.incompatible_reason || "")}">
         <span class="img-lora-excluded-name">${esc(it.display)}</span>
         <span class="img-lora-excluded-reason">${esc(it.incompatible_reason || "兼容性检测未通过")}</span>
@@ -669,6 +748,8 @@ async function loadImageLoras() {
        set: v => { state.img.loras = v; }},
       {name: "Qwen-Image 2.1", store: QWEN_LORAS,
        set: v => { state.imgQwen.loras = v; }},
+      {name: "MOSS-Image", store: MOSS_LORAS,
+       set: v => { state.imgMoss.loras = v; }},
     ];
     for (const base of bases) {
       const resp = await fetch("/api/image-loras?base=" + encodeURIComponent(base.name),
@@ -727,7 +808,11 @@ function updateNegativeNote() {
           + "官方路径就是 cfg=1；要启用负面提示词请把 CFG 调到 1 以上。"
         : (isQwenMode()
             ? "Qwen-Image 2.1 非蒸馏，CFG>1 时负面提示词生效。"
-            : "Base 非蒸馏，负面提示词生效（官方强烈建议）"))
+            : (isMossMode()
+                ? "MOSS-Image 未蒸馏，CFG>1 时负面提示词生效。"
+                  + "官方 USERGUIDE 推荐 CFG 3.0，并给出一组实测有效的负面标签"
+                  + "（nsfw, worst quality, bad anatomy, watermark, jpeg artifact）。"
+                : "Base 非蒸馏，负面提示词生效（官方强烈建议）")))
     : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
 }
 
@@ -775,6 +860,13 @@ function renderImagePanel() {
   // 避免用户选完才在跑图时炸掉。
   const modelSel = $("#imgModelSelect");
   modelSel.innerHTML = "";
+  // 标题里的底模族名随模式切换（原来写死「Z-Image 模型」，
+  // 在 MOSS / Qwen 面板下会误导用户以为选的是 Z-Image 权重）。
+  const modelLabel = $("#imgModelLabel");
+  if (modelLabel) {
+    modelLabel.textContent = isMossMode() ? "MOSS-Image 模型"
+      : (isQwenMode() ? "Qwen-Image 2.1 模型" : "Z-Image 模型");
+  }
   Object.entries(ctx.models).forEach(([key, m]) => {
     const opt = document.createElement("option");
     opt.value = key;
@@ -820,7 +912,15 @@ function renderImagePanel() {
   // Qwen-Image 2.1 的 SHIFT 是 0.69 —— 用同一套量程会把 0.69 夹成 1，
   // 界面显示的值就和真正送出去的不一致。
   const stepsEl = $("#imgSteps"), cfgEl = $("#imgCfg"), shiftEl = $("#imgShift");
-  if (isQwenMode()) {
+  if (isMossMode()) {
+    // MOSS-Image 官方 USERGUIDE：steps >= 50 / CFG 3.0~6.0 / shift 5.0
+    // 量程要覆盖官方推荐值 —— steps 上限给到 100（官方下限 50 起步），
+    // CFG 给到 0.1 步进（官方区间 3.0~6.0，需要能调到 3.5/4.0/4.5…），
+    // shift 给到 0.1 步进（官方推荐 5.0）。
+    stepsEl.min = "1"; stepsEl.max = "100"; stepsEl.step = "1";
+    cfgEl.min = "0"; cfgEl.max = "10"; cfgEl.step = "0.1";
+    shiftEl.min = "0"; shiftEl.max = "10"; shiftEl.step = "0.1";
+  } else if (isQwenMode()) {
     stepsEl.min = "1"; stepsEl.max = "60"; stepsEl.step = "1";
     cfgEl.min = "0"; cfgEl.max = "8"; cfgEl.step = "0.1";
     shiftEl.min = "0"; shiftEl.max = "3"; shiftEl.step = "0.01";
@@ -834,7 +934,10 @@ function renderImagePanel() {
   cfgEl.value = s.cfg;
   $("#imgCfgVal").textContent = Number(s.cfg).toFixed(isQwenMode() ? 1 : 1);
   shiftEl.value = s.shift;
-  $("#imgShiftVal").textContent = Number(s.shift).toFixed(isQwenMode() ? 2 : 1);
+  // MOSS 的 shift 量程是 0~10 步进 0.1 -> 显示 1 位小数即可；
+  // Qwen 是 0~3 步进 0.01 -> 要 2 位；Z-Image 是 1~7 步进 0.5 -> 1 位
+  $("#imgShiftVal").textContent = Number(s.shift).toFixed(
+    isQwenMode() ? 2 : (isMossMode() ? 1 : 1));
 
   // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
   const negSupported = !!(model && model.supports_negative);
@@ -858,9 +961,74 @@ function renderImagePanel() {
   renderBatchChips();
   renderLoraSelect();
   renderLoraList();
+  renderSlgChips();
 
   updateImageSizeFields();
   updateImageModelNote();
+  renderStaleBackendBanner();
+}
+
+// ---------- 后端版本错配告警 ----------
+// 【为什么需要】前端是静态文件（改了刷新页面就生效），后端是长跑进程
+// （改了必须重启才生效）。两者错配时，用户看到的是：
+//   - 分辨率档位 / 模型下拉全空
+//   - LoRA 下拉串到别的底模族
+//   - 点生成直接报「未知模式 t2i_moss」
+// 这类症状极难自查（前端没错、后端也没错，只是版本对不上）。
+// 所以这里把「后端没重启」直接写在面板顶上，并给出修复命令。
+function renderStaleBackendBanner() {
+  const box = $("#staleBackendBanner");
+  if (!box) return;
+  if (!isMossMode()) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  if (MOSS_BACKEND_READY) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML =
+    "<b>后端未重启，MOSS-Image 面板当前不可用。</b><br>"
+    + "页面资源（前端）已经是新的，但后端进程还是旧代码 —— "
+    + "所以分辨率档位/模型下拉是空的，点生成会报「未知模式 t2i_moss」。<br>"
+    + "修复：<code>systemctl restart h3-studio.service</code> "
+    + "（本机）或 <code>sudo systemctl restart h3-studio.service</code>，"
+    + "然后刷新页面。";
+}
+
+// ---------- MOSS-Image：SLG（SkipLayerGuidance）skip layer ----------
+// 官方 USERGUIDE 推荐 22（0-indexed），22/24/26 都有帮助；
+// 空字符串 = 关闭 SLG（画面更写实，但官方提示部分细节会崩）。
+const SLG_LAYER_OPTIONS = ["22", "24", "26", ""];
+const SLG_LAYER_LABELS = {"22": "22（官方推荐）", "24": "24", "26": "26", "": "关闭"};
+
+function renderSlgChips() {
+  const box = $("#imgSlgChips");
+  if (!box) return;
+  const field = $("#imgSlgField");
+  if (!isMossMode()) {
+    if (field) field.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  if (field) field.style.display = "";
+  box.innerHTML = "";
+  SLG_LAYER_OPTIONS.forEach(value => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.v = value;
+    btn.textContent = SLG_LAYER_LABELS[value] || value;
+    if (value === (state.imgMoss.slgSingle || "")) btn.classList.add("active");
+    btn.addEventListener("click", () => {
+      state.imgMoss.slgSingle = value;
+      renderSlgChips();
+      updateImageModelNote();
+    });
+    box.appendChild(btn);
+  });
 }
 
 // 宽高吸附：与后端 workflows.normalize_z_image_size() 同一套规则。
@@ -880,6 +1048,32 @@ function normalizeImgSize(w, h) {
   if (nh > max) { reasons.push(`高度超过上限 ${max} → 已钳到上限`); nh = max; }
   if (nw < min) { reasons.push(`宽度低于下限 ${min} → 已抬到下限`); nw = min; }
   if (nh < min) { reasons.push(`高度低于下限 ${min} → 已抬到下限`); nh = min; }
+  // MOSS-Image 额外有「总像素」区间（官方推荐 0.25M ~ 4M）。
+  // 规则与后端 normalize_moss_image_size() 一致：
+  //   下限 = 官方推荐区间下沿（512×512）
+  //   上限 = 官方直出上限（≈2K）；更大尺寸需挂 4MP+ hires LoRa
+  const minMp = ctx.minMp;
+  if (minMp) {
+    const minPixels = minMp * 1024 * 1024;
+    if (nw * nh < minPixels) {
+      const scale = Math.sqrt(minPixels / (nw * nh));
+      const sw = Math.max(mult, Math.round(nw * scale / mult) * mult);
+      const sh = Math.max(mult, Math.round(nh * scale / mult) * mult);
+      reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 低于官方下限 ${minMp}MP → 按比例放大到 ${sw}×${sh}`);
+      nw = sw; nh = sh;
+    }
+  }
+  const maxMp = ctx.maxMp;
+  if (maxMp) {
+    const maxPixels = maxMp * 1024 * 1024;
+    if (nw * nh > maxPixels) {
+      const scale = Math.sqrt(maxPixels / (nw * nh));
+      const sw = Math.max(mult, Math.round(nw * scale / mult) * mult);
+      const sh = Math.max(mult, Math.round(nh * scale / mult) * mult);
+      reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 超过官方直出上限 ${maxMp}MP → 按比例缩到 ${sw}×${sh}（更大尺寸需挂 4MP+ hires LoRa）`);
+      nw = sw; nh = sh;
+    }
+  }
   return [nw, nh, reasons];
 }
 
@@ -976,6 +1170,23 @@ function updateImageModelNote() {
   if (!m) return;
   $("#imgModelNote").textContent = m.note;
   if (m.warn) $("#imgModelWarn").textContent = m.warn;
+  // MOSS-Image 专属：SLG（SkipLayerGuidance）skip layer 的当前值
+  // 官方 USERGUIDE 推荐 22（0-indexed）；22/24/26 都有帮助，空 = 关。
+  // 关掉 SLG 会让画面「非常写实」，但部分细节会崩 —— 所以这里显式告知。
+  const slgBox = $("#imgSlgNote");
+  if (slgBox) {
+    if (isMossMode()) {
+      const layer = state.imgMoss.slgSingle;
+      slgBox.hidden = false;
+      slgBox.textContent = layer
+        ? `SLG skip layer = ${layer}（官方推荐 22；22/24/26 都有帮助）。`
+          + "关掉 SLG 画面会更写实，但部分细节会崩。"
+        : "SLG 已关闭：画面更写实，但官方提示部分细节会崩。";
+    } else {
+      slgBox.hidden = true;
+      slgBox.textContent = "";
+    }
+  }
   // 加速 / 蒸馏 LoRA 固定内置于工作流 —— 明确告诉用户它不在下拉列表里
   const accelBox = $("#imgAccelNote");
   if (accelBox) {
@@ -1073,7 +1284,8 @@ $("#imgCfg").addEventListener("input", e => {
 $("#imgShift").addEventListener("input", e => {
   const s = imgCtx().st;
   s.shift = parseFloat(e.target.value);
-  $("#imgShiftVal").textContent = Number(s.shift).toFixed(isQwenMode() ? 2 : 1);
+  $("#imgShiftVal").textContent = Number(s.shift).toFixed(
+    isQwenMode() ? 2 : (isMossMode() ? 1 : 1));
   updateImageModelNote();
 });
 $("#imgNegative").addEventListener("input", e => {
@@ -1192,6 +1404,11 @@ async function loadImageOptions() {
     const resp = await fetch("/api/image-options", {cache: "no-store"});
     if (!resp.ok) return;
     const data = await resp.json();
+    // ---- 后端能力探测（必须在读 moss 字段之前）----
+    // 后端没重启时 /api/image-options 里没有 moss 字段 -> MOSS 面板的
+    // 档位/模型下拉会是空的、LoRA 会串到 Z-Image 族。
+    // 与其让用户对着空白面板猜，不如直接告诉他「后端没重启」。
+    SERVER_FEATURES = data.features || SERVER_FEATURES;
     IMG_OPTIONS.tiers = data.tiers || [];
     IMG_OPTIONS.aspects = data.aspects || [];
     IMG_OPTIONS.models = data.models || {};
@@ -1230,6 +1447,42 @@ async function loadImageOptions() {
       const qKnown = QWEN_OPTIONS.aspects.some(a => a.key === state.imgQwen.aspect);
       if (!qKnown && QWEN_OPTIONS.aspects.length) {
         state.imgQwen.aspect = QWEN_OPTIONS.aspects[0].key;
+      }
+    }
+    // MOSS-Image 的独立一套清单（服务端 moss 字段）
+    const m = data.moss || {};
+    // 服务端没下发 moss 字段 = 后端还是旧代码（没重启）
+    MOSS_BACKEND_READY = !!(m.tiers && m.tiers.length);
+    MOSS_OPTIONS.tiers = m.tiers || [];
+    MOSS_OPTIONS.aspects = m.aspects || [];
+    MOSS_OPTIONS.models = m.models || {};
+    MOSS_OPTIONS.sizeMultiple = m.size_multiple || 16;
+    MOSS_OPTIONS.maxDirectMp = m.max_direct_mp || 4;
+    MOSS_OPTIONS.minMp = m.min_mp || 0.25;
+    MOSS_OPTIONS.sizeMin = 16;
+    MOSS_OPTIONS.sizeMax = 16384;
+    MOSS_OPTIONS.defaultTier = m.default_tier || "1mp";
+    MOSS_OPTIONS.defaultModel = m.default_model || "moss_image_base";
+    MOSS_OPTIONS.defaultNegative = m.default_negative || "";
+    // MOSS 默认值对齐服务端推荐（官方 USERGUIDE：50 步 / cfg 3 / shift 5）
+    const mm = MOSS_OPTIONS.models[MOSS_OPTIONS.defaultModel];
+    if (mm) {
+      state.imgMoss.model = MOSS_OPTIONS.defaultModel;
+      state.imgMoss.steps = mm.steps;
+      state.imgMoss.cfg = mm.cfg;
+      state.imgMoss.shift = mm.shift;
+      state.imgMoss.sampler = mm.sampler;
+      state.imgMoss.scheduler = mm.scheduler;
+      state.imgMoss.slgSingle = mm.slg_single_layers !== undefined
+        ? mm.slg_single_layers : "22";
+      state.imgMoss.tier = MOSS_OPTIONS.defaultTier;
+      // 负面提示词：官方推荐值预填（用户改过就不覆盖）
+      if (!state.imgMoss.negative && MOSS_OPTIONS.defaultNegative) {
+        state.imgMoss.negative = MOSS_OPTIONS.defaultNegative;
+      }
+      const mKnown = MOSS_OPTIONS.aspects.some(a => a.key === state.imgMoss.aspect);
+      if (!mKnown && MOSS_OPTIONS.aspects.length) {
+        state.imgMoss.aspect = MOSS_OPTIONS.aspects[0].key;
       }
     }
     if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
@@ -1444,8 +1697,7 @@ function updateActionButtons() {
   const genBtn = $("#genBtn");
   const enhBtn = $("#enhanceBtn");
   const enhText = $("#enhanceBtnText");
-  const refBtn = $("#refineBtn");
-  const refText = $("#refineBtnText");
+  const menuBtn = $("#enhanceMenuBtn");
   if (genBtn) {
     genBtn.disabled = busy;
     genBtn.classList.toggle("busy", state.genBusy);
@@ -1455,12 +1707,21 @@ function updateActionButtons() {
     enhBtn.disabled = busy;
     enhBtn.classList.toggle("busy", promptEnhance.busy);
   }
-  if (enhText) enhText.textContent = promptEnhance.busy ? "正在增强…" : "增强";
-  if (refBtn) {
-    refBtn.disabled = busy;
-    refBtn.classList.toggle("busy", promptVersions.busy);
+  // 主按钮文字随「当前增强方式」变化 —— 方式名由 enhance-menu.js 管，
+  // 这里只负责 busy 期间的临时文案。
+  if (enhText) {
+    if (promptEnhance.busy) {
+      enhText.textContent = "正在增强…";
+    } else if (promptVersions.busy) {
+      enhText.textContent = "正在细化…";
+    } else if (window.enhanceMethods && window.enhanceMethods.list) {
+      const m = window.enhanceMethods.list.find(
+        x => x.id === window.enhanceMethods.current);
+      enhText.textContent = m ? m.buttonText : "增强";
+    }
   }
-  if (refText) refText.textContent = promptVersions.busy ? "正在细化…" : "二次增强";
+  // 下拉箭头同样要禁 —— 否则增强进行中还能切换方式
+  if (menuBtn) menuBtn.disabled = busy;
 }
 
 // ---------- 未增强拦截：确认用原始提示词生成 / 取消中止 ----------
@@ -1593,6 +1854,10 @@ $("#genBtn").addEventListener("click", async () => {
     if (isQwenMode()) {
       // Qwen-Image 2.1：官方 PE 提示词扩写开关
       params.use_pe = !!state.imgQwen.usePe;
+    }
+    if (isMossMode()) {
+      // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关
+      params.slg_single_layers = state.imgMoss.slgSingle || "";
     }
   }
   // 图片编辑的参考图：**必须来自素材库**。
@@ -1736,7 +2001,9 @@ function modelLabel(p) {
 
 // 图像模式：模型版本的可读名（清单来自 /api/image-options）
 function imgModelLabel(key) {
-  const m = IMG_OPTIONS.models[key];
+  // 三族模型各自的清单分开 —— key 在别的族里查不到就回落到原 key
+  const m = IMG_OPTIONS.models[key] || MOSS_OPTIONS.models[key]
+            || QWEN_OPTIONS.models[key];
   return m ? m.label : (key || "—");
 }
 
@@ -2043,7 +2310,7 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
-      ${job.mode === "t2i" ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
+      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : `
@@ -2169,6 +2436,40 @@ function jobCard(job) {
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
+    if (job.mode === "t2i_moss") {
+      // MOSS-Image：还原档位 / 比例 / 实际宽高 / 采样参数 / SLG
+      const s = state.imgMoss;
+      if (p.resolution) s.tier = p.resolution;
+      if (p.aspect) s.aspect = p.aspect;
+      if (p.width && p.height) {
+        s.width = p.width; s.height = p.height;
+        s.rawWidth = p.width; s.rawHeight = p.height;
+        s.custom = true;      // 复用旧任务的尺寸 -> 也是自定义模式
+      }
+      if (p.model && MOSS_OPTIONS.models[p.model]) applyModelDefaults(p.model);
+      if (p.sampler) s.sampler = p.sampler;
+      if (p.scheduler) s.scheduler = p.scheduler;
+      if (p.steps) s.steps = p.steps;
+      if (p.cfg != null) s.cfg = p.cfg;
+      if (p.shift != null) s.shift = p.shift;
+      if (p.negative_prompt != null) s.negative = p.negative_prompt;
+      if (p.batch_count) s.batchCount = Number(p.batch_count);
+      if (p.slg_single_layers !== undefined && p.slg_single_layers !== null) {
+        s.slgSingle = String(p.slg_single_layers);
+      }
+      if (Array.isArray(p.loras)) {
+        s.loras = p.loras.map(l => ({
+          name: l.name,
+          strength: Number(l.strength),
+          enabled: true,
+          trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
+          display: l.name,
+          strength_cap: 1.0,
+        }));
+      }
+      renderImagePanel();
+      return;
+    }
     if (job.mode === "t2i") {
       // 图像模式：还原分辨率档位 / 比例 / 实际宽高 / Z-Image 采样参数
       const s = state.img;
@@ -2589,14 +2890,20 @@ function renderDonePagination(total, currentPage) {
   });
   controls.push(`<button data-page="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>下一页</button>`);
   controls.push(`<span class="page-summary">共 ${total} 个作品</span>`);
-  pager.innerHTML = controls.join("");
+  // 分页条每 2 秒被刷新重建一次；内容没变就不动 DOM ——
+  // 换了节点等于把「上一页/下一页」按钮换掉，用户点了没反应、焦点也丢了。
+  const changed = window.H3UI
+    ? window.H3UI.setHTMLIfChanged(pager, controls.join(""))
+    : (pager.innerHTML = controls.join(""), true);
   pager.hidden = false;
-  pager.querySelectorAll("button[data-page]").forEach(button => button.addEventListener("click", () => {
-    if (button.disabled) return;
-    state.donePage = Number(button.dataset.page);
-    refreshJobs();
-    $("#jobsArea").scrollTo({top: 0, behavior: "smooth"});
-  }));
+  if (changed) {
+    pager.querySelectorAll("button[data-page]").forEach(button => button.addEventListener("click", () => {
+      if (button.disabled) return;
+      state.donePage = Number(button.dataset.page);
+      refreshJobs();
+      $("#jobsArea").scrollTo({top: 0, behavior: "smooth"});
+    }));
+  }
 }
 
 async function refreshJobs() {
@@ -2646,45 +2953,77 @@ async function refreshJobs() {
       return {jobs, total: data.total ?? jobs.length, page: data.page ?? 1};
     }));
     if (ticket !== jobsRequest || tab !== state.tab) return;
-    if (["done", "longfilm", "all"].includes(tab)) {
-      state.donePage = groups[0].page;
-      renderDonePagination(groups[0].total, state.donePage);
-    } else {
-      renderDonePagination(0, 1);
-    }
-    const jobs = [...new Map(groups.flatMap(group => group.jobs).map(job => [job.id, job])).values()]
-      .sort((a,b) => (b.status === "running") - (a.status === "running") || b.created_at - a.created_at);
-    if (!jobs.length) {
-      grid.innerHTML = '<div class="empty-hint">' + ({active:"当前没有排队或生成中的任务", done:"暂无已完成的任务", longfilm:"暂无已合成的长片", failed:"暂无失败的任务", canceled:"暂无已取消的任务"}[tab]) + '</div>';
-      return;
-    }
-    // 骨架不是卡片节点（没有 data-jid），直接清掉；
-    // 真正的卡片会被下面的增量逻辑复用，不会被重建。
-    for (const node of [...grid.childNodes]) if (!node.dataset?.jid) node.remove();
-
-    // 增量更新：数据未变化的卡片不重建，避免打断视频播放
-    const existing = new Map();
-    [...grid.children].forEach(el => { if (el.dataset?.jid) existing.set(el.dataset.jid, el); });
-    const seen = new Set();
-    jobs.forEach(j => {
-      seen.add(j.id);
-      const sig = jobSig(j);
-      let el = existing.get(j.id);
-      if (el && el.dataset.sig !== sig) {
-        const fresh = jobCard(j);
-        el.replaceWith(fresh);
-        el = fresh;
-      } else if (!el) {
-        el = jobCard(j);
+    // 最后一道闸：**此刻**如果有原生下拉正开着，就不动 DOM。
+    // 上面 fetch 是异步的 —— 判断通过之后、数据返回之前，
+    // 用户可能刚好展开了下拉；这时写 DOM 会把下拉当场关闭。
+    const writeAll = () => {
+      if (["done", "longfilm", "all"].includes(tab)) {
+        state.donePage = groups[0].page;
+        renderDonePagination(groups[0].total, state.donePage);
+      } else {
+        renderDonePagination(0, 1);
       }
-      el.dataset.sig = sig;
-      // appendChild 对已存在节点是"移动"，不销毁元素，视频播放不中断
-      grid.appendChild(el);
-    });
-    existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
-    // 列数跟着「每页作品数」走；实时刮新也走这里，所以每页数量不会被刷掉
-    applyGridColumns(state.pageSize);
+      const jobs = [...new Map(groups.flatMap(group => group.jobs).map(job => [job.id, job])).values()]
+        .sort((a,b) => (b.status === "running") - (a.status === "running") || b.created_at - a.created_at);
+      // 空态与卡片更新都在「保住焦点 / 滚动」的包裹里跑：
+      // 刷新周期里用户可能正按着某张卡片上的按钮，或正滚到列表中部。
+      const area = $("#jobsArea");
+      const preserve = fn => {
+        window.H3UI ? window.H3UI.withPreserved(area, fn) : fn();
+      };
+      if (!jobs.length) {
+        preserve(() => {
+          grid.innerHTML = '<div class="empty-hint">' + ({active:"当前没有排队或生成中的任务", done:"暂无已完成的任务", longfilm:"暂无已合成的长片", failed:"暂无失败的任务", canceled:"暂无已取消的任务"}[tab]) + '</div>';
+        });
+        return;
+      }
+      preserve(() => syncJobCards(grid, jobs));
+    };
+    if (window.H3UI && !window.H3UI.canWriteDOM("jobs", () => refreshJobs())) return;
+    writeAll();
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
+}
+
+// 把任务列表按「稳定 key + 最小改动」同步到网格里。
+//
+// 关键约束：**顺序没变的节点一律不碰 DOM**。
+// 旧实现无条件 grid.appendChild(el) —— 对已在容器里的节点，appendChild
+// 是「移动」：节点被摘下来再挂回去，焦点随之丢失（实测：焦点在卡片
+// 「提示词」按钮上，2 秒后焦点掉到 body），视频也会从头重播。
+function syncJobCards(grid, jobs) {
+  // 骨架不是卡片节点（没有 data-jid），直接清掉；
+  // 真正的卡片会被下面的增量逻辑复用，不会被重建。
+  // 非卡片节点（空态提示）也一并清掉 —— 否则下标会算错。
+  for (const node of [...grid.childNodes]) {
+    if (node.nodeType !== 1) { node.remove(); continue; }
+    if (!node.dataset || !node.dataset.jid) node.remove();
+  }
+
+  // 增量更新：数据未变化的卡片不重建，避免打断视频播放
+  const existing = new Map();
+  [...grid.children].forEach(el => { if (el.dataset?.jid) existing.set(el.dataset.jid, el); });
+  const seen = new Set();
+  jobs.forEach(j => {
+    seen.add(j.id);
+    const sig = jobSig(j);
+    let el = existing.get(j.id);
+    if (el && el.dataset.sig !== sig) {
+      const fresh = jobCard(j);
+      el.replaceWith(fresh);
+      el = fresh;
+    } else if (!el) {
+      el = jobCard(j);
+    }
+    el.dataset.sig = sig;
+    // 只有「位置真的错了」才搬动节点：位置正确 = 原样不动 = 焦点/播放不中断。
+    const atIndex = Array.prototype.indexOf.call(grid.children, el);
+    if (atIndex !== seen.size - 1) {
+      grid.insertBefore(el, grid.children[seen.size - 1] || null);
+    }
+  });
+  existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
+  // 列数跟着「每页作品数」走；实时刮新也走这里，所以每页数量不会被刷掉
+  applyGridColumns(state.pageSize);
 }
 
 // ---------- 长片拼接 ----------
@@ -3170,8 +3509,27 @@ function renderHardware(d) {
     : `<div class="sys-row"><span>目录</span><b style="font-size:11px">${d.models_dir || "—"}</b></div>
        <div class="sys-row"><span>状态</span><b>未扫描到模型</b></div>`));
 
-  grid.innerHTML = cards.join("");
-  $("#sysSub").textContent = `刷新于 ${new Date().toLocaleTimeString("zh-CN")} · 每 3 秒自动刷新`;
+  // 硬件面板每 3 秒刷新一次。原来这里是整块 innerHTML 重建 —— 后果是：
+  //   1. 功耗上限 <select> 被换成一个新节点 -> 原生下拉关闭、展开位置丢失；
+  //   2. 用户刚选好的目标值（PL_PENDING）虽然被还原了，但**交互过程**被打断；
+  //   3. 焦点掉回 body，键盘操作直接断掉。
+  // 现在改成三条：
+  //   a) 有原生下拉正开着 -> 本轮整个跳过（guardDOMWrite）；
+  //   b) 内容没变就不动 DOM（setHTMLIfChanged）—— 绝大多数刷新属于这一类；
+  //   c) 真要重建时，先记焦点快照再重建、重建后还原（withPreserved）。
+  const html = cards.join("");
+  const write = () => {
+    if (window.H3UI) {
+      window.H3UI.withPreserved($("#systemPage"), () => {
+        window.H3UI.setHTMLIfChanged(grid, html);
+      });
+    } else {
+      grid.innerHTML = html;
+    }
+    $("#sysSub").textContent = `刷新于 ${new Date().toLocaleTimeString("zh-CN")} · 每 3 秒自动刷新`;
+  };
+  if (window.H3UI && !window.H3UI.canWriteDOM("hardware", () => refreshHardware())) return;
+  write();
 }
 
 async function refreshHardware(force) {
@@ -3182,7 +3540,8 @@ async function refreshHardware(force) {
     state.hwTimer = Date.now();
   } catch (e) { /* ignore */ }
 }
-setInterval(() => { if (state.page === "system") refreshHardware(); }, 3000);
+// 硬件页的 3 秒轮询注册在文件末尾（scheduleRefresh 里）——
+// 交互期间会推迟刷新，所以注册点必须能拿到 scheduleRefresh。
 
 // ---------- LoRA 面板交互 ----------
 $("#imgLoraAdd")?.addEventListener("click", () => {
@@ -3382,5 +3741,34 @@ boot("长片片段", renderStitchClips);
 boot("任务列表", refreshJobs);
 boot("系统状态", refreshSystem);
 boot("状态实时推送", startStatusStream);
-setInterval(refreshJobs, 2000);
+
+// ---------- 定时刷新调度 ----------
+//
+// 原来的写法是 setInterval(refreshJobs, 2000) —— 不管用户在干什么，
+// 每 2 秒就把列表重画一遍。用户正展开着下拉、正打着字、正滚到列表中部，
+// 都会被这次重画打断（实测：焦点掉到 body、原生下拉关闭、滚动位置跳）。
+//
+// 现在改成「用户正在交互时把这次刷新推迟，交互结束再补跑」：
+//   1. 定时器照常触发（所以新内容仍会实时出现，不是「干脆不刷新」）；
+//   2. 但如果此刻用户正在交互（原生下拉展开 / 焦点在输入框 / 弹出层展开），
+//      这次刷新被登记为「待补跑」，等交互结束后由守卫模块统一执行；
+//   3. 同一类刷新只保留最后一次，避免堆积成风暴。
+function scheduleRefresh(key, fn) {
+  if (!window.H3UI) { fn(); return; }
+  if (window.H3UI.isUserInteracting()) {
+    window.H3UI.deferRefresh(key, fn);
+    return;
+  }
+  fn();
+}
+
+setInterval(() => scheduleRefresh("jobs", refreshJobs), 2000);
+// 状态栏**不**推迟：renderStatus() 只写 #statusText 和那个小圆点，
+// 既不碰输入框也不碰下拉框 —— 推迟它反而会让右上角状态变陈旧
+// （用户停在一个输入框里不动时，状态就一直不更新）。
 setInterval(refreshSystem, 3000);
+// 硬件页：用户正在硬件页时才刷；交互期间同样推迟
+setInterval(() => {
+  if (state.page !== "system") return;
+  scheduleRefresh("hardware", () => refreshHardware());
+}, 3000);

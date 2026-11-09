@@ -595,10 +595,17 @@ def _lookup_lora_meta(name: str) -> dict:
     """按界面上的 LoRA 名查本机注册表（拿到 kind / trigger 等元信息）。
 
     查不到就返回空 dict —— 调用方据此回落到前端传值，不报错。
+
+    **必须同时查三族清单**（Z-Image / Qwen-Image 2.1 / MOSS-Image）：
+    底模族不同，LoRA 不通用，但元信息（触发词 / 推荐强度 / 兼容性）是同一套
+    语义。之前只查 Z-Image 族，导致 MOSS / Qwen 的 LoRA 查不到元信息 ——
+    表现为「上游标注的触发词不会被自动追加进提示词」。
     """
     if not name:
         return {}
-    for item in lora_registry.list_z_image_loras():
+    for item in (lora_registry.list_z_image_loras()
+                 + lora_registry.list_qwen_image_loras()
+                 + lora_registry.list_moss_image_loras()):
         if item["name"] == name or Path(item["name"]).name == Path(name).name:
             return item
     return {}
@@ -1733,8 +1740,459 @@ def build_qwen_i2i(params):
     return p
 
 
+# ------------------------------------------------------------------
+# MOSS-Image：文生图（t2i_moss）
+# ------------------------------------------------------------------
+# 【规格来源 —— 全部来自本机可核验证据，不是推测】
+#
+# 1) ComfyUI 插件源码 /home/ubuntu/comfyui/custom_nodes/moss-image/
+#    - loaders.py: MOSSImageConfig
+#        latent_format = latent_formats.Flux2   -> spacial_downscale_ratio = 16
+#                                            -> latent_channels = 128
+#        sampling_settings = {"shift": 1.0, "multiplier": 1000}
+#        model_type = ModelType.FLOW -> 采样类是 ModelSamplingDiscreteFlow
+#    - loaders.py: clip_state() 要求 "a Qwen3.5-9B text encoder"
+#    - nodes.py: 6 个加载节点（UNET / CLIP / HF 全家桶）
+#
+# 2) 官方示例工作流（插件自带）
+#    custom_nodes/moss-image/example_workflows/moss-image-api.json
+#      MOSSImageHFLoader(model_path) -> MODEL/CLIP/VAE
+#      EmptyFlux2LatentImage(1024,1024,1)
+#      ModelSamplingSD3(shift=5)          <- 标题 "Official Flow sigma shift"
+#      SkipLayerGuidanceDiTSimple(single_layers="22")
+#      KSampler(steps=50, cfg=3, euler, sgm_uniform, denoise=1)
+#      CLIPTextEncode 正/负 + VAEDecode + SaveImage
+#
+# 3) 本机底模目录 /mnt/nvme1t_colorful/comfyui-models/MOSS-Image-{Base,SFT}/
+#    - transformer/config.json: dim=3072 / num_layers=42 / latent_channels=128
+#    - vae/config.json: AutoencoderKLFlux2, patch_size=[2,2]
+#    - model_index.json: text_encoder = Qwen3_5Model, vae = AutoencoderKLFlux2
+#
+# 4) 本机工作流 /home/ubuntu/comfyui/user/default/workflows/文生图moss-image.json
+#    —— 本机已在用 Base 底模，60 步 / cfg 4 / euler / sgm_uniform / SLG 22
+#
+# 5) 官方 USERGUIDE（MOSS-Image-Base User Guide，本机 README.md 已抄录）
+#    - Steps >= 50（"Best results are achieved with >= 50 steps"）
+#    - CFG 3.0（范围 3.0~6.0，短 prompt 可上调）
+#    - Shift 5.0（ModelSamplingSD3）
+#    - Sampler Euler / scheduler sgm_uniform
+#    - SLG skip layer 22（22/24/26 都有帮助；空 = 关）
+#    - 分辨率推荐 1M / 1.5M / 2M 总像素，可外推 0.25M(512²)~4M(2K)
+#    - 宽高比任意，但**宽高必须是 16 的倍数**
+#    - 负面提示词推荐：nsfw, worst quality, bad anatomy, watermark, jpeg artifact
+#
+# 【SHIFT 为什么用 ModelSamplingSD3 而不是 ModelSamplingFlux】
+#   MOSS 的 model_type 是 FLOW（不是 FLUX）-> 采样类是 ModelSamplingDiscreteFlow，
+#   sigma 公式走 flux_time_shift(shift, 1.0, t) **带 multiplier=1000 这一层**
+#   （sampling_settings 里显式写了 multiplier: 1000）。
+#   ModelSamplingSD3 恰好继承 ModelSamplingDiscreteFlow 且 patch() 里
+#   multiplier 写死 1000（comfy_extras/nodes_model_advanced.py:127）—— 与 MOSS
+#   的内置设置一致。官方工作流的节点标题就是 "Official Flow sigma shift"。
+#   反过来，如果用 ModelSamplingFlux（Qwen-Image 2.1 用的那个），它**没有**
+#   multiplier 层 -> sigma 表会被缩小 1000 倍 -> 出图退化成噪点。
+#   这与本项目 Qwen-Image 2.1 的注释（workflows.py 里 ModelSamplingFlux vs
+#   ModelSamplingSD3 的取舍）正好相反 —— 因为两者 model_type 不同。
+#
+# 【latent 节点】Flux2 是 16 倍下采样（spacial_downscale_ratio = 16），
+#   所以宽高必须是 16 的倍数 —— 与 Z-Image / Qwen-Image 2.1 一样是 16。
+#   官方用的是 EmptyFlux2LatentImage（不是 EmptySD3LatentImage）。
+
+# 底模目录（HF 目录结构，由 MOSSImageHFLoader 的 model_path 指向）
+# 本机两个底模都在，Base 是 LoRA 的训练父本，SFT 是官方后训练对齐版。
+MOSS_IMAGE_MODELS = {
+    "moss_image_base": {
+        "label": "MOSS-Image-Base · 未对齐基模（LoRA 训练父本）",
+        # MOSSImageHFLoader 的 model_path
+        "model_path": "/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-Base",
+        "weight_dtype": "default",
+        "sampler": "euler",
+        "scheduler": "sgm_uniform",
+        # 官方 USERGUIDE：>= 50 步
+        "steps": 50,
+        "cfg": 3.0,
+        # 官方 ModelSamplingSD3(shift=5)
+        "shift": 5.0,
+        # 官方 SLG single_layers="22"（空字符串 = 关）
+        "slg_single_layers": "22",
+        "slg_double_layers": "",
+        "supports_negative": True,
+        "samplers": ["euler", "euler_cfg_pp", "dpmpp_2m", "dpmpp_2m_sde",
+                     "dpmpp_3m_sde", "dpm_2", "heun", "er_sde", "res_multistep"],
+        "schedulers": ["sgm_uniform", "simple", "beta", "normal", "karras",
+                       "exponential", "linear_quadratic"],
+        "note": "官方 USERGUIDE：50 步 / cfg 3 / euler / sgm_uniform / shift 5 / SLG 22。",
+        "warn": "Base 未经过 CFG 等推理参数的后训练或蒸馏，推理参数需自己配对；"
+                "官方推荐步数 >= 50，CFG 3.0~6.0。",
+    },
+    "moss_image_sft": {
+        "label": "MOSS-Image-SFT · 官方后训练对齐版（文字渲染更强）",
+        "model_path": "/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-SFT",
+        "weight_dtype": "default",
+        "sampler": "euler",
+        "scheduler": "sgm_uniform",
+        "steps": 50,
+        "cfg": 3.0,
+        "shift": 5.0,
+        "slg_single_layers": "22",
+        "slg_double_layers": "",
+        "supports_negative": True,
+        "samplers": ["euler", "euler_cfg_pp", "dpmpp_2m", "dpmpp_2m_sde",
+                     "dpmpp_3m_sde", "dpm_2", "heun", "er_sde", "res_multistep"],
+        "schedulers": ["sgm_uniform", "simple", "beta", "normal", "karras",
+                       "exponential", "linear_quadratic"],
+        "note": "官方 USERGUIDE（Base 与 SFT 的采样表一致）：50 步 / cfg 3 / euler / sgm_uniform。",
+        "warn": "SFT 相对 Base 只改了 transformer 1.305%（轻量微调），"
+                "官方主打能力是文字渲染；换 LoRA 时注意 LoRA 的训练父本是 Base。",
+    },
+}
+MOSS_IMAGE_DEFAULT_MODEL = "moss_image_base"
+
+# 官方推荐负面提示词（USERGUIDE 给的实测有效标签）
+MOSS_IMAGE_DEFAULT_NEGATIVE = "nsfw, worst quality, bad anatomy, watermark, jpeg artifact"
+
+# 分辨率档位 —— 官方 USERGUIDE 推荐 1M / 1.5M / 2M 总像素，
+# 可外推 0.25M(512²) ~ 4M(2K)。超出 4M 走 hires LoRa 路径（不是原生直出）。
+MOSS_IMAGE_RES_TIERS = {
+    "1mp": 1.0,        # 官方默认 1024×1024
+    "480p": 0.4,       # ≈512×512（0.25M 起步）
+    "720p": 0.9,
+    "1080p": 2.0,      # 官方推荐的 2M 档
+    "1440p": 3.5,      # 官方推荐区间上沿附近
+    "2k": 4.0,         # 2K 直出上限（1:1 时正好 2048×2048 = 4.0MP）
+}
+MOSS_IMAGE_DEFAULT_TIER = "1mp"
+# 官方推荐的直出上限：4M（约 2K）。超过这个总像素不再是「官方推荐区间」，
+# 本机的 hires LoRa（4MP+ 高分辨率 LoHa）就是为这个区间的。
+MOSS_IMAGE_MAX_DIRECT_MP = 4.0
+# Flux2 VAE 是 16 倍下采样（latent_formats.Flux2.spacial_downscale_ratio = 16）
+MOSS_IMAGE_SIZE_MULTIPLE = 16
+# 官方 USERGUIDE 的下限：0.25M 像素（512×512）起
+MOSS_IMAGE_MIN_MP = 0.25
+
+
+def moss_image_dimensions(aspect, tier, width=None, height=None):
+    """比例 + 分辨率档位 -> 实际像素宽高（MOSS-Image）。
+
+    算法与 z_image_dimensions / qwen_image_dimensions 完全一致
+    （同一套 ResolutionSelector 语义），只是档位表换成 MOSS 官方推荐区间。
+    """
+    w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
+    megapixels = MOSS_IMAGE_RES_TIERS.get(tier,
+                                           MOSS_IMAGE_RES_TIERS[MOSS_IMAGE_DEFAULT_TIER])
+    mult = MOSS_IMAGE_SIZE_MULTIPLE
+
+    if width and height:
+        final_w, final_h = int(width), int(height)
+    else:
+        total_pixels = megapixels * 1024 * 1024
+        scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
+        final_w = w_ratio * scale
+        final_h = h_ratio * scale
+    final_w = max(mult, int(round(final_w / mult)) * mult)
+    final_h = max(mult, int(round(final_h / mult)) * mult)
+    return final_w, final_h
+
+
+def normalize_moss_image_size(width, height, multiple=MOSS_IMAGE_SIZE_MULTIPLE,
+                              min_megapixels=MOSS_IMAGE_MIN_MP,
+                              max_megapixels=MOSS_IMAGE_MAX_DIRECT_MP):
+    """把用户手填的宽高吸附到 MOSS-Image 的合法值。
+
+    返回 (生效宽, 生效高, 调整原因列表)。**不抛异常** —— 界面要拿
+    「原始值 / 生效值 / 调整原因」三样东西一起显示。
+
+    吸附规则（依据全部来自本机实测）：
+      1. 宽高必须是 16 的倍数
+         （EmptyFlux2LatentImage schema: width/height = INT(min=16,
+          max=16384, step=16)；Flux2 VAE 16 倍下采样 -> latent = H//16, W//16，
+          再经 VAE patch_size=[2,2] -> 有效网格步长 16）
+      2. 单边 16 ~ 16384（节点 schema 的 min / nodes.MAX_RESOLUTION）
+      3. 总像素不得低于官方下限 0.25M（512×512）
+      4. 总像素不得高于官方直出上限 4M（约 2K）
+
+    原因列表是给人看的短句，直接显示在界面上。
+    """
+    reasons: list[str] = []
+    try:
+        w = int(round(float(width)))
+        h = int(round(float(height)))
+    except (TypeError, ValueError):
+        return 0, 0, ["宽高必须是数字"]
+
+    if w <= 0 or h <= 0:
+        return 0, 0, ["宽高必须大于 0"]
+
+    # -- 1. 倍数吸附 --
+    adj_w = max(multiple, int(round(w / multiple)) * multiple)
+    adj_h = max(multiple, int(round(h / multiple)) * multiple)
+    if adj_w != w:
+        reasons.append(f"宽度 {w} 不是 {multiple} 的倍数 -> {adj_w}")
+    if adj_h != h:
+        reasons.append(f"高度 {h} 不是 {multiple} 的倍数 -> {adj_h}")
+    w, h = adj_w, adj_h
+
+    # -- 2. 范围钳制（与 Z-Image 同口径：EmptySD3/EmptyFlux2LatentImage schema） --
+    if w > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"宽度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        w = Z_IMAGE_SIZE_MAX
+    if h > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"高度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        h = Z_IMAGE_SIZE_MAX
+    if w < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"宽度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        w = Z_IMAGE_SIZE_MIN
+    if h < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"高度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        h = Z_IMAGE_SIZE_MIN
+
+    # -- 3. 总像素下限（官方推荐区间下沿 0.25M ≈ 512×512） --
+    if min_megapixels:
+        min_pixels = min_megapixels * 1024 * 1024
+        if w * h < min_pixels:
+            scale = math.sqrt(min_pixels / float(w * h))
+            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
+            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            reasons.append(
+                f"总像素 {w * h / (1024 * 1024):.2f}MP 低于官方下限 "
+                f"{min_megapixels}MP -> 按比例放大到 {nw}×{nh}")
+            w, h = nw, nh
+
+    # -- 4. 总像素上限（官方直出上限 4M；更大要走 hires LoRa 路线） --
+    if max_megapixels:
+        max_pixels = max_megapixels * 1024 * 1024
+        if w * h > max_pixels:
+            scale = math.sqrt(max_pixels / float(w * h))
+            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
+            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            reasons.append(
+                f"总像素 {w * h / (1024 * 1024):.2f}MP 超过官方直出上限 "
+                f"{max_megapixels}MP -> 按比例缩到 {nw}×{nh}"
+                "（更大尺寸需挂 4MP+ hires LoRa）")
+            w, h = nw, nh
+    return w, h, reasons
+
+
+def moss_image_megapixels(width, height):
+    return (width * height) / (1024.0 * 1024.0)
+
+
+def moss_image_model_available(model: dict) -> bool:
+    """底模目录在本机是否存在（HF 目录结构：transformer/ text_encoder/ tokenizer/ vae/）。
+
+    目录缺失时前端要把该版本标成「不可用」并给出说明，
+    而不是让用户选完才在跑图时炸掉。
+    """
+    path = model.get("model_path") or ""
+    if not path:
+        return False
+    root = Path(path).expanduser()
+    if not root.is_dir():
+        return False
+    # 四个子组件都要在才算完整底模（与插件 hf.py 的读取路径一致）
+    for sub in ("transformer", "text_encoder", "tokenizer", "vae"):
+        if not (root / sub).is_dir():
+            return False
+    return True
+
+
+def _moss_lora_chain(lora_items, base_model_ref):
+    """把选中的效果 LoRA 串到 MOSS-Image 的模型链上。
+
+    与 Z-Image / Qwen-Image 的链式语义一致：
+      - 用 **LoraLoaderModelOnly**（MOSS 的 text encoder 是 Qwen3.5-9B，
+        LoRA 权重里只含 transformer 侧的键；接 clip 反而会因为
+        文本编码器 patch 不到而报 "lora key not loaded"）
+      - 本机 MOSS LoRA 都是 transformer.* 键（转换后为 diffusion_model.*），
+        模型侧命中即可 —— 见 loras/moss/_INDEX.md 的 204/252 patch 实测。
+    """
+    nodes: dict = {}
+    current_model = base_model_ref
+    for index, item in enumerate(lora_items):
+        name = item.get("name") or ""
+        if not name:
+            raise ValueError("LoRA 配置缺少 name")
+        resolved, path = lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            raise ValueError(f"本机不存在该 LoRA 文件：{name}")
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength <= 0:
+            continue
+        node_id = f"moss:40{index}"
+        nodes[node_id] = {
+            "inputs": {
+                "lora_name": resolved,
+                "strength_model": strength,
+                "model": current_model,
+            },
+            "class_type": "LoraLoaderModelOnly",
+        }
+        current_model = [node_id, 0]
+    return nodes, current_model
+
+
+def _moss_collect_loras(params):
+    """收集用户选中的效果 LoRA（沿用 Z-Image / Qwen 的语义与校验）。
+
+    与 Qwen 版的差别：MOSS 底模的 LoRA 兼容性**不靠底模权重比对**
+    （底模是 diffusers 目录而非单文件 safetensors，键集要跨 3 个分片拼），
+    因此这里做三道校验：
+      1. 文件必须存在于本机
+      2. 不能是加速/蒸馏类
+      3. **不能是别的底模族的 LoRA**（如 Z-Image 的）——
+         底模结构不同，键名对不上，ComfyUI 只会打 "lora key not loaded"
+         的 WARNING，出图照跑但 LoRA 根本没生效（静默失效，比报错更难查）。
+    """
+    loras = []
+    for item in (params.get("loras") or []):
+        if not isinstance(item, dict):
+            continue
+        if not item.get("enabled", True):
+            continue
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength <= 0:
+            continue
+        name = item.get("name") or ""
+        # 先查文件是否存在（错误信息要最贴近用户操作：文件不存在 vs 底模族不对）
+        resolved, path = lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            raise ValueError(f"本机不存在该 LoRA 文件：{name}")
+        meta = _lookup_lora_meta(name)
+        if meta and meta.get("kind") == lora_registry.KIND_ACCELERATION:
+            raise ValueError(
+                f"「{meta.get('display') or name}」是加速/蒸馏类 LoRA，"
+                "不能作为可选效果 LoRA 使用")
+        # 跨底模族误用 -> 明确拒绝（否则 ComfyUI 静默丢弃，LoRA 根本不生效）
+        if not lora_registry.is_moss_family_lora(name):
+            raise ValueError(
+                f"「{name}」不是 MOSS-Image 的 LoRA，不能挂到 MOSS-Image 上："
+                "底模结构不同，键名对不上，ComfyUI 会静默丢弃（只打 "
+                "\"lora key not loaded\" 的 WARNING，出图照跑但 LoRA 没生效）。")
+        trigger = item.get("trigger")
+        if trigger is None:
+            trigger = (meta or {}).get("trigger", "")
+        loras.append({"name": name, "strength": strength, "trigger": trigger or ""})
+    return loras
+
+
+def build_moss_t2i(params):
+    """MOSS-Image 文生图。
+
+    工作流结构完全对齐官方 example_workflows/moss-image-api.json：
+
+        MOSSImageHFLoader(model_path) -> MODEL / CLIP / VAE
+          ├─ MODEL -> ModelSamplingSD3(shift) -> SkipLayerGuidanceDiTSimple(SLG)
+          │            -> [效果 LoRA] -> KSampler
+          ├─ CLIP  -> CLIPTextEncode 正/负
+          └─ VAE   -> VAEDecode
+
+        EmptyFlux2LatentImage(w, h, 1) -> KSampler.latent_image
+        KSampler -> VAEDecode -> SaveImage
+    """
+    job_id = params["job_id"]
+    model_key = params.get("model") or MOSS_IMAGE_DEFAULT_MODEL
+    if model_key not in MOSS_IMAGE_MODELS:
+        model_key = MOSS_IMAGE_DEFAULT_MODEL
+    model = MOSS_IMAGE_MODELS[model_key]
+
+    # 底模缺失保护：给明确中文错误，而不是让 ComfyUI 报看不懂的错
+    if not moss_image_model_available(model):
+        raise ValueError(
+            f"本机缺少该模型版本的底模目录：{model['model_path']}。"
+            f"请先下载 MOSS-Image-{model_key.split('_')[-1]} 到该路径后再使用")
+
+    seed = params.get("seed") or random.randint(0, 2**48)
+    aspect = params.get("aspect", "16:9")
+    if aspect not in ASPECT_NUM:
+        aspect = "16:9"
+    tier = params.get("resolution")
+    if tier not in MOSS_IMAGE_RES_TIERS:
+        tier = MOSS_IMAGE_DEFAULT_TIER
+
+    # 手填宽高走 MOSS 自己的吸附规则（16 倍数 + 0.25M~4M 像素区间）
+    raw_w, raw_h = params.get("width"), params.get("height")
+    if raw_w and raw_h:
+        width, height, _ = normalize_moss_image_size(raw_w, raw_h)
+    else:
+        width, height = moss_image_dimensions(aspect, tier)
+
+    sampler = params.get("sampler") or model["sampler"]
+    scheduler = params.get("scheduler") or model["scheduler"]
+    steps = int(params.get("steps") or model["steps"])
+    cfg = float(params.get("cfg") if params.get("cfg") is not None else model["cfg"])
+    shift = float(params.get("shift") if params.get("shift") is not None else model["shift"])
+    negative_text = params.get("negative_prompt", "")
+    if negative_text is None:
+        negative_text = ""
+    prompt = params.get("prompt", "")
+
+    loras = _moss_collect_loras(params)
+    prompt = merge_lora_triggers(prompt, loras)
+
+    # SLG（SkipLayerGuidance）：官方推荐 single_layers="22"（0-indexed）。
+    # 官方 USERGUIDE 说明「关掉 SLG 会让画面非常写实，但部分细节会崩」。
+    slg_single = params.get("slg_single_layers")
+    if slg_single is None:
+        slg_single = model["slg_single_layers"]
+    slg_double = params.get("slg_double_layers")
+    if slg_double is None:
+        slg_double = model["slg_double_layers"]
+
+    p = {
+        # HF 底模加载器 -> MODEL / CLIP / VAE（官方工作流的第一个节点）
+        "moss:1": {"inputs": {"model_path": model["model_path"],
+                              "weight_dtype": model["weight_dtype"],
+                              "text_device": "default"},
+                   "class_type": "MOSSImageHFLoader"},
+        # 官方 Flow sigma shift（ModelSamplingSD3，shift=5）
+        "moss:15": {"inputs": {"model": ["moss:1", 0], "shift": shift},
+                    "class_type": "ModelSamplingSD3"},
+        # SLG：只改 uncond 分支（官方 single_layers="22"）
+        "moss:13": {"inputs": {"model": ["moss:15", 0],
+                               "double_layers": slg_double,
+                               "single_layers": slg_single,
+                               "start_percent": 0.0, "end_percent": 1.0},
+                    "class_type": "SkipLayerGuidanceDiTSimple"},
+        # Flux2 latent（16 倍下采样 -> 宽高 16 的倍数）
+        "moss:6": {"inputs": {"width": width, "height": height, "batch_size": 1},
+                   "class_type": "EmptyFlux2LatentImage"},
+        # 正/负条件
+        "moss:4": {"inputs": {"text": prompt, "clip": ["moss:1", 1]},
+                   "class_type": "CLIPTextEncode"},
+        "moss:5": {"inputs": {"text": negative_text, "clip": ["moss:1", 1]},
+                   "class_type": "CLIPTextEncode"},
+        # 采样
+        "moss:16": {"inputs": {"seed": int(seed), "steps": steps, "cfg": cfg,
+                               "sampler_name": sampler, "scheduler": scheduler,
+                               "denoise": 1, "model": ["moss:13", 0],
+                               "positive": ["moss:4", 0], "negative": ["moss:5", 0],
+                               "latent_image": ["moss:6", 0]},
+                    "class_type": "KSampler"},
+        # 解码 + 保存
+        "moss:17": {"inputs": {"samples": ["moss:16", 0], "vae": ["moss:1", 2]},
+                    "class_type": "VAEDecode"},
+        "moss:18": {"inputs": {"filename_prefix": f"h3studio/moss_{job_id}",
+                               "images": ["moss:17", 0]},
+                    "class_type": "SaveImage"},
+    }
+
+    # 效果 LoRA 串在 SLG 之后、KSampler 之前
+    if loras:
+        lora_nodes, model_ref = _moss_lora_chain(loras, ["moss:13", 0])
+        p.update(lora_nodes)
+        p["moss:16"]["inputs"]["model"] = model_ref
+
+    return p
+
+
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i,
-             "t2i_qwen": build_qwen_t2i, "i2i_qwen": build_qwen_i2i}
+             "t2i_qwen": build_qwen_t2i, "i2i_qwen": build_qwen_i2i,
+             "t2i_moss": build_moss_t2i}
 
 
 def build_workflow(mode, params):

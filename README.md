@@ -247,6 +247,7 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 | GET | `/api/enhancer` | 提示词增强 Agent 的模板清单与参数 |
 | PUT | `/api/enhancer` | 保存用户可编辑的模板覆盖与参数 |
 | POST | `/api/enhance` | 提示词增强（`prompt` + `mode`=replace/append + `spec_id` + `provider_id`） |
+| POST | `/api/moss-layout` | MOSS 结构化增强（`prompt` + `intent` + `width`/`height` + `provider_id`），产出 MOSS Layout JSON 与翻译后的文本提示词 |
 
 ## 本地模型 Provider
 
@@ -272,6 +273,17 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 - 模板与参数可在「本地模型配置」页编辑并持久化（API Key 不回显明文）
 - 图像页提示词框旁有「增强」按钮，结果可一键替换或追加（追加时保留原文）
 - 本地模型不可达时返回明确错误并在界面提示，不会静默失败
+
+### MOSS-Image 结构化增强（layout）
+
+MOSS-Image 面板在「增强 / 二次增强」之外，另有 **「结构化增强（layout）」** 入口：
+本地模型把自然语言需求扩写成 MOSS **Layout JSON**（对象清单 + 位置坐标），
+服务端做 schema 校验与坐标编译，再**确定性翻译**成最终文本提示词送进 `CLIPTextEncode`。
+产物可查看、可编辑、可复制、可回填；Layout JSON 为官方格式
+（`bbox_coord_space=abs_centralized`、`bbox_format=yxyx`）。
+
+这是 ComfyUI-Moss 插件 `MossPrompt` 节点能力的**外部复现** —— 不接任何外部 API，
+全程走本地模型 Provider。详见 [docs/MOSS结构化增强说明.md](docs/MOSS结构化增强说明.md)。
 
 ## 时长→帧数
 

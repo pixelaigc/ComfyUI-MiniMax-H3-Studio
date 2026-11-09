@@ -28,12 +28,18 @@ function enhanceCurrentMode() {
 // 注意：Qwen-Image 2.1 的两个模式（t2i_qwen / i2i_qwen）用的是
 // state.imgQwen.model，不是 state.img.model —— 取错会让模型族过滤失效，
 // 于是 Qwen 模式下也会列出 Z-Image 专属模板。
+// MOSS-Image（t2i_moss）同理用 state.imgMoss.model ——
+// 漏了它会掉到 state.model（视频的 MiniMax-H3），
+// 于是 MOSS 模式下模板按视频模型族过滤，列出的是错的模板。
 function enhanceCurrentModelKey() {
   if (typeof state === "undefined" || !state) return "";
   const mode = state.mode || "";
   if (mode === "t2i") return (state.img && state.img.model) || "";
   if (mode === "t2i_qwen" || mode === "i2i_qwen") {
     return (state.imgQwen && state.imgQwen.model) || "";
+  }
+  if (mode === "t2i_moss") {
+    return (state.imgMoss && state.imgMoss.model) || "";
   }
   return state.model || "";
 }
@@ -530,59 +536,14 @@ $("#enhanceSpec").addEventListener("change", e => {
 // 首次进入时拉一次 Agent 配置，把模板清单喂给下拉框
 loadAgentConfig().then(renderEnhanceSpecSelect);
 
-$("#enhanceBtn").addEventListener("click", async () => {
-  const btn = $("#enhanceBtn");
-  const prompt = $("#prompt").value.trim();
-  if (!prompt) {
-    setEnhanceHint("请先输入要增强的提示词", "error");
-    $("#prompt").focus();
-    return;
-  }
-  btn.disabled = true;
-  btn.classList.add("busy");
-  promptEnhance.busy = true;
-  updateActionButtons();
-  setEnhanceHint("正在增强…", "busy");
-  try {
-    const d = await apiJSON("POST", "/api/enhance", {
-      prompt,
-      mode: "replace",
-      spec_id: provState.specId || "image",
-      // 当前上下文：后端用它做模板适用性兜底，保证执行模板与下拉显示一致
-      mode_ctx: enhanceCurrentMode(),
-      model_key: enhanceCurrentModelKey(),
-    });
-    provState.lastEnhance = d;
-    // 服务端可能因模式回落换了模板 —— 同步下拉显示，避免「显示 A 实际用 B」
-    if (d.spec_id && d.spec_id !== provState.specId) {
-      provState.specId = d.spec_id;
-      renderEnhanceSpecSelect();
-    }
-    $("#enhanceResult").value = d.enhanced || "";
-    $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
-    $("#enhanceModal").hidden = false;
-    // 记录版本谱系：原始(0) -> 一次增强(1)，供「版本历史」查看与再增强
-    if (d.enhanced) {
-      pushPromptVersion(0, prompt, "原始提示词");
-      pushPromptVersion(1, d.enhanced, `模板：${d.spec_id || "image"}`, d.spec_id);
-    }
-    setEnhanceHint(`已用「${d.provider}」扩写，${d.enhanced ? d.enhanced.length : 0} 字`, "ok");
-  } catch (e) {
-    // 失败必须可见 —— 本地模型不可达时不静默
-    const detail = e.payload && e.payload.error ? e.payload.error : e.message;
-    const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
-    setEnhanceHint(`增强失败：${detail}`, "error");
-    alert(`提示词增强失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove("busy");
-    promptEnhance.busy = false;
-    updateActionButtons();
-  }
-});
+// 「增强」主按钮与下拉菜单的绑定、以及三种增强方式的路由，统一放在
+// web/enhance-menu.js 里（那里有一份增强方式注册表，是唯一真相来源）。
+// 这里只保留「模板下拉」与「结果弹窗的通用处理」——
+// 前者决定普通增强用哪个模板，后者决定各方式的回填语义一致。
 
-// ---------- 二次增强（物体逐个枚举 + 逐个细化） ----------
-// 作用对象由 promptVersions.refineTarget 决定：0=原始提示词 / 1=一次增强后的提示词
+// 二次增强的输入来源：由 promptVersions.refineTarget 决定
+// 0=原始提示词 / 1=一次增强后的提示词
+// （enhance-menu.js 的二次增强路由会调它）
 function refineSourcePrompt() {
   const target = promptVersions.refineTarget;
   if (target === 1) {
@@ -592,59 +553,6 @@ function refineSourcePrompt() {
   }
   return $("#prompt").value.trim();
 }
-
-$("#refineBtn")?.addEventListener("click", async () => {
-  const btn = $("#refineBtn");
-  const text = $("#refineBtnText");
-  const source = refineSourcePrompt();
-  if (!source) {
-    setEnhanceHint("请先输入要细化的提示词", "error");
-    $("#prompt").focus();
-    return;
-  }
-  const targetLevel = promptVersions.refineTarget === 1 ? 1 : 0;
-  btn.disabled = true;
-  text.textContent = "正在细化…";
-  promptVersions.busy = true;
-  updateActionButtons();
-  setEnhanceHint("正在逐个物体细化…", "busy");
-  try {
-    const d = await apiJSON("POST", "/api/enhance", {
-      prompt: source,
-      mode: "replace",
-      // 二次增强固定走「物体细化」模板；服务端仍会按 media/families 过滤校验
-      spec_id: "image-refine",
-      mode_ctx: enhanceCurrentMode(),
-      model_key: enhanceCurrentModelKey(),
-    });
-    if (d.spec_id) { provState.specId = d.spec_id; renderEnhanceSpecSelect(); }
-    const refined = d.enhanced || "";
-    if (!refined) throw new Error("本地模型返回了空结果");
-    // 回填到输入框
-    $("#prompt").value = refined;
-    // 记录为第 2 级版本；保留原始 / 一次增强版本
-    pushPromptVersion(2, refined, `模板：${d.spec_id || "image-refine"}`, d.spec_id);
-    markPromptEnhanced();
-    updatePromptBadge();
-    renderPromptVersions();
-    // 来源版本也要留在谱系里（供「版本历史」查看）
-    pushPromptVersion(targetLevel, source, targetLevel === 1 ? "一次增强（本次二次增强的输入）" : "原始提示词（本次二次增强的输入）");
-    $("#enhanceResult").value = refined;
-    $("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
-    $("#enhanceModal").hidden = false;
-    setEnhanceHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字`, "ok");
-  } catch (e) {
-    const detail = e.payload && e.payload.error ? e.payload.error : e.message;
-    const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
-    setEnhanceHint(`二次增强失败：${detail}`, "error");
-    alert(`二次增强失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
-  } finally {
-    promptVersions.busy = false;
-    btn.disabled = false;
-    text.textContent = "二次增强";
-    updateActionButtons();
-  }
-});
 
 // ---------- 版本历史弹窗 ----------
 $("#promptVersionBtn")?.addEventListener("click", openPromptVersionModal);

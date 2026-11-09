@@ -108,7 +108,12 @@
 
   async function loadAssets() {
     const grid = $("#alGrid");
-    if (grid) grid.innerHTML = `<div class="al-empty">加载中…</div>`;
+    // 「加载中…」占位只在**首次**（还没有任何卡片）时铺。
+    // 原来每次刷新都先清空网格再铺占位 —— 刷新期间列表整个消失，
+    // 滚动位置归零、已展开的卡片被抹掉。
+    if (grid && !grid.querySelector(".al-card")) {
+      grid.innerHTML = `<div class="al-empty">加载中…</div>`;
+    }
     try {
       const data = await api("/api/assets?" + buildQuery());
       state.items = data.assets || [];
@@ -135,6 +140,46 @@
     return `<span class="ph">${CATEGORY_ICON[asset.category] || "📦"}</span>`;
   }
 
+  // 单张素材卡的 HTML（同时用于增量渲染与首次渲染）
+  function assetCardHtml(asset) {
+    const tags = asset.tags || [];
+    const shown = tags.slice(0, 3).map(t => `<span class="al-tag">${esc(t)}</span>`).join("");
+    const more = tags.length > 3 ? `<span class="al-tag more">+${tags.length - 3}</span>` : "";
+    const badge = asset.category === "video" && asset.duration_sec != null
+      ? `<span class="dur">${esc(fmtDuration(asset.duration_sec))}</span>` : "";
+    const refBadge = asset.ref_count > 0
+      ? `<span class="badge right" title="被引用 ${asset.ref_count} 次">引用 ${asset.ref_count}</span>` : "";
+    const analyzed = asset.analyzed
+      ? `<span class="badge" title="已有模型分析">已分析</span>` : "";
+    const inTrash = asset.deleted_at ? `<span class="badge" style="background:rgba(200,50,55,.85)">回收站</span>` : "";
+    return `<div class="al-card" data-id="${esc(asset.id)}" draggable="true">
+      <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}</div>
+      <div class="al-card-body">
+        <div class="al-name" title="${esc(asset.name)}">${esc(asset.name)}</div>
+        <div class="al-meta">
+          <span>${esc(CATEGORY_LABEL[asset.category] || asset.category)}</span>
+          <span>${esc(fmtBytes(asset.bytes))}</span>
+          ${asset.width ? `<span>${asset.width}×${asset.height}</span>` : ""}
+          ${asset.duration_sec != null && asset.category !== "video"
+            ? `<span>${esc(fmtDuration(asset.duration_sec))}</span>` : ""}
+        </div>
+        <div class="al-tags">${shown}${more}</div>
+      </div>
+    </div>`;
+  }
+
+  // 素材卡的内容签名：只有签名变了才重建这张卡。
+  // 签名覆盖所有会显示在卡面上的字段 —— 少了任何一项都会导致
+  // 「内容变了但没重绘」。
+  function assetSig(asset) {
+    return [
+      asset.id, asset.name, asset.category, asset.bytes,
+      asset.width || "", asset.height || "", asset.duration_sec ?? "",
+      asset.ref_count || 0, asset.analyzed ? 1 : 0, asset.deleted_at || "",
+      (asset.tags || []).join(","),
+    ].join("|");
+  }
+
   function renderAssets() {
     const grid = $("#alGrid");
     if (!grid) return;
@@ -147,37 +192,60 @@
       grid.innerHTML = `<div class="al-empty">${esc(msg)}</div>`;
       return;
     }
-    grid.innerHTML = state.items.map(asset => {
-      const tags = asset.tags || [];
-      const shown = tags.slice(0, 3).map(t => `<span class="al-tag">${esc(t)}</span>`).join("");
-      const more = tags.length > 3 ? `<span class="al-tag more">+${tags.length - 3}</span>` : "";
-      const badge = asset.category === "video" && asset.duration_sec != null
-        ? `<span class="dur">${esc(fmtDuration(asset.duration_sec))}</span>` : "";
-      const refBadge = asset.ref_count > 0
-        ? `<span class="badge right" title="被引用 ${asset.ref_count} 次">引用 ${asset.ref_count}</span>` : "";
-      const analyzed = asset.analyzed
-        ? `<span class="badge" title="已有模型分析">已分析</span>` : "";
-      const inTrash = asset.deleted_at ? `<span class="badge" style="background:rgba(200,50,55,.85)">回收站</span>` : "";
-      return `<div class="al-card" data-id="${esc(asset.id)}" draggable="true">
-        <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}</div>
-        <div class="al-card-body">
-          <div class="al-name" title="${esc(asset.name)}">${esc(asset.name)}</div>
-          <div class="al-meta">
-            <span>${esc(CATEGORY_LABEL[asset.category] || asset.category)}</span>
-            <span>${esc(fmtBytes(asset.bytes))}</span>
-            ${asset.width ? `<span>${asset.width}×${asset.height}</span>` : ""}
-            ${asset.duration_sec != null && asset.category !== "video"
-              ? `<span>${esc(fmtDuration(asset.duration_sec))}</span>` : ""}
-          </div>
-          <div class="al-tags">${shown}${more}</div>
-        </div>
-      </div>`;
-    }).join("");
-    bindAssetCards();
+    // 增量渲染：按 data-id 做稳定 key，内容没变的卡片**保留原节点**。
+    // 原实现是整块 innerHTML 重建 —— 每次刷新都把整页卡片换掉：
+    //   焦点丢失、滚动位置跳、右键菜单锚定的卡片消失。
+    const existing = new Map();
+    // 非卡片节点（空态提示 / 加载中占位）先清掉，否则下标会算错
+    for (const node of [...grid.children]) {
+      if (node.dataset && node.dataset.id) existing.set(node.dataset.id, node);
+      else node.remove();
+    }
+    const seen = new Set();
+    const freshCards = [];
+    state.items.forEach(asset => {
+      seen.add(asset.id);
+      const sig = assetSig(asset);
+      let el = existing.get(asset.id);
+      if (el && el.dataset.sig !== sig) {
+        const fresh = document.createElement("div");
+        fresh.innerHTML = assetCardHtml(asset);
+        const node = fresh.firstElementChild;
+        el.replaceWith(node);
+        el = node;
+        freshCards.push(el);
+      } else if (!el) {
+        const fresh = document.createElement("div");
+        fresh.innerHTML = assetCardHtml(asset);
+        el = fresh.firstElementChild;
+        freshCards.push(el);
+      }
+      el.dataset.sig = sig;
+      // 只有「位置真的错了」才搬动节点：位置正确 = 原样不动 = 焦点不丢。
+      const atIndex = Array.prototype.indexOf.call(grid.children, el);
+      if (atIndex !== seen.size - 1) {
+        grid.insertBefore(el, grid.children[seen.size - 1] || null);
+      }
+    });
+    // 已删除的卡片直接移除
+    existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
+    // 只给**新建/重建**的卡片绑事件 —— 已有卡片保留原来的监听器，
+    // 否则每次刷新都会再叠一层监听器（点一下触发两次）。
+    bindAssetCards(freshCards);
   }
 
-  function bindAssetCards() {
-    $$("#alGrid .al-card").forEach(card => {
+  // 给素材卡绑事件。
+  // cards：不传 = 绑定网格里的全部卡片（首次渲染用）；
+  // 传列表 = 只给这些「新建/重建」的卡绑（增量刷新用）。
+  //
+  // 为什么要区分：增量刷新会复用旧卡节点，旧节点上已经有监听器了。
+  // 如果每次刷新都重新 bind 全部卡片，监听器会一层层叠上去 ——
+  // 点一次卡片触发 N 次 openDrawer。
+  function bindAssetCards(cards) {
+    const list = cards || $$("#alGrid .al-card");
+    list.forEach(card => {
+      if (card.dataset.h3Bound) return;      // 已绑过就别再绑
+      card.dataset.h3Bound = "1";
       const assetId = card.dataset.id;
       card.addEventListener("click", () => openDrawer(assetId));
       card.addEventListener("contextmenu", event => {
@@ -203,23 +271,29 @@
     const pageSize = state.filters.page_size;
     const pages = Math.max(1, Math.ceil(state.total / pageSize));
     if (pages <= 1) { pager.innerHTML = ""; pager.hidden = true; return; }
-    pager.hidden = false;
     const current = state.filters.page;
     const buttons = [];
     for (let i = Math.max(1, current - 2); i <= Math.min(pages, current + 2); i += 1) {
       buttons.push(`<button data-page="${i}" class="${i === current ? "active" : ""}">${i}</button>`);
     }
-    pager.innerHTML = `
+    const html = `
       <button data-page="${current - 1}" ${current <= 1 ? "disabled" : ""}>上一页</button>
       ${buttons.join("")}
       <button data-page="${current + 1}" ${current >= pages ? "disabled" : ""}>下一页</button>
       <span class="page-summary">共 ${state.total} 个 · 第 ${current}/${pages} 页</span>`;
-    pager.querySelectorAll("button[data-page]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        state.filters.page = Number(btn.dataset.page) || 1;
-        loadAssets();
+    // 内容没变就不动 DOM —— 换了节点等于把「上一页/下一页」换掉。
+    const changed = window.H3UI
+      ? window.H3UI.setHTMLIfChanged(pager, html)
+      : (pager.innerHTML = html, true);
+    pager.hidden = false;
+    if (changed) {
+      pager.querySelectorAll("button[data-page]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.filters.page = Number(btn.dataset.page) || 1;
+          loadAssets();
+        });
       });
-    });
+    }
   }
 
   // ---------------------------------------------------------------- 标签筛选
@@ -232,17 +306,26 @@
       menu.innerHTML = `<div style="padding:8px 10px;color:var(--muted);font-size:12px">还没有标签</div>`;
       return;
     }
-    menu.innerHTML = tags.map(item => `
+    // 标签下拉里每一项的勾选状态由 state.filters.tags_any 决定。
+    // 原来每次都整块重建 —— 用户正要点某个标签时，节点被换掉，
+    // 点击落空、展开的菜单也会被顶掉。
+    // 现在：内容没变就不动 DOM；变了也只改「哪些项被勾上」。
+    const html = tags.map(item => `
       <label><input type="checkbox" data-tag="${esc(item.tag)}"
         ${state.filters.tags_any === item.tag ? "checked" : ""}>
         <span>${esc(item.tag)}</span><span class="tag-count">${item.count}</span></label>`).join("");
-    menu.querySelectorAll("input[data-tag]").forEach(box => {
-      box.addEventListener("change", () => {
-        state.filters.tags_any = box.checked ? box.dataset.tag : "";
-        state.filters.page = 1;
-        loadAssets();
+    const changed = window.H3UI
+      ? window.H3UI.setHTMLIfChanged(menu, html)
+      : (menu.innerHTML = html, true);
+    if (changed) {
+      menu.querySelectorAll("input[data-tag]").forEach(box => {
+        box.addEventListener("change", () => {
+          state.filters.tags_any = box.checked ? box.dataset.tag : "";
+          state.filters.page = 1;
+          loadAssets();
+        });
       });
-    });
+    }
   }
 
   function renderChips() {
@@ -1040,6 +1123,48 @@
   function boot() {
     bindStatic();
     renderChips();
+    startLiveRefresh();
+  }
+
+  // ---------------------------------------------------------------- 素材库实时刷新
+  //
+  // 用户要求：「生成完成后素材库仍要能实时出现新内容」——
+  // 所以素材库必须有轮询（原来只有用户手动操作才刷新）。
+  //
+  // 但轮询不能打断交互：
+  //   1. 用户正在交互（原生下拉展开 / 焦点在输入框 / 弹出层展开）-> 本轮推迟；
+  //   2. 推迟的那一轮在交互结束后补跑（守卫模块负责触发）；
+  //   3. 渲染走增量路径（稳定 key），只补新增/变化的卡片。
+  //
+  // 页面不在素材库页时完全不轮询 —— 不做无谓请求。
+  const LIVE_REFRESH_MS = 4000;
+
+  function onAssetsPage() {
+    const page = $("#assetsPage");
+    return !!page && page.style.display !== "none" && page.offsetParent !== null;
+  }
+
+  async function liveRefreshTick() {
+    if (!onAssetsPage()) return;
+    const guard = window.H3UI;
+    if (guard && guard.isUserInteracting($("#assetsPage"))) {
+      // 用户正在操作素材库 —— 推迟本轮，交互结束后自动补跑
+      guard.deferRefresh("assets", liveRefreshTick);
+      return;
+    }
+    const page = $("#assetsPage");
+    const scroll = guard ? guard.preserveScroll(page) : null;
+    // 最后一道闸：写 DOM 的那一刻如果有原生下拉正开着，本轮跳过。
+    // （上面的 isUserInteracting 判断与 fetch 之间有时间差。）
+    if (guard && !guard.canWriteDOM("assets", () => liveRefreshTick())) return;
+    await loadAssets();
+    await loadStats();
+    if (guard) guard.restoreScroll(page, scroll);
+  }
+
+  function startLiveRefresh() {
+    if (window.__assetLiveTimer) return;
+    window.__assetLiveTimer = setInterval(liveRefreshTick, LIVE_REFRESH_MS);
   }
 
   if (document.readyState === "loading") {

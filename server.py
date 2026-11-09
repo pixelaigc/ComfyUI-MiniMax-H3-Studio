@@ -61,10 +61,21 @@ from h3studio.workflows import (
     Z_IMAGE_SIZE_MAX,
     z_image_dimensions,
     z_image_megapixels,
+    MOSS_IMAGE_DEFAULT_MODEL,
+    MOSS_IMAGE_DEFAULT_TIER,
+    MOSS_IMAGE_MAX_DIRECT_MP,
+    MOSS_IMAGE_MIN_MP,
+    MOSS_IMAGE_MODELS,
+    MOSS_IMAGE_RES_TIERS,
+    MOSS_IMAGE_SIZE_MULTIPLE,
+    MOSS_IMAGE_DEFAULT_NEGATIVE,
+    moss_image_model_available,
+    normalize_moss_image_size,
 )
 from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
+from h3studio import moss_layout
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
@@ -75,6 +86,47 @@ from h3studio import ref_images as ref_imgs
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
+
+
+def _build_fingerprint() -> str:
+    """后端「代码指纹」—— 前端用它判断自己连的是不是最新后端。
+
+    为什么需要：前端资源是静态文件（改了立刻生效），后端是长跑进程
+    （改了要重启才生效）。两者版本错配时，界面上会出现**最难查的一类 bug**：
+    新前端把 t2i_moss 提交给旧后端 -> 旧后端的模式白名单里没有它 ->
+    直接 400「未知模式」；或者 /api/image-options 没有 moss 字段 ->
+    分辨率档位和模型下拉全是空的、LoRA 列表串到 Z-Image 族。
+
+    指纹取「本项目所有后端 .py 文件的内容哈希」+ 启动时刻，
+    前端拿到后与「页面里 script 标签的版本参数」一起比对，
+    不一致就在面板顶部挂一条醒目的红色横幅，明确告诉用户「重启服务」。
+
+    这里刻意用**内容哈希**而不是 mtime：git checkout / rsync 会保留或
+    重置 mtime，但内容一定变。
+    """
+    import hashlib
+    h = hashlib.sha256()
+    for path in sorted(BASE.rglob("*.py")):
+        if "__pycache__" in path.parts or ".git" in path.parts:
+            continue
+        try:
+            h.update(path.relative_to(BASE).as_posix().encode("utf-8"))
+            h.update(path.read_bytes())
+        except OSError:
+            continue
+    return h.hexdigest()[:12]
+
+
+# 进程启动时刻（用于「后端重启了没有」的判断）
+SERVER_STARTED_AT = time.time()
+BUILD_FINGERPRINT = _build_fingerprint()
+# 后端支持的功能位 —— 前端按这个决定某个模式/入口是否可用。
+# 老后端没有这些位 -> 前端不会把 MOSS 入口当成可用功能展示。
+SERVER_FEATURES = {
+    "moss_image": True,
+    "moss_image_loras": True,
+    "moss_image_slg": True,
+}
 
 DEFAULT_CONFIG = {
     "host": "0.0.0.0",
@@ -574,7 +626,7 @@ class Worker:
         mode = job_row["mode"]
         print(f"[worker] 开始任务 {job_id} ({mode})")
         # 批次任务：逐个批次独立跑，单个批次失败不影响其它批次
-        if mode in ("t2i", "t2i_qwen", "i2i_qwen") and self._has_batches(job_id):
+        if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss") and self._has_batches(job_id):
             await self._run_batches(job_row)
             return
         try:
@@ -852,7 +904,7 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen"):
+    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
         return web.json_response({"error": f"未知模式 {mode}"}, status=400)
 
     if mode == "flf":
@@ -917,7 +969,7 @@ async def api_create(request):
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
-    if mode in ("t2i", "t2i_qwen", "i2i_qwen"):
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
         try:
             batch_count = int(params.get("batch_count") or 1)
         except (TypeError, ValueError):
@@ -1294,6 +1346,12 @@ async def api_system(request):
         "comfyui_ok": sysinfo is not None,
         "comfyui": (sysinfo or {}).get("system") or {},
         "devices": (sysinfo or {}).get("devices") or [],
+        # 后端指纹 + 功能位：前端据此判断「我连的是不是最新后端」
+        # （前端静态文件改了立刻生效、后端改了要重启 —— 两者错配时
+        #   界面上是空白下拉 / 400 未知模式这类极难自查的问题）。
+        "build_fingerprint": BUILD_FINGERPRINT,
+        "features": SERVER_FEATURES,
+        "started_at": SERVER_STARTED_AT,
     })
 
 
@@ -1443,6 +1501,39 @@ async def api_image_options(request):
             "clip_cond": QWEN_IMAGE_CLIP_COND,  # 条件编码器（TextEncode 的 clip 输入）
             # Qwen-Image 2.1 没有加速 LoRA（bfs_head 是换头效果类）
         }
+    # MOSS-Image 的档位/比例：官方 USERGUIDE 推荐 1M / 1.5M / 2M 总像素，
+    # 可外推 0.25M(512^2)~4M(2K)。Flux2 VAE 16 倍下采样 -> 宽高取 16 的倍数。
+    moss_tiers = []
+    for key, megapixels in MOSS_IMAGE_RES_TIERS.items():
+        moss_tiers.append({
+            "key": key,
+            "label": _Z_IMAGE_TIER_LABELS.get(key, key.upper()),
+            "megapixels": megapixels,
+            "max_direct_mp": MOSS_IMAGE_MAX_DIRECT_MP,
+        })
+    moss_models = {}
+    for key, m in MOSS_IMAGE_MODELS.items():
+        # 底模目录是否在本机 —— 前端据此把该版本标成「不可用」并给出说明
+        available = moss_image_model_available(m)
+        moss_models[key] = {
+            "label": m["label"],
+            "model_path": m["model_path"],
+            "note": m["note"],
+            "warn": m["warn"],
+            "sampler": m["sampler"],
+            "scheduler": m["scheduler"],
+            "steps": m["steps"],
+            "cfg": m["cfg"],
+            "shift": m["shift"],
+            "supports_negative": m["supports_negative"],
+            "samplers": m["samplers"],
+            "schedulers": m["schedulers"],
+            # SLG（SkipLayerGuidance）skip layer —— 官方推荐 22
+            "slg_single_layers": m["slg_single_layers"],
+            "slg_double_layers": m["slg_double_layers"],
+            # 底模是否就位（False 时前端置灰该版本）
+            "available": available,
+        }
     return json_ok({
         "tiers": tiers,
         "aspects": aspects,
@@ -1471,6 +1562,19 @@ async def api_image_options(request):
             # 官方 PE 两个 checkpoint 的参数（前端显示当前档位，不可互换）
             "pe_params": QWEN_IMAGE_PE_PARAMS,
             "pe_default_max_length": QWEN_IMAGE_PE_DEFAULT_MAX_LENGTH,
+        },
+        # MOSS-Image 独立的一套（文生图）
+        "moss": {
+            "tiers": moss_tiers,
+            "aspects": aspects,
+            "models": moss_models,
+            "size_multiple": MOSS_IMAGE_SIZE_MULTIPLE,
+            "max_direct_mp": MOSS_IMAGE_MAX_DIRECT_MP,
+            "min_mp": MOSS_IMAGE_MIN_MP,
+            "default_tier": MOSS_IMAGE_DEFAULT_TIER,
+            "default_model": MOSS_IMAGE_DEFAULT_MODEL,
+            # 官方推荐的负面提示词（前端作为默认值预填）
+            "default_negative": MOSS_IMAGE_DEFAULT_NEGATIVE,
         },
     })
 
@@ -1502,7 +1606,13 @@ async def api_image_loras(request):
     # 兼容性要各自比对、配置也要分开存，混在一起会让用户选到不匹配的权重。
     base = request.query.get("base", "") or ""
     qwen = lora_registry.is_qwen_base(base)
-    if qwen:
+    moss = lora_registry.is_moss_base(base)
+    if moss:
+        available = lora_registry.list_moss_effect_loras()
+        incompatible = lora_registry.list_moss_incompatible_loras()
+        acceleration = [item for item in lora_registry.list_moss_image_loras()
+                        if item["kind"] == lora_registry.KIND_ACCELERATION]
+    elif qwen:
         available = lora_registry.list_qwen_effect_loras()
         incompatible = lora_registry.list_qwen_incompatible_loras()
         acceleration = [item for item in lora_registry.list_qwen_image_loras()
@@ -1567,9 +1677,13 @@ async def api_image_loras_save(request):
     base = body.get("base", "") or ""
     pref_key = lora_registry.pref_key_for_base(base)
     qwen = lora_registry.is_qwen_base(base)
-    all_effect = (lora_registry.list_qwen_effect_loras(include_incompatible=True)
-                  if qwen else
-                  lora_registry.list_effect_loras(include_incompatible=True))
+    moss = lora_registry.is_moss_base(base)
+    if moss:
+        all_effect = lora_registry.list_moss_effect_loras(include_incompatible=True)
+    elif qwen:
+        all_effect = lora_registry.list_qwen_effect_loras(include_incompatible=True)
+    else:
+        all_effect = lora_registry.list_effect_loras(include_incompatible=True)
     cleaned = []
     for item in items:
         if not isinstance(item, dict):
@@ -1583,8 +1697,16 @@ async def api_image_loras_save(request):
                 {"error": f"本机不存在该 LoRA 文件：{name}"}, status=400)
         # 真·不兼容的 LoRA 拒绝保存（要 patch 的层在底模里根本不存在）
         meta = next((m for m in all_effect if m["name"] == resolved), {})
+        # 跨底模族误用拒绝保存：MOSS 底模挂 Z-Image 的 LoRA 会静默失效
+        # （ComfyUI 只打 "lora key not loaded" 的 WARNING，出图照跑但没生效）
+        if moss and not lora_registry.is_moss_family_lora(resolved):
+            return web.json_response({
+                "error": f"「{name}」不是 MOSS-Image 的 LoRA，不能加入 MOSS-Image 的 "
+                          "LoRA 列表：底模结构不同，键名对不上，ComfyUI 会静默丢弃。"
+            }, status=400)
         if meta and not meta.get("compatible", True):
-            base_label = "Qwen-Image 2.1" if qwen else "Z-Image"
+            base_label = ("MOSS-Image" if moss else
+                          "Qwen-Image 2.1" if qwen else "Z-Image")
             return web.json_response({
                 "error": f"「{meta.get('display') or name}」与 {base_label} 底模不兼容，"
                           f"不能加入 LoRA 列表：{meta.get('incompatible_reason') or '未知原因'}"
@@ -2142,6 +2264,122 @@ async def api_enhance(request):
     })
 
 
+# ------------------------------------------------------------------ MOSS 结构化增强（layout）
+async def api_moss_layout(request):
+    """
+    POST /api/moss-layout —— MOSS-Image 结构化（layout）提示词增强
+
+    这是 ComfyUI-Moss 插件里 MossPrompt 节点的**外部复现**：
+      - 不接 OpenAI 官方 API，也不接任何外部 API
+      - 模型调用走本项目已有的 provider 配置（本地模型）
+      - 模型只出 layout 草稿；schema 校验与坐标编译都在本地做
+        （编译算法与官方 scripts/compile_prompt.py 逐条对齐）
+
+    body:
+      prompt      要增强的原始提示词（可含已有增强结果）
+      intent      可选，画面意图补充说明
+      width       画布宽（必须是 16 的倍数，且与出图尺寸一致）
+      height      画布高
+      provider_id 可选，指定 Provider；不给则用默认 Provider
+
+    返回:
+      draft        草稿（原样，abs/xyxy 左上原点）
+      layout       编译后的 MOSS Layout（abs_centralized/yxyx）
+      layout_json  编译后 layout 的紧凑 JSON 文本
+      final_prompt 由 layout 确定性翻译出的自然语言提示词（送 CLIPTextEncode）
+
+    失败一律 4xx/5xx + 可读原因，**不返回半成品**。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+
+    intent = str(payload.get("intent") or "").strip()
+    if len(intent) > 1000:
+        return web.json_response({"error": "画面意图过长（上限 1000 字）"}, status=400)
+
+    try:
+        width = int(payload.get("width"))
+        height = int(payload.get("height"))
+    except Exception:
+        return web.json_response(
+            {"error": "画布尺寸无效：需要给出 width 与 height"}, status=400)
+    if width <= 0 or height <= 0:
+        return web.json_response({"error": "画布宽高必须是正整数"}, status=400)
+    # 画布尺寸用**后端权威**的吸附规则归一：
+    # workflows.normalize_moss_image_size() 才是 MOSS 出图尺寸的唯一定义
+    # （16 倍数 + 单边 16~16384 + 总像素 0.25M~4M）。
+    # 前端若自己算一份必然走偏（同一常量写两处的问题）——
+    # 所以这里由后端归一，并把生效尺寸回传给前端显示。
+    width, height, size_reasons = normalize_moss_image_size(width, height)
+    if width <= 0 or height <= 0:
+        return web.json_response(
+            {"error": "画布尺寸无效：" + "；".join(size_reasons)}, status=400)
+
+    # 选 Provider：显式指定 > 默认。与 /api/enhance 走同一套配置体系，
+    # 不新增第二套 provider 配置。
+    with db() as conn:
+        provider_id = payload.get("provider_id")
+        item = None
+        if provider_id:
+            item = prov.get_provider_full(conn, provider_id)
+            if not item:
+                return web.json_response({"error": "指定的 Provider 不存在"}, status=404)
+            if not item["enabled"]:
+                return web.json_response({"error": "该 Provider 已停用"}, status=400)
+        else:
+            item = prov.resolve_default(conn, "default")
+            if not item:
+                return web.json_response(
+                    {"error": "尚未配置可用的本地模型 Provider。"
+                             "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    messages = moss_layout.build_messages(original, width, height, intent)
+    try:
+        raw = await llm_client.call_provider(
+            item, messages,
+            options={"temperature": 0.3, "top_p": 0.9, "max_tokens": 1400,
+                     "do_sample": False})
+    except llm_client.ProviderError as exc:
+        # 本地模型不可达 —— 明确报错，不静默失败
+        return web.json_response(
+            {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    raw = enh.strip_thinking(raw)
+    try:
+        result = moss_layout.enhance(original, raw, width, height, intent)
+    except moss_layout.LayoutError as exc:
+        # 模型返回的内容没通过 schema 校验 —— 明确报错 + 逐条原因
+        return web.json_response(
+            {"error": str(exc), "errors": exc.errors,
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    return json_ok({
+        "ok": True,
+        "original": original,
+        "intent": intent,
+        "provider": item["name"],
+        "provider_id": item["id"],
+        "draft": result["draft"],
+        "layout": result["layout"],
+        "layout_json": result["layout_json"],
+        "final_prompt": result["final_prompt"],
+        "width": result["width"],
+        "height": result["height"],
+        # 画布尺寸的归一说明（前端提示用：用户填的值可能被吸附过）
+        "size_notes": size_reasons,
+    })
+
+
 # ------------------------------------------------------------------ LLM 代理
 # ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload（没有 chat_template_kwargs），
 # 对 Qwen3 这类 thinking 模型关不掉思考，接口返回 content=null，节点再
@@ -2294,6 +2532,8 @@ def make_app():
     app.router.add_get("/api/enhancer", api_enhancer_config)
     app.router.add_put("/api/enhancer", api_enhancer_save)
     app.router.add_post("/api/enhance", api_enhance)
+    # MOSS-Image 结构化（layout）增强 —— 外部复现 MossPrompt 节点的能力
+    app.router.add_post("/api/moss-layout", api_moss_layout)
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
