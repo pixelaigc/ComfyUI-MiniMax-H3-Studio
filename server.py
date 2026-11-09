@@ -768,6 +768,16 @@ class Worker:
                     params["ref_audio"] = flat_name
 
                 params["job_id"] = job_id
+                # 【关键，2026-11-09】params["mode"] 有两个语义：
+                #   - HTTP 生成模式（t2a / a2a / t2i / t2v …）
+                #   - 音乐工作流里的「谱面规划模式」（full / melody）
+                # 以前这里直接 params["mode"] = mode，把用户选的谱面模式
+                # 覆盖成了 t2a/a2a -> 任务记录里谱面模式永久丢失，
+                # 作品卡片只能显示一个编造的「完整谱面」。
+                # 现在把谱面模式单独存到 params["plan_mode"]，
+                # music_yue2 优先读它（读不到再回退 params["mode"]）。
+                if mode in ("t2a", "a2a"):
+                    params["plan_mode"] = params.get("plan_mode") or params.get("music_plan") or "full"
                 params["mode"] = mode
                 workflow = build_workflow(mode, params)
                 client_id = f"h3studio-{job_id}"
