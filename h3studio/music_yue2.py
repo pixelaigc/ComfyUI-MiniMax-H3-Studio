@@ -56,9 +56,14 @@ from . import music_style
 #   转换脚本：scripts/convert_yue2_hf_to_native.py
 #
 # 【models/yue2/ 不动】
-#   models/yue2/YuE2-3B/ 与 models/yue2/YuE2-Vae/ 是**第三方节点**
-#   （ComfyUI-YuE2 / ComfyUI-FL-YuE2）的原配依赖，删了那条链路就断。
-#   面板走的是原生 CheckpointLoaderSimple，与它们无关。
+#   models/yue2/YuE2-3B/ 与 models/yue2/YuE2-Vae/ 是第三方节点
+#   **ComfyUI-FL-YuE2** 的原配依赖（其 downloads.py:resolve() 在
+#   folder_paths.get_folder_paths("yue2") 下找 YuE2-3B/，缺失才联网下载）
+#   —— 删了那条链路就断。
+#   注意：**ComfyUI-YuE2 主节点走的是 HF 缓存**（yue2/storage.py:resolve_model()
+#   对 "m-a-p/YuE2-3B" 调 snapshot_download），不依赖 models/yue2/。
+#   两者都保留最稳。
+#   面板走的是原生 CheckpointLoaderSimple，与它们都无关。
 #
 # 【note 字段不谎报可用性】
 #   可用性描述由 `model_options()` 按**运行时实测**的 available 动态拼接，
