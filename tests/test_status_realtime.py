@@ -627,6 +627,10 @@ class TestComfyQueueReporting(unittest.TestCase):
         sys.path.insert(0, str(REPO))
         import server as server_mod
         importlib.reload(server_mod)
+        # 建表：init_db() 只在 server.main() 里调，而这里直接 import 模块
+        # 调 status_snapshot()，不建表就会报 "no such table: jobs"。
+        # （本项目其它测试也是这个做法，见 test_qwen_refs_browser.py）
+        server_mod.init_db()
         return server_mod
 
     def test_fetch_comfy_queue_reports_nonempty_queue(self):
