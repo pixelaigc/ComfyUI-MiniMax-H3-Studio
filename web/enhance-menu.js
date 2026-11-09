@@ -110,6 +110,29 @@
         },
       ],
     },
+    {
+      // 【统一增强体系 · 音乐路线】
+      // 音乐的增强**不是**文本扩写，而是产出「结构化风格 + 歌词」
+      // （YuE2 官方流程：12 个结构化风格字段 + 一段歌词）。
+      // 所以它是**另一条路线**（kind: "yue2-struct"），
+      // 走 POST /api/music-enhance，结果由 music-enhance.js 的
+      // **结构化写回契约**落到结构化风格区与歌词区。
+      //
+      // 【为什么放在同一份注册表里】审查 P0-2 的根治要求：
+      // 「targets() 与音乐增强方法注册表并入同一份增强体系」。
+      // 两份注册表各自渲染同一个菜单会互相覆盖（实测：图像注册表
+      // 把音乐菜单内容覆盖成 basic/refine/layout/qwen_pe）。
+      id: "yue2_struct",
+      label: "YuE2 结构化风格 + 歌词",
+      hint: "把描述拆成 YuE2 的结构化风格字段（语言/曲风/情绪/人声/乐器/BPM/能量/意象）并生成配套歌词",
+      // 只在音乐模式可用（图像/视频不认音乐 style 串）
+      modes: ["t2a", "a2a"],
+      specId: "",
+      busyFlag: "enhance",
+      buttonText: "生成风格+歌词",
+      recommended: true,
+      kind: "yue2-struct",
+    },
   ];
 
   // 当前选中的增强方式 id 集合（多选）。默认只选「普通增强」。
@@ -142,7 +165,7 @@
    * - 二次增强：按媒体类型取（服务端 refine_specs 下发）——
    *   图像/视频 = image-refine（逐个画面物体）；音乐 = music-refine（逐个音乐要素）。
    * - 普通增强：取当前上下文的默认模板（服务端 mode_defaults 下发）。
-   * - 其它方式（layout / 官方 PE）：不用模板，返回空串。
+   * - 其它方式（layout / 官方 PE / 音乐结构化）：不用模板，返回空串。
    */
   function methodSpecId(method) {
     if (!method) return "";
@@ -175,7 +198,9 @@
   function methodSpecOptions(method) {
     if (!method) return [];
     if (method.id === "refine") return [refineSpecId()];
+    // layout / 官方 PE / 音乐结构化增强：各自有专属链路，不用模板
     if (method.id === "layout" || method.id === "qwen_pe") return [];
+    if (method.kind === "yue2-struct") return [];
     const specs = currentContextSpecs();
     if (specs.length) return specs.map(s => s.id);
     return [currentSpecId()];
@@ -290,8 +315,35 @@
     return spec ? spec.label : specId;
   }
 
-  /** 某方式在当前模式下是否可用。 */
+  /**
+   * 当前是否在音乐模式（文生音乐 / 参考生音乐）。
+   *
+   * 音乐模式的增强产物是**结构化对象**（12 个风格字段 + 歌词），
+   * 与图像路线的「一段文本」不同 —— 所以两条路线的可用项不同。
+   */
+  function isMusicContext() {
+    if (typeof state === "undefined" || !state) return false;
+    const mode = state.mode || "";
+    return mode === "t2a" || mode === "a2a";
+  }
+
+  /**
+   * 某增强方式在当前模式下是否可用。
+   *
+   * 【音乐模式下的关键规则】文本扩写类（普通增强 / 二次增强）
+   * 在音乐面板**不可用**：
+   *   - 它们的产物是「一段文本」，而音乐面板的写回目标是
+   *     **结构化契约**（12 个风格字段 + 歌词）—— 文本塞不进去；
+   *   - 而且音乐有**专属**的结构化增强项（yue2_struct），
+   *     它才是 YuE2 官方流程对应的产物形态。
+   * 所以音乐面板只提供「YuE2 结构化风格 + 歌词」这一项。
+   */
   function isAvailable(method) {
+    if (!method) return false;
+    // 音乐路线：只认结构化增强（产物形态与面板的写回契约一致）
+    if (isMusicContext()) {
+      return method.kind === "yue2-struct";
+    }
     if (!method.modes || !method.modes.length) return true;
     const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
     return method.modes.includes(mode);
@@ -572,10 +624,19 @@
    * 某方式在当前模式下不可用的原因（说清楚「它属于哪个功能」）。
    */
   function unavailableReason(method) {
-    if (!method || !method.modes || !method.modes.length) return "当前模式不可用";
+    if (!method) return "当前模式不可用";
+    // 音乐模式：文本扩写类不可用 —— 说清楚**为什么**（产物形态不匹配）
+    if (isMusicContext() && method.kind !== "yue2-struct") {
+      if (method.kind === "template") {
+        return "文本扩写类，YuE2 音乐需结构化风格+歌词";
+      }
+      return "图像/视频专属，音乐面板不可用";
+    }
+    if (!method.modes || !method.modes.length) return "当前模式不可用";
     const owners = {
       layout: "MOSS-Image 专属",
       qwen_pe: "Qwen-Image 2.1 专属",
+      yue2_struct: "YuE2 音乐专属",
     };
     const owner = owners[method.id] || "其它功能专属";
     return owner + "，本面板不可用";
@@ -634,7 +695,13 @@
       const m = byId[id];
       return m && isAvailable(m);
     });
-    if (!selectedIds.length) selectedIds = ["basic"];
+    // 兜底：当前模式下没有任何可用的方式时，选一个**该模式可用**的。
+    // 音乐模式的可用项是 yue2_struct（不是 basic）—— 否则主按钮会停在一个
+    // 不可用的方式上，用户点「增强」没反应。
+    if (!selectedIds.length) {
+      const fallback = ENHANCE_METHODS.find(m => isAvailable(m));
+      selectedIds = fallback ? [fallback.id] : [];
+    }
     if (selectedIds.length !== before) {
       saveSelection();
       renderMenu();
@@ -932,6 +999,9 @@
   async function runOne(method, opts) {
     opts = opts || {};
     if (!isAvailable(method)) return null;
+    if (method.kind === "yue2-struct") {
+      return runYue2Struct(method, opts);
+    }
     if (method.id === "layout") {
       return runLayout(method, opts);
     }
@@ -942,6 +1012,27 @@
       return runRefine(method, opts);
     }
     return runBasic(method, opts);
+  }
+
+  // ---- 音乐：YuE2 结构化风格 + 歌词（走 /api/music-enhance）----
+  //
+  // 【为什么委托给 music-enhance.js】这条路线由音乐模块实现
+  // （web/music-enhance.js 里有完整的请求/回填/契约逻辑）。
+  // 这里只做**路由**，保证「一份注册表、一个主按钮、一套组件」。
+  async function runYue2Struct(method, opts) {
+    const music = window.MusicEnhance;
+    if (!music || typeof music.run !== "function") {
+      setHint("音乐增强模块未加载，请刷新页面", "error");
+      return null;
+    }
+    // 多选时 collect 语义不适用于结构化产物（结构化对象没法和文本片段合并），
+    // 所以音乐路线**只支持单选**。
+    if (opts && opts.collect) {
+      setHint("音乐结构化增强不能与其它增强同时勾选（产物是结构化对象，无法合并）", "error");
+      return null;
+    }
+    await music.run({});
+    return { expanded: "", meta: "" };
   }
 
   // ---- 普通增强（沿用既有 /api/enhance + 模板下拉） ----

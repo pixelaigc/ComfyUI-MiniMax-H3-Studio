@@ -74,17 +74,23 @@
    * @param {object} opts    { unavailableText, specHtml, renderField, valueOf }
    *   unavailableText  不可用时的原因文案（说清楚「它属于哪个功能」）
    *   specHtml         该项自带的模板选择器 HTML（可选）
+   *
+   * 【审查 P3-1】不可用的项**不再显示 Recommended 徽标** ——
+   * 「推荐」与「本面板不可用」并列会让人以为该面板也推荐它，
+   * 读起来有歧义。推荐徽标只在**可用**时才有意义。
    */
   function enhanceMenuItemHtml(m, checked, ok, opts) {
     const o = opts || {};
     const why = o.unavailableText || "当前模式不可用";
     const specTag = o.specHtml || "";
+    const recBadge = (m.recommended && ok)
+      ? '<span class="enhance-menu-badge rec">Recommended</span>' : "";
     return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
         <label class="enhance-menu-check" title="${esc(m.hint)}">
           <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
           <span class="enhance-menu-label">${esc(m.label)}</span>
           ${specTag}
-          ${m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : ""}
+          ${recBadge}
           ${ok ? "" : `<span class="enhance-menu-badge">${esc(why)}</span>`}
         </label>
         <span class="enhance-menu-hint">${esc(m.hint)}</span>

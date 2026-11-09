@@ -6,16 +6,20 @@
    不另造一套）。所以本文件**复用**共用组件 web/enhance-menu-shared.js
    （renderEnhanceMenu / bindEnhanceMenu / positionMenu / resolveWriteTarget），
    自己只负责：
-     * 音乐侧的增强项注册表（当前只有一项：YuE2 结构化风格 + 歌词）
      * 路由到 POST /api/music-enhance
      * 结果回填到音乐面板的结构化风格区与歌词区
      * **注册写回能力契约**（供 providers.js / enhance-menu.js 解析写回目标）
 
-   【与生图面板的关系】
-   生图面板的注册表在 enhance-menu.js 的 ENHANCE_METHODS 里，
-   音乐面板的注册表在这里 MUSIC_ENHANCE_METHODS 里 —— 两份注册表
-   **内容不同**（音乐要产出结构化风格+歌词，不是文本扩写），
-   但**组件实现是同一份**（enhance-menu-shared.js）。
+   【与生图面板的关系：同一份注册表】
+   增强方式注册表现在**只有一份** —— enhance-menu.js 的
+   ENHANCE_METHODS，音乐路线那一项（yue2_struct）也在里面。
+   （审查 P0-2 的根治要求：「targets() 与音乐增强方法注册表并入同一份
+   增强体系」。）
+   之前本文件另有一份 MUSIC_ENHANCE_METHODS，两边都渲染同一个
+   #musicEnhanceMenu、都绑同一个 #musicEnhanceBtn -> 互相覆盖，
+   实测音乐面板的下拉里出现的是图像路线的项。
+   现在：菜单渲染 / 勾选 / 按钮文字 / 当前方式回显**全部**由统一注册表负责；
+   本模块只提供「怎么执行」与「怎么写回」。
 
    【写回能力契约（审查 P0-1）】
    旧实现（enh-unify 分支）硬编码 `$("#musicStyle")` 作为音乐增强的
@@ -41,123 +45,52 @@
 
   // ------------------------------------------------------------------ 注册表
 
-  /**
-   * 音乐侧的增强方式注册表。
-   *
-   * 字段语义与 enhance-menu.js 的 ENHANCE_METHODS 一致 —— 因为渲染用的是
-   * **同一个** renderEnhanceMenu()（共用组件）。
-   */
-  const MUSIC_ENHANCE_METHODS = [
-    {
-      id: "yue2_struct",
-      label: "YuE2 结构化风格 + 歌词",
-      hint: "把描述拆成 YuE2 的结构化风格字段（语言/曲风/情绪/人声/乐器/BPM/能量/意象）并生成配套歌词",
-      modes: [],              // 音乐面板专属注册表 -> 恒可用
-      busyFlag: "enhance",
-      buttonText: "生成风格+歌词",
-      recommended: true,
-    },
-  ];
+  // 【音乐侧不再有自己的增强方式注册表】
+  //
+  // yue2_struct 已并入**统一注册表**（enhance-menu.js 的 ENHANCE_METHODS）——
+  // 那是审查 P0-2 的根治要求（「targets() 与音乐增强方法注册表并入同一份
+  // 增强体系」）。
+  //
+  // 之前两边各有一份注册表、都渲染同一个 #musicEnhanceMenu、都绑同一个
+  // #musicEnhanceBtn，结果互相覆盖：实测音乐面板的下拉里出现的是
+  // basic/refine/layout/qwen_pe（图像路线的项），yue2_struct 根本不在里面。
+  //
+  // 现在：菜单渲染 / 勾选 / 按钮文字 / 当前方式回显**全部**由统一注册表负责；
+  // 本模块只提供「怎么执行」（run）与「怎么写回」（契约）。
 
-  // 当前选中的 id 集合（音乐侧目前只有一项，仍按多选语义实现以便将来扩展）
-  let selectedIds = ["yue2_struct"];
 
-  const STATE_KEY = "h3studio.musicEnhanceSelection.v1";
-
-  function saveSelection() {
-    try {
-      localStorage.setItem(STATE_KEY, JSON.stringify({ selected: selectedIds }));
-    } catch (e) { /* 隐私模式忽略 */ }
-  }
-
-  function loadSelection() {
-    try {
-      const raw = localStorage.getItem(STATE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (data && Array.isArray(data.selected)) {
-        const valid = data.selected.filter(id =>
-          MUSIC_ENHANCE_METHODS.some(m => m.id === id));
-        if (valid.length) selectedIds = valid;
-      }
-    } catch (e) { /* 忽略 */ }
-  }
 
   // ------------------------------------------------------------------ 菜单
 
-  function isAvailable() {
-    // 音乐面板专属注册表 -> 恒可用
-    return true;
-  }
-
-  function renderMenu() {
-    const menu = $("#musicEnhanceMenu");
-    if (!menu) return;
-    const shared = window.EnhanceMenuShared;
-    if (!shared || typeof shared.renderEnhanceMenu !== "function") {
-      // 共用组件没加载（脚本顺序问题）—— 明确报错，不静默失败
-      setHint("增强组件未就绪（enhance-menu-shared.js 未加载），请刷新页面", "error");
-      return;
+  /**
+   * 当前选中的音乐增强方式（读统一注册表的状态）。
+   *
+   * 统一注册表（window.enhanceMethods）持有选中集合与渲染逻辑；
+   * 这里只是**读**它，用于回显与「至少留一项」的判断。
+   */
+  function selectedMethods() {
+    const unified = window.enhanceMethods;
+    if (unified && typeof unified.getSelected === "function") {
+      const ids = unified.getSelected();
+      const list = unified.list || [];
+      return list.filter(m => ids.indexOf(m.id) >= 0);
     }
-    shared.renderEnhanceMenu(menu, {
-      methods: MUSIC_ENHANCE_METHODS,
-      selectedIds: selectedIds,
-      isAvailable: isAvailable,
-      onToggle: toggleMethod,
-      onFieldEdit: () => { /* 音乐侧当前没有可编辑字段 */ },
-    });
-  }
-
-  function toggleMethod(id, on) {
-    if (on) {
-      if (selectedIds.indexOf(id) < 0) selectedIds.push(id);
-    } else {
-      if (selectedIds.length <= 1) {
-        // 至少留一项：取消最后一项时保持原状
-        setHint("至少要保留一项增强方式", "error");
-        return;
-      }
-      selectedIds = selectedIds.filter(x => x !== id);
-    }
-    saveSelection();
-    renderMenu();
-    updateButton();
+    return [];
   }
 
   /**
-   * 主按钮文字 + 「当前增强方式」回显。
+   * 当前音乐面板的「当前增强方式」回显。
    *
-   * 审查 P2-4：音乐面板之前**没有**回显元素（#musicEnhanceCurrent 不存在），
-   * 与其它面板形态不一致。现在补上，回显格式与图像面板完全一致
-   * （「当前增强：xxx」）。
+   * 统一注册表已经负责渲染这条回显（enhance-menu.js 的
+   * updateCurrentIndicator 会同时更新 #enhanceCurrent 与
+   * #musicEnhanceCurrent）。这里保留一个空实现是为了兼容旧调用方
+   * （app.js 仍会调 window.musicEnhance.updateButton()）。
    */
   function updateButton() {
-    const text = $("#musicEnhanceBtnText");
-    const sel = selectedMethods();
-    const method = sel[0] || MUSIC_ENHANCE_METHODS[0];
-    if (text) text.textContent = sel.length > 1 ? `增强（${sel.length} 项）` : method.buttonText;
-    const btn = $("#musicEnhanceBtn");
-    if (btn) {
-      btn.title = sel.length > 1
-        ? "按选中顺序依次执行：" + sel.map(m => m.label).join(" → ")
-        : method.hint;
+    const unified = window.enhanceMethods;
+    if (unified && typeof unified.refreshButton === "function") {
+      unified.refreshButton();
     }
-    updateCurrentIndicator();
-  }
-
-  /** 「当前所选增强方式」的可见回显（与图像面板同一套格式）。 */
-  function updateCurrentIndicator() {
-    const sel = selectedMethods();
-    const parts = sel.map(m => (m.specLabel ? `${m.label}（${m.specLabel}）` : m.label));
-    const text = parts.length ? "当前增强：" + parts.join(" + ") : "";
-    const el = $("#musicEnhanceCurrent");
-    if (!el) return;
-    el.textContent = text;
-    el.hidden = !text;
-  }
-
-  function selectedMethods() {
-    return MUSIC_ENHANCE_METHODS.filter(m => selectedIds.indexOf(m.id) >= 0);
   }
 
   // ------------------------------------------------------------------ 路由
@@ -323,18 +256,21 @@
   // ------------------------------------------------------------------ 绑定
 
   function bind() {
-    const btn = $("#musicEnhanceBtn");
-    if (btn) btn.addEventListener("click", () => run());
+    // 【不再自己绑主按钮】审查 P0-2 返修实测发现的问题：
+    // 增强体系合并后，enhance-menu.js 的统一注册表已经包含
+    // yue2_struct 这一项，并**自己**绑了 #musicEnhanceBtn /
+    // #musicEnhanceMenuBtn。如果本模块再绑一遍：
+    //   - 主按钮会触发两次（图像注册表的 run + 音乐注册表的 run）
+    //   - 菜单内容会被两套注册表互相覆盖
+    //     （实测：音乐菜单被渲染成 basic/refine/layout/qwen_pe）
+    // 现在**只保留一份绑定** —— 统一注册表（enhance-menu.js）负责，
+    // 本模块只提供「怎么执行」（run）与「怎么写回」（契约）。
+    //
+    // 菜单的**渲染**也交给统一注册表（renderMenu 由 enhance-menu.js 调），
+    // 本模块不再单独渲染一份，避免互相覆盖。
 
-    const menu = $("#musicEnhanceMenu");
-    const menuBtn = $("#musicEnhanceMenuBtn");
-    // 菜单开合走**共用实现**（与生图面板同一套组件）
-    const shared = window.EnhanceMenuShared;
-    if (shared) {
-      shared.bindEnhanceMenu(menu, menuBtn, "musicEnhanceSplit", renderMenu);
-    }
-
-    // 「基于当前内容重新生成」
+    // 「基于当前内容重新生成」—— 这两个按钮是音乐面板独有的，
+    // 不属于统一增强入口，所以仍由本模块绑定。
     const styleRegen = $("#musicStyleRegenBtn");
     if (styleRegen) {
       styleRegen.addEventListener("click", () => run({ base: true, intent: "style" }));
@@ -348,17 +284,19 @@
   // ------------------------------------------------------------------ 启动
 
   function boot() {
-    loadSelection();
     bind();
-    updateButton();
-    renderMenu();
     if (typeof window !== "undefined") {
       window.MusicEnhance = {
         run: run,
-        renderMenu: renderMenu,
+        // 菜单渲染由统一注册表负责 —— 这里只是**代理**，
+        // 旧调用方（app.js 的 window.musicEnhance.renderMenu()）仍可用。
+        renderMenu: () => {
+          const unified = window.enhanceMethods;
+          if (unified && typeof unified.renderMenu === "function") unified.renderMenu();
+        },
         updateButton: updateButton,
-        getSelected: () => selectedIds.slice(),
-        list: MUSIC_ENHANCE_METHODS,
+        getSelected: () => selectedMethods().map(m => m.id),
+        list: (window.enhanceMethods && window.enhanceMethods.list) || [],
         // 写回能力契约（供 providers.js / enhance-menu.js 解析目标）
         getWriteContract: getWriteContract,
       };
