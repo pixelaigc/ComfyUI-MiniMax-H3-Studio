@@ -263,30 +263,30 @@
       </div>
 
       <div class="field">
-        <div class="field-label">YuE2 模型 <span class="muted" id="musicModelHint">本机已安装</span></div>
+        <div class="field-label">YuE2 音乐模型 <span class="muted" id="musicModelHint">本机已安装</span></div>
         <select class="img-select" id="musicModelSelect"></select>
         <div class="img-note" id="musicModelNote"></div>
         <div class="img-warn" id="musicModelWarn"></div>
       </div>
 
       <div class="field" id="musicEncoderField" style="display:none">
-        <div class="field-label">音频编码器 <span class="muted">参考音频转谱用</span></div>
+        <div class="field-label">音频编码器 <span class="muted">SheetSage2 · 参考音频转乐谱用</span></div>
         <select class="img-select" id="musicEncoderSelect"></select>
         <div class="img-note" id="musicEncoderNote"></div>
       </div>
 
       <div class="field">
-        <div class="field-label">风格描述 <span class="muted">Style</span></div>
+        <div class="field-label">风格描述 <span class="muted">Style · 必填</span></div>
         <textarea id="musicStyle" rows="4"
                   placeholder="English, warm piano pop, expressive female voice, acoustic piano, rounded bass and light drums, 88 BPM"></textarea>
-        <div class="img-note">写语言 + 曲风 + 人声 + 速度 + 乐器。歌词写在下面这个框里，不要混在一起。</div>
+        <div class="img-note">描述要生成的曲子：语言 + 曲风 + 人声 + 速度(BPM) + 乐器 + 氛围。官方推荐写法：<code>English, warm female vocal, contemporary pop, 96 BPM, piano, rounded electric bass, restrained drums</code>。只写音乐描述，歌词写到下面那个框里，不要混在一起。</div>
       </div>
 
       <div class="field">
-        <div class="field-label">歌词 <span class="muted">Lyrics · 可留空（纯器乐）</span></div>
+        <div class="field-label">歌词 <span class="muted">Lyrics · 可留空（留空 = 纯器乐）</span></div>
         <textarea id="musicLyrics" rows="6"
-                  placeholder="[Verse]&#10;Morning light across the window&#10;City waking down below&#10;&#10;[Chorus]&#10;Run with me into the sunlight"></textarea>
-        <div class="img-note">用 [Verse] / [Chorus] / [Bridge] / [Outro] 段落标记。只写要被唱出来的字。</div>
+                  placeholder="[Verse]&#10;Morning light across the window&#10;City waking down below&#10;&#10;[Chorus]&#10;Run with me into the sunlight&#10;Leave the shadows far behind"></textarea>
+        <div class="img-note">只写要被唱出来的字，用 <code>[Verse]</code> / <code>[Chorus]</code> / <code>[Bridge]</code> / <code>[Outro]</code> 标段落。留空则生成纯器乐（无歌词与人声）。参考生音乐时，歌词的句式与字数越接近原曲，越贴合原旋律。</div>
       </div>
 
       <div class="field" id="musicRefField" style="display:none">
@@ -299,7 +299,7 @@
       </div>
 
       <div class="field">
-        <div class="field-label">谱面规划 <span class="muted" id="musicModeHint">ABC Planning</span></div>
+        <div class="field-label">谱面规划 <span class="muted" id="musicModeHint">ABC Planning · 音乐生成前的乐谱规划</span></div>
         <div class="chips" id="musicPlanChips"></div>
         <div class="img-note" id="musicPlanNote"></div>
       </div>
@@ -307,19 +307,19 @@
       <div class="field">
         <div class="field-label">最长时长 <span id="musicDurationVal">60s</span></div>
         <input type="range" id="musicDuration" min="10" max="360" step="10" value="60">
-        <div class="img-note">上限。实际成曲可能更短（取决于歌词段落与 BPM）。参考生音乐时受参考音频长度约束。</div>
+        <div class="img-note">这是<strong>上限</strong>，不是保证时长 —— 成曲可能因为歌词段落和 BPM 提前结束。上限 360 秒（6 分钟）；歌词越长、段落越少，越容易顶到上限。参考生音乐时还会受参考音频长度的约束。</div>
       </div>
 
       <div class="compact-pair">
         <div class="compact-field">
           <div class="compact-label"><span>采样步数</span><b id="musicStepsVal">32</b></div>
           <input type="range" id="musicSteps" min="1" max="100" step="1" value="32">
-          <small class="muted">官方模板 32 步</small>
+          <small class="muted">官方模板 32 步 · 越大越慢</small>
         </div>
         <div class="compact-field">
           <div class="compact-label"><span>CFG</span><b id="musicCfgVal">1.0</b></div>
           <input type="range" id="musicCfg" min="0" max="8" step="0.5" value="1">
-          <small class="muted">官方模板 1.0</small>
+          <small class="muted">官方模板 1.0 · CFG=1 表示不做负向引导</small>
         </div>
       </div>
 
@@ -337,12 +337,13 @@
       <div class="field">
         <div class="field-label">输出格式</div>
         <div class="chips" id="musicFormatChips"></div>
-        <div class="img-note">FLAC 无损、体积大；MP3 体积小、通用。</div>
+        <div class="img-note">FLAC 无损、体积大（本机默认）；MP3 体积小、通用；OPUS 压缩率最高。三种格式都是 48 kHz 立体声。</div>
       </div>
 
       <div class="field">
         <div class="field-label">种子 <span class="muted">留空随机</span></div>
         <input type="text" id="musicSeed" placeholder="随机">
+        <div class="img-note">同一个种子 + 同一组参数 = 同一首曲子，便于微调对比。</div>
       </div>
 
       <details class="img-ref-detail" id="musicAdvancedBox">
@@ -367,7 +368,7 @@
             <input type="range" id="musicRep" min="0.1" max="2" step="0.01" value="1.2">
           </div>
         </div>
-        <div class="img-note" id="musicAdvNote">以上是「音乐生成」阶段的采样参数；谱面（ABC）规划阶段有一组独立参数，用官方推荐值。</div>
+        <div class="img-note" id="musicAdvNote">以上 4 项是<strong>音乐生成阶段</strong>的采样参数（官方模板：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2）。谱面（ABC）规划阶段还有一组独立参数，本面板固定用官方推荐值（温度 0.7 / top_p 0.9 / top_k 30），不开放调整。改动这些值会改变曲子的「随机性」，一般保持默认即可。</div>
       </details>
     </div>
 

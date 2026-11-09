@@ -397,8 +397,13 @@ function renderMode() {
   $("#stepsField").style.display = isVideo ? "" : "none";
   // 图像模式用自己的一套比例/分辨率控件，隐藏视频模式的那套
   $("#aspectField").style.display = isVideo ? "" : "none";
-  $("#imagePanel").style.display = isVideo ? "none" : "";
-  if (!isVideo) renderImagePanel();
+  // 音频模式（kind === "audio"）也自带面板：若沿用 isVideo 判断，
+  // 整个 Z-Image 参数块（分辨率档位 / 画面比例 / 输出尺寸 / 生成批次 /
+  // Z-Image 模型 / LoRA …）会整块漏进音乐面板。
+  // 所以这里按「确实是图像模式」判断，而不是「不是视频」。
+  const isImageMode = info.kind === "image";
+  $("#imagePanel").style.display = isImageMode ? "" : "none";
+  if (isImageMode) renderImagePanel();
 
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
   const music = isMusicMode(mode);
@@ -2069,6 +2074,14 @@ function imgModelLabel(key) {
   return m ? m.label : (key || "—");
 }
 
+// 音乐任务的模型显示名（YuE2 checkpoint key -> 人话）
+function musicModelLabel(key) {
+  if (!key) return "YuE2";
+  const opts = (window.MusicUI && window.MusicUI.getOptions) || null;
+  const entry = opts && opts.checkpoints ? opts.checkpoints[key] : null;
+  return entry ? entry.label : String(key);
+}
+
 function outputUrl(job, output) {
   const relative = String(output.file || "").replace(/\\/g, "/");
   const path = relative.includes("/") ? relative : `${job.id}/${relative}`;
@@ -2378,13 +2391,19 @@ function jobCard(job) {
       ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : `
+      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
+      <div class="row"><span>时长上限</span><b>${p.max_duration || "—"}s</b></div>
+      <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
+      <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
+      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
+      <div class="row"><span>谱面</span><b>${p.mode === "melody" ? "仅旋律" : "完整谱面"}</b></div>
+      <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
       <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
-      ${job.mode !== "longfilm" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : ""}
+      ${job.mode !== "longfilm" ? (info.kind === "audio" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整风格描述与歌词"><span>风格描述</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>`) : ""}
     </div>`}
     ${renderJobBatches(job)}
     <div class="job-actions">
@@ -2479,7 +2498,15 @@ function jobCard(job) {
     a.download = String(f.file || "").split(/[\\/]/).pop();
     a.click();
   });
-  card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => openPromptModal(p.prompt || ""));
+  card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => {
+    if (info.kind === "audio") {
+      const lyrics = (p.lyrics || "").trim();
+      const body = "【风格描述】\n" + (p.prompt || "") + (lyrics ? "\n\n【歌词】\n" + lyrics : "");
+      openPromptModal(body, "完整风格描述与歌词");
+    } else {
+      openPromptModal(p.prompt || "");
+    }
+  });
   // 批次结果展开/折叠（点标题行任意位置或三角都可以）
   card.querySelector('[data-act="toggle-batches"]')?.addEventListener("click", event => {
     event.stopPropagation();
@@ -2664,7 +2691,9 @@ function bindMediaContextMenu(card, job) {
   });
 }
 
-function openPromptModal(prompt) {
+function openPromptModal(prompt, title) {
+  const t = $("#promptModalTitle");
+  if (t) t.textContent = title || "完整提示词";
   $("#promptModalText").value = prompt;
   $("#promptModal").hidden = false;
   document.body.classList.add("modal-open");

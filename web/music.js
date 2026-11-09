@@ -157,8 +157,9 @@
     const modeNote = $("#musicModeNote");
     if (modeNote) {
       modeNote.textContent = isCover
-        ? "参考生音乐：参考音频提供旋律，YuE2 按下面的风格与歌词重新演绎。"
-        : "文生音乐：YuE2 自己规划谱面，按风格描述与歌词从零生成。";
+        ? "参考生音乐（翻唱）：参考音频只提供旋律线，YuE2 按下面的风格描述与歌词重新编曲、重新演唱；"
+          + "原曲的和弦与编曲不会被沿用。参考音频需先从素材库选择。"
+        : "文生音乐：YuE2 先按风格描述与歌词规划一份乐谱（ABC），再据此生成带人声与伴奏的完整歌曲。";
     }
 
     // 模型
@@ -184,7 +185,9 @@
     const curModel = OPTIONS.checkpoints[st.checkpoint];
     const modelNote = $("#musicModelNote");
     const modelWarn = $("#musicModelWarn");
-    if (modelNote) modelNote.textContent = curModel ? (curModel.note || "") : "";
+    if (modelNote) {
+      modelNote.textContent = curModel ? (curModel.note || "") : "";
+    }
     if (modelWarn) {
       const missing = curModel && curModel.available === false;
       modelWarn.textContent = missing
@@ -240,8 +243,16 @@
         b.type = "button";
         b.dataset.v = modeKey;
         b.textContent = modeKey === "full" ? "完整谱面（旋律+和弦）" : "仅旋律（适合翻唱）";
-        b.classList.toggle("active", modeKey === st.plan);
+        // 参考生音乐：SheetSage2 转谱固定输出「仅旋律」谱面，
+        // 「完整谱面」在这里拿不到和弦符号 -> 禁用并说明原因，
+        // 不能给用户一个点了不生效的选项。
+        if (isCover && modeKey === "full") {
+          b.disabled = true;
+          b.title = "参考音频转谱固定产出仅旋律谱面，无法附加和弦符号";
+        }
+        b.classList.toggle("active", modeKey === (isCover ? "melody" : st.plan));
         b.addEventListener("click", () => {
+          if (b.disabled) return;
           st.plan = modeKey;
           saveState();
           render();
@@ -251,11 +262,17 @@
     }
     const planNote = $("#musicPlanNote");
     const planHint = $("#musicModeHint");
-    if (planHint) planHint.textContent = "ABC Planning";
+    if (planHint) planHint.textContent = "ABC Planning · 音乐生成前的乐谱规划";
     if (planNote) {
-      planNote.textContent = st.plan === "melody"
-        ? "只规划旋律线，伴奏由 YuE2 自由生成 —— 参考生音乐（翻唱）推荐这个。"
-        : "先规划「旋律 + 和弦」的完整谱面 —— 文生音乐推荐这个。";
+      if (isCover) {
+        planNote.textContent =
+          "参考生音乐固定用「仅旋律」谱面：SheetSage2 从参考音频只转出旋律线，不含和弦符号，"
+          + "伴奏与和声由 YuE2 依据风格描述重新生成。这就是官方 cover 模板的做法。";
+      } else {
+        planNote.textContent = st.plan === "melody"
+          ? "仅旋律：只规划旋律线，伴奏由 YuE2 自由生成 —— 适合想要更大编曲自由度的写法。"
+          : "完整谱面：先规划「旋律 + 和弦」，再据此生成音乐 —— 文生音乐推荐这个。";
+      }
     }
 
     // 时长
@@ -363,7 +380,9 @@
       empty.className = "img-note";
       empty.textContent = "尚未选择参考音频";
       box.appendChild(empty);
-      if (note) note.textContent = "从素材库选一段音频（wav/mp3/flac）。音频越短，转谱越快。";
+      if (note) note.textContent =
+        "从素材库选 1 段音频（wav/mp3/flac/m4a/ogg）。这段音频只用来提取旋律线，"
+        + "原曲的编曲和人声不会被沿用；音频越短，转谱越快。";
       return;
     }
     const card = document.createElement("div");
@@ -381,7 +400,8 @@
     });
     card.append(name, remove);
     box.appendChild(card);
-    if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id);
+    if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id)
+      + "（仅提取旋律线，成曲时长另受上方「最长时长」限制）";
   }
 
   // ---------------------------------------------------------------- 提交
@@ -393,10 +413,13 @@
 
   function collect() {
     const mode = currentMode();
+    const isCover = mode === "a2a";
     const params = {
       prompt: promptValue(),
       lyrics: ($("#musicLyrics") || {}).value || "",
-      mode: st.plan,
+      // 参考生音乐：谱面来自 SheetSage2 转谱，固定「仅旋律」
+      // （SheetSage2 不输出和弦符号，与 full 谱面不兼容 —— 后端也会强制纠正）
+      mode: isCover ? "melody" : st.plan,
       checkpoint: st.checkpoint,
       audio_encoder: st.audio_encoder,
       max_duration: st.duration,
@@ -553,6 +576,8 @@
     loadOptions,
     bind,
     getState: () => st,
+    // 供 app.js 的 musicModelLabel 查 checkpoint key -> 显示名
+    getOptions: () => OPTIONS,
     setMode(mode) { st.mode = mode; saveState(); },
   };
 })();

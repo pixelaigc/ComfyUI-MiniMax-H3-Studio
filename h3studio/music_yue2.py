@@ -49,13 +49,16 @@ YUE2_CHECKPOINTS = {
     "yue2_3b_int8_convrot": {
         "label": "YuE2 3B · INT8 ConvRot（官方量化版）",
         "ckpt": "yue2_3b_int8_convrot.safetensors",
-        "note": "Comfy-Org/YuE2 官方 INT8 ConvRot 量化版，官方模板默认用这个。",
+        "note": "Comfy-Org/YuE2 官方 INT8 ConvRot 量化版（官方模板 audio_yue2_text2music 默认用这个）。"
+                "3B 参数的音乐生成模型：吃风格描述 + 歌词，先规划 ABC 乐谱再生成带人声与伴奏的音频。"
+                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版，是本机唯一可用的版本。",
         "warn": "",
     },
     "yue2_3b_bf16": {
         "label": "YuE2 3B · BF16 完整版",
         "ckpt": "yue2_3b_bf16.safetensors",
-        "note": "Comfy-Org/YuE2 官方 BF16 原精度版，音质略好但显存/耗时更高。",
+        "note": "Comfy-Org/YuE2 官方 BF16 原精度版，音质略好但显存与耗时明显更高。"
+                "本机未下载该权重文件，故不可用。",
         "warn": "",
     },
 }
@@ -66,7 +69,9 @@ YUE2_AUDIO_ENCODERS = {
     "sheetsage2_bf16": {
         "label": "SheetSage2 · BF16（官方音频转谱）",
         "encoder": "sheetsage2_bf16.safetensors",
-        "note": "Comfy-Org/YuE2 官方音频编码器，把参考音频转成 ABC 乐谱。",
+        "note": "Comfy-Org/YuE2 官方音频编码器 SheetSage2（BF16）。参考生音乐时，"
+                "它把参考音频转成 ABC 乐谱 —— 只提取旋律线，不含和弦符号，"
+                "原曲的编曲与和声由 YuE2 依据风格描述重新生成。",
     },
 }
 YUE2_DEFAULT_AUDIO_ENCODER = "sheetsage2_bf16"
@@ -278,6 +283,17 @@ def build_music_workflow(params: dict) -> dict:
     mode = params.get("mode") or "full"
     if mode not in YUE2_MODES:
         mode = "full"
+
+    # 参考生音乐：谱面来自参考音频（SheetSage2 转谱），不是 YuE2 自己规划的。
+    # SheetSage2AudioToABC 固定输出「仅旋律」谱面（不含和弦符号），
+    # 所以 YuE2GenerateMusic 的 mode 也必须是 melody —— 否则它的指令前缀
+    # 会声称「带和弦的完整谱面」，而实际喂进去的 ABC 里没有和弦，
+    # 模型与谱面互相矛盾。
+    # 【实测，2026-11-09】官方 cover 模板 audio_yue2_music_cover.json 里
+    # SheetSage2AudioToABC 与 YuE2GenerateMusic 两处的 mode 都是 "melody"。
+    ref_audio_param = (params.get("ref_audio") or "").strip()
+    if ref_audio_param and mode != "melody":
+        mode = "melody"
 
     seed = _seed(params)
     max_duration = _clamp_duration(params.get("max_duration", YUE2_DEFAULT_DURATION))
