@@ -42,7 +42,20 @@ import random
 from pathlib import Path
 
 # ------------------------------------------------------------------
-# 模型清单（只列本机 ComfyUI 实测存在的权重文件）
+# 模型清单（键 -> ComfyUI 原生 CheckpointLoaderSimple 读的本地文件名）
+#
+# 【两种精度的来源与关系 —— 2026-11-09 核实】
+#   * `yue2_3b_int8_convrot`：Comfy-Org/YuE2 官方重打包的 INT8 ConvRot 量化单文件。
+#   * `yue2_3b_bf16`        ：由本机 m-a-p/YuE2-3B（HF 布局）+ m-a-p/YuE2-Vae
+#                              转换成 ComfyUI 原生单文件布局而来（bf16 原精度）。
+#     转换脚本：scripts/convert_yue2_hf_to_native.py
+#
+# 【note 字段不再谎报可用性】
+#   之前 bf16 那条写死了「本机未下载该权重文件，故不可用」——
+#   权重下载后这句话仍然是假的。现在 note 的可用性描述部分由
+#   `model_options()` 按**运行时实测**的 available 动态拼接，
+#   权重在不在盘上，说的就是不在盘上。
+#
 # ------------------------------------------------------------------
 #: YuE2 主模型（ComfyUI 原生 CheckpointLoaderSimple 读 checkpoints/）
 YUE2_CHECKPOINTS = {
@@ -51,14 +64,15 @@ YUE2_CHECKPOINTS = {
         "ckpt": "yue2_3b_int8_convrot.safetensors",
         "note": "Comfy-Org/YuE2 官方 INT8 ConvRot 量化版（官方模板 audio_yue2_text2music 默认用这个）。"
                 "3B 参数的音乐生成模型：吃风格描述 + 歌词，先规划 ABC 乐谱再生成带人声与伴奏的音频。"
-                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版，是本机唯一可用的版本。",
+                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版。",
         "warn": "",
     },
     "yue2_3b_bf16": {
         "label": "YuE2 3B · BF16 完整版",
         "ckpt": "yue2_3b_bf16.safetensors",
         "note": "Comfy-Org/YuE2 官方 BF16 原精度版，音质略好但显存与耗时明显更高。"
-                "本机未下载该权重文件，故不可用。",
+                "本机这份由 m-a-p/YuE2-3B（官方原始 BF16 权重）+ m-a-p/YuE2-Vae "
+                "转换为 ComfyUI 原生单文件布局而来，数值与官方版逐字节一致。",
         "warn": "",
     },
 }
@@ -155,12 +169,19 @@ def model_options() -> dict:
     """给前端的模型清单（含本机可用性）。"""
     checkpoints = {}
     for key, m in YUE2_CHECKPOINTS.items():
+        available = checkpoint_available(key)
         checkpoints[key] = {
             "label": m["label"],
             "ckpt": m["ckpt"],
-            "note": m["note"],
+            # 可用性描述按**运行时实测**动态拼接 —— 不再写死「未下载/不可用」
+            # 这种权重到货后就是假话的文案。
+            "note": m["note"] + (
+                "本机已就绪（models/checkpoints/）。"
+                if available else
+                f"本机未安装该权重文件（models/checkpoints/{m['ckpt']}），暂不可用。"
+            ),
             "warn": m["warn"],
-            "available": checkpoint_available(key),
+            "available": available,
         }
     encoders = {}
     for key, m in YUE2_AUDIO_ENCODERS.items():
