@@ -634,8 +634,17 @@ class TestMusicModelLabelFallback(unittest.TestCase):
         self.assertIn("yue2_3b_bf16", js)
 
     def test_label_falls_back_to_human_name(self):
+        """已知档位 -> 人类可读名；未知档位（已删除的量化版）-> 不再印裸 key。
+
+        【2026-11-09】int8 量化版删除后，历史作品卡片里存的
+        `yue2_3b_int8_convrot` 会在下拉/兜底表里查不到。
+        旧实现 `|| String(key)` 会把裸 key 原样印在卡片上 ——
+        用户会以为面板里还有这个档。改成统一的「历史档位」文案。
+        """
         js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
-        self.assertIn("return MUSIC_MODEL_FALLBACK[key] || String(key);", js)
+        self.assertIn("MUSIC_MODEL_FALLBACK[key]", js)
+        self.assertIn("YuE2（历史档位）", js)
+        self.assertNotIn("|| String(key);", js)
 
 
 class TestMusicCheckpointNoteNotLying(unittest.TestCase):

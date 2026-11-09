@@ -2088,7 +2088,10 @@ function musicModelLabel(key) {
   const opts = (window.MusicUI && window.MusicUI.getOptions) || null;
   const entry = opts && opts.checkpoints ? opts.checkpoints[key] : null;
   if (entry && entry.label) return entry.label;
-  return MUSIC_MODEL_FALLBACK[key] || String(key);
+  if (MUSIC_MODEL_FALLBACK[key]) return MUSIC_MODEL_FALLBACK[key];
+  // 未知 key = 已下线的历史档位（量化版已删除，见 music_yue2.py）。
+  // 不再回落到裸 key —— 那会把已删除的模型键原样印在作品卡片上。
+  return "YuE2（历史档位）";
 }
 
 function outputUrl(job, output) {
