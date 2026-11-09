@@ -682,10 +682,26 @@ const ENHANCE_WRITE_TARGETS = {
 };
 
 function enhanceWriteContract() {
-  // 音乐面板注册的是**结构化**契约（结构化风格 + 歌词）
-  const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
-    ? window.MusicEnhance.getWriteContract() : null;
-  if (music) return music;
+  // 音乐面板注册的是**结构化**契约（结构化风格 + 歌词）。
+  //
+  // 【2026-11-10 修复 · 真机回归】必须先判断「当前是不是音乐面板」。
+  // MusicEnhance 在 DOMContentLoaded 时**无条件**注册 window.MusicEnhance
+  // （脚本整页加载，与当前模式无关），所以只要脚本加载了，
+  // getWriteContract() 永远能拿到结构化契约 ——
+  // 于是**图像/视频面板**的写回也被解析成 kind:"structured"，
+  // 结果：
+  //   1. writeBackEnhanceResult() 命中 structured 分支直接 return false
+  //      -> 「替换/追加」按钮**点了没反应**（静默失败）；
+  //   2. 徽标不显示、版本等级恒为 0（内容压根没写回提示词框）。
+  // 这正是多选增强「徽标不可见 + 等级=0」的根因。
+  //
+  // 修法：只有**音乐面板**才用结构化契约，其余面板一律走文本契约。
+  // 判据用现有的 isMusicMode()（app.js 已定义，判的是 state.mode）。
+  if (typeof isMusicMode === "function" && isMusicMode()) {
+    const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
+      ? window.MusicEnhance.getWriteContract() : null;
+    if (music) return music;
+  }
   return ENHANCE_WRITE_TARGETS.text;
 }
 
