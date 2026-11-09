@@ -58,7 +58,19 @@ with sync_playwright() as pw:
     # 选中官方 PE -> 真跑
     page.click("#enhanceMenuBtn")
     page.wait_for_timeout(500)
-    page.click('#enhanceMenu button[data-method="qwen_pe"]')
+    # 多选语义：只勾官方 PE（先勾后取消其余）
+    page.click('#enhanceMenu input[data-method-check="qwen_pe"]')
+    page.wait_for_timeout(300)
+    for mid in ("basic", "refine"):
+        page.evaluate("""(mid) => {
+          const el = document.querySelector(
+            `#enhanceMenu input[data-method-check="${mid}"]`);
+          if (el && el.checked && !el.disabled) {
+            el.checked = false;
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+          }
+        }""", mid)
+        page.wait_for_timeout(200)
     page.wait_for_timeout(500)
     page.fill("#prompt", "把图里的主体改成橙色，保持姿态和背景不变")
     t0 = time.time()

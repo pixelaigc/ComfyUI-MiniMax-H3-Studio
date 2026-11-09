@@ -2529,6 +2529,10 @@ async def api_qwen_pe_expand(request):
       prompt      要扩写的原始提示词
       mode        t2i_qwen（文生图）| i2i_qwen（图片编辑）—— 决定 PE 档位
       refs        可选，图片编辑的参考图（素材库条目列表）；顺序即 <imageN> 顺序
+      system_prompt  可选，用户在「增强」多选列表里编辑过的官方 PE system prompt；
+                     不传 = 用官方内置模板（与出图链路同一份文本）
+      pe_params   可选，用户编辑过的官方 PE 档位参数
+                   （presence_penalty / max_new_tokens），不传 = 官方卡值
 
     返回:
       expanded    扩写后的提示词（前端写回提示词框，可继续编辑）
@@ -2536,6 +2540,7 @@ async def api_qwen_pe_expand(request):
       tier_label  档位中文名
       clip_name   实际用的官方 PE checkpoint 文件名
       ref_count   参考图数量
+      pe_params   实际套用的档位参数（前端用于回显「推荐参数已套用」）
 
     失败一律 4xx/5xx + 可读原因，**不返回半成品**。
     """
@@ -2571,10 +2576,27 @@ async def api_qwen_pe_expand(request):
             return web.json_response(
                 {"error": f"参考图上传失败：{exc}"[:300], "degraded": True}, status=502)
 
+    # 用户编辑过的官方 PE system prompt（不传 = 官方内置模板）。
+    # 走「增强」多选列表时，前端会把该项的可编辑字段一起传上来 ——
+    # 扩写与出图共用同一份文本（出图链路见 params["pe_system_prompt"]）。
+    system_prompt = payload.get("system_prompt")
+    if system_prompt is not None:
+        system_prompt = str(system_prompt)
+        if not system_prompt.strip():
+            return web.json_response(
+                {"error": "官方 PE 的 system prompt 不能为空（清空请改用「不使用官方 PE」）"},
+                status=400)
+
+    # 用户编辑过的官方 PE 档位参数（不传 = 官方卡值）
+    pe_params = payload.get("pe_params")
+    if pe_params is not None and not isinstance(pe_params, dict):
+        pe_params = None
+
     try:
         async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
             result = await qwen_pe.run_pe_expansion(
-                session, COMFY, original, is_edit, ref_images or None)
+                session, COMFY, original, is_edit, ref_images or None,
+                system_prompt=system_prompt, pe_params=pe_params)
     except qwen_pe.PEError as exc:
         return web.json_response(
             {"error": str(exc), "degraded": True}, status=502)
@@ -2591,6 +2613,7 @@ async def api_qwen_pe_expand(request):
         "tier_label": result["tier_label"],
         "clip_name": result["clip_name"],
         "ref_count": result["ref_count"],
+        "pe_params": result.get("pe_params"),
         "mode": mode,
     })
 

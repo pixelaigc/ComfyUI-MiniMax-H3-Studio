@@ -184,9 +184,49 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         """
         self.page.goto(self.base, wait_until="domcontentloaded")
         self.page.wait_for_timeout(2000)
+        # 「增强」多选状态存在 localStorage 里 -> 跨用例残留会让下一个用例
+        # 看到上一个用例勾过的项（甚至是在当前模式**不可用**的项，
+        # 那种复选框是 disabled 的，点不动）。所以每条用例前清干净。
+        self.page.evaluate(
+            "() => localStorage.removeItem('h3studio.enhanceSelection.v1')")
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_timeout(1500)
 
     def setUp(self):
         self.reset_page()
+
+
+    def select_only(self, method_id):
+        """只勾选指定增强项（取消默认勾的「普通增强」）。
+
+        【多选语义】下拉默认勾了「普通增强」。要测「只跑某一项」，
+        必须先把其它项取消勾 —— 否则多项都会被执行。
+        """
+        self.page.click("#enhanceMenuBtn")
+        self.page.wait_for_timeout(300)
+        # 顺序很重要：**先**勾上目标项，再取消其它项。
+        # 因为界面不允许取消到「一项都不剩」（那会让「增强」按钮无事可做），
+        # 所以先取消普通增强是取消不掉的。
+        self.page.click(f'#enhanceMenu input[data-method-check="{method_id}"]')
+        self.page.wait_for_timeout(250)
+        # 取消其余项：用 evaluate 直接改 checked 并派发 change 事件
+        # （菜单每次勾选都会重渲染 -> 旧的 element handle 会失效，
+        #   playwright 的 uncheck 会在元素被替换后做校验而超时）。
+        # 禁用的项（当前模式不可用）跳过 —— disabled 的复选框点不动。
+        for mid in ("basic", "refine", "layout", "qwen_pe"):
+            if mid == method_id:
+                continue
+            self.page.evaluate("""(mid) => {
+              const el = document.querySelector(
+                `#enhanceMenu input[data-method-check="${mid}"]`);
+              if (el && el.checked && !el.disabled) {
+                el.checked = false;
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+              }
+            }""", mid)
+            self.page.wait_for_timeout(250)
+        self.page.click(f'#enhanceMenu input[data-method-check="{method_id}"]')
+        self.page.wait_for_timeout(350)
 
     # ---- 下拉选项 ----
 
@@ -204,10 +244,11 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(400)
         items = self.page.eval_on_selector_all(
-            "#enhanceMenu button[data-method]",
-            "els => els.map(e => ({id: e.dataset.method, label:"
+            "#enhanceMenu .enhance-menu-item[data-method]",
+            "els => els.map(e => {const c = e.querySelector('input[data-method-check]');"
+            " return {id: e.dataset.method, label:"
             " e.querySelector('.enhance-menu-label').textContent.trim(),"
-            " disabled: e.disabled}))")
+            " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
         ids = [i["id"] for i in items]
         for required in ("basic", "refine", "layout"):
             self.assertIn(required, ids, f"下拉缺少 {required}")
@@ -222,7 +263,7 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(400)
         disabled = self.page.get_attribute(
-            '#enhanceMenu button[data-method="layout"]', "disabled")
+            '#enhanceMenu input[data-method-check="layout"]', "disabled")
         self.assertIsNone(disabled, "MOSS 面板下结构化增强应可用")
         self.page.keyboard.press("Escape")
 
@@ -234,23 +275,20 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
             self.page.wait_for_timeout(350)
             self.assertIsNotNone(
                 self.page.get_attribute(
-                    '#enhanceMenu button[data-method="layout"]', "disabled"),
+                    '#enhanceMenu input[data-method-check="layout"]', "disabled"),
                 f"{mode} 面板下结构化增强应被禁用")
             # 其它两种方式仍可用
             for other in ("basic", "refine"):
                 self.assertIsNone(
                     self.page.get_attribute(
-                        f'#enhanceMenu button[data-method="{other}"]', "disabled"),
+                        f'#enhanceMenu input[data-method-check="{other}"]', "disabled"),
                     f"{mode} 面板下 {other} 不该被禁用")
             self.page.keyboard.press("Escape")
             self.page.wait_for_timeout(200)
 
     def test_selecting_layout_changes_button_label_and_panels(self):
         self.switch_mode("t2i_moss")
-        self.page.click("#enhanceMenuBtn")
-        self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu button[data-method="layout"]')
-        self.page.wait_for_timeout(400)
+        self.select_only("layout")
         self.assertEqual(
             self.page.evaluate("window.enhanceMethods && window.enhanceMethods.current"),
             "layout")
@@ -264,7 +302,7 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
     def test_switching_back_to_basic_restores_template_select(self):
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu button[data-method="basic"]')
+        self.page.click('#enhanceMenu input[data-method-check="basic"]')
         self.page.wait_for_timeout(400)
         self.assertFalse(self.page.is_hidden("#enhanceSpec"))
         self.assertTrue(self.page.is_hidden("#mossLayoutBar"))
@@ -281,10 +319,7 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         这正是本条要验的东西（选项 -> 接口的路由关系）。
         """
         self.switch_mode("t2i_moss")
-        self.page.click("#enhanceMenuBtn")
-        self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu button[data-method="layout"]')
-        self.page.wait_for_timeout(300)
+        self.select_only("layout")
         self.page.fill("#prompt", "a lighthouse at dusk")
 
         # 装路由桩：记录 URL，按成功响应返回一份最小合法产物
@@ -339,10 +374,8 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
     def test_basic_option_calls_enhance_endpoint(self):
         """普通增强仍然打 /api/enhance（没被结构化增强改坏）。"""
         self.switch_mode("t2i_moss")
-        self.page.click("#enhanceMenuBtn")
-        self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu button[data-method="basic"]')
-        self.page.wait_for_timeout(300)
+        # 普通增强默认已勾 —— 这里要保证它是**唯一**被选中的项
+        self.select_only("basic")
         self.page.fill("#prompt", "a lighthouse at dusk")
         self.page.evaluate("""() => {
           window.__calls = [];
@@ -372,10 +405,7 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
     def test_layout_failure_shows_error_not_silent(self):
         """模型不可用 / 非法 JSON 时必须明确报错，不静默失败。"""
         self.switch_mode("t2i_moss")
-        self.page.click("#enhanceMenuBtn")
-        self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu button[data-method="layout"]')
-        self.page.wait_for_timeout(300)
+        self.select_only("layout")
         self.page.fill("#prompt", "a lighthouse at dusk")
         # 弹窗会拦截 alert —— 记录它，证明「有明确提示」
         self.page.evaluate("""() => {

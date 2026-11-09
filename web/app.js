@@ -109,6 +109,13 @@ const state = {
     // 「手动扩写」入口已并入「增强」下拉菜单（「qwen21图片官方增强PE」），
     // 不再是面板上的独立勾选框 —— 避免两处开关语义打架。
     usePe: true,
+    // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
+    // 由「增强」多选列表里官方 PE 那一项**自动套用**（选中即套用，可再改）。
+    // 多项共存时是叠加结果 —— 后一项不会清掉前一项已套用的参数。
+    peParams: null,
+    // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
+    // 与手动扩写用同一份文本 -> 扩写与出图走同一套规则。
+    peSystemPrompt: "",
     loras: [],
     // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
     // 参考图强制来自素材库，状态由那个模块自己管。
@@ -1746,15 +1753,18 @@ function updateActionButtons() {
   }
   // 主按钮文字随「当前增强方式」变化 —— 方式名由 enhance-menu.js 管，
   // 这里只负责 busy 期间的临时文案。
+  //
+  // 【多选】按钮文字取决于**选中了几项**（一项=该项文字，多项=「增强（N 项）」），
+  // 这个逻辑在 enhance-menu.js 里（updateButton），所以这里不要自己拼 ——
+  // 两处各拼一遍必然走偏。enhance-menu.js 暴露了 refreshButton() 供这里调用。
   if (enhText) {
     if (promptEnhance.busy) {
       enhText.textContent = "正在增强…";
     } else if (promptVersions.busy) {
       enhText.textContent = "正在细化…";
-    } else if (window.enhanceMethods && window.enhanceMethods.list) {
-      const m = window.enhanceMethods.list.find(
-        x => x.id === window.enhanceMethods.current);
-      enhText.textContent = m ? m.buttonText : "增强";
+    } else if (window.enhanceMethods
+               && typeof window.enhanceMethods.refreshButton === "function") {
+      window.enhanceMethods.refreshButton();
     }
   }
   // 下拉箭头同样要禁 —— 否则增强进行中还能切换方式
@@ -1924,6 +1934,21 @@ $("#genBtn").addEventListener("click", async () => {
       // 用户在「增强」下拉里手动跑过「qwen21图片官方增强PE」后变 false ——
       // 此时提示词框里已经是官方 PE 结果，再扩一次会冲掉用户的编辑。
       params.use_pe = !!state.imgQwen.usePe;
+      // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
+      // 由「增强」多选列表里官方 PE 那一项自动套用（选中即套用，可再改）。
+      // 多项共存时是**叠加**结果，后一项不会清掉前一项已套用的参数。
+      if (state.imgQwen.peParams) {
+        params.pe_params = {
+          presence_penalty: state.imgQwen.peParams.presence_penalty,
+          max_new_tokens: state.imgQwen.peParams.max_new_tokens,
+        };
+      }
+      // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
+      // 与手动扩写用的是同一份文本 -> 扩写与出图走同一套规则。
+      const peSp = state.imgQwen.peSystemPrompt;
+      if (peSp && String(peSp).trim()) {
+        params.pe_system_prompt = String(peSp);
+      }
     }
     if (isMossMode()) {
       // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关
