@@ -202,6 +202,82 @@ class SessionStore:
                                (session_id,))
             return cur.rowcount > 0
 
+    # ------------------------------------------------------------------ 检索
+
+    def search(self, query: str, limit: int = 20,
+               session_id: str = "", roles: tuple = ()) -> list[dict]:
+        """
+        跨会话检索历史消息。
+
+        用于 Agent 的 search_conversations 工具 —— 用户问
+        「我上次让它做那个视频是什么时候用的什么比例？」时，
+        Agent 需要能真的**找回**那句话，而不是靠模型瞎编。
+
+        实现要点：
+          * 用 LIKE 做**子串**匹配（不是 FTS）—— SQLite 默认不带 FTS5 的
+            Python 构建也有 FTS5，但 LIKE 足够：会话消息量是几百条量级，
+            全表扫的代价可以忽略，换来的是零依赖 + 行为可预测。
+          * 结果按时间倒序（最近的优先）—— 用户问的通常是最近那次。
+          * 命中片段做高亮裁剪 —— 只回传命中位置附近的上下文，
+            否则一条长消息会把工具结果撑爆（模型看到的是被截断的 JSON）。
+        """
+        needle = (query or "").strip()
+        if not needle:
+            return []
+        limit = max(1, min(int(limit or 20), 100))
+
+        sql = ("SELECT m.session_id, m.role, m.content, m.tool_name, "
+               "m.created_at, s.title FROM agent_messages m "
+               "LEFT JOIN agent_sessions s ON s.id = m.session_id "
+               "WHERE m.content LIKE ?")
+        args: list = [f"%{needle}%"]
+        if session_id:
+            sql += " AND m.session_id=?"
+            args.append(session_id)
+        if roles:
+            placeholders = ",".join("?" * len(roles))
+            sql += f" AND m.role IN ({placeholders})"
+            args.extend(list(roles))
+        sql += " ORDER BY m.created_at DESC, m.id DESC LIMIT ?"
+        args.append(limit)
+
+        with self.connect() as conn:
+            rows = conn.execute(sql, args).fetchall()
+
+        results = []
+        for row in rows:
+            content = row["content"] or ""
+            position = content.lower().find(needle.lower())
+            if position >= 0:
+                start = max(0, position - 60)
+                snippet = content[start:position + len(needle) + 120]
+                if start > 0:
+                    snippet = "…" + snippet
+                if position + len(needle) + 120 < len(content):
+                    snippet = snippet + "…"
+            else:
+                snippet = content[:180]
+            results.append({
+                "session_id": row["session_id"],
+                "session_title": row["title"] or "",
+                "role": row["role"],
+                "tool_name": row["tool_name"] or "",
+                "snippet": snippet,
+                "created_at": row["created_at"],
+            })
+        return results
+
+    def stats(self) -> dict:
+        """会话库统计（给前端/调试看）。"""
+        with self.connect() as conn:
+            sessions = conn.execute(
+                "SELECT COUNT(*) AS c FROM agent_sessions").fetchone()["c"]
+            messages = conn.execute(
+                "SELECT COUNT(*) AS c FROM agent_messages").fetchone()["c"]
+        return {"sessions": sessions, "messages": messages,
+                "max_message_chars": MAX_MESSAGE_CHARS,
+                "history_limit": HISTORY_LIMIT}
+
 
 _STORE: SessionStore | None = None
 

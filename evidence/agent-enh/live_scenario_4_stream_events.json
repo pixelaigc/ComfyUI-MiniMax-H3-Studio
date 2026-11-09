@@ -1,0 +1,421 @@
+{
+  "scenario": "SSE 流式事件序列",
+  "request": {
+    "message": "用素材库里的「雷神三视图 · 定妆照」做参考，生成一个 16:9、8 秒的文生视频，提示词：雷神手持战锤站在雪山之巅。",
+    "session_id": "live-stream-v3",
+    "stream": 1
+  },
+  "elapsed_ms": 12372,
+  "event_names": [
+    "progress",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "job",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
+    "done",
+    "result"
+  ],
+  "event_count": 24,
+  "events": [
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "start",
+        "detail": "",
+        "done": 0,
+        "total": 8,
+        "elapsed_ms": 1
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 1/8 步",
+        "done": 0,
+        "total": 8,
+        "elapsed_ms": 1
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在检索素材库",
+        "done": 0,
+        "total": 8,
+        "elapsed_ms": 1715
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "search_assets",
+        "args": {
+          "query": "雷神三视图 定妆照",
+          "category": "image"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "search_assets",
+        "ok": true,
+        "summary": "找到 0 条结果",
+        "type": "tool_result",
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在读取模式 schema",
+        "done": 0,
+        "total": 8,
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "get_mode_schema",
+        "args": {
+          "mode": "t2v"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "get_mode_schema",
+        "ok": true,
+        "summary": "已返回 t2v 的参数 schema",
+        "type": "tool_result",
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 2/8 步",
+        "done": 1,
+        "total": 8,
+        "elapsed_ms": 1716
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在检索素材库",
+        "done": 1,
+        "total": 8,
+        "elapsed_ms": 3827
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "search_assets",
+        "args": {
+          "query": "雷神"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 3827
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "search_assets",
+        "ok": true,
+        "summary": "找到 1 条结果",
+        "type": "tool_result",
+        "elapsed_ms": 3827
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 3/8 步",
+        "done": 2,
+        "total": 8,
+        "elapsed_ms": 3827
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在下发生成任务",
+        "done": 2,
+        "total": 8,
+        "elapsed_ms": 7463
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "create_job",
+        "args": {
+          "mode": "t2v",
+          "prompt": "雷神手持战锤站在雪山之巅",
+          "asset_id": "asset_c48be15ecac2",
+          "aspect": "16:9",
+          "duration": 8,
+          "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 7463
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "create_job",
+        "ok": true,
+        "summary": "已创建任务 0ce9fd35e6ad（t2v）",
+        "type": "tool_result",
+        "elapsed_ms": 7464
+      }
+    },
+    {
+      "event": "job",
+      "data": {
+        "job_id": "0ce9fd35e6ad",
+        "mode": "t2v",
+        "label": "文生视频",
+        "status": "queued",
+        "params": {
+          "prompt": "雷神手持战锤站在雪山之巅",
+          "aspect": "16:9",
+          "duration": 8.0,
+          "gen_type": "t2v"
+        },
+        "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频",
+        "prompt": "雷神手持战锤站在雪山之巅",
+        "type": "job",
+        "elapsed_ms": 7464
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 4/8 步",
+        "done": 3,
+        "total": 8,
+        "elapsed_ms": 7464
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在整理结论",
+        "done": 3,
+        "total": 8,
+        "elapsed_ms": 12346
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "respond",
+        "args": {
+          "summary": "已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
+          "job_ids": [
+            "0ce9fd35e6ad"
+          ],
+          "asset_ids": [
+            "asset_c48be15ecac2"
+          ]
+        },
+        "type": "tool_call",
+        "elapsed_ms": 12346
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "respond",
+        "ok": true,
+        "summary": "已给出结论",
+        "type": "tool_result",
+        "elapsed_ms": 12346
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "done",
+        "detail": "已完成",
+        "done": 5,
+        "total": 8,
+        "elapsed_ms": 12346
+      }
+    },
+    {
+      "event": "done",
+      "data": {
+        "answer": "已找到素材「雷神三视图 · 定妆��」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
+        "status": "completed",
+        "jobs": [
+          {
+            "job_id": "0ce9fd35e6ad",
+            "mode": "t2v",
+            "label": "文生视频",
+            "status": "queued",
+            "params": {
+              "prompt": "雷神手持战锤站在雪山之巅",
+              "aspect": "16:9",
+              "duration": 8.0,
+              "gen_type": "t2v"
+            },
+            "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频",
+            "prompt": "雷神手持战锤站在雪山之巅"
+          }
+        ],
+        "type": "done",
+        "elapsed_ms": 12346
+      }
+    },
+    {
+      "event": "result",
+      "data": {
+        "session_id": "live-stream-v3",
+        "status": "completed",
+        "answer": "已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
+        "jobs": [
+          {
+            "job_id": "0ce9fd35e6ad",
+            "mode": "t2v",
+            "label": "文生视频",
+            "prompt": "雷神手持战锤站在雪山之巅",
+            "params": {
+              "prompt": "雷神手持战锤站在雪山之巅",
+              "aspect": "16:9",
+              "duration": 8.0,
+              "gen_type": "t2v"
+            },
+            "asset_refs": [
+              {
+                "asset_id": "asset_c48be15ecac2",
+                "slot": "ref_image",
+                "ordinal": 0
+              }
+            ],
+            "status": "queued",
+            "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频"
+          }
+        ],
+        "assets": [
+          {
+            "asset_id": "asset_c48be15ecac2",
+            "name": "雷神三视图 · 定妆照",
+            "category": "image",
+            "tags": [
+              "原神中的角色雷神三视图"
+            ],
+            "description": "【素材描述】\n【主体人物】\n画面中央为一名男性武士角色（根据文件名推测为《红色警戒2》中的“武士”单位）。该人物占据画面约三分之二的比例，呈现半身特写。面部轮廓硬朗，五官立体，具有典型的东亚男性特征，神情严肃且充满杀气。\n\n【服装与配饰】\n身着华丽的日式",
+            "analyzed": true
+          }
+        ],
+        "prompt": null,
+        "steps": [
+          {
+            "step": 1,
+            "tool": "search_assets",
+            "ok": true,
+            "ms": 1714,
+            "args": "{\"query\": \"雷神三视图 定妆照\", \"category\": \"image\"}",
+            "error": null
+          },
+          {
+            "step": 1,
+            "tool": "get_mode_schema",
+            "ok": true,
+            "ms": 1715,
+            "args": "{\"mode\": \"t2v\"}",
+            "error": null
+          },
+          {
+            "step": 2,
+            "tool": "search_assets",
+            "ok": true,
+            "ms": 2111,
+            "args": "{\"query\": \"雷神\"}",
+            "error": null
+          },
+          {
+            "step": 3,
+            "tool": "create_job",
+            "ok": true,
+            "ms": 3636,
+            "args": "{\"mode\": \"t2v\", \"prompt\": \"雷神手持战锤站在雪山之巅\", \"asset_id\": \"asset_c48be15ecac2\", \"aspect\": \"16:9\", \"duration\": 8, \"summary\": \"参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频\"}",
+            "error": null
+          },
+          {
+            "step": 4,
+            "tool": "respond",
+            "ok": true,
+            "ms": 4882,
+            "args": "{\"summary\": \"已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\\n\\n- **Job ID**: 0ce9fd35e6ad\\n- **模式**: t2v（文生视频）\\n- **提示词**: …（结果已截断）…, \"job_ids\": [\"0ce9fd35e6ad\"], \"asset_ids\": [\"asset_c48be15ecac2\"]}",
+            "error": null
+          }
+        ],
+        "usage": {
+          "steps": 5,
+          "tool_calls": 5,
+          "elapsed_ms": 12345
+        },
+        "provider": {
+          "name": "本机 Qwen 多模态",
+          "model": "qwen3.8-flash-next-iq3_xxs"
+        },
+        "error": null,
+        "memory": {
+          "used": false
+        },
+        "provider_name": "本机 Qwen 多模态",
+        "type": "result"
+      }
+    }
+  ]
+}

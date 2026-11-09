@@ -1,0 +1,42 @@
+# 全量回归对比：基线 a455c7e  vs  本分支 local/feature/agent-enh-backend
+
+## 运行方式（两边完全相同）
+  python3 -m pytest tests/ -p no:cacheprovider -q
+
+## 基线（git worktree --detach a455c7e，干净工作树）
+  27 failed, 490 passed, 3 skipped, 134 errors   (197.44s)
+
+## 本分支（local/feature/agent-enh-backend）
+  27 failed, 600 passed, 3 skipped, 134 errors   (421.56s)
+
+  passed 从 490 -> 600（+110 = 新增的 79 条后端增强单测 + 11 条 SSE 单测 + 本轮其它新增；
+  失败与错误**数量完全一致**）
+
+## 失败名单 diff（diff -u baseline_failures.txt enh_failures.txt）
+
+### 新增失败（NEW —— 必须为空）
+  （无）
+
+### 新增错误（NEW —— 必须为空）
+  （无）
+
+### 消失的失败（GONE —— 基线有、本分支没有）
+  （无）
+
+### 消失的错误（GONE）
+  （无）
+
+## 逐条 diff 原文
+
+```diff
+
+```
+
+## 结论
+
+  新增失败：0 条
+  新增错误：0 条
+  消失失败：0 条
+  消失错误：0 条
+
+  基线与本分支的失败/错误名单**逐条完全相同** -> 零新增回归。
