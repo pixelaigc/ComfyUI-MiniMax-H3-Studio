@@ -643,6 +643,9 @@ body.modal-open { overflow: hidden; }
   border-radius: 6px;
   padding: 3px 6px;
   max-width: 220px;
+  /* 触控目标高度不得小于 32px（手机端契约，见 tests/test_responsive_mobile.py）。
+     这是一行真实回归：新增的模板选择器默认渲染高度只有 22px。 */
+  min-height: 32px;
 }
 .enhance-spec-select:focus { outline: none; border-color: var(--accent); }
 .enhance-spec-select:disabled { opacity: .6; cursor: default; }

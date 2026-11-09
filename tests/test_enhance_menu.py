@@ -208,6 +208,31 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         self.page.click(f'.nav-item[data-mode="{mode}"]')
         self.page.wait_for_timeout(900)
 
+    def wait_ready(self, timeout_ms=20000):
+        """
+        等「增强 Agent 配置」加载完。
+
+        /api/enhancer 是异步拉的：模板清单（provState.agent.specs）、
+        mode_defaults、refine_specs 都在它返回之后才到位。
+        「当前所选增强方式」回显要显示**模板名**（如「物体细化」），
+        必须有模板清单才查得到 —— 配置没到时回显只有裸的方式名。
+
+        这不是产品缺陷（配置到达后 providers.js 会 refreshButton() 刷新回显，
+        实测自愈），但用例不能去断言「加载中的中间态」。
+        """
+        self.page.wait_for_function(
+            """() => {
+              try {
+                return typeof provState !== 'undefined'
+                  && provState && provState.agent
+                  && Array.isArray(provState.agent.specs)
+                  && provState.agent.specs.length > 0
+                  && Object.keys(provState.modeFilters || {}).length > 0;
+              } catch (e) { return false; }
+            }""",
+            timeout=timeout_ms)
+        self.page.wait_for_timeout(300)
+
     def reset_page(self):
         """
         每条用例前把页面恢复到干净状态。
@@ -227,6 +252,8 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
             "() => localStorage.removeItem('h3studio.enhanceSelection.v1')")
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_timeout(1500)
+        # 配置到位后再跑断言（回显里的模板名依赖它）
+        self.wait_ready()
 
     def setUp(self):
         self.reset_page()
@@ -374,6 +401,8 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
 
     def test_current_enhance_method_is_visible(self):
         """规则 4：明确显示当前所选增强方式。"""
+        # 先等配置到位（回显要显示模板名，需要模板清单）
+        self.wait_ready()
         self.switch_mode("t2i")
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(250)
