@@ -301,10 +301,35 @@ SAMPLING_PRESETS = {
 
 # 【官方】InvokeAI 官方口径：扩写 max_new_tokens = 300
 # 【官方】Z-Image 本地 max_sequence_length=1024，官方换算 0.75 word/token
+#
+# 【2026-11-09 修正】原先的 300/300/512 + min(..., 1024) 硬上限是**真实缺陷**：
+#   逐物体枚举（二次增强）需要 2000+ tokens 才能写完 L1/L2/L3/环境现象/主体细化，
+#   512 会在 L2 中途硬切，后面的背景/环境/氛围/构图整段丢失 —— 表现为
+#   「二次增强只剩人物特写，骑楼/霓虹/海报/路面/光线全部消失」。
+#   官方 PE 的 300 是**单段 caption** 的口径，不是逐物体枚举的口径；
+#   直接套用到 refine 档就是拿错了尺子。
+#
+# 输出 token 上限的**可配置天花板**。
+# 用户可在「本地模型配置 → 增强 Agent」里改，默认 32768。
+# 后端实际能力：llama.cpp server 的 n_ctx=262144，本机 VRGDG_LocalLLM 节点
+# 的 max_tokens 字段上限是 262144 —— 所以 65536 也是后端允许的。
+MAX_TOKENS_CEILING = 32768
+# 允许的取值范围（前端输入框也要用同一套边界）
+MAX_TOKENS_FLOOR = 256
+MAX_TOKENS_MAX = 65536
+
+# 现在的口径：
+#   - short/medium 保留官方 300（单段 caption 场景确实够用，且是官方可复现值）
+#   - long 用**用户配置的上限**（默认 32768）—— 逐物体枚举的实际需求随
+#     提示词长度变化（实测 381 字中文 -> 2254 tokens），
+#     写死一个数不是「上限」而是「另一个硬编码」。
+#   - 硬上限改为 MAX_TOKENS_CEILING，由用户在「本地模型配置」里可调，
+#     默认 32768（≈ 2.4 万汉字，远超任何一次提示词增强的实际需要）。
 LENGTH_PRESETS = {
     "short": {"label": "精简", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
     "medium": {"label": "标准", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
-    "long": {"label": "详尽", "max_tokens": 512, "hint": "512 tokens ≈ 384 词（上限 1024）"},
+    "long": {"label": "详尽", "max_tokens": MAX_TOKENS_CEILING,
+             "hint": "用「最大输出 token 上限」（默认 32768）—— 逐物体枚举档"},
 }
 
 DEFAULT_PARAMS = {
@@ -314,6 +339,8 @@ DEFAULT_PARAMS = {
     "length": "medium",
     "sampling": "sample",
     "language": "auto",
+    # 输出 token 上限的天花板 —— 用户可配置，不再是硬编码 512/1024。
+    "max_tokens_ceiling": MAX_TOKENS_CEILING,
 }
 
 # ------------------------------------------------------------------ 模板装载
@@ -511,15 +538,62 @@ def resolve_params(params: dict | None, overrides: dict | None = None,
     if not length:
         length = merged.get("length", "medium")
     merged["length"] = length
-    if length in LENGTH_PRESETS:
-        merged["max_tokens"] = LENGTH_PRESETS[length]["max_tokens"]
-    else:
-        merged["max_tokens"] = int(merged.get("max_tokens") or 300)
-    merged["max_tokens"] = min(int(merged["max_tokens"]), 1024)
+    merged["max_tokens"] = _tier_budget(length, merged)
+    merged["max_tokens"] = clamp_max_tokens(merged["max_tokens"], merged)
 
     if merged.get("language") not in ("auto", "zh", "en"):
         merged["language"] = "auto"
     return merged
+
+
+def _tier_budget(tier: str, merged_params: dict) -> int:
+    """
+    该长度档实际使用的输出 token 预算。
+
+      short / medium —— 官方单段 caption 口径 300 tokens（可复现官方值）。
+                        单段扩写本来就不需要更多，硬给大预算只是让模型
+                        有空间去絮絮叨叨。
+      long           —— 逐物体枚举档（二次增强用它）。预算交给**用户配置的
+                        上限**：实际需求随提示词长度变化
+                        （实测 381 字中文 -> 2254 tokens），
+                        写死一个数不是「上限」而是「另一个硬编码」。
+    """
+    ceiling = _ceiling_of(merged_params)
+    if tier in ("short", "medium"):
+        return min(LENGTH_PRESETS.get(tier, {}).get("max_tokens", 300), ceiling)
+    return ceiling
+
+
+def _ceiling_of(merged_params: dict | None) -> int:
+    """取（并归一）输出 token 上限天花板。"""
+    merged_params = merged_params or {}
+    ceiling = merged_params.get("max_tokens_ceiling")
+    if ceiling is None:
+        ceiling = MAX_TOKENS_CEILING
+    try:
+        ceiling = int(ceiling)
+    except (TypeError, ValueError):
+        ceiling = MAX_TOKENS_CEILING
+    return max(MAX_TOKENS_FLOOR, min(ceiling, MAX_TOKENS_MAX))
+
+
+def clamp_max_tokens(value, merged_params: dict | None = None) -> int:
+    """
+    把 max_tokens 夹到 [MAX_TOKENS_FLOOR, 用户配置的天花板] 区间。
+
+    天花板来源（优先级从高到低）：
+      1. 本次请求传入的 max_tokens_ceiling
+      2. 用户在「本地模型配置」里保存的 params.max_tokens_ceiling
+      3. 内置默认 MAX_TOKENS_CEILING（32768）
+
+    无论夹到多少，都**不会**再被一个更小的硬编码数字（如原来的 1024）盖回去。
+    """
+    ceiling = _ceiling_of(merged_params)
+    try:
+        val = int(value)
+    except (TypeError, ValueError):
+        val = 300
+    return max(MAX_TOKENS_FLOOR, min(val, ceiling))
 
 
 def build_messages(spec: dict, original: str, language: str = "auto") -> list:
@@ -671,6 +745,193 @@ def merge_result(original: str, enhanced: str, mode: str) -> str:
             return original
         return f"{original}\n\n{enhanced}"
     return enhanced or original
+
+
+# ------------------------------------------------------------------ 要素覆盖核查
+
+# 中文分句符（中英文标点 + 换行）
+_CLAUSE_SPLIT = re.compile(r"[，。；、！？!?;,\n\r]+")
+# 英文单词（>=4 字母，避免 a/an/is 之类）
+_EN_WORD = re.compile(r"[A-Za-z][A-Za-z\-']{3,}")
+# 连续汉字（>=2 字）
+_CJK_RUN = re.compile(r"[\u4e00-\u9fff]{2,}")
+
+# 纯连接词/代词：本身不承载画面要素，切句时剔除。
+# 注意：只剔除**整个片段恰好等于**这些词的情况；
+# 「光线」「构图」「氛围」「霓虹」这类**画面维度**必须保留
+# （用户明确要求这些不能丢），所以不在这个表里。
+_CLAUSE_NOISE = {
+    "她的", "他的", "它的", "他们", "她们", "以及", "并且", "同时", "还有",
+    "其中", "这个", "那个", "可以", "能够", "整体", "感觉",
+}
+
+# 二次增强（refine 档）的结构分段标题 —— 模板规定按此顺序输出。
+# 若输出被 token 上限硬切，**后面的分段会整段消失**，
+# 这正是「背景/环境/氛围全丢」的可观测特征。
+#
+# 注意：模板写明「若某一级没有物体，跳过该级标题」——
+# 所以**不能**要求每一级都在（模型跳过 L1 是合法的）。
+# 真正可靠的判据是**末段标题**：主体细化是模板的最后一段，
+# 它不在 = 输出在中途被切断。
+REFINE_SECTIONS = ("【L1", "【L2", "【L3", "【环境现象】", "【主体细化】")
+REFINE_TERMINAL_SECTION = "【主体细化】"
+
+
+def _clause_units(original: str) -> list:
+    """
+    把用户原文切成「可核查的要素单元」。
+
+    中文按标点切句后取连续汉字片段；英文按单词。
+    过滤掉纯连接词/泛称，避免把句法变化误判成内容丢失。
+    """
+    units = []
+    for chunk in _CLAUSE_SPLIT.split(original or ""):
+        chunk = (chunk or "").strip()
+        if not chunk:
+            continue
+        for run in _CJK_RUN.findall(chunk):
+            if run in _CLAUSE_NOISE or len(run) < 2:
+                continue
+            units.append(run)
+        for word in _EN_WORD.findall(chunk):
+            if word.lower() in _CLAUSE_NOISE:
+                continue
+            units.append(word)
+    return units
+
+
+def _lcs_len(a: str, b: str) -> int:
+    """最长公共子序列长度（用于中文改写后的语义近似判定）。"""
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for i in range(1, len(a) + 1):
+        cur = [0] * (len(b) + 1)
+        ai = a[i - 1]
+        for j in range(1, len(b) + 1):
+            if ai == b[j - 1]:
+                cur[j] = prev[j - 1] + 1
+            else:
+                left = prev[j]
+                up = cur[j - 1]
+                cur[j] = left if left >= up else up
+        prev = cur
+    return prev[len(b)]
+
+
+def _unit_covered(unit: str, enhanced_low: str) -> bool:
+    """
+    一个要素单元是否在扩写结果里被保留。
+
+    中文：逐字命中，或存在 >= 3 个字的公共子序列即视为保留
+    （模型常把「褪色的繁体中文海报」写成「繁体中文海报（右侧墙面）」，
+    逐字比对会因为插入字而误判，改用 LCS 更贴近「语义是否还在」）。
+    英文：按词边界整词匹配。
+
+    这是一个**保守**的信号：refine 模板是「重新表述」而不是「逐字复制」，
+    所以单个要素单元匹配不上不代表要素丢了 —— 它只用于给出粗粒度的
+    「保留了多少原文片段」的量化指标，不能单独当作失败判据。
+    真正的失败判据是下面的 truncation 检测（finish_reason + 结构完整性）。
+    """
+    if re.search(r"[\u4e00-\u9fff]", unit):
+        if unit in enhanced_low:
+            return True
+        return _lcs_len(unit, enhanced_low) >= 3
+    pattern = r"(?<![a-z0-9])" + re.escape(unit.lower()) + r"(?![a-z0-9])"
+    return bool(re.search(pattern, enhanced_low))
+
+
+def check_element_coverage(original: str, enhanced: str) -> dict:
+    """
+    核查「扩写结果保留了多少原文要素」。
+
+    返回 {"ratio", "missing", "missing_count", "total"}。
+    ratio 是**粗粒度指标**，不是通过/失败判据（refine 模板是重述式改写，
+    单个片段匹配不上不代表要素丢了）。
+    """
+    units = _clause_units(original)
+    if not original or not enhanced or not units:
+        return {"ratio": 1.0, "missing": [], "missing_count": 0, "total": len(units)}
+    low = enhanced.lower()
+    missing = [u for u in units if not _unit_covered(u, low)]
+    ratio = 1.0 - (len(missing) / len(units))
+    return {"ratio": round(ratio, 4), "missing": missing,
+            "missing_count": len(missing), "total": len(units)}
+
+
+def check_truncation(enhanced: str, finish_reason: str = "",
+                     validate_mode: str = "", expected_sections=None) -> dict:
+    """
+    检测「输出被 token 上限硬切」。
+
+    两个独立信号，任意一个命中即判定为截断：
+
+    1. finish_reason == "length"
+       —— 后端明确告诉我们：生成是因为达到 max_tokens 而停止的。
+          这是**权威**信号（llama.cpp / OpenAI 兼容后端都会给）。
+
+    2. 末段标题缺失（refine 档）
+       —— refine 模板规定按 L1 → L2 → L3 → 环境现象 → 主体细化 顺序输出，
+          「主体细化」是**最后一段**。它不在 = 输出在中途被切断，
+          后面该出现的背景 / 环境 / 氛围 / 构图整段丢了。
+
+    注意：**不能**用「每一级标题都必须存在」当判据 ——
+    模板明确写了「若某一级没有物体，跳过该级标题」，
+    模型合法地跳过 L1 是正常的（实测本地模型确实会这么干，
+    早先按「所有级都在」判会误报截断，把好结果当失败拒掉）。
+
+    返回 {"truncated": bool, "reason": str, "missing_sections": [...]}。
+    """
+    text = enhanced or ""
+    missing_sections = []
+    # 记录「调用方是否显式指定了分段口径」——
+    # 必须在把 None 换成默认口径**之前**记下来，
+    # 否则后面判断「末段缺失」时会误以为调用方指定过口径。
+    explicit_sections = expected_sections is not None
+    if expected_sections is None:
+        expected_sections = REFINE_SECTIONS if validate_mode == "refine" else ()
+    for sec in expected_sections:
+        if sec not in text:
+            missing_sections.append(sec)
+
+    # 信号 1：后端明确说「因为长度停止」
+    if finish_reason == "length":
+        reason = (f"输出被 max_tokens 上限硬切（finish_reason=length），"
+                  f"内容不完整")
+        if missing_sections:
+            reason += "，缺失分段：" + "、".join(missing_sections)
+        return {"truncated": True, "reason": reason,
+                "missing_sections": missing_sections}
+
+    # 信号 2：refine 档的末段标题缺失 —— 输出在中途被切断。
+    # 只看末段（主体细化），中间各级允许被合法跳过。
+    if validate_mode == "refine" and not explicit_sections \
+            and REFINE_TERMINAL_SECTION not in text:
+        reason = (f"输出缺少末段「{REFINE_TERMINAL_SECTION}」，"
+                  "说明在中途被截断 —— 后面的背景/环境/氛围/构图整段丢失")
+        return {"truncated": True, "reason": reason,
+                "missing_sections": missing_sections}
+
+    return {"truncated": False, "reason": "", "missing_sections": missing_sections}
+
+
+def coverage_report(original: str, enhanced: str, finish_reason: str = "",
+                     validate_mode: str = "", expected_sections=None) -> dict:
+    """
+    要素覆盖 + 截断检测 -> 完整报告。供 /api/enhance 回传并在 UI 里显示。
+    """
+    cov = check_element_coverage(original, enhanced)
+    trunc = check_truncation(enhanced, finish_reason, validate_mode, expected_sections)
+    return {
+        "ok": not trunc["truncated"],
+        "ratio": cov["ratio"],
+        "missing": cov["missing"],
+        "missing_count": cov["missing_count"],
+        "total": cov["total"],
+        "truncated": trunc["truncated"],
+        "truncation_reason": trunc["reason"],
+        "missing_sections": trunc["missing_sections"],
+    }
 
 
 # ------------------------------------------------------------------ 校验
