@@ -334,12 +334,40 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     # ---- 下拉选项 ----
 
     def test_dropdown_lists_four_methods(self):
-        """下拉里同时有：普通增强 / 二次增强 / 结构化增强 / 官方PE。"""
+        """下拉里同时有：普通增强 / 二次增强 / 结构化增强 / 官方PE。
+
+        【2026-11-10 架构裁决】统一注册表现在有 **5** 项 ——
+        多了「YuE2 结构化风格 + 歌词」（kind: "yue2-struct"）。
+        它在**图像/视频面板是禁用的**（写明「YuE2 音乐专属，本面板不可用」），
+        但仍会出现在同一个下拉里 —— 这样用户能看到「音乐增强是什么」，
+        而不是完全看不到这一项。
+        所以本用例的判据从「恰好 4 项」放宽为
+        「4 项图像/视频相关的都在，且多出来的音乐项是禁用的」。
+        """
         self.switch_mode("t2i_qwen")
         self.open_menu()
         items = self.menu_items()
         ids = [i["id"] for i in items]
-        self.assertEqual(ids, ["basic", "refine", "layout", "qwen_pe"])
+        # 图像/视频面板应有的 4 项（顺序即注册表顺序）
+        for want in ("basic", "refine", "layout", "qwen_pe"):
+            self.assertIn(want, ids, f"下拉应包含 {want}：{ids}")
+        # 顺序：basic -> refine -> layout -> qwen_pe（yue2_struct 插在 layout 之后）
+        self.assertEqual(
+            [i for i in ids if i != "yue2_struct"],
+            ["basic", "refine", "layout", "qwen_pe"],
+            f"图像/视频面板的 4 项顺序应为注册表顺序：{ids}")
+        # 音乐项在图像/视频面板必须禁用（复选框 disabled），
+        # 并在菜单项上写明归属。
+        yue2 = [i for i in items if i["id"] == "yue2_struct"]
+        self.assertTrue(yue2, f"下拉应包含 yue2_struct 项：{ids}")
+        self.assertTrue(yue2[0]["disabled"],
+                        "yue2_struct 在图像/视频面板应禁用（复选框 disabled）")
+        # 归属文案在菜单项的徽标里
+        badge = self.page.eval_on_selector(
+            '#enhanceMenu .enhance-menu-item[data-method="yue2_struct"]',
+            "e => (e.querySelector('.enhance-menu-badge')||{}).textContent||''")
+        self.assertIn("音乐专属", badge,
+                      f"yue2_struct 应写明是音乐专属：{badge!r}")
         labels = [i["label"] for i in items]
         self.assertIn("普通增强", labels)
         self.assertIn("二次增强", labels)
