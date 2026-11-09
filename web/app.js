@@ -1431,14 +1431,9 @@ $("#imgRefSort")?.addEventListener("click", () => {
 //   做过手动官方 PE 扩写后：usePe=false -> 提示词框里**已经是**官方 PE 结果，
 //     出图时不再二次扩写（否则会把用户的编辑冲掉、白白多花一次 9B 推理）
 //   两条路都能拿到官方 PE 效果，区别只在「谁来扩写」。
-function qwenPeTierInfo() {
-  const m = QWEN_OPTIONS.models[state.imgQwen.model];
-  const tierKey = state.mode === "i2i_qwen" ? "i2i" : "t2i";
-  const tier = (QWEN_OPTIONS.peParams || {})[tierKey] || {};
-  const peClip = m ? ((tierKey === "i2i" ? m.clip_i2i : m.clip_t2i) || "") : "";
-  const tierLabel = tier.label || (tierKey === "i2i" ? "PE-I2I（图片编辑）" : "PE-T2I（文生图）");
-  return { tierKey, tierLabel, peClip, tier };
-}
+//
+// 注：原先读取官方 PE 档位的辅助函数，随独立 PE 勾选框（及其档位徽标）
+//     一起删除后已无调用点，故不再保留。
 
 // 拉取服务端下发的档位 / 比例 / 模型清单
 async function loadImageOptions() {
