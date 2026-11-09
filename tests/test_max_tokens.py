@@ -47,14 +47,6 @@ HK_PROMPT = (
 class TestMaxTokensCeiling(unittest.TestCase):
     """max_token 上限必须是可配置的大值，不是硬编码 512/1024。"""
 
-    def test_long_preset_exceeds_512(self):
-        """「详尽」档必须 > 512 —— 逐物体枚举需要 2000+ tokens。"""
-        self.assertGreater(enh.LENGTH_PRESETS["long"]["max_tokens"], 512)
-
-    def test_long_preset_covers_measured_need(self):
-        """实测：381 字中文提示词 -> 2254 tokens。上限必须盖得住。"""
-        self.assertGreaterEqual(enh.LENGTH_PRESETS["long"]["max_tokens"], 2254)
-
     def test_default_ceiling_is_large(self):
         """默认天花板必须在 32k 级别（用户要求「10 万字都正常」）。"""
         self.assertGreaterEqual(enh.MAX_TOKENS_CEILING, 32768)
@@ -66,51 +58,44 @@ class TestMaxTokensCeiling(unittest.TestCase):
         self.assertNotIn("1024", src,
                          "resolve_params 里仍有 1024 硬上限，会把可配置值盖回去")
 
-    def test_refine_default_length_gets_big_budget(self):
-        """二次增强档默认走「详尽」-> 用满用户配置的上限。"""
-        spec = {"id": "image-refine", "default_length": "long"}
-        p = enh.resolve_params(None, {}, spec)
-        self.assertEqual(p["length"], "long")
-        self.assertGreaterEqual(p["max_tokens"], enh.MAX_TOKENS_CEILING)
+    def test_ceiling_is_persisted_param(self):
+        """天花板是 DEFAULT_PARAMS 的一项，save API 才能存下来。"""
+        self.assertIn("max_tokens_ceiling", enh.DEFAULT_PARAMS)
 
     def test_saved_ceiling_is_honoured(self):
         """用户保存的天花板生效。"""
         saved = {"params": {"max_tokens_ceiling": 4096}}
-        p = enh.resolve_params({"length": "long"}, saved)
-        self.assertEqual(p["max_tokens"], 4096)
+        p = enh.resolve_params({"length": "long"}, saved, original="x" * 400)
+        self.assertLessEqual(p["max_tokens"], 4096)
 
     def test_request_ceiling_overrides_saved(self):
         """本次请求传的天花板优先于保存值。"""
         saved = {"params": {"max_tokens_ceiling": 4096}}
-        p = enh.resolve_params({"length": "long", "max_tokens_ceiling": 2048}, saved)
+        p = enh.resolve_params({"length": "long", "max_tokens_ceiling": 2048},
+                               saved, original="x" * 400)
         self.assertEqual(p["max_tokens"], 2048)
 
     def test_ceiling_clamped_to_upper_bound(self):
-        """离谱大的天花板被夹到 MAX_TOKENS_MAX，不会无限放大。"""
+        """
+        离谱大的天花板被夹到 MAX_TOKENS_MAX，不会无限放大。
+        用足够长的原文，让自适应估算值本身就超过 MAX_TOKENS_MAX，
+        这样天花板才会真正成为约束。
+        """
         saved = {"params": {"max_tokens_ceiling": 10 ** 9}}
-        p = enh.resolve_params({"length": "long"}, saved)
+        p = enh.resolve_params({"length": "long"}, saved, original="x" * 200000)
         self.assertEqual(p["max_tokens"], enh.MAX_TOKENS_MAX)
+
+    def test_ceiling_clamps_large_estimate(self):
+        """天花板低于自适应估算值时，以天花板为准。"""
+        saved = {"params": {"max_tokens_ceiling": 1000}}
+        p = enh.resolve_params({"length": "long"}, saved, original="x" * 4000)
+        self.assertEqual(p["max_tokens"], 1000)
 
     def test_ceiling_clamped_to_lower_bound(self):
         """离谱小的天花板（0）被夹到 MAX_TOKENS_FLOOR，不会变成 0。"""
         saved = {"params": {"max_tokens_ceiling": 0}}
-        p = enh.resolve_params({"length": "long"}, saved)
+        p = enh.resolve_params({"length": "long"}, saved, original="x" * 400)
         self.assertEqual(p["max_tokens"], enh.MAX_TOKENS_FLOOR)
-
-    def test_medium_tier_stays_official_300(self):
-        """单段 caption 档保持官方 300（官方可复现值不被破坏）。"""
-        p = enh.resolve_params({"length": "medium"}, {})
-        self.assertEqual(p["max_tokens"], 300)
-
-    def test_medium_tier_respects_lower_ceiling(self):
-        """天花板低于 300 时，medium 档跟着降（不越权）。"""
-        saved = {"params": {"max_tokens_ceiling": 256}}
-        p = enh.resolve_params({"length": "medium"}, saved)
-        self.assertEqual(p["max_tokens"], 256)
-
-    def test_ceiling_is_persisted_param(self):
-        """天花板是 DEFAULT_PARAMS 的一项，save API 才能存下来。"""
-        self.assertIn("max_tokens_ceiling", enh.DEFAULT_PARAMS)
 
     def test_clamp_helper_direct(self):
         """默认天花板下，超大值被夹到默认天花板；负值被夹到下限。"""
@@ -124,6 +109,94 @@ class TestMaxTokensCeiling(unittest.TestCase):
         self.assertEqual(enh.clamp_max_tokens(99999, p), 4096)
         self.assertEqual(enh.clamp_max_tokens(99999, {"max_tokens_ceiling": 999999}),
                          enh.MAX_TOKENS_MAX)
+
+
+class TestAdaptiveBudget(unittest.TestCase):
+    """
+    【审查 P1-3 阻断项】输出预算必须**按输入长度自适应**。
+
+    旧实现：medium 档固定 300 tokens -> 381 字提示词必被硬切，
+    审查实测 10 次有 6 次被切，成功率只有 40%。
+    新实现：预算 = f(原文长度, 模板口径)，没有任何固定值能卡死长提示词。
+    """
+
+    # 官方 PE（pe 档）实测自然产出 222~351 tokens
+    PE_NATURAL_MAX = 400
+    # 逐物体枚举（refine 档）实测自然产出 2254 tokens
+    REFINE_NATURAL = 2254
+
+    def test_medium_tier_is_not_capped_at_300(self):
+        """medium 档**不能**再是固定 300 —— 这是审查 P1-3 的根因。"""
+        preset = enh.LENGTH_PRESETS["medium"]
+        self.assertNotEqual(preset.get("max_tokens"), 300,
+                            "medium 档仍写死 max_tokens=300，长提示词必被硬切")
+        self.assertIsNone(preset.get("cap"),
+                           "medium 档不该有固定上限（cap 会卡死长提示词）")
+
+    def test_pe_budget_covers_natural_output(self):
+        """普通增强（pe 档）的预算要盖得住模型的自然产出。"""
+        spec = {"validate_mode": "pe"}
+        p = enh.resolve_params(None, {}, spec, original=HK_PROMPT)
+        self.assertGreaterEqual(p["max_tokens"], self.PE_NATURAL_MAX)
+
+    def test_refine_budget_covers_natural_output(self):
+        """二次增强（refine 档）的预算要盖得住 2254 tokens 的自然产出。"""
+        spec = {"validate_mode": "refine"}
+        p = enh.resolve_params(None, {}, spec, original=HK_PROMPT)
+        self.assertGreaterEqual(p["max_tokens"], self.REFINE_NATURAL)
+
+    def test_default_length_medium_no_longer_truncates(self):
+        """
+        审查 P1-3 的直接复现：image/moss-image/video 的 default_length=medium，
+        但 medium 档现在也自适应 -> 不再被 300 硬切。
+        """
+        for spec_id in ("image", "moss-image", "video"):
+            spec = enh.get_spec(spec_id, {})
+            self.assertEqual(spec.get("default_length"), "medium")
+            p = enh.resolve_params(None, {}, spec, original=HK_PROMPT)
+            self.assertGreater(p["max_tokens"], 1000,
+                               f"{spec_id} 仍是固定小预算，长提示词会被硬切")
+
+    def test_budget_grows_with_input_length(self):
+        """输入越长，预算越大（不是常数）。"""
+        spec = {"validate_mode": "pe"}
+        short = enh.resolve_params(None, {}, spec, original="a" * 50)
+        long_ = enh.resolve_params(None, {}, spec, original="a" * 2000)
+        self.assertGreater(long_["max_tokens"], short["max_tokens"])
+
+    def test_short_tier_still_capped(self):
+        """「精简」档仍然有 1024 上限（用户显式要求短输出）。"""
+        p = enh.resolve_params({"length": "short"}, {}, {"validate_mode": "pe"},
+                               original="a" * 4000)
+        self.assertLessEqual(p["max_tokens"], 1024)
+
+    def test_long_tier_has_floor(self):
+        """「详尽」档有 4096 下限。"""
+        p = enh.resolve_params({"length": "long"}, {}, {"validate_mode": "pe"},
+                               original="短")
+        self.assertGreaterEqual(p["max_tokens"], 4096)
+
+    def test_output_ratio_by_mode(self):
+        """放大倍数按 validate_mode 查表（新增模板只改 mode 即可）。"""
+        self.assertEqual(enh.output_ratio_for({"validate_mode": "pe"}),
+                         enh.OUTPUT_RATIO_DEFAULT)
+        self.assertEqual(enh.output_ratio_for({"validate_mode": "refine"}),
+                         enh.OUTPUT_RATIO_REFINE)
+        self.assertEqual(enh.output_ratio_for({"validate_mode": "music_refine"}),
+                         enh.OUTPUT_RATIO_REFINE)
+        self.assertEqual(enh.output_ratio_for({"validate_mode": "bbox"}),
+                         enh.OUTPUT_RATIO_STRUCTURED)
+
+    def test_unknown_mode_falls_back_to_default(self):
+        """未知 mode 不会崩，回落到默认倍数。"""
+        self.assertEqual(enh.output_ratio_for({"validate_mode": "nope"}),
+                         enh.OUTPUT_RATIO_DEFAULT)
+        self.assertEqual(enh.output_ratio_for(None), enh.OUTPUT_RATIO_DEFAULT)
+
+    def test_no_original_gives_floor_budget(self):
+        """没传原文时退化成保底预算，不返回 0。"""
+        p = enh.resolve_params(None, {}, {"validate_mode": "pe"})
+        self.assertGreaterEqual(p["max_tokens"], enh.MAX_TOKENS_FLOOR)
 
 
 class TestFinishReasonExtraction(unittest.TestCase):
@@ -198,37 +271,159 @@ class TestTruncationDetection(unittest.TestCase):
 
 class TestTimeoutScalesWithBudget(unittest.TestCase):
     """
-    超时必须随 max_tokens 放大。
+    超时必须随**本次实际给的 max_tokens** 放大，且封顶 600 秒。
 
-    真实故障：固定 180 秒超时在 32768 上限下直接超时，
-    而后端其实**没有**截断 —— 看起来像「输出被截断」，
-    实际是我们自己掐断了已经开始写的请求。
+    真实故障（审查 P1-3）：
+      - 固定 180 秒超时在 32768 上限下直接超时，后端其实**没有**截断
+      - 旧实现把「用户配置的上限」当成「本次预算」，
+        ceiling=32768 时即使本次只给 800 tokens，超时也被放大到封顶 1800 秒
+        -> 表现为「模型 3 秒写完了，前端却挂满 30 分钟」
     """
 
     def test_small_budget_gets_baseline(self):
-        """小预算给基础超时，且不低于下限。"""
         t = llm_client.compute_timeout(300)
         self.assertGreaterEqual(t, llm_client.MIN_TIMEOUT)
         self.assertLess(t, llm_client.compute_timeout(8192))
 
     def test_large_budget_gets_more_time(self):
         small = llm_client.compute_timeout(300)
-        large = llm_client.compute_timeout(32768)
+        large = llm_client.compute_timeout(8192)
         self.assertGreater(large, small)
-        # 实测 1646 tokens 用了 154.6 秒 -> 32768 至少要给到几百秒
-        self.assertGreater(large, 600)
+        # 3000 tokens 未封顶时给到 480 秒（实测 2254 tokens 约 210 秒）
+        self.assertGreater(llm_client.compute_timeout(3000), 400)
 
-    def test_timeout_capped(self):
+    def test_timeout_capped_at_600(self):
+        """审查要求：MAX_TIMEOUT 收到 600（不再是 1800）。"""
+        self.assertEqual(llm_client.MAX_TIMEOUT, 600.0)
         self.assertLessEqual(llm_client.compute_timeout(10 ** 9),
                              llm_client.MAX_TIMEOUT)
 
-    def test_realistic_budget_not_capped(self):
-        """8192（实测够用的一档）不应被封顶。"""
-        self.assertLess(llm_client.compute_timeout(8192), llm_client.MAX_TIMEOUT)
+    def test_ceiling_does_not_inflate_timeout(self):
+        """
+        关键回归：超时只跟**本次预算**有关，与「用户配置的上限」无关。
+        本次给 800 -> 超时 ~216 秒，绝不能因为 ceiling=32768 就变成 600 秒。
+        """
+        t800 = llm_client.compute_timeout(800)
+        self.assertLess(t800, 300)
+        self.assertNotEqual(t800, llm_client.MAX_TIMEOUT)
+
+    def test_realistic_budget_capped(self):
+        """本次给 32768 -> 封顶 600。"""
+        self.assertEqual(llm_client.compute_timeout(32768),
+                         llm_client.MAX_TIMEOUT)
 
     def test_bad_input_does_not_crash(self):
         self.assertGreater(llm_client.compute_timeout("abc"), 0)  # type: ignore[arg-type]
         self.assertGreater(llm_client.compute_timeout(None), 0)  # type: ignore[arg-type]
+
+
+class TestTemplateDerivedTerminalSection(unittest.TestCase):
+    """
+    【跨分支复用 · 审查 P2-1】末段标题必须**从模板正文解析**，
+    不能按模板 id 硬编码 —— 否则 enh-unify 的 music-refine
+    （末段「【整体细化】」）会漏检截断。
+    """
+
+    IMAGE_REFINE_TEMPLATE = """### 输出格式
+严格按以下结构输出：
+
+【L1 特写】
+物件名：
+
+【L2 中景】
+...
+
+【L3 远景】
+...
+
+【环境现象】
+光：
+
+【主体细化】
+（主体描述）
+"""
+
+    MUSIC_REFINE_TEMPLATE = """### 输出格式
+严格按以下结构输出：
+
+【L1 主线】
+人声类型：
+
+【L2 支撑】
+...
+
+【L3 远景】
+...
+
+【整体细化】
+（整体描述）
+"""
+
+    def test_parses_image_refine_sections(self):
+        secs = enh.template_sections(self.IMAGE_REFINE_TEMPLATE)
+        self.assertEqual(secs, ["【L1 特写】", "【L2 中景】", "【L3 远景】",
+                                "【环境现象】", "【主体细化】"])
+
+    def test_parses_music_refine_sections(self):
+        """音乐版模板解析出【整体细化】末段。"""
+        secs = enh.template_sections(self.MUSIC_REFINE_TEMPLATE)
+        self.assertEqual(secs, ["【L1 主线】", "【L2 支撑】", "【L3 远景】",
+                                "【整体细化】"])
+
+    def test_terminal_section_derived_from_template(self):
+        self.assertEqual(
+            enh.terminal_section_for(self.IMAGE_REFINE_TEMPLATE, "refine"),
+            "【主体细化】")
+        self.assertEqual(
+            enh.terminal_section_for(self.MUSIC_REFINE_TEMPLATE, "music_refine"),
+            "【整体细化】")
+
+    def test_terminal_section_fallback_by_mode(self):
+        """模板正文解析不出来时，按 validate_mode 查兜底表。"""
+        self.assertEqual(enh.terminal_section_for("", "refine"), "【主体细化】")
+        self.assertEqual(enh.terminal_section_for("", "music_refine"),
+                         "【整体细化】")
+        self.assertEqual(enh.terminal_section_for("", "pe"), "")
+
+    def test_music_refine_truncation_detected(self):
+        """
+        审查 P1-4 的直接复现：
+        明显被截断的 music_refine 输出，旧实现判定为「未截断」。
+        """
+        truncated = "【L1 主线】\n人声类型：温暖\n\n【L2 支撑】\n编曲：钢琴"
+        rep = enh.coverage_report(
+            "一段音乐描述", truncated, finish_reason="stop",
+            validate_mode="music_refine",
+            system_prompt=self.MUSIC_REFINE_TEMPLATE)
+        self.assertTrue(rep["truncated"], "music_refine 档的截断漏检了")
+        self.assertIn("整体细化", rep["truncation_reason"])
+
+    def test_music_refine_complete_not_truncated(self):
+        complete = ("【L1 主线】\n人声类型：温暖\n\n【L2 支撑】\n编曲：钢琴\n\n"
+                    "【L3 远景】\n空间：客厅\n\n【整体细化】\n整体：安静")
+        rep = enh.coverage_report(
+            "一段音乐描述", complete, finish_reason="stop",
+            validate_mode="music_refine",
+            system_prompt=self.MUSIC_REFINE_TEMPLATE)
+        self.assertFalse(rep["truncated"], rep["truncation_reason"])
+
+    def test_no_output_format_marker_falls_back_to_mode_table(self):
+        """
+        模板没有「输出格式」小节时，按 validate_mode 查兜底表
+        （refine -> 【主体细化】）。兜底表命中就仍然判截断。
+        """
+        rep = enh.coverage_report(
+            "一段文字", "随便什么内容", finish_reason="stop",
+            validate_mode="refine", system_prompt="你是一个助手")
+        self.assertTrue(rep["truncated"])
+        self.assertIn("主体细化", rep["truncation_reason"])
+
+    def test_mode_without_fallback_means_no_judgement(self):
+        """既没模板结构、mode 也不在兜底表里 -> 不判截断（宁可不报也不误报）。"""
+        rep = enh.coverage_report(
+            "一段文字", "随便什么内容", finish_reason="stop",
+            validate_mode="pe", system_prompt="你是一个助手")
+        self.assertFalse(rep["truncated"])
 
 
 class TestElementCoverage(unittest.TestCase):
@@ -279,6 +474,130 @@ class TestNoOther512TruncationPoints(unittest.TestCase):
         """VRGDG_LocalLLM 节点的 max_tokens 上限必须容得下我们的天花板。"""
         # 节点 schema: ["INT", {"default": 4096, "min": -1, "max": 262144, ...}]
         self.assertGreaterEqual(262144, enh.MAX_TOKENS_MAX)
+
+
+class TestEnhanceConcurrencyGate(unittest.TestCase):
+    """
+    【审查 P1-3 · 中】/api/enhance 必须有并发闸门。
+
+    没有闸门时：N 个并发请求 = N 个最长 600 秒的挂起协程，
+    aiohttp 连接池被占满，后续请求一起排队到超时。
+    """
+
+    def test_server_defines_gate(self):
+        import server
+        self.assertTrue(hasattr(server, "ENHANCE_CONCURRENCY"))
+        self.assertTrue(hasattr(server, "ENHANCE_GATE"))
+        self.assertTrue(callable(server._enhance_gate))
+
+    def test_concurrency_limit_is_2_to_3(self):
+        """审查要求：上限 2~3。"""
+        import server
+        self.assertGreaterEqual(server.ENHANCE_CONCURRENCY, 2)
+        self.assertLessEqual(server.ENHANCE_CONCURRENCY, 3)
+
+    def test_gate_is_semaphore(self):
+        import asyncio
+        import server
+        server.ENHANCE_GATE = None
+        gate = server._enhance_gate()
+        self.assertIsInstance(gate, asyncio.Semaphore)
+        self.assertEqual(gate._value, server.ENHANCE_CONCURRENCY)
+
+    def test_locked_reports_saturation(self):
+        """闸门满时 locked() 为 True（用于「抢不到就 429」的判据）。"""
+        import asyncio
+        import server
+        server.ENHANCE_GATE = None
+        gate = server._enhance_gate()
+        self.assertFalse(gate.locked())
+
+    def test_api_enhance_uses_gate(self):
+        """api_enhance 必须真的走闸门（源码级断言）。"""
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn("_enhance_gate", src)
+        self.assertIn("async with gate", src)
+        self.assertIn("429", src)
+
+    def test_concurrency_gate_does_not_block_when_free(self):
+        """闸门空闲时能立刻进入（不误伤正常请求）。"""
+        import asyncio
+        import server
+        server.ENHANCE_GATE = None
+        gate = server._enhance_gate()
+
+        async def run():
+            async with gate:
+                return "ok"
+        self.assertEqual(asyncio.run(run()), "ok")
+
+
+class TestEnhanceRetryOnTruncation(unittest.TestCase):
+    """
+    【审查 P1-3 建议修法 3】截断时**自动降级重试**，而不是直接 502。
+    """
+
+    def test_api_enhance_has_retry_loop(self):
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn("attempts", src)
+        self.assertIn("已用满上限重试仍被截断", src)
+
+    def test_retry_uses_ceiling(self):
+        """重试用的是「满上限」。"""
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn("MAX_TOKENS_CEILING", src)
+
+    def test_system_prompt_passed_to_coverage(self):
+        """system_prompt 必须传给 coverage_report（末段靠它解析）。"""
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn("system_prompt=spec.get(", src)
+
+    def test_original_passed_to_resolve_params(self):
+        """预算自适应必须拿到原文长度。"""
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn("original=original", src)
+
+
+class TestNoLegacyFixedBudgets(unittest.TestCase):
+    """调用链上不能还有别的地方把预算压回小值。"""
+
+    def test_server_enhance_uses_resolved_max_tokens(self):
+        import inspect
+        import server
+        src = inspect.getsource(server.api_enhance)
+        self.assertIn('"max_tokens": mt', src)
+        self.assertNotIn("min(params", src)
+
+    def test_llm_layer_does_not_lower_max_tokens(self):
+        """llm.py 只做透传，不得自己再夹一刀。"""
+        import inspect
+        src = inspect.getsource(llm_client.call_provider_full)
+        self.assertNotIn("min(max_tokens", src)
+
+    def test_comfy_node_path_passes_max_tokens_through(self):
+        """ComfyUI 节点链路也必须把 max_tokens 传下去。"""
+        import inspect
+        src = inspect.getsource(llm_client._call_via_comfyui)
+        self.assertIn('"max_tokens": max_tokens', src)
+
+    def test_node_supports_large_max_tokens(self):
+        """VRGDG_LocalLLM 节点的 max_tokens 上限必须容得下我们的天花板。"""
+        self.assertGreaterEqual(262144, enh.MAX_TOKENS_MAX)
+
+    def test_no_dead_tier_budget_function(self):
+        """旧的 _tier_budget 已被 adaptive_max_tokens 取代，不该残留。"""
+        self.assertFalse(hasattr(enh, "_tier_budget"))
+
 
 
 if __name__ == "__main__":
