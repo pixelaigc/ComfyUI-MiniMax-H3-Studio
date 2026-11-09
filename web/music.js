@@ -57,6 +57,10 @@
     style_enums: {},
     lyric_templates: [],
     lyric_template_default: "V-C-V-C-bridge-C",
+    // length_hint -> style 串里的英文时长描述。
+    // 【审查 P1-1】这份映射原先**硬编码在前端**（本文件的第三份副本）——
+    // 现在由服务端 /api/music-options 下发，前端不再维护第二份。
+    length_hint_text: {},
     loaded: false,
   };
 
@@ -147,6 +151,7 @@
       OPTIONS.style_enums = data.style_enums || {};
       OPTIONS.lyric_templates = data.lyric_templates || [];
       OPTIONS.lyric_template_default = data.lyric_template_default || OPTIONS.lyric_template_default;
+      OPTIONS.length_hint_text = data.length_hint_text || {};
       OPTIONS.loaded = true;
 
       // 首次进入时把默认值对齐服务端推荐
@@ -431,14 +436,8 @@
   };
   // 纯器乐时人声音色要一起清成 (none)（第三方 yue2_schema.py:397-402）
   const INSTRUMENTAL = "(instrumental / no lead vocal)";
-  // length_hint -> 英文描述（第三方 ComfyUI-YuE2/nodes.py:173）
-  const STYLE_LENGTH_HINT_TEXT = {
-    "model decides": "",
-    "short clip (~45-75s)": "short song, about one minute",
-    "single edit (~2-3 min)": "radio-length song, about two to three minutes",
-    "full song (~3.5-5 min)": "full-length song, about four minutes",
-    "very long (may truncate)": "long-form song with extended sections",
-  };
+  // length_hint -> 英文描述：**由服务端下发**（OPTIONS.length_hint_text），
+  // 前端不再硬编码（审查 P1-1：同一常量写三处必然走偏）。
 
   function styleValue(field) {
     const v = st.style_fields ? st.style_fields[field] : undefined;
@@ -554,7 +553,7 @@
     if (bpm > 0) parts.push(bpm + " BPM");
     const energy = styleValue("energy");
     if (energy && !String(energy).startsWith("(")) parts.push(String(energy));
-    const hint = STYLE_LENGTH_HINT_TEXT[String(styleValue("length_hint"))];
+    const hint = (OPTIONS.length_hint_text || {})[String(styleValue("length_hint"))];
     if (hint) parts.push(hint);
     const extra = String(styleValue("extra") || "").trim();
     if (extra) parts.push(extra);

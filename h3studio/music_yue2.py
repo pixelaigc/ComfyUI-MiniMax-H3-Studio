@@ -274,6 +274,11 @@ def model_options() -> dict:
         "style_enums": music_style.style_options()["enums"],
         "lyric_templates": music_style.style_options()["lyric_templates"],
         "lyric_template_default": music_style.style_options()["lyric_template_default"],
+        # length_hint -> style 串里的英文时长描述。
+        # 【审查 P1-1】前端原先硬编码了第三份 length_hint 映射
+        # （web/music.js 的 STYLE_LENGTH_HINT_TEXT）—— 那是「同一常量
+        # 写三处」的典型隐患。现在由服务端下发，前端不再硬编码。
+        "length_hint_text": music_style.style_options()["length_hint_text"],
     }
 
 

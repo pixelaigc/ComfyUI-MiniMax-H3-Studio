@@ -124,7 +124,18 @@ OMIT_PREFIX = "("
 INSTRUMENTAL_VOCAL = "(instrumental / no lead vocal)"
 
 MIN_LYRICS_CHARS = 200
-MIN_LINES_PER_SECTION = 4
+#: 普通段（Verse / Intro / Bridge / Outro …）的最小正文行数。
+#: 【审查 P3-2】原先对所有段一律要求 4 行，把正常的段落结构误判成问题。
+#: 现在行数门槛**只对副歌段生效**，普通段不再按行数判。
+MIN_LINES_PER_SECTION = 0
+#: 主副歌段（[Chorus] / [Final Chorus] …）的最小正文行数。
+#: 副歌是全曲记忆点，行数不足确实值得提醒，所以要求更严。
+MIN_LINES_PER_CHORUS = 4
+#: 判定「这是不是副歌段」的段标签特征。
+#:   [Chorus] / [Chorus 2] / [Final Chorus] / [Big Chorus] …
+#:   注意：**排除** [Pre-Chorus] —— 它是前副歌，不是主副歌，
+#:   行数少是正常写法（审查 P3-2 的误报案例里就有它）。
+CHORUS_TAG_RE = re.compile(r"(?<!pre-)chorus", re.I)
 SECTION_TAG_RE = re.compile(r"^\[[^\]\n]{1,30}\]\s*$", re.M)
 # [Instrumental] / [Instrumental Break] 这类不是曲式段，是段内的占位内容。
 # 纯器乐歌词全是它，不能当段标签切，否则每段都变成 0 行正文，误报「段不足 4 行」。
@@ -333,6 +344,15 @@ def extract_sections(lyrics: str):
     return sections
 
 
+def _is_chorus_tag(tag: str) -> bool:
+    """这个段是不是主副歌段（[Chorus] / [Final Chorus] / [Chorus 2] …）。
+
+    【审查 P3-2】副歌的行数要求比其它段严 —— 副歌是全曲记忆点，
+    写成 1~2 行确实值得提醒；而 Verse 3 行 / Intro 2 行是常规写法。
+    """
+    return bool(CHORUS_TAG_RE.search(tag or ""))
+
+
 def _lyrics_problems(lyrics: str):
     """返回歌词质量问题列表（非空 = 有问题）。"""
     problems = []
@@ -345,15 +365,32 @@ def _lyrics_problems(lyrics: str):
     for required in ("[Chorus]", "[Bridge]"):
         if not any(t == required for t in tags):
             problems.append(f"lyrics: 缺 {required} 段")
-    # 纯器乐歌词每段只有一行 [Instrumental]，是正确写法，不按 4 行要求判
+    # 纯器乐歌词每段只有一行 [Instrumental]，是正确写法，不按行数要求判
     instrumental_only = all(
         all(not b or b.lower() == "[instrumental]"
             or b.lower().startswith("[instrumental") for b in body)
         for _t, body in sections)
-    thin = [] if instrumental_only else [
-        t for t, body in sections if len([b for b in body if b]) < MIN_LINES_PER_SECTION]
-    if thin:
-        problems.append(f"lyrics: 这些段不足 {MIN_LINES_PER_SECTION} 行: {thin}")
+    if not instrumental_only:
+        # 【审查 P3-2】原来对**所有**段一律要求 >= 4 行，把
+        #   [Intro] / [Verse 1] / [Pre-Chorus] / [Bridge] / [Outro]
+        # 这些**正常段落结构**全判成问题（实测每次必现的固定噪音，
+        # 降低提示的可信度）。
+        #
+        # 审查报告的建议原文：「把『不足 4 行』降级为**仅对
+        # [Chorus]/[Final Chorus] 这类主歌段生效**」。照此实现：
+        #   - 主副歌段（[Chorus] / [Final Chorus] / [Chorus 2] …）
+        #     -> 仍要求 >= 4 行（副歌是全曲记忆点，行数不足值得提醒）
+        #   - 其它段（Verse / Intro / Pre-Chorus / Bridge / Outro）
+        #     -> **不再按行数判**（Verse 3 行、Intro 1 行都是常规写法）
+        thin = []
+        for tag, body in sections:
+            if not _is_chorus_tag(tag):
+                continue
+            if len([b for b in body if b]) < MIN_LINES_PER_CHORUS:
+                thin.append(tag)
+        if thin:
+            problems.append(
+                f"lyrics: 这些副歌段不足 {MIN_LINES_PER_CHORUS} 行: {thin}")
     if len(clean.strip()) < MIN_LYRICS_CHARS:
         problems.append(f"lyrics: 只有 {len(clean.strip())} 字符 (<{MIN_LYRICS_CHARS})")
     return problems
@@ -513,9 +550,9 @@ _LYRICS_DOC = [
     ("template", "COMBO", "歌词骨架模板。只在 lyrics_override 为空时兜底，"
      "程序会强制改成 V-C-V-C-bridge-C，你按这个填即可。",
      "固定填 V-C-V-C-bridge-C"),
-    ("lyrics_override", "STRING", "完整歌词，多行。必须带段标签，每段至少 4 行，"
-     "全文字符数 >= 200。段标签可用：[Intro] [Verse 1] [Pre-Chorus] [Chorus] "
-     "[Verse 2] [Bridge] [Final Chorus] [Outro]。",
+    ("lyrics_override", "STRING", "完整歌词，多行。必须带段标签，副歌段至少 4 行，"
+     "全文字符数 >= 200。段标签可用：[Intro] [Verse 1] [Pre-Chorus] "
+     "[Chorus] [Verse 2] [Bridge] [Final Chorus] [Outro]。",
      "人声歌：段标签下面写真实歌词，必须跟用户主题一致。纯器乐：每个段标签下面"
      "单独一行写 [Instrumental]，但段标签本身必须齐全（这是 YuE2 识别曲式的依据）"),
 ]
@@ -704,7 +741,7 @@ def build_system_prompt(enums=None) -> str:
     A("4. `vocal` 是纯器乐时，写的是 `(instrumental / no lead vocal)`（带两侧圆括号）。")
     A("5. `length_hint` 写的是 `full song (~3.5-5 min)` 这样的原始枚举，不是自己改写的说法。")
     A("6. `tempo_bpm` 是数字，在 0-220 之间。")
-    A("7. `lyrics_override` 有段标签、每段 >= 4 行、总字符 >= 200。")
+    A("7. `lyrics_override` 有段标签、副歌段 >= 4 行、总字符 >= 200。")
     A("8. `custom_language` 和 `custom_genre` 都是 `\"\"`。")
     A("")
     A("以上任一条不满足，先修正再输出。最终答案只有那个 JSON 对象。")

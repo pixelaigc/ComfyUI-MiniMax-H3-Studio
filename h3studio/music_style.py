@@ -1,118 +1,89 @@
 # -*- coding: utf-8 -*-
+"""YuE2 结构化风格 —— 面板侧的薄封装（**权威实现见 yue2_schema.py**）。
+
+【为什么是薄封装】审查 P1-1：
+   本模块曾与 h3studio/yue2_schema.py **各持一份** STATIC_ENUMS /
+   _omit() / build_style_prompt() / length_hint 映射。两份副本当前
+   行为一致（已实测同进程比对），但那是**巧合性的一致** —— 改一处忘
+   另一处就会出现「A 路径能拼、B 路径拼不出」的隐性 bug。
+
+   现在：**权威实现唯一** = h3studio/yue2_schema.py
+     - STATIC_ENUMS / get_enums()  -> 运行时从 ComfyUI /object_info 拉，
+       失败回退静态副本（永不在前端维护第二份枚举）
+     - build_style_prompt()         -> 与官方节点 ComfyUI-YuE2/nodes.py
+       逐条对齐
+     - LENGTH_HINTS                 -> length_hint -> style 串里的英文时长描述
+   本模块只保留**面板需要、但 schema 里没有**的东西：
+     - STYLE_DEFAULTS（面板默认值，与 schema 的 DEFAULTS 语义不同：
+       schema 的 DEFAULTS 是「模型漏填时的收敛目标」，面板默认是
+       「用户没动过时给什么」）
+     - style_fields_from_params()   -> 从 HTTP 参数取 12 个字段 + 纯器乐联动
+     - style_options()              -> 给前端 /api/music-options 的选项清单
+     - resolve_lyrics()             -> 歌词为空时用段落骨架兜底
+
+【兼容】
+   旧名保留（re-export），现有调用方（music_yue2.py / server.py / 测试）
+   不需要改：
+     STATIC_ENUMS / LENGTH_HINT_TEXT / LYRIC_TEMPLATES / STYLE_FIELDS /
+     _OMIT_PREFIX / get_enums / _omit
 """
-YuE2 结构化风格描述 —— 对齐第三方 `YuE2StylePrompt` 节点的语义。
 
-【为什么要它】
-第三方链路（nonebot_plugin_novelai/h3_yue2.py）不是让用户直接写一整段英文
-style，而是用 `YuE2StylePrompt` 节点把 **12 个结构化字段** 拼成 style 串
-（custom_nodes/ComfyUI-YuE2/nodes.py:184-212 的 build_style_prompt）。
-那套字段是实跑验证过出活效果的，我们之前只支持「一整段自由文本」，
-表达力弱于第三方。
-
-【关键语义（全部来自第三方节点源码，不是我们发明的）】
-1. **「括号即省略」**：`_omit(value)`（nodes.py:181-182）—— 值以 `(` 开头
-   就把该段整段丢弃。所以枚举里的 `(none)` / `(custom / none)` /
-   `(instrumental / no lead vocal)` 不是字面量，是「不要这一段」。
-2. **拼接顺序固定**（nodes.py:184-212）：
-   language → genre → mood → (vocal_color + vocal) → instruments →
-   "{BPM} BPM" → energy → length_hint 的英文描述 → extra
-3. **length_hint 是文本映射不是参数**（nodes.py:173）：
-   model decides        -> ""
-   short clip (~45-75s) -> "short song, about one minute"
-   single edit (~2-3 min) -> "radio-length song, about two to three minutes"
-   full song (~3.5-5 min) -> "full-length song, about four minutes"
-   very long (may truncate) -> "long-form song with extended sections"
-4. **纯器乐必须 vocal + vocal_color 成对置 `(none)`**（yue2_schema.py:397-402），
-   否则会拼出 "warm instrumental"，模型可能自己加唱。
-5. **tempo_bpm=0 不写进 style 串**（nodes.py:196-197）。
-6. **枚举值以运行时 ComfyUI /object_info 为准**（yue2_schema.py:106-134，
-   TTL 15 分钟），失败回退静态副本 —— 绝不二次手抄。
-
-【我们做什么、保留什么】
-* 新增：结构化风格字段（12 个），可单独使用，也可与自由文本 style 合并。
-* 保留：面板的自由文本风格描述框（那是我们的交互，第三方是聊天里选枚举）。
-* 拼接：**沿用第三方节点的 build_style_prompt 逐字逻辑**，不自己发明。
-"""
-from __future__ import annotations
-
-import json
-import time
-import urllib.request
-from pathlib import Path
+from . import yue2_schema
 
 # ------------------------------------------------------------------
-# 枚举（静态兜底副本；权威来源是运行中的 ComfyUI /object_info）
-# 抄自 ComfyUI-YuE2/nodes.py:167-180（第三方 yue2_schema.py:59-68 的 STATIC_ENUMS 同源）
+# 权威实现的 re-export（**不要在这里再抄一份**）
 # ------------------------------------------------------------------
-STATIC_ENUMS = {
-    "language": [
-        "English", "Mandarin", "Cantonese", "Japanese", "Korean", "Spanish",
-        "French", "Portuguese", "German", "Italian", "Hindi",
-        "(custom / none)",
-    ],
-    "genre": [
-        "pop", "piano pop", "indie pop", "synth pop", "dance pop", "r&b", "soul",
-        "funk", "nu-disco", "disco", "house", "edm", "hip hop", "trap", "rap",
-        "rock", "indie rock", "alternative rock", "punk", "metal", "jazz",
-        "jazz-funk", "bossa nova", "latin", "reggaeton", "country", "folk",
-        "indie folk", "singer-songwriter", "acoustic", "gospel", "blues",
-        "lo-fi", "dream pop", "shoegaze", "ambient", "cinematic", "film score",
-        "classical crossover", "k-pop", "j-pop", "city pop", "c-pop",
-        "afrobeats", "reggae", "ska", "(custom / none)",
-    ],
-    "mood": [
-        "(none)", "uplifting", "euphoric", "romantic", "intimate", "melancholic",
-        "bittersweet", "dark", "aggressive", "playful", "nostalgic", "dreamy",
-        "cinematic", "chill", "anthemic", "mysterious",
-    ],
-    "vocal": [
-        "(instrumental / no lead vocal)", "female vocal", "male vocal",
-        "androgynous vocal", "duet male and female", "choir / stacked vocals",
-        "rap lead", "spoken word",
-    ],
-    "vocal_color": [
-        "(none)", "warm", "bright", "breathy", "powerful", "raspy",
-        "soft intimate", "belting", "tenor", "baritone", "soprano", "alto",
-    ],
-    "energy": [
-        "(none)", "low energy", "mid energy", "high energy",
-        "builds from quiet to loud",
-    ],
-    "length_hint": [
-        "model decides", "short clip (~45-75s)", "single edit (~2-3 min)",
-        "full song (~3.5-5 min)", "very long (may truncate)",
-    ],
-}
 
-#: length_hint -> 写进 style 串的英文描述（第三方 nodes.py:173）
-LENGTH_HINT_TEXT = {
-    "model decides": "",
-    "short clip (~45-75s)": "short song, about one minute",
-    "single edit (~2-3 min)": "radio-length song, about two to three minutes",
-    "full song (~3.5-5 min)": "full-length song, about four minutes",
-    "very long (may truncate)": "long-form song with extended sections",
-}
+#: 静态兜底枚举（运行时权威仍是 ComfyUI /object_info）
+STATIC_ENUMS = yue2_schema.STATIC_ENUMS
 
-#: 歌词段落骨架模板 —— 抄自第三方 ComfyUI-YuE2/nodes.py:174-179
-#:
-#: 【第三方语义】`YuE2LyricsTemplate.build()`（nodes.py:281-283）逻辑是
-#: **lyrics_override 非空就完全忽略 template**；为空才用 template 的骨架。
-#: 我们的面板有自由歌词框，所以模板只作为「歌词为空时的兜底骨架」。
-LYRIC_TEMPLATES = {
-    "blank": "",
-    "verse + chorus": "[Verse]\nLine one of the verse\nLine two of the verse\n\n[Chorus]\nSing the hook here\nRepeat the title line",
-    "V-C-V-C": "[Verse]\nFirst verse line\n\n[Chorus]\nMain hook\n\n[Verse]\nSecond verse line\n\n[Chorus]\nMain hook",
-    "V-C-V-C-bridge-C": "[Verse]\nFirst verse\n\n[Chorus]\nHook\n\n[Verse]\nSecond verse\n\n[Chorus]\nHook\n\n[Bridge]\nContrast the chorus here\n\n[Chorus]\nFinal hook",
-}
+#: length_hint -> 写进 style 串的英文时长描述
+#: （旧名 LENGTH_HINT_TEXT 保留；权威名 LENGTH_HINTS）
+LENGTH_HINT_TEXT = yue2_schema.LENGTH_HINTS
+LENGTH_HINTS = yue2_schema.LENGTH_HINTS
 
-#: 字段顺序 = ComfyUI YuE2StylePrompt 的 input_order（第三方 yue2_schema.py:35-39）
-STYLE_FIELDS = [
-    "language", "genre", "mood", "vocal", "vocal_color", "instruments",
-    "tempo_bpm", "energy", "length_hint", "extra",
-    "custom_language", "custom_genre",
-]
+#: 歌词段落骨架模板
+LYRIC_TEMPLATES = yue2_schema.LYRIC_TEMPLATES
 
-#: 第三方默认字段值（ComfyUI-YuE2/nodes.py:253-265）
+#: 字段顺序 = ComfyUI YuE2StylePrompt 的 input_order
+STYLE_FIELDS = yue2_schema.STYLE_FIELDS
+
+#: 「括号即省略」的标记
+_OMIT_PREFIX = yue2_schema.OMIT_PREFIX
+
+#: 运行时枚举（优先 ComfyUI，失败回退静态副本）
+get_enums = yue2_schema.get_enums
+
+#: 「括号即省略」判定（官方节点 nodes.py:181-182 语义）
+_omit = yue2_schema._omit
+
+
+def build_style_prompt(language, genre, mood, vocal, vocal_color, instruments,
+                       tempo_bpm, energy, length_hint, extra,
+                       custom_language="", custom_genre="") -> str:
+    """拼 style 串 —— **委托给权威实现** yue2_schema.build_style_prompt()。
+
+    保留位置参数签名（历史调用方按位置传），内部转成 dict 交给权威实现。
+    两边的判定逻辑因此**结构上**一致，不再依赖「两份副本碰巧相同」。
+    """
+    return yue2_schema.build_style_prompt({
+        "language": language,
+        "genre": genre,
+        "mood": mood,
+        "vocal": vocal,
+        "vocal_color": vocal_color,
+        "instruments": instruments,
+        "tempo_bpm": tempo_bpm,
+        "energy": energy,
+        "length_hint": length_hint,
+        "extra": extra,
+        "custom_language": custom_language,
+        "custom_genre": custom_genre,
+    })
+
+
+#: 面板默认值（用户没动过时给什么）。
+#: 注意与 yue2_schema.DEFAULTS 的区别：那是「模型漏填时的收敛目标」。
 STYLE_DEFAULTS = {
     "language": "English",
     "genre": "piano pop",
@@ -128,128 +99,11 @@ STYLE_DEFAULTS = {
     "custom_genre": "",
 }
 
-#: 「括号即省略」的标记 —— 值以 ( 开头就整段丢弃（第三方 nodes.py:181-182）
-_OMIT_PREFIX = "("
-
-#: 运行时枚举缓存（第三方 yue2_schema.py:28-29 同款：15 分钟 TTL）
-_OBJECT_INFO_URL = "http://127.0.0.1:8188/object_info"
-_ENUM_TTL = 900.0
-_enum_cache: dict = {"at": 0.0, "enums": {}}
-
-
-def _fetch_enums() -> dict:
-    """从运行中的 ComfyUI 拉 YuE2StylePrompt 的真实枚举。
-
-    第三方 yue2_schema.py:106-134 就是这么做的 —— 枚举永不二次手抄，
-    因为手抄过一次就出过 ComfyUI 400 value_not_in_list（h3_yue2.py:36-39 注释）。
-    """
-    try:
-        with urllib.request.urlopen(_OBJECT_INFO_URL, timeout=8) as resp:
-            data = json.loads(resp.read())
-    except Exception:
-        return {}
-    node = data.get("YuE2StylePrompt") or {}
-    required = node.get("input", {}).get("required", {})
-    out = {}
-    for field, spec in required.items():
-        if isinstance(spec, list) and spec and isinstance(spec[0], list):
-            out[field] = list(spec[0])
-    return out
-
-
-def get_enums() -> dict:
-    """取枚举（优先运行时，失败回退静态副本）。"""
-    now = time.time()
-    if now - _enum_cache["at"] < _ENUM_TTL and _enum_cache["enums"]:
-        return _enum_cache["enums"]
-    runtime = _fetch_enums()
-    merged = {k: list(v) for k, v in STATIC_ENUMS.items()}
-    for k, v in runtime.items():
-        if v:
-            merged[k] = v
-    _enum_cache["at"] = now
-    _enum_cache["enums"] = merged
-    return merged
-
-
-def _omit(value) -> bool:
-    """第三方 nodes.py:181-182 的 _omit：值为空或以 ( 开头 -> 该段丢弃。
-
-    【重要，只对 mood / vocal / vocal_color / energy 生效】
-    language / genre 走的是另一条路（见 build_style_prompt）——
-    它们的 "(custom / none)" 是**要换成 custom_* 的值**，不是「省略」。
-    """
-    s = "" if value is None else str(value).strip()
-    return not s or s.startswith(_OMIT_PREFIX)
-
-
-def build_style_prompt(language, genre, mood, vocal, vocal_color, instruments,
-                       tempo_bpm, energy, length_hint, extra,
-                       custom_language="", custom_genre="") -> str:
-    """拼 style 串 —— **逐行对齐**第三方 ComfyUI-YuE2/nodes.py:184-212。
-
-    与第三方唯一的差别：第三方是 COMBO 值，这里允许任意字符串；
-    但每个分支的判定逻辑完全一致（已用 9 组参数做同进程输出比对验证）。
-
-    第三方原始逻辑（nodes.py:186-212）：
-        lang = custom_language if language.startswith("(custom") else language
-        gen  = custom_genre   if genre.startswith("(custom")    else genre
-        if lang: parts.append(lang)
-        if gen:  parts.append(gen)
-        if not _omit(mood):     parts.append(mood)
-        if not _omit(vocal):
-            color = "" if _omit(vocal_color) else vocal_color + " "
-            parts.append(color + vocal)
-        elif not _omit(vocal_color):
-            parts.append(vocal_color + " instrumental")
-        inst = (instruments or "").strip()
-        if inst: parts.append(inst)
-        if int(tempo_bpm) > 0: parts.append(f"{int(tempo_bpm)} BPM")
-        if not _omit(energy):   parts.append(energy)
-        hint = LENGTH_HINTS.get(length_hint, "")
-        if hint: parts.append(hint)
-        extra_txt = (extra or "").strip()
-        if extra_txt: parts.append(extra_txt)
-        return ", ".join(parts)
-    """
-    parts = []
-    lang = str(custom_language or "").strip() if str(language).startswith("(custom") else language
-    if lang:
-        parts.append(lang)
-    gen = str(custom_genre or "").strip() if str(genre).startswith("(custom") else genre
-    if gen:
-        parts.append(gen)
-    if not _omit(mood):
-        parts.append(mood)
-    if not _omit(vocal):
-        color = "" if _omit(vocal_color) else str(vocal_color) + " "
-        parts.append(color + str(vocal))
-    elif not _omit(vocal_color):
-        parts.append(str(vocal_color) + " instrumental")
-    inst = (instruments or "").strip()
-    if inst:
-        parts.append(inst)
-    try:
-        bpm = int(tempo_bpm)
-    except (TypeError, ValueError):
-        bpm = 0
-    if bpm > 0:
-        parts.append(f"{bpm} BPM")
-    if not _omit(energy):
-        parts.append(energy)
-    hint = LENGTH_HINT_TEXT.get(length_hint, "")
-    if hint:
-        parts.append(hint)
-    extra_txt = (extra or "").strip()
-    if extra_txt:
-        parts.append(extra_txt)
-    return ", ".join(parts)
-
 
 def style_fields_from_params(params: dict) -> dict:
     """从面板参数里取结构化风格字段。
 
-    params 里没给就用第三方默认值 —— 保证「什么都不填」也能出活，
+    params 里没给就用面板默认值 —— 保证「什么都不填」也能出活，
     与第三方节点默认行为一致。
     """
     out = {}
@@ -271,7 +125,12 @@ def style_fields_from_params(params: dict) -> dict:
 
 
 def style_options() -> dict:
-    """给前端的结构化风格选项清单。"""
+    """给前端的结构化风格选项清单。
+
+    【length_hint 的英文描述也在这里下发】前端原先硬编码了第三份
+    length_hint 映射（web/music.js 的 STYLE_LENGTH_HINT_TEXT）——
+    审查 P1-1 指出的第三份副本。现在由服务端下发，前端不再硬编码。
+    """
     enums = get_enums()
     return {
         "fields": list(STYLE_FIELDS),
@@ -279,6 +138,8 @@ def style_options() -> dict:
         "enums": {k: list(v) for k, v in enums.items()},
         "lyric_templates": list(LYRIC_TEMPLATES.keys()),
         "lyric_template_default": "V-C-V-C-bridge-C",
+        # length_hint -> style 串里的英文时长描述（前端拼预览用）
+        "length_hint_text": dict(LENGTH_HINTS),
     }
 
 
