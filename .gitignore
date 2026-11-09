@@ -8,6 +8,7 @@ outputs/
 
 # ── 环境相关配置（从 config.example.json 复制后按需修改）───────────
 config.json
+config.dev.json
 .env
 .env.*
 !.env.example

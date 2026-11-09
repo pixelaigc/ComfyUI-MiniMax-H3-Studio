@@ -47,9 +47,49 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from h3studio import music_style
 from h3studio import music_yue2  # noqa: E402
+
+
+def _strip_js_comments(src: str) -> str:
+    """去掉 JS 注释（// 与 /* */），只留真实代码。
+
+    断言「某个标识符不该再出现」时，注释里的历史说明会造成误判
+    （例如文件头写着「旧的 #musicModeChips 已删除」）。
+    """
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"//[^\n]*", "", src)
+    return src
 from h3studio import gen_types  # noqa: E402
 from h3studio import workflows  # noqa: E402
+
+
+def _strip_comments(text: str) -> str:
+    """剔除 Python 注释与 docstring，只留真正的代码。
+
+    用于「源码里不得再有 X 引用」这类断言 —— 注释里解释历史决策是合理的，
+    要禁的是会被执行/展示的代码。
+    """
+    out = []
+    in_doc = False
+    quote = ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if in_doc:
+            if quote in stripped:
+                in_doc = False
+            continue
+        if stripped.startswith('"') and len(stripped) >= 3:
+            head = stripped[:3]
+            if head in ('"""', "'''"):
+                quote = head
+                if not (stripped.endswith(head) and len(stripped) > 3):
+                    in_doc = True
+                continue
+        if stripped.startswith("#"):
+            continue
+        out.append(line.split("#", 1)[0])
+    return "\n".join(out)
 
 
 # ComfyUI 原生 YuE2 节点白名单 —— 工作流里只允许出现这些
@@ -233,8 +273,16 @@ class TestMusicWorkflow(unittest.TestCase):
         self.assertEqual(ks["inputs"]["seed"], 1234)
 
     def test_empty_prompt_rejected(self):
+        """风格描述全空要报错。
+
+        【2026-11-09 对齐第三方后】面板支持结构化风格字段，
+        所以「prompt 为空」不再必然报错 —— 只有**结构化字段也全空**才报错。
+        显式把所有结构化字段置空才能触发这个错误。
+        """
+        blank = {f"style_{f}": "" for f in music_style.STYLE_FIELDS}
+        blank["style_tempo_bpm"] = 0
         with self.assertRaises(ValueError):
-            workflows.build_workflow("t2a", {"prompt": "   ", "job_id": "z"})
+            workflows.build_workflow("t2a", {"prompt": "   ", "job_id": "z", **blank})
 
     def test_duration_clamped(self):
         wf = self._wf(max_duration=99999)
@@ -255,13 +303,49 @@ class TestMusicWorkflow(unittest.TestCase):
         self.assertEqual(ks["inputs"]["sampler_name"], "dpm_2")
 
     def test_style_and_lyrics_reach_both_abc_and_music(self):
-        wf = self._wf(prompt="jazz, 120 BPM", lyrics="[Verse]\nhi")
+        """结构化风格 + 自由文本都进 style；歌词两处一致。
+
+        【2026-11-09 对齐第三方】style 现在 = 结构化字段拼出的串 + 自由文本，
+        顺序是「结构化在前、自由文本在后」。
+        """
+        blank = {f"style_{f}": "" for f in music_style.STYLE_FIELDS}
+        blank["style_tempo_bpm"] = 0
+        wf = self._wf(prompt="jazz, 120 BPM", lyrics="[Verse]\nhi", **blank)
         abc = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateABC")
         music = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateMusic")
         self.assertEqual(abc["inputs"]["style"], "jazz, 120 BPM")
         self.assertEqual(music["inputs"]["style"], "jazz, 120 BPM")
         self.assertEqual(abc["inputs"]["lyrics"], "[Verse]\nhi")
         self.assertEqual(music["inputs"]["lyrics"], "[Verse]\nhi")
+
+    def test_structured_style_prepended_to_free_text(self):
+        """结构化字段拼出的串在前，自由文本在后。"""
+        wf = self._wf(prompt="sunset over the sea",
+                      style_genre="jazz-funk", style_tempo_bpm=120,
+                      style_mood="(none)", style_vocal="(none)",
+                      style_vocal_color="(none)", style_energy="(none)",
+                      style_length_hint="model decides", style_extra="",
+                      style_instruments="upright bass, brush drums",
+                      style_language="English")
+        abc = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateABC")
+        music = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateMusic")
+        expected = "English, jazz-funk, upright bass, brush drums, 120 BPM, sunset over the sea"
+        self.assertEqual(abc["inputs"]["style"], expected)
+        self.assertEqual(music["inputs"]["style"], expected)
+
+    def test_style_defaults_used_when_nothing_set(self):
+        """什么都不填 -> 用第三方默认字段，仍能出活（不报错）。"""
+        wf = self._wf(prompt="")
+        music = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateMusic")
+        style = music["inputs"]["style"]
+        self.assertIn("piano pop", style)
+        self.assertIn("88 BPM", style)
+
+    def test_empty_lyrics_falls_back_to_template(self):
+        """歌词为空 -> 用第三方段落骨架（YuE2LyricsTemplate 语义）。"""
+        wf = self._wf(lyrics="")
+        music = next(n for n in wf.values() if n["class_type"] == "YuE2GenerateMusic")
+        self.assertIn("[Chorus]", music["inputs"]["lyrics"])
 
 
 class TestMusicModelOptions(unittest.TestCase):
@@ -430,12 +514,78 @@ class TestMusicFrontend(unittest.TestCase):
     def test_index_html_has_music_panel(self):
         html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="musicPanel"', html)
-        self.assertIn('id="musicStyle"', html)
+        # 【2026-11-09】自由文本「风格描述」框改成「音乐描述」框（增强的输入）
+        self.assertIn('id="musicPrompt"', html)
         self.assertIn('id="musicLyrics"', html)
         self.assertIn('id="musicRefPick"', html)
         self.assertIn('data-mode="t2a"', html)
         self.assertIn('data-mode="a2a"', html)
         self.assertIn("/static/music.js", html)
+
+    def test_no_mode_switch_in_music_panel(self):
+        """
+        【用户要求 1】面板顶部**不再有「生成模式」切换** ——
+        文生音乐 / 参考生音乐靠**左侧两个独立标签**切换。
+        旧的 chips / note 必须删干净。
+
+        注意：检查的是**代码**，不是注释 —— 文件头的说明注释里会提到
+        「旧的 #musicModeChips 已删除」这类历史，不能因此误判。
+        """
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="musicModeChips"', html,
+                         "音乐面板里的生成模式切换必须移除（靠左侧标签切）")
+        self.assertNotIn('id="musicModeNote"', html)
+        js = _strip_js_comments(
+            (REPO / "web" / "music.js").read_text(encoding="utf-8"))
+        self.assertNotIn("musicModeChips", js,
+                         "music.js 不得再有任何模式切换逻辑")
+        self.assertNotIn("musicModeNote", js)
+
+    def test_no_duration_control(self):
+        """【用户要求 3】移除「最长时长」参数 —— 面板与前端都不再有。"""
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="musicDuration"', html, "「最长时长」控件必须移除")
+        js = _strip_js_comments(
+            (REPO / "web" / "music.js").read_text(encoding="utf-8"))
+        self.assertNotIn("musicDuration", js)
+        self.assertNotIn("max_duration", js,
+                         "前端不得再提交 max_duration（后端也不再按时长截断）")
+
+    def test_structured_style_and_regen_exist(self):
+        """【用户要求 5】可编辑的结构化风格区 + 歌词区 + 「重新生成」。"""
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="musicStyleStructField"', html)
+        self.assertIn('id="musicStyleFieldsGrid"', html)
+        self.assertIn('id="musicStyleRegenBtn"', html)
+        self.assertIn('id="musicLyricsRegenBtn"', html)
+
+    def test_music_enhance_uses_shared_component(self):
+        """
+        【用户要求 6】音乐面板的增强必须与生图面板**同一套组件** ——
+        复用 enhance-menu.js 导出的共用实现，不另造一套。
+        """
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('class="enhance-split" id="musicEnhanceSplit"', html)
+        self.assertIn('class="enhance-btn enhance-btn-main" id="musicEnhanceBtn"', html)
+        self.assertIn('class="enhance-btn enhance-btn-caret" id="musicEnhanceMenuBtn"', html)
+        self.assertIn('class="enhance-menu" id="musicEnhanceMenu"', html)
+        js = (REPO / "web" / "music-enhance.js").read_text(encoding="utf-8")
+        self.assertIn("EnhanceMenuShared", js,
+                      "音乐增强必须复用 enhance-menu.js 的共用组件")
+        self.assertIn("renderEnhanceMenu", js)
+        self.assertIn("bindEnhanceMenu", js)
+        shared = (REPO / "web" / "enhance-menu.js").read_text(encoding="utf-8")
+        self.assertIn("window.EnhanceMenuShared", shared)
+        # 脚本顺序：enhance-menu.js 必须先于 music-enhance.js
+        self.assertLess(html.index("/static/enhance-menu.js"),
+                        html.index("/static/music-enhance.js"))
+
+    def test_music_enhance_routes_to_music_endpoint(self):
+        """音乐增强必须打 /api/music-enhance（不是 /api/enhance）。"""
+        js = (REPO / "web" / "music-enhance.js").read_text(encoding="utf-8")
+        self.assertIn("/api/music-enhance", js)
+        server = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn('app.router.add_post("/api/music-enhance", api_music_enhance)', server)
 
     def test_music_js_exists_and_persists_params(self):
         js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
@@ -476,7 +626,9 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
     def test_music_job_card_has_no_resolution_row(self):
         js = self._app_js()
         self.assertIn('info.kind === "audio" ? `', js)
-        self.assertIn('<span>时长上限</span>', js)
+        # 【2026-11-09】时长上限已移除 -> 卡片上也不再显示这一行
+        self.assertNotIn('<span>时长上限</span>', js,
+                         "时长上限已移除，卡片不该再显示它")
         self.assertIn('<span>谱面</span>', js)
         self.assertIn('<span>格式</span>', js)
         # 音乐分支必须在「分辨率」那一行之前分流
@@ -506,7 +658,6 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
         html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
         js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
         blob = html + js
-        self.assertIn("360", blob)          # 时长上限
         self.assertIn("48 kHz", blob)       # 输出采样率
         self.assertIn("仅旋律", blob)        # 谱面模式
         self.assertIn("SheetSage2", blob)   # 音频编码器
@@ -558,11 +709,20 @@ class TestMusicModelLabelFallback(unittest.TestCase):
     def test_static_fallback_table_exists(self):
         js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("MUSIC_MODEL_FALLBACK", js)
-        self.assertIn("yue2_3b_int8_convrot", js)
+        self.assertIn("yue2_3b_bf16", js)
 
     def test_label_falls_back_to_human_name(self):
+        """已知档位 -> 人类可读名；未知档位（已删除的量化版）-> 不再印裸 key。
+
+        【2026-11-09】int8 量化版删除后，历史作品卡片里存的
+        `yue2_3b_int8_convrot` 会在下拉/兜底表里查不到。
+        旧实现 `|| String(key)` 会把裸 key 原样印在卡片上 ——
+        用户会以为面板里还有这个档。改成统一的「历史档位」文案。
+        """
         js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
-        self.assertIn("return MUSIC_MODEL_FALLBACK[key] || String(key);", js)
+        self.assertIn("MUSIC_MODEL_FALLBACK[key]", js)
+        self.assertIn("YuE2（历史档位）", js)
+        self.assertNotIn("|| String(key);", js)
 
 
 class TestMusicCheckpointNoteNotLying(unittest.TestCase):
@@ -584,13 +744,24 @@ class TestMusicCheckpointNoteNotLying(unittest.TestCase):
             if m["available"]:
                 self.assertIn("已就绪", note,
                               f"{key} 已就绪但 note 没说已就绪：{note}")
-                self.assertNotIn("未安装该权重文件", note,
+                self.assertNotIn("未安装该", note,
                                  f"{key} 已就绪但 note 还说没装：{note}")
                 self.assertNotIn("未下载", note,
                                  f"{key} 已就绪但 note 还说未下载：{note}")
             else:
-                self.assertIn("未安装该权重文件", note,
+                # 不可用时要说清「缺的是这种**格式**的单文件」，
+                # 而不是笼统说「本机没有权重」—— 本机其实有 BF16，
+                # 只是它是 HF 目录结构、原生节点不认。
+                self.assertIn("未安装该**格式**的权重", note,
                               f"{key} 不可用但 note 没说明原因：{note}")
+                self.assertIn("原生节点不识别", note,
+                              f"{key} 不可用但 note 没解释格式原因：{note}")
+
+    def test_int8_note_points_to_bf16(self):
+        """int8 已删除 —— 面板不应再有 int8 档。"""
+        opts = music_yue2.model_options()
+        self.assertNotIn("yue2_3b_int8_convrot", opts["checkpoints"],
+                         "int8 档必须从面板清单里消失")
 
     def test_no_hardcoded_missing_claim_in_source(self):
         """源码里不能再有写死的「未下载…故不可用」文案。
@@ -598,43 +769,81 @@ class TestMusicCheckpointNoteNotLying(unittest.TestCase):
         只查**代码**（剔除注释行）—— 注释里解释历史 bug 时提到这句话是合理的，
         要禁的是会被当成 note 展示给用户的字面量。
         """
-        src = (REPO / "h3studio" / "music_yue2.py").read_text(encoding="utf-8")
-        code_lines = []
-        in_doc = False
-        for line in src.splitlines():
-            stripped = line.strip()
-            if in_doc:
-                if stripped.endswith('"""') or stripped.endswith("'''"):
-                    in_doc = False
-                continue
-            if stripped.startswith('"""') or stripped.startswith("'''"):
-                # 单行 docstring
-                if not (stripped.endswith('"""') and len(stripped) > 3):
-                    in_doc = True
-                    continue
-                continue
-            if stripped.startswith("#"):
-                continue
-            code_lines.append(line.split("#", 1)[0])
-        code = "\n".join(code_lines)
+        code = _strip_comments(
+            (REPO / "h3studio" / "music_yue2.py").read_text(encoding="utf-8"))
         self.assertNotIn("本机未下载该权重文件", code)
         self.assertNotIn("是本机唯一可用的版本", code)
 
+    def test_frontend_suffix_states_real_reason(self):
+        """前端下拉后缀要说明真实原因「本机无原生格式权重」。"""
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        self.assertIn("（本机无原生格式权重，不可用）", js)
+        self.assertNotIn("（权重缺失，不可用）", js)
+
     def test_both_precisions_present(self):
-        """两种精度都要在清单里，且各有独立 ckpt 文件名。"""
+        """只剩 BF16 一档。"""
         opts = music_yue2.model_options()
-        self.assertIn("yue2_3b_int8_convrot", opts["checkpoints"])
         self.assertIn("yue2_3b_bf16", opts["checkpoints"])
-        a = opts["checkpoints"]["yue2_3b_int8_convrot"]["ckpt"]
-        b = opts["checkpoints"]["yue2_3b_bf16"]["ckpt"]
-        self.assertNotEqual(a, b)
+        self.assertEqual(list(opts["checkpoints"].keys()), ["yue2_3b_bf16"],
+                         "面板只应保留 BF16 一档")
+        self.assertEqual(opts["checkpoints"]["yue2_3b_bf16"]["ckpt"],
+                         "yue2_3b_bf16.safetensors")
 
     def test_int8_stays_available_as_fallback(self):
-        """int8 链路不能被 bf16 接入破坏（回退保障）。"""
-        self.assertTrue(music_yue2.checkpoint_available("yue2_3b_int8_convrot"),
-                        "int8 权重必须始终在盘上 —— 它是 bf16 出问题时的回退")
-        self.assertEqual(music_yue2.YUE2_DEFAULT_CHECKPOINT, "yue2_3b_int8_convrot",
-                         "默认档必须仍是 int8（显存占用低、更稳）")
+        """int8 已删除 —— 面板不得再引用它，默认档必须是 BF16。"""
+        self.assertFalse(music_yue2.checkpoint_available("yue2_3b_int8_convrot"),
+                         "int8 权重已删除，checkpoint_available 必须返回 False")
+        self.assertEqual(music_yue2.YUE2_DEFAULT_CHECKPOINT, "yue2_3b_bf16",
+                         "默认档必须是 BF16")
+
+
+class TestMusicInt8FullyRemoved(unittest.TestCase):
+    """INT8 量化版已从本机彻底删除 —— 代码/文案/前端/测试里不得再有残留引用。
+
+    2026-11-09 用户拍板：ComfyUI 走队列执行，不存在并发冲突，
+    量化版没有存在价值，直接删掉。
+    但 **models/yue2/YuE2-3B/ 必须保留** —— 那是第三方节点
+    （ComfyUI-YuE2 / ComfyUI-FL-YuE2）的原配依赖。
+    """
+
+    INT8_TOKENS = ("yue2_3b_int8_convrot", "int8_convrot", "INT8 ConvRot")
+
+    def test_no_int8_reference_in_music_sources(self):
+        """音乐相关源码里不得再有 int8 **引用**。
+
+        只查**代码**（剔除注释与 docstring）—— 注释里说明
+        「int8 已删除、为什么删」是必要的，不算残留引用。
+        """
+        targets = [
+            REPO / "h3studio" / "music_yue2.py",
+            REPO / "web" / "music.js",
+            REPO / "web" / "app.js",
+        ]
+        for path in targets:
+            code = _strip_comments(path.read_text(encoding="utf-8"))
+            for token in self.INT8_TOKENS:
+                self.assertNotIn(token, code,
+                                 f"{path.name} 仍有 int8 代码残留：{token}")
+
+    def test_int8_weight_file_removed(self):
+        """ComfyUI 模型目录里不得再有 int8 权重文件。"""
+        roots = [
+            Path("/home/ubuntu/comfyui/models/checkpoints"),
+            Path("/mnt/nvme1t_colorful/comfyui-models/checkpoints"),
+            Path("/mnt/usb2t_toshiba/comfyui-models/checkpoints"),
+        ]
+        for root in roots:
+            hit = root / "yue2_3b_int8_convrot.safetensors"
+            self.assertFalse(hit.exists(), f"int8 权重还在：{hit}")
+
+    def test_third_party_hf_copy_preserved(self):
+        """models/yue2/ 原配副本必须保留（第三方节点链路依赖）。"""
+        mot = Path("/home/ubuntu/comfyui/models/yue2/YuE2-3B/model.safetensors")
+        vae = Path("/home/ubuntu/comfyui/models/yue2/YuE2-Vae/model.safetensors")
+        self.assertTrue(mot.is_file(), f"第三方链路的 MOT 权重被误删：{mot}")
+        self.assertTrue(vae.is_file(), f"第三方链路的 VAE 权重被误删：{vae}")
+        self.assertEqual(mot.stat().st_size, 7261441640,
+                         f"{mot} 大小异常（应为 7,261,441,640 B 的官方 BF16 全量）")
 
 
 if __name__ == "__main__":

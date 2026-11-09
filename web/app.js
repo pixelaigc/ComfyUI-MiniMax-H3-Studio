@@ -266,6 +266,12 @@ function renderMode() {
           window.enhanceMethods.refreshButton();
         }
       }
+      // 音乐面板有**自己的一套**增强菜单（音乐侧注册表）—— 切到音乐模式时
+      // 也要刷新它的按钮文字与菜单（否则按钮还显示上一个模式的文案）。
+      if (window.musicEnhance) {
+        window.musicEnhance.updateButton();
+        window.musicEnhance.renderMenu();
+      }
     } catch (e) { /* 忽略 */ }
   });
   const mode = state.mode;
@@ -435,21 +441,15 @@ function renderMode() {
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
     $("#seedStrengthPair").style.display = "none";
-    // 风格描述在音乐面板里（提示词框留给图像/视频）
+    // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
+    // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
+    // （#musicEnhanceSplit，在 #musicPromptField 内），所以通用 #promptField 整个隐藏。
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "none";
-    // 音乐面板有**自己的**增强栏（同一个增强组件，另一套 DOM id）——
-    // 音乐的输入是「风格描述」而不是提示词框，所以增强入口也跟着搬过来。
-    // 同一时刻只有一处可见 —— 规则 4「每个面板只有一个增强入口」。
-    const musicEnhanceBar = $("#musicEnhanceBar");
-    if (musicEnhanceBar) musicEnhanceBar.style.display = "";
     if (window.MusicUI) window.MusicUI.render();
   } else {
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "";
-    // 非音乐模式：隐藏音乐面板的增强栏（音乐那一套不出现）
-    const musicEnhanceBar = $("#musicEnhanceBar");
-    if (musicEnhanceBar) musicEnhanceBar.style.display = "none";
   }
   // 模式变了 -> 增强模板下拉按新模式过滤，当前模板不适用则自动回落
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
@@ -1862,11 +1862,20 @@ $("#genBtn").addEventListener("click", async () => {
   if (state.genBusy || promptEnhance.busy) return;
   const mode = state.mode;
 
-  // 音乐模式：提示词来自「风格描述」框，走 music.js 的收集逻辑
+  // 音乐模式：描述来自音乐面板的「音乐描述」框（#musicPrompt），
+  // 走 music.js 的收集逻辑
   if (isMusicMode(mode)) {
     if (!window.MusicUI) { alert("音乐面板模块未加载"); return; }
     const collected = window.MusicUI.collect();
-    if (!collected.params.prompt) { alert("请填写风格描述"); return; }
+    // 有结构化风格时，style 由结构化字段合成（后端用 style_* 字段），
+    // 所以「描述」可以为空；没有结构化风格时描述必填。
+    // 结构化字段在 params 里是 style_<field> 形式。
+    const hasStruct = Object.keys(collected.params)
+      .some(k => k.startsWith("style_") && collected.params[k] !== "");
+    if (!collected.params.prompt && !hasStruct) {
+      alert("请填写音乐描述，或先用「增强」生成结构化风格");
+      return;
+    }
     if (mode === "a2a" && !collected.assetRefs.length) {
       alert("参考生音乐需要从素材库选择一段参考音频。");
       return;
@@ -2118,7 +2127,6 @@ function imgModelLabel(key) {
 // 注意：作品卡片可能在 /api/music-options 返回前就渲染出来，
 // 所以这里必须带一份静态兜底表，不能只依赖 window.MusicUI。
 const MUSIC_MODEL_FALLBACK = {
-  yue2_3b_int8_convrot: "YuE2 3B · INT8 ConvRot（官方量化版）",
   yue2_3b_bf16: "YuE2 3B · BF16 完整版",
 };
 function musicModelLabel(key) {
@@ -2126,7 +2134,10 @@ function musicModelLabel(key) {
   const opts = (window.MusicUI && window.MusicUI.getOptions) || null;
   const entry = opts && opts.checkpoints ? opts.checkpoints[key] : null;
   if (entry && entry.label) return entry.label;
-  return MUSIC_MODEL_FALLBACK[key] || String(key);
+  if (MUSIC_MODEL_FALLBACK[key]) return MUSIC_MODEL_FALLBACK[key];
+  // 未知 key = 已下线的历史档位（量化版已删除，见 music_yue2.py）。
+  // 不再回落到裸 key —— 那会把已删除的模型键原样印在作品卡片上。
+  return "YuE2（历史档位）";
 }
 
 function outputUrl(job, output) {
@@ -2439,7 +2450,6 @@ function jobCard(job) {
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
-      <div class="row"><span>时长上限</span><b>${p.max_duration || "—"}s</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>

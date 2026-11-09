@@ -648,43 +648,91 @@ function applyQwenPeWritebackFlag() {
   provState.lastEnhanceKind = "";
 }
 
-// 回填的目标输入框：音乐模式写回「音乐描述」框，其它写回提示词框。
-// （音乐面板的输入不是提示词框 —— 增强结果要落到它真正会被生成用的那个框）
+// ------------------------------------------------------------------
+// 增强结果写回：按**能力契约**解析目标，而不是硬编码 DOM id
+// ------------------------------------------------------------------
 //
-// 【2026-11-09 按能力抽象】原来这里是硬编码的 `$("#musicStyle")`：
-//   yue2-flow 分支把音乐输入框改名为 #musicPrompt（同一语义，两个名字），
-//   合并后 querySelector 返回 null -> 后面 `.value` 抛 TypeError
-//   -> 音乐增强在点「替换提示词框」时静默崩溃。
+// 【为什么要改成契约】审查 P0-1：
+//   enh-unify 的旧实现硬编码 `$("#musicStyle")`（音乐「风格描述」框）。
+//   yue2-flow 把那个 textarea 改名成 #musicPrompt（音乐描述），
+//   并把「结构化风格」拆成 12 个独立字段 —— 合并后
+//   `document.querySelector("#musicStyle")` 返回 **null**，
+//   写回会静默抛 `TypeError: Cannot read properties of null (reading 'value')`。
 //
-// 现在按**能力**解析（候选列表，先新后旧）：
-//   音乐：#musicPrompt（yue2-flow 命名） -> #musicStyle（enh-unify 命名）
-//   图像/视频：#prompt
-// 两个名字指向同一个语义（音乐的描述输入框），任一存在即可用；
-// 都不存在时返回 null，由调用方给出可读提示（不抛异常）。
-const MUSIC_ENHANCE_INPUT_SELECTORS = ["#musicPrompt", "#musicStyle"];
+// 【契约语义】
+//   kind = "text"       -> 产物是一段文本，写回一个输入框
+//   kind = "structured" -> 产物是结构化对象（音乐：12 风格字段 + 歌词）
+//   目标缺失时**不抛异常**，而是返回可读原因，由调用方提示用户。
+//
+// 音乐侧的能力契约由 web/music-enhance.js 注册（结构化路线），
+// 图像/视频侧就是提示词框（文本路线）。
+// 两条路线互不依赖对方的 DOM id —— 合并时不需要再对齐 id。
+// 文本路线的写回目标：**候选列表**（先新后旧）。
+//   图像/视频 = 提示词框 #prompt
+//   音乐      = 音乐描述框 —— #musicPrompt（yue2-flow 命名）
+//               与 #musicStyle（enh-unify 命名）是**同一语义的两个名字**，
+//               任一存在即可用；都不存在时给可读提示（不抛异常）。
+const ENHANCE_WRITE_TARGETS = {
+  text: {
+    kind: "text",
+    target: "#prompt",
+    targets: ["#prompt", "#musicPrompt", "#musicStyle"],
+    describe: () => "本面板找不到可写回的输入框",
+  },
+};
 
-function enhanceTargetInput() {
-  const music = (typeof state !== "undefined" && state
-                 && (state.mode === "t2a" || state.mode === "a2a"));
-  const selectors = music ? MUSIC_ENHANCE_INPUT_SELECTORS : ["#prompt"];
-  for (const sel of selectors) {
-    const el = $(sel);
-    if (el) return el;
+function enhanceWriteContract() {
+  // 音乐面板注册的是**结构化**契约（结构化风格 + 歌词）
+  const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
+    ? window.MusicEnhance.getWriteContract() : null;
+  if (music) return music;
+  return ENHANCE_WRITE_TARGETS.text;
+}
+
+/**
+ * 解析写回目标。目标缺失时返回 { ok:false, reason } —— **不抛异常**。
+ */
+function resolveEnhanceWriteTarget() {
+  const shared = window.EnhanceMenuShared;
+  const contract = enhanceWriteContract();
+  if (!shared || typeof shared.resolveWriteTarget !== "function") {
+    return { ok: false, reason: "增强共用组件未就绪（enhance-menu-shared.js 未加载）" };
   }
-  return null;
+  return shared.resolveWriteTarget(contract);
+}
+
+/**
+ * 写回增强结果到当前契约声明的目标。
+ * @returns {boolean} 是否写回成功
+ */
+function writeBackEnhanceResult(text, mode) {
+  const target = resolveEnhanceWriteTarget();
+  if (!target.ok) {
+    setEnhanceHint("写回失败：" + target.reason, "error");
+    return false;
+  }
+  if (target.kind === "structured") {
+    // 结构化路线：文本不是写回目标，由调用方走结构化 apply
+    return false;
+  }
+  const el = target.element;
+  if (!el) {
+    setEnhanceHint("写回失败：目标输入框不存在", "error");
+    return false;
+  }
+  if (mode === "append") {
+    const original = el.value.trim();
+    el.value = original ? `${original}\n\n${text}` : text;
+  } else {
+    el.value = text;
+  }
+  return true;
 }
 
 $("#enhanceReplace").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  const box = enhanceTargetInput();
-  if (!box) {
-    // 目标不存在 —— 给可读提示，不抛异常
-    setEnhanceHint("本面板找不到可写回的输入框，增强结果未写入。"
-      + "请刷新页面后重试。", "error");
-    return;
-  }
-  box.value = text;
+  if (!writeBackEnhanceResult(text, "replace")) return;
   $("#enhanceModal").hidden = true;
   // 回填后的内容即「已增强」版本：标记它，让生成时不再弹未增强确认
   markPromptEnhanced();
@@ -695,14 +743,7 @@ $("#enhanceReplace").addEventListener("click", () => {
 $("#enhanceAppend").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  const box = enhanceTargetInput();
-  if (!box) {
-    setEnhanceHint("本面板找不到可写回的输入框，增强结果未写入。"
-      + "请刷新页面后重试。", "error");
-    return;
-  }
-  const original = box.value.trim();
-  box.value = original ? `${original}\n\n${text}` : text;
+  if (!writeBackEnhanceResult(text, "append")) return;
   $("#enhanceModal").hidden = true;
   markPromptEnhanced();
   applyQwenPeWritebackFlag();
