@@ -4,6 +4,37 @@
 > 基线：`local/feature/builtin-agent`（a455c7e + 后续 4 个提交 = 17c9adb）
 > 范围：**仅后端**。`web/` 前端文件**一行未改**。
 > 上线约定：本轮**不合并** `local/maintainer`，**不部署**。
+>
+> **第二轮补充**：纳入《Agent媒体语义与提示词策略》的基线实测事实 ——
+> create_job 参数 schema 扩展、按族分辨率/时长校验、素材槽位分派修复、
+> 负面提示词支持矩阵、Provider 前置检查、内容策略扩为 5 类。
+
+---
+
+## 0bis. 第二轮：纳入基线实测事实
+
+第二轮把《Agent媒体语义与提示词策略》里那些**代码级已验证**的事实全部落进后端。
+每一条都先在本仓库核验了代码出处，再实现，再写单测。
+
+| # | 基线事实 | 本轮实现 | 落点 |
+|---|---|---|---|
+| 1 | 真实 mode 只有 9 个；`longfilm` 走 `/api/longfilms`，Agent 建不了 | `list_modes` 如实只列这 9 个；`create_job` 的 mode 枚举就是 `BUILDERS` | `agent.py` / 已有一致，补单测锁死 |
+| 2 | `create_job` 原来只能传 7 个参数，模型版本/LoRA/负面提示词/歌词/音乐时长传不下去 | **扩展 12 个参数**：`model` `lora` `lora_strength` `negative_prompt` `cfg` `seed` `max_duration` `lyrics` `plan_mode` `format` `checkpoint` `precision` + 具名素材槽位 `first_frame`/`last_frame`/`ref_audio` | `agent.py` 工具 schema + 实现；`agent_schema.py` 校验 |
+| 3a | 素材槽位恒为 `ref_image` → `a2a`（要 ref_audio）与 `flf`（要 first_frame）**必被服务端拦** | 按 mode 的**槽位计划**分派（`agent_schema.MODE_SLOTS`），`a2a` → `ref_audio`、`flf` → `first_frame`/`last_frame` | `agent._build_asset_refs()` |
+| 3b | 音乐时长字段是 `max_duration`（4~360，默认 60），`duration` 被静默忽略 | `create_job` 新增 `max_duration`；`list_modes` 明确给 `duration_field`；校验按 `max_duration` 走 | `agent_schema.mode_duration_field()` |
+| 3c | 视频分辨率只有 `544p`/`768p`，传 `1080p` 静默落 768p；图像分辨率按族有各自 MP 上下限 | 校验器按族卡：视频只认 2 档；图像比对各族 MP 表（`t2i` 3.0 / `qwen` 4.2 / `moss` 4.0-0.25），超限**拒绝**（t2i 有官方放大路径则放行并说明） | `agent_schema.validate_params()` |
+| 3d | 视频 `duration` 后端不设上下限（5~15 只是面板区间） | Agent 侧按**面板可复现区间**卡 5~15，越界给夹取 + 拆段方案 | `agent_schema.validate_params()` |
+| 4 | 全仓**无审核模块**；负面提示词仅 `t2i_moss` 与 `t2i`+Z-Image Base 生效 | 新增负面提示词通道 + **支持矩阵**（按真实 `supports_negative`/`cfg` 推导）；不生效时如实告知 | `agent_schema.negative_support()` |
+| 4b | 内容安全边界只能靠 Agent 侧提示词与话术 | 内容策略扩为 5 类（色情/暴力/真实人物/未成年人/敏感语境豁免）；**如实标注无服务端审核**；负面提示词语境**不拦** | `agent_safety.py` |
+| 5 | `comfyui` 类型 Provider 不支持 tools 协议，`call_provider_with_tools` 直接报错不降级 | **前置检查**：第一次模型调用之前就报可读错误 + 修复指引（改用 openai/ollama/llamacpp） | `agent._check_provider_supports_tools()` |
+
+### 第二轮实跑又抓到 3 个真 bug（都已修 + 回归单测）
+
+| bug | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| **编造 job id** | 模型调完 `enhance_prompt` 就 `respond`，说「已下发文生视频任务（job t2v_019d874a）」—— 它**从没调过 create_job**，那个 id 是编的。用户去生成列表找不到任何东西 | 原来的叙述检测只认「我将要…」这类未来时，漏掉了「已下发」这种**完成时的虚假声明** | 新增 `_looks_like_fabricated_job_claim()`（扫正文里的 job id 形状片段并与真实任务比对）；`respond` 报告不存在的 job id 直接报错；编排层硬失败 `code=fabricated_job_id` |
+| **负面提示词语境误拦** | 用户说「画一张海报，负面提示词用 nsfw, blurry」被整个请求拒了 | 敏感词检测不区分「索取」与「抑制」 | 新增负面提示词语境标记（`负面提示词`/`排除`/`不要出现`/`negative prompt`…）—— 命中即不拦 |
+| **`retry_job` 预校验要 mode** | 实跑报「retry_job 需要 mode 参数」，但工具 schema 里根本没有 mode（mode 来自被重试的任务） | 预校验按 `create_job` 的形状写的 | 预校验改为**从原任务取 mode**；`overrides` 照样按族校验 |
 
 ---
 
@@ -177,10 +208,18 @@
 
 ### 3.1 新增单测
 
-`tests/test_agent_backend_enh.py` —— **83 条，全绿**：
+| 文件 | 条数 | 内容 |
+|---|---|---|
+| `tests/test_agent_backend_enh.py` | 83 | 第一轮：工具扩展 / 校验 / 记忆 / 安全 / 编排 |
+| `tests/test_agent_stream_sse.py` | 11 | 第一轮：SSE HTTP 端到端 |
+| `tests/test_agent_media_semantics.py` | **87** | **第二轮：媒体语义 / 参数 schema / 槽位 / 按族校验 / Provider / 内容策略 / 编造 job id** |
+| 合计 | **181** | |
 
+全绿：
 ```
-79 passed in 1.02s
+$ python3 -m pytest tests/test_agent_backend_enh.py tests/test_agent_stream_sse.py \
+      tests/test_agent_media_semantics.py -q
+181 passed
 ```
 
 覆盖（14 个测试类）：
@@ -201,6 +240,23 @@
 | `TestEventStream` | 事件序列（tool_call 早于 tool_result；done 最后）；`job` 事件带完整任务卡数据且 job_id 是服务端真实 id |
 | `TestSensitiveRequestShortCircuit` | 违规请求**不调用模型**（模型调用次数 = 0） |
 | `TestMemoryInjectionIntoPrompt` | 记忆注入到 system 提示词 |
+
+### 3.1b 第二轮测试类（`tests/test_agent_media_semantics.py`，87 条）
+
+| 测试类 | 覆盖 |
+|---|---|
+| `TestModeInventory` | BUILDERS 与 JOB_MODES 一致（9 个）；`longfilm` 不可下发；`list_modes` 结果不超工具结果上限；音乐 `duration_field=max_duration`；素材槽位如实给出；视频分辨率 2 档；负面提示词生效性 |
+| `TestSlotDispatch` | `a2a`→`ref_audio`（只 1 段）、`flf`→`first_frame`/`last_frame`、`i2i_qwen`→`ref_image`（多条）、无槽位模式忽略素材；槽位计划是唯一真源 |
+| `TestCreateJobParamExtension` | 12 个新参数逐个透传；非法 model/lora/max_duration/plan_mode/format 被拦且**不建任务**；非数字 seed 被拒 |
+| `TestPerFamilyResolutionValidation` | 视频 `1080p` 被拒；Z-Image `4k` 走放大路径（提示不拒）；超限判定基于**真实 MP 表**（临时改表验证判定逻辑本身）；MOSS 下限 |
+| `TestDurationValidation` | 视频时长越界**只报一条**（不重复）；拆段建议每段都在合法区间；音乐 `max_duration` 区间；音乐 schema 用 `max_duration` 不用 `duration` |
+| `TestNegativePromptMatrix` | Z-Image Turbo/蒸馏/DarkBeast 不支持；Z-Image Base 支持；Qwen 需 cfg>1；MOSS 支持且带默认负面词；视频/音乐无通道；不生效时给出替代方案 |
+| `TestFabricatedJobClaim` | 编造 job id 被识别；真实 id 不误杀；`respond` 报假 id 报错；整条链路被拦且无任务 |
+| `TestNegativeContextNotBlocked` | 「负面提示词用 nsfw」不拦；「画一张 NSFW 裸体图」仍拦 |
+| `TestToolBudgetAndSearchWaste` | 描述截断上限存在；工具调用预算已提到 10+；搜索命中后的 hint 明确禁止重复搜 |
+| `TestRetryJobPrecheck` | `retry_job` 预校验**不要求 mode**（从原任务取）；未知 job 报 `job_not_found`；overrides 按族校验 |
+| `TestProviderCapability` | `comfyui` 类型被前置拦下（第一次模型调用之前，调用次数=0）；openai/ollama/llamacpp 放行 |
+| `TestContentPolicy` | 未成年人性化 → 绝对拒绝；普通未成年人场景放行；血腥写实 → 拒绝并给镜头语言替代；非写实暴力放行；真实人物复刻 → 拒绝并给虚构角色；泛指人物放行；政策说明如实标注无服务端审核；违规请求不调模型 |
 
 ### 3.2 原有测试
 
@@ -223,10 +279,13 @@
 
 | 场景 | 结果 | 证据文件 |
 |---|---|---|
-| 1. 正常建任务 | ✅ status=completed，30.4 s，6 步 6 工具全 ok | `evidence/agent-enh/live_scenario_1_normal.json` |
-| 2. 参数非法被纠正 | 见 §4.1 | `evidence/agent-enh/live_scenario_2_invalid_params.json` |
-| 3. 澄清式多轮 | 见 §4.2 | `evidence/agent-enh/live_scenario_3_clarification.json` |
-| 4. SSE 事件序列 | 见 §4.3 | `evidence/agent-enh/live_scenario_4_stream_events.json` |
+| 1. 正常建任务 | ✅ status=completed，31.4 s，8 步 8 工具全 ok，**落库 1 个任务** | `evidence/agent-enh/live_scenario_1_normal.json` |
+| 2. 参数非法被纠正 | ✅ status=needs_clarification，**0 个任务**，Agent 给出合法值 + 可执行替代方案 | `evidence/agent-enh/live_scenario_2_invalid_params.json` |
+| 3. 澄清式多轮 | ✅ Turn1 `needs_clarification` → Turn2 `completed` + 落库 1 个任务 | `evidence/agent-enh/live_scenario_3_clarification.json` |
+| 4. SSE 事件序列 | ✅ 38 事件，`job` 事件带完整任务卡数据 | `evidence/agent-enh/live_scenario_4_stream_events.json` |
+| 5. **音乐时长走 max_duration** | ✅ 落库 `max_duration=120.0`（不是 duration） | `evidence/agent-enh/live_scenario_5_music_duration.json` |
+| 6. **视频分辨率 1080p 被纠正** | ✅ 落库 `resolution=768p`（合法档位） | `evidence/agent-enh/live_scenario_6_video_resolution.json` |
+| 7. **负面提示词** | ✅ 模型选 `t2i_moss`（负面真正生效的族），落库 `negative_prompt="nsfw, blurry"` | `evidence/agent-enh/live_scenario_7_negative_prompt.json` |
 
 ### 4.1 场景 1 的落库证据（真实 SQLite）
 

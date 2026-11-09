@@ -58,6 +58,62 @@ VIDEO_RESOLUTIONS = tuple(wf.RES_MP.keys())
 #: 视频 LoRA 取值。来源：workflows.LORAS + "none"（官方工作流的无 LoRA 档）
 VIDEO_LORAS = ("none",) + tuple(wf.LORAS.keys())
 
+#: 视频时长区间（秒）—— **Agent 侧硬校验**。
+#:
+#: 【为什么后端不限也要在这里限】
+#: 实测后端 `float(params.get("duration", 5))` **不设上下限** —— 传 40 秒
+#: 也能建出任务。但：
+#:   * 面板滑块只有 5~15 秒（web/index.html），用户没法在面板复现 40 秒的任务；
+#:   * 帧数表达式 `max(5, round(a*24)) + (5 - (max(5, round(a*24)) % 17)) % 17`
+#:     会让长时长产生与用户预期不符的实际时长（偏差 0~0.7s，40 秒时更明显）；
+#:   * 超长单段的一致性会漂移（模型能力和素材库都没有长镜头先例）。
+#: 所以 Agent 侧按**面板可复现区间**卡 5~15 秒，越界时给拆段替代方案。
+VIDEO_DURATION_HARD_MIN = 5
+VIDEO_DURATION_HARD_MAX = 15
+
+#: 音乐谱面模式。来源：music_yue2.YUE2_MODES
+def _music_modes() -> tuple:
+    try:
+        from . import music_yue2
+        return tuple(music_yue2.YUE2_MODES)
+    except Exception:
+        return ("full", "melody")
+
+MUSIC_PLAN_MODES = _music_modes()
+
+#: 音乐输出格式。来源：music_yue2.YUE2_AUDIO_FORMATS
+def _music_formats() -> tuple:
+    try:
+        from . import music_yue2
+        return tuple(music_yue2.YUE2_AUDIO_FORMATS)
+    except Exception:
+        return ("flac", "mp3", "opus")
+
+MUSIC_FORMATS = _music_formats()
+
+#: 音乐主模型版本。来源：music_yue2.YUE2_CHECKPOINTS
+def _music_checkpoints() -> list:
+    try:
+        from . import music_yue2
+        return list(music_yue2.YUE2_CHECKPOINTS.keys())
+    except Exception:
+        return []
+
+MUSIC_CHECKPOINTS = _music_checkpoints()
+
+#: 视频精度档位。来源：workflows.UNET 的精度键
+def _video_precisions() -> list:
+    try:
+        keys = set()
+        for entry in wf.UNET.values():
+            if isinstance(entry, dict):
+                keys.update(entry.keys())
+        return sorted(keys)
+    except Exception:
+        return ["int8"]
+
+VIDEO_PRECISIONS = _video_precisions()
+
 #: 音乐时长区间（秒）。来源：music_yue2 的 _clamp_duration 上下限。
 def _music_duration_range() -> tuple[int, int]:
     try:
@@ -293,17 +349,177 @@ def mode_defaults(mode: str) -> dict:
     return clean
 
 
+# ------------------------------------------------------------------ 负面提示词支持矩阵
+
+#: 该 mode 的**默认模型版本**（负面支持判定要用）。
+#:
+#: 【必须按 mode 取】—— 不能「按常量顺序取第一个非空」。
+#: 踩过的坑：Z_IMAGE_DEFAULT_MODEL 非空，导致 t2i_moss / t2i_qwen 拿到的
+#: 是 Z-Image 的默认模型名，负面支持判定就用错了族的元数据。
+def _default_model_of(mode: str) -> str:
+    const = {
+        "t2i": "Z_IMAGE_DEFAULT_MODEL",
+        "t2i_qwen": "QWEN_IMAGE_DEFAULT_MODEL",
+        "i2i_qwen": "QWEN_IMAGE_DEFAULT_MODEL",
+        "t2i_moss": "MOSS_IMAGE_DEFAULT_MODEL",
+    }.get(mode)
+    if not const:
+        return ""
+    return getattr(wf, const, None) or ""
+
+
+#: 负面提示词生效条件（**来自 workflows 的真实模型元数据**，不是拍脑袋的表）。
+#:
+#: 【实测事实，2026-11-10】
+#:   t2i / z_image_turbo_bf16    -> supports_negative=False（负分支固定 zero，且 cfg=1 跳过 uncond）
+#:   t2i / z_image_bf16          -> supports_negative=True （negative="encode"，独立 CLIP 负分支）
+#:   t2i / z_image_base_distill  -> False（cfg=1）
+#:   t2i / darkbeast_z6_blitz_fp8-> False（cfg=1）
+#:   t2i_qwen / i2i_qwen         -> True，但**只有 cfg>1 时才生效**（默认 cfg=1.0）
+#:   t2i_moss                    -> True（cfg=3.0，负面生效）
+#:   视频三模式 / 音乐两模式      -> 无 negative_prompt 通道（代码中未见）
+def negative_support(mode: str, model_key: str = "") -> dict:
+    """
+    返回该 mode（可选指定模型版本）的负面提示词支持情况。
+
+    返回 {"supported": bool, "effective": bool, "reason": str,
+          "requires_cfg_above": float|None, "default_negative": str}
+    """
+    key = model_key or _default_model_of(mode)
+    # 【必须按 mode 选表】—— 不能「遍历三张表看谁包含这个 key」。
+    # 踩过的坑：t2i_moss 的默认模型是 moss_image_base，但 Z_IMAGE_MODELS 里
+    # 没有它、而遍历顺序把 Z 表当成命中表的前缀，导致**用错族的元数据**判定
+    # 负面提示词是否生效（t2i_moss 被误判成不支持）。
+    table_const = {
+        "t2i": "Z_IMAGE_MODELS",
+        "t2i_qwen": "QWEN_IMAGE_MODELS",
+        "i2i_qwen": "QWEN_IMAGE_MODELS",
+        "t2i_moss": "MOSS_IMAGE_MODELS",
+    }.get(mode)
+    table = getattr(wf, table_const, None) if table_const else None
+    if not isinstance(table, dict) or key not in table:
+        return {"supported": False, "effective": False,
+                "reason": f"{mode} 没有负面提示词通道", "requires_cfg_above": None,
+                "default_negative": ""}
+    entry = table[key]
+    supported = bool(entry.get("supports_negative"))
+    cfg = entry.get("cfg")
+    default_negative = ""
+    if mode == "t2i_moss":
+        default_negative = getattr(wf, "MOSS_IMAGE_DEFAULT_NEGATIVE", "") or ""
+    if not supported:
+        return {"supported": False, "effective": False,
+                "reason": (f"{mode} / {key} 的负面提示词不生效"
+                           f"（该版本 cfg={cfg}，负分支被固定或 cfg=1 跳过 uncond）"),
+                "requires_cfg_above": None, "default_negative": default_negative}
+    # Qwen 族：supports_negative=True，但默认 cfg=1.0 时 ComfyUI 跳过 uncond
+    requires = None
+    if mode in ("t2i_qwen", "i2i_qwen"):
+        requires = 1.0
+    effective = True
+    reason = f"{mode} / {key} 支持负面提示词（cfg={cfg}，负面生效）"
+    if requires is not None:
+        effective = False
+        reason = (f"{mode} / {key} 支持负面提示词，但默认 cfg={cfg}，"
+                  f"需要把 cfg 抬到 {requires} 以上才生效")
+    return {"supported": True, "effective": effective, "reason": reason,
+            "requires_cfg_above": requires, "default_negative": default_negative}
+
+
+# ------------------------------------------------------------------ 分辨率按族上限
+
+#: 各图像族的「直出 MP 上限 / 下限」。来源：workflows 的真实常量。
+def _family_mp_bounds(mode: str) -> tuple[float, float] | None:
+    if mode == "t2i":
+        return (0.0, float(getattr(wf, "Z_IMAGE_MAX_DIRECT_MP", 3.0)))
+    if mode in ("t2i_qwen", "i2i_qwen"):
+        return (0.0, float(getattr(wf, "QWEN_IMAGE_MAX_DIRECT_MP", 4.2)))
+    if mode == "t2i_moss":
+        return (float(getattr(wf, "MOSS_IMAGE_MIN_MP", 0.25)),
+                float(getattr(wf, "MOSS_IMAGE_MAX_DIRECT_MP", 4.0)))
+    return None
+
+
+def _resolution_megapixels(mode: str, tier: str) -> float | None:
+    """某档位在该 mode 下的 MP 值（来源：对应族的 RES_TIERS 表）。"""
+    entry = _IMAGE_MODEL_TABLES.get(mode)
+    if not entry:
+        return None
+    table = _table(entry[1])
+    value = table.get(tier)
+    return float(value) if isinstance(value, (int, float)) else None
+
+
+# ------------------------------------------------------------------ 素材槽位
+
+#: 各 mode 的**素材槽位分派表**（Agent 侧）。
+#:
+#: 【实测事实，2026-11-10】Agent 的 create_job 原先**恒写** slot="ref_image"，
+#: 而服务端按 slot 分派参数（server._ASSET_SLOT_PARAM）：
+#:     first_frame/last_frame -> params["first_frame"/"last_frame"]
+#:     ref_image              -> params["ref_images"]
+#:     ref_audio              -> params["ref_audios"]
+#: 于是 a2a（要 ref_audio）与 flf（要 first_frame）**必被服务端拦下** ——
+#: 不是用户请求有问题，是 Agent 根本没给出正确的槽位。
+#:
+#: 这张表把「mode 需要什么槽位」写成显式映射，Agent 按它分派。
+#: 值 = (单个素材槽位列表, 多素材槽位列表)
+MODE_SLOTS = {
+    "t2v":    ([], []),
+    "t2i":    ([], []),
+    "t2i_qwen": ([], []),
+    "t2i_moss": ([], []),
+    # 图片编辑：参考图 -> ref_images（多条）
+    "i2i_qwen": ([], ["ref_image"]),
+    # 首尾帧：first_frame（必需）+ last_frame（可选）
+    "flf":    (["first_frame", "last_frame"], []),
+    # 参考生视频：参考图 -> ref_images（多条）
+    "r2v":    ([], ["ref_image"]),
+    # 参考生音乐：参考音频 -> ref_audio（只能 1 条）
+    "a2a":    (["ref_audio"], []),
+    # 文生音乐：无素材
+    "t2a":    ([], []),
+}
+
+
+def mode_slot_plan(mode: str) -> dict:
+    """
+    返回该 mode 的素材槽位计划。
+
+    {"single": ["first_frame", ...], "multi": ["ref_image", ...],
+     "max_per_slot": {"ref_image": 10, "ref_audio": 1}}
+    """
+    single, multi = MODE_SLOTS.get(mode, ([], []))
+    limits = {}
+    if "ref_image" in multi:
+        limits["ref_image"] = REF_IMAGE_MAX
+    if "ref_audio" in single:
+        limits["ref_audio"] = 1
+    if "first_frame" in single:
+        limits["first_frame"] = 1
+    if "last_frame" in single:
+        limits["last_frame"] = 1
+    return {"single": list(single), "multi": list(multi),
+            "max_per_slot": limits}
+
+
 def mode_requires_refs(mode: str) -> list[str]:
-    """该模式**必须**提供的参考素材槽位。"""
-    if mode == "i2i_qwen":
-        return ["asset_id"]
-    if mode == "r2v":
-        return ["asset_id"]
-    if mode == "a2a":
-        return ["asset_id"]
-    if mode == "flf":
-        return ["first_frame"]
-    return []
+    """
+    该模式**必须**提供的参考素材槽位。
+
+    【来源：mode_slot_plan】—— 与 create_job 实际分派用的是同一张表，
+    两处不能各写一份（各写一份必然漂移）。
+    """
+    plan = mode_slot_plan(mode)
+    required = []
+    # single 槽位里除了 last_frame 都是必需的
+    for slot in plan["single"]:
+        if slot != "last_frame":
+            required.append(slot)
+    # multi 槽位统一用 asset_id 表示（泛指「参考图」）
+    if plan["multi"]:
+        required.append("asset_id")
+    return required
 
 
 # ------------------------------------------------------------------ 模式 schema
@@ -402,6 +618,79 @@ def mode_schema(mode: str) -> dict:
             "default": 1,
             "source": "server.MAX_BATCH_COUNT",
         }
+        # 负面提示词支持矩阵（按模型版本）—— 让人一眼看出「这个模式能不能用负面」
+        schema["params"]["negative_prompt"] = {
+            "type": "string",
+            "supported_by_model": {
+                key: negative_support(mode, key)
+                for key in mode_models(mode)
+            },
+            "source": "workflows.*_MODELS 的 supports_negative / cfg",
+        }
+
+    # --- 音乐专属 ---
+    if is_music_mode(mode):
+        schema["params"]["max_duration"] = {
+            "type": "number",
+            "unit": "second",
+            "min": MUSIC_DURATION_MIN,
+            "max": MUSIC_DURATION_MAX,
+            "step": 1,
+            "default": 60,
+            "source": "h3studio.music_yue2._clamp_duration",
+        }
+        schema["params"]["plan_mode"] = {
+            "type": "string",
+            "values": list(MUSIC_PLAN_MODES),
+            "default": "full",
+            "source": "music_yue2.YUE2_MODES",
+        }
+        schema["params"]["format"] = {
+            "type": "string",
+            "values": list(MUSIC_FORMATS),
+            "default": "flac",
+            "source": "music_yue2.YUE2_AUDIO_FORMATS",
+        }
+        schema["params"]["lyrics"] = {
+            "type": "string",
+            "source": "music_yue2.build_music_workflow",
+            "note": "留空 = 纯器乐",
+        }
+        if MUSIC_CHECKPOINTS:
+            schema["params"]["checkpoint"] = {
+                "type": "string",
+                "values": list(MUSIC_CHECKPOINTS),
+                "default": MUSIC_CHECKPOINTS[0],
+                "source": "music_yue2.YUE2_CHECKPOINTS",
+            }
+
+    # --- 视频专属 ---
+    if is_video_mode(mode):
+        schema["params"]["precision"] = {
+            "type": "string",
+            "values": list(VIDEO_PRECISIONS),
+            "default": "int8",
+            "source": "workflows.UNET[*] 的精度键",
+        }
+        schema["params"]["lora_strength"] = {
+            "type": "number",
+            "min": 0.0,
+            "max": 2.0,
+            "default": 1.0,
+            "source": "workflows._h3_video_workflow",
+        }
+
+    # --- 素材槽位计划（Agent 按它分派 asset_refs 的 slot）---
+    slot_plan = mode_slot_plan(mode)
+    if slot_plan["single"] or slot_plan["multi"]:
+        schema["asset_slots"] = {
+            "single": slot_plan["single"],
+            "multi": slot_plan["multi"],
+            "max_per_slot": slot_plan["max_per_slot"],
+            "source": "server._ASSET_SLOT_PARAM",
+            "note": ("single = 每个槽位 1 个素材（如首帧/尾帧/参考音频）；"
+                     "multi = 同一槽位可多张（如参考图）"),
+        }
 
     schema["notes"] = {
         "unlisted_params": "未列出的参数留空即由工作台用官方默认值补齐",
@@ -441,6 +730,30 @@ class ValidationIssue:
 
     def __repr__(self):  # pragma: no cover - 调试用
         return f"<ValidationIssue {self.field}: {self.message}>"
+
+
+def _largest_allowed_tier(mode: str, max_mp: float) -> str:
+    """该 mode 下不超过 max_mp 的最大档位（按 MP 降序找第一个）。"""
+    allowed = mode_resolutions(mode)
+    best = allowed[0] if allowed else ""
+    best_mp = -1.0
+    for tier in allowed:
+        mp = _resolution_megapixels(mode, tier)
+        if mp is not None and mp <= max_mp + 1e-9 and mp > best_mp:
+            best, best_mp = tier, mp
+    return best
+
+
+def _smallest_allowed_tier(mode: str, min_mp: float) -> str:
+    """该 mode 下不小于 min_mp 的最小档位（按 MP 升序找第一个）。"""
+    allowed = mode_resolutions(mode)
+    best = allowed[0] if allowed else ""
+    best_mp = None
+    for tier in allowed:
+        mp = _resolution_megapixels(mode, tier)
+        if mp is not None and mp >= min_mp - 1e-9 and (best_mp is None or mp < best_mp):
+            best, best_mp = tier, mp
+    return best
 
 
 def _suggest_duration(mode: str, value: float) -> list[dict]:
@@ -580,6 +893,52 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                 suggestions=_suggest_enum("resolution", str(resolution),
                                           allowed, mode),
                 code="invalid_resolution"))
+        else:
+            # 档位名合法，但**该族可能超出直出 MP 上限**。
+            #
+            # 【实测事实，2026-11-10】
+            #   t2i       直出上限 3.0MP（超过自动走官方 2K 放大路径 —— 这是**支持**的）
+            #   t2i_qwen  直出上限 4.2MP（超过**无**放大路径 —— 直出会崩）
+            #   t2i_moss  直出上限 4.0MP，下限 0.25MP（超过**无**放大路径）
+            # 静默回落是坏体验 —— 用户要 4K 却拿到 2K，且**没有任何提示**。
+            bounds = _family_mp_bounds(mode)
+            megapixels = _resolution_megapixels(mode, str(resolution))
+            if bounds and megapixels is not None:
+                low_mp, high_mp = bounds
+                if megapixels > high_mp + 1e-9:
+                    if mode == "t2i":
+                        # Z-Image 有官方 2K 放大路径 —— 允许，但要说清
+                        issues.append(ValidationIssue(
+                            "resolution",
+                            f"{resolution}（{megapixels}MP）超过 {mode} 直出上限 "
+                            f"{high_mp}MP，会自动走官方 2K 放大路径"
+                            f"（低分辨率生成 + RealESRGAN x4 + 二次细化）",
+                            code="resolution_upscaled",
+                            suggestions=[{"action": "use",
+                                          "params": {"resolution": "2k"},
+                                          "reason": "若不想走放大路径，直接用 2k 档"}]))
+                    else:
+                        issues.append(ValidationIssue(
+                            "resolution",
+                            f"{resolution}（{megapixels}MP）超过 {mode} 的直出上限 "
+                            f"{high_mp}MP，且该模式**没有**放大路径，会直出并可能崩图",
+                            allowed=[t for t in allowed
+                                     if (_resolution_megapixels(mode, t) or 0) <= high_mp],
+                            suggestions=[{
+                                "action": "use",
+                                "params": {"resolution": _largest_allowed_tier(mode, high_mp)},
+                                "reason": (f"改用 {mode} 支持的最大档位；"
+                                           f"要更大尺寸可先 t2i 出 4K 再用 i2i_qwen 修图")},
+                                ],
+                            code="resolution_too_large"))
+                elif low_mp > 0 and megapixels < low_mp - 1e-9:
+                    issues.append(ValidationIssue(
+                        "resolution",
+                        f"{resolution}（{megapixels}MP）低于 {mode} 的下限 {low_mp}MP",
+                        code="resolution_too_small",
+                        suggestions=[{"action": "use",
+                                      "params": {"resolution": _smallest_allowed_tier(mode, low_mp)},
+                                      "reason": f"改用 {mode} 支持的最小档位"}]))
 
     # --- 时长 ---
     duration_field = mode_duration_field(mode)
@@ -633,6 +992,102 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                               "reason": f"只保留前 {REF_IMAGE_MAX} 张参考图"}],
                 code="too_many_refs"))
 
+    # --- 视频 duration 硬上限 ---
+    #
+    # 后端 `float(params.get("duration", 5))` 不设限 —— 但面板滑块只有 5~15 秒，
+    # 用户没法复现超范围的任务，且帧数换算会让实际时长偏离预期。
+    # 所以 Agent 侧按**面板可复现区间**卡。
+    #
+    # 注意：上面的通用区间检查已经用 mode_duration_range() 卡了同一件事
+    # （VIDEO_DURATION_MIN/MAX 就是 5/15）。这里**不再重复报一条** ——
+    # 重复报会让模型看到两条几乎一样的错误，反而困惑。
+    # 这段只在「通用检查没覆盖」时兜底（未来改了区间常量也不会漏）。
+    if is_video_mode(mode) and duration is not None:
+        try:
+            value = float(duration)
+        except (TypeError, ValueError):
+            pass
+        else:
+            span = mode_duration_range(mode)
+            already_reported = bool(span and not (span[0] <= value <= span[1]))
+            if (not already_reported
+                    and (value < VIDEO_DURATION_HARD_MIN
+                         or value > VIDEO_DURATION_HARD_MAX)):
+                issues.append(ValidationIssue(
+                    "duration",
+                    f"时长 {value} 秒超出可下发区间 "
+                    f"{VIDEO_DURATION_HARD_MIN}~{VIDEO_DURATION_HARD_MAX} 秒"
+                    f"（面板滑块范围；超出会与用户预期不符）",
+                    allowed=[f"{VIDEO_DURATION_HARD_MIN}~{VIDEO_DURATION_HARD_MAX} 秒"],
+                    suggestions=_suggest_duration(mode, value),
+                    code="invalid_duration"))
+
+    # --- 音乐专属参数 ---
+    if is_music_mode(mode):
+        plan_mode = params.get("plan_mode")
+        if plan_mode and str(plan_mode) not in MUSIC_PLAN_MODES:
+            issues.append(ValidationIssue(
+                "plan_mode",
+                f"谱面模式「{plan_mode}」不是合法取值",
+                allowed=list(MUSIC_PLAN_MODES),
+                suggestions=[{"action": "use",
+                              "params": {"plan_mode": MUSIC_PLAN_MODES[0]},
+                              "reason": f"改用默认谱面模式「{MUSIC_PLAN_MODES[0]}」"}],
+                code="invalid_plan_mode"))
+        fmt = params.get("format")
+        if fmt and str(fmt) not in MUSIC_FORMATS:
+            issues.append(ValidationIssue(
+                "format",
+                f"输出格式「{fmt}」不是合法取值",
+                allowed=list(MUSIC_FORMATS),
+                suggestions=[{"action": "use",
+                              "params": {"format": MUSIC_FORMATS[0]},
+                              "reason": f"改用默认格式「{MUSIC_FORMATS[0]}」"}],
+                code="invalid_format"))
+        checkpoint = params.get("checkpoint")
+        if checkpoint and MUSIC_CHECKPOINTS and str(checkpoint) not in MUSIC_CHECKPOINTS:
+            issues.append(ValidationIssue(
+                "checkpoint",
+                f"音乐模型「{checkpoint}」不是合法取值",
+                allowed=list(MUSIC_CHECKPOINTS),
+                suggestions=[{"action": "use",
+                              "params": {"checkpoint": MUSIC_CHECKPOINTS[0]},
+                              "reason": f"改用默认模型「{MUSIC_CHECKPOINTS[0]}」"}],
+                code="invalid_checkpoint"))
+
+    # --- 负面提示词生效性 ---
+    #
+    # 关键：**不因为「该族不支持负面提示词」就拒绝任务** ——
+    # 用户要的是图/片/曲，负面提示词只是附加诉求。
+    # 但必须**如实告知**它不生效，否则用户以为「NSFW 已被抑制」而实际没有。
+    negative = params.get("negative_prompt")
+    if negative and str(negative).strip():
+        support = negative_support(mode, str(params.get("model") or ""))
+        if not support["supported"]:
+            issues.append(ValidationIssue(
+                "negative_prompt",
+                f"{mode} 不支持负面提示词（{support['reason']}）",
+                code="negative_not_supported",
+                suggestions=[{
+                    "action": "drop",
+                    "params": {},
+                    "reason": ("去掉负面提示词照常生成；"
+                               "若必须抑制某些内容，可改用 t2i_moss"
+                               "（cfg=3.0，负面生效）或 t2i + z_image_bf16"
+                               "（Z-Image Base，独立 CLIP 负分支）"),
+                }]))
+        elif not support["effective"]:
+            issues.append(ValidationIssue(
+                "negative_prompt",
+                f"{mode} 的负面提示词默认不生效（{support['reason']}）",
+                code="negative_needs_cfg",
+                suggestions=[{
+                    "action": "use",
+                    "params": {"model": "qwen_image_2.1_bf16", "cfg": 1.5},
+                    "reason": ("需要负面生效：改用基座模型并把 cfg 抬到 1 以上"
+                               "（cfg=1 时 ComfyUI 跳过 uncond）"),
+                }]))
+
     return issues
 
 
@@ -642,22 +1097,36 @@ def missing_params(mode: str, params: dict) -> list[str]:
 
     只列真正影响产出结果的字段 —— 把「batch_count 没填」也算成缺失，
     会让 Agent 逢单必问，用户体验极差。
+
+    素材缺失按**槽位计划**判定（mode_slot_plan）：
+      * flf  -> 缺 first_frame（必需），last_frame 可选
+      * a2a  -> 缺 ref_audio（必需，1 段）
+      * i2i_qwen / r2v -> 缺参考图
     """
     missing = []
     if mode not in wf.BUILDERS:
         return missing
     if not str(params.get("prompt") or "").strip():
         missing.append("prompt")
-    # 参考图是硬性依赖
-    requires = mode_requires_refs(mode)
-    if requires:
+
+    plan = mode_slot_plan(mode)
+
+    # 具名槽位（first_frame / last_frame / ref_audio）
+    for slot in plan["single"]:
+        value = str(params.get(slot) or "").strip()
+        if value:
+            continue
+        if slot == "last_frame":
+            continue          # 尾帧可选
+        missing.append(slot)
+
+    # 多素材槽位（ref_image）
+    if plan["multi"]:
         asset_ids = params.get("asset_ids") or params.get("asset_id")
         if isinstance(asset_ids, str):
             asset_ids = [asset_ids]
         if not [a for a in (asset_ids or []) if str(a or "").strip()]:
             missing.append("asset_id")
-    if mode == "flf" and not params.get("first_frame"):
-        missing.append("first_frame")
     return missing
 
 

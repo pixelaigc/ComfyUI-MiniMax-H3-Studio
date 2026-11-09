@@ -2,6 +2,17 @@
 """
 Agent 的**安全与合规**层。
 
+【重要前提 —— 本工作台没有服务端内容审核】
+全仓检索结论（2026-11-10 实测）：**不存在任何审核/拦截模块**
+（无 moderation / blocklist / 敏感词表 / safety_filter / NSFWFilter）。
+`enhancer.validate_output` 的硬约束**全部是提示词质量约束**
+（质量词、权重语法、thinking 残留、bbox 结构、主体保留），
+**不含任何内容合规判定**。
+
+所以本模块是**唯一**的内容边界，它靠的是**提示词层策略 + 话术**，
+不是服务端拦截。任何「后端会拦住违规内容」的说法都是假的 —— 本模块
+的文档与返回值都如实标注这一点。
+
 【为什么要单独一个模块】
 安全规则如果散落在各个工具函数里，会出现三个问题：
   1. 同一类检查在 5 个工具里写 5 遍，其中 3 遍会漏
@@ -11,7 +22,7 @@ Agent 的**安全与合规**层。
 所以这里把三类检查抽成纯函数：
   * 提示注入检测与隔离（对素材描述 / 用户输入 / 记忆值）
   * 素材访问权限边界（路径穿越 / 越权）
-  * 敏感内容策略（NSFW 等）
+  * 敏感内容策略（NSFW / 暴力 / 真实人物 —— 全部在 Agent 侧）
 
 【设计原则：拒绝要可读、可执行】
 每一条拒绝都必须说清楚三件事：
@@ -192,6 +203,23 @@ _EXEMPT_CONTEXTS = (
 )
 
 
+#: 「作为负面提示词」的语境标记 —— 出现这些词时，敏感词是在**排除**它，
+#: 不是在索取它。
+#:
+#: 【实测踩过的坑，2026-11-10】用户说「画一张海报，负面提示词用 nsfw, blurry」
+#: —— 这是**抑制** NSFW 的正确用法，却因为文本里出现了 "nsfw" 被整个请求拒了。
+#: 这是误判：用户主动要负面提示词，恰恰是想**避免**违规内容。
+_NEGATIVE_CONTEXT_MARKERS = (
+    "负面提示词", "负面词", "排除", "不要出现", "不希望出现", "避免出现",
+    "negative prompt", "negative_prompt", "排除项",
+)
+
+
+def _is_negative_context(lower: str) -> bool:
+    """文本是否处于「把这些词当作负面提示词」的语境。"""
+    return any(marker.lower() in lower for marker in _NEGATIVE_CONTEXT_MARKERS)
+
+
 def check_sensitive(text: str) -> dict:
     """
     检查一段文本是否是「索取违规内容」的请求。
@@ -207,6 +235,13 @@ def check_sensitive(text: str) -> dict:
     if not matched:
         return {"sensitive": False, "reason": "", "matched": [],
                 "refusal": ""}
+
+    # 【新增】敏感词出现在「负面提示词」语境里 = 用户在**抑制**违规内容，
+    # 不是在索取 -> 不拦。
+    if _is_negative_context(lower):
+        return {"sensitive": False,
+                "reason": "敏感词处于负面提示词语境（用户在抑制而非索取）",
+                "matched": matched, "refusal": ""}
 
     # 豁免语境
     exempt = [word for word in _EXEMPT_CONTEXTS if word.lower() in lower]
@@ -243,4 +278,138 @@ REFUSAL_TEXT = (
     "  · 换成合规题材（如风景、人物肖像、抽象艺术、产品图）\n"
     "  · 用「非露骨」的方式表达同一创意\n"
     "  · 如果你是在做内容审查/合规研究，可以把相关文本贴给我，我帮你分析规则角度"
+)
+
+# ------------------------------------------------------------------ 扩展敏感类别
+
+#: 暴力 / 血腥类。判定要求「血腥 + 写实呈现」同时命中 ——
+#: 讨论暴力、动作片、剪影构图是正常创作需求，不能一刀切。
+_VIOLENCE_TERMS = ("血腥", "肢解", "虐杀", "断肢", "开膛", "剖尸",
+                    "gore", "dismember", "mutilat", "torture")
+_VIOLENCE_WRITERS = ("写实", "特写", "细节", "逼真", "照片级",
+                      "photoreal", "realistic", "close-up")
+
+#: 真实人物 / 名人类。命中「可识别公众人物」才拦 ——
+#: 「一个穿西装的男性」这类泛指描述不该被拦。
+_REAL_PERSON_MARKERS = ("名人", "明星", "公众人物", "总统", "总统",
+                        "演员", "总统", "c发", "celebrity", "president")
+_REAL_PERSON_TERMS = ("长得像", "一模一样", "复刻", "扮演", "cosplay",
+                      "肖像", "照片", "翻拍")
+
+#: 未成年人相关 —— **绝对拒绝**，不提供任何改写。
+_MINOR_MARKERS = ("未成年", "小学生", "初中生", "高中生", "童颜",
+                   "萝莉", "正太", "underage", "minor", "child",
+                   "schoolgirl", "schoolboy")
+
+
+def check_minor(text: str) -> dict:
+    """
+    未成年人相关 —— **绝对拒绝**，不提供任何改写。
+
+    单独一个函数而不是塞进 check_sensitive：这类请求的处置**不同**
+    （其它类别给替代方案，这一类连改写都不提供）。
+    """
+    raw = (text or "")
+    lower = raw.lower()
+    matched = [w for w in _MINOR_MARKERS if w.lower() in lower]
+    if not matched:
+        return {"sensitive": False, "category": "", "matched": [],
+                "reason": "", "refusal": ""}
+    # 只有当同时含「性化 / 危险」语境时才判定为需要拒绝 ——
+    # 「画一张高中生运动会」是正常创作需求。
+    risky = any(w in lower for w in ("裸", "性感", "情色", "色情", "sex",
+                                      "nsfw", "nude", "erotic", "sexual",
+                                      "诱惑", "挑逗", "性化"))
+    if not risky:
+        return {"sensitive": False, "category": "", "matched": matched,
+                "reason": "涉未成年人但无性化/危险语境，按普通创作处理",
+                "refusal": ""}
+    return {
+        "sensitive": True,
+        "category": "minor",
+        "matched": matched,
+        "reason": f"检出未成年人性化/危险语境：{'、'.join(matched[:3])}",
+        "refusal": ("涉及未成年人的这类内容我不能处理，也无法改写。"),
+    }
+
+
+def check_violence(text: str) -> dict:
+    """暴力 / 血腥写实化 —— 拒绝写实呈现，但给非血腥替代方案。"""
+    raw = (text or "")
+    lower = raw.lower()
+    matched = [w for w in _VIOLENCE_TERMS if w.lower() in lower]
+    if not matched:
+        return {"sensitive": False, "category": "", "matched": [],
+                "reason": "", "refusal": ""}
+    writer = any(w.lower() in lower for w in _VIOLENCE_WRITERS)
+    if not writer:
+        return {"sensitive": False, "category": "", "matched": matched,
+                "reason": "检出暴力相关词但非写实呈现诉求，按普通创作处理",
+                "refusal": ""}
+    return {
+        "sensitive": True,
+        "category": "violence",
+        "matched": matched,
+        "reason": f"检出血腥暴力写实化诉求：{'、'.join(matched[:3])}",
+        "refusal": (
+            "这段涉及血腥暴力的写实呈现，我不能按原样生成。"
+            "可以改成不直接呈现伤害的镜头语言——比如用碎裂的玻璃、"
+            "倒地后的空镜、忽明忽暗的手电光来传达紧张感。"
+            "要我按这个方向改吗？"),
+    }
+
+
+def check_real_person(text: str) -> dict:
+    """真实人物 / 名人 —— 不做肖像复刻，给「同类气质虚构角色」替代。"""
+    raw = (text or "")
+    lower = raw.lower()
+    markers = [w for w in _REAL_PERSON_MARKERS if w.lower() in lower]
+    if not markers:
+        return {"sensitive": False, "category": "", "matched": [],
+                "reason": "", "refusal": ""}
+    terms = [w for w in _REAL_PERSON_TERMS if w.lower() in lower]
+    if not terms:
+        return {"sensitive": False, "category": "", "matched": markers,
+                "reason": "仅提及公众人物身份，未要求复刻形象",
+                "refusal": ""}
+    return {
+        "sensitive": True,
+        "category": "real_person",
+        "matched": markers,
+        "reason": f"检出真实人物肖像复刻诉求：{'、'.join(markers[:3])}",
+        "refusal": (
+            "我不能复刻在世真实人物的形象或用他们的名字做提示词。"
+            "我可以改成「一位有相同气质特征但完全虚构的原创角色」——"
+            "如果你告诉我想要的特征（发型、体型、气质、着装），我来写。"),
+    }
+
+
+def check_content_policy(text: str) -> dict:
+    """
+    完整的内容策略检查（**Agent 侧的唯一内容边界**）。
+
+    按优先级依次判定（先命中先生效）：
+      1. 未成年人相关      -> 绝对拒绝，不提供改写
+      2. 暴力 / 血腥写实化 -> 拒绝写实化，给非血腥替代
+      3. 真实人物 / 名人   -> 不做肖像复刻，给虚构角色替代
+      4. 色情 / 露骨       -> 拒绝，给非露骨替代
+
+    返回 {"sensitive": bool, "category": str, "reason": str,
+          "matched": [...], "refusal": str}
+    """
+    for checker in (check_minor, check_violence, check_real_person,
+                    check_sensitive):
+        result = checker(text)
+        if result.get("sensitive"):
+            result.setdefault("category", "")
+            return result
+    return {"sensitive": False, "category": "", "reason": "", "matched": [],
+            "refusal": ""}
+
+
+#: 全局说明：供 respond / 文档引用，如实告诉用户边界的性质。
+POLICY_NOTE = (
+    "本工作台**没有服务端内容审核模块** —— 内容边界由 Agent 在提示词层面执行："
+    "即先拒绝并说明理由，而不是「先生成再过滤」。"
+    "因此请不要把本工作台当作合规审核工具使用。"
 )

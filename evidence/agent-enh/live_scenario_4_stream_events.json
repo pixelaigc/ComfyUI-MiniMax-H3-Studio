@@ -2,16 +2,25 @@
   "scenario": "SSE 流式事件序列",
   "request": {
     "message": "用素材库里的「雷神三视图 · 定妆照」做参考，生成一个 16:9、8 秒的文生视频，提示词：雷神手持战锤站在雪山之巅。",
-    "session_id": "live-stream-v3",
+    "session_id": "live-stream-r4",
     "stream": 1
   },
-  "elapsed_ms": 12372,
+  "elapsed_ms": 37833,
   "event_names": [
     "progress",
     "progress",
     "progress",
     "tool_call",
     "tool_result",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
     "progress",
     "tool_call",
     "tool_result",
@@ -29,10 +38,14 @@
     "tool_call",
     "tool_result",
     "progress",
+    "progress",
+    "tool_call",
+    "tool_result",
+    "progress",
     "done",
     "result"
   ],
-  "event_count": 24,
+  "event_count": 37,
   "events": [
     {
       "event": "progress",
@@ -42,7 +55,7 @@
         "detail": "",
         "done": 0,
         "total": 8,
-        "elapsed_ms": 1
+        "elapsed_ms": 4
       }
     },
     {
@@ -53,7 +66,7 @@
         "detail": "第 1/8 步",
         "done": 0,
         "total": 8,
-        "elapsed_ms": 1
+        "elapsed_ms": 4
       }
     },
     {
@@ -64,7 +77,7 @@
         "detail": "正在检索素材库",
         "done": 0,
         "total": 8,
-        "elapsed_ms": 1715
+        "elapsed_ms": 8052
       }
     },
     {
@@ -76,7 +89,7 @@
           "category": "image"
         },
         "type": "tool_call",
-        "elapsed_ms": 1716
+        "elapsed_ms": 8052
       }
     },
     {
@@ -86,39 +99,7 @@
         "ok": true,
         "summary": "找到 0 条结果",
         "type": "tool_result",
-        "elapsed_ms": 1716
-      }
-    },
-    {
-      "event": "progress",
-      "data": {
-        "type": "progress",
-        "stage": "tool",
-        "detail": "正在读取模式 schema",
-        "done": 0,
-        "total": 8,
-        "elapsed_ms": 1716
-      }
-    },
-    {
-      "event": "tool_call",
-      "data": {
-        "tool": "get_mode_schema",
-        "args": {
-          "mode": "t2v"
-        },
-        "type": "tool_call",
-        "elapsed_ms": 1716
-      }
-    },
-    {
-      "event": "tool_result",
-      "data": {
-        "tool": "get_mode_schema",
-        "ok": true,
-        "summary": "已返回 t2v 的参数 schema",
-        "type": "tool_result",
-        "elapsed_ms": 1716
+        "elapsed_ms": 8052
       }
     },
     {
@@ -129,7 +110,7 @@
         "detail": "第 2/8 步",
         "done": 1,
         "total": 8,
-        "elapsed_ms": 1716
+        "elapsed_ms": 8052
       }
     },
     {
@@ -140,7 +121,7 @@
         "detail": "正在检索素材库",
         "done": 1,
         "total": 8,
-        "elapsed_ms": 3827
+        "elapsed_ms": 9243
       }
     },
     {
@@ -151,7 +132,7 @@
           "query": "雷神"
         },
         "type": "tool_call",
-        "elapsed_ms": 3827
+        "elapsed_ms": 9243
       }
     },
     {
@@ -161,7 +142,7 @@
         "ok": true,
         "summary": "找到 1 条结果",
         "type": "tool_result",
-        "elapsed_ms": 3827
+        "elapsed_ms": 9243
       }
     },
     {
@@ -172,7 +153,7 @@
         "detail": "第 3/8 步",
         "done": 2,
         "total": 8,
-        "elapsed_ms": 3827
+        "elapsed_ms": 9243
       }
     },
     {
@@ -180,55 +161,31 @@
       "data": {
         "type": "progress",
         "stage": "tool",
-        "detail": "正在下发生成任务",
+        "detail": "正在读取模式 schema",
         "done": 2,
         "total": 8,
-        "elapsed_ms": 7463
+        "elapsed_ms": 11046
       }
     },
     {
       "event": "tool_call",
       "data": {
-        "tool": "create_job",
+        "tool": "get_mode_schema",
         "args": {
-          "mode": "t2v",
-          "prompt": "雷神手持战锤站在雪山之巅",
-          "asset_id": "asset_c48be15ecac2",
-          "aspect": "16:9",
-          "duration": 8,
-          "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频"
+          "mode": "t2v"
         },
         "type": "tool_call",
-        "elapsed_ms": 7463
+        "elapsed_ms": 11046
       }
     },
     {
       "event": "tool_result",
       "data": {
-        "tool": "create_job",
+        "tool": "get_mode_schema",
         "ok": true,
-        "summary": "已创建任务 0ce9fd35e6ad（t2v）",
+        "summary": "已返回 t2v 的参数 schema",
         "type": "tool_result",
-        "elapsed_ms": 7464
-      }
-    },
-    {
-      "event": "job",
-      "data": {
-        "job_id": "0ce9fd35e6ad",
-        "mode": "t2v",
-        "label": "文生视频",
-        "status": "queued",
-        "params": {
-          "prompt": "雷神手持战锤站在雪山之巅",
-          "aspect": "16:9",
-          "duration": 8.0,
-          "gen_type": "t2v"
-        },
-        "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频",
-        "prompt": "雷神手持战锤站在雪山之巅",
-        "type": "job",
-        "elapsed_ms": 7464
+        "elapsed_ms": 11046
       }
     },
     {
@@ -239,7 +196,7 @@
         "detail": "第 4/8 步",
         "done": 3,
         "total": 8,
-        "elapsed_ms": 7464
+        "elapsed_ms": 11046
       }
     },
     {
@@ -247,37 +204,228 @@
       "data": {
         "type": "progress",
         "stage": "tool",
-        "detail": "正在整理结论",
+        "detail": "正在查看素材详情",
         "done": 3,
         "total": 8,
-        "elapsed_ms": 12346
+        "elapsed_ms": 13802
       }
     },
     {
       "event": "tool_call",
       "data": {
-        "tool": "respond",
+        "tool": "describe_asset",
         "args": {
-          "summary": "已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
-          "job_ids": [
-            "0ce9fd35e6ad"
-          ],
-          "asset_ids": [
-            "asset_c48be15ecac2"
-          ]
+          "asset_id": "asset_c48be15ecac2"
         },
         "type": "tool_call",
-        "elapsed_ms": 12346
+        "elapsed_ms": 13803
       }
     },
     {
       "event": "tool_result",
       "data": {
-        "tool": "respond",
+        "tool": "describe_asset",
         "ok": true,
-        "summary": "已给出结论",
+        "summary": "已完成",
         "type": "tool_result",
-        "elapsed_ms": 12346
+        "elapsed_ms": 13803
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 5/8 步",
+        "done": 4,
+        "total": 8,
+        "elapsed_ms": 13803
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在增强提示词",
+        "done": 4,
+        "total": 8,
+        "elapsed_ms": 18427
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "enhance_prompt",
+        "args": {
+          "prompt": "雷神手持战锤站在雪山之巅",
+          "mode": "t2v"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 21288
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "enhance_prompt",
+        "ok": true,
+        "summary": "提示词已增强",
+        "type": "tool_result",
+        "elapsed_ms": 21288
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 6/8 步",
+        "done": 5,
+        "total": 8,
+        "elapsed_ms": 21288
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在下发生成任务",
+        "done": 5,
+        "total": 8,
+        "elapsed_ms": 27941
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "create_job",
+        "args": {
+          "mode": "t2v",
+          "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
+          "aspect": "16:9",
+          "duration": 8,
+          "asset_id": "asset_c48be15ecac2",
+          "summary": "参考「雷神三视图 · 定妆照」生成雷神持战锤立于雪山之巅的 16:9 / 8 秒视频"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 27941
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "create_job",
+        "ok": true,
+        "summary": "已创建任务 f118563049aa（t2v）",
+        "type": "tool_result",
+        "elapsed_ms": 27941
+      }
+    },
+    {
+      "event": "job",
+      "data": {
+        "job_id": "f118563049aa",
+        "mode": "t2v",
+        "label": "文生视频",
+        "status": "queued",
+        "params": {
+          "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
+          "aspect": "16:9",
+          "duration": 8.0,
+          "gen_type": "t2v"
+        },
+        "summary": "参考「雷神三视图 · 定妆照」生成雷神持战锤立于雪山之巅的 16:9 / 8 秒视频",
+        "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
+        "type": "job",
+        "elapsed_ms": 27941
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 7/8 步",
+        "done": 6,
+        "total": 8,
+        "elapsed_ms": 27941
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在查询任务进度",
+        "done": 6,
+        "total": 8,
+        "elapsed_ms": 32418
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "get_job_status",
+        "args": {
+          "job_id": "f118563049aa"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 32418
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "get_job_status",
+        "ok": true,
+        "summary": "任务 f118563049aa 状态 queued（）",
+        "type": "tool_result",
+        "elapsed_ms": 32418
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "thinking",
+        "detail": "第 8/8 步",
+        "done": 7,
+        "total": 8,
+        "elapsed_ms": 32418
+      }
+    },
+    {
+      "event": "progress",
+      "data": {
+        "type": "progress",
+        "stage": "tool",
+        "detail": "正在读取模式 schema",
+        "done": 7,
+        "total": 8,
+        "elapsed_ms": 37783
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "tool": "get_mode_schema",
+        "args": {
+          "mode": "r2v"
+        },
+        "type": "tool_call",
+        "elapsed_ms": 37783
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "tool": "get_mode_schema",
+        "ok": true,
+        "summary": "已返回 r2v 的参数 schema",
+        "type": "tool_result",
+        "elapsed_ms": 37783
       }
     },
     {
@@ -286,63 +434,57 @@
         "type": "progress",
         "stage": "done",
         "detail": "已完成",
-        "done": 5,
+        "done": 8,
         "total": 8,
-        "elapsed_ms": 12346
+        "elapsed_ms": 37783
       }
     },
     {
       "event": "done",
       "data": {
-        "answer": "已找到素材「雷神三视图 · 定妆��」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
-        "status": "completed",
+        "answer": "已创建 1 个生成任务，可在左侧「生成」列表查看进度。",
+        "status": "truncated",
         "jobs": [
           {
-            "job_id": "0ce9fd35e6ad",
+            "job_id": "f118563049aa",
             "mode": "t2v",
             "label": "文生视频",
             "status": "queued",
             "params": {
-              "prompt": "雷神手持战锤站在雪山之巅",
+              "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
               "aspect": "16:9",
               "duration": 8.0,
               "gen_type": "t2v"
             },
-            "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频",
-            "prompt": "雷神手持战锤站在雪山之巅"
+            "summary": "参考「雷神三视图 · 定妆照」生成雷神持战锤立于雪山之巅的 16:9 / 8 秒视频",
+            "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花���风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。"
           }
         ],
         "type": "done",
-        "elapsed_ms": 12346
+        "elapsed_ms": 37783
       }
     },
     {
       "event": "result",
       "data": {
-        "session_id": "live-stream-v3",
-        "status": "completed",
-        "answer": "已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\n\n- **Job ID**: 0ce9fd35e6ad\n- **模式**: t2v（文生视频）\n- **提示词**: 雷神手持战锤站在雪山之巅\n- **比例**: 16:9 ✓\n- **时长**: 8 秒 ✓（schema 合法范围 5–15s）\n- **分辨率**: 768p（官方默认）\n- **参考素材**: asset_c48be15ecac2\n\n任务已进入 ComfyUI 队列，可在「生成」列表中查看进度。",
+        "session_id": "live-stream-r4",
+        "status": "truncated",
+        "answer": "已创建 1 个生成任务，可在左侧「生成」列表查看进度。",
         "jobs": [
           {
-            "job_id": "0ce9fd35e6ad",
+            "job_id": "f118563049aa",
             "mode": "t2v",
             "label": "文生视频",
-            "prompt": "雷神手持战锤站在雪山之巅",
+            "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
             "params": {
-              "prompt": "雷神手持战锤站在雪山之巅",
+              "prompt": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
               "aspect": "16:9",
               "duration": 8.0,
               "gen_type": "t2v"
             },
-            "asset_refs": [
-              {
-                "asset_id": "asset_c48be15ecac2",
-                "slot": "ref_image",
-                "ordinal": 0
-              }
-            ],
+            "asset_refs": [],
             "status": "queued",
-            "summary": "参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频"
+            "summary": "参考「雷神三视图 · 定妆照」生成雷神持战锤立于雪山之巅的 16:9 / 8 秒视频"
           }
         ],
         "assets": [
@@ -350,68 +492,111 @@
             "asset_id": "asset_c48be15ecac2",
             "name": "雷神三视图 · 定妆照",
             "category": "image",
+            "subtype": "character",
             "tags": [
               "原神中的角色雷神三视图"
             ],
-            "description": "【素材描述】\n【主体人物】\n画面中央为一名男性武士角色（根据文件名推测为《红色警戒2》中的“武士”单位）。该人物占据画面约三分之二的比例，呈现半身特写。面部轮廓硬朗，五官立体，具有典型的东亚男性特征，神情严肃且充满杀气。\n\n【服装与配饰】\n身着华丽的日式",
+            "width": 1024,
+            "height": 1024,
+            "duration_sec": null,
+            "description": "【素材描述】\n【主体人物】\n画面中央为一名男性武士角色（根据文件名推测为《红色警戒2》中的“武士”单位）。该人物占据画面约三分之二的比例，呈现半身特写。面部轮廓硬朗，五官立体，具有典型的东亚男性特征，神情严肃且充满杀气。\n\n【服装与配饰】\n身着华丽的日式改良铠甲，主色调为深红色与金色。\n*   **胸甲**：胸部覆盖着带有横向纹理的深红色护甲，正中央镶嵌着一块巨大的金色金属饰板，形状呈明显的菱形（钻石形），边缘有复杂的镂空雕花，表面刻有类似兽面或面具的纹样细节。\n*   **肩甲**：双肩配有高耸且向外张开的硬质肩甲，呈暗红色，边缘镶金，表面刻有精细的云纹浮雕。\n*   **腰带与下摆**：腰间系着一条宽大的红色织物腰带（类似和服带），正中间有一个金色的圆形金属扣饰，带有兽面浮雕细节。下身穿着深红色的裙甲或战袍下摆，隐约可见暗纹图案。\n*   **护臂**：双臂佩戴黑红相间的硬质护臂，上面覆盖着繁复的金色卷草纹或龙纹装饰。\n*   **武器**：双手各持一把武士刀（太刀）。左手握持刀柄，刀柄缠绕黑色绳索；右手握持另一把刀的刀柄，刀鞘为红色，带有金色装饰。\n\n【发型与妆容】\n*   **发型**：黑色长发在头顶束成高高的发髻（类似日本传统的“茶筅髷”或武士发髻），发丝根根分明，向上竖起，显得干练且充满张力。鬓角处留有少许散落的碎发。\n*   **妆容/面部特征**：最显著的特征是双眼——瞳孔完全消失，整个眼球发出明亮的红光，仿佛燃烧着火焰或散发着魔法光芒。眉毛浓密且紧锁，鼻梁高挺，嘴唇紧闭，嘴角略微下垂，呈现出一种坚毅、冷酷甚至带有魔性的神态。\n\n【表情与神态】\n人物表情极度严肃、凶狠。眉头紧皱，眼神犀利（尽管是发光的红眼），直视前方略偏下的角度，传递出强烈的压迫感、战斗意志和某种超自然的力量感。面部肌肉紧绷，显示出随时准备投入战斗的状态。\n\n【动���与姿态】\n人物呈站立姿态，身体略微向右侧转，但头部正对镜头方向。双手分别握住两把武士刀的刀柄，左手位于画面左下方，右手位于画面右下方，呈现出一种蓄势待发、拔刀或持刀戒备的架势。肩膀耸起，胸肌紧绷，显示出力量感。\n\n【场景与环境】\n背景为充满戏剧性的天空。没有具体的地面或建筑物，完全被云层占据。云层厚重且翻滚，呈现出暴风雨来临前或黄昏时的景象。整体环境氛围宏大、压抑且充满史诗感。\n\n【光线与色彩】\n*   **色调**：画面主色调为暖色系，以红色、橙色、金色和黑色为主。背景天空呈现从深红到亮黄色的渐变，模拟夕阳或战火映照的效果。\n*   **光照**：光源似乎来自人物正后方（逆光），勾勒出人物的轮廓剪影，使边缘带有金色的辉光。同时，正面有补光，照亮了铠甲的金属质感和面部细节。人物双眼发出的红光也是画面中的点光源之一。\n\n【构图与镜头】\n采用中心对称式构图，人物位于画面正中。视角为低角度仰拍（虫视），这种视角增强了人物的崇高感、威严感和压迫感，使角色看起来比观众更强大。景深较浅，背景云层虽然清晰但主要作为衬托，焦点完全集中在人物面部和上半身铠甲上。\n\n【画面风格与质感】\n具有典型的3D游戏渲染风格或高质量概念插画风格。材质表现细腻，金属铠甲的光泽、织物的纹理、皮肤的质感以及云层的体积感都刻画得非常逼真。光影处理极具戏剧性，属于写实风格的奇幻/历史题材美术作品。\n\n【文字与标识】\n画面中无任何可见的文字、Logo或水印。\n\n【其他值得注意的细节】\n*   人物双眼的发光效果是视觉焦点之一，暗示该角色可能具有某种特殊能力（如狂暴状态、被控制状态或超自然属性）。\n*   铠甲上的金色纹饰非常繁复，包含了类似龙形或兽形的浮雕细节，增加了华丽感。\n*   背景的云层动态感很强，与人物静止的姿态形成动静对比。",
             "analyzed": true
           }
         ],
-        "prompt": null,
+        "prompt": {
+          "original": "雷神手持战锤站在雪山之巅",
+          "enhanced": "中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，裸露的黑色岩石纹理清晰可见。天空呈现阴沉的灰蓝色调，光线柔和漫射，无直射阳光。远处山峰轮廓模糊，近处雪花随风轻微飘散，营造出寒冷且压抑的氛围。画面中无任何文字元素。",
+          "spec_id": "video",
+          "validation": {
+            "ok": true,
+            "errors": [],
+            "warnings": [
+              "用户原文的核心要素可能丢失：雷神手持战锤站在雪山之巅、神手、手持、持战、战锤、锤站、在雪、山之、之巅"
+            ],
+            "stats": {
+              "words": 100,
+              "chars": 167
+            }
+          }
+        },
         "steps": [
           {
             "step": 1,
             "tool": "search_assets",
             "ok": true,
-            "ms": 1714,
+            "ms": 8051,
             "args": "{\"query\": \"雷神三视图 定妆照\", \"category\": \"image\"}",
-            "error": null
-          },
-          {
-            "step": 1,
-            "tool": "get_mode_schema",
-            "ok": true,
-            "ms": 1715,
-            "args": "{\"mode\": \"t2v\"}",
             "error": null
           },
           {
             "step": 2,
             "tool": "search_assets",
             "ok": true,
-            "ms": 2111,
+            "ms": 1190,
             "args": "{\"query\": \"雷神\"}",
             "error": null
           },
           {
             "step": 3,
-            "tool": "create_job",
+            "tool": "get_mode_schema",
             "ok": true,
-            "ms": 3636,
-            "args": "{\"mode\": \"t2v\", \"prompt\": \"雷神手持战锤站在雪山之巅\", \"asset_id\": \"asset_c48be15ecac2\", \"aspect\": \"16:9\", \"duration\": 8, \"summary\": \"参考「雷神三视图 · 定妆照」生成 16:9、8 秒的雷神雪山之巅视频\"}",
+            "ms": 1802,
+            "args": "{\"mode\": \"t2v\"}",
             "error": null
           },
           {
             "step": 4,
-            "tool": "respond",
+            "tool": "describe_asset",
             "ok": true,
-            "ms": 4882,
-            "args": "{\"summary\": \"已找到素材「雷神三视图 · 定妆照」(asset_c48be15ecac2) 作为参考图，并下发了文生视频任务：\\n\\n- **Job ID**: 0ce9fd35e6ad\\n- **模式**: t2v（文生视频）\\n- **提示词**: …（结果已截断）…, \"job_ids\": [\"0ce9fd35e6ad\"], \"asset_ids\": [\"asset_c48be15ecac2\"]}",
+            "ms": 2755,
+            "args": "{\"asset_id\": \"asset_c48be15ecac2\"}",
+            "error": null
+          },
+          {
+            "step": 5,
+            "tool": "enhance_prompt",
+            "ok": true,
+            "ms": 7487,
+            "args": "{\"prompt\": \"雷神手持战锤站在雪山之巅\", \"mode\": \"t2v\"}",
+            "error": null
+          },
+          {
+            "step": 6,
+            "tool": "create_job",
+            "ok": true,
+            "ms": 6653,
+            "args": "{\"mode\": \"t2v\", \"prompt\": \"中景固定镜头，低角度仰拍视角。主体为雷神托尔，身披红色斗篷与银色铠甲，右手紧握雷神之锤妙尔尼尔，垂直握持于身侧，姿态静止伫立。背景为险峻的雪山山脊，覆盖着厚重的白色积雪，���露的黑色岩石纹理清晰可见。天空呈现阴沉的…（结果已截断）…e15ecac2\", \"summary\": \"参考「雷神三视图 · 定妆照」生成雷神持战锤立于雪山之巅的 16:9 / 8 秒视频\"}",
+            "error": null
+          },
+          {
+            "step": 7,
+            "tool": "get_job_status",
+            "ok": true,
+            "ms": 4477,
+            "args": "{\"job_id\": \"f118563049aa\"}",
+            "error": null
+          },
+          {
+            "step": 8,
+            "tool": "get_mode_schema",
+            "ok": true,
+            "ms": 5365,
+            "args": "{\"mode\": \"r2v\"}",
             "error": null
           }
         ],
         "usage": {
-          "steps": 5,
-          "tool_calls": 5,
-          "elapsed_ms": 12345
+          "steps": 8,
+          "tool_calls": 8,
+          "elapsed_ms": 37783
         },
         "provider": {
           "name": "本机 Qwen 多模态",
           "model": "qwen3.8-flash-next-iq3_xxs"
         },
-        "error": null,
+        "error": "已达到步骤上限（8 步），返回已完成的部分结果",
         "memory": {
-          "used": false
+          "used": true
         },
         "provider_name": "本机 Qwen 多模态",
         "type": "result"

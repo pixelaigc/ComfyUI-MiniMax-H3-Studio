@@ -206,11 +206,94 @@ def scenario_stream() -> dict:
     return evidence
 
 
+def scenario_music_duration() -> dict:
+    """
+    场景 5：音乐时长字段（max_duration 而非 duration）。
+
+    用户说「120 秒」—— Agent 必须用 max_duration 传下去。
+    若误传 duration，落库会是默认 60 秒（静默出错）。
+    """
+    req = {"message": "写一段 120 秒的赛博朋克风格 BGM，"
+                      "提示词：synthwave, 霓虹, 80 BPM, 合成器主音",
+           "session_id": os.environ.get("SESS_MUSIC", "live-music")}
+    resp = post("/api/agent/chat", req)
+    jobs = resp["body"].get("jobs") or []
+    evidence = {
+        "scenario": "音乐时长走 max_duration",
+        "request": req,
+        "response_status": resp["status"],
+        "response_elapsed_ms": resp["elapsed_ms"],
+        "response": resp["body"],
+        "steps": resp["body"].get("steps") or [],
+        "jobs_from_response": jobs,
+        "jobs_from_sqlite": [read_job(j["job_id"]) for j in jobs],
+    }
+    (OUT / "live_scenario_5_music_duration.json").write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+    return evidence
+
+
+def scenario_video_resolution() -> dict:
+    """
+    场景 6：视频分辨率非法值被纠正（1080p -> 768p）。
+
+    实测事实：视频分辨率只有 544p/768p，传 1080p 会被 workflows 静默落成 768p。
+    Agent 侧必须拦下并说明，而不是静默。
+    """
+    req = {"message": "做一个 1080p 横屏、10 秒的视频，"
+                      "提示词：一只猫在雨中的霓虹街道奔跑",
+           "session_id": os.environ.get("SESS_VRES", "live-vres")}
+    resp = post("/api/agent/chat", req)
+    jobs = resp["body"].get("jobs") or []
+    evidence = {
+        "scenario": "视频分辨率非法值被纠正",
+        "request": req,
+        "response_status": resp["status"],
+        "response_elapsed_ms": resp["elapsed_ms"],
+        "response": resp["body"],
+        "steps": resp["body"].get("steps") or [],
+        "jobs_from_response": jobs,
+        "jobs_from_sqlite": [read_job(j["job_id"]) for j in jobs],
+    }
+    (OUT / "live_scenario_6_video_resolution.json").write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+    return evidence
+
+
+def scenario_negative_prompt() -> dict:
+    """
+    场景 7：负面提示词在不生效的模式下被如实告知。
+
+    实测事实：负面提示词只在 t2i_moss 与 t2i+Z-Image Base 真正生效。
+    走 t2i（默认 Turbo，cfg=1）时，Agent 必须告知「没用」而不是假装抑制了。
+    """
+    req = {"message": "画一张赛博朋克少女海报，负面提示词用 nsfw, blurry",
+           "session_id": os.environ.get("SESS_NEG", "live-neg")}
+    resp = post("/api/agent/chat", req)
+    jobs = resp["body"].get("jobs") or []
+    evidence = {
+        "scenario": "负面提示词生效性如实告知",
+        "request": req,
+        "response_status": resp["status"],
+        "response_elapsed_ms": resp["elapsed_ms"],
+        "response": resp["body"],
+        "steps": resp["body"].get("steps") or [],
+        "jobs_from_response": jobs,
+        "jobs_from_sqlite": [read_job(j["job_id"]) for j in jobs],
+    }
+    (OUT / "live_scenario_7_negative_prompt.json").write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+    return evidence
+
+
 SCENARIOS = {
     "normal": scenario_normal,
     "invalid": scenario_invalid_params,
     "clarification": scenario_clarification,
     "stream": scenario_stream,
+    "music": scenario_music_duration,
+    "vres": scenario_video_resolution,
+    "negative": scenario_negative_prompt,
 }
 
 

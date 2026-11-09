@@ -185,11 +185,85 @@ error             ← {error, code}，随后关流（**没有** result）
 | 工具 | 入参 | 返回 |
 |---|---|---|
 | `search_assets` | `query`(必) `category` `limit` | `{total, assets[], hint}`；素材描述已做注入隔离 |
-| `list_modes` | — | `{modes[], aspects[], video_duration_range, music_duration_range, notes}` |
+| `list_modes` | — | `{modes[], aspects[], image_families, video_resolutions, video_loras, music_plan_modes, music_formats, video_duration_range, music_duration_range, notes}` |
 | `describe_asset` | `asset_id`(必) | 素材详情（描述已隔离） |
 | `enhance_prompt` | `prompt`(必) `mode` | `{original, enhanced, spec_id, validation_ok}` |
-| `create_job` | `mode`(必) `prompt`(必) `aspect` `duration` `resolution` `batch_count` `asset_id` `summary` | `{job_id, mode, status, label}` |
+| `create_job` | `mode`(必) `prompt`(必) + 见 §3.1.1 | `{job_id, mode, status, label}` |
 | `respond` | `summary`(必) `job_ids` `asset_ids` `needs_clarification` | `{ok:true}` |
+
+#### 3.1.1 create_job 的完整入参（第二轮扩展）
+
+> **扩展背景**：原来只能传 7 个参数（`prompt` / `aspect` / `resolution` /
+> `duration` / `batch_count` / `ref_images` / `asset_refs`），
+> 模型版本、LoRA、负面提示词、歌词、音乐时长**全部传不下去** ——
+> 等于「用官方默认值出片」。而这些参数**工作流本来就支持**
+> （`workflows` 里 `params.get("model")` / `params.get("lora")` /
+> `params.get("negative_prompt")` / `params.get("lyrics")` /
+> `params.get("max_duration")` 都在读）—— 缺的是 Agent 侧通道。
+
+| 参数 | 类型 | 适用模式 | 合法值 | 说明 |
+|---|---|---|---|---|
+| `mode` | string | 全部 | `workflows.BUILDERS` 的 9 个 | 必填 |
+| `prompt` | string | 全部 | 非空 | 必填 |
+| `aspect` | string | 图像/视频 | 8 个比例 | |
+| `resolution` | string | 图像/视频 | **按族不同**（见下表） | |
+| `model` | string | 图像 | 该族的模型清单 | |
+| `duration` | number | **视频** | 5~15 秒 | 音乐模式请用 `max_duration` |
+| `max_duration` | number | **音乐** | 4~360 秒，默认 60 | 音乐时长的**真实字段名** |
+| `negative_prompt` | string | 图像 | 文本 | **仅部分模式生效**（见 §3.1.2） |
+| `cfg` | number | 图像 | >0 | Qwen 负面生效需 cfg>1 |
+| `seed` | integer | 全部 | 整数 | |
+| `lora` | string | 视频 | `none` / `ckpt850` / `v4step600` | |
+| `lora_strength` | number | 视频 | 0~2，默认 1.0 | |
+| `precision` | string | 视频 | `int8` / `nvfp4` | |
+| `batch_count` | integer | 图像 | 1~5 | 服务端 clamp |
+| `lyrics` | string | 音乐 | 文本 | 留空 = 纯器乐 |
+| `plan_mode` | string | 音乐 | `full` / `melody` | |
+| `format` | string | 音乐 | `flac` / `mp3` / `opus` | |
+| `checkpoint` | string | 音乐 | `yue2_*` 清单 | |
+| `asset_id` | string | 图片编辑/参考生视频 | 素材库 asset_id | 参考图 |
+| `first_frame` | string | 首尾帧 | 素材库 asset_id | **必需** |
+| `last_frame` | string | 首尾帧 | 素材库 asset_id | 可选 |
+| `ref_audio` | string | 参考生音乐 | 素材库 asset_id | **只能 1 段** |
+| `summary` | string | 全部 | 文本 | 一句话说明 |
+
+**分辨率按族（合法值来源：workflows 的真实常量表）**
+
+| 模式 | 合法档位 | 直出 MP 上限 | 超上限行为 |
+|---|---|---|---|
+| `t2v` / `flf` / `r2v` | `544p` / `768p` | — | 传其它值 → **静默落 768p**（Agent 侧已拦截并报错） |
+| `t2i` | `1mp` `480p` `720p` `1080p` `1440p` `2k` `4k` | 3.0 MP | 超限自动走官方 2K 放大路径（**允许**，会提示） |
+| `t2i_qwen` / `i2i_qwen` | `1mp` `480p` `720p` `1080p` `1440p` `2k` | 4.2 MP | 超限**无**放大路径 → 拒绝 |
+| `t2i_moss` | `1mp` `480p` `720p` `1080p` `1440p` `2k` | 4.0 MP（下限 0.25） | 同上 |
+
+#### 3.1.2 负面提示词生效矩阵（来自 workflows.*_MODELS 的 `supports_negative` / `cfg`）
+
+| 模式 / 模型版本 | 生效 | 原因 |
+|---|---|---|
+| `t2i` / `z_image_bf16` | ✅ | `negative="encode"`，独立 CLIP 负分支，cfg=4.0 |
+| `t2i` / `z_image_turbo_bf16` | ❌ | cfg=1.0，负分支固定 zero，ComfyUI 跳过 uncond |
+| `t2i` / `z_image_base_distill` | ❌ | cfg=1.0 |
+| `t2i` / `darkbeast_z6_blitz_fp8` | ❌ | cfg=1.0 |
+| `t2i_qwen` / `i2i_qwen` | ⚠️ | 支持，但**需 cfg>1** 才生效（默认 cfg=1.0） |
+| `t2i_moss` | ✅ | cfg=3.0；默认负面词 `nsfw, worst quality, bad anatomy, watermark, jpeg artifact` |
+| 视频三模式 / 音乐两模式 | ❌ | **没有** negative_prompt 通道 |
+
+不生效时 Agent 会**如实告知**（`code=negative_not_supported` / `negative_needs_cfg`），
+不会假装抑制成功。
+
+#### 3.1.3 素材槽位分派（`slot` 由模式决定）
+
+| 模式 | 槽位 | 说明 |
+|---|---|---|
+| `i2i_qwen` / `r2v` | `ref_image`（多条） | 参考图 |
+| `flf` | `first_frame`（必需）+ `last_frame`（可选） | 首尾帧 |
+| `a2a` | `ref_audio`（**1 条**） | 参考音频 |
+| `t2v` / `t2i*` / `t2a` | 无 | 传了素材会被忽略（不报错） |
+
+> **为什么强调**：Agent 原先恒写 `slot="ref_image"`，而服务端按槽位分派参数，
+> 导致 `a2a` 必被「参考生音乐需要选择一段参考音频」拦下、
+> `flf` 必被「首尾帧模式需要至少上传首帧图片」拦下。
+> 现在按上表分派，两个模式都可正常下发。
 
 ### 3.2 素材类（4 个，新增）
 
@@ -316,10 +390,46 @@ Body：`{"key": "preferred_aspect", "value": "9:16", "scope": "global"}`
 | `prompt_injection_detected` | 400 | 内容含提示注入，拒绝写入记忆 |
 | `sensitive_content` | — | 敏感内容请求被拒（`status=failed`，`refusal` 给拒绝话术） |
 | `no_tool_call` | — | 模型只做口头承诺，未真正调用工具（`status=failed`） |
+| `fabricated_job_id` | — | 模型声称已下发任务但**报告的 job id 是编造的**（`status=failed`） |
+| `invalid_params` | 400 | 参数取值非法。带 `issues[]`（`allowed` 合法值 + `suggestions` 可执行替代方案） |
+| `negative_not_supported` | 400 | 该模式/模型版本的负面提示词**不生效**（不拦任务，只如实告知） |
+| `negative_needs_cfg` | 400 | 负面提示词需 cfg>1 才生效 |
+| `resolution_upscaled` | — | 超过直出上限但该模式有官方放大路径（t2i 的 2k/4k）—— 允许 |
+| `resolution_too_large` | 400 | 超过直出上限且**无**放大路径（qwen/moss）—— 拒绝 |
+| `resolution_too_small` | 400 | 低于该族下限（moss 0.25MP）—— 拒绝 |
+| `invalid_plan_mode` / `invalid_format` / `invalid_checkpoint` | 400 | 音乐参数取值非法 |
+| `provider_not_tool_capable` | 400 | Provider 是 comfyui 类型，**不支持 tools 协议**（前置拦截，不降级） |
+| `library_unavailable` | 503 | 素材库磁盘未挂载/不可写 |
 | `no_provider` | 400 | 没有可用 Provider |
 | `provider_error` | 502 | 本地模型调用失败 |
 | `too_many_requests` | 429 | 并发超限（当前 2 个会话在跑） |
 | `agent_internal_error` | 500 | 内部异常 |
+
+### 5.1 内容策略的真实边界（**没有服务端审核**）
+
+**全仓不存在任何内容审核/拦截模块**（无 moderation / blocklist / 敏感词表 /
+safety_filter / NSFWFilter）。`enhancer.validate_output` 的硬约束**全部是提示词
+质量约束**（质量词、权重语法、thinking 残留、bbox 结构、主体保留），
+**不含任何内容合规判定**。
+
+所以内容边界**由 Agent 在提示词层执行**（先拒绝并说明，而不是先生成再过滤）：
+
+| 类别 | 判定要点 | 处理 | 拒绝话术要点 |
+|---|---|---|---|
+| 未成年人相关 | 敏感词 + 性化/危险语境 | **绝对拒绝**，不提供任何改写 | 「涉及未成年人的这类内容我不能处理，也无法改写。」 |
+| 暴力 / 血腥 | 血腥词 + 写实呈现诉求 | 拒绝写实化，给非血腥替代 | 改用镜头语言（碎裂玻璃、倒地空镜、手电光）传达紧张感 |
+| 在世真实人物 | 公众人物身份 + 复刻诉求 | 不做肖像复刻 | 改「同样气质但完全虚构的原创角色」 |
+| 色情 / 露骨 | 敏感词 + 索取意图 + 无豁免语境 | 拒绝，给非露骨替代 | 给合规题材与非露骨表达方向 |
+
+**豁免语境**（不拦）：学术 / 论文 / 研究 / 新闻 / 报道 / 教育 / 科普 / 教学 /
+讨论 / 批评 / 审查 / 合规 / 法规 / 法律 / 分级 / 医学 / 解剖。
+
+**负面提示词语境不拦**：「负面提示词用 nsfw, blurry」是**抑制**违规内容的正确用法，
+不能因为文本里出现敏感词就整个拒掉。
+
+> 响应里 `status=failed` + `code=sensitive_content` + `category`（minor /
+> violence / real_person / nsfw）+ `refusal`（拒绝话术全文）。
+> **不会调用模型**，也不会创建任务。
 
 ---
 
@@ -335,6 +445,7 @@ Body：`{"key": "preferred_aspect", "value": "9:16", "scope": "global"}`
 | `no_tool_retry` | 1 | 强制重试一轮（多一轮 = 多付 20~120 s） |
 | `tool_retry` | 1 | 只重试「读类」工具的「非参数类」失败；写类不重试（防重复副作用） |
 | `repeat_limit` | 3 | 同名同参第 2 次给纠偏提示，第 3 次判定打转收尾 |
+| `tool_result_limit` | 2000 | 单个工具结果回给模型的上限。基线是 1200（刚好装下当时的 list_modes = 1199 字符）；本轮 list_modes 增加了每个模式都要知道的坑位事实（素材槽位 / 音乐时长字段 / 负面提示词是否生效 / 视频分辨率），压缩后 1850 字符 —— 1200 会截断，截断 = 模型看到残缺 JSON |
 
 记忆限额（`GET /api/agent/tools` → `memory_limits`）：
 `max_entries=500`、`max_value_chars=2000`、`max_read_limit=100`。
