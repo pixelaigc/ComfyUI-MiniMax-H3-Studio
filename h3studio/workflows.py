@@ -1049,8 +1049,12 @@ QWEN_IMAGE_MODELS = {
         "schedulers": ["simple", "beta", "sgm_uniform", "normal", "karras",
                        "exponential", "linear_quadratic"],
         "note": "官方 README 默认参数：40 步 / cfg 1 / euler / simple。",
+        # 注意：出图时是否再扩写一次，由「增强」下拉里的官方 PE 写回状态决定，
+        # 面板上**没有**独立的 PE 开关 —— 所以这里不要再写「去面板里关掉」
+        # 这种指向已删除控件的指引（那是死指引，用户会去找一个不存在的勾选框）。
         "warn": "官方 PE 文本编码器自带提示词扩写（提示词会被重写得更详细）；"
-                "想完全控制提示词，可在面板里关掉 PE 编码器。",
+                "想自己控制最终提示词，可先用「增强」下拉里的「qwen21图片官方增强PE」"
+                "扩写一次并写回提示词框，写回后出图不再二次扩写。",
     },
     "qwen_image_2.1_turbo_bf16": {
         "label": "Qwen-Image 2.1 Turbo · 8 步蒸馏版",
