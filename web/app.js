@@ -1935,6 +1935,7 @@ window.addEventListener("resize", () => {
   if (lightbox.open) lightboxFit();
   // 窗口宽度变了，网格列数要跟着重算（每页作品数不变）
   applyGridColumns(state.pageSize);
+  updateResponsiveChrome();
 });
 
 // 单条任务内的批次结果：可展开/折叠的缩略图网格 + 每批次状态
@@ -2359,12 +2360,29 @@ let filterDebounce = null;
 //      这样每一行都是满的，不会出现「最后一行只有 1 个」；
 //   3. 找不到合适的因数时保留原列数（宁可最后一行少几张，也不要整行浪费宽度）。
 // 列用 1fr —— 行始终铺满容器宽度，不会出现右侧空白。
-const CARD_MIN_WIDTH = 260;   // 卡片最小可读宽度（低于此宽度内部信息会破版）
-const GRID_GAP = 14;
+// 卡片最小可读宽度与间距：**真源在 CSS**（responsive.css 的 --card-min-width /
+// --grid-gap）。JS 从网格元素上读计算样式，这样窄屏换档时
+// 「CSS 决定的卡片宽度」与「JS 决定的列数」永远是同一套数字 ——
+// 两处各写一份常量必然走偏（窄屏卡片变小、列数没变 = 卡片被挤扁）。
+const CARD_MIN_WIDTH_FALLBACK = 260;   // 读不到 CSS 变量时的兜底
+const GRID_GAP_FALLBACK = 14;
+
+function readGridMetrics() {
+  const grid = $("#jobsGrid");
+  if (!grid) return {cardMin: CARD_MIN_WIDTH_FALLBACK, gap: GRID_GAP_FALLBACK};
+  const cs = getComputedStyle(grid);
+  const min = parseFloat(cs.getPropertyValue("--card-min-width"));
+  const gap = parseFloat(cs.getPropertyValue("--grid-gap"));
+  return {
+    cardMin: Number.isFinite(min) && min > 0 ? min : CARD_MIN_WIDTH_FALLBACK,
+    gap: Number.isFinite(gap) && gap >= 0 ? gap : GRID_GAP_FALLBACK,
+  };
+}
 
 function gridColumnCount(pageSize, containerWidth) {
   const width = containerWidth || 0;
   if (width <= 0) return 1;
+  const {cardMin: CARD_MIN_WIDTH, gap: GRID_GAP} = readGridMetrics();
   const maxByWidth = Math.floor((width + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP));
   const maxCols = Math.max(1, Math.min(maxByWidth, pageSize));
   // 优先「数量能整除」的列数，使每一行都是满的 —— 既不浪费宽度，又不留空行：
@@ -2418,25 +2436,80 @@ function initGridResizeObserver() {
 }
 
 // ---------- 骨架占位 ----------
-// 切换筛选（状态标签 / 生成类型 / 分页）时先铺一组固定尺寸的骨架卡，
+// 切换筛选（状态标签 / 生成类型 / 分页）时先铺一组骨架卡，
 // 让网格的列宽与行高在数据到达前就稳定下来 —— 数据到达瞬间不再有
 // 「图片从无到有」引起的布局抖动。
+//
+// 关键设计：**骨架卡直接复用真实卡片的 DOM 结构**（jobCard()），
+// 只把预览图换成占位块。
+// 为什么不能另写一套骨架：真实卡片的元信息区高度随「生成模式」变化
+// （t2i 有 8 行、t2v 有 7 行、t2i_qwen 只有 5 行），而且行高受
+// @container 断点（卡片窄于 340px 时 3 列改 2 列）影响。
+// 另写的骨架只能猜一个高度 —— 数据到达时高度一变就是布局抖动。
+// 复用 jobCard() 则保证「骨架 → 真实卡片」的盒模型逐像素一致。
 const SKELETON_MAX = 12;
+
+// 造一个「形状与真实卡片一致」的假任务：
+// mode 用当前模式，params 用该模式会渲染的字段集 —— 于是元信息行数相同。
+function skeletonJob(index) {
+  const mode = state.mode || DEFAULT_MODE;
+  const isImage = IMAGE_MODES.includes(mode);
+  const params = {
+    mode: mode,
+    prompt: "骨架占位提示词，用于让元信息区高度与真实卡片保持一致，长度对齐真实内容。",
+    aspect: "16:9",
+    resolution: "768p",
+    duration: 5,
+    width: 1360,
+    height: 768,
+    model: "z_image_turbo_bf16",
+    steps: 8,
+    cfg: 1,
+    sampler: "res_multistep",
+    scheduler: "simple",
+    seed: 0,
+  };
+  if (!isImage) {
+    // 视频模式不显示分辨率/模型/采样这几行，删掉免得多出空行
+    delete params.width;
+    delete params.height;
+    delete params.model;
+    delete params.steps;
+    delete params.cfg;
+    delete params.sampler;
+    delete params.scheduler;
+  }
+  return {
+    id: "__skeleton__" + index,
+    created_at: 0,
+    mode: mode,
+    params: params,
+    status: "done",
+    progress: 1,
+    progress_text: "",
+    outputs: [],
+    batches: [],
+    elapsed: 0,
+  };
+}
+
 function renderGridSkeleton(grid, count) {
   const n = Math.max(1, Math.min(count || SKELETON_MAX, SKELETON_MAX));
   const frag = document.createDocumentFragment();
   for (let i = 0; i < n; i++) {
-    const sk = document.createElement("div");
-    sk.className = "job-card job-skeleton";
-    sk.setAttribute("aria-hidden", "true");
-    sk.innerHTML =
-      '<div class="sk sk-top"></div>' +
-      '<div class="sk sk-preview"><span class="sk-spin"></span></div>' +
-      '<div class="sk sk-meta">' +
-      '<i></i><i></i><i></i><i></i><i></i><i></i>' +
-      '</div>' +
-      '<div class="sk sk-actions"></div>';
-    frag.appendChild(sk);
+    const card = jobCard(skeletonJob(i));
+    // 去掉 jid —— 骨架不是真实卡片，不能被增量更新逻辑当成已有卡片复用
+    delete card.dataset.jid;
+    delete card.dataset.sig;
+    card.classList.add("job-skeleton");
+    card.setAttribute("aria-hidden", "true");
+    // 预览区换成占位块（真实卡片这里是 <img>/<video>）
+    const preview = card.querySelector(".job-preview");
+    if (preview) {
+      preview.classList.remove("has-image");
+      preview.innerHTML = '<span class="sk-spin"></span>';
+    }
+    frag.appendChild(card);
   }
   grid.replaceChildren(frag);
 }
@@ -2808,6 +2881,8 @@ function showCreate() {
   $("#systemPage").style.display = "none";
   $("#providersPage").style.display = "none";
   $("#assetsPage").style.display = "none";
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
 }
 
 function showStitch() {
@@ -2826,6 +2901,8 @@ function showStitch() {
   renderTabs();
   renderStitchClips();
   refreshJobs();
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
 }
 
 function showSystem() {
@@ -2839,6 +2916,8 @@ function showSystem() {
   $("#providersPage").style.display = "none";
   $("#assetsPage").style.display = "none";
   refreshHardware();
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
 }
 
 // 本地模型配置页（实现见 providers.js）
@@ -2854,6 +2933,8 @@ function showProviders() {
   $("#assetsPage").style.display = "none";
   loadProviders();
   loadAgentConfig();
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
 }
 
 $("#navSystem").addEventListener("click", showSystem);
@@ -3136,6 +3217,136 @@ document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("#loraInfoModal").hidden) closeLoraInfo();
 });
 
+// ---------- 窄屏适配：抽屉 / 底部面板 ----------
+//
+// 断点真源在 web/responsive.css（--bp-phone / --bp-tablet），
+// 这里只读不写 —— 改断点只改 CSS 一处。
+const BREAKPOINTS = {phone: 700, tablet: 1100};
+// 挂到 window —— 响应式回归测试要读它，和 CSS 的 --bp-phone 做一致性比对
+window.BREAKPOINTS = BREAKPOINTS;
+
+function isPhoneViewport() {
+  return window.innerWidth <= BREAKPOINTS.phone;
+}
+
+// 侧栏抽屉（窄屏）
+function setSidebarOpen(open) {
+  const sidebar = $("#sidebar");
+  const mask = $("#sidebarMask");
+  const toggle = $("#navToggle");
+  if (!sidebar) return;
+  sidebar.classList.toggle("open", open);
+  if (mask) mask.classList.toggle("open", open);
+  if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+// 当前「可折叠参数面板」—— 创作页是 #panel，长片拼接页是 #stitchPanel。
+// 两者在 HTML 里都带 .panel 类（窄屏下都是底部抽屉）。
+function activePanel() {
+  const create = $("#panel");
+  const stitch = $("#stitchPanel");
+  const createOn = create && create.style.display !== "none";
+  const stitchOn = stitch && stitch.style.display !== "none";
+  if (stitchOn) return stitch;
+  if (createOn) return create;
+  return null;
+}
+
+// 参数面板底部抽屉（窄屏）
+function setPanelOpen(open) {
+  const panel = activePanel();
+  const mask = $("#panelMask");
+  if (!panel) return;
+  panel.classList.toggle("open", open);
+  if (mask) mask.classList.toggle("open", open);
+}
+
+// 浮动「参数」按钮：只在**参数面板处于抽屉模式**时出现。
+// 抽屉模式的断点是 tablet（≤1100px）—— 平板上参数区也收进了底部抽屉，
+// 所以按钮在平板同样要显示；桌面端参数区常驻，不需要按钮。
+function updateResponsiveChrome() {
+  const fab = $("#panelFab");
+  if (!fab) return;
+  const panel = activePanel();
+  const drawerMode = window.innerWidth <= BREAKPOINTS.tablet;
+  if (!drawerMode || !panel) {
+    fab.hidden = true;
+    return;
+  }
+  fab.hidden = false;
+  const stitch = panel.id === "stitchPanel";
+  fab.querySelector("span").textContent = stitch ? "片段" : "参数";
+}
+
+function closeDrawers() {
+  setSidebarOpen(false);
+  setPanelOpen(false);
+}
+
+// 切到别的页面时收掉抽屉 —— 参数抽屉的内容属于上一页，
+// 留着会造成「点开参数看到的是上一个模式的参数」。
+function closePanelDrawerOnPageChange() {
+  if (window.innerWidth > BREAKPOINTS.tablet) return;
+  const panel = activePanel();
+  if (panel) panel.classList.remove("open");
+  const mask = $("#panelMask");
+  if (mask) mask.classList.remove("open");
+}
+
+function initResponsive() {
+  const toggle = $("#navToggle");
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      const open = !$("#sidebar").classList.contains("open");
+      setSidebarOpen(open);
+      // 打开侧栏时关掉参数抽屉：两个抽屉不叠在一起
+      if (open) setPanelOpen(false);
+    });
+  }
+  const sidebarMask = $("#sidebarMask");
+  if (sidebarMask) sidebarMask.addEventListener("click", () => setSidebarOpen(false));
+
+  const panelMask = $("#panelMask");
+  if (panelMask) panelMask.addEventListener("click", () => setPanelOpen(false));
+
+  const fab = $("#panelFab");
+  if (fab) {
+    fab.addEventListener("click", () => {
+      const panel = activePanel();
+      if (!panel) return;
+      const open = !panel.classList.contains("open");
+      panel.classList.toggle("open", open);
+      const mask = $("#panelMask");
+      if (mask) mask.classList.toggle("open", open);
+      if (open) setSidebarOpen(false);
+    });
+  }
+
+  // 点导航项后自动收起侧栏（窄屏）：选完模式就该看到内容，而不是被抽屉挡住
+  $$(".nav-item").forEach(item => item.addEventListener("click", () => {
+    if (isPhoneViewport()) setSidebarOpen(false);
+  }));
+
+  // Esc 关闭抽屉
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    closeDrawers();
+  });
+
+  // 视口跨过断点时清掉抽屉状态：
+  // 桌面端 .sidebar / .panel 是常驻的，残留的 .open 类会让
+  // 缩小窗口时侧栏被 translateX(-100%) 藏起来。
+  window.addEventListener("resize", () => {
+    // 视口跨过断点时清掉抽屉状态：
+    // 桌面端 .sidebar / .panel 是常驻的，残留的 .open 类会让
+    // 缩小窗口时侧栏被 translateX(-100%) 藏起来。
+    if (window.innerWidth > BREAKPOINTS.tablet) {
+      setSidebarOpen(false);
+      setPanelOpen(false);
+    }
+  });
+}
+
 // ---------- 启动 ----------
 // 启动脚本必须「逐项隔离」：任何一项抛异常都不能中断后面的项。
 // 之前 esc() 未定义抛 ReferenceError 会中断整个顶层脚本，连带
@@ -3162,6 +3373,10 @@ boot("生成类型清单", loadGenerationTypes);
 boot("模式面板", renderMode);
 boot("状态标签", renderTabs);
 boot("每页数量", initPageSizeSelect);
+boot("网格尺寸监听", initGridResizeObserver);
+boot("窄屏抽屉", initResponsive);
+// assets.js 是独立作用域（IIFE），要通过 window 才能调到这里的函数
+window.updateResponsiveChrome = updateResponsiveChrome;
 boot("提示词版本", renderPromptVersions);   // 初始化二次增强「作用对象」切换（原始 / 一次增强后）
 boot("长片片段", renderStitchClips);
 boot("任务列表", refreshJobs);

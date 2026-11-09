@@ -888,6 +888,8 @@
     const nav = $("#navAssets");
     if (nav) nav.classList.add("active");
     if (window.ASSETLIB_setPage) window.ASSETLIB_setPage("assets");
+    // 素材库页没有参数面板 —— 窄屏的「参数」浮动按钮要收起来
+    if (typeof window.updateResponsiveChrome === "function") window.updateResponsiveChrome();
     await loadAssets();
     await loadTags();
     await loadStats();

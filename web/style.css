@@ -22,20 +22,25 @@ body {
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* Logo：SVG「播放 + 多路输出」图形 —— 一台工作台同时产出图像 / 视频 / 音频 */
 .logo {
   background: linear-gradient(135deg, #4f6ef7, #7b4ff7); color: #fff;
-  width: 24px; height: 24px; border-radius: 7px; font-weight: 700; font-size: 11px;
+  width: 26px; height: 26px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; overflow: hidden;
 }
-.brand-name { font-weight: 400; font-size: 15px; }
-.brand-name strong { font-weight: 750; }
-.brand-version { color: var(--muted); font-size: 12px; margin-left: 2px; }
-.brand-links { display: inline-flex; align-items: center; gap: 3px; margin-left: 7px; padding-left: 9px; border-left: 1px solid var(--border); }
-.brand-links a { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: rgba(79,86,99,.74); }
-.brand-links a:hover { background: rgba(138,145,156,.14); color: rgba(45,50,59,.96); }
-.brand-links svg { width: 15px; height: 15px; fill: currentColor; }
-.brand-links a:nth-child(2) svg { fill: none; stroke: currentColor; stroke-width: 1.6; }
+.logo svg { width: 100%; height: 100%; display: block; }
+.brand-name {
+  font-weight: 400; font-size: 15px;
+  display: flex; align-items: baseline; gap: 8px; min-width: 0;
+}
+.brand-name strong { font-weight: 750; white-space: nowrap; }
+.brand-tagline {
+  color: var(--muted); font-size: 12px; font-weight: 400;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-version { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .top-status { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #34c17e; }
 .dot-busy { background: var(--danger); animation: pulse 1.2s infinite; }
@@ -62,19 +67,6 @@ body {
 .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .nav-item.active svg { color: var(--accent); }
 .sidebar-foot { margin-top: auto; padding: 8px 6px; }
-.sidebar-links {
-  width: 66%; margin: 0 auto 10px; display: flex; align-items: center;
-  justify-content: space-between; gap: 4px;
-  padding-bottom: 10px; border-bottom: 1px solid var(--border);
-}
-.sidebar-links a {
-  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-  border-radius: 6px; color: rgba(105, 112, 124, .52); text-decoration: none;
-  transition: color .15s ease, background-color .15s ease;
-}
-.sidebar-links a:hover { background: rgba(138, 145, 156, .10); color: rgba(79, 86, 99, .82); }
-.sidebar-links svg { width: 13px; height: 13px; fill: currentColor; }
-.sidebar-links a:nth-child(2) svg { fill: none; stroke: currentColor; stroke-width: 1.6; }
 .sidebar-foot button {
   width: 100%; padding: 7px; border: 1px solid var(--border); background: #fff;
   border-radius: 8px; cursor: pointer; color: var(--muted); font-size: 12.5px;
@@ -260,6 +252,46 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
    这里的 auto-fill 只是 JS 尚未执行时的兜底。 */
 .jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .empty-hint { color: var(--muted); text-align: center; padding: 60px 0; grid-column: 1/-1; }
+
+/* ---------- 骨架占位（切换筛选 / 数据加载中） ----------
+ * 骨架卡与真实卡片共用 .job-card 的盒模型（同样的顶部条 / 16:9 预览 / 元信息区），
+ * 所以「骨架 → 真实卡片」的替换不会引起任何尺寸变化 —— 这正是消除
+ * 「首图巨大闪现 + 布局抖动」的关键：占位与实体的几何完全一致。
+ */
+/* 骨架卡：与真实卡片共用 .job-card 的 DOM 结构（见 app.js 的 renderGridSkeleton），
+   所以这里只需要把「内容」涂成灰色块 —— 盒模型完全由真实卡片的样式决定，
+   高度逐像素一致，数据到达时网格不发生任何位移。 */
+.job-skeleton { pointer-events: none; }
+.job-skeleton .job-top,
+.job-skeleton .job-meta .row span,
+.job-skeleton .job-meta .row b,
+.job-skeleton .job-preview {
+  color: transparent;
+}
+.job-skeleton .job-top { background: #f7f8fa; }
+/* 关键：**不覆盖 span / b 的高度**。
+   真实行高 = span(11px) + gap(2px) + b(14px) = 27px。
+   一旦给占位块写死 height: 11px，行高就缩到 21px —— 骨架与实体不等高，
+   数据到达时网格高度会跳 6px × 行数。
+   只改颜色和背景（transparent 文字照样占位），高度完全由真实样式决定。 */
+.job-skeleton .job-meta .row b {
+  background: #eef0f3; border-radius: 4px;
+}
+.job-skeleton .job-meta .row span {
+  background: #f2f3f6; border-radius: 3px; width: 60%;
+}
+.job-skeleton .job-meta button.prompt-row b { width: 80%; }
+.job-skeleton .job-preview { background: #e6e8ec; }
+.job-skeleton .job-actions { background: #fafbfc; }
+.job-skeleton .job-actions button,
+.job-skeleton .job-actions a { color: transparent; }
+.job-skeleton .sk-spin {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid #d3d7de; border-top-color: var(--accent);
+  animation: sk-spin .9s linear infinite;
+  position: absolute;
+}
+@keyframes sk-spin { to { transform: rotate(360deg); } }
 .jobs-pagination {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 18px 0 6px;
@@ -295,13 +327,30 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
   cursor: pointer; font-size: 11.5px; color: var(--text);
 }
 .job-top .cancel-btn:hover { color: var(--danger); border-color: var(--danger); }
+/* 预览框：高度必须由 CSS 决定，与图片自身像素无关。
+ *
+ * 原实现（aspect-ratio + flex 居中 + img 的 max-width/max-height）的问题：
+ * flex 容器的 aspect-ratio 会被**内容**的固有尺寸压过 ——
+ * 一张 1024×1024 的原图会把 335px 宽的预览框撑到 1024px 高。
+ * 素材库页隐藏了容器（width=0）再切回来时，列数算成 1 列，
+ * 首张卡片宽度 = 整个容器（实测 1040px），原图就以 1024×1024
+ * 原尺寸巨图形式闪一帧 —— 这就是「首图巨大闪现」。
+ *
+ * 现在改成：预览框用 padding-bottom 占位撑出 16:9，
+ * 媒体用 position:absolute 铺满并 object-fit:contain。
+ * 容器高度恒定 = 宽度 × 9/16，图片再大也不会溢出容器。
+ */
 .job-preview {
-  aspect-ratio: 16/9; background: #0d0f12; display: flex; align-items: center;
-  justify-content: center; position: relative;
+  position: relative; width: 100%; height: 0; padding-bottom: 56.25%;
+  background: #0d0f12; overflow: hidden;
 }
-.job-preview video { width: 100%; height: 100%; object-fit: contain; }
+.job-preview video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+}
 .job-card:has(.job-preview video) .job-preview { cursor: grab; }
-.job-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.job-preview img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+}
 .job-card:has(.job-preview img) .job-preview { cursor: zoom-in; }
 .job-card.dragging-image { opacity: .55; }
 .progress-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
