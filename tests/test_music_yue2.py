@@ -170,6 +170,15 @@ class TestMusicWorkflow(unittest.TestCase):
         # subfolder 必须是空字符串
         self.assertIn('data.add_field("subfolder", "")', source)
 
+    def test_audio_output_kind_recognized(self):
+        """音频扩展名必须被识别成 audio（否则素材库里归成 video）。"""
+        source = (REPO / "h3studio" / "asset_service.py").read_text(encoding="utf-8")
+        # kind 推断要认音频扩展名
+        self.assertIn('".flac"', source)
+        self.assertIn('".mp3"', source)
+        # category 三分支：image / audio / video
+        self.assertIn('else "audio" if kind == "audio"', source)
+
     def test_cover_requires_ref_audio(self):
         with self.assertRaises(ValueError):
             workflows.build_workflow("a2a", {"prompt": "x", "job_id": "y"})

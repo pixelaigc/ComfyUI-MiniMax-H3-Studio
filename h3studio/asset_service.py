@@ -242,8 +242,11 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
         raise LibraryError("生成结果缺少文件路径", status=400)
 
     params = job.get("params") or {}
-    kind = output.get("kind") or ("image" if str(raw).lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
-                                  else "video")
+    kind = output.get("kind") or (
+        "image" if str(raw).lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+        else "audio" if str(raw).lower().endswith((".flac", ".mp3", ".opus", ".wav",
+                                                     ".m4a", ".ogg", ".aac"))
+        else "video")
 
     if outputs_dir is None:
         raise LibraryError("缺少生成结果目录", status=500)
@@ -289,7 +292,11 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
         filename=Path(source_path).name,
         mime=A.guess_mime(source_path.name),
         name=Path(source_path).name,
-        category="image" if kind == "image" else "video",
+        # 【2026-11-09 修】音乐产物 kind="audio" 之前被归成 "video" ——
+        # 素材库的音频筛选（category=audio）查不到，右键入库看着像没生效。
+        category=("image" if kind == "image"
+                  else "audio" if kind == "audio"
+                  else "video"),
         tags=tags,
         source="job_output",
         source_ref=job.get("id"),
