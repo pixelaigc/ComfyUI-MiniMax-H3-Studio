@@ -213,6 +213,13 @@ def main():
                         ck.check("本面板不可用" in joined,
                                  f"[{tag}] 禁用项 {it['method']} 写明归属", joined)
                 results["panels"].setdefault(pname, {})[str(w)] = geo
+                # 截图前把增强栏滚进视野
+                page.evaluate(
+                    """(sel) => {
+                      const el = document.querySelector(sel);
+                      if (el) el.scrollIntoView({block: 'center'});
+                    }""", row_id)
+                page.wait_for_timeout(300)
                 shot = out / f"menu-{pname}-{w}.png"
                 try:
                     page.screenshot(path=str(shot))
@@ -266,6 +273,13 @@ def main():
                          f"[spec-row {pname}] 模板行有选项", str(row))
                 ck.check(row["value"] in row["options"],
                          f"[spec-row {pname}] 当前模板在选项里", str(row))
+            # 截图前把增强栏滚进视野（面板很长，不滚动看不到增强区）
+            page.evaluate(
+                """(sel) => {
+                  const el = document.querySelector(sel);
+                  if (el) el.scrollIntoView({block: 'center'});
+                }""", row_id)
+            page.wait_for_timeout(350)
             shot = out / f"specrow-{pname}-1280.png"
             try:
                 page.screenshot(path=str(shot))
