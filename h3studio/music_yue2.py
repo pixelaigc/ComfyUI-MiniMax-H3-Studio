@@ -419,13 +419,20 @@ def build_music_workflow(params: dict) -> dict:
     }
 
     # -- 输出 --------------------------------------------------------
-    # SaveAudioAdvanced 的 format 是 COMFY_DYNAMICCOMBO_V3 —— API 格式里
-    # 必须写成嵌套 dict {"format": "flac"}（execution.py:296 的
-    # build_nested_inputs 会把 "format.quality" 这类点号键还原成嵌套结构）。
+    # SaveAudioAdvanced 的 format 是 COMFY_DYNAMICCOMBO_V3。
+    # 【实测，2026-11-09】API 格式里必须写**扁平字符串** "format": "flac"，
+    # 不能写嵌套 dict {"format": "flac"} —— 后者会让 execute() 收不到
+    # format 参数，报 "SaveAudioAdvanced.execute() missing 1 required
+    # positional argument: 'format'"。
+    # mp3 / opus 的附加参数走**顶层点号键** "format.quality"。
+    # 三种写法实测结论（probe_dyncombo.py）：
+    #   A 嵌套 dict      -> ERROR（missing format）
+    #   B 扁平字符串      -> OK（fmt_b_00001.flac）
+    #   C 扁平 + 点号quality -> OK（fmt_c_00001.mp3）
     save_inputs = {
         "audio": ["9", 0],
         "filename_prefix": filename_prefix,
-        "format": {"format": audio_format},
+        "format": audio_format,
     }
     if audio_format == "mp3":
         save_inputs["format.quality"] = params.get("audio_quality") or "V0"

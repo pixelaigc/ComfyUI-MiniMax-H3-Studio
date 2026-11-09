@@ -147,16 +147,19 @@ class TestMusicWorkflow(unittest.TestCase):
         wf = self._wf()
         save = next(n for n in wf.values()
                     if n["class_type"] == "SaveAudioAdvanced")
-        fmt = save["inputs"]["format"]
-        # COMFY_DYNAMICCOMBO_V3 -> 必须嵌套成 {"format": "flac"}
-        self.assertIsInstance(fmt, dict)
-        self.assertEqual(fmt.get("format"), "flac")
+        # COMFY_DYNAMICCOMBO_V3 —— 【实测】必须写扁平字符串。
+        # 写嵌套 dict {"format": "flac"} 会报
+        # "SaveAudioAdvanced.execute() missing 1 required positional argument: 'format'"
+        self.assertEqual(save["inputs"]["format"], "flac")
+        self.assertIsInstance(save["inputs"]["format"], str)
 
     def test_save_audio_mp3_has_quality(self):
         wf = self._wf(format="mp3")
         save = next(n for n in wf.values()
                     if n["class_type"] == "SaveAudioAdvanced")
+        # 附加参数走顶层点号键（实测可用）
         self.assertEqual(save["inputs"].get("format.quality"), "V0")
+        self.assertEqual(save["inputs"]["format"], "mp3")
 
     def test_official_sampler_defaults(self):
         wf = self._wf()
@@ -279,6 +282,93 @@ class TestAudioOutputHandling(unittest.TestCase):
     def test_audio_output_dir_declared(self):
         source = (REPO / "server.py").read_text(encoding="utf-8")
         self.assertIn('AUDIO_DIR = OUT_DIR / "audio"', source)
+
+
+class TestMusicLiveComfy(unittest.TestCase):
+    """真机验证 —— 打真实 ComfyUI 的 /prompt。
+
+    这一组是「不测就会回归」的那类：静态检查看不出 ComfyUI 的动态节点
+    参数格式到底要哪种写法，必须真跑一次。
+
+    需要本机 ComfyUI 在 8188。不可达时整类 skip（不算失败）。
+    """
+
+    COMFY = "http://127.0.0.1:8188"
+
+    @classmethod
+    def setUpClass(cls):
+        import urllib.request
+        try:
+            urllib.request.urlopen(cls.COMFY + "/system_stats", timeout=5).read()
+            cls.online = True
+        except Exception:
+            cls.online = False
+
+    def setUp(self):
+        if not self.online:
+            self.skipTest("ComfyUI 未运行（127.0.0.1:8188 不可达）")
+
+    def _probe_audio_output(self, save_inputs):
+        """用一段现成音频跑 SaveAudioAdvanced，验证 format 的写法。"""
+        import glob
+        import json
+        import os
+        import time
+        import urllib.request
+
+        cands = glob.glob("/home/ubuntu/comfyui/input/*.wav")[:1] or \
+            glob.glob("/home/ubuntu/comfyui/input/*.mp3")[:1]
+        if not cands:
+            self.skipTest("ComfyUI input 里没有可用音频")
+        fname = os.path.basename(cands[0])
+
+        wf = {
+            "1": {"inputs": {"audio": fname}, "class_type": "LoadAudio"},
+            "2": {"inputs": save_inputs, "class_type": "SaveAudioAdvanced"},
+        }
+        req = urllib.request.Request(
+            self.COMFY + "/prompt", data=json.dumps({"prompt": wf}).encode(),
+            headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                pid = json.loads(resp.read())["prompt_id"]
+        except Exception as exc:
+            self.fail(f"/prompt 被拒: {exc}")
+
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            time.sleep(3)
+            with urllib.request.urlopen(self.COMFY + f"/history/{pid}", timeout=30) as r:
+                entry = json.loads(r.read()).get(pid)
+            if not entry:
+                continue
+            st = entry.get("status") or {}
+            if st.get("status_str") == "error":
+                msg = ""
+                for m in st.get("messages", []):
+                    if m and m[0] == "execution_error":
+                        msg = (m[1] or {}).get("exception_message", "")
+                return False, msg
+            if entry.get("outputs"):
+                return True, json.dumps(entry["outputs"], ensure_ascii=False)
+        return False, "timeout"
+
+    def test_flat_format_string_is_accepted(self):
+        """扁平字符串 "format": "flac" 必须被 ComfyUI 接受。"""
+        ok, detail = self._probe_audio_output({
+            "audio": ["1", 0], "filename_prefix": "h3studio_test/fmt_flat",
+            "format": "flac"})
+        self.assertTrue(ok, f"扁平 format 被拒: {detail}")
+        # 产物挂在 "audio" 键下 —— 这正是 server._extract_outputs 要认的键
+        self.assertIn("audio", detail)
+
+    def test_nested_dict_format_is_rejected(self):
+        """嵌套 dict 写法必须失败（写死这个反面案例，防止有人「优化」回去）。"""
+        ok, detail = self._probe_audio_output({
+            "audio": ["1", 0], "filename_prefix": "h3studio_test/fmt_nested",
+            "format": {"format": "flac"}})
+        self.assertFalse(ok, "嵌套 dict 写法本该失败，却成功了 —— 说明行为变了，要重新核对")
+        self.assertIn("format", detail)
 
 
 class TestMusicFrontend(unittest.TestCase):
