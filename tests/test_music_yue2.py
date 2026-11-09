@@ -584,13 +584,27 @@ class TestMusicCheckpointNoteNotLying(unittest.TestCase):
             if m["available"]:
                 self.assertIn("已就绪", note,
                               f"{key} 已就绪但 note 没说已就绪：{note}")
-                self.assertNotIn("未安装该权重文件", note,
+                self.assertNotIn("未安装该", note,
                                  f"{key} 已就绪但 note 还说没装：{note}")
                 self.assertNotIn("未下载", note,
                                  f"{key} 已就绪但 note 还说未下载：{note}")
             else:
-                self.assertIn("未安装该权重文件", note,
+                # 不可用时要说清「缺的是这种**格式**的单文件」，
+                # 而不是笼统说「本机没有权重」—— 本机其实有 BF16，
+                # 只是它是 HF 目录结构、原生节点不认。
+                self.assertIn("未安装该**格式**的权重", note,
                               f"{key} 不可用但 note 没说明原因：{note}")
+                self.assertIn("原生节点不识别", note,
+                              f"{key} 不可用但 note 没解释格式原因：{note}")
+
+    def test_int8_note_points_to_bf16(self):
+        """int8 那条要说明「本机另有 BF16、但仅第三方节点可用」。"""
+        opts = music_yue2.model_options()
+        note = opts["checkpoints"]["yue2_3b_int8_convrot"]["note"]
+        self.assertIn("本机另有 BF16", note,
+                      f"int8 note 没提本机另有 BF16：{note}")
+        self.assertIn("仅第三方节点可用", note,
+                      f"int8 note 没说明 BF16 只对第三方节点可用：{note}")
 
     def test_no_hardcoded_missing_claim_in_source(self):
         """源码里不能再有写死的「未下载…故不可用」文案。
@@ -619,6 +633,12 @@ class TestMusicCheckpointNoteNotLying(unittest.TestCase):
         code = "\n".join(code_lines)
         self.assertNotIn("本机未下载该权重文件", code)
         self.assertNotIn("是本机唯一可用的版本", code)
+
+    def test_frontend_suffix_states_real_reason(self):
+        """前端下拉后缀要说明真实原因「本机无原生格式权重」。"""
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        self.assertIn("（本机无原生格式权重，不可用）", js)
+        self.assertNotIn("（权重缺失，不可用）", js)
 
     def test_both_precisions_present(self):
         """两种精度都要在清单里，且各有独立 ckpt 文件名。"""

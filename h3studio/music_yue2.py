@@ -64,7 +64,9 @@ YUE2_CHECKPOINTS = {
         "ckpt": "yue2_3b_int8_convrot.safetensors",
         "note": "Comfy-Org/YuE2 官方 INT8 ConvRot 量化版（官方模板 audio_yue2_text2music 默认用这个）。"
                 "3B 参数的音乐生成模型：吃风格描述 + 歌词，先规划 ABC 乐谱再生成带人声与伴奏的音频。"
-                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版。",
+                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版。"
+                "本机另有 BF16 全量权重（m-a-p/YuE2-3B），但它是 HF 目录结构、仅第三方节点可用，"
+                "原生节点要的是 checkpoints/ 下的单文件格式。",
         "warn": "",
     },
     "yue2_3b_bf16": {
@@ -175,10 +177,13 @@ def model_options() -> dict:
             "ckpt": m["ckpt"],
             # 可用性描述按**运行时实测**动态拼接 —— 不再写死「未下载/不可用」
             # 这种权重到货后就是假话的文案。
+            # 措辞要说清「缺的是**这种格式**的单文件」，而不是「本机没有 BF16」——
+            # 本机其实有 BF16（HF 目录结构），只是原生节点不认那种布局。
             "note": m["note"] + (
                 "本机已就绪（models/checkpoints/）。"
                 if available else
-                f"本机未安装该权重文件（models/checkpoints/{m['ckpt']}），暂不可用。"
+                f"本机未安装该**格式**的权重（models/checkpoints/{m['ckpt']}）："
+                "现有 m-a-p/YuE2-3B 是 HF 目录结构，原生节点不识别，暂不可用。"
             ),
             "warn": m["warn"],
             "available": available,
