@@ -304,6 +304,66 @@ async def comfy_upload_media(session: ClientSession, path: Path) -> str:
     return f"{sub}/{name}" if sub else name
 
 
+async def _upload_ref_audio_flat(session: ClientSession, job_id: str,
+                                 params: dict) -> str:
+    """把参考音频（素材库）上传到 ComfyUI input 顶层，返回纯文件名。"""
+    from h3studio import asset_repo as _repo
+    from h3studio import assets as _assets
+
+    refs = params.get("asset_refs") or []
+    item = next((r for r in refs if isinstance(r, dict)
+                 and r.get("slot") == "ref_audio"), None)
+    if not item:
+        raise RuntimeError("参考生音乐缺少参考音频")
+    asset_id = str(item.get("asset_id") or "").strip()
+    with _assets.connect() as conn:
+        version = _repo.current_version(conn, asset_id)
+        if not version:
+            raise RuntimeError(f"参考音频素材不存在或已删除：{asset_id}")
+        path = _assets.resolve_inside(_assets.library_root(), version["storage_path"])
+        if not path or not path.is_file():
+            raise RuntimeError(f"参考音频素材文件已丢失：{asset_id}")
+        # 文件名带素材 id 前缀 —— 顶层的输入目录是共用的，避免撞名
+        safe_id = asset_id.replace("_", "-")[-12:]
+        filename = f"h3studio_ref_{safe_id}{path.suffix.lower()}"
+        return await comfy_upload_audio_flat(session, path, filename)
+
+
+async def comfy_upload_audio_flat(session: ClientSession, path: Path,
+                                    filename: str | None = None) -> str:
+    """
+    上传音频到 ComfyUI 的 input **顶层**（不带 subfolder），返回纯文件名。
+
+    为什么不能复用 comfy_upload_media：
+      * comfy_upload_media 传到 `input/h3studio/` 子目录，返回 "h3studio/x.wav"
+      * ComfyUI 的 `LoadAudio` 节点 audio 是 COMBO，值必须命中 `input/`
+        **顶层**的文件清单（没有子目录项）-> 传子目录路径会报
+        "value not in list"
+      * `VHS_LoadAudio` 的 audio_file 要的是**绝对文件系统路径**
+        （validate_path 用 os.path.isfile 判）-> 相对路径报 "Invalid file path"
+
+    参考音频（参考生音乐）必须能命中 LoadAudio 的 COMBO，所以单开这条通道。
+    文件名带内容指纹，避免撞名。
+    """
+    name = filename or path.name
+    data = aiohttp.FormData()
+    data.add_field("image", open(path, "rb"),
+                   filename=name, content_type="application/octet-stream")
+    data.add_field("subfolder", "")
+    data.add_field("overwrite", "true")
+    data.add_field("type", "input")
+    async with session.post(f"{COMFY}/upload/image", data=data) as resp:
+        raw = await resp.text()
+    try:
+        r = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"ComfyUI 上传失败：{raw[:200]}") from exc
+    if not r.get("name"):
+        raise RuntimeError(f"ComfyUI 上传失败：{raw[:200]}")
+    # 只取文件名 —— LoadAudio 的 COMBO 里没有子目录项
+    return str(r["name"]).split("/")[-1]
+
+
 async def comfy_submit(session: ClientSession, workflow: dict, client_id: str | None = None) -> str:
     payload = {"prompt": workflow}
     if client_id:
@@ -684,7 +744,9 @@ class Worker:
                     audios = params.get("ref_audios") or []
                     if not audios:
                         raise RuntimeError("参考生音乐缺少参考音频")
-                    params["ref_audio"] = audios[0]
+                    # 重新上传到 input 顶层（LoadAudio 的 COMBO 只认顶层文件名）
+                    flat_name = await _upload_ref_audio_flat(session, job_id, params)
+                    params["ref_audio"] = flat_name
 
                 params["job_id"] = job_id
                 params["mode"] = mode

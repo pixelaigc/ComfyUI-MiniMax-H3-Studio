@@ -64,6 +64,7 @@ NATIVE_YUE2_NODES = {
     # 参考生音乐专用
     "AudioEncoderLoader",
     "SheetSage2AudioToABC",
+    "LoadAudio",
 }
 
 # 第三方节点 —— 用了就会把 ComfyUI 进程的显存上限永久压低
@@ -126,6 +127,48 @@ class TestMusicWorkflow(unittest.TestCase):
         self.assertIn("AudioEncoderLoader", classes)
         # 参考音频提供谱面 -> 不该再有 YuE2GenerateABC
         self.assertNotIn("YuE2GenerateABC", classes)
+
+    def test_cover_audio_is_audio_object_not_filename(self):
+        """【真机踩坑 1】SheetSage2AudioToABC.audio 必须是 AUDIO **对象**。
+
+        直接塞文件名字符串 -> ComfyUI 报
+        "'str' object has no attribute 'get'"（节点 1 就挂，任务失败）。
+        必须先经 LoadAudio 读成 AUDIO 对象再接进去。
+        """
+        wf = self._wf(cover=True, ref_audio="h3studio_ref_abc.wav")
+        abc = next(n for n in wf.values()
+                   if n["class_type"] == "SheetSage2AudioToABC")
+        audio_input = abc["inputs"]["audio"]
+        self.assertIsInstance(audio_input, list,
+                              "audio 必须是节点引用 [node_id, slot]，不能是文件名")
+        self.assertEqual(len(audio_input), 2)
+        source_id = audio_input[0]
+        source = wf[source_id]
+        self.assertEqual(source["class_type"], "LoadAudio")
+
+    def test_cover_loadaudio_uses_combo_input_name(self):
+        """【真机踩坑 2】LoadAudio 的输入名是 `audio`（COMBO），不是 `audio_file`。
+
+        `audio_file` 是 VHS_LoadAudio 的输入名，且它要**绝对文件系统路径**
+        （validate_path 用 os.path.isfile 判）-> 相对路径报 "Invalid file path"。
+        LoadAudio.audio 是 COMBO，值必须命中 input/ 顶层清单 -> 所以服务端
+        把参考音频上传到 input 顶层（server.comfy_upload_audio_flat）。
+        """
+        wf = self._wf(cover=True, ref_audio="h3studio_ref_abc.wav")
+        loader = next(n for n in wf.values()
+                      if n["class_type"] == "LoadAudio")
+        self.assertIn("audio", loader["inputs"])
+        self.assertNotIn("audio_file", loader["inputs"])
+        # 传进去的必须是**纯文件名**（没有子目录）
+        self.assertNotIn("/", loader["inputs"]["audio"])
+
+    def test_server_uploads_ref_audio_to_input_top_level(self):
+        """服务端必须把参考音频传到 input 顶层（LoadAudio 的 COMBO 只认顶层）。"""
+        source = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn("comfy_upload_audio_flat", source)
+        self.assertIn("_upload_ref_audio_flat", source)
+        # subfolder 必须是空字符串
+        self.assertIn('data.add_field("subfolder", "")', source)
 
     def test_cover_requires_ref_audio(self):
         with self.assertRaises(ValueError):
