@@ -303,6 +303,15 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
             " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
 
 
+    def all_method_ids(self):
+        """增强方式注册表里的全部 id（从页面上的注册表读，不写死）。
+
+        新增增强方式时测试不用改 —— 「同一常量只写一处」。
+        """
+        return self.page.evaluate(
+            "() => (window.enhanceMethods && window.enhanceMethods.list"
+            " || []).map(m => m.id)")
+
     def select_only_qwen_pe(self):
         """只勾选官方 PE（取消其它已勾项）。
 
@@ -334,15 +343,25 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     # ---- 下拉选项 ----
 
     def test_dropdown_lists_four_methods(self):
-        """下拉里同时有：普通增强 / 二次增强 / 结构化增强 / 官方PE。"""
+        """下拉里同时有：普通增强 / 二次增强 / 视频导演提示词 / 结构化增强 / 官方PE。
+
+        【为什么断言全表而不是前四项】
+          增强方式注册表会长大（本次新增了「视频导演提示词」）。
+          断言一个写死的 id 列表 = 每加一项就要改一次测试，
+          漏改就会得到一条**假失败**（功能是好的，只是清单变了）。
+          所以这里断言「注册表里的每一项都在下拉里、顺序一致、都有说明」，
+          再单独断言几个关键项的 label。
+        """
         self.switch_mode("t2i_qwen")
         self.open_menu()
         items = self.menu_items()
         ids = [i["id"] for i in items]
-        self.assertEqual(ids, ["basic", "refine", "layout", "qwen_pe"])
+        # 下拉里的项 = 注册表里的项（顺序一致，一个不多一个不少）
+        self.assertEqual(ids, self.all_method_ids())
         labels = [i["label"] for i in items]
         self.assertIn("普通增强", labels)
         self.assertIn("二次增强", labels)
+        self.assertIn("视频导演提示词", labels)
         self.assertIn("结构化增强（layout）", labels)
         self.assertIn("qwen21图片官方增强PE", labels)
         # 每个项都要有简短说明

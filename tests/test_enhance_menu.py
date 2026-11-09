@@ -196,6 +196,15 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         self.reset_page()
 
 
+    def all_method_ids(self):
+        """增强方式注册表里的全部 id（从页面上的注册表读，不写死）。
+
+        新增增强方式时测试不用改 —— 这正是「同一常量只写一处」的做法。
+        """
+        return self.page.evaluate(
+            "() => (window.enhanceMethods && window.enhanceMethods.list"
+            " || []).map(m => m.id)")
+
     def select_only(self, method_id):
         """只勾选指定增强项（取消默认勾的「普通增强」）。
 
@@ -213,7 +222,14 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         # （菜单每次勾选都会重渲染 -> 旧的 element handle 会失效，
         #   playwright 的 uncheck 会在元素被替换后做校验而超时）。
         # 禁用的项（当前模式不可用）跳过 —— disabled 的复选框点不动。
-        for mid in ("basic", "refine", "layout", "qwen_pe"):
+        #
+        # 【为什么要枚举全表而不是写死几个 id】
+        #   增强方式注册表会长大（本次新增了「视频导演提示词」）。
+        #   写死列表 = 新增一项就漏掉它 -> 那一项会和目标项一起被勾上，
+        #   「只跑某一项」的用例就不再是「只跑一项」了（实测：
+        #   test_selecting_layout_changes_button_label_and_panels 因此挂掉）。
+        # 所以这里从**注册表本身**取全表 —— 新增增强方式不用改测试。
+        for mid in self.all_method_ids():
             if mid == method_id:
                 continue
             self.page.evaluate("""(mid) => {
