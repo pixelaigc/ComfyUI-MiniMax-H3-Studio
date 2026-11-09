@@ -314,16 +314,6 @@ QWEN21_MIHOYO: dict[str, dict] = {
 }
 
 MOSS_MIHOYO: dict[str, dict] = {
-    'moss-effects/1770636596.687291-4bd6f72c-5a2d-454a-b88c-14d459b72909.safetensors': {
-        "display": '原神角色立绘 · 二次元（i2L 五图蒸馏出的原神角色立绘风）',
-        "base": 'MOSS-Image',
-        "trigger": '',
-        "recommended_strength": 1.0,
-        "scene": '原神角色立绘 · 二次元（i2L 五图蒸馏出的原神角色立绘风）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。非官方：原神 IP。。【实测】已核验 SHA256（modelscope）；ComfyUI key_map 命中率 100%',
-        "source": 'https://www.modelscope.cn/models/diffsynth-i2L-gallery/Z-Image-GenshinImpact-characterart-anime-1770636601.768804',
-        "strength_source": '作者未给',
-        "plan_id": 'M-28',
-    },
     'moss-effects/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors': {
         "display": '绝区零艾尔妲挽昼（Eldreda Sunbringer，MOSS 版）',
         "base": 'MOSS-Image',
@@ -332,7 +322,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '绝区零艾尔妲挽昼（Eldreda Sunbringer，MOSS 版）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/makimakimakima12138/Eldreda_Sunbringer_moss_12138',
         "strength_source": '作者未给区间',
-        "plan_id": 'M-29',
+        "plan_id": 'M-28',
     },
     'moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors': {
         "display": '平涂二次元线稿风（可爱系）',
@@ -342,7 +332,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '平涂二次元线稿风（可爱系）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 A】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容',
         "source": 'https://civitai.com/models/3021291?modelVersionId=3430550',
         "strength_source": '作者明示（Civitai 模型页 “The style applies at strength 1.0 regardless of prompt” / 「无需触发词，强度 1.0 即可生效」）',
-        "plan_id": 'M-30',
+        "plan_id": 'M-29',
     },
     'moss-effects/MOSS-Image-Anime-LoRA-ComfyUI.safetensors': {
         "display": '硬派二次元（seinen）动画风',
@@ -352,7 +342,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '硬派二次元（seinen）动画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 A】。触发词来源：权重头部 trigger。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/axiomofmind/Moss-image-anime-lora',
         "strength_source": '作者明示（README「Recommended scale」表：2000 步 → 1.0；1500 步 → 0.7 或 1.0）',
-        "plan_id": 'M-31',
+        "plan_id": 'M-30',
     },
     'moss-effects/MOSS-Image-Gouache-LoRA-ComfyUI.safetensors': {
         "display": '水粉 / 不透明水彩（gouache）绘画风',
@@ -362,7 +352,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '水粉 / 不透明水彩（gouache）绘画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/axiomofmind/Moss-image-gouache-lora',
         "strength_source": '作者未给',
-        "plan_id": 'M-32',
+        "plan_id": 'M-31',
     },
     'moss-effects/MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors': {
         "display": '二次元 / 2D 插画风（漫库 2000 张）',
@@ -372,7 +362,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '二次元 / 2D 插画风（漫库 2000 张）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/mfxq2l/MOSS-Image-SFT-lora-Anime',
         "strength_source": '作者未给',
-        "plan_id": 'M-33',
+        "plan_id": 'M-32',
     },
     'moss-effects/MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors': {
         "display": '仙侠 · 妖姬（幻想国风仙侠插画，MOSS 版）',
@@ -382,7 +372,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '仙侠 · 妖姬（幻想国风仙侠插画，MOSS 版）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/Q491791643/MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0',
         "strength_source": '作者未给',
-        "plan_id": 'M-34',
+        "plan_id": 'M-33',
     },
     'moss-effects/chenbin_style_v2_blush_1500step_rank32.safetensors': {
         "display": '画师「鬼针草」个人画风（柔和细线 + 低饱和水彩 + 淡樱粉腮红）',
@@ -392,7 +382,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '画师「鬼针草」个人画风（柔和细线 + 低饱和水彩 + 淡樱粉腮红）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 A】。触发词未标注。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。⚠️ 版权敏感：这是对特定画师个人风格的复刻，该画师本人（非米哈游）才是著作权人；即使作者写了 Apache-2.0，也未取得画师授权，商用风险高。。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/lantianws666/moss-chenbin-style',
         "strength_source": '作者明示（README「Recommended Settings」表：LoRA Weight 0.8 (0.6–1.0)，Steps 50，CFG 3.0，Euler/Simple，1024×1024–1536×2048，Skip Layer Guidance single_layers 22）',
-        "plan_id": 'M-35',
+        "plan_id": 'M-34',
     },
     'moss-effects/firefly26710_Moss.safetensors': {
         "display": 'firefly_MOSS（流萤，崩坏星穹铁道，MOSS 基座）',
@@ -402,7 +392,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": 'firefly_MOSS（流萤，崩坏星穹铁道，MOSS 基座）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：HF 页面无 license 字段 —— 未授予任何许可，需向作者确认。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/lingjiu09/firefly_MOSS',
         "strength_source": '上游未给区间（清单原文：作者 README（模型卡）），取 LoRA 默认 1.0',
-        "plan_id": 'M-36',
+        "plan_id": 'M-35',
     },
     'moss-effects/helives3d_dora_r64_s00006400_comfy.safetensors': {
         "display": '柔和光影 3D 动漫风（2.5D 赛璐璐立体渲染）',
@@ -412,7 +402,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '柔和光影 3D 动漫风（2.5D 赛璐璐立体渲染）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：mit。HF `license: mit`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/Helives/Soft-light-3D-Anime-style-For-MOSS',
         "strength_source": '作者未给',
-        "plan_id": 'M-37',
+        "plan_id": 'M-36',
     },
     'moss-effects/lunhuimoss1_c1-st1000.safetensors': {
         "display": '轮回画风',
@@ -422,7 +412,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '轮回画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/l422575706/lunhuimoss1',
         "strength_source": '作者未给',
-        "plan_id": 'M-38',
+        "plan_id": 'M-37',
     },
     'moss-effects/moss-pixelart-v.0.3.safetensors': {
         "display": '8×8 网格像素画 / 2D 游戏素材风',
@@ -432,7 +422,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '8×8 网格像素画 / 2D 游戏素材风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 ss_tag_frequency。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容',
         "source": 'https://huggingface.co/probablyhumanAB/moss-pixelart-v.0.3',
         "strength_source": '作者未给',
-        "plan_id": 'M-39',
+        "plan_id": 'M-38',
     },
     'moss-effects/moss_matcha_style_v1_c1-st1000.safetensors': {
         "display": '抹茶（Matcha）画风',
@@ -442,7 +432,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '抹茶（Matcha）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/Biger1/moss_matcha_style_v1',
         "strength_source": '作者未给',
-        "plan_id": 'M-40',
+        "plan_id": 'M-39',
     },
     'moss-effects/mossps1_c1-st1000.safetensors': {
         "display": 'PS1 像素风',
@@ -452,7 +442,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": 'PS1 像素风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/xiaojie18/mossps1',
         "strength_source": '作者未给',
-        "plan_id": 'M-41',
+        "plan_id": 'M-40',
     },
     'moss-effects/nekometaru-moss_c1-st1000.safetensors': {
         "display": 'nekometaru 画风',
@@ -462,7 +452,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": 'nekometaru 画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/storyaura/nekometaru-moss',
         "strength_source": '作者未给',
-        "plan_id": 'M-42',
+        "plan_id": 'M-41',
     },
     'moss-effects/style-moss-image-base-epoch-07.safetensors': {
         "display": '玉之けだま（Kedama）画风',
@@ -472,7 +462,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '玉之けだま（Kedama）画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容',
         "source": 'https://civitai.com/models/3012667?modelVersionId=3419290',
         "strength_source": '作者未给',
-        "plan_id": 'M-43',
+        "plan_id": 'M-42',
     },
     'moss-effects/style-moss-image-base-epoch-10.safetensors': {
         "display": '赛璐璐动画（Cel-Animation）画风',
@@ -482,7 +472,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '赛璐璐动画（Cel-Animation）画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容',
         "source": 'https://civitai.com/models/3012746?modelVersionId=3419395',
         "strength_source": '作者未给',
-        "plan_id": 'M-44',
+        "plan_id": 'M-43',
     },
     'moss-effects/zshfmoss_c1-st1000.safetensors': {
         "display": '咒术（咒术回战向）画风',
@@ -492,7 +482,7 @@ MOSS_MIHOYO: dict[str, dict] = {
         "scene": '咒术（咒术回战向）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容',
         "source": 'https://www.modelscope.cn/models/h616867981/zshfmoss',
         "strength_source": '作者未给',
-        "plan_id": 'M-45',
+        "plan_id": 'M-44',
     },
 }
 

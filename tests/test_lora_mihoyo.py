@@ -244,6 +244,74 @@ class TestMihoyoStrengthDiscipline(unittest.TestCase):
                                  f"{key} 的推荐强度超出滑块量程")
 
 
+class TestMihoyoFamilyPlacement(unittest.TestCase):
+    """跨族错放 —— 落盘位置必须与权重真实族一致。"""
+
+    def test_no_entry_is_placed_in_a_wrong_family_directory(self):
+        """跨族错放检测：同一权重不得同时出现在两个族目录。
+
+        实测踩过的坑：Z-Image i2L 画廊产物被同时下载到
+        `z-image-effects/` 与 `moss-effects/`（清单里两条记录指向同一份
+        文件，但只有一条的基座标注是对的）。错放的那份会让 Z-Image
+        扫描器通过 layer_structure 把它收进 Z 族清单 -> 跨族误用。
+
+        判据：用**项目自己的族正则**（`_FAMILY_ATTENTION_RE`）按键名
+        指纹判定权重真正属于哪一族，与它所在的目录比对。
+        """
+        import json as _json
+        import struct
+        from h3studio import loras as R
+
+        def family_of(path):
+            with open(path, "rb") as f:
+                n = struct.unpack("<Q", f.read(8))[0]
+                hdr = _json.loads(f.read(n).decode("utf-8", "replace"))
+            bases = set()
+            for key in hdr:
+                if key == "__metadata__":
+                    continue
+                for marker in (".lora_A.default.weight", ".lora_B.default.weight",
+                               ".lora_A.weight", ".lora_B.weight",
+                               ".lora_down.weight", ".lora_up.weight",
+                               ".lokr_w1", ".lokr_w2", ".hada_w1", ".hada_w2"):
+                    if key.endswith(marker):
+                        bases.add(key[: -len(marker)])
+                        break
+            if not bases:
+                return None
+            best, best_hits = None, 0
+            for fam_name, pattern in R._FAMILY_ATTENTION_RE.items():
+                hits = sum(1 for b in bases if pattern.search(b))
+                if hits > best_hits:
+                    best, best_hits = fam_name, hits
+            return best
+
+        offenders = []
+        for key in catalog.ALL_MIHOYO_EFFECTS:
+            path = LORAS_ROOT / key
+            if not path.is_file():
+                continue
+            real = family_of(path)
+            if not real:
+                continue
+            expect = {"z-image-effects/": "Z-Image",
+                      "qwen21-effects/": "Qwen-Image 2.1",
+                      "moss-effects/": "MOSS-Image"}[key.split("/")[0] + "/"]
+            if real != expect:
+                offenders.append((key, real, expect))
+        self.assertFalse(offenders,
+                         f"以下条目放错了族目录：{offenders[:3]}")
+
+    def test_no_duplicate_file_across_family_directories(self):
+        """同一个文件名不得同时出现在两个族目录。"""
+        import collections
+        seen = collections.defaultdict(list)
+        for key in catalog.ALL_MIHOYO_EFFECTS:
+            seen[key.split("/")[-1]].append(key)
+        dup = {k: v for k, v in seen.items() if len(v) > 1}
+        self.assertFalse(dup, f"同一文件名出现在多个族目录：{dup}")
+
+
 class TestMihoyoCopyrightLabelling(unittest.TestCase):
     """版权敏感：每条都必须标明 IP 归属 —— 不得让用户误以为是官方 IP 权重。"""
 
