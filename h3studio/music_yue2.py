@@ -321,15 +321,33 @@ def build_music_workflow(params: dict) -> dict:
     ref_audio = (params.get("ref_audio") or "").strip()
     abc_source = None
     if ref_audio:
-        # 参考生音乐：音频 -> SheetSage2 -> ABC
+        # 参考生音乐：音频 -> LoadAudio -> SheetSage2 -> ABC
+        #
+        # 【关键，2026-11-09 真机踩坑，两处】
+        # 1) SheetSage2AudioToABC 的 `audio` 输入类型是 **AUDIO**（对象），
+        #    不是文件名字符串。直接塞 "h3studio/xxx.wav" 会报
+        #    "'str' object has no attribute 'get'"（节点 1 就挂）。
+        #    必须先用 LoadAudio 把文件读成 AUDIO 对象再接进去。
+        # 2) 节点选 `LoadAudio` 而不是 `VHS_LoadAudio`：
+        #    * LoadAudio.audio 是 COMBO，值必须命中 `input/` **顶层**清单
+        #      -> 所以服务端把参考音频上传到 input 顶层（见 server.py 的
+        #         comfy_upload_audio_flat），传回来的就是纯文件名。
+        #    * VHS_LoadAudio.audio_file 要的是**绝对文件系统路径**
+        #      （validate_path 用 os.path.isfile 判），传相对路径会报
+        #      "Invalid file path"。
         encoder_name = _resolve_audio_encoder(params)
         p["43"] = {
             "inputs": {"audio_encoder_name": encoder_name},
             "class_type": "AudioEncoderLoader",
             "_meta": {"title": "加载音频编码器"},
         }
+        p["45"] = {
+            "inputs": {"audio": ref_audio},
+            "class_type": "LoadAudio",
+            "_meta": {"title": "加载参考音频"},
+        }
         p["41"] = {
-            "inputs": {"audio_encoder": ["43", 0], "audio": ref_audio,
+            "inputs": {"audio_encoder": ["43", 0], "audio": ["45", 0],
                        "mode": "melody"},
             "class_type": "SheetSage2AudioToABC",
             "_meta": {"title": "参考音频转 ABC 谱"},
