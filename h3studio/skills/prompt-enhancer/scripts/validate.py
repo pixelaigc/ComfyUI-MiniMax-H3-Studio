@@ -42,7 +42,49 @@ SUBJECTIVE_WORDS = [
 # 覆盖 (word:1.2) / (word) / ((word)) / [word] / word++ / word---
 # 注意：方括号/圆括号里的内容若是「纯数字列表」（bbox 的 [y_min, x_min, y_max, x_max]）
 # 或「JSON 数组」（["cat", "animal", ...]），不是权重语法 —— 用否定前瞻排除。
-_WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))[^()]{1,80}?\s*\)")
+_WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))([^()]{1,80}?)\s*\)")
+# 括号里带「词:数值」或纯数字权重值 —— 一定是 Compel 权重语法
+_WEIGHT_PAREN_VALUE = re.compile(r"^[^()]{1,60}\s*:\s*[0-9.]+\s*$")
+
+
+def _is_weight_paren(inner: str) -> bool:
+    """
+    括号里的内容是不是 Compel 权重语法。
+
+    官方口径（diffusers weighted_prompts）：
+      (cat)        单个词 -> 1.1 倍
+      (cat:1.5)    词:数值 -> 1.5 倍
+    所以**只有这两类**才是权重语法。
+
+    【2026-11-09 修正】旧实现把**任意**括号内容都当权重语法，
+    于是模型写的普通英文注释也会被误杀：
+      (Tong Lau)              港式地名注音 -> 误报
+      (arcade buildings)      骑楼建筑的英文补充 -> 误报
+      (partially obscured or fragmented)  状态描述 -> 误报
+    实测：普通增强 10 次有 3 次因此整单 502 被拒，
+    而这些输出其实都是完整的（finish_reason=stop）。
+
+    现在只把这两类判为权重语法：
+      1. 括号内是「词:数值」或「数值」
+      2. 括号内是**单个词**（不含空格、不含逗号）—— diffusers 的 (cat) 形式
+    多词短语（中英文皆然）不算权重语法。
+    """
+    text = (inner or "").strip()
+    if not text:
+        return False
+    # (word:1.5) / (1.5)
+    if _WEIGHT_PAREN_VALUE.match(text):
+        return True
+    # 纯数字
+    if re.fullmatch(r"[0-9.]+", text):
+        return True
+    # 单个词（无空格、无逗号、非中文）—— diffusers 的 (cat) 形式
+    # 中文括号内容（如「（红色霓虹灯）」）是注释，不是权重语法
+    if (" " not in text and "," not in text
+            and not re.search(r"[\u4e00-\u9fff]", text)):
+        return True
+    # 多词短语 -> 普通注释，不算权重语法
+    return False
 def _is_json_like(inner: str) -> bool:
     """
     判断方括号里的内容是不是「结构化数据」而不是权重语法。
@@ -123,6 +165,11 @@ def check_weight_syntax(text: str, mode: str = "pe"):
                 # 方括号：区分权重语法 [word] 与结构化数据 ["a","b"] / [1,2]
                 inner = match.group(1)
                 if _is_json_like(inner):
+                    continue
+            if pattern is _WEIGHT_PAREN:
+                # 括号：区分 Compel 权重语法 (cat) / (cat:1.5) 与
+                # 普通英文/中文注释 (Tong Lau) / (arcade buildings)
+                if not _is_weight_paren(match.group(1)):
                     continue
             snippet = match.group(0).strip()
             if snippet and snippet not in hits:

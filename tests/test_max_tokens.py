@@ -652,5 +652,58 @@ class TestRefineStructureValidatorConsistency(unittest.TestCase):
 
 
 
+class TestWeightSyntaxFalsePositive(unittest.TestCase):
+    """
+    括号权重误判修复。
+
+    旧实现把**任意**括号内容当 Compel 权重语法，于是模型写的普通注释
+    也会被整单拒收：
+      (Tong Lau)                          港式地名注音
+      (arcade buildings)                  骑楼建筑的英文补充
+      (partially obscured or fragmented)  状态描述
+    实测：普通增强 10 次有 3 次因此 502（而输出本身是完整的）。
+
+    官方口径（diffusers weighted_prompts）：括号权重只有
+      (cat)      单个词
+      (cat:1.5)  词:数值
+    两种。多词短语不是权重语法。
+    """
+
+    def _validator(self):
+        import importlib.util
+        import os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "h3studio", "skills", "prompt-enhancer", "scripts", "validate.py")
+        spec = importlib.util.spec_from_file_location("pv2", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_real_weight_syntax_still_rejected(self):
+        v = self._validator()
+        for case in ("(word:1.2)", "(word)", "((word))", "[word]", "word++"):
+            self.assertTrue(v.check_weight_syntax("x %s y" % case, "pe"),
+                            "真正的权重语法必须被拒：%s" % case)
+
+    def test_multiword_gloss_not_rejected(self):
+        v = self._validator()
+        for case in ("(Tong Lau)", "(arcade buildings)",
+                     "(partially obscured or fragmented)", "(cat dog)",
+                     "(红色霓虹灯)"):
+            self.assertFalse(v.check_weight_syntax("x %s y" % case, "pe"),
+                             "普通注释不该被判权重语法：%s" % case)
+
+    def test_single_word_still_rejected(self):
+        """diffusers 的 (cat) 形式仍要拦。"""
+        v = self._validator()
+        self.assertTrue(v.check_weight_syntax("a (cat) b", "pe"))
+
+    def test_numeric_weight_still_rejected(self):
+        v = self._validator()
+        self.assertTrue(v.check_weight_syntax("a (1.5) b", "pe"))
+
+
+
 if __name__ == "__main__":
     unittest.main()
