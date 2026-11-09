@@ -88,15 +88,25 @@ class TestEnhanceMultiSelectSource(unittest.TestCase):
             self.assertIn(api, src, f"缺少对外 API {api}")
 
     def test_menu_renders_checkbox_per_item(self):
-        """每一项必须渲染一个复选框（多选的前提）。"""
+        """每一项必须渲染一个复选框（多选的前提）。
+
+        【2026-11-10】渲染实现已收进**共用组件** web/enhance-menu-shared.js
+        （审查 C3：同一份渲染实现只留一份），所以复选框的模板与 change 绑定
+        现在在共用组件里；enhance-menu.js 只负责「把方法列表交给共用组件」。
+        """
+        shared = self.read("enhance-menu-shared.js")
+        self.assertIn("data-method-check", shared,
+                      "共用渲染组件必须给每项渲染复选框（多选）")
+        self.assertIn('type="checkbox"', shared)
+        # 复选框的 change 事件 -> 走 onToggle（共用组件回调到 toggleMethod）
+        self.assertRegex(shared, r'addEventListener\("change"',
+                         "复选框的 change 必须绑定切换逻辑")
+        # enhance-menu.js 必须把 toggleMethod 作为 onToggle 交给共用组件
         src = self.read("enhance-menu.js")
-        self.assertIn("data-method-check", src,
-                      "菜单项必须带复选框（多选）")
-        self.assertIn('type="checkbox"', src)
-        # 复选框的 change 事件 -> 走 toggleMethod
-        self.assertRegex(src, r'addEventListener\("change",\s*\(\)\s*=>\s*\{\s*'
-                         r'toggleMethod\(',
-                         "复选框的 change 必须触发切换逻辑")
+        self.assertIn("shared.renderEnhanceMenu(menu, {", src,
+                      "enhance-menu.js 应调用共用渲染实现")
+        self.assertIn("onToggle: toggleMethod", src,
+                      "共用组件的 onToggle 必须接到 toggleMethod")
 
     def test_selection_is_multi_not_radio(self):
         """选中集合是数组（可多项），不是单个 currentId。"""
