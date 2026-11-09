@@ -97,32 +97,48 @@ class TestAgentLayoutBrowser(unittest.TestCase):
         assert cls.server.start(), "Studio 实例启动失败"
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(args=["--no-sandbox"])
+        # **整个类共用一个 context / page**（与 tests/test_qwen_pe_enhance.py 一致）。
+        #
+        # 为什么不能每个用例新建 context：新建 context = 全新浏览器上下文 =
+        # 一次完整的页面加载 + 全部静态资源重下。8 个用例就是 8 次全量加载，
+        # 在全量回归里会把机器压到超时（实测 page.goto 超时，测试体根本没跑到，
+        # 表现为「随机失败」）。复用 context 后只有首屏一次加载。
+        cls.ctx = cls.browser.new_context(
+            viewport={"width": 1280, "height": 900})
+        cls.page = cls.ctx.new_page()
+        cls.errors = []
+        cls.failed_requests = []
+        cls.page.on("pageerror", lambda e: cls.errors.append(str(e)))
+        cls.page.on("console", lambda m: cls.errors.append(m.text)
+                    if m.type == "error" else None)
+        cls.page.on("requestfailed", lambda rq: cls.failed_requests.append(
+            f"{rq.method} {rq.url} -> {rq.failure}"))
+        cls.page.on("response", lambda rs: cls.failed_requests.append(
+            f"{rs.status} {rs.url}") if rs.status >= 400 else None)
+        cls.page.goto("http://127.0.0.1:%d/" % cls.server.port,
+                      wait_until="domcontentloaded")
+        cls.page.wait_for_timeout(1500)
 
     @classmethod
     def tearDownClass(cls):
+        cls.ctx.close()
         cls.browser.close()
         cls.playwright.stop()
         cls.server.stop()
 
     def setUp(self):
-        self.ctx = self.browser.new_context(
-            viewport={"width": 1280, "height": 900})
-        self.page = self.ctx.new_page()
-        self.errors = []
-        self.failed_requests = []
-        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
-        self.page.on("console", lambda m: self.errors.append(m.text)
-                     if m.type == "error" else None)
-        self.page.on("requestfailed", lambda rq: self.failed_requests.append(
-            f"{rq.method} {rq.url} -> {rq.failure}"))
-        self.page.on("response", lambda rs: self.failed_requests.append(
-            f"{rs.status} {rs.url}") if rs.status >= 400 else None)
-        self.page.goto("http://127.0.0.1:%d/" % self.server.port,
-                      wait_until="domcontentloaded")
-        self.page.wait_for_timeout(1200)
+        # 复用类的 page；每个用例前重置视口并把错误记录清空
+        # （cls.errors / cls.failed_requests 就是同一批 list 对象，
+        #   clear() 之后本用例期间的错误是干净的）
+        self.page.set_viewport_size({"width": 1280, "height": 900})
+        self.page.wait_for_timeout(200)
+        self.errors = self.__class__.errors
+        self.failed_requests = self.__class__.failed_requests
+        self.errors.clear()
+        self.failed_requests.clear()
 
     def tearDown(self):
-        self.ctx.close()
+        pass
 
     # -------------------------------------------------- 辅助
     def open_agent(self):
