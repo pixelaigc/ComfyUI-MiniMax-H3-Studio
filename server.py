@@ -1090,8 +1090,22 @@ async def api_create(request):
         asset_refs = audio_refs
 
     prompt = (params.get("prompt") or "").strip()
-    if not prompt:
+    if not prompt and mode not in ("t2a", "a2a"):
         return web.json_response({"error": "提示词不能为空"}, status=400)
+    # 【2026-11-09 对齐第三方】音乐模式允许 prompt 为空：
+    # 面板新增了结构化风格（第三方 YuE2StylePrompt 的 12 字段），
+    # 纯结构化也能出活 —— 真正判空在 music_yue2._resolve_style() 里做
+    # （结构化 + 自由文本都空才报错）。
+    if mode in ("t2a", "a2a") and not prompt:
+        has_style_field = any(
+            str(params.get(f"style_{f}") or "").strip()
+            for f in ("language", "genre", "mood", "vocal", "vocal_color",
+                      "instruments", "tempo_bpm", "energy", "length_hint", "extra")
+        )
+        if not has_style_field:
+            return web.json_response(
+                {"error": "音乐风格描述不能为空：请填写自由文本风格描述，或填写结构化风格字段。",
+                 "code": "music_style_required"}, status=400)
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
