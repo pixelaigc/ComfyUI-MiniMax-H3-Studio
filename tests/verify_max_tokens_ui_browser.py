@@ -64,6 +64,48 @@ DUMP_JS = """
                 && Number(ceil.value) <= Number(ceil.max || Infinity)),
     };
   }
+  // --- 回归项 1：「详尽（详尽（…））」文案重复 ---
+  // 长度档下拉里每一项的显示文本，检测是否出现嵌套重复
+  // （旧 bug：label = "详尽（详尽（按原文长度自适应））"）
+  const lengthLabelIssues = [];
+  const lenSelect = q('#agentLength') || q('#enhancerLength') || q('#provLength');
+  if (lenSelect && lenSelect.options) {
+    for (const opt of Array.from(lenSelect.options)) {
+      const txt = (opt.textContent || '').trim();
+      if (!txt) continue;
+      // 出现同一段文字嵌套两次 = 文案重复
+      const m = txt.match(/^(.+?)[（(]\1/) || txt.match(/([\u4e00-\u9fffA-Za-z]{2,})[（(]\1[）)]/);
+      if (m) {
+        lengthLabelIssues.push({value: opt.value, text: txt, repeated: m[1]});
+      }
+    }
+  }
+  // 全页面扫描：任何元素的文本里出现「XX（XX」都算重复
+  const dupTextNodes = [];
+  document.querySelectorAll('option, label, .hint, .field-label, .row label, span')
+    .forEach(el => {
+      const t = (el.textContent || '').trim();
+      if (t.length < 4 || t.length > 120) return;
+      const mm = t.match(/([\u4e00-\u9fffA-Za-z]{2,})[（(]\1[）)]/);
+      if (mm) dupTextNodes.push({tag: el.tagName, text: t, repeated: mm[1]});
+    });
+
+  // --- 回归项 2：数字输入框（number input）要有样式 ---
+  // 判据：border-width >= 1px 且 border-style 不是 none/hidden
+  const numberInputs = [];
+  document.querySelectorAll('input[type="number"]').forEach(el => {
+    const cs = getComputedStyle(el);
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    numberInputs.push({
+      id: el.id || null,
+      visible: visible(el),
+      borderWidth: bw,
+      borderStyle: cs.borderTopStyle,
+      background: cs.backgroundColor,
+      styled: bw >= 1 && cs.borderTopStyle !== 'none' && cs.borderTopStyle !== 'hidden',
+    });
+  });
+
   return {
     url: location.href,
     docScrollW: document.documentElement.scrollWidth,
@@ -75,6 +117,9 @@ DUMP_JS = """
     enhanceBar: inBox('#enhanceSplit') || inBox('.prompt-enhance-bar'),
     enhanceBtn: inBox('#enhanceBtn'),
     specSelect: inBox('#enhanceSpec'),
+    lengthLabelIssues: lengthLabelIssues,
+    dupTextNodes: dupTextNodes,
+    numberInputs: numberInputs,
   };
 }
 """
@@ -155,6 +200,13 @@ def run(port, tag, outdir):
             "max_tokens_input_exists": bool(v["maxTokens"] and v["maxTokens"]["exists"]),
             "max_tokens_in_range": bool(v["maxTokens"] and v["maxTokens"]["inRange"]),
             "enhance_btn_visible": bool(v["enhanceBtn"]),
+            # 回归项 1：长度档文案无「XX（XX…）」重复
+            "no_duplicate_length_label": len(v.get("lengthLabelIssues") or []) == 0,
+            "no_duplicate_text_anywhere": len(v.get("dupTextNodes") or []) == 0,
+            # 回归项 2：number 输入框有可见边框（被样式覆盖过）
+            "number_inputs_styled": all(
+                n["styled"] for n in (v.get("numberInputs") or []) if n["visible"]
+            ) if any(n["visible"] for n in (v.get("numberInputs") or [])) else True,
         })
     results["checks"] = checks
     results["summary"] = {
