@@ -3087,7 +3087,21 @@ async function refreshJobs() {
       const jobs = status === "all" ? data.jobs : data.jobs.filter(job => job.status === status);
       return {jobs, total: data.total ?? jobs.length, page: data.page ?? 1};
     }));
-    if (ticket !== jobsRequest || tab !== state.tab) return;
+    // 【竞态防护】只有「本轮仍是最新的一次请求」才写 DOM。
+    //
+    // 为什么不能只看 ticket !== jobsRequest：
+    //   轮询间隔 2 秒，但一次 /api/jobs 请求在服务端被阻塞时可能要走好几秒
+    //   （实测并发任务的 music_style 会在 aiohttp 事件循环里同步拉
+    //     ComfyUI /object_info，首个请求把整个服务堵住约 6 秒）。
+    //   这时下一次轮询先把 jobsRequest 递增了 —— 旧请求回来时 ticket
+    //   必然对不上，于是**每一次**都提前 return，骨架占位永远替换不掉，
+    //   表现为「任务列表一直是骨架」（用户看到列表空白/一直转圈）。
+    //
+    // 正确的判据是「**筛选态**有没有变」：
+    //   - 筛选态没变（只是又轮询了一轮）-> 旧数据依然有效，照样渲染；
+    //   - 筛选态变了（切标签/翻页/改筛选条件）-> 旧数据对应的是旧筛选态，
+    //     必须丢弃，否则会把上一个筛选态的卡片画到新筛选态上。
+    if (tab !== state.tab || filterKey !== jobsFilterKey(state.tab)) return;
     // 最后一道闸：**此刻**如果有原生下拉正开着，就不动 DOM。
     // 上面 fetch 是异步的 —— 判断通过之后、数据返回之前，
     // 用户可能刚好展开了下拉；这时写 DOM 会把下拉当场关闭。
