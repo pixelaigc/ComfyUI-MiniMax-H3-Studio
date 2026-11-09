@@ -47,7 +47,7 @@ _WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))([^()]{1,80}?)\s*\)")
 _WEIGHT_PAREN_VALUE = re.compile(r"^[^()]{1,60}\s*:\s*[0-9.]+\s*$")
 
 
-def _is_weight_paren(inner: str) -> bool:
+def _is_weight_paren(inner: str, scoped: str = "") -> bool:
     """
     括号里的内容是不是 Compel 权重语法。
 
@@ -78,12 +78,42 @@ def _is_weight_paren(inner: str) -> bool:
     # 纯数字
     if re.fullmatch(r"[0-9.]+", text):
         return True
-    # 单个词（无空格、无逗号、非中文）—— diffusers 的 (cat) 形式
-    # 中文括号内容（如「（红色霓虹灯）」）是注释，不是权重语法
-    if (" " not in text and "," not in text
-            and not re.search(r"[\u4e00-\u9fff]", text)):
-        return True
-    # 多词短语 -> 普通注释，不算权重语法
+    # 括号内是中文 -> 是注释（如「（红色霓虹灯）」），不是权重语法
+    if re.search(r"[\u4e00-\u9fff]", text):
+        return False
+    # 多词短语 -> 普通注释（(Tong Lau) / (arcade buildings)），不是权重语法
+    if " " in text or "," in text:
+        return False
+    # 剩下的：单个英文词
+    #
+    # 官方口径是「(cat) = 1.1 倍」，所以单个词**按字面**就是权重语法。
+    # 但实测发现模型会用它做**逐字注音**：港式招牌「金」「記」「酒」
+    # 被扩写成 "金" (gold)、"記" (record)、"酒" (wine) ——
+    # 这些是给渲染模型看的**说明性注释**，不是倍率。
+    #
+    # 判据：单个词如果**前面紧邻一个被引号包住的画面文字**，
+    # 它就是在给那段文字做注音（官方 PE 模板要求「文字用双引号括起来」），
+    # 属于合法输出，不该当权重语法拒掉。
+    if _is_transliteration_gloss(text, scoped):
+        return False
+    return True
+
+
+# 「"金" (gold)」这类结构：引号文字 + 紧跟的括号注音
+_GLOSS_PATTERN = re.compile(r"\"[^\"]{1,40}\"\s*\(([^()]{1,40})\)")
+
+
+def _is_transliteration_gloss(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给**引号里的画面文字**做逐字注音。
+
+    官方 PE 模板要求「所有文字内容用英文双引号括起来」，
+    模型常写成 `"金" (gold)` —— 括号里是注音，不是倍率。
+    这种不该被当权重语法拒掉（否则整单 502，输出本身是好的）。
+    """
+    for m in _GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
     return False
 def _is_json_like(inner: str) -> bool:
     """
@@ -169,7 +199,7 @@ def check_weight_syntax(text: str, mode: str = "pe"):
             if pattern is _WEIGHT_PAREN:
                 # 括号：区分 Compel 权重语法 (cat) / (cat:1.5) 与
                 # 普通英文/中文注释 (Tong Lau) / (arcade buildings)
-                if not _is_weight_paren(match.group(1)):
+                if not _is_weight_paren(match.group(1), scoped):
                     continue
             snippet = match.group(0).strip()
             if snippet and snippet not in hits:

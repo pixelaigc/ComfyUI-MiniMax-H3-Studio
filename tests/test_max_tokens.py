@@ -703,6 +703,22 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
         v = self._validator()
         self.assertTrue(v.check_weight_syntax("a (1.5) b", "pe"))
 
+    def test_transliteration_gloss_not_rejected(self):
+        """
+        官方 PE 模板要求「画面文字用双引号括起来」，
+        模型常写成 `"金" (gold)` —— 括号里是**逐字注音**，不是倍率。
+        这种不该被当权重语法拒掉（否则整单 502，输出本身是好的）。
+        """
+        v = self._validator()
+        for case in ('"金" (gold)', '"記" (record)', '"酒" (wine)'):
+            self.assertFalse(v.check_weight_syntax("霓虹招牌 " + case, "pe"),
+                             "注音不该被判权重语法：%s" % case)
+
+    def test_transliteration_gloss_still_lets_real_weights_through(self):
+        """豁免只针对注音，真正的权重语法仍然要拦。"""
+        v = self._validator()
+        self.assertTrue(v.check_weight_syntax('"cat" (cat:1.5)', "pe"))
+
 
 
 if __name__ == "__main__":
