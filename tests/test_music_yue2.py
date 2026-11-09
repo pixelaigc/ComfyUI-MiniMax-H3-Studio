@@ -526,5 +526,44 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
             self.assertNotIn(bad, blob, f"音乐面板残留图像系文案：{bad}")
 
 
+class TestMusicPlanModeNotLost(unittest.TestCase):
+    """谱面模式不能被 HTTP 生成模式覆盖掉。
+
+    背景（真机发现，2026-11-09）：server.py 里 `params["mode"] = mode`
+    把用户选的谱面模式（full / melody）覆盖成了 HTTP 生成模式（t2a / a2a）
+    -> 任务记录里谱面模式永久丢失 -> 作品卡片只能显示一个编造的「完整谱面」。
+    """
+
+    def test_server_stores_plan_mode_separately(self):
+        srv = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn('params["plan_mode"]', srv)
+
+    def test_music_yue2_reads_plan_mode_first(self):
+        py = (REPO / "h3studio" / "music_yue2.py").read_text(encoding="utf-8")
+        self.assertIn('params.get("plan_mode")', py)
+        self.assertIn('params.get("music_plan")', py)
+
+    def test_frontend_sends_plan_mode(self):
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        self.assertIn("plan_mode:", js)
+
+    def test_job_card_reads_plan_mode(self):
+        js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("(p.plan_mode || p.mode) === \"melody\"", js)
+
+
+class TestMusicModelLabelFallback(unittest.TestCase):
+    """作品卡片可能在 /api/music-options 返回前渲染 -> 模型名要有静态兜底。"""
+
+    def test_static_fallback_table_exists(self):
+        js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("MUSIC_MODEL_FALLBACK", js)
+        self.assertIn("yue2_3b_int8_convrot", js)
+
+    def test_label_falls_back_to_human_name(self):
+        js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("return MUSIC_MODEL_FALLBACK[key] || String(key);", js)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

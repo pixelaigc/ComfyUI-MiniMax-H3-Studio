@@ -420,6 +420,9 @@
       // 参考生音乐：谱面来自 SheetSage2 转谱，固定「仅旋律」
       // （SheetSage2 不输出和弦符号，与 full 谱面不兼容 —— 后端也会强制纠正）
       mode: isCover ? "melody" : st.plan,
+      // 谱面模式单独走 plan_mode：params.mode 是 HTTP 生成模式（t2a/a2a），
+      // 两者语义不同，不能共用一个键（否则会被 server.py 覆盖）。
+      plan_mode: isCover ? "melody" : st.plan,
       checkpoint: st.checkpoint,
       audio_encoder: st.audio_encoder,
       max_duration: st.duration,

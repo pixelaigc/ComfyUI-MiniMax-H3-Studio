@@ -2074,11 +2074,18 @@ function imgModelLabel(key) {
 }
 
 // 音乐任务的模型显示名（YuE2 checkpoint key -> 人话）
+// 注意：作品卡片可能在 /api/music-options 返回前就渲染出来，
+// 所以这里必须带一份静态兜底表，不能只依赖 window.MusicUI。
+const MUSIC_MODEL_FALLBACK = {
+  yue2_3b_int8_convrot: "YuE2 3B · INT8 ConvRot（官方量化版）",
+  yue2_3b_bf16: "YuE2 3B · BF16 完整版",
+};
 function musicModelLabel(key) {
   if (!key) return "YuE2";
   const opts = (window.MusicUI && window.MusicUI.getOptions) || null;
   const entry = opts && opts.checkpoints ? opts.checkpoints[key] : null;
-  return entry ? entry.label : String(key);
+  if (entry && entry.label) return entry.label;
+  return MUSIC_MODEL_FALLBACK[key] || String(key);
 }
 
 function outputUrl(job, output) {
@@ -2395,7 +2402,7 @@ function jobCard(job) {
       <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
-      <div class="row"><span>谱面</span><b>${p.mode === "melody" ? "仅旋律" : "完整谱面"}</b></div>
+      <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
