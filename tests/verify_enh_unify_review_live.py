@@ -210,8 +210,14 @@ def main():
                         joined = " | ".join(it["badges"])
                         ck.check("Recommended" not in joined,
                                  f"[{tag}] 禁用项 {it['method']} 不含 Recommended", joined)
-                        ck.check("本面板不可用" in joined,
-                                 f"[{tag}] 禁用项 {it['method']} 写明归属", joined)
+                        # 归属文案：图像/视频面板是「XXX 专属，本面板不可用」；
+                        # 音乐面板是「文本扩写类，YuE2 音乐需结构化风格+歌词」
+                        # 或「图像/视频专属，音乐面板不可用」。
+                        # 判据：写明**归属或不可用原因**，而不是死抠某一句文案。
+                        ck.check(
+                            ("专属" in joined) or ("不可用" in joined)
+                            or ("文本扩写类" in joined) or ("需结构化" in joined),
+                            f"[{tag}] 禁用项 {it['method']} 写明归属或不可用原因", joined)
                 results["panels"].setdefault(pname, {})[str(w)] = geo
                 # 截图前把增强栏滚进视野
                 page.evaluate(
@@ -268,11 +274,23 @@ def main():
             if row:
                 ck.check(not row["inMenu"],
                          f"[spec-row {pname}] 模板行不在增强方式下拉内部", str(row))
-                ck.check(row["visible"], f"[spec-row {pname}] 模板行可见", str(row))
-                ck.check(len(row["options"]) > 0,
-                         f"[spec-row {pname}] 模板行有选项", str(row))
-                ck.check(row["value"] in row["options"],
-                         f"[spec-row {pname}] 当前模板在选项里", str(row))
+                # 【2026-11-10 架构裁决】音乐面板的增强是**结构化风格 + 歌词**，
+                # 走自己的专属链路（/api/music-enhance），**不用模板** ——
+                # 所以音乐面板的模板行是隐藏的（label 会写明「模板（YuE2 结构化风格 + 歌词）」）。
+                # 其余面板（图像/视频）必须有一行可见的模板选择器。
+                if pname in ("t2a", "a2a"):
+                    ck.check(row["hidden"],
+                             f"[spec-row {pname}] 音乐面板不提供模板行（结构化路线不用模板）",
+                             str(row))
+                    ck.check("YuE2" in (row["labelText"] or ""),
+                             f"[spec-row {pname}] 模板行标签写明是结构化风格路线",
+                             str(row))
+                else:
+                    ck.check(row["visible"], f"[spec-row {pname}] 模板行可见", str(row))
+                    ck.check(len(row["options"]) > 0,
+                             f"[spec-row {pname}] 模板行有选项", str(row))
+                    ck.check(row["value"] in row["options"],
+                             f"[spec-row {pname}] 当前模板在选项里", str(row))
             # 截图前把增强栏滚进视野（面板很长，不滚动看不到增强区）
             page.evaluate(
                 """(sel) => {
@@ -285,6 +303,31 @@ def main():
                 page.screenshot(path=str(shot))
             except Exception:
                 pass
+
+        # ---------- 写回契约：图像/视频=文本契约，音乐=结构化契约 ----------
+        # 【2026-11-10 真机回归】MusicEnhance 在 DOMContentLoaded 时**无条件**
+        # 注册 window.MusicEnhance，providers.js 的 enhanceWriteContract()
+        # 曾无条件返回音乐结构化契约 -> 图像面板的写回被解析成 kind:"structured"
+        # -> 「替换/追加」按钮点了没反应（静默失败），徽标不显示、等级恒为 0。
+        # 断言：只有音乐面板用结构化契约。
+        for pname, (mode, _mb, _mi, _ri, _si) in PANELS.items():
+            switch_mode(page, mode)
+            page.wait_for_timeout(700)
+            contract = page.evaluate(
+                """() => {
+                  const t = resolveEnhanceWriteTarget();
+                  return { ok: t.ok, kind: t.kind || '', reason: t.reason || '',
+                           selector: t.selector || '' };
+                }""")
+            results.setdefault("write_contract", {})[pname] = contract
+            if pname in ("t2a", "a2a"):
+                ck.check(contract.get("kind") == "structured",
+                         f"[contract {pname}] 音乐面板用结构化写回契约", str(contract))
+            else:
+                ck.check(contract.get("kind") == "text",
+                         f"[contract {pname}] 图像/视频面板用文本写回契约", str(contract))
+                ck.check(contract.get("selector") == "#prompt",
+                         f"[contract {pname}] 文本契约目标是 #prompt", str(contract))
 
         # ---------- 多选：版本历史 + 徽标 ----------
         switch_mode(page, "t2i")

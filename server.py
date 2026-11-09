@@ -265,6 +265,50 @@ LONGFILM_LOCK = asyncio.Lock()
 LONGFILM_TASKS = set()
 LONGFILM_PROCESSES = {}
 
+# ------------------------------------------------------------------ 增强并发闸门
+#
+# 【2026-11-09 审查返修】/api/enhance 之前**没有任何并发限制**。
+# 单次请求最坏挂起 600 秒（llm.MAX_TIMEOUT），N 个并发 = N 个长挂起协程，
+# 会把 aiohttp 连接池占满，并让后续请求一起排队。
+#
+# 为什么用「抢不到就 429」而不是「排队等」：
+#   本机 llama.cpp server 的 total_slots = 1（实测），
+#   多个请求并发进去也只是在模型侧串行排队 —— 对用户没有更快，
+#   只会让所有请求一起等到超时。直接 429 让用户立刻知道「现在忙」，
+#   比静默排队 10 分钟然后超时要好。
+#
+# 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
+#   timeout=0 会在 acquire 真正执行前就取消它，结果是**所有**请求都 429
+#   （builtin-agent 分支实测踩过这个坑）。locked() 判据实测 peak 并发
+#   恰好等于上限，无超发。asyncio.Semaphore.acquire 内部是「先减计数再 await」，
+#   本身是原子的。
+#
+# 【2026-11-10 取值裁决】**本文件是唯一权威定义处**。
+#   enh-unify 分支曾取 2、max-token 分支曾取 3，两份定义同时存在于
+#   server.py（后定义覆盖先定义）—— 上限实际值取决于代码顺序，注释也自相矛盾。
+#   现统一取 **3**，理由：
+#     1. 本机 llama.cpp server total_slots = 1（实测），并发请求在模型侧
+#        本就串行；闸门的意义是「不要把 aiohttp 连接池占满 + 给出即时反馈」，
+#        不是「让模型并行跑」。
+#     2. 取 3 时，最坏挂起时长 = 3 × llm.MAX_TIMEOUT(600s) = 30 分钟；
+#        取 2 时是 20 分钟。两者都不构成「一个请求拖住服务 30 分钟」的问题，
+#        因为闸门本身已经挡住了 N+1 个请求。
+#     3. 取 3 对**多选增强**更友好：一次多选要连续跑 2~3 项增强
+#        （普通增强 + 二次增强 + 官方 PE），上限 2 会让同一次操作里的
+#        后续项立刻 429，用户看到「刚点了就报忙」。上限 3 允许同一轮
+#        多选的各项顺序执行而不互相挤掉。
+#   若将来实测 llama.cpp 改为多槽（total_slots > 1），应重新评估此值。
+ENHANCE_CONCURRENCY = 3
+ENHANCE_GATE: asyncio.Semaphore | None = None
+
+
+def _enhance_gate() -> asyncio.Semaphore:
+    """并发闸门（惰性创建，避免 import 期就占住事件循环）。"""
+    global ENHANCE_GATE
+    if ENHANCE_GATE is None:
+        ENHANCE_GATE = asyncio.Semaphore(ENHANCE_CONCURRENCY)
+    return ENHANCE_GATE
+
 
 async def comfy_upload_image(session: ClientSession, path: Path) -> str:
     """上传图片到 ComfyUI input，返回 'name'（subfolder 走 h3studio/）"""
@@ -2356,27 +2400,16 @@ async def api_providers_test(request):
 
 
 # ------------------------------------------------------------------ 提示词增强 Agent
-#: 同时运行的「提示词增强」请求数上限。
-#:
-#: 【2026-11-09 新增并发闸门】
-#: 为什么要闸门：max_token 上限提升后，单次增强请求最坏可挂到
-#: MAX_TIMEOUT（600 秒）。本机 llama.cpp 是单槽串行 —— N 个并发请求
-#: 不会让它们更快，只会让它们**全部**排到队尾，把 aiohttp 的连接
-#: 全部占住。没有闸门时，脚本批量调用会堆积出几十个悬挂协程。
-#:
-#: 上限取 2：单槽串行的后端，2 已能让一个请求在跑、另一个在准备，
-#: 超过 2 只是徒增排队。
-ENHANCE_CONCURRENCY = 2
-#: 并发闸门（惰性创建 —— import 期不占住事件循环）
-ENHANCE_GATE: asyncio.Semaphore | None = None
+#
+# 【2026-11-10 单一权威定义】ENHANCE_CONCURRENCY 与 ENHANCE_GATE 已上移到
+# 本文件的「增强并发闸门」小节（唯一权威定义处）。
+#
+# 之前这里与上方**各有一份** ENHANCE_CONCURRENCY（enh-unify=2 / max-token=3），
+# 后定义的会静默覆盖先定义的 —— 上限到底是 2 还是 3 取决于文件顺序，
+# 两份注释还各说各话。这是本轮审查 P1-2 的根因。
+# 现在：全局只有一处定义，取值与理由见上方小节。
 
 
-def _enhance_gate() -> asyncio.Semaphore:
-    """取（并惰性创建）增强请求的并发闸门。"""
-    global ENHANCE_GATE
-    if ENHANCE_GATE is None:
-        ENHANCE_GATE = asyncio.Semaphore(ENHANCE_CONCURRENCY)
-    return ENHANCE_GATE
 
 
 async def api_enhancer_config(request):
@@ -2550,7 +2583,10 @@ async def api_enhance(request):
             saved = {}
 
     spec = enh.get_spec(spec_id, saved)
-    params = enh.resolve_params(payload.get("params"), saved, spec)
+    # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
+    #   原实现不传 original -> 只能拿到固定 300 -> 长提示词必被硬切
+    #   （审查实测：普通增强 10 次有 6 次被切，成功率仅 40%）。
+    params = enh.resolve_params(payload.get("params"), saved, spec, original=original)
 
     # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
     with db() as conn:
@@ -2576,75 +2612,100 @@ async def api_enhance(request):
                         {"error": "尚未配置可用的本地模型 Provider。"
                                  "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+
+    validate_mode = spec.get("validate_mode", "pe")
     messages = enh.build_messages(spec, original, params.get("language", "auto"))
-    # 【并发闸门】抢不到就立刻 429，**不排队**。
-    #
-    # 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
-    # 实测（50 并发 × 20 轮）wait_for(acquire(), timeout=0) **一次都抢不到**
-    # —— timeout=0 会在 acquire 真正执行前就取消它，结果是所有请求都 429。
-    # locked() 判据则实测 peak 并发恰好等于上限，无超发。
-    # （asyncio.Semaphore.acquire 内部是「先减计数再 await」，本身是原子的。）
+
+    # 并发闸门：抢不到就立刻 429，**不排队**。
+    # 理由见 ENHANCE_CONCURRENCY 上方的注释（本机 llama.cpp total_slots=1，
+    # 排队只会让所有请求一起等到超时）。
     gate = _enhance_gate()
     if gate.locked():
         return web.json_response(
-            {"error": f"当前已有 {ENHANCE_CONCURRENCY} 个增强任务在运行，"
-                      "请稍候再试。",
-             "code": "too_many_requests"}, status=429)
+            {"error": f"当前已有 {ENHANCE_CONCURRENCY} 个提示词增强任务在运行，"
+                      "本地模型一次只能处理这么多，请稍候再试。",
+             "code": "too_many_requests",
+             "concurrency": ENHANCE_CONCURRENCY}, status=429)
 
     async with gate:
-        try:
-            res = await llm_client.call_provider_full(
-                item, messages, images=images or None,
-                options={"temperature": params["temperature"],
-                         "top_p": params["top_p"],
-                         "max_tokens": params["max_tokens"],
-                         "do_sample": params.get("do_sample", True)})
-        except llm_client.ProviderError as exc:
-            # 本地模型不可达 —— 明确报错，不静默失败
+        # 【审查返修】截断自动降级重试。
+        #   第一次按自适应预算跑；若仍被硬切（finish_reason=length），
+        #   自动用**满上限**再跑一次，而不是直接 502 让用户失败。
+        #   （审查实测：普通增强 10 次有 6 次被 300 硬切，成功率仅 40%。
+        #    预算自适应后这一步基本不会触发；这里是最后一道保险。）
+        budget = params["max_tokens"]
+        ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
+        attempts = [budget]
+        if ceiling > budget:
+            attempts.append(ceiling)
+
+        last = None
+        for attempt_idx, mt in enumerate(attempts):
+            try:
+                res = await llm_client.call_provider_full(
+                    item, messages, images=images or None,
+                    options={"temperature": params["temperature"],
+                             "top_p": params["top_p"],
+                             "max_tokens": mt,
+                             "do_sample": params.get("do_sample", True)})
+            except llm_client.ProviderError as exc:
+                # 本地模型不可达 —— 明确报错，不静默失败
+                return web.json_response(
+                    {"error": str(exc), "provider": item["name"],
+                     "provider_id": item["id"],
+                     "degraded": True}, status=502)
+            raw = res["text"]
+            finish_reason = res.get("finish_reason") or ""
+
+            # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
+            raw = enh.strip_thinking(raw)
+            enhanced = enh.strip_wrapping(raw)
+            if not enhanced:
+                return web.json_response(
+                    {"error": "模型返回了空内容，未做修改",
+                     "provider": item["name"],
+                     "degraded": True}, status=502)
+            # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
+            if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+                return web.json_response(
+                    {"error": f"Provider「{item['name']}」返回的是系统提示词复读，"
+                              "不是有效的提示词。"
+                              "该模型可能太小或未按指令输出，请换用更强的模型。",
+                     "provider": item["name"], "provider_id": item["id"],
+                     "degraded": True}, status=502)
+
+            # 截断检测 —— 二次增强丢背景的根因守门人。
+            #   finish_reason=length 或末段标题缺失 -> 判定被硬切。
+            #   system_prompt 传进去是为了**从模板正文解析末段标题**，
+            #   这样别的分支新增的 refine 模板（如末段「【整体细化】」的音乐版）
+            #   不改代码也能被正确判定（跨分支复用，见 enhancer.template_sections）。
+            coverage = enh.coverage_report(
+                original, enhanced,
+                finish_reason=finish_reason,
+                validate_mode=validate_mode,
+                system_prompt=spec.get("system_prompt", ""))
+            if not coverage.get("truncated"):
+                last = (mt, res, enhanced, finish_reason, coverage)
+                break
+            # 被截断 —— 还有下一次机会（用满上限重跑）就继续
+            if attempt_idx + 1 < len(attempts):
+                continue
             return web.json_response(
-                {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
+                {"error": "增强结果被 max_tokens 上限截断，内容不完整，未写回。"
+                          + coverage.get("truncation_reason", "")
+                          + f"（本次 max_tokens={mt}，已用满上限重试仍被截断）"
+                          "请在「本地模型配置 → 增强 Agent」里调高"
+                          "「最大输出 token 上限」，或改用更强的模型。",
+                 "truncated": True,
+                 "truncation_reason": coverage.get("truncation_reason", ""),
+                 "missing_sections": coverage.get("missing_sections", []),
+                 "coverage": coverage,
+                 "provider": item["name"], "provider_id": item["id"],
                  "degraded": True}, status=502)
-    raw = res["text"]
-    finish_reason = res.get("finish_reason") or ""
 
-    # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
-    raw = enh.strip_thinking(raw)
-    enhanced = enh.strip_wrapping(raw)
-    if not enhanced:
-        return web.json_response(
-            {"error": "模型返回了空内容，未做修改", "provider": item["name"],
-             "degraded": True}, status=502)
-    # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
-    if enh.looks_like_echo(enhanced, spec["system_prompt"]):
-        return web.json_response(
-            {"error": f"Provider「{item['name']}」返回的是系统提示词复读，不是有效的提示词。"
-                      "该模型可能太小或未按指令输出，请换用更强的模型。",
-             "provider": item["name"], "provider_id": item["id"],
-             "degraded": True}, status=502)
-
-    validate_mode = spec.get("validate_mode", "pe")
-    # 【2026-11-09】截断检测 —— 二次增强丢背景的根因守门人。
-    #   旧实现把 finish_reason 丢掉，512 token 上限把输出硬切在 L2 中途，
-    #   后面的骑楼/霓虹/海报/路面/雨雾/冷暖对比/构图整段消失，
-    #   校验器只给一句泛泛的「核心要素可能丢失」警告，内容照样写回提示词框。
-    #   现在：finish_reason=length 或 refine 档结构不完整 -> 直接判失败，
-    #   并把「怎么调」写进错误信息，用户不会拿到半截提示词。
-    coverage = enh.coverage_report(original, enhanced,
-                                   finish_reason=finish_reason,
-                                   validate_mode=validate_mode)
-    if coverage.get("truncated"):
-        return web.json_response(
-            {"error": "增强结果被 max_tokens 上限截断，内容不完整，未写回。"
-                      + coverage.get("truncation_reason", "")
-                      + f"（本次 max_tokens={params['max_tokens']}）"
-                      "请在「本地模型配置 → 增强 Agent」里调高「最大输出 token 上限」，"
-                      "或把长度档切到「详尽」。",
-             "truncated": True,
-             "truncation_reason": coverage.get("truncation_reason", ""),
-             "missing_sections": coverage.get("missing_sections", []),
-             "coverage": coverage,
-             "provider": item["name"], "provider_id": item["id"],
-             "degraded": True}, status=502)
+        used_max_tokens, res, enhanced, finish_reason, coverage = last
+        params = dict(params)
+        params["max_tokens"] = used_max_tokens
 
     # 硬约束校验（质量词 / 权重语法 / think 段 / bbox 结构）
     validation = enh.validate_output(enhanced, original, validate_mode)

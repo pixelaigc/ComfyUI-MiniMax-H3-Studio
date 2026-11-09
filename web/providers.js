@@ -460,8 +460,8 @@ function renderAgentConfig() {
     </div>
     <div class="agent-hint">
       最大输出 token 上限：${ceilMin} ~ ${ceilMax}，默认 ${esc(bounds.default ?? 32768)}。
-      「详尽」档用于二次增强（逐物体枚举），需要 2000+ tokens；
-      调太大会在模型已经写完时浪费等待时间。
+      实际预算按**提示词长度自适应**（普通增强约 1.6 倍、二次增强约 6 倍），
+      这个上限只是天花板 —— 调太大不会让模型多写，只会在真的被截断时多等一次。
     </div>
     <div class="agent-dims">${esc(spec.source || "")} · 覆盖维度：${(spec.dimensions || []).map(d =>
       `<span class="agent-dim">${esc(d)}</span>`).join("")}</div>
@@ -682,24 +682,25 @@ const ENHANCE_WRITE_TARGETS = {
 };
 
 function enhanceWriteContract() {
-  // 契约必须按**当前面板**选，不能只看「音乐模块加载了没」。
+  // 音乐面板注册的是**结构化**契约（结构化风格 + 歌词）。
   //
-  // 【2026-11-10 修的真实缺陷】之前这里是无条件优先用音乐契约，
-  // 而 music-enhance.js 在页面加载时就注册了契约 —— 于是**图像面板**
-  // 点「替换提示词框」时拿到的也是结构化契约 ->
-  // writeBackEnhanceResult() 走 structured 分支直接 return false ->
-  // 提示词框**根本没被写入**，徽标也不显示（实测：#prompt 值不变）。
+  // 【2026-11-10 修复 · 真机回归】必须先判断「当前是不是音乐面板」。
+  // MusicEnhance 在 DOMContentLoaded 时**无条件**注册 window.MusicEnhance
+  // （脚本整页加载，与当前模式无关），所以只要脚本加载了，
+  // getWriteContract() 永远能拿到结构化契约 ——
+  // 于是**图像/视频面板**的写回也被解析成 kind:"structured"，
+  // 结果：
+  //   1. writeBackEnhanceResult() 命中 structured 分支直接 return false
+  //      -> 「替换/追加」按钮**点了没反应**（静默失败）；
+  //   2. 徽标不显示、版本等级恒为 0（内容压根没写回提示词框）。
+  // 这正是多选增强「徽标不可见 + 等级=0」的根因。
   //
-  // 现在：按当前模式决定走哪条路线。
-  //   音乐模式 -> 结构化契约（music-enhance.js 注册）
-  //   其它模式 -> 文本契约（提示词框）
-  const music = (typeof state !== "undefined" && state
-                 && (state.mode === "t2a" || state.mode === "a2a"));
-  if (music) {
-    const contract = window.MusicEnhance
-      && typeof window.MusicEnhance.getWriteContract === "function"
+  // 修法：只有**音乐面板**才用结构化契约，其余面板一律走文本契约。
+  // 判据用现有的 isMusicMode()（app.js 已定义，判的是 state.mode）。
+  if (typeof isMusicMode === "function" && isMusicMode()) {
+    const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
       ? window.MusicEnhance.getWriteContract() : null;
-    if (contract) return contract;
+    if (music) return music;
   }
   return ENHANCE_WRITE_TARGETS.text;
 }

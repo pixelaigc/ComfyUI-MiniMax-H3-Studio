@@ -558,10 +558,18 @@ body.modal-open { overflow: hidden; }
 .agent-field { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--muted); }
 .agent-field.block { width: 100%; }
 .agent-field.block > span { font-weight: 600; color: var(--text); font-size: 12px; }
-.agent-field select, .agent-field textarea, .agent-field input[type=range] {
+.agent-field select, .agent-field textarea, .agent-field input[type=range],
+.agent-field input[type=number] {
   border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   font-size: 12.5px; background: #fff; color: var(--text); font-family: inherit;
 }
+/* 数字输入框：宽度按内容，别撑破窄屏；隐藏原生步进箭头避免挤位 */
+.agent-field input[type=number] { width: 116px; }
+.agent-field input[type=number]::-webkit-outer-spin-button,
+.agent-field input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.agent-field input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .agent-field textarea { line-height: 1.55; resize: vertical; }
 .agent-field input[type=range] { padding: 0; }
 .agent-field b { color: var(--accent); }
@@ -643,6 +651,9 @@ body.modal-open { overflow: hidden; }
   border-radius: 6px;
   padding: 3px 6px;
   max-width: 220px;
+  /* 触控目标高度不得小于 32px（手机端契约，见 tests/test_responsive_mobile.py）。
+     这是一行真实回归：新增的模板选择器默认渲染高度只有 22px。 */
+  min-height: 32px;
 }
 .enhance-spec-select:focus { outline: none; border-color: var(--accent); }
 .enhance-spec-select:disabled { opacity: .6; cursor: default; }
@@ -1528,3 +1539,4 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .music-sf-label { font-size: 11px; color: var(--muted); }
 .music-sf-item .img-select,
 .music-sf-item .img-input { width: 100%; min-width: 0; }
+
