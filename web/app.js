@@ -261,6 +261,10 @@ function renderMode() {
           window.enhanceMethods.ensureAvailable();
         }
         window.enhanceMethods.updatePanelVisibility();
+        // 「当前增强方式」回显要跟着模式换（音乐面板是另一套 DOM id）
+        if (typeof window.enhanceMethods.refreshButton === "function") {
+          window.enhanceMethods.refreshButton();
+        }
       }
       // 音乐面板有**自己的一套**增强菜单（音乐侧注册表）—— 切到音乐模式时
       // 也要刷新它的按钮文字与菜单（否则按钮还显示上一个模式的文案）。
@@ -439,7 +443,7 @@ function renderMode() {
     $("#seedStrengthPair").style.display = "none";
     // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
     // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
-    // （#musicEnhanceSplit），所以通用 #promptField 整个隐藏。
+    // （#musicEnhanceSplit，在 #musicPromptField 内），所以通用 #promptField 整个隐藏。
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "none";
     if (window.MusicUI) window.MusicUI.render();
@@ -1761,6 +1765,10 @@ function updateActionButtons() {
   }
   // 主按钮文字随「当前增强方式」变化 —— 方式名由 enhance-menu.js 管，
   // 这里只负责 busy 期间的临时文案。
+  //
+  // 【多选】按钮文字取决于**选中了几项**（一项=该项文字，多项=「增强（N 项）」），
+  // 这个逻辑在 enhance-menu.js 里（updateButton），所以这里不要自己拼 ——
+  // 两处各拼一遍必然走偏。enhance-menu.js 暴露了 refreshButton() 供这里调用。
   if (enhText) {
     if (promptEnhance.busy) {
       enhText.textContent = "正在增强…";
@@ -3103,15 +3111,15 @@ async function refreshJobs() {
       const jobs = status === "all" ? data.jobs : data.jobs.filter(job => job.status === status);
       return {jobs, total: data.total ?? jobs.length, page: data.page ?? 1};
     }));
-    // 【竞态防护】只有「本轮仍是最新的一次请求」才写 DOM。
+    // 【竞态防护】只有「筛选态」变了才丢弃本次请求的数据。
     //
     // 为什么不能只看 ticket !== jobsRequest：
-    //   轮询间隔 2 秒，但一次 /api/jobs 请求在服务端被阻塞时可能要走好几秒
-    //   （实测并发任务的 music_style 会在 aiohttp 事件循环里同步拉
-    //     ComfyUI /object_info，首个请求把整个服务堵住约 6 秒）。
-    //   这时下一次轮询先把 jobsRequest 递增了 —— 旧请求回来时 ticket
-    //   必然对不上，于是**每一次**都提前 return，骨架占位永远替换不掉，
-    //   表现为「任务列表一直是骨架」（用户看到列表空白/一直转圈）。
+    //   jobsRequest 是「请求发起次数」的计数器。轮询间隔 2 秒，但一次
+    //   /api/jobs 在服务端被阻塞时可能要走好几秒（实测并发任务的
+    //   music_style 会在 aiohttp 事件循环里同步拉 ComfyUI /object_info，
+    //   把整个服务堵住约 6 秒）。这时下一次轮询先把 jobsRequest 递增了，
+    //   旧请求回来时 ticket 必然对不上 —— 于是**每一次**都提前 return，
+    //   骨架占位永远替换不掉（表现为「任务列表一直是骨架」）。
     //
     // 正确的判据是「**筛选态**有没有变」：
     //   - 筛选态没变（只是又轮询了一轮）-> 旧数据依然有效，照样渲染；

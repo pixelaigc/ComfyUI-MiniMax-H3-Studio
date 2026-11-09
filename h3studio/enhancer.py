@@ -106,6 +106,44 @@ TEMPLATE_SPECS = {
         "dimensions": ["caption", "id", "bbox", "desc"],
         "source": "BFL FLUX 3 官方 t2i_bbox system prompt",
     },
+    # YuE2 专用增强（文生音乐 / 参考生音乐）。
+    # 这是**音乐功能自己的专属增强**：把一句笼统的音乐想法扩写成
+    # 一段可直接送进 YuE2 的完整 style 串（语言/曲风/情绪/人声/音色/
+    # 乐器/BPM/能量/时长倾向/制作质感）。
+    # families 锁 yue2 —— 图像/视频模式不认音乐 style 串。
+    "yue2-style": {
+        "id": "yue2-style",
+        "label": "音乐提示词（YuE2 专用扩写）",
+        "media": "audio",
+        "families": ["yue2"],
+        "template": "yue2-style.txt",
+        "validate_mode": "music",
+        "default_length": "medium",
+        "builtin": True,
+        "dimensions": ["语言", "曲风", "情绪", "人声", "人声音色", "乐器",
+                        "速度 BPM", "能量", "时长倾向", "制作质感"],
+        "source": "YuE2 官方风格描述字段（language/genre/mood/vocal/vocal_color/"
+                  "instruments/tempo_bpm/energy/length_hint/extra）",
+    },
+    # 音乐版「二次增强」：与图像版「二次增强」同语义（逐要素细化），
+    # 但模板是音乐向的（逐个音乐要素逐项细化），不是画面物体向的。
+    # 同一个「二次增强」能力，按媒体类型选对应模板。
+    "music-refine": {
+        "id": "music-refine",
+        "label": "音乐提示词·逐要素细化（二次增强）",
+        "media": "audio",
+        "families": ["*"],
+        "template": "refine-music.txt",
+        "validate_mode": "music_refine",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["语言", "人声", "人声音色", "曲风", "情绪", "乐器",
+                        "编配层次", "速度", "节拍", "能量走向", "时长倾向",
+                        "制作质感", "混音倾向", "时代感"],
+        "source": "本机 skill: scene-object-inventory（逐要素枚举 + L1/L2/L3 分级）"
+                  " 的音乐版改写",
+        "refine": True,
+    },
     # Qwen-Image 2.1 官方 PE 两档（文生图 / 图片编辑）。
     # 正文取自 ComfyUI 官方工作流模板里的官方 PE system prompt：
     #   image_qwen_image_2_1_t2i.json       -> assets/qwen21-pe-t2i.txt
@@ -197,6 +235,9 @@ MODE_MEDIA = {
     "flf": "video",
     "r2v": "video",
     "longfilm": "video",
+    # 音乐（YuE2）：文生音乐 / 参考生音乐 —— 媒体类型是 audio
+    "t2a": "audio",
+    "a2a": "audio",
     "audio": "audio",
 }
 
@@ -215,6 +256,8 @@ MODEL_FAMILY = {
     # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
     "lora": "minimax_h3",
     "standard": "minimax_h3",
+    # 音乐（YuE2）：checkpoint key 与 /api/music-options 下发的一致
+    "yue2_3b_bf16": "yue2",
 }
 
 # 模式 -> 默认模型 key（用于解上下文；前端会传实际选中的模型）
@@ -240,7 +283,10 @@ MODE_DEFAULT_SPEC = {
     "flf": "video",
     "r2v": "video",
     "longfilm": "video",
-    "audio": "audio",
+    # 音乐模式默认用 YuE2 专用扩写模板
+    "t2a": "yue2-style",
+    "a2a": "yue2-style",
+    "audio": "yue2-style",
 }
 
 # 视频 / 音频模板（占位实现，便于后续直接换官方原文）
@@ -435,6 +481,31 @@ def resolve_spec_for_mode(spec_id: str, mode: str = "", specs: list | None = Non
         return spec_id
     fallback = default_spec_for_mode(mode, available, model_key)
     return fallback if fallback else spec_id
+
+
+# ------------------------------------------------------------------ 二次增强模板
+
+#: 「二次增强」是**通用能力**（逐要素细化），但它按媒体类型用不同的模板：
+#:   image -> image-refine（逐个画面物体）
+#:   audio -> music-refine（逐个音乐要素）
+#:   video -> image-refine（画面物体同样适用于视频分镜）
+#: 前端**不再硬编码**模板 id —— 由服务端按当前媒体类型下发，
+#: 否则音乐模式会拿到「逐个画面物体」的视频/美术向模板（语义不符）。
+REFINE_SPEC_BY_MEDIA = {
+    "image": "image-refine",
+    "video": "image-refine",
+    "audio": "music-refine",
+}
+
+
+def refine_spec_for_mode(mode: str = "") -> str:
+    """
+    该模式下「二次增强」该用哪个模板 id。
+
+    mode 为空 / 未知 -> 退回图像档（保持历史默认行为）。
+    """
+    media = mode_media(mode) or "image"
+    return REFINE_SPEC_BY_MEDIA.get(media, "image-refine")
 
 
 def get_spec(spec_id: str, overrides: dict | None = None) -> dict:

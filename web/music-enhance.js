@@ -3,18 +3,28 @@
    ------------------------------------------------------------
    【为什么单独一个文件】
    音乐面板的「增强」必须与生图面板**同一套组件与视觉**（用户要求：
-   不另造一套）。所以本文件**复用** enhance-menu.js 导出的共用实现
-   （renderEnhanceMenu / bindEnhanceMenu / positionMenu），
+   不另造一套）。所以本文件**复用**共用组件 web/enhance-menu-shared.js
+   （renderEnhanceMenu / bindEnhanceMenu / positionMenu / resolveWriteTarget），
    自己只负责：
      * 音乐侧的增强项注册表（当前只有一项：YuE2 结构化风格 + 歌词）
      * 路由到 POST /api/music-enhance
      * 结果回填到音乐面板的结构化风格区与歌词区
+     * **注册写回能力契约**（供 providers.js / enhance-menu.js 解析写回目标）
 
    【与生图面板的关系】
    生图面板的注册表在 enhance-menu.js 的 ENHANCE_METHODS 里，
-   音乐面板的注册表在这里 MUSIC_ENHANCE_METHODS 里 ——
-   两份注册表**内容不同**（音乐要产出结构化风格+歌词，不是文本扩写），
-   但**组件实现是同一份**（enhance-menu.js 导出的共用函数）。
+   音乐面板的注册表在这里 MUSIC_ENHANCE_METHODS 里 —— 两份注册表
+   **内容不同**（音乐要产出结构化风格+歌词，不是文本扩写），
+   但**组件实现是同一份**（enhance-menu-shared.js）。
+
+   【写回能力契约（审查 P0-1）】
+   旧实现（enh-unify 分支）硬编码 `$("#musicStyle")` 作为音乐增强的
+   写回目标。yue2-flow 把那个 textarea 改名成 #musicPrompt（音乐描述），
+   并把「结构化风格」拆成 12 个独立字段 —— 合并后
+   `document.querySelector("#musicStyle")` 返回 null，
+   紧接着 `.value` 抛 TypeError（写回静默死掉）。
+   现在音乐侧**显式注册**结构化契约：写回目标由本模块声明，
+   任何调用方都通过 resolveWriteTarget() 拿目标，拿不到就给可读提示。
 
    【链路对应 nonebot 插件的咏唱文生音乐】
      POST /api/music-enhance
@@ -84,9 +94,9 @@
     const menu = $("#musicEnhanceMenu");
     if (!menu) return;
     const shared = window.EnhanceMenuShared;
-    if (!shared) {
+    if (!shared || typeof shared.renderEnhanceMenu !== "function") {
       // 共用组件没加载（脚本顺序问题）—— 明确报错，不静默失败
-      setHint("增强组件未就绪（enhance-menu.js 未加载），请刷新页面", "error");
+      setHint("增强组件未就绪（enhance-menu-shared.js 未加载），请刷新页面", "error");
       return;
     }
     shared.renderEnhanceMenu(menu, {
@@ -114,13 +124,36 @@
     updateButton();
   }
 
+  /**
+   * 主按钮文字 + 「当前增强方式」回显。
+   *
+   * 审查 P2-4：音乐面板之前**没有**回显元素（#musicEnhanceCurrent 不存在），
+   * 与其它面板形态不一致。现在补上，回显格式与图像面板完全一致
+   * （「当前增强：xxx」）。
+   */
   function updateButton() {
     const text = $("#musicEnhanceBtnText");
     const sel = selectedMethods();
     const method = sel[0] || MUSIC_ENHANCE_METHODS[0];
     if (text) text.textContent = sel.length > 1 ? `增强（${sel.length} 项）` : method.buttonText;
     const btn = $("#musicEnhanceBtn");
-    if (btn) btn.title = method.hint;
+    if (btn) {
+      btn.title = sel.length > 1
+        ? "按选中顺序依次执行：" + sel.map(m => m.label).join(" → ")
+        : method.hint;
+    }
+    updateCurrentIndicator();
+  }
+
+  /** 「当前所选增强方式」的可见回显（与图像面板同一套格式）。 */
+  function updateCurrentIndicator() {
+    const sel = selectedMethods();
+    const parts = sel.map(m => (m.specLabel ? `${m.label}（${m.specLabel}）` : m.label));
+    const text = parts.length ? "当前增强：" + parts.join(" + ") : "";
+    const el = $("#musicEnhanceCurrent");
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = !text;
   }
 
   function selectedMethods() {
@@ -230,6 +263,37 @@
     }
   }
 
+  // ------------------------------------------------------------------ 写回能力契约
+
+  /**
+   * 音乐侧的**写回能力契约**（结构化路线）。
+   *
+   * 契约由本模块声明，不依赖别的模块硬编码本项目的 DOM id：
+   *   kind = "structured" -> 产物是「结构化风格 + 歌词」，不是一个输入框
+   *   apply(obj)         -> 由本模块负责把结构化产物落到界面上
+   *
+   * 调用方（providers.js 的「替换/追加」按钮、enhance-menu.js 的二次增强）
+   * 通过 window.EnhanceMenuShared.resolveWriteTarget(contract) 拿目标，
+   * 拿不到时得到 { ok:false, reason } —— 不抛异常，给可读提示。
+   */
+  function getWriteContract() {
+    return {
+      kind: "structured",
+      // 说明：写回目标缺失时给用户看的提示
+      describe: () => "音乐面板的结构化风格区或歌词区不存在，无法写回",
+      apply: (obj) => {
+        const music = window.MusicUI;
+        if (!music) return false;
+        if (obj && obj.style) music.setStyleFields(obj.style);
+        if (obj && obj.lyrics) {
+          music.setLyrics(obj.lyrics.lyrics_override || obj.lyrics_text || obj.lyrics || "");
+        }
+        if (typeof music.markEnhanced === "function") music.markEnhanced();
+        return true;
+      },
+    };
+  }
+
   // ------------------------------------------------------------------ 工具
 
   function setHint(text, kind) {
@@ -289,13 +353,17 @@
     updateButton();
     renderMenu();
     if (typeof window !== "undefined") {
-      window.musicEnhance = {
+      window.MusicEnhance = {
         run: run,
         renderMenu: renderMenu,
         updateButton: updateButton,
         getSelected: () => selectedIds.slice(),
         list: MUSIC_ENHANCE_METHODS,
+        // 写回能力契约（供 providers.js / enhance-menu.js 解析目标）
+        getWriteContract: getWriteContract,
       };
+      // 兼容旧名（上一轮交付里用的是 window.musicEnhance）
+      window.musicEnhance = window.MusicEnhance;
     }
   }
 

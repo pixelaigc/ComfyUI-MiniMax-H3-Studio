@@ -227,9 +227,15 @@
   /**
    * 当前上下文的 DOM 目标 —— 音乐面板用另一套 id。
    *
-   * 音乐模式的输入是「风格描述」(#musicStyle)，不是提示词框 (#prompt)；
-   * 所以增强按钮 / 下拉 / 提示栏都要指向音乐面板里的那一套元素。
    * 同一时刻只有一个面板可见，因此这里按模式返回一套目标即可。
+   *
+   * 【写回目标不再硬编码】旧实现里 `input: music ? "#musicStyle" : "#prompt"`
+   * 是**硬编码 DOM id** —— 审查 P0-1 指出：yue2-flow 把那个 textarea 改名成
+   * #musicPrompt 后，合并进来的 enh-unify 会在音乐模式下
+   * `document.querySelector("#musicStyle")` 拿到 null 并抛 TypeError。
+   * 现在写回目标改由**能力契约**决定（见 web/enhance-menu-shared.js 的
+   * resolveWriteTarget + web/music-enhance.js 注册的结构化契约），
+   * 这里只保留「输入框」用于**读取**当前内容（取样式/取值/聚焦）。
    */
   function targets() {
     const music = isMusicContext();
@@ -241,9 +247,26 @@
       hint: music ? "#musicEnhanceHint" : "#enhanceHint",
       applied: music ? "#musicEnhanceAppliedParams" : "#enhanceAppliedParams",
       split: music ? "#musicEnhanceSplit" : "#enhanceSplit",
-      // 输入框：音乐 = 风格描述；其它 = 提示词框
-      input: music ? "#musicStyle" : "#prompt",
+      current: music ? "#musicEnhanceCurrent" : "#enhanceCurrent",
+      // 输入框（只用于**读取**当前内容）：音乐 = 音乐描述；其它 = 提示词框
+      input: music ? "#musicPrompt" : "#prompt",
     };
+  }
+
+  /**
+   * 当前上下文的增强**输入框**元素。取不到时返回 null（不抛异常）。
+   */
+  function inputElement() {
+    const t = targets();
+    return document.querySelector(t.input);
+  }
+
+  /**
+   * 当前上下文的增强输入内容（取不到输入框时返回空串）。
+   */
+  function inputValue() {
+    const el = inputElement();
+    return el ? String(el.value || "").trim() : "";
   }
 
   /** 当前是否在音乐模式（文生音乐 / 参考生音乐）。 */
@@ -428,60 +451,79 @@
 
   // ------------------------------------------------------------------ 菜单渲染
 
+  /**
+   * HTML 转义 —— 走**共用组件**（web/enhance-menu-shared.js），
+   * 避免同一个转义实现有两份（审查 P1-1 的同类问题：同一常量写两处必然走偏）。
+   */
   function esc(s) {
+    const shared = window.EnhanceMenuShared;
+    if (shared && typeof shared.esc === "function") return shared.esc(s);
     return String(s == null ? "" : s).replace(/[&<>"']/g,
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  /**
+   * 解析当前上下文的增强**写回目标**（按能力契约）。
+   *
+   * 审查 P0-1：旧实现硬编码 `$("#musicStyle")` —— 合并 yue2-flow 后
+   * 那个 id 不存在，`document.querySelector` 返回 null，
+   * 紧接着 `.value` 抛 TypeError（整条写回链路静默死掉）。
+   *
+   * 现在：目标由**能力契约**声明（音乐侧注册结构化契约，图像侧是提示词框），
+   * 解析失败时返回 { ok:false, reason } —— **不抛异常**，调用方给可读提示。
+   */
+  function resolveWriteTarget() {
+    const shared = window.EnhanceMenuShared;
+    if (!shared || typeof shared.resolveWriteTarget !== "function") {
+      return { ok: false, reason: "增强共用组件未就绪（enhance-menu-shared.js 未加载）" };
+    }
+    // 契约来源：音乐面板注册了结构化契约就用它，否则用提示词框。
+    const music = window.MusicEnhance
+      && typeof window.MusicEnhance.getWriteContract === "function"
+      ? window.MusicEnhance.getWriteContract() : null;
+    const contract = music || {
+      kind: "text",
+      target: "#prompt",
+      describe: () => "提示词框（#prompt）不存在，无法写回",
+    };
+    return shared.resolveWriteTarget(contract);
   }
 
   function renderMenu() {
     const t = targets();
     const menu = document.querySelector(t.menu);
     if (!menu) return;
-    menu.innerHTML = ENHANCE_METHODS.map(m => {
-      const ok = isAvailable(m);
-      const checked = selectedIds.indexOf(m.id) >= 0;
-      // 每项显示它用的模板（改造前模板藏在第二个下拉里，
-      // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
-      const specTag = renderSpecPicker(m);
-      // 不可用时说明**为什么**不可用（属于哪个功能）
-      const why = unavailableReason(m);
-      return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
-        <label class="enhance-menu-check" title="${esc(m.hint)}">
-          <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
-          <span class="enhance-menu-label">${esc(m.label)}</span>
-          ${specTag}
-          ${m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : ""}
-          ${ok ? "" : `<span class="enhance-menu-badge">${esc(why)}</span>`}
-        </label>
-        <span class="enhance-menu-hint">${esc(m.hint)}</span>
-        ${m.fields && m.fields.length ? renderFields(m) : ""}
-      </div>`;
-    }).join("");
-
-    menu.querySelectorAll("input[data-method-check]").forEach(box => {
-      box.addEventListener("change", () => {
-        toggleMethod(box.dataset.methodCheck, box.checked);
-      });
-    });
-    // 模板就地切换：改了立刻套用（普通增强用的模板 = 实际扩写用的模板）
-    menu.querySelectorAll("select[data-spec-method]").forEach(sel => {
-      sel.addEventListener("click", e => e.stopPropagation());
-      sel.addEventListener("change", () => {
-        setMethodSpec(sel.dataset.specMethod, sel.value);
-        renderMenu();
-        updateButton();
-        updatePanelVisibility();
-      });
-    });
-    menu.querySelectorAll(".enhance-menu-field").forEach(el => {
-      const onEdit = () => {
-        setFieldValue(el.dataset.method, el.dataset.field, el.value);
+    const shared = window.EnhanceMenuShared;
+    if (!shared || typeof shared.renderEnhanceMenu !== "function") {
+      // 共用组件没加载（脚本顺序问题）—— 明确报错，不静默失败
+      setHint("增强组件未就绪（enhance-menu-shared.js 未加载），请刷新页面", "error");
+      return;
+    }
+    // 渲染走**共用组件**（web/enhance-menu-shared.js）——
+    // 图像面板与音乐面板用的是同一套实现与视觉，不另造一套。
+    shared.renderEnhanceMenu(menu, {
+      methods: ENHANCE_METHODS,
+      selectedIds: selectedIds,
+      isAvailable: isAvailable,
+      onToggle: toggleMethod,
+      onFieldEdit: (methodId, fieldKey, value) => {
+        setFieldValue(methodId, fieldKey, value);
         saveSelection();
         applySelectedParams();      // 参数即时套用并回显
         updateButton();
-      };
-      el.addEventListener("input", onEdit);
-      el.addEventListener("change", onEdit);
+      },
+      onSpecChange: (methodId, specId) => {
+        setMethodSpec(methodId, specId);
+        renderMenu();
+        updateButton();
+        updatePanelVisibility();
+      },
+      // 不可用时说明**为什么**不可用（属于哪个功能）
+      unavailableText: unavailableReason,
+      // 每项显示它用的模板（改造前模板藏在第二个下拉里，
+      // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
+      specHtml: renderSpecPicker,
+      valueOf: (method, field) => effectiveFieldValue(method, field),
     });
   }
 
@@ -537,21 +579,6 @@
     };
     const owner = owners[method.id] || "其它功能专属";
     return owner + "，本面板不可用";
-  }
-
-  /** 某项的可编辑字段区（system prompt 文本框 + 档位参数）。 */
-  function renderFields(method) {
-    const blocks = method.fields.map(f => {
-      const shown = effectiveFieldValue(method, f);
-      const input = f.kind === "textarea"
-        ? `<textarea class="enhance-menu-field" rows="4" data-method="${esc(method.id)}" data-field="${esc(f.key)}" title="${esc(f.hint)}">${esc(shown)}</textarea>`
-        : `<input type="number" step="${f.key === "presencePenalty" ? "0.1" : "1"}" class="enhance-menu-field" data-method="${esc(method.id)}" data-field="${esc(f.key)}" value="${esc(shown)}" title="${esc(f.hint)}">`;
-      return `<div class="enhance-menu-field-row">
-        <span class="enhance-menu-field-label" title="${esc(f.hint)}">${esc(f.label)}</span>
-        ${input}
-      </div>`;
-    }).join("");
-    return `<div class="enhance-menu-fields">${blocks}</div>`;
   }
 
   // ------------------------------------------------------------------ 选中与路由
@@ -850,7 +877,7 @@
     const metas = [];
     let anyPe = false;
     // 链式输入：第一项吃提示词框里的原文，后一项吃前一项的产出
-    let input = document.querySelector(targets().input).value.trim();
+    let input = inputValue();
     for (const method of sel) {
       const piece = await runOne(method, { collect: true, input });
       if (!piece) continue;
@@ -923,10 +950,10 @@
     // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
     const prompt = (opts && opts.input !== undefined)
       ? String(opts.input || "").trim()
-      : document.querySelector(targets().input).value.trim();
+      : inputValue();
     if (!prompt) {
       setHint(isMusicContext() ? "请先输入要增强的风格描述" : "请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const _inp = inputElement(); if (_inp) _inp.focus();
       return null;
     }
     btn.disabled = true;
@@ -988,7 +1015,7 @@
       : refineSourcePrompt();
     if (!source) {
       setHint(isMusicContext() ? "请先输入要细化的风格描述" : "请先输入要细化的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const _inp = inputElement(); if (_inp) _inp.focus();
       return null;
     }
     const targetLevel = promptVersions.refineTarget === 1 ? 1 : 0;
@@ -1015,8 +1042,17 @@
       if (opts.collect) {
         return { expanded: refined, meta: buildEnhanceMeta(d) };
       }
-      // 写回输入框：音乐写回风格描述框，其它写回提示词框
-      document.querySelector(targets().input).value = refined;
+      // 写回输入框：走**能力契约**解析目标（不再硬编码 DOM id）
+      const _wb = resolveWriteTarget();
+      if (!_wb.ok) {
+        throw new Error(_wb.reason);
+      }
+      if (_wb.kind === "structured") {
+        // 结构化路线（音乐）：二次增强的产物是一段文本，不是结构化对象 ——
+        // 这种组合当前没有对应实现，明确提示而不是静默丢弃。
+        throw new Error("当前面板的增强产物是结构化对象，暂不支持二次增强写回");
+      }
+      _wb.apply(refined);
       pushPromptVersion(2, refined, `模板：${d.spec_id || refineSpecId()}`, d.spec_id);
       markPromptEnhanced();
       updatePromptBadge();
@@ -1046,10 +1082,10 @@
   async function runLayout(method, opts) {
     const btn = document.querySelector(targets().btn);
     const text = document.querySelector(targets().btnText);
-    const prompt = document.querySelector(targets().input).value.trim();
+    const prompt = inputValue();
     if (!prompt) {
       setHint("请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const _inp = inputElement(); if (_inp) _inp.focus();
       return null;
     }
     const intentEl = document.querySelector("#mossLayoutIntent");
@@ -1111,10 +1147,10 @@
     // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
     const prompt = (opts && opts.input !== undefined)
       ? String(opts.input || "").trim()
-      : document.querySelector(targets().input).value.trim();
+      : inputValue();
     if (!prompt) {
       setHint("请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const _inp = inputElement(); if (_inp) _inp.focus();
       return null;
     }
     const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";

@@ -363,8 +363,8 @@ def check_refine_structure(text: str):
     if not re.search(r"【\s*L1\s*", text):
         errors.append("二次增强结果缺少 L1 特写分级标题（逐物体枚举结构不完整）")
     if not (re.search(r"【\s*L[123]\s*", text)
-            or re.search(r"【\s*主体细化\s*】", text)):
-        errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或主体细化）")
+            or re.search(r"【\s*(主体细化|整体细化)\s*】", text)):
+        errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或主体细化/整体细化）")
     # 至少要有若干个物件条目，每个带冒号字段
     entries = re.findall(r"^[^\n:：]{1,40}[：:].{0,80}$", text, flags=re.M)
     if len(entries) < 3:
@@ -374,6 +374,44 @@ def check_refine_structure(text: str):
         if key not in text:
             warnings.append(f"未见「{key}」类细化字段")
             break
+    return errors, warnings
+
+
+def check_music_structure(text: str, refine: bool = False):
+    """
+    音乐档专用：style 串的基本结构 —— 错误 / 警告。
+
+    音乐 style 串是「逗号分隔的自然语言」，不是 JSON、不是分项清单。
+    这里只查**会毁掉下游可用性**的硬伤：
+      - 输出成了 JSON / 键值对 / markdown 列表（下游 YuE2 只吃自然语言串）
+      - refine 档没有逐要素展开（等于没细化）
+    """
+    errors = []
+    warnings = []
+    stripped = text.strip()
+    # JSON 复读：{...} 或 [...] 开头
+    if stripped[:1] in ("{", "["):
+        errors.append("音乐档输出看起来是 JSON/数组，不是自然语言 style 串")
+    # markdown 标题 / 列表符号开头
+    if re.match(r"^(#|\*\*|-\s|\d+\.\s)", stripped):
+        errors.append("音乐档输出带 markdown 标题或列表符号，不是纯 style 串")
+    # 键值对写法：language: / genre: 这类
+    if re.search(r"^[A-Za-z_\s]{3,20}\s*[:：]", stripped, flags=re.M):
+        errors.append("音乐档输出是「字段: 值」写法，不是逗号分隔的自然语言 style 串")
+    if refine:
+        # refine 档要能看到分级标题（逐要素展开的结构）
+        # 图像版标题是「L1 特写 / L2 中景 / L3 远景 / 主体细化」，
+        # 音乐版是「L1 主线 / L2 支撑 / L3 远景 / 整体细化」——
+        # 两套都认（共同点是 L1/L2/L3 分级标题）。
+        if not (re.search(r"【\s*L[123]\s*", text)
+                or re.search(r"【\s*(主体细化|整体细化)\s*】", text)):
+            errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或 主体细化/整体细化）")
+        entries = re.findall(r"^[^\n:：]{1,40}[：:].{0,80}$", text, flags=re.M)
+        if len(entries) < 3:
+            warnings.append("细化字段偏少，可能没有真正逐个要素展开")
+    # 速度：应该给出具体 BPM
+    if not re.search(r"\b\d{2,3}\s*BPM\b", text, flags=re.I):
+        warnings.append("未见具体 BPM 数值（建议写成「96 BPM」而不是「中速」）")
     return errors, warnings
 
 
@@ -390,6 +428,9 @@ def check_length(text: str, mode: str):
     elif mode == "refine":
         # 逐物体枚举天然更长，但也不该无限长
         lo, hi = 80, 600
+    elif mode in ("music", "music_refine"):
+        # 音乐 style 串：9~10 个要素，比纯 caption 短但比图像 caption 长
+        lo, hi = 15, 600
     else:
         lo, hi = 60, 350
     if est < lo:
@@ -550,6 +591,12 @@ def validate(text: str, original: str = "", mode: str = "pe"):
         errors.extend(bbox_errors)
         warnings.extend(bbox_warnings)
 
+    if mode in ("music", "music_refine"):
+        music_errors, music_warnings = check_music_structure(
+            text, refine=(mode == "music_refine"))
+        errors.extend(music_errors)
+        warnings.extend(music_warnings)
+
     hits = check_subjective(text)
     if hits:
         warnings.append("出现主观评价词（官方 PE 要求客观具象）："
@@ -577,7 +624,8 @@ def main():
     parser = argparse.ArgumentParser(description="提示词增强结果校验器")
     parser.add_argument("--text", required=True, help="要校验的扩写结果")
     parser.add_argument("--original", default="", help="用户原始输入（用于主体保留检查）")
-    parser.add_argument("--mode", default="pe", choices=["pe", "scalist", "bbox"],
+    parser.add_argument("--mode", default="pe",
+                        choices=["pe", "scalist", "bbox", "music", "music_refine"],
                         help="模板档位")
     args = parser.parse_args()
     result = validate(args.text, args.original, args.mode)
