@@ -73,6 +73,48 @@ class TestQwenPeEnhanceSource(unittest.TestCase):
         self.assertNotIn("\"t2i\"", body)
         self.assertNotIn("t2i_moss", body)
 
+    def test_no_stale_text_pointing_at_removed_pe_checkbox(self):
+        """界面文案不得再指引用户去「面板里关掉 PE 编码器」。
+
+        独立 PE 勾选框已删除，warn 文案若还这么说，用户会去找一个
+        不存在的控件 —— 属于死指引，必须一起改掉。
+
+        断言直接打**用户能看到的 warn 字符串**，而不是全文搜源码 ——
+        否则源码注释里提到这些词就会误报（这正是本测试第一版的毛病）。
+        """
+        from h3studio import workflows as W
+        qwen_models = [k for k in W.QWEN_IMAGE_MODELS if "qwen_image_2.1" in k]
+        self.assertTrue(qwen_models, "找不到 Qwen-Image 2.1 模型定义")
+        dead_phrases = ("可在面板里关掉", "可在面板关闭", "面板里关掉 PE", "面板里关掉")
+        # 只有「官方 PE 文本编码器自带扩写」那条 warn 需要改写；
+        # Turbo 那条讲的是 sigma schedule，不提 PE，不该强加「增强」字样。
+        pe_warn_keys = [k for k in qwen_models if "PE" in W.QWEN_IMAGE_MODELS[k].get("warn", "")]
+        self.assertTrue(pe_warn_keys, "应至少有一个模型提到官方 PE 扩写行为")
+        for key in qwen_models:
+            warn = W.QWEN_IMAGE_MODELS[key].get("warn", "")
+            self.assertTrue(warn.strip(), f"{key} 的 warn 不应为空")
+            for dead in dead_phrases:
+                self.assertNotIn(dead, warn,
+                                 f"{key} 的 warn 仍指向已删除的 PE 勾选框：{dead}")
+        for key in pe_warn_keys:
+            warn = W.QWEN_IMAGE_MODELS[key].get("warn", "")
+            # 正向：应当把用户引到「增强」下拉里的官方 PE 选项
+            self.assertIn("增强", warn, f"{key} 的 warn 应指引到「增强」下拉")
+            self.assertIn("qwen21图片官方增强PE", warn,
+                          f"{key} 的 warn 应写明官方 PE 下拉项名称")
+
+    def test_no_dead_qwen_pe_tier_helper(self):
+        """随独立勾选框一起删掉的档位读取函数不得留成死代码。"""
+        app_js = self.read("app.js")
+        # 去掉注释后再查 —— 注释里可以叙述「这个函数被删了」
+        code_only = re.sub(r"//[^\n]*", "", app_js)
+        code_only = re.sub(r"/\*.*?\*/", "", code_only, flags=re.S)
+        self.assertNotIn("qwenPeTierInfo", code_only,
+                         "qwenPeTierInfo() 已无调用点，应随档位徽标一并删除")
+        for token in ("imgUsePe", "imgPeField", "imgPeTier", "imgPeNote"):
+            self.assertNotIn(token, code_only,
+                             f"app.js 可执行代码里仍残留独立 PE 入口标识 {token}")
+
     def test_qwen_pe_routes_to_its_own_endpoint(self):
         """选中官方 PE 后必须打 /api/qwen-pe/expand（不是 /api/enhance）。"""
         src = self.read("enhance-menu.js")
