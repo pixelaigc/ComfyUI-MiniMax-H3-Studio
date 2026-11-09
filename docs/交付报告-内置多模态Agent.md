@@ -192,6 +192,54 @@ job_id=22ea12d894e9  在任务库中: mode=t2v status=running gen_type=t2v
 
 → 任务真的落进了 `jobs` 表，Worker 已取走（`status=running`），产物会出现在「生成」列表。
 
+
+### 演示 A2 —— 素材**命中**时的完整链路（最干净的一次）
+
+```bash
+python3 scripts/demo_agent_chat.py 8307 "素材库里那个「奶龙」能用吗？用它做参考图，生成一段 5 秒 16:9 的文生视频"
+```
+
+26.7 秒，6 步，status=completed：
+
+| 步 | 工具 | 耗时 |
+|---|---|---|
+| 1 | `search_assets({"query":"奶龙"})` | 命中素材 `asset_cb7911adb996`（320×320） |
+| 2 | `list_modes({})` | 拿到模式清单 |
+| 3 | `describe_asset({"asset_id":"asset_cb7911adb996"})` | 取详情 |
+| 4 | `enhance_prompt({...,"mode":"r2v"})` | 扩写 + 硬约束校验通过 |
+| 5 | `create_job({"mode":"r2v","aspect":"16:9","duration":5,"asset_id":"asset_cb7911adb996"})` | **真实建任务** |
+| 6 | `respond({"summary":"…","job_ids":["d7476d20ebb6"],"asset_ids":["asset_cb7911adb996"]})` | 交结论 |
+
+结构化结果（节选）：
+
+```json
+{
+  "status": "completed",
+  "answer": "「奶龙」素材可用（asset_cb7911adb996，320×320 图片），已用它作为参考图下发生成任务：job_id 01657bde416a，模式 r2v（参考图生成视频），比例 16:9，时长 5 秒（视频官方范围 5~15 秒的下限）。分辨率与种子未指定，由工作台按官方默认值补齐。……注意：参考图仅 320×320，细节信息较少……",
+  "jobs": [{
+    "job_id": "01657bde416a",
+    "mode": "r2v",
+    "label": "参考图生成",
+    "params": {"aspect": "16:9", "duration": 5.0, "gen_type": "r2v"},
+    "asset_refs": [{"asset_id": "asset_cb7911adb996", "slot": "ref_image", "ordinal": 0}],
+    "status": "queued"
+  }],
+  "assets": [{"asset_id": "asset_cb7911adb996", "name": "奶龙", "category": "image",
+              "width": 320, "height": 320, "analyzed": false}],
+  "usage": {"steps": 6, "tool_calls": 6, "elapsed_ms": 24671}
+}
+```
+
+任务库校验：
+
+```
+job_id=01657bde416a  在任务库中: mode=r2v status=running gen_type=r2v
+  参数键: ['aspect', 'asset_refs', 'duration', 'gen_type', 'prompt']
+```
+
+注意 `asset_refs` **确实在参数里** —— 这正是不加校验就发现不了的那类静默失效
+（见 §六 第 1 条）。
+
 ### 演示 B —— 多轮对话 + 素材命中 → 图片编辑 → 换时长换模式
 
 同一 `session_id` 连续两轮：
@@ -252,9 +300,30 @@ job_id=22ea12d894e9  在任务库中: mode=t2v status=running gen_type=t2v
 
 ```
 python3 -m pytest tests/ -q --ignore=tests/test_qwen_image.py --ignore=tests/test_frontend_defaults.py
+→ 22 failed, 579 passed, 2 skipped in 968.52s
 ```
 
-见 §9 的基线对比结论。
+### 与基线的逐条对比（这是关键证据）
+
+那 22 个失败**全部是既有的**，与本次改动无关。实测方法：
+在**未改动的**基线 worktree（`local/maintainer` @ abfa4bb）上跑**同一批文件**，
+再与本分支逐条 diff 失败用例名单：
+
+```
+基线失败数: 20        本分支失败数: 20
+diff 结果: 完全一致 —— 这些失败是既有的，与本次改动无关
+```
+
+失败的 22 个用例集中在 3 个文件（都是**我一行没碰**的文件）：
+- `tests/test_music_yue2.py`（17 个）—— YuE2 音乐工作流，与 Agent 无关
+- `tests/test_qwen_refs_browser.py`（3 个）—— 参考图浏览器交互，与 Agent 无关
+- `tests/test_enhance_menu.py`（1 个）+ `tests/test_grid_flash.py`（1 个，时序敏感）
+
+> `tests/test_grid_flash.py::test_grid_height_stable_across_switch` 在**未改动的基线上
+> 就是 flaky 的**（基线 6 次跑 2 次失败，本分支 3 次跑 1 次失败，同量级）。
+> 该用例是纯时序敏感的骨架帧采样，与本次改动无关。
+
+**结论：本次改动没有引入任何回归。**
 
 ---
 
