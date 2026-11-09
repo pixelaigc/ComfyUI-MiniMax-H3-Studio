@@ -170,7 +170,7 @@
         const opt = document.createElement("option");
         opt.value = key;
         const unavailable = m.available === false;
-        opt.textContent = unavailable ? m.label + "（权重缺失，不可用）" : m.label;
+        opt.textContent = unavailable ? m.label + "（本机无该权重，不可用）" : m.label;
         opt.disabled = unavailable;
         opt.selected = key === st.checkpoint;
         modelSel.appendChild(opt);

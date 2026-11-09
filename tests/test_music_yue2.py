@@ -565,5 +565,77 @@ class TestMusicModelLabelFallback(unittest.TestCase):
         self.assertIn("return MUSIC_MODEL_FALLBACK[key] || String(key);", js)
 
 
+class TestMusicCheckpointNoteNotLying(unittest.TestCase):
+    """模型 note 里的「可用 / 不可用」描述必须跟**运行时实测**走。
+
+    历史 bug：bf16 那条的 note 写死了「本机未下载该权重文件，故不可用」。
+    权重后来真的装到 models/checkpoints/ 了，那句话就成了假话 ——
+    面板会一边启用该选项、一边说它没装。所以 note 的可用性描述
+    必须由 model_options() 按 available 动态拼接。
+
+    参考：交付报告《YuE2-bf16接入报告.md》2026-11-09。
+    """
+
+    def test_note_reflects_actual_availability(self):
+        """available=True 时 note 必须说「已就绪」，不能还挂着「未下载」。"""
+        opts = music_yue2.model_options()
+        for key, m in opts["checkpoints"].items():
+            note = m["note"]
+            if m["available"]:
+                self.assertIn("已就绪", note,
+                              f"{key} 已就绪但 note 没说已就绪：{note}")
+                self.assertNotIn("未安装该权重文件", note,
+                                 f"{key} 已就绪但 note 还说没装：{note}")
+                self.assertNotIn("未下载", note,
+                                 f"{key} 已就绪但 note 还说未下载：{note}")
+            else:
+                self.assertIn("未安装该权重文件", note,
+                              f"{key} 不可用但 note 没说明原因：{note}")
+
+    def test_no_hardcoded_missing_claim_in_source(self):
+        """源码里不能再有写死的「未下载…故不可用」文案。
+
+        只查**代码**（剔除注释行）—— 注释里解释历史 bug 时提到这句话是合理的，
+        要禁的是会被当成 note 展示给用户的字面量。
+        """
+        src = (REPO / "h3studio" / "music_yue2.py").read_text(encoding="utf-8")
+        code_lines = []
+        in_doc = False
+        for line in src.splitlines():
+            stripped = line.strip()
+            if in_doc:
+                if stripped.endswith('"""') or stripped.endswith("'''"):
+                    in_doc = False
+                continue
+            if stripped.startswith('"""') or stripped.startswith("'''"):
+                # 单行 docstring
+                if not (stripped.endswith('"""') and len(stripped) > 3):
+                    in_doc = True
+                    continue
+                continue
+            if stripped.startswith("#"):
+                continue
+            code_lines.append(line.split("#", 1)[0])
+        code = "\n".join(code_lines)
+        self.assertNotIn("本机未下载该权重文件", code)
+        self.assertNotIn("是本机唯一可用的版本", code)
+
+    def test_both_precisions_present(self):
+        """两种精度都要在清单里，且各有独立 ckpt 文件名。"""
+        opts = music_yue2.model_options()
+        self.assertIn("yue2_3b_int8_convrot", opts["checkpoints"])
+        self.assertIn("yue2_3b_bf16", opts["checkpoints"])
+        a = opts["checkpoints"]["yue2_3b_int8_convrot"]["ckpt"]
+        b = opts["checkpoints"]["yue2_3b_bf16"]["ckpt"]
+        self.assertNotEqual(a, b)
+
+    def test_int8_stays_available_as_fallback(self):
+        """int8 链路不能被 bf16 接入破坏（回退保障）。"""
+        self.assertTrue(music_yue2.checkpoint_available("yue2_3b_int8_convrot"),
+                        "int8 权重必须始终在盘上 —— 它是 bf16 出问题时的回退")
+        self.assertEqual(music_yue2.YUE2_DEFAULT_CHECKPOINT, "yue2_3b_int8_convrot",
+                         "默认档必须仍是 int8（显存占用低、更稳）")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
