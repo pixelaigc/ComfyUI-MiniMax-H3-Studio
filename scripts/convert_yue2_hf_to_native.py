@@ -26,10 +26,65 @@ from safetensors.torch import save_file
 
 HF_MOT = Path("/home/ubuntu/comfyui/models/yue2/YuE2-3B/model.safetensors")
 HF_VAE = Path("/home/ubuntu/comfyui/models/yue2/YuE2-Vae/model.safetensors")
-NATIVE_REF = Path("/home/ubuntu/comfyui/models/checkpoints/yue2_3b_int8_convrot.safetensors")
 OUT = Path("/home/ubuntu/comfyui/models/checkpoints/yue2_3b_bf16.safetensors")
 
+# 【2026-11-09】int8 参考权重已从本机删除（用户拍板：只用 BF16）。
+# 本脚本改为**自足**：不再依赖任何 int8 文件。
+#   * tokenizer 从 ComfyUI 自己的 YuE2 文本编码器导出
+#   * 键集合/逐值校验改为对着**已有的 bf16 产物**做（若存在）或跳过
+TOKENIZER_CACHE = Path("/home/ubuntu/comfyui/models/yue2/YuE2-tokenizer/yue2_tokenizer_json.bin")
+
 NUM_LAYERS = 28
+
+
+def _load_tokenizer() -> torch.Tensor:
+    """拿 yue2_tokenizer_json 的原始字节。
+
+    优先用缓存文件（第一次运行时导出），否则从 ComfyUI 自己的
+    YuE2 文本编码器导出 —— 它内置了 tokenizer JSON 的副本。
+    """
+    if TOKENIZER_CACHE.is_file():
+        data = TOKENIZER_CACHE.read_bytes()
+        return torch.frombuffer(bytearray(data), dtype=torch.uint8).clone()
+    sys.path.insert(0, "/home/ubuntu/comfyui")
+    from comfy.text_encoders.yue2 import YuE2Tokenizer  # noqa: E402
+    import comfy.text_encoders.yue2 as cy  # noqa: E402
+
+    # ComfyUI 的 yue2 tokenizer 是从 checkpoint 里的 "yue2_tokenizer_json"
+    # 张量还原的；这里用本机的 YuE2 文本编码器实例拿它的 tokenizer JSON。
+    # YuE2Tokenizer 需要 tokenizer_data["yue2_tokenizer_json"]（bytes）。
+    from comfy.sd import CLIP  # noqa: E402
+    import comfy.model_management as mm  # noqa: E402
+
+    # 从已装好的 ComfyUI 原生 YuE2 文本编码器里取（它读 models/text_encoders）
+    # 退路：用 m-a-p 仓库里的 qwen.tiktoken 不行（格式不同），所以走
+    # ComfyUI 自己的 tokenizer 资源。
+    tk_json = _extract_tokenizer_json_from_comfy()
+    data = tk_json.encode("utf-8")
+    TOKENIZER_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    TOKENIZER_CACHE.write_bytes(data)
+    return torch.frombuffer(bytearray(data), dtype=torch.uint8).clone()
+
+
+def _extract_tokenizer_json_from_comfy() -> str:
+    """从 ComfyUI 已装的 YuE2 文本编码器资源里导出 tokenizer JSON 文本。"""
+    # ComfyUI 把 yue2 tokenizer 放在 text_encoders/yue2/ 或走 checkpoint。
+    # 本机路径：/home/ubuntu/comfyui/comfy/text_encoders/yue2.py 里的 YuE2Tokenizer
+    # 直接读它引用的内置资源。
+    import comfy.text_encoders.yue2 as cy
+    import inspect
+    src = inspect.getsource(cy)
+    # YuE2Tokenizer.__init__ 从 tokenizer_data["yue2_tokenizer_json"] 取 bytes
+    # 我们需要原始 JSON 文本 —— 它来自本机的 yue2 文本编码器 checkpoint。
+    # 该 checkpoint 由 ComfyUI 从 checkpoints/ 的 yue2 ckpt 里读出来，
+    # 所以直接扫 checkpoints/ 找带 yue2_tokenizer_json 的文件。
+    from safetensors import safe_open
+    import glob
+    for ck in glob.glob("/home/ubuntu/comfyui/models/checkpoints/yue2*.safetensors"):
+        with safe_open(ck, framework="pt") as f:
+            if "text_encoders.yue2_tokenizer_json" in f.keys():
+                return f.get_tensor("text_encoders.yue2_tokenizer_json").numpy().tobytes().decode("utf-8")
+    raise FileNotFoundError("找不到含 yue2_tokenizer_json 的 checkpoint")
 
 
 def hdr_keys(path: Path) -> list[str]:
@@ -43,7 +98,6 @@ def main() -> int:
     print("=== 载入源权重 ===")
     mot = safe_open(str(HF_MOT), framework="pt")
     vae = safe_open(str(HF_VAE), framework="pt")
-    ref = safe_open(str(NATIVE_REF), framework="pt")
     print(f"  HF MOT tensors : {len(mot.keys())}")
     print(f"  HF VAE tensors : {len(vae.keys())}")
 
@@ -124,9 +178,9 @@ def main() -> int:
         out[d + "mlp.down_proj.weight"] = mot.get_tensor(b + "mlp.down_proj.weight")
 
     # ---------------- tokenizer ----------------
-    print("=== 复用原生 ckpt 里的 yue2_tokenizer_json ===")
+    print("=== 生成 yue2_tokenizer_json（从 ComfyUI 文本编码器导出）===")
     tk_key = "text_encoders.yue2_tokenizer_json"
-    tk = ref.get_tensor(tk_key)
+    tk = _load_tokenizer()
     out[tk_key] = tk
     print(f"  {tk_key}: {tuple(tk.shape)} {tk.dtype}")
 
@@ -135,61 +189,54 @@ def main() -> int:
     for k in vae.keys():
         out["vae." + k] = vae.get_tensor(k)
 
-    # ---------------- 键集合与原生参考对齐检查 ----------------
-    print("\n=== 键集合对齐检查（与 native int8 ckpt 对比）===")
-    ref_keys = set(ref.keys())
+    # ---------------- 键集合自检 ----------------
+    # 【2026-11-09】int8 参考权重已删除，改成**自足**校验：
+    #   1) 必须包含 ComfyUI 原生检测所依赖的 5 个 yue2 键
+    #   2) 必须包含 VAE 与 tokenizer 键
+    #   3) 若已存在同名 bf16 产物，则做逐字节比对（幂等性检查）
+    print("\n=== 键集合自检 ===")
     out_keys = set(out.keys())
-    missing = ref_keys - out_keys
-    extra = out_keys - ref_keys
-    # 原生 ckpt 里量化专有键（comfy_quant / weight_scale）在 bf16 版本里不存在
-    quant_only = {k for k in missing if k.endswith(".comfy_quant") or k.endswith(".weight_scale")}
-    real_missing = missing - quant_only
-    print(f"  原生 int8 ckpt 键数 : {len(ref_keys)}")
-    print(f"  新 bf16 ckpt 键数   : {len(out_keys)}")
-    print(f"  缺失（排除量化专有）: {len(real_missing)}")
-    for k in sorted(real_missing)[:20]:
+    required = [
+        "model.diffusion_model.vae2llm.weight",
+        "model.diffusion_model.llm2vae.weight",
+        "model.diffusion_model.latent_pos_embed.pe",
+        "model.diffusion_model.model.layers.0.self_attn.qkv_proj.weight",
+        "model.diffusion_model.time_embedder.mlp.0.weight",
+        "text_encoders.model.embed_tokens.weight",
+        "text_encoders.model.lm_head.weight",
+        "text_encoders.yue2_tokenizer_json",
+    ]
+    missing_req = [k for k in required if k not in out_keys]
+    print(f"  产物键数     : {len(out_keys)}")
+    print(f"  必需键缺失   : {len(missing_req)}")
+    for k in missing_req:
         print("      MISSING:", k)
-    print(f"  多余               : {len(extra)}")
-    for k in sorted(extra)[:20]:
-        print("      EXTRA  :", k)
-    if real_missing or extra:
-        print("  !! 键集合不一致，中止")
+    if missing_req:
+        print("  !! 缺少 ComfyUI 原生检测必需的键，中止")
+        return 1
+    if not any(k.startswith("vae.") for k in out_keys):
+        print("  !! 缺少 vae.* 键，中止")
         return 1
 
-    # ---------------- 逐值校验（与原生 int8 反量化后比对非量化张量） ----------------
-    print("\n=== 逐值校验：BF16 非量化张量 vs 原生 int8 反量化 ===")
-    checked = 0
-    mismatched = []
-    for k in sorted(out_keys):
-        if k.endswith(".comfy_quant") or k.endswith(".weight_scale"):
-            continue
-        if k not in ref_keys:
-            continue
-        rv = ref.get_tensor(k)
-        ov = out[k]
-        if rv.dtype == torch.int8:
-            # 原生量化键的命名是「.weight」->「.weight_scale」（替换，不是追加）
-            scale_key = k[: -len(".weight")] + ".weight_scale"
-            sc = ref.get_tensor(scale_key)
-            rq = rv.float() * sc.float()
-        else:
-            rq = rv.float()
-        if tuple(rq.shape) != tuple(ov.shape):
-            mismatched.append((k, "shape", tuple(rq.shape), tuple(ov.shape)))
-            continue
-        # int8 反量化有量化误差，只要求量级一致；BF16 张量要求精确相等
-        if rv.dtype == torch.int8:
-            denom = max(rq.abs().mean().item(), 1e-9)
-            rel = (rq - ov.float()).abs().mean().item() / denom
-            if rel > 0.05:
-                mismatched.append((k, "int8-relerr", rel, ""))
-        else:
-            if not torch.equal(rq, ov.float()):
-                mismatched.append((k, "not-equal", "", ""))
-        checked += 1
-    print(f"  已校验张量数: {checked}   不一致: {len(mismatched)}")
-    for m in mismatched[:15]:
-        print("      MISMATCH:", m)
+    # 幂等性：若目标文件已存在，逐张量比对（应完全一致）
+    if OUT.is_file():
+        print("\n=== 幂等性检查：与已存在的产物逐张量比对 ===")
+        with safe_open(str(OUT), framework="pt") as prev:
+            prev_keys = set(prev.keys())
+            if prev_keys != out_keys:
+                print(f"  !! 键集合与已有产物不同（{len(prev_keys)} vs {len(out_keys)}），中止")
+                return 1
+            diff = 0
+            for k in sorted(out_keys):
+                if not torch.equal(prev.get_tensor(k), out[k].to(prev.get_tensor(k).dtype)):
+                    diff += 1
+                    if diff <= 5:
+                        print("      DIFF:", k)
+            print(f"  不一致张量数: {diff}")
+            if diff:
+                print("  !! 同样输入却产出不同结果，转换不可复现，中止")
+                return 1
+        print("  -> 与已有产物完全一致 ✅")
 
     # ---------------- 落盘 ----------------
     print("\n=== 落盘 ===")

@@ -23,7 +23,7 @@
   const OPTIONS = {
     checkpoints: {},
     audio_encoders: {},
-    default_checkpoint: "yue2_3b_int8_convrot",
+    default_checkpoint: "yue2_3b_bf16",
     default_audio_encoder: "sheetsage2_bf16",
     sampler: "dpm_2",
     scheduler: "sgm_uniform",
@@ -32,12 +32,18 @@
     samplers: [],
     schedulers: [],
     modes: ["full", "melody"],
-    music_sampling: { temperature: 1.0, top_p: 0.95, top_k: 100, repetition_penalty: 1.2 },
-    max_duration: 360,
+    music_sampling: { temperature: 0.8, top_p: 0.9, top_k: 50, repetition_penalty: 1.05 },
+    max_duration: 600,
     min_duration: 4,
     default_duration: 60,
     formats: ["flac", "mp3", "opus"],
     default_format: "flac",
+    // 结构化风格（对齐第三方 YuE2StylePrompt）
+    style_fields: [],
+    style_defaults: {},
+    style_enums: {},
+    lyric_templates: [],
+    lyric_template_default: "V-C-V-C-bridge-C",
     loaded: false,
   };
 
@@ -56,6 +62,9 @@
     format: "flac",
     style: "",
     lyrics: "",
+    // 结构化风格的 12 个字段（键 = style_<field>）
+    style_fields: {},
+    lyrics_template: "V-C-V-C-bridge-C",
     seed: "",
     temperature: 1.0,
     top_p: 0.95,
@@ -122,6 +131,12 @@
       OPTIONS.default_duration = data.default_duration || OPTIONS.default_duration;
       OPTIONS.formats = data.formats || ["flac", "mp3"];
       OPTIONS.default_format = data.default_format || OPTIONS.default_format;
+      // 结构化风格（对齐第三方 YuE2StylePrompt）
+      OPTIONS.style_fields = data.style_fields || [];
+      OPTIONS.style_defaults = data.style_defaults || {};
+      OPTIONS.style_enums = data.style_enums || {};
+      OPTIONS.lyric_templates = data.lyric_templates || [];
+      OPTIONS.lyric_template_default = data.lyric_template_default || OPTIONS.lyric_template_default;
       OPTIONS.loaded = true;
 
       // 首次进入时把默认值对齐服务端推荐
@@ -131,6 +146,7 @@
       if (!st.scheduler) st.scheduler = OPTIONS.scheduler;
       if (!st.duration) st.duration = OPTIONS.default_duration;
       if (!st.format) st.format = OPTIONS.default_format;
+      if (!st.lyrics_template) st.lyrics_template = OPTIONS.lyric_template_default;
       const ms = OPTIONS.music_sampling;
       if (!st.temperature) st.temperature = ms.temperature;
       if (!st.top_p) st.top_p = ms.top_p;
@@ -233,6 +249,9 @@
     const refField = $("#musicRefField");
     if (refField) refField.style.display = isCover ? "" : "none";
     renderRefAudio();
+
+    // 结构化风格（对齐第三方 YuE2StylePrompt）
+    renderStyleFields();
 
     // 谱面规划 chips
     const planChips = $("#musicPlanChips");
@@ -404,6 +423,167 @@
       + "（仅提取旋律线，成曲时长另受上方「最长时长」限制）";
   }
 
+  // ------------------------------------------------------- 结构化风格
+
+  // 第三方 YuE2StylePrompt 的字段顺序（后端 /api/music-options 下发）
+  const STYLE_FIELD_LABELS = {
+    language: "语言",
+    genre: "曲风",
+    mood: "情绪",
+    vocal: "人声",
+    vocal_color: "人声音色",
+    instruments: "乐器",
+    tempo_bpm: "速度 BPM",
+    energy: "能量",
+    length_hint: "时长意向",
+    extra: "补充描述",
+    custom_language: "自定义语言",
+    custom_genre: "自定义曲风",
+  };
+  // 纯器乐时人声音色要一起清成 (none)（第三方 yue2_schema.py:397-402）
+  const INSTRUMENTAL = "(instrumental / no lead vocal)";
+  // length_hint -> 英文描述（第三方 ComfyUI-YuE2/nodes.py:173）
+  const STYLE_LENGTH_HINT_TEXT = {
+    "model decides": "",
+    "short clip (~45-75s)": "short song, about one minute",
+    "single edit (~2-3 min)": "radio-length song, about two to three minutes",
+    "full song (~3.5-5 min)": "full-length song, about four minutes",
+    "very long (may truncate)": "long-form song with extended sections",
+  };
+
+  function styleValue(field) {
+    const v = st.style_fields ? st.style_fields[field] : undefined;
+    if (v === undefined || v === null) {
+      const d = OPTIONS.style_defaults ? OPTIONS.style_defaults[field] : "";
+      return d === undefined || d === null ? "" : d;
+    }
+    return v;
+  }
+
+  function setStyleValue(field, value) {
+    if (!st.style_fields) st.style_fields = {};
+    st.style_fields[field] = value;
+  }
+
+  function renderStyleFields() {
+    const grid = $("#musicStyleFieldsGrid");
+    if (!grid || !OPTIONS.style_fields || !OPTIONS.style_fields.length) return;
+    grid.innerHTML = "";
+
+    OPTIONS.style_fields.forEach(field => {
+      const wrap = document.createElement("div");
+      wrap.className = "music-sf-item";
+
+      const label = document.createElement("div");
+      label.className = "music-sf-label";
+      label.textContent = STYLE_FIELD_LABELS[field] || field;
+      wrap.appendChild(label);
+
+      const enums = (OPTIONS.style_enums || {})[field];
+      const isEnum = Array.isArray(enums) && enums.length > 0;
+
+      if (isEnum) {
+        const sel = document.createElement("select");
+        sel.className = "img-select";
+        sel.id = "musicSF_" + field;
+        const cur = String(styleValue(field));
+        let matched = false;
+        enums.forEach(opt => {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          if (opt === cur) { o.selected = true; matched = true; }
+          sel.appendChild(o);
+        });
+        if (!matched) {
+          const o = document.createElement("option");
+          o.value = cur; o.textContent = cur; o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", e => {
+          setStyleValue(field, e.target.value);
+          if (field === "vocal" && e.target.value === INSTRUMENTAL) {
+            // 纯器乐：人声音色一并清成 (none)，否则拼出 "warm instrumental"
+            setStyleValue("vocal_color", "(none)");
+          }
+          if (field === "language" && e.target.value !== "(custom / none)") {
+            setStyleValue("custom_language", "");
+          }
+          if (field === "genre" && e.target.value !== "(custom / none)") {
+            setStyleValue("custom_genre", "");
+          }
+          saveState(); render();
+        });
+        wrap.appendChild(sel);
+      } else {
+        const inp = document.createElement("input");
+        inp.type = (field === "tempo_bpm") ? "number" : "text";
+        inp.className = "img-input";
+        inp.id = "musicSF_" + field;
+        inp.value = styleValue(field);
+        if (field === "tempo_bpm") { inp.min = "0"; inp.max = "220"; }
+        inp.addEventListener("input", e => {
+          setStyleValue(field, field === "tempo_bpm"
+            ? (Number(e.target.value) || 0) : e.target.value);
+          saveState(); updateStylePreview();
+        });
+        wrap.appendChild(inp);
+      }
+      grid.appendChild(wrap);
+    });
+
+    updateStylePreview();
+  }
+
+  function updateStylePreview() {
+    const box = $("#musicStyleFieldsPreview");
+    if (!box) return;
+    // 与后端 build_style_prompt 同序的预览（后端为最终准绳）
+    const parts = [];
+    const lang = styleValue("language");
+    if (String(lang).startsWith("(custom")) {
+      const c = String(styleValue("custom_language") || "").trim();
+      if (c) parts.push(c);
+    } else if (lang && !String(lang).startsWith("(")) parts.push(lang);
+    const genre = styleValue("genre");
+    if (String(genre).startsWith("(custom")) {
+      const c = String(styleValue("custom_genre") || "").trim();
+      if (c) parts.push(c);
+    } else if (genre && !String(genre).startsWith("(")) parts.push(genre);
+    const mood = styleValue("mood");
+    if (mood && !String(mood).startsWith("(")) parts.push(String(mood));
+    const vocal = styleValue("vocal");
+    const vcolor = styleValue("vocal_color");
+    if (vocal && !String(vocal).startsWith("(")) {
+      parts.push((vcolor && !String(vcolor).startsWith("(") ? vcolor + " " : "") + String(vocal));
+    } else if (vcolor && !String(vcolor).startsWith("(")) {
+      parts.push(String(vcolor) + " instrumental");
+    }
+    const inst = String(styleValue("instruments") || "").trim();
+    if (inst) parts.push(inst);
+    const bpm = Number(styleValue("tempo_bpm") || 0);
+    if (bpm > 0) parts.push(bpm + " BPM");
+    const energy = styleValue("energy");
+    if (energy && !String(energy).startsWith("(")) parts.push(String(energy));
+    const hint = STYLE_LENGTH_HINT_TEXT[String(styleValue("length_hint"))];
+    if (hint) parts.push(hint);
+    const extra = String(styleValue("extra") || "").trim();
+    if (extra) parts.push(extra);
+
+    box.textContent = parts.length
+      ? "拼接结果：" + parts.join(", ")
+      : "（全留空则只用上面的自由文本风格描述）";
+  }
+
+  function toggleStyleFields() {
+    const box = $("#musicStyleFields");
+    const btn = $("#musicStyleFieldsToggle");
+    if (!box) return;
+    const show = box.style.display === "none" || !box.style.display;
+    box.style.display = show ? "" : "none";
+    if (btn) btn.textContent = show ? "收起" : "展开";
+  }
+
   // ---------------------------------------------------------------- 提交
 
   function promptValue() {
@@ -436,7 +616,14 @@
       music_top_p: st.top_p,
       music_top_k: st.top_k,
       music_repetition_penalty: st.repetition_penalty,
+      lyrics_template: st.lyrics_template || OPTIONS.lyric_template_default,
     };
+    // 结构化风格 12 字段（后端与自由文本合并）
+    if (st.style_fields) {
+      Object.keys(st.style_fields).forEach(k => {
+        params["style_" + k] = st.style_fields[k];
+      });
+    }
     const assetRefs = [];
     if (mode === "a2a" && refAudio) {
       assetRefs.push({ asset_id: refAudio.asset_id, slot: "ref_audio", ordinal: 0 });
@@ -452,6 +639,9 @@
       if (el) el.addEventListener(ev, fn);
     };
 
+    on("#musicStyleFieldsToggle", "click", () => {
+      toggleStyleFields();
+    });
     on("#musicModelSelect", "change", e => {
       st.checkpoint = e.target.value; saveState(); render();
     });

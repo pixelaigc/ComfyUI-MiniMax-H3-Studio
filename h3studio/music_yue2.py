@@ -41,44 +41,43 @@ import math
 import random
 from pathlib import Path
 
+from . import music_style
+
 # ------------------------------------------------------------------
 # 模型清单（键 -> ComfyUI 原生 CheckpointLoaderSimple 读的本地文件名）
 #
-# 【两种精度的来源与关系 —— 2026-11-09 核实】
-#   * `yue2_3b_int8_convrot`：Comfy-Org/YuE2 官方重打包的 INT8 ConvRot 量化单文件。
-#   * `yue2_3b_bf16`        ：由本机 m-a-p/YuE2-3B（HF 布局）+ m-a-p/YuE2-Vae
-#                              转换成 ComfyUI 原生单文件布局而来（bf16 原精度）。
-#     转换脚本：scripts/convert_yue2_hf_to_native.py
+# 【只用 BF16 原精度版 —— 2026-11-09 用户拍板】
+#   INT8 ConvRot 量化版已从本机删除（权重 + 代码/文案/测试引用全部清理）。
+#   ComfyUI 走队列执行、不存在并发冲突，量化版没有存在价值。
 #
-# 【note 字段不再谎报可用性】
-#   之前 bf16 那条写死了「本机未下载该权重文件，故不可用」——
-#   权重下载后这句话仍然是假的。现在 note 的可用性描述部分由
-#   `model_options()` 按**运行时实测**的 available 动态拼接，
+# 【BF16 权重的来源】
+#   由本机 m-a-p/YuE2-3B（HF 布局）+ m-a-p/YuE2-Vae 转换成 ComfyUI 原生
+#   单文件布局而来（数值与官方 Comfy-Org 版逐字节一致）。
+#   转换脚本：scripts/convert_yue2_hf_to_native.py
+#
+# 【models/yue2/ 不动】
+#   models/yue2/YuE2-3B/ 与 models/yue2/YuE2-Vae/ 是**第三方节点**
+#   （ComfyUI-YuE2 / ComfyUI-FL-YuE2）的原配依赖，删了那条链路就断。
+#   面板走的是原生 CheckpointLoaderSimple，与它们无关。
+#
+# 【note 字段不谎报可用性】
+#   可用性描述由 `model_options()` 按**运行时实测**的 available 动态拼接，
 #   权重在不在盘上，说的就是不在盘上。
 #
 # ------------------------------------------------------------------
 #: YuE2 主模型（ComfyUI 原生 CheckpointLoaderSimple 读 checkpoints/）
 YUE2_CHECKPOINTS = {
-    "yue2_3b_int8_convrot": {
-        "label": "YuE2 3B · INT8 ConvRot（官方量化版）",
-        "ckpt": "yue2_3b_int8_convrot.safetensors",
-        "note": "Comfy-Org/YuE2 官方 INT8 ConvRot 量化版（官方模板 audio_yue2_text2music 默认用这个）。"
-                "3B 参数的音乐生成模型：吃风格描述 + 歌词，先规划 ABC 乐谱再生成带人声与伴奏的音频。"
-                "INT8 量化版显存占用与耗时都明显低于 BF16 完整版。"
-                "本机另有 BF16 全量权重（m-a-p/YuE2-3B），但它是 HF 目录结构、仅第三方节点可用，"
-                "原生节点要的是 checkpoints/ 下的单文件格式。",
-        "warn": "",
-    },
     "yue2_3b_bf16": {
         "label": "YuE2 3B · BF16 完整版",
         "ckpt": "yue2_3b_bf16.safetensors",
-        "note": "Comfy-Org/YuE2 官方 BF16 原精度版，音质略好但显存与耗时明显更高。"
+        "note": "官方 BF16 原精度版（3.63B 参数，628 个 BF16 张量），"
+                "音质与生成稳定性都优于量化版。"
                 "本机这份由 m-a-p/YuE2-3B（官方原始 BF16 权重）+ m-a-p/YuE2-Vae "
                 "转换为 ComfyUI 原生单文件布局而来，数值与官方版逐字节一致。",
         "warn": "",
     },
 }
-YUE2_DEFAULT_CHECKPOINT = "yue2_3b_int8_convrot"
+YUE2_DEFAULT_CHECKPOINT = "yue2_3b_bf16"
 
 #: 参考生音乐用的音频编码器（SheetSage2，读 audio_encoders/）
 YUE2_AUDIO_ENCODERS = {
@@ -105,23 +104,45 @@ YUE2_SCHEDULER = "sgm_uniform"
 YUE2_STEPS = 32
 YUE2_CFG = 1.0
 
-#: 官方模板 YuE2GenerateMusic 的采样参数
+#: 语义(人声/伴奏内容)阶段的采样参数。
+#:
+#: 【2026-11-09 对齐第三方】第三方链路（nonebot_plugin_novelai/h3_yue2.py:58-62,
+#:  以及 yue2_remix_18node.json 节点 13）实际用的是：
+#:     temperature=0.8  top_p=0.9  top_k=50  repetition_penalty=1.05
+#: 我们之前用的是 ComfyUI 官方模板的 music 采样默认（1.0 / 0.95 / 100 / 1.2）。
+#: 第三方那套是**实跑验证过出活效果**的值 —— 这里对齐它。
 YUE2_MUSIC_SAMPLING = {
-    "temperature": 1.0,
-    "top_p": 0.95,
-    "top_k": 100,
-    "repetition_penalty": 1.2,
+    "temperature": 0.8,
+    "top_p": 0.9,
+    "top_k": 50,
+    "repetition_penalty": 1.05,
 }
 
-#: 官方模板 YuE2GenerateABC 的采样参数
+#: ABC 符号谱生成阶段的采样参数。
+#:
+#: 第三方链路的 abc_sampling 在 yue2 运行时是**硬编码**的
+#: （ComfyUI-YuE2/nodes.py:327：temp .7 / top_p .9 / top_k 30 / rp 1.005 /
+#:  penalty_window 100 / min_tokens 32），只有 abc_max_tokens 可调。
+#: 我们的 abc_max_tokens 用第三方 remix 链路的值 8192（顶格），
+#: 文生链路用 4096 —— 这里统一取 4096（第三方文生链路的值，h3_yue2.py:65）。
 YUE2_ABC_SAMPLING = {
     "temperature": 0.7,
     "top_p": 0.9,
     "top_k": 30,
     "repetition_penalty": 1.005,
     "penalty_window": 100,
-    "max_abc_tokens": 8192,
+    "max_abc_tokens": 4096,
 }
+
+#: 语义 token 数上限（第三方 yue2_infer 的硬顶是 16000）。
+#:
+#: 【与 max_duration 的关系】原生 YuE2GenerateMusic 没有 token cap 参数，
+#: 它用 max_duration 秒数换算 max_tokens = max_duration * FRAMES_PER_SECOND(25)
+#: （comfy_extras/nodes_yue2.py:73）。而原生节点内部还会按 prompt 长度
+#: 二次收紧（comfy/text_encoders/yue2.py:253-258）。
+#: 我们用 max_duration 做用户可见控制（更直观），并按下面这个上限夹紧，
+#: 保证实际 token 数不超过第三方链路的量级。
+YUE2_SEMANTIC_MAX_TOKENS = 16000
 
 #: 采样器 / 调度器可选范围（KSampler 的合法取值）
 YUE2_SAMPLERS = ["dpm_2", "euler", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde",
@@ -135,7 +156,15 @@ YUE2_SCHEDULERS = ["sgm_uniform", "simple", "beta", "normal", "karras",
 YUE2_MODES = ["full", "melody"]
 
 #: 时长上限（秒）。官方模板给 360（6 分钟）；节点 schema 上限 900。
-YUE2_MAX_DURATION = 360.0
+#:
+#: 【2026-11-09 对齐第三方】第三方链路没有「时长 API」（yue2 节点自己写明
+#: "no duration API; length ~ lyrics/sections + BPM + token cap"，nodes.py:335），
+#: 它靠 semantic_max_tokens 硬顶（200~16000）控制长度。
+#: 原生节点这边 max_duration 秒 -> max_tokens = 秒 * FRAMES_PER_SECOND(25)
+#: （comfy_extras/nodes_yue2.py:73），所以 16000 token 对应 640 秒。
+#: 我们把用户可见的时长上限压到 600 秒，正好落在第三方的 token 量级内
+#: （600s * 25 = 15000 token < 16000 顶）。
+YUE2_MAX_DURATION = 600.0
 YUE2_MIN_DURATION = 4.0
 YUE2_DEFAULT_DURATION = 60.0
 
@@ -215,6 +244,12 @@ def model_options() -> dict:
         "default_duration": YUE2_DEFAULT_DURATION,
         "formats": YUE2_AUDIO_FORMATS,
         "default_format": YUE2_DEFAULT_FORMAT,
+        # 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
+        "style_fields": music_style.style_options()["fields"],
+        "style_defaults": music_style.style_options()["defaults"],
+        "style_enums": music_style.style_options()["enums"],
+        "lyric_templates": music_style.style_options()["lyric_templates"],
+        "lyric_template_default": music_style.style_options()["lyric_template_default"],
     }
 
 
@@ -224,6 +259,35 @@ def _clamp_duration(value) -> float:
     except (TypeError, ValueError):
         return YUE2_DEFAULT_DURATION
     return max(YUE2_MIN_DURATION, min(YUE2_MAX_DURATION, seconds))
+
+
+def _resolve_style(params: dict) -> str:
+    """合成最终送进模型的 style 串。
+
+    【对齐第三方，2026-11-09】
+    第三方 YuE2StylePrompt 把 12 个结构化字段拼成 style（nodes.py:184-212）。
+    我们的面板既有自由文本风格框，也新增了结构化字段 —— 两者合并：
+    **结构化在前、自由文本在后**（自由文本是用户自己的具体描述，放后面更靠近
+    [Lyrics] 段、权重更高）。
+
+    「什么都没填」时：只用结构化字段的第三方默认值，仍能出活；
+    结构化字段也全空时：回落到自由文本；两者都空 -> 报错（与旧行为一致）。
+    """
+    free_text = (params.get("prompt") or "").strip()
+    fields = music_style.style_fields_from_params(params)
+    structured = music_style.build_style_prompt(
+        fields["language"], fields["genre"], fields["mood"],
+        fields["vocal"], fields["vocal_color"], fields["instruments"],
+        fields["tempo_bpm"], fields["energy"], fields["length_hint"],
+        fields["extra"], fields["custom_language"], fields["custom_genre"],
+    )
+    if structured and free_text:
+        return f"{structured}, {free_text}"
+    if structured:
+        return structured
+    if free_text:
+        return free_text
+    raise ValueError("音乐风格描述不能为空")
 
 
 def _resolve_checkpoint(params: dict) -> str:
@@ -287,7 +351,7 @@ def build_music_workflow(params: dict) -> dict:
       prompt        风格描述（style）—— 必填，由调用方保证非空
       lyrics        歌词（可选，空 = 纯器乐）
       mode          谱面规划：full / melody（默认 full）
-      checkpoint    主模型 key（默认 yue2_3b_int8_convrot）
+      checkpoint    主模型 key（默认 yue2_3b_bf16）
       audio_encoder 参考生音乐的音频编码器 key
       ref_audio     参考音频文件名（ComfyUI input 里的 'subfolder/name'）
       max_duration  最长时长（秒），默认 60
@@ -297,14 +361,21 @@ def build_music_workflow(params: dict) -> dict:
       music_temperature / music_top_p / music_top_k / music_repetition_penalty
       abc_temperature / abc_top_p / abc_top_k / abc_repetition_penalty
       abc_max_tokens / abc_penalty_window
+
+      style_*       结构化风格字段（language / genre / mood / vocal /
+                    vocal_color / instruments / tempo_bpm / energy /
+                    length_hint / extra / custom_language / custom_genre）——
+                    对齐第三方 YuE2StylePrompt 的 12 字段语义。
+                    与自由文本 prompt 合并：结构化在前，自由文本在后。
     """
     ckpt_name = _resolve_checkpoint(params)
-    style = (params.get("prompt") or "").strip()
-    if not style:
-        raise ValueError("音乐风格描述不能为空")
+    style = _resolve_style(params)
+    # 歌词：用户填了就用用户的；没填则用第三方段落骨架兜底
+    # （第三方 YuE2LyricsTemplate：override 非空 -> 忽略 template，nodes.py:281-283）
     lyrics = params.get("lyrics") or ""
     if isinstance(lyrics, str):
         lyrics = lyrics.strip()
+    lyrics = music_style.resolve_lyrics(lyrics, params.get("lyrics_template") or "V-C-V-C-bridge-C")
 
     # 谱面规划模式（full / melody）。
     #

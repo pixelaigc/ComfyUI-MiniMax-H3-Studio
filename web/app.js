@@ -2081,7 +2081,6 @@ function imgModelLabel(key) {
 // 注意：作品卡片可能在 /api/music-options 返回前就渲染出来，
 // 所以这里必须带一份静态兜底表，不能只依赖 window.MusicUI。
 const MUSIC_MODEL_FALLBACK = {
-  yue2_3b_int8_convrot: "YuE2 3B · INT8 ConvRot（官方量化版）",
   yue2_3b_bf16: "YuE2 3B · BF16 完整版",
 };
 function musicModelLabel(key) {

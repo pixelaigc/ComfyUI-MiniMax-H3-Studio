@@ -272,10 +272,29 @@
       </div>
 
       <div class="field">
-        <div class="field-label">风格描述 <span class="muted">Style · 必填</span></div>
+        <div class="field-label">风格描述 <span class="muted">Style · 自由文本</span></div>
         <textarea id="musicStyle" rows="4"
                   placeholder="English, warm piano pop, expressive female voice, acoustic piano, rounded bass and light drums, 88 BPM"></textarea>
         <div class="img-note">描述要生成的曲子：语言 + 曲风 + 人声 + 速度(BPM) + 乐器 + 氛围。官方推荐写法：<code>English, warm female vocal, contemporary pop, 96 BPM, piano, rounded electric bass, restrained drums</code>。只写音乐描述，歌词写到下面那个框里，不要混在一起。</div>
+      </div>
+
+      <!-- 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
+           第三方用 12 个字段拼 style，比一整段自由文本表达力强。
+           这里做成可折叠区，默认收起；展开后填的字段会拼在自由文本前面。 -->
+      <div class="field">
+        <div class="field-label">
+          结构化风格 <span class="muted">Style Fields · 对齐第三方 YuE2StylePrompt</span>
+          <button type="button" id="musicStyleFieldsToggle" class="music-toggle">展开</button>
+        </div>
+        <div id="musicStyleFields" style="display:none">
+          <div class="music-sf-grid" id="musicStyleFieldsGrid"></div>
+          <div class="img-note">
+            按第三方 <code>YuE2StylePrompt</code> 的 12 个字段拼一段标准 style（会加在上面的自由文本<b>前面</b>）。
+            标记 <code>(none)</code> 的选项表示<b>不要这一段</b>；<code>(custom / none)</code> 要配合下面的自定义输入框。
+            纯器乐请选 <code>(instrumental / no lead vocal)</code>，人声音色会自动清成 <code>(none)</code>。
+          </div>
+          <div id="musicStyleFieldsPreview" class="img-note"></div>
+        </div>
       </div>
 
       <div class="field">
@@ -302,7 +321,7 @@
 
       <div class="field">
         <div class="field-label">最长时长 <span id="musicDurationVal">60s</span></div>
-        <input type="range" id="musicDuration" min="10" max="360" step="10" value="60">
+        <input type="range" id="musicDuration" min="10" max="600" step="10" value="60">
         <div class="img-note">这是<strong>上限</strong>，不是保证时长 —— 成曲可能因为歌词段落和 BPM 提前结束。上限 360 秒（6 分钟）；歌词越长、段落越少，越容易顶到上限。参考生音乐时还会受参考音频长度的约束。</div>
       </div>
 
