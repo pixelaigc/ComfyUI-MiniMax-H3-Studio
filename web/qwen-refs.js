@@ -29,11 +29,51 @@
   let refs = [];
   let sortBusy = false;
 
+  // ---------- 占位槽位模型 ----------
+  //
+  // 【不变式】提示词里的 <imageN> 永远指向「参考图列表的第 N 张」。
+  //
+  // 但列表会变（移除 / 排序 / 拖拽）。变更时不能按「出现顺序」重编 ——
+  // 那样「删掉第 2 张」会把 <image3> 留在提示词里变成悬空标记，
+  // 而模型只收到 2 张图，编号与插槽彻底错位。
+  //
+  // 做法：变更前后各拍一张「布局快照」（uid -> 槽位号），
+  // 用「旧槽位 -> 新槽位」的单遍替换重写提示词：
+  //   · 旧槽位的图还在 -> 换成新槽位号
+  //   · 旧槽位的图被删了 -> **整个标记删掉**（不留悬空）
+  //   · 提示词里本来就没有对应槽位的标记（用户手写超出的号）-> 原样留着，
+  //     交给 validate() 报「多出 <imageN>」，不由这里偷偷改写
+  //
+  // uid 不可枚举，不会进 JSON payload（见 toPayload）。
+  let uidSeq = 0;
+
+  function ensureUid(ref) {
+    if (!ref || typeof ref !== "object") return "";
+    if (!ref.__uid) {
+      Object.defineProperty(ref, "__uid", {
+        value: "u" + (++uidSeq), enumerable: false, writable: true,
+      });
+    }
+    return ref.__uid;
+  }
+
+  /** 拍一张布局快照：uid -> 槽位号（下标 + 1）。 */
+  function captureLayout() {
+    const layout = new Map();
+    refs.forEach((ref, i) => layout.set(ensureUid(ref), i + 1));
+    return layout;
+  }
+
   // ---------- 工具 ----------
   function esc(text) {
     return String(text == null ? "" : text)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  /** 给所有参考图发身份标记（uid）。 */
+  function syncSlots() {
+    refs.forEach(ensureUid);
   }
 
   function api(path, options) {
@@ -79,6 +119,8 @@
 
   function setRefs(list) {
     refs = (list || []).slice(0, MAX_REFS);
+    refs.forEach(ensureUid);
+    syncSlots();
     render();
   }
 
@@ -134,6 +176,8 @@
       added.push(item);
     });
     refs = refs.concat(added).slice(0, MAX_REFS);
+    // 新加入的图要发身份标记（uid）—— 后续移除/排序按身份追踪
+    syncSlots();
     render();
     if (overflow > 0) {
       alert(`参考图最多 ${MAX_REFS} 张，超出的 ${overflow} 张未添加。`);
@@ -150,16 +194,43 @@
 
   function removeAt(index) {
     if (index < 0 || index >= refs.length) return;
+    const oldLayout = captureLayout();
     refs.splice(index, 1);
-    // 剩余参考图重新编号：占位标记整体重排，保持连续无空洞
-    reindexPrompt();
+    // 剩余参考图重新编号：占位标记整体重排，保持连续无空洞，
+    // 被移除那张图的标记直接删掉（不留悬空 <imageN>）。
+    reindexPrompt(oldLayout);
     render();
   }
 
   // ---------- 排序 ----------
 
+  /**
+   * 用服务端返回的列表替换 refs，但**保留每张图的身份（uid）**。
+   *
+   * 为什么必须做：服务端返回的是**新对象**（JSON 反序列化出来的），
+   * 如果直接替换，这些图会拿到全新的 uid -> 槽位表对不上 ->
+   * reindexPrompt() 会把提示词里的占位标记全删掉（明明只是排了个序）。
+   * 用 asset_id 做桥接，把旧 uid 搬到新对象上。
+   */
+  function adoptSorted(newList) {
+    const uidByAsset = new Map();
+    refs.forEach(r => { uidByAsset.set(r.asset_id, ensureUid(r)); });
+    return (newList || []).map(item => {
+      const old = uidByAsset.get(item.asset_id);
+      if (old) {
+        Object.defineProperty(item, "__uid", {
+          value: old, enumerable: false, writable: true,
+        });
+      } else {
+        ensureUid(item);
+      }
+      return item;
+    });
+  }
+
   async function smartSort(promptText) {
     if (refs.length < 2) return;
+    const oldLayout = captureLayout();
     sortBusy = true;
     render();
     let data;
@@ -175,26 +246,27 @@
       const sorted = refs.slice().sort((a, b) =>
         (b.created_at || 0) - (a.created_at || 0));
       refs = sorted;
-      reindexPrompt();
+      reindexPrompt(oldLayout);
       render();
       alert("智能排序不可用，已降级为「入库时间倒序」：" + e.message);
       return;
     }
     sortBusy = false;
     const before = refs.map(r => r.asset_id).join(",");
-    refs = (data.refs || refs).slice(0, MAX_REFS);
+    refs = adoptSorted((data.refs || refs).slice(0, MAX_REFS));
     const after = refs.map(r => r.asset_id).join(",");
-    if (before !== after) reindexPrompt();
+    if (before !== after) reindexPrompt(oldLayout);
     render();
   }
 
   function move(from, to) {
     if (from === to) return;
+    const oldLayout = captureLayout();
     const list = refs.slice();
     const moved = list.splice(from, 1)[0];
     list.splice(to, 0, moved);
     refs = list;
-    reindexPrompt();
+    reindexPrompt(oldLayout);
     render();
   }
 
@@ -202,19 +274,44 @@
 
   /**
    * 提示词里的占位标记要跟参考图顺序对齐。
-   * 做法：把提示词里出现的占位序号，按「当前参考图顺序」重排；
-   * 若提示词里没有占位（用户没写），不动它 —— 提交时服务端会统一注入。
+   *
+   * @param {Map|null} oldLayout 变更**前**的布局快照（uid -> 旧槽位）。
+   *   传 null = 首次渲染 / 用户没动过列表 -> 不改写提示词。
+   *
+   * 做法：用「旧槽位 -> 新槽位」的单遍替换重写。
+   *   · 旧槽位的图还在   -> 换成新槽位号
+   *   · 旧槽位的图被删了 -> **整个标记删掉**（不留悬空 <imageN>）
+   *   · 提示词里有列表之外的号（用户手写超出的）-> 原样留着，
+   *     交给 validate() 报「多出 <imageN>」，不由这里偷偷改写
+   *
+   * 单遍替换（不能用「先替换大的再替换小的」，会连环替换）。
    */
-  function reindexPrompt() {
+  function reindexPrompt(oldLayout) {
     const box = $("#prompt");
     if (!box) return;
     const text = box.value || "";
-    const found = parsePlaceholders(text);
-    if (!found.length) return;
-    // 现有占位序号（升序）映射到新的连续序号 1..N
-    const mapping = {};
-    found.forEach((old, i) => { mapping[old] = i + 1; });
-    box.value = renumber(text, mapping);
+    if (!parsePlaceholders(text).length) return;
+    if (!oldLayout || !oldLayout.size) return;
+
+    // 旧槽位 -> uid -> 新槽位
+    const newSlotByUid = captureLayout();
+    const mapping = {};          // 旧槽位 -> 新槽位
+    const removedSlots = new Set();
+    oldLayout.forEach((oldSlot, uid) => {
+      const ns = newSlotByUid.get(uid);
+      if (ns === undefined) removedSlots.add(oldSlot);
+      else mapping[oldSlot] = ns;
+    });
+
+    // 单遍替换：被移除的槽位 -> 标记删掉
+    box.value = (text || "").replace(/<image(\d+)>/g, (whole, num) => {
+      const n = Number(num);
+      if (removedSlots.has(n)) return "";
+      const next = mapping[n];
+      return next === undefined ? whole : `<image${next}>`;
+    });
+    // 清理删除标记后留下的多余空格 / 连续空行
+    box.value = box.value.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
   }
 
   /**
@@ -417,7 +514,7 @@
       const cls = r.missing ? "img-ref-desc-row missing" : "img-ref-desc-row";
       return `
         <div class="${cls}">
-          <span class="img-ref-desc-tag" title="${esc(srcLabel)}">${placeholderFor(i)}</span>
+          <span class="img-ref-desc-tag" title="${esc(srcLabel)}">${esc(placeholderFor(i))}</span>
           <textarea data-desc-idx="${i}" rows="2"
             placeholder="${r.missing ? "素材已失效，无法编辑" : "素材库未提供描述 —— 请手动补充这张图的内容描述"}"
             ${r.missing ? "disabled" : ""}>${esc(r.description || "")}</textarea>
