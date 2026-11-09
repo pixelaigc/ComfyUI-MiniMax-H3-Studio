@@ -93,10 +93,18 @@ class TestEnhanceMultiSelectSource(unittest.TestCase):
         self.assertIn("data-method-check", src,
                       "菜单项必须带复选框（多选）")
         self.assertIn('type="checkbox"', src)
-        # 复选框的 change 事件 -> 走 toggleMethod
+        # 复选框的 change 事件 -> 走切换逻辑。
+        # 【2026-11-09】菜单渲染抽成了**共用组件** renderEnhanceMenu()
+        # （图像面板与音乐面板共用同一套 UI），所以 change 回调走的是
+        # cfg.onToggle(...) —— 图像面板传进来的就是 toggleMethod。
         self.assertRegex(src, r'addEventListener\("change",\s*\(\)\s*=>\s*\{\s*'
-                         r'toggleMethod\(',
+                         r'cfg\.onToggle\(',
                          "复选框的 change 必须触发切换逻辑")
+        # 共用组件把 onToggle 接到 toggleMethod 上
+        self.assertRegex(src, r'onToggle:\s*toggleMethod',
+                         "共用组件的 onToggle 必须接到 toggleMethod")
+        self.assertIn("function renderEnhanceMenu(menu, cfg)", src,
+                      "菜单渲染必须是可复用的共用组件（音乐面板复用）")
 
     def test_selection_is_multi_not_radio(self):
         """选中集合是数组（可多项），不是单个 currentId。"""

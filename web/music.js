@@ -1,5 +1,21 @@
 /* H3 Studio 音乐面板（YuE2）：文生音乐 / 参考生音乐
  *
+ * 【2026-11-09 重设计 —— 用户需求逐条对应】
+ * 1. 文生音乐 / 参考生音乐是**左侧两个独立标签**（.nav-item[data-mode]）。
+ *    面板顶部**不再有任何「生成模式」切换**（旧的 #musicModeChips /
+ *    #musicModeNote 已从 index.html 删除），只读 state.mode。
+ * 2. 流程：音乐描述框 -> 「增强」按钮（+下拉）-> 增强后产出
+ *    **结构化风格** 与 **歌词** 两份结果。
+ *    增强按钮/下拉复用**与生图面板完全同一套组件**
+ *    （.enhance-split / .enhance-btn / .enhance-menu），
+ *    见 web/music-enhance.js（它用 enhance-menu.js 导出的
+ *    window.EnhanceMenuShared）。
+ * 3. 移除「最长时长」参数 -> index.html 里的 #musicDuration 已删除，
+ *    后端 music_yue2 也不再按时长上限截断（生成自然完成）。
+ * 5. 结果形态：增强后可逐项编辑结构化风格 / 歌词；
+ *    也可「基于当前内容重新生成/修改」（#musicStyleRegenBtn /
+ *    #musicLyricsRegenBtn）。
+ *
  * 独立成文件（不塞进 app.js）的原因：app.js 已 3800 行，音乐面板自成一块
  * 逻辑（模型清单 / 参考音频选择 / 参数持久化），单独放更清楚，也避免和
  * 并发的其它前端改动撞同一段代码。
@@ -33,9 +49,6 @@
     schedulers: [],
     modes: ["full", "melody"],
     music_sampling: { temperature: 0.8, top_p: 0.9, top_k: 50, repetition_penalty: 1.05 },
-    max_duration: 600,
-    min_duration: 4,
-    default_duration: 60,
     formats: ["flac", "mp3", "opus"],
     default_format: "flac",
     // 结构化风格（对齐第三方 YuE2StylePrompt）
@@ -54,13 +67,13 @@
     checkpoint: "",
     audio_encoder: "",
     plan: "full",
-    duration: 60,
     steps: 32,
     cfg: 1.0,
     sampler: "dpm_2",
     scheduler: "sgm_uniform",
     format: "flac",
-    style: "",
+    // 音乐描述（增强的输入；也是没有结构化风格时的 style 来源）
+    prompt: "",
     lyrics: "",
     // 结构化风格的 12 个字段（键 = style_<field>）
     style_fields: {},
@@ -126,9 +139,6 @@
       OPTIONS.schedulers = data.schedulers || [];
       OPTIONS.modes = data.modes || ["full", "melody"];
       OPTIONS.music_sampling = data.music_sampling || OPTIONS.music_sampling;
-      OPTIONS.max_duration = data.max_duration || OPTIONS.max_duration;
-      OPTIONS.min_duration = data.min_duration || OPTIONS.min_duration;
-      OPTIONS.default_duration = data.default_duration || OPTIONS.default_duration;
       OPTIONS.formats = data.formats || ["flac", "mp3"];
       OPTIONS.default_format = data.default_format || OPTIONS.default_format;
       // 结构化风格（对齐第三方 YuE2StylePrompt）
@@ -144,7 +154,6 @@
       if (!st.audio_encoder) st.audio_encoder = OPTIONS.default_audio_encoder;
       if (!st.sampler) st.sampler = OPTIONS.sampler;
       if (!st.scheduler) st.scheduler = OPTIONS.scheduler;
-      if (!st.duration) st.duration = OPTIONS.default_duration;
       if (!st.format) st.format = OPTIONS.default_format;
       if (!st.lyrics_template) st.lyrics_template = OPTIONS.lyric_template_default;
       const ms = OPTIONS.music_sampling;
@@ -165,18 +174,9 @@
     const mode = currentMode();
     if (!isMusicMode(mode)) return;
 
-    // 生成模式 chips
-    $$("#musicModeChips button").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.v === mode);
-    });
+    // 【2026-11-09】面板内不再有「生成模式」切换 ——
+    // 文生音乐 / 参考生音乐是**左侧两个独立标签**，这里只读当前 mode。
     const isCover = mode === "a2a";
-    const modeNote = $("#musicModeNote");
-    if (modeNote) {
-      modeNote.textContent = isCover
-        ? "参考生音乐（翻唱）：参考音频只提供旋律线，YuE2 按下面的风格描述与歌词重新编曲、重新演唱；"
-          + "原曲的和弦与编曲不会被沿用。参考音频需先从素材库选择。"
-        : "文生音乐：YuE2 先按风格描述与歌词规划一份乐谱（ABC），再据此生成带人声与伴奏的完整歌曲。";
-    }
 
     // 模型
     const modelSel = $("#musicModelSelect");
@@ -294,17 +294,6 @@
       }
     }
 
-    // 时长
-    const dur = $("#musicDuration");
-    if (dur) {
-      dur.min = String(Math.max(10, Math.ceil(OPTIONS.min_duration)));
-      dur.max = String(OPTIONS.max_duration);
-      dur.step = "10";
-      dur.value = st.duration;
-    }
-    const durVal = $("#musicDurationVal");
-    if (durVal) durVal.textContent = st.duration + "s";
-
     // 步数 / CFG
     const steps = $("#musicSteps");
     if (steps) { steps.min = "1"; steps.max = "100"; steps.step = "1"; steps.value = st.steps; }
@@ -358,9 +347,9 @@
     if (repVal) repVal.textContent = Number(st.repetition_penalty).toFixed(2);
 
     // 文本域：只在用户没在编辑时回填（避免打断输入）
-    const styleBox = $("#musicStyle");
-    if (styleBox && document.activeElement !== styleBox && !styleBox.dataset.touched) {
-      styleBox.value = st.style || "";
+    const promptBox = $("#musicPrompt");
+    if (promptBox && document.activeElement !== promptBox && !promptBox.dataset.touched) {
+      promptBox.value = st.prompt || "";
     }
     const lyricsBox = $("#musicLyrics");
     if (lyricsBox && document.activeElement !== lyricsBox && !lyricsBox.dataset.touched) {
@@ -420,7 +409,7 @@
     card.append(name, remove);
     box.appendChild(card);
     if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id)
-      + "（仅提取旋律线，成曲时长另受上方「最长时长」限制）";
+      + "（仅提取旋律线；成曲时长由歌词段落与 BPM 决定）";
   }
 
   // ------------------------------------------------------- 结构化风格
@@ -587,7 +576,7 @@
   // ---------------------------------------------------------------- 提交
 
   function promptValue() {
-    const box = $("#musicStyle");
+    const box = $("#musicPrompt");
     return box ? box.value.trim() : "";
   }
 
@@ -605,7 +594,6 @@
       plan_mode: isCover ? "melody" : st.plan,
       checkpoint: st.checkpoint,
       audio_encoder: st.audio_encoder,
-      max_duration: st.duration,
       steps: st.steps,
       cfg: st.cfg,
       sampler: st.sampler,
@@ -647,12 +635,6 @@
     });
     on("#musicEncoderSelect", "change", e => {
       st.audio_encoder = e.target.value; saveState(); render();
-    });
-    on("#musicDuration", "input", e => {
-      st.duration = Number(e.target.value);
-      const v = $("#musicDurationVal");
-      if (v) v.textContent = st.duration + "s";
-      saveState();
     });
     on("#musicSteps", "input", e => {
       st.steps = Number(e.target.value);
@@ -698,11 +680,11 @@
     });
 
     // 文本域：记住内容 + 标记「用户动过」（之后不再自动回填）
-    const styleBox = $("#musicStyle");
-    if (styleBox) {
-      styleBox.addEventListener("input", () => {
-        styleBox.dataset.touched = "1";
-        st.style = styleBox.value;
+    const promptBox = $("#musicPrompt");
+    if (promptBox) {
+      promptBox.addEventListener("input", () => {
+        promptBox.dataset.touched = "1";
+        st.prompt = promptBox.value;
         saveState();
       });
     }
@@ -722,19 +704,6 @@
         saveState();
       });
     }
-
-    // 生成模式切换（面板内的两个 chip）
-    $$("#musicModeChips button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const mode = btn.dataset.v;
-        st.mode = mode;
-        saveState();
-        // 交给 app.js 的模式切换入口，保持导航高亮 + 面板一致
-        const navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
-        if (navEl) navEl.click();
-        else render();
-      });
-    });
 
     // 参考音频选择
     on("#musicRefPick", "click", () => {
@@ -772,5 +741,50 @@
     // 供 app.js 的 musicModelLabel 查 checkpoint key -> 显示名
     getOptions: () => OPTIONS,
     setMode(mode) { st.mode = mode; saveState(); },
+
+    // ---- 增强侧（web/music-enhance.js 调用）----
+    /** 结构化风格的 12 个字段（增强产物；用户可逐项编辑） */
+    getStyleFields: () => ({ ...(st.style_fields || {}) }),
+    /** 回填结构化风格（增强产物）。填完自动展开折叠区，让用户看得见。 */
+    setStyleFields: (fields) => {
+      st.style_fields = (fields && typeof fields === "object") ? { ...fields } : {};
+      saveState();
+      const box = $("#musicStyleFields");
+      if (box) box.style.display = "";
+      const btn = $("#musicStyleFieldsToggle");
+      if (btn) btn.textContent = "收起";
+      renderStyleFields();
+    },
+    /** 歌词正文 */
+    getLyrics: () => {
+      const box = $("#musicLyrics");
+      return box ? box.value : (st.lyrics || "");
+    },
+    /** 回填歌词正文 */
+    setLyrics: (text) => {
+      st.lyrics = text || "";
+      const box = $("#musicLyrics");
+      if (box) box.value = st.lyrics;
+      saveState();
+    },
+    /** 提示栏（增强状态提示） */
+    setHint: (text, kind) => {
+      const hint = $("#musicEnhanceHint");
+      if (!hint) return;
+      hint.textContent = text;
+      hint.className = "enhance-hint" + (kind ? " " + kind : "");
+    },
+    /** busy 态（禁用增强按钮） */
+    setBusy: (busy) => {
+      const btn = $("#musicEnhanceBtn");
+      if (btn) btn.disabled = !!busy;
+      const caret = $("#musicEnhanceMenuBtn");
+      if (caret) caret.disabled = !!busy;
+    },
+    /** 标记「已增强」徽标 */
+    markEnhanced: () => {
+      const badge = $("#musicPromptBadge");
+      if (badge) badge.hidden = false;
+    },
   };
 })();

@@ -160,18 +160,36 @@ YUE2_SCHEDULERS = ["sgm_uniform", "simple", "beta", "normal", "karras",
 #   melody = 只出旋律（参考生音乐推荐 —— 保留原曲旋律线）
 YUE2_MODES = ["full", "melody"]
 
-#: 时长上限（秒）。官方模板给 360（6 分钟）；节点 schema 上限 900。
+#: 生成时长上限（秒）。
 #:
-#: 【2026-11-09 对齐第三方】第三方链路没有「时长 API」（yue2 节点自己写明
-#: "no duration API; length ~ lyrics/sections + BPM + token cap"，nodes.py:335），
-#: 它靠 semantic_max_tokens 硬顶（200~16000）控制长度。
-#: 原生节点这边 max_duration 秒 -> max_tokens = 秒 * FRAMES_PER_SECOND(25)
-#: （comfy_extras/nodes_yue2.py:73），所以 16000 token 对应 640 秒。
-#: 我们把用户可见的时长上限压到 600 秒，正好落在第三方的 token 量级内
-#: （600s * 25 = 15000 token < 16000 顶）。
-YUE2_MAX_DURATION = 600.0
+#: 【2026-11-09 用户要求：移除「最长时长」参数，生成始终自然完成】
+#:   原先这里有「最长时长」滑杆（10~600 秒），后端按用户值夹取 max_duration
+#:   —— 也就是「按时长上限截断」。现在：**不再按时长上限截断**，固定给
+#:   YuE2GenerateMusic.max_duration 一个「足够大、让模型自己吐 MUSIC_END 结束」
+#:   的值。
+#:
+#: 【为什么是 900 而不是 600】
+#:   节点 schema 上限是 900 秒（comfy_extras/nodes_yue2.py:56）。
+#:   真正的天花板是**模型上下文**：Qwen3_8BConfig.max_position_embeddings
+#:   = 24576（comfy/ldm/yue2/model.py:18），且 encode_token_weights 里
+#:   max_tokens 会被压到 `context - max(len(prefix), len(negative))`。
+#:   24576 token / 25 frames-per-second ≈ 983 秒，但 prefix（风格+歌词+ABC）
+#:   也要占位置，实际可用略小于 900。
+#:   给 900 是「节点 schema 上限」—— 超过这个数 ComfyUI 会直接拒绝参数。
+#:
+#: 【「自然完成」的语义】
+#:   YuE2GenerateMusic 的 max_duration 是「**最大**时长」不是目标时长：
+#:   模型生成到 MUSIC_END 结束标记就停（comfy/text_encoders/yue2.py 的
+#:   `_generate()`：token == MUSIC_END 就 return history, False）。
+#:   给足上限 = 让它自然结束。
+#:
+#: 【与 semantic_max_tokens 的关系】
+#:   原生节点内部还会按 prompt 长度二次收紧 token 预算
+#:   （comfy/text_encoders/yue2.py:253-258），所以真实时长由
+#:   「歌词段落数 + BPM + token 预算」共同决定，与用户设的上限无关。
+YUE2_MAX_DURATION = 900.0
 YUE2_MIN_DURATION = 4.0
-YUE2_DEFAULT_DURATION = 60.0
+YUE2_DEFAULT_DURATION = 900.0
 
 #: 音频输出格式
 YUE2_AUDIO_FORMATS = ["flac", "mp3", "opus"]
@@ -244,9 +262,10 @@ def model_options() -> dict:
         "modes": YUE2_MODES,
         "music_sampling": dict(YUE2_MUSIC_SAMPLING),
         "abc_sampling": dict(YUE2_ABC_SAMPLING),
+        # 时长上限已移除（2026-11-09 用户要求：生成始终自然完成）。
+        # 这里只保留 max_duration 让前端知道「上限」这个事实，
+        # 前端**不提供**任何时长控件，也不再提交 max_duration。
         "max_duration": YUE2_MAX_DURATION,
-        "min_duration": YUE2_MIN_DURATION,
-        "default_duration": YUE2_DEFAULT_DURATION,
         "formats": YUE2_AUDIO_FORMATS,
         "default_format": YUE2_DEFAULT_FORMAT,
         # 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
@@ -258,12 +277,31 @@ def model_options() -> dict:
     }
 
 
-def _clamp_duration(value) -> float:
+def _resolve_duration(params: dict) -> float:
+    """
+    解析生成时长上限。
+
+    【2026-11-09 用户要求：移除「最长时长」参数，生成始终自然完成】
+    用户端已没有时长滑杆了，所以这里**不再读用户传的 max_duration**，
+    也不再按它夹取 —— 固定返回 YUE2_MAX_DURATION（节点 schema 上限 900 秒）。
+    YuE2GenerateMusic 的 max_duration 语义是「最大时长」：模型生成到
+    MUSIC_END 结束标记就停，所以给足上限 = 「让它自然完成」。
+
+    仍然读 params 里的 max_duration 是为了**兼容历史任务重放**：
+    旧任务库里存着 max_duration=30（用户当时选的），重放时若按新语义走
+    会得到 900 秒的曲子，与当初产物不一致。历史值 < 上限的按原值走，
+    >= 上限的按上限走。
+    """
+    legacy = params.get("max_duration")
+    if legacy is None:
+        return YUE2_MAX_DURATION
     try:
-        seconds = float(value)
+        seconds = float(legacy)
     except (TypeError, ValueError):
-        return YUE2_DEFAULT_DURATION
-    return max(YUE2_MIN_DURATION, min(YUE2_MAX_DURATION, seconds))
+        return YUE2_MAX_DURATION
+    if seconds >= YUE2_MAX_DURATION:
+        return YUE2_MAX_DURATION
+    return max(YUE2_MIN_DURATION, seconds)
 
 
 def _resolve_style(params: dict) -> str:
@@ -406,7 +444,7 @@ def build_music_workflow(params: dict) -> dict:
         mode = "melody"
 
     seed = _seed(params)
-    max_duration = _clamp_duration(params.get("max_duration", YUE2_DEFAULT_DURATION))
+    max_duration = _resolve_duration(params)
     sampler = params.get("sampler") or YUE2_SAMPLER
     if sampler not in YUE2_SAMPLERS:
         sampler = YUE2_SAMPLER
@@ -603,8 +641,13 @@ def build_a2a(params: dict) -> dict:
 
 
 def estimate_seconds(params: dict) -> float:
-    """粗略估计成曲时长（秒）—— 仅用于界面提示，实际以模型输出为准。"""
+    """
+    粗略估计成曲时长（秒）—— 仅用于界面提示，实际以模型输出为准。
+
+    【2026-11-09】时长上限已移除，生成自然完成，所以这里返回的是
+    「时长上限」而不是「预计时长」。真正时长由模型的 MUSIC_END 决定。
+    """
     try:
-        return _clamp_duration(params.get("max_duration", YUE2_DEFAULT_DURATION))
+        return _resolve_duration(params)
     except Exception:
-        return YUE2_DEFAULT_DURATION
+        return YUE2_MAX_DURATION

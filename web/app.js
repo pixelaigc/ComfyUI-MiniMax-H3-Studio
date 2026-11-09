@@ -262,6 +262,12 @@ function renderMode() {
         }
         window.enhanceMethods.updatePanelVisibility();
       }
+      // 音乐面板有**自己的一套**增强菜单（音乐侧注册表）—— 切到音乐模式时
+      // 也要刷新它的按钮文字与菜单（否则按钮还显示上一个模式的文案）。
+      if (window.musicEnhance) {
+        window.musicEnhance.updateButton();
+        window.musicEnhance.renderMenu();
+      }
     } catch (e) { /* 忽略 */ }
   });
   const mode = state.mode;
@@ -431,7 +437,9 @@ function renderMode() {
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
     $("#seedStrengthPair").style.display = "none";
-    // 风格描述在音乐面板里（提示词框留给图像/视频）
+    // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
+    // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
+    // （#musicEnhanceSplit），所以通用 #promptField 整个隐藏。
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "none";
     if (window.MusicUI) window.MusicUI.render();
@@ -1846,11 +1854,20 @@ $("#genBtn").addEventListener("click", async () => {
   if (state.genBusy || promptEnhance.busy) return;
   const mode = state.mode;
 
-  // 音乐模式：提示词来自「风格描述」框，走 music.js 的收集逻辑
+  // 音乐模式：描述来自音乐面板的「音乐描述」框（#musicPrompt），
+  // 走 music.js 的收集逻辑
   if (isMusicMode(mode)) {
     if (!window.MusicUI) { alert("音乐面板模块未加载"); return; }
     const collected = window.MusicUI.collect();
-    if (!collected.params.prompt) { alert("请填写风格描述"); return; }
+    // 有结构化风格时，style 由结构化字段合成（后端用 style_* 字段），
+    // 所以「描述」可以为空；没有结构化风格时描述必填。
+    // 结构化字段在 params 里是 style_<field> 形式。
+    const hasStruct = Object.keys(collected.params)
+      .some(k => k.startsWith("style_") && collected.params[k] !== "");
+    if (!collected.params.prompt && !hasStruct) {
+      alert("请填写音乐描述，或先用「增强」生成结构化风格");
+      return;
+    }
     if (mode === "a2a" && !collected.assetRefs.length) {
       alert("参考生音乐需要从素材库选择一段参考音频。");
       return;
@@ -2425,7 +2442,6 @@ function jobCard(job) {
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
-      <div class="row"><span>时长上限</span><b>${p.max_duration || "—"}s</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>

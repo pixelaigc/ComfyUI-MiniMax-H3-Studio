@@ -85,6 +85,8 @@ from h3studio import asset_api
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
+from h3studio import music_style
+from h3studio import yue2_schema
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -1576,6 +1578,192 @@ async def api_music_options(request):
     return json_ok(music_yue2.model_options())
 
 
+# ------------------------------------------------------------------ YuE2 音乐增强
+async def api_music_enhance(request):
+    """
+    POST /api/music-enhance —— YuE2 音乐专用增强（结构化风格 + 歌词）
+
+    【链路对应】
+    移植自 nonebot 插件 `nonebot_plugin_novelai` 的咏唱「文生音乐」实现：
+      * 系统提示词由 h3studio/yue2_schema.py 的 build_system_prompt() 渲染
+        （枚举从 ComfyUI /object_info 运行时拉，永不二次手抄）
+      * 模型产出的 JSON 由同模块的 normalize_and_validate() 归一化 + 校验
+        （拦脏 COMBO 值、补齐缺字段、纯器乐时强制 vocal_color=(none)）
+      * 归一化后的结构化字段由 h3studio/music_style.py 的 build_style_prompt()
+        合成最终送进 YuE2 节点的 style 串（与官方节点逐条对齐）
+
+    body:
+      prompt      用户的一句话描述（必填，除非 base 提供了现有内容）
+      mode        t2a（文生音乐）/ a2a（参考生音乐）—— 只影响措辞
+      base        可选：以当前内容为底稿做「修改」（而非从零生成）
+      style       可选：当前的结构化风格字段（用户编辑过的那份）
+      lyrics      可选：当前的歌词正文（用户编辑过的那份）
+      provider_id 可选，指定 Provider；不给则用默认 Provider
+
+    返回:
+      style       归一化后的结构化风格字段（12 个字段）
+      lyrics      归一化后的结构化歌词字段（template + lyrics_override）
+      style_text  按官方规则合成的 style 串（预览用）
+      lyrics_text 合成后的歌词文本（预览用）
+      fixes       自动修复清单（界面上可展示，让用户知道模型被纠正过什么）
+      problems    遗留质量问题（不阻断，只提示）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    base = str(payload.get("base") or "").strip()
+    if not original and not base:
+        return web.json_response({"error": "请先输入要增强的描述"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "描述过长（上限 4000 字）"}, status=400)
+
+    mode = str(payload.get("mode") or "t2a").strip()
+    if mode not in ("t2a", "a2a"):
+        mode = "t2a"
+
+    # 选 Provider：显式指定 > 默认。与 /api/enhance 走同一套配置体系，
+    # 不新增第二套 provider 配置。
+    with db() as conn:
+        provider_id = payload.get("provider_id")
+        item = None
+        if provider_id:
+            item = prov.get_provider_full(conn, provider_id)
+            if not item:
+                return web.json_response({"error": "指定的 Provider 不存在"}, status=404)
+            if not item["enabled"]:
+                return web.json_response({"error": "该 Provider 已停用"}, status=400)
+        else:
+            item = prov.resolve_default(conn, "default")
+            if not item:
+                return web.json_response(
+                    {"error": "尚未配置可用的本地模型 Provider。"
+                             "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    system_prompt = yue2_schema.build_system_prompt()
+    user_prompt = _music_enhance_user_prompt(original, base, mode,
+                                             payload.get("style"),
+                                             payload.get("lyrics"))
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    try:
+        raw = await llm_client.call_provider(
+            item, messages,
+            options={"temperature": 0.7, "top_p": 0.95,
+                     "max_tokens": 4000, "do_sample": True})
+    except llm_client.ProviderError as exc:
+        return web.json_response(
+            {"error": str(exc), "provider": item["name"],
+             "provider_id": item["id"], "degraded": True}, status=502)
+
+    raw = yue2_schema.strip_code_fence(raw)
+    parsed = _parse_music_json(raw)
+    if not parsed:
+        return web.json_response(
+            {"error": "模型返回的内容不是有效的 JSON 配置文件，未做修改。",
+             "provider": item["name"], "provider_id": item["id"],
+             "raw_preview": raw[:400], "degraded": True}, status=502)
+
+    ok, normalized, fixes, problems = yue2_schema.normalize_and_validate(parsed)
+    if not ok or not normalized:
+        return web.json_response(
+            {"error": "模型产出无法归一化成合法配置（" +
+                      "；".join(problems or ["结构不可用"]) + "）",
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    style_struct = normalized[yue2_schema.STYLE_KEY]
+    lyrics_struct = normalized[yue2_schema.LYRICS_KEY]
+    # 最终 style 串用 music_style.build_style_prompt（与官方节点逐条对齐）
+    style_text = music_style.build_style_prompt(
+        style_struct.get("language", ""), style_struct.get("genre", ""),
+        style_struct.get("mood", ""), style_struct.get("vocal", ""),
+        style_struct.get("vocal_color", ""), style_struct.get("instruments", ""),
+        style_struct.get("tempo_bpm", 0), style_struct.get("energy", ""),
+        style_struct.get("length_hint", ""), style_struct.get("extra", ""),
+        style_struct.get("custom_language", ""), style_struct.get("custom_genre", ""),
+    )
+    lyrics_text = music_style.resolve_lyrics(
+        lyrics_struct.get("lyrics_override", ""),
+        lyrics_struct.get("template") or "V-C-V-C-bridge-C")
+    return json_ok({
+        "style": style_struct,
+        "lyrics": lyrics_struct,
+        "style_text": style_text,
+        "lyrics_text": lyrics_text,
+        "fixes": fixes,
+        "problems": problems,
+        "provider": item["name"],
+        "provider_id": item["id"],
+        "mode": mode,
+    })
+
+
+def _music_enhance_user_prompt(original: str, base: str, mode: str,
+                               style, lyrics) -> str:
+    """
+    组装给模型的用户消息。
+
+    【两种语义】
+      * base 为空 -> 从零生成（用户给一句描述，要结构化风格 + 歌词）
+      * base 非空 -> 以当前内容为底稿做修改（用户已经有一版，想改）
+    """
+    parts = []
+    if mode == "a2a":
+        parts.append(
+            "【场景】这是「参考生音乐」（cover）模式：用户会额外提供一段参考音频，"
+            "音频只提供旋律线，编曲与和声由你写的风格与歌词决定。"
+            "所以风格里的 instruments / extra 要写清楚编曲意图。")
+    if base:
+        parts.append("【任务】在下面这份**现有配置**的基础上修改，"
+                     "按用户的修改意图调整相应字段；没提到的字段尽量保持原样。")
+        if isinstance(style, dict) and style:
+            parts.append("现有 style 字段：\n" +
+                         json.dumps(style, ensure_ascii=False, indent=2))
+        if isinstance(lyrics, str) and lyrics.strip():
+            parts.append("现有歌词正文：\n" + lyrics.strip())
+        parts.append("【修改意图】\n" + (original or base))
+    else:
+        parts.append("【任务】根据用户描述，从零产出结构化风格与歌词。")
+        parts.append("【用户描述】\n" + original)
+    parts.append("只输出 JSON 对象，不要任何解释文字。")
+    return "\n\n".join(parts)
+
+
+def _parse_music_json(text: str):
+    """
+    宽容地解析模型产出的 JSON。
+
+    移植自 nonebot 插件 h3_yue2.py 的 _parse_yue2_json_robust()：
+      先用 raw_decode（能吃住尾随内容），再截取最外层花括号重试。
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    decoder = json.JSONDecoder()
+    try:
+        obj, _ = decoder.raw_decode(text)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+    if "{" in text and "}" in text:
+        candidate = text[text.index("{"):text.rindex("}") + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            try:
+                obj, _ = decoder.raw_decode(candidate)
+                return obj if isinstance(obj, dict) else None
+            except Exception:
+                pass
+    return None
+
+
 async def api_image_options(request):
     """GET /api/image-options —— 图像面板可选项（含每个模型版本的推荐参数）"""
     tiers = []
@@ -2780,6 +2968,8 @@ def make_app():
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
     app.router.add_get("/api/music-options", api_music_options)
+    app.router.add_post("/api/music-enhance", api_music_enhance)
+
     app.router.add_get("/api/generation-types", api_generation_types)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)

@@ -286,13 +286,14 @@
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  function renderMenu() {
-    const menu = document.querySelector("#enhanceMenu");
-    if (!menu) return;
-    menu.innerHTML = ENHANCE_METHODS.map(m => {
-      const ok = isAvailable(m);
-      const checked = selectedIds.indexOf(m.id) >= 0;
-      return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
+  /**
+   * 菜单项的 HTML 模板 —— **图像面板与音乐面板共用**。
+   *
+   * 【为什么要抽出来】音乐面板的「增强」下拉必须与生图面板**同一套组件与视觉**
+   * （用户要求：不另造一套）。所以模板只写一份，两个实例各自调用。
+   */
+  function enhanceMenuItemHtml(m, checked, ok) {
+    return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
         <label class="enhance-menu-check" title="${esc(m.hint)}">
           <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
           <span class="enhance-menu-label">${esc(m.label)}</span>
@@ -302,23 +303,107 @@
         <span class="enhance-menu-hint">${esc(m.hint)}</span>
         ${m.fields && m.fields.length ? renderFields(m) : ""}
       </div>`;
-    }).join("");
+  }
+
+  /**
+   * 渲染一份菜单到指定容器 —— **图像面板与音乐面板共用**。
+   *
+   * cfg:
+   *   methods      注册表（有序 = 渲染顺序 = 执行顺序）
+   *   selectedIds  当前选中的 id 集合
+   *   isAvailable  某项在当前模式下是否可用
+   *   onToggle     勾选变化回调 (id, checked)
+   *   onFieldEdit  可编辑字段变化回调 (methodId, fieldKey, value)
+   *   renderFields 某项的可编辑字段区渲染（音乐侧目前没有可编辑字段）
+   */
+  function renderEnhanceMenu(menu, cfg) {
+    menu.innerHTML = cfg.methods.map(m =>
+      enhanceMenuItemHtml(m, cfg.selectedIds.indexOf(m.id) >= 0, cfg.isAvailable(m))
+    ).join("");
 
     menu.querySelectorAll("input[data-method-check]").forEach(box => {
       box.addEventListener("change", () => {
-        toggleMethod(box.dataset.methodCheck, box.checked);
+        cfg.onToggle(box.dataset.methodCheck, box.checked);
       });
     });
     menu.querySelectorAll(".enhance-menu-field").forEach(el => {
       const onEdit = () => {
-        setFieldValue(el.dataset.method, el.dataset.field, el.value);
-        saveSelection();
-        applySelectedParams();      // 参数即时套用并回显
-        updateButton();
+        cfg.onFieldEdit(el.dataset.method, el.dataset.field, el.value);
       };
       el.addEventListener("input", onEdit);
       el.addEventListener("change", onEdit);
     });
+  }
+
+  function renderMenu() {
+    const menu = document.querySelector("#enhanceMenu");
+    if (!menu) return;
+    renderEnhanceMenu(menu, {
+      methods: ENHANCE_METHODS,
+      selectedIds: selectedIds,
+      isAvailable: isAvailable,
+      onToggle: toggleMethod,
+      onFieldEdit: (methodId, fieldKey, value) => {
+        setFieldValue(methodId, fieldKey, value);
+        saveSelection();
+        applySelectedParams();      // 参数即时套用并回显
+        updateButton();
+      },
+    });
+  }
+
+  /**
+   * 菜单定位在按钮下方；靠近视口右/下边缘时翻转，避免出屏。
+   * —— 图像面板与音乐面板共用。
+   */
+  function positionMenu(menu, btn) {
+    const r = btn.getBoundingClientRect();
+    const mw = menu.offsetWidth || 260;
+    const mh = menu.offsetHeight || 160;
+    let left = r.left;
+    if (left + mw > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - mw - 8);
+    }
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) {
+      top = Math.max(8, r.top - mh - 6);
+    }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+  }
+
+  /**
+   * 绑定菜单的开合交互（点箭头开/关、点别处关、Esc 关、窗口变化关）
+   * —— **图像面板与音乐面板共用**。
+   */
+  function bindEnhanceMenu(menu, btn, splitId, onOpen) {
+    if (!menu) return;
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (menu.hidden) {
+          if (typeof onOpen === "function") onOpen();
+          menu.hidden = false;
+          btn.setAttribute("aria-expanded", "true");
+          positionMenu(menu, btn);
+        } else {
+          menu.hidden = true;
+          btn.setAttribute("aria-expanded", "false");
+        }
+      });
+    }
+    document.addEventListener("click", (e) => {
+      if (menu.hidden) return;
+      if (menu.contains(e.target)) return;
+      if (splitId && e.target.closest && e.target.closest(`#${splitId}`)) return;
+      menu.hidden = true;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") menu.hidden = true;
+    });
+    // 窗口尺寸变化时菜单位置会失效 -> 关掉（下次打开会重新定位）
+    window.addEventListener("resize", () => { menu.hidden = true; });
   }
 
   /** 某项的可编辑字段区（system prompt 文本框 + 档位参数）。 */
@@ -513,49 +598,6 @@
     });
     note.textContent = parts.length ? ("已套用推荐参数 → " + parts.join("；")) : "";
     note.hidden = !parts.length;
-  }
-
-  // ------------------------------------------------------------------ 菜单开合
-
-  function openMenu() {
-    const menu = document.querySelector("#enhanceMenu");
-    const btn = document.querySelector("#enhanceMenuBtn");
-    if (!menu || !btn) return;
-    renderMenu();
-    menu.hidden = false;
-    btn.setAttribute("aria-expanded", "true");
-    positionMenu(menu, btn);
-  }
-
-  function closeMenu() {
-    const menu = document.querySelector("#enhanceMenu");
-    const btn = document.querySelector("#enhanceMenuBtn");
-    if (!menu) return;
-    menu.hidden = true;
-    if (btn) btn.setAttribute("aria-expanded", "false");
-  }
-
-  function toggleMenu() {
-    const menu = document.querySelector("#enhanceMenu");
-    if (!menu) return;
-    if (menu.hidden) openMenu(); else closeMenu();
-  }
-
-  /** 菜单定位在按钮下方；靠近视口右/下边缘时翻转，避免出屏。 */
-  function positionMenu(menu, btn) {
-    const r = btn.getBoundingClientRect();
-    const mw = menu.offsetWidth || 260;
-    const mh = menu.offsetHeight || 160;
-    let left = r.left;
-    if (left + mw > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - mw - 8);
-    }
-    let top = r.bottom + 6;
-    if (top + mh > window.innerHeight - 8) {
-      top = Math.max(8, r.top - mh - 6);
-    }
-    menu.style.left = left + "px";
-    menu.style.top = top + "px";
   }
 
   // ------------------------------------------------------------------ 路由
@@ -978,26 +1020,10 @@
     const btn = document.querySelector("#enhanceBtn");
     if (btn) btn.addEventListener("click", () => run());
 
-    const menuBtn = document.querySelector("#enhanceMenuBtn");
-    if (menuBtn) {
-      menuBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleMenu();
-      });
-    }
-    // 点别处关菜单
-    document.addEventListener("click", (e) => {
-      const menu = document.querySelector("#enhanceMenu");
-      if (!menu || menu.hidden) return;
-      if (menu.contains(e.target)) return;
-      if (e.target.closest && e.target.closest("#enhanceSplit")) return;
-      closeMenu();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeMenu();
-    });
-    // 窗口尺寸变化时菜单位置会失效 -> 关掉（下次打开会重新定位）
-    window.addEventListener("resize", () => closeMenu());
+    // 菜单开合交互走**共用实现**（与音乐面板同一套组件）
+    bindEnhanceMenu(document.querySelector("#enhanceMenu"),
+                    document.querySelector("#enhanceMenuBtn"),
+                    "enhanceSplit", renderMenu);
   }
 
   // ------------------------------------------------------------------ 启动
@@ -1030,6 +1056,18 @@
           const f = (m.fields || []).find(x => x.key === fieldKey);
           return f ? effectiveFieldValue(m, f) : "";
         },
+      };
+
+      /**
+       * 共用组件导出 —— 音乐面板（web/music-enhance.js）用**同一套**
+       * 菜单渲染 / 定位 / 开合交互，不另造一套 UI。
+       */
+      window.EnhanceMenuShared = {
+        renderEnhanceMenu: renderEnhanceMenu,
+        positionMenu: positionMenu,
+        bindEnhanceMenu: bindEnhanceMenu,
+        enhanceMenuItemHtml: enhanceMenuItemHtml,
+        esc: esc,
       };
     }
   }
