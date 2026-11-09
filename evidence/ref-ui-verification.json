@@ -1,0 +1,44 @@
+{
+ "base": "http://127.0.0.1:8193",
+ "shots": [
+  "/root/projects/h3studio-qwen-refs/evidence/50-i2i-panel-asset-library.png",
+  "/root/projects/h3studio-qwen-refs/evidence/51-i2i-3-refs-from-library.png",
+  "/root/projects/h3studio-qwen-refs/evidence/52-i2i-smart-sort.png",
+  "/root/projects/h3studio-qwen-refs/evidence/53-i2i-after-remove-renumbered.png",
+  "/root/projects/h3studio-qwen-refs/evidence/54-i2i-validate-mismatch.png",
+  "/root/projects/h3studio-qwen-refs/evidence/55-i2i-overflow-cap.png",
+  "/root/projects/h3studio-qwen-refs/evidence/56-i2i-final-3-refs.png"
+ ],
+ "console_errors": [],
+ "state": {
+  "mode": "i2i_qwen",
+  "refVisible": true,
+  "addBtnText": "+ 从素材库添加",
+  "hasFileInput": false,
+  "sortBtn": true,
+  "note": "至少 1 张、最多 10 张（模型官方能力上限 10 张）。参考图**强制来自素材库**：先在「素材库」页上传入库，再从这里选择。"
+ },
+ "after_remove": {
+  "count": 2,
+  "ids": [
+   "1",
+   "2"
+  ],
+  "descRows": [
+   "蓝色 MPU-6050 六轴惯性传感器模块",
+   "雪山��峰在日出时泛起金色高山辉光，倒映在平静的湖面上"
+  ],
+  "hint": "2 / 10 张"
+ },
+ "overflow": {
+  "count": 10,
+  "hint": "10 / 10 张",
+  "addDisabled": true,
+  "problems": [
+   "有 10 张参考图，提示词里必须有 <image1> <image2> <image3> <image4> <image5> <image6> <image7> <image8> <image9> <image10> 占位标记（官方 PE-I2I 多图模板要求用 <imageN> 引用每张图）"
+  ]
+ },
+ "validate_mismatch": [
+  "提示词里的占位标记与参考图数量不一致（2 张参考图，应为 1..2 连续）：缺少 <image2>"
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "prompt": "<image1> 是画布图，提供黄昏海岸与灯塔的场景。\n<image2> 提供雪山与湖面的环境元素。\n<image3> 提供前景的物件。\n把这三张图合成一张：保持 <image1> 的灯塔与黄昏光线，把 <image2> 的雪山倒影放进 <image1> 的海面，把 <image3> 的传感器模块放在前景沙滩上。",
+ "ref_images": [
+  {
+   "asset_id": "asset_c5abcf443cf1",
+   "version": 1,
+   "name": "i-zimage-000075.png",
+   "description": "黄昏海岸边的白色灯塔，暖色落日映在海面上",
+   "description_source": "analysis",
+   "tags": [],
+   "created_at": 1794145045.612697,
+   "preview_url": "/api/assets/asset_c5abcf443cf1/preview",
+   "missing": false,
+   "ordinal": null
+  },
+  {
+   "asset_id": "asset_5c85c52db088",
+   "version": 1,
+   "name": "i-zimage-000067.png",
+   "description": "雪山��峰在日出时泛起金色高山辉光，倒映在平静的湖面上",
+   "description_source": "analysis",
+   "tags": [],
+   "created_at": 1794133459.3752637,
+   "preview_url": "/api/assets/asset_5c85c52db088/preview",
+   "missing": false,
+   "ordinal": null
+  },
+  {
+   "asset_id": "asset_46a674499d00",
+   "version": 1,
+   "name": "fresh_tagged.jpg",
+   "description": "蓝色 MPU-6050 六轴惯性传感器模块，白色丝印标注 I2C 引脚",
+   "description_source": "analysis",
+   "tags": [
+    "上传时打的标签",
+    "第二个"
+   ],
+   "created_at": 1794130176.7240033,
+   "preview_url": "/api/assets/asset_46a674499d00/preview",
+   "missing": false,
+   "ordinal": null
+  }
+ ]
+}

@@ -64,18 +64,25 @@ def _describe(asset: dict, analysis: dict | None, tags: list[str]) -> tuple[str,
     return "", "empty"
 
 
-def _condense(text: str, limit: int = 120) -> str:
-    """把长描述压成一行短句（占位描述用）。"""
-    text = " ".join((text or "").split())
+def _condense(text: str, limit: int = 80) -> str:
+    """把长描述压成一行短句（占位描述用）。
+
+    素材库的分析文本动辄几百字（分【主体人物】【服装与配饰】等小节），
+    直接塞进提示词会淹没用户的编辑指令。这里只取**第一个有内容的小节**
+    并截断到 limit 字。
+    """
+    text = (text or "").strip()
     if not text:
         return ""
-    # 分析文本常见结构：【主体人物】…  取第一段有实际内容���
+    # 分析文本常见结构：【主体人物】…  取第一段有实际内容的
     for chunk in text.replace("【", "\n【").split("\n"):
         chunk = chunk.strip()
-        if len(chunk) > 4:
+        if len(chunk) > 6:
             text = chunk
             break
-    text = text.replace("【", "").replace("】", " ").strip()
+    # 去掉残留的方括号标记
+    text = text.replace("【", "").replace("】", " ")
+    text = " ".join(text.split())
     if len(text) > limit:
         text = text[:limit].rstrip() + "…"
     return text

@@ -395,7 +395,12 @@
     const details = $("#imgRefDetail");
     const markerNote = $("#imgRefMarkerNote");
     if (!wrap) return;
-    if (details) details.hidden = refs.length === 0;
+    if (details) {
+      details.hidden = refs.length === 0;
+      // 参考图有描述要**始终可见**（需求 B1：把描述/标签带入并在 UI 显示），
+      // 折叠起来用户就看不到模型到底拿到了什么描述。
+      if (refs.length) details.open = true;
+    }
     if (!refs.length) { wrap.innerHTML = ""; return; }
 
     if (markerNote) {
