@@ -751,6 +751,61 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
             self.assertFalse(v.check_weight_syntax(case, "pe"),
                              "术语转写不该被判权重语法：%s" % case)
 
+    def test_compound_term_gloss_requires_hyphen(self):
+        """
+        【2026-11-10 修正 · 真权重语法漏判】
+
+        旧版 _COMPOUND_GLOSS_PATTERN 里连字符是**可选**的：
+            [A-Za-z][A-Za-z\-]{2,}
+        于是 "neon (neon) signs" 也能命中「复合术语 + 英文名」规则，
+        把真正的 Compel 强调语法 (neon) 当成注释放过了。
+
+        修正：复合术语**必须**含连字符/下划线/斜杠。
+          "T-tong lau (shophouse)" -> 含连字符 -> 注释，不拒
+          "neon (neon) signs"       -> 无连字符 -> 真权重语法，必须拒
+        """
+        v = self._validator()
+        # 复合术语（含连字符）-> 注释，不拒
+        self.assertFalse(v.check_weight_syntax(
+            "a row of cramped T-tong lau (shophouse) buildings", "pe"))
+        # 真权重语法 -> 必须拒
+        self.assertTrue(v.check_weight_syntax("neon (neon) signs everywhere", "pe"),
+                        "带连字符的复合术语规则不该放过真正的 (neon) 强调语法")
+
+    def test_inc_dec_weight_accepts_any_run_of_signs(self):
+        """
+        【2026-11-10 修正 · 真权重语法漏判】
+
+        旧版 `(\\+\\+|--)` 只认**恰好两个**符号，"cat---" 漏掉了。
+        但按 InvokeAI 的官方口径（frontend/webv1/src/common/util/promptAST.ts:
+            WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/）
+        [+-]+ 匹配**任意长度**的 +/- 串 -> "cat---" 是合法的权重语法。
+
+        同时不能把普通连字符误判："a--b" 不是权重语法。
+        """
+        v = self._validator()
+        for case in ("cat++ in the frame", "cat-- in the frame",
+                     "cat--- in the frame", "cat++++ in the frame"):
+            self.assertTrue(v.check_weight_syntax(case, "pe"),
+                            "任意长度的 +/- 串都是权重语法：%s" % case)
+        # 普通连字符不是权重语法
+        self.assertFalse(v.check_weight_syntax("mid-2020 street view", "pe"),
+                         "普通连字符不该被判权重语法")
+
+    def test_both_gloss_and_real_weight_in_one_text(self):
+        """
+        一段文本里既有术语注释又有真权重语法时，两边都要判对：
+        注释放过、真权重拒掉。
+        """
+        v = self._validator()
+        text = ('arcade buildings (tong lau) with T-tong lau (shophouse) facades, '
+                'a cat sitting nearby, (cat) on a stool')
+        hits = v.check_weight_syntax(text, "pe")
+        self.assertIn("(cat)", hits)
+        for not_weight in ("(tong lau)", "(shophouse)"):
+            self.assertNotIn(not_weight, hits,
+                             "术语注释不该出现在命中列表：%s" % not_weight)
+
 
 
 if __name__ == "__main__":
