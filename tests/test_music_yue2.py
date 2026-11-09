@@ -39,6 +39,7 @@
 """
 import json
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -450,6 +451,79 @@ class TestMusicFrontend(unittest.TestCase):
     def test_audio_preview_uses_audio_element(self):
         js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("<audio src=", js)
+
+
+class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
+    """文案隔离 —— 音乐模式不得出现 z-image / 图像面板的文案。
+
+    背景（真机审计，2026-11-09）：renderMode() 里
+        $("#imagePanel").style.display = isVideo ? "none" : "";
+    只用 isVideo 判断，而音乐 mode 的 kind === "audio" —— 既不是 video 也不是
+    image，于是整块 Z-Image 参数面板（分辨率档位 / 画面比例 / 输出尺寸 /
+    生成批次 / Z-Image 模型 / LoRA …）会漏进音乐面板，共 27 条 z-image 文案。
+    """
+
+    def _app_js(self) -> str:
+        return (REPO / "web" / "app.js").read_text(encoding="utf-8")
+
+    def test_image_panel_hidden_by_image_kind_not_by_not_video(self):
+        js = self._app_js()
+        self.assertIn('const isImageMode = info.kind === "image";', js)
+        self.assertIn('$("#imagePanel").style.display = isImageMode ? "" : "none";', js)
+        # 旧写法（音频会漏进图像面板）必须不再存在
+        self.assertNotIn('$("#imagePanel").style.display = isVideo ? "none" : "";', js)
+
+    def test_music_job_card_has_no_resolution_row(self):
+        js = self._app_js()
+        self.assertIn('info.kind === "audio" ? `', js)
+        self.assertIn('<span>时长上限</span>', js)
+        self.assertIn('<span>谱面</span>', js)
+        self.assertIn('<span>格式</span>', js)
+        # 音乐分支必须在「分辨率」那一行之前分流
+        audio_at = js.find('info.kind === "audio" ? `')
+        res_at = js.find('<span>分辨率</span><b>${p.resolution || "768p"}')
+        self.assertLess(audio_at, res_at, "音乐分支必须先于通用分辨率行")
+
+    def test_music_card_prompt_row_renamed(self):
+        js = self._app_js()
+        self.assertIn("<span>风格描述</span>", js)
+        self.assertIn("完整风格描述与歌词", js)
+
+    def test_music_js_forces_melody_for_reference_mode(self):
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        self.assertIn('mode: isCover ? "melody" : st.plan,', js)
+        # 参考模式下「完整谱面」必须禁用并说明原因
+        self.assertIn('if (isCover && modeKey === "full")', js)
+        self.assertIn("b.disabled = true;", js)
+
+    def test_backend_forces_melody_when_reference_audio_present(self):
+        py = (REPO / "h3studio" / "music_yue2.py").read_text(encoding="utf-8")
+        self.assertIn('if ref_audio_param and mode != "melody":', py)
+        self.assertIn('mode = "melody"', py)
+
+    def test_music_panel_copy_mentions_real_yue2_facts(self):
+        """音乐面板文案要写真实的 yue2 事实，而不是泛泛而谈。"""
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        blob = html + js
+        self.assertIn("360", blob)          # 时长上限
+        self.assertIn("48 kHz", blob)       # 输出采样率
+        self.assertIn("仅旋律", blob)        # 谱面模式
+        self.assertIn("SheetSage2", blob)   # 音频编码器
+        self.assertIn("ABC", blob)          # 谱面规划
+
+    def test_music_copy_has_no_zimage_terms(self):
+        """音乐面板自身（music.js + musicPanel 区块）不得含图像系词汇。"""
+        js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        m = re.search(r'<div id="musicPanel".*?\n    </div>\n', html, re.S)
+        self.assertIsNotNone(m, "找不到 musicPanel 区块")
+        panel = m.group(0)
+        blob = panel + js
+        for bad in ("Z-Image", "z-image", "文生图", "分辨率", "画面比例",
+                    "输出尺寸", "负面提示词", "首帧", "尾帧", "参考图",
+                    "成图", "出图", "像素"):
+            self.assertNotIn(bad, blob, f"音乐面板残留图像系文案：{bad}")
 
 
 if __name__ == "__main__":
