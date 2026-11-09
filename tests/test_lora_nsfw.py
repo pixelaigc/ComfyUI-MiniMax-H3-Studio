@@ -170,6 +170,19 @@ class TestNSFWCatalog(unittest.TestCase):
                 self.assertEqual(by_name[key]["kind"], "effect",
                                  f"{key} 在 registry 里不是 effect")
 
+    def test_catalog_entries_have_complete_display_metadata(self):
+        """目录条目必须带完整的中文显示名与场景说明（界面要显示这些）"""
+        incomplete = []
+        for key, entry in catalog.NSFW_ALL_EFFECTS.items():
+            if not (entry.get("display") or "").strip():
+                incomplete.append(f"{key} 缺 display")
+            if not (entry.get("scene") or "").strip():
+                incomplete.append(f"{key} 缺 scene")
+            if not (entry.get("source") or "").strip():
+                incomplete.append(f"{key} 缺 source")
+        self.assertEqual(incomplete, [],
+                         f"目录条目缺界面需要的字段：{incomplete[:10]}")
+
     def test_moss_uses_model_only_loader(self):
         """MOSS 链必须用 LoraLoaderModelOnly（DiT），不能用带 clip 的 LoraLoader"""
         import inspect

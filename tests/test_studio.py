@@ -66,11 +66,12 @@ class TestLoRARegistry(unittest.TestCase):
                 self.assertEqual(lora_registry.effect_family_of(item["name"]),
                                  "Z-Image",
                                  f"{item['name']} 的族判定与所在目录不一致")
-        # 数量兜底：本机总共有 264 个 LoRA，Z-Image 相关的只有个位数。
-        # 2026-11-09 接入效果 LoRA 目录后，本族合法条目增加到 35 个
-        # （29 个 z-image-effects/ + 4 个既有 + 2 个结构兜底）。
-        # 判据仍然能挡住「把全机 264 个都塞进来」—— 264 >> 40。
-        self.assertLess(len(items), 60,
+        # 数量兜底：本机总共有 443 个 LoRA，Z-Image 相关的只有个位数。
+        # 2026-11-09 接入通用效果 LoRA 目录后，本族合法条目 35 个；
+        # 2026-11-10 再接入 NSFW 成人向效果类目录 45 个 -> 80 个
+        # （75 个 z-image-effects/ + 4 个既有 + 1 个 z-image/）。
+        # 判据仍然能挡住「把全机 443 个都塞进来」—— 443 >> 120。
+        self.assertLess(len(items), 120,
                         f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
                         "结构兜底的判据放太宽了")
 
