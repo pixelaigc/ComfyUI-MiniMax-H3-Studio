@@ -14,7 +14,7 @@
 
 ## 待办（按序，每步完成即落盘 + 提交）
 
-- [ ] D1 下载 57 条匿名可下条目到族目录（大小 + magic + SHA256 前缀校验，.part → rename）
+- [x] D1 下载 57 条匿名可下条目到族目录 —— ✅ 57/57 成功，8.49 GB，0 失败
 - [ ] D2 回平台 API 取权威 SHA256 逐位比对（0 不一致）
 - [ ] D3 提取权重头部触发词（ss_tag_frequency / trigger_word / trigger），提取不到标「触发词未标注」
 - [ ] D4 生成元数据并接入 `h3studio/lora_catalog_mihoyo.py`（四类合并）
