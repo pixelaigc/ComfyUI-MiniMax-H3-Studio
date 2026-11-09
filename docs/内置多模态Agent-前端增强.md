@@ -266,10 +266,37 @@ python3 scripts/verify_agent_frontend_enh.py 8471 <证据目录>
 
 产出：三档宽度截图 + 每档 console 全量输出 + 横向溢出实测 + 输入框可达性。
 
-### 7.3 全量回归
+实测结果（三档全部）：横向溢出 **0 px**、越界元素 **0 个**、输入框**可达**、console **0 条**。
 
-`python3 -m pytest tests/ -q`，与基线 `17c9adb` 对比失败名单，确认零新增回归。
-（对比结果见交付汇报。）
+### 7.3 任务卡实时更新 —— 端到端证据
+
+```bash
+python3 scripts/verify_jobcard_live_update.py 8473 <证据目录>
+```
+
+**没有任何桩**：真实 `server.py` + 真实 `web/` 前端 + 真实 `POST /api/jobs` 建任务 +
+真实 `GET /api/jobs/{id}` 轮询。唯一「注入」的是把服务端真实存在的 `job_id`
+交给前端（模拟 Agent 把 job_id 交给前端的那一步），之后状态更新全部由前端自己轮询完成。
+
+实测结果（11/11 断言全绿）：
+
+| 阶段 | 卡片徽标（DOM 实测） | 服务端 jobs 表 status |
+|---|---|---|
+| 初始 | `排队中` | `queued` |
+| 运行中 | `生成中`（+ 进度「采样中 45%」） | `running` |
+| 完成 | `已完成`（+ 产物缩略图，`naturalWidth > 0`） | `done` |
+
+### 7.4 全量回归
+
+`python3 -m pytest tests/ -q`，与基线 `17c9adb` 对比失败名单。
+
+| | 失败 | 通过 | 跳过 | 错误 |
+|---|---|---|---|---|
+| 分支 | 27 | **566** | 3 | 134 |
+| 基线 `17c9adb` | 27 | 517 | 3 | 134 |
+
+**161 条 FAILED/ERROR 名单逐条比对完全相同（md5 一致）→ 零新增回归。**
+`passed` +49 = 本次新增的前端用例。详见交付汇报 §8.3。
 
 ---
 
@@ -298,6 +325,7 @@ python3 scripts/verify_agent_frontend_enh.py 8471 <证据目录>
 | `web/index.html` | 改 | 加一行 `<script src="agent-media.js">`（须在 agent.js 之前） |
 | `tests/test_agent_frontend_enh.py` | **新增** | 31 个前端用例 |
 | `tests/test_agent_media_semantics.py` | **新增** | 18 个媒体语义用例 |
-| `scripts/verify_agent_frontend_enh.py` | **新增** | 真实浏览器证据采集脚本 |
+| `scripts/verify_agent_frontend_enh.py` | **新增** | 真实浏览器三档宽度证据采集脚本 |
+| `scripts/verify_jobcard_live_update.py` | **新增** | 任务卡实时更新端到端证据脚本（无桩） |
 
 **未改**：`h3studio/**`（Python 后端）、`web/app.js`、`server.py`、任何 systemd unit。
