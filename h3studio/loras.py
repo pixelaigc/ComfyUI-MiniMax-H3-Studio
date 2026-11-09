@@ -401,14 +401,29 @@ def _looks_like_z_image_layers(path: Path) -> bool:
 
 
 def _lora_layer_bases(header: dict) -> set[str]:
-    """从 header 提取 LoRA 想 patch 的层名集合（去掉 lora_A/lora_B 后缀）。"""
+    """从 header 提取 LoRA 想 patch 的层名集合（去掉 lora_A/lora_B 后缀）。
+
+    除了标准 LoRA（lora_A/lora_B、lora_up/lora_down），
+    还要认 **LoKR**（lokr_w1/lokr_w2/alpha）和 **LoHa**（hada_w1/hada_w2）
+    —— ComfyUI 的 weight_adapter 支持这两种格式
+    （comfy/weight_adapter/lokr.py / loha.py），它们同样是可用的效果 LoRA。
+    2026-11-09 实测：`lokr-moss-kodachrome-v1.safetensors` 用的是
+    `diffusion_model.layers.N.proj.*.lokr_w1` 这种键名，
+    不认的话会被当成「不是 LoRA 权重」而漏掉。
+    """
     bases: set[str] = set()
     for key in header:
         if key == "__metadata__":
             continue
         for marker in (".lora_A.default.weight", ".lora_B.default.weight",
                        ".lora_A.weight", ".lora_B.weight",
-                       ".lora_down.weight", ".lora_up.weight"):
+                       ".lora_down.weight", ".lora_up.weight",
+                       # LoKR（lokr_w1 / lokr_w2 / alpha）
+                       ".lokr_w1", ".lokr_w2", ".lokr_w1_a", ".lokr_w1_b",
+                       ".lokr_w2_a", ".lokr_w2_b",
+                       # LoHa（hada_w1 / hada_w2）
+                       ".hada_w1_a", ".hada_w1_b", ".hada_w2_a", ".hada_w2_b",
+                       ".hada_w1", ".hada_w2"):
             if key.endswith(marker):
                 bases.add(key[: -len(marker)])
                 break
