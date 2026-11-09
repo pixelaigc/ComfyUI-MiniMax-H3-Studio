@@ -280,9 +280,17 @@ def build_music_workflow(params: dict) -> dict:
     if isinstance(lyrics, str):
         lyrics = lyrics.strip()
 
-    mode = params.get("mode") or "full"
+    # 谱面规划模式（full / melody）。
+    #
+    # 【关键，2026-11-09】历史上 params["mode"] 被 server.py 用作 HTTP 生成
+    # 模式（t2a / a2a）覆盖掉了，谱面模式因此丢失。现在：
+    #   - 优先读 params["plan_mode"]（server.py 落库时单独存的那份）
+    #   - 其次读 params["music_plan"]（旧字段名兼容）
+    #   - 最后才回退 params["mode"]（仅当它本身就是 full/melody 时）
+    mode = (params.get("plan_mode") or params.get("music_plan") or "").strip()
     if mode not in YUE2_MODES:
-        mode = "full"
+        legacy = (params.get("mode") or "").strip()
+        mode = legacy if legacy in YUE2_MODES else "full"
 
     # 参考生音乐：谱面来自参考音频（SheetSage2 转谱），不是 YuE2 自己规划的。
     # SheetSage2AudioToABC 固定输出「仅旋律」谱面（不含和弦符号），
