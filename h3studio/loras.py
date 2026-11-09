@@ -25,6 +25,7 @@ from pathlib import Path
 from . import lora_damping
 from .lora_catalog_effects import ALL_EFFECTS as _EFFECT_CATALOG
 from .lora_catalog_effects import FAMILY_PREFIXES as _EFFECT_FAMILY_PREFIXES
+from .lora_catalog_mihoyo import ALL_MIHOYO_EFFECTS as _MIHOYO_CATALOG
 
 # ------------------------------------------------------------------ 已知说明
 # 说明来源全部标注在 source 字段里，界面上可展开查看。
@@ -204,6 +205,8 @@ LORA_CATALOG: dict[str, dict] = {
 #     三族重名的文件，没有前缀根本分不出来）
 #   * 跨族误用能在服务端被直接拒绝（键名对不上，ComfyUI 会静默丢弃）
 LORA_CATALOG.update(_EFFECT_CATALOG)
+# 米哈游（HoYoverse）画风 / 场景效果 LoRA 目录 —— 并列新文件，不动既有目录文件
+LORA_CATALOG.update(_MIHOYO_CATALOG)
 
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
 Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
