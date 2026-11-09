@@ -276,10 +276,13 @@ taskkill /PID <LISTENING 那一行的进程号> /F
 
 ### MOSS-Image 结构化增强（layout）
 
-MOSS-Image 面板在「增强 / 二次增强」之外，另有 **「结构化增强（layout）」** 入口：
-本地模型把自然语言需求扩写成 MOSS **Layout JSON**（对象清单 + 位置坐标），
-服务端做 schema 校验与坐标编译，再**确定性翻译**成最终文本提示词送进 `CLIPTextEncode`。
-产物可查看、可编辑、可复制、可回填；Layout JSON 为官方格式
+「增强」按钮是一个**分裂按钮**：主键执行当前增强方式，右侧 **▾ 箭头**展开下拉菜单，
+可在 **普通增强 / 二次增强 / 结构化增强（layout）** 之间切换。
+
+其中 **结构化增强（layout）** 让本地模型把自然语言需求扩写成 MOSS **Layout JSON**
+（对象清单 + 位置坐标），服务端做 schema 校验与坐标编译，再**确定性翻译**成最终文本
+提示词送进 `CLIPTextEncode`。产物可查看、可编辑、可复制、可回填；Layout JSON 为官方格式
+该选项**仅在 MOSS-Image 面板可用**（其它模型不认 layout 坐标）。
 （`bbox_coord_space=abs_centralized`、`bbox_format=yxyx`）。
 
 这是 ComfyUI-Moss 插件 `MossPrompt` 节点能力的**外部复现** —— 不接任何外部 API，
