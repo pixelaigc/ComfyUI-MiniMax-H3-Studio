@@ -359,13 +359,16 @@ OUTPUT_RATIO_BY_MODE = {
 #   cap   —— 该档最多给这么多（None = 不限，受用户配置的上限约束）
 #   注意：short/medium 不再是固定 300，而是「下限 + 可自适应放大」，
 #   否则长提示词在 medium 档照样被硬切（审查 P1-3 的实测根因）。
+# hint 只描述「这一档怎么算预算」，**不重复 label** ——
+# 前端把 label 和 hint 拼成「标签（提示）」，重复会显示成
+# 「详尽（详尽（至少 4096 tokens…））」（浏览器实测窄屏下可见）。
 LENGTH_PRESETS = {
     "short": {"label": "精简", "floor": 300, "cap": 1024,
-              "hint": "精简（上限 1024 tokens）"},
+              "hint": "上限 1024 tokens"},
     "medium": {"label": "标准", "floor": 300, "cap": None,
-               "hint": "标准（按原文长度自适应，最少 300 tokens）"},
+               "hint": "按原文长度自适应，最少 300 tokens"},
     "long": {"label": "详尽", "floor": 4096, "cap": None,
-             "hint": "详尽（至少 4096 tokens，按原文长度自适应）"},
+             "hint": "至少 4096 tokens，按原文长度自适应"},
 }
 
 DEFAULT_PARAMS = {
