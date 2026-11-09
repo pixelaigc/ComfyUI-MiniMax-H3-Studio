@@ -360,10 +360,14 @@ def check_refine_structure(text: str):
     """
     errors = []
     warnings = []
-    if not re.search(r"【\s*L1\s*", text):
-        errors.append("二次增强结果缺少 L1 特写分级标题（逐物体枚举结构不完整）")
+    # 【2026-11-09 修正】模板原文写着「若某一级没有物体，跳过该级标题」——
+    #   所以**不能**硬要求 L1 存在。旧实现要求 L1，与模板自相矛盾，
+    #   模型合法地跳过 L1 时会被判「结构不完整」而整单拒收
+    #   （实测：合并实例上二次增强 502，报「缺少 L1 特写分级标题」）。
+    # 现在：只要有**任意一级**分级标题（或末段）就算结构完整。
     if not (re.search(r"【\s*L[123]\s*", text)
-            or re.search(r"【\s*主体细化\s*】", text)):
+            or re.search(r"【\s*主体细化\s*】", text)
+            or re.search(r"【\s*整体细化\s*】", text)):
         errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或主体细化）")
     # 至少要有若干个物件条目，每个带冒号字段
     entries = re.findall(r"^[^\n:：]{1,40}[：:].{0,80}$", text, flags=re.M)
@@ -535,7 +539,10 @@ def validate(text: str, original: str = "", mode: str = "pe"):
         errors.append("出现提示词权重语法（Z-Image 不支持 Compel 语法）："
                       + "、".join(hits))
 
-    if mode == "refine":
+    if mode in ("refine", "music_refine"):
+        # music_refine（音乐版二次增强）也走逐物体枚举的结构检查 ——
+        # 它的分级标题是「【L1 主线】/【L2 支撑】/【L3 远景】/【整体细化】」，
+        # 末段用「整体细化」而不是「主体细化」。
         refine_errors, refine_warnings = check_refine_structure(text)
         errors.extend(refine_errors)
         warnings.extend(refine_warnings)

@@ -600,5 +600,57 @@ class TestNoLegacyFixedBudgets(unittest.TestCase):
 
 
 
+class TestRefineStructureValidatorConsistency(unittest.TestCase):
+    """
+    模板原文写着「若某一级没有物体，跳过该级标题」——
+    校验器**不能**硬要求 L1 存在（旧实现要求，与模板自相矛盾）。
+
+    实测后果：模型合法跳过 L1 时，整单被拒（502「缺少 L1 特写分级标题」），
+    白白浪费一次已经写好的完整结果。
+    """
+
+    def _validator(self):
+        import importlib.util
+        import os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "h3studio", "skills", "prompt-enhancer", "scripts", "validate.py")
+        spec = importlib.util.spec_from_file_location("pv", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_skipping_l1_is_not_an_error(self):
+        v = self._validator()
+        out = ("【L2 中景】\n外套：\n  颜色：深红\n\n【L3 远景】\n骑楼：\n  轮廓：x\n\n"
+               "【主体细化】\n姿态：站")
+        errors, warnings = v.check_refine_structure(out)
+        self.assertEqual(errors, [], "合法跳过 L1 不该被判结构不完整")
+
+    def test_no_levels_at_all_is_still_an_error(self):
+        """完全没有分级标题仍然要报错（真的没做细化）。"""
+        v = self._validator()
+        errors, warnings = v.check_refine_structure("就是一段普通文字，没有任何结构")
+        self.assertTrue(errors)
+
+    def test_music_refine_mode_is_wired(self):
+        """music_refine 档也要走逐物体枚举结构检查。"""
+        import inspect
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "h3studio", "skills", "prompt-enhancer", "scripts", "validate.py")
+        src = open(path, encoding="utf-8").read()
+        self.assertIn('"refine", "music_refine"', src)
+
+    def test_music_refine_terminal_accepted(self):
+        """音乐版末段「【整体细化】」也算结构完整。"""
+        v = self._validator()
+        out = ("【L1 主线】\n人声：温暖\n\n【L2 支撑】\n编曲：钢琴\n\n"
+               "【整体细化】\n整体：安静")
+        errors, _ = v.check_refine_structure(out)
+        self.assertEqual(errors, [])
+
+
+
 if __name__ == "__main__":
     unittest.main()
