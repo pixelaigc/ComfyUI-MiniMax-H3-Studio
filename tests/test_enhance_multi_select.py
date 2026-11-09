@@ -88,15 +88,24 @@ class TestEnhanceMultiSelectSource(unittest.TestCase):
             self.assertIn(api, src, f"缺少对外 API {api}")
 
     def test_menu_renders_checkbox_per_item(self):
-        """每一项必须渲染一个复选框（多选的前提）。"""
-        src = self.read("enhance-menu.js")
-        self.assertIn("data-method-check", src,
+        """每一项必须渲染一个复选框（多选的前提）。
+
+        【2026-11-10】菜单项的 HTML 渲染已抽到**共用组件**
+        （web/enhance-menu-shared.js 的 enhanceMenuItemHtml /
+        renderEnhanceMenu）—— 图像面板与音乐面板用的是同一份实现，
+        所以复选框标记在那里，不在 enhance-menu.js 里。
+        """
+        shared = self.read("enhance-menu-shared.js")
+        self.assertIn("data-method-check", shared,
                       "菜单项必须带复选框（多选）")
-        self.assertIn('type="checkbox"', src)
-        # 复选框的 change 事件 -> 走 toggleMethod
-        self.assertRegex(src, r'addEventListener\("change",\s*\(\)\s*=>\s*\{\s*'
-                         r'toggleMethod\(',
-                         "复选框的 change 必须触发切换逻辑")
+        self.assertIn('type="checkbox"', shared)
+
+        src = self.read("enhance-menu.js")
+        # enhance-menu.js 仍要调用共用渲染实现（不自己另写一份）
+        self.assertIn("shared.renderEnhanceMenu(menu, {", src,
+                      "enhance-menu.js 应调用共用渲染实现")
+        self.assertIn("onToggle: toggleMethod", src,
+                      "共用组件的 onToggle 必须接到 toggleMethod")
 
     def test_selection_is_multi_not_radio(self):
         """选中集合是数组（可多项），不是单个 currentId。"""
