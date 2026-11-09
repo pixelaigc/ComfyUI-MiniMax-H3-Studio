@@ -40,6 +40,11 @@
    * recommended 标注「推荐」
    * fields      该项自带的可编辑字段
    * kind        "template"（走 /api/enhance 模板扩写）| "moss-layout" | "qwen-pe"
+   *             | "yue2-struct"（音乐结构化：风格字段 + 歌词）
+   * write       该方式的**写回契约**（审查 P0-1 要求「按能力契约」而非硬编码 id）：
+   *             - 不写 = 文本路线，写回当前面板的文本输入框
+   *             - kind:"structured" = 结构化路线，产物是结构化对象
+   *               （由该方式自己注册契约，见 music-enhance.js）
    */
   const ENHANCE_METHODS = [
     {
@@ -51,6 +56,9 @@
       busyFlag: "enhance",
       buttonText: "增强",
       kind: "template",
+      // 【写回契约 · 文本路线】产物是一段文本，写回当前面板的文本输入框。
+      // 目标由 targets() 按能力解析（先 #prompt，再兼容 #musicPrompt/#musicStyle）。
+      write: { kind: "text" },
     },
     {
       id: "refine",
@@ -63,6 +71,8 @@
       busyFlag: "refine",
       buttonText: "二次增强",
       kind: "template",
+      // 【写回契约 · 文本路线】
+      write: { kind: "text" },
     },
     {
       id: "layout",
@@ -74,6 +84,10 @@
       busyFlag: "layout",
       buttonText: "结构化增强",
       kind: "moss-layout",
+      // 【写回契约 · 文本路线】
+      // layout 的产物最终仍翻译成**文本提示词**写回提示词框
+      // （坐标 JSON 本身由 moss-layout.js 渲染成弹窗）。
+      write: { kind: "text" },
     },
     {
       // 【统一增强体系 · 音乐路线】
@@ -97,6 +111,11 @@
       buttonText: "生成风格+歌词",
       recommended: true,
       kind: "yue2-struct",
+      // 【写回契约 · 结构化路线】
+      // 产物是「12 个风格字段 + 歌词」这个**结构化对象**，塞不进文本框。
+      // 契约由 music-enhance.js 注册（window.MusicEnhance.getWriteContract），
+      // 这里只声明「走结构化路线」，具体落地交给契约的 apply()。
+      write: { kind: "structured" },
     },
     {
       id: "qwen_pe",
@@ -110,6 +129,8 @@
       // 官方最佳实践 —— 界面上标 Recommended
       recommended: true,
       kind: "qwen-pe",
+      // 【写回契约 · 文本路线】官方 PE 的产物是扩写后的提示词文本。
+      write: { kind: "text" },
       // 该项自带的可编辑字段：官方 PE 的 system prompt 与档位参数。
       // systemPrompt 走「扩写 + 出图」同一条链路；params 是 PE 节点参数。
       fields: [
@@ -358,12 +379,55 @@
   /**
    * 把增强结果写回到本面板的输入元素。
    * 找不到目标时返回 false（调用方给出可读提示，不抛异常）。
+   *
+   * 【按能力契约写回 · 审查 P0-1】
+   * 目标不再由调用点硬编码，而是由**增强方式自己声明的 write 契约**决定：
+   *   - write.kind === "structured" -> 结构化路线（音乐）：交给契约的 apply()
+   *   - write.kind === "text"（或未声明）-> 文本路线：写回当前面板的文本输入框
+   *
+   * @param {string} text   写回的文本
+   * @param {object} method 增强方式（取它的 write 声明）；不传则按文本路线
+   * @returns {boolean} 是否写回成功
    */
-  function writeBackInput(text) {
-    const { el, selector } = resolveTarget(targets().outputSelectors);
+  function writeBackInput(text, method) {
+    const decl = method && method.write ? method.write : { kind: "text" };
+    if (decl.kind === "structured") {
+      const t = resolveStructuredWriteTarget();
+      if (!t.ok) return false;
+      if (typeof t.apply === "function") t.apply(text);
+      return true;
+    }
+    const { el } = resolveTarget(targets().outputSelectors);
     if (!el) return false;
     el.value = text == null ? "" : String(text);
     return true;
+  }
+
+  /**
+   * 取某个增强方式的**写回契约**（供外部调用方使用）。
+   *
+   * 返回结构与 EnhanceMenuShared.resolveWriteTarget 的输入一致：
+   *   { kind: "text"|"structured", targets?, target?, describe?, apply? }
+   *
+   * 文本路线的 targets 是**候选列表**（按优先级探测，先新后旧）：
+   *   图像/视频 = #prompt
+   *   音乐      = #musicPrompt（yue2-flow 改名后的），
+   *                并兼容 enh-unify 的 #musicStyle（同一语义的两个名字）
+   */
+  function methodWriteContract(method) {
+    const decl = method && method.write ? method.write : { kind: "text" };
+    if (decl.kind === "structured") {
+      const music = window.MusicEnhance
+        && typeof window.MusicEnhance.getWriteContract === "function"
+        ? window.MusicEnhance.getWriteContract() : null;
+      if (music) return music;
+      return { kind: "structured", describe: () => "音乐写回契约未注册" };
+    }
+    return {
+      kind: "text",
+      targets: targets().outputSelectors,
+      describe: () => `本面板找不到可写回的${targets().label}输入框`,
+    };
   }
 
   /**
@@ -1412,7 +1476,7 @@
         };
       }
       // 写回输入框（按能力契约；找不到目标时给可读提示，不抛异常）
-      if (!writeBackInput(refined)) {
+      if (!writeBackInput(refined, method)) {
         throw new Error(`本面板找不到可写回的${targets().label}输入框，增强结果未写入`);
       }
       pushPromptVersion(2, refined, `模板：${d.spec_id || refineSpecId()}`, d.spec_id);
@@ -1699,10 +1763,24 @@
         refreshButton: updateButton,
         mergeFragments: mergeFragments,
         getSelected: () => selectedIds.slice(),
+        // 【写回契约 · 审查 P0-1】按增强方式取它自己声明的写回契约。
+        // 外部调用方（providers.js 的「替换/追加」写回）用它，
+        // 而不是各自硬编码某个 id。
+        getWriteContract: (methodId) => {
+          // 注意：默认取**当前可运行的**方式（runnableMethods），
+          // 不能直接用 currentMethod() —— 后者不按可用性过滤，
+          // 在音乐面板可能取到已失效的文本扩写类（basic 排在注册表最前），
+          // 那样会拿到文本契约而漏掉结构化契约。
+          const m = methodId
+            ? byId[methodId]
+            : (runnableMethods()[0] || currentMethod());
+          return methodWriteContract(m);
+        },
         // 统一增强体系对外接口（供测试与其它面板使用）
         getMethods: () => ENHANCE_METHODS.map(m => ({
           id: m.id, label: m.label, modes: m.modes || [], kind: m.kind,
           specId: methodSpecId(m), specLabel: methodSpecLabel(m),
+          write: m.write || { kind: "text" },
         })),
         getMethodSpec: (methodId) => {
           const m = byId[methodId];

@@ -159,16 +159,31 @@ class TestMusicWritebackContract(unittest.TestCase):
         enhanceWriteContract() 无条件返回音乐结构化契约 ->
         图像面板写回被解析成 kind:"structured" -> 「替换/追加」静默失败、
         徽标不显示、版本等级恒为 0。
-        修法：只有音乐面板（isMusicMode()）才用结构化契约。
+        修法：契约按「当前可运行的增强方式」决定（统一注册表），
+        兜底仍用 isMusicMode() 守卫。
         """
         body = strip_js_comments(PROVIDERS_JS.read_text(encoding="utf-8"))
         idx = body.index("function enhanceWriteContract()")
         fn = body[idx:idx + 1200]
+        # 1) 必须先问统一注册表（增强方式自己声明写回形态）
+        self.assertIn("enhanceMethods", fn,
+                      "enhanceWriteContract 必须优先用统一注册表声明的契约")
+        self.assertIn("getWriteContract", fn,
+                      "enhanceWriteContract 必须向注册表要契约")
+        # 2) 兜底路径仍必须用 isMusicMode 守卫结构化契约
         self.assertIn("isMusicMode", fn,
-                      "enhanceWriteContract 必须先判断是否音乐面板")
-        # 结构化契约的取用必须在 isMusicMode 守卫之内
-        self.assertLess(fn.index("isMusicMode"), fn.index("getWriteContract"),
-                        "isMusicMode 判据必须出现在 getWriteContract 之前")
+                      "兜底路径必须判断是否音乐面板")
+        # 3) 结构化契约的取用必须在 isMusicMode 守卫之内
+        guard = fn.index("isMusicMode")
+        self.assertLess(guard, fn.index("window.MusicEnhance"),
+                        "结构化契约的取用必须在 isMusicMode 守卫之内")
+        # 4) 注册表侧必须按「可运行方式」解析（不是无条件取第一个注册项）
+        reg = strip_js_comments(ENHANCE_JS.read_text(encoding="utf-8"))
+        m = re.search(r"getWriteContract:\s*\(methodId\)\s*=>\s*\{(.*?)\n        \}",
+                      reg, flags=re.S)
+        self.assertIsNotNone(m, "注册表没导出 getWriteContract")
+        self.assertIn("runnableMethods()", m.group(1),
+                      "注册表必须按可运行方式解析契约（按可用性过滤）")
 
     def test_structured_fields_are_filled_by_contract(self):
         """契约的 apply 要同时写结构化风格字段与歌词。"""
