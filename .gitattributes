@@ -1,0 +1,49 @@
+# 仓库行尾策略（2026-11-09 审查返修引入）
+#
+# 【为什么需要】
+# 本仓库历史上混用 CRLF / LF，且没有 .gitattributes，行尾完全依赖每个
+# 开发者/工具的本地设置。结果：
+#   - 同一份文件在 maintainer 是 CRLF、在某个分支被静默转成 LF
+#   - `git diff --stat` 显示 5827 行「巨改」，真实改动只有 233 行
+#   - 每次涉及这些文件的合并都产生大量**伪冲突**（行尾差异）
+#
+# 【策略】
+#   1. 仓库内**一律 LF**（text=auto eol=lf）：这是跨平台最稳的选择，
+#      也让 git 的 blob 归一化生效 —— 同一份内容无论在哪个平台
+#      提交，blob 都一样，diff 干净、合并不产生行尾伪冲突。
+#   2. 历史遗留的 CRLF 文件（server.py / web/index.html / web/app.js /
+#      web/style.css 等）在**本次返修中一次性归一化成 LF**，
+#      归一化本身是一个独立的、可审阅的提交。
+#
+# 【为什么不保留 CRLF】
+# `text eol=crlf` 只能保证**检出**时是 CRLF，blob 仍会被归一化成 LF；
+# 而历史 blob 是**带 CR 的真实字节**，两者在 merge 时仍会被判为
+# 不同内容 —— 伪冲突不会消失（已实测：CRLF blob 与 LF blob 合并
+# 必然冲突）。唯一能根治的办法是让 blob 本身统一。
+#
+# 【Windows 开发者】
+# 检出时 git 会按 text=auto eol=lf 把工作区写成 LF。若某个工具
+# 必须在 CRLF 下工作，用 `git config core.autocrlf true` 本地覆盖，
+# 但**提交前请确认没有把 CRLF 写回 blob**（git 会自动归一化，无需担心）。
+#
+# 【校验】
+#   git ls-files --eol | grep -v 'i/lf'   # 应该只剩二进制文件
+
+* text=auto eol=lf
+
+# 二进制：明确不参与行尾转换
+*.safetensors binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bin binary
+*.mp4 binary
+*.flac binary
+*.wav binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
