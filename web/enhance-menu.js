@@ -148,12 +148,14 @@
     if (!method) return "";
     const options = methodSpecOptions(method);
     if (!options.length) return method.specId || "";
-    // 用户在该方式下选过的模板优先（菜单里就地切换过）
+    // 用户在该方式下选过的模板优先（模板行里切换过）。
+    // 注意 options 是**当前上下文**的清单 —— 跨模式残留的旧选择
+    // 不在 options 里，自然被丢弃（这就是「切换模式时失效旧选择」）。
     const picked = selectedSpecByMethod[specKey(method.id)];
     if (picked && options.indexOf(picked) >= 0) return picked;
     // 否则用当前上下文的默认模板（服务端 mode_defaults）
     const def = currentSpecId();
-    if (options.indexOf(def) >= 0) return def;
+    if (def && options.indexOf(def) >= 0) return def;
     return options[0];
   }
 
@@ -174,11 +176,15 @@
    */
   function methodSpecOptions(method) {
     if (!method) return [];
-    if (method.id === "refine") return [refineSpecId()];
+    if (method.id === "refine") {
+      const id = refineSpecId();
+      return id ? [id] : [];
+    }
     if (method.id === "layout" || method.id === "qwen_pe") return [];
     const specs = currentContextSpecs();
     if (specs.length) return specs.map(s => s.id);
-    return [currentSpecId()];
+    const def = currentSpecId();
+    return def ? [def] : [];
   }
 
   /** 本面板可用的模板清单（按当前模式 + 模型过滤）。 */
@@ -205,31 +211,66 @@
     saveSelection();
   }
 
-  /** 当前媒体类型下「二次增强」的模板 id（服务端下发，前端不硬编码）。 */
+  /**
+   * 当前媒体类型下「二次增强」的模板 id（服务端下发，前端不硬编码）。
+   *
+   * 【2026-11-09】去掉了硬编码兜底 "image-refine"：
+   * 服务端加了新媒体类型后，前端回落到写死的旧 id 会拿错模板。
+   * 取不到时返回空串，由调用方提示「配置未就绪，请刷新」。
+   */
   function refineSpecId() {
-    if (typeof provState === "undefined" || !provState) return "image-refine";
+    if (typeof provState === "undefined" || !provState) return "";
     const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
     const byMode = provState.refineSpecs || {};
     if (byMode[mode]) return byMode[mode];
     const byMedia = provState.refineSpecByMedia || {};
     const media = currentMedia();
-    return byMedia[media] || "image-refine";
-  }
-
-  /** 当前上下文的默认增强模板 id（普通增强用）。 */
-  function currentSpecId() {
-    if (typeof provState === "undefined" || !provState) return "image";
-    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
-    const defaults = provState.modeDefaults || {};
-    return defaults[mode] || provState.specId || "image";
+    return byMedia[media] || "";
   }
 
   /**
-   * 当前上下文的 DOM 目标 —— 音乐面板用另一套 id。
+   * 当前上下文的默认增强模板 id（普通增强用）。
    *
-   * 音乐模式的输入是「风格描述」(#musicStyle)，不是提示词框 (#prompt)；
-   * 所以增强按钮 / 下拉 / 提示栏都要指向音乐面板里的那一套元素。
-   * 同一时刻只有一个面板可见，因此这里按模式返回一套目标即可。
+   * 【2026-11-09 统一状态来源】原来这里是
+   *     defaults[mode] || provState.specId || "image"
+   * 其中 provState.specId 是**全局单值**状态，与
+   * selectedSpecByMethod（按 mode::method 存）**两套状态并存** ——
+   * 切到别的模式再切回来时，可能命中一个属于别的模式的模板 id。
+   *
+   * 现在只认两处：
+   *   1. 服务端下发的 modeDefaults[mode]（该上下文的权威默认）
+   *   2. 用户在该上下文下显式选过的模板（selectedSpecByMethod）
+   * 兜底改为「空串 + 提示刷新配置」，不再硬编码模板 id ——
+   * 服务端加了新模板后，前端不应回落到一个写死的旧 id。
+   */
+  function currentSpecId() {
+    if (typeof provState === "undefined" || !provState) return "";
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    const defaults = provState.modeDefaults || {};
+    return defaults[mode] || "";
+  }
+
+  /**
+   * 当前上下文的 DOM 目标 —— **按能力抽象**，不硬编码某个 id。
+   *
+   * 【2026-11-09 重构】原来这里是硬编码的：
+   *     input: music ? "#musicStyle" : "#prompt"
+   * 问题：yue2-flow 分支把音乐输入框从 #musicStyle 改名成 #musicPrompt
+   * （且结构化风格字段是另一组 id），两边合并后
+   * `document.querySelector("#musicStyle")` 返回 null ->
+   * 后面 `.value` 抛 TypeError -> **音乐增强静默崩溃**。
+   *
+   * 现在改成「能力契约」：
+   *   - input      —— 增强的**输入**载体（一个可写文本的控件）
+   *   - outputs    —— 增强的**产物**写回目标（可以是多个：
+   *                  文本框 + 一组结构化字段 + 歌词框）
+   *   - badge      —— 「已增强」徽标元素
+   *   - versions   —— 版本历史是否适用于本面板
+   *   - label      —— 面板里这个输入框叫什么（提示文案用）
+   *
+   * 契约是**能力**而不是 id：具体 id 由 resolveTarget() 按「先新后旧」
+   * 的顺序探测，探测不到就返回 null，由调用方给出可读提示，
+   * **绝不静默抛 TypeError**。
    */
   function targets() {
     const music = isMusicContext();
@@ -241,9 +282,63 @@
       hint: music ? "#musicEnhanceHint" : "#enhanceHint",
       applied: music ? "#musicEnhanceAppliedParams" : "#enhanceAppliedParams",
       split: music ? "#musicEnhanceSplit" : "#enhanceSplit",
-      // 输入框：音乐 = 风格描述；其它 = 提示词框
-      input: music ? "#musicStyle" : "#prompt",
+      current: music ? "#musicEnhanceCurrent" : "#enhanceCurrent",
+      // 【模板选择行】与增强方式下拉平级的一行（见 renderSpecRow）
+      specRow: music ? "#musicEnhanceSpecRow" : "#enhanceSpecRow",
+      specLabel: music ? "#musicEnhanceSpecLabel" : "#enhanceSpecLabel",
+      specSelect: music ? "#musicEnhanceSpecSelect" : "#enhanceSpecSelect",
+      // 【能力契约】见上。inputSelectors 是**候选列表**（按优先级）：
+      //   图像/视频 = 提示词框
+      //   音乐      = 音乐描述框（yue2-flow 改名后的 #musicPrompt）
+      //               与 enh-unify 的 #musicStyle（同一语义的两个名字）
+      inputSelectors: music
+        ? ["#musicPrompt", "#musicStyle"]
+        : ["#prompt"],
+      // 产物写回目标（候选列表，同上语义）
+      outputSelectors: music
+        ? ["#musicPrompt", "#musicStyle"]
+        : ["#prompt"],
+      // 徽标与版本历史：音乐面板有独立的徽标；版本历史目前只对图像面板生效
+      badgeSelectors: music ? ["#musicPromptBadge"] : ["#promptEnhancedBadge"],
+      supportsVersions: !music,
+      label: music ? "音乐描述" : "提示词",
     };
+  }
+
+  /**
+   * 按能力契约解析出实际的 DOM 元素。
+   *
+   * 返回 { el, selector } —— 找不到时 el = null（**不抛异常**）。
+   * 调用方必须处理 null，给出可读提示，而不是让 TypeError 冒到顶层。
+   */
+  function resolveTarget(selectors) {
+    const list = Array.isArray(selectors) ? selectors : [selectors];
+    for (const sel of list) {
+      if (!sel) continue;
+      const el = document.querySelector(sel);
+      if (el) return { el, selector: sel };
+    }
+    return { el: null, selector: list[0] || "" };
+  }
+
+  /**
+   * 当前的增强输入元素（取它当前的文本）。
+   * 找不到时返回空串 —— 调用方据此提示「本面板没有可增强的输入」。
+   */
+  function currentInputValue() {
+    const { el } = resolveTarget(targets().inputSelectors);
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  /**
+   * 把增强结果写回到本面板的输入元素。
+   * 找不到目标时返回 false（调用方给出可读提示，不抛异常）。
+   */
+  function writeBackInput(text) {
+    const { el, selector } = resolveTarget(targets().outputSelectors);
+    if (!el) return false;
+    el.value = text == null ? "" : String(text);
+    return true;
   }
 
   /** 当前是否在音乐模式（文生音乐 / 参考生音乐）。 */
@@ -442,16 +537,22 @@
       const checked = selectedIds.indexOf(m.id) >= 0;
       // 每项显示它用的模板（改造前模板藏在第二个下拉里，
       // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
-      const specTag = renderSpecPicker(m);
+      const specTag = renderSpecTag(m);
       // 不可用时说明**为什么**不可用（属于哪个功能）
       const why = unavailableReason(m);
+      // 【2026-11-09 修文案冲突】禁用项**不**再同时挂 Recommended 与
+      // 「本面板不可用」两套徽标 —— 两者语义矛盾（「这里推荐」+「这里用不了」）。
+      // 规则：可用时才标 Recommended；不可用时只说明**为什么这里没有**
+      //（写明它属于哪个功能）。
+      const badge = ok
+        ? (m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : "")
+        : `<span class="enhance-menu-badge">${esc(why)}</span>`;
       return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
         <label class="enhance-menu-check" title="${esc(m.hint)}">
           <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
           <span class="enhance-menu-label">${esc(m.label)}</span>
           ${specTag}
-          ${m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : ""}
-          ${ok ? "" : `<span class="enhance-menu-badge">${esc(why)}</span>`}
+          ${badge}
         </label>
         <span class="enhance-menu-hint">${esc(m.hint)}</span>
         ${m.fields && m.fields.length ? renderFields(m) : ""}
@@ -461,16 +562,6 @@
     menu.querySelectorAll("input[data-method-check]").forEach(box => {
       box.addEventListener("change", () => {
         toggleMethod(box.dataset.methodCheck, box.checked);
-      });
-    });
-    // 模板就地切换：改了立刻套用（普通增强用的模板 = 实际扩写用的模板）
-    menu.querySelectorAll("select[data-spec-method]").forEach(sel => {
-      sel.addEventListener("click", e => e.stopPropagation());
-      sel.addEventListener("change", () => {
-        setMethodSpec(sel.dataset.specMethod, sel.value);
-        renderMenu();
-        updateButton();
-        updatePanelVisibility();
       });
     });
     menu.querySelectorAll(".enhance-menu-field").forEach(el => {
@@ -490,18 +581,65 @@
    * 规则 1 的可见表达：别的功能的专属增强在本面板被禁用并说明来历。
    */
   /**
-   * 某个增强方式自带的**模板选择器**（就地在菜单里切换）。
+   * 增强栏里的**模板选择行**（与「增强方式」下拉平级的一行）。
    *
-   * 这是被删掉的第二个下拉（#enhanceSpec）的替代：
-   * 原来它平铺列出所有模板，与「增强方式」下拉语义重叠；
-   * 现在模板选择**长在对应的增强方式下面** ——
-   *   普通增强 -> 本面板可用的模板（Z-Image 官方PE / SCALIST / bbox …）
-   *   二次增强 -> 唯一那条（按媒体类型选定的通用细化模板）
-   *   结构化增强 / 官方 PE -> 不用模板（各自有专属链路），不显示
+   * 【2026-11-09 从「菜单项的子属性」提升为「平级一行」】
+   * 改造前（enh-unify 第一版）：模板选择被塞进增强方式菜单项内部
+   *   （renderSpecPicker），用户要在两级 UI 里做两次选择；
+   *   而且 methodSpecOptions("basic") 返回当前上下文的**全部**模板，
+   *   塞进一个菜单项里既挤又难发现。
    *
-   * 只有一条模板时不显示下拉（直接显示名字），避免无意义的单选控件。
+   * 现在：模板选择器是增强栏里的**独立一行**（enhance-spec-row），
+   *   与增强方式下拉平级 —— 一次点击就能看到「当前用哪个模板」，
+   *   一次点击就能改。规则 4「一个增强按钮 + 一个下拉 + 明确显示
+   *   当前所选增强方式」依然成立（模板行不是**增强入口**，
+   *   它只是当前主增强方式的参数）。
+   *
+   * 模板行显示的是**当前主增强方式**（多选时取第一个选中的）的模板；
+   * 其它方式各自的模板仍可在菜单项里看到（renderSpecTag）。
    */
-  function renderSpecPicker(method) {
+  function renderSpecRow() {
+    const t = targets();
+    const row = document.querySelector(t.specRow);
+    if (!row) return;
+    const method = currentMethod();
+    const options = methodSpecOptions(method);
+    const specs = (typeof provState !== "undefined" && provState
+                   && provState.agent && provState.agent.specs)
+      ? provState.agent.specs : [];
+    const byIdMap = {};
+    specs.forEach(s => { byIdMap[s.id] = s; });
+    const label = document.querySelector(t.specLabel);
+    if (label) label.textContent = method ? `模板（${method.label}）` : "模板";
+    const sel = document.querySelector(t.specSelect);
+    if (!sel) return;
+    if (!options.length) {
+      // 该方式不用模板（结构化增强 / 官方 PE）或配置未就绪
+      sel.innerHTML = `<option value="">${options.length ? "" : "该增强方式不使用模板"}</option>`;
+      sel.disabled = true;
+      sel.value = "";
+      row.hidden = true;
+      return;
+    }
+    row.hidden = false;
+    sel.disabled = false;
+    const current = methodSpecId(method);
+    sel.innerHTML = options.map(id => {
+      const s = byIdMap[id];
+      const name = s ? s.label : id;
+      return `<option value="${esc(id)}"${id === current ? " selected" : ""}>${esc(name)}</option>`;
+    }).join("");
+    sel.value = current;
+  }
+
+  /**
+   * 菜单项里的**模板标签**（只读，不再是可点的子下拉）。
+   *
+   * 模板选择已提升到增强栏的平级一行（renderSpecRow），
+   * 这里只显示「这一项用的是哪个模板」，让用户在选增强方式时
+   * 就能看出差别 —— 但不再要求两级 UI。
+   */
+  function renderSpecTag(method) {
     const options = methodSpecOptions(method);
     if (!options.length) return "";
     const specs = (typeof provState !== "undefined" && provState
@@ -510,20 +648,10 @@
     const byIdMap = {};
     specs.forEach(s => { byIdMap[s.id] = s; });
     const current = methodSpecId(method);
-    if (options.length === 1) {
-      const one = byIdMap[options[0]];
-      const name = one ? one.label : options[0];
-      return `<span class="enhance-menu-spec" title="该项使用的增强模板">${esc(name)}</span>`;
-    }
-    const opts = options.map(id => {
-      const s = byIdMap[id];
-      const name = s ? s.label : id;
-      return `<option value="${esc(id)}"${id === current ? " selected" : ""}>${esc(name)}</option>`;
-    }).join("");
-    return `<label class="enhance-menu-spec-row" title="该项使用的增强模板">
-      <span class="enhance-menu-spec-label">模板</span>
-      <select class="enhance-menu-spec" data-spec-method="${esc(method.id)}">${opts}</select>
-    </label>`;
+    const one = byIdMap[current];
+    const name = one ? one.label : current;
+    const more = options.length > 1 ? `（共 ${options.length} 档，可在下方模板行切换）` : "";
+    return `<span class="enhance-menu-spec" title="该项使用的增强模板">${esc(name)}${esc(more)}</span>`;
   }
 
   /**
@@ -595,6 +723,49 @@
   }
 
   /**
+   * 切换模式 / 模型后**失效**不属于当前上下文的模板选择。
+   *
+   * 【2026-11-09】原来 selectedSpecByMethod（按 mode::method 存）
+   * 与 provState.specId（全局单值）两套状态并存：
+   * 切到别的模式再切回来时，可能命中一个属于别的模式的模板 id
+   * （因为键里虽然带了 mode，但**模型**变了而 mode 没变时，
+   * 同一 mode 下的模板集合已经变了 —— 例如 Qwen 面板切到 Z-Image 模型）。
+   *
+   * 现在：模式/模型变化时，把该上下文**不可用**的模板选择直接清掉。
+   * 保留「该上下文仍然可用」的选择 —— 用户不必每次重选。
+   */
+  function invalidateSpecSelection() {
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    if (!mode) return false;
+    const valid = new Set(currentContextSpecs().map(s => s.id));
+    let changed = false;
+    Object.keys(selectedSpecByMethod).forEach(key => {
+      // key = "<mode>::<methodId>"
+      const keyMode = key.split("::")[0];
+      if (keyMode !== mode) return;               // 别的模式的先不动
+      const methodId = key.split("::")[1];
+      const method = byId[methodId];
+      if (!method) { delete selectedSpecByMethod[key]; changed = true; return; }
+      const options = methodSpecOptions(method);
+      // 二次增强的模板按媒体类型选，不在普通模板清单里 —— 单独判
+      if (methodId === "refine") {
+        const want = refineSpecId();
+        if (!want || selectedSpecByMethod[key] !== want) {
+          delete selectedSpecByMethod[key];
+          changed = true;
+        }
+        return;
+      }
+      if (options.length && options.indexOf(selectedSpecByMethod[key]) < 0) {
+        delete selectedSpecByMethod[key];
+        changed = true;
+      }
+    });
+    if (changed) saveSelection();
+    return changed;
+  }
+
+  /**
    * 当前选中的方式在当前模式下是否仍可用；不可用则剔除。
    *
    * 模式切换时必须做这件事 —— 否则主按钮会停在一个「当前模式不可用」的
@@ -603,6 +774,8 @@
    */
   function ensureAvailable() {
     const before = selectedIds.length;
+    // 模式/模型变了 -> 先失效不属于当前上下文的模板选择
+    invalidateSpecSelection();
     selectedIds = selectedIds.filter(id => {
       const m = byId[id];
       return m && isAvailable(m);
@@ -641,6 +814,8 @@
         : method.hint;
     }
     updateCurrentIndicator();
+    // 模板行跟着主方式走（主方式变了，模板行要换清单）
+    renderSpecRow();
     // 对外同步「当前方式」：多选时取第一个选中的（兼容旧的单选调用方）
     if (typeof window !== "undefined") {
       window.enhanceMethods = window.enhanceMethods || {};
@@ -755,6 +930,55 @@
 
   // ------------------------------------------------------------------ 菜单开合
 
+  /**
+   * 菜单的「宿主」—— 打开时挂到 body，关闭时挂回原位。
+   *
+   * 【2026-11-09 窄屏弹到视口外的根因修复】
+   * 症状：375 / 390 视口下点开增强下拉，菜单整体位于视口上方之外
+   *      （实测 menuTop=-979 / menuBottom=-350，menuOnScreen=false），
+   *      屏幕上一个选项都看不到。
+   *
+   * 根因：`.enhance-menu` 是 `position: fixed`，但它挂在 #enhanceSplit 里，
+   *      而窄屏下 #panel 是 `position: fixed` + `transform: translateY(0)`
+   *      （web/responsive.css）。**CSS 规定：带 transform 的祖先会成为
+   *      fixed 定位的包含块** —— 于是菜单的 top 不再相对视口，
+   *      而是相对那个被 transform 的 #panel 的滚动内容盒，
+   *      于是落到视口上方 −979px。
+   *
+   * 修法（采用「挂到 body」）：打开时把菜单 append 到 document.body，
+   *      它就不在任何 transform 祖先里 —— fixed 重新相对视口定位。
+   *      关闭时挂回原来的父节点，恢复 DOM 结构。
+   *
+   * 为什么不用另一个方案（去掉 #panel 的 transform）：
+   *      那会破坏底部抽屉的 translateY 动画（审查报告实测过的方案 C）。
+   *
+   * 为什么不用 position:absolute + offsetParent 定位：
+   *      那样菜单会被 #panel 的 overflow-y:auto 裁剪（审查报告 P1-1
+   *      明确要求「不受父级 overflow 裁剪」），且要重写一套定位逻辑。
+   */
+  const MENU_HOME = new WeakMap();   // menu -> 原父节点
+
+  /** 把菜单挂到 body（脱离 transform 包含块）。 */
+  function mountMenuToBody(menu) {
+    if (!menu) return;
+    if (menu.parentElement === document.body) return;
+    MENU_HOME.set(menu, menu.parentElement);
+    document.body.appendChild(menu);
+    // 挂到 body 后不再受原父级的 overflow / z-index 上下文约束，
+    // 给一个足够高的层级（高于面板抽屉的 950）。
+    menu.style.zIndex = "1300";
+  }
+
+  /** 把菜单挂回原来的位置。 */
+  function restoreMenuHome(menu) {
+    if (!menu) return;
+    const home = MENU_HOME.get(menu);
+    if (!home || menu.parentElement === home) return;
+    home.appendChild(menu);
+    menu.style.zIndex = "";
+    MENU_HOME.delete(menu);
+  }
+
   function openMenu() {
     const t = targets();
     const menu = document.querySelector(t.menu);
@@ -763,6 +987,8 @@
     renderMenu();
     menu.hidden = false;
     btn.setAttribute("aria-expanded", "true");
+    // 先挂到 body 再定位 —— 否则算出来的 top 是相对 transform 祖先的
+    mountMenuToBody(menu);
     positionMenu(menu, btn);
   }
 
@@ -773,6 +999,7 @@
     if (!menu) return;
     menu.hidden = true;
     if (btn) btn.setAttribute("aria-expanded", "false");
+    restoreMenuHome(menu);
   }
 
   function toggleMenu() {
@@ -781,7 +1008,13 @@
     if (menu.hidden) openMenu(); else closeMenu();
   }
 
-  /** 菜单定位在按钮下方；靠近视口右/下边缘时翻转，避免出屏。 */
+  /**
+   * 菜单定位在按钮下方；靠近视口右/下边缘时翻转，避免出屏。
+   *
+   * 【2026-11-09】菜单挂到 body 后，getBoundingClientRect() 拿到的
+   * 是**视口坐标**，与 position:fixed 的参照系一致 —— 这正是原来
+   * 在窄屏下算错的原因（坐标是相对 transform 祖先的）。
+   */
   function positionMenu(menu, btn) {
     const r = btn.getBoundingClientRect();
     const mw = menu.offsetWidth || 260;
@@ -790,9 +1023,12 @@
     if (left + mw > window.innerWidth - 8) {
       left = Math.max(8, window.innerWidth - mw - 8);
     }
+    if (left < 8) left = 8;
     let top = r.bottom + 6;
     if (top + mh > window.innerHeight - 8) {
-      top = Math.max(8, r.top - mh - 6);
+      // 下方放不下 -> 翻到按钮上方；上方也放不下就贴着视口顶
+      const above = r.top - mh - 6;
+      top = above >= 8 ? above : 8;
     }
     menu.style.left = left + "px";
     menu.style.top = top + "px";
@@ -848,9 +1084,11 @@
     // 多项：按注册表顺序依次执行，链式输入 + 片段合并 + 参数叠加
     const merged = [];
     const metas = [];
+    const versions = [];
     let anyPe = false;
-    // 链式输入：第一项吃提示词框里的原文，后一项吃前一项的产出
-    let input = document.querySelector(targets().input).value.trim();
+    // 链式输入：第一项吃输入框里的原文，后一项吃前一项的产出
+    const originalInput = currentInputValue();
+    let input = originalInput;
     for (const method of sel) {
       const piece = await runOne(method, { collect: true, input });
       if (!piece) continue;
@@ -860,12 +1098,14 @@
       }
       if (piece.meta) metas.push(piece.meta);
       if (piece.isPe) anyPe = true;
+      if (piece.version) versions.push(piece.version);
     }
     if (!merged.length) return;
     const combined = mergeFragments(merged);
     document.querySelector("#enhanceResult").value = combined;
     document.querySelector("#enhanceMeta").innerHTML = metas.join("<br>");
     document.querySelector("#enhanceModal").hidden = false;
+
     // 【写回标记】合并结果里若含官方 PE 的产出，写回提示词框后
     // 出图就不该再二次扩写（提示词框里已经是官方 PE 结果）。
     // 这个标记必须在**所有项都跑完之后**统一设置 —— 否则先跑的普通增强
@@ -873,6 +1113,44 @@
     if (anyPe && typeof provState !== "undefined") {
       provState.lastEnhanceKind = "qwen_pe";
     }
+
+    // 【2026-11-09 修复】多选路径写版本历史 + 打「已增强」徽标。
+    //
+    // 症状：勾选「普通增强 + 二次增强」执行后，徽标不显示、
+    //       版本历史为空，点生成还会弹「提示词尚未增强」确认框。
+    //
+    // 根因：pushPromptVersion 写在 runBasic()/runRefine() 的
+    //       「非 collect 分支」里 —— 多选走 collect=true，
+    //       提前 return，版本历史一次都没写。
+    //
+    // 修法：各步骤把版本信息**回报**给 run()（piece.version），
+    //       由 run() 在**全部步骤跑完之后**统一写：
+    //         - 原始输入 -> level 0
+    //         - 每个步骤的产出 -> 它自己的 level（普通增强=1，二次增强=2）
+    //         - 合并结果 -> 取最高 level（多选里含二次增强就是 2）
+    //       这样徽标等级与单选路径语义一致。
+    if (targets().supportsVersions && typeof pushPromptVersion === "function") {
+      // 原始输入（level 0）—— 只有当有产出时才记
+      if (originalInput) {
+        pushPromptVersion(0, originalInput, "原始提示词");
+      }
+      // 每一步的产出
+      versions.forEach(v => {
+        if (v && v.text) pushPromptVersion(v.level, v.text, v.source, v.specId);
+      });
+      // 合并结果本身也要是一条版本 —— 用户真正写回的是它
+      const topLevel = versions.reduce((acc, v) => Math.max(acc, (v && v.level) || 0), 0);
+      pushPromptVersion(
+        topLevel || 1, combined,
+        `合并 ${merged.length} 项增强结果`, "");
+      // 徽标：等级由版本谱系判定（currentPromptLevel）。
+      // 注意：这里**不**调 markPromptEnhanced() —— 那是「内容已写回输入框」
+      // 的标记，由 providers.js 的「替换/追加」写回按钮负责。
+      // 这里只刷新徽标显示与版本列表。
+      if (typeof updatePromptBadge === "function") updatePromptBadge();
+      if (typeof renderPromptVersions === "function") renderPromptVersions();
+    }
+
     setHint(`已按顺序应用 ${merged.length} 项增强，合并后 ${combined.length} 字`, "ok");
   }
 
@@ -923,10 +1201,15 @@
     // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
     const prompt = (opts && opts.input !== undefined)
       ? String(opts.input || "").trim()
-      : document.querySelector(targets().input).value.trim();
+      : currentInputValue();
     if (!prompt) {
-      setHint(isMusicContext() ? "请先输入要增强的风格描述" : "请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const { el } = resolveTarget(targets().inputSelectors);
+      if (!el) {
+        setHint(`本面板没有可增强的${targets().label}输入框，无法执行增强`, "error");
+        return null;
+      }
+      setHint(`请先输入要增强的${targets().label}`, "error");
+      el.focus();
       return null;
     }
     btn.disabled = true;
@@ -948,19 +1231,36 @@
       // 只有**单独**跑普通增强时才清标记；多选时由 run() 统一设置，
       // 否则先跑的普通增强会把后跑的官方 PE 标记冲掉。
       if (!opts.collect) provState.lastEnhanceKind = "";   // 普通增强，不是官方 PE
-      // 模板由注册表按当前上下文解析（methodSpecId），不再有独立的模板下拉需要同步
-      if (d.spec_id) provState.specId = d.spec_id;
+      // 【2026-11-09】不再写 provState.specId ——
+      // 那是「本地模型配置」页用来决定「当前编辑哪条模板」的全局单值，
+      // 与本文件的 selectedSpecByMethod（按 mode::method 存）**双状态并存**，
+      // 切模式时会互相污染。模板选择状态统一由 selectedSpecByMethod 承担。
       const enhanced = d.enhanced || "";
       if (opts.collect) {
-        return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+        // 【多选】把「这一步的版本信息」回报给 run()，
+        // 由 run() 统一写版本历史 + 打徽标。
+        // 为什么不在这里直接写：多选时后面还有别的增强项要跑，
+        // 每一步都写一次会留下一堆中间态版本，而且徽标会在
+        // 最后一步之前就被「提前」标记 —— 与单选路径的语义不一致。
+        return {
+          expanded: enhanced,
+          meta: buildEnhanceMeta(d),
+          version: {
+            level: 1,
+            text: enhanced,
+            source: `模板：${d.spec_id || "image"}`,
+            specId: d.spec_id || "",
+          },
+        };
       }
-      document.querySelector("#enhanceResult").value = enhanced;
-      document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
-      document.querySelector("#enhanceModal").hidden = false;
+      // 【单选】写版本历史（徽标由「替换/追加」写回时的 markPromptEnhanced 驱动）
       if (d.enhanced) {
         pushPromptVersion(0, prompt, "原始提示词");
         pushPromptVersion(1, d.enhanced, `模板：${d.spec_id || "image"}`, d.spec_id);
       }
+      document.querySelector("#enhanceResult").value = enhanced;
+      document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
+      document.querySelector("#enhanceModal").hidden = false;
       setHint(`已用「${d.provider}」扩写，${d.enhanced ? d.enhanced.length : 0} 字`, "ok");
       return { expanded: enhanced, meta: buildEnhanceMeta(d) };
     } catch (e) {
@@ -987,8 +1287,13 @@
       ? String(opts.input || "").trim()
       : refineSourcePrompt();
     if (!source) {
-      setHint(isMusicContext() ? "请先输入要细化的风格描述" : "请先输入要细化的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const { el } = resolveTarget(targets().inputSelectors);
+      if (!el) {
+        setHint(`本面板没有可细化的${targets().label}输入框，无法执行二次增强`, "error");
+        return null;
+      }
+      setHint(`请先输入要细化的${targets().label}`, "error");
+      el.focus();
       return null;
     }
     const targetLevel = promptVersions.refineTarget === 1 ? 1 : 0;
@@ -1008,15 +1313,27 @@
         mode_ctx: enhanceCurrentMode(),
         model_key: enhanceCurrentModelKey(),
       });
-      if (d.spec_id) provState.specId = d.spec_id;
+      // 【2026-11-09】不再写 provState.specId（见 runBasic 的同名注释）
       if (!opts.collect) provState.lastEnhanceKind = "";   // 二次增强，不是官方 PE
       const refined = d.enhanced || "";
       if (!refined) throw new Error("本地模型返回了空结果");
       if (opts.collect) {
-        return { expanded: refined, meta: buildEnhanceMeta(d) };
+        // 【多选】回报版本信息，由 run() 统一写版本历史 + 打徽标
+        return {
+          expanded: refined,
+          meta: buildEnhanceMeta(d),
+          version: {
+            level: 2,
+            text: refined,
+            source: `模板：${d.spec_id || refineSpecId()}`,
+            specId: d.spec_id || "",
+          },
+        };
       }
-      // 写回输入框：音乐写回风格描述框，其它写回提示词框
-      document.querySelector(targets().input).value = refined;
+      // 写回输入框（按能力契约；找不到目标时给可读提示，不抛异常）
+      if (!writeBackInput(refined)) {
+        throw new Error(`本面板找不到可写回的${targets().label}输入框，增强结果未写入`);
+      }
       pushPromptVersion(2, refined, `模板：${d.spec_id || refineSpecId()}`, d.spec_id);
       markPromptEnhanced();
       updatePromptBadge();
@@ -1046,10 +1363,15 @@
   async function runLayout(method, opts) {
     const btn = document.querySelector(targets().btn);
     const text = document.querySelector(targets().btnText);
-    const prompt = document.querySelector(targets().input).value.trim();
+    const prompt = currentInputValue();
     if (!prompt) {
-      setHint("请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const { el } = resolveTarget(targets().inputSelectors);
+      if (!el) {
+        setHint(`本面板没有可增强的${targets().label}输入框，无法执行结构化增强`, "error");
+        return null;
+      }
+      setHint(`请先输入要增强的${targets().label}`, "error");
+      el.focus();
       return null;
     }
     const intentEl = document.querySelector("#mossLayoutIntent");
@@ -1111,10 +1433,15 @@
     // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
     const prompt = (opts && opts.input !== undefined)
       ? String(opts.input || "").trim()
-      : document.querySelector(targets().input).value.trim();
+      : currentInputValue();
     if (!prompt) {
-      setHint("请先输入要增强的提示词", "error");
-      document.querySelector(targets().input).focus();
+      const { el } = resolveTarget(targets().inputSelectors);
+      if (!el) {
+        setHint(`本面板没有可增强的${targets().label}输入框，无法执行官方 PE 扩写`, "error");
+        return null;
+      }
+      setHint(`请先输入要增强的${targets().label}`, "error");
+      el.focus();
       return null;
     }
     const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
@@ -1236,6 +1563,21 @@
         });
       }
     });
+    // 【模板选择行】改模板 -> 记录到该方式（按 mode::method 存），
+    // 立刻刷新菜单标签与「当前增强方式」回显。
+    [["#enhanceSpecSelect", "#enhanceSpecRow"],
+     ["#musicEnhanceSpecSelect", "#musicEnhanceSpecRow"]].forEach(([selSel]) => {
+      const sel = document.querySelector(selSel);
+      if (!sel) return;
+      sel.addEventListener("change", () => {
+        const method = currentMethod();
+        if (!method || !sel.value) return;
+        setMethodSpec(method.id, sel.value);
+        renderMenu();
+        updateButton();
+        updatePanelVisibility();
+      });
+    });
     // 点别处关菜单
     document.addEventListener("click", (e) => {
       const t = targets();
@@ -1260,6 +1602,7 @@
     ensureAvailable();
     updateButton();
     renderMenu();
+    renderSpecRow();
     updatePanelVisibility();
     applySelectedParams();
     if (typeof window !== "undefined") {
@@ -1289,6 +1632,21 @@
         getSpecOptions: (methodId) => {
           const m = byId[methodId];
           return m ? methodSpecOptions(m) : [];
+        },
+        // 【2026-11-09】模板选择器已提升为增强栏里的平级一行
+        renderSpecRow: renderSpecRow,
+        invalidateSpecSelection: invalidateSpecSelection,
+        getSelectedSpecByMethod: () => Object.assign({}, selectedSpecByMethod),
+        getSpecRowState: () => {
+          const t = targets();
+          const sel = document.querySelector(t.specSelect);
+          const row = document.querySelector(t.specRow);
+          return {
+            hidden: row ? !!row.hidden : null,
+            value: sel ? sel.value : "",
+            options: sel ? Array.from(sel.options).map(o => o.value) : [],
+            method: currentMethod() ? currentMethod().id : "",
+          };
         },
         isAvailable: (methodId) => {
           const m = byId[methodId];

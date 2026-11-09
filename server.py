@@ -2154,6 +2154,29 @@ async def api_providers_test(request):
 
 
 # ------------------------------------------------------------------ 提示词增强 Agent
+#: 同时运行的「提示词增强」请求数上限。
+#:
+#: 【2026-11-09 新增并发闸门】
+#: 为什么要闸门：max_token 上限提升后，单次增强请求最坏可挂到
+#: MAX_TIMEOUT（600 秒）。本机 llama.cpp 是单槽串行 —— N 个并发请求
+#: 不会让它们更快，只会让它们**全部**排到队尾，把 aiohttp 的连接
+#: 全部占住。没有闸门时，脚本批量调用会堆积出几十个悬挂协程。
+#:
+#: 上限取 2：单槽串行的后端，2 已能让一个请求在跑、另一个在准备，
+#: 超过 2 只是徒增排队。
+ENHANCE_CONCURRENCY = 2
+#: 并发闸门（惰性创建 —— import 期不占住事件循环）
+ENHANCE_GATE: asyncio.Semaphore | None = None
+
+
+def _enhance_gate() -> asyncio.Semaphore:
+    """取（并惰性创建）增强请求的并发闸门。"""
+    global ENHANCE_GATE
+    if ENHANCE_GATE is None:
+        ENHANCE_GATE = asyncio.Semaphore(ENHANCE_CONCURRENCY)
+    return ENHANCE_GATE
+
+
 async def api_enhancer_config(request):
     """
     GET /api/enhancer —— 读取增强 Agent 的模板清单与参数
@@ -2194,6 +2217,12 @@ async def api_enhancer_config(request):
         "length_presets": enh.LENGTH_PRESETS,
         "sampling_presets": enh.SAMPLING_PRESETS,
         "skill_dir": str(enh.SKILL_DIR),
+        # 输出 token 上限的边界（前端输入框用同一套边界）
+        "max_tokens_bounds": {
+            "default": enh.MAX_TOKENS_CEILING,
+            "min": enh.MAX_TOKENS_FLOOR,
+            "max": enh.MAX_TOKENS_MAX,
+        },
         # 上下文 -> 适用模板 id 列表（前端按当前模式/模型取用；新增模型只改服务端这两张表）
         "mode_filters": {
             m: [s["id"] for s in enh.filter_specs(specs, m)]
@@ -2255,6 +2284,16 @@ async def api_enhancer_save(request):
         if payload.get("params"):
             saved["params"] = {k: v for k, v in payload["params"].items()
                                if k in enh.DEFAULT_PARAMS}
+            # max_tokens_ceiling 是「输出 token 上限天花板」——
+            # 必须在夹取之前先归一到合法区间，否则前端传个 999999
+            # 会被 clamp 到 MAX_TOKENS_MAX，传 0 会被 clamp 到 MIN。
+            ceiling = saved["params"].get("max_tokens_ceiling")
+            try:
+                ceiling = int(ceiling) if ceiling is not None else enh.MAX_TOKENS_CEILING
+            except (TypeError, ValueError):
+                ceiling = enh.MAX_TOKENS_CEILING
+            saved["params"]["max_tokens_ceiling"] = max(
+                enh.MAX_TOKENS_FLOOR, min(ceiling, enh.MAX_TOKENS_MAX))
         prov.set_pref(conn, "enhancer", json.dumps(saved, ensure_ascii=False))
     return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
 
@@ -2336,18 +2375,35 @@ async def api_enhance(request):
                                  "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
     messages = enh.build_messages(spec, original, params.get("language", "auto"))
-    try:
-        raw = await llm_client.call_provider(
-            item, messages, images=images or None,
-            options={"temperature": params["temperature"],
-                     "top_p": params["top_p"],
-                     "max_tokens": params["max_tokens"],
-                     "do_sample": params.get("do_sample", True)})
-    except llm_client.ProviderError as exc:
-        # 本地模型不可达 —— 明确报错，不静默失败
+    # 【并发闸门】抢不到就立刻 429，**不排队**。
+    #
+    # 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
+    # 实测（50 并发 × 20 轮）wait_for(acquire(), timeout=0) **一次都抢不到**
+    # —— timeout=0 会在 acquire 真正执行前就取消它，结果是所有请求都 429。
+    # locked() 判据则实测 peak 并发恰好等于上限，无超发。
+    # （asyncio.Semaphore.acquire 内部是「先减计数再 await」，本身是原子的。）
+    gate = _enhance_gate()
+    if gate.locked():
         return web.json_response(
-            {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
-             "degraded": True}, status=502)
+            {"error": f"当前已有 {ENHANCE_CONCURRENCY} 个增强任务在运行，"
+                      "请稍候再试。",
+             "code": "too_many_requests"}, status=429)
+
+    async with gate:
+        try:
+            res = await llm_client.call_provider_full(
+                item, messages, images=images or None,
+                options={"temperature": params["temperature"],
+                         "top_p": params["top_p"],
+                         "max_tokens": params["max_tokens"],
+                         "do_sample": params.get("do_sample", True)})
+        except llm_client.ProviderError as exc:
+            # 本地模型不可达 —— 明确报错，不静默失败
+            return web.json_response(
+                {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
+                 "degraded": True}, status=502)
+    raw = res["text"]
+    finish_reason = res.get("finish_reason") or ""
 
     # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
     raw = enh.strip_thinking(raw)
@@ -2364,9 +2420,32 @@ async def api_enhance(request):
              "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    validate_mode = spec.get("validate_mode", "pe")
+    # 【2026-11-09】截断检测 —— 二次增强丢背景的根因守门人。
+    #   旧实现把 finish_reason 丢掉，512 token 上限把输出硬切在 L2 中途，
+    #   后面的骑楼/霓虹/海报/路面/雨雾/冷暖对比/构图整段消失，
+    #   校验器只给一句泛泛的「核心要素可能丢失」警告，内容照样写回提示词框。
+    #   现在：finish_reason=length 或 refine 档结构不完整 -> 直接判失败，
+    #   并把「怎么调」写进错误信息，用户不会拿到半截提示词。
+    coverage = enh.coverage_report(original, enhanced,
+                                   finish_reason=finish_reason,
+                                   validate_mode=validate_mode)
+    if coverage.get("truncated"):
+        return web.json_response(
+            {"error": "增强结果被 max_tokens 上限截断，内容不完整，未写回。"
+                      + coverage.get("truncation_reason", "")
+                      + f"（本次 max_tokens={params['max_tokens']}）"
+                      "请在「本地模型配置 → 增强 Agent」里调高「最大输出 token 上限」，"
+                      "或把长度档切到「详尽」。",
+             "truncated": True,
+             "truncation_reason": coverage.get("truncation_reason", ""),
+             "missing_sections": coverage.get("missing_sections", []),
+             "coverage": coverage,
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
     # 硬约束校验（质量词 / 权重语法 / think 段 / bbox 结构）
-    validation = enh.validate_output(enhanced, original,
-                                     spec.get("validate_mode", "pe"))
+    validation = enh.validate_output(enhanced, original, validate_mode)
     if not validation.get("ok", True):
         return web.json_response(
             {"error": "扩写结果违反 Z-Image 提示词硬约束："
@@ -2397,8 +2476,12 @@ async def api_enhance(request):
         "used_multimodal": bool(images),
         "validation": validation,
         "elements": elements,
+        # 要素覆盖 + 截断检测结果（前端可显示保留率）
+        "coverage": coverage,
+        "finish_reason": finish_reason,
         "params": {"temperature": params["temperature"], "top_p": params["top_p"],
                    "max_tokens": params["max_tokens"],
+                   "max_tokens_ceiling": params.get("max_tokens_ceiling"),
                    "sampling": params.get("sampling", "sample"),
                    "length": params.get("length", "medium")},
     })

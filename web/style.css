@@ -622,6 +622,31 @@ body.modal-open { overflow: hidden; }
 }
 .enhance-current[hidden] { display: none; }
 
+/* ---------- 【模板选择行】与增强方式下拉平级 ---------- */
+/* 改造前模板选择是增强方式菜单项的子属性（两级 UI）；
+   现在提升为增强栏里的独立一行：当前主增强方式用哪个模板一目了然。 */
+.enhance-spec-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.enhance-spec-row[hidden] { display: none; }
+.enhance-spec-label { white-space: nowrap; }
+.enhance-spec-select {
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  max-width: 220px;
+}
+.enhance-spec-select:focus { outline: none; border-color: var(--accent); }
+.enhance-spec-select:disabled { opacity: .6; cursor: default; }
+
 /* ---------- 增强菜单里「就地切换模板」 ---------- */
 .enhance-menu-spec {
   font-size: 10.5px; color: var(--muted); font-weight: 500;
