@@ -2204,6 +2204,11 @@ async def api_enhancer_config(request):
         "mode_media": dict(enh.MODE_MEDIA),
         # 模型族映射（前端据此判断当前模型属于哪一族）
         "model_families": dict(enh.MODEL_FAMILY),
+        # 「二次增强」是通用能力，但按媒体类型用不同模板 ——
+        # 前端不再硬编码模板 id（否则音乐模式会拿到画面物体向的模板）。
+        "refine_spec_by_media": dict(enh.REFINE_SPEC_BY_MEDIA),
+        # 模式 -> 「二次增强」模板 id（前端直接取，不用自己推）
+        "refine_specs": {m: enh.refine_spec_for_mode(m) for m in enh.MODE_MEDIA},
     }
     if mode:
         filtered = enh.filter_specs(specs, mode, model_key)

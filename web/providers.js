@@ -19,6 +19,9 @@ const provState = {
   modelFamilies: {},      // { z_image_turbo_bf16: "z_image", lora: "minimax_h3", ... }
   modeMedia: {},          // { t2i: "image", t2v: "video", ... } 模式 -> 媒体类型
   specIdByMode: {},       // { t2i: "image", ... } 各模式下用户最后选中的模板
+  // 「二次增强」按媒体类型用不同模板（服务端 refine_specs / refine_spec_by_media 下发）
+  refineSpecs: {},        // { t2i: "image-refine", t2a: "music-refine", ... }
+  refineSpecByMedia: {},  // { image: "image-refine", audio: "music-refine", ... }
 };
 
 // 当前工作模式
@@ -43,6 +46,14 @@ function enhanceCurrentModelKey() {
   }
   if (mode === "t2i_moss") {
     return (state.imgMoss && state.imgMoss.model) || "";
+  }
+  // 音乐（YuE2）：模型是 checkpoint key，取自音乐面板自己的状态。
+  // 漏了它会掉到 state.model（视频的 MiniMax-H3），
+  // 于是模型族过滤按 minimax_h3 走，YuE2 专用模板会被整条滤掉。
+  if (mode === "t2a" || mode === "a2a") {
+    const st = window.MusicUI && typeof window.MusicUI.getState === "function"
+      ? window.MusicUI.getState() : null;
+    return (st && st.checkpoint) || "yue2_3b_bf16";
   }
   return state.model || "";
 }
@@ -364,6 +375,9 @@ async function loadAgentConfig() {
     provState.modeDefaults = d.mode_defaults || {};
     provState.modeMedia = d.mode_media || {};
     provState.modelFamilies = d.model_families || {};
+    // 「二次增强」的模板按媒体类型选 —— 服务端下发，前端不硬编码
+    provState.refineSpecs = d.refine_specs || {};
+    provState.refineSpecByMedia = d.refine_spec_by_media || {};
     // 默认选官方 PE 档（image）
     if (!provState.specId || !provState.agent.specs.find(s => s.id === provState.specId)) {
       provState.specId = "image";
@@ -371,13 +385,17 @@ async function loadAgentConfig() {
     // 当前上下文下若模板不适用则回落 —— 保证下拉显示值与实际生效值一致
     alignSpecWithContext(enhanceCurrentMode(), enhanceCurrentModelKey());
     renderAgentConfig();
-    renderEnhanceSpecSelect();
     // 增强模板清单到齐了 -> 「增强」多选列表里官方 PE 那一项的
     // system prompt 默认值（官方原文）才能取到。
     // 这一步同时把推荐参数套用到 state（选中即自动套用）。
     if (window.enhanceMethods && typeof window.enhanceMethods.renderMenu === "function") {
       window.enhanceMethods.renderMenu();
       window.enhanceMethods.ensureAvailable();
+      // 模板清单到齐后要重算「当前增强方式」回显 ——
+      // 否则它只能显示裸的模板 id（清单没到时查不到显示名）。
+      if (typeof window.enhanceMethods.refreshButton === "function") {
+        window.enhanceMethods.refreshButton();
+      }
     }
   } catch (e) {
     box.innerHTML = `<div class="prov-empty error">读取增强 Agent 配置失败：${esc(e.message)}</div>`;
@@ -496,38 +514,22 @@ function setEnhanceHint(text, kind) {
   hint.className = "enhance-hint" + (kind ? " " + kind : "");
 }
 
-// 图像页的模板下拉 —— 与「本地模型配置」页共用同一份 provState.specId
-// 候选项按当前上下文（模式 + 模型）过滤：
-//   图像模式只显示图像模板，视频模式只显示视频模板，音频模式只显示音频模板
-function renderEnhanceSpecSelect() {
-  const sel = $("#enhanceSpec");
-  if (!sel) return;
-  const mode = enhanceCurrentMode();
-  const modelKey = enhanceCurrentModelKey();
-  const specs = enhanceSpecsForContext(mode, modelKey);
-  if (!specs.length) { sel.innerHTML = ""; sel.style.display = "none"; return; }
-  sel.style.display = "";
-  sel.innerHTML = specs.map(s =>
-    `<option value="${esc(s.id)}"${s.id === provState.specId ? " selected" : ""}>${esc(s.label)}</option>`
-  ).join("");
-  // 下拉显示值必须与实际生效值一致：不在候选里的 id 一律回落到上下文默认
-  const ids = specs.map(s => s.id);
-  if (!ids.includes(provState.specId)) {
-    const fallback = enhanceDefaultSpecForContext(mode, modelKey, specs);
-    if (fallback) provState.specId = fallback;
-  }
-  sel.value = provState.specId;
-  sel.setAttribute("data-mode", mode || "");
-  sel.setAttribute("data-model", modelKey || "");
-}
+// 【模板选择已并入「增强」下拉】原来这里有一个独立的 #enhanceSpec「增强模板」
+// 下拉，与「增强方式」下拉语义重叠（两者列的是同一组东西），让人困惑。
+// 现在模板选择**长在对应的增强方式下面**（见 web/enhance-menu.js 的
+// renderSpecPicker）—— 每个面板仍然只有一个增强入口。
+//
+// 保留下来的只有两件事：
+//   1. alignSpecWithContext —— 模式/模型切换后回落到适用模板
+//      （「本地模型配置」页的模板编辑框仍用它决定当前编辑哪一条）
+//   2. enhanceSpecsForContext —— 当前上下文可用的模板清单（增强下拉要用）
 
-// 模式切换 / 模型切换后调用：重新过滤下拉 + 回落不适用模板
+// 模式切换 / 模型切换后调用：重新对齐当前上下文适用的模板
 function refreshEnhanceSpecForMode() {
   const mode = enhanceCurrentMode();
   const modelKey = enhanceCurrentModelKey();
   const before = provState.specId;
   const { changed, specId } = alignSpecWithContext(mode, modelKey);
-  renderEnhanceSpecSelect();
   if (changed) {
     const spec = (provState.agent.specs || []).find(s => s.id === specId);
     setEnhanceHint(
@@ -536,15 +538,8 @@ function refreshEnhanceSpecForMode() {
   return before !== provState.specId;
 }
 
-$("#enhanceSpec").addEventListener("change", e => {
-  provState.specId = e.target.value;
-  const mode = enhanceCurrentMode();
-  provState.specIdByMode[mode] = e.target.value;
-  setEnhanceHint("已切换模板：" + e.target.selectedOptions[0].textContent, "ok");
-});
-
-// 首次进入时拉一次 Agent 配置，把模板清单喂给下拉框
-loadAgentConfig().then(renderEnhanceSpecSelect);
+// 首次进入时拉一次 Agent 配置（模板清单供「增强」下拉里的模板选择器使用）
+loadAgentConfig();
 
 // 「增强」主按钮与下拉菜单的绑定、以及三种增强方式的路由，统一放在
 // web/enhance-menu.js 里（那里有一份增强方式注册表，是唯一真相来源）。
@@ -613,10 +608,18 @@ function applyQwenPeWritebackFlag() {
   provState.lastEnhanceKind = "";
 }
 
+// 回填的目标输入框：音乐模式写回「风格描述」框，其它写回提示词框。
+// （音乐面板的输入不是提示词框 —— 增强结果要落到它真正会被生成用的那个框）
+function enhanceTargetInput() {
+  const music = (typeof state !== "undefined" && state
+                 && (state.mode === "t2a" || state.mode === "a2a"));
+  return music ? $("#musicStyle") : $("#prompt");
+}
+
 $("#enhanceReplace").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  $("#prompt").value = text;
+  enhanceTargetInput().value = text;
   $("#enhanceModal").hidden = true;
   // 回填后的内容即「已增强」版本：标记它，让生成时不再弹未增强确认
   markPromptEnhanced();
@@ -627,8 +630,9 @@ $("#enhanceReplace").addEventListener("click", () => {
 $("#enhanceAppend").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  const original = $("#prompt").value.trim();
-  $("#prompt").value = original ? `${original}\n\n${text}` : text;
+  const box = enhanceTargetInput();
+  const original = box.value.trim();
+  box.value = original ? `${original}\n\n${text}` : text;
   $("#enhanceModal").hidden = true;
   markPromptEnhanced();
   applyQwenPeWritebackFlag();

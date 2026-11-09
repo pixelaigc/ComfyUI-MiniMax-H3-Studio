@@ -261,6 +261,10 @@ function renderMode() {
           window.enhanceMethods.ensureAvailable();
         }
         window.enhanceMethods.updatePanelVisibility();
+        // 「当前增强方式」回显要跟着模式换（音乐面板是另一套 DOM id）
+        if (typeof window.enhanceMethods.refreshButton === "function") {
+          window.enhanceMethods.refreshButton();
+        }
       }
     } catch (e) { /* 忽略 */ }
   });
@@ -434,10 +438,18 @@ function renderMode() {
     // 风格描述在音乐面板里（提示词框留给图像/视频）
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "none";
+    // 音乐面板有**自己的**增强栏（同一个增强组件，另一套 DOM id）——
+    // 音乐的输入是「风格描述」而不是提示词框，所以增强入口也跟着搬过来。
+    // 同一时刻只有一处可见 —— 规则 4「每个面板只有一个增强入口」。
+    const musicEnhanceBar = $("#musicEnhanceBar");
+    if (musicEnhanceBar) musicEnhanceBar.style.display = "";
     if (window.MusicUI) window.MusicUI.render();
   } else {
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "";
+    // 非音乐模式：隐藏音乐面板的增强栏（音乐那一套不出现）
+    const musicEnhanceBar = $("#musicEnhanceBar");
+    if (musicEnhanceBar) musicEnhanceBar.style.display = "none";
   }
   // 模式变了 -> 增强模板下拉按新模式过滤，当前模板不适用则自动回落
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();

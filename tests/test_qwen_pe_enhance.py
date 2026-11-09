@@ -398,10 +398,15 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
         btn = self.page.inner_text("#enhanceBtnText")
         self.assertTrue("PE" in btn or "项" in btn,
                         f"按钮文字应反映选中状态，实际：{btn}")
-        # 【多选】普通增强默认仍选中 -> 模板下拉**继续显示**（普通增强要用模板）。
-        # 只有当**没有**任何走模板的项被选中时才隐藏。
-        self.assertFalse(self.page.is_hidden("#enhanceSpec"),
-                         "普通增强仍选中时模板下拉应可见")
+        # 【统一增强入口】模板下拉已删除（它并入了「增强」下拉里的模板选择器）——
+        # 断言这里确实只有一个增强入口。
+        self.assertIsNone(self.page.query_selector("#enhanceSpec"),
+                          "不该再有第二个增强下拉")
+        # 官方 PE 项在菜单里带自己的模板标注
+        self.page.click("#enhanceMenuBtn")
+        self.page.wait_for_timeout(300)
+        item = self.page.inner_text('#enhanceMenu .enhance-menu-item[data-method="qwen_pe"]')
+        self.assertIn("官方 PE", item)
         # 版本历史按钮是共用的，仍可见
         self.assertTrue(self.page.is_visible("#promptVersionBtn"))
 
