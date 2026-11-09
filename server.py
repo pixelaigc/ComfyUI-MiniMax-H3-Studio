@@ -70,6 +70,8 @@ from h3studio import gen_types
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import asset_api
+from h3studio import ref_api
+from h3studio import ref_images as ref_imgs
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -389,6 +391,49 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
             params[key] = values
 
 
+async def _upload_asset_refs(session: ClientSession, job_id: str, params: dict) -> list[str]:
+    """
+    把「素材库来源」的参考图上传到 ComfyUI input，返回 ComfyUI 文件名列表。
+
+    params["ref_images"] = [{"asset_id": ..., "description": ..., "tags": ...}, ...]
+
+    规则：
+      * **顺序即语义** —— 返回顺序与入参顺序严格一致，
+        因为占位标记 <image1>..<imageN> 与 ComfyUI 的 image_1..image_N
+        是按下标一一对应的（见 workflows.build_qwen_i2i）。
+      * 素材失效（已删除 / 文件丢失）-> 明确报错，不静默跳过
+        （静默跳过会让占位号与实际插槽错位，图1 变成图2 —— 很难查）。
+      * 登记引用关系（asset_refs），素材被删时 409 保护。
+    """
+    from h3studio import asset_repo as _repo
+    from h3studio import assets as _assets
+
+    refs = ref_imgs.normalize_refs(params.get("ref_images") or [])
+    if not refs:
+        raise RuntimeError("图片编辑没有参考图（参考图必须来自素材库）")
+
+    names: list[str] = []
+    with _assets.connect() as conn:
+        for index, ref in enumerate(refs):
+            asset_id = ref["asset_id"]
+            version = _repo.current_version(conn, asset_id)
+            if not version:
+                asset = _repo.get_asset(conn, asset_id, include_deleted=True)
+                state = "已从素材库删除" if asset else "不存在"
+                raise RuntimeError(
+                    f"第 {index + 1} 张参考图的素材{state}：{asset_id}。"
+                    f"请在参考图列表里移除它后再生成")
+            path = _assets.resolve_inside(_assets.library_root(), version["storage_path"])
+            if not path or not path.is_file():
+                raise RuntimeError(
+                    f"第 {index + 1} 张参考图的素材文件已丢失：{asset_id}")
+            names.append(await comfy_upload_image(session, path))
+            _repo.add_ref(conn, asset_id, "job", job_id, slot="ref_image",
+                          ordinal=index,
+                          label=f"任务 {job_id} 的参考图 {index + 1}")
+    return names
+
+
 async def save_uploaded_image(part) -> str:
     """保存上传图片；内容相同则复用 uploads 中已有文件。"""
     suffix = Path(part.filename or "image.png").suffix.lower()
@@ -555,21 +600,18 @@ class Worker:
                         names.append(await comfy_upload_image(session, lp))
                     params["ref_images"] = names
                 elif mode == "i2i_qwen":
-                    # Qwen 图片编辑：参考图（1-9 张）上传到 ComfyUI input，
-                    # LoadImage 节点按返回的 'subfolder/name' 引用
-                    names = []
-                    for up in params.get("ref_images", []):
-                        if isinstance(up, dict):
-                            up = up.get("file") or ""
-                        lp = UPLOAD_DIR / up
-                        if not lp.exists():
-                            raise RuntimeError(f"找不到上传文件: {up}")
-                        names.append(await comfy_upload_image(session, lp))
+                    # Qwen 图片编辑：参考图**来自素材库**（asset_id + 版本快照），
+                    # 这里把素材库里的文件上传到 ComfyUI input，
+                    # LoadImage 节点按返回的 'subfolder/name' 引用。
+                    # 顺序必须与占位标记 <imageN> 严格一致 —— 这里保持列表原序。
+                    names = await _upload_asset_refs(session, job_id, params)
                     params["ref_images"] = names
 
                 # 素材库引用：把素材库里的文件按槽位上传到 ComfyUI，
                 # 并在 params 里落成 ref_images / ref_videos / ref_audios。
-                if params.get("asset_refs"):
+                # i2i_qwen 的参考图已经在上面按 <imageN> 顺序处理过了，
+                # 这里不能再覆盖（会打乱占位与插槽的对应关系）。
+                if params.get("asset_refs") and mode != "i2i_qwen":
                     await _apply_asset_refs(session, job_id, params)
 
                 params["job_id"] = job_id
@@ -715,14 +757,8 @@ class Worker:
         async with ClientSession(timeout=HTTP_TIMEOUT) as session:
             # 参考图要上传到 ComfyUI input，LoadImage 才能引用
             if mode == "i2i_qwen":
-                names = []
-                for up in batch_params.get("ref_images", []):
-                    if isinstance(up, dict):
-                        up = up.get("file") or ""
-                    lp = UPLOAD_DIR / up
-                    if not lp.exists():
-                        raise RuntimeError(f"找不到上传文件: {up}")
-                    names.append(await comfy_upload_image(session, lp))
+                # 参考图来自素材库（asset_id + 版本快照），顺序即 <imageN> 语义
+                names = await _upload_asset_refs(session, job_id, batch_params)
                 batch_params["ref_images"] = names
             workflow = build_workflow(mode, batch_params)
             async with self.submit_lock:
@@ -832,19 +868,48 @@ async def api_create(request):
             return web.json_response({"error": "参考模式需要至少 1 张参考图"}, status=400)
         params["ref_images"] = refs[:3]
     elif mode == "i2i_qwen":
-        # Qwen-Image 2.1 参考图生图：1–9 张，超出给明确提示
-        refs = saved_files.get("file_ref", [])
-        if len(refs) < QWEN_IMAGE_MIN_REF_IMAGES:
+        # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
+        #
+        # 需求原文：「编辑里的参考图，强制要求必须走素材库」。
+        # 所以这里**不接受**本地上传通道（file_ref）作为图片编辑的参考图 ——
+        # 走本地上传的会被明确拒绝，并提示改从素材库选择。
+        # （上传到素材库本身仍然可用：素材库页有上传入口，
+        #   入库后的条目带 asset_id，才能作为参考图。）
+        uploaded = saved_files.get("file_ref", [])
+        if uploaded:
             return web.json_response(
-                {"error": f"图片编辑至少需要 {QWEN_IMAGE_MIN_REF_IMAGES} 张参考图，"
-                          f"当前 {len(refs)} 张"}, status=400)
-        if len(refs) > QWEN_IMAGE_MAX_REF_IMAGES:
+                {"error": "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
+                          "请先在「素材库」页上传并入库，再从素材库选择参考图。",
+                 "code": "ref_must_come_from_library"}, status=400)
+
+        # 参考图元数据（asset_id + 描述 + 标签 + 顺序）由前端提交
+        ref_specs = params.get("ref_images") or []
+        if not isinstance(ref_specs, list):
+            ref_specs = []
+        refs = ref_imgs.normalize_refs(ref_specs)
+        if len(refs) < ref_imgs.MIN_REF_IMAGES:
             return web.json_response(
-                {"error": f"参考图最多 {QWEN_IMAGE_MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
-                          f"请删除多余参考图（上限 {QWEN_IMAGE_MAX_REF_IMAGES} 张，"
-                          f"模型官方能力上限 10 张）"},
-                status=400)
-        params["ref_images"] = refs[:QWEN_IMAGE_MAX_REF_IMAGES]
+                {"error": f"图片编辑至少需要 {ref_imgs.MIN_REF_IMAGES} 张参考图，"
+                          f"当前 {len(refs)} 张（参考图必须来自素材库）",
+                 "code": "ref_required"}, status=400)
+        if len(refs) > ref_imgs.MAX_REF_IMAGES:
+            return web.json_response(
+                {"error": f"参考图最多 {ref_imgs.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
+                          f"请删除多余参考图（上限 {ref_imgs.MAX_REF_IMAGES} 张，"
+                          f"模型官方能力上限 10 张）",
+                 "code": "ref_too_many"}, status=400)
+
+        # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
+        prompt_text = (params.get("prompt") or "").strip()
+        check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
+        if not check["ok"]:
+            return web.json_response(
+                {"error": "参考图校验未通过：" + "；".join(check["errors"]),
+                 "code": "ref_invalid", "errors": check["errors"]}, status=400)
+
+        # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
+        params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
+        params["ref_images"] = refs
 
     prompt = (params.get("prompt") or "").strip()
     if not prompt:
@@ -2234,6 +2299,8 @@ def make_app():
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
     # 资产素材库（/api/assets/*）
     asset_api.register(app, server_module=sys.modules[__name__])
+    # Qwen 图片编辑的参考图（/api/refs/*）—— 素材库来源约束
+    ref_api.register(app)
     app.router.add_get("/files/{path:.+}", files_handler)
     app.router.add_static("/static", BASE / "web")
     app.router.add_get("/", index_handler)

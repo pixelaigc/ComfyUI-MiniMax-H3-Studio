@@ -1243,7 +1243,7 @@ def _qwen_pe_system_prompt(is_edit: bool) -> str:
 def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                        sampler, scheduler, steps, cfg, shift, negative_text, prompt,
                        job_id, filename_prefix=None, loras=None, is_edit=False,
-                       use_pe=True, pe_params=None):
+                       use_pe=True, pe_params=None, pe_image_nodes=None):
     """Qwen-Image 2.1 公共链路。
 
     文生图与参考图生图共用同一套节点，区别只在：
@@ -1258,6 +1258,15 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
         CLIPLoader(PE) -> TextGenerate（官方 PE 扩写）-> TextEncodeQwenImage21
         CLIPLoader(条件) -> TextEncodeQwenImage21 的 clip 输入
         VAELoader -> TextEncodeQwenImage21 的 vae 输入（参考图编码成 ref_latents）
+
+    pe_image_nodes:
+      参考图节点列表（[node_id, ...]）。官方 PE-I2I 工作流里，
+      **参考图会同时喂给 PE 提示词扩写节点**（BatchImagesNode -> TextGenerate.image），
+      这样 PE 才能「看着图」改写编辑指令、并在输出里写 <image1>/<image2>。
+      官方模板的接法是：
+        BatchImagesNode(images.image0..imageN) -> TextGenerate.image
+      这里用同样的语义：把参考图按顺序拼成一批，喂给 PE。
+      文生图没有参考图 -> None。
 
     SHIFT 说明（实测踩过坑）：Qwen-Image 2.1 走 model_type=FLUX
     （comfy/model_base.py:2672），采样类是 ModelSamplingFlux，sigma 公式
@@ -1360,6 +1369,18 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
         system_prompt = _qwen_pe_system_prompt(is_edit)
         if system_prompt:
             pe_inputs["system_prompt"] = system_prompt
+        # 参考图也喂给 PE（官方 PE-I2I 工作流就是这么接的）：
+        #   BatchImagesNode(images.image0..imageN) -> TextGenerate.image
+        # 这样 PE 才能「看着图」改写编辑指令，并在输出里写 <image1>/<image2>。
+        # PE checkpoint（qwen3.5_*_pe_*）自带 visual tower，实测权重里有
+        # 549 个 model.visual.* 张量 -> 支持读图。
+        if pe_image_nodes:
+            p["qw:25"] = {
+                "inputs": {f"images.image{i}": [node_id, 0]
+                           for i, node_id in enumerate(pe_image_nodes)},
+                "class_type": "BatchImagesNode",
+            }
+            pe_inputs["image"] = ["qw:25", 0]
         p["qw:26"] = {"inputs": pe_inputs, "class_type": "TextGenerate"}
         prompt_ref = ["qw:26", 0]
     else:
@@ -1655,14 +1676,13 @@ def build_qwen_i2i(params):
     # PE-I2I 档（presence_penalty=0 / max_new_tokens=24000）
     pe_params = dict(QWEN_IMAGE_PE_PARAMS["i2i"])
 
-    # 参考图 -> LoadImage 节点（只允许引用本机已存在的文件）
-    p = _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
-                            scheduler, steps, cfg, shift, negative_text,
-                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
-                            pe_params=pe_params)
-    # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
-    # （COMFY_AUTOGROW_V3，槽位名 image_1..image_N）
-    te_inputs = p["qw:27"]["inputs"]
+    # ---- 第一步：把参考图做成 LoadImage 节点 -------------------------
+    #
+    # 参考图**必须先建节点**，因为它有两个去向：
+    #   1. TextEncodeQwenImage21 的 images 输入（模型看图）
+    #   2. TextGenerate（PE 扩写）的 image 输入（PE 看图，
+    #      官方 PE-I2I 工作流就是这么接的：
+    #      BatchImagesNode -> TextGenerate.image）
     #
     # 【API 格式：必须用扁平点号键，不能用嵌套字典】—— 实测结论（2026-11-08）
     #   TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，ComfyUI 在
@@ -1677,17 +1697,37 @@ def build_qwen_i2i(params):
     #
     #   （另：顶层扁平的 "image_1" 也不行 —— 那会被当成 execute() 的
     #     关键字参数，报 unexpected keyword argument 'image_1'。）
+    #
+    # **顺序即语义**：列表下标 i 对应 image_{i+1} 插槽，
+    # 也对应提示词里的 <image{i+1}> 占位标记 —— 三者必须严格一致。
+    ref_nodes: list[str] = []
+    ref_files: list[str] = []
     for index, ref in enumerate(refs[:QWEN_IMAGE_MAX_REF_IMAGES]):
         node_id = f"qw:ref{index}"
         # ref_images 两种形态都收：
-        #   服务端上传后是文件名列表（["h3studio/x.png", ...]）
+        #   服务端把素材库文件上传到 ComfyUI 后是文件名列表（["h3studio/x.png", ...]）
         #   也接受字典列表（[{"file": "h3studio/x.png"}, ...]）
         if isinstance(ref, dict):
-            filename = ref.get("file") or ""
+            filename = ref.get("file") or ref.get("filename") or ""
         else:
             filename = str(ref or "")
         if not filename:
             raise ValueError(f"第 {index + 1} 张参考图缺少文件名")
+        ref_nodes.append(node_id)
+        ref_files.append(filename)
+
+    # ---- 第二步：建公共链路（PE 节点会用到参考图节点） ----------------
+    p = _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
+                            scheduler, steps, cfg, shift, negative_text,
+                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
+                            pe_params=pe_params,
+                            pe_image_nodes=(ref_nodes if use_pe else None))
+
+    # ---- 第三步：把 LoadImage 节点挂进工作流 -------------------------
+    # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入
+    # （COMFY_AUTOGROW_V3，槽位名 image_1..image_N）
+    te_inputs = p["qw:27"]["inputs"]
+    for index, (node_id, filename) in enumerate(zip(ref_nodes, ref_files)):
         p[node_id] = {"inputs": {"image": filename}, "class_type": "LoadImage"}
         te_inputs[f"images.image_{index + 1}"] = [node_id, 0]
     return p
