@@ -33,12 +33,16 @@ class TestLoRARegistry(unittest.TestCase):
     def test_scanner_only_returns_z_image_loras(self):
         """不能把 285 个 LoRA 全塞进来，只返回 Z-Image 相关的。
 
-        判据有两条（2026-11-08 实测扩了一条）：
+        判据有三条（2026-11-08 扩了一条，2026-11-09 再扩一条）：
           1. 文件名含 z-image 字样（Z_IMAGE_MARKERS）
           2. **或** 层结构与 Z-Image 完全对应 —— 实测 `dejpeg_v3.safetensors`
              文件名毫无 z-image 痕迹，但层结构 100% 命中 Z-Image 底模，
              实测在 ComfyUI 里 attach 出 180 patches、真实生效。
              只按文件名过滤会把它整个漏掉（用户根本选不到）。
+          3. **或** 在族专属目录 `z-image-effects/` 下 —— 2026-11-09 接入
+             调研清单的效果 LoRA 时加的：那批文件统一放在这个目录里，
+             目录前缀本身就是族归属的**唯一真相源**
+             （`pytorch_lora_weights.safetensors` 三族同名，靠文件名分不出来）。
 
         真正的「不把 285 个都塞进来」由**数量上限**兜底断言。
         """
@@ -47,15 +51,26 @@ class TestLoRARegistry(unittest.TestCase):
             lowered = item["name"].lower()
             by_name = any(m in lowered for m in lora_registry.Z_IMAGE_MARKERS)
             by_structure = item.get("discovered_by") == "layer_structure"
-            self.assertTrue(by_name or by_structure,
-                            f"{item['name']} 既不靠文件名也不靠层结构认定，"
-                            "说明判定条件有漏洞")
+            by_effect_dir = item.get("discovered_by") == "effect_dir"
+            self.assertTrue(by_name or by_structure or by_effect_dir,
+                            f"{item['name']} 既不靠文件名也不靠层结构"
+                            "也不靠族目录认定，说明判定条件有漏洞")
             # 结构兜底找到的，层命中率必须 100%
             if by_structure and not by_name:
                 self.assertEqual(float(item.get("attention_hit") or 0), 1.0,
                                  f"{item['name']} 靠层结构认定，注意力命中率必须 100%")
-        # 数量兜底：本机总共有 264 个 LoRA，Z-Image 相关的只有个位数
-        self.assertLess(len(items), 30,
+            # 族目录里的，族归属必须自洽（不能串到别的族）
+            if by_effect_dir:
+                self.assertTrue(item["name"].startswith("z-image-effects/"),
+                                f"{item['name']} 的族目录前缀不对")
+                self.assertEqual(lora_registry.effect_family_of(item["name"]),
+                                 "Z-Image",
+                                 f"{item['name']} 的族判定与所在目录不一致")
+        # 数量兜底：本机总共有 264 个 LoRA，Z-Image 相关的只有个位数。
+        # 2026-11-09 接入效果 LoRA 目录后，本族合法条目增加到 35 个
+        # （29 个 z-image-effects/ + 4 个既有 + 2 个结构兜底）。
+        # 判据仍然能挡住「把全机 264 个都塞进来」—— 264 >> 40。
+        self.assertLess(len(items), 60,
                         f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
                         "结构兜底的判据放太宽了")
 
@@ -74,18 +89,48 @@ class TestLoRARegistry(unittest.TestCase):
         self.assertIsNone(path)
 
     def test_catalog_entries_are_not_invented(self):
-        """说明表里的每个 LoRA 都必须在本机真实存在。
+        """说明表里的每个 LoRA 要么本机真实存在，要么**还没落地**。
 
         说明表现在覆盖三个底模族（Z-Image、Qwen-Image 2.1、MOSS-Image），
         所以三族的清单都要查 —— 只查一族会把另一族的真实条目误判成「编造」。
+
+        ⚠️ 2026-11-09 语义变化：说明表 = **调研清单的完整目录**
+        （148 条里筛选出 78 条），其中一部分权重还在下载 / 待落地。
+        所以断言不能是「目录里每条都必须已在本机」—— 那是「全部下载完了」
+        的断言，不是「不能编造」的断言。
+
+        真正的「不能编造」是这两条：
+          1. **本机存在的**目录条目，必须出现在对应族的面板清单里
+             （不能有「文件在但用户选不到」的漏网之鱼）
+          2. **本机不存在**的目录条目，必须**不在**面板清单里
+             （不能把没下载的权重挂进下拉 -> 用户选了必然报错）
         """
         available = {item["name"] for item in lora_registry.list_z_image_loras()}
         available |= {item["name"] for item in lora_registry.list_qwen_image_loras()}
         available |= {item["name"] for item in lora_registry.list_moss_image_loras()}
         for name in lora_registry.LORA_CATALOG:
             base = name.split("/")[-1]
-            self.assertTrue(name in available or base in available,
-                            f"说明表里的 {name} 本机不存在（不能编造）")
+            on_disk = name in available or base in available
+            if on_disk:
+                continue
+            # 本机没有 -> 必须不在面板清单里（不能挂出选不中的选项）
+            self.assertFalse(
+                any(base == item.split("/")[-1] for item in available),
+                f"说明表里的 {name} 本机不存在，却被挂进了用户可选列表"
+                "（选了必然报「文件不存在」）")
+
+    def test_catalog_entry_without_weights_is_not_offered(self):
+        """目录里「还没落地」的条目绝不能出现在面板里。"""
+        available = set()
+        for lister in (lora_registry.list_z_image_loras,
+                       lora_registry.list_qwen_image_loras,
+                       lora_registry.list_moss_image_loras):
+            available |= {item["name"] for item in lister()}
+        for name in lora_registry.LORA_CATALOG:
+            resolved, path = lora_registry.resolve_lora(name)
+            if path is None:
+                self.assertNotIn(name, available,
+                                 f"{name} 本机没文件却被挂进了面板")
 
 
 class TestWorkflowLoRA(unittest.TestCase):

@@ -561,8 +561,17 @@ function renderLoraSelect() {
   const ctx = imgLoraCtx();
   const used = new Set(ctx.list.map(l => l.name));
   const options = ctx.store.available.filter(l => !used.has(l.name));
+  // 下拉里带上「功能 / 适用场景」的一句话说明 —— 用户在选之前
+  // 就能看到这个 LoRA 是干什么的（原来只有名字，选完才看得到说明）。
+  // 用 title 属性挂完整说明（原生下拉的 tooltip），文本只带简短版，
+  // 免得把下拉撑得太长。
   sel.innerHTML = options.length
-    ? options.map(l => `<option value="${esc(l.name)}">${esc(l.display)}</option>`).join("")
+    ? options.map(l => {
+        const scene = (l.scene || "").split(/[。；\n]/)[0].trim();
+        const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
+        const title = l.scene ? ` title="${esc(l.scene)}"` : "";
+        return `<option value="${esc(l.name)}"${title}>${esc(l.display)}${esc(brief)}</option>`;
+      }).join("")
     : `<option value="">${ctx.store.available.length ? "全部已添加" : `本机未找到 ${ctx.label} LoRA`}</option>`;
   sel.disabled = !options.length;
   $("#imgLoraAdd").disabled = !options.length;

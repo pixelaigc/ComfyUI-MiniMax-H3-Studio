@@ -7,16 +7,24 @@ folder_paths 扫描得出（跟 /object_info/LoraLoaderModelOnly 同一个来源
 每个 LoRA 的说明字段来自：
   * safetensors 头部 __metadata__（modelspec / ss_* 字段）
   * 上游仓库 README（ModelScope / Civitai），触发词即上游 tags
+
+**三基座的效果 LoRA 目录**（Z-Image / Qwen-Image 2.1 / MOSS-Image）
+在 `lora_catalog_effects.py` 里 —— 那是纯数据（链接 / 强度 / 触发词 /
+场景说明原样取自调研清单），与本文件的扫描 / 兼容性逻辑分开，
+改目录不用碰逻辑。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 
 from . import lora_damping
+from .lora_catalog_effects import ALL_EFFECTS as _EFFECT_CATALOG
+from .lora_catalog_effects import FAMILY_PREFIXES as _EFFECT_FAMILY_PREFIXES
 
 # ------------------------------------------------------------------ 已知说明
 # 说明来源全部标注在 source 字段里，界面上可展开查看。
@@ -187,6 +195,16 @@ LORA_CATALOG: dict[str, dict] = {
     },
 }
 
+# ------------------------------------------------------------------
+# 三基座效果 LoRA 目录（来自调研清单，见 lora_catalog_effects.py）
+# ------------------------------------------------------------------
+# 这些条目统一带**族专属的目录前缀**（z-image-effects/ / qwen21-effects/ /
+# moss-effects/），前缀本身就是「这个 LoRA 属于哪一族」的唯一真相源：
+#   * 族判定不再靠文件名猜测（`pytorch_lora_weights.safetensors` 这种
+#     三族重名的文件，没有前缀根本分不出来）
+#   * 跨族误用能在服务端被直接拒绝（键名对不上，ComfyUI 会静默丢弃）
+LORA_CATALOG.update(_EFFECT_CATALOG)
+
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
 Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
 # Qwen-Image 2.1 家族的 marker（文件名里带这些字样的才可能是 2.1 的 LoRA）
@@ -195,6 +213,27 @@ QWEN_IMAGE_MARKERS = ("qwen_image_2.1", "qwen_image2.1", "qwenimage2.1",
 # MOSS-Image 家族的 marker（文件名里带这些字样的才可能是 MOSS 的 LoRA）
 MOSS_IMAGE_MARKERS = ("moss_image", "moss-image", "mossimage", "moss_hires",
                       "moss_xvstyle")
+
+# 目录里的**族专属前缀** -> 族名。用前缀判定族，比文件名猜测可靠得多。
+EFFECT_FAMILY_BY_PREFIX: dict[str, str] = {}
+for _fam, _prefixes in _EFFECT_FAMILY_PREFIXES.items():
+    for _prefix in _prefixes:
+        EFFECT_FAMILY_BY_PREFIX[_prefix] = _fam
+
+
+def effect_family_of(name: str) -> str | None:
+    """这个 LoRA 属于哪一族（按目录前缀判定）。不属于效果目录则返回 None。
+
+    前缀是**唯一**的族判定依据：调研清单里有一批文件三族同名
+    （`pytorch_lora_weights.safetensors` 在 Z-Image 是「写实增强」、
+    在 QI21 是「Y2K 数码」、在 MOSS 是别的东西），靠文件名分不出来。
+    """
+    if not name:
+        return None
+    for prefix, family in EFFECT_FAMILY_BY_PREFIX.items():
+        if name.startswith(prefix):
+            return family
+    return None
 
 # LoRA 分类
 #   effect       —— 效果类（滤镜 / 写实风格 / 人像增强）：用户可自行挑选
@@ -206,10 +245,23 @@ KIND_ACCELERATION = "acceleration"
 
 # 加速/蒸馏类 LoRA 的判定关键词 —— 命中即排除出用户可选列表。
 # 只对「上游目录里没登记过 kind」的 LoRA 生效（已登记的以登记为准）。
+#
+# ⚠️ 关键词必须**够具体**（2026-11-09 实测踩坑）：
+# 原来有 "turbo_lora"，用来抓 `Z-Image-Fun-Lora-Distill-8-Steps-2603`
+# 这类加速 LoRA。但 Z-Image-Turbo 的**效果** LoRA 仓库 URL 恰好长这样：
+#   https://huggingface.co/DK9/3D_MMORPG_style_z-image-turbo_lora
+#   https://huggingface.co/AlekseyCalvin/Marionette_Modernism_Z-image-Turbo_LoRA
+# -> 启发式把这两条**效果** LoRA 判成了加速类，工作流直接拒绝、
+#    也不进用户可选列表。
+# 现在改成更精确的组合词（"distill" 已经能覆盖绝大多数加速 LoRA），
+# 并且效果目录里的条目一律**显式声明** kind=effect，不靠猜。
 ACCELERATION_MARKERS = (
     "distill", "distillation", "accel", "speedup", "speed-up",
-    "lightx2v", "lightning", "turbo_lora", "step4", "step8", "4step", "8step",
+    "lightx2v", "lightning", "step4", "step8", "4step", "8step",
     "fewstep", "few-step", "lightning2", "sparse", "fast",
+    # 加速 LoRA 的命名组合（比裸 "turbo_lora" 精确 —— 效果 LoRA 不会
+    # 同时带 "turbo" + "distill"/"step"）
+    "turbo_distill", "turbo-distill", "distill_turbo",
 )
 
 
@@ -408,13 +460,31 @@ def _lora_key_variants(base: str) -> set[str]:
       * `lora_unet_<层名把点换成下划线>`          （diffusers 风格）
       * diffusers 的 to_q/to_k/to_v -> 融合 qkv 的映射
     比对时必须把 LoRA 侧的层名展开成全部候选再命中。
+
+    ⚠️ **必须先剥掉已有的前缀**（2026-11-09 实测踩坑）：
+    LoRA 权重里的层名**本身就可能带 `diffusion_model.` 前缀**
+    （实测 MOSS 的 ComfyUI 版 LoRA 全是
+     `diffusion_model.layers.N.proj.*`）。
+    如果不剥，直接拼前缀会变成
+    `diffusion_model.diffusion_model.layers.0.proj.q` —— 永远命中不了，
+    于是 MOSS 的 LoRA 被判成 0 命中 -> 假不兼容。
     """
+    # 先剥掉 LoRA 侧自带的前缀，得到**裸层名**
+    stem = base
+    for prefix in ("diffusion_model.", "transformer."):
+        if stem.startswith(prefix):
+            stem = stem[len(prefix):]
+            break
+    if stem.startswith("lora_unet_"):
+        stem = stem[len("lora_unet_"):].replace("_", ".")
     out: set[str] = set()
     for prefix in _LORA_KEY_PREFIXES:
         if prefix == "lora_unet_":
-            out.add("lora_unet_" + base.replace(".", "_"))
+            out.add("lora_unet_" + stem.replace(".", "_"))
             continue
-        out.add(prefix + base)
+        out.add(prefix + stem)
+    # 裸层名本身也要试（ComfyUI 登记的 generic key 就是裸名）
+    out.add(stem)
     return out
 
 
@@ -426,14 +496,22 @@ def _layer_hit(base: str, unet_keys: set[str]) -> bool:
         if cand in unet_keys:
             return True
     # 分离投影 to_q/to_k/to_v -> 融合 qkv 的三段（ComfyUI 的正规映射）
+    # stem 要用**剥掉前缀**的裸层名，否则
+    # `diffusion_model.layers.0.attention.to_q` 会拼出
+    # `diffusion_model.diffusion_model.layers.0.attention.qkv`（不存在）。
+    stem = base
+    for prefix in ("diffusion_model.", "transformer."):
+        if stem.startswith(prefix):
+            stem = stem[len(prefix):]
+            break
     for suffix, fused in ((".attention.to_q", ".attention.qkv"),
                           (".attention.to_k", ".attention.qkv"),
                           (".attention.to_v", ".attention.qkv"),
                           (".attention.to_out.0", ".attention.out")):
-        if base.endswith(suffix):
-            stem = base[: -len(suffix)]
+        if stem.endswith(suffix):
+            head = stem[: -len(suffix)]
             for pre in ("diffusion_model.", ""):
-                if pre + stem + fused in unet_keys:
+                if pre + head + fused in unet_keys:
                     return True
     return False
 
@@ -520,12 +598,19 @@ def _parse_extra_base_dirs(raw: str) -> list[Path]:
 def _attention_hit_ratio(lora_bases: set[str], unet_keys: set[str]) -> tuple[float, int, int]:
     """注意力层的命中率。
 
-    注意力层 = 键名里含 '.attention.' 的 LoRA layer。
+    注意力层 = 键名里含 '.attention.' 的 LoRA layer（**Z-Image 的写法**）。
     命中 = 该 layer 名能在 UNET 的同名层里找到（或其 fused / 前缀变体）。
 
     命中判定统一走 `_layer_hit()` —— 它把 LoRA 侧层名的三种前缀写法
     （`diffusion_model.` / `lora_unet_` / 无前缀）与 to_q/to_k/to_v
     -> 融合 qkv 的映射都试一遍。
+
+    ⚠️ **这个函数只对 Z-Image 有效**。三族的层命名完全不同：
+        Z-Image   layers.N.attention.to_q
+        QI21      transformer_blocks.N.attn.to_q
+        MOSS      layers.N.proj.q
+    拿它去判 QI21 / MOSS 会得到「0 个注意力层 -> 命中率 1.0」的**假通过**。
+    那两族请用 `_family_layer_hit_ratio()`（按族选正则）。
     """
     attn = {b for b in lora_bases if ".attention." in b}
     if not attn:
@@ -535,6 +620,49 @@ def _attention_hit_ratio(lora_bases: set[str], unet_keys: set[str]) -> tuple[flo
         if _layer_hit(base, unet_keys):
             hit += 1
     return (hit / len(attn) if attn else 1.0), hit, len(attn)
+
+
+# ------------------------------------------------------------------
+# 分族的「注意力/投影层」命中判定
+# ------------------------------------------------------------------
+# 三族的层命名完全不同，用同一套正则去比会得到假通过或假失败：
+#
+#   族          LoRA 层名                        底模层名
+#   Z-Image     layers.N.attention.to_q          layers.N.attention.qkv（融合）
+#   QI21        transformer_blocks.N.attn.to_q   transformer_blocks.N.attn.to_q
+#   MOSS        layers.N.proj.q                  layers.N.proj.q（分离 q/k/v）
+#
+# 命中判定仍然复用 `_layer_hit()`：它已经把 LoRA 侧的三种前缀写法
+# 与 Z-Image 的 to_q/to_k/to_v -> 融合 qkv 映射都覆盖了；
+# QI21 / MOSS 的层名底模里是**同名同形**的（前缀写法试一遍即可命中）。
+#
+# 关键：**必须按族选正则**，否则 QI21 的 LoRA（`.attn.`）
+# 在 Z-Image 的正则下会被判成「没有注意力层 -> 命中率 1.0」而假通过。
+_FAMILY_ATTENTION_RE = {
+    "Z-Image": re.compile(r"\.attention\.(to_q|to_k|to_v|to_out\.0|qkv)$"),
+    "Qwen-Image 2.1": re.compile(r"\.attn\.(to_q|to_k|to_v|to_out\.0)$"),
+    "MOSS-Image": re.compile(r"\.proj\.(q|k|v|o)$"),
+}
+
+
+def _family_layer_hit_ratio(lora_bases: set[str], unet_keys: set[str],
+                            family: str) -> tuple[float, int, int]:
+    """按底模族算「注意力/投影层」的命中率。
+
+    返回 (命中率, 命中数, 总数)。该 LoRA 没有这类层时返回 (1.0, 0, 0)
+    —— 表示「无法用命中率判定」，不是「100% 命中」。
+    """
+    pattern = _FAMILY_ATTENTION_RE.get(family)
+    if pattern is None:
+        return 1.0, 0, 0
+    attn = {b for b in lora_bases if pattern.search(b)}
+    if not attn:
+        return 1.0, 0, 0
+    hit = 0
+    for base in attn:
+        if _layer_hit(base, unet_keys):
+            hit += 1
+    return (hit / len(attn)), hit, len(attn)
 
 
 # 兼容性检测缓存 —— 检测要读 UNET 权重（12GB），不能每次调用都重算。
@@ -558,14 +686,25 @@ def clear_compat_cache() -> None:
     _UNET_CACHE_KEY = None
 
 
-def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
-    """检测一个 LoRA 与 Z-Image 底模的兼容性。
+def check_compatibility(path: Path, unet_path: Path | None = None,
+                        family: str = "Z-Image") -> dict:
+    """检测一个 LoRA 与对应底模的兼容性。
+
+    参数:
+      path       LoRA 权重路径
+      unet_path  底模 UNET 权重路径（None = 不做权重比对）
+      family     底模族（"Z-Image" / "Qwen-Image 2.1" / "MOSS-Image"）
+
+    ⚠️ **family 必须传对**（2026-11-09 实测教训）：
+    三族的层命名完全不同，用 Z-Image 的正则去判 QI21 的 LoRA
+    （层名是 `.attn.` 而不是 `.attention.`）会得到「0 个注意力层」
+    -> 命中率 1.0 -> **假通过**（明明不兼容却放行）。
 
     返回:
       {
         "compatible": bool,
         "reason": str,            # 不兼容原因（给界面显示）
-        "attention_hit": float,   # 注意力层命中率
+        "attention_hit": float,   # 注意力/投影层命中率
         "relative_perturbation": float | None,  # 相对扰动（需读权重，慢；失败为 None）
         "suggested_strength": float,  # 安全推荐强度
       }
@@ -578,8 +717,8 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
                 "relative_perturbation": None, "suggested_strength": 1.0,
                 "strength_cap": 1.0, "verified": False}
 
-    # 缓存命中则直接返回
-    key = _cache_key(path)
+    # 缓存命中则直接返回（缓存键含族，避免跨族串味）
+    key = _cache_key(path) + (family,)
     unet_key = _cache_key(unet_path)
     if _UNET_CACHE_KEY == unet_key and key in _COMPAT_CACHE:
         return dict(_COMPAT_CACHE[key])
@@ -588,7 +727,8 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
     bases = _lora_layer_bases(lora_header)
     unet_keys = _unet_layer_keys(unet_path)
 
-    hit_ratio, hit, total = _attention_hit_ratio(bases, unet_keys)
+    # 按族选正则算命中率（见 _family_layer_hit_ratio 的说明）
+    hit_ratio, hit, total = _family_layer_hit_ratio(bases, unet_keys, family)
     result = {
         "compatible": True,
         "reason": "",
@@ -608,8 +748,9 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
     if total and hit_ratio < COMPAT_MIN_ATTENTION_HIT:
         result["compatible"] = False
         result["reason"] = (
-            f"注意力层在 Z-Image 底模里不存在（仅 {hit}/{total} 命中）："
-            "该 LoRA patch 的层与底模结构对不上，加载后出图会变成彩色噪点。")
+            f"注意力/投影层在 {family} 底模里不存在（仅 {hit}/{total} 命中）："
+            "该 LoRA patch 的层与底模结构对不上，ComfyUI 会静默丢弃"
+            "（只打 \"lora key not loaded\" 的 WARNING，出图照跑但 LoRA 没生效）。")
         _COMPAT_CACHE[key] = dict(result)
         _UNET_CACHE_KEY = unet_key
         return result
@@ -621,23 +762,27 @@ def check_compatibility(path: Path, unet_path: Path | None = None) -> dict:
     except Exception:
         pert = None
 
-    # context_refiner 扰动 —— 这是「出彩色噪点」的决定性指标
-    try:
-        from . import lora_damping
-        ctx = lora_damping._ctx_damping_needed(path, unet_path)
-        result["ctx_perturbation"] = ctx
-        if ctx is not None and ctx >= COMPAT_CTX_DAMPING_THRESHOLD:
-            factor = lora_damping.DEFAULT_CTX_DAMPING
-            result["ctx_damping"] = factor
-            result["strength_cap"] = 1.0
-            result["suggested_strength"] = 1.0
-            result["reason"] = (
-                f"context_refiner 权重扰动较大（相对原权重 {ctx * 100:.1f}%）："
-                f"该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散、"
-                f"出图为彩色噪点。已自动对 context_refiner 做 {factor:.2f} 阻尼，"
-                f"强度可保持 1.0。")
-    except Exception:
-        pass
+    # context_refiner 扰动 —— 这是「出彩色噪点」的决定性指标。
+    # ⚠️ context_refiner 是 **Z-Image 独有**的模块（联合处理文本条件 + 潜变量），
+    # QI21 / MOSS 底模里没有这个模块 —— 对它们做阻尼没有意义，
+    # 而且 _ctx_damping_needed() 里的键名对不上会算出 None。
+    if family == "Z-Image":
+        try:
+            from . import lora_damping
+            ctx = lora_damping._ctx_damping_needed(path, unet_path)
+            result["ctx_perturbation"] = ctx
+            if ctx is not None and ctx >= COMPAT_CTX_DAMPING_THRESHOLD:
+                factor = lora_damping.DEFAULT_CTX_DAMPING
+                result["ctx_damping"] = factor
+                result["strength_cap"] = 1.0
+                result["suggested_strength"] = 1.0
+                result["reason"] = (
+                    f"context_refiner 权重扰动较大（相对原权重 {ctx * 100:.1f}%）："
+                    f"该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散、"
+                    f"出图为彩色噪点。已自动对 context_refiner 做 {factor:.2f} 阻尼，"
+                    f"强度可保持 1.0。")
+        except Exception:
+            pass
 
     if pert is not None and pert > 0 and not result.get("ctx_damping"):
         # 整体扰动大但 context_refiner 正常 -> 仍按比例给个保守推荐强度
@@ -818,12 +963,14 @@ def _rel_to_lora_dir(name: str, dirs: list[Path]) -> tuple[str, str]:
     return "", ""
 
 
-def _list_loras_for_base(markers, unet_path, base_label):
+def _list_loras_for_base(markers, unet_path, base_label, family=None):
     """扫描本机，返回某一底模族下真实存在的 LoRA 清单。
 
     markers: 文件名里出现即视为该族的 marker
     unet_path: 兼容性比对用的底模 UNET 权重（找不到则跳过校验）
     base_label: 底模名（写进条目的 base 字段）
+    family: 底模族名（用于按族选正则做兼容性判定）——
+             默认取 base_label。
 
     ⚠️ **unet_path=None 表示「这一族不做权重比对」**（MOSS-Image 的底模是
     diffusers 目录，没有单文件 UNET 可读）。
@@ -831,7 +978,15 @@ def _list_loras_for_base(markers, unet_path, base_label):
     `unet_path or _z_image_unet_path()` —— 于是 MOSS 的 LoRA 被拿去和
     **Z-Image 的 UNET** 比键集，结论毫无意义（verified=True 但数据是错的）。
     这里显式分流：None -> 不调用 check_compatibility()。
+
+    收录规则（**族判定优先于文件名猜测**）：
+      1. 目录前缀命中族专属前缀（z-image-effects/ / qwen21-effects/ /
+         moss-effects/）-> 一定属于该族，即使文件名里没有任何族关键词
+         （`pytorch_lora_weights.safetensors` 这种三族同名的文件靠前缀分）
+      2. 否则按文件名 marker 命中
     """
+    family = family or base_label
+    effect_prefixes = _EFFECT_FAMILY_PREFIXES.get(family, ())
     dirs = comfyui_lora_dirs()
     found: list[dict] = []
     seen: set[str] = set()
@@ -845,7 +1000,20 @@ def _list_loras_for_base(markers, unet_path, base_label):
             lowered = rel.lower()
             if lowered.startswith(lora_damping.DERIVED_PREFIX):
                 continue
-            if not any(marker in lowered for marker in markers):
+            # 族归属：目录前缀优先（唯一真相源），否则退回文件名 marker
+            by_prefix = any(rel.startswith(prefix) for prefix in effect_prefixes)
+            by_marker = any(marker in lowered for marker in markers)
+            if not by_prefix and not by_marker:
+                continue
+            # 别的族的专属前缀 -> 排除（跨族误用会被 ComfyUI 静默丢弃）
+            other_prefix = False
+            for other_family, prefixes in _EFFECT_FAMILY_PREFIXES.items():
+                if other_family == family:
+                    continue
+                if any(rel.startswith(prefix) for prefix in prefixes):
+                    other_prefix = True
+                    break
+            if other_prefix:
                 continue
             if rel in seen:
                 continue
@@ -859,12 +1027,16 @@ def _list_loras_for_base(markers, unet_path, base_label):
                       "verified": False}
             if kind == KIND_EFFECT and unet_path is not None:
                 try:
-                    compat = check_compatibility(path, unet_path)
+                    compat = check_compatibility(path, unet_path, family=family)
                 except Exception:
                     compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                               "relative_perturbation": None, "suggested_strength": 1.0,
                               "ctx_perturbation": None, "ctx_damping": None,
                               "verified": False}
+            elif kind == KIND_EFFECT and family == "MOSS-Image":
+                # MOSS 没有单文件 UNET 可比，但底模的层键清单在
+                # index.json 里 —— 用它做同样的「投影层命中率」判定。
+                compat = _check_moss_compatibility(path)
             found.append({
                 "name": rel,
                 "path": str(path),
@@ -872,16 +1044,18 @@ def _list_loras_for_base(markers, unet_path, base_label):
                 "display": info.get("display") or path.stem,
                 "base": info.get("base") or base_label,
                 "trigger": info.get("trigger", ""),
-                # 推荐强度：只有**真的做过权重比对**（verified=True）时，
-                # 兼容性检测算出的安全值才优先；否则用目录里人工核对的
-                # recommended_strength。
-                # 为什么：底模是 diffusers 目录的模型（MOSS）没有单文件 UNET
-                # 可比对，check_compatibility() 会返回「未验证 + 1.0」，
-                # 若无条件采纳就会把上游标注的 0.7 覆盖成 1.0。
-                "recommended_strength": (compat.get("suggested_strength")
-                                         if compat.get("verified")
-                                         and compat.get("suggested_strength")
-                                         else info.get("recommended_strength", 1.0)),
+                # 推荐强度：**目录里人工核对的 upstream 值优先**。
+                # 兼容性检测算出的 suggested_strength 只是「这个权重扰动
+                # 大不大」的兜底安全值 —— 它不该覆盖作者明示的推荐值
+                # （例：调研清单写「作者明示 0.5」，实测扰动算出来 1.0，
+                #  用 1.0 会让作者精心标定的强度失效）。
+                # 只有目录**没有**给出推荐强度时，才用检测算出的安全值。
+                "recommended_strength": (info.get("recommended_strength")
+                                         if info.get("recommended_strength") is not None
+                                         else (compat.get("suggested_strength")
+                                               if compat.get("verified")
+                                               and compat.get("suggested_strength")
+                                               else 1.0)),
                 "strength_cap": compat.get("strength_cap", 1.0),
                 "ctx_perturbation": compat.get("ctx_perturbation"),
                 "ctx_damping": compat.get("ctx_damping"),
@@ -894,9 +1068,14 @@ def _list_loras_for_base(markers, unet_path, base_label):
                 "compat_verified": bool(compat.get("verified", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
-                # 认定方式：filename（文件名含 z-image 字样）或
+                # 认定方式：filename（文件名含族关键词）/
+                # effect_dir（族专属目录前缀，最可靠）/
                 # layer_structure（靠层结构比对认出来的）
-                "discovered_by": info.get("discovered_by", "filename"),
+                "discovered_by": info.get(
+                    "discovered_by",
+                    "effect_dir" if by_prefix else "filename"),
+                "family": family,
+                "plan_id": info.get("plan_id", ""),
                 "metadata": meta,
             })
     return found
@@ -909,7 +1088,7 @@ def list_qwen_image_loras() -> list[dict]:
     把 2.1 的 LoRA 混进 Z-Image 的下拉会让用户选到不匹配的权重。
     """
     return _list_loras_for_base(QWEN_IMAGE_MARKERS, _qwen_image_unet_path(),
-                                "Qwen-Image 2.1")
+                                "Qwen-Image 2.1", family="Qwen-Image 2.1")
 
 
 def list_moss_image_loras() -> list[dict]:
@@ -929,7 +1108,98 @@ def list_moss_image_loras() -> list[dict]:
 
     因此这里只做「文件名 marker 命中 + 元数据」两步，不做权重比对。
     """
-    return _list_loras_for_base(MOSS_IMAGE_MARKERS, None, "MOSS-Image")
+    return _list_loras_for_base(MOSS_IMAGE_MARKERS, None, "MOSS-Image",
+                                family="MOSS-Image")
+
+
+# MOSS 底模（diffusers 目录）的层键缓存
+_MOSS_KEYS_CACHE: set[str] | None = None
+
+
+def _moss_base_layer_keys() -> set[str] | None:
+    """MOSS-Image 底模的层键集合（带 `diffusion_model.` 前缀）。
+
+    MOSS 的底模是 diffusers 目录（transformer/ 下 3 个分片），
+    没有单文件 safetensors 可读 —— 但**不需要**把 9.5GB 权重读出来：
+    `diffusion_pytorch_model.safetensors.index.json` 里的 weight_map
+    就是完整的张量名清单，跟实际加载后的 state_dict 键一一对应。
+
+    键前缀说明（2026-11-09 实测）：ComfyUI 加载 MOSS 后，
+    `model_lora_keys_unet()` 只登记 `diffusion_model.*` 一种写法
+    （没有 `transformer.` 别名 —— 实测 909 个 key 里 transformer. 前缀为 0）。
+    所以上游 diffusers 原版（`transformer.layers.N.proj.*`）
+    直接丢进 models/loras/ 会**静默不加载**，
+    必须用带 `diffusion_model.` 前缀的版本。
+    """
+    global _MOSS_KEYS_CACHE
+    if _MOSS_KEYS_CACHE is not None:
+        return _MOSS_KEYS_CACHE or None
+    roots = [
+        Path("/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-Base"),
+        Path("/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-SFT"),
+    ]
+    keys: set[str] = set()
+    for root in roots:
+        index = root / "transformer" / "diffusion_pytorch_model.safetensors.index.json"
+        if not index.is_file():
+            continue
+        try:
+            weight_map = json.loads(index.read_text(encoding="utf-8")).get("weight_map", {})
+        except Exception:
+            continue
+        for name in weight_map:
+            for suffix in (".weight", ".bias"):
+                if name.endswith(suffix):
+                    keys.add("diffusion_model." + name[: -len(suffix)])
+                    break
+            else:
+                keys.add("diffusion_model." + name)
+        if keys:
+            break
+    _MOSS_KEYS_CACHE = keys
+    return keys or None
+
+
+def _check_moss_compatibility(path: Path) -> dict:
+    """MOSS-Image 的兼容性判定（用底模 index.json 的层键清单）。
+
+    MOSS 没有单文件 UNET，但底模的层名清单在
+    `diffusion_pytorch_model.safetensors.index.json` 里 ——
+    与 ComfyUI 加载后的 state_dict 键一一对应，成本是读一个 JSON。
+
+    判定口径与其它两族一致：`.proj.{q,k,v,o}` 投影层命中率 < 0.8 -> 不兼容。
+
+    ⚠️ **必须带 `diffusion_model.` 前缀**：ComfyUI 给 MOSS 登记的 key_map
+    只有 `diffusion_model.*` 一种写法（实测 909 个 key 里
+    `transformer.` 前缀为 0 个）。上游 diffusers 原版
+    （`transformer.layers.N.proj.*`）命中率为 0 —— 静默不加载。
+    """
+    base = {"compatible": True, "reason": "", "attention_hit": 1.0,
+            "attention_hit_count": 0, "attention_total": 0,
+            "relative_perturbation": None, "suggested_strength": 1.0,
+            "strength_cap": 1.0, "ctx_perturbation": None, "ctx_damping": None,
+            "verified": False}
+    unet_keys = _moss_base_layer_keys()
+    if not unet_keys:
+        return base
+    try:
+        bases = _lora_layer_bases(_read_safetensors_header(path))
+    except Exception:
+        return base
+    ratio, hit, total = _family_layer_hit_ratio(bases, unet_keys, "MOSS-Image")
+    base["attention_hit"] = round(ratio, 4)
+    base["attention_hit_count"] = hit
+    base["attention_total"] = total
+    base["verified"] = True
+    if total and ratio < COMPAT_MIN_ATTENTION_HIT:
+        base["compatible"] = False
+        base["reason"] = (
+            f"投影层在 MOSS-Image 底模里不存在（仅 {hit}/{total} 命中）："
+            "该 LoRA 的键名与本机 MOSS 底模对不上，ComfyUI 会静默丢弃"
+            "（只打 \"lora key not loaded\" 的 WARNING，出图照跑但 LoRA 没生效）。"
+            "常见原因：上游 diffusers 原版键名是 `transformer.` 前缀，"
+            "本机 ComfyUI 只认 `diffusion_model.` 前缀。")
+    return base
 
 
 def list_moss_effect_loras(include_incompatible: bool = False) -> list[dict]:
@@ -999,6 +1269,9 @@ def list_z_image_loras() -> list[dict]:
                     or lowered.startswith("__p14_")):
                 continue
             name_hit = any(marker in lowered for marker in Z_IMAGE_MARKERS)
+            # 族专属目录前缀（z-image-effects/）-> 一定是 Z-Image 的，
+            # 即使文件名里一个 z-image 字样都没有。
+            by_prefix = rel.startswith("z-image-effects/")
             if rel in seen:
                 continue
             seen.add(rel)
@@ -1017,7 +1290,7 @@ def list_z_image_loras() -> list[dict]:
             # 头部（毫秒级），而 `check_compatibility()` 要读 12GB 的 UNET +
             # LoRA 权重（几十秒）。所以**先用便宜的粗筛**，粗筛过了再做
             # 昂贵的精确检测 —— 否则每次打开面板都要扫 264 个 LoRA 的权重。
-            if not name_hit:
+            if not name_hit and not by_prefix:
                 if kind != KIND_EFFECT:
                     continue
                 if not _looks_like_z_image_layers(path):
@@ -1029,13 +1302,13 @@ def list_z_image_loras() -> list[dict]:
                       "verified": False}
             if kind == KIND_EFFECT:
                 try:
-                    compat = check_compatibility(path)
+                    compat = check_compatibility(path, family="Z-Image")
                 except Exception:
                     compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                               "relative_perturbation": None, "suggested_strength": 1.0,
                               "ctx_perturbation": None, "ctx_damping": None,
                               "verified": False}
-            if not name_hit:
+            if not name_hit and not by_prefix:
                 # 粗筛过了还要精确验证：注意力层必须 100% 命中
                 if float(compat.get("attention_hit") or 0) < 1.0:
                     continue
@@ -1049,10 +1322,13 @@ def list_z_image_loras() -> list[dict]:
                 "display": info.get("display") or path.stem,
                 "base": info.get("base") or (meta.get("modelspec.architecture") or meta.get("ss_base_model_version") or "Z-Image"),
                 "trigger": info.get("trigger", ""),
-                # 推荐强度：上游标注优先；否则按兼容性检测给出的安全值
-                "recommended_strength": (compat.get("suggested_strength")
-                                         if compat.get("suggested_strength")
-                                         else info.get("recommended_strength", 1.0)),
+                # 推荐强度：**目录里人工核对的 upstream 值优先**；
+                # 目录没给才用兼容性检测算出的安全值（理由同 _list_loras_for_base）
+                "recommended_strength": (info.get("recommended_strength")
+                                         if info.get("recommended_strength") is not None
+                                         else (compat.get("suggested_strength")
+                                               if compat.get("suggested_strength")
+                                               else 1.0)),
                 # 强度上限（1.0 = 不限制）；前端滑块按这个封顶
                 "strength_cap": compat.get("strength_cap", 1.0),
                 # context_refiner 阻尼信息（界面提示用）
@@ -1067,9 +1343,14 @@ def list_z_image_loras() -> list[dict]:
                 "compat_verified": bool(compat.get("verified", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
-                # 认定方式：filename（文件名含 z-image 字样）或
+                # 认定方式：filename（文件名含 z-image 字样）/
+                # effect_dir（族专属目录前缀，最可靠）/
                 # layer_structure（靠层结构比对认出来的）
-                "discovered_by": info.get("discovered_by", "filename"),
+                "discovered_by": info.get(
+                    "discovered_by",
+                    "effect_dir" if by_prefix else "filename"),
+                "family": "Z-Image",
+                "plan_id": info.get("plan_id", ""),
                 "metadata": meta,
             })
     return found
