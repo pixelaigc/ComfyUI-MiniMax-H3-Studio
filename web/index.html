@@ -216,14 +216,10 @@
         <div class="img-note" id="imgSlgNote" hidden></div>
       </div>
 
-      <div class="field" id="imgPeField" style="display:none">
-        <label class="img-toggle">
-          <input type="checkbox" id="imgUsePe" checked>
-          <span>官方 PE 提示词扩写</span>
-          <span class="muted" id="imgPeTier"></span>
-        </label>
-        <div class="img-note" id="imgPeNote"></div>
-      </div>
+      <!-- Qwen 的官方 PE 扩写**不再有独立勾选框** ——
+           它已并入「增强」按钮的下拉菜单（「qwen21图片官方增强PE」）。
+           出图时是否再扩写一次，由后端工作流的官方 PE 接线决定，
+           前端不再提供第二个入口（避免两处开关语义打架）。 -->
       <div class="field" id="imgRefField" style="display:none">
         <div class="field-label">参考图 <span class="muted" id="imgRefHint">最多 10 张</span></div>
         <div class="img-ref-list" id="imgRefList"></div>
@@ -853,10 +849,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
-<script src="/static/app.js?v=qwen21-1"></script>
-<script src="/static/providers.js?v=qwen21-1"></script>
+<script src="/static/app.js?v=qwen21-2"></script>
+<script src="/static/providers.js?v=qwen21-2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
-<script src="/static/enhance-menu.js?v=enhancemenu1"></script>
+<script src="/static/enhance-menu.js?v=enhancemenu2"></script>
 </body>
 </html>

@@ -624,8 +624,8 @@ class TestQwenFrontend(unittest.TestCase):
           model: state.imgQwen.model,
           shiftShown: document.querySelector('#imgShiftVal').textContent,
           stepsShown: document.querySelector('#imgStepsVal').textContent,
-          peVisible: getComputedStyle(document.querySelector('#imgPeField')).display !== 'none',
-          peChecked: document.querySelector('#imgUsePe').checked,
+          peFieldExists: !!document.querySelector('#imgPeField'),
+          peCheckboxExists: !!document.querySelector('#imgUsePe'),
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
           loras: Array.from(document.querySelectorAll('#imgLoraSelect option')).map(o => o.textContent),
         })""")
@@ -638,16 +638,19 @@ class TestQwenFrontend(unittest.TestCase):
         # 滑块显示的 SHIFT 必须与真实值一致（量程不能把它夹掉）
         self.assertAlmostEqual(float(s["shiftShown"]), 0.69, places=3)
         self.assertEqual(s["stepsShown"], str(self.recommended_steps()))
-        # PE 开关可见且默认开；文生图不显示参考图区
-        self.assertTrue(s["peVisible"])
-        self.assertTrue(s["peChecked"])
+        # 官方 PE 已并入「增强」下拉菜单 -> 面板上**不再有**独立 PE 区块/勾选框；
+        # 文生图不显示参考图区
+        self.assertFalse(s["peFieldExists"],
+                         "官方 PE 已并入增强下拉，不该再有独立 PE 区块")
+        self.assertFalse(s["peCheckboxExists"],
+                         "官方 PE 已并入增强下拉，不该再有独立 PE 勾选框")
         self.assertFalse(s["refVisible"])
         # LoRA 列表是 Qwen 的那两个
         self.assertTrue(any("Qwen" in t for t in s["loras"]),
                         f"LoRA 列表应含 Qwen 的条目，实际 {s['loras']}")
 
     def test_switch_to_qwen_i2i(self):
-        """切到 Qwen 图片编辑：参考图区出现，PE 开关可见。"""
+        """切到 Qwen 图片编辑：参考图区出现；官方 PE 已并入增强下拉（无独立勾选框）。"""
         self.page.evaluate(
             "() => document.querySelector('.nav-item[data-mode=\"i2i_qwen\"]').click()")
         self.page.wait_for_timeout(1200)
@@ -656,7 +659,7 @@ class TestQwenFrontend(unittest.TestCase):
         # 参考图强制来自素材库，state.imgQwen.refs 已移除。
         s = self.page.evaluate("""() => ({
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
-          peVisible: getComputedStyle(document.querySelector('#imgPeField')).display !== 'none',
+          peFieldExists: !!document.querySelector('#imgPeField'),
           hint: document.querySelector('#imgRefHint').textContent,
           note: document.querySelector('#imgRefNote').textContent,
           max: window.QwenRefs ? window.QwenRefs.getRefs().length : -1,
@@ -664,7 +667,8 @@ class TestQwenFrontend(unittest.TestCase):
           hasFileInput: !!document.querySelector('#imgRefInput'),
         })""")
         self.assertTrue(s["refVisible"], "图片编辑应显示参考图区")
-        self.assertTrue(s["peVisible"])
+        self.assertFalse(s["peFieldExists"],
+                         "官方 PE 已并入增强下拉，不该再有独立 PE 区块")
         # 参考图上限以服务端下发的为准（官方节点支持 16 个槽位，
         # 面板取官方工作流用量对应的值）
         max_ref = self.recommended_max_ref_images()
@@ -685,7 +689,7 @@ class TestQwenFrontend(unittest.TestCase):
           shift: state.img.shift,
           shiftMin: document.querySelector('#imgShift').min,
           shiftShown: document.querySelector('#imgShiftVal').textContent,
-          peVisible: getComputedStyle(document.querySelector('#imgPeField')).display !== 'none',
+          peFieldExists: !!document.querySelector('#imgPeField'),
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
           model: state.img.model,
         })""")
@@ -693,7 +697,8 @@ class TestQwenFrontend(unittest.TestCase):
         self.assertEqual(s["shiftMin"], "1")
         # 显示精度按模式（Z-Image 1 位小数 / Qwen 2 位），值本身要对
         self.assertAlmostEqual(float(s["shiftShown"]), 3.0, places=3)
-        self.assertFalse(s["peVisible"], "Z-IMAGE 不该显示 PE 开关")
+        self.assertFalse(s["peFieldExists"],
+                         "官方 PE 已并入增强下拉，不该再有独立 PE 区块")
         self.assertFalse(s["refVisible"], "Z-IMAGE 不该显示参考图区")
 
     def test_no_console_errors(self):
