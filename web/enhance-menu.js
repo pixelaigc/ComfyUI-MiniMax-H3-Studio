@@ -590,7 +590,13 @@
 
   // ------------------------------------------------------------------ 菜单渲染
 
+  /**
+   * HTML 转义 —— 走**共用组件**（web/enhance-menu-shared.js），
+   * 避免同一个转义实现有两份（同一常量写两处必然走偏）。
+   */
   function esc(s) {
+    const shared = window.EnhanceMenuShared;
+    if (shared && typeof shared.esc === "function") return shared.esc(s);
     return String(s == null ? "" : s).replace(/[&<>"']/g,
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -599,47 +605,31 @@
     const t = targets();
     const menu = document.querySelector(t.menu);
     if (!menu) return;
-    menu.innerHTML = ENHANCE_METHODS.map(m => {
-      const ok = isAvailable(m);
-      const checked = selectedIds.indexOf(m.id) >= 0;
-      // 每项显示它用的模板（改造前模板藏在第二个下拉里，
-      // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
-      const specTag = renderSpecTag(m);
-      // 不可用时说明**为什么**不可用（属于哪个功能）
-      const why = unavailableReason(m);
-      // 【2026-11-09 修文案冲突】禁用项**不**再同时挂 Recommended 与
-      // 「本面板不可用」两套徽标 —— 两者语义矛盾（「这里推荐」+「这里用不了」）。
-      // 规则：可用时才标 Recommended；不可用时只说明**为什么这里没有**
-      //（写明它属于哪个功能）。
-      const badge = ok
-        ? (m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : "")
-        : `<span class="enhance-menu-badge">${esc(why)}</span>`;
-      return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
-        <label class="enhance-menu-check" title="${esc(m.hint)}">
-          <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
-          <span class="enhance-menu-label">${esc(m.label)}</span>
-          ${specTag}
-          ${badge}
-        </label>
-        <span class="enhance-menu-hint">${esc(m.hint)}</span>
-        ${m.fields && m.fields.length ? renderFields(m) : ""}
-      </div>`;
-    }).join("");
-
-    menu.querySelectorAll("input[data-method-check]").forEach(box => {
-      box.addEventListener("change", () => {
-        toggleMethod(box.dataset.methodCheck, box.checked);
-      });
-    });
-    menu.querySelectorAll(".enhance-menu-field").forEach(el => {
-      const onEdit = () => {
-        setFieldValue(el.dataset.method, el.dataset.field, el.value);
+    const shared = window.EnhanceMenuShared;
+    if (!shared || typeof shared.renderEnhanceMenu !== "function") {
+      // 共用组件没加载（脚本顺序问题）—— 明确报错，不静默失败
+      setHint("增强组件未就绪（enhance-menu-shared.js 未加载），请刷新页面", "error");
+      return;
+    }
+    // 渲染走**共用组件**（web/enhance-menu-shared.js）——
+    // 图像面板与音乐面板用的是同一套实现与视觉，不另造一套。
+    shared.renderEnhanceMenu(menu, {
+      methods: ENHANCE_METHODS,
+      selectedIds: selectedIds,
+      isAvailable: isAvailable,
+      onToggle: toggleMethod,
+      onFieldEdit: (methodId, fieldKey, value) => {
+        setFieldValue(methodId, fieldKey, value);
         saveSelection();
         applySelectedParams();      // 参数即时套用并回显
         updateButton();
-      };
-      el.addEventListener("input", onEdit);
-      el.addEventListener("change", onEdit);
+      },
+      // 不可用时说明**为什么**不可用（属于哪个功能）
+      unavailableText: unavailableReason,
+      // 每项显示它用的模板（改造前模板藏在第二个下拉里，
+      // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
+      specHtml: renderSpecTag,
+      valueOf: (method, field) => effectiveFieldValue(method, field),
     });
   }
 
@@ -741,21 +731,6 @@
     };
     const owner = owners[method.id] || "其它功能专属";
     return owner + "，本面板不可用";
-  }
-
-  /** 某项的可编辑字段区（system prompt 文本框 + 档位参数）。 */
-  function renderFields(method) {
-    const blocks = method.fields.map(f => {
-      const shown = effectiveFieldValue(method, f);
-      const input = f.kind === "textarea"
-        ? `<textarea class="enhance-menu-field" rows="4" data-method="${esc(method.id)}" data-field="${esc(f.key)}" title="${esc(f.hint)}">${esc(shown)}</textarea>`
-        : `<input type="number" step="${f.key === "presencePenalty" ? "0.1" : "1"}" class="enhance-menu-field" data-method="${esc(method.id)}" data-field="${esc(f.key)}" value="${esc(shown)}" title="${esc(f.hint)}">`;
-      return `<div class="enhance-menu-field-row">
-        <span class="enhance-menu-field-label" title="${esc(f.hint)}">${esc(f.label)}</span>
-        ${input}
-      </div>`;
-    }).join("");
-    return `<div class="enhance-menu-fields">${blocks}</div>`;
   }
 
   // ------------------------------------------------------------------ 选中与路由

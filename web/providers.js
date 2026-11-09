@@ -728,7 +728,11 @@ function writeBackEnhanceResult(text, mode) {
     return false;
   }
   if (target.kind === "structured") {
-    // 结构化路线：文本不是写回目标，由调用方走结构化 apply
+    // 结构化路线（音乐）：产物是「12 个风格字段 + 歌词」，不是一个文本框。
+    // 这类增强**不走**「替换提示词框 / 追加」弹窗 —— 它在增强完成时
+    // 直接落到结构化风格区与歌词区（由 music-enhance.js 的契约负责）。
+    // 所以这里明确拒绝，而不是静默丢弃。
+    setEnhanceHint("音乐的结构化增强直接写入结构化风格区与歌词区，不走文本写回", "error");
     return false;
   }
   const el = target.element;
