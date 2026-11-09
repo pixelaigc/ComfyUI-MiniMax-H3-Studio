@@ -384,20 +384,27 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         self.assertIn("物体细化", note,
                       f"当前增强方式回显应含所用模板名，实际：{note!r}")
 
-    def test_template_choice_lives_inside_the_menu(self):
+    def test_template_choice_is_a_parallel_row(self):
         """
-        模板选择**并入**增强方式下拉（不再是第二个平级下拉）。
+        模板选择是增强栏里与「增强方式」**平级**的一行。
 
-        「普通增强」那一项下面带一个模板选择器，
-        里面是**本面板**可用的模板（Z-Image 面板 = Z-Image 官方 PE 等）。
+        【2026-11-09 改造】原先模板选择是增强方式菜单项的子属性
+        （用户要两级 UI 选两次），代码审查 P1-2 要求提升为平级一行。
+        这里的契约不变的是：模板选择器列的是**本面板**可用的模板
+        （Z-Image 面板 = Z-Image 官方 PE 等，不含 Qwen 专属档）。
         """
         self.switch_mode("t2i")
-        self.page.click("#enhanceMenuBtn")
-        self.page.wait_for_timeout(350)
-        sel = self.page.query_selector('#enhanceMenu select[data-spec-method="basic"]')
-        self.assertIsNotNone(sel, "「普通增强」项下应有模板选择器")
+        # 模板行在增强栏里，不在增强方式下拉内部
+        self.assertTrue(self.page.is_visible("#enhanceSpecRow"),
+                        "增强栏里应有模板选择行")
+        self.assertFalse(
+            self.page.evaluate(
+                "() => !!document.querySelector('#enhanceMenu #enhanceSpecRow')"),
+            "模板选择行不应在增强方式下拉内部（那是两级 UI）")
+        sel = self.page.query_selector("#enhanceSpecSelect")
+        self.assertIsNotNone(sel, "增强栏里应有模板选择器")
         opts = [o.strip() for o in self.page.eval_on_selector_all(
-            '#enhanceMenu select[data-spec-method="basic"] option',
+            '#enhanceSpecSelect option',
             "els => els.map(e => e.textContent)")]
         self.assertTrue(opts, "模板选择器应列出模板")
         # Z-Image 面板：含 Z-Image 官方 PE 档；不含 Qwen 官方 PE 档

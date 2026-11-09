@@ -372,17 +372,19 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
         self.assertTrue(self.page.is_visible("#mossLayoutBar"))
 
     def test_music_panel_lists_yue2_templates(self):
-        """音乐面板的「普通增强」列 YuE2 专属模板，不列图像模板。"""
+        """
+        音乐面板的模板行列 YuE2 专属模板，不列图像模板。
+
+        【2026-11-09】模板选择已从菜单项子属性提升为增强栏里的平级一行
+        （代码审查 P1-2），所以这里查 #musicEnhanceSpecSelect。
+        """
         self.switch_mode("t2a")
-        self.open_menu()
         opts = self.page.evaluate("""() => {
-          const menu = document.querySelector('#musicEnhanceMenu');
-          if (!menu) return null;
-          const sel = menu.querySelector('select[data-spec-method="basic"]');
+          const sel = document.querySelector('#musicEnhanceSpecSelect');
           if (!sel) return null;
           return Array.from(sel.options).map(o => o.textContent);
         }""")
-        self.assertIsNotNone(opts, "音乐面板的普通增强项应有模板选择器")
+        self.assertIsNotNone(opts, "音乐面板应有模板选择行")
         joined = " | ".join(opts)
         self.assertIn("YuE2", joined, f"音乐面板应列出 YuE2 模板，实际：{joined}")
         self.assertNotIn("Z-Image", joined, f"音乐面板不该列图像模板，实际：{joined}")

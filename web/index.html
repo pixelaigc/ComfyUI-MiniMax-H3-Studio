@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=enh-unify1">
+<link rel="stylesheet" href="/static/style.css?v=enh-unify2">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
 <link rel="stylesheet" href="/static/responsive.css?v=rs1">
 </head>
@@ -284,8 +284,15 @@
             </button>
             <div class="enhance-menu" id="musicEnhanceMenu" role="menu" hidden></div>
           </div>
+          <!-- 【模板选择行】与图像面板同一套机制（见 #enhanceSpecRow 的说明） -->
+          <label class="enhance-spec-row" id="musicEnhanceSpecRow" hidden>
+            <span class="enhance-spec-label" id="musicEnhanceSpecLabel">模板</span>
+            <select class="enhance-spec-select" id="musicEnhanceSpecSelect"
+                    title="当前增强方式使用的模板"></select>
+          </label>
           <!-- 当前所选增强方式的显式回显（审查 P2-4：音乐面板也必须有） -->
           <span class="enhance-current" id="musicEnhanceCurrent" hidden></span>
+          <span class="enhance-applied-params" id="musicEnhanceAppliedParams" hidden></span>
           <span class="enhance-hint" id="musicEnhanceHint">用本地模型生成结构化风格与歌词</span>
         </div>
       </div>
@@ -428,6 +435,15 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           </button>
           <div class="enhance-menu" id="enhanceMenu" role="menu" hidden></div>
         </div>
+        <!-- 【模板选择行】与「增强方式」下拉**平级**的一行。
+             改造前模板选择是增强方式菜单项的子属性（要两级 UI 选两次），
+             现在提升为独立一行：当前主增强方式用哪个模板一目了然，一次点击即可改。
+             它不是**增强入口** —— 增强入口仍然只有「按钮 + 下拉」这一个。 -->
+        <label class="enhance-spec-row" id="enhanceSpecRow" hidden>
+          <span class="enhance-spec-label" id="enhanceSpecLabel">模板</span>
+          <select class="enhance-spec-select" id="enhanceSpecSelect"
+                  title="当前增强方式使用的模板"></select>
+        </label>
         <!-- 当前所选增强方式的显式回显（改造前只有按钮文字，多选时看不出具体是哪几项） -->
         <span class="enhance-current" id="enhanceCurrent" hidden></span>
         <!-- 已套用推荐参数的可见回显：选中增强项即自动套用推荐参数。 -->
@@ -890,14 +906,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
-<script src="/static/app.js?v=enh-unify1"></script>
-<script src="/static/providers.js?v=enh-unify1"></script>
+<script src="/static/app.js?v=enh-unify2"></script>
+<script src="/static/providers.js?v=enh-unify2"></script>
+<script src="/static/assets.js?v=assetlib1"></script>
+<script src="/static/moss-layout.js?v=mosslayout2"></script>
+<script src="/static/app.js?v=enh-unify2"></script>
+<script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
 <script src="/static/enhance-menu-shared.js?v=shared1"></script>
-<script src="/static/enhance-menu.js?v=enh-unify1"></script>
+<script src="/static/enhance-menu.js?v=enh-unify2"></script>
 <!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
      window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
 <script src="/static/music-enhance.js?v=musicyue2-1"></script>

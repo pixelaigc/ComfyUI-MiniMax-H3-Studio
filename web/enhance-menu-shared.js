@@ -214,6 +214,9 @@
    *   kind        "text"（一段文本，写回一个输入框）
    *              | "structured"（结构化对象，写回一组字段 + 歌词框）
    *   target      kind=text 时的输入框选择器
+   *   targets     kind=text 时的**候选列表**（先新后旧）—— 同一个语义
+   *              可能有两个名字（如 #musicPrompt / #musicStyle），
+   *              任一存在即可用，避免跨分支合并后又拿到 null
    *   apply(text) kind=text 时的写回动作（默认写 target.value）
    *   apply(obj)  kind=structured 时的写回动作
    *   describe()  给用户看的说明（不可用 / 缺目标时的提示）
@@ -240,20 +243,28 @@
       }
       return { ok: true, kind: "structured", apply: contract.apply };
     }
-    // kind === "text"
-    const el = contract.target
-      ? document.querySelector(contract.target)
-      : null;
+    // kind === "text"：按候选列表逐个找（先新后旧）
+    const candidates = [];
+    if (Array.isArray(contract.targets)) candidates.push(...contract.targets);
+    if (contract.target) candidates.push(contract.target);
+    let el = null;
+    let used = "";
+    for (const sel of candidates) {
+      if (!sel) continue;
+      const found = document.querySelector(sel);
+      if (found) { el = found; used = sel; break; }
+    }
     if (!el) {
       const why = contract.describe
         ? contract.describe()
-        : `写回目标 ${contract.target || "(未声明)"} 不存在`;
+        : `写回目标 ${candidates[0] || "(未声明)"} 不存在`;
       return { ok: false, reason: why };
     }
     return {
       ok: true,
       kind: "text",
       element: el,
+      selector: used,
       apply: (text) => {
         if (typeof contract.apply === "function") {
           contract.apply(text, el);

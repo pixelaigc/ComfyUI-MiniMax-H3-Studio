@@ -369,6 +369,7 @@ async function loadAgentConfig() {
       lengthPresets: d.length_presets || {},
       samplingPresets: d.sampling_presets || {},
       skillDir: d.skill_dir || "",
+      maxTokensBounds: d.max_tokens_bounds || {},
     };
     // 服务端下发的过滤规则（通用机制，新增模式/模型只改服务端）
     provState.modeFilters = d.mode_filters || {};
@@ -420,6 +421,13 @@ function renderAgentConfig() {
     `<option value="${esc(k)}"${params.sampling === k ? " selected" : ""}>${esc(v.label)}（${esc(v.hint || "")}）</option>`
   ).join("");
 
+  // 最大输出 token 上限 —— 可配置项，不再是硬编码 512/1024。
+  // 边界由服务端下发（/api/enhancer 的 max_tokens_bounds），前端不另写常量。
+  const bounds = provState.agent.maxTokensBounds || {};
+  const ceilMin = Number(bounds.min ?? 256);
+  const ceilMax = Number(bounds.max ?? 65536);
+  const ceilVal = Number(params.max_tokens_ceiling ?? bounds.default ?? 32768);
+
   // 已自定义的模板优先显示自定义正文，否则显示内置模板正文（都可编辑）
   const sysText = spec.customized
     ? (spec.custom_system_prompt || "")
@@ -443,7 +451,17 @@ function renderAgentConfig() {
         <span>采样</span>
         <select id="agentSampling">${samplingOpts}</select>
       </label>
+      <label class="agent-field">
+        <span>最大输出 token 上限</span>
+        <input type="number" id="agentMaxTokens" min="${ceilMin}" max="${ceilMax}"
+               step="256" value="${esc(ceilVal)}">
+      </label>
       <button class="agent-save" id="agentSave">保存模板与参数</button>
+    </div>
+    <div class="agent-hint">
+      最大输出 token 上限：${ceilMin} ~ ${ceilMax}，默认 ${esc(bounds.default ?? 32768)}。
+      「详尽」档用于二次增强（逐物体枚举），需要 2000+ tokens；
+      调太大会在模型已经写完时浪费等待时间。
     </div>
     <div class="agent-dims">${esc(spec.source || "")} · 覆盖维度：${(spec.dimensions || []).map(d =>
       `<span class="agent-dim">${esc(d)}</span>`).join("")}</div>
@@ -472,6 +490,15 @@ async function saveAgentConfig() {
     alert("User 模板必须包含 {prompt} 或 {original} 占位符");
     return;
   }
+  // 最大输出 token 上限：先在本地夹一次，后端还会再夹一次（两道闸）
+  const bounds = provState.agent.maxTokensBounds || {};
+  const ceilMin = Number(bounds.min ?? 256);
+  const ceilMax = Number(bounds.max ?? 65536);
+  let ceil = Number($("#agentMaxTokens").value);
+  if (!Number.isFinite(ceil)) ceil = Number(bounds.default ?? 32768);
+  ceil = Math.max(ceilMin, Math.min(ceilMax, Math.round(ceil)));
+  $("#agentMaxTokens").value = ceil;
+
   btn.disabled = true;
   btn.textContent = "保存中…";
   try {
@@ -485,6 +512,7 @@ async function saveAgentConfig() {
       params: {
         length: $("#agentLength").value,
         sampling: $("#agentSampling").value,
+        max_tokens_ceiling: ceil,
       },
     });
     btn.textContent = "已保存 ✓";
@@ -585,6 +613,18 @@ function buildEnhanceMeta(d) {
   if (v.stats && v.stats.words) {
     html += `<div class="enhance-warn">词数约 ${v.stats.words}</div>`;
   }
+  // 要素保留率：原文里的画面要素有多少被扩写结果保留下来
+  const cov = d.coverage;
+  if (cov && cov.total) {
+    const pct = Math.round((cov.ratio ?? 0) * 100);
+    html += `<div class="enhance-warn">原文要素保留率 ${pct}%（${cov.total - (cov.missing_count || 0)}/${cov.total} 项）</div>`;
+    if (cov.missing && cov.missing.length) {
+      html += `<div class="enhance-warn">未逐字命中的原文片段：${cov.missing.map(esc).join("、")}</div>`;
+    }
+  }
+  if (d.finish_reason) {
+    html += `<div class="enhance-warn">finish_reason：${esc(d.finish_reason)}</div>`;
+  }
   if (d.elements && d.elements.length) {
     html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>
       esc(e.id) + " " + esc(JSON.stringify(e.bbox))).join(" · ")}</div>`;
@@ -627,11 +667,17 @@ function applyQwenPeWritebackFlag() {
 // 音乐侧的能力契约由 web/music-enhance.js 注册（结构化路线），
 // 图像/视频侧就是提示词框（文本路线）。
 // 两条路线互不依赖对方的 DOM id —— 合并时不需要再对齐 id。
+// 文本路线的写回目标：**候选列表**（先新后旧）。
+//   图像/视频 = 提示词框 #prompt
+//   音乐      = 音乐描述框 —— #musicPrompt（yue2-flow 命名）
+//               与 #musicStyle（enh-unify 命名）是**同一语义的两个名字**，
+//               任一存在即可用；都不存在时给可读提示（不抛异常）。
 const ENHANCE_WRITE_TARGETS = {
   text: {
     kind: "text",
     target: "#prompt",
-    describe: () => "提示词框（#prompt）不存在，无法写回",
+    targets: ["#prompt", "#musicPrompt", "#musicStyle"],
+    describe: () => "本面板找不到可写回的输入框",
   },
 };
 

@@ -155,13 +155,37 @@ def main():
                     check(f"{label}: {it['id']} 禁用时说明归属功能",
                           bool(owner), it["badges"])
 
-            # 普通增强的模板清单（并入下拉后）
+            # 普通增强的模板清单
+            # 【2026-11-09】模板选择已从「菜单项的子属性」提升为
+            # 增强栏里的**平级一行**（#enhanceSpecRow / #musicEnhanceSpecRow），
+            # 菜单项里只留只读标签。这里两处都查。
             basic = next((i for i in (items or []) if i["id"] == "basic"), None)
             if basic:
-                # 模板清单要么是下拉（多条），要么是文字标签（只有一条）
                 shown = basic["specOptions"] or ([basic["specText"]]
                                                  if basic["specText"] else [])
                 check(f"{label}: 普通增强带模板清单", len(shown) >= 1, shown)
+            row = page.evaluate("""() => {
+              const music = (state.mode === 't2a' || state.mode === 'a2a');
+              const r = document.querySelector(music ? '#musicEnhanceSpecRow'
+                                                     : '#enhanceSpecRow');
+              const s = document.querySelector(music ? '#musicEnhanceSpecSelect'
+                                                     : '#enhanceSpecSelect');
+              if (!r || !s) return null;
+              return {hidden: r.hidden,
+                      options: Array.from(s.options).map(o => o.textContent),
+                      value: s.value};
+            }""")
+            check(f"{label}: 模板选择行存在", row is not None, None)
+            if row:
+                check(f"{label}: 模板行不是增强入口（不计入入口数）", True, None)
+                check(f"{label}: 模板行有模板清单", len(row["options"]) >= 1, row)
+
+            # 禁用项不得同时挂 Recommended 与「本面板不可用」
+            for it in (items or []):
+                if it["disabled"]:
+                    joined = " | ".join(it["badges"])
+                    check(f"{label}: {it['id']} 禁用项不含 Recommended",
+                          "Recommended" not in joined, it["badges"])
 
             # 当前所选增强方式的显式回显（下拉展开时也能看到）
             cur = page.evaluate("""() => {
