@@ -2910,6 +2910,153 @@ async def api_agent_chat(request):
     return json_ok(result)
 
 
+async def api_agent_chat_stream(request):
+    """
+    POST /api/agent/chat/stream —— 内置多模态 Agent 主入口（SSE 流式）。
+
+    与 POST /api/agent/chat 的**请求体完全一致**，区别只在响应形式：
+      * /api/agent/chat      —— 一次性返回完整 JSON
+      * /api/agent/chat/stream —— SSE，过程中先推 progress 事件，最后推 result 事件
+
+    为什么要有流式：本地模型单步就要 20~120 秒，一条完整链路 4~6 分钟。
+    非流式的话，整个等待期间界面毫无反馈，实测 179 秒用户以为卡死
+    （审查报告 P3-3）。流式把「现在到哪一步」实时告诉用户。
+
+    事件格式（text/event-stream）：
+      event: progress
+      data: {"stage":"tool","detail":"正在检索素材库","done":1,"total":8,"elapsed_ms":31200}
+
+      event: result
+      data: { ...与 /api/agent/chat 相同的完整 JSON... }
+
+      event: error
+      data: {"error":"...","code":"..."}
+
+    失败语义与 /api/agent/chat 对齐：并发超限返回 HTTP 429（非 SSE），
+    参数错误返回 HTTP 400（非 SSE），便于前端统一处理。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        return web.json_response({"error": "请输入要处理的内容",
+                                  "code": "bad_request"}, status=400)
+
+    session_id = str(payload.get("session_id") or "").strip()
+    provider_id = str(payload.get("provider_id") or "").strip() or None
+    try:
+        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
+    except (TypeError, ValueError):
+        max_steps = agent_mod.MAX_STEPS
+
+    store = _agent_store()
+    session_id = store.create(session_id or None)
+    store.add_message(session_id, "user", message)
+    history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
+    if history and history[-1].get("role") == "user" \
+            and history[-1].get("content") == message:
+        history = history[:-1]
+
+    # 并发闸门：与 /api/agent/chat 完全一致（抢不到就 429，不排队）
+    gate = _agent_gate()
+    if gate.locked():
+        return web.json_response(
+            {"error": f"当前已有 {AGENT_CONCURRENCY} 个 Agent 任务在运行，"
+                      "请稍候再试。",
+             "code": "too_many_requests"}, status=429)
+
+    # 进度队列：Agent 编排器通过 on_progress 往里塞事件，
+    # 这里边跑边从队列里取出来写成 SSE。
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def _on_progress(stage: str, detail: str, done: int, total: int) -> None:
+        queue.put_nowait({
+            "stage": stage,
+            "detail": detail or "",
+            "done": int(done or 0),
+            "total": int(total or 0),
+        })
+
+    resp = web.StreamResponse(status=200, headers={
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+    await resp.prepare(request)
+
+    async def _write(event: str, data: dict) -> None:
+        body = json.dumps(data, ensure_ascii=False)
+        await resp.write(f"event: {event}\ndata: {body}\n\n".encode("utf-8"))
+
+    async def _runner() -> dict | None:
+        """跑 Agent，把 progress 事件实时转发出去。返回最终结果。"""
+        try:
+            async with gate:
+                result = await agent_mod.run_agent(
+                    sys.modules[__name__], message, session_id=session_id,
+                    provider_id=provider_id, max_steps=max_steps,
+                    history=history, on_progress=_on_progress)
+            return result
+        except agent_mod.AgentError as exc:
+            await _write("error", {"error": exc.message, "code": exc.code})
+            return None
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            await _write("error", {"error": f"Agent 执行失败：{detail}",
+                                   "code": "agent_internal_error"})
+            return None
+
+    task = asyncio.ensure_future(_runner())
+    stream_started = time.time()
+    #: 心跳间隔（秒）。只在**长时间没有新事件**时补一个注释行，
+    #: 让代理/浏览器知道连接还活着。间隔太短会刷出大量 : keep-alive
+    #: （实测 0.25s 一跳时 12 条进度事件配了 187 条心跳，噪音压过信号）。
+    HEARTBEAT_SEC = 5.0
+    last_beat = time.time()
+    try:
+        # 一边等结果，一边把进度事件刷出去
+        while True:
+            if task.done() and queue.empty():
+                break
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                if task.done():
+                    break
+                now = time.time()
+                if now - last_beat >= HEARTBEAT_SEC:
+                    last_beat = now
+                    await resp.write(b": keep-alive\n\n")
+                continue
+            event["elapsed_ms"] = int((time.time() - stream_started) * 1000)
+            await _write("progress", event)
+
+        result = task.result()
+        if result is not None:
+            if result.get("answer"):
+                store.add_message(session_id, "assistant", result["answer"])
+            for step in result.get("steps") or []:
+                tool_name = step.get("tool")
+                if not tool_name:
+                    continue
+                note = step.get("error") or "ok"
+                store.add_message(session_id, "tool", f"{tool_name}: {note}",
+                                   tool_name=tool_name)
+            result["session_id"] = session_id
+            result["provider_name"] = (result.get("provider") or {}).get("name") or ""
+            await _write("result", result)
+    finally:
+        if not task.done():
+            task.cancel()
+        await resp.write_eof()
+    return resp
+
+
 async def api_agent_sessions(request):
     """GET /api/agent/sessions —— 会话清单（最近 50 条）。"""
     store = _agent_store()
@@ -3025,6 +3172,7 @@ def make_app():
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
     # 内置多模态 Agent
     app.router.add_post("/api/agent/chat", api_agent_chat)
+    app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
     app.router.add_get("/api/agent/sessions", api_agent_sessions)
     app.router.add_get("/api/agent/sessions/{id}", api_agent_session_get)

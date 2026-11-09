@@ -2,6 +2,38 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
+// ---------- 页面显隐（统一切页契约） ----------
+//
+// 所有主页面（jobsArea / panel / stitchPanel / systemPage / providersPage /
+// assetsPage / agentPage）都靠 .page-hidden 这个类切换显隐，
+// **不再用内联 style.display**。
+//
+// 为什么必须这样：内联 style.display 的优先级高于任何 CSS 规则。
+// 只要有人写了 style.display="block"，.agent-page{display:flex} 就被覆盖 ——
+// flex 布局塌掉后 .ag-messages 的 flex:1 + min-height:0 全部失效，
+// 消息区按内容撑高、composer 被顶出视口，而 body{overflow:hidden} 让整页滚不动。
+// 结果是窄屏下对话一变长，输入框就彻底不可达（实测 390px 下
+// inputTop=3068 / reachable=false，滚轮与触摸滑动都无效）。
+//
+// 显隐写成类之后，任何一条 CSS 规则都能覆盖它，不会再出现「一个人改坏了整条链」。
+//
+// 显示时**不**套一个统一的 .page-visible{display:flex} ——
+// 各页的布局不同（.jobs-area/.system-page 是块级，.assets-page/.agent-page 是 flex），
+// 统一成 flex 会改变它们的内部排版。这里只管「隐藏」，显示时把内联 display
+// 整个移除，让该页自己的 CSS 规则决定布局。
+function showPage(el, visible) {
+  if (!el) return;
+  el.classList.toggle("page-hidden", !visible);
+  el.style.removeProperty("display");
+}
+
+// 页面当前是否可见（按计算样式判断，不依赖内联 display —— 现在已经没有内联 display 了）
+function pageIsVisible(el) {
+  if (!el) return false;
+  if (el.classList.contains("page-hidden")) return false;
+  return getComputedStyle(el).display !== "none";
+}
+
 const MODE_INFO = {
   t2v: { name: "文生视频", kind: "video" },
   flf: { name: "首尾帧", kind: "video" },
@@ -3365,13 +3397,13 @@ $("#unloadBtn").addEventListener("click", async () => {
 // ---------- 硬件参数页 ----------
 function showCreate() {
   state.page = "create";
-  $("#jobsArea").style.display = "";
-  $("#panel").style.display = "";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
-  $("#agentPage").style.display = "none";
+  showPage($("#jobsArea"), true);
+  showPage($("#panel"), true);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
 }
@@ -3380,13 +3412,13 @@ function showStitch() {
   state.page = "stitch";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navStitch").classList.add("active");
-  $("#jobsArea").style.display = "";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
-  $("#agentPage").style.display = "none";
+  showPage($("#jobsArea"), true);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), true);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   state.tab = "done";
   state.doneFilters.media = "video";
   $("#doneMedia").value = "video";
@@ -3401,13 +3433,13 @@ function showSystem() {
   state.page = "system";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navSystem").classList.add("active");
-  $("#jobsArea").style.display = "none";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "block";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
-  $("#agentPage").style.display = "none";
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), true);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   refreshHardware();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
@@ -3418,13 +3450,13 @@ function showProviders() {
   state.page = "providers";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navProviders").classList.add("active");
-  $("#jobsArea").style.display = "none";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "block";
-  $("#assetsPage").style.display = "none";
-  $("#agentPage").style.display = "none";
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), true);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   loadProviders();
   loadAgentConfig();
   closePanelDrawerOnPageChange();
@@ -3437,13 +3469,13 @@ function showAgent() {
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   const nav = $("#navAgent");
   if (nav) nav.classList.add("active");
-  $("#jobsArea").style.display = "none";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
-  $("#agentPage").style.display = "block";
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), true);
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
   if (window.AgentUI && typeof window.AgentUI.renderMessages === "function") {
@@ -3779,10 +3811,8 @@ function setSidebarOpen(open) {
 function activePanel() {
   const create = $("#panel");
   const stitch = $("#stitchPanel");
-  const createOn = create && create.style.display !== "none";
-  const stitchOn = stitch && stitch.style.display !== "none";
-  if (stitchOn) return stitch;
-  if (createOn) return create;
+  if (pageIsVisible(stitch)) return stitch;
+  if (pageIsVisible(create)) return create;
   return null;
 }
 

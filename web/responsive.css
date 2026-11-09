@@ -228,6 +228,20 @@
     padding: 12px 12px 24px;
   }
 
+  /* ---------- 4.3b 内置 Agent 页：保证输入框永远可达 ----------
+     .agent-page 是 flex 列布局：head / messages(flex:1,min-height:0) / composer。
+     三个条件缺一不可：
+       1) .agent-page 自身是 flex（不能用内联 display:block 覆盖）
+       2) .ag-messages 有 flex:1 + min-height:0（否则消息区撑高）
+       3) .ag-composer 是 flex:0 0 auto（否则被压扁）
+     再加上 body{overflow:hidden}，只要上面任何一条失效，
+     整页就滚不动 -> 窄屏下对话变长后输入框彻底不可达。 */
+  .agent-page { min-height: 0; overflow: hidden; }
+  .ag-messages { min-height: 0; }
+  .ag-head { padding: 12px 14px 10px; }
+  .ag-composer { padding: 8px 14px 10px; }
+  .ag-messages { padding: 14px 14px; gap: 12px; }
+
   /* ---------- 4.4 网格：手机上卡片更小，列数自适应 ---------- */
   .jobs-grid {
     --card-min-width: 150px;

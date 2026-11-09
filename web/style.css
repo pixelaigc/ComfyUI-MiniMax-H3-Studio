@@ -1454,12 +1454,31 @@ body.modal-open { overflow: hidden; }
   flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: 11px;
 }
 
+/* ---------- 页面显隐（统一切页契约） ----------
+   所有主页面（jobsArea / panel / stitchPanel / systemPage / providersPage /
+   assetsPage / agentPage）都靠 .page-hidden 这个类切换显隐，**不用内联 style.display**。
+
+   为什么必须这样：内联 display 的优先级高于任何 CSS 规则，
+   一旦有人写了 style.display="block"，CSS 里的 display:flex 就被覆盖 ——
+   .agent-page 的 flex 布局塌掉后，消息区不再收缩、composer 被顶出视口，
+   而 body{overflow:hidden} 让整页滚不动（窄屏下输入框彻底不可达，
+   实测 390px 下 inputTop=3068 / reachable=false）。
+   用类切换把「显隐」变成一条可被 CSS 覆盖的契约，坏不了一条链全坏。 */
+/* 隐藏：用 !important 压过任何内联 display。
+   显示：**不加类**，而是把内联 display 整个移除 —— 让该页自己的 CSS 规则
+   （.jobs-area 是块级、.assets-page/.agent-page 是 flex）决定布局。
+   若用统一的 .page-visible{display:flex}，会把 .jobs-area / .system-page
+   从块级改成 flex，改变它们的内部排版 —— 不能这么做。 */
+.page-hidden { display: none !important; }
+
 /* ---------- 内置多模态 Agent 面板 ---------- */
 .agent-page {
-  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
   background: var(--bg); overflow: hidden;
 }
 .ag-head {
+  flex: 0 0 auto;
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; padding: 16px 22px 12px; border-bottom: 1px solid var(--border);
   background: var(--panel);
@@ -1474,8 +1493,11 @@ body.modal-open { overflow: hidden; }
 .ag-new:hover { border-color: var(--accent); color: var(--accent); }
 
 .ag-messages {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px;
+  /* flex:1 + min-height:0 是「消息区自己滚动、composer 留在视口内」的关键。
+     缺任何一个，消息区就会按内容撑高把输入框顶出视口。 */
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 22px;
   display: flex; flex-direction: column; gap: 14px;
+  overscroll-behavior: contain;
 }
 .ag-empty {
   margin: auto; max-width: 520px; text-align: center; color: var(--muted);
@@ -1564,10 +1586,31 @@ body.modal-open { overflow: hidden; }
 .ag-act:hover { background: var(--accent-soft); }
 
 .ag-composer {
-  border-top: 1px solid var(--border); background: var(--panel);
+  /* composer 是固定在底部的工作区 —— 不允许被消息区压缩掉 */
+  flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--panel);
   padding: 10px 22px 12px;
 }
 .ag-status { font-size: 11.5px; color: var(--muted); min-height: 16px; margin-bottom: 6px; }
+/* 进度反馈：阶段名 + 已用时间。等待时给一个脉动点，让用户知道「还在跑」。 */
+.ag-status.ag-status-busy { color: var(--accent); font-weight: 600; }
+.ag-progress {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--muted);
+}
+.ag-progress-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  flex: 0 0 auto; animation: ag-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ag-pulse {
+  0%, 100% { opacity: .25; transform: scale(.8); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-progress-dot { animation: none; opacity: .8; }
+}
+.ag-progress-stage { color: var(--text); font-weight: 600; }
+.ag-progress-elapsed { font-variant-numeric: tabular-nums; }
+.ag-progress-step { color: var(--muted); }
 .ag-input-row { display: flex; gap: 10px; align-items: stretch; }
 .ag-input-row textarea {
   flex: 1; min-width: 0; resize: vertical; font-family: inherit; font-size: 13px;

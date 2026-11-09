@@ -462,7 +462,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </aside>
 
   <!-- 长片拼接编辑器 -->
-  <aside class="panel stitch-panel" id="stitchPanel" style="display:none">
+  <aside class="panel stitch-panel page-hidden" id="stitchPanel">
     <div class="stitch-heading">
       <b>长片拼接</b>
       <span>从右侧拖入视频，拖动片段可排序</span>
@@ -542,7 +542,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </main>
 
   <!-- 资产素材库页 -->
-  <main class="assets-page" id="assetsPage" style="display:none">
+  <main class="assets-page page-hidden" id="assetsPage">
     <div class="al-head">
       <div>
         <div class="al-title">资产素材库 <span class="al-title-sub">OmniStudio · 多模型创作工作台</span></div>
@@ -634,7 +634,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   <div class="ctx-menu" id="mediaContext"></div>
 
   <!-- 硬件参数页 -->
-  <main class="system-page" id="systemPage" style="display:none">
+  <main class="system-page page-hidden" id="systemPage">
     <div class="sys-head">
       <div>
         <div class="sys-title">本机硬件参数</div>
@@ -645,7 +645,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="sys-grid" id="sysGrid"></div>
   </main>
   <!-- 本地模型配置页 -->
-  <main class="system-page providers-page" id="providersPage" style="display:none">
+  <main class="system-page providers-page page-hidden" id="providersPage">
     <div class="sys-head">
       <div>
         <div class="sys-title">本地模型配置</div>
@@ -667,7 +667,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     </div>
   </main>
   <!-- 内置多模态 Agent 页 -->
-  <main class="agent-page" id="agentPage" style="display:none">
+  <main class="agent-page page-hidden" id="agentPage">
     <div class="ag-head">
       <div>
         <div class="ag-title">内置多模态 Agent</div>
@@ -684,7 +684,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <textarea id="agInput" rows="3" placeholder="例：素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5 秒 16:9 的视频"></textarea>
         <button class="ag-send" id="agSend" type="button">发送</button>
       </div>
-      <div class="ag-hint-line">Enter 发送 · Shift+Enter 换行 · 本地模型多步处理通常需要 30~120 秒</div>
+      <div class="ag-hint-line">Enter 发送 · Shift+Enter 换行 · 本地模型多步处理较慢，完整链路约 1~5 分钟，处理期间下方会显示当前进度</div>
     </div>
   </main>
 </div>

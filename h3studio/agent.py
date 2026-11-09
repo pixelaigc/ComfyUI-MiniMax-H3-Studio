@@ -86,6 +86,27 @@ TOOL_RESULT_LIMIT = 1200
 REPEAT_LIMIT = 3
 
 
+#: 进度阶段的中文文案。前端直接显示这些词，不要让模型自己编阶段名。
+#: 键 = 内部阶段标识，值 = 面向用户的短语。
+PROGRESS_STAGES = {
+    "start": "正在理解你的意图",
+    "thinking": "正在思考下一步",
+    "tool": "正在调用工具",
+    "creating": "正在下发生成任务",
+    "done": "已完成",
+}
+
+#: 每个工具给用户看的动作短语（比工具名更口语）。
+TOOL_STAGE_TEXT = {
+    "search_assets": "正在检索素材库",
+    "list_modes": "正在读取可用生成模式",
+    "describe_asset": "正在查看素材详情",
+    "enhance_prompt": "正在增强提示词",
+    "create_job": "正在下发生成任务",
+    "respond": "正在整理结论",
+}
+
+
 class AgentError(RuntimeError):
     """Agent 错误。message 面向用户，直接可读。"""
 
@@ -313,7 +334,7 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
     #
     # 为什么：工具结果会被截到 TOOL_RESULT_LIMIT（600 字符）。
     # 之前每个模式都带一份完整的 8 项比例列表 + 时长说明，
-    # 9 个模式加起来超过 1200 字符 -> 被截断 -> 模型看到的���
+    # 9 个模式加起来超过 1200 字符 -> 被截断 -> 模型看到的是
     # 「详情被截断，未逐条列出参数」-> 然后它就去重复调 list_modes（实测打转 3 次）。
     # 压缩后同一份信息只要 ~400 字符，能完整传过去。
     shared_aspects = list(wf.ASPECT_MAP.keys())
@@ -523,7 +544,7 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 图片编辑（i2i_qwen）的参考图走**另一条**参数通道：
     # 它要的是 params["ref_images"]（带描述/标签的参考图元数据），
     # 而其它模式走 params["asset_refs"]（只有 asset_id + 槽位）。
-    # 这里用素材库自己���解析函数（ref_api._ref_entry）把 asset_id 变成元数据 ——
+    # 这里用素材库自己的解析函数（ref_api._ref_entry）把 asset_id 变成元数据 ——
     # 描述取自素材库已有的分析结果，与面板选参考图时看到的完全一致。
     if mode == "i2i_qwen":
         ref_specs = await _resolve_ref_specs(ctx, asset_refs)
@@ -740,9 +761,17 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     provider_id: str | None = None,
                     max_steps: int = MAX_STEPS,
                     history: list | None = None,
-                    session_store=None) -> dict:
+                    session_store=None,
+                    on_progress=None) -> dict:
     """
     跑一次 Agent。返回结构化结果。
+
+    on_progress:
+      可选的进度回调。签名 ``on_progress(stage: str, detail: str, done: int,
+      total: int)``，每发生一个可读的阶段变化就调一次（同步函数即可）。
+      用途：让前端在长耗时请求期间显示「现在到哪一步了」——
+      本地模型单步就要 20~120 秒，全程静默会被当成卡死（实测 179 秒无任何反馈）。
+      回调异常会被吞掉 —— 进度显示是锦上添花，绝不能因为它把主流程带崩。
 
     返回结构（这是对外契约，前端按这个渲染）：
     {
@@ -780,6 +809,16 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
 
     tools = _tool_specs()
     started = time.time()
+
+    # 进度回调：任何异常都吞掉 —— 进度显示不该有能力把主流程带崩。
+    def _emit(stage: str, detail: str = "", done: int = 0) -> None:
+        if on_progress is None:
+            return
+        try:
+            on_progress(stage, detail, done, steps_limit)
+        except Exception:
+            pass
+
     steps: list[dict] = []
     tool_calls = 0
     status = "completed"
@@ -800,6 +839,7 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
         nonlocal tool_calls, repeat_signature, repeat_count
         for step_index in range(1, steps_limit + 1):
             turn_started = time.time()
+            _emit("thinking", f"第 {step_index}/{steps_limit} 步", step_index - 1)
             response = await _one_turn()
             calls = response.get("tool_calls") or []
             content = response.get("content")
@@ -869,6 +909,7 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                 tool_calls += 1
                 name = call["name"]
                 spec = TOOLS.get(name)
+                _emit("tool", TOOL_STAGE_TEXT.get(name, name), step_index - 1)
                 signature = (name, json.dumps(call["arguments"], sort_keys=True,
                                               ensure_ascii=False))
                 if signature == repeat_signature:
@@ -964,6 +1005,7 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                              or f"已达到步骤上限（{steps_limit} 步），"
                              "返回已完成的部分结果")
 
+    _emit("start", "", 0)
     try:
         # 整体超时用 wait_for 兜住 —— 不用「每步都很快」来假设总时长可控
         # （实测单步就能到 120 秒）。
@@ -975,6 +1017,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
             f"单次请求超过总时限（{int(TOTAL_TIMEOUT)} 秒），已返回已完成的部分结果")
     except llm_client.ProviderError as exc:
         raise AgentError(str(exc), status=502, code="provider_error") from exc
+
+    # 统一在这里回传「结束」阶段 —— 覆盖**所有**退出路径
+    # （模型给结论 / respond 收尾 / 步骤上限 / 工具调用上限 / 打转收尾 / 总超时）。
+    # 放在这里而不是循环内部，是因为循环里有 6 条不同的 return 路径，
+    # 放在任何一条里都会漏掉其它几条（漏掉的路径 = 界面永远停在「处理中…」）。
+    _emit("done", "已完成", len(steps))
 
     elapsed_ms = int((time.time() - started) * 1000)
 
