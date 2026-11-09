@@ -87,16 +87,42 @@ def _is_weight_paren(inner: str, scoped: str = "") -> bool:
     # 剩下的：单个英文词
     #
     # 官方口径是「(cat) = 1.1 倍」，所以单个词**按字面**就是权重语法。
-    # 但实测发现模型会用它做**逐字注音**：港式招牌「金」「記」「酒」
-    # 被扩写成 "金" (gold)、"記" (record)、"酒" (wine) ——
-    # 这些是给渲染模型看的**说明性注释**，不是倍率。
+    # 但实测发现模型会用括号做**两种说明性注释**（都不是倍率）：
     #
-    # 判据：单个词如果**前面紧邻一个被引号包住的画面文字**，
-    # 它就是在给那段文字做注音（官方 PE 模板要求「文字用双引号括起来」），
-    # 属于合法输出，不该当权重语法拒掉。
+    #   a) 逐字注音：港式招牌「金」「記」「酒」
+    #      被扩写成 "金" (gold)、"記" (record)、"酒" (wine)
+    #   b) 术语转写：中文建筑术语「骑楼」
+    #      被扩写成 arcade buildings (tong lau)
+    #
+    # 这两种都是给渲染模型看的说明（官方 PE 模板也要求
+    # 「所有画面文字用双引号括起来」，模型顺手就给术语加了注音），
+    # 不是 Compel 倍率 —— 当成权重语法拒掉会整单 502，输出本身是好的。
+    #
+    # 判据（能覆盖上面两种）：
+    #   - 括号紧跟在**被引号包住的画面文字**后面 -> 逐字注音
+    #   - 括号紧跟在**中文词**后面 -> 术语转写
     if _is_transliteration_gloss(text, scoped):
         return False
+    if _is_term_transliteration(text, scoped):
+        return False
     return True
+
+
+# 「骑楼 (tong lau)」这类结构：中文词 + 紧跟的括号转写
+_TERM_GLOSS_PATTERN = re.compile(r"[\u4e00-\u9fff]{1,10}\s*\(([^()]{1,40})\)")
+
+
+def _is_term_transliteration(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给**紧邻的中文词**做转写/音译。
+
+    实测：模型把「骑楼」写成 "arcade buildings (tong lau)" ——
+    括号里是粤语音译，不是倍率。
+    """
+    for m in _TERM_GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
+    return False
 
 
 # 「"金" (gold)」这类结构：引号文字 + 紧跟的括号注音

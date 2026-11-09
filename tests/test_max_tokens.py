@@ -719,6 +719,18 @@ class TestWeightSyntaxFalsePositive(unittest.TestCase):
         v = self._validator()
         self.assertTrue(v.check_weight_syntax('"cat" (cat:1.5)', "pe"))
 
+    def test_term_transliteration_not_rejected(self):
+        """
+        模型把中文建筑术语「骑楼」写成 "arcade buildings (tong lau)" ——
+        括号里是**粤语音译**，不是倍率。
+        （实测：普通增强 10 次里有 1 次因此 502，而输出本身是完整的。）
+        """
+        v = self._validator()
+        for case in ("arcade buildings (tong lau)", "骑楼 (tong lau)",
+                     "混凝土墙 (concrete wall)"):
+            self.assertFalse(v.check_weight_syntax(case, "pe"),
+                             "术语转写不该被判权重语法：%s" % case)
+
 
 
 if __name__ == "__main__":
