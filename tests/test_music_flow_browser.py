@@ -359,6 +359,51 @@ class TestMusicFlowBrowser(unittest.TestCase):
         self.assertEqual(p.get("style", {}).get("genre"), "jazz",
                          "「重新生成」必须把当前结构化风格作为上下文")
 
+    def test_enhance_request_carries_live_mode(self):
+        """
+        增强请求里的 mode 必须是**当前生效**的模式。
+
+        【回归】曾经踩过的坑：请求体用 `music.getState().mode` ——
+        那是**持久化**的那份（localStorage 里的 st.mode），切了左侧标签
+        不一定跟着变。实测在「参考生音乐」面板下发出的是 mode=t2a，
+        后端就会按文生音乐的措辞去生成（参考音频场景的提示语丢失）。
+        """
+        self.reset()
+        for mode in ("t2a", "a2a"):
+            self.switch_mode(mode)
+            self.open_param_panel()
+            self.page.evaluate("""() => {
+              window.__modes = [];
+              const orig = window.fetch;
+              window.fetch = async (url, opts) => {
+                const u = String(url);
+                if (u.includes('/api/music-enhance')) {
+                  window.__modes.push(JSON.parse(opts.body).mode);
+                  return new Response(JSON.stringify({
+                    provider: '桩', fixes: [], problems: [],
+                    style: {language:'English', genre:'pop', mood:'(none)',
+                            vocal:'female vocal', vocal_color:'(none)',
+                            instruments:'piano', tempo_bpm:90, energy:'mid energy',
+                            length_hint:'single edit (~2-3 min)', extra:'',
+                            custom_language:'', custom_genre:''},
+                    lyrics: {template:'V-C-V-C-bridge-C',
+                              lyrics_override:'[Verse]' + String.fromCharCode(10) + 'X'},
+                  }), {status: 200, headers: {'Content-Type': 'application/json'}});
+                }
+                return orig(url, opts);
+              };
+            }""")
+            self.page.fill("#musicPrompt", "测试描述")
+            self.page.click("#musicEnhanceBtn")
+            self.page.wait_for_function(
+                "() => { const h = document.querySelector('#musicEnhanceHint');"
+                " return h && h.textContent.includes('已生成'); }",
+                timeout=60_000)
+            modes = self.page.evaluate("() => window.__modes || []")
+            self.assertTrue(modes, f"{mode} 下增强请求没发出")
+            self.assertEqual(modes[-1], mode,
+                             f"在 {mode} 面板下，增强请求的 mode 应为 {mode}")
+
     def test_screenshots_at_three_widths(self):
         """【交付要求】两个标签 × 三档宽度截图，并记录 console / 失败请求。"""
         self.reset()

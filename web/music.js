@@ -741,6 +741,15 @@
     // 供 app.js 的 musicModelLabel 查 checkpoint key -> 显示名
     getOptions: () => OPTIONS,
     setMode(mode) { st.mode = mode; saveState(); },
+    /**
+     * **当前生效**的工作模式（文生音乐 t2a / 参考生音乐 a2a）。
+     *
+     * 【为什么要单独一个接口】getState().mode 返回的是**持久化**的那份
+     * （localStorage 里的 st.mode），切了左侧标签它不一定跟着变 ——
+     * 增强请求用它拼 mode 就会发错（实测在参考生音乐面板下发出的是 t2a）。
+     * currentMode() 读的是活的 state.mode，才是对的。
+     */
+    getCurrentMode: () => currentMode(),
 
     // ---- 增强侧（web/music-enhance.js 调用）----
     /** 结构化风格的 12 个字段（增强产物；用户可逐项编辑） */

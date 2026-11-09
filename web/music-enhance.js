@@ -170,7 +170,10 @@
     try {
       const payload = {
         prompt: prompt,
-        mode: music.getState().mode || "t2a",
+        // 用**活的**当前模式（getCurrentMode），不能用 getState().mode ——
+        // 后者是持久化的那份，切了左侧标签不一定跟着变（会发错 t2a/a2a）。
+        mode: (typeof music.getCurrentMode === "function"
+               ? music.getCurrentMode() : music.getState().mode) || "t2a",
       };
       if (base) {
         // 以当前内容为底稿 —— 用户改了什么就在「修改意图」里说什么
