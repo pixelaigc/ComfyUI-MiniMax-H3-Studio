@@ -372,6 +372,13 @@ async function loadAgentConfig() {
     alignSpecWithContext(enhanceCurrentMode(), enhanceCurrentModelKey());
     renderAgentConfig();
     renderEnhanceSpecSelect();
+    // 增强模板清单到齐了 -> 「增强」多选列表里官方 PE 那一项的
+    // system prompt 默认值（官方原文）才能取到。
+    // 这一步同时把推荐参数套用到 state（选中即自动套用）。
+    if (window.enhanceMethods && typeof window.enhanceMethods.renderMenu === "function") {
+      window.enhanceMethods.renderMenu();
+      window.enhanceMethods.ensureAvailable();
+    }
   } catch (e) {
     box.innerHTML = `<div class="prov-empty error">读取增强 Agent 配置失败：${esc(e.message)}</div>`;
   }

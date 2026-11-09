@@ -274,6 +274,13 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     def reset_page(self):
         self.page.goto(self.base, wait_until="domcontentloaded")
         self.page.wait_for_timeout(2000)
+        # 「增强」多选状态存在 localStorage 里 -> 跨用例残留会让下一个用例
+        # 看到上一个用例勾过的项（甚至是在当前模式**不可用**的项，
+        # 那种复选框是 disabled 的，点不动）。所以每条用例前清干净。
+        self.page.evaluate(
+            "() => localStorage.removeItem('h3studio.enhanceSelection.v1')")
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_timeout(1500)
 
     def setUp(self):
         self.reset_page()
@@ -288,11 +295,41 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
 
     def menu_items(self):
         return self.page.eval_on_selector_all(
-            "#enhanceMenu button[data-method]",
-            "els => els.map(e => ({id: e.dataset.method,"
+            "#enhanceMenu .enhance-menu-item[data-method]",
+            "els => els.map(e => {const c = e.querySelector('input[data-method-check]');"
+            " return {id: e.dataset.method,"
             " label: e.querySelector('.enhance-menu-label').textContent.trim(),"
             " hint: (e.querySelector('.enhance-menu-hint')||{}).textContent||'',"
-            " disabled: e.disabled}))")
+            " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
+
+
+    def select_only_qwen_pe(self):
+        """只勾选官方 PE（取消其它已勾项）。
+
+        【多选语义】下拉默认勾了「普通增强」。要测「只跑官方 PE」，
+        必须先把其它项取消勾 —— 否则多项都会被执行。
+        """
+        self.open_menu()
+        # 顺序很重要：**先**勾上官方 PE，再取消其它项。
+        # 因为界面不允许取消到「一项都不剩」（那会让「增强」按钮无事可做），
+        # 所以先取消普通增强是取消不掉的。
+        self.page.click('#enhanceMenu input[data-method-check="qwen_pe"]')
+        self.page.wait_for_timeout(250)
+        # 取消其余项：用 evaluate 直接改 checked 并派发 change 事件
+        # （菜单每次勾选都会重渲染 -> 旧的 element handle 会失效）。
+        for mid in ("basic", "refine"):
+            self.page.evaluate("""(mid) => {
+              const el = document.querySelector(
+                `#enhanceMenu input[data-method-check="${mid}"]`);
+              if (el && el.checked && !el.disabled) {
+                el.checked = false;
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+              }
+            }""", mid)
+            self.page.wait_for_timeout(250)
+        self.page.wait_for_timeout(150)
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_timeout(200)
 
     # ---- 下拉选项 ----
 
@@ -319,7 +356,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
             self.switch_mode(mode)
             self.open_menu()
             disabled = self.page.get_attribute(
-                '#enhanceMenu button[data-method="qwen_pe"]', "disabled")
+                '#enhanceMenu input[data-method-check="qwen_pe"]', "disabled")
             self.assertIsNone(disabled, f"{mode} 面板下官方 PE 应可用")
             self.page.keyboard.press("Escape")
             self.page.wait_for_timeout(200)
@@ -331,48 +368,65 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
             self.open_menu()
             self.assertIsNotNone(
                 self.page.get_attribute(
-                    '#enhanceMenu button[data-method="qwen_pe"]', "disabled"),
+                    '#enhanceMenu input[data-method-check="qwen_pe"]', "disabled"),
                 f"{mode} 面板下官方 PE 应被禁用")
             # 其它方式仍可用
             for other in ("basic", "refine"):
                 self.assertIsNone(
                     self.page.get_attribute(
-                        f'#enhanceMenu button[data-method="{other}"]', "disabled"),
+                        f'#enhanceMenu input[data-method-check="{other}"]', "disabled"),
                     f"{mode} 面板下 {other} 不该被禁用")
             self.page.keyboard.press("Escape")
             self.page.wait_for_timeout(200)
 
     def test_selecting_qwen_pe_changes_button_label(self):
-        """选中后主按钮文字随之变化。"""
+        """
+        选中后主按钮文字随之变化。
+
+        【多选语义】官方 PE 是复选项：勾上后它会**追加**到已选项里
+        （普通增强默认已勾）。此时按钮文字按「选中了几项」走：
+        多项 -> 「增强（N 项）」。这里断言的是「PE 项已生效且被选中」，
+        而不是旧单选下的「current == qwen_pe」。
+        """
         self.switch_mode("t2i_qwen")
         self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
+        self.page.click('#enhanceMenu input[data-method-check="qwen_pe"]')
         self.page.wait_for_timeout(400)
-        self.assertEqual(
-            self.page.evaluate("window.enhanceMethods && window.enhanceMethods.current"),
-            "qwen_pe")
-        self.assertIn("PE", self.page.inner_text("#enhanceBtnText"))
-        # 官方 PE 不走模板 -> 模板下拉隐藏
-        self.assertTrue(self.page.is_hidden("#enhanceSpec"))
+        selected = self.page.evaluate(
+            "() => window.enhanceMethods.getSelected()")
+        self.assertIn("qwen_pe", selected, "官方 PE 应处于选中状态")
+        btn = self.page.inner_text("#enhanceBtnText")
+        self.assertTrue("PE" in btn or "项" in btn,
+                        f"按钮文字应反映选中状态，实际：{btn}")
+        # 【多选】普通增强默认仍选中 -> 模板下拉**继续显示**（普通增强要用模板）。
+        # 只有当**没有**任何走模板的项被选中时才隐藏。
+        self.assertFalse(self.page.is_hidden("#enhanceSpec"),
+                         "普通增强仍选中时模板下拉应可见")
         # 版本历史按钮是共用的，仍可见
         self.assertTrue(self.page.is_visible("#promptVersionBtn"))
 
     def test_switching_mode_falls_back_when_method_unavailable(self):
         """
         在 Qwen 面板选了官方 PE，切到 Z-Image ->
-        当前方式不可用 -> 必须回落到普通增强（否则点「增强」没反应）。
+        当前方式不可用 -> 必须剔除不可用的项（否则点「增强」没反应）。
+
+        【多选语义】不再是「回落到普通增强」这一个，而是**剔除**不可用项；
+        剩下的仍是可执行的（这里普通增强默认已勾，所以还在）。
         """
         self.switch_mode("t2i_qwen")
         self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
+        self.page.click('#enhanceMenu input[data-method-check="qwen_pe"]')
         self.page.wait_for_timeout(300)
-        self.assertEqual(
-            self.page.evaluate("window.enhanceMethods.current"), "qwen_pe")
+        self.assertIn("qwen_pe", self.page.evaluate(
+            "() => window.enhanceMethods.getSelected()"))
         self.switch_mode("t2i")
         self.page.wait_for_timeout(600)
-        self.assertEqual(
-            self.page.evaluate("window.enhanceMethods.current"), "basic",
-            "切到不可用模式后应回落到普通增强")
+        selected = self.page.evaluate(
+            "() => window.enhanceMethods.getSelected()")
+        self.assertNotIn("qwen_pe", selected,
+                         "切到不可用模式后官方 PE 应被剔除")
+        self.assertIn("basic", selected,
+                      "剩下的项应仍可执行（普通增强默认已勾）")
 
     # ---- 无独立勾选框 ----
 
@@ -422,9 +476,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     def test_qwen_pe_calls_its_own_endpoint(self):
         """选中官方 PE 后点「增强」-> 打 /api/qwen-pe/expand（不是 /api/enhance）。"""
         self.switch_mode("t2i_qwen")
-        self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
-        self.page.wait_for_timeout(300)
+        self.select_only_qwen_pe()
         self.page.fill("#prompt", "a cat")
         self._stub_pe_endpoint()
 
@@ -445,9 +497,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
           - 之后还能继续编辑
         """
         self.switch_mode("t2i_qwen")
-        self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
-        self.page.wait_for_timeout(300)
+        self.select_only_qwen_pe()
         self.page.fill("#prompt", "a cat")
         expanded = "A warm photograph of an orange tabby cat on a wooden windowsill."
         self._stub_pe_endpoint(expanded)
@@ -475,9 +525,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
         （提示词框里已经是官方 PE 结果，再扩会冲掉用户的编辑）。
         """
         self.switch_mode("t2i_qwen")
-        self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
-        self.page.wait_for_timeout(300)
+        self.select_only_qwen_pe()
         self.page.fill("#prompt", "a cat")
         self._stub_pe_endpoint()
         self.page.click("#enhanceBtn")
@@ -494,9 +542,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     def test_qwen_pe_failure_shows_error_not_silent(self):
         """官方 PE 失败必须明确报错，提示词框不被改动。"""
         self.switch_mode("t2i_qwen")
-        self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
-        self.page.wait_for_timeout(300)
+        self.select_only_qwen_pe()
         self.page.fill("#prompt", "a cat")
         self.page.evaluate("""() => {
           window.__alerts = [];
@@ -522,9 +568,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     def test_i2i_panel_sends_reference_images_to_pe(self):
         """图片编辑面板：参考图要一起送去官方 PE（官方 PE-I2I 工作流接法）。"""
         self.switch_mode("i2i_qwen")
-        self.open_menu()
-        self.page.click('#enhanceMenu button[data-method="qwen_pe"]')
-        self.page.wait_for_timeout(300)
+        self.select_only_qwen_pe()
         self.page.fill("#prompt", "把茶壶改成橙色")
         # 造一个假的参考图（前端只关心 payload 形状）
         self.page.evaluate("""() => {

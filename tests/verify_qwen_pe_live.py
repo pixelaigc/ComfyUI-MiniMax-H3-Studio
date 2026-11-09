@@ -44,12 +44,32 @@ def open_menu(page):
 
 
 def menu_items(page):
+    """下拉项（多选形态：每项带复选框）。"""
     return page.eval_on_selector_all(
-        "#enhanceMenu button[data-method]",
-        "els => els.map(e => ({id: e.dataset.method,"
+        "#enhanceMenu .enhance-menu-item[data-method]",
+        "els => els.map(e => {const c = e.querySelector('input[data-method-check]');"
+        " return {id: e.dataset.method,"
         " label: e.querySelector('.enhance-menu-label').textContent.trim(),"
         " hint: (e.querySelector('.enhance-menu-hint')||{}).textContent||'',"
-        " disabled: e.disabled}))")
+        " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
+
+
+def select_only(page, method_id):
+    """只勾选指定增强项（多选语义：先勾目标，再取消其余）。"""
+    page.click(f'#enhanceMenu input[data-method-check="{method_id}"]')
+    page.wait_for_timeout(300)
+    for mid in ("basic", "refine", "layout", "qwen_pe"):
+        if mid == method_id:
+            continue
+        page.evaluate("""(mid) => {
+          const el = document.querySelector(
+            `#enhanceMenu input[data-method-check="${mid}"]`);
+          if (el && el.checked && !el.disabled) {
+            el.checked = false;
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+          }
+        }""", mid)
+        page.wait_for_timeout(200)
 
 
 with sync_playwright() as pw:
@@ -99,13 +119,22 @@ with sync_playwright() as pw:
           all(i["hint"].strip() for i in items))
     shot(page, "02-qwen-t2i-enhance-menu.png")
 
-    # 选中官方 PE
-    page.click('#enhanceMenu button[data-method="qwen_pe"]')
+    # 选中官方 PE（多选：只勾这一项）
+    select_only(page, "qwen_pe")
     page.wait_for_timeout(600)
-    cur = page.evaluate("() => window.enhanceMethods && window.enhanceMethods.current")
+    selected = page.evaluate("() => window.enhanceMethods.getSelected()")
     btn_text = page.inner_text("#enhanceBtnText")
-    check("文生图：选中后主按钮文案随之变化", cur == "qwen_pe",
-          f"current={cur}, btn='{btn_text}'")
+    check("文生图：官方 PE 进入选中状态", "qwen_pe" in selected,
+          f"selected={selected}, btn='{btn_text}'")
+    # 【新增】推荐参数自动套用 + 可见回显
+    pe_params = page.evaluate("() => state.imgQwen.peParams")
+    check("文生图：选中即自动套用官方 PE 推荐参数",
+          pe_params and pe_params.get("presence_penalty") == 1.5
+          and pe_params.get("max_new_tokens") == 16256,
+          f"peParams={pe_params}")
+    applied_note = page.inner_text("#enhanceAppliedParams")
+    check("文生图：已套用参数有可见回显", "1.5" in applied_note and "16256" in applied_note,
+          applied_note)
     shot(page, "03-qwen-t2i-qwen-pe-selected.png")
 
     # ---------------------------------------------------------- 真跑官方 PE

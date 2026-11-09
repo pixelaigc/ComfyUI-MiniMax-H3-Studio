@@ -100,7 +100,9 @@ def system_prompt_for(is_edit: bool) -> str:
 
 
 def build_pe_workflow(prompt: str, is_edit: bool,
-                      ref_images: list[str] | None = None) -> dict:
+                      ref_images: list[str] | None = None,
+                      system_prompt: str | None = None,
+                      pe_params: dict | None = None) -> dict:
     """
     构造官方 PE 扩写的 ComfyUI 工作流。
 
@@ -113,11 +115,27 @@ def build_pe_workflow(prompt: str, is_edit: bool,
 
     注意：**不接** TextEncodeQwenImage21 / UNETLoader —— 这里只做扩写，
     不出图。带 UNET 会白占 20GB 显存，且与出图链路的显存争抢。
+
+    system_prompt / pe_params 可覆盖：
+      「增强」多选列表里官方 PE 那一项自带**可编辑的 system prompt**
+      与**可编辑的档位参数**（presence_penalty / max_new_tokens）。
+      传 None = 用官方内置值（默认行为，向后兼容）。
     """
     tier = tier_for(is_edit)
     clip_name = PE_CLIP_NAMES[tier]
-    pe = pe_params_for(is_edit)
-    system_prompt = system_prompt_for(is_edit)
+    pe = dict(pe_params_for(is_edit))
+    if pe_params:
+        # 只覆盖显式给出的键，未给出的保留官方值（不写死一套并行默认）
+        for key in ("presence_penalty", "max_new_tokens"):
+            if pe_params.get(key) is not None:
+                pe[key] = pe_params[key]
+    system_prompt = (system_prompt if system_prompt is not None
+                     else system_prompt_for(is_edit))
+    if not (system_prompt or "").strip():
+        raise PEError(
+            "官方 PE 的 system prompt 为空："
+            f"{PE_PROMPT_FILES.get(tier, '?')}。"
+            "请检查 h3studio/skills/prompt-enhancer/assets/ 下的模板文件是否完整。")
 
     workflow: dict = {
         "pe:clip": {
@@ -240,14 +258,26 @@ def validate_pe_output(text: str, original: str) -> str:
 
 
 async def run_pe_expansion(session, comfy_url: str, prompt: str, is_edit: bool,
-                           ref_images: list[str] | None = None) -> dict:
+                           ref_images: list[str] | None = None,
+                           system_prompt: str | None = None,
+                           pe_params: dict | None = None) -> dict:
     """
     跑一次官方 PE 扩写，返回 {"expanded": str, "tier": str, ...}。
 
     失败一律抛 PEError（带可读原因），**不返回半成品**。
+
+    system_prompt / pe_params：来自「增强」多选列表里官方 PE 那一项的
+    可编辑字段；None = 用官方内置值。
     """
-    workflow = build_pe_workflow(prompt, is_edit, ref_images)
+    workflow = build_pe_workflow(prompt, is_edit, ref_images,
+                                 system_prompt=system_prompt,
+                                 pe_params=pe_params)
     tier = tier_for(is_edit)
+    applied_pe = dict(pe_params_for(is_edit))
+    if pe_params:
+        for key in ("presence_penalty", "max_new_tokens"):
+            if pe_params.get(key) is not None:
+                applied_pe[key] = pe_params[key]
 
     payload = {"prompt": workflow}
     async with session.post(f"{comfy_url}/prompt", json=payload) as resp:
@@ -286,9 +316,13 @@ async def run_pe_expansion(session, comfy_url: str, prompt: str, is_edit: bool,
             return {
                 "expanded": expanded,
                 "tier": tier,
-                "tier_label": pe_params_for(is_edit).get("label", tier),
+                "tier_label": applied_pe.get("label", tier),
                 "clip_name": PE_CLIP_NAMES[tier],
                 "prompt_id": prompt_id,
                 "ref_count": len(ref_images or []),
+                "pe_params": {
+                    "presence_penalty": applied_pe.get("presence_penalty"),
+                    "max_new_tokens": applied_pe.get("max_new_tokens"),
+                },
             }
     raise PEError(f"官方 PE 扩写超时（{PE_TIMEOUT_SEC} 秒）")
