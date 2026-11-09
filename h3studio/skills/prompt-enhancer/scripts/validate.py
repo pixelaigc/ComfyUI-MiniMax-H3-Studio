@@ -42,7 +42,161 @@ SUBJECTIVE_WORDS = [
 # 覆盖 (word:1.2) / (word) / ((word)) / [word] / word++ / word---
 # 注意：方括号/圆括号里的内容若是「纯数字列表」（bbox 的 [y_min, x_min, y_max, x_max]）
 # 或「JSON 数组」（["cat", "animal", ...]），不是权重语法 —— 用否定前瞻排除。
-_WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))[^()]{1,80}?\s*\)")
+_WEIGHT_PAREN = re.compile(r"\(\s*(?![-\d,\s]+\))([^()]{1,80}?)\s*\)")
+# 括号里带「词:数值」或纯数字权重值 —— 一定是 Compel 权重语法
+_WEIGHT_PAREN_VALUE = re.compile(r"^[^()]{1,60}\s*:\s*[0-9.]+\s*$")
+
+
+def _is_weight_paren(inner: str, scoped: str = "") -> bool:
+    """
+    括号里的内容是不是 Compel 权重语法。
+
+    官方口径（diffusers weighted_prompts）：
+      (cat)        单个词 -> 1.1 倍
+      (cat:1.5)    词:数值 -> 1.5 倍
+    所以**只有这两类**才是权重语法。
+
+    【2026-11-09 修正】旧实现把**任意**括号内容都当权重语法，
+    于是模型写的普通英文注释也会被误杀：
+      (Tong Lau)              港式地名注音 -> 误报
+      (arcade buildings)      骑楼建筑的英文补充 -> 误报
+      (partially obscured or fragmented)  状态描述 -> 误报
+    实测：普通增强 10 次有 3 次因此整单 502 被拒，
+    而这些输出其实都是完整的（finish_reason=stop）。
+
+    现在只把这两类判为权重语法：
+      1. 括号内是「词:数值」或「数值」
+      2. 括号内是**单个词**（不含空格、不含逗号）—— diffusers 的 (cat) 形式
+    多词短语（中英文皆然）不算权重语法。
+    """
+    text = (inner or "").strip()
+    if not text:
+        return False
+    # (word:1.5) / (1.5)
+    if _WEIGHT_PAREN_VALUE.match(text):
+        return True
+    # 纯数字
+    if re.fullmatch(r"[0-9.]+", text):
+        return True
+    # 括号内是中文 -> 是注释（如「（红色霓虹灯）」），不是权重语法
+    if re.search(r"[\u4e00-\u9fff]", text):
+        return False
+    # 多词短语 -> 普通注释（(Tong Lau) / (arcade buildings)），不是权重语法
+    if " " in text or "," in text:
+        return False
+    # 剩下的：单个英文词
+    #
+    # 【语义判据 · 比上下文匹配更根本】
+    # Compel 的 (cat) 是「**强调**这个已有的词」——
+    # 官方写法必然是 "a (cat) sitting" 这种：**括号里的词在别处也出现**。
+    # 而模型写的说明性注释是「这个词只出现在括号里」：
+    #     "Tong lau (arcade) buildings"   -> arcade 只在这里出现
+    #     "a (cat) b"                     -> cat 在括号外也出现 -> 真权重语法
+    #
+    # 所以：单个词只有在**括号外也出现**时才判权重语法。
+    # 这一条把三类注释（逐字注音 / 术语转写 / 术语英文名）统一覆盖掉了，
+    # 不需要逐个匹配上下文 —— 也不用追着模型的新写法跑。
+    #
+    # 官方口径是「(cat) = 1.1 倍」，所以单个词**按字面**就是权重语法。
+    # 但实测发现模型会用括号做**两种说明性注释**（都不是倍率）：
+    #
+    #   a) 逐字注音：港式招牌「金」「記」「酒」
+    #      被扩写成 "金" (gold)、"記" (record)、"酒" (wine)
+    #   b) 术语转写：中文建筑术语「骑楼」
+    #      被扩写成 arcade buildings (tong lau)
+    #
+    # 这两种都是给渲染模型看的说明（官方 PE 模板也要求
+    # 「所有画面文字用双引号括起来」，模型顺手就给术语加了注音），
+    # 不是 Compel 倍率 —— 当成权重语法拒掉会整单 502，输出本身是好的。
+    #
+    # 判据（覆盖模型实际会写的三类说明性注释）：
+    #   a) 逐字注音：  "金" (gold)
+    #   b) 术语转写：  骑楼 (tong lau)
+    #   c) 术语英文：  T-tong lau (shophouse) buildings
+    #      —— 括号跟着一个**连字符/斜杠分隔的复合术语**，
+    #         是给它标英文名，不是倍率。
+    if _is_transliteration_gloss(text, scoped):
+        return False
+    if _is_term_transliteration(text, scoped):
+        return False
+    if _is_compound_term_gloss(text, scoped):
+        return False
+    # 单个词：Compel 强调语法会**重复**这个词（"(cat)" 强调前面已有的 cat），
+    # 而说明性注释里的词只出现一次。
+    #   真权重语法："a cat sitting, (cat) nearby"  -> cat 出现 2 次
+    #   说明性注释："Tong lau (arcade) buildings"    -> arcade 只出现 1 次
+    if _count_word_occurrences(text, scoped) < 2:
+        return False
+    return True
+
+
+def _count_word_occurrences(word: str, scoped: str) -> int:
+    """
+    这个词在整段文本里出现了几次（按词边界计数）。
+
+    Compel 强调：同一个词在括号内外都出现 -> >= 2
+    说明性注释：括号里新引入的词 -> == 1
+    """
+    target = (word or "").strip().lower()
+    if not target:
+        return 0
+    pattern = r"(?<![a-z0-9])" + re.escape(target) + r"(?![a-z0-9])"
+    return len(re.findall(pattern, (scoped or "").lower()))
+
+
+# 「T-tong lau (shophouse) buildings」这类：复合术语 + 括号英文名
+_COMPOUND_GLOSS_PATTERN = re.compile(
+    r"[A-Za-z][A-Za-z\-]{2,}(?:\s+[A-Za-z][A-Za-z\-]{2,}){0,2}\s*\(([^()]{1,40})\)")
+
+
+def _is_compound_term_gloss(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给一个**复合术语**标英文名。
+
+    实测上下文：
+        "a row of cramped T-tong lau (shophouse) buildings featuring rusty iron window bars"
+    括号里 (shophouse) 是「唐楼」的英文名，不是倍率。
+    判据：括号前紧邻的词含有连字符/下划线/斜杠（复合术语特征）。
+    """
+    for m in _COMPOUND_GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
+    return False
+
+
+# 「骑楼 (tong lau)」这类结构：中文词 + 紧跟的括号转写
+_TERM_GLOSS_PATTERN = re.compile(r"[\u4e00-\u9fff]{1,10}\s*\(([^()]{1,40})\)")
+
+
+def _is_term_transliteration(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给**紧邻的中文词**做转写/音译。
+
+    实测：模型把「骑楼」写成 "arcade buildings (tong lau)" ——
+    括号里是粤语音译，不是倍率。
+    """
+    for m in _TERM_GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
+    return False
+
+
+# 「"金" (gold)」这类结构：引号文字 + 紧跟的括号注音
+_GLOSS_PATTERN = re.compile(r"\"[^\"]{1,40}\"\s*\(([^()]{1,40})\)")
+
+
+def _is_transliteration_gloss(inner: str, scoped: str) -> bool:
+    """
+    判断这个括号是不是在给**引号里的画面文字**做逐字注音。
+
+    官方 PE 模板要求「所有文字内容用英文双引号括起来」，
+    模型常写成 `"金" (gold)` —— 括号里是注音，不是倍率。
+    这种不该被当权重语法拒掉（否则整单 502，输出本身是好的）。
+    """
+    for m in _GLOSS_PATTERN.finditer(scoped or ""):
+        if m.group(1).strip().lower() == (inner or "").strip().lower():
+            return True
+    return False
 def _is_json_like(inner: str) -> bool:
     """
     判断方括号里的内容是不是「结构化数据」而不是权重语法。
@@ -123,6 +277,11 @@ def check_weight_syntax(text: str, mode: str = "pe"):
                 # 方括号：区分权重语法 [word] 与结构化数据 ["a","b"] / [1,2]
                 inner = match.group(1)
                 if _is_json_like(inner):
+                    continue
+            if pattern is _WEIGHT_PAREN:
+                # 括号：区分 Compel 权重语法 (cat) / (cat:1.5) 与
+                # 普通英文/中文注释 (Tong Lau) / (arcade buildings)
+                if not _is_weight_paren(match.group(1), scoped):
                     continue
             snippet = match.group(0).strip()
             if snippet and snippet not in hits:
@@ -360,8 +519,11 @@ def check_refine_structure(text: str):
     """
     errors = []
     warnings = []
-    if not re.search(r"【\s*L1\s*", text):
-        errors.append("二次增强结果缺少 L1 特写分级标题（逐物体枚举结构不完整）")
+    # 【2026-11-09 修正】模板原文写着「若某一级没有物体，跳过该级标题」——
+    #   所以**不能**硬要求 L1 存在。旧实现要求 L1，与模板自相矛盾，
+    #   模型合法地跳过 L1 时会被判「结构不完整」而整单拒收
+    #   （实测：合并实例上二次增强 502，报「缺少 L1 特写分级标题」）。
+    # 现在：只要有**任意一级**分级标题（或末段）就算结构完整。
     if not (re.search(r"【\s*L[123]\s*", text)
             or re.search(r"【\s*(主体细化|整体细化)\s*】", text)):
         errors.append("二次增强结果缺少分级标题（应含 L1/L2/L3 或主体细化/整体细化）")
@@ -576,7 +738,10 @@ def validate(text: str, original: str = "", mode: str = "pe"):
         errors.append("出现提示词权重语法（Z-Image 不支持 Compel 语法）："
                       + "、".join(hits))
 
-    if mode == "refine":
+    if mode in ("refine", "music_refine"):
+        # music_refine（音乐版二次增强）也走逐物体枚举的结构检查 ——
+        # 它的分级标题是「【L1 主线】/【L2 支撑】/【L3 远景】/【整体细化】」，
+        # 末段用「整体细化」而不是「主体细化」。
         refine_errors, refine_warnings = check_refine_structure(text)
         errors.extend(refine_errors)
         warnings.extend(refine_warnings)

@@ -348,12 +348,25 @@ SAMPLING_PRESETS = {
 # 【官方】InvokeAI 官方口径：扩写 max_new_tokens = 300
 # 【官方】Z-Image 本地 max_sequence_length=1024，官方换算 0.75 word/token
 #
-# 【2026-11-09 修正】原先的 300/300/512 + min(..., 1024) 硬上限是**真实缺陷**：
+# 【2026-11-09 修正 · 第一轮】原先的 300/300/512 + min(..., 1024) 硬上限是**真实缺陷**：
 #   逐物体枚举（二次增强）需要 2000+ tokens 才能写完 L1/L2/L3/环境现象/主体细化，
 #   512 会在 L2 中途硬切，后面的背景/环境/氛围/构图整段丢失 —— 表现为
 #   「二次增强只剩人物特写，骑楼/霓虹/海报/路面/光线全部消失」。
-#   官方 PE 的 300 是**单段 caption** 的口径，不是逐物体枚举的口径；
-#   直接套用到 refine 档就是拿错了尺子。
+#
+# 【2026-11-09 修正 · 第二轮（审查返修）】第一轮只把 long 档抬到上限，
+#   但**普通增强（image / moss-image / video）的 default_length 仍是 medium(300)**，
+#   而 medium 档是**固定 300** —— 实测 10 次有 6 次被硬切，成功率只有 40%。
+#   根因：把「官方单段 caption 的 300」当成了「所有档的通用预算」。
+#
+#   现在的口径：**预算按输入自适应**，不再有任何固定值能卡死长提示词。
+#     - 每个模板声明自己的「输出放大倍数」（output_ratio）：
+#         官方 PE 单段 caption      → 1.6（实测 381 字输入 → 自然产出 222~351 tokens）
+#         逐物体枚举（refine）      → 6.0（实测 381 字输入 → 自然产出 2254 tokens）
+#         结构化（bbox/scalist）    → 4.0（JSON 元素表比 caption 长）
+#     - 预算 = clamp(base + len(原文) × ratio, 256, 用户配置的上限)
+#     - 用户**显式**选长度档时，长度档只作为「下限/上限约束」，不覆盖自适应值；
+#       用户没选（前端不发 params.length）时走自适应。
+#     - 截断守卫命中时**自动用满上限重试一次**，而不是直接 502 让用户失败。
 #
 # 输出 token 上限的**可配置天花板**。
 # 用户可在「本地模型配置 → 增强 Agent」里改，默认 32768。
@@ -364,18 +377,44 @@ MAX_TOKENS_CEILING = 32768
 MAX_TOKENS_FLOOR = 256
 MAX_TOKENS_MAX = 65536
 
-# 现在的口径：
-#   - short/medium 保留官方 300（单段 caption 场景确实够用，且是官方可复现值）
-#   - long 用**用户配置的上限**（默认 32768）—— 逐物体枚举的实际需求随
-#     提示词长度变化（实测 381 字中文 -> 2254 tokens），
-#     写死一个数不是「上限」而是「另一个硬编码」。
-#   - 硬上限改为 MAX_TOKENS_CEILING，由用户在「本地模型配置」里可调，
-#     默认 32768（≈ 2.4 万汉字，远超任何一次提示词增强的实际需要）。
+# 各模板的「输出放大倍数」：输出 token ≈ 原文长度 × ratio + BASE_BUDGET
+# 上表说明见本文件顶部的注释。
+OUTPUT_RATIO_DEFAULT = 1.6      # 单段 caption（官方 PE / 通用 pe 档）
+OUTPUT_RATIO_REFINE = 6.0       # 逐物体枚举（L1/L2/L3/环境现象/主体细化）
+OUTPUT_RATIO_STRUCTURED = 4.0   # 结构化输出（bbox 元素表 / scalist 字段表）
+# 无论多短，原文都要留的基础预算
+BASE_BUDGET = 300
+# 自适应预算的「余量系数」：模型自然产出有时会略超估算，留 40% 保险
+BUDGET_SAFETY_FACTOR = 1.4
+
+# 各 validate_mode 对应的输出放大倍数。
+# **按 validate_mode 索引而不是按模板 id** —— 这样新增模板时
+# 只要选对 validate_mode 就自动拿到正确的预算口径，
+# 不必再改这张表（也便于其它分支复用）。
+OUTPUT_RATIO_BY_MODE = {
+    "pe": OUTPUT_RATIO_DEFAULT,
+    "music": OUTPUT_RATIO_DEFAULT,
+    "scalist": OUTPUT_RATIO_STRUCTURED,
+    "bbox": OUTPUT_RATIO_STRUCTURED,
+    "refine": OUTPUT_RATIO_REFINE,
+    "music_refine": OUTPUT_RATIO_REFINE,
+}
+
+# 长度档 = 用户**显式**选择时的约束。
+#   floor —— 该档至少给这么多（保证「精简」也够用）
+#   cap   —— 该档最多给这么多（None = 不限，受用户配置的上限约束）
+#   注意：short/medium 不再是固定 300，而是「下限 + 可自适应放大」，
+#   否则长提示词在 medium 档照样被硬切（审查 P1-3 的实测根因）。
+# hint 只描述「这一档怎么算预算」，**不重复 label** ——
+# 前端把 label 和 hint 拼成「标签（提示）」，重复会显示成
+# 「详尽（详尽（至少 4096 tokens…））」（浏览器实测窄屏下可见）。
 LENGTH_PRESETS = {
-    "short": {"label": "精简", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
-    "medium": {"label": "标准", "max_tokens": 300, "hint": "官方默认 300 tokens ≈ 225 词"},
-    "long": {"label": "详尽", "max_tokens": MAX_TOKENS_CEILING,
-             "hint": "用「最大输出 token 上限」（默认 32768）—— 逐物体枚举档"},
+    "short": {"label": "精简", "floor": 300, "cap": 1024,
+              "hint": "上限 1024 tokens"},
+    "medium": {"label": "标准", "floor": 300, "cap": None,
+               "hint": "按原文长度自适应，最少 300 tokens"},
+    "long": {"label": "详尽", "floor": 4096, "cap": None,
+             "hint": "至少 4096 tokens，按原文长度自适应"},
 }
 
 DEFAULT_PARAMS = {
@@ -569,13 +608,20 @@ def get_spec(spec_id: str, overrides: dict | None = None) -> dict:
 
 
 def resolve_params(params: dict | None, overrides: dict | None = None,
-                   spec: dict | None = None) -> dict:
+                   spec: dict | None = None, original: str = "") -> dict:
     """
     合并参数：内置默认 <- 用户保存的覆盖 <- 本次请求传入。
-    采样档优先于裸 temperature/top_p；长度档优先于裸 max_tokens。
+    采样档优先于裸 temperature/top_p。
 
-    spec 给了的话，用它的 default_length 作为长度档的起点
-    （bbox 档要输出 caption + JSON，比纯 caption 长，默认给 longer 的预算）。
+    【输出预算口径】max_tokens **按输入长度自适应**，不再由固定值决定：
+      1. 估算出「自然产出需要多少」= BASE_BUDGET + len(原文) × 该模板的放大倍数
+      2. 乘安全系数（模型自然产出有时会略超估算）
+      3. 套上长度档的 floor/cap 约束（若用户显式选了长度档）
+      4. 夹到 [256, 用户配置的上限]
+
+    spec 给了的话，用它的 validate_mode 决定放大倍数
+    （pe 单段 caption / refine 逐物体枚举 / bbox·scalist 结构化）。
+    original 传了才会做长度自适应；没传就退化成「按模板口径的保底预算」。
     """
     params = params or {}
     overrides = overrides or {}
@@ -598,6 +644,8 @@ def resolve_params(params: dict | None, overrides: dict | None = None,
 
     # 长度档优先级：
     #   本次请求 > 该模板单独保存的长度 > 模板默认 > 全局保存 > 内置默认
+    #   注意：长度档**不再决定预算大小**，只作为 floor/cap 约束
+    #   （旧实现里 medium=固定 300，是审查 P1-3 的实测根因）。
     length = params.get("length")
     if not length:
         spec_lengths = saved.get("spec_lengths") or {}
@@ -609,30 +657,60 @@ def resolve_params(params: dict | None, overrides: dict | None = None,
     if not length:
         length = merged.get("length", "medium")
     merged["length"] = length
-    merged["max_tokens"] = _tier_budget(length, merged)
-    merged["max_tokens"] = clamp_max_tokens(merged["max_tokens"], merged)
+
+    merged["max_tokens"] = adaptive_max_tokens(
+        original, spec=spec, length=length, merged_params=merged)
 
     if merged.get("language") not in ("auto", "zh", "en"):
         merged["language"] = "auto"
     return merged
 
 
-def _tier_budget(tier: str, merged_params: dict) -> int:
+def output_ratio_for(spec: dict | None) -> float:
     """
-    该长度档实际使用的输出 token 预算。
+    该模板的「输出放大倍数」。
 
-      short / medium —— 官方单段 caption 口径 300 tokens（可复现官方值）。
-                        单段扩写本来就不需要更多，硬给大预算只是让模型
-                        有空间去絮絮叨叨。
-      long           —— 逐物体枚举档（二次增强用它）。预算交给**用户配置的
-                        上限**：实际需求随提示词长度变化
-                        （实测 381 字中文 -> 2254 tokens），
-                        写死一个数不是「上限」而是「另一个硬编码」。
+    按 validate_mode 查表（而不是按模板 id），这样新增模板只要
+    选对 validate_mode 就自动拿到正确口径，别的分支也能直接复用。
     """
+    mode = (spec or {}).get("validate_mode") or ""
+    return OUTPUT_RATIO_BY_MODE.get(mode, OUTPUT_RATIO_DEFAULT)
+
+
+def adaptive_max_tokens(original: str, spec: dict | None = None,
+                         length: str = "", merged_params: dict | None = None) -> int:
+    """
+    按原文长度 + 模板口径算出本次该给多少输出 token。
+
+    这是「长提示词不再被硬切」的**唯一决策点**：
+      - 没有任何固定值能卡死长提示词（medium 档也照样放大）
+      - 短提示词不会被无谓地给 32768（按需给，不浪费等待时间）
+
+    实测依据（本地 Qwen3.8 flash IQ3）：
+      - 官方 PE（pe 档）381 字输入 → 自然产出 222~351 tokens
+      - 逐物体枚举（refine 档）381 字输入 → 自然产出 2254 tokens
+    """
+    merged_params = merged_params or {}
     ceiling = _ceiling_of(merged_params)
-    if tier in ("short", "medium"):
-        return min(LENGTH_PRESETS.get(tier, {}).get("max_tokens", 300), ceiling)
-    return ceiling
+    ratio = output_ratio_for(spec)
+
+    text = original or ""
+    est = int(BASE_BUDGET + len(text) * ratio)
+    est = int(est * BUDGET_SAFETY_FACTOR)
+
+    # 长度档约束（仅当用户显式选了档位时）
+    preset = LENGTH_PRESETS.get(length or "")
+    if preset:
+        floor = int(preset.get("floor") or 0)
+        cap = preset.get("cap")
+        if floor:
+            est = max(est, floor)
+        if cap:
+            est = min(est, int(cap))
+        # 档位的 floor 不允许超过用户配置的上限
+        est = min(est, ceiling)
+
+    return clamp_max_tokens(est, merged_params)
 
 
 def _ceiling_of(merged_params: dict | None) -> int:
@@ -842,10 +920,76 @@ _CLAUSE_NOISE = {
 #
 # 注意：模板写明「若某一级没有物体，跳过该级标题」——
 # 所以**不能**要求每一级都在（模型跳过 L1 是合法的）。
-# 真正可靠的判据是**末段标题**：主体细化是模板的最后一段，
+# 真正可靠的判据是**末段标题**：末段是模板的最后一段，
 # 它不在 = 输出在中途被切断。
+#
+# 【跨分支复用 · 关键设计】
+#   下面的 REFINE_SECTIONS / REFINE_TERMINAL_SECTION 只是**图像 refine 档的默认值**。
+#   其它分支（如 enh-unify 的 music-refine，末段是「【整体细化】」）
+#   **不应该**改这张表 —— 而是让 `template_sections()` 直接从**模板正文**里
+#   解析出分段标题。这样：
+#     - 新增任何 refine 模板都自动被覆盖，不需要改代码
+#     - 别的分支 cherry-pick 这段逻辑后直接生效
+#   详见 template_sections() 的 docstring。
 REFINE_SECTIONS = ("【L1", "【L2", "【L3", "【环境现象】", "【主体细化】")
 REFINE_TERMINAL_SECTION = "【主体细化】"
+
+# 各 validate_mode 的末段标题兜底表（模板正文解析不出来时用）。
+# 按 validate_mode 索引，新增模板只要选对 mode 就能拿到兜底。
+TERMINAL_SECTION_BY_MODE = {
+    "refine": "【主体细化】",
+    "music_refine": "【整体细化】",
+}
+
+# 模板正文里「输出格式」小节的起始标记 —— 分段标题从它之后开始数。
+_OUTPUT_FORMAT_MARKER = "输出格式"
+
+
+def template_sections(system_prompt: str) -> list:
+    """
+    从模板正文里解析出「输出格式」小节里声明的分段标题。
+
+    这是**跨分支复用的关键**：不按模板 id 硬编码，而是看模板自己怎么说。
+    于是：
+      - 图像 refine 模板 → 【L1 特写】…【主体细化】
+      - 音乐 refine 模板 → 【L1 主线】…【整体细化】
+    两种模板共用同一套代码，各自得到正确的末段标题。
+
+    解析规则：
+      1. 找到「输出格式」标记；找不到就返回空列表（不判截断）
+      2. 取标记之后所有形如「【xxx】」的行首标题（按出现顺序）
+      3. 只认行首独立出现的标题（避免正文里引用的「【L1」被误收）
+
+    返回 list[str]，空列表表示「该模板没有可判定的结构」。
+    """
+    text = system_prompt or ""
+    idx = text.find(_OUTPUT_FORMAT_MARKER)
+    if idx == -1:
+        return []
+    tail = text[idx:]
+    found = []
+    for line in tail.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("【"):
+            continue
+        m = re.match(r"^(【[^】]{1,20}】)", stripped)
+        if m:
+            title = m.group(1)
+            if title not in found:
+                found.append(title)
+    return found
+
+
+def terminal_section_for(system_prompt: str = "", validate_mode: str = "") -> str:
+    """
+    该模板的**末段标题**（判「中途被截断」的权威结构信号）。
+
+    优先从模板正文解析；解析不出来时按 validate_mode 查兜底表。
+    """
+    sections = template_sections(system_prompt)
+    if sections:
+        return sections[-1]
+    return TERMINAL_SECTION_BY_MODE.get(validate_mode or "", "")
 
 
 def _clause_units(original: str) -> list:
@@ -931,7 +1075,8 @@ def check_element_coverage(original: str, enhanced: str) -> dict:
 
 
 def check_truncation(enhanced: str, finish_reason: str = "",
-                     validate_mode: str = "", expected_sections=None) -> dict:
+                     validate_mode: str = "", expected_sections=None,
+                     system_prompt: str = "") -> dict:
     """
     检测「输出被 token 上限硬切」。
 
@@ -941,15 +1086,22 @@ def check_truncation(enhanced: str, finish_reason: str = "",
        —— 后端明确告诉我们：生成是因为达到 max_tokens 而停止的。
           这是**权威**信号（llama.cpp / OpenAI 兼容后端都会给）。
 
-    2. 末段标题缺失（refine 档）
-       —— refine 模板规定按 L1 → L2 → L3 → 环境现象 → 主体细化 顺序输出，
-          「主体细化」是**最后一段**。它不在 = 输出在中途被切断，
+    2. 末段标题缺失
+       —— refine 类模板规定按 L1 → L2 → L3 → … → 末段 顺序输出，
+          末段是**最后一段**。它不在 = 输出在中途被切断，
           后面该出现的背景 / 环境 / 氛围 / 构图整段丢了。
 
     注意：**不能**用「每一级标题都必须存在」当判据 ——
     模板明确写了「若某一级没有物体，跳过该级标题」，
     模型合法地跳过 L1 是正常的（实测本地模型确实会这么干，
     早先按「所有级都在」判会误报截断，把好结果当失败拒掉）。
+
+    【跨分支复用】
+    末段标题由 `terminal_section_for(system_prompt, validate_mode)` 决定：
+      - 优先**从模板正文解析**（任何分支新增的 refine 模板都自动生效）
+      - 解析不出来时按 validate_mode 查 TERMINAL_SECTION_BY_MODE 兜底
+    所以 enh-unify 的 music-refine（末段「【整体细化】」）与
+    本分支的 image-refine（末段「【主体细化】」）共用同一套代码。
 
     返回 {"truncated": bool, "reason": str, "missing_sections": [...]}。
     """
@@ -974,11 +1126,14 @@ def check_truncation(enhanced: str, finish_reason: str = "",
         return {"truncated": True, "reason": reason,
                 "missing_sections": missing_sections}
 
-    # 信号 2：refine 档的末段标题缺失 —— 输出在中途被切断。
-    # 只看末段（主体细化），中间各级允许被合法跳过。
-    if validate_mode == "refine" and not explicit_sections \
-            and REFINE_TERMINAL_SECTION not in text:
-        reason = (f"输出缺少末段「{REFINE_TERMINAL_SECTION}」，"
+    # 信号 2：末段标题缺失 —— 输出在中途被切断。
+    # 只看末段，中间各级允许被合法跳过。
+    # 末段标题从模板正文解析（跨分支通用），拿不到就不判（宁可不报也不误报）。
+    terminal = ""
+    if not explicit_sections:
+        terminal = terminal_section_for(system_prompt, validate_mode)
+    if terminal and terminal not in text:
+        reason = (f"输出缺少末段「{terminal}」，"
                   "说明在中途被截断 —— 后面的背景/环境/氛围/构图整段丢失")
         return {"truncated": True, "reason": reason,
                 "missing_sections": missing_sections}
@@ -987,12 +1142,14 @@ def check_truncation(enhanced: str, finish_reason: str = "",
 
 
 def coverage_report(original: str, enhanced: str, finish_reason: str = "",
-                     validate_mode: str = "", expected_sections=None) -> dict:
+                     validate_mode: str = "", expected_sections=None,
+                     system_prompt: str = "") -> dict:
     """
     要素覆盖 + 截断检测 -> 完整报告。供 /api/enhance 回传并在 UI 里显示。
     """
     cov = check_element_coverage(original, enhanced)
-    trunc = check_truncation(enhanced, finish_reason, validate_mode, expected_sections)
+    trunc = check_truncation(enhanced, finish_reason, validate_mode,
+                             expected_sections, system_prompt)
     return {
         "ok": not trunc["truncated"],
         "ratio": cov["ratio"],

@@ -29,7 +29,10 @@ CHAT_TIMEOUT = ClientTimeout(total=180, connect=10)
 HEALTH_TIMEOUT = ClientTimeout(total=8, connect=5)
 
 # 单次生成的超时基数与每 token 的增量估算。
-# 经验值：本机 llama.cpp（Qwen3.8 flash IQ3）约 10 tokens/秒。
+# 经验值：本机 llama.cpp（Qwen3.8 flash IQ3）实测约 10.6 tokens/秒
+#   —— 1646 tokens 用了 154.6 秒（10.6 tok/s）；2254 tokens 用了 ~210 秒。
+#   PER_TOKEN_TIMEOUT = 0.12 秒/token ≈ 8.3 tok/s，**留了约 25% 余量**
+#   （用 0.094 会刚好卡在实测值上，不留余量）。
 BASE_TIMEOUT = 120.0
 PER_TOKEN_TIMEOUT = 0.12
 MIN_TIMEOUT = 120.0
@@ -38,9 +41,10 @@ MIN_TIMEOUT = 120.0
 #: 【2026-11-09 下调 1800 -> 600】
 #: 上限从 1800 收到 600 的理由：/api/enhance 一次请求最坏会挂住整个
 #: 连接（本机 llama.cpp 单槽串行），1800 秒意味着「一个请求能把服务
-#: 拖住 30 分钟」。配合 server.py 的 ENHANCE_GATE 并发闸门（上限 2），
-#: 600 秒足够覆盖实测用量（1646 tokens = 154.6 秒；本机约 10 tokens/秒
-#: -> 600 秒 ≈ 6000 tokens，远超任何一次增强的真实产出）。
+#: 拖住 30 分钟」。实测 2254 tokens 约 210 秒，600 秒有近 3 倍余量；
+#: 并发闸门只能挡并发数、挡不住单次挂起时长。
+#: 配合 server.py 的 ENHANCE_GATE 并发闸门（见该常量处的取值说明），
+#: 最坏情况 = 并发上限 × 600 秒。
 MAX_TIMEOUT = 600.0
 
 
@@ -49,7 +53,14 @@ def compute_timeout(max_tokens: int) -> float:
     按 max_tokens 估算本次调用的超时秒数。
 
     180 秒固定值对大预算不够用（实测 1646 tokens = 154.6 秒，
-    32768 上限会直接超时）。这里按 token 数线性放宽，并封顶 MAX_TIMEOUT。
+    32768 上限会直接超时）。这里按 token 数线性放宽，并封顶 MAX_TIMEOUT（600 秒）。
+
+    【审查返修 · 关键】**不按用户配置的上限（ceiling）算超时**，
+    只按**本次实际给模型的 max_tokens** 算。
+    旧实现把「上限」当成「本次预算」，
+    于是 ceiling=32768 时即使本次只给 800 tokens，超时也被放大到封顶 1800 秒，
+    表现为「模型 3 秒就写完了，前端却挂满 30 分钟」。
+    现在：本次给 800 -> 超时 216 秒；本次给 32768 -> 超时 600 秒（封顶）。
     """
     try:
         mt = int(max_tokens)
