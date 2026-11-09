@@ -214,13 +214,47 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
             "() => { try { localStorage.removeItem('h3studio.enhanceSelection.v1'); }"
             "catch (e) {} }")
         self.page.reload(wait_until="domcontentloaded")
-        self.page.wait_for_timeout(1200)
+        self.wait_ready()
+
+    def wait_ready(self, timeout_ms=20000):
+        """
+        等「增强 Agent 配置」加载完。
+
+        /api/enhancer 是异步拉的：模板清单、mode_filters、mode_media、refine_specs
+        都在它返回之后才进 provState。配置没到就开下拉的话，
+        模板清单是空的、下拉渲染不出选择器、二次增强也会算成 image-refine ——
+        那测的是「加载中的中间态」，不是产品行为。
+        """
+        self.page.wait_for_function(
+            """() => {
+              try {
+                return typeof provState !== 'undefined'
+                  && provState && provState.agent
+                  && Array.isArray(provState.agent.specs)
+                  && provState.agent.specs.length > 0
+                  && Object.keys(provState.modeFilters || {}).length > 0
+                  && Object.keys(provState.refineSpecs || {}).length > 0;
+              } catch (e) { return false; }
+            }""",
+            timeout=timeout_ms)
+        self.page.wait_for_timeout(300)
 
     def switch_mode(self, mode):
         self.page.evaluate(
             "(m) => { const el = document.querySelector(`.nav-item[data-mode='${m}']`);"
             "if (el) el.click(); }", mode)
         self.page.wait_for_timeout(600)
+        # 模式切换会重新按上下文过滤模板 —— 等菜单重渲染完再断言
+        self.page.wait_for_function(
+            """() => {
+              try {
+                return typeof window.enhanceMethods !== 'undefined'
+                  && window.enhanceMethods
+                  && typeof window.enhanceMethods.getSpecOptions === 'function';
+              } catch (e) { return false; }
+            }""",
+            timeout=10000)
+        self.page.wait_for_timeout(300)
 
     def open_menu(self):
         """打开当前上下文的增强下拉（音乐面板是另一套 id）。"""
