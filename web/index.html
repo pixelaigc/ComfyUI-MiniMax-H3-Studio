@@ -850,8 +850,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 
 <script src="/static/qwen-refs.js?v=refs1"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
+<!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
+     window.MusicUI 不存在时会跳过音乐清单加载 -->
+<script src="/static/music.js?v=musicyue2-2"></script>
 <script src="/static/app.js?v=qwen21-1"></script>
-<script src="/static/music.js?v=musicyue2-1"></script>
 <script src="/static/providers.js?v=qwen21-1"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
