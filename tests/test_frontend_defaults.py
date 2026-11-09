@@ -51,6 +51,18 @@ def free_port() -> int:
 SEED_MODES = ["t2i", "t2v", "flf", "r2v", "longfilm"]
 SEED_STATUSES = ["done", "done", "done", "failed", "canceled"]
 
+#: 等待「真实数据已渲染」的超时（毫秒）。
+#:
+#: 【2026-11-10】原来各处硬编码 20000ms。实测（空载）任务列表首屏要 **8.11 秒**
+#: 才把骨架换成真实卡片 —— 因为前端靠 setInterval(2000) 轮询 + 首次请求，
+#: 不是首屏直出。机器有其它并发任务时（load average 27+ / 24 核），
+#: 8 秒会涨到 20 秒以上，于是**大量浏览器用例集体超时**，
+#: 表现为「168 个 error」，看起来像代码坏了，其实只是等不及。
+#:
+#: 60 秒仍然够用（真出问题时它会一直等到超时并给出明确报错），
+#: 但给机器留出余量。
+WAIT_TIMEOUT = 60000
+
 
 class StudioServer:
     """在临时目录里起一个独立端口的 Studio 实例（真实 server.py + 真实前端）。
@@ -213,7 +225,7 @@ class TestFrontendDefaults(unittest.TestCase):
         cls.page.goto("http://127.0.0.1:%d/" % cls.server.port, wait_until="domcontentloaded")
         # 等首屏任务列表渲染完
         cls.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid > *').length > 0", timeout=20000)
+            "() => document.querySelectorAll('#jobsGrid > *:not(.job-skeleton)').length > 0", timeout=WAIT_TIMEOUT)
 
     @classmethod
     def tearDownClass(cls):
@@ -401,8 +413,8 @@ class TestStartupFaultIsolation(unittest.TestCase):
             page.goto("http://127.0.0.1:%d/" % self.server.port,
                       wait_until="domcontentloaded")
             page.wait_for_function(
-                "() => document.querySelectorAll('#jobsGrid > *').length > 0",
-                timeout=20000)
+                "() => document.querySelectorAll('#jobsGrid > *:not(.job-skeleton)').length > 0",
+                timeout=WAIT_TIMEOUT)
             count = page.evaluate("document.querySelectorAll('#jobsGrid > *').length")
             self.assertGreater(count, 0,
                                "启动期异常后任务列表仍为空白 —— 逐项隔离失效")
