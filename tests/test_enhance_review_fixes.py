@@ -140,18 +140,22 @@ class TestEnhanceReviewStatic(unittest.TestCase):
 
     # ---- P3-1 禁用项文案 ----
     def test_disabled_item_has_single_badge(self):
-        """禁用项不能同时挂 Recommended 与「本面板不可用」。"""
-        idx = self.code.find("function renderMenu()")
-        self.assertGreater(idx, 0)
-        body = self.code[idx:idx + 2500]
-        # badge 由 ok 三元决定：可用才 Recommended，不可用只给原因
+        """禁用项不能同时挂 Recommended 与「本面板不可用」。
+
+        【2026-11-10】渲染已改为走共用组件（web/enhance-menu-shared.js），
+        badge 的判定在那里 —— 所以断言查**共用组件**，而不是
+        enhance-menu.js 的 renderMenu 内部。
+        """
+        shared = (WEB / "enhance-menu-shared.js").read_text(encoding="utf-8")
+        idx = shared.find("function enhanceMenuItemHtml")
+        self.assertGreater(idx, 0, "共用组件应负责菜单项渲染")
+        body = shared[idx:idx + 2500]
+        # badge 由 ok 决定：可用才 Recommended，不可用只给原因
         self.assertRegex(
-            body, r"const badge\s*=\s*ok\s*\?",
-            "badge 必须由可用性决定（可用 -> Recommended；不可用 -> 原因）")
-        self.assertNotIn(
-            '${m.recommended ? \'<span class="enhance-menu-badge rec">Recommended</span>\' : ""}',
-            body,
-            "Recommended 徽标必须只在可用时出现")
+            body, r"m\.recommended\s*&&\s*ok",
+            "Recommended 徽标必须只在**可用**时出现")
+        self.assertIn("unavailableText", body,
+                      "不可用时必须给出原因文案")
 
     # ---- 模板选择器提升为平级一行 ----
     def test_spec_picker_is_a_parallel_row(self):
@@ -214,23 +218,45 @@ class TestEnhanceReviewStatic(unittest.TestCase):
 
     # ---- 音乐写回目标：能力契约 ----
     def test_music_writeback_is_capability_based(self):
-        """音乐写回目标按能力解析（#musicPrompt / #musicStyle 都认）。"""
+        """音乐写回目标按能力解析（#musicPrompt / #musicStyle 都认）。
+
+        【2026-11-10】写回改为**能力契约**（web/enhance-menu-shared.js 的
+        resolveWriteTarget + providers.js 的 ENHANCE_WRITE_TARGETS）：
+          - 文本路线的 targets 是候选列表（先新后旧）
+          - 结构化路线由 music-enhance.js 注册契约
+        两种形态都不硬编码某一个 id，找不到时返回原因而不抛异常。
+        """
         providers = (WEB / "providers.js").read_text(encoding="utf-8")
-        self.assertIn('MUSIC_ENHANCE_INPUT_SELECTORS = ["#musicPrompt", "#musicStyle"]',
-                      providers,
-                      "providers.js 应按候选列表解析音乐输入框")
-        self.assertIn("function enhanceTargetInput", providers)
-        idx = providers.find("function enhanceTargetInput")
-        body = providers[idx:idx + 800]
-        self.assertIn("return null", body,
-                      "找不到目标时应返回 null（由调用方给可读提示），不抛异常")
+        self.assertIn("ENHANCE_WRITE_TARGETS", providers,
+                      "providers.js 应按能力契约解析写回目标")
+        self.assertIn('"#musicPrompt"', providers,
+                      "候选列表应包含 #musicPrompt（yue2-flow 命名）")
+        self.assertIn('"#musicStyle"', providers,
+                      "候选列表应包含 #musicStyle（enh-unify 命名，同一语义兜底）")
+
+        shared = (WEB / "enhance-menu-shared.js").read_text(encoding="utf-8")
+        self.assertIn("function resolveWriteTarget", shared)
+        idx = shared.find("function resolveWriteTarget")
+        body = shared[idx:idx + 2000]
+        self.assertIn("ok: false", body,
+                      "找不到目标时应返回 { ok:false, reason }（由调用方给可读提示）")
+        self.assertIn("reason", body)
+
+        # 契约缺失时也不应抛异常
+        self.assertIn("if (!contract)", body,
+                      "契约缺失时应给出原因而不是抛异常")
 
     def test_writeback_handlers_handle_missing_target(self):
         """写回按钮在目标缺失时给可读提示，不抛 TypeError。"""
         providers = (WEB / "providers.js").read_text(encoding="utf-8")
-        self.assertIn("本面板找不到可写回的输入框", providers,
+        # 【2026-11-10】写回改为能力契约后，提示文案在 writeBackEnhanceResult 里
+        self.assertIn("function writeBackEnhanceResult", providers,
+                      "写回应走契约解析")
+        idx = providers.find("function writeBackEnhanceResult")
+        body = providers[idx:idx + 1200]
+        self.assertIn("写回失败", body,
                       "写回时找不到目标应给出可读提示")
-        # enhanceTargetInput().value 直接用会炸 —— 必须先判空
+        # 不能直接对可能为 null 的结果取 .value
         self.assertNotIn("enhanceTargetInput().value", providers,
                          "不能直接对可能为 null 的结果取 .value")
 

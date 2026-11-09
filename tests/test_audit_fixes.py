@@ -141,11 +141,16 @@ class TestC2SingleEnhanceEntry(unittest.TestCase):
                          "#enhanceSpec 第二个下拉应删除（模板选择已并入增强下拉）")
 
     def test_no_enhance_spec_in_js(self):
-        """前端不再引用 #enhanceSpec（只看真实代码，注释里的说明不算）。"""
+        """前端不再引用**旧的** #enhanceSpec 下拉（只看真实代码，注释不算）。
+
+        注意：新的「模板选择行」用的是 #enhanceSpecRow / #enhanceSpecSelect
+        （enh-unify 的 P1-2 修法：模板选择器提升为增强栏里的平级一行），
+        与旧的独立下拉 #enhanceSpec 不是同一个东西。
+        """
         offenders = []
         for p in sorted(WEB.glob("*.js")):
             code = js_code(p)
-            if "#enhanceSpec" in code:
+            if re.search(r"""["'#]enhanceSpec["']""", code):
                 offenders.append(f"{p.name}: #enhanceSpec")
             if "renderEnhanceSpecSelect" in code:
                 offenders.append(f"{p.name}: renderEnhanceSpecSelect")
@@ -171,11 +176,26 @@ class TestC2SingleEnhanceEntry(unittest.TestCase):
                          "#musicEnhanceBar 已并入 #musicPromptField 内的增强栏")
 
     def test_music_enhance_updates_indicator(self):
-        """音乐侧维护当前方式回显（与图像面板同一套格式）。"""
-        src = read(WEB / "music-enhance.js")
-        self.assertIn("function updateCurrentIndicator", src)
-        self.assertIn("#musicEnhanceCurrent", src)
-        self.assertIn("当前增强：", src)
+        """音乐侧的当前方式回显由**统一注册表**维护（与图像面板同一套格式）。
+
+        【架构说明】音乐侧的回显不再由 music-enhance.js 自己实现 ——
+        增强体系合并后，回显是统一注册表（enhance-menu.js 的
+        updateCurrentIndicator）的职责，它同时更新 #enhanceCurrent 与
+        #musicEnhanceCurrent。music-enhance.js 只负责「怎么执行」与
+        「怎么写回」。
+        """
+        menu = read(WEB / "enhance-menu.js")
+        self.assertIn("function updateCurrentIndicator", menu,
+                      "统一注册表应维护当前方式回显")
+        self.assertIn("#musicEnhanceCurrent", menu,
+                      "回显要同时更新音乐面板的元素")
+        self.assertIn("当前增强：", menu, "回显文案与图像面板一致")
+
+        # 音乐模块只保留执行与写回
+        music = read(WEB / "music-enhance.js")
+        self.assertIn("function getWriteContract", music,
+                      "音乐模块应注册写回能力契约")
+        self.assertIn("function run(", music, "音乐模块应提供执行入口")
 
 
 class TestC3SharedComponent(unittest.TestCase):
@@ -416,9 +436,19 @@ class TestC7NoRegressionOnSharedAssets(unittest.TestCase):
         self.assertIn("function targets()", src, "多面板路由 targets() 应保留")
         self.assertIn("function updateCurrentIndicator", src)
         self.assertIn("function unavailableReason", src)
-        self.assertIn("function renderSpecPicker", src)
-        # 模板并入下拉
-        self.assertIn("specHtml: renderSpecPicker", src)
+        # 模板选择：enh-unify 的 P1-2 修法把它提升为增强栏里的**平级一行**
+        # （renderSpecRow + renderSpecTag），不再是菜单项里的子属性。
+        self.assertIn("function renderSpecRow", src, "模板选择行应保留")
+        self.assertIn("function renderSpecTag", src, "菜单项的模板标注应保留")
+        self.assertIn("specHtml: renderSpecTag", src,
+                      "菜单渲染应通过共用组件传入模板标注")
+        # 能力契约的候选列表（审查 P0-1）
+        self.assertIn("inputSelectors", src, "输入目标应是候选列表")
+        self.assertIn("outputSelectors", src, "写回目标应是候选列表")
+        self.assertIn("function resolveTarget", src,
+                      "目标探测应返回 null 而不是抛异常")
+        # 多选版本历史修复（审查 P1-2）
+        self.assertIn("version:", src, "各步骤应回报版本信息")
 
     def test_server_keeps_both_endpoints(self):
         src = read(REPO / "server.py")

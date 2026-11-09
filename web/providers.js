@@ -682,10 +682,25 @@ const ENHANCE_WRITE_TARGETS = {
 };
 
 function enhanceWriteContract() {
-  // 音乐面板注册的是**结构化**契约（结构化风格 + 歌词）
-  const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
-    ? window.MusicEnhance.getWriteContract() : null;
-  if (music) return music;
+  // 契约必须按**当前面板**选，不能只看「音乐模块加载了没」。
+  //
+  // 【2026-11-10 修的真实缺陷】之前这里是无条件优先用音乐契约，
+  // 而 music-enhance.js 在页面加载时就注册了契约 —— 于是**图像面板**
+  // 点「替换提示词框」时拿到的也是结构化契约 ->
+  // writeBackEnhanceResult() 走 structured 分支直接 return false ->
+  // 提示词框**根本没被写入**，徽标也不显示（实测：#prompt 值不变）。
+  //
+  // 现在：按当前模式决定走哪条路线。
+  //   音乐模式 -> 结构化契约（music-enhance.js 注册）
+  //   其它模式 -> 文本契约（提示词框）
+  const music = (typeof state !== "undefined" && state
+                 && (state.mode === "t2a" || state.mode === "a2a"));
+  if (music) {
+    const contract = window.MusicEnhance
+      && typeof window.MusicEnhance.getWriteContract === "function"
+      ? window.MusicEnhance.getWriteContract() : null;
+    if (contract) return contract;
+  }
   return ENHANCE_WRITE_TARGETS.text;
 }
 
@@ -712,7 +727,11 @@ function writeBackEnhanceResult(text, mode) {
     return false;
   }
   if (target.kind === "structured") {
-    // 结构化路线：文本不是写回目标，由调用方走结构化 apply
+    // 结构化路线（音乐）：产物是「12 个风格字段 + 歌词」，不是一个文本框。
+    // 这类增强**不走**「替换提示词框 / 追加」弹窗 —— 它在增强完成时
+    // 直接落到结构化风格区与歌词区（由 music-enhance.js 的契约负责）。
+    // 所以这里明确拒绝，而不是静默丢弃。
+    setEnhanceHint("音乐的结构化增强直接写入结构化风格区与歌词区，不走文本写回", "error");
     return false;
   }
   const el = target.element;

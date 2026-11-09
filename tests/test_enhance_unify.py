@@ -149,12 +149,14 @@ class TestEnhanceFrontendSource(unittest.TestCase):
     def test_music_panel_has_its_own_enhance_entry(self):
         """文生音乐 / 参考生音乐要有增强入口（之前完全没有）。"""
         html = self.read("index.html")
-        for el in ("musicEnhanceBar", "musicEnhanceBtn", "musicEnhanceMenuBtn",
-                   "musicEnhanceMenu", "musicEnhanceHint"):
+        for el in ("musicEnhanceSplit", "musicEnhanceBtn", "musicEnhanceMenuBtn",
+                   "musicEnhanceMenu", "musicEnhanceHint", "musicEnhanceCurrent"):
             self.assertIn(f'id="{el}"', html, f"音乐面板缺 #{el}")
         js = self.read("enhance-menu.js")
         self.assertIn("isMusicContext", js)
-        self.assertIn("#musicStyle", js)
+        # 音乐输入框是 #musicPrompt（yue2-flow 命名）；#musicStyle 只作为
+        # 候选列表里的兜底出现（同一语义的两个名字，见审查 P0-1）。
+        self.assertIn("#musicPrompt", js)
 
     def test_no_parallel_enhance_item_list(self):
         """不得另起一套平行的增强项列表（第二套增强入口）。"""
@@ -307,12 +309,34 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
                              f"{mode} 面板应只有 1 个增强入口，实际 {visible}")
 
     def test_refine_is_universal(self):
-        """规则 2：二次增强在每个面板都能选。"""
-        for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss", "t2v", "t2a", "a2a"):
+        """规则 2：二次增强在每个面板都能选。
+
+        【2026-11-10 按统一增强体系更新】音乐面板例外：
+        音乐走**结构化路线**（yue2_struct -> 12 个风格字段 + 歌词），
+        二次增强的产物是「一段文本」，与音乐的结构化写回契约不匹配 ——
+        所以音乐面板禁用文本扩写类（普通增强 / 二次增强），
+        并在界面上写明原因（「文本扩写类，YuE2 音乐需结构化风格+歌词」）。
+
+        图像/视频面板：二次增强仍是通用能力，各面板都可用。
+        """
+        for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss", "t2v"):
             self.switch_mode(mode)
             self.open_menu()
             disabled = self.page.get_attribute(self.menu_sel("refine"), "disabled")
             self.assertIsNone(disabled, f"{mode} 面板下二次增强不该被禁用")
+
+        # 音乐面板：二次增强禁用，且写明原因
+        for mode in ("t2a", "a2a"):
+            self.switch_mode(mode)
+            self.open_menu()
+            disabled = self.page.get_attribute(self.menu_sel("refine"), "disabled")
+            self.assertIsNotNone(disabled,
+                                 f"{mode} 面板下二次增强应禁用（产物形态与结构化契约不匹配）")
+            item = self.page.inner_text(
+                f'{self.menu_sel("refine").split(" input")[0]} '
+                f'.enhance-menu-item[data-method="refine"]')
+            self.assertIn("结构化", item,
+                          f"禁用原因应写明需要结构化风格，实际：{item}")
             self.page.keyboard.press("Escape")
             self.page.wait_for_timeout(150)
 
@@ -373,12 +397,25 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
 
     def test_music_panel_lists_yue2_templates(self):
         """
-        音乐面板的模板行列 YuE2 专属模板，不列图像模板。
+        音乐面板的增强是**结构化路线**（YuE2 结构化风格 + 歌词），
+        它走专属链路 /api/music-enhance，**不用文本扩写模板**。
 
-        【2026-11-09】模板选择已从菜单项子属性提升为增强栏里的平级一行
-        （代码审查 P1-2），所以这里查 #musicEnhanceSpecSelect。
+        【2026-11-10 按统一增强体系更新】原先这里断言「模板行列 YuE2 专属模板」，
+        那是 enh-unify 最初的音乐设计（音乐 = 文本扩写）。
+        审查 P0-1 / P2-2 的裁决是「以 yue2-flow 的结构化数据模型为准」：
+        音乐的增强产物是「12 个结构化风格字段 + 歌词」，与文本模板无关。
+
+        所以这里改断言：
+          - 音乐面板的当前增强方式是 yue2_struct（结构化路线）
+          - 模板行对这一项显示「该增强方式不使用模板」（而不是列图像模板）
         """
         self.switch_mode("t2a")
+        cur = self.page.evaluate("""() => {
+          const el = document.querySelector('#musicEnhanceCurrent');
+          return el ? el.textContent.trim() : '';
+        }""")
+        self.assertIn("YuE2", cur, f"音乐面板当前方式应是结构化增强，实际：{cur}")
+
         opts = self.page.evaluate("""() => {
           const sel = document.querySelector('#musicEnhanceSpecSelect');
           if (!sel) return null;
@@ -386,7 +423,6 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
         }""")
         self.assertIsNotNone(opts, "音乐面板应有模板选择行")
         joined = " | ".join(opts)
-        self.assertIn("YuE2", joined, f"音乐面板应列出 YuE2 模板，实际：{joined}")
         self.assertNotIn("Z-Image", joined, f"音乐面板不该列图像模板，实际：{joined}")
 
     def test_music_refine_uses_music_template(self):

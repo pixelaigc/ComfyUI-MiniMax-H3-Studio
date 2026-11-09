@@ -414,8 +414,15 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
                          f"Z-Image 面板不该列出 Qwen 专属模板，实际：{joined}")
 
     def test_second_enhance_is_universal_across_panels(self):
-        """规则 2：二次增强是通用增强 —— 每个面板都能选到。"""
-        for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss", "t2v", "t2a", "a2a"):
+        """规则 2：二次增强是通用增强 —— 图像/视频每个面板都能选到。
+
+        【2026-11-10 按统一增强体系更新】音乐面板例外：
+        音乐走**结构化路线**（yue2_struct -> 12 个风格字段 + 歌词），
+        二次增强的产物是「一段文本」，与音乐的结构化写回契约不匹配 ——
+        所以音乐面板禁用文本扩写类（普通增强 / 二次增强），
+        并写明原因（「文本扩写类，YuE2 音乐需结构化风格+歌词」）。
+        """
+        for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss", "t2v"):
             self.switch_mode(mode)
             # 音乐面板的增强下拉是另一套 id（#musicEnhanceMenu）
             menu = "#musicEnhanceMenu" if mode in ("t2a", "a2a") else "#enhanceMenu"
@@ -431,6 +438,24 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
                 f'{menu} input[data-method-check="refine"]', "disabled")
             self.assertIsNone(disabled,
                               f"{mode} 面板下「二次增强」不该被禁用（它是通用能力）")
+            self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(150)
+
+        # 音乐面板：二次增强禁用，且写明原因
+        for mode in ("t2a", "a2a"):
+            self.switch_mode(mode)
+            self.page.evaluate(
+                """() => { const b = document.querySelector('#musicEnhanceMenuBtn');
+                    if (b) b.click(); }""")
+            self.page.wait_for_timeout(300)
+            disabled = self.page.get_attribute(
+                '#musicEnhanceMenu input[data-method-check="refine"]', "disabled")
+            self.assertIsNotNone(disabled,
+                                 f"{mode} 面板下二次增强应禁用（产物形态与结构化契约不匹配）")
+            item = self.page.inner_text(
+                '#musicEnhanceMenu .enhance-menu-item[data-method="refine"]')
+            self.assertIn("结构化", item,
+                          f"禁用原因应写明需要结构化风格，实际：{item}")
             self.page.keyboard.press("Escape")
             self.page.wait_for_timeout(150)
 
