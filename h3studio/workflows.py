@@ -1252,10 +1252,33 @@ def _qwen_pe_system_prompt(is_edit: bool) -> str:
     return text
 
 
+def _apply_pe_overrides(target: dict, overrides) -> dict:
+    """把用户编辑过的官方 PE 档位参数覆盖到 target（原地）。
+
+    只覆盖显式给出的键，未给出的保留官方档位值 —— 不写死一套并行默认。
+    多个增强项的推荐参数是**叠加**语义：后一项只覆盖它自己声明的键，
+    不会清掉前一项已套用的参数。
+
+    返回 target（便于链式调用）。
+    """
+    if not isinstance(overrides, dict):
+        return target
+    for key in ("presence_penalty", "max_new_tokens"):
+        value = overrides.get(key)
+        if value is None:
+            continue
+        try:
+            target[key] = float(value) if key == "presence_penalty" else int(value)
+        except (TypeError, ValueError):
+            continue
+    return target
+
+
 def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                        sampler, scheduler, steps, cfg, shift, negative_text, prompt,
                        job_id, filename_prefix=None, loras=None, is_edit=False,
-                       use_pe=True, pe_params=None, pe_image_nodes=None):
+                       use_pe=True, pe_params=None, pe_image_nodes=None,
+                       pe_system_prompt=None):
     """Qwen-Image 2.1 公共链路。
 
     文生图与参考图生图共用同一套节点，区别只在：
@@ -1378,7 +1401,12 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
         # 官方 PE 的 system prompt：让 PE 节点用官方那套「观察者式描述」规则，
         # 而不是模型内置的默认 system prompt。
         # 文生图档 = PE-T2I 的 system prompt；编辑档 = PE-I2I 的。
-        system_prompt = _qwen_pe_system_prompt(is_edit)
+        #
+        # pe_system_prompt：用户在「增强」多选列表里编辑过的版本
+        # （与手动扩写用的是同一份文本 -> 扩写与出图走同一套规则）。
+        # 传 None = 用官方内置模板（向后兼容）。
+        system_prompt = (pe_system_prompt if pe_system_prompt is not None
+                         else _qwen_pe_system_prompt(is_edit))
         if system_prompt:
             pe_inputs["system_prompt"] = system_prompt
         # 参考图也喂给 PE（官方 PE-I2I 工作流就是这么接的）：
@@ -1620,11 +1648,15 @@ def build_qwen_t2i(params):
     cond_clip = QWEN_IMAGE_CLIP_COND
     # PE-T2I 档（presence_penalty=1.5 / max_new_tokens=16256）
     pe_params = dict(QWEN_IMAGE_PE_PARAMS["t2i"])
+    _apply_pe_overrides(pe_params, params.get("pe_params"))
+    # 用户在「增强」多选列表里编辑过的官方 PE system prompt（None = 官方内置）
+    pe_system_prompt = params.get("pe_system_prompt")
 
     return _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
                                scheduler, steps, cfg, shift, negative_text,
                                prompt, job_id, loras=loras, use_pe=use_pe,
-                               pe_params=pe_params)
+                               pe_params=pe_params,
+                               pe_system_prompt=pe_system_prompt)
 
 
 def build_qwen_i2i(params):
@@ -1687,6 +1719,9 @@ def build_qwen_i2i(params):
     cond_clip = QWEN_IMAGE_CLIP_COND
     # PE-I2I 档（presence_penalty=0 / max_new_tokens=24000）
     pe_params = dict(QWEN_IMAGE_PE_PARAMS["i2i"])
+    _apply_pe_overrides(pe_params, params.get("pe_params"))
+    # 用户在「增强」多选列表里编辑过的官方 PE system prompt（None = 官方内置）
+    pe_system_prompt = params.get("pe_system_prompt")
 
     # ---- 第一步：把参考图做成 LoadImage 节点 -------------------------
     #
@@ -1733,6 +1768,7 @@ def build_qwen_i2i(params):
                             scheduler, steps, cfg, shift, negative_text,
                             prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
                             pe_params=pe_params,
+                            pe_system_prompt=pe_system_prompt,
                             pe_image_nodes=(ref_nodes if use_pe else None))
 
     # ---- 第三步：把 LoadImage 节点挂进工作流 -------------------------

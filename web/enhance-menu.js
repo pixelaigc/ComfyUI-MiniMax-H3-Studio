@@ -1,5 +1,5 @@
 /* ============================================================
-   提示词增强方式注册表 + 「增强」下拉菜单
+   提示词增强方式注册表 + 「增强」多选下拉菜单
    ------------------------------------------------------------
    为什么要这一层：
    原来「增强」「二次增强」是两个**并列的独立按钮**，每加一种增强方式
@@ -12,13 +12,29 @@
      - 下拉菜单按它渲染
      - 主按钮按它路由
      - 面板的可见性按它决定（哪些方式只对特定模式可用）
-   新增一种增强方式 = 在注册表里加一条，前后端不用改。
+
+   【多选（2026-11-09 用户要求）】
+   下拉不再是单选：每一项前面带复选框，可以**同时选中多项**。
+   - 点「增强」按钮 = 按**注册表顺序**依次执行选中的增强方式
+   - 各项的「推荐参数」是**叠加**语义：后一项只覆盖它自己声明的键，
+     不会清掉前一项已套用的参数（最终提交的是叠加后的结果）
+   - 各项的「提示词片段」合并追加到最终提示词，互不覆盖、不互相截断
+   - 合并后用户仍可在提示词框里手动编辑
+   - 选中状态 + 已套用的推荐参数在界面上可见（勾选框 + 参数回显）
 
    【与结构化增强（layout）的关系】
    「结构化增强（layout）」只是注册表里的一条，调用的是既有的
    POST /api/moss-layout，产物弹窗与回填语义和其它方式一致。
    它**只在 MOSS-Image 面板可用**（其它图像模型不认 layout 坐标），
    所以在 Z-Image / Qwen-Image 面板下该选项会被禁用并说明原因。
+
+   【与官方 PE（qwen_pe）的关系】
+   官方 PE 是注册表里的一条**普通增强项**，与其它项同级、可多选。
+   它自带两项可编辑字段：
+     - systemPrompt：官方 PE 的扩写 system prompt（可编辑）
+       -> 扩写与出图共用同一份文本
+     - params（presence_penalty / max_new_tokens）：官方 PE 推荐档位
+       -> 选中即自动套用，用户可再改
    ============================================================ */
 (function () {
   "use strict";
@@ -32,6 +48,9 @@
    * modes       该方式在哪些工作模式下可用；空数组 = 全部模式
    * busyFlag    该方式运行时把哪个 busy 标记置起来（决定「生成」按钮是否禁用）
    * buttonText  选中后主按钮上显示的文字
+   * recommended 标注「推荐」（界面上显示 Recommended 徽标）
+   * exclusive   true = 与其它项互斥（不能同时选中）
+   * fields      该项自带的可编辑字段（渲染在展开区里）
    */
   const ENHANCE_METHODS = [
     {
@@ -67,17 +86,48 @@
       modes: ["t2i_qwen", "i2i_qwen"],
       busyFlag: "enhance",
       buttonText: "官方PE扩写",
+      // 官方最佳实践 —— 界面上标 Recommended
+      recommended: true,
+      // 该项自带的可编辑字段：官方 PE 的 system prompt 与档位参数。
+      // systemPrompt 走「扩写 + 出图」同一条链路；params 是 PE 节点参数。
+      fields: [
+        {
+          key: "systemPrompt",
+          label: "官方 PE system prompt",
+          kind: "textarea",
+          hint: "官方 PE 扩写所用的指令原文。编辑后，扩写与出图共用这一份文本。",
+        },
+        {
+          key: "presencePenalty",
+          label: "presence_penalty",
+          kind: "number",
+          hint: "官方 PE 档位参数：文生图 1.5 / 图片编辑 0。选中即自动套用，可再改。",
+        },
+        {
+          key: "maxNewTokens",
+          label: "max_new_tokens",
+          kind: "number",
+          hint: "官方 PE 档位参数：文生图 16256 / 图片编辑 24000。不能压到 4096（会静默返回空串）。",
+        },
+      ],
     },
   ];
 
-  // 当前选中的增强方式（默认普通增强）
-  let currentId = "basic";
+  // 当前选中的增强方式 id 集合（多选）。默认只选「普通增强」。
+  let selectedIds = ["basic"];
 
   const byId = {};
   ENHANCE_METHODS.forEach(m => { byId[m.id] = m; });
 
+  /** 当前选中的方式（按注册表顺序 = 执行顺序）。 */
+  function selectedMethods() {
+    return ENHANCE_METHODS.filter(m => selectedIds.indexOf(m.id) >= 0);
+  }
+
+  /** 兼容旧调用方：返回「当前主方式」（多选时取第一个选中的）。 */
   function currentMethod() {
-    return byId[currentId] || byId.basic;
+    const sel = selectedMethods();
+    return sel[0] || byId.basic;
   }
 
   /** 某方式在当前模式下是否可用。 */
@@ -87,85 +137,289 @@
     return method.modes.includes(mode);
   }
 
-  // ------------------------------------------------------------------ 菜单渲染
-
-  function renderMenu() {
-    const menu = document.querySelector("#enhanceMenu");
-    if (!menu) return;
-    menu.innerHTML = ENHANCE_METHODS.map(m => {
-      const ok = isAvailable(m);
-      const active = m.id === currentId;
-      return `<button type="button" role="menuitem" data-method="${esc(m.id)}"`
-        + ` class="${active ? "active" : ""}"${ok ? "" : " disabled"}`
-        + ` title="${esc(m.hint)}">`
-        + `<span class="enhance-menu-label">${esc(m.label)}</span>`
-        + `<span class="enhance-menu-hint">${esc(m.hint)}</span>`
-        + (ok ? "" : `<span class="enhance-menu-badge">当前模式不可用</span>`)
-        + `</button>`;
-    }).join("");
-    menu.querySelectorAll("button[data-method]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (btn.disabled) return;
-        selectMethod(btn.dataset.method);
-        closeMenu();
-      });
-    });
+  /** 可用且被选中的方式（真正会被执行的那些）。 */
+  function runnableMethods() {
+    return selectedMethods().filter(isAvailable);
   }
+
+  // ------------------------------------------------------------------ 状态
+
+  const STATE_KEY = "h3studio.enhanceSelection.v1";
+
+  /** 把选中集合与可编辑字段持久化到 localStorage（刷新后不丢）。 */
+  function saveSelection() {
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        selected: selectedIds,
+        fields: fieldValues(),
+        touched: Array.from(fieldTouched),
+      }));
+    } catch (e) { /* 隐私模式下忽略 */ }
+  }
+
+  /** 读取持久化状态；损坏/缺失时退回默认值。 */
+  function loadSelection() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.selected)) {
+        // 只保留注册表里真实存在、且当前模式下可用的 id
+        const valid = data.selected.filter(id => byId[id]);
+        if (valid.length) selectedIds = valid;
+      }
+      if (data && data.fields && typeof data.fields === "object") {
+        Object.keys(data.fields).forEach(key => {
+          if (fieldValues()[key] !== undefined) fieldState[key] = data.fields[key];
+        });
+      }
+      if (data && Array.isArray(data.touched)) {
+        data.touched.forEach(key => fieldTouched.add(key));
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+
+  // 各增强项的可编辑字段当前值。key = "<methodId>.<fieldKey>"
+  const fieldState = {};
+
+  // 用户**动过**的字段（哪怕改成空串）。
+  // 动过的字段用用户的值（不静默回落默认值）；没动过的用默认值。
+  const fieldTouched = new Set();
+
+  /** 展开成扁平表：{"qwen_pe.systemPrompt": "...", ...} */
+  function fieldValues() {
+    const out = {};
+    Object.keys(fieldState).forEach(k => { out[k] = fieldState[k]; });
+    return out;
+  }
+
+  /** 某项某字段的当前值（未设置过 = undefined）。 */
+  function fieldValue(methodId, fieldKey) {
+    return fieldState[`${methodId}.${fieldKey}`];
+  }
+
+  /** 某项某字段是否被用户动过。 */
+  function fieldIsTouched(methodId, fieldKey) {
+    return fieldTouched.has(`${methodId}.${fieldKey}`);
+  }
+
+  /** 记录一次字段编辑（值 + 动过标记）。 */
+  function setFieldValue(methodId, fieldKey, value) {
+    fieldState[`${methodId}.${fieldKey}`] = value;
+    fieldTouched.add(`${methodId}.${fieldKey}`);
+  }
+
+  /**
+   * 某项某字段的**生效值**：
+   *   动过 -> 用用户的值（哪怕是空串）
+   *   没动 -> 用默认值（官方 PE 用官方档位 / 官方 system prompt）
+   */
+  function effectiveFieldValue(method, field) {
+    if (fieldIsTouched(method.id, field.key)) {
+      const v = fieldValue(method.id, field.key);
+      return v === undefined || v === null ? "" : v;
+    }
+    const d = defaultFieldValue(method, field);
+    return d === undefined ? "" : d;
+  }
+
+  /** 某项某字段的默认值：官方 PE 用官方档位；其余项 = undefined。 */
+  function defaultFieldValue(method, field) {
+    if (method.id === "qwen_pe" && field.key === "presencePenalty") {
+      const p = currentQwenPeParams();
+      return p.presence_penalty;
+    }
+    if (method.id === "qwen_pe" && field.key === "maxNewTokens") {
+      const p = currentQwenPeParams();
+      return p.max_new_tokens;
+    }
+    if (method.id === "qwen_pe" && field.key === "systemPrompt") {
+      return officialPeSystemPrompt();
+    }
+    return undefined;
+  }
+
+  /** 当前模式对应的官方 PE 档位参数（presence_penalty / max_new_tokens）。 */
+  function currentQwenPeParams() {
+    const opts = (typeof QWEN_OPTIONS !== "undefined" && QWEN_OPTIONS)
+      ? QWEN_OPTIONS : null;
+    const table = opts && opts.peParams ? opts.peParams : null;
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    const tier = mode === "i2i_qwen" ? "i2i" : "t2i";
+    if (table && table[tier]) {
+      return {
+        presence_penalty: table[tier].presence_penalty,
+        max_new_tokens: table[tier].max_new_tokens,
+        label: table[tier].label,
+      };
+    }
+    // 后端还没下发（未重启）时的兜底：官方卡值
+    const fallback = tier === "i2i"
+      ? { presence_penalty: 0, max_new_tokens: 24000, label: "PE-I2I（图片编辑）" }
+      : { presence_penalty: 1.5, max_new_tokens: 16256, label: "PE-T2I（文生图）" };
+    return fallback;
+  }
+
+  /**
+   * 官方 PE 的 system prompt 原文。
+   * 来源：/api/enhancer 下发的模板清单（enhancer.py 的 TEMPLATE_SPECS 里
+   * qwen21-pe-t2i / qwen21-pe-i2i 两档的 builtin_system_prompt，
+   * 用户在「本地模型配置」里改过则为 custom_system_prompt）。
+   * 取不到就返回空串 —— 前端据此提示「后端未就绪」，不编造。
+   */
+  function officialPeSystemPrompt() {
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    const specId = mode === "i2i_qwen" ? "qwen21-pe-i2i" : "qwen21-pe-t2i";
+    const specs = (typeof provState !== "undefined" && provState
+                   && provState.agent && provState.agent.specs)
+      ? provState.agent.specs : null;
+    if (!specs) return "";
+    const spec = specs.find(s => s.id === specId);
+    if (!spec) return "";
+    return spec.custom_system_prompt || spec.builtin_system_prompt || "";
+  }
+
+  // ------------------------------------------------------------------ 菜单渲染
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g,
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  function renderMenu() {
+    const menu = document.querySelector("#enhanceMenu");
+    if (!menu) return;
+    menu.innerHTML = ENHANCE_METHODS.map(m => {
+      const ok = isAvailable(m);
+      const checked = selectedIds.indexOf(m.id) >= 0;
+      return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
+        <label class="enhance-menu-check" title="${esc(m.hint)}">
+          <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
+          <span class="enhance-menu-label">${esc(m.label)}</span>
+          ${m.recommended ? '<span class="enhance-menu-badge rec">Recommended</span>' : ""}
+          ${ok ? "" : '<span class="enhance-menu-badge">当前模式不可用</span>'}
+        </label>
+        <span class="enhance-menu-hint">${esc(m.hint)}</span>
+        ${m.fields && m.fields.length ? renderFields(m) : ""}
+      </div>`;
+    }).join("");
+
+    menu.querySelectorAll("input[data-method-check]").forEach(box => {
+      box.addEventListener("change", () => {
+        toggleMethod(box.dataset.methodCheck, box.checked);
+      });
+    });
+    menu.querySelectorAll(".enhance-menu-field").forEach(el => {
+      const onEdit = () => {
+        setFieldValue(el.dataset.method, el.dataset.field, el.value);
+        saveSelection();
+        applySelectedParams();      // 参数即时套用并回显
+        updateButton();
+      };
+      el.addEventListener("input", onEdit);
+      el.addEventListener("change", onEdit);
+    });
+  }
+
+  /** 某项的可编辑字段区（system prompt 文本框 + 档位参数）。 */
+  function renderFields(method) {
+    const blocks = method.fields.map(f => {
+      const shown = effectiveFieldValue(method, f);
+      const input = f.kind === "textarea"
+        ? `<textarea class="enhance-menu-field" rows="4" data-method="${esc(method.id)}" data-field="${esc(f.key)}" title="${esc(f.hint)}">${esc(shown)}</textarea>`
+        : `<input type="number" step="${f.key === "presencePenalty" ? "0.1" : "1"}" class="enhance-menu-field" data-method="${esc(method.id)}" data-field="${esc(f.key)}" value="${esc(shown)}" title="${esc(f.hint)}">`;
+      return `<div class="enhance-menu-field-row">
+        <span class="enhance-menu-field-label" title="${esc(f.hint)}">${esc(f.label)}</span>
+        ${input}
+      </div>`;
+    }).join("");
+    return `<div class="enhance-menu-fields">${blocks}</div>`;
+  }
+
   // ------------------------------------------------------------------ 选中与路由
 
   /**
-   * 选中一种增强方式。
+   * 选中/取消一种增强方式（多选）。
    * @param {string} id
-   * @param {boolean} silent  true = 只切换不跑（默认）；false = 切换后立刻执行
+   * @param {boolean} on  true=选中，false=取消
    */
-  function selectMethod(id, silent) {
+  function toggleMethod(id, on) {
     const method = byId[id];
     if (!method) return;
-    if (!isAvailable(method)) return;      // 不可用的方式不切换
-    currentId = id;
-    updateButton();
-    renderMenu();
-    updatePanelVisibility();
-    if (typeof window !== "undefined") {
-      window.enhanceMethods = window.enhanceMethods || {};
-      window.enhanceMethods.current = id;
-    }
-    if (!silent) {
-      const hint = document.querySelector("#enhanceHint");
-      if (hint) {
-        hint.textContent = "已切换增强方式：" + method.label;
-        hint.className = "enhance-hint ok";
+    if (on && !isAvailable(method)) return;   // 不可用的方式不选中
+    if (on) {
+      if (selectedIds.indexOf(id) < 0) selectedIds.push(id);
+    } else {
+      if (selectedIds.length <= 1) {
+        // 至少留一项：取消最后一项时保持原状
+        // （否则用户点「增强」没反应 —— 比多留一项更糟）
+        renderMenu();
+        updateButton();
+        const hint = document.querySelector("#enhanceHint");
+        if (hint) {
+          hint.textContent = "至少要保留一项增强方式";
+          hint.className = "enhance-hint error";
+        }
+        return;
       }
+      selectedIds = selectedIds.filter(x => x !== id);
+    }
+    saveSelection();
+    renderMenu();
+    updateButton();
+    updatePanelVisibility();
+    applySelectedParams();
+    const hint = document.querySelector("#enhanceHint");
+    if (hint) {
+      hint.textContent = on ? "已选中：" + method.label : "已取消：" + method.label;
+      hint.className = "enhance-hint ok";
     }
   }
 
   /**
-   * 当前选中的方式在当前模式下是否仍可用；不可用则回落到普通增强。
+   * 当前选中的方式在当前模式下是否仍可用；不可用则剔除。
    *
    * 模式切换时必须做这件事 —— 否则主按钮会停在一个「当前模式不可用」的
    * 方式上（比如在 Qwen 面板选了官方 PE 扩写，切到 Z-Image），
    * 用户点「增强」却什么都没发生（run() 直接 return）。
    */
   function ensureAvailable() {
-    const method = currentMethod();
-    if (isAvailable(method)) return false;
-    selectMethod("basic", true);
-    return true;
+    const before = selectedIds.length;
+    selectedIds = selectedIds.filter(id => {
+      const m = byId[id];
+      return m && isAvailable(m);
+    });
+    if (!selectedIds.length) selectedIds = ["basic"];
+    if (selectedIds.length !== before) {
+      saveSelection();
+      renderMenu();
+      updateButton();
+      updatePanelVisibility();
+      return true;
+    }
+    return false;
   }
 
-  /** 主按钮的文字随当前方式变化。 */
+  /** 主按钮的文字随当前选中的方式变化。 */
   function updateButton() {
     const text = document.querySelector("#enhanceBtnText");
-    const method = currentMethod();
-    if (text) text.textContent = method.buttonText;
+    const sel = runnableMethods();
+    const method = sel[0] || byId.basic;
+    if (text) {
+      text.textContent = sel.length > 1 ? `增强（${sel.length} 项）` : method.buttonText;
+    }
     const btn = document.querySelector("#enhanceBtn");
-    if (btn) btn.title = method.hint;
+    if (btn) {
+      btn.title = sel.length > 1
+        ? "按选中顺序依次执行：" + sel.map(m => m.label).join(" → ")
+        : method.hint;
+    }
+    // 对外同步「当前方式」：多选时取第一个选中的（兼容旧的单选调用方）
+    if (typeof window !== "undefined") {
+      window.enhanceMethods = window.enhanceMethods || {};
+      window.enhanceMethods.current = (sel[0] || byId.basic).id;
+      window.enhanceMethods.selected = selectedIds.slice();
+    }
   }
 
   /**
@@ -178,17 +432,87 @@
    * 所以只藏 #refineTargetGroup 这一组，不能藏整个 #refineBar。
    */
   function updatePanelVisibility() {
+    const sel = selectedIds;
     const layoutBar = document.querySelector("#mossLayoutBar");
-    if (layoutBar) layoutBar.hidden = currentId !== "layout";
+    if (layoutBar) layoutBar.hidden = sel.indexOf("layout") < 0;
     const specSel = document.querySelector("#enhanceSpec");
     if (specSel) {
-      // 模板下拉对结构化增强无意义（那条链路不走模板），
-      // 官方 PE 扩写同理（走官方 checkpoint + 官方 system prompt，不走模板）
-      specSel.style.display =
-        (currentId === "layout" || currentId === "qwen_pe") ? "none" : "";
+      // 模板下拉只对**走模板**的方式有意义：
+      //   - 结构化增强（layout）走 /api/moss-layout，不用模板
+      //   - 官方 PE 扩写走官方 checkpoint + 官方 system prompt，不用模板
+      // 只要还有任意一项走模板，普通增强/二次增强就要能选模板 -> 显示。
+      const usesTemplate = sel.some(id => id !== "layout" && id !== "qwen_pe");
+      specSel.style.display = usesTemplate ? "" : "none";
     }
     const targetGroup = document.querySelector("#refineTargetGroup");
-    if (targetGroup) targetGroup.hidden = currentId !== "refine";
+    if (targetGroup) targetGroup.hidden = sel.indexOf("refine") < 0;
+  }
+
+  // ------------------------------------------------------------------ 参数套用
+
+  /**
+   * 把选中各项的「推荐参数」叠加套用，并回显到界面。
+   *
+   * 叠加语义：后一项只覆盖它自己声明的键，不会清掉前一项已套用的参数。
+   * 最终提交的参数 = 各项叠加后的结果。
+   *
+   * 官方 PE 的参数落到 state.imgQwen.peParams（出图时随 params 提交）；
+   * 其它项目前没有独立参数，声明为空 —— 后续新增增强项时在这里加分支即可。
+   */
+  function applySelectedParams() {
+    if (typeof state === "undefined" || !state || !state.imgQwen) return;
+    const merged = {};
+    const sel = runnableMethods();
+    const hasPe = sel.some(m => m.id === "qwen_pe");
+    sel.forEach(m => {
+      if (m.id !== "qwen_pe") return;
+      const dflt = currentQwenPeParams();
+      // 生效值：用户动过用用户的，没动过用官方档位
+      const ppRaw = effectiveFieldValue(m, { key: "presencePenalty" });
+      const mnRaw = effectiveFieldValue(m, { key: "maxNewTokens" });
+      if (ppRaw !== "" && ppRaw !== undefined && ppRaw !== null) {
+        merged.presence_penalty = Number(ppRaw);
+      } else if (dflt.presence_penalty !== undefined) {
+        merged.presence_penalty = dflt.presence_penalty;
+      }
+      if (mnRaw !== "" && mnRaw !== undefined && mnRaw !== null) {
+        merged.max_new_tokens = Number(mnRaw);
+      } else if (dflt.max_new_tokens !== undefined) {
+        merged.max_new_tokens = dflt.max_new_tokens;
+      }
+    });
+    // 官方 PE 未被选中时清掉（不残留上一轮的参数）
+    if (hasPe) {
+      state.imgQwen.peParams = merged;
+      // system prompt：用户改过就用用户的；没改过用官方内置的
+      // （出图链路与手动扩写共用同一份 -> 扩写与出图走同一套规则）
+      const peMethod = byId.qwen_pe;
+      const sp = effectiveFieldValue(peMethod, { key: "systemPrompt" });
+      state.imgQwen.peSystemPrompt = sp || "";
+    } else {
+      state.imgQwen.peParams = null;
+      state.imgQwen.peSystemPrompt = "";
+    }
+    updateAppliedParamsNote();
+  }
+
+  /** 已套用参数的可见回显（「选中即自动应用参数」要让用户看得见）。 */
+  function updateAppliedParamsNote() {
+    const note = document.querySelector("#enhanceAppliedParams");
+    if (!note) return;
+    const sel = runnableMethods();
+    const parts = [];
+    sel.forEach(m => {
+      if (m.id === "qwen_pe") {
+        const p = (typeof state !== "undefined" && state && state.imgQwen
+                   && state.imgQwen.peParams) ? state.imgQwen.peParams : null;
+        if (p) {
+          parts.push(`官方PE：presence_penalty=${p.presence_penalty}、max_new_tokens=${p.max_new_tokens}`);
+        }
+      }
+    });
+    note.textContent = parts.length ? ("已套用推荐参数 → " + parts.join("；")) : "";
+    note.hidden = !parts.length;
   }
 
   // ------------------------------------------------------------------ 菜单开合
@@ -263,30 +587,107 @@
    * 每个方式各自调自己的后端接口，各自处理成功/失败，
    * 但**回填语义一致**：结果进同一个弹窗、同一个「替换/追加」按钮组，
    * 回填后都标记为「已增强」并进版本历史。
+   *
+   * 【多选】按注册表顺序依次执行选中的每一项：
+   *   - **链式输入**：后一项的输入 = 前一项的产出（真正的「依次应用」）
+   *   - 片段合并：每一项产出的「提示词片段」合并追加，互不覆盖
+   *   - 参数叠加：每一项的推荐参数叠加套用，后一项不清掉前一项
    */
   async function run(methodId) {
-    const method = byId[methodId || currentId] || currentMethod();
-    if (!isAvailable(method)) return;
+    // 兼容旧调用：run("layout") = 只跑这一项
+    if (methodId) {
+      return runOne(byId[methodId] || currentMethod());
+    }
+    const sel = runnableMethods();
+    if (!sel.length) {
+      setHint("请先在「增强」下拉里选中至少一项", "error");
+      return;
+    }
+    if (sel.length === 1) return runOne(sel[0]);
+
+    // 多项：按注册表顺序依次执行，链式输入 + 片段合并 + 参数叠加
+    const merged = [];
+    const metas = [];
+    let anyPe = false;
+    // 链式输入：第一项吃提示词框里的原文，后一项吃前一项的产出
+    let input = document.querySelector("#prompt").value.trim();
+    for (const method of sel) {
+      const piece = await runOne(method, { collect: true, input });
+      if (!piece) continue;
+      if (piece.expanded) {
+        merged.push(piece.expanded);
+        input = piece.expanded;      // 下一项接着这一项的产出继续
+      }
+      if (piece.meta) metas.push(piece.meta);
+      if (piece.isPe) anyPe = true;
+    }
+    if (!merged.length) return;
+    const combined = mergeFragments(merged);
+    document.querySelector("#enhanceResult").value = combined;
+    document.querySelector("#enhanceMeta").innerHTML = metas.join("<br>");
+    document.querySelector("#enhanceModal").hidden = false;
+    // 【写回标记】合并结果里若含官方 PE 的产出，写回提示词框后
+    // 出图就不该再二次扩写（提示词框里已经是官方 PE 结果）。
+    // 这个标记必须在**所有项都跑完之后**统一设置 —— 否则先跑的普通增强
+    // 会把后跑的官方 PE 标记冲掉（两处生效 = 出图扩写两次）。
+    if (anyPe && typeof provState !== "undefined") {
+      provState.lastEnhanceKind = "qwen_pe";
+    }
+    setHint(`已按顺序应用 ${merged.length} 项增强，合并后 ${combined.length} 字`, "ok");
+  }
+
+  /**
+   * 合并多项增强的提示词片段。
+   *
+   * 规则（与 LoRA 触发词合并同一套思路）：
+   *   - 各片段互不覆盖、不互相截断
+   *   - 已存在的片段不重复追加
+   *   - 顺序 = 执行顺序
+   */
+  function mergeFragments(parts) {
+    const seen = new Set();
+    const out = [];
+    parts.forEach(p => {
+      const text = String(p || "").trim();
+      if (!text) return;
+      if (seen.has(text)) return;
+      seen.add(text);
+      out.push(text);
+    });
+    return out.join("\n\n");
+  }
+
+  /**
+   * 执行单个增强方式。
+   * @param {object} method
+   * @param {object} opts collect=true 时不直接写弹窗，只返回产物（供多选合并）
+   */
+  async function runOne(method, opts) {
+    opts = opts || {};
+    if (!isAvailable(method)) return null;
     if (method.id === "layout") {
-      return runLayout(method);
+      return runLayout(method, opts);
     }
     if (method.id === "qwen_pe") {
-      return runQwenPe(method);
+      return runQwenPe(method, opts);
     }
     if (method.id === "refine") {
-      return runRefine(method);
+      return runRefine(method, opts);
     }
-    return runBasic(method);
+    return runBasic(method, opts);
   }
 
   // ---- 普通增强（沿用既有 /api/enhance + 模板下拉） ----
-  async function runBasic(method) {
+  async function runBasic(method, opts) {
     const btn = document.querySelector("#enhanceBtn");
-    const prompt = document.querySelector("#prompt").value.trim();
+    // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
+    const prompt = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : document.querySelector("#prompt").value.trim();
     if (!prompt) {
       setHint("请先输入要增强的提示词", "error");
       document.querySelector("#prompt").focus();
-      return;
+      return null;
     }
     btn.disabled = true;
     btn.classList.add("busy");
@@ -302,12 +703,18 @@
         model_key: enhanceCurrentModelKey(),
       });
       provState.lastEnhance = d;
-      provState.lastEnhanceKind = "";   // 普通增强，不是官方 PE
+      // 只有**单独**跑普通增强时才清标记；多选时由 run() 统一设置，
+      // 否则先跑的普通增强会把后跑的官方 PE 标记冲掉。
+      if (!opts.collect) provState.lastEnhanceKind = "";   // 普通增强，不是官方 PE
       if (d.spec_id && d.spec_id !== provState.specId) {
         provState.specId = d.spec_id;
         renderEnhanceSpecSelect();
       }
-      document.querySelector("#enhanceResult").value = d.enhanced || "";
+      const enhanced = d.enhanced || "";
+      if (opts.collect) {
+        return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+      }
+      document.querySelector("#enhanceResult").value = enhanced;
       document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
       document.querySelector("#enhanceModal").hidden = false;
       if (d.enhanced) {
@@ -315,11 +722,13 @@
         pushPromptVersion(1, d.enhanced, `模板：${d.spec_id || "image"}`, d.spec_id);
       }
       setHint(`已用「${d.provider}」扩写，${d.enhanced ? d.enhanced.length : 0} 字`, "ok");
+      return { expanded: enhanced, meta: buildEnhanceMeta(d) };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
       const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
       setHint(`增强失败：${detail}`, "error");
       alert(`提示词增强失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
+      return null;
     } finally {
       btn.disabled = false;
       btn.classList.remove("busy");
@@ -329,14 +738,18 @@
   }
 
   // ---- 二次增强（沿用既有 /api/enhance + image-refine 模板） ----
-  async function runRefine(method) {
+  async function runRefine(method, opts) {
     const btn = document.querySelector("#enhanceBtn");
     const text = document.querySelector("#enhanceBtnText");
-    const source = refineSourcePrompt();
+    // 多选时用链式输入（上一项的产出）；单选时用既有语义
+    // （refineTarget=1 时取「一次增强」版本，否则取提示词框原文）
+    const source = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : refineSourcePrompt();
     if (!source) {
       setHint("请先输入要细化的提示词", "error");
       document.querySelector("#prompt").focus();
-      return;
+      return null;
     }
     const targetLevel = promptVersions.refineTarget === 1 ? 1 : 0;
     btn.disabled = true;
@@ -353,9 +766,12 @@
         model_key: enhanceCurrentModelKey(),
       });
       if (d.spec_id) { provState.specId = d.spec_id; renderEnhanceSpecSelect(); }
-      provState.lastEnhanceKind = "";   // 二次增强，不是官方 PE
+      if (!opts.collect) provState.lastEnhanceKind = "";   // 二次增强，不是官方 PE
       const refined = d.enhanced || "";
       if (!refined) throw new Error("本地模型返回了空结果");
+      if (opts.collect) {
+        return { expanded: refined, meta: buildEnhanceMeta(d) };
+      }
       document.querySelector("#prompt").value = refined;
       pushPromptVersion(2, refined, `模板：${d.spec_id || "image-refine"}`, d.spec_id);
       markPromptEnhanced();
@@ -367,28 +783,30 @@
       document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
       document.querySelector("#enhanceModal").hidden = false;
       setHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字`, "ok");
+      return { expanded: refined, meta: buildEnhanceMeta(d) };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
       const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
       setHint(`二次增强失败：${detail}`, "error");
       alert(`二次增强失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
+      return null;
     } finally {
       promptVersions.busy = false;
       btn.disabled = false;
-      text.textContent = currentMethod().buttonText;
+      updateButton();   // 多选：按钮文字取决于选中项数，不能只取第一项
       updateActionButtons();
     }
   }
 
   // ---- 结构化增强（layout）—— 调既有 /api/moss-layout ----
-  async function runLayout(method) {
+  async function runLayout(method, opts) {
     const btn = document.querySelector("#enhanceBtn");
     const text = document.querySelector("#enhanceBtnText");
     const prompt = document.querySelector("#prompt").value.trim();
     if (!prompt) {
       setHint("请先输入要增强的提示词", "error");
       document.querySelector("#prompt").focus();
-      return;
+      return null;
     }
     const intentEl = document.querySelector("#mossLayoutIntent");
     const intent = intentEl ? intentEl.value.trim() : "";
@@ -411,16 +829,18 @@
       view.renderResult(d);
       view.openModal();
       setHint(`结构化增强完成（${d.provider}）：${d.layout.items.length} 个元素`, "ok");
+      return { expanded: "", meta: "" };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
       const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
       setHint(`结构化增强失败：${detail}`, "error");
       alert(`MOSS 结构化增强失败${who}\n\n${detail}\n\n`
         + `请检查「本地模型配置」里的 Provider 是否可用。`);
+      return null;
     } finally {
       promptEnhance.busy = false;
       btn.disabled = false;
-      text.textContent = currentMethod().buttonText;
+      updateButton();   // 多选：按钮文字取决于选中项数，不能只取第一项
       updateActionButtons();
     }
   }
@@ -436,19 +856,27 @@
   //   2. 图片编辑模式下要把参考图一起送去 —— 官方 PE-I2I 工作流就是这么接的
   //      （BatchImagesNode -> TextGenerate.image），PE 才能「看着图」改写，
   //      并在输出里写 <image1>/<image2>。
-  async function runQwenPe(method) {
+  //
+  // 【system prompt 与档位参数】
+  //   这两项来自该增强项自带的可编辑字段（用户改过就以用户的为准），
+  //   没改过就用官方内置值（后端 /api/enhancer 下发的模板 + 官方卡值）。
+  //   同一份 system prompt 也随出图参数提交 -> 扩写与出图走同一套规则。
+  async function runQwenPe(method, opts) {
     const btn = document.querySelector("#enhanceBtn");
     const text = document.querySelector("#enhanceBtnText");
-    const prompt = document.querySelector("#prompt").value.trim();
+    // 多选时用链式输入（上一项的产出）；单选时用提示词框原文
+    const prompt = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : document.querySelector("#prompt").value.trim();
     if (!prompt) {
       setHint("请先输入要增强的提示词", "error");
       document.querySelector("#prompt").focus();
-      return;
+      return null;
     }
     const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
     if (mode !== "t2i_qwen" && mode !== "i2i_qwen") {
       setHint("官方 PE 扩写只在 Qwen-Image 2.1 的文生图 / 图片编辑模式下可用", "error");
-      return;
+      return null;
     }
     // 参考图：素材库来源，顺序即 <imageN> 顺序（与出图链路同一份 payload）
     let refs = [];
@@ -456,20 +884,37 @@
         && typeof window.QwenRefs.toPayload === "function") {
       refs = window.QwenRefs.toPayload();
     }
+    // 可编辑字段：用户改过就带上，没改过就不传（后端用官方内置值）
+    const peMethod = byId.qwen_pe;
+    const sp = effectiveFieldValue(peMethod, { key: "systemPrompt" });
+    const peParams = {};
+    const pp = effectiveFieldValue(peMethod, { key: "presencePenalty" });
+    const mn = effectiveFieldValue(peMethod, { key: "maxNewTokens" });
+    if (pp !== "" && pp !== undefined && pp !== null) peParams.presence_penalty = Number(pp);
+    if (mn !== "" && mn !== undefined && mn !== null) peParams.max_new_tokens = Number(mn);
+    const payload = { prompt, mode, refs };
+    if (sp !== undefined && sp !== null && String(sp).trim()) {
+      payload.system_prompt = String(sp);
+    }
+    if (Object.keys(peParams).length) payload.pe_params = peParams;
+
     btn.disabled = true;
     text.textContent = "官方PE扩写中…";
     promptEnhance.busy = true;
     updateActionButtons();
     setHint("官方 PE 扩写中（9B 模型 + thinking，约需半分钟）…", "busy");
     try {
-      const d = await apiJSON("POST", "/api/qwen-pe/expand", {
-        prompt, mode, refs,
-      });
+      const d = await apiJSON("POST", "/api/qwen-pe/expand", payload);
       const expanded = d.expanded || "";
       if (!expanded) throw new Error("官方 PE 返回了空结果");
+      const meta = buildQwenPeMeta(d);
+      if (opts.collect) {
+        // 多选：只回报「这次是官方 PE 的」，写回标记由 run() 统一设置
+        return { expanded, meta, isPe: true };
+      }
       // 回填到弹窗（与其它增强方式同一个弹窗 / 同一组按钮）
       document.querySelector("#enhanceResult").value = expanded;
-      document.querySelector("#enhanceMeta").innerHTML = buildQwenPeMeta(d);
+      document.querySelector("#enhanceMeta").innerHTML = meta;
       document.querySelector("#enhanceModal").hidden = false;
       // 记录「这次结果是官方 PE 的」—— 真正**写回提示词框**时
       // （用户在弹窗里点「替换提示词框 / 追加到原提示词」）
@@ -489,15 +934,17 @@
       }
       setHint(`官方 PE 扩写完成（${d.tier_label || d.tier}）：${expanded.length} 字；`
         + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+      return { expanded, meta };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
       setHint(`官方 PE 扩写失败：${detail}`, "error");
       alert(`Qwen 官方 PE 扩写失败\n\n${detail}\n\n`
         + `请确认 ComfyUI 正在运行，且官方 PE 权重（qwen3.5_qwen_image_2.1_pe_*.safetensors）已就位。`);
+      return null;
     } finally {
       promptEnhance.busy = false;
       btn.disabled = false;
-      text.textContent = currentMethod().buttonText;
+      updateButton();   // 多选：按钮文字取决于选中项数，不能只取第一项
       updateActionButtons();
     }
   }
@@ -510,6 +957,10 @@
       parts.push(`checkpoint：<code>${esc(d.clip_name)}</code>`);
     }
     if (d.ref_count) parts.push(`参考图：${Number(d.ref_count)} 张`);
+    if (d.pe_params) {
+      parts.push(`已套用参数：presence_penalty=${esc(d.pe_params.presence_penalty)}、`
+        + `max_new_tokens=${esc(d.pe_params.max_new_tokens)}`);
+    }
     parts.push(`字数：${(d.expanded || "").length}`);
     return parts.join(" · ");
   }
@@ -553,22 +1004,32 @@
 
   function boot() {
     bind();
+    loadSelection();
+    ensureAvailable();
     updateButton();
     renderMenu();
     updatePanelVisibility();
-    // 模式切换后：当前方式若在新模式下不可用，回落到普通增强
-    const prev = currentMethod();
-    if (!isAvailable(prev)) selectMethod("basic", true);
-    else updatePanelVisibility();
+    applySelectedParams();
     if (typeof window !== "undefined") {
       window.enhanceMethods = {
-        current: currentId,
+        current: selectedIds[0] || "basic",
+        selected: selectedIds.slice(),
         list: ENHANCE_METHODS,
-        select: selectMethod,
+        toggle: toggleMethod,
         run: run,
         renderMenu: renderMenu,
         updatePanelVisibility: updatePanelVisibility,
         ensureAvailable: ensureAvailable,
+        refreshButton: updateButton,
+        mergeFragments: mergeFragments,
+        getSelected: () => selectedIds.slice(),
+        getFieldValue: fieldValue,
+        getEffectiveFieldValue: (methodId, fieldKey) => {
+          const m = byId[methodId];
+          if (!m) return "";
+          const f = (m.fields || []).find(x => x.key === fieldKey);
+          return f ? effectiveFieldValue(m, f) : "";
+        },
       };
     }
   }
