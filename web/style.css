@@ -1058,13 +1058,54 @@ body.modal-open { overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
 }
 .img-ref-del:hover { background: var(--danger); }
+.img-ref-actions { display: flex; gap: 8px; align-items: center; }
 .img-ref-add {
-  width: 100%; height: 32px; border: 1px dashed var(--border); border-radius: 8px;
+  flex: 1 1 auto; height: 32px; border: 1px dashed var(--border); border-radius: 8px;
   background: #fafbfc; color: var(--muted); cursor: pointer;
   font-family: inherit; font-size: 12px;
 }
 .img-ref-add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .img-ref-add:disabled { opacity: .5; cursor: not-allowed; }
+/* 智能排序按钮 */
+.img-ref-sort {
+  flex: 0 0 auto; height: 32px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fafbfc; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: 12px;
+}
+.img-ref-sort:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.img-ref-sort:disabled { opacity: .5; cursor: not-allowed; }
+/* 参考图缺描述时的高亮（素材库未提供描述 -> 提示用户手写） */
+.img-ref-item.no-desc { border-color: #d9a441; }
+.img-ref-item.missing { border-color: var(--danger); opacity: .7; }
+.img-ref-badge {
+  position: absolute; left: 3px; bottom: 3px; max-width: calc(100% - 6px);
+  padding: 0 4px; border-radius: 6px; background: rgba(0, 0, 0, .66);
+  color: #fff; font-size: 9px; line-height: 14px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+}
+.img-ref-badge.missing { background: var(--danger); }
+/* 占位标记与描述编辑区 */
+.img-ref-detail { margin-top: 8px; }
+.img-ref-detail summary {
+  cursor: pointer; font-size: 11.5px; color: var(--muted);
+  user-select: none;
+}
+.img-ref-desc-list { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.img-ref-desc-row {
+  display: flex; gap: 6px; align-items: flex-start;
+}
+.img-ref-desc-tag {
+  flex: 0 0 auto; margin-top: 4px; padding: 1px 6px; border-radius: 6px;
+  background: rgba(0, 0, 0, .06); color: var(--muted);
+  font-size: 10.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+.img-ref-desc-row textarea {
+  flex: 1 1 auto; min-height: 30px; resize: vertical;
+  font-size: 11.5px; font-family: inherit; line-height: 1.45;
+}
+.img-ref-desc-row.missing textarea { border-color: var(--danger); }
 
 /* ---------- 被排除的不兼容 LoRA ---------- */
 .img-lora-excluded {

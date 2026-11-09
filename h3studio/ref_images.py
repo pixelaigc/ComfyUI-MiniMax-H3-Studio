@@ -59,22 +59,34 @@ def renumber_placeholders(text: str, mapping: dict[int, int]) -> str:
     """
     按 mapping（旧序号 -> 新序号）重排文本里的占位标记。
 
-    mapping 里的旧序号必须**从大到小**替换，否则 1->2、2->3 会连环替换
-    （先把 <image1> 变成 <image2>，再被当成 <image2> 改成 <image3>）。
-    这里内部按序号降序处理，调用方无需关心。
+    必须**单遍替换**：用 re.sub 的回调一次扫过，每个占位按它**原本**的序号
+    查表替换。
+
+    之前用「先替换大的、再替换小的」来避免连环替换 —— 那是错的：
+    mapping={2:1, 3:2} 时，先把 <image3> 变成 <image2>，
+    接着这一轮又把新产生的 <image2> 变成 <image1>，
+    结果三个占位全变成 <image1>。单遍替换没有这个问题。
     """
     if not text:
         return text or ""
-    out = text
-    for old in sorted(mapping, key=lambda v: -int(v)):
-        new = int(mapping[old])
-        out = out.replace(f"<image{old}>", f"<image{new}>")
-    return out
+    if not mapping:
+        return text
+
+    def _replace(match: "re.Match[str]") -> str:
+        old = int(match.group(1))
+        new = mapping.get(old)
+        return f"<image{new}>" if new is not None else match.group(0)
+
+    return PLACEHOLDER_RE.sub(_replace, text)
 
 
 def strip_placeholders(text: str) -> str:
     """移除所有占位标记（移除参考图时清掉悬空标记用）。"""
-    return PLACEHOLDER_RE.sub("", text or "")
+    cleaned = PLACEHOLDER_RE.sub("", text or "")
+    # 移除标记后可能留下多余空格 / 空行
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def normalize_refs(refs) -> list[dict]:
@@ -134,16 +146,21 @@ def build_reference_block(refs: list[dict], style: str = "inline") -> str:
 
     N=1 时**不注入占位标记**（官方 PE-I2I system prompt 明确要求），
     但仍然给一行描述（自然表述，不带标签）。
+
+    【占位编号按「原始列表下标」算，不按过滤后的下标】
+    失效素材（missing）会被跳过，但**后面的图不前移** —— 否则
+    「图1 已失效、图2 有效」时，图2 的占位会变成 <image1>，
+    而模型看到的 image_1 插槽拿到的是图2 —— 编号与插槽错位。
+    失效素材在提交时会被 validate_refs 拦下，所以不会真的带着错位跑。
     """
-    refs = [r for r in refs if not r.get("missing")]
-    if not refs:
-        return ""
+    total = len(refs)
     lines = []
-    multi = len(refs) >= 2
     for index, ref in enumerate(refs):
+        if ref.get("missing"):
+            continue
         desc = (ref.get("description") or "").strip()
         marker = placeholder_for(index)
-        if not multi:
+        if total < 2:
             # 单图：官方要求不用标签 -> 只给描述
             line = desc or (ref.get("name") or "")
         elif style == "bullet":
@@ -165,16 +182,16 @@ def inject_reference_block(prompt: str, refs: list[dict], style: str = "inline")
     官方 PE-I2I 的多图模板本身就是「<image1> 是画布图…」起手的，
     占位在前更符合官方写法。
 
-    幂等：若提示词里已经有占位标记（用户自己写了 <image1>），**不重复注入**，
-    只做重编号对齐（避免出现两个 <image1>）。
+    幂等：若提示词里已经有占位标记（用户自己写了 <image1>），**不重复注入**。
+    这时**不动**用户写的编号 —— 用户写 <image2> 就是想指第 2 张，
+    强行重编号会改坏用户的语义。编号对齐由前端在增删参考图时负责
+    （见 web/qwen-refs.js 的 reindexPrompt）。
     """
     prompt = prompt or ""
     block = build_reference_block(refs, style=style)
-    existing = parse_placeholders(prompt)
-    if existing:
-        # 用户手写了占位 -> 不注入第二份，但要把编号对齐到实际插槽顺序
-        mapping = {old: i + 1 for i, old in enumerate(sorted(existing))}
-        return renumber_placeholders(prompt, mapping)
+    if parse_placeholders(prompt):
+        # 用户手写了占位 -> 不注入第二份，也不动他的编号
+        return prompt
     if not block:
         return prompt
     return f"{block}\n{prompt}" if prompt else block
@@ -317,11 +334,24 @@ def smart_sort(refs: list[dict], prompt: str = "", use_model: bool = True) -> di
                   for i, r in enumerate(refs)]
 
     # 稳定排序：分数降序 -> 入库时间降序 -> 原下标升序
-    scored.sort(key=lambda item: (
-        -item["score"],
-        -float((item["ref"] or {}).get("created_at") or 0),
-        item["index"],
-    ))
+    # 排序键本身也要兜底：ref 可能是被改坏的对象（.get 抛异常），
+    # 这时退回 0，不能让异常冒出去。
+    def _sort_key(item):
+        try:
+            created = float((item["ref"] or {}).get("created_at") or 0)
+        except Exception:
+            created = 0.0
+        try:
+            score = float(item.get("score") or 0)
+        except Exception:
+            score = 0.0
+        return (-score, -created, item["index"])
+
+    try:
+        scored.sort(key=_sort_key)
+    except Exception:
+        scored = [{"index": i, "ref": r, "score": 0.0, "signals": {}}
+                  for i, r in enumerate(refs)]
     ordered = [item["ref"] for item in scored]
     return {
         "refs": ordered,

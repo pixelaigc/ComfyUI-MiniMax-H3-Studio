@@ -652,12 +652,16 @@ class TestQwenFrontend(unittest.TestCase):
             "() => document.querySelector('.nav-item[data-mode=\"i2i_qwen\"]').click()")
         self.page.wait_for_timeout(1200)
         self.assertEqual(self.page.evaluate("() => state.mode"), "i2i_qwen")
+        # 参考图状态搬到 web/qwen-refs.js（window.QwenRefs）——
+        # 参考图强制来自素材库，state.imgQwen.refs 已移除。
         s = self.page.evaluate("""() => ({
           refVisible: getComputedStyle(document.querySelector('#imgRefField')).display !== 'none',
           peVisible: getComputedStyle(document.querySelector('#imgPeField')).display !== 'none',
           hint: document.querySelector('#imgRefHint').textContent,
           note: document.querySelector('#imgRefNote').textContent,
-          max: state.imgQwen.refs.length,
+          max: window.QwenRefs ? window.QwenRefs.getRefs().length : -1,
+          addBtn: document.querySelector('#imgRefAdd').textContent,
+          hasFileInput: !!document.querySelector('#imgRefInput'),
         })""")
         self.assertTrue(s["refVisible"], "图片编辑应显示参考图区")
         self.assertTrue(s["peVisible"])
@@ -666,6 +670,11 @@ class TestQwenFrontend(unittest.TestCase):
         max_ref = self.recommended_max_ref_images()
         self.assertIn(str(max_ref), s["hint"])
         self.assertIn("最多", s["note"])
+        # 参考图**必须来自素材库** -> 入口是「从素材库添加」，没有本地上传通道
+        self.assertIn("素材库", s["addBtn"])
+        self.assertFalse(s["hasFileInput"],
+                         "图片编辑不该再有本地参考图上传通道（参考图强制来自素材库）")
+        self.assertEqual(s["max"], 0)
 
     def test_zimage_mode_unchanged(self):
         """切回 Z-IMAGE：参数仍是它自己的推荐值（SHIFT 3 / min=1）。"""

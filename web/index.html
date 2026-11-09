@@ -208,9 +208,17 @@
       <div class="field" id="imgRefField" style="display:none">
         <div class="field-label">参考图 <span class="muted" id="imgRefHint">最多 10 张</span></div>
         <div class="img-ref-list" id="imgRefList"></div>
-        <input type="file" id="imgRefInput" accept="image/*" multiple hidden>
-        <button type="button" class="img-ref-add" id="imgRefAdd">+ 添加参考图</button>
+        <div class="img-ref-actions">
+          <button type="button" class="img-ref-add" id="imgRefAdd">+ 从素材库添加</button>
+          <button type="button" class="img-ref-sort" id="imgRefSort" disabled
+                  title="按与提示词的匹配度、标签相关度、入库时间给出建议顺序">智能排序</button>
+        </div>
         <div class="img-note" id="imgRefNote"></div>
+        <details class="img-ref-detail" id="imgRefDetail" hidden>
+          <summary>占位标记与描述（可编辑）</summary>
+          <div class="img-note" id="imgRefMarkerNote"></div>
+          <div id="imgRefDescList" class="img-ref-desc-list"></div>
+        </details>
       </div>
       <div class="field" id="imgLoraField">
         <div class="field-label">LoRA <span class="muted" id="imgLoraHint">本机已安装</span></div>
@@ -650,6 +658,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<script src="/static/qwen-refs.js?v=refs1"></script>
 <script src="/static/app.js?v=qwen21-1"></script>
 <script src="/static/providers.js?v=qwen21-1"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

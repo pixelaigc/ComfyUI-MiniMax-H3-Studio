@@ -96,9 +96,8 @@ const state = {
     // 官方 PE 提示词扩写（默认开 —— 官方最佳实践）
     usePe: true,
     loras: [],
-    // 参考图（图片编辑用，最多 10 张 —— 模型官方能力上限）：
-    // [{file, name, url}]
-    refs: [],
+    // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
+    // 参考图强制来自素材库，状态由那个模块自己管。
   },
   // 图像模式（Z-Image 文生图）专属状态
   img: {
@@ -1127,96 +1126,32 @@ $("#imgUsePe").addEventListener("change", e => {
   updateQwenPeNote();
 });
 
-// ---------- Qwen-Image 2.1：参考图（最多 10 张 —— 模型官方能力上限） ----------
+// ---------- Qwen-Image 2.1：参考图（素材库来源，最多 10 张） ----------
+//
+// 参考图的完整逻辑搬到 web/qwen-refs.js（window.QwenRefs）——
+// 理由：app.js 正被并发任务修改（移动端适配 / LoRA 面板），
+// 参考图这块改动集中在一个文件里，冲突面最小。
+//
+// 关键语义变化（相对上一版）：
+//   * 参考图**只能**来自素材库 —— 本地上传通道已移除；
+//   * 占位标记是官方的 <imageN>（不是中文「<参考图N>」）：
+//     官方 PE-I2I system prompt 要求多图必须用 <image1>/<image2>，
+//     单图不要用标签；ComfyUI 的 qwen_image21.py 也用 "<image{n}>" 前缀。
+//   * 顺序即语义：第 N 张 <-> <imageN> <-> ComfyUI 的 image_N 插槽。
 function qwenRefLimit() {
   return QWEN_OPTIONS.maxRefImages || 10;
 }
 
 function renderQwenRefs() {
-  const box = $("#imgRefList");
-  if (!box) return;
-  const refs = state.imgQwen.refs;
-  const max = qwenRefLimit();
-  // 每张缩略图带序号（<imageN> 语义）：官方 PE 按顺序引用参考图，
-  // 顺序即语义 —— 用户必须能看到并调整顺序。
-  box.innerHTML = refs.map((r, i) => `
-    <div class="img-ref-item" data-idx="${i}" draggable="true" title="${esc(r.name || "")} — 拖动可排序（序号即 &lt;image${i + 1}&gt; 引用顺序）">
-      <img src="${r.url}" alt="参考图 ${i + 1}">
-      <span class="img-ref-idx">${i + 1}</span>
-      <button type="button" class="img-ref-del" data-del="${i}" title="移除">×</button>
-    </div>`).join("");
-  box.querySelectorAll("[data-del]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.dataset.del);
-      const r = state.imgQwen.refs[idx];
-      if (r && r.url && r.url.startsWith("blob:")) URL.revokeObjectURL(r.url);
-      state.imgQwen.refs.splice(idx, 1);
-      renderQwenRefs();
-    });
-  });
-  // 拖动排序：图序即语义（官方 PE 按 <imageN> 引用）
-  box.querySelectorAll(".img-ref-item").forEach(item => {
-    item.addEventListener("dragstart", e => {
-      item.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", item.dataset.idx);
-    });
-    item.addEventListener("dragend", () => {
-      item.classList.remove("dragging");
-      box.querySelectorAll(".img-ref-item").forEach(x => x.classList.remove("drag-over"));
-    });
-    item.addEventListener("dragover", e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      item.classList.add("drag-over");
-    });
-    item.addEventListener("dragleave", () => item.classList.remove("drag-over"));
-    item.addEventListener("drop", e => {
-      e.preventDefault();
-      item.classList.remove("drag-over");
-      const from = Number(e.dataTransfer.getData("text/plain"));
-      const to = Number(item.dataset.idx);
-      if (Number.isNaN(from) || from === to) return;
-      const list = state.imgQwen.refs;
-      const moved = list.splice(from, 1)[0];
-      list.splice(to, 0, moved);
-      renderQwenRefs();
-    });
-  });
-  $("#imgRefHint").textContent = refs.length
-    ? `${refs.length} / ${max} 张`
-    : `最多 ${max} 张`;
-  const note = $("#imgRefNote");
-  const slots = QWEN_OPTIONS.nodeRefSlots || 16;
-  if (refs.length >= max) {
-    note.textContent = `已达上限 ${max} 张（模型官方能力上限 10 张；`
-      + `ComfyUI 节点侧有 ${slots} 个 image 插槽，本面板取两者较小值 ${max}）。`;
-  } else if (refs.length) {
-    note.textContent = `还可以再加 ${max - refs.length} 张（上限 ${max} 张，模型官方能力 10 张）。`;
-  } else {
-    note.textContent = `至少 1 张、最多 ${max} 张（模型官方能力上限 10 张）。`
-      + `多图可做换头/换装/融合等编辑；图序即语义，顺序变了引用会错位。`;
-  }
-  $("#imgRefAdd").disabled = refs.length >= max;
+  if (window.QwenRefs) window.QwenRefs.render();
 }
 
-$("#imgRefAdd").addEventListener("click", () => $("#imgRefInput").click());
-$("#imgRefInput").addEventListener("change", e => {
-  const files = Array.from(e.target.files || []);
-  const max = qwenRefLimit();
-  const cur = state.imgQwen.refs;
-  let added = 0;
-  let overflow = 0;
-  for (const file of files) {
-    if (cur.length >= max) { overflow++; continue; }
-    cur.push({file, name: file.name, url: URL.createObjectURL(file)});
-    added++;
-  }
-  e.target.value = "";
-  renderQwenRefs();
-  if (overflow) {
-    alert(`参考图最多 ${max} 张，超出的 ${overflow} 张未添加。`);
-  }
+$("#imgRefAdd")?.addEventListener("click", () => {
+  if (window.QwenRefs) window.QwenRefs.openLibraryPicker();
+});
+
+$("#imgRefSort")?.addEventListener("click", () => {
+  if (window.QwenRefs) window.QwenRefs.smartSort($("#prompt")?.value || "");
 });
 
 // 官方 PE 有两个独立 checkpoint，**不可互换**：
@@ -1660,6 +1595,28 @@ $("#genBtn").addEventListener("click", async () => {
       params.use_pe = !!state.imgQwen.usePe;
     }
   }
+  // 图片编辑的参考图：**必须来自素材库**。
+  // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
+  // 服务端据此把素材库文件上传到 ComfyUI，并按 <imageN> 顺序接线。
+  if (mode === "i2i_qwen") {
+    const max = QWEN_OPTIONS.maxRefImages || 10;
+    const refList = window.QwenRefs ? window.QwenRefs.getRefs() : [];
+    if (!refList.length) {
+      alert("图片编辑的参考图必须来自素材库：请点「从素材库添加」选择至少 1 张。");
+      return;
+    }
+    if (refList.length > max) {
+      alert(`参考图最多 ${max} 张，当前 ${refList.length} 张。`);
+      return;
+    }
+    // 提交前一致性校验：占位标记 <imageN> 与参考图数量必须匹配
+    const problems = window.QwenRefs.validate($("#prompt")?.value || "");
+    if (problems) {
+      alert("参考图校验未通过：\n\n" + problems.map(x => "· " + x).join("\n"));
+      return;
+    }
+    params.ref_images = window.QwenRefs.toPayload();
+  }
   fd.append("params", JSON.stringify(params));
   try {
     // 素材库引用：槽位 -> asset_id，随任务一起提交（服务端按槽位上传到 ComfyUI）
@@ -1687,19 +1644,6 @@ $("#genBtn").addEventListener("click", async () => {
       const refs = [state.files.ref0, state.files.ref1, state.files.ref2].filter(Boolean);
       const assetCount = Object.keys(state.assetRefs || {}).filter(k => k.startsWith("ref")).length;
       if (!refs.length && !assetCount) { alert("参考模式至少需要 1 张参考图"); return; }
-      refs.forEach(f => fd.append("file_ref", f));
-    } else if (mode === "i2i_qwen") {
-      // Qwen 图片编辑：参考图 1-9 张（上限由服务端再校验一次）
-      const max = QWEN_OPTIONS.maxRefImages || 9;
-      const refs = state.imgQwen.refs.map(r => r.file).filter(Boolean);
-      if (!refs.length) {
-        alert(`图片编辑至少需要 1 张参考图（最多 ${max} 张）`);
-        return;
-      }
-      if (refs.length > max) {
-        alert(`参考图最多 ${max} 张，当前 ${refs.length} 张。`);
-        return;
-      }
       refs.forEach(f => fd.append("file_ref", f));
     }
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
