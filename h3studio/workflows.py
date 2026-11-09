@@ -17,6 +17,7 @@ import random
 from . import loras as lora_registry
 from . import lora_damping
 from . import enhancer
+from . import music_yue2
 
 # ------------------------------------------------------------------
 # 模型清单（与 d:\cfup\ComfyUI\models 实际文件一致）
@@ -2192,7 +2193,9 @@ def build_moss_t2i(params):
 
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i,
              "t2i_qwen": build_qwen_t2i, "i2i_qwen": build_qwen_i2i,
-             "t2i_moss": build_moss_t2i}
+             "t2i_moss": build_moss_t2i,
+             # 音乐（YuE2）：文生音乐 / 参考生音乐
+             "t2a": music_yue2.build_t2a, "a2a": music_yue2.build_a2a}
 
 
 def build_workflow(mode, params):

@@ -83,6 +83,7 @@ from h3studio import assets as asset_store
 from h3studio import asset_api
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
+from h3studio import music_yue2
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -154,8 +155,10 @@ OUT_DIR = DATA / "outputs"
 UPLOAD_DIR = DATA / "uploads"
 VIDEO_DIR = OUT_DIR / "videos"
 IMAGE_DIR = OUT_DIR / "images"
+# 音乐（YuE2）产物目录 —— 与视频/图片同级，产物统一走 /files/ 路由
+AUDIO_DIR = OUT_DIR / "audio"
 DB_PATH = DATA / "jobs.db"
-for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR):
+for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # ------------------------------------------------------------------ DB
@@ -316,7 +319,10 @@ def _extract_outputs(history_entry):
     """从 history 条目提取输出文件列表 [{kind,filename,subfolder}]"""
     outs = []
     for node_out in (history_entry.get("outputs") or {}).values():
-        for key, kind in (("videos", "video"), ("gifs", "video"), ("images", "image")):
+        # ComfyUI 的 SaveAudioAdvanced 通过 SavedAudios.as_dict() 挂在
+        # **"audio"** 键下（comfy_api/latest/_ui.py:56-61）—— 不是 "images"。
+        for key, kind in (("videos", "video"), ("gifs", "video"),
+                          ("images", "image"), ("audio", "audio")):
             val = node_out.get(key)
             items = val if isinstance(val, list) else ([val] if val else [])
             for item in items:
@@ -327,6 +333,9 @@ def _extract_outputs(history_entry):
                         kind = "video"
                     elif fname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                         kind = "image"
+                    elif fname.lower().endswith((".flac", ".mp3", ".opus", ".wav",
+                                               ".m4a", ".ogg", ".aac")):
+                        kind = "audio"
                     outs.append({"kind": kind, "filename": fname,
                                  "subfolder": item.get("subfolder", ""),
                                  "type": item.get("type", "output")})
@@ -337,6 +346,8 @@ def _next_output_path(kind: str, suffix: str) -> Path:
     """为新输出分配稳定、易检索的顺序文件名。"""
     if kind == "image":
         dest_dir, prefix = IMAGE_DIR, "i-zimage-"
+    elif kind == "audio":
+        dest_dir, prefix = AUDIO_DIR, "a-yue2-"
     elif kind == "longfilm":
         dest_dir, prefix = VIDEO_DIR, "v-l-"
     else:
@@ -666,6 +677,15 @@ class Worker:
                 if params.get("asset_refs") and mode != "i2i_qwen":
                     await _apply_asset_refs(session, job_id, params)
 
+                # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
+                # 里落进 params["ref_audios"]。这里取第一段，转成
+                # SheetSage2AudioToABC 需要的 LoadAudio 输入名。
+                if mode == "a2a":
+                    audios = params.get("ref_audios") or []
+                    if not audios:
+                        raise RuntimeError("参考生音乐缺少参考音频")
+                    params["ref_audio"] = audios[0]
+
                 params["job_id"] = job_id
                 params["mode"] = mode
                 workflow = build_workflow(mode, params)
@@ -904,7 +924,8 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                    "t2a", "a2a"):
         return web.json_response({"error": f"未知模式 {mode}"}, status=400)
 
     if mode == "flf":
@@ -962,6 +983,20 @@ async def api_create(request):
         # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
         params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
         params["ref_images"] = refs
+
+    # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
+    if mode == "a2a":
+        audio_refs = [r for r in (asset_refs or [])
+                      if isinstance(r, dict) and r.get("slot") == "ref_audio"]
+        if not audio_refs:
+            return web.json_response(
+                {"error": "参考生音乐需要选择一段参考音频（从素材库选择）。",
+                 "code": "ref_audio_required"}, status=400)
+        if len(audio_refs) > 1:
+            return web.json_response(
+                {"error": f"参考生音乐只能选 1 段参考音频，当前 {len(audio_refs)} 段。",
+                 "code": "ref_audio_too_many"}, status=400)
+        asset_refs = audio_refs
 
     prompt = (params.get("prompt") or "").strip()
     if not prompt:
@@ -1425,6 +1460,15 @@ _Z_IMAGE_TIER_LABELS = {
     "2k": "2K",
     "4k": "4K",
 }
+
+
+async def api_music_options(request):
+    """GET /api/music-options —— 音乐面板可选项（模型/采样参数/本机可用性）
+
+    模型清单来自 h3studio/music_yue2，权重是否在本机由该模块实测磁盘给出 ——
+    前端据此把不可用的版本标灰并禁用，而不是等提交后才报错。
+    """
+    return json_ok(music_yue2.model_options())
 
 
 async def api_image_options(request):
@@ -2483,7 +2527,11 @@ async def api_llm_proxy_chat(request):
 
 # ------------------------------------------------------------------ static
 MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
-               ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+               ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+               # 音频（音乐生成产物）—— 补上后浏览器 <audio> 能正常播放
+               ".flac": "audio/flac", ".mp3": "audio/mpeg", ".opus": "audio/opus",
+               ".wav": "audio/wav", ".m4a": "audio/mp4", ".ogg": "audio/ogg",
+               ".aac": "audio/aac"}
 
 
 async def files_handler(request):
@@ -2491,7 +2539,12 @@ async def files_handler(request):
     full = (OUT_DIR / path).resolve()
     if not str(full).startswith(str(OUT_DIR.resolve())) or not full.is_file():
         raise web.HTTPNotFound()
-    return web.FileResponse(full, headers={"Cache-Control": "no-cache"})
+    # 显式给 Content-Type —— 音频产物没有它的话浏览器会当成下载而不是播放
+    mime = MEDIA_TYPES.get(full.suffix.lower())
+    headers = {"Cache-Control": "no-cache"}
+    if mime:
+        headers["Content-Type"] = mime
+    return web.FileResponse(full, headers=headers)
 
 
 async def index_handler(request):
@@ -2518,6 +2571,7 @@ def make_app():
     app.router.add_post("/api/gpu/power-limit", api_gpu_power_limit)
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
+    app.router.add_get("/api/music-options", api_music_options)
     app.router.add_get("/api/generation-types", api_generation_types)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)
