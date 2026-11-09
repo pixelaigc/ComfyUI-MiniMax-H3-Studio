@@ -244,6 +244,40 @@ class TestMihoyoStrengthDiscipline(unittest.TestCase):
                                  f"{key} 的推荐强度超出滑块量程")
 
 
+class TestMihoyoCopyrightLabelling(unittest.TestCase):
+    """版权敏感：每条都必须标明 IP 归属 —— 不得让用户误以为是官方 IP 权重。"""
+
+    def test_every_entry_states_ip_ownership(self):
+        """每条要么标「复刻米哈游 IP」要么标「非米哈游 IP（邻接替代）」。
+
+        漏标 = 用户可能把「国风仙侠画风」当成米哈游官方授权权重。
+        """
+        missing = []
+        for key, info in catalog.ALL_MIHOYO_EFFECTS.items():
+            scene = info.get("scene") or ""
+            if "复刻米哈游 IP" not in scene and "非米哈游 IP" not in scene:
+                missing.append(key)
+        self.assertFalse(missing,
+                         f"以下条目没标明 IP 归属：{missing[:5]}")
+
+    def test_mihoyo_ip_entries_state_license_is_not_upstream_rights(self):
+        """复刻米哈游 IP 的条目必须说明「权重许可 ≠ 原作授权」。"""
+        for key, info in catalog.ALL_MIHOYO_EFFECTS.items():
+            if "复刻米哈游 IP" not in (info.get("scene") or ""):
+                continue
+            self.assertIn("原作", info["scene"],
+                          f"{key} 复刻米哈游 IP 却没说明原作授权归属")
+
+    def test_license_is_present_in_scene_or_source(self):
+        """许可信息必须可见（scene 或 source 至少有一处带着许可）。"""
+        for key, info in catalog.ALL_MIHOYO_EFFECTS.items():
+            blob = (info.get("scene") or "") + (info.get("source") or "")
+            self.assertTrue(
+                any(w in blob for w in ("许可", "License", "license",
+                                        "Apache", "apache", "Civitai")),
+                f"{key} 没有可追溯的许可信息")
+
+
 class TestMihoyoKindAndFamily(unittest.TestCase):
     """分类与族隔离。"""
 
