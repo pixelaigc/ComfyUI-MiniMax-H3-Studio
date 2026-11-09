@@ -82,6 +82,8 @@ from h3studio import gen_types
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import asset_api
+from h3studio import video_models
+from h3studio import video_workflow
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
@@ -988,6 +990,161 @@ def json_ok(payload=None, **kw):
     return web.json_response(payload)
 
 
+def normalize_t2v_params(params: dict) -> tuple[dict, str]:
+    """文生视频面板参数的**服务端归一**（唯一入口）。
+
+    返回 (归一后的 params, 错误信息)。错误信息为空表示通过。
+
+    归一的每一项都对应一条真实的本机约束：
+      * 宽高 -> 32 的倍数（H3 节点 schema step=32 / CANVAS_MULTIPLE=32）
+      * 模型 -> 必须是 video_models.VIDEO_MODELS 里登记的 key，且文件在本机
+      * 加速 LoRA -> 逐个查文件是否存在 + 与底模的层结构是否对得上
+      * 注意力 -> 必须是本机 ComfyUI 里真有的节点
+      * 二采 -> SelfLift 的硬约束（Euler / transition_step 范围 / rho 与 upscaler 组合）
+    """
+    out = dict(params)
+
+    # ---- 宽高 ----
+    width, height, reasons = video_models.normalize_video_size(
+        params.get("width"), params.get("height"))
+    if width <= 0 or height <= 0:
+        return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
+    out["width"] = width
+    out["height"] = height
+    if reasons:
+        out["size_adjust_reasons"] = reasons
+
+    # ---- 时长（H3 训练区间约 124~362 帧 = 5~15 秒）----
+    try:
+        duration = float(params.get("duration") or 5)
+    except (TypeError, ValueError):
+        duration = 5.0
+    duration = max(2.0, min(15.0, duration))
+    out["duration"] = duration
+
+    # ---- 底模 ----
+    model_key = params.get("model_key") or video_models.VIDEO_DEFAULT_MODEL
+    model = video_models.VIDEO_MODELS.get(model_key)
+    if model is None:
+        return out, f"未知的视频模型 {model_key}"
+    if not video_models.model_available(model_key):
+        return out, (f"本机找不到底模权重 {model['unet']}"
+                     f"（{model.get('location') or '未知目录'}）—— 盘未挂载或文件已删。")
+    out["model_key"] = model_key
+
+    # ---- 固定加速 LoRA ----
+    fixed_key = params.get("fixed_accel_lora") or video_models.VIDEO_FIXED_ACCEL_LORA_DEFAULT
+    fixed = video_models.VIDEO_ACCEL_LORAS.get(fixed_key)
+    if fixed is None:
+        return out, f"未知的固定加速 LoRA {fixed_key}"
+    if not video_models.lora_available(fixed["name"]):
+        return out, f"本机找不到固定加速 LoRA {fixed['name']}"
+    out["fixed_accel_lora"] = fixed_key
+
+    # ---- 可勾选的加速 LoRA 组合 ----
+    combos = []
+    for item in params.get("accel_loras") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("enabled") is False:
+            continue
+        key = item.get("key") or ""
+        meta = video_models.VIDEO_ACCEL_LORA_COMBOS.get(key)
+        if meta is None:
+            return out, f"未知的加速 LoRA 组合 {key}"
+        if not video_models.lora_available(meta["name"]):
+            return out, f"本机找不到加速 LoRA {meta['name']}"
+        check = video_models.check_h3_lora_compat(meta["name"], model["unet"])
+        if not check["compatible"]:
+            return out, (f"「{meta['display']}」与当前底模不兼容："
+                         f"{check['reason']}")
+        try:
+            strength = float(item.get("strength", meta.get("recommended_strength", 1.0)))
+        except (TypeError, ValueError):
+            strength = float(meta.get("recommended_strength", 1.0))
+        if strength <= 0:
+            continue
+        combos.append({"key": key, "strength": strength, "enabled": True})
+    out["accel_loras"] = combos
+
+    # ---- 注意力机制 ----
+    attention = params.get("attention") or video_models.VIDEO_DEFAULT_ATTENTION
+    mode_meta = video_models.VIDEO_ATTENTION_MODES.get(attention)
+    if mode_meta is None:
+        return out, f"未知的注意力机制 {attention}"
+    node = mode_meta.get("node")
+    if node and node not in _COMFY_NODE_NAMES:
+        return out, (f"本机 ComfyUI 里没有节点 {node}"
+                     f"（{mode_meta['label']}）—— 无法使用该注意力机制。")
+    out["attention"] = attention
+
+    # ---- 二采 ----
+    twopass = params.get("twopass") or {}
+    if not isinstance(twopass, dict):
+        twopass = {}
+    enabled = bool(twopass.get("enabled"))
+    if enabled:
+        if "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES:
+            return out, ("本机 ComfyUI 里没有 SelfLiftH3Sampler 节点 —— 无法开启二采。")
+        try:
+            steps = int(params.get("steps") or 4)
+        except (TypeError, ValueError):
+            steps = 4
+        max_transition = max(1, steps - 1)
+        transition = int(twopass.get("transition_step")
+                         or video_models.VIDEO_TWOPASS["transition_step_default"])
+        if transition < 1 or transition > max_transition:
+            transition = max(1, min(transition, max_transition))
+        lowres = float(twopass.get("lowres_scale")
+                       or video_models.VIDEO_TWOPASS["lowres_scale_default"])
+        lowres = max(0.25, min(1.0, lowres))
+        rho = float(twopass.get("rho", video_models.VIDEO_TWOPASS["rho_default"]))
+        upscaler = twopass.get("upscaler_model") \
+            or video_models.VIDEO_TWOPASS["upscaler_default"]
+        if rho <= 0 and upscaler == "none":
+            # SelfLift 节点会直接 raise：两条路都关掉了
+            rho = 0.6
+        w_min = float(twopass.get("w_min", video_models.VIDEO_TWOPASS["w_min_default"]))
+        w_max = float(twopass.get("w_max", video_models.VIDEO_TWOPASS["w_max_default"]))
+        if w_min > w_max:
+            w_min, w_max = w_max, w_min
+        out["twopass"] = {
+            "enabled": True,
+            "transition_step": transition,
+            "lowres_scale": lowres,
+            "rho": rho,
+            "w_min": w_min,
+            "w_max": w_max,
+            "upscaler_model": upscaler,
+        }
+    else:
+        out["twopass"] = {"enabled": False}
+
+    # ---- 步数 / 采样参数 ----
+    try:
+        steps = int(params.get("steps") or model.get("steps", 4))
+    except (TypeError, ValueError):
+        steps = int(model.get("steps", 4))
+    out["steps"] = max(1, min(100, steps))
+    out["sampler"] = params.get("sampler") or model.get("sampler", "euler")
+    out["scheduler"] = params.get("scheduler") or model.get("scheduler", "beta")
+    try:
+        out["cfg"] = float(params.get("cfg", model.get("cfg", 1.0)))
+    except (TypeError, ValueError):
+        out["cfg"] = float(model.get("cfg", 1.0))
+
+    # 种子：留空则随机（worker 里再兜一次）
+    if params.get("seed") not in (None, ""):
+        try:
+            out["seed"] = int(params["seed"])
+        except (TypeError, ValueError):
+            out["seed"] = None
+    else:
+        out["seed"] = None
+
+    return out, ""
+
+
 async def api_create(request):
     """POST /api/jobs  (multipart: mode, params(JSON), files[])"""
     reader = await request.multipart()
@@ -1092,6 +1249,14 @@ async def api_create(request):
     prompt = (params.get("prompt") or "").strip()
     if not prompt:
         return web.json_response({"error": "提示词不能为空"}, status=400)
+
+    # 文生视频新面板：服务端校验并归一全部参数。
+    # 这一段是**唯一**的参数入口 —— 前端传什么都不认，只认这里算出来的值。
+    if mode == "t2v":
+        normalized, error = normalize_t2v_params(params)
+        if error:
+            return web.json_response({"error": error}, status=400)
+        params = normalized
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -1409,6 +1574,70 @@ async def api_delete(request):
     return json_ok({"deleted": jid})
 
 
+# ------------------------------------------------------------------ ComfyUI 节点名探测
+#
+# 文生视频面板的「注意力机制」「二采」都是 ComfyUI 侧的节点。
+# 用户能选哪些，取决于**本机 ComfyUI 里真有没有那个节点** ——
+# 所以要按需问 ComfyUI，拿到节点名缓存下来。
+#
+# 【为什么按单个节点问，而不是拉整个 /object_info】
+#   全量 /object_info 本机实测 26.9 MB / 4.9 秒（7027 个节点）。
+#   而 ComfyUI 支持按节点名问：`/object_info/<ClassName>` —— 实测 1.2 KB / 1 ms。
+#   面板只关心 6 个节点，按名单问就是 6 次 1 ms。
+_COMFY_NODE_NAMES: set[str] = set()
+_COMFY_NODES_TS = 0.0
+
+# 面板关心的节点名（video_models.VIDEO_ATTENTION_MODES 里用到的 +
+# SelfLift 二采）。加新注意力机制时同步加到这里。
+_VIDEO_PANEL_NODES = [
+    "ModelAttentionBackend",
+    "MiniMaxH3MemoryEfficientSageAttentionPatch",
+    "MiniMaxH3MemoryEfficientSolAttentionPatch",
+    "MiniMaxH3ScheduledSolAttentionPatch",
+    "H3SparseAttention",
+    "SelfLiftH3Sampler",
+]
+
+
+async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str]:
+    """确认面板关心的那些节点在本机 ComfyUI 里是否存在。
+
+    按单个节点问（实测 1 ms/个），不用拉 27 MB 的全量 /object_info。
+    """
+    global _COMFY_NODE_NAMES, _COMFY_NODES_TS
+    now = time.time()
+    if not force and _COMFY_NODE_NAMES and now - _COMFY_NODES_TS < 60:
+        return _COMFY_NODE_NAMES
+    found: set[str] = set()
+    try:
+        if session is None:
+            async with ClientSession(timeout=ClientTimeout(total=10)) as s:
+                for name in _VIDEO_PANEL_NODES:
+                    try:
+                        async with s.get(f"{COMFY}/object_info/{name}") as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                if isinstance(data, dict) and name in data:
+                                    found.add(name)
+                    except Exception:
+                        continue
+        else:
+            for name in _VIDEO_PANEL_NODES:
+                try:
+                    async with session.get(f"{COMFY}/object_info/{name}") as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if isinstance(data, dict) and name in data:
+                                found.add(name)
+                except Exception:
+                    continue
+        _COMFY_NODE_NAMES = found
+        _COMFY_NODES_TS = now
+    except Exception:
+        pass
+    return _COMFY_NODE_NAMES
+
+
 async def fetch_comfy_queue(session):
     """读 ComfyUI 的真实队列：{running: n, pending: n}。
 
@@ -1711,6 +1940,90 @@ async def api_image_options(request):
             # 官方推荐的负面提示词（前端作为默认值预填）
             "default_negative": MOSS_IMAGE_DEFAULT_NEGATIVE,
         },
+    })
+
+
+async def api_video_options(request):
+    """GET /api/video-options —— 文生视频面板的可选项清单
+
+    清单全部来自服务端实测（h3studio/video_models.py）：
+      * 可用底模（文件真在本机）
+      * 固定加速 LoRA（工作流硬性必需，不进可勾选列表）
+      * 可勾选的加速 LoRA 组合（每项带用途与推荐强度）
+      * 注意力机制（只列本机 ComfyUI 里真有的节点）
+      * 二采（SelfLift）参数与硬约束
+      * 宽高吸附规则（倍数 / 上下限）
+    """
+    # 本机 ComfyUI 里真有哪些节点 —— 决定「注意力机制」「二采」能不能选
+    await refresh_comfy_node_names()
+
+    def node_available(class_type: str) -> bool:
+        return class_type in _COMFY_NODE_NAMES
+
+    payload = video_models.options_payload(node_available=node_available)
+    # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
+    # 前端据此把对不上的组合置灰并显示原因。
+    model_key = request.query.get("model") or payload["default_model"]
+    model = video_models.VIDEO_MODELS.get(model_key)
+    payload["selected_model"] = model_key
+    if model:
+        combos = []
+        for item in payload["accel_lora_combos"]:
+            entry = dict(item)
+            check = video_models.check_h3_lora_compat(item["name"], model["unet"])
+            entry["compatible"] = check["compatible"]
+            entry["compat_reason"] = check["reason"]
+            entry["compat_matched"] = check["matched"]
+            entry["compat_runtime_injected"] = check["runtime_injected"]
+            entry["compat_total"] = check["total"]
+            combos.append(entry)
+        payload["accel_lora_combos"] = combos
+    return json_ok(payload)
+
+
+async def api_video_config(request):
+    """GET /api/video-config —— 读回文生视频面板保存的配置（局域网共用）
+
+    PUT /api/video-config —— 保存文生视频面板配置
+    """
+    key = "video_panel_config"
+    if request.method == "GET":
+        with db() as conn:
+            row = conn.execute("SELECT value FROM model_provider_prefs WHERE key=?",
+                              (key,)).fetchone()
+        payload = {}
+        if row and row["value"]:
+            try:
+                payload = json.loads(row["value"] or "{}")
+            except Exception:
+                payload = {}
+        return json_ok(payload)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "配置必须是对象"}, status=400)
+    with db() as conn:
+        prov.set_pref(conn, key, json.dumps(body, ensure_ascii=False))
+    return json_ok({"ok": True, "config": body})
+
+
+async def api_video_size(request):
+    """GET /api/video-size?width=&height= —— 宽高吸附（服务端权威）
+
+    返回生效宽高 + 调整原因，前端原样显示「输入值 → 实际使用值」。
+    """
+    try:
+        width = request.query.get("width")
+        height = request.query.get("height")
+        w, h, reasons = video_models.normalize_video_size(width, height)
+    except Exception as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+    return json_ok({
+        "width": w, "height": h, "reasons": reasons,
+        "input_width": width, "input_height": height,
     })
 
 
@@ -2766,6 +3079,11 @@ def make_app():
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
     app.router.add_get("/api/music-options", api_music_options)
+    # 文生视频面板（模型 / 加速 LoRA / 注意力 / 二采 / 宽高吸附）
+    app.router.add_get("/api/video-options", api_video_options)
+    app.router.add_get("/api/video-size", api_video_size)
+    app.router.add_get("/api/video-config", api_video_config)
+    app.router.add_put("/api/video-config", api_video_config)
     app.router.add_get("/api/generation-types", api_generation_types)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)

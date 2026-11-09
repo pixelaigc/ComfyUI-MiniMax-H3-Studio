@@ -105,6 +105,80 @@
   <!-- 参数面板（窄屏从底部抽屉弹出，见 responsive.css） -->
   <div class="panel-mask" id="panelMask"></div>
   <aside class="panel" id="panel">
+    <!-- 文生视频面板（2026-11-10 改造）：宽高直填 + 模型/加速LoRA/注意力/二采 -->
+    <div id="videoPanel" style="display:none">
+      <div class="stale-backend-banner" id="staleVideoBanner" hidden></div>
+
+      <div class="field">
+        <div class="field-label">输出尺寸 <span class="muted" id="vidSizeHint">—</span>
+          <span class="img-tag" id="vidSizeMode" hidden>自定义</span></div>
+        <div class="img-size-row">
+          <input type="number" id="vidWidth" min="32" step="32" title="宽度（像素，必须是 32 的倍数）">
+          <span class="img-x">×</span>
+          <input type="number" id="vidHeight" min="32" step="32" title="高度（像素，必须是 32 的倍数）">
+          <button type="button" class="img-reset" id="vidSizeReset" title="恢复为按比例自动计算的尺寸">自动</button>
+        </div>
+        <div class="img-note" id="vidSizeNote"></div>
+        <div class="img-note img-size-adjust" id="vidSizeAdjust" hidden></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">画面比例 <span class="muted">用于自动算尺寸</span></div>
+        <div class="chips" id="vidAspectChips"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span id="vidModelLabel">MiniMax-H3 模型</span> <span class="muted">本机已安装</span></div>
+        <select class="img-select" id="vidModelSelect"></select>
+        <div class="img-note" id="vidModelNote"></div>
+        <div class="img-warn" id="vidModelWarn"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">加速 LoRA 组合 <span class="muted">可多选</span></div>
+        <div id="vidAccelLoraList" class="img-lora-list"></div>
+        <div class="img-note" id="vidAccelLoraNote"></div>
+        <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">注意力机制 <span class="muted">生成加速</span></div>
+        <select class="img-select" id="vidAttentionSelect"></select>
+        <div class="img-note" id="vidAttentionNote"></div>
+      </div>
+
+      <div class="field" id="vidTwopassField">
+        <label class="img-toggle">
+          <input type="checkbox" id="vidTwopassEnabled">
+          <span>开启二采</span>
+          <span class="muted" id="vidTwopassHint">低分辨率一采 + 高分辨率二采</span>
+        </label>
+        <div id="vidTwopassBody" hidden>
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>一采步数</span><b id="vidTransitionVal">3</b></div>
+              <input type="range" id="vidTransition" min="1" max="6" step="1" value="3">
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>一采分辨率</span><b id="vidLowresVal">0.50</b></div>
+              <input type="range" id="vidLowres" min="0.25" max="1" step="0.05" value="0.5">
+            </div>
+          </div>
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>修正比例 ρ</span><b id="vidRhoVal">0.00</b></div>
+              <input type="range" id="vidRho" min="0" max="1" step="0.05" value="0">
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>潜空间放大器</span><small id="vidUpscalerHint">—</small></div>
+              <select class="img-select" id="vidUpscalerSelect"></select>
+            </div>
+          </div>
+          <div class="img-note" id="vidTwopassNote"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="field" id="resField">
       <div class="field-label">分辨率</div>
       <div class="seg" id="resSeg">
@@ -852,6 +926,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
+<!-- video-panel.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
+     window.VIDEO_PANEL 不存在时会跳过视频清单加载 -->
+<script src="/static/video-panel.js?v=videopanel1"></script>
 <script src="/static/app.js?v=enhancemulti1"></script>
 <script src="/static/providers.js?v=enhancemulti1"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

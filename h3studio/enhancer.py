@@ -171,6 +171,28 @@ TEMPLATE_SPECS = {
         "dimensions": ["主体", "环境", "运镜", "光线", "风格", "声音"],
         "source": "预留复用位（沿用同一套 Agent 边界）",
     },
+    # H3 官方「导演提示词」档：严格按 H3 的三段式结构
+    # (integrated_multimodal_description / overall_soundscape / non_diegetic_music)
+    # 输出。模板正文依据本机 ComfyUI 的官方 skill：
+    #   custom_nodes/comfyui-minimax-h3-prompt-enhancer-T8/official_skills/
+    #     h3-prompt-writing/references/base-en.txt
+    # 与上面那个 "video" 档的区别：那个是泛用扩写，这个是**按 H3 官方
+    # 视频提示词规范**写（镜头编号 / 切换时间 / 运镜三维度 / 说话人 ID /
+    # 画面文字双引号 / 三段式字段）。
+    "video-director": {
+        "id": "video-director",
+        "label": "视频导演提示词（MiniMax-H3 官方三段式）",
+        "media": "video",
+        "families": ["minimax_h3"],
+        "template": "video-director.txt",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["integrated_multimodal_description", "overall_soundscape",
+                        "non_diegetic_music", "镜头编号与切换", "运镜三维度",
+                        "说话人 ID 与台词", "画面文字"],
+        "source": "本机官方 skill h3-prompt-writing/references/base-en.txt（实测 2026-11-10）",
+    },
     "audio": {
         "id": "audio",
         "label": "音频提示词（BGM / 音效）",
@@ -215,6 +237,13 @@ MODEL_FAMILY = {
     # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
     "lora": "minimax_h3",
     "standard": "minimax_h3",
+    # 文生视频新面板的模型 key（video_models.VIDEO_MODELS）——
+    # 全部属于 H3 家族，所以增强模板的过滤结果不变。
+    "fl2va_pruned_int8": "minimax_h3",
+    "fl2va_int8": "minimax_h3",
+    "fl2va_pruned_w4a8": "minimax_h3",
+    "fl2va_bf16": "minimax_h3",
+    "hybrid_fl2va_ref2va": "minimax_h3",
 }
 
 # 模式 -> 默认模型 key（用于解上下文；前端会传实际选中的模型）
@@ -236,10 +265,11 @@ MODE_DEFAULT_SPEC = {
     "i2i_qwen": "qwen21-pe-i2i",
     # MOSS 用官方 Skill 的描述式扩写模板
     "t2i_moss": "moss-image",
-    "t2v": "video",
-    "flf": "video",
-    "r2v": "video",
-    "longfilm": "video",
+    # 文生视频默认走 H3 官方「导演提示词」档（video-director）
+    "t2v": "video-director",
+    "flf": "video-director",
+    "r2v": "video-director",
+    "longfilm": "video-director",
     "audio": "audio",
 }
 

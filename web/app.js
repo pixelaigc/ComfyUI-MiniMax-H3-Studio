@@ -420,6 +420,20 @@ function renderMode() {
   $("#imagePanel").style.display = isImageMode ? "" : "none";
   if (isImageMode) renderImagePanel();
 
+  // 文生视频（t2v）用自己的一套面板：宽高直填 + 模型 / 加速 LoRA 组合 /
+  // 注意力机制 / 二采。flf / r2v / longfilm 仍走旧面板（本次不改造）。
+  const isT2V = mode === "t2v";
+  const videoPanel = $("#videoPanel");
+  if (videoPanel) videoPanel.style.display = isT2V ? "" : "none";
+  if (isT2V) {
+    // 旧面板的控件全部让位（分辨率快捷档 / 比例 / 模型 / LoRA / 步数）
+    $("#resField").style.display = "none";
+    $("#aspectField").style.display = "none";
+    $("#modelField").style.display = "none";
+    $("#stepsField").style.display = "none";
+    if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
+  }
+
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
   const music = isMusicMode(mode);
   const musicPanel = $("#musicPanel");
@@ -1955,6 +1969,10 @@ $("#genBtn").addEventListener("click", async () => {
       params.slg_single_layers = state.imgMoss.slgSingle || "";
     }
   }
+  if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采
+    Object.assign(params, window.VIDEO_PANEL.submitParams());
+  }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
   // 服务端据此把素材库文件上传到 ComfyUI，并按 <imageN> 顺序接线。
@@ -2564,6 +2582,34 @@ function jobCard(job) {
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
+    if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
+      // 文生视频新面板：还原宽高 / 模型 / 加速 LoRA / 注意力 / 二采
+      window.VIDEO_PANEL.applyConfig({
+        model: p.model_key,
+        aspect: p.aspect || (window.VIDEO_PANEL ? window.VIDEO_PANEL.state.aspect : "16:9"),
+        width: p.width, height: p.height,
+        rawWidth: p.width, rawHeight: p.height,
+        custom: true,
+        fixed_accel_lora: p.fixed_accel_lora,
+        accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
+        attention: p.attention,
+        twopass: p.twopass,
+      });
+      window.VIDEO_PANEL.render();
+      if (p.duration) {
+        state.duration = p.duration;
+        $("#duration").value = p.duration;
+        $("#durVal").textContent = p.duration + "s";
+      }
+      if (p.steps) {
+        state.steps = p.steps;
+        $("#steps").value = p.steps;
+        $("#stepsVal").textContent = p.steps;
+      }
+      if (p.seed) $("#seed").value = p.seed;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (job.mode === "t2i_moss") {
       // MOSS-Image：还原档位 / 比例 / 实际宽高 / 采样参数 / SLG
       const s = state.imgMoss;
@@ -3878,6 +3924,12 @@ boot("默认模式", () => {
   else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
 });
 boot("图像参数清单", loadImageOptions);
+boot("视频参数清单", async () => {
+  if (!window.VIDEO_PANEL) return;
+  await window.VIDEO_PANEL.load();
+  window.VIDEO_PANEL.bind();
+  window.VIDEO_PANEL.render();
+});
 boot("音乐参数清单", async () => {
   if (!window.MusicUI) return;
   await window.MusicUI.loadOptions();
