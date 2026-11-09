@@ -38,6 +38,11 @@ GENERATION_TYPES: dict[str, dict] = {
             "category": "video"},
     "longfilm": {"label": "长片拼接", "media": "video", "group": "generation_type",
                  "category": "video"},
+    # 音乐（YuE2）：文生音乐 / 参考生音乐（cover）
+    "t2a": {"label": "文生音乐", "media": "audio", "group": "generation_type",
+            "category": "music"},
+    "a2a": {"label": "参考生音乐", "media": "audio", "group": "generation_type",
+            "category": "music"},
 }
 
 # 界面分类（左侧导航 / 面板分区）。键是 category，值是显示名。
@@ -46,6 +51,7 @@ GENERATION_CATEGORIES: dict[str, str] = {
     "t2i": "文生图",
     "i2i": "图片编辑",
     "video": "视频",
+    "music": "音乐",
 }
 
 # 兜底：mode 未登记时的归类（保证不出现空白 / 全部归到未知）

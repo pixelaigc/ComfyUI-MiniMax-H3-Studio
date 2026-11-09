@@ -351,6 +351,12 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-preview img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
 }
+/* 音频产物：不用铺满卡片，居中给个像样的播放器宽度 */
+.job-preview audio {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: calc(100% - 24px); max-width: 420px;
+}
+.job-card:has(.job-preview audio) .job-preview { cursor: default; }
 .job-card:has(.job-preview img) .job-preview { cursor: zoom-in; }
 .job-card.dragging-image { opacity: .55; }
 .progress-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
@@ -1362,4 +1368,26 @@ body.modal-open { overflow: hidden; }
   line-height: 1.45;
   color: #ffb08a;
   margin: 3px 0 2px;
+}
+
+/* ---------- 音乐面板（YuE2） ---------- */
+#musicPanel .field { margin-bottom: 12px; }
+#musicPanel textarea {
+  width: 100%; resize: vertical; font-family: inherit; font-size: 12px;
+  line-height: 1.55; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: #fff; color: var(--text);
+}
+#musicPanel textarea:focus { outline: none; border-color: var(--accent); }
+/* 参考音频条目（素材库引用，不是图片缩略图） */
+#musicPanel .img-ref-card {
+  display: flex; align-items: center; gap: 8px; grid-column: 1 / -1;
+  padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fafbfc; font-size: 11.5px;
+}
+#musicPanel .img-ref-card .tag {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#musicPanel .img-ref-card .img-ref-sort {
+  flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: 11px;
 }

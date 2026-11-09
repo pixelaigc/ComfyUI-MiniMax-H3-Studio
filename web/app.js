@@ -15,6 +15,9 @@ const MODE_INFO = {
   // diffusers 目录（transformer/ + text_encoder/ + tokenizer/ + vae/）。
   t2i_moss: { name: "MOSS-Image 文生图", kind: "image", engine: "moss" },
   longfilm: { name: "长片", kind: "video" },
+  // 音乐（YuE2）：文生音乐 / 参考生音乐
+  t2a: { name: "文生音乐", kind: "audio", engine: "music" },
+  a2a: { name: "参考生音乐", kind: "audio", engine: "music" },
 };
 
 // 图像类模式：共用「图像」参数面板
@@ -162,6 +165,15 @@ const state = {
 // 生成类型清单，由 /api/generation-types 下发（后端真实注册的模式），
 // 前端不硬编码任何类型名。
 const GEN_TYPES = { types: [], registeredModes: [] };
+
+// 音乐模式（YuE2）：文生音乐 / 参考生音乐
+const MUSIC_MODES = ["t2a", "a2a"];
+function isMusicMode(mode) {
+  return MUSIC_MODES.includes(mode || state.mode);
+}
+
+// music.js 需要读当前模式 —— 只暴露一个只读 getter，不把整个 state 交出去
+window.__h3state = () => ({ mode: state.mode });
 
 // 图像模式的档位 / 比例 / 模型清单，由 /api/image-options 下发（服务端与本机
 // ComfyUI 的实际权重、官方推荐参数一致），前端不硬编码模型文件名。
@@ -387,6 +399,26 @@ function renderMode() {
   $("#aspectField").style.display = isVideo ? "" : "none";
   $("#imagePanel").style.display = isVideo ? "none" : "";
   if (!isVideo) renderImagePanel();
+
+  // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
+  const music = isMusicMode(mode);
+  const musicPanel = $("#musicPanel");
+  if (musicPanel) musicPanel.style.display = music ? "" : "none";
+  if (music) {
+    // 音乐面板自带模型/步数/采样器，通用那套全部隐藏
+    $("#resField").style.display = "none";
+    $("#durField").style.display = "none";
+    $("#modelField").style.display = "none";
+    $("#stepsField").style.display = "none";
+    $("#seedStrengthPair").style.display = "none";
+    // 风格描述在音乐面板里（提示词框留给图像/视频）
+    const promptField = $("#promptField");
+    if (promptField) promptField.style.display = "none";
+    if (window.MusicUI) window.MusicUI.render();
+  } else {
+    const promptField = $("#promptField");
+    if (promptField) promptField.style.display = "";
+  }
   // 模式变了 -> 增强模板下拉按新模式过滤，当前模板不适用则自动回落
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
   updateSeedStrengthLayout();
@@ -1801,9 +1833,39 @@ async function pollPendingJobs() {
 // ---------- 提交 ----------
 $("#genBtn").addEventListener("click", async () => {
   if (state.genBusy || promptEnhance.busy) return;
+  const mode = state.mode;
+
+  // 音乐模式：提示词来自「风格描述」框，走 music.js 的收集逻辑
+  if (isMusicMode(mode)) {
+    if (!window.MusicUI) { alert("音乐面板模块未加载"); return; }
+    const collected = window.MusicUI.collect();
+    if (!collected.params.prompt) { alert("请填写风格描述"); return; }
+    if (mode === "a2a" && !collected.assetRefs.length) {
+      alert("参考生音乐需要从素材库选择一段参考音频。");
+      return;
+    }
+    const musicFd = new FormData();
+    musicFd.append("mode", mode);
+    musicFd.append("params", JSON.stringify(collected.params));
+    if (collected.assetRefs.length) {
+      musicFd.append("asset_refs", JSON.stringify(collected.assetRefs));
+    }
+    try {
+      const resp = await fetch("/api/jobs", { method: "POST", body: musicFd });
+      const data = await resp.json();
+      if (!resp.ok) { alert(data.error || "提交失败"); return; }
+      trackJob(data.id);
+      state.tab = "active";
+      renderTabs();
+      refreshJobs();
+    } catch (e) {
+      alert("提交失败: " + e.message);
+    }
+    return;
+  }
+
   const prompt = $("#prompt").value.trim();
   if (!prompt) { alert("请填写提示词"); return; }
-  const mode = state.mode;
   // 图像模式：提示词未增强时先确认
   //   确认 -> 用用户原始提示词继续生成；取消/关闭 -> 中止本次生成（不自动开始增强）
   if (IMAGE_MODES.includes(mode) && currentPromptLevel() === 0) {
@@ -2280,7 +2342,10 @@ function jobCard(job) {
   let preview = "";
   const video = (job.outputs || []).find(o => o.kind === "video");
   const image = (job.outputs || []).find(o => o.kind === "image");
-  if (video) {
+  const audio = (job.outputs || []).find(o => o.kind === "audio");
+  if (audio) {
+    preview = `<audio src="${outputUrl(job, audio)}" controls preload="metadata"></audio>`;
+  } else if (video) {
     preview = `<video src="${outputUrl(job, video)}" controls preload="metadata"></video>`;
   } else if (image) {
     preview = `<img src="${outputUrl(job, image)}">
@@ -2323,7 +2388,7 @@ function jobCard(job) {
     </div>`}
     ${renderJobBatches(job)}
     <div class="job-actions">
-      ${video || image ? `<button data-act="download">⬇ 下载</button>` : ""}
+      ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
@@ -2407,10 +2472,11 @@ function jobCard(job) {
     refreshJobs();
   });
   card.querySelector('[data-act="download"]')?.addEventListener("click", () => {
-    const f = video || image;
+    const f = video || image || audio;
+    if (!f) return;
     const a = document.createElement("a");
     a.href = outputUrl(job, f);
-    a.download = f.file.split(/[\\/]/).pop();
+    a.download = String(f.file || "").split(/[\\/]/).pop();
     a.click();
   });
   card.querySelector('[data-act="prompt"]')?.addEventListener("click", () => openPromptModal(p.prompt || ""));
@@ -2561,9 +2627,10 @@ function bindMediaContextMenu(card, job) {
     });
   };
 
-  // 无批次：卡片上的图片 / 视频
+  // 无批次：卡片上的图片 / 视频 / 音频
   const image = (job.outputs || []).find(o => o.kind === "image");
   const video = (job.outputs || []).find(o => o.kind === "video");
+  const audioOut = (job.outputs || []).find(o => o.kind === "audio");
   const previewImg = card.querySelector(".job-preview img");
   if (previewImg && image) {
     previewImg.addEventListener("contextmenu", event => openMenu(event, {
@@ -2574,6 +2641,12 @@ function bindMediaContextMenu(card, job) {
   if (previewVideo && video) {
     previewVideo.addEventListener("contextmenu", event => openMenu(event, {
       file: video.file, kind: "video", batch_id: null,
+    }));
+  }
+  const previewAudio = card.querySelector(".job-preview audio");
+  if (previewAudio && audioOut) {
+    previewAudio.addEventListener("contextmenu", event => openMenu(event, {
+      file: audioOut.file, kind: "audio", batch_id: null,
     }));
   }
 
@@ -3727,6 +3800,12 @@ boot("默认模式", () => {
   else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
 });
 boot("图像参数清单", loadImageOptions);
+boot("音乐参数清单", async () => {
+  if (!window.MusicUI) return;
+  await window.MusicUI.loadOptions();
+  window.MusicUI.bind();
+  window.MusicUI.render();
+});
 boot("图像 LoRA 清单", loadImageLoras);
 boot("生成类型清单", loadGenerationTypes);
 boot("模式面板", renderMode);
