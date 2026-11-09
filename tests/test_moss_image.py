@@ -324,14 +324,32 @@ class TestMossBackend(unittest.TestCase):
         底模是 diffusers 目录（没有单文件 UNET），之前 None 会被
         check_compatibility() 的默认参数兜成 Z-Image 的 UNET ——
         结论毫无意义但 verified 却是 True。
+
+        ⚠️ 2026-11-09 语义演进：MOSS 现在**有**真正的兼容性判定了 ——
+        但它比的不是「Z-Image 的 UNET」，而是 **MOSS 自己底模**的层键清单
+        （从 `diffusion_pytorch_model.safetensors.index.json` 读，
+        与 ComfyUI 加载后的 state_dict 键一一对应）。
+        所以断言改成「判定依据必须是 MOSS 底模的层键」，
+        而不是「没做判定」。
         """
         items = lora_registry.list_moss_image_loras()
         if not items:
             self.skipTest("本机没有 MOSS LoRA")
+        moss_keys = lora_registry._moss_base_layer_keys()
+        self.assertTrue(moss_keys, "本机应有 MOSS 底模的层键清单")
+        # MOSS 底模的键一律带 diffusion_model. 前缀（实测 909 个 key 里
+        # transformer. 前缀为 0 个）—— 判定必须按这个口径。
+        self.assertTrue(all(k.startswith("diffusion_model.") for k in moss_keys),
+                        "MOSS 底模层键应全部带 diffusion_model. 前缀")
         for item in items:
-            self.assertFalse(item["compat_verified"],
-                             f"{item['name']} 不该被标成「已做权重比对」"
-                             "（MOSS 底模没有单文件 UNET 可比）")
+            if not item["compat_verified"]:
+                continue
+            # 做过判定 -> 必须有命中率数据（真比对过，不是兜底 1.0）
+            self.assertIsNotNone(item.get("attention_hit"),
+                                 f"{item['name']} 标成已验证却没有命中率")
+            # 判定依据不能是 Z-Image 的层结构
+            self.assertNotEqual(item.get("family"), "Z-Image",
+                                f"{item['name']} 的族判定错了")
 
     def test_moss_lora_registry_is_separate_from_other_families(self):
         """MOSS 的 LoRA 不能混进 Z-Image / Qwen 的列表。"""
