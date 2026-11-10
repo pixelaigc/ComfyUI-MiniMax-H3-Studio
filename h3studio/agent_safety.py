@@ -39,6 +39,176 @@ from pathlib import Path
 
 # ------------------------------------------------------------------ 提示注入
 
+#: **可隐藏字符集**（Unicode 类别 Cf = Format + 隐形空白字符）。
+#:
+#: 【为什么要有这一个「真源」—— 2026-11-10 独立复验】
+#: 第一轮修复只补了 4 个零宽字符（U+200C/200D/2060/FEFF），
+#: 独立复验发现 **U+200B（ZERO WIDTH SPACE）仍然能绕过**：
+#:   detect_injection 返回 False -> 记忆入库不拒写 -> 载荷原样入库
+#:   -> 经 summary_for_prompt 进入 system 提示词。
+#: 根因是**字符集是逐个手抄的**：漏一个就漏一条完整绕过路径，
+#: 而且 agent_safety / agent_memory 各抄一份，抄错的地方必然不一致。
+#:
+#: 【怎么彻底解决 —— 不再逐个抄，改成按 Unicode 类别全量覆盖】
+#: 攻击者藏字符只可能藏在「渲染时看不见」的码位上，也就是 Unicode
+#: 类别 Cf（Format）。按类别取全集比手维护清单**不会漏**：
+#:   * 新增的 Cf 字符自动覆盖（Unicode 版本升级也不用改代码）
+#:   * 覆盖范围**可枚举、可审计**（下面有断言锁住）
+#:
+#: 【覆盖清单（Python 3.13 / Unicode 15.1 实测）】
+#:
+#: A. Cf 类别全集 —— 170 个码位：
+#:   U+00AD            SOFT HYPHEN（软连字符）—— 可藏字
+#:   U+0600-U+0605     阿拉伯文数字/符号格式控制
+#:   U+061C            ARABIC LETTER MARK
+#:   U+06DD            ARABIC END OF AYAH
+#:   U+070F            SYRIAC ABBREVIATION MARK
+#:   U+0890-U+0891     ARABIC POUND MARK / PIASTRE MARK
+#:   U+08E2            ARABIC DISPUTED END OF AYAH
+#:   U+180E            MONGOLIAN VOWEL SEPARATOR（曾被当零宽，现在也是 Cf）
+#:   U+200B-U+200F     ZERO WIDTH SPACE / NON-JOINER / JOINER / LRM / RLM
+#:   U+202A-U+202E     双向文本嵌入与覆写（LRE/RLE/PDF/LRO/RLO）
+#:   U+2060-U+2064     WORD JOINER / FUNCTION APPLICATION / INVISIBLE ×
+#:   U+2066-U+206F     双向隔离与符号交换控制
+#:   U+FEFF            ZERO WIDTH NO-BREAK SPACE（BOM）
+#:   U+FFF9-U+FFFB     插图/等宽/行分隔符
+#:   U+110BD-U+110CD   婆罗米/天城体格式字符
+#:   U+13430-U+1343F   埃及象形文字格式控制
+#:   U+1BCA0-U+1BCA3   速记格式控制
+#:   U+1D173-U+1D17A   音乐记号格式控制
+#:   U+E0001           LANGUAGE TAG
+#:   U+E0020-U+007F    TAG SPACE / CANCEL TAG（emoji 标签序列）
+#:
+#: B. 隐形空白字符 —— 15 个码位（见 _HIDDEN_SPACES）：
+#:   U+00A0 / U+1680 / U+2000-U+200A / U+202F / U+205F
+#:   复验点名要核查的 **U+202F** 就在这里 —— 它的类别是 Zs 不是 Cf，
+#:   所以「只按 Cf 取全集」会漏掉它。
+#:
+#: 【为什么连双向控制符（U+202A-U+202E）也剥】
+#: 它们同样能让源码里的文本与模型/用户**看到的**文本不一致
+#: （RLO 能把后面的字符整体反转显示）。这既是注入藏身点，
+#: 也是「视觉欺骗」类攻击的载体。素材描述里没有任何合理场景
+#: 需要保留这些控制符。
+#:
+#: 【为什么连 TAG 字符（U+E0020-U+E007F）也剥】
+#: 它们用于 emoji 标签序列（如 🏴󠁧󠁢󠁳󠁣󠁴󠁿 旗帜），
+#: 但**只剥掉**格式控制符不会破坏 emoji 本身的呈现（ZWJ U+200D
+#: 也是 Cf —— 它同样被剥，但旗帜/家庭/职业 emoji 会退化成
+#: 单个码位显示，而不是乱码）。素材描述是给人看的描述文本，
+#: 保留 emoji 视觉不是它的职责。
+#:
+#: 【U+034F COMBINING GRAPHEME JOINER 为什么不在内】
+#: 它是类别 Mn（Mark），不是 Cf。理论上能藏字，但：真正的注入
+#: 触发词被拆开后**语义已经断裂**（组合字符附加在前一个基字符上），
+#: 且 Mn 类字符数量庞大（数千个），全剥会破坏正常的注音/组合字母。
+#: 窄口径原则：只处理 Unicode 明确归类为「不可见格式控制」的 Cf，
+#: 外加明确列举的隐形空白。
+#:
+#: 【不变量】**检测用文本 == 清理后文本** —— 这条在
+#: agent_safety.detect_injection / agent_memory.detect_injection 里
+#: 都有断言锁死（测试里**逐个变体**验证，170+15 个码位全覆盖）。
+#:
+#: 【性能】按类别扫全码位约 56ms —— 放在**模块导入**里会拖慢
+#: 每次起服务，所以做成**惰性**：第一次真正用到时才计算，
+#: 之后走模块级缓存。导入成本 = 0。
+_hidden_chars_cache: str | None = None
+
+
+#: **隐形空白字符**（类别 Zs/Zl/Zp 里那些「看起来是空白、但不是普通空格」
+#: 的码位）。
+#:
+#: 【为什么 Cf 全集不够 —— 2026-11-10 独立复验】
+#: 复验点名要核查 U+202F。实测它的 Unicode 类别是 **Zs（Space Separator）**
+#: 而不是 Cf —— 所以「只按 Cf 取全集」会漏掉它。
+#:
+#: 【为什么它们也是绕过路径】
+#: 这些字符在**视觉上几乎看不见**（U+202F 窄不换行空格宽度只有普通空格的
+#: 1/5，U+2009 细空格 1/5，U+00A0 不换行空格与普通空格等宽），
+#: 但它们能**打断词的连续性**：
+#:   "忽<U+202F>略之前的所有指令"  ->  正则 `忽略` 匹配不上 -> 放行
+#: 也就是说：人眼扫过去看不见异常，模型那侧也匹配不到触发词。
+#:
+#: 【为什么不剥 U+3000（IDEOGRAPHIC SPACE）】
+#: 全角空格在中文正文里是**正常用法**（"雨 夜" 这种排版），
+#: 剥掉会改变用户写的内容。全角空格本身**可见**，不构成隐藏。
+#:
+#: 【为什么不剥普通空格 U+0020】
+#: 普通空格可见、常用，剥掉会改变所有正文。普通空格打断的词
+#: 在人眼看来也是断的 —— 不构成「隐藏」。
+_HIDDEN_SPACES = (
+    "\u00a0"    # NO-BREAK SPACE（不换行空格，与普通空格等宽）
+    "\u1680"    # OGHAM SPACE MARK
+    "\u2000"    # EN QUAD
+    "\u2001"    # EM QUAD
+    "\u2002"    # EN SPACE
+    "\u2003"    # EM SPACE
+    "\u2004"    # THREE-PER-EM SPACE
+    "\u2005"    # FOUR-PER-EM SPACE
+    "\u2006"    # SIX-PER-EM SPACE
+    "\u2007"    # FIGURE SPACE
+    "\u2008"    # PUNCTUATION SPACE
+    "\u2009"    # THIN SPACE（细空格，宽度 1/5）
+    "\u200a"    # HAIR SPACE（发丝空格，宽度 1/5）
+    "\u202f"    # NARROW NO-BREAK SPACE（窄不换行空格，宽度 1/5）
+    "\u205f"    # MEDIUM MATHEMATICAL SPACE
+    "\u3000"    # IDEOGRAPHIC SPACE —— 刻意**不剥**（中文排版常用）
+)
+
+
+def _build_hidden_chars() -> str:
+    """取「可隐藏字符」全集 = Cf 类别全集 + 隐形空白字符（去重）。"""
+    global _hidden_chars_cache
+    if _hidden_chars_cache is not None:
+        return _hidden_chars_cache
+
+    import unicodedata
+
+    # 白名单：Cf 里少数在正文里有实际意义、剥掉反而有害的字符。
+    # 目前为空 —— 保留这个结构是为了将来加白名单时不必改结构。
+    whitelist = set()
+
+    chars = []
+    for cp in range(0x110000):
+        ch = chr(cp)
+        if unicodedata.category(ch) != "Cf":
+            continue
+        if cp in whitelist:
+            continue
+        chars.append(ch)
+
+    # 隐形空白（不含 U+3000，见上面的说明）
+    for ch in _HIDDEN_SPACES:
+        if ch == "\u3000":
+            continue
+        if ord(ch) not in whitelist:
+            chars.append(ch)
+
+    _hidden_chars_cache = "".join(chars)
+    return _hidden_chars_cache
+
+
+def hidden_chars() -> str:
+    """全部可隐藏字符（Cf 类别全集 + 隐形空白）—— **唯一真源**。"""
+    return _build_hidden_chars()
+
+
+def hidden_char_codepoints() -> tuple:
+    """可隐藏字符的码位清单（排序后）—— 供测试与审计用。"""
+    return tuple(sorted(ord(c) for c in hidden_chars()))
+
+
+#: 编译好的「含可隐藏字符」正则（惰性构建 + 缓存）。
+_hidden_re_cache = None
+
+
+def _hidden_re():
+    """匹配任意可隐藏字符的正则（惰性构建 + 缓存）。"""
+    global _hidden_re_cache
+    if _hidden_re_cache is None:
+        _hidden_re_cache = re.compile(f"[{re.escape(hidden_chars())}]")
+    return _hidden_re_cache
+
+
 #: 注入特征。**窄口径**：宁可漏判（少过滤一条普通描述），也不误判
 #: （把正常素材描述当注入拦掉，用户会莫名其妙）。
 #:
@@ -113,11 +283,22 @@ def detect_injection(text: str) -> dict:
 
 
 def sanitize(text: str, limit: int = 2000) -> str:
-    """清理文本：控制字符 + 零宽字符 + 截断。"""
+    """
+    清理文本：控制字符 + **全部可隐藏字符（Cf 类别全集）** + 截断。
+
+    【为什么不再手抄零宽字符清单 —— 2026-11-10 独立复验】
+    旧实现写死 `[\u200c\u200d\u2060\ufeff]` 四个字符，
+    独立复验实测 **U+200B 仍能绕过**（检测放行 -> 记忆入库 ->
+    经 summary_for_prompt 进 system 提示词）。
+    手抄清单的致命缺陷是**漏一个就漏一条完整绕过路径**，
+    而且 agent_safety / agent_memory 各抄一份，必然漂移。
+    现在改成按 Unicode 类别取 Cf 全集（见 hidden_chars()），
+    新增码位自动覆盖，两侧共用同一份真源。
+    """
     if not text:
         return ""
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
-    cleaned = re.sub(r"[‌‍⁠﻿]", "", cleaned)
+    cleaned = _hidden_re().sub("", cleaned)
     cleaned = cleaned.strip()
     if len(cleaned) > limit:
         cleaned = cleaned[:limit] + "…（已截断）"

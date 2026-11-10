@@ -792,5 +792,224 @@ class TestMusicAspectContract(_ContractBase):
                         f"音乐卡该渲染时长：{rendered['params']}")
 
 
+# ==================================================================== 契约 ⑥
+class TestOneShotToolResultContract(_ContractBase):
+    """
+    契约 ⑥：**一次性（非 SSE）路径的工具卡「结果」区**。
+
+    【独立复验实测的事实】
+      第一轮修复补了 steps[].args（参数行），但**结果行仍然是空的**：
+        * web/agent.js 里 `result: null` 硬编码
+        * 后端 steps[] **没有**结果摘要字段
+        * 真实 DOM 里 `.ag-tool-result` 节点数 = **0**
+      这与 P0-4 同源：一次性路径的工具卡只显示工具名 + 耗时，
+      看不到 Agent 到底干了什么、结果是什么、失败原因是什么。
+
+    【修法】
+      后端 steps[] 补发 `summary`（与 SSE 的 tool_result 事件
+      **同一个函数** `_tool_result_summary()` 的输出，保证两条路径语义一致）
+      和 `call_id`；前端归一化层消费。
+
+    【取证纪律】
+      数据必须来自**真实 server.make_app() 的一次性 JSON 响应**，
+      断言打在**真实前端渲染出的 DOM** 上。
+      不得用前端自造 mock 断言自己。
+    """
+
+    def _one_shot_result(self, tool_name, arguments, ok=True):
+        """跑一次真实的一次性请求，返回后端真实产出的 JSON 结果。"""
+        return self.json_result([
+            {"content": None, "tool_calls": [
+                {"id": "call_1", "name": tool_name, "arguments": arguments}]},
+            {"content": "好了", "tool_calls": [], "raw": {}},
+        ])
+
+    def _render_one_shot(self, result):
+        """把后端真实的一次性结果喂进真实前端并渲染，返回 DOM 结果。"""
+        page = self.frontend()
+        # 【为什么要先清状态】
+        # Chromium 页面在同一个测试类里**复用**（cls._page），
+        # 不清的话上一条用例的消息和工具块会**留在 DOM 里**，
+        # querySelectorAll('.ag-tool') 会把它们一起捞出来 ->
+        # 断言打到上一条用例的残留上（假覆盖）。
+        # 契约测试的纪律：断言必须打在**本次**产生的 DOM 上。
+        page.evaluate("""() => {
+          window.AgentUI.state.messages = [];
+          window.AgentUI.state.sessionId = '';
+          window.AgentUI.state.lastResult = null;
+          window.AgentUI.state.streaming = null;
+          window.AgentUI.state.busy = false;
+          document.getElementById('agMessages').innerHTML = '';
+        }""")
+        page.evaluate("""(result) => {
+          window.fetch = async (url, opts) => {
+            return {ok:true, status:200, text: async()=>JSON.stringify(result),
+                    headers:{get:()=>'application/json'}};
+          };
+        }""", result)
+        page.fill("#agInput", "一次性路径")
+        page.click("#agSend")
+        page.wait_for_timeout(1200)
+        return page.evaluate("""() => ({
+          tools: Array.from(document.querySelectorAll('.ag-tool')).map(t => ({
+            name: (t.querySelector('.ag-tool-name')||{}).textContent || '',
+            args: (t.querySelector('.ag-tool-args code')||{}).textContent || '',
+            result: (t.querySelector('.ag-tool-result code')||{}).textContent || '',
+            err: (t.querySelector('.ag-tool-err')||{}).textContent || '',
+            ok: !t.classList.contains('ag-tool-bad'),
+          })),
+          resultNodeCount: document.querySelectorAll('.ag-tool-result').length,
+        })""")
+
+    # ------------------------------------------------------------ 后端
+    def test_backend_steps_carry_summary(self):
+        """后端 steps[] 必须带 summary（真实编排产出）。"""
+        result = self._one_shot_result(
+            "list_modes", {})
+        steps = result.get("steps") or []
+        self.assertTrue(steps, f"没有步骤：{result}")
+        step = steps[0]
+        self.assertIn("summary", step,
+                      f"后端 steps[] 没有 summary 字段：{step}")
+        self.assertTrue(str(step.get("summary") or "").strip(),
+                        f"steps[].summary 是空的：{step}")
+
+    def test_backend_steps_summary_matches_sse_summary(self):
+        """
+        一次性路径的 summary 必须与 **SSE 路径**的 summary 一致。
+
+        这是「两条路径语义一致」的硬约束 —— 同一个工具同一次调用，
+        用户在两条路径下看到的摘要必须**逐字相同**。
+        """
+        one_shot = self._one_shot_result("list_modes", {})
+        steps = one_shot.get("steps") or []
+        self.assertTrue(steps)
+        one_shot_summary = steps[0].get("summary")
+
+        events = self.sse_events([
+            {"content": None, "tool_calls": [
+                {"id": "call_1", "name": "list_modes", "arguments": {}}]},
+            {"content": "好了", "tool_calls": [], "raw": {}},
+        ])
+        sse_results = [e["data"] for e in events if e["event"] == "tool_result"]
+        self.assertTrue(sse_results, f"SSE 没有 tool_result 事件：{events}")
+        self.assertEqual(one_shot_summary, sse_results[0].get("summary"),
+                         "一次性路径与 SSE 路径的结果摘要不一致")
+
+    def test_backend_steps_carry_call_id(self):
+        """steps[] 必须带 call_id（与 SSE 同套配对依据）。"""
+        result = self._one_shot_result("list_modes", {})
+        steps = result.get("steps") or []
+        self.assertTrue(steps)
+        self.assertTrue(steps[0].get("call_id"),
+                        f"steps[] 没有 call_id：{steps[0]}")
+
+    def test_backend_failed_tool_summary_carries_error_text(self):
+        """
+        **失败工具**的 summary 必须带错误文案。
+
+        怎么造一个真失败？用「未知工具」—— 后端走 spec is None 分支，
+        result = {"error": "未知工具：xxx", ...}，ok=False。
+        （用真实后端路径，不 mock 工具实现。）
+        """
+        result = self._one_shot_result("definitely_not_a_tool", {})
+        steps = result.get("steps") or []
+        self.assertTrue(steps, f"没有步骤：{result}")
+        step = steps[0]
+        self.assertFalse(step.get("ok", True),
+                         f"未知工具竟然标记为成功：{step}")
+        self.assertIn("未知工具", str(step.get("summary") or ""),
+                      f"失败步骤的 summary 里没有错误文案：{step}")
+
+    # ------------------------------------------------------------ 前端
+    def test_frontend_renders_one_shot_tool_result_in_dom(self):
+        """
+        渲染层断言（真 DOM）：一次性路径的工具块里
+        必须出现**非空**的「结果」行。
+
+        这一条直接对应复验实测的「`.ag-tool-result` 节点数 = 0」。
+        """
+        result = self._one_shot_result("list_modes", {})
+        rendered = self._render_one_shot(result)
+        self.assertTrue(rendered["tools"],
+                        f"一次性路径没有渲染出工具块：{rendered}")
+        self.assertGreaterEqual(rendered["resultNodeCount"], 1,
+                                f"没有 .ag-tool-result 节点：{rendered}")
+        self.assertTrue(rendered["tools"][0]["result"].strip(),
+                        f"一次性路径的工具块「结果」区是空的：{rendered['tools'][0]}")
+
+    def test_frontend_one_shot_tool_block_has_both_args_and_result(self):
+        """
+        「参数」和「结果」两行**都要有** —— 这是复验点名的核心。
+        """
+        result = self._one_shot_result(
+            "create_job",
+            {"mode": "t2v", "prompt": "雨夜霓虹街道", "aspect": "9:16"})
+        rendered = self._render_one_shot(result)
+        self.assertTrue(rendered["tools"],
+                        f"一次性路径没有渲染出工具块：{rendered}")
+        tool = rendered["tools"][0]
+        self.assertTrue(tool["args"].strip(),
+                        f"一次性路径工具块缺「参数」行：{tool}")
+        self.assertTrue(tool["result"].strip(),
+                        f"一次性路径工具块缺「结果」行：{tool}")
+        self.assertIn("mode=t2v", tool["args"])
+        self.assertIn("已创建任务", tool["result"])
+
+    def test_frontend_one_shot_failed_tool_shows_error_text(self):
+        """
+        失败工具在一次性路径下必须显示**错误文案**。
+        """
+        result = self._one_shot_result("definitely_not_a_tool", {})
+        rendered = self._render_one_shot(result)
+        self.assertTrue(rendered["tools"],
+                        f"一次性路径没有渲染出工具块：{rendered}")
+        tool = rendered["tools"][0]
+        self.assertFalse(tool["ok"], f"失败工具被渲染成成功态：{tool}")
+        self.assertIn("未知工具", tool["result"],
+                      f"失败工具没有显示错误文案：{tool}")
+        # 错误文案只应出现**一次**（结果行里已经有，不该再重复一遍）
+        self.assertEqual(tool["err"].strip(), "",
+                         f"错误文案重复显示了：{tool}")
+
+    def test_frontend_one_shot_result_is_not_null(self):
+        """
+        前端内部状态层面：一次性路径的 tools[].result **不能**是 null。
+
+        这条锁死「result: null 硬编码」这个根因 ——
+        将来谁再把 result 写死成 null，这条会红。
+        """
+        result = self._one_shot_result("list_modes", {})
+        page = self.frontend()
+        page.evaluate("""() => {
+          window.AgentUI.state.messages = [];
+          window.AgentUI.state.sessionId = '';
+          window.AgentUI.state.lastResult = null;
+          window.AgentUI.state.streaming = null;
+          window.AgentUI.state.busy = false;
+          document.getElementById('agMessages').innerHTML = '';
+        }""")
+        page.evaluate("""(result) => {
+          window.fetch = async (url, opts) => {
+            return {ok:true, status:200, text: async()=>JSON.stringify(result),
+                    headers:{get:()=>'application/json'}};
+          };
+        }""", result)
+        page.fill("#agInput", "一次性路径")
+        page.click("#agSend")
+        page.wait_for_timeout(1200)
+        tools = page.evaluate(
+            "() => { const s = window.AgentUI.state.messages; "
+            "const last = s[s.length-1]; return (last.tools||[]).map(t => ({"
+            "name:t.name, result:t.result, call_id:t.call_id})); }")
+        self.assertTrue(tools, f"一次性路径没有生成工具轨迹：{tools}")
+        self.assertIsNotNone(tools[0]["result"],
+                             f"一次性路径 tools[].result 是 null：{tools}")
+        self.assertTrue(str(tools[0]["result"]).strip(),
+                        f"一次性路径 tools[].result 是空串：{tools}")
+        self.assertTrue(tools[0].get("call_id"),
+                        f"一次性路径 tools[].call_id 是空的：{tools}")
+
+
 if __name__ == "__main__":
     unittest.main()

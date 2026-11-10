@@ -2112,6 +2112,25 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     "args": _clip(json.dumps(call["arguments"], ensure_ascii=False), 200),
                     "error": (result.get("error") if isinstance(result, dict)
                               else None),
+                    # 【结果摘要 —— 2026-11-10 独立复验发现的一次性路径残留】
+                    #
+                    # 审查实测：一次性（非 SSE）降级路径下，
+                    # 前端 .ag-tool-result 节点数 = 0（结果区恒为空）。
+                    # 根因：SSE 路径发的是 tool_result 事件，带 summary；
+                    #       而一次性路径只有 steps[]，steps[] **不带**结果摘要
+                    #       -> 前端只能把 result 硬编码成 null。
+                    #
+                    # 【为什么必须与 SSE 语义一致】
+                    # 同一个工具、同一次调用，在两条路径下应该给用户看
+                    # **同样的**结果摘要。SSE 发的是 _tool_result_summary(name, result, ok)
+                    # —— 这里就发**同一个函数的输出**，不是另写一份摘要逻辑。
+                    # 失败工具的 error 文案由 _tool_result_summary 统一处理
+                    # （失败时返回 result["error"]），所以这里不重复拼。
+                    "summary": _tool_result_summary(name, result, ok),
+                    # call_id：与 SSE 的 tool_call / tool_result 同一套配对依据。
+                    # 前端归一化层消费它，把一次性路径的工具块和流式路径
+                    # 关联起来（同名字工具并发时不会串卡）。
+                    "call_id": call["id"],
                 })
                 messages.append({
                     "role": "tool",

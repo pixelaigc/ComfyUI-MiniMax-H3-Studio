@@ -1062,19 +1062,41 @@
   //（`if (!args || typeof args !== "object") return ""`）——
   // 直接塞字符串仍然渲染不出来。必须先 parse。
   // 解析失败就**原样当字符串**保留（不吞掉），让用户至少能看到原文。
+  //
+  // 【为什么要真的用 steps[].summary —— 2026-11-10 独立复验】
+  // 第一次修复只补了「参数」行，**结果」行仍然是空的**：
+  // 审查实测一次性路径下 .ag-tool-result 节点数 = 0。
+  // 根因：SSE 路径发 tool_result 事件（带 summary），
+  //       一次性路径只有 steps[]，而旧实现把 result 硬编码成 null。
+  // 现在后端 steps[] 补发了 summary（与 SSE **同一个函数**的输出），
+  // 这里通过 normalizeToolResult() 消费 —— 两条路径共用一套归一化，
+  // 渲染层不用知道后端字段叫什么。
   function syncToolsFromSteps(msg, steps) {
     if (!Array.isArray(steps) || !steps.length) return;
     if (msg.tools && msg.tools.length) return;   // 已经有流式轨迹了，不覆盖
-    msg.tools = steps.filter(s => s && s.tool).map(s => ({
-      name: s.tool,
-      arguments: parseStepArgs(s.args),
-      result: null,
-      ok: s.ok !== false,
-      error: s.error || "",
-      ms: s.ms,
-      done: true,
-      call_id: s.call_id || null,
-    }));
+    msg.tools = steps.filter(s => s && s.tool).map(s => {
+      const raw = normalizeToolResult(s);
+      const hasResult = raw !== undefined && String(raw).trim() !== "";
+      return {
+        name: normalizeToolName(s),
+        arguments: parseStepArgs(s.args),
+        // 结果：走归一化层（result / summary / output 都认），
+        // 与 SSE 的 tool_result 事件**同一条消费路径**。
+        result: hasResult ? filterToolResult(s.tool, raw) : undefined,
+        ok: s.ok !== false,
+        // 【失败工具的错误文案只显示一次】
+        // 后端 _tool_result_summary() 对失败工具返回的就是 result["error"]
+        // —— 所以 summary 里**已经**是错误文案了。
+        // SSE 路径同理：tool_result 事件只带 summary，不带 error 字段，
+        //            于是前端只渲染「结果」行，不重复渲染 .ag-tool-err。
+        // 这里如果再把 steps[].error 填上，同一句错误会**显示两遍**。
+        // 所以：只有「没有结果摘要」时才用 steps[].error 兜底。
+        error: (s.ok === false && !hasResult) ? (s.error || "") : "",
+        ms: s.ms,
+        done: true,
+        call_id: s.call_id || null,
+      };
+    });
   }
 
   // steps[].args（JSON 字符串）-> 对象。解析失败返回原始字符串。

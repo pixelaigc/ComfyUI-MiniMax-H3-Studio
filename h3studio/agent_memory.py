@@ -84,7 +84,10 @@ def default_db_path() -> Path:
 #: （md5 完全相同），改一处忘另一处是必然的 —— 审查实测的「零宽绕过」就是
 #: 这么漏的（只改了一处）。现在直接 import agent_safety 的那份，
 #: 两边**永远**是同一份规则。
-from .agent_safety import _INJECTION_PATTERNS  # noqa: F401
+from .agent_safety import (  # noqa: F401
+    _INJECTION_PATTERNS,
+    _hidden_re,
+)
 
 
 def detect_injection(text: str) -> dict:
@@ -126,18 +129,28 @@ def sanitize_value(text: str, limit: int = MAX_VALUE_CHARS) -> str:
 
     做三件事：
       1. 去掉控制字符（除了换行/制表符）—— 防日志注入与终端转义
-      2. 去掉零宽字符 —— 用来藏「忽略之前指令」的注入特征
+      2. 去掉**全部可隐藏字符**（Unicode Cf 类别全集）——
+         用来藏「忽略之前指令」的注入特征
       3. 截断到 limit（默认 MAX_VALUE_CHARS）
 
     【上限语义】存储值的长度**永远不超过** limit —— 截断标记本身也
     算在长度里（实测旧实现存了 2006 字符 > MAX_VALUE_CHARS=2000，
     上限声明与实际不符）。所以是「先留出标记的位置，再截内容」。
+
+    【为什么隐藏字符集从 agent_safety import —— 2026-11-10 独立复验】
+    这里原来自己抄了一份 `[\\u200c\\u200d\\u2060\\ufeff]`，
+    独立复验实测 **U+200B 仍能绕过**（检测放行 -> 记忆入库 ->
+    经 summary_for_prompt 进 system 提示词）。
+    两处各抄一份 = 抄漏一处就多一条绕过路径。
+    现在统一 import agent_safety.hidden_chars() —— **同一份真源**，
+    且 agent_safety 那侧已改成按 Unicode 类别取 Cf 全集，
+    以后新增码位自动覆盖。
     """
     if not text:
         return ""
-    # 控制字符（保留 \n \t），零宽字符，全角/半角空白规整
+    # 控制字符（保留 \n \t），可隐藏字符，全角/半角空白规整
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
-    cleaned = re.sub(r"[‌‍⁠﻿]", "", cleaned)
+    cleaned = _hidden_re().sub("", cleaned)
     cleaned = cleaned.strip()
     if len(cleaned) > limit:
         # 标记本身占长度 -> 留给内容的额度要减掉标记长度
