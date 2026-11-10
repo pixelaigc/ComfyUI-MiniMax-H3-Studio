@@ -883,6 +883,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <script src="/static/enhance-menu.js?v=enhancemulti1"></script>
-<script src="/static/agent.js?v=agent1"></script>
+<!-- agent-media.js 必须在 agent.js **之前**：agent.js 的任务卡渲染要用
+     AgentMedia 判定「实际生效参数」与静默回落（视频分辨率 / 音乐时长） -->
+<script src="/static/agent-media.js?v=agentmedia1"></script>
+<script src="/static/agent.js?v=agent2"></script>
 </body>
 </html>

@@ -439,6 +439,20 @@
   .ag-input-row { flex-direction: column; }
   .ag-send { align-self: stretch; width: 100%; }
   .ag-hint-line { font-size: 10.5px; }
+
+  /* 新增组件的窄屏规则：
+     工具块的长参数/结果用 code 承载，窄屏必须能换行而不是撑出横向滚动条；
+     澄清提问的选项和输入框也要能换行。 */
+  .ag-tool-head { flex-wrap: wrap; gap: 5px; }
+  .ag-tool-meta { margin-left: 0; }
+  .ag-tool-args code, .ag-tool-result code {
+    max-width: 100%; display: block;
+  }
+  .ag-tool-body { padding: 5px 8px 8px 8px; }
+  .ag-clarify-reply { flex-direction: column; }
+  .ag-clarify-opt { white-space: normal; text-overflow: clip; }
+  .ag-job-thumbs .ag-job-thumb { width: 56px; height: 56px; }
+  .ag-job-refresh { margin-left: auto; }
 }
 
 /* 平板：输入区改为上下两行，发送按钮不撑满 */

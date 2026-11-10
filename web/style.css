@@ -1576,6 +1576,141 @@ body.modal-open { overflow: hidden; }
   margin-top: 8px; font-size: 12px; color: #b3272b; background: #fdecec;
   border: 1px solid #f6cfd0; border-radius: 6px; padding: 6px 9px; line-height: 1.55;
 }
+/* 错误块里的重试按钮：与错误文案同排，但独立成可点区域 */
+.ag-error-text { word-break: break-word; }
+.ag-act-retry { margin-top: 7px; }
+.ag-act-retry:hover { background: #fff; }
+
+/* ---------- 流式渲染中的气泡 ---------- */
+.ag-streaming-hint {
+  margin-top: 5px; font-size: 11px; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ag-streaming-hint::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); animation: ag-pulse 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-streaming-hint::before { animation: none; opacity: .8; }
+}
+
+/* ---------- 工具调用可视化 ---------- */
+.ag-tools summary { cursor: pointer; }
+.ag-tool-list { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.ag-tool {
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; overflow: hidden;
+}
+.ag-tool-head {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 5px 8px; cursor: pointer; list-style: none;
+  font-size: 12px; min-width: 0;
+}
+.ag-tool-head::-webkit-details-marker { display: none; }
+.ag-tool-head::before {
+  content: "\25B8"; color: var(--muted); font-size: 9px; flex: 0 0 auto;
+  transition: transform .15s ease;
+}
+.ag-tool[open] > .ag-tool-head::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .ag-tool-head::before { transition: none; }
+}
+.ag-tool-state { flex: 0 0 auto; font-weight: 700; }
+.ag-tool-ok .ag-tool-state { color: #1a7f45; }
+.ag-tool-bad .ag-tool-state { color: #b3272b; }
+.ag-tool-name {
+  font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.ag-tool-meta { margin-left: auto; color: var(--muted); font-size: 10.5px; flex: 0 0 auto; }
+.ag-tool-body {
+  padding: 3px 8px 7px 8px; border-top: 1px dashed var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ag-tool-label {
+  display: inline-block; font-size: 10px; color: var(--muted);
+  margin-right: 6px; vertical-align: top;
+}
+.ag-tool-args code, .ag-tool-result code {
+  font-size: 11px; background: #f4f6f9; padding: 2px 6px; border-radius: 4px;
+  color: #3d444e; word-break: break-word; white-space: pre-wrap;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  display: inline-block; max-width: calc(100% - 48px);
+}
+.ag-tool-err {
+  font-size: 11px; color: #b3272b; background: #fdecec;
+  border: 1px solid #f6cfd0; border-radius: 5px; padding: 4px 7px;
+  word-break: break-word;
+}
+
+/* ---------- 任务卡（Agent 下发的生成任务） ---------- */
+.ag-job-badge {
+  display: inline-block; font-size: 10.5px; padding: 1px 7px;
+  border-radius: 20px; border: 1px solid transparent;
+}
+.ag-job-refresh {
+  margin-left: auto; font-size: 10.5px; padding: 1px 7px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 5px; background: #fff;
+  color: var(--muted); font-family: inherit; flex: 0 0 auto;
+}
+.ag-job-refresh:hover { border-color: var(--accent); color: var(--accent); }
+.ag-job-status { margin-left: 0; }
+.ag-job-params { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.ag-param {
+  font-size: 10.5px; background: #eef1f5; color: #5b6472;
+  padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+}
+/* 发生过静默回落的参数：高亮出来，并配一条说明文字。
+   卡片上写「1080p」而实际落 768p，就是误导 —— 必须让人看得见。 */
+.ag-param-fallback { background: #fdf3e2; color: #96601a; border: 1px solid #f4e0bd; }
+.ag-job-note-warn {
+  color: #96601a; background: #fdf3e2; border: 1px solid #f4e0bd;
+  border-radius: 5px; padding: 4px 7px; margin-top: 5px; line-height: 1.5;
+}
+.ag-job-progress {
+  display: block; font-size: 11px; color: var(--accent); margin-top: 4px;
+}
+.ag-job-error {
+  font-size: 11.5px; color: #b3272b; background: #fdecec;
+  border: 1px solid #f6cfd0; border-radius: 5px; padding: 4px 7px;
+  margin-top: 5px; word-break: break-word;
+}
+.ag-job-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ag-job-thumb {
+  display: block; width: 68px; height: 68px; border-radius: 6px;
+  overflow: hidden; border: 1px solid var(--border); background: #f4f6f9;
+  flex: 0 0 auto; position: relative;
+}
+.ag-job-thumb img, .ag-job-thumb video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ag-job-thumb-audio {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--muted); text-decoration: none;
+}
+
+/* ---------- 澄清式提问气泡 ---------- */
+.ag-clarify { border-color: #d7ddfb; background: #f7f8ff; }
+.ag-clarify-q {
+  font-size: 13px; line-height: 1.65; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}
+.ag-clarify-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.ag-clarify-options { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ag-clarify-opt {
+  font-size: 12px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--accent); color: var(--accent); background: #fff;
+  border-radius: 14px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-clarify-opt:hover { background: var(--accent-soft); }
+.ag-clarify-reply { display: flex; gap: 7px; margin-top: 8px; align-items: stretch; }
+.ag-clarify-input {
+  flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px;
+  line-height: 1.5; padding: 6px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: #fff; color: var(--text);
+}
+.ag-clarify-input:focus { outline: none; border-color: var(--accent); }
 
 .ag-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
 .ag-act {
