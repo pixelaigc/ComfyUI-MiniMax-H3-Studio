@@ -1312,6 +1312,188 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   color: #ffc46b;
 }
 
+/* ---------- 提示词历史（各功能面板共用） ---------- */
+/* 「历史」入口按钮 —— 放在 field-label 行内（与「已增强」徽标同一行）。
+   field-label 是 space-between 布局，所以按钮要自己 margin-left:auto 靠右。 */
+.ph-open-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 2px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ph-open-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* 浮层本体。
+   position: fixed + z-index 1400（高于面板抽屉的 950 与增强菜单的 1300）。
+   max-width / max-height 由 JS 按视口实时设置，这里给兜底值。 */
+.ph-popover {
+  position: fixed;
+  z-index: 1400;
+  width: min(320px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, calc(100vh - 16px));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(20, 26, 38, .2);
+  overflow: hidden;
+}
+.ph-popover[hidden] { display: none; }
+
+.ph-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+.ph-head b { font-size: 13px; }
+.ph-count { font-size: 10.5px; color: var(--muted); margin-left: auto; }
+.ph-head button {
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.ph-head button:hover { color: var(--text); }
+
+/* 记录列表：内部滚动，浮层本体高度不失控 */
+.ph-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ph-item {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+}
+.ph-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.ph-time { font-weight: 600; color: var(--text); }
+.ph-model, .ph-count, .ph-src {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(93, 95, 239, .08);
+  color: var(--muted);
+}
+.ph-src { background: rgba(38, 150, 90, .12); color: #1f8a52; }
+
+.ph-prompt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.ph-tag {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(120, 125, 140, .14);
+  color: var(--muted);
+  margin-top: 1px;
+}
+.ph-tag-enh { background: rgba(93, 95, 239, .12); color: #4a5bbf; }
+.ph-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ph-text-none { color: var(--muted); font-style: italic; }
+
+.ph-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ph-item-actions button {
+  flex: 1 1 auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  min-height: 26px;
+}
+.ph-item-actions button:hover:not([disabled]) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ph-item-actions button[disabled] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.ph-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.ph-empty-err { color: #c8323a; }
+
+.ph-foot {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  background: #fafbfc;
+}
+.ph-foot button {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 7px 12px;
+  cursor: pointer;
+  min-height: 34px;
+}
+.ph-foot button:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.ph-foot button[disabled] { opacity: .5; cursor: progress; }
+.ph-foot button[hidden] { display: none; }
+
 /* ---------- 提示词版本历史 ---------- */
 .version-list {
   display: flex;

@@ -81,6 +81,8 @@ from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
+from h3studio import prompt_history as ph
+from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
@@ -213,6 +215,8 @@ def init_db():
         )
     # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
     prov.ensure_tables(conn)
+    # 提示词历史表（各功能面板的提示词留痕）
+    ph.ensure_table(conn)
 
 
 def row_to_job(r):
@@ -1350,6 +1354,9 @@ async def api_create(request):
                     "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
                     "VALUES (?,?,?,?, 'queued', ?)",
                     (uuid.uuid4().hex[:12], job_id, index, seed, now))
+        # 【提示词历史】提交即留痕 —— 原始提示词 + 最终使用的提示词。
+        # 放在 INSERT 之后：任务真的建成了，才算一次真实的提示词使用。
+        ph_hooks.record_prompt_history(conn, mode, params, source=ph.SOURCE_GENERATE)
     return json_ok({"id": job_id, "status": "queued", "batch_count": batch_count})
 
 
@@ -1973,6 +1980,14 @@ async def api_music_enhance(request):
     lyrics_text = music_style.resolve_lyrics(
         lyrics_struct.get("lyrics_override", ""),
         lyrics_struct.get("template") or "V-C-V-C-bridge-C")
+    # 【提示词历史】音乐的结构化增强产物也进历史。
+    # 音乐面板的「最终提示词」= 合成后的 style 串（真正送进 YuE2 的那段），
+    # 原始 = 用户写的那句描述。
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original or base, "prompt": style_text},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "style": style_struct,
         "lyrics": lyrics_struct,
@@ -3051,6 +3066,18 @@ async def api_enhance(request):
                 elements = None
 
     merged = enh.merge_result(original, enhanced, mode)
+    # 【提示词历史】增强流程也留痕 —— 无论这次增强最后有没有被写回提示词框，
+    # 「原始 -> 增强后」这条对应关系都值得留下（用户下次能直接填回去）。
+    # mode_ctx 是发起增强时所在的面板（t2i / t2i_moss / t2v / t2a …），
+    # 它就是面板 key —— 跨面板隔离靠它。
+    _ph_panel = mode_ctx or ""
+    if _ph_panel:
+        with db() as conn:
+            ph_hooks.record_prompt_history(
+                conn, _ph_panel,
+                {"original_prompt": original, "prompt": enhanced,
+                 "model_key": model_key},
+                source=ph.SOURCE_ENHANCE)
     return json_ok({
         "original": original,
         "enhanced": enhanced,
@@ -3172,6 +3199,13 @@ async def api_moss_layout(request):
              "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    # 【提示词历史】MOSS 结构化增强的最终文本提示词也进历史。
+    # 面板固定是 t2i_moss —— layout 是 MOSS-Image 专属能力。
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, "t2i_moss",
+            {"original_prompt": original, "prompt": result["final_prompt"]},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "ok": True,
         "original": original,
@@ -3279,6 +3313,12 @@ async def api_qwen_pe_expand(request):
             {"error": f"官方 PE 扩写失败：{type(exc).__name__} {exc}"[:300],
              "degraded": True}, status=502)
 
+    # 【提示词历史】官方 PE 的扩写结果也进历史（面板 = mode，即 t2i_qwen / i2i_qwen）
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original, "prompt": result["expanded"]},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "ok": True,
         "original": original,
@@ -3424,6 +3464,62 @@ async def index_handler(request):
     return resp
 
 
+
+# ------------------------------------------------------------------ 提示词历史
+async def api_prompt_history_list(request):
+    """GET /api/prompt-history —— 按面板读取提示词历史（分页）。
+
+    query:
+      panel_key  可选。按面板过滤（跨面板隔离的判据）。
+                 省略 = 全部面板。
+      model_key  可选。按模型过滤（同一个面板内换模型时用）。
+      limit      可选。默认 20，上限 100。
+      offset     可选。默认 0（滚动加载用）。
+
+    返回:
+      { items: [{id, panel_key, model_key, original_prompt,
+                 enhanced_prompt, source, timestamp, use_count}],
+        total: 该面板（or 全部）的总条数,
+        limit, offset, has_more }
+    """
+    panel_key = (request.query.get("panel_key") or "").strip()
+    model_key = (request.query.get("model_key") or "").strip()
+    try:
+        limit = int(request.query.get("limit") or ph.DEFAULT_LIMIT)
+    except (TypeError, ValueError):
+        limit = ph.DEFAULT_LIMIT
+    try:
+        offset = int(request.query.get("offset") or 0)
+    except (TypeError, ValueError):
+        offset = 0
+    limit = max(1, min(limit, ph.MAX_LIMIT))
+    offset = max(0, offset)
+
+    with db() as conn:
+        items = ph.list_history(conn, panel_key=panel_key, model_key=model_key,
+                                limit=limit, offset=offset)
+        total = ph.count_history(conn, panel_key=panel_key, model_key=model_key)
+        panels = ph.list_panels(conn)
+    return json_ok({
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(items) < total,
+        "panels": panels,
+    })
+
+
+async def api_prompt_history_delete(request):
+    """DELETE /api/prompt-history?panel_key=xxx —— 清空某个面板的历史。"""
+    panel_key = (request.query.get("panel_key") or "").strip()
+    if not panel_key:
+        return web.json_response({"error": "缺少 panel_key"}, status=400)
+    with db() as conn:
+        removed = ph.delete_panel(conn, panel_key)
+    return json_ok({"ok": True, "removed": removed, "panel_key": panel_key})
+
+
 # ------------------------------------------------------------------ app
 def make_app():
     app = web.Application(client_max_size=200 * 1024 * 1024)
@@ -3448,6 +3544,9 @@ def make_app():
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)
     app.router.add_get("/api/generation-types", api_generation_types)
+    # 提示词历史（各功能面板的提示词留痕）
+    app.router.add_get("/api/prompt-history", api_prompt_history_list)
+    app.router.add_delete("/api/prompt-history", api_prompt_history_delete)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)
     # 本地模型 Provider 配置

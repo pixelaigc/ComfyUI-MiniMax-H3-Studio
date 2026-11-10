@@ -156,6 +156,10 @@
   .enhance-btn { min-height: 40px; padding: 8px 14px; }
   .enhance-spec { max-width: 100%; width: 100%; min-height: 38px; }
   .refine-history-btn { min-height: 38px; }
+  /* 提示词历史的「历史」入口 —— 触控目标不得小于 32px
+     （测试 test_touch_targets_are_large_enough_on_phone 的硬约束）。
+     它默认只有 21px 高（padding 2px + 10.5px 字号），手机上点不准。 */
+  .ph-open-btn { min-height: 38px; padding: 8px 14px; font-size: 12px; }
   .gen-btn { height: 48px; font-size: 15px; }
   .img-lora-btn { width: 34px; height: 34px; }
   .img-lora-slider input[type=range] { height: 30px; }

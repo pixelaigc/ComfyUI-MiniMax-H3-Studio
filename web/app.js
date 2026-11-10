@@ -1693,6 +1693,24 @@ function currentPromptLevel() {
   return level;
 }
 
+/**
+ * 当前提示词框内容的「原始版」（增强之前用户写的那段）。
+ *
+ * 【为什么需要】
+ * 提示词框里放的是**增强后**的内容（用户点「替换提示词框」就换掉了）。
+ * 但提示词历史要同时保留「原始」与「增强后」两份 ——
+ * 所以提交时把原始版一起带上（params.original_prompt），
+ * 服务端才能把两条都记进历史。
+ *
+ * 取法：版本谱系里的 level 0（就是「原始提示词」那条）。
+ * 没有 level 0（比如用户自己手敲的、没走过增强）-> 返回空串，
+ * 服务端会退化成「原始 == 最终」。
+ */
+function currentOriginalPrompt() {
+  const original = promptVersions.versions.find(v => v.level === 0 && v.text);
+  return original ? original.text : "";
+}
+
 // 记录一个版本
 function pushPromptVersion(level, text, source, specId) {
   const trimmed = (text || "").trim();
@@ -1926,6 +1944,12 @@ $("#genBtn").addEventListener("click", async () => {
     }
     const musicFd = new FormData();
     musicFd.append("mode", mode);
+    // 【提示词历史】音乐面板的原始版 = 增强前的音乐描述。
+    // 音乐增强是**结构化**的（风格字段 + 歌词），提示词框里的描述通常没被改，
+    // 所以这里取提示词框当前值即可；服务端会自己判定是否算「未增强」。
+    if (collected.params.prompt && !collected.params.original_prompt) {
+      collected.params.original_prompt = collected.params.prompt;
+    }
     musicFd.append("params", JSON.stringify(collected.params));
     if (collected.assetRefs.length) {
       musicFd.append("asset_refs", JSON.stringify(collected.assetRefs));
@@ -1956,6 +1980,9 @@ $("#genBtn").addEventListener("click", async () => {
   fd.append("mode", mode);
   const params = {
     prompt,
+    // 【提示词历史】原始版一起带上 —— 提示词框里现在是增强后的内容，
+    // 没有这一项服务端就分不出「原始」与「增强后」。
+    original_prompt: currentOriginalPrompt(),
     resolution: state.res,
     aspect: state.aspect,
     duration: state.duration,
