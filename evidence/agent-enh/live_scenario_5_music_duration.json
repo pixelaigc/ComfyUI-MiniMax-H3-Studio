@@ -1,0 +1,184 @@
+{
+  "scenario": "音乐时长走 max_duration",
+  "request": {
+    "message": "写一段 120 秒的赛博朋克风格 BGM，提示词：synthwave, 霓虹, 80 BPM, 合成器主音",
+    "session_id": "live-music-r4"
+  },
+  "response_status": 200,
+  "response_elapsed_ms": 21485,
+  "response": {
+    "session_id": "live-music-r4",
+    "status": "completed",
+    "answer": "已下发 120 秒赛博朋克 BGM 生成任务。\n\n- 任务 ID：d649b85567e4（状态：排队中）\n- 模式：文生音乐 t2a / 模型 yue2\n- 提示词：synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM\n- 时长上限：120 秒（在合法范围 4~360 内）\n- 歌词留空 → 纯器乐 BGM；谱面模式 full，输出格式 flac（均为官方默认）\n\n说明：提示词增强模板返回的是图像化扩写版本，音乐任务实际使用的是你给的原始风格标签 + 「赛博朋克风格 BGM」，未套用图像描述。需要进度播报或想改成 mp3 / 调整 BPM 表述，告诉我即可。",
+    "jobs": [
+      {
+        "job_id": "d649b85567e4",
+        "mode": "t2a",
+        "label": "文生音乐",
+        "prompt": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+        "params": {
+          "prompt": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+          "max_duration": 120.0,
+          "plan_mode": "full",
+          "format": "flac",
+          "gen_type": "t2a"
+        },
+        "asset_refs": [],
+        "status": "queued",
+        "summary": "120秒赛博朋克/synthwave纯器乐BGM，80 BPM合成器主音"
+      }
+    ],
+    "assets": [],
+    "prompt": {
+      "original": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+      "enhanced": "1980年代复古未来主义音乐可视化场景，深蓝色夜空下矗立着由发光紫色和品红色霓虹灯管勾勒的几何摩天大楼剪影，背景远处悬挂着一轮巨大的像素化落日，呈现黄橙色条纹渐变效果。前景中央悬浮着一个半透明的全息波形图界面，显示着动态的正弦波与锯齿波混合的合成器音频轨迹，波形线条呈明亮的青色与洋红色发光状。画面底部叠加着抽象的透视网格地面，由发光的紫罗兰色线条组成，向地平线无限延伸。整体色调以高对比度的霓虹粉、电光蓝和深黑为主，充满胶片颗粒感与色差效果。全息界面上方清晰显示白色无衬线字体文字 \"80 BPM\"，波形下方标注着细体白色文字 \"SYNTHWAVE LEAD\"。画面右侧边缘隐约可见半透明的故障艺术干扰条纹。",
+      "spec_id": "image",
+      "validation": {
+        "ok": true,
+        "errors": [],
+        "warnings": [
+          "用户原文的核心要素可能丢失：BGM、合成器主音、器主、主音、赛博朋克风格、赛博、博朋、朋克、克风、风格"
+        ],
+        "stats": {
+          "words": 177,
+          "chars": 305
+        }
+      }
+    },
+    "steps": [
+      {
+        "step": 1,
+        "tool": "get_mode_schema",
+        "ok": true,
+        "ms": 844,
+        "args": "{\"mode\": \"t2a\"}",
+        "error": null
+      },
+      {
+        "step": 2,
+        "tool": "enhance_prompt",
+        "ok": true,
+        "ms": 7046,
+        "args": "{\"prompt\": \"synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM\", \"mode\": \"t2a\"}",
+        "error": null
+      },
+      {
+        "step": 3,
+        "tool": "get_mode_schema",
+        "ok": true,
+        "ms": 2464,
+        "args": "{\"mode\": \"t2a\"}",
+        "error": null
+      },
+      {
+        "step": 4,
+        "tool": "create_job",
+        "ok": true,
+        "ms": 4755,
+        "args": "{\"mode\": \"t2a\", \"prompt\": \"synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM\", \"max_duration\": 120, \"lyrics\": \"\", \"plan_mode\": \"full\", \"format\": \"flac\", \"summary\": \"120秒赛博朋克/synthwave纯器乐BGM，80 BPM合成器主音\"}",
+        "error": null
+      },
+      {
+        "step": 5,
+        "tool": "respond",
+        "ok": true,
+        "ms": 6342,
+        "args": "{\"summary\": \"已下发 120 秒赛博朋克 BGM 生成任务。\\n\\n- 任务 ID：d649b85567e4（状态：排队中）\\n- 模式：文生音乐 t2a / 模型 yue2\\n- 提示词：synthwave, 霓虹, 80 BPM, 合成器主音, 赛博…（结果已截断）…描述。需要进度播报或想改成 mp3 / 调整 BPM 表述，告诉我即可。\", \"job_ids\": [\"d649b85567e4\"]}",
+        "error": null
+      }
+    ],
+    "usage": {
+      "steps": 5,
+      "tool_calls": 5,
+      "elapsed_ms": 21453
+    },
+    "provider": {
+      "name": "本机 Qwen 多模态",
+      "model": "qwen3.8-flash-next-iq3_xxs"
+    },
+    "error": null,
+    "memory": {
+      "used": true
+    },
+    "provider_name": "本机 Qwen 多模态"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_mode_schema",
+      "ok": true,
+      "ms": 844,
+      "args": "{\"mode\": \"t2a\"}",
+      "error": null
+    },
+    {
+      "step": 2,
+      "tool": "enhance_prompt",
+      "ok": true,
+      "ms": 7046,
+      "args": "{\"prompt\": \"synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM\", \"mode\": \"t2a\"}",
+      "error": null
+    },
+    {
+      "step": 3,
+      "tool": "get_mode_schema",
+      "ok": true,
+      "ms": 2464,
+      "args": "{\"mode\": \"t2a\"}",
+      "error": null
+    },
+    {
+      "step": 4,
+      "tool": "create_job",
+      "ok": true,
+      "ms": 4755,
+      "args": "{\"mode\": \"t2a\", \"prompt\": \"synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM\", \"max_duration\": 120, \"lyrics\": \"\", \"plan_mode\": \"full\", \"format\": \"flac\", \"summary\": \"120秒赛博朋克/synthwave纯器乐BGM，80 BPM合成器主音\"}",
+      "error": null
+    },
+    {
+      "step": 5,
+      "tool": "respond",
+      "ok": true,
+      "ms": 6342,
+      "args": "{\"summary\": \"已下发 120 秒赛博朋克 BGM 生成任务。\\n\\n- 任务 ID：d649b85567e4（状态：排队中）\\n- 模式：文生音乐 t2a / 模型 yue2\\n- 提示词：synthwave, 霓虹, 80 BPM, 合成器主音, 赛博…（结果已截断）…描述。需要进度播报或想改成 mp3 / 调整 BPM 表述，告诉我即可。\", \"job_ids\": [\"d649b85567e4\"]}",
+      "error": null
+    }
+  ],
+  "jobs_from_response": [
+    {
+      "job_id": "d649b85567e4",
+      "mode": "t2a",
+      "label": "文生音乐",
+      "prompt": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+      "params": {
+        "prompt": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+        "max_duration": 120.0,
+        "plan_mode": "full",
+        "format": "flac",
+        "gen_type": "t2a"
+      },
+      "asset_refs": [],
+      "status": "queued",
+      "summary": "120秒赛博朋克/synthwave纯器乐BGM，80 BPM合成器主音"
+    }
+  ],
+  "jobs_from_sqlite": [
+    {
+      "id": "d649b85567e4",
+      "mode": "t2a",
+      "status": "queued",
+      "created_at": 1794265439.66867,
+      "params": {
+        "prompt": "synthwave, 霓虹, 80 BPM, 合成器主音, 赛博朋克风格 BGM",
+        "max_duration": 120.0,
+        "plan_mode": "full",
+        "format": "flac",
+        "gen_type": "t2a"
+      },
+      "progress": 0.0,
+      "progress_text": null,
+      "error": null,
+      "outputs": null
+    }
+  ]
+}

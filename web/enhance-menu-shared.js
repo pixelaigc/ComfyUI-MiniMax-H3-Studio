@@ -85,15 +85,27 @@
     const specTag = o.specHtml || "";
     const recBadge = (m.recommended && ok)
       ? '<span class="enhance-menu-badge rec">Recommended</span>' : "";
+    // 【2026-11-10 出框修复】specTag（模板选择器）**移出** .enhance-menu-check。
+    //
+    // 原来它在同一个 flex 行里：<label class="enhance-menu-check">
+    //   [checkbox 14px] [名称] [模板 select]
+    // 而 .enhance-menu-spec-row 是 display:flex 且 min-width:auto ——
+    // flex 子项的 min-width:auto = min-content 宽度，**不能收缩**，
+    // 于是 select 那一坨（实测 309px）把整行占满，名称被压成 **0 宽**
+    // （实测 .enhance-menu-label 宽 0 / scrollWidth 13），
+    // 文字溢出 13px 且整条菜单 scrollWidth 353 > clientWidth 338（横向出框）。
+    //
+    // 另外这还是**非法 HTML**：<label> 套 <label>。
+    // 改成：名称一行，模板自己占一行（与「不可用原因」徽标同样的处理方式）。
     return `<div class="enhance-menu-item${checked ? " checked" : ""}${ok ? "" : " unavailable"}" data-method="${esc(m.id)}">
         <label class="enhance-menu-check" title="${esc(m.hint)}">
           <input type="checkbox" data-method-check="${esc(m.id)}"${checked ? " checked" : ""}${ok ? "" : " disabled"}>
-          <span class="enhance-menu-label">${esc(m.label)}</span>
-          ${specTag}
+          <span class="enhance-menu-label" title="${esc(m.label)}">${esc(m.label)}</span>
           ${recBadge}
         </label>
+        ${specTag ? `<div class="enhance-menu-spec-wrap">${specTag}</div>` : ""}
         ${ok ? "" : `<span class="enhance-menu-badge why">${esc(why)}</span>`}
-        <span class="enhance-menu-hint">${esc(m.hint)}</span>
+        <span class="enhance-menu-hint" title="${esc(m.hint)}">${esc(m.hint)}</span>
         ${renderFieldsHtml(m, o)}
       </div>`;
   }

@@ -1121,6 +1121,12 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 10px;
   box-shadow: 0 12px 34px rgba(20, 26, 38, .2);
   padding: 5px;
+  /* 【2026-11-10 出框修复】菜单自身**不允许横向出框**：
+     原来内容比盒子宽（scrollWidth 353 > clientWidth 338）时，
+     文字会横向溢出到菜单边框之外。overflow-x:hidden 让超宽内容
+     被裁在盒子里而不是溢出到页面；配合下面每行的 min-width:0 +
+     overflow-wrap:anywhere，长文本改为**换行**而不是撑宽盒子。 */
+  overflow-x: hidden;
 }
 .enhance-menu[hidden] { display: none; }
 /* 【多选】每一项是一个 div（不再是一个 button），里面有复选框 + 名称 + 说明。
@@ -1130,6 +1136,11 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 7px;
   padding: 7px 10px;
   border: 1px solid transparent;
+  /* 【出框修复】每一项都必须是「宽度不超过父」的块 —— 默认 block 的
+     width:auto 本来就等于父宽，但 flex/grid 子项的 min-width:auto
+     会让它撑出父容器。显式 min-width:0 + max-width:100% 双重保险。 */
+  min-width: 0;
+  max-width: 100%;
 }
 .enhance-menu-item:hover { background: var(--accent-soft); }
 .enhance-menu-item.checked {
@@ -1143,6 +1154,9 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   gap: 7px;
   cursor: pointer;
   font-family: inherit;
+  /* 【出框修复】flex 容器本身也不能撑宽父级 */
+  min-width: 0;
+  max-width: 100%;
 }
 .enhance-menu-check input[type="checkbox"] {
   flex: 0 0 auto;
@@ -1165,6 +1179,11 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   min-width: 0;
   flex: 0 1 auto;
   overflow-wrap: anywhere;
+  /* 【2026-11-10 出框修复】标签**必须能收缩到 0** ——
+     原来 specTag（模板 select，min-width:auto 的 flex 子项）把整行占满，
+     名称被压成 0 宽（实测 label 宽 0 / scrollWidth 13）→ 文字被裁掉。
+     flex-shrink:1 + min-width:0 让它正常参与收缩。 */
+  flex-shrink: 1;
 }
 .enhance-menu-item.checked .enhance-menu-label { color: var(--accent); }
 .enhance-menu-hint {
@@ -1174,6 +1193,19 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   color: var(--muted);
   margin-top: 2px;
   padding-left: 21px;
+  /* 【出框修复】说明文字允许在词内断行，不撑宽菜单 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+/* 【2026-11-10 出框修复】模板选择器**独占一行**。
+   原来它被塞进 .enhance-menu-check（名称那一行）的 flex 里，
+   select 的 min-width:auto 让整行被占满，名称被挤成 0 宽。
+   现在它是独立的一行，宽度受菜单盒子的 max-width 约束。 */
+.enhance-menu-spec-wrap {
+  margin: 6px 0 2px 21px;
+  max-width: 100%;
+  min-width: 0;
 }
 .enhance-menu-badge {
   display: inline-block;
@@ -1311,6 +1343,188 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: rgba(255, 176, 32, .16);
   color: #ffc46b;
 }
+
+/* ---------- 提示词历史（各功能面板共用） ---------- */
+/* 「历史」入口按钮 —— 放在 field-label 行内（与「已增强」徽标同一行）。
+   field-label 是 space-between 布局，所以按钮要自己 margin-left:auto 靠右。 */
+.ph-open-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 2px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ph-open-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* 浮层本体。
+   position: fixed + z-index 1400（高于面板抽屉的 950 与增强菜单的 1300）。
+   max-width / max-height 由 JS 按视口实时设置，这里给兜底值。 */
+.ph-popover {
+  position: fixed;
+  z-index: 1400;
+  width: min(320px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, calc(100vh - 16px));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(20, 26, 38, .2);
+  overflow: hidden;
+}
+.ph-popover[hidden] { display: none; }
+
+.ph-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+.ph-head b { font-size: 13px; }
+.ph-count { font-size: 10.5px; color: var(--muted); margin-left: auto; }
+.ph-head button {
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.ph-head button:hover { color: var(--text); }
+
+/* 记录列表：内部滚动，浮层本体高度不失控 */
+.ph-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ph-item {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+}
+.ph-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.ph-time { font-weight: 600; color: var(--text); }
+.ph-model, .ph-count, .ph-src {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(93, 95, 239, .08);
+  color: var(--muted);
+}
+.ph-src { background: rgba(38, 150, 90, .12); color: #1f8a52; }
+
+.ph-prompt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.ph-tag {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(120, 125, 140, .14);
+  color: var(--muted);
+  margin-top: 1px;
+}
+.ph-tag-enh { background: rgba(93, 95, 239, .12); color: #4a5bbf; }
+.ph-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ph-text-none { color: var(--muted); font-style: italic; }
+
+.ph-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ph-item-actions button {
+  flex: 1 1 auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  min-height: 26px;
+}
+.ph-item-actions button:hover:not([disabled]) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ph-item-actions button[disabled] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.ph-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.ph-empty-err { color: #c8323a; }
+
+.ph-foot {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  background: #fafbfc;
+}
+.ph-foot button {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 7px 12px;
+  cursor: pointer;
+  min-height: 34px;
+}
+.ph-foot button:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.ph-foot button[disabled] { opacity: .5; cursor: progress; }
+.ph-foot button[hidden] { display: none; }
 
 /* ---------- 提示词版本历史 ---------- */
 .version-list {
@@ -1537,7 +1751,6 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 /* 加速 LoRA 组合的用途说明 */
 #vidAccelLoraList .img-lora-meta { font-size: 9.5px; line-height: 1.45; }
 #vidAccelLoraList .img-lora-name { font-size: 11.5px; }
-
 /* ---------- 音乐面板（YuE2） ---------- */
 #musicPanel .field { margin-bottom: 12px; }
 #musicPanel textarea {
@@ -1582,4 +1795,310 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .music-sf-label { font-size: 11px; color: var(--muted); }
 .music-sf-item .img-select,
 .music-sf-item .img-input { width: 100%; min-width: 0; }
+/* ---------- 页面显隐（统一切页契约） ----------
+   所有主页面（jobsArea / panel / stitchPanel / systemPage / providersPage /
+   assetsPage / agentPage）都靠 .page-hidden 这个类切换显隐，**不用内联 style.display**。
+
+   为什么必须这样：内联 display 的优先级高于任何 CSS 规则，
+   一旦有人写了 style.display="block"，CSS 里的 display:flex 就被覆盖 ——
+   .agent-page 的 flex 布局塌掉后，消息区不再收缩、composer 被顶出视口，
+   而 body{overflow:hidden} 让整页滚不动（窄屏下输入框彻底不可达，
+   实测 390px 下 inputTop=3068 / reachable=false）。
+   用类切换把「显隐」变成一条可被 CSS 覆盖的契约，坏不了一条链全坏。 */
+/* 隐藏：用 !important 压过任何内联 display。
+   显示：**不加类**，而是把内联 display 整个移除 —— 让该页自己的 CSS 规则
+   （.jobs-area 是块级、.assets-page/.agent-page 是 flex）决定布局。
+   若用统一的 .page-visible{display:flex}，会把 .jobs-area / .system-page
+   从块级改成 flex，改变它们的内部排版 —— 不能这么做。 */
+.page-hidden { display: none !important; }
+
+/* ---------- 内置多模态 Agent 面板 ---------- */
+.agent-page {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg); overflow: hidden;
+}
+.ag-head {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 16px 22px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.ag-title { font-size: 16px; font-weight: 700; }
+.ag-sub { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.ag-new {
+  flex: 0 0 auto; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  color: var(--text); font-family: inherit;
+}
+.ag-new:hover { border-color: var(--accent); color: var(--accent); }
+
+.ag-messages {
+  /* flex:1 + min-height:0 是「消息区自己滚动、composer 留在视口内」的关键。
+     缺任何一个，消息区就会按内容撑高把输入框顶出视口。 */
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+  overscroll-behavior: contain;
+}
+.ag-empty {
+  margin: auto; max-width: 520px; text-align: center; color: var(--muted);
+}
+.ag-empty b { display: block; font-size: 15px; color: var(--text); margin-bottom: 8px; }
+.ag-empty p { font-size: 13px; line-height: 1.65; margin-bottom: 6px; }
+.ag-empty .ag-hint { font-size: 12px; opacity: .8; }
+
+.ag-msg { display: flex; gap: 10px; align-items: flex-start; }
+.ag-msg-role {
+  flex: 0 0 auto; width: 46px; font-size: 11px; color: var(--muted);
+  padding-top: 9px; text-align: right;
+}
+.ag-msg-body {
+  flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 13px;
+}
+.ag-msg-user .ag-msg-body { background: var(--accent-soft); border-color: #d7ddfb; }
+.ag-bubble-text { font-size: 13px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.ag-bubble-text:empty { display: none; }
+
+.ag-badge {
+  display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 20px;
+  margin-bottom: 6px; border: 1px solid transparent;
+}
+.ag-badge-ok { background: #e8f7ee; color: #1a7f45; border-color: #c6ecd5; }
+.ag-badge-warn { background: #fdf3e2; color: #96601a; border-color: #f4e0bd; }
+.ag-badge-bad { background: #fdecec; color: #b3272b; border-color: #f6cfd0; }
+
+.ag-block {
+  margin-top: 10px; padding: 9px 11px; border: 1px solid var(--border);
+  border-radius: 8px; background: #fafbfc;
+}
+.ag-block-title { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.ag-job + .ag-job { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.ag-job-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.ag-job-head code {
+  font-size: 11px; background: #eef1f5; padding: 1px 6px; border-radius: 4px;
+  color: #47505d; font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.ag-job-status { font-size: 10.5px; color: var(--muted); margin-left: auto; }
+.ag-job-prompt { font-size: 12px; color: #3d444e; margin-top: 4px; line-height: 1.55; }
+.ag-job-note { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+.ag-assets { list-style: none; }
+.ag-assets li + li { margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--border); }
+.ag-assets b { font-size: 12.5px; }
+.ag-tag {
+  display: inline-block; font-size: 10.5px; margin-left: 6px; padding: 0 6px;
+  border-radius: 4px; background: #eef1f5; color: #5b6472;
+}
+.ag-asset-desc { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+.ag-prompt-orig {
+  font-size: 11.5px; color: var(--muted); text-decoration: line-through;
+  margin-bottom: 5px; line-height: 1.5;
+}
+.ag-prompt-new {
+  font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  padding: 7px 9px; background: #fff; border: 1px solid var(--border); border-radius: 6px;
+}
+
+.ag-steps summary { cursor: pointer; margin-bottom: 0; }
+.ag-step-list { list-style: none; margin-top: 7px; }
+.ag-step {
+  display: flex; align-items: baseline; gap: 8px; font-size: 11.5px;
+  padding: 2px 0; flex-wrap: wrap;
+}
+.ag-step-n { color: var(--muted); min-width: 16px; }
+.ag-step-name { font-weight: 600; }
+.ag-step-ms { color: var(--muted); }
+.ag-step-err { color: var(--danger); flex: 1 1 100%; }
+.ag-step-bad .ag-step-name { color: var(--danger); }
+
+.ag-error {
+  margin-top: 8px; font-size: 12px; color: #b3272b; background: #fdecec;
+  border: 1px solid #f6cfd0; border-radius: 6px; padding: 6px 9px; line-height: 1.55;
+}
+/* 错误块里的重试按钮：与错误文案同排，但独立成可点区域 */
+.ag-error-text { word-break: break-word; }
+.ag-act-retry { margin-top: 7px; }
+.ag-act-retry:hover { background: #fff; }
+
+/* ---------- 流式渲染中的气泡 ---------- */
+.ag-streaming-hint {
+  margin-top: 5px; font-size: 11px; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ag-streaming-hint::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); animation: ag-pulse 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-streaming-hint::before { animation: none; opacity: .8; }
+}
+
+/* ---------- 工具调用可视化 ---------- */
+.ag-tools summary { cursor: pointer; }
+.ag-tool-list { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.ag-tool {
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; overflow: hidden;
+}
+.ag-tool-head {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 5px 8px; cursor: pointer; list-style: none;
+  font-size: 12px; min-width: 0;
+}
+.ag-tool-head::-webkit-details-marker { display: none; }
+.ag-tool-head::before {
+  content: "\25B8"; color: var(--muted); font-size: 9px; flex: 0 0 auto;
+  transition: transform .15s ease;
+}
+.ag-tool[open] > .ag-tool-head::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .ag-tool-head::before { transition: none; }
+}
+.ag-tool-state { flex: 0 0 auto; font-weight: 700; }
+.ag-tool-ok .ag-tool-state { color: #1a7f45; }
+.ag-tool-bad .ag-tool-state { color: #b3272b; }
+.ag-tool-name {
+  font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.ag-tool-meta { margin-left: auto; color: var(--muted); font-size: 10.5px; flex: 0 0 auto; }
+.ag-tool-body {
+  padding: 3px 8px 7px 8px; border-top: 1px dashed var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ag-tool-label {
+  display: inline-block; font-size: 10px; color: var(--muted);
+  margin-right: 6px; vertical-align: top;
+}
+.ag-tool-args code, .ag-tool-result code {
+  font-size: 11px; background: #f4f6f9; padding: 2px 6px; border-radius: 4px;
+  color: #3d444e; word-break: break-word; white-space: pre-wrap;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  display: inline-block; max-width: calc(100% - 48px);
+}
+.ag-tool-err {
+  font-size: 11px; color: #b3272b; background: #fdecec;
+  border: 1px solid #f6cfd0; border-radius: 5px; padding: 4px 7px;
+  word-break: break-word;
+}
+
+/* ---------- 任务卡（Agent 下发的生成任务） ---------- */
+.ag-job-badge {
+  display: inline-block; font-size: 10.5px; padding: 1px 7px;
+  border-radius: 20px; border: 1px solid transparent;
+}
+.ag-job-refresh {
+  margin-left: auto; font-size: 10.5px; padding: 1px 7px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 5px; background: #fff;
+  color: var(--muted); font-family: inherit; flex: 0 0 auto;
+}
+.ag-job-refresh:hover { border-color: var(--accent); color: var(--accent); }
+.ag-job-status { margin-left: 0; }
+.ag-job-params { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.ag-param {
+  font-size: 10.5px; background: #eef1f5; color: #5b6472;
+  padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+}
+/* 发生过静默回落的参数：高亮出来，并配一条说明文字。
+   卡片上写「1080p」而实际落 768p，就是误导 —— 必须让人看得见。 */
+.ag-param-fallback { background: #fdf3e2; color: #96601a; border: 1px solid #f4e0bd; }
+.ag-job-note-warn {
+  color: #96601a; background: #fdf3e2; border: 1px solid #f4e0bd;
+  border-radius: 5px; padding: 4px 7px; margin-top: 5px; line-height: 1.5;
+}
+.ag-job-progress {
+  display: block; font-size: 11px; color: var(--accent); margin-top: 4px;
+}
+.ag-job-error {
+  font-size: 11.5px; color: #b3272b; background: #fdecec;
+  border: 1px solid #f6cfd0; border-radius: 5px; padding: 4px 7px;
+  margin-top: 5px; word-break: break-word;
+}
+.ag-job-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ag-job-thumb {
+  display: block; width: 68px; height: 68px; border-radius: 6px;
+  overflow: hidden; border: 1px solid var(--border); background: #f4f6f9;
+  flex: 0 0 auto; position: relative;
+}
+.ag-job-thumb img, .ag-job-thumb video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ag-job-thumb-audio {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--muted); text-decoration: none;
+}
+
+/* ---------- 澄清式提问气泡 ---------- */
+.ag-clarify { border-color: #d7ddfb; background: #f7f8ff; }
+.ag-clarify-q {
+  font-size: 13px; line-height: 1.65; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}
+.ag-clarify-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.ag-clarify-options { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ag-clarify-opt {
+  font-size: 12px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--accent); color: var(--accent); background: #fff;
+  border-radius: 14px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-clarify-opt:hover { background: var(--accent-soft); }
+.ag-clarify-reply { display: flex; gap: 7px; margin-top: 8px; align-items: stretch; }
+.ag-clarify-input {
+  flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px;
+  line-height: 1.5; padding: 6px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: #fff; color: var(--text);
+}
+.ag-clarify-input:focus { outline: none; border-color: var(--accent); }
+
+.ag-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.ag-act {
+  font-size: 12px; padding: 5px 11px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--accent); color: var(--accent); background: #fff;
+  border-radius: 7px;
+}
+.ag-act:hover { background: var(--accent-soft); }
+
+.ag-composer {
+  /* composer 是固定在底部的工作区 —— 不允许被消息区压缩掉 */
+  flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--panel);
+  padding: 10px 22px 12px;
+}
+.ag-status { font-size: 11.5px; color: var(--muted); min-height: 16px; margin-bottom: 6px; }
+/* 进度反馈：阶段名 + 已用时间。等待时给一个脉动点，让用户知道「还在跑」。 */
+.ag-status.ag-status-busy { color: var(--accent); font-weight: 600; }
+.ag-progress {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--muted);
+}
+.ag-progress-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  flex: 0 0 auto; animation: ag-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ag-pulse {
+  0%, 100% { opacity: .25; transform: scale(.8); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-progress-dot { animation: none; opacity: .8; }
+}
+.ag-progress-stage { color: var(--text); font-weight: 600; }
+.ag-progress-elapsed { font-variant-numeric: tabular-nums; }
+.ag-progress-step { color: var(--muted); }
+.ag-input-row { display: flex; gap: 10px; align-items: stretch; }
+.ag-input-row textarea {
+  flex: 1; min-width: 0; resize: vertical; font-family: inherit; font-size: 13px;
+  line-height: 1.55; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--border); background: #fff; color: var(--text);
+}
+.ag-input-row textarea:focus { outline: none; border-color: var(--accent); }
+.ag-send {
+  flex: 0 0 auto; align-self: flex-end; padding: 9px 20px; font-size: 13px;
+  font-family: inherit; cursor: pointer; border: none; border-radius: 9px;
+  background: var(--accent); color: #fff;
+}
+.ag-send:disabled { opacity: .55; cursor: default; }
+.ag-hint-line { font-size: 11px; color: var(--muted); margin-top: 6px; }
 

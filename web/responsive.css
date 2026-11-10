@@ -156,6 +156,10 @@
   .enhance-btn { min-height: 40px; padding: 8px 14px; }
   .enhance-spec { max-width: 100%; width: 100%; min-height: 38px; }
   .refine-history-btn { min-height: 38px; }
+  /* 提示词历史的「历史」入口 —— 触控目标不得小于 32px
+     （测试 test_touch_targets_are_large_enough_on_phone 的硬约束）。
+     它默认只有 21px 高（padding 2px + 10.5px 字号），手机上点不准。 */
+  .ph-open-btn { min-height: 38px; padding: 8px 14px; font-size: 12px; }
   .gen-btn { height: 48px; font-size: 15px; }
   .img-lora-btn { width: 34px; height: 34px; }
   .img-lora-slider input[type=range] { height: 30px; }
@@ -227,6 +231,20 @@
     width: 100%; min-width: 0; flex: 1 1 auto;
     padding: 12px 12px 24px;
   }
+
+  /* ---------- 4.3b 内置 Agent 页：保证输入框永远可达 ----------
+     .agent-page 是 flex 列布局：head / messages(flex:1,min-height:0) / composer。
+     三个条件缺一不可：
+       1) .agent-page 自身是 flex（不能用内联 display:block 覆盖）
+       2) .ag-messages 有 flex:1 + min-height:0（否则消息区撑高）
+       3) .ag-composer 是 flex:0 0 auto（否则被压扁）
+     再加上 body{overflow:hidden}，只要上面任何一条失效，
+     整页就滚不动 -> 窄屏下对话变长后输入框彻底不可达。 */
+  .agent-page { min-height: 0; overflow: hidden; }
+  .ag-messages { min-height: 0; }
+  .ag-head { padding: 12px 14px 10px; }
+  .ag-composer { padding: 8px 14px 10px; }
+  .ag-messages { padding: 14px 14px; gap: 12px; }
 
   /* ---------- 4.4 网格：手机上卡片更小，列数自适应 ---------- */
   .jobs-grid {
@@ -405,4 +423,45 @@
   .job-actions button,
   .job-actions a { flex: 1 1 45%; }
   .al-drawer-close { width: 40px; height: 40px; }
+}
+
+/* ============================================================
+   内置多模态 Agent 面板 —— 窄屏适配
+   断点真源仍是 web/responsive.css 顶部的 --bp-phone / --bp-tablet。
+   ============================================================ */
+
+/* 手机：消息区与输入区都要能滚动，输入区不能被键盘顶出屏幕 */
+@media (max-width: 700px) {
+  .ag-head { padding: 12px 14px 10px; }
+  .ag-title { font-size: 15px; }
+  .ag-sub { font-size: 11.5px; }
+  .ag-messages { padding: 14px; gap: 12px; }
+  .ag-msg { flex-direction: column; gap: 4px; }
+  .ag-msg-role { width: auto; text-align: left; padding-top: 0; font-size: 10.5px; }
+  .ag-msg-body { width: 100%; }
+  .ag-composer { padding: 8px 14px 10px; }
+  .ag-input-row { flex-direction: column; }
+  .ag-send { align-self: stretch; width: 100%; }
+  .ag-hint-line { font-size: 10.5px; }
+
+  /* 新增组件的窄屏规则：
+     工具块的长参数/结果用 code 承载，窄屏必须能换行而不是撑出横向滚动条；
+     澄清提问的选项和输入框也要能换行。 */
+  .ag-tool-head { flex-wrap: wrap; gap: 5px; }
+  .ag-tool-meta { margin-left: 0; }
+  .ag-tool-args code, .ag-tool-result code {
+    max-width: 100%; display: block;
+  }
+  .ag-tool-body { padding: 5px 8px 8px 8px; }
+  .ag-clarify-reply { flex-direction: column; }
+  .ag-clarify-opt { white-space: normal; text-overflow: clip; }
+  .ag-job-thumbs .ag-job-thumb { width: 56px; height: 56px; }
+  .ag-job-refresh { margin-left: auto; }
+}
+
+/* 平板：输入区改为上下两行，发送按钮不撑满 */
+@media (max-width: 1100px) {
+  .ag-head { padding: 14px 18px 11px; }
+  .ag-messages { padding: 16px 18px; }
+  .ag-composer { padding: 9px 18px 11px; }
 }

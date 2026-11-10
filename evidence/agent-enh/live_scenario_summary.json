@@ -1,0 +1,44 @@
+{
+  "normal": {
+    "ok": true,
+    "status": 200,
+    "jobs": 1,
+    "elapsed_ms": 31358
+  },
+  "invalid": {
+    "ok": true,
+    "status": 200,
+    "jobs": 0,
+    "elapsed_ms": 4426
+  },
+  "clarification": {
+    "ok": true,
+    "status": "completed",
+    "jobs": 1,
+    "elapsed_ms": null
+  },
+  "stream": {
+    "ok": true,
+    "status": null,
+    "jobs": 0,
+    "elapsed_ms": 37833
+  },
+  "music": {
+    "ok": true,
+    "status": 200,
+    "jobs": 1,
+    "elapsed_ms": 21485
+  },
+  "vres": {
+    "ok": true,
+    "status": 200,
+    "jobs": 1,
+    "elapsed_ms": 14895
+  },
+  "negative": {
+    "ok": true,
+    "status": 200,
+    "jobs": 1,
+    "elapsed_ms": 33463
+  }
+}

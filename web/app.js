@@ -2,6 +2,38 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
+// ---------- 页面显隐（统一切页契约） ----------
+//
+// 所有主页面（jobsArea / panel / stitchPanel / systemPage / providersPage /
+// assetsPage / agentPage）都靠 .page-hidden 这个类切换显隐，
+// **不再用内联 style.display**。
+//
+// 为什么必须这样：内联 style.display 的优先级高于任何 CSS 规则。
+// 只要有人写了 style.display="block"，.agent-page{display:flex} 就被覆盖 ——
+// flex 布局塌掉后 .ag-messages 的 flex:1 + min-height:0 全部失效，
+// 消息区按内容撑高、composer 被顶出视口，而 body{overflow:hidden} 让整页滚不动。
+// 结果是窄屏下对话一变长，输入框就彻底不可达（实测 390px 下
+// inputTop=3068 / reachable=false，滚轮与触摸滑动都无效）。
+//
+// 显隐写成类之后，任何一条 CSS 规则都能覆盖它，不会再出现「一个人改坏了整条链」。
+//
+// 显示时**不**套一个统一的 .page-visible{display:flex} ——
+// 各页的布局不同（.jobs-area/.system-page 是块级，.assets-page/.agent-page 是 flex），
+// 统一成 flex 会改变它们的内部排版。这里只管「隐藏」，显示时把内联 display
+// 整个移除，让该页自己的 CSS 规则决定布局。
+function showPage(el, visible) {
+  if (!el) return;
+  el.classList.toggle("page-hidden", !visible);
+  el.style.removeProperty("display");
+}
+
+// 页面当前是否可见（按计算样式判断，不依赖内联 display —— 现在已经没有内联 display 了）
+function pageIsVisible(el) {
+  if (!el) return false;
+  if (el.classList.contains("page-hidden")) return false;
+  return getComputedStyle(el).display !== "none";
+}
+
 const MODE_INFO = {
   t2v: { name: "文生视频", kind: "video" },
   flf: { name: "首尾帧", kind: "video" },
@@ -1693,6 +1725,24 @@ function currentPromptLevel() {
   return level;
 }
 
+/**
+ * 当前提示词框内容的「原始版」（增强之前用户写的那段）。
+ *
+ * 【为什么需要】
+ * 提示词框里放的是**增强后**的内容（用户点「替换提示词框」就换掉了）。
+ * 但提示词历史要同时保留「原始」与「增强后」两份 ——
+ * 所以提交时把原始版一起带上（params.original_prompt），
+ * 服务端才能把两条都记进历史。
+ *
+ * 取法：版本谱系里的 level 0（就是「原始提示词」那条）。
+ * 没有 level 0（比如用户自己手敲的、没走过增强）-> 返回空串，
+ * 服务端会退化成「原始 == 最终」。
+ */
+function currentOriginalPrompt() {
+  const original = promptVersions.versions.find(v => v.level === 0 && v.text);
+  return original ? original.text : "";
+}
+
 // 记录一个版本
 function pushPromptVersion(level, text, source, specId) {
   const trimmed = (text || "").trim();
@@ -1926,6 +1976,12 @@ $("#genBtn").addEventListener("click", async () => {
     }
     const musicFd = new FormData();
     musicFd.append("mode", mode);
+    // 【提示词历史】音乐面板的原始版 = 增强前的音乐描述。
+    // 音乐增强是**结构化**的（风格字段 + 歌词），提示词框里的描述通常没被改，
+    // 所以这里取提示词框当前值即可；服务端会自己判定是否算「未增强」。
+    if (collected.params.prompt && !collected.params.original_prompt) {
+      collected.params.original_prompt = collected.params.prompt;
+    }
     musicFd.append("params", JSON.stringify(collected.params));
     if (collected.assetRefs.length) {
       musicFd.append("asset_refs", JSON.stringify(collected.assetRefs));
@@ -1956,6 +2012,9 @@ $("#genBtn").addEventListener("click", async () => {
   fd.append("mode", mode);
   const params = {
     prompt,
+    // 【提示词历史】原始版一起带上 —— 提示词框里现在是增强后的内容，
+    // 没有这一项服务端就分不出「原始」与「增强后」。
+    original_prompt: currentOriginalPrompt(),
     resolution: state.res,
     aspect: state.aspect,
     duration: state.duration,
@@ -2126,6 +2185,17 @@ async function loadGenerationTypes() {
     const data = await resp.json();
     GEN_TYPES.types = data.types || [];
     GEN_TYPES.registeredModes = data.registered_modes || [];
+    // 把「Agent 有哪些素材通道」下发给媒体语义模块。
+    //
+    // 【为什么必须在这里接 —— 2026-11-10 审查修复】
+    // AgentMedia 里原来**硬编码**「a2a / flf 是 Agent 建不了的」，
+    // 而后端已改成按 mode 分派槽位（a2a→ref_audio、flf→first_frame）——
+    // 合并后那条提示变成**反向阻断**：后端能建，前端说不能。
+    // 现在能力位由服务端下发，前端只渲染服务端给的结论。
+    const media = window.AgentMedia;
+    if (media && typeof media.applyServerAgentSlots === "function") {
+      media.applyServerAgentSlots(data);
+    }
     renderGenTypeTabs();
   } catch (e) { /* 静默：不阻断任务列表 */ }
 }
@@ -3463,12 +3533,13 @@ $("#unloadBtn").addEventListener("click", async () => {
 // ---------- 硬件参数页 ----------
 function showCreate() {
   state.page = "create";
-  $("#jobsArea").style.display = "";
-  $("#panel").style.display = "";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
+  showPage($("#jobsArea"), true);
+  showPage($("#panel"), true);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
 }
@@ -3477,12 +3548,13 @@ function showStitch() {
   state.page = "stitch";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navStitch").classList.add("active");
-  $("#jobsArea").style.display = "";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
+  showPage($("#jobsArea"), true);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), true);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   state.tab = "done";
   state.doneFilters.media = "video";
   $("#doneMedia").value = "video";
@@ -3497,12 +3569,13 @@ function showSystem() {
   state.page = "system";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navSystem").classList.add("active");
-  $("#jobsArea").style.display = "none";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "block";
-  $("#providersPage").style.display = "none";
-  $("#assetsPage").style.display = "none";
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), true);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   refreshHardware();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
@@ -3513,16 +3586,37 @@ function showProviders() {
   state.page = "providers";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   $("#navProviders").classList.add("active");
-  $("#jobsArea").style.display = "none";
-  $("#panel").style.display = "none";
-  $("#stitchPanel").style.display = "none";
-  $("#systemPage").style.display = "none";
-  $("#providersPage").style.display = "block";
-  $("#assetsPage").style.display = "none";
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), true);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
   loadProviders();
   loadAgentConfig();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
+}
+
+// 内置多模态 Agent 页（实现见 agent.js）
+function showAgent() {
+  state.page = "agent";
+  $$(".nav-item").forEach(x => x.classList.remove("active"));
+  const nav = $("#navAgent");
+  if (nav) nav.classList.add("active");
+  showPage($("#jobsArea"), false);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), true);
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
+  if (window.AgentUI && typeof window.AgentUI.renderMessages === "function") {
+    window.AgentUI.renderMessages();
+  }
 }
 
 $("#navSystem").addEventListener("click", showSystem);
@@ -3853,10 +3947,8 @@ function setSidebarOpen(open) {
 function activePanel() {
   const create = $("#panel");
   const stitch = $("#stitchPanel");
-  const createOn = create && create.style.display !== "none";
-  const stitchOn = stitch && stitch.style.display !== "none";
-  if (stitchOn) return stitch;
-  if (createOn) return create;
+  if (pageIsVisible(stitch)) return stitch;
+  if (pageIsVisible(create)) return create;
   return null;
 }
 

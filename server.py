@@ -81,6 +81,8 @@ from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
+from h3studio import prompt_history as ph
+from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
@@ -89,6 +91,10 @@ from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
+from h3studio import agent as agent_mod
+from h3studio import agent_memory
+from h3studio import agent_sessions
+
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -145,12 +151,32 @@ DEFAULT_CONFIG = {
 
 
 def load_config():
+    """读取配置。
+
+    优先级：环境变量 > config.json > 默认值。
+
+    ⚠️ 2026-11-10 加环境变量覆盖：独立测试实例需要**独立端口 + 独立
+    data_dir**，但 config.json 是被 git 跟踪的（不能就地改）。
+    agent 分支的 run_live_8199.sh 已经在用 H3STUDIO_DATA_DIR，
+    这里把端口也补上（之前端口只能从 config.json 读，
+    独立实例根本起不来 —— 实测报 "address already in use"）。
+    """
     cfg = dict(DEFAULT_CONFIG)
     if CONFIG_PATH.exists():
         try:
             cfg.update(json.loads(CONFIG_PATH.read_text(encoding="utf-8")))
         except Exception as e:
             print(f"[config] 读取失败，用默认配置: {e}")
+    # 环境变量覆盖（独立实例用）
+    port_env = os.environ.get("H3STUDIO_PORT")
+    if port_env:
+        try:
+            cfg["port"] = int(port_env)
+        except ValueError:
+            print(f"[config] H3STUDIO_PORT 不是数字，忽略: {port_env!r}")
+    data_env = os.environ.get("H3STUDIO_DATA_DIR")
+    if data_env:
+        cfg["data_dir"] = data_env
     return cfg
 
 
@@ -213,6 +239,8 @@ def init_db():
         )
     # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
     prov.ensure_tables(conn)
+    # 提示词历史表（各功能面板的提示词留痕）
+    ph.ensure_table(conn)
 
 
 def row_to_job(r):
@@ -901,9 +929,21 @@ class Worker:
 
         任何一个批次失败只标记该批次 failed，其余批次继续跑；
         任务整体状态 = done（至少一个成功）/ failed（全部失败）。
+
+        ⚠️ 2026-11-10 修复：**mode 必须从 job_row 的 DB 列取**。
+            旧代码让 `_run_one_batch` 用 `params.get("mode") or "t2i"`，
+            而 params（DB 的 params JSON）里**从来没有 mode 键** ——
+            `params["mode"] = mode` 只在**非批次**分支里设置（server.py:829）。
+            于是 MOSS 批量任务（mode=t2i_moss）走到批次分支时 mode 变成 "t2i"，
+            build_workflow 走的是 **Z-Image t2i** 工作流：
+            用户设的 steps=100 / cfg=4.3 / shift=5 / sgm_uniform 全被忽略，
+            实际跑的是 Z-Image 的 steps=8 + 放大分支的 KSampler(steps=5)
+            —— 界面显示「MOSS-Image 采样步数 100」，日志却只跑 5 步。
+            现在把 mode 显式传下去，批次与单张走**同一条**工作流构建路径。
         """
         job_id = job_row["id"]
         params = json.loads(job_row["params"])
+        mode = job_row["mode"]
         with db() as conn:
             rows = conn.execute(
                 "SELECT * FROM job_batches WHERE job_id=? ORDER BY idx", (job_id,)).fetchall()
@@ -916,7 +956,7 @@ class Worker:
                     "UPDATE job_batches SET status='running', started_at=? WHERE id=?",
                     (time.time(), batch_id))
             try:
-                outputs = await self._run_one_batch(job_id, batch_id, params, row["seed"])
+                outputs = await self._run_one_batch(job_id, batch_id, mode, params, row["seed"])
                 done_count += 1
                 with db() as conn:
                     conn.execute(
@@ -957,9 +997,16 @@ class Worker:
                     "UPDATE jobs SET status='failed', error=?, progress_text=?, finished_at=? WHERE id=?",
                     ("所有批次均失败", f"0/{total} 批次成功", time.time(), job_id))
 
-    async def _run_one_batch(self, job_id: str, batch_id: str, params: dict, seed):
-        """跑单个批次并返回产物列表（文件已落盘）。"""
-        mode = params.get("mode") or "t2i"
+    async def _run_one_batch(self, job_id: str, batch_id: str, mode: str,
+                             params: dict, seed):
+        """跑单个批次并返回产物列表（文件已落盘）。
+
+        mode 由调用方从 jobs 表的 mode 列传入（**不能**从 params 里取 ——
+        params 里没有 mode 键，见 _run_batches 的说明）。
+        批次与单张走**完全相同**的 build_workflow(mode, params) 路径，
+        所以 steps / cfg / shift / scheduler / seed 的语义一致，
+        只有 seed 按批次递推（每张一个变体）。
+        """
         batch_params = dict(params)
         batch_params["seed"] = int(seed)
         batch_params["job_id"] = f"{job_id}_{batch_id}"
@@ -1191,6 +1238,339 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     return out, ""
 
 
+def create_job_record(mode: str, params: dict) -> str:
+    """
+    建一条生成任务记录，返回 job_id。
+
+    【为什么要抽成独立函数】
+    POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
+    必须是**同一套**建任务逻辑 —— 两份实现必然漂移：
+      * 生成类型（gen_type）写不进去 -> 任务列表标签变成「其它生成」
+      * 批次拆分逻辑不同 -> 面板出 3 张、Agent 出 1 张
+      * 素材引用（asset_refs）漏写 -> worker 拿不到参考图
+    所以这里抽出唯一的实现，两边都调它。
+
+    params 会被就地写入（补 gen_type / asset_refs），调用方按需自取。
+    """
+    job_id = uuid.uuid4().hex[:12]
+    now = time.time()
+    # 生成类型写进任务 meta（真实记录，不靠读时推断）
+    params["gen_type"] = gen_types.type_key_for_mode(mode)
+    asset_refs = params.get("asset_refs")
+    if asset_refs:
+        params["asset_refs"] = asset_refs
+    # 生成批次：文生图支持一次出 N 张（各自独立种子）
+    batch_count = 1
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+        try:
+            batch_count = int(params.get("batch_count") or 1)
+        except (TypeError, ValueError):
+            batch_count = 1
+        batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
+            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
+        if batch_count > 1:
+            base_seed = params.get("seed")
+            for index in range(batch_count):
+                # 种子递推：同参数批量出图但每张可区分
+                if base_seed:
+                    seed = int(base_seed) + index
+                else:
+                    seed = random.randint(0, 2**48)
+                conn.execute(
+                    "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
+                    "VALUES (?,?,?,?, 'queued', ?)",
+                    (uuid.uuid4().hex[:12], job_id, index, seed, now))
+    return job_id
+
+
+# ------------------------------------------------------------------ Agent 任务查询
+#
+# Agent 的任务类工具（cancel_job / retry_job / list_jobs / get_job_status）
+# 需要**读**任务库。写成模块级函数而不是 HTTP handler，是为了让 Agent
+# 直接复用（与 create_job_record / prepare_job_params 同一个模式）。
+#
+# 为什么不复用 api_get / api_cancel（它们是 async handler）：
+#   * api_cancel 会去 ComfyUI 撤单 —— Agent 的 cancel_job 需要这个行为，
+#     但它得在 async 上下文里跑。Agent 的工具 handler 本来就是 async，
+#     所以这里提供 async 版本。
+#   * 读类（get/list）用同步函数即可 —— SQLite 读很快。
+
+def get_job_params(job_id: str) -> dict | None:
+    """取一个任务的 mode + params（供 retry_job 复用）。不存在返回 None。"""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT mode, params FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    try:
+        params = json.loads(row["params"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        params = {}
+    return {"mode": row["mode"], "params": params}
+
+
+def list_job_records(status: str | None = None, mode: str | None = None,
+                     since_hours: int | None = None,
+                     limit: int = 10) -> list[dict]:
+    """
+    检索历史任务（供 Agent 的 list_jobs 工具用）。
+
+    刻意**自己查**而不复用 api_list 的过滤逻辑：api_list 面向前端
+    （有一堆 UI 专用筛选），Agent 需要的是「按状态/模式/时间窗口」的
+    简单检索。两套筛选各有用途，强行合并会让两边都变复杂。
+    """
+    conditions = []
+    args: list = []
+    if status:
+        conditions.append("status=?")
+        args.append(status)
+    if mode:
+        conditions.append("mode=?")
+        args.append(mode)
+    if since_hours and since_hours > 0:
+        conditions.append("created_at >= ?")
+        args.append(time.time() - float(since_hours) * 3600.0)
+    sql = "SELECT * FROM jobs"
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    args.append(int(limit))
+    with db() as conn:
+        rows = conn.execute(sql, args).fetchall()
+    result = []
+    for row in rows:
+        job = row_to_job(row)
+        result.append({
+            "job_id": job["id"],
+            "mode": job["mode"],
+            "label": job["gen_type_label"],
+            "status": job["status"],
+            "created_at": job["created_at"],
+            "progress": job["progress"],
+            "progress_text": job["progress_text"],
+            "prompt": (job["params"] or {}).get("prompt") or "",
+            "error": job["error"],
+            "outputs": job["outputs"],
+        })
+    return result
+
+
+def get_job_status_payload(job_id: str) -> dict | None:
+    """
+    单个任务的**轮询友好**状态（供 Agent 的 get_job_status 工具用）。
+
+    刻意做成「前端拿到就能直接渲染」的形状：
+      * status / progress / progress_text —— 进度条能直接用
+      * outputs —— 产物路径（前端轮询这个拿缩略图/输出）
+      * elapsed —— 已耗时
+      * poll_after_ms —— 建议的下次轮询间隔（前端照着排程即可）
+    """
+    with db() as conn:
+        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    job = row_to_job(row)
+    batches = batches_of(job_id)
+    status = job["status"]
+    # 未结束的任务建议 3 秒后再查；已结束的让前端停掉轮询
+    poll_after_ms = 0 if status in ("done", "failed", "canceled") else 3000
+    payload = {
+        "job_id": job["id"],
+        "mode": job["mode"],
+        "label": job["gen_type_label"],
+        "status": status,
+        "progress": job["progress"],
+        "progress_text": job["progress_text"] or "",
+        "error": job["error"],
+        "outputs": job["outputs"] or [],
+        "params": job["params"] or {},
+        "created_at": job["created_at"],
+        "elapsed": job["elapsed"],
+        "poll_after_ms": poll_after_ms,
+        "is_terminal": status in ("done", "failed", "canceled"),
+    }
+    if batches:
+        payload["batches"] = batches
+    return payload
+
+
+async def cancel_job_record(job_id: str) -> dict:
+    """
+    取消一个任务（供 Agent 的 cancel_job 工具用）。
+
+    与 api_cancel 的区别：api_cancel 是 HTTP handler（读 request），
+    这里接受 job_id 直接调用；两者共用同一套状态机与 ComfyUI 撤单逻辑。
+    """
+    async with WORKER.submit_lock:
+        with db() as conn:
+            r = conn.execute(
+                "SELECT status, prompt_id, mode FROM jobs WHERE id=?",
+                (job_id,)).fetchone()
+        if not r:
+            raise ValueError(f"任务不存在：{job_id}")
+        if r["status"] not in ("running", "queued"):
+            # 已经结束了 —— 不是错误，直接告诉模型当前状态
+            return {"job_id": job_id, "status": r["status"], "ok": True,
+                    "message": f"任务已是「{r['status']}」状态，无需取消"}
+        pid = r["prompt_id"]
+        if pid:
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=6)) as session:
+                    for endpoint, payload in (("queue", {"delete": [pid]}),
+                                              ("interrupt", {"prompt_id": pid})):
+                        async with session.post(f"{COMFY}/{endpoint}",
+                                                json=payload) as resp:
+                            resp.raise_for_status()
+            except Exception as exc:
+                raise ValueError(f"无法确认停止请求，请重试：{exc}")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='canceled', finished_at=? "
+                "WHERE id=? AND status IN ('queued','running','failed')",
+                (time.time(), job_id))
+            status = conn.execute(
+                "SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()["status"]
+    return {"job_id": job_id, "status": status, "ok": True}
+
+
+class JobValidationError(ValueError):
+    """建任务前的参数校验失败。message 面向用户，直接可读。"""
+
+    def __init__(self, message, code="bad_request", extra=None):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.extra = extra or {}
+
+
+#: 允许的生成模式（与 workflows.BUILDERS 一致 —— 后端真实注册的模式）
+JOB_MODES = ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+             "t2a", "a2a")
+
+
+def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
+                       saved_files: dict | None = None) -> list:
+    """
+    校验并补全一个任务的参数。**就地修改 params**，返回最终的 asset_refs。
+
+    【为什么要抽成独立函数】
+    POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
+    必须是**同一套**校验 —— 各写一份必然漂移：
+      * Agent 允许 i2i_qwen 不带参考图 -> 提交后才炸
+      * Agent 允许 a2a 带 3 段音频 -> worker 报错
+      * Agent 漏掉 <imageN> 占位注入 -> 图1 变成图2（极难查）
+    所以这里抽出唯一的实现，两边都调它。
+
+    失败一律抛 JobValidationError（带可读原因 + code）。
+    """
+    asset_refs = list(asset_refs or [])
+    saved_files = saved_files or {}
+
+    if mode not in JOB_MODES:
+        raise JobValidationError(f"未知模式 {mode}")
+
+    if mode == "flf":
+        if saved_files.get("file_first"):
+            params["first_frame"] = saved_files["file_first"][0]
+        if saved_files.get("file_last"):
+            params["last_frame"] = saved_files["file_last"][0]
+        if not params.get("first_frame"):
+            raise JobValidationError("首尾帧模式需要至少上传首帧图片")
+    elif mode == "r2v":
+        refs = saved_files.get("file_ref", [])
+        if not refs:
+            # 素材库来源的参考图也算（worker 会按 asset_refs 上传）
+            if not [r for r in asset_refs
+                    if isinstance(r, dict) and r.get("slot") == "ref_image"]:
+                raise JobValidationError("参考模式需要至少 1 张参考图")
+        else:
+            params["ref_images"] = refs[:3]
+    elif mode == "i2i_qwen":
+        # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
+        #
+        # 需求原文：「编辑里的参考图，强制要求必须走素材库」。
+        # 所以这里**不接受**本地上传通道（file_ref）作为图片编辑的参考图 ——
+        # 走本地上传的会被明确拒绝，并提示改从素材库选择。
+        # （上传到素材库本身仍然可用：素材库页有上传入口，
+        #   入库后的条目带 asset_id，才能作为参考图。）
+        uploaded = saved_files.get("file_ref", [])
+        if uploaded:
+            raise JobValidationError(
+                "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
+                "请先在「素材库」页上传并入库，再从素材库选择参考图。",
+                code="ref_must_come_from_library")
+
+        # 参考图元数据（asset_id + 描述 + 标签 + 顺序）由前端提交
+        ref_specs = params.get("ref_images") or []
+        if not isinstance(ref_specs, list):
+            ref_specs = []
+        refs = ref_imgs.normalize_refs(ref_specs)
+        if len(refs) < ref_imgs.MIN_REF_IMAGES:
+            raise JobValidationError(
+                f"图片编辑至少需要 {ref_imgs.MIN_REF_IMAGES} 张参考图，"
+                f"当前 {len(refs)} 张（参考图必须来自素材库）",
+                code="ref_required")
+        if len(refs) > ref_imgs.MAX_REF_IMAGES:
+            raise JobValidationError(
+                f"参考图最多 {ref_imgs.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
+                f"请删除多余参考图（上限 {ref_imgs.MAX_REF_IMAGES} 张，"
+                f"模型官方能力上限 10 张）",
+                code="ref_too_many")
+
+        # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
+        prompt_text = (params.get("prompt") or "").strip()
+        check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
+        if not check["ok"]:
+            raise JobValidationError(
+                "参考图校验未通过：" + "；".join(check["errors"]),
+                code="ref_invalid", extra={"errors": check["errors"]})
+
+        # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
+        params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
+        params["ref_images"] = refs
+
+    # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
+    if mode == "a2a":
+        audio_refs = [r for r in (asset_refs or [])
+                      if isinstance(r, dict) and r.get("slot") == "ref_audio"]
+        if not audio_refs:
+            raise JobValidationError(
+                "参考生音乐需要选择一段参考音频（从素材库选择）。",
+                code="ref_audio_required")
+        if len(audio_refs) > 1:
+            raise JobValidationError(
+                f"参考生音乐只能选 1 段参考音频，当前 {len(audio_refs)} 段。",
+                code="ref_audio_too_many")
+        asset_refs = audio_refs
+
+    # 【2026-11-09 对齐第三方 · 音乐结构化豁免】
+    # 面板新增了结构化风格（第三方 YuE2StylePrompt 的 12 字段），
+    # **纯结构化也能出活** —— 所以 t2a / a2a 的 prompt 允许为空。
+    # 真正判空在 music_yue2._resolve_style() 里做（结构化 + 自由文本都空才报错）。
+    # ⚠️ 这段逻辑原在 api_create 里（live 侧）；合并到 prepare_job_params 后，
+    #    内置 Agent 的 create_job 工具也走同一套 —— 否则 Agent 建音乐任务时
+    #    「结构化风格齐全但 prompt 空」会被误拒（回归已上线的音乐能力）。
+    if not (params.get("prompt") or "").strip():
+        if mode in ("t2a", "a2a"):
+            has_style_field = any(
+                str(params.get(f"style_{f}") or "").strip()
+                for f in ("language", "genre", "mood", "vocal", "vocal_color",
+                          "instruments", "tempo_bpm", "energy", "length_hint", "extra")
+            )
+            if has_style_field:
+                # 结构化风格齐全 —— 放行（prompt 留空是合法的）
+                return asset_refs
+            raise JobValidationError(
+                "音乐风格描述不能为空：请填写自由文本风格描述，或填写结构化风格字段。",
+                code="music_style_required")
+        raise JobValidationError("提示词不能为空")
+    return asset_refs
+
+
+
 async def api_create(request):
     """POST /api/jobs  (multipart: mode, params(JSON), files[])"""
     reader = await request.multipart()
@@ -1218,105 +1598,24 @@ async def api_create(request):
             fname = await save_uploaded_image(part)
             saved_files.setdefault(part.name, []).append(fname)
 
-    if mode not in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
-                    "t2a", "a2a"):
-        return web.json_response({"error": f"未知模式 {mode}"}, status=400)
-
-    if mode == "flf":
-        if saved_files.get("file_first"):
-            params["first_frame"] = saved_files["file_first"][0]
-        if saved_files.get("file_last"):
-            params["last_frame"] = saved_files["file_last"][0]
-        if not params.get("first_frame"):
-            return web.json_response({"error": "首尾帧模式需要至少上传首帧图片"}, status=400)
-    elif mode == "r2v":
-        refs = saved_files.get("file_ref", [])
-        if not refs:
-            return web.json_response({"error": "参考模式需要至少 1 张参考图"}, status=400)
-        params["ref_images"] = refs[:3]
-    elif mode == "i2i_qwen":
-        # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
-        #
-        # 需求原文：「编辑里的参考图，强制要求必须走素材库」。
-        # 所以这里**不接受**本地上传通道（file_ref）作为图片编辑的参考图 ——
-        # 走本地上传的会被明确拒绝，并提示改从素材库选择。
-        # （上传到素材库本身仍然可用：素材库页有上传入口，
-        #   入库后的条目带 asset_id，才能作为参考图。）
-        uploaded = saved_files.get("file_ref", [])
-        if uploaded:
-            return web.json_response(
-                {"error": "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
-                          "请先在「素材库」页上传并入库，再从素材库选择参考图。",
-                 "code": "ref_must_come_from_library"}, status=400)
-
-        # 参考图元数据（asset_id + 描述 + 标签 + 顺序）由前端提交
-        ref_specs = params.get("ref_images") or []
-        if not isinstance(ref_specs, list):
-            ref_specs = []
-        refs = ref_imgs.normalize_refs(ref_specs)
-        if len(refs) < ref_imgs.MIN_REF_IMAGES:
-            return web.json_response(
-                {"error": f"图片编辑至少需要 {ref_imgs.MIN_REF_IMAGES} 张参考图，"
-                          f"当前 {len(refs)} 张（参考图必须来自素材库）",
-                 "code": "ref_required"}, status=400)
-        if len(refs) > ref_imgs.MAX_REF_IMAGES:
-            return web.json_response(
-                {"error": f"参考图最多 {ref_imgs.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。"
-                          f"请删除多余参考图（上限 {ref_imgs.MAX_REF_IMAGES} 张，"
-                          f"模型官方能力上限 10 张）",
-                 "code": "ref_too_many"}, status=400)
-
-        # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
-        prompt_text = (params.get("prompt") or "").strip()
-        check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
-        if not check["ok"]:
-            return web.json_response(
-                {"error": "参考图校验未通过：" + "；".join(check["errors"]),
-                 "code": "ref_invalid", "errors": check["errors"]}, status=400)
-
-        # 占位标记由服务端统一注入（保证与插槽顺序一致，前端不能自己乱填）
-        params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
-        params["ref_images"] = refs
-
-    # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
-    if mode == "a2a":
-        audio_refs = [r for r in (asset_refs or [])
-                      if isinstance(r, dict) and r.get("slot") == "ref_audio"]
-        if not audio_refs:
-            return web.json_response(
-                {"error": "参考生音乐需要选择一段参考音频（从素材库选择）。",
-                 "code": "ref_audio_required"}, status=400)
-        if len(audio_refs) > 1:
-            return web.json_response(
-                {"error": f"参考生音乐只能选 1 段参考音频，当前 {len(audio_refs)} 段。",
-                 "code": "ref_audio_too_many"}, status=400)
-        asset_refs = audio_refs
-
-    prompt = (params.get("prompt") or "").strip()
-    if not prompt and mode not in ("t2a", "a2a"):
-        return web.json_response({"error": "提示词不能为空"}, status=400)
-    # 【2026-11-09 对齐第三方】音乐模式允许 prompt 为空：
-    # 面板新增了结构化风格（第三方 YuE2StylePrompt 的 12 字段），
-    # 纯结构化也能出活 —— 真正判空在 music_yue2._resolve_style() 里做
-    # （结构化 + 自由文本都空才报错）。
-    if mode in ("t2a", "a2a") and not prompt:
-        has_style_field = any(
-            str(params.get(f"style_{f}") or "").strip()
-            for f in ("language", "genre", "mood", "vocal", "vocal_color",
-                      "instruments", "tempo_bpm", "energy", "length_hint", "extra")
-        )
-        if not has_style_field:
-            return web.json_response(
-                {"error": "音乐风格描述不能为空：请填写自由文本风格描述，或填写结构化风格字段。",
-                 "code": "music_style_required"}, status=400)
-
     # 文生视频新面板：服务端校验并归一全部参数。
     # 这一段是**唯一**的参数入口 —— 前端传什么都不认，只认这里算出来的值。
+    # 必须在 prepare_job_params **之前**跑：归一会改写 params，
+    # 而 prepare 的占位/素材校验依赖归一后的宽高。
     if mode == "t2v":
         normalized, error = normalize_t2v_params(params)
         if error:
             return web.json_response({"error": error}, status=400)
         params = normalized
+
+    try:
+        asset_refs = prepare_job_params(str(mode or ""), params, asset_refs,
+                                        saved_files)
+    except JobValidationError as exc:
+        payload = {"error": exc.message, "code": exc.code}
+        payload.update(exc.extra or {})
+        return web.json_response(payload, status=400)
+
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -1327,29 +1626,21 @@ async def api_create(request):
             batch_count = 1
         batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
 
-    job_id = uuid.uuid4().hex[:12]
-    now = time.time()
-    # 生成类型写进任务 meta（真实记录，不靠读时推断）
-    params["gen_type"] = gen_types.type_key_for_mode(mode)
     # 素材库引用写进 params：worker 跑的时候据此把素材上传到 ComfyUI
     if asset_refs:
         params["asset_refs"] = asset_refs
+    # 建任务记录走共享实现（与内置 Agent 的 create_job 工具同一条路）
+    job_id = create_job_record(str(mode or ""), params)
+    # 【提示词历史】提交即留痕 —— 原始提示词 + 最终使用的提示词。
+    # 放在任务真的建成之后：任务建成了，才算一次真实的提示词使用。
+    #
+    # 【为什么单独一个 db() 而不是并进 create_job_record】
+    # create_job_record 是 Agent 的 create_job 工具与面板「生成」共用的
+    # 唯一实现（见该函数的 docstring）。提示词历史是**面板侧**的需求 ——
+    # Agent 工具链自己有自己的落点（见 h3studio/agent.py 的 record 钩子），
+    # 所以这里在面板提交这一层单独记账，两条链路互不干扰。
     with db() as conn:
-        conn.execute(
-            "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
-            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
-        if batch_count > 1:
-            base_seed = params.get("seed")
-            for index in range(batch_count):
-                # 种子递推：同参数批量出图但每张可区分
-                if base_seed:
-                    seed = int(base_seed) + index
-                else:
-                    seed = random.randint(0, 2**48)
-                conn.execute(
-                    "INSERT INTO job_batches (id, job_id, idx, seed, status, created_at) "
-                    "VALUES (?,?,?,?, 'queued', ?)",
-                    (uuid.uuid4().hex[:12], job_id, index, seed, now))
+        ph_hooks.record_prompt_history(conn, mode, params, source=ph.SOURCE_GENERATE)
     return json_ok({"id": job_id, "status": "queued", "batch_count": batch_count})
 
 
@@ -1973,6 +2264,14 @@ async def api_music_enhance(request):
     lyrics_text = music_style.resolve_lyrics(
         lyrics_struct.get("lyrics_override", ""),
         lyrics_struct.get("template") or "V-C-V-C-bridge-C")
+    # 【提示词历史】音乐的结构化增强产物也进历史。
+    # 音乐面板的「最终提示词」= 合成后的 style 串（真正送进 YuE2 的那段），
+    # 原始 = 用户写的那句描述。
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original or base, "prompt": style_text},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "style": style_struct,
         "lyrics": lyrics_struct,
@@ -2288,9 +2587,32 @@ async def api_generation_types(request):
 
     清单来自后端真实注册的生成模式（workflows.BUILDERS + longfilm），
     前端不硬编码任何类型名。
+
+    【每个类型额外带 agent_asset_slots —— 2026-11-10 审查修复】
+    前端原来**硬编码**「Agent 建不了 a2a / flf」（因为旧基线的 Agent
+    素材槽位恒为 ref_image）。但后端增强分支已经把槽位改成分派制
+    （agent_schema.MODE_SLOTS / mode_slot_plan）——
+    合并后前端那条提示变成**反向阻断**（后端能建，前端说不能）。
+    现在把真实槽位计划下发，前端只渲染服务端给的结论。
     """
+    types = gen_types.list_types()
+    for item in types:
+        key = item.get("key")
+        if not key or key == "__other__":
+            continue
+        try:
+            plan = agent_mod.agent_schema.mode_slot_plan(key)
+        except Exception:
+            continue
+        if plan.get("single") or plan.get("multi"):
+            item["agent_asset_slots"] = {
+                "single": plan["single"],
+                "multi": plan["multi"],
+                "max_per_slot": plan["max_per_slot"],
+                "source": "agent_schema.MODE_SLOTS",
+            }
     return json_ok({
-        "types": gen_types.list_types(),
+        "types": types,
         "registered_modes": gen_types.registered_modes(),
         # 界面分类（文生图 / 图片编辑 / 视频）—— 前端左侧入口按这个分组
         "categories": gen_types.list_categories(),
@@ -3051,6 +3373,18 @@ async def api_enhance(request):
                 elements = None
 
     merged = enh.merge_result(original, enhanced, mode)
+    # 【提示词历史】增强流程也留痕 —— 无论这次增强最后有没有被写回提示词框，
+    # 「原始 -> 增强后」这条对应关系都值得留下（用户下次能直接填回去）。
+    # mode_ctx 是发起增强时所在的面板（t2i / t2i_moss / t2v / t2a …），
+    # 它就是面板 key —— 跨面板隔离靠它。
+    _ph_panel = mode_ctx or ""
+    if _ph_panel:
+        with db() as conn:
+            ph_hooks.record_prompt_history(
+                conn, _ph_panel,
+                {"original_prompt": original, "prompt": enhanced,
+                 "model_key": model_key},
+                source=ph.SOURCE_ENHANCE)
     return json_ok({
         "original": original,
         "enhanced": enhanced,
@@ -3172,6 +3506,13 @@ async def api_moss_layout(request):
              "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    # 【提示词历史】MOSS 结构化增强的最终文本提示词也进历史。
+    # 面板固定是 t2i_moss —— layout 是 MOSS-Image 专属能力。
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, "t2i_moss",
+            {"original_prompt": original, "prompt": result["final_prompt"]},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "ok": True,
         "original": original,
@@ -3279,6 +3620,12 @@ async def api_qwen_pe_expand(request):
             {"error": f"官方 PE 扩写失败：{type(exc).__name__} {exc}"[:300],
              "degraded": True}, status=502)
 
+    # 【提示词历史】官方 PE 的扩写结果也进历史（面板 = mode，即 t2i_qwen / i2i_qwen）
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original, "prompt": result["expanded"]},
+            source=ph.SOURCE_ENHANCE)
     return json_ok({
         "ok": True,
         "original": original,
@@ -3393,6 +3740,442 @@ async def api_llm_proxy_chat(request):
     return web.Response(text=raw, status=200, content_type="application/json")
 
 
+# ------------------------------------------------------------------ 内置多模态 Agent
+#
+# Agent 的能力边界与设计见 docs/内置多模态Agent-架构设计.md。
+# 这里只做 HTTP 适配层：解析请求 -> 调 h3studio.agent.run_agent -> 返回结构化结果。
+
+#: 同时运行的 Agent 会话数上限（本地模型单卡，并发只会互相拖慢）
+AGENT_CONCURRENCY = agent_mod.MAX_CONCURRENT
+#: 并发闸门（惰性创建，避免 import 期就占住事件循环）
+AGENT_GATE: asyncio.Semaphore | None = None
+
+
+def _agent_gate() -> asyncio.Semaphore:
+    global AGENT_GATE
+    if AGENT_GATE is None:
+        AGENT_GATE = asyncio.Semaphore(AGENT_CONCURRENCY)
+    return AGENT_GATE
+
+
+def _agent_store():
+    return agent_sessions.get_store()
+
+
+def _agent_memory_store():
+    """Agent 的长期记忆库（跨会话用户偏好）。"""
+    return agent_memory.get_store()
+
+
+def _agent_error(exc: agent_mod.AgentError) -> web.Response:
+    payload = {"error": exc.message, "code": exc.code}
+    payload.update(exc.extra or {})
+    return web.json_response(payload, status=exc.status)
+
+
+async def api_agent_chat(request):
+    """
+    POST /api/agent/chat —— 内置多模态 Agent 主入口。
+
+    body:
+      message       用户意图（必填，上限 4000 字）
+      session_id    会话 ID（可选；不给则新建，多轮对话靠它串联）
+      provider_id   指定本地模型 Provider（可选；不给则用「本地模型配置」里的默认）
+      max_steps     最大步骤数（可选，默认 agent_mod.MAX_STEPS，上限同值）
+      stream        1/true = 用 SSE 流式返回（事件契约见
+                    docs/内置多模态Agent-接口契约.md）
+                    等价于调用 POST /api/agent/chat/stream。
+
+    【流式开关的两种合法写法 —— 2026-11-10 审查后明确】
+      A. POST /api/agent/chat
+         body: {"message": "...", "stream": 1}          ← body 载体
+      B. POST /api/agent/chat?stream=1
+         body: {"message": "..."}                       ← query 载体
+    两种都命中同一条 SSE 契约（事件名 / 字段完全一致）。
+    审查实测原前端发的是 B，而后端只读 body（A）——
+    于是真实浏览器 12/12 请求返回 application/json，流式 100% 不生效。
+    现在后端两边都读，前端也改用 A（body），
+    这样**已部署的旧前端**（B）依然能命中流式。
+
+    返回结构化结果（见 h3studio.agent.run_agent 的 docstring）：
+      status / answer / jobs / assets / prompt / steps / usage / provider / error
+      clarify_options / clarify_hint  （澄清态的快捷选项与提示）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+
+    # stream=1 -> 走 SSE（与 /api/agent/chat/stream 完全一致的契约）。
+    #
+    # 为什么要同一个端点也支持 stream：前端只需要一个 URL，
+    # 带不带 stream 由请求体决定，不用在两套 URL 之间切换。
+    #
+    # 【两种写法都合法，2026-11-10】
+    #   A. POST /api/agent/chat        + body {"stream": 1}   （body 载体）
+    #   B. POST /api/agent/chat?stream=1 + body 无 stream    （query 载体）
+    # 审查实测：前端原来发的是 B，而后端只读 body（A）——
+    # 于是真实浏览器 12/12 请求返回 application/json，流式 100% 不生效。
+    # 现在两边都读，任一写法都能命中 SSE。
+    # （后端只读 query 也能兼容**已部署的旧前端**；只改前端则旧前端仍坏。）
+    stream_flag = payload.get("stream")
+    if stream_flag is None or str(stream_flag).strip() == "":
+        stream_flag = request.query.get("stream")
+    if str(stream_flag or "").lower() in ("1", "true", "yes", "on"):
+        return await api_agent_chat_stream(request)
+
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        return web.json_response({"error": "请输入要处理的内容",
+                                  "code": "bad_request"}, status=400)
+
+    session_id = str(payload.get("session_id") or "").strip()
+    provider_id = str(payload.get("provider_id") or "").strip() or None
+    try:
+        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
+    except (TypeError, ValueError):
+        max_steps = agent_mod.MAX_STEPS
+
+    store = _agent_store()
+    session_id = store.create(session_id or None)
+    # 存用户消息（在跑 Agent 之前存 —— 即使 Agent 挂了，历史也不丢）
+    store.add_message(session_id, "user", message)
+
+    history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
+    # history 末尾那条就是本次刚存的 user 消息 —— 去掉，避免重复喂给模型
+    if history and history[-1].get("role") == "user" \
+            and history[-1].get("content") == message:
+        history = history[:-1]
+
+    # 并发闸门：抢不到就立刻 429，**不排队**。
+    #
+    # 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
+    # 实测（50 并发 × 20 轮）wait_for(acquire(), timeout=0) **一次都抢不到**
+    # —— timeout=0 会在 acquire 真正执行前就取消它，结果是所有请求都 429。
+    # locked() 判据则实测 peak 并发恰好等于上限，无超发。
+    # （asyncio.Semaphore.acquire 内部是「先减计数再 await」，本身是原子的。）
+    gate = _agent_gate()
+    if gate.locked():
+        return web.json_response(
+            {"error": f"当前已有 {AGENT_CONCURRENCY} 个 Agent 任务在运行，"
+                      "请稍候再试。",
+             "code": "too_many_requests"}, status=429)
+
+    async with gate:
+        try:
+            result = await agent_mod.run_agent(
+                sys.modules[__name__], message, session_id=session_id,
+                provider_id=provider_id, max_steps=max_steps, history=history,
+                session_store=store, memory_store=_agent_memory_store())
+        except agent_mod.AgentError as exc:
+            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
+            return _agent_error(exc)
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            store.add_message(session_id, "assistant", f"[请求失败] {detail}")
+            return web.json_response(
+                {"error": f"Agent 执行失败：{detail}", "code": "agent_internal_error"},
+                status=500)
+    # 落库：模型结论 + 工具调用轨迹（下一轮对话时作为上下文）
+    if result.get("answer"):
+        store.add_message(session_id, "assistant", result["answer"])
+    for step in result.get("steps") or []:
+        tool_name = step.get("tool")
+        if not tool_name:
+            continue
+        note = step.get("error") or "ok"
+        store.add_message(session_id, "tool", f"{tool_name}: {note}",
+                           tool_name=tool_name)
+
+    result["session_id"] = session_id
+    result["provider_name"] = (result.get("provider") or {}).get("name") or ""
+    return json_ok(result)
+
+
+async def api_agent_chat_stream(request):
+    """
+    POST /api/agent/chat/stream —— 内置多模态 Agent 主入口（SSE 流式）。
+
+    与 POST /api/agent/chat 的**请求体完全一致**，区别只在响应形式：
+      * /api/agent/chat      —— 一次性返回完整 JSON
+      * /api/agent/chat/stream —— SSE，过程中先推 progress 事件，最后推 result 事件
+
+    为什么要有流式：本地模型单步就要 20~120 秒，一条完整链路 4~6 分钟。
+    非流式的话，整个等待期间界面毫无反馈，实测 179 秒用户以为卡死
+    （审查报告 P3-3）。流式把「现在到哪一步」实时告诉用户。
+
+    事件格式（text/event-stream）：
+      event: progress
+      data: {"stage":"tool","detail":"正在检索素材库","done":1,"total":8,"elapsed_ms":31200}
+
+      event: result
+      data: { ...与 /api/agent/chat 相同的完整 JSON... }
+
+      event: error
+      data: {"error":"...","code":"..."}
+
+    失败语义与 /api/agent/chat 对齐：并发超限返回 HTTP 429（非 SSE），
+    参数错误返回 HTTP 400（非 SSE），便于前端统一处理。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        return web.json_response({"error": "请输入要处理的内容",
+                                  "code": "bad_request"}, status=400)
+
+    session_id = str(payload.get("session_id") or "").strip()
+    provider_id = str(payload.get("provider_id") or "").strip() or None
+    try:
+        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
+    except (TypeError, ValueError):
+        max_steps = agent_mod.MAX_STEPS
+
+    store = _agent_store()
+    session_id = store.create(session_id or None)
+    store.add_message(session_id, "user", message)
+    history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
+    if history and history[-1].get("role") == "user" \
+            and history[-1].get("content") == message:
+        history = history[:-1]
+
+    # 并发闸门：与 /api/agent/chat 完全一致（抢不到就 429，不排队）
+    gate = _agent_gate()
+    if gate.locked():
+        return web.json_response(
+            {"error": f"当前已有 {AGENT_CONCURRENCY} 个 Agent 任务在运行，"
+                      "请稍候再试。",
+             "code": "too_many_requests"}, status=429)
+
+    # 事件队列：Agent 编排器通过 on_progress / on_event 往里塞事件，
+    # 这里边跑边从队列里取出来写成 SSE。
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def _on_progress(stage: str, detail: str, done: int, total: int) -> None:
+        queue.put_nowait({
+            "type": "progress",
+            "stage": stage,
+            "detail": detail or "",
+            "done": int(done or 0),
+            "total": int(total or 0),
+        })
+
+    def _on_event(name: str, data: dict) -> None:
+        """Agent 的结构化事件（token / tool_call / tool_result / job / done / error）。"""
+        payload = dict(data or {})
+        payload["type"] = name
+        queue.put_nowait(payload)
+
+    resp = web.StreamResponse(status=200, headers={
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+    await resp.prepare(request)
+
+    async def _write(event: str, data: dict) -> None:
+        body = json.dumps(data, ensure_ascii=False)
+        await resp.write(f"event: {event}\ndata: {body}\n\n".encode("utf-8"))
+
+    async def _runner() -> dict | None:
+        """跑 Agent，把 progress 事件实时转发出去。返回最终结果。"""
+        try:
+            async with gate:
+                result = await agent_mod.run_agent(
+                    sys.modules[__name__], message, session_id=session_id,
+                    provider_id=provider_id, max_steps=max_steps,
+                    history=history, on_progress=_on_progress,
+                    on_event=_on_event, session_store=store,
+                    memory_store=_agent_memory_store())
+            return result
+        except agent_mod.AgentError as exc:
+            await _write("error", {"error": exc.message, "code": exc.code})
+            return None
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            await _write("error", {"error": f"Agent 执行失败：{detail}",
+                                   "code": "agent_internal_error"})
+            return None
+
+    task = asyncio.ensure_future(_runner())
+    stream_started = time.time()
+    #: 心跳间隔（秒）。只在**长时间没有新事件**时补一个注释行，
+    #: 让代理/浏览器知道连接还活着。间隔太短会刷出大量 : keep-alive
+    #: （实测 0.25s 一跳时 12 条进度事件配了 187 条心跳，噪音压过信号）。
+    HEARTBEAT_SEC = 5.0
+    last_beat = time.time()
+    try:
+        # 一边等结果，一边把进度事件刷出去
+        while True:
+            if task.done() and queue.empty():
+                break
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                if task.done():
+                    break
+                now = time.time()
+                if now - last_beat >= HEARTBEAT_SEC:
+                    last_beat = now
+                    await resp.write(b": keep-alive\n\n")
+                continue
+            event["elapsed_ms"] = int((time.time() - stream_started) * 1000)
+            # 按事件类型分发到不同的 SSE event 名 —— 前端可以按名字监听，
+            # 也可以统一用 onmessage（data 里带 type 字段）。
+            #
+            # type 一律补齐（哪怕事件本来就带）：前端如果统一用 onmessage
+            # 分派，缺 type 就只能靠猜 —— 契约要求**每个**事件都有 type。
+            event_type = event.get("type") or "progress"
+            event["type"] = event_type
+            await _write(event_type, event)
+
+        result = task.result()
+        if result is not None:
+            # 失败链路（no_tool_call / sensitive_content）：
+            # Agent 已经发了 error 事件 —— 此时**不再发 result**。
+            #
+            # 为什么：result 是「成功收尾」信号（基线前端靠它判定完成）。
+            # 失败后再补一个 result，前端会以为任务成功了。
+            failed_code = result.get("code")
+            if failed_code:
+                # Agent 侧**已经**发过 error 事件（见 agent.py 的 _event("error",...)），
+                # 这里只补落库并**抑制 result** —— 不要重复发 error。
+                if result.get("answer"):
+                    store.add_message(session_id, "assistant", result["answer"])
+                return resp
+            if result.get("answer"):
+                store.add_message(session_id, "assistant", result["answer"])
+            for step in result.get("steps") or []:
+                tool_name = step.get("tool")
+                if not tool_name:
+                    continue
+                note = step.get("error") or "ok"
+                store.add_message(session_id, "tool", f"{tool_name}: {note}",
+                                   tool_name=tool_name)
+            result["session_id"] = session_id
+            result["provider_name"] = (result.get("provider") or {}).get("name") or ""
+            # result 也带 type —— 契约要求每个事件都有，前端可统一 onmessage 分派
+            result["type"] = "result"
+            await _write("result", result)
+    finally:
+        if not task.done():
+            task.cancel()
+        await resp.write_eof()
+    return resp
+
+
+async def api_agent_sessions(request):
+    """GET /api/agent/sessions —— 会话清单（最近 50 条）。"""
+    store = _agent_store()
+    return json_ok({"sessions": store.list_sessions(limit=50)})
+
+
+async def api_agent_session_get(request):
+    """GET /api/agent/sessions/{id} —— 取某个会话的完整消息历史。"""
+    sid = request.match_info["id"]
+    store = _agent_store()
+    if not store.exists(sid):
+        return web.json_response({"error": "会话不存在", "code": "not_found"},
+                                 status=404)
+    return json_ok({"session_id": sid, "messages": store.raw_history(sid)})
+
+
+async def api_agent_session_delete(request):
+    """DELETE /api/agent/sessions/{id} —— 清空会话。"""
+    sid = request.match_info["id"]
+    store = _agent_store()
+    deleted = store.delete(sid)
+    return json_ok({"deleted": sid, "ok": deleted})
+
+
+async def api_agent_tools(request):
+    """GET /api/agent/tools —— 列出 Agent 的工具清单（调试 / 前端展示用）。"""
+    specs = []
+    for name, spec in agent_mod.TOOLS.items():
+        specs.append({
+            "name": name,
+            "description": spec["description"],
+            "parameters": spec["parameters"],
+        })
+    return json_ok({
+        "tools": specs,
+        "tool_count": len(specs),
+        "limits": {
+            "max_steps": agent_mod.MAX_STEPS,
+            "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
+            "total_timeout": agent_mod.TOTAL_TIMEOUT,
+            "step_timeout": agent_mod.STEP_TIMEOUT,
+            "max_concurrent": agent_mod.MAX_CONCURRENT,
+            "no_tool_retry": agent_mod.NO_TOOL_RETRY,
+            "tool_retry": agent_mod.TOOL_RETRY,
+            "repeat_limit": agent_mod.REPEAT_LIMIT,
+        },
+        "memory_limits": {
+            "max_entries": agent_memory.MAX_ENTRIES,
+            "max_value_chars": agent_memory.MAX_VALUE_CHARS,
+            "max_read_limit": agent_memory.MAX_READ_LIMIT,
+        },
+        "events": ["token", "tool_call", "tool_result", "job", "done", "error",
+                   "progress", "result"],
+    })
+
+
+async def api_agent_memory(request):
+    """GET /api/agent/memory —— 读取 Agent 的长期记忆（跨会话用户偏好）。
+
+    查询参数：
+      query   记忆键关键词（留空返回最近的全部）
+      scope   global（默认）或 session:<id>
+      limit   返回条数上限（默认 20，上限 100）
+    """
+    store = _agent_memory_store()
+    query = request.query.get("query", "")
+    scope = request.query.get("scope") or None
+    try:
+        limit = int(request.query.get("limit") or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    entries = store.recall(query, scope=scope, limit=limit)
+    return json_ok({"memories": entries, "total": len(entries),
+                    "stats": store.stats()})
+
+
+async def api_agent_memory_set(request):
+    """POST /api/agent/memory —— 写入一条长期记忆。
+
+    body: {"key": str, "value": any, "scope": "global" | "session:<id>"}
+    命中提示注入的内容会被拒绝（code=prompt_injection_detected）。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+    key = str(payload.get("key") or "").strip()
+    value = payload.get("value")
+    scope = str(payload.get("scope") or "").strip() or None
+    if not key:
+        return web.json_response({"error": "key 不能为空", "code": "bad_request"},
+                                 status=400)
+    if value is None or str(value).strip() == "":
+        return web.json_response({"error": "value 不能为空",
+                                  "code": "bad_request"}, status=400)
+    store = _agent_memory_store()
+    result = store.remember(key, value, scope=scope, source="http")
+    if result.get("error"):
+        return web.json_response({"error": result["error"],
+                                  "code": result.get("code", "bad_request"),
+                                  "matches": result.get("matches") or []},
+                                 status=400)
+    return json_ok(result)
+
+
 # ------------------------------------------------------------------ static
 MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
                ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
@@ -3424,6 +4207,62 @@ async def index_handler(request):
     return resp
 
 
+
+# ------------------------------------------------------------------ 提示词历史
+async def api_prompt_history_list(request):
+    """GET /api/prompt-history —— 按面板读取提示词历史（分页）。
+
+    query:
+      panel_key  可选。按面板过滤（跨面板隔离的判据）。
+                 省略 = 全部面板。
+      model_key  可选。按模型过滤（同一个面板内换模型时用）。
+      limit      可选。默认 20，上限 100。
+      offset     可选。默认 0（滚动加载用）。
+
+    返回:
+      { items: [{id, panel_key, model_key, original_prompt,
+                 enhanced_prompt, source, timestamp, use_count}],
+        total: 该面板（or 全部）的总条数,
+        limit, offset, has_more }
+    """
+    panel_key = (request.query.get("panel_key") or "").strip()
+    model_key = (request.query.get("model_key") or "").strip()
+    try:
+        limit = int(request.query.get("limit") or ph.DEFAULT_LIMIT)
+    except (TypeError, ValueError):
+        limit = ph.DEFAULT_LIMIT
+    try:
+        offset = int(request.query.get("offset") or 0)
+    except (TypeError, ValueError):
+        offset = 0
+    limit = max(1, min(limit, ph.MAX_LIMIT))
+    offset = max(0, offset)
+
+    with db() as conn:
+        items = ph.list_history(conn, panel_key=panel_key, model_key=model_key,
+                                limit=limit, offset=offset)
+        total = ph.count_history(conn, panel_key=panel_key, model_key=model_key)
+        panels = ph.list_panels(conn)
+    return json_ok({
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(items) < total,
+        "panels": panels,
+    })
+
+
+async def api_prompt_history_delete(request):
+    """DELETE /api/prompt-history?panel_key=xxx —— 清空某个面板的历史。"""
+    panel_key = (request.query.get("panel_key") or "").strip()
+    if not panel_key:
+        return web.json_response({"error": "缺少 panel_key"}, status=400)
+    with db() as conn:
+        removed = ph.delete_panel(conn, panel_key)
+    return json_ok({"ok": True, "removed": removed, "panel_key": panel_key})
+
+
 # ------------------------------------------------------------------ app
 def make_app():
     app = web.Application(client_max_size=200 * 1024 * 1024)
@@ -3448,6 +4287,9 @@ def make_app():
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)
     app.router.add_get("/api/generation-types", api_generation_types)
+    # 提示词历史（各功能面板的提示词留痕）
+    app.router.add_get("/api/prompt-history", api_prompt_history_list)
+    app.router.add_delete("/api/prompt-history", api_prompt_history_delete)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)
     # 本地模型 Provider 配置
@@ -3468,6 +4310,15 @@ def make_app():
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
+    # 内置多模态 Agent
+    app.router.add_post("/api/agent/chat", api_agent_chat)
+    app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
+    app.router.add_get("/api/agent/tools", api_agent_tools)
+    app.router.add_get("/api/agent/memory", api_agent_memory)
+    app.router.add_post("/api/agent/memory", api_agent_memory_set)
+    app.router.add_get("/api/agent/sessions", api_agent_sessions)
+    app.router.add_get("/api/agent/sessions/{id}", api_agent_session_get)
+    app.router.add_delete("/api/agent/sessions/{id}", api_agent_session_delete)
     # 资产素材库（/api/assets/*）
     asset_api.register(app, server_module=sys.modules[__name__])
     # Qwen 图片编辑的参考图（/api/refs/*）—— 素材库来源约束
