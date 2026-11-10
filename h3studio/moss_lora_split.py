@@ -112,6 +112,23 @@ def normalize_lora(lora_path, target_dir=None) -> dict:
                       reason="已是 ComfyUI 兼容形态，无需转换")
         return result
 
+    # **有些前缀形态 ComfyUI 的 key_map 本来就能命中**（它同时登记
+    # `lora_unet_<层名>` 与 `transformer.<层名>` 等别名）。
+    # 这类文件**不要**产出派生文件：多一份派生文件 = ComfyUI 下拉里
+    # 多一个同款条目，反而干扰用户。
+    #
+    # ⚠️ 判据必须精确 —— 不能只看「有没有前缀」：
+    #   * `lora_unet_layers_0_proj_q`   -> ComfyUI 有 `lora_unet_` 别名 -> 命中
+    #   * `layers.0.proj.q`（裸）          -> ComfyUI **没有**这个别名 -> 挂不上
+    #   * `transformer.layers.0.proj.q`   -> ComfyUI 只登记 `diffusion_model.` -> 挂不上
+    # 所以判据是「归一后的键**能被 ComfyUI 的别名规则命中**」。
+    if needs_prefix and not needs_split:
+        unnormalized = [k for k in raw_keys if compat.normalize_key(k) is None]
+        if not unnormalized and compat.prefix_directly_hits(raw_keys):
+            result.update(ok=True, target=str(src), changed=False,
+                          reason="前缀形态可被 ComfyUI 的别名直接命中，无需转换")
+            return result
+
     target_dir = Path(target_dir) if target_dir else src.parent
     target = target_dir / derived_name(src.name)
 

@@ -200,7 +200,10 @@ class TestFamilyAwareCompatibility(unittest.TestCase):
         src = inspect.getsource(lora_registry.check_compatibility)
         self.assertIn("family", src,
                       "check_compatibility 必须接受 family 参数")
-        self.assertIn("+ (family,)", src,
+        # 缓存键 = _cache_key(path) + (family, bool(deep))
+        # （2026-11-10 起多了 deep 标记 —— 结构判定与权重级分析的结果
+        #   不能共用同一个缓存项）
+        self.assertIn("+ (family, bool(deep))", src,
                       "兼容性缓存键必须包含族，避免跨族串味")
 
 
@@ -240,14 +243,33 @@ class TestEffectLorasVisibleInPanel(unittest.TestCase):
                                    f"{item['name']} 推荐强度必须 > 0")
 
     def test_effect_loras_are_not_incompatible(self):
-        """已安装的效果 LoRA 不该被判成不兼容（否则用户选不到）。"""
+        """已安装的效果 LoRA 不该被判成不兼容（否则用户选不到）。
+
+        ⚠️ 2026-11-10 例外：MOSS 族的**融合 qkv 且是 LoKR 形态**的 LoRA
+        真的挂不上（本机 MOSS 底模是分离 q/k/v，LoKR 的 Kronecker 分解
+        与三等分不对应，实测数值不等价 —— 见 moss_lora_compat 的说明）。
+        这类条目**必须**被判不兼容并给出原因（界面如实标注），
+        否则就是「照常列出让用户误以为已生效」的静默失效。
+        """
+        allowed_incompatible = 0
         for family in FAMILIES:
             for item in _list_for(family):
                 if item.get("discovered_by") != "effect_dir":
                     continue
-                self.assertTrue(item.get("compatible", True),
-                                f"{item['name']} 被判不兼容："
-                                f"{item.get('incompatible_reason', '')}")
+                if item.get("compatible", True):
+                    continue
+                reason = item.get("incompatible_reason", "")
+                # 只允许「LoKR 融合 qkv 不可拆分」这一类
+                self.assertIn("LoKR", reason,
+                              f"{item['name']} 被判不兼容但原因不是 LoKR 不可拆分："
+                              f"{reason}")
+                self.assertIn("无法无损拆分", reason,
+                              f"{item['name']} 不兼容原因没说明「无法无损拆分」："
+                              f"{reason}")
+                allowed_incompatible += 1
+        # 台账里记录的被挡条目数应该有限（防止规则放宽成「什么都行」）
+        self.assertLessEqual(allowed_incompatible, 20,
+                             "被判不兼容的条目过多 —— 判定规则可能过宽")
 
     def test_acceleration_loras_are_not_in_effect_list(self):
         """加速/蒸馏类只在 acceleration 里，不在 available 里。"""

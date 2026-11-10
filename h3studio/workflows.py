@@ -2093,7 +2093,7 @@ def _moss_lora_chain(lora_items, base_model_ref):
         # 融合 qkv -> 分离形态（无损）；已是分离形态则原样使用
         effective = resolved
         try:
-            split = moss_lora_split.ensure_split_available(path)
+            split = moss_lora_split.ensure_normalized(path)
         except Exception as exc:
             split = {"path": None, "derived": False,
                      "reason": f"{type(exc).__name__}: {exc}"[:200]}

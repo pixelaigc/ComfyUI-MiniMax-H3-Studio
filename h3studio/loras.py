@@ -34,6 +34,51 @@ from .lora_catalog_mihoyo import ALL_MIHOYO_EFFECTS as _MIHOYO_CATALOG
 # 说明来源全部标注在 source 字段里，界面上可展开查看。
 # trigger 为上游 README tags 中明确标出的触发词；上游未标注的一律留空，
 # 不用「猜测」填满。
+
+#: 目录之间的**同名 key 冲突台账**。
+#:
+#: 2026-11-10 实测：这些目录**不是互斥**的 —— 同一个文件可能同时被
+#: 两个目录登记，且 plan_id 不同：
+#:     `qwen21-effects/fusal-qwen-image-2.1-v2-exact-r80.safetensors`
+#:       * lora_catalog_nsfw   -> QN-08（成人向二次元画风，带触发词与作者标定强度）
+#:       * lora_catalog_mihoyo -> Q-28（「风格族邻接替代条目」）
+#: dict.update() 是「后者覆盖前者」—— 合并顺序决定哪条生效，
+#: **任何顺序都会挂掉其中一侧的 plan_id 断言**。
+#:
+#: 解法（见 _merge_catalog）：**先合并者优先**，后来的同名条目不覆盖，
+#: 但会记进这个台账 —— 冲突被**显式登记**，不是静默丢失。
+#: 结构：{key: [(来源目录, plan_id, 保留/被挡), ...]}，第一条是生效的那条。
+LORA_CATALOG_CONFLICTS: dict[str, list[dict]] = {}
+
+
+def _merge_catalog(catalog: dict, source_name: str) -> None:
+    """把一个目录合并进 LORA_CATALOG，**不覆盖**已有的同名 key。
+
+    规则：
+      1. 同一个 key 只保留**先合并**的那条（先合并者优先）
+      2. 被挡下的条目记进 LORA_CATALOG_CONFLICTS，供测试断言冲突已登记
+    """
+    for key, info in catalog.items():
+        if key not in LORA_CATALOG:
+            LORA_CATALOG[key] = info
+            continue
+        existing = LORA_CATALOG[key]
+        conflict = LORA_CATALOG_CONFLICTS.setdefault(key, [])
+        if not conflict:
+            conflict.append({
+                "source": "effects",
+                "plan_id": existing.get("plan_id"),
+                "kept": True,
+                "display": existing.get("display"),
+            })
+        conflict.append({
+            "source": source_name,
+            "plan_id": info.get("plan_id"),
+            "kept": False,
+            "display": info.get("display"),
+        })
+
+
 LORA_CATALOG: dict[str, dict] = {
     # ---- Qwen-Image 2.1 ----
     # 元数据实读：ss_base_model_version=qwen_image_2 / ss_output_name=bfs_qwen_2.1，
@@ -207,9 +252,9 @@ LORA_CATALOG: dict[str, dict] = {
 #   * 族判定不再靠文件名猜测（`pytorch_lora_weights.safetensors` 这种
 #     三族重名的文件，没有前缀根本分不出来）
 #   * 跨族误用能在服务端被直接拒绝（键名对不上，ComfyUI 会静默丢弃）
-LORA_CATALOG.update(_EFFECT_CATALOG)
+_merge_catalog(_EFFECT_CATALOG, "effects")
 # 米哈游（HoYoverse）画风 / 场景效果 LoRA 目录 —— 并列新文件，不动既有目录文件
-LORA_CATALOG.update(_MIHOYO_CATALOG)
+_merge_catalog(_MIHOYO_CATALOG, "mihoyo")
 
 # 三基座的**东亚人像效果类** LoRA（2026-11-10 本轮接入）。
 # 目录在 lora_catalog_ea.py，字段结构与上面那份完全一致，
@@ -219,12 +264,12 @@ LORA_CATALOG.update(_MIHOYO_CATALOG)
 # 这批条目里有一部分在清单里标的是「近似适用」（基座未指明 / 无 base_model
 # tag），目录里如实保留该标注，界面 scene 字段带 ⚠️ 前缀，
 # 不会被误当成「原生 / 已验证」。
-LORA_CATALOG.update(_EA_CATALOG)
+_merge_catalog(_EA_CATALOG, "ea")
 # 三基座的**成人向 / NSFW 效果类** LoRA（2026-11-10 本轮接入）。
 # 目录在 lora_catalog_nsfw.py，字段结构与上面那份完全一致，
 # 同样靠**族专属目录前缀**（z-image-effects/ qwen21-effects/ moss-effects/）
 # 判定族归属 —— 前缀是唯一真相源，不靠文件名猜。
-LORA_CATALOG.update(_NSFW_CATALOG)
+_merge_catalog(_NSFW_CATALOG, "nsfw")
 
 # 只认这些关键词算「Z-Image 相关」，避免把 285 个 LoRA 全塞进面板
 Z_IMAGE_MARKERS = ("zimage", "z-image", "z_image", "kook_zimage")
@@ -720,29 +765,48 @@ def clear_compat_cache() -> None:
     global _UNET_CACHE_KEY
     _COMPAT_CACHE.clear()
     _UNET_CACHE_KEY = None
+    _PERTURB_TENSOR_CACHE.clear()
 
 
 def check_compatibility(path: Path, unet_path: Path | None = None,
-                        family: str = "Z-Image") -> dict:
+                         family: str = "Z-Image",
+                         deep: bool = False) -> dict:
     """检测一个 LoRA 与对应底模的兼容性。
 
     参数:
       path       LoRA 权重路径
       unet_path  底模 UNET 权重路径（None = 不做权重比对）
       family     底模族（"Z-Image" / "Qwen-Image 2.1" / "MOSS-Image"）
+      deep       是否做**权重级**分析（相对扰动 + ctx 阻尼判定）。
+                 False（默认）= 只做**结构级**判定 —— 只读 safetensors
+                 **头部**（几毫秒），不碰权重本体。
 
     ⚠️ **family 必须传对**（2026-11-09 实测教训）：
     三族的层命名完全不同，用 Z-Image 的正则去判 QI21 的 LoRA
     （层名是 `.attn.` 而不是 `.attention.`）会得到「0 个注意力层」
     -> 命中率 1.0 -> **假通过**（明明不兼容却放行）。
 
+    ⚠️ **deep 默认关闭**（2026-11-10 性能修复）：
+    本机 LoRA 目录在 /mnt/usb2t（USB 盘，实测 95MB/s），共 226GB。
+    权重级分析要**读** LoRA 与底模的权重张量，195 个 Z-Image LoRA
+    实测要 **37 秒**（其中 27.7 秒是 b@a 的矩阵乘，9 秒是读盘），
+    而这一切发生在 **asyncio 事件循环里**（同步阻塞整个 HTTP 服务）——
+    /api/image-loras 因此要跑 40~150 秒；页面首屏为 3 个基座各请求
+    一次就把服务打满，Playwright 用例 page.reload 30s 超时。
+
+    结构兼容性（「会不会挂不上 / 会不会被静默丢弃」）**只需要头部**：
+    safetensors 头部里有全部张量名与 shape，判断层是否命中底模
+    完全够用。权重级分析（推荐强度 / 自动 ctx 阻尼）改为**按需触发**
+    —— 见 `_list_loras_for_base` 的 deep_analysis 参数。
+
     返回:
       {
         "compatible": bool,
         "reason": str,            # 不兼容原因（给界面显示）
         "attention_hit": float,   # 注意力/投影层命中率
-        "relative_perturbation": float | None,  # 相对扰动（需读权重，慢；失败为 None）
+        "relative_perturbation": float | None,  # 相对扰动（deep=True 才算）
         "suggested_strength": float,  # 安全推荐强度
+        "deep_analyzed": bool,     # 是否做过权重级分析
       }
     """
     global _UNET_CACHE_KEY
@@ -751,10 +815,10 @@ def check_compatibility(path: Path, unet_path: Path | None = None,
         # 找不到 UNET 就无法判定 —— 不阻断，但标注「未验证」
         return {"compatible": True, "reason": "", "attention_hit": 1.0,
                 "relative_perturbation": None, "suggested_strength": 1.0,
-                "strength_cap": 1.0, "verified": False}
+                "strength_cap": 1.0, "verified": False, "deep_analyzed": False}
 
-    # 缓存命中则直接返回（缓存键含族，避免跨族串味）
-    key = _cache_key(path) + (family,)
+    # 缓存命中则直接返回（缓存键含族 + deep 标记，避免跨族串味）
+    key = _cache_key(path) + (family, bool(deep))
     unet_key = _cache_key(unet_path)
     if _UNET_CACHE_KEY == unet_key and key in _COMPAT_CACHE:
         return dict(_COMPAT_CACHE[key])
@@ -779,6 +843,7 @@ def check_compatibility(path: Path, unet_path: Path | None = None,
         "ctx_perturbation": None,
         "ctx_damping": None,
         "verified": True,
+        "deep_analyzed": False,
     }
 
     if total and hit_ratio < COMPAT_MIN_ATTENTION_HIT:
@@ -791,6 +856,14 @@ def check_compatibility(path: Path, unet_path: Path | None = None,
         _UNET_CACHE_KEY = unet_key
         return result
 
+    if not deep:
+        # 只要结构判定 —— 不读权重（这是性能修复的关键分支）
+        _COMPAT_CACHE[key] = dict(result)
+        _UNET_CACHE_KEY = unet_key
+        return result
+
+    # ---- 权重级分析（deep=True）----
+    result["deep_analyzed"] = True
     # 相对扰动需要读权重（较慢），只在结构兼容时做
     try:
         pert = _relative_perturbation(path, unet_path)
@@ -832,40 +905,100 @@ def check_compatibility(path: Path, unet_path: Path | None = None,
     return result
 
 
+#: 相对扰动要采样的层（LoRA 前缀 -> 底模权重键）
+#: 与 2026-11-08 的实测标定一致（见 COMPAT_MIN_ATTENTION_HIT 上方的注释）。
+_PERTURBATION_SAMPLES = (
+    ("context_refiner.0.attention.to_q", "context_refiner.0.attention.qkv.weight"),
+    ("context_refiner.0.feed_forward.w1", "context_refiner.0.feed_forward.w1.weight"),
+)
+
+#: 底模张量读取缓存 —— key = (底模路径, mtime_ns, 张量名)
+#: 只缓存**采样用到的那几个**张量（不是整个 12GB）。
+_PERTURB_TENSOR_CACHE: dict[tuple, object] = {}
+
+
+def _read_safetensors_tensors(path: Path, names: list[str]) -> dict:
+    """只读 safetensors 里**指定的那几个**张量（不整体加载）。
+
+    ⚠️ 2026-11-10 性能修复：旧实现用 `load_file(unet_path)` 把整个
+    12GB 的 Z-Image UNET **整体读进内存**，每个 LoRA 调一次 ——
+    /api/image-loras 因此要跑 150 秒，而且是在 **asyncio 事件循环里**
+    同步做的（阻塞整个 HTTP 服务），页面首屏为 3 个基座各请求一次
+    就把服务打满，Playwright 用例 page.reload 30s 超时。
+
+    现在用 safetensors 的 **按名读取**（safe_open + get_tensor）：
+    只读采样用到的那 2~4 个张量，耗时从「读 12GB」降到「读几 MB」。
+    """
+    out: dict = {}
+    try:
+        from safetensors import safe_open
+    except Exception:
+        return out
+    try:
+        with safe_open(str(path), framework="pt", device="cpu") as f:
+            available = set(f.keys())
+            for name in names:
+                if name not in available:
+                    continue
+                key = (str(path), name)
+                cached = _PERTURB_TENSOR_CACHE.get(key)
+                if cached is not None:
+                    out[name] = cached
+                    continue
+                tensor = f.get_tensor(name)
+                _PERTURB_TENSOR_CACHE[key] = tensor
+                out[name] = tensor
+    except Exception:
+        return out
+    return out
+
+
 def _relative_perturbation(lora_path: Path, unet_path: Path) -> float | None:
-    """采样若干层，算 LoRA 有效权重相对原权重的平均扰动比例。"""
+    """采样若干层，算 LoRA 有效权重相对原权重的平均扰动比例。
+
+    ⚠️ 2026-11-10：**只读需要的张量**（见 _read_safetensors_tensors 的说明）。
+    旧实现整体 load 12GB 底模，是 /api/image-loras 慢到 150 秒的根因。
+    """
     try:
         import torch
-        from safetensors.torch import load_file
-    except Exception:
-        return None
-    try:
-        lora_sd = load_file(str(lora_path))
-        unet_sd = load_file(str(unet_path))
+        from safetensors import safe_open
     except Exception:
         return None
 
-    def pick(prefix: str) -> tuple | None:
-        for key, value in lora_sd.items():
-            if key.startswith(prefix) and ".lora_A." in key:
-                b_key = key.replace(".lora_A.", ".lora_B.")
-                if b_key in lora_sd:
-                    return value.float(), lora_sd[b_key].float()
+    # ---- LoRA 侧：找出采样层对应的 lora_A / lora_B ----
+    lora_pairs: dict[str, tuple] = {}
+    try:
+        with safe_open(str(lora_path), framework="pt", device="cpu") as f:
+            lora_keys = list(f.keys())
+            for lora_prefix, unet_key in _PERTURBATION_SAMPLES:
+                for key in lora_keys:
+                    if key.startswith(lora_prefix) and ".lora_A." in key:
+                        b_key = key.replace(".lora_A.", ".lora_B.")
+                        if b_key in lora_keys:
+                            lora_pairs[unet_key] = (
+                                f.get_tensor(key).float(), f.get_tensor(b_key).float())
+                            break
+    except Exception:
         return None
+    if not lora_pairs:
+        return None
+
+    # ---- 底模侧：只读采样用到的张量 ----
+    unet_tensors = _read_safetensors_tensors(unet_path, list(lora_pairs.keys()))
 
     ratios: list[float] = []
-    for lora_prefix, unet_key in (
-        ("context_refiner.0.attention.to_q", "context_refiner.0.attention.qkv.weight"),
-        ("context_refiner.0.feed_forward.w1", "context_refiner.0.feed_forward.w1.weight"),
-    ):
-        pair = pick(lora_prefix)
-        if pair is None or unet_key not in unet_sd:
+    for lora_prefix, unet_key in _PERTURBATION_SAMPLES:
+        pair = lora_pairs.get(unet_key)
+        weight_tensor = unet_tensors.get(unet_key)
+        if pair is None or weight_tensor is None:
             continue
         a, b = pair
-        weight = unet_sd[unet_key].float()
-        try:
-            delta = b @ a
-        except Exception:
+        weight = weight_tensor.float()
+        # ⚠️ 2026-11-10 性能修复：不物化完整的 b@a 矩阵
+        #   （见 lora_damping._frob_sq_of_product 的说明 —— 它是 /api/image-loras
+        #   慢到 40~150 秒的真正瓶颈）。
+        delta_sq = lora_damping._frob_sq_of_product(a, b)
+        if delta_sq is None:
             continue
         if lora_prefix.endswith("to_q"):
             # fused qkv 的第一段对应 to_q
@@ -874,7 +1007,7 @@ def _relative_perturbation(lora_path: Path, unet_path: Path) -> float | None:
         denom = float(weight.norm().item())
         if denom <= 0:
             continue
-        ratios.append(float(delta.norm().item()) / denom)
+        ratios.append((delta_sq ** 0.5) / denom)
     return sum(ratios) / len(ratios) if ratios else None
 
 
@@ -999,7 +1132,8 @@ def _rel_to_lora_dir(name: str, dirs: list[Path]) -> tuple[str, str]:
     return "", ""
 
 
-def _list_loras_for_base(markers, unet_path, base_label, family=None):
+def _list_loras_for_base(markers, unet_path, base_label, family=None,
+                         deep_analysis: bool = False):
     """扫描本机，返回某一底模族下真实存在的 LoRA 清单。
 
     markers: 文件名里出现即视为该族的 marker
@@ -1063,7 +1197,8 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None):
                       "verified": False}
             if kind == KIND_EFFECT and unet_path is not None:
                 try:
-                    compat = check_compatibility(path, unet_path, family=family)
+                    compat = check_compatibility(path, unet_path, family=family,
+                                                deep=deep_analysis)
                 except Exception:
                     compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                               "relative_perturbation": None, "suggested_strength": 1.0,
@@ -1121,17 +1256,21 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None):
     return found
 
 
-def list_qwen_image_loras() -> list[dict]:
+def list_qwen_image_loras(deep_analysis: bool = False) -> list[dict]:
     """本机真实存在的 Qwen-Image 2.1 LoRA 清单。
 
     与 Z-Image 清单分开返回 —— 两者的底模结构不同，兼容性要各自比对，
     把 2.1 的 LoRA 混进 Z-Image 的下拉会让用户选到不匹配的权重。
+
+    deep_analysis=True 时额外做**权重级**分析（相对扰动 / ctx 阻尼），
+    要读权重本体，慢 —— 默认关闭（见 check_compatibility 的说明）。
     """
     return _list_loras_for_base(QWEN_IMAGE_MARKERS, _qwen_image_unet_path(),
-                                "Qwen-Image 2.1", family="Qwen-Image 2.1")
+                                "Qwen-Image 2.1", family="Qwen-Image 2.1",
+                                deep_analysis=deep_analysis)
 
 
-def list_moss_image_loras() -> list[dict]:
+def list_moss_image_loras(deep_analysis: bool = False) -> list[dict]:
     """本机真实存在的 MOSS-Image LoRA 清单。
 
     与 Z-Image / Qwen-Image 分开返回 —— MOSS 的底模是 diffusers 目录
@@ -1149,7 +1288,7 @@ def list_moss_image_loras() -> list[dict]:
     因此这里只做「文件名 marker 命中 + 元数据」两步，不做权重比对。
     """
     return _list_loras_for_base(MOSS_IMAGE_MARKERS, None, "MOSS-Image",
-                                family="MOSS-Image")
+                                family="MOSS-Image", deep_analysis=deep_analysis)
 
 
 # MOSS 底模（diffusers 目录）的层键缓存
@@ -1194,18 +1333,19 @@ def _check_moss_compatibility(path: Path) -> dict:
     return moss_lora_compat.check_moss_compatibility(path)
 
 
-def list_moss_effect_loras(include_incompatible: bool = False) -> list[dict]:
+def list_moss_effect_loras(include_incompatible: bool = False,
+                           deep_analysis: bool = False) -> list[dict]:
     """MOSS-Image 的「效果类」LoRA —— 用户可自由挑选的列表。"""
-    items = [item for item in list_moss_image_loras()
+    items = [item for item in list_moss_image_loras(deep_analysis=deep_analysis)
              if item["kind"] == KIND_EFFECT]
     if include_incompatible:
         return items
     return [item for item in items if item.get("compatible", True)]
 
 
-def list_moss_incompatible_loras() -> list[dict]:
+def list_moss_incompatible_loras(deep_analysis: bool = False) -> list[dict]:
     """MOSS-Image 下被过滤掉的不兼容效果 LoRA（界面显示原因用）。"""
-    return [item for item in list_moss_image_loras()
+    return [item for item in list_moss_image_loras(deep_analysis=deep_analysis)
             if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
 
 
@@ -1235,8 +1375,13 @@ def is_moss_family_lora(name: str) -> bool:
     return False
 
 
-def list_z_image_loras() -> list[dict]:
-    """扫描本机，返回真实存在的 Z-Image LoRA 清单。"""
+def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
+    """扫描本机，返回真实存在的 Z-Image LoRA 清单。
+
+    deep_analysis=True 时额外做**权重级**分析（相对扰动 / ctx 阻尼），
+    要读权重本体（实测 195 个 LoRA 要 37 秒）—— 默认关闭，
+    见 check_compatibility 的说明。
+    """
     dirs = comfyui_lora_dirs()
     # 清掉阻尼系数变更后遗留的旧派生文件（避免 ComfyUI 下拉里出现多份副本）
     try:
@@ -1294,7 +1439,8 @@ def list_z_image_loras() -> list[dict]:
                       "verified": False}
             if kind == KIND_EFFECT:
                 try:
-                    compat = check_compatibility(path, family="Z-Image")
+                    compat = check_compatibility(path, family="Z-Image",
+                                                deep=deep_analysis)
                 except Exception:
                     compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                               "relative_perturbation": None, "suggested_strength": 1.0,
@@ -1352,25 +1498,28 @@ def list_z_image_loras() -> list[dict]:
     return found
 
 
-def list_qwen_effect_loras(include_incompatible: bool = False) -> list[dict]:
+def list_qwen_effect_loras(include_incompatible: bool = False,
+                          deep_analysis: bool = False) -> list[dict]:
     """Qwen-Image 2.1 的「效果类」LoRA —— 用户可自由挑选的列表。
 
     与 Z-Image 同语义：加速/蒸馏类不进（由工作流固定使用），
     不兼容的不进（权重键与 2.1 底模对不上）。
     """
-    items = [item for item in list_qwen_image_loras() if item["kind"] == KIND_EFFECT]
+    items = [item for item in list_qwen_image_loras(deep_analysis=deep_analysis)
+             if item["kind"] == KIND_EFFECT]
     if include_incompatible:
         return items
     return [item for item in items if item.get("compatible", True)]
 
 
-def list_qwen_incompatible_loras() -> list[dict]:
+def list_qwen_incompatible_loras(deep_analysis: bool = False) -> list[dict]:
     """Qwen-Image 2.1 下被过滤掉的不兼容效果 LoRA（界面显示原因用）。"""
-    return [item for item in list_qwen_image_loras()
+    return [item for item in list_qwen_image_loras(deep_analysis=deep_analysis)
             if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
 
 
-def list_effect_loras(include_incompatible: bool = False) -> list[dict]:
+def list_effect_loras(include_incompatible: bool = False,
+                      deep_analysis: bool = False) -> list[dict]:
     """只返回「效果类」LoRA —— 这才是用户可以自由挑选的列表。
 
     两条过滤规则：
@@ -1381,21 +1530,23 @@ def list_effect_loras(include_incompatible: bool = False) -> list[dict]:
          加载后会把出图变成彩色噪点，不能交给用户选。
          include_incompatible=True 时会带上（用于界面提示原因）。
     """
-    items = [item for item in list_z_image_loras() if item["kind"] == KIND_EFFECT]
+    items = [item for item in list_z_image_loras(deep_analysis=deep_analysis)
+             if item["kind"] == KIND_EFFECT]
     if include_incompatible:
         return items
     return [item for item in items if item.get("compatible", True)]
 
 
-def list_incompatible_loras() -> list[dict]:
+def list_incompatible_loras(deep_analysis: bool = False) -> list[dict]:
     """被过滤掉的不兼容效果 LoRA（界面用来显示「已排除」及原因）。"""
-    return [item for item in list_z_image_loras()
+    return [item for item in list_z_image_loras(deep_analysis=deep_analysis)
             if item["kind"] == KIND_EFFECT and not item.get("compatible", True)]
 
 
-def list_acceleration_loras() -> list[dict]:
+def list_acceleration_loras(deep_analysis: bool = False) -> list[dict]:
     """加速 / 蒸馏类 LoRA（工作流固定使用，不进用户下拉）。"""
-    return [item for item in list_z_image_loras() if item["kind"] == KIND_ACCELERATION]
+    return [item for item in list_z_image_loras(deep_analysis=deep_analysis)
+            if item["kind"] == KIND_ACCELERATION]
 
 
 def _read_safetensors_metadata(path: Path) -> dict:

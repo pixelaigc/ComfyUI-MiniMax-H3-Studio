@@ -86,10 +86,18 @@ _SHARED_SUFFIXES = (
     "lokr_w1_b",
     "lokr_w2_b",
     "alpha",
+    "dora_scale",          # DoRA: 标量缩放因子（复制三份）
     "lora_A.weight",       # 标准 LoRA: (rank, in)
     "lora_A.default.weight",
     "lora_down.weight",    # diffusers 风格: (rank, in)
 )
+
+#: 「diff」形态的载体 —— ComfyUI 的 model_lora_keys_unet 支持
+#: `<层>.diff`（直接加到权重上，形状与底模权重相同）。
+#: 这种**不参与** q/k/v 拆分（它本来就是整块权重差），
+#: 但前缀归一后它就能挂上了（实测 krealistick_MOSS 的 .diff 部分
+#: 之前因为 lora_unet_ 前缀而挂不上）。
+_DIFF_SUFFIXES = ("diff", "diff_b")
 
 #: 载体后缀的**匹配顺序**（长后缀优先，避免 "lora_B.weight" 被
 #: "lora_B" 抢先匹配，或 "lokr_w2" 抢在 "lokr_w2_a" 前面）。
@@ -100,7 +108,7 @@ _ALL_CARRIER_SUFFIXES = tuple(sorted(
 
 #: 全部载体后缀（含不可拆分的），按长度倒序 —— 匹配时用最长优先
 _ALL_SUFFIXES_INCLUDING_UNSPLITTABLE = tuple(sorted(
-    set(_ALL_CARRIER_SUFFIXES) | set(UNSPLITTABLE_SUFFIXES),
+    set(_ALL_CARRIER_SUFFIXES) | set(UNSPLITTABLE_SUFFIXES) | set(_DIFF_SUFFIXES),
     key=len, reverse=True))
 
 #: 归一化后的标准前缀
@@ -142,8 +150,21 @@ def _lora_unet_to_dots(name: str) -> str | None:
     """
     body = name[len("lora_unet_"):] if name.startswith("lora_unet_") else name
     parts = body.split("_")
+    # 文本塔：text_embedder_blocks_N_<模块>
+    if parts and parts[0] == "text_embedder":
+        if len(parts) < 3 or parts[1] != "blocks" or not parts[2].isdigit():
+            return None
+        tail = "_".join(parts[3:])
+        if tail in ("ffn_down", "ffn_gate", "ffn_up", "proj", "qkv",
+                    "k_norm", "norm1", "norm2", "q_norm"):
+            return f"text_embedder.blocks.{parts[2]}.{tail}"
+        return None
     # 找 "layers" 锚点
     if "layers" not in parts:
+        # 非 layers.* 的顶层模块（final_linear_video / final_norm_video）
+        tail = "_".join(parts)
+        if tail in ("final_linear_video", "final_norm_video"):
+            return tail
         return None
     i = parts.index("layers")
     if i + 1 >= len(parts):
@@ -151,9 +172,15 @@ def _lora_unet_to_dots(name: str) -> str | None:
     layer_no = parts[i + 1]
     if not layer_no.isdigit():
         return None
+
     rest = parts[i + 2:]
     if not rest:
         return None
+    # 层内的非投影模块（k_norm / norm1 / norm2）
+    if rest[0] in ("k_norm", "norm1", "norm2"):
+        if len(rest) != 1:
+            return None
+        return f"layers.{layer_no}.{rest[0]}"
     # MOSS 的模块名只有 proj + (q|k|v|o|qkv|ffn_down|ffn_up_gate)
     if rest[0] != "proj":
         return None
@@ -206,9 +233,11 @@ def normalize_key(name: str) -> str | None:
             return None
         return TARGET_PREFIX + base
 
-    # 3) transformer. / 裸 layers. / text_embedder.
+    # 3) transformer. / 裸 layers. / text_embedder. / 顶层模块
     bare = _strip_diffusion_prefix(name)
-    if bare.startswith("layers.") or bare.startswith("text_embedder."):
+    if (bare.startswith("layers.") or bare.startswith("text_embedder.")
+            or bare.startswith("final_linear_video")
+            or bare.startswith("final_norm_video")):
         return TARGET_PREFIX + bare
     return None
 
@@ -247,7 +276,7 @@ def module_name_of(key: str) -> str | None:
     载体后缀按**最长优先**匹配 —— 否则 "lokr_w2_a" 会被 "lokr_w2"
     抢先匹配，模块名就会被截错。
     """
-    for marker in _ALL_CARRIER_SUFFIXES + UNSPLITTABLE_SUFFIXES:
+    for marker in _ALL_CARRIER_SUFFIXES + UNSPLITTABLE_SUFFIXES + _DIFF_SUFFIXES:
         if key.endswith("." + marker):
             return key[: -(len(marker) + 1)]
     return None
@@ -388,6 +417,36 @@ def normalize_and_split(state: dict) -> tuple[dict, list[str]]:
             unhandled.append(key)
             out[key] = value
     return out, unhandled
+
+
+# ------------------------------------------------------------------ 前缀别名判定
+
+#: ComfyUI 的 model_lora_keys_unet（comfy/lora.py:192-196）为每个底模权重
+#: 登记这些别名：
+#:   * `diffusion_model.<层名>`            （通用格式）
+#:   * `lora_unet_<层名把点换成下划线>`     （diffusers 风格）
+#:   * `<层名>`                            （裸名）
+#: 所以带 `lora_unet_` 前缀的 LoRA **不需要**转换就能命中；
+#: 而裸 `layers.` / `transformer.` 前缀**命不中**（ComfyUI 不登记这两种别名）。
+_COMFYUI_ALIAS_PREFIXES = ("lora_unet_", "diffusion_model.")
+
+
+def prefix_directly_hits(raw_keys: list[str]) -> bool:
+    """这些带前缀的键，ComfyUI 的别名规则能不能**直接**命中。
+
+    True  -> 不需要产出派生文件（ComfyUI 本来就能挂上）
+    False -> 必须归一（裸 layers. / transformer. 前缀 ComfyUI 不认）
+    """
+    if not raw_keys:
+        return False
+    for key in raw_keys:
+        if key.startswith("diffusion_model."):
+            continue
+        if key.startswith("lora_unet_"):
+            continue
+        # 裸层名 / transformer. 前缀 / 其它 -> ComfyUI 没有对应别名
+        return False
+    return True
 
 
 # ------------------------------------------------------------------ 兼容性判定
