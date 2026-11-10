@@ -14,7 +14,10 @@ BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8291/"
 
 PANELS = [("t2i", "#enhanceMenuBtn", "#enhanceMenu"),
           ("t2a", "#musicEnhanceMenuBtn", "#musicEnhanceMenu")]
-VIEWPORTS = [(375, 780), (390, 844), (1280, 900)]
+#: 三档视口。额外加两档**矮视口**（375x500 / 375x400）——
+#: 菜单内容实测 633~667px，比这些视口还高，
+#: 所以必须验证「菜单框在视口内 + 内部可滚动」，而不是「内容全展开」。
+VIEWPORTS = [(375, 780), (390, 844), (1280, 900), (375, 500), (375, 400)]
 
 PROBE = """(sel) => {
   const m = document.querySelector(sel);
@@ -42,6 +45,7 @@ PROBE = """(sel) => {
     scrollH: m.scrollHeight, clientH: m.clientHeight,
     scrollW: m.scrollWidth, clientW: m.clientWidth,
     overflowY: cs.overflowY, overflowX: cs.overflowX,
+    right: Math.round(r.right), innerW: window.innerWidth,
     verticallyClipped: m.scrollHeight > m.clientHeight + 1,
     horizontallyClipped: m.scrollWidth > m.clientWidth + 1,
     itemCount: items.length,
@@ -88,17 +92,28 @@ with sync_playwright() as pw:
             key = "%s@%d" % (mode, w)
             out[key] = st
             if st:
-                good = (st["onScreen"] and not st["verticallyClipped"]
+                # 判据（矮视口下菜单**必然**比视口高 —— 5 个选项 + 说明文字
+                # 实测 633~667px，而 375x500 的视口只有 500px）。
+                # 所以正确的要求不是「内容全部展开」，而是：
+                #   a) 菜单框本身**完整在视口内**（不被视口裁掉）
+                #   b) 内容超高时菜单**内部可滚动**（scrollHeight > clientHeight
+                #      且 overflow-y 是 auto/scroll）—— 用户能滚到剩下的选项
+                #   c) 菜单**不横向溢出**（左右都在视口内）
+                #   d) 文字**不横向被截断**（scrollWidth > clientWidth 的项）
+                scrollable_ok = (st["scrollH"] > st["clientH"] + 1
+                                 and st["overflowY"] in ("auto", "scroll"))
+                content_fits = st["scrollH"] <= st["clientH"] + 1
+                good = (st["onScreen"]
+                        and st["right"] <= st["innerW"] + 1
+                        and (content_fits or scrollable_ok)
                         and not st["horizontallyClipped"]
-                        and st["lastItemFullyVisible"] is True
                         and not st["clippedTextItems"])
                 ok = ok and good
                 print("[%s] %s  menu(top=%d bottom=%d innerH=%d) scrollH=%d clientH=%d "
-                      "lastItemBottom=%d clippedText=%d" % (
+                      "overflowY=%s scrollable=%s clippedText=%d" % (
                           "PASS" if good else "FAIL", key, st["menuTop"], st["menuBottom"],
-                          st["innerH"], st["scrollH"], st["clientH"], st["lastItemBottom"],
-                          len(st["clippedTextItems"])))
-                print("     lastItem = %s" % st["lastItemText"])
+                          st["innerH"], st["scrollH"], st["clientH"], st["overflowY"],
+                          scrollable_ok, len(st["clippedTextItems"])))
             page.keyboard.press("Escape")
             page.wait_for_timeout(250)
             page.evaluate("""() => {
