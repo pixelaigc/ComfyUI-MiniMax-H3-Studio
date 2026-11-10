@@ -248,6 +248,31 @@
     }
   }
 
+  // 构造「可回答的提问气泡」数据。
+  //
+  // 【字段名兼容 —— 2026-11-10 契约修复】
+  // 后端原来只发 `clarification`（一个字符串），
+  // 前端却读 `clarify_options` / `clarify_hint` ——
+  // 契约对不上，快捷选项 **100% 落空**（用户被迫手打「9:16」）。
+  // 现在后端**同时**产出 clarify_options / clarify_hint，
+  // 这里也做**多字段兼容**（万一对到老服务端）：
+  //   问题文本 <- clarification || answer
+  //   快捷选项 <- clarify_options || options
+  //   提示     <- clarify_hint || hint
+  //
+  // 两条路径（流式 done 事件 / 一次性 JSON 结果）共用这一段。
+  function buildClarify(data) {
+    data = data || {};
+    return {
+      question: data.clarification || data.answer
+        || "Agent 需要你补充一些信息才能继续。",
+      options: Array.isArray(data.clarify_options)
+        ? data.clarify_options
+        : (Array.isArray(data.options) ? data.options : []),
+      hint: data.clarify_hint || data.hint || "",
+    };
+  }
+
   // 工具结果里的「模式清单」要按 Agent 真实能力过滤。
   //
   // 【事实】workflows.BUILDERS 只有 9 个 mode；longfilm 走 /api/longfilms
@@ -767,6 +792,17 @@
         if (Array.isArray(data.assets)) msg.assets = data.assets;
         if (data.prompt) msg.prompt = data.prompt;
         if (Array.isArray(data.steps)) msg.steps = data.steps;
+        // 澄清态 -> 构造「可回答的提问气泡」。
+        //
+        // 【为什么必须在这里做 —— 2026-11-10 契约修复】
+        // 原来这段逻辑只在 send() 的**一次性 JSON 路径**里（send() 函数体内），
+        // 流式路径完全没有 —— 于是走 SSE 时（也就是正常路径）
+        // 「Agent 需要你确认」气泡**根本不出现**，
+        // 快捷选项更无从谈起。
+        // 现在提到 applyStreamEvent 里，两条路径共用同一段逻辑。
+        if (data.status === "needs_clarification") {
+          msg.clarify = buildClarify(data);
+        }
         msg.result = data;
         msg.streaming = false;
         break;
@@ -988,19 +1024,10 @@
       // 前端却读 `clarify_options` / `clarify_hint` ——
       // 契约对不上，快捷选项 **100% 落空**（用户被迫手打「9:16」）。
       // 现在后端**同时**产出 clarify_options / clarify_hint，
-      // 前端这里也做**多字段兼容**（万一对到老服务端）：
-      //   问题文本 <- clarification || answer
-      //   快捷选项 <- clarify_options || options
-      //   提示     <- clarify_hint || hint
+      // 前端这里也做**多字段兼容**（万一对到老服务端）。
+      // 逻辑与流式路径共用 buildClarify（避免两处各写一份必然漂移）。
       if (data.status === "needs_clarification") {
-        msg.clarify = {
-          question: data.clarification || data.answer
-            || "Agent 需要你补充一些信息才能继续。",
-          options: Array.isArray(data.clarify_options)
-            ? data.clarify_options
-            : (Array.isArray(data.options) ? data.options : []),
-          hint: data.clarify_hint || data.hint || "",
-        };
+        msg.clarify = buildClarify(data);
       }
       if (data.error) msg.error = data.error;
       // 任务卡状态轮询启动

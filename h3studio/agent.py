@@ -2308,5 +2308,16 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
             "已按「不可信数据」隔离处理。")
         result["injection_detected"] = True
     _event("done", {"answer": ctx.answer, "status": result["status"],
-                    "jobs": [_job_event_payload(j) for j in ctx.jobs]})
+                    "jobs": [_job_event_payload(j) for j in ctx.jobs],
+                    # 澄清态的快捷选项 + 提示 —— 前端**流式路径**要靠这个
+                    # 渲染「Agent 需要你确认」气泡。
+                    #
+                    # 【为什么必须带上 —— 2026-11-10 契约修复】
+                    # 原来 done 事件只有 answer/status/jobs，
+                    # 前端的澄清气泡只在**一次性 JSON 路径**里构造
+                    # （send() 里的那段）—— 于是走流式时气泡根本不出现。
+                    # 跨侧契约测试实测暴露了这一点。
+                    "clarify_options": result["clarify_options"],
+                    "clarify_hint": result["clarify_hint"],
+                    "clarification": result.get("clarification", "")})
     return result
