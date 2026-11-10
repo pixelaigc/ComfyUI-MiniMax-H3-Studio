@@ -48,6 +48,7 @@
 | **D2** | 汇报未更新到本轮 | 阻断 | ✅ **已修** | 本文档即更新版（工作区 + `docs/` 两份 md5 一致） |
 | **D3** | 契约文档 `steps[]` 仍是旧形态 | 交付缺口 | ✅ **已修** | 两份契约文档补 `summary` / `call_id`，与后端实际产出**逐字段一致** |
 | **D4** | 交付脚本半成品死代码 | 交付缺陷 | ✅ **已修** | 场景 D / E 真正接入 `run_browser()`，断言**能咬住**产品缺陷（变异测试 3/3） |
+| **D4-补** | 交付脚本**根本跑不起来**（`page.goto(networkidle)` 超时） | 交付缺陷 | ✅ **已修** | 独立复验实测连跑 **0/5 通过**；根因是页面常驻 `/api/status/stream` 的 EventSource，`networkidle` 永不触发。改 `domcontentloaded` + 等 `AgentUI` 就绪后连跑 **6/6 通过**（§0.3 的 D-补） |
 
 **零新增回归**：全量 pytest 名单与基线 **md5 完全一致**（见 §4）。
 
@@ -208,6 +209,66 @@
 **为什么不用 415 造降级**：`shouldFallback()` 里「有业务 code 就**不**降级」，
 且任何 4xx 都会在 console 留一条 `Failed to load resource`，
 污染 console 干净度断言。
+
+#### D-补：交付脚本「跑不起来」—— 独立复验实测发现并已修
+
+**复验实测的事实**（在**没有**任何其它负载的独立环境里复现）：
+
+```
+python3 scripts/verify_agent_contract_fix.py <dir>   # 连跑 5 次
+run1=1 run2=1 run3=1 run4=1 run5=1
+PASS=0 FAIL=5      ← 全部失败
+```
+
+失败点固定在 `page.goto(studio.base, wait_until="networkidle")`：
+
+```
+playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+  - navigating to "http://127.0.0.1:8197/", waiting until "networkidle"
+```
+
+**根因（实测抓到的 pending 请求清单，不是推测）**：
+
+```
+PENDING: eventsource http://127.0.0.1:8197/api/status/stream
+PENDING: fetch http://127.0.0.1:8197/api/generation-types
+PENDING: fetch http://127.0.0.1:8197/api/jobs?status=all&page=1&page_size=12
+PENDING: fetch http://127.0.0.1:8197/api/system
+PENDING: fetch http://127.0.0.1:8197/api/enhancer
+PENDING: fetch http://127.0.0.1:8197/api/image-loras?base=Z-Image
+```
+
+前端 boot 时 `web/app.js:3383` 的 `startStatusStream()` 会开一条
+`EventSource("/api/status/stream")`，**这条 SSE 连接永不关闭**；
+同时还有 5 个并发 fetch。`networkidle` 的判定是「网络空闲 500ms」，
+在这种页面结构下**可能永远等不到**，机器负载稍高时 30 秒超时直接抛出。
+
+> **为什么它此前「看起来是好的」**：首轮跑时机器空闲，5 个 fetch 在
+> 500ms 窗口内跑完了，`networkidle` 侥幸成立。**一旦连续跑第二次、
+> 或与全量回归并行，就会 100% 超时** —— 也就是说，这个脚本在
+> 「交付者本机跑一遍」时是绿的，**换台机器/换个时段就红**，
+> 属于典型的「不可复现的交付物」。
+
+**修法**（`scripts/verify_agent_contract_fix.py:491-506`）：
+
+```python
+page.goto(studio.base, wait_until="domcontentloaded")
+page.wait_for_function(
+    "() => window.AgentUI && window.AgentUI.state", timeout=30000)
+```
+
+改成「domcontentloaded + 等 `AgentUI` 就绪」—— 这才是真正要等的状态
+（前端 boot 完、Agent UI 对象可用），而不是等一个**永远不会发生**的网络空闲。
+仓内另外 5 个同类脚本（`verify_agent_frontend_enh.py` / `verify_agent_review_fixes.py` /
+`verify_agent_ui.py` / `verify_jobcard_live_update.py`）**本来就用的 `domcontentloaded`**，
+本脚本是唯一的例外。
+
+**修完后的独立复跑**（无任何其它负载、串行）：
+
+| | 结果 |
+|---|---|
+| 修前（连跑 5 次） | **PASS=0 FAIL=5** |
+| 修后（连跑 6 次） | **PASS=6 FAIL=0** |
 
 **变异测试**（破坏**产品代码** → 浏览器断言必须报 FAIL，3/3 全部咬住）：
 
@@ -1036,6 +1097,7 @@ tool      | respond: ok
 | 11 | **浏览器场景 E 依赖 Playwright 路由改写请求体** | — | **已如实标注** | 场景 E 用 `route.fetch()` **转发给真实服务端**（只去掉 `stream` 字段），不是伪造响应体 —— 服务端是真的，`steps[]` 里的 `summary`/`call_id` 是真的后端产出。但它**不是**「服务端主动降级」那种真实故障场景（那需要老服务端），本轮用这种方式覆盖同一段前端代码路径 |
 | 12 | **注入场景的剧本键依赖「U+200B 会被剥掉」** | — | **已如实标注** | mock LLM 靠请求里的 user 消息匹配剧本，后端隔离时先剥 U+200B，所以剧本键用可读形式。**剧本能匹配上本身就是 U+200B 被剥掉的证据**；若不剥，匹配不上、场景 D 会因「没抓到任何真实请求」而 FAIL |
 | 13 | **契约文档的 `steps[]` 两种形态未在 schema 层强制** | — | **未做** | 「推模型继续」步骤（`tool == null`）只有 `note` 没有 `summary`/`call_id`，前端要按 `tool == null` 跳过。目前靠前端过滤，没有 JSON Schema 约束。属契约加固，不影响功能 |
+| 14 | **浏览器脚本对「前端 boot 完成」的判定较宽松** | — | **已收紧（本轮）** | 原用 `page.goto(networkidle)` 判定「页面就绪」，但页面常驻一条 EventSource + 5 个并发 fetch，该条件**不稳定**（实测 0/5 通过）。已改为 `domcontentloaded` + `wait_for_function(window.AgentUI && window.AgentUI.state)`。**遗留**：脚本仍不做「前端资源全部加载完」的断言，若未来 `AgentUI` 早于某些资源就绪，理论上仍有窗口期 —— 但所有断言点都在 DOM 与后端真实响应上，实测未暴露问题 |
 
 ---
 

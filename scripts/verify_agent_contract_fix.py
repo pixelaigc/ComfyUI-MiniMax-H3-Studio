@@ -488,7 +488,22 @@ def run_browser(studio: Studio):
                 "ct": r.headers.get("content-type", "")})
                 if "/api/agent/chat" in r.url else None)
 
-            page.goto(studio.base, wait_until="networkidle")
+            # 【为什么等 domcontentloaded 而不是 networkidle】
+            # 页面 boot 时会常驻一条 EventSource -> /api/status/stream
+            # （web/app.js 的 startStatusStream()），这条连接**永不关闭**。
+            # networkidle 的判定是「网络空闲 500ms」，而这条 SSE 让
+            # in-flight 请求数永远降不下来 —— 实测页面 boot 时同时有
+            # 5+ 个 fetch 在飞（/api/generation-types /api/jobs /
+            # /api/system /api/enhancer /api/image-loras ...），
+            # 机器负载稍高时这批请求 30 秒内还没结束 ->
+            # page.goto(networkidle) 直接 Timeout，脚本**根本跑不起来**
+            # （实测连跑 5 次 0/5 通过）。
+            # 所以改成「domcontentloaded + 等 AgentUI 就绪」——
+            # 这才是真正要等的状态（前端 boot 完、前端对象可用）。
+            page.goto(studio.base, wait_until="domcontentloaded")
+            page.wait_for_function(
+                "() => window.AgentUI && window.AgentUI.state",
+                timeout=30000)
             page.wait_for_timeout(800)
             # 进 Agent 页。
             #
