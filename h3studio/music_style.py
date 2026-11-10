@@ -125,13 +125,39 @@ def style_fields_from_params(params: dict) -> dict:
 
 
 def style_options() -> dict:
-    """给前端的结构化风格选项清单。
+    """给前端的结构化风格选项清单（**同步**版）。
 
     【length_hint 的英文描述也在这里下发】前端原先硬编码了第三份
     length_hint 映射（web/music.js 的 STYLE_LENGTH_HINT_TEXT）——
     审查 P1-1 指出的第三份副本。现在由服务端下发，前端不再硬编码。
+
+    【注意】这个函数内部会**同步阻塞**地拉 ComfyUI（见 get_enums）。
+    async handler 里请用 style_options_async()，别直接调这个。
     """
-    enums = get_enums()
+    return _build_style_options(get_enums())
+
+
+async def style_options_async() -> dict:
+    """异步版 style_options —— 给 aiohttp 的 async handler 用。
+
+    【为什么要异步版】
+    get_enums() 内部是**同步阻塞**的 urllib 拉 ComfyUI /object_info
+    （timeout 10s）。直接在 aiohttp 事件循环里调，整个 server 会被卡住
+    —— 表现为「打开工作台后所有接口都超时」。
+
+    这里用 yue2_schema.get_enums_async()（丢线程池）拿到枚举，
+    再用同一份组装逻辑拼出选项清单。
+
+    【为什么要单独一个函数】
+    style_options() 里 style_options() 被调了 6 次（每个字段一次），
+    缓存未命中时会打 6 次 ComfyUI。所以必须先取一次 enums，再组装。
+    """
+    enums = await yue2_schema.get_enums_async()
+    return _build_style_options(enums)
+
+
+def _build_style_options(enums: dict) -> dict:
+    """按给定的枚举组装前端要的选项清单（纯组装，无 IO）。"""
     return {
         "fields": list(STYLE_FIELDS),
         "defaults": dict(STYLE_DEFAULTS),

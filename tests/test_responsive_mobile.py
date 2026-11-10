@@ -33,7 +33,7 @@ except Exception:                                   # pragma: no cover
     sync_playwright = None
     HAS_PLAYWRIGHT = False
 
-from test_frontend_defaults import StudioServer  # noqa: E402
+from test_frontend_defaults import StudioServer, WAIT_TIMEOUT  # noqa: E402
 
 
 PHONE_WIDTHS = (375, 390, 414)
@@ -130,8 +130,8 @@ class TestResponsiveMobile(unittest.TestCase):
         self.page.goto("http://127.0.0.1:%d/" % self.server.port,
                       wait_until="domcontentloaded")
         self.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
-            timeout=20000)
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
+            timeout=WAIT_TIMEOUT)
         self.page.wait_for_timeout(1200)
 
     def tearDown(self):

@@ -1115,6 +1115,8 @@
     const btn = document.querySelector(t.menuBtn);
     if (!menu) return;
     menu.hidden = true;
+    // 清掉定位时临时设的高度约束 —— 下次打开要按新的视口重新算。
+    menu.style.maxHeight = "";
     if (btn) btn.setAttribute("aria-expanded", "false");
     restoreMenuHome(menu);
   }
@@ -1135,17 +1137,34 @@
   function positionMenu(menu, btn) {
     const r = btn.getBoundingClientRect();
     const mw = menu.offsetWidth || 260;
-    const mh = menu.offsetHeight || 160;
+    // 【窄屏】菜单高度被 CSS 的 max-height 限制在视口内（超高时内部滚动）。
+    // 这里必须用**实际高度**做定位判定 —— 否则会拿「内容高度」去比视口，
+    // 得出「放不下」的结论，把菜单翻到按钮上方，但按钮上方也不够放，
+    // 结果菜单仍然溢出视口（实测 375x500 视口下整块菜单底部在 643px，
+    // 视口只有 500px —— 最后几项被裁掉）。
+    const maxH = Math.max(120, window.innerHeight - 16);
+    const mh = Math.min(menu.offsetHeight || 160, maxH);
     let left = r.left;
     if (left + mw > window.innerWidth - 8) {
       left = Math.max(8, window.innerWidth - mw - 8);
     }
     if (left < 8) left = 8;
+
+    // 下方优先；下方放不下就翻到上方；**两边都放不下**时贴着视口顶，
+    // 并把高度压到视口内（菜单内部滚动，见 style.css 的 max-height/overflow-y）。
     let top = r.bottom + 6;
     if (top + mh > window.innerHeight - 8) {
-      // 下方放不下 -> 翻到按钮上方；上方也放不下就贴着视口顶
       const above = r.top - mh - 6;
-      top = above >= 8 ? above : 8;
+      if (above >= 8) {
+        top = above;
+      } else {
+        top = 8;
+        menu.style.maxHeight = Math.max(120, window.innerHeight - 16) + "px";
+      }
+    }
+    // 兜底：任何情况下底部都不越过视口。
+    if (top + mh > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - 8 - mh);
     }
     menu.style.left = left + "px";
     menu.style.top = top + "px";

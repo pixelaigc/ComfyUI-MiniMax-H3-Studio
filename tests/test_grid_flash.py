@@ -49,7 +49,7 @@ except Exception:                                   # pragma: no cover
     sync_playwright = None
     HAS_PLAYWRIGHT = False
 
-from test_frontend_defaults import StudioServer  # noqa: E402
+from test_frontend_defaults import StudioServer, WAIT_TIMEOUT  # noqa: E402
 
 
 # 预置任务：全部带产物，图片输出指向真实存在的大图（1024×1024）
@@ -158,8 +158,8 @@ class TestGridFlash(unittest.TestCase):
         cls.page.goto("http://127.0.0.1:%d/" % cls.server.port,
                       wait_until="domcontentloaded")
         cls.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid .job-card').length > 0",
-            timeout=20000)
+            "() => document.querySelectorAll('#jobsGrid .job-card:not(.job-skeleton)').length > 0",
+            timeout=WAIT_TIMEOUT)
         cls.page.wait_for_timeout(1500)
 
     @classmethod

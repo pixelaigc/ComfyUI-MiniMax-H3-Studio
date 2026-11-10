@@ -614,8 +614,13 @@ function buildEnhanceMeta(d) {
     html += `<div class="enhance-warn">词数约 ${v.stats.words}</div>`;
   }
   // 要素保留率：原文里的画面要素有多少被扩写结果保留下来
+  //
+  // 【2026-11-10 修复】cov.applicable=false 时**不显示**这个数字 ——
+  // 那是「原文与产出书写系统不同」（如 moss-image 模板官方口径就是
+  // 「默认用英文描述画面」，中文原文 vs 英文产出），逐字比对必然 0%，
+  // 显示 0% 会让用户误以为「要素全丢了」。
   const cov = d.coverage;
-  if (cov && cov.total) {
+  if (cov && cov.total && cov.applicable !== false) {
     const pct = Math.round((cov.ratio ?? 0) * 100);
     html += `<div class="enhance-warn">原文要素保留率 ${pct}%（${cov.total - (cov.missing_count || 0)}/${cov.total} 项）</div>`;
     if (cov.missing && cov.missing.length) {

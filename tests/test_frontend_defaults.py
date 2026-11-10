@@ -16,6 +16,7 @@ active 状态是在更早的 renderTabs() 里设好的，所以看起来「筛�
 运行：python3 -m pytest tests/test_frontend_defaults.py -v
 需要：playwright（chromium）。缺失时整类 skip，不算失败。
 """
+import atexit
 import json
 import os
 import shutil
@@ -26,6 +27,7 @@ import sys
 import tempfile
 import time
 import unittest
+import weakref
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -48,6 +50,18 @@ def free_port() -> int:
 # 预置任务：覆盖全部已注册生成类型 + 各种状态，用于验证「全部类型」语义
 SEED_MODES = ["t2i", "t2v", "flf", "r2v", "longfilm"]
 SEED_STATUSES = ["done", "done", "done", "failed", "canceled"]
+
+#: 等待「真实数据已渲染」的超时（毫秒）。
+#:
+#: 【2026-11-10】原来各处硬编码 20000ms。实测（空载）任务列表首屏要 **8.11 秒**
+#: 才把骨架换成真实卡片 —— 因为前端靠 setInterval(2000) 轮询 + 首次请求，
+#: 不是首屏直出。机器有其它并发任务时（load average 27+ / 24 核），
+#: 8 秒会涨到 20 秒以上，于是**大量浏览器用例集体超时**，
+#: 表现为「168 个 error」，看起来像代码坏了，其实只是等不及。
+#:
+#: 60 秒仍然够用（真出问题时它会一直等到超时并给出明确报错），
+#: 但给机器留出余量。
+WAIT_TIMEOUT = 60000
 
 
 class StudioServer:
@@ -126,6 +140,17 @@ class StudioServer:
             [sys.executable, "server.py"], cwd=str(self.tmp),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        # 【2026-11-10】注册兜底清理 ——
+        # setUpClass 里 `assert started` 之类失败时，tearDownClass **不会**执行，
+        # 于是这个 server 进程就泄漏了。实测一次全量 pytest 会泄漏几十上百个
+        # /tmp/h3studio-ui-* 进程（每个占一个端口 + 一份内存），
+        # 把后续所有浏览器用例拖成「端口耗尽」的假失败
+        # （本轮实测：168 个 error，全是这类假失败，不是产品缺陷）。
+        #
+        # 兜底方案：atexit + weakref.finalize 双保险，
+        # 无论测试怎么结束（正常 / 异常 / Ctrl-C），进程都会被收掉。
+        atexit.register(self.stop)
+        self._finalizer = weakref.finalize(self, _reap_proc, self.proc, self.tmp)
         deadline = time.time() + 30
         while time.time() < deadline:
             try:
@@ -136,13 +161,35 @@ class StudioServer:
         return False
 
     def stop(self):
-        if self.proc:
-            self.proc.terminate()
+        proc, self.proc = self.proc, None
+        if proc:
             try:
-                self.proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
+            except Exception:
+                pass
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+
+def _reap_proc(proc, tmp):
+    """atexit / weakref.finalize 的兜底收尸函数（模块级，避免闭包持有 self）。"""
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        except Exception:
+            pass
+    shutil.rmtree(tmp, ignore_errors=True)
 
 
 def texts(page, selector):
@@ -178,7 +225,7 @@ class TestFrontendDefaults(unittest.TestCase):
         cls.page.goto("http://127.0.0.1:%d/" % cls.server.port, wait_until="domcontentloaded")
         # 等首屏任务列表渲染完
         cls.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid > *').length > 0", timeout=20000)
+            "() => document.querySelectorAll('#jobsGrid > *:not(.job-skeleton)').length > 0", timeout=WAIT_TIMEOUT)
 
     @classmethod
     def tearDownClass(cls):
@@ -366,8 +413,8 @@ class TestStartupFaultIsolation(unittest.TestCase):
             page.goto("http://127.0.0.1:%d/" % self.server.port,
                       wait_until="domcontentloaded")
             page.wait_for_function(
-                "() => document.querySelectorAll('#jobsGrid > *').length > 0",
-                timeout=20000)
+                "() => document.querySelectorAll('#jobsGrid > *:not(.job-skeleton)').length > 0",
+                timeout=WAIT_TIMEOUT)
             count = page.evaluate("document.querySelectorAll('#jobsGrid > *').length")
             self.assertGreater(count, 0,
                                "启动期异常后任务列表仍为空白 —— 逐项隔离失效")

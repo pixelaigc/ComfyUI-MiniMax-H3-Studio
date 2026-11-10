@@ -1056,6 +1056,27 @@ def _unit_covered(unit: str, enhanced_low: str) -> bool:
     return bool(re.search(pattern, enhanced_low))
 
 
+def _script_of(text: str) -> str:
+    """
+    判定一段文本的主要书写系统：cjk / latin / mixed / empty。
+
+    【为什么需要】要素保留率是**逐字比对**出来的指标 ——
+    中文原文 vs 英文产出必然「一个都匹配不上」，显示成 0%。
+    但有些模板（moss-image）的官方口径就是「默认用英文描述画面」，
+    产出英文是**正确行为**，不是「要素丢了」。
+    所以必须先判定两边书写系统是否可比，再决定这个指标能不能显示。
+    """
+    t = text or ""
+    cjk = len(_CJK_RUN.findall(t))
+    latin = len(_EN_WORD.findall(t))
+    if not cjk and not latin:
+        return "empty"
+    if cjk and latin:
+        # 混合：以占比多的那种为主（相同时算 cjk —— 中文模板常夹英文术语）
+        return "cjk" if cjk >= latin else "latin"
+    return "cjk" if cjk else "latin"
+
+
 def check_element_coverage(original: str, enhanced: str) -> dict:
     """
     核查「扩写结果保留了多少原文要素」。
@@ -1063,15 +1084,30 @@ def check_element_coverage(original: str, enhanced: str) -> dict:
     返回 {"ratio", "missing", "missing_count", "total"}。
     ratio 是**粗粒度指标**，不是通过/失败判据（refine 模板是重述式改写，
     单个片段匹配不上不代表要素丢了）。
+
+    【applicable】当原文与产出的书写系统**不可比**时（如中文原文 vs 英文产出，
+    见 moss-image 模板「默认用英文描述画面」的官方口径），这个指标没有意义 ——
+    返回 applicable=False，让前端**不显示**这个数字，而不是显示误导性的 0%。
     """
     units = _clause_units(original)
     if not original or not enhanced or not units:
-        return {"ratio": 1.0, "missing": [], "missing_count": 0, "total": len(units)}
+        return {"ratio": 1.0, "missing": [], "missing_count": 0,
+                "total": len(units), "applicable": True}
+
+    orig_script = _script_of(original)
+    enh_script = _script_of(enhanced)
+    # 原文与产出书写系统不同 -> 逐字比对无意义，标记为不适用
+    if orig_script != "empty" and enh_script != "empty" and orig_script != enh_script:
+        return {"ratio": None, "missing": [], "missing_count": 0,
+                "total": len(units), "applicable": False,
+                "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义"}
+
     low = enhanced.lower()
     missing = [u for u in units if not _unit_covered(u, low)]
     ratio = 1.0 - (len(missing) / len(units))
     return {"ratio": round(ratio, 4), "missing": missing,
-            "missing_count": len(missing), "total": len(units)}
+            "missing_count": len(missing), "total": len(units),
+            "applicable": True}
 
 
 def check_truncation(enhanced: str, finish_reason: str = "",
@@ -1156,6 +1192,9 @@ def coverage_report(original: str, enhanced: str, finish_reason: str = "",
         "missing": cov["missing"],
         "missing_count": cov["missing_count"],
         "total": cov["total"],
+        # 逐字比对不可比时（原文与产出书写系统不同），前端不应显示这个数字
+        "applicable": cov.get("applicable", True),
+        "reason": cov.get("reason", ""),
         "truncated": trunc["truncated"],
         "truncation_reason": trunc["reason"],
         "missing_sections": trunc["missing_sections"],

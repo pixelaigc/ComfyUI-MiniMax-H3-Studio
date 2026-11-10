@@ -1619,7 +1619,11 @@ async def api_music_options(request):
     模型清单来自 h3studio/music_yue2，权重是否在本机由该模块实测磁盘给出 ——
     前端据此把不可用的版本标灰并禁用，而不是等提交后才报错。
     """
-    return json_ok(music_yue2.model_options())
+    # 【2026-11-10 修复】用异步版 —— 同步版内部会阻塞事件循环
+    # （yue2_schema._fetch_enums 是同步 urllib，timeout 10s）。
+    # 在事件循环里直接调会让**整个 server** 冻结 10 秒：
+    # 前端首屏请求 /api/music-options，于是页面打不开。
+    return json_ok(await music_yue2.model_options_async())
 
 
 # ------------------------------------------------------------------ YuE2 音乐增强
@@ -1686,7 +1690,12 @@ async def api_music_enhance(request):
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
-    system_prompt = yue2_schema.build_system_prompt()
+    # 【2026-11-10 修复】先在**线程池**里把枚举取一次（见 yue2_schema 的说明），
+    # 再把它同时喂给 build_system_prompt() 和 normalize_and_validate()。
+    # 原来两处各自调 get_enums()，各自**同步阻塞**事件循环最长 10 秒；
+    # 在 aiohttp 里这么干 = 整个 server 冻结，其它请求全部排队。
+    enums = await yue2_schema.get_enums_async()
+    system_prompt = yue2_schema.build_system_prompt(enums)
     user_prompt = _music_enhance_user_prompt(original, base, mode,
                                              payload.get("style"),
                                              payload.get("lyrics"))
@@ -1712,7 +1721,8 @@ async def api_music_enhance(request):
              "provider": item["name"], "provider_id": item["id"],
              "raw_preview": raw[:400], "degraded": True}, status=502)
 
-    ok, normalized, fixes, problems = yue2_schema.normalize_and_validate(parsed)
+    ok, normalized, fixes, problems = yue2_schema.normalize_and_validate(
+        parsed, enums)
     if not ok or not normalized:
         return web.json_response(
             {"error": "模型产出无法归一化成合法配置（" +

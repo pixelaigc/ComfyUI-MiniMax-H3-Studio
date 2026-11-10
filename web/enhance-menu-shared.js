@@ -91,8 +91,8 @@
           <span class="enhance-menu-label">${esc(m.label)}</span>
           ${specTag}
           ${recBadge}
-          ${ok ? "" : `<span class="enhance-menu-badge">${esc(why)}</span>`}
         </label>
+        ${ok ? "" : `<span class="enhance-menu-badge why">${esc(why)}</span>`}
         <span class="enhance-menu-hint">${esc(m.hint)}</span>
         ${renderFieldsHtml(m, o)}
       </div>`;

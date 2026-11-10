@@ -544,16 +544,42 @@ class TestEnhanceConcurrencyGate(unittest.TestCase):
         self.assertIn("429", src)
 
     def test_concurrency_gate_does_not_block_when_free(self):
-        """闸门空闲时能立刻进入（不误伤正常请求）。"""
+        """闸门空闲时能立刻进入（不误伤正常请求）。
+
+        【2026-11-10 修复 · 测试健壮性】
+        原来这里直接 `asyncio.run(run())` —— 但 `asyncio.run()` **要求当前线程
+        没有正在运行的 event loop**。全量跑时前面的 Playwright 同步用例可能
+        留下一个「正在运行」的 loop，于是这里抛
+        `RuntimeError: asyncio.run() cannot be called from a running event loop`
+        —— 这是**测试自身的顺序依赖**，与产品代码无关
+        （隔离跑必过；基线在同机器上同样出现同类 mass error）。
+
+        修法：自己建 loop 并在**同一个 loop 内**创建闸门与进入闸门，
+        不依赖环境里有没有运行中的 loop，也不受别的用例污染。
+        """
         import asyncio
         import server
-        server.ENHANCE_GATE = None
-        gate = server._enhance_gate()
 
-        async def run():
-            async with gate:
-                return "ok"
-        self.assertEqual(asyncio.run(run()), "ok")
+        async def scenario():
+            server.ENHANCE_GATE = None
+            gate = server._enhance_gate()
+
+            async def run():
+                async with gate:
+                    return "ok"
+            # 在**同一个 loop 内**跑 —— 闸门与使用它的协程必须同 loop
+            return await run()
+
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            self.assertEqual(loop.run_until_complete(scenario()), "ok")
+        finally:
+            try:
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
+            loop.close()
 
 
 class TestEnhanceRetryOnTruncation(unittest.TestCase):
