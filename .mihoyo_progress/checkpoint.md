@@ -52,7 +52,24 @@
 - 遇 429 不硬刚：立即落盘已完成进度并停该步
 - 每完成一个原子步骤即 git commit
 
-## 待办
+## 最终状态：全部完成
 
-- [ ] 补测 Qwen-Image 2.1 / MOSS-Image 两族的实测生成（进行中）
-- [ ] 报告补上两族证据后定稿
+- [x] 补测 Qwen-Image 2.1 / MOSS-Image 两族的实测生成
+      （像素差异 88.71% / 99.64%，节点图 + 触发词 + clip patch 全部确认）
+- [x] 报告定稿：`米哈游LoRA集成与使用证据.md`（38 KB）
+- [x] 交付断言 54/54 PASS
+- [x] 临时 8290 实例已关闭；线上 8190 / `h3-studio.service` 全程未动
+
+## 最终提交
+
+```
+8e6a1f4 chore(mihoyo): 补三族实测证据 + 更新断点检查点
+e62fe33 fix(lora): 修正版本号污染导致的强度误算（Moss_danica 1.5 -> 1.0）
+624ce29 test(lora): 补角色/机体增量批次回归测试（23 项）
+d9dbff8 feat(lora): 接入米哈游角色/机体 54 条效果 LoRA（Z21/Q5/MOSS28）
+5f79f3c chore(mihoyo): 角色/机体 57 条下载完成（8.49 GB，0 失败）
+44562a3 chore(mihoyo): 加断点续跑检查点
+14c8225 fix(lora): 修正跨族错放
+e503c4e fix(lora): 米哈游目录补全 IP 归属标注
+4674fb0 feat(lora): 接入米哈游画风/场景效果 LoRA 目录（46 条）
+```
