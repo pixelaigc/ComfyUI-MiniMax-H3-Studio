@@ -93,13 +93,40 @@ class TestEnhanceReviewStatic(unittest.TestCase):
         self.assertGreater(restore_idx, 0, "closeMenu 必须把菜单挂回原位")
 
     def test_position_clamps_to_viewport(self):
-        """定位必须夹到视口内（左右下三边）。"""
+        """
+        定位必须夹到视口内（左右下三边）。
+
+        【2026-11-10 放宽字面量】原来断言的是字面量 "left < 8"。
+        现在 positionMenu 把边距抽成了常量 EDGE（= 8），
+        代码写成 `if (left < EDGE) left = EDGE;` —— 语义完全一样，
+        但字面量断言会假红。
+
+        所以改成断言**语义**：左边界必须有夹取，且夹取值必须
+        来自一个 >= 0 的常量。同时把取样窗口从 1200 放宽到 2000
+        （函数体变长了，夹取语句移到了窗口之外）。
+
+        注意：这条仍是**静态**断言（读源码文本），真正验证几何的是
+        tests/verify_dropdown_overflow_fix.py 的 G3 / G4。
+        """
         idx = self.code.find("function positionMenu(menu, btn)")
         self.assertGreater(idx, 0)
-        body = self.code[idx:idx + 1200]
+        body = self.code[idx:idx + 2000]
         self.assertIn("window.innerWidth", body, "应按视口宽度夹取")
         self.assertIn("window.innerHeight", body, "应按视口高度夹取")
-        self.assertIn("left < 8", body, "左边也要夹（否则可能贴出视口）")
+        # 左边也要夹（否则可能贴出视口）
+        self.assertRegex(body, r"left\s*<\s*([A-Za-z_]\w*|\d+)",
+                         "左边也要夹（否则可能贴出视口）")
+        # 夹取用的常量必须是个非负数
+        m = re.search(r"const\s+(?:EDGE|MIN_EDGE|PAD)\s*=\s*(\d+)", self.code)
+        self.assertIsNotNone(m, "定位边距必须是显式常量，便于统一调整")
+        assert m is not None
+        self.assertGreaterEqual(int(m.group(1)), 0)
+        # 右边：超出视口右沿要往左收
+        self.assertRegex(body, r"left\s*\+\s*\w+\s*>\s*vw\s*-",
+                         "右边超出视口要往左收")
+        # 下边：底边超出视口要往上收
+        self.assertRegex(body, r"top\s*\+\s*\w+\s*>\s*vh\s*-",
+                         "下边超出视口要往上收")
 
     # ---- P1-2 多选写版本历史 ----
     def test_multiselect_reports_version_info(self):

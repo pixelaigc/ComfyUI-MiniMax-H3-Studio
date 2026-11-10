@@ -1124,6 +1124,66 @@
     // 先挂到 body 再定位 —— 否则算出来的 top 是相对 transform 祖先的
     mountMenuToBody(menu);
     positionMenu(menu, btn);
+    // 【2026-11-10 出框修复】锚点行会在**定位之后**移动/变高 ——
+    //   a) 模板清单是异步加载的（providers.js 在 /api/providers 回来后才重算
+    //      「当前增强：xxx」回显），回显换行 -> 增强栏高度 +24px；
+    //   b) 面板是滚动容器，菜单打开后如果它继续滚动（scrollIntoView 的
+    //      惯性、LoRA 列表加载后撑高把内容顶下去），锚点行会**上下移动**，
+    //      而菜单是 position:fixed（坐标相对视口）—— 菜单不动，锚点动了，
+    //      于是菜单就飘到了提示词框上面（实测 1280 视口：
+    //      菜单 y=253.8，提示词框 y=494.8 ~ 606.8，被压住）。
+    //
+    // 一次性定位覆盖不了这两种情况，所以：
+    //   - ResizeObserver 盯锚点行的**尺寸**变化；
+    //   - scroll（捕获阶段）+ 滚动容器 的 scroll 事件盯**位置**变化。
+    // 任一发生就重新定位。
+    watchAnchorRow(menu, btn);
+  }
+
+  /** 盯住锚点行（尺寸 + 位置），变了就重新定位菜单。 */
+  const ANCHOR_WATCHERS = new WeakMap();
+
+  /** 找到最近的可滚动祖先（菜单要跟着它一起走）。 */
+  function scrollParent(el) {
+    let node = el && el.parentElement;
+    while (node && node !== document.body) {
+      const cs = getComputedStyle(node);
+      if (/(auto|scroll|overlay)/.test(cs.overflowY + " " + cs.overflowX)) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function watchAnchorRow(menu, btn) {
+    const old = ANCHOR_WATCHERS.get(menu);
+    if (old) old.dispose();
+    const row = btn.closest(".prompt-enhance-bar") || btn.parentElement || btn;
+    // 重入保护：positionMenu 里可能滚动面板来腾空间，
+    // 滚动又会触发 reposition —— 没有保护就会来回抖。
+    let busy = false;
+    const reposition = () => {
+      if (busy || menu.hidden) return;
+      busy = true;
+      try { positionMenu(menu, btn); } finally { busy = false; }
+    };
+
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(reposition);
+      ro.observe(row);
+    }
+    // 捕获阶段的 scroll 能同时收到页面滚动与容器滚动。
+    window.addEventListener("scroll", reposition, true);
+    const scroller = scrollParent(row);
+    if (scroller) scroller.addEventListener("scroll", reposition);
+
+    ANCHOR_WATCHERS.set(menu, {
+      dispose() {
+        if (ro) ro.disconnect();
+        window.removeEventListener("scroll", reposition, true);
+        if (scroller) scroller.removeEventListener("scroll", reposition);
+      },
+    });
   }
 
   function closeMenu() {
@@ -1132,9 +1192,18 @@
     const btn = document.querySelector(t.menuBtn);
     if (!menu) return;
     menu.hidden = true;
-    // 清掉定位时临时设的高度约束 —— 下次打开要按新的视口重新算。
+    // 清掉定位时临时设的尺寸约束 —— 下次打开要按新的视口/容器重新算。
+    // width / max-width / min-width 也要清：不清理的话，上一次打开时
+    // 按「旧容器宽度」算出来的值会残留，窗口尺寸变化后会话菜单尺寸
+    // 与容器不匹配（这正是出框的第二个来源）。
     menu.style.maxHeight = "";
+    menu.style.maxWidth = "";
+    menu.style.minWidth = "";
+    menu.style.width = "";
     if (btn) btn.setAttribute("aria-expanded", "false");
+    // 断开锚点观察 —— 不然每次开菜单都留一个 observer 盯着 DOM。
+    const ro = ANCHOR_WATCHERS.get(menu);
+    if (ro) { ro.dispose(); ANCHOR_WATCHERS.delete(menu); }
     restoreMenuHome(menu);
   }
 
@@ -1145,46 +1214,110 @@
   }
 
   /**
-   * 菜单定位在按钮下方；靠近视口右/下边缘时翻转，避免出屏。
+   * 菜单定位：贴住触发按钮所在的**增强栏**下方；宽度不超过所在容器，
+   * 高度封顶（内部滚动），不遮挡相邻字段。
    *
    * 【2026-11-09】菜单挂到 body 后，getBoundingClientRect() 拿到的
    * 是**视口坐标**，与 position:fixed 的参照系一致 —— 这正是原来
    * 在窄屏下算错的原因（坐标是相对 transform 祖先的）。
+   *
+   * 【2026-11-10 出框修复】四件事：
+   *   1) 宽度上限取「所在容器宽度 - 24」，并同步压低 min-width ——
+   *      原来固定 340px，在桌面端（参数面板内容区只有 297px）比容器还宽，
+   *      视觉上就是「浮层出框」。
+   *   2) 高度按「下方可用空间」计算 —— 原来菜单直接用内容高度
+   *      （实测 1280 视口下菜单高 861px，把提示词框、LoRA 区全遮了）。
+   *      现在封顶后内部滚动。
+   *   3) 锚点从「按钮底边」改成「增强栏（.prompt-enhance-bar）边」——
+   *      增强栏里除了按钮还有「当前增强：xxx」回显，贴按钮下沿会把
+   *      那行字盖住（用户截图报的就是这个）。
+   *   4) **始终向下展开**，不向上翻 —— 见下面 positionMenu 里的说明。
+   *
+   * 【关于 MAX_MENU_H】这个上限在实测里**几乎不会生效**：
+   * 参数面板的内容总是被滚到底（scrollTop == maxScroll），
+   * 增强栏永远贴着面板底部，所以「下方可用空间」被钉死在 ~190px，
+   * 远小于 360px（实测 375/390/1280/1280x1400 四档，
+   * availBelow 分别是 213.8 / 213.8 / 187.5 / 187.5）。
+   * 也就是说真正把菜单高度限制住的是「可用空间」，不是这个上限。
+   * 保留它作为兜底（面板以后加了内容、布局变了，它会兜住），
+   * 但**不要**把它当成已验证的行为 —— 守卫脚本里对它的断言
+   * 只在真能触发时才算数。
    */
-  function positionMenu(menu, btn) {
-    const r = btn.getBoundingClientRect();
-    const mw = menu.offsetWidth || 260;
-    // 【窄屏】菜单高度被 CSS 的 max-height 限制在视口内（超高时内部滚动）。
-    // 这里必须用**实际高度**做定位判定 —— 否则会拿「内容高度」去比视口，
-    // 得出「放不下」的结论，把菜单翻到按钮上方，但按钮上方也不够放，
-    // 结果菜单仍然溢出视口（实测 375x500 视口下整块菜单底部在 643px，
-    // 视口只有 500px —— 最后几项被裁掉）。
-    const maxH = Math.max(120, window.innerHeight - 16);
-    const mh = Math.min(menu.offsetHeight || 160, maxH);
-    let left = r.left;
-    if (left + mw > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - mw - 8);
-    }
-    if (left < 8) left = 8;
+  const MAX_MENU_H = 360;   // 菜单最大高度（兜底；实测中由「可用空间」主导）
+  const MAX_MENU_W = 340;   // 菜单最大宽度（自适应内容的上限）
+  const MIN_MENU_W = 268;   // 菜单最小宽度（容器不够宽时按比例压低）
+  const EDGE = 8;           // 距视口边缘的留白
+  const MIN_MENU_H = 120;   // 菜单最小高度（再小就没法用了）
 
-    // 下方优先；下方放不下就翻到上方；**两边都放不下**时贴着视口顶，
-    // 并把高度压到视口内（菜单内部滚动，见 style.css 的 max-height/overflow-y）。
-    let top = r.bottom + 6;
-    if (top + mh > window.innerHeight - 8) {
-      const above = r.top - mh - 6;
-      if (above >= 8) {
-        top = above;
-      } else {
-        top = 8;
-        menu.style.maxHeight = Math.max(120, window.innerHeight - 16) + "px";
-      }
-    }
-    // 兜底：任何情况下底部都不越过视口。
-    if (top + mh > window.innerHeight - 8) {
-      top = Math.max(8, window.innerHeight - 8 - mh);
-    }
+  function positionMenu(menu, btn) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const r = btn.getBoundingClientRect();
+
+    // ---- 1) 宽度：自适应内容，但不超过所在容器，也不超过视口 ----
+    // 用 width:max-content + max-width 让浏览器自己算「内容自然宽度」，
+    // 再被 max-width 夹住 —— 结果是**确定的**，不依赖 left 还没设好时的
+    // shrink-to-fit（position:fixed + left:auto 时宽度会随 left 变化，
+    // 边测边改会来回抖）。
+    const host = btn.closest(".field, #panel, .panel") || document.body;
+    const hostW = (host.getBoundingClientRect().width) || vw;
+    const maxW = Math.max(160, Math.min(MAX_MENU_W, hostW - 24, vw - EDGE * 2));
+    menu.style.maxWidth = maxW + "px";
+    // min-width 也必须跟着压低 —— CSS 里 min-width 优先级高于 max-width，
+    // 容器比 268px 还窄时，菜单会「不听话」地撑出去。
+    menu.style.minWidth = Math.min(MIN_MENU_W, maxW) + "px";
+    menu.style.width = "max-content";
+
+    // ---- 2) 高度与锚点：贴增强栏（不是贴按钮），保证不盖住同一组的回显 ----
+    const row = btn.closest(".prompt-enhance-bar") || btn.parentElement || btn;
+    const rr = row.getBoundingClientRect();
+    const belowTop = rr.bottom + 6;
+    const availBelow = vh - EDGE - belowTop;
+
+    // 【2026-11-10】**始终向下展开**，不向上翻。
+    // 理由是 DOM 顺序决定的，不是审美偏好：
+    //   <textarea id="prompt">            ← 提示词框
+    //   <div class="prompt-enhance-bar">   ← 增强栏（按钮 + 当前增强回显）
+    // 增强栏在提示词框的**下面**，所以「向上弹」必然压住提示词框
+    // （实测 1280 视口：菜单 y=249.8~609.8，提示词框 y=506.5~618.5，
+    //  重叠 103px —— 用户要对比着看的原文直接被盖住）。
+    //
+    // 下方空间不够时**不滚面板**（滚面板会把用户正在看的内容挪走，
+    // 是更糟的副作用）—— 菜单高度取「下方可用空间」，
+    // 内容超出就在菜单内部滚动（既有契约，见 tests/verify_menu_not_clipped.py）。
+    const h = Math.min(MAX_MENU_H, Math.max(MIN_MENU_H, availBelow));
+    let top = belowTop;
+    if (top + h > vh - EDGE) top = Math.max(EDGE, vh - EDGE - h);
+    menu.style.maxHeight = h + "px";
+
+    // ---- 3) 横向：贴按钮左沿，超出视口就往左收 ----
+    // 宽度此时已确定（max-content 被 max-width 夹住），offsetWidth 是稳定值。
+    const mw = menu.offsetWidth || Math.min(maxW, MIN_MENU_W);
+    let left = r.left;
+    if (left + mw > vw - EDGE) left = Math.max(EDGE, vw - EDGE - mw);
+    if (left < EDGE) left = EDGE;
+
     menu.style.left = left + "px";
     menu.style.top = top + "px";
+  }
+
+  /**
+   * 【已弃用】曾经想「面板下方空间不够就滚动面板腾空间」。
+   *
+   * 试过之后发现两个问题，都比它想解决的问题更严重：
+   *   1) 面板往往**已经滚到目标内容的底部**（scrollTop == maxScroll），
+   *      这时 scrollTop 减小会让面板内容整体下移，锚点行反而
+   *      **掉出视口**（实测 rowBottom 590 -> 1729px），
+   *      菜单高度从 208px 缩到 118px —— 比不改还糟。
+   *   2) 无论如何挪动，都会把用户正在看的其它字段挪走，
+   *      副作用比「菜单内部滚动」大得多。
+   *
+   * 结论：菜单高度直接取「下方可用空间」，超出部分在菜单内部滚动
+   * （这是既有契约，见 tests/verify_menu_not_clipped.py）。
+   * 本函数保留为空实现，免得以后有人再犯同样的错。
+   */
+  function ensureRoomBelow(row, need, vh) {
+    return false;
   }
 
   // ------------------------------------------------------------------ 路由
