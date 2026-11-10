@@ -1,9 +1,15 @@
 # 内置多模态 Agent —— 后端接口契约
 
-> 对应分支：`local/feature/agent-enh-backend`
+> 对应分支：`local/feature/agent-enh-fix`（合并 `agent-enh-backend` + `agent-enh-frontend`）
 > 基线：`local/feature/builtin-agent`（提交 a455c7e）
 > 本文覆盖**后端**提供的全部 HTTP 接口、工具名、入参、返回值与错误码。
 > 前端（`web/`）由另一条线负责，本文只定义后端给出的**数据形状**。
+>
+> **2026-11-10 三轮综合审查后修订**：
+> ① 流式开关的**两种写法**都合法（body / query）
+> ② `tool_call` / `tool_result` 补发 `call_id`
+> ③ 澄清态补 `clarify_options` / `clarify_hint`（`done` 事件也带）
+> ④ `GET /api/generation-types` 每个类型补 `agent_asset_slots`（能力位下发）
 
 ---
 
@@ -19,6 +25,7 @@
 | GET | `/api/agent/sessions` | 会话清单 |
 | GET | `/api/agent/sessions/{id}` | 某会话的完整消息历史 |
 | DELETE | `/api/agent/sessions/{id}` | 清空会话 |
+| GET | `/api/generation-types` | 生成类型清单。**每个类型带 `agent_asset_slots`**（Agent 素材通道） |
 
 ---
 
@@ -33,6 +40,25 @@
 | `provider_id` | string | 否 | 指定本地模型 Provider。不给则用「本地模型配置」里的默认 |
 | `max_steps` | int | 否 | 最大步骤数。默认与上限都是 `8` |
 | `stream` | 1/true/yes/on | 否 | `1` = 用 SSE 流式返回（等价于 `/api/agent/chat/stream`） |
+
+### 1.1.1 流式开关的两种写法（**都合法**）
+
+审查实测：前端原来发的是 `?stream=1`（query 载体），而后端只读 `body.stream`
+—— 两边对同一个参数的载体认知不同，结果真实浏览器 12/12 请求拿到的都是
+`application/json`，**流式 100% 不生效**。
+
+现在**两种写法都命中同一条 SSE 契约**（事件名 / 字段完全一致）：
+
+| 写法 | 请求 | 说明 |
+|---|---|---|
+| **A（body 载体）** | `POST /api/agent/chat`<br>body `{"message":"…","stream":1}` | **推荐**。前端当前走这条 |
+| **B（query 载体）** | `POST /api/agent/chat?stream=1`<br>body `{"message":"…"}` | 兼容**已部署的旧前端**（旧前端发的是这条） |
+
+判定优先级：body 里的 `stream` 优先；body 里没有（或为空）才读 query。
+两边都取不到 → 走一次性 JSON。
+
+> `/api/agent/chat/stream` 与上面两者**完全等价**（请求体一致），
+> 前端降级链用它作为老契约端点。
 
 ### 1.2 响应（一次性 JSON，`stream` 不为 1）
 
@@ -65,16 +91,46 @@
   "error": null,              // 失败/截断原因（可读中文）
   "code": null,               // 失败时的结构化错误码（见 §5）
   "clarification": "要竖屏还是横屏？",  // 仅 needs_clarification 时出现
-  "memory": { "used": true }  // 是否注入了记忆库偏好
+  "clarify_options": ["9:16 竖屏", "16:9 横屏"],  // 澄清快捷选项（见下）
+  "clarify_hint": "视频时长合法区间是 5~15 秒。",  // 澄清提示（可空串）
+  "memory": { "used": true }, // 是否注入了记忆库偏好
+  "warning": null,            // 安全提示（如注入隔离），正常为 null
+  "injection_detected": false // 用户输入是否命中提示注入检测
 }
 ```
+
+#### 1.2.1 澄清字段（`needs_clarification` 时）
+
+审查实测：后端原来**只**产出 `clarification`（一个字符串），
+而前端读的是 `clarify_options` / `clarify_hint` —— 契约对不上，
+快捷选项 **100% 落空**（用户被迫手打「9:16」）。
+
+现在后端**同时**产出三个字段：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `clarification` | string | 澄清问题正文（模型给的） |
+| `clarify_options` | string[] | 快捷选项（**可直接点发的完整回答**）。始终存在，没有就给 `[]` |
+| `clarify_hint` | string | 补充说明（为什么需要确认 / 怎么答最快）。始终存在，没有就给 `""` |
+
+**选项来源（两级）**：
+
+1. **模型给的**：`respond` 工具新增 `clarify_options` / `clarify_hint` 两个入参，
+   模型知道自己在问什么，由它给候选最准。
+2. **后端兜底**：模型没给（实测很常见）时，由
+   `agent.py::_infer_clarify_options` 按**真实能力表**
+   （`agent_schema.mode_aspects` / `mode_duration_range` / `mode_resolutions`）
+   推断「这次缺什么」的候选。音乐模式不推比例（真实参数是 `max_duration`）。
+
+> 跨侧契约测试 `tests/test_agent_contract.py::TestClarificationFieldContract`
+> 锁死了这一条（后端真实产出 → 前端真实渲染 → DOM 里必须出现选项 chip）。
 
 ### 1.3 状态语义
 
 | status | 含义 | 前端该做什么 |
 |---|---|---|
 | `completed` | 正常完成 | 渲染结论 + 任务卡 |
-| `needs_clarification` | Agent 在提问，等用户补充 | 显示 `clarification`，把用户输入带回同一 `session_id` |
+| `needs_clarification` | Agent 在提问，等用户补充 | 显示 `clarification` + `clarify_options`（快捷选项）+ `clarify_hint`，把用户输入带回同一 `session_id` |
 | `truncated` | 达到步数/工具数上限或总超时 | 展示已完成的部分 + `error` 原因 |
 | `failed` | 模型什么都没做成 / 被安全策略拒绝 | 展示 `error` 与 `code`，**不要**当作有任务 |
 
@@ -82,7 +138,8 @@
 
 ## 2. SSE 事件契约
 
-`stream=1` 或 `POST /api/agent/chat/stream` 时返回 `text/event-stream`。
+`stream=1`（body 或 query 任一写法）或 `POST /api/agent/chat/stream` 时返回
+`text/event-stream`。
 
 格式：
 ```
@@ -100,12 +157,32 @@ data: <JSON>
 |---|---|---|
 | `progress` | `stage` `detail` `done` `total` `elapsed_ms` | 阶段进度（长耗时期间保持界面有反馈） |
 | `token` | `text` | 增量文本（模型输出的正文片段） |
-| `tool_call` | `tool` `args` | 模型发起了一个工具调用（工具名 + 参数） |
-| `tool_result` | `tool` `ok` `summary` | 工具结果摘要（一句话，可直接显示） |
+| `tool_call` | `tool` `args` **`call_id`** | 模型发起了一个工具调用（工具名 + 参数 + 调用 id） |
+| `tool_result` | `tool` `ok` `summary` **`call_id`** | 工具结果摘要（一句话，可直接显示）+ 调用 id |
 | `job` | `job_id` `mode` `label` `status` `params` `summary` `prompt` (+`outputs` `thumbnail`) | **任务卡数据**，前端据此渲染卡片并开始轮询 |
-| `done` | `answer` `status` `jobs` | Agent 编排结束（**不是**流的最后一个事件，后面还有 `result`） |
+| `done` | `answer` `status` `jobs` **`clarify_options`** **`clarify_hint`** **`clarification`** | Agent 编排结束（**不是**流的最后一个事件，后面还有 `result`） |
 | `error` | `error` `code` | 错误（可读文案 + 错误码） |
 | `result` | 完整 JSON | 流的**最后一个**事件，结构与一次性接口完全相同（向后兼容基线前端） |
+
+#### 2.1.1 `call_id`（2026-11-10 新增）
+
+同一个工具可能被**并发**调用两次（同名同参或不同参）。前端靠 `call_id` 把
+`tool_call` 与 `tool_result` 配对成同一张卡片。
+
+**没有 `call_id` 时前端只能「按名字找第一个未完成的工具」**
+→ 同名并发会串到同一张卡片上（审查实测 `call_id` 恒为 null）。
+
+契约：`tool_call` 与对应的 `tool_result` 的 `call_id` **必须相同**，
+值取模型返回的 tool_call id（`call["id"]`）。
+
+#### 2.1.2 `done` 事件里的澄清字段（2026-11-10 新增）
+
+审查实测：前端构造澄清气泡的逻辑只在**一次性 JSON 路径**里，
+流式路径完全没有 —— 于是走 SSE（正常路径）时「Agent 需要你确认」气泡
+**根本不出现**。
+
+现在 `done` 事件带上 `clarify_options` / `clarify_hint` / `clarification`，
+前端两条路径共用同一段构造逻辑。
 
 ### 2.2 事件顺序（典型成功链路）
 
@@ -189,7 +266,7 @@ error             ← {error, code}，随后关流（**没有** result）
 | `describe_asset` | `asset_id`(必) | 素材详情（描述已隔离） |
 | `enhance_prompt` | `prompt`(必) `mode` | `{original, enhanced, spec_id, validation_ok}` |
 | `create_job` | `mode`(必) `prompt`(必) + 见 §3.1.1 | `{job_id, mode, status, label}` |
-| `respond` | `summary`(必) `job_ids` `asset_ids` `needs_clarification` | `{ok:true}` |
+| `respond` | `summary`(必) `job_ids` `asset_ids` `needs_clarification` **`clarify_options`** **`clarify_hint`** | `{ok:true}` |
 
 #### 3.1.1 create_job 的完整入参（第二轮扩展）
 
@@ -264,6 +341,37 @@ error             ← {error, code}，随后关流（**没有** result）
 > 导致 `a2a` 必被「参考生音乐需要选择一段参考音频」拦下、
 > `flf` 必被「首尾帧模式需要至少上传首帧图片」拦下。
 > 现在按上表分派，两个模式都可正常下发。
+
+#### 3.1.4 能力位下发：`agent_asset_slots`（2026-11-10 新增）
+
+`GET /api/generation-types` 的每个类型会额外带一个 `agent_asset_slots` 字段
+（没有素材通道的类型**不带**这个字段）：
+
+```jsonc
+{
+  "types": [
+    { "key": "a2a", "label": "参考生音乐", "media": "audio",
+      "agent_asset_slots": {
+        "single": ["ref_audio"], "multi": [],
+        "max_per_slot": {"ref_audio": 1},
+        "source": "agent_schema.MODE_SLOTS" } },
+    { "key": "flf", "label": "首尾帧生成", "media": "video",
+      "agent_asset_slots": {
+        "single": ["first_frame", "last_frame"], "multi": [],
+        "max_per_slot": {"first_frame": 1, "last_frame": 1},
+        "source": "agent_schema.MODE_SLOTS" } }
+  ]
+}
+```
+
+**为什么需要**：前端原来**硬编码**「Agent 建不了 a2a / flf」
+（理由是旧基线的 Agent 素材槽位恒为 `ref_image`）。
+后端改成槽位分派后，那条提示变成**反向阻断** ——
+后端明明能建，任务卡上却写「Agent 建不了，请到面板手动提交」。
+
+现在能力位**由后端下发**，前端只渲染服务端给的结论：
+有槽位 → 不提示；服务端没下发 → 也不提示（宁可少提示，
+也不给一条与事实相反的阻塞提示）。
 
 ### 3.2 素材类（4 个，新增）
 
