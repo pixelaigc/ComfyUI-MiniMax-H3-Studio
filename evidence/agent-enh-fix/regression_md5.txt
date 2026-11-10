@@ -1,0 +1,10 @@
+baseline_failures_canonical_md5 = 7aecedc45b683dc99d7d13389e01db0c
+fix_failures_canonical_md5      = 7aecedc45b683dc99d7d13389e01db0c
+baseline_count = 161
+fix_count = 161
+only_in_baseline = 0
+only_in_fix = 0
+identical = True
+# 规范形式 = 排序去重（pytest 收集顺序不固定，行序会变）
+# 基线来源: /root/projects/h3studio-agent-enh-review-baseline @ 17c9adb
+# 命令: python3 -m pytest tests/ -p no:cacheprovider -q -rfE

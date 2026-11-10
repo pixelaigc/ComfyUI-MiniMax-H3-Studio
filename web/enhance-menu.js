@@ -45,6 +45,11 @@
    *             - 不写 = 文本路线，写回当前面板的文本输入框
    *             - kind:"structured" = 结构化路线，产物是结构化对象
    *               （由该方式自己注册契约，见 music-enhance.js）
+   * recommended 标注「推荐」（界面上显示 Recommended 徽标）
+   * owner       该增强能力归属哪个功能；不在本面板可用时用它说明「为什么没有」
+   * exclusive   true = 与其它项互斥（不能同时选中）
+   * fields      该项自带的可编辑字段（渲染在展开区里）
+
    */
   const ENHANCE_METHODS = [
     {
@@ -125,6 +130,8 @@
       // 契约由 music-enhance.js 注册（window.MusicEnhance.getWriteContract），
       // 这里只声明「走结构化路线」，具体落地交给契约的 apply()。
       write: { kind: "structured" },
+      owner: "MOSS-Image",
+
     },
     {
       id: "qwen_pe",
@@ -140,6 +147,8 @@
       kind: "qwen-pe",
       // 【写回契约 · 文本路线】官方 PE 的产物是扩写后的提示词文本。
       write: { kind: "text" },
+      owner: "Qwen-Image 2.1",
+
       // 该项自带的可编辑字段：官方 PE 的 system prompt 与档位参数。
       // systemPrompt 走「扩写 + 出图」同一条链路；params 是 PE 节点参数。
       fields: [
@@ -514,6 +523,21 @@
   /** 可用且被选中的方式（真正会被执行的那些）。 */
   function runnableMethods() {
     return selectedMethods().filter(isAvailable);
+  }
+
+  /**
+   * 某方式在当前模式下不可用的原因 —— 说清楚「它属于哪个功能」。
+   *
+   * 规则 1 的可见表达：别的功能的专属增强在本面板被禁用并说明来历，
+   * 而不是只丢一句「当前模式不可用」（用户不知道该去哪找它）。
+   */
+  function unavailableReason(method) {
+    const owners = {
+      layout: "MOSS-Image",
+      qwen_pe: "Qwen-Image 2.1",
+    };
+    const owner = owners[method.id] || method.owner || "其它功能";
+    return owner + " 专属，本面板不可用";
   }
 
   // ------------------------------------------------------------------ 状态
