@@ -500,6 +500,10 @@ python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
 python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
 ```
 
+**名单合并方式**：审查③的基线输出分两个文件（`-rf` 只列 FAILED、
+`-rE` 只列 ERROR），本分支用 `-rfE` 一次列出两类。
+比对时把两边的条目统一规范化成 `"{FAILED|ERROR} {nodeid}"` 再排序去重。
+
 | 项 | 值 |
 |---|---|
 | 名单条目数 | 基线 **161** / 本分支 **161** |
@@ -508,11 +512,16 @@ python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
 | **新增(NEW) 失败/错误** | **0** |
 | **消失(GONE) 失败/错误** | **0** |
 | **同名但类型不同** | **0** |
-| md5（ERROR 名单） | `81122fb9c8664078135af0206d2c130c`（两边一致） |
+| **md5（161 条完整名单）** | `fc3438e62cd08a4f6338488e8d60ee98`（两边**完全一致**） |
+| md5（ERROR 子集，134 条） | `81122fb9c8664078135af0206d2c130c`（两边一致） |
 
-> **零新增回归** —— 逐条相同。
-> 名单文件：`evidence/agent-enh-fix/fix_failures.txt` /
-> `baseline_failures_rE.txt` / `fix_full_pytest.txt` / `fix_full_pytest_rfE.txt`。
+> **零新增回归** —— 161 条逐条相同，md5 一致。
+> 交叉验证：本分支名单与后端分支 `evidence/agent-enh/baseline_failures.txt`
+> （同一基线跑的 161 条）md5 **也完全一致**（`fc3438e6...`）。
+>
+> 名单文件：`evidence/agent-enh-fix/fix_failures_rfE.txt` /
+> `baseline_failures_full_161.txt` / `fix_full_pytest.txt` /
+> `fix_full_pytest_rfE.txt`。
 
 ### 4.3 基线 27 条 FAILED 的归属（全部与 Agent 增强无关）
 
@@ -611,6 +620,74 @@ job → done → result 逐条推送），本轮验证脚本据此断言，
 
 ## 6. 真实任务实跑与 SQLite 落库
 
+### 6.1 【真实模型 + 真实 ComfyUI】完整链路
+
+```bash
+python3 scripts/live_real_task.py <证据目录>
+```
+
+- **真实**：`server.py` + 真实本地模型（`qwen3.8-flash-next-iq3_xxs`，本机 llama.cpp）
+  + **真实 ComfyUI**（8188）+ 真实 SQLite + 真实产物文件
+- Provider 配置从线上库**只读复制**（`mode=ro` 打开，线上库一个字都不改）
+- 独立端口（8197 或随机空闲端口）+ 独立 `data_dir`（临时目录，跑完即删）
+- **8190 线上服务与 systemd unit 全程未碰**
+
+**实测结果**：
+
+```
+== 已从线上库**只读复制** 1 个 Provider ==
+== 独立实例：http://127.0.0.1:56239（data_dir=/tmp/h3studio-realtask-*/data）==
+== 可用 Provider：['b17cccaab67d'] ==
+== 发请求（真实模型）==
+   耗时 40523ms  status=completed
+   answer=已用 Z-IMAGE 文生图模式（t2i）下发生成任务：
+          **任务 ID**：1ec7d56fdbc0（已进入 ComfyUI 队列）
+          **画面比例**：16:9 ✅  **模型**：z_image_turbo_bf16  **分辨率**：1mp
+          **提示词**：已按图像增强模板扩写 —— 橘猫端坐于老式木质窗台…
+          补充说明：Z-IMAGE turbo 版本的负面提示词不生效（cfg=1）…
+== 等 ComfyUI 出图 ==
+   status=running progress=0.7058 节点 7/10 · 步 5/8
+   status=done    progress=1.0    节点 10/10
+   产物：[{'kind': 'image', 'file': 'images/i-zimage-000001.png',
+           'name': 't2i_1ec7d56fdbc0_00001_.png'}]
+
+===== 断言结果 =====
+全部通过（真实模型建任务 -> ComfyUI 出图 -> 产物落库 -> SQLite 有记录）
+```
+
+**真实工具调用序列**（6 次，全部 `ok=True`）：
+```
+get_mode_schema(mode=t2i_moss) → list_modes → get_mode_schema(mode=t2i)
+→ enhance_prompt(prompt=…, mode=t2i)
+→ create_job(mode=t2i, prompt=…, aspect=16:9)
+→ respond(job_ids=[1ec7d56fdbc0], summary=…)
+```
+
+**任务表**（`jobs.db` 真实落库）：
+```json
+{"id": "1ec7d56fdbc0", "mode": "t2i", "status": "done", "progress": 1.0,
+ "progress_text": "节点 10/10", "error": null,
+ "outputs": [{"kind": "image", "file": "images/i-zimage-000001.png",
+               "name": "t2i_1ec7d56fdbc0_00001_.png"}],
+ "params": {"aspect": "16:9", "gen_type": "t2i", "prompt": "主体：一只成年橘猫…"}}
+```
+
+**会话表**（`agent_sessions.db` 真实落库）：
+```
+user      | 用 Z-IMAGE 文生图模式生成一张 16:9 的图：一只橘猫坐在洒满阳光的木窗台上…
+assistant | 已用 Z-IMAGE 文生图模式（t2i）下发生成任务：…
+tool      | get_mode_schema: ok
+tool      | list_modes: ok
+tool      | get_mode_schema: ok
+tool      | enhance_prompt: ok
+tool      | create_job: ok
+tool      | respond: ok
+```
+
+> 证据：`evidence/agent-enh-fix/live_real_task.json`
+
+### 6.2 mock 模型下的三档宽度实跑
+
 证据：`evidence/agent-enh-fix/browser_contract_evidence.json` → `sqlite_jobs` / `sqlite_sessions`
 
 **任务表**（`jobs.db`，真实落库）：
@@ -648,7 +725,7 @@ tool      | respond: ok
 | 3 | **SSE 客户端无 AbortController 超时** | P1 | **未做** | 审查「重要 2」：流挂死时连接不会断。同上，属独立健壮性问题 |
 | 4 | **`recall(limit<0)` 返回 1 条** | P2 | **未做** | 审查「G19」：语义不明（钳到 0 还是默认 20）。语义要拍板 |
 | 5 | **注入正则仍有双份维护的风险面** | — | **已缓解** | `agent_memory` 已改为 import `agent_safety` 的那份（单一真源）。但 `agent_safety` 内部仍是一份长正则元组 —— 未来若要加「按来源分级的检测策略」仍需重构，未做 |
-| 6 | **真实本地大模型下的流式观感** | — | **未测** | 本地模型单步 20~120 秒、链路 4~6 分钟且输出不可控。本轮用 mock 覆盖**渲染路径与契约**（事件分批、参数、结果、澄清选项全部实测），**未覆盖**真实模型产出的节奏与长度 |
+| 6 | **真实本地大模型下的流式观感** | — | **部分测** | 本轮已用**真实本地模型 + 真实 ComfyUI** 跑通完整链路（40.5 秒，真实出图，真实落库，见 §6.1），证明契约修复后真链路可跑。但**流式的事件节奏**是在 mock 下测的（本地模型单步 20~120 秒，真实节奏未采样） |
 | 7 | **119/120 档断点（≤700px）** | — | **未测** | 审查要求只指定 375/390/1280 三档；`responsive.css` 的 `max-width:700px` 断点正落在 390 与 1280 之间，未取样 |
 | 8 | **素材库真实检索链路** | — | **未测** | mock 的 `search_assets` 未接真实素材库；`filterToolResult` 对 `list_modes` 的模式过滤未在真实模式下验证 |
 
@@ -679,6 +756,9 @@ tool      | respond: ok
 | `evidence/agent-enh-fix/baseline_failures_rE.txt` | 基线 161 条 FAILED/ERROR 名单 |
 | `evidence/agent-enh-fix/browser_contract_evidence.json` | 真实浏览器三档宽度全量数据（工具块 / 澄清 / 流式 / 布局 / console / SQLite） |
 | `evidence/agent-enh-fix/screenshots/fix-{375,390,1280}-{01-toolchain,02-clarify,03-stream}.png` | 9 张真实渲染截图 |
+| `evidence/agent-enh-fix/live_real_task.json` | **真实模型 + 真实 ComfyUI** 完整链路实跑记录 |
+| `evidence/agent-enh-fix/fix_failures_rfE.txt` | 本分支 161 条 FAILED/ERROR 完整名单 |
+| `evidence/agent-enh-fix/baseline_failures_full_161.txt` | 基线 161 条完整名单（合并审查③的 -rf 与 -rE 两份输出） |
 | `evidence/agent-enh-fix/server_stdout.log` | 独立实例的服务端日志 |
 
 **复现命令**：
@@ -699,6 +779,9 @@ python3 -m pytest tests/test_agent_contract.py -v
 # 全量回归
 python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
 
-# 真实浏览器验证
+# 真实浏览器验证（mock 模型 + 真实 server + 真实 Chromium）
 python3 scripts/verify_agent_contract_fix.py /tmp/agent-contract-fix
+
+# 真实任务实跑（真实本地模型 + 真实 ComfyUI 出图）
+python3 scripts/live_real_task.py /tmp/agent-real-task
 ```
