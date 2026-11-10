@@ -8,6 +8,27 @@
 > **第二轮补充**：纳入《Agent媒体语义与提示词策略》的基线实测事实 ——
 > create_job 参数 schema 扩展、按族分辨率/时长校验、素材槽位分派修复、
 > 负面提示词支持矩阵、Provider 前置检查、内容策略扩为 5 类。
+>
+> ---
+>
+> ## ⚠️ 2026-11-10 审查修订说明（务必先读）
+>
+> 本文档由后端增强分支撰写。三轮综合审查发现其中 **6 处数字/口径与代码事实不符**，
+> 本轮（`local/feature/agent-enh-fix`）已**如实更正**，每处都标了「✅ 已更正」。
+> 更正依据是 `git diff --numstat 17c9adb..agent-enh-backend` 的**实测值**。
+>
+> | # | 原报告声明 | 代码事实（实测） | 本轮状态 |
+> |---|---|---|---|
+> | R1 | `agent.py` **+494 行** | **+1115 / −51** | ✅ 已更正（§1.2） |
+> | R2 | `server.py` **+247 行 −5** | **+265 / −5** | ✅ 已更正（§1.2） |
+> | R3 | `agent_schema.py` **~740** | **1219 行**（偏差 65%） | ✅ 已更正（§1.1） |
+> | R4 | `agent_safety.py` **~330** | **415 行** | ✅ 已更正（§1.1） |
+> | R5 | 注入检测「**4 种**攻击句式」 | 实际 **9 条**正则 | ✅ 已更正（§4 覆盖表） |
+> | R6 | 回归结论「基线 27F/490P vs 本分支 27F/600P」 | 与 commit `1c75f36` 的 message（「30F/134E vs 30F/134E」）口径不一致 | ✅ 已用本轮合并后实测数据替换（§5） |
+>
+> **另有一处口径提示**（审查已核实为「与代码一致」，不算不符）：
+> §1.1 称 `agent_tools.py` 是「17 个扩展工具」—— 实测 `agent_tools.py` 注册 **17** 个，
+> `agent.py` 注册 6 个，合计 23 个，该声明正确。
 
 ---
 
@@ -44,11 +65,15 @@
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
-| `h3studio/agent_memory.py` | ~430 | 长期记忆库（跨会话用户偏好）。独立 SQLite 库、键值+作用域模型、条目/长度硬上限、提示注入拦截 |
-| `h3studio/agent_schema.py` | ~740 | 参数合法性校验器 + 模式 schema 推导。**纯函数层**，不碰 DB/HTTP/模型，可独立单测 |
-| `h3studio/agent_safety.py` | ~330 | 安全与合规层。提示注入检测与隔离、路径边界（防穿越）、敏感内容策略 |
-| `h3studio/agent_tools.py` | ~700 | 17 个扩展工具的实现（素材/任务/预设/模式 schema/记忆历史） |
-| `tests/test_agent_backend_enh.py` | ~1030 | 新增单测 83 条 |
+| `h3studio/agent_memory.py` | **423**（新增时） | 长期记忆库（跨会话用户偏好）。独立 SQLite 库、键值+作用域模型、条目/长度硬上限、提示注入拦截 |
+| `h3studio/agent_schema.py` | **1219**（新增时） | 参数合法性校验器 + 模式 schema 推导。**纯函数层**，不碰 DB/HTTP/模型，可独立单测 |
+| `h3studio/agent_safety.py` | **415**（新增时） | 安全与合规层。提示注入检测与隔离、路径边界（防穿越）、敏感内容策略 |
+| `h3studio/agent_tools.py` | **721** | 17 个扩展工具的实现（素材/任务/预设/模式 schema/记忆历史） |
+| `tests/test_agent_backend_enh.py` | **1033** | 新增单测 83 条 |
+
+> ✅ **已更正（R3 / R4）**：原表写 `agent_schema.py ~740`（实测 **1219**，偏差 65%）、
+> `agent_safety.py ~330`（实测 **415**）。
+> 现按 `git diff --numstat 17c9adb..agent-enh-backend` 的实测值填写。
 
 外加两个实跑脚本：`scripts/run_live_8199.sh`、`scripts/live_agent_check.py`。
 
@@ -56,9 +81,13 @@
 
 | 文件 | 改动 |
 |---|---|
-| `h3studio/agent.py` | +494 行。工具注册点、system 提示词扩充、`run_agent` 增强（事件回调/记忆注入/敏感前置检查/强制重试/参数预校验/工具重试） |
+| `h3studio/agent.py` | **+1115 行 −51 行**。工具注册点、system 提示词扩充、`run_agent` 增强（事件回调/记忆注入/敏感前置检查/强制重试/参数预校验/工具重试） |
 | `h3studio/agent_sessions.py` | +76 行。新增 `search()`（跨会话检索）与 `stats()` |
-| `server.py` | +247 行 −5 行。4 个 Agent 任务查询函数、`/api/agent/memory` 两个端点、`/api/agent/tools` 扩充、`stream=1` 支持、事件分发改造 |
+| `server.py` | **+265 行 −5 行**。4 个 Agent 任务查询函数、`/api/agent/memory` 两个端点、`/api/agent/tools` 扩充、`stream=1` 支持、事件分发改造 |
+
+> ✅ **已更正（R1 / R2）**：原表写 `agent.py +494 行`（实测 **+1115 / −51**）、
+> `server.py +247 行 −5 行`（实测 **+265 / −5**）。
+> 数字差得离谱的原因是原表是**估算**而非实测。
 
 ### 1.3 架构约束的遵守情况
 
@@ -233,7 +262,8 @@ $ python3 -m pytest tests/test_agent_backend_enh.py tests/test_agent_stream_sse.
 | `TestConversationSearch` | 跨会话检索、限定会话、无命中、工具包装 |
 | `TestJobTools` | create/list/get_status/cancel/retry/batch 的成功路径；retry 非法 override 被拦；batch 部分失败；未知模式被拒 |
 | `TestAssetTools` | upload 成功；**路径穿越被拒**（3 种越界写法）；非法 category；文件不存在；标签工具 |
-| `TestSafety` | 路径穿越拦截（`../`、绝对路径、嵌套逃逸）；注入检测（4 种攻击句式）；正常文本不误判；隔离标记；敏感请求拒绝 + 学术语境豁免 |
+| `TestSafety` | 路径穿越拦截（`../`、绝对路径、嵌套逃逸）；注入检测；正常文本不误判；隔离标记；敏感请求拒绝 + 学术语境豁免 |
+| `TestInjectionHardening` | **2026-11-10 审查后新增**：零宽变体绕过（U+200C/200D/2060/FEFF）、检测用文本 == 清理后文本、正则单一真源、召回补 6 条漏判、用户输入入口隔离、`safe_join` 反斜杠归一化、`mode_defaults` 白名单、记忆值长度不超上限 |
 | `TestNoToolCallGuard` | **纯口头承诺被重试并拦截**（status=failed + code=no_tool_call + jobs 为空）；用过工具后的口头承诺被推（既有行为不破坏）；真结论不被误判；中途停住被拦 |
 | `TestClarificationFlow` | `needs_clarification` 状态与 `clarification` 字段；问题落库 + 下一轮可续 |
 | `TestPrecheckAndRetry` | 非法参数在进工具前被拦（**不会建出任务**）；合法参数正常建任务 |
@@ -411,23 +441,52 @@ progress → progress → progress
 | `enh_full_pytest.txt` | 本分支全量 pytest 原始输出 |
 | `regression_diff.txt` | 两份失败名单的 diff（证明零新增回归） |
 
-### 对比结论
+### 对比结论（⚠️ 2026-11-10 审查后已替换）
 
-```
-基线 a455c7e：  27 failed, 490 passed, 3 skipped, 134 errors  (197.44s)
-本分支：        27 failed, 600 passed, 3 skipped, 134 errors  (421.56s)
+> **原结论（口径不一致，已作废）**：
+> ```
+> 基线 a455c7e：  27 failed, 490 passed, 3 skipped, 134 errors  (197.44s)
+> 本分支：        27 failed, 600 passed, 3 skipped, 134 errors  (421.56s)
+> ```
+> 问题：这个「本分支」数字来自**后端分支自己工作树**的一次跑，
+> 而 commit `1c75f36` 的 message 写的是「基线 30F/134E vs 本分支 30F/134E」
+> —— 报告正文与 commit message 两套口径，且与基线跑的**不是同一环境**，
+> 不能直接相减。
+>
+> **更重要的口径问题**：合并前端分支后，两条分支各自的全量回归数据
+> **来自不同工作树，不能相加**。必须在**合并视图**上重新跑。
+
+#### 本轮（`local/feature/agent-enh-fix`，合并 + 修复后）的实测
+
+```bash
+# 基线对照（审查③已产出，同环境同命令）
+cd <baseline worktree> && python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
+# 本分支
+cd /root/projects/h3studio-agent-enh-fix && python3 -m pytest tests/ -p no:cacheprovider -q --tb=no -rfE
 ```
 
-失败名单逐条 diff（`diff -u baseline_failures.txt enh_failures.txt`）：**输出为空**。
+| | 失败 | 通过 | 跳过 | 错误 | 耗时 |
+|---|---|---|---|---|---|
+| 基线 `17c9adb` | 27 | 517 | 3 | 134 | 290.34s |
+| **本分支 `local/feature/agent-enh-fix`** | **27** | **782** | 3 | **134** | 263.31s |
+
+FAILED + ERROR 名单逐条 diff：
 
 | 项 | 数量 |
 |---|---|
-| 新增失败 | **0** |
-| 新增错误 | **0** |
-| 消失失败 | 0 |
-| 消失错误 | 0 |
+| 名单条目数 | 基线 **161** / 本分支 **161** |
+| 新增(NEW) 失败/错误 | **0** |
+| 消失(GONE) 失败/错误 | **0** |
+| 同名但类型不同 | **0** |
+| md5（ERROR 名单） | `81122fb9c8664078135af0206d2c130c`（两边一致） |
 
 → 基线与本分支的失败/错误名单**逐条完全相同**，**零新增回归**。
+
+> `passed` 517 → 782（+265）= 后端 181 + 前端 49 + 本轮新增 35（跨侧契约 19 + 注入防护等 16）。
+>
+> 证据：`evidence/agent-enh-fix/fix_full_pytest.txt`、
+> `fix_full_pytest_rfE.txt`、`fix_failures.txt`、`baseline_failures_rE.txt`。
+> 详细清单见《内置多模态Agent-审查问题修复汇报.md》§4。
 
 > 基线的 134 errors 全部是 Playwright 超时（`Page.wait_for_function: Timeout 20000ms exceeded`）
 > 与 `Sync API inside the asyncio loop` —— **与本轮改动无关**，两边一模一样。
