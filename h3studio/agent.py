@@ -827,6 +827,12 @@ async def _tool_enhance_prompt(ctx: AgentContext, args: dict) -> dict:
 
     ctx.enhanced = {"original": original, "enhanced": enhanced,
                     "spec_id": spec_id, "validation": validation}
+    # 【提示词历史】Agent 增强的结果也进面板可见的历史表
+    # （面板侧钩子看不到 Agent 链路 —— 见 _record_agent_prompt_history）。
+    _record_agent_prompt_history(
+        ctx, mode or "t2i",
+        {"original_prompt": original, "prompt": enhanced},
+        _ph_source_enhance())
     return {"original": original, "enhanced": enhanced,
             "spec_id": spec_id, "validation_ok": validation.get("ok", True)}
 
@@ -1082,6 +1088,14 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
         params["asset_refs"] = asset_refs
 
     job_id = _create_job_record(ctx, mode, params)
+    # 【提示词历史】Agent 建的任务也进历史表（source = generate）。
+    # 面板侧钩子只挂在 server.api_create 上，Agent 走自己的工具链 ——
+    # 不在这里补一笔，Agent 生成的提示词在「历史」浮层里查不到。
+    _record_agent_prompt_history(
+        ctx, mode,
+        {"original_prompt": prompt, "prompt": prompt,
+         "model_key": params.get("model") or params.get("checkpoint") or ""},
+        _ph_source_generate())
     entry = {
         "job_id": job_id,
         "mode": mode,
@@ -1410,6 +1424,76 @@ def _create_job_record(ctx: AgentContext, mode: str, params: dict) -> str:
         raise
     except ValueError as exc:
         raise AgentError(str(exc), status=400) from exc
+
+
+def _ph_source_enhance() -> str:
+    """提示词历史的 source 常量（enhance）。
+
+    刻意**不**在模块顶层 import h3studio.prompt_history ——
+    那个模块会连带引入 sqlite 依赖，而 Agent 模块在部分测试里是
+    单独导入的。这里按需取常量，取不到就退回字面量 "enh"
+    （与 h3studio.prompt_history.SOURCE_ENHANCE 同值）。
+    """
+    try:
+        from . import prompt_history as ph
+        return ph.SOURCE_ENHANCE
+    except Exception:
+        return "enh"
+
+
+def _ph_source_generate() -> str:
+    """提示词历史的 source 常量（generate）。同 _ph_source_enhance 的理由。"""
+    try:
+        from . import prompt_history as ph
+        return ph.SOURCE_GENERATE
+    except Exception:
+        return "generate"
+
+
+def _record_agent_prompt_history(ctx: AgentContext, mode: str, params: dict,
+                                  source: str) -> None:
+    """
+    把 Agent 侧的一次提示词使用记进**提示词历史**（面板可见的那份表）。
+
+    【为什么 Agent 要自己记，而不是靠面板提交那一层兜】
+    内置 Agent 走的是自己的工具链（enhance_prompt / create_job），
+    **不经过** server.api_create 那条面板提交路径 —— 面板侧的
+    「提交即留痕」钩子看不到 Agent 产生的提示词。
+    结果就是：Agent 写出来的提示词在面板的「历史」浮层里查不到，
+    用户没法把 Agent 的成果一键填回提示词框。
+
+    【与面板侧钩子的关系：两条链路互不冲突】
+    * 面板侧钩子挂在 server.api_create —— 面板点「生成」时记账，
+      source = generate（use_count 计入）。
+    * 本钩子挂在 Agent 的工具上 —— Agent 增强时 source = enhance，
+      Agent 建任务时 source = generate。
+    两者写的是**同一张表**、用的是**同一套去重/上限逻辑**
+    （h3studio.prompt_history），所以同一条提示词在两边用会**合并成一行**
+    （use_count 累加），不会重复建行。
+
+    【失败不阻断主流程】
+    历史是**旁路**功能 —— 记账失败绝不能把用户的生成/增强搞挂。
+    所以这里吞掉异常，只记一条日志。
+    """
+    server = ctx.server
+    if server is None:
+        return
+    try:
+        from . import prompt_history as ph
+        from . import prompt_history_hooks as ph_hooks
+        db = getattr(server, "db", None)
+        if db is None:
+            return
+        with db() as conn:
+            ph_hooks.record_prompt_history(
+                conn, mode, params, source=source)
+    except Exception as exc:  # pragma: no cover - 旁路功能不阻断主流程
+        try:
+            sys.stderr.write(
+                f"[agent] 提示词历史记账失败（已忽略）: {exc}\n")
+            sys.stderr.flush()
+        except Exception:
+            pass
 
 
 # ------------------------------------------------------------------ 编排器
