@@ -436,12 +436,15 @@ class TestC7NoRegressionOnSharedAssets(unittest.TestCase):
         self.assertIn("function targets()", src, "多面板路由 targets() 应保留")
         self.assertIn("function updateCurrentIndicator", src)
         self.assertIn("function unavailableReason", src)
-        # 模板选择：enh-unify 的 P1-2 修法把它提升为增强栏里的**平级一行**
-        # （renderSpecRow + renderSpecTag），不再是菜单项里的子属性。
-        self.assertIn("function renderSpecRow", src, "模板选择行应保留")
-        self.assertIn("function renderSpecTag", src, "菜单项的模板标注应保留")
-        self.assertIn("specHtml: renderSpecTag", src,
-                      "菜单渲染应通过共用组件传入模板标注")
+        # 模板选择：【2026-11-10 契约】收进增强菜单项内（renderSpecPicker），
+        # 不再有平行的模板行 —— 面板里只剩**一个**下拉（增强方式）。
+        # 这项能力（菜单项内可切换模板）必须保留，不能被合并覆盖掉。
+        self.assertIn("function renderSpecPicker", src,
+                      "菜单项内的模板选择器应保留")
+        self.assertIn("specHtml: renderSpecPicker", src,
+                      "菜单渲染应通过共用组件传入模板选择器")
+        self.assertIn("function setMethodSpec", src,
+                      "模板选择的单一状态来源应保留")
         # 能力契约的候选列表（审查 P0-1）
         self.assertIn("inputSelectors", src, "输入目标应是候选列表")
         self.assertIn("outputSelectors", src, "写回目标应是候选列表")

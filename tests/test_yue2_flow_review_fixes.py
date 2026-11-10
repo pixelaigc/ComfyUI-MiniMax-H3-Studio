@@ -221,10 +221,25 @@ class TestMusicPanelSingleEnhanceEntry(unittest.TestCase):
         self.assertIsNotNone(m, "两个面板的回显必须由同一段代码更新")
 
     def test_no_nested_template_select_in_enhance_menu(self):
-        """契约 H：增强方式下拉里不再嵌套模板下拉（模板行是平级配置行）。"""
-        self.assertNotIn('id="musicEnhanceSpecMenu"', self.html)
-        # 模板行必须是独立的 label.enhance-spec-row，不是 enhance-menu 内部
-        self.assertIn('class="enhance-spec-row" id="musicEnhanceSpecRow"', self.html)
+        """契约 H：面板里不再有第二个模板下拉（模板选择收进增强菜单项内）。
+
+        【2026-11-10 契约变更】
+        改造前模板选择是增强栏里与「增强方式」平级的一行
+        （#musicEnhanceSpecRow / #musicEnhanceSpecSelect）—— 那是
+        第二个下拉，与「增强方式」下拉语义重叠。
+        现在模板选择收进菜单项内（renderSpecPicker）。
+        """
+        # 平行的模板行 / 模板下拉必须已从 HTML 删掉
+        for gone in ('id="musicEnhanceSpecRow"', 'id="musicEnhanceSpecSelect"',
+                     'id="enhanceSpecRow"', 'id="enhanceSpecSelect"'):
+            self.assertNotIn(gone, self.html,
+                             f"{gone} 是第二个模板下拉，必须删除")
+        # 模板选择器在菜单项内
+        code = strip_js_comments(read(ENHANCE_JS))
+        self.assertIn("function renderSpecPicker", code,
+                      "必须有 renderSpecPicker（菜单项内的模板选择器）")
+        self.assertIn("specHtml: renderSpecPicker", code,
+                      "菜单渲染必须用 renderSpecPicker")
 
     def test_music_mode_switcher_removed(self):
         """面板顶部不再有生成模式切换。"""

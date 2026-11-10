@@ -329,10 +329,12 @@
       applied: music ? "#musicEnhanceAppliedParams" : "#enhanceAppliedParams",
       split: music ? "#musicEnhanceSplit" : "#enhanceSplit",
       current: music ? "#musicEnhanceCurrent" : "#enhanceCurrent",
-      // 【模板选择行】与增强方式下拉平级的一行（见 renderSpecRow）
-      specRow: music ? "#musicEnhanceSpecRow" : "#enhanceSpecRow",
-      specLabel: music ? "#musicEnhanceSpecLabel" : "#enhanceSpecLabel",
-      specSelect: music ? "#musicEnhanceSpecSelect" : "#enhanceSpecSelect",
+      // 【模板选择行已删除】模板选择收进增强菜单项内（renderSpecPicker），
+      // 所以不再有平级的 specRow / specLabel / specSelect 元素。
+      // 这里保留空串，避免调用方 querySelector("") 抛错。
+      specRow: "",
+      specLabel: "",
+      specSelect: "",
       // 【能力契约】见上。inputSelectors 是**候选列表**（按优先级）：
       //   图像/视频 = 提示词框
       //   音乐      = 音乐描述框（yue2-flow 改名后的 #musicPrompt）
@@ -690,77 +692,39 @@
       },
       // 不可用时说明**为什么**不可用（属于哪个功能）
       unavailableText: unavailableReason,
-      // 每项显示它用的模板（改造前模板藏在第二个下拉里，
-      // 用户看不到「这一项到底用哪个模板」—— 现在并到这一项里）
-      specHtml: renderSpecTag,
+      // 模板选择**收进菜单项内**（审查要求：不再有第二个下拉）。
+      // 多档时该项自带一个下拉，单档时只显示名字。
+      specHtml: renderSpecPicker,
+      onSpecChange: (methodId, specId) => {
+        setMethodSpec(methodId, specId);
+        renderMenu();
+        updateButton();
+        updatePanelVisibility();
+      },
       valueOf: (method, field) => effectiveFieldValue(method, field),
     });
   }
 
   /**
-   * 某方式在当前模式不可用的原因（说清楚「它属于哪个功能」）。
-   * 规则 1 的可见表达：别的功能的专属增强在本面板被禁用并说明来历。
+   * 菜单项里的**模板选择器**（可点，就地切换）。
+   *
+   * 【2026-11-10 改回「菜单项内」】
+   * 改造前（2026-11-09）把模板选择提升成增强栏里的**平级一行**
+   * （#enhanceSpecRow / #musicEnhanceSpecRow）—— 那是**第二个下拉**，
+   * 与「增强方式」下拉语义重叠：用户看到两个下拉，却不知道该选哪个、
+   * 哪个才是「增强入口」。审查要求统一为
+   *   **一个增强按钮 + 一个下拉（列出可用增强方式）+ 当前方式回显**，
+   *   模板选择**收进增强菜单项内**。
+   *
+   * 现在每个增强方式自带它的模板清单（多档时是下拉，单档时只显示名字）：
+   *   - 一条下拉搞定「用哪种增强方式」+「这一项用哪个模板」
+   *   - 不再有第二个下拉
+   *   - 只有一条模板时不显示下拉（无意义的单选控件）
+   *
+   * 模板状态仍由 selectedSpecByMethod 承担（单一来源），
+   * 跨模式残留的旧选择不在 options 里，自然被丢弃。
    */
-  /**
-   * 增强栏里的**模板选择行**（与「增强方式」下拉平级的一行）。
-   *
-   * 【2026-11-09 从「菜单项的子属性」提升为「平级一行」】
-   * 改造前（enh-unify 第一版）：模板选择被塞进增强方式菜单项内部
-   *   （renderSpecPicker），用户要在两级 UI 里做两次选择；
-   *   而且 methodSpecOptions("basic") 返回当前上下文的**全部**模板，
-   *   塞进一个菜单项里既挤又难发现。
-   *
-   * 现在：模板选择器是增强栏里的**独立一行**（enhance-spec-row），
-   *   与增强方式下拉平级 —— 一次点击就能看到「当前用哪个模板」，
-   *   一次点击就能改。规则 4「一个增强按钮 + 一个下拉 + 明确显示
-   *   当前所选增强方式」依然成立（模板行不是**增强入口**，
-   *   它只是当前主增强方式的参数）。
-   *
-   * 模板行显示的是**当前主增强方式**（多选时取第一个选中的）的模板；
-   * 其它方式各自的模板仍可在菜单项里看到（renderSpecTag）。
-   */
-  function renderSpecRow() {
-    const t = targets();
-    const row = document.querySelector(t.specRow);
-    if (!row) return;
-    const method = currentMethod();
-    const options = methodSpecOptions(method);
-    const specs = (typeof provState !== "undefined" && provState
-                   && provState.agent && provState.agent.specs)
-      ? provState.agent.specs : [];
-    const byIdMap = {};
-    specs.forEach(s => { byIdMap[s.id] = s; });
-    const label = document.querySelector(t.specLabel);
-    if (label) label.textContent = method ? `模板（${method.label}）` : "模板";
-    const sel = document.querySelector(t.specSelect);
-    if (!sel) return;
-    if (!options.length) {
-      // 该方式不用模板（结构化增强 / 官方 PE）或配置未就绪
-      sel.innerHTML = `<option value="">${options.length ? "" : "该增强方式不使用模板"}</option>`;
-      sel.disabled = true;
-      sel.value = "";
-      row.hidden = true;
-      return;
-    }
-    row.hidden = false;
-    sel.disabled = false;
-    const current = methodSpecId(method);
-    sel.innerHTML = options.map(id => {
-      const s = byIdMap[id];
-      const name = s ? s.label : id;
-      return `<option value="${esc(id)}"${id === current ? " selected" : ""}>${esc(name)}</option>`;
-    }).join("");
-    sel.value = current;
-  }
-
-  /**
-   * 菜单项里的**模板标签**（只读，不再是可点的子下拉）。
-   *
-   * 模板选择已提升到增强栏的平级一行（renderSpecRow），
-   * 这里只显示「这一项用的是哪个模板」，让用户在选增强方式时
-   * 就能看出差别 —— 但不再要求两级 UI。
-   */
-  function renderSpecTag(method) {
+  function renderSpecPicker(method) {
     const options = methodSpecOptions(method);
     if (!options.length) return "";
     const specs = (typeof provState !== "undefined" && provState
@@ -769,10 +733,42 @@
     const byIdMap = {};
     specs.forEach(s => { byIdMap[s.id] = s; });
     const current = methodSpecId(method);
-    const one = byIdMap[current];
-    const name = one ? one.label : current;
-    const more = options.length > 1 ? `（共 ${options.length} 档，可在下方模板行切换）` : "";
-    return `<span class="enhance-menu-spec" title="该项使用的增强模板">${esc(name)}${esc(more)}</span>`;
+    if (options.length === 1) {
+      const one = byIdMap[options[0]];
+      const name = one ? one.label : options[0];
+      return `<span class="enhance-menu-spec" title="该项使用的增强模板">${esc(name)}</span>`;
+    }
+    const opts = options.map(id => {
+      const s = byIdMap[id];
+      const name = s ? s.label : id;
+      return `<option value="${esc(id)}"${id === current ? " selected" : ""}>${esc(name)}</option>`;
+    }).join("");
+    return `<label class="enhance-menu-spec-row" title="该项使用的增强模板">
+      <span class="enhance-menu-spec-label">模板</span>
+      <select class="enhance-menu-spec" data-spec-method="${esc(method.id)}">${opts}</select>
+    </label>`;
+  }
+
+  /**
+   * 某方式在当前模式不可用的原因（说清楚「它属于哪个功能」）。
+   * 规则 1 的可见表达：别的功能的专属增强在本面板被禁用并说明来历。
+   */
+  /**
+   * 增强栏里的**模板选择行** —— **已移除**。
+   *
+   * 【2026-11-10】模板选择收进增强菜单项内（renderSpecPicker），
+   * 所以不再有「第二个下拉」。本函数保留为空实现，避免调用方
+   * （updateButton / 导出接口）报错；模板状态改由菜单项内的
+   * select[data-spec-method] 承担。
+   *
+   * 保留空实现的原因：外部（providers.js / 测试）可能仍调用
+   * renderSpecRow()，让它静默无操作比抛异常安全。
+   */
+  function renderSpecRow() {
+    // 模板行元素已删除（模板收进菜单项内），这里无需任何 DOM 操作。
+    // 注意不要写 document.querySelector(t.specRow) —— t.specRow 现在是空串，
+    // querySelector("") 会抛 SyntaxError。
+    return;
   }
 
   /**
@@ -1708,21 +1704,10 @@
         });
       }
     });
-    // 【模板选择行】改模板 -> 记录到该方式（按 mode::method 存），
-    // 立刻刷新菜单标签与「当前增强方式」回显。
-    [["#enhanceSpecSelect", "#enhanceSpecRow"],
-     ["#musicEnhanceSpecSelect", "#musicEnhanceSpecRow"]].forEach(([selSel]) => {
-      const sel = document.querySelector(selSel);
-      if (!sel) return;
-      sel.addEventListener("change", () => {
-        const method = currentMethod();
-        if (!method || !sel.value) return;
-        setMethodSpec(method.id, sel.value);
-        renderMenu();
-        updateButton();
-        updatePanelVisibility();
-      });
-    });
+    // 【模板选择已收进增强菜单项内】
+    // 模板下拉现在由共享组件渲染在菜单项内部（select[data-spec-method]），
+    // 共享组件已经绑好 change 事件（onSpecChange -> setMethodSpec）。
+    // 所以这里**不再**需要绑定已删除的平级模板行。
     // 点别处关菜单
     document.addEventListener("click", (e) => {
       const t = targets();
@@ -1792,19 +1777,24 @@
           const m = byId[methodId];
           return m ? methodSpecOptions(m) : [];
         },
-        // 【2026-11-09】模板选择器已提升为增强栏里的平级一行
+        // 【2026-11-10】模板选择已收进增强菜单项内（renderSpecPicker），
+        // 不再有平级的模板行；本接口保留但返回「无模板行」状态。
         renderSpecRow: renderSpecRow,
         invalidateSpecSelection: invalidateSpecSelection,
         getSelectedSpecByMethod: () => Object.assign({}, selectedSpecByMethod),
         getSpecRowState: () => {
           const t = targets();
-          const sel = document.querySelector(t.specSelect);
-          const row = document.querySelector(t.specRow);
+          // 注意：specSelect/specRow 现在是空串（元素已删除），
+          // querySelector("") 会抛 SyntaxError —— 必须先判空。
+          const sel = t.specSelect ? document.querySelector(t.specSelect) : null;
+          const row = t.specRow ? document.querySelector(t.specRow) : null;
           return {
             hidden: row ? !!row.hidden : null,
             value: sel ? sel.value : "",
             options: sel ? Array.from(sel.options).map(o => o.value) : [],
             method: currentMethod() ? currentMethod().id : "",
+            // 模板现在在菜单项内，用这个字段告诉调用方去哪里找
+            inMenu: true,
           };
         },
         isAvailable: (methodId) => {

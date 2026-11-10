@@ -233,10 +233,25 @@ class TestSingleTemplateState(unittest.TestCase):
         self.assertIn("delete selectedSpecByMethod[key]", body)
 
     def test_spec_row_is_parallel_to_method_selector(self):
-        """模板选择器与增强方式平级（在增强栏内，不在下拉项里）。"""
+        """模板选择器在**增强菜单项内**，面板里没有第二个模板下拉。
+
+        【2026-11-10 契约变更】
+        改造前模板选择是增强栏里与「增强方式」平级的一行
+        （#enhanceSpecRow / #enhanceSpecSelect）—— 那是第二个下拉，
+        与「增强方式」下拉语义重叠。现在模板选择收进菜单项内
+        （renderSpecPicker -> select[data-spec-method]）。
+        """
         html = INDEX_HTML.read_text(encoding="utf-8")
-        self.assertIn('id="enhanceSpecRow"', html)
-        self.assertIn('id="enhanceSpecSelect"', html)
+        # 平行的模板行 / 模板下拉必须已删除
+        self.assertNotIn('id="enhanceSpecRow"', html,
+                         "平行的模板行必须删除（第二个下拉）")
+        self.assertNotIn('id="enhanceSpecSelect"', html,
+                         "平行的模板下拉必须删除（第二个下拉）")
+        # 模板选择器由菜单项内的 renderSpecPicker 提供
+        self.assertIn("function renderSpecPicker", self.code,
+                      "必须有 renderSpecPicker（菜单项内的模板选择器）")
+        self.assertIn("specHtml: renderSpecPicker", self.code,
+                      "菜单渲染必须用 renderSpecPicker")
         # 旧的独立模板下拉必须已删除
         self.assertNotIn('id="enhanceSpec"', html,
                          "独立模板下拉 #enhanceSpec 应已删除")

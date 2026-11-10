@@ -417,11 +417,24 @@ class TestEnhanceUnifyBrowser(unittest.TestCase):
         self.assertIn("YuE2", cur, f"音乐面板当前方式应是结构化增强，实际：{cur}")
 
         opts = self.page.evaluate("""() => {
-          const sel = document.querySelector('#musicEnhanceSpecSelect');
-          if (!sel) return null;
-          return Array.from(sel.options).map(o => o.textContent);
+          // 【2026-11-10】模板选择收进增强菜单项内，
+          // 音乐面板不再有平行的 #musicEnhanceSpecSelect。
+          const sel = document.querySelector(
+            '#musicEnhanceMenu select[data-spec-method]');
+          if (sel) {
+            return Array.from(sel.options).map(o => o.textContent);
+          }
+          // 没有项内模板下拉时（该方式不用模板），收集项内的模板名标签
+          return Array.from(
+            document.querySelectorAll('#musicEnhanceMenu .enhance-menu-spec'))
+            .map(e => e.textContent.trim());
         }""")
-        self.assertIsNotNone(opts, "音乐面板应有模板选择行")
+        self.assertIsNotNone(opts, "音乐面板的模板选择应在增强菜单项内")
+        # 面板里不应再有平行的模板下拉
+        self.assertFalse(
+            self.page.evaluate(
+                "() => !!document.querySelector('#musicEnhanceSpecSelect')"),
+            "音乐面板不应再有平行的模板下拉（第二个下拉）")
         joined = " | ".join(opts)
         self.assertNotIn("Z-Image", joined, f"音乐面板不该列图像模板，实际：{joined}")
 

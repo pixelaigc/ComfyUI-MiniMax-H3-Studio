@@ -415,25 +415,36 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
 
     def test_template_choice_is_a_parallel_row(self):
         """
-        模板选择是增强栏里与「增强方式」**平级**的一行。
+        模板选择在**增强菜单项内部**，面板里没有第二个模板下拉。
 
-        【2026-11-09 改造】原先模板选择是增强方式菜单项的子属性
-        （用户要两级 UI 选两次），代码审查 P1-2 要求提升为平级一行。
-        这里的契约不变的是：模板选择器列的是**本面板**可用的模板
+        【2026-11-10 改造】原先模板选择是增强栏里与「增强方式」
+        平级的一行（#enhanceSpecRow / #enhanceSpecSelect）—— 那是
+        第二个下拉，与「增强方式」下拉语义重叠，用户分不清哪个是
+        增强入口、哪个是它的参数。现在模板选择收进菜单项内。
+
+        契约不变的是：模板选择器列的是**本面板**可用的模板
         （Z-Image 面板 = Z-Image 官方 PE 等，不含 Qwen 专属档）。
         """
         self.switch_mode("t2i")
-        # 模板行在增强栏里，不在增强方式下拉内部
-        self.assertTrue(self.page.is_visible("#enhanceSpecRow"),
-                        "增强栏里应有模板选择行")
+        # 打开增强方式下拉，模板选择器在菜单项内
+        self.page.evaluate(
+            "() => { const b = document.querySelector('#enhanceMenuBtn');"
+            " if (b) b.click(); }")
+        self.page.wait_for_timeout(600)
+        # 面板里不应再有平行的模板行 / 模板下拉
         self.assertFalse(
-            self.page.evaluate(
-                "() => !!document.querySelector('#enhanceMenu #enhanceSpecRow')"),
-            "模板选择行不应在增强方式下拉内部（那是两级 UI）")
-        sel = self.page.query_selector("#enhanceSpecSelect")
-        self.assertIsNotNone(sel, "增强栏里应有模板选择器")
+            self.page.evaluate("() => !!document.querySelector('#enhanceSpecRow')"),
+            "增强栏里不应再有平行的模板行（第二个下拉）")
+        self.assertFalse(
+            self.page.evaluate("() => !!document.querySelector('#enhanceSpecSelect')"),
+            "增强栏里不应再有平行的模板下拉（第二个下拉）")
+        # 模板选择器在菜单项内
+        n_in_menu = self.page.evaluate(
+            "() => document.querySelectorAll("
+            "'#enhanceMenu select[data-spec-method]').length")
+        self.assertGreater(n_in_menu, 0, "菜单项内应有模板选择器")
         opts = [o.strip() for o in self.page.eval_on_selector_all(
-            '#enhanceSpecSelect option',
+            '#enhanceMenu select[data-spec-method] option',
             "els => els.map(e => e.textContent)")]
         self.assertTrue(opts, "模板选择器应列出模板")
         # Z-Image 面板：含 Z-Image 官方 PE 档；不含 Qwen 官方 PE 档

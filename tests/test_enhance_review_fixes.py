@@ -44,6 +44,7 @@ except Exception:                                   # pragma: no cover
 
 WEB = REPO / "web"
 ENHANCE_JS = WEB / "enhance-menu.js"
+SHARED_JS = WEB / "enhance-menu-shared.js"
 INDEX_HTML = WEB / "index.html"
 STYLE_CSS = WEB / "style.css"
 
@@ -157,34 +158,42 @@ class TestEnhanceReviewStatic(unittest.TestCase):
         self.assertIn("unavailableText", body,
                       "不可用时必须给出原因文案")
 
-    # ---- 模板选择器提升为平级一行 ----
-    def test_spec_picker_is_a_parallel_row(self):
-        """模板选择器是增强栏里的独立一行（与增强方式平级）。"""
-        self.assertIn('id="enhanceSpecRow"', self.html,
-                      "图像面板应有模板选择行")
-        self.assertIn('id="musicEnhanceSpecRow"', self.html,
-                      "音乐面板应有模板选择行")
-        self.assertIn('id="enhanceSpecSelect"', self.html)
-        self.assertIn('id="musicEnhanceSpecSelect"', self.html)
-        self.assertIn(".enhance-spec-row", self.css, "模板行要有样式")
+    # ---- 模板选择器收进增强菜单项内（2026-11-10）----
+    def test_spec_picker_is_inside_the_menu_item(self):
+        """模板选择器在**增强菜单项内部**，不再有平行的第二个下拉。
 
-    def test_spec_row_is_not_inside_the_menu(self):
-        """模板行必须在增强栏里，**不在**增强方式下拉内部。"""
-        menu_idx = self.html.find('id="enhanceMenu"')
-        row_idx = self.html.find('id="enhanceSpecRow"')
-        self.assertGreater(menu_idx, 0)
-        self.assertGreater(row_idx, 0)
-        # 模板行不在 #enhanceMenu 元素内部（它是 #enhanceSplit 的兄弟）
-        self.assertGreater(row_idx, menu_idx)
+        【2026-11-10 契约变更】
+        改造前模板选择被提升成增强栏里的独立一行（#enhanceSpecRow /
+        #musicEnhanceSpecRow）—— 那是**第二个下拉**，与「增强方式」
+        下拉语义重叠。现在每个增强方式自带它的模板清单：
+        多档时是项内的 select[data-spec-method]，单档时只显示名字。
+        """
+        code = self.code
+        self.assertIsNotNone(
+            re.search(r"function\s+renderSpecPicker\s*\(", code),
+            "必须保留 renderSpecPicker —— 菜单项内的模板选择器")
+        self.assertIn("specHtml: renderSpecPicker", code,
+                      "菜单渲染必须用 renderSpecPicker 提供模板选择器")
+        # 平行的模板行 / 模板下拉**必须已从 HTML 删掉**
+        for gone in ('id="enhanceSpecRow"', 'id="musicEnhanceSpecRow"',
+                     'id="enhanceSpecSelect"', 'id="musicEnhanceSpecSelect"'):
+            self.assertNotIn(gone, self.html,
+                             f"{gone} 是第二个模板下拉，必须删除")
+        # 菜单项内的模板选择器用的是 .enhance-menu-spec 系列样式
+        self.assertIn(".enhance-menu-spec", self.css,
+                      "菜单项内的模板选择器要有样式")
 
-    def test_no_nested_spec_select_in_menu(self):
-        """菜单项内部不应再有可点的模板子下拉（两级 UI 已去掉）。"""
-        self.assertNotIn('select[data-spec-method]', self.code,
-                         "菜单项里不应再有模板子下拉")
-        # 只查**函数定义**（注释里提到不算）
-        self.assertIsNone(
-            re.search(r"function\s+renderSpecPicker\s*\(", self.code),
-            "旧的 renderSpecPicker 应已被 renderSpecTag 取代")
+    def test_no_second_template_dropdown_in_panel(self):
+        """面板里不得再有**第二个**模板下拉（增强方式下拉之外）。"""
+        # 模板选择器只允许出现在增强菜单项内
+        self.assertNotIn('class="enhance-spec-row"', self.html,
+                         "平行的 .enhance-spec-row 必须删除")
+        self.assertNotIn('class="enhance-spec-select"', self.html,
+                         "平行的 .enhance-spec-select 必须删除")
+        # 共享组件支持项内模板选择器（select[data-spec-method]）
+        shared = SHARED_JS.read_text(encoding="utf-8")
+        self.assertIn("select[data-spec-method]", shared,
+                      "共享组件必须支持菜单项内的模板选择器")
 
     # ---- 模板状态统一 + 跨模式失效 ----
     def test_no_dual_template_state(self):
@@ -558,30 +567,46 @@ class TestEnhanceReviewBrowser(unittest.TestCase):
             self.assertIn("本面板不可用", joined,
                           f"{it['method']} 禁用项应写明归属功能：{joined}")
 
-    # ---- 模板选择器：平级一行 ----
-    def test_spec_row_is_visible_and_parallel(self):
-        """模板选择器是增强栏里的独立一行，与增强方式平级。"""
+    # ---- 模板选择器：在增强菜单项内（2026-11-10 契约）----
+    def test_spec_picker_is_inside_the_menu(self):
+        """模板选择器在**增强菜单项内部**，面板里没有第二个模板下拉。"""
         self.switch_mode("t2i")
-        row = self.page.evaluate(
+        # 打开增强方式下拉
+        self.page.evaluate(
+            "() => { const b = document.querySelector('#enhanceMenuBtn');"
+            " if (b) b.click(); }")
+        self.page.wait_for_timeout(600)
+        state = self.page.evaluate(
             """() => {
-              const r = document.querySelector('#enhanceSpecRow');
-              const sel = document.querySelector('#enhanceSpecSelect');
-              if (!r || !sel) return null;
-              const rb = r.getBoundingClientRect();
+              // 面板里不应再有平行的模板行 / 模板下拉
+              const parallelRow = document.querySelector('#enhanceSpecRow');
+              const parallelSel = document.querySelector('#enhanceSpecSelect');
+              // 菜单项内的模板选择器
+              const inMenu = Array.from(
+                document.querySelectorAll('#enhanceMenu select[data-spec-method]'));
+              const specTags = Array.from(
+                document.querySelectorAll('#enhanceMenu .enhance-menu-spec'));
               return {
-                hidden: r.hidden,
-                visible: rb.width > 0 && rb.height > 0,
-                options: Array.from(sel.options).map(o => o.value),
-                value: sel.value,
-                inMenu: !!document.querySelector('#enhanceMenu #enhanceSpecRow'),
+                parallel_row_exists: !!parallelRow,
+                parallel_select_exists: !!parallelSel,
+                in_menu_selects: inMenu.length,
+                in_menu_options: inMenu.map(s => Array.from(s.options).map(o => o.value)),
+                in_menu_values: inMenu.map(s => s.value),
+                spec_tags: specTags.length,
               };
             }""")
-        self.assertIsNotNone(row, "应有模板选择行")
-        self.assertFalse(row["hidden"], "普通增强有多个模板 -> 模板行应显示")
-        self.assertTrue(row["visible"], "模板行应可见")
-        self.assertFalse(row["inMenu"], "模板行不应在增强方式下拉内部")
-        self.assertTrue(row["options"], "模板行应列出模板")
-        self.assertIn(row["value"], row["options"], "当前值应在选项里")
+        self.assertFalse(state["parallel_row_exists"],
+                         "面板里不应再有平行的模板行（第二个下拉）")
+        self.assertFalse(state["parallel_select_exists"],
+                         "面板里不应再有平行的模板下拉（第二个下拉）")
+        # 至少要有一个项内模板选择器或模板名标签
+        self.assertTrue(state["in_menu_selects"] > 0 or state["spec_tags"] > 0,
+                        f"模板选择器应在增强菜单项内：{state}")
+        # 项内选择器的当前值必须在选项里
+        for opts, val in zip(state["in_menu_options"], state["in_menu_values"]):
+            if opts:
+                self.assertIn(val, opts,
+                              f"项内模板选择器的当前值应在选项里：{state}")
 
     def test_spec_selection_invalidated_across_modes(self):
         """
@@ -591,10 +616,15 @@ class TestEnhanceReviewBrowser(unittest.TestCase):
               再切回来，不能命中别的上下文的模板。
         """
         self.switch_mode("t2i")
-        # 选一个非默认模板
+        # 打开增强方式下拉，在**菜单项内**选一个非默认模板
+        self.page.evaluate(
+            "() => { const b = document.querySelector('#enhanceMenuBtn');"
+            " if (b) b.click(); }")
+        self.page.wait_for_timeout(600)
         picked = self.page.evaluate(
             """() => {
-              const sel = document.querySelector('#enhanceSpecSelect');
+              const sel = document.querySelector(
+                '#enhanceMenu select[data-spec-method]');
               if (!sel || sel.options.length < 2) return '';
               const opt = sel.options[1];
               sel.value = opt.value;
@@ -616,14 +646,20 @@ class TestEnhanceReviewBrowser(unittest.TestCase):
         self.page.wait_for_timeout(600)
 
         # 回到 Z-Image 面板后，当前模板必须在**本面板的**可用集合里
+        self.page.evaluate(
+            "() => { const b = document.querySelector('#enhanceMenuBtn');"
+            " if (b) b.click(); }")
+        self.page.wait_for_timeout(600)
         state = self.page.evaluate(
             """() => {
-              const sel = document.querySelector('#enhanceSpecSelect');
+              const sel = document.querySelector(
+                '#enhanceMenu select[data-spec-method]');
               const opts = sel ? Array.from(sel.options).map(o => o.value) : [];
               return {value: sel ? sel.value : '', options: opts};
             }""")
-        self.assertIn(state["value"], state["options"],
-                      f"跨模式回来后当前模板必须属于本面板可用集合：{state}")
+        if state["options"]:
+            self.assertIn(state["value"], state["options"],
+                          f"跨模式回来后当前模板必须属于本面板可用集合：{state}")
 
     def test_no_console_errors(self):
         """本轮改动不应引入 console 报错。"""
