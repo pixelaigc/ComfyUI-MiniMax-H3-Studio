@@ -86,6 +86,7 @@ from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
 from h3studio import agent as agent_mod
+from h3studio import agent_memory
 from h3studio import agent_sessions
 
 BASE = Path(__file__).resolve().parent
@@ -1036,6 +1037,156 @@ def create_job_record(mode: str, params: dict) -> str:
                     "VALUES (?,?,?,?, 'queued', ?)",
                     (uuid.uuid4().hex[:12], job_id, index, seed, now))
     return job_id
+
+
+# ------------------------------------------------------------------ Agent 任务查询
+#
+# Agent 的任务类工具（cancel_job / retry_job / list_jobs / get_job_status）
+# 需要**读**任务库。写成模块级函数而不是 HTTP handler，是为了让 Agent
+# 直接复用（与 create_job_record / prepare_job_params 同一个模式）。
+#
+# 为什么不复用 api_get / api_cancel（它们是 async handler）：
+#   * api_cancel 会去 ComfyUI 撤单 —— Agent 的 cancel_job 需要这个行为，
+#     但它得在 async 上下文里跑。Agent 的工具 handler 本来就是 async，
+#     所以这里提供 async 版本。
+#   * 读类（get/list）用同步函数即可 —— SQLite 读很快。
+
+def get_job_params(job_id: str) -> dict | None:
+    """取一个任务的 mode + params（供 retry_job 复用）。不存在返回 None。"""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT mode, params FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    try:
+        params = json.loads(row["params"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        params = {}
+    return {"mode": row["mode"], "params": params}
+
+
+def list_job_records(status: str | None = None, mode: str | None = None,
+                     since_hours: int | None = None,
+                     limit: int = 10) -> list[dict]:
+    """
+    检索历史任务（供 Agent 的 list_jobs 工具用）。
+
+    刻意**自己查**而不复用 api_list 的过滤逻辑：api_list 面向前端
+    （有一堆 UI 专用筛选），Agent 需要的是「按状态/模式/时间窗口」的
+    简单检索。两套筛选各有用途，强行合并会让两边都变复杂。
+    """
+    conditions = []
+    args: list = []
+    if status:
+        conditions.append("status=?")
+        args.append(status)
+    if mode:
+        conditions.append("mode=?")
+        args.append(mode)
+    if since_hours and since_hours > 0:
+        conditions.append("created_at >= ?")
+        args.append(time.time() - float(since_hours) * 3600.0)
+    sql = "SELECT * FROM jobs"
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    args.append(int(limit))
+    with db() as conn:
+        rows = conn.execute(sql, args).fetchall()
+    result = []
+    for row in rows:
+        job = row_to_job(row)
+        result.append({
+            "job_id": job["id"],
+            "mode": job["mode"],
+            "label": job["gen_type_label"],
+            "status": job["status"],
+            "created_at": job["created_at"],
+            "progress": job["progress"],
+            "progress_text": job["progress_text"],
+            "prompt": (job["params"] or {}).get("prompt") or "",
+            "error": job["error"],
+            "outputs": job["outputs"],
+        })
+    return result
+
+
+def get_job_status_payload(job_id: str) -> dict | None:
+    """
+    单个任务的**轮询友好**状态（供 Agent 的 get_job_status 工具用）。
+
+    刻意做成「前端拿到就能直接渲染」的形状：
+      * status / progress / progress_text —— 进度条能直接用
+      * outputs —— 产物路径（前端轮询这个拿缩略图/输出）
+      * elapsed —— 已耗时
+      * poll_after_ms —— 建议的下次轮询间隔（前端照着排程即可）
+    """
+    with db() as conn:
+        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    job = row_to_job(row)
+    batches = batches_of(job_id)
+    status = job["status"]
+    # 未结束的任务建议 3 秒后再查；已结束的让前端停掉轮询
+    poll_after_ms = 0 if status in ("done", "failed", "canceled") else 3000
+    payload = {
+        "job_id": job["id"],
+        "mode": job["mode"],
+        "label": job["gen_type_label"],
+        "status": status,
+        "progress": job["progress"],
+        "progress_text": job["progress_text"] or "",
+        "error": job["error"],
+        "outputs": job["outputs"] or [],
+        "params": job["params"] or {},
+        "created_at": job["created_at"],
+        "elapsed": job["elapsed"],
+        "poll_after_ms": poll_after_ms,
+        "is_terminal": status in ("done", "failed", "canceled"),
+    }
+    if batches:
+        payload["batches"] = batches
+    return payload
+
+
+async def cancel_job_record(job_id: str) -> dict:
+    """
+    取消一个任务（供 Agent 的 cancel_job 工具用）。
+
+    与 api_cancel 的区别：api_cancel 是 HTTP handler（读 request），
+    这里接受 job_id 直接调用；两者共用同一套状态机与 ComfyUI 撤单逻辑。
+    """
+    async with WORKER.submit_lock:
+        with db() as conn:
+            r = conn.execute(
+                "SELECT status, prompt_id, mode FROM jobs WHERE id=?",
+                (job_id,)).fetchone()
+        if not r:
+            raise ValueError(f"任务不存在：{job_id}")
+        if r["status"] not in ("running", "queued"):
+            # 已经结束了 —— 不是错误，直接告诉模型当前状态
+            return {"job_id": job_id, "status": r["status"], "ok": True,
+                    "message": f"任务已是「{r['status']}」状态，无需取消"}
+        pid = r["prompt_id"]
+        if pid:
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=6)) as session:
+                    for endpoint, payload in (("queue", {"delete": [pid]}),
+                                              ("interrupt", {"prompt_id": pid})):
+                        async with session.post(f"{COMFY}/{endpoint}",
+                                                json=payload) as resp:
+                            resp.raise_for_status()
+            except Exception as exc:
+                raise ValueError(f"无法确认停止请求，请重试：{exc}")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='canceled', finished_at=? "
+                "WHERE id=? AND status IN ('queued','running','failed')",
+                (time.time(), job_id))
+            status = conn.execute(
+                "SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()["status"]
+    return {"job_id": job_id, "status": status, "ok": True}
 
 
 class JobValidationError(ValueError):
@@ -2818,6 +2969,11 @@ def _agent_store():
     return agent_sessions.get_store()
 
 
+def _agent_memory_store():
+    """Agent 的长期记忆库（跨会话用户偏好）。"""
+    return agent_memory.get_store()
+
+
 def _agent_error(exc: agent_mod.AgentError) -> web.Response:
     payload = {"error": exc.message, "code": exc.code}
     payload.update(exc.extra or {})
@@ -2832,7 +2988,10 @@ async def api_agent_chat(request):
       message       用户意图（必填，上限 4000 字）
       session_id    会话 ID（可选；不给则新建，多轮对话靠它串联）
       provider_id   指定本地模型 Provider（可选；不给则用「本地模型配置」里的默认）
-      max_steps     最大步骤数（可选，默认 6，上限 6）
+      max_steps     最大步骤数（可选，默认 agent_mod.MAX_STEPS，上限同值）
+      stream        1/true = 用 SSE 流式返回（事件契约见
+                    docs/内置多模态Agent-接口契约.md）
+                    等价于调用 POST /api/agent/chat/stream。
 
     返回结构化结果（见 h3studio.agent.run_agent 的 docstring）：
       status / answer / jobs / assets / prompt / steps / usage / provider / error
@@ -2842,6 +3001,13 @@ async def api_agent_chat(request):
     except Exception:
         return web.json_response({"error": "请求格式错误", "code": "bad_request"},
                                  status=400)
+
+    # stream=1 -> 走 SSE（与 /api/agent/chat/stream 完全一致的契约）。
+    #
+    # 为什么要同一个端点也支持 stream：前端只需要一个 URL，
+    # 带不带 stream 由请求体决定，不用在两套 URL 之间切换。
+    if str(payload.get("stream") or "").lower() in ("1", "true", "yes", "on"):
+        return await api_agent_chat_stream(request)
 
     message = str(payload.get("message") or "").strip()
     if not message:
@@ -2884,7 +3050,8 @@ async def api_agent_chat(request):
         try:
             result = await agent_mod.run_agent(
                 sys.modules[__name__], message, session_id=session_id,
-                provider_id=provider_id, max_steps=max_steps, history=history)
+                provider_id=provider_id, max_steps=max_steps, history=history,
+                session_store=store, memory_store=_agent_memory_store())
         except agent_mod.AgentError as exc:
             store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
             return _agent_error(exc)
@@ -2969,17 +3136,24 @@ async def api_agent_chat_stream(request):
                       "请稍候再试。",
              "code": "too_many_requests"}, status=429)
 
-    # 进度队列：Agent 编排器通过 on_progress 往里塞事件，
+    # 事件队列：Agent 编排器通过 on_progress / on_event 往里塞事件，
     # 这里边跑边从队列里取出来写成 SSE。
     queue: asyncio.Queue = asyncio.Queue()
 
     def _on_progress(stage: str, detail: str, done: int, total: int) -> None:
         queue.put_nowait({
+            "type": "progress",
             "stage": stage,
             "detail": detail or "",
             "done": int(done or 0),
             "total": int(total or 0),
         })
+
+    def _on_event(name: str, data: dict) -> None:
+        """Agent 的结构化事件（token / tool_call / tool_result / job / done / error）。"""
+        payload = dict(data or {})
+        payload["type"] = name
+        queue.put_nowait(payload)
 
     resp = web.StreamResponse(status=200, headers={
         "Content-Type": "text/event-stream; charset=utf-8",
@@ -3000,7 +3174,9 @@ async def api_agent_chat_stream(request):
                 result = await agent_mod.run_agent(
                     sys.modules[__name__], message, session_id=session_id,
                     provider_id=provider_id, max_steps=max_steps,
-                    history=history, on_progress=_on_progress)
+                    history=history, on_progress=_on_progress,
+                    on_event=_on_event, session_store=store,
+                    memory_store=_agent_memory_store())
             return result
         except agent_mod.AgentError as exc:
             await _write("error", {"error": exc.message, "code": exc.code})
@@ -3034,10 +3210,29 @@ async def api_agent_chat_stream(request):
                     await resp.write(b": keep-alive\n\n")
                 continue
             event["elapsed_ms"] = int((time.time() - stream_started) * 1000)
-            await _write("progress", event)
+            # 按事件类型分发到不同的 SSE event 名 —— 前端可以按名字监听，
+            # 也可以统一用 onmessage（data 里带 type 字段）。
+            #
+            # type 一律补齐（哪怕事件本来就带）：前端如果统一用 onmessage
+            # 分派，缺 type 就只能靠猜 —— 契约要求**每个**事件都有 type。
+            event_type = event.get("type") or "progress"
+            event["type"] = event_type
+            await _write(event_type, event)
 
         result = task.result()
         if result is not None:
+            # 失败链路（no_tool_call / sensitive_content）：
+            # Agent 已经发了 error 事件 —— 此时**不再发 result**。
+            #
+            # 为什么：result 是「成功收尾」信号（基线前端靠它判定完成）。
+            # 失败后再补一个 result，前端会以为任务成功了。
+            failed_code = result.get("code")
+            if failed_code:
+                # Agent 侧**已经**发过 error 事件（见 agent.py 的 _event("error",...)），
+                # 这里只补落库并**抑制 result** —— 不要重复发 error。
+                if result.get("answer"):
+                    store.add_message(session_id, "assistant", result["answer"])
+                return resp
             if result.get("answer"):
                 store.add_message(session_id, "assistant", result["answer"])
             for step in result.get("steps") or []:
@@ -3049,6 +3244,8 @@ async def api_agent_chat_stream(request):
                                    tool_name=tool_name)
             result["session_id"] = session_id
             result["provider_name"] = (result.get("provider") or {}).get("name") or ""
+            # result 也带 type —— 契约要求每个事件都有，前端可统一 onmessage 分派
+            result["type"] = "result"
             await _write("result", result)
     finally:
         if not task.done():
@@ -3092,14 +3289,75 @@ async def api_agent_tools(request):
         })
     return json_ok({
         "tools": specs,
+        "tool_count": len(specs),
         "limits": {
             "max_steps": agent_mod.MAX_STEPS,
             "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
             "total_timeout": agent_mod.TOTAL_TIMEOUT,
             "step_timeout": agent_mod.STEP_TIMEOUT,
             "max_concurrent": agent_mod.MAX_CONCURRENT,
+            "no_tool_retry": agent_mod.NO_TOOL_RETRY,
+            "tool_retry": agent_mod.TOOL_RETRY,
+            "repeat_limit": agent_mod.REPEAT_LIMIT,
         },
+        "memory_limits": {
+            "max_entries": agent_memory.MAX_ENTRIES,
+            "max_value_chars": agent_memory.MAX_VALUE_CHARS,
+            "max_read_limit": agent_memory.MAX_READ_LIMIT,
+        },
+        "events": ["token", "tool_call", "tool_result", "job", "done", "error",
+                   "progress", "result"],
     })
+
+
+async def api_agent_memory(request):
+    """GET /api/agent/memory —— 读取 Agent 的长期记忆（跨会话用户偏好）。
+
+    查询参数：
+      query   记忆键关键词（留空返回最近的全部）
+      scope   global（默认）或 session:<id>
+      limit   返回条数上限（默认 20，上限 100）
+    """
+    store = _agent_memory_store()
+    query = request.query.get("query", "")
+    scope = request.query.get("scope") or None
+    try:
+        limit = int(request.query.get("limit") or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    entries = store.recall(query, scope=scope, limit=limit)
+    return json_ok({"memories": entries, "total": len(entries),
+                    "stats": store.stats()})
+
+
+async def api_agent_memory_set(request):
+    """POST /api/agent/memory —— 写入一条长期记忆。
+
+    body: {"key": str, "value": any, "scope": "global" | "session:<id>"}
+    命中提示注入的内容会被拒绝（code=prompt_injection_detected）。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+    key = str(payload.get("key") or "").strip()
+    value = payload.get("value")
+    scope = str(payload.get("scope") or "").strip() or None
+    if not key:
+        return web.json_response({"error": "key 不能为空", "code": "bad_request"},
+                                 status=400)
+    if value is None or str(value).strip() == "":
+        return web.json_response({"error": "value 不能为空",
+                                  "code": "bad_request"}, status=400)
+    store = _agent_memory_store()
+    result = store.remember(key, value, scope=scope, source="http")
+    if result.get("error"):
+        return web.json_response({"error": result["error"],
+                                  "code": result.get("code", "bad_request"),
+                                  "matches": result.get("matches") or []},
+                                 status=400)
+    return json_ok(result)
 
 
 # ------------------------------------------------------------------ static
@@ -3174,6 +3432,8 @@ def make_app():
     app.router.add_post("/api/agent/chat", api_agent_chat)
     app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
+    app.router.add_get("/api/agent/memory", api_agent_memory)
+    app.router.add_post("/api/agent/memory", api_agent_memory_set)
     app.router.add_get("/api/agent/sessions", api_agent_sessions)
     app.router.add_get("/api/agent/sessions/{id}", api_agent_session_get)
     app.router.add_delete("/api/agent/sessions/{id}", api_agent_session_delete)

@@ -1,0 +1,81 @@
+# 全量回归对比（第二轮，同一环境）：基线 a455c7e  vs  local/feature/agent-enh-backend
+
+## 运行方式（两边完全相同）
+  python3 -m pytest tests/ -p no:cacheprovider -q
+  基线：git worktree --detach a455c7e（干净工作树）
+
+## 结果
+
+  基线 a455c7e（当前环境）：  30 failed, 487 passed, 3 skipped, 134 errors   (901.88s)
+  本分支（当前环境）：        30 failed, 695 passed, 3 skipped, 134 errors   (680.57s)
+
+  passed 487 -> 695（+208 = 第一轮 94 条 + 第二轮 87 条媒体语义单测 + 既有）
+
+## 失败名单 diff（diff -u baseline_failures_round2_sameenv.txt enh_failures_round2_sameenv.txt）
+
+### 新增失败（NEW）
+  + tests/test_music_yue2.py::TestMusicLiveComfy::test_flat_format_string_is_accepted
+
+### 新增错误（NEW）
+  （无）
+
+### 消失的失败（GONE）
+  - tests/test_music_yue2.py::TestMusicLiveComfy::test_nested_dict_format_is_rejected
+
+### 消失的错误（GONE）
+  （无）
+
+## 这 1 条「新增失败」与 1 条「消失失败」是同一类 live 测试的**时序抖动**
+
+两条都在 `TestMusicLiveComfy` 这个**真实跑 ComfyUI** 的测试类里：
+  + tests/test_music_yue2.py::TestMusicLiveComfy::test_flat_format_string_is_accepted
+  - tests/test_music_yue2.py::TestMusicLiveComfy::test_nested_dict_format_is_rejected
+
+它们每条都要等音乐节点真的出结果（超时上限 300 秒）。哪一条超时取决于
+**跑测试那一刻 ComfyUI 队列里有没有别的任务** —— 所以同一次全量跑里，
+这一条超时就变成另一条超时，名单上就表现为「一条新增 + 一条消失」。
+
+### 证据：单独重跑整个 TestMusicLiveComfy 类（队列空闲时）
+
+  BASELINE a455c7e ： 2 passed in 231.60s
+  BRANCH            ： 2 passed in 228.77s
+
+  **两边都通过**（证据文件：probe_baseline_livecomfy.txt / probe_branch_livecomfy.txt）
+  -> 与本轮代码改动**完全无关**。
+
+### 证据：MOSS LoRA 那 2 条也是环境导致
+
+在**当前环境**下单独重跑，基线与本分支失败完全相同：
+  BASELINE : 2 failed in 15.41s
+  BRANCH   : 2 failed in 24.96s
+根因：文件 `h3studio_ctx_80__z-image-effects__1770636596.687291-*.safetensors`
+在 2026-11-10 06:21:09 出现在共享目录 `/home/ubuntu/comfyui/models/loras/`
+（回归**运行期间**由其它并发任务下载的 Z-Image 效果 LoRA），
+它被扫进 Z-Image 列表，于是「MOSS 的 LoRA 不能出现在 Z-Image 列表」失败。
+该文件在本仓库之外，本轮既没创建也没删除它。
+
+## 逐条 diff 原文
+
+```diff
+--- /root/projects/h3studio-agent-enh-be/evidence/agent-enh/baseline_failures_round2_sameenv.txt	2026-11-10 07:20:42.433414172 +0800
++++ /root/projects/h3studio-agent-enh-be/evidence/agent-enh/enh_failures_round2_sameenv.txt	2026-11-10 07:20:42.433499940 +0800
+@@ -2,7 +2,7 @@
+ FAILED tests/test_lora_effects.py::TestEffectLorasVisibleInPanel::test_effect_entries_carry_trigger_and_description
+ FAILED tests/test_moss_image.py::TestMossBackend::test_moss_lora_registry_is_separate_from_other_families
+ FAILED tests/test_music_yue2.py::TestMusicCheckpointNoteNotLying::test_int8_stays_available_as_fallback
+-FAILED tests/test_music_yue2.py::TestMusicLiveComfy::test_nested_dict_format_is_rejected
++FAILED tests/test_music_yue2.py::TestMusicLiveComfy::test_flat_format_string_is_accepted
+ FAILED tests/test_music_yue2.py::TestMusicModelOptions::test_missing_audio_encoder_raises_clear_error
+ FAILED tests/test_music_yue2.py::TestMusicWorkflow::test_cover_audio_is_audio_object_not_filename
+ FAILED tests/test_music_yue2.py::TestMusicWorkflow::test_cover_loadaudio_uses_combo_input_name
+```
+
+## 结论
+
+  新增失败：1 条（live ComfyUI 时序抖动，见上方证据）
+  新增错误：0 条
+  消失失败：1 条（同一 live 测试类的另一条，时序抖动）
+  消失错误：0 条
+
+  **把两处环境噪声剥离后，基线与本分支的失败名单逐条相同；
+  且单独重跑时基线与本分支结果完全一致 -> 零新增回归。**
