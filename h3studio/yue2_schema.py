@@ -36,6 +36,7 @@ h3studio/music_yue2.py 用**与官方节点逐条对齐的拼接规则**合成�
 """
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
 import logging
@@ -158,6 +159,27 @@ def _fetch_enums(timeout: float = 10.0) -> dict:
         out[k] = list(sp[k][0])
     out["template"] = list(oi[LYRICS_NODE]["input"]["required"]["template"][0])
     return out
+
+
+async def get_enums_async(force: bool = False) -> dict:
+    """异步版 get_enums —— 给 aiohttp 的 async handler 用。
+
+    【为什么必须有这个】
+    urllib.request.urlopen 是**同步阻塞**调用。直接在 aiohttp 的事件循环里
+    调用它，整个事件循环会被卡住 —— 表现为「打开工作台后，服务端所有接口
+    都超时」，连首页都打不开。
+
+    实测（2026-11-10）：/api/music-options 走 music_yue2.model_options()
+    -> music_style.style_options() -> get_enums() -> _fetch_enums()，
+    一次同步 urlopen（timeout 10s）把整个 server 卡住 10 秒；
+    而 /api/music-options 在前端首屏就会被调用，于是
+    **页面加载 = 服务端冻结**，后续所有请求排队等它。
+
+    修法：把阻塞的 urllib 调用丢进线程池（run_in_executor），
+    事件循环继续跑别的连接，等它回来再取结果。
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: get_enums(force=force))
 
 
 def get_enums(force: bool = False) -> dict:

@@ -219,8 +219,61 @@ def audio_encoder_available(key: str) -> bool:
     return _find_model("audio_encoders", entry["encoder"]) is not None
 
 
+async def model_options_async() -> dict:
+    """异步版 model_options —— 给 aiohttp 的 async handler 用。
+
+    【为什么要异步版】
+    model_options() 里调了 music_style.style_options() 6 次，
+    而 style_options() 内部是**同步阻塞**的 urllib 拉 ComfyUI
+    /object_info（timeout 10s）。在 aiohttp 事件循环里直接调，
+    整个 server 会被卡住 —— 实测表现为「打开工作台后所有接口都超时」，
+    连首页都打不开（因为前端首屏就会请求 /api/music-options）。
+
+    这里把阻塞部分挪到线程池（yue2_schema.get_enums_async），
+    事件循环不阻塞。
+
+    顺带修一个真问题：原实现里 style_options() 被调 6 次，
+    缓存未命中时会打 **6 次** ComfyUI。现在只取一次枚举再组装。
+    """
+    style = await music_style.style_options_async()
+    opts = model_options()
+    # 用异步取到的枚举覆盖（model_options() 里那 6 次同步调用只为拼这几项）
+    opts["style_fields"] = style["fields"]
+    opts["style_defaults"] = style["defaults"]
+    opts["style_enums"] = style["enums"]
+    opts["lyric_templates"] = style["lyric_templates"]
+    opts["lyric_template_default"] = style["lyric_template_default"]
+    opts["length_hint_text"] = style["length_hint_text"]
+    return opts
+
+
+async def model_options_async() -> dict:
+    """异步版 model_options —— 给 aiohttp 的 async handler 用。
+
+    【为什么要异步版】
+    model_options() 里的结构化风格部分会调 music_style.style_options()，
+    而后者内部是**同步阻塞**的 urllib 拉 ComfyUI /object_info（timeout 10s）。
+    在 aiohttp 事件循环里直接调，整个 server 会被卡住 —— 实测表现为
+    「打开工作台后所有接口都超时」，连首页都打不开
+    （因为前端首屏就会请求 /api/music-options）。
+
+    这里把阻塞部分挪到线程池（yue2_schema.get_enums_async），
+    事件循环不阻塞。
+
+    顺带修一个真问题：原实现里 style_options() 被调 6 次，
+    缓存未命中时会打 **6 次** ComfyUI。现在只取一次枚举再组装。
+    """
+    style = await music_style.style_options_async()
+    return _model_options_core(style)
+
+
 def model_options() -> dict:
     """给前端的模型清单（含本机可用性）。"""
+    return _model_options_core(music_style.style_options())
+
+
+def _model_options_core(style: dict) -> dict:
+    """model_options 的内核 —— 结构化风格部分由调用方传入（避免重复拉 ComfyUI）。"""
     checkpoints = {}
     for key, m in YUE2_CHECKPOINTS.items():
         available = checkpoint_available(key)
@@ -269,16 +322,16 @@ def model_options() -> dict:
         "formats": YUE2_AUDIO_FORMATS,
         "default_format": YUE2_DEFAULT_FORMAT,
         # 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
-        "style_fields": music_style.style_options()["fields"],
-        "style_defaults": music_style.style_options()["defaults"],
-        "style_enums": music_style.style_options()["enums"],
-        "lyric_templates": music_style.style_options()["lyric_templates"],
-        "lyric_template_default": music_style.style_options()["lyric_template_default"],
+        "style_fields": style["fields"],
+        "style_defaults": style["defaults"],
+        "style_enums": style["enums"],
+        "lyric_templates": style["lyric_templates"],
+        "lyric_template_default": style["lyric_template_default"],
         # length_hint -> style 串里的英文时长描述。
         # 【审查 P1-1】前端原先硬编码了第三份 length_hint 映射
         # （web/music.js 的 STYLE_LENGTH_HINT_TEXT）—— 那是「同一常量
         # 写三处」的典型隐患。现在由服务端下发，前端不再硬编码。
-        "length_hint_text": music_style.style_options()["length_hint_text"],
+        "length_hint_text": style["length_hint_text"],
     }
 
 

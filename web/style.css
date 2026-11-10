@@ -1107,6 +1107,12 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   z-index: 1250;
   min-width: 268px;
   max-width: min(340px, calc(100vw - 16px));
+  /* 【窄屏】菜单内容比视口还高时，必须能滚 ——
+     否则最后几项（Qwen 官方 PE 等）在矮视口里被裁掉，用户看不到也点不到。
+     实测：音乐面板菜单高 667px，375x500 视口下整块溢出视口底部。 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
