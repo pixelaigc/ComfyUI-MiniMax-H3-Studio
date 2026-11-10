@@ -239,6 +239,58 @@ def mode_loras(mode: str) -> list[str]:
 
 # ------------------------------------------------------------------ 默认值推导
 
+
+def mode_param_keys(mode: str) -> set[str]:
+    """
+    该 mode **真实存在**的参数名集合。
+
+    【这是 mode_schema(mode)["params"] 的键集合的单一真源】
+    mode_schema 按这些参数逐个展开（取值集合 + 默认值 + 来源），
+    mode_defaults 按同一份集合**过滤**默认值 ——
+    两边用同一份定义，就不需要为每个模式手写例外表
+    （审查实测：音乐模式 t2a 的 defaults 混进了 duration/lora/resolution，
+    三个都是**视频**参数，模型看到会以为音乐时长 5 秒）。
+
+    判据全部来自真实能力函数，不是硬编码白名单：
+      * 画面比例 -> mode_aspects（音乐模式返回空 -> 没有 aspect）
+      * 模型     -> mode_models
+      * 分辨率   -> mode_resolutions（音乐模式返回空 -> 没有 resolution）
+      * 时长     -> mode_duration_range + mode_duration_field
+                    （视频 duration / 音乐 max_duration）
+      * LoRA     -> mode_loras（只有视频有）
+      * 负面词   -> 图像模式才有
+      * 批量     -> 图像模式才有
+    """
+    keys: set[str] = set()
+    if mode_aspects(mode):
+        keys.add("aspect")
+    if mode_models(mode):
+        keys.add("model")
+    if mode_resolutions(mode):
+        keys.add("resolution")
+    duration_range = mode_duration_range(mode)
+    if duration_range:
+        keys.add(mode_duration_field(mode))
+    if mode_loras(mode):
+        keys.add("lora")
+    if is_image_mode(mode):
+        keys.add("batch_count")
+        keys.add("negative_prompt")
+    if is_music_mode(mode):
+        keys.add("max_duration")
+        keys.add("plan_mode")
+        keys.add("format")
+        keys.add("lyrics")
+        if MUSIC_CHECKPOINTS:
+            keys.add("checkpoint")
+    if is_video_mode(mode):
+        keys.add("precision")
+        keys.add("lora_strength")
+    if mode_requires_refs(mode):
+        keys.add("asset_id")
+    return keys
+
+
 def _builder_defaults(mode: str) -> dict:
     """
     从**真实的工作流构造函数源码**里读出「参数留空时的默认值」。
@@ -297,6 +349,22 @@ def mode_defaults(mode: str) -> dict:
     该模式各参数的默认值（来源：真实常量 + 真实 builder 源码）。
 
     返回 {"aspect": "16:9", "resolution": "768p", "duration": 5, ...}
+
+    【关键约束 —— 只返回该模式**真实存在**的参数，2026-11-10】
+    审查实测：旧实现无条件把 builder 解析出来的
+    aspect/resolution/duration/lora/model/seed 拷进来，
+    而 t2a（音乐）的 builder 走的是 `_h3_video_workflow` 的 fallback，
+    解析出的是**视频**默认值：
+        mode_defaults("t2a") == {'lora':'ckpt850', 'resolution':'768p', 'duration':5.0}
+    多余键 = ['duration', 'lora', 'resolution']
+    但音乐模式**没有**这三个参数（真实参数是 max_duration，4~360）。
+    get_mode_schema 是模型**主动调用**的工具 —— 看到 `duration: 5.0`
+    会以为音乐时长是 5 秒，于是传 duration=5（被静默忽略）
+    或传 max_duration=5（合法但与用户意图不符）。
+
+    修法：**按模式 params 白名单过滤** —— 只保留 mode_schema(mode)
+    的 params 里真实存在的键。这样默认值与参数集合**永远一致**，
+    不需要为每个模式手写一张例外表。
     """
     defaults: dict = {}
 
@@ -346,6 +414,12 @@ def mode_defaults(mode: str) -> dict:
         if allowed and str(value) not in allowed:
             continue
         clean[key] = value
+
+    # 5. 【按模式 params 白名单过滤】—— 只保留该模式真实存在的参数。
+    #    （mode_param_keys 是 mode_schema 的 params 键集合，单一真源。）
+    allowed_keys = mode_param_keys(mode)
+    if allowed_keys:
+        clean = {k: v for k, v in clean.items() if k in allowed_keys}
     return clean
 
 

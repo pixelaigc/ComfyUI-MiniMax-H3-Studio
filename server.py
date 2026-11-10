@@ -1947,9 +1947,32 @@ async def api_generation_types(request):
 
     清单来自后端真实注册的生成模式（workflows.BUILDERS + longfilm），
     前端不硬编码任何类型名。
+
+    【每个类型额外带 agent_asset_slots —— 2026-11-10 审查修复】
+    前端原来**硬编码**「Agent 建不了 a2a / flf」（因为旧基线的 Agent
+    素材槽位恒为 ref_image）。但后端增强分支已经把槽位改成分派制
+    （agent_schema.MODE_SLOTS / mode_slot_plan）——
+    合并后前端那条提示变成**反向阻断**（后端能建，前端说不能）。
+    现在把真实槽位计划下发，前端只渲染服务端给的结论。
     """
+    types = gen_types.list_types()
+    for item in types:
+        key = item.get("key")
+        if not key or key == "__other__":
+            continue
+        try:
+            plan = agent_mod.agent_schema.mode_slot_plan(key)
+        except Exception:
+            continue
+        if plan.get("single") or plan.get("multi"):
+            item["agent_asset_slots"] = {
+                "single": plan["single"],
+                "multi": plan["multi"],
+                "max_per_slot": plan["max_per_slot"],
+                "source": "agent_schema.MODE_SLOTS",
+            }
     return json_ok({
-        "types": gen_types.list_types(),
+        "types": types,
         "registered_modes": gen_types.registered_modes(),
         # 界面分类（文生图 / 图片编辑 / 视频）—— 前端左侧入口按这个分组
         "categories": gen_types.list_categories(),
@@ -2993,8 +3016,20 @@ async def api_agent_chat(request):
                     docs/内置多模态Agent-接口契约.md）
                     等价于调用 POST /api/agent/chat/stream。
 
+    【流式开关的两种合法写法 —— 2026-11-10 审查后明确】
+      A. POST /api/agent/chat
+         body: {"message": "...", "stream": 1}          ← body 载体
+      B. POST /api/agent/chat?stream=1
+         body: {"message": "..."}                       ← query 载体
+    两种都命中同一条 SSE 契约（事件名 / 字段完全一致）。
+    审查实测原前端发的是 B，而后端只读 body（A）——
+    于是真实浏览器 12/12 请求返回 application/json，流式 100% 不生效。
+    现在后端两边都读，前端也改用 A（body），
+    这样**已部署的旧前端**（B）依然能命中流式。
+
     返回结构化结果（见 h3studio.agent.run_agent 的 docstring）：
       status / answer / jobs / assets / prompt / steps / usage / provider / error
+      clarify_options / clarify_hint  （澄清态的快捷选项与提示）
     """
     try:
         payload = await request.json()
@@ -3006,7 +3041,18 @@ async def api_agent_chat(request):
     #
     # 为什么要同一个端点也支持 stream：前端只需要一个 URL，
     # 带不带 stream 由请求体决定，不用在两套 URL 之间切换。
-    if str(payload.get("stream") or "").lower() in ("1", "true", "yes", "on"):
+    #
+    # 【两种写法都合法，2026-11-10】
+    #   A. POST /api/agent/chat        + body {"stream": 1}   （body 载体）
+    #   B. POST /api/agent/chat?stream=1 + body 无 stream    （query 载体）
+    # 审查实测：前端原来发的是 B，而后端只读 body（A）——
+    # 于是真实浏览器 12/12 请求返回 application/json，流式 100% 不生效。
+    # 现在两边都读，任一写法都能命中 SSE。
+    # （后端只读 query 也能兼容**已部署的旧前端**；只改前端则旧前端仍坏。）
+    stream_flag = payload.get("stream")
+    if stream_flag is None or str(stream_flag).strip() == "":
+        stream_flag = request.query.get("stream")
+    if str(stream_flag or "").lower() in ("1", "true", "yes", "on"):
         return await api_agent_chat_stream(request)
 
     message = str(payload.get("message") or "").strip()

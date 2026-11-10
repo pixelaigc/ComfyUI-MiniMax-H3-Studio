@@ -76,23 +76,15 @@ def default_db_path() -> Path:
 # ------------------------------------------------------------------ 注入检测
 
 #: 提示注入特征。命中即拒绝写入（宁可少一条记忆，也不要污染未来每一轮）。
-#
-# 判据要**窄**：宁可漏判（那只是一条普通偏好），也不误判（误判会让用户
-# 「设置偏好」被莫名拒绝，非常恼人）。这里只匹配明确试图改写模型行为的句式。
-_INJECTION_PATTERNS = (
-    # 「忽略(之前|以上|前面|先前)?(所有)?(的)?(指令|命令|提示|规则|设定)」
-    # —— 中文里「的所有指令」「所有指令」两种语序都常见，所以量词段用
-    #    可选修饰的宽松写法，而不是固定顺序（固定顺序会漏判「忽略之前的所有指令」）。
-    re.compile(r"忽略[^。；\n]{0,12}?(?:指令|命令|提示|规则|设定|系统提示)", re.I),
-    re.compile(r"(?:不要|别|无需|不用)[^。；\n]{0,8}?(?:遵守|执行)[^。；\n]{0,8}?(?:规则|指令|限制|策略)", re.I),
-    re.compile(r"ignore\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|prompts?|rules?|directives?)", re.I),
-    re.compile(r"(?:disregard|override|bypass|forget)\s+(?:your\s+|all\s+|any\s+)?(?:instructions?|rules?|guardrails?|safety|system\s+prompt)", re.I),
-    re.compile(r"(?:你现在是|from now on|现在开始|从现在起)[^\n]{0,24}(?:扮演|假装|成为|无视|绕过|不受)", re.I),
-    re.compile(r"(?:执行|运行|调用)[^\n]{0,12}(?:rm\s+-rf|curl\s+[^\n]*\|[^\n]*sh|删除所有文件|格式化磁盘)", re.I),
-    re.compile(r"(?:reveal|leak|print|输出|泄露|复述)[^\n]{0,20}(?:system\s+prompt|系统提示词|你的指令|初始指令)", re.I),
-    re.compile(r"</?\s*(?:system|assistant|developer)\s*>", re.I),
-    re.compile(r"###\s*(?:system|instruction|指令|系统)\s*(?:prompt)?\s*:", re.I),
-)
+#:
+#: 判据要**窄**：宁可漏判（那只是一条普通偏好），也不误判（误判会让用户
+#: 「设置偏好」被莫名拒绝，非常恼人）。这里只匹配明确试图改写模型行为的句式。
+#:
+#: 【单一真源，2026-11-10】这份表以前和 agent_safety.py 里那份**逐字重复**
+#: （md5 完全相同），改一处忘另一处是必然的 —— 审查实测的「零宽绕过」就是
+#: 这么漏的（只改了一处）。现在直接 import agent_safety 的那份，
+#: 两边**永远**是同一份规则。
+from .agent_safety import _INJECTION_PATTERNS  # noqa: F401
 
 
 def detect_injection(text: str) -> dict:
@@ -102,29 +94,44 @@ def detect_injection(text: str) -> dict:
     返回 {"injection": bool, "matches": [...], "sanitized": str}
     sanitized 是**清理后**的文本（控制字符剥离 + 超长截断），
     即使没命中注入也可以安全入库。
+
+    【关键不变量 —— 必须先归一化再检测】
+    实测踩过的坑（2026-11-10）：原实现先在**原文**上匹配，**之后**才剥零宽
+    字符，于是「忽<U+200D>略之前的所有指令」这类变体
+      1. 原文匹配失败 -> injection=False（放行）
+      2. 进入 sanitize -> 零宽被剥 -> 载荷变回一句**完整**的真注入
+      3. 记忆入库 -> summary_for_prompt 把它原样拼进 system 提示词
+    也就是「检测失配后，清理反而把载荷还原成真注入」。
+    现在改成：**先归一化，再在归一化后的文本上匹配**，
+    并保证「检测用文本 == 清理后文本」（测试里有断言锁死这条不变量）。
     """
     raw = text or ""
+    # 先归一化：检测对象必须是「模型真正会读到的那个文本」
+    cleaned = sanitize_value(raw, limit=10 ** 9)
     matches = []
     for pattern in _INJECTION_PATTERNS:
-        found = pattern.search(raw)
+        found = pattern.search(cleaned)
         if found:
             matches.append(found.group(0)[:80])
-    cleaned = sanitize_value(raw)
     return {
         "injection": bool(matches),
         "matches": matches[:5],
-        "sanitized": cleaned,
+        "sanitized": sanitize_value(raw),
     }
 
 
-def sanitize_value(text: str) -> str:
+def sanitize_value(text: str, limit: int = MAX_VALUE_CHARS) -> str:
     """
     把值清理成可安全存储/回灌的文本。
 
     做三件事：
       1. 去掉控制字符（除了换行/制表符）—— 防日志注入与终端转义
       2. 去掉零宽字符 —— 用来藏「忽略之前指令」的注入特征
-      3. 截断到 MAX_VALUE_CHARS
+      3. 截断到 limit（默认 MAX_VALUE_CHARS）
+
+    【上限语义】存储值的长度**永远不超过** limit —— 截断标记本身也
+    算在长度里（实测旧实现存了 2006 字符 > MAX_VALUE_CHARS=2000，
+    上限声明与实际不符）。所以是「先留出标记的位置，再截内容」。
     """
     if not text:
         return ""
@@ -132,8 +139,11 @@ def sanitize_value(text: str) -> str:
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
     cleaned = re.sub(r"[‌‍⁠﻿]", "", cleaned)
     cleaned = cleaned.strip()
-    if len(cleaned) > MAX_VALUE_CHARS:
-        cleaned = cleaned[:MAX_VALUE_CHARS] + "…（已截断）"
+    if len(cleaned) > limit:
+        # 标记本身占长度 -> 留给内容的额度要减掉标记长度
+        marker = "…（已截断）"
+        keep = max(0, limit - len(marker))
+        cleaned = cleaned[:keep] + marker
     return cleaned
 
 
@@ -243,9 +253,9 @@ class MemoryStore:
         if isinstance(payload, str):
             stored = check["sanitized"]
         else:
-            stored = _encode(payload)
-            if len(stored) > MAX_VALUE_CHARS:
-                stored = stored[:MAX_VALUE_CHARS] + "…（已截断）"
+            # 非字符串：先编码成 JSON，再走同一条「截断后总长不超上限」的规则
+            # （旧实现是 encoded[:MAX] + 标记 -> 实际 2006 > 2000）
+            stored = sanitize_value(_encode(payload))
 
         now = time.time()
         with self.connect() as conn:

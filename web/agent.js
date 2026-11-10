@@ -679,6 +679,52 @@
     return found;
   }
 
+  // ============================================================ 契约归一化层
+  //
+  // 【为什么要有这一层 —— 2026-11-10 审查修复】
+  // 前后端各自实现了一套 SSE 字段名，而且**对不上**：
+  //   后端发：tool_call   {tool, args}          tool_result {tool, ok, summary}
+  //   前端读：tool_call   {name, arguments, call_id?}
+  //            tool_result {name, result, ok, ms?, error?, call_id?}
+  // 结果：工具结果**永远渲染不出来**（result 恒 undefined），
+  //       失败原因不显示、耗时不显示、call_id 恒 null
+  //       （同名工具并发调用会串到同一张卡片）。
+  //
+  // 【修法】前端加一层**归一化适配**：把后端字段映射成前端内部字段。
+  // 这样：
+  //   * 后端保持自己的契约（已发布的接口契约文档不用改语义）
+  //   * 前端对**两种**命名都认（向后兼容，也兼容更老的服务端）
+  //   * 跨侧契约测试可以只测这一层
+  //
+  // 归一化后的**内部字段名**（前端唯一认的）：
+  //   tool_call   -> {name, arguments, call_id}
+  //   tool_result -> {name, result, ok, error, ms, call_id}
+
+  // 工具名：后端用 tool，前端内部用 name
+  function normalizeToolName(data) {
+    return data.name || data.tool || "";
+  }
+
+  // 工具参数：后端用 args（对象），前端内部用 arguments（对象）
+  function normalizeToolArguments(data) {
+    if (data.arguments !== undefined) return data.arguments;
+    if (data.args !== undefined) return data.args;
+    return undefined;
+  }
+
+  // 工具结果摘要：后端用 summary（字符串），前端内部用 result
+  //
+  // 【为什么要把 summary 映射到 result 而不是新增字段】
+  // 前端的展示链路（toolResultSummary -> .ag-tool-result）已经吃
+  // 「result」这个字段；再新增一个 summary 字段就要改两处渲染。
+  // 归一化层把差异**收敛在一处**，渲染层不用知道后端叫什么。
+  function normalizeToolResult(data) {
+    if (data.result !== undefined) return data.result;
+    if (data.summary !== undefined) return data.summary;
+    if (data.output !== undefined) return data.output;
+    return undefined;
+  }
+
   // 应用一条流式事件到正在渲染的消息上。
   function applyStreamEvent(msg, event, data) {
     if (!data || typeof data !== "object") return;
@@ -691,18 +737,18 @@
       }
       case "tool_call": {
         upsertTool(msg, {
-          name: data.name || data.tool,
-          arguments: data.arguments !== undefined ? data.arguments : data.args,
+          name: normalizeToolName(data),
+          arguments: normalizeToolArguments(data),
           call_id: data.call_id || data.id,
         });
         break;
       }
       case "tool_result": {
+        const name = normalizeToolName(data);
+        const raw = normalizeToolResult(data);
         upsertTool(msg, {
-          name: data.name || data.tool,
-          result: data.result !== undefined
-            ? filterToolResult(data.name || data.tool, data.result)
-            : data.output,
+          name: name,
+          result: raw !== undefined ? filterToolResult(name, raw) : undefined,
           ok: data.ok !== false,
           error: data.error || "",
           ms: data.ms,
@@ -753,15 +799,26 @@
 
   // ---------- 动作 ----------
 
-  // 新契约：POST /api/agent/chat?stream=1
+  // 新契约：POST /api/agent/chat（body 带 stream=1）
   //
   // 用 fetch + ReadableStream 而不是 EventSource —— EventSource 只能 GET，
   // 而 Agent 的输入在 POST body 里。
+  //
+  // 【stream 放在 body 里 —— 2026-11-10 审查修复】
+  // 原来这里发的是 `/api/agent/chat?stream=1`（query 载体），
+  // 而后端只读 body 的 `stream` 字段 —— 契约在两侧对不上，
+  // 结果真实浏览器 12/12 请求拿到的都是 application/json，
+  // **流式输出 100% 不生效**（界面从空串直接跳到整段结果）。
+  // 现在两边都支持：
+  //   A. body {"message":..., "stream":1}   ← 前端走这条
+  //   B. query ?stream=1                      ← 后端也认（兼容旧前端）
+  // 两种写法命中**同一条** SSE 契约。
   async function sendStreamNew(body, msg) {
-    const resp = await fetch("/api/agent/chat?stream=1", {
+    const payload = Object.assign({}, body, { stream: 1 });
+    const resp = await fetch("/api/agent/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
@@ -925,11 +982,24 @@
       if (Array.isArray(data.assets)) msg.assets = data.assets;
       if (data.prompt) msg.prompt = data.prompt;
       // 需要澄清：渲染成可回答的提问气泡
+      //
+      // 【字段名兼容 —— 2026-11-10 审查修复】
+      // 后端原来只发 `clarification`（一个字符串），
+      // 前端却读 `clarify_options` / `clarify_hint` ——
+      // 契约对不上，快捷选项 **100% 落空**（用户被迫手打「9:16」）。
+      // 现在后端**同时**产出 clarify_options / clarify_hint，
+      // 前端这里也做**多字段兼容**（万一对到老服务端）：
+      //   问题文本 <- clarification || answer
+      //   快捷选项 <- clarify_options || options
+      //   提示     <- clarify_hint || hint
       if (data.status === "needs_clarification") {
         msg.clarify = {
-          question: data.answer || "Agent 需要你补充一些信息才能继续。",
-          options: Array.isArray(data.clarify_options) ? data.clarify_options : [],
-          hint: data.clarify_hint || "",
+          question: data.clarification || data.answer
+            || "Agent 需要你补充一些信息才能继续。",
+          options: Array.isArray(data.clarify_options)
+            ? data.clarify_options
+            : (Array.isArray(data.options) ? data.options : []),
+          hint: data.clarify_hint || data.hint || "",
         };
       }
       if (data.error) msg.error = data.error;
@@ -952,19 +1022,44 @@
   }
 
   // 一次性结果里的 steps -> 工具轨迹（统一展示形态）。
+  //
+  // 【为什么要真的用 steps[].args —— 2026-11-10 审查修复】
+  // 服务端的 steps[] **确实带**完整参数：
+  //   {"tool": "create_job",
+  //    "args": "{\"mode\": \"t2i\", \"prompt\": \"雨夜霓虹街道…\", \"aspect\": \"16:9\"}"}
+  // 但旧实现硬编码 `arguments: null` —— 参数被**主动丢弃**。
+  // 于是降级路径（服务端退回一次性 JSON）下工具卡只显示工具名和耗时，
+  // 没有「参数」行 —— 审查实测截图里确实只有「✓ 工具名 耗时」三样。
+  //
+  // 注意：args 是 **JSON 字符串**，而 toolArgsPreview 只接受对象
+  //（`if (!args || typeof args !== "object") return ""`）——
+  // 直接塞字符串仍然渲染不出来。必须先 parse。
+  // 解析失败就**原样当字符串**保留（不吞掉），让用户至少能看到原文。
   function syncToolsFromSteps(msg, steps) {
     if (!Array.isArray(steps) || !steps.length) return;
     if (msg.tools && msg.tools.length) return;   // 已经有流式轨迹了，不覆盖
     msg.tools = steps.filter(s => s && s.tool).map(s => ({
       name: s.tool,
-      arguments: null,
+      arguments: parseStepArgs(s.args),
       result: null,
       ok: s.ok !== false,
       error: s.error || "",
       ms: s.ms,
       done: true,
-      call_id: null,
+      call_id: s.call_id || null,
     }));
+  }
+
+  // steps[].args（JSON 字符串）-> 对象。解析失败返回原始字符串。
+  function parseStepArgs(raw) {
+    if (raw === undefined || raw === null || raw === "") return null;
+    if (typeof raw === "object") return raw;   // 已经是对象（老契约直接给对象）
+    try {
+      const parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object") ? parsed : raw;
+    } catch (e) {
+      return raw;   // 不吞：让用户看到原文而不是空白
+    }
   }
 
   // ---------- 任务卡状态轮询 ----------

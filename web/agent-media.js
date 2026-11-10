@@ -54,18 +54,59 @@
     },
   };
 
-  // Agent 的素材槽位恒为 ref_image（agent.py:534 固定写死），
-  // 所以 a2a（要 ref_audio）与 flf（要 first_frame）建不了。
-  const UNSUPPORTED_BY_AGENT = {
-    a2a: {
-      reason: "Agent 的素材槽位固定为 ref_image，服务端只认 ref_audio。",
-      advice: "请到音乐面板手动选参考音频提交，或先用 Agent 生成风格稿（t2a）。",
-    },
-    flf: {
-      reason: "Agent 没有首帧/尾帧通道，素材只能作为 ref_image 传入。",
-      advice: "请到视频面板上传首帧（或改用 r2v 参考图生成）。",
-    },
-  };
+  // Agent 的素材槽位**按模式分派**（后端 agent_schema.MODE_SLOTS / mode_slot_plan）：
+  //   a2a -> ref_audio（参考音频，1 条）
+  //   flf -> first_frame（+ last_frame，可选）
+  //   i2i_qwen / r2v -> ref_image（多条）
+  //
+  // 【为什么这里不再写死「Agent 建不了 a2a / flf」—— 2026-11-10 审查修复】
+  // 旧版本这里有 UNSUPPORTED_BY_AGENT = {a2a, flf}，理由是
+  // 「Agent 的素材槽位恒为 ref_image（agent.py:534 固定写死）」。
+  // 那条**在旧基线上成立**，但后端增强分支已经把槽位改成分派制
+  // （agent.py 的 _build_asset_refs + agent_schema.MODE_SLOTS）——
+  // 合并后前端这条提示就变成了**反向阻断**：
+  // 后端明明能建 a2a / flf，任务卡上却写「Agent 建不了，请到面板手动提交」。
+  //
+  // 【现在的做法 —— 能力位由后端下发】
+  // 服务端在 GET /api/generation-types 的每个类型上带 agent_asset_slots，
+  // 前端据此判断「这个模式 Agent 有没有素材通道」。
+  // 服务端没给（老服务端）时**不显示**能力缺口提示 ——
+  // 宁可少提示，也不要给一条与事实相反的阻塞提示。
+  const UNSUPPORTED_BY_AGENT = {};
+
+  // 后端下发的「Agent 素材槽位计划」缓存。
+  // 结构：{mode: {single: [...], multi: [...], max_per_slot: {...}}}
+  let SERVER_AGENT_SLOTS = {};
+
+  // 用服务端下发的槽位计划刷新能力位。
+  //
+  // payload 来自 GET /api/generation-types：
+  //   {types: [{key, label, media, agent_asset_slots: {...}}], ...}
+  // 没有 agent_asset_slots 的类型 = 服务端没说 Agent 有素材通道
+  // -> 记成空计划（不阻塞，因为 Agent 可能本来就不需要素材）。
+  function applyServerAgentSlots(payload) {
+    const list = (payload && payload.types) || [];
+    const slots = {};
+    (Array.isArray(list) ? list : []).forEach(t => {
+      if (!t || !t.key) return;
+      const plan = t.agent_asset_slots;
+      if (plan && typeof plan === "object") {
+        slots[t.key] = {
+          single: Array.isArray(plan.single) ? plan.single : [],
+          multi: Array.isArray(plan.multi) ? plan.multi : [],
+          max_per_slot: plan.max_per_slot || {},
+        };
+      }
+    });
+    SERVER_AGENT_SLOTS = slots;
+    return slots;
+  }
+
+  // 该模式在 Agent 侧的素材槽位计划（服务端下发优先）。
+  function agentSlotsFor(mode) {
+    if (SERVER_AGENT_SLOTS[mode]) return SERVER_AGENT_SLOTS[mode];
+    return null;
+  }
 
   // ------------------------------------------------------------------
   // 2. 分辨率：视频只有两档，其它值静默回落
@@ -104,18 +145,21 @@
   const MUSIC_MAX_DURATION = 360;
 
   // ------------------------------------------------------------------
-  // 4. Agent 的 create_job 只能传这些参数
+  // 4. Agent 的 create_job 能传哪些参数
   // ------------------------------------------------------------------
   //
-  // 【事实】agent.py:501-556 只写入下列键：
-  //   prompt / aspect / resolution / duration / batch_count /
-  //   ref_images / asset_refs
-  // 其它（model / steps / cfg / sampler / seed / lora / negative_prompt …）
-  // Agent 传不了 → 任务卡**不要**展示成用户可设项。
-  const AGENT_SETTABLE_PARAMS = [
-    "prompt", "aspect", "resolution", "duration",
-    "batch_count", "ref_images", "asset_refs",
-  ];
+  // 【为什么这里不再维护一份白名单 —— 2026-11-10 审查修复】
+  // 旧版本有一份 AGENT_SETTABLE_PARAMS = [prompt, aspect, resolution,
+  // duration, batch_count, ref_images, asset_refs]，注释说
+  // 「事实：agent.py:501-556 只写入下列键」。
+  // 那条在**基线 7 参数时代**成立，后端扩到 23 参数后就过期了，
+  // 而且这份清单**全仓没有任何消费点**（web/ 与 tests/ 引用数都是 0）——
+  // 纯死代码 + 纯过期事实，留着只会误导下一个人。
+  //
+  // 现在**删除**它。真实能力由服务端下发：
+  //   * 模式清单与素材通道 -> GET /api/generation-types
+  //   * 参数取值集合       -> Agent 工具 get_mode_schema
+  // 前端只做展示，不再猜「Agent 能设什么」。
 
   // 任务卡上**允许展示**的参数（白名单）。
   // 注意：刻意不含 model/steps/cfg/seed/lora/negative_prompt ——
@@ -243,7 +287,18 @@
   // 注意区分两种「不是用户传的值」：
   //   * 没传 -> 用默认 16:9 —— 这是**默认**，不是「回落」，不该报警
   //   * 传了但非法 -> 回落 16:9 —— 这才是**回落**，必须让用户看见
+  //
+  // 【音频守卫 —— 2026-11-10 审查修复】
+  // 音乐模式（t2a / a2a）是**纯音频**任务，没有画面比例这回事。
+  // 旧实现无条件返回 "16:9"，于是参考生音乐的任务卡上渲染出
+  // 「比例 16:9」这种**无意义**的参数 —— 而且那个值根本不是
+  // Agent 设的（后端 schema 里音乐模式压根没有 aspect）。
+  // 现在音频模式返回空值，调用方（effectiveParams）据此不渲染这一项。
   function resolveAspect(mode, requested) {
+    if (isAudio(mode)) {
+      // 音频模式没有画面比例 —— 即使参数里带了 aspect 也不认
+      return { value: "", requested: "", fallback: false, note: "" };
+    }
     const req = requested == null ? "" : String(requested);
     if (!req) return { value: "16:9", requested: "", fallback: false, note: "" };
     if (ASPECT_VALUES.indexOf(req) >= 0) {
@@ -290,14 +345,30 @@
   }
 
   // 该模式在 Agent 侧的能力缺口（用于提示替代方案，而不是只报错）
+  //
+  // 【语义，2026-11-10 审查修复后】
+  // 只在**服务端明确说 Agent 缺这个槽位**时才提示。
+  // 服务端下发 agent_asset_slots 时：
+  //   * 有槽位（single/multi 非空）-> Agent 有素材通道 -> 不提示
+  //   * 槽位计划为空且该模式**本来就需要素材** -> 提示
+  // 服务端没下发（老服务端）-> **不提示**（宁可少提示，也不要给反向阻断提示）。
   function limitationFor(mode, params) {
     if (UNSUPPORTED_BY_AGENT[mode]) return UNSUPPORTED_BY_AGENT[mode];
     if (MANUAL_ONLY_MODES[mode]) return MANUAL_ONLY_MODES[mode];
-    // a2a / flf 已在上面；这里再检查「素材槽位不匹配」的组合：
-    // Agent 传的素材全是 slot=ref_image，如果目标是音频/首尾帧就不成立。
+    const plan = agentSlotsFor(mode);
+    if (!plan) return null;               // 服务端没说 -> 不臆断
+    const hasChannel = (plan.single && plan.single.length)
+      || (plan.multi && plan.multi.length);
+    if (hasChannel) return null;          // Agent 有素材通道 -> 没问题
+    // 服务端说「这个模式没有素材通道」，但任务里却带了素材引用
+    // -> 说明引用放不进去，给出替代建议。
     const refs = (params && (params.asset_refs || params.ref_images)) || [];
-    if (isAudio(mode) && refs.length && !UNSUPPORTED_BY_AGENT[mode]) {
-      return UNSUPPORTED_BY_AGENT.a2a;
+    if (refs.length) {
+      return {
+        reason: `服务端没有给「${modeLabel(mode)}」下发 Agent 素材通道，`
+          + "这次带的素材引用放不进去。",
+        advice: "请到对应面板手动提交这个任务，或去掉素材引用让 Agent 重新生成。",
+      };
     }
     return null;
   }
@@ -324,7 +395,6 @@
     MUSIC_DEFAULT_DURATION,
     MUSIC_MIN_DURATION,
     MUSIC_MAX_DURATION,
-    AGENT_SETTABLE_PARAMS,
     DISPLAYABLE_PARAMS,
     ASPECT_VALUES,
     isVideo, isAudio, isImage,
@@ -333,5 +403,8 @@
     effectiveParams,
     limitationFor,
     resolveServerModes,
+    // 能力位由后端下发（2026-11-10 审查修复）
+    applyServerAgentSlots,
+    agentSlotsFor,
   };
 })(typeof window !== "undefined" ? window : globalThis);

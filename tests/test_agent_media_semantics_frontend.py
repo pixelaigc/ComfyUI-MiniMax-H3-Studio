@@ -215,23 +215,101 @@ class TestAgentMediaBehaviour(unittest.TestCase):
                          f"展示了不该展示的参数：{params}")
 
     # -------------------------------------------------- 能力缺口
-    def test_limitation_for_a2a_and_flf(self):
-        """Agent 建不了 a2a / flf —— 必须给替代建议，不能只报错。"""
+    def test_limitation_absent_for_a2a_and_flf_after_slot_dispatch(self):
+        """
+        a2a / flf **不再**有「Agent 建不了」的能力缺口提示。
+
+        【为什么改这条断言 —— 2026-11-10 审查修复】
+        旧版本这里断言「a2a / flf 必须有能力缺口说明」，
+        那条断言**把错误行为锁死了**：
+        前端硬编码 UNSUPPORTED_BY_AGENT = {a2a, flf}，理由是
+        「Agent 的素材槽位恒为 ref_image（agent.py:534 固定写死）」。
+        那条在旧基线上成立，但后端增强分支已把槽位改成分派制
+        （agent_schema.MODE_SLOTS / mode_slot_plan）：
+            a2a -> ref_audio
+            flf -> first_frame（+ last_frame）
+        合并后前端那条提示变成**反向阻断** ——
+        后端明明能建，任务卡上却写「Agent 建不了，请到面板手动提交」。
+
+        现在能力位**由后端下发**（GET /api/generation-types 的
+        agent_asset_slots），前端只渲染服务端给的结论。
+        """
         for mode in ("a2a", "flf"):
             lim = self.media(f"M.limitationFor('{mode}', {{}})")
-            self.assertIsNotNone(lim, f"{mode} 缺能力缺口说明")
-            self.assertTrue(lim["reason"], f"{mode} 缺原因说明")
-            self.assertTrue(lim["advice"], f"{mode} 缺替代建议")
-            # 建议必须指向**可执行的人工路径**（面板 / 换一种模式），
-            # 不能只是一句「做不到」。
-            self.assertTrue(
-                any(k in lim["advice"] for k in ("面板", "请到", "或先用", "改用")),
-                f"{mode} 的建议没有可执行的下一步：{lim['advice']}")
+            self.assertIsNone(lim,
+                              f"{mode} 不该有能力缺口提示（后端已支持分派槽位）：{lim}")
+
+    def test_agent_capability_bits_come_from_server(self):
+        """
+        服务端下发槽位计划后，前端按服务端结论判定能力缺口。
+
+        - a2a 下发 ref_audio 通道 -> 有通道 -> 不提示
+        - 某模式下发「无通道」但任务带了素材引用 -> 提示（引用放不进去）
+        - 服务端没下发 -> 不提示（宁可少提示，也不要反向阻断）
+        """
+        payload = {
+            "types": [
+                {"key": "a2a", "label": "参考生音乐", "media": "audio",
+                 "agent_asset_slots": {"single": ["ref_audio"], "multi": [],
+                                       "max_per_slot": {"ref_audio": 1}}},
+                {"key": "flf", "label": "首尾帧生成", "media": "video",
+                 "agent_asset_slots": {"single": ["first_frame", "last_frame"],
+                                       "multi": [],
+                                       "max_per_slot": {"first_frame": 1,
+                                                        "last_frame": 1}}},
+            ]
+        }
+        self.page.evaluate("(p) => window.AgentMedia.applyServerAgentSlots(p)", payload)
+        for mode in ("a2a", "flf"):
+            lim = self.media(f"M.limitationFor('{mode}', {{}})")
+            self.assertIsNone(lim, f"{mode} 有服务端下发的素材通道，不该提示：{lim}")
+            slots = self.media(f"M.agentSlotsFor('{mode}')")
+            self.assertIsNotNone(slots, f"{mode} 的槽位计划没被接住")
+        # 服务端说「没有通道」但任务带了素材 -> 提示
+        self.page.evaluate("""(p) => {
+          window.AgentMedia.applyServerAgentSlots({types:[
+            {key:'t2a', label:'文生音乐', media:'audio',
+             agent_asset_slots:{single:[], multi:[], max_per_slot:{}}}
+          ]});
+        }""")
+        lim = self.media("M.limitationFor('t2a', {asset_refs:[{asset_id:'a1'}]})")
+        self.assertIsNotNone(lim, "服务端说没有通道但带了素材引用，必须提示")
+        self.assertTrue(lim["reason"], "提示必须说明原因")
+        self.assertTrue(lim["advice"], "提示必须给出可执行的下一步")
 
     def test_limitation_absent_for_supported_modes(self):
         for mode in ("t2i", "t2v", "r2v", "i2i_qwen", "t2a"):
             lim = self.media(f"M.limitationFor('{mode}', {{}})")
             self.assertIsNone(lim, f"{mode} 不该有能力缺口提示：{lim}")
+
+    # -------------------------------------------------- 音乐卡不渲染 aspect
+    def test_music_card_has_no_aspect_param(self):
+        """
+        音乐模式（t2a / a2a）是纯音频任务，**没有画面比例**。
+
+        【为什么必须断言 —— 2026-11-10 审查修复】
+        旧实现的 resolveAspect 没有音频守卫，无条件返回 "16:9"，
+        于是参考生音乐的任务卡上渲染出「比例 16:9」这种无意义参数
+        （后端 schema 里音乐模式压根没有 aspect 这个参数）。
+        """
+        for mode in ("t2a", "a2a"):
+            res = self.media(f"M.resolveAspect('{mode}', '')")
+            self.assertEqual(res["value"], "",
+                             f"{mode} 不该有画面比例：{res}")
+            params = self.media(f"M.effectiveParams('{mode}', {{aspect:'16:9'}})")
+            keys = {p["key"] for p in params}
+            self.assertNotIn("aspect", keys,
+                             f"{mode} 的任务卡不该渲染比例：{params}")
+            # 但时长必须照常渲染（音乐的真实参数是 max_duration）
+            self.assertIn("duration", keys, f"{mode} 该渲染时长：{params}")
+
+    def test_video_card_still_has_aspect(self):
+        """视频/图像的比例照常渲染（别把守卫做过头）。"""
+        params = self.media(
+            "M.effectiveParams('t2v', {aspect:'16:9', duration:8})")
+        keys = {p["key"] for p in params}
+        self.assertIn("aspect", keys, f"视频该渲染比例：{params}")
+        self.assertIn("duration", keys, f"视频该渲染时长：{params}")
 
 
 if __name__ == "__main__":

@@ -172,10 +172,27 @@ class TestFrontendStreamContract(unittest.TestCase):
                           f"前端不认识 {event} 事件 —— 流式契约不完整")
 
     def test_client_uses_stream_query_param(self):
-        """新契约：POST /api/agent/chat?stream=1。"""
+        """
+        新契约：POST /api/agent/chat，**body 里带 stream=1**。
+
+        【为什么是 body 而不是 query —— 2026-11-10 审查修复】
+        旧实现发的是 `/api/agent/chat?stream=1`（query 载体），
+        而后端只读 body 的 `stream` 字段 —— 契约在两侧对不上，
+        真实浏览器 12/12 请求拿到的都是 application/json，
+        **流式输出 100% 不生效**。
+        现在前端把 stream 放进 body（后端同时兼容 query，
+        这样已部署的旧前端也能命中流式）。
+        """
         src = read_web("agent.js")
-        self.assertIn("/api/agent/chat?stream=1", src,
+        self.assertIn('fetch("/api/agent/chat"', src,
                       "前端没有按新契约请求流式端点")
+        # body 里必须真的带 stream（不是只在注释里说）
+        code = strip_comments(src)
+        self.assertRegex(code, r"stream:\s*1",
+                         "请求体里没有 stream:1 —— 后端读不到流式开关")
+        # 端点 URL 上不该再挂 stream=1（那是旧契约的位置）
+        self.assertNotIn('fetch("/api/agent/chat?stream=1"', code,
+                         "stream 仍在 query 上 —— 与后端读 body 的契约不一致")
 
     def test_client_has_fallback_chain(self):
         """降级链：新契约 SSE -> 老契约 SSE -> 一次性 JSON。"""
@@ -742,12 +759,23 @@ class TestAgentFrontendEnhBrowser(unittest.TestCase):
         端点不存在（404）时必须降级到老契约并正常渲染。
 
         这是降级链的正向验证：前端要能跟「还没实现新契约」的后端配合。
+
+        【2026-11-10 修复】打桩条件从 `url.includes('stream=1')`
+        改成**精确匹配** `/api/agent/chat` ——
+        因为流式开关现在放在 **body** 里（body.stream=1），
+        URL 上不再有 `stream=1` 这个查询串了。
+        （旧打桩条件永远匹配不到 -> 404 分支根本没走到 ->
+        这条「降级链正向验证」实际上一直在测别的东西。）
+
+        注意必须**精确**匹配：老契约端点是 `/api/agent/chat/stream`，
+        用 `includes('/api/agent/chat')` 会把老契约端点也一起拦掉。
         """
         self.page.evaluate("""() => {
           window.__calls = [];
           window.fetch = async (url, opts) => {
-            window.__calls.push({url:String(url), body: opts && opts.body});
-            if (String(url).includes('stream=1')) {
+            const u = String(url);
+            window.__calls.push({url:u, body: opts && opts.body});
+            if (u === '/api/agent/chat') {
               return {ok:false, status:404,
                       text: async()=>JSON.stringify({error:'not found'}),
                       headers:{get:()=>'application/json'}};

@@ -2089,6 +2089,17 @@ async function loadGenerationTypes() {
     const data = await resp.json();
     GEN_TYPES.types = data.types || [];
     GEN_TYPES.registeredModes = data.registered_modes || [];
+    // 把「Agent 有哪些素材通道」下发给媒体语义模块。
+    //
+    // 【为什么必须在这里接 —— 2026-11-10 审查修复】
+    // AgentMedia 里原来**硬编码**「a2a / flf 是 Agent 建不了的」，
+    // 而后端已改成按 mode 分派槽位（a2a→ref_audio、flf→first_frame）——
+    // 合并后那条提示变成**反向阻断**：后端能建，前端说不能。
+    // 现在能力位由服务端下发，前端只渲染服务端给的结论。
+    const media = window.AgentMedia;
+    if (media && typeof media.applyServerAgentSlots === "function") {
+      media.applyServerAgentSlots(data);
+    }
     renderGenTypeTabs();
   } catch (e) { /* 静默：不阻断任务列表 */ }
 }
