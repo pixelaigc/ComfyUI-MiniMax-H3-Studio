@@ -1121,6 +1121,12 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 10px;
   box-shadow: 0 12px 34px rgba(20, 26, 38, .2);
   padding: 5px;
+  /* 【2026-11-10 出框修复】菜单自身**不允许横向出框**：
+     原来内容比盒子宽（scrollWidth 353 > clientWidth 338）时，
+     文字会横向溢出到菜单边框之外。overflow-x:hidden 让超宽内容
+     被裁在盒子里而不是溢出到页面；配合下面每行的 min-width:0 +
+     overflow-wrap:anywhere，长文本改为**换行**而不是撑宽盒子。 */
+  overflow-x: hidden;
 }
 .enhance-menu[hidden] { display: none; }
 /* 【多选】每一项是一个 div（不再是一个 button），里面有复选框 + 名称 + 说明。
@@ -1130,6 +1136,11 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 7px;
   padding: 7px 10px;
   border: 1px solid transparent;
+  /* 【出框修复】每一项都必须是「宽度不超过父」的块 —— 默认 block 的
+     width:auto 本来就等于父宽，但 flex/grid 子项的 min-width:auto
+     会让它撑出父容器。显式 min-width:0 + max-width:100% 双重保险。 */
+  min-width: 0;
+  max-width: 100%;
 }
 .enhance-menu-item:hover { background: var(--accent-soft); }
 .enhance-menu-item.checked {
@@ -1143,6 +1154,9 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   gap: 7px;
   cursor: pointer;
   font-family: inherit;
+  /* 【出框修复】flex 容器本身也不能撑宽父级 */
+  min-width: 0;
+  max-width: 100%;
 }
 .enhance-menu-check input[type="checkbox"] {
   flex: 0 0 auto;
@@ -1165,6 +1179,11 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   min-width: 0;
   flex: 0 1 auto;
   overflow-wrap: anywhere;
+  /* 【2026-11-10 出框修复】标签**必须能收缩到 0** ——
+     原来 specTag（模板 select，min-width:auto 的 flex 子项）把整行占满，
+     名称被压成 0 宽（实测 label 宽 0 / scrollWidth 13）→ 文字被裁掉。
+     flex-shrink:1 + min-width:0 让它正常参与收缩。 */
+  flex-shrink: 1;
 }
 .enhance-menu-item.checked .enhance-menu-label { color: var(--accent); }
 .enhance-menu-hint {
@@ -1174,6 +1193,19 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   color: var(--muted);
   margin-top: 2px;
   padding-left: 21px;
+  /* 【出框修复】说明文字允许在词内断行，不撑宽菜单 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+/* 【2026-11-10 出框修复】模板选择器**独占一行**。
+   原来它被塞进 .enhance-menu-check（名称那一行）的 flex 里，
+   select 的 min-width:auto 让整行被占满，名称被挤成 0 宽。
+   现在它是独立的一行，宽度受菜单盒子的 max-width 约束。 */
+.enhance-menu-spec-wrap {
+  margin: 6px 0 2px 21px;
+  max-width: 100%;
+  min-width: 0;
 }
 .enhance-menu-badge {
   display: inline-block;
