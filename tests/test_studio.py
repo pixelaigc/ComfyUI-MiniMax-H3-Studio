@@ -486,7 +486,7 @@ class TestLoRACompatibility(unittest.TestCase):
         所以：扰动超阈值的 LoRA 必须（a）保持可选、（b）自动阻尼、
         （c）强度不再被封顶（阻尼后 1.0 是安全的）。
         """
-        for item in lora_registry.list_z_image_loras():
+        for item in lora_registry.list_z_image_loras(deep_analysis=True):
             pert = item.get("relative_perturbation")
             if pert is None:
                 continue
@@ -612,7 +612,10 @@ class TestLoRAContextDamping(unittest.TestCase):
 
     def test_measured_ctx_perturbation_matches_real_measurement(self):
         """实测扰动值必须与独立测量脚本一致（瑶光 ~12.8%）。"""
-        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        # deep_analysis=True —— 权重级分析（ctx 扰动）默认关闭
+        # （2026-11-10 性能修复：默认只做结构判定，不读权重本体）
+        found = {i["name"]: i
+                 for i in lora_registry.list_z_image_loras(deep_analysis=True)}
         yao = found.get("Kook_Zimage_瑶光.safetensors")
         if not yao:
             self.skipTest("本机无瑶光 LoRA")
@@ -623,7 +626,8 @@ class TestLoRAContextDamping(unittest.TestCase):
 
     def test_low_ctx_perturbation_lora_is_not_damped(self):
         """context_refiner 扰动小的 LoRA（如梦似幻 1.36%）不该被阻尼。"""
-        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        found = {i["name"]: i
+                 for i in lora_registry.list_z_image_loras(deep_analysis=True)}
         rms = found.get("Kook_Zimage_如梦似幻.safetensors")
         if not rms:
             self.skipTest("本机无如梦似幻 LoRA")
@@ -633,7 +637,8 @@ class TestLoRAContextDamping(unittest.TestCase):
 
     def test_workflow_uses_damped_lora_when_needed(self):
         """context_refiner 扰动大的 LoRA -> 工作流引用阻尼后的派生文件。"""
-        found = {i["name"]: i for i in lora_registry.list_z_image_loras()}
+        found = {i["name"]: i
+                 for i in lora_registry.list_z_image_loras(deep_analysis=True)}
         yao = found.get("Kook_Zimage_瑶光.safetensors")
         if not yao or not yao.get("ctx_damping"):
             self.skipTest("本机瑶光未触发阻尼")

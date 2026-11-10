@@ -370,10 +370,32 @@ class TestMihoyoKindAndFamily(unittest.TestCase):
                           f"{key} 没进 LORA_CATALOG")
 
     def test_registered_entries_carry_plan_id(self):
+        """注册表里的 plan_id 必须与**生效的那条**目录一致。
+
+        ⚠️ 2026-11-10：这几个目录**不是互斥**的 —— 同一个文件可能同时
+        被两个目录登记且 plan_id 不同（实测：`fusal-qwen-image-2.1-v2-exact-r80`
+        同时在 mihoyo（Q-28）与 nsfw（QN-08）里）。
+        解法是**先合并者优先**（loras._merge_catalog），并把冲突记进
+        LORA_CATALOG_CONFLICTS —— 所以这条断言要按台账区分：
+          * 无冲突的条目 -> plan_id 必须等于本目录的值
+          * 有冲突的条目 -> plan_id 等于台账里 kept=True 那条的 plan_id
+        """
         for key in catalog.ALL_MIHOYO_EFFECTS:
-            self.assertEqual(lora_registry.LORA_CATALOG[key].get("plan_id"),
-                             catalog.ALL_MIHOYO_EFFECTS[key]["plan_id"],
-                             f"{key} 注册表里的 plan_id 与目录不一致")
+            expected = catalog.ALL_MIHOYO_EFFECTS[key]["plan_id"]
+            actual = lora_registry.LORA_CATALOG[key].get("plan_id")
+            conflict = lora_registry.LORA_CATALOG_CONFLICTS.get(key)
+            if not conflict:
+                self.assertEqual(actual, expected,
+                                 f"{key} 注册表里的 plan_id 与目录不一致")
+                continue
+            # 有冲突：生效的是台账里 kept=True 的那条
+            kept = [c for c in conflict if c.get("kept")]
+            self.assertTrue(kept, f"{key} 冲突台账里没有 kept 条目")
+            self.assertEqual(actual, kept[0]["plan_id"],
+                             f"{key} 注册表里的 plan_id 与冲突台账的生效条目不一致")
+            # 本目录的 plan_id 必须**在台账里出现过**（不能凭空丢）
+            self.assertIn(expected, [c["plan_id"] for c in conflict],
+                          f"{key} 本目录的 plan_id {expected} 没进冲突台账")
 
 
 class TestMihoyoVisibleInFamilyList(unittest.TestCase):

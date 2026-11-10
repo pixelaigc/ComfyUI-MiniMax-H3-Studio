@@ -1,0 +1,45 @@
+{
+  "scenario": "参数非法被纠正",
+  "request": {
+    "message": "做一个 30 秒、21:10 比例的竖屏视频，提示词：一只猫在雨中的霓虹街道上奔跑。",
+    "session_id": "live-invalid-r3"
+  },
+  "response_status": 200,
+  "response_elapsed_ms": 4426,
+  "response": {
+    "session_id": "live-invalid-r3",
+    "status": "needs_clarification",
+    "answer": "您说的「21:10 竖屏」无法同时满足，需要您定一下方向：\\n\\n1) 走竖屏 → 用 9:16（最接近竖屏的比例）；\\n2) 走超宽横屏 → 用 21:9（最接近 21:10 的合法比例，但它是横屏）。\\n\\n时长 30 秒也超出视频上限（5~15 秒），如需 30 秒我可以拆成两段各 15 秒拼接生成。\\n\\n请回复选哪个比例、以及是否需要拆段凑 30 秒，我就直接下发任务。",
+    "jobs": [],
+    "assets": [],
+    "prompt": null,
+    "steps": [
+      {
+        "step": 1,
+        "tool": "respond",
+        "ok": true,
+        "ms": 4411,
+        "args": "{\"summary\": \"您说的「21:10 竖屏」无法同时满足，需要您定一下方向：\\\\n\\\\n1) 走竖屏 → 用 9:16（最接近竖屏的比例）；\\\\n2) 走超宽横屏 → 用 21:9（最接近 21:10 的合法比例，但它是横屏）。\\\\n\\\\n时长 30 秒也超…（结果已截断）…\\\\n请回复选哪个比例、以及是否需要拆段凑 30 秒，我就直接下发任务。\", \"needs_clarification\": true}",
+        "error": null
+      }
+    ],
+    "usage": {
+      "steps": 1,
+      "tool_calls": 1,
+      "elapsed_ms": 4412
+    },
+    "provider": {
+      "name": "本机 Qwen 多模态",
+      "model": "qwen3.8-flash-next-iq3_xxs"
+    },
+    "error": null,
+    "clarification": "您说的「21:10 竖屏」无法同时满足，需要您定一下方向：\\n\\n1) 走竖屏 → 用 9:16（最接近竖屏的比例）；\\n2) 走超宽横屏 → 用 21:9（最接近 21:10 的合法比例，但它是横屏）。\\n\\n时长 30 秒也超出视频上限（5~15 秒），如需 30 秒我可以拆成两段各 15 秒拼接生成。\\n\\n请回复选哪个比例、以及是否需要拆段凑 30 秒，我就直接下发任务。",
+    "memory": {
+      "used": false
+    },
+    "provider_name": "本机 Qwen 多模态"
+  },
+  "validation_errors_in_steps": [],
+  "jobs_from_response": [],
+  "jobs_from_sqlite": []
+}

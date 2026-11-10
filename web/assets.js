@@ -956,17 +956,19 @@
       window.showCreate();
     }
     const page = $("#assetsPage");
-    if (page) page.style.display = "flex";
+    if (page) { page.classList.remove("page-hidden"); page.style.removeProperty("display"); }
     const jobs = $("#jobsArea");
-    if (jobs) jobs.style.display = "none";
+    if (jobs) { jobs.classList.add("page-hidden"); jobs.style.removeProperty("display"); }
     const panel = $("#panel");
-    if (panel) panel.style.display = "none";
+    if (panel) { panel.classList.add("page-hidden"); panel.style.removeProperty("display"); }
     const stitch = $("#stitchPanel");
-    if (stitch) stitch.style.display = "none";
+    if (stitch) { stitch.classList.add("page-hidden"); stitch.style.removeProperty("display"); }
     const system = $("#systemPage");
-    if (system) system.style.display = "none";
+    if (system) { system.classList.add("page-hidden"); system.style.removeProperty("display"); }
     const providers = $("#providersPage");
-    if (providers) providers.style.display = "none";
+    if (providers) { providers.classList.add("page-hidden"); providers.style.removeProperty("display"); }
+    const agentPage = $("#agentPage");
+    if (agentPage) { agentPage.classList.add("page-hidden"); agentPage.style.removeProperty("display"); }
     $$(".nav-item").forEach(x => x.classList.remove("active"));
     const nav = $("#navAssets");
     if (nav) nav.classList.add("active");
@@ -1141,7 +1143,9 @@
 
   function onAssetsPage() {
     const page = $("#assetsPage");
-    return !!page && page.style.display !== "none" && page.offsetParent !== null;
+    if (!page) return false;
+    if (page.classList.contains("page-hidden")) return false;
+    return page.offsetParent !== null;
   }
 
   async function liveRefreshTick() {

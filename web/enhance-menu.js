@@ -45,6 +45,11 @@
    *             - 不写 = 文本路线，写回当前面板的文本输入框
    *             - kind:"structured" = 结构化路线，产物是结构化对象
    *               （由该方式自己注册契约，见 music-enhance.js）
+   * recommended 标注「推荐」（界面上显示 Recommended 徽标）
+   * owner       该增强能力归属哪个功能；不在本面板可用时用它说明「为什么没有」
+   * exclusive   true = 与其它项互斥（不能同时选中）
+   * fields      该项自带的可编辑字段（渲染在展开区里）
+
    */
   const ENHANCE_METHODS = [
     {
@@ -97,6 +102,8 @@
       // layout 的产物最终仍翻译成**文本提示词**写回提示词框
       // （坐标 JSON 本身由 moss-layout.js 渲染成弹窗）。
       write: { kind: "text" },
+      // 归属功能（禁用原因的唯一真相源，见 unavailableReason）
+      owner: "MOSS-Image",
     },
     {
       // 【统一增强体系 · 音乐路线】
@@ -125,6 +132,8 @@
       // 契约由 music-enhance.js 注册（window.MusicEnhance.getWriteContract），
       // 这里只声明「走结构化路线」，具体落地交给契约的 apply()。
       write: { kind: "structured" },
+      // 归属功能（禁用原因的唯一真相源，见 unavailableReason）
+      owner: "YuE2 音乐",
     },
     {
       id: "qwen_pe",
@@ -140,6 +149,8 @@
       kind: "qwen-pe",
       // 【写回契约 · 文本路线】官方 PE 的产物是扩写后的提示词文本。
       write: { kind: "text" },
+      // 归属功能（禁用原因的唯一真相源，见 unavailableReason）
+      owner: "Qwen-Image 2.1",
       // 该项自带的可编辑字段：官方 PE 的 system prompt 与档位参数。
       // systemPrompt 走「扩写 + 出图」同一条链路；params 是 PE 节点参数。
       fields: [
@@ -784,7 +795,7 @@
    * 某方式在当前模式下不可用的原因（说清楚「它属于哪个功能」）。
    */
   function unavailableReason(method) {
-    if (!method) return "当前模式不可用";
+    if (!method) return "本面板不可用（未登记该增强方式）";
     // 音乐模式：文本扩写类不可用 —— 说清楚**为什么**（产物形态不匹配）
     if (isMusicContext() && method.kind !== "yue2-struct") {
       if (method.kind === "template") {
@@ -792,14 +803,11 @@
       }
       return "图像/视频专属，音乐面板不可用";
     }
-    if (!method.modes || !method.modes.length) return "当前模式不可用";
-    const owners = {
-      layout: "MOSS-Image 专属",
-      qwen_pe: "Qwen-Image 2.1 专属",
-      yue2_struct: "YuE2 音乐专属",
-    };
-    const owner = owners[method.id] || "其它功能专属";
-    return owner + "，本面板不可用";
+    // 归属信息以**注册表**的 owner 字段为唯一真相源
+    // （合并 Agent 分支时两侧各有一份 unavailableReason，JS 里后者会
+    //   静默覆盖前者 —— 现在只留这一份，owner 从注册表读）
+    const owner = method.owner || "其它功能";
+    return owner + " 专属，本面板不可用";
   }
 
   // ------------------------------------------------------------------ 选中与路由
