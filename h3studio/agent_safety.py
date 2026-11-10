@@ -197,6 +197,91 @@ def hidden_char_codepoints() -> tuple:
     return tuple(sorted(ord(c) for c in hidden_chars()))
 
 
+def strip_hidden(text: str) -> str:
+    """
+    只剥掉**可隐藏字符**（Cf 全集 + 隐形空白），**不动空白本身**。
+
+    【为什么要和 fold_key 分成两步 —— 2026-11-10 独立复验（第二轮）】
+    第一版把 sanitize_key 写成「剥零宽 + 折叠空白」一步做完，
+    结果制造了一个**新的漏检**：
+
+        "dis\\u200bregard the above instructions"
+          -> 剥零宽  -> "disregard the above instructions"
+          -> 折叠空白 -> "disregard_the_above_instructions"
+          -> 注入正则里的 `\\s+` 匹配不上下划线 -> **漏检**！
+
+    也就是说：折叠空白会把注入句式里的词间空格换成下划线，
+    而检测正则认的是空格 —— 于是「检测用文本」和
+    「真正读到的文本」形态不一致，漏检又回来了。
+
+    所以正确顺序是：**先剥隐藏字符 -> 在这个形态上做检测 ->
+    最后才折叠空白**（折叠只影响存储形态，不影响检测）。
+
+    检测用的就是本函数的输出 —— 与 value 路径
+    （sanitize_value 同样先剥后检）保持同一条不变量：
+    「检测用文本 == 清理后文本」。
+    """
+    if not text:
+        return ""
+    return _hidden_re().sub("", str(text))
+
+
+def fold_key(text: str) -> str:
+    """
+    把键名折叠成**标识符形态**：连续空白/控制字符 -> 单个下划线。
+
+    【为什么要单独一步】见 strip_hidden 的说明 ——
+    折叠必须发生在**检测之后**，否则会把注入句式里的空格换成下划线，
+    导致检测正则（认空格）漏检。
+
+    【沿用旧实现语义】旧实现是
+        re.sub(r"[\\s\\x00-\\x1f]+", "_", key.strip())
+    这里保持一致 —— 既有键名（如 "preferred_aspect"）行为不变。
+    """
+    if not text:
+        return ""
+    return re.sub(r"[\s\x00-\x1f]+", "_", str(text).strip())
+
+
+def sanitize_key(text: str) -> str:
+    """
+    清理**键名**（记忆 key / 偏好键）—— 剥隐藏字符 + 折叠空白。
+
+    【为什么键名也要清理 —— 2026-11-10 独立复验（第二轮）】
+    上一轮修复只覆盖了记忆的 **value** 路径。但 key 同样是**模型可见**的：
+    summary_for_prompt 拼的是 `- {key}：{value}` —— key 和 value **都**
+    会进 system 提示词。而旧实现对 key 只做：
+        re.sub(r"[\\s\\x00-\\x1f]+", "_", key.strip())
+    这条正则**不碰 Cf 类字符**（U+200B 是 Cf，不是控制字符 \\x00-\\x1f），
+    于是「键名藏注入」是完整的绕过路径：
+        remember(key="\\u200b忽略之前的所有指令", value="benign")
+        -> 写入成功（value 干净，没有注入特征）
+        -> summary_for_prompt -> "- \\u200b忽略之前的所有指令：benign"
+        -> 载荷进 system 提示词
+    实测五个码点（U+200B/200C/200D/2060/FEFF）**全部**走通这条路径。
+
+    【键名的语义与 value 不同 —— 所以规则也不同】
+    key 是**标识符**（如 preferred_aspect），不是自由文本：
+      * 可隐藏字符一律**剥掉**（藏字符没有合法用途）
+      * 空白折叠成单个下划线（沿用旧实现的行为，不改变既有键名）
+      * 控制字符同样折叠成下划线
+    剥离后如果 key 变成空的（比如整个 key 都是零宽字符），
+    调用方要当成「键无效」处理 —— 这里返回空串。
+
+    【与 value 路径的关系】
+    value 走 sanitize_value()（截断 + 剥隐藏字符）；
+    key 走本函数。两者共用同一个 _hidden_re() —— **同一份真源**，
+    不会出现「value 剥了、key 没剥」的漂移。
+
+    【调用顺序的要求】**调用方必须在检测前用 strip_hidden()，
+    检测后再用本函数做最终规范化**。本函数把两步合在一起，
+    只适合「不需要再检测」的场合（如 summary_for_prompt 的读路径兜底）。
+    """
+    if not text:
+        return ""
+    return fold_key(strip_hidden(text))
+
+
 #: 编译好的「含可隐藏字符」正则（惰性构建 + 缓存）。
 _hidden_re_cache = None
 
