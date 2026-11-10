@@ -491,6 +491,12 @@ python3 scripts/verify_agent_frontend_enh.py 8471 <证据目录>
 
 实测结果（三档全部）：横向溢出 **0 px**、越界元素 **0 个**、输入框**可达**、console **0 条**。
 
+> **证据位置**：契约修复那一轮的浏览器证据（3 档 × **5** 场景，
+> 含场景 D 注入隔离与场景 E 一次性路径）**已随分支提交**在
+> `evidence/agent-enh-fix/` —— 截图 15 张 + `browser_contract_evidence.json`
+> 全量数据。逐条清单见 `evidence/agent-enh-fix/README.md`
+> 与《修复汇报》§9。
+
 ### 7.3 任务卡实时更新 —— 端到端证据
 
 ```bash
