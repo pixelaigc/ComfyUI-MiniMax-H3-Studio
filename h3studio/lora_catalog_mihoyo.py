@@ -868,10 +868,10 @@ MOSS_MIHOYO_CHAR_MECH: dict[str, dict] = {
         "display": '达尼卡 Danica（原神·角色身份）',
         "base": 'MOSS-Image',
         "trigger": 'danica / Danica',
-        "recommended_strength": 1.5,
+        "recommended_strength": 1.0,
         "scene": '原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=RentCivit / 免署名=是 / 允许衍生=否。archive 内另有 v1.0 权重 `Moss_danica_v1_azusa.safetensors`（99,146,968 B）。。',
         "source": 'https://civitai.com/models/3018682',
-        "strength_source": '作者明示（作者正文：v2.0「强度为1，经过自己测试是没有出现崩图」；v1.0「强度不能为1.0，推荐强度0.6到0.8」）',
+        "strength_source": '作者明示（作者正文：v2.0「强度为1，经过自己测试是没有出现崩图」；v1.0「强度不能为1.0，推荐强度0.6到0.8」（取 v2.0 档））',
         "plan_id": 'M-55',
     },
     'moss-effects/moss_image_charref_v2.safetensors': {

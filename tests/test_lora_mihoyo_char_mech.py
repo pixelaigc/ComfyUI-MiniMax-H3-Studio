@@ -176,6 +176,23 @@ class TestStrengthNotFromTriggerString(unittest.TestCase):
             self.assertLessEqual(v - 1e-6, max(nums),
                                  f"{key} 推荐强度 {v} 高于作者区间上限 {max(nums)}")
 
+    def test_version_number_not_mistaken_for_strength(self):
+        """版本号里的数字不是强度。
+
+        实测踩过的坑：`Moss_danica_v2step400_azusa` 的上游 strength 栏写的是
+        "v2.0 = 1.0；v1.0 = 0.6–0.8" —— 直接正则取数字再平均会得到
+        (2.0 + 1.0) / 2 = 1.5，而作者明说 v2.0 档的强度是 1.0。
+        """
+        key = "moss-effects/Moss_danica_v2step400_azusa.safetensors"
+        info = catalog.ALL_MIHOYO_EFFECTS.get(key)
+        self.assertIsNotNone(info, f"{key} 不在目录里")
+        self.assertEqual(info["recommended_strength"], 1.0,
+                         f"{key} 的推荐强度应为 1.0（作者明示 v2.0 档强度为 1），"
+                         f"实际 {info['recommended_strength']}")
+        self.assertIn("取 v2.0 档", info["strength_source"],
+                      f"{key} 的 strength_source 没写明取的是哪一档："
+                      f"{info['strength_source']}")
+
 
 class TestNoDuplicateKeyInCatalog(unittest.TestCase):
     """同一权重不得在目录文件里出现两次（后者会静默覆盖前者）。"""
