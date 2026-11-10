@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=enh-unify6">
+<link rel="stylesheet" href="/static/style.css?v=enh-unify7">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
-<link rel="stylesheet" href="/static/responsive.css?v=rs1">
+<link rel="stylesheet" href="/static/responsive.css?v=rs2">
 </head>
 <body>
 <header class="topbar">
@@ -343,7 +343,9 @@
 
       <!-- 音乐描述 + 增强（与生图面板同一套组件：.enhance-split / .enhance-menu） -->
       <div class="field prompt-field" id="musicPromptField">
-        <div class="field-label">音乐描述 <span class="prompt-badge" id="musicPromptBadge" hidden>已增强</span></div>
+        <div class="field-label">音乐描述 <span class="prompt-badge" id="musicPromptBadge" hidden>已增强</span>
+          <button type="button" class="ph-open-btn" data-ph-open title="查看这个面板用过的历史提示词">历史</button>
+        </div>
         <textarea id="musicPrompt" rows="4"
                   placeholder="一首关于雨夜告别的日语慢歌，钢琴加弦乐，副歌要爆发"></textarea>
         <div class="prompt-enhance-bar">
@@ -488,7 +490,9 @@
     </div>
 
     <div class="field prompt-field" id="promptField">
-      <div class="field-label">提示词 <span class="prompt-badge" id="promptEnhancedBadge" hidden>已增强</span></div>
+      <div class="field-label">提示词 <span class="prompt-badge" id="promptEnhancedBadge" hidden>已增强</span>
+        <button type="button" class="ph-open-btn" data-ph-open title="查看这个面板用过的历史提示词">历史</button>
+      </div>
       <textarea id="prompt" rows="6" placeholder="描述画面…支持多镜头分镜写法">integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia period film. At night in a moonlit bamboo forest, a tight close-up frames an adult swordsman in black robes (S1) from the white-robed swordsman’s shoulder, forming the first angle of a shot–reverse-shot sequence. Cold mist drifts behind him; his tied long hair moves slightly in the wind, and one hand rests on the hilt at his waist. The camera slowly pushes in with small amplitude as the black-robed swordsman, speaking in a low, restrained male voice, fixes his opponent with an unwavering stare and says: &lt;d&gt;[Chinese] 你终于来了。&lt;/d&gt; [Shot 2] At 00:02.300, the camera cuts to the exact reverse angle: a tight close-up of the adult white-robed swordsman (S2) over the black-robed swordsman’s shoulder. Moonlight traces the edge of his face while swaying bamboo shadows cross his calm expression. Without drawing his sword, the white-robed swordsman replies in a quiet, firm male voice: &lt;d&gt;[Chinese] 今夜，做个了断。&lt;/d&gt; His thumb slowly pushes the sword guard forward, exposing a narrow glint of steel before the video ends at 5.00 seconds.
 
 overall_soundscape: Night wind rustles dense bamboo leaves while insects call faintly in the distance. Robe fabric shifts softly, followed by the subtle metallic scrape of a sword beginning to leave its scabbard.
@@ -918,6 +922,22 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 提示词历史浮层（各功能面板共用）
+     放在 body 直属子级：窄屏下 #panel 带 transform，会成为 fixed 定位的
+     包含块 —— 浮层若挂在面板里就会弹到视口外（与此前「增强」下拉出框同源）。
+     脚本在打开时还会再挂一次到 body 兜底。 -->
+<div class="ph-popover" id="phPopover" hidden>
+  <div class="ph-head">
+    <b id="phTitle">提示词历史</b>
+    <span class="ph-count" id="phCount"></span>
+    <button id="phClose" aria-label="关闭">×</button>
+  </div>
+  <div class="ph-list" id="phList"></div>
+  <div class="ph-foot">
+    <button type="button" id="phMore" hidden>加载更多</button>
+  </div>
+</div>
+
 <!-- 提示词版本历史（原始 / 一次增强 / 二次增强） -->
 <div class="prompt-modal" id="promptVersionModal" hidden>
   <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="promptVersionTitle">
@@ -1011,15 +1031,15 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
 <script src="/static/enhance-menu-shared.js?v=shared2"></script>
-<script src="/static/enhance-menu.js?v=enh-unify3"></script>
+<script src="/static/enhance-menu.js?v=enhancemulti1"></script>
 <!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
      window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
 <script src="/static/music-enhance.js?v=musicyue2-1"></script>
-<script src="/static/enhance-menu.js?v=enhancemulti1"></script>
 <!-- agent-media.js 必须在 agent.js **之前**：agent.js 的任务卡渲染要用
      AgentMedia 判定「实际生效参数」与静默回落（视频分辨率 / 音乐时长） -->
 <script src="/static/agent-media.js?v=agentmedia1"></script>
 <script src="/static/agent.js?v=agent2"></script>
-
+<!-- 提示词历史浮层（各面板共用） -->
+<script src="/static/prompt-history.js?v=ph4"></script>
 </body>
 </html>
