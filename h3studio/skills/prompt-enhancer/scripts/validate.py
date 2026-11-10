@@ -145,8 +145,20 @@ def _count_word_occurrences(word: str, scoped: str) -> int:
 
 
 # 「T-tong lau (shophouse) buildings」这类：复合术语 + 括号英文名
+#
+# 【2026-11-10 修正】原正则里「连字符」是**可选**的：
+#     [A-Za-z][A-Za-z\-]{2,}   -> 允许 "Tong lau (arcade)" 这种普通词组
+# 于是「neon (neon) signs」也命中（neon 后面跟着 " (neon)"），
+# 把真正的 Compel 强调语法 `(neon)` 误判成「术语英文名」放过了。
+#
+# 修正：**连字符/下划线/斜杠是复合术语的必需特征**，不能省。
+#     复合术语 = 至少一个词**含**连字符（X-tong lau / T-tong / tong-lau）。
+# 修正后：
+#     "T-tong lau (shophouse)"  -> 命中（含连字符）-> 注释，不拒
+#     "neon (neon) signs"        -> 不命中（无连字符）-> 走词频判据 -> 真权重语法，拒
 _COMPOUND_GLOSS_PATTERN = re.compile(
-    r"[A-Za-z][A-Za-z\-]{2,}(?:\s+[A-Za-z][A-Za-z\-]{2,}){0,2}\s*\(([^()]{1,40})\)")
+    r"[A-Za-z][A-Za-z]*(?:[-_/][A-Za-z0-9]+)+"
+    r"(?:\s+[A-Za-z][A-Za-z\-]{2,}){0,2}\s*\(([^()]{1,40})\)")
 
 
 def _is_compound_term_gloss(inner: str, scoped: str) -> bool:
@@ -156,7 +168,11 @@ def _is_compound_term_gloss(inner: str, scoped: str) -> bool:
     实测上下文：
         "a row of cramped T-tong lau (shophouse) buildings featuring rusty iron window bars"
     括号里 (shophouse) 是「唐楼」的英文名，不是倍率。
-    判据：括号前紧邻的词含有连字符/下划线/斜杠（复合术语特征）。
+    判据：括号**前面紧邻的词本身含连字符/下划线/斜杠**（复合术语特征）。
+
+    【2026-11-10 修正】连字符从「可选」改成「必需」。
+    旧正则允许无连字符的普通词组命中，导致 "neon (neon) signs"
+    这种**真权重语法**被误判成注释而放过。
     """
     for m in _COMPOUND_GLOSS_PATTERN.finditer(scoped or ""):
         if m.group(1).strip().lower() == (inner or "").strip().lower():
@@ -221,7 +237,15 @@ def _is_json_like(inner: str) -> bool:
 
 _WEIGHT_BRACKET = re.compile(r"\[\s*([^\[\]]{1,120}?)\s*\]")
 _WEIGHT_DOUBLE_PAREN = re.compile(r"\(\([^()]{1,80}?\)\)")
-_WEIGHT_INC_DEC = re.compile(r"(?<![+\-])\b[A-Za-z\u4e00-\u9fff]{2,}\s*(\+\+|--)(?![+\-])")
+# 【2026-11-10 修正】原来的 `(\+\+|--)` 只认**恰好两个**符号，
+# 于是 "cat---"（三个连字符）漏掉了 —— 但它按 InvokeAI 的官方口径
+# （promptAST.ts: WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/）
+# **是合法的权重语法**：[+-]+ 匹配任意长度的 +/- 串。
+#
+# 改成 `[-+]{2,}`：2 个及以上连续 +/- 都算权重语法。
+# 同时保留 `(?<![+\-])` / `(?![+\-])` 的边界断言，
+# 避免把 "a--b"（普通连字符）误判成权重语法。
+_WEIGHT_INC_DEC = re.compile(r"(?<![+\-])\b[A-Za-z\u4e00-\u9fff]{2,}\s*([-+]{2,})(?![+\-])")
 
 WEIGHT_PATTERNS = [
     _WEIGHT_PAREN,        # (word:1.2) / (word)
