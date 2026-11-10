@@ -45,8 +45,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -101,8 +101,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -157,8 +157,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -213,8 +213,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -269,8 +269,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -325,8 +325,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -381,8 +381,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -437,8 +437,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -493,8 +493,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -549,8 +549,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -605,8 +605,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -661,8 +661,8 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return await self._connection.wrap_api_call(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright._impl._connection.Connection object at 0x73d6e9579300>
-cb = <function Channel.send.<locals>.<lambda> at 0x73d6e8821c60>
+self = <playwright._impl._connection.Connection object at 0x7909bbf46440>
+cb = <function Channel.send.<locals>.<lambda> at 0x7909b9030b80>
 is_internal = False, title = None
 
     async def wrap_api_call(
@@ -700,7 +700,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -733,7 +733,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -766,7 +766,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -799,7 +799,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -832,7 +832,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -865,7 +865,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -898,7 +898,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -931,7 +931,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -964,7 +964,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e9e73100>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b90a3d30>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -997,7 +997,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1030,7 +1030,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1063,7 +1063,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1096,7 +1096,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1129,7 +1129,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1162,7 +1162,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1195,7 +1195,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1228,7 +1228,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1261,7 +1261,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1294,7 +1294,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1327,7 +1327,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e959fe50>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb17abf0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1360,7 +1360,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1393,7 +1393,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1426,7 +1426,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1459,7 +1459,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1492,7 +1492,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1525,7 +1525,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1558,7 +1558,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1591,7 +1591,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1624,7 +1624,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1657,7 +1657,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1690,7 +1690,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1723,7 +1723,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6e8b1ad40>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9140250>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1764,7 +1764,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb202140>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa5ba0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1805,7 +1805,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb202140>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa5ba0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1839,7 +1839,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1873,7 +1873,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1907,7 +1907,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1941,7 +1941,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -1975,7 +1975,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2009,7 +2009,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2043,7 +2043,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2077,7 +2077,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2111,7 +2111,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2145,7 +2145,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6db318df0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbfa4cd0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2178,7 +2178,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2211,7 +2211,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2244,7 +2244,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2277,7 +2277,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2310,7 +2310,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2343,7 +2343,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2376,7 +2376,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf30a0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909b9143130>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2410,7 +2410,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2444,7 +2444,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2478,7 +2478,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2512,7 +2512,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2546,7 +2546,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2580,7 +2580,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2614,7 +2614,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2648,7 +2648,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2682,7 +2682,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2716,7 +2716,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2750,7 +2750,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2784,7 +2784,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2818,7 +2818,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2852,7 +2852,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2886,7 +2886,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2920,7 +2920,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2954,7 +2954,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -2988,7 +2988,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3022,7 +3022,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3056,7 +3056,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3090,7 +3090,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3124,7 +3124,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb6672b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bbe7e2c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3158,7 +3158,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5e1cc7880>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b15ec80>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3192,7 +3192,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5e1cc7880>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b15ec80>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3226,7 +3226,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5e1cc7880>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b15ec80>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3260,7 +3260,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5e1cc7880>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b15ec80>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3294,7 +3294,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5e1cc7880>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b15ec80>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3327,7 +3327,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3360,7 +3360,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3393,7 +3393,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3426,7 +3426,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3459,7 +3459,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3492,7 +3492,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3525,7 +3525,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3558,7 +3558,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3591,7 +3591,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3624,7 +3624,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3657,7 +3657,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3690,7 +3690,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5caab1510>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b0284c0>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3723,7 +3723,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3756,7 +3756,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3789,7 +3789,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3822,7 +3822,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3855,7 +3855,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3888,7 +3888,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3921,7 +3921,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3954,7 +3954,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -3987,7 +3987,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4020,7 +4020,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4053,7 +4053,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4086,7 +4086,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4119,7 +4119,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4152,7 +4152,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4185,7 +4185,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4218,7 +4218,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf0e80>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089af77520>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4258,7 +4258,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4298,7 +4298,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4338,7 +4338,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4378,7 +4378,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4418,7 +4418,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4458,7 +4458,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4498,7 +4498,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4538,7 +4538,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4578,7 +4578,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4618,7 +4618,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4658,7 +4658,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4698,7 +4698,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4738,7 +4738,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4778,7 +4778,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4818,7 +4818,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -4858,7 +4858,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     return self.__enter__()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb568eb0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b32f310>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -5541,7 +5541,7 @@ tests/test_qwen_refs_browser.py:112: in _run
     with sync_playwright() as pw:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cadf3760>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089ae16200>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -5601,7 +5601,7 @@ tests/test_qwen_refs_browser.py:112: in _run
     with sync_playwright() as pw:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d5cabf23b0>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x7909bb178280>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -5656,7 +5656,7 @@ tests/test_qwen_refs_browser.py:112: in _run
     with sync_playwright() as pw:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x73d6eb695900>
+self = <playwright.sync_api._context_manager.PlaywrightContextManager object at 0x79089b02b610>
 
         def __enter__(self) -> SyncPlaywright:
             try:
@@ -5688,7 +5688,7 @@ self = <test_status_realtime.TestComfyQueueReporting testMethod=test_fetch_comfy
 tests/test_status_realtime.py:642: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-main = <coroutine object fetch_comfy_queue at 0x73d6ead88ba0>
+main = <coroutine object fetch_comfy_queue at 0x7909bc7f8270>
 
     def run(main, *, debug=None):
         """Execute the coroutine and return the result.
@@ -5740,7 +5740,7 @@ tests/test_status_realtime.py:686: in asyncio_run
     return asyncio.run(coro)
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-main = <coroutine object fetch_comfy_queue at 0x73d5ca629000>
+main = <coroutine object fetch_comfy_queue at 0x79089af1ab20>
 
     def run(main, *, debug=None):
         """Execute the coroutine and return the result.
@@ -5792,7 +5792,7 @@ tests/test_status_realtime.py:686: in asyncio_run
     return asyncio.run(coro)
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-main = <coroutine object status_snapshot at 0x73d6eb4c50e0>
+main = <coroutine object status_snapshot at 0x7909bb8de650>
 
     def run(main, *, debug=None):
         """Execute the coroutine and return the result.
@@ -5839,7 +5839,7 @@ self = <test_status_realtime.TestComfyQueueReporting testMethod=test_status_snap
 tests/test_status_realtime.py:666: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-main = <coroutine object status_snapshot at 0x73d6e8a6db60>
+main = <coroutine object status_snapshot at 0x7909bc6df7d0>
 
     def run(main, *, debug=None):
         """Execute the coroutine and return the result.
@@ -6097,4 +6097,4 @@ ERROR tests/test_status_realtime.py::TestStatusRealtime::test_status_returns_to_
 ERROR tests/test_status_realtime.py::TestStatusRealtime::test_status_shows_generating_when_comfyui_busy
 ERROR tests/test_status_realtime.py::TestStatusRealtime::test_status_text_is_chinese
 ERROR tests/test_status_realtime.py::TestStatusRealtime::test_status_unknown_queue_falls_back_to_studio_state
-27 failed, 803 passed, 3 skipped, 2 warnings, 134 errors, 8 subtests passed in 266.53s (0:04:26)
+27 failed, 803 passed, 3 skipped, 2 warnings, 134 errors, 8 subtests passed in 264.02s (0:04:24)
