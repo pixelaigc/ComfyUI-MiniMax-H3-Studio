@@ -75,6 +75,15 @@
       write: { kind: "text" },
     },
     {
+      id: "director",
+      label: "视频导演提示词",
+      hint: "按 MiniMax-H3 官方三段式（画面时间线 / 整体声景 / 非剧情音乐）写导演稿",
+      // 只对视频模式开放：H3 的三段式结构是视频模型专属
+      modes: ["t2v", "flf", "r2v", "longfilm"],
+      busyFlag: "enhance",
+      buttonText: "导演提示词",
+    },
+    {
       id: "layout",
       label: "结构化增强（layout）",
       hint: "生成 MOSS Layout JSON（对象清单 + 位置坐标），并翻译成最终文本提示词",
@@ -1331,6 +1340,9 @@
     if (method.id === "refine") {
       return runRefine(method, opts);
     }
+    if (method.id === "director") {
+      return runDirector(method, opts);
+    }
     return runBasic(method, opts);
   }
 
@@ -1353,6 +1365,63 @@
     }
     await music.run({});
     return { expanded: "", meta: "" };
+  }
+
+  // ---- 视频导演提示词（H3 官方三段式） ----
+  //
+  // 走既有 /api/enhance，只是把 spec_id 换成 "video-director" ——
+  // 模板正文在服务端 h3studio/skills/prompt-enhancer/assets/video-director.txt，
+  // 依据本机 ComfyUI 的官方 skill h3-prompt-writing/references/base-en.txt。
+  async function runDirector(method, opts) {
+    const btn = document.querySelector("#enhanceBtn");
+    const text = document.querySelector("#enhanceBtnText");
+    const prompt = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : document.querySelector("#prompt").value.trim();
+    if (!prompt) {
+      setHint("请先输入要写成导演稿的提示词", "error");
+      document.querySelector("#prompt").focus();
+      return null;
+    }
+    btn.disabled = true;
+    const originalLabel = text.textContent;
+    text.textContent = "正在写导演稿…";
+    promptEnhance.busy = true;
+    updateActionButtons();
+    setHint("正在按 H3 官方三段式写导演稿…", "busy");
+    try {
+      const d = await apiJSON("POST", "/api/enhance", {
+        prompt,
+        mode: "replace",
+        spec_id: "video-director",
+        mode_ctx: enhanceCurrentMode(),
+        model_key: enhanceCurrentModelKey(),
+      });
+      if (!opts.collect) provState.lastEnhanceKind = "";
+      const enhanced = d.enhanced || "";
+      if (!enhanced) throw new Error("本地模型返回了空结果");
+      if (opts.collect) {
+        return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+      }
+      document.querySelector("#enhanceResult").value = enhanced;
+      document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
+      document.querySelector("#enhanceModal").hidden = false;
+      pushPromptVersion(0, prompt, "原始提示词");
+      pushPromptVersion(1, enhanced, "视频导演提示词（H3 三段式）", "video-director");
+      setHint(`导演稿已生成（${d.provider}）：${enhanced.length} 字`, "ok");
+      return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+    } catch (e) {
+      const detail = e.payload && e.payload.error ? e.payload.error : e.message;
+      const who = e.payload && e.payload.provider ? `（${e.payload.provider}）` : "";
+      setHint(`导演提示词生成失败：${detail}`, "error");
+      alert(`视频导演提示词生成失败${who}\n\n${detail}\n\n请检查「本地模型配置」里的 Provider 是否可用。`);
+      return null;
+    } finally {
+      promptEnhance.busy = false;
+      btn.disabled = false;
+      text.textContent = originalLabel;
+      updateActionButtons();
+    }
   }
 
   // ---- 普通增强（沿用既有 /api/enhance + 模板下拉） ----

@@ -305,6 +305,15 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
             " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
 
 
+    def all_method_ids(self):
+        """增强方式注册表里的全部 id（从页面上的注册表读，不写死）。
+
+        新增增强方式时测试不用改 —— 「同一常量只写一处」。
+        """
+        return self.page.evaluate(
+            "() => (window.enhanceMethods && window.enhanceMethods.list"
+            " || []).map(m => m.id)")
+
     def select_only_qwen_pe(self):
         """只勾选官方 PE（取消其它已勾项）。
 
@@ -336,35 +345,27 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     # ---- 下拉选项 ----
 
     def test_dropdown_lists_four_methods(self):
-        """下拉里同时有：普通增强 / 二次增强 / 结构化增强 / 官方PE。
+        """下拉里同时有：普通增强 / 二次增强 / 视频导演提示词 / 结构化增强 / 官方PE。
 
-        【2026-11-10 架构裁决】统一注册表现在有 **5** 项 ——
-        多了「YuE2 结构化风格 + 歌词」（kind: "yue2-struct"）。
-        它在**图像/视频面板是禁用的**（写明「YuE2 音乐专属，本面板不可用」），
-        但仍会出现在同一个下拉里 —— 这样用户能看到「音乐增强是什么」，
-        而不是完全看不到这一项。
-        所以本用例的判据从「恰好 4 项」放宽为
-        「4 项图像/视频相关的都在，且多出来的音乐项是禁用的」。
+        【为什么断言全表而不是前四项】
+          增强方式注册表会长大（本次新增了「视频导演提示词」）。
+          断言一个写死的 id 列表 = 每加一项就要改一次测试，
+          漏改就会得到一条**假失败**（功能是好的，只是清单变了）。
+          所以这里断言「注册表里的每一项都在下拉里、顺序一致、都有说明」，
+          再单独断言几个关键项的 label。
         """
         self.switch_mode("t2i_qwen")
         self.open_menu()
         items = self.menu_items()
         ids = [i["id"] for i in items]
-        # 图像/视频面板应有的 4 项（顺序即注册表顺序）
-        for want in ("basic", "refine", "layout", "qwen_pe"):
-            self.assertIn(want, ids, f"下拉应包含 {want}：{ids}")
-        # 顺序：basic -> refine -> layout -> qwen_pe（yue2_struct 插在 layout 之后）
-        self.assertEqual(
-            [i for i in ids if i != "yue2_struct"],
-            ["basic", "refine", "layout", "qwen_pe"],
-            f"图像/视频面板的 4 项顺序应为注册表顺序：{ids}")
+        # 下拉里的项 = 注册表里的项（顺序一致，一个不多一个不少）
+        self.assertEqual(ids, self.all_method_ids())
         # 音乐项在图像/视频面板必须禁用（复选框 disabled），
         # 并在菜单项上写明归属。
         yue2 = [i for i in items if i["id"] == "yue2_struct"]
         self.assertTrue(yue2, f"下拉应包含 yue2_struct 项：{ids}")
         self.assertTrue(yue2[0]["disabled"],
                         "yue2_struct 在图像/视频面板应禁用（复选框 disabled）")
-        # 归属文案在菜单项的徽标里
         badge = self.page.eval_on_selector(
             '#enhanceMenu .enhance-menu-item[data-method="yue2_struct"]',
             "e => (e.querySelector('.enhance-menu-badge')||{}).textContent||''")
@@ -373,6 +374,7 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
         labels = [i["label"] for i in items]
         self.assertIn("普通增强", labels)
         self.assertIn("二次增强", labels)
+        self.assertIn("视频导演提示词", labels)
         self.assertIn("结构化增强（layout）", labels)
         self.assertIn("qwen21图片官方增强PE", labels)
         # 每个项都要有简短说明
