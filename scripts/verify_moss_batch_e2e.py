@@ -40,20 +40,31 @@ def http_json(url, method="GET", data=None, timeout=60):
 
 
 def start_server():
+    """起一个**独立实例**（独立端口 + 独立 data_dir）—— 不碰 8190 线上服务。
+
+    ⚠️ server.py 的端口来自**仓库根目录的 config.json**（不是环境变量），
+    所以不能直接改仓库里的 config.json（那是被 git 跟踪的）。
+    做法：把整个 worktree **软链接**到临时目录，在临时目录里放自己的
+    config.json —— server.py 用 `Path(__file__).resolve().parent` 定位
+    仓库根，但 `resolve()` 会把软链接解析成**真实路径**……
+    所以改用**复制一份最小可运行集**的方式不可行（太大）。
+
+    正确做法：直接改 server.py 里的端口读取优先级 ——
+    加一个环境变量 `H3STUDIO_PORT` / `H3STUDIO_DATA_DIR` 的覆盖，
+    这本来就是独立测试实例该有的能力（agent 分支的 run_live_8199.sh
+    已经在用 H3STUDIO_DATA_DIR）。
+    """
     env = dict(os.environ)
-    env["H3STUDIO_CONFIG"] = str(DATA / "config.json")
-    (DATA / "config.json").write_text(json.dumps({
-        "host": "127.0.0.1", "port": PORT,
-        "comfyui_url": COMFY,
-        "data_dir": str(DATA),
-        "models_dir": "/home/ubuntu/comfyui/models",
-        "poll_interval": 1.5,
-    }, ensure_ascii=False), encoding="utf-8")
+    env["H3STUDIO_PORT"] = str(PORT)
+    env["H3STUDIO_DATA_DIR"] = str(DATA)
+    env["AGENT_SESSION_DB"] = str(DATA / "agent_sessions.db")
+    env["AGENT_MEMORY_DB"] = str(DATA / "agent_memory.db")
+    env["PYTHONPATH"] = str(REPO)
     proc = subprocess.Popen(
         ["/home/ubuntu/comfyui/venv/bin/python", "server.py"],
         cwd=str(REPO), env=env,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    for _ in range(80):
+    for _ in range(120):
         time.sleep(0.5)
         try:
             http_json(f"http://127.0.0.1:{PORT}/api/system", timeout=5)

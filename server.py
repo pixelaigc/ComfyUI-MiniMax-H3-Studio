@@ -149,12 +149,32 @@ DEFAULT_CONFIG = {
 
 
 def load_config():
+    """读取配置。
+
+    优先级：环境变量 > config.json > 默认值。
+
+    ⚠️ 2026-11-10 加环境变量覆盖：独立测试实例需要**独立端口 + 独立
+    data_dir**，但 config.json 是被 git 跟踪的（不能就地改）。
+    agent 分支的 run_live_8199.sh 已经在用 H3STUDIO_DATA_DIR，
+    这里把端口也补上（之前端口只能从 config.json 读，
+    独立实例根本起不来 —— 实测报 "address already in use"）。
+    """
     cfg = dict(DEFAULT_CONFIG)
     if CONFIG_PATH.exists():
         try:
             cfg.update(json.loads(CONFIG_PATH.read_text(encoding="utf-8")))
         except Exception as e:
             print(f"[config] 读取失败，用默认配置: {e}")
+    # 环境变量覆盖（独立实例用）
+    port_env = os.environ.get("H3STUDIO_PORT")
+    if port_env:
+        try:
+            cfg["port"] = int(port_env)
+        except ValueError:
+            print(f"[config] H3STUDIO_PORT 不是数字，忽略: {port_env!r}")
+    data_env = os.environ.get("H3STUDIO_DATA_DIR")
+    if data_env:
+        cfg["data_dir"] = data_env
     return cfg
 
 
