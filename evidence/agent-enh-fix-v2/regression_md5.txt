@@ -1,0 +1,34 @@
+# 全量 pytest 回归对比 —— 本分支 vs 未改动基线
+#
+# 基线：/root/projects/h3studio-agent-enh-review-baseline @ 17c9adb
+# 本分支：/root/projects/h3studio-agent-enh-fix2 @ (agent-enh-fix-v2)
+# 命令（两个 worktree 串行跑，互不干扰）：
+#   python3 -m pytest tests/ -q -rfE -p no:cacheprovider
+#
+# 规范形式 = 排序去重（pytest 收集顺序不固定，行序会变）
+
+baseline_failures_canonical_md5 = 7aecedc45b683dc99d7d13389e01db0c
+fix_failures_canonical_md5      = 7aecedc45b683dc99d7d13389e01db0c
+baseline_count = 161
+fix_count      = 161
+only_in_baseline = 0
+only_in_fix      = 0
+identical        = True
+
+# 汇总
+#   基线   : 27 failed, 517 passed, 3 skipped, 134 errors
+#   本分支 : 27 failed, 824 passed, 3 skipped, 134 errors
+#   passed +307（新增 16 条 key 路径注入单测 + 5 条一次性路径真 HTTP 端到端
+#                + 上一轮分支自带的 286 条）
+#
+# 结论：两份 FAILED/ERROR 名单**逐条一致**（md5 相同、条目数相同、
+#       双向 diff 均为空）-> **零新增回归**。
+#
+# 注意：本仓库基线本身就不全绿（161 条 FAILED/ERROR 来自与 Agent 无关的
+#       模块，如 test_batches_collapse.py / test_status_realtime.py 等）。
+#       本轮承诺的是「零新增回归」，不是「全绿」。
+#
+# 另：基线名单的 md5 与仓库既有证据
+#       evidence/agent-enh-fix/regression_md5.txt 记录的上一轮基线 md5
+#       **逐字节一致** —— 说明本次基线复跑与上一轮同环境同结果，
+#       基线本身没有漂移。

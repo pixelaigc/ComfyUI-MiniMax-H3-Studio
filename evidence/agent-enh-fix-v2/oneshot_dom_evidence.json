@@ -1,0 +1,89 @@
+{
+  "list_modes_success": {
+    "request_bodies": [
+      "{\"message\":\"做个视频\",\"stream\":1}"
+    ],
+    "responses": [
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      }
+    ],
+    "dom_tool_count": 1,
+    "dom_result_node_count": 1,
+    "dom_args_node_count": 0,
+    "dom_tools": [
+      {
+        "name": "list_modes",
+        "args": "",
+        "result": "已完成",
+        "err": "",
+        "ok": true
+      }
+    ]
+  },
+  "create_job_with_args": {
+    "request_bodies": [
+      "{\"message\":\"做个视频\",\"stream\":1}"
+    ],
+    "responses": [
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      }
+    ],
+    "dom_tool_count": 1,
+    "dom_result_node_count": 1,
+    "dom_args_node_count": 1,
+    "dom_tools": [
+      {
+        "name": "create_job",
+        "args": "mode=t2v · prompt=雨夜霓虹街道 · aspect=9:16",
+        "result": "已创建任务 job0000（t2v）",
+        "err": "",
+        "ok": true
+      }
+    ]
+  },
+  "failed_unknown_tool": {
+    "request_bodies": [
+      "{\"message\":\"做个视频\",\"stream\":1}"
+    ],
+    "responses": [
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "url": "http://127.0.0.1:43615/api/agent/chat",
+        "status": 200,
+        "content_type": "application/json; charset=utf-8"
+      }
+    ],
+    "dom_tool_count": 1,
+    "dom_result_node_count": 1,
+    "dom_args_node_count": 0,
+    "dom_tools": [
+      {
+        "name": "definitely_not_a_tool",
+        "args": "",
+        "result": "未知工具：definitely_not_a_tool",
+        "err": "",
+        "ok": false
+      }
+    ]
+  }
+}
