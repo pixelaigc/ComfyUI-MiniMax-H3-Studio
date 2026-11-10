@@ -387,6 +387,22 @@ def _h3_video_workflow(params, image_inputs=None):
 
 
 def build_t2v(params):
+    """文生视频。
+
+    **两条路径**（2026-11-10 改造）：
+      * 新面板路径：params 里带 `model_key` / `width` / `height` ->
+        走 `video_workflow.build_t2v_panel()`（模型可选 / 宽高直填 /
+        加速 LoRA 组合 / 注意力机制 / 二采）。
+      * 旧路径（历史任务 / 老客户端）：params 里是 `resolution` + `lora` ->
+        走原来的 `_h3_video_workflow()`（比例 + 总像素的快捷档）。
+
+    判据用「有没有 model_key」而不是「有没有 resolution」—— 因为新面板
+    也可能带上 resolution 字段（任务卡片的显示要用），用错判据会把
+    新任务发到旧工作流上。
+    """
+    if params.get("model_key") or params.get("width") and params.get("height"):
+        from . import video_workflow
+        return video_workflow.build_t2v_panel(params)
     return _h3_video_workflow(params)
 
 

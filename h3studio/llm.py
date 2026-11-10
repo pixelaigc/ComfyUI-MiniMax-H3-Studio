@@ -20,9 +20,54 @@ import time
 
 from aiohttp import ClientSession, ClientTimeout
 
-# 超时：本地模型冷启动可能较慢，给足时间
+# 超时：本地模型冷启动可能较慢，给足时间。
+# 注意：单次生成的超时必须**随 max_tokens 放大** —— 逐物体枚举档
+# 一次要生成 2000+ tokens，本机实测 1646 tokens 用了 154.6 秒。
+# 固定 180 秒会在模型**已经快写完**时被我们自己掐断，
+# 表现为「输出被截断」但其实后端根本没截 —— 极易误判。
 CHAT_TIMEOUT = ClientTimeout(total=180, connect=10)
 HEALTH_TIMEOUT = ClientTimeout(total=8, connect=5)
+
+# 单次生成的超时基数与每 token 的增量估算。
+# 经验值：本机 llama.cpp（Qwen3.8 flash IQ3）实测约 10.6 tokens/秒
+#   —— 1646 tokens 用了 154.6 秒（10.6 tok/s）；2254 tokens 用了 ~210 秒。
+#   PER_TOKEN_TIMEOUT = 0.12 秒/token ≈ 8.3 tok/s，**留了约 25% 余量**
+#   （用 0.094 会刚好卡在实测值上，不留余量）。
+BASE_TIMEOUT = 120.0
+PER_TOKEN_TIMEOUT = 0.12
+MIN_TIMEOUT = 120.0
+#: 单次调用的超时上限（秒）。
+#:
+#: 【2026-11-09 下调 1800 -> 600】
+#: 上限从 1800 收到 600 的理由：/api/enhance 一次请求最坏会挂住整个
+#: 连接（本机 llama.cpp 单槽串行），1800 秒意味着「一个请求能把服务
+#: 拖住 30 分钟」。实测 2254 tokens 约 210 秒，600 秒有近 3 倍余量；
+#: 并发闸门只能挡并发数、挡不住单次挂起时长。
+#: 配合 server.py 的 ENHANCE_GATE 并发闸门（见该常量处的取值说明），
+#: 最坏情况 = 并发上限 × 600 秒。
+MAX_TIMEOUT = 600.0
+
+
+def compute_timeout(max_tokens: int) -> float:
+    """
+    按 max_tokens 估算本次调用的超时秒数。
+
+    180 秒固定值对大预算不够用（实测 1646 tokens = 154.6 秒，
+    32768 上限会直接超时）。这里按 token 数线性放宽，并封顶 MAX_TIMEOUT（600 秒）。
+
+    【审查返修 · 关键】**不按用户配置的上限（ceiling）算超时**，
+    只按**本次实际给模型的 max_tokens** 算。
+    旧实现把「上限」当成「本次预算」，
+    于是 ceiling=32768 时即使本次只给 800 tokens，超时也被放大到封顶 1800 秒，
+    表现为「模型 3 秒就写完了，前端却挂满 30 分钟」。
+    现在：本次给 800 -> 超时 216 秒；本次给 32768 -> 超时 600 秒（封顶）。
+    """
+    try:
+        mt = int(max_tokens)
+    except (TypeError, ValueError):
+        mt = 1024
+    est = BASE_TIMEOUT + max(0, mt) * PER_TOKEN_TIMEOUT
+    return max(MIN_TIMEOUT, min(est, MAX_TIMEOUT))
 
 # ComfyUI 节点名（vrgamedevgirl 插件的本地 LLM 节点，支持图片输入）
 COMFY_LLM_NODE = "VRGDG_LocalLLM"
@@ -135,12 +180,47 @@ def _extract_openai_text(body: dict) -> str:
     return cleaned.strip()
 
 
+def _extract_finish_reason(body: dict) -> str:
+    """
+    取后端给的 finish_reason。
+
+    这是**判断输出是否被 max_tokens 硬切的权威信号**：
+      "length" —— 生成因为达到 max_tokens 上限而停止（内容必然不完整）
+      "stop"   —— 模型自己说完了（内容完整）
+      其他后端可能不给这个字段，返回空串。
+
+    之前 _extract_openai_text 把 finish_reason 直接丢掉，
+    导致上层无法区分「模型就写这么多」和「被上限切断了」——
+    这正是「二次增强丢背景」缺陷能悄无声息通过校验的原因之一。
+    """
+    choices = body.get("choices") or []
+    if not choices:
+        return ""
+    return str(choices[0].get("finish_reason") or "")
+
+
 def _extract_ollama_text(body: dict) -> str:
     message = body.get("message") or {}
     text = message.get("content")
     if not isinstance(text, str) or not text.strip():
         raise ProviderError("模型返回了空内容")
     return text.strip()
+
+
+def _extract_ollama_finish_reason(body: dict) -> str:
+    """
+    Ollama 的 done_reason（等价于 OpenAI 的 finish_reason）。
+
+    Ollama 用 `done_reason` 字段，值为 "length" 时表示
+    生成因为达到 num_predict（= max_tokens）上限而停止 —— 内容不完整。
+    部分版本还会在 body 顶层给 `done` + `done_reason`。
+    """
+    reason = str(body.get("done_reason") or "")
+    if not reason and body.get("done"):
+        # done=True 但没给 done_reason —— 无法断定是长度截断，
+        # 保守地不当作 length 处理（避免误报）。
+        reason = "stop"
+    return reason
 
 
 # ------------------------------------------------------------------ 连通性
@@ -219,6 +299,22 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
                         options: dict | None = None) -> str:
     """
     调用 Provider 返回文本。失败一律抛 ProviderError（带可读原因）。
+
+    调用方若需要知道「输出是否被 max_tokens 硬切」，
+    请改用 call_provider_full() —— 它额外返回 finish_reason。
+    """
+    res = await call_provider_full(provider, messages, images, options)
+    return res["text"]
+
+
+async def call_provider_full(provider: dict, messages: list, images: list | None = None,
+                             options: dict | None = None) -> dict:
+    """
+    调用 Provider，返回 {"text", "finish_reason", "usage"}。
+
+    与 call_provider 的区别：**不丢 finish_reason**。
+    finish_reason == "length" 表示生成因为达到 max_tokens 上限而停止，
+    内容必然不完整 —— 调用方据此可以拦截并报错，而不是把半截内容当成功。
     """
     options = options or {}
     ptype = provider.get("type")
@@ -240,7 +336,8 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
             f"Provider「{name}」未标记多模态能力，无法读图。"
             "请在本地模型配置里勾选「多模态」，或改用默认多模态模型。")
 
-    timeout = ClientTimeout(total=float(options.get("timeout", 180)), connect=10)
+    # 超时随 max_tokens 放大（大预算需要更长时间，见 compute_timeout）
+    timeout = ClientTimeout(total=compute_timeout(max_tokens), connect=10)
     async with ClientSession(timeout=timeout) as session:
         try:
             if ptype == "ollama":
@@ -258,11 +355,16 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
                         raise ProviderError(
                             f"Ollama 返回 HTTP {resp.status}：{raw[:300]}")
                     body = json.loads(raw)
-                return _extract_ollama_text(body)
+                return {"text": _extract_ollama_text(body),
+                        "finish_reason": _extract_ollama_finish_reason(body),
+                        "usage": body.get("usage") or {}}
 
             if ptype == "comfyui":
-                return await _call_via_comfyui(session, provider, messages, images,
+                text = await _call_via_comfyui(session, provider, messages, images,
                                                temperature, top_p, max_tokens)
+                # ComfyUI 节点链路拿不到后端的 finish_reason，
+                # 结构完整性由上层的 check_truncation 兜底判断。
+                return {"text": text, "finish_reason": "", "usage": {}}
 
             # openai / llamacpp
             payload = {
@@ -300,12 +402,15 @@ async def call_provider(provider: dict, messages: list, images: list | None = No
                             f"模型返回 HTTP {resp.status}：{raw[:300]}")
                 else:
                     body = json.loads(raw)
-            return _extract_openai_text(body)
+            return {"text": _extract_openai_text(body),
+                    "finish_reason": _extract_finish_reason(body),
+                    "usage": body.get("usage") or {}}
         except ProviderError:
             raise
         except asyncio.TimeoutError:
             raise ProviderError(
-                f"调用 Provider「{name}」超时（{max_tokens} tokens 上限，"
+                f"调用 Provider「{name}」超时（max_tokens={max_tokens}，"
+                f"超时上限 {compute_timeout(max_tokens):.0f} 秒，"
                 f"模型可能未加载或过慢）")
         except json.JSONDecodeError as exc:
             raise ProviderError(f"Provider「{name}」返回的不是合法 JSON：{exc}")

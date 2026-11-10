@@ -1,5 +1,6 @@
 # ── 本地运行数据（任务库 / 成片 / 上传素材）────────────────────────
 data/
+data-dev/
 outputs/
 *.db
 *.sqlite
@@ -7,6 +8,7 @@ outputs/
 
 # ── 环境相关配置（从 config.example.json 复制后按需修改）───────────
 config.json
+config.dev.json
 .env
 .env.*
 !.env.example
@@ -72,3 +74,7 @@ weights/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 本轮本地验证用的独立实例配置（8198 端口，不影响线上 8190）
+/config.json
+/data/

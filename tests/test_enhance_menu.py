@@ -168,9 +168,70 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         cls.playwright.stop()
         cls.server.stop()
 
+    def click_menu_item(self, method):
+        """
+        点下拉里某一项的复选框。
+
+        下拉是**绝对定位**在按钮下方，可能落在视口之外 ——
+        直接 page.click() 会因为「元素不可见」而超时。
+        """
+        self.page.evaluate(
+            """(sel) => {
+              const el = document.querySelector(sel);
+              if (!el) return false;
+              el.scrollIntoView({block: 'center'});
+              el.click();
+              return true;
+            }""",
+            f'#enhanceMenu input[data-method-check="{method}"]')
+        self.page.wait_for_timeout(400)
+
+    def uncheck_menu_item(self, method, menu="#enhanceMenu"):
+        """取消勾选某一项。
+
+        菜单每次勾选都会重渲染 -> 旧的 element handle 会失效，
+        playwright 的 uncheck 会在元素被替换后做校验而超时。
+        所以用 evaluate 直接改 checked 并派发 change 事件。
+        """
+        self.page.evaluate("""(args) => {
+          const [menuId, mid] = args;
+          const el = document.querySelector(
+            `${menuId} input[data-method-check="${mid}"]`);
+          if (el && el.checked && !el.disabled) {
+            el.checked = false;
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+          }
+        }""", [menu, method])
+        self.page.wait_for_timeout(300)
+
     def switch_mode(self, mode):
         self.page.click(f'.nav-item[data-mode="{mode}"]')
         self.page.wait_for_timeout(900)
+
+    def wait_ready(self, timeout_ms=20000):
+        """
+        等「增强 Agent 配置」加载完。
+
+        /api/enhancer 是异步拉的：模板清单（provState.agent.specs）、
+        mode_defaults、refine_specs 都在它返回之后才到位。
+        「当前所选增强方式」回显要显示**模板名**（如「物体细化」），
+        必须有模板清单才查得到 —— 配置没到时回显只有裸的方式名。
+
+        这不是产品缺陷（配置到达后 providers.js 会 refreshButton() 刷新回显，
+        实测自愈），但用例不能去断言「加载中的中间态」。
+        """
+        self.page.wait_for_function(
+            """() => {
+              try {
+                return typeof provState !== 'undefined'
+                  && provState && provState.agent
+                  && Array.isArray(provState.agent.specs)
+                  && provState.agent.specs.length > 0
+                  && Object.keys(provState.modeFilters || {}).length > 0;
+              } catch (e) { return false; }
+            }""",
+            timeout=timeout_ms)
+        self.page.wait_for_timeout(300)
 
     def reset_page(self):
         """
@@ -191,10 +252,21 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
             "() => localStorage.removeItem('h3studio.enhanceSelection.v1')")
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_timeout(1500)
+        # 配置到位后再跑断言（回显里的模板名依赖它）
+        self.wait_ready()
 
     def setUp(self):
         self.reset_page()
 
+
+    def all_method_ids(self):
+        """增强方式注册表里的全部 id（从页面上的注册表读，不写死）。
+
+        新增增强方式时测试不用改 —— 这正是「同一常量只写一处」的做法。
+        """
+        return self.page.evaluate(
+            "() => (window.enhanceMethods && window.enhanceMethods.list"
+            " || []).map(m => m.id)")
 
     def select_only(self, method_id):
         """只勾选指定增强项（取消默认勾的「普通增强」）。
@@ -213,7 +285,14 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
         # （菜单每次勾选都会重渲染 -> 旧的 element handle 会失效，
         #   playwright 的 uncheck 会在元素被替换后做校验而超时）。
         # 禁用的项（当前模式不可用）跳过 —— disabled 的复选框点不动。
-        for mid in ("basic", "refine", "layout", "qwen_pe"):
+        #
+        # 【为什么要枚举全表而不是写死几个 id】
+        #   增强方式注册表会长大（本次新增了「视频导演提示词」）。
+        #   写死列表 = 新增一项就漏掉它 -> 那一项会和目标项一起被勾上，
+        #   「只跑某一项」的用例就不再是「只跑一项」了（实测：
+        #   test_selecting_layout_changes_button_label_and_panels 因此挂掉）。
+        # 所以这里从**注册表本身**取全表 —— 新增增强方式不用改测试。
+        for mid in self.all_method_ids():
             if mid == method_id:
                 continue
             self.page.evaluate("""(mid) => {
@@ -293,20 +372,177 @@ class TestEnhanceMenuBrowser(unittest.TestCase):
             self.page.evaluate("window.enhanceMethods && window.enhanceMethods.current"),
             "layout")
         self.assertIn("结构化增强", self.page.inner_text("#enhanceBtnText"))
-        # 意图补充栏出现，模板下拉隐藏
+        # 意图补充栏出现
         self.assertTrue(self.page.is_visible("#mossLayoutBar"))
-        self.assertTrue(self.page.is_hidden("#enhanceSpec"))
         # 版本历史按钮仍可见（它是所有方式共用的）
         self.assertTrue(self.page.is_visible("#promptVersionBtn"))
 
-    def test_switching_back_to_basic_restores_template_select(self):
+    def test_switching_back_to_basic_restores_normal_enhance(self):
+        """
+        从「结构化增强」切回「普通增强」-> 意图补充栏收起、按钮文字变回「增强」。
+
+        【多选语义】下拉是复选列表 —— 勾上「普通增强」是**追加**，
+        不是替换。所以这里先取消「结构化增强」，再勾「普通增强」，
+        让选中集合回到只剩普通增强。
+        """
+        self.switch_mode("t2i_moss")
+        self.select_only("layout")
+        self.assertTrue(self.page.is_visible("#mossLayoutBar"))
+        # 先勾上「普通增强」（复选列表：勾选是追加，不是替换）
         self.page.click("#enhanceMenuBtn")
         self.page.wait_for_timeout(300)
-        self.page.click('#enhanceMenu input[data-method-check="basic"]')
-        self.page.wait_for_timeout(400)
-        self.assertFalse(self.page.is_hidden("#enhanceSpec"))
+        self.click_menu_item("basic")
+        # 再取消「结构化增强」
+        # （顺序不能反：只剩一项时取消不掉 —— 界面不允许「一项都不剩」）
+        self.uncheck_menu_item("layout")
+        selected = self.page.evaluate("window.enhanceMethods.getSelected()")
+        self.assertEqual(selected, ["basic"],
+                         f"切回普通增强后选中集合应只剩 basic，实际 {selected}")
         self.assertTrue(self.page.is_hidden("#mossLayoutBar"))
         self.assertIn("增强", self.page.inner_text("#enhanceBtnText"))
+
+    # ---- 统一增强入口（2026-11-09 用户要求）----
+
+    def test_no_second_enhance_dropdown(self):
+        """
+        规则 4：每个面板只有「一个增强按钮 + 一个下拉」。
+
+        改造前 Z-Image 面板还有一个 #enhanceSpec「增强模板」下拉，
+        与「增强方式」下拉语义重叠 —— 这里断言它已从 DOM 彻底消失。
+        """
+        self.assertIsNone(self.page.query_selector("#enhanceSpec"),
+                          "#enhanceSpec（第二个增强下拉）应已从 DOM 删除")
+        self.assertIsNone(self.page.query_selector("#musicEnhanceSpec"),
+                          "音乐面板也不该有第二个增强下拉")
+
+    def test_current_enhance_method_is_visible(self):
+        """规则 4：明确显示当前所选增强方式。"""
+        # 先等配置到位（回显要显示模板名，需要模板清单）
+        self.wait_ready()
+        self.switch_mode("t2i")
+        self.page.click("#enhanceMenuBtn")
+        self.page.wait_for_timeout(250)
+        self.click_menu_item("refine")
+        note = self.page.inner_text("#enhanceCurrent")
+        self.assertIn("二次增强", note,
+                      f"当前增强方式回显应含「二次增强」，实际：{note!r}")
+        self.assertIn("物体细化", note,
+                      f"当前增强方式回显应含所用模板名，实际：{note!r}")
+
+    def test_template_choice_is_a_parallel_row(self):
+        """
+        模板选择在**增强菜单项内部**，面板里没有第二个模板下拉。
+
+        【2026-11-10 改造】原先模板选择是增强栏里与「增强方式」
+        平级的一行（#enhanceSpecRow / #enhanceSpecSelect）—— 那是
+        第二个下拉，与「增强方式」下拉语义重叠，用户分不清哪个是
+        增强入口、哪个是它的参数。现在模板选择收进菜单项内。
+
+        契约不变的是：模板选择器列的是**本面板**可用的模板
+        （Z-Image 面板 = Z-Image 官方 PE 等，不含 Qwen 专属档）。
+        """
+        self.switch_mode("t2i")
+        # 打开增强方式下拉，模板选择器在菜单项内
+        self.page.evaluate(
+            "() => { const b = document.querySelector('#enhanceMenuBtn');"
+            " if (b) b.click(); }")
+        self.page.wait_for_timeout(600)
+        # 面板里不应再有平行的模板行 / 模板下拉
+        self.assertFalse(
+            self.page.evaluate("() => !!document.querySelector('#enhanceSpecRow')"),
+            "增强栏里不应再有平行的模板行（第二个下拉）")
+        self.assertFalse(
+            self.page.evaluate("() => !!document.querySelector('#enhanceSpecSelect')"),
+            "增强栏里不应再有平行的模板下拉（第二个下拉）")
+        # 模板选择器在菜单项内
+        n_in_menu = self.page.evaluate(
+            "() => document.querySelectorAll("
+            "'#enhanceMenu select[data-spec-method]').length")
+        self.assertGreater(n_in_menu, 0, "菜单项内应有模板选择器")
+        opts = [o.strip() for o in self.page.eval_on_selector_all(
+            '#enhanceMenu select[data-spec-method] option',
+            "els => els.map(e => e.textContent)")]
+        self.assertTrue(opts, "模板选择器应列出模板")
+        # Z-Image 面板：含 Z-Image 官方 PE 档；不含 Qwen 官方 PE 档
+        joined = " | ".join(opts)
+        self.assertIn("Z-Image 官方 PE", joined)
+        self.assertNotIn("qwen21", joined.lower(),
+                         f"Z-Image 面板不该列出 Qwen 专属模板，实际：{joined}")
+
+    def test_second_enhance_is_universal_across_panels(self):
+        """规则 2：二次增强是通用增强 —— 图像/视频每个面板都能选到。
+
+        【2026-11-10 按统一增强体系更新】音乐面板例外：
+        音乐走**结构化路线**（yue2_struct -> 12 个风格字段 + 歌词），
+        二次增强的产物是「一段文本」，与音乐的结构化写回契约不匹配 ——
+        所以音乐面板禁用文本扩写类（普通增强 / 二次增强），
+        并写明原因（「文本扩写类，YuE2 音乐需结构化风格+歌词」）。
+        """
+        for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss", "t2v"):
+            self.switch_mode(mode)
+            # 音乐面板的增强下拉是另一套 id（#musicEnhanceMenu）
+            menu = "#musicEnhanceMenu" if mode in ("t2a", "a2a") else "#enhanceMenu"
+            self.page.evaluate(
+                """(menuId) => {
+                  const music = menuId === '#musicEnhanceMenu';
+                  const b = document.querySelector(music ? '#musicEnhanceMenuBtn'
+                                                         : '#enhanceMenuBtn');
+                  if (b) b.click();
+                }""", menu)
+            self.page.wait_for_timeout(300)
+            disabled = self.page.get_attribute(
+                f'{menu} input[data-method-check="refine"]', "disabled")
+            self.assertIsNone(disabled,
+                              f"{mode} 面板下「二次增强」不该被禁用（它是通用能力）")
+            self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(150)
+
+        # 音乐面板：二次增强禁用，且写明原因
+        for mode in ("t2a", "a2a"):
+            self.switch_mode(mode)
+            self.page.evaluate(
+                """() => { const b = document.querySelector('#musicEnhanceMenuBtn');
+                    if (b) b.click(); }""")
+            self.page.wait_for_timeout(300)
+            disabled = self.page.get_attribute(
+                '#musicEnhanceMenu input[data-method-check="refine"]', "disabled")
+            self.assertIsNotNone(disabled,
+                                 f"{mode} 面板下二次增强应禁用（产物形态与结构化契约不匹配）")
+            item = self.page.inner_text(
+                '#musicEnhanceMenu .enhance-menu-item[data-method="refine"]')
+            self.assertIn("结构化", item,
+                          f"禁用原因应写明需要结构化风格，实际：{item}")
+            self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(150)
+
+    def test_function_specific_enhance_is_scoped_to_its_panel(self):
+        """
+        规则 1：每个功能只有自己对应的增强能力。
+
+        - MOSS 结构化增强只在 MOSS-Image 面板可用
+        - Qwen 官方 PE 只在 Qwen 两个面板可用
+        """
+        cases = [
+            ("t2i_moss", "layout", True),
+            ("t2i", "layout", False),
+            ("t2i_qwen", "layout", False),
+            ("t2i_qwen", "qwen_pe", True),
+            ("i2i_qwen", "qwen_pe", True),
+            ("t2i", "qwen_pe", False),
+            ("t2i_moss", "qwen_pe", False),
+        ]
+        for mode, method, should_enable in cases:
+            self.switch_mode(mode)
+            self.page.click("#enhanceMenuBtn")
+            self.page.wait_for_timeout(250)
+            disabled = self.page.get_attribute(
+                f'#enhanceMenu input[data-method-check="{method}"]', "disabled")
+            if should_enable:
+                self.assertIsNone(disabled, f"{mode} 面板下 {method} 应可用")
+            else:
+                self.assertIsNotNone(disabled, f"{mode} 面板下 {method} 应被禁用")
+            self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(150)
 
     # ---- 路由 + 回填 ----
 

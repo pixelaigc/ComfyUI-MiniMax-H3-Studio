@@ -300,8 +300,19 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
             " return {id: e.dataset.method,"
             " label: e.querySelector('.enhance-menu-label').textContent.trim(),"
             " hint: (e.querySelector('.enhance-menu-hint')||{}).textContent||'',"
+            " badges: Array.from(e.querySelectorAll('.enhance-menu-badge'))"
+            "          .map(b => b.textContent.trim()),"
             " checked: !!(c && c.checked), disabled: !!(c && c.disabled)};})")
 
+
+    def all_method_ids(self):
+        """增强方式注册表里的全部 id（从页面上的注册表读，不写死）。
+
+        新增增强方式时测试不用改 —— 「同一常量只写一处」。
+        """
+        return self.page.evaluate(
+            "() => (window.enhanceMethods && window.enhanceMethods.list"
+            " || []).map(m => m.id)")
 
     def select_only_qwen_pe(self):
         """只勾选官方 PE（取消其它已勾项）。
@@ -334,15 +345,36 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
     # ---- 下拉选项 ----
 
     def test_dropdown_lists_four_methods(self):
-        """下拉里同时有：普通增强 / 二次增强 / 结构化增强 / 官方PE。"""
+        """下拉里同时有：普通增强 / 二次增强 / 视频导演提示词 / 结构化增强 / 官方PE。
+
+        【为什么断言全表而不是前四项】
+          增强方式注册表会长大（本次新增了「视频导演提示词」）。
+          断言一个写死的 id 列表 = 每加一项就要改一次测试，
+          漏改就会得到一条**假失败**（功能是好的，只是清单变了）。
+          所以这里断言「注册表里的每一项都在下拉里、顺序一致、都有说明」，
+          再单独断言几个关键项的 label。
+        """
         self.switch_mode("t2i_qwen")
         self.open_menu()
         items = self.menu_items()
         ids = [i["id"] for i in items]
-        self.assertEqual(ids, ["basic", "refine", "layout", "qwen_pe"])
+        # 下拉里的项 = 注册表里的项（顺序一致，一个不多一个不少）
+        self.assertEqual(ids, self.all_method_ids())
+        # 音乐项在图像/视频面板必须禁用（复选框 disabled），
+        # 并在菜单项上写明归属。
+        yue2 = [i for i in items if i["id"] == "yue2_struct"]
+        self.assertTrue(yue2, f"下拉应包含 yue2_struct 项：{ids}")
+        self.assertTrue(yue2[0]["disabled"],
+                        "yue2_struct 在图像/视频面板应禁用（复选框 disabled）")
+        badge = self.page.eval_on_selector(
+            '#enhanceMenu .enhance-menu-item[data-method="yue2_struct"]',
+            "e => (e.querySelector('.enhance-menu-badge')||{}).textContent||''")
+        self.assertIn("音乐专属", badge,
+                      f"yue2_struct 应写明是音乐专属：{badge!r}")
         labels = [i["label"] for i in items]
         self.assertIn("普通增强", labels)
         self.assertIn("二次增强", labels)
+        self.assertIn("视频导演提示词", labels)
         self.assertIn("结构化增强（layout）", labels)
         self.assertIn("qwen21图片官方增强PE", labels)
         # 每个项都要有简短说明
@@ -398,10 +430,15 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
         btn = self.page.inner_text("#enhanceBtnText")
         self.assertTrue("PE" in btn or "项" in btn,
                         f"按钮文字应反映选中状态，实际：{btn}")
-        # 【多选】普通增强默认仍选中 -> 模板下拉**继续显示**（普通增强要用模板）。
-        # 只有当**没有**任何走模板的项被选中时才隐藏。
-        self.assertFalse(self.page.is_hidden("#enhanceSpec"),
-                         "普通增强仍选中时模板下拉应可见")
+        # 【统一增强入口】模板下拉已删除（它并入了「增强」下拉里的模板选择器）——
+        # 断言这里确实只有一个增强入口。
+        self.assertIsNone(self.page.query_selector("#enhanceSpec"),
+                          "不该再有第二个增强下拉")
+        # 官方 PE 项在菜单里带自己的模板标注
+        self.page.click("#enhanceMenuBtn")
+        self.page.wait_for_timeout(300)
+        item = self.page.inner_text('#enhanceMenu .enhance-menu-item[data-method="qwen_pe"]')
+        self.assertIn("官方 PE", item)
         # 版本历史按钮是共用的，仍可见
         self.assertTrue(self.page.is_visible("#promptVersionBtn"))
 

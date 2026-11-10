@@ -43,7 +43,7 @@ except Exception:                                   # pragma: no cover
     sync_playwright = None
     HAS_PLAYWRIGHT = False
 
-from test_frontend_defaults import StudioServer  # noqa: E402
+from test_frontend_defaults import StudioServer, WAIT_TIMEOUT  # noqa: E402
 
 
 BATCH_JOB_ID = "batchcollapse01"
@@ -92,7 +92,7 @@ class TestBatchesCollapse(unittest.TestCase):
                       wait_until="domcontentloaded")
         cls.page.wait_for_function(
             "() => document.querySelectorAll('#jobsGrid [data-act=\"toggle-batches\"]').length > 0",
-            timeout=20000)
+            timeout=WAIT_TIMEOUT)
 
     @classmethod
     def tearDownClass(cls):

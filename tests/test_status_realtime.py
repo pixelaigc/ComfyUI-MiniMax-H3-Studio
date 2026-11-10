@@ -40,7 +40,7 @@ except Exception:                                   # pragma: no cover
     sync_playwright = None
     HAS_PLAYWRIGHT = False
 
-from test_frontend_defaults import StudioServer, texts, visible  # noqa: E402
+from test_frontend_defaults import StudioServer, texts, visible, WAIT_TIMEOUT  # noqa: E402
 
 
 # 本机 ComfyUI 地址（测试用；连不上时相关用例按未知态处理）
@@ -150,7 +150,7 @@ class TestStatusRealtime(unittest.TestCase):
         cls.page.on("pageerror", lambda e: cls.errors.append(str(e)))
         cls.page.goto("http://127.0.0.1:%d/" % cls.server.port, wait_until="domcontentloaded")
         cls.page.wait_for_function(
-            "() => document.querySelectorAll('#jobsGrid > *').length > 0", timeout=20000)
+            "() => document.querySelectorAll('#jobsGrid > *:not(.job-skeleton)').length > 0", timeout=WAIT_TIMEOUT)
         # 记录状态文案的变化序列
         cls.page.evaluate("""
             window.__statLog = [];

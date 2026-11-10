@@ -558,10 +558,18 @@ body.modal-open { overflow: hidden; }
 .agent-field { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--muted); }
 .agent-field.block { width: 100%; }
 .agent-field.block > span { font-weight: 600; color: var(--text); font-size: 12px; }
-.agent-field select, .agent-field textarea, .agent-field input[type=range] {
+.agent-field select, .agent-field textarea, .agent-field input[type=range],
+.agent-field input[type=number] {
   border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   font-size: 12.5px; background: #fff; color: var(--text); font-family: inherit;
 }
+/* 数字输入框：宽度按内容，别撑破窄屏；隐藏原生步进箭头避免挤位 */
+.agent-field input[type=number] { width: 116px; }
+.agent-field input[type=number]::-webkit-outer-spin-button,
+.agent-field input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.agent-field input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .agent-field textarea { line-height: 1.55; resize: vertical; }
 .agent-field input[type=range] { padding: 0; }
 .agent-field b { color: var(--accent); }
@@ -613,6 +621,61 @@ body.modal-open { overflow: hidden; }
 .enhance-hint.error { color: var(--danger); font-weight: 600; }
 .enhance-hint.ok { color: #1f8a52; }
 .enhance-hint.busy { color: var(--accent); }
+
+/* ---------- 当前所选增强方式的显式回显 ---------- */
+.enhance-current {
+  font-size: 11.5px; color: var(--text); background: var(--accent-soft);
+  border: 1px solid var(--accent); border-radius: 7px; padding: 3px 8px;
+  font-weight: 600;
+}
+.enhance-current[hidden] { display: none; }
+
+/* ---------- 【模板选择行】与增强方式下拉平级 ---------- */
+/* 改造前模板选择是增强方式菜单项的子属性（两级 UI）；
+   现在提升为增强栏里的独立一行：当前主增强方式用哪个模板一目了然。 */
+.enhance-spec-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.enhance-spec-row[hidden] { display: none; }
+.enhance-spec-label { white-space: nowrap; }
+.enhance-spec-select {
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  max-width: 220px;
+  /* 触控目标高度不得小于 32px（手机端契约，见 tests/test_responsive_mobile.py）。
+     这是一行真实回归：新增的模板选择器默认渲染高度只有 22px。 */
+  min-height: 32px;
+}
+.enhance-spec-select:focus { outline: none; border-color: var(--accent); }
+.enhance-spec-select:disabled { opacity: .6; cursor: default; }
+
+/* ---------- 增强菜单里「就地切换模板」 ---------- */
+.enhance-menu-spec {
+  font-size: 10.5px; color: var(--muted); font-weight: 500;
+  margin-left: 6px;
+}
+.enhance-menu-spec-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 6px;
+}
+.enhance-menu-spec-label {
+  font-size: 10.5px; color: var(--muted); flex: 0 0 auto;
+}
+select.enhance-menu-spec {
+  flex: 1 1 auto; min-width: 0; margin-left: 0;
+  border: 1px solid var(--border); background: #fff; border-radius: 6px;
+  padding: 2px 6px; font-size: 10.5px; color: var(--text);
+  font-family: inherit; cursor: pointer;
+}
+select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 
 .enhance-meta {
   padding: 9px 16px; font-size: 11.5px; color: var(--muted);
@@ -688,6 +751,9 @@ body.modal-open { overflow: hidden; }
 .img-lora-tag.rec { background: #e8f6ee; color: #1f8a52; }
 .img-lora-tag.miss { background: #fbeaea; color: var(--danger); }
 .img-lora-tag.damp { background: #e8f0fb; color: #2f6fd0; }
+/* 「近似适用」：清单里标的是非该基座原生训练的条目，
+   必须一眼可辨 —— 不能跟「原生」条目长得一样。 */
+.img-lora-tag.near { background: #fdf3e0; color: #a2660a; }
 .img-lora-cap {
   font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
   background: #eef1f5; color: var(--muted); white-space: nowrap;
@@ -1044,6 +1110,12 @@ body.modal-open { overflow: hidden; }
   z-index: 1250;
   min-width: 268px;
   max-width: min(340px, calc(100vw - 16px));
+  /* 【窄屏】菜单内容比视口还高时，必须能滚 ——
+     否则最后几项（Qwen 官方 PE 等）在矮视口里被裁掉，用户看不到也点不到。
+     实测：音乐面板菜单高 667px，375x500 视口下整块溢出视口底部。 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1085,6 +1157,14 @@ body.modal-open { overflow: hidden; }
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text);
+  /* 徽标用 margin-left:auto 顶到右边，标签是**行内**元素 ——
+     行内元素不吃 min-width:0，长标签会**溢出**而不是换行
+     （实测「结构化增强（layout）」scrollWidth 128 > clientWidth 126，
+     最后 2px 被切）。改成 flex 项 + min-width:0 就正常折行。 */
+  display: inline-block;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-wrap: anywhere;
 }
 .enhance-menu-item.checked .enhance-menu-label { color: var(--accent); }
 .enhance-menu-hint {
@@ -1105,6 +1185,16 @@ body.modal-open { overflow: hidden; }
   color: #b46a10;
 }
 .enhance-menu-badge.rec { margin-left: auto; }
+/* 「本面板不可用」这类**归属原因**徽标单独占一行。
+   原来它和选项名挤在同一行 flex 里：徽标 152px + 标签 126px
+   正好把 306px 的一行填满，标签内容（128px）被挤出去 2px。
+   独占一行后，标签宽度 = 整行宽度，永远够用。 */
+.enhance-menu-badge.why {
+  display: block;
+  margin: 4px 0 0 21px;
+  width: fit-content;
+  max-width: calc(100% - 21px);
+}
 /* 【增强项自带的可编辑字段】（官方 PE 的 system prompt 与档位参数） */
 .enhance-menu-fields {
   margin: 6px 0 2px 21px;
@@ -1432,6 +1522,22 @@ body.modal-open { overflow: hidden; }
   margin: 3px 0 2px;
 }
 
+/* ---------- 文生视频面板（MiniMax-H3） ---------- */
+#videoPanel .field { margin-bottom: 12px; }
+#videoPanel .img-lora-list { margin-top: 2px; }
+/* 二采参数区：缩进 + 淡底，和主面板区分开 */
+#vidTwopassBody {
+  margin-top: 8px; padding: 9px 10px 4px;
+  border-radius: 9px; background: #f7f9fc; border: 1px solid #e3e9f2;
+}
+#vidTwopassBody .compact-pair { margin-bottom: 8px; }
+#vidTwopassBody .compact-label b { font-variant-numeric: tabular-nums; }
+#vidTwopassBody .compact-label small { font-size: 9px; color: var(--muted); }
+#vidTwopassNote { margin-top: 2px; }
+/* 加速 LoRA 组合的用途说明 */
+#vidAccelLoraList .img-lora-meta { font-size: 9.5px; line-height: 1.45; }
+#vidAccelLoraList .img-lora-name { font-size: 11.5px; }
+
 /* ---------- 音乐面板（YuE2） ---------- */
 #musicPanel .field { margin-bottom: 12px; }
 #musicPanel textarea {
@@ -1476,3 +1582,4 @@ body.modal-open { overflow: hidden; }
 .music-sf-label { font-size: 11px; color: var(--muted); }
 .music-sf-item .img-select,
 .music-sf-item .img-input { width: 100%; min-width: 0; }
+

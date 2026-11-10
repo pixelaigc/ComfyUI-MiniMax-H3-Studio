@@ -19,6 +19,9 @@ const provState = {
   modelFamilies: {},      // { z_image_turbo_bf16: "z_image", lora: "minimax_h3", ... }
   modeMedia: {},          // { t2i: "image", t2v: "video", ... } 模式 -> 媒体类型
   specIdByMode: {},       // { t2i: "image", ... } 各模式下用户最后选中的模板
+  // 「二次增强」按媒体类型用不同模板（服务端 refine_specs / refine_spec_by_media 下发）
+  refineSpecs: {},        // { t2i: "image-refine", t2a: "music-refine", ... }
+  refineSpecByMedia: {},  // { image: "image-refine", audio: "music-refine", ... }
 };
 
 // 当前工作模式
@@ -43,6 +46,14 @@ function enhanceCurrentModelKey() {
   }
   if (mode === "t2i_moss") {
     return (state.imgMoss && state.imgMoss.model) || "";
+  }
+  // 音乐（YuE2）：模型是 checkpoint key，取自音乐面板自己的状态。
+  // 漏了它会掉到 state.model（视频的 MiniMax-H3），
+  // 于是模型族过滤按 minimax_h3 走，YuE2 专用模板会被整条滤掉。
+  if (mode === "t2a" || mode === "a2a") {
+    const st = window.MusicUI && typeof window.MusicUI.getState === "function"
+      ? window.MusicUI.getState() : null;
+    return (st && st.checkpoint) || "yue2_3b_bf16";
   }
   return state.model || "";
 }
@@ -358,12 +369,16 @@ async function loadAgentConfig() {
       lengthPresets: d.length_presets || {},
       samplingPresets: d.sampling_presets || {},
       skillDir: d.skill_dir || "",
+      maxTokensBounds: d.max_tokens_bounds || {},
     };
     // 服务端下发的过滤规则（通用机制，新增模式/模型只改服务端）
     provState.modeFilters = d.mode_filters || {};
     provState.modeDefaults = d.mode_defaults || {};
     provState.modeMedia = d.mode_media || {};
     provState.modelFamilies = d.model_families || {};
+    // 「二次增强」的模板按媒体类型选 —— 服务端下发，前端不硬编码
+    provState.refineSpecs = d.refine_specs || {};
+    provState.refineSpecByMedia = d.refine_spec_by_media || {};
     // 默认选官方 PE 档（image）
     if (!provState.specId || !provState.agent.specs.find(s => s.id === provState.specId)) {
       provState.specId = "image";
@@ -371,13 +386,17 @@ async function loadAgentConfig() {
     // 当前上下文下若模板不适用则回落 —— 保证下拉显示值与实际生效值一致
     alignSpecWithContext(enhanceCurrentMode(), enhanceCurrentModelKey());
     renderAgentConfig();
-    renderEnhanceSpecSelect();
     // 增强模板清单到齐了 -> 「增强」多选列表里官方 PE 那一项的
     // system prompt 默认值（官方原文）才能取到。
     // 这一步同时把推荐参数套用到 state（选中即自动套用）。
     if (window.enhanceMethods && typeof window.enhanceMethods.renderMenu === "function") {
       window.enhanceMethods.renderMenu();
       window.enhanceMethods.ensureAvailable();
+      // 模板清单到齐后要重算「当前增强方式」回显 ——
+      // 否则它只能显示裸的模板 id（清单没到时查不到显示名）。
+      if (typeof window.enhanceMethods.refreshButton === "function") {
+        window.enhanceMethods.refreshButton();
+      }
     }
   } catch (e) {
     box.innerHTML = `<div class="prov-empty error">读取增强 Agent 配置失败：${esc(e.message)}</div>`;
@@ -402,6 +421,13 @@ function renderAgentConfig() {
     `<option value="${esc(k)}"${params.sampling === k ? " selected" : ""}>${esc(v.label)}（${esc(v.hint || "")}）</option>`
   ).join("");
 
+  // 最大输出 token 上限 —— 可配置项，不再是硬编码 512/1024。
+  // 边界由服务端下发（/api/enhancer 的 max_tokens_bounds），前端不另写常量。
+  const bounds = provState.agent.maxTokensBounds || {};
+  const ceilMin = Number(bounds.min ?? 256);
+  const ceilMax = Number(bounds.max ?? 65536);
+  const ceilVal = Number(params.max_tokens_ceiling ?? bounds.default ?? 32768);
+
   // 已自定义的模板优先显示自定义正文，否则显示内置模板正文（都可编辑）
   const sysText = spec.customized
     ? (spec.custom_system_prompt || "")
@@ -425,7 +451,17 @@ function renderAgentConfig() {
         <span>采样</span>
         <select id="agentSampling">${samplingOpts}</select>
       </label>
+      <label class="agent-field">
+        <span>最大输出 token 上限</span>
+        <input type="number" id="agentMaxTokens" min="${ceilMin}" max="${ceilMax}"
+               step="256" value="${esc(ceilVal)}">
+      </label>
       <button class="agent-save" id="agentSave">保存模板与参数</button>
+    </div>
+    <div class="agent-hint">
+      最大输出 token 上限：${ceilMin} ~ ${ceilMax}，默认 ${esc(bounds.default ?? 32768)}。
+      实际预算按**提示词长度自适应**（普通增强约 1.6 倍、二次增强约 6 倍），
+      这个上限只是天花板 —— 调太大不会让模型多写，只会在真的被截断时多等一次。
     </div>
     <div class="agent-dims">${esc(spec.source || "")} · 覆盖维度：${(spec.dimensions || []).map(d =>
       `<span class="agent-dim">${esc(d)}</span>`).join("")}</div>
@@ -454,6 +490,15 @@ async function saveAgentConfig() {
     alert("User 模板必须包含 {prompt} 或 {original} 占位符");
     return;
   }
+  // 最大输出 token 上限：先在本地夹一次，后端还会再夹一次（两道闸）
+  const bounds = provState.agent.maxTokensBounds || {};
+  const ceilMin = Number(bounds.min ?? 256);
+  const ceilMax = Number(bounds.max ?? 65536);
+  let ceil = Number($("#agentMaxTokens").value);
+  if (!Number.isFinite(ceil)) ceil = Number(bounds.default ?? 32768);
+  ceil = Math.max(ceilMin, Math.min(ceilMax, Math.round(ceil)));
+  $("#agentMaxTokens").value = ceil;
+
   btn.disabled = true;
   btn.textContent = "保存中…";
   try {
@@ -467,6 +512,7 @@ async function saveAgentConfig() {
       params: {
         length: $("#agentLength").value,
         sampling: $("#agentSampling").value,
+        max_tokens_ceiling: ceil,
       },
     });
     btn.textContent = "已保存 ✓";
@@ -496,38 +542,22 @@ function setEnhanceHint(text, kind) {
   hint.className = "enhance-hint" + (kind ? " " + kind : "");
 }
 
-// 图像页的模板下拉 —— 与「本地模型配置」页共用同一份 provState.specId
-// 候选项按当前上下文（模式 + 模型）过滤：
-//   图像模式只显示图像模板，视频模式只显示视频模板，音频模式只显示音频模板
-function renderEnhanceSpecSelect() {
-  const sel = $("#enhanceSpec");
-  if (!sel) return;
-  const mode = enhanceCurrentMode();
-  const modelKey = enhanceCurrentModelKey();
-  const specs = enhanceSpecsForContext(mode, modelKey);
-  if (!specs.length) { sel.innerHTML = ""; sel.style.display = "none"; return; }
-  sel.style.display = "";
-  sel.innerHTML = specs.map(s =>
-    `<option value="${esc(s.id)}"${s.id === provState.specId ? " selected" : ""}>${esc(s.label)}</option>`
-  ).join("");
-  // 下拉显示值必须与实际生效值一致：不在候选里的 id 一律回落到上下文默认
-  const ids = specs.map(s => s.id);
-  if (!ids.includes(provState.specId)) {
-    const fallback = enhanceDefaultSpecForContext(mode, modelKey, specs);
-    if (fallback) provState.specId = fallback;
-  }
-  sel.value = provState.specId;
-  sel.setAttribute("data-mode", mode || "");
-  sel.setAttribute("data-model", modelKey || "");
-}
+// 【模板选择已并入「增强」下拉】原来这里有一个独立的 #enhanceSpec「增强模板」
+// 下拉，与「增强方式」下拉语义重叠（两者列的是同一组东西），让人困惑。
+// 现在模板选择**长在对应的增强方式下面**（见 web/enhance-menu.js 的
+// renderSpecPicker）—— 每个面板仍然只有一个增强入口。
+//
+// 保留下来的只有两件事：
+//   1. alignSpecWithContext —— 模式/模型切换后回落到适用模板
+//      （「本地模型配置」页的模板编辑框仍用它决定当前编辑哪一条）
+//   2. enhanceSpecsForContext —— 当前上下文可用的模板清单（增强下拉要用）
 
-// 模式切换 / 模型切换后调用：重新过滤下拉 + 回落不适用模板
+// 模式切换 / 模型切换后调用：重新对齐当前上下文适用的模板
 function refreshEnhanceSpecForMode() {
   const mode = enhanceCurrentMode();
   const modelKey = enhanceCurrentModelKey();
   const before = provState.specId;
   const { changed, specId } = alignSpecWithContext(mode, modelKey);
-  renderEnhanceSpecSelect();
   if (changed) {
     const spec = (provState.agent.specs || []).find(s => s.id === specId);
     setEnhanceHint(
@@ -536,15 +566,8 @@ function refreshEnhanceSpecForMode() {
   return before !== provState.specId;
 }
 
-$("#enhanceSpec").addEventListener("change", e => {
-  provState.specId = e.target.value;
-  const mode = enhanceCurrentMode();
-  provState.specIdByMode[mode] = e.target.value;
-  setEnhanceHint("已切换模板：" + e.target.selectedOptions[0].textContent, "ok");
-});
-
-// 首次进入时拉一次 Agent 配置，把模板清单喂给下拉框
-loadAgentConfig().then(renderEnhanceSpecSelect);
+// 首次进入时拉一次 Agent 配置（模板清单供「增强」下拉里的模板选择器使用）
+loadAgentConfig();
 
 // 「增强」主按钮与下拉菜单的绑定、以及三种增强方式的路由，统一放在
 // web/enhance-menu.js 里（那里有一份增强方式注册表，是唯一真相来源）。
@@ -590,6 +613,23 @@ function buildEnhanceMeta(d) {
   if (v.stats && v.stats.words) {
     html += `<div class="enhance-warn">词数约 ${v.stats.words}</div>`;
   }
+  // 要素保留率：原文里的画面要素有多少被扩写结果保留下来
+  //
+  // 【2026-11-10 修复】cov.applicable=false 时**不显示**这个数字 ——
+  // 那是「原文与产出书写系统不同」（如 moss-image 模板官方口径就是
+  // 「默认用英文描述画面」，中文原文 vs 英文产出），逐字比对必然 0%，
+  // 显示 0% 会让用户误以为「要素全丢了」。
+  const cov = d.coverage;
+  if (cov && cov.total && cov.applicable !== false) {
+    const pct = Math.round((cov.ratio ?? 0) * 100);
+    html += `<div class="enhance-warn">原文要素保留率 ${pct}%（${cov.total - (cov.missing_count || 0)}/${cov.total} 项）</div>`;
+    if (cov.missing && cov.missing.length) {
+      html += `<div class="enhance-warn">未逐字命中的原文片段：${cov.missing.map(esc).join("、")}</div>`;
+    }
+  }
+  if (d.finish_reason) {
+    html += `<div class="enhance-warn">finish_reason：${esc(d.finish_reason)}</div>`;
+  }
   if (d.elements && d.elements.length) {
     html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>
       esc(e.id) + " " + esc(JSON.stringify(e.bbox))).join(" · ")}</div>`;
@@ -613,10 +653,126 @@ function applyQwenPeWritebackFlag() {
   provState.lastEnhanceKind = "";
 }
 
+// ------------------------------------------------------------------
+// 增强结果写回：按**能力契约**解析目标，而不是硬编码 DOM id
+// ------------------------------------------------------------------
+//
+// 【为什么要改成契约】审查 P0-1：
+//   enh-unify 的旧实现硬编码 `$("#musicStyle")`（音乐「风格描述」框）。
+//   yue2-flow 把那个 textarea 改名成 #musicPrompt（音乐描述），
+//   并把「结构化风格」拆成 12 个独立字段 —— 合并后
+//   `document.querySelector("#musicStyle")` 返回 **null**，
+//   写回会静默抛 `TypeError: Cannot read properties of null (reading 'value')`。
+//
+// 【契约语义】
+//   kind = "text"       -> 产物是一段文本，写回一个输入框
+//   kind = "structured" -> 产物是结构化对象（音乐：12 风格字段 + 歌词）
+//   目标缺失时**不抛异常**，而是返回可读原因，由调用方提示用户。
+//
+// 音乐侧的能力契约由 web/music-enhance.js 注册（结构化路线），
+// 图像/视频侧就是提示词框（文本路线）。
+// 两条路线互不依赖对方的 DOM id —— 合并时不需要再对齐 id。
+// 文本路线的写回目标：**候选列表**（先新后旧）。
+//   图像/视频 = 提示词框 #prompt
+//   音乐      = 音乐描述框 —— #musicPrompt（yue2-flow 命名）
+//               与 #musicStyle（enh-unify 命名）是**同一语义的两个名字**，
+//               任一存在即可用；都不存在时给可读提示（不抛异常）。
+/**
+ * 文本路线的写回契约（兜底）。
+ *
+ * 【按能力契约 · 审查 P0-1】
+ * 首选**统一注册表**声明的契约（window.enhanceMethods.getWriteContract）——
+ * 增强方式自己声明自己的写回目标与形态，调用方不再硬编码 id。
+ * 注册表还没就绪时，才退回下面这份静态候选表。
+ */
+const ENHANCE_WRITE_TARGETS = {
+  text: {
+    kind: "text",
+    target: "#prompt",
+    targets: ["#prompt", "#musicPrompt", "#musicStyle"],
+    describe: () => "本面板找不到可写回的输入框",
+  },
+};
+
+/**
+ * 当前上下文的写回契约。
+ *
+ * 【为什么先问注册表】增强方式自己声明写回契约（text / structured），
+ * 所以「当前方式是哪一项」决定契约形态：
+ *   - 音乐面板的结构化增强 -> 结构化契约（风格字段 + 歌词）
+ *   - 其它（文本扩写类）    -> 文本契约（当前面板的文本输入框）
+ *
+ * 【2026-11-10 修复 · 真机回归】曾经无条件用音乐的结构化契约，
+ * 导致**图像/视频面板**的写回也被解析成 kind:"structured"：
+ *   1. writeBackEnhanceResult() 命中 structured 分支直接 return false
+ *      -> 「替换/追加」按钮**点了没反应**（静默失败）；
+ *   2. 徽标不显示、版本等级恒为 0（内容压根没写回提示词框）。
+ */
+function enhanceWriteContract() {
+  // 1) 优先用注册表按「当前增强方式」解析出的契约
+  const unified = window.enhanceMethods;
+  if (unified && typeof unified.getWriteContract === "function") {
+    const c = unified.getWriteContract();
+    if (c) return c;
+  }
+  // 2) 兜底：只有**音乐面板**才用结构化契约，其余面板一律走文本契约。
+  //    判据用现有的 isMusicMode()（app.js 已定义，判的是 state.mode）。
+  if (typeof isMusicMode === "function" && isMusicMode()) {
+    const music = window.MusicEnhance && typeof window.MusicEnhance.getWriteContract === "function"
+      ? window.MusicEnhance.getWriteContract() : null;
+    if (music) return music;
+  }
+  return ENHANCE_WRITE_TARGETS.text;
+}
+
+/**
+ * 解析写回目标。目标缺失时返回 { ok:false, reason } —— **不抛异常**。
+ */
+function resolveEnhanceWriteTarget() {
+  const shared = window.EnhanceMenuShared;
+  const contract = enhanceWriteContract();
+  if (!shared || typeof shared.resolveWriteTarget !== "function") {
+    return { ok: false, reason: "增强共用组件未就绪（enhance-menu-shared.js 未加载）" };
+  }
+  return shared.resolveWriteTarget(contract);
+}
+
+/**
+ * 写回增强结果到当前契约声明的目标。
+ * @returns {boolean} 是否写回成功
+ */
+function writeBackEnhanceResult(text, mode) {
+  const target = resolveEnhanceWriteTarget();
+  if (!target.ok) {
+    setEnhanceHint("写回失败：" + target.reason, "error");
+    return false;
+  }
+  if (target.kind === "structured") {
+    // 结构化路线（音乐）：产物是「12 个风格字段 + 歌词」，不是一个文本框。
+    // 这类增强**不走**「替换提示词框 / 追加」弹窗 —— 它在增强完成时
+    // 直接落到结构化风格区与歌词区（由 music-enhance.js 的契约负责）。
+    // 所以这里明确拒绝，而不是静默丢弃。
+    setEnhanceHint("音乐的结构化增强直接写入结构化风格区与歌词区，不走文本写回", "error");
+    return false;
+  }
+  const el = target.element;
+  if (!el) {
+    setEnhanceHint("写回失败：目标输入框不存在", "error");
+    return false;
+  }
+  if (mode === "append") {
+    const original = el.value.trim();
+    el.value = original ? `${original}\n\n${text}` : text;
+  } else {
+    el.value = text;
+  }
+  return true;
+}
+
 $("#enhanceReplace").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  $("#prompt").value = text;
+  if (!writeBackEnhanceResult(text, "replace")) return;
   $("#enhanceModal").hidden = true;
   // 回填后的内容即「已增强」版本：标记它，让生成时不再弹未增强确认
   markPromptEnhanced();
@@ -627,8 +783,7 @@ $("#enhanceReplace").addEventListener("click", () => {
 $("#enhanceAppend").addEventListener("click", () => {
   const text = $("#enhanceResult").value.trim();
   if (!text) return;
-  const original = $("#prompt").value.trim();
-  $("#prompt").value = original ? `${original}\n\n${text}` : text;
+  if (!writeBackEnhanceResult(text, "append")) return;
   $("#enhanceModal").hidden = true;
   markPromptEnhanced();
   applyQwenPeWritebackFlag();

@@ -49,6 +49,17 @@ sys.path.insert(0, str(REPO))
 
 from h3studio import music_style
 from h3studio import music_yue2  # noqa: E402
+
+
+def _strip_js_comments(src: str) -> str:
+    """去掉 JS 注释（// 与 /* */），只留真实代码。
+
+    断言「某个标识符不该再出现」时，注释里的历史说明会造成误判
+    （例如文件头写着「旧的 #musicModeChips 已删除」）。
+    """
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"//[^\n]*", "", src)
+    return src
 from h3studio import gen_types  # noqa: E402
 from h3studio import workflows  # noqa: E402
 
@@ -503,12 +514,78 @@ class TestMusicFrontend(unittest.TestCase):
     def test_index_html_has_music_panel(self):
         html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="musicPanel"', html)
-        self.assertIn('id="musicStyle"', html)
+        # 【2026-11-09】自由文本「风格描述」框改成「音乐描述」框（增强的输入）
+        self.assertIn('id="musicPrompt"', html)
         self.assertIn('id="musicLyrics"', html)
         self.assertIn('id="musicRefPick"', html)
         self.assertIn('data-mode="t2a"', html)
         self.assertIn('data-mode="a2a"', html)
         self.assertIn("/static/music.js", html)
+
+    def test_no_mode_switch_in_music_panel(self):
+        """
+        【用户要求 1】面板顶部**不再有「生成模式」切换** ——
+        文生音乐 / 参考生音乐靠**左侧两个独立标签**切换。
+        旧的 chips / note 必须删干净。
+
+        注意：检查的是**代码**，不是注释 —— 文件头的说明注释里会提到
+        「旧的 #musicModeChips 已删除」这类历史，不能因此误判。
+        """
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="musicModeChips"', html,
+                         "音乐面板里的生成模式切换必须移除（靠左侧标签切）")
+        self.assertNotIn('id="musicModeNote"', html)
+        js = _strip_js_comments(
+            (REPO / "web" / "music.js").read_text(encoding="utf-8"))
+        self.assertNotIn("musicModeChips", js,
+                         "music.js 不得再有任何模式切换逻辑")
+        self.assertNotIn("musicModeNote", js)
+
+    def test_no_duration_control(self):
+        """【用户要求 3】移除「最长时长」参数 —— 面板与前端都不再有。"""
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="musicDuration"', html, "「最长时长」控件必须移除")
+        js = _strip_js_comments(
+            (REPO / "web" / "music.js").read_text(encoding="utf-8"))
+        self.assertNotIn("musicDuration", js)
+        self.assertNotIn("max_duration", js,
+                         "前端不得再提交 max_duration（后端也不再按时长截断）")
+
+    def test_structured_style_and_regen_exist(self):
+        """【用户要求 5】可编辑的结构化风格区 + 歌词区 + 「重新生成」。"""
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="musicStyleStructField"', html)
+        self.assertIn('id="musicStyleFieldsGrid"', html)
+        self.assertIn('id="musicStyleRegenBtn"', html)
+        self.assertIn('id="musicLyricsRegenBtn"', html)
+
+    def test_music_enhance_uses_shared_component(self):
+        """
+        【用户要求 6】音乐面板的增强必须与生图面板**同一套组件** ——
+        复用 enhance-menu.js 导出的共用实现，不另造一套。
+        """
+        html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('class="enhance-split" id="musicEnhanceSplit"', html)
+        self.assertIn('class="enhance-btn enhance-btn-main" id="musicEnhanceBtn"', html)
+        self.assertIn('class="enhance-btn enhance-btn-caret" id="musicEnhanceMenuBtn"', html)
+        self.assertIn('class="enhance-menu" id="musicEnhanceMenu"', html)
+        js = (REPO / "web" / "music-enhance.js").read_text(encoding="utf-8")
+        self.assertIn("EnhanceMenuShared", js,
+                      "音乐增强必须复用 enhance-menu.js 的共用组件")
+        self.assertIn("renderEnhanceMenu", js)
+        self.assertIn("bindEnhanceMenu", js)
+        shared = (REPO / "web" / "enhance-menu.js").read_text(encoding="utf-8")
+        self.assertIn("window.EnhanceMenuShared", shared)
+        # 脚本顺序：enhance-menu.js 必须先于 music-enhance.js
+        self.assertLess(html.index("/static/enhance-menu.js"),
+                        html.index("/static/music-enhance.js"))
+
+    def test_music_enhance_routes_to_music_endpoint(self):
+        """音乐增强必须打 /api/music-enhance（不是 /api/enhance）。"""
+        js = (REPO / "web" / "music-enhance.js").read_text(encoding="utf-8")
+        self.assertIn("/api/music-enhance", js)
+        server = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn('app.router.add_post("/api/music-enhance", api_music_enhance)', server)
 
     def test_music_js_exists_and_persists_params(self):
         js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
@@ -549,7 +626,9 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
     def test_music_job_card_has_no_resolution_row(self):
         js = self._app_js()
         self.assertIn('info.kind === "audio" ? `', js)
-        self.assertIn('<span>时长上限</span>', js)
+        # 【2026-11-09】时长上限已移除 -> 卡片上也不再显示这一行
+        self.assertNotIn('<span>时长上限</span>', js,
+                         "时长上限已移除，卡片不该再显示它")
         self.assertIn('<span>谱面</span>', js)
         self.assertIn('<span>格式</span>', js)
         # 音乐分支必须在「分辨率」那一行之前分流
@@ -579,7 +658,6 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
         html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
         js = (REPO / "web" / "music.js").read_text(encoding="utf-8")
         blob = html + js
-        self.assertIn("360", blob)          # 时长上限
         self.assertIn("48 kHz", blob)       # 输出采样率
         self.assertIn("仅旋律", blob)        # 谱面模式
         self.assertIn("SheetSage2", blob)   # 音频编码器

@@ -261,6 +261,16 @@ function renderMode() {
           window.enhanceMethods.ensureAvailable();
         }
         window.enhanceMethods.updatePanelVisibility();
+        // 「当前增强方式」回显要跟着模式换（音乐面板是另一套 DOM id）
+        if (typeof window.enhanceMethods.refreshButton === "function") {
+          window.enhanceMethods.refreshButton();
+        }
+      }
+      // 音乐面板有**自己的一套**增强菜单（音乐侧注册表）—— 切到音乐模式时
+      // 也要刷新它的按钮文字与菜单（否则按钮还显示上一个模式的文案）。
+      if (window.musicEnhance) {
+        window.musicEnhance.updateButton();
+        window.musicEnhance.renderMenu();
       }
     } catch (e) { /* 忽略 */ }
   });
@@ -420,6 +430,20 @@ function renderMode() {
   $("#imagePanel").style.display = isImageMode ? "" : "none";
   if (isImageMode) renderImagePanel();
 
+  // 文生视频（t2v）用自己的一套面板：宽高直填 + 模型 / 加速 LoRA 组合 /
+  // 注意力机制 / 二采。flf / r2v / longfilm 仍走旧面板（本次不改造）。
+  const isT2V = mode === "t2v";
+  const videoPanel = $("#videoPanel");
+  if (videoPanel) videoPanel.style.display = isT2V ? "" : "none";
+  if (isT2V) {
+    // 旧面板的控件全部让位（分辨率快捷档 / 比例 / 模型 / LoRA / 步数）
+    $("#resField").style.display = "none";
+    $("#aspectField").style.display = "none";
+    $("#modelField").style.display = "none";
+    $("#stepsField").style.display = "none";
+    if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
+  }
+
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
   const music = isMusicMode(mode);
   const musicPanel = $("#musicPanel");
@@ -431,7 +455,9 @@ function renderMode() {
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
     $("#seedStrengthPair").style.display = "none";
-    // 风格描述在音乐面板里（提示词框留给图像/视频）
+    // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
+    // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
+    // （#musicEnhanceSplit，在 #musicPromptField 内），所以通用 #promptField 整个隐藏。
     const promptField = $("#promptField");
     if (promptField) promptField.style.display = "none";
     if (window.MusicUI) window.MusicUI.render();
@@ -572,13 +598,32 @@ function renderLoraSelect() {
   // 就能看到这个 LoRA 是干什么的（原来只有名字，选完才看得到说明）。
   // 用 title 属性挂完整说明（原生下拉的 tooltip），文本只带简短版，
   // 免得把下拉撑得太长。
+  //
+  // **分组**：东亚人像目录一个族就有 85 条，不分组根本没法找。
+  // 有 group 的按 group 用 <optgroup> 归拢，没有的（其它目录的条目）
+  // 放进「其它效果 LoRA」组，保持下拉结构统一。
+  const withGroup = options.filter(l => l.group);
+  const withoutGroup = options.filter(l => !l.group);
+  const order = [];
+  const buckets = new Map();
+  for (const l of withGroup) {
+    if (!buckets.has(l.group)) { buckets.set(l.group, []); order.push(l.group); }
+    buckets.get(l.group).push(l);
+  }
+  const optOf = (l) => {
+    const scene = (l.scene || "").split(/[。；\n]/)[0].trim();
+    const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
+    const title = l.scene ? ` title="${esc(l.scene)}"` : "";
+    return `<option value="${esc(l.name)}"${title}>${esc(l.display)}${esc(brief)}</option>`;
+  };
+  const groupsHtml = order.map(g =>
+    `<optgroup label="${esc(g)}">${buckets.get(g).map(optOf).join("")}</optgroup>`
+  ).join("");
+  const otherHtml = withoutGroup.length
+    ? `<optgroup label="其它效果 LoRA">${withoutGroup.map(optOf).join("")}</optgroup>`
+    : "";
   sel.innerHTML = options.length
-    ? options.map(l => {
-        const scene = (l.scene || "").split(/[。；\n]/)[0].trim();
-        const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
-        const title = l.scene ? ` title="${esc(l.scene)}"` : "";
-        return `<option value="${esc(l.name)}"${title}>${esc(l.display)}${esc(brief)}</option>`;
-      }).join("")
+    ? groupsHtml + otherHtml
     : `<option value="">${ctx.store.available.length ? "全部已添加" : `本机未找到 ${ctx.label} LoRA`}</option>`;
   sel.disabled = !options.length;
   $("#imgLoraAdd").disabled = !options.length;
@@ -643,6 +688,12 @@ function renderLoraList() {
     const dampNote = damp > 0
       ? `<span class="img-lora-tag damp" title="该 LoRA 对 context_refiner 的权重扰动较大（${(ctxPert * 100).toFixed(1)}%），该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散。服务端已自动对 context_refiner 做 ${damp.toFixed(2)} 阻尼，强度可保持 1.0">已阻尼 ×${damp.toFixed(2)}</span>`
       : "";
+    // 「近似适用」标注：清单里标的是「近似适用」（基座未指明 / 无 base_model tag）
+    // 的条目，界面上必须能一眼看出来 —— 不能让它跟「原生」条目长得一样。
+    const near = meta && meta.base_verdict === "近似适用";
+    const nearNote = near
+      ? `<span class="img-lora-tag near" title="${esc(meta.scene || "")}">近似适用</span>`
+      : "";
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
       ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
@@ -660,6 +711,7 @@ function renderLoraList() {
         ${excluded ? `<span class="img-lora-tag excl">不兼容</span>` : ""}
         ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
+        ${nearNote}
         ${dampNote}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
         <button type="button" class="img-lora-btn down" title="下移" ${index === ctx.list.length - 1 ? "disabled" : ""}>↓</button>
@@ -783,6 +835,10 @@ function openLoraInfo(name) {
       <dt>文件路径</dt><dd>${esc(meta.path)}</dd>
       <dt>大小</dt><dd>${meta.size_mb} MB</dd>
       <dt>基础模型</dt><dd>${esc(meta.base)}</dd>
+      <dt>分组</dt><dd>${esc(meta.group || "—")}</dd>
+      <dt>基座适用性</dt><dd>${meta.base_verdict === "近似适用"
+        ? "⚠️ 近似适用（非该基座原生训练，依据见下方说明）"
+        : (meta.base_verdict || "原生")}</dd>
       <dt>触发词</dt><dd>${trigger}</dd>
       <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}${meta.strength_source ? "（" + esc(meta.strength_source) + "）" : ""}</dd>
       <dt>类型</dt><dd>${meta.kind === "acceleration" ? "加速 / 蒸馏类（工作流固定使用，不可选）" : "效果类（可自行选用）"}</dd>
@@ -1753,6 +1809,10 @@ function updateActionButtons() {
   }
   // 主按钮文字随「当前增强方式」变化 —— 方式名由 enhance-menu.js 管，
   // 这里只负责 busy 期间的临时文案。
+  //
+  // 【多选】按钮文字取决于**选中了几项**（一项=该项文字，多项=「增强（N 项）」），
+  // 这个逻辑在 enhance-menu.js 里（updateButton），所以这里不要自己拼 ——
+  // 两处各拼一遍必然走偏。enhance-menu.js 暴露了 refreshButton() 供这里调用。
   if (enhText) {
     if (promptEnhance.busy) {
       enhText.textContent = "正在增强…";
@@ -1846,11 +1906,20 @@ $("#genBtn").addEventListener("click", async () => {
   if (state.genBusy || promptEnhance.busy) return;
   const mode = state.mode;
 
-  // 音乐模式：提示词来自「风格描述」框，走 music.js 的收集逻辑
+  // 音乐模式：描述来自音乐面板的「音乐描述」框（#musicPrompt），
+  // 走 music.js 的收集逻辑
   if (isMusicMode(mode)) {
     if (!window.MusicUI) { alert("音乐面板模块未加载"); return; }
     const collected = window.MusicUI.collect();
-    if (!collected.params.prompt) { alert("请填写风格描述"); return; }
+    // 有结构化风格时，style 由结构化字段合成（后端用 style_* 字段），
+    // 所以「描述」可以为空；没有结构化风格时描述必填。
+    // 结构化字段在 params 里是 style_<field> 形式。
+    const hasStruct = Object.keys(collected.params)
+      .some(k => k.startsWith("style_") && collected.params[k] !== "");
+    if (!collected.params.prompt && !hasStruct) {
+      alert("请填写音乐描述，或先用「增强」生成结构化风格");
+      return;
+    }
     if (mode === "a2a" && !collected.assetRefs.length) {
       alert("参考生音乐需要从素材库选择一段参考音频。");
       return;
@@ -1950,6 +2019,10 @@ $("#genBtn").addEventListener("click", async () => {
       // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关
       params.slg_single_layers = state.imgMoss.slgSingle || "";
     }
+  }
+  if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采
+    Object.assign(params, window.VIDEO_PANEL.submitParams());
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
@@ -2425,7 +2498,6 @@ function jobCard(job) {
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
-      <div class="row"><span>时长上限</span><b>${p.max_duration || "—"}s</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
@@ -2562,6 +2634,34 @@ function jobCard(job) {
     $(`.nav-item[data-mode="${job.mode}"]`)?.click();
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
+    if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
+      // 文生视频新面板：还原宽高 / 模型 / 加速 LoRA / 注意力 / 二采
+      window.VIDEO_PANEL.applyConfig({
+        model: p.model_key,
+        aspect: p.aspect || (window.VIDEO_PANEL ? window.VIDEO_PANEL.state.aspect : "16:9"),
+        width: p.width, height: p.height,
+        rawWidth: p.width, rawHeight: p.height,
+        custom: true,
+        fixed_accel_lora: p.fixed_accel_lora,
+        accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
+        attention: p.attention,
+        twopass: p.twopass,
+      });
+      window.VIDEO_PANEL.render();
+      if (p.duration) {
+        state.duration = p.duration;
+        $("#duration").value = p.duration;
+        $("#durVal").textContent = p.duration + "s";
+      }
+      if (p.steps) {
+        state.steps = p.steps;
+        $("#steps").value = p.steps;
+        $("#stepsVal").textContent = p.steps;
+      }
+      if (p.seed) $("#seed").value = p.seed;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (job.mode === "t2i_moss") {
       // MOSS-Image：还原档位 / 比例 / 实际宽高 / 采样参数 / SLG
       const s = state.imgMoss;
@@ -3087,15 +3187,15 @@ async function refreshJobs() {
       const jobs = status === "all" ? data.jobs : data.jobs.filter(job => job.status === status);
       return {jobs, total: data.total ?? jobs.length, page: data.page ?? 1};
     }));
-    // 【竞态防护】只有「本轮仍是最新的一次请求」才写 DOM。
+    // 【竞态防护】只有「筛选态」变了才丢弃本次请求的数据。
     //
     // 为什么不能只看 ticket !== jobsRequest：
-    //   轮询间隔 2 秒，但一次 /api/jobs 请求在服务端被阻塞时可能要走好几秒
-    //   （实测并发任务的 music_style 会在 aiohttp 事件循环里同步拉
-    //     ComfyUI /object_info，首个请求把整个服务堵住约 6 秒）。
-    //   这时下一次轮询先把 jobsRequest 递增了 —— 旧请求回来时 ticket
-    //   必然对不上，于是**每一次**都提前 return，骨架占位永远替换不掉，
-    //   表现为「任务列表一直是骨架」（用户看到列表空白/一直转圈）。
+    //   jobsRequest 是「请求发起次数」的计数器。轮询间隔 2 秒，但一次
+    //   /api/jobs 在服务端被阻塞时可能要走好几秒（实测并发任务的
+    //   music_style 会在 aiohttp 事件循环里同步拉 ComfyUI /object_info，
+    //   把整个服务堵住约 6 秒）。这时下一次轮询先把 jobsRequest 递增了，
+    //   旧请求回来时 ticket 必然对不上 —— 于是**每一次**都提前 return，
+    //   骨架占位永远替换不掉（表现为「任务列表一直是骨架」）。
     //
     // 正确的判据是「**筛选态**有没有变」：
     //   - 筛选态没变（只是又轮询了一轮）-> 旧数据依然有效，照样渲染；
@@ -3876,6 +3976,12 @@ boot("默认模式", () => {
   else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
 });
 boot("图像参数清单", loadImageOptions);
+boot("视频参数清单", async () => {
+  if (!window.VIDEO_PANEL) return;
+  await window.VIDEO_PANEL.load();
+  window.VIDEO_PANEL.bind();
+  window.VIDEO_PANEL.render();
+});
 boot("音乐参数清单", async () => {
   if (!window.MusicUI) return;
   await window.MusicUI.loadOptions();

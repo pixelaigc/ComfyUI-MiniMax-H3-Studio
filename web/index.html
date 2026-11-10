@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=enhancemulti1">
+<link rel="stylesheet" href="/static/style.css?v=enh-unify6">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
 <link rel="stylesheet" href="/static/responsive.css?v=rs1">
 </head>
@@ -105,6 +105,80 @@
   <!-- 参数面板（窄屏从底部抽屉弹出，见 responsive.css） -->
   <div class="panel-mask" id="panelMask"></div>
   <aside class="panel" id="panel">
+    <!-- 文生视频面板（2026-11-10 改造）：宽高直填 + 模型/加速LoRA/注意力/二采 -->
+    <div id="videoPanel" style="display:none">
+      <div class="stale-backend-banner" id="staleVideoBanner" hidden></div>
+
+      <div class="field">
+        <div class="field-label">输出尺寸 <span class="muted" id="vidSizeHint">—</span>
+          <span class="img-tag" id="vidSizeMode" hidden>自定义</span></div>
+        <div class="img-size-row">
+          <input type="number" id="vidWidth" min="32" step="32" title="宽度（像素，必须是 32 的倍数）">
+          <span class="img-x">×</span>
+          <input type="number" id="vidHeight" min="32" step="32" title="高度（像素，必须是 32 的倍数）">
+          <button type="button" class="img-reset" id="vidSizeReset" title="恢复为按比例自动计算的尺寸">自动</button>
+        </div>
+        <div class="img-note" id="vidSizeNote"></div>
+        <div class="img-note img-size-adjust" id="vidSizeAdjust" hidden></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">画面比例 <span class="muted">用于自动算尺寸</span></div>
+        <div class="chips" id="vidAspectChips"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span id="vidModelLabel">MiniMax-H3 模型</span> <span class="muted">本机已安装</span></div>
+        <select class="img-select" id="vidModelSelect"></select>
+        <div class="img-note" id="vidModelNote"></div>
+        <div class="img-warn" id="vidModelWarn"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">加速 LoRA 组合 <span class="muted">可多选</span></div>
+        <div id="vidAccelLoraList" class="img-lora-list"></div>
+        <div class="img-note" id="vidAccelLoraNote"></div>
+        <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">注意力机制 <span class="muted">生成加速</span></div>
+        <select class="img-select" id="vidAttentionSelect"></select>
+        <div class="img-note" id="vidAttentionNote"></div>
+      </div>
+
+      <div class="field" id="vidTwopassField">
+        <label class="img-toggle">
+          <input type="checkbox" id="vidTwopassEnabled">
+          <span>开启二采</span>
+          <span class="muted" id="vidTwopassHint">低分辨率一采 + 高分辨率二采</span>
+        </label>
+        <div id="vidTwopassBody" hidden>
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>一采步数</span><b id="vidTransitionVal">3</b></div>
+              <input type="range" id="vidTransition" min="1" max="6" step="1" value="3">
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>一采分辨率</span><b id="vidLowresVal">0.50</b></div>
+              <input type="range" id="vidLowres" min="0.25" max="1" step="0.05" value="0.5">
+            </div>
+          </div>
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>修正比例 ρ</span><b id="vidRhoVal">0.00</b></div>
+              <input type="range" id="vidRho" min="0" max="1" step="0.05" value="0">
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>潜空间放大器</span><small id="vidUpscalerHint">—</small></div>
+              <select class="img-select" id="vidUpscalerSelect"></select>
+            </div>
+          </div>
+          <div class="img-note" id="vidTwopassNote"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="field" id="resField">
       <div class="field-label">分辨率</div>
       <div class="seg" id="resSeg">
@@ -250,15 +324,6 @@
     <!-- 音乐模式专属（YuE2）：文生音乐 / 参考生音乐 -->
     <div id="musicPanel" style="display:none">
       <div class="field">
-        <div class="field-label">生成模式</div>
-        <div class="chips" id="musicModeChips">
-          <button data-v="t2a" class="active">文生音乐</button>
-          <button data-v="a2a">参考生音乐</button>
-        </div>
-        <div class="img-note" id="musicModeNote"></div>
-      </div>
-
-      <div class="field">
         <div class="field-label">YuE2 音乐模型 <span class="muted" id="musicModelHint">本机已安装</span></div>
         <select class="img-select" id="musicModelSelect"></select>
         <div class="img-note" id="musicModelNote"></div>
@@ -271,20 +336,51 @@
         <div class="img-note" id="musicEncoderNote"></div>
       </div>
 
-      <div class="field">
-        <div class="field-label">风格描述 <span class="muted">Style · 自由文本</span></div>
-        <textarea id="musicStyle" rows="4"
-                  placeholder="English, warm piano pop, expressive female voice, acoustic piano, rounded bass and light drums, 88 BPM"></textarea>
-        <div class="img-note">描述要生成的曲子：语言 + 曲风 + 人声 + 速度(BPM) + 乐器 + 氛围。官方推荐写法：<code>English, warm female vocal, contemporary pop, 96 BPM, piano, rounded electric bass, restrained drums</code>。只写音乐描述，歌词写到下面那个框里，不要混在一起。</div>
+      <!-- 音乐描述 + 增强（与生图面板同一套组件：.enhance-split / .enhance-menu） -->
+      <div class="field prompt-field" id="musicPromptField">
+        <div class="field-label">音乐描述 <span class="prompt-badge" id="musicPromptBadge" hidden>已增强</span></div>
+        <textarea id="musicPrompt" rows="4"
+                  placeholder="一首关于雨夜告别的日语慢歌，钢琴加弦乐，副歌要爆发"></textarea>
+        <div class="prompt-enhance-bar">
+          <!-- 增强：分裂按钮 —— 与生图面板**完全同一套组件**（enhance-split /
+               enhance-btn / enhance-menu），只是下拉里的增强项按当前模式过滤。
+               音乐模式下提供的是「YuE2 结构化风格 + 歌词」。 -->
+          <div class="enhance-split" id="musicEnhanceSplit">
+            <button class="enhance-btn enhance-btn-main" id="musicEnhanceBtn"
+                    title="调用本地模型生成结构化风格与歌词">
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5l1.6 3.9 4.4.4-3.3 2.9 1 4.3L8 10.9l-3.7 2.1 1-4.3L2 5.8l4.4-.4z" fill="currentColor"/></svg>
+              <span id="musicEnhanceBtnText">增强</span>
+            </button>
+            <button class="enhance-btn enhance-btn-caret" id="musicEnhanceMenuBtn"
+                    aria-haspopup="menu" aria-expanded="false"
+                    title="选择增强方式">
+              <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="enhance-menu" id="musicEnhanceMenu" role="menu" hidden></div>
+          </div>
+          <!-- 【模板选择已收进增强菜单项内】
+               改造前这里有一条平行的「模板」下拉（#musicEnhanceSpecSelect），
+               与上面的「增强方式」下拉语义重叠 —— 用户看到两个下拉，
+               却不知道哪个才是增强入口、哪个是它的参数。
+               现在每个增强方式自带它的模板清单（多档时是下拉，
+               单档时只显示名字），一条下拉就够用。 -->
+          <!-- 当前所选增强方式的显式回显（审查 P2-4：音乐面板也必须有） -->
+          <span class="enhance-current" id="musicEnhanceCurrent" hidden></span>
+          <span class="enhance-applied-params" id="musicEnhanceAppliedParams" hidden></span>
+          <span class="enhance-hint" id="musicEnhanceHint">用本地模型生成结构化风格与歌词</span>
+        </div>
       </div>
 
       <!-- 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
            第三方用 12 个字段拼 style，比一整段自由文本表达力强。
-           这里做成可折叠区，默认收起；展开后填的字段会拼在自由文本前面。 -->
-      <div class="field">
+           这里是「增强」的产物区：增强后自动填好，可逐项改；
+           点「重新生成」= 以当前内容为底稿让模型再改一版。 -->
+      <div class="field" id="musicStyleStructField">
         <div class="field-label">
           结构化风格 <span class="muted">Style Fields · 对齐第三方 YuE2StylePrompt</span>
           <button type="button" id="musicStyleFieldsToggle" class="music-toggle">展开</button>
+          <button type="button" class="img-ref-add" id="musicStyleRegenBtn"
+                  title="基于当前内容重新生成结构化风格">重新生成</button>
         </div>
         <div id="musicStyleFields" style="display:none">
           <div class="music-sf-grid" id="musicStyleFieldsGrid"></div>
@@ -293,12 +389,17 @@
             标记 <code>(none)</code> 的选项表示<b>不要这一段</b>；<code>(custom / none)</code> 要配合下面的自定义输入框。
             纯器乐请选 <code>(instrumental / no lead vocal)</code>，人声音色会自动清成 <code>(none)</code>。
           </div>
+          <div class="img-note" id="musicStyleStructNote">增强后这里会自动填好结构化风格字段，可以逐项改，改完再生成。</div>
           <div id="musicStyleFieldsPreview" class="img-note"></div>
         </div>
       </div>
 
       <div class="field">
-        <div class="field-label">歌词 <span class="muted">Lyrics · 可留空（留空 = 纯器乐）</span></div>
+        <div class="field-label">
+          歌词 <span class="muted">Lyrics · 可留空（留空 = 纯器乐）</span>
+          <button type="button" class="img-ref-add" id="musicLyricsRegenBtn"
+                  title="基于当前内容重新生成歌词">重新生成</button>
+        </div>
         <textarea id="musicLyrics" rows="6"
                   placeholder="[Verse]&#10;Morning light across the window&#10;City waking down below&#10;&#10;[Chorus]&#10;Run with me into the sunlight&#10;Leave the shadows far behind"></textarea>
         <div class="img-note">只写要被唱出来的字，用 <code>[Verse]</code> / <code>[Chorus]</code> / <code>[Bridge]</code> / <code>[Outro]</code> 标段落。留空则生成纯器乐（无歌词与人声）。参考生音乐时，歌词的句式与字数越接近原曲，越贴合原旋律。</div>
@@ -317,12 +418,6 @@
         <div class="field-label">谱面规划 <span class="muted" id="musicModeHint">ABC Planning · 音乐生成前的乐谱规划</span></div>
         <div class="chips" id="musicPlanChips"></div>
         <div class="img-note" id="musicPlanNote"></div>
-      </div>
-
-      <div class="field">
-        <div class="field-label">最长时长 <span id="musicDurationVal">60s</span></div>
-        <input type="range" id="musicDuration" min="10" max="600" step="10" value="60">
-        <div class="img-note">这是<strong>上限</strong>，不是保证时长 —— 成曲可能因为歌词段落和 BPM 提前结束。上限 360 秒（6 分钟）；歌词越长、段落越少，越容易顶到上限。参考生音乐时还会受参考音频长度的约束。</div>
       </div>
 
       <div class="compact-pair">
@@ -396,7 +491,11 @@ overall_soundscape: Night wind rustles dense bamboo leaves while insects call fa
 non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, ending on a single deep drumbeat as the blade is exposed.</textarea>
       <div class="prompt-enhance-bar">
         <!-- 增强：分裂按钮 —— 主按钮走「当前选中的增强方式」，
-             右侧箭头展开下拉菜单切换增强方式（普通 / 二次 / 结构化(layout)） -->
+             右侧箭头展开下拉菜单切换增强方式。
+             【统一增强入口】每个面板只有**这一个**增强入口：
+             一个增强按钮 + 一个列出可用增强方式的下拉。
+             （改造前还有一个 #enhanceSpec「增强模板」下拉，
+               与本下拉语义重叠、让人困惑 —— 已删除。） -->
         <div class="enhance-split" id="enhanceSplit">
           <button class="enhance-btn enhance-btn-main" id="enhanceBtn"
                   title="调用本地模型按当前增强方式扩写提示词">
@@ -410,7 +509,14 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           </button>
           <div class="enhance-menu" id="enhanceMenu" role="menu" hidden></div>
         </div>
-        <select class="enhance-spec" id="enhanceSpec" title="增强模板"></select>
+        <!-- 【模板选择已收进增强菜单项内】
+             改造前这里有一条平行的「模板」下拉（#enhanceSpecSelect），
+             与「增强方式」下拉语义重叠 —— 两个下拉让人分不清
+             哪个是增强入口、哪个是它的参数。
+             现在每个增强方式自带它的模板清单（多档时是下拉，
+             单档时只显示名字），一条下拉就够用。 -->
+        <!-- 当前所选增强方式的显式回显（改造前只有按钮文字，多选时看不出具体是哪几项） -->
+        <span class="enhance-current" id="enhanceCurrent" hidden></span>
         <!-- 已套用推荐参数的可见回显：选中增强项即自动套用推荐参数。 -->
         <span class="enhance-applied-params" id="enhanceAppliedParams" hidden></span>
         <span class="enhance-hint" id="enhanceHint">用本地模型扩写提示词</span>
@@ -871,10 +977,17 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
-<script src="/static/app.js?v=enhancemulti1"></script>
-<script src="/static/providers.js?v=enhancemulti1"></script>
+<script src="/static/video-panel.js?v=videopanel1"></script>
+<script src="/static/app.js?v=enh-unify2"></script>
+<script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
-<script src="/static/enhance-menu.js?v=enhancemulti1"></script>
+<!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
+     图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
+<script src="/static/enhance-menu-shared.js?v=shared2"></script>
+<script src="/static/enhance-menu.js?v=enh-unify3"></script>
+<!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
+     window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
+<script src="/static/music-enhance.js?v=musicyue2-1"></script>
 </body>
 </html>
