@@ -62,6 +62,22 @@ SCOPE_GLOBAL = "global"
 SCOPE_SESSION_PREFIX = "session:"
 
 
+def _normalize_read_limit(limit) -> int:
+    """把 limit 归一成统一语义（见 recall 的 docstring）。
+
+    返回值：
+      * > 0  -> 具体条数上限（已夹到 MAX_READ_LIMIT）
+      * <= 0 -> 0，表示「返回全部」（调用方不写 LIMIT 子句）
+    """
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return 20
+    if value <= 0:
+        return 0
+    return min(value, MAX_READ_LIMIT)
+
+
 def default_db_path() -> Path:
     """记忆库路径。可用 AGENT_MEMORY_DB 环境变量覆盖（测试用）。"""
     override = os.environ.get("AGENT_MEMORY_DB")
@@ -336,8 +352,20 @@ class MemoryStore:
 
         query 非空时按「键包含关键词」过滤（大小写不敏感）；
         query 为空时按 scope 过滤返回全部。
+
+        ⚠️ **limit 的语义**（2026-11-10 统一，之前两处实现不一致）：
+          * limit > 0  -> 最多返回这么多条（上限 MAX_READ_LIMIT）
+          * limit == 0 -> **返回全部**（等价于 limit=None）
+          * limit < 0  -> **返回全部**（等价于 limit=0）
+        旧实现在两处分别写成：
+          * agent_memory.recall:  `max(1, min(int(limit or 20), MAX))`
+            -> limit=0 变成 20、limit=-1 变成 **1**（完全不是「全部」）
+          * agent_tools 的工具层: `max(1, min(MAX_READ_LIMIT, limit))`
+            -> limit=0 变成 **1**
+        同一个参数名在两层有**三种**结果，是典型的「语义未统一」。
+        现在统一成上面这一套，并在工具 schema 的 description 里写明。
         """
-        limit = max(1, min(int(limit or 20), MAX_READ_LIMIT))
+        limit = _normalize_read_limit(limit)
         sql = ("SELECT key, scope, value, source, created_at, updated_at "
                "FROM agent_memory")
         args: list = []
@@ -351,8 +379,10 @@ class MemoryStore:
             args.append(f"%{needle}%")
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
-        sql += " ORDER BY updated_at DESC LIMIT ?"
-        args.append(limit)
+        sql += " ORDER BY updated_at DESC"
+        if limit > 0:
+            sql += " LIMIT ?"
+            args.append(limit)
         with self.connect() as conn:
             rows = conn.execute(sql, args).fetchall()
         return [{

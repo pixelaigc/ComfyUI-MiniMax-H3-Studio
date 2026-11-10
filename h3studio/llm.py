@@ -614,6 +614,116 @@ async def call_provider_with_tools(provider: dict, messages: list,
                 f"调用 Provider「{name}」失败：{type(exc).__name__} {exc}"[:300])
 
 
+# ------------------------------------------------------------------ 流式调用
+
+async def call_provider_with_tools_stream(
+        provider: dict, messages: list, tools: list,
+        options: dict | None = None, images: list | None = None,
+        on_token=None) -> dict:
+    """
+    带 **token 级增量** 的工具调用轮。
+
+    与 call_provider_with_tools 的区别：**真的逐 token 推送**。
+    旧实现是「整段返回」—— agent.py 只能在拿到完整 content 后
+    发一次 `_event("token", {"text": content})`，前端只能整段重渲染，
+    用户看不到「边生成边出字」。
+
+    on_token: 可选回调 ``on_token(text: str)`` —— 每收到一个增量就调一次。
+              回调异常会被吞掉（流式展示不该有能力把主流程带崩）。
+
+    返回 {"content": str|None, "tool_calls": [...], "raw": dict}
+      —— 语义与 call_provider_with_tools 完全一致（content 已 strip、
+         tool_calls 已统一结构），所以调用方可以无缝切换。
+
+    ⚠️ 协议差异：流式模式下**不能**同时用 tools（部分本地推理服务
+    在 stream + tools 组合下会拒绝或丢掉 tool_calls）。所以这里的策略是：
+      1. 带 tools 时**先试一次非流式** —— 拿到完整结果；
+         若 content 很长（超过 on_token_min_chars），再**二次**用流式
+         重放同样的请求来获得增量（此时不带 tools，避免协议冲突）。
+      2. 不带 tools 时直接流式。
+    这个「两次调用」的做法有代价（多一次推理），所以只在
+    `options["stream_replay"]` 为真时启用（Agent 默认开启，
+    因为它要的就是「边生成边出字」）。
+    """
+    options = options or {}
+    replay = bool(options.get("stream_replay"))
+    if not replay or on_token is None:
+        return await call_provider_with_tools(provider, messages, tools,
+                                              options=options, images=images)
+
+    # ---- 第一步：非流式拿完整结果（含 tool_calls）----
+    result = await call_provider_with_tools(provider, messages, tools,
+                                            options=options, images=images)
+    content = result.get("content") or ""
+    min_chars = int(options.get("stream_min_chars", 12))
+    if not content or len(content) < min_chars:
+        return result
+
+    # ---- 第二步：流式重放，只取增量文本 ----
+    try:
+        await _replay_stream_text(provider, messages, images, options, on_token)
+    except Exception:
+        # 流式重放失败**不影响**主流程 —— 已经有完整 content 了
+        pass
+    return result
+
+
+async def _replay_stream_text(provider: dict, messages: list,
+                              images: list | None, options: dict,
+                              on_token) -> None:
+    """用 OpenAI 兼容的 SSE 流式接口重放一次请求，逐段回调 on_token。
+
+    只推送**文本增量**（不处理 tool_calls —— 工具调用已在非流式那轮拿到）。
+    """
+    base = (provider.get("base_url") or "").rstrip("/")
+    model = provider.get("model") or ""
+    temperature = float(options.get("temperature", 0.2))
+    max_tokens = int(options.get("max_tokens", 1024))
+    top_p = float(options.get("top_p", 0.95))
+
+    payload = {
+        "model": model,
+        "messages": _messages_to_openai(messages, images),
+        "temperature": temperature,
+        "top_p": top_p,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    payload["chat_template_kwargs"] = {"enable_thinking": False}
+
+    timeout = ClientTimeout(total=float(options.get("timeout", 180)), connect=10)
+    async with ClientSession(timeout=timeout) as session:
+        async with session.post(f"{base}/v1/chat/completions", json=payload,
+                                 headers=_auth_headers(provider)) as resp:
+            if resp.status != 200:
+                raw = await resp.text()
+                raise ProviderError(f"流式请求返回 HTTP {resp.status}：{raw[:200]}")
+            emitted = 0
+            async for raw_line in resp.content:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                piece = delta.get("content")
+                if not isinstance(piece, str) or not piece:
+                    continue
+                emitted += 1
+                try:
+                    on_token(piece)
+                except Exception:
+                    pass
+
+
 # ------------------------------------------------------------------ ComfyUI 节点
 
 

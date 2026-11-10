@@ -306,6 +306,21 @@ def _builder_defaults(mode: str) -> dict:
 
     解析失败就返回空 dict（不抛）—— 拿不到默认值时，宁可不给，
     也不要给一个编出来的。
+
+    ⚠️ 2026-11-10 修（合并 live 侧后暴露的回归）：
+        旧实现用「源码里没有 params.get( 就去 helper 里找」当判据。
+        live 侧的 build_t2v 改成了**两条路径**：
+            if params.get("model_key") or params.get("width") and ...:
+                return video_workflow.build_t2v_panel(params)
+            return _h3_video_workflow(params)
+        于是 build_t2v 的源码里**有** params.get( 了（只有 model_key/width），
+        旧判据认为「不用去 helper 里找」-> 解析的是 build_t2v 自己，
+        拿不到真正的默认值（resolution/duration/lora），
+        mode_defaults("t2v") 于是退化成 Z-Image 的 544p / lora=none。
+
+        修法：把 builder **和**它转调的 helper 的源码都当候选，
+        谁提供的默认值**更多**就用谁 —— 不依赖「源码里有没有某个关键字」
+        这种脆弱判据。
     """
     builder = wf.BUILDERS.get(mode)
     if builder is None:
@@ -313,35 +328,84 @@ def _builder_defaults(mode: str) -> dict:
     try:
         import inspect
         import re
-        source = inspect.getsource(builder)
-    except (OSError, TypeError):
+    except Exception:
         return {}
 
-    # builder 可能只是转调（build_t2v -> _h3_video_workflow），
-    # 这种情况下继续往被调用的模块级函数里找。
-    if "params.get(" not in source:
-        for name in ("_h3_video_workflow",):
-            helper = getattr(wf, name, None)
-            if helper is None:
-                continue
-            try:
-                helper_source = inspect.getsource(helper)
-            except (OSError, TypeError):
-                continue
-            if "params.get(" in helper_source:
-                source = helper_source
-                break
-
-    defaults: dict = {}
-    # params.get("key", default) —— default 可以是字面量或数字
-    for match in re.finditer(
-            r"""params\.get\(\s*["']([a-z_]+)["']\s*,\s*["']?([A-Za-z0-9_.]+)["']?\s*\)""",
-            source):
-        key, raw = match.group(1), match.group(2)
-        if key in defaults:
+    candidates: list[str] = []
+    try:
+        candidates.append(inspect.getsource(builder))
+    except (OSError, TypeError):
+        return {}
+    # builder 可能只是转调（build_t2v -> _h3_video_workflow）
+    for name in ("_h3_video_workflow",):
+        helper = getattr(wf, name, None)
+        if helper is None:
             continue
-        defaults[key] = raw
-    return defaults
+        try:
+            candidates.append(inspect.getsource(helper))
+        except (OSError, TypeError):
+            continue
+
+    pattern = re.compile(
+        r"""params\.get\(\s*["']([a-z_]+)["']\s*,\s*["']?([A-Za-z0-9_.]+)["']?\s*\)""")
+
+    def _defaults_in(text: str) -> dict:
+        found: dict = {}
+        for match in pattern.finditer(text):
+            key, raw = match.group(1), match.group(2)
+            if key not in found:
+                found[key] = raw
+        return found
+
+    # 选**默认值最多**的那个候选（真实默认值所在的那份源码）
+    best: dict = {}
+    for text in candidates:
+        found = _defaults_in(text)
+        if len(found) > len(best):
+            best = found
+    defaults: dict = dict(best)
+
+    # 字面量与常量引用都要能取到值；取不到就丢掉这个键（宁可不给默认值）
+    resolved: dict = {}
+    for key, raw in defaults.items():
+        value = _resolve_default_literal(raw)
+        if value is not None:
+            resolved[key] = value
+    return resolved
+
+
+def _resolve_default_literal(raw: str):
+    """把源码里的默认值字面量解析成真值；解析不了返回 None。"""
+    import re
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    # 数字
+    if re.fullmatch(r"[-+]?\d+", text):
+        try:
+            return int(text)
+        except ValueError:
+            return None
+    if re.fullmatch(r"[-+]?\d*\.\d+", text):
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    # 带引号的字符串字面量
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+        return text[1:-1]
+    # 裸标识符 —— 源码里的默认值常量（如 params.get("resolution", "768p")
+    # 的 "768p" 被正则捕获成裸文本）。它既可能是字面量值本身，
+    # 也可能是模块常量名（如 VIDEO_DEFAULT_LORA）。
+    # 两种都试：先当字面量字符串，再查模块常量。
+    if text and all(ch.isalnum() or ch in "_.-:" for ch in text):
+        # 查模块常量（优先 —— 那是「真实默认值」的权威来源）
+        value = getattr(wf, text, None)
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            return value
+        # 不是已知常量 -> 当字面量字符串用（如 "768p" / "ckpt850"）
+        return text
+    return None
 
 
 def mode_defaults(mode: str) -> dict:

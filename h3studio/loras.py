@@ -1237,6 +1237,10 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 "attention_hit": compat.get("attention_hit"),
                 "relative_perturbation": compat.get("relative_perturbation"),
                 "compat_verified": bool(compat.get("verified", False)),
+                # MOSS 专用：注意力投影形态（split / fused / n/a）与可否无损转换。
+                # 前端据此如实标注「融合 qkv（自动转换）」，不装作原生。
+                "qkv_shape": compat.get("qkv_shape", ""),
+                "qkv_convertible": bool(compat.get("convertible", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 # 认定方式：filename（文件名含族关键词）/
@@ -1479,6 +1483,10 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 "attention_hit": compat.get("attention_hit"),
                 "relative_perturbation": compat.get("relative_perturbation"),
                 "compat_verified": bool(compat.get("verified", False)),
+                # MOSS 专用：注意力投影形态（split / fused / n/a）与可否无损转换。
+                # 前端据此如实标注「融合 qkv（自动转换）」，不装作原生。
+                "qkv_shape": compat.get("qkv_shape", ""),
+                "qkv_convertible": bool(compat.get("convertible", False)),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 # 认定方式：filename（文件名含 z-image 字样）/

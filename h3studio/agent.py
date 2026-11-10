@@ -62,6 +62,16 @@ def is_music_mode(mode: str) -> bool:
 #: 4~5 步的正常流程就要 4~6 分钟。给到 420 秒是「够跑完正常流程」与
 #: 「不让请求无限挂着」之间的平衡点。
 TOTAL_TIMEOUT = 420.0
+#: 是否启用真 token 级增量流式（2026-11-10）。
+#:
+#: 关掉的话 Agent 退回到「整段返回 + 一次 token 事件」——
+#: 那是**整段全量重渲染**，不是流式（审查遗留项）。
+#: 代价：流式重放会让模型**多跑一次**（先非流式拿完整结果与工具调用，
+#: 再流式重放一次拿增量文本）。这是本地推理服务在
+#: 「stream + tools」组合下不可靠时的折中 —— 实测 llama.cpp 的
+#: OpenAI 兼容端点带 tools 时会丢掉 tool_calls。
+STREAM_REPLAY_ENABLED = True
+
 #: 单次模型调用超时（秒）。与 llm.CHAT_TIMEOUT 一致。
 STEP_TIMEOUT = 180.0
 #: 最大步骤数（= 模型轮数，含最后一轮「给结论」）。
@@ -377,7 +387,72 @@ class AgentContext:
         self.attempted_modes: list[str] = []
 
     def record(self, step: dict) -> None:
-        self.steps.append(step)
+        """记录一步。**字段集合必须符合 STEP_FIELDS 契约**。
+
+        2026-11-10：以前这里是 `self.steps.append(step)` —— 裸 dict，
+        字段随调用方而变（这是 steps[] 两种形态的根源之一）。
+        现在强制校验字段集合，不符合就补齐缺省值（不丢数据）。
+        """
+        entry = dict(step or {})
+        for field in STEP_FIELDS:
+            entry.setdefault(field, None if field in ("tool", "error") else
+                             ("" if field in ("args", "summary", "call_id", "note")
+                              else 0))
+        self.steps.append(entry)
+
+
+# ------------------------------------------------------------------ steps[] 形态
+
+#: steps[] 的**唯一**字段契约（2026-11-10 强制统一）。
+#:
+#: 之前 steps[] 有**两种形态**：
+#:   A. 工具调用步：{step, tool, ok, ms, args, error, summary, call_id}
+#:   B. 非工具步：  {step, tool: None, ok, ms, note, error}
+#: 前端要按两种形状分别写解析分支（`if (s.tool) ... else ...`），
+#: 任何一侧新增字段都会被另一侧忽略 —— 而且**契约文档没法写**。
+#:
+#: 现在统一成**一种**形态：所有步都带全套字段，缺的用 None / ""。
+#: 这样：
+#:   * 前端只有一条解析路径
+#:   * 契约文档可以逐字段写死
+#:   * 一次性路径与 SSE 路径的 steps[] 完全同构
+STEP_FIELDS = (
+    "step",        # 第几步（1 起）
+    "tool",        # 工具名；非工具步为 None
+    "ok",          # 该步是否成功
+    "ms",          # 该步耗时（毫秒）
+    "args",        # 工具入参（JSON 字符串）；非工具步为 ""
+    "summary",     # 结果摘要（与 SSE 的 tool_result.summary 同源）
+    "call_id",     # 工具调用 id（与 SSE 的 tool_call/tool_result 同一套）
+    "note",        # 人类可读的说明（非工具步用）
+    "error",       # 错误原因；无错为 None
+)
+
+
+def _step_entry(step: int, tool: str | None = None, ok: bool = True,
+                ms: int = 0, args: str = "", summary: str = "",
+                call_id: str = "", note: str = "",
+                error: str | None = None) -> dict:
+    """构造一个**符合 STEP_FIELDS 契约**的 steps[] 条目。
+
+    所有 steps.append 都必须走这里 —— 这样字段集合永远一致，
+    前端与契约文档都只需要认一种形状。
+    """
+    entry = {
+        "step": int(step),
+        "tool": tool or None,
+        "ok": bool(ok),
+        "ms": int(ms or 0),
+        "args": args or "",
+        "summary": summary or "",
+        "call_id": call_id or "",
+        "note": note or "",
+        "error": error,
+    }
+    # 契约自检：字段集合必须完全一致（防止将来有人直接 append 裸 dict）
+    assert set(entry) == set(STEP_FIELDS), (
+        f"steps[] 条目字段与契约不符：{sorted(entry)} != {sorted(STEP_FIELDS)}")
+    return entry
 
 
 # ------------------------------------------------------------------ 工具实现
@@ -1932,11 +2007,40 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     no_tool_retries = 0
 
     async def _one_turn():
-        """一轮模型调用（含 tools）。"""
-        return await llm_client.call_provider_with_tools(
+        """一轮模型调用（含 tools）。
+
+        ⚠️ 2026-11-10：**真 token 级增量**。
+        旧实现只在拿到完整 content 后发一次 `_event("token", ...)` ——
+        那是「整段全量重渲染」，不是流式。
+        现在把 on_token 接到 llm.call_provider_with_tools_stream，
+        模型的每个增量都会触发一次 `_event("token", {"text": piece})`，
+        前端才能「边生成边出字」。
+
+        降级语义：流式不可用（Provider 不支持 / 出错）时，
+        llm 层会**自动退回**非流式并只发一次完整 content ——
+        所以本函数的行为在两种情况下都成立，只是增量粒度不同。
+        """
+        streamed = False
+
+        # ⚠️ 必须是**同步**回调 —— llm 层在 SSE 解析循环里直接调它，
+        # 定义成 async 会得到「coroutine was never awaited」的警告，
+        # 而且增量会被**丢掉**（前端看不到逐字输出）。
+        def _on_token(piece: str) -> None:
+            nonlocal streamed
+            if not piece:
+                return
+            streamed = True
+            _event("token", {"text": piece, "delta": True})
+
+        result = await llm_client.call_provider_with_tools_stream(
             provider, messages, tools,
             options={"temperature": 0.2, "top_p": 0.95, "max_tokens": 1024,
-                     "timeout": STEP_TIMEOUT})
+                     "timeout": STEP_TIMEOUT,
+                     "stream_replay": bool(on_event) and STREAM_REPLAY_ENABLED},
+            on_token=_on_token)
+        # 流式已经推过增量 -> 不要再补一次整段（否则前端会重复渲染）
+        result["_streamed"] = streamed
+        return result
 
     async def _loop():
         """主循环。返回 (status, truncated_reason)。"""
@@ -2004,16 +2108,16 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                             "jobs_created": len(ctx.jobs),
                         },
                     }
-                    steps.append({
-                        "step": step_index, "tool": None, "ok": True,
-                        "ms": int((time.time() - turn_started) * 1000),
-                        "note": ("模型只做了口头承诺，已推它继续调工具"
-                                 if narration
-                                 else ("模型声称已下发任务但实际没有建，"
-                                       "已推它真正调用 create_job"
-                                       if fabricated
-                                       else "模型中途停止调用工具，已推它继续")),
-                    })
+                    steps.append(_step_entry(
+                        step_index, tool=None, ok=True,
+                        ms=int((time.time() - turn_started) * 1000),
+                        note=("模型只做了口头承诺，已推它继续调工具"
+                              if narration
+                              else ("模型声称已下发任务但实际没有建，"
+                                    "已推它真正调用 create_job"
+                                    if fabricated
+                                    else "模型中途停止调用工具，已推它继续")),
+                    ))
                     if content:
                         messages.append({"role": "assistant", "content": content})
                     messages.append({
@@ -2027,15 +2131,15 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     ctx.no_tool_call = True
                     ctx.no_tool_call_code = ("fabricated_job_id"
                                              if fabricated else "no_tool_call")
-                    steps.append({
-                        "step": step_index, "tool": None, "ok": False,
-                        "ms": int((time.time() - turn_started) * 1000),
-                        "note": ("模型声称已下发任务但实际未建（编造 job id）"
-                                 if fabricated
-                                 else "模型连续只做口头承诺，未真正调用任何工具"),
-                        "error": "fabricated_job_id" if fabricated
-                                 else "no_tool_call",
-                    })
+                    steps.append(_step_entry(
+                        step_index, tool=None, ok=False,
+                        ms=int((time.time() - turn_started) * 1000),
+                        note=("模型声称已下发任务但实际未建（编造 job id）"
+                              if fabricated
+                              else "模型连续只做口头承诺，未真正调用任何工具"),
+                        error="fabricated_job_id" if fabricated
+                              else "no_tool_call",
+                    ))
                     _event("error", {
                         "error": ("模型声称已下发任务但实际没有创建任何任务"
                                   "（报告的 job id 是编造的），已拦截。"
@@ -2052,10 +2156,13 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                          "已拦截（本次没有创建任何任务）。"))
                 if content:
                     ctx.answer = content
-                    _event("token", {"text": content})
-                steps.append({"step": step_index, "tool": None, "ok": True,
-                              "ms": int((time.time() - turn_started) * 1000),
-                              "note": "模型给出结论"})
+                    # 已经逐 token 推过增量 -> 不再补整段（否则前端重复渲染）
+                    if not response.get("_streamed"):
+                        _event("token", {"text": content})
+                steps.append(_step_entry(
+                    step_index, tool=None, ok=True,
+                    ms=int((time.time() - turn_started) * 1000),
+                    note="模型给出结论"))
                 return "completed", None
 
             # 有工具调用 —— assistant 消息必须原样带回，否则模型失去上下文
@@ -2106,12 +2213,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                         result, ok = await _run_tool_with_retry(
                             spec, ctx, call["arguments"], name)
 
-                steps.append({
-                    "step": step_index, "tool": name, "ok": ok,
-                    "ms": int((time.time() - turn_started) * 1000),
-                    "args": _clip(json.dumps(call["arguments"], ensure_ascii=False), 200),
-                    "error": (result.get("error") if isinstance(result, dict)
-                              else None),
+                steps.append(_step_entry(
+                    step_index, tool=name, ok=ok,
+                    ms=int((time.time() - turn_started) * 1000),
+                    args=_clip(json.dumps(call["arguments"], ensure_ascii=False), 200),
+                    error=(result.get("error") if isinstance(result, dict)
+                           else None),
                     # 【结果摘要 —— 2026-11-10 独立复验发现的一次性路径残留】
                     #
                     # 审查实测：一次性（非 SSE）降级路径下，
@@ -2126,12 +2233,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     # —— 这里就发**同一个函数的输出**，不是另写一份摘要逻辑。
                     # 失败工具的 error 文案由 _tool_result_summary 统一处理
                     # （失败时返回 result["error"]），所以这里不重复拼。
-                    "summary": _tool_result_summary(name, result, ok),
+                    summary=_tool_result_summary(name, result, ok),
                     # call_id：与 SSE 的 tool_call / tool_result 同一套配对依据。
                     # 前端归一化层消费它，把一次性路径的工具块和流式路径
                     # 关联起来（同名字工具并发时不会串卡）。
-                    "call_id": call["id"],
-                })
+                    call_id=call["id"],
+                ))
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
@@ -2203,13 +2310,13 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                                 and msg.get("tool_call_id") == call["id"]):
                             msg["content"] = _clip(json.dumps(result, ensure_ascii=False))
                             break
-                    steps.append({
-                        "step": step_index, "tool": name, "ok": ok,
-                        "ms": int((time.time() - turn_started) * 1000),
-                        "args": _clip(json.dumps(call["arguments"], ensure_ascii=False), 200),
-                        "error": None,
-                        "note": "重复调用，已给出纠偏提示",
-                    })
+                    steps.append(_step_entry(
+                        step_index, tool=name, ok=ok,
+                        ms=int((time.time() - turn_started) * 1000),
+                        args=_clip(json.dumps(call["arguments"], ensure_ascii=False), 200),
+                        error=None,
+                        note="重复调用，已给出纠偏提示",
+                    ))
                     # 注意：这里**不** break，也**不**清零计数 ——
                     # 让模型再走一轮，看它是否接受提示。
                     # 这一轮如果它又用同样的参数，repeat_count 变成 3，

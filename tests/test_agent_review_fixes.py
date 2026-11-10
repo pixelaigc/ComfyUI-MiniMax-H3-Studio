@@ -320,6 +320,15 @@ class TestAgentProgressFeedback(unittest.TestCase):
 class TestEnhanceMenuBadgeWording(unittest.TestCase):
     """禁用项的徽标文案：只用一套，不出现「推荐 + 不可用」并列。"""
 
+    def _render_src(self):
+        """徽标的**真实渲染处**。
+
+        ⚠️ 2026-11-10：live 侧把菜单渲染搬到了**共用组件**
+        enhance-menu-shared.js（图像面板与音乐面板同一套实现），
+        所以徽标渲染行在那里 —— 不是 enhance-menu.js。
+        """
+        return read_web("enhance-menu-shared.js")
+
     def test_unavailable_item_has_no_recommended_badge(self):
         """
         不可用时不显示 Recommended。
@@ -327,11 +336,14 @@ class TestEnhanceMenuBadgeWording(unittest.TestCase):
         审查实测：t2i 面板 qwen_pe 项 badges=["Recommended","当前模式不可用"]，
         读起来像「本面板也推荐它」—— 语义冲突。
         """
-        src = read_web("enhance-menu.js")
+        src = self._render_src()
         lines = [ln for ln in src.splitlines() if "enhance-menu-badge rec" in ln]
         self.assertTrue(lines, "找不到 Recommended 徽标的渲染行")
-        expr = lines[0]
-        self.assertRegex(expr, r"m\.recommended\s*&&\s*ok",
+        # 徽标的显示条件在**上一行**（三元的 true 分支），
+        # 所以要看渲染行**及其上一行**的上下文。
+        idx = src.splitlines().index(lines[0])
+        context = "\n".join(src.splitlines()[max(0, idx - 2): idx + 1])
+        self.assertRegex(context, r"m\.recommended\s*&&\s*ok",
                          "Recommended 徽标必须在「可用」(ok) 时才显示 —— "
                          "否则不可用项会同时挂「推荐」与「不可用」两个徽标")
 
@@ -345,6 +357,19 @@ class TestEnhanceMenuBadgeWording(unittest.TestCase):
         self.assertNotIn('"当前模式不可用"', src,
                          "不要再用硬编码的「当前模式不可用」—— "
                          "它没写明归属功能")
+
+    def test_enhance_menu_has_single_unavailable_reason(self):
+        """enhance-menu.js 里只能有**一个** unavailableReason 定义。
+
+        合并 Agent 分支时两侧各有一份（live 侧简版 + agent 侧音乐感知版），
+        JS 里后声明的会**静默覆盖**前面的 —— 留下一份没人用的死代码，
+        而且改错那一份不会生效。
+        """
+        src = read_web("enhance-menu.js")
+        count = len(re.findall(r"function\s+unavailableReason\s*\(", src))
+        self.assertEqual(count, 1,
+                         f"enhance-menu.js 里有 {count} 个 unavailableReason 定义"
+                         " —— 后者会静默覆盖前者，必须合并成一份")
 
     def test_registry_declares_owners(self):
         """归属信息写在注册表里（唯一真相来源）。"""

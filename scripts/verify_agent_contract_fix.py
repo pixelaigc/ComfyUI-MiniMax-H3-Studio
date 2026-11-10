@@ -505,6 +505,44 @@ def run_browser(studio: Studio):
                 "() => window.AgentUI && window.AgentUI.state",
                 timeout=30000)
             page.wait_for_timeout(800)
+
+            # ⚠️ 2026-11-10 补断言：**所有前端资源必须真的加载完**。
+            # 之前只等了 window.AgentUI 就绪 —— 但那只能证明
+            # agent.js 加载完了；其它静态资源（app.js / music.js /
+            # enhance-menu.js / moss-layout.js / qwen-refs.js …）
+            # 可能 404 或加载失败，而脚本**照样跑完并报告通过**。
+            # 这正是「交付脚本不断言前端资源全部加载完」的遗留项。
+            #
+            # 判据（真实浏览器事实，不是猜）：
+            #   1. 每个 <script src> 元素都必须有非空 src，且都已加载完
+            #      （readyState 不可查 -> 用「元素存在 + fetch 200」双重确认）
+            #   2. 每个 <link rel=stylesheet> 的 href 必须返回 200
+            #   3. 页面里不能有 failed 的资源（performance resource 时长为 0
+            #      且 transferSize 为 0 且 responseStatus 非 2xx 的）
+            script_urls = page.evaluate("""() => [...document.querySelectorAll('script[src]')]
+                .map(s => s.src).filter(u => !!u)""")
+            link_urls = page.evaluate("""() => [...document.querySelectorAll('link[rel=stylesheet]')]
+                .map(l => l.href).filter(u => !!u)""")
+            all_static = list(script_urls) + list(link_urls)
+            if not all_static:
+                raise AssertionError("页面里没有任何静态资源 —— 断言本身失效")
+            failed_static = []
+            for url in all_static:
+                status = page.evaluate(
+                    """async (u) => {
+                        try {
+                            const r = await fetch(u, {method: 'GET', cache: 'no-store'});
+                            return r.status;
+                        } catch (e) { return 0; }
+                    }""", url)
+                if status != 200:
+                    failed_static.append({"url": url, "status": status})
+            if failed_static:
+                raise AssertionError(
+                    f"{len(failed_static)} 个前端资源没加载成功："
+                    + json.dumps(failed_static, ensure_ascii=False))
+            print(f"    [资源断言] {len(script_urls)} 个 script + "
+                  f"{len(link_urls)} 个 stylesheet 全部 200")
             # 进 Agent 页。
             #
             # 【为什么直接调 AgentUI.show() 而不是点 #navAgent】

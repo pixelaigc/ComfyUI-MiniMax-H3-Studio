@@ -546,21 +546,26 @@ def register(agent_mod, create_job_handler):
                       "description": "记忆键的关键词（留空返回最近的全部）"},
             "scope": {"type": "string",
                       "description": "作用域：global（跨会话）或 session:<id>"},
-            "limit": {"type": "integer", "description": "返回条数上限，默认 20"},
+            "limit": {"type": "integer",
+                      "description": ("返回条数上限，默认 20；"
+                                       "填 0 或负数表示「返回全部」"
+                                       "（上限 "
+                                       f"{agent_memory.MAX_READ_LIMIT} 条）")},
         }),
     )
     async def _tool_recall_memory(ctx, args: dict) -> dict:
         store = _memory_store(ctx)
-        try:
-            limit = int(args.get("limit") or 20)
-        except (TypeError, ValueError):
-            limit = 20
-        limit = max(1, min(agent_memory.MAX_READ_LIMIT, limit))
+        # ⚠️ 2026-11-10 语义统一：limit <= 0 -> 返回全部（0 条/负数不再
+        #   被夹成 1）。归一逻辑在 agent_memory._normalize_read_limit，
+        #   工具层与存储层用**同一个**函数，不会再各说各话。
+        limit = agent_memory._normalize_read_limit(args.get("limit"))
         query = str(args.get("query") or "").strip()
         scope = str(args.get("scope") or "").strip() or None
         entries = store.recall(query, scope=scope, limit=limit)
         return {"total": len(entries), "memories": entries,
-                "scope": scope or "global"}
+                "scope": scope or "global",
+                "limit": limit,
+                "returned_all": limit == 0}
 
     @tool(
         "search_conversations",

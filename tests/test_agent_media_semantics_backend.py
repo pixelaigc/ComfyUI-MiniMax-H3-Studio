@@ -466,12 +466,23 @@ class TestDurationValidation(_Base):
                 agent_schema.validate_params("t2v", {"duration": value}), [])
 
     def test_music_max_duration_range(self):
+        """音乐时长区间必须与 music_yue2 的**真实**上下限一致。
+
+        ⚠️ 2026-11-10 合并后更正：上限是 **900 秒**（live 侧
+        music_yue2.YUE2_MAX_DURATION = 900.0 —— YuE2GenerateMusic 节点的
+        schema 上限），不是 agent 分支旧值 360。区间**从 music_yue2 取**
+        （agent_schema._music_duration_range()），所以这里也按它取，
+        不能写死数字 —— 否则改一边就会挂另一边。
+        """
+        from h3studio import music_yue2
+        lo = int(music_yue2.YUE2_MIN_DURATION)
+        hi = int(music_yue2.YUE2_MAX_DURATION)
         self.assertEqual(
-            agent_schema.validate_params("t2a", {"max_duration": 4}), [])
+            agent_schema.validate_params("t2a", {"max_duration": lo}), [])
         self.assertEqual(
-            agent_schema.validate_params("t2a", {"max_duration": 360}), [])
-        issues = agent_schema.validate_params("t2a", {"max_duration": 361})
-        self.assertTrue(issues)
+            agent_schema.validate_params("t2a", {"max_duration": hi}), [])
+        issues = agent_schema.validate_params("t2a", {"max_duration": hi + 1})
+        self.assertTrue(issues, f"超过上限 {hi} 秒必须被拦下")
         self.assertEqual(issues[0].field, "max_duration")
 
     def test_music_duration_field_is_max_duration(self):

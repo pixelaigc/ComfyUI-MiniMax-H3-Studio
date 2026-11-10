@@ -851,11 +851,36 @@
   // 两种写法命中**同一条** SSE 契约。
   async function sendStreamNew(body, msg) {
     const payload = Object.assign({}, body, { stream: 1 });
-    const resp = await fetch("/api/agent/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-      body: JSON.stringify(payload),
-    });
+    // ⚠️ 2026-11-10：SSE 加 **AbortController** —— 之前**没有任何取消/超时**：
+    //   * 页面关掉/切走 -> 连接一直挂着，服务端那边 Agent 还在跑（浪费本地算力）
+    //   * 后端卡住 -> 前端永远等，界面停在「思考中」
+    // 现在：SSE_MAX_MS 超时自动 abort；并暴露 cancelAgentSSE() 给「停止」按钮用。
+    const controller = new AbortController();
+    activeSSE = controller;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { controller.abort(); } catch (e) { /* 已断 */ }
+    }, SSE_MAX_MS);
+    let resp;
+    try {
+      resp = await fetch("/api/agent/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      if (activeSSE === controller) activeSSE = null;
+      if (timedOut) {
+        const e = new Error("Agent 响应超时（" + Math.round(SSE_MAX_MS / 1000) + " 秒），已断开");
+        e.code = "sse_timeout";
+        throw e;
+      }
+      throw err;
+    }
+    clearTimeout(timer);
 
     if (!resp.ok) {
       const raw = await resp.text();
@@ -877,14 +902,22 @@
       return data;
     }
 
-    const { result } = await consumeSse(resp, (event, data) => {
-      applyStreamEvent(msg, event, data);
-      // token 是纯文本 -> 走轻量路径；
-      // progress 只更新 #agStatus 进度条，不动气泡；
-      // 其余（tool_call/tool_result/job/done/error/result）是结构变更 -> 重绘这一条气泡
-      if (event === "token") renderStreamingMessage(false);
-      else if (event !== "progress") renderStreamingMessage(true);
-    });
+    let result;
+    try {
+      const consumed = await consumeSse(resp, (event, data) => {
+        applyStreamEvent(msg, event, data);
+        // token 是纯文本 -> 走轻量路径；
+        // progress 只更新 #agStatus 进度条，不动气泡；
+        // 其余（tool_call/tool_result/job/done/error/result）是结构变更 -> 重绘这一条气泡
+        if (event === "token") renderStreamingMessage(false);
+        else if (event !== "progress") renderStreamingMessage(true);
+      });
+      result = consumed.result;
+    } catch (err) {
+      if (activeSSE === controller) activeSSE = null;
+      throw err;
+    }
+    if (activeSSE === controller) activeSSE = null;
     if (result) {
       applyStreamEvent(msg, "result", result);
     } else if (!msg.result) {
@@ -1130,10 +1163,36 @@
     timer: null,
     ids: new Set(),
     messages: new Map(),   // job_id -> message
+    startedAt: 0,          // 轮询开始时间（超时判定用）
+    errors: 0,             // 连续失败次数
   };
+
+  // SSE 的**硬超时**（2026-11-10 补）：Agent 一条完整链路实测 4~6 分钟，
+  // 服务端自身有 TOTAL_TIMEOUT=420s 兜底；前端再给一层 10 分钟上限，
+  // 避免后端异常时界面永远停在「思考中」。
+  const SSE_MAX_MS = 10 * 60 * 1000;
+  // 当前活跃的 SSE 控制器（用于「停止」按钮主动取消）
+  let activeSSE = null;
+
+  // 主动取消正在进行的 SSE（页面卸载 / 用户点「停止」时调用）
+  function cancelAgentSSE(reason) {
+    if (!activeSSE) return false;
+    try { activeSSE.abort(); } catch (e) { /* 已断 */ }
+    activeSSE = null;
+    if (reason) setHint(reason, "error");
+    return true;
+  }
 
   const JOB_POLL_INTERVAL = 3000;
   const JOB_TERMINAL = ["done", "failed", "canceled"];
+  // 轮询的**硬终止条件**（2026-11-10 补）：
+  //   1. 全部任务进终态 -> 停（原有逻辑）
+  //   2. 超过 JOB_POLL_MAX_MS -> 停（原来**没有**这条：任务卡永远停在
+  //      「排队中/运行中」，页面一直每 3 秒打一次 /api/jobs/{id}）
+  //   3. 连续 JOB_POLL_MAX_ERRORS 次查询失败 -> 停（后端挂了不该无限轮询）
+  // 停止时把超时的任务标成「状态未知（已停止轮询）」，不假装它还在跑。
+  const JOB_POLL_MAX_MS = 30 * 60 * 1000;   // 30 分钟
+  const JOB_POLL_MAX_ERRORS = 12;            // 连续 12 次失败（约 36 秒）
 
   function startJobPolling(msg) {
     (msg.jobs || []).forEach(j => {
@@ -1142,6 +1201,8 @@
       jobPoll.messages.set(j.job_id, msg);
     });
     if (jobPoll.timer) return;
+    jobPoll.startedAt = Date.now();
+    jobPoll.errors = 0;
     jobPoll.timer = setInterval(pollJobs, JOB_POLL_INTERVAL);
     pollJobs();
   }
@@ -1149,7 +1210,15 @@
   async function pollJobs() {
     const ids = [...jobPoll.ids];
     if (!ids.length) { stopJobPolling(); return; }
+    // ---- 终止条件 2：超时 ----
+    if (jobPoll.startedAt && Date.now() - jobPoll.startedAt > JOB_POLL_MAX_MS) {
+      markPollingTimedOut();
+      stopJobPolling();
+      renderMessages();
+      return;
+    }
     let stillActive = false;
+    let sawError = false;
     for (const id of ids) {
       try {
         const job = await apiJSON("GET", "/api/jobs/" + encodeURIComponent(id));
@@ -1172,7 +1241,20 @@
         // 单个任务查不到（可能被删了）—— 不致命，继续轮询其余任务。
         // 但不能因此判定「全部完成」，所以仍保留轮询。
         stillActive = true;
+        sawError = true;
       }
+    }
+    // ---- 终止条件 3：连续失败太多次 ----
+    if (sawError) {
+      jobPoll.errors += 1;
+      if (jobPoll.errors >= JOB_POLL_MAX_ERRORS) {
+        markPollingTimedOut("后端连续查询失败，已停止轮询");
+        stopJobPolling();
+        renderMessages();
+        return;
+      }
+    } else {
+      jobPoll.errors = 0;
     }
     if (!stillActive && !jobPoll.ids.size) {
       stopJobPolling();
@@ -1180,6 +1262,22 @@
     } else if (stillActive) {
       renderMessages();
     }
+  }
+
+  // 把还在轮询的任务标成「状态未知」—— 不假装它还在跑，
+  // 也不谎称它失败（用户可以手动刷新）。
+  function markPollingTimedOut(reason) {
+    const text = reason || "已超过轮询时限，状态未知（可手动刷新）";
+    for (const id of jobPoll.ids) {
+      const msg = jobPoll.messages.get(id);
+      if (!msg) continue;
+      const entry = (msg.jobs || []).find(j => j.job_id === id);
+      if (!entry) continue;
+      if (JOB_TERMINAL.includes(entry.status)) continue;
+      entry.status = "unknown";
+      entry.progress_text = text;
+    }
+    jobPoll.ids.clear();
   }
 
   function stopJobPolling() {
@@ -1351,7 +1449,21 @@
     _pollJobs: pollJobs,
     _startJobPolling: startJobPolling,
     _renderStreamingMessage: renderStreamingMessage,
+    // 2026-11-10：SSE 取消 / 轮询终止的内部接口（测试与「停止」按钮用）
+    _cancelAgentSSE: cancelAgentSSE,
+    _stopJobPolling: stopJobPolling,
+    _markPollingTimedOut: markPollingTimedOut,
+    _SSE_MAX_MS: SSE_MAX_MS,
+    _JOB_POLL_MAX_MS: JOB_POLL_MAX_MS,
+    _JOB_POLL_MAX_ERRORS: JOB_POLL_MAX_ERRORS,
   };
+
+  // 页面卸载时**必须**断开 SSE —— 否则服务端那边的 Agent 还在跑，
+  // 而前端连接一直挂着（本地算力被白白占用）。
+  window.addEventListener("beforeunload", () => {
+    try { cancelAgentSSE(); } catch (e) { /* 忽略 */ }
+    try { stopJobPolling(); } catch (e) { /* 忽略 */ }
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bind);
