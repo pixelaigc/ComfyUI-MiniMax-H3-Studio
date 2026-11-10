@@ -14,6 +14,10 @@
 > ⑤ 能力位改由**后端下发**（原来硬编码「a2a/flf 建不了」，合并后变反向阻断）
 > ⑥ 音乐卡**不渲染 aspect**（原来渲染无意义的「比例 16:9」）
 >
+> **2026-11-10 独立复验后二次修订**（详见 §9.2）：
+> ⑦ 一次性路径的工具卡**「结果」区也要有内容**（原来硬编码 `result: null`
+>    且后端 `steps[]` 不带摘要 → `.ag-tool-result` 节点数 = 0）；详见 §2.1
+>
 > ---
 >
 > ## ⚠️ 审查发现的「报告与实现不符」5 处 —— 已如实更正
@@ -151,6 +155,35 @@
 > **去重**：`renderTools`（流式驱动，有参数/结果/成功态）与 `renderSteps`（一次性结果驱动，只有工具名+耗时）展示的是同一件事。同时渲染会出现「工具调用 (2)」和「工具调用轨迹 (2)」两个几乎一样的块 —— **这个问题是看截图发现的**，不是读代码发现的。
 > 现在：有 `msg.tools` 就只渲染它，没有才退回 `msg.steps`。
 > 回归测试：`test_tool_container_is_open_and_trace_is_not_duplicated`。
+
+### 2.1 一次性路径的工具轨迹（2026-11-10 独立复验后补齐）
+
+一次性（非 SSE）路径下，工具轨迹来自响应里的 `steps[]`，
+由 `syncToolsFromSteps(msg, steps)` 转换。
+
+| 前端内部字段 | 来源 | 说明 |
+|---|---|---|
+| `name` | `normalizeToolName(s)` | `s.name \|\| s.tool` |
+| `arguments` | `parseStepArgs(s.args)` | `s.args` 是 **JSON 字符串**，先 parse；解析失败保留原文 |
+| `result` | `normalizeToolResult(s)` | `s.result \|\| s.summary \|\| s.output` |
+| `ok` | `s.ok !== false` | |
+| `error` | `s.error` | **仅当没有结果摘要时兜底**（避免错误文案显示两遍） |
+| `ms` | `s.ms` | |
+| `call_id` | `s.call_id` | 与 SSE 的 `tool_call` / `tool_result` **同一套**配对依据 |
+
+**「结果」区在一次性路径下也必须有内容**（2026-11-10 独立复验实测的残留）：
+
+- 复验前：前端硬编码 `result: null`，后端 `steps[]` 也不带结果摘要
+  → 真实 DOM 里 `.ag-tool-result` 节点数 = **0**（工具卡「结果」区恒为空）。
+- 现在：后端 `steps[]` 补发 `summary`（**与 SSE `tool_result` 事件同一个
+  函数** `_tool_result_summary()` 的输出，逐字相同）与 `call_id`，
+  前端通过**已有的归一化层**消费 —— 两条路径共用一套归一化，
+  渲染层不用知道后端字段叫什么。
+
+**失败工具**的 `summary` 就是**错误文案**（例：`"未知工具：xxx"`），
+显示在「结果」行里；此时 `error` 字段留空，避免同一句话显示两遍。
+
+契约字段的完整定义见 `docs/内置多模态Agent-接口契约.md` §1.2.1。
 
 ---
 
@@ -380,7 +413,7 @@ python3 -m pytest tests/test_agent_frontend_enh.py \
 
 ### 7.1.1 跨侧契约测试（**本次审查最关键的补强**）
 
-`tests/test_agent_contract.py`（19 条）—— **测试数据来自真实后端产出，
+`tests/test_agent_contract.py`（**27 条**，6 个契约类）—— **测试数据来自真实后端产出，
 断言打在真实前端代码上**：
 
 | 契约 | 用例 | 数据来源 | 断言落点 |
@@ -390,6 +423,7 @@ python3 -m pytest tests/test_agent_frontend_enh.py \
 | ③ 澄清字段 | 5 | 真 Agent 产出的澄清结果 | DOM 里必须出现选项 chip |
 | ④ steps[].args | 3 | 真 Agent 产出的 `steps[]` | DOM 里必须出现「参数」行 |
 | ⑤ 音乐 aspect | 3 | 真 `mode_schema("t2a")` + 真任务卡 | 音乐卡不得渲染「比例」 |
+| ⑥ **一次性路径工具结果** | **8** | 真 `server.make_app()` 的**一次性 JSON 响应** | DOM 里必须出现**非空**的「结果」行 |
 
 **为什么这样写**：审查实测 5 处契约断裂，**两侧测试各自全绿** ——
 因为没有任何一条测试跨越前后端两侧（假覆盖）。
@@ -397,6 +431,13 @@ python3 -m pytest tests/test_agent_frontend_enh.py \
 1. 测试数据必须来自**真实后端产出**（真起 app、真跑 Agent）；
 2. 断言必须打在**真实前端代码**（真 Chromium + 真 `web/agent.js`）；
 3. 端到端那条用**前端真实请求形态**打**真实 `server.make_app()`**。
+
+**契约 ⑥（2026-11-10 独立复验后新增）** 覆盖的是复验点名的残留：
+一次性（非 SSE）降级路径下工具卡「结果」区恒为空
+（`.ag-tool-result` 节点数 = 0）。8 条用例覆盖：
+后端 `steps[]` 带 `summary` / `call_id`、一次性与 SSE 的摘要**逐字一致**、
+失败工具的 `summary` 是错误文案、前端 `tools[].result` 不再是 `null`、
+DOM 里「参数」「结果」两行都在。
 
 **变异测试实测**（回退每个修复 → 对应命名断言变红）：
 
@@ -408,6 +449,34 @@ python3 -m pytest tests/test_agent_frontend_enh.py \
 | 前端不读 `summary` | `test_frontend_consumes_backend_tool_result_payload` 等 2 条 |
 | 前端丢弃 `steps[].args` | `test_frontend_uses_steps_args` 等 2 条 |
 | 前端音乐 aspect 无守卫 | `test_frontend_music_card_has_no_aspect` |
+| **后端 `steps[]` 不补 `summary`** | `test_backend_steps_carry_summary` 等 **7 条** |
+| **后端 `steps[]` 不补 `call_id`** | `test_backend_steps_carry_call_id` 等 **2 条** |
+| **前端一次性路径 `result` 写死 null** | `test_frontend_one_shot_result_is_not_null` 等 **4 条** |
+
+**浏览器层取证**（`scripts/verify_agent_contract_fix.py`）：
+
+| 场景 | 断言 |
+|---|---|
+| A 工具链 + 任务卡 | 工具块的「参数」「结果」两行都在 |
+| B 澄清式提问 | DOM 里有澄清 chip + hint + 输入框 |
+| C 流式增量 | SSE 分块到达（chunkCount ≥ 2）+ 事件顺序正确 |
+| **D U+200B 注入** | ① 前端 `injection_detected` + warning ② 记忆写入是**失败态**且显示拒绝原因 ③ 模型**真实收到**的 system 提示词里**没有**载荷（可读形式与原始形式都没有）④ 长期记忆库里**没有** `injected_pref` |
+| **E 一次性降级路径** | `.ag-tool-result` 节点数 ≥ 1、每个工具块「参数」「结果」两行都有、失败工具显示「未知工具」错误文案、真实后端的 `steps[]` 带 `summary` 与 `call_id` |
+
+场景 D 的取证方式：mock LLM 记录**每一次真实请求体**，断言打在**模型真实
+收到的 messages** 上，不是读源码。
+场景 E 的造降级方式：Playwright 路由**改写请求体去掉 `stream`** 再
+**转发给真实服务端** —— 服务端是真的，`steps[]` 里的 `summary`/`call_id`
+是真的后端产出，前端走的是真的一次性路径代码（**不是**在前端伪造 fetch
+返回体）。
+
+**变异测试实测**（破坏产品代码 → 浏览器断言必须报 FAIL）：
+
+| 变异 | 浏览器断言结果 |
+|---|---|
+| 隐藏字符集退回手抄 4 字符 | 场景 D 三层断言全红 |
+| 前端一次性路径 `result` 写死 null | 场景 E「结果」区断言全红 |
+| 后端 `steps[]` 不补 `summary` | 场景 E「结果」区 + `steps[]` 字段断言全红 |
 
 ### 7.2 真实浏览器证据
 
@@ -484,6 +553,69 @@ python3 scripts/verify_jobcard_live_update.py 8473 <证据目录>
 | `web/app.js` | 改 | **仅一处**：`loadGenerationTypes()` 里把服务端的 `agent_asset_slots` 喂给 `AgentMedia.applyServerAgentSlots()` |
 | `tests/test_agent_frontend_enh.py` | **新增** | 31 个前端用例 |
 | `tests/test_agent_media_semantics_frontend.py` | **新增** | 21 个媒体语义用例（原 `test_agent_media_semantics.py` 改名） |
-| `tests/test_agent_contract.py` | **新增** | 19 个**跨侧契约**用例（真实后端 → 真实前端） |
+| `tests/test_agent_contract.py` | **新增** | **27 个跨侧契约用例**（真实后端 → 真实前端），含契约 ⑥ 一次性路径工具结果 8 条 |
 | `scripts/verify_agent_frontend_enh.py` | **新增** | 真实浏览器三档宽度证据采集脚本 |
 | `scripts/verify_jobcard_live_update.py` | **新增** | 任务卡实时更新端到端证据脚本（无桩） |
+| `scripts/verify_agent_contract_fix.py` | 改 | 契约修复的浏览器取证脚本：新增**场景 D（U+200B 注入）**与**场景 E（一次性降级路径）**，mock LLM 记录真实请求体 |
+
+---
+
+## 9.2 独立复验后的二次修订（2026-11-10）
+
+第一轮修复后，独立复验实测发现 **2 处残留** + **1 处交付缺陷**。
+本节记录这三项的处理结果。
+
+### 9.2.1 A：U+200B 仍能绕过注入检测（已修）
+
+**复验实测的事实**：第一轮把零宽字符集补成
+`[\u200c\u200d\u2060\ufeff]` 四个，**不含 U+200B**（ZERO WIDTH SPACE）。
+实测 `detect_injection` 返回 `False`、记忆写入**不拒写**、
+载荷原样入库并经 `summary_for_prompt` 进入 system 提示词。
+其余四种变体均拒写 —— 属**修复不完整**，不是回归。
+
+**根因**：字符集是**逐个手抄**的。漏一个就漏一条完整绕过路径，
+而且 `agent_safety` / `agent_memory` 各抄一份，抄漏一处必然不一致。
+
+**修法（不再手抄清单）**：
+
+- `h3studio/agent_safety.py` 新增 `hidden_chars()`：
+  **按 Unicode 类别 Cf 取全集**（170 码位）+ 明确列举的**隐形空白**
+  （15 码位，含复验点名的 **U+202F** —— 它的类别是 Zs 不是 Cf，
+  只按 Cf 取全会漏）。
+- 惰性构建 + 模块级缓存，导入成本 **0**（按类别扫全码位约 56ms，
+  放在模块导入里会拖慢每次起服务）。
+- `agent_safety.sanitize` 与 `agent_memory.sanitize_value`
+  共用**同一个** `_hidden_re()` 对象 —— 单一真源，不可能漂移。
+- 不变量「**检测用文本 == 清理后文本**」对**全部 185 个码位**成立，
+  断言锁在 `tests/test_agent_backend_enh.py` 的
+  `TestHiddenCharInjectionBypass` 类（`test_detection_text_equals_sanitized_text_for_every_variant`）。
+
+### 9.2.2 B：一次性路径工具卡「结果」区恒为空（已修）
+
+**复验实测的事实**：第一轮补了 `steps[].args`（参数行），但**结果行仍空**：
+前端硬编码 `result: null`、后端 `steps[]` 不带结果摘要字段，
+真实 DOM 里 `.ag-tool-result` 节点数 = **0**。
+
+**修法**：
+
+- 后端 `h3studio/agent.py` 的 `steps[]` 补发 `summary`
+  （**与 SSE `tool_result` 事件同一个函数** `_tool_result_summary()` 的输出
+  —— 两条路径摘要**逐字相同**；失败工具的错误文案由该函数统一产出）
+  与 `call_id`。
+- 前端 `web/agent.js` 的 `syncToolsFromSteps` 通过**已有的归一化层**
+  （`normalizeToolResult` / `normalizeToolName`）消费，
+  不再硬编码 `result: null` —— 与 SSE 的 `tool_result` **同一条消费路径**。
+- 失败工具的错误文案**只显示一次**（结果行里已有，`error` 字段留空）。
+
+契约字段定义见 `docs/内置多模态Agent-接口契约.md` §1.2.1。
+
+### 9.2.3 C：证据路径全部打不开（已修）
+
+**复验实测的事实**：第一轮汇报引用的 11 个 `evidence/agent-enh-fix/*` 路径
+在仓库里 `git ls-files` **0 条** —— 从未进过任何分支；文件只在工作区，
+其中 `server_stdout.log` 在工作区实测为 **0 字节**空文件却仍被索引。
+
+**修法**：把真实证据文件（截图 / json / 回归名单）**复制进仓库**
+`evidence/agent-enh-fix/` 并提交，路径与汇报引用**逐一对上**；
+**移除 0 字节空日志的索引条目**（空文件不引用）。
+汇报里不再出现仓库中不存在的路径。

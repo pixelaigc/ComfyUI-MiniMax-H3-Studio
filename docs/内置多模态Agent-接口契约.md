@@ -83,7 +83,8 @@
   "prompt": { "original": "…", "enhanced": "…", "spec_id": "image", "validation_ok": true },
   "steps": [
     { "step": 1, "tool": "search_assets", "ok": true, "ms": 1200,
-      "args": "{\"query\":\"雷神\"}", "error": null, "note": null }
+      "args": "{\"query\":\"雷神\"}", "error": null,
+      "summary": "找到 3 条结果", "call_id": "call_search_1" }
   ],
   "usage": { "steps": 4, "tool_calls": 5, "elapsed_ms": 213000 },
   "provider": { "name": "本机 Qwen 多模态", "model": "qwen3.8-flash-next-iq3_xxs" },
@@ -99,7 +100,66 @@
 }
 ```
 
-#### 1.2.1 澄清字段（`needs_clarification` 时）
+#### 1.2.1 `steps[]` 字段（2026-11-10 独立复验后补齐）
+
+`steps[]` 是一轮对话里**每一次工具调用**的轨迹。两种形态：
+
+**A. 工具调用步骤**（`tool` 非空）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `step` | int | 步骤序号（从 1 开始） |
+| `tool` | string | 工具名（`create_job` / `search_assets` / …） |
+| `ok` | bool | 工具是否成功 |
+| `ms` | int | 累计耗时（毫秒） |
+| `args` | string | **JSON 字符串**（不是对象）。完整参数，最多 200 字符 |
+| `error` | string\|null | 失败时的错误文案 |
+| `summary` | string | **结果摘要**（见下） |
+| `call_id` | string | 工具调用 id，与 SSE 的 `tool_call` / `tool_result` 事件**同一套**配对依据 |
+
+**B. 「推模型继续」步骤**（`tool` 为 `null`）
+
+只有 `step` / `tool` / `ok` / `ms` / `note` 五个字段，`note` 说明为什么推它继续
+（例：`"模型只做了口头承诺，已推它继续调工具"`）。**没有** `args` / `summary` /
+`call_id` —— 前端渲染时要按 `tool == null` 跳过。
+
+##### `summary` —— 与 SSE `tool_result` **同源**的结果摘要
+
+`summary` 由后端**同一个函数** `_tool_result_summary(tool, result, ok)` 产出
+（`h3studio/agent.py`），与 SSE `tool_result` 事件里的 `summary` 字段
+**逐字相同**。因此：
+
+- 同一次工具调用，在**一次性 JSON** 和 **SSE** 两条路径下，
+  用户看到的摘要**完全一致**；
+- **失败工具**的 `summary` 就是**错误文案**
+  （例：`"未知工具：no_such_tool_for_contract_test"`）。
+
+> **为什么以前没有这个字段**：一次性路径只有 `steps[]`，而 `steps[]` 不带
+> 结果摘要，前端只能把 `result` 硬编码成 `null` ——
+> 独立复验实测 `.ag-tool-result` 节点数 = **0**（工具卡「结果」区恒为空）。
+> 现在后端补发 `summary`，前端归一化层消费，两条路径共用一套归一化。
+
+##### `call_id` —— 前后端配对依据
+
+同一个工具可能被**并发**调用两次（同名同参或不同参）。
+前端靠 `call_id` 把工具块和结果配对；没有它时前端只能「按名字找第一个
+未完成的」—— 同名并发会串到同一张卡片上。
+
+##### 前端怎么消费（`web/agent.js`）
+
+一次性路径由 `syncToolsFromSteps(msg, steps)` 把 `steps[]` 转成工具轨迹：
+
+| 前端内部字段 | 来源 |
+|---|---|
+| `name` | `normalizeToolName(s)` ← `s.name \|\| s.tool` |
+| `arguments` | `parseStepArgs(s.args)` ← JSON 字符串先 parse（失败保留原文） |
+| `result` | `normalizeToolResult(s)` ← `s.result \|\| s.summary \|\| s.output` |
+| `ok` | `s.ok !== false` |
+| `error` | `s.error`（仅当**没有**结果摘要时兜底，避免错误文案显示两遍） |
+| `ms` | `s.ms` |
+| `call_id` | `s.call_id` |
+
+#### 1.2.2 澄清字段（`needs_clarification` 时）
 
 审查实测：后端原来**只**产出 `clarification`（一个字符串），
 而前端读的是 `clarify_options` / `clarify_hint` —— 契约对不上，
@@ -163,6 +223,11 @@ data: <JSON>
 | `done` | `answer` `status` `jobs` **`clarify_options`** **`clarify_hint`** **`clarification`** | Agent 编排结束（**不是**流的最后一个事件，后面还有 `result`） |
 | `error` | `error` `code` | 错误（可读文案 + 错误码） |
 | `result` | 完整 JSON | 流的**最后一个**事件，结构与一次性接口完全相同（向后兼容基线前端） |
+
+> **两条路径的结果摘要同源**：`tool_result` 事件的 `summary` 与一次性 JSON
+> 里 `steps[].summary` 由**同一个函数** `_tool_result_summary(tool, result, ok)`
+> 产出，**逐字相同**。所以同一次工具调用，用户在流式和一次性两条路径下
+> 看到的摘要完全一致（详见 §1.2.1）。
 
 #### 2.1.1 `call_id`（2026-11-10 新增）
 
