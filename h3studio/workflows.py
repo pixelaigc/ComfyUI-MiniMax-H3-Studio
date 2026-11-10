@@ -16,6 +16,7 @@ import random
 
 from . import loras as lora_registry
 from . import lora_damping
+from . import moss_lora_split
 from . import enhancer
 from . import music_yue2
 
@@ -2061,6 +2062,18 @@ def _moss_lora_chain(lora_items, base_model_ref):
         文本编码器 patch 不到而报 "lora key not loaded"）
       - 本机 MOSS LoRA 都是 transformer.* 键（转换后为 diffusion_model.*），
         模型侧命中即可 —— 见 loras/moss/_INDEX.md 的 204/252 patch 实测。
+
+    ⚠️ 2026-11-10 新增：**融合 qkv 的 LoRA 必须先转成分离形态**。
+
+        MOSS 底模的注意力投影是分离的 `proj.{q,k,v,o}`
+        （custom_nodes/moss-image/model.py 的 `_Block` 用 nn.ModuleDict）。
+        而一批 MOSS LoRA 是在**融合 qkv** 底模上训的，键名 `proj.qkv.*`，
+        直接挂上去 ComfyUI 会**静默丢弃**（只打 "lora key not loaded"，
+        出图照跑但 LoRA 没生效）。
+
+        融合 -> 分离是**无损**的（上游成对文件逐位验证，数值最大绝对差 0.0），
+        所以这里在提交工作流前把派生文件生成出来，工作流引用派生文件。
+        转换失败 -> 明确报错，不静默提交一个必然失效的 LoRA。
     """
     nodes: dict = {}
     current_model = base_model_ref
@@ -2077,10 +2090,29 @@ def _moss_lora_chain(lora_items, base_model_ref):
             strength = 0.0
         if strength <= 0:
             continue
+        # 融合 qkv -> 分离形态（无损）；已是分离形态则原样使用
+        effective = resolved
+        try:
+            split = moss_lora_split.ensure_split_available(path)
+        except Exception as exc:
+            split = {"path": None, "derived": False,
+                     "reason": f"{type(exc).__name__}: {exc}"[:200]}
+        if split.get("path") is None:
+            raise ValueError(
+                f"「{name}」是融合 qkv 形态的 MOSS LoRA，但转换成分离形态失败："
+                f"{split.get('reason') or '未知原因'}。"
+                "本机 MOSS 底模的注意力投影是分离 q/k/v，"
+                "融合形态直接挂上去会被 ComfyUI 静默丢弃（LoRA 不生效）。")
+        if split.get("derived"):
+            effective = lora_registry.lora_name_for_path(split["path"])
+            if not effective:
+                raise ValueError(
+                    f"「{name}」的分离形态派生文件已生成，但 ComfyUI 扫不到它："
+                    f"{split['path']}")
         node_id = f"moss:40{index}"
         nodes[node_id] = {
             "inputs": {
-                "lora_name": resolved,
+                "lora_name": effective,
                 "strength_model": strength,
                 "model": current_model,
             },

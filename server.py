@@ -901,9 +901,21 @@ class Worker:
 
         任何一个批次失败只标记该批次 failed，其余批次继续跑；
         任务整体状态 = done（至少一个成功）/ failed（全部失败）。
+
+        ⚠️ 2026-11-10 修复：**mode 必须从 job_row 的 DB 列取**。
+            旧代码让 `_run_one_batch` 用 `params.get("mode") or "t2i"`，
+            而 params（DB 的 params JSON）里**从来没有 mode 键** ——
+            `params["mode"] = mode` 只在**非批次**分支里设置（server.py:829）。
+            于是 MOSS 批量任务（mode=t2i_moss）走到批次分支时 mode 变成 "t2i"，
+            build_workflow 走的是 **Z-Image t2i** 工作流：
+            用户设的 steps=100 / cfg=4.3 / shift=5 / sgm_uniform 全被忽略，
+            实际跑的是 Z-Image 的 steps=8 + 放大分支的 KSampler(steps=5)
+            —— 界面显示「MOSS-Image 采样步数 100」，日志却只跑 5 步。
+            现在把 mode 显式传下去，批次与单张走**同一条**工作流构建路径。
         """
         job_id = job_row["id"]
         params = json.loads(job_row["params"])
+        mode = job_row["mode"]
         with db() as conn:
             rows = conn.execute(
                 "SELECT * FROM job_batches WHERE job_id=? ORDER BY idx", (job_id,)).fetchall()
@@ -916,7 +928,7 @@ class Worker:
                     "UPDATE job_batches SET status='running', started_at=? WHERE id=?",
                     (time.time(), batch_id))
             try:
-                outputs = await self._run_one_batch(job_id, batch_id, params, row["seed"])
+                outputs = await self._run_one_batch(job_id, batch_id, mode, params, row["seed"])
                 done_count += 1
                 with db() as conn:
                     conn.execute(
@@ -957,9 +969,16 @@ class Worker:
                     "UPDATE jobs SET status='failed', error=?, progress_text=?, finished_at=? WHERE id=?",
                     ("所有批次均失败", f"0/{total} 批次成功", time.time(), job_id))
 
-    async def _run_one_batch(self, job_id: str, batch_id: str, params: dict, seed):
-        """跑单个批次并返回产物列表（文件已落盘）。"""
-        mode = params.get("mode") or "t2i"
+    async def _run_one_batch(self, job_id: str, batch_id: str, mode: str,
+                             params: dict, seed):
+        """跑单个批次并返回产物列表（文件已落盘）。
+
+        mode 由调用方从 jobs 表的 mode 列传入（**不能**从 params 里取 ——
+        params 里没有 mode 键，见 _run_batches 的说明）。
+        批次与单张走**完全相同**的 build_workflow(mode, params) 路径，
+        所以 steps / cfg / shift / scheduler / seed 的语义一致，
+        只有 seed 按批次递推（每张一个变体）。
+        """
         batch_params = dict(params)
         batch_params["seed"] = int(seed)
         batch_params["job_id"] = f"{job_id}_{batch_id}"

@@ -23,6 +23,7 @@ import sqlite3
 from pathlib import Path
 
 from . import lora_damping
+from . import moss_lora_compat
 from .lora_catalog_effects import ALL_EFFECTS as _EFFECT_CATALOG
 from .lora_catalog_effects import FAMILY_PREFIXES as _EFFECT_FAMILY_PREFIXES
 from .lora_catalog_ea import EA_ALL_EFFECTS as _EA_CATALOG
@@ -1158,10 +1159,9 @@ _MOSS_KEYS_CACHE: set[str] | None = None
 def _moss_base_layer_keys() -> set[str] | None:
     """MOSS-Image 底模的层键集合（带 `diffusion_model.` 前缀）。
 
-    MOSS 的底模是 diffusers 目录（transformer/ 下 3 个分片），
-    没有单文件 safetensors 可读 —— 但**不需要**把 9.5GB 权重读出来：
-    `diffusion_pytorch_model.safetensors.index.json` 里的 weight_map
-    就是完整的张量名清单，跟实际加载后的 state_dict 键一一对应。
+    实现搬到了 `h3studio.moss_lora_compat` —— 那里同时住着
+    「融合 qkv vs 分离 q/k/v」的形态判定与无损拆分规则，
+    键集合与形态判定必须用**同一份底模真相**，否则又会各说各话。
 
     键前缀说明（2026-11-09 实测）：ComfyUI 加载 MOSS 后，
     `model_lora_keys_unet()` 只登记 `diffusion_model.*` 一种写法
@@ -1170,75 +1170,28 @@ def _moss_base_layer_keys() -> set[str] | None:
     直接丢进 models/loras/ 会**静默不加载**，
     必须用带 `diffusion_model.` 前缀的版本。
     """
-    global _MOSS_KEYS_CACHE
-    if _MOSS_KEYS_CACHE is not None:
-        return _MOSS_KEYS_CACHE or None
-    roots = [
-        Path("/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-Base"),
-        Path("/mnt/nvme1t_colorful/comfyui-models/MOSS-Image-SFT"),
-    ]
-    keys: set[str] = set()
-    for root in roots:
-        index = root / "transformer" / "diffusion_pytorch_model.safetensors.index.json"
-        if not index.is_file():
-            continue
-        try:
-            weight_map = json.loads(index.read_text(encoding="utf-8")).get("weight_map", {})
-        except Exception:
-            continue
-        for name in weight_map:
-            for suffix in (".weight", ".bias"):
-                if name.endswith(suffix):
-                    keys.add("diffusion_model." + name[: -len(suffix)])
-                    break
-            else:
-                keys.add("diffusion_model." + name)
-        if keys:
-            break
-    _MOSS_KEYS_CACHE = keys
-    return keys or None
+    return moss_lora_compat.moss_base_layer_keys()
 
 
 def _check_moss_compatibility(path: Path) -> dict:
-    """MOSS-Image 的兼容性判定（用底模 index.json 的层键清单）。
+    """MOSS-Image 的兼容性判定（逐模块去底模真实键集合里查）。
 
-    MOSS 没有单文件 UNET，但底模的层名清单在
-    `diffusion_pytorch_model.safetensors.index.json` 里 ——
-    与 ComfyUI 加载后的 state_dict 键一一对应，成本是读一个 JSON。
+    ⚠️ 2026-11-10 重写 —— 旧实现是**假兼容**，是「静默失效」的根因：
 
-    判定口径与其它两族一致：`.proj.{q,k,v,o}` 投影层命中率 < 0.8 -> 不兼容。
+        旧实现用正则 `\\.proj\\.(q|k|v|o)$` 挑注意力模块。
+        对**融合 qkv** 的 LoRA（键名 `layers.N.proj.qkv.*`），
+        这个正则**一个都匹配不到** -> 匹配集合为空 ->
+        `_family_layer_hit_ratio()` 返回 (1.0, 0, 0)（「无法判定」）
+        -> 被当成「100% 兼容」-> 界面照常列出 -> 用户选了以为生效，
+        实际 ComfyUI 把 qkv 那部分**静默丢弃**（只打 lora key not loaded）。
 
-    ⚠️ **必须带 `diffusion_model.` 前缀**：ComfyUI 给 MOSS 登记的 key_map
-    只有 `diffusion_model.*` 一种写法（实测 909 个 key 里
-    `transformer.` 前缀为 0 个）。上游 diffusers 原版
-    （`transformer.layers.N.proj.*`）命中率为 0 —— 静默不加载。
+    新实现（见 `h3studio.moss_lora_compat.check_moss_compatibility`）：
+      1. 先判定形态（split / fused / n/a）
+      2. 逐个模块名去底模**真实**键集合里查，命中才叫命中
+      3. 融合 qkv 的模块按「可无损转换」判定（转换后必然命中）
+      4. 命中率 0 / 有未知缺失 -> 明确判为不兼容并给出原因
     """
-    base = {"compatible": True, "reason": "", "attention_hit": 1.0,
-            "attention_hit_count": 0, "attention_total": 0,
-            "relative_perturbation": None, "suggested_strength": 1.0,
-            "strength_cap": 1.0, "ctx_perturbation": None, "ctx_damping": None,
-            "verified": False}
-    unet_keys = _moss_base_layer_keys()
-    if not unet_keys:
-        return base
-    try:
-        bases = _lora_layer_bases(_read_safetensors_header(path))
-    except Exception:
-        return base
-    ratio, hit, total = _family_layer_hit_ratio(bases, unet_keys, "MOSS-Image")
-    base["attention_hit"] = round(ratio, 4)
-    base["attention_hit_count"] = hit
-    base["attention_total"] = total
-    base["verified"] = True
-    if total and ratio < COMPAT_MIN_ATTENTION_HIT:
-        base["compatible"] = False
-        base["reason"] = (
-            f"投影层在 MOSS-Image 底模里不存在（仅 {hit}/{total} 命中）："
-            "该 LoRA 的键名与本机 MOSS 底模对不上，ComfyUI 会静默丢弃"
-            "（只打 \"lora key not loaded\" 的 WARNING，出图照跑但 LoRA 没生效）。"
-            "常见原因：上游 diffusers 原版键名是 `transformer.` 前缀，"
-            "本机 ComfyUI 只认 `diffusion_model.` 前缀。")
-    return base
+    return moss_lora_compat.check_moss_compatibility(path)
 
 
 def list_moss_effect_loras(include_incompatible: bool = False) -> list[dict]:
@@ -1465,6 +1418,23 @@ def resolve_lora(name: str) -> tuple[str, Path | None]:
     dirs = comfyui_lora_dirs()
     rel, absolute = _rel_to_lora_dir(name, dirs)
     return rel, (Path(absolute) if absolute else None)
+
+
+def lora_name_for_path(path) -> str:
+    """绝对路径 -> ComfyUI 里的 lora_name（相对 loras 根目录的 posix 路径）。
+
+    找不到归属目录时返回 ""（调用方必须据此报错）。
+    """
+    if path is None:
+        return ""
+    candidate = Path(path)
+    for directory in comfyui_lora_dirs():
+        try:
+            if candidate.is_file() and candidate.is_relative_to(directory):
+                return candidate.relative_to(directory).as_posix()
+        except (OSError, ValueError):
+            continue
+    return ""
 
 
 # ------------------------------------------------------------------ 持久化
