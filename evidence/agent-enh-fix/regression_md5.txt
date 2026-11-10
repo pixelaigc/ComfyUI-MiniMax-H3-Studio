@@ -1,0 +1,7 @@
+baseline_failures_canonical_md5 = 7aecedc45b683dc99d7d13389e01db0c
+fix_failures_canonical_md5      = 7aecedc45b683dc99d7d13389e01db0c
+baseline_count = 161
+fix_count = 161
+only_in_baseline = 0
+only_in_fix = 0
+identical = True
