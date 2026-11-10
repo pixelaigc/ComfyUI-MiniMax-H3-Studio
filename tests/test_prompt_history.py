@@ -16,6 +16,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -31,6 +32,97 @@ def _conn():
     conn.row_factory = sqlite3.Row
     ph.ensure_table(conn)
     return conn
+
+
+class _IsolatedLoop:
+    """在一个**独立线程**里跑 async 代码，自带一个干净的、**长驻**的 event loop。
+
+    【为什么要这样，而不是直接 asyncio.new_event_loop() + run_until_complete】
+
+    全量 pytest 里，前面任何一个浏览器用例的 setUpClass 失败（Playwright
+    超时之类），它的 tearDownClass 就不会执行 —— 于是 `playwright.stop()`
+    不会被调用。Playwright 的 sync API 内部持有一个**正在运行**的 event
+    loop（它用 greenlet 驱动 `loop.run_until_complete`），并且这个 loop
+    会留在**主线程**上。
+
+    主线程里已经有一个正在运行的 loop 时，再调
+    `loop.run_until_complete(...)` 直接抛：
+        RuntimeError: Cannot run the event loop while another loop is running
+    实测（2026-11-10）：全量套件里 `TestPageSize` 先超时失败，
+    本文件里的 HTTP 接口类与端到端类全部 setup ERROR，就是撞上了这个。
+
+    放到独立线程里跑，线程有自己的 loop 政策，主线程那个「脏」的
+    running loop 碰不到我们 —— 既不受它的影响，也不去影响后面的用例。
+
+    【为什么必须是「一个线程 + 一个长驻 loop」】
+    aiohttp 的 ClientSession 会记住创建它时的那个 loop。
+    如果每次请求都新起一个线程/新 loop，第一个请求建的 session
+    在第二个请求里就会报 "Event loop is closed"。
+    所以：线程与 loop 都**只建一次**，后续请求用 `run_coroutine_threadsafe`
+    投递回同一个 loop 上执行。
+
+    用法：
+        runner = _IsolatedLoop()
+        runner.start()
+        status, body = runner.run(self.client.get(url))
+        runner.stop()
+    """
+
+    def __init__(self):
+        self._loop = None
+        self._thread = None
+        self._ready = threading.Event()
+
+    # ------------------------------------------------------------ 生命周期
+    def start(self):
+        """起线程并在里面建好 loop（必须先调 start，再调 run）。"""
+        if self._thread is not None:
+            return
+
+        def target():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._loop = loop
+            self._ready.set()
+            try:
+                loop.run_forever()
+            finally:
+                try:
+                    loop.close()
+                finally:
+                    asyncio.set_event_loop(None)
+
+        self._thread = threading.Thread(target=target, daemon=True,
+                                        name="ph-isolated-loop")
+        self._thread.start()
+        if not self._ready.wait(timeout=30):
+            raise RuntimeError("隔离事件循环线程启动超时")
+
+    def stop(self):
+        """停掉线程与 loop（幂等）。"""
+        loop, self._loop = self._loop, None
+        thread, self._thread = self._thread, None
+        if loop is not None:
+            loop.call_soon_threadsafe(loop.stop)
+        if thread is not None:
+            thread.join(timeout=30)
+
+    # ------------------------------------------------------------ 执行
+    def run(self, factory, timeout=120):
+        """factory 是返回协程的无参可调用对象。返回它的结果。"""
+        if self._loop is None:
+            raise RuntimeError("_IsolatedLoop 还没 start()")
+        coro = factory()
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result(timeout=timeout)
+
+    def __enter__(self):
+        self.start()
+        return self.run
+
+    def __exit__(self, *exc):
+        self.stop()
+        return False
 
 
 class TestPromptHistoryWrite(unittest.TestCase):
@@ -311,9 +403,14 @@ class TestPromptHistoryApi(unittest.TestCase):
         app.router.add_delete("/api/prompt-history", server_mod.api_prompt_history_delete)
 
         # TestClient 的构造需要「正在运行的事件循环」（CookieJar 会去取
-        # running loop），所以 server + client 都要在同一个 loop 内启动。
-        cls.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(cls.loop)
+        # running loop），所以 server + client 要在同一个 loop 内启动。
+        #
+        # 【关键】这个 loop 必须待在**独立线程**里 —— 见 _IsolatedLoop 的
+        # 注释：主线程可能残留着别的用例留下的「正在运行的」loop，
+        # 那样在这里 run_until_complete 会直接抛
+        # "Cannot run the event loop while another loop is running"。
+        cls.loop = _IsolatedLoop()
+        cls.loop.start()
 
         async def boot():
             cls.server = TestServer(app)
@@ -321,25 +418,30 @@ class TestPromptHistoryApi(unittest.TestCase):
             cls.client = TestClient(cls.server)
             await cls.client.start_server()
 
-        cls.loop.run_until_complete(boot())
+        cls.loop.run(boot)
 
     @classmethod
     def tearDownClass(cls):
-        cls.loop.run_until_complete(cls.client.close())
-        cls.loop.run_until_complete(cls.server.close())
-        cls.loop.close()
-        # 把当前线程的 event loop 还原（否则后面的用例拿到的是已关闭的 loop）
-        asyncio.set_event_loop(None)
-        import server as server_mod
-        server_mod.DB_PATH = cls._orig_db_path
+        try:
+            cls.loop.run(cls.client.close)
+        finally:
+            try:
+                cls.loop.run(cls.server.close)
+            finally:
+                cls.loop.stop()
+                import server as server_mod
+                server_mod.DB_PATH = cls._orig_db_path
 
     def _get(self, **params):
         query = "&".join(f"{k}={v}" for k, v in params.items())
         url = "/api/prompt-history" + (("?" + query) if query else "")
-        resp = self.loop.run_until_complete(self.client.get(url))
-        # aiohttp 的 resp.json() 是协程 —— 必须 await，否则拿到的是协程对象。
-        body = self.loop.run_until_complete(resp.json())
-        return resp.status, body
+
+        async def go():
+            resp = await self.client.get(url)
+            # aiohttp 的 resp.json() 是协程 —— 必须 await，否则拿到的是协程对象。
+            return resp.status, await resp.json()
+
+        return self.loop.run(go)
 
     def test_endpoint_returns_expected_shape(self):
         status, body = self._get(panel_key="t2i", limit=5, offset=0)
@@ -390,7 +492,10 @@ class TestPromptHistoryApi(unittest.TestCase):
         self.assertLessEqual(body["limit"], ph.MAX_LIMIT)
 
     def test_delete_requires_panel_key(self):
-        resp = self.loop.run_until_complete(self.client.delete("/api/prompt-history"))
+        async def go():
+            return await self.client.delete("/api/prompt-history")
+
+        resp = self.loop.run(go)
         self.assertEqual(resp.status, 400)
 
     def test_delete_clears_panel_only(self):
@@ -398,8 +503,12 @@ class TestPromptHistoryApi(unittest.TestCase):
         with server_mod.db() as conn:
             ph.record(conn, "api_del", "要删的")
             ph.record(conn, "api_keep", "要留的")
-        resp = self.loop.run_until_complete(
-            self.client.delete("/api/prompt-history?panel_key=api_del"))
+
+        async def go():
+            return await self.client.delete(
+                "/api/prompt-history?panel_key=api_del")
+
+        resp = self.loop.run(go)
         self.assertEqual(resp.status, 200)
         _, body = self._get(panel_key="api_keep")
         self.assertTrue(body["items"])
@@ -425,8 +534,9 @@ class TestPromptHistoryEndToEnd(unittest.TestCase):
         server_mod.init_db()
 
         app = server_mod.make_app()
-        cls.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(cls.loop)
+        # 【关键】独立线程的 event loop —— 理由见 _IsolatedLoop 的注释。
+        cls.loop = _IsolatedLoop()
+        cls.loop.start()
 
         async def boot():
             cls.server = TestServer(app)
@@ -434,16 +544,19 @@ class TestPromptHistoryEndToEnd(unittest.TestCase):
             cls.client = TestClient(cls.server)
             await cls.client.start_server()
 
-        cls.loop.run_until_complete(boot())
+        cls.loop.run(boot)
 
     @classmethod
     def tearDownClass(cls):
-        cls.loop.run_until_complete(cls.client.close())
-        cls.loop.run_until_complete(cls.server.close())
-        cls.loop.close()
-        asyncio.set_event_loop(None)
-        import server as server_mod
-        server_mod.DB_PATH = cls._orig_db_path
+        try:
+            cls.loop.run(cls.client.close)
+        finally:
+            try:
+                cls.loop.run(cls.server.close)
+            finally:
+                cls.loop.stop()
+                import server as server_mod
+                server_mod.DB_PATH = cls._orig_db_path
 
     def _post_job(self, mode, params):
         """按真实前端的方式提交一个生成任务（multipart/form-data）。"""
@@ -461,13 +574,13 @@ class TestPromptHistoryEndToEnd(unittest.TestCase):
             resp = await self.client.post("/api/jobs", data=body,
                                           headers={"Content-Type": ctype})
             return resp.status, await resp.json()
-        return self.loop.run_until_complete(go())
+        return self.loop.run(go)
 
     def _history(self, panel_key):
         async def go():
             resp = await self.client.get(f"/api/prompt-history?panel_key={panel_key}")
             return await resp.json()
-        return self.loop.run_until_complete(go())
+        return self.loop.run(go)
 
     def test_submit_records_original_and_final_prompt(self):
         status, body = self._post_job("t2i", {
