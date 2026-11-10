@@ -1,0 +1,132 @@
+{
+  "cases": {
+    "普通": {
+      "wrapper": "Japanese, piano pop, bittersweet, breathy female vocal, acoustic piano, sustained strings, 76 BPM, builds from quiet to loud, full-length song, about four minutes, 雨夜告别",
+      "authority": "Japanese, piano pop, bittersweet, breathy female vocal, acoustic piano, sustained strings, 76 BPM, builds from quiet to loud, full-length song, about four minutes, 雨夜告别"
+    },
+    "纯器乐": {
+      "wrapper": "English, ambient, calm, felt piano, 60 BPM, low energy",
+      "authority": "English, ambient, calm, felt piano, 60 BPM, low energy"
+    },
+    "括号省略": {
+      "wrapper": "",
+      "authority": ""
+    },
+    "custom 语言与曲风": {
+      "wrapper": "粤语, city pop, warm, husky male vocal, acoustic guitar, 92 BPM, mid energy, radio-length song, about two to three minutes",
+      "authority": "粤语, city pop, warm, husky male vocal, acoustic guitar, 92 BPM, mid energy, radio-length song, about two to three minutes"
+    },
+    "BPM 非数字": {
+      "wrapper": "English, jazz, smooth, warm female vocal, upright bass, mid energy, short song, about one minute",
+      "authority": "English, jazz, smooth, warm female vocal, upright bass, mid energy, short song, about one minute"
+    },
+    "全空": {
+      "wrapper": "",
+      "authority": ""
+    }
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "[等价] 普通 两条路径输出必须一致",
+      "detail": "wrapper='Japanese, piano pop, bittersweet, breathy female vocal, acoustic piano, sustained strings, 76 BPM, builds from quiet to loud, full-length song, about four minutes, 雨夜告别' authority='Japanese, piano pop, bittersweet, breathy female vocal, acoustic piano, sustained strings, 76 BPM, builds from quiet to loud, full-length song, about four minutes, 雨夜告别'"
+    },
+    {
+      "ok": true,
+      "label": "[等价] 纯器乐 两条路径输出必须一致",
+      "detail": "wrapper='English, ambient, calm, felt piano, 60 BPM, low energy' authority='English, ambient, calm, felt piano, 60 BPM, low energy'"
+    },
+    {
+      "ok": true,
+      "label": "[等价] 括号省略 两条路径输出必须一致",
+      "detail": "wrapper='' authority=''"
+    },
+    {
+      "ok": true,
+      "label": "[等价] custom 语言与曲风 两条路径输出必须一致",
+      "detail": "wrapper='粤语, city pop, warm, husky male vocal, acoustic guitar, 92 BPM, mid energy, radio-length song, about two to three minutes' authority='粤语, city pop, warm, husky male vocal, acoustic guitar, 92 BPM, mid energy, radio-length song, about two to three minutes'"
+    },
+    {
+      "ok": true,
+      "label": "[等价] BPM 非数字 两条路径输出必须一致",
+      "detail": "wrapper='English, jazz, smooth, warm female vocal, upright bass, mid energy, short song, about one minute' authority='English, jazz, smooth, warm female vocal, upright bass, mid energy, short song, about one minute'"
+    },
+    {
+      "ok": true,
+      "label": "[等价] 全空 两条路径输出必须一致",
+      "detail": "wrapper='' authority=''"
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] STATIC_ENUMS 是 re-export 而非副本",
+      "detail": "identity 不同 -> 有一份拷贝"
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] LENGTH_HINTS 是 re-export 而非副本",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] LYRIC_TEMPLATES 是 re-export 而非副本",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] STYLE_FIELDS 是 re-export 而非副本",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] _omit 是 re-export 而非副本",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] get_enums 是 re-export 而非副本",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[下发一致] style_options().length_hint_text == 权威 LENGTH_HINTS",
+      "detail": "got={'model decides': '', 'short clip (~45-75s)': 'short song, about one minute', 'single edit (~2-3 min)': 'radio-length song, about two to three minutes', 'full song (~3.5-5 min)': 'full-length song, about four minutes', 'very long (may truncate)': 'long-form song with extended sections'} want={'model decides': '', 'short clip (~45-75s)': 'short song, about one minute', 'single edit (~2-3 min)': 'radio-length song, about two to three minutes', 'full song (~3.5-5 min)': 'full-length song, about four minutes', 'very long (may truncate)': 'long-form song with extended sections'}"
+    },
+    {
+      "ok": true,
+      "label": "[同一对象] 旧名 LENGTH_HINT_TEXT 仍指向权威映射",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[唯一权威] `STATIC_ENUMS = {` 只应在一处定义",
+      "detail": "发现于 ['yue2_schema.py']"
+    },
+    {
+      "ok": true,
+      "label": "[唯一权威] `LENGTH_HINTS = {` 只应在一处定义",
+      "detail": "发现于 ['yue2_schema.py']"
+    },
+    {
+      "ok": true,
+      "label": "[唯一权威] `LYRIC_TEMPLATES = {` 只应在一处定义",
+      "detail": "发现于 ['yue2_schema.py']"
+    },
+    {
+      "ok": true,
+      "label": "[唯一权威] `def _omit(` 只应在一处定义",
+      "detail": "发现于 ['yue2_schema.py']"
+    },
+    {
+      "ok": true,
+      "label": "[前端不硬编码] 前端 JS 里不得出现 length_hint 英文描述字面量",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "[前端取服务端] music.js 必须从 /api/music-options 读 length_hint_text",
+      "detail": ""
+    }
+  ],
+  "passed": 20,
+  "failed": 0
+}

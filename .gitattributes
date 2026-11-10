@@ -1,0 +1,71 @@
+# 仓库行尾策略（2026-11-09 综合审查返修引入）
+#
+# 【问题】
+# 本仓库历史上混用 CRLF / LF，且没有 .gitattributes，行尾完全依赖每个
+# 开发者/工具的本地设置。后果（审查报告 P0-3 实测）：
+#   - `git diff --stat` 显示 server.py 5827 行「巨改」，真实改动只有 233 行
+#   - 任何涉及这些文件的合并都产生大量**伪冲突**（行尾差异）
+#   - 人工审查几乎必然漏掉真问题
+#
+# 【策略：blob 字节对齐合并目标】
+# 合并目标（local/maintainer / local/feature/enh-unify）里这批文件是
+# **CRLF blob**。要让合并不再产生伪冲突，唯一可靠的办法是让**本分支的
+# blob 字节与之完全一致** —— 不是靠 .gitattributes 在合并时转换。
+#
+# 关键事实（已实测验证，勿凭直觉改）：
+#   - `text eol=crlf` 会在 **add 时把 blob 归一化成 LF**，
+#     所以它**无法**保住历史 CRLF blob（checkout 时才转回 CRLF）。
+#   - `-text` 才是「原样保存字节」：blob 里带不带 CR 完全由提交内容决定。
+#   - merge 比对的是 **blob 字节**。base 是 CRLF、ours 是 LF 时，
+#     即使开了 `merge.renormalize=true` 也照样冲突（已实测）。
+#   => 结论：CRLF 文件必须用 `-text` 标注，**并且**工作区内容本身是 CRLF。
+#
+# 【规则顺序很重要】
+# git 的 .gitattributes 是「**最后一条匹配规则生效**」。
+# 所以通配规则 `* text=auto eol=lf` 必须写在**前面**，
+# 后面再用具体路径的 `-text` 覆盖它。
+# （若顺序写反，具体规则会被通配规则盖掉 —— 已踩过一次。）
+#
+# 【给后续维护者】
+#   要改这批 CRLF 文件时，**保持工作区里就是 CRLF**（用编辑器或
+#   `unix2dos`），不要让它变成 LF —— 否则又会制造一次全文件伪冲突。
+#   校验：`git ls-files --eol | grep -v 'i/lf'`   # 只应剩下面这批 crlf
+#
+# 【新文件用 LF】
+#   其余所有文本文件一律 LF（text=auto eol=lf）——
+#   这是跨平台最稳的选择，也让 git 的 blob 归一化生效。
+
+# ---- 通配规则（先写，具体规则在后面覆盖它）----
+* text=auto eol=lf
+
+# ---- 历史遗留的 CRLF 文件：字节原样保存（-text）----
+# 注意：这些文件的工作区内容必须保持 CRLF，提交时才会存成 CRLF blob。
+/.gitignore            -text
+/LICENSE               -text
+/README.md             -text
+/config.example.json   -text
+/h3studio/workflows.py -text
+/projects/wenzhou-60s/merge_video.py    -text
+/projects/wenzhou-60s/prompts.json       -text
+/projects/wenzhou-60s/submit_episode.py -text
+/server.py             -text
+/web/app.js            -text
+/web/index.html        -text
+/web/style.css         -text
+
+# ---- 二进制：明确不参与行尾转换 ----
+*.safetensors binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bin binary
+*.mp4 binary
+*.flac binary
+*.wav binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

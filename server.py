@@ -85,6 +85,8 @@ from h3studio import asset_api
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
+from h3studio import music_style
+from h3studio import yue2_schema
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -262,6 +264,50 @@ FFPROBE = shutil.which("ffprobe")
 LONGFILM_LOCK = asyncio.Lock()
 LONGFILM_TASKS = set()
 LONGFILM_PROCESSES = {}
+
+# ------------------------------------------------------------------ 增强并发闸门
+#
+# 【2026-11-09 审查返修】/api/enhance 之前**没有任何并发限制**。
+# 单次请求最坏挂起 600 秒（llm.MAX_TIMEOUT），N 个并发 = N 个长挂起协程，
+# 会把 aiohttp 连接池占满，并让后续请求一起排队。
+#
+# 为什么用「抢不到就 429」而不是「排队等」：
+#   本机 llama.cpp server 的 total_slots = 1（实测），
+#   多个请求并发进去也只是在模型侧串行排队 —— 对用户没有更快，
+#   只会让所有请求一起等到超时。直接 429 让用户立刻知道「现在忙」，
+#   比静默排队 10 分钟然后超时要好。
+#
+# 为什么用 locked() 而不是 wait_for(acquire(), timeout=0)：
+#   timeout=0 会在 acquire 真正执行前就取消它，结果是**所有**请求都 429
+#   （builtin-agent 分支实测踩过这个坑）。locked() 判据实测 peak 并发
+#   恰好等于上限，无超发。asyncio.Semaphore.acquire 内部是「先减计数再 await」，
+#   本身是原子的。
+#
+# 【2026-11-10 取值裁决】**本文件是唯一权威定义处**。
+#   enh-unify 分支曾取 2、max-token 分支曾取 3，两份定义同时存在于
+#   server.py（后定义覆盖先定义）—— 上限实际值取决于代码顺序，注释也自相矛盾。
+#   现统一取 **3**，理由：
+#     1. 本机 llama.cpp server total_slots = 1（实测），并发请求在模型侧
+#        本就串行；闸门的意义是「不要把 aiohttp 连接池占满 + 给出即时反馈」，
+#        不是「让模型并行跑」。
+#     2. 取 3 时，最坏挂起时长 = 3 × llm.MAX_TIMEOUT(600s) = 30 分钟；
+#        取 2 时是 20 分钟。两者都不构成「一个请求拖住服务 30 分钟」的问题，
+#        因为闸门本身已经挡住了 N+1 个请求。
+#     3. 取 3 对**多选增强**更友好：一次多选要连续跑 2~3 项增强
+#        （普通增强 + 二次增强 + 官方 PE），上限 2 会让同一次操作里的
+#        后续项立刻 429，用户看到「刚点了就报忙」。上限 3 允许同一轮
+#        多选的各项顺序执行而不互相挤掉。
+#   若将来实测 llama.cpp 改为多槽（total_slots > 1），应重新评估此值。
+ENHANCE_CONCURRENCY = 3
+ENHANCE_GATE: asyncio.Semaphore | None = None
+
+
+def _enhance_gate() -> asyncio.Semaphore:
+    """并发闸门（惰性创建，避免 import 期就占住事件循环）。"""
+    global ENHANCE_GATE
+    if ENHANCE_GATE is None:
+        ENHANCE_GATE = asyncio.Semaphore(ENHANCE_CONCURRENCY)
+    return ENHANCE_GATE
 
 
 async def comfy_upload_image(session: ClientSession, path: Path) -> str:
@@ -1090,8 +1136,22 @@ async def api_create(request):
         asset_refs = audio_refs
 
     prompt = (params.get("prompt") or "").strip()
-    if not prompt:
+    if not prompt and mode not in ("t2a", "a2a"):
         return web.json_response({"error": "提示词不能为空"}, status=400)
+    # 【2026-11-09 对齐第三方】音乐模式允许 prompt 为空：
+    # 面板新增了结构化风格（第三方 YuE2StylePrompt 的 12 字段），
+    # 纯结构化也能出活 —— 真正判空在 music_yue2._resolve_style() 里做
+    # （结构化 + 自由文本都空才报错）。
+    if mode in ("t2a", "a2a") and not prompt:
+        has_style_field = any(
+            str(params.get(f"style_{f}") or "").strip()
+            for f in ("language", "genre", "mood", "vocal", "vocal_color",
+                      "instruments", "tempo_bpm", "energy", "length_hint", "extra")
+        )
+        if not has_style_field:
+            return web.json_response(
+                {"error": "音乐风格描述不能为空：请填写自由文本风格描述，或填写结构化风格字段。",
+                 "code": "music_style_required"}, status=400)
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -1560,6 +1620,192 @@ async def api_music_options(request):
     前端据此把不可用的版本标灰并禁用，而不是等提交后才报错。
     """
     return json_ok(music_yue2.model_options())
+
+
+# ------------------------------------------------------------------ YuE2 音乐增强
+async def api_music_enhance(request):
+    """
+    POST /api/music-enhance —— YuE2 音乐专用增强（结构化风格 + 歌词）
+
+    【链路对应】
+    移植自 nonebot 插件 `nonebot_plugin_novelai` 的咏唱「文生音乐」实现：
+      * 系统提示词由 h3studio/yue2_schema.py 的 build_system_prompt() 渲染
+        （枚举从 ComfyUI /object_info 运行时拉，永不二次手抄）
+      * 模型产出的 JSON 由同模块的 normalize_and_validate() 归一化 + 校验
+        （拦脏 COMBO 值、补齐缺字段、纯器乐时强制 vocal_color=(none)）
+      * 归一化后的结构化字段由 h3studio/music_style.py 的 build_style_prompt()
+        合成最终送进 YuE2 节点的 style 串（与官方节点逐条对齐）
+
+    body:
+      prompt      用户的一句话描述（必填，除非 base 提供了现有内容）
+      mode        t2a（文生音乐）/ a2a（参考生音乐）—— 只影响措辞
+      base        可选：以当前内容为底稿做「修改」（而非从零生成）
+      style       可选：当前的结构化风格字段（用户编辑过的那份）
+      lyrics      可选：当前的歌词正文（用户编辑过的那份）
+      provider_id 可选，指定 Provider；不给则用默认 Provider
+
+    返回:
+      style       归一化后的结构化风格字段（12 个字段）
+      lyrics      归一化后的结构化歌词字段（template + lyrics_override）
+      style_text  按官方规则合成的 style 串（预览用）
+      lyrics_text 合成后的歌词文本（预览用）
+      fixes       自动修复清单（界面上可展示，让用户知道模型被纠正过什么）
+      problems    遗留质量问题（不阻断，只提示）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    base = str(payload.get("base") or "").strip()
+    if not original and not base:
+        return web.json_response({"error": "请先输入要增强的描述"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "描述过长（上限 4000 字）"}, status=400)
+
+    mode = str(payload.get("mode") or "t2a").strip()
+    if mode not in ("t2a", "a2a"):
+        mode = "t2a"
+
+    # 选 Provider：显式指定 > 默认。与 /api/enhance 走同一套配置体系，
+    # 不新增第二套 provider 配置。
+    with db() as conn:
+        provider_id = payload.get("provider_id")
+        item = None
+        if provider_id:
+            item = prov.get_provider_full(conn, provider_id)
+            if not item:
+                return web.json_response({"error": "指定的 Provider 不存在"}, status=404)
+            if not item["enabled"]:
+                return web.json_response({"error": "该 Provider 已停用"}, status=400)
+        else:
+            item = prov.resolve_default(conn, "default")
+            if not item:
+                return web.json_response(
+                    {"error": "尚未配置可用的本地模型 Provider。"
+                             "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    system_prompt = yue2_schema.build_system_prompt()
+    user_prompt = _music_enhance_user_prompt(original, base, mode,
+                                             payload.get("style"),
+                                             payload.get("lyrics"))
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    try:
+        raw = await llm_client.call_provider(
+            item, messages,
+            options={"temperature": 0.7, "top_p": 0.95,
+                     "max_tokens": 4000, "do_sample": True})
+    except llm_client.ProviderError as exc:
+        return web.json_response(
+            {"error": str(exc), "provider": item["name"],
+             "provider_id": item["id"], "degraded": True}, status=502)
+
+    raw = yue2_schema.strip_code_fence(raw)
+    parsed = _parse_music_json(raw)
+    if not parsed:
+        return web.json_response(
+            {"error": "模型返回的内容不是有效的 JSON 配置文件，未做修改。",
+             "provider": item["name"], "provider_id": item["id"],
+             "raw_preview": raw[:400], "degraded": True}, status=502)
+
+    ok, normalized, fixes, problems = yue2_schema.normalize_and_validate(parsed)
+    if not ok or not normalized:
+        return web.json_response(
+            {"error": "模型产出无法归一化成合法配置（" +
+                      "；".join(problems or ["结构不可用"]) + "）",
+             "provider": item["name"], "provider_id": item["id"],
+             "degraded": True}, status=502)
+
+    style_struct = normalized[yue2_schema.STYLE_KEY]
+    lyrics_struct = normalized[yue2_schema.LYRICS_KEY]
+    # 最终 style 串用 music_style.build_style_prompt（与官方节点逐条对齐）
+    style_text = music_style.build_style_prompt(
+        style_struct.get("language", ""), style_struct.get("genre", ""),
+        style_struct.get("mood", ""), style_struct.get("vocal", ""),
+        style_struct.get("vocal_color", ""), style_struct.get("instruments", ""),
+        style_struct.get("tempo_bpm", 0), style_struct.get("energy", ""),
+        style_struct.get("length_hint", ""), style_struct.get("extra", ""),
+        style_struct.get("custom_language", ""), style_struct.get("custom_genre", ""),
+    )
+    lyrics_text = music_style.resolve_lyrics(
+        lyrics_struct.get("lyrics_override", ""),
+        lyrics_struct.get("template") or "V-C-V-C-bridge-C")
+    return json_ok({
+        "style": style_struct,
+        "lyrics": lyrics_struct,
+        "style_text": style_text,
+        "lyrics_text": lyrics_text,
+        "fixes": fixes,
+        "problems": problems,
+        "provider": item["name"],
+        "provider_id": item["id"],
+        "mode": mode,
+    })
+
+
+def _music_enhance_user_prompt(original: str, base: str, mode: str,
+                               style, lyrics) -> str:
+    """
+    组装给模型的用户消息。
+
+    【两种语义】
+      * base 为空 -> 从零生成（用户给一句描述，要结构化风格 + 歌词）
+      * base 非空 -> 以当前内容为底稿做修改（用户已经有一版，想改）
+    """
+    parts = []
+    if mode == "a2a":
+        parts.append(
+            "【场景】这是「参考生音乐」（cover）模式：用户会额外提供一段参考音频，"
+            "音频只提供旋律线，编曲与和声由你写的风格与歌词决定。"
+            "所以风格里的 instruments / extra 要写清楚编曲意图。")
+    if base:
+        parts.append("【任务】在下面这份**现有配置**的基础上修改，"
+                     "按用户的修改意图调整相应字段；没提到的字段尽量保持原样。")
+        if isinstance(style, dict) and style:
+            parts.append("现有 style 字段：\n" +
+                         json.dumps(style, ensure_ascii=False, indent=2))
+        if isinstance(lyrics, str) and lyrics.strip():
+            parts.append("现有歌词正文：\n" + lyrics.strip())
+        parts.append("【修改意图】\n" + (original or base))
+    else:
+        parts.append("【任务】根据用户描述，从零产出结构化风格与歌词。")
+        parts.append("【用户描述】\n" + original)
+    parts.append("只输出 JSON 对象，不要任何解释文字。")
+    return "\n\n".join(parts)
+
+
+def _parse_music_json(text: str):
+    """
+    宽容地解析模型产出的 JSON。
+
+    移植自 nonebot 插件 h3_yue2.py 的 _parse_yue2_json_robust()：
+      先用 raw_decode（能吃住尾随内容），再截取最外层花括号重试。
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    decoder = json.JSONDecoder()
+    try:
+        obj, _ = decoder.raw_decode(text)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+    if "{" in text and "}" in text:
+        candidate = text[text.index("{"):text.rindex("}") + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            try:
+                obj, _ = decoder.raw_decode(candidate)
+                return obj if isinstance(obj, dict) else None
+            except Exception:
+                pass
+    return None
 
 
 async def api_image_options(request):
@@ -2154,6 +2400,18 @@ async def api_providers_test(request):
 
 
 # ------------------------------------------------------------------ 提示词增强 Agent
+#
+# 【2026-11-10 单一权威定义】ENHANCE_CONCURRENCY 与 ENHANCE_GATE 已上移到
+# 本文件的「增强并发闸门」小节（唯一权威定义处）。
+#
+# 之前这里与上方**各有一份** ENHANCE_CONCURRENCY（enh-unify=2 / max-token=3），
+# 后定义的会静默覆盖先定义的 —— 上限到底是 2 还是 3 取决于文件顺序，
+# 两份注释还各说各话。这是本轮审查 P1-2 的根因。
+# 现在：全局只有一处定义，取值与理由见上方小节。
+
+
+
+
 async def api_enhancer_config(request):
     """
     GET /api/enhancer —— 读取增强 Agent 的模板清单与参数
@@ -2194,6 +2452,12 @@ async def api_enhancer_config(request):
         "length_presets": enh.LENGTH_PRESETS,
         "sampling_presets": enh.SAMPLING_PRESETS,
         "skill_dir": str(enh.SKILL_DIR),
+        # 输出 token 上限的边界（前端输入框用同一套边界）
+        "max_tokens_bounds": {
+            "default": enh.MAX_TOKENS_CEILING,
+            "min": enh.MAX_TOKENS_FLOOR,
+            "max": enh.MAX_TOKENS_MAX,
+        },
         # 上下文 -> 适用模板 id 列表（前端按当前模式/模型取用；新增模型只改服务端这两张表）
         "mode_filters": {
             m: [s["id"] for s in enh.filter_specs(specs, m)]
@@ -2204,6 +2468,11 @@ async def api_enhancer_config(request):
         "mode_media": dict(enh.MODE_MEDIA),
         # 模型族映射（前端据此判断当前模型属于哪一族）
         "model_families": dict(enh.MODEL_FAMILY),
+        # 「二次增强」是通用能力，但按媒体类型用不同模板 ——
+        # 前端不再硬编码模板 id（否则音乐模式会拿到画面物体向的模板）。
+        "refine_spec_by_media": dict(enh.REFINE_SPEC_BY_MEDIA),
+        # 模式 -> 「二次增强」模板 id（前端直接取，不用自己推）
+        "refine_specs": {m: enh.refine_spec_for_mode(m) for m in enh.MODE_MEDIA},
     }
     if mode:
         filtered = enh.filter_specs(specs, mode, model_key)
@@ -2250,6 +2519,16 @@ async def api_enhancer_save(request):
         if payload.get("params"):
             saved["params"] = {k: v for k, v in payload["params"].items()
                                if k in enh.DEFAULT_PARAMS}
+            # max_tokens_ceiling 是「输出 token 上限天花板」——
+            # 必须在夹取之前先归一到合法区间，否则前端传个 999999
+            # 会被 clamp 到 MAX_TOKENS_MAX，传 0 会被 clamp 到 MIN。
+            ceiling = saved["params"].get("max_tokens_ceiling")
+            try:
+                ceiling = int(ceiling) if ceiling is not None else enh.MAX_TOKENS_CEILING
+            except (TypeError, ValueError):
+                ceiling = enh.MAX_TOKENS_CEILING
+            saved["params"]["max_tokens_ceiling"] = max(
+                enh.MAX_TOKENS_FLOOR, min(ceiling, enh.MAX_TOKENS_MAX))
         prov.set_pref(conn, "enhancer", json.dumps(saved, ensure_ascii=False))
     return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
 
@@ -2304,7 +2583,10 @@ async def api_enhance(request):
             saved = {}
 
     spec = enh.get_spec(spec_id, saved)
-    params = enh.resolve_params(payload.get("params"), saved, spec)
+    # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
+    #   原实现不传 original -> 只能拿到固定 300 -> 长提示词必被硬切
+    #   （审查实测：普通增强 10 次有 6 次被切，成功率仅 40%）。
+    params = enh.resolve_params(payload.get("params"), saved, spec, original=original)
 
     # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
     with db() as conn:
@@ -2330,38 +2612,103 @@ async def api_enhance(request):
                         {"error": "尚未配置可用的本地模型 Provider。"
                                  "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
-    messages = enh.build_messages(spec, original, params.get("language", "auto"))
-    try:
-        raw = await llm_client.call_provider(
-            item, messages, images=images or None,
-            options={"temperature": params["temperature"],
-                     "top_p": params["top_p"],
-                     "max_tokens": params["max_tokens"],
-                     "do_sample": params.get("do_sample", True)})
-    except llm_client.ProviderError as exc:
-        # 本地模型不可达 —— 明确报错，不静默失败
-        return web.json_response(
-            {"error": str(exc), "provider": item["name"], "provider_id": item["id"],
-             "degraded": True}, status=502)
 
-    # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
-    raw = enh.strip_thinking(raw)
-    enhanced = enh.strip_wrapping(raw)
-    if not enhanced:
+    validate_mode = spec.get("validate_mode", "pe")
+    messages = enh.build_messages(spec, original, params.get("language", "auto"))
+
+    # 并发闸门：抢不到就立刻 429，**不排队**。
+    # 理由见 ENHANCE_CONCURRENCY 上方的注释（本机 llama.cpp total_slots=1，
+    # 排队只会让所有请求一起等到超时）。
+    gate = _enhance_gate()
+    if gate.locked():
         return web.json_response(
-            {"error": "模型返回了空内容，未做修改", "provider": item["name"],
-             "degraded": True}, status=502)
-    # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
-    if enh.looks_like_echo(enhanced, spec["system_prompt"]):
-        return web.json_response(
-            {"error": f"Provider「{item['name']}」返回的是系统提示词复读，不是有效的提示词。"
-                      "该模型可能太小或未按指令输出，请换用更强的模型。",
-             "provider": item["name"], "provider_id": item["id"],
-             "degraded": True}, status=502)
+            {"error": f"当前已有 {ENHANCE_CONCURRENCY} 个提示词增强任务在运行，"
+                      "本地模型一次只能处理这么多，请稍候再试。",
+             "code": "too_many_requests",
+             "concurrency": ENHANCE_CONCURRENCY}, status=429)
+
+    async with gate:
+        # 【审查返修】截断自动降级重试。
+        #   第一次按自适应预算跑；若仍被硬切（finish_reason=length），
+        #   自动用**满上限**再跑一次，而不是直接 502 让用户失败。
+        #   （审查实测：普通增强 10 次有 6 次被 300 硬切，成功率仅 40%。
+        #    预算自适应后这一步基本不会触发；这里是最后一道保险。）
+        budget = params["max_tokens"]
+        ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
+        attempts = [budget]
+        if ceiling > budget:
+            attempts.append(ceiling)
+
+        last = None
+        for attempt_idx, mt in enumerate(attempts):
+            try:
+                res = await llm_client.call_provider_full(
+                    item, messages, images=images or None,
+                    options={"temperature": params["temperature"],
+                             "top_p": params["top_p"],
+                             "max_tokens": mt,
+                             "do_sample": params.get("do_sample", True)})
+            except llm_client.ProviderError as exc:
+                # 本地模型不可达 —— 明确报错，不静默失败
+                return web.json_response(
+                    {"error": str(exc), "provider": item["name"],
+                     "provider_id": item["id"],
+                     "degraded": True}, status=502)
+            raw = res["text"]
+            finish_reason = res.get("finish_reason") or ""
+
+            # thinking 残留（llm 层已剥离一次，这里再兜一次，防不同后端行为差异）
+            raw = enh.strip_thinking(raw)
+            enhanced = enh.strip_wrapping(raw)
+            if not enhanced:
+                return web.json_response(
+                    {"error": "模型返回了空内容，未做修改",
+                     "provider": item["name"],
+                     "degraded": True}, status=502)
+            # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
+            if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+                return web.json_response(
+                    {"error": f"Provider「{item['name']}」返回的是系统提示词复读，"
+                              "不是有效的提示词。"
+                              "该模型可能太小或未按指令输出，请换用更强的模型。",
+                     "provider": item["name"], "provider_id": item["id"],
+                     "degraded": True}, status=502)
+
+            # 截断检测 —— 二次增强丢背景的根因守门人。
+            #   finish_reason=length 或末段标题缺失 -> 判定被硬切。
+            #   system_prompt 传进去是为了**从模板正文解析末段标题**，
+            #   这样别的分支新增的 refine 模板（如末段「【整体细化】」的音乐版）
+            #   不改代码也能被正确判定（跨分支复用，见 enhancer.template_sections）。
+            coverage = enh.coverage_report(
+                original, enhanced,
+                finish_reason=finish_reason,
+                validate_mode=validate_mode,
+                system_prompt=spec.get("system_prompt", ""))
+            if not coverage.get("truncated"):
+                last = (mt, res, enhanced, finish_reason, coverage)
+                break
+            # 被截断 —— 还有下一次机会（用满上限重跑）就继续
+            if attempt_idx + 1 < len(attempts):
+                continue
+            return web.json_response(
+                {"error": "增强结果被 max_tokens 上限截断，内容不完整，未写回。"
+                          + coverage.get("truncation_reason", "")
+                          + f"（本次 max_tokens={mt}，已用满上限重试仍被截断）"
+                          "请在「本地模型配置 → 增强 Agent」里调高"
+                          "「最大输出 token 上限」，或改用更强的模型。",
+                 "truncated": True,
+                 "truncation_reason": coverage.get("truncation_reason", ""),
+                 "missing_sections": coverage.get("missing_sections", []),
+                 "coverage": coverage,
+                 "provider": item["name"], "provider_id": item["id"],
+                 "degraded": True}, status=502)
+
+        used_max_tokens, res, enhanced, finish_reason, coverage = last
+        params = dict(params)
+        params["max_tokens"] = used_max_tokens
 
     # 硬约束校验（质量词 / 权重语法 / think 段 / bbox 结构）
-    validation = enh.validate_output(enhanced, original,
-                                     spec.get("validate_mode", "pe"))
+    validation = enh.validate_output(enhanced, original, validate_mode)
     if not validation.get("ok", True):
         return web.json_response(
             {"error": "扩写结果违反 Z-Image 提示词硬约束："
@@ -2392,8 +2739,12 @@ async def api_enhance(request):
         "used_multimodal": bool(images),
         "validation": validation,
         "elements": elements,
+        # 要素覆盖 + 截断检测结果（前端可显示保留率）
+        "coverage": coverage,
+        "finish_reason": finish_reason,
         "params": {"temperature": params["temperature"], "top_p": params["top_p"],
                    "max_tokens": params["max_tokens"],
+                   "max_tokens_ceiling": params.get("max_tokens_ceiling"),
                    "sampling": params.get("sampling", "sample"),
                    "length": params.get("length", "medium")},
     })
@@ -2541,8 +2892,8 @@ async def api_qwen_pe_expand(request):
       clip_name   实际用的官方 PE checkpoint 文件名
       ref_count   参考图数量
       pe_params   实际套用的档位参数（前端用于回显「推荐参数已套用」）
-
     失败一律 4xx/5xx + 可读原因，**不返回半成品**。
+
     """
     try:
         payload = await request.json()
@@ -2766,6 +3117,8 @@ def make_app():
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
     app.router.add_get("/api/music-options", api_music_options)
+    app.router.add_post("/api/music-enhance", api_music_enhance)
+
     app.router.add_get("/api/generation-types", api_generation_types)
     app.router.add_get("/api/image-loras", api_image_loras)
     app.router.add_put("/api/image-loras", api_image_loras_save)

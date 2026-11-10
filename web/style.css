@@ -558,10 +558,18 @@ body.modal-open { overflow: hidden; }
 .agent-field { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--muted); }
 .agent-field.block { width: 100%; }
 .agent-field.block > span { font-weight: 600; color: var(--text); font-size: 12px; }
-.agent-field select, .agent-field textarea, .agent-field input[type=range] {
+.agent-field select, .agent-field textarea, .agent-field input[type=range],
+.agent-field input[type=number] {
   border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   font-size: 12.5px; background: #fff; color: var(--text); font-family: inherit;
 }
+/* 数字输入框：宽度按内容，别撑破窄屏；隐藏原生步进箭头避免挤位 */
+.agent-field input[type=number] { width: 116px; }
+.agent-field input[type=number]::-webkit-outer-spin-button,
+.agent-field input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.agent-field input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .agent-field textarea { line-height: 1.55; resize: vertical; }
 .agent-field input[type=range] { padding: 0; }
 .agent-field b { color: var(--accent); }
@@ -613,6 +621,61 @@ body.modal-open { overflow: hidden; }
 .enhance-hint.error { color: var(--danger); font-weight: 600; }
 .enhance-hint.ok { color: #1f8a52; }
 .enhance-hint.busy { color: var(--accent); }
+
+/* ---------- 当前所选增强方式的显式回显 ---------- */
+.enhance-current {
+  font-size: 11.5px; color: var(--text); background: var(--accent-soft);
+  border: 1px solid var(--accent); border-radius: 7px; padding: 3px 8px;
+  font-weight: 600;
+}
+.enhance-current[hidden] { display: none; }
+
+/* ---------- 【模板选择行】与增强方式下拉平级 ---------- */
+/* 改造前模板选择是增强方式菜单项的子属性（两级 UI）；
+   现在提升为增强栏里的独立一行：当前主增强方式用哪个模板一目了然。 */
+.enhance-spec-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.enhance-spec-row[hidden] { display: none; }
+.enhance-spec-label { white-space: nowrap; }
+.enhance-spec-select {
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  max-width: 220px;
+  /* 触控目标高度不得小于 32px（手机端契约，见 tests/test_responsive_mobile.py）。
+     这是一行真实回归：新增的模板选择器默认渲染高度只有 22px。 */
+  min-height: 32px;
+}
+.enhance-spec-select:focus { outline: none; border-color: var(--accent); }
+.enhance-spec-select:disabled { opacity: .6; cursor: default; }
+
+/* ---------- 增强菜单里「就地切换模板」 ---------- */
+.enhance-menu-spec {
+  font-size: 10.5px; color: var(--muted); font-weight: 500;
+  margin-left: 6px;
+}
+.enhance-menu-spec-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 6px;
+}
+.enhance-menu-spec-label {
+  font-size: 10.5px; color: var(--muted); flex: 0 0 auto;
+}
+select.enhance-menu-spec {
+  flex: 1 1 auto; min-width: 0; margin-left: 0;
+  border: 1px solid var(--border); background: #fff; border-radius: 6px;
+  padding: 2px 6px; font-size: 10.5px; color: var(--text);
+  font-family: inherit; cursor: pointer;
+}
+select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 
 .enhance-meta {
   padding: 9px 16px; font-size: 11.5px; color: var(--muted);
@@ -1453,3 +1516,27 @@ body.modal-open { overflow: hidden; }
 #musicPanel .img-ref-card .img-ref-sort {
   flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: 11px;
 }
+
+/* ---- YuE2 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）---- */
+.music-toggle {
+  margin-left: 8px;
+  padding: 2px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .12));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .06);
+  color: var(--muted);
+  cursor: pointer;
+}
+.music-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.music-sf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 10px;
+  margin: 8px 0 4px;
+}
+.music-sf-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.music-sf-label { font-size: 11px; color: var(--muted); }
+.music-sf-item .img-select,
+.music-sf-item .img-input { width: 100%; min-width: 0; }
+

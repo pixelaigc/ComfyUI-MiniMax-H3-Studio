@@ -1,5 +1,21 @@
 /* H3 Studio 音乐面板（YuE2）：文生音乐 / 参考生音乐
  *
+ * 【2026-11-09 重设计 —— 用户需求逐条对应】
+ * 1. 文生音乐 / 参考生音乐是**左侧两个独立标签**（.nav-item[data-mode]）。
+ *    面板顶部**不再有任何「生成模式」切换**（旧的 #musicModeChips /
+ *    #musicModeNote 已从 index.html 删除），只读 state.mode。
+ * 2. 流程：音乐描述框 -> 「增强」按钮（+下拉）-> 增强后产出
+ *    **结构化风格** 与 **歌词** 两份结果。
+ *    增强按钮/下拉复用**与生图面板完全同一套组件**
+ *    （.enhance-split / .enhance-btn / .enhance-menu），
+ *    见 web/music-enhance.js（它用 enhance-menu.js 导出的
+ *    window.EnhanceMenuShared）。
+ * 3. 移除「最长时长」参数 -> index.html 里的 #musicDuration 已删除，
+ *    后端 music_yue2 也不再按时长上限截断（生成自然完成）。
+ * 5. 结果形态：增强后可逐项编辑结构化风格 / 歌词；
+ *    也可「基于当前内容重新生成/修改」（#musicStyleRegenBtn /
+ *    #musicLyricsRegenBtn）。
+ *
  * 独立成文件（不塞进 app.js）的原因：app.js 已 3800 行，音乐面板自成一块
  * 逻辑（模型清单 / 参考音频选择 / 参数持久化），单独放更清楚，也避免和
  * 并发的其它前端改动撞同一段代码。
@@ -23,7 +39,7 @@
   const OPTIONS = {
     checkpoints: {},
     audio_encoders: {},
-    default_checkpoint: "yue2_3b_int8_convrot",
+    default_checkpoint: "yue2_3b_bf16",
     default_audio_encoder: "sheetsage2_bf16",
     sampler: "dpm_2",
     scheduler: "sgm_uniform",
@@ -32,12 +48,19 @@
     samplers: [],
     schedulers: [],
     modes: ["full", "melody"],
-    music_sampling: { temperature: 1.0, top_p: 0.95, top_k: 100, repetition_penalty: 1.2 },
-    max_duration: 360,
-    min_duration: 4,
-    default_duration: 60,
+    music_sampling: { temperature: 0.8, top_p: 0.9, top_k: 50, repetition_penalty: 1.05 },
     formats: ["flac", "mp3", "opus"],
     default_format: "flac",
+    // 结构化风格（对齐第三方 YuE2StylePrompt）
+    style_fields: [],
+    style_defaults: {},
+    style_enums: {},
+    lyric_templates: [],
+    lyric_template_default: "V-C-V-C-bridge-C",
+    // length_hint -> style 串里的英文时长描述。
+    // 【审查 P1-1】这份映射原先**硬编码在前端**（本文件的第三份副本）——
+    // 现在由服务端 /api/music-options 下发，前端不再维护第二份。
+    length_hint_text: {},
     loaded: false,
   };
 
@@ -48,14 +71,17 @@
     checkpoint: "",
     audio_encoder: "",
     plan: "full",
-    duration: 60,
     steps: 32,
     cfg: 1.0,
     sampler: "dpm_2",
     scheduler: "sgm_uniform",
     format: "flac",
-    style: "",
+    // 音乐描述（增强的输入；也是没有结构化风格时的 style 来源）
+    prompt: "",
     lyrics: "",
+    // 结构化风格的 12 个字段（键 = style_<field>）
+    style_fields: {},
+    lyrics_template: "V-C-V-C-bridge-C",
     seed: "",
     temperature: 1.0,
     top_p: 0.95,
@@ -117,11 +143,15 @@
       OPTIONS.schedulers = data.schedulers || [];
       OPTIONS.modes = data.modes || ["full", "melody"];
       OPTIONS.music_sampling = data.music_sampling || OPTIONS.music_sampling;
-      OPTIONS.max_duration = data.max_duration || OPTIONS.max_duration;
-      OPTIONS.min_duration = data.min_duration || OPTIONS.min_duration;
-      OPTIONS.default_duration = data.default_duration || OPTIONS.default_duration;
       OPTIONS.formats = data.formats || ["flac", "mp3"];
       OPTIONS.default_format = data.default_format || OPTIONS.default_format;
+      // 结构化风格（对齐第三方 YuE2StylePrompt）
+      OPTIONS.style_fields = data.style_fields || [];
+      OPTIONS.style_defaults = data.style_defaults || {};
+      OPTIONS.style_enums = data.style_enums || {};
+      OPTIONS.lyric_templates = data.lyric_templates || [];
+      OPTIONS.lyric_template_default = data.lyric_template_default || OPTIONS.lyric_template_default;
+      OPTIONS.length_hint_text = data.length_hint_text || {};
       OPTIONS.loaded = true;
 
       // 首次进入时把默认值对齐服务端推荐
@@ -129,8 +159,8 @@
       if (!st.audio_encoder) st.audio_encoder = OPTIONS.default_audio_encoder;
       if (!st.sampler) st.sampler = OPTIONS.sampler;
       if (!st.scheduler) st.scheduler = OPTIONS.scheduler;
-      if (!st.duration) st.duration = OPTIONS.default_duration;
       if (!st.format) st.format = OPTIONS.default_format;
+      if (!st.lyrics_template) st.lyrics_template = OPTIONS.lyric_template_default;
       const ms = OPTIONS.music_sampling;
       if (!st.temperature) st.temperature = ms.temperature;
       if (!st.top_p) st.top_p = ms.top_p;
@@ -149,18 +179,9 @@
     const mode = currentMode();
     if (!isMusicMode(mode)) return;
 
-    // 生成模式 chips
-    $$("#musicModeChips button").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.v === mode);
-    });
+    // 【2026-11-09】面板内不再有「生成模式」切换 ——
+    // 文生音乐 / 参考生音乐是**左侧两个独立标签**，这里只读当前 mode。
     const isCover = mode === "a2a";
-    const modeNote = $("#musicModeNote");
-    if (modeNote) {
-      modeNote.textContent = isCover
-        ? "参考生音乐（翻唱）：参考音频只提供旋律线，YuE2 按下面的风格描述与歌词重新编曲、重新演唱；"
-          + "原曲的和弦与编曲不会被沿用。参考音频需先从素材库选择。"
-        : "文生音乐：YuE2 先按风格描述与歌词规划一份乐谱（ABC），再据此生成带人声与伴奏的完整歌曲。";
-    }
 
     // 模型
     const modelSel = $("#musicModelSelect");
@@ -170,7 +191,7 @@
         const opt = document.createElement("option");
         opt.value = key;
         const unavailable = m.available === false;
-        opt.textContent = unavailable ? m.label + "（本机无该权重，不可用）" : m.label;
+        opt.textContent = unavailable ? m.label + "（本机无原生格式权重，不可用）" : m.label;
         opt.disabled = unavailable;
         opt.selected = key === st.checkpoint;
         modelSel.appendChild(opt);
@@ -210,7 +231,7 @@
         const opt = document.createElement("option");
         opt.value = key;
         const unavailable = m.available === false;
-        opt.textContent = unavailable ? m.label + "（权重缺失，不可用）" : m.label;
+        opt.textContent = unavailable ? m.label + "（本机无原生格式权重，不可用）" : m.label;
         opt.disabled = unavailable;
         opt.selected = key === st.audio_encoder;
         encSel.appendChild(opt);
@@ -233,6 +254,9 @@
     const refField = $("#musicRefField");
     if (refField) refField.style.display = isCover ? "" : "none";
     renderRefAudio();
+
+    // 结构化风格（对齐第三方 YuE2StylePrompt）
+    renderStyleFields();
 
     // 谱面规划 chips
     const planChips = $("#musicPlanChips");
@@ -274,17 +298,6 @@
           : "完整谱面：先规划「旋律 + 和弦」，再据此生成音乐 —— 文生音乐推荐这个。";
       }
     }
-
-    // 时长
-    const dur = $("#musicDuration");
-    if (dur) {
-      dur.min = String(Math.max(10, Math.ceil(OPTIONS.min_duration)));
-      dur.max = String(OPTIONS.max_duration);
-      dur.step = "10";
-      dur.value = st.duration;
-    }
-    const durVal = $("#musicDurationVal");
-    if (durVal) durVal.textContent = st.duration + "s";
 
     // 步数 / CFG
     const steps = $("#musicSteps");
@@ -339,9 +352,9 @@
     if (repVal) repVal.textContent = Number(st.repetition_penalty).toFixed(2);
 
     // 文本域：只在用户没在编辑时回填（避免打断输入）
-    const styleBox = $("#musicStyle");
-    if (styleBox && document.activeElement !== styleBox && !styleBox.dataset.touched) {
-      styleBox.value = st.style || "";
+    const promptBox = $("#musicPrompt");
+    if (promptBox && document.activeElement !== promptBox && !promptBox.dataset.touched) {
+      promptBox.value = st.prompt || "";
     }
     const lyricsBox = $("#musicLyrics");
     if (lyricsBox && document.activeElement !== lyricsBox && !lyricsBox.dataset.touched) {
@@ -401,13 +414,168 @@
     card.append(name, remove);
     box.appendChild(card);
     if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id)
-      + "（仅提取旋律线，成曲时长另受上方「最长时长」限制）";
+      + "（仅提取旋律线；成曲时长由歌词段落与 BPM 决定）";
+  }
+
+  // ------------------------------------------------------- 结构化风格
+
+  // 第三方 YuE2StylePrompt 的字段顺序（后端 /api/music-options 下发）
+  const STYLE_FIELD_LABELS = {
+    language: "语言",
+    genre: "曲风",
+    mood: "情绪",
+    vocal: "人声",
+    vocal_color: "人声音色",
+    instruments: "乐器",
+    tempo_bpm: "速度 BPM",
+    energy: "能量",
+    length_hint: "时长意向",
+    extra: "补充描述",
+    custom_language: "自定义语言",
+    custom_genre: "自定义曲风",
+  };
+  // 纯器乐时人声音色要一起清成 (none)（第三方 yue2_schema.py:397-402）
+  const INSTRUMENTAL = "(instrumental / no lead vocal)";
+  // length_hint -> 英文描述：**由服务端下发**（OPTIONS.length_hint_text），
+  // 前端不再硬编码（审查 P1-1：同一常量写三处必然走偏）。
+
+  function styleValue(field) {
+    const v = st.style_fields ? st.style_fields[field] : undefined;
+    if (v === undefined || v === null) {
+      const d = OPTIONS.style_defaults ? OPTIONS.style_defaults[field] : "";
+      return d === undefined || d === null ? "" : d;
+    }
+    return v;
+  }
+
+  function setStyleValue(field, value) {
+    if (!st.style_fields) st.style_fields = {};
+    st.style_fields[field] = value;
+  }
+
+  function renderStyleFields() {
+    const grid = $("#musicStyleFieldsGrid");
+    if (!grid || !OPTIONS.style_fields || !OPTIONS.style_fields.length) return;
+    grid.innerHTML = "";
+
+    OPTIONS.style_fields.forEach(field => {
+      const wrap = document.createElement("div");
+      wrap.className = "music-sf-item";
+
+      const label = document.createElement("div");
+      label.className = "music-sf-label";
+      label.textContent = STYLE_FIELD_LABELS[field] || field;
+      wrap.appendChild(label);
+
+      const enums = (OPTIONS.style_enums || {})[field];
+      const isEnum = Array.isArray(enums) && enums.length > 0;
+
+      if (isEnum) {
+        const sel = document.createElement("select");
+        sel.className = "img-select";
+        sel.id = "musicSF_" + field;
+        const cur = String(styleValue(field));
+        let matched = false;
+        enums.forEach(opt => {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          if (opt === cur) { o.selected = true; matched = true; }
+          sel.appendChild(o);
+        });
+        if (!matched) {
+          const o = document.createElement("option");
+          o.value = cur; o.textContent = cur; o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener("change", e => {
+          setStyleValue(field, e.target.value);
+          if (field === "vocal" && e.target.value === INSTRUMENTAL) {
+            // 纯器乐：人声音色一并清成 (none)，否则拼出 "warm instrumental"
+            setStyleValue("vocal_color", "(none)");
+          }
+          if (field === "language" && e.target.value !== "(custom / none)") {
+            setStyleValue("custom_language", "");
+          }
+          if (field === "genre" && e.target.value !== "(custom / none)") {
+            setStyleValue("custom_genre", "");
+          }
+          saveState(); render();
+        });
+        wrap.appendChild(sel);
+      } else {
+        const inp = document.createElement("input");
+        inp.type = (field === "tempo_bpm") ? "number" : "text";
+        inp.className = "img-input";
+        inp.id = "musicSF_" + field;
+        inp.value = styleValue(field);
+        if (field === "tempo_bpm") { inp.min = "0"; inp.max = "220"; }
+        inp.addEventListener("input", e => {
+          setStyleValue(field, field === "tempo_bpm"
+            ? (Number(e.target.value) || 0) : e.target.value);
+          saveState(); updateStylePreview();
+        });
+        wrap.appendChild(inp);
+      }
+      grid.appendChild(wrap);
+    });
+
+    updateStylePreview();
+  }
+
+  function updateStylePreview() {
+    const box = $("#musicStyleFieldsPreview");
+    if (!box) return;
+    // 与后端 build_style_prompt 同序的预览（后端为最终准绳）
+    const parts = [];
+    const lang = styleValue("language");
+    if (String(lang).startsWith("(custom")) {
+      const c = String(styleValue("custom_language") || "").trim();
+      if (c) parts.push(c);
+    } else if (lang && !String(lang).startsWith("(")) parts.push(lang);
+    const genre = styleValue("genre");
+    if (String(genre).startsWith("(custom")) {
+      const c = String(styleValue("custom_genre") || "").trim();
+      if (c) parts.push(c);
+    } else if (genre && !String(genre).startsWith("(")) parts.push(genre);
+    const mood = styleValue("mood");
+    if (mood && !String(mood).startsWith("(")) parts.push(String(mood));
+    const vocal = styleValue("vocal");
+    const vcolor = styleValue("vocal_color");
+    if (vocal && !String(vocal).startsWith("(")) {
+      parts.push((vcolor && !String(vcolor).startsWith("(") ? vcolor + " " : "") + String(vocal));
+    } else if (vcolor && !String(vcolor).startsWith("(")) {
+      parts.push(String(vcolor) + " instrumental");
+    }
+    const inst = String(styleValue("instruments") || "").trim();
+    if (inst) parts.push(inst);
+    const bpm = Number(styleValue("tempo_bpm") || 0);
+    if (bpm > 0) parts.push(bpm + " BPM");
+    const energy = styleValue("energy");
+    if (energy && !String(energy).startsWith("(")) parts.push(String(energy));
+    const hint = (OPTIONS.length_hint_text || {})[String(styleValue("length_hint"))];
+    if (hint) parts.push(hint);
+    const extra = String(styleValue("extra") || "").trim();
+    if (extra) parts.push(extra);
+
+    box.textContent = parts.length
+      ? "拼接结果：" + parts.join(", ")
+      : "（全留空则只用上面的自由文本风格描述）";
+  }
+
+  function toggleStyleFields() {
+    const box = $("#musicStyleFields");
+    const btn = $("#musicStyleFieldsToggle");
+    if (!box) return;
+    const show = box.style.display === "none" || !box.style.display;
+    box.style.display = show ? "" : "none";
+    if (btn) btn.textContent = show ? "收起" : "展开";
   }
 
   // ---------------------------------------------------------------- 提交
 
   function promptValue() {
-    const box = $("#musicStyle");
+    const box = $("#musicPrompt");
     return box ? box.value.trim() : "";
   }
 
@@ -425,7 +593,6 @@
       plan_mode: isCover ? "melody" : st.plan,
       checkpoint: st.checkpoint,
       audio_encoder: st.audio_encoder,
-      max_duration: st.duration,
       steps: st.steps,
       cfg: st.cfg,
       sampler: st.sampler,
@@ -436,7 +603,14 @@
       music_top_p: st.top_p,
       music_top_k: st.top_k,
       music_repetition_penalty: st.repetition_penalty,
+      lyrics_template: st.lyrics_template || OPTIONS.lyric_template_default,
     };
+    // 结构化风格 12 字段（后端与自由文本合并）
+    if (st.style_fields) {
+      Object.keys(st.style_fields).forEach(k => {
+        params["style_" + k] = st.style_fields[k];
+      });
+    }
     const assetRefs = [];
     if (mode === "a2a" && refAudio) {
       assetRefs.push({ asset_id: refAudio.asset_id, slot: "ref_audio", ordinal: 0 });
@@ -452,17 +626,14 @@
       if (el) el.addEventListener(ev, fn);
     };
 
+    on("#musicStyleFieldsToggle", "click", () => {
+      toggleStyleFields();
+    });
     on("#musicModelSelect", "change", e => {
       st.checkpoint = e.target.value; saveState(); render();
     });
     on("#musicEncoderSelect", "change", e => {
       st.audio_encoder = e.target.value; saveState(); render();
-    });
-    on("#musicDuration", "input", e => {
-      st.duration = Number(e.target.value);
-      const v = $("#musicDurationVal");
-      if (v) v.textContent = st.duration + "s";
-      saveState();
     });
     on("#musicSteps", "input", e => {
       st.steps = Number(e.target.value);
@@ -508,11 +679,11 @@
     });
 
     // 文本域：记住内容 + 标记「用户动过」（之后不再自动回填）
-    const styleBox = $("#musicStyle");
-    if (styleBox) {
-      styleBox.addEventListener("input", () => {
-        styleBox.dataset.touched = "1";
-        st.style = styleBox.value;
+    const promptBox = $("#musicPrompt");
+    if (promptBox) {
+      promptBox.addEventListener("input", () => {
+        promptBox.dataset.touched = "1";
+        st.prompt = promptBox.value;
         saveState();
       });
     }
@@ -532,19 +703,6 @@
         saveState();
       });
     }
-
-    // 生成模式切换（面板内的两个 chip）
-    $$("#musicModeChips button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const mode = btn.dataset.v;
-        st.mode = mode;
-        saveState();
-        // 交给 app.js 的模式切换入口，保持导航高亮 + 面板一致
-        const navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
-        if (navEl) navEl.click();
-        else render();
-      });
-    });
 
     // 参考音频选择
     on("#musicRefPick", "click", () => {
@@ -582,5 +740,59 @@
     // 供 app.js 的 musicModelLabel 查 checkpoint key -> 显示名
     getOptions: () => OPTIONS,
     setMode(mode) { st.mode = mode; saveState(); },
+    /**
+     * **当前生效**的工作模式（文生音乐 t2a / 参考生音乐 a2a）。
+     *
+     * 【为什么要单独一个接口】getState().mode 返回的是**持久化**的那份
+     * （localStorage 里的 st.mode），切了左侧标签它不一定跟着变 ——
+     * 增强请求用它拼 mode 就会发错（实测在参考生音乐面板下发出的是 t2a）。
+     * currentMode() 读的是活的 state.mode，才是对的。
+     */
+    getCurrentMode: () => currentMode(),
+
+    // ---- 增强侧（web/music-enhance.js 调用）----
+    /** 结构化风格的 12 个字段（增强产物；用户可逐项编辑） */
+    getStyleFields: () => ({ ...(st.style_fields || {}) }),
+    /** 回填结构化风格（增强产物）。填完自动展开折叠区，让用户看得见。 */
+    setStyleFields: (fields) => {
+      st.style_fields = (fields && typeof fields === "object") ? { ...fields } : {};
+      saveState();
+      const box = $("#musicStyleFields");
+      if (box) box.style.display = "";
+      const btn = $("#musicStyleFieldsToggle");
+      if (btn) btn.textContent = "收起";
+      renderStyleFields();
+    },
+    /** 歌词正文 */
+    getLyrics: () => {
+      const box = $("#musicLyrics");
+      return box ? box.value : (st.lyrics || "");
+    },
+    /** 回填歌词正文 */
+    setLyrics: (text) => {
+      st.lyrics = text || "";
+      const box = $("#musicLyrics");
+      if (box) box.value = st.lyrics;
+      saveState();
+    },
+    /** 提示栏（增强状态提示） */
+    setHint: (text, kind) => {
+      const hint = $("#musicEnhanceHint");
+      if (!hint) return;
+      hint.textContent = text;
+      hint.className = "enhance-hint" + (kind ? " " + kind : "");
+    },
+    /** busy 态（禁用增强按钮） */
+    setBusy: (busy) => {
+      const btn = $("#musicEnhanceBtn");
+      if (btn) btn.disabled = !!busy;
+      const caret = $("#musicEnhanceMenuBtn");
+      if (caret) caret.disabled = !!busy;
+    },
+    /** 标记「已增强」徽标 */
+    markEnhanced: () => {
+      const badge = $("#musicPromptBadge");
+      if (badge) badge.hidden = false;
+    },
   };
 })();
