@@ -584,13 +584,32 @@ function renderLoraSelect() {
   // 就能看到这个 LoRA 是干什么的（原来只有名字，选完才看得到说明）。
   // 用 title 属性挂完整说明（原生下拉的 tooltip），文本只带简短版，
   // 免得把下拉撑得太长。
+  //
+  // **分组**：东亚人像目录一个族就有 85 条，不分组根本没法找。
+  // 有 group 的按 group 用 <optgroup> 归拢，没有的（其它目录的条目）
+  // 放进「其它效果 LoRA」组，保持下拉结构统一。
+  const withGroup = options.filter(l => l.group);
+  const withoutGroup = options.filter(l => !l.group);
+  const order = [];
+  const buckets = new Map();
+  for (const l of withGroup) {
+    if (!buckets.has(l.group)) { buckets.set(l.group, []); order.push(l.group); }
+    buckets.get(l.group).push(l);
+  }
+  const optOf = (l) => {
+    const scene = (l.scene || "").split(/[。；\n]/)[0].trim();
+    const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
+    const title = l.scene ? ` title="${esc(l.scene)}"` : "";
+    return `<option value="${esc(l.name)}"${title}>${esc(l.display)}${esc(brief)}</option>`;
+  };
+  const groupsHtml = order.map(g =>
+    `<optgroup label="${esc(g)}">${buckets.get(g).map(optOf).join("")}</optgroup>`
+  ).join("");
+  const otherHtml = withoutGroup.length
+    ? `<optgroup label="其它效果 LoRA">${withoutGroup.map(optOf).join("")}</optgroup>`
+    : "";
   sel.innerHTML = options.length
-    ? options.map(l => {
-        const scene = (l.scene || "").split(/[。；\n]/)[0].trim();
-        const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
-        const title = l.scene ? ` title="${esc(l.scene)}"` : "";
-        return `<option value="${esc(l.name)}"${title}>${esc(l.display)}${esc(brief)}</option>`;
-      }).join("")
+    ? groupsHtml + otherHtml
     : `<option value="">${ctx.store.available.length ? "全部已添加" : `本机未找到 ${ctx.label} LoRA`}</option>`;
   sel.disabled = !options.length;
   $("#imgLoraAdd").disabled = !options.length;
@@ -655,6 +674,12 @@ function renderLoraList() {
     const dampNote = damp > 0
       ? `<span class="img-lora-tag damp" title="该 LoRA 对 context_refiner 的权重扰动较大（${(ctxPert * 100).toFixed(1)}%），该模块联合处理文本条件与潜变量，长提示词下会把采样推到发散。服务端已自动对 context_refiner 做 ${damp.toFixed(2)} 阻尼，强度可保持 1.0">已阻尼 ×${damp.toFixed(2)}</span>`
       : "";
+    // 「近似适用」标注：清单里标的是「近似适用」（基座未指明 / 无 base_model tag）
+    // 的条目，界面上必须能一眼看出来 —— 不能让它跟「原生」条目长得一样。
+    const near = meta && meta.base_verdict === "近似适用";
+    const nearNote = near
+      ? `<span class="img-lora-tag near" title="${esc(meta.scene || "")}">近似适用</span>`
+      : "";
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
       ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
@@ -672,6 +697,7 @@ function renderLoraList() {
         ${excluded ? `<span class="img-lora-tag excl">不兼容</span>` : ""}
         ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
+        ${nearNote}
         ${dampNote}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
         <button type="button" class="img-lora-btn down" title="下移" ${index === ctx.list.length - 1 ? "disabled" : ""}>↓</button>
@@ -795,6 +821,10 @@ function openLoraInfo(name) {
       <dt>文件路径</dt><dd>${esc(meta.path)}</dd>
       <dt>大小</dt><dd>${meta.size_mb} MB</dd>
       <dt>基础模型</dt><dd>${esc(meta.base)}</dd>
+      <dt>分组</dt><dd>${esc(meta.group || "—")}</dd>
+      <dt>基座适用性</dt><dd>${meta.base_verdict === "近似适用"
+        ? "⚠️ 近似适用（非该基座原生训练，依据见下方说明）"
+        : (meta.base_verdict || "原生")}</dd>
       <dt>触发词</dt><dd>${trigger}</dd>
       <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}${meta.strength_source ? "（" + esc(meta.strength_source) + "）" : ""}</dd>
       <dt>类型</dt><dd>${meta.kind === "acceleration" ? "加速 / 蒸馏类（工作流固定使用，不可选）" : "效果类（可自行选用）"}</dd>

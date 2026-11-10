@@ -751,6 +751,9 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .img-lora-tag.rec { background: #e8f6ee; color: #1f8a52; }
 .img-lora-tag.miss { background: #fbeaea; color: var(--danger); }
 .img-lora-tag.damp { background: #e8f0fb; color: #2f6fd0; }
+/* 「近似适用」：清单里标的是非该基座原生训练的条目，
+   必须一眼可辨 —— 不能跟「原生」条目长得一样。 */
+.img-lora-tag.near { background: #fdf3e0; color: #a2660a; }
 .img-lora-cap {
   font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
   background: #eef1f5; color: var(--muted); white-space: nowrap;
