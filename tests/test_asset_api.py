@@ -86,6 +86,20 @@ class AssetApiTestBase(unittest.TestCase):
         cls.loop.run_until_complete(cls.client.close())
         cls.loop.run_until_complete(cls.server.close())
         cls.loop.close()
+        # 【2026-11-10 修复】把当前线程的 event loop **还原**。
+        # 原来只 loop.close()，却没 set_event_loop(None) ——
+        # 于是「一个已关闭的 loop」仍然挂在当前线程上。
+        # 后果（实测）：后续任何走 asyncio.get_event_loop() 的库
+        # （aiohttp / Playwright sync API）都会拿到这个已关闭的 loop，
+        # 于是报
+        #   "It looks like you are using Playwright Sync API inside the asyncio loop"
+        # 或 "Event loop is closed"
+        # —— 表现为**后面所有浏览器用例集体失败**（实测 103 个 error），
+        # 与本用例自身完全无关。
+        try:
+            asyncio.set_event_loop(None)
+        except Exception:
+            pass
         if cls._old_root is None:
             os.environ.pop("ASSET_LIBRARY_ROOT", None)
         else:
