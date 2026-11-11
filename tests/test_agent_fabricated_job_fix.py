@@ -321,6 +321,35 @@ class TestAuthoritativeSourceCoversCommitDelay(_Base):
         self.server.list_job_ids_since = None
         self.assertEqual(agent_mod._refresh_authoritative_job_ids(ctx), set())
 
+    def test_lookback_window_covers_previous_turn_references(self):
+        """
+        锁住**回看窗口**的取值。
+
+        【实测依据 2026-11-11】线上 jobs 表（122 条）相邻两次任务创建的
+        间隔中位数 4.7 分钟、最大 609 分钟。窗口如果只有几分钟，
+        用户隔一会儿再对话、模型引用上一轮的任务 id 就会被误判成编造。
+        """
+        self.assertGreaterEqual(agent_mod.AUTHORITATIVE_LOOKBACK_SEC, 3600,
+                                "回看窗口至少要盖住「上一轮对话」")
+        self.assertEqual(agent_mod.AUTHORITATIVE_LOOKBACK_SEC, 86400)
+
+    def test_refresh_queries_from_started_at_minus_window(self):
+        """查询起点 = 本次运行起点 - 回看窗口。"""
+        seen = {}
+
+        def spy(since_ts):
+            seen["since"] = since_ts
+            return ["x0000000001"]
+
+        ctx = self.ctx()
+        ctx.started_at = 1_000_000.0
+        self.server.list_job_ids_since = spy
+        agent_mod._refresh_authoritative_job_ids(ctx)
+        self.assertAlmostEqual(
+            seen["since"],
+            1_000_000.0 - agent_mod.AUTHORITATIVE_LOOKBACK_SEC,
+            places=3)
+
     def test_respond_accepts_job_only_present_in_authoritative_source(self):
         """任务在库里但不在 ctx.jobs（面板建 / 异步落库）-> 接受。"""
         ctx = self.ctx()
