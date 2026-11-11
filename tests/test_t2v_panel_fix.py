@@ -61,7 +61,13 @@ class TestSizePresets(unittest.TestCase):
             self.assertTrue(presets, f"{aspect} 应该有尺寸预设")
 
     def test_every_preset_respects_h3_native_canvas(self):
-        """每条预设都必须同时满足三条硬约束。"""
+        """每条预设都必须满足两条硬约束。
+
+        【2026-11-11 改】原第三条「短边 <= 768」已删除 —— 那是 ComfyUI
+        节点里**只管参考视频适配**的 BASE_SHORT_EDGE，被误当成生成分辨率
+        约束了。官方模板 Note 的 2.0 MP 行是 1920x1088（短边 1088 > 768），
+        官方明确背书，所以短边不能作为生成侧上限。
+        """
         for p in VM.all_size_presets():
             w, h = p["width"], p["height"]
             with self.subTest(preset=p["key"]):
@@ -69,9 +75,7 @@ class TestSizePresets(unittest.TestCase):
                 self.assertEqual(h % 32, 0, f"{p['key']} 高度不是 32 的倍数")
                 self.assertLessEqual(
                     w * h, VM.VIDEO_MAX_CANVAS_PIXELS,
-                    f"{p['key']} 超出 H3 原生画布面积上限 768x1344")
-                self.assertLessEqual(
-                    min(w, h), 768, f"{p['key']} 短边超过 768 基准")
+                    f"{p['key']} 超出 2.0M 像素面积上限")
 
     def test_16_9_presets_match_official_table(self):
         """16:9 的预设必须与官方模板 Note 的像素表**逐格一致**。"""
@@ -88,56 +92,84 @@ class TestSizePresets(unittest.TestCase):
 
         这是预设清单的地基 —— 地基歪了，预设就是编的。
         """
+        # 【2026-11-11 放宽】官方表实测列到 2.0 MP（1920x1088），
+        # 这里把整张表都纳入断言 —— 上限放宽了，官方背书的档位必须全中。
         full = {
             0.2: (608, 352), 0.3: (736, 416), 0.4: (864, 480),
             0.5: (960, 544), 0.6: (1056, 608), 0.7: (1152, 640),
             0.8: (1216, 672), 0.9: (1280, 736), 0.98: (1344, 768),
+            1.0: (1376, 768), 1.2: (1504, 832), 1.5: (1664, 928),
+            1.8: (1824, 1024), 2.0: (1920, 1088),
         }
         for mp, expected in full.items():
             with self.subTest(mp=mp):
                 self.assertEqual(VM.video_dimensions("16:9", mp), expected)
 
     def test_over_canvas_combinations_are_excluded(self):
-        """超画布的组合不能出现在下拉里（不是置灰，是不出现）。"""
-        # 1:1 @ 0.98MP -> 1024x1024，面积 1048576 > 768*1344 -> 必须被剔除
-        over = VM.video_dimensions("1:1", 0.98)
+        """超上限的组合不能出现在下拉里（不是置灰，是不出现）。
+
+        【2026-11-11 放宽】上限从 0.98MP 提到 2.0MP，所以 1:1 @ 0.98MP
+        现在**在限内**了；真正被剔除的是 21:9 @ 2.0MP
+        （2208x960 = 2,119,680 px > 2,097,152）。
+        """
+        over = VM.video_dimensions("21:9", 2.0)
         self.assertGreater(over[0] * over[1], VM.VIDEO_MAX_CANVAS_PIXELS)
-        keys = {p["megapixels"] for p in VM.size_presets_for_aspect("1:1")}
-        self.assertNotIn(0.98, keys, "1:1 的 0.98MP 超画布，不该出现在下拉里")
+        keys = {p["megapixels"] for p in VM.size_presets_for_aspect("21:9")}
+        self.assertNotIn(2.0, keys, "21:9 的 2.0MP 超上限，不该出现在下拉里")
+        # 放宽后 1:1 的 0.98MP 应该在限内、出现在下拉里
+        keys11 = {p["megapixels"] for p in VM.size_presets_for_aspect("1:1")}
+        self.assertIn(0.98, keys11, "1:1 的 0.98MP 现在在 2.0M 限内，应该出现")
 
     def test_area_rule_is_observable_independently(self):
-        """面积规则必须**独立地**起作用，不能被短边规则顺带覆盖。
+        """面积规则必须**独立地**起作用，不能被别的规则顺带覆盖。
 
-        16:9 @ 1.0MP -> 1376x768：短边 768 没超，但面积 1056768 >
-        768*1344 = 1032192 —— 只靠短边规则拦不住它。
-        这条断言保证「面积上限」这条规则是真的在跑（变异测试：
-        把面积判断改成 if False，本断言必须变红）。
+        【2026-11-11 放宽】上限改成 2.0M 之后，「短边 <= 768」这条规则
+        已经没有（那是参考视频画布上限），所以面积规则成了**唯一**的闸门 ——
+        这条断言保证它是真的在跑（变异测试：把面积判断改成 if False，
+        本断言必须变红）。
+
+        21:9 @ 2.0MP -> 2208x960：短边 960，但面积 2,119,680 >
+        2,097,152 —— 只看短边拦不住它。
         """
-        w, h = VM.video_dimensions("16:9", 1.0)
-        self.assertEqual(min(w, h), 768, "这个样例的短边必须没超 768")
+        w, h = VM.video_dimensions("21:9", 2.0)
         self.assertGreater(w * h, VM.VIDEO_MAX_CANVAS_PIXELS,
                            "这个样例的面积必须超上限")
-        keys = {p["megapixels"] for p in VM.size_presets_for_aspect("16:9")}
-        self.assertNotIn(1.0, keys,
-                         "16:9 的 1.0MP 面积超画布上限，不该出现在下拉里")
+        keys = {p["megapixels"] for p in VM.size_presets_for_aspect("21:9")}
+        self.assertNotIn(2.0, keys,
+                         "21:9 的 2.0MP 面积超上限，不该出现在下拉里")
         # 而面积没超的档位要在（证明不是把高 MP 全砍了）
-        self.assertIn(0.98, keys, "16:9 的 0.98MP 在画布内，应该出现")
+        self.assertIn(1.8, keys, "21:9 的 1.8MP 在限内，应该出现")
 
-    def test_area_limit_constant_matches_comfyui_source(self):
-        """面积上限常量必须等于 ComfyUI 源码里的 MAX_PIXELS。
+    def test_area_limit_constant_is_2mp_not_the_reference_video_canvas(self):
+        """面积上限是 2.0 MP，**不是** ComfyUI 源码里的 MAX_PIXELS。
 
-        这是「不臆造」的地基：常量一旦漂移，预设就会给出跑不动的尺寸。
+        【为什么】ComfyUI 节点里 MAX_PIXELS = 768*1344 与
+        BASE_SHORT_EDGE = 768 只被 adapt_canvas() 使用 —— 那是给
+        **参考视频**做尺寸适配的。生成路径 MiniMaxH3ImageToVideo
+        根本不查它们（只查 schema 的 min=32 / max=16384 / step=32）。
+        旧版把 768*1344 当成生成分辨率上限是**误读源码**。
+
+        这条断言把「生成上限」与「参考视频画布上限」彻底分开：
+        两者数值必须不同，且生成上限必须是 2.0 MP。
         """
+        self.assertEqual(VM.VIDEO_MAX_CANVAS_PIXELS, 2 * 1024 * 1024,
+                         "生成分辨率上限必须是 2.0 MP")
+
         src = Path("/home/ubuntu/comfyui/comfy_extras/nodes_minimax_h3.py")
         if not src.is_file():
             self.skipTest("本机没有 ComfyUI 源码可比对")
         text = src.read_text(encoding="utf-8", errors="ignore")
         m = re.search(r"^MAX_PIXELS\s*=\s*(\d+)\s*\*\s*(\d+)", text, re.M)
         self.assertIsNotNone(m, "ComfyUI 源码里找不到 MAX_PIXELS 定义")
-        self.assertEqual(VM.VIDEO_MAX_CANVAS_PIXELS, int(m.group(1)) * int(m.group(2)))
-        m2 = re.search(r"^BASE_SHORT_EDGE\s*=\s*(\d+)", text, re.M)
-        self.assertIsNotNone(m2)
-        self.assertEqual(768, int(m2.group(1)))
+        reference_video_canvas = int(m.group(1)) * int(m.group(2))
+        self.assertNotEqual(VM.VIDEO_MAX_CANVAS_PIXELS, reference_video_canvas,
+                            "生成上限与参考视频画布上限必须是两个不同的数")
+        # MAX_PIXELS 在节点里只被 adapt_canvas() 用（参考视频适配），
+        # 生成路径不查它 —— 断言它确实没出现在生成节点的 execute 里。
+        gen_body = text.split("class MiniMaxH3ImageToVideo", 1)[1]
+        gen_body = gen_body.split("\nclass ", 1)[0]
+        self.assertNotIn("MAX_PIXELS", gen_body,
+                         "生成节点里不该出现 MAX_PIXELS（它只管参考视频）")
 
     def test_preset_keys_are_unique(self):
         keys = [p["key"] for p in VM.all_size_presets()]
@@ -158,14 +190,30 @@ class TestSizePresets(unittest.TestCase):
             len(payload["size_presets"]), len(VM.all_size_presets()))
 
     def test_server_snaps_oversize_input_to_canvas(self):
-        """手填 1920x1080（超出原生画布）要被缩回上限，并说明原因。"""
-        import server as srv
+        """手填超上限的尺寸要被缩回上限，并说明原因。
+
+        【2026-11-11 放宽】1920x1080 现在**在** 2.0M 限内了
+        （2,073,600 px <= 2,097,152），所以这里改用真正超限的样例。
+        """
+        w, h, reasons = VM.normalize_video_size(
+            2560, 1440,
+            max_pixels=VM.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
+        self.assertLessEqual(w * h, VM.VIDEO_MAX_CANVAS_PIXELS)
+        self.assertTrue(reasons, "超上限必须给出调整原因")
+        self.assertTrue(any("像素" in r or "上限" in r for r in reasons))
+
+    def test_1920x1080_is_now_inside_the_limit(self):
+        """1920x1080 现在必须**不再被面积上限缩回**。
+
+        1920x1080 里 1080 不是 32 的倍数 -> 吸附成 1088（这条原因保留），
+        但**面积**已经不再触发缩放 —— 旧版会被缩到 1344x768 那一档。
+        """
         w, h, reasons = VM.normalize_video_size(
             1920, 1080,
             max_pixels=VM.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
-        self.assertLessEqual(w * h, VM.VIDEO_MAX_CANVAS_PIXELS)
-        self.assertTrue(reasons, "超画布必须给出调整原因")
-        self.assertTrue(any("像素" in r or "上限" in r for r in reasons))
+        self.assertEqual((w, h), (1920, 1088))
+        self.assertFalse(any("超过上限" in r for r in reasons),
+                         f"不该再因面积上限被缩放：{reasons}")
 
 
 class TestAccelLoraSingleSelect(unittest.TestCase):

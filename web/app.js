@@ -276,6 +276,41 @@ $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
   activateMode(el.dataset.mode, el);
 }));
 
+// ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
+//
+// 【为什么单独一个模块】
+// 视频导航是「类别 -> 模型」两级，而其它模式（图像 / 音乐）仍是平铺的
+// 单级入口。两套结构混在一起会让 activateMode() 的高亮逻辑分叉，
+// 所以视频这一支独立走 web/video-nav.js：
+//   * 类别 -> 模型的映射只有服务端一份（/api/video-categories），
+//     前端不再维护第二张映射表；
+//   * 每个模型项仍带 data-mode（老 mode），老任务卡片的「复用」
+//     按钮按 .nav-item[data-mode=...] 点选照样命中 —— 向后兼容。
+function videoNavContainer() {
+  return $("#navVideoCategories");
+}
+
+function syncVideoNavActive() {
+  const box = videoNavContainer();
+  if (!box || !window.VideoNav) return;
+  window.VideoNav.syncActive(box);
+}
+
+/** 选中某个视频 mode（来自两级导航或老任务卡片），并高亮对应层级。 */
+function activateVideoMode(mode) {
+  const box = videoNavContainer();
+  let navEl = null;
+  if (box && window.VideoNav) {
+    window.VideoNav.selectByMode(mode);
+    navEl = box.querySelector(`.nav-model-item[data-mode="${mode}"]`);
+  }
+  if (!navEl) {
+    navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
+  }
+  activateMode(mode, navEl);
+  syncVideoNavActive();
+}
+
 function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
   queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
@@ -2710,7 +2745,7 @@ function jobCard(job) {
   });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
     // 找到对应模式侧栏项并切换
-    $(`.nav-item[data-mode="${job.mode}"]`)?.click();
+    activateVideoMode(job.mode);
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
     if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
@@ -3556,7 +3591,12 @@ function showCreate() {
 function showStitch() {
   state.page = "stitch";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
-  $("#navStitch").classList.add("active");
+  // 【2026-11-11】长片拼接不再是独立侧栏项，改成「长片拼接」类别下的
+  // 一个模型项 —— 高亮走两级导航的 syncActive()。
+  if (window.VideoNav) {
+    window.VideoNav.selectByMode("longfilm");
+    syncVideoNavActive();
+  }
   showPage($("#jobsArea"), true);
   showPage($("#panel"), false);
   showPage($("#stitchPanel"), true);
@@ -3629,7 +3669,9 @@ function showAgent() {
 }
 
 $("#navSystem").addEventListener("click", showSystem);
-$("#navStitch").addEventListener("click", showStitch);
+// 【2026-11-11】长片拼接入口搬进两级导航（web/video-nav.js），
+// 这里不再直接绑定 #navStitch —— 那个 id 只存在于 <noscript> 兜底里，
+// 直接 addEventListener 会在 null 上抛错，把整个 app.js 带崩。
 $("#sysRefresh").addEventListener("click", () => { refreshHardware(true); });
 
 function fmtBytes(b) {
@@ -4077,6 +4119,30 @@ boot("默认模式", () => {
   else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
 });
 boot("图像参数清单", loadImageOptions);
+boot("视频类别导航", async () => {
+  const box = videoNavContainer();
+  if (!box || !window.VideoNav) return;
+  window.VideoNav.onSelect = (category, modelKey, mode) => {
+    // 长片拼接是独立页面（#stitchPanel），不是创作页的普通模式。
+    if (mode === "longfilm") {
+      showStitch();
+      syncVideoNavActive();
+      return;
+    }
+    activateMode(mode, box.querySelector(`.nav-model-item[data-model-key="${modelKey}"]`));
+    syncVideoNavActive();
+  };
+  window.VideoNav.onUnavailable = (category) => {
+    const label = (window.VideoNav.categoryByKey(category) || {}).label || category;
+    alert(`「${label}」类别下没有可用的模型，无法切换。`);
+  };
+  await window.VideoNav.load();
+  window.VideoNav.render(box);
+  window.VideoNav.bind(box);
+  // 默认选中（持久化 > 服务端默认）
+  window.VideoNav.applyDefault();
+  syncVideoNavActive();
+});
 boot("视频参数清单", async () => {
   if (!window.VIDEO_PANEL) return;
   await window.VIDEO_PANEL.load();

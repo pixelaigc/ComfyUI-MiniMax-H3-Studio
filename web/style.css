@@ -66,6 +66,32 @@ body {
 .nav-item:hover { background: #f2f3f6; }
 .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .nav-item.active svg { color: var(--accent); }
+
+/* ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
+   清单由 web/video-nav.js 从服务端 /api/video-categories 渲染，
+   这里的 CSS 只负责外观与展开/收起。 */
+.nav-categories { display: flex; flex-direction: column; gap: 2px; }
+.nav-cat { display: flex; flex-direction: column; }
+.nav-cat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--text); font-size: 13.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.nav-cat-head:hover { background: #f2f3f6; }
+.nav-cat-head.active { background: var(--accent-soft); color: var(--accent); }
+.nav-cat-head:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
+.nav-cat-head:disabled:hover { background: transparent; }
+.nav-cat-caret { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+.nav-cat.active > .nav-cat-head .nav-cat-caret { color: var(--accent); }
+/* 第二级：模型项 */
+.nav-cat-models { display: flex; flex-direction: column; gap: 1px; padding: 0 0 4px 14px; }
+.nav-model-item {
+  width: 100%; border: 0; background: transparent; text-align: left;
+  font-size: 12.5px; padding: 6px 10px; font-family: inherit;
+}
+.nav-model-item.unavailable { color: var(--muted); cursor: not-allowed; text-decoration: line-through; }
 .sidebar-foot { margin-top: auto; padding: 8px 6px; }
 .sidebar-foot button {
   width: 100%; padding: 7px; border: 1px solid var(--border); background: #fff;

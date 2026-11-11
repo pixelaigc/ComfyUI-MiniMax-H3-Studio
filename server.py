@@ -86,6 +86,7 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
+from h3studio import video_categories
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
@@ -1099,8 +1100,12 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     out = dict(params)
 
     # ---- 宽高 ----
+    # 【2026-11-11】strict_over_limit=True —— 超限时**不静默截断**，
+    # 直接返回可执行的错误提示（说明 2.0M 上限与当前请求值）。
     width, height, reasons = video_models.normalize_video_size(
-        params.get("width"), params.get("height"))
+        params.get("width"), params.get("height"),
+        max_pixels=video_models.max_pixels_for_mode("t2v"),
+        strict_over_limit=True)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
     out["width"] = width
@@ -2624,21 +2629,64 @@ async def api_video_size(request):
 
     返回生效宽高 + 调整原因，前端原样显示「输入值 → 实际使用值」。
 
-    【2026-11-11】吸附规则加了一条「H3 原生画布面积上限」：
-    总像素超过 768*1344 会按比例缩到上限，并把原因写进 reasons ——
-    否则用户填 1920x1080 会得到一个「能提交但超出 H3 训练分布」的尺寸。
+    【2026-11-11 放宽】文生视频的上限从 768*1344（0.98 MP）放宽到
+    2.0 MP —— 官方模板 Note 的像素表明确列到 2.0 MP -> 1920x1088，
+    而旧上限来自 ComfyUI 节点里**只管参考视频适配**的 MAX_PIXELS 常量，
+    被误当成生成分辨率上限了。
+
+    `mode` 参数决定用哪套约束（需求：各模式按各自工作流的真实约束
+    分别处理，不要一刀切套用 2.0M）：
+      * mode=t2v（默认）-> 2.0M 上限
+      * mode=flf / r2v  -> 仍走 ResolutionSelector 的 0.8 MP 档位上限
+      * mode=longfilm   -> 不限（拼片不产生新画面）
     """
     try:
         width = request.query.get("width")
         height = request.query.get("height")
+        mode = request.query.get("mode") or "t2v"
+        max_pixels = video_models.max_pixels_for_mode(mode)
         w, h, reasons = video_models.normalize_video_size(
-            width, height,
-            max_pixels=video_models.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
+            width, height, max_pixels=max_pixels)
     except Exception as exc:
         return web.json_response({"error": str(exc)}, status=400)
     return json_ok({
         "width": w, "height": h, "reasons": reasons,
         "input_width": width, "input_height": height,
+        "mode": mode,
+        "max_pixels": (int(max_pixels * 1024 * 1024)
+                       if max_pixels else None),
+        "max_pixels_mp": max_pixels,
+    })
+
+
+async def api_video_categories(request):
+    """GET /api/video-categories —— 左侧导航的**两级**视频清单
+
+    两级结构（需求）：
+      1) 第一级「视频类别」：固定四项，顺序与文案不可变 ——
+         文生视频 / 首尾帧生视频 / 参考生视频 / 长片拼接
+      2) 第二级：该类别下的具体模型项
+
+    【单一真源】这份清单完全来自 h3studio/video_categories.py，
+    前端不自己维护第二份 mode/model 映射表。
+
+    【向后兼容】老 URL / 老参数 / 老任务记录里的 mode（t2v / flf /
+    r2v / longfilm）**一个字都没改**，类别只是给它们套了一层分组视图。
+    `legacy_modes` 字段给出「mode -> 类别」的桥，老链接照样能定位面板。
+    """
+    categories = video_categories.list_categories()
+    models = video_categories.list_models()
+    return json_ok({
+        "categories": categories,
+        "models": models,
+        # mode -> 类别 key（老 mode 的桥）
+        "legacy_modes": dict(video_categories.MODE_TO_CATEGORY),
+        # 老 mode 的旧显示名（历史任务卡片回显用）
+        "legacy_labels": dict(video_categories.LEGACY_MODE_LABELS),
+        # 默认类别 / 默认模型项（前端首屏默认选中用）
+        "default_category": (categories[0]["key"] if categories else ""),
+        "default_model": (categories[0].get("default_model", "")
+                          if categories else ""),
     })
 
 
@@ -4384,6 +4432,7 @@ def make_app():
 
     # 文生视频面板（模型 / 加速 LoRA / 注意力 / 二采 / 宽高吸附）
     app.router.add_get("/api/video-options", api_video_options)
+    app.router.add_get("/api/video-categories", api_video_categories)
     app.router.add_get("/api/video-size", api_video_size)
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)

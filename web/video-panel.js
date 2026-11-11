@@ -39,6 +39,11 @@
     size_max: 16384,
     mp_table: [],
     default_mp: 0.4,
+    // 【2026-11-11 放宽】文生视频上限 2.0M 像素（服务端下发，别在前端写死）
+    max_pixels: 2 * 1024 * 1024,
+    max_pixels_mp: 2,
+    // 各模式各自的尺寸策略（不一刀切套用 2.0M）
+    mode_size_policy: {},
     size_presets: [],        // 服务端下发的合法尺寸预设（含宽高）
     accel_lora_single_select: true,
     accel_lora_default: "",
@@ -102,6 +107,18 @@
 
   // ------------------------------------------------------------ 尺寸
 
+  /** 当前模式的上限（像素），用于提示文案。 */
+  function maxPixels() {
+    const policy = (VIDEO_OPTIONS.mode_size_policy || {})[VIDEO_OPTIONS.mode || "t2v"];
+    if (policy && policy.max_pixels) return policy.max_pixels;
+    return VIDEO_OPTIONS.max_pixels || 2 * 1024 * 1024;
+  }
+
+  function formatMaxPixels() {
+    const px = maxPixels();
+    return `${(px / (1024 * 1024)).toFixed(1)}M 像素（${px.toLocaleString("en-US")} px）`;
+  }
+
   /** 比例 + 总像素 -> 像素宽高（与 ComfyUI 的 ResolutionSelector 同一算法） */
   function autoSize(aspect, megapixels) {
     const [wr, hr] = ASPECT_NUM[aspect] || [16, 9];
@@ -122,8 +139,11 @@
    */
   async function snapSize(rawW, rawH) {
     try {
+      // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算
+      // （t2v 放宽到 2.0M；flf / r2v 仍是 0.8MP 档位）。
+      const mode = encodeURIComponent(VIDEO_OPTIONS.mode || "t2v");
       const resp = await fetch(
-        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}`,
+        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}&mode=${mode}`,
         { cache: "no-store" });
       if (!resp.ok) return null;
       return await resp.json();
@@ -190,7 +210,7 @@
         const p = presets.find(x => x.key === want);
         note.textContent = p
           ? `官方档位 ${p.megapixels}MP · ${p.width}×${p.height}`
-            + `（H3 原生画布上限 768×1344，本项在限内）`
+            + `（上限 ${formatMaxPixels()}，本项在限内）`
           : "";
       }
     }
@@ -210,6 +230,8 @@
     const note = document.getElementById("vidSizeNote");
     if (note) {
       const parts = [`${mp.toFixed(2)} MP`];
+      // 【2026-11-11】把上限显式写出来 —— 用户看得见天花板在哪。
+      parts.push(`上限 ${formatMaxPixels()}`);
       if (videoState.custom) parts.push("自定义尺寸，点「自动」可恢复按比例计算的尺寸");
       note.textContent = parts.join(" · ");
     }
@@ -234,10 +256,20 @@
 
   async function applySize(rawW, rawH) {
     const snapped = await snapSize(rawW, rawH);
-    if (!snapped || !snapped.width) return;
+    if (!snapped) return;
+    videoState.sizeReasons = snapped.reasons || [];
+    if (!snapped.width || !snapped.height) {
+      // 【2026-11-11】服务端判定超限（strict）时返回 width=0 + 原因。
+      // 这里把原因原样显示，**不静默吞掉**（需求：超限要给出明确提示）。
+      videoState.width = null;
+      videoState.height = null;
+      videoState.sizePresetKey = "";
+      renderSizePresetSelect();
+      renderSizeFields();
+      return;
+    }
     videoState.width = snapped.width;
     videoState.height = snapped.height;
-    videoState.sizeReasons = snapped.reasons || [];
     // 手填之后就不再是任何预设 —— 预设下拉要切到「自定义」
     const presets = presetsForAspect(videoState.aspect);
     const hit = presets.find(p => p.width === snapped.width && p.height === snapped.height);
@@ -543,6 +575,9 @@
   // ------------------------------------------------------------ 总渲染
 
   function renderVideoPanel() {
+    // 【2026-11-11】视频面板是 t2v 专用的（首尾帧 / 参考生视频走各自的老面板），
+    // 但仍把 mode 记下来 —— 尺寸策略按 mode 取，不写死。
+    VIDEO_OPTIONS.mode = "t2v";
     if (!optionsReady) return;
     renderModelSelect();
     renderAspectChips();
