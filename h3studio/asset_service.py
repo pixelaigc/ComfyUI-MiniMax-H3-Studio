@@ -164,11 +164,28 @@ def register_asset(conn, *, source_path: Path, filename: str, mime: str | None =
         "SELECT v.asset_id, v.version FROM asset_versions v WHERE v.sha256=? "
         "ORDER BY v.version DESC LIMIT 1", (fingerprint,)).fetchone()
     if dup:
-        tmp.unlink(missing_ok=True)
         existing = asset_repo.get_asset(conn, dup["asset_id"], include_deleted=True)
         if existing and not existing["deleted_at"]:
+            # 已有**活着的**同内容素材 -> 直接复用，临时文件可以删了
+            tmp.unlink(missing_ok=True)
             return {"asset": existing, "duplicated": True,
                     "sha256": fingerprint, "message": "素材已存在，已复用原记录"}
+        # 【修复 —— 2026-11-11 实测踩到的 bug】
+        #
+        # 命中的这条 asset_versions 属于一个**已软删除**（进回收站）的素材：
+        # soft_delete 把物理文件移到了 trash/，但**版本行还在**（可恢复）。
+        #
+        # 原实现在这里**无条件** tmp.unlink()，然后往下走到
+        # atomic_move(tmp, target) —— 而 tmp 已经被自己删了 ->
+        #   FileNotFoundError: tmp -> target
+        #
+        # 实测触发路径：上传同一张图 -> 测试清理把它删了（进回收站）
+        # -> 再上传同一张图 -> 500。
+        #
+        # 修法：只有**确实要复用**时才删临时文件；
+        # 否则保留它，继续走下面的正常入库流程（会建一条新的素材记录）。
+        # （物理文件已经不在 originals/ 里了，所以 target 不存在，
+        #   atomic_move 会把临时文件搬过去 —— 这正是我们要的。）
 
     # --- 原子移动到正式位置 --------------------------------------------
     rel = A.original_relpath(fingerprint, filename)
