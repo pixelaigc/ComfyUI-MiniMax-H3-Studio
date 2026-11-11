@@ -2169,6 +2169,24 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   font-size: 11px; color: #b3272b; word-break: break-word;
 }
 
+/* 素材库预处理中（入库 + 生成描述与标签，实测 120~180 秒/张） */
+.ag-attach-busy {
+  flex: 1 1 100%; min-width: 0;
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+}
+.ag-attach-spinner {
+  flex: 0 0 auto;
+  width: 11px; height: 11px; margin-top: 2px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ag-attach-spin .8s linear infinite;
+}
+@keyframes ag-attach-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ag-attach-spinner { animation: none; border-top-color: var(--accent); }
+}
+
 /* 拖拽高亮 */
 .ag-composer.ag-composer-drag {
   background: var(--accent-soft);
