@@ -200,6 +200,11 @@
       // 【创建时间 —— 2026-11-12】需求要求列表同时展示「创建/最后更新时间」。
       // 后端一直有 created_at（之前前端丢弃了），现在显示绝对日期。
       const created = formatDate(s.created_at);
+      // 【未完成任务数 —— 2026-11-12】
+      // 文案必须指向**任务**，不能说会话「进行中」——
+      // 服务端没有 per-session 运行注册表（AGENT_GATE 是全局信号量），
+      // 这里统计的是 jobs.status，是任务层面的事实。
+      const pending = Number(s.pending_count || 0);
       // 【状态徽章 —— 2026-11-12】后端给的 status_label 是中文标签，
       // 前端不自己翻译（免得两处显示成两个词）。
       const st = String(s.status || "");
@@ -215,7 +220,8 @@
           <span class="ag-session-item-time">${esc(time)}</span>
           ${created ? `<span class="ag-session-item-created">建于 ${esc(created)}</span>` : ""}
           <span class="ag-session-item-count">${count} 条</span>
-          ${arts ? `<span class="ag-session-item-arts">${arts} 产物</span>` : ""}
+          ${arts ? `<span class="ag-session-item-arts" title="该会话创建的任务数（每个任务产出一个作品）">${arts} 产物</span>` : ""}
+          ${pending ? `<span class="ag-session-item-pending" title="该会话下还没跑完的任务数">${pending} 个生成中</span>` : ""}
           ${stBadge}
         </div>
         <button type="button" class="ag-session-del" data-act="delete-session"

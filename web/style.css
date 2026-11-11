@@ -1917,6 +1917,12 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .ag-session-item-count,
 .ag-session-item-arts { white-space: nowrap; }
 .ag-session-item-created { opacity: .8; }
+/* 未完成任务数：这是**任务**层面的事实，不是会话在跑 */
+.ag-session-item-pending {
+  white-space: nowrap; flex: 0 0 auto;
+  color: #96601a; background: #fdf3e2; border: 1px solid #f4e0bd;
+  border-radius: 20px; padding: 0 5px; font-size: 9.5px; line-height: 1.5;
+}
 /* 状态徽章：比 .ag-badge 略小一点，列表项里才不抢标题的视觉重心 */
 .ag-session-status {
   font-size: 9.5px; padding: 1px 5px; line-height: 1.5;

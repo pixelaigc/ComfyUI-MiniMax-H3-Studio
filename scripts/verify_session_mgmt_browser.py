@@ -603,6 +603,14 @@ def main():
                       f"status={status_badges}")
                 page.screenshot(path=str(SHOTS / f"session-status-{width}.png"))
 
+                # 4d3) 【2026-11-12 新增】未完成任务数（「N 个生成中」）
+                #       种子数据里 cccc2222dddd 是 queued -> pending_count 应该是 1。
+                pending_texts = page.evaluate("""() => [...document.querySelectorAll(
+                    '.ag-session-item-pending')].map(e => e.textContent.trim())""")
+                check(f"[{width}] 会话条目显示未完成任务数",
+                      any("生成中" in t for t in pending_texts),
+                      f"pending={pending_texts}")
+
                 # 4e) 搜索/过滤
                 page.fill("#agSessionSearch", "林黛玉")
                 page.wait_for_timeout(900)

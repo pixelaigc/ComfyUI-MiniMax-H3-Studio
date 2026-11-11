@@ -161,6 +161,59 @@ class TestSessionStatus(unittest.TestCase):
         item = self._one(sid)
         self.assertEqual(item["status"], "completed")
 
+    # ---------------------------------------------------------- 失败链路
+
+    def test_failed_request_is_not_reported_as_completed(self):
+        """
+        失败的请求必须显示成「失败」，不能是「完成」。
+
+        【回归点 —— 2026-11-12 实测发现】
+        一次性接口（POST /api/agent/chat）的异常分支原来这样落库：
+            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
+        —— **不带 meta**。于是这条消息的 meta 是空的，
+        会话状态判定拿不到 status -> 回落到「完成」。
+        结果：**Provider 超时的会话，列表里显示绿色「完成」**。
+
+        修法在源头：失败落库时带 meta={"status": "failed", ...}。
+        这里锁住「失败 -> failed」这条映射。
+        """
+        sid = self.store.create()
+        self.store.add_message(sid, "user", "做段视频")
+        self.store.add_message(sid, "assistant", "[请求失败] Provider 超时",
+                               meta={"status": "failed", "error": "Provider 超时"})
+        item = self._one(sid)
+        self.assertEqual(item["status"], "failed")
+        self.assertEqual(item["status_label"], "失败")
+
+    def test_server_failure_path_stores_failed_status(self):
+        """
+        服务端的失败分支必须真的写 meta.status=failed（静态契约层）。
+
+        【为什么要静态查源码 —— 2026-11-12】
+        上面那条测的是「映射对不对」；这条测的是
+        「服务端那条失败分支有没有真的带 meta」。
+        真跑一次异常路径要 mock Provider，成本高；
+        而这次的 bug 恰恰是「忘了传 meta」——
+        这种漏参，静态查调用点比跑异常路径更直接。
+        """
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        # 两处失败落库（AgentError 分支 + 通用 Exception 分支）
+        # 都必须带 meta，且 meta 里必须有 status=failed。
+        self.assertIn('meta={"status": "failed"', server)
+        self.assertGreaterEqual(
+            server.count('meta={"status": "failed"'), 2,
+            "一次性接口的两个失败分支都应带上 status=failed 的 meta")
+
+    def test_sse_failure_result_already_carries_failed_status(self):
+        """
+        SSE 失败链路的 result 本身带 status=failed（无需额外处理）。
+
+        守住这个契约：将来有人改了 agent.py 的失败返回，
+        会话列表的「失败」状态会静默退化成「完成」。
+        """
+        agent = (ROOT / "h3studio" / "agent.py").read_text(encoding="utf-8")
+        self.assertIn('"status": "failed"', agent)
+
     # ---------------------------------------------------------- 列表字段完整性
 
     def test_list_includes_created_at_and_status_fields(self):
@@ -191,6 +244,84 @@ class TestSessionStatus(unittest.TestCase):
         items = self.store.list_sessions(query="赛博朋克")
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["status"], "failed")
+
+
+# ==================================================================
+# A2. 后端：未完成任务数（pending_count）
+# ==================================================================
+
+class TestPendingCount(unittest.TestCase):
+    """
+    会话列表的「N 个生成中」——统计的是**任务**，不是会话的运行状态。
+
+    【为什么需要它】
+    会话的「状态」字段只描述这一轮对话的收尾方式，不含「进行中」——
+    服务端**没有** per-session 运行注册表（AGENT_GATE 是全局信号量，
+    不记录是哪个会话在跑），跨会话无从判断。
+    但「这个会话还有任务在生成」是**任务**层面的客观事实，可以单独显示。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server_src = (ROOT / "server.py").read_text(encoding="utf-8")
+        cls.js = (ROOT / "web" / "agent_sessions.js").read_text(encoding="utf-8")
+
+    def test_session_job_stats_exists_and_is_additive(self):
+        """
+        必须**新增** session_job_stats，不改 session_job_counts。
+
+        session_job_counts 返回 {sid: int}，被既有测试按整数用；
+        改成 dict-of-dict 是 breaking change。
+        """
+        self.assertIn("def session_job_counts(", self.server_src)
+        self.assertIn("def session_job_stats(", self.server_src)
+        # 老函数的返回类型必须还是 dict[str, int]
+        idx = self.server_src.index("def session_job_counts(")
+        block = self.server_src[idx:idx + 2000]
+        self.assertIn("-> dict[str, int]", block)
+
+    def test_pending_counts_queued_and_running_only(self):
+        """pending 只算 queued + running（done/failed/canceled 不算）。"""
+        idx = self.server_src.index("def session_job_stats(")
+        block = self.server_src[idx:idx + 1800]
+        self.assertIn("status IN ('queued','running')", block)
+
+    def test_sessions_api_returns_pending_count(self):
+        """列表接口要返回 pending_count。"""
+        idx = self.server_src.index("async def api_agent_sessions(")
+        block = self.server_src[idx:idx + 2000]
+        self.assertIn("pending_count", block)
+        self.assertIn("session_job_stats", block)
+
+    def test_frontend_renders_pending_count(self):
+        """前端要渲染「N 个生成中」。"""
+        self.assertIn("pending_count", self.js)
+        self.assertIn("ag-session-item-pending", self.js)
+        self.assertIn("生成中", self.js)
+
+    def test_pending_wording_refers_to_tasks_not_session_running(self):
+        """
+        文案必须指向**任务**，不能说「会话进行中」。
+
+        「这个会话进行中」是**假的** —— 服务端没有 per-session 运行态。
+        说「N 个生成中」（指任务）才是事实。
+        """
+        idx = self.js.index("ag-session-item-pending")
+        snippet = self.js[max(0, idx - 400):idx + 200]
+        self.assertIn("生成中", snippet)
+        self.assertNotIn("会话进行中", snippet)
+        self.assertNotIn("会话正在", snippet)
+
+    def test_artifact_count_wording_kept_for_requirement_compat(self):
+        """
+        「产物数」这个措辞要保留（需求原文用词），但要有 tooltip 说明口径。
+
+        口径真相：artifact_count 数的是**任务数**（每个任务产出一个作品）。
+        直接改成「任务」会偏离需求用词，也会让既有验收断言失效；
+        改成「产物」+ tooltip 说明，是两者兼顾。
+        """
+        self.assertIn("产物", self.js)
+        self.assertIn("该会话创建的任务数", self.js)
 
 
 # ==================================================================
