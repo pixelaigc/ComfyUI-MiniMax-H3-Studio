@@ -1905,6 +1905,22 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 .ag-session-item-meta {
   font-size: 10px; color: var(--muted); margin-top: 3px; opacity: .85;
+  /* 改成 flex 布局：需求要求一行里同时放下
+     「最后更新 / 创建时间 / 消息数 / 产物数 / 状态徽章」5 样东西。
+     原来是一行纯文本用 "·" 拼接，加状态徽章后宽度会撑破侧栏 ->
+     375px 窄屏下必然横向溢出。flex + wrap 让它**换行**而不是溢出。 */
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px;
+}
+/* 各段之间不再用 "·" 分隔（改用 gap 间距），去掉自带的分隔符 */
+.ag-session-item-time,
+.ag-session-item-created,
+.ag-session-item-count,
+.ag-session-item-arts { white-space: nowrap; }
+.ag-session-item-created { opacity: .8; }
+/* 状态徽章：比 .ag-badge 略小一点，列表项里才不抢标题的视觉重心 */
+.ag-session-status {
+  font-size: 9.5px; padding: 1px 5px; line-height: 1.5;
+  white-space: nowrap; flex: 0 0 auto;
 }
 .ag-session-del {
   position: absolute; top: 7px; right: 6px;
@@ -1985,6 +2001,23 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 6px; background: #eef1f6; display: block;
 }
 .ag-artifact-thumb.is-video { object-fit: contain; background: #10131a; }
+/* 音频产物没有可视缩略图 —— 用一个符号占位（原来会渲染成 <video>，
+   浏览器拿 mp3 当视频播 -> 显示空白黑框，用户以为坏了）。 */
+.ag-artifact-thumb.is-audio {
+  object-fit: contain; background: #eef1f6; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; line-height: 1;
+}
+/* 缩略图外面包一层 button（为了可点击看大图）。
+   button 有浏览器默认样式（边框/背景/内边距）必须清掉，
+   否则缩略图会带一圈灰边。 */
+.ag-artifact-thumb-btn {
+  display: block; width: 100%; padding: 0; margin: 0;
+  border: none; background: transparent; cursor: zoom-in;
+  line-height: 0; font-family: inherit;
+}
+.ag-artifact-thumb-btn:hover .ag-artifact-thumb { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ag-artifact-thumb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ag-artifact-prompt {
   font-size: 11px; color: var(--text); line-height: 1.45; margin-top: 6px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -2003,6 +2036,20 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: #fff; color: var(--muted); font-family: inherit;
 }
 .ag-artifact-locate:hover { border-color: var(--accent); color: var(--accent); }
+/* 产物卡片的操作行：两个按钮并排（查看大图 / 在生成库中定位） */
+.ag-artifact-actions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px;
+}
+.ag-artifact-actions .ag-artifact-locate { margin-top: 0; flex: 0 0 auto; }
+
+/* 「在生成库中定位」命中的卡片高亮（2026-11-12）。
+   2.5 秒后由 app.js 的 flashLocatedCard 撤掉 class。 */
+.job-card.is-located {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  border-radius: var(--radius);
+}
 /* ---------- 内置多模态 Agent 面板 ---------- */
 .agent-page {
   flex: 1 1 auto; min-width: 0; min-height: 0;

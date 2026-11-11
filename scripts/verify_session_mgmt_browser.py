@@ -21,6 +21,7 @@ The whole feature is DOM + fetch. A DOM-existence assertion proves nothing
 about whether the session actually reloads, whether switching mixes the two
 sessions, or whether the artifact panel renders real thumbnails.
 """
+
 import json
 import os
 import shutil
@@ -32,6 +33,9 @@ import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from seed_png import make_png  # noqa: E402
 
 REPO = Path(os.environ.get("VERIFY_REPO",
                            "/root/projects/h3studio-session-mgmt"))
@@ -234,12 +238,24 @@ def main():
             # sids[0] = 赛博朋克（更早 -> 切过去时用来验「不串味」）
             conn = sqlite3.connect(jobs_db)
             conn.execute("DELETE FROM jobs")
+            # 【2026-11-12】第一条任务挂一张**真实的图片产物**。
+            #   需求 5 要求「集中查看 … 缩略图 … 点击产物可打开大图/预览」——
+            #   没有真实文件的话，缩略图 <img> 会加载失败（onerror），
+            #   lightbox 打开也是空白，验收脚本只能验到「DOM 存在」，
+            #   验不到「真的能看」。
+            #   PNG 用 seed_png 现算（64x36）—— 见那个文件的说明。
+            seed_png = tmp / "data" / "outputs" / "aaaa1111bbbb"
+            seed_png.mkdir(parents=True, exist_ok=True)
+            (seed_png / "preview.png").write_bytes(make_png(64, 36))
             conn.execute(
-                "INSERT INTO jobs (id, created_at, mode, params, status, session_id)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO jobs (id, created_at, mode, params, status, session_id, outputs)"
+                " VALUES (?,?,?,?,?,?,?)",
                 ("aaaa1111bbbb", time.time(), "t2i",
-                 json.dumps({"prompt": "雨夜霓虹", "aspect": "16:9"},
-                            ensure_ascii=False), "done", sids[1]))
+                 json.dumps({"prompt": "雨夜霓虹", "aspect": "16:9",
+                             "width": 1344, "height": 768, "resolution": "768p"},
+                            ensure_ascii=False), "done", sids[1],
+                 json.dumps([{"kind": "image", "file": "preview.png",
+                              "name": "preview.png"}], ensure_ascii=False)))
             conn.execute(
                 "INSERT INTO jobs (id, created_at, mode, params, status, session_id)"
                 " VALUES (?,?,?,?,?,?)",
@@ -451,10 +467,92 @@ def main():
                 check(f"[{width}] 未完成任务状态实时刷新", refreshed,
                       "queued -> running 没有被轮询到")
                 page.screenshot(path=str(SHOTS / f"artifact-pending-{width}.png"))
+
+                # 4c2) 【2026-11-12 新增】产物分辨率 + 大图预览
+                #       需求 5：「集中查看 … 状态、缩略图、生成参数与时间；
+                #       点击产物可跳转到生成库对应条目或打开大图/预览」
+                reso_texts = page.evaluate("""() => [...document.querySelectorAll(
+                    '.ag-artifact-meta')].map(e => e.textContent)""")
+                check(f"[{width}] 产物显示分辨率/参数",
+                      any("×" in t for t in reso_texts), f"meta={reso_texts}")
+
+                preview_btns = page.query_selector_all(
+                    ".ag-artifact-thumb-btn[data-act='preview-artifact']")
+                check(f"[{width}] 图片产物缩略图可点看大图",
+                      len(preview_btns) >= 1, f"实际 {len(preview_btns)} 个")
+                if preview_btns:
+                    preview_btns[0].click()
+                    page.wait_for_timeout(700)
+                    lb_open = page.evaluate(
+                        "() => { const el = document.querySelector('#lightbox');"
+                        " return !!el && !el.hidden; }")
+                    check(f"[{width}] 点缩略图打开大图查看器", lb_open,
+                          "lightbox 没打开")
+                    page.screenshot(path=str(SHOTS / f"artifact-lightbox-{width}.png"))
+                    # 关掉大图（Esc）
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(400)
+                    lb_closed = page.evaluate(
+                        "() => { const el = document.querySelector('#lightbox');"
+                        " return !!el && el.hidden; }")
+                    check(f"[{width}] 大图查看器可关闭", lb_closed,
+                          "Esc 没关掉 lightbox")
+
+                # 4c3) 【2026-11-12 新增】「在生成库中定位」真的能定位
+                #       原实现只写 location.hash（全仓 0 消费者）-> 假功能。
+                #       现在应该：切到生成页 + 关键词筛到该任务 + 卡片高亮。
+                #
+                # 【为什么要先确认面板状态 —— 2026-11-12 踩过】
+                # #agArtifactsBtn 是**开关**（toggle）。面板本来就是开着的，
+                # 再点一次就是**关掉**它 —— DOM 被清空，后面的断言全部找不到元素。
+                # 这里改成「只在关着的时候才点开」。
+                panel_open = page.evaluate(
+                    "() => { const el = document.querySelector('#agArtifacts');"
+                    " return !!el && !el.hidden; }")
+                if not panel_open:
+                    page.click("#agArtifactsBtn")
+                    page.wait_for_timeout(600)
+                locate_btn = page.query_selector(
+                    ".ag-artifact-locate[data-act='locate-job']")
+                if locate_btn:
+                    target_job = locate_btn.get_attribute("data-job-id")
+                    locate_btn.click()
+                    page.wait_for_timeout(2500)
+                    # 生成页应该可见
+                    jobs_visible = page.evaluate(
+                        "() => { const el = document.querySelector('#jobsArea');"
+                        " return !!el && !el.classList.contains('page-hidden'); }")
+                    check(f"[{width}] 定位切到生成库", jobs_visible,
+                          "生成库页面没显示")
+                    # 搜索框被填成了目标 id
+                    kw = page.evaluate(
+                        "() => (document.querySelector('#doneSearch')||{}).value || ''")
+                    check(f"[{width}] 定位填入任务 id 筛选", target_job in kw,
+                          f"keyword={kw} target={target_job}")
+                    # 目标卡片被高亮
+                    highlighted = page.evaluate(
+                        """(jid) => !!document.querySelector(
+                            '.job-card.is-located[data-jid="' + jid + '"]')""",
+                        target_job or "")
+                    check(f"[{width}] 定位高亮目标任务卡片", highlighted,
+                          f"job={target_job}")
+                    page.screenshot(path=str(SHOTS / f"artifact-located-{width}.png"))
+                    # 定位那步切到了生成库 —— 要回 Agent 页才能继续后面的步骤
+                    # （产物面板在 Agent 页里，生成库页面上点不到它）。
+                    page.click("#navAgent")
+                    page.wait_for_timeout(700)
+                else:
+                    check(f"[{width}] 产物有定位按钮（可点）", False,
+                          "没找到定位按钮")
+
                 # 面板用完了才关（4b/4c 需要它是打开的 ——
                 # 关掉会停掉轮询，DOM 也会被清空）
-                page.click("#agArtifactsClose")
-                page.wait_for_timeout(200)
+                panel_open = page.evaluate(
+                    "() => { const el = document.querySelector('#agArtifacts');"
+                    " return !!el && !el.hidden; }")
+                if panel_open:
+                    page.click("#agArtifactsClose")
+                    page.wait_for_timeout(200)
 
                 # 4d) 会话列表带关联产物数
                 page.click("#agMenu")
@@ -463,6 +561,28 @@ def main():
                     '.ag-session-item-meta')].map(e => e.textContent)""")
                 check(f"[{width}] 会话条目显示产物数",
                       any("产物" in m for m in metas), f"metas={metas}")
+
+                # 4d2) 【2026-11-12 新增】创建时间 + 状态徽章
+                #      需求 2：「展示每条会话的标题、创建/最后更新时间、
+                #      消息数、产物数、状态」
+                created_texts = page.evaluate("""() => [...document.querySelectorAll(
+                    '.ag-session-item-created')].map(e => e.textContent)""")
+                check(f"[{width}] 会话条目显示创建时间",
+                      len(created_texts) >= 1
+                      and all("建于" in t for t in created_texts),
+                      f"created={created_texts}")
+                status_badges = page.evaluate("""() => [...document.querySelectorAll(
+                    '.ag-session-status')].map(e => e.textContent.trim())""")
+                check(f"[{width}] 会话条目显示状态徽章",
+                      len(status_badges) >= 1, f"status={status_badges}")
+                # 状态徽章的文案必须是后端给的中文标签之一
+                # （不能是空串、不能是 undefined）
+                check(f"[{width}] 状态徽章文案有效",
+                      bool(status_badges)
+                      and all(s in ("空会话", "完成", "已截断", "失败", "待补充")
+                              for s in status_badges),
+                      f"status={status_badges}")
+                page.screenshot(path=str(SHOTS / f"session-status-{width}.png"))
 
                 # 4e) 搜索/过滤
                 page.fill("#agSessionSearch", "林黛玉")
