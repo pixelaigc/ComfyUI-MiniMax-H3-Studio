@@ -472,6 +472,27 @@ class TestFrontendWiring(unittest.TestCase):
         self.assertIn("/api/video-categories", js,
                       "前端必须从服务端拿类别清单")
 
+    def test_persisted_selection_is_applied_not_just_stored(self):
+        """持久化的选择必须**真的切到那个 mode**，不能只是存进 navState。
+
+        【踩过的坑】applyDefault() 原本用 silent 模式恢复，
+        只把值写进 navState；随后 syncActive() 又因为「当前 mode 不是
+        视频模式」把它清掉 —— 结果刷新后仍然停在 Z-IMAGE 文生图，
+        持久化形同虚设（浏览器实测复现）。
+
+        判据：恢复时必须走 onSelect 回调（让 app.js 走 activateMode）。
+        """
+        js = self._read("web/video-nav.js")
+        i = js.find("function applyDefault")
+        self.assertNotEqual(i, -1, "找不到 applyDefault")
+        body = js[i:i + 2000]
+        # 恢复时不能是 silent
+        self.assertIn("select(category, modelKey, { silent: true })", body)
+        # 之后必须触发 onSelect
+        self.assertIn("onSelect(", body,
+                      "恢复持久化选择时必须触发 onSelect（否则应用不会切过去）")
+        self.assertIn("applyDefault", js)
+
     def test_app_js_wires_the_two_level_nav(self):
         js = self._read("web/app.js")
         self.assertIn("VideoNav", js)

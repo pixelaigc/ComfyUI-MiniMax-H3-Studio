@@ -4144,7 +4144,9 @@ boot("视频类别导航", async () => {
   await window.VideoNav.load();
   window.VideoNav.render(box);
   window.VideoNav.bind(box);
-  // 默认选中（持久化 > 服务端默认）
+  // 恢复持久化选择（从来没选过就不动 —— 让 DEFAULT_MODE 独家高亮）。
+  // applyDefault 内部会通过 onSelect 把应用切到那个 mode，
+  // 所以它必须在「默认模式」boot 之后跑。
   window.VideoNav.applyDefault();
   syncVideoNavActive();
 });

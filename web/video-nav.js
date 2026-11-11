@@ -349,7 +349,19 @@
     if (!modelKey && category === DATA.default_category) {
       modelKey = DATA.default_model;
     }
-    return select(category, modelKey, { silent: true });
+    // 【关键】恢复持久化选择时必须**同时把应用切到那个 mode**，
+    // 否则「刷新后恢复上次选择」只是把值存进 navState，
+    // 而 syncActive() 又会因为当前 mode 不是视频模式把它清掉 ——
+    // 结果是刷新后仍然停在 Z-IMAGE 文生图，持久化形同虚设。
+    //
+    // 用 onSelect 回调（而不是 silent）让 app.js 走 activateMode()，
+    // 这样 mode、参数面板、导航高亮三者一起切过去。
+    if (!select(category, modelKey, { silent: true })) return false;
+    const model = modelByKey(navState.modelKey);
+    if (model && onSelect) {
+      onSelect(category, model.key, model.mode, model);
+    }
+    return true;
   }
 
   window.VideoNav = {
