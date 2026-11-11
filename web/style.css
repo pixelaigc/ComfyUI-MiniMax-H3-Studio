@@ -1821,11 +1821,197 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
    从块级改成 flex，改变它们的内部排版 —— 不能这么做。 */
 .page-hidden { display: none !important; }
 
+
+/* ---------- Agent 会话管理（2026-11-11） ---------- */
+
+/* 侧栏抽屉：桌面贴左，窄屏全宽覆盖。 */
+.ag-drawer {
+  position: absolute; top: 0; left: 0; bottom: 0; z-index: 30;
+  width: 300px; max-width: 86vw;
+  display: flex; flex-direction: column;
+  background: var(--panel); border-right: 1px solid var(--border);
+  transform: translateX(-102%);
+  transition: transform .18s ease, visibility .18s ease;
+  min-height: 0;
+  /* 关掉时彻底退出命中测试。
+     translateX 移出屏幕**不等于**不可点 —— 元素还在文档流里，
+     依然会挡住主区按钮的 pointer events。
+     实测踩过：点了会话后抽屉视觉上关掉了，但「本次会话产物」按钮
+     点 30 秒都点不动（subtree intercepts pointer events）。
+     visibility:hidden 保留过渡动画（display:none 就没了）。 */
+  visibility: hidden;
+}
+.agent-page.ag-drawer-open .ag-drawer {
+  transform: translateX(0); visibility: visible;
+}
+
+/* 遮罩：只窄屏需要（桌面抽屉不挡主区）。 */
+.ag-drawer-backdrop {
+  position: absolute; inset: 0; z-index: 29;
+  background: rgba(15, 23, 42, .34);
+}
+.ag-drawer-backdrop[hidden] { display: none; }
+
+.ag-drawer-head {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 13px 14px 9px; border-bottom: 1px solid var(--border);
+}
+.ag-drawer-title { font-size: 13px; font-weight: 700; }
+.ag-drawer-close {
+  width: 28px; height: 28px; line-height: 1; font-size: 19px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: #fff; color: var(--text); font-family: inherit;
+}
+.ag-drawer-close:hover { border-color: var(--accent); color: var(--accent); }
+
+.ag-drawer-new {
+  flex: 0 0 auto; margin: 10px 12px 6px; padding: 8px 10px; font-size: 12.5px;
+  cursor: pointer; border: 1px dashed var(--border); border-radius: 8px;
+  background: #fff; color: var(--text); font-family: inherit;
+}
+.ag-drawer-new:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 搜索框（2026-11-11 新增需求） */
+.ag-session-search {
+  flex: 0 0 auto; padding: 0 12px 8px;
+}
+.ag-session-search input {
+  width: 100%; padding: 7px 10px; font-size: 12.5px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--text); font-family: inherit;
+}
+.ag-session-search input:focus {
+  outline: none; border-color: var(--accent);
+}
+
+.ag-session-list {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 4px 8px 10px; display: flex; flex-direction: column; gap: 5px;
+}
+.ag-session-item {
+  position: relative; border: 1px solid transparent; border-radius: 9px;
+  padding: 8px 30px 8px 10px; cursor: pointer; background: transparent;
+  text-align: left; width: 100%; font-family: inherit;
+}
+.ag-session-item:hover { background: #f5f7fb; }
+.ag-session-item.ag-active { background: var(--accent-soft); border-color: #d7ddfb; }
+.ag-session-item-title {
+  font-size: 12.5px; color: var(--text); font-weight: 600; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-session-item-preview {
+  font-size: 11px; color: var(--muted); line-height: 1.45; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-session-item-meta {
+  font-size: 10px; color: var(--muted); margin-top: 3px; opacity: .85;
+}
+.ag-session-del {
+  position: absolute; top: 7px; right: 6px;
+  width: 22px; height: 22px; line-height: 1; font-size: 15px; cursor: pointer;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--muted); font-family: inherit;
+}
+.ag-session-del:hover { border-color: #f0b4b6; color: #b3272b; background: #fdecec; }
+.ag-session-empty { font-size: 12px; color: var(--muted); padding: 14px 10px; text-align: center; }
+.ag-drawer-foot {
+  flex: 0 0 auto; padding: 8px 12px; border-top: 1px solid var(--border);
+  font-size: 10.5px; color: var(--muted);
+}
+
+/* 头部：菜单按钮 + 文案 + 操作区 */
+.ag-head {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 16px 22px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  /* 定位上下文：会话侧栏与遮罩是 position:absolute，
+     没有这一行它们会锚到**视口**而不是 Agent 页 ——
+     抽屉就会盖住整个窗口（含顶栏），而不是只覆盖 Agent 区域。 */
+  position: relative;
+}
+.ag-menu {
+  flex: 0 0 auto; width: 34px; height: 34px; font-size: 16px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  color: var(--text); font-family: inherit; line-height: 1;
+}
+.ag-menu:hover { border-color: var(--accent); color: var(--accent); }
+.ag-head-text { flex: 1 1 auto; min-width: 0; }
+.ag-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.ag-artifacts-btn {
+  flex: 0 0 auto; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  color: var(--text); font-family: inherit;
+}
+.ag-artifacts-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ag-current-session {
+  font-size: 11px; color: var(--muted); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 本次会话产物面板 */
+.ag-artifacts {
+  flex: 0 0 auto; max-height: 42%; min-height: 0;
+  display: flex; flex-direction: column;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.ag-artifacts[hidden] { display: none; }
+.ag-artifacts-head {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 9px 18px; border-bottom: 1px solid var(--border);
+}
+.ag-artifacts-title { font-size: 12.5px; font-weight: 700; }
+.ag-artifacts-close {
+  width: 26px; height: 26px; line-height: 1; font-size: 17px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 7px; background: #fff;
+  color: var(--text); font-family: inherit;
+}
+.ag-artifacts-close:hover { border-color: var(--accent); color: var(--accent); }
+.ag-artifacts-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 10px 18px 14px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px;
+}
+.ag-artifact-item {
+  border: 1px solid var(--border); border-radius: 9px; padding: 8px 9px;
+  background: #fafbfc; min-width: 0;
+}
+.ag-artifact-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  font-size: 11px; color: var(--muted); margin-bottom: 6px;
+}
+.ag-artifact-id { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.ag-artifact-thumb {
+  width: 100%; aspect-ratio: 16 / 9; object-fit: cover;
+  border-radius: 6px; background: #eef1f6; display: block;
+}
+.ag-artifact-thumb.is-video { object-fit: contain; background: #10131a; }
+.ag-artifact-prompt {
+  font-size: 11px; color: var(--text); line-height: 1.45; margin-top: 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+.ag-artifact-meta {
+  font-size: 10px; color: var(--muted); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-artifacts-empty { font-size: 12px; color: var(--muted); padding: 12px 2px; }
+/* 未完成的任务：指示等待再更新 */
+.ag-artifact-item.is-pending { border-color: #f4e0bd; background: #fffdf8; }
+.ag-artifact-locate {
+  margin-top: 7px; padding: 4px 8px; font-size: 10.5px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; color: var(--muted); font-family: inherit;
+}
+.ag-artifact-locate:hover { border-color: var(--accent); color: var(--accent); }
 /* ---------- 内置多模态 Agent 面板 ---------- */
 .agent-page {
   flex: 1 1 auto; min-width: 0; min-height: 0;
   display: flex; flex-direction: column;
   background: var(--bg); overflow: hidden;
+  /* 定位上下文：会话侧栏与遮罩是 position:absolute，
+     没有这一行它们会锚到**视口**而不是 Agent 页 ——
+     抽屉就会盖住整个窗口（含顶栏），而不是只覆盖 Agent 区域。 */
+  position: relative;
 }
 .ag-head {
   flex: 0 0 auto;

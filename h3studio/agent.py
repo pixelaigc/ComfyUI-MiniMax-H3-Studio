@@ -424,6 +424,14 @@ class AgentContext:
         #: 形状：{"asset_id": str, "name": str, "description": str,
         #:        "preview_url": str|None, "tags": list[str]}
         self.attachments: list[dict] = []
+        #: 本次运行所属的**会话 id**（面板直接建任务时为空）。
+        #:
+        #: 【为什么需要，2026-11-11】会话管理需求要求「本次会话产物」
+        #: 面板能列出这个会话里 Agent 建的所有任务。唯一可信的来源是
+        #: jobs.session_id —— 建任务时**当场**写进去。
+        #: 所以 AgentContext 必须知道自己在哪个会话里，
+        #: create_job 工具才能把它传给服务端的建任务函数。
+        self.session_id: str = ""
 
     def record(self, step: dict) -> None:
         """记录一步。**字段集合必须符合 STEP_FIELDS 契约**。
@@ -1746,6 +1754,11 @@ def _create_job_record(ctx: AgentContext, mode: str, params: dict) -> str:
     刻意**复用** server 侧的建任务逻辑（server.create_job_record），
     而不是在这里另写一份 SQL —— 两份实现必然会漂移（字段默认值、批次拆分、
     gen_type 写入都会不一致）。
+
+    【为什么传 session_id —— 2026-11-11】
+    会话管理需求要「本次会话产物」面板列出这个会话建的任务。
+    唯一可信的来源是 jobs.session_id —— 建任务时当场写进去。
+    ctx.session_id 是空串时（面板侧直接建任务）照常建，只是归属为空。
     """
     server = ctx.server
     if server is None:
@@ -1754,11 +1767,56 @@ def _create_job_record(ctx: AgentContext, mode: str, params: dict) -> str:
     if creator is None:
         raise AgentError("服务端缺少 create_job_record，无法创建任务", status=500)
     try:
+        # 老服务端没有 session_id 参数 —— 不能因此建不了任务。
+        # 这是**向前兼容**：Agent 侧升级了、服务端还没升级时，
+        # 会话归属会丢，但任务照建（不能因为新字段把老功能搞挂）。
+        #
+        # 【为什么用签名探测而不是 catch TypeError 再试一次】
+        # 靠「先传 3 个、报 TypeError 再退回 2 个」有两个致命问题：
+        #   1. TypeError 也可能从**函数体内部**抛出来（比如建任务逻辑自己
+        #      算错参数）—— 那时盲目重试会把真正的错误掩盖成「参数不对」；
+        #   2. Python 的报错文案是
+        #      "takes 3 positional arguments but 4 were given"，
+        #      **根本不含参数名** —— 想按名字匹配根本匹配不上。
+        # 用 inspect.signature 探测「能不能接受第 3 个位置参数」是确定的：
+        # 接受就传，不接受就不传，不会误伤函数体内部的 TypeError。
+        if _accepts_session_id(creator):
+            return creator(mode, params, ctx.session_id or "")
         return creator(mode, params)
     except AgentError:
         raise
     except ValueError as exc:
         raise AgentError(str(exc), status=400) from exc
+
+
+def _accepts_session_id(creator) -> bool:
+    """
+    这个建任务函数能不能接受第 3 个位置参数（session_id）？
+
+    用 inspect.signature 探测，不用 try/except TypeError：
+      * TypeError 可能来自函数体内部（真正的 bug），不能盲目重试；
+      * Python 的 arity 报错文案不含参数名，按名字匹配匹配不上。
+
+    探不出来（比如 C 扩展 / 可调用对象没有签名）时返回 False ——
+    **保守**：宁可丢会话归属，也不能把任务建不出来。
+    """
+    import inspect
+
+    try:
+        sig = inspect.signature(creator)
+    except (TypeError, ValueError):
+        return False
+    positional = 0
+    has_varargs = False
+    for param in sig.parameters.values():
+        if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
+            positional += 1
+        elif param.kind == param.VAR_POSITIONAL:
+            has_varargs = True
+    if has_varargs:
+        return True
+    # mode + params 已经占了 2 个位置
+    return positional >= 3
 
 
 #: 权威查询的**时间窗回看量**（秒）。
@@ -2671,6 +2729,9 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     ctx = AgentContext(server_module=server_module, provider=provider)
     ctx.session_store = session_store
     ctx.memory_store = memory_store
+    # 会话 id 记进 ctx —— create_job 建任务时要写进 jobs.session_id，
+    # 这样「本次会话产物」面板才有权威数据源（见 AgentContext.session_id）。
+    ctx.session_id = str(session_id or "")
 
     # 事件回调：任何异常都吞掉 —— 流式输出是锦上添花。
     def _event(name: str, data: dict) -> None:

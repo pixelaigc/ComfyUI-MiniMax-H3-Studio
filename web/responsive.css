@@ -464,6 +464,23 @@
   .ag-msg-attach { width: 46px; height: 46px; max-width: 46px; }
   .ag-attach-hint { white-space: normal; overflow: visible; }
   .ag-attach-row { gap: 6px; }
+
+  /* 会话管理 —— 375px 窄屏不许横向溢出：
+     1) 抽屉改成**全宽覆盖**（挤占式会把主区只剩 ~135px，气泡放不下）；
+     2) 头部改成「菜单 | 文案」两行，操作按钮换到第二行（否则按钮被挤没）；
+     3) 产物面板网格改成单列（两列在 375px 下每列只有 ~170px，缩略图太小）。 */
+  .ag-drawer { width: 100%; max-width: 100%; }
+  .ag-head { flex-wrap: wrap; row-gap: 8px; }
+  .ag-head-text { flex: 1 1 0; min-width: 0; }
+  .ag-head-actions { flex: 1 1 100%; }
+  .ag-head-actions .ag-new,
+  .ag-head-actions .ag-artifacts-btn { flex: 1 1 0; }
+  .ag-current-session { white-space: normal; overflow: visible; }
+  .ag-artifacts { max-height: 52%; }
+  .ag-artifacts-body {
+    grid-template-columns: 1fr; padding: 10px 14px 12px;
+  }
+  .ag-artifact-thumb { aspect-ratio: 16 / 10; }
 }
 
 /* 平板：输入区改为上下两行，发送按钮不撑满 */
