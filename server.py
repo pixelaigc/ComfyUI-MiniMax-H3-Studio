@@ -1723,10 +1723,18 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
         if not refs:
-            # 素材库来源的参考图也算（worker 会按 asset_refs 上传）
-            if not [r for r in asset_refs
-                    if isinstance(r, dict) and r.get("slot") == "ref_image"]:
-                raise JobValidationError("参考模式需要至少 1 张参考图")
+            # 素材库来源的参考素材也算（worker 会按 asset_refs 上传）
+            #
+            # 【2026-11-11 音视频扩展】参考模式现在也接受参考视频/参考音频
+            # —— H3 参考生成节点的真实槽位上限：
+            #   ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
+            # 扩展前只接受 ref_image，一个纯视频参考会被统一拒掉，
+            # 变成一个不存在的能力。
+            _r2v_slots = {r.get("slot") for r in (asset_refs or [])
+                          if isinstance(r, dict)}
+            if not _r2v_slots & {"ref_image", "ref_video", "ref_audio"}:
+                raise JobValidationError(
+                    "参考模式需要至少 1 个参考素材（图片 / 视频 / 音频）")
         else:
             params["ref_images"] = refs[:3]
     elif mode == "i2i_qwen":
@@ -4118,14 +4126,22 @@ async def api_agent_upload(request):
     POST /api/agent/upload —— 内置 Agent 聊天区的**媒体上传**。
 
     multipart 表单：
-      files[] / file / image   一个或多个图片文件（png/jpg/jpeg/webp/bmp/gif）
+      files[] / file / image   一个或多个**媒体**文件（图片 / 音频 / 视频）
+
+      图片：png/jpg/jpeg/webp/bmp/gif       上限 20 MB，一次最多 9 张
+      音频：wav/mp3/flac/m4a/aac/ogg/opus/aiff/aif/wma  上限 100 MB
+      视频：mp4/webm/mov/mkv/m4v/avi       上限 500 MB
+      音视频合计一次最多 4 个
 
     行为：
-      * 每个文件独立校验（类型 / 大小 / 魔数），一个失败不影响其它
+      * 每个文件独立校验（扩展名 / 大小 / **魔数**），一个失败不影响其它
       * 落进**素材库**（复用 asset_service.register_asset —— 与素材库页
-        的 /api/assets 上传完全同一条链路）
-      * 落库后异步排一次多模态分析（描述来自素材库已有的分析结果）
-      * 返回每个文件的 asset_id / preview_url / 描述
+        的 /api/assets 上传完全同一条链路，库在 /mnt/usb2t/asset_library）
+      * 图片：落库后**同步**做多模态分析
+      * 音视频：落库后排**异步**分析 job（深度音频管线 / 视频抽帧）
+        ，前端轮询 GET /api/agent/media/{id}/status，就绪前不能引用
+      * 分析失败 -> 明确报错 + soft_delete 回滚（不留“已入库没描述”的脏条目）
+      * 返回每个文件的 asset_id / preview_url / kind / 描述
 
     为什么要有这个端点：
       用户要「拿这张图做复刻/修改」时，聊天区原本**没有任何入口**
@@ -4146,6 +4162,28 @@ async def api_agent_upload(request):
                                   "code": "upload_failed"},
                                  status=500)
     return web.json_response(payload)
+
+async def api_agent_media_status(request):
+    """
+    GET /api/agent/media/{id}/status -- Agent 聊天区**音视频素材**的分析就绪状态。
+
+    音视频上传后走**异步**分析（深度音频管线 / 视频抽帧多模态），
+    耗时几分钟到十几分钟 —— 所以前端轮询本接口，
+    直到 status == "done" 才允许把该素材作为参考素材引用。
+
+    返回：{"asset_id", "status", "stage", "progress", "message",
+          "available", "description", "tags", "kind",
+          "duration_sec", "width", "height", "error"}
+    """
+    asset_id = request.match_info["id"]
+    try:
+        payload = await agent_media.handle_analysis_status(asset_id)
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:200]
+        return web.json_response({"error": detail, "code": "status_failed"},
+                                 status=500)
+    return web.json_response(payload)
+
 
 async def api_agent_chat(request):
     """
@@ -4908,6 +4946,7 @@ def make_app():
     # 内置多模态 Agent
     app.router.add_post("/api/agent/chat", api_agent_chat)
     app.router.add_post("/api/agent/upload", api_agent_upload)
+    app.router.add_get("/api/agent/media/{id}/status", api_agent_media_status)
     app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
     app.router.add_get("/api/agent/memory", api_agent_memory)

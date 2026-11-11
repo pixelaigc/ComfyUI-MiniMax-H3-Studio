@@ -2404,6 +2404,58 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: var(--accent-soft);
 }
 
+/* 素材类型徽标：区分 图片 / 音频 / 视频，并标出「分析中」「不可用」 */
+.ag-attach-badge {
+  position: absolute; left: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none; max-width: calc(100% - 22px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 类型标签（音频/视频）—— 右上角，× 按钮左侧。
+   放右上角是为了把底部整行留给「时长 · 尺寸」——
+   两者都挤在底部时，「0:01 · 160x120」会被压成「0:01 - 160...」（截断）。 */
+.ag-attach-kind {
+  position: absolute; right: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none; max-width: calc(100% - 22px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-attach-badge-audio { background: rgba(26, 115, 92, .88); }
+.ag-attach-badge-video { background: rgba(120, 68, 168, .88); }
+.ag-attach-badge-pending { background: rgba(180, 120, 20, .9); }
+.ag-attach-badge-failed { background: rgba(179, 39, 43, .9); }
+
+/* 时长 / 尺寸（音频视频才有时长） */
+.ag-attach-meta {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font-size: 9px; line-height: 1.4; padding: 1px 3px;
+  color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: center;
+}
+
+/* 分析进度条（音视频异步分析） */
+.ag-attach-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: rgba(255, 255, 255, .45);
+  pointer-events: none;
+}
+.ag-attach-progress > span {
+  display: block; height: 100%; background: var(--accent);
+  transition: width .3s ease;
+}
+
+/* 「分析中」提示（不阻塞，但要明确告诉用户） */
+.ag-attach-note {
+  flex: 1 1 100%; min-width: 0;
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+  word-break: break-word;
+}
+
 /* 用户消息气泡里的附件缩略图 */
 .ag-msg-attachments {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -2416,5 +2468,17 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 .ag-msg-attach img {
   width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ag-msg-attach-badge {
+  position: absolute; left: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+.ag-msg-attach[data-kind="audio"] .ag-msg-attach-badge {
+  background: rgba(26, 115, 92, .88);
+}
+.ag-msg-attach[data-kind="video"] .ag-msg-attach-badge {
+  background: rgba(120, 68, 168, .88);
 }
 

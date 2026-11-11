@@ -602,6 +602,11 @@ def _resolution_megapixels(mode: str, tier: str) -> float | None:
 #:
 #: 这张表把「mode 需要什么槽位」写成显式映射，Agent 按它分派。
 #: 值 = (单个素材槽位列表, 多素材槽位列表)
+#:
+#: 【注意：single 里的槽位是「该模式**需要**的」】
+#: mode_requires_refs / missing_params 都按它判断「缺什么要问用户」。
+#: 所以「这个模式**支持**哪些类型的素材」不能塞进这张表 ——
+#: 那属于 MODE_MEDIA_SLOTS（见下）。
 MODE_SLOTS = {
     "t2v":    ([], []),
     "t2i":    ([], []),
@@ -625,7 +630,27 @@ def mode_slot_plan(mode: str) -> dict:
     返回该 mode 的素材槽位计划。
 
     {"single": ["first_frame", ...], "multi": ["ref_image", ...],
-     "max_per_slot": {"ref_image": 10, "ref_audio": 1}}
+     "max_per_slot": {"ref_image": 10, "ref_audio": 1},
+     "media_slots": {"image": "ref_image", "audio": "ref_audio",
+                     "video": "ref_video"}}
+
+    【media_slots —— 素材类型 -> 槽位】
+    这是 2026-11-11 音视频上传扩展带来的新维度：
+    同一个 mode（r2v）可以同时接受参考图、参考视频、参考音频，
+    落到**哪个**槽位取决于素材的**真实类型**，而不是调用方随便填。
+
+    映射依据是服务端真实的槽位映射（server._ASSET_SLOT_PARAM）：
+        ref_image -> params["ref_images"]
+        ref_video -> params["ref_videos"]
+        ref_audio -> params["ref_audios"]
+    以及 H3 参考节点的真实槽位上限（实测 /object_info）：
+        ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
+
+    【为什么每个 mode 的 media_slots 不同】
+      * i2i_qwen：只吃图片（Qwen-Image 2.1 的参考图是图像编码器通道）
+      * flf：首帧/尾帧是**图片**通道
+      * a2a：只吃音频（YuE2 的 cover 模式要参考音频）
+      * r2v：H3 参考生成，三种都能吃
     """
     single, multi = MODE_SLOTS.get(mode, ([], []))
     limits = {}
@@ -637,8 +662,70 @@ def mode_slot_plan(mode: str) -> dict:
         limits["first_frame"] = 1
     if "last_frame" in single:
         limits["last_frame"] = 1
+    if "ref_video" in multi:
+        # H3 参考节点的真实上限：ref_videos 0~3
+        limits["ref_video"] = REF_VIDEO_MAX
     return {"single": list(single), "multi": list(multi),
-            "max_per_slot": limits}
+            "max_per_slot": limits,
+            "media_slots": _media_slots_for(mode)}
+
+
+#: H3 参考视频槽位上限（实测 /object_info: MiniMaxH3ReferenceToVideo
+#: 的 ref_videos 是 0~3）。
+REF_VIDEO_MAX = 3
+
+#: H3 参考音频槽位上限（实测 /object_info: ref_audios 0~3；
+#: 但 a2a 模式的服务端校验只允许 1 段 —— 那是另一条更严的约束）。
+REF_AUDIO_MAX = 3
+
+#: 各 mode 支持的「素材类型 -> 槽位」映射（2026-11-11 音视频上传扩展）。
+#:
+#: 【为什么单独一张表，不塞进 MODE_SLOTS】
+#: MODE_SLOTS 回答的是「这个模式**需要**什么素材」（缺了要问用户），
+#: 而这张表回答的是「这个模式**能吃**什么类型的素材」。
+#: 两者语义不同，混在一张表里会导致：
+#:   * r2v 的 ref_audio 被当成「必需」-> 模型每次都被要求提供参考音频
+#:   * i2i_qwen 的 image 被当成「必需」-> 同理
+#:
+#: 【映射依据 —— 全部来自真实能力，不是拍脑袋】
+#:   * 服务端槽位映射（server._ASSET_SLOT_PARAM）：
+#:       ref_image -> params["ref_images"]
+#:       ref_video -> params["ref_videos"]
+#:       ref_audio -> params["ref_audios"]
+#:   * H3 参考节点的真实槽位上限（实测 /object_info）：
+#:       ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
+#:   * Qwen-Image 2.1 的参考图走**图像编码器**通道（只吃图片）
+#:   * YuE2 cover（a2a）走 SheetSage2AudioToABC（只吃音频）
+#:
+#: 值 = {素材类型: 槽位名}。类型不在表里 = 该模式**不接受**这种素材。
+MODE_MEDIA_SLOTS = {
+    # 文生类：不接受任何素材
+    "t2v": {},
+    "t2i": {},
+    "t2i_qwen": {},
+    "t2i_moss": {},
+    "t2a": {},
+    # 图片编辑：只吃参考图
+    "i2i_qwen": {"image": "ref_image"},
+    # 首尾帧：首帧/尾帧都是图片通道（具名槽位）
+    "flf": {"image": "first_frame"},
+    # 参考生音乐：只吃参考音频（1 段）
+    "a2a": {"audio": "ref_audio"},
+    # 参考生视频（H3 参考生成）：图 / 视频 / 音频都能吃
+    "r2v": {"image": "ref_image", "video": "ref_video", "audio": "ref_audio"},
+}
+
+
+def _media_slots_for(mode: str) -> dict:
+    """
+    该 mode 支持的「素材类型 -> 槽位」映射。
+
+    【只列该 mode **真的**支持的类型】
+    i2i_qwen / flf 只吃图片 -> 映射里只有 image。
+    映射里没有的类型 = 该模式**不接受**这种素材
+    （Agent 侧要据此把素材排除，而不是硬塞进某个槽位）。
+    """
+    return dict(MODE_MEDIA_SLOTS.get(mode, {}))
 
 
 def mode_requires_refs(mode: str) -> list[str]:

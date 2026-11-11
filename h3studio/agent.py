@@ -682,6 +682,17 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
             entry["requires"] = "首帧来自素材库（first_frame）"
         if mode in ("i2i_qwen", "r2v"):
             entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
+        if mode == "r2v":
+            # 【2026-11-11 音视频扩展】r2v（H3 参考生成）除参考图外，
+            # 还能吃**参考视频**与**参考音频** —— H3 的
+            # MiniMaxH3ReferenceToVideo 节点实测支持
+            #   ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
+            # 模型必须知道这一点，否则用户上传了视频却被塞进 ref_image。
+            entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
+            entry["media_slots"] = {"image": "ref_image", "video": "ref_video",
+                                    "audio": "ref_audio"}
+            entry["requires"] = ("参考素材来自素材库：图片 -> ref_image，"
+                                  "视频 -> ref_video，音频 -> ref_audio")
         if mode in ("t2i", "t2i_qwen", "t2i_moss"):
             # 负面提示词支持矩阵 —— 让模型知道「这个模式传了也没用」
             entry["negative_prompt_support"] = {
@@ -739,6 +750,15 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
             parts = list(slots.get("single") or []) + list(slots.get("multi") or [])
             if parts:
                 item["slots"] = ",".join(parts)
+        if entry.get("media_slots"):
+            # 【2026-11-11】素材类型 -> 槽位（紧凑表示）。
+            # 模型必须知道「音频用 ref_audio、视频用 ref_video」，
+            # 否则会把音频塞进 ref_image（服务端按槽位选上传通道，
+            # 音频被当图片上传 -> 任务建成了但参考素材是坏的）。
+            # 格式："image:ref_image,video:ref_video,audio:ref_audio"
+            item["media_slots"] = ",".join(
+                f"{kind}:{slot}"
+                for kind, slot in sorted(entry["media_slots"].items()))
         if entry.get("negative_prompt_support"):
             # 只给「这个模式有没有负面提示词通道」的布尔结论 ——
             # 逐模型矩阵太长（4 个模型名 ~120 字符/族），
@@ -992,6 +1012,9 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> dict | Non
                        "description": "尾帧素材 ID（仅 flf 首尾帧模式用，可选）"},
         "ref_audio": {"type": "string",
                       "description": "参考音频素材 ID（仅 a2a 参考生音乐模式用，只能 1 段）"},
+        "ref_video": {"type": "string",
+                      "description": "参考视频素材 ID（r2v 参考生视频模式用，"
+                                     "最多 3 个）"},
         "aspect": {"type": "string", "description": "画面比例，如 16:9 / 9:16 / 1:1"},
         "duration": {"type": "number",
                      "description": "时长（秒），**仅视频模式**（5~15）。"
@@ -1141,12 +1164,12 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     raw_assets = [x for x in raw_assets if x]
 
     # 【附件兜底 —— 2026-11-11】
-    # 用户本轮上传了图，但模型**没有**显式传 asset_id/asset_ids
+    # 用户本轮上传了素材，但模型**没有**显式传 asset_id/asset_ids
     # （小模型很常见：它知道用户传了图，却忘了把 id 带上）。
     #
     # 【为什么不自动带上 —— 模式分派有讲究】
     # _build_asset_refs 会按 mode 的槽位计划分派：
-    #   * i2i_qwen / r2v -> 全部落到 ref_image（多条参考图）
+    #   * i2i_qwen / r2v -> 参考图（多条）
     #   * flf             -> first_frame（只能 1 张）+ last_frame（可选）
     #   * a2a             -> ref_audio（只能 1 段）
     #   * t2i / t2v / t2a -> 不接受素材（忽略）
@@ -1161,12 +1184,33 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 所以：模型没显式给参考图时，用本轮上传的附件兜底。
     # 模型**显式**给了就用模型的（模型可能有更准确的判断，
     # 比如它从素材库里另外找了一张更合适的）。
+    #
+    # 【2026-11-11 音视频：按素材**真实类型**分派参数位】
+    # 音频 -> ref_audio，视频 -> ref_video，图片 -> ref_image。
+    # 类型来自三个来源：附件 / ctx.assets（search_assets 命中）/ 直接查库。
+    # 没有类型信息的条目会保守退化到旧行为（落到第一个 multi 槽位），
+    # 所以**旧调用方不受影响**。
+    attachment_kinds = _resolve_asset_kinds(
+        ctx, getattr(ctx, "attachments", None), raw_assets)
     if not raw_assets:
         attachment_ids = _attachment_asset_ids(getattr(ctx, "attachments", None))
         if attachment_ids:
             raw_assets = attachment_ids
 
-    asset_refs = _build_asset_refs(mode, args, raw_assets)
+    asset_refs = _build_asset_refs(mode, args, raw_assets, attachment_kinds)
+
+    # --- 就绪门槛（所有引用入口，不只是附件兜底）---
+    #
+    # 【2026-11-11】模型**自己**把 asset_id 写进 asset_ids 时，
+    # 那条路径不经过 _attachment_asset_ids 的过滤 -> 一个还在做深度
+    # 分析的音频会被当成参考音频传给服务端（静默失效：任务建成了，
+    # 但模型对这条音频一无所知）。所以在**这里**统一把关：
+    # 分析 pending / failed 的条目一律剔除。
+    #
+    # 剔除后如果一个参考素材都不剩，而模式**要求**参考素材，
+    # 下面 prepare_job_params 会给出「必须指定参考图」的明确错误 ——
+    # 这比建出一个坏任务好。
+    asset_refs = _filter_unavailable_refs(asset_refs)
 
     # --- Agent 侧取值校验（合法值全部来自真实配置）---
     #
@@ -1460,7 +1504,8 @@ agent_tools.register(sys.modules[__name__], _tool_create_job)
 # ------------------------------------------------------------------ 辅助
 
 
-def _build_asset_refs(mode: str, args: dict, raw_assets: list) -> list[dict]:
+def _build_asset_refs(mode: str, args: dict, raw_assets: list,
+                      asset_kinds: dict | None = None) -> list[dict]:
     """
     按 mode 的**素材槽位计划**把 asset_id 分派成 asset_refs。
 
@@ -1468,11 +1513,31 @@ def _build_asset_refs(mode: str, args: dict, raw_assets: list) -> list[dict]:
       first_frame -> params["first_frame"]   必需（flf）
       last_frame  -> params["last_frame"]    可选（flf）
       ref_image   -> params["ref_images"]    多条（i2i_qwen / r2v）
+      ref_video   -> params["ref_videos"]    多条（r2v）
       ref_audio   -> params["ref_audios"]    1 条（a2a）
 
     【入参兼容】
       * asset_ids / asset_id —— 通用素材列表（按 mode 计划落到对应槽位）
       * first_frame / last_frame / ref_audio —— 具名槽位（显式指定）
+
+    【2026-11-11 音视频扩展：按素材**真实类型**分派】
+    asset_kinds: {asset_id: "image"|"audio"|"video"}。
+    给了它就能把音频分到 ref_audio、视频分到 ref_video、图片分到 ref_image，
+    而不是「所有东西都塞进第一个 multi 槽位」。
+
+    【为什么必须按类型分派】
+    服务端按 slot 分派参数，槽位名直接决定 params 里的字段：
+      ref_image -> params["ref_images"]  -> 走 comfy_upload_image
+      ref_video -> params["ref_videos"]  -> 走 comfy_upload_media
+      ref_audio -> params["ref_audios"]  -> 走 comfy_upload_media
+    一个音频被塞进 ref_image 槽位，就会被当**图片**上传到 ComfyUI ——
+    ComfyUI 会拿到一个非图片文件当 image 输入，图节点直接报错，
+    而任务已经建成了（**静默失效**，最难查的一类问题）。
+
+    【没有类型信息时怎么办 —— 保守退化】
+    asset_kinds 缺失（老调用方）-> 沿用旧行为：落到该模式的第一个
+    multi 槽位（i2i_qwen/r2v -> ref_image；flf/a2a -> 第一个 single 槽位）。
+    这样**旧行为不变**，只是新链路（附件）会带上类型信息。
 
     返回的 asset_refs 形状与 /api/jobs 完全一致：
     [{"asset_id": ..., "slot": ..., "ordinal": ...}]
@@ -1481,13 +1546,15 @@ def _build_asset_refs(mode: str, args: dict, raw_assets: list) -> list[dict]:
     single_slots = list(plan["single"])
     multi_slots = list(plan["multi"])
     max_per_slot = plan["max_per_slot"]
+    media_slots = plan.get("media_slots") or {}
 
     refs: list[dict] = []
 
     # --- 具名槽位（显式指定优先）---
     named = {"first_frame": args.get("first_frame"),
              "last_frame": args.get("last_frame"),
-             "ref_audio": args.get("ref_audio")}
+             "ref_audio": args.get("ref_audio"),
+             "ref_video": args.get("ref_video")}
     for slot in single_slots:
         value = named.get(slot)
         if value is None:
@@ -1499,20 +1566,31 @@ def _build_asset_refs(mode: str, args: dict, raw_assets: list) -> list[dict]:
 
     # --- 通用素材列表 ---
     # 单槽位模式（flf / a2a）：按顺序填入该模式的具名槽位。
-    # 多槽位模式（i2i_qwen / r2v）：全部落到 ref_image。
+    # 多槽位模式（i2i_qwen / r2v）：按**素材类型**落到对应槽位。
     ordinals: dict[str, int] = {}
     for index, item in enumerate(raw_assets or []):
         asset_id = str(item or "").strip()
         if not asset_id:
             continue
-        if multi_slots:
-            slot = multi_slots[0]
-        elif single_slots:
-            slot = single_slots[0]
-        else:
-            # 该模式不接受素材（t2v / t2i / t2a）—— 忽略，不报错
-            # （用户多说了素材不该让整个任务失败）
-            continue
+
+        slot = None
+        if asset_kinds:
+            kind = str(asset_kinds.get(asset_id) or "").strip()
+            if kind:
+                # 该模式**不支持**这种类型的素材 -> 跳过（不硬塞）
+                slot = media_slots.get(kind)
+                if not slot:
+                    continue
+        if slot is None:
+            if multi_slots:
+                slot = multi_slots[0]
+            elif single_slots:
+                slot = single_slots[0]
+            else:
+                # 该模式不接受素材（t2v / t2i / t2a）—— 忽略，不报错
+                # （用户多说了素材不该让整个任务失败）
+                continue
+
         used = ordinals.get(slot, 0)
         limit = max_per_slot.get(slot)
         if limit is not None and used >= limit:
@@ -1605,8 +1683,8 @@ def _load_attachments(ctx: AgentContext, raw) -> list[dict]:
 
     返回的每个条目：
       {"asset_id", "name", "description", "description_source",
-       "tags", "preview_url", "width", "height", "missing", "reason",
-       "analyzed"}
+       "tags", "preview_url", "width", "height", "duration_sec",
+       "kind", "missing", "reason", "analyzed", "available"}
     """
     from . import assets as asset_store
     from . import ref_api
@@ -1637,37 +1715,292 @@ def _load_attachments(ctx: AgentContext, raw) -> list[dict]:
                 "missing": bool(raw_entry.get("missing")),
                 "reason": raw_entry.get("reason") or "",
             }
+            # 【2026-11-11 音视频扩展】类型 + 时长 + 编码
+            # kind 是**素材库里的真实类别**（image/audio/video）——
+            # Agent 据此决定它能落到哪个参数位（参考图 / 参考音频 / 参考视频）。
+            entry["kind"] = raw_entry.get("kind") or _kind_of_asset(conn, asset_id)
+            entry["duration_sec"] = raw_entry.get("duration_sec")
+            entry["codec"] = raw_entry.get("codec")
             # 条目存在但素材库没有分析结论 -> 明确标出「未分析」。
             # （正常流程下上传接口已经同步做完预处理，这里是兜底 ——
             #   比如素材是在别处入库的，或分析结果被清掉了。）
             entry["analyzed"] = bool(entry["description"])
+            # 【可用性 —— 2026-11-11】
+            # 一个附件要能被引用，必须满足：
+            #   1) 素材条目存在且没进回收站（missing == False）
+            #   2) 素材库的**分析任务**没有处于「未完成」状态
+            #
+            # 【为什么用「分析任务状态」而不是「有没有描述」】
+            # 音视频走的是**异步 job**（深度音频分析实测 116 秒素材要 ~600 秒，
+            # 视频要抽帧 + 调多模态模型）。在任务还在跑的时候，素材库里
+            # 确实还没有描述 —— 此时把它当参考素材用，模型会以为它有
+            # BPM/乐器/人声信息，实际上一无所知，**比没有更糟**。
+            #
+            # 但「素材库里从来没有过分析记录」是**另一种**状态：
+            # 那不是「分析还在跑」，而是这个素材压根没被分析过
+            # （老流程里图片上传是同步分析的，所以正常链路不会出现；
+            #   素材库页手动入库的素材会这样）。
+            # 对这种素材沿用既有语义（可用，但提示块如实说「尚无分析结论」），
+            # 避免把「没分析过」误判成「分析中」而白白禁掉用户的素材。
+            #
+            # 判据优先级：**有成功的分析结论 > 任务状态**。
+            # （曾经成功分析过、后来又排了一次任务失败的素材，结论仍然有效。）
+            state = _analysis_state(conn, asset_id)
+            entry["analysis_state"] = state
+            entry["available"] = bool(
+                not entry["missing"] and state != "pending"
+                and state != "failed")
+            if entry["missing"]:
+                entry["unavailable_reason"] = entry["reason"] or "素材已失效"
+            elif state == "pending":
+                entry["unavailable_reason"] = (
+                    "素材库尚无分析结论（分析任务仍在进行中，"
+                    "描述与标签还没生成）")
+            elif state == "failed":
+                entry["unavailable_reason"] = (
+                    "素材库尚无分析结论（分析任务失败，没有生成描述与标签）")
+            elif not entry["analyzed"]:
+                # 【措辞要含「尚无分析结论」】
+                # 这是既有契约（test_prompt_block_does_not_fabricate_description
+                # 断言提示块里出现这四个字，且**不含**编造的描述内容）。
+                # 「尚无分析结论」比「尚未完成分析」更准确地说明了
+                # **素材库里确实没有描述**这件事 —— 模型据此知道
+                # 该素材没有内容特征可用，而不是「分析还在跑」。
+                entry["unavailable_reason"] = (
+                    "素材库尚无分析结论（描述与标签还没生成）")
+            else:
+                entry["unavailable_reason"] = ""
             entries.append(entry)
             # 附件也要进 ctx.assets —— 这样它在结果里与 search_assets
             # 命中的素材**同构**，前端渲染逻辑不用分两套。
             ctx.assets[asset_id] = {
                 "asset_id": asset_id,
                 "name": entry["name"],
-                "category": "image",
+                "category": entry["kind"],
                 "tags": entry["tags"],
                 "description": entry["description"],
                 "analyzed": entry["analyzed"],
+                "available": entry["available"],
+                "duration_sec": entry["duration_sec"],
             }
     return entries
 
 
+def _analysis_state(conn, asset_id: str) -> str:
+    """
+    该素材的**分析任务状态**：pending / failed / done / none。
+
+    【为什么需要它】
+    音视频走异步分析 job，任务在跑的时候素材库里还没有描述。
+    如果此时把它当参考素材用，模型会以为它有 BPM/乐器/人声信息，
+    实际上一无所知 —— **比没有更糟**。
+    所以要能区分「分析还在跑」和「压根没分析过」：
+      * pending —— 有 queued/running 的任务 -> 还不能引用
+      * failed —— 最后一个任务失败且没有成功结论 -> 不能引用
+      * done   —— 有成功的分析结论 -> 可用
+      * none   —— 从来没有过分析记录 -> 沿用既有语义（可用，
+                   但提示块如实说「尚无分析结论」）
+
+    【为什么 done 优先于 failed】
+    曾经成功分析过、后来又排了一次任务失败 —— 结论仍然有效，
+    不该把可用素材判成不可用。
+    """
+    from . import asset_repo
+
+    try:
+        analyses = asset_repo.analyses_of(conn, asset_id)
+    except Exception:  # noqa: BLE001
+        return "none"
+
+    # 有成功的分析记录 -> done（哪怕后来又有任务失败）
+    for item in analyses or []:
+        if (item.get("text") or "").strip() and not item.get("error"):
+            return "done"
+
+    try:
+        jobs = asset_repo.jobs_of(conn, asset_id, limit=10)
+    except Exception:  # noqa: BLE001
+        return "none"
+
+    statuses = [str((job or {}).get("status") or "") for job in jobs or []]
+    if any(status in ("queued", "running") for status in statuses):
+        return "pending"
+    if any(status == "failed" for status in statuses):
+        return "failed"
+    return "none"
+
+
+def _kind_of_asset(conn, asset_id: str) -> str:
+    """取素材的**真实类别**（image / audio / video / other）。
+
+    【为什么不能靠 mime 前缀猜】
+    assets.classify 会按文件名里的关键字改 subtype，但 category 本身
+    是入库时定的（register_asset 的 category 参数）。直接读库最准。
+    """
+    from . import asset_repo
+
+    try:
+        asset = asset_repo.get_asset(conn, asset_id, include_deleted=True)
+    except Exception:  # noqa: BLE001
+        return ""
+    if not asset:
+        return ""
+    category = str(asset.get("category") or "").strip().lower()
+    if category in ("image", "audio", "video"):
+        return category
+    return category or ""
+
+
 def _attachment_asset_ids(attachments: list[dict] | None) -> list[str]:
     """
-    附件里**可用**的 asset_id（失效的条目排除掉）。
+    附件里**可用**的 asset_id（失效/未分析的条目排除掉）。
 
     【为什么要排除失效条目】
     用户要求「条目失效要有明确提示」，而且失效的条目**不能**作为
     create_job 的参考图 —— 否则任务建成了，参考图却是空的（静默失效）。
     失效的条目会在提示块里被如实告知模型，让它自己决定怎么办。
+
+    【2026-11-11：未分析的条目也排除】
+    「可用」的判据是 available（= 条目有效 **且** 素材库已给出分析结论）。
+    音视频的深度分析要几分钟（音频 116 秒素材实测 ~600 秒），
+    分析没跑完的音频**不能**当参考音频：
+    模型会以为它有 BPM/乐器/人声信息，实际上一无所知 —— 那比没有更糟。
+
+    【向后兼容】
+    老条目没有 available 字段（None）-> 按「有效即可用」处理，
+    只有显式 False 才排除。这样既不破坏旧行为，又让新链路有严格语义。
     """
-    return [str(item.get("asset_id") or "").strip()
-            for item in (attachments or [])
-            if str(item.get("asset_id") or "").strip()
-            and not item.get("missing")]
+    out: list[str] = []
+    for item in (attachments or []):
+        asset_id = str(item.get("asset_id") or "").strip()
+        if not asset_id:
+            continue
+        if item.get("missing"):
+            continue
+        available = item.get("available")
+        if available is False:
+            continue
+        out.append(asset_id)
+    return out
+
+
+def _attachment_asset_kinds(attachments: list[dict] | None) -> dict:
+    """
+    附件的 {asset_id: kind} 映射（image / audio / video）。
+
+    【用途】按**素材真实类型**分派参数位：
+    音频 -> ref_audio，视频 -> ref_video，图片 -> ref_image。
+    没有类型信息的条目不进入映射（调用方会保守退化到旧行为）。
+    """
+    out: dict[str, str] = {}
+    for item in (attachments or []):
+        asset_id = str(item.get("asset_id") or "").strip()
+        kind = str(item.get("kind") or "").strip().lower()
+        if asset_id and kind in ("image", "audio", "video"):
+            out[asset_id] = kind
+    return out
+
+
+def _resolve_asset_kinds(ctx: AgentContext, attachments: list[dict] | None,
+                         extra_ids: list[str] | None = None) -> dict:
+    """
+    汇总本轮可用的 {asset_id: kind} 映射（素材真实类型）。
+
+    【为什么需要两个来源】
+      * 附件       —— 用户本轮上传的（_load_attachments 已带回 kind）
+      * ctx.assets —— 模型用 search_assets 找到的素材（entry 里有 category）
+    模型显式传的 asset_ids 常常来自 search_assets，这些素材的类型
+    同样要知道 —— 否则用户从素材库挑了一段音频，模型传进来后
+    会被错塞进 ref_image（当图片上传，任务静默失效）。
+
+    【查不到类型怎么办】
+    不进映射 -> 调用方保守退化到旧行为（落到第一个 multi 槽位）。
+    这与「类型已知但该模式不支持」是两种情况：
+    后者会被**明确排除**（media_slots 里查不到 -> 跳过）。
+    """
+    kinds = _attachment_asset_kinds(attachments)
+
+    assets = getattr(ctx, "assets", None) or {}
+    if isinstance(assets, dict):
+        for asset_id, entry in assets.items():
+            key = str(asset_id or "").strip()
+            if not key or key in kinds:
+                continue
+            category = str((entry or {}).get("category") or "").strip().lower()
+            if category in ("image", "audio", "video"):
+                kinds[key] = category
+
+    # 显式传入但 ctx.assets 里没有的（模型可能凭空编了一个 id）
+    # -> 查素材库拿真实类别。查不到就不进映射。
+    unknown = [str(x or "").strip() for x in (extra_ids or [])]
+    unknown = [x for x in unknown if x and x not in kinds]
+    if unknown:
+        from . import assets as asset_store
+
+        try:
+            with asset_store.connect() as conn:
+                for asset_id in unknown:
+                    kind = _kind_of_asset(conn, asset_id)
+                    if kind in ("image", "audio", "video"):
+                        kinds[asset_id] = kind
+        except Exception:  # noqa: BLE001
+            pass
+    return kinds
+
+
+def _filter_unavailable_refs(refs: list[dict], conn=None) -> list[dict]:
+    """
+    把**未就绪**的参考素材从 asset_refs 里剔掉。
+
+    【2026-11-11 音视频扩展补上的洞】
+    就绪门槛原本只作用在「附件兜底」路径（_attachment_asset_ids）。
+    但模型可以**自己**把 asset_id 写进 create_job 的 asset_ids ——
+    那条路径不经过附件过滤，于是：
+
+      上传了一个正在做深度分析的音频 -> 模型把 id 写进 asset_ids
+      -> 任务建成了，参考音频却是「还没分析完」的素材
+      -> 模型以为它有 BPM/乐器/人声信息，实际上一无所知
+
+    这是**静默失效**（最难查的一类）：任务不报错，出来的东西就是不对。
+    所以门槛必须落在**所有**引用入口上，而不只是附件兜底。
+
+    【判据与附件路径保持一致】
+    用同一个 _analysis_state：pending / failed -> 剔除；
+    done / none -> 保留（none = 从没分析过，沿用既有语义，不误伤老素材）。
+
+    【拿不到状态怎么办 —— 保守保留】
+    查库失败时**不剔除**。理由：宁可多传一个素材让服务端报错，
+    也不要在这里静默丢掉用户明确要的参考图。
+    （剔除是「主动丢弃用户的东西」，必须证据充分才做。）
+    """
+    if not refs:
+        return []
+    out: list[dict] = []
+    own_conn = None
+    try:
+        if conn is None:
+            from . import assets as asset_store
+
+            own_conn = asset_store.connect()
+            conn = own_conn
+        for ref in refs:
+            asset_id = str((ref or {}).get("asset_id") or "").strip()
+            if not asset_id:
+                continue
+            try:
+                state = _analysis_state(conn, asset_id)
+            except Exception:  # noqa: BLE001
+                state = "none"
+            if state in ("pending", "failed"):
+                continue
+            out.append(ref)
+    finally:
+        if own_conn is not None:
+            try:
+                own_conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+    return out
 
 
 def _attachment_prompt_block(attachments: list[dict]) -> str:
@@ -1676,7 +2009,7 @@ def _attachment_prompt_block(attachments: list[dict]) -> str:
 
     【为什么不能只是把 asset_id 丢给模型】
     模型拿到一个裸 id（asset_abc123）无从判断那是张什么图。
-    必须告诉它：用户这次传了哪几张、每张的 asset_id 是什么、
+    必须告诉它：用户这次传了哪几个、每个的 asset_id 是什么、
     素材库里已有的描述是什么 —— 这样它才能写
     「用 <image1> 的构图，把人物换成…」这种**可执行**的提示词。
 
@@ -1685,45 +2018,105 @@ def _attachment_prompt_block(attachments: list[dict]) -> str:
     没有分析结果时如实说「尚无分析结论」，**不编造**。
 
     【标签也带上】
-    标签是素材库的检索索引 —— 模型用它判断「这张图适不适合当前需求」，
+    标签是素材库的检索索引 —— 模型用它判断「这个素材适不适合当前需求」，
     也让模型在 respond 里能准确报出素材的特征词。
 
-    【失效条目】
-    明确标出「已失效，不可用」—— 模型必须知道不能拿它当参考图。
+    【失效 / 未就绪条目】
+    明确标出「已失效，不可用」/「未完成分析，不可用」——
+    模型必须知道不能拿它当参考素材。
+
+    【2026-11-11：按类型分节】
+    图片 / 音频 / 视频分开列，并告诉模型各自的**参数位**：
+      图片 -> 参考图（ref_image）/ 首尾帧（first_frame）
+      音频 -> 参考音频（ref_audio）
+      视频 -> 参考视频（ref_video）
+    这样模型才能「按类型选择正确的参数位」（用户要求 D）。
     """
     if not attachments:
         return ""
-    usable = [item for item in attachments if not item.get("missing")]
-    lines = ["## 用户本轮上传的附件（图片）", ""]
+
+    KIND_LABEL = {"image": "图片", "audio": "音频", "video": "视频"}
+    KIND_SLOT = {"image": "参考图（ref_image）", "audio": "参考音频（ref_audio）",
+                 "video": "参考视频（ref_video）"}
+
+    usable = [item for item in attachments
+              if not item.get("missing") and item.get("available") is not False]
+    unusable = [item for item in attachments if item not in usable]
+
+    lines = ["## 用户本轮上传的附件", ""]
     if usable:
-        lines.append(f"用户这次随消息上传了 {len(usable)} 张图片。"
+        kinds = []
+        for item in usable:
+            kind = str(item.get("kind") or "image").lower()
+            kinds.append(KIND_LABEL.get(kind, kind))
+        summary = "、".join(sorted(set(kinds)))
+        lines.append(f"用户这次随消息上传了 {len(usable)} 个素材（{summary}）。"
                      "它们已入库到素材库并完成预处理（已生成描述与标签），"
-                     "可以直接作为参考图传给 create_job（用 asset_id）。")
-    if len(usable) != len(attachments):
-        lines.append(f"另有 {len(attachments) - len(usable)} 张附件已失效"
-                     "（素材条目不存在或已进回收站），**不可用**，"
-                     "请如实告知用户，不要把它们当参考图。")
+                     "可以直接作为参考素材传给 create_job（用 asset_id，"
+                     "按素材类型落到对应参数位）。")
+    if unusable:
+        lines.append(f"另有 {len(unusable)} 个附件**不可用**"
+                     "（素材条目不存在、已进回收站，或素材库尚未完成分析），"
+                     "**不要**把它们当参考素材；"
+                     "请如实告知用户，不要臆造它们的内容。")
     lines.append("")
-    for index, item in enumerate(attachments, start=1):
+
+    # --- 按类型分节 ---
+    counters = {"image": 0, "audio": 0, "video": 0}
+    for item in attachments:
+        kind = str(item.get("kind") or "image").lower()
+        if kind not in KIND_LABEL:
+            kind = "image"
+        counters[kind] += 1
+        index = counters[kind]
         name = item.get("name") or item.get("asset_id") or ""
         desc = (item.get("description") or "").strip()
         tags = item.get("tags") or []
+        tag_part = (f"；标签：{'、'.join(str(t) for t in tags)}" if tags else "")
+
         if item.get("missing"):
             detail = f"（已失效：{item.get('reason') or '素材不存在'}，不可用）"
-            lines.append(f"- 附件{index}（**不可用**）："
+            lines.append(f"- {KIND_LABEL[kind]}{index}（**不可用**）："
                          f"asset_id={item.get('asset_id') or ''}，"
                          f"名称={name}。{detail}")
             continue
+        if item.get("available") is False:
+            reason = item.get("unavailable_reason") or "素材库尚未完成分析"
+            lines.append(f"- {KIND_LABEL[kind]}{index}（**不可用**）："
+                         f"asset_id={item.get('asset_id') or ''}，"
+                         f"名称={name}。{reason}，不可用")
+            continue
+
         if desc:
             detail = desc
         else:
-            detail = ("（素材库尚无分析结论；可先调用 describe_asset 查看详情）")
-        tag_part = (f"；标签：{'、'.join(str(t) for t in tags)}" if tags else "")
-        lines.append(f"- 参考图{index}（占位标记 <image{index}>）："
+            detail = "（素材库尚无分析结论；可先调用 describe_asset 查看详情）"
+        duration = item.get("duration_sec")
+        meta = ""
+        if kind in ("audio", "video") and duration:
+            meta = f"；时长：{float(duration):.1f} 秒"
+        # 【占位标记 —— 只对图片】
+        # <imageN> 是 Qwen-Image 2.1 图片编辑的**官方语义**：
+        # 多张参考图时提示词必须写 <image1>/<image2> 指明用第几张，
+        # 且编号要与参考图顺序严格一致（服务端 validate_refs 会校验）。
+        # 音频/视频没有这套占位语义 —— H3 的参考音频/参考视频是
+        # 按**槽位**传的，不按编号，所以不能给它们编 <imageN>。
+        marker = f"（占位标记 <image{index}>）" if kind == "image" else ""
+        lines.append(f"- {KIND_LABEL[kind]}{index}{marker}"
+                     f"（用途：{KIND_SLOT.get(kind, '参考素材')}）："
                      f"asset_id={item.get('asset_id') or ''}，"
-                     f"名称={name}{tag_part}。素材库描述：{detail}")
+                     f"名称={name}{meta}{tag_part}。素材库描述：{detail}")
+
     lines.append("")
-    lines.append("注意：<imageN> 的编号顺序必须与上面的参考图N 严格一致。")
+    lines.append("注意：")
+    lines.append("1. 传 create_job 时请**按上面的类型**选参数位 —— "
+                 "音频用 ref_audio，视频用 ref_video，图片用 ref_image"
+                 "（首尾帧模式用 first_frame/last_frame）。")
+    lines.append("2. 类型与槽位对不上时不要硬传（服务端会拒绝，"
+                 "而且会让任务静默失效）。")
+    if any(str(item.get("kind") or "image").lower() == "image"
+           for item in attachments):
+        lines.append("3. 图片的 <imageN> 编号顺序必须与上面的参考图N 严格一致。")
     return "\n".join(lines)
 
 
@@ -2153,7 +2546,7 @@ def _precheck_tool_args(name: str, args: dict, ctx=None) -> dict | None:
         raw_assets = [raw_assets]
     params["asset_ids"] = list(raw_assets)
     # 具名槽位也参与「缺参考素材」的判定
-    for slot in ("first_frame", "last_frame", "ref_audio"):
+    for slot in ("first_frame", "last_frame", "ref_audio", "ref_video"):
         value = str(args.get(slot) or "").strip()
         if value:
             params["asset_ids"] = list(params["asset_ids"]) + [value]

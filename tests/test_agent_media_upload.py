@@ -226,10 +226,20 @@ class TestUploadEndpointValidation(AssetLibraryTestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_text_extension_is_rejected(self):
+        """【2026-11-11 契约更新】上传从「只收图片」扩到「图片+音频+视频」。
+
+        原来只收图片时，.txt 的报错是「不支持的图片类型」。
+        现在有三类媒体，报错必须列出**三类**各自的清单 ——
+        否则用户传 .txt 时不知道音频/视频行不行。
+        """
         results, errors = self._upload([("notes.txt", b"hello")])
         self.assertEqual(results, [])
         self.assertEqual(len(errors), 1)
-        self.assertIn("不支持的图片类型", errors[0]["error"])
+        message = errors[0]["error"]
+        self.assertIn("不支持", message)
+        self.assertIn("图片", message)
+        self.assertIn("音频", message)
+        self.assertIn("视频", message)
 
     def test_no_extension_is_rejected(self):
         results, errors = self._upload([("blob", b"hello")])
