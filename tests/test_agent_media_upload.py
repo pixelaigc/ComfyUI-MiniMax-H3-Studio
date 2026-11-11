@@ -928,6 +928,46 @@ class TestLibraryIngestAndPreprocess(AssetLibraryTestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_reupload_after_soft_delete_succeeds(self):
+        """【回归 —— 生产实测踩到的 bug】
+
+        素材库 register_asset 的去重分支原来**无条件**删掉临时文件，
+        然后往下走 atomic_move(tmp, target) —— 而 tmp 已经被自己删了：
+
+          FileNotFoundError: tmp -> target
+
+        触发路径：上传同一张图 -> 软删除（进回收站，版本行还在）
+        -> 再上传同一张图 -> 500。
+
+        这条链路是「上传 -> 测试清理删掉 -> 再上传」的真实场景
+        （本次浏览器验收的清理就会走这条路）。
+        """
+        from h3studio import asset_service
+
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            p = make_image(tmp / "again.png")
+
+            def register(name):
+                with asset_store.connect() as conn:
+                    return asset_service.register_asset(
+                        conn, source_path=p, filename=name,
+                        category="image", subtype="photo",
+                        source="agent_upload", creator="agent")
+
+            first = register("again1.png")
+            first_id = first["asset"]["id"]
+            # 软删除（进回收站；版本行仍在，sha256 仍能命中）
+            with asset_store.connect() as conn:
+                asset_repo.soft_delete(conn, first_id)
+
+            # **关键**：再上传同一张图不能再 500
+            second = register("again2.png")
+            self.assertIsNotNone(second.get("asset"))
+            self.assertNotEqual(second["asset"]["id"], first_id)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 # ------------------------------------------------------------------ 9. 标签抽取
 
