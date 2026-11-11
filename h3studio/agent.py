@@ -1199,6 +1199,19 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
 
     asset_refs = _build_asset_refs(mode, args, raw_assets, attachment_kinds)
 
+    # --- 就绪门槛（所有引用入口，不只是附件兜底）---
+    #
+    # 【2026-11-11】模型**自己**把 asset_id 写进 asset_ids 时，
+    # 那条路径不经过 _attachment_asset_ids 的过滤 -> 一个还在做深度
+    # 分析的音频会被当成参考音频传给服务端（静默失效：任务建成了，
+    # 但模型对这条音频一无所知）。所以在**这里**统一把关：
+    # 分析 pending / failed 的条目一律剔除。
+    #
+    # 剔除后如果一个参考素材都不剩，而模式**要求**参考素材，
+    # 下面 prepare_job_params 会给出「必须指定参考图」的明确错误 ——
+    # 这比建出一个坏任务好。
+    asset_refs = _filter_unavailable_refs(asset_refs)
+
     # --- Agent 侧取值校验（合法值全部来自真实配置）---
     #
     # 【为什么要在这里再校验一遍】编排器里有一层预校验（_precheck_tool_args），
@@ -1933,6 +1946,61 @@ def _resolve_asset_kinds(ctx: AgentContext, attachments: list[dict] | None,
         except Exception:  # noqa: BLE001
             pass
     return kinds
+
+
+def _filter_unavailable_refs(refs: list[dict], conn=None) -> list[dict]:
+    """
+    把**未就绪**的参考素材从 asset_refs 里剔掉。
+
+    【2026-11-11 音视频扩展补上的洞】
+    就绪门槛原本只作用在「附件兜底」路径（_attachment_asset_ids）。
+    但模型可以**自己**把 asset_id 写进 create_job 的 asset_ids ——
+    那条路径不经过附件过滤，于是：
+
+      上传了一个正在做深度分析的音频 -> 模型把 id 写进 asset_ids
+      -> 任务建成了，参考音频却是「还没分析完」的素材
+      -> 模型以为它有 BPM/乐器/人声信息，实际上一无所知
+
+    这是**静默失效**（最难查的一类）：任务不报错，出来的东西就是不对。
+    所以门槛必须落在**所有**引用入口上，而不只是附件兜底。
+
+    【判据与附件路径保持一致】
+    用同一个 _analysis_state：pending / failed -> 剔除；
+    done / none -> 保留（none = 从没分析过，沿用既有语义，不误伤老素材）。
+
+    【拿不到状态怎么办 —— 保守保留】
+    查库失败时**不剔除**。理由：宁可多传一个素材让服务端报错，
+    也不要在这里静默丢掉用户明确要的参考图。
+    （剔除是「主动丢弃用户的东西」，必须证据充分才做。）
+    """
+    if not refs:
+        return []
+    out: list[dict] = []
+    own_conn = None
+    try:
+        if conn is None:
+            from . import assets as asset_store
+
+            own_conn = asset_store.connect()
+            conn = own_conn
+        for ref in refs:
+            asset_id = str((ref or {}).get("asset_id") or "").strip()
+            if not asset_id:
+                continue
+            try:
+                state = _analysis_state(conn, asset_id)
+            except Exception:  # noqa: BLE001
+                state = "none"
+            if state in ("pending", "failed"):
+                continue
+            out.append(ref)
+    finally:
+        if own_conn is not None:
+            try:
+                own_conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+    return out
 
 
 def _attachment_prompt_block(attachments: list[dict]) -> str:

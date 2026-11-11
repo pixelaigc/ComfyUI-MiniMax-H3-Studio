@@ -514,6 +514,49 @@ class TestReadinessGate(AssetLibraryTestCase):
         self.assertFalse(result["available"])
         self.assertEqual(result["kind"], "audio")
 
+    def test_model_explicitly_passing_pending_asset_is_filtered(self):
+        """模型**显式**传了一个还在分析中的 asset_id -> 也要被挡住。
+
+        【为什么这条要单列】附件兜底路径走 _attachment_asset_ids()，
+        会过滤掉未就绪的条目。但模型可以**自己**把 id 写进
+        create_job 的 asset_ids —— 那条路径原本不经过任何就绪检查，
+        结果是：任务建成了，参考音频却是「还没分析完」的素材，
+        模型以为它有 BPM/人声信息，实际上一无所知（静默失效）。
+
+        所以就绪门槛必须落在**所有**引用入口上，不只是附件兜底。
+        """
+        asset_id = self._register_audio()
+        self.set_job(asset_id, kind="audio", status="running")
+
+        with asset_store.connect() as conn:
+            refs = agent_mod._filter_unavailable_refs(
+                [{"asset_id": asset_id, "slot": "ref_audio", "ordinal": 0}],
+                conn)
+        self.assertEqual(refs, [])
+
+    def test_ready_asset_survives_the_filter(self):
+        """分析完成的素材**不能**被过滤掉（门槛不能误伤）。"""
+        asset_id = self._register_audio(analyzed=True)
+        self.set_job(asset_id, kind="audio", status="done")
+
+        with asset_store.connect() as conn:
+            refs = agent_mod._filter_unavailable_refs(
+                [{"asset_id": asset_id, "slot": "ref_audio", "ordinal": 0}],
+                conn)
+        self.assertEqual([r["asset_id"] for r in refs], [asset_id])
+
+    def test_never_analyzed_asset_survives_the_filter(self):
+        """从没分析过的素材沿用既有语义 -> 保留（不误伤老素材）。"""
+        asset_id = self._register_audio()
+
+        with asset_store.connect() as conn:
+            refs = agent_mod._filter_unavailable_refs(
+                [{"asset_id": asset_id, "slot": "ref_audio", "ordinal": 0}],
+                conn)
+        self.assertEqual([r["asset_id"] for r in refs], [asset_id])
+
+
+
 
 # ------------------------------------------------------------------ 6. 标签落库
 
