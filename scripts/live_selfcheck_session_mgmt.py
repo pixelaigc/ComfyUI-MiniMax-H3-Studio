@@ -51,7 +51,12 @@ def api(path, method="GET", body=None):
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             raw = r.read().decode()
-            return r.status, (json.loads(raw) if raw else {})
+            # 首页返回的是 HTML —— 不是 JSON 端点。
+            # 所以解析失败**不是错误**，只是「这个端点不返回 JSON」。
+            try:
+                return r.status, (json.loads(raw) if raw else {})
+            except ValueError:
+                return r.status, {}
     except urllib.error.HTTPError as e:
         raw = e.read().decode()
         try:
