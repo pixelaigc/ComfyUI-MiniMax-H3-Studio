@@ -856,6 +856,27 @@ class Worker:
                 if mode in ("t2a", "a2a"):
                     params["plan_mode"] = params.get("plan_mode") or params.get("music_plan") or "full"
                 params["mode"] = mode
+
+                # 【2026-11-12 修】视频任务的节点可用性必须在这里**重新确认**。
+                #
+                # 归一层（normalize_t2v_params / prepare_job_params）算出的
+                # use_sigma_shift 依赖 _COMFY_NODE_NAMES，而那个集合只有
+                # /api/video-options 被调用过才有值。
+                # 真实场景：内置 Agent 建的任务**不经过面板**
+                #            -> 集合是空的
+                #            -> use_sigma_shift=False
+                #            -> MiniMaxH3SigmaShift 节点不进工作流
+                #            -> 用户在面板上拖的 shift 滑杆对这个任务完全无效
+                #               （且没有任何报错 —— 静默失效）。
+                #
+                # 修法：worker 在拼工作流前强制刷新一次节点清单，
+                #       并把结果回写进 params —— 工作流拼装拿到的是真实可用性。
+                if mode in ("t2v", "flf", "r2v"):
+                    await refresh_comfy_node_names(session, force=True)
+                    params["use_sigma_shift"] = bool(
+                        params.get("use_sigma_shift", True)
+                        and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
                 workflow = build_workflow(mode, params)
                 client_id = f"h3studio-{job_id}"
                 async with self.submit_lock:
@@ -1213,6 +1234,14 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         w_max = float(twopass.get("w_max", video_models.VIDEO_TWOPASS["w_max_default"]))
         if w_min > w_max:
             w_min, w_max = w_max, w_min
+        # CFG：SelfLiftH3Sampler 自带 cfg 输入（0~100）—— 这是 H3 链路里
+        # **唯一**真正可调的 CFG（标准路径的 BasicGuider 没有 cfg 槽位）。
+        try:
+            twopass_cfg = float(twopass.get(
+                "cfg", video_models.VIDEO_TWOPASS["cfg_default"]))
+        except (TypeError, ValueError):
+            twopass_cfg = float(video_models.VIDEO_TWOPASS["cfg_default"])
+        twopass_cfg = max(0.0, min(100.0, twopass_cfg))
         out["twopass"] = {
             "enabled": True,
             "transition_step": transition,
@@ -1221,22 +1250,51 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
             "w_min": w_min,
             "w_max": w_max,
             "upscaler_model": upscaler,
+            "cfg": twopass_cfg,
         }
     else:
         out["twopass"] = {"enabled": False}
 
     # ---- 步数 / 采样参数 ----
-    try:
-        steps = int(params.get("steps") or model.get("steps", 4))
-    except (TypeError, ValueError):
-        steps = int(model.get("steps", 4))
-    out["steps"] = max(1, min(100, steps))
-    out["sampler"] = params.get("sampler") or model.get("sampler", "euler")
-    out["scheduler"] = params.get("scheduler") or model.get("scheduler", "beta")
-    try:
-        out["cfg"] = float(params.get("cfg", model.get("cfg", 1.0)))
-    except (TypeError, ValueError):
-        out["cfg"] = float(model.get("cfg", 1.0))
+    #
+    # 【2026-11-11】文生视频面板补齐采样参数后，这几个字段真的有前端控件了，
+    # 所以这里必须做**白名单归一化**：
+    #   * steps 越界 -> 夹到 [1, 50]
+    #   * sampler / scheduler 不在本机 ComfyUI 的 COMBO 清单里 -> 回落到模型默认
+    #     （不报错：用户在老任务里存过的名字可能是旧版清单里的）
+    #   * shift 越界 -> 夹到 [0.01, 100]
+    #
+    # CFG 单独处理：H3 **标准采样路径没有 CFG**（BasicGuider 无 cfg 槽位），
+    # 所以 out["cfg"] 固定为 1.0（VIDEO_CFG_FIXED）；面板只做只读说明。
+    # 真正可调的 CFG 是二采路径的 twopass.cfg -> SelfLiftH3Sampler.cfg。
+    steps = video_models.normalize_steps(
+        params.get("steps"), int(model.get("steps", 4)))
+    out["steps"] = steps
+    out["sampler"] = video_models.normalize_sampler(
+        params.get("sampler"), model.get("sampler", "euler"))
+    out["scheduler"] = video_models.normalize_scheduler(
+        params.get("scheduler"), model.get("scheduler", "beta"))
+    # 标准路径 CFG：固定 1.0（见 video_models.VIDEO_CFG_FIXED_REASON）
+    out["cfg"] = video_models.VIDEO_CFG_FIXED
+
+    # ---- shift（MiniMaxH3SigmaShift）----
+    # 节点是 ComfyUI 核心节点（comfy_extras.nodes_minimax_h3），
+    # 默认值 12.0 / 3.0 = 模型内生值 -> 不改任何出图结果。
+    out["shift_video"] = video_models.normalize_shift(
+        params.get("shift_video"), video_models.VIDEO_SHIFT_DEFAULT_VIDEO)
+    out["shift_audio"] = video_models.normalize_shift(
+        params.get("shift_audio"), video_models.VIDEO_SHIFT_DEFAULT_AUDIO)
+    # 节点不存在时前端会收到 sigma_shift_node 的可用性 -> 这里再兜一层，
+    # 保证提交到工作流的一定是本机 ComfyUI 认识的节点。
+    out["use_sigma_shift"] = bool(
+        params.get("use_sigma_shift", True)
+        and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
+    # 【2026-11-12 补】shift 节点在本机 ComfyUI 里真不存在时，
+    # 服务端必须**明确告诉前端**，否则面板上两个 shift 滑杆
+    # 变成「能拖但服务端会丢掉」的假控件。
+    # （本机实测该节点是 ComfyUI 核心节点，恒在 —— 但不能假设。）
+    out["sigma_shift_available"] = "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES
 
     # 种子：留空则随机（worker 里再兜一次）
     if params.get("seed") not in (None, ""):
@@ -1515,6 +1573,40 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
 
     if mode not in JOB_MODES:
         raise JobValidationError(f"未知模式 {mode}")
+
+    # 【2026-11-11】首尾帧 / 参考生视频的采样参数归一。
+    # 这两个模式走旧工作流路径，但采样链路与文生视频相同
+    # （BasicScheduler + KSamplerSelect + BasicGuider），
+    # 所以采样器 / 调度器 / shift 一样是真参数。
+    #
+    # CFG 例外：H3 标准路径固定 1.0（BasicGuider 没有 cfg 槽位），
+    # 面板只做只读说明 —— 这里也不写 params["cfg"]，
+    # 免得旧路径的 params 看起来像有个可调的 cfg（实际没人读）。
+    if mode in ("flf", "r2v"):
+        # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致**，
+        # 否则老客户端（不传 sampler/scheduler）会被静默改画质：
+        #   workflows._h3_video_workflow 的规则是
+        #     lora != "none" -> steps 4 / scheduler beta   / sampler euler
+        #     lora == "none" -> steps 20 / scheduler simple / sampler res_multistep
+        # 之前这里写死 default="euler"/"beta" 并且**无条件写回** params，
+        # -> lora=="none" 的老任务被改成 euler/beta（静默回归）。
+        # 现在：客户端**没传**就不写回（让工作流用自己的档位），
+        #       传了才做白名单归一。
+        legacy_default_sampler = "euler" if params.get("lora") != "none" else "res_multistep"
+        legacy_default_scheduler = "beta" if params.get("lora") != "none" else "simple"
+        if params.get("sampler"):
+            params["sampler"] = video_models.normalize_sampler(
+                params["sampler"], legacy_default_sampler)
+        if params.get("scheduler"):
+            params["scheduler"] = video_models.normalize_scheduler(
+                params["scheduler"], legacy_default_scheduler)
+        params["shift_video"] = video_models.normalize_shift(
+            params.get("shift_video"), video_models.VIDEO_SHIFT_DEFAULT_VIDEO)
+        params["shift_audio"] = video_models.normalize_shift(
+            params.get("shift_audio"), video_models.VIDEO_SHIFT_DEFAULT_AUDIO)
+        params["use_sigma_shift"] = bool(
+            params.get("use_sigma_shift", True)
+            and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
 
     if mode == "flf":
         if saved_files.get("file_first"):
@@ -1991,6 +2083,17 @@ _VIDEO_PANEL_NODES = [
     "MiniMaxH3ScheduledSolAttentionPatch",
     "H3SparseAttention",
     "SelfLiftH3Sampler",
+    # 【2026-11-12 修】MiniMaxH3SigmaShift —— shift（视频/音频）参数对应的
+    # ComfyUI **核心**节点（comfy_extras/nodes_minimax_h3.py:367，
+    # display_name「ModelSamplingMiniMaxH3」）。
+    #
+    # 【为什么以前漏了】这个名单是给「面板可选项过滤」用的，
+    # 只列了注意力机制 + 二采。shift 节点当时还没做，就没进名单。
+    # 结果服务端归一里的
+    #   use_sigma_shift = "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES
+# 永远为 False -> shift 节点永远不进工作流 -> 面板上的两个 shift 滑杆
+    # 是**死控件**（能拖、但不生效）。这正是「假控件」纪律要禁止的。
+    "MiniMaxH3SigmaShift",
 ]
 
 

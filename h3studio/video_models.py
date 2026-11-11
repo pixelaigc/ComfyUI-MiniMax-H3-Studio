@@ -399,6 +399,121 @@ VIDEO_TWOPASS = {
 
 
 # ------------------------------------------------------------------
+# 采样参数（步数 / 采样器 / 调度器 / shift）
+# ------------------------------------------------------------------
+# 【2026-11-11 新增】文生视频面板补齐采样参数时引入。
+#
+# 取值**不是拍脑袋定的**，每一项都有本机实测依据：
+#
+#   * VIDEO_SAMPLERS / VIDEO_SCHEDULERS 来自 ComfyUI 核心节点
+#     `KSamplerSelect.sampler_name`（68 项）与
+#     `BasicScheduler.scheduler`（14 项）的 COMBO 清单
+#     （/object_info 实测，2026-11-11）。
+#     这两个节点**本来就在** H3 工作流里（h3studio/workflows.py
+#     的 _video_sampler_block()），只是前端没有控件、也没传值。
+#
+#   * VIDEO_SHIFT_DEFAULT_VIDEO / _AUDIO 来自 **模型内生值**，不是随意取值：
+#       - comfy/supported_models.py:964  class MiniMaxH3
+#             sampling_settings = {"shift": 12.0, "audio_shift": 3.0}
+#       - comfy/ldm/minimax/model.py:492  MiniMaxH3Model.__init__(
+#             sigma_shift_video=12.0, sigma_shift_audio=3.0)
+#       - ComfyUI-MiniMax-H3-Turbo/__init__.py:31  SHIFT_V, SHIFT_A = 12.0, 3.0
+#     所以用默认 12.0 / 3.0 调 `MiniMaxH3SigmaShift` 与「不加这个节点」
+#     **完全等价**（节点写的是同一组 model_sampling + transformer_options）。
+#
+#   * CFG：H3 标准采样路径**没有** CFG 概念 ——
+#     `BasicGuider`（comfy_extras/nodes_custom_sampler.py:801）
+#     只有 model + conditioning 两个输入，没有 cfg 槽位；
+#     官方蓝图用的也是 BasicGuider 而不是 CFGGuider；
+#     comfy/ldm/minimax/model.py 与 comfy_extras/nodes_minimax_h3.py
+#     全程没有 negative / uncond / cfg 字样。
+#     → 标准路径 CFG 固定 1.0，面板只做**只读说明**，不做假控件。
+#     → 例外：二采 `SelfLiftH3Sampler` 有 cfg 槽位（default 5.0），
+#       那条路径的 CFG 是真可调的（见 VIDEO_TWOPASS["cfg_default"]）。
+VIDEO_SAMPLERS: list[str] = [
+    "euler", "euler_cfg_pp", "euler_ancestral", "euler_ancestral_cfg_pp",
+    "heun", "heunpp2", "exp_heun_2_x0", "exp_heun_2_x0_sde",
+    "dpm_2", "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
+    "dpmpp_2s_ancestral", "dpmpp_2s_ancestral_cfg_pp", "dpmpp_sde", "dpmpp_sde_gpu",
+    "dpmpp_2m", "dpmpp_2m_cfg_pp", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
+    "dpmpp_2m_sde_heun", "dpmpp_2m_sde_heun_gpu",
+    "dpmpp_3m_sde", "dpmpp_3m_sde_gpu",
+    "ddpm", "lcm", "ipndm", "ipndm_v", "deis",
+    "cfgpp_ud10_ab", "res_multistep", "res_multistep_cfg_pp",
+    "res_multistep_ancestral", "res_multistep_ancestral_cfg_pp",
+    "gradient_estimation", "gradient_estimation_cfg_pp",
+    "er_sde", "seeds_2", "seeds_3", "sa_solver", "sa_solver_pece",
+    "ddim", "uni_pc", "uni_pc_bh2", "legacy_rk", "rk", "rk_beta",
+    "deis_3m_ode", "deis_2m_ode", "deis_3m", "deis_2m",
+    "res_6s_ode", "res_5s_ode", "res_3s_ode", "res_2s_ode",
+    "res_3m_ode", "res_2m_ode", "res_6s", "res_5s", "res_3s", "res_2s",
+    "res_3m", "res_2m", "euler_extsig", "euler_extsig_ancestral",
+    "euler_extsig_ancestral_cfg_pp", "euler_extsig_cfg_pp",
+]
+
+VIDEO_SCHEDULERS: list[str] = [
+    "simple", "sgm_uniform", "karras", "exponential", "ddim_uniform",
+    "beta", "normal", "linear_quadratic", "kl_optimal",
+    "FlowMatchEulerDiscreteScheduler", "zipf_linear", "zeta",
+    "bong_tangent", "beta57",
+]
+
+#: 步数范围（面板滑杆）。上界对齐 BasicScheduler 的 int(1~10000)，
+#: 但实际给到 50 就已经远超任何 H3 场景（Turbo 4~8 步，官方蓝图 4/6/20）。
+VIDEO_STEPS_MIN = 1
+VIDEO_STEPS_MAX = 50
+VIDEO_STEPS_DEFAULT = 4
+
+#: shift（MiniMaxH3SigmaShift 的取值范围，节点 schema: 0.01~100, step 0.01）
+VIDEO_SHIFT_MIN = 0.01
+VIDEO_SHIFT_MAX = 100.0
+VIDEO_SHIFT_DEFAULT_VIDEO = 12.0
+VIDEO_SHIFT_DEFAULT_AUDIO = 3.0
+
+#: 标准采样路径的 CFG —— H3 固定 1.0（BasicGuider 无 cfg 槽位）。
+#: 面板用这个值做**只读说明**，不是可调控件。
+VIDEO_CFG_FIXED = 1.0
+VIDEO_CFG_FIXED_REASON = (
+    "H3 标准采样路径固定 CFG=1.0：官方工作流用的是 BasicGuider"
+    "（只有 model + conditioning，没有 cfg 槽位），"
+    "H3 的音视频潜变量是单流条件化，没有负面分支。"
+    "只有开启二采时 CFG 才可调（SelfLiftH3Sampler 自带 cfg 槽位）。"
+)
+
+
+def normalize_sampler(name: str | None, default: str = "euler") -> str:
+    """采样器名合法性 —— 不在清单里就用默认值（不报错，避免用户被卡住）。"""
+    value = (name or "").strip()
+    return value if value in VIDEO_SAMPLERS else default
+
+
+def normalize_scheduler(name: str | None, default: str = "beta") -> str:
+    """调度器名合法性 —— 同上。"""
+    value = (name or "").strip()
+    return value if value in VIDEO_SCHEDULERS else default
+
+
+def normalize_steps(value, default: int = VIDEO_STEPS_DEFAULT) -> int:
+    """步数：整数，落在 [VIDEO_STEPS_MIN, VIDEO_STEPS_MAX]。"""
+    try:
+        steps = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(VIDEO_STEPS_MIN, min(VIDEO_STEPS_MAX, steps))
+
+
+def normalize_shift(value, default: float) -> float:
+    """shift 值：浮点，落在 [0.01, 100.0]。"""
+    try:
+        shift = float(value)
+    except (TypeError, ValueError):
+        return default
+    if shift != shift:  # NaN
+        return default
+    return max(VIDEO_SHIFT_MIN, min(VIDEO_SHIFT_MAX, shift))
+
+
+# ------------------------------------------------------------------
 # 尺寸吸附
 # ------------------------------------------------------------------
 def normalize_video_size(width, height,
@@ -920,6 +1035,28 @@ def options_payload(node_available=None) -> dict:
         "accel_lora_compat": {
             key: accel_lora_compat_matrix(key) for key in VIDEO_MODELS
         },
+        # 【2026-11-11 新增】采样参数清单 —— 步数 / 采样器 / 调度器 / shift。
+        # 取值来源见本文件 VIDEO_SAMPLERS 上方的实测依据注释。
+        "sampling": {
+            "steps_min": VIDEO_STEPS_MIN,
+            "steps_max": VIDEO_STEPS_MAX,
+            "steps_default": VIDEO_STEPS_DEFAULT,
+            "samplers": list(VIDEO_SAMPLERS),
+            "schedulers": list(VIDEO_SCHEDULERS),
+            "shift_min": VIDEO_SHIFT_MIN,
+            "shift_max": VIDEO_SHIFT_MAX,
+            "shift_default_video": VIDEO_SHIFT_DEFAULT_VIDEO,
+            "shift_default_audio": VIDEO_SHIFT_DEFAULT_AUDIO,
+            # CFG：标准路径固定 1.0，**不是**可调控件，前端做只读说明。
+            "cfg_fixed": VIDEO_CFG_FIXED,
+            "cfg_fixed_reason": VIDEO_CFG_FIXED_REASON,
+            # 二采路径的 CFG 是真可调的（SelfLiftH3Sampler 自带 cfg 槽位）。
+            "cfg_twopass_default": VIDEO_TWOPASS["cfg_default"],
+        },
+        # shift 节点名（ComfyUI 核心节点）。是否本机可用见下方
+        # node_available 分支 —— 面板按「节点真在」的原则处理，
+        # 和注意力机制 / 二采同一套做法。
+        "sigma_shift_node": "MiniMaxH3SigmaShift",
     }
     if node_available:
         for item in payload["attention_modes"]:
@@ -927,4 +1064,12 @@ def options_payload(node_available=None) -> dict:
             item["available"] = True if not node else bool(node_available(node))
         payload["twopass"]["node_available"] = bool(
             node_available("SelfLiftH3Sampler"))
+        # 【2026-11-12】shift 节点本机可用性 —— 前端据此禁用 shift 滑杆，
+        # 避免出现「能拖但服务端会丢掉」的假控件。
+        payload["sigma_shift_available"] = bool(
+            node_available("MiniMaxH3SigmaShift"))
+    else:
+        # 没传回调（单测直接调用 options_payload()）-> 按「可用」，
+        # 因为该节点是 ComfyUI 核心节点，恒在。
+        payload["sigma_shift_available"] = True
     return payload

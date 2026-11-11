@@ -189,8 +189,71 @@
               <select class="img-select" id="vidUpscalerSelect"></select>
             </div>
           </div>
+          <!-- 【2026-11-11】二采路径的 CFG：SelfLiftH3Sampler 自带 cfg 槽位，
+               是 H3 链路里**唯一**真正可调的 CFG（标准路径的 BasicGuider 没有）。 -->
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>二采 CFG</span><b id="vidTwopassCfgVal">1.0</b></div>
+              <input type="range" id="vidTwopassCfg" min="0" max="10" step="0.1" value="1">
+              <small class="muted" id="vidTwopassCfgHint">仅二采生效</small>
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>二采采样器</span><small id="vidTwopassSamplerHint">固定 Euler</small></div>
+              <input type="text" id="vidTwopassSampler" value="euler" readonly>
+            </div>
+          </div>
           <div class="img-note" id="vidTwopassNote"></div>
         </div>
+      </div>
+
+      <!-- 【2026-11-11 新增】采样参数（与生图面板同级）
+           取值全部来自本机实测：步数/采样器/调度器 -> BasicScheduler +
+           KSamplerSelect（H3 工作流里本来就有这两个节点，之前只是没有控件）；
+           shift -> MiniMaxH3SigmaShift（ComfyUI 核心节点，默认 12.0/3.0
+           就是 H3 模型内生值，不改结果）。CFG 在标准路径上是**只读说明**，
+           因为 BasicGuider 没有 cfg 槽位 —— 只有二采才可调（见上）。 -->
+      <div class="field" id="vidSamplingField">
+        <div class="field-label">采样参数 <span class="muted">与生图面板同级</span></div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>采样步数</span><b id="vidStepsVal">4</b></div>
+            <input type="range" id="vidSteps" min="1" max="50" step="1" value="4">
+            <small class="muted" id="vidStepsHint">推荐</small>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>CFG</span><b id="vidCfgVal">1.0</b></div>
+            <input type="text" id="vidCfg" value="1.0" readonly>
+            <small class="muted" id="vidCfgHint">H3 固定</small>
+          </div>
+        </div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>shift（视频）</span><b id="vidShiftVideoVal">12.0</b></div>
+            <input type="range" id="vidShiftVideo" min="0.01" max="100" step="0.01" value="12">
+            <small class="muted" id="vidShiftVideoHint">推荐</small>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>shift（音频）</span><b id="vidShiftAudioVal">3.0</b></div>
+            <input type="range" id="vidShiftAudio" min="0.01" max="100" step="0.01" value="3">
+            <small class="muted" id="vidShiftAudioHint">推荐</small>
+          </div>
+        </div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>采样器</span><small id="vidSamplerHint">推荐</small></div>
+            <select class="img-select" id="vidSamplerSelect"></select>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>调度器</span><small id="vidSchedulerHint">推荐</small></div>
+            <select class="img-select" id="vidSchedulerSelect"></select>
+          </div>
+        </div>
+
+        <div class="img-note" id="vidSamplingNote"></div>
+        <div class="img-note" id="vidCfgFixedNote"></div>
       </div>
     </div>
 
@@ -570,7 +633,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="field" id="modelField">
       <div class="field-label">模型 <span class="muted">基础模型随模式自动切换</span></div>
       <div class="cards2" id="modelCards">
-        <button data-v="lora" class="active"><b>MiniMax-H3 + LoRA</b><small>Turbo 加速 · 默认 6 步</small></button>
+        <button data-v="lora" class="active"><b>MiniMax-H3 + LoRA</b><small>Turbo 加速 · 默认 4 步</small></button>
         <button data-v="standard"><b>标准 MiniMax-H3</b><small>20 步 · 质量优先</small></button>
       </div>
       <div class="subfield" id="loraField">
@@ -593,8 +656,61 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     </div>
 
     <div class="field" id="stepsField">
-      <div class="field-label">步数 <span id="stepsVal">6</span> <span class="muted">4~20，步多质量高但更慢</span></div>
-      <input type="range" id="steps" min="4" max="20" step="1" value="6">
+      <div class="field-label">步数 <span id="stepsVal">4</span> <span class="muted">4~20，步多质量高但更慢</span></div>
+      <input type="range" id="steps" min="4" max="20" step="1" value="4">
+      <!-- 【2026-11-12】步数的「推荐 / 已改」提示。
+           默认档位与工作流硬编码一致：挂加速 LoRA -> 4 步，不用 LoRA -> 20 步。 -->
+      <small class="muted" id="vidLegacyStepsHint">推荐</small>
+    </div>
+
+    <!-- 【2026-11-11 新增】首尾帧 / 参考生视频的采样参数。
+         这两个模式走的是**旧工作流路径**（h3studio/workflows.py 的
+         _h3_video_workflow / build_r2v），但采样链路与文生视频完全相同 ——
+         同样是 BasicScheduler + KSamplerSelect + BasicGuider，
+         所以步数 / 采样器 / 调度器 / shift 一样是真参数、一样能调。
+         （文生视频面板在自己那块独立的「采样参数」区里。）
+         CFG 同样是 H3 固定 1.0 —— 只做只读说明。 -->
+    <div class="field" id="videoSamplingField" style="display:none">
+      <div class="field-label">采样参数 <span class="muted">与文生视频面板一致</span></div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>采样器</span><small id="vidLegacySamplerHint">推荐</small></div>
+          <select class="img-select" id="vidLegacySamplerSelect"></select>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>调度器</span><small id="vidLegacySchedulerHint">推荐</small></div>
+          <select class="img-select" id="vidLegacySchedulerSelect"></select>
+        </div>
+      </div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>shift（视频）</span><b id="vidLegacyShiftVideoVal">12.0</b></div>
+          <input type="range" id="vidLegacyShiftVideo" min="0.01" max="100" step="0.01" value="12">
+          <small class="muted" id="vidLegacyShiftVideoHint">推荐</small>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>shift（音频）</span><b id="vidLegacyShiftAudioVal">3.0</b></div>
+          <input type="range" id="vidLegacyShiftAudio" min="0.01" max="100" step="0.01" value="3">
+          <small class="muted" id="vidLegacyShiftAudioHint">推荐</small>
+        </div>
+      </div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>CFG</span><b id="vidLegacyCfgVal">1.0</b></div>
+          <input type="text" id="vidLegacyCfg" value="1.0" readonly>
+          <small class="muted" id="vidLegacyCfgHint">H3 固定</small>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>二采</span><small id="vidLegacyTwopassHint">不适用</small></div>
+          <input type="text" id="vidLegacyTwopassNote" value="此模式无二采" readonly>
+        </div>
+      </div>
+
+      <div class="img-note" id="vidLegacySamplingNote"></div>
+      <div class="img-note" id="vidLegacyCfgFixedNote"></div>
     </div>
 
     <!-- 【2026-11-11】这里原来是一个 compact-pair：左边「LoRA 强度」滑杆
