@@ -5,12 +5,20 @@
    （/api/video-options），前端只渲染 + 提交，不硬编码任何文件名。
 
    本模块负责：
-     * 宽高直填 + 服务端权威吸附（显示「输入值 → 实际使用值」+ 原因）
+     * 尺寸预设下拉（服务端下发合法组合）+ 宽高直填 + 权威吸附
+       （显示「输入值 → 实际使用值」+ 原因）
      * 模型选择（本机实测可用清单）
-     * 加速 LoRA 组合（可多选；固定加速 LoRA 不在这里）
+     * 加速 LoRA **下拉单选**（一个主模型只能挑一个加速 LoRA），
+       且**按当前主模型做适配过滤**（不适配的根本不出现）
      * 注意力机制（本机 ComfyUI 里真有的节点才可选）
      * 二采（SelfLift）开关与参数
      * 配置持久化（/api/video-config，局域网共用，与图像面板同一套机制）
+
+   【2026-11-11 改造】
+     1. 尺寸预设下拉 —— 之前只能手填宽高
+     2. 加速 LoRA 多选列表 -> 下拉单选
+     3. 加速 LoRA 按主模型适配过滤（服务端实测矩阵）
+     4. 去掉生成按钮下方重复的 LORA 强度控件（见 web/index.html）
    ============================================================ */
 (function () {
   "use strict";
@@ -31,6 +39,10 @@
     size_max: 16384,
     mp_table: [],
     default_mp: 0.4,
+    size_presets: [],        // 服务端下发的合法尺寸预设（含宽高）
+    accel_lora_single_select: true,
+    accel_lora_default: "",
+    accel_lora_compat: {},   // {model_key: {lora_key: {compatible, reason, ...}}}
   };
 
   /** 视频面板状态（与图像面板的 state.img 同级，互不污染） */
@@ -43,8 +55,10 @@
     height: null,
     rawWidth: null,         // 用户原始输入（未经吸附）
     rawHeight: null,
+    sizePresetKey: "",      // 当前选中的尺寸预设（空 = 自定义）
     fixedAccelLora: "",
-    accelLoras: [],         // [{key, strength, enabled}]
+    accelLora: "",          // 【单选】当前选中的加速 LoRA key（空 = 不额外挂）
+    accelLoraStrength: 1.0, // 【单选】该加速 LoRA 的强度
     attention: "",
     twopass: {
       enabled: false,
@@ -125,6 +139,63 @@
     return autoSize(videoState.aspect, videoState.megapixels);
   }
 
+  /** 当前比例下的合法尺寸预设（服务端下发的清单里筛） */
+  function presetsForAspect(aspect) {
+    return (VIDEO_OPTIONS.size_presets || []).filter(p => p.aspect === aspect);
+  }
+
+  /**
+   * 渲染尺寸预设下拉。
+   *
+   * 清单来自服务端（/api/video-options 的 size_presets），每一条都已按
+   * H3 原生画布的硬约束（面积 <= 768*1344、短边 <= 768、32 的倍数）裁过 ——
+   * 下拉里出现的都是真能跑的组合。
+   */
+  function renderSizePresetSelect() {
+    const sel = document.getElementById("vidSizePresetSelect");
+    if (!sel) return;
+    const presets = presetsForAspect(videoState.aspect);
+    const prev = sel.value;
+    sel.innerHTML = "";
+
+    // 「自定义」项：用户手填宽高后这里要能反映出来
+    const customOpt = document.createElement("option");
+    customOpt.value = "";
+    customOpt.textContent = "自定义（手动填宽高）";
+    sel.appendChild(customOpt);
+
+    presets.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.key;
+      opt.textContent = p.label;
+      opt.title = `${p.width}×${p.height} · ${p.megapixels}MP`;
+      sel.appendChild(opt);
+    });
+
+    // 回显：优先用 state 里记的 preset key；没有就按当前宽高反查
+    let want = videoState.sizePresetKey;
+    if (!want || !presets.some(p => p.key === want)) {
+      const [w, h] = currentSize();
+      const hit = presets.find(p => p.width === w && p.height === h);
+      want = hit ? hit.key : "";
+    }
+    sel.value = want;
+    videoState.sizePresetKey = want;
+
+    const note = document.getElementById("vidSizePresetNote");
+    if (note) {
+      if (!want) {
+        note.textContent = "当前是手填尺寸。选一个预设可一键回到 H3 原生画布内的标准分辨率。";
+      } else {
+        const p = presets.find(x => x.key === want);
+        note.textContent = p
+          ? `官方档位 ${p.megapixels}MP · ${p.width}×${p.height}`
+            + `（H3 原生画布上限 768×1344，本项在限内）`
+          : "";
+      }
+    }
+  }
+
   function renderSizeFields() {
     const [w, h] = currentSize();
     if (!sizeTyping) {
@@ -167,6 +238,11 @@
     videoState.width = snapped.width;
     videoState.height = snapped.height;
     videoState.sizeReasons = snapped.reasons || [];
+    // 手填之后就不再是任何预设 —— 预设下拉要切到「自定义」
+    const presets = presetsForAspect(videoState.aspect);
+    const hit = presets.find(p => p.width === snapped.width && p.height === snapped.height);
+    videoState.sizePresetKey = hit ? hit.key : "";
+    renderSizePresetSelect();
     renderSizeFields();
   }
 
@@ -229,106 +305,99 @@
     }
     box.hidden = false;
     box.textContent = `工作流固定使用加速 LoRA「${meta.display}」`
-      + `（${meta.purpose}），不随上面的勾选变化。`;
+      + `（${meta.purpose}），不随上面的选择变化。`;
   }
 
-  function renderAccelLoraList() {
-    const box = document.getElementById("vidAccelLoraList");
+  /**
+   * 当前主模型下**可选**的加速 LoRA 清单。
+   *
+   * 过滤判据（全部来自服务端实测，见 h3studio/video_models.py）：
+   *   * 文件在本机（available）
+   *   * 与当前底模的层结构对得上（compatible —— 逐层比对权重头）
+   * 不满足的一律**不出现**在下拉里（不是置灰 —— 置灰等于「能选但会
+   * 被服务端改写」，那是假选项）。
+   */
+  function selectableAccelLoras() {
+    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    return combos.filter(item => {
+      if (item.available === false) return false;
+      if (item.selectable === false) return false;
+      if (item.compatible === false) return false;
+      return true;
+    });
+  }
+
+  function renderAccelLoraSelect() {
+    const sel = document.getElementById("vidAccelLoraSelect");
+    if (!sel) return;
+    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    const selectable = selectableAccelLoras();
+
+    sel.innerHTML = "";
+    // 「不额外挂加速 LoRA」—— 工作流里已经有固定的那枚 Turbo LoRA
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "不额外挂加速 LoRA（仅用工作流固定的 Turbo）";
+    sel.appendChild(noneOpt);
+
+    selectable.forEach(item => {
+      const opt = document.createElement("option");
+      opt.value = item.key;
+      opt.textContent = item.display;
+      opt.title = `${item.name}｜推荐强度 ${item.recommended_strength}`;
+      sel.appendChild(opt);
+    });
+
+    // 当前选中的不再适配（切了主模型）-> 自动回落成「不额外挂」
+    if (videoState.accelLora && !selectable.some(x => x.key === videoState.accelLora)) {
+      videoState.accelLora = "";
+    }
+    sel.value = videoState.accelLora;
+
+    renderAccelLoraNote();
+    renderAccelLoraStrength();
+  }
+
+  function renderAccelLoraNote() {
     const note = document.getElementById("vidAccelLoraNote");
-    if (!box) return;
-    const combos = VIDEO_OPTIONS.accel_lora_combos;
-    if (!combos.length) {
-      box.innerHTML = "";
-      if (note) note.textContent = "本机未检测到可用的加速 LoRA 组合。";
-      return;
-    }
-    // 已选的放前面（用户勾过的），其余按清单顺序
-    const chosen = new Set(videoState.accelLoras.filter(l => l.enabled !== false)
-      .map(l => l.key));
-    box.innerHTML = combos.map(item => {
-      const on = chosen.has(item.key);
-      const incompatible = item.compatible === false;
-      const missing = item.available === false;
-      const disabled = incompatible || missing;
-      const meta = videoState.accelLoras.find(l => l.key === item.key);
-      const strength = meta ? Number(meta.strength) : Number(item.recommended_strength || 1);
-      const rec = Number(item.recommended_strength || 1);
-      const reasons = [];
-      if (missing) reasons.push("本机缺少该文件");
-      if (incompatible) reasons.push(item.compat_reason || "与当前底模不兼容");
-      return `<div class="img-lora-item ${disabled ? "disabled" : ""} ${incompatible ? "excluded" : ""}">
-        <div class="img-lora-head">
-          <button type="button" class="img-lora-btn toggle" data-key="${esc(item.key)}"
-            title="${disabled ? esc(reasons.join("；")) : (on ? "取消勾选" : "勾选启用")}"
-            ${disabled ? "disabled" : ""}>${on ? "●" : "○"}</button>
-          <span class="img-lora-name" title="${esc(item.name)}">${esc(item.display)}</span>
-          ${Math.abs(strength - rec) < 1e-6 ? '<span class="img-lora-tag rec">推荐强度</span>' : ""}
-          ${incompatible ? '<span class="img-lora-tag excl">不兼容</span>' : ""}
-          ${missing ? '<span class="img-lora-tag miss">文件缺失</span>' : ""}
-        </div>
-        <div class="img-lora-slider">
-          <input type="range" class="strength" data-key="${esc(item.key)}"
-            min="0" max="1.5" step="0.05" value="${Math.min(strength, 1.5)}"
-            ${disabled ? "disabled" : ""} title="强度 0-1.5，0 表示关闭">
-          <span class="img-lora-strength">${strength.toFixed(2)}</span>
-        </div>
-        <div class="img-lora-meta">${esc(item.purpose || "")}</div>
-        <div class="img-lora-meta">${esc(item.note || "")}</div>
-        ${reasons.length ? `<div class="img-lora-excl-reason">${esc(reasons.join("；"))}</div>` : ""}
-      </div>`;
-    }).join("");
+    if (!note) return;
+    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    const selectable = selectableAccelLoras();
+    const parts = [];
 
-    box.querySelectorAll("button.toggle").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const key = btn.dataset.key;
-        const existing = videoState.accelLoras.find(l => l.key === key);
-        if (existing) {
-          existing.enabled = existing.enabled === false;
-        } else {
-          const meta = accelComboMeta(key);
-          videoState.accelLoras.push({
-            key,
-            strength: Number(meta && meta.recommended_strength || 1),
-            enabled: true,
-          });
-        }
-        renderAccelLoraList();
-        saveVideoConfig();
-      });
-    });
-    box.querySelectorAll("input.strength").forEach(slider => {
-      slider.addEventListener("input", () => {
-        const key = slider.dataset.key;
-        let item = videoState.accelLoras.find(l => l.key === key);
-        if (!item) {
-          item = { key, strength: 1, enabled: true };
-          videoState.accelLoras.push(item);
-        }
-        item.strength = Number(slider.value);
-        item.enabled = item.strength > 0;
-        const label = slider.parentElement.querySelector(".img-lora-strength");
-        if (label) label.textContent = item.strength.toFixed(2);
-      });
-      slider.addEventListener("change", () => {
-        renderAccelLoraList();
-        saveVideoConfig();
-      });
-    });
-
-    const selected = videoState.accelLoras.filter(l => l.enabled !== false
-      && Number(l.strength) > 0);
-    if (note) {
-      const parts = [`已选 ${selected.length} 个加速 LoRA 组合`];
-      if (selected.length) {
-        parts.push("：" + selected.map(l => {
-          const meta = accelComboMeta(l.key);
-          return `${meta ? meta.display : l.key} ×${Number(l.strength).toFixed(2)}`;
-        }).join("、"));
-      }
-      const blocked = combos.filter(c => c.compatible === false).length;
-      if (blocked) parts.push(`（另有 ${blocked} 个与当前底模不兼容，已置灰）`);
-      note.textContent = parts.join(" ");
+    const meta = videoState.accelLora ? accelComboMeta(videoState.accelLora) : null;
+    if (meta) {
+      parts.push(`已选「${meta.display}」×${Number(videoState.accelLoraStrength).toFixed(2)}`);
+      if (meta.note) parts.push(meta.note);
+    } else {
+      parts.push("未额外挂加速 LoRA（工作流固定的 Turbo LoRA 仍然生效）。");
     }
+    // 被过滤掉的数量 + 原因（说清楚「为什么少了几项」）
+    const blocked = combos.length - selectable.length;
+    if (blocked > 0) {
+      const reasons = combos
+        .filter(c => !selectable.some(s => s.key === c.key))
+        .map(c => {
+          if (c.available === false) return `${c.display}（本机缺少文件）`;
+          return `${c.display}（${c.compat_reason || "与当前底模不兼容"}）`;
+        });
+      parts.push(`当前底模下另有 ${blocked} 个加速 LoRA 不适配，已从列表剔除：`
+        + reasons.join("；"));
+    }
+    note.textContent = parts.join(" ");
+  }
+
+  function renderAccelLoraStrength() {
+    const slider = document.getElementById("vidAccelLoraStrength");
+    const label = document.getElementById("vidAccelLoraStrengthVal");
+    const field = document.getElementById("vidAccelLoraStrengthField");
+    const has = !!videoState.accelLora;
+    if (field) field.style.display = has ? "" : "none";
+    if (slider) {
+      slider.value = videoState.accelLoraStrength;
+      slider.disabled = !has;
+    }
+    if (label) label.textContent = Number(videoState.accelLoraStrength).toFixed(2);
   }
 
   // ------------------------------------------------------------ 注意力
@@ -460,8 +529,10 @@
         videoState.rawWidth = null;
         videoState.rawHeight = null;
         videoState.sizeReasons = [];
+        videoState.sizePresetKey = "";
         sizeTyping = false;
         renderAspectChips();
+        renderSizePresetSelect();
         renderSizeFields();
         saveVideoConfig();
       });
@@ -475,9 +546,10 @@
     if (!optionsReady) return;
     renderModelSelect();
     renderAspectChips();
+    renderSizePresetSelect();
     renderSizeFields();
     renderFixedLoraNote();
-    renderAccelLoraList();
+    renderAccelLoraSelect();
     renderAttention();
     renderTwopass();
   }
@@ -494,10 +566,11 @@
       height: videoState.height,
       rawWidth: videoState.rawWidth,
       rawHeight: videoState.rawHeight,
+      size_preset_key: videoState.sizePresetKey,
       fixed_accel_lora: videoState.fixedAccelLora,
-      accel_loras: videoState.accelLoras.map(l => ({
-        key: l.key, strength: Number(l.strength), enabled: l.enabled !== false,
-      })),
+      // 【单选】只存一个加速 LoRA + 它的强度
+      accel_lora: videoState.accelLora,
+      accel_lora_strength: Number(videoState.accelLoraStrength),
       attention: videoState.attention,
       twopass: { ...videoState.twopass },
     };
@@ -513,15 +586,24 @@
     if (cfg.height) videoState.height = Number(cfg.height);
     if (cfg.rawWidth) videoState.rawWidth = Number(cfg.rawWidth);
     if (cfg.rawHeight) videoState.rawHeight = Number(cfg.rawHeight);
+    if (cfg.size_preset_key) videoState.sizePresetKey = cfg.size_preset_key;
     if (cfg.fixed_accel_lora) videoState.fixedAccelLora = cfg.fixed_accel_lora;
-    if (Array.isArray(cfg.accel_loras)) {
-      videoState.accelLoras = cfg.accel_loras
-        .filter(l => l && l.key)
-        .map(l => ({
-          key: l.key,
-          strength: Number(l.strength || 1),
-          enabled: l.enabled !== false,
-        }));
+    // 【单选】新格式
+    if (cfg.accel_lora !== undefined) {
+      videoState.accelLora = cfg.accel_lora || "";
+    }
+    if (cfg.accel_lora_strength !== undefined) {
+      videoState.accelLoraStrength = Number(cfg.accel_lora_strength);
+    }
+    // 【兼容旧格式】老配置里存的是 accel_loras 数组（可能多项）——
+    // 取第一项启用且强度 > 0 的，落到新的单选字段上。
+    if (Array.isArray(cfg.accel_loras) && cfg.accel_loras.length) {
+      const first = cfg.accel_loras.find(
+        l => l && l.key && l.enabled !== false && Number(l.strength) > 0);
+      if (first && !cfg.accel_lora) {
+        videoState.accelLora = first.key;
+        videoState.accelLoraStrength = Number(first.strength || 1);
+      }
     }
     if (cfg.attention) videoState.attention = cfg.attention;
     if (cfg.twopass && typeof cfg.twopass === "object") {
@@ -606,7 +688,10 @@
       if (!resp.ok) return;
       const data = await resp.json();
       VIDEO_OPTIONS.accel_lora_combos = data.accel_lora_combos || [];
-      renderAccelLoraList();
+      if (data.accel_lora_compat) {
+        VIDEO_OPTIONS.accel_lora_compat = data.accel_lora_compat;
+      }
+      renderAccelLoraSelect();
     } catch (e) { /* 忽略：清单保持上一次的结果 */ }
   }
 
@@ -614,6 +699,14 @@
 
   function submitParams() {
     const [w, h] = currentSize();
+    const accel = [];
+    if (videoState.accelLora && Number(videoState.accelLoraStrength) > 0) {
+      accel.push({
+        key: videoState.accelLora,
+        strength: Number(videoState.accelLoraStrength),
+        enabled: true,
+      });
+    }
     return {
       model_key: videoState.model,
       width: w,
@@ -623,9 +716,8 @@
       steps: state.steps,
       seed: $("#seed").value.trim() || null,
       fixed_accel_lora: videoState.fixedAccelLora,
-      accel_loras: videoState.accelLoras
-        .filter(l => l.enabled !== false && Number(l.strength) > 0)
-        .map(l => ({ key: l.key, strength: Number(l.strength), enabled: true })),
+      // 【单选】最多一项
+      accel_loras: accel,
       attention: videoState.attention,
       twopass: {
         enabled: !!videoState.twopass.enabled,
@@ -642,6 +734,44 @@
   // ------------------------------------------------------------ 事件绑定
 
   function bind() {
+    // ---- 尺寸预设下拉 ----
+    const presetSel = document.getElementById("vidSizePresetSelect");
+    if (presetSel) {
+      presetSel.addEventListener("change", e => {
+        const key = e.target.value;
+        videoState.sizePresetKey = key || "";
+        if (!key) {
+          // 选了「自定义」-> 回到按比例自动算的尺寸
+          videoState.custom = false;
+          videoState.width = null;
+          videoState.height = null;
+          videoState.rawWidth = null;
+          videoState.rawHeight = null;
+          videoState.sizeReasons = [];
+          sizeTyping = false;
+          renderSizePresetSelect();
+          renderSizeFields();
+          saveVideoConfig();
+          return;
+        }
+        const p = presetsForAspect(videoState.aspect).find(x => x.key === key);
+        if (!p) return;
+        videoState.aspect = p.aspect;
+        videoState.custom = false;
+        videoState.width = p.width;
+        videoState.height = p.height;
+        videoState.rawWidth = null;
+        videoState.rawHeight = null;
+        videoState.megapixels = p.megapixels;
+        videoState.sizeReasons = [];
+        sizeTyping = false;
+        renderAspectChips();
+        renderSizePresetSelect();
+        renderSizeFields();
+        saveVideoConfig();
+      });
+    }
+
     const widthInput = document.getElementById("vidWidth");
     const heightInput = document.getElementById("vidHeight");
     if (widthInput) {
@@ -681,7 +811,9 @@
         videoState.rawWidth = null;
         videoState.rawHeight = null;
         videoState.sizeReasons = [];
+        videoState.sizePresetKey = "";
         sizeTyping = false;
+        renderSizePresetSelect();
         renderSizeFields();
         saveVideoConfig();
       });
@@ -693,6 +825,37 @@
         videoState.model = e.target.value;
         renderModelNote();
         refreshAccelCompat();
+        saveVideoConfig();
+      });
+    }
+
+    // ---- 加速 LoRA（下拉单选）----
+    const accelSel = document.getElementById("vidAccelLoraSelect");
+    if (accelSel) {
+      accelSel.addEventListener("change", e => {
+        videoState.accelLora = e.target.value || "";
+        const meta = videoState.accelLora ? accelComboMeta(videoState.accelLora) : null;
+        if (meta) {
+          // 切到某个 LoRA 时，强度回到它的推荐值（除非用户已经改过这项）
+          if (videoState.accelLoraStrength === undefined
+            || videoState.accelLoraStrength === null) {
+            videoState.accelLoraStrength = Number(meta.recommended_strength || 1);
+          }
+        }
+        renderAccelLoraNote();
+        renderAccelLoraStrength();
+        saveVideoConfig();
+      });
+    }
+    const accelStrength = document.getElementById("vidAccelLoraStrength");
+    if (accelStrength) {
+      accelStrength.addEventListener("input", e => {
+        videoState.accelLoraStrength = parseFloat(e.target.value);
+        const label = document.getElementById("vidAccelLoraStrengthVal");
+        if (label) label.textContent = videoState.accelLoraStrength.toFixed(2);
+      });
+      accelStrength.addEventListener("change", () => {
+        renderAccelLoraNote();
         saveVideoConfig();
       });
     }
@@ -761,5 +924,11 @@
     applyConfig: applyConfig,
     collectConfig: collectConfig,
     save: saveVideoConfig,
+    // 供验收脚本直接读状态（证明「界面值 == 提交值」）
+    _debug: {
+      selectableAccelLoras,
+      presetsForAspect,
+      currentSize,
+    },
   };
 })();
