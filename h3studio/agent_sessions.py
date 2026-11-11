@@ -52,6 +52,23 @@ MAX_META_CHARS = 8000
 HISTORY_LIMIT = 8
 
 
+def _escape_like(text: str) -> str:
+    """
+    转义 SQL LIKE 里的通配符（% 和 _）。
+
+    【为什么需要】
+    LIKE 的 % 匹配任意长度、_ 匹配任意单字符。用户搜 "%" 时，
+    不转义就会匹配**所有**会话 —— 搜索框看起来「什么都没输入
+    却列出全部」。这是 LIKE 的经典误用。
+
+    转义方式：在字符前加反斜杠，配合 SQL 里的 ESCAPE '\\' 子句。
+    （SQLite 默认不把反斜杠当转义符，**必须**显式声明 ESCAPE。）
+
+    反斜杠本身也要转义 —— 否则用户搜 "\" 会把后面的 % 变成通配符。
+    """
+    return (text or "").replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _parse_meta(raw) -> dict:
     """
     解析 meta 列。坏数据一律降级成空 dict。
@@ -211,12 +228,13 @@ class SessionStore:
                                 (session_id,))
             return cur.rowcount > 0
 
-    def list_sessions(self, limit: int = 50) -> list[dict]:
+    def list_sessions(self, limit: int = 50, query: str = "") -> list[dict]:
         """
         会话清单（最近 N 条，按最近活跃排序）。
 
         每条返回：
-          id / title / created_at / updated_at / message_count / preview
+          id / title / created_at / updated_at / message_count /
+          preview / artifact_count
 
         【title 与 preview 的区别 —— 2026-11-11】
         title 是**自动生成**的会话名（首条用户消息前 40 字），用于侧栏列表；
@@ -232,13 +250,47 @@ class SessionStore:
         【空标题兜底】
         刚建的会话还没发过消息 -> title 是空串。这时列表里显示成
         「新会话」，而不是留一个空白项让用户以为页面没加载出来。
+
+        query:
+          搜索关键词（2026-11-11 新增）。为空 = 不过滤。
+          匹配范围：**标题 + 任意一条消息的正文**。
+          为什么搜消息正文而不只搜标题：
+            标题只是首条用户消息的前 40 字 —— 用户后来聊的内容
+            （比如「改成 16:9」「再生成一版」）根本不在标题里。
+            只搜标题等于搜不到用户真正想找的东西。
+          用 LIKE 而不是全文索引：会话量级（几百到几千条）下
+          LIKE + 索引够快，且不引入 FTS5 的额外依赖与迁移负担。
         """
+        needle = (query or "").strip()
         with self.connect() as conn:
-            rows = conn.execute(
-                "SELECT s.*, (SELECT COUNT(*) FROM agent_messages m "
-                "                WHERE m.session_id=s.id) AS message_count "
-                "FROM agent_sessions s ORDER BY s.updated_at DESC LIMIT ?",
-                (limit,)).fetchall()
+            if needle:
+                # 搜索：标题或任意消息正文命中
+                #
+                # 【为什么要转义 LIKE 通配符】
+                # LIKE 里的 % 和 _ 是通配符。用户搜 "%" 时，
+                # LIKE '%%%' 会匹配**所有**会话 —— 搜索框看起来
+                # 「什么都没输入却列出全部」，是典型的 LIKE 误用。
+                # 转义后 "%" 只匹配字面的百分号。
+                #
+                # ESCAPE 子句是必需的：SQLite 默认**不**把反斜杠当转义符，
+                # 必须显式写 ESCAPE '\'，否则 \% 会被当成「反斜杠 + 任意字符」。
+                like = f"%{_escape_like(needle)}%"
+                rows = conn.execute(
+                    "SELECT s.*, (SELECT COUNT(*) FROM agent_messages m "
+                    "                WHERE m.session_id=s.id) AS message_count "
+                    "FROM agent_sessions s "
+                    "WHERE s.title LIKE ? ESCAPE '\\' COLLATE NOCASE "
+                    "   OR EXISTS (SELECT 1 FROM agent_messages m2 "
+                    "               WHERE m2.session_id=s.id "
+                    "                 AND m2.content LIKE ? ESCAPE '\\' COLLATE NOCASE) "
+                    "ORDER BY s.updated_at DESC LIMIT ?",
+                    (like, like, limit)).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT s.*, (SELECT COUNT(*) FROM agent_messages m "
+                    "                WHERE m.session_id=s.id) AS message_count "
+                    "FROM agent_sessions s ORDER BY s.updated_at DESC LIMIT ?",
+                    (limit,)).fetchall()
             # 首条用户消息（preview）。单独查是因为 SQLite 不支持
             #  correlated subquery 取「第一条」的直接写法（LIMIT 不进子查询）。
             previews: dict[str, str] = {}
@@ -264,6 +316,9 @@ class SessionStore:
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
                 "message_count": r["message_count"],
+                # 关联产物数 —— 由 server 侧补（jobs 表不在会话库里）。
+                # 这里先填 0，server.list_sessions_with_jobs 会覆盖。
+                "artifact_count": 0,
             })
         return result
 

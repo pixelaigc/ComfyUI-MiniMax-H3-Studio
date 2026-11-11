@@ -1412,6 +1412,76 @@ def list_job_records(status: str | None = None, mode: str | None = None,
     return result
 
 
+def session_job_counts(session_ids: list[str]) -> dict[str, int]:
+    """
+    一批会话各自关联的任务数（会话库 -> 任务库的跨库统计）。
+
+    【为什么单独一个函数】
+    会话库（agent_sessions.db）与任务库（jobs.db）是**两个库**，
+    会话库自己不知道产物数；要拿就得查 jobs 表。
+
+    【为什么用一次 IN 查询而不是每个会话查一次】
+    会话列表可能有几百条 —— N+1 次查询在 SQLite 上也不致命，
+    但一次 IN 查询更干净，也避免两个库的连接来回切。
+
+    返回 {session_id: count}；查不到/出错返回空 dict（不阻断列表）。
+    """
+    ids = [str(s) for s in (session_ids or []) if s]
+    if not ids:
+        return {}
+    try:
+        with db() as conn:
+            placeholders = ",".join("?" * len(ids))
+            rows = conn.execute(
+                f"SELECT session_id, COUNT(*) AS c FROM jobs "
+                f"WHERE session_id IN ({placeholders}) GROUP BY session_id",
+                ids).fetchall()
+        return {str(r["session_id"]): int(r["c"]) for r in rows}
+    except Exception:
+        # 查不到就返回空 —— 列表照常显示，产物数显示 0。
+        # **不能**因为统计失败就让整个会话列表打不开。
+        return {}
+
+
+def clear_session_job_refs(session_id: str) -> int:
+    """
+    清掉某个会话的任务**引用关系**（jobs.session_id 置空）。
+
+    【删除会话时调用 —— 2026-11-11 新增需求】
+    用户要求「删除会话需级联清理该会话下的消息与产物引用关系，
+    不误删素材库实体文件」。
+
+    【关键：只清引用，不删任务】
+    jobs 表里的任务记录**不是**会话的私有财产：
+      * 它同时是「生成库」里的一条记录（用户能在生成列表里看到它）；
+      * 它带着产物文件路径（outputs），删掉任务记录会让生成列表
+        里出现「任务不见了但文件还在」的孤儿状态；
+      * 素材库里的 asset_refs 是**独立**的实体文件（/mnt/usb2t/asset_library），
+        与会话完全无关 —— **绝对不能**碰。
+    所以这里只把 jobs.session_id 置空：任务本身留在生成库里，
+    只是不再归属任何会话。
+
+    【为什么不删任务，而是置空】
+    删任务 = 用户在生成列表里凭空少了一条记录（可能是他想要的结果）。
+    置空 = 「这个会话删了，但生成结果还在生成库里」——
+    与「会话数据可丢弃、任务不可」的整体取舍一致。
+
+    返回被清理的任务数。
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return 0
+    try:
+        with db() as conn:
+            cur = conn.execute(
+                "UPDATE jobs SET session_id='' WHERE session_id=?", (sid,))
+            return int(cur.rowcount or 0)
+    except Exception:
+        # 清引用失败不阻断会话删除 —— 会话数据本身才是要删的。
+        return 0
+
+
+
 def list_jobs_for_session(session_id: str) -> list[dict]:
     """
     列出某个 Agent 会话里创建的**全部**任务（权威来源：jobs 表）。
@@ -4396,14 +4466,22 @@ async def api_agent_sessions(request):
 
     可选查询参数：
       limit   返回条数上限（默认 100，上限 500）
+      q       搜索关键词（标题或任意消息正文命中；为空 = 不过滤）
     """
     try:
         limit = int(request.query.get("limit") or 100)
     except (TypeError, ValueError):
         limit = 100
     limit = max(1, min(limit, 500))
+    query = str(request.query.get("q") or "").strip()[:120]
     store = _agent_store()
-    return json_ok({"sessions": store.list_sessions(limit=limit)})
+    sessions = store.list_sessions(limit=limit, query=query)
+    # 关联产物数：会话库与任务库是**两个库**（见 agent_sessions.py 的说明），
+    # 所以产物数要去 jobs 表数 —— 不能指望会话库自己知道。
+    counts = session_job_counts([s["id"] for s in sessions])
+    for item in sessions:
+        item["artifact_count"] = counts.get(item["id"], 0)
+    return json_ok({"sessions": sessions, "query": query})
 
 
 async def api_agent_session_get(request):
@@ -4459,8 +4537,21 @@ async def api_agent_session_delete(request):
     sid = request.match_info["id"]
     store = _agent_store()
     existed = store.exists(sid)
+    # 【级联清理产物引用 —— 2026-11-11 新增需求】
+    # 删会话时把该会话的任务**引用关系**清掉（jobs.session_id 置空），
+    # 但**任务记录本身留在生成库里**。
+    #
+    # 【为什么不删任务、也不碰素材库】
+    #   * 任务同时是「生成库」里的一条记录，删了会让用户在生成列表里
+    #     凭空少一条（可能是他想要的结果）；
+    #   * 任务带 outputs 产物路径，删记录会产生「文件还在、任务没了」的孤儿；
+    #   * 素材库实体文件在 /mnt/usb2t/asset_library，与会话完全无关 ——
+    #     **绝对不能**因为删会话就删素材。
+    # 详见 clear_session_job_refs 的说明。
+    cleared_jobs = clear_session_job_refs(sid)
     deleted = store.delete(sid)
-    return json_ok({"deleted": sid, "ok": bool(deleted and existed)})
+    return json_ok({"deleted": sid, "ok": bool(deleted and existed),
+                    "cleared_job_refs": cleared_jobs})
 
 
 async def api_agent_tools(request):

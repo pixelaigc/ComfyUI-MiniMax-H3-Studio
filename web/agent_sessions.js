@@ -28,6 +28,11 @@
   const state = {
     // 会话清单（服务端返回）
     sessions: [],
+    // 当前的搜索关键词（2026-11-11 新增）。
+    // 空串 = 不过滤。
+    search: "",
+    // 产物轮询句柄（未完成任务实时刷新状态）。
+    artifactTimer: null,
     // 当前会话 id
     currentId: "",
     // 当前会话的消息（已转成 agent.js 的消息结构）
@@ -120,7 +125,10 @@
 
   async function loadSessions() {
     try {
-      const data = await apiJSON("GET", "/api/agent/sessions?limit=200");
+      // 搜索词走 query 参数（服务端用 LIKE 匹配标题 + 任意消息正文）。
+      const q = state.search ? encodeURIComponent(state.search) : "";
+      const path = "/api/agent/sessions?limit=200" + (q ? "&q=" + q : "");
+      const data = await apiJSON("GET", path);
       state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
     } catch (err) {
       // 【不要在这里把已有会话清空】
@@ -148,11 +156,12 @@
       const preview = s.preview ? esc(s.preview) : "";
       const time = formatTime(s.updated_at);
       const count = Number(s.message_count || 0);
+      const arts = Number(s.artifact_count || 0);
       return `<div class="ag-session-item${active}" data-session-id="${esc(s.id)}"
                    role="button" tabindex="0" title="${title}">
         <div class="ag-session-item-title">${title}</div>
         ${preview ? `<div class="ag-session-item-preview">${preview}</div>` : ""}
-        <div class="ag-session-item-meta">${esc(time)} · ${count} 条</div>
+        <div class="ag-session-item-meta">${esc(time)} · ${count} 条${arts ? " · " + arts + " 产物" : ""}</div>
         <button type="button" class="ag-session-del" data-act="delete-session"
                 data-session-id="${esc(s.id)}" title="删除这个交互">&times;</button>
       </div>`;
@@ -348,7 +357,10 @@
       const prompt = job.params && job.params.prompt ? String(job.params.prompt) : "";
       const status = job.status || "queued";
       const label = job.gen_type_label || job.mode || "任务";
-      return `<div class="ag-artifact-item">
+      // 未完成的任务（排队中/生成中）标出来 —— 面板会持续刷新它们的状态。
+      const pending = status === "queued" || status === "running";
+      return `<div class="ag-artifact-item${pending ? " is-pending" : ""}"
+                   data-job-id="${esc(job.id)}">
         <div class="ag-artifact-head">
           <span class="ag-artifact-id">${esc(job.id)}</span>
           <span class="ag-job-badge ag-badge-${status === "done" ? "ok" : (status === "failed" ? "bad" : "warn")}">${esc(status)}</span>
@@ -356,15 +368,50 @@
         ${thumb}
         <div class="ag-artifact-prompt">${esc(prompt || label)}</div>
         <div class="ag-artifact-meta">${esc(label)} · ${esc(formatTime(job.created_at))}</div>
+        <button type="button" class="ag-artifact-locate" data-act="locate-job"
+                data-job-id="${esc(job.id)}">在生成库中定位</button>
       </div>`;
     }).join("");
     box.innerHTML = items;
+  }
+
+  // 未完成任务的状态轮询间隔（毫秒）。
+  //
+  // 【为什么是 4 秒】
+  // 任务状态从 queued -> running -> done，实测几十秒到几分钟。
+  // 4 秒足够跟得上，又不会把服务端打爆（面板开着时每 4 秒一次）。
+  const ARTIFACT_POLL_MS = 4000;
+
+  // 面板打开时是否该继续轮询。
+  //
+  // 【为什么要条件轮询而不是无条件 setInterval】
+  // 面板关着的时候没必要轮询 —— 那是白白发请求。
+  // 只有「面板开着」且「有未完成的任务」时才继续。
+  function hasPendingArtifacts() {
+    return state.artifacts.some(j => j.status === "queued" || j.status === "running");
+  }
+
+  function stopArtifactPolling() {
+    if (state.artifactTimer) {
+      clearInterval(state.artifactTimer);
+      state.artifactTimer = null;
+    }
+  }
+
+  function startArtifactPolling() {
+    stopArtifactPolling();
+    state.artifactTimer = setInterval(() => {
+      if (!state.artifactsOpen) { stopArtifactPolling(); return; }
+      if (!hasPendingArtifacts()) { stopArtifactPolling(); return; }
+      refreshArtifacts();
+    }, ARTIFACT_POLL_MS);
   }
 
   async function refreshArtifacts() {
     if (!state.currentId) {
       state.artifacts = [];
       renderArtifacts();
+      stopArtifactPolling();
       return;
     }
     try {
@@ -372,6 +419,12 @@
         "/api/agent/sessions/" + encodeURIComponent(state.currentId) + "/jobs");
       state.artifacts = Array.isArray(data.jobs) ? data.jobs : [];
       renderArtifacts();
+      // 有未完成的任务 -> 继续轮询直到全部结束。
+      if (state.artifactsOpen && hasPendingArtifacts()) {
+        startArtifactPolling();
+      } else {
+        stopArtifactPolling();
+      }
     } catch (err) {
       state.artifacts = [];
       renderArtifacts();
@@ -384,7 +437,38 @@
     const open = force == null ? panel.hidden : !!force;
     panel.hidden = !open;
     state.artifactsOpen = open;
-    if (open) refreshArtifacts();
+    if (open) {
+      refreshArtifacts();
+    } else {
+      // 面板关了 -> 停掉轮询（别白白发请求）。
+      stopArtifactPolling();
+    }
+  }
+
+  // 「在生成库中定位」—— 把用户带到生成列表里的那一条任务。
+  //
+  // 【为什么不做成「跳转 + 高亮」而只提示】
+  // 生成列表（#jobsArea）是**另一个页面**（app.js 管的），跨页高亮需要
+  // app.js 配合加一个「定位并高亮」的入口 —— 那会把两个模块耦在一起。
+  // 现在的做法：切到生成页 + 把任务 id 写进 location.hash，
+  // 用户在生成列表里能自己找到；同时**在产物面板上直接给出可点的
+  // 任务详情**（点缩略图打开产物）。两条路都通。
+  function locateJob(jobId) {
+    if (!jobId) return;
+    // 切到生成页
+    const nav = document.querySelector('.nav-item[data-mode="t2i"]')
+      || document.querySelector(".nav-item");
+    if (nav) nav.click();
+    // 把 id 放进 hash —— 生成页可以据此定位（app.js 不读它也不受影响）
+    try {
+      location.hash = "job=" + encodeURIComponent(jobId);
+    } catch (e) {
+      // 某些环境禁用了 hash 写入 —— 不影响主流程。
+    }
+    const status = $("#agStatus");
+    if (status) {
+      status.textContent = "已切到生成库，任务 " + jobId + " 可在生成列表中查看。";
+    }
   }
 
   // ---------- 抽屉 ----------
@@ -532,11 +616,47 @@
       });
     }
 
+    // 会话搜索（2026-11-11 新增需求）。
+    //
+    // 【为什么用 input 事件而不是 change】
+    // change 只在失焦时触发 —— 用户一边打字一边看列表会觉得很迟钝。
+    // input 事件每次按键都触发，但这里做了 **250ms 防抖**，
+    // 否则打「赛博朋克」会发 4 次请求。
+    const search = $("#agSessionSearch");
+    if (search) {
+      let timer = null;
+      search.addEventListener("input", event => {
+        state.search = event.target.value || "";
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { loadSessions(); }, 250);
+      });
+      // 回车立刻搜（不等防抖）
+      search.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (timer) clearTimeout(timer);
+          loadSessions();
+        }
+      });
+    }
+
     // 产物面板
     const artBtn = $("#agArtifactsBtn");
     if (artBtn) artBtn.addEventListener("click", () => toggleArtifacts());
     const artClose = $("#agArtifactsClose");
     if (artClose) artClose.addEventListener("click", () => toggleArtifacts(false));
+
+    // 产物卡片上的「在生成库中定位」（事件委托 —— 卡片是重绘出来的，
+    // 不能在 renderArtifacts 里逐个绑定，否则每次重绘都要重新绑）。
+    const artBody = $("#agArtifactsBody");
+    if (artBody) {
+      artBody.addEventListener("click", event => {
+        const btn = event.target.closest("[data-act='locate-job']");
+        if (!btn) return;
+        event.preventDefault();
+        locateJob(btn.dataset.jobId);
+      });
+    }
 
     // 窄屏遮罩状态跟随窗口宽度变化（旋转 / 缩放）
     window.addEventListener("resize", () => {
