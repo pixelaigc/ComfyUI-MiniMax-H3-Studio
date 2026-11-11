@@ -30,17 +30,43 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_d8257c554dff/preview"
+          "/api/assets/asset_2c12f6883bbb/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_d8257c554dff"
+          {
+            "asset_id": "asset_2c12f6883bbb",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 375,
         "docClientW": 375,
         "bodyScrollW": 375
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "width": 120,
+        "height": 90,
+        "mime": "image/png",
+        "analysis_text": "**【主体人物】**\n一位穿着深蓝色风衣的年轻女性，独自站在桥上。\n\n**【场景与环境】**\n雨夜的石桥，远处是城市的霓虹灯海，水面倒映着斑斓的光。\n\n**【光线与色彩】**\n冷色调为主，紫蓝与橙黄交织，霓虹在湿漉漉的桥面上拉出长长的光带。",
+        "tags": [
+          "主体人物",
+          "光线与色彩",
+          "冷色调为主",
+          "场景与环境",
+          "独自站在桥上",
+          "雨夜的石桥"
+        ]
       },
       "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-02-one-uploaded.png",
       "checks": {
@@ -49,6 +75,11 @@
         "预览指向素材库接口": true,
         "拿到 asset_id": true,
         "无错误提示": true,
+        "素材库里真的有这条": true,
+        "素材库抽出了尺寸": true,
+        "预处理写入了描述": true,
+        "预处理写入了标签": true,
+        "前端拿到标签": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -60,17 +91,47 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_6f4be6787813/preview",
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_55a5a6387280/preview",
+          "/api/assets/asset_dbe5797170c2/preview",
+          "/api/assets/asset_1d1223c53cc6/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_6f4be6787813",
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_55a5a6387280",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_dbe5797170c2",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_1d1223c53cc6",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 375,
         "docClientW": 375,
@@ -92,15 +153,35 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_dbe5797170c2/preview",
+          "/api/assets/asset_1d1223c53cc6/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_dbe5797170c2",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_1d1223c53cc6",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 375,
         "docClientW": 375,
@@ -143,29 +224,119 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_114dfc6bfcaf/preview",
-          "/api/assets/asset_f645dadb645a/preview",
-          "/api/assets/asset_7d94481d99de/preview",
-          "/api/assets/asset_366c620c285d/preview",
-          "/api/assets/asset_2d4dccd6f4a8/preview",
-          "/api/assets/asset_58e0d7507f36/preview",
-          "/api/assets/asset_e8fa84567681/preview",
-          "/api/assets/asset_0e4253fa050b/preview",
-          "/api/assets/asset_164bf19bb58d/preview"
+          "/api/assets/asset_6308bc517c87/preview",
+          "/api/assets/asset_f29cf6fd0e6c/preview",
+          "/api/assets/asset_7d868a6a65bd/preview",
+          "/api/assets/asset_00b5de16132d/preview",
+          "/api/assets/asset_b4b725a85c02/preview",
+          "/api/assets/asset_704958257dfc/preview",
+          "/api/assets/asset_7710e4abae10/preview",
+          "/api/assets/asset_71188d908c15/preview",
+          "/api/assets/asset_099f0d7509f4/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "btnVisible": true,
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_114dfc6bfcaf",
-          "asset_f645dadb645a",
-          "asset_7d94481d99de",
-          "asset_366c620c285d",
-          "asset_2d4dccd6f4a8",
-          "asset_58e0d7507f36",
-          "asset_e8fa84567681",
-          "asset_0e4253fa050b",
-          "asset_164bf19bb58d"
+          {
+            "asset_id": "asset_6308bc517c87",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_f29cf6fd0e6c",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_7d868a6a65bd",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_00b5de16132d",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_b4b725a85c02",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_704958257dfc",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_7710e4abae10",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_71188d908c15",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_099f0d7509f4",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 375,
         "docClientW": 375,
@@ -211,17 +382,43 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_d8257c554dff/preview"
+          "/api/assets/asset_814be5aba0ff/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_d8257c554dff"
+          {
+            "asset_id": "asset_814be5aba0ff",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 390,
         "docClientW": 390,
         "bodyScrollW": 390
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "width": 120,
+        "height": 90,
+        "mime": "image/png",
+        "analysis_text": "**【主体人物】**\n一位穿着深蓝色风衣的年轻女性，独自站在桥上。\n\n**【场景与环境】**\n雨夜的石桥，远处是城市的霓虹灯海，水面倒映着斑斓的光。\n\n**【光线与色彩】**\n冷色调为主，紫蓝与橙黄交织，霓虹在湿漉漉的桥面上拉出长长的光带。",
+        "tags": [
+          "主体人物",
+          "光线与色彩",
+          "冷色调为主",
+          "场景与环境",
+          "独自站在桥上",
+          "雨夜的石桥"
+        ]
       },
       "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-02-one-uploaded.png",
       "checks": {
@@ -230,6 +427,11 @@
         "预览指向素材库接口": true,
         "拿到 asset_id": true,
         "无错误提示": true,
+        "素材库里真的有这条": true,
+        "素材库抽出了尺寸": true,
+        "预处理写入了描述": true,
+        "预处理写入了标签": true,
+        "前端拿到标签": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -241,17 +443,47 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_6f4be6787813/preview",
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_a2a38e4291b0/preview",
+          "/api/assets/asset_67731a17b7ca/preview",
+          "/api/assets/asset_ed3190b5780c/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_6f4be6787813",
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_a2a38e4291b0",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_67731a17b7ca",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_ed3190b5780c",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 390,
         "docClientW": 390,
@@ -273,15 +505,35 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_67731a17b7ca/preview",
+          "/api/assets/asset_ed3190b5780c/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_67731a17b7ca",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_ed3190b5780c",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 390,
         "docClientW": 390,
@@ -324,29 +576,119 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_114dfc6bfcaf/preview",
-          "/api/assets/asset_f645dadb645a/preview",
-          "/api/assets/asset_7d94481d99de/preview",
-          "/api/assets/asset_366c620c285d/preview",
-          "/api/assets/asset_2d4dccd6f4a8/preview",
-          "/api/assets/asset_58e0d7507f36/preview",
-          "/api/assets/asset_e8fa84567681/preview",
-          "/api/assets/asset_0e4253fa050b/preview",
-          "/api/assets/asset_164bf19bb58d/preview"
+          "/api/assets/asset_c370204f234d/preview",
+          "/api/assets/asset_5267f540fec9/preview",
+          "/api/assets/asset_7c6c31c8170c/preview",
+          "/api/assets/asset_eb7d50dc5906/preview",
+          "/api/assets/asset_55666b2dbe52/preview",
+          "/api/assets/asset_bf59c17bab2a/preview",
+          "/api/assets/asset_f6664081915c/preview",
+          "/api/assets/asset_779b816726fc/preview",
+          "/api/assets/asset_623026b74f09/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "btnVisible": true,
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_114dfc6bfcaf",
-          "asset_f645dadb645a",
-          "asset_7d94481d99de",
-          "asset_366c620c285d",
-          "asset_2d4dccd6f4a8",
-          "asset_58e0d7507f36",
-          "asset_e8fa84567681",
-          "asset_0e4253fa050b",
-          "asset_164bf19bb58d"
+          {
+            "asset_id": "asset_c370204f234d",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_5267f540fec9",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_7c6c31c8170c",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_eb7d50dc5906",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_55666b2dbe52",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_bf59c17bab2a",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_f6664081915c",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_779b816726fc",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_623026b74f09",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 390,
         "docClientW": 390,
@@ -392,17 +734,43 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_d8257c554dff/preview"
+          "/api/assets/asset_44c47dc76449/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_d8257c554dff"
+          {
+            "asset_id": "asset_44c47dc76449",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 1280,
         "docClientW": 1280,
         "bodyScrollW": 1280
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "width": 120,
+        "height": 90,
+        "mime": "image/png",
+        "analysis_text": "**【主体人物】**\n一位穿着深蓝色风衣的年轻女性，独自站在桥上。\n\n**【场景与环境】**\n雨夜的石桥，远处是城市的霓虹灯海，水面倒映着斑斓的光。\n\n**【光线与色彩】**\n冷色调为主，紫蓝与橙黄交织，霓虹在湿漉漉的桥面上拉出长长的光带。",
+        "tags": [
+          "主体人物",
+          "光线与色彩",
+          "冷色调为主",
+          "场景与环境",
+          "独自站在桥上",
+          "雨夜的石桥"
+        ]
       },
       "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-02-one-uploaded.png",
       "checks": {
@@ -411,6 +779,11 @@
         "预览指向素材库接口": true,
         "拿到 asset_id": true,
         "无错误提示": true,
+        "素材库里真的有这条": true,
+        "素材库抽出了尺寸": true,
+        "预处理写入了描述": true,
+        "预处理写入了标签": true,
+        "前端拿到标签": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -422,17 +795,47 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_6f4be6787813/preview",
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_c5696c28439f/preview",
+          "/api/assets/asset_d9c4bbb44c81/preview",
+          "/api/assets/asset_249554f3557b/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_6f4be6787813",
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_c5696c28439f",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_d9c4bbb44c81",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_249554f3557b",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 1280,
         "docClientW": 1280,
@@ -454,15 +857,35 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_f93f813922e3/preview",
-          "/api/assets/asset_9ed9c3b057b4/preview"
+          "/api/assets/asset_d9c4bbb44c81/preview",
+          "/api/assets/asset_249554f3557b/preview"
         ],
         "error": "",
         "btnVisible": true,
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_f93f813922e3",
-          "asset_9ed9c3b057b4"
+          {
+            "asset_id": "asset_d9c4bbb44c81",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_249554f3557b",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 1280,
         "docClientW": 1280,
@@ -505,29 +928,119 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_114dfc6bfcaf/preview",
-          "/api/assets/asset_f645dadb645a/preview",
-          "/api/assets/asset_7d94481d99de/preview",
-          "/api/assets/asset_366c620c285d/preview",
-          "/api/assets/asset_2d4dccd6f4a8/preview",
-          "/api/assets/asset_58e0d7507f36/preview",
-          "/api/assets/asset_e8fa84567681/preview",
-          "/api/assets/asset_0e4253fa050b/preview",
-          "/api/assets/asset_164bf19bb58d/preview"
+          "/api/assets/asset_70dcd6910238/preview",
+          "/api/assets/asset_09f2b2f01f75/preview",
+          "/api/assets/asset_068568e4b8ec/preview",
+          "/api/assets/asset_b8c5bddebaf5/preview",
+          "/api/assets/asset_96e61ee0bea6/preview",
+          "/api/assets/asset_728063d500f7/preview",
+          "/api/assets/asset_0fc2c0b64926/preview",
+          "/api/assets/asset_7ebe424dece3/preview",
+          "/api/assets/asset_1ebba95e4982/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "btnVisible": true,
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
-          "asset_114dfc6bfcaf",
-          "asset_f645dadb645a",
-          "asset_7d94481d99de",
-          "asset_366c620c285d",
-          "asset_2d4dccd6f4a8",
-          "asset_58e0d7507f36",
-          "asset_e8fa84567681",
-          "asset_0e4253fa050b",
-          "asset_164bf19bb58d"
+          {
+            "asset_id": "asset_70dcd6910238",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_09f2b2f01f75",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_068568e4b8ec",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_b8c5bddebaf5",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_96e61ee0bea6",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_728063d500f7",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_0fc2c0b64926",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_7ebe424dece3",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          },
+          {
+            "asset_id": "asset_1ebba95e4982",
+            "tags": [
+              "主体人物",
+              "光线与色彩",
+              "冷色调为主",
+              "场景与环境",
+              "独自站在桥上",
+              "雨夜的石桥"
+            ]
+          }
         ],
         "docScrollW": 1280,
         "docClientW": 1280,
@@ -547,55 +1060,159 @@
   "console_errors": [],
   "cleaned_assets": [
     {
-      "asset_id": "asset_0e4253fa050b",
+      "asset_id": "asset_00b5de16132d",
       "status": 200
     },
     {
-      "asset_id": "asset_114dfc6bfcaf",
+      "asset_id": "asset_068568e4b8ec",
       "status": 200
     },
     {
-      "asset_id": "asset_164bf19bb58d",
+      "asset_id": "asset_099f0d7509f4",
       "status": 200
     },
     {
-      "asset_id": "asset_2d4dccd6f4a8",
+      "asset_id": "asset_09f2b2f01f75",
       "status": 200
     },
     {
-      "asset_id": "asset_366c620c285d",
+      "asset_id": "asset_0fc2c0b64926",
       "status": 200
     },
     {
-      "asset_id": "asset_58e0d7507f36",
+      "asset_id": "asset_1d1223c53cc6",
       "status": 200
     },
     {
-      "asset_id": "asset_6f4be6787813",
+      "asset_id": "asset_1ebba95e4982",
       "status": 200
     },
     {
-      "asset_id": "asset_7d94481d99de",
+      "asset_id": "asset_249554f3557b",
       "status": 200
     },
     {
-      "asset_id": "asset_9ed9c3b057b4",
+      "asset_id": "asset_2c12f6883bbb",
       "status": 200
     },
     {
-      "asset_id": "asset_d8257c554dff",
+      "asset_id": "asset_44c47dc76449",
       "status": 200
     },
     {
-      "asset_id": "asset_e8fa84567681",
+      "asset_id": "asset_5267f540fec9",
       "status": 200
     },
     {
-      "asset_id": "asset_f645dadb645a",
+      "asset_id": "asset_55666b2dbe52",
       "status": 200
     },
     {
-      "asset_id": "asset_f93f813922e3",
+      "asset_id": "asset_55a5a6387280",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_623026b74f09",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_6308bc517c87",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_67731a17b7ca",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_704958257dfc",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_70dcd6910238",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_71188d908c15",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_728063d500f7",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_7710e4abae10",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_779b816726fc",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_7c6c31c8170c",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_7d868a6a65bd",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_7ebe424dece3",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_814be5aba0ff",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_96e61ee0bea6",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_a2a38e4291b0",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_b4b725a85c02",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_b8c5bddebaf5",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_bf59c17bab2a",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_c370204f234d",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_c5696c28439f",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_d9c4bbb44c81",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_dbe5797170c2",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_eb7d50dc5906",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_ed3190b5780c",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_f29cf6fd0e6c",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_f6664081915c",
       "status": 200
     }
   ],
