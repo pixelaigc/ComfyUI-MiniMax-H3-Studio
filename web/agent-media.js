@@ -314,20 +314,37 @@
 
   // 生成任务卡要展示的「实际生效参数」列表。
   // 返回 [{key, label, value, fallback, note}]
-  function effectiveParams(mode, params) {
+  //
+  // 【2026-11-11】分辨率 / 比例改用**服务端算好的 resolution_info**。
+  // 原来这里读的是 params.resolution（档位字符串），而：
+  //   * 文生视频新面板根本不写这个字段 -> 恒为遗留默认 "544p"；
+  //   * 档位字符串还原不出真实像素（"1mp" 在 16:9 / 1:1 / 21:9 下各不相同）。
+  // 服务端已按「产物实际像素优先」算好标签，这里直接用；
+  // 服务端没给（旧版本）时退回原来的档位语义，保证不空。
+  function effectiveParams(mode, params, job) {
     params = params || {};
     const out = [];
 
-    const aspect = resolveAspect(mode, params.aspect);
-    if (aspect.value) {
-      out.push({ key: "aspect", label: "比例", value: aspect.value,
-                 fallback: aspect.fallback, note: aspect.note });
-    }
-
-    const res = resolveResolution(mode, params.resolution);
-    if (res.value) {
-      out.push({ key: "resolution", label: "分辨率", value: res.value,
-                 fallback: res.fallback, note: res.note });
+    const info = job && job.resolution_info;
+    if (info && info.has_size) {
+      // 有真实尺寸 -> 比例与分辨率都按实际像素来
+      if (info.aspect) {
+        out.push({ key: "aspect", label: "比例", value: info.aspect,
+                   fallback: false, note: "" });
+      }
+      out.push({ key: "resolution", label: "分辨率", value: info.label,
+                 fallback: false, note: info.note || "" });
+    } else {
+      const aspect = resolveAspect(mode, params.aspect);
+      if (aspect.value) {
+        out.push({ key: "aspect", label: "比例", value: aspect.value,
+                   fallback: aspect.fallback, note: aspect.note });
+      }
+      const res = resolveResolution(mode, params.resolution);
+      if (res.value) {
+        out.push({ key: "resolution", label: "分辨率", value: res.value,
+                   fallback: res.fallback, note: res.note });
+      }
     }
 
     const dur = resolveDuration(mode, params);

@@ -2781,6 +2781,83 @@ function batchCaret(open) {
   return open ? "▼" : "▶";
 }
 
+// ---------- 分辨率 / 比例标签（前端兜底） ----------
+//
+// 【与后端 h3studio/reso_label.py 的关系】
+// 后端已经在 /api/jobs 的每条任务里下发 `resolution_info`（唯一真源）。
+// 这个函数只在**服务端是旧版本**（没有该字段）时兜底 ——
+// 此时还没有产物实际像素可用，就按请求的 width/height 算。
+//
+// 【为什么不能继续读 params.resolution】
+// 它是个**档位字符串**（"544p" / "1mp"），与像素是两条独立的语义：
+// 同一个 "1mp" 在 16:9 下是 1360×768、1:1 下是 1024×1024、21:9 下是 1568×672。
+// 文生视频新面板压根不写这个字段，它永远停在遗留默认值 "544p" ——
+// 于是实际跑 1344×768 的任务，卡片显示成「544p · 16:9」。
+const RESO_KNOWN_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
+// 比例匹配容差 = max(固定容差, 量化步长 / 短边)。
+//
+// 量化误差来自「宽高各自吸附到 16/32 的倍数」：短边越小，
+// 同一个名义比例算出来的真实比例偏差越大。
+// 例：16:9 的 0.2MP 预设 608×352，真实比例 1.727，
+// 相对名义 1.778 差 2.8% —— 超过固定 2% 就会被误判成 19:11。
+const RESO_ASPECT_TOLERANCE = 0.02;
+const RESO_ASPECT_QUANTUM = 32;
+
+function resoTierLabel(w, h) {
+  // 档位名 = 短边像素，**原样用**不四舍五入。
+  // 官方预设的短边是 352/416/480/544/608/640/672/736/768 ——
+  // 其中 416/544/608/736/768 都不是 10 的倍数，
+  // 四舍五入会让 768 变成 770，与面板自己的预设标签对不上。
+  return `${Math.min(w, h)}p`;
+}
+
+function resoAspectLabel(w, h, preferred) {
+  const short = Math.min(w, h);
+  const tolerance = Math.max(RESO_ASPECT_TOLERANCE, RESO_ASPECT_QUANTUM / short);
+  const actual = w / h;
+  const candidates = [];
+  for (const name of RESO_KNOWN_ASPECTS) {
+    const [wr, hr] = name.split(":").map(Number);
+    const err = Math.abs(actual - wr / hr) / (wr / hr);
+    if (err <= tolerance) candidates.push({ err, name });
+  }
+  if (candidates.length) {
+    // 请求的比例优先（只要也在容差内）—— 量化误差不该改写用户的意图
+    if (preferred) {
+      const hit = candidates.find(c => c.name === preferred);
+      if (hit) return hit.name;
+    }
+    candidates.sort((a, b) => a.err - b.err);
+    return candidates[0].name;
+  }
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  const d = gcd(w, h) || 1;
+  return `${w / d}:${h / d}`;
+}
+
+// 按请求参数算标签（没有产物实际像素时的兜底）。
+function localResolutionInfo(p) {
+  p = p || {};
+  const w = Number(p.width) || 0;
+  const h = Number(p.height) || 0;
+  if (!w || !h) {
+    // 两个尺寸都没有 -> 只把请求的档位/比例原样带出，不编造尺寸
+    const tier = String(p.resolution || "");
+    const aspect = String(p.aspect || "");
+    return {
+      label: [tier, aspect].filter(Boolean).join(" · "),
+      note: "", hasSize: false, width: null, height: null,
+    };
+  }
+  const tier = resoTierLabel(w, h);
+  const aspect = resoAspectLabel(w, h, String(p.aspect || ""));
+  return {
+    label: `${tier} · ${w}×${h} · ${aspect}`,
+    note: "", hasSize: true, width: w, height: h,
+    tier, aspect, pixels: `${w}×${h}`,
+  };
+}
+
 // 把折叠状态落到 DOM：标题行 class/aria + 网格 hidden
 function applyBatchesState(card, open) {
   const btn = card.querySelector('[data-act="toggle-batches"]');
@@ -2826,7 +2903,17 @@ function renderJobBatches(job) {
     </div>`;
   }).join("");
   // 标题行摘要：完成/失败数 + 出图尺寸 —— 折叠时也能一眼看出里面是什么
-  const size = p.width && p.height ? ` · ${p.width}×${p.height}` : "";
+  //
+  // 【2026-11-11】尺寸取**批次产物里的实际像素**（服务端已把 width/height
+  // 写进 outputs 条目），没有就退回请求的 width/height。
+  // 原来只看请求值 —— 走放大链时请求 2560×1400、实际出 2560×1408，
+  // 摘要会写错。
+  let size = "";
+  for (const batch of batches) {
+    const hit = (batch.outputs || []).find(o => o && o.width && o.height);
+    if (hit) { size = ` · ${hit.width}×${hit.height}`; break; }
+  }
+  if (!size && p.width && p.height) size = ` · ${p.width}×${p.height}`;
   return `<button type="button" class="job-batches-toggle ${open ? "open" : ""}" data-act="toggle-batches" aria-expanded="${open ? "true" : "false"}">
       <span class="caret">${batchCaret(open)}</span> 批次结果（${summary}${size}）
     </button>
@@ -2838,6 +2925,20 @@ function jobCard(job) {
   const info = MODE_INFO[job.mode] || { name: job.mode };
   const card = document.createElement("div");
   card.className = "job-card";
+  // ---- 分辨率 / 比例标签（服务端算好的唯一真源）----
+  //
+  // 【2026-11-11 修复】原来这里直接渲染 `p.resolution`（档位字符串），
+  // 而文生视频新面板**根本不写这个字段** —— 它写的是 width/height，
+  // 于是 params.resolution 永远停在遗留默认值 "544p"：
+  //   实际跑 1344×768，卡片却显示「544p · 16:9」（544p 不是 1344×768
+  //   的任何合法档位）。
+  // 现在：优先用服务端下发的 resolution_info（它以**产物实际像素**为准）；
+  // 服务端是旧版本（没这个字段）时，本地按同样规则兜底算一次。
+  const reso = job.resolution_info || localResolutionInfo(p);
+  const resoRow = escapeHtml(reso.label || "—");
+  const resoNote = reso.note
+    ? `<div class="row reso-note"><span>尺寸差异</span><b>${escapeHtml(reso.note)}</b></div>`
+    : "";
   const runningOrQueued = ["queued", "running"].includes(job.status);
   const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
   const pctText = job.status === "queued" ? "排队中…"
@@ -2879,7 +2980,8 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
-      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
+      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
+      ${resoNote}
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
@@ -2888,7 +2990,8 @@ function jobCard(job) {
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
-      <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
+      <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
+      ${resoNote}
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
       <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
