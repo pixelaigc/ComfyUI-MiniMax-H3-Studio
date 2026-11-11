@@ -517,7 +517,22 @@ def main():
                 if locate_btn:
                     target_job = locate_btn.get_attribute("data-job-id")
                     locate_btn.click()
-                    page.wait_for_timeout(2500)
+                    # 等定位链路走完（跳页 + 拉数据 + 渲染卡片 + 高亮）。
+                    #
+                    # 【为什么要轮询等而不是 sleep 固定时长 —— 2026-11-12 踩过】
+                    # 定位是异步链路：切页 -> fetch /api/jobs -> 渲染卡片 -> 加高亮 class。
+                    # 固定 sleep 会在慢机器上「查得太早」（高亮还没加上），
+                    # 或者在快机器上「查得太晚」（高亮已经撤掉）—— 两种都是假失败。
+                    # 轮询等高亮出现，是唯一稳的判据。
+                    highlighted = False
+                    try:
+                        page.wait_for_function(
+                            """(jid) => !!document.querySelector(
+                                '.job-card.is-located[data-jid="' + jid + '"]')""",
+                            arg=target_job or "", timeout=12000)
+                        highlighted = True
+                    except Exception:
+                        highlighted = False
                     # 生成页应该可见
                     jobs_visible = page.evaluate(
                         "() => { const el = document.querySelector('#jobsArea');"
@@ -530,16 +545,20 @@ def main():
                     check(f"[{width}] 定位填入任务 id 筛选", target_job in kw,
                           f"keyword={kw} target={target_job}")
                     # 目标卡片被高亮
-                    highlighted = page.evaluate(
-                        """(jid) => !!document.querySelector(
-                            '.job-card.is-located[data-jid="' + jid + '"]')""",
-                        target_job or "")
                     check(f"[{width}] 定位高亮目标任务卡片", highlighted,
                           f"job={target_job}")
                     page.screenshot(path=str(SHOTS / f"artifact-located-{width}.png"))
                     # 定位那步切到了生成库 —— 要回 Agent 页才能继续后面的步骤
                     # （产物面板在 Agent 页里，生成库页面上点不到它）。
-                    page.click("#navAgent")
+                    #
+                    # 【为什么用 JS 点击而不是 page.click —— 2026-11-12 踩过】
+                    # 375/390px 下左侧导航是**折叠抽屉**（#sidebar 收在屏幕外），
+                    # #navAgent 虽然「可见」但**在视口外**，
+                    # page.click 会一直 retry 到 30 秒超时。
+                    # 直接调元素的 .click() 走的是同一套事件处理，不受视口限制。
+                    page.evaluate(
+                        "() => { const el = document.querySelector('#navAgent');"
+                        " if (el) el.click(); }")
                     page.wait_for_timeout(700)
                 else:
                     check(f"[{width}] 产物有定位按钮（可点）", False,

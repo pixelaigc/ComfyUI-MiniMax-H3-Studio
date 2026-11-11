@@ -3343,12 +3343,22 @@ let pendingLocateTimer = null;
 // 免得「定位」这个一次性动作留下一个永久挂着的定时器。
 const LOCATE_TIMEOUT_MS = 8000;
 
+// 定位命中后的高亮持续时长（毫秒）。
+//
+// 【为什么是 4 秒而不是 2.5 秒 —— 2026-11-12 实测】
+// 用户点「在生成库中定位」之后，页面要跳页 + 拉数据 + 渲染卡片，
+// 等他真正看清那张卡片时可能已经过去 2-3 秒了。
+// 高亮只闪 2.5 秒的话，用户第一眼看到的往往是「已经不高亮了」——
+// 等于白做。
+const LOCATE_FLASH_MS = 4000;
+
 // 高亮样式挂到 .job-card 上（见 style.css 的 .job-card.is-located）。
 function flashLocatedCard(card) {
   if (!card) return;
   card.classList.add("is-located");
-  // 2.5 秒后撤掉高亮 —— 高亮是「刚才定位到这」的提示，不该一直挂着。
-  setTimeout(() => card.classList.remove("is-located"), 2500);
+  // 高亮是「刚才定位到这」的提示，不该一直挂着；
+  // 但也不能太短（见 LOCATE_FLASH_MS 的说明）。
+  setTimeout(() => card.classList.remove("is-located"), LOCATE_FLASH_MS);
   try {
     card.scrollIntoView({block: "center", behavior: "smooth"});
   } catch (e) {
