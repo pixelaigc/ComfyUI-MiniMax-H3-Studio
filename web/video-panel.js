@@ -247,6 +247,25 @@
   }
 
   // ------------------------------------------------------------ 模型
+  //
+  // 【2026-11-11 改造】下拉的每一项都由**服务端下发的数据**驱动：
+  //   * 能不能选 —— 服务端用 ComfyUI 的模型列表 API 判定的 status
+  //     （available / external_missing / missing / unknown）；
+  //   * 显示什么 —— 服务端算好的 status_note（如实说明，不是写死常量）。
+  //
+  // 原来这里只认 `m.available`，且红字取自静态的 `m.warn` —— 那句
+  // 「盘未挂载时 ComfyUI 下拉里根本没有这个名字」是**写死的常量**，
+  // 在盘已挂载、ComfyUI 已收录权重的情况下依然整句显示，
+  // 让用户误以为「获取不到模型」（用户 2026-11-11 报的缺陷）。
+
+  /** 模型项在下拉里的显示文案：不可用时追加**如实**的状态后缀。 */
+  function modelOptionLabel(m) {
+    const status = m.status || (m.available === false ? "missing" : "available");
+    if (status === "available") return m.label;
+    if (status === "external_missing") return m.label + "（外置未挂载，当前不可选）";
+    if (status === "unknown") return m.label + "（未能确认，可用性未知）";
+    return m.label + "（权重缺失，不可用）";
+  }
 
   function renderModelSelect() {
     const sel = document.getElementById("vidModelSelect");
@@ -255,19 +274,28 @@
     Object.entries(VIDEO_OPTIONS.models).forEach(([key, m]) => {
       const opt = document.createElement("option");
       opt.value = key;
-      const unavailable = m.available === false;
-      opt.textContent = unavailable
-        ? m.label + "（权重缺失，不可用）" : m.label;
+      const status = m.status || (m.available === false ? "missing" : "available");
+      const unavailable = status !== "available";
+      opt.textContent = modelOptionLabel(m);
       opt.disabled = unavailable;
       opt.selected = key === videoState.model;
+      // title 里带上**真实**的权重文件名与状态，便于排查
+      opt.title = `${m.unet || ""}${m.status_note ? "\n" + m.status_note : ""}`;
       sel.appendChild(opt);
     });
-    // 当前选中的模型不可用 -> 回落到默认
+    // 当前选中的模型不可用 -> 回落到**第一个可用**的模型
     const model = currentModel();
-    if (!model || model.available === false) {
-      const fallback = VIDEO_OPTIONS.models[VIDEO_OPTIONS.default_model];
-      if (fallback) {
-        videoState.model = VIDEO_OPTIONS.default_model;
+    const curStatus = model
+      ? (model.status || (model.available === false ? "missing" : "available"))
+      : "missing";
+    if (!model || curStatus !== "available") {
+      const fallbackKey = Object.keys(VIDEO_OPTIONS.models).find(k => {
+        const m = VIDEO_OPTIONS.models[k];
+        const st = m.status || (m.available === false ? "missing" : "available");
+        return st === "available";
+      }) || VIDEO_OPTIONS.default_model;
+      if (fallbackKey && VIDEO_OPTIONS.models[fallbackKey]) {
+        videoState.model = fallbackKey;
         sel.value = videoState.model;
       }
     }
@@ -283,13 +311,55 @@
       if (warn) warn.textContent = "";
       return;
     }
+    const status = model.status
+      || (model.available === false ? "missing" : "available");
     if (note) {
       const bits = [model.note || ""];
       if (model.size_mb) bits.push(`本机体积 ${(model.size_mb / 1024).toFixed(1)} GB`);
       if (model.location) bits.push(`位置 ${model.location}`);
       note.textContent = bits.filter(Boolean).join(" · ");
     }
-    if (warn) warn.textContent = model.warn || "";
+    // 红字区域：**只显示当前真实状态**。
+    //   - status_note 是服务端按 ComfyUI 模型列表现算的，**不谎称**「获取不到模型」；
+    //   - 静态 warn 只保留与可用性无关的固有提醒（显存 / 兼容性）。
+    if (warn) {
+      const parts = [];
+      if (status !== "available" && model.status_note) {
+        parts.push(model.status_note);
+      } else if (status === "available" && model.comfy_listed === true) {
+        parts.push("已确认在 ComfyUI 模型列表中可用。");
+      }
+      if (model.warn) parts.push(model.warn);
+      warn.textContent = parts.join(" ");
+    }
+  }
+
+  /**
+   * 模型清单的来源说明（显示在模型区顶部）。
+   * 「下拉里为什么少了一个模型」永远有答案：
+   *   - 正常：清单来自 ComfyUI 的模型列表 API（带条目数）
+   *   - 降级：连不上 ComfyUI，如实说明当前用的是磁盘扫描 + 原因
+   */
+  function renderModelSourceNote() {
+    const box = document.getElementById("vidModelSourceNote");
+    if (!box) return;
+    const src = VIDEO_OPTIONS.model_list_source;
+    const counts = VIDEO_OPTIONS.model_list_counts || {};
+    if (src === "comfyui_api") {
+      const n = counts.diffusion_models || 0;
+      const l = counts.loras || 0;
+      box.textContent = `清单来源：ComfyUI 模型列表 API（${n} 个扩散模型 / ${l} 个 LoRA）`;
+      box.className = "img-note";
+      box.hidden = false;
+      return;
+    }
+    const err = VIDEO_OPTIONS.model_list_error || "未知原因";
+    // 原因可能很长（三个接口各一条）—— 界面上只留第一条 + 截断，
+    // 完整原因在 /api/video-options 的 model_list_error 里。
+    const short = err.split("；")[0].slice(0, 160);
+    box.textContent = `未能连上 ComfyUI 模型列表（${short}）—— 当前清单来自本机磁盘扫描，可用性可能与 ComfyUI 下拉框不一致。`;
+    box.className = "img-warn";
+    box.hidden = false;
   }
 
   // ------------------------------------------------------------ 加速 LoRA
@@ -544,6 +614,7 @@
 
   function renderVideoPanel() {
     if (!optionsReady) return;
+    renderModelSourceNote();
     renderModelSelect();
     renderAspectChips();
     renderSizePresetSelect();

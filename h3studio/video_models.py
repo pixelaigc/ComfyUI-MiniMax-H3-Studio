@@ -22,10 +22,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import struct
 from pathlib import Path
+
+from . import comfy_models
 
 # ------------------------------------------------------------------
 # 尺寸约束（实测依据）
@@ -123,8 +126,16 @@ VIDEO_MODELS: dict[str, dict] = {
         "note": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。"
                 "剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由"
                 "ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。",
-        "warn": "权重在外接盘 /mnt/nvme1t_colorful —— 盘未挂载时 ComfyUI 下拉里"
-                "根本没有这个名字，提交会被拒绝。",
+        # 【2026-11-11 改造】原来这里写死了一句
+        #   「权重在外接盘 /mnt/nvme1t_colorful —— 盘未挂载时 ComfyUI 下拉里
+        #     根本没有这个名字，提交会被拒绝。」
+        # 那是个**条件句**（"盘未挂载时"），但因为是写死的常量，它在盘
+        # **已经挂载、ComfyUI 早就收录了该权重**的情况下依然整句红字显示，
+        # 让用户以为「获取不到模型」（用户 2026-11-11 报的就是这个）。
+        #
+        # 现在：静态字段只放**与可用性无关**的固有属性；
+        # 「能不能选」一律由 ComfyUI 的模型列表 API 现算（见 list_models()
+        # 里的 status 字段），盘没挂载时才会显示「外置未挂载，当前不可选」。
     },
     "fl2va_int8": {
         "label": "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
@@ -182,7 +193,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "cfg": 1.0,
         "note": "把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。"
                 "Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。",
-        "warn": "外接盘权重；参考通道（Ref2VA）在文生视频面板里不暴露。",
+        "warn": "参考通道（Ref2VA）在文生视频面板里不暴露。",
     },
 }
 VIDEO_DEFAULT_MODEL = "fl2va_pruned_int8"
@@ -643,14 +654,264 @@ def find_weight(name: str, kind: str = "diffusion_models") -> Path | None:
 
 
 def model_available(model_key: str) -> bool:
-    model = VIDEO_MODELS.get(model_key)
-    if not model:
-        return False
-    return find_weight(model["unet"]) is not None
+    """底模在本机是否可用（**以 ComfyUI 的模型列表为准**）。
+
+    【2026-11-11 改造】原来这里只扫盘（`find_weight`），跟 ComfyUI 的
+    下拉框**没有必然关系** —— 磁盘上有的文件，ComfyUI 未必扫得到
+    （extra_model_paths.yaml 没配 / 目录类型不匹配 / 缓存未刷新），
+    反之 ComfyUI 扫到的也未必在我们写死的这几个目录里。
+
+    现在：**先问 ComfyUI**（`/models/diffusion_models` + `UNETLoader`
+    的 `unet_name` 枚举，两者交叉验证），ComfyUI 不可达时才退回扫盘。
+
+    实现上是 `model_status()` 的薄封装 —— **只有一个判据**，
+    面板（list_models）与提交校验（normalize_t2v_params）都走它，
+    所以不会出现「下拉显示 A、提交用 B」。
+
+    见 h3studio/comfy_models.py 的模块说明。
+    """
+    return model_status(model_key) == "available"
 
 
 def lora_available(name: str) -> bool:
-    return find_weight(name, kind="loras") is not None
+    """加速 LoRA 在本机是否可用（同样以 ComfyUI 的 `/models/loras` 为准）。"""
+    return _lora_available(name, comfy_snapshot())
+
+
+# ------------------------------------------------------------------
+# ComfyUI 模型清单快照（availability 的**权威来源**）
+# ------------------------------------------------------------------
+#
+# 【为什么要一个「快照」而不是每次都问】
+#   list_models() 要给 5 个底模 + 8 个 LoRA 各判一次可用性。
+#   逐个问 ComfyUI 就是几十次 HTTP —— 面板每次打开都打一遍太浪费。
+#   所以：一次拉，缓存成快照，全部分析共用同一份事实。
+#
+# 【快照里有什么】
+#   * unets   —— `/models/diffusion_models` 的全部条目（目录视角）
+#   * unet_enum —— `UNETLoader.unet_name` 的可选值（节点视角）
+#   * loras   —— `/models/loras` 的全部条目
+#   两个 unet 视角做**交叉验证**：任一视角认这个名字就算在。
+#   （实测本机两者完全一致，各 151 条。）
+#
+# 【拿不到时怎么办】
+#   返回 None -> 上面的 model_available / lora_available 退回扫盘，
+#   并且 list_models() 会在 payload 里标 model_list_source=
+#   "filesystem_fallback" + model_list_error=原因，让前端如实显示。
+
+
+class ComfyModelSnapshot:
+    """ComfyUI 当前可用模型清单的一次快照。"""
+
+    __slots__ = ("unets", "unet_enum", "loras", "error", "fetched_at")
+
+    def __init__(self,
+                 unets: list[str] | None = None,
+                 unet_enum: list[str] | None = None,
+                 loras: list[str] | None = None,
+                 error: str = "",
+                 fetched_at: float = 0.0):
+        self.unets = list(unets or [])
+        self.unet_enum = list(unet_enum or [])
+        self.loras = list(loras or [])
+        self.error = error
+        self.fetched_at = fetched_at
+
+    @property
+    def ok(self) -> bool:
+        return not self.error
+
+    def has_unet(self, name: str) -> bool:
+        """这个名字在 ComfyUI 的 UNET 下拉框里吗？
+
+        两个视角取**并集** —— 只要任一视角认，就算 ComfyUI 能选。
+        （目录视角漏了但节点枚举有 -> 仍可选，反之亦然。）
+        """
+        if not name:
+            return False
+        return name in set(self.unets) or name in set(self.unet_enum)
+
+    def has_lora(self, name: str) -> bool:
+        if not name:
+            return False
+        return name in set(self.loras)
+
+    def missing_unets(self) -> list[str]:
+        """ComfyUI 两个视角都没认的底模权重名（诊断用）。"""
+        pool = set(self.unets) | set(self.unet_enum)
+        out = []
+        for meta in VIDEO_MODELS.values():
+            name = meta["unet"]
+            if name not in pool and name not in out:
+                out.append(name)
+        return out
+
+
+#: 快照缓存（模块级）。面板每次打开 /api/video-options 时刷新。
+_SNAPSHOT: ComfyModelSnapshot | None = None
+_SNAPSHOT_TS = 0.0
+
+
+def comfy_base_url() -> str:
+    """ComfyUI 地址（与 server.py 的 COMFY 同一来源）。
+
+    优先读环境变量 H3STUDIO_COMFY_URL，其次读 H3STUDIO_CONFIG 指向的
+    config.json 的 comfyui_url，最后退回本机默认 8188。
+
+    注意：server.py 的 COMFY 常量读的是**同目录**的 config.json
+    （CONFIG_PATH = BASE / "config.json"），而不是 H3STUDIO_CONFIG ——
+    所以这里也优先读同目录的 config.json，保持两边一致。
+    """
+    env = os.environ.get("H3STUDIO_COMFY_URL")
+    if env:
+        return env.rstrip("/")
+    # 候选配置：H3STUDIO_CONFIG 环境变量指向的，其次同目录的 config.json
+    candidates = []
+    env_cfg = os.environ.get("H3STUDIO_CONFIG")
+    if env_cfg:
+        candidates.append(Path(env_cfg))
+    candidates.append(Path(__file__).resolve().parent.parent / "config.json")
+    for path in candidates:
+        try:
+            if not path.is_file():
+                continue
+            raw = path.read_text(encoding="utf-8")
+            url = (json.loads(raw) or {}).get("comfyui_url")
+            if url:
+                return str(url).rstrip("/")
+        except Exception:
+            continue
+    return "http://127.0.0.1:8188"
+
+
+def refresh_comfy_snapshot(base_url: str | None = None,
+                           *,
+                           ttl: float = 20.0,
+                           force: bool = False,
+                           now: float | None = None) -> ComfyModelSnapshot:
+    """重新拉一次 ComfyUI 模型清单快照。
+
+    ComfyUI 不可达时**不抛异常** —— 返回一个带 error 的快照，
+    调用方据此退回扫盘并把原因如实带给前端。
+    """
+    global _SNAPSHOT, _SNAPSHOT_TS
+    import time as _time
+    stamp = _time.time() if now is None else now
+    if not force and _SNAPSHOT is not None and (stamp - _SNAPSHOT_TS) < ttl:
+        return _SNAPSHOT
+    url = (base_url or comfy_base_url()).rstrip("/")
+    unets: list[str] = []
+    unet_enum: list[str] = []
+    loras: list[str] = []
+    errors: list[str] = []
+    try:
+        unets = comfy_models.fetch_model_list(url, "diffusion_models")
+    except comfy_models.ComfyModelListError as exc:
+        errors.append(str(exc))
+    try:
+        loras = comfy_models.fetch_model_list(url, "loras")
+    except comfy_models.ComfyModelListError as exc:
+        errors.append(str(exc))
+    try:
+        unet_enum = comfy_models.fetch_object_info_enum(url, "UNETLoader",
+                                                        "unet_name")
+    except comfy_models.ComfyModelListError as exc:
+        errors.append(str(exc))
+    # 全军覆没才算「拿不到」；只挂了一个视角仍然可用（降级但有事实）
+    if not unets and not unet_enum and not loras:
+        snapshot = ComfyModelSnapshot(error="；".join(errors) or "ComfyUI 模型清单为空")
+    else:
+        snapshot = ComfyModelSnapshot(unets=unets, unet_enum=unet_enum,
+                                      loras=loras, error="", fetched_at=stamp)
+    _SNAPSHOT = snapshot
+    _SNAPSHOT_TS = stamp
+    return snapshot
+
+
+def comfy_snapshot(base_url: str | None = None,
+                   *,
+                   ttl: float = 20.0,
+                   force: bool = False) -> ComfyModelSnapshot | None:
+    """拿当前快照（必要时刷新）。拿不到 ComfyUI 时返回 None。"""
+    snapshot = refresh_comfy_snapshot(base_url, ttl=ttl, force=force)
+    return snapshot if snapshot.ok else None
+
+
+def comfy_snapshot_error() -> str:
+    """最近一次拿 ComfyUI 清单失败的原因（没有则空串）。"""
+    return _SNAPSHOT.error if _SNAPSHOT is not None else ""
+
+
+def reset_comfy_snapshot() -> None:
+    """清掉快照缓存（测试用）。"""
+    global _SNAPSHOT, _SNAPSHOT_TS
+    _SNAPSHOT = None
+    _SNAPSHOT_TS = 0.0
+    comfy_models.clear_cache()
+
+
+async def refresh_comfy_snapshot_async(base_url: str | None = None,
+                                       *,
+                                       ttl: float = 20.0,
+                                       force: bool = False,
+                                       timeout: float = 60.0) -> ComfyModelSnapshot:
+    """异步版快照刷新 —— **服务端必须用这个**。
+
+    【为什么不能直接用同步版】
+    同步版用 urllib 发 HTTP，在 aiohttp 的事件循环里**会阻塞整个
+    服务端**（直到 ComfyUI 回应）。而 ComfyUI 的
+    `/models/diffusion_models` 首次调用实测要 **43 秒**（它要递归扫
+    所有 extra_model_paths 目录）—— 那 43 秒里整个 Studio 的
+    状态流、其它 API 全都卡住。
+
+    所以服务端一律走 aiohttp（异步），并且**三个请求并发**发出去，
+    总耗时 = 最慢的那个，而不是三个加起来。
+
+    ComfyUI 不可达时**不抛异常** —— 返回带 error 的快照，
+    调用方据此退回扫盘并把原因如实带给前端。
+    """
+    global _SNAPSHOT, _SNAPSHOT_TS
+    import time as _time
+    stamp = _time.time()
+    if not force and _SNAPSHOT is not None and (stamp - _SNAPSHOT_TS) < ttl:
+        return _SNAPSHOT
+    url = (base_url or comfy_base_url()).rstrip("/")
+
+    from aiohttp import ClientSession, ClientTimeout
+
+    async def _one(coro, label):
+        """跑一个请求；失败返回 ([], 原因)，**不抛**（降级要拿到原因）。"""
+        try:
+            return await coro, ""
+        except comfy_models.ComfyModelListError as exc:
+            return [], f"{label}: {exc}"
+        except Exception as exc:  # noqa: BLE001 —— 任何意外都不该炸掉面板
+            return [], f"{label}: {type(exc).__name__}: {exc}"
+
+    async with ClientSession(timeout=ClientTimeout(total=timeout)) as session:
+        results = await asyncio.gather(
+            _one(comfy_models.fetch_model_list_async(
+                session, url, "diffusion_models"), "diffusion_models"),
+            _one(comfy_models.fetch_model_list_async(
+                session, url, "loras"), "loras"),
+            _one(comfy_models.fetch_object_info_enum_async(
+                session, url, "UNETLoader", "unet_name"), "UNETLoader"),
+        )
+    unets = results[0][0]
+    loras = results[1][0]
+    unet_enum = results[2][0]
+    errors = [results[0][1], results[1][1], results[2][1]]
+    errors = [e for e in errors if e]
+    # 全军覆没才算「拿不到」；只挂了一个视角仍然可用（降级但有事实）
+    if not unets and not unet_enum and not loras:
+        snapshot = ComfyModelSnapshot(
+            error="；".join(errors) or "ComfyUI 模型清单为空")
+    else:
+        snapshot = ComfyModelSnapshot(unets=unets, unet_enum=unet_enum,
+                                      loras=loras, error="", fetched_at=stamp)
+    _SNAPSHOT = snapshot
+    _SNAPSHOT_TS = stamp
+    return snapshot
 
 
 # ------------------------------------------------------------------
@@ -845,31 +1106,174 @@ def accel_lora_compat_matrix(model_key: str) -> dict[str, dict]:
 # ------------------------------------------------------------------
 # 下发给前端的清单
 # ------------------------------------------------------------------
-def list_models() -> list[dict]:
+#
+# 【可用性判定的唯一真相源：ComfyUI 的模型列表 API】
+#
+# 用户 2026-11-11 报缺陷：「文生视频」面板下方红字说
+# 「权重在外硬盘 /mnt/nvme1t_colorful —— 尚未挂载或 ComfyUI 下拉框确实没有
+#  这个单卡，提交会被拒绝」—— 这条结论是**错的**，因为：
+#
+#   1. 那行字是 `VIDEO_MODELS[...]["warn"]` 里**写死的常量**，
+#      跟实际可用性判定（`model_available()`）**没有任何关系**；
+#   2. `model_available()` 只扫盘，从没问过 ComfyUI「你下拉框里到底有啥」；
+#   3. 本机实测：外置盘**已挂载**（/dev/nvme2n1p1 -> /mnt/nvme1t_colorful），
+#      ComfyUI `/models/diffusion_models` 有 **151 条**，5 个 H3 FL2VA 权重
+#      **全在里面**（curl 证据见交付报告）。
+#
+# 所以现在改成：**问 ComfyUI 本人**。每个底模带三种状态之一：
+#
+#   status = "available"   ComfyUI 的下拉框里有这个权重 -> 可选
+#   status = "external_missing"
+#                          权重在外置盘但 ComfyUI 没扫到（盘没挂 / 没配
+#                          extra_model_paths / 缓存没刷新）-> **禁用**，
+#                          提示「外置未挂载，当前不可选」
+#   status = "missing"     文件在本机默认目录都找不到 -> 禁用
+#
+# 另加 status = "unknown"：ComfyUI 连不上（降级到扫盘），此时如实告诉
+# 用户「未能连上 ComfyUI 模型列表」，而不是谎称「获取不到模型」。
+
+#: 外置盘根目录（用来判断「这个权重是不是在外置盘上」）
+_EXTERNAL_ROOTS = ("/mnt/nvme1t_colorful", "/mnt/nvme232g",
+                   "/mnt/usb2t_toshiba", "/mnt/usb2t")
+
+
+def _is_external_location(location: str) -> bool:
+    """权重位置是否在外置盘上。"""
+    if not location:
+        return False
+    return any(location.startswith(root) for root in _EXTERNAL_ROOTS)
+
+
+def _model_status(key: str, meta: dict, snapshot: ComfyModelSnapshot | None) -> str:
+    """单个底模的可用状态。
+
+    返回：
+      available        —— ComfyUI 认它（权威），或降级时磁盘上有它
+      external_missing —— ComfyUI 不认，但磁盘上有（在**外置盘**上）-> 禁用
+      missing          —— ComfyUI 不认，磁盘上也没有 -> 禁用
+      unknown          —— ComfyUI 连不上且磁盘上也没有 -> 禁用
+    """
+    name = meta["unet"]
+    if snapshot is not None:
+        # ComfyUI 说有 -> 有（这是唯一权威）
+        if snapshot.has_unet(name):
+            return "available"
+        # ComfyUI 说没有 -> 看看文件在不在盘上，区分「外置没挂载」与「真没有」
+        if find_weight(name) is None:
+            return "missing"
+        return "external_missing"
+    # ComfyUI 不可达：退回扫盘。文件在 -> 仍可选（ComfyUI 恢复后照样能跑），
+    # 但**不能**声称「已确认在 ComfyUI 模型列表里」。
+    return "available" if find_weight(name) is not None else "unknown"
+
+
+def _status_note(key: str, meta: dict, status: str,
+                 snapshot: ComfyModelSnapshot | None) -> str:
+    """按状态给出**如实**的提示文案。
+
+    【硬约束】绝不能在 ComfyUI 已经收录该权重时显示「获取不到模型」
+    之类的断言 —— 那正是本次要修的 bug。
+    """
+    if status == "available":
+        if snapshot is not None and snapshot.has_unet(meta["unet"]):
+            return "ComfyUI 模型列表已收录该权重，可直接选用。"
+        return "本机磁盘扫描到该权重（当前未能连上 ComfyUI 模型列表，可用性待确认）。"
+    if status == "external_missing":
+        if _is_external_location(meta.get("location", "")):
+            return (f"权重位于外置盘 {meta.get('location') or ''}，"
+                    "但 ComfyUI 的模型列表里没有它 —— 外置盘可能未挂载或未扫描到，"
+                    "当前不可选。")
+        return (f"权重在 {meta.get('location') or '本机目录'}，"
+                "但 ComfyUI 的模型列表里没有它 —— 当前不可选。")
+    if status == "missing":
+        return (f"本机找不到权重 {meta['unet']}"
+                f"（{meta.get('location') or '未知目录'}）。")
+    return "未能连上 ComfyUI 模型列表，且本机磁盘也找不到该权重 —— 当前不可选。"
+
+
+def list_models(snapshot: ComfyModelSnapshot | None = None) -> list[dict]:
+    """下发给前端的底模清单（**数据驱动**：可用性来自 ComfyUI API）。
+
+    每条除原有的静态字段外，新增：
+      * status         —— available / external_missing / missing / unknown
+      * available      —— status == "available"（前端据此决定禁用与否）
+      * status_note    —— 按 status 现算的如实提示（**不是写死的常量**）
+      * comfy_listed   —— ComfyUI 的下拉框里是否有这个名字（布尔）
+      * on_external_disk —— 权重位置是否在外置盘
+    """
+    if snapshot is None:
+        snapshot = comfy_snapshot()
     out = []
     for key, model in VIDEO_MODELS.items():
         item = dict(model)
         item["key"] = key
-        item["available"] = model_available(key)
+        status = _model_status(key, model, snapshot)
+        item["status"] = status
+        item["available"] = status == "available"
+        item["comfy_listed"] = bool(snapshot.has_unet(model["unet"])) \
+            if snapshot is not None else None
+        item["on_external_disk"] = _is_external_location(model.get("location", ""))
+        item["status_note"] = _status_note(key, model, status, snapshot)
+        # 静态 warn 只保留**与可用性无关**的固有提醒（显存/兼容性）
+        item["warn"] = model.get("warn", "")
         out.append(item)
     return out
 
 
-def list_accel_loras() -> tuple[list[dict], list[dict]]:
-    """固定加速 LoRA（不进可勾选列表）+ 可勾选的加速 LoRA 组合。"""
+def list_accel_loras(snapshot: ComfyModelSnapshot | None = None
+                     ) -> tuple[list[dict], list[dict]]:
+    """固定加速 LoRA（不进可勾选列表）+ 可勾选的加速 LoRA 组合。
+
+    可用性同样以 ComfyUI 的 `/models/loras` 为准（实测 686 条）。
+    """
+    if snapshot is None:
+        snapshot = comfy_snapshot()
     fixed = []
     for key, meta in VIDEO_ACCEL_LORAS.items():
         item = dict(meta)
         item["key"] = key
-        item["available"] = lora_available(meta["name"])
+        item["available"] = _lora_available(meta["name"], snapshot)
         fixed.append(item)
     combos = []
     for key, meta in VIDEO_ACCEL_LORA_COMBOS.items():
         item = dict(meta)
         item["key"] = key
-        item["available"] = lora_available(meta["name"])
+        item["available"] = _lora_available(meta["name"], snapshot)
         combos.append(item)
     return fixed, combos
+
+
+def _lora_available(name: str, snapshot: ComfyModelSnapshot | None) -> bool:
+    if snapshot is not None:
+        return snapshot.has_lora(name)
+    return find_weight(name, kind="loras") is not None
+
+
+def model_status(model_key: str,
+                 snapshot: ComfyModelSnapshot | None = None) -> str:
+    """某个底模的当前状态（available / external_missing / missing / unknown）。
+
+    **面板与提交共用这一个判据** —— 保证「下拉里显示的」和「提交时用的」
+    是同一个结论，不会出现「下拉显示 A、提交被拒」。
+    """
+    meta = VIDEO_MODELS.get(model_key)
+    if meta is None:
+        return "unknown"
+    if snapshot is None:
+        snapshot = comfy_snapshot()
+    return _model_status(model_key, meta, snapshot)
+
+
+def model_status_note(model_key: str,
+                      snapshot: ComfyModelSnapshot | None = None) -> str:
+    """某个底模的如实状态说明（给界面显示）。"""
+    meta = VIDEO_MODELS.get(model_key)
+    if meta is None:
+        return "未知的视频模型。"
+    if snapshot is None:
+        snapshot = comfy_snapshot()
+    status = _model_status(model_key, meta, snapshot)
+    return _status_note(model_key, meta, status, snapshot)
 
 
 def list_attention_modes() -> list[dict]:
@@ -887,15 +1291,26 @@ def twopass_defaults() -> dict:
     return cfg
 
 
-def options_payload(node_available=None) -> dict:
+def options_payload(node_available=None,
+                    snapshot: ComfyModelSnapshot | None = None) -> dict:
     """GET /api/video-options 的响应体。
 
     node_available: 可选的回调 class_type -> bool，用来把「本机 ComfyUI
     里没有这个节点」的注意力选项标成不可用（而不是让用户选完才报错）。
+
+    【2026-11-11 新增 —— 模型清单来源的可追溯性】
+    payload 里多三个字段，前端据此如实告诉用户「清单从哪来」：
+      * model_list_source     "comfyui_api" | "filesystem_fallback"
+      * model_list_error      连不上 ComfyUI 时的原因（空串 = 一切正常）
+      * model_list_counts     {"diffusion_models": n, "loras": n}
+    这样「下拉里为什么没有某个模型」永远有答案，不会再出现
+    「界面说没有、API 说有」这种自相矛盾。
     """
-    fixed, combos = list_accel_loras()
+    if snapshot is None:
+        snapshot = comfy_snapshot()
+    fixed, combos = list_accel_loras(snapshot)
     payload = {
-        "models": list_models(),
+        "models": list_models(snapshot),
         "default_model": VIDEO_DEFAULT_MODEL,
         "fixed_accel_loras": fixed,
         "accel_lora_combos": combos,
@@ -920,6 +1335,16 @@ def options_payload(node_available=None) -> dict:
         "accel_lora_compat": {
             key: accel_lora_compat_matrix(key) for key in VIDEO_MODELS
         },
+        # ---- 模型清单来源（可追溯）----
+        "model_list_source": "comfyui_api" if snapshot is not None
+                             else "filesystem_fallback",
+        "model_list_error": "" if snapshot is not None else comfy_snapshot_error(),
+        "model_list_counts": {
+            "diffusion_models": len(snapshot.unets) if snapshot else 0,
+            "unet_enum": len(snapshot.unet_enum) if snapshot else 0,
+            "loras": len(snapshot.loras) if snapshot else 0,
+        },
+        "comfyui_url": comfy_base_url(),
     }
     if node_available:
         for item in payload["attention_modes"]:
