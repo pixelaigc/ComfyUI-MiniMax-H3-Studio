@@ -1456,6 +1456,29 @@
     _SSE_MAX_MS: SSE_MAX_MS,
     _JOB_POLL_MAX_MS: JOB_POLL_MAX_MS,
     _JOB_POLL_MAX_ERRORS: JOB_POLL_MAX_ERRORS,
+    // 2026-11-11：把一份「结果」渲染成一条消息（测试与验收用）。
+    //
+    // 【为什么需要】
+    // 「编造 job id 误报」的验收要看**用户真正看到的界面**：
+    // 红色「失败」标签、底部红条、任务卡与缩略图是否渲染。
+    // 直接构造 state 再调 renderMessages 会绕过 upsertJob / 轮询，
+    // 与真实 SSE 路径不等价 —— 所以这里走**与 SSE 完全相同**的
+    // applyStreamEvent 入口。
+    _injectRenderedMessage(result, eventName) {
+      const msg = {
+        role: "assistant",
+        content: "",
+        streaming: false,
+        tools: [],
+        jobs: [],
+        assets: [],
+        steps: [],
+      };
+      state.messages.push(msg);
+      applyStreamEvent(msg, eventName || "done", result || {});
+      renderMessages();
+      return msg;
+    },
   };
 
   // 页面卸载时**必须**断开 SSE —— 否则服务端那边的 Agent 还在跑，

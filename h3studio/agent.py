@@ -375,6 +375,21 @@ class AgentContext:
         self.no_tool_call = False
         #: 拦截的具体原因码（no_tool_call / fabricated_job_id）。
         self.no_tool_call_code = ""
+        #: 本次运行的**权威任务 id 集合**（来源：服务端 jobs 表）。
+        #:
+        #: 【为什么需要，2026-11-11 实测误报】
+        #: 「模型是否编造 job id」的判定**不能**只看 ctx.jobs
+        #: （= 本次运行工具链往内存里 append 的条目）：
+        #:   * 任务可能来自别的路径（面板点生成 / 另一个会话）
+        #:   * 任务行已提交但 Agent 进程还没拿到回执（异步落库延迟）
+        #: 这些情况下 ctx.jobs 为空，但任务**真的存在** ->
+        #: 把真实任务判成「编造」-> 用户看到红色「失败」标签。
+        #:
+        #: 所以额外维护一份**权威来源**（服务端 jobs 表查询），
+        #: 判定时两者取并集。
+        self.authoritative_job_ids: set[str] = set()
+        #: 本次运行的**起始时间戳**（用来限定权威查询的时间窗）。
+        self.started_at: float = 0.0
         #: 本次运行识别到的敏感内容（若有）。
         self.sensitive: dict | None = None
         #: 待澄清的问题（澄清式多轮对话）。
@@ -1144,8 +1159,20 @@ async def _tool_respond(ctx: AgentContext, args: dict) -> dict:
         raise AgentError("respond 需要 summary 参数")
     ctx.answer = summary
     reported_jobs = [str(x) for x in (args.get("job_ids") or [])]
-    real_jobs = {str(j.get("job_id")) for j in ctx.jobs if j.get("job_id")}
-    fabricated = [jid for jid in reported_jobs if jid not in real_jobs]
+    # 【权威来源 —— 2026-11-11 实测误报修复】
+    # 判定「模型报的任务 id 是不是真的存在」时，必须查**服务端 jobs 表**，
+    # 而不是只看 ctx.jobs（本次运行工具链的内存条目）。
+    # ctx.jobs 漏掉真实任务的三种情况（都会造成误报）：
+    #   * 任务由面板/另一条路径建（不在本次运行的工具链里）
+    #   * 任务行已提交但回执还没回到 Agent 进程（异步落库延迟）
+    #   * 模型引用的是上一轮建好的任务
+    ctx.authoritative_job_ids |= _refresh_authoritative_job_ids(ctx)
+    real_jobs = set(_known_job_ids(ctx))
+    # 判定用**容错比对**（_job_id_matches_any）：模型常把真实 id 抄错
+    # （实测 ac8778a06a04 -> ac8778a6ea84，12 位错 3 位），
+    # 精确相等会把这种「抄错」判成「编造」-> 误报失败。
+    fabricated = [jid for jid in reported_jobs
+                  if not _job_id_matches_any(jid, real_jobs)]
     # 澄清快捷选项：模型给的候选项。
     #
     # 【为什么要在这里收，2026-11-10】前端要的是「可点的快捷选项」，
@@ -1424,6 +1451,71 @@ def _create_job_record(ctx: AgentContext, mode: str, params: dict) -> str:
         raise
     except ValueError as exc:
         raise AgentError(str(exc), status=400) from exc
+
+
+#: 权威查询的**时间窗回看量**（秒）。
+#:
+#: 【为什么需要回看窗口】
+#: 判定「模型报的任务是不是真的存在」时，查询窗口必须**略早于**本次运行
+#: 的起点 —— 因为：
+#:   * 任务可能由**上一轮**对话建好，本轮模型在正文里引用它；
+#:   * 任务可能由**面板**在同一时刻建好（另一个会话/另一条路径）；
+#:   * 系统时钟与 created_at 之间有毫秒级抖动。
+#: 窗口太窄 -> 真实任务查不到 -> 误判成编造（正是本次修的 bug）。
+#: 窗口太宽 -> 可能把「更早的、别的任务」算进来 -> 判据变松。
+#: 5 分钟是个折中：够覆盖上述全部情况，又不至于把历史任务算进来。
+AUTHORITATIVE_LOOKBACK_SEC = 300
+
+
+def _refresh_authoritative_job_ids(ctx: AgentContext) -> set[str]:
+    """
+    从**权威来源**（服务端 jobs 表）刷新本次运行可见的真实任务 id。
+
+    返回服务端真实存在的 id 集合（查询失败时返回空集，不阻断主流程）。
+
+    【为什么必须查库 —— 2026-11-11 实测误报】
+    ctx.jobs 只是「本次运行的工具链往内存里 append 的条目」，
+    它**不是**「系统里真实存在的任务」的完整集合：
+      * 面板点「生成」建的任务不在 ctx.jobs 里；
+      * 别的会话建的任务不在 ctx.jobs 里；
+      * 任务行已提交但回执还没回到 Agent 进程时，ctx.jobs 可能是空的。
+    只看 ctx.jobs -> 把真实任务判成「编造」-> 误报失败。
+
+    【失败不阻断】查库失败就返回空集 —— 判定退回到只看 ctx.jobs
+    （= 旧行为），不会因为 DB 抖动就把正常的对话搞挂。
+    """
+    server = ctx.server
+    if server is None:
+        return set()
+    lister = getattr(server, "list_job_ids_since", None)
+    if lister is None:
+        return set()
+    since = (ctx.started_at or 0.0) - AUTHORITATIVE_LOOKBACK_SEC
+    try:
+        ids = lister(since)
+    except Exception:
+        return set()
+    return {str(x) for x in (ids or []) if x}
+
+
+def _known_job_ids(ctx: AgentContext) -> list[str]:
+    """
+    本次运行里「真实存在」的任务 id 列表 —— **两个来源的并集**。
+
+      1. ctx.jobs            —— 本次运行工具链建的任务（内存）
+      2. ctx.authoritative_job_ids —— 服务端 jobs 表里的真实记录（权威）
+
+    【为什么要两个来源】
+    权威来源是**判定依据**（数据库才说了算），但它有**时间窗**限制；
+    内存来源能覆盖「本次运行刚建、还没落库窗口内」的情况。
+    两者取并集 = 既不漏判真实任务，也不把编造的 id 放过去。
+    """
+    ids = set(ctx.authoritative_job_ids or set())
+    for job in ctx.jobs:
+        jid = job.get("job_id")
+        if jid:
+            ids.add(str(jid))
+    return sorted(ids)
 
 
 def _ph_source_enhance() -> str:
@@ -1794,6 +1886,122 @@ _FABRICATED_JOB_MARKERS = (
 )
 
 
+#: 「模型抄错了 job id」的**容错阈值**。
+#:
+#: 【实测踩过的坑，2026-11-11 —— 真实误报】
+#: 用户说「换成moss模型看看」，Agent 真的建了任务（jobs 表里
+#: ac8778a06a04，t2i_moss，已完成，产物正常），但模型在正文里把 id
+#: **抄错**成了 ac8778a6ea84（12 位里错了 3 位：0->e、6->a、a->8）。
+#: 原来的精确字符串比对判定「不在真实任务列表里」-> 编造 -> 整轮硬失败，
+#: 用户看到红色「失败」标签 + 拦截红条，而任务其实**真的建成了**。
+#:
+#: 所以比对不能是**纯精确相等**。但也不能放宽成「差不多就算」——
+#: 真编造的 id（t2v_019d874a / 3f2a9c1b7d04）与任何真实 id 都差得很远。
+#:
+#: 判据：**归一化后的字符差异数 <= 容错阈值** 才认为是「抄错」而非「编造」。
+#: 阈值 3 是实测选出来的：真实误报差 3 位（0->e、6->a、a->8），必须 >=3
+#: 才放过；而真编造的 id 与真实 id 差 8+ 位。
+#:
+#: 【为什么不用前缀/长度之类的模糊判据】
+#: job id 是 uuid4().hex[:12] —— 定长 12 位十六进制。长度相同、前缀可能
+#: 相同（实测两个 id 前 7 位相同！），所以只有**逐位差异数**能区分
+#: 「抄错几个字符」与「凭空编一个」。
+#:
+#: 【误判概率】随机 12 位十六进制串与某个真实 id 相差 <=3 位的概率约
+#: 7e-10；库里 500 个任务也只有 4e-7 量级 —— 拦截能力实质不受影响。
+JOB_ID_TYPO_TOLERANCE = 3
+
+#: 「被截断的 id」允许的**最短长度**。
+#:
+#: 模型有时只抄了 id 的前几位（ac8778a06a04 -> ac8778a0）。
+#: 只认 >=8 位的前缀：随机 8 位十六进制串撞上某个真实 id 子串的概率约
+#: 1e-7 量级，可忽略；而 8/12 的前缀重合已经是很强的「抄自真实 id」信号。
+JOB_ID_PREFIX_MIN_LEN = 8
+
+#: job id 的**已知前缀**。模型写 job_xxx / t2v_xxx 之类，
+#: 归一化时必须剥掉，否则同一个 id 的两种写法比不上（格式差异漏判）。
+JOB_ID_PREFIXES = (
+    "job", "t2v", "t2i", "t2iqwen", "i2iqwen", "t2imoss",
+    "flf", "r2v", "t2a", "a2a",
+)
+
+
+def _normalize_job_id(value: str) -> str:
+    """
+    把 job id 归一化成**可比较**的形式。
+
+    归一化动作（小写 / 去分隔符 / 剥前缀 / 剥 _id 后缀）解决的是
+    **格式差异**：同一个真实 id 可能被写成
+        ac8778a06a04 / AC8778A06A04 / ac8778a0-6a04 / job_ac8778a06a04
+    精确比对会把它们全判成「不认识的 id」-> 误报。
+    """
+    text = str(value or "").strip().lower()
+    for ch in ("-", "_", " "):
+        text = text.replace(ch, "")
+    # 结尾的 "id"（job_id / jobid）—— 只在后面还有内容时剥掉
+    if text.endswith("id") and len(text) > 2 and text[:-2]:
+        text = text[:-2]
+    # 已知前缀（job / t2v / t2i_moss …）
+    for prefix in JOB_ID_PREFIXES:
+        if text.startswith(prefix):
+            rest = text[len(prefix):]
+            if rest:
+                text = rest
+            break
+    return text
+
+
+def _job_id_typo_distance(a: str, b: str) -> int:
+    """
+    两个 job id 的**归一化后字符差异数**（对长度不等取最大距离）。
+
+    长度不等 -> 视为完全不同（不可能是抄错，长度都变了）。
+    长度相同 -> 逐位比较，统计不同的位数。
+    """
+    na, nb = _normalize_job_id(a), _normalize_job_id(b)
+    if not na or not nb:
+        return 999
+    if len(na) != len(nb):
+        return 999
+    return sum(1 for x, y in zip(na, nb) if x != y)
+
+
+def _job_id_matches_any(candidate: str, known_ids) -> bool:
+    """
+    candidate 是不是 known_ids 里某个 id 的「抄错 / 改写 / 截断」版本。
+
+    三档判定（任一命中即认为**不是编造**）：
+      1. **精确相等** —— 本来就是真 id。
+      2. **归一化后相等** —— 只是大小写/分隔符/前缀写法不同
+         （AC8778A06A04 / ac8778a0-6a04 / job_ac8778a06a04）。
+      3. **容错匹配** —— 字符差异数 <= JOB_ID_TYPO_TOLERANCE（抄错了几位），
+         **或** candidate 是某个真实 id 的 >= JOB_ID_PREFIX_MIN_LEN 位前缀
+         （模型只抄了前几位）。
+
+    否则 -> 不匹配（这是另一个 id，或者凭空编的）。
+    """
+    normalized_candidate = _normalize_job_id(candidate)
+    if not normalized_candidate:
+        return False
+    for known in known_ids:
+        if candidate == known:
+            return True
+        normalized_known = _normalize_job_id(known)
+        if not normalized_known:
+            continue
+        # 2) 归一化后相等（格式差异）
+        if normalized_candidate == normalized_known:
+            return True
+        # 3a) 抄错 <= N 位
+        if _job_id_typo_distance(candidate, known) <= JOB_ID_TYPO_TOLERANCE:
+            return True
+        # 3b) 截断的前缀（模型只抄了前几位）
+        if len(normalized_candidate) >= JOB_ID_PREFIX_MIN_LEN \
+                and normalized_known.startswith(normalized_candidate):
+            return True
+    return False
+
+
 def _looks_like_fabricated_job_claim(text: str, real_job_ids: list) -> bool:
     """
     这段文本是不是在**声称建了任务**，但实际一个任务都没建？
@@ -1801,10 +2009,20 @@ def _looks_like_fabricated_job_claim(text: str, real_job_ids: list) -> bool:
     判据（三条同时满足）：
       1. 文本里有「已下发/已创建/已进入队列」这类**完成时**声明；
       2. 文本里出现了一个 **job id 形状**的字符串；
-      3. 这个 job id **不在**本次真实创建的任务列表里。
+      3. 这个 job id **不匹配**本次真实创建的任务列表里的任何 id。
 
     为什么要有第 3 条：如果 Agent 真的调过 create_job，它的 respond 里
     带的 job id 一定是服务端给的真实 id（在 ctx.jobs 里）-> 不算编造。
+
+    【第 3 条为什么不是纯精确相等 —— 2026-11-11 实测误报】
+    模型会把服务端给的真实 id **抄错**（实测 ac8778a06a04 ->
+    ac8778a6ea84，12 位错 3 位）。精确相等会把这种「抄错」判成「编造」，
+    把一次真实成功的任务打成失败，用户看到红色「失败」标签。
+    所以这里用**容错比对**（见 JOB_ID_TYPO_TOLERANCE）。
+
+    【重要边界】容错只覆盖**同长度** id 的少量字符差异。
+    凭空编的 id（t2v_019d874a / 3f2a9c1b7d04 / 长度不同的）依然判为编造，
+    拦截能力不削弱。
     """
     if not text:
         return False
@@ -1815,24 +2033,49 @@ def _looks_like_fabricated_job_claim(text: str, real_job_ids: list) -> bool:
         return False
     if not any(marker in stripped for marker in _FABRICATED_JOB_MARKERS):
         return False
-    # 找 job id 形状的片段：12 位十六进制，或带明确前缀的短 id
-    #
-    # 【注意】不能用 \b 做边界 —— 中文语境里 id 前面常是全角括号
-    # （「（job t2v_019d874a）」），\b 在 CJK 与 ASCII 之间不成立，
-    # 会导致整条正则匹配不到（实测踩过）。
-    candidates = re.findall(r"[0-9a-f]{12}", stripped)
-    candidates += re.findall(
-        r"(?:job|t2v|t2i|t2i_qwen|i2i_qwen|t2i_moss|flf|r2v|t2a|a2a)"
-        r"[_-][A-Za-z0-9]{6,}", stripped)
-    # 去掉可能的粘连前缀（如 "job_id=abc" -> "job_id" 已被上面吃掉）
-    candidates = [c for c in candidates if not c.endswith("_id")]
+    candidates = _extract_job_id_candidates(stripped)
     if not candidates:
         return False
-    known = {str(j.get("job_id")) for j in real_job_ids if j.get("job_id")}
+    known = _job_id_list(real_job_ids)
     for candidate in candidates:
-        if candidate not in known:
+        if not _job_id_matches_any(candidate, known):
             return True
     return False
+
+
+def _job_id_list(real_job_ids) -> list[str]:
+    """
+    把「真实任务列表」统一成**纯 id 列表**。
+
+    兼容两种形态（调用方历史上给过两种）：
+      * [{"job_id": "ac8778a06a04"}, ...]  —— ctx.jobs 的条目
+      * ["ac8778a06a04", ...]              —— 已经抽好的 id 列表
+    """
+    out = []
+    for item in real_job_ids or []:
+        if isinstance(item, dict):
+            jid = item.get("job_id")
+        else:
+            jid = item
+        if jid:
+            out.append(str(jid))
+    return out
+
+
+def _extract_job_id_candidates(text: str) -> list[str]:
+    """
+    从正文里抽出**像 job id** 的片段。
+
+    【注意】不能用 \\b 做边界 —— 中文语境里 id 前面常是全角括号
+    （「（job t2v_019d874a）」），\\b 在 CJK 与 ASCII 之间不成立，
+    会导致整条正则匹配不到（实测踩过）。
+    """
+    candidates = re.findall(r"[0-9a-f]{12,}", text)
+    candidates += re.findall(
+        r"(?:job|t2v|t2i|t2i_qwen|i2i_qwen|t2i_moss|flf|r2v|t2a|a2a)"
+        r"[_-][A-Za-z0-9]{6,}", text)
+    # 去掉可能的粘连前缀（如 "job_id=abc" -> "job_id" 已被上面吃掉）
+    return [c for c in candidates if not c.endswith("_id")]
 
 
 def _as_bool(value) -> bool:
@@ -2070,6 +2313,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
 
     tools = _tool_specs()
     started = time.time()
+    # 本次运行的起点 —— 权威任务查询的时间窗基准。
+    # 【为什么要在最早就记下来 —— 2026-11-11】
+    # 判定「模型报的任务是不是真的存在」时，查询窗口以本次运行起点为界。
+    # 起点必须早于任何 create_job 发生，否则「本次运行刚建的任务」会
+    # 落在窗口外 -> 查不到 -> 误判成编造（正是本次修的 bug）。
+    ctx.started_at = started
 
     # 进度回调：任何异常都吞掉 —— 进度显示不该有能力把主流程带崩。
     def _emit(stage: str, detail: str = "", done: int = 0) -> None:
@@ -2132,6 +2381,9 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
         # 「模型编造 job id」的标记 —— 在「无工具调用」分支与「工具执行」分支
         # 都要用，所以提到循环外（Python 里分支内赋值会变成局部变量）。
         fabricated = False
+        #: respond 工具的结果（收尾处用它区分「respond 自己报了编造」
+        #: 与「前面某步的正文判定是误报」）。初值 None = 还没调过 respond。
+        respond_result = None
         for step_index in range(1, steps_limit + 1):
             turn_started = time.time()
             _emit("thinking", f"第 {step_index}/{steps_limit} 步", step_index - 1)
@@ -2164,9 +2416,20 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                 #
                 # 这里**不能**只看 respond 的 job_ids 参数（模型可能不传），
                 # 所以还要扫**正文**里有没有 job id 形状的片段。
-                if (bool(content)
-                        and _looks_like_fabricated_job_claim(content, ctx.jobs)):
-                    fabricated = True
+                #
+                # 【权威来源 + 容错比对 —— 2026-11-11 实测误报修复】
+                # 判定用的是「服务端 jobs 表 ∪ 本次运行内存条目」的并集，
+                # 而不是只有 ctx.jobs：
+                #   * 只看 ctx.jobs -> 面板建的任务 / 上一轮建的任务 /
+                #     异步落库延迟的任务 都查不到 -> 真实任务被判「编造」。
+                #   * 模型常把真实 id **抄错**（实测 ac8778a06a04 ->
+                #     ac8778a6ea84，12 位错 3 位）-> 精确相等也会误判。
+                if bool(content):
+                    # 先刷新权威来源（每次判定前都刷新，覆盖异步落库延迟）
+                    ctx.authoritative_job_ids |= _refresh_authoritative_job_ids(ctx)
+                    if _looks_like_fabricated_job_claim(
+                            content, _known_job_ids(ctx)):
+                        fabricated = True
                 if (narration or stalled or fabricated) and \
                         no_tool_retries < NO_TOOL_RETRY:
                     # 【强制重试一轮】
@@ -2353,8 +2616,15 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     # respond 报「编造 job id」-> 这不是普通工具失败，
                     # 是**模型在说谎**（声称建了任务但没建）。
                     # 必须当硬失败处理：推它一轮，如果还这样就整体失败。
-                    if (isinstance(result, dict)
-                            and result.get("code") == "fabricated_job_id"):
+                    #
+                    # 【记录 respond 的判定结果 —— 2026-11-11】
+                    # 收尾处要区分「respond 自己报了编造」和
+                    # 「前面某一步的正文判定是误报」。所以在这里把
+                    # respond 的结果单独存下来，不依赖循环变量 result
+                    # （respond 未必是本轮最后一个工具调用）。
+                    respond_result = result
+                    if (isinstance(respond_result, dict)
+                            and respond_result.get("code") == "fabricated_job_id"):
                         fabricated = True
 
                     stop_after_step = True
@@ -2414,16 +2684,44 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                 # 说「已下发文生视频任务（job t2v_019d874a）」—— 它从没调过
                 # create_job，那个 id 是**编的**。如果不拦，用户看到的是
                 # 「任务已下发」，去生成列表里却什么都没有。
+                #
+                # 【粘住标志的坑 —— 2026-11-11 实测误报】
+                # `fabricated` 是循环外的变量，一旦在「无工具调用」分支被置
+                # True，就会**一路粘到 respond 分支**。于是：
+                #   第 N 步：正文里有 job id 形状的串（但那次判定是误报）
+                #          -> fabricated=True -> 推它一轮
+                #   第 N+1 步：模型**真的调了 create_job 并 respond 成功**
+                #          -> 任务真的建成了，但 fabricated 还是 True
+                #          -> 整轮硬失败 -> 用户看到红色「失败」标签
+                # 也就是说：**后面真的成功了，前面那次的误判仍然会判失败**。
+                #
+                # 修法：respond **成功**时（result 里没有 fabricated_job_id）
+                # 必须重新按**当前**权威状态判定一次：
+                #   * 本次运行确实有真实任务（ctx.jobs / 权威来源非空）
+                #     -> 之前的 fabricated 是误报 -> 清掉，正常收尾；
+                #   * 一次任务都没建 -> 仍然判编造 -> 硬失败（拦截不削弱）。
                 if fabricated:
-                    ctx.no_tool_call = True
-                    ctx.no_tool_call_code = "fabricated_job_id"
-                    _event("error", {
-                        "error": ("模型声称已下发任务但实际没有创建任何任务"
-                                  "（报告的 job id 是编造的），已拦截。"),
-                        "code": "fabricated_job_id"})
-                    return "failed", (
-                        "模型声称已下发任务但实际没有创建任何任务"
-                        "（报告的 job id 是编造的），已拦截。")
+                    ctx.authoritative_job_ids |= _refresh_authoritative_job_ids(ctx)
+                    still_fabricated = False
+                    if isinstance(respond_result, dict) \
+                            and respond_result.get("code") == "fabricated_job_id":
+                        still_fabricated = True
+                    elif not _known_job_ids(ctx):
+                        # 一次任务都没建，却声称已下发 -> 仍然拦。
+                        still_fabricated = True
+                    if still_fabricated:
+                        ctx.no_tool_call = True
+                        ctx.no_tool_call_code = "fabricated_job_id"
+                        _event("error", {
+                            "error": ("模型声称已下发任务但实际没有创建任何任务"
+                                      "（报告的 job id 是编造的），已拦截。"),
+                            "code": "fabricated_job_id"})
+                        return "failed", (
+                            "模型声称已下发任务但实际没有创建任何任务"
+                            "（报告的 job id 是编造的），已拦截。")
+                    # 本次运行**确实**建出了任务 -> 之前的判定是误报，
+                    # 正常收尾（不再硬失败）。
+                    fabricated = False
                 return "completed", None
         return "truncated", (truncated_reason
                              or f"已达到步骤上限（{steps_limit} 步），"

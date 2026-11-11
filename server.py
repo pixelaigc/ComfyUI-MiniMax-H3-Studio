@@ -1358,6 +1358,38 @@ def list_job_records(status: str | None = None, mode: str | None = None,
     return result
 
 
+def list_job_ids_since(since_ts: float) -> list[str]:
+    """
+    **权威来源**：某个时间点之后创建的任务 id 列表。
+
+    【为什么需要这个函数 —— 2026-11-11 实测误报】
+    Agent 的「模型是否在编造 job id」判定，原来只看 ctx.jobs
+    （= 本次运行 create_job 工具往内存里 append 的条目）。
+    但真实任务可能来自**别的路径**：
+      * batch_create_jobs / retry_job（内部调 create_job，条目也会进 ctx.jobs）
+      * 面板侧点「生成」（同一时刻另一个会话建的任务）
+      * 任务行已提交但 Agent 进程还没拿到回执（异步落库延迟）
+    这些情况下 ctx.jobs 为空，但任务**真的存在**。
+    拿 ctx.jobs 当唯一判据 = 把真实任务判成「编造」。
+
+    所以判定必须落到**数据库**这一层：本函数直接查 jobs 表。
+
+    【为什么不用 list_job_records 再筛】
+    list_job_records 返回整行（含 params/outputs），Agent 只需要 id，
+    多读一堆 JSON 纯属浪费；而且它的 since_hours 是**小时**粒度，
+    覆盖不了「几秒前刚建的任务」这种判定窗口。
+
+    返回的 id 按 created_at 升序（旧的在前）。
+    """
+    if not since_ts:
+        return []
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id FROM jobs WHERE created_at >= ? ORDER BY created_at ASC",
+            (float(since_ts),)).fetchall()
+    return [str(row["id"]) for row in rows]
+
+
 def get_job_status_payload(job_id: str) -> dict | None:
     """
     单个任务的**轮询友好**状态（供 Agent 的 get_job_status 工具用）。
