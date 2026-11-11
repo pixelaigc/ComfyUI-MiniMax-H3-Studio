@@ -1919,6 +1919,13 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 /* 错误块里的重试按钮：与错误文案同排，但独立成可点区域 */
 .ag-error-text { word-break: break-word; }
+/* 中性提示条（截断 / 部分结果）—— 不是错误，不该用红色。
+   2026-11-11：截断说明原先走 .ag-error（红），与黄色「已截断」徽章自相矛盾。 */
+.ag-notice {
+  margin-top: 8px; font-size: 12px; color: #96601a; background: #fdf3e2;
+  border: 1px solid #f4e0bd; border-radius: 6px; padding: 6px 9px; line-height: 1.55;
+}
+.ag-notice-text { word-break: break-word; }
 .ag-act-retry { margin-top: 7px; }
 .ag-act-retry:hover { background: #fff; }
 

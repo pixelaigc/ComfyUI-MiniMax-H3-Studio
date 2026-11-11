@@ -376,7 +376,8 @@
          ${renderPrompt(msg.prompt)}
          ${toolBlock}
          ${renderClarify(msg)}
-         ${msg.error ? renderError(msg) : ""}
+         ${renderStatusNote(msg)}
+         ${renderError(msg)}
          ${renderFillButton(msg)}`;
     return `<div class="ag-msg ${isUser ? "ag-msg-user" : "ag-msg-bot"}" data-msg-index="${index}">
       <div class="ag-msg-role">${isUser ? "我" : "Agent"}</div>
@@ -393,9 +394,46 @@
     const error = msg.error;
     const text = typeof error === "string" ? error : (error && error.message) || "未知错误";
     const canRetry = !!msg.retryRequest;
+    // 【截断不显示红色失败条 —— 2026-11-11】
+    // truncated 的说明由 renderStatusNote 渲染成**黄色中性条**。
+    // 这里再渲染一次红条，用户就会同时看到「已截断（黄）」+
+    // 「已达到步骤上限（红）」—— 同一个语义两种颜色，自相矛盾。
+    // 真正的失败（status=failed）继续走红色错误条 + 重试入口。
+    const status = (msg.result && msg.result.status) || "";
+    if (status === "truncated") return "";
+    if (!error) return "";
     return `<div class="ag-error">
       <div class="ag-error-text">${esc(text)}</div>
       ${canRetry ? `<button type="button" class="ag-act ag-act-retry" data-act="retry">重试</button>` : ""}
+    </div>`;
+  }
+
+  // 中性提示条（**不是**错误条）。
+  //
+  // 【为什么需要 —— 2026-11-11 实测修复】
+  // 截断（truncated）的语义是「达到步骤/工具上限，**返回已完成的部分结果**」，
+  // 不是「执行失败」。但后端把截断原因也放进了 `error` 字段
+  // （契约 §1.3 要求 truncated 给出原因），前端就把它渲染成了
+  // `.ag-error` —— **红色**失败条。
+  //
+  // 实测线上截图：徽章是黄色的「已截断」，底部却是红色条，
+  // 文案「已达到步骤上限（8 步），返回已完成的部分结果」。
+  // 用户看到红条会以为整个请求挂了。
+  //
+  // 修法：**按 status 分流**。
+  //   truncated  -> 黄色中性提示条（.ag-notice），不进 .ag-error
+  //   failed     -> 红色错误条（.ag-error），保留重试入口
+  //
+  // 老服务端没有 `notice` 字段时，兜底用 error 文本渲染成中性条 ——
+  // 这样「截断被显示成红色失败」的老数据也能变回中性。
+  function renderStatusNote(msg) {
+    const status = (msg.result && msg.result.status) || "";
+    if (status !== "truncated") return "";
+    const notice = (msg.result && msg.result.notice) || "";
+    const text = notice || msg.error || "";
+    if (!text) return "";
+    return `<div class="ag-notice">
+      <div class="ag-notice-text">${esc(text)}</div>
     </div>`;
   }
 
@@ -1459,11 +1497,21 @@
     // 2026-11-11：把一份「结果」渲染成一条消息（测试与验收用）。
     //
     // 【为什么需要】
-    // 「编造 job id 误报」的验收要看**用户真正看到的界面**：
-    // 红色「失败」标签、底部红条、任务卡与缩略图是否渲染。
+    // 「编造 job id 误报」「工具级 ✓/✗」「截断中性条」的验收要看
+    // **用户真正看到的界面**：红色「失败」标签、底部红条、工具块的
+    // ✓/✗、任务卡与缩略图是否渲染。
     // 直接构造 state 再调 renderMessages 会绕过 upsertJob / 轮询，
     // 与真实 SSE 路径不等价 —— 所以这里走**与 SSE 完全相同**的
     // applyStreamEvent 入口。
+    //
+    // 【2026-11-11 补齐 —— 让它与真实路径等价】
+    // 真实链路（send() 里）除了 applyStreamEvent 还做两件事：
+    //   1) syncToolsFromSteps(msg, data.steps) —— 一次性路径靠它把
+    //      steps[] 转成工具轨迹（流式路径由 tool_result 事件驱动）。
+    //      少了它，工具块根本不会出现（工具级 ✓/✗ 没法验收）。
+    //   2) if (data.error) msg.error = data.error —— 截断原因就是靠
+    //      这里进 msg.error，前端才渲染出说明条。
+    // 少了第 2 条，截断场景在验收里会**假通过**（看不到条 = 看不到 bug）。
     _injectRenderedMessage(result, eventName) {
       const msg = {
         role: "assistant",
@@ -1476,6 +1524,10 @@
       };
       state.messages.push(msg);
       applyStreamEvent(msg, eventName || "done", result || {});
+      // 与真实一次性路径一致：steps[] -> 工具轨迹
+      syncToolsFromSteps(msg, (result || {}).steps);
+      // 与真实路径一致：错误/截断原因进 msg.error
+      if (result && result.error) msg.error = result.error;
       renderMessages();
       return msg;
     },
