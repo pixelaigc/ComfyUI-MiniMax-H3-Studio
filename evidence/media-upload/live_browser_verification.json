@@ -1,0 +1,603 @@
+{
+  "results": [
+    {
+      "width": 375,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "one",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_d8257c554dff/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 1 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_d8257c554dff"
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-02-one-uploaded.png",
+      "checks": {
+        "单图上传成功": true,
+        "有 preview_url": true,
+        "预览指向素材库接口": true,
+        "拿到 asset_id": true,
+        "无错误提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "multi",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 3,
+        "thumbSrcs": [
+          "/api/assets/asset_6f4be6787813/preview",
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 3 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_6f4be6787813",
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-03-multi-uploaded.png",
+      "checks": {
+        "多图都上传成功": true,
+        "asset_id 三个": true,
+        "缩略图各不相同": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "remove",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 2 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-04-after-remove.png",
+      "checks": {
+        "移除后剩 2 张": true,
+        "移除后 asset_id 剩 2 个": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "「live-bad-375.txt」不是支持的图片格式（只支持 png / jpg / webp / bmp / gif）",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-05-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "limit",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 9,
+        "thumbSrcs": [
+          "/api/assets/asset_114dfc6bfcaf/preview",
+          "/api/assets/asset_f645dadb645a/preview",
+          "/api/assets/asset_7d94481d99de/preview",
+          "/api/assets/asset_366c620c285d/preview",
+          "/api/assets/asset_2d4dccd6f4a8/preview",
+          "/api/assets/asset_58e0d7507f36/preview",
+          "/api/assets/asset_e8fa84567681/preview",
+          "/api/assets/asset_0e4253fa050b/preview",
+          "/api/assets/asset_164bf19bb58d/preview"
+        ],
+        "error": "一次最多附 9 张图，2 张未上传",
+        "btnVisible": true,
+        "hint": "已附 9 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_114dfc6bfcaf",
+          "asset_f645dadb645a",
+          "asset_7d94481d99de",
+          "asset_366c620c285d",
+          "asset_2d4dccd6f4a8",
+          "asset_58e0d7507f36",
+          "asset_e8fa84567681",
+          "asset_0e4253fa050b",
+          "asset_164bf19bb58d"
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-375-06-limit-9.png",
+      "failed_requests": [],
+      "checks": {
+        "最多 9 张": true,
+        "asset_id 最多 9 个": true,
+        "有多余的提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "one",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_d8257c554dff/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 1 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_d8257c554dff"
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-02-one-uploaded.png",
+      "checks": {
+        "单图上传成功": true,
+        "有 preview_url": true,
+        "预览指向素材库接口": true,
+        "拿到 asset_id": true,
+        "无错误提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "multi",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 3,
+        "thumbSrcs": [
+          "/api/assets/asset_6f4be6787813/preview",
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 3 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_6f4be6787813",
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-03-multi-uploaded.png",
+      "checks": {
+        "多图都上传成功": true,
+        "asset_id 三个": true,
+        "缩略图各不相同": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "remove",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 2 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-04-after-remove.png",
+      "checks": {
+        "移除后剩 2 张": true,
+        "移除后 asset_id 剩 2 个": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "「live-bad-390.txt」不是支持的图片格式（只支持 png / jpg / webp / bmp / gif）",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-05-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "limit",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 9,
+        "thumbSrcs": [
+          "/api/assets/asset_114dfc6bfcaf/preview",
+          "/api/assets/asset_f645dadb645a/preview",
+          "/api/assets/asset_7d94481d99de/preview",
+          "/api/assets/asset_366c620c285d/preview",
+          "/api/assets/asset_2d4dccd6f4a8/preview",
+          "/api/assets/asset_58e0d7507f36/preview",
+          "/api/assets/asset_e8fa84567681/preview",
+          "/api/assets/asset_0e4253fa050b/preview",
+          "/api/assets/asset_164bf19bb58d/preview"
+        ],
+        "error": "一次最多附 9 张图，2 张未上传",
+        "btnVisible": true,
+        "hint": "已附 9 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_114dfc6bfcaf",
+          "asset_f645dadb645a",
+          "asset_7d94481d99de",
+          "asset_366c620c285d",
+          "asset_2d4dccd6f4a8",
+          "asset_58e0d7507f36",
+          "asset_e8fa84567681",
+          "asset_0e4253fa050b",
+          "asset_164bf19bb58d"
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-390-06-limit-9.png",
+      "failed_requests": [],
+      "checks": {
+        "最多 9 张": true,
+        "asset_id 最多 9 个": true,
+        "有多余的提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "one",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_d8257c554dff/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 1 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_d8257c554dff"
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-02-one-uploaded.png",
+      "checks": {
+        "单图上传成功": true,
+        "有 preview_url": true,
+        "预览指向素材库接口": true,
+        "拿到 asset_id": true,
+        "无错误提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "multi",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 3,
+        "thumbSrcs": [
+          "/api/assets/asset_6f4be6787813/preview",
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 3 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_6f4be6787813",
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-03-multi-uploaded.png",
+      "checks": {
+        "多图都上传成功": true,
+        "asset_id 三个": true,
+        "缩略图各不相同": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "remove",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_f93f813922e3/preview",
+          "/api/assets/asset_9ed9c3b057b4/preview"
+        ],
+        "error": "",
+        "btnVisible": true,
+        "hint": "已附 2 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_f93f813922e3",
+          "asset_9ed9c3b057b4"
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-04-after-remove.png",
+      "checks": {
+        "移除后剩 2 张": true,
+        "移除后 asset_id 剩 2 个": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "error": "「live-bad-1280.txt」不是支持的图片格式（只支持 png / jpg / webp / bmp / gif）",
+        "btnVisible": true,
+        "hint": "上传的图片会作为参考图交给 Agent",
+        "attachments": [],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-05-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "limit",
+      "probe": {
+        "attachBoxHidden": false,
+        "thumbCount": 9,
+        "thumbSrcs": [
+          "/api/assets/asset_114dfc6bfcaf/preview",
+          "/api/assets/asset_f645dadb645a/preview",
+          "/api/assets/asset_7d94481d99de/preview",
+          "/api/assets/asset_366c620c285d/preview",
+          "/api/assets/asset_2d4dccd6f4a8/preview",
+          "/api/assets/asset_58e0d7507f36/preview",
+          "/api/assets/asset_e8fa84567681/preview",
+          "/api/assets/asset_0e4253fa050b/preview",
+          "/api/assets/asset_164bf19bb58d/preview"
+        ],
+        "error": "一次最多附 9 张图，2 张未上传",
+        "btnVisible": true,
+        "hint": "已附 9 张图，Agent 会把它们当参考图",
+        "attachments": [
+          "asset_114dfc6bfcaf",
+          "asset_f645dadb645a",
+          "asset_7d94481d99de",
+          "asset_366c620c285d",
+          "asset_2d4dccd6f4a8",
+          "asset_58e0d7507f36",
+          "asset_e8fa84567681",
+          "asset_0e4253fa050b",
+          "asset_164bf19bb58d"
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/media-upload/live-media-1280-06-limit-9.png",
+      "failed_requests": [],
+      "checks": {
+        "最多 9 张": true,
+        "asset_id 最多 9 个": true,
+        "有多余的提示": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    }
+  ],
+  "console_errors": [],
+  "cleaned_assets": [
+    {
+      "asset_id": "asset_0e4253fa050b",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_114dfc6bfcaf",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_164bf19bb58d",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_2d4dccd6f4a8",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_366c620c285d",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_58e0d7507f36",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_6f4be6787813",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_7d94481d99de",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_9ed9c3b057b4",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_d8257c554dff",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_e8fa84567681",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_f645dadb645a",
+      "status": 200
+    },
+    {
+      "asset_id": "asset_f93f813922e3",
+      "status": 200
+    }
+  ],
+  "all_pass": true
+}
