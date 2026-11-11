@@ -1455,9 +1455,7 @@ def looks_like_echo(output: str, system_prompt: str) -> bool:
     if sig["ratio"] >= 0.85:
         return True
     # 判据 4：短输出的复读兜底（几乎整段照抄）
-    if len(output) < 300 and sig["coverage"] >= 0.85:
-        return True
-    return False
+    return len(output) < 300 and sig["coverage"] >= 0.85
 
 
 def echo_detail(output: str, system_prompt: str) -> dict:
