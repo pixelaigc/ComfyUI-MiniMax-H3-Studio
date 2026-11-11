@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=enh-unify7">
+<link rel="stylesheet" href="/static/style.css?v=enh-unify8">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
-<link rel="stylesheet" href="/static/responsive.css?v=rs2">
+<link rel="stylesheet" href="/static/responsive.css?v=rs3">
 </head>
 <body>
 <header class="topbar">
@@ -815,12 +815,41 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </main>
   <!-- 内置多模态 Agent 页 -->
   <main class="agent-page page-hidden" id="agentPage">
+    <!-- 会话侧栏（抽屉）：列出所有交互，可切换 / 删除 -->
+    <div class="ag-drawer-backdrop" id="agDrawerBackdrop" hidden></div>
+    <aside class="ag-drawer" id="agDrawer" aria-hidden="true">
+      <div class="ag-drawer-head">
+        <div class="ag-drawer-title">交互记录</div>
+        <button class="ag-drawer-close" id="agDrawerClose" type="button"
+                aria-label="关闭会话列表">&times;</button>
+      </div>
+      <button class="ag-drawer-new" id="agDrawerNew" type="button">＋ 新建交互</button>
+      <div class="ag-session-list" id="agSessionList"></div>
+      <div class="ag-drawer-foot" id="agSessionFoot"></div>
+    </aside>
+
     <div class="ag-head">
-      <div>
+      <button class="ag-menu" id="agMenu" type="button" aria-label="会话列表">☰</button>
+      <div class="ag-head-text">
         <div class="ag-title">内置多模态 Agent</div>
         <div class="ag-sub">用一句话说清创作意图，Agent 自己查素材、选模式、组装参数，最后下发成可执行的生成任务。</div>
+        <div class="ag-current-session" id="agCurrentSession"></div>
       </div>
-      <button class="ag-new" id="agNew" type="button">新会话</button>
+      <div class="ag-head-actions">
+        <button class="ag-new" id="agNew" type="button">新会话</button>
+        <button class="ag-artifacts-btn" id="agArtifactsBtn" type="button"
+                title="查看本次会话产生的所有任务">本次会话产物</button>
+      </div>
+    </div>
+
+    <!-- 本次会话产物面板 -->
+    <div class="ag-artifacts" id="agArtifacts" hidden>
+      <div class="ag-artifacts-head">
+        <div class="ag-artifacts-title">本次会话产物</div>
+        <button class="ag-artifacts-close" id="agArtifactsClose" type="button"
+                aria-label="关闭产物面板">&times;</button>
+      </div>
+      <div class="ag-artifacts-body" id="agArtifactsBody"></div>
     </div>
 
     <div class="ag-messages" id="agMessages"></div>
@@ -1065,7 +1094,8 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- agent-media.js 必须在 agent.js **之前**：agent.js 的任务卡渲染要用
      AgentMedia 判定「实际生效参数」与静默回落（视频分辨率 / 音乐时长） -->
 <script src="/static/agent-media.js?v=agentmedia1"></script>
-<script src="/static/agent.js?v=agent2"></script>
+<script src="/static/agent.js?v=agent3"></script>
+<script src="/static/agent_sessions.js?v=agtsess2"></script>
 <!-- 提示词历史浮层（各面板共用） -->
 <script src="/static/prompt-history.js?v=ph4"></script>
 </body>

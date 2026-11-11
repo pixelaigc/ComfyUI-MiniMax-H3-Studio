@@ -238,10 +238,40 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_job_batches_job ON job_batches(job_id, idx);
             """
         )
-    # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
-    prov.ensure_tables(conn)
-    # 提示词历史表（各功能面板的提示词留痕）
-    ph.ensure_table(conn)
+        # 本地模型 Provider 配置 + 提示词增强 Agent 的模板/参数覆盖
+        prov.ensure_tables(conn)
+        # 提示词历史表（各功能面板的提示词留痕）
+        ph.ensure_table(conn)
+        # 会话 -> 任务的关联列（见 _ensure_jobs_session_column 的说明）
+        _ensure_jobs_session_column(conn)
+
+
+def _ensure_jobs_session_column(conn) -> None:
+    """
+    给 jobs 表补 session_id 列（增量迁移，老库自动升级）。
+
+    【为什么需要这一列 —— 2026-11-11 会话管理需求】
+    「本次会话产物」面板要列出**这个会话里** Agent 建的所有任务。
+    但 jobs 表原先**没有**任何会话维度的信息 —— 只有 id/mode/params/status。
+    于是有两种坏做法：
+      1. 按时间窗猜（「会话活跃期间创建的任务」）-> 会话之间会互相串味，
+         而且用户隔一天回来点开会话，看到的是别人的任务；
+      2. 从 agent_messages 的文本里正则抠 job id -> 那是**模型写的**文本，
+         模型可能编 id（这正是本项目修过的 bug），不可信。
+
+    唯一可靠的做法是**建任务时就把会话 id 记进去**。
+    老任务没有这个信息（session_id 为 NULL），它们本来就不属于任何会话，
+    不影响新功能。
+
+    【为什么用 PRAGMA 查列名而不是写死迁移版本】
+    幂等：已经有列就跳过。老库执行 ALTER TABLE 后立刻可查。
+    """
+    rows = conn.execute("PRAGMA table_info(jobs)").fetchall()
+    columns = {str(r[1]) for r in rows}
+    if "session_id" not in columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN session_id TEXT DEFAULT ''")
+    # 索引：按会话查任务时会用到。没有索引的话会话多了会全表扫。
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id)")
 
 
 def row_to_job(r):
@@ -266,6 +296,11 @@ def row_to_job(r):
         "error": r["error"],
         "outputs": json.loads(r["outputs"] or "[]"),
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
+        # 任务归属的 Agent 会话（面板侧建的任务为空）。
+        # row["session_id"] 在**迁移前**的老库上不存在 —— 用 keys 兜底，
+        # 否则老库一读就 KeyError（init_db 的迁移在进程启动时跑，
+        # 但测试里经常直接构造旧结构的库）。
+        "session_id": (r["session_id"] if "session_id" in r.keys() else "") or "",
     }
 
 
@@ -1250,7 +1285,7 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     return out, ""
 
 
-def create_job_record(mode: str, params: dict) -> str:
+def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     """
     建一条生成任务记录，返回 job_id。
 
@@ -1263,6 +1298,11 @@ def create_job_record(mode: str, params: dict) -> str:
     所以这里抽出唯一的实现，两边都调它。
 
     params 会被就地写入（补 gen_type / asset_refs），调用方按需自取。
+
+    session_id:
+      任务归属的 Agent 会话 id（面板侧创建的任务留空）。
+      建任务时**当场**记进 jobs.session_id —— 这是「本次会话产物」面板
+      唯一可信的数据来源（详见 _ensure_jobs_session_column 的说明）。
     """
     job_id = uuid.uuid4().hex[:12]
     now = time.time()
@@ -1281,8 +1321,10 @@ def create_job_record(mode: str, params: dict) -> str:
         batch_count = min(MAX_BATCH_COUNT, max(1, batch_count))
     with db() as conn:
         conn.execute(
-            "INSERT INTO jobs (id, created_at, mode, params, status) VALUES (?,?,?,?, 'queued')",
-            (job_id, now, mode, json.dumps(params, ensure_ascii=False)))
+            "INSERT INTO jobs (id, created_at, mode, params, status, session_id) "
+            "VALUES (?,?,?,?, 'queued', ?)",
+            (job_id, now, mode, json.dumps(params, ensure_ascii=False),
+             str(session_id or "")))
         if batch_count > 1:
             base_seed = params.get("seed")
             for index in range(batch_count):
@@ -1368,6 +1410,39 @@ def list_job_records(status: str | None = None, mode: str | None = None,
             "outputs": job["outputs"],
         })
     return result
+
+
+def list_jobs_for_session(session_id: str) -> list[dict]:
+    """
+    列出某个 Agent 会话里创建的**全部**任务（权威来源：jobs 表）。
+
+    【为什么这是唯一可信的来源 —— 2026-11-11】
+    「本次会话产物」面板不能用这两种做法：
+      1. 从 agent_messages 的正文里正则抠 job id
+         -> 那是**模型写的文本**，模型可能编 id（本项目修过这个 bug），
+            抠出来的可能是假任务；
+      2. 按时间窗猜「会话活跃期间创建的任务」
+         -> 会话之间串味（用户在会话 A 里操作，看到会话 B 的任务）。
+    只有 jobs.session_id 是**建任务时当场写入**的，天然精确。
+
+    返回结构与 /api/jobs 一致（row_to_job 的形状），
+    外加 session_id 与 batches —— 前端可以直接渲染，不用再拼。
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return []
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM jobs WHERE session_id=? ORDER BY created_at DESC",
+            (sid,)).fetchall()
+    out = []
+    for row in rows:
+        job = row_to_job(row)
+        job["session_id"] = sid
+        job["batches"] = batches_of(str(row["id"]))
+        out.append(job)
+    return out
+
 
 
 def list_job_ids_since(since_ts: float) -> list[str]:
@@ -3937,7 +4012,8 @@ async def api_agent_chat(request):
     store = _agent_store()
     session_id = store.create(session_id or None)
     # 存用户消息（在跑 Agent 之前存 —— 即使 Agent 挂了，历史也不丢）
-    store.add_message(session_id, "user", message)
+    store.add_message(session_id, "user", message,
+                      meta=_agent_user_meta(attachments))
 
     history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
     # history 末尾那条就是本次刚存的 user 消息 —— 去掉，避免重复喂给模型
@@ -3977,7 +4053,8 @@ async def api_agent_chat(request):
                 status=500)
     # 落库：模型结论 + 工具调用轨迹（下一轮对话时作为上下文）
     if result.get("answer"):
-        store.add_message(session_id, "assistant", result["answer"])
+        store.add_message(session_id, "assistant", result["answer"],
+                          meta=_agent_message_meta(result))
     for step in result.get("steps") or []:
         tool_name = step.get("tool")
         if not tool_name:
@@ -4038,7 +4115,8 @@ async def api_agent_chat_stream(request):
 
     store = _agent_store()
     session_id = store.create(session_id or None)
-    store.add_message(session_id, "user", message)
+    store.add_message(session_id, "user", message,
+                      meta=_agent_user_meta(attachments))
     history = store.history(session_id, limit=agent_sessions.HISTORY_LIMIT)
     if history and history[-1].get("role") == "user" \
             and history[-1].get("content") == message:
@@ -4148,10 +4226,12 @@ async def api_agent_chat_stream(request):
                 # Agent 侧**已经**发过 error 事件（见 agent.py 的 _event("error",...)），
                 # 这里只补落库并**抑制 result** —— 不要重复发 error。
                 if result.get("answer"):
-                    store.add_message(session_id, "assistant", result["answer"])
+                    store.add_message(session_id, "assistant", result["answer"],
+                                      meta=_agent_message_meta(result))
                 return resp
             if result.get("answer"):
-                store.add_message(session_id, "assistant", result["answer"])
+                store.add_message(session_id, "assistant", result["answer"],
+                                  meta=_agent_message_meta(result))
             for step in result.get("steps") or []:
                 tool_name = step.get("tool")
                 if not tool_name:
@@ -4171,28 +4251,216 @@ async def api_agent_chat_stream(request):
     return resp
 
 
-async def api_agent_sessions(request):
-    """GET /api/agent/sessions —— 会话清单（最近 50 条）。"""
+
+
+def _agent_user_meta(attachments) -> dict:
+    """
+    用户消息的 meta：只存附件（asset_id / 名字 / 预览图）。
+
+    恢复对话时前端要能画出「你附了 2 张图」—— 但只存 asset_id 就够前端
+    去拉缩略图。这里额外存 name/preview_url 是为了**少一次请求**：
+    附件可能已经被素材库清理（条目失效），那时 preview_url 是最后一张底图。
+    """
+    items = attachments if isinstance(attachments, list) else []
+    out = []
+    for item in items:
+        if isinstance(item, str):
+            out.append({"asset_id": item})
+            continue
+        if not isinstance(item, dict):
+            continue
+        asset_id = str(item.get("asset_id") or "")
+        if not asset_id:
+            continue
+        entry = {"asset_id": asset_id}
+        for key in ("name", "preview_url"):
+            value = item.get(key)
+            if value:
+                entry[key] = value
+        out.append(entry)
+    return {"attachments": out} if out else {}
+
+
+def _agent_message_meta(result: dict) -> dict:
+    """
+    从 Agent 的结果里抽出**前端恢复对话所需**的最小结构化信息。
+
+    只存这些：
+      status       状态徽章（completed / truncated / failed / needs_clarification）
+      jobs         任务卡（job_id / mode / label / status / prompt / params /
+                   outputs / error / progress）
+      attachments  本轮附件（asset_id / name / preview_url / description）
+      error        失败原因（失败时前端要显示红条）
+      notice       中性说明（截断时前端显示黄条，不是红条）
+
+    【刻意不存的】
+      * steps / usage / provider —— 对恢复对话没有价值，纯占地方；
+      * 完整的 steps[].args —— 可能含超长参数；
+      * 原始响应体 —— 会让库迅速膨胀。
+
+    【为什么用最小集】
+    meta 是**恢复 UI 的数据源**，不是审计日志。
+    多存一点不会更准，只会让库更快变大。
+    """
+    if not isinstance(result, dict):
+        return {}
+    meta: dict = {}
+    status = str(result.get("status") or "").strip()
+    if status:
+        meta["status"] = status
+    error = str(result.get("error") or "").strip()
+    if error:
+        meta["error"] = error
+    notice = str(result.get("notice") or "").strip()
+    if notice:
+        meta["notice"] = notice
+
+    jobs = []
+    for job in result.get("jobs") or []:
+        if not isinstance(job, dict):
+            continue
+        entry = {
+            "job_id": str(job.get("job_id") or ""),
+            "mode": str(job.get("mode") or ""),
+            "label": str(job.get("label") or ""),
+            "status": str(job.get("status") or "queued"),
+        }
+        for key in ("prompt", "summary", "progress", "progress_text", "error"):
+            value = job.get(key)
+            if value not in (None, ""):
+                entry[key] = value
+        params = job.get("params")
+        if isinstance(params, dict) and params:
+            entry["params"] = params
+        outputs = job.get("outputs")
+        if isinstance(outputs, list) and outputs:
+            entry["outputs"] = outputs
+        if entry["job_id"]:
+            jobs.append(entry)
+    if jobs:
+        meta["jobs"] = jobs
+
+    attachments = []
+    for item in result.get("attachments") or []:
+        if not isinstance(item, dict):
+            continue
+        asset_id = str(item.get("asset_id") or "")
+        if not asset_id:
+            continue
+        entry = {"asset_id": asset_id}
+        for key in ("name", "description", "preview_url"):
+            value = item.get(key)
+            if value not in (None, ""):
+                entry[key] = value
+        tags = item.get("tags")
+        if isinstance(tags, list) and tags:
+            entry["tags"] = [str(t) for t in tags][:20]
+        attachments.append(entry)
+    if attachments:
+        meta["attachments"] = attachments
+
+    return meta
+
+
+async def api_agent_sessions_create(request):
+    """
+    POST /api/agent/sessions —— 新建会话。
+
+    【为什么要有这个接口 —— 2026-11-11】
+    前端原来的「新建会话」只是把内存里的 sessionId 清空，
+    **服务端根本不知道有这个会话** —— 于是：
+      * 刷新页面后回到的是「空会话」，用户刚发的那轮对话找不回来；
+      * 会话列表里没有这一条。
+    现在新建就真的落库，前端拿回 id 存起来。
+
+    请求体（可选）：{"title": "..."} —— 不给就等首条用户消息自动生成标题。
+    """
     store = _agent_store()
-    return json_ok({"sessions": store.list_sessions(limit=50)})
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    title = str(payload.get("title") or "").strip()[:80]
+    sid = store.create(None)
+    if title:
+        store.rename(sid, title)
+    return json_ok({"session_id": sid, "ok": True})
+
+
+async def api_agent_sessions(request):
+    """
+    GET /api/agent/sessions —— 会话清单（最近 N 条）。
+
+    可选查询参数：
+      limit   返回条数上限（默认 100，上限 500）
+    """
+    try:
+        limit = int(request.query.get("limit") or 100)
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
+    store = _agent_store()
+    return json_ok({"sessions": store.list_sessions(limit=limit)})
 
 
 async def api_agent_session_get(request):
-    """GET /api/agent/sessions/{id} —— 取某个会话的完整消息历史。"""
+    """
+    GET /api/agent/sessions/{id} —— 会话详情（消息历史 + 产物）。
+
+    返回：
+      session_id / title / messages（带 meta）/ jobs（该会话建的任务）
+    """
     sid = request.match_info["id"]
     store = _agent_store()
     if not store.exists(sid):
         return web.json_response({"error": "会话不存在", "code": "not_found"},
                                  status=404)
-    return json_ok({"session_id": sid, "messages": store.raw_history(sid)})
+    jobs = list_jobs_for_session(sid)
+    return json_ok({
+        "session_id": sid,
+        "title": store.title_of(sid),
+        "messages": store.raw_history(sid),
+        "jobs": jobs,
+    })
+
+
+async def api_agent_session_jobs(request):
+    """
+    GET /api/agent/sessions/{id}/jobs —— 该会话产生的全部任务（产物观测）。
+
+    权威来源是 jobs 表的 session_id 列（建任务时当场写入），
+    不是从模型正文里抠 id —— 见 list_jobs_for_session 的说明。
+    """
+    sid = request.match_info["id"]
+    store = _agent_store()
+    if not store.exists(sid):
+        return web.json_response({"error": "会话不存在", "code": "not_found"},
+                                 status=404)
+    jobs = list_jobs_for_session(sid)
+    return json_ok({"session_id": sid, "jobs": jobs, "count": len(jobs)})
 
 
 async def api_agent_session_delete(request):
-    """DELETE /api/agent/sessions/{id} —— 清空会话。"""
+    """
+    DELETE /api/agent/sessions/{id} —— 删除会话（连同它的消息）。
+
+    【语义澄清 —— 2026-11-11】
+    这个接口**删除会话**（会话行 + 全部消息都删），
+    不是只「清空消息」。老接口名叫 api_agent_session_delete 但文档写
+    「清空会话」，前端拿不准该显示什么 —— 现在统一成「删除」。
+
+    注意：**不会**删除该会话建的任务。任务在 jobs 库里，
+    删掉会话只是丢对话历史，生成结果照旧在生成列表里。
+    （这与素材库的 409 保护是同一套取舍：会话数据可丢弃，任务不可。）
+    """
     sid = request.match_info["id"]
     store = _agent_store()
+    existed = store.exists(sid)
     deleted = store.delete(sid)
-    return json_ok({"deleted": sid, "ok": deleted})
+    return json_ok({"deleted": sid, "ok": bool(deleted and existed)})
 
 
 async def api_agent_tools(request):
@@ -4418,8 +4686,10 @@ def make_app():
     app.router.add_get("/api/agent/tools", api_agent_tools)
     app.router.add_get("/api/agent/memory", api_agent_memory)
     app.router.add_post("/api/agent/memory", api_agent_memory_set)
+    app.router.add_post("/api/agent/sessions", api_agent_sessions_create)
     app.router.add_get("/api/agent/sessions", api_agent_sessions)
     app.router.add_get("/api/agent/sessions/{id}", api_agent_session_get)
+    app.router.add_get("/api/agent/sessions/{id}/jobs", api_agent_session_jobs)
     app.router.add_delete("/api/agent/sessions/{id}", api_agent_session_delete)
     # 资产素材库（/api/assets/*）
     asset_api.register(app, server_module=sys.modules[__name__])
