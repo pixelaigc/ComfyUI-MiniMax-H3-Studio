@@ -1380,7 +1380,13 @@ function updateImageModelNote() {
   const m = ctx.models[s.model];
   if (!m) return;
   $("#imgModelNote").textContent = m.note;
-  if (m.warn) $("#imgModelWarn").textContent = m.warn;
+  // 【2026-11-11】同视频面板：没有内容就别渲染橙色空条
+  // （.img-warn 自带背景 + padding + 边框，空内容也会显示成一条橙条）。
+  const imgWarn = $("#imgModelWarn");
+  if (imgWarn) {
+    imgWarn.textContent = m.warn || "";
+    imgWarn.hidden = !m.warn;
+  }
   // MOSS-Image 专属：SLG（SkipLayerGuidance）skip layer 的当前值
   // 官方 USERGUIDE 推荐 22（0-indexed）；22/24/26 都有帮助，空 = 关。
   // 关掉 SLG 会让画面「非常写实」，但部分细节会崩 —— 所以这里显式告知。

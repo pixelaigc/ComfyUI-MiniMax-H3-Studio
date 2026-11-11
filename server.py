@@ -2306,38 +2306,55 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     """确认面板关心的那些节点在本机 ComfyUI 里是否存在。
 
     按单个节点问（实测 1 ms/个），不用拉 27 MB 的全量 /object_info。
+
+    【2026-11-11 修复 —— 不能让面板被 ComfyUI 拖死】
+    原实现是**串行**问 6 个节点，每个 10 秒超时 —— ComfyUI 卡住/正在启动时
+    （实测本机 21:01/21:05/21:06 连续出现 object_info timed out），
+    这个函数要 **60 秒**才返回，导致 GET /api/video-options 挂 66 秒，
+    浏览器先放弃 -> 文生视频面板**整块空白**（用户 21:06 实报）。
+
+    现在：
+      * 6 个节点**并发**问 -> 总耗时 = 最慢的那个（<= 单个超时）
+      * 单个超时从 10 秒压到 **3 秒** -> 最坏 3 秒返回
+      * 拿不到就返回**上一次成功的缓存**（或空集），不抛、不拖慢
     """
     global _COMFY_NODE_NAMES, _COMFY_NODES_TS
     now = time.time()
     if not force and _COMFY_NODE_NAMES and now - _COMFY_NODES_TS < 60:
         return _COMFY_NODE_NAMES
+
+    async def _probe(s, name):
+        try:
+            async with s.get(f"{COMFY}/object_info/{name}") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, dict) and name in data:
+                        return name
+        except Exception:
+            return None
+        return None
+
     found: set[str] = set()
     try:
+        timeout = ClientTimeout(total=3)
         if session is None:
-            async with ClientSession(timeout=ClientTimeout(total=10)) as s:
-                for name in _VIDEO_PANEL_NODES:
-                    try:
-                        async with s.get(f"{COMFY}/object_info/{name}") as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                if isinstance(data, dict) and name in data:
-                                    found.add(name)
-                    except Exception:
-                        continue
+            async with ClientSession(timeout=timeout) as s:
+                names = await asyncio.gather(*[_probe(s, n)
+                                                for n in _VIDEO_PANEL_NODES])
         else:
-            for name in _VIDEO_PANEL_NODES:
-                try:
-                    async with session.get(f"{COMFY}/object_info/{name}") as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if isinstance(data, dict) and name in data:
-                                found.add(name)
-                except Exception:
-                    continue
+            names = await asyncio.gather(*[_probe(session, n)
+                                            for n in _VIDEO_PANEL_NODES])
+        found = {n for n in names if n}
+    except Exception:
+        found = set()
+
+    if found:
+        # 只有真问到东西才更新缓存 —— 全挂时保留上一次的（可能还有效）
         _COMFY_NODE_NAMES = found
         _COMFY_NODES_TS = now
-    except Exception:
-        pass
+    elif not _COMFY_NODE_NAMES:
+        # 从来没成功过：记时间戳，避免每个请求都去撞一遍 3 秒超时
+        _COMFY_NODES_TS = now
     return _COMFY_NODE_NAMES
 
 
