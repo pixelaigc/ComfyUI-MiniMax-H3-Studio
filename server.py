@@ -4039,14 +4039,22 @@ async def api_agent_upload(request):
     POST /api/agent/upload —— 内置 Agent 聊天区的**媒体上传**。
 
     multipart 表单：
-      files[] / file / image   一个或多个图片文件（png/jpg/jpeg/webp/bmp/gif）
+      files[] / file / image   一个或多个**媒体**文件（图片 / 音频 / 视频）
+
+      图片：png/jpg/jpeg/webp/bmp/gif       上限 20 MB，一次最多 9 张
+      音频：wav/mp3/flac/m4a/aac/ogg/opus/aiff/aif/wma  上限 100 MB
+      视频：mp4/webm/mov/mkv/m4v/avi       上限 500 MB
+      音视频合计一次最多 4 个
 
     行为：
-      * 每个文件独立校验（类型 / 大小 / 魔数），一个失败不影响其它
+      * 每个文件独立校验（扩展名 / 大小 / **魔数**），一个失败不影响其它
       * 落进**素材库**（复用 asset_service.register_asset —— 与素材库页
-        的 /api/assets 上传完全同一条链路）
-      * 落库后异步排一次多模态分析（描述来自素材库已有的分析结果）
-      * 返回每个文件的 asset_id / preview_url / 描述
+        的 /api/assets 上传完全同一条链路，库在 /mnt/usb2t/asset_library）
+      * 图片：落库后**同步**做多模态分析
+      * 音视频：落库后排**异步**分析 job（深度音频管线 / 视频抽帧）
+        ，前端轮询 GET /api/agent/media/{id}/status，就绪前不能引用
+      * 分析失败 -> 明确报错 + soft_delete 回滚（不留“已入库没描述”的脏条目）
+      * 返回每个文件的 asset_id / preview_url / kind / 描述
 
     为什么要有这个端点：
       用户要「拿这张图做复刻/修改」时，聊天区原本**没有任何入口**
