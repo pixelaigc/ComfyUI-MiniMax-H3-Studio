@@ -20,7 +20,151 @@
     lastResult: null,
     // 正在流式渲染的那条消息（增量渲染的锚点）
     streaming: null,
+    // 【本轮待发送的附件 —— 2026-11-11】
+    // 上传完成、**还没随消息发出**的图片。
+    // 每项：{asset_id, name, preview_url, description, width, height}
+    // 发出后由 send() 清空（附件只属于一条消息）。
+    attachments: [],
+    // 附件区的临时状态（上传中 / 出错）
+    attachError: "",
+    attachBusy: false,
   };
+
+  // ---------- 附件（图片上传） ----------
+
+  // 一次最多几张（与服务端 agent_media.MAX_IMAGES_PER_UPLOAD 对齐）。
+  //
+  // 【为什么要前端也限】
+  // 前端限是为了**即时反馈**（用户选到第 10 张时立刻提示），
+  // 不是安全边界 —— 服务端还会再限一次。
+  const MAX_ATTACHMENTS = 9;
+
+  // 允许的图片类型（与 agent_media.ALLOWED_IMAGE_SUFFIXES 对齐）。
+  const ATTACH_ACCEPT = "image/png,image/jpeg,image/webp,image/bmp,image/gif";
+
+  // 单张大小上限（20 MB，与服务端 agent_media.MAX_IMAGE_BYTES 对齐）。
+  const MAX_ATTACH_BYTES = 20 * 1024 * 1024;
+
+  function renderAttachments() {
+    const box = $("#agAttachments");
+    const hint = $("#agAttachHint");
+    const btn = $("#agAttachBtn");
+    if (!box) return;
+    const items = state.attachments;
+    if (!items.length && !state.attachError) {
+      box.hidden = true;
+      box.innerHTML = "";
+      if (hint) hint.textContent = "上传的图片会作为参考图交给 Agent";
+      if (btn) btn.disabled = false;
+      return;
+    }
+    box.hidden = false;
+    const thumbs = items.map((item, index) => `
+      <div class="ag-attach-thumb" data-asset-id="${esc(item.asset_id || "")}">
+        <img src="${esc(item.preview_url || "")}" alt="${esc(item.name || "附件")}"
+             loading="lazy">
+        <button type="button" class="ag-attach-remove" data-act="remove-attachment"
+                data-index="${index}" title="移除"
+                aria-label="移除附件">×</button>
+      </div>`).join("");
+    box.innerHTML = thumbs + (state.attachError
+      ? `<div class="ag-attach-err">${esc(state.attachError)}</div>` : "");
+    if (hint) {
+      hint.textContent = state.attachBusy
+        ? "正在上传…"
+        : (items.length
+          ? `已附 ${items.length} 张图，Agent 会把它们当参考图`
+          : "上传的图片会作为参考图交给 Agent");
+    }
+    if (btn) {
+      btn.disabled = state.attachBusy;
+      btn.textContent = state.attachBusy ? "上传中…" : "📎 图片";
+    }
+  }
+
+  // 校验一个待上传的文件。返回错误字符串，null = 通过。
+  function validateAttachFile(file) {
+    const name = (file && file.name) || "";
+    const type = (file && file.type) || "";
+    const lower = name.toLowerCase();
+    const okType = /^image\/(png|jpeg|jpg|webp|bmp|gif)$/i.test(type)
+      || /\.(png|jpe?g|webp|bmp|gif)$/i.test(lower);
+    if (!okType) {
+      return `「${name}」不是支持的图片格式（只支持 png / jpg / webp / bmp / gif）`;
+    }
+    if (file.size > MAX_ATTACH_BYTES) {
+      return `「${name}」超过 ${MAX_ATTACH_BYTES / (1024 * 1024)} MB 上限`;
+    }
+    if (file.size <= 0) {
+      return `「${name}」是空文件`;
+    }
+    return null;
+  }
+
+  async function uploadAttachments(files) {
+    const list = [...(files || [])];
+    if (!list.length) return;
+    state.attachError = "";
+    const room = MAX_ATTACHMENTS - state.attachments.length;
+    if (room <= 0) {
+      state.attachError = `一次最多附 ${MAX_ATTACHMENTS} 张图，请先移除一些`;
+      renderAttachments();
+      return;
+    }
+    const accepted = list.slice(0, room);
+    const rejected = list.slice(room);
+    const errors = [];
+    const form = new FormData();
+    for (const file of accepted) {
+      const err = validateAttachFile(file);
+      if (err) { errors.push(err); continue; }
+      form.append("files[]", file, file.name);
+    }
+    if (rejected.length) {
+      errors.push(`一次最多附 ${MAX_ATTACHMENTS} 张图，${rejected.length} 张未上传`);
+    }
+    if (!form.has("files[]")) {
+      state.attachError = errors.join("；") || "没有可上传的文件";
+      renderAttachments();
+      return;
+    }
+    state.attachBusy = true;
+    renderAttachments();
+    try {
+      const resp = await fetch("/api/agent/upload", { method: "POST", body: form });
+      const raw = await resp.text();
+      let data;
+      try { data = raw ? JSON.parse(raw) : {}; }
+      catch (e) { data = { error: raw || "服务端返回了非 JSON 响应" }; }
+      if (!resp.ok) throw new Error(data.error || ("上传失败（HTTP " + resp.status + "）"));
+      const results = data.results || [];
+      for (const item of results) {
+        state.attachments.push({
+          asset_id: item.asset_id,
+          name: item.name || "",
+          preview_url: item.preview_url || "",
+          description: item.description || "",
+          width: item.width || null,
+          height: item.height || null,
+        });
+      }
+      const serverErrors = (data.errors || []).map(e => e.error).filter(Boolean);
+      state.attachError = errors.concat(serverErrors).join("；");
+    } catch (err) {
+      state.attachError = err.message || "上传失败";
+    } finally {
+      state.attachBusy = false;
+      renderAttachments();
+    }
+  }
+
+  function removeAttachment(index) {
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= state.attachments.length) return;
+    state.attachments.splice(idx, 1);
+    state.attachError = "";
+    renderAttachments();
+  }
 
   // ---------- 工具 ----------
 
@@ -352,6 +496,22 @@
     </div>`;
   }
 
+  // 用户气泡里的附件缩略图。
+  //
+  // 【为什么用户气泡要显示缩略图】
+  // 用户发完消息后要能**看见自己附了什么** —— 否则传错图了都不知道。
+  // 而且缩略图本身就是一种「我传了图」的视觉确认，
+  // 比「附了 2 张图」这种文字更快被用户读到。
+  function renderMessageAttachments(attachments) {
+    if (!attachments || !attachments.length) return "";
+    const items = attachments.map(item => `
+      <div class="ag-msg-attach">
+        <img src="${esc(item.preview_url || "")}" alt="${esc(item.name || "附件")}"
+             loading="lazy">
+      </div>`).join("");
+    return `<div class="ag-msg-attachments">${items}</div>`;
+  }
+
   function bubbleHtml(msg, index) {
     const isUser = msg.role === "user";
     // 工具轨迹只渲染**一次**。
@@ -367,7 +527,8 @@
       ? renderTools(msg.tools, index)
       : renderSteps(msg.steps, index);
     const body = isUser
-      ? `<div class="ag-bubble-text">${esc(msg.content)}</div>`
+      ? `<div class="ag-bubble-text">${esc(msg.content)}</div>
+         ${renderMessageAttachments(msg.attachments)}`
       : `${statusBadge(msg.result || {})}
          <div class="ag-bubble-text">${esc(msg.content || "")}</div>
          ${msg.streaming ? `<div class="ag-streaming-hint">正在接收…</div>` : ""}
@@ -828,6 +989,11 @@
         if (typeof data.answer === "string" && data.answer) msg.content = data.answer;
         if (Array.isArray(data.jobs)) data.jobs.forEach(j => upsertJob(msg, j));
         if (Array.isArray(data.assets)) msg.assets = data.assets;
+        // 【本轮附件 —— 2026-11-11】
+        // 服务端回传它**实际收到**的附件（权威来源）。
+        // 前端已经在用户气泡里显示过缩略图（发出前就显示了），
+        // 这里存的是「服务端确认收到的那份」，用于失败时也能追溯。
+        if (Array.isArray(data.attachments)) msg.attachments = data.attachments;
         if (data.prompt) msg.prompt = data.prompt;
         if (Array.isArray(data.steps)) msg.steps = data.steps;
         // 澄清态 -> 构造「可回答的提问气泡」。
@@ -1038,17 +1204,31 @@
     if (state.busy) return;
     const input = $("#agInput");
     const text = (input.value || "").trim();
-    if (!text) return;
+    // 【附件 —— 2026-11-11】
+    // 有附件时**允许只发图不写字**（用户可能只想说「照这张改」）。
+    // 没附件也没字 -> 不发（避免空消息）。
+    const pending = state.attachments.slice();
+    if (!text && !pending.length) return;
     input.value = "";
-    state.messages.push({ role: "user", content: text });
+    // 附件随消息发出后清空（附件只属于这一条消息）。
+    state.attachments = [];
+    state.attachError = "";
+    renderAttachments();
+    // 用户气泡里也显示缩略图 —— 用户发完要能看见自己附了什么。
+    state.messages.push({ role: "user", content: text, attachments: pending });
     renderMessages();
     setBusy(true);
     startProgress();
 
     const body = {
-      message: text,
+      message: text || "请看看我上传的这张图，按图片编辑（i2i_qwen）处理。",
       session_id: state.sessionId || undefined,
     };
+    // 附件的 asset_id 列表 —— 服务端据此把图放进 Agent 上下文，
+    // 并在模型没显式指定参考图时自动作为参考图。
+    if (pending.length) {
+      body.attachments = pending.map(a => a.asset_id).filter(Boolean);
+    }
 
     // 正在流式渲染的那条消息
     const msg = { role: "assistant", content: "", result: {}, jobs: [], assets: [],
@@ -1087,6 +1267,8 @@
       if (!msg.content) msg.content = data.answer || "";
       if (Array.isArray(data.jobs)) data.jobs.forEach(j => upsertJob(msg, j));
       if (Array.isArray(data.assets)) msg.assets = data.assets;
+      // 【本轮附件 —— 2026-11-11】与流式路径同一处理。
+      if (Array.isArray(data.attachments)) msg.attachments = data.attachments;
       if (data.prompt) msg.prompt = data.prompt;
       // 需要澄清：渲染成可回答的提问气泡
       //
@@ -1351,6 +1533,11 @@
     jobPoll.ids.clear();
     jobPoll.messages.clear();
     stopJobPolling();
+    // 新会话 = 旧附件不再属于任何消息 —— 清掉。
+    state.attachments = [];
+    state.attachError = "";
+    state.attachBusy = false;
+    renderAttachments();
     renderMessages();
     const status = $("#agStatus");
     if (status) status.textContent = "";
@@ -1433,6 +1620,54 @@
     }
     const fresh = $("#agNew");
     if (fresh) fresh.addEventListener("click", newSession);
+
+    // --- 附件上传入口（2026-11-11） ---
+    const attachBtn = $("#agAttachBtn");
+    const attachInput = $("#agAttachInput");
+    if (attachBtn && attachInput) {
+      attachBtn.addEventListener("click", () => attachInput.click());
+      attachInput.addEventListener("change", event => {
+        const files = event.target.files;
+        if (files && files.length) uploadAttachments(files);
+        // 清空 value —— 否则连续选同一个文件不会触发 change 事件
+        event.target.value = "";
+      });
+    }
+    // 拖拽上传：把图片拖进输入区也能传。
+    const composer = $(".ag-composer");
+    if (composer) {
+      composer.addEventListener("dragover", event => {
+        if (!event.dataTransfer) return;
+        const hasFile = [...(event.dataTransfer.types || [])].includes("Files");
+        if (!hasFile) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        composer.classList.add("ag-composer-drag");
+      });
+      composer.addEventListener("dragleave", event => {
+        if (event.target === composer) composer.classList.remove("ag-composer-drag");
+      });
+      composer.addEventListener("drop", event => {
+        composer.classList.remove("ag-composer-drag");
+        const files = event.dataTransfer && event.dataTransfer.files;
+        if (!files || !files.length) return;
+        event.preventDefault();
+        uploadAttachments(files);
+      });
+    }
+    // 附件缩略图上的「移除」按钮（事件委托）。
+    //
+    // 【为什么单独绑而不是复用 #agMessages 的委托】
+    // 附件区在 composer 里，不在消息区里。
+    const attachBox = $("#agAttachments");
+    if (attachBox) {
+      attachBox.addEventListener("click", event => {
+        const btn = event.target.closest("[data-act='remove-attachment']");
+        if (!btn) return;
+        event.preventDefault();
+        removeAttachment(btn.dataset.index);
+      });
+    }
     const box = $("#agMessages");
     if (box) {
       // 事件委托：所有交互元素都用 data-act 标记。
@@ -1480,6 +1715,16 @@
   // 暴露给 app.js（app.js 的 show* 系列需要能切到这个页）
   window.AgentUI = {
     show, state, renderMessages,
+    // 2026-11-11：附件（图片上传）的内部接口 —— 测试与验收用。
+    //
+    // 【为什么不直接操作 DOM】
+    // 上传走的是真实 HTTP（multipart）+ 真实素材库落库，
+    // 验收必须打到真实服务端才有意义。
+    // 这里暴露的是「把文件塞进上传流程」与「当前附件列表」两个入口。
+    _renderAttachments: renderAttachments,
+    _uploadAttachments: uploadAttachments,
+    _removeAttachment: removeAttachment,
+    _MAX_ATTACHMENTS: MAX_ATTACHMENTS,
     // 测试与调试用的内部接口
     _applyStreamEvent: applyStreamEvent,
     _parseSseBlock: parseSseBlock,
@@ -1541,8 +1786,12 @@
   });
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bind);
+    document.addEventListener("DOMContentLoaded", () => {
+      bind();
+      renderAttachments();
+    });
   } else {
     bind();
+    renderAttachments();
   }
 })();

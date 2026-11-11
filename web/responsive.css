@@ -457,6 +457,13 @@
   .ag-clarify-opt { white-space: normal; text-overflow: clip; }
   .ag-job-thumbs .ag-job-thumb { width: 56px; height: 56px; }
   .ag-job-refresh { margin-left: auto; }
+
+  /* 附件（图片上传）—— 375px 窄屏不许横向溢出：
+     缩略图缩小 + 提示文案允许换行（不能 nowrap+ellipsis 把内容藏掉）。 */
+  .ag-attach-thumb { width: 52px; height: 52px; max-width: 52px; }
+  .ag-msg-attach { width: 46px; height: 46px; max-width: 46px; }
+  .ag-attach-hint { white-space: normal; overflow: visible; }
+  .ag-attach-row { gap: 6px; }
 }
 
 /* 平板：输入区改为上下两行，发送按钮不撑满 */
