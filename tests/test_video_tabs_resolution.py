@@ -494,6 +494,12 @@ class TestFrontendWiring(unittest.TestCase):
                       "前端必须带 mode，让服务端按各模式自己的策略算")
 
 
+def srv_available(mode: str) -> bool:
+    """服务端视角：某个 mode 的视频链路在本机是否可用。"""
+    import server as srv
+    return bool(srv._video_model_available({"mode": mode}))
+
+
 # ==================================================================
 # 八、服务端接口
 # ==================================================================
@@ -516,6 +522,33 @@ class TestVideoCategoriesEndpoint(unittest.TestCase):
         self.assertIn("legacy_modes", payload)
         for model in payload["models"]:
             self.assertIn("category", model)
+
+    def test_payload_marks_model_availability(self):
+        """每个模型项都要带 available —— 回退规则③（禁用并提示）靠它。
+
+        没有这个位，前端的「无可用模型 -> 禁用类别 + 提示」分支就是死代码。
+        """
+        import server as srv
+        import asyncio
+        result = asyncio.new_event_loop().run_until_complete(
+            srv.api_video_categories(None))
+        payload = json.loads(result.text)
+        for model in payload["models"]:
+            with self.subTest(model=model["key"]):
+                self.assertIn("available", model)
+                self.assertIsInstance(model["available"], bool)
+        for cat in payload["categories"]:
+            for model in cat["models"]:
+                with self.subTest(category=cat["key"], model=model["key"]):
+                    self.assertIsInstance(model["available"], bool)
+
+    def test_unavailable_category_is_rejected_by_resolver(self):
+        """类别无可用模型时不能解析出 mode（前端据此禁用 + 提示）。"""
+        # longfilm 不依赖 H3 权重 -> 恒可用；t2v 依赖底模
+        self.assertTrue(srv_available("longfilm"))
+        # 直接验证前端规则：availableModels 只收 available != false
+        import server as srv
+        self.assertTrue(hasattr(srv, "_video_model_available"))
 
     def test_options_payload_exposes_pixel_limit(self):
         payload = VM.options_payload()

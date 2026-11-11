@@ -2659,6 +2659,34 @@ async def api_video_size(request):
     })
 
 
+def _video_model_available(model: dict) -> bool:
+    """某个视频模型项在本机是否真的可用。
+
+    t2v / flf / r2v 都要 H3 底模权重落盘；longfilm 只拼已完成的视频，
+    不需要 H3 权重。
+
+    返回 False 时前端会把该模型项置为不可选（并在类别无任何可用模型时
+    禁用整个类别 + 提示）—— 这正是需求的回退规则③。
+    """
+    mode = (model.get("mode") or "").strip()
+    if mode == "longfilm":
+        return True
+    try:
+        from h3studio import workflows as _wf
+        if mode not in _wf.BUILDERS:
+            return False
+    except Exception:
+        return False
+    # H3 底模：任一登记的权重在本机就算可用
+    try:
+        for key in video_models.VIDEO_MODELS:
+            if video_models.model_available(key):
+                return True
+    except Exception:
+        return False
+    return False
+
+
 async def api_video_categories(request):
     """GET /api/video-categories —— 左侧导航的**两级**视频清单
 
@@ -2676,6 +2704,17 @@ async def api_video_categories(request):
     """
     categories = video_categories.list_categories()
     models = video_categories.list_models()
+
+    # 【可用性位】让前端的「回退规则③ 禁用并提示」不是死代码 ——
+    # 每个模型项都要真的带上 available，前端才知道哪个不可选。
+    #   * t2v / flf / r2v：依赖 H3 底模权重在本机（实测 check）
+    #   * longfilm：拼片链路不依赖 H3 权重（它只拼已完成的视频）
+    for model in models:
+        model["available"] = _video_model_available(model)
+    for cat in categories:
+        for model in cat["models"]:
+            model["available"] = _video_model_available(model)
+
     return json_ok({
         "categories": categories,
         "models": models,
