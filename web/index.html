@@ -115,6 +115,12 @@
       <div class="stale-backend-banner" id="staleVideoBanner" hidden></div>
 
       <div class="field">
+        <div class="field-label">尺寸预设 <span class="muted">H3 原生画布内</span></div>
+        <select class="img-select" id="vidSizePresetSelect"></select>
+        <div class="img-note" id="vidSizePresetNote"></div>
+      </div>
+
+      <div class="field">
         <div class="field-label">输出尺寸 <span class="muted" id="vidSizeHint">—</span>
           <span class="img-tag" id="vidSizeMode" hidden>自定义</span></div>
         <div class="img-size-row">
@@ -140,8 +146,12 @@
       </div>
 
       <div class="field">
-        <div class="field-label">加速 LoRA 组合 <span class="muted">可多选</span></div>
-        <div id="vidAccelLoraList" class="img-lora-list"></div>
+        <div class="field-label">加速 LoRA <span class="muted">单选 · 按主模型适配过滤</span></div>
+        <select class="img-select" id="vidAccelLoraSelect"></select>
+        <div class="compact-field" id="vidAccelLoraStrengthField">
+          <div class="compact-label"><span>加速 LoRA 强度</span><b id="vidAccelLoraStrengthVal">1.00</b></div>
+          <input type="range" id="vidAccelLoraStrength" min="0" max="1.5" step="0.05" value="1">
+        </div>
         <div class="img-note" id="vidAccelLoraNote"></div>
         <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
       </div>
@@ -569,6 +579,16 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <button data-v="ckpt850" class="active"><b>Turbo ckpt850</b><small>EMA 权重</small></button>
           <button data-v="v4step600"><b>v4-step600</b><small>4 步 · 推荐</small></button>
         </div>
+        <!-- 【2026-11-11】LoRA 强度控件从「生成按钮下方」搬到这里 ——
+             生成按钮下方那个是重复控件（与文生视频面板「加速 LoRA」旁的
+             强度控件指的是同一件事），而这里才是唯一一处。
+             放在一起也符合直觉：强度就是跟着「选哪枚 LoRA」走的。
+             flf / r2v 走旧工作流路径（读 params.lora_strength），
+             文生视频走新面板（读 accel_loras[].strength）—— 两边各一处。 -->
+        <div class="compact-field" id="loraStrengthField">
+          <div class="compact-label"><span>LoRA 强度</span><b id="loraStrengthVal">1.00</b></div>
+          <input type="range" id="loraStrength" min="0" max="1.5" step="0.05" value="1">
+        </div>
       </div>
     </div>
 
@@ -577,15 +597,13 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <input type="range" id="steps" min="4" max="20" step="1" value="6">
     </div>
 
-    <div class="compact-pair" id="seedStrengthPair">
-      <div class="compact-field" id="loraStrengthField">
-        <div class="compact-label"><span>LoRA 强度</span><b id="loraStrengthVal">1.00</b></div>
-        <input type="range" id="loraStrength" min="0" max="1.5" step="0.05" value="1">
-      </div>
-      <div class="compact-field" id="seedField">
-        <div class="compact-label"><span>种子</span><small>留空随机</small></div>
-        <input type="text" id="seed" placeholder="随机">
-      </div>
+    <!-- 【2026-11-11】这里原来是一个 compact-pair：左边「LoRA 强度」滑杆
+         + 右边「种子」。「LoRA 强度」是重复控件（与文生视频面板「加速 LoRA」
+         旁的强度控件指的是同一件事），已搬到上面「LoRA 选择」旁边 ——
+         现在全站只有唯一一处强度控件。种子单独一行。 -->
+    <div class="compact-field" id="seedField">
+      <div class="compact-label"><span>种子</span><small>留空随机</small></div>
+      <input type="text" id="seed" placeholder="随机">
     </div>
 
   </aside>
