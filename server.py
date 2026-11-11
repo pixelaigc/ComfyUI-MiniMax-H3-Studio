@@ -3371,12 +3371,19 @@ async def api_enhance(request):
                      "provider": item["name"],
                      "degraded": True}, status=502)
             # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
-            if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+            #
+            # 【2026-11-11】错误文案要**可读、可操作**：
+            #   - 给出具体判据（哪一段重合、重合了多少），别只丢一句「复读」
+            #   - 提示词框**绝不**写回复读内容（这里直接 502，不进 merged）
+            echo = enh.echo_detail(enhanced, spec["system_prompt"])
+            if echo.get("is_echo"):
                 return web.json_response(
                     {"error": f"Provider「{item['name']}」返回的是系统提示词复读，"
-                              "不是有效的提示词。"
+                              f"不是有效的提示词（{echo.get('reason')}）。"
                               "该模型可能太小或未按指令输出，请换用更强的模型。",
                      "provider": item["name"], "provider_id": item["id"],
+                     "code": "system_prompt_echo",
+                     "echo": echo,
                      "degraded": True}, status=502)
 
             # 截断检测 —— 二次增强丢背景的根因守门人。

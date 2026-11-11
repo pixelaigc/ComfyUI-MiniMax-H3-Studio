@@ -850,11 +850,16 @@ async def _tool_enhance_prompt(ctx: AgentContext, args: dict) -> dict:
     if not enhanced:
         raise AgentError("模型返回了空内容，未做修改", status=502,
                          code="provider_error")
-    if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+    # 【2026-11-11】与 /api/enhance 同一套复读判据 + 同样的可读文案。
+    #   判据从「40 字符公共子块」换成「三档相似度」（见 enhancer.looks_like_echo），
+    #   旧判据会把「忠实按格式输出的 H3 导演稿」误判成复读。
+    echo = enh.echo_detail(enhanced, spec["system_prompt"])
+    if echo.get("is_echo"):
         raise AgentError(
             f"Provider「{provider.get('name')}」返回的是系统提示词复读，"
-            "不是有效的提示词。该模型可能太小或未按指令输出，请换用更强的模型。",
-            status=502, code="provider_error")
+            f"不是有效的提示词（{echo.get('reason')}）。"
+            "该模型可能太小或未按指令输出，请换用更强的模型。",
+            status=502, code="system_prompt_echo")
 
     validation = enh.validate_output(enhanced, original,
                                      spec.get("validate_mode", "pe"))
