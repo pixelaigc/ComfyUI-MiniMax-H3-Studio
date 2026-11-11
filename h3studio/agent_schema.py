@@ -1268,6 +1268,66 @@ def missing_params(mode: str, params: dict) -> list[str]:
     return missing
 
 
+#: **软问题**的 code 集合 —— 「如实告知，但**不拦**任务」。
+#:
+#: 【为什么需要这个分类 —— 2026-11-11 实测】
+#: `validate_params()` 把所有问题都塞进同一个 `issues` 列表，
+#: 上层（`_precheck_tool_args` / `_validate_create_job_args`）只看到
+#: 「列表非空」就 `raise AgentError` —— 于是**告知类**问题也变成了硬失败。
+#:
+#: 实测后果（生产会话 06f7145d3dab4085，09:24:11）：
+#:   用户说「最后用 qwen-image21 试试」，模型带了 negative_prompt，
+#:   -> 撞上 `negative_needs_cfg`（Qwen 默认 cfg=1.0，负面不生效）
+#:   -> 任务被拒（一个都没建）-> 模型用**同样参数**又试 5 次
+#:   -> 8 步上限 -> 用户看到「5 个红色 ✗ + 红色失败条 + 已截断」。
+#:
+#: 而 `validate_params()` 里那段代码**自己的注释**写着：
+#:   「关键：**不因为「该族不支持负面提示词」就拒绝任务** …」
+#: `docs/内置多模态Agent-接口契约.md` 也写着
+#:   「`negative_not_supported` | 400 | …（**不拦任务**，只如实告知）」
+#: —— **实现与自己的注释、契约文档相反**。
+#:
+#: 契约文档里 `resolution_upscaled` 标的是「—（允许）」，也说明
+#: issues 列表本来就有「只告知」与「必须拦」两类，代码**没有区分**。
+#:
+#: 【软问题的判定标准】
+#: 「这个参数**取值本身**是合法的，只是它的**效果**没达到用户预期」。
+#:   * negative_not_supported —— 负面提示词在该族没有通道（取值合法）
+#:   * negative_needs_cfg   —— 负面提示词需 cfg>1 才生效（取值合法）
+#:   * resolution_upscaled  —— 档位合法，会自动走官方 2K 放大路径
+#:
+#: 【硬问题仍然照旧拦】
+#: 取值**非法**、超出该族直出上限且无放大路径、缺参考图、未知模式… ——
+#: 这些必须拦，拦了模型能改参数重来。
+SOFT_ISSUE_CODES = (
+    "negative_not_supported",
+    "negative_needs_cfg",
+    "resolution_upscaled",
+)
+
+
+def split_issues(issues: list[ValidationIssue]) -> tuple[list, list]:
+    """
+    把校验问题分成 **(必须拦的硬问题, 只告知的软问题)**。
+
+    返回 (hard, soft)。调用方应当：
+      * hard 非空 -> 拒绝任务，把错误和替代方案回给模型；
+      * 只有 soft -> **照常建任务**，把 soft 的内容如实告知模型/用户。
+
+    【为什么要拆 —— 见 SOFT_ISSUE_CODES 的说明】
+    实测线上误报：负面提示词「默认不生效」被当成硬失败，
+    任务一个都没建成，模型反复重试直到撞上步骤上限。
+    """
+    hard: list[ValidationIssue] = []
+    soft: list[ValidationIssue] = []
+    for issue in issues or []:
+        if getattr(issue, "code", "") in SOFT_ISSUE_CODES:
+            soft.append(issue)
+        else:
+            hard.append(issue)
+    return hard, soft
+
+
 def format_issues(issues: list[ValidationIssue]) -> str:
     """
     把校验问题渲染成**给人看**的一段话。

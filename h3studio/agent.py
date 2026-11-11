@@ -852,7 +852,40 @@ async def _tool_enhance_prompt(ctx: AgentContext, args: dict) -> dict:
             "spec_id": spec_id, "validation_ok": validation.get("ok", True)}
 
 
-def _validate_create_job_args(mode: str, args: dict, params: dict) -> None:
+def _soft_issue_notice(mode: str, soft: list) -> dict:
+    """
+    把**软问题**渲染成一段「如实告知」，返回给工具结果。
+
+    【语义 —— 2026-11-11 实测修复】
+    软问题 = 「取值本身合法，只是效果没达到用户预期」，
+    例如「负面提示词在 Qwen 族默认 cfg=1.0 时不生效」。
+
+    契约文档（docs/内置多模态Agent-接口契约.md）明确写着：
+    「`negative_not_supported` | 400 | …（**不拦任务**，只如实告知）」，
+    `validate_params()` 里那段代码的注释也写着
+    「**不因为「该族不支持负面提示词」就拒绝任务**」。
+    但实现把两类问题混在一个列表里，一律 raise —— 与自己的注释相反。
+
+    实测线上后果（生产会话 06f7145d3dab4085，09:24:11）：
+    任务被拒 -> 模型用同样参数重试 5 次 -> 撞 8 步上限 ->
+    用户看到「5 个红色 ✗ + 红色失败条 + 已截断」。
+
+    现在：软问题**照常建任务**，并在工具结果里如实告知
+    （notice 字段），界面对应的工具块显示 ✓ 而不是 ✗。
+
+    返回结构：
+        {"notices": [{"field","message","code","suggestions"}...],
+         "message": "给人看的一段话"}
+    """
+    issues = list(soft or [])
+    payload = agent_schema.issues_to_payload(issues)
+    return {
+        "notices": payload["issues"],
+        "message": payload["message"],
+    }
+
+
+def _validate_create_job_args(mode: str, args: dict, params: dict) -> dict | None:
     """
     create_job 工具的**最后一道取值校验**。
 
@@ -862,7 +895,14 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> None:
       * 音乐字段 -> music_yue2 的真实白名单
       * 负面提示词 -> workflows.*_MODELS 的 supports_negative / cfg
 
-    失败抛 AgentError（带 code + 可执行替代方案），**不建任务**。
+    **硬问题**（取值非法）抛 AgentError（带 code + 可执行替代方案），
+    **不建任务**。
+
+    **软问题**（取值合法、只是效果不达预期）**不拦** ——
+    返回一段如实告知（notice），由工具结果带给模型与用户。
+    见 _soft_issue_notice 的说明。
+
+    返回 None = 没有任何问题。
     """
     check: dict = {}
     for field in ("aspect", "resolution", "model", "lora", "duration",
@@ -877,9 +917,16 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> None:
             check["max_duration"] = check["duration"]
 
     issues = agent_schema.validate_params(mode, check)
-    if not issues:
-        return
-    payload = agent_schema.issues_to_payload(issues)
+    hard, soft = agent_schema.split_issues(issues)
+    if not hard:
+        # 【只有软问题 —— 不拦任务，2026-11-11】
+        # 例如「负面提示词在该族默认不生效」：取值本身合法，
+        # 只是效果没达到预期。契约文档明确写着「不拦任务，只如实告知」。
+        # 这里把软问题**如实告知**（工具结果里的 notice 段），
+        # 让模型知道「负面没生效，可以改 cfg」，
+        # 而不是让整个任务建不出来。
+        return _soft_issue_notice(mode, soft) if soft else None
+    payload = agent_schema.issues_to_payload(hard)
     raise AgentError(
         "参数校验未通过：\n" + payload["message"],
         status=400, code="invalid_params",
@@ -1066,7 +1113,12 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     #
     # 校验项：duration / resolution / aspect / model / lora / max_duration /
     #         plan_mode / format / checkpoint / negative_prompt。
-    _validate_create_job_args(mode, args, params)
+    #
+    # 【返回值 —— 2026-11-11】软问题（取值合法、只是效果不达预期，
+    #  例如「负面提示词在该族默认不生效」）**不拦任务**，
+    # 返回一段如实告知（notice），挂进工具结果给模型与用户看。
+    # 硬问题（取值非法）在这里抛 AgentError，不建任务。
+    soft_notice = _validate_create_job_args(mode, args, params)
 
     # 走服务端**同一套**校验（与面板点「生成」完全一致）：
     # 模式白名单 / 参考图数量 / <imageN> 占位注入 / 参考音频数量 / 提示词非空。
@@ -1123,8 +1175,17 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     }
     entry["_pending"] = True
     ctx.jobs.append(entry)
-    return {"job_id": job_id, "mode": mode, "status": "queued",
-            "label": entry["label"]}
+    result = {"job_id": job_id, "mode": mode, "status": "queued",
+              "label": entry["label"]}
+    # 【软问题如实告知 —— 2026-11-11】
+    # 任务**建出来了**（job_id 有效、记录已入库），只是某个参数的效果
+    # 没达到预期（例如负面提示词在该族默认不生效）。
+    # 把告知挂进结果：模型在 tool 消息里看得见，用户在界面上也看得见。
+    # 关键：这里**不影响 ok=True** —— 任务是成功建出来的。
+    if soft_notice:
+        result["notice"] = soft_notice
+        result["notices"] = soft_notice.get("notices") or []
+    return result
 
 
 @tool(
@@ -1511,6 +1572,98 @@ def _refresh_authoritative_job_ids(ctx: AgentContext) -> set[str]:
     return {str(x) for x in (ids or []) if x}
 
 
+def _reconcile_tool_ok_with_db(ctx: AgentContext, tool_name: str,
+                                result: dict, ok: bool) -> bool:
+    """
+    工具级 ✓/✗ 的**权威复核**：以数据库记录为准，而不是只看工具返回值。
+
+    【为什么需要 —— 2026-11-11 实测】
+    用户要求核实「create_job 实际成功却被标 ✗」。实测结论：
+    截图里那 5 次 create_job **确实一个任务都没建**（jobs 表零新增记录），
+    所以那 5 个 ✗ 是**如实**的，工具级判定当时**没有**误报。
+
+    但判定链路确实有**结构性**隐患：工具的 ok 只来自
+    「工具函数有没有抛异常」。只要任务**建成了**、工具却在**建完之后**
+    抛了异常，ok 就是 False -> 界面标 ✗，而任务其实**真的在库里** ->
+    用户看到「create_job 失败」但生成列表里明明有任务。
+    这正是「真实成功被判失败」在工具层的形态。
+
+    【复核方向 —— 只做「失败 -> 成功」，绝不反向 —— 2026-11-11 修正】
+    实测踩坑：先实现了「工具说成功但库里查不到 -> 判失败」，
+    结果 **tests/test_agent_oneshot_e2e.py 真回归**：
+      该测试的服务端替身 `create_job_record` 只往内存里 append，
+      **不写 jobs 表**（这是合法的服务端实现形态），
+      于是「查不到」-> 被翻成失败 -> 真实成功的工具块显示 ✗。
+
+    这说明「库里查不到」**不能**区分「假成功」与「读不到」：
+      * 假成功：任务真的没建出来；
+      * 读不到：写库成功但当前读路径看不到（另一条实现 / 事务未提交 /
+        连接指向别处 / 替身不落库）。
+    分不清的时候翻成「失败」，制造出的正是本次要消灭的那类误报。
+
+    所以复核**只做单向**：
+      * 任务**确实在库里** -> 判成功（ok=True）。这是「真实成功」的
+        **权威证据**，能救回「建成了但工具后段抛异常」的真实成功。
+      * 其余情况（查不到 / 查不清）-> **保持原判定**，绝不翻转。
+
+    【为什么单向不会削弱拦截】
+    「真编造 job id」的拦截走的是**另一条**链路（正文扫描 +
+    权威 id 集合比对，见 _looks_like_fabricated_job_claim /
+    _known_job_ids），与本函数无关。本函数只影响**工具块**的 ✓/✗。
+
+    【只对会建任务的工具生效】
+    create_job / retry_job / batch_create_jobs —— 其它工具（检索、查询）
+    的成败与任务表无关。
+    """
+    if tool_name not in ("create_job", "retry_job", "batch_create_jobs"):
+        return ok
+    if not isinstance(result, dict):
+        return ok
+    server = ctx.server
+    if server is None:
+        return ok
+    getter = getattr(server, "get_job_status_payload", None)
+    if getter is None:
+        return ok
+
+    def _exists(job_id) -> bool | None:
+        """True=确实存在 / False=确实不存在 / None=查不清。"""
+        if not job_id:
+            return None
+        try:
+            payload = getter(str(job_id))
+        except Exception:
+            return None
+        if payload is None:
+            return False
+        return True
+
+    candidates: list[str] = []
+    raw_id = result.get("job_id")
+    if raw_id:
+        candidates.append(str(raw_id))
+    created = result.get("created")
+    if isinstance(created, list):
+        for item in created:
+            if isinstance(item, dict) and item.get("job_id"):
+                candidates.append(str(item["job_id"]))
+    for job in ctx.jobs:
+        jid = job.get("job_id")
+        if jid:
+            candidates.append(str(jid))
+
+    if not candidates:
+        return ok
+
+    verdicts = [_exists(jid) for jid in dict.fromkeys(candidates)]
+    if any(v is True for v in verdicts):
+        # 任务**确实在库里** -> 无论工具返回值怎么说，都算**建成了**。
+        # 这是权威来源给出的「真实成功」证据。
+        return True
+    # 查不到 / 查不清 -> 保持原判定（绝不因读不到就翻成失败）。
+    return ok
+
+
 def _known_job_ids(ctx: AgentContext) -> list[str]:
     """
     本次运行里「真实存在」的任务 id 列表 —— **两个来源的并集**。
@@ -1701,9 +1854,19 @@ def _precheck_tool_args(name: str, args: dict, ctx=None) -> dict | None:
             params["asset_ids"] = list(params["asset_ids"]) + [value]
 
     issues = agent_schema.validate_params(mode, params)
-    if not issues:
+    hard, soft = agent_schema.split_issues(issues)
+    if not hard:
+        # 【只有软问题 —— 不拦，2026-11-11】
+        # 预校验的职责是「**非法取值**别进工具」，
+        # 而软问题（负面提示词默认不生效 / 会走 2K 放大路径）
+        # 取值本身合法，放行进工具，由工具把告知挂进结果里。
+        #
+        # 实测线上后果（会话 06f7145d3dab4085，09:24:11）：
+        # 软问题在这里被当成硬失败 -> 任务一个都没建 ->
+        # 模型用同样参数重试 5 次 -> 撞 8 步上限 ->
+        # 用户看到「5 个红色 ✗ + 红色失败条 + 已截断」。
         return None
-    payload = agent_schema.issues_to_payload(issues)
+    payload = agent_schema.issues_to_payload(hard)
     return {
         "error": "参数校验未通过：\n" + payload["message"],
         "code": "invalid_params",
@@ -1776,8 +1939,18 @@ def _tool_result_summary(name: str, result, ok: bool) -> str:
         return "已返回结果" if ok else "调用失败"
     if not ok:
         return str(result.get("error") or "调用失败")[:200]
+    # 【软问题附注 —— 2026-11-11】
+    # 任务建成了，但有「只告知」的问题（例如负面提示词默认不生效）。
+    # 摘要里带上这半句，用户一眼能看出「任务下了，但负面没生效」。
+    notice = result.get("notice")
+    notice_text = ""
+    if isinstance(notice, dict):
+        notice_text = str(notice.get("message") or "").strip()
     if name in ("create_job", "retry_job"):
-        return f"已创建任务 {result.get('job_id')}（{result.get('mode')}）"
+        base = f"已创建任务 {result.get('job_id')}（{result.get('mode')}）"
+        if notice_text:
+            return (base + "；注意：" + notice_text)[:300]
+        return base
     if name == "batch_create_jobs":
         return (f"已创建 {result.get('created_count', 0)} 个任务"
                 f"（失败 {result.get('failed_count', 0)} 个）")
@@ -2573,6 +2746,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                         result, ok = await _run_tool_with_retry(
                             spec, ctx, call["arguments"], name)
 
+                # 【工具级 ✓/✗ 的权威复核 —— 2026-11-11】
+                # 以 jobs 表为准复核「这次调用到底有没有建出任务」。
+                # 任务真在库里 -> 判成功；确实不在 -> 判失败；
+                # 查不清 -> 保持原判定。详见 _reconcile_tool_ok_with_db。
+                ok = _reconcile_tool_ok_with_db(ctx, name, result, ok)
+
                 steps.append(_step_entry(
                     step_index, tool=name, ok=ok,
                     ms=int((time.time() - turn_started) * 1000),
@@ -2785,6 +2964,26 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
         error = truncated_reason or error
         status = "failed"
 
+    # 【截断的说明不该显示成「失败」—— 2026-11-11 实测修复】
+    #
+    # 实测线上截图（生产会话 06f7145d3dab4085，09:24:11）：
+    #   徽章是黄色的「已截断」（warn 样式），
+    #   但同一条消息底部的说明条却是**红色**失败条
+    #   （.ag-error，背景 #fdecec），文案是
+    #   「已达到步骤上限（8 步），返回已完成的部分结果」。
+    #
+    # 语义完全错位：「达到步骤上限、返回已完成的部分」是**中性/警告**，
+    # 不是「执行失败」。用户看到红条会以为整个请求挂了。
+    #
+    # 修法：截断时**额外**产出 `notice` 字段（中性说明），
+    # 前端按 status 分流：truncated -> 黄色提示条；failed -> 红色错误条。
+    # `error` 字段保持不变（契约文档 §1.3 写明 truncated 也要给 error 原因，
+    # 老消费者不能因此断掉），前端只是**优先**看 status 决定样式。
+    if status == "truncated" and truncated_reason:
+        notice = truncated_reason
+    else:
+        notice = ""
+
     result = {
         "session_id": session_id or "",
         "status": status,
@@ -2797,6 +2996,10 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                   "elapsed_ms": elapsed_ms},
         "provider": {"name": provider.get("name"), "model": provider.get("model")},
         "error": error,
+        # 【中性说明 —— 2026-11-11】截断原因走 notice，不走 error 的红色样式。
+        # error 字段保持不变（契约 §1.3 要求 truncated 也给 error 原因），
+        # 前端按 status 分流：truncated 黄色、failed 红色。
+        "notice": notice,
     }
     if ctx.respond_payload.get("needs_clarification"):
         result["status"] = "needs_clarification"
@@ -2840,5 +3043,10 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     # 跨侧契约测试实测暴露了这一点。
                     "clarify_options": result["clarify_options"],
                     "clarify_hint": result["clarify_hint"],
-                    "clarification": result.get("clarification", "")})
+                    "clarification": result.get("clarification", ""),
+                    # 【中性说明 —— 2026-11-11】流式路径也要拿到 notice，
+                    # 否则一次性路径显示黄色提示条、流式路径显示红色失败条 ——
+                    # 同一个语义两种颜色（实测截图就是流式路径）。
+                    "notice": result.get("notice", ""),
+                    "error": result.get("error") or ""})
     return result

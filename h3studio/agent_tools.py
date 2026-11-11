@@ -317,12 +317,17 @@ def register(agent_mod, create_job_handler):
         params.update({str(k): v for k, v in overrides.items()})
 
         # 重试前走**同一套**校验（非法参数照样拦下并给替代方案）
+        #
+        # 【软问题不拦 —— 2026-11-11】与 create_job 同一语义：
+        # 「负面提示词在该族默认不生效」这类**告知类**问题，
+        # 取值本身合法，不该把整个重试拦掉。
         issues = agent_schema.validate_params(mode, params)
-        if issues:
+        hard, soft = agent_schema.split_issues(issues)
+        if hard:
             raise AgentError(
-                "重试参数校验未通过：\n" + agent_schema.format_issues(issues),
+                "重试参数校验未通过：\n" + agent_schema.format_issues(hard),
                 status=400, code="invalid_params",
-                extra={"issues": agent_schema.issues_to_payload(issues)})
+                extra={"issues": agent_schema.issues_to_payload(hard)})
 
         asset_refs = params.pop("asset_refs", None) or []
         prepare = getattr(server, "prepare_job_params", None)
