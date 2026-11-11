@@ -1,0 +1,303 @@
+{
+  "results": [
+    {
+      "width": 375,
+      "case": "tool-ok",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✓",
+            "isBad": false
+          }
+        ],
+        "job_cards": 1
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-375-01-createjob-ok.png",
+      "checks": {
+        "工具级真成功: 工具块存在": true,
+        "工具级真成功: 显示 ✓": true,
+        "工具级真成功: 不是 bad 类": true,
+        "工具级真成功: 无红条": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "tool-bad",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✕",
+            "isBad": true
+          }
+        ],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-375-02-createjob-bad.png",
+      "checks": {
+        "工具级真失败: 显示 ✗": true,
+        "工具级真失败: 是 bad 类": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "truncated",
+      "probe": {
+        "badges": [
+          "已截断"
+        ],
+        "error_bars": [],
+        "notice_bars": [
+          "已达到步骤上限（8 步），返回已完成的部分结果"
+        ],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-375-03-truncated-neutral.png",
+      "checks": {
+        "截断: 徽章是已截断": true,
+        "截断: 无失败徽章": true,
+        "截断: **无红条**": true,
+        "截断: 有中性提示条": true,
+        "截断: 中性条文案正确": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "failed",
+      "probe": {
+        "badges": [
+          "失败"
+        ],
+        "error_bars": [
+          "模型声称已下发任务但实际没有创建任何任务（报告的 job id 是编造的），已拦截。"
+        ],
+        "notice_bars": [],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-375-04-failed-red.png",
+      "failed_requests": [],
+      "checks": {
+        "真失败: 徽章是失败": true,
+        "真失败: 有红条": true,
+        "真失败: 无中性条": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "tool-ok",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✓",
+            "isBad": false
+          }
+        ],
+        "job_cards": 1
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-390-01-createjob-ok.png",
+      "checks": {
+        "工具级真成功: 工具块存在": true,
+        "工具级真成功: 显示 ✓": true,
+        "工具级真成功: 不是 bad 类": true,
+        "工具级真成功: 无红条": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "tool-bad",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✕",
+            "isBad": true
+          }
+        ],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-390-02-createjob-bad.png",
+      "checks": {
+        "工具级真失败: 显示 ✗": true,
+        "工具级真失败: 是 bad 类": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "truncated",
+      "probe": {
+        "badges": [
+          "已截断"
+        ],
+        "error_bars": [],
+        "notice_bars": [
+          "已达到步骤上限（8 步），返回已完成的部分结果"
+        ],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-390-03-truncated-neutral.png",
+      "checks": {
+        "截断: 徽章是已截断": true,
+        "截断: 无失败徽章": true,
+        "截断: **无红条**": true,
+        "截断: 有中性提示条": true,
+        "截断: 中性条文案正确": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "failed",
+      "probe": {
+        "badges": [
+          "失败"
+        ],
+        "error_bars": [
+          "模型声称已下发任务但实际没有创建任何任务（报告的 job id 是编造的），已拦截。"
+        ],
+        "notice_bars": [],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-390-04-failed-red.png",
+      "failed_requests": [],
+      "checks": {
+        "真失败: 徽章是失败": true,
+        "真失败: 有红条": true,
+        "真失败: 无中性条": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "tool-ok",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✓",
+            "isBad": false
+          }
+        ],
+        "job_cards": 1
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-1280-01-createjob-ok.png",
+      "checks": {
+        "工具级真成功: 工具块存在": true,
+        "工具级真成功: 显示 ✓": true,
+        "工具级真成功: 不是 bad 类": true,
+        "工具级真成功: 无红条": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "tool-bad",
+      "probe": {
+        "badges": [
+          "完成"
+        ],
+        "error_bars": [],
+        "notice_bars": [],
+        "tools": [
+          {
+            "name": "create_job",
+            "state": "✕",
+            "isBad": true
+          }
+        ],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-1280-02-createjob-bad.png",
+      "checks": {
+        "工具级真失败: 显示 ✗": true,
+        "工具级真失败: 是 bad 类": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "truncated",
+      "probe": {
+        "badges": [
+          "已截断"
+        ],
+        "error_bars": [],
+        "notice_bars": [
+          "已达到步骤上限（8 步），返回已完成的部分结果"
+        ],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-1280-03-truncated-neutral.png",
+      "checks": {
+        "截断: 徽章是已截断": true,
+        "截断: 无失败徽章": true,
+        "截断: **无红条**": true,
+        "截断: 有中性提示条": true,
+        "截断: 中性条文案正确": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "failed",
+      "probe": {
+        "badges": [
+          "失败"
+        ],
+        "error_bars": [
+          "模型声称已下发任务但实际没有创建任何任务（报告的 job id 是编造的），已拦截。"
+        ],
+        "notice_bars": [],
+        "tools": [],
+        "job_cards": 0
+      },
+      "screenshot": "/root/projects/h3studio-live/evidence/tool-status-fix/tool-1280-04-failed-red.png",
+      "failed_requests": [],
+      "checks": {
+        "真失败: 徽章是失败": true,
+        "真失败: 有红条": true,
+        "真失败: 无中性条": true
+      },
+      "all_pass": true
+    }
+  ],
+  "console_errors": [],
+  "all_pass": true
+}
