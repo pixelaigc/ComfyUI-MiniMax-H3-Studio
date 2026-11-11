@@ -86,6 +86,7 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
+from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
@@ -244,6 +245,36 @@ def init_db():
     ph.ensure_table(conn)
 
 
+def _first_media_output(outputs: list[dict]) -> dict | None:
+    """取第一个图像/视频产物（音频没有尺寸，不参与）。"""
+    for item in outputs or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("kind") in ("image", "video"):
+            return item
+    return None
+
+
+def _job_resolution_info(job_params: dict, outputs: list[dict]) -> dict:
+    """
+    生成库卡片「分辨率 / 画面比例」这一行的**唯一计算入口**（服务端算好下发）。
+
+    【为什么放服务端】前端曾经直接读 `params["resolution"]`（一个档位字符串），
+    于是文生视频实际跑 1344×768 时，卡片显示的是遗留默认值 "544p" ——
+    544p 根本不是 1344×768 的任何合法档位。
+
+    现在统一按 reso_label.describe() 的规则算：
+      * 有产物实际像素 -> 以实际为准（档位 + 比例都由实际像素反算）；
+      * 没有产物 -> 退回请求的 width/height；
+      * 都没有 -> 只把请求的档位/比例原样带出，不编造尺寸。
+    """
+    actual = _first_media_output(outputs)
+    actual_size = None
+    if actual and actual.get("width") and actual.get("height"):
+        actual_size = {"width": actual["width"], "height": actual["height"]}
+    return reso_label.describe(job_params, actual_size)
+
+
 def row_to_job(r):
     mode = r["mode"]
     job_params = json.loads(r["params"] or "{}")
@@ -252,6 +283,7 @@ def row_to_job(r):
     stored_type = str(job_params.get("gen_type") or "").strip()
     gen_type = (gen_types.type_for_mode(stored_type) if stored_type
                 else gen_types.type_for_mode(mode))
+    outputs = json.loads(r["outputs"] or "[]")
     return {
         "id": r["id"],
         "created_at": r["created_at"],
@@ -264,7 +296,9 @@ def row_to_job(r):
         "progress": r["progress"],
         "progress_text": r["progress_text"],
         "error": r["error"],
-        "outputs": json.loads(r["outputs"] or "[]"),
+        "outputs": outputs,
+        # 【2026-11-11】卡片显示用的分辨率 / 比例标签（服务端算好的唯一真源）
+        "resolution_info": _job_resolution_info(job_params, outputs),
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
     }
 
@@ -509,6 +543,106 @@ async def comfy_download_output(session: ClientSession, item: dict) -> str:
         resp.raise_for_status()
         dest.write_bytes(await resp.read())
     return dest.relative_to(OUT_DIR).as_posix()
+
+
+# ------------------------------------------------------------------
+# 产物实际尺寸探测
+# ------------------------------------------------------------------
+# 【为什么必须探测真实产物，而不是只信请求参数】
+# 请求尺寸 ≠ 实际输出尺寸是**常态**，不是异常：
+#   * 视频：H3 原生画布上限 768×1344，超出的会被按比例缩；
+#   * 图像：Z-Image ≥3MP 自动走「低分辨率生成 + RealESRGAN 放大 + 低 denoise
+#     二次细化」的官方 2K 放大链，最终像素由 ImageScale 节点决定；
+#   * 图片编辑（i2i_qwen）：实测请求 1360×768 出了 2048×2048 / 2720×1536。
+# 生成库卡片要显示「实际输出尺寸」，就只能去读产物本身。
+def _probe_image_size(path: Path) -> tuple[int, int] | None:
+    """读图片头拿宽高（只读文件头，不解码整图、不转码）。"""
+    try:
+        from PIL import Image
+    except ImportError:                     # pragma: no cover - 环境缺 PIL
+        return None
+    try:
+        with Image.open(path) as img:
+            width, height = img.size
+        if width > 0 and height > 0:
+            return int(width), int(height)
+    except Exception:
+        return None
+    return None
+
+
+def _probe_media_video_size(path: Path) -> tuple[int, int] | None:
+    """
+    读视频流宽高（ffprobe 只读容器头，不解码）。
+
+    【与长片链路的区别】长片那边有个同名的 `_probe_video_size`，
+    那个在 ffprobe 缺失时会**返回猜测值 864×480**（长片拼接必须有尺寸才能跑）。
+    本函数用于给卡片显示真实尺寸，**探测不到就返回 None** ——
+    宁可少显示一栏，也不能显示一个与产物对不上的数字。
+    """
+    if not FFPROBE:
+        return None
+    cmd = [FFPROBE, "-v", "error", "-select_streams", "v:0",
+           "-show_entries", "stream=width,height", "-of", "csv=p=0", str(path)]
+    try:
+        raw = subprocess.check_output(cmd, encoding="utf-8", timeout=30,
+                                      creationflags=CREATE_NO_WINDOW,
+                                      stderr=subprocess.STDOUT).strip()
+    except Exception:
+        return None
+    parts = [p for p in raw.replace("\n", ",").split(",") if p.strip().isdigit()]
+    if len(parts) < 2:
+        return None
+    width, height = int(parts[0]), int(parts[1])
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def probe_output_size(kind: str, rel_path: str) -> dict | None:
+    """
+    探测一个产物的实际像素尺寸。
+
+    返回 {"width": w, "height": h} 或 None（探测不了就返回 None，
+    **绝不返回猜测值** —— 卡片宁可少显示，也不能显示错的）。
+    """
+    try:
+        path = OUT_DIR / rel_path
+    except Exception:
+        return None
+    if not path.is_file():
+        return None
+    size = None
+    if kind == "image":
+        size = _probe_image_size(path)
+    elif kind == "video":
+        size = _probe_media_video_size(path)
+    if not size:
+        # 后缀兜底：有些 ComfyUI 节点把视频挂在 images 键下（见 _extract_outputs）
+        suffix = path.suffix.lower()
+        if suffix in (".png", ".jpg", ".jpeg", ".webp"):
+            size = _probe_image_size(path)
+        elif suffix in (".mp4", ".webm", ".mkv", ".mov"):
+            size = _probe_media_video_size(path)
+    if not size:
+        return None
+    return {"width": size[0], "height": size[1]}
+
+
+def annotate_outputs_with_size(saved: list[dict]) -> list[dict]:
+    """
+    给一批已落盘的产物探测实际尺寸。
+
+    产物条目形如 {"kind": ..., "file": ..., "name": ...}，
+    这里补上 "width" / "height"（探测不到就不加这个键）。
+    """
+    for item in saved:
+        kind = item.get("kind")
+        if kind not in ("image", "video"):
+            continue
+        size = probe_output_size(kind, item.get("file") or "")
+        if size:
+            item["width"] = size["width"]
+            item["height"] = size["height"]
+    return saved
 
 
 def _file_sha256(path: Path) -> str:
@@ -889,6 +1023,10 @@ class Worker:
                                 for item in outs:
                                     fname = await comfy_download_output(session, item)
                                     saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
+                                # 【2026-11-11】记录产物的**实际像素尺寸**。
+                                # 卡片要显示真实输出，而不是请求值（请求值可能
+                                # 被画布上限 / 放大链 / 模型限制改写过）。
+                                annotate_outputs_with_size(saved)
                                 with db() as conn:
                                     conn.execute(
                                         "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
@@ -959,6 +1097,9 @@ class Worker:
             try:
                 outputs = await self._run_one_batch(job_id, batch_id, mode, params, row["seed"])
                 done_count += 1
+                # 【2026-11-11】批次产物同样记录实际像素尺寸（卡片「批次结果」
+                # 的缩略图网格与标题行摘要都会用到）。
+                annotate_outputs_with_size(outputs)
                 with db() as conn:
                     conn.execute(
                         "UPDATE job_batches SET status='done', progress=1, outputs=?, "
@@ -1107,6 +1248,17 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     out["height"] = height
     if reasons:
         out["size_adjust_reasons"] = reasons
+    # 【2026-11-11】把**实际生效**的档位标签写回 params.resolution。
+    #
+    # 【为什么】文生视频新面板只提交 width/height，不写 resolution。
+    # 而任务记录里的 params.resolution 会保留前端全局 state 的**遗留默认值**
+    # "544p" —— 于是任务卡片显示「544p · 16:9」，实际产物却是 1344×768。
+    # 544p 不是 1344×768 的任何合法档位，这就是用户报出的那个现象。
+    #
+    # 现在写回真实档位（由实际像素反算的短边标签），
+    # 让 params 本身也不再说谎。卡片显示仍以「产物实际像素」为准
+    # （见 reso_label.describe），这一行只是让落库的参数自洽。
+    out["resolution"] = reso_label.tier_for_pixels(width, height)
 
     # ---- 时长（H3 训练区间约 124~362 帧 = 5~15 秒）----
     try:
@@ -1366,6 +1518,11 @@ def list_job_records(status: str | None = None, mode: str | None = None,
             "prompt": (job["params"] or {}).get("prompt") or "",
             "error": job["error"],
             "outputs": job["outputs"],
+            # 【2026-11-11】把「实际输出尺寸 / 比例」一起给 Agent 任务卡。
+            # 原来 Agent 卡只显示 params.resolution 那个档位字符串，
+            # 文生视频实际跑 1344×768 时它恒为遗留默认 "544p"。
+            "params": job["params"],
+            "resolution_info": job["resolution_info"],
         })
     return result
 

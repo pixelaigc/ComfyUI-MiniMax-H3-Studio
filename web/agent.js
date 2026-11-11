@@ -264,8 +264,10 @@
       const params = job.params || {};
       const mode = job.mode || "";
       // 实际生效参数（媒体语义判定）
+      // 【2026-11-11】把 job 一起传进去 —— 它带着服务端算好的
+      // resolution_info（按产物实际像素算的分辨率/比例标签）。
       const effective = media
-        ? media.effectiveParams(mode, params)
+        ? media.effectiveParams(mode, params, job)
         : [];
       // 能力缺口提示（例如 Agent 建不了 a2a / flf 时给替代建议）
       const limitation = media ? media.limitationFor(mode, params) : null;
