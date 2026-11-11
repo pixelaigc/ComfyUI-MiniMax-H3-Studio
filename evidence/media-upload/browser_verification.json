@@ -32,7 +32,7 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_14e387849a9d/preview"
+          "/api/assets/asset_f3809c6cfc75/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -41,7 +41,7 @@
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_14e387849a9d",
+            "asset_id": "asset_f3809c6cfc75",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -85,6 +85,7 @@
         "预处理写入了描述": true,
         "预处理写入了标签": true,
         "前端拿到标签": true,
+        "缩略图真的渲染出内容": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -96,9 +97,9 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_4d59484f2779/preview",
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_33a0891cea00/preview",
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -107,7 +108,7 @@
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_4d59484f2779",
+            "asset_id": "asset_33a0891cea00",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -119,7 +120,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -131,7 +132,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -163,8 +164,8 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -173,7 +174,7 @@
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -185,7 +186,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -241,15 +242,15 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_a4d5f9cb9ca4/preview",
-          "/api/assets/asset_74e0bb8ee467/preview",
-          "/api/assets/asset_88d3e068fb94/preview",
-          "/api/assets/asset_7b8aec7828ef/preview",
-          "/api/assets/asset_4a0dc0d13b9b/preview",
-          "/api/assets/asset_9aa45d17b1f1/preview",
-          "/api/assets/asset_168eea47b120/preview",
-          "/api/assets/asset_a35f38c0f54d/preview",
-          "/api/assets/asset_6e45d0fea75a/preview"
+          "/api/assets/asset_7d4028c97a0f/preview",
+          "/api/assets/asset_28e50323f17d/preview",
+          "/api/assets/asset_8064fbaed6d7/preview",
+          "/api/assets/asset_542b0631fc5f/preview",
+          "/api/assets/asset_d364d7474204/preview",
+          "/api/assets/asset_cec379d37c9f/preview",
+          "/api/assets/asset_5e806c9322de/preview",
+          "/api/assets/asset_a9c088889cdd/preview",
+          "/api/assets/asset_c5bdf74f299f/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "busyVisible": false,
@@ -258,7 +259,7 @@
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_a4d5f9cb9ca4",
+            "asset_id": "asset_7d4028c97a0f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -270,7 +271,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_74e0bb8ee467",
+            "asset_id": "asset_28e50323f17d",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -282,7 +283,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_88d3e068fb94",
+            "asset_id": "asset_8064fbaed6d7",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -294,7 +295,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_7b8aec7828ef",
+            "asset_id": "asset_542b0631fc5f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -306,7 +307,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_4a0dc0d13b9b",
+            "asset_id": "asset_d364d7474204",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -318,7 +319,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_9aa45d17b1f1",
+            "asset_id": "asset_cec379d37c9f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -330,7 +331,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_168eea47b120",
+            "asset_id": "asset_5e806c9322de",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -342,7 +343,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_a35f38c0f54d",
+            "asset_id": "asset_a9c088889cdd",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -354,7 +355,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_6e45d0fea75a",
+            "asset_id": "asset_c5bdf74f299f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -412,7 +413,7 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_14e387849a9d/preview"
+          "/api/assets/asset_f3809c6cfc75/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -421,7 +422,7 @@
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_14e387849a9d",
+            "asset_id": "asset_f3809c6cfc75",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -465,6 +466,7 @@
         "预处理写入了描述": true,
         "预处理写入了标签": true,
         "前端拿到标签": true,
+        "缩略图真的渲染出内容": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -476,9 +478,9 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_4d59484f2779/preview",
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_33a0891cea00/preview",
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -487,7 +489,7 @@
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_4d59484f2779",
+            "asset_id": "asset_33a0891cea00",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -499,7 +501,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -511,7 +513,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -543,8 +545,8 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -553,7 +555,7 @@
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -565,7 +567,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -621,15 +623,15 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_a4d5f9cb9ca4/preview",
-          "/api/assets/asset_74e0bb8ee467/preview",
-          "/api/assets/asset_88d3e068fb94/preview",
-          "/api/assets/asset_7b8aec7828ef/preview",
-          "/api/assets/asset_4a0dc0d13b9b/preview",
-          "/api/assets/asset_9aa45d17b1f1/preview",
-          "/api/assets/asset_168eea47b120/preview",
-          "/api/assets/asset_a35f38c0f54d/preview",
-          "/api/assets/asset_6e45d0fea75a/preview"
+          "/api/assets/asset_7d4028c97a0f/preview",
+          "/api/assets/asset_28e50323f17d/preview",
+          "/api/assets/asset_8064fbaed6d7/preview",
+          "/api/assets/asset_542b0631fc5f/preview",
+          "/api/assets/asset_d364d7474204/preview",
+          "/api/assets/asset_cec379d37c9f/preview",
+          "/api/assets/asset_5e806c9322de/preview",
+          "/api/assets/asset_a9c088889cdd/preview",
+          "/api/assets/asset_c5bdf74f299f/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "busyVisible": false,
@@ -638,7 +640,7 @@
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_a4d5f9cb9ca4",
+            "asset_id": "asset_7d4028c97a0f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -650,7 +652,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_74e0bb8ee467",
+            "asset_id": "asset_28e50323f17d",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -662,7 +664,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_88d3e068fb94",
+            "asset_id": "asset_8064fbaed6d7",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -674,7 +676,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_7b8aec7828ef",
+            "asset_id": "asset_542b0631fc5f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -686,7 +688,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_4a0dc0d13b9b",
+            "asset_id": "asset_d364d7474204",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -698,7 +700,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_9aa45d17b1f1",
+            "asset_id": "asset_cec379d37c9f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -710,7 +712,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_168eea47b120",
+            "asset_id": "asset_5e806c9322de",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -722,7 +724,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_a35f38c0f54d",
+            "asset_id": "asset_a9c088889cdd",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -734,7 +736,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_6e45d0fea75a",
+            "asset_id": "asset_c5bdf74f299f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -792,7 +794,7 @@
         "attachBoxHidden": false,
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_14e387849a9d/preview"
+          "/api/assets/asset_f3809c6cfc75/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -801,7 +803,7 @@
         "hint": "已附 1 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_14e387849a9d",
+            "asset_id": "asset_f3809c6cfc75",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -845,6 +847,7 @@
         "预处理写入了描述": true,
         "预处理写入了标签": true,
         "前端拿到标签": true,
+        "缩略图真的渲染出内容": true,
         "窄屏无横向溢出": true
       },
       "all_pass": true
@@ -856,9 +859,9 @@
         "attachBoxHidden": false,
         "thumbCount": 3,
         "thumbSrcs": [
-          "/api/assets/asset_4d59484f2779/preview",
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_33a0891cea00/preview",
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -867,7 +870,7 @@
         "hint": "已附 3 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_4d59484f2779",
+            "asset_id": "asset_33a0891cea00",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -879,7 +882,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -891,7 +894,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -923,8 +926,8 @@
         "attachBoxHidden": false,
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3919616f365c/preview",
-          "/api/assets/asset_1f31e48e4226/preview"
+          "/api/assets/asset_d823d6c4449e/preview",
+          "/api/assets/asset_db7c8ad122b5/preview"
         ],
         "error": "",
         "busyVisible": false,
@@ -933,7 +936,7 @@
         "hint": "已附 2 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_3919616f365c",
+            "asset_id": "asset_d823d6c4449e",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -945,7 +948,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_1f31e48e4226",
+            "asset_id": "asset_db7c8ad122b5",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1001,15 +1004,15 @@
         "attachBoxHidden": false,
         "thumbCount": 9,
         "thumbSrcs": [
-          "/api/assets/asset_a4d5f9cb9ca4/preview",
-          "/api/assets/asset_74e0bb8ee467/preview",
-          "/api/assets/asset_88d3e068fb94/preview",
-          "/api/assets/asset_7b8aec7828ef/preview",
-          "/api/assets/asset_4a0dc0d13b9b/preview",
-          "/api/assets/asset_9aa45d17b1f1/preview",
-          "/api/assets/asset_168eea47b120/preview",
-          "/api/assets/asset_a35f38c0f54d/preview",
-          "/api/assets/asset_6e45d0fea75a/preview"
+          "/api/assets/asset_7d4028c97a0f/preview",
+          "/api/assets/asset_28e50323f17d/preview",
+          "/api/assets/asset_8064fbaed6d7/preview",
+          "/api/assets/asset_542b0631fc5f/preview",
+          "/api/assets/asset_d364d7474204/preview",
+          "/api/assets/asset_cec379d37c9f/preview",
+          "/api/assets/asset_5e806c9322de/preview",
+          "/api/assets/asset_a9c088889cdd/preview",
+          "/api/assets/asset_c5bdf74f299f/preview"
         ],
         "error": "一次最多附 9 张图，2 张未上传",
         "busyVisible": false,
@@ -1018,7 +1021,7 @@
         "hint": "已附 9 张图，Agent 会把它们当参考图",
         "attachments": [
           {
-            "asset_id": "asset_a4d5f9cb9ca4",
+            "asset_id": "asset_7d4028c97a0f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1030,7 +1033,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_74e0bb8ee467",
+            "asset_id": "asset_28e50323f17d",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1042,7 +1045,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_88d3e068fb94",
+            "asset_id": "asset_8064fbaed6d7",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1054,7 +1057,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_7b8aec7828ef",
+            "asset_id": "asset_542b0631fc5f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1066,7 +1069,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_4a0dc0d13b9b",
+            "asset_id": "asset_d364d7474204",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1078,7 +1081,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_9aa45d17b1f1",
+            "asset_id": "asset_cec379d37c9f",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1090,7 +1093,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_168eea47b120",
+            "asset_id": "asset_5e806c9322de",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1102,7 +1105,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_a35f38c0f54d",
+            "asset_id": "asset_a9c088889cdd",
             "tags": [
               "主体人物",
               "光线与色彩",
@@ -1114,7 +1117,7 @@
             "description": "主体人物 **"
           },
           {
-            "asset_id": "asset_6e45d0fea75a",
+            "asset_id": "asset_c5bdf74f299f",
             "tags": [
               "主体人物",
               "光线与色彩",
