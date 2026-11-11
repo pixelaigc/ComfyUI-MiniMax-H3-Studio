@@ -1584,12 +1584,21 @@ def _load_attachments(ctx: AgentContext, raw) -> list[dict]:
     每个附件读一次素材库条目（复用 ref_api._ref_entry —— 与面板选参考图
     同一个解析函数），描述取自**素材库已有的分析结果**。
 
-    附件不存在 / 已进回收站 -> 跳过（并标注），不抛异常 ——
-    用户的图没了不该让整轮对话失败。
+    【约束落地：只认正式素材条目】
+    用户要求「Agent 侧只引用该 asset id」「条目失效要有明确提示」。
+    所以这里**不做任何本地兜底**：
+      * 条目不存在 / 已进回收站 -> missing=True + 明确 reason
+        （**不**编造描述，也**不**当成可用参考图）
+      * 条目存在但没有分析描述 -> 标 analyzed=False（素材库预处理未完成）
+    这与 Qwen 参考图的素材库化规则一致：只能用素材库条目。
+
+    附件不存在 / 已进回收站 -> 标注但不抛异常 ——
+    用户的图没了不该让整轮对话失败（模型会看到明确提示并如实告知）。
 
     返回的每个条目：
       {"asset_id", "name", "description", "description_source",
-       "tags", "preview_url", "width", "height", "missing", "reason"}
+       "tags", "preview_url", "width", "height", "missing", "reason",
+       "analyzed"}
     """
     from . import assets as asset_store
     from . import ref_api
@@ -1620,6 +1629,10 @@ def _load_attachments(ctx: AgentContext, raw) -> list[dict]:
                 "missing": bool(raw_entry.get("missing")),
                 "reason": raw_entry.get("reason") or "",
             }
+            # 条目存在但素材库没有分析结论 -> 明确标出「未分析」。
+            # （正常流程下上传接口已经同步做完预处理，这里是兜底 ——
+            #   比如素材是在别处入库的，或分析结果被清掉了。）
+            entry["analyzed"] = bool(entry["description"])
             entries.append(entry)
             # 附件也要进 ctx.assets —— 这样它在结果里与 search_assets
             # 命中的素材**同构**，前端渲染逻辑不用分两套。
@@ -1629,9 +1642,24 @@ def _load_attachments(ctx: AgentContext, raw) -> list[dict]:
                 "category": "image",
                 "tags": entry["tags"],
                 "description": entry["description"],
-                "analyzed": bool(entry["description"]),
+                "analyzed": entry["analyzed"],
             }
     return entries
+
+
+def _attachment_asset_ids(attachments: list[dict] | None) -> list[str]:
+    """
+    附件里**可用**的 asset_id（失效的条目排除掉）。
+
+    【为什么要排除失效条目】
+    用户要求「条目失效要有明确提示」，而且失效的条目**不能**作为
+    create_job 的参考图 —— 否则任务建成了，参考图却是空的（静默失效）。
+    失效的条目会在提示块里被如实告知模型，让它自己决定怎么办。
+    """
+    return [str(item.get("asset_id") or "").strip()
+            for item in (attachments or [])
+            if str(item.get("asset_id") or "").strip()
+            and not item.get("missing")]
 
 
 def _attachment_prompt_block(attachments: list[dict]) -> str:
@@ -1645,38 +1673,50 @@ def _attachment_prompt_block(attachments: list[dict]) -> str:
     「用 <image1> 的构图，把人物换成…」这种**可执行**的提示词。
 
     【描述从哪来】
-    素材库里**已有的**多模态分析结果（上传时已异步排过一次分析）。
+    素材库里**已有的**多模态分析结果（上传时已由素材库预处理管线生成）。
     没有分析结果时如实说「尚无分析结论」，**不编造**。
+
+    【标签也带上】
+    标签是素材库的检索索引 —— 模型用它判断「这张图适不适合当前需求」，
+    也让模型在 respond 里能准确报出素材的特征词。
+
+    【失效条目】
+    明确标出「已失效，不可用」—— 模型必须知道不能拿它当参考图。
     """
     if not attachments:
         return ""
-    lines = ["## 用户本轮上传的附件（图片）",
-             "",
-             f"用户这次随消息上传了 {len(attachments)} 张图片。"
-             "它们已经在素材库里，可以直接作为参考图传给 create_job"
-             "（用 asset_id）。"]
+    usable = [item for item in attachments if not item.get("missing")]
+    lines = ["## 用户本轮上传的附件（图片）", ""]
+    if usable:
+        lines.append(f"用户这次随消息上传了 {len(usable)} 张图片。"
+                     "它们已入库到素材库并完成预处理（已生成描述与标签），"
+                     "可以直接作为参考图传给 create_job（用 asset_id）。")
+    if len(usable) != len(attachments):
+        lines.append(f"另有 {len(attachments) - len(usable)} 张附件已失效"
+                     "（素材条目不存在或已进回收站），**不可用**，"
+                     "请如实告知用户，不要把它们当参考图。")
+    lines.append("")
     for index, item in enumerate(attachments, start=1):
         name = item.get("name") or item.get("asset_id") or ""
         desc = (item.get("description") or "").strip()
+        tags = item.get("tags") or []
         if item.get("missing"):
-            detail = f"（该附件已失效：{item.get('reason') or '素材不存在'}）"
-        elif desc:
+            detail = f"（已失效：{item.get('reason') or '素材不存在'}，不可用）"
+            lines.append(f"- 附件{index}（**不可用**）："
+                         f"asset_id={item.get('asset_id') or ''}，"
+                         f"名称={name}。{detail}")
+            continue
+        if desc:
             detail = desc
         else:
-            detail = "（素材库尚无分析结论；可先调用 describe_asset 查看详情）"
+            detail = ("（素材库尚无分析结论；可先调用 describe_asset 查看详情）")
+        tag_part = (f"；标签：{'、'.join(str(t) for t in tags)}" if tags else "")
         lines.append(f"- 参考图{index}（占位标记 <image{index}>）："
                      f"asset_id={item.get('asset_id') or ''}，"
-                     f"名称={name}。素材库描述：{detail}")
+                     f"名称={name}{tag_part}。素材库描述：{detail}")
     lines.append("")
     lines.append("注意：<imageN> 的编号顺序必须与上面的参考图N 严格一致。")
     return "\n".join(lines)
-
-
-def _attachment_asset_ids(attachments: list[dict] | None) -> list[str]:
-    """附件的 asset_id 列表（供 create_job 在模型没显式指定时兜底使用）。"""
-    return [str(item.get("asset_id") or "").strip()
-            for item in (attachments or [])
-            if str(item.get("asset_id") or "").strip()]
 
 
 def _load_enhancer_overrides(ctx: AgentContext) -> dict:

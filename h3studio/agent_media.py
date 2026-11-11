@@ -253,43 +253,231 @@ def _register_one(item: dict) -> dict:
         }
 
 
-def _maybe_start_analysis(asset_id: str) -> dict:
+#: 预处理（分析）的等待上限（秒）。
+#:
+#: 【为什么是 300 秒】
+#: 实测本机 Qwen 多模态分析一张 512x512 的图约需 **120 秒**（本地推理，
+#: iq3 量化小模型看图 + 生成长描述）。9 张图排队（RUNNER 是单 worker）
+#: 最坏要 9×120 ≈ 1080 秒 —— 但那是**全部串行**的极端情况。
+#:
+#: 【为什么不把上限调大到能覆盖 9 张全串行】
+#: HTTP 请求挂 18 分钟，用户早就走了（前端还有 20 分钟的 SSE 超时）。
+#: 更好的做法是**逐张处理**（见 handle_upload 的处理顺序），
+#: 并让每张图的等待有独立上限 —— 超时就明确报错，而不是无限等。
+#:
+#: 【为什么不用素材库那套异步 job + 前端轮询】
+#: 素材库页的「深度分析」是**用户主动点**的异步操作，轮询没问题；
+#: 而 Agent 上传是**用户等着用**的同步流程 —— 他上传完就要发给 Agent。
+#: 同步等待 + 明确失败，比「先返回、后台慢慢跑、Agent 拿到空描述」更符合
+#: 用户预期（约束 3：失败要明确报错，不得静默降级）。
+PREPROCESS_TIMEOUT = 300.0
+
+def _extract_tags_from_description(text: str, limit: int = 8) -> list[str]:
     """
-    给刚上传的图排一次多模态分析（**异步**，立刻返回）。
+    从分析文本里抽出**关键词**作为素材标签。
 
-    【为什么要分析】
-    Agent 引用参考图时，提示词/描述来自**素材库已有的分析结论**
-    （ref_api._describe / agent._tool_describe_asset）。
-    如果不分析，模型看到的是「一个没有描述的图」，
-    无法做「复刻这张图的风格」「把人物换成…」这类需要理解图内容的操作。
+    【为什么需要标签】
+    用户约束：「描述文本与标签可被 Agent 检索/引用」。
+    描述能检索，但标签是素材库的**结构化索引** —— search_assets 的
+    关键词检索会命中标签，Agent 才能用「雨夜」「人像」这类词找到这张图。
 
-    【为什么不自己看图】
-    用户明确要求：走已有素材分析结果，不要自己看片/自行跑 ComfyUI。
-    所以这里**复用素材库的分析管线**（analysis_jobs.start_analysis），
-    与素材库页「深度分析」按钮是同一条路。
+    【怎么抽 —— 不调模型】
+    再调一次模型抽标签 = 一次上传两次推理（+120 秒）。
+    而分析文本本身是**结构化**的（【主体人物】【场景与环境】…），
+    直接从它的结构里切就能拿到有用的标签，零额外成本。
 
-    【失败了怎么办】
-    分析失败**不影响上传成功** —— 素材照样入库，用户照样能把它当参考图。
-    只是描述会空着，模型会看到「analyzed=false」。
+    【抽什么 —— 小节标题 + 小节正文里的关键词】
+    小节标题（「主体人物」「场景与环境」）是**固定的结构名**，
+    10 张图抽出来全都一样 —— 检索价值≈0（「主体人物」匹配任何图）。
+    真正有检索价值的是**正文里的内容词**（「像素化」「马赛克」「极简主义」）。
 
-    【重复上传同一张图时】
-    第二次命中 sha256 去重 -> 复用同一个素材 -> 如果它已经在分析中，
-    再排一次就是浪费 CPU（分析很吃资源）。
-    所以先查有没有在跑的分析任务（active_job_of），有就不再排。
+    所以：
+      * 小节标题：保留但**降权**（排在内容词之后，且同名只留一次）
+      * 小节正文：抽**实义词**（去掉「的」「是」「画面中」这类虚词）
+    这样「主体人物 / 像素化 / 马赛克 / 极简主义」才是能命中的标签。
+
+    抽出来的标签会**真的写进素材库**（asset_repo.add_tags），
+    于是它和用户在素材库页手动打的标签**完全同构** ——
+    Agent 检索、素材库筛选、引用计数全部自动生效。
     """
+    import re
+
+    if not text:
+        return []
+
+    # --- 1) 按小节切开：标题 + 正文 ---------------------------------
+    sections: list[tuple[str, str]] = []
+    pattern = re.compile(r"\*\*?【\s*([^】]{1,20})\s*】\*\*?")
+    matches = list(pattern.finditer(text))
+    for index, match in enumerate(matches):
+        title = match.group(1).strip()
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections.append((title, text[start:end]))
+
+    content_tags: list[str] = []
+    heading_tags: list[str] = []
+
+    # --- 2) 正文里的实义词 -----------------------------------------
+    # 中文没有空格分词，用「去虚词 + 取 2-6 字片段」近似。
+    stop = {"无", "没有", "画面中", "整体", "这个", "一个", "以下", "该",
+            "其中", "可以", "以及", "并且", "但是", "所以", "因为", "如果",
+            "没有", "似乎", "仿佛", "呈现", "显示", "感到", "看到", "位于",
+            "上方", "下方", "左侧", "右侧", "中央", "边缘", "部分", "一些",
+            "非常", "十分", "比较", "较为", "略微", "稍微",
+            "包括", "包含", "颜色", "材质", "感觉", "构成", "填充", "边缘",
+            # 以「的」开头的片段是定语残片（「的方格阵列」），不是独立关键词
+            "的", "地", "得"}
+    for title, body in sections:
+        # 去掉 markdown 强调符号与项目符号
+        clean = re.sub(r"[*_`#>\-•]", " ", body)
+        # 「包括」「呈现」这类动词会把两个词粘在一起（「颜色包括橄榄绿」），
+        # 在它们处切开，才能拿到「橄榄绿」这种**真正可检索**的词。
+        clean = re.sub(r"(包括|包含|呈现|显示|构成|填充|组成|使用|带有)",
+                       " ", clean)
+        for chunk in re.split(r"[，。；：、,.;:\n()（）\[\]「」“”\"'\s]+", clean):
+            chunk = chunk.strip()
+            if not (2 <= len(chunk) <= 8):
+                continue
+            if chunk in stop or chunk in content_tags:
+                continue
+            # 以「的」开头 -> 定语残片，不是关键词
+            if chunk.startswith("的"):
+                continue
+            # 含「或」「和」「及」的片段是并列结构，不是单一关键词
+            if any(ch in chunk for ch in "或和及与"):
+                continue
+            # 全是虚词的片段不要（「的了是在」这种）
+            if all(ch in stop for ch in chunk):
+                continue
+            content_tags.append(chunk)
+
+    # --- 3) 小节标题（降权，放后面） --------------------------------
+    for title, _body in sections:
+        if title and title not in heading_tags and not title.startswith("无"):
+            heading_tags.append(title)
+
+    # 内容词优先，标题补位
+    tags = content_tags[:max(0, limit - 2)] + heading_tags
+    # 去重保序
+    seen: set[str] = set()
+    final: list[str] = []
+    for tag in tags:
+        if tag in seen:
+            continue
+        seen.add(tag)
+        final.append(tag)
+    return final[:limit]
+
+
+def _apply_tags(asset_id: str, tags: list[str]) -> list[str]:
+    """把标签**写进素材库**（与用户手动打的标签同构）。"""
+    if not tags:
+        return []
     try:
         with asset_store.connect() as conn:
-            active = asset_repo.active_job_of(conn, asset_id)
-        if active:
-            return {"analysis_started": False,
-                    "analysis_already_running": True,
-                    "analysis_job_id": active.get("id")}
-        job = analysis_jobs.start_analysis(asset_id, "image", mode="analyze")
-        return {"analysis_started": True,
-                "analysis_job_id": (job or {}).get("id")}
+            asset_repo.add_tags(conn, asset_id, tags, creator="agent_media")
+        return list(tags)
     except Exception:  # noqa: BLE001
-        # 分析是「锦上添花」，失败不能连累上传本身
-        return {"analysis_started": False}
+        return []
+
+
+def _preprocess_asset(asset_id: str) -> dict:
+    """
+    对已入库的素材做**同步预处理**：跑分析管线 -> 写描述 -> 写标签。
+
+    返回 {"ok": bool, "description": str, "tags": list, "error": str}。
+
+    【失败怎么办 —— 明确报错，不静默降级】
+    用户约束 3：「入库或预处理失败要明确报错，不得静默降级为
+    『未入库的裸文件』」。所以这里失败时 ok=False + 具体原因，
+    由 handle_upload 转成 errors 里的明确条目。
+
+    【为什么复用素材库的管线】
+    直接调 analysis.run_analysis（而不是 start_analysis + 轮询）：
+      * 同步等待，语义简单
+      * 失败有明确的 LibraryError 原因
+      * 产出落在同一张 asset_analyses 表，素材库页看得到
+    """
+    from h3studio import analysis as analysis_mod
+    from h3studio import asset_service
+
+    try:
+        with asset_store.connect() as conn:
+            asset = asset_repo.get_asset(conn, asset_id)
+            version = asset_repo.current_version(conn, asset_id)
+            if not asset or not version:
+                return {"ok": False, "description": "", "tags": [],
+                        "error": "素材入库后读不到版本记录"}
+            source = analysis_jobs._source_of(asset_id, version)
+            if source is None or not Path(source).is_file():
+                return {"ok": False, "description": "", "tags": [],
+                        "error": "素材文件已丢失，无法预处理"}
+
+            result = _run_analysis_sync(analysis_mod, asset, version,
+                                        Path(source))
+            text = (result or {}).get("text") or ""
+
+            revision = asset_repo.next_revision(conn, asset_id)
+            extra = dict((result or {}).get("extra") or {})
+            extra["analyzer_mode"] = "multimodal"
+            extra["preprocessed_by"] = "agent_media"
+            asset_repo.save_analysis(
+                conn, asset_id, result.get("kind", "image"), text, revision,
+                provider=result.get("provider"),
+                prompt=result.get("prompt", ""),
+                frames=result.get("frames") or [], extra=extra)
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:200]
+        return {"ok": False, "description": "", "tags": [],
+                "error": f"素材预处理失败：{detail}"}
+
+    tags = _apply_tags(asset_id, _extract_tags_from_description(text))
+    return {"ok": True, "description": text, "tags": tags, "error": ""}
+
+
+def _run_analysis_sync(analysis_mod, asset: dict, version: dict,
+                        source: Path) -> dict:
+    """
+    同步跑一次多模态分析。
+
+    【为什么不能直接 await analysis_mod.run_analysis】
+    那个函数是 async，但内部用 llm_client.call_provider 同步调用模型。
+    在**已经有 running loop** 的线程里直接调会炸（await 一个同步阻塞调用
+    会卡死整个事件循环 —— 这是最严重的一种卡法）。
+
+    所以这里起一个**独立线程**跑同步版（asyncio.run），
+    主线程 join 等它 —— 与 analysis_jobs._run_multimodal 的做法一致，
+    区别只是那个是「提交到线程池不等」，这个是「提交并等结果」。
+
+    【conn 传什么】
+    run_analysis 的 conn 只用于 pick_provider，而 pick_provider 内部
+    **自己开 jobs.db 连接**（Provider 表在 jobs.db，不在素材库库）。
+    传 None 与传素材库连接等价 —— 这里传 None 明确表达「不依赖它」。
+    """
+    import asyncio
+    import threading
+
+    box: dict = {}
+
+    def _runner():
+        try:
+            box["result"] = asyncio.run(analysis_mod.run_analysis(
+                None, asset, version, source, {}, None))
+        except Exception as exc:  # noqa: BLE001
+            box["error"] = exc
+
+    thread = threading.Thread(target=_runner, daemon=True,
+                              name="agent-media-preprocess")
+    thread.start()
+    thread.join(timeout=PREPROCESS_TIMEOUT)
+
+    if thread.is_alive():
+        raise TimeoutError(
+            f"素材预处理超时（超过 {int(PREPROCESS_TIMEOUT)} 秒）")
+    if "error" in box:
+        raise box["error"]
+    return box.get("result") or {}
 
 
 def _describe_asset(asset_id: str) -> dict:
@@ -324,6 +512,20 @@ async def handle_upload(request) -> dict:
     期望的表单字段：
       files[] / file / image —— 一个或多个图片文件
 
+    【完整流程 —— 严格按用户约束】
+      1. 校验（扩展名 + 魔数 + 大小）
+      2. **入素材库**（asset_service.register_asset）→ 拿到正式 asset_id
+         + 元数据（尺寸/编码/类型，register_asset 内部探测）
+      3. **素材库预处理**（分析管线）：生成描述文本 + 标签
+      4. 只有 2、3 都成功，才返回给 Agent 作为可引用条目
+
+    【失败语义 —— 不静默降级】
+    入库失败 -> errors 里明确条目
+    预处理失败 -> errors 里明确条目（**不返回**这个 asset_id，
+    避免 Agent 拿到一个「没有描述的裸条目」）
+    预处理超时的素材会**从素材库删除**（回滚）——
+    留一条「已入库但没处理好」的孤儿素材在库里更糟。
+
     返回 {"ok": True, "results": [...], "errors": [...]}。
     单个文件失败**不影响**其它文件（与素材库上传同一语义）。
     """
@@ -356,6 +558,7 @@ async def handle_upload(request) -> dict:
                            "code": exc.code})
             continue
 
+        # --- 2) 入素材库 -------------------------------------------------
         try:
             entry = _register_one(item)
         except UploadError as exc:
@@ -367,15 +570,30 @@ async def handle_upload(request) -> dict:
             # register_asset 已把文件原子移动到正式位置；这里兜底清理
             item["tmp"].unlink(missing_ok=True)
 
-        # 分析（异步）；失败不影响上传成功
-        analysis = _maybe_start_analysis(entry["asset_id"])
-        described = _describe_asset(entry["asset_id"])
+        asset_id = entry["asset_id"]
+
+        # --- 3) 素材库预处理（分析 + 标签） ------------------------------
+        pre = _preprocess_asset(asset_id)
+        if not pre.get("ok"):
+            # 预处理失败 -> 明确报错，并**回滚**这条素材
+            # （不让「已入库但没描述」的孤儿条目留在库里）
+            _rollback_asset(asset_id)
+            errors.append({
+                "filename": item["filename"],
+                "error": pre.get("error") or "素材预处理失败",
+                "code": "preprocess_failed",
+            })
+            continue
+
+        # --- 4) 读取素材库里的权威状态（描述/标签都从库里取） -----------
+        described = _describe_asset(asset_id)
         entry.update({
-            "analysis_started": analysis.get("analysis_started", False),
             "analyzed": bool(described.get("description")),
             "description": described.get("description") or "",
+            "tags": described.get("tags") or pre.get("tags") or [],
             "width": described.get("width") or entry.get("width"),
             "height": described.get("height") or entry.get("height"),
+            "preprocessed": True,
         })
         results.append(entry)
 
@@ -388,3 +606,24 @@ async def handle_upload(request) -> dict:
         "max_images": MAX_IMAGES_PER_UPLOAD,
         "max_bytes": MAX_IMAGE_BYTES,
     }
+
+
+def _rollback_asset(asset_id: str) -> bool:
+    """
+    把刚入库但预处理失败的素材**撤回**（进回收站，不 purge）。
+
+    【为什么必须回滚】
+    用户约束 3：「不得静默降级为『未入库的裸文件』」。
+    如果只报错却把素材留在库里，素材库页面会多出一条「已入库但没描述、
+    没分析结果」的条目 —— 那是另一种形式的静默降级（用户会以为
+    上传成功了，只是描述还没生成）。
+
+    回滚进回收站（不是 purge）—— 用户在素材库页仍能看到并手动恢复，
+    这样「出错了但东西还在」是可追溯的。
+    """
+    try:
+        with asset_store.connect() as conn:
+            asset_repo.soft_delete(conn, asset_id)
+        return True
+    except Exception:  # noqa: BLE001
+        return False

@@ -28,6 +28,8 @@
     // 附件区的临时状态（上传中 / 出错）
     attachError: "",
     attachBusy: false,
+    // 附件处理阶段的文案（「正在入库素材库…」「正在生成描述与标签…」）
+    attachStage: "",
   };
 
   // ---------- 附件（图片上传） ----------
@@ -51,7 +53,7 @@
     const btn = $("#agAttachBtn");
     if (!box) return;
     const items = state.attachments;
-    if (!items.length && !state.attachError) {
+    if (!items.length && !state.attachError && !state.attachBusy) {
       box.hidden = true;
       box.innerHTML = "";
       if (hint) hint.textContent = "上传的图片会作为参考图交给 Agent";
@@ -59,26 +61,37 @@
       return;
     }
     box.hidden = false;
-    const thumbs = items.map((item, index) => `
-      <div class="ag-attach-thumb" data-asset-id="${esc(item.asset_id || "")}">
+    const thumbs = items.map((item, index) => {
+      const tagHint = (item.tags && item.tags.length)
+        ? ` title="${esc(item.tags.join("、"))}"` : "";
+      return `
+      <div class="ag-attach-thumb" data-asset-id="${esc(item.asset_id || "")}"${tagHint}>
         <img src="${esc(item.preview_url || "")}" alt="${esc(item.name || "附件")}"
              loading="lazy">
         <button type="button" class="ag-attach-remove" data-act="remove-attachment"
                 data-index="${index}" title="移除"
                 aria-label="移除附件">×</button>
-      </div>`).join("");
-    box.innerHTML = thumbs + (state.attachError
+      </div>`;
+    }).join("");
+    // 处理中：明确告知在做什么、大概要多久（本地分析 120~180 秒/张）
+    const busy = state.attachBusy
+      ? `<div class="ag-attach-busy">
+           <span class="ag-attach-spinner"></span>
+           <span>${esc(state.attachStage || "正在处理…")}素材库需要生成描述与标签，
+             本地模型约 1~3 分钟/张，请耐心等待</span>
+         </div>` : "";
+    box.innerHTML = thumbs + busy + (state.attachError
       ? `<div class="ag-attach-err">${esc(state.attachError)}</div>` : "");
     if (hint) {
       hint.textContent = state.attachBusy
-        ? "正在上传…"
+        ? (state.attachStage || "正在处理…")
         : (items.length
           ? `已附 ${items.length} 张图，Agent 会把它们当参考图`
           : "上传的图片会作为参考图交给 Agent");
     }
     if (btn) {
       btn.disabled = state.attachBusy;
-      btn.textContent = state.attachBusy ? "上传中…" : "📎 图片";
+      btn.textContent = state.attachBusy ? "处理中…" : "📎 图片";
     }
   }
 
@@ -129,6 +142,11 @@
       return;
     }
     state.attachBusy = true;
+    // 【素材库预处理要时间 —— 2026-11-11】
+    // 上传后服务端会**同步**跑素材库的预处理管线（多模态分析 + 抽标签），
+    // 实测一张 512x512 的图约需 **120~180 秒**（本地推理）。
+    // 所以提示必须说清楚「在做什么、大概要多久」，否则用户以为卡死。
+    state.attachStage = "正在入库素材库…";
     renderAttachments();
     try {
       const resp = await fetch("/api/agent/upload", { method: "POST", body: form });
@@ -144,6 +162,7 @@
           name: item.name || "",
           preview_url: item.preview_url || "",
           description: item.description || "",
+          tags: item.tags || [],
           width: item.width || null,
           height: item.height || null,
         });
@@ -154,6 +173,7 @@
       state.attachError = err.message || "上传失败";
     } finally {
       state.attachBusy = false;
+      state.attachStage = "";
       renderAttachments();
     }
   }
@@ -1537,6 +1557,7 @@
     state.attachments = [];
     state.attachError = "";
     state.attachBusy = false;
+    state.attachStage = "";
     renderAttachments();
     renderMessages();
     const status = $("#agStatus");

@@ -774,5 +774,313 @@ class TestFrontendContract(unittest.TestCase):
                                                     "web/responsive.css"})
 
 
+# ------------------------------------------------------------------ 8. 素材库入库 + 预处理
+
+
+class TestLibraryIngestAndPreprocess(AssetLibraryTestCase):
+    """
+    【追加约束】上传的媒体必须**先进入资产素材库**，并由素材库完成预处理
+    （元数据抽取 / 模型内容分析生成描述 / 标签），之后才进入 Agent 上下文。
+
+    这里的测试**不跑真模型**（一次 120~180 秒，太慢且要真 GPU），
+    而是把分析管线**替换成可控的桩**，验证：
+      * 入库一定发生（产出正式 asset_id）
+      * 预处理一定被调用
+      * 预处理产物（描述 + 标签）**真的写进素材库**
+      * 预处理失败 -> 明确报错 + 回滚，**不**返回裸 asset_id
+    """
+
+    def _register(self, tmp: Path):
+        p = make_image(tmp / "pre.png")
+        item = {"tmp": p, "filename": "pre.png", "suffix": ".png",
+                "bytes": p.stat().st_size}
+        entry = agent_media._register_one(item)
+        p.unlink(missing_ok=True)
+        return entry
+
+    def test_upload_registers_into_asset_library(self):
+        """上传 -> 素材库里有正式条目（含 asset_id）。"""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry = self._register(tmp)
+            asset_id = entry["asset_id"]
+            self.assertTrue(asset_id.startswith("asset_"))
+            with asset_store.connect() as conn:
+                asset = asset_repo.get_asset(conn, asset_id)
+                self.assertIsNotNone(asset, "素材库里没有这条条目")
+                self.assertEqual(asset["source"], "agent_upload")
+                version = asset_repo.current_version(conn, asset_id)
+                self.assertIsNotNone(version)
+                # 元数据由 register_asset 抽取（尺寸）
+                self.assertEqual(version["width"], 64)
+                self.assertEqual(version["height"], 48)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_preprocess_writes_description_into_library(self):
+        """预处理产出的描述**真的落在素材库**（不是只在内存里）。"""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry = self._register(tmp)
+            asset_id = entry["asset_id"]
+
+            fake_result = {
+                "text": "**【场景与环境】**\n雨夜的街道，霓虹灯倒映在积水里。",
+                "provider": {"id": "p1", "name": "测试模型", "model": "m"},
+                "kind": "image", "prompt": "p", "frames": [],
+                "extra": {"width": 64, "height": 48},
+            }
+            original = agent_media._run_analysis_sync
+            agent_media._run_analysis_sync = lambda *a, **k: fake_result
+            try:
+                pre = agent_media._preprocess_asset(asset_id)
+            finally:
+                agent_media._run_analysis_sync = original
+
+            self.assertTrue(pre["ok"], pre.get("error"))
+            with asset_store.connect() as conn:
+                analysis = asset_repo.latest_analysis(conn, asset_id)
+                self.assertIsNotNone(analysis, "分析结果没落库")
+                self.assertIn("雨夜的街道", analysis["text"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_preprocess_writes_tags_into_library(self):
+        """预处理产出的标签**真的落在素材库**（可被 search_assets 检索）。"""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry = self._register(tmp)
+            asset_id = entry["asset_id"]
+
+            fake_result = {
+                "text": ("**【场景与环境】**\n雨夜的街道，霓虹灯倒映在积水里。\n\n"
+                         "**【光线与色彩】**\n冷色调为主，强烈的蓝紫色霓虹。"),
+                "provider": {"id": "p1", "name": "测试模型", "model": "m"},
+                "kind": "image", "prompt": "p", "frames": [], "extra": {},
+            }
+            original = agent_media._run_analysis_sync
+            agent_media._run_analysis_sync = lambda *a, **k: fake_result
+            try:
+                pre = agent_media._preprocess_asset(asset_id)
+            finally:
+                agent_media._run_analysis_sync = original
+
+            self.assertTrue(pre["ok"], pre.get("error"))
+            self.assertTrue(pre["tags"], "没有抽出任何标签")
+            with asset_store.connect() as conn:
+                tags = [t["tag"] for t in conn.execute(
+                    "SELECT tag FROM asset_tags WHERE asset_id=?", (asset_id,))]
+                self.assertTrue(tags, "标签没落库")
+                # **关键**：标签要能被检索命中（这才是「Agent 可检索」的意义）
+                hit = asset_repo.search_assets(conn, {"q": tags[0],
+                                                      "page_size": 5})
+                self.assertGreaterEqual(hit.get("total", 0), 1,
+                                        "标签检索不到这条素材")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_preprocess_failure_reports_and_rolls_back(self):
+        """【约束 3】预处理失败 -> 明确报错 + 回滚，**不**返回裸 asset_id。"""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry = self._register(tmp)
+            asset_id = entry["asset_id"]
+
+            def boom(*a, **k):
+                raise RuntimeError("模型调用失败")
+
+            original = agent_media._run_analysis_sync
+            agent_media._run_analysis_sync = boom
+            try:
+                pre = agent_media._preprocess_asset(asset_id)
+            finally:
+                agent_media._run_analysis_sync = original
+
+            self.assertFalse(pre["ok"])
+            self.assertIn("预处理失败", pre["error"])
+            self.assertIn("模型调用失败", pre["error"])
+
+            # 回滚后条目进回收站（不是留着当孤儿）
+            agent_media._rollback_asset(asset_id)
+            with asset_store.connect() as conn:
+                asset = asset_repo.get_asset(conn, asset_id,
+                                             include_deleted=True)
+                self.assertIsNotNone(asset)
+                self.assertIsNotNone(asset.get("deleted_at"),
+                                     "预处理失败的素材没被回滚")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rollback_uses_soft_delete(self):
+        """回滚必须进回收站（可恢复），不能 purge。"""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            entry = self._register(tmp)
+            asset_id = entry["asset_id"]
+            self.assertTrue(agent_media._rollback_asset(asset_id))
+            with asset_store.connect() as conn:
+                asset = asset_repo.get_asset(conn, asset_id,
+                                             include_deleted=True)
+                self.assertIsNotNone(asset.get("deleted_at"))
+                # 版本文件仍在（可恢复）
+                version = asset_repo.current_version(conn, asset_id)
+                self.assertIsNotNone(version)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ------------------------------------------------------------------ 9. 标签抽取
+
+
+class TestTagExtraction(unittest.TestCase):
+    """标签抽取：从分析文本里取出**可检索**的关键词。"""
+
+    def test_extracts_section_headings(self):
+        text = "**【主体人物】**\n一位红衣女性。\n\n**【场景与环境】**\n雨夜街道。"
+        tags = agent_media._extract_tags_from_description(text)
+        self.assertIn("主体人物", tags)
+        self.assertIn("场景与环境", tags)
+
+    def test_extracts_content_keywords_not_only_headings(self):
+        """【关键】不能只抽小节标题 —— 那是固定结构名，检索价值≈0。
+
+        10 张不同的小节标题完全一样，但「像素化」「马赛克」这类内容词
+        才是能命中的标签。
+        """
+        text = ("**【场景与环境】**\n画面呈现为一个抽象的几何背景，"
+                "由低分辨率的彩色方块网格构成（类似马赛克或像素化效果）。")
+        tags = agent_media._extract_tags_from_description(text)
+        self.assertTrue(tags)
+        # 至少有一个内容词（不是只有标题）
+        self.assertTrue(any(t not in ("主体人物", "场景与环境", "光线与色彩")
+                            for t in tags),
+                        f"只抽到了小节标题，没有内容词：{tags}")
+
+    def test_drops_boilerplate_openers(self):
+        text = ("基于您提供的图片素材 `a.png`，以下是详尽的中文描述：\n\n"
+                "**【主体人物】**\n无。")
+        tags = agent_media._extract_tags_from_description(text)
+        self.assertFalse(any(t.startswith("以下") for t in tags), tags)
+        self.assertFalse(any(t.startswith("基于") for t in tags), tags)
+
+    def test_empty_text_yields_no_tags(self):
+        self.assertEqual(agent_media._extract_tags_from_description(""), [])
+
+    def test_tags_are_deduplicated_and_limited(self):
+        text = ("**【场景与环境】**\n雨夜街道，雨夜街道，雨夜街道。\n"
+                "**【主体人物】**\n无。")
+        tags = agent_media._extract_tags_from_description(text, limit=8)
+        self.assertEqual(len(tags), len(set(tags)))
+        self.assertLessEqual(len(tags), 8)
+
+
+# ------------------------------------------------------------------ 10. 失效条目
+
+
+class TestInvalidAttachmentEntry(AssetLibraryTestCase):
+    """【约束 2】条目失效要有明确提示，且不能当参考图用。"""
+
+    def test_missing_entry_is_marked_and_excluded_from_refs(self):
+        ctx = agent_mod.AgentContext(server_module=None, provider={})
+        entries = agent_mod._load_attachments(ctx, ["asset_nonexistent"])
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0]["missing"])
+        self.assertTrue(entries[0]["reason"])
+        # **失效条目不能作为参考图**
+        self.assertEqual(agent_mod._attachment_asset_ids(entries), [])
+
+    def test_deleted_entry_is_marked_and_excluded(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            p = make_image(tmp / "d.png")
+            result = self.register(p)
+            asset_id = result["asset"]["id"]
+            with asset_store.connect() as conn:
+                asset_repo.soft_delete(conn, asset_id)
+
+            ctx = agent_mod.AgentContext(server_module=None, provider={})
+            entries = agent_mod._load_attachments(ctx, [asset_id])
+            self.assertTrue(entries[0]["missing"])
+            self.assertEqual(agent_mod._attachment_asset_ids(entries), [])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_valid_entry_is_usable_and_included(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            p = make_image(tmp / "v.png")
+            result = self.register(p)
+            asset_id = result["asset"]["id"]
+            ctx = agent_mod.AgentContext(server_module=None, provider={})
+            entries = agent_mod._load_attachments(ctx, [asset_id])
+            self.assertFalse(entries[0]["missing"])
+            self.assertEqual(agent_mod._attachment_asset_ids(entries), [asset_id])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_prompt_block_marks_invalid_entry_as_unusable(self):
+        """提示块必须明确说「不可用」，模型才知道不能拿它当参考图。"""
+        ctx = agent_mod.AgentContext(server_module=None, provider={})
+        entries = agent_mod._load_attachments(ctx, ["asset_nonexistent"])
+        block = agent_mod._attachment_prompt_block(entries)
+        self.assertIn("不可用", block)
+        self.assertIn("失效", block)
+
+    def test_prompt_block_includes_tags(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            p = make_image(tmp / "t.png")
+            result = self.register(p)
+            asset_id = result["asset"]["id"]
+            with asset_store.connect() as conn:
+                asset_repo.add_tags(conn, asset_id, ["雨夜", "霓虹"])
+
+            ctx = agent_mod.AgentContext(server_module=None, provider={})
+            entries = agent_mod._load_attachments(ctx, [asset_id])
+            block = agent_mod._attachment_prompt_block(entries)
+            self.assertIn("雨夜", block)
+            self.assertIn("霓虹", block)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ------------------------------------------------------------------ 11. 既有两项约束
+
+
+class TestPriorConstraintsStillHold(unittest.TestCase):
+    """【约束 5】不得因本次改造放宽既有修复。"""
+
+    def test_fabricated_job_id_blocking_intact(self):
+        source = Path(agent_mod.__file__).read_text(encoding="utf-8")
+        self.assertIn("fabricated_job_id", source)
+        self.assertTrue(hasattr(agent_mod, "_job_id_matches_any"))
+
+    def test_truncated_neutral_notice_intact(self):
+        source = Path(agent_mod.__file__).read_text(encoding="utf-8")
+        self.assertIn('"notice": notice', source)
+
+    def test_upload_does_not_touch_fabricated_or_truncated_logic(self):
+        """agent_media 不该改动那两条判定（它只管上传与入库）。"""
+        source = Path(agent_media.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("fabricated_job_id", source)
+        self.assertNotIn("no_tool_call", source)
+
+    def test_agent_media_has_no_comfyui_dependency(self):
+        """上传/预处理**不许**自己跑 ComfyUI（走素材库既有管线）。"""
+        source = Path(agent_media.__file__).read_text(encoding="utf-8")
+        for forbidden in ("comfy", "COMFY", "workflow"):
+            self.assertNotIn(forbidden, source,
+                             f"agent_media 不该出现 {forbidden}")
+
+    def test_preprocess_uses_library_analysis_pipeline(self):
+        """预处理必须复用素材库的分析管线（analysis_mod.run_analysis）。"""
+        source = Path(agent_media.__file__).read_text(encoding="utf-8")
+        self.assertIn("analysis_mod.run_analysis", source)
+
+    def test_max_images_still_nine(self):
+        self.assertEqual(agent_media.MAX_IMAGES_PER_UPLOAD, 9)
+        self.assertEqual(agent_mod.MAX_ATTACHMENTS, 9)
+
+
 if __name__ == "__main__":
     unittest.main()
