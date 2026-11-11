@@ -1,0 +1,54 @@
+{
+  "comfyui_api": {
+    "diffusion_models": 151,
+    "unet_enum": 151,
+    "loras": 686
+  },
+  "chain": [
+    {
+      "dropdown_key": "fl2va_pruned_int8",
+      "dropdown_label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+      "panel_status": "available",
+      "submit_normalize_error": "",
+      "workflow_unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "equals_catalog_unet": true,
+      "in_comfyui_unet_list": true
+    },
+    {
+      "dropdown_key": "fl2va_int8",
+      "dropdown_label": "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+      "panel_status": "available",
+      "submit_normalize_error": "",
+      "workflow_unet_name": "minimax_h3_fl2va_int8_convrot.safetensors",
+      "equals_catalog_unet": true,
+      "in_comfyui_unet_list": true
+    },
+    {
+      "dropdown_key": "fl2va_pruned_w4a8",
+      "dropdown_label": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+      "panel_status": "available",
+      "submit_normalize_error": "",
+      "workflow_unet_name": "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors",
+      "equals_catalog_unet": true,
+      "in_comfyui_unet_list": true
+    },
+    {
+      "dropdown_key": "fl2va_bf16",
+      "dropdown_label": "MiniMax-H3 FL2VA · BF16（官方原始精度）",
+      "panel_status": "available",
+      "submit_normalize_error": "",
+      "workflow_unet_name": "minimax_h3_fl2va_bf16.safetensors",
+      "equals_catalog_unet": true,
+      "in_comfyui_unet_list": true
+    },
+    {
+      "dropdown_key": "hybrid_fl2va_ref2va",
+      "dropdown_label": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
+      "panel_status": "available",
+      "submit_normalize_error": "",
+      "workflow_unet_name": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
+      "equals_catalog_unet": true,
+      "in_comfyui_unet_list": true
+    }
+  ]
+}

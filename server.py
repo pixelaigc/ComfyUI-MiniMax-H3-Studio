@@ -86,7 +86,10 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
+# 合并说明：video_categories（video-tabs 分支）与 comfy_models
+# （model-list-fix 分支）是两个独立模块，两条 import 都保留。
 from h3studio import video_categories
+from h3studio import comfy_models
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
@@ -1184,9 +1187,22 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     model = video_models.VIDEO_MODELS.get(model_key)
     if model is None:
         return out, f"未知的视频模型 {model_key}"
-    if not video_models.model_available(model_key):
-        return out, (f"本机找不到底模权重 {model['unet']}"
-                     f"（{model.get('location') or '未知目录'}）—— 盘未挂载或文件已删。")
+    # 【2026-11-11】可用性判定与面板**同源** —— 都以 ComfyUI 的模型列表
+    # API 为准（面板显示什么，这里就按什么判）。
+    # 原来这里只扫盘（model_available），面板与提交走两条路，
+    # 就会出现「下拉显示 A、提交被拒」的不一致。
+    model_status = video_models.model_status(model_key)
+    if model_status != "available":
+        if model_status == "external_missing":
+            return out, (f"模型「{model['label']}」的权重位于外置盘 "
+                         f"{model.get('location') or ''}，但 ComfyUI 的模型"
+                         "列表里没有它（外置盘未挂载或未扫描到）—— 当前不可选。")
+        if model_status == "missing":
+            return out, (f"本机找不到模型权重 {model['unet']}"
+                         f"（{model.get('location') or '未知目录'}）。")
+        # unknown：ComfyUI 连不上，无法确认 -> 放行（让 ComfyUI 自己判）
+        # 但要把原因带出去，避免「静默失败」。
+        out["model_status_note"] = video_models.model_status_note(model_key)
     out["model_key"] = model_key
 
     # ---- 固定加速 LoRA ----
@@ -2871,12 +2887,19 @@ async def api_video_options(request):
     """GET /api/video-options —— 文生视频面板的可选项清单
 
     清单全部来自服务端实测（h3studio/video_models.py）：
-      * 可用底模（文件真在本机）
+      * 可用底模（**以 ComfyUI 的模型列表 API 为准** —— 见下）
       * 固定加速 LoRA（工作流硬性必需，不进可勾选列表）
       * 可勾选的加速 LoRA 组合（每项带用途与推荐强度）
       * 注意力机制（只列本机 ComfyUI 里真有的节点）
       * 二采（SelfLift）参数与硬约束
       * 宽高吸附规则（倍数 / 上下限）
+
+    【2026-11-11 改造】底模的「能不能选」不再靠写死的常量，也不只靠
+    扫盘 —— 现在**问 ComfyUI 本人**：拉 `/models/diffusion_models` 与
+    `UNETLoader.unet_name` 枚举（两者交叉验证），再决定每条模型的状态
+    （available / external_missing / missing / unknown）。
+    ComfyUI 不可达时降级到扫盘，并在 payload 里标 model_list_source
+    与 model_list_error —— 如实说明来源，不谎称「获取不到模型」。
     """
     # 本机 ComfyUI 里真有哪些节点 —— 决定「注意力机制」「二采」能不能选
     await refresh_comfy_node_names()
@@ -2884,7 +2907,12 @@ async def api_video_options(request):
     def node_available(class_type: str) -> bool:
         return class_type in _COMFY_NODE_NAMES
 
-    payload = video_models.options_payload(node_available=node_available)
+    # 模型清单快照（带 20 秒缓存）：一次拉，供全部分析共用
+    # 用**异步**版 —— ComfyUI 首次列目录实测要 43 秒，
+    # 同步调用会把整个事件循环卡住（状态流/其它 API 全瘫）。
+    snapshot = await video_models.refresh_comfy_snapshot_async()
+    payload = video_models.options_payload(node_available=node_available,
+                                           snapshot=snapshot)
     # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
     # 前端据此把对不上的组合从**下拉里剔除**（不是置灰）。
     #
@@ -5015,6 +5043,71 @@ async def api_prompt_history_delete(request):
     return json_ok({"ok": True, "removed": removed, "panel_key": panel_key})
 
 
+async def api_comfy_models(request):
+    """GET /api/comfy-models —— **ComfyUI 当前可用模型清单**（诊断用）。
+
+    直接把 ComfyUI 的模型目录列表 + 节点输入枚举转发出来，并标注
+    本面板登记的每个权重「在不在里面」。
+
+    为什么需要这个端点：
+      用户报「文生视频面板说获取不到模型」时，第一件事就是要有**一份
+      可核对的原始事实** —— ComfyUI 自己说它有哪些模型。这个端点就是
+      那个事实的落地形式，不用再去猜哪个接口对。
+
+    查询参数：
+      folder      diffusion_models（默认） | loras
+      full        1 = 返回完整清单；0（默认）= 只返回计数 + 本面板相关项
+    """
+    folder = (request.query.get("folder") or "diffusion_models").strip()
+    if folder not in comfy_models.COMFY_MODEL_FOLDERS:
+        return web.json_response(
+            {"error": f"未知目录 {folder}，可选：{list(comfy_models.COMFY_MODEL_FOLDERS)}"},
+            status=400)
+    full = (request.query.get("full") or "").strip() in ("1", "true", "yes")
+    base = video_models.comfy_base_url()
+    try:
+        # 异步版：ComfyUI 首次列目录实测 43 秒，同步调用会卡住事件循环。
+        # 本端点每次都直接问 ComfyUI（诊断用，不吃快照缓存）；
+        # 面板自己走 /api/video-options 的快照缓存。
+        async with ClientSession(timeout=ClientTimeout(total=60)) as session:
+            names = await comfy_models.fetch_model_list_async(session, base,
+                                                              folder)
+    except comfy_models.ComfyModelListError as exc:
+        return web.json_response(
+            {"ok": False, "error": str(exc), "folder": folder,
+             "comfyui_url": base}, status=502)
+    payload = {
+        "ok": True,
+        "folder": folder,
+        "comfyui_url": base,
+        "count": len(names),
+    }
+    if full:
+        payload["names"] = names
+    # 本面板登记的权重 vs ComfyUI 清单 —— 逐个标注
+    if folder == "diffusion_models":
+        checked = []
+        for key, meta in video_models.VIDEO_MODELS.items():
+            checked.append({
+                "key": key,
+                "label": meta["label"],
+                "unet": meta["unet"],
+                "listed": meta["unet"] in set(names),
+                "location": meta.get("location", ""),
+            })
+        payload["panel_models"] = checked
+    else:
+        checked = []
+        for key, meta in video_models.VIDEO_ACCEL_LORAS.items():
+            checked.append({"key": key, "name": meta["name"],
+                            "listed": meta["name"] in set(names)})
+        for key, meta in video_models.VIDEO_ACCEL_LORA_COMBOS.items():
+            checked.append({"key": key, "name": meta["name"],
+                            "listed": meta["name"] in set(names)})
+        payload["panel_loras"] = checked
+    return json_ok(payload)
+
+
 # ------------------------------------------------------------------ app
 def make_app():
     app = web.Application(client_max_size=200 * 1024 * 1024)
@@ -5035,7 +5128,10 @@ def make_app():
 
     # 文生视频面板（模型 / 加速 LoRA / 注意力 / 二采 / 宽高吸附）
     app.router.add_get("/api/video-options", api_video_options)
+    # 合并说明：/api/video-categories（video-tabs）与 /api/comfy-models
+    # （model-list-fix）是两个独立路由，都保留。
     app.router.add_get("/api/video-categories", api_video_categories)
+    app.router.add_get("/api/comfy-models", api_comfy_models)
     app.router.add_get("/api/video-size", api_video_size)
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)

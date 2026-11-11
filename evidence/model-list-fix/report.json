@@ -1,0 +1,310 @@
+{
+  "base": "http://127.0.0.1:8191",
+  "viewports": {
+    "375": {
+      "options": [
+        {
+          "value": "fl2va_pruned_int8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": true
+        },
+        {
+          "value": "fl2va_int8",
+          "text": "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_pruned_w4a8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_bf16",
+          "text": "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "hybrid_fl2va_ref2va",
+          "text": "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        }
+      ],
+      "selected": "fl2va_pruned_int8",
+      "warn": "权重位于外置盘 /mnt/nvme1t_colorful/comfyui-models/diffusion_models，但 ComfyUI 的模型列表里没有它 —— 外置盘可能未挂载或未扫描到，当前不可选。",
+      "warnVisible": true,
+      "sourceNote": "清单来源：ComfyUI 模型列表 API（0 个扩散模型 / 0 个 LoRA）",
+      "sourceVisible": true,
+      "sourceClass": "img-note",
+      "note": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 /mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+      "submitModelKey": "fl2va_pruned_int8",
+      "stateModel": "fl2va_pruned_int8",
+      "selWidth": 343,
+      "selHeight": 38,
+      "selRight": 359,
+      "selTop": 491.953125,
+      "display": "inline-block",
+      "visibility": "visible",
+      "panelOpen": true,
+      "docScrollWidth": 375,
+      "docClientWidth": 375,
+      "blockRight": 359,
+      "visible": true,
+      "horizontal_overflow_px": 0,
+      "overflow_ok": true,
+      "disabled_labels": [
+        "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+        "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）"
+      ],
+      "disabled_labelled": true,
+      "forbidden_found": [],
+      "console_errors": [],
+      "page_errors": [],
+      "all_visible": true,
+      "ok": true
+    },
+    "390": {
+      "options": [
+        {
+          "value": "fl2va_pruned_int8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": true
+        },
+        {
+          "value": "fl2va_int8",
+          "text": "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_pruned_w4a8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_bf16",
+          "text": "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "hybrid_fl2va_ref2va",
+          "text": "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        }
+      ],
+      "selected": "fl2va_pruned_int8",
+      "warn": "权重位于外置盘 /mnt/nvme1t_colorful/comfyui-models/diffusion_models，但 ComfyUI 的模型列表里没有它 —— 外置盘可能未挂载或未扫描到，当前不可选。",
+      "warnVisible": true,
+      "sourceNote": "清单来源：ComfyUI 模型列表 API（0 个扩散模型 / 0 个 LoRA）",
+      "sourceVisible": true,
+      "sourceClass": "img-note",
+      "note": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 /mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+      "submitModelKey": "fl2va_pruned_int8",
+      "stateModel": "fl2va_pruned_int8",
+      "selWidth": 358,
+      "selHeight": 38,
+      "selRight": 374,
+      "selTop": 495.78125,
+      "display": "inline-block",
+      "visibility": "visible",
+      "panelOpen": true,
+      "docScrollWidth": 390,
+      "docClientWidth": 390,
+      "blockRight": 374,
+      "visible": true,
+      "horizontal_overflow_px": 0,
+      "overflow_ok": true,
+      "disabled_labels": [
+        "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+        "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）"
+      ],
+      "disabled_labelled": true,
+      "forbidden_found": [],
+      "console_errors": [],
+      "page_errors": [],
+      "all_visible": true,
+      "ok": true
+    },
+    "1280": {
+      "options": [
+        {
+          "value": "fl2va_pruned_int8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": true
+        },
+        {
+          "value": "fl2va_int8",
+          "text": "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_pruned_w4a8",
+          "text": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "fl2va_bf16",
+          "text": "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        },
+        {
+          "value": "hybrid_fl2va_ref2va",
+          "text": "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）",
+          "disabled": true,
+          "selected": false
+        }
+      ],
+      "selected": "fl2va_pruned_int8",
+      "warn": "权重位于外置盘 /mnt/nvme1t_colorful/comfyui-models/diffusion_models，但 ComfyUI 的模型列表里没有它 —— 外置盘可能未挂载或未扫描到，当前不可选。",
+      "warnVisible": true,
+      "sourceNote": "清单来源：ComfyUI 模型列表 API（0 个扩散模型 / 0 个 LoRA）",
+      "sourceVisible": true,
+      "sourceClass": "img-note",
+      "note": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 /mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+      "submitModelKey": "fl2va_pruned_int8",
+      "stateModel": "fl2va_pruned_int8",
+      "selWidth": 297,
+      "selHeight": 32,
+      "selRight": 503,
+      "selTop": 418.25,
+      "display": "inline-block",
+      "visibility": "visible",
+      "panelOpen": true,
+      "docScrollWidth": 1280,
+      "docClientWidth": 1280,
+      "blockRight": 503,
+      "visible": true,
+      "horizontal_overflow_px": 0,
+      "overflow_ok": true,
+      "disabled_labels": [
+        "MiniMax-H3 FL2VA · 剪枝 int8（默认）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 完整 int8（保真最高）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）（外置未挂载，当前不可选）",
+        "MiniMax-H3 FL2VA · BF16（官方原始精度）（外置未挂载，当前不可选）",
+        "MiniMax-H3 混合版 · FL2VA+Ref2VA（外置未挂载，当前不可选）"
+      ],
+      "disabled_labelled": true,
+      "forbidden_found": [],
+      "console_errors": [],
+      "page_errors": [],
+      "all_visible": true,
+      "ok": true
+    }
+  },
+  "console_errors": [],
+  "page_errors": [],
+  "api": {
+    "video_options": {
+      "model_list_source": "comfyui_api",
+      "model_list_error": "",
+      "model_list_counts": {
+        "diffusion_models": 151,
+        "unet_enum": 151,
+        "loras": 686
+      },
+      "models": [
+        {
+          "key": "fl2va_pruned_int8",
+          "status": "available",
+          "available": true,
+          "comfy_listed": true,
+          "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+          "status_note": "ComfyUI 模型列表已收录该权重，可直接选用。"
+        },
+        {
+          "key": "fl2va_int8",
+          "status": "available",
+          "available": true,
+          "comfy_listed": true,
+          "unet": "minimax_h3_fl2va_int8_convrot.safetensors",
+          "status_note": "ComfyUI 模型列表已收录该权重，可直接选用。"
+        },
+        {
+          "key": "fl2va_pruned_w4a8",
+          "status": "available",
+          "available": true,
+          "comfy_listed": true,
+          "unet": "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors",
+          "status_note": "ComfyUI 模型列表已收录该权重，可直接选用。"
+        },
+        {
+          "key": "fl2va_bf16",
+          "status": "available",
+          "available": true,
+          "comfy_listed": true,
+          "unet": "minimax_h3_fl2va_bf16.safetensors",
+          "status_note": "ComfyUI 模型列表已收录该权重，可直接选用。"
+        },
+        {
+          "key": "hybrid_fl2va_ref2va",
+          "status": "available",
+          "available": true,
+          "comfy_listed": true,
+          "unet": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
+          "status_note": "ComfyUI 模型列表已收录该权重，可直接选用。"
+        }
+      ]
+    },
+    "comfy_models": {
+      "ok": true,
+      "folder": "diffusion_models",
+      "count": 151,
+      "panel_models": [
+        {
+          "key": "fl2va_pruned_int8",
+          "label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+          "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+          "listed": true,
+          "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models"
+        },
+        {
+          "key": "fl2va_int8",
+          "label": "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+          "unet": "minimax_h3_fl2va_int8_convrot.safetensors",
+          "listed": true,
+          "location": "/home/ubuntu/comfyui/models/diffusion_models"
+        },
+        {
+          "key": "fl2va_pruned_w4a8",
+          "label": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+          "unet": "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors",
+          "listed": true,
+          "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models"
+        },
+        {
+          "key": "fl2va_bf16",
+          "label": "MiniMax-H3 FL2VA · BF16（官方原始精度）",
+          "unet": "minimax_h3_fl2va_bf16.safetensors",
+          "listed": true,
+          "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models"
+        },
+        {
+          "key": "hybrid_fl2va_ref2va",
+          "label": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
+          "unet": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
+          "listed": true,
+          "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models"
+        }
+      ]
+    }
+  },
+  "ok": true
+}
