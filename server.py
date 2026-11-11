@@ -1664,6 +1664,11 @@ def session_job_counts(session_ids: list[str]) -> dict[str, int]:
     但一次 IN 查询更干净，也避免两个库的连接来回切。
 
     返回 {session_id: count}；查不到/出错返回空 dict（不阻断列表）。
+
+    【口径说明 —— 2026-11-12】
+    这里数的是**任务数**，不是「产出了文件的任务数」。
+    失败的任务、空输出的任务也计入。
+    前端把它显示成「N 产物」略有歧义（见 session_job_stats 的说明）。
     """
     ids = [str(s) for s in (session_ids or []) if s]
     if not ids:
@@ -1682,6 +1687,47 @@ def session_job_counts(session_ids: list[str]) -> dict[str, int]:
     except Exception:
         # 查不到就返回空 —— 列表照常显示，产物数显示 0。
         # **不能**因为统计失败就让整个会话列表打不开。
+        return {}
+
+
+def session_job_stats(session_ids: list[str]) -> dict[str, dict]:
+    """
+    一批会话的任务统计（任务数 / 未完成数）—— **新增**，不改动 session_job_counts。
+
+    【为什么不直接改 session_job_counts —— 2026-11-12】
+    session_job_counts 返回 {sid: int}，被 server.py 与既有测试按整数用。
+    改成 dict-of-dict 是 breaking change。
+    这里**另起一个函数**，老函数原样保留 —— 零风险。
+
+    【返回什么】
+      {session_id: {"count": 任务数, "pending": 排队中+生成中的任务数}}
+
+    【pending_count 的用途】
+    会话列表的「状态」只描述**这一轮对话的收尾方式**，
+    不含「进行中」—— 因为服务端没有 per-session 运行注册表
+    （AGENT_GATE 是**全局**信号量，不记录是哪个会话在跑）。
+    但「这个会话还有任务在生成」是**任务**层面的事实，
+    可以作为独立副信息显示（文案必须指向任务，不能说会话「进行中」）。
+
+    一次查询同时拿到两个数 —— 不额外往返。
+    """
+    ids = [str(s) for s in (session_ids or []) if s]
+    if not ids:
+        return {}
+    if not _jobs_table_has_session_column():
+        return {}
+    try:
+        with db() as conn:
+            placeholders = ",".join("?" * len(ids))
+            rows = conn.execute(
+                f"SELECT session_id, COUNT(*) AS c, "
+                f"       SUM(CASE WHEN status IN ('queued','running') THEN 1 ELSE 0 END) AS pending "
+                f"FROM jobs WHERE session_id IN ({placeholders}) GROUP BY session_id",
+                ids).fetchall()
+        return {str(r["session_id"]): {"count": int(r["c"]),
+                                       "pending": int(r["pending"] or 0)}
+                for r in rows}
+    except Exception:
         return {}
 
 
@@ -4591,11 +4637,18 @@ async def api_agent_chat(request):
                 session_store=store, memory_store=_agent_memory_store(),
                 attachments=attachments)
         except agent_mod.AgentError as exc:
-            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
+            # 【为什么要带 meta —— 2026-11-12】
+            # 不带 meta 的话，这条失败消息的 meta 是空的 -> 会话列表的
+            # 「状态」判定拿不到 status -> 回落到「完成」。
+            # 结果是：**失败的会话显示成「完成」**（实测复现）。
+            # 失败必须落成 meta.status=failed，状态才有真源。
+            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}",
+                              meta={"status": "failed", "error": exc.message})
             return _agent_error(exc)
         except Exception as exc:
             detail = f"{type(exc).__name__}: {exc}"[:300]
-            store.add_message(session_id, "assistant", f"[请求失败] {detail}")
+            store.add_message(session_id, "assistant", f"[请求失败] {detail}",
+                              meta={"status": "failed", "error": detail})
             return web.json_response(
                 {"error": f"Agent 执行失败：{detail}", "code": "agent_internal_error"},
                 status=500)
@@ -4957,8 +5010,16 @@ async def api_agent_sessions(request):
     # 关联产物数：会话库与任务库是**两个库**（见 agent_sessions.py 的说明），
     # 所以产物数要去 jobs 表数 —— 不能指望会话库自己知道。
     counts = session_job_counts([s["id"] for s in sessions])
+    # 未完成任务数：一次查询同时拿（session_job_stats 与 counts 共用一次 IN 查询
+    # 的思路，但 stats 多带一个 SUM 聚合列 —— 单独查避免重复往返）。
+    stats = session_job_stats([s["id"] for s in sessions])
     for item in sessions:
         item["artifact_count"] = counts.get(item["id"], 0)
+        # pending_count = 该会话下排队中/生成中的任务数。
+        # 【为什么文案要说「任务」而不能说「会话进行中」】
+        # 服务端**没有** per-session 运行注册表（AGENT_GATE 是全局信号量），
+        # 这里统计的是**任务**状态，不是会话的运行状态。
+        item["pending_count"] = (stats.get(item["id"]) or {}).get("pending", 0)
     return json_ok({"sessions": sessions, "query": query})
 
 

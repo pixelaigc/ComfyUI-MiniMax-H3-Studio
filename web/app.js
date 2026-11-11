@@ -3721,6 +3721,122 @@ async function refreshJobs() {
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
 
+// ---------- 「在生成库中定位」通道（2026-11-12） ----------
+//
+// 【为什么需要这一层 —— 2026-11-12 实测发现】
+// Agent 的产物面板上有个「在生成库中定位」按钮，它原来只做两件事：
+//   1. 切到生成页；
+//   2. 把任务 id 写进 location.hash。
+// 但**全仓没有任何地方读这个 hash**（grep 命中 0 处消费者）——
+// 于是这个按钮的实际效果只是「切换了一下页面」，用户到了生成库还要
+// 自己翻找那条任务。按钮写着「定位」却**根本没有定位**，这是假功能。
+//
+// 【现在的做法】
+// 走生成库**既有的**关键词筛选通道（#doneSearch -> state.doneFilters.keyword
+// -> /api/jobs?keyword=...，服务端按 id LIKE 匹配），
+// 再等列表渲染完成后滚动到那张卡片并高亮。
+//
+// 【为什么不新造一套查询接口】
+// 多一份查询 = 多一份状态 = 多一处会漂移的地方。
+// 复用既有的 keyword 筛选，用户也能在搜索框里看到并修改这个条件 ——
+// 「定位」不是黑魔法，它就是把筛选条件填好了。
+//
+// 【为什么要有 pendingLocate 而不是直接滚动】
+// refreshJobs 是**异步**的（要等网络）。点完按钮那一刻卡片还没渲染出来，
+// 直接 scrollIntoView 会滚到一个不存在的元素上（静默失败）。
+// 所以先把目标 id 存起来，等 syncJobCards 跑完再消费它。
+let pendingLocateJobId = "";
+let pendingLocateTimer = null;
+
+// 定位任务的等待上限（毫秒）。超过就不再等 ——
+// 免得「定位」这个一次性动作留下一个永久挂着的定时器。
+const LOCATE_TIMEOUT_MS = 8000;
+
+// 定位命中后的高亮持续时长（毫秒）。
+//
+// 【为什么是 4 秒而不是 2.5 秒 —— 2026-11-12 实测】
+// 用户点「在生成库中定位」之后，页面要跳页 + 拉数据 + 渲染卡片，
+// 等他真正看清那张卡片时可能已经过去 2-3 秒了。
+// 高亮只闪 2.5 秒的话，用户第一眼看到的往往是「已经不高亮了」——
+// 等于白做。
+const LOCATE_FLASH_MS = 4000;
+
+// 高亮样式挂到 .job-card 上（见 style.css 的 .job-card.is-located）。
+function flashLocatedCard(card) {
+  if (!card) return;
+  card.classList.add("is-located");
+  // 高亮是「刚才定位到这」的提示，不该一直挂着；
+  // 但也不能太短（见 LOCATE_FLASH_MS 的说明）。
+  setTimeout(() => card.classList.remove("is-located"), LOCATE_FLASH_MS);
+  try {
+    card.scrollIntoView({block: "center", behavior: "smooth"});
+  } catch (e) {
+    // 老浏览器不支持 scrollIntoView 选项 -> 退化成默认行为
+    try { card.scrollIntoView(); } catch (e2) { /* 忽略 */ }
+  }
+}
+
+/**
+ * 把生成库定位到指定任务。
+ *
+ * @param {string} jobId 任务 id
+ * @returns {boolean} 是否成功发起定位
+ */
+function locateJobInLibrary(jobId) {
+  const id = String(jobId || "").trim();
+  if (!id) return false;
+  pendingLocateJobId = id;
+  if (pendingLocateTimer) clearTimeout(pendingLocateTimer);
+  pendingLocateTimer = setTimeout(() => {
+    // 超时未命中 -> 放弃（不报错，用户自己看列表就行）
+    pendingLocateJobId = "";
+    pendingLocateTimer = null;
+  }, LOCATE_TIMEOUT_MS);
+
+  // 「全部」标签 = 不按状态过滤，能看到任何状态的任务。
+  state.tab = "all";
+  state.genType = "";
+  state.donePage = 1;
+  // 清掉其它筛选条件，否则命中不了目标任务。
+  ["#doneMedia", "#doneAspect", "#doneDuration"].forEach(sel => {
+    const el = $(sel);
+    if (el) el.value = "";
+  });
+  // 关键词筛选：服务端 keyword 会匹配 params / id / outputs。
+  //
+  // 【为什么用 applyDoneFilters() 而不是自己写 state.doneFilters —— 2026-11-12】
+  // applyDoneFilters() 是**既有的**筛选真源（它同时读 DOM 控件 + 写 state + 触发刷新）。
+  // 自己再写一遍 state.doneFilters = {...} 就是第二份状态 —— 将来改了筛选逻辑
+  // （比如加一个筛选项）这里就会漏掉。两份状态必然漂移。
+  const search = $("#doneSearch");
+  if (search) search.value = id;
+
+  // 切到生成页 + 同步标签高亮。
+  showCreate();
+  renderTabs();
+  applyDoneFilters();
+  return true;
+}
+
+// syncJobCards 渲染完卡片后消费「待定位」的目标。
+function consumePendingLocate() {
+  if (!pendingLocateJobId) return;
+  const grid = $("#jobsGrid");
+  if (!grid) return;
+  const target = pendingLocateJobId;
+  // 用 dataset 遍历而不是 CSS 选择器 —— 任务 id 里的字符不一定是
+  // 「选择器安全」的（CSS.escape 在极老浏览器上不存在），
+  // 而 dataset 比较没有转义问题。
+  let card = null;
+  for (const node of grid.children) {
+    if (node.dataset && node.dataset.jid === target) { card = node; break; }
+  }
+  if (!card) return;   // 还没渲染出来 -> 下一轮再试
+  pendingLocateJobId = "";
+  if (pendingLocateTimer) { clearTimeout(pendingLocateTimer); pendingLocateTimer = null; }
+  flashLocatedCard(card);
+}
+
 // 把任务列表按「稳定 key + 最小改动」同步到网格里。
 //
 // 关键约束：**顺序没变的节点一律不碰 DOM**。
@@ -3761,6 +3877,8 @@ function syncJobCards(grid, jobs) {
   existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
   // 列数跟着「每页作品数」走；实时刮新也走这里，所以每页数量不会被刷掉
   applyGridColumns(state.pageSize);
+  // 「在生成库中定位」：卡片渲染完成后消费待定位目标（滚动 + 高亮）。
+  consumePendingLocate();
 }
 
 // ---------- 长片拼接 ----------
@@ -4351,6 +4469,21 @@ document.addEventListener("keydown", event => {
 const BREAKPOINTS = {phone: 700, tablet: 1100};
 // 挂到 window —— 响应式回归测试要读它，和 CSS 的 --bp-phone 做一致性比对
 window.BREAKPOINTS = BREAKPOINTS;
+
+// ---------- 跨模块导出（2026-11-12） ----------
+//
+// Agent 的产物面板要「在生成库中定位」某条任务，
+// 但生成库是 app.js 管的（agent_sessions.js 碰不到它的 DOM 与 state）。
+// 通过 window 暴露一个**窄接口**，而不是让 agent_sessions.js 直接
+// 读 app.js 的内部 state —— 后者会把两个模块焊死。
+//
+// 同时导出 lightboxShow：产物缩略图点「查看大图」要复用生成库
+// 已经调好的大图查看器（缩放/拖拽/下载/新窗口），
+// 不再新造一个功能更少的模态框。
+window.H3Studio = Object.assign(window.H3Studio || {}, {
+  locateJobInLibrary,
+  lightboxShow,
+});
 
 function isPhoneViewport() {
   return window.innerWidth <= BREAKPOINTS.phone;
