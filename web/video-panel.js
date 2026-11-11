@@ -280,7 +280,10 @@
     const warn = document.getElementById("vidModelWarn");
     if (!model) {
       if (note) note.textContent = "";
-      if (warn) warn.textContent = "";
+      // 【2026-11-11】没有内容时**把元素藏掉**：
+      // .img-warn 自带橙色背景 + padding + 边框，空内容也会渲染成
+      // 一条橙色的空条（用户 21:06 实报的「模型框下面挂着橙色告警条」）。
+      if (warn) { warn.textContent = ""; warn.hidden = true; }
       return;
     }
     if (note) {
@@ -289,7 +292,12 @@
       if (model.location) bits.push(`位置 ${model.location}`);
       note.textContent = bits.filter(Boolean).join(" · ");
     }
-    if (warn) warn.textContent = model.warn || "";
+    // 同样：有内容才显示，别留一条空的橙条
+    const warnText = model.warn || "";
+    if (warn) {
+      warn.textContent = warnText;
+      warn.hidden = !warnText;
+    }
   }
 
   // ------------------------------------------------------------ 加速 LoRA
@@ -544,14 +552,27 @@
 
   function renderVideoPanel() {
     if (!optionsReady) return;
-    renderModelSelect();
-    renderAspectChips();
-    renderSizePresetSelect();
-    renderSizeFields();
-    renderFixedLoraNote();
-    renderAccelLoraSelect();
-    renderAttention();
-    renderTwopass();
+    // 【2026-11-11】每一段独立 try/catch —— **一个区块渲染失败不能
+    // 阻断其它区块**（原来任何一处抛错，后面的下拉全都不渲染，
+    // 于是整块面板空掉）。这正是「模型列表 API 失败不得阻断
+    // 尺寸预设 / LoRA / 注意力机制等其它下拉」的实现方式。
+    const steps = [
+      ["模型", renderModelSelect],
+      ["画面比例", renderAspectChips],
+      ["尺寸预设", renderSizePresetSelect],
+      ["输出尺寸", renderSizeFields],
+      ["固定加速LoRA", renderFixedLoraNote],
+      ["加速LoRA", renderAccelLoraSelect],
+      ["注意力", renderAttention],
+      ["二采", renderTwopass],
+    ];
+    steps.forEach(([name, fn]) => {
+      try {
+        fn();
+      } catch (e) {
+        console.error(`[视频面板] 渲染「${name}」失败:`, e);
+      }
+    });
   }
 
   // ------------------------------------------------------------ 配置持久化
@@ -631,8 +652,105 @@
   }
 
   // ------------------------------------------------------------ 加载清单
+  //
+  // 【2026-11-11 修复 —— 下拉空白】
+  // 原来这里 catch 掉异常就**什么都不做**：
+  //   fetch 失败 -> 直接进 catch -> renderVideoPanel() 从未执行
+  // -> 尺寸预设 / 模型 / 加速 LoRA / 注意力机制**全是空下拉**
+  //   （控件在、选项没有），用户完全没法用。
+  // 触发场景实测：ComfyUI 正在启动（object_info 超时）时，
+  // /api/video-options 要 66 秒才返回，浏览器先放弃。
+  //
+  // 现在：**失败也要渲染**。
+  //   * 拿不到服务端清单 -> 用 web/video-panel-fallback.js 里的
+  //     静态兜底清单（同源实测数据），保证每个下拉都有选项；
+  //   * 同时显示明确的错误条，告诉用户「当前是兜底清单，
+  //     服务端没连上」—— 不静默、不假装正常；
+  //   * 其它面板（尺寸预设 / 加速 LoRA / 注意力）**互不阻断**：
+  //     各自的数据缺失只影响自己。
+
+  /** 取静态兜底清单（脚本没加载时返回 null）。 */
+  function fallbackManifest() {
+    return window.VIDEO_PANEL_FALLBACK || null;
+  }
+
+  /**
+   * 用静态兜底清单填 VIDEO_OPTIONS。
+   * 只填**缺的那部分** —— 服务端给了的以服务端为准。
+   *
+   * 【健壮性】整个函数**不能抛** —— 它跑在「已经出过一次错」的路径上，
+   * 再抛一次就会让整个面板初始化中断（比空下拉更糟）。
+   */
+  function applyFallbackManifest() {
+    let fb = null;
+    try {
+      fb = fallbackManifest();
+    } catch (e) {
+      fb = null;
+    }
+    if (!fb || typeof fb !== "object") return false;
+    try {
+      // models：服务端没给或给了空 -> 用兜底
+      if (!VIDEO_OPTIONS.models || !Object.keys(VIDEO_OPTIONS.models).length) {
+        const dict = {};
+        (fb.models || []).forEach(m => {
+          if (m && m.key) dict[m.key] = m;
+        });
+        VIDEO_OPTIONS.models = dict;
+        VIDEO_OPTIONS.default_model = fb.default_model || "";
+      }
+      if (!VIDEO_OPTIONS.size_presets || !VIDEO_OPTIONS.size_presets.length) {
+        // 服务端的 size_presets 是**扁平 list**（每条带 aspect 字段）——
+        // 兜底清单必须同形，否则 renderSizePresetSelect 里
+        // presets.filter(...) 会抛 "object is not iterable"。
+        VIDEO_OPTIONS.size_presets = Array.isArray(fb.size_presets)
+          ? fb.size_presets : [];
+      }
+      if (!VIDEO_OPTIONS.attention_modes || !VIDEO_OPTIONS.attention_modes.length) {
+        VIDEO_OPTIONS.attention_modes = Array.isArray(fb.attention_modes)
+          ? fb.attention_modes : [];
+        VIDEO_OPTIONS.default_attention = fb.default_attention || "default";
+      }
+      if (!VIDEO_OPTIONS.accel_lora_combos || !VIDEO_OPTIONS.accel_lora_combos.length) {
+        VIDEO_OPTIONS.accel_lora_combos = Array.isArray(fb.accel_lora_combos)
+          ? fb.accel_lora_combos : [];
+      }
+      if (!VIDEO_OPTIONS.fixed_accel_loras || !VIDEO_OPTIONS.fixed_accel_loras.length) {
+        VIDEO_OPTIONS.fixed_accel_loras = Array.isArray(fb.fixed_accel_loras)
+          ? fb.fixed_accel_loras : [];
+        VIDEO_OPTIONS.default_fixed_accel_lora = fb.default_fixed_accel_lora || "";
+      }
+      if (!VIDEO_OPTIONS.aspects || !VIDEO_OPTIONS.aspects.length) {
+        VIDEO_OPTIONS.aspects = Array.isArray(fb.aspects) ? fb.aspects : [];
+      }
+      if (!VIDEO_OPTIONS.size_multiple) VIDEO_OPTIONS.size_multiple = fb.size_multiple || 32;
+      if (!VIDEO_OPTIONS.size_min) VIDEO_OPTIONS.size_min = fb.size_min || 32;
+      if (!VIDEO_OPTIONS.size_max) VIDEO_OPTIONS.size_max = fb.size_max || 16384;
+      if (!VIDEO_OPTIONS.mp_table || !VIDEO_OPTIONS.mp_table.length) {
+        VIDEO_OPTIONS.mp_table = Array.isArray(fb.mp_table) ? fb.mp_table : [];
+      }
+      if (!VIDEO_OPTIONS.default_mp) VIDEO_OPTIONS.default_mp = fb.default_mp || 0.4;
+      return true;
+    } catch (e) {
+      console.error("[视频面板] 兜底清单填充失败:", e);
+      return false;
+    }
+  }
+
+  /** 兜底态的错误条：说清楚「现在显示的是兜底清单」而不是假装正常。 */
+  function renderFallbackNotice(reason) {
+    const box = document.getElementById("staleVideoBanner");
+    if (!box) return;
+    box.hidden = false;
+    // 不改 class —— 保留 .stale-backend-banner 的既有样式
+    box.innerHTML = "视频面板清单载入失败：<b>" + esc(reason)
+      + "</b>。已切换到<b>内置兜底清单</b>（下拉仍可选择），"
+      + "但服务端无法校验本机权重 —— 提交可能失败。"
+      + "请确认后端与 ComfyUI 已就绪（<code>systemctl status h3-studio comfyui</code>）。";
+  }
 
   async function loadVideoOptions() {
+    let reason = "";
     try {
       const resp = await fetch("/api/video-options", { cache: "no-store" });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -668,12 +786,37 @@
 
       renderVideoPanel();
     } catch (e) {
+      // 【关键】失败也必须渲染 —— 否则整个面板是空的
       console.error("[视频面板] 载入清单失败:", e.message);
-      const banner = document.getElementById("staleVideoBanner");
-      if (banner) {
-        banner.hidden = false;
-        banner.innerHTML = "视频面板清单载入失败：<b>" + esc(e.message)
-          + "</b>。请确认后端已重启（<code>systemctl restart h3-studio</code>）。";
+      reason = e.message || String(e);
+      optionsReady = true;                 // 让 renderVideoPanel() 能跑
+      const usedFallback = applyFallbackManifest();
+      // 兜底态：模型项标记为「可用性未知」，且默认选中第一个
+      if (!videoState.model) {
+        videoState.model = VIDEO_OPTIONS.default_model
+          || (Object.keys(VIDEO_OPTIONS.models || {})[0] || "");
+      }
+      if (!videoState.attention) {
+        videoState.attention = VIDEO_OPTIONS.default_attention || "default";
+      }
+      if (!videoState.megapixels) {
+        videoState.megapixels = VIDEO_OPTIONS.default_mp || 0.4;
+      }
+      try {
+        renderVideoPanel();
+      } catch (renderErr) {
+        console.error("[视频面板] 兜底渲染也失败:", renderErr);
+      }
+      if (usedFallback) {
+        renderFallbackNotice(reason);
+      } else {
+        const banner = document.getElementById("staleVideoBanner");
+        if (banner) {
+          banner.hidden = false;
+          banner.innerHTML = "视频面板清单载入失败：<b>" + esc(reason)
+            + "</b>，且没有内置兜底清单可用。请确认后端已启动"
+            + "（<code>systemctl restart h3-studio</code>）。";
+        }
       }
     }
   }

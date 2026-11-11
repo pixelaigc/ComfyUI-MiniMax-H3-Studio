@@ -1,0 +1,69 @@
+  test_grid_flash :: FAILED tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch
+  test_music_flow_browser :: FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_regen_uses_current_content_as_base
+  test_music_flow_browser :: FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_structured_fields_are_editable
+  test_qwen_pe_enhance :: FAILED tests/test_qwen_pe_enhance.py::TestQwenPeEnhanceBrowser::test_dropdown_lists_four_methods
+  test_qwen_refs_browser :: FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_desc_tag_renders_placeholder_text
+  test_qwen_refs_browser :: FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_remove_middle_drops_dangling_placeholder
+  test_yue2_flow_review_fixes :: FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
+FAIL test_grid_flash :: 1 failed, 9 passed in 50.00s
+FAIL test_music_flow_browser :: 2 failed, 8 passed in 150.53s (0:02:30)
+FAIL test_qwen_pe_enhance :: 1 failed, 28 passed in 82.99s (0:01:22)
+FAIL test_qwen_refs_browser :: 2 failed, 1 passed in 70.98s (0:01:10)
+FAIL test_yue2_flow_review_fixes :: 1 failed, 21 passed in 0.04s
+PASS test_agent :: 41 passed in 4.93s
+PASS test_agent_backend_enh :: 109 passed in 1.46s
+PASS test_agent_contract :: 27 passed in 14.92s
+PASS test_agent_fabricated_job_fix :: 31 passed in 0.31s
+PASS test_agent_frontend_enh :: 31 passed in 23.04s
+PASS test_agent_injection_key_path :: 16 passed in 0.12s
+PASS test_agent_layout_browser :: 8 passed in 25.06s
+PASS test_agent_legacy_fixes :: 26 passed in 0.11s
+PASS test_agent_media_semantics_backend :: 87 passed in 0.61s
+PASS test_agent_media_semantics_frontend :: 21 passed in 0.45s
+PASS test_agent_media_upload :: 66 passed in 0.33s
+PASS test_agent_oneshot_e2e :: 5 passed in 16.13s
+PASS test_agent_prompt_history_hook :: 11 passed in 0.06s
+PASS test_agent_review_fixes :: 20 passed in 0.12s
+PASS test_agent_session_frontend :: 27 passed in 0.02s
+PASS test_agent_session_mgmt :: 23 passed in 0.15s
+PASS test_agent_session_search_cascade :: 26 passed in 0.12s
+PASS test_agent_stream_sse :: 11 passed in 6.65s
+PASS test_agent_tool_status_fix :: 24 passed in 0.26s
+PASS test_asset_api :: 19 passed in 0.18s
+PASS test_asset_deep_audio :: 32 passed in 8.33s
+PASS test_asset_library :: 40 passed in 2.00s
+PASS test_audit_fixes :: 36 passed in 0.04s
+PASS test_batches_collapse :: 12 passed in 27.68s
+PASS test_coverage_cross_script :: 10 passed in 0.01s
+PASS test_enhance_architecture_fixes :: 28 passed in 21.18s
+PASS test_enhance_menu :: 24 passed in 121.81s (0:02:01)
+PASS test_enhance_multi_select :: 20 passed in 83.23s (0:01:23)
+PASS test_enhance_review_fixes :: 23 passed in 39.76s
+PASS test_enhance_unify :: 20 passed in 62.16s (0:01:02)
+PASS test_frontend_defaults :: 14 passed in 10.84s
+PASS test_hardware :: 34 passed in 0.03s
+PASS test_image_res_lora :: 24 passed in 30.66s
+PASS test_lora_catalog_conflicts :: 7 passed in 0.01s
+PASS test_lora_ea :: 18 passed in 0.08s
+PASS test_lora_effects :: 22 passed in 19.81s
+PASS test_lora_mihoyo :: 25 passed in 3.06s
+PASS test_lora_mihoyo_char_mech :: 24 passed in 3.29s
+PASS test_lora_nsfw :: 13 passed in 1.28s
+PASS test_max_tokens :: 84 passed, 2 warnings in 0.11s
+PASS test_moss_image :: 47 passed in 20.62s
+PASS test_moss_layout :: 52 passed in 0.06s
+PASS test_music_yue2 :: 65 passed, 2 skipped in 70.23s (0:01:10)
+PASS test_page_size :: 22 passed in 86.53s (0:01:26)
+PASS test_panel_fallback :: 24 passed in 3.28s
+PASS test_prompt_history :: 41 passed in 0.13s
+PASS test_prompt_history_dirtyloop :: 2 passed in 0.09s
+PASS test_qwen_image :: 36 passed, 1 skipped in 7.42s
+PASS test_qwen_ref_assets :: 37 passed in 0.08s
+PASS test_responsive_mobile :: 16 passed in 132.35s (0:02:12)
+PASS test_status_realtime :: 20 passed in 16.47s
+PASS test_studio_server_cleanup :: 4 passed in 0.87s
+PASS test_t2v_panel :: 37 passed in 0.43s
+PASS test_t2v_panel_fix :: 38 passed in 0.63s
+PASS test_yue2_enum_dedup :: 11 passed in 0.03s
+PASS test_yue2_schema :: 26 passed in 0.03s
+TIMEOUT test_studio :: (exceeded 240s)
