@@ -1,23 +1,30 @@
 #!/usr/bin/env python3
 """
-Real-browser verification of the Agent media-upload feature (2026-11-11).
+Real-browser verification of the Agent media-upload feature (2026-11-11),
+including the **素材库入库 + 预处理** pipeline.
 
 Proves, in a REAL browser against a REAL running server (throwaway data dir):
 
   1. UPLOAD: the composer has a visible upload entry; picking a real PNG
      uploads it through the REAL multipart endpoint and shows a THUMBNAIL.
-  2. MULTI:  several images upload at once and each gets its own thumbnail.
-  3. REMOVE: clicking the x on a thumbnail removes it.
-  4. REJECT: a non-image file is rejected with a readable error (no crash).
-  5. LIMIT: more than 9 images is refused (the extra ones are not uploaded).
-  6. NO OVERFLOW: at 375 / 390 / 1280 the page has NO horizontal overflow.
-  7. console has 0 errors and 0 failed requests at every width.
+  2. LIBRARY: the uploaded image really landed in the asset library
+     (source=agent_upload) with extracted metadata (width/height).
+  3. PREPROCESS: the server really ran the library analysis pipeline and
+     the description + tags landed in the library (searchable).
+  4. MULTI / REMOVE / REJECT / LIMIT: as before.
+  5. NO OVERFLOW at 375 / 390 / 1280; console 0 errors; 0 failed requests.
 
-Also asserts the reference-image capability the feature exists for:
-  the uploaded asset lands in the asset library and can be referenced by
-  asset_id (i.e. it really is a library entry, not a loose temp file).
+【为什么用假 Provider】
+The real multimodal analysis takes 120~180 s per image on this box.
+For a browser test that must run 3 widths x 6 cases, that is ~1 hour.
+So the test server points at a **fake OpenAI-compatible provider** that
+returns a canned structured description instantly.
 
-No real generation is triggered and no production data is touched.
+That still exercises the REAL code path:
+  handle_upload -> register_asset (real) -> analysis.run_analysis (real)
+  -> llm.call_provider (real client, fake HTTP endpoint)
+  -> save_analysis (real) -> add_tags (real)
+Only the model inference is stubbed.
 """
 import json
 import os
@@ -25,21 +32,70 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 REPO = Path(os.environ.get("VERIFY_REPO",
                            "/root/projects/h3studio-media-upload"))
 SHOTS = REPO / "evidence" / "media-upload"
 PORT = int(os.environ.get("VERIFY_PORT", "8198"))
-LIB = os.environ.get("ASSET_LIBRARY_ROOT", "")
+FAKE_PORT = int(os.environ.get("VERIFY_FAKE_PORT", "8918"))
+
+#: 假 Provider 返回的结构化描述（与真模型同格式）
+FAKE_DESCRIPTION = """**【主体人物】**
+一位穿着深蓝色风衣的年轻女性，独自站在桥上。
+
+**【场景与环境】**
+雨夜的石桥，远处是城市的霓虹灯海，水面倒映着斑斓的光。
+
+**【光线与色彩】**
+冷色调为主，紫蓝与橙黄交织，霓虹在湿漉漉的桥面上拉出长长的光带。
+"""
+
+
+class FakeProviderHandler(BaseHTTPRequestHandler):
+    """最小 OpenAI 兼容端点：立刻返回一段结构化描述。"""
+
+    def log_message(self, *args):  # 静音
+        pass
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        body = {
+            "id": "chatcmpl-fake",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": "fake-vision",
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": FAKE_DESCRIPTION},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10,
+                      "total_tokens": 20},
+        }
+        raw = json.dumps(body).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+
+def start_fake_provider():
+    server = HTTPServer(("127.0.0.1", FAKE_PORT), FakeProviderHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def start_server(tmp: Path):
     data = tmp / "data"
     (data / "outputs" / "images").mkdir(parents=True, exist_ok=True)
-    # 素材库也指到临时目录 —— 绝不碰生产素材库。
     lib = tmp / "asset_library"
     lib.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -64,6 +120,36 @@ def start_server(tmp: Path):
     raise RuntimeError("server did not start:\n" + out[-3000:])
 
 
+def seed_fake_provider(data_dir: Path):
+    """在测试实例的 jobs.db 里种一个指向假 Provider 的多模态模型。"""
+    import sqlite3
+    db = data_dir / "jobs.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS model_providers (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
+            base_url TEXT NOT NULL, llm_base_url TEXT DEFAULT '',
+            use_proxy INTEGER DEFAULT 0, proxy_base_url TEXT DEFAULT '',
+            model TEXT NOT NULL, api_key TEXT DEFAULT '',
+            multimodal INTEGER DEFAULT 0, enabled INTEGER DEFAULT 1,
+            created_at REAL);
+        CREATE TABLE IF NOT EXISTS model_provider_prefs (
+            key TEXT PRIMARY KEY, value TEXT);
+        """
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO model_providers VALUES "
+        "('fakevis','假视觉模型','openai',?,'',0,'',"
+        "'fake-vision','',1,1,0)", (f"http://127.0.0.1:{FAKE_PORT}",))
+    conn.execute("INSERT OR REPLACE INTO model_provider_prefs "
+                 "VALUES ('default','fakevis')")
+    conn.execute("INSERT OR REPLACE INTO model_provider_prefs "
+                 "VALUES ('default_multimodal','fakevis')")
+    conn.commit()
+    conn.close()
+
+
 def make_png(path: Path, color=(200, 30, 30)) -> Path:
     from PIL import Image
     Image.new("RGB", (120, 90), color).save(path)
@@ -76,13 +162,13 @@ def make_text(path: Path) -> Path:
 
 
 def probe(page):
-    """读取附件区与整页溢出情况。"""
     return page.evaluate("""() => {
-        const box = document.getElementById('agAttachments');
         const thumbs = [...document.querySelectorAll('.ag-attach-thumb')];
         const errEl = document.querySelector('.ag-attach-err');
+        const busyEl = document.querySelector('.ag-attach-busy');
         const btn = document.getElementById('agAttachBtn');
         const hint = document.getElementById('agAttachHint');
+        const box = document.getElementById('agAttachments');
         return {
             attachBoxHidden: box ? box.hidden : null,
             thumbCount: thumbs.length,
@@ -91,11 +177,14 @@ def probe(page):
                 return img ? (img.getAttribute('src') || '') : '';
             }),
             error: errEl ? errEl.textContent.trim() : '',
+            busyVisible: busyEl ? (busyEl.offsetParent !== null) : false,
             btnVisible: btn ? (btn.offsetParent !== null) : false,
             btnText: btn ? btn.textContent.trim() : '',
             hint: hint ? hint.textContent.trim() : '',
-            attachments: window.AgentUI.state.attachments.map(a => a.asset_id),
-            // 整页横向溢出检测（375px 不许溢出）
+            attachments: window.AgentUI.state.attachments.map(a => ({
+                asset_id: a.asset_id, tags: a.tags || [],
+                description: a.description || '',
+            })),
             docScrollW: document.documentElement.scrollWidth,
             docClientW: document.documentElement.clientWidth,
             bodyScrollW: document.body.scrollWidth,
@@ -108,14 +197,49 @@ def overflow_free(data):
             and data["bodyScrollW"] <= data["docClientW"] + 1)
 
 
+def library_probe(asset_id: str) -> dict:
+    """直接查**素材库**（权威来源），验证真的入库 + 预处理。"""
+    import sqlite3
+    lib = Path(os.environ.get("VERIFY_LIB", ""))
+    db = lib / "asset_library.db"
+    if not db.is_file():
+        return {"ok": False}
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    asset = conn.execute("SELECT * FROM assets WHERE id=?",
+                         (asset_id,)).fetchone()
+    version = conn.execute(
+        "SELECT * FROM asset_versions WHERE asset_id=? ORDER BY version DESC",
+        (asset_id,)).fetchone()
+    analysis = conn.execute(
+        "SELECT * FROM asset_analyses WHERE asset_id=? ORDER BY id DESC",
+        (asset_id,)).fetchone()
+    tags = [r["tag"] for r in conn.execute(
+        "SELECT tag FROM asset_tags WHERE asset_id=?", (asset_id,))]
+    conn.close()
+    return {
+        "ok": True,
+        "source": asset["source"] if asset else None,
+        "width": version["width"] if version else None,
+        "height": version["height"] if version else None,
+        "mime": version["mime"] if version else None,
+        "analysis_text": (analysis["text"] if analysis else "") or "",
+        "tags": tags,
+    }
+
+
 def main():
     from playwright.sync_api import sync_playwright
     SHOTS.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="h3verify-media-"))
+    fake = start_fake_provider()
     proc = start_server(tmp)
     console_errors = []
     results = []
+    uploaded_ids = []
     try:
+        seed_fake_provider(tmp / "data")
+        os.environ["VERIFY_LIB"] = str(tmp / "asset_library")
         with sync_playwright() as p:
             browser = p.chromium.launch(args=["--no-sandbox"])
             for width, height, tag in ((375, 812, "375"),
@@ -143,77 +267,82 @@ def main():
                     "el => !el.classList.contains('page-hidden')"
                 ), "Agent 面板没有显示出来"
 
-                # 每次用例前清空附件状态
                 def reset():
                     page.evaluate("""() => {
                       window.AgentUI.state.attachments = [];
                       window.AgentUI.state.attachError = '';
                       window.AgentUI.state.attachBusy = false;
+                      window.AgentUI.state.attachStage = '';
                       window.AgentUI._renderAttachments();
                     }""")
 
                 def upload(paths):
-                    """把文件塞进**真实的** <input type=file>，触发真实 change 事件。"""
-                    page.set_input_files("#agAttachInput", [str(x) for x in paths])
-                    # 等上传完成（缩略图出现或错误出现）
+                    page.set_input_files("#agAttachInput",
+                                         [str(x) for x in paths])
                     page.wait_for_function(
-                        """() => {
-                          const s = window.AgentUI.state;
-                          return !s.attachBusy;
-                        }""", timeout=30000)
+                        """() => !window.AgentUI.state.attachBusy""",
+                        timeout=120000)
                     page.wait_for_timeout(250)
 
-                # --- 用例 1：上传入口存在 + 单图上传 ---
+                # --- entry ---
                 reset()
-                shot1 = SHOTS / f"media-{tag}-01-upload-entry.png"
-                page.screenshot(path=str(shot1), full_page=False)
-                base = probe(page)
+                shot = SHOTS / f"media-{tag}-01-upload-entry.png"
+                page.screenshot(path=str(shot), full_page=False)
                 results.append({"width": width, "case": "entry",
-                                "probe": base, "screenshot": str(shot1)})
+                                "probe": probe(page), "screenshot": str(shot)})
 
+                # --- one ---
                 png1 = make_png(tmp / f"one-{tag}.png", (200, 30, 30))
                 upload([png1])
-                shot2 = SHOTS / f"media-{tag}-02-one-uploaded.png"
-                page.screenshot(path=str(shot2), full_page=False)
-                results.append({"width": width, "case": "one",
-                                "probe": probe(page), "screenshot": str(shot2)})
+                shot = SHOTS / f"media-{tag}-02-one-uploaded.png"
+                page.screenshot(path=str(shot), full_page=False)
+                pr = probe(page)
+                uploaded_ids.extend(a["asset_id"] for a in pr["attachments"])
+                lib = (library_probe(pr["attachments"][0]["asset_id"])
+                       if pr["attachments"] else {"ok": False})
+                results.append({"width": width, "case": "one", "probe": pr,
+                                "library": lib, "screenshot": str(shot)})
 
-                # --- 用例 2：多图 ---
+                # --- multi ---
                 reset()
                 pngs = [make_png(tmp / f"multi-{tag}-{i}.png",
                                  (i * 30, 100, 200)) for i in range(3)]
                 upload(pngs)
-                shot3 = SHOTS / f"media-{tag}-03-multi-uploaded.png"
-                page.screenshot(path=str(shot3), full_page=False)
-                results.append({"width": width, "case": "multi",
-                                "probe": probe(page), "screenshot": str(shot3)})
+                shot = SHOTS / f"media-{tag}-03-multi-uploaded.png"
+                page.screenshot(path=str(shot), full_page=False)
+                pr = probe(page)
+                uploaded_ids.extend(a["asset_id"] for a in pr["attachments"])
+                results.append({"width": width, "case": "multi", "probe": pr,
+                                "screenshot": str(shot)})
 
-                # --- 用例 3：移除 ---
+                # --- remove ---
                 page.click(".ag-attach-thumb .ag-attach-remove")
                 page.wait_for_timeout(300)
-                shot4 = SHOTS / f"media-{tag}-04-after-remove.png"
-                page.screenshot(path=str(shot4), full_page=False)
+                shot = SHOTS / f"media-{tag}-04-after-remove.png"
+                page.screenshot(path=str(shot), full_page=False)
                 results.append({"width": width, "case": "remove",
-                                "probe": probe(page), "screenshot": str(shot4)})
+                                "probe": probe(page), "screenshot": str(shot)})
 
-                # --- 用例 4：非法类型被拒 ---
+                # --- bad type ---
                 reset()
                 txt = make_text(tmp / f"bad-{tag}.txt")
                 upload([txt])
-                shot5 = SHOTS / f"media-{tag}-05-bad-type-rejected.png"
-                page.screenshot(path=str(shot5), full_page=False)
+                shot = SHOTS / f"media-{tag}-05-bad-type-rejected.png"
+                page.screenshot(path=str(shot), full_page=False)
                 results.append({"width": width, "case": "bad-type",
-                                "probe": probe(page), "screenshot": str(shot5)})
+                                "probe": probe(page), "screenshot": str(shot)})
 
-                # --- 用例 5：超过 9 张被拒 ---
+                # --- limit ---
                 reset()
                 many = [make_png(tmp / f"many-{tag}-{i}.png",
                                  (10 * i, 20, 30)) for i in range(11)]
                 upload(many)
-                shot6 = SHOTS / f"media-{tag}-06-limit-9.png"
-                page.screenshot(path=str(shot6), full_page=False)
-                results.append({"width": width, "case": "limit",
-                                "probe": probe(page), "screenshot": str(shot6)})
+                shot = SHOTS / f"media-{tag}-06-limit-9.png"
+                page.screenshot(path=str(shot), full_page=False)
+                pr = probe(page)
+                uploaded_ids.extend(a["asset_id"] for a in pr["attachments"])
+                results.append({"width": width, "case": "limit", "probe": pr,
+                                "screenshot": str(shot)})
 
                 results[-1]["failed_requests"] = failed_requests
                 console_errors.extend(errs)
@@ -225,6 +354,7 @@ def main():
             proc.wait(timeout=10)
         except Exception:
             proc.kill()
+        fake.shutdown()
         shutil.rmtree(tmp, ignore_errors=True)
 
     # ---- assertions -------------------------------------------------
@@ -236,26 +366,33 @@ def main():
             checks = {
                 "上传入口可见": pr["btnVisible"],
                 "没有附件时缩略图区隐藏": pr["attachBoxHidden"] is True,
-                "375 窄屏无横向溢出": overflow_free(pr),
+                "窄屏无横向溢出": overflow_free(pr),
             }
         elif case == "one":
+            lib = r.get("library") or {}
             checks = {
                 "单图上传成功": pr["thumbCount"] == 1,
-                "缩略图有 preview_url": bool(pr["thumbSrcs"][0]
-                                          if pr["thumbSrcs"] else ""),
-                "预览指向素材库预览接口": (pr["thumbSrcs"][0].startswith(
-                    "/api/assets/") if pr["thumbSrcs"] else False),
-                "状态里有 asset_id": len(pr["attachments"]) == 1
-                                    and pr["attachments"][0].startswith("asset_"),
+                "有 preview_url": bool(pr["thumbSrcs"][0] if pr["thumbSrcs"] else ""),
+                "预览指向素材库接口": (pr["thumbSrcs"][0].startswith("/api/assets/")
+                                       if pr["thumbSrcs"] else False),
+                "拿到 asset_id": len(pr["attachments"]) == 1
+                                 and pr["attachments"][0]["asset_id"].startswith("asset_"),
                 "无错误提示": not pr["error"],
-                "375 窄屏无横向溢出": overflow_free(pr),
+                # --- 素材库入库 ---
+                "素材库里真的有这条": lib.get("ok") and lib.get("source") == "agent_upload",
+                "素材库抽出了尺寸": lib.get("width") == 120 and lib.get("height") == 90,
+                # --- 预处理 ---
+                "预处理写入了描述": len(lib.get("analysis_text") or "") > 20,
+                "预处理写入了标签": len(lib.get("tags") or []) > 0,
+                "前端拿到标签": len(pr["attachments"][0]["tags"]) > 0,
+                "窄屏无横向溢出": overflow_free(pr),
             }
         elif case == "multi":
             checks = {
                 "多图都上传成功": pr["thumbCount"] == 3,
                 "asset_id 三个": len(pr["attachments"]) == 3,
                 "缩略图各不相同": len(set(pr["thumbSrcs"])) == 3,
-                "375 窄屏无横向溢出": overflow_free(pr),
+                "窄屏无横向溢出": overflow_free(pr),
             }
         elif case == "remove":
             checks = {
@@ -265,7 +402,7 @@ def main():
         elif case == "bad-type":
             checks = {
                 "非法类型不被接受": pr["thumbCount"] == 0,
-                "有可读的���误提示": bool(pr["error"]),
+                "有可读的错误提示": bool(pr["error"]),
                 "错误提示提到格式": ("格式" in pr["error"]
                                      or "不支持" in pr["error"]),
                 "没有 JS 崩溃": True,
@@ -275,7 +412,7 @@ def main():
                 "最多 9 张": pr["thumbCount"] == 9,
                 "asset_id 最多 9 个": len(pr["attachments"]) == 9,
                 "有多余的提示": bool(pr["error"]) or "9" in pr["hint"],
-                "375 窄屏无横向溢出": overflow_free(pr),
+                "窄屏无横向溢出": overflow_free(pr),
             }
         r["checks"] = checks
         r["all_pass"] = all(checks.values())
