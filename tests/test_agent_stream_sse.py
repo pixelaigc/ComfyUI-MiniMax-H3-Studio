@@ -105,6 +105,14 @@ class TestAgentStreamSSE(unittest.TestCase):
         if self._patched:
             original = agent_mod.llm_client.call_provider_with_tools
             agent_mod.llm_client.call_provider_with_tools = original
+        # 还原被替换的 server 模块属性（见 _make_app 的说明）——
+        # 不还原会污染后面所有 `import server` 的用例。
+        srv = getattr(self, "_patched_module", None)
+        if srv is not None:
+            for name, real in getattr(self, "_orig_attrs", {}).items():
+                setattr(srv, name, real)
+            self._patched_module = None
+            self._orig_attrs = {}
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _patch_model(self, turns):
@@ -176,6 +184,25 @@ class TestAgentStreamSSE(unittest.TestCase):
         if _REAL_PREPARE_JOB_PARAMS is None:
             _REAL_PREPARE_JOB_PARAMS = srv.prepare_job_params
         # 把 server 模块的 db/建任务函数指向测试用的假服务端
+        #
+        # 【必须还原 —— 2026-11-11 修】
+        # 这三个属性是**替换**共享模块 server 的属性，不还原的话
+        # 假服务端的 db 会一直留在 server 模块里 → 后面任何
+        # `import server` 拿到的都是被污染的模块。
+        # 实测后果（合并时踩到）：
+        #   tests/test_prompt_history.py::TestPromptHistoryApi.setUpClass
+        #   调 server_mod.init_db() → 走到 FakeServer.db → 连的是
+        #   FakeServer 自己的临时目录 → sqlite3.OperationalError:
+        #   unable to open database file → 该文件 10 个用例全 ERROR。
+        #
+        # 真实原因不是产品缺陷，是**测试间的全局状态污染**。
+        # 修法：tearDownClass 里把三个属性还原成模块原函数。
+        self._patched_module = srv
+        self._orig_attrs = {
+            "db": srv.db,
+            "prepare_job_params": srv.prepare_job_params,
+            "create_job_record": srv.create_job_record,
+        }
         srv.db = self.server.db
         srv.prepare_job_params = self.server.prepare_job_params
         srv.create_job_record = self.server.create_job_record
