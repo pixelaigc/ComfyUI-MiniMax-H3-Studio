@@ -151,7 +151,8 @@
       case "truncated": return "warn";
       case "failed": return "bad";
       case "needs_clarification": return "warn";
-      default: return "";   // 空会话 / 未知 -> 无色（灰）
+      case "empty": return "empty";
+      default: return "empty";   // 未知状态 -> 灰色（不假装知道）
     }
   }
 

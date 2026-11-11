@@ -1921,7 +1921,13 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .ag-session-status {
   font-size: 9.5px; padding: 1px 5px; line-height: 1.5;
   white-space: nowrap; flex: 0 0 auto;
+  /* .ag-badge 有 margin-bottom: 6px（它原本是给气泡里用的，
+     那里是竖排流式布局）。在 meta 行的 flex 里那 6px 会把徽章顶上去。
+     这里必须清掉 —— 否则徽章和「2 条」不在同一条基线上。 */
+  margin-bottom: 0;
 }
+/* 空会话 / 未知状态：无色徽章，用 muted 灰（与 .ag-badge 的透明底相配） */
+.ag-session-status.ag-badge-empty { color: var(--muted); }
 .ag-session-del {
   position: absolute; top: 7px; right: 6px;
   width: 22px; height: 22px; line-height: 1; font-size: 15px; cursor: pointer;
