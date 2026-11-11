@@ -10,9 +10,9 @@
     "best_hits": 432,
     "box": [
       16,
-      1060,
+      1052,
       140,
-      1184
+      1176
     ],
     "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-03-audio-ready.png"
   },
@@ -24,7 +24,7 @@
       80,
       160
     ],
-    "best_hits": 1186,
+    "best_hits": 1123,
     "box": [
       16,
       1060,
@@ -44,9 +44,9 @@
     "best_hits": 432,
     "box": [
       16,
-      1124,
+      1116,
       140,
-      1248
+      1240
     ],
     "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-03-audio-ready.png"
   },
@@ -58,7 +58,7 @@
       80,
       160
     ],
-    "best_hits": 1186,
+    "best_hits": 1123,
     "box": [
       16,
       1124,
@@ -78,9 +78,9 @@
     "best_hits": 631,
     "box": [
       424,
-      1356,
+      1348,
       548,
-      1480
+      1472
     ],
     "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-03-audio-ready.png"
   },
@@ -92,7 +92,7 @@
       80,
       160
     ],
-    "best_hits": 2139,
+    "best_hits": 2018,
     "box": [
       424,
       1356,

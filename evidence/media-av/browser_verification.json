@@ -42,7 +42,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -65,7 +65,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -92,7 +92,7 @@
         "tags": [],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-02-audio-pending.png",
       "checks": {
@@ -119,7 +119,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -142,7 +142,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [
               "容器格式",
               "wav",
@@ -187,7 +187,7 @@
         ],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-03-audio-ready.png",
       "checks": {
@@ -212,7 +212,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -235,7 +235,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -262,7 +262,7 @@
         "tags": [],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-04-video-pending.png",
       "checks": {
@@ -285,7 +285,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -308,7 +308,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [
               "00",
               "全景渐变",
@@ -351,7 +351,7 @@
         ],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-05-video-ready.png",
       "checks": {
@@ -372,8 +372,8 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3a50d213c585/preview",
-          "/api/assets/asset_b13f7458697e/preview"
+          "/api/assets/asset_176ee68b7d1d/preview",
+          "/api/assets/asset_b438d55d4459/preview"
         ],
         "thumbKinds": [
           "audio",
@@ -400,7 +400,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_3a50d213c585",
+            "asset_id": "asset_176ee68b7d1d",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -409,7 +409,7 @@
             "available": false
           },
           {
-            "asset_id": "asset_b13f7458697e",
+            "asset_id": "asset_b438d55d4459",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -538,7 +538,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -561,7 +561,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -597,7 +597,7 @@
         ],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-02-audio-pending.png",
       "checks": {
@@ -624,7 +624,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -647,7 +647,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [
               "00",
               "03",
@@ -692,7 +692,7 @@
         ],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-03-audio-ready.png",
       "checks": {
@@ -717,7 +717,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -740,7 +740,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -775,7 +775,7 @@
         ],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-04-video-pending.png",
       "checks": {
@@ -798,7 +798,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -821,7 +821,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [
               "00",
               "02",
@@ -864,7 +864,7 @@
         ],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-05-video-ready.png",
       "checks": {
@@ -885,8 +885,8 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3a50d213c585/preview",
-          "/api/assets/asset_b13f7458697e/preview"
+          "/api/assets/asset_176ee68b7d1d/preview",
+          "/api/assets/asset_b438d55d4459/preview"
         ],
         "thumbKinds": [
           "audio",
@@ -913,7 +913,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_3a50d213c585",
+            "asset_id": "asset_176ee68b7d1d",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -922,7 +922,7 @@
             "available": false
           },
           {
-            "asset_id": "asset_b13f7458697e",
+            "asset_id": "asset_b438d55d4459",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -1051,7 +1051,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -1074,7 +1074,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -1110,7 +1110,7 @@
         ],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-02-audio-pending.png",
       "checks": {
@@ -1137,7 +1137,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_1e747c9cd8d8/preview"
+          "/api/assets/asset_988c11c60e7a/preview"
         ],
         "thumbKinds": [
           "audio"
@@ -1160,7 +1160,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_1e747c9cd8d8",
+            "asset_id": "asset_988c11c60e7a",
             "tags": [
               "00",
               "03",
@@ -1205,7 +1205,7 @@
         ],
         "job_status": "done",
         "job_kind": "audio",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_988c11c60e7a_analysis\", \"provider_id\": null, \"deep\": true}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-03-audio-ready.png",
       "checks": {
@@ -1230,7 +1230,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -1253,7 +1253,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -1288,7 +1288,7 @@
         ],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-04-video-pending.png",
       "checks": {
@@ -1311,7 +1311,7 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 1,
         "thumbSrcs": [
-          "/api/assets/asset_2030f21f7d14/preview"
+          "/api/assets/asset_8cad735e49dc/preview"
         ],
         "thumbKinds": [
           "video"
@@ -1334,7 +1334,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_2030f21f7d14",
+            "asset_id": "asset_8cad735e49dc",
             "tags": [
               "00",
               "02",
@@ -1377,7 +1377,7 @@
         ],
         "job_status": "done",
         "job_kind": "video",
-        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-7iilmxa7/asset_library/derived/as/asset_8cad735e49dc_analysis\", \"provider_id\": null}"
       },
       "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-05-video-ready.png",
       "checks": {
@@ -1398,8 +1398,8 @@
         "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
         "thumbCount": 2,
         "thumbSrcs": [
-          "/api/assets/asset_3a50d213c585/preview",
-          "/api/assets/asset_b13f7458697e/preview"
+          "/api/assets/asset_176ee68b7d1d/preview",
+          "/api/assets/asset_b438d55d4459/preview"
         ],
         "thumbKinds": [
           "audio",
@@ -1426,7 +1426,7 @@
         "sendDisabled": false,
         "attachments": [
           {
-            "asset_id": "asset_3a50d213c585",
+            "asset_id": "asset_176ee68b7d1d",
             "tags": [],
             "description": "",
             "kind": "audio",
@@ -1435,7 +1435,7 @@
             "available": false
           },
           {
-            "asset_id": "asset_b13f7458697e",
+            "asset_id": "asset_b438d55d4459",
             "tags": [],
             "description": "",
             "kind": "video",
@@ -1525,18 +1525,18 @@
   ],
   "console_errors": [],
   "uploaded_ids": [
-    "asset_1e747c9cd8d8",
-    "asset_2030f21f7d14",
-    "asset_3a50d213c585",
-    "asset_b13f7458697e",
-    "asset_1e747c9cd8d8",
-    "asset_2030f21f7d14",
-    "asset_3a50d213c585",
-    "asset_b13f7458697e",
-    "asset_1e747c9cd8d8",
-    "asset_2030f21f7d14",
-    "asset_3a50d213c585",
-    "asset_b13f7458697e"
+    "asset_988c11c60e7a",
+    "asset_8cad735e49dc",
+    "asset_176ee68b7d1d",
+    "asset_b438d55d4459",
+    "asset_988c11c60e7a",
+    "asset_8cad735e49dc",
+    "asset_176ee68b7d1d",
+    "asset_b438d55d4459",
+    "asset_988c11c60e7a",
+    "asset_8cad735e49dc",
+    "asset_176ee68b7d1d",
+    "asset_b438d55d4459"
   ],
   "all_pass": true
 }
