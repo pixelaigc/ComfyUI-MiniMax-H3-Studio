@@ -233,6 +233,43 @@ def delete_asset(asset_id: str) -> int:
         return 0
 
 
+def _thumb_has_pixels(screenshot: str | None, min_red: int = 300) -> bool:
+    """
+    数截图里**缩略图区域**的红色像素，判断缩略图**真的渲染出了内容**。
+
+    【为什么需要这个断言】
+    实测踩到过：窄屏（375/390）下缩略图只有 52px，截图时 <img> 还没解码完
+    -> 拍到的是**空白方框**。而「有 <img> 且 src 指向 /api/assets/...」
+    这类 DOM 断言**照样全绿** —— 假通过。
+
+    所以必须做**像素级**核对：测试图是纯红色 RGB(200,30,30)，
+    缩略图区域必须出现足够多的红色像素。
+
+    定位缩略图区域：它是页面下部、缩略图条里的第一个 .ag-attach-thumb。
+    这里不做精确裁剪（不同宽度缩略图大小不同），而是统计
+    **截图下部 1/3** 里的红色像素 —— 页头那个小图标只有 13 个红色像素，
+    与缩略图的 2000+ 差两个数量级，不会混淆。
+    """
+    if not screenshot:
+        return False
+    path = Path(screenshot)
+    if not path.is_file():
+        return False
+    try:
+        from PIL import Image
+        image = Image.open(path).convert("RGB")
+    except Exception:  # noqa: BLE001
+        return False
+    width, height = image.size
+    red = 0
+    for y in range(height * 2 // 3, height, 2):
+        for x in range(0, width, 2):
+            r, g, b = image.getpixel((x, y))
+            if r > 140 and g < 90 and b < 90:
+                red += 1
+    return red >= min_red
+
+
 def main():
     from playwright.sync_api import sync_playwright
     SHOTS.mkdir(parents=True, exist_ok=True)
@@ -284,7 +321,23 @@ def main():
                     page.wait_for_function(
                         """() => !window.AgentUI.state.attachBusy""",
                         timeout=180000)
-                    page.wait_for_timeout(350)
+                    # 【关键】等缩略图**真的加载完**再截图。
+                    #
+                    # 【实测踩到的坑】窄屏（375/390）下缩略图只有 52px，
+                    # 截图时 <img> 还没解码完 -> 拍到的是**空白方框**。
+                    # 像素级核对：本地截图红色像素 2214，线上窄屏只有 13
+                    # （13 个都在页头，不是缩略图）。
+                    #
+                    # 只等 attachBusy=false 不够 —— 那是「上传请求返回了」，
+                    # 不是「图片渲染好了」。必须等 img.complete && naturalWidth>0。
+                    page.wait_for_function(
+                        """() => {
+                          const imgs = [...document.querySelectorAll(
+                            '.ag-attach-thumb img')];
+                          if (!imgs.length) return true;
+                          return imgs.every(i => i.complete && i.naturalWidth > 0);
+                        }""", timeout=30000)
+                    page.wait_for_timeout(250)
 
                 reset()
                 shot = SHOTS / f"live-media-{tag}-01-upload-entry.png"
@@ -378,6 +431,11 @@ def main():
                 "预处理写入了描述": len(lib.get("analysis_text") or "") > 20,
                 "预处理写入了标签": len(lib.get("tags") or []) > 0,
                 "前端拿到标签": len(pr["attachments"][0]["tags"]) > 0,
+                # 【像素级】缩略图**真的渲染出了图片内容**。
+                # 只断言「有 <img> 且 src 正确」不够 —— 实测踩到过：
+                # 窄屏下 <img> 还没解码完就截图，断言全绿但拍到的是空白方框
+                # （红色像素只有 13 个，全在页头）。所以数**图片区域的红色像素**。
+                "缩略图真的渲染出内容": _thumb_has_pixels(r.get("screenshot")),
                 "窄屏无横向溢出": overflow_free(pr),
             }
         elif case == "multi":
