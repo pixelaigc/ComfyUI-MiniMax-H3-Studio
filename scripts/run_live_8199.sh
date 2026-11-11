@@ -3,14 +3,19 @@
 #
 # 【为什么要单独脚本】
 #   * 线上 8190 由 systemd unit h3-studio 管着（WorkingDirectory=/root/projects/h3studio-live），
-#     绝不能在这里 restart/stop/改配置。
-#   * 实跑实例必须用**本 worktree 的代码**（local/feature/agent-enh-backend），
-#     所以不能复用线上那个进程。
+#     本任务明确要求「不要重启 8190 服务与 systemd unit」。
+#   * 实跑实例必须用**本 worktree 的代码**（local/feature/t2v-panel-fix）。
 #   * 数据目录独立（data-live/），任务落库证据不污染线上 jobs.db。
+#
+# 沿用 agent 分支已有的约定（scripts/run_live_8199.sh）：
+#   H3STUDIO_PORT        —— 独立端口
+#   H3STUDIO_DATA_DIR    —— 独立数据目录（jobs.db / outputs）
+#   AGENT_SESSION_DB / AGENT_MEMORY_DB —— 独立 Agent 库
 set -euo pipefail
 
-ROOT=/root/projects/h3studio-agent-enh-be
+ROOT=/root/projects/h3studio-t2v-panel-fix
 PORT=8199
+export H3STUDIO_PORT="$PORT"
 export H3STUDIO_DATA_DIR="$ROOT/data-live"
 export AGENT_SESSION_DB="$ROOT/data-live/agent_sessions.db"
 export AGENT_MEMORY_DB="$ROOT/data-live/agent_memory.db"
