@@ -106,7 +106,20 @@ const state = {
   loraStrength: 1.0,
   aspect: "16:9",
   duration: 5,
-  steps: 6,
+  // 【2026-11-12 修】初值必须与工作流档位一致。
+  // 工作流（workflows._h3_video_workflow）：params.lora != "none" -> steps 4。
+  // 之前这里写 6、HTML 滑杆写 6，但工作流实际跑 4 步；
+  // 后来 HTML 改成 4 之后，state.steps 还是 6
+  // -> 滑杆显示 4、说明行写「步数 6」= 界面自相矛盾。
+  steps: 4,
+  // 【2026-11-11】首尾帧 / 参考生视频的采样参数（走旧工作流路径，
+  // 但采样链路与文生视频相同，所以这些参数一样是真参数）。
+  // 候选项来自 /api/video-options 的 sampling 清单（服务端从本机
+  // ComfyUI 的 /object_info 取，前端不硬编码名单）。
+  vidSampler: "",
+  vidScheduler: "",
+  vidShiftVideo: 12.0,
+  vidShiftAudio: 3.0,
   donePage: 1,
   // 每页作品数（可配置，持久化在 localStorage）
   pageSize: loadPageSize(),
@@ -503,7 +516,9 @@ function renderMode() {
   if (isImageMode) renderImagePanel();
 
   // 文生视频（t2v）用自己的一套面板：宽高直填 + 模型 / 加速 LoRA 组合 /
-  // 注意力机制 / 二采。flf / r2v / longfilm 仍走旧面板（本次不改造）。
+  // 注意力机制 / 二采 / 采样参数。flf / r2v 走旧面板，但**采样参数**
+  // （采样器 / 调度器 / shift / CFG 说明）同样补齐 —— 它们的采样链路
+  // 与 t2v 完全相同。longfilm 只做拼接，不采样，不需要这些参数。
   const isT2V = mode === "t2v";
   const videoPanel = $("#videoPanel");
   if (videoPanel) videoPanel.style.display = isT2V ? "" : "none";
@@ -514,6 +529,14 @@ function renderMode() {
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
     if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
+  }
+
+  // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
+  const legacyVideoSampling = $("#videoSamplingField");
+  if (legacyVideoSampling) {
+    const show = mode === "flf" || mode === "r2v";
+    legacyVideoSampling.style.display = show ? "" : "none";
+    if (show) renderLegacyVideoSampling();
   }
 
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
@@ -1683,10 +1706,17 @@ bindSeg("#modelCards", "model", () => {
   $("#loraField").style.display = state.model === "lora" ? "" : "none";
   updateSeedStrengthLayout();
   setDefaultSteps();
+  // 【2026-11-12】模型卡片换了 -> legacy 采样参数的「推荐」基准也变了
+  // （Turbo 档 4 步 / euler / beta，标准档 20 步 / res_multistep / simple），
+  // 必须重渲染，否则提示停留在旧基准。
+  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
   // 视频模型换了 -> 增强模板按新模型的模型族重新过滤
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
-bindSeg("#loraCards", "lora");
+bindSeg("#loraCards", "lora", () => {
+  // 【2026-11-12】LoRA 卡片换了 -> 同样要重算 legacy 采样参数的推荐基准
+  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+});
 // 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
 // （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
 // 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
@@ -1698,12 +1728,234 @@ $("#loraStrength").addEventListener("input", e => {
 $("#steps").addEventListener("input", e => {
   state.steps = parseInt(e.target.value);
   $("#stepsVal").textContent = state.steps;
+  renderLegacyVideoSampling();
 });
+// ---- 首尾帧 / 参考生视频的采样参数事件 ----
+(function bindLegacyVideoSampling() {
+  const sampler = $("#vidLegacySamplerSelect");
+  if (sampler) {
+    sampler.addEventListener("change", e => {
+      state.vidSampler = e.target.value;
+      renderLegacyVideoSampling();
+    });
+  }
+  const scheduler = $("#vidLegacySchedulerSelect");
+  if (scheduler) {
+    scheduler.addEventListener("change", e => {
+      state.vidScheduler = e.target.value;
+      renderLegacyVideoSampling();
+    });
+  }
+  const shiftVideo = $("#vidLegacyShiftVideo");
+  if (shiftVideo) {
+    shiftVideo.addEventListener("input", e => {
+      state.vidShiftVideo = parseFloat(e.target.value);
+      renderLegacyVideoSampling();
+    });
+  }
+  const shiftAudio = $("#vidLegacyShiftAudio");
+  if (shiftAudio) {
+    shiftAudio.addEventListener("input", e => {
+      state.vidShiftAudio = parseFloat(e.target.value);
+      renderLegacyVideoSampling();
+    });
+  }
+})();
+/**
+ * 通用「步数」滑杆的默认值。
+ *
+ * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位一致：
+ *   params.lora != "none" -> steps 4
+ *   params.lora == "none" -> steps 20
+ * 而 params.lora = state.model === "lora" ? state.lora : "none"。
+ *
+ * 之前 LoRA 档写的是 6 —— 面板显示 6 步，工作流实际跑 4 步。
+ * 卡片上的文案「Turbo 加速 · 默认 6 步」也一并改成 4 步（index.html）。
+ */
 function setDefaultSteps() {
-  const def = state.model === "lora" ? 6 : 20;
+  const def = legacySamplingDefaults().steps;
   state.steps = def;
   $("#steps").value = def;
   $("#stepsVal").textContent = def;
+}
+
+// ---------- 【2026-11-11】首尾帧 / 参考生视频的采样参数 ----------
+// 这两个模式走旧工作流路径，但采样链路与文生视频完全相同
+// （BasicScheduler + KSamplerSelect + BasicGuider），
+// 所以采样器 / 调度器 / shift 一样是真参数。
+//
+// 候选项来自 /api/video-options 的 sampling 清单 —— 服务端从本机
+// ComfyUI 的 /object_info 取（KSamplerSelect 68 项 / BasicScheduler 14 项），
+// 前端不硬编码名单。清单拉不到时降级为「不显示这两项」，
+// 不阻塞其它功能。
+let VIDEO_SAMPLING_OPTIONS = null;
+
+function videoSamplingDefaults() {
+  const cfg = (VIDEO_SAMPLING_OPTIONS && VIDEO_SAMPLING_OPTIONS.sampling) || {};
+  return {
+    samplers: cfg.samplers || [],
+    schedulers: cfg.schedulers || [],
+    cfg_fixed: cfg.cfg_fixed != null ? cfg.cfg_fixed : 1.0,
+    cfg_reason: cfg.cfg_fixed_reason || "",
+    shift_default_video: cfg.shift_default_video != null ? cfg.shift_default_video : 12.0,
+    shift_default_audio: cfg.shift_default_audio != null ? cfg.shift_default_audio : 3.0,
+    // 【2026-11-12】shift 节点本机可用性 —— 不可用时禁用滑杆（不做假控件）
+    sigma_shift_available: cfg.sigma_shift_available !== false,
+  };
+}
+
+/**
+ * 旧路径视频模式提交时**真正用的** params.lora 值。
+ *
+ * 必须与提交路径（app.js 的 params.lora）完全一致：
+ *   lora: state.model === "lora" ? state.lora : "none"
+ * 「标准 MiniMax-H3」卡片也会把 params.lora 置成 "none"（= 不用 LoRA），
+ * 所以判据不能只看 state.lora。
+ */
+function effectiveLegacyLora() {
+  return state.model === "lora" ? (state.lora || "ckpt850") : "none";
+}
+
+/**
+ * 旧路径视频模式的采样参数默认值。
+ *
+ * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位
+ * **逐项一致**，否则「推荐」标记是假的：
+ *   lora != "none" -> steps 4  / sampler euler          / scheduler beta
+ *   lora == "none" -> steps 20 / sampler res_multistep  / scheduler simple
+ *
+ * 之前 steps 默认写的是 6，而工作流实际用 4（Turbo 档）——
+ * 面板上写「默认 6 步」，工作流跑的是 4 步 = 假提示。
+ */
+function legacySamplingDefaults() {
+  const withLora = effectiveLegacyLora() !== "none";
+  return {
+    steps: withLora ? 4 : 20,
+    sampler: withLora ? "euler" : "res_multistep",
+    scheduler: withLora ? "beta" : "simple",
+  };
+}
+
+function fillVideoSelect(sel, values, current) {
+  if (!sel) return;
+  sel.innerHTML = "";
+  values.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    opt.selected = name === current;
+    sel.appendChild(opt);
+  });
+  if (current && !values.includes(current)) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = current;
+    sel.appendChild(opt);
+  }
+  sel.value = current;
+}
+
+function renderLegacyVideoSampling() {
+  const field = $("#videoSamplingField");
+  if (!field) return;
+  const cfg = videoSamplingDefaults();
+  const defaults = legacySamplingDefaults();
+
+  if (!state.vidSampler) state.vidSampler = defaults.sampler;
+  if (!state.vidScheduler) state.vidScheduler = defaults.scheduler;
+
+  fillVideoSelect($("#vidLegacySamplerSelect"), cfg.samplers, state.vidSampler);
+  fillVideoSelect($("#vidLegacySchedulerSelect"), cfg.schedulers, state.vidScheduler);
+
+  const sHint = $("#vidLegacySamplerHint");
+  if (sHint) sHint.textContent = state.vidSampler === defaults.sampler ? "推荐" : "已改";
+  const scHint = $("#vidLegacySchedulerHint");
+  if (scHint) scHint.textContent = state.vidScheduler === defaults.scheduler ? "推荐" : "已改";
+
+  const svEl = $("#vidLegacyShiftVideo");
+  const saEl = $("#vidLegacyShiftAudio");
+  if (svEl) svEl.value = state.vidShiftVideo;
+  if (saEl) saEl.value = state.vidShiftAudio;
+  const svVal = $("#vidLegacyShiftVideoVal");
+  if (svVal) svVal.textContent = Number(state.vidShiftVideo).toFixed(2);
+  const saVal = $("#vidLegacyShiftAudioVal");
+  if (saVal) saVal.textContent = Number(state.vidShiftAudio).toFixed(2);
+  const svHint = $("#vidLegacyShiftVideoHint");
+  if (svHint) {
+    svHint.textContent = Number(state.vidShiftVideo) === Number(cfg.shift_default_video)
+      ? "推荐" : "已改";
+  }
+  const saHint = $("#vidLegacyShiftAudioHint");
+  if (saHint) {
+    saHint.textContent = Number(state.vidShiftAudio) === Number(cfg.shift_default_audio)
+      ? "推荐" : "已改";
+  }
+
+  // 【2026-11-12】shift 节点本机不可用时禁用滑杆（不制造假控件）
+  const shiftAvailable = cfg.sigma_shift_available !== false;
+  [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
+  if (svHint) {
+    svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
+    svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+  }
+  if (saHint) {
+    saHint.textContent = shiftAvailable ? saHint.textContent : "节点不可用";
+    saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+  }
+
+  // CFG：H3 标准路径固定 1.0 —— 只读说明，不做假控件
+  const cfgEl = $("#vidLegacyCfg");
+  const cfgVal = $("#vidLegacyCfgVal");
+  const cfgHint = $("#vidLegacyCfgHint");
+  const cfgNote = $("#vidLegacyCfgFixedNote");
+  if (cfgEl) cfgEl.value = Number(cfg.cfg_fixed).toFixed(1);
+  if (cfgVal) cfgVal.textContent = Number(cfg.cfg_fixed).toFixed(1);
+  if (cfgHint) cfgHint.textContent = "H3 固定";
+  if (cfgNote) cfgNote.textContent = cfg.cfg_reason;
+
+  // 步数的「推荐 / 已改」提示 —— 文生视频面板有 vidStepsHint，
+  // 这里必须也有（否则用户看不到步数是不是被改过）。
+  const stepsHint = $("#vidLegacyStepsHint");
+  if (stepsHint) {
+    stepsHint.textContent = Number(state.steps) === Number(defaults.steps)
+      ? "推荐" : "已改";
+  }
+
+  const note = $("#vidLegacySamplingNote");
+  if (note) {
+    note.textContent = [
+      `步数 ${state.steps} → BasicScheduler.steps`,
+      `采样器 ${state.vidSampler} → KSamplerSelect.sampler_name`,
+      `调度器 ${state.vidScheduler} → BasicScheduler.scheduler`,
+      `shift ${Number(state.vidShiftVideo).toFixed(2)} / `
+        + `${Number(state.vidShiftAudio).toFixed(2)} → MiniMaxH3SigmaShift`,
+    ].join(" · ");
+  }
+}
+
+/**
+ * 拉一次 /api/video-options，只为拿 sampling 清单（首尾帧/参考模式用）。
+ *
+ * 【2026-11-12 修】这个 fetch 是异步的，而 boot() 不 await 它。
+ * 用户在 fetch 返回前切到 flf/r2v 时：
+ *   renderLegacyVideoSampling() 拿到的 VIDEO_SAMPLING_OPTIONS 还是 null
+ *   -> 候选清单是空数组 -> 下拉只剩 1 个当前值（不是 68 / 14 个候选）
+ * 而且 fetch 完成后没人重渲染 -> 残缺的下拉一直留着。
+ * 修法：拿到清单后主动重渲染一次 legacy 面板。
+ */
+async function loadVideoSamplingOptions() {
+  try {
+    const resp = await fetch("/api/video-options", { cache: "no-store" });
+    if (!resp.ok) return;
+    VIDEO_SAMPLING_OPTIONS = await resp.json();
+    const cfg = videoSamplingDefaults();
+    if (!state.vidShiftVideo) state.vidShiftVideo = cfg.shift_default_video;
+    if (!state.vidShiftAudio) state.vidShiftAudio = cfg.shift_default_audio;
+    // 清单到位后重渲染（补上「fetch 未返回就先切模式」造成的残缺下拉）
+    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+  } catch (e) {
+    console.warn("[视频采样参数] 清单拉取失败:", e.message);
+  }
 }
 // 【2026-11-11】原来这个函数控制「生成按钮下方」的 LoRA 强度滑杆显隐。
 // 那个滑杆已搬到「LoRA 选择」旁边（#loraField 内），所以这里改成控制
@@ -2129,8 +2381,16 @@ $("#genBtn").addEventListener("click", async () => {
     }
   }
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
-    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采
+    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+  } else if (mode === "flf" || mode === "r2v") {
+    // 【2026-11-11】首尾帧 / 参考生视频：采样参数（采样器 / 调度器 / shift）
+    // 与文生视频同链路，同样是真参数。CFG 在 H3 标准路径固定 1.0
+    // （BasicGuider 无 cfg 槽位），面板只做只读说明，不提交。
+    params.sampler = state.vidSampler;
+    params.scheduler = state.vidScheduler;
+    params.shift_video = Number(state.vidShiftVideo);
+    params.shift_audio = Number(state.vidShiftAudio);
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
@@ -4156,6 +4416,7 @@ boot("视频参数清单", async () => {
   window.VIDEO_PANEL.bind();
   window.VIDEO_PANEL.render();
 });
+boot("视频采样参数清单", loadVideoSamplingOptions);
 boot("音乐参数清单", async () => {
   if (!window.MusicUI) return;
   await window.MusicUI.loadOptions();

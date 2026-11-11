@@ -292,6 +292,33 @@ def _video_sampler_block(p, model_ref, steps, scheduler, sampler):
     return f"{p['_p']}14"
 
 
+def _apply_sigma_shift(p, model_ref, params, node_id="139"):
+    """把 MiniMaxH3SigmaShift 插进 model 链（可选）。
+
+    【2026-11-11】flf / r2v 与 t2v 走的是同一条 H3 采样链路，
+    所以 shift 对它们同样适用 —— 这里复用同一套逻辑。
+
+    节点是 ComfyUI 核心节点（comfy_extras/nodes_minimax_h3.py:367），
+    默认 12.0 / 3.0 就是 H3 模型内生值
+    （comfy/supported_models.py:964 sampling_settings = {"shift": 12.0, "audio_shift": 3.0}），
+    所以用默认值接上去 == 完全等价，不改变任何出图结果。
+    """
+    from . import video_models as vmodels
+    if not params.get("use_sigma_shift", True):
+        return model_ref
+    shift_video = vmodels.normalize_shift(
+        params.get("shift_video"), vmodels.VIDEO_SHIFT_DEFAULT_VIDEO)
+    shift_audio = vmodels.normalize_shift(
+        params.get("shift_audio"), vmodels.VIDEO_SHIFT_DEFAULT_AUDIO)
+    p[node_id] = {
+        "inputs": {"model": model_ref, "shift_video": shift_video,
+                   "shift_audio": shift_audio},
+        "class_type": "MiniMaxH3SigmaShift",
+        "_meta": {"title": "sigma shift（视频/音频）"},
+    }
+    return [node_id, 0]
+
+
 def _video_decode_save_block(p, samples_ref):
     prefix = f"h3studio/{p['_mode']}_{p['_job_id']}"
     p[f"{p['_p']}10"] = {"inputs": {"samples": samples_ref, "vae": [f"{p['_p']}11", 0]},
@@ -310,13 +337,21 @@ def _video_decode_save_block(p, samples_ref):
 
 def _h3_video_workflow(params, image_inputs=None):
     """t2v / flf 共用骨架。image_inputs: {'first_frame': fname, 'last_frame': fname}"""
+    from . import video_models as vmodels
     job_id = params["job_id"]
     seed = params.get("seed") or random.randint(0, 2**48)
     precision = params.get("precision", "int8")
     lora = params.get("lora", "ckpt850")          # none / ckpt850 / v4step600
-    steps = params.get("steps") or (4 if lora != "none" else 20)
-    scheduler = "beta" if lora != "none" else "simple"
-    sampler = "euler" if lora != "none" else "res_multistep"
+    # 【2026-11-11】采样参数改为「用户可调」：没给才回落到原来的硬编码档位。
+    #   steps 4 / scheduler beta / sampler euler（有加速 LoRA 时）
+    #   steps 20 / scheduler simple / sampler res_multistep（无加速 LoRA 时）
+    default_steps = 4 if lora != "none" else 20
+    default_scheduler = "beta" if lora != "none" else "simple"
+    default_sampler = "euler" if lora != "none" else "res_multistep"
+    steps = vmodels.normalize_steps(params.get("steps"), default_steps)
+    scheduler = vmodels.normalize_scheduler(
+        params.get("scheduler"), default_scheduler)
+    sampler = vmodels.normalize_sampler(params.get("sampler"), default_sampler)
     aspect = ASPECT_MAP.get(params.get("aspect", "16:9"), ASPECT_MAP["16:9"])
     mp = RES_MP.get(params.get("resolution", "768p"), 0.8)
     duration = float(params.get("duration", 5))
@@ -378,6 +413,9 @@ def _h3_video_workflow(params, image_inputs=None):
 
     p["105:11"] = {"inputs": {"vae_name": VAE_VIDEO}, "class_type": "VAELoader"}
 
+    # shift（MiniMaxH3SigmaShift）—— 与 t2v 新面板同一套逻辑
+    model_ref = _apply_sigma_shift(p, model_ref, params, node_id="139")
+
     samples = _video_sampler_block(p, model_ref, steps, scheduler, sampler)
     _video_decode_save_block(p, [samples, 0])
 
@@ -415,13 +453,19 @@ def build_flf(params):
 
 
 def build_r2v(params):
+    from . import video_models as vmodels
     job_id = params["job_id"]
     seed = params.get("seed") or random.randint(0, 2**48)
     precision = params.get("precision", "int8")
     lora = params.get("lora", "ckpt850")
-    steps = params.get("steps") or (4 if lora != "none" else 20)
-    scheduler = "beta" if lora != "none" else "simple"
-    sampler = "euler" if lora != "none" else "res_multistep"
+    # 【2026-11-11】采样参数可调（同 flf / t2v）
+    default_steps = 4 if lora != "none" else 20
+    default_scheduler = "beta" if lora != "none" else "simple"
+    default_sampler = "euler" if lora != "none" else "res_multistep"
+    steps = vmodels.normalize_steps(params.get("steps"), default_steps)
+    scheduler = vmodels.normalize_scheduler(
+        params.get("scheduler"), default_scheduler)
+    sampler = vmodels.normalize_sampler(params.get("sampler"), default_sampler)
     aspect = ASPECT_MAP.get(params.get("aspect", "16:9"), ASPECT_MAP["16:9"])
     mp = RES_MP.get(params.get("resolution", "768p"), 0.8)
     duration = float(params.get("duration", 5))
@@ -501,6 +545,9 @@ def build_r2v(params):
     expr["132"]["inputs"]["value"] = duration
     p.update(expr)
     p["136"]["inputs"]["length"] = ["131", 1]
+
+    # shift（MiniMaxH3SigmaShift）—— 与 t2v 新面板同一套逻辑
+    model_ref = _apply_sigma_shift(p, model_ref, params, node_id="139")
 
     samples = _video_sampler_block(p, model_ref, steps, scheduler, sampler)
     _video_decode_save_block(p, [samples, 0])
