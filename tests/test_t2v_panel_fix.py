@@ -105,6 +105,40 @@ class TestSizePresets(unittest.TestCase):
         keys = {p["megapixels"] for p in VM.size_presets_for_aspect("1:1")}
         self.assertNotIn(0.98, keys, "1:1 的 0.98MP 超画布，不该出现在下拉里")
 
+    def test_area_rule_is_observable_independently(self):
+        """面积规则必须**独立地**起作用，不能被短边规则顺带覆盖。
+
+        16:9 @ 1.0MP -> 1376x768：短边 768 没超，但面积 1056768 >
+        768*1344 = 1032192 —— 只靠短边规则拦不住它。
+        这条断言保证「面积上限」这条规则是真的在跑（变异测试：
+        把面积判断改成 if False，本断言必须变红）。
+        """
+        w, h = VM.video_dimensions("16:9", 1.0)
+        self.assertEqual(min(w, h), 768, "这个样例的短边必须没超 768")
+        self.assertGreater(w * h, VM.VIDEO_MAX_CANVAS_PIXELS,
+                           "这个样例的面积必须超上限")
+        keys = {p["megapixels"] for p in VM.size_presets_for_aspect("16:9")}
+        self.assertNotIn(1.0, keys,
+                         "16:9 的 1.0MP 面积超画布上限，不该出现在下拉里")
+        # 而面积没超的档位要在（证明不是把高 MP 全砍了）
+        self.assertIn(0.98, keys, "16:9 的 0.98MP 在画布内，应该出现")
+
+    def test_area_limit_constant_matches_comfyui_source(self):
+        """面积上限常量必须等于 ComfyUI 源码里的 MAX_PIXELS。
+
+        这是「不臆造」的地基：常量一旦漂移，预设就会给出跑不动的尺寸。
+        """
+        src = Path("/home/ubuntu/comfyui/comfy_extras/nodes_minimax_h3.py")
+        if not src.is_file():
+            self.skipTest("本机没有 ComfyUI 源码可比对")
+        text = src.read_text(encoding="utf-8", errors="ignore")
+        m = re.search(r"^MAX_PIXELS\s*=\s*(\d+)\s*\*\s*(\d+)", text, re.M)
+        self.assertIsNotNone(m, "ComfyUI 源码里找不到 MAX_PIXELS 定义")
+        self.assertEqual(VM.VIDEO_MAX_CANVAS_PIXELS, int(m.group(1)) * int(m.group(2)))
+        m2 = re.search(r"^BASE_SHORT_EDGE\s*=\s*(\d+)", text, re.M)
+        self.assertIsNotNone(m2)
+        self.assertEqual(768, int(m2.group(1)))
+
     def test_preset_keys_are_unique(self):
         keys = [p["key"] for p in VM.all_size_presets()]
         self.assertEqual(len(keys), len(set(keys)), "预设 key 必须唯一")
