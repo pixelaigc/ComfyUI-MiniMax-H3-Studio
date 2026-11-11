@@ -1352,6 +1352,10 @@ def _instruction_prose(system_prompt: str) -> str:
     markdown 表格、列表符号去掉，只留「人话指令」部分。
     真正的复读（模型原样吐回整段 system prompt）散文重合度依然极高；
     正常输出只在字段名这种短片段上重合。
+
+    【2026-11-11 二次修正】行内代码也要剥（`` `integrated_multimodal_description` ``）：
+    模板在「输出结构」小节里用反引号逐个点名了三个字段名，模型照样会抄进产物。
+    不剥的话这些字段名会成为 33 字符的公共块，把「短产物」的覆盖率判据顶上去。
     """
     if not system_prompt:
         return ""
@@ -1360,11 +1364,13 @@ def _instruction_prose(system_prompt: str) -> str:
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
     # 2. 去掉未闭合的围栏（模板少写一个 ``` 时同样要兜住）
     text = re.sub(r"```.*", " ", text, flags=re.S)
-    # 3. 去掉 markdown 表格行（| a | b |）与列表符号
+    # 3. 去掉行内代码（字段名 / 示例片段）
+    text = re.sub(r"`[^`\n]{1,120}`", " ", text)
+    # 4. 去掉 markdown 表格行（| a | b |）与列表符号
     text = re.sub(r"^\s*\|.*$", " ", text, flags=re.M)
     text = re.sub(r"^\s*[-*+]\s+", " ", text, flags=re.M)
     text = re.sub(r"^\s*#{1,6}\s*", " ", text, flags=re.M)
-    # 4. 去掉行内的 markdown 强调标记
+    # 5. 去掉行内的 markdown 强调标记
     text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
     return re.sub(r"[ \t]+", " ", text).strip()
 
@@ -1408,23 +1414,48 @@ def looks_like_echo(output: str, system_prompt: str) -> bool:
       就被判成「系统提示词复读」，整个增强 502 —— 用户侧表现就是
       「该模型可能太小或未按指令输出，请换用更强的模型」（误导）。
 
-    现在改成**三档判据**（任一命中才算复读）：
-      1. 最长公共子块 >= 120 字符（真复读会整段照抄散文）
-      2. 公共字符占输出比例 >= 0.6（输出大部分来自 system prompt）
-      3. 输出与 system prompt 整体相似度 >= 0.85
+    现在改成**四档判据**（任一命中才算复读）：
+      1. 最长公共子块 >= 60 字符（真复读会整段照抄指令散文）
+      2. 公共字符占输出比例 >= 0.75，**且**输出够长（>= 300 字符）
+      3. 整体相似度 >= 0.85
+      4. 公共字符占输出比例 >= 0.85（**短**复读的兜底；
+         短输出不走判据 2，因为覆盖率对短文本没有区分力）
+
+    【阈值是怎么定的 —— 实测分离度，不是拍脑袋】
+      合法产物（7 个样本：真实模型返回 3 个 + 手工构造的贴模板措辞的短稿 4 个）
+        最长公共子块 = 33（且全是同一个字段名）、覆盖率 0.06~0.48、相似度 0.07~0.11
+      真复读（9 个样本：整段 / 重新排版 / 去 markdown / 加前缀 / 围栏包裹 /
+        截断 200/500/800 字 / 半段散文）
+        最长公共子块 = 71~800、覆盖率 0.56~1.00、相似度 0.23~0.74
+      于是「最长公共子块」这一维在 33 与 71 之间有**干净的间隙**，
+      阈值取 60 落在中间，两侧都不误伤。
+      「整体相似度」这一维：合法 <= 0.11，真复读 >= 0.23 —— 阈值 0.85 过于宽松，
+      改用「判据 1 + 判据 2/4」的组合后本维度不再承担主判责任，
+      保留 0.85 只作极端情况兜底。
+
+    【判据 2 为什么加「输出 >= 300 字符」这个前提】
+      覆盖率对**短输出**没有区分力：一句 100 字的产物，只要其中 80 字
+      碰巧与模板措辞相同（模板里列了大量运镜/声音术语，合法产物会照抄
+      这些词），覆盖率就能到 0.5 —— 但那不是复读。
+      所以长输出走「覆盖率 + 长度前提」，短输出走判据 4（覆盖率 >= 0.85，
+      只有几乎整段照抄才够得上）。
+
     并且公共子块只与**指令散文**比（不含输出骨架），避免格式字段名误伤。
     """
     if not output or not system_prompt:
         return False
     sig = _echo_signature(output, system_prompt)
-    # 判据 1：整段照抄
-    if sig["longest"] >= 120:
+    # 判据 1：整段照抄（实测：合法 <= 33，真复读 >= 71，阈值 60 落在间隙里）
+    if sig["longest"] >= 60:
         return True
-    # 判据 2：输出大部分来自 system prompt
-    if sig["coverage"] >= 0.6:
+    # 判据 2：长输出的大部分来自 system prompt
+    if len(output) >= 300 and sig["coverage"] >= 0.75:
         return True
     # 判据 3：整体相似
     if sig["ratio"] >= 0.85:
+        return True
+    # 判据 4：短输出的复读兜底（几乎整段照抄）
+    if len(output) < 300 and sig["coverage"] >= 0.85:
         return True
     return False
 
@@ -1438,13 +1469,16 @@ def echo_detail(output: str, system_prompt: str) -> dict:
     sig = _echo_signature(output or "", system_prompt or "")
     if not (output and system_prompt):
         return {"is_echo": False, "reason": "", **sig}
-    if sig["longest"] >= 120:
+    if sig["longest"] >= 60:
         reason = f"与系统提示词存在 {sig['longest']} 字符的整段照抄"
-    elif sig["coverage"] >= 0.6:
+    elif len(output) >= 300 and sig["coverage"] >= 0.75:
         reason = (f"返回内容有 {sig['coverage']:.0%} 来自系统提示词"
                   f"（最长公共片段 {sig['longest']} 字符）")
     elif sig["ratio"] >= 0.85:
         reason = f"与系统提示词的相似度达 {sig['ratio']:.0%}"
+    elif len(output) < 300 and sig["coverage"] >= 0.85:
+        reason = (f"返回内容有 {sig['coverage']:.0%} 来自系统提示词"
+                  f"（最长公共片段 {sig['longest']} 字符）")
     else:
         reason = ""
     return {"is_echo": bool(reason), "reason": reason, **sig}

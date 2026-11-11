@@ -149,6 +149,62 @@ class TestEchoDetectionNoFalsePositive(unittest.TestCase):
                 enh.looks_like_echo(parsed, sp),
                 f"{spec_id} 忠实照抄输出骨架的产物被判成复读（假阳性）")
 
+    def test_short_legal_output_is_not_echo(self):
+        """
+        【护栏 · 防我自己引入的新假阳性】
+
+        「覆盖率」这一维对**短输出**没有区分力：
+        模板里列了大量运镜/声音术语，合法产物会照抄这些词，
+        于是 100 来字的短产物覆盖率也能到 0.5 —— 但那不是复读。
+
+        修判据时踩过这个坑（一度把阈值设成 coverage>=0.6，
+        结果合法的 112 字短稿被判成复读）。这里把边界钉死。
+        """
+        spec = enh.get_spec("video-director")
+        sp = spec["system_prompt"]
+        legal_samples = {
+            "最短": ("integrated_multimodal_description: [Shot 1] "
+                     "A cinematic shot of a woman walking in the rain "
+                     "with a red umbrella."),
+            "贴模板措辞": ("integrated_multimodal_description: [Shot 1] "
+                           "A wide establishing shot. [Shot 2] At 00:03.500, "
+                           "the camera cuts to a close-up. The camera pushes in "
+                           "with small amplitude at slow speed. "
+                           "overall_soundscape: Rain. non_diegetic_music: A pad."),
+            "照抄指令示例句": ("integrated_multimodal_description: [Shot 1] A cat. "
+                              "The camera pushes in with small amplitude at slow "
+                              "speed toward the folded letter in her hands. "
+                              "overall_soundscape: Quiet room tone. "
+                              "non_diegetic_music: N/A"),
+        }
+        for name, sample in legal_samples.items():
+            self.assertFalse(
+                enh.looks_like_echo(sample, sp),
+                f"合法短产物（{name}，{len(sample)} 字）被判成复读（假阳性）")
+
+    def test_echo_threshold_has_clean_separation(self):
+        """
+        【护栏 · 阈值分离度】
+
+        实测：合法产物的「最长公共子块」<= 33，真复读 >= 71。
+        阈值取 60 落在中间的**干净间隙**里 ——
+        两侧都不误伤。这条把「阈值从哪来」钉成可验证的事实，
+        而不是一句「凭经验取的」。
+        """
+        spec = enh.get_spec("video-director")
+        sp = spec["system_prompt"]
+        legal = (REAL_OUTPUT_1024, REAL_OUTPUT_4096,
+                 "integrated_multimodal_description: [Shot 1] A cinematic shot.")
+        echo = (sp, sp[:800], " ".join(sp.split()))
+        legal_max = max(enh.echo_detail(o, sp)["longest"] for o in legal)
+        echo_min = min(enh.echo_detail(o, sp)["longest"] for o in echo)
+        self.assertLessEqual(legal_max, 40,
+                             f"合法产物的公共块不该超过 40（实测 {legal_max}）")
+        self.assertGreaterEqual(echo_min, 60,
+                                f"真复读的公共块必须 >= 60（实测 {echo_min}）")
+        self.assertGreater(echo_min, legal_max,
+                           "合法与复读之间必须存在分离间隙")
+
 
 class TestEchoDetectionStillCatchesRealEcho(unittest.TestCase):
     """契约 B：真正的复读必须仍然被抓住（不能把护栏改成放行一切）"""
@@ -172,6 +228,30 @@ class TestEchoDetectionStillCatchesRealEcho(unittest.TestCase):
         prose = enh._instruction_prose(self.sysp)
         self.assertTrue(enh.looks_like_echo(prose[:600], self.sysp),
                         "整段照抄指令散文必须被判成复读")
+
+    def test_truncated_echo_is_detected(self):
+        """
+        复读被**截断**（模型只吐了前 N 字）也要抓住 ——
+        这是「小模型复读到一半被 max_tokens 切了」的真实形态。
+        """
+        for n in (200, 500, 800):
+            truncated = self.sysp[:n]
+            self.assertTrue(
+                enh.looks_like_echo(truncated, self.sysp),
+                f"截断到 {n} 字的复读未被抓住")
+
+    def test_reformatted_echo_variants_are_detected(self):
+        """复读的各种「变形」（重排版 / 去 markdown / 加前缀 / 围栏）都要抓住。"""
+        variants = {
+            "reflowed": " ".join(self.sysp.split()),
+            "no-markdown": self.sysp.replace("## ", "").replace("**", ""),
+            "prefixed": "Sure! Here is the prompt:\n\n" + self.sysp,
+            "fenced": "```\n" + self.sysp + "\n```",
+        }
+        for name, variant in variants.items():
+            self.assertTrue(
+                enh.looks_like_echo(variant, self.sysp),
+                f"复读变体 {name} 未被抓住")
 
     def test_echo_detail_gives_reason(self):
         """复读时必须给出**具体**原因（不能只丢一个布尔）。"""
