@@ -4,12 +4,22 @@
 # 【为什么要单独脚本】
 #   * 线上 8190 由 systemd unit h3-studio 管着（WorkingDirectory=/root/projects/h3studio-live），
 #     本任务明确要求「不要重启 8190 服务与 systemd unit」。
-#   * 实跑实例必须用**本 worktree 的代码**（local/feature/t2v-sampler）。
+#   * 实跑实例必须用**本 worktree 的代码**（local/feature/enhance-system-echo）。
 #   * 数据目录独立（data-live/），任务落库证据不污染线上 jobs.db。
+#
+# 沿用既有约定（scripts/run_live_8199.sh）：
+#   H3STUDIO_PORT        —— 独立端口
+#   H3STUDIO_DATA_DIR    —— 独立数据目录（jobs.db / outputs）
+#   AGENT_SESSION_DB / AGENT_MEMORY_DB —— 独立 Agent 库
+#
+# 合并说明：t2v-sampler 分支也有一份同名脚本（ROOT=h3studio-t2v-sampler，
+# PORT 固定 8199），enhance-system-echo 分支把 PORT 改成可由环境变量覆盖。
+# 两者语义兼容，本文件取 enhance-system-echo 版本（功能超集），
+# t2v-sampler 的等价脚本另存为 scripts/run_live_8199_t2v.sh，两份都保留。
 set -euo pipefail
 
-ROOT=/root/projects/h3studio-t2v-sampler
-PORT=8199
+ROOT=/root/projects/h3studio-echo-fix
+PORT="${H3STUDIO_PORT:-8199}"
 export H3STUDIO_PORT="$PORT"
 export H3STUDIO_DATA_DIR="$ROOT/data-live"
 export AGENT_SESSION_DB="$ROOT/data-live/agent_sessions.db"
