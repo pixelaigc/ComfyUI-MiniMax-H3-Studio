@@ -1,0 +1,1542 @@
+{
+  "results": [
+    {
+      "width": 375,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "accept 含音频": true,
+        "accept 含视频": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "audio-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-02-audio-pending.png",
+      "checks": {
+        "音频上传成功": true,
+        "类型标为 audio": true,
+        "状态为分析中": true,
+        "徽标显示分析中": true,
+        "拿到 asset_id": true,
+        "素材库真的有这条": true,
+        "category 是 audio": true,
+        "抽出了时长": true,
+        "排了分析任务": true,
+        "任务是音频类型": true,
+        "未就绪时不可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "audio-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "音频"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（音频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [
+              "容器格式",
+              "wav",
+              "时长",
+              "00",
+              "03",
+              "采样率",
+              "音频基本信息",
+              "节拍与速度"
+            ],
+            "description": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [
+          "00",
+          "03",
+          "wav",
+          "容器格式",
+          "时长",
+          "节拍与速度",
+          "采样率",
+          "音频基本信息"
+        ],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-03-audio-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示音频": true,
+        "显示了时长": true,
+        "描述落库": true,
+        "描述是音频类型": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "前端拿到标签": true,
+        "就绪后可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "video-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-04-video-pending.png",
+      "checks": {
+        "视频上传成功": true,
+        "类型标为 video": true,
+        "素材库真的有这条": true,
+        "category 是 video": true,
+        "抽出了分辨率": true,
+        "排了分析任务": true,
+        "任务是视频类型": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "video-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "视频"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（视频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [
+              "00",
+              "全景渐变",
+              "02",
+              "镜头缓慢推进",
+              "整体概述",
+              "分镜与时间线",
+              "光线与色彩"
+            ],
+            "description": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [
+          "00",
+          "02",
+          "光线与色彩",
+          "全景渐变",
+          "分镜与时间线",
+          "整体概述",
+          "镜头缓慢推进"
+        ],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-05-video-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示视频": true,
+        "描述落库": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "mixed",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_3a50d213c585/preview",
+          "/api/assets/asset_b13f7458697e/preview"
+        ],
+        "thumbKinds": [
+          "audio",
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending",
+          "pending"
+        ],
+        "badges": [
+          "分析中",
+          "分析中"
+        ],
+        "metas": [
+          "0:02",
+          "0:01 · 160×120"
+        ],
+        "error": "",
+        "note": "2 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 2 个素材，2 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_3a50d213c585",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          },
+          {
+            "asset_id": "asset_b13f7458697e",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 1,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-06-mixed.png",
+      "checks": {
+        "两个都上传成功": true,
+        "类型分别是 audio/video": true,
+        "asset_id 两个": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "「bad-375.txt」不是支持的格式（图片 png/jpg/webp/bmp/gif；音频 wav/mp3/flac/m4a/ogg；视频 mp4/webm/mov/mkv）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-07-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 375,
+      "case": "disguised",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "文件内容不是有效的音频文件（扩展名与真实格式不符）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 375,
+        "docClientW": 375,
+        "bodyScrollW": 375
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-08-disguised-rejected.png",
+      "failed_requests": [],
+      "checks": {
+        "伪装文件不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到内容不符": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "accept 含音频": true,
+        "accept 含视频": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "audio-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [
+          "00",
+          "03",
+          "wav",
+          "容器格式",
+          "时长",
+          "节拍与速度",
+          "采样率",
+          "音频基本信息"
+        ],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-02-audio-pending.png",
+      "checks": {
+        "音频上传成功": true,
+        "类型标为 audio": true,
+        "状态为分析中": true,
+        "徽标显示分析中": true,
+        "拿到 asset_id": true,
+        "素材库真的有这条": true,
+        "category 是 audio": true,
+        "抽出了时长": true,
+        "排了分析任务": true,
+        "任务是音频类型": true,
+        "未就绪时不可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "audio-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "音频"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（音频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [
+              "00",
+              "03",
+              "wav",
+              "容器格式",
+              "时长",
+              "节拍与速度",
+              "采样率",
+              "音频基本信息"
+            ],
+            "description": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [
+          "00",
+          "03",
+          "wav",
+          "容器格式",
+          "时长",
+          "节拍与速度",
+          "采样率",
+          "音频基本信息"
+        ],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-03-audio-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示音频": true,
+        "显示了时长": true,
+        "描述落库": true,
+        "描述是音频类型": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "前端拿到标签": true,
+        "就绪后可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "video-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [
+          "00",
+          "02",
+          "光线与色彩",
+          "全景渐变",
+          "分镜与时间线",
+          "整体概述",
+          "镜头缓慢推进"
+        ],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-04-video-pending.png",
+      "checks": {
+        "视频上传成功": true,
+        "类型标为 video": true,
+        "素材库真的有这条": true,
+        "category 是 video": true,
+        "抽出了分辨率": true,
+        "排了分析任务": true,
+        "任务是视频类型": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "video-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "视频"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（视频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [
+              "00",
+              "02",
+              "光线与色彩",
+              "全景渐变",
+              "分镜与时间线",
+              "整体概述",
+              "镜头缓慢推进"
+            ],
+            "description": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [
+          "00",
+          "02",
+          "光线与色彩",
+          "全景渐变",
+          "分镜与时间线",
+          "整体概述",
+          "镜头缓慢推进"
+        ],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-05-video-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示视频": true,
+        "描述落库": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "mixed",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_3a50d213c585/preview",
+          "/api/assets/asset_b13f7458697e/preview"
+        ],
+        "thumbKinds": [
+          "audio",
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending",
+          "pending"
+        ],
+        "badges": [
+          "分析中",
+          "分析中"
+        ],
+        "metas": [
+          "0:02",
+          "0:01 · 160×120"
+        ],
+        "error": "",
+        "note": "2 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 2 个素材，2 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_3a50d213c585",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          },
+          {
+            "asset_id": "asset_b13f7458697e",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 1,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-06-mixed.png",
+      "checks": {
+        "两个都上传成功": true,
+        "类型分别是 audio/video": true,
+        "asset_id 两个": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "「bad-390.txt」不是支持的格式（图片 png/jpg/webp/bmp/gif；音频 wav/mp3/flac/m4a/ogg；视频 mp4/webm/mov/mkv）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-07-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 390,
+      "case": "disguised",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "文件内容不是有效的音频文件（扩展名与真实格式不符）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 390,
+        "docClientW": 390,
+        "bodyScrollW": 390
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-08-disguised-rejected.png",
+      "failed_requests": [],
+      "checks": {
+        "伪装文件不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到内容不符": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "entry",
+      "probe": {
+        "attachBoxHidden": true,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-01-upload-entry.png",
+      "checks": {
+        "上传入口可见": true,
+        "accept 含音频": true,
+        "accept 含视频": true,
+        "没有附件时缩略图区隐藏": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "audio-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [
+          "00",
+          "03",
+          "wav",
+          "容器格式",
+          "时长",
+          "节拍与速度",
+          "采样率",
+          "音频基本信息"
+        ],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-02-audio-pending.png",
+      "checks": {
+        "音频上传成功": true,
+        "类型标为 audio": true,
+        "状态为分析中": true,
+        "徽标显示分析中": true,
+        "拿到 asset_id": true,
+        "素材库真的有这条": true,
+        "category 是 audio": true,
+        "抽出了时长": true,
+        "排了分析任务": true,
+        "任务是音频类型": true,
+        "未就绪时不可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "audio-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_1e747c9cd8d8/preview"
+        ],
+        "thumbKinds": [
+          "audio"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "音频"
+        ],
+        "metas": [
+          "0:03"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（音频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_1e747c9cd8d8",
+            "tags": [
+              "00",
+              "03",
+              "wav",
+              "容器格式",
+              "时长",
+              "节拍与速度",
+              "采样率",
+              "音频基本信息"
+            ],
+            "description": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+            "kind": "audio",
+            "duration_sec": 3,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "audio",
+        "deleted": false,
+        "width": null,
+        "height": null,
+        "duration_sec": 3.0,
+        "mime": "audio/x-wav",
+        "analysis_text": "## 一、音频基本信息\n- 容器格式：wav\n- 时长：3.00 秒（00:03）\n- 采样率：16000 Hz\n\n## 二、节拍与速度\n- 测得 BPM：152\n- 节拍规整度：0.94\n\n## 三、乐器与音色\n- 人声：占比 0.98\n- 电子舞曲：占比 0.32\n",
+        "analysis_kind": "audio",
+        "tags": [
+          "00",
+          "03",
+          "wav",
+          "容器格式",
+          "时长",
+          "节拍与速度",
+          "采样率",
+          "音频基本信息"
+        ],
+        "job_status": "done",
+        "job_kind": "audio",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_1e747c9cd8d8_analysis\", \"provider_id\": null, \"deep\": true}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-03-audio-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示音频": true,
+        "显示了时长": true,
+        "描述落库": true,
+        "描述是音频类型": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "前端拿到标签": true,
+        "就绪后可用": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "video-pending",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending"
+        ],
+        "badges": [
+          "分析中"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "1 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个素材，1 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [
+          "00",
+          "02",
+          "光线与色彩",
+          "全景渐变",
+          "分镜与时间线",
+          "整体概述",
+          "镜头缓慢推进"
+        ],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-04-video-pending.png",
+      "checks": {
+        "视频上传成功": true,
+        "类型标为 video": true,
+        "素材库真的有这条": true,
+        "category 是 video": true,
+        "抽出了分辨率": true,
+        "排了分析任务": true,
+        "任务是视频类型": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "video-ready",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 1,
+        "thumbSrcs": [
+          "/api/assets/asset_2030f21f7d14/preview"
+        ],
+        "thumbKinds": [
+          "video"
+        ],
+        "thumbStatuses": [
+          "ready"
+        ],
+        "badges": [
+          "视频"
+        ],
+        "metas": [
+          "0:02 · 160×120"
+        ],
+        "error": "",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 1 个（视频），Agent 会引用它们",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_2030f21f7d14",
+            "tags": [
+              "00",
+              "02",
+              "光线与色彩",
+              "全景渐变",
+              "分镜与时间线",
+              "整体概述",
+              "镜头缓慢推进"
+            ],
+            "description": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+            "kind": "video",
+            "duration_sec": 2,
+            "analysis_status": "done",
+            "available": true
+          }
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "library": {
+        "ok": true,
+        "source": "agent_upload",
+        "category": "video",
+        "deleted": false,
+        "width": 160,
+        "height": 120,
+        "duration_sec": 2.0,
+        "mime": "video/mp4",
+        "analysis_text": "**【整体概述】**\n一段彩色渐变画面在缓慢流动。\n\n**【分镜与时间线】**\n00:00 全景渐变；00:02 镜头缓慢推进。\n\n**【光线与色彩】**\n蓝紫与橙黄交织的渐变色调。",
+        "analysis_kind": "video",
+        "tags": [
+          "00",
+          "02",
+          "光线与色彩",
+          "全景渐变",
+          "分镜与时间线",
+          "整体概述",
+          "镜头缓慢推进"
+        ],
+        "job_status": "done",
+        "job_kind": "video",
+        "job_options": "{\"derived_dir\": \"/tmp/h3verify-media-av-m788it8e/asset_library/derived/as/asset_2030f21f7d14_analysis\", \"provider_id\": null}"
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-05-video-ready.png",
+      "checks": {
+        "分析完成": true,
+        "徽标显示视频": true,
+        "描述落库": true,
+        "标签落库": true,
+        "任务已完成": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "mixed",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 2,
+        "thumbSrcs": [
+          "/api/assets/asset_3a50d213c585/preview",
+          "/api/assets/asset_b13f7458697e/preview"
+        ],
+        "thumbKinds": [
+          "audio",
+          "video"
+        ],
+        "thumbStatuses": [
+          "pending",
+          "pending"
+        ],
+        "badges": [
+          "分析中",
+          "分析中"
+        ],
+        "metas": [
+          "0:02",
+          "0:01 · 160×120"
+        ],
+        "error": "",
+        "note": "2 个素材正在分析，\n        分析完成前不能作为参考素材引用",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "已附 2 个素材，2 个仍在分析",
+        "sendDisabled": false,
+        "attachments": [
+          {
+            "asset_id": "asset_3a50d213c585",
+            "tags": [],
+            "description": "",
+            "kind": "audio",
+            "duration_sec": 2,
+            "analysis_status": "queued",
+            "available": false
+          },
+          {
+            "asset_id": "asset_b13f7458697e",
+            "tags": [],
+            "description": "",
+            "kind": "video",
+            "duration_sec": 1,
+            "analysis_status": "queued",
+            "available": false
+          }
+        ],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-06-mixed.png",
+      "checks": {
+        "两个都上传成功": true,
+        "类型分别是 audio/video": true,
+        "asset_id 两个": true,
+        "窄屏无横向溢出": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "bad-type",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "「bad-1280.txt」不是支持的格式（图片 png/jpg/webp/bmp/gif；音频 wav/mp3/flac/m4a/ogg；视频 mp4/webm/mov/mkv）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-07-bad-type-rejected.png",
+      "checks": {
+        "非法类型不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到格式": true
+      },
+      "all_pass": true
+    },
+    {
+      "width": 1280,
+      "case": "disguised",
+      "probe": {
+        "attachBoxHidden": false,
+        "acceptAttr": "image/png,image/jpeg,image/webp,image/bmp,image/gif,\n                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,\n                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,\n                      video/mp4,video/webm,video/quicktime,video/x-matroska,\n                      video/x-msvideo",
+        "thumbCount": 0,
+        "thumbSrcs": [],
+        "thumbKinds": [],
+        "thumbStatuses": [],
+        "badges": [],
+        "metas": [],
+        "error": "文件内容不是有效的音频文件（扩展名与真实格式不符）",
+        "note": "",
+        "busyVisible": false,
+        "btnVisible": true,
+        "btnText": "📎 媒体",
+        "hint": "上传的图片 / 音频 / 视频会入库素材库后交给 Agent",
+        "sendDisabled": false,
+        "attachments": [],
+        "docScrollW": 1280,
+        "docClientW": 1280,
+        "bodyScrollW": 1280
+      },
+      "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-08-disguised-rejected.png",
+      "failed_requests": [],
+      "checks": {
+        "伪装文件不被接受": true,
+        "有可读的错误提示": true,
+        "错误提示提到内容不符": true
+      },
+      "all_pass": true
+    }
+  ],
+  "console_errors": [],
+  "uploaded_ids": [
+    "asset_1e747c9cd8d8",
+    "asset_2030f21f7d14",
+    "asset_3a50d213c585",
+    "asset_b13f7458697e",
+    "asset_1e747c9cd8d8",
+    "asset_2030f21f7d14",
+    "asset_3a50d213c585",
+    "asset_b13f7458697e",
+    "asset_1e747c9cd8d8",
+    "asset_2030f21f7d14",
+    "asset_3a50d213c585",
+    "asset_b13f7458697e"
+  ],
+  "all_pass": true
+}

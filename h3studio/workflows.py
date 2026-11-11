@@ -445,7 +445,12 @@ def build_r2v(params):
     p["120"] = {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader"}
 
     ref_inputs = {}
-    for index, filename in enumerate(params["ref_images"][:3]):
+    # 【2026-11-11 音视频扩展】ref_images 可能**不存在** ——
+    # 用户可以只上传参考视频/参考音频（不传参考图）。
+    # 原来写死 params["ref_images"] -> KeyError: 'ref_images'
+    # -> 任务已经建成了，worker 跑起来才炸（静默失效，最难查）。
+    # 所以这里用 .get() 兜底。
+    for index, filename in enumerate((params.get("ref_images") or [])[:3]):
         node_id = f"136:{201 + index}"
         p[node_id] = {
             "inputs": {"image": filename},

@@ -1,0 +1,104 @@
+{
+  "375-03-audio-ready": {
+    "ok": true,
+    "label": "音频波形",
+    "color": [
+      110,
+      168,
+      254
+    ],
+    "best_hits": 432,
+    "box": [
+      16,
+      1060,
+      140,
+      1184
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-03-audio-ready.png"
+  },
+  "375-05-video-ready": {
+    "ok": true,
+    "label": "视频首帧",
+    "color": [
+      48,
+      80,
+      160
+    ],
+    "best_hits": 1186,
+    "box": [
+      16,
+      1060,
+      140,
+      1184
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-375-05-video-ready.png"
+  },
+  "390-03-audio-ready": {
+    "ok": true,
+    "label": "音频波形",
+    "color": [
+      110,
+      168,
+      254
+    ],
+    "best_hits": 432,
+    "box": [
+      16,
+      1124,
+      140,
+      1248
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-03-audio-ready.png"
+  },
+  "390-05-video-ready": {
+    "ok": true,
+    "label": "视频首帧",
+    "color": [
+      48,
+      80,
+      160
+    ],
+    "best_hits": 1186,
+    "box": [
+      16,
+      1124,
+      140,
+      1248
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-390-05-video-ready.png"
+  },
+  "1280-03-audio-ready": {
+    "ok": true,
+    "label": "音频波形",
+    "color": [
+      110,
+      168,
+      254
+    ],
+    "best_hits": 631,
+    "box": [
+      424,
+      1356,
+      548,
+      1480
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-03-audio-ready.png"
+  },
+  "1280-05-video-ready": {
+    "ok": true,
+    "label": "视频首帧",
+    "color": [
+      48,
+      80,
+      160
+    ],
+    "best_hits": 2139,
+    "box": [
+      424,
+      1356,
+      548,
+      1480
+    ],
+    "screenshot": "/root/projects/h3studio-agent-av-upload/evidence/media-av/mediaav-1280-05-video-ready.png"
+  }
+}

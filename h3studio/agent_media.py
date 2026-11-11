@@ -48,6 +48,39 @@ ALLOWED_IMAGE_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif",
 }
 
+#: 允许上传的音频扩展名。
+#:
+#: 【选型依据 —— 素材库能探测 + 深度管线能读】
+#:   wav / mp3 / flac —— 无损或高兼容，ffmpeg + librosa + soundfile 全支持
+#:   m4a / aac      —— iPhone 录音默认格式（ffmpeg 解码没问题）
+#:   ogg / opus     —— 语音与游戏音效常用
+#:   aiff / wma     —— 补几个常见的老格式
+#: 判定「能不能处理」看的是**能不能解出采样率/时长**（media_probe.probe_audio），
+#: 深度管线再在其上做 BPM/乐器/人声/ASR。
+ALLOWED_AUDIO_SUFFIXES = {
+    ".wav", ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".aiff", ".aif", ".wma",
+}
+
+#: 允许上传的视频扩展名。
+#:
+#: 【为什么含 mov / mkv】
+#: iPhone 拍的是 .mov，ComfyUI/ffmpeg 都能解；mkv 是录制常用容器。
+#: 真正能不能用由 ffprobe 说了算（见 _detect_video_kind）。
+ALLOWED_VIDEO_SUFFIXES = {
+    ".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi",
+}
+
+#: 一次上传允许的**总**媒体类型集合（图片 + 音频 + 视频）。
+ALLOWED_MEDIA_SUFFIXES = (
+    ALLOWED_IMAGE_SUFFIXES | ALLOWED_AUDIO_SUFFIXES | ALLOWED_VIDEO_SUFFIXES)
+
+#: 媒体类型 -> 素材库 category（与 assets.classify 的语义一致）。
+MEDIA_CATEGORY = {
+    "image": "image",
+    "audio": "audio",
+    "video": "video",
+}
+
 #: 单张图片大小上限（字节）。
 #:
 #: 【为什么比素材库的 8 GB 严得多】
@@ -57,6 +90,24 @@ ALLOWED_IMAGE_SUFFIXES = {
 #: 20 MB 足够覆盖手机原图与绝大多数设计稿，且足够安全。
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
+#: 单个音频文件大小上限（字节）—— 100 MB。
+#:
+#: 【为什么音频可以比图片宽 5 倍】
+#: 音频走的是**深度管线**（BPM/乐器/人声/ASR），管线内部自己重采样到
+#: 16k/48k —— 不需要把原文件整段读进推理上下文。
+#: 但 librosa/soundfile 载入仍要占内存：100 MB 的 wav ≈ 50 MB PCM，
+#: 完全在可控范围。超过这个量级，用户应该先裁剪。
+MAX_AUDIO_BYTES = 100 * 1024 * 1024
+
+#: 单个视频文件大小上限（字节）—— 500 MB。
+#:
+#: 【为什么视频可以到 500 MB】
+#: 视频分析是**抽帧**（每 2 秒 1 帧，最多 24 帧）—— 分析侧只吃几十张
+#: JPEG，不吃原视频；原视频只是落盘 + 生成一张封面。
+#: 500 MB 覆盖手机 4K 短视频（1 分钟约 200~400 MB）的绝大多数场景。
+#: 再大就该走素材库页的归档上传（上限 8 GB），不适合当聊天附件。
+MAX_VIDEO_BYTES = 500 * 1024 * 1024
+
 #: 一次上传最多几张（用户要求：建议上限 9 张，与 Qwen-Image 参考图对齐）。
 #:
 #: 【为什么不直接用 ref_images.MAX_REF_IMAGES = 10】
@@ -65,7 +116,25 @@ MAX_IMAGE_BYTES = 20 * 1024 * 1024
 #: 可以避免「刚好卡在 10 张边界」时的边界困惑（9 → 10 还能再加 1 张，
 #: 10 → 11 直接被拒，用户会觉得莫名其妙）。
 #: 真实能力上限仍然是 10（服务端会再校验一次），这里只是交互层的软上限。
+#:
+#: 【图片 / 音视频分开计数 —— 2026-11-11】
+#: 之前是「所有媒体共用 9 个」的额度。现在拆成两组：
+#:   * 图片 9 张（与 Qwen-Image 参考图上限对齐，语义不变）
+#:   * 音视频合计 4 个（参考音频 1 段 + 参考视频 3 个 = H3 参考生成节点的
+#:     ref_audios 0~3 / ref_videos 0~3 上限）
+#: 为什么音视频额度更小：H3 视频模式**每个**参考视频/音频都要整段
+#: 参与推理（不是抽帧），上传太多会拖垮 ComfyUI 侧；
+#: 而参考图只进图像编码器。分开计数也让报错信息能说清是哪一类超了。
 MAX_IMAGES_PER_UPLOAD = 9
+
+#: 一次上传最多几个**音视频**（音频 + 视频合计）。
+#:
+#: 【为什么是 4】
+#: H3 参考生成节点的真实槽位上限（实测 /object_info）：
+#:   ref_images 0~9 / ref_videos 0~3 / ref_video_audios 0~3 / ref_audios 0~3
+#: 参考视频与参考音频各能到 3，合起来给 4 留了一点余量，
+#: 同时避免用户一次拖进来十几个几百 MB 的视频把队列压垮。
+MAX_MEDIA_FILES_PER_UPLOAD = 4
 
 #: 魔数嗅探表：(扩展名, 头部字节, 最小长度)。
 #:
@@ -91,6 +160,87 @@ MAGIC_TABLE = (
 #: WEBP 的完整魔数：offset 0 是 RIFF，offset 8 是 WEBP。
 WEBP_RIFF = b"RIFF"
 WEBP_TAG = b"WEBP"
+
+# ------------------------------------------------------------------ 音视频魔数
+
+#: 音频魔数表：(扩展名, 头部字节集合, 最小长度)。
+#:
+#: 【为什么音频也要嗅探】
+#: 音视频是**二进制容器**，扩展名几乎不携带可信信息 ——
+#: 把 .mp4 改名成 .wav、或者把 .exe 改名成 .mp3 都很容易。
+#: 素材库后面要用 ffprobe 真的去解码它（拿时长/采样率），
+#: 所以在入口处先挡一道「这根本不是音频」比让它在分析阶段炸掉好。
+#:
+#: 【各格式的头部】
+#:   WAV  -> "RIFF"...."WAVE"
+#:   MP3  -> "ID3" 或 0xFF 0xEx/0xFx 帧同步
+#:   FLAC -> "fLaC"
+#:   OGG  -> "OggS"
+#:   MP4/M4A/M4V -> offset 4 是 "ftyp"
+#:   AIFF -> "FORM"...."AIFF"
+#:   WMA -> 0x30 0x26 0xB2 0x75
+AUDIO_MAGIC_TABLE = (
+    (".wav", (b"RIFF",), 4),          # 真正的 WAVE 标记在 offset 8
+    (".mp3", (b"ID3",), 3),
+    (".flac", (b"fLaC",), 4),
+    (".ogg", (b"OggS",), 4),
+    (".opus", (b"OggS",), 4),
+    (".m4a", (b"",), 0),              # 用 ftyp 判定（见 _detect_audio_kind）
+    (".aac", (b"",), 0),              # ADTS：0xFFF 同步字
+    (".aiff", (b"FORM",), 4),
+    (".aif", (b"FORM",), 4),
+    (".wma", (b"\x30\x26\xb2\x75",), 4),
+)
+
+#: 视频魔数表：(扩展名, 头部字节集合, 最小长度)。
+#:
+#: 【关键现实：视频容器不是靠固定魔数区分的】
+#: mp4 / mov / m4v 都是 ISO-BMFF（offset 4 = "ftyp"），
+#: webm / mkv 都是 Matroska（头部是 0x1A45DFA3），
+#: avi 是 "RIFF"...."AVI "。
+#: 所以**光看魔数分不出 mp4 和 mov** —— 它们本来就是同一个家族。
+#:
+#: 【那怎么区分「这确实是视频」而不是「随便一个二进制」】
+#: 判据分两层：
+#:   1) 魔数对得上容器家族（ftyp / EBML / RIFF+AVI）
+#:   2) 容器家族对得上扩展名 —— mp4/mov/m4v 都是 ftyp，webm/mkv 都是 EBML，
+#:      avi 是 RIFF+AVI。**扩展名与家族不符就拒**（.mkv 其实是 mp4 -> 拒）。
+#: 这样既不误伤（mp4 改名为 mov 仍可用，因为它们同家族），
+#: 又挡住了「.mp4 里装的是 exe」。
+VIDEO_MAGIC_TABLE = (
+    (".mp4", (b"ftyp",), 4),
+    (".m4v", (b"ftyp",), 4),
+    (".mov", (b"ftyp",), 4),
+    (".webm", (b"\x1a\x45\xdf\xa3",), 4),
+    (".mkv", (b"\x1a\x45\xdf\xa3",), 4),
+    (".avi", (b"RIFF",), 4),
+)
+
+#: WAV 的完整标记：offset 0 是 RIFF，offset 8 是 WAVE。
+WAVE_TAG = b"WAVE"
+
+#: AVI 的完整标记：offset 0 是 RIFF，offset 8 是 AVI 。
+AVI_TAG = b"AVI "
+
+#: ISO-BMFF 家族的 ftyp 标记（在 offset 4）。
+FTYP_TAG = b"ftyp"
+
+#: Matroska/WebM 的 EBML 标记。
+EBML_MAGIC = b"\x1a\x45\xdf\xa3"
+
+#: MP3 帧同步字（0xFF + 0xE0 掩码的高 11 位）。
+MP3_FRAME_SYNC = 0xFFE0
+
+#: AAC ADTS 帧同步字（0xFFF + 0xF0 掩码的高 12 位）。
+AAC_FRAME_SYNC = 0xFFF0
+
+
+#: 媒体类型 -> 中文标签（报错与前端提示共用）。
+_KIND_LABEL = {
+    "image": "图片",
+    "audio": "音频",
+    "video": "视频",
+}
 
 
 class UploadError(Exception):
@@ -131,15 +281,148 @@ def _detect_image_kind(filename: str, head: bytes) -> str | None:
     return None
 
 
-def _validate_suffix(filename: str) -> str:
+def _detect_audio_kind(filename: str, head: bytes) -> str | None:
+    """
+    按**头部字节**判断这是什么音频格式。
+
+    返回规范化扩展名（".wav" / ".mp3" / ...），不匹配返回 None。
+
+    【为什么不信任扩展名】见 AUDIO_MAGIC_TABLE 的说明。
+
+    【MP3 的两种头】MP3 文件可能带 ID3v2 标签（"ID3" 开头），
+    也可能没有（直接是帧同步字 0xFF 0xE0~0xFF）。两种都要认。
+    """
     suffix = Path(filename or "").suffix.lower()
-    if suffix not in ALLOWED_IMAGE_SUFFIXES:
-        allowed = "、".join(sorted(ALLOWED_IMAGE_SUFFIXES))
+    if suffix == ".wav":
+        if (len(head) >= 12 and head[:4] == WEBP_RIFF
+                and head[8:12] == WAVE_TAG):
+            return ".wav"
+        return None
+    if suffix == ".aiff" or suffix == ".aif":
+        if (len(head) >= 12 and head[:4] == b"FORM"
+                and head[8:12] == b"AIFF"):
+            return suffix
+        return None
+    if suffix == ".m4a":
+        # m4a 是 ISO-BMFF 里的「只有音轨的 mp4」—— 头部同样是 ftyp
+        if len(head) >= 8 and head[4:8] == FTYP_TAG:
+            return ".m4a"
+        return None
+    if suffix == ".aac":
+        # ADTS 裸流：0xFF 0xF?
+        if len(head) >= 2 and (int.from_bytes(head[:2], "big")
+                               & AAC_FRAME_SYNC) == AAC_FRAME_SYNC:
+            return ".aac"
+        return None
+    if suffix == ".mp3":
+        if head.startswith(b"ID3"):
+            return ".mp3"
+        if len(head) >= 2 and (int.from_bytes(head[:2], "big")
+                               & MP3_FRAME_SYNC) == MP3_FRAME_SYNC:
+            return ".mp3"
+        return None
+    for ext, magics, min_len in AUDIO_MAGIC_TABLE:
+        if ext in (".wav", ".aiff", ".aif", ".m4a", ".aac", ".mp3"):
+            continue
+        if len(head) < min_len:
+            continue
+        for magic in magics:
+            if magic and head.startswith(magic):
+                return ext
+    return None
+
+
+def _detect_video_kind(filename: str, head: bytes) -> str | None:
+    """
+    按**头部字节**判断这是什么视频容器。
+
+    返回规范化扩展名（".mp4" / ".webm" / ".mov" / ...），不匹配返回 None。
+
+    【为什么要按「容器家族」而不是按精确魔数】
+    mp4 / mov / m4v 都是 ISO-BMFF（ftyp），webm / mkv 都是 Matroska（EBML），
+    avi 是 RIFF+AVI。分不出同家族的具体格式 —— 也不需要分：
+    同一家族内改扩展名不影响 ffprobe 解码，素材库会按真实内容探测。
+
+    【但家族必须与扩展名相符】
+    .mkv 里装 mp4 -> 拒。理由是**元数据会写错**：
+    register_asset 用扩展名猜 mime（assets.guess_mime），
+    .mkv 装 mp4 会被记成 video/x-matroska，而 ComfyUI 侧按 mime 选
+    加载节点时会挑错容器。宁可拒掉，也不要留一条元数据错乱的素材。
+    """
+    suffix = Path(filename or "").suffix.lower()
+    if len(head) < 8:
+        return None
+    if suffix in (".mp4", ".m4v", ".mov"):
+        # ISO-BMFF：offset 4 是 "ftyp"
+        return suffix if head[4:8] == FTYP_TAG else None
+    if suffix in (".webm", ".mkv"):
+        # Matroska / WebM
+        return suffix if head[:4] == EBML_MAGIC else None
+    if suffix == ".avi":
+        if head[:4] == WEBP_RIFF and head[8:12] == AVI_TAG:
+            return ".avi"
+        return None
+    return None
+
+
+def _media_kind_for_suffix(suffix: str) -> str:
+    """扩展名 -> 媒体类型（image / audio / video）。不属于任何一类返回 ""。"""
+    if suffix in ALLOWED_IMAGE_SUFFIXES:
+        return "image"
+    if suffix in ALLOWED_AUDIO_SUFFIXES:
+        return "audio"
+    if suffix in ALLOWED_VIDEO_SUFFIXES:
+        return "video"
+    return ""
+
+
+def _validate_suffix(filename: str) -> str:
+    """
+    扩展名白名单校验。被拒时抛 UploadError（消息面向用户）。
+
+    【为什么要按类型给不同的措辞】
+    报错必须让用户知道**自己错在哪一类**：
+    「不支持的图片类型 .txt」比「不支持的文件类型 .txt」有用得多
+    （用户可能是想传音频，结果后缀打错了）。
+    而音视频的扩展名与图片不重叠，所以一个 .txt 会被归到「无法归类」，
+    那时给出三类各自的清单。
+    """
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in ALLOWED_MEDIA_SUFFIXES:
+        return suffix
+
+    images = "、".join(sorted(ALLOWED_IMAGE_SUFFIXES))
+    audios = "、".join(sorted(ALLOWED_AUDIO_SUFFIXES))
+    videos = "、".join(sorted(ALLOWED_VIDEO_SUFFIXES))
+
+    # 后缀能看出用户**想**传哪一类（按同族近似），就用那类的措辞。
+    if suffix in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif",
+                  ".tiff", ".heic", ".heif", ".svg"):
         raise UploadError(
-            f"不支持的图片类型 {suffix or '(无扩展名)'}，"
-            f"只接受 {allowed}",
+            f"不支持的图片类型 {suffix}，只接受 {images}",
             code="unsupported_type")
-    return suffix
+    if suffix in (".wma", ".amr", ".mid", ".midi", ".aiff", ".ape", ".mka"):
+        raise UploadError(
+            f"不支持的音频类型 {suffix}，只接受 {audios}",
+            code="unsupported_type")
+    if suffix in (".flv", ".wmv", ".rm", ".rmvb", ".ts", ".m2ts", ".3gp"):
+        raise UploadError(
+            f"不支持的视频类型 {suffix}，只接受 {videos}",
+            code="unsupported_type")
+
+    raise UploadError(
+        f"不支持的文件类型 {suffix or '(无扩展名)'}，"
+        f"只接受 图片（{images}）、音频（{audios}）、视频（{videos}）",
+        code="unsupported_type")
+
+
+def _max_bytes_for_kind(kind: str) -> int:
+    """按媒体类型取单文件大小上限。"""
+    if kind == "audio":
+        return MAX_AUDIO_BYTES
+    if kind == "video":
+        return MAX_VIDEO_BYTES
+    return MAX_IMAGE_BYTES
 
 
 async def _read_and_validate_part(part, tmp_dir: Path) -> dict:
@@ -147,10 +430,18 @@ async def _read_and_validate_part(part, tmp_dir: Path) -> dict:
     把一个 multipart 文件 part 流式落到临时区并做全部校验。
 
     返回 {"tmp": Path, "filename": str, "suffix": str, "bytes": int,
-          "sha256": str}；被拒时抛 UploadError（临时文件已清理）。
+          "kind": "image"|"audio"|"video", "sha256": str}；
+    被拒时抛 UploadError（临时文件已清理）。
+
+    【三类媒体的校验顺序】
+      1. 扩展名白名单（图片 / 音频 / 视频各一套）
+      2. 流式落盘 + 按**该类型**的大小上限累计（超了立刻停）
+      3. 魔数嗅探：文件**真的**是那个格式吗
     """
     filename = Path(part.filename or "upload.png").name  # 只取 basename
     suffix = _validate_suffix(filename)
+    kind = _media_kind_for_suffix(suffix)
+    max_bytes = _max_bytes_for_kind(kind)
 
     tmp = tmp_dir / f".agent-upload-{uuid.uuid4().hex}.tmp"
     total = 0
@@ -166,7 +457,7 @@ async def _read_and_validate_part(part, tmp_dir: Path) -> dict:
                     head = chunk[:32]
                 handle.write(chunk)
                 total += len(chunk)
-                if total > MAX_IMAGE_BYTES:
+                if total > max_bytes:
                     overflow = True
                     break
     except Exception as exc:  # noqa: BLE001
@@ -176,49 +467,74 @@ async def _read_and_validate_part(part, tmp_dir: Path) -> dict:
 
     if overflow:
         tmp.unlink(missing_ok=True)
+        limit_mb = max_bytes // (1024 * 1024)
         raise UploadError(
-            f"图片超过上限 {MAX_IMAGE_BYTES // (1024 * 1024)} MB",
+            f"{_KIND_LABEL.get(kind, '文件')}超过上限 {limit_mb} MB",
             code="file_too_large", status=413)
     if total <= 0:
         tmp.unlink(missing_ok=True)
         raise UploadError("文件为空", code="empty_file")
 
     # --- 魔数嗅探：文件**真的**是那个格式吗？ ---
-    detected = _detect_image_kind(filename, head)
+    if kind == "image":
+        detected = _detect_image_kind(filename, head)
+    elif kind == "audio":
+        detected = _detect_audio_kind(filename, head)
+    else:
+        detected = _detect_video_kind(filename, head)
+
     if detected is None:
         tmp.unlink(missing_ok=True)
         raise UploadError(
-            "文件内容不是有效的图片（扩展名与真实格式不符）",
-            code="invalid_image_content")
+            f"文件内容不是有效的{_KIND_LABEL.get(kind, '媒体')}文件"
+            "（扩展名与真实格式不符）",
+            code="invalid_media_content")
     # 真实格式与扩展名不一致时以**真实格式**为准（例如 .png 其实是 jpeg），
     # 避免 mime 写错导致下游 PIL/ComfyUI 读图失败。
     real_suffix = detected
+    real_kind = _media_kind_for_suffix(real_suffix) or kind
 
     return {"tmp": tmp, "filename": filename, "suffix": real_suffix,
-            "bytes": total}
+            "bytes": total, "kind": real_kind}
 
 
 def _register_one(item: dict) -> dict:
     """
     把一个已落盘的临时文件入库（复用素材库的 register_asset）。
 
-    返回 {"asset_id", "name", "preview_url", "duplicated", "bytes"}。
+    返回 {"asset_id", "name", "preview_url", "duplicated", "bytes",
+          "kind", "width", "height", "duration_sec", ...}。
+
+    【三类媒体走同一套入库】
+    category 必须是**真实的媒体类型**（image / audio / video）：
+      * 素材库的筛选器按 category 分（category=audio 才能筛出音频）
+      * analysis.run_analysis 按 category 选分析器
+      * 缩略图生成按 category 分支（图片出缩略图 / 视频抽首帧 / 音频画波形）
+    写死 category="image" 会让音视频被记成图片 —— 后面 ffprobe 探测失败、
+    缩略图空白、分析器选错。**这是本次扩展最关键的一处改动。**
+
+    【为什么刻意不写 note】
+    ref_api._describe 会把 note 当成**描述的兜底**（还标成 "analysis" 来源）。
+    如果这里写「Agent 聊天区上传的附件」，素材库里每个附件的「描述」
+    都会变成这句固定文案 —— 模型会以为那就是内容本身。
+    来源信息应该走 source 字段（= "agent_upload"），
+    描述只能来自**真正的分析结果**。
     """
+    kind = item.get("kind") or "image"
+    category = MEDIA_CATEGORY.get(kind, "image")
+    # subtype 让素材库页的分类有意义（与 assets.classify 的语义一致）：
+    #   图片 -> photo / 音频 -> music / 视频 -> clip
+    subtype = {"image": "photo", "audio": "music", "video": "clip"}.get(
+        kind, "photo")
+
     with asset_store.connect() as conn:
         try:
             result = asset_service.register_asset(
                 conn,
                 source_path=item["tmp"],
                 filename=item["filename"],
-                category="image",
-                subtype="photo",
-                # 【刻意不写 note】
-                # ref_api._describe 会把 note 当成**描述的兜底**（还标成
-                # "analysis" 来源）。如果这里写「Agent 聊天区上传的附件」，
-                # 素材库里每张附件的「描述」都会变成这句固定文案 ——
-                # 模型会以为那就是图片的内容。
-                # 来源信息应该走 source 字段（= "agent_upload"），
-                # 描述只能来自**真正的分析结果**。
+                category=category,
+                subtype=subtype,
                 note=None,
                 source="agent_upload",
                 creator="agent",
@@ -248,8 +564,15 @@ def _register_one(item: dict) -> dict:
             "preview_url": preview_url,
             "duplicated": bool(result.get("duplicated")),
             "bytes": item["bytes"],
+            "kind": kind,
+            "category": category,
             "width": version.get("width"),
             "height": version.get("height"),
+            "duration_sec": version.get("duration_sec"),
+            "mime": version.get("mime"),
+            "codec": version.get("codec"),
+            "sample_rate": version.get("sample_rate"),
+            "channels": version.get("channels"),
         }
 
 
@@ -315,7 +638,18 @@ def _extract_tags_from_description(text: str, limit: int = 8) -> list[str]:
     # -> sections 为空 -> 标签全空（生产实测踩到）。
     #
     # 所以：**只匹配【...】本身**，markdown 强调符号交给后面的
-    # `re.sub(r"[*_`#>\-•]", " ", body)` 清理。
+    # `re.sub(r"[*_`#>\\-•]", " ", body)` 清理。
+    #
+    # 【第三种格式：markdown 标题 —— 2026-11-11 音频扩展踩到】
+    # 深度音频管线（analyze_audio.py 的 render_text）产出的结构是
+    # **markdown 二级标题**，不是【】：
+    #     ## 一、音频基本信息
+    #     ## 二、节拍与速度
+    #     ## 三、乐器与音色
+    # 只认【】的话，音频分析文本会抽出**零个**标签 ——
+    # 而标签是素材库的结构化索引（Agent 靠它检索），
+    # 音频素材就会在素材库里「搜不到」。
+    # 所以这里**两种结构都认**：先切【】小节，再切 markdown 标题小节。
     sections: list[tuple[str, str]] = []
     pattern = re.compile(r"【\s*([^】]{1,20})\s*】")
     matches = list(pattern.finditer(text))
@@ -323,6 +657,19 @@ def _extract_tags_from_description(text: str, limit: int = 8) -> list[str]:
         title = match.group(1).strip()
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections.append((title, text[start:end]))
+
+    # markdown 标题小节（## / ### + 标题文字）
+    # 标题文字里常带「一、」「二、」这类序号 —— 切掉（它们不是关键词）
+    md_pattern = re.compile(r"^#{1,4}\s*(.+?)\s*$", re.MULTILINE)
+    md_matches = list(md_pattern.finditer(text))
+    for index, match in enumerate(md_matches):
+        title = re.sub(r"^[一二三四五六七八九十\d]+[、.．)]\s*", "",
+                       match.group(1).strip())
+        title = re.sub(r"[*_`#]", "", title).strip()
+        start = match.end()
+        end = (md_matches[index + 1].start()
+               if index + 1 < len(md_matches) else len(text))
         sections.append((title, text[start:end]))
 
     content_tags: list[str] = []
@@ -408,6 +755,15 @@ def _preprocess_asset(asset_id: str) -> dict:
       * 同步等待，语义简单
       * 失败有明确的 LibraryError 原因
       * 产出落在同一张 asset_analyses 表，素材库页看得到
+
+    【2026-11-11：图片仍然同步，音视频走异步】
+    音视频的预处理耗时差一个数量级：
+      * 图片（多模态）：实测 120~180 秒/张
+      * 视频（抽帧 + 多模态）：抽 24 帧 + 模型看帧，**更慢**
+      * 音频（深度管线 BPM/乐器/人声/ASR）：实测 116 秒素材 ~600 秒
+    同步等 600 秒会把上传请求挂死，用户早就走了。
+    所以音视频走**素材库既有的异步 job 通道**（analysis_jobs），
+    前端轮询 /api/assets/{id}/analysis-status。
     """
     from h3studio import analysis as analysis_mod
     from h3studio import asset_service
@@ -444,6 +800,94 @@ def _preprocess_asset(asset_id: str) -> dict:
 
     tags = _apply_tags(asset_id, _extract_tags_from_description(text))
     return {"ok": True, "description": text, "tags": tags, "error": ""}
+
+
+def _start_async_preprocess(asset_id: str, kind: str) -> dict:
+    """
+    对音视频素材**异步**排一次分析任务（复用素材库的 analysis_jobs）。
+
+    返回 {"ok": bool, "job_id": int, "status": str, "error": str}。
+
+    【为什么复用 analysis_jobs 而不是自己起线程】
+    analysis_jobs 是素材库**既有**的分析调度层：
+      * 有 job 表（asset_analysis_jobs）—— 状态可查、可回溯
+      * 有进度回调（深度音频分析按阶段回调）
+      * 有失败留痕（_fail_job 写一条 error 的分析记录）
+      * 前端素材库页已经在轮询 /api/assets/{id}/analysis-status
+    自己另造一套 = 状态无处可查 + 前端要写第二套轮询逻辑。
+
+    【音频走深度管线，视频走多模态】
+      * 音频：options["deep"]=True -> _run_audio_deep
+        （BPM / 乐器 / 人声 / ASR 带时间戳 / LLM 语义补充）
+      * 视频：多模态分析器（抽帧 + 模型看帧写中文描述）
+    这正是素材库页「深度分析」对这两类素材的既有行为 ——
+    Agent 上传只是**复用**它，不另造算法。
+
+    【抽标签】
+    深度音频分析写出来的文本是**结构化**的（## 一、音频基本信息
+    ## 二、节拍与速度 …），所以复用图片那套抽标签逻辑就行
+    （_extract_tags_from_description）—— 但要等分析完成后才能抽。
+    见 _finalize_async_tags。
+    """
+    options: dict = {"derived_dir": None, "provider_id": None}
+    try:
+        with asset_store.connect() as conn:
+            version = asset_repo.current_version(conn, asset_id)
+            if not version:
+                return {"ok": False, "job_id": 0, "status": "",
+                        "error": "素材没有可用版本"}
+            source = analysis_jobs._source_of(asset_id, version)
+            if source is None:
+                return {"ok": False, "job_id": 0, "status": "",
+                        "error": "素材文件已丢失"}
+            root = asset_store.library_root()
+            options["derived_dir"] = str(
+                root / asset_store.DIR_DERIVED / asset_id[:2]
+                / f"{asset_id}_analysis")
+            if kind == "audio":
+                options["deep"] = True
+            job = analysis_jobs.start_analysis(asset_id, kind, mode="analyze",
+                                               options=options)
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:200]
+        return {"ok": False, "job_id": 0, "status": "",
+                "error": f"无法启动素材分析：{detail}"}
+    return {"ok": True, "job_id": int(job.get("id") or 0),
+            "status": job.get("status") or "queued", "error": ""}
+
+
+def _finalize_async_tags(asset_id: str) -> dict:
+    """
+    异步分析完成后抽标签并写进素材库（描述由 analysis_jobs 自己写入）。
+
+    返回 {"ok": bool, "tags": list, "error": str}。
+
+    【为什么需要这一步】
+    analysis_jobs._run_multimodal / _run_audio_deep 只写**描述**
+    （asset_analyses.text），**不写标签**（asset_tags）。
+    图片的同步预处理是 agent_media 自己抽标签再写的 ——
+    异步路径必须补上这一步，否则音视频素材在素材库里没有标签，
+    Agent 就搜不到它们（search_assets 的关键词检索命中标签）。
+
+    【为什么抽标签要放在「分析完成后」而不是提交时】
+    分析还没跑完时 asset_analyses 里没有文本 —— 抽不出东西来。
+    前端轮询发现 job 完成后调这个接口补标签。
+    """
+    try:
+        with asset_store.connect() as conn:
+            analysis = asset_repo.latest_analysis(conn, asset_id)
+            if not analysis:
+                return {"ok": False, "tags": [],
+                        "error": "素材还没有分析结论"}
+            text = (analysis.get("text") or "").strip()
+            if not text:
+                return {"ok": False, "tags": [],
+                        "error": "分析结论为空"}
+            tags = _extract_tags_from_description(text)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "tags": [],
+                "error": f"抽取标签失败：{type(exc).__name__}: {exc}"[:200]}
+    return {"ok": True, "tags": _apply_tags(asset_id, tags), "error": ""}
 
 
 def _run_analysis_sync(analysis_mod, asset: dict, version: dict,
@@ -550,16 +994,12 @@ async def handle_upload(request) -> dict:
 
     results: list[dict] = []
     errors: list[dict] = []
+    # 图片 / 音视频**分开计数**（额度不同，报错也要说清是哪一类超了）
+    image_count = 0
+    media_count = 0
 
     async for part in reader:
         if not part.filename:
-            continue
-        if len(results) >= MAX_IMAGES_PER_UPLOAD:
-            errors.append({
-                "filename": part.filename,
-                "error": (f"一次最多上传 {MAX_IMAGES_PER_UPLOAD} 张图片，"
-                          f"多余的已忽略"),
-            })
             continue
         try:
             item = await _read_and_validate_part(part, tmp_dir)
@@ -567,6 +1007,29 @@ async def handle_upload(request) -> dict:
             errors.append({"filename": part.filename, "error": exc.message,
                            "code": exc.code})
             continue
+
+        kind = item.get("kind") or "image"
+        # --- 数量上限（分类型计数）-------------------------------------
+        if kind == "image":
+            if image_count >= MAX_IMAGES_PER_UPLOAD:
+                item["tmp"].unlink(missing_ok=True)
+                errors.append({
+                    "filename": part.filename,
+                    "error": (f"一次最多上传 {MAX_IMAGES_PER_UPLOAD} 张图片，"
+                              f"多余的已忽略"),
+                    "code": "too_many_images",
+                })
+                continue
+        else:
+            if media_count >= MAX_MEDIA_FILES_PER_UPLOAD:
+                item["tmp"].unlink(missing_ok=True)
+                errors.append({
+                    "filename": part.filename,
+                    "error": (f"一次最多上传 {MAX_MEDIA_FILES_PER_UPLOAD} "
+                              f"个音频/视频，多余的已忽略"),
+                    "code": "too_many_media",
+                })
+                continue
 
         # --- 2) 入素材库 -------------------------------------------------
         try:
@@ -582,29 +1045,60 @@ async def handle_upload(request) -> dict:
 
         asset_id = entry["asset_id"]
 
-        # --- 3) 素材库预处理（分析 + 标签） ------------------------------
-        pre = _preprocess_asset(asset_id)
-        if not pre.get("ok"):
-            # 预处理失败 -> 明确报错，并**回滚**这条素材
-            # （不让「已入库但没描述」的孤儿条目留在库里）
-            _rollback_asset(asset_id)
-            errors.append({
-                "filename": item["filename"],
-                "error": pre.get("error") or "素材预处理失败",
-                "code": "preprocess_failed",
-            })
-            continue
+        # --- 3) 素材库预处理 ---------------------------------------------
+        # 图片：同步预处理（描述 + 标签）—— 与既有行为完全一致。
+        # 音视频：异步 job（描述由 analysis_jobs 写，标签完成后补）——
+        #   深度音频分析实测 ~600 秒/116 秒素材，同步等会挂死请求。
+        if kind == "image":
+            pre = _preprocess_asset(asset_id)
+            if not pre.get("ok"):
+                # 预处理失败 -> 明确报错，并**回滚**这条素材
+                # （不让「已入库但没描述」的孤儿条目留在库里）
+                _rollback_asset(asset_id)
+                errors.append({
+                    "filename": item["filename"],
+                    "error": pre.get("error") or "素材预处理失败",
+                    "code": "preprocess_failed",
+                })
+                continue
 
-        # --- 4) 读取素材库里的权威状态（描述/标签都从库里取） -----------
-        described = _describe_asset(asset_id)
-        entry.update({
-            "analyzed": bool(described.get("description")),
-            "description": described.get("description") or "",
-            "tags": described.get("tags") or pre.get("tags") or [],
-            "width": described.get("width") or entry.get("width"),
-            "height": described.get("height") or entry.get("height"),
-            "preprocessed": True,
-        })
+            # --- 4) 读取素材库里的权威状态（描述/标签都从库里取） ------
+            described = _describe_asset(asset_id)
+            entry.update({
+                "analyzed": bool(described.get("description")),
+                "description": described.get("description") or "",
+                "tags": described.get("tags") or pre.get("tags") or [],
+                "width": described.get("width") or entry.get("width"),
+                "height": described.get("height") or entry.get("height"),
+                "preprocessed": True,
+                "analysis_status": "done",
+                "available": True,
+            })
+            image_count += 1
+        else:
+            started = _start_async_preprocess(asset_id, kind)
+            if not started.get("ok"):
+                # 任务都排不起来 -> 明确报错 + 回滚（不留孤儿条目）
+                _rollback_asset(asset_id)
+                errors.append({
+                    "filename": item["filename"],
+                    "error": started.get("error") or "素材分析任务启动失败",
+                    "code": "preprocess_failed",
+                })
+                continue
+            entry.update({
+                "analyzed": False,
+                "description": "",
+                "tags": [],
+                "preprocessed": False,
+                # 前端据此轮询 /api/assets/{id}/analysis-status
+                "analysis_job_id": started.get("job_id"),
+                "analysis_status": started.get("status") or "queued",
+                "available": False,
+                "analysis_pending": True,
+            })
+            media_count += 1
+
         results.append(entry)
 
     return {
@@ -614,7 +1108,10 @@ async def handle_upload(request) -> dict:
         "uploaded": len(results),
         "failed": len(errors),
         "max_images": MAX_IMAGES_PER_UPLOAD,
+        "max_media_files": MAX_MEDIA_FILES_PER_UPLOAD,
         "max_bytes": MAX_IMAGE_BYTES,
+        "max_audio_bytes": MAX_AUDIO_BYTES,
+        "max_video_bytes": MAX_VIDEO_BYTES,
     }
 
 
@@ -637,3 +1134,118 @@ def _rollback_asset(asset_id: str) -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+# ------------------------------------------------------------------ 就绪查询
+
+#: 异步分析的前端轮询间隔（秒）。
+POLL_INTERVAL_SEC = 3.0
+
+
+async def handle_analysis_status(asset_id: str) -> dict:
+    """
+    查询音视频素材的**分析就绪状态**（前端轮询用）。
+
+    返回 {"asset_id", "status", "stage", "progress", "message",
+          "available", "description", "tags", "duration_sec",
+          "width", "height", "kind", "error"}。
+
+    status:
+      pending —— 分析还在跑（不可用）
+      done    —— 分析完成，描述与标签已就绪（可用）
+      failed  —— 分析失败（不可用，且明确报错）
+      none    —— 没有分析记录（不可用）
+
+    【为什么在这个接口里「完成即补标签」】
+    analysis_jobs 只写描述（asset_analyses.text），不写标签
+    （asset_tags）。前端轮询到 done 时调用本接口，这里顺带把标签
+    抽好写进去 —— 这样前端只轮询一个接口，不用再发第二个请求，
+    且「标签已落库」与「状态已就绪」是同一次原子返回，不会出现
+    「状态说好了但标签还没写」的中间态。
+
+    【为什么失败时也要回滚】
+    约束 3：「分析失败要明确报错并按现有约定 soft_delete 回滚，
+    不留『已入库没描述』的脏条目」。
+    同步路径（图片）在上传时就回滚；异步路径（音视频）失败发生在
+    上传之后，所以回滚放在这里 —— 第一次检测到 failed 时回滚，
+    并用 job 记录标记，保证**只回滚一次**。
+    """
+    from . import assets as asset_store
+
+    try:
+        with asset_store.connect() as conn:
+            # include_deleted=True —— 回滚后素材进回收站，但**状态还要能查到**
+            # （前端轮询要看到「已失败并已回滚」，而不是「素材不存在」）。
+            asset = asset_repo.get_asset(conn, asset_id, include_deleted=True)
+            if not asset:
+                return {"asset_id": asset_id, "status": "failed",
+                        "stage": "", "progress": 0,
+                        "message": "素材不存在", "available": False,
+                        "description": "", "tags": [], "kind": "",
+                        "duration_sec": None, "width": None, "height": None,
+                        "error": "素材不存在"}
+
+            version = asset_repo.current_version(conn, asset_id) or {}
+            analysis = asset_repo.latest_analysis(conn, asset_id)
+            text = (analysis or {}).get("text") or ""
+            job = asset_repo.active_job_of(conn, asset_id)
+            if job is None:
+                jobs = asset_repo.jobs_of(conn, asset_id, limit=1)
+                job = jobs[0] if jobs else None
+
+            status = (job or {}).get("status") or "none"
+            message = (job or {}).get("message") or ""
+            stage = (job or {}).get("stage") or ""
+            progress = float((job or {}).get("progress") or 0)
+            # 已被回滚（进了回收站）—— 不再是「可用」的候选
+            rolled_back = bool(asset.get("deleted_at"))
+
+            tags = asset_repo.tags_of(conn, asset_id)
+
+            # 分析完成 -> 补标签（幂等：add_tags 是 INSERT OR IGNORE）
+            if status == "done" and text and not rolled_back:
+                if not tags:
+                    finalized = _finalize_async_tags(asset_id)
+                    tags = finalized.get("tags") or []
+                    if not finalized.get("ok"):
+                        message = finalized.get("error") or message
+
+            result = {
+                "asset_id": asset_id,
+                "status": status,
+                "stage": stage,
+                "progress": progress,
+                "message": message,
+                "available": bool(status == "done" and text and not rolled_back),
+                "description": text,
+                "tags": tags,
+                "kind": asset.get("category") or "",
+                "duration_sec": version.get("duration_sec"),
+                "width": version.get("width"),
+                "height": version.get("height"),
+                "rolled_back": rolled_back,
+                "error": "",
+            }
+
+            # 分析失败 -> 明确报错 + 回滚（只回滚一次）
+            if status == "failed":
+                result["available"] = False
+                result["error"] = message or "素材分析失败"
+                if not rolled_back:
+                    _rollback_asset(asset_id)
+                    result["rolled_back"] = True
+                    result["error"] = (result["error"] + "（素材已回滚）")
+                    try:
+                        asset_repo.update_job(
+                            conn, int((job or {}).get("id") or 0),
+                            message=result["error"])
+                    except Exception:  # noqa: BLE001
+                        pass
+            return result
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:200]
+        return {"asset_id": asset_id, "status": "failed", "stage": "",
+                "progress": 0, "message": detail, "available": False,
+                "description": "", "tags": [], "kind": "",
+                "duration_sec": None, "width": None, "height": None,
+                "error": detail}
