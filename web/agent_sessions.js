@@ -442,6 +442,15 @@
     } else {
       // 面板关了 -> 停掉轮询（别白白发请求）。
       stopArtifactPolling();
+      // 【清空面板内容】
+      // 关掉的面板如果还留着上一次的 DOM，用户看不到（display:none）
+      // 但内容是**陈旧**的：下次打开的瞬间会先闪一下旧数据，
+      // 而且自动化验收会误以为「面板还开着」——
+      // 实测就是踩了这个：关面板后 querySelectorAll(".ag-artifact-item")
+      // 还能查到旧卡片，导致「未完成任务实时刷新」的断言假通过。
+      const body = $("#agArtifactsBody");
+      if (body) body.innerHTML = "";
+      state.artifacts = [];
     }
   }
 

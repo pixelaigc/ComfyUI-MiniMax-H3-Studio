@@ -319,6 +319,25 @@ class TestFrontendContract(unittest.TestCase):
         css = self._read("style.css")
         self.assertIn(".ag-artifact-item.is-pending", css)
 
+    def test_closing_artifacts_panel_clears_dom(self):
+        """
+        关掉产物面板要**清空** DOM。
+
+        【为什么这是回归点】
+        关掉的面板如果还留着上一次的 DOM：
+          * 用户下次打开会先闪一下陈旧数据；
+          * 自动化验收会误判「面板还开着」——
+            实测就是踩了这个：关面板后 querySelectorAll(".ag-artifact-item")
+            还能查到旧卡片，导致「未完成任务实时刷新」的断言**假通过**
+            （断言查的是陈旧 DOM，不是真实渲染结果）。
+        """
+        js = self._read("agent_sessions.js")
+        i = js.index("function toggleArtifacts(force)")
+        block = js[i:i + 1200]
+        self.assertIn("stopArtifactPolling", block, "关闭面板要停轮询")
+        self.assertIn("innerHTML = ", block, "关闭面板要清空内容")
+        self.assertIn("state.artifacts = []", block, "关闭面板要清空状态")
+
     def test_search_and_locate_styles_exist(self):
         """新增元素要有样式（不然是裸 HTML）。"""
         css = self._read("style.css")

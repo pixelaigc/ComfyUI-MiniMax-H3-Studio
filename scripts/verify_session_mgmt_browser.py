@@ -24,6 +24,7 @@ sessions, or whether the artifact panel renders real thumbnails.
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -195,34 +196,68 @@ def main():
             failures.append(f"{name} {detail}")
 
     try:
-        # --- 造两个真实会话 ---------------------------------------------
-        sids = []
-        for text in ("帮我做一段雨夜的赛博朋克视频",
-                     "用素材库里的林黛玉做一段电影场景"):
-            sid = api("/api/agent/sessions", "POST", {})["session_id"]
-            api("/api/agent/chat", "POST", {"message": text, "session_id": sid})
-            sids.append(sid)
-        print(f"[seed] sessions={sids}")
-
-        # 直接在 jobs.db 里插一条带 session_id 的任务（模拟 Agent 建了任务）
-        import sqlite3
         jobs_db = tmp / "data" / "jobs.db"
-        conn = sqlite3.connect(jobs_db)
-        conn.execute(
-            "INSERT INTO jobs (id, created_at, mode, params, status, session_id)"
-            " VALUES (?,?,?,?,?,?)",
-            ("aaaa1111bbbb", time.time(), "t2i",
-             json.dumps({"prompt": "雨夜霓虹", "aspect": "16:9"},
-                        ensure_ascii=False), "done", sids[1]))
-        conn.commit()
-        rows = conn.execute("SELECT id, session_id FROM jobs").fetchall()
-        print("[seed] jobs in db:", rows)
-        conn.close()
+
+        def seed_sessions():
+            """
+            造两个真实会话 + 两个任务。**每个宽度都重新造一遍**。
+
+            【为什么每档宽度都要重新造】
+            上一档宽度会在末尾**删掉**「林黛玉」会话（测级联清理）。
+            如果不重新造，下一档宽度刷新后：
+              * localStorage 是新的（每个宽度用独立 browser context）
+              * 服务端只剩「赛博朋克」会话 + 一个刚新建的空会话
+              * 刷新后恢复到**最新的那个** —— 也就是刚新建的空会话
+              * -> 消息数 0 -> 「刷新后恢复会话历史」假失败
+            这是**测试之间互相污染**，不是产品 bug。
+            每档独立造数据，三档互不影响。
+            """
+            sids = []
+            # 【先把上一档宽度留下的会话全清掉】
+            # 否则三档之间会互相污染：
+            #   上一档末尾删了「林黛玉」会话、又「新建交互」建了一个空会话；
+            #   下一档刷新时服务端有 4~5 个会话，列表里会出现**同名**会话，
+            #   「找到第一个标题含林黛玉的项」就可能找到别的会话。
+            # 每档从**已知状态**开始，三档互不影响。
+            for old in api("/api/agent/sessions?limit=500")["sessions"]:
+                api("/api/agent/sessions/" + old["id"], "DELETE")
+
+            # 顺序很重要：后创建的那个 updated_at 更大 -> 刷新后默认回到它。
+            # 所以「林黛玉」（后面要挂产物、还要切过去看）必须**最后**创建。
+            for text in ("帮我做一段雨夜的赛博朋克视频",
+                         "用素材库里的林黛玉做一段电影场景"):
+                sid = api("/api/agent/sessions", "POST", {})["session_id"]
+                api("/api/agent/chat", "POST",
+                    {"message": text, "session_id": sid})
+                sids.append(sid)
+            # sids[1] = 林黛玉（最后创建 -> 刷新后默认回到它；也挂产物）
+            # sids[0] = 赛博朋克（更早 -> 切过去时用来验「不串味」）
+            conn = sqlite3.connect(jobs_db)
+            conn.execute("DELETE FROM jobs")
+            conn.execute(
+                "INSERT INTO jobs (id, created_at, mode, params, status, session_id)"
+                " VALUES (?,?,?,?,?,?)",
+                ("aaaa1111bbbb", time.time(), "t2i",
+                 json.dumps({"prompt": "雨夜霓虹", "aspect": "16:9"},
+                            ensure_ascii=False), "done", sids[1]))
+            conn.execute(
+                "INSERT INTO jobs (id, created_at, mode, params, status, session_id)"
+                " VALUES (?,?,?,?,?,?)",
+                ("cccc2222dddd", time.time(), "t2v",
+                 json.dumps({"prompt": "林黛玉回眸", "duration": 5},
+                            ensure_ascii=False), "queued", sids[1]))
+            conn.commit()
+            conn.close()
+            print(f"[seed] sessions={sids}")
+            return sids
+
 
         SHOTS.mkdir(parents=True, exist_ok=True)
         with sync_playwright() as pw:
             browser = pw.chromium.launch(args=["--no-sandbox"])
             for width in (375, 390, 1280):
+                # 每档宽度重新造数据（三档互不影响 —— 见 seed_sessions 的说明）
+                sids = seed_sessions()
                 # 每个宽度用**独立的 browser context** ——
                 # 独立的缓存分区，保证测到的是当前代码（不是上一轮缓存的 JS）。
                 ctx = browser.new_context(viewport={"width": width,
@@ -365,17 +400,96 @@ def main():
                 check(f"[{width}] 产物面板列出任务", len(art_items) >= 1,
                       f"实际 {len(art_items)} 项")
                 if art_items:
-                    art_id = art_items[0].query_selector(
-                        ".ag-artifact-id").inner_text()
-                    check(f"[{width}] 产物带任务 id",
-                          "aaaa1111bbbb" in art_id, f"id={art_id}")
-                    prompt = art_items[0].query_selector(
-                        ".ag-artifact-prompt").inner_text()
-                    check(f"[{width}] 产物带提示词",
-                          "雨夜" in prompt, f"prompt={prompt}")
+                    # 【为什么要遍历找而不是取第一个】
+                    # 产物列表按 created_at **倒序**（最新的在前）——
+                    # 所以第一个是那条 queued 的任务，不是 done 的。
+                    # 取第一个会让断言依赖列表顺序（换种子顺序就假失败）。
+                    # 遍历找是「集合里有它」的语义，与顺序无关。
+                    found = False
+                    prompt_ok = False
+                    for el in art_items:
+                        art_id = el.query_selector(".ag-artifact-id").inner_text()
+                        if "aaaa1111bbbb" in art_id:
+                            found = True
+                            prompt = el.query_selector(
+                                ".ag-artifact-prompt").inner_text()
+                            prompt_ok = "雨夜" in prompt
+                    check(f"[{width}] 产物带任务 id", found,
+                          f"ids={[e.query_selector('.ag-artifact-id').inner_text() for e in art_items]}")
+                    check(f"[{width}] 产物带提示词", prompt_ok, "")
                 page.screenshot(path=str(SHOTS / f"artifacts-{width}.png"))
+
+                # 4b) 产物卡片：未完成任务标记 + 定位入口
+                pending_items = page.query_selector_all(".ag-artifact-item.is-pending")
+                check(f"[{width}] 未完成任务有标记", len(pending_items) >= 1,
+                      f"实际 {len(pending_items)} 个 pending")
+                locate_btns = page.query_selector_all(
+                    ".ag-artifact-locate[data-act='locate-job']")
+                check(f"[{width}] 产物有「在生成库中定位」入口",
+                      len(locate_btns) >= 1, f"实际 {len(locate_btns)} 个")
+                if locate_btns:
+                    job_id_attr = locate_btns[0].get_attribute("data-job-id")
+                    check(f"[{width}] 定位按钮带真实 job id",
+                          bool(job_id_attr), f"job-id={job_id_attr}")
+
+                # 4c) 未完成任务状态实时刷新：把库里的 queued 改成 running，
+                #     面板应该自己轮询到（不需要用户手动刷新）。
+                with sqlite3.connect(jobs_db) as c2:
+                    c2.execute("UPDATE jobs SET status='running' WHERE id=?",
+                               ("cccc2222dddd",))
+                    c2.commit()
+                # 等一轮轮询（4 秒间隔）—— 给 12 秒余量
+                try:
+                    page.wait_for_function(
+                        """() => [...document.querySelectorAll(
+                                '.ag-artifact-item')]
+                            .some(el => el.textContent.includes('running'))""",
+                        timeout=12000)
+                    refreshed = True
+                except Exception:
+                    refreshed = False
+                check(f"[{width}] 未完成任务状态实时刷新", refreshed,
+                      "queued -> running 没有被轮询到")
+                page.screenshot(path=str(SHOTS / f"artifact-pending-{width}.png"))
+                # 面板用完了才关（4b/4c 需要它是打开的 ——
+                # 关掉会停掉轮询，DOM 也会被清空）
                 page.click("#agArtifactsClose")
                 page.wait_for_timeout(200)
+
+                # 4d) 会话列表带关联产物数
+                page.click("#agMenu")
+                page.wait_for_selector(".ag-session-item", timeout=10000)
+                metas = page.evaluate("""() => [...document.querySelectorAll(
+                    '.ag-session-item-meta')].map(e => e.textContent)""")
+                check(f"[{width}] 会话条目显示产物数",
+                      any("产物" in m for m in metas), f"metas={metas}")
+
+                # 4e) 搜索/过滤
+                page.fill("#agSessionSearch", "林黛玉")
+                page.wait_for_timeout(900)
+                hits = page.query_selector_all(".ag-session-item")
+                check(f"[{width}] 搜索能过滤出会话", len(hits) == 1,
+                      f"实际 {len(hits)} 项")
+                if hits:
+                    hit_text = hits[0].inner_text()
+                    check(f"[{width}] 搜索命中正确会话",
+                          "林黛玉" in hit_text, f"text={hit_text}")
+                page.screenshot(path=str(SHOTS / f"search-{width}.png"))
+
+                # 搜一个不存在的词 -> 空列表
+                page.fill("#agSessionSearch", "zzz不存在的关键词zzz")
+                page.wait_for_timeout(900)
+                empty_hits = page.query_selector_all(".ag-session-item")
+                check(f"[{width}] 搜不到时列表为空", len(empty_hits) == 0,
+                      f"实际 {len(empty_hits)} 项")
+                # 清空搜索 -> 恢复
+                page.fill("#agSessionSearch", "")
+                page.wait_for_timeout(900)
+                restored = page.query_selector_all(".ag-session-item")
+                check(f"[{width}] 清空搜索后恢复全部", len(restored) >= 2,
+                      f"实际 {len(restored)} 项")
+                page.click("#agDrawerClose")
+                page.wait_for_timeout(300)
 
                 # 5) 新建会话 -> 服务端真的多一个
                 # （新建按钮在抽屉里 —— 抽屉此刻是关着的，要先打开）
@@ -394,7 +508,17 @@ def main():
                 page.click("#agMenu")
                 page.wait_for_selector(".ag-session-item", timeout=10000)
                 page.once("dialog", lambda d: d.accept())
-                del_btn = page.query_selector(".ag-session-del")
+                # 【为什么要精确找到「林黛玉」会话的删除按钮】
+                # 列表按 updated_at 倒序 —— 刚「新建交互」建出来的空会话
+                # 排在最前面，query_selector(".ag-session-del") 取到的
+                # 是**它**的删除按钮。删掉它跟级联清理毫无关系
+                # （那个会话本来就没挂任务）—— 那样测的就不是级联清理了。
+                del_btn = None
+                for item in page.locator(".ag-session-item").all():
+                    title = item.locator(".ag-session-item-title").inner_text()
+                    if "林黛玉" in (title or ""):
+                        del_btn = item.locator(".ag-session-del").first
+                        break
                 if del_btn:
                     del_btn.click()
                     page.wait_for_timeout(900)
@@ -403,7 +527,24 @@ def main():
                           final_list == after_list - 1,
                           f"{after_list} -> {final_list}")
                 else:
-                    check(f"[{width}] 找到删除按钮", False)
+                    check(f"[{width}] 找到删除按钮（林黛玉会话）", False,
+                          "列表里没找到林黛玉会话")
+
+                # 级联清理：删掉的会话如果原来挂着任务，任务应该**仍在**
+                # 生成库里（只是不再归属会话）。
+                with sqlite3.connect(jobs_db) as c3:
+                    remaining = c3.execute(
+                        "SELECT COUNT(*) FROM jobs WHERE id IN "
+                        "('aaaa1111bbbb','cccc2222dddd')").fetchone()[0]
+                    still_attached = c3.execute(
+                        "SELECT COUNT(*) FROM jobs WHERE session_id!='' "
+                        "AND id IN ('aaaa1111bbbb','cccc2222dddd')"
+                    ).fetchone()[0]
+                check(f"[{width}] 级联清理不删任务记录", remaining == 2,
+                      f"剩余 {remaining} 条")
+                check(f"[{width}] 级联清理只清引用关系",
+                      still_attached == 0,
+                      f"仍有 {still_attached} 条挂在会话上")
 
                 # 7) 不溢出 + console 干净
                 dims = page.evaluate("""() => ({
