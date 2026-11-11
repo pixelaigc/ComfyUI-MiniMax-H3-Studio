@@ -228,6 +228,38 @@ def library_probe(asset_id: str) -> dict:
     }
 
 
+def _thumb_has_pixels(screenshot: str | None, min_red: int = 300) -> bool:
+    """
+    数截图里**缩略图区域**的红色像素，判断缩略图**真的渲染出了内容**。
+
+    【为什么需要这个断言】
+    实测踩到过：窄屏（375/390）下缩略图只有 52px，截图时 <img> 还没解码完
+    -> 拍到的是**空白方框**。而「有 <img> 且 src 指向 /api/assets/...」
+    这类 DOM 断言**照样全绿** —— 假通过。
+
+    所以必须做**像素级**核对：测试图是纯红色 RGB(200,30,30)，
+    缩略图区域必须出现足够多的红色像素。
+    """
+    if not screenshot:
+        return False
+    path = Path(screenshot)
+    if not path.is_file():
+        return False
+    try:
+        from PIL import Image
+        image = Image.open(path).convert("RGB")
+    except Exception:  # noqa: BLE001
+        return False
+    width, height = image.size
+    red = 0
+    for y in range(height * 2 // 3, height, 2):
+        for x in range(0, width, 2):
+            r, g, b = image.getpixel((x, y))
+            if r > 140 and g < 90 and b < 90:
+                red += 1
+    return red >= min_red
+
+
 def main():
     from playwright.sync_api import sync_playwright
     SHOTS.mkdir(parents=True, exist_ok=True)
@@ -385,6 +417,8 @@ def main():
                 "预处理写入了描述": len(lib.get("analysis_text") or "") > 20,
                 "预处理写入了标签": len(lib.get("tags") or []) > 0,
                 "前端拿到标签": len(pr["attachments"][0]["tags"]) > 0,
+                # 【像素级】缩略图真的渲染出了图片内容（DOM 断言会假通过）
+                "缩略图真的渲染出内容": _thumb_has_pixels(r.get("screenshot")),
                 "窄屏无横向溢出": overflow_free(pr),
             }
         elif case == "multi":
