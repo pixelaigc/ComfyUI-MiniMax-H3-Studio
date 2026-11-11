@@ -271,8 +271,19 @@ def _maybe_start_analysis(asset_id: str) -> dict:
     【失败了怎么办】
     分析失败**不影响上传成功** —— 素材照样入库，用户照样能把它当参考图。
     只是描述会空着，模型会看到「analyzed=false」。
+
+    【重复上传同一张图时】
+    第二次命中 sha256 去重 -> 复用同一个素材 -> 如果它已经在分析中，
+    再排一次就是浪费 CPU（分析很吃资源）。
+    所以先查有没有在跑的分析任务（active_job_of），有就不再排。
     """
     try:
+        with asset_store.connect() as conn:
+            active = asset_repo.active_job_of(conn, asset_id)
+        if active:
+            return {"analysis_started": False,
+                    "analysis_already_running": True,
+                    "analysis_job_id": active.get("id")}
         job = analysis_jobs.start_analysis(asset_id, "image", mode="analyze")
         return {"analysis_started": True,
                 "analysis_job_id": (job or {}).get("id")}
