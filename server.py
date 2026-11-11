@@ -94,6 +94,7 @@ from h3studio import yue2_schema
 from h3studio import agent as agent_mod
 from h3studio import agent_memory
 from h3studio import agent_sessions
+from h3studio import agent_media
 
 
 BASE = Path(__file__).resolve().parent
@@ -3832,6 +3833,41 @@ def _agent_error(exc: agent_mod.AgentError) -> web.Response:
     return web.json_response(payload, status=exc.status)
 
 
+
+async def api_agent_upload(request):
+    """
+    POST /api/agent/upload —— 内置 Agent 聊天区的**媒体上传**。
+
+    multipart 表单：
+      files[] / file / image   一个或多个图片文件（png/jpg/jpeg/webp/bmp/gif）
+
+    行为：
+      * 每个文件独立校验（类型 / 大小 / 魔数），一个失败不影响其它
+      * 落进**素材库**（复用 asset_service.register_asset —— 与素材库页
+        的 /api/assets 上传完全同一条链路）
+      * 落库后异步排一次多模态分析（描述来自素材库已有的分析结果）
+      * 返回每个文件的 asset_id / preview_url / 描述
+
+    为什么要有这个端点：
+      用户要「拿这张图做复刻/修改」时，聊天区原本**没有任何入口**
+      能把图送进 Agent —— 只能打字。参考图必须是素材库条目
+      （i2i_qwen 强制要求参考图来自素材库），所以「上传」与「入库」
+      必须是同一件事，不能各做一套。
+
+    返回：{"ok", "results": [...], "errors": [...], "uploaded", "failed"}
+    """
+    try:
+        payload = await agent_media.handle_upload(request)
+    except agent_media.UploadError as exc:
+        return web.json_response({"error": exc.message, "code": exc.code},
+                                 status=exc.status)
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:300]
+        return web.json_response({"error": f"上传失败：{detail}",
+                                  "code": "upload_failed"},
+                                 status=500)
+    return web.json_response(payload)
+
 async def api_agent_chat(request):
     """
     POST /api/agent/chat —— 内置多模态 Agent 主入口。
@@ -3891,6 +3927,8 @@ async def api_agent_chat(request):
 
     session_id = str(payload.get("session_id") or "").strip()
     provider_id = str(payload.get("provider_id") or "").strip() or None
+    # 附件（用户随消息上传的图片）
+    attachments = payload.get("attachments") or []
     try:
         max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
     except (TypeError, ValueError):
@@ -3926,7 +3964,8 @@ async def api_agent_chat(request):
             result = await agent_mod.run_agent(
                 sys.modules[__name__], message, session_id=session_id,
                 provider_id=provider_id, max_steps=max_steps, history=history,
-                session_store=store, memory_store=_agent_memory_store())
+                session_store=store, memory_store=_agent_memory_store(),
+                attachments=attachments)
         except agent_mod.AgentError as exc:
             store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
             return _agent_error(exc)
@@ -3990,6 +4029,8 @@ async def api_agent_chat_stream(request):
 
     session_id = str(payload.get("session_id") or "").strip()
     provider_id = str(payload.get("provider_id") or "").strip() or None
+    # 附件（用户随消息上传的图片）
+    attachments = payload.get("attachments") or []
     try:
         max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
     except (TypeError, ValueError):
@@ -4051,7 +4092,8 @@ async def api_agent_chat_stream(request):
                     provider_id=provider_id, max_steps=max_steps,
                     history=history, on_progress=_on_progress,
                     on_event=_on_event, session_store=store,
-                    memory_store=_agent_memory_store())
+                    memory_store=_agent_memory_store(),
+                    attachments=attachments)
             return result
         except agent_mod.AgentError as exc:
             await _write("error", {"error": exc.message, "code": exc.code})
@@ -4371,6 +4413,7 @@ def make_app():
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)
     # 内置多模态 Agent
     app.router.add_post("/api/agent/chat", api_agent_chat)
+    app.router.add_post("/api/agent/upload", api_agent_upload)
     app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
     app.router.add_get("/api/agent/memory", api_agent_memory)

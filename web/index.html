@@ -827,6 +827,15 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 
     <div class="ag-composer">
       <div class="ag-status" id="agStatus"></div>
+      <!-- 本轮上传的附件（图片）：缩略图条 + 上传入口 -->
+      <div class="ag-attachments" id="agAttachments" hidden></div>
+      <div class="ag-attach-row">
+        <button class="ag-attach-btn" id="agAttachBtn" type="button"
+                title="上传参考图（png / jpg / webp，最多 9 张）">📎 图片</button>
+        <input type="file" id="agAttachInput" multiple hidden
+               accept="image/png,image/jpeg,image/webp,image/bmp,image/gif">
+        <span class="ag-attach-hint" id="agAttachHint">上传的图片会作为参考图交给 Agent</span>
+      </div>
       <div class="ag-input-row">
         <textarea id="agInput" rows="3" placeholder="例：素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5 秒 16:9 的视频"></textarea>
         <button class="ag-send" id="agSend" type="button">发送</button>

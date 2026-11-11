@@ -2118,3 +2118,73 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .ag-send:disabled { opacity: .55; cursor: default; }
 .ag-hint-line { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
+/* ==================================================================
+   内置 Agent 聊天区 —— 附件（图片上传）
+   ================================================================== */
+
+/* 附件行：上传按钮 + 提示文案 */
+.ag-attach-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 7px; max-width: 100%;
+}
+.ag-attach-btn {
+  flex: 0 0 auto;
+  font-size: 12px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--border); color: var(--text); background: #fff;
+  border-radius: 7px; line-height: 1.4;
+}
+.ag-attach-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.ag-attach-btn:disabled { opacity: .55; cursor: default; }
+.ag-attach-hint {
+  font-size: 11px; color: var(--muted); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 缩略图条：flex-wrap 保证窄屏换行而不是横向溢出 */
+.ag-attachments {
+  display: flex; flex-wrap: wrap; gap: 7px; align-items: flex-start;
+  margin-bottom: 8px; max-width: 100%; overflow-x: hidden;
+}
+.ag-attachments[hidden] { display: none; }
+.ag-attach-thumb {
+  position: relative; flex: 0 0 auto;
+  width: 62px; height: 62px; max-width: 62px;
+  border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); background: #fff;
+}
+.ag-attach-thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ag-attach-remove {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; line-height: 1; padding: 0;
+  border: none; border-radius: 50%;
+  background: rgba(0, 0, 0, .55); color: #fff;
+  font-size: 13px; line-height: 18px; text-align: center;
+  cursor: pointer; font-family: inherit;
+}
+.ag-attach-remove:hover { background: rgba(0, 0, 0, .78); }
+.ag-attach-err {
+  flex: 1 1 100%; min-width: 0;
+  font-size: 11px; color: #b3272b; word-break: break-word;
+}
+
+/* 拖拽高亮 */
+.ag-composer.ag-composer-drag {
+  background: var(--accent-soft);
+}
+
+/* 用户消息气泡里的附件缩略图 */
+.ag-msg-attachments {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 7px; max-width: 100%;
+}
+.ag-msg-attach {
+  flex: 0 0 auto; width: 54px; height: 54px; max-width: 54px;
+  border-radius: 7px; overflow: hidden;
+  border: 1px solid var(--border); background: #fff;
+}
+.ag-msg-attach img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+
