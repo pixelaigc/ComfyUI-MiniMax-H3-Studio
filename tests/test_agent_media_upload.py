@@ -941,6 +941,35 @@ class TestTagExtraction(unittest.TestCase):
         self.assertIn("主体人物", tags)
         self.assertIn("场景与环境", tags)
 
+    def test_extracts_section_headings_without_markdown_emphasis(self):
+        """【回归 —— 生产实测踩到的 bug】
+
+        同一个模型在两次调用里输出过**两种**小节格式：
+          A: **【主体人物】**   （带 markdown 强调）
+          B: 【主体人物】      （不带）
+        原来的 pattern 要求结尾的 `**`，于是 B 格式**一个标题都匹配不到**
+        -> sections 为空 -> 标签全空（上传返回 tags: []）。
+        """
+        text = ("【主体人物】\n无。\n\n"
+                "【场景与环境】\n这是一个抽象的二维平面背景，由矩形色块拼接而成，"
+                "呈现出网格状布局。")
+        tags = agent_media._extract_tags_from_description(text)
+        self.assertIn("主体人物", tags)
+        self.assertIn("场景与环境", tags)
+        # 内容词也要抽出来（不是只有标题）
+        self.assertTrue(any(t not in ("主体人物", "场景与环境",
+                                      "光线与色彩") for t in tags),
+                        f"只抽到标题，没有内容词：{tags}")
+
+    def test_both_formats_yield_similar_tags(self):
+        """两种格式应该抽出**等价**的标签（不能一种有、一种没有）。"""
+        body = "这是一个抽象的几何背景，由彩色方块拼接而成，呈现马赛克状布局。"
+        with_md = agent_media._extract_tags_from_description(
+            f"**【场景与环境】**\n{body}")
+        without_md = agent_media._extract_tags_from_description(
+            f"【场景与环境】\n{body}")
+        self.assertEqual(set(with_md), set(without_md))
+
     def test_extracts_content_keywords_not_only_headings(self):
         """【关键】不能只抽小节标题 —— 那是固定结构名，检索价值≈0。
 

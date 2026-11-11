@@ -306,8 +306,18 @@ def _extract_tags_from_description(text: str, limit: int = 8) -> list[str]:
         return []
 
     # --- 1) 按小节切开：标题 + 正文 ---------------------------------
+    #
+    # 【小节标题的两种格式 —— 实测踩过的坑】
+    # 同一个模型在两次调用里输出过**两种**格式：
+    #   A: **【主体人物】**   （带 markdown 强调）
+    #   B: 【主体人物】      （不带）
+    # 原来的 pattern 要求结尾的 `**`，于是 B 格式**一个标题都匹配不到**
+    # -> sections 为空 -> 标签全空（生产实测踩到）。
+    #
+    # 所以：**只匹配【...】本身**，markdown 强调符号交给后面的
+    # `re.sub(r"[*_`#>\-•]", " ", body)` 清理。
     sections: list[tuple[str, str]] = []
-    pattern = re.compile(r"\*\*?【\s*([^】]{1,20})\s*】\*\*?")
+    pattern = re.compile(r"【\s*([^】]{1,20})\s*】")
     matches = list(pattern.finditer(text))
     for index, match in enumerate(matches):
         title = match.group(1).strip()
