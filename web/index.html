@@ -40,22 +40,19 @@
   <nav class="sidebar" id="sidebar">
     <div class="nav-label">CREATE</div>
     <div class="nav-group">视频</div>
-    <a class="nav-item" data-mode="t2v">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="3" width="13" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 6l4 2.5-4 2.5z" fill="currentColor"/></svg>
-      文生视频
-    </a>
-    <a class="nav-item" data-mode="flf">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1" y="3" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="3" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2v12" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/></svg>
-      首尾帧
-    </a>
-    <a class="nav-item" data-mode="r2v">
-      <svg viewBox="0 0 16 16" width="15" height="15"><circle cx="5" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 13.5c0-2 1.5-3 3-3s3 1 3 3M8 13.5c0-2 1.5-3 3-3s3 1 3 3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
-      参考生成
-    </a>
-    <a class="nav-item" id="navStitch">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6.7 8h2.6M8 6.7V9.3" stroke="currentColor" stroke-width="1.3"/></svg>
-      长片拼接
-    </a>
+    <!-- 【2026-11-11】视频导航改成两级：类别 -> 模型。
+         清单由服务端 /api/video-categories 下发（web/video-nav.js 渲染），
+         前端不硬编码任何 mode/model 映射。
+         四个类别（顺序与文案固定）：文生视频 / 首尾帧生视频 / 参考生视频 / 长片拼接。
+         【兼容】每个模型项仍带 data-mode，老任务卡片的「复用」按钮
+         按 .nav-item[data-mode=...] 点选照样命中。 -->
+    <div id="navVideoCategories" class="nav-categories"></div>
+    <noscript>
+      <a class="nav-item" data-mode="t2v">文生视频</a>
+      <a class="nav-item" data-mode="flf">首尾帧生视频</a>
+      <a class="nav-item" data-mode="r2v">参考生视频</a>
+      <a class="nav-item" id="navStitch" data-mode="longfilm">长片拼接</a>
+    </noscript>
     <div class="nav-group">文生图</div>
     <a class="nav-item" data-mode="t2i">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
@@ -1085,6 +1082,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
 <script src="/static/video-panel.js?v=videopanel1"></script>
+<script src="/static/video-nav.js?v=videonav1"></script>
 <script src="/static/app.js?v=enh-unify2"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

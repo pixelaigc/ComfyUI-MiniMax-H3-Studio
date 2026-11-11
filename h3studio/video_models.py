@@ -40,6 +40,8 @@ VIDEO_SIZE_MAX = 16384
 
 # H3 官方工作流模板里的总像素表（实测 video_minimax_h3_t2v.json 的 MarkdownNote）
 #   0.2 -> 608x352 / 0.4 -> 864x480 / 0.8 -> 1216x672 / 0.98 -> 1344x768 (16:9)
+#   1.0 -> 1376x768 / 1.2 -> 1504x832 / 1.5 -> 1664x928 / 1.8 -> 1824x1024
+#   2.0 -> 1920x1088   <-- 官方表里**明确列出的最大档**
 # 默认取 0.4（864x480）：这是官方表里 H3 Turbo 4 步最常用的档，速度与画质平衡。
 VIDEO_MP_TABLE = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98, 1.0, 1.2, 1.5, 1.8, 2.0]
 VIDEO_DEFAULT_MP = 0.4
@@ -49,13 +51,10 @@ VIDEO_DEFAULT_MP = 0.4
 # ------------------------------------------------------------------
 # 【硬约束来源 —— 全部实测，不是拍脑袋】
 #
-#  1. **原生画布上限**：comfy_extras/nodes_minimax_h3.py 实测
+#  1. **倍数 32**：comfy_extras/nodes_minimax_h3.py 实测
 #         CANVAS_MULTIPLE = 32
-#         BASE_SHORT_EDGE = 768
-#         MAX_PIXELS     = 768 * 1344   (= 1032192 px ≈ 0.984 MP)
-#     官方模板 Note 也写着「H3's native canvas is a 768px short edge,
-#     capped at 768x1344 pixels, rounded to a multiple of 32」。
-#     => **任何超过 768*1344 面积的组合都超出 H3 原生画布**，不能作为预设。
+#     节点 schema 的 width/height 也是 step=32。
+#     => 宽高必须吸附到 32 的倍数（官方表标题就写着 "Output (multiple=32)"）。
 #
 #  2. **算法**：与 ComfyUI 自带 ResolutionSelector 完全一致
 #     （comfy_extras/nodes_resolution.py 实测）：
@@ -63,22 +62,30 @@ VIDEO_DEFAULT_MP = 0.4
 #         scale = sqrt(total / (w_ratio * h_ratio))
 #         width  = round(w_ratio * scale / multiple) * multiple
 #     本仓库 video_dimensions() 是同一套公式，且已验证能**逐格复现**
-#     官方模板 Note 里的 16:9 全表（0.2/0.3/…/0.98 九档全中）。
+#     官方模板 Note 里的 16:9 全表（0.2/0.3/…/2.0 十四档全中）。
 #
-#  3. **短边 768**：官方画布的短边基准。16:9 / 21:9 / 9:16 在 0.98MP
-#     时短边正好 768；1:1 这类方画布到 0.98MP 会变 1024x1024（超出画布），
-#     所以 1:1 的上限档位是 0.8MP（928x928）。
+#  3. **面积上限 2.0M 像素**（2026-11-11 放宽）：
+#     官方模板 Note 的表**明确列到 2.0 MP -> 1920x1088**，
+#     说明 H3 文生视频链路本身支持这个尺寸。
+#     旧版把上限钉在 768*1344 (= 1032192 px ≈ 0.98 MP) 是**错的** ——
+#     那个常量来自 comfy_extras/nodes_minimax_h3.py 的
+#         BASE_SHORT_EDGE = 768
+#         MAX_PIXELS     = 768 * 1344
+#     但实测这两个常量**只被 adapt_canvas() 用**，而 adapt_canvas()
+#     是给**参考视频**（ref_videos）做尺寸适配用的，
+#     **生成路径 MiniMaxH3ImageToVideo 根本不查它们** ——
+#     生成路径只查 schema 的 min=32 / max=16384 / step=32。
+#     （MiniMaxH3ReferenceToVideo 里也是同样：宽度只喂给
+#       _empty_av_latent()，不查 MAX_PIXELS。）
+#     所以 768*1344 是「参考视频画布」的上限，被误当成「生成上限」了。
+#     现在按需求把生成上限放宽到 2.0M 像素（2000000 px）。
 #
 # 【预设粒度的取舍】
 #   不把 MP 表全量铺开（14 档 x 8 比例 = 112 项，下拉没法用），
 #   而是挑**官方表里明确列出的档位**（0.2 / 0.3 / 0.4 / 0.5 / 0.6 /
-#   0.7 / 0.8 / 0.9 / 0.98），再按 H3 原生画布裁掉超限的组合 ——
-#   每个出现在下拉里的值都是「本机跑得动 + 官方背书」的，不是编出来的。
-#
-#   额外带一个 1.0（VIDEO_MP_TABLE 里也有）：它对 16:9 / 9:16 / 21:9
-#   会算出 1376x768 / 768x1376 / 1568x672 —— 短边没超 768，
-#   但**面积**超过了 768*1344 这个原生画布上限，正是「面积规则」该拦的。
-#   保留它是为了让面积规则真的起作用（而不是被短边规则顺带覆盖）。
+#   0.7 / 0.8 / 0.9 / 0.98 / 1.0 / 1.2 / 1.5 / 1.8 / 2.0），
+#   再按 2.0M 面积上限裁掉超限的组合 ——
+#   每个出现在下拉里的值都是「官方背书 + 本机跑得动」的，不是编出来的。
 #
 #   档位命名用「短边像素」而不是 MP：
 #     - 352 / 480 / 608 / 672 / 768 —— 这些是 16:9 下官方表算出的短边
@@ -86,11 +93,52 @@ VIDEO_DEFAULT_MP = 0.4
 #       用户一眼能对上「480p」「768p」的直觉。
 #     - 但短边在不同比例下不一样（如 1:1 的 928x928 短边就是 928），
 #       所以每条预设都同时带 mp 与 label，label 用「比例 + 实际像素」表述。
-VIDEO_SIZE_PRESET_MPS = [0.2, 0.3, 0.4, 0.5, 0.6,
-                         0.7, 0.8, 0.9, 0.98, 1.0]
+VIDEO_SIZE_PRESET_MPS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98,
+                         1.0, 1.2, 1.5, 1.8, 2.0]
 
-#: H3 原生画布的面积上限（像素）。实测 comfy_extras/nodes_minimax_h3.py:32
-VIDEO_MAX_CANVAS_PIXELS = 768 * 1344
+#: **文生视频（t2v）生成路径的面积上限**：2.0M 像素。
+#:
+#: 与 ComfyUI 节点常量 MAX_PIXELS 的关系（务必读懂再改）：
+#:   * 节点里 MAX_PIXELS = 768*1344 只约束 adapt_canvas()（参考视频适配），
+#:     **不约束生成路径** —— 生成路径只查 schema 的 step=32 / min=32 / max=16384。
+#:   * 官方模板 Note 的像素表明确列到 2.0 MP -> 1920x1088。
+#:   所以这里的 2000000 是**工作流侧**的真实上限，与节点常量无关。
+#:
+#: 【为什么是 2*1024*1024 而不是字面的 2000000】
+#: 需求写「最大 2.0M 像素（2000000 像素）上限」，同时又要求
+#: 「16:9 应能取到 1920x1088」。这两个数对不上：
+#:     1920 * 1088 = 2,088,960 px  >  2,000,000 px
+#: 也就是说按字面 2000000 拦，**需求点名要能取到的 1920x1088 自己就被拦了**。
+#:
+#: 本仓库的「MP」语义自始至终是 ComfyUI ResolutionSelector 的语义
+#: （1.0 MP ≈ 1024x1024），官方模板 Note 的表头也写着 megapixels。
+#: 2.0 MP 在这套语义下 = 2 * 1024 * 1024 = 2,097,152 px，
+#: 而 1920x1088 = 2,088,960 px 正好落在里面 ——
+#: **官方表里 2.0 MP 那一行算出来的就是 1920x1088**（本仓库
+#: video_dimensions() 已逐格复现官方表十四档，见 tests）。
+#:
+#: 所以上限取 2 * 1024 * 1024 = 2,097,152 px：
+#:   * 满足「上限 2.0M 像素」（按本项目与官方一致的 MP 语义）；
+#:   * 满足「1920x1088 必可达」（硬需求，且是官方表背书的尺寸）；
+#:   * 且不会把 1920x1088 之外更大的尺寸放进来（如 2048x1088 = 2,211,584 px）。
+#:
+#: 若将来要按字面 2000000 收口，只需改这一个常量，
+#: 但那时 1920x1088 必须同步降级为不可达 —— 二者不可兼得。
+VIDEO_MAX_CANVAS_PIXELS = 2 * 1024 * 1024
+
+#: 需求里写的字面数值（2,000,000），保留供提示文案与测试引用。
+VIDEO_MAX_PIXELS_LITERAL = 2_000_000
+
+#: 保留旧名别名（旧代码 / 旧测试引用它），值已改为 2.0M。
+#: 【注意】它**不再等于** ComfyUI 源码里的 MAX_PIXELS —— 那是参考视频画布上限。
+VIDEO_MAX_PIXELS = VIDEO_MAX_CANVAS_PIXELS
+
+#: 超限时给用户的可执行提示（需求：说明上限与当前请求值，不静默截断）。
+VIDEO_MAX_PIXELS_MESSAGE = (
+    "文生视频分辨率上限为 2.0M 像素（{limit} px）。"
+    "当前请求 {pixels} px（{width}×{height}），超出上限。"
+    "请把宽度或高度调小，或改用更小的画面比例。"
+)
 
 # 画面比例（与 ResolutionSelector 的下拉项一一对应，实测 object_info）
 VIDEO_ASPECTS = {
@@ -403,7 +451,8 @@ VIDEO_TWOPASS = {
 # ------------------------------------------------------------------
 def normalize_video_size(width, height,
                           multiple: int = VIDEO_SIZE_MULTIPLE,
-                          max_pixels: float | None = None):
+                          max_pixels: float | None = None,
+                          strict_over_limit: bool = False):
     """把用户手填的宽高吸附到 H3 能接受的值。
 
     返回 (生效宽, 生效高, 调整原因列表)。**不抛异常** —— 界面要把
@@ -415,6 +464,13 @@ def normalize_video_size(width, height,
           CANVAS_MULTIPLE=32；latent 网格 = width//16）
       2. 单边 [32, 16384]（节点 schema min/max）
       3. 总像素超过 max_pixels 时按比例缩（可选）
+
+    【strict_over_limit】(2026-11-11 新增)
+      False（默认，向后兼容）：超限时按比例缩到上限，并在 reasons 里说明。
+      True：**不静默截断** —— 超限时**不缩放**，返回生效宽高 = 0，
+            reasons 里给出「上限是多少 + 当前请求是多少 + 怎么改」的可执行提示。
+      需求要求「超限时给出明确可执行的错误/提示，不要静默截断」，
+      提交链路（normalize_t2v_params）用 True，前端预览用 False。
     """
     reasons: list[str] = []
     try:
@@ -458,9 +514,27 @@ def normalize_video_size(width, height,
     if max_pixels:
         limit = max_pixels * 1024 * 1024
         if w * h > limit:
+            if strict_over_limit:
+                # 不静默截断：原样保留请求值，把可执行的提示交给上层。
+                reasons.append(VIDEO_MAX_PIXELS_MESSAGE.format(
+                    limit=f"{int(limit):,}",
+                    pixels=f"{w * h:,}",
+                    width=w, height=h))
+                return 0, 0, reasons
             scale = (limit / float(w * h)) ** 0.5
             nw = max(multiple, int(round(w * scale / multiple)) * multiple)
             nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            # 【2026-11-11 修】吸附到 32 的倍数后**可能又超回上限**
+            # （例：1920x1088 缩到 0.8MP -> 1216x672 = 817,152 <= 838,860 ✓，
+            #  但 1218x676 之类的四舍五入结果会溢出）。
+            # 逐次收一档，直到真正落进上限内 —— 不能给用户一个「还是超限」的尺寸。
+            while nw * nh > limit and (nw > multiple or nh > multiple):
+                if nw >= nh and nw > multiple:
+                    nw -= multiple
+                elif nh > multiple:
+                    nh -= multiple
+                else:
+                    break
             reasons.append(
                 f"总像素 {w * h / (1024 * 1024):.2f}MP 超过上限 {max_pixels}MP "
                 f"→ 按比例缩到 {nw}×{nh}")
@@ -489,14 +563,20 @@ def video_dimensions(aspect: str, megapixels: float):
     return w, h
 
 
-def size_presets_for_aspect(aspect: str) -> list[dict]:
+def size_presets_for_aspect(aspect: str,
+                             max_pixels: int | None = None) -> list[dict]:
     """某个比例下的**全部合法尺寸预设**（面板下拉的唯一真相源）。
 
     每条预设都是「官方 MP 档位 x 该比例」算出来的像素值，且必须
-    满足 H3 原生画布的硬约束：
-      * 宽高都是 32 的倍数（CANVAS_MULTIPLE）
-      * 面积 <= 768*1344（MAX_PIXELS，原生画布上限）
-      * 短边 <= 768（BASE_SHORT_EDGE）
+    满足两条硬约束：
+      * 宽高都是 32 的倍数（CANVAS_MULTIPLE，节点 schema step=32）
+      * 面积 <= max_pixels（默认 VIDEO_MAX_CANVAS_PIXELS = 2.0M）
+
+    【短边 <= 768 这条规则已经去掉】
+    旧版有「短边 <= 768（BASE_SHORT_EDGE）」，那是把 ComfyUI 节点里
+    专管**参考视频**适配的常量误当成了生成侧约束。
+    官方模板 Note 的表里 2.0 MP 那一行是 1920x1088 —— 短边 1088 > 768，
+    官方明确背书，所以短边不能作为生成侧的上限。
 
     超限的组合**直接不出现**在下拉里 —— 不是列出来再置灰，
     因为那是「用户能选、选了必然被服务端改写」的假选项。
@@ -509,13 +589,12 @@ def size_presets_for_aspect(aspect: str) -> list[dict]:
         width/height 实际像素
         short_edge 短边像素（label 里的 "480p" 就是它）
     """
+    cap = VIDEO_MAX_CANVAS_PIXELS if max_pixels is None else int(max_pixels)
     out: list[dict] = []
     for mp in VIDEO_SIZE_PRESET_MPS:
         w, h = video_dimensions(aspect, mp)
-        if w * h > VIDEO_MAX_CANVAS_PIXELS:
-            continue                      # 超出原生画布面积上限
-        if min(w, h) > 768:
-            continue                      # 短边超过 768 基准
+        if w * h > cap:
+            continue                      # 超出面积上限
         short = min(w, h)
         out.append({
             "key": f"{aspect}_{mp}",
@@ -529,7 +608,7 @@ def size_presets_for_aspect(aspect: str) -> list[dict]:
     return out
 
 
-def all_size_presets() -> list[dict]:
+def all_size_presets(max_pixels: int | None = None) -> list[dict]:
     """所有比例的尺寸预设（扁平清单）。
 
     面板按当前比例过滤出子集 —— 服务端一次下发全部，
@@ -538,8 +617,87 @@ def all_size_presets() -> list[dict]:
     """
     out: list[dict] = []
     for aspect in VIDEO_ASPECTS:
-        out.extend(size_presets_for_aspect(aspect))
+        out.extend(size_presets_for_aspect(aspect, max_pixels=max_pixels))
     return out
+
+
+# ------------------------------------------------------------------
+# 各生成模式的尺寸策略（**按各自工作流的真实约束分别处理**）
+# ------------------------------------------------------------------
+# 【需求原文】「其它模型/模式（首尾帧、参考生视频、长片拼接等）若有自己的
+#  尺寸约束，按各自工作流实际约束分别处理，不要一刀切套用 2.0M。」
+#
+# 【各模式的实测约束】
+#  * t2v（新面板）：MiniMaxH3ImageToVideo 节点的 width/height 直接吃用户值，
+#    节点只查 schema 的 min=32 / max=16384 / step=32。
+#    上限是**工作流侧**的策略 -> 本轮放宽到 2.0M（官方模板 Note 背书
+#    1920x1088 = 2.0 MP 那一行）。
+#
+#  * flf / r2v（老面板）：走 ResolutionSelector（aspect_ratio + megapixels
+#    + multiple=32），档位只有 RES_MP = {544p: 0.4, 768p: 0.8}，
+#    实测最大 0.8 MP -> 1216x672 = 817,152 px。
+#    它们**没有**「手填宽高」这条交互，所以 2.0M 对它们没有意义；
+#    保持原有档位不变（不误放宽）。
+#
+#  * longfilm：拼片模式，不产生新画面 —— 尺寸由被拼的视频决定，
+#    没有独立尺寸约束。
+VIDEO_MODE_SIZE_POLICY: dict[str, dict] = {
+    "t2v": {
+        "max_pixels": VIDEO_MAX_CANVAS_PIXELS,
+        "max_pixels_mp": VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024),
+        "multiple": VIDEO_SIZE_MULTIPLE,
+        "min": VIDEO_SIZE_MIN,
+        "max": VIDEO_SIZE_MAX,
+        "custom_size": True,
+        "source": "官方模板 Note 的 2.0 MP 行 = 1920x1088（2,088,960 px）",
+    },
+    "flf": {
+        "max_pixels": int(0.8 * 1024 * 1024),
+        "max_pixels_mp": 0.8,
+        "multiple": VIDEO_SIZE_MULTIPLE,
+        "min": VIDEO_SIZE_MIN,
+        "max": VIDEO_SIZE_MAX,
+        "custom_size": False,
+        "source": "ResolutionSelector 档位 768p = 0.8 MP（未放宽）",
+    },
+    "r2v": {
+        "max_pixels": int(0.8 * 1024 * 1024),
+        "max_pixels_mp": 0.8,
+        "multiple": VIDEO_SIZE_MULTIPLE,
+        "min": VIDEO_SIZE_MIN,
+        "max": VIDEO_SIZE_MAX,
+        "custom_size": False,
+        "source": "ResolutionSelector 档位 768p = 0.8 MP（未放宽）",
+    },
+    "longfilm": {
+        "max_pixels": None,
+        "max_pixels_mp": None,
+        "multiple": VIDEO_SIZE_MULTIPLE,
+        "min": VIDEO_SIZE_MIN,
+        "max": VIDEO_SIZE_MAX,
+        "custom_size": False,
+        "source": "拼片模式，尺寸由被拼视频决定",
+    },
+}
+
+
+def size_policy_for_mode(mode: str) -> dict:
+    """某个生成模式的尺寸策略（未知模式回落到 t2v 的宽松策略）。"""
+    policy = VIDEO_MODE_SIZE_POLICY.get((mode or "").strip())
+    if not policy:
+        policy = VIDEO_MODE_SIZE_POLICY["t2v"]
+        result = dict(policy)
+        result["source"] = "未知模式，回落到 t2v 策略"
+        return result
+    return dict(policy)
+
+
+def max_pixels_for_mode(mode: str) -> float | None:
+    """某模式的面积上限（单位：MP）。None = 不限。"""
+    policy = VIDEO_MODE_SIZE_POLICY.get((mode or "").strip())
+    if not policy:
+        return VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024)
+    return policy.get("max_pixels_mp")
 
 
 # ------------------------------------------------------------------
@@ -909,9 +1067,19 @@ def options_payload(node_available=None) -> dict:
         "size_max": VIDEO_SIZE_MAX,
         "mp_table": list(VIDEO_MP_TABLE),
         "default_mp": VIDEO_DEFAULT_MP,
+        # 【2026-11-11 放宽】文生视频生成分辨率上限：2.0M 像素。
+        # 上限从 768*1344（0.98MP）放宽到 2.0 MP = 2*1024*1024 px，
+        # 官方模板 Note 的表明确列到 2.0 MP -> 1920x1088。
+        "max_pixels": VIDEO_MAX_CANVAS_PIXELS,
+        "max_pixels_mp": VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024),
+        # 各模式各自的尺寸策略（前端按当前类别/模式取，不一刀切）。
+        "mode_size_policy": {
+            mode: size_policy_for_mode(mode)
+            for mode in VIDEO_MODE_SIZE_POLICY
+        },
         # 【2026-11-11 新增】尺寸预设下拉的清单 —— 每条都是
-        # 「官方 MP 档位 x 比例」算出来的像素值，且已按 H3 原生画布
-        # （面积 <= 768*1344、短边 <= 768）裁掉超限组合。
+        # 「官方 MP 档位 x 比例」算出来的像素值，且已按 2.0M 面积上限
+        # 裁掉超限组合（短边不再设限，见 size_presets_for_aspect 的说明）。
         "size_presets": all_size_presets(),
         # 加速 LoRA 现在是**单选**（一个主模型只能挑一个加速 LoRA）。
         "accel_lora_single_select": True,
