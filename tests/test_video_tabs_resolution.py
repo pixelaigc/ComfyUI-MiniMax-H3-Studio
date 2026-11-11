@@ -513,8 +513,11 @@ class TestVideoCategoriesEndpoint(unittest.TestCase):
     def test_payload_shape(self):
         import server as srv
         import asyncio
-        result = asyncio.get_event_loop().run_until_complete(
-            srv.api_video_categories(None))
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(srv.api_video_categories(None))
+        finally:
+            loop.close()
         payload = json.loads(result.text)
         self.assertEqual([c["key"] for c in payload["categories"]],
                          REQUIRED_CATEGORY_ORDER)

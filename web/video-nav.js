@@ -183,9 +183,30 @@
     });
   }
 
-  /** 高亮当前类别与模型项。 */
-  function syncActive(container) {
+  /**
+   * 高亮当前类别与模型项。
+   *
+   * 【一致性契约】高亮必须与「应用当前的 mode」一致：
+   * 只有当 app 当前 mode 落在某个视频模型项上时，视频分组才该高亮。
+   * 否则（比如当前在「Z-IMAGE 文生图」）视频分组保持未选中 ——
+   * 否则首屏会出现两个高亮项。
+   */
+  function syncActive(container, currentMode) {
     if (!container) return;
+    // 没传 currentMode 时按内部状态判断（调用方通常会传 app 的 state.mode）
+    if (currentMode === undefined || currentMode === null) {
+      const model = modelByKey(navState.modelKey);
+      currentMode = (navState.category && model) ? model.mode : "";
+    }
+    const videoMode = DATA.legacy_modes[currentMode] ? currentMode : "";
+    if (!videoMode) {
+      // 当前不在任何视频模式上 -> 视频分组整体不高亮
+      navState.category = "";
+      navState.modelKey = "";
+    } else if (!navState.category) {
+      const cat = DATA.legacy_modes[videoMode];
+      navState.category = cat || "";
+    }
     container.querySelectorAll(".nav-cat").forEach(catEl => {
       const key = catEl.dataset.category;
       const isActive = key === navState.category;
@@ -298,11 +319,29 @@
     });
   }
 
-  /** 首屏默认选中：持久化 > 服务端默认。 */
+  /**
+   * 首屏默认选中：持久化 > 服务端默认。
+   *
+   * 【重要】只恢复**持久化过的**选择，不做「服务端默认」的无条件选中。
+   * 原因：整个应用的默认模式是「Z-IMAGE 文生图」（DEFAULT_MODE = "t2i"），
+   * 视频分类的默认类别（t2v）只是「视频分组里的第一个」，不是整个应用的默认。
+   * 无条件选中它会让首屏出现**两个**高亮项（视频的 h3_t2v + 图像的 t2i），
+   * 违反「导航高亮与参数面板一致」的既有契约。
+   *
+   * 所以：
+   *   * 用户之前选过视频（localStorage 里有记录）-> 恢复那一个；
+   *   * 从没选过 -> 不动，让 app.js 的 DEFAULT_MODE 独家高亮。
+   */
   function applyDefault() {
     const saved = loadPersisted();
-    let category = saved && saved.category ? saved.category : DATA.default_category;
-    let modelKey = saved && saved.modelKey ? saved.modelKey : "";
+    if (!saved || !saved.category) {
+      // 从没选过视频 -> 不预选，视频分组保持「未选中」态
+      navState.category = "";
+      navState.modelKey = "";
+      return false;
+    }
+    let category = saved.category;
+    let modelKey = saved.modelKey || "";
     if (!categoryByKey(category)) {
       category = DATA.default_category;
       modelKey = "";
@@ -310,11 +349,15 @@
     if (!modelKey && category === DATA.default_category) {
       modelKey = DATA.default_model;
     }
-    select(category, modelKey, { silent: true });
+    return select(category, modelKey, { silent: true });
   }
 
   window.VideoNav = {
     DATA,
+    /** 当前应用 mode 是否落在某个视频模型项上（用于一致性判断）。 */
+    isVideoMode(mode) {
+      return !!(mode && DATA.legacy_modes[mode]);
+    },
     state: navState,
     load,
     bind,

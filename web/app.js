@@ -268,6 +268,9 @@ function activateMode(mode, navEl) {
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   if (navEl) navEl.classList.add("active");
   state.mode = mode;
+  // 【2026-11-11 两级导航】视频分组的高亮要跟着当前 mode 走 ——
+  // 切到图像模式时视频分组必须取消高亮，否则两个高亮项并存。
+  syncVideoNavActive();
   showCreate();
   renderMode();
 }
@@ -293,7 +296,9 @@ function videoNavContainer() {
 function syncVideoNavActive() {
   const box = videoNavContainer();
   if (!box || !window.VideoNav) return;
-  window.VideoNav.syncActive(box);
+  // 传入当前 mode —— 视频分组只在「当前 mode 确实是视频模式」时高亮，
+  // 否则首屏会同时高亮「Z-IMAGE 文生图」和视频项。
+  window.VideoNav.syncActive(box, state.mode);
 }
 
 /** 选中某个视频 mode（来自两级导航或老任务卡片），并高亮对应层级。 */
