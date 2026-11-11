@@ -94,6 +94,9 @@ def _resolve_accel_chain(params: dict, model: dict) -> list[dict]:
             continue
         chain.append({"name": meta["name"], "strength": strength,
                       "key": key, "fixed": False})
+        # 【2026-11-11】单选：用户选的加速 LoRA 只能有一个 ——
+        # 拿到第一个就停，后面的忽略（两枚 4 步蒸馏 LoRA 叠加没有意义）。
+        break
     return chain
 
 

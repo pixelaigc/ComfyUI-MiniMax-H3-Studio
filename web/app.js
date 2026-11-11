@@ -486,7 +486,7 @@ function renderMode() {
     $("#durField").style.display = "none";
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
-    $("#seedStrengthPair").style.display = "none";
+    // 【2026-11-11】原来这里隐藏 #seedStrengthPair —— 该容器已删除
     // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
     // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
     // （#musicEnhanceSplit，在 #musicPromptField 内），所以通用 #promptField 整个隐藏。
@@ -1647,6 +1647,10 @@ bindSeg("#modelCards", "model", () => {
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
 bindSeg("#loraCards", "lora");
+// 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
+// （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
+// 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
+// flf / r2v 走旧工作流路径，读的就是 params.lora_strength。
 $("#loraStrength").addEventListener("input", e => {
   state.loraStrength = parseFloat(e.target.value);
   $("#loraStrengthVal").textContent = state.loraStrength.toFixed(2);
@@ -1661,10 +1665,15 @@ function setDefaultSteps() {
   $("#steps").value = def;
   $("#stepsVal").textContent = def;
 }
+// 【2026-11-11】原来这个函数控制「生成按钮下方」的 LoRA 强度滑杆显隐。
+// 那个滑杆已搬到「LoRA 选择」旁边（#loraField 内），所以这里改成控制
+// #loraStrengthField —— 它现在住在 #loraField 里，而 #loraField 只在
+// 选了 lora 模型时显示，因此两者的显隐天然一致。
+// （#seedStrengthPair 容器已不存在，不再操作。）
 function updateSeedStrengthLayout() {
   const showStrength = MODE_INFO[state.mode].kind === "video" && state.model === "lora";
-  $("#loraStrengthField").style.display = showStrength ? "" : "none";
-  $("#seedStrengthPair").classList.toggle("seed-only", !showStrength);
+  const field = $("#loraStrengthField");
+  if (field) field.style.display = showStrength ? "" : "none";
 }
 $("#duration").addEventListener("input", e => {
   state.duration = parseInt(e.target.value);

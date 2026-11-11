@@ -44,6 +44,54 @@ VIDEO_SIZE_MAX = 16384
 VIDEO_MP_TABLE = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98, 1.0, 1.2, 1.5, 1.8, 2.0]
 VIDEO_DEFAULT_MP = 0.4
 
+# ------------------------------------------------------------------
+# 尺寸预设（面板的「分辨率下拉」）
+# ------------------------------------------------------------------
+# 【硬约束来源 —— 全部实测，不是拍脑袋】
+#
+#  1. **原生画布上限**：comfy_extras/nodes_minimax_h3.py 实测
+#         CANVAS_MULTIPLE = 32
+#         BASE_SHORT_EDGE = 768
+#         MAX_PIXELS     = 768 * 1344   (= 1032192 px ≈ 0.984 MP)
+#     官方模板 Note 也写着「H3's native canvas is a 768px short edge,
+#     capped at 768x1344 pixels, rounded to a multiple of 32」。
+#     => **任何超过 768*1344 面积的组合都超出 H3 原生画布**，不能作为预设。
+#
+#  2. **算法**：与 ComfyUI 自带 ResolutionSelector 完全一致
+#     （comfy_extras/nodes_resolution.py 实测）：
+#         total = megapixels * 1024 * 1024
+#         scale = sqrt(total / (w_ratio * h_ratio))
+#         width  = round(w_ratio * scale / multiple) * multiple
+#     本仓库 video_dimensions() 是同一套公式，且已验证能**逐格复现**
+#     官方模板 Note 里的 16:9 全表（0.2/0.3/…/0.98 九档全中）。
+#
+#  3. **短边 768**：官方画布的短边基准。16:9 / 21:9 / 9:16 在 0.98MP
+#     时短边正好 768；1:1 这类方画布到 0.98MP 会变 1024x1024（超出画布），
+#     所以 1:1 的上限档位是 0.8MP（928x928）。
+#
+# 【预设粒度的取舍】
+#   不把 MP 表全量铺开（14 档 x 8 比例 = 112 项，下拉没法用），
+#   而是挑**官方表里明确列出的档位**（0.2 / 0.3 / 0.4 / 0.5 / 0.6 /
+#   0.7 / 0.8 / 0.9 / 0.98），再按 H3 原生画布裁掉超限的组合 ——
+#   每个出现在下拉里的值都是「本机跑得动 + 官方背书」的，不是编出来的。
+#
+#   额外带一个 1.0（VIDEO_MP_TABLE 里也有）：它对 16:9 / 9:16 / 21:9
+#   会算出 1376x768 / 768x1376 / 1568x672 —— 短边没超 768，
+#   但**面积**超过了 768*1344 这个原生画布上限，正是「面积规则」该拦的。
+#   保留它是为了让面积规则真的起作用（而不是被短边规则顺带覆盖）。
+#
+#   档位命名用「短边像素」而不是 MP：
+#     - 352 / 480 / 608 / 672 / 768 —— 这些是 16:9 下官方表算出的短边
+#       （608x352 / 864x480 / 1056x608 / 1216x672 / 1344x768），
+#       用户一眼能对上「480p」「768p」的直觉。
+#     - 但短边在不同比例下不一样（如 1:1 的 928x928 短边就是 928），
+#       所以每条预设都同时带 mp 与 label，label 用「比例 + 实际像素」表述。
+VIDEO_SIZE_PRESET_MPS = [0.2, 0.3, 0.4, 0.5, 0.6,
+                         0.7, 0.8, 0.9, 0.98, 1.0]
+
+#: H3 原生画布的面积上限（像素）。实测 comfy_extras/nodes_minimax_h3.py:32
+VIDEO_MAX_CANVAS_PIXELS = 768 * 1344
+
 # 画面比例（与 ResolutionSelector 的下拉项一一对应，实测 object_info）
 VIDEO_ASPECTS = {
     "1:1": (1, 1),
@@ -195,13 +243,25 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
                 "MiniMaxH3LightX2VSLAKJSageComposerT8Advanced 节点默认就指向它。",
     },
     "lightx2v_8step": {
+        # 【2026-11-11 实测修正】原来写的是
+        #   "h3_lightx2v/minimax_h3_fl2v_turbo_8step_v1.0_bf16.safetensors"
+        # 但那个文件**不是 H3 的 LoRA** —— 它的 312 个层名全是
+        #   token_refiner.refiner_blocks.* / transformer_blocks.*
+        # （Wan/SD 系命名），而 H3 底模里这两个前缀一个都没有：
+        #   含 'refiner_blocks' 的底模层: 0
+        #   含 'transformer_blocks' 的底模层: 0
+        # 实测命中 0/312 —— ComfyUI 会**静默丢弃**，出片照跑但加速没生效。
+        # 真正的 H3 8 步权重在 loras 根目录（官方模板 Note 里指向的也是
+        # 这个路径）：minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors
+        # 实测 208/208 全命中。
         "name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
         "display": "LightX2V 8 步",
         "purpose": "8 步档蒸馏：比 4 步慢一倍，但细节与运动更稳，"
                    "适合最终成片而不是快速试片。",
         "recommended_strength": 1.0,
         "recommended_steps": 8,
-        "note": "208 个层全部命中（实测），训练 alpha=8 / scale=0.0625。",
+        "note": "208 个层全部命中（实测），训练 alpha=8 / scale=0.0625。"
+                "这是官方模板 Note 指向的 8 步权重（根目录那一份）。",
     },
     "dmad_4step_critic": {
         "name": "dmad_minimax_h3_4step_full_critic_comfyui.safetensors",
@@ -427,6 +487,59 @@ def video_dimensions(aspect: str, megapixels: float):
     w = max(mult, int(round(w_ratio * scale / mult)) * mult)
     h = max(mult, int(round(h_ratio * scale / mult)) * mult)
     return w, h
+
+
+def size_presets_for_aspect(aspect: str) -> list[dict]:
+    """某个比例下的**全部合法尺寸预设**（面板下拉的唯一真相源）。
+
+    每条预设都是「官方 MP 档位 x 该比例」算出来的像素值，且必须
+    满足 H3 原生画布的硬约束：
+      * 宽高都是 32 的倍数（CANVAS_MULTIPLE）
+      * 面积 <= 768*1344（MAX_PIXELS，原生画布上限）
+      * 短边 <= 768（BASE_SHORT_EDGE）
+
+    超限的组合**直接不出现**在下拉里 —— 不是列出来再置灰，
+    因为那是「用户能选、选了必然被服务端改写」的假选项。
+
+    返回的每条：
+        key        "<aspect>_<mp>"，稳定标识（存配置用）
+        label      "480p · 864×480"（短边像素 + 实际宽高）
+        aspect     比例 key
+        megapixels 总像素档位
+        width/height 实际像素
+        short_edge 短边像素（label 里的 "480p" 就是它）
+    """
+    out: list[dict] = []
+    for mp in VIDEO_SIZE_PRESET_MPS:
+        w, h = video_dimensions(aspect, mp)
+        if w * h > VIDEO_MAX_CANVAS_PIXELS:
+            continue                      # 超出原生画布面积上限
+        if min(w, h) > 768:
+            continue                      # 短边超过 768 基准
+        short = min(w, h)
+        out.append({
+            "key": f"{aspect}_{mp}",
+            "label": f"{short}p · {w}×{h}",
+            "aspect": aspect,
+            "megapixels": mp,
+            "width": w,
+            "height": h,
+            "short_edge": short,
+        })
+    return out
+
+
+def all_size_presets() -> list[dict]:
+    """所有比例的尺寸预设（扁平清单）。
+
+    面板按当前比例过滤出子集 —— 服务端一次下发全部，
+    前端切比例时不用再发请求（与「切模型才重拉兼容性」不同：
+    尺寸预算是纯算术，没有磁盘 IO）。
+    """
+    out: list[dict] = []
+    for aspect in VIDEO_ASPECTS:
+        out.extend(size_presets_for_aspect(aspect))
+    return out
 
 
 # ------------------------------------------------------------------
@@ -699,6 +812,36 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
     return result
 
 
+def accel_lora_compat_matrix(model_key: str) -> dict[str, dict]:
+    """某个底模下，所有可勾选加速 LoRA 的**实测**兼容性。
+
+    返回 {lora_key: {compatible, reason, matched, runtime_injected, total}}。
+
+    这是「按主模型过滤加速 LoRA 下拉」的**唯一判据** —— 全部来自
+    check_h3_lora_compat() 对本机权重头的逐层实测，不是查表硬编。
+
+    缓存：兼容性只跟「权重文件的字节」有关，不随时间变，
+    所以按 (model_key, lora_name, 文件 mtime/size) 缓存，
+    切来切去模型不会反复读盘。
+    """
+    model = VIDEO_MODELS.get(model_key)
+    if model is None:
+        return {}
+    out: dict[str, dict] = {}
+    for key, meta in VIDEO_ACCEL_LORA_COMBOS.items():
+        check = check_h3_lora_compat(meta["name"], model["unet"])
+        out[key] = {
+            "compatible": bool(check["compatible"]),
+            "reason": check["reason"],
+            "matched": check["matched"],
+            "runtime_injected": check["runtime_injected"],
+            "shape_mismatch": check["shape_mismatch"],
+            "missing": check["missing"],
+            "total": check["total"],
+        }
+    return out
+
+
 # ------------------------------------------------------------------
 # 下发给前端的清单
 # ------------------------------------------------------------------
@@ -766,6 +909,17 @@ def options_payload(node_available=None) -> dict:
         "size_max": VIDEO_SIZE_MAX,
         "mp_table": list(VIDEO_MP_TABLE),
         "default_mp": VIDEO_DEFAULT_MP,
+        # 【2026-11-11 新增】尺寸预设下拉的清单 —— 每条都是
+        # 「官方 MP 档位 x 比例」算出来的像素值，且已按 H3 原生画布
+        # （面积 <= 768*1344、短边 <= 768）裁掉超限组合。
+        "size_presets": all_size_presets(),
+        # 加速 LoRA 现在是**单选**（一个主模型只能挑一个加速 LoRA）。
+        "accel_lora_single_select": True,
+        "accel_lora_default": "",
+        # 各底模下每个加速 LoRA 的实测兼容性（前端按当前模型过滤下拉）。
+        "accel_lora_compat": {
+            key: accel_lora_compat_matrix(key) for key in VIDEO_MODELS
+        },
     }
     if node_available:
         for item in payload["attention_modes"]:

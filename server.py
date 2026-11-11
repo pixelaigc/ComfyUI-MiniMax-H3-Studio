@@ -1134,7 +1134,16 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         return out, f"本机找不到固定加速 LoRA {fixed['name']}"
     out["fixed_accel_lora"] = fixed_key
 
-    # ---- 可勾选的加速 LoRA 组合 ----
+    # ---- 可勾选的加速 LoRA 组合（**单选**：一个主模型只能挑一个）----
+    #
+    # 【2026-11-11 改】原来是「可多选叠加」。现在前端是下拉单选，
+    # 服务端这里也必须收紧 —— 否则绕过前端直接调 API 仍能塞多个，
+    # 两枚 4 步蒸馏 LoRA 叠在一起没有意义（都是把 20 步压到 4 步的
+    # 蒸馏权重，叠加只会互相打架）。
+    #
+    # 兼容旧客户端：老任务里存的是 accel_loras 数组（可能多项）。
+    #   * 全部不兼容 / 未启用 -> 空
+    #   * 有多项 -> 取**第一个可用且兼容的**（保持老任务能重放）
     combos = []
     for item in params.get("accel_loras") or []:
         if not isinstance(item, dict):
@@ -1158,6 +1167,8 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         if strength <= 0:
             continue
         combos.append({"key": key, "strength": strength, "enabled": True})
+        # 单选：拿到第一个就停 —— 后面的忽略
+        break
     out["accel_loras"] = combos
 
     # ---- 注意力机制 ----
@@ -2549,20 +2560,30 @@ async def api_video_options(request):
 
     payload = video_models.options_payload(node_available=node_available)
     # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
-    # 前端据此把对不上的组合置灰并显示原因。
+    # 前端据此把对不上的组合从**下拉里剔除**（不是置灰）。
+    #
+    # 【2026-11-11 改】加速 LoRA 改成单选：一个主模型只能挑一个加速 LoRA。
+    #   互斥单选的语义：两枚 4 步蒸馏 LoRA 叠在一起没有意义
+    #   （都是把 20 步压到 4 步的蒸馏权重，叠加只会互相打架），
+    #   而「固定 Turbo LoRA」已经在工作流里常驻，用户这一栏选的是
+    #   **额外**的那一枚。
     model_key = request.query.get("model") or payload["default_model"]
     model = video_models.VIDEO_MODELS.get(model_key)
     payload["selected_model"] = model_key
     if model:
+        matrix = video_models.accel_lora_compat_matrix(model_key)
         combos = []
         for item in payload["accel_lora_combos"]:
             entry = dict(item)
-            check = video_models.check_h3_lora_compat(item["name"], model["unet"])
-            entry["compatible"] = check["compatible"]
-            entry["compat_reason"] = check["reason"]
-            entry["compat_matched"] = check["matched"]
-            entry["compat_runtime_injected"] = check["runtime_injected"]
-            entry["compat_total"] = check["total"]
+            check = matrix.get(item["key"], {})
+            entry["compatible"] = bool(check.get("compatible"))
+            entry["compat_reason"] = check.get("reason", "")
+            entry["compat_matched"] = check.get("matched", 0)
+            entry["compat_runtime_injected"] = check.get("runtime_injected", 0)
+            entry["compat_total"] = check.get("total", 0)
+            # 不适配当前底模的**不出现**在下拉里（前端据此过滤）
+            entry["selectable"] = bool(entry["compatible"]) and \
+                entry.get("available", True)
             combos.append(entry)
         payload["accel_lora_combos"] = combos
     return json_ok(payload)
@@ -2601,11 +2622,17 @@ async def api_video_size(request):
     """GET /api/video-size?width=&height= —— 宽高吸附（服务端权威）
 
     返回生效宽高 + 调整原因，前端原样显示「输入值 → 实际使用值」。
+
+    【2026-11-11】吸附规则加了一条「H3 原生画布面积上限」：
+    总像素超过 768*1344 会按比例缩到上限，并把原因写进 reasons ——
+    否则用户填 1920x1080 会得到一个「能提交但超出 H3 训练分布」的尺寸。
     """
     try:
         width = request.query.get("width")
         height = request.query.get("height")
-        w, h, reasons = video_models.normalize_video_size(width, height)
+        w, h, reasons = video_models.normalize_video_size(
+            width, height,
+            max_pixels=video_models.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
     except Exception as exc:
         return web.json_response({"error": str(exc)}, status=400)
     return json_ok({
