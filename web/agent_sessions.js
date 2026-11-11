@@ -123,7 +123,12 @@
       const data = await apiJSON("GET", "/api/agent/sessions?limit=200");
       state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
     } catch (err) {
-      state.sessions = [];
+      // 【不要在这里把已有会话清空】
+      // 刷新页面时，第一次 loadSessions 可能还在飞，
+      // 而 loadSession 已经恢复了消息 —— 此时一个**后续**的
+      // loadSessions 失败（网络抖动）会把 state.sessions 清成 [],
+      // 连带 renderSessionList 显示「还没有交互记录」。
+      // 保留旧数据 + 提示错误，比清空更接近用户的真实状态。
       setStatus("会话列表加载失败：" + (err.message || "未知错误"));
     }
     renderSessionList();
@@ -414,7 +419,27 @@
 
   // ---------- 启动 ----------
 
+  // init 只跑一次。
+  //
+  // 【为什么必须幂等 —— 2026-11-11 实测踩过】
+  // 这个脚本有两条启动路径：
+  //   1) document.readyState === "loading" -> 等 DOMContentLoaded
+  //   2) 否则直接 init()
+  // 在某些加载时序下**两条都会走到**（脚本在 DOMContentLoaded 之后才被
+  // 解析，但 readyState 还没翻转的窗口期）。
+  //
+  // 后果不是「多跑一遍没关系」，而是**状态被打回初始值**：
+  // 第一次 init 已经 loadSessions 拿到 2 个会话 + loadSession 恢复了消息，
+  // 第二次 init 又跑一遍，中途 state.sessions 被清空、
+  // currentId 被 saveCurrentId("") 抹掉 ——
+  // 用户看到的现象就是「刷新后历史全没了」。
+  //
+  // 幂等守卫是这里唯一正确的修法。
+  let _initialized = false;
+
   async function init() {
+    if (_initialized) return;
+    _initialized = true;
     const agent = window.AgentUI;
     // 【先绑事件，再拉数据 —— 2026-11-11 实测踩过】
     // 原来是把所有 addEventListener 放在 init() 的**最后**，

@@ -230,9 +230,13 @@ def main():
                 page = ctx.new_page()
                 errors = []
                 failed_req = []
-                page.on("console", lambda m: errors.append(m.text)
-                        if m.type == "error" else None)
+                all_console = []
+                page.on("console", lambda m: (all_console.append((m.type, m.text)),
+                                              errors.append(m.text) if m.type == "error" else None))
                 page.on("requestfailed", lambda r: failed_req.append(r.url))
+                resp_log = []
+                page.on("response", lambda r: resp_log.append(
+                    (r.status, r.url)) if "/api/agent" in r.url else None)
                 page.goto(f"http://127.0.0.1:{PORT}/", wait_until="domcontentloaded")
                 page.wait_for_timeout(900)
 
@@ -311,6 +315,11 @@ def main():
                     if (nav) nav.click();
                 }""")
                 page.wait_for_timeout(800)
+                # 恢复是**异步**的（loadSessions -> loadSession -> restoreMessages），
+                # 等它真的恢复完再断言，不能只 sleep 一下就查。
+                page.wait_for_function(
+                    "() => window.AgentUI && window.AgentUI.state.messages.length > 0",
+                    timeout=15000)
                 after = page.evaluate(
                     "() => window.AgentUI.state.messages.length")
                 check(f"[{width}] 刷新后恢复会话历史",

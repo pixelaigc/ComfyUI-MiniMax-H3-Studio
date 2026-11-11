@@ -1978,6 +1978,10 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   flex: 1 1 auto; min-width: 0; min-height: 0;
   display: flex; flex-direction: column;
   background: var(--bg); overflow: hidden;
+  /* 定位上下文：会话侧栏与遮罩是 position:absolute，
+     没有这一行它们会锚到**视口**而不是 Agent 页 ——
+     抽屉就会盖住整个窗口（含顶栏），而不是只覆盖 Agent 区域。 */
+  position: relative;
 }
 .ag-head {
   flex: 0 0 auto;
