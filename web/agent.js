@@ -1008,6 +1008,10 @@
       case "done": {
         if (typeof data.answer === "string" && data.answer) msg.content = data.answer;
         if (Array.isArray(data.jobs)) data.jobs.forEach(j => upsertJob(msg, j));
+        // 产物面板同步：新建了任务 -> 「本次会话产物」列表要跟着更新。
+        if (window.AgentSessions && window.AgentSessions.onJobsCreated) {
+          window.AgentSessions.onJobsCreated();
+        }
         if (Array.isArray(data.assets)) msg.assets = data.assets;
         // 【本轮附件 —— 2026-11-11】
         // 服务端回传它**实际收到**的附件（权威来源）。
@@ -1244,6 +1248,16 @@
       message: text || "请看看我上传的这张图，按图片编辑（i2i_qwen）处理。",
       session_id: state.sessionId || undefined,
     };
+    // 【会话 id 同步 —— 2026-11-11】
+    // state.sessionId 与 AgentSessions.state.currentId 是**两份**状态。
+    // 如果这里不先同步，请求会带着空 session_id 发出去，
+    // 服务端就会**新建一个会话** —— 用户在侧栏点「会话 A」，
+    // 发出的消息却落进了「会话 B」。那是最难查的一类串味。
+    const sessions = window.AgentSessions;
+    if (sessions && sessions.state && sessions.state.currentId) {
+      state.sessionId = sessions.state.currentId;
+      body.session_id = state.sessionId;
+    }
     // 附件的 asset_id 列表 —— 服务端据此把图放进 Agent 上下文，
     // 并在模型没显式指定参考图时自动作为参考图。
     if (pending.length) {
@@ -1282,10 +1296,23 @@
       // 一次性 JSON 路径：把 steps 映射成工具轨迹（统一的展示形态）
       syncToolsFromSteps(msg, data.steps);
       state.sessionId = data.session_id || state.sessionId;
+      // 反向同步到会话管理层 —— 服务端可能**新建**了会话
+      // （比如本地没有会话 id 时首次发送），那边必须知道当前是哪个会话，
+      // 否则侧栏高亮错位、刷新后恢复到别的会话。
+      if (data.session_id && window.AgentSessions) {
+        window.AgentSessions.state.currentId = data.session_id;
+        if (window.AgentSessions.loadSessions) {
+          window.AgentSessions.loadSessions();
+        }
+      }
       state.lastResult = data;
       if (!msg.result || !Object.keys(msg.result).length) msg.result = data;
       if (!msg.content) msg.content = data.answer || "";
       if (Array.isArray(data.jobs)) data.jobs.forEach(j => upsertJob(msg, j));
+      // 产物面板同步：新建了任务 -> 「本次会话产物」列表要跟着更新。
+      if (window.AgentSessions && window.AgentSessions.onJobsCreated) {
+        window.AgentSessions.onJobsCreated();
+      }
       if (Array.isArray(data.assets)) msg.assets = data.assets;
       // 【本轮附件 —— 2026-11-11】与流式路径同一处理。
       if (Array.isArray(data.attachments)) msg.attachments = data.attachments;
@@ -1562,6 +1589,18 @@
     renderMessages();
     const status = $("#agStatus");
     if (status) status.textContent = "";
+
+    // 【真正新建一个会话 —— 2026-11-11】
+    // 原来这里只是把内存里的 sessionId 清空，**服务端根本不知道**，
+    // 于是：刷新页面回到空会话、刚发的那轮对话找不回来、侧栏列表里也没有。
+    // 现在交给会话管理层去服务端建一个（并落库）。
+    //
+    // 【为什么不在这里直接调 API】
+    // 会话的新建/删除/列表是**一整套**操作（建库 + 刷列表 + 切视图），
+    // 分散在两个文件里必然漂移。统一由 agent_sessions.js 负责。
+    if (window.AgentSessions && window.AgentSessions.createSession) {
+      await window.AgentSessions.createSession();
+    }
   }
 
   // 把 Agent 的任务回填到创作面板
@@ -1736,6 +1775,60 @@
   // 暴露给 app.js（app.js 的 show* 系列需要能切到这个页）
   window.AgentUI = {
     show, state, renderMessages,
+
+    // 2026-11-11：会话恢复 —— 把服务端会话库里的消息还原成界面。
+    //
+    // 【为什么必须有这个入口】
+    // 会话持久化的完整链路是：
+    //   服务端落库（agent_sessions.py）-> agent_sessions.js 拉取 ->
+    //   **这里还原成消息结构** -> renderMessages 画出来。
+    // 少了这一步，前端就只是「拿到了 JSON 但画不出来」。
+    //
+    // 【为什么直接替换 state.messages 而不是追加】
+    // 恢复是**整段替换**当前会话的视图。追加会把旧会话的消息
+    // 和新会话的消息混在一起 —— 用户切到 B 会话却看到 A 的对话。
+    restoreMessages(messages, options) {
+      // 【为什么要有「不要覆盖已有消息」的模式 —— 2026-11-11 实测回归】
+      // 会话管理层是**异步**初始化的（要拉会话列表 + 会话详情）。
+      // 它的 init() 会在某个时刻调用 restoreMessages()。
+      //
+      // 实测踩到的竞态：
+      //   1. 用户（或测试）很快发了一条消息 -> state.messages 里有 1 条
+      //   2. 会话层 init() 这时才拿到「恢复出来的历史」-> 调 restoreMessages
+      //   3. restoreMessages 直接**替换** state.messages -> 那条刚发的消息**没了**
+      //
+      // 后果：用户发完消息刷新一下（或慢一点网络），消息凭空消失。
+      // 这不是测试问题 —— 是真的会把用户消息弄丢。
+      //
+      // 修法：会话层初始化时用 "merge" 模式 ——
+      // **只补历史，不删已经在的**。真正切换会话时仍然整体替换
+      // （那是用户主动要的语义）。
+      const opts = options || {};
+      const incoming = Array.isArray(messages) ? messages.slice() : [];
+      if (opts.merge) {
+        // 已在的保留在前面（用户刚发的更新），恢复的历史追加在后面。
+        const seen = new Set(state.messages.map(m => m._sid || ""));
+        for (const m of incoming) {
+          if (!m._sid || !seen.has(m._sid)) state.messages.push(m);
+        }
+      } else {
+        state.messages = incoming;
+        state.streaming = null;
+        state.lastResult = null;
+      }
+      // 恢复出来的消息**不该**再触发轮询（服务端已经落了状态）。
+      // 但任务卡里的产物缩略图要能显示 —— 那依赖 msg.jobs[].outputs，
+      // 由 meta 带过来（见 server._agent_message_meta）。
+      renderMessages();
+      return state.messages;
+    },
+
+    // 2026-11-11：新建/删除会话的内部接口（测试与验收用）。
+    _newSession: newSession,
+    _setSessionId: function (id) {
+      state.sessionId = id || "";
+      return state.sessionId;
+    },
     // 2026-11-11：附件（图片上传）的内部接口 —— 测试与验收用。
     //
     // 【为什么不直接操作 DOM】
