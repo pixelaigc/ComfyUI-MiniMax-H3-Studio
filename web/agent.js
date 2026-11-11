@@ -1787,10 +1787,35 @@
     // 【为什么直接替换 state.messages 而不是追加】
     // 恢复是**整段替换**当前会话的视图。追加会把旧会话的消息
     // 和新会话的消息混在一起 —— 用户切到 B 会话却看到 A 的对话。
-    restoreMessages(messages) {
-      state.messages = Array.isArray(messages) ? messages.slice() : [];
-      state.streaming = null;
-      state.lastResult = null;
+    restoreMessages(messages, options) {
+      // 【为什么要有「不要覆盖已有消息」的模式 —— 2026-11-11 实测回归】
+      // 会话管理层是**异步**初始化的（要拉会话列表 + 会话详情）。
+      // 它的 init() 会在某个时刻调用 restoreMessages()。
+      //
+      // 实测踩到的竞态：
+      //   1. 用户（或测试）很快发了一条消息 -> state.messages 里有 1 条
+      //   2. 会话层 init() 这时才拿到「恢复出来的历史」-> 调 restoreMessages
+      //   3. restoreMessages 直接**替换** state.messages -> 那条刚发的消息**没了**
+      //
+      // 后果：用户发完消息刷新一下（或慢一点网络），消息凭空消失。
+      // 这不是测试问题 —— 是真的会把用户消息弄丢。
+      //
+      // 修法：会话层初始化时用 "merge" 模式 ——
+      // **只补历史，不删已经在的**。真正切换会话时仍然整体替换
+      // （那是用户主动要的语义）。
+      const opts = options || {};
+      const incoming = Array.isArray(messages) ? messages.slice() : [];
+      if (opts.merge) {
+        // 已在的保留在前面（用户刚发的更新），恢复的历史追加在后面。
+        const seen = new Set(state.messages.map(m => m._sid || ""));
+        for (const m of incoming) {
+          if (!m._sid || !seen.has(m._sid)) state.messages.push(m);
+        }
+      } else {
+        state.messages = incoming;
+        state.streaming = null;
+        state.lastResult = null;
+      }
       // 恢复出来的消息**不该**再触发轮询（服务端已经落了状态）。
       // 但任务卡里的产物缩略图要能显示 —— 那依赖 msg.jobs[].outputs，
       // 由 meta 带过来（见 server._agent_message_meta）。

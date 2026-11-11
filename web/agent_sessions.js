@@ -183,9 +183,13 @@
   // 所以这里把 meta 里的结构化信息**还原**成这些字段。
   function messagesFromServer(rawMessages) {
     const out = [];
+    let index = 0;
     for (const m of rawMessages || []) {
       const meta = m.meta || {};
-      const msg = { role: m.role, content: m.content || "" };
+      // 稳定 id：会话内第几条消息。用于 merge 模式下的去重
+      // （同一条历史不能被加两次）。
+      const msg = { role: m.role, content: m.content || "",
+                    _sid: "hist-" + (index++) };
       if (m.role === "user") {
         if (Array.isArray(meta.attachments) && meta.attachments.length) {
           msg.attachments = meta.attachments;
@@ -558,14 +562,16 @@
     if (!target && state.sessions.length) target = state.sessions[0].id;
     if (target) {
       const messages = await loadSession(target);
-      if (messages && messages.length && agent && agent.restoreMessages) {
-        agent.restoreMessages(messages);
-      } else if (agent && agent.restoreMessages) {
-        agent.restoreMessages([]);
+      if (agent && agent.restoreMessages) {
+        // 【merge 模式】init 是异步的 —— 这期间用户可能已经发了消息。
+        // 直接替换会把那条消息弄丢（实测踩过）。
+        agent.restoreMessages(messages, { merge: true });
       }
     } else {
       await createSession();
-      if (agent && agent.restoreMessages) agent.restoreMessages([]);
+      if (agent && agent.restoreMessages) {
+        agent.restoreMessages([], { merge: true });
+      }
     }
     renderCurrentSessionLabel();
   }

@@ -338,6 +338,39 @@ class TestFrontendContract(unittest.TestCase):
         self.assertIn("innerHTML = ", block, "关闭面板要清空内容")
         self.assertIn("state.artifacts = []", block, "关闭面板要清空状态")
 
+    def test_restore_messages_has_merge_mode(self):
+        """
+        restoreMessages 必须支持「merge」模式（不覆盖已有消息）。
+
+        【为什么这是回归点 —— 实测踩过】
+        会话管理层是**异步**初始化的（拉会话列表 + 会话详情）。
+        它的 init() 会在某个时刻调 restoreMessages()。
+        如果 init 期间用户已经发了一条消息，直接替换 state.messages
+        会把那条消息**弄丢**。
+
+        实测表现：一次性 E2E 测试（真起 server + 真 Chromium）
+        偶发「工具块没渲染」—— 根因就是消息被 init 的 restore 抹掉了
+        （state.messages 长度 0）。
+        """
+        js = self._read("agent.js")
+        i = js.index("restoreMessages(messages")
+        block = js[i:i + 1400]
+        self.assertIn("opts.merge", block,
+                      "restoreMessages 必须支持 merge 模式")
+        self.assertIn("state.messages = incoming", block,
+                      "非 merge 模式仍然整体替换（切换会话要用）")
+
+    def test_session_layer_uses_merge_on_init(self):
+        """会话层 init 恢复历史时必须用 merge 模式。"""
+        js = self._read("agent_sessions.js")
+        self.assertIn("{ merge: true }", js,
+                      "init 里必须用 merge 模式，否则会抹掉用户刚发的消息")
+
+    def test_restored_messages_have_stable_ids(self):
+        """恢复出来的消息要带稳定 id（merge 模式下去重要靠它）。"""
+        js = self._read("agent_sessions.js")
+        self.assertIn("_sid", js, "恢复的消息要带 _sid")
+
     def test_search_and_locate_styles_exist(self):
         """新增元素要有样式（不然是裸 HTML）。"""
         css = self._read("style.css")

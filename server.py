@@ -244,6 +244,8 @@ def init_db():
         ph.ensure_table(conn)
         # 会话 -> 任务的关联列（见 _ensure_jobs_session_column 的说明）
         _ensure_jobs_session_column(conn)
+        # 迁移可能刚补上这一列 -> 让列名判断重新算一次
+        _JOBS_HAS_SESSION_COL.pop(str(DB_PATH), None)
 
 
 def _ensure_jobs_session_column(conn) -> None:
@@ -1429,6 +1431,9 @@ def session_job_counts(session_ids: list[str]) -> dict[str, int]:
     ids = [str(s) for s in (session_ids or []) if s]
     if not ids:
         return {}
+    if not _jobs_table_has_session_column():
+        # 这张库没有归属信息 -> 产物数一律 0（不抛异常，列表照常显示）。
+        return {}
     try:
         with db() as conn:
             placeholders = ",".join("?" * len(ids))
@@ -1471,6 +1476,8 @@ def clear_session_job_refs(session_id: str) -> int:
     sid = str(session_id or "").strip()
     if not sid:
         return 0
+    if not _jobs_table_has_session_column():
+        return 0
     try:
         with db() as conn:
             cur = conn.execute(
@@ -1480,6 +1487,34 @@ def clear_session_job_refs(session_id: str) -> int:
         # 清引用失败不阻断会话删除 —— 会话数据本身才是要删的。
         return 0
 
+
+
+#: 缓存「当前 jobs 库有没有 session_id 列」。
+#:
+#: 【为什么需要缓存】
+#: 正常路径下 init_db() 会保证这一列存在（迁移）。
+#: 但**测试替身**（tests/test_agent_oneshot_e2e.py 里的 FakeServer）会自己
+#: 建一张 12 列的 jobs 表且不调 init_db() —— 服务端去 ALTER 别人的库
+#: 是不可接受的副作用。
+#: 所以这里改成「查询前先看有没有这一列，没有就不按它过滤」，
+#: 并把判断结果按库路径缓存（同一个进程里查一次就够）。
+_JOBS_HAS_SESSION_COL: dict[str, bool] = {}
+
+
+def _jobs_table_has_session_column() -> bool:
+    """当前 jobs 库有没有 session_id 列（按 DB_PATH 缓存结果）。"""
+    key = str(DB_PATH)
+    cached = _JOBS_HAS_SESSION_COL.get(key)
+    if cached is not None:
+        return cached
+    try:
+        with db() as conn:
+            rows = conn.execute("PRAGMA table_info(jobs)").fetchall()
+        has = any(str(r[1]) == "session_id" for r in rows)
+    except Exception:
+        has = False
+    _JOBS_HAS_SESSION_COL[key] = has
+    return has
 
 
 def list_jobs_for_session(session_id: str) -> list[dict]:
@@ -1497,9 +1532,21 @@ def list_jobs_for_session(session_id: str) -> list[dict]:
 
     返回结构与 /api/jobs 一致（row_to_job 的形状），
     外加 session_id 与 batches —— 前端可以直接渲染，不用再拼。
+
+    【兼容没有 session_id 列的库 —— 2026-11-11】
+    老库 / 测试替身的 jobs 表可能没有这一列。这种情况下
+    **返回空列表**（而不是抛异常）——
+    因为「查不到归属」等价于「这个会话没有产物」。
+    抛异常会让整个 /api/agent/sessions/{id} 500，
+    前端连对话历史都读不回来（实测一次性路径的工具块因此没渲染）。
     """
     sid = str(session_id or "").strip()
     if not sid:
+        return []
+    if not _jobs_table_has_session_column():
+        # 这张库没有归属信息 -> 无法按会话过滤 -> 当作「没有产物」。
+        # 不抛异常：调用方是 /api/agent/sessions/{id}，
+        # 抛了会让**整个会话详情** 500（历史消息都读不回来）。
         return []
     with db() as conn:
         rows = conn.execute(

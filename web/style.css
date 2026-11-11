@@ -1920,7 +1920,16 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 
 /* 头部：菜单按钮 + 文案 + 操作区 */
-.ag-head { position: relative; }
+.ag-head {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 16px 22px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  /* 定位上下文：会话侧栏与遮罩是 position:absolute，
+     没有这一行它们会锚到**视口**而不是 Agent 页 ——
+     抽屉就会盖住整个窗口（含顶栏），而不是只覆盖 Agent 区域。 */
+  position: relative;
+}
 .ag-menu {
   flex: 0 0 auto; width: 34px; height: 34px; font-size: 16px; cursor: pointer;
   border: 1px solid var(--border); border-radius: 8px; background: #fff;
