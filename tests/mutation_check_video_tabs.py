@@ -106,6 +106,14 @@ MUTATIONS = [
         '    return ""',
         "TestCategoryModelMapping::test_resolve_mode_falls_back_to_first_model",
     ),
+    (
+        "把 applyDefault 的 onSelect 触发删掉（持久化只存不切）"
+        "——「持久化必须真的切过去」断言必须红",
+        "web/video-nav.js",
+        "    if (model && onSelect) {\n      onSelect(category, model.key, model.mode, model);\n    }",
+        "    if (model && false) {\n      onSelect(category, model.key, model.mode, model);\n    }",
+        "TestFrontendWiring::test_persisted_selection_is_applied_not_just_stored",
+    ),
 ]
 
 

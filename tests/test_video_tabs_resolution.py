@@ -485,13 +485,22 @@ class TestFrontendWiring(unittest.TestCase):
         js = self._read("web/video-nav.js")
         i = js.find("function applyDefault")
         self.assertNotEqual(i, -1, "找不到 applyDefault")
-        body = js[i:i + 2000]
-        # 恢复时不能是 silent
-        self.assertIn("select(category, modelKey, { silent: true })", body)
-        # 之后必须触发 onSelect
-        self.assertIn("onSelect(", body,
-                      "恢复持久化选择时必须触发 onSelect（否则应用不会切过去）")
-        self.assertIn("applyDefault", js)
+        # 只截取函数体（到下一个顶层 function 定义为止）
+        j = js.find("\n  function ", i + 10)
+        body = js[i:j if j > 0 else i + 2000]
+
+        # 恢复时先 silent 选中
+        self.assertIn("select(category, modelKey, { silent: true })", body,
+                      "applyDefault 应该先 silent 选中")
+        # 【关键判据】之后必须**真的调用** onSelect 回调 ——
+        # 只声明 onSelect 变量或写个注释都不算。
+        # 变异测试：把 `if (model && onSelect)` 改成 `if (model && false)`
+        #            -> 本断言必须红。
+        self.assertRegex(
+            body,
+            r"if\s*\(\s*model\s*&&\s*onSelect\s*\)\s*\{[^}]*onSelect\s*\(",
+            "applyDefault 恢复持久化选择时必须真的调用 onSelect("
+            "（只把值存进 navState 不算 —— 应用不会切过去）")
 
     def test_app_js_wires_the_two_level_nav(self):
         js = self._read("web/app.js")
