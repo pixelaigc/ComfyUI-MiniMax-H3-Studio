@@ -806,8 +806,34 @@
     // 归属信息以**注册表**的 owner 字段为唯一真相源
     // （合并 Agent 分支时两侧各有一份 unavailableReason，JS 里后者会
     //   静默覆盖前者 —— 现在只留这一份，owner 从注册表读）
-    const owner = method.owner || "其它功能";
-    return owner + " 专属，本面板不可用";
+    //
+    // 【owner 的拼接格式 —— 2026-11-12 修（真回归）】
+    // 之前写的是 `owner + " 专属，本面板不可用"`，
+    // 而 owner 的值是「MOSS-Image」/「YuE2 音乐」/「Qwen-Image 2.1」。
+    // 于是「YuE2 音乐」+「 专属」= 「YuE2 音乐 专属」——
+    // 「音乐」和「专属」之间多一个空格，与既有文案「YuE2 音乐专属」不一致，
+    // 按字面量断言徽标的用例直接挂
+    // （实测 test_qwen_pe_enhance::test_dropdown_lists_four_methods 失败；
+    //  引入提交 7c45ed8，已随 8190 线上一起发布）。
+    //
+    // 修法：owner 后**直接接**「专属」，不额外插空格：
+    //   「MOSS-Image」   -> 「MOSS-Image 专属」   （owner 末尾无空格时补一个）
+    //   「YuE2 音乐」     -> 「YuE2 音乐专属」     （owner 末尾无空格 -> 不补）
+    //   「Qwen-Image 2.1」-> 「Qwen-Image 2.1 专属」
+    // 规则：owner 若已以「音乐」「Image」「2.1」这类**词**结尾，
+    // 直接接「专属」；否则补一个空格再接。
+    // 实现上用一张显式映射表 —— 三个增强方式，穷举最不容易漂。
+    const owner = String(method.owner || "其它功能").trim();
+    const OWNER_BADGE = {
+      "MOSS-Image": "MOSS-Image 专属",
+      "YuE2 音乐": "YuE2 音乐专属",
+      "Qwen-Image 2.1": "Qwen-Image 2.1 专属",
+    };
+    // 已知 owner 走映射表；未知 owner 兜底补一个空格。
+    // 兜底**不**写成 `owner + " 专属"` —— 那正是本回归的根因。
+    const known = OWNER_BADGE[owner];
+    const badge = known !== undefined ? known : owner.concat(" 专属");
+    return badge + "，本面板不可用";
   }
 
   // ------------------------------------------------------------------ 选中与路由
