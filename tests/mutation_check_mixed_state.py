@@ -71,6 +71,7 @@ MUTATIONS = [
         '    if (src_w, src_h) == (dst_w, dst_h):\n'
         '        return ""\n'
         '    return ("") or (f"接续失败：上一段是 {src_w}×{src_h}，本段是 {dst_w}×{dst_h} —— "',
+        ["tests/test_continuation_mixed_state.py"],
     ),
     (
         "「复用参数」不再清接续上下文（混合态的根因）",
