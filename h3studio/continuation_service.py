@@ -41,15 +41,16 @@ from . import continuation as cont
 
 
 # ------------------------------------------------------------------
-# 链 id
+# 落盘坐标（服务层的公开入口）
 # ------------------------------------------------------------------
+# 【为什么这里有一层薄包装】协议层（continuation.py）是**规则**的单一真源，
+# 但调用方（server / 工作流拼装 / 测试）大多拿的是「任务参数」而不是
+# 裸的 info 字典。这层包装把「怎么从参数拿到坐标」收在一处，
+# 免得每个调用方各写一遍取字段的代码（取错字段 = 写到 A 目录读 B 目录）。
 def chain_run_id(chain_id: str) -> str:
-    """链 id -> Relay-Kit 的 run_id（落盘目录名）。
+    """链 id -> Relay-Kit 的 run_id（**链首段**的落盘目录名）。
 
-    规则本身在 continuation.py（协议层）—— 单一真源，
-    工作流拼装与服务层必须用**同一个**规则，否则落盘与读回会对不上。
-
-    ⚠️ 只用于**链首段**（第 0 段）。第 1 段起用 segment_run_id_of。
+    ⚠️ 只用于链首段（第 0 段，外观锚）。第 1 段起用 segment_run_id。
     """
     return cont.chain_run_id(chain_id)
 
@@ -57,7 +58,8 @@ def chain_run_id(chain_id: str) -> str:
 def segment_run_id(job_id: str) -> str:
     """一个段的 Relay-Kit run_id（落盘目录名）。
 
-    规则在 continuation.py（协议层）—— 单一真源。
+    每段一个目录 —— 目录名由**该段自己的任务 id** 派生，
+    兄弟分支各写各的目录，结构上不可能互相覆盖。
     """
     return cont.segment_run_id(job_id)
 
@@ -217,7 +219,6 @@ def stage_exists(run_id: str, stage_index: int) -> bool:
     return cont.stage_file_exists(comfy_output_dir(), run_id, stage_index)
 
 
-
 # ------------------------------------------------------------------
 # 链状态（从任务记录反推）
 # ------------------------------------------------------------------
@@ -252,19 +253,6 @@ def next_stage_index(params: dict) -> int:
         return 0
 
 
-def chain_run_id_of(params: dict) -> str:
-    """本段所属链的 run_id（**链首段**的落盘目录名）。
-
-    ⚠️ 只有链首段（第 0 段）用它。第 1 段起用 latent_coords_of。
-    保留这个函数是因为「外观锚」要读链首段那一份。
-    """
-    info = chain_info(params)
-    chain_id = str(info.get("chain_id") or "").strip()
-    if not chain_id:
-        return ""
-    return chain_run_id(chain_id)
-
-
 def latent_coords_of(params: dict) -> tuple[str, int]:
     """本段的潜空间坐标 `(run_id, 文件里的段号)`。
 
@@ -272,11 +260,6 @@ def latent_coords_of(params: dict) -> tuple[str, int]:
     必须用同一个，否则会「写到 A 目录、从 B 目录读」。
     """
     return cont.latent_coords(chain_info(params))
-
-
-def latent_run_id_of(params: dict) -> str:
-    """本段潜空间所在目录名（空 = 这段没有可接续的潜空间）。"""
-    return latent_coords_of(params)[0]
 
 
 # ------------------------------------------------------------------
