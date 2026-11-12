@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import random
 
+from . import continuation as cont
 from . import video_models as vmodels
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
@@ -264,38 +265,230 @@ def build_t2v_panel(params: dict) -> dict:
     twopass = params.get("twopass") or {}
     use_twopass = bool(twopass.get("enabled"))
 
+    # ---- 接续（continuation）----
+    #
+    # 【插在哪】拷贝桥改的是**采样器的 latent 输入**，所以它必须接在
+    # `latent_ref` 与采样器**之间**；裁重叠（TrimAV）改的是 **decode 之后
+    # 的像素帧**，所以它必须接在 VAEDecode 之后。两头都不能接错。
+    #
+    # 两种接续形态：
+    #   * 首段（无上游）：latent 直通采样器；采样器的输出**落盘**成接力棒。
+    #   * 续接段（有上游）：读回上游潜空间 -> 拷贝桥（逐位拷贝尾段 + 噪声掩码）
+    #     -> 采样器；采样器的输出**落盘**成下一段的接力棒；
+    #     decode 之后经裁重叠（裁掉钉住区）再合成视频。
+    #
+    # 【为什么二采不走这条路】见 h3studio/continuation.py 的模块说明：
+    # 二采的潜空间与标准采样路径不同源，接续会位移。服务端在
+    # continuation.continuation_allowed() 里已经拦掉了，这里再兜一次底。
+    cont_state = _continuation_state(params)
+    latent_in_ref = latent_ref
+    cond_ref = ["105:104", 0]
+    trim_ref = None
+
+    if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
+        # ---- 续接段：读回上游潜空间 -> 拷贝桥 ----
+        #
+        # 【落盘目录】用 Relay-Kit 自己的目录结构
+        # （ComfyUI output/relay_kit/<run_id>/stage_<N>.safetensors）：
+        #   * H3RelayLatentSave / H3RelayLatentLoad 是成对的一对，
+        #     段号语义由节点自己管（本段号 N -> 读回第 N-1 段）；
+        #   * 外观锚（ref_anchor_stage=0）会自动去读同一个 run_id 的
+        #     stage_00000 —— 换成别的目录结构这个自动读取就断了。
+        # run_id 带 h3studio_ 前缀，避免和用户手工跑 Relay-Kit 建的目录撞车。
+        p["300:load"] = {
+            "inputs": {
+                "run_id": cont_state["run_id"],
+                # 本段段号 N -> 节点读回第 N-1 段（与 Relay-Kit 段号语义一致）
+                "stage_index": cont_state["stage_index"],
+                "explicit_path": "",
+            },
+            "class_type": "H3RelayLatentLoad",
+            "_meta": {"title": "接续·读回上游潜空间"},
+        }
+        p["300:bridge"] = {
+            "inputs": {
+                "latent": latent_ref,
+                "context_frames": cont_state["context_frames"],
+                "context_latent": ["300:load", 0],
+                # hard = 钉住区零重绘（真续接唯一推荐档）。
+                "mask_mode": "hard",
+                "pin_audio": True,
+                # 段号 >= 1 且没有 context_latent 时拷贝桥会 raise ——
+                # 我们永远接了 context_latent，所以段号给真实值即可。
+                "stage_index": cont_state["stage_index"],
+                "run_id": cont_state["run_id"],
+                # 外观锚：读第 0 段当全局锚，防长程漂移。
+                "ref_anchor_stage": 0 if cont_state["stage_index"] > 0 else -1,
+                "ref_anchor_frames": cont_state["anchor_frames"],
+                # 第 4 路：conditioning 钉帧（管取景/构图）。
+                "conditioning": cond_ref,
+            },
+            "class_type": "H3RelayCopyBridge",
+            "_meta": {"title": "接续·拷贝桥（零重编码潜空间桥）"},
+        }
+        latent_in_ref = ["300:bridge", 0]
+        cond_ref = ["300:bridge", 3]
+        trim_ref = ["300:bridge", 2]
+
     if use_twopass:
         # 二采路径的 CFG 来自 twopass.cfg（面板上二采区块里的真控件），
         # 没给才回落到模型默认值。
         samples_ref = _twopass_block(p, model_ref, steps, scheduler, sampler, seed,
                                      cfg, twopass, width, height, duration,
-                                     latent_ref)
+                                     latent_in_ref)
     else:
         p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
                    "_meta": {"title": "噪波"}}
-        p["16"] = {"inputs": {"model": model_ref, "conditioning": ["105:104", 0]},
+        p["16"] = {"inputs": {"model": model_ref, "conditioning": cond_ref},
                    "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
         p["14"] = {"inputs": {"noise": ["15", 0], "guider": ["16", 0],
                                "sampler": ["17", 0], "sigmas": ["9", 0],
-                               "latent_image": latent_ref},
+                               "latent_image": latent_in_ref},
                    "class_type": "SamplerCustomAdvanced", "_meta": {"title": "采样"}}
         samples_ref = ["14", 0]
 
     # ---- 解码 + 合成 + 保存 ----
     prefix = f"h3studio/t2v_{job_id}"
+
     p["10"] = {"inputs": {"samples": samples_ref, "vae": ["105:11", 0]},
                "class_type": "VAEDecode", "_meta": {"title": "解码视频"}}
     p["24"] = {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader",
                "_meta": {"title": "音频 VAE"}}
     p["23"] = {"inputs": {"samples": samples_ref, "vae": ["24", 0]},
                "class_type": "VAEDecodeAudio", "_meta": {"title": "解码音频"}}
-    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": ["10", 0],
-                          "audio": ["23", 0]},
+
+    # ---- 裁重叠：去掉钉住区（音画同裁，保住 A/V 同步）----
+    if trim_ref is not None:
+        p["300:trim"] = {
+            "inputs": {
+                "images": ["10", 0],
+                "audio": ["23", 0],
+                "trim_frames": trim_ref,
+                "fps": 24,
+                # 沉降帧保持 0：只裁钉住区。Relay-Kit 实测「裁沉降」才是
+                # 缝处跳帧的源头（裁 0 帧跳 0.020 几乎无感 / 裁 16 帧 0.055）。
+                "settle_frames": 0,
+                "seam_ghost": 0,
+            },
+            "class_type": "H3RelayTrimAV",
+            "_meta": {"title": "接续·裁重叠（裁掉钉住区，音画同裁）"},
+        }
+        video_images_ref = ["300:trim", 0]
+        video_audio_ref = ["300:trim", 1]
+    else:
+        video_images_ref = ["10", 0]
+        video_audio_ref = ["23", 0]
+
+    # ---- 落盘接力棒 ----
+    # 采样器的输出（latent）落盘，供下一段读回。
+    # 节点名 H3RelayLatentSave：把本段 AV latent 存成文件，它是下一段的「接力棒」。
+    if cont_state["enabled"]:
+        p["300:save"] = {
+            "inputs": {
+                "latent": samples_ref,
+                "run_id": cont_state["run_id"],
+                "stage_index": cont_state["stage_index"],
+                "note": f"h3studio job {job_id}",
+            },
+            "class_type": "H3RelayLatentSave",
+            "_meta": {"title": "接续·落盘本段潜空间（下一段的接力棒）"},
+        }
+
+    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": video_images_ref,
+                          "audio": video_audio_ref},
                "class_type": "CreateVideo", "_meta": {"title": "合成视频"}}
     p["92"] = {"inputs": {"filename_prefix": prefix, "format": "auto", "codec": "auto",
                           "video": ["91", 0]},
                "class_type": "SaveVideo", "_meta": {"title": "保存视频"}}
     return p
+
+
+def _continuation_state(params: dict) -> dict:
+    """从任务参数算出「这次要不要接续、接谁的第几段」。
+
+    返回：
+      {
+        "enabled":        本次任务是否参与接续（会落盘接力棒）,
+        "has_source":     本次是否是「续接段」（有上游潜空间）,
+        "run_id":         Relay-Kit 的片子名（= 链 id）,
+        "stage_index":    本段段号（第 1 段 = 0）,
+        "explicit_path":  上游潜空间的绝对路径（有上游时必填）,
+        "context_frames": 钉住窗口（像素帧）,
+        "anchor_frames":  外观锚帧数,
+      }
+
+    【参数来源】前端回填的接续上下文会带 `continuation` 字段：
+      {
+        "chain_id":    链 id（同一链的所有段共用）,
+        "stage_index": 本段段号,
+        "source_job":  上游任务 id,
+        "source_segment": 上游段号,
+        "context_frames": 钉住窗口,
+      }
+    没有这个字段 = 不接续（普通生成）。
+    """
+    info = (params or {}).get("continuation")
+    if not isinstance(info, dict) or not info:
+        return {"enabled": False, "has_source": False, "run_id": "",
+                "stage_index": 0, "explicit_path": "", "context_frames": 0,
+                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
+
+    chain_id = str(info.get("chain_id") or "").strip()
+    if not chain_id:
+        return {"enabled": False, "has_source": False, "run_id": "",
+                "stage_index": 0, "explicit_path": "", "context_frames": 0,
+                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
+
+    # run_id 的规则在 continuation.chain_run_id（协议层，单一真源）——
+    # 落盘（H3RelayLatentSave）与读回（H3RelayLatentLoad + 外观锚自动读）
+    # 必须用同一个，否则会写到 A 目录、从 B 目录读。
+    run_id = cont.chain_run_id(chain_id)
+
+    try:
+        stage_index = int(info.get("stage_index", 0))
+    except (TypeError, ValueError):
+        stage_index = 0
+    stage_index = max(0, stage_index)
+
+    # 钉住窗口：必须落在 5+17k 网格上，否则拷贝桥切不出来。
+    raw_window = info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES
+    try:
+        window = int(raw_window)
+    except (TypeError, ValueError):
+        window = cont.DEFAULT_CONTEXT_FRAMES
+    if not cont.valid_context_frames(window):
+        window = cont.snap_context_frames(window) or cont.DEFAULT_CONTEXT_FRAMES
+
+    source_job = str(info.get("source_job") or "").strip()
+    try:
+        source_segment = int(info.get("source_segment", 0))
+    except (TypeError, ValueError):
+        source_segment = 0
+
+    has_source = bool(source_job)
+    # 显式路径：上游潜空间文件在 ComfyUI output 下的相对路径。
+    # 服务端在提交前会把它算成绝对路径写进这里。
+    explicit_path = str(info.get("explicit_path") or "").strip()
+
+    anchor_frames = info.get("anchor_frames")
+    try:
+        anchor_frames = int(anchor_frames)
+    except (TypeError, ValueError):
+        anchor_frames = cont.DEFAULT_CONTEXT_FRAMES
+    if not cont.valid_context_frames(anchor_frames):
+        anchor_frames = cont.snap_context_frames(anchor_frames) or cont.DEFAULT_CONTEXT_FRAMES
+
+    return {
+        "enabled": True,
+        "has_source": has_source,
+        "run_id": run_id,
+        "stage_index": stage_index,
+        "explicit_path": explicit_path,
+        "context_frames": window,
+        "anchor_frames": anchor_frames,
+        "source_job": source_job,
+        "source_segment": source_segment,
+    }
 
 
 def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,

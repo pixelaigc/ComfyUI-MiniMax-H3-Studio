@@ -1,0 +1,106 @@
+{
+  "base": "http://127.0.0.1:8199",
+  "steps": [
+    {
+      "step": "capability",
+      "available": true,
+      "nodes": {
+        "H3RelayLatentSave": true,
+        "H3RelayLatentLoad": true,
+        "H3RelayCopyBridge": true,
+        "H3RelayTrimAV": true
+      },
+      "reason": ""
+    },
+    {
+      "step": "segment1_reused",
+      "job_id": "cc778e829faf"
+    },
+    {
+      "step": "gallery_375",
+      "continue_card": {
+        "jid": "cc778e829faf"
+      },
+      "diag": {
+        "all": 10,
+        "real": 10,
+        "capability": {
+          "available": true,
+          "reason": "",
+          "nodes": {
+            "H3RelayLatentSave": true,
+            "H3RelayLatentLoad": true,
+            "H3RelayCopyBridge": true,
+            "H3RelayTrimAV": true
+          }
+        }
+      }
+    },
+    {
+      "step": "drawer_opened_375",
+      "opened": true
+    },
+    {
+      "step": "after_continue_375",
+      "panelHidden": false,
+      "panelText": "\n      \n        接续上下文\n        清除\n      \n      \n        接续自生成库里的「cc778e829faf」（v-h3-studio-000016.mp4）\n      \n      当前累计时长12.75s\n      模型MiniMax-H3 FL2VA · 完整 int8（保真最高）固定加速 LoRATurbo 4 步 · ckpt850（工作流固定）注意力机制默认（PyTorch 稠密注意力）二采关闭输出尺寸768×448时长5.0s采样步数4采样器euler调度器simpleshift（视频）12.00shift（音频）3.00CFG1.00种子999\n      \n        提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。\n        生成结果会自动拼成完整视频。\n      ",
+      "hasClear": true,
+      "addButtons": [
+        "清除"
+      ],
+      "model": "fl2va_int8",
+      "width": 768,
+      "height": 448,
+      "steps": 4,
+      "prompt": ""
+    },
+    {
+      "step": "gallery_1280",
+      "continue_card": {
+        "jid": "cc778e829faf"
+      },
+      "diag": {
+        "all": 10,
+        "real": 10,
+        "capability": {
+          "available": true,
+          "reason": "",
+          "nodes": {
+            "H3RelayLatentSave": true,
+            "H3RelayLatentLoad": true,
+            "H3RelayCopyBridge": true,
+            "H3RelayTrimAV": true
+          }
+        }
+      }
+    },
+    {
+      "step": "after_continue_1280",
+      "panelHidden": false,
+      "panelText": "\n      \n        接续上下文\n        清除\n      \n      \n        接续自生成库里的「cc778e829faf」（v-h3-studio-000016.mp4）\n      \n      当前累计时长12.75s\n      模型MiniMax-H3 FL2VA · 完整 int8（保真最高）固定加速 LoRATurbo 4 步 · ckpt850（工作流固定）注意力机制默认（PyTorch 稠密注意力）二采关闭输出尺寸768×448时长5.0s采样步数4采样器euler调度器simpleshift（视频）12.00shift（音频）3.00CFG1.00种子999\n      \n        提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。\n        生成结果会自动拼成完整视频。\n      ",
+      "hasClear": true,
+      "addButtons": [
+        "清除"
+      ],
+      "model": "fl2va_int8",
+      "width": 768,
+      "height": 448,
+      "steps": 4,
+      "prompt": ""
+    }
+  ],
+  "console_errors": [],
+  "failed_requests": [],
+  "shots": [
+    "evidence/continuation/cont-375-01-gallery.png",
+    "evidence/continuation/cont-375-02-backfilled.png",
+    "evidence/continuation/cont-375-02b-context-panel.png",
+    "evidence/continuation/cont-375-02c-left-panel.png",
+    "evidence/continuation/cont-375-03-prompt.png",
+    "evidence/continuation/cont-1280-01-gallery.png",
+    "evidence/continuation/cont-1280-02-backfilled.png",
+    "evidence/continuation/cont-1280-02b-context-panel.png",
+    "evidence/continuation/cont-1280-02c-left-panel.png",
+    "evidence/continuation/cont-1280-03-prompt.png"
+  ]
+}

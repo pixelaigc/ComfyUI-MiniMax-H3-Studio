@@ -2404,6 +2404,17 @@ $("#genBtn").addEventListener("click", async () => {
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+    // 【接续】把接续上下文一起提交（服务端据此校验并算段号）。
+    //
+    // 【为什么这里原样透传而不自己算段号】前端回填的 continuation
+    // 描述的是**上一段**；本段是新的一段，段号必须 +1 —— 那只能由
+    // 服务端按任务记录算（前端改个数字就能让接缝错位）。
+    if (window.Continuation && window.Continuation.state) {
+      const ctx = window.Continuation.state().current;
+      if (ctx && ctx.continuation) {
+        params.continuation = ctx.continuation;
+      }
+    }
   } else if (mode === "flf" || mode === "r2v") {
     // 【2026-11-11】首尾帧 / 参考生视频：采样参数（采样器 / 调度器 / shift）
     // 与文生视频同链路，同样是真参数。CFG 在 H3 标准路径固定 1.0
@@ -3200,6 +3211,7 @@ function jobCard(job) {
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
+      ${window.Continuation && window.Continuation.canShowButton(job) ? `<button data-act="continue" title="${escapeHtml(window.Continuation.buttonTitle(job))}">⏭ 接续</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
@@ -3313,6 +3325,16 @@ function jobCard(job) {
       const name = url.split("/").pop();
       lightboxShow(url, name, el.naturalWidth, el.naturalHeight);
     });
+  });
+  // 「接续」：把这一段的全部配置回填到左侧配置区（提示词除外），
+  // 用户写下一段提示词即可继续生成。
+  //
+  // 【与「复用参数」的区别】复用参数把提示词也带过去（独立重生成一段）；
+  // 接续**不带**提示词 —— 上一段被潜空间桥真正接上，拼出完整视频。
+  card.querySelector('[data-act="continue"]')?.addEventListener("click", () => {
+    if (window.Continuation && typeof window.Continuation.start === "function") {
+      window.Continuation.start(job);
+    }
   });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
     // 找到对应模式侧栏项并切换
@@ -4907,3 +4929,27 @@ setInterval(() => {
   if (state.page !== "system") return;
   scheduleRefresh("hardware", () => refreshHardware());
 }, 3000);
+
+// ---------- 接续生成（continuation）----------
+//
+// web/continuation.js 需要访问三样东西：
+//   * state            —— 时长 / 步数在全局 state 里（不在 VIDEO_PANEL 里）
+//   * activateVideoMode —— 切换到文生视频面板
+//   * refreshJobs      —— 回填后刷新卡片（「接续」按钮的显隐依赖卡片数据）
+//
+// 这里集中暴露，避免 continuation.js 去猜内部结构。
+// 【为什么不直接把 continuation.js 合并进 app.js】app.js 已 3800+ 行；
+// 接续是一条独立链路（按钮 -> 取上下文 -> 回填 -> 展示 -> 清除），
+// 独立成模块才能单独测，也才不至于和「复用参数」逻辑搅在一起。
+window.__h3State = state;
+window.activateVideoMode = activateVideoMode;
+window.refreshJobs = refreshJobs;
+
+// 接续能力探测：Relay-Kit 节点在不在。
+//
+// 【为什么不据此决定按钮显隐】按钮显隐完全听服务端的逐任务判定
+// （continuation_info.can_continue）—— 那是权威，且没有异步竞态。
+// 能力探测只用于「本机到底缺不缺节点」的诊断信息。
+if (window.Continuation && typeof window.Continuation.loadCapability === "function") {
+  window.Continuation.loadCapability();
+}

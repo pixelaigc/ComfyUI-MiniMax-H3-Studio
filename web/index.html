@@ -560,6 +560,19 @@
       </details>
     </div>
 
+    <!-- 接续上下文（只读回填区）
+         【只能从生成库添加】这里**没有任何**「添加接续」的入口 ——
+         用户必须在右侧生成库点某个视频卡片的「接续」按钮，
+         上下文才会出现在这里。前端刻意不提供手动添加入口：
+         接续上下文包含潜空间落盘位置这类**服务端才知道**的信息，
+         手动填必然对不上。
+
+         【为什么放在提示词正上方】接续的用户动作是「写下一段提示词」。
+         放在面板顶部（尺寸预设上面）的话，用户点完「接续」看不到它 ——
+         实测面板滚动位置让它落在可视区外（y = -1410）。
+         放在提示词上方：点完就看见，且正好引导「在这里写下一段」。 -->
+    <div class="continuation-panel" id="continuationPanel" hidden></div>
+
     <div class="field prompt-field" id="promptField">
       <div class="field-label">提示词 <span class="prompt-badge" id="promptEnhancedBadge" hidden>已增强</span>
         <button type="button" class="ph-open-btn" data-ph-open title="查看这个面板用过的历史提示词">历史</button>
@@ -1205,6 +1218,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
 <script src="/static/video-panel.js?v=videopanel1"></script>
+<script src="/static/continuation.js?v=continuation1"></script>
 <script src="/static/video-nav.js?v=videonav1"></script>
 <script src="/static/app.js?v=enh-unify2"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>

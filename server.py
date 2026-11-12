@@ -87,6 +87,8 @@ from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
 from h3studio import job_meta
+from h3studio import continuation as cont
+from h3studio import continuation_service as cont_service
 # 合并说明：video_categories（video-tabs 分支）、comfy_models
 # （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
 # 独立模块，三条 import 都保留。
@@ -339,6 +341,9 @@ def row_to_job(r):
         # 现在由服务端按任务真实参数算好摘要下发，前端只渲染这一份，
         # 「面板所选 == 落库记录 == 卡片显示」三者必然同源。
         "model_info": job_meta.summarize(mode, job_params),
+        # 【2026-11-12 新增】接续状态（能否被接续 / 为什么不能 / 累计帧数）。
+        # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
+        "continuation_info": cont_service.continuation_state(mode, job_params, r["id"]),
         "status": r["status"],
         "progress": r["progress"],
         "progress_text": r["progress_text"],
@@ -1100,6 +1105,14 @@ class Worker:
                                 # 卡片要显示真实输出，而不是请求值（请求值可能
                                 # 被画布上限 / 放大链 / 模型限制改写过）。
                                 annotate_outputs_with_size(saved)
+                                # 【2026-11-12 新增】接续：把本段登记进链，
+                                # 并拼接出**完整视频**（上一段 + 本段）。
+                                # 失败**不影响**本段本身的产物 —— 拼接是附加产物。
+                                try:
+                                    saved = await self._finalize_continuation(
+                                        job_id, mode, params, saved)
+                                except Exception as ce:
+                                    print(f"[worker] 接续拼接失败（不影响本段产物）: {ce}")
                                 with db() as conn:
                                     conn.execute(
                                         "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
@@ -1129,6 +1142,66 @@ class Worker:
             if self.current == job_id:
                 self.current = None
 
+
+    async def _finalize_continuation(self, job_id: str, mode: str, params: dict,
+                                     saved: list[dict]) -> list[dict]:
+        """接续收尾：登记本段 + 拼接**完整视频**。
+
+        用户需求第 6 条：「最终媒体库中得到的是**完整视频**
+        （上一段 + 本段完整长度）」。所以每接续一段，都要产出
+        一个包含**整条链**的完整视频。
+
+        返回加了「完整视频」条目的产物列表。
+
+        【为什么拼接失败不影响本段产物】本段视频本身是好的，
+        拼接只是附加产物。拼接失败（比如 ffmpeg 不可用）时，
+        本段仍然要出现在生成库里 —— 只是没有完整视频。
+        """
+        if mode != "t2v":
+            return saved
+        info = cont_service.chain_info(params)
+        if not info:
+            return saved
+
+        video = next((o for o in saved if o.get("kind") == "video"), None)
+        if not video:
+            return saved
+
+        chain_id = str(info.get("chain_id") or "")
+        try:
+            stage = int(info.get("stage_index", 0))
+        except (TypeError, ValueError):
+            stage = 0
+        if not chain_id:
+            return saved
+
+        # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
+        segment_rel = str(video.get("file") or "")
+
+        # 链上已有的分段列表：从上游任务继承
+        segments = await asyncio.to_thread(
+            _chain_segments, chain_id, stage, segment_rel)
+        # 把本段写进链（供下一段继承）
+        await asyncio.to_thread(_append_chain_segment, chain_id, stage,
+                                 segment_rel, job_id)
+
+        # 只有**续接段**才需要拼完整视频（第 0 段本身就是完整视频）
+        if stage <= 0:
+            return saved
+
+        full = await asyncio.to_thread(_concat_chain_video, segments, chain_id)
+        if not full:
+            return saved
+        full_rel = full.relative_to(OUT_DIR).as_posix()
+        annotate_outputs_with_size([{"kind": "video", "file": full_rel,
+                                     "name": full.name}])
+        # 完整视频放在产物列表**前面** —— 生成库卡片取第一个视频显示，
+        # 用户看到的第一眼就该是完整视频。
+        out = [{"kind": "video", "file": full_rel, "name": full.name,
+                "is_full": True}]
+        out.extend(saved)
+        print(f"[worker] 接续完整视频: {full_rel} ({len(segments)} 段拼接)")
+        return out
 
     def _has_batches(self, job_id: str) -> bool:
         with db() as conn:
@@ -1529,11 +1602,232 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     return out, ""
 
 
+def _chain_segments(chain_id: str, stage: int, current_rel: str) -> list[str]:
+    """取一条链到目前为止的全部分段视频（相对 OUT_DIR 的路径，按段号排序）。
+
+    链的分段存在**链首段任务**的 params 里 —— 链首段是这条链的
+    「账本」。每接续一段就把本段追加进去。
+
+    为什么用链首段的 params 存账本：链首段的任务 id 就是 chain_id，
+    永远存在（除非用户删了它）；而每段的 params 里只记「我是第几段」。
+    """
+    with db() as conn:
+        row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                           (chain_id,)).fetchone()
+    if not row:
+        return [current_rel] if current_rel else []
+    params = json.loads(row["params"] or "{}")
+    info = cont_service.chain_info(params)
+    segments = info.get("segments")
+    if not isinstance(segments, list):
+        segments = []
+    out = [str(s) for s in segments if isinstance(s, str) and s]
+    # 本段如果还没在账本里（刚跑完还没写），补在末尾
+    if current_rel and current_rel not in out:
+        out.append(current_rel)
+    return out
+
+
+def _append_chain_segment(chain_id: str, stage: int, segment_rel: str,
+                           job_id: str) -> None:
+    """把本段追加到链首段任务的账本里（供下一段继承）。"""
+    if not segment_rel:
+        return
+    with db() as conn:
+        row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                           (chain_id,)).fetchone()
+        if not row:
+            return
+        params = json.loads(row["params"] or "{}")
+        info = cont_service.chain_info(params)
+        if not info:
+            return
+        segments = info.get("segments")
+        if not isinstance(segments, list):
+            segments = []
+        segments = [str(s) for s in segments if isinstance(s, str) and s]
+        if segment_rel not in segments:
+            segments.append(segment_rel)
+        info["segments"] = segments
+        params["continuation"] = info
+        conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                     (json.dumps(params, ensure_ascii=False), chain_id))
+
+
+def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
+    """把链上的分段视频按序拼成**完整视频**。返回输出路径（失败返回 None）。
+
+    【为什么用 concat demuxer 而不是 filter_complex】
+    concat demuxer 直接拼流，不重新编码 —— 快、不掉画质。
+    分辨率/帧率不一致时 ffmpeg concat 会出问题，所以先探测第一段的
+    尺寸并统一（与 run_longfilm 的做法一致）。
+
+    【音画同步】分段视频各自已经是音画同裁的（TrimAV 裁重叠时
+    音画一起裁），所以直接拼接不会累积 A/V 偏移。
+    """
+    if not segments:
+        return None
+    paths: list[Path] = []
+    for rel in segments:
+        candidate = (OUT_DIR / rel).resolve()
+        try:
+            candidate.relative_to(OUT_DIR.resolve())
+        except ValueError:
+            continue
+        if candidate.is_file():
+            paths.append(candidate)
+    if not paths:
+        return None
+    if len(paths) == 1:
+        # 只有一段 —— 完整视频就是它自己
+        return paths[0]
+    if not FFMPEG:
+        print("[接续] 未找到 FFmpeg，无法拼接完整视频")
+        return None
+    width, height = _probe_video_size(paths[0])
+    list_path = DATA / f"concat-cont-{cont.sanitize_run_id(chain_id)}.txt"
+
+    def quote_concat(path: Path) -> str:
+        return str(path).replace("'", "'\\''")
+
+    try:
+        list_path.write_text(
+            "\n".join(f"file '{quote_concat(p)}'" for p in paths),
+            encoding="utf-8")
+        output_path = _next_output_path("video", ".mp4")
+        vf = (f"scale={width}:{height}:force_original_aspect_ratio=decrease:"
+              f"force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
+              f"setsar=1,fps={cont.FPS},format=yuv420p")
+        command = [FFMPEG, "-y", "-f", "concat", "-safe", "0",
+                   "-i", str(list_path), "-vf", vf,
+                   "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                   "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+                   "-movflags", "+faststart", str(output_path)]
+        result = subprocess.run(command, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, timeout=600,
+                                creationflags=CREATE_NO_WINDOW)
+        if result.returncode != 0:
+            message = result.stderr.decode("utf-8", errors="replace")[-800:]
+            print(f"[接续] 拼接失败: {message}")
+            if output_path.exists():
+                output_path.unlink()
+            return None
+        return output_path
+    except Exception as exc:
+        print(f"[接续] 拼接异常: {exc}")
+        return None
+    finally:
+        if list_path.exists():
+            try:
+                list_path.unlink()
+            except OSError:
+                pass
+
+
+def _prepare_continuation_params(params: dict) -> str:
+    """校验并补全任务的接续参数。返回错误信息（空串 = 通过）。
+
+    前端提交时带的 `continuation` 字段来自「接续上下文」回填 —— 它描述的是
+    **上一段**。本段是**新的一段**，所以段号要 +1、接力棒指向上一段。
+
+    服务端在这里做四件事：
+      1. 校验上游产物支持接续（不是二采 —— 二采潜空间不同源）；
+      2. 校验上游潜空间文件**真的在**（不在就明确报错）；
+      3. 算本段的段号（上游段号 + 1）；
+      4. 算累计帧数（用于拼接出完整视频的总长）。
+
+    【为什么不信任前端传来的 chain_id / stage_index】前端可以随便填。
+    段号与累计帧数必须由服务端按**任务记录**重算，否则用户改个数字
+    就能让接缝错位（表现为整体位移的接缝）。
+    """
+    info = params.get("continuation")
+    if not isinstance(info, dict) or not info:
+        return ""
+
+    source_job = str(info.get("source_job") or "").strip()
+    if not source_job:
+        return ("接续上下文缺少来源任务（source_job）—— "
+                "请在生成库里重新点一次「接续」。")
+
+    with db() as conn:
+        row = conn.execute("SELECT mode, params, status FROM jobs WHERE id=?",
+                           (source_job,)).fetchone()
+    if not row:
+        return f"接续的上游任务 {source_job} 不存在（可能已被删除）。"
+
+    source_mode = row["mode"]
+    source_params = json.loads(row["params"] or "{}")
+
+    # 上游必须支持接续
+    allowed, reason = cont.continuation_allowed(source_mode, source_params)
+    if not allowed:
+        return ("接续失败：" + reason)
+
+    # 上游的段号（权威值来自上游任务自己的记录，不是前端传的）
+    source_info = cont_service.chain_info(source_params)
+    try:
+        source_stage = int(source_info.get("stage_index", 0))
+    except (TypeError, ValueError):
+        source_stage = 0
+    source_chain = str(source_info.get("chain_id") or "").strip()
+
+    # 上游潜空间必须真的在
+    source_run_id = cont_service.chain_run_id_of(source_params)
+    if not source_run_id:
+        return ("接续的上游任务没有可用的潜空间（不是用「接续」生成的）—— "
+                "请改用「复用参数」重新生成一段。")
+    if not cont_service.stage_exists(source_run_id, source_stage):
+        return cont.missing_reason(cont_service.comfy_output_dir(),
+                                   source_run_id, source_stage)
+
+    # 本段的段号 = 上游段号 + 1
+    stage_index = source_stage + 1
+
+    # 链 id：链首段用**自己的任务 id**做链 id，后续段沿用上游的链 id。
+    # 这样「用户对完整视频再点接续」时链 id 不变、段号 +1 —— 无限接续。
+    chain_id = source_chain or source_job
+
+    # 钉住窗口 / 外观锚帧数：必须落在 5+17k 网格上
+    window = cont.snap_context_frames(
+        int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    if not window:
+        window = cont.DEFAULT_CONTEXT_FRAMES
+    anchor = cont.snap_context_frames(
+        int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    if not anchor:
+        anchor = cont.DEFAULT_CONTEXT_FRAMES
+
+    # 本段总帧数（17k+5 网格）与本段交付帧数（总帧数 - 钉住帧数）
+    duration = float(params.get("duration") or 5)
+    segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
+
+    # 累计帧数：上游已累计的 + 本段交付的
+    try:
+        chain_total = int(info.get("chain_total_frames") or 0)
+    except (TypeError, ValueError):
+        chain_total = 0
+    if not chain_total:
+        # 上游没给就按上游自己的记录重算
+        upstream_state = cont_service.continuation_state(source_mode,
+                                                         source_params, source_job)
+        chain_total = int(upstream_state.get("total_frames") or 0)
+
+    params["continuation"] = {
+        "chain_id": chain_id,
+        "stage_index": stage_index,
+        "source_job": source_job,
+        "source_segment": source_stage,
+        "context_frames": window,
+        "anchor_frames": anchor,
+        "chain_total_frames": chain_total,
+        "segment_frames": segment_total,
+    }
+    return ""
+
+
 def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     """
     建一条生成任务记录，返回 job_id。
-
-    【为什么要抽成独立函数】
     POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
     必须是**同一套**建任务逻辑 —— 两份实现必然漂移：
       * 生成类型（gen_type）写不进去 -> 任务列表标签变成「其它生成」
@@ -1555,6 +1849,33 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     asset_refs = params.get("asset_refs")
     if asset_refs:
         params["asset_refs"] = asset_refs
+
+    # ---- 接续链的建立 ----
+    #
+    # 【为什么每个 t2v 任务都要有链信息】用户需求：「每次生成自动把
+    # 可接续的潜空间文件落盘保存，与产物记录关联并可在生成库中识别」。
+    # 所以**每一个** t2v 任务都是一条链的第 0 段：它会落盘自己的潜空间，
+    # 从而可以被继续接续。
+    #
+    # 链 id = **自己的任务 id**（链首段）。后续段沿用上游的链 id，
+    # 于是「对完整视频再点接续」时链 id 不变、段号 +1 —— 无限接续。
+    #
+    # 二采不建链（潜空间不同源，见 h3studio/continuation.py）。
+    if mode == "t2v":
+        info = params.get("continuation")
+        if not isinstance(info, dict) or not info:
+            duration = float(params.get("duration") or 5)
+            segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
+            params["continuation"] = {
+                "chain_id": job_id,
+                "stage_index": 0,
+                "source_job": "",
+                "source_segment": -1,
+                "context_frames": cont.DEFAULT_CONTEXT_FRAMES,
+                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES,
+                "chain_total_frames": 0,
+                "segment_frames": segment_total,
+            }
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
     if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
@@ -2187,6 +2508,22 @@ async def api_create(request):
         payload.update(exc.extra or {})
         return web.json_response(payload, status=400)
 
+    # ---- 接续（continuation）----
+    #
+    # 前端提交时带 `continuation` 字段（来自「接续上下文」回填）。
+    # 服务端在这里**校验并补全**它：
+    #   * 校验上游潜空间真的在（不在就明确报错，不静默退化成普通生成）；
+    #   * 校验上游产物支持接续（不是二采）；
+    #   * 算出本段的段号、链 id、累计帧数。
+    #
+    # 【为什么不信任前端传来的 chain_id / stage_index】前端回填的内容
+    # 是**上一段**的链信息，本段是新的一段 —— 段号必须 +1、
+    # 接力棒必须指向上一段。这两件事只能由服务端算。
+    if mode == "t2v" and params.get("continuation"):
+        cont_error = _prepare_continuation_params(params)
+        if cont_error:
+            return web.json_response({"error": cont_error}, status=400)
+
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -2443,6 +2780,68 @@ async def api_get(request):
     return json_ok(job)
 
 
+# ------------------------------------------------------------------
+# 接续生成（continuation）
+# ------------------------------------------------------------------
+async def api_continuation_context(request):
+    """GET /api/jobs/{id}/continuation —— 取「接续上下文」（回填用）。
+
+    用户在生成库点「接续」-> 前端调这个接口 -> 服务端把该任务的
+    全部配置/参数/模型/素材（**提示词除外**）组装好下发 ->
+    前端回填到左侧配置区。
+
+    返回 ok:false 的情况有两种：
+      * 该产物不支持接续（二采 / 非视频 / 老任务）；
+      * 潜空间文件已不在。
+    两种都**明确说明原因** —— 不静默失败，也不让用户点了才知道。
+    """
+    jid = request.match_info["id"]
+    with db() as conn:
+        r = conn.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone()
+    if not r:
+        return web.json_response({"ok": False, "error": "找不到这个任务。"}, status=404)
+    mode = r["mode"]
+    params = json.loads(r["params"] or "{}")
+    context = cont_service.build_continuation_context(mode, params, jid)
+    # 附带来源信息（前端要显示「接续自哪条产物」）
+    outputs = json.loads(r["outputs"] or "[]")
+    video = next((o for o in outputs if o.get("kind") == "video"), None)
+    context["source"] = {
+        "job_id": jid,
+        "mode": mode,
+        "created_at": r["created_at"],
+        "video_file": (video or {}).get("file", ""),
+        "video_name": (video or {}).get("name", ""),
+        "prompt_preview": str(params.get("prompt") or "")[:80],
+    }
+    return json_ok(context)
+
+
+async def api_continuation_state(request):
+    """GET /api/continuation/state —— 接续功能是否可用（本机能力探测）。
+
+    前端用它决定「接续」入口要不要出现：
+      * Relay-Kit 节点没装 -> 整个功能不可用，入口隐藏；
+      * 节点在 -> 入口可用；具体某个产物能不能接续看卡片上的
+        continuation_info（服务端逐任务算好）。
+
+    【为什么要先刷新节点清单】节点清单是**懒加载**的（只有
+    /api/video-options 被调过才有值）。这里主动刷一次，
+    否则刚启动时前端会拿到空清单 -> 误判「功能不可用」。
+    """
+    await refresh_comfy_node_names(force=True)
+    have = {name: name in _COMFY_NODE_NAMES
+            for name in ("H3RelayLatentSave", "H3RelayLatentLoad",
+                         "H3RelayCopyBridge", "H3RelayTrimAV")}
+    available = all(have.values())
+    reason = ""
+    if not available:
+        missing = [name for name, ok in have.items() if not ok]
+        reason = ("本机 ComfyUI 里缺少接续所需的节点：" + "、".join(missing)
+                  + "（ComfyUI-H3-Relay-Kit）—— 接续功能不可用。")
+    return json_ok({"available": available, "nodes": have, "reason": reason})
+
+
 async def api_cancel(request):
     jid = request.match_info["id"]
     async with WORKER.submit_lock:
@@ -2529,6 +2928,16 @@ _VIDEO_PANEL_NODES = [
 # 永远为 False -> shift 节点永远不进工作流 -> 面板上的两个 shift 滑杆
     # 是**死控件**（能拖、但不生效）。这正是「假控件」纪律要禁止的。
     "MiniMaxH3SigmaShift",
+    # 【2026-11-12 新增】接续生成所需的 Relay-Kit 节点。
+    # 这四个节点是**接续功能的硬依赖**（读回潜空间 / 拷贝桥 / 裁重叠 / 落盘）。
+    # 放进这份名单 -> /api/continuation/state 能准确告诉前端
+    # 「本机具备接续能力」还是「缺节点，功能不可用」。
+    # 放在这里而不是另建一份名单：这份名单已经有并发探测 + 60 秒缓存
+    # + 失败不拖慢的机制，另建一份会重复那套逻辑。
+    "H3RelayLatentSave",
+    "H3RelayLatentLoad",
+    "H3RelayCopyBridge",
+    "H3RelayTrimAV",
 ]
 
 
@@ -5351,6 +5760,9 @@ def make_app():
     app.router.add_post("/api/longfilms", api_longfilm_create)
     app.router.add_get("/api/jobs", api_list)
     app.router.add_get("/api/jobs/{id}", api_get)
+    # 接续生成：上下文回填 + 功能可用性探测
+    app.router.add_get("/api/jobs/{id}/continuation", api_continuation_context)
+    app.router.add_get("/api/continuation/state", api_continuation_state)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
     app.router.add_get("/api/system", api_system)
