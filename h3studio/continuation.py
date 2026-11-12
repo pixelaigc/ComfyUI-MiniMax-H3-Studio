@@ -536,11 +536,6 @@ def summarize_context(context_params: dict) -> list[dict]:
 #
 # 所以这里只提供「按 Relay-Kit 规则算路径」的能力，
 # 具体 run_id 的推导在 continuation_service（它知道链 id -> run_id）。
-def relay_root(comfy_output_dir: str | os.PathLike) -> Path:
-    """Relay-Kit 的落盘根（ComfyUI output/relay_kit）。"""
-    return Path(comfy_output_dir) / "relay_kit"
-
-
 def stage_relpath(run_id: str, segment: int = 0) -> str:
     """段文件相对 ComfyUI output 的路径。
 

@@ -253,15 +253,6 @@ def next_stage_index(params: dict) -> int:
         return 0
 
 
-def latent_coords_of(params: dict) -> tuple[str, int]:
-    """本段的潜空间坐标 `(run_id, 文件里的段号)`。
-
-    唯一真源在 continuation.latent_coords —— 工作流拼装与服务层
-    必须用同一个，否则会「写到 A 目录、从 B 目录读」。
-    """
-    return cont.latent_coords(chain_info(params))
-
-
 # ------------------------------------------------------------------
 # 可接续性（唯一判定入口）
 # ------------------------------------------------------------------
