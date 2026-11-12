@@ -86,6 +86,7 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
+from h3studio import job_meta
 # 合并说明：video_categories（video-tabs 分支）、comfy_models
 # （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
 # 独立模块，三条 import 都保留。
@@ -329,6 +330,15 @@ def row_to_job(r):
         "gen_type_label": gen_type["label"],
         "gen_type_media": gen_type["media"],
         "params": job_params,
+        # 【2026-11-12 修】模型 / LoRA 的**权威摘要**（服务端算好的唯一真源）。
+        #
+        # 【为什么必须有它】用户实测报过：面板选了「混合版 + DMAD LoRA」，
+        # 卡片却恒显「H3 + ckpt850 · 4步」、LoRA 显示「空」——
+        # 因为前端 modelLabel() 读的是**遗留字段** p.model / p.lora，
+        # 而新面板提交的是 model_key / accel_loras。
+        # 现在由服务端按任务真实参数算好摘要下发，前端只渲染这一份，
+        # 「面板所选 == 落库记录 == 卡片显示」三者必然同源。
+        "model_info": job_meta.summarize(mode, job_params),
         "status": r["status"],
         "progress": r["progress"],
         "progress_text": r["progress_text"],
