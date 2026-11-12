@@ -2675,7 +2675,17 @@ function modelLabel(job) {
 }
 
 // 「LoRA」一行的文案。
-// **没有 LoRA 时返回空字符串** -> 前端不渲染这一行（而不是显示「空」）。
+//
+// 【语义 —— 2026-11-12】面板上有**两个** LoRA 概念：
+//   * 「加速 LoRA」下拉 —— **用户的选择**（可多选/单选，带强度）
+//   * 工作流固定的那枚 Turbo LoRA —— 常驻，不在可勾选列表里
+// 所以这一行要同时说清两件事：
+//   1. 用户选的那枚（带强度）；**没选时显示「空」**
+//      —— 需求原文「未选 LoRA 时才显示「空」」。
+//   2. 工作流固定的那枚（标明是「工作流固定」，免得被误读成用户选的）。
+//
+// 这样卡片显示与 ComfyUI prompt 里的 LoRA 节点**严格对应**：
+// prompt 里挂了几枚，这里就列几枚。
 function loraLabel(job) {
   const info = jobModelInfo(job);
   const parts = [];
@@ -2683,9 +2693,14 @@ function loraLabel(job) {
     parts.push(info.lora_strength != null
       ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
       : info.lora_label);
+  } else {
+    // 用户没额外选加速 LoRA —— 如实显示「空」（不是留白，也不是编一个名字）
+    parts.push("空");
   }
-  if (info.fixed_lora_label) parts.push(info.fixed_lora_label);
-  return parts.join(" + ");
+  if (info.fixed_lora_label) {
+    parts.push(`工作流固定：${info.fixed_lora_label}`);
+  }
+  return parts.join(" · ");
 }
 
 // 图像模式：模型版本的可读名（清单来自 /api/image-options）

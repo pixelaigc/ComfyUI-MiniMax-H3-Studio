@@ -173,7 +173,12 @@ class TestT2VModelLoraSummary(unittest.TestCase):
                          "minimax_h3_turbo_v4_step600_ema.safetensors")
 
     def test_no_accel_lora_means_empty_label(self):
-        """未选加速 LoRA 时，lora_label 必须是**空串**（前端据此不渲染该行）。"""
+        """未选加速 LoRA 时，lora_label 必须是**空串**（服务端摘要层）。
+
+        「显示成『空』」这件事发生在**前端文案层**（loraLabel），
+        服务端摘要保持空串，这样调用方能区分
+        「没有 LoRA」与「有 LoRA 但没名字」。
+        """
         params = {"model_key": "fl2va_pruned_int8",
                   "accel_loras": [], "fixed_accel_lora": "ckpt850"}
         info = job_meta.summarize("t2v", params)

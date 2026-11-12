@@ -95,12 +95,14 @@ MUTATIONS = [
         "test_card_has_lora_row",
     ),
     (
-        "前端把 LoRA 行改成恒渲染（没有 LoRA 也显示空行）",
+        "前端把「未选 LoRA」的显示改成编一个名字",
         "web/app.js",
-        "function loraRowHtml(loraText) {\n"
-        "  if (!loraText) return \"\";\n",
-        "function loraRowHtml(loraText) {\n",
-        "test_no_accel_lora_means_no_lora_row",
+        '  } else {\n'
+        '    // 用户没额外选加速 LoRA —— 如实显示「空」（不是留白，也不是编一个名字）\n'
+        '    parts.push("空");\n'
+        "  }\n",
+        "  }\n",
+        "test_no_accel_lora_shows_empty_marker",
     ),
     (
         "前端提交层又把遗留 lora 写回所有模式",

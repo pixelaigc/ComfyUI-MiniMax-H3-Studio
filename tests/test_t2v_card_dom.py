@@ -182,16 +182,16 @@ console.log(JSON.stringify({{ lora: loraLabel({json.dumps(job)}) }}));
         self.assertIn("DMAD 4 步（critic 版）", out["lora"])
         self.assertIn("×1.00", out["lora"])
 
-    def test_no_accel_lora_means_no_lora_row(self):
-        """没选加速 LoRA -> loraLabel 返回空串，loraRowHtml 返回空串。
+    def test_no_accel_lora_shows_empty_marker(self):
+        """没选加速 LoRA -> 显示「空」，并标明工作流固定的那枚。
 
-        两层都要断言：文本层（loraLabel）与渲染层（loraRowHtml）。
-        渲染层才是「卡片上到底出现不出现这一行」的那一层。
+        需求原文：「未选 LoRA 时才显示「空」」。
+        「空」指的是**用户选的加速 LoRA**那一项 ——
+        工作流固定的那枚 Turbo LoRA 始终生效，必须单独标明。
         """
         info = dict(HYBRID_SUMMARY)
         info["lora_label"] = ""
         info["lora_strength"] = None
-        info["fixed_lora_label"] = ""
         params = dict(HYBRID_PARAMS)
         params["accel_loras"] = []
         job = {"mode": "t2v", "params": params, "model_info": info}
@@ -201,8 +201,12 @@ console.log(JSON.stringify({{
   row: loraRowHtml(loraLabel({json.dumps(job)})),
 }}));
 """)
-        self.assertEqual(out["lora"], "")
-        self.assertEqual(out["row"], "", "没有 LoRA 时不能渲染这一行")
+        self.assertIn("空", out["lora"])
+        self.assertNotIn("DMAD", out["lora"])
+        # 固定那枚仍要标明（它始终生效）
+        self.assertIn("工作流固定", out["lora"])
+        # 仍然渲染这一行（用户能看见「没额外挂」这个事实）
+        self.assertIn("<span>LoRA</span>", out["row"])
 
     def test_lora_row_rendered_when_lora_present(self):
         """有 LoRA 时必须渲染出带「LoRA」标签与内容的一行。"""
