@@ -631,10 +631,30 @@ class TestMusicCopyNotLeakingImageWording(unittest.TestCase):
                          "时长上限已移除，卡片不该再显示它")
         self.assertIn('<span>谱面</span>', js)
         self.assertIn('<span>格式</span>', js)
-        # 音乐分支必须在「分辨率」那一行之前分流
+        # 音乐分支必须在「分辨率」那一行之前分流。
+        #
+        # 【2026-11-12】分辨率行的渲染表达式换过两次：
+        #   旧：<span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b>
+        #   新：<span>分辨率</span><b>${resoRow}</b>   （reso-label-fix 改为按产物实际像素）
+        # 所以这里**不能**硬编码某一条字面量 —— 那样只会在表达式
+        # 再次演进时假失败，而本测试真正要保证的是两件事：
+        #   (1) 音乐分支排在分辨率行之前（音乐卡不显示分辨率）
+        #   (2) 音乐分支自己的模板里不含「分辨率」行
         audio_at = js.find('info.kind === "audio" ? `')
-        res_at = js.find('<span>分辨率</span><b>${p.resolution || "768p"}')
+        self.assertGreater(audio_at, 0, "找不到音乐分支")
+        res_at = js.find('<span>分辨率</span>', audio_at)
+        self.assertGreater(res_at, 0, "找不到通用分辨率行")
         self.assertLess(audio_at, res_at, "音乐分支必须先于通用分辨率行")
+
+        # (2) 音乐分支模板内部不得出现「分辨率」行 ——
+        #     取出该三元分支的模板字符串（audio 分支到下一个反引号为止）。
+        seg = js[audio_at:]
+        start = seg.find('info.kind === "audio" ? `') + len(
+            'info.kind === "audio" ? `')
+        end = seg.find('`', start)
+        music_template = seg[start:end]
+        self.assertNotIn("分辨率", music_template,
+                         "音乐卡片不该显示分辨率行")
 
     def test_music_card_prompt_row_renamed(self):
         js = self._app_js()

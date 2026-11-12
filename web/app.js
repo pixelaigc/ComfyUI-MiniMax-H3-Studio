@@ -106,7 +106,20 @@ const state = {
   loraStrength: 1.0,
   aspect: "16:9",
   duration: 5,
-  steps: 6,
+  // 【2026-11-12 修】初值必须与工作流档位一致。
+  // 工作流（workflows._h3_video_workflow）：params.lora != "none" -> steps 4。
+  // 之前这里写 6、HTML 滑杆写 6，但工作流实际跑 4 步；
+  // 后来 HTML 改成 4 之后，state.steps 还是 6
+  // -> 滑杆显示 4、说明行写「步数 6」= 界面自相矛盾。
+  steps: 4,
+  // 【2026-11-11】首尾帧 / 参考生视频的采样参数（走旧工作流路径，
+  // 但采样链路与文生视频相同，所以这些参数一样是真参数）。
+  // 候选项来自 /api/video-options 的 sampling 清单（服务端从本机
+  // ComfyUI 的 /object_info 取，前端不硬编码名单）。
+  vidSampler: "",
+  vidScheduler: "",
+  vidShiftVideo: 12.0,
+  vidShiftAudio: 3.0,
   donePage: 1,
   // 每页作品数（可配置，持久化在 localStorage）
   pageSize: loadPageSize(),
@@ -268,6 +281,9 @@ function activateMode(mode, navEl) {
   $$(".nav-item").forEach(x => x.classList.remove("active"));
   if (navEl) navEl.classList.add("active");
   state.mode = mode;
+  // 【2026-11-11 两级导航】视频分组的高亮要跟着当前 mode 走 ——
+  // 切到图像模式时视频分组必须取消高亮，否则两个高亮项并存。
+  syncVideoNavActive();
   showCreate();
   renderMode();
 }
@@ -275,6 +291,43 @@ function activateMode(mode, navEl) {
 $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
   activateMode(el.dataset.mode, el);
 }));
+
+// ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
+//
+// 【为什么单独一个模块】
+// 视频导航是「类别 -> 模型」两级，而其它模式（图像 / 音乐）仍是平铺的
+// 单级入口。两套结构混在一起会让 activateMode() 的高亮逻辑分叉，
+// 所以视频这一支独立走 web/video-nav.js：
+//   * 类别 -> 模型的映射只有服务端一份（/api/video-categories），
+//     前端不再维护第二张映射表；
+//   * 每个模型项仍带 data-mode（老 mode），老任务卡片的「复用」
+//     按钮按 .nav-item[data-mode=...] 点选照样命中 —— 向后兼容。
+function videoNavContainer() {
+  return $("#navVideoCategories");
+}
+
+function syncVideoNavActive() {
+  const box = videoNavContainer();
+  if (!box || !window.VideoNav) return;
+  // 传入当前 mode —— 视频分组只在「当前 mode 确实是视频模式」时高亮，
+  // 否则首屏会同时高亮「Z-IMAGE 文生图」和视频项。
+  window.VideoNav.syncActive(box, state.mode);
+}
+
+/** 选中某个视频 mode（来自两级导航或老任务卡片），并高亮对应层级。 */
+function activateVideoMode(mode) {
+  const box = videoNavContainer();
+  let navEl = null;
+  if (box && window.VideoNav) {
+    window.VideoNav.selectByMode(mode);
+    navEl = box.querySelector(`.nav-model-item[data-mode="${mode}"]`);
+  }
+  if (!navEl) {
+    navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
+  }
+  activateMode(mode, navEl);
+  syncVideoNavActive();
+}
 
 function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
@@ -463,7 +516,9 @@ function renderMode() {
   if (isImageMode) renderImagePanel();
 
   // 文生视频（t2v）用自己的一套面板：宽高直填 + 模型 / 加速 LoRA 组合 /
-  // 注意力机制 / 二采。flf / r2v / longfilm 仍走旧面板（本次不改造）。
+  // 注意力机制 / 二采 / 采样参数。flf / r2v 走旧面板，但**采样参数**
+  // （采样器 / 调度器 / shift / CFG 说明）同样补齐 —— 它们的采样链路
+  // 与 t2v 完全相同。longfilm 只做拼接，不采样，不需要这些参数。
   const isT2V = mode === "t2v";
   const videoPanel = $("#videoPanel");
   if (videoPanel) videoPanel.style.display = isT2V ? "" : "none";
@@ -474,6 +529,14 @@ function renderMode() {
     $("#modelField").style.display = "none";
     $("#stepsField").style.display = "none";
     if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
+  }
+
+  // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
+  const legacyVideoSampling = $("#videoSamplingField");
+  if (legacyVideoSampling) {
+    const show = mode === "flf" || mode === "r2v";
+    legacyVideoSampling.style.display = show ? "" : "none";
+    if (show) renderLegacyVideoSampling();
   }
 
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
@@ -1317,7 +1380,13 @@ function updateImageModelNote() {
   const m = ctx.models[s.model];
   if (!m) return;
   $("#imgModelNote").textContent = m.note;
-  if (m.warn) $("#imgModelWarn").textContent = m.warn;
+  // 【2026-11-11】同视频面板：没有内容就别渲染橙色空条
+  // （.img-warn 自带背景 + padding + 边框，空内容也会显示成一条橙条）。
+  const imgWarn = $("#imgModelWarn");
+  if (imgWarn) {
+    imgWarn.textContent = m.warn || "";
+    imgWarn.hidden = !m.warn;
+  }
   // MOSS-Image 专属：SLG（SkipLayerGuidance）skip layer 的当前值
   // 官方 USERGUIDE 推荐 22（0-indexed）；22/24/26 都有帮助，空 = 关。
   // 关掉 SLG 会让画面「非常写实」，但部分细节会崩 —— 所以这里显式告知。
@@ -1643,10 +1712,17 @@ bindSeg("#modelCards", "model", () => {
   $("#loraField").style.display = state.model === "lora" ? "" : "none";
   updateSeedStrengthLayout();
   setDefaultSteps();
+  // 【2026-11-12】模型卡片换了 -> legacy 采样参数的「推荐」基准也变了
+  // （Turbo 档 4 步 / euler / beta，标准档 20 步 / res_multistep / simple），
+  // 必须重渲染，否则提示停留在旧基准。
+  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
   // 视频模型换了 -> 增强模板按新模型的模型族重新过滤
   if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
 });
-bindSeg("#loraCards", "lora");
+bindSeg("#loraCards", "lora", () => {
+  // 【2026-11-12】LoRA 卡片换了 -> 同样要重算 legacy 采样参数的推荐基准
+  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+});
 // 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
 // （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
 // 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
@@ -1658,12 +1734,234 @@ $("#loraStrength").addEventListener("input", e => {
 $("#steps").addEventListener("input", e => {
   state.steps = parseInt(e.target.value);
   $("#stepsVal").textContent = state.steps;
+  renderLegacyVideoSampling();
 });
+// ---- 首尾帧 / 参考生视频的采样参数事件 ----
+(function bindLegacyVideoSampling() {
+  const sampler = $("#vidLegacySamplerSelect");
+  if (sampler) {
+    sampler.addEventListener("change", e => {
+      state.vidSampler = e.target.value;
+      renderLegacyVideoSampling();
+    });
+  }
+  const scheduler = $("#vidLegacySchedulerSelect");
+  if (scheduler) {
+    scheduler.addEventListener("change", e => {
+      state.vidScheduler = e.target.value;
+      renderLegacyVideoSampling();
+    });
+  }
+  const shiftVideo = $("#vidLegacyShiftVideo");
+  if (shiftVideo) {
+    shiftVideo.addEventListener("input", e => {
+      state.vidShiftVideo = parseFloat(e.target.value);
+      renderLegacyVideoSampling();
+    });
+  }
+  const shiftAudio = $("#vidLegacyShiftAudio");
+  if (shiftAudio) {
+    shiftAudio.addEventListener("input", e => {
+      state.vidShiftAudio = parseFloat(e.target.value);
+      renderLegacyVideoSampling();
+    });
+  }
+})();
+/**
+ * 通用「步数」滑杆的默认值。
+ *
+ * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位一致：
+ *   params.lora != "none" -> steps 4
+ *   params.lora == "none" -> steps 20
+ * 而 params.lora = state.model === "lora" ? state.lora : "none"。
+ *
+ * 之前 LoRA 档写的是 6 —— 面板显示 6 步，工作流实际跑 4 步。
+ * 卡片上的文案「Turbo 加速 · 默认 6 步」也一并改成 4 步（index.html）。
+ */
 function setDefaultSteps() {
-  const def = state.model === "lora" ? 6 : 20;
+  const def = legacySamplingDefaults().steps;
   state.steps = def;
   $("#steps").value = def;
   $("#stepsVal").textContent = def;
+}
+
+// ---------- 【2026-11-11】首尾帧 / 参考生视频的采样参数 ----------
+// 这两个模式走旧工作流路径，但采样链路与文生视频完全相同
+// （BasicScheduler + KSamplerSelect + BasicGuider），
+// 所以采样器 / 调度器 / shift 一样是真参数。
+//
+// 候选项来自 /api/video-options 的 sampling 清单 —— 服务端从本机
+// ComfyUI 的 /object_info 取（KSamplerSelect 68 项 / BasicScheduler 14 项），
+// 前端不硬编码名单。清单拉不到时降级为「不显示这两项」，
+// 不阻塞其它功能。
+let VIDEO_SAMPLING_OPTIONS = null;
+
+function videoSamplingDefaults() {
+  const cfg = (VIDEO_SAMPLING_OPTIONS && VIDEO_SAMPLING_OPTIONS.sampling) || {};
+  return {
+    samplers: cfg.samplers || [],
+    schedulers: cfg.schedulers || [],
+    cfg_fixed: cfg.cfg_fixed != null ? cfg.cfg_fixed : 1.0,
+    cfg_reason: cfg.cfg_fixed_reason || "",
+    shift_default_video: cfg.shift_default_video != null ? cfg.shift_default_video : 12.0,
+    shift_default_audio: cfg.shift_default_audio != null ? cfg.shift_default_audio : 3.0,
+    // 【2026-11-12】shift 节点本机可用性 —— 不可用时禁用滑杆（不做假控件）
+    sigma_shift_available: cfg.sigma_shift_available !== false,
+  };
+}
+
+/**
+ * 旧路径视频模式提交时**真正用的** params.lora 值。
+ *
+ * 必须与提交路径（app.js 的 params.lora）完全一致：
+ *   lora: state.model === "lora" ? state.lora : "none"
+ * 「标准 MiniMax-H3」卡片也会把 params.lora 置成 "none"（= 不用 LoRA），
+ * 所以判据不能只看 state.lora。
+ */
+function effectiveLegacyLora() {
+  return state.model === "lora" ? (state.lora || "ckpt850") : "none";
+}
+
+/**
+ * 旧路径视频模式的采样参数默认值。
+ *
+ * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位
+ * **逐项一致**，否则「推荐」标记是假的：
+ *   lora != "none" -> steps 4  / sampler euler          / scheduler beta
+ *   lora == "none" -> steps 20 / sampler res_multistep  / scheduler simple
+ *
+ * 之前 steps 默认写的是 6，而工作流实际用 4（Turbo 档）——
+ * 面板上写「默认 6 步」，工作流跑的是 4 步 = 假提示。
+ */
+function legacySamplingDefaults() {
+  const withLora = effectiveLegacyLora() !== "none";
+  return {
+    steps: withLora ? 4 : 20,
+    sampler: withLora ? "euler" : "res_multistep",
+    scheduler: withLora ? "beta" : "simple",
+  };
+}
+
+function fillVideoSelect(sel, values, current) {
+  if (!sel) return;
+  sel.innerHTML = "";
+  values.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    opt.selected = name === current;
+    sel.appendChild(opt);
+  });
+  if (current && !values.includes(current)) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = current;
+    sel.appendChild(opt);
+  }
+  sel.value = current;
+}
+
+function renderLegacyVideoSampling() {
+  const field = $("#videoSamplingField");
+  if (!field) return;
+  const cfg = videoSamplingDefaults();
+  const defaults = legacySamplingDefaults();
+
+  if (!state.vidSampler) state.vidSampler = defaults.sampler;
+  if (!state.vidScheduler) state.vidScheduler = defaults.scheduler;
+
+  fillVideoSelect($("#vidLegacySamplerSelect"), cfg.samplers, state.vidSampler);
+  fillVideoSelect($("#vidLegacySchedulerSelect"), cfg.schedulers, state.vidScheduler);
+
+  const sHint = $("#vidLegacySamplerHint");
+  if (sHint) sHint.textContent = state.vidSampler === defaults.sampler ? "推荐" : "已改";
+  const scHint = $("#vidLegacySchedulerHint");
+  if (scHint) scHint.textContent = state.vidScheduler === defaults.scheduler ? "推荐" : "已改";
+
+  const svEl = $("#vidLegacyShiftVideo");
+  const saEl = $("#vidLegacyShiftAudio");
+  if (svEl) svEl.value = state.vidShiftVideo;
+  if (saEl) saEl.value = state.vidShiftAudio;
+  const svVal = $("#vidLegacyShiftVideoVal");
+  if (svVal) svVal.textContent = Number(state.vidShiftVideo).toFixed(2);
+  const saVal = $("#vidLegacyShiftAudioVal");
+  if (saVal) saVal.textContent = Number(state.vidShiftAudio).toFixed(2);
+  const svHint = $("#vidLegacyShiftVideoHint");
+  if (svHint) {
+    svHint.textContent = Number(state.vidShiftVideo) === Number(cfg.shift_default_video)
+      ? "推荐" : "已改";
+  }
+  const saHint = $("#vidLegacyShiftAudioHint");
+  if (saHint) {
+    saHint.textContent = Number(state.vidShiftAudio) === Number(cfg.shift_default_audio)
+      ? "推荐" : "已改";
+  }
+
+  // 【2026-11-12】shift 节点本机不可用时禁用滑杆（不制造假控件）
+  const shiftAvailable = cfg.sigma_shift_available !== false;
+  [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
+  if (svHint) {
+    svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
+    svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+  }
+  if (saHint) {
+    saHint.textContent = shiftAvailable ? saHint.textContent : "节点不可用";
+    saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+  }
+
+  // CFG：H3 标准路径固定 1.0 —— 只读说明，不做假控件
+  const cfgEl = $("#vidLegacyCfg");
+  const cfgVal = $("#vidLegacyCfgVal");
+  const cfgHint = $("#vidLegacyCfgHint");
+  const cfgNote = $("#vidLegacyCfgFixedNote");
+  if (cfgEl) cfgEl.value = Number(cfg.cfg_fixed).toFixed(1);
+  if (cfgVal) cfgVal.textContent = Number(cfg.cfg_fixed).toFixed(1);
+  if (cfgHint) cfgHint.textContent = "H3 固定";
+  if (cfgNote) cfgNote.textContent = cfg.cfg_reason;
+
+  // 步数的「推荐 / 已改」提示 —— 文生视频面板有 vidStepsHint，
+  // 这里必须也有（否则用户看不到步数是不是被改过）。
+  const stepsHint = $("#vidLegacyStepsHint");
+  if (stepsHint) {
+    stepsHint.textContent = Number(state.steps) === Number(defaults.steps)
+      ? "推荐" : "已改";
+  }
+
+  const note = $("#vidLegacySamplingNote");
+  if (note) {
+    note.textContent = [
+      `步数 ${state.steps} → BasicScheduler.steps`,
+      `采样器 ${state.vidSampler} → KSamplerSelect.sampler_name`,
+      `调度器 ${state.vidScheduler} → BasicScheduler.scheduler`,
+      `shift ${Number(state.vidShiftVideo).toFixed(2)} / `
+        + `${Number(state.vidShiftAudio).toFixed(2)} → MiniMaxH3SigmaShift`,
+    ].join(" · ");
+  }
+}
+
+/**
+ * 拉一次 /api/video-options，只为拿 sampling 清单（首尾帧/参考模式用）。
+ *
+ * 【2026-11-12 修】这个 fetch 是异步的，而 boot() 不 await 它。
+ * 用户在 fetch 返回前切到 flf/r2v 时：
+ *   renderLegacyVideoSampling() 拿到的 VIDEO_SAMPLING_OPTIONS 还是 null
+ *   -> 候选清单是空数组 -> 下拉只剩 1 个当前值（不是 68 / 14 个候选）
+ * 而且 fetch 完成后没人重渲染 -> 残缺的下拉一直留着。
+ * 修法：拿到清单后主动重渲染一次 legacy 面板。
+ */
+async function loadVideoSamplingOptions() {
+  try {
+    const resp = await fetch("/api/video-options", { cache: "no-store" });
+    if (!resp.ok) return;
+    VIDEO_SAMPLING_OPTIONS = await resp.json();
+    const cfg = videoSamplingDefaults();
+    if (!state.vidShiftVideo) state.vidShiftVideo = cfg.shift_default_video;
+    if (!state.vidShiftAudio) state.vidShiftAudio = cfg.shift_default_audio;
+    // 清单到位后重渲染（补上「fetch 未返回就先切模式」造成的残缺下拉）
+    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+  } catch (e) {
+    console.warn("[视频采样参数] 清单拉取失败:", e.message);
+  }
 }
 // 【2026-11-11】原来这个函数控制「生成按钮下方」的 LoRA 强度滑杆显隐。
 // 那个滑杆已搬到「LoRA 选择」旁边（#loraField 内），所以这里改成控制
@@ -2089,8 +2387,16 @@ $("#genBtn").addEventListener("click", async () => {
     }
   }
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
-    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采
+    // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+  } else if (mode === "flf" || mode === "r2v") {
+    // 【2026-11-11】首尾帧 / 参考生视频：采样参数（采样器 / 调度器 / shift）
+    // 与文生视频同链路，同样是真参数。CFG 在 H3 标准路径固定 1.0
+    // （BasicGuider 无 cfg 槽位），面板只做只读说明，不提交。
+    params.sampler = state.vidSampler;
+    params.scheduler = state.vidScheduler;
+    params.shift_video = Number(state.vidShiftVideo);
+    params.shift_audio = Number(state.vidShiftAudio);
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
@@ -2475,6 +2781,83 @@ function batchCaret(open) {
   return open ? "▼" : "▶";
 }
 
+// ---------- 分辨率 / 比例标签（前端兜底） ----------
+//
+// 【与后端 h3studio/reso_label.py 的关系】
+// 后端已经在 /api/jobs 的每条任务里下发 `resolution_info`（唯一真源）。
+// 这个函数只在**服务端是旧版本**（没有该字段）时兜底 ——
+// 此时还没有产物实际像素可用，就按请求的 width/height 算。
+//
+// 【为什么不能继续读 params.resolution】
+// 它是个**档位字符串**（"544p" / "1mp"），与像素是两条独立的语义：
+// 同一个 "1mp" 在 16:9 下是 1360×768、1:1 下是 1024×1024、21:9 下是 1568×672。
+// 文生视频新面板压根不写这个字段，它永远停在遗留默认值 "544p" ——
+// 于是实际跑 1344×768 的任务，卡片显示成「544p · 16:9」。
+const RESO_KNOWN_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
+// 比例匹配容差 = max(固定容差, 量化步长 / 短边)。
+//
+// 量化误差来自「宽高各自吸附到 16/32 的倍数」：短边越小，
+// 同一个名义比例算出来的真实比例偏差越大。
+// 例：16:9 的 0.2MP 预设 608×352，真实比例 1.727，
+// 相对名义 1.778 差 2.8% —— 超过固定 2% 就会被误判成 19:11。
+const RESO_ASPECT_TOLERANCE = 0.02;
+const RESO_ASPECT_QUANTUM = 32;
+
+function resoTierLabel(w, h) {
+  // 档位名 = 短边像素，**原样用**不四舍五入。
+  // 官方预设的短边是 352/416/480/544/608/640/672/736/768 ——
+  // 其中 416/544/608/736/768 都不是 10 的倍数，
+  // 四舍五入会让 768 变成 770，与面板自己的预设标签对不上。
+  return `${Math.min(w, h)}p`;
+}
+
+function resoAspectLabel(w, h, preferred) {
+  const short = Math.min(w, h);
+  const tolerance = Math.max(RESO_ASPECT_TOLERANCE, RESO_ASPECT_QUANTUM / short);
+  const actual = w / h;
+  const candidates = [];
+  for (const name of RESO_KNOWN_ASPECTS) {
+    const [wr, hr] = name.split(":").map(Number);
+    const err = Math.abs(actual - wr / hr) / (wr / hr);
+    if (err <= tolerance) candidates.push({ err, name });
+  }
+  if (candidates.length) {
+    // 请求的比例优先（只要也在容差内）—— 量化误差不该改写用户的意图
+    if (preferred) {
+      const hit = candidates.find(c => c.name === preferred);
+      if (hit) return hit.name;
+    }
+    candidates.sort((a, b) => a.err - b.err);
+    return candidates[0].name;
+  }
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  const d = gcd(w, h) || 1;
+  return `${w / d}:${h / d}`;
+}
+
+// 按请求参数算标签（没有产物实际像素时的兜底）。
+function localResolutionInfo(p) {
+  p = p || {};
+  const w = Number(p.width) || 0;
+  const h = Number(p.height) || 0;
+  if (!w || !h) {
+    // 两个尺寸都没有 -> 只把请求的档位/比例原样带出，不编造尺寸
+    const tier = String(p.resolution || "");
+    const aspect = String(p.aspect || "");
+    return {
+      label: [tier, aspect].filter(Boolean).join(" · "),
+      note: "", hasSize: false, width: null, height: null,
+    };
+  }
+  const tier = resoTierLabel(w, h);
+  const aspect = resoAspectLabel(w, h, String(p.aspect || ""));
+  return {
+    label: `${tier} · ${w}×${h} · ${aspect}`,
+    note: "", hasSize: true, width: w, height: h,
+    tier, aspect, pixels: `${w}×${h}`,
+  };
+}
+
 // 把折叠状态落到 DOM：标题行 class/aria + 网格 hidden
 function applyBatchesState(card, open) {
   const btn = card.querySelector('[data-act="toggle-batches"]');
@@ -2520,7 +2903,17 @@ function renderJobBatches(job) {
     </div>`;
   }).join("");
   // 标题行摘要：完成/失败数 + 出图尺寸 —— 折叠时也能一眼看出里面是什么
-  const size = p.width && p.height ? ` · ${p.width}×${p.height}` : "";
+  //
+  // 【2026-11-11】尺寸取**批次产物里的实际像素**（服务端已把 width/height
+  // 写进 outputs 条目），没有就退回请求的 width/height。
+  // 原来只看请求值 —— 走放大链时请求 2560×1400、实际出 2560×1408，
+  // 摘要会写错。
+  let size = "";
+  for (const batch of batches) {
+    const hit = (batch.outputs || []).find(o => o && o.width && o.height);
+    if (hit) { size = ` · ${hit.width}×${hit.height}`; break; }
+  }
+  if (!size && p.width && p.height) size = ` · ${p.width}×${p.height}`;
   return `<button type="button" class="job-batches-toggle ${open ? "open" : ""}" data-act="toggle-batches" aria-expanded="${open ? "true" : "false"}">
       <span class="caret">${batchCaret(open)}</span> 批次结果（${summary}${size}）
     </button>
@@ -2532,6 +2925,20 @@ function jobCard(job) {
   const info = MODE_INFO[job.mode] || { name: job.mode };
   const card = document.createElement("div");
   card.className = "job-card";
+  // ---- 分辨率 / 比例标签（服务端算好的唯一真源）----
+  //
+  // 【2026-11-11 修复】原来这里直接渲染 `p.resolution`（档位字符串），
+  // 而文生视频新面板**根本不写这个字段** —— 它写的是 width/height，
+  // 于是 params.resolution 永远停在遗留默认值 "544p"：
+  //   实际跑 1344×768，卡片却显示「544p · 16:9」（544p 不是 1344×768
+  //   的任何合法档位）。
+  // 现在：优先用服务端下发的 resolution_info（它以**产物实际像素**为准）；
+  // 服务端是旧版本（没这个字段）时，本地按同样规则兜底算一次。
+  const reso = job.resolution_info || localResolutionInfo(p);
+  const resoRow = escapeHtml(reso.label || "—");
+  const resoNote = reso.note
+    ? `<div class="row reso-note"><span>尺寸差异</span><b>${escapeHtml(reso.note)}</b></div>`
+    : "";
   const runningOrQueued = ["queued", "running"].includes(job.status);
   const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
   const pctText = job.status === "queued" ? "排队中…"
@@ -2573,7 +2980,8 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
-      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${p.width || "—"}×${p.height || "—"} · ${p.aspect || "16:9"}</b></div>
+      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
+      ${resoNote}
       <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
@@ -2582,7 +2990,8 @@ function jobCard(job) {
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
-      <div class="row"><span>分辨率</span><b>${p.resolution || "768p"} · ${p.aspect || "16:9"}</b></div>
+      <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
+      ${resoNote}
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
       <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
@@ -2710,7 +3119,7 @@ function jobCard(job) {
   });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
     // 找到对应模式侧栏项并切换
-    $(`.nav-item[data-mode="${job.mode}"]`)?.click();
+    activateVideoMode(job.mode);
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
     if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
@@ -3312,6 +3721,122 @@ async function refreshJobs() {
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
 
+// ---------- 「在生成库中定位」通道（2026-11-12） ----------
+//
+// 【为什么需要这一层 —— 2026-11-12 实测发现】
+// Agent 的产物面板上有个「在生成库中定位」按钮，它原来只做两件事：
+//   1. 切到生成页；
+//   2. 把任务 id 写进 location.hash。
+// 但**全仓没有任何地方读这个 hash**（grep 命中 0 处消费者）——
+// 于是这个按钮的实际效果只是「切换了一下页面」，用户到了生成库还要
+// 自己翻找那条任务。按钮写着「定位」却**根本没有定位**，这是假功能。
+//
+// 【现在的做法】
+// 走生成库**既有的**关键词筛选通道（#doneSearch -> state.doneFilters.keyword
+// -> /api/jobs?keyword=...，服务端按 id LIKE 匹配），
+// 再等列表渲染完成后滚动到那张卡片并高亮。
+//
+// 【为什么不新造一套查询接口】
+// 多一份查询 = 多一份状态 = 多一处会漂移的地方。
+// 复用既有的 keyword 筛选，用户也能在搜索框里看到并修改这个条件 ——
+// 「定位」不是黑魔法，它就是把筛选条件填好了。
+//
+// 【为什么要有 pendingLocate 而不是直接滚动】
+// refreshJobs 是**异步**的（要等网络）。点完按钮那一刻卡片还没渲染出来，
+// 直接 scrollIntoView 会滚到一个不存在的元素上（静默失败）。
+// 所以先把目标 id 存起来，等 syncJobCards 跑完再消费它。
+let pendingLocateJobId = "";
+let pendingLocateTimer = null;
+
+// 定位任务的等待上限（毫秒）。超过就不再等 ——
+// 免得「定位」这个一次性动作留下一个永久挂着的定时器。
+const LOCATE_TIMEOUT_MS = 8000;
+
+// 定位命中后的高亮持续时长（毫秒）。
+//
+// 【为什么是 4 秒而不是 2.5 秒 —— 2026-11-12 实测】
+// 用户点「在生成库中定位」之后，页面要跳页 + 拉数据 + 渲染卡片，
+// 等他真正看清那张卡片时可能已经过去 2-3 秒了。
+// 高亮只闪 2.5 秒的话，用户第一眼看到的往往是「已经不高亮了」——
+// 等于白做。
+const LOCATE_FLASH_MS = 4000;
+
+// 高亮样式挂到 .job-card 上（见 style.css 的 .job-card.is-located）。
+function flashLocatedCard(card) {
+  if (!card) return;
+  card.classList.add("is-located");
+  // 高亮是「刚才定位到这」的提示，不该一直挂着；
+  // 但也不能太短（见 LOCATE_FLASH_MS 的说明）。
+  setTimeout(() => card.classList.remove("is-located"), LOCATE_FLASH_MS);
+  try {
+    card.scrollIntoView({block: "center", behavior: "smooth"});
+  } catch (e) {
+    // 老浏览器不支持 scrollIntoView 选项 -> 退化成默认行为
+    try { card.scrollIntoView(); } catch (e2) { /* 忽略 */ }
+  }
+}
+
+/**
+ * 把生成库定位到指定任务。
+ *
+ * @param {string} jobId 任务 id
+ * @returns {boolean} 是否成功发起定位
+ */
+function locateJobInLibrary(jobId) {
+  const id = String(jobId || "").trim();
+  if (!id) return false;
+  pendingLocateJobId = id;
+  if (pendingLocateTimer) clearTimeout(pendingLocateTimer);
+  pendingLocateTimer = setTimeout(() => {
+    // 超时未命中 -> 放弃（不报错，用户自己看列表就行）
+    pendingLocateJobId = "";
+    pendingLocateTimer = null;
+  }, LOCATE_TIMEOUT_MS);
+
+  // 「全部」标签 = 不按状态过滤，能看到任何状态的任务。
+  state.tab = "all";
+  state.genType = "";
+  state.donePage = 1;
+  // 清掉其它筛选条件，否则命中不了目标任务。
+  ["#doneMedia", "#doneAspect", "#doneDuration"].forEach(sel => {
+    const el = $(sel);
+    if (el) el.value = "";
+  });
+  // 关键词筛选：服务端 keyword 会匹配 params / id / outputs。
+  //
+  // 【为什么用 applyDoneFilters() 而不是自己写 state.doneFilters —— 2026-11-12】
+  // applyDoneFilters() 是**既有的**筛选真源（它同时读 DOM 控件 + 写 state + 触发刷新）。
+  // 自己再写一遍 state.doneFilters = {...} 就是第二份状态 —— 将来改了筛选逻辑
+  // （比如加一个筛选项）这里就会漏掉。两份状态必然漂移。
+  const search = $("#doneSearch");
+  if (search) search.value = id;
+
+  // 切到生成页 + 同步标签高亮。
+  showCreate();
+  renderTabs();
+  applyDoneFilters();
+  return true;
+}
+
+// syncJobCards 渲染完卡片后消费「待定位」的目标。
+function consumePendingLocate() {
+  if (!pendingLocateJobId) return;
+  const grid = $("#jobsGrid");
+  if (!grid) return;
+  const target = pendingLocateJobId;
+  // 用 dataset 遍历而不是 CSS 选择器 —— 任务 id 里的字符不一定是
+  // 「选择器安全」的（CSS.escape 在极老浏览器上不存在），
+  // 而 dataset 比较没有转义问题。
+  let card = null;
+  for (const node of grid.children) {
+    if (node.dataset && node.dataset.jid === target) { card = node; break; }
+  }
+  if (!card) return;   // 还没渲染出来 -> 下一轮再试
+  pendingLocateJobId = "";
+  if (pendingLocateTimer) { clearTimeout(pendingLocateTimer); pendingLocateTimer = null; }
+  flashLocatedCard(card);
+}
+
 // 把任务列表按「稳定 key + 最小改动」同步到网格里。
 //
 // 关键约束：**顺序没变的节点一律不碰 DOM**。
@@ -3352,6 +3877,8 @@ function syncJobCards(grid, jobs) {
   existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
   // 列数跟着「每页作品数」走；实时刮新也走这里，所以每页数量不会被刷掉
   applyGridColumns(state.pageSize);
+  // 「在生成库中定位」：卡片渲染完成后消费待定位目标（滚动 + 高亮）。
+  consumePendingLocate();
 }
 
 // ---------- 长片拼接 ----------
@@ -3556,7 +4083,12 @@ function showCreate() {
 function showStitch() {
   state.page = "stitch";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
-  $("#navStitch").classList.add("active");
+  // 【2026-11-11】长片拼接不再是独立侧栏项，改成「长片拼接」类别下的
+  // 一个模型项 —— 高亮走两级导航的 syncActive()。
+  if (window.VideoNav) {
+    window.VideoNav.selectByMode("longfilm");
+    syncVideoNavActive();
+  }
   showPage($("#jobsArea"), true);
   showPage($("#panel"), false);
   showPage($("#stitchPanel"), true);
@@ -3629,7 +4161,9 @@ function showAgent() {
 }
 
 $("#navSystem").addEventListener("click", showSystem);
-$("#navStitch").addEventListener("click", showStitch);
+// 【2026-11-11】长片拼接入口搬进两级导航（web/video-nav.js），
+// 这里不再直接绑定 #navStitch —— 那个 id 只存在于 <noscript> 兜底里，
+// 直接 addEventListener 会在 null 上抛错，把整个 app.js 带崩。
 $("#sysRefresh").addEventListener("click", () => { refreshHardware(true); });
 
 function fmtBytes(b) {
@@ -3936,6 +4470,21 @@ const BREAKPOINTS = {phone: 700, tablet: 1100};
 // 挂到 window —— 响应式回归测试要读它，和 CSS 的 --bp-phone 做一致性比对
 window.BREAKPOINTS = BREAKPOINTS;
 
+// ---------- 跨模块导出（2026-11-12） ----------
+//
+// Agent 的产物面板要「在生成库中定位」某条任务，
+// 但生成库是 app.js 管的（agent_sessions.js 碰不到它的 DOM 与 state）。
+// 通过 window 暴露一个**窄接口**，而不是让 agent_sessions.js 直接
+// 读 app.js 的内部 state —— 后者会把两个模块焊死。
+//
+// 同时导出 lightboxShow：产物缩略图点「查看大图」要复用生成库
+// 已经调好的大图查看器（缩放/拖拽/下载/新窗口），
+// 不再新造一个功能更少的模态框。
+window.H3Studio = Object.assign(window.H3Studio || {}, {
+  locateJobInLibrary,
+  lightboxShow,
+});
+
 function isPhoneViewport() {
   return window.innerWidth <= BREAKPOINTS.phone;
 }
@@ -4077,12 +4626,39 @@ boot("默认模式", () => {
   else { state.mode = DEFAULT_MODE; showCreate(); renderMode(); }
 });
 boot("图像参数清单", loadImageOptions);
+boot("视频类别导航", async () => {
+  const box = videoNavContainer();
+  if (!box || !window.VideoNav) return;
+  window.VideoNav.onSelect = (category, modelKey, mode) => {
+    // 长片拼接是独立页面（#stitchPanel），不是创作页的普通模式。
+    if (mode === "longfilm") {
+      showStitch();
+      syncVideoNavActive();
+      return;
+    }
+    activateMode(mode, box.querySelector(`.nav-model-item[data-model-key="${modelKey}"]`));
+    syncVideoNavActive();
+  };
+  window.VideoNav.onUnavailable = (category) => {
+    const label = (window.VideoNav.categoryByKey(category) || {}).label || category;
+    alert(`「${label}」类别下没有可用的模型，无法切换。`);
+  };
+  await window.VideoNav.load();
+  window.VideoNav.render(box);
+  window.VideoNav.bind(box);
+  // 恢复持久化选择（从来没选过就不动 —— 让 DEFAULT_MODE 独家高亮）。
+  // applyDefault 内部会通过 onSelect 把应用切到那个 mode，
+  // 所以它必须在「默认模式」boot 之后跑。
+  window.VideoNav.applyDefault();
+  syncVideoNavActive();
+});
 boot("视频参数清单", async () => {
   if (!window.VIDEO_PANEL) return;
   await window.VIDEO_PANEL.load();
   window.VIDEO_PANEL.bind();
   window.VIDEO_PANEL.render();
 });
+boot("视频采样参数清单", loadVideoSamplingOptions);
 boot("音乐参数清单", async () => {
   if (!window.MusicUI) return;
   await window.MusicUI.loadOptions();

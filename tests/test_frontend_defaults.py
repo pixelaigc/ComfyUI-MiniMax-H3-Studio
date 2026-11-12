@@ -267,19 +267,48 @@ class TestFrontendDefaults(unittest.TestCase):
         self.assertTrue(models, "模型下拉不应为空")
 
     def test_switching_mode_keeps_nav_and_panel_in_sync(self):
-        """手动切到其它模式：选中态与面板内容同步；切回 Z-IMAGE 也同步。"""
-        for mode, label in (("t2v", "文生视频"), ("flf", "首尾帧"), ("r2v", "参考生成")):
+        """手动切到其它模式：选中态与面板内容同步；切回 Z-IMAGE 也同步。
+
+        【2026-11-11 视频导航改两级】视频入口现在是
+        「类别 -> 模型」两层，`.nav-item.active` 命中的是**模型项**
+        （显示名是「minimax-h3 文生视频」等），而不是原来的平铺类别名。
+        类别标题用 `.nav-cat-head.active` 断言。
+        """
+        for mode, label in (("t2v", "minimax-h3 文生视频"),
+                            ("flf", "minimax-h3 首尾帧生视频"),
+                            ("r2v", "minimax-h3 参考生视频")):
             self.page.click('.nav-item[data-mode="%s"]' % mode)
             self.page.wait_for_function("m => state.mode === m", arg=mode, timeout=5000)
             self.assertEqual(texts(self.page, ".nav-item.active"), [label],
-                             "切到 %s 后高亮应同步" % label)
+                             "切到 %s 后高亮应同步" % mode)
             self.assertFalse(visible(self.page, "#imagePanel"),
-                             "切到 %s 后图像面板应隐藏" % label)
+                             "切到 %s 后图像面板应隐藏" % mode)
 
         self.page.click('.nav-item[data-mode="t2i"]')
         self.page.wait_for_function("() => state.mode === 't2i'", timeout=5000)
         self.assertEqual(texts(self.page, ".nav-item.active"), ["Z-IMAGE 文生图"])
         self.assertTrue(visible(self.page, "#imagePanel"))
+        # 切回图像模式后，视频分组**不该**还留着高亮
+        self.assertEqual(texts(self.page, ".nav-cat-head.active"), [],
+                         "切回图像模式后视频分类不应高亮")
+
+    def test_video_nav_is_two_level(self):
+        """视频导航是两级：四个类别 + 类别下的模型项。"""
+        # 用 .nav-cat-label 拿纯类别名（.nav-cat-head 的 innerText 里还带
+        # 展开箭头 ▾，那是纯装饰，不属于类别文案）
+        heads = texts(self.page, "#navVideoCategories .nav-cat-label")
+        self.assertEqual(
+            heads,
+            ["文生视频", "首尾帧生视频", "参考生视频", "长片拼接"],
+            "视频类别顺序与文案必须固定四项")
+        # 每个类别下至少一个模型项
+        for cat in self.page.query_selector_all("#navVideoCategories .nav-cat"):
+            key = cat.get_attribute("data-category")
+            models = cat.query_selector_all(".nav-model-item")
+            self.assertTrue(models, "类别 %s 下没有模型项" % key)
+            for m in models:
+                self.assertTrue(m.get_attribute("data-mode"),
+                                "模型项必须带 data-mode（向后兼容）")
 
     # ------------------------------------------------------- 需求 2
     def test_default_filters_show_job_list(self):

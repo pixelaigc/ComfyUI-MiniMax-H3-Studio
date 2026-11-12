@@ -1,0 +1,5 @@
+=== ComfyUI 挂住时 GET /api/video-options 耗时 ===
+修复前 (8194, 串行探测 6×10s):
+  http=200 time=65.855890s
+修复后 (8195, 并发探测 3s):
+  http=200 time=3.198136s

@@ -116,6 +116,46 @@
     }
   }
 
+  // 创建时间用**绝对日期**，不用相对时间。
+  //
+  // 【为什么不能用 formatTime —— 2026-11-12】
+  // formatTime 是相对时间（"3 分钟前" / "昨天" / "3-12"）。
+  // 相对时间对「最后更新时间」合适（用户关心的是「多久之前」）。
+  // 但对「创建时间」不合适：会话创建于 3 天前，3 天后看就是 "3-12"，
+  // 再过 5 个月就是 "3-12" —— 用户完全无法判断这是哪一年的 3-12。
+  // 列表项空间有限，写绝对日期（2026-03-12）最省心也最不会误导。
+  function formatDate(ts) {
+    if (!ts) return "";
+    const t = Number(ts) * 1000;
+    if (!isFinite(t) || t <= 0) return "";
+    const d = new Date(t);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const today = new Date();
+    const isThisYear = yyyy === today.getFullYear();
+    // 同年不显示年份（省 5 个字符）；跨年才显示。
+    return isThisYear ? `${mm}-${dd}` : `${yyyy}-${mm}-${dd}`;
+  }
+
+  // 会话状态 -> 徽章样式类。
+  //
+  // 【状态语义 —— 2026-11-12】
+  // 后端只产出「这一轮对话的收尾方式」：空会话 / 完成 / 已截断 / 失败 / 待补充。
+  // 颜色与对话气泡里的状态徽章（agent.js 的 statusBadge）保持一致：
+  //   完成 = 绿、已截断/待补充 = 黄、失败 = 红、空会话 = 灰。
+  // 截断是**部分成功**（拿到了已完成的部分结果），所以是黄色不是红色。
+  function statusClass(status) {
+    switch (status) {
+      case "completed": return "ok";
+      case "truncated": return "warn";
+      case "failed": return "bad";
+      case "needs_clarification": return "warn";
+      case "empty": return "empty";
+      default: return "empty";   // 未知状态 -> 灰色（不假装知道）
+    }
+  }
+
   function readCurrentId() {
     try { return localStorage.getItem(STORAGE_KEY) || ""; }
     catch (e) { return ""; }
@@ -157,11 +197,33 @@
       const time = formatTime(s.updated_at);
       const count = Number(s.message_count || 0);
       const arts = Number(s.artifact_count || 0);
+      // 【创建时间 —— 2026-11-12】需求要求列表同时展示「创建/最后更新时间」。
+      // 后端一直有 created_at（之前前端丢弃了），现在显示绝对日期。
+      const created = formatDate(s.created_at);
+      // 【未完成任务数 —— 2026-11-12】
+      // 文案必须指向**任务**，不能说会话「进行中」——
+      // 服务端没有 per-session 运行注册表（AGENT_GATE 是全局信号量），
+      // 这里统计的是 jobs.status，是任务层面的事实。
+      const pending = Number(s.pending_count || 0);
+      // 【状态徽章 —— 2026-11-12】后端给的 status_label 是中文标签，
+      // 前端不自己翻译（免得两处显示成两个词）。
+      const st = String(s.status || "");
+      const stLabel = s.status_label || "";
+      const stBadge = stLabel
+        ? `<span class="ag-session-status ag-badge ag-badge-${statusClass(st)}">${esc(stLabel)}</span>`
+        : "";
       return `<div class="ag-session-item${active}" data-session-id="${esc(s.id)}"
                    role="button" tabindex="0" title="${title}">
         <div class="ag-session-item-title">${title}</div>
         ${preview ? `<div class="ag-session-item-preview">${preview}</div>` : ""}
-        <div class="ag-session-item-meta">${esc(time)} · ${count} 条${arts ? " · " + arts + " 产物" : ""}</div>
+        <div class="ag-session-item-meta">
+          <span class="ag-session-item-time">${esc(time)}</span>
+          ${created ? `<span class="ag-session-item-created">建于 ${esc(created)}</span>` : ""}
+          <span class="ag-session-item-count">${count} 条</span>
+          ${arts ? `<span class="ag-session-item-arts" title="该会话创建的任务数（每个任务产出一个作品）">${arts} 产物</span>` : ""}
+          ${pending ? `<span class="ag-session-item-pending" title="该会话下还没跑完的任务数">${pending} 个生成中</span>` : ""}
+          ${stBadge}
+        </div>
         <button type="button" class="ag-session-del" data-act="delete-session"
                 data-session-id="${esc(s.id)}" title="删除这个交互">&times;</button>
       </div>`;
@@ -336,6 +398,48 @@
     return "/files/" + path.split("/").map(encodeURIComponent).join("/");
   }
 
+  // 产物的「分辨率 / 比例」标签。
+  //
+  // 【为什么不直接读 params.resolution —— 2026-11-12】
+  // params.resolution 是**档位字符串**（"544p" / "768p" / "1mp"），
+  // 而文生视频面板提交的是 width/height（真实像素），不写 resolution。
+  // 于是面板实际跑 1344×768，卡片却显示「544p」—— 与产物对不上。
+  //
+  // 【取值优先级】
+  //  1. job.resolution_info.label —— 服务端按**实际输出像素**算好的标签
+  //     （唯一真源；由 reso_label.describe 产出）。有就直接用。
+  //     这样等「生成库分辨率显示修复」那条分支合进来后，
+  //     本面板**自动**显示准确值，不需要再改一遍。
+  //  2. 退回 outputs 里带的宽高（如果有）。
+  //  3. 退回请求参数 width/height + resolution 档位 + aspect。
+  function artifactResolution(job) {
+    const params = job.params || {};
+    const outputs = Array.isArray(job.outputs) ? job.outputs : [];
+    // 1) 服务端算好的标签（优先）
+    const info = job.resolution_info;
+    if (info && typeof info === "object" && info.label) {
+      return String(info.label);
+    }
+    let w = 0;
+    let h = 0;
+    // 2) 实际输出尺寸
+    for (const out of outputs) {
+      if (out && out.width && out.height) { w = Number(out.width); h = Number(out.height); break; }
+    }
+    // 3) 请求参数
+    if (!w || !h) {
+      w = Number(params.width || 0);
+      h = Number(params.height || 0);
+    }
+    const aspect = String(params.aspect || "").trim();
+    const tier = String(params.resolution || "").trim();
+    const parts = [];
+    if (w && h) parts.push(`${w}×${h}`);
+    if (tier) parts.push(tier);
+    if (aspect) parts.push(aspect);
+    return parts.join(" · ");
+  }
+
   function renderArtifacts() {
     const box = $("#agArtifactsBody");
     if (!box) return;
@@ -352,17 +456,29 @@
       const first = outputs[0];
       const url = first ? outputUrl(job.id, first) : "";
       const kind = first ? String(first.kind || "") : "";
-      const isVideo = kind === "video" || kind === "audio";
+      const isVideo = kind === "video";
+      const isAudio = kind === "audio";
+      const isImage = kind === "image";
+      // 图片产物：缩略图可点 -> 打开大图查看器（复用 app.js 已有的 lightbox）。
+      // 视频/音频：缩略图本身是播放器，点它会开始播放，**不做**预览绑定。
       const thumb = url
         ? (isVideo
             ? `<video class="ag-artifact-thumb is-video" src="${esc(url)}" muted preload="metadata"></video>`
-            : `<img class="ag-artifact-thumb" src="${esc(url)}" alt="${esc(job.id)}" loading="lazy">`)
+            : isAudio
+              ? `<div class="ag-artifact-thumb is-audio">♪</div>`
+              : `<button type="button" class="ag-artifact-thumb-btn" data-act="preview-artifact"
+                          data-url="${esc(url)}" data-name="${esc(first.name || job.id)}"
+                          title="点击查看大图">
+                   <img class="ag-artifact-thumb" src="${esc(url)}" alt="${esc(job.id)}" loading="lazy">
+                 </button>`)
         : `<div class="ag-artifact-thumb"></div>`;
       const prompt = job.params && job.params.prompt ? String(job.params.prompt) : "";
       const status = job.status || "queued";
       const label = job.gen_type_label || job.mode || "任务";
       // 未完成的任务（排队中/生成中）标出来 —— 面板会持续刷新它们的状态。
       const pending = status === "queued" || status === "running";
+      const resolution = artifactResolution(job);
+      const meta = [label, resolution, formatTime(job.created_at)].filter(Boolean).join(" · ");
       return `<div class="ag-artifact-item${pending ? " is-pending" : ""}"
                    data-job-id="${esc(job.id)}">
         <div class="ag-artifact-head">
@@ -371,9 +487,13 @@
         </div>
         ${thumb}
         <div class="ag-artifact-prompt">${esc(prompt || label)}</div>
-        <div class="ag-artifact-meta">${esc(label)} · ${esc(formatTime(job.created_at))}</div>
-        <button type="button" class="ag-artifact-locate" data-act="locate-job"
-                data-job-id="${esc(job.id)}">在生成库中定位</button>
+        <div class="ag-artifact-meta">${esc(meta)}</div>
+        <div class="ag-artifact-actions">
+          ${isImage && url ? `<button type="button" class="ag-artifact-locate" data-act="preview-artifact"
+                data-url="${esc(url)}" data-name="${esc(first.name || job.id)}">查看大图</button>` : ""}
+          <button type="button" class="ag-artifact-locate" data-act="locate-job"
+                  data-job-id="${esc(job.id)}">在生成库中定位</button>
+        </div>
       </div>`;
     }).join("");
     box.innerHTML = items;
@@ -460,27 +580,64 @@
 
   // 「在生成库中定位」—— 把用户带到生成列表里的那一条任务。
   //
-  // 【为什么不做成「跳转 + 高亮」而只提示】
-  // 生成列表（#jobsArea）是**另一个页面**（app.js 管的），跨页高亮需要
-  // app.js 配合加一个「定位并高亮」的入口 —— 那会把两个模块耦在一起。
-  // 现在的做法：切到生成页 + 把任务 id 写进 location.hash，
-  // 用户在生成列表里能自己找到；同时**在产物面板上直接给出可点的
-  // 任务详情**（点缩略图打开产物）。两条路都通。
+  // 【原实现是假功能 —— 2026-11-12 实测发现】
+  // 原来只做两件事：切到生成页 + 把任务 id 写进 location.hash。
+  // 但**全仓没有任何地方读这个 hash**（grep 命中 0 处消费者），
+  // 于是这个按钮的实际效果只是「切换了一下页面」，
+  // 用户到了生成库还得自己翻找那条任务 —— 按钮写着「定位」却没定位。
+  //
+  // 【现在的做法】
+  // 调 app.js 暴露的 H3Studio.locateJobInLibrary()：
+  // 它走生成库既有的关键词筛选通道（服务端按 id LIKE 匹配），
+  // 等列表渲染完成后滚动到那张卡片并高亮。
+  // 用户还能在搜索框里看到并修改这个条件 —— 定位不是黑魔法。
   function locateJob(jobId) {
     if (!jobId) return;
-    // 切到生成页
-    const nav = document.querySelector('.nav-item[data-mode="t2i"]')
-      || document.querySelector(".nav-item");
-    if (nav) nav.click();
-    // 把 id 放进 hash —— 生成页可以据此定位（app.js 不读它也不受影响）
-    try {
-      location.hash = "job=" + encodeURIComponent(jobId);
-    } catch (e) {
-      // 某些环境禁用了 hash 写入 —— 不影响主流程。
+    const bridge = window.H3Studio;
+    const located = bridge && typeof bridge.locateJobInLibrary === "function"
+      ? bridge.locateJobInLibrary(jobId)
+      : false;
+    if (!located) {
+      // 兜底：老服务端 / app.js 还没加载 -> 至少切到生成页，
+      // 并把 id 放进 hash（用户还能在搜索框里手动搜）。
+      const nav = document.querySelector('.nav-item[data-mode="t2i"]')
+        || document.querySelector(".nav-item");
+      if (nav) nav.click();
+      try {
+        location.hash = "job=" + encodeURIComponent(jobId);
+      } catch (e) {
+        // 某些环境禁用了 hash 写入 —— 不影响主流程。
+      }
     }
     const status = $("#agStatus");
     if (status) {
-      status.textContent = "已切到生成库，任务 " + jobId + " 可在生成列表中查看。";
+      status.textContent = located
+        ? "已在生成库中定位任务 " + jobId + "。"
+        : "已切到生成库，任务 " + jobId + " 可在生成列表中查看。";
+    }
+  }
+
+  // 「查看大图」—— 复用生成库已经调好的大图查看器。
+  //
+  // 【为什么不自己写一个模态框 —— 2026-11-12】
+  // app.js 的 lightbox 已经支持缩放 / 拖拽 / 适应屏幕 / 原始尺寸 /
+  // 下载 / 新窗口打开，交互是调好的。自己再写一个只有「一张大图」的
+  // 模态框，功能更少、样式还得再对一遍 —— 两份大图查看器必然漂移。
+  function previewArtifact(url, name) {
+    if (!url) return;
+    const bridge = window.H3Studio;
+    if (bridge && typeof bridge.lightboxShow === "function") {
+      // 宽高传 0 -> lightbox 会在图片 load 后用 naturalWidth/Height 自适应。
+      bridge.lightboxShow(url, name || "产物", 0, 0);
+      return;
+    }
+    // 兜底：app.js 没加载 -> 新窗口打开原图。
+    try {
+      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      // 弹窗被拦截 -> 至少给用户一个状态提示
+      const status = $("#agStatus");
+      if (status) status.textContent = "产物地址：" + url;
     }
   }
 
@@ -661,11 +818,19 @@
     const artClose = $("#agArtifactsClose");
     if (artClose) artClose.addEventListener("click", () => toggleArtifacts(false));
 
-    // 产物卡片上的「在生成库中定位」（事件委托 —— 卡片是重绘出来的，
+    // 产物卡片上的「查看大图 / 在生成库中定位」（事件委托 —— 卡片是重绘出来的，
     // 不能在 renderArtifacts 里逐个绑定，否则每次重绘都要重新绑）。
     const artBody = $("#agArtifactsBody");
     if (artBody) {
       artBody.addEventListener("click", event => {
+        // 图片产物 -> 打开大图查看器（复用 app.js 的 lightbox）
+        const preview = event.target.closest("[data-act='preview-artifact']");
+        if (preview) {
+          event.preventDefault();
+          event.stopPropagation();
+          previewArtifact(preview.dataset.url, preview.dataset.name);
+          return;
+        }
         const btn = event.target.closest("[data-act='locate-job']");
         if (!btn) return;
         event.preventDefault();

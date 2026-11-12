@@ -40,22 +40,19 @@
   <nav class="sidebar" id="sidebar">
     <div class="nav-label">CREATE</div>
     <div class="nav-group">视频</div>
-    <a class="nav-item" data-mode="t2v">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="3" width="13" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 6l4 2.5-4 2.5z" fill="currentColor"/></svg>
-      文生视频
-    </a>
-    <a class="nav-item" data-mode="flf">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1" y="3" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="3" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2v12" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/></svg>
-      首尾帧
-    </a>
-    <a class="nav-item" data-mode="r2v">
-      <svg viewBox="0 0 16 16" width="15" height="15"><circle cx="5" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 13.5c0-2 1.5-3 3-3s3 1 3 3M8 13.5c0-2 1.5-3 3-3s3 1 3 3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
-      参考生成
-    </a>
-    <a class="nav-item" id="navStitch">
-      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9.5" y="3" width="5" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6.7 8h2.6M8 6.7V9.3" stroke="currentColor" stroke-width="1.3"/></svg>
-      长片拼接
-    </a>
+    <!-- 【2026-11-11】视频导航改成两级：类别 -> 模型。
+         清单由服务端 /api/video-categories 下发（web/video-nav.js 渲染），
+         前端不硬编码任何 mode/model 映射。
+         四个类别（顺序与文案固定）：文生视频 / 首尾帧生视频 / 参考生视频 / 长片拼接。
+         【兼容】每个模型项仍带 data-mode，老任务卡片的「复用」按钮
+         按 .nav-item[data-mode=...] 点选照样命中。 -->
+    <div id="navVideoCategories" class="nav-categories"></div>
+    <noscript>
+      <a class="nav-item" data-mode="t2v">文生视频</a>
+      <a class="nav-item" data-mode="flf">首尾帧生视频</a>
+      <a class="nav-item" data-mode="r2v">参考生视频</a>
+      <a class="nav-item" id="navStitch" data-mode="longfilm">长片拼接</a>
+    </noscript>
     <div class="nav-group">文生图</div>
     <a class="nav-item" data-mode="t2i">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
@@ -140,6 +137,7 @@
 
       <div class="field">
         <div class="field-label"><span id="vidModelLabel">MiniMax-H3 模型</span> <span class="muted">本机已安装</span></div>
+        <div class="img-note" id="vidModelSourceNote"></div>
         <select class="img-select" id="vidModelSelect"></select>
         <div class="img-note" id="vidModelNote"></div>
         <div class="img-warn" id="vidModelWarn"></div>
@@ -189,8 +187,71 @@
               <select class="img-select" id="vidUpscalerSelect"></select>
             </div>
           </div>
+          <!-- 【2026-11-11】二采路径的 CFG：SelfLiftH3Sampler 自带 cfg 槽位，
+               是 H3 链路里**唯一**真正可调的 CFG（标准路径的 BasicGuider 没有）。 -->
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>二采 CFG</span><b id="vidTwopassCfgVal">1.0</b></div>
+              <input type="range" id="vidTwopassCfg" min="0" max="10" step="0.1" value="1">
+              <small class="muted" id="vidTwopassCfgHint">仅二采生效</small>
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>二采采样器</span><small id="vidTwopassSamplerHint">固定 Euler</small></div>
+              <input type="text" id="vidTwopassSampler" value="euler" readonly>
+            </div>
+          </div>
           <div class="img-note" id="vidTwopassNote"></div>
         </div>
+      </div>
+
+      <!-- 【2026-11-11 新增】采样参数（与生图面板同级）
+           取值全部来自本机实测：步数/采样器/调度器 -> BasicScheduler +
+           KSamplerSelect（H3 工作流里本来就有这两个节点，之前只是没有控件）；
+           shift -> MiniMaxH3SigmaShift（ComfyUI 核心节点，默认 12.0/3.0
+           就是 H3 模型内生值，不改结果）。CFG 在标准路径上是**只读说明**，
+           因为 BasicGuider 没有 cfg 槽位 —— 只有二采才可调（见上）。 -->
+      <div class="field" id="vidSamplingField">
+        <div class="field-label">采样参数 <span class="muted">与生图面板同级</span></div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>采样步数</span><b id="vidStepsVal">4</b></div>
+            <input type="range" id="vidSteps" min="1" max="50" step="1" value="4">
+            <small class="muted" id="vidStepsHint">推荐</small>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>CFG</span><b id="vidCfgVal">1.0</b></div>
+            <input type="text" id="vidCfg" value="1.0" readonly>
+            <small class="muted" id="vidCfgHint">H3 固定</small>
+          </div>
+        </div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>shift（视频）</span><b id="vidShiftVideoVal">12.0</b></div>
+            <input type="range" id="vidShiftVideo" min="0.01" max="100" step="0.01" value="12">
+            <small class="muted" id="vidShiftVideoHint">推荐</small>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>shift（音频）</span><b id="vidShiftAudioVal">3.0</b></div>
+            <input type="range" id="vidShiftAudio" min="0.01" max="100" step="0.01" value="3">
+            <small class="muted" id="vidShiftAudioHint">推荐</small>
+          </div>
+        </div>
+
+        <div class="compact-pair">
+          <div class="compact-field">
+            <div class="compact-label"><span>采样器</span><small id="vidSamplerHint">推荐</small></div>
+            <select class="img-select" id="vidSamplerSelect"></select>
+          </div>
+          <div class="compact-field">
+            <div class="compact-label"><span>调度器</span><small id="vidSchedulerHint">推荐</small></div>
+            <select class="img-select" id="vidSchedulerSelect"></select>
+          </div>
+        </div>
+
+        <div class="img-note" id="vidSamplingNote"></div>
+        <div class="img-note" id="vidCfgFixedNote"></div>
       </div>
     </div>
 
@@ -570,7 +631,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="field" id="modelField">
       <div class="field-label">模型 <span class="muted">基础模型随模式自动切换</span></div>
       <div class="cards2" id="modelCards">
-        <button data-v="lora" class="active"><b>MiniMax-H3 + LoRA</b><small>Turbo 加速 · 默认 6 步</small></button>
+        <button data-v="lora" class="active"><b>MiniMax-H3 + LoRA</b><small>Turbo 加速 · 默认 4 步</small></button>
         <button data-v="standard"><b>标准 MiniMax-H3</b><small>20 步 · 质量优先</small></button>
       </div>
       <div class="subfield" id="loraField">
@@ -593,8 +654,61 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     </div>
 
     <div class="field" id="stepsField">
-      <div class="field-label">步数 <span id="stepsVal">6</span> <span class="muted">4~20，步多质量高但更慢</span></div>
-      <input type="range" id="steps" min="4" max="20" step="1" value="6">
+      <div class="field-label">步数 <span id="stepsVal">4</span> <span class="muted">4~20，步多质量高但更慢</span></div>
+      <input type="range" id="steps" min="4" max="20" step="1" value="4">
+      <!-- 【2026-11-12】步数的「推荐 / 已改」提示。
+           默认档位与工作流硬编码一致：挂加速 LoRA -> 4 步，不用 LoRA -> 20 步。 -->
+      <small class="muted" id="vidLegacyStepsHint">推荐</small>
+    </div>
+
+    <!-- 【2026-11-11 新增】首尾帧 / 参考生视频的采样参数。
+         这两个模式走的是**旧工作流路径**（h3studio/workflows.py 的
+         _h3_video_workflow / build_r2v），但采样链路与文生视频完全相同 ——
+         同样是 BasicScheduler + KSamplerSelect + BasicGuider，
+         所以步数 / 采样器 / 调度器 / shift 一样是真参数、一样能调。
+         （文生视频面板在自己那块独立的「采样参数」区里。）
+         CFG 同样是 H3 固定 1.0 —— 只做只读说明。 -->
+    <div class="field" id="videoSamplingField" style="display:none">
+      <div class="field-label">采样参数 <span class="muted">与文生视频面板一致</span></div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>采样器</span><small id="vidLegacySamplerHint">推荐</small></div>
+          <select class="img-select" id="vidLegacySamplerSelect"></select>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>调度器</span><small id="vidLegacySchedulerHint">推荐</small></div>
+          <select class="img-select" id="vidLegacySchedulerSelect"></select>
+        </div>
+      </div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>shift（视频）</span><b id="vidLegacyShiftVideoVal">12.0</b></div>
+          <input type="range" id="vidLegacyShiftVideo" min="0.01" max="100" step="0.01" value="12">
+          <small class="muted" id="vidLegacyShiftVideoHint">推荐</small>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>shift（音频）</span><b id="vidLegacyShiftAudioVal">3.0</b></div>
+          <input type="range" id="vidLegacyShiftAudio" min="0.01" max="100" step="0.01" value="3">
+          <small class="muted" id="vidLegacyShiftAudioHint">推荐</small>
+        </div>
+      </div>
+
+      <div class="compact-pair">
+        <div class="compact-field">
+          <div class="compact-label"><span>CFG</span><b id="vidLegacyCfgVal">1.0</b></div>
+          <input type="text" id="vidLegacyCfg" value="1.0" readonly>
+          <small class="muted" id="vidLegacyCfgHint">H3 固定</small>
+        </div>
+        <div class="compact-field">
+          <div class="compact-label"><span>二采</span><small id="vidLegacyTwopassHint">不适用</small></div>
+          <input type="text" id="vidLegacyTwopassNote" value="此模式无二采" readonly>
+        </div>
+      </div>
+
+      <div class="img-note" id="vidLegacySamplingNote"></div>
+      <div class="img-note" id="vidLegacyCfgFixedNote"></div>
     </div>
 
     <!-- 【2026-11-11】这里原来是一个 compact-pair：左边「LoRA 强度」滑杆
@@ -861,14 +975,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 
     <div class="ag-composer">
       <div class="ag-status" id="agStatus"></div>
-      <!-- 本轮上传的附件（图片）：缩略图条 + 上传入口 -->
+      <!-- 本轮上传的附件（图片 / 音频 / 视频）：素材卡片条 + 上传入口 -->
       <div class="ag-attachments" id="agAttachments" hidden></div>
       <div class="ag-attach-row">
         <button class="ag-attach-btn" id="agAttachBtn" type="button"
-                title="上传参考图（png / jpg / webp，最多 9 张）">📎 图片</button>
+                title="上传参考素材（图片最多 9 张，音频/视频最多 4 个）">📎 媒体</button>
         <input type="file" id="agAttachInput" multiple hidden
-               accept="image/png,image/jpeg,image/webp,image/bmp,image/gif">
-        <span class="ag-attach-hint" id="agAttachHint">上传的图片会作为参考图交给 Agent</span>
+               accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,
+                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,
+                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,
+                      video/mp4,video/webm,video/quicktime,video/x-matroska,
+                      video/x-msvideo">
+        <span class="ag-attach-hint" id="agAttachHint">上传的图片 / 音频 / 视频会入库素材库后交给 Agent</span>
       </div>
       <div class="ag-input-row">
         <textarea id="agInput" rows="3" placeholder="例：素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5 秒 16:9 的视频"></textarea>
@@ -1080,11 +1198,14 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 </div>
 
 <script src="/static/qwen-refs.js?v=refs1"></script>
+<!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
+<script src="/static/video-panel-fallback.js?v=vpfb1"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
 <script src="/static/video-panel.js?v=videopanel1"></script>
+<script src="/static/video-nav.js?v=videonav1"></script>
 <script src="/static/app.js?v=enh-unify2"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

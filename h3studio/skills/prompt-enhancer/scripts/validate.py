@@ -235,6 +235,59 @@ def _is_json_like(inner: str) -> bool:
     return False
 
 
+# ------------------------------------------------------------------
+# 结构化标记白名单（不是权重语法）
+# ------------------------------------------------------------------
+# 【2026-11-11 新增 · 文生视频增强被整单 502 的第二个根因】
+#
+# 方括号权重语法 [word] 的拒收规则是**给 Z-Image 图像档**定的
+# （InvokeAI 官方：Z-Image 不支持 Compel 语法）。
+# 但 MiniMax-H3 的官方提示词规范**要求**用方括号写两类结构化标记：
+#   1. 镜头编号   [Shot 1] / [Shot 2] …
+#   2. 台词语言标签（在 <d> 里） [English] / [Chinese] / [Japanese] …
+# 这两类标记长得跟 [word] 一模一样，于是被旧规则当成权重语法拒收，
+# 整单 502 —— 报「出现提示词权重语法（Z-Image 不支持 Compel 语法）：[Shot 1]」。
+#
+# 模型**按格式输出**就必然带这两个标记，所以这不是偶发，是必然。
+# 修法：把这批**结构化标记**加白名单，其余 [word] 仍然拒收
+# （Z-Image 图像档的语义完全不变 —— 它的模板从不产生这些标记）。
+#
+# 白名单是**精确枚举**，不写通配 —— 写成通配会把 "[cat]" 这类真权重语法放过。
+_STRUCTURAL_MARKERS = {
+    # 镜头编号：Shot + 数字
+    "shot 1", "shot 2", "shot 3", "shot 4", "shot 5", "shot 6", "shot 7",
+    "shot 8", "shot 9", "shot 10", "shot 11", "shot 12", "shot 13",
+    "shot 14", "shot 15",
+    # 台词语言标签（H3 官方 <d> 标签内）
+    "english", "chinese", "japanese", "korean", "french", "german", "spanish",
+    "italian", "portuguese", "russian", "hindi", "thai", "vietnamese",
+    "indonesian", "malay", "arabic",
+}
+
+_STRUCTURAL_MARKER_RE = re.compile(
+    r"^shot\s+\d{1,3}$|^(english|chinese|japanese|korean|french|german|spanish|"
+    r"italian|portuguese|russian|hindi|thai|vietnamese|indonesian|malay|arabic)$",
+    re.I,
+)
+
+
+def _is_structural_marker(inner: str) -> bool:
+    """
+    方括号里是不是**结构化标记**（H3 镜头编号 / 台词语言标签）而不是权重语法。
+
+    这些标记是 MiniMax-H3 官方提示词规范**强制要求**的产物：
+      - 「第一个镜头直接写 `[Shot 1]`」
+      - 「`<d>` 里面只有语言标签和用户原话」（语言标签形如 `[English]`）
+    模型不写它们才是格式错误，所以它们绝不能被当成权重语法拒掉。
+    """
+    text = (inner or "").strip()
+    if not text:
+        return False
+    if _STRUCTURAL_MARKER_RE.match(text):
+        return True
+    return text.lower() in _STRUCTURAL_MARKERS
+
+
 _WEIGHT_BRACKET = re.compile(r"\[\s*([^\[\]]{1,120}?)\s*\]")
 _WEIGHT_DOUBLE_PAREN = re.compile(r"\(\([^()]{1,80}?\)\)")
 # 【2026-11-10 修正】原来的 `(\+\+|--)` 只认**恰好两个**符号，
@@ -301,6 +354,9 @@ def check_weight_syntax(text: str, mode: str = "pe"):
                 # 方括号：区分权重语法 [word] 与结构化数据 ["a","b"] / [1,2]
                 inner = match.group(1)
                 if _is_json_like(inner):
+                    continue
+                # H3 官方结构化标记（[Shot 1] / [English]）—— 不是权重语法
+                if _is_structural_marker(inner):
                     continue
             if pattern is _WEIGHT_PAREN:
                 # 括号：区分 Compel 权重语法 (cat) / (cat:1.5) 与

@@ -66,6 +66,32 @@ body {
 .nav-item:hover { background: #f2f3f6; }
 .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .nav-item.active svg { color: var(--accent); }
+
+/* ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
+   清单由 web/video-nav.js 从服务端 /api/video-categories 渲染，
+   这里的 CSS 只负责外观与展开/收起。 */
+.nav-categories { display: flex; flex-direction: column; gap: 2px; }
+.nav-cat { display: flex; flex-direction: column; }
+.nav-cat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--text); font-size: 13.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.nav-cat-head:hover { background: #f2f3f6; }
+.nav-cat-head.active { background: var(--accent-soft); color: var(--accent); }
+.nav-cat-head:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
+.nav-cat-head:disabled:hover { background: transparent; }
+.nav-cat-caret { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+.nav-cat.active > .nav-cat-head .nav-cat-caret { color: var(--accent); }
+/* 第二级：模型项 */
+.nav-cat-models { display: flex; flex-direction: column; gap: 1px; padding: 0 0 4px 14px; }
+.nav-model-item {
+  width: 100%; border: 0; background: transparent; text-align: left;
+  font-size: 12.5px; padding: 6px 10px; font-family: inherit;
+}
+.nav-model-item.unavailable { color: var(--muted); cursor: not-allowed; text-decoration: line-through; }
 .sidebar-foot { margin-top: auto; padding: 8px 6px; }
 .sidebar-foot button {
   width: 100%; padding: 7px; border: 1px solid var(--border); background: #fff;
@@ -1905,7 +1931,35 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 .ag-session-item-meta {
   font-size: 10px; color: var(--muted); margin-top: 3px; opacity: .85;
+  /* 改成 flex 布局：需求要求一行里同时放下
+     「最后更新 / 创建时间 / 消息数 / 产物数 / 状态徽章」5 样东西。
+     原来是一行纯文本用 "·" 拼接，加状态徽章后宽度会撑破侧栏 ->
+     375px 窄屏下必然横向溢出。flex + wrap 让它**换行**而不是溢出。 */
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px;
 }
+/* 各段之间不再用 "·" 分隔（改用 gap 间距），去掉自带的分隔符 */
+.ag-session-item-time,
+.ag-session-item-created,
+.ag-session-item-count,
+.ag-session-item-arts { white-space: nowrap; }
+.ag-session-item-created { opacity: .8; }
+/* 未完成任务数：这是**任务**层面的事实，不是会话在跑 */
+.ag-session-item-pending {
+  white-space: nowrap; flex: 0 0 auto;
+  color: #96601a; background: #fdf3e2; border: 1px solid #f4e0bd;
+  border-radius: 20px; padding: 0 5px; font-size: 9.5px; line-height: 1.5;
+}
+/* 状态徽章：比 .ag-badge 略小一点，列表项里才不抢标题的视觉重心 */
+.ag-session-status {
+  font-size: 9.5px; padding: 1px 5px; line-height: 1.5;
+  white-space: nowrap; flex: 0 0 auto;
+  /* .ag-badge 有 margin-bottom: 6px（它原本是给气泡里用的，
+     那里是竖排流式布局）。在 meta 行的 flex 里那 6px 会把徽章顶上去。
+     这里必须清掉 —— 否则徽章和「2 条」不在同一条基线上。 */
+  margin-bottom: 0;
+}
+/* 空会话 / 未知状态：无色徽章，用 muted 灰（与 .ag-badge 的透明底相配） */
+.ag-session-status.ag-badge-empty { color: var(--muted); }
 .ag-session-del {
   position: absolute; top: 7px; right: 6px;
   width: 22px; height: 22px; line-height: 1; font-size: 15px; cursor: pointer;
@@ -1985,6 +2039,23 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 6px; background: #eef1f6; display: block;
 }
 .ag-artifact-thumb.is-video { object-fit: contain; background: #10131a; }
+/* 音频产物没有可视缩略图 —— 用一个符号占位（原来会渲染成 <video>，
+   浏览器拿 mp3 当视频播 -> 显示空白黑框，用户以为坏了）。 */
+.ag-artifact-thumb.is-audio {
+  object-fit: contain; background: #eef1f6; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; line-height: 1;
+}
+/* 缩略图外面包一层 button（为了可点击看大图）。
+   button 有浏览器默认样式（边框/背景/内边距）必须清掉，
+   否则缩略图会带一圈灰边。 */
+.ag-artifact-thumb-btn {
+  display: block; width: 100%; padding: 0; margin: 0;
+  border: none; background: transparent; cursor: zoom-in;
+  line-height: 0; font-family: inherit;
+}
+.ag-artifact-thumb-btn:hover .ag-artifact-thumb { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ag-artifact-thumb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ag-artifact-prompt {
   font-size: 11px; color: var(--text); line-height: 1.45; margin-top: 6px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -2003,6 +2074,20 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: #fff; color: var(--muted); font-family: inherit;
 }
 .ag-artifact-locate:hover { border-color: var(--accent); color: var(--accent); }
+/* 产物卡片的操作行：两个按钮并排（查看大图 / 在生成库中定位） */
+.ag-artifact-actions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px;
+}
+.ag-artifact-actions .ag-artifact-locate { margin-top: 0; flex: 0 0 auto; }
+
+/* 「在生成库中定位」命中的卡片高亮（2026-11-12）。
+   2.5 秒后由 app.js 的 flashLocatedCard 撤掉 class。 */
+.job-card.is-located {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  border-radius: var(--radius);
+}
 /* ---------- 内置多模态 Agent 面板 ---------- */
 .agent-page {
   flex: 1 1 auto; min-width: 0; min-height: 0;
@@ -2378,6 +2463,58 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: var(--accent-soft);
 }
 
+/* 素材类型徽标：区分 图片 / 音频 / 视频，并标出「分析中」「不可用」 */
+.ag-attach-badge {
+  position: absolute; left: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none; max-width: calc(100% - 22px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 类型标签（音频/视频）—— 右上角，× 按钮左侧。
+   放右上角是为了把底部整行留给「时长 · 尺寸」——
+   两者都挤在底部时，「0:01 · 160x120」会被压成「0:01 - 160...」（截断）。 */
+.ag-attach-kind {
+  position: absolute; right: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none; max-width: calc(100% - 22px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ag-attach-badge-audio { background: rgba(26, 115, 92, .88); }
+.ag-attach-badge-video { background: rgba(120, 68, 168, .88); }
+.ag-attach-badge-pending { background: rgba(180, 120, 20, .9); }
+.ag-attach-badge-failed { background: rgba(179, 39, 43, .9); }
+
+/* 时长 / 尺寸（音频视频才有时长） */
+.ag-attach-meta {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font-size: 9px; line-height: 1.4; padding: 1px 3px;
+  color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: center;
+}
+
+/* 分析进度条（音视频异步分析） */
+.ag-attach-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: rgba(255, 255, 255, .45);
+  pointer-events: none;
+}
+.ag-attach-progress > span {
+  display: block; height: 100%; background: var(--accent);
+  transition: width .3s ease;
+}
+
+/* 「分析中」提示（不阻塞，但要明确告诉用户） */
+.ag-attach-note {
+  flex: 1 1 100%; min-width: 0;
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+  word-break: break-word;
+}
+
 /* 用户消息气泡里的附件缩略图 */
 .ag-msg-attachments {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -2390,5 +2527,17 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 .ag-msg-attach img {
   width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ag-msg-attach-badge {
+  position: absolute; left: 2px; top: 2px;
+  font-size: 9px; line-height: 1.4; padding: 0 4px;
+  border-radius: 4px; color: #fff; background: rgba(0, 0, 0, .55);
+  pointer-events: none;
+}
+.ag-msg-attach[data-kind="audio"] .ag-msg-attach-badge {
+  background: rgba(26, 115, 92, .88);
+}
+.ag-msg-attach[data-kind="video"] .ag-msg-attach-badge {
+  background: rgba(120, 68, 168, .88);
 }
 

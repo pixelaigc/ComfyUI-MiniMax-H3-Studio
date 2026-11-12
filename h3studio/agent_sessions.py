@@ -90,6 +90,55 @@ def _parse_meta(raw) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+#: 会话状态的取值集合（后端产出，前端只负责显示）。
+#:
+#: 【为什么只有这 5 个 —— 2026-11-12】
+#: 需求要求会话列表显示「状态」。这个字段必须**只描述这一轮对话的收尾方式**，
+#: 不能塞任何「运行中 / 排队中」之类服务端拿不到的信息 ——
+#: Agent 的并发闸门（AGENT_GATE）是**全局**信号量，不记录是哪个会话在跑，
+#: 服务端**无法**给出跨会话的「进行中」。硬造一个假状态比不显示更糟。
+SESSION_STATUS_EMPTY = "empty"
+SESSION_STATUS_COMPLETED = "completed"
+SESSION_STATUS_TRUNCATED = "truncated"
+SESSION_STATUS_FAILED = "failed"
+SESSION_STATUS_NEEDS_CLARIFICATION = "needs_clarification"
+
+#: 状态 -> 中文标签。前端直接显示这个字符串（不自己翻译），
+#: 免得同一个状态在两处显示成两个词。
+SESSION_STATUS_LABELS = {
+    SESSION_STATUS_EMPTY: "空会话",
+    SESSION_STATUS_COMPLETED: "完成",
+    SESSION_STATUS_TRUNCATED: "已截断",
+    SESSION_STATUS_FAILED: "失败",
+    SESSION_STATUS_NEEDS_CLARIFICATION: "待补充",
+}
+
+
+def _session_status(message_count: int, meta: dict) -> tuple[str, str]:
+    """
+    算出会话状态（key, 中文标签）。
+
+    【判定顺序 —— 2026-11-12】
+      1. 一条消息都没有 -> 空会话
+      2. 最后一条 assistant 消息的 meta.status 决定：
+         completed / truncated / failed / needs_clarification
+      3. 没有 meta.status（老会话，迁移前建的）-> 归为「完成」
+         —— 理由：迁移前的老会话**只存了纯文本**，
+         拿不到状态不代表出问题；标成「待补充」会让用户以为要补什么。
+
+    【为什么 truncated 不是 failed —— 语义边界】
+    截断是「达到步骤上限，**返回了已完成的部分结果**」，
+    是**部分成功**，不是失败（agent.py 专门修过这个语义错位）。
+    标成红色「失败」会让用户以为白干了。
+    """
+    if int(message_count or 0) <= 0:
+        return SESSION_STATUS_EMPTY, SESSION_STATUS_LABELS[SESSION_STATUS_EMPTY]
+    raw = str((meta or {}).get("status") or "").strip()
+    if raw in SESSION_STATUS_LABELS:
+        return raw, SESSION_STATUS_LABELS[raw]
+    return SESSION_STATUS_COMPLETED, SESSION_STATUS_LABELS[SESSION_STATUS_COMPLETED]
+
+
 def default_db_path() -> Path:
     """Agent 会话库路径。可用 AGENT_SESSION_DB 环境变量覆盖（测试用）。"""
     override = os.environ.get("AGENT_SESSION_DB")
@@ -234,7 +283,7 @@ class SessionStore:
 
         每条返回：
           id / title / created_at / updated_at / message_count /
-          preview / artifact_count
+          preview / artifact_count / status / status_label
 
         【title 与 preview 的区别 —— 2026-11-11】
         title 是**自动生成**的会话名（首条用户消息前 40 字），用于侧栏列表；
@@ -294,9 +343,20 @@ class SessionStore:
             # 首条用户消息（preview）。单独查是因为 SQLite 不支持
             #  correlated subquery 取「第一条」的直接写法（LIMIT 不进子查询）。
             previews: dict[str, str] = {}
+            # 最后一条 **assistant** 消息的 meta —— 会话状态的真源。
+            #
+            # 【为什么必须限定 role='assistant' —— 2026-11-12 实测】
+            # 一轮交互落库是 user -> assistant -> tool(*) 的顺序。
+            # 如果按「最后一条任意角色的消息」取状态，
+            # 正常完成的一轮最后一条是 **tool**（工具轨迹），
+            # 于是状态会被算成「没有助手结论」-> 列表里全部显示「待补充」——
+            # 而实际上每一轮都正常完成了。tool 消息**不携带** meta.status，
+            # 用它推断状态必然出错。
+            last_meta: dict[str, dict] = {}
             if rows:
                 ids = [r["id"] for r in rows]
                 placeholders = ",".join("?" * len(ids))
+                # 首条用户消息（preview）。
                 first_rows = conn.execute(
                     f"SELECT session_id, content FROM agent_messages "
                     f"WHERE session_id IN ({placeholders}) AND role='user' "
@@ -305,17 +365,31 @@ class SessionStore:
                     sid = str(fr["session_id"])
                     if sid not in previews:
                         previews[sid] = (fr["content"] or "").strip()
+                # 只取**最后一条** assistant 消息的 meta。
+                # 一次会话可能有几十条 assistant 消息，不能全取出来在 Python 里筛
+                # —— 那会把列表接口的内存占用放大一个量级。
+                last_rows = conn.execute(
+                    f"SELECT session_id, meta FROM agent_messages "
+                    f"WHERE session_id IN ({placeholders}) AND role='assistant' "
+                    f"ORDER BY id ASC", ids).fetchall()
+                for lr in last_rows:
+                    last_meta[str(lr["session_id"])] = _parse_meta(lr["meta"])
         result = []
         for r in rows:
             title = (r["title"] or "").strip()
             preview = previews.get(str(r["id"]), "")
+            message_count = int(r["message_count"] or 0)
+            status, status_label = _session_status(message_count, last_meta.get(str(r["id"]), {}))
             result.append({
                 "id": r["id"],
                 "title": title or "新会话",
                 "preview": preview[:120],
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
-                "message_count": r["message_count"],
+                "message_count": message_count,
+                # 会话状态（2026-11-12 新增）—— 见 _session_status 的说明。
+                "status": status,
+                "status_label": status_label,
                 # 关联产物数 —— 由 server 侧补（jobs 表不在会话库里）。
                 # 这里先填 0，server.list_sessions_with_jobs 会覆盖。
                 "artifact_count": 0,

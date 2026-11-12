@@ -791,24 +791,84 @@ def build_messages(spec: dict, original: str, language: str = "auto") -> list:
 # ------------------------------------------------------------------ 输出处理
 
 
+# 模型可能加的「这是我的产出」类前缀（Markdown 包裹 / 角色前缀 / 引导语）。
+# 逐字匹配，去掉后必须是**整行**或**整段开头**才算剥成功 ——
+# 否则正文里正常出现的同名词（比如提示词正文写「提示词：xxx」）会被误剥。
+_LEADING_LABEL_PREFIXES = (
+    "扩写后的提示词：", "扩写结果：", "扩写后：", "增强结果：", "增强后的提示词：",
+    "提示词：", "提示词如下：", "最终提示词：", "输出：", "结果：",
+    "Prompt:", "prompt:", "Enhanced prompt:", "Output:", "Result:",
+)
+
+# 角色前缀 —— 模型有时先写一句「As an AI video director, ...」再给正文。
+# 只剥**行首**的角色自称，且剥完后面必须还有实质内容。
+_ROLE_PREFIX_RE = re.compile(
+    r"^(?:作为(?:一位|一名)?[^，。\n]{0,24}(?:导演|工程师|助手|专家|模型|agent|AI)"
+    r"|As an?[^,\n]{0,40}(?:director|engineer|assistant|model|AI|agent)"
+    r"|Here(?:'s| is)[^,\n]{0,60}(?:prompt|result|output|version)"
+    r"|Below is[^,\n]{0,60}(?:prompt|result|output)"
+    r"|Sure[,.!][^\n]{0,60})[：:，,。\n]?",
+    re.I,
+)
+
+
+def _strip_leading_label(result: str) -> str:
+    """
+    剥掉模型加的前缀标签（可叠加：先 Markdown 强调，再角色前缀）。
+
+    循环直到剥不动 —— 模型常写成
+    「**扩写后的提示词：**\n\n正文」这种**两级**包裹，
+    只剥一层会留下残余。
+    """
+    for _ in range(4):
+        before = result
+        # Markdown 强调包裹：`**扩写后的提示词：**` / `*提示词：*` / `**提示词**`
+        # （收尾的强调标记可能在冒号**之前** —— `**扩写后的提示词：**` 就是这种）
+        m = re.match(r"^\s*[*_]{1,3}\s*([^:*_\n]{1,40}?)\s*[*_]{0,3}\s*"
+                     r"[*_]{0,3}\s*[：:]\s*[*_]{0,3}\s*(?:\n+|$)", before)
+        if m and m.group(1).strip() in [p.rstrip("：:") for p in _LEADING_LABEL_PREFIXES]:
+            result = before[m.end():].strip()
+        # 无冒号的纯强调标签：**扩写结果**
+        m_nb = re.match(r"^\s*[*_]{1,3}\s*([^:*_\n]{1,40}?)\s*[*_]{1,3}\s*"
+                        r"(?:\n+|$)", before)
+        if (m_nb and m_nb.group(1).strip()
+                in [p.rstrip("：:") for p in _LEADING_LABEL_PREFIXES]):
+            result = before[m_nb.end():].strip()
+        for prefix in _LEADING_LABEL_PREFIXES:
+            if result.startswith(prefix):
+                result = result[len(prefix):].strip()
+                break
+        # 角色前缀 / 引导语
+        m2 = _ROLE_PREFIX_RE.match(result)
+        if m2:
+            result = result[m2.end():].strip()
+        if result == before:
+            break
+    return result
+
+
 def strip_wrapping(text: str) -> str:
     """
     清理模型可能的包装：代码块围栏、引号、以及「提示词：」这类前缀。
     只做保守剥离，不动正文内容。
+
+    【2026-11-11 增补 · 系统提示词复读的根因之一】
+    原实现只处理「以 ``` 开头」的围栏 —— 模型把正文包在围栏**中间**
+    （前面有话、后面有话）时，围栏原样留在结果里；
+    且只剥一层标签前缀，Markdown 强调/角色前缀都会残留。
+    这次统一按「先剥围栏 → 再剥标签 → 再剥角色前缀」三步走，
+    且每步都循环到收敛。
     """
     if not text:
         return ""
     result = text.strip()
-    if result.startswith("```"):
-        lines = result.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]
-        result = "\n".join(lines).strip()
-    for prefix in ("扩写后的提示词：", "扩写结果：", "提示词：", "Prompt:", "prompt:"):
-        if result.startswith(prefix):
-            result = result[len(prefix):].strip()
+    # 围栏：可能出现在**任意位置**（不止开头）—— 先整体摘掉围栏标记，
+    # 保留围栏里的内容（模型常把正文放进 ``` 块）。
+    result = re.sub(r"^\s*```[^\n]*\n", "", result)
+    result = re.sub(r"\n\s*```\s*$", "", result)
+    result = re.sub(r"```[a-zA-Z0-9_+\-]*", "", result)
+    result = result.strip()
+    result = _strip_leading_label(result)
     if len(result) >= 2 and result[0] in "\"'“" and result[-1] in "\"'”":
         result = result[1:-1].strip()
     return result
@@ -1274,17 +1334,149 @@ def validate_output(text: str, original: str = "", mode: str = "pe") -> dict:
     return module.validate(text, original, mode)
 
 
+def _instruction_prose(system_prompt: str) -> str:
+    """
+    从 system prompt 里抽出**指令散文**（不含「输出骨架」）。
+
+    为什么要抽：
+      模板正文里有一段**输出格式示例**（``` 围栏包着），
+      比如 H3 导演稿的
+        integrated_multimodal_description: [Shot 1] ...
+        overall_soundscape: ...
+        non_diegetic_music: ...
+      模型**忠实按格式输出**时，正文里必然出现这几个字段名 ——
+      于是「输出 vs system prompt 的最长公共子块」必然 >= 40 字符，
+      旧判据会把**完全正确的输出**判成「系统提示词复读」。
+
+    所以判定复读时要比的是**指令散文**：把围栏（输出骨架）、
+    markdown 表格、列表符号去掉，只留「人话指令」部分。
+    真正的复读（模型原样吐回整段 system prompt）散文重合度依然极高；
+    正常输出只在字段名这种短片段上重合。
+
+    【2026-11-11 二次修正】行内代码也要剥（`` `integrated_multimodal_description` ``）：
+    模板在「输出结构」小节里用反引号逐个点名了三个字段名，模型照样会抄进产物。
+    不剥的话这些字段名会成为 33 字符的公共块，把「短产物」的覆盖率判据顶上去。
+    """
+    if not system_prompt:
+        return ""
+    text = system_prompt
+    # 1. 去掉代码围栏（输出骨架示例）
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    # 2. 去掉未闭合的围栏（模板少写一个 ``` 时同样要兜住）
+    text = re.sub(r"```.*", " ", text, flags=re.S)
+    # 3. 去掉行内代码（字段名 / 示例片段）
+    text = re.sub(r"`[^`\n]{1,120}`", " ", text)
+    # 4. 去掉 markdown 表格行（| a | b |）与列表符号
+    text = re.sub(r"^\s*\|.*$", " ", text, flags=re.M)
+    text = re.sub(r"^\s*[-*+]\s+", " ", text, flags=re.M)
+    text = re.sub(r"^\s*#{1,6}\s*", " ", text, flags=re.M)
+    # 5. 去掉行内的 markdown 强调标记
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    return re.sub(r"[ \t]+", " ", text).strip()
+
+
+def _echo_signature(output: str, system_prompt: str) -> dict:
+    """
+    计算「输出 vs system prompt」的相似度特征。
+
+    返回 {"longest": 最长公共子块长度, "ratio": 公共字符占比,
+          "coverage": 输出里有多少比例来自 system prompt}
+    """
+    import difflib
+    prose = _instruction_prose(system_prompt)
+    if not output or not prose:
+        return {"longest": 0, "ratio": 0.0, "coverage": 0.0}
+    matcher = difflib.SequenceMatcher(None, prose, output, autojunk=False)
+    longest = matcher.find_longest_match(0, len(prose), 0, len(output)).size
+    matched = sum(b.size for b in matcher.get_matching_blocks())
+    return {
+        "longest": longest,
+        "ratio": matcher.ratio(),
+        "coverage": matched / float(len(output)) if output else 0.0,
+    }
+
+
 def looks_like_echo(output: str, system_prompt: str) -> bool:
     """
     检测模型是不是把 system prompt 原样吐了回来。
 
     小参数量模型（135M 之类）经常不干活，直接复读系统提示词。
     这种输出必须当成失败处理 —— 否则用户会拿到一段系统提示词冒充提示词。
-    判据：输出与系统提示词存在长度 >= 40 字符的公共子块。
+
+    【2026-11-11 修正 · 根因】
+    旧判据是「输出与 system prompt 存在长度 >= 40 字符的公共子块」。
+    那是**假阳性**：模板正文里的「输出格式骨架」（字段名、示例行）
+    会被模型忠实抄进产物，于是公共子块天然 >= 40 字符。
+    实测（本机 qwen3.8-flash-next-iq3_xxs，video-director 档）：
+      模型返回 1275 字的**完全正确**的三段式导演稿，
+      只因为与模板骨架共有一段
+        「integrated_multimodal_description: [Shot 1] 」（44 字符）
+      就被判成「系统提示词复读」，整个增强 502 —— 用户侧表现就是
+      「该模型可能太小或未按指令输出，请换用更强的模型」（误导）。
+
+    现在改成**四档判据**（任一命中才算复读）：
+      1. 最长公共子块 >= 60 字符（真复读会整段照抄指令散文）
+      2. 公共字符占输出比例 >= 0.75，**且**输出够长（>= 300 字符）
+      3. 整体相似度 >= 0.85
+      4. 公共字符占输出比例 >= 0.85（**短**复读的兜底；
+         短输出不走判据 2，因为覆盖率对短文本没有区分力）
+
+    【阈值是怎么定的 —— 实测分离度，不是拍脑袋】
+      合法产物（7 个样本：真实模型返回 3 个 + 手工构造的贴模板措辞的短稿 4 个）
+        最长公共子块 = 33（且全是同一个字段名）、覆盖率 0.06~0.48、相似度 0.07~0.11
+      真复读（9 个样本：整段 / 重新排版 / 去 markdown / 加前缀 / 围栏包裹 /
+        截断 200/500/800 字 / 半段散文）
+        最长公共子块 = 71~800、覆盖率 0.56~1.00、相似度 0.23~0.74
+      于是「最长公共子块」这一维在 33 与 71 之间有**干净的间隙**，
+      阈值取 60 落在中间，两侧都不误伤。
+      「整体相似度」这一维：合法 <= 0.11，真复读 >= 0.23 —— 阈值 0.85 过于宽松，
+      改用「判据 1 + 判据 2/4」的组合后本维度不再承担主判责任，
+      保留 0.85 只作极端情况兜底。
+
+    【判据 2 为什么加「输出 >= 300 字符」这个前提】
+      覆盖率对**短输出**没有区分力：一句 100 字的产物，只要其中 80 字
+      碰巧与模板措辞相同（模板里列了大量运镜/声音术语，合法产物会照抄
+      这些词），覆盖率就能到 0.5 —— 但那不是复读。
+      所以长输出走「覆盖率 + 长度前提」，短输出走判据 4（覆盖率 >= 0.85，
+      只有几乎整段照抄才够得上）。
+
+    并且公共子块只与**指令散文**比（不含输出骨架），避免格式字段名误伤。
     """
     if not output or not system_prompt:
         return False
-    import difflib
-    matcher = difflib.SequenceMatcher(None, system_prompt, output, autojunk=False)
-    block = matcher.find_longest_match(0, len(system_prompt), 0, len(output))
-    return block.size >= 40
+    sig = _echo_signature(output, system_prompt)
+    # 判据 1：整段照抄（实测：合法 <= 33，真复读 >= 71，阈值 60 落在间隙里）
+    if sig["longest"] >= 60:
+        return True
+    # 判据 2：长输出的大部分来自 system prompt
+    if len(output) >= 300 and sig["coverage"] >= 0.75:
+        return True
+    # 判据 3：整体相似
+    if sig["ratio"] >= 0.85:
+        return True
+    # 判据 4：短输出的复读兜底（几乎整段照抄）
+    return len(output) < 300 and sig["coverage"] >= 0.85
+
+
+def echo_detail(output: str, system_prompt: str) -> dict:
+    """
+    复读判定的**可解释信息** —— 给上层拼明确错误文案用。
+
+    返回 {"is_echo": bool, "reason": str, **sig}
+    """
+    sig = _echo_signature(output or "", system_prompt or "")
+    if not (output and system_prompt):
+        return {"is_echo": False, "reason": "", **sig}
+    if sig["longest"] >= 60:
+        reason = f"与系统提示词存在 {sig['longest']} 字符的整段照抄"
+    elif len(output) >= 300 and sig["coverage"] >= 0.75:
+        reason = (f"返回内容有 {sig['coverage']:.0%} 来自系统提示词"
+                  f"（最长公共片段 {sig['longest']} 字符）")
+    elif sig["ratio"] >= 0.85:
+        reason = f"与系统提示词的相似度达 {sig['ratio']:.0%}"
+    elif len(output) < 300 and sig["coverage"] >= 0.85:
+        reason = (f"返回内容有 {sig['coverage']:.0%} 来自系统提示词"
+                  f"（最长公共片段 {sig['longest']} 字符）")
+    else:
+        reason = ""
+    return {"is_echo": bool(reason), "reason": reason, **sig}

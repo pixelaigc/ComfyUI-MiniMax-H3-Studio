@@ -21,8 +21,11 @@
     // 正在流式渲染的那条消息（增量渲染的锚点）
     streaming: null,
     // 【本轮待发送的附件 —— 2026-11-11】
-    // 上传完成、**还没随消息发出**的图片。
-    // 每项：{asset_id, name, preview_url, description, width, height}
+    // 上传完成、**还没随消息发出**的媒体。
+    // 每项：{asset_id, name, preview_url, description, tags, width, height,
+    //       kind, duration_sec, analysis_status, available, analysis_job_id}
+    // kind = image | audio | video（素材库里的真实类别）。
+    // analysis_status = done（就绪）| pending（分析中）| failed（失败）。
     // 发出后由 send() 清空（附件只属于一条消息）。
     attachments: [],
     // 附件区的临时状态（上传中 / 出错）
@@ -30,22 +33,91 @@
     attachBusy: false,
     // 附件处理阶段的文案（「正在入库素材库…」「正在生成描述与标签…」）
     attachStage: "",
+    // 音视频**异步分析**的进度：{asset_id: {status, progress, stage}}
+    attachJobs: {},
   };
 
-  // ---------- 附件（图片上传） ----------
+  // ---------- 附件（图片 / 音频 / 视频上传） ----------
 
-  // 一次最多几张（与服务端 agent_media.MAX_IMAGES_PER_UPLOAD 对齐）。
+  // 一次最多几张图片（与服务端 agent_media.MAX_IMAGES_PER_UPLOAD 对齐）。
   //
   // 【为什么要前端也限】
   // 前端限是为了**即时反馈**（用户选到第 10 张时立刻提示），
   // 不是安全边界 —— 服务端还会再限一次。
   const MAX_ATTACHMENTS = 9;
 
-  // 允许的图片类型（与 agent_media.ALLOWED_IMAGE_SUFFIXES 对齐）。
-  const ATTACH_ACCEPT = "image/png,image/jpeg,image/webp,image/bmp,image/gif";
+  // 一次最多几个音频/视频（与服务端 agent_media.MAX_MEDIA_FILES_PER_UPLOAD 对齐）。
+  //
+  // 【为什么单独计数、且比图片少】
+  // H3 参考生成节点的槽位上限是 ref_videos 0~3 / ref_audios 0~3；
+  // 而每个参考视频/音频都整段参与推理（不像参考图只进图像编码器），
+  // 一次拖十几个几百 MB 的视频会把队列压垮。
+  const MAX_MEDIA_ATTACHMENTS = 4;
 
-  // 单张大小上限（20 MB，与服务端 agent_media.MAX_IMAGE_BYTES 对齐）。
+  // 允许的文件类型（与 agent_media.ALLOWED_*_SUFFIXES 对齐）。
+  const ATTACH_ACCEPT = [
+    "image/png", "image/jpeg", "image/webp", "image/bmp", "image/gif",
+    "audio/wav", "audio/mpeg", "audio/mp3", "audio/flac", "audio/x-flac",
+    "audio/mp4", "audio/m4a", "audio/aac", "audio/ogg", "audio/opus",
+    "video/mp4", "video/webm", "video/quicktime", "video/x-matroska",
+    "video/x-msvideo",
+  ].join(",");
+
+  // 单文件大小上限（与服务端 agent_media.MAX_*_BYTES 对齐）。
   const MAX_ATTACH_BYTES = 20 * 1024 * 1024;
+  const MAX_AUDIO_ATTACH_BYTES = 100 * 1024 * 1024;
+  const MAX_VIDEO_ATTACH_BYTES = 500 * 1024 * 1024;
+
+  // 媒体类型 -> 中文标签（卡片与提示共用）。
+  const KIND_LABEL = { image: "图片", audio: "音频", video: "视频" };
+
+  // 媒体类型 -> 该类型的单文件上限。
+  function maxBytesForKind(kind) {
+    if (kind === "audio") return MAX_AUDIO_ATTACH_BYTES;
+    if (kind === "video") return MAX_VIDEO_ATTACH_BYTES;
+    return MAX_ATTACH_BYTES;
+  }
+
+  // 文件名后缀 -> 媒体类型（与 agent_media._media_kind_for_suffix 同语义）。
+  function kindForFile(file) {
+    const name = ((file && file.name) || "").toLowerCase();
+    const type = ((file && file.type) || "").toLowerCase();
+    if (type.startsWith("image/")) return "image";
+    if (type.startsWith("audio/")) return "audio";
+    if (type.startsWith("video/")) return "video";
+    if (/\.(png|jpe?g|webp|bmp|gif)$/.test(name)) return "image";
+    if (/\.(wav|mp3|flac|m4a|aac|ogg|opus|aiff?|wma)$/.test(name)) return "audio";
+    if (/\.(mp4|webm|mov|mkv|m4v|avi)$/.test(name)) return "video";
+    return "";
+  }
+
+  // 时长格式化（秒 -> 0:12 / 1:05）。
+  function fmtDuration(seconds) {
+    const value = Number(seconds);
+    if (!isFinite(value) || value <= 0) return "";
+    const total = Math.round(value);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  // 一个附件的「就绪」状态。
+  //
+  // 【为什么要分三种状态而不是布尔】
+  //   ready    —— 分析完成，可以引用
+  //   pending  —— 分析在跑，**还不能引用**（前端要拦住发送）
+  //   failed   —— 分析失败，不可用
+  // 图片上传是同步预处理的，上传完就是 ready；
+  // 音视频走异步 job，要轮询到 done 才 ready。
+  function attachStatus(item) {
+    if (!item) return "ready";
+    if (item.analysis_status === "failed") return "failed";
+    if (item.analysis_pending || item.analysis_status === "pending"
+        || item.analysis_status === "queued"
+        || item.analysis_status === "running") return "pending";
+    if (item.available === false && item.kind !== "image") return "pending";
+    return "ready";
+  }
 
   function renderAttachments() {
     const box = $("#agAttachments");
@@ -53,60 +125,115 @@
     const btn = $("#agAttachBtn");
     if (!box) return;
     const items = state.attachments;
+    const pending = items.filter(it => attachStatus(it) === "pending");
+    const failed = items.filter(it => attachStatus(it) === "failed");
     if (!items.length && !state.attachError && !state.attachBusy) {
       box.hidden = true;
       box.innerHTML = "";
-      if (hint) hint.textContent = "上传的图片会作为参考图交给 Agent";
+      if (hint) hint.textContent = "上传的图片 / 音频 / 视频会入库素材库后交给 Agent";
       if (btn) btn.disabled = false;
       return;
     }
     box.hidden = false;
-    const thumbs = items.map((item, index) => {
+    const cards = items.map((item, index) => {
+      const kind = item.kind || "image";
+      const status = attachStatus(item);
       const tagHint = (item.tags && item.tags.length)
         ? ` title="${esc(item.tags.join("、"))}"` : "";
+      const duration = fmtDuration(item.duration_sec);
+      const meta = [];
+      if (kind !== "image" && duration) meta.push(duration);
+      if (item.width && item.height) meta.push(item.width + "×" + item.height);
+      const metaText = meta.length ? esc(meta.join(" · ")) : "";
+      // 【类型徽标 —— 卡片左上角】
+      // 「分析中 / 不可用」是**状态**，优先级高于类型 ——
+      // 用户要先知道「这个东西能不能用」，再关心它是什么类型。
+      // 所以分析中/失败时只显示状态徽标，不显示类型徽标
+      // （否则两个徽标会挤在 62px 的卡片里互相盖住）。
+      const badge = status === "pending"
+        ? `<span class="ag-attach-badge ag-attach-badge-pending">分析中</span>`
+        : (status === "failed"
+          ? `<span class="ag-attach-badge ag-attach-badge-failed">不可用</span>`
+          : `<span class="ag-attach-badge ag-attach-badge-${esc(kind)}">${esc(KIND_LABEL[kind] || kind)}</span>`);
+      // 【类型标签 —— 卡片右上角（× 按钮左侧）】
+      // 类型徽标挪到**右上角**后，底部的时长/尺寸才有整行宽度可用 ——
+      // 之前两者都在底部，「0:01 · 160×120」被压成「0:01 - 160…」（截断）。
+      // 右上角这里留给类型标签（× 按钮在更右上，absolute 定位互不重叠）。
+      const kindTag = (status === "ready" && kind !== "image")
+        ? `<span class="ag-attach-kind">${esc(KIND_LABEL[kind] || kind)}</span>`
+        : "";
+      const progress = status === "pending"
+        ? (() => {
+            const job = state.attachJobs[item.asset_id] || {};
+            const pct = Math.round((Number(job.progress) || 0) * 100);
+            return `<div class="ag-attach-progress"><span style="width:${pct}%"></span></div>`;
+          })()
+        : "";
       return `
-      <div class="ag-attach-thumb" data-asset-id="${esc(item.asset_id || "")}"${tagHint}>
+      <div class="ag-attach-thumb" data-asset-id="${esc(item.asset_id || "")}"
+           data-kind="${esc(kind)}" data-status="${esc(status)}"${tagHint}>
         <img src="${esc(item.preview_url || "")}" alt="${esc(item.name || "附件")}"
              loading="lazy">
+        ${badge}
+        ${kindTag}
+        ${metaText ? `<span class="ag-attach-meta">${metaText}</span>` : ""}
+        ${progress}
         <button type="button" class="ag-attach-remove" data-act="remove-attachment"
                 data-index="${index}" title="移除"
                 aria-label="移除附件">×</button>
       </div>`;
     }).join("");
-    // 处理中：明确告知在做什么、大概要多久（本地分析 120~180 秒/张）
+    // 处理中：明确告知在做什么、大概要多久
     const busy = state.attachBusy
       ? `<div class="ag-attach-busy">
            <span class="ag-attach-spinner"></span>
            <span>${esc(state.attachStage || "正在处理…")}素材库需要生成描述与标签，
              本地模型约 1~3 分钟/张，请耐心等待</span>
          </div>` : "";
-    box.innerHTML = thumbs + busy + (state.attachError
-      ? `<div class="ag-attach-err">${esc(state.attachError)}</div>` : "");
+    const notes = [];
+    if (pending.length) {
+      notes.push(`<div class="ag-attach-note">${pending.length} 个素材正在分析，
+        分析完成前不能作为参考素材引用</div>`);
+    }
+    if (failed.length) {
+      notes.push(`<div class="ag-attach-err">${failed.length} 个素材分析失败，
+        不可用</div>`);
+    }
+    box.innerHTML = cards + busy + notes.join("")
+      + (state.attachError
+        ? `<div class="ag-attach-err">${esc(state.attachError)}</div>` : "");
     if (hint) {
-      hint.textContent = state.attachBusy
-        ? (state.attachStage || "正在处理…")
-        : (items.length
-          ? `已附 ${items.length} 张图，Agent 会把它们当参考图`
-          : "上传的图片会作为参考图交给 Agent");
+      if (state.attachBusy) {
+        hint.textContent = (state.attachStage || "正在处理…");
+      } else if (pending.length) {
+        hint.textContent = `已附 ${items.length} 个素材，${pending.length} 个仍在分析`;
+      } else {
+        const kinds = {};
+        items.forEach(it => { kinds[it.kind || "image"] = true; });
+        const summary = Object.keys(kinds).map(k => KIND_LABEL[k] || k).join("/");
+        hint.textContent = items.length
+          ? `已附 ${items.length} 个${summary ? "（" + summary + "）" : ""}，Agent 会引用它们`
+          : "上传的图片 / 音频 / 视频会入库素材库后交给 Agent";
+      }
     }
     if (btn) {
       btn.disabled = state.attachBusy;
-      btn.textContent = state.attachBusy ? "处理中…" : "📎 图片";
+      btn.textContent = state.attachBusy ? "处理中…" : "📎 媒体";
     }
   }
 
   // 校验一个待上传的文件。返回错误字符串，null = 通过。
   function validateAttachFile(file) {
     const name = (file && file.name) || "";
-    const type = (file && file.type) || "";
-    const lower = name.toLowerCase();
-    const okType = /^image\/(png|jpeg|jpg|webp|bmp|gif)$/i.test(type)
-      || /\.(png|jpe?g|webp|bmp|gif)$/i.test(lower);
-    if (!okType) {
-      return `「${name}」不是支持的图片格式（只支持 png / jpg / webp / bmp / gif）`;
+    const kind = kindForFile(file);
+    if (!kind) {
+      return `「${name}」不是支持的格式（图片 png/jpg/webp/bmp/gif；`
+        + `音频 wav/mp3/flac/m4a/ogg；视频 mp4/webm/mov/mkv）`;
     }
-    if (file.size > MAX_ATTACH_BYTES) {
-      return `「${name}」超过 ${MAX_ATTACH_BYTES / (1024 * 1024)} MB 上限`;
+    const limit = maxBytesForKind(kind);
+    if (file.size > limit) {
+      return `「${name}」超过 ${limit / (1024 * 1024)} MB 上限`
+        + `（${KIND_LABEL[kind]}上限 ${limit / (1024 * 1024)} MB）`;
     }
     if (file.size <= 0) {
       return `「${name}」是空文件`;
@@ -118,23 +245,38 @@
     const list = [...(files || [])];
     if (!list.length) return;
     state.attachError = "";
-    const room = MAX_ATTACHMENTS - state.attachments.length;
-    if (room <= 0) {
-      state.attachError = `一次最多附 ${MAX_ATTACHMENTS} 张图，请先移除一些`;
+    // 图片与音视频**分开**算额度
+    const images = state.attachments.filter(a => (a.kind || "image") === "image");
+    const medias = state.attachments.filter(a => (a.kind || "image") !== "image");
+    const imageRoom = MAX_ATTACHMENTS - images.length;
+    const mediaRoom = MAX_MEDIA_ATTACHMENTS - medias.length;
+    if (imageRoom <= 0 && mediaRoom <= 0) {
+      state.attachError = `一次最多附 ${MAX_ATTACHMENTS} 张图、`
+        + `${MAX_MEDIA_ATTACHMENTS} 个音频/视频，请先移除一些`;
       renderAttachments();
       return;
     }
-    const accepted = list.slice(0, room);
-    const rejected = list.slice(room);
     const errors = [];
     const form = new FormData();
-    for (const file of accepted) {
+    let usedImages = 0;
+    let usedMedias = 0;
+    let dropped = 0;
+    for (const file of list) {
+      const kind = kindForFile(file);
       const err = validateAttachFile(file);
       if (err) { errors.push(err); continue; }
+      if (kind === "image") {
+        if (usedImages >= imageRoom) { dropped++; continue; }
+        usedImages++;
+      } else {
+        if (usedMedias >= mediaRoom) { dropped++; continue; }
+        usedMedias++;
+      }
       form.append("files[]", file, file.name);
     }
-    if (rejected.length) {
-      errors.push(`一次最多附 ${MAX_ATTACHMENTS} 张图，${rejected.length} 张未上传`);
+    if (dropped) {
+      errors.push(`超出数量上限（最多 ${MAX_ATTACHMENTS} 张图、`
+        + `${MAX_MEDIA_ATTACHMENTS} 个音频/视频），${dropped} 个未上传`);
     }
     if (!form.has("files[]")) {
       state.attachError = errors.join("；") || "没有可上传的文件";
@@ -143,8 +285,10 @@
     }
     state.attachBusy = true;
     // 【素材库预处理要时间 —— 2026-11-11】
-    // 上传后服务端会**同步**跑素材库的预处理管线（多模态分析 + 抽标签），
+    // 图片：服务端**同步**跑素材库的预处理管线（多模态分析 + 抽标签），
     // 实测一张 512x512 的图约需 **120~180 秒**（本地推理）。
+    // 音视频：**异步** job（深度音频分析 / 视频抽帧多模态），
+    // 上传立刻返回，之后由前端轮询 /api/agent/media/{id}/status。
     // 所以提示必须说清楚「在做什么、大概要多久」，否则用户以为卡死。
     state.attachStage = "正在入库素材库…";
     renderAttachments();
@@ -157,7 +301,7 @@
       if (!resp.ok) throw new Error(data.error || ("上传失败（HTTP " + resp.status + "）"));
       const results = data.results || [];
       for (const item of results) {
-        state.attachments.push({
+        const entry = {
           asset_id: item.asset_id,
           name: item.name || "",
           preview_url: item.preview_url || "",
@@ -165,10 +309,24 @@
           tags: item.tags || [],
           width: item.width || null,
           height: item.height || null,
-        });
+          kind: item.kind || "image",
+          duration_sec: item.duration_sec || null,
+          analysis_status: item.analysis_status || "done",
+          available: item.available !== false,
+          analysis_job_id: item.analysis_job_id || null,
+          analysis_pending: !!item.analysis_pending,
+        };
+        state.attachments.push(entry);
+        if (entry.analysis_pending) {
+          state.attachJobs[entry.asset_id] = { status: "queued", progress: 0 };
+        }
       }
       const serverErrors = (data.errors || []).map(e => e.error).filter(Boolean);
       state.attachError = errors.concat(serverErrors).join("；");
+      // 有音视频在分析 -> 开始轮询
+      if (state.attachments.some(it => attachStatus(it) === "pending")) {
+        pollMediaStatus();
+      }
     } catch (err) {
       state.attachError = err.message || "上传失败";
     } finally {
@@ -176,6 +334,61 @@
       state.attachStage = "";
       renderAttachments();
     }
+  }
+
+  // 轮询音视频的分析就绪状态。
+  //
+  // 【为什么要轮询而不是让服务端阻塞】
+  // 深度音频分析实测 116 秒素材要 ~600 秒；视频要抽 24 帧再调多模态。
+  // 服务端阻塞 = HTTP 请求挂十几分钟，用户早就走了。
+  //
+  // 【为什么单独一个端点而不是复用 /api/assets/{id}/analysis-status】
+  // 素材库那个端点只返回 job 状态，**不补标签**；
+  // 而 Agent 侧要求「分析完成」与「标签已落库」是同一次返回。
+  // /api/agent/media/{id}/status 两者都做。
+  let mediaPollTimer = null;
+  function pollMediaStatus() {
+    if (mediaPollTimer) return;
+    mediaPollTimer = setInterval(async () => {
+      const pending = state.attachments.filter(it => attachStatus(it) === "pending");
+      if (!pending.length) {
+        clearInterval(mediaPollTimer);
+        mediaPollTimer = null;
+        renderAttachments();
+        return;
+      }
+      for (const item of pending) {
+        try {
+          const resp = await fetch(
+            "/api/agent/media/" + encodeURIComponent(item.asset_id) + "/status");
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          state.attachJobs[item.asset_id] = {
+            status: data.status || "",
+            progress: data.progress || 0,
+            stage: data.stage || "",
+          };
+          if (data.status === "done") {
+            item.analysis_status = "done";
+            item.analysis_pending = false;
+            item.available = data.available !== false;
+            item.description = data.description || item.description;
+            item.tags = data.tags || item.tags;
+            item.duration_sec = data.duration_sec || item.duration_sec;
+          } else if (data.status === "failed") {
+            item.analysis_status = "failed";
+            item.analysis_pending = false;
+            item.available = false;
+            item.analysis_error = data.error || "分析失败";
+            state.attachError = `「${item.name || item.asset_id}」分析失败：`
+              + (item.analysis_error || "未知原因");
+          }
+        } catch (e) {
+          // 网络抖动 —— 下个周期再试，不打断整体
+        }
+      }
+      renderAttachments();
+    }, 3000);
   }
 
   function removeAttachment(index) {
@@ -264,8 +477,10 @@
       const params = job.params || {};
       const mode = job.mode || "";
       // 实际生效参数（媒体语义判定）
+      // 【2026-11-11】把 job 一起传进去 —— 它带着服务端算好的
+      // resolution_info（按产物实际像素算的分辨率/比例标签）。
       const effective = media
-        ? media.effectiveParams(mode, params)
+        ? media.effectiveParams(mode, params, job)
         : [];
       // 能力缺口提示（例如 Agent 建不了 a2a / flf 时给替代建议）
       const limitation = media ? media.limitationFor(mode, params) : null;
@@ -522,13 +737,24 @@
   // 用户发完消息后要能**看见自己附了什么** —— 否则传错图了都不知道。
   // 而且缩略图本身就是一种「我传了图」的视觉确认，
   // 比「附了 2 张图」这种文字更快被用户读到。
+  //
+  // 【2026-11-11 音视频扩展】
+  // 音频/视频的缩略图分别是**波形图**和**首帧**（素材库入库时生成），
+  // 所以 img 一样能用；额外加类型角标，让用户一眼分清
+  // 「附的是音频还是视频」。
   function renderMessageAttachments(attachments) {
     if (!attachments || !attachments.length) return "";
-    const items = attachments.map(item => `
-      <div class="ag-msg-attach">
+    const items = attachments.map(item => {
+      const kind = item.kind || "image";
+      const badge = (kind === "image") ? "" :
+        `<span class="ag-msg-attach-badge">${esc(KIND_LABEL[kind] || kind)}</span>`;
+      return `
+      <div class="ag-msg-attach" data-kind="${esc(kind)}">
         <img src="${esc(item.preview_url || "")}" alt="${esc(item.name || "附件")}"
              loading="lazy">
-      </div>`).join("");
+        ${badge}
+      </div>`;
+    }).join("");
     return `<div class="ag-msg-attachments">${items}</div>`;
   }
 
@@ -1233,6 +1459,27 @@
     // 没附件也没字 -> 不发（避免空消息）。
     const pending = state.attachments.slice();
     if (!text && !pending.length) return;
+    // 【就绪门槛 —— 2026-11-11 音视频扩展】
+    // 分析**还没跑完**的素材不能作为参考素材发出去：
+    //   * 模型会以为它有 BPM/乐器/人声信息，实际上一无所知
+    //   * Agent 侧也会把「分析中」的条目排除出可引用范围 -> 静默失效
+    // 所以这里**拦住发送**，明确告诉用户还在分析。
+    const notReady = pending.filter(it => attachStatus(it) !== "ready");
+    if (notReady.length) {
+      const analyzing = notReady.filter(it => attachStatus(it) === "pending");
+      const failed = notReady.filter(it => attachStatus(it) === "failed");
+      const parts = [];
+      if (analyzing.length) {
+        parts.push(`${analyzing.length} 个素材还在分析中，`
+          + "分析完成后才能作为参考素材发送");
+      }
+      if (failed.length) {
+        parts.push(`${failed.length} 个素材分析失败，请移除后再发送`);
+      }
+      state.attachError = parts.join("；");
+      renderAttachments();
+      return;
+    }
     input.value = "";
     // 附件随消息发出后清空（附件只属于这一条消息）。
     state.attachments = [];
@@ -1258,8 +1505,8 @@
       state.sessionId = sessions.state.currentId;
       body.session_id = state.sessionId;
     }
-    // 附件的 asset_id 列表 —— 服务端据此把图放进 Agent 上下文，
-    // 并在模型没显式指定参考图时自动作为参考图。
+    // 附件的 asset_id 列表 —— 服务端据此把素材放进 Agent 上下文，
+    // 并在模型没显式指定参考素材时自动作为参考素材。
     if (pending.length) {
       body.attachments = pending.map(a => a.asset_id).filter(Boolean);
     }

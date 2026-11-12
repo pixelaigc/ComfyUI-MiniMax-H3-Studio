@@ -86,6 +86,12 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
+# 合并说明：video_categories（video-tabs 分支）、comfy_models
+# （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
+# 独立模块，三条 import 都保留。
+from h3studio import video_categories
+from h3studio import comfy_models
+from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
@@ -276,6 +282,36 @@ def _ensure_jobs_session_column(conn) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id)")
 
 
+def _first_media_output(outputs: list[dict]) -> dict | None:
+    """取第一个图像/视频产物（音频没有尺寸，不参与）。"""
+    for item in outputs or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("kind") in ("image", "video"):
+            return item
+    return None
+
+
+def _job_resolution_info(job_params: dict, outputs: list[dict]) -> dict:
+    """
+    生成库卡片「分辨率 / 画面比例」这一行的**唯一计算入口**（服务端算好下发）。
+
+    【为什么放服务端】前端曾经直接读 `params["resolution"]`（一个档位字符串），
+    于是文生视频实际跑 1344×768 时，卡片显示的是遗留默认值 "544p" ——
+    544p 根本不是 1344×768 的任何合法档位。
+
+    现在统一按 reso_label.describe() 的规则算：
+      * 有产物实际像素 -> 以实际为准（档位 + 比例都由实际像素反算）；
+      * 没有产物 -> 退回请求的 width/height；
+      * 都没有 -> 只把请求的档位/比例原样带出，不编造尺寸。
+    """
+    actual = _first_media_output(outputs)
+    actual_size = None
+    if actual and actual.get("width") and actual.get("height"):
+        actual_size = {"width": actual["width"], "height": actual["height"]}
+    return reso_label.describe(job_params, actual_size)
+
+
 def row_to_job(r):
     mode = r["mode"]
     job_params = json.loads(r["params"] or "{}")
@@ -284,6 +320,7 @@ def row_to_job(r):
     stored_type = str(job_params.get("gen_type") or "").strip()
     gen_type = (gen_types.type_for_mode(stored_type) if stored_type
                 else gen_types.type_for_mode(mode))
+    outputs = json.loads(r["outputs"] or "[]")
     return {
         "id": r["id"],
         "created_at": r["created_at"],
@@ -296,7 +333,9 @@ def row_to_job(r):
         "progress": r["progress"],
         "progress_text": r["progress_text"],
         "error": r["error"],
-        "outputs": json.loads(r["outputs"] or "[]"),
+        "outputs": outputs,
+        # 【2026-11-11】卡片显示用的分辨率 / 比例标签（服务端算好的唯一真源）
+        "resolution_info": _job_resolution_info(job_params, outputs),
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
         # 任务归属的 Agent 会话（面板侧建的任务为空）。
         # row["session_id"] 在**迁移前**的老库上不存在 —— 用 keys 兜底，
@@ -546,6 +585,106 @@ async def comfy_download_output(session: ClientSession, item: dict) -> str:
         resp.raise_for_status()
         dest.write_bytes(await resp.read())
     return dest.relative_to(OUT_DIR).as_posix()
+
+
+# ------------------------------------------------------------------
+# 产物实际尺寸探测
+# ------------------------------------------------------------------
+# 【为什么必须探测真实产物，而不是只信请求参数】
+# 请求尺寸 ≠ 实际输出尺寸是**常态**，不是异常：
+#   * 视频：H3 原生画布上限 768×1344，超出的会被按比例缩；
+#   * 图像：Z-Image ≥3MP 自动走「低分辨率生成 + RealESRGAN 放大 + 低 denoise
+#     二次细化」的官方 2K 放大链，最终像素由 ImageScale 节点决定；
+#   * 图片编辑（i2i_qwen）：实测请求 1360×768 出了 2048×2048 / 2720×1536。
+# 生成库卡片要显示「实际输出尺寸」，就只能去读产物本身。
+def _probe_image_size(path: Path) -> tuple[int, int] | None:
+    """读图片头拿宽高（只读文件头，不解码整图、不转码）。"""
+    try:
+        from PIL import Image
+    except ImportError:                     # pragma: no cover - 环境缺 PIL
+        return None
+    try:
+        with Image.open(path) as img:
+            width, height = img.size
+        if width > 0 and height > 0:
+            return int(width), int(height)
+    except Exception:
+        return None
+    return None
+
+
+def _probe_media_video_size(path: Path) -> tuple[int, int] | None:
+    """
+    读视频流宽高（ffprobe 只读容器头，不解码）。
+
+    【与长片链路的区别】长片那边有个同名的 `_probe_video_size`，
+    那个在 ffprobe 缺失时会**返回猜测值 864×480**（长片拼接必须有尺寸才能跑）。
+    本函数用于给卡片显示真实尺寸，**探测不到就返回 None** ——
+    宁可少显示一栏，也不能显示一个与产物对不上的数字。
+    """
+    if not FFPROBE:
+        return None
+    cmd = [FFPROBE, "-v", "error", "-select_streams", "v:0",
+           "-show_entries", "stream=width,height", "-of", "csv=p=0", str(path)]
+    try:
+        raw = subprocess.check_output(cmd, encoding="utf-8", timeout=30,
+                                      creationflags=CREATE_NO_WINDOW,
+                                      stderr=subprocess.STDOUT).strip()
+    except Exception:
+        return None
+    parts = [p for p in raw.replace("\n", ",").split(",") if p.strip().isdigit()]
+    if len(parts) < 2:
+        return None
+    width, height = int(parts[0]), int(parts[1])
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def probe_output_size(kind: str, rel_path: str) -> dict | None:
+    """
+    探测一个产物的实际像素尺寸。
+
+    返回 {"width": w, "height": h} 或 None（探测不了就返回 None，
+    **绝不返回猜测值** —— 卡片宁可少显示，也不能显示错的）。
+    """
+    try:
+        path = OUT_DIR / rel_path
+    except Exception:
+        return None
+    if not path.is_file():
+        return None
+    size = None
+    if kind == "image":
+        size = _probe_image_size(path)
+    elif kind == "video":
+        size = _probe_media_video_size(path)
+    if not size:
+        # 后缀兜底：有些 ComfyUI 节点把视频挂在 images 键下（见 _extract_outputs）
+        suffix = path.suffix.lower()
+        if suffix in (".png", ".jpg", ".jpeg", ".webp"):
+            size = _probe_image_size(path)
+        elif suffix in (".mp4", ".webm", ".mkv", ".mov"):
+            size = _probe_media_video_size(path)
+    if not size:
+        return None
+    return {"width": size[0], "height": size[1]}
+
+
+def annotate_outputs_with_size(saved: list[dict]) -> list[dict]:
+    """
+    给一批已落盘的产物探测实际尺寸。
+
+    产物条目形如 {"kind": ..., "file": ..., "name": ...}，
+    这里补上 "width" / "height"（探测不到就不加这个键）。
+    """
+    for item in saved:
+        kind = item.get("kind")
+        if kind not in ("image", "video"):
+            continue
+        size = probe_output_size(kind, item.get("file") or "")
+        if size:
+            item["width"] = size["width"]
+            item["height"] = size["height"]
+    return saved
 
 
 def _file_sha256(path: Path) -> str:
@@ -893,6 +1032,27 @@ class Worker:
                 if mode in ("t2a", "a2a"):
                     params["plan_mode"] = params.get("plan_mode") or params.get("music_plan") or "full"
                 params["mode"] = mode
+
+                # 【2026-11-12 修】视频任务的节点可用性必须在这里**重新确认**。
+                #
+                # 归一层（normalize_t2v_params / prepare_job_params）算出的
+                # use_sigma_shift 依赖 _COMFY_NODE_NAMES，而那个集合只有
+                # /api/video-options 被调用过才有值。
+                # 真实场景：内置 Agent 建的任务**不经过面板**
+                #            -> 集合是空的
+                #            -> use_sigma_shift=False
+                #            -> MiniMaxH3SigmaShift 节点不进工作流
+                #            -> 用户在面板上拖的 shift 滑杆对这个任务完全无效
+                #               （且没有任何报错 —— 静默失效）。
+                #
+                # 修法：worker 在拼工作流前强制刷新一次节点清单，
+                #       并把结果回写进 params —— 工作流拼装拿到的是真实可用性。
+                if mode in ("t2v", "flf", "r2v"):
+                    await refresh_comfy_node_names(session, force=True)
+                    params["use_sigma_shift"] = bool(
+                        params.get("use_sigma_shift", True)
+                        and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
                 workflow = build_workflow(mode, params)
                 client_id = f"h3studio-{job_id}"
                 async with self.submit_lock:
@@ -926,6 +1086,10 @@ class Worker:
                                 for item in outs:
                                     fname = await comfy_download_output(session, item)
                                     saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
+                                # 【2026-11-11】记录产物的**实际像素尺寸**。
+                                # 卡片要显示真实输出，而不是请求值（请求值可能
+                                # 被画布上限 / 放大链 / 模型限制改写过）。
+                                annotate_outputs_with_size(saved)
                                 with db() as conn:
                                     conn.execute(
                                         "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
@@ -996,6 +1160,9 @@ class Worker:
             try:
                 outputs = await self._run_one_batch(job_id, batch_id, mode, params, row["seed"])
                 done_count += 1
+                # 【2026-11-11】批次产物同样记录实际像素尺寸（卡片「批次结果」
+                # 的缩略图网格与标题行摘要都会用到）。
+                annotate_outputs_with_size(outputs)
                 with db() as conn:
                     conn.execute(
                         "UPDATE job_batches SET status='done', progress=1, outputs=?, "
@@ -1136,14 +1303,29 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     out = dict(params)
 
     # ---- 宽高 ----
+    # 【2026-11-11】strict_over_limit=True —— 超限时**不静默截断**，
+    # 直接返回可执行的错误提示（说明 2.0M 上限与当前请求值）。
     width, height, reasons = video_models.normalize_video_size(
-        params.get("width"), params.get("height"))
+        params.get("width"), params.get("height"),
+        max_pixels=video_models.max_pixels_for_mode("t2v"),
+        strict_over_limit=True)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
     out["width"] = width
     out["height"] = height
     if reasons:
         out["size_adjust_reasons"] = reasons
+    # 【2026-11-11】把**实际生效**的档位标签写回 params.resolution。
+    #
+    # 【为什么】文生视频新面板只提交 width/height，不写 resolution。
+    # 而任务记录里的 params.resolution 会保留前端全局 state 的**遗留默认值**
+    # "544p" —— 于是任务卡片显示「544p · 16:9」，实际产物却是 1344×768。
+    # 544p 不是 1344×768 的任何合法档位，这就是用户报出的那个现象。
+    #
+    # 现在写回真实档位（由实际像素反算的短边标签），
+    # 让 params 本身也不再说谎。卡片显示仍以「产物实际像素」为准
+    # （见 reso_label.describe），这一行只是让落库的参数自洽。
+    out["resolution"] = reso_label.tier_for_pixels(width, height)
 
     # ---- 时长（H3 训练区间约 124~362 帧 = 5~15 秒）----
     try:
@@ -1158,9 +1340,22 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     model = video_models.VIDEO_MODELS.get(model_key)
     if model is None:
         return out, f"未知的视频模型 {model_key}"
-    if not video_models.model_available(model_key):
-        return out, (f"本机找不到底模权重 {model['unet']}"
-                     f"（{model.get('location') or '未知目录'}）—— 盘未挂载或文件已删。")
+    # 【2026-11-11】可用性判定与面板**同源** —— 都以 ComfyUI 的模型列表
+    # API 为准（面板显示什么，这里就按什么判）。
+    # 原来这里只扫盘（model_available），面板与提交走两条路，
+    # 就会出现「下拉显示 A、提交被拒」的不一致。
+    model_status = video_models.model_status(model_key)
+    if model_status != "available":
+        if model_status == "external_missing":
+            return out, (f"模型「{model['label']}」的权重位于外置盘 "
+                         f"{model.get('location') or ''}，但 ComfyUI 的模型"
+                         "列表里没有它（外置盘未挂载或未扫描到）—— 当前不可选。")
+        if model_status == "missing":
+            return out, (f"本机找不到模型权重 {model['unet']}"
+                         f"（{model.get('location') or '未知目录'}）。")
+        # unknown：ComfyUI 连不上，无法确认 -> 放行（让 ComfyUI 自己判）
+        # 但要把原因带出去，避免「静默失败」。
+        out["model_status_note"] = video_models.model_status_note(model_key)
     out["model_key"] = model_key
 
     # ---- 固定加速 LoRA ----
@@ -1250,6 +1445,14 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         w_max = float(twopass.get("w_max", video_models.VIDEO_TWOPASS["w_max_default"]))
         if w_min > w_max:
             w_min, w_max = w_max, w_min
+        # CFG：SelfLiftH3Sampler 自带 cfg 输入（0~100）—— 这是 H3 链路里
+        # **唯一**真正可调的 CFG（标准路径的 BasicGuider 没有 cfg 槽位）。
+        try:
+            twopass_cfg = float(twopass.get(
+                "cfg", video_models.VIDEO_TWOPASS["cfg_default"]))
+        except (TypeError, ValueError):
+            twopass_cfg = float(video_models.VIDEO_TWOPASS["cfg_default"])
+        twopass_cfg = max(0.0, min(100.0, twopass_cfg))
         out["twopass"] = {
             "enabled": True,
             "transition_step": transition,
@@ -1258,22 +1461,51 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
             "w_min": w_min,
             "w_max": w_max,
             "upscaler_model": upscaler,
+            "cfg": twopass_cfg,
         }
     else:
         out["twopass"] = {"enabled": False}
 
     # ---- 步数 / 采样参数 ----
-    try:
-        steps = int(params.get("steps") or model.get("steps", 4))
-    except (TypeError, ValueError):
-        steps = int(model.get("steps", 4))
-    out["steps"] = max(1, min(100, steps))
-    out["sampler"] = params.get("sampler") or model.get("sampler", "euler")
-    out["scheduler"] = params.get("scheduler") or model.get("scheduler", "beta")
-    try:
-        out["cfg"] = float(params.get("cfg", model.get("cfg", 1.0)))
-    except (TypeError, ValueError):
-        out["cfg"] = float(model.get("cfg", 1.0))
+    #
+    # 【2026-11-11】文生视频面板补齐采样参数后，这几个字段真的有前端控件了，
+    # 所以这里必须做**白名单归一化**：
+    #   * steps 越界 -> 夹到 [1, 50]
+    #   * sampler / scheduler 不在本机 ComfyUI 的 COMBO 清单里 -> 回落到模型默认
+    #     （不报错：用户在老任务里存过的名字可能是旧版清单里的）
+    #   * shift 越界 -> 夹到 [0.01, 100]
+    #
+    # CFG 单独处理：H3 **标准采样路径没有 CFG**（BasicGuider 无 cfg 槽位），
+    # 所以 out["cfg"] 固定为 1.0（VIDEO_CFG_FIXED）；面板只做只读说明。
+    # 真正可调的 CFG 是二采路径的 twopass.cfg -> SelfLiftH3Sampler.cfg。
+    steps = video_models.normalize_steps(
+        params.get("steps"), int(model.get("steps", 4)))
+    out["steps"] = steps
+    out["sampler"] = video_models.normalize_sampler(
+        params.get("sampler"), model.get("sampler", "euler"))
+    out["scheduler"] = video_models.normalize_scheduler(
+        params.get("scheduler"), model.get("scheduler", "beta"))
+    # 标准路径 CFG：固定 1.0（见 video_models.VIDEO_CFG_FIXED_REASON）
+    out["cfg"] = video_models.VIDEO_CFG_FIXED
+
+    # ---- shift（MiniMaxH3SigmaShift）----
+    # 节点是 ComfyUI 核心节点（comfy_extras.nodes_minimax_h3），
+    # 默认值 12.0 / 3.0 = 模型内生值 -> 不改任何出图结果。
+    out["shift_video"] = video_models.normalize_shift(
+        params.get("shift_video"), video_models.VIDEO_SHIFT_DEFAULT_VIDEO)
+    out["shift_audio"] = video_models.normalize_shift(
+        params.get("shift_audio"), video_models.VIDEO_SHIFT_DEFAULT_AUDIO)
+    # 节点不存在时前端会收到 sigma_shift_node 的可用性 -> 这里再兜一层，
+    # 保证提交到工作流的一定是本机 ComfyUI 认识的节点。
+    out["use_sigma_shift"] = bool(
+        params.get("use_sigma_shift", True)
+        and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
+    # 【2026-11-12 补】shift 节点在本机 ComfyUI 里真不存在时，
+    # 服务端必须**明确告诉前端**，否则面板上两个 shift 滑杆
+    # 变成「能拖但服务端会丢掉」的假控件。
+    # （本机实测该节点是 ComfyUI 核心节点，恒在 —— 但不能假设。）
+    out["sigma_shift_available"] = "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES
 
     # 种子：留空则随机（worker 里再兜一次）
     if params.get("seed") not in (None, ""):
@@ -1410,6 +1642,11 @@ def list_job_records(status: str | None = None, mode: str | None = None,
             "prompt": (job["params"] or {}).get("prompt") or "",
             "error": job["error"],
             "outputs": job["outputs"],
+            # 【2026-11-11】把「实际输出尺寸 / 比例」一起给 Agent 任务卡。
+            # 原来 Agent 卡只显示 params.resolution 那个档位字符串，
+            # 文生视频实际跑 1344×768 时它恒为遗留默认 "544p"。
+            "params": job["params"],
+            "resolution_info": job["resolution_info"],
         })
     return result
 
@@ -1427,6 +1664,11 @@ def session_job_counts(session_ids: list[str]) -> dict[str, int]:
     但一次 IN 查询更干净，也避免两个库的连接来回切。
 
     返回 {session_id: count}；查不到/出错返回空 dict（不阻断列表）。
+
+    【口径说明 —— 2026-11-12】
+    这里数的是**任务数**，不是「产出了文件的任务数」。
+    失败的任务、空输出的任务也计入。
+    前端把它显示成「N 产物」略有歧义（见 session_job_stats 的说明）。
     """
     ids = [str(s) for s in (session_ids or []) if s]
     if not ids:
@@ -1445,6 +1687,47 @@ def session_job_counts(session_ids: list[str]) -> dict[str, int]:
     except Exception:
         # 查不到就返回空 —— 列表照常显示，产物数显示 0。
         # **不能**因为统计失败就让整个会话列表打不开。
+        return {}
+
+
+def session_job_stats(session_ids: list[str]) -> dict[str, dict]:
+    """
+    一批会话的任务统计（任务数 / 未完成数）—— **新增**，不改动 session_job_counts。
+
+    【为什么不直接改 session_job_counts —— 2026-11-12】
+    session_job_counts 返回 {sid: int}，被 server.py 与既有测试按整数用。
+    改成 dict-of-dict 是 breaking change。
+    这里**另起一个函数**，老函数原样保留 —— 零风险。
+
+    【返回什么】
+      {session_id: {"count": 任务数, "pending": 排队中+生成中的任务数}}
+
+    【pending_count 的用途】
+    会话列表的「状态」只描述**这一轮对话的收尾方式**，
+    不含「进行中」—— 因为服务端没有 per-session 运行注册表
+    （AGENT_GATE 是**全局**信号量，不记录是哪个会话在跑）。
+    但「这个会话还有任务在生成」是**任务**层面的事实，
+    可以作为独立副信息显示（文案必须指向任务，不能说会话「进行中」）。
+
+    一次查询同时拿到两个数 —— 不额外往返。
+    """
+    ids = [str(s) for s in (session_ids or []) if s]
+    if not ids:
+        return {}
+    if not _jobs_table_has_session_column():
+        return {}
+    try:
+        with db() as conn:
+            placeholders = ",".join("?" * len(ids))
+            rows = conn.execute(
+                f"SELECT session_id, COUNT(*) AS c, "
+                f"       SUM(CASE WHEN status IN ('queued','running') THEN 1 ELSE 0 END) AS pending "
+                f"FROM jobs WHERE session_id IN ({placeholders}) GROUP BY session_id",
+                ids).fetchall()
+        return {str(r["session_id"]): {"count": int(r["c"]),
+                                       "pending": int(r["pending"] or 0)}
+                for r in rows}
+    except Exception:
         return {}
 
 
@@ -1708,6 +1991,40 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     if mode not in JOB_MODES:
         raise JobValidationError(f"未知模式 {mode}")
 
+    # 【2026-11-11】首尾帧 / 参考生视频的采样参数归一。
+    # 这两个模式走旧工作流路径，但采样链路与文生视频相同
+    # （BasicScheduler + KSamplerSelect + BasicGuider），
+    # 所以采样器 / 调度器 / shift 一样是真参数。
+    #
+    # CFG 例外：H3 标准路径固定 1.0（BasicGuider 没有 cfg 槽位），
+    # 面板只做只读说明 —— 这里也不写 params["cfg"]，
+    # 免得旧路径的 params 看起来像有个可调的 cfg（实际没人读）。
+    if mode in ("flf", "r2v"):
+        # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致**，
+        # 否则老客户端（不传 sampler/scheduler）会被静默改画质：
+        #   workflows._h3_video_workflow 的规则是
+        #     lora != "none" -> steps 4 / scheduler beta   / sampler euler
+        #     lora == "none" -> steps 20 / scheduler simple / sampler res_multistep
+        # 之前这里写死 default="euler"/"beta" 并且**无条件写回** params，
+        # -> lora=="none" 的老任务被改成 euler/beta（静默回归）。
+        # 现在：客户端**没传**就不写回（让工作流用自己的档位），
+        #       传了才做白名单归一。
+        legacy_default_sampler = "euler" if params.get("lora") != "none" else "res_multistep"
+        legacy_default_scheduler = "beta" if params.get("lora") != "none" else "simple"
+        if params.get("sampler"):
+            params["sampler"] = video_models.normalize_sampler(
+                params["sampler"], legacy_default_sampler)
+        if params.get("scheduler"):
+            params["scheduler"] = video_models.normalize_scheduler(
+                params["scheduler"], legacy_default_scheduler)
+        params["shift_video"] = video_models.normalize_shift(
+            params.get("shift_video"), video_models.VIDEO_SHIFT_DEFAULT_VIDEO)
+        params["shift_audio"] = video_models.normalize_shift(
+            params.get("shift_audio"), video_models.VIDEO_SHIFT_DEFAULT_AUDIO)
+        params["use_sigma_shift"] = bool(
+            params.get("use_sigma_shift", True)
+            and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
     if mode == "flf":
         if saved_files.get("file_first"):
             params["first_frame"] = saved_files["file_first"][0]
@@ -1718,10 +2035,18 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
         if not refs:
-            # 素材库来源的参考图也算（worker 会按 asset_refs 上传）
-            if not [r for r in asset_refs
-                    if isinstance(r, dict) and r.get("slot") == "ref_image"]:
-                raise JobValidationError("参考模式需要至少 1 张参考图")
+            # 素材库来源的参考素材也算（worker 会按 asset_refs 上传）
+            #
+            # 【2026-11-11 音视频扩展】参考模式现在也接受参考视频/参考音频
+            # —— H3 参考生成节点的真实槽位上限：
+            #   ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
+            # 扩展前只接受 ref_image，一个纯视频参考会被统一拒掉，
+            # 变成一个不存在的能力。
+            _r2v_slots = {r.get("slot") for r in (asset_refs or [])
+                          if isinstance(r, dict)}
+            if not _r2v_slots & {"ref_image", "ref_video", "ref_audio"}:
+                raise JobValidationError(
+                    "参考模式需要至少 1 个参考素材（图片 / 视频 / 音频）")
         else:
             params["ref_images"] = refs[:3]
     elif mode == "i2i_qwen":
@@ -2183,6 +2508,17 @@ _VIDEO_PANEL_NODES = [
     "MiniMaxH3ScheduledSolAttentionPatch",
     "H3SparseAttention",
     "SelfLiftH3Sampler",
+    # 【2026-11-12 修】MiniMaxH3SigmaShift —— shift（视频/音频）参数对应的
+    # ComfyUI **核心**节点（comfy_extras/nodes_minimax_h3.py:367，
+    # display_name「ModelSamplingMiniMaxH3」）。
+    #
+    # 【为什么以前漏了】这个名单是给「面板可选项过滤」用的，
+    # 只列了注意力机制 + 二采。shift 节点当时还没做，就没进名单。
+    # 结果服务端归一里的
+    #   use_sigma_shift = "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES
+# 永远为 False -> shift 节点永远不进工作流 -> 面板上的两个 shift 滑杆
+    # 是**死控件**（能拖、但不生效）。这正是「假控件」纪律要禁止的。
+    "MiniMaxH3SigmaShift",
 ]
 
 
@@ -2190,38 +2526,55 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     """确认面板关心的那些节点在本机 ComfyUI 里是否存在。
 
     按单个节点问（实测 1 ms/个），不用拉 27 MB 的全量 /object_info。
+
+    【2026-11-11 修复 —— 不能让面板被 ComfyUI 拖死】
+    原实现是**串行**问 6 个节点，每个 10 秒超时 —— ComfyUI 卡住/正在启动时
+    （实测本机 21:01/21:05/21:06 连续出现 object_info timed out），
+    这个函数要 **60 秒**才返回，导致 GET /api/video-options 挂 66 秒，
+    浏览器先放弃 -> 文生视频面板**整块空白**（用户 21:06 实报）。
+
+    现在：
+      * 6 个节点**并发**问 -> 总耗时 = 最慢的那个（<= 单个超时）
+      * 单个超时从 10 秒压到 **3 秒** -> 最坏 3 秒返回
+      * 拿不到就返回**上一次成功的缓存**（或空集），不抛、不拖慢
     """
     global _COMFY_NODE_NAMES, _COMFY_NODES_TS
     now = time.time()
     if not force and _COMFY_NODE_NAMES and now - _COMFY_NODES_TS < 60:
         return _COMFY_NODE_NAMES
+
+    async def _probe(s, name):
+        try:
+            async with s.get(f"{COMFY}/object_info/{name}") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, dict) and name in data:
+                        return name
+        except Exception:
+            return None
+        return None
+
     found: set[str] = set()
     try:
+        timeout = ClientTimeout(total=3)
         if session is None:
-            async with ClientSession(timeout=ClientTimeout(total=10)) as s:
-                for name in _VIDEO_PANEL_NODES:
-                    try:
-                        async with s.get(f"{COMFY}/object_info/{name}") as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                if isinstance(data, dict) and name in data:
-                                    found.add(name)
-                    except Exception:
-                        continue
+            async with ClientSession(timeout=timeout) as s:
+                names = await asyncio.gather(*[_probe(s, n)
+                                                for n in _VIDEO_PANEL_NODES])
         else:
-            for name in _VIDEO_PANEL_NODES:
-                try:
-                    async with session.get(f"{COMFY}/object_info/{name}") as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if isinstance(data, dict) and name in data:
-                                found.add(name)
-                except Exception:
-                    continue
+            names = await asyncio.gather(*[_probe(session, n)
+                                            for n in _VIDEO_PANEL_NODES])
+        found = {n for n in names if n}
+    except Exception:
+        found = set()
+
+    if found:
+        # 只有真问到东西才更新缓存 —— 全挂时保留上一次的（可能还有效）
         _COMFY_NODE_NAMES = found
         _COMFY_NODES_TS = now
-    except Exception:
-        pass
+    elif not _COMFY_NODE_NAMES:
+        # 从来没成功过：记时间戳，避免每个请求都去撞一遍 3 秒超时
+        _COMFY_NODES_TS = now
     return _COMFY_NODE_NAMES
 
 
@@ -2738,12 +3091,19 @@ async def api_video_options(request):
     """GET /api/video-options —— 文生视频面板的可选项清单
 
     清单全部来自服务端实测（h3studio/video_models.py）：
-      * 可用底模（文件真在本机）
+      * 可用底模（**以 ComfyUI 的模型列表 API 为准** —— 见下）
       * 固定加速 LoRA（工作流硬性必需，不进可勾选列表）
       * 可勾选的加速 LoRA 组合（每项带用途与推荐强度）
       * 注意力机制（只列本机 ComfyUI 里真有的节点）
       * 二采（SelfLift）参数与硬约束
       * 宽高吸附规则（倍数 / 上下限）
+
+    【2026-11-11 改造】底模的「能不能选」不再靠写死的常量，也不只靠
+    扫盘 —— 现在**问 ComfyUI 本人**：拉 `/models/diffusion_models` 与
+    `UNETLoader.unet_name` 枚举（两者交叉验证），再决定每条模型的状态
+    （available / external_missing / missing / unknown）。
+    ComfyUI 不可达时降级到扫盘，并在 payload 里标 model_list_source
+    与 model_list_error —— 如实说明来源，不谎称「获取不到模型」。
     """
     # 本机 ComfyUI 里真有哪些节点 —— 决定「注意力机制」「二采」能不能选
     await refresh_comfy_node_names()
@@ -2751,7 +3111,12 @@ async def api_video_options(request):
     def node_available(class_type: str) -> bool:
         return class_type in _COMFY_NODE_NAMES
 
-    payload = video_models.options_payload(node_available=node_available)
+    # 模型清单快照（带 20 秒缓存）：一次拉，供全部分析共用
+    # 用**异步**版 —— ComfyUI 首次列目录实测要 43 秒，
+    # 同步调用会把整个事件循环卡住（状态流/其它 API 全瘫）。
+    snapshot = await video_models.refresh_comfy_snapshot_async()
+    payload = video_models.options_payload(node_available=node_available,
+                                           snapshot=snapshot)
     # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
     # 前端据此把对不上的组合从**下拉里剔除**（不是置灰）。
     #
@@ -2816,21 +3181,103 @@ async def api_video_size(request):
 
     返回生效宽高 + 调整原因，前端原样显示「输入值 → 实际使用值」。
 
-    【2026-11-11】吸附规则加了一条「H3 原生画布面积上限」：
-    总像素超过 768*1344 会按比例缩到上限，并把原因写进 reasons ——
-    否则用户填 1920x1080 会得到一个「能提交但超出 H3 训练分布」的尺寸。
+    【2026-11-11 放宽】文生视频的上限从 768*1344（0.98 MP）放宽到
+    2.0 MP —— 官方模板 Note 的像素表明确列到 2.0 MP -> 1920x1088，
+    而旧上限来自 ComfyUI 节点里**只管参考视频适配**的 MAX_PIXELS 常量，
+    被误当成生成分辨率上限了。
+
+    `mode` 参数决定用哪套约束（需求：各模式按各自工作流的真实约束
+    分别处理，不要一刀切套用 2.0M）：
+      * mode=t2v（默认）-> 2.0M 上限
+      * mode=flf / r2v  -> 仍走 ResolutionSelector 的 0.8 MP 档位上限
+      * mode=longfilm   -> 不限（拼片不产生新画面）
     """
     try:
         width = request.query.get("width")
         height = request.query.get("height")
+        mode = request.query.get("mode") or "t2v"
+        max_pixels = video_models.max_pixels_for_mode(mode)
         w, h, reasons = video_models.normalize_video_size(
-            width, height,
-            max_pixels=video_models.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
+            width, height, max_pixels=max_pixels)
     except Exception as exc:
         return web.json_response({"error": str(exc)}, status=400)
     return json_ok({
         "width": w, "height": h, "reasons": reasons,
         "input_width": width, "input_height": height,
+        "mode": mode,
+        "max_pixels": (int(max_pixels * 1024 * 1024)
+                       if max_pixels else None),
+        "max_pixels_mp": max_pixels,
+    })
+
+
+def _video_model_available(model: dict) -> bool:
+    """某个视频模型项在本机是否真的可用。
+
+    t2v / flf / r2v 都要 H3 底模权重落盘；longfilm 只拼已完成的视频，
+    不需要 H3 权重。
+
+    返回 False 时前端会把该模型项置为不可选（并在类别无任何可用模型时
+    禁用整个类别 + 提示）—— 这正是需求的回退规则③。
+    """
+    mode = (model.get("mode") or "").strip()
+    if mode == "longfilm":
+        return True
+    try:
+        from h3studio import workflows as _wf
+        if mode not in _wf.BUILDERS:
+            return False
+    except Exception:
+        return False
+    # H3 底模：任一登记的权重在本机就算可用
+    try:
+        for key in video_models.VIDEO_MODELS:
+            if video_models.model_available(key):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+async def api_video_categories(request):
+    """GET /api/video-categories —— 左侧导航的**两级**视频清单
+
+    两级结构（需求）：
+      1) 第一级「视频类别」：固定四项，顺序与文案不可变 ——
+         文生视频 / 首尾帧生视频 / 参考生视频 / 长片拼接
+      2) 第二级：该类别下的具体模型项
+
+    【单一真源】这份清单完全来自 h3studio/video_categories.py，
+    前端不自己维护第二份 mode/model 映射表。
+
+    【向后兼容】老 URL / 老参数 / 老任务记录里的 mode（t2v / flf /
+    r2v / longfilm）**一个字都没改**，类别只是给它们套了一层分组视图。
+    `legacy_modes` 字段给出「mode -> 类别」的桥，老链接照样能定位面板。
+    """
+    categories = video_categories.list_categories()
+    models = video_categories.list_models()
+
+    # 【可用性位】让前端的「回退规则③ 禁用并提示」不是死代码 ——
+    # 每个模型项都要真的带上 available，前端才知道哪个不可选。
+    #   * t2v / flf / r2v：依赖 H3 底模权重在本机（实测 check）
+    #   * longfilm：拼片链路不依赖 H3 权重（它只拼已完成的视频）
+    for model in models:
+        model["available"] = _video_model_available(model)
+    for cat in categories:
+        for model in cat["models"]:
+            model["available"] = _video_model_available(model)
+
+    return json_ok({
+        "categories": categories,
+        "models": models,
+        # mode -> 类别 key（老 mode 的桥）
+        "legacy_modes": dict(video_categories.MODE_TO_CATEGORY),
+        # 老 mode 的旧显示名（历史任务卡片回显用）
+        "legacy_labels": dict(video_categories.LEGACY_MODE_LABELS),
+        # 默认类别 / 默认模型项（前端首屏默认选中用）
+        "default_category": (categories[0]["key"] if categories else ""),
+        "default_model": (categories[0].get("default_model", "")
+                          if categories else ""),
     })
 
 
@@ -3563,12 +4010,19 @@ async def api_enhance(request):
                      "provider": item["name"],
                      "degraded": True}, status=502)
             # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
-            if enh.looks_like_echo(enhanced, spec["system_prompt"]):
+            #
+            # 【2026-11-11】错误文案要**可读、可操作**：
+            #   - 给出具体判据（哪一段重合、重合了多少），别只丢一句「复读」
+            #   - 提示词框**绝不**写回复读内容（这里直接 502，不进 merged）
+            echo = enh.echo_detail(enhanced, spec["system_prompt"])
+            if echo.get("is_echo"):
                 return web.json_response(
                     {"error": f"Provider「{item['name']}」返回的是系统提示词复读，"
-                              "不是有效的提示词。"
+                              f"不是有效的提示词（{echo.get('reason')}）。"
                               "该模型可能太小或未按指令输出，请换用更强的模型。",
                      "provider": item["name"], "provider_id": item["id"],
+                     "code": "system_prompt_echo",
+                     "echo": echo,
                      "degraded": True}, status=502)
 
             # 截断检测 —— 二次增强丢背景的根因守门人。
@@ -4031,14 +4485,22 @@ async def api_agent_upload(request):
     POST /api/agent/upload —— 内置 Agent 聊天区的**媒体上传**。
 
     multipart 表单：
-      files[] / file / image   一个或多个图片文件（png/jpg/jpeg/webp/bmp/gif）
+      files[] / file / image   一个或多个**媒体**文件（图片 / 音频 / 视频）
+
+      图片：png/jpg/jpeg/webp/bmp/gif       上限 20 MB，一次最多 9 张
+      音频：wav/mp3/flac/m4a/aac/ogg/opus/aiff/aif/wma  上限 100 MB
+      视频：mp4/webm/mov/mkv/m4v/avi       上限 500 MB
+      音视频合计一次最多 4 个
 
     行为：
-      * 每个文件独立校验（类型 / 大小 / 魔数），一个失败不影响其它
+      * 每个文件独立校验（扩展名 / 大小 / **魔数**），一个失败不影响其它
       * 落进**素材库**（复用 asset_service.register_asset —— 与素材库页
-        的 /api/assets 上传完全同一条链路）
-      * 落库后异步排一次多模态分析（描述来自素材库已有的分析结果）
-      * 返回每个文件的 asset_id / preview_url / 描述
+        的 /api/assets 上传完全同一条链路，库在 /mnt/usb2t/asset_library）
+      * 图片：落库后**同步**做多模态分析
+      * 音视频：落库后排**异步**分析 job（深度音频管线 / 视频抽帧）
+        ，前端轮询 GET /api/agent/media/{id}/status，就绪前不能引用
+      * 分析失败 -> 明确报错 + soft_delete 回滚（不留“已入库没描述”的脏条目）
+      * 返回每个文件的 asset_id / preview_url / kind / 描述
 
     为什么要有这个端点：
       用户要「拿这张图做复刻/修改」时，聊天区原本**没有任何入口**
@@ -4059,6 +4521,28 @@ async def api_agent_upload(request):
                                   "code": "upload_failed"},
                                  status=500)
     return web.json_response(payload)
+
+async def api_agent_media_status(request):
+    """
+    GET /api/agent/media/{id}/status -- Agent 聊天区**音视频素材**的分析就绪状态。
+
+    音视频上传后走**异步**分析（深度音频管线 / 视频抽帧多模态），
+    耗时几分钟到十几分钟 —— 所以前端轮询本接口，
+    直到 status == "done" 才允许把该素材作为参考素材引用。
+
+    返回：{"asset_id", "status", "stage", "progress", "message",
+          "available", "description", "tags", "kind",
+          "duration_sec", "width", "height", "error"}
+    """
+    asset_id = request.match_info["id"]
+    try:
+        payload = await agent_media.handle_analysis_status(asset_id)
+    except Exception as exc:  # noqa: BLE001
+        detail = f"{type(exc).__name__}: {exc}"[:200]
+        return web.json_response({"error": detail, "code": "status_failed"},
+                                 status=500)
+    return web.json_response(payload)
+
 
 async def api_agent_chat(request):
     """
@@ -4160,11 +4644,18 @@ async def api_agent_chat(request):
                 session_store=store, memory_store=_agent_memory_store(),
                 attachments=attachments)
         except agent_mod.AgentError as exc:
-            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}")
+            # 【为什么要带 meta —— 2026-11-12】
+            # 不带 meta 的话，这条失败消息的 meta 是空的 -> 会话列表的
+            # 「状态」判定拿不到 status -> 回落到「完成」。
+            # 结果是：**失败的会话显示成「完成」**（实测复现）。
+            # 失败必须落成 meta.status=failed，状态才有真源。
+            store.add_message(session_id, "assistant", f"[请求失败] {exc.message}",
+                              meta={"status": "failed", "error": exc.message})
             return _agent_error(exc)
         except Exception as exc:
             detail = f"{type(exc).__name__}: {exc}"[:300]
-            store.add_message(session_id, "assistant", f"[请求失败] {detail}")
+            store.add_message(session_id, "assistant", f"[请求失败] {detail}",
+                              meta={"status": "failed", "error": detail})
             return web.json_response(
                 {"error": f"Agent 执行失败：{detail}", "code": "agent_internal_error"},
                 status=500)
@@ -4526,8 +5017,16 @@ async def api_agent_sessions(request):
     # 关联产物数：会话库与任务库是**两个库**（见 agent_sessions.py 的说明），
     # 所以产物数要去 jobs 表数 —— 不能指望会话库自己知道。
     counts = session_job_counts([s["id"] for s in sessions])
+    # 未完成任务数：一次查询同时拿（session_job_stats 与 counts 共用一次 IN 查询
+    # 的思路，但 stats 多带一个 SUM 聚合列 —— 单独查避免重复往返）。
+    stats = session_job_stats([s["id"] for s in sessions])
     for item in sessions:
         item["artifact_count"] = counts.get(item["id"], 0)
+        # pending_count = 该会话下排队中/生成中的任务数。
+        # 【为什么文案要说「任务」而不能说「会话进行中」】
+        # 服务端**没有** per-session 运行注册表（AGENT_GATE 是全局信号量），
+        # 这里统计的是**任务**状态，不是会话的运行状态。
+        item["pending_count"] = (stats.get(item["id"]) or {}).get("pending", 0)
     return json_ok({"sessions": sessions, "query": query})
 
 
@@ -4770,6 +5269,71 @@ async def api_prompt_history_delete(request):
     return json_ok({"ok": True, "removed": removed, "panel_key": panel_key})
 
 
+async def api_comfy_models(request):
+    """GET /api/comfy-models —— **ComfyUI 当前可用模型清单**（诊断用）。
+
+    直接把 ComfyUI 的模型目录列表 + 节点输入枚举转发出来，并标注
+    本面板登记的每个权重「在不在里面」。
+
+    为什么需要这个端点：
+      用户报「文生视频面板说获取不到模型」时，第一件事就是要有**一份
+      可核对的原始事实** —— ComfyUI 自己说它有哪些模型。这个端点就是
+      那个事实的落地形式，不用再去猜哪个接口对。
+
+    查询参数：
+      folder      diffusion_models（默认） | loras
+      full        1 = 返回完整清单；0（默认）= 只返回计数 + 本面板相关项
+    """
+    folder = (request.query.get("folder") or "diffusion_models").strip()
+    if folder not in comfy_models.COMFY_MODEL_FOLDERS:
+        return web.json_response(
+            {"error": f"未知目录 {folder}，可选：{list(comfy_models.COMFY_MODEL_FOLDERS)}"},
+            status=400)
+    full = (request.query.get("full") or "").strip() in ("1", "true", "yes")
+    base = video_models.comfy_base_url()
+    try:
+        # 异步版：ComfyUI 首次列目录实测 43 秒，同步调用会卡住事件循环。
+        # 本端点每次都直接问 ComfyUI（诊断用，不吃快照缓存）；
+        # 面板自己走 /api/video-options 的快照缓存。
+        async with ClientSession(timeout=ClientTimeout(total=60)) as session:
+            names = await comfy_models.fetch_model_list_async(session, base,
+                                                              folder)
+    except comfy_models.ComfyModelListError as exc:
+        return web.json_response(
+            {"ok": False, "error": str(exc), "folder": folder,
+             "comfyui_url": base}, status=502)
+    payload = {
+        "ok": True,
+        "folder": folder,
+        "comfyui_url": base,
+        "count": len(names),
+    }
+    if full:
+        payload["names"] = names
+    # 本面板登记的权重 vs ComfyUI 清单 —— 逐个标注
+    if folder == "diffusion_models":
+        checked = []
+        for key, meta in video_models.VIDEO_MODELS.items():
+            checked.append({
+                "key": key,
+                "label": meta["label"],
+                "unet": meta["unet"],
+                "listed": meta["unet"] in set(names),
+                "location": meta.get("location", ""),
+            })
+        payload["panel_models"] = checked
+    else:
+        checked = []
+        for key, meta in video_models.VIDEO_ACCEL_LORAS.items():
+            checked.append({"key": key, "name": meta["name"],
+                            "listed": meta["name"] in set(names)})
+        for key, meta in video_models.VIDEO_ACCEL_LORA_COMBOS.items():
+            checked.append({"key": key, "name": meta["name"],
+                            "listed": meta["name"] in set(names)})
+        payload["panel_loras"] = checked
+    return json_ok(payload)
+
+
 # ------------------------------------------------------------------ app
 def make_app():
     app = web.Application(client_max_size=200 * 1024 * 1024)
@@ -4790,6 +5354,10 @@ def make_app():
 
     # 文生视频面板（模型 / 加速 LoRA / 注意力 / 二采 / 宽高吸附）
     app.router.add_get("/api/video-options", api_video_options)
+    # 合并说明：/api/video-categories（video-tabs）与 /api/comfy-models
+    # （model-list-fix）是两个独立路由，都保留。
+    app.router.add_get("/api/video-categories", api_video_categories)
+    app.router.add_get("/api/comfy-models", api_comfy_models)
     app.router.add_get("/api/video-size", api_video_size)
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)
@@ -4820,6 +5388,7 @@ def make_app():
     # 内置多模态 Agent
     app.router.add_post("/api/agent/chat", api_agent_chat)
     app.router.add_post("/api/agent/upload", api_agent_upload)
+    app.router.add_get("/api/agent/media/{id}/status", api_agent_media_status)
     app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
     app.router.add_get("/api/agent/memory", api_agent_memory)

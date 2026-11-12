@@ -1,0 +1,109 @@
+0a1
+>   test_grid_flash :: FAILED tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch
+7,15c8,17
+< FAIL test_music_flow_browser :: 2 failed, 8 passed in 152.27s (0:02:32)
+< FAIL test_qwen_pe_enhance :: 1 failed, 28 passed in 82.20s (0:01:22)
+< FAIL test_qwen_refs_browser :: 2 failed, 1 passed in 70.12s (0:01:10)
+< FAIL test_yue2_flow_review_fixes :: 1 failed, 21 passed in 0.03s
+< PASS test_agent :: 41 passed in 4.92s
+< PASS test_agent_backend_enh :: 109 passed in 1.60s
+< PASS test_agent_contract :: 27 passed in 14.93s
+< PASS test_agent_fabricated_job_fix :: 31 passed in 0.33s
+< PASS test_agent_frontend_enh :: 31 passed in 23.12s
+---
+> FAIL test_grid_flash :: 1 failed, 9 passed in 50.00s
+> FAIL test_music_flow_browser :: 2 failed, 8 passed in 150.53s (0:02:30)
+> FAIL test_qwen_pe_enhance :: 1 failed, 28 passed in 82.99s (0:01:22)
+> FAIL test_qwen_refs_browser :: 2 failed, 1 passed in 70.98s (0:01:10)
+> FAIL test_yue2_flow_review_fixes :: 1 failed, 21 passed in 0.04s
+> PASS test_agent :: 41 passed in 4.93s
+> PASS test_agent_backend_enh :: 109 passed in 1.46s
+> PASS test_agent_contract :: 27 passed in 14.92s
+> PASS test_agent_fabricated_job_fix :: 31 passed in 0.31s
+> PASS test_agent_frontend_enh :: 31 passed in 23.04s
+17c19
+< PASS test_agent_layout_browser :: 8 passed in 25.01s
+---
+> PASS test_agent_layout_browser :: 8 passed in 25.06s
+19,22c21,24
+< PASS test_agent_media_semantics_backend :: 87 passed in 0.64s
+< PASS test_agent_media_semantics_frontend :: 21 passed in 0.47s
+< PASS test_agent_media_upload :: 66 passed in 0.32s
+< PASS test_agent_oneshot_e2e :: 5 passed in 15.02s
+---
+> PASS test_agent_media_semantics_backend :: 87 passed in 0.61s
+> PASS test_agent_media_semantics_frontend :: 21 passed in 0.45s
+> PASS test_agent_media_upload :: 66 passed in 0.33s
+> PASS test_agent_oneshot_e2e :: 5 passed in 16.13s
+27,28c29,30
+< PASS test_agent_session_search_cascade :: 26 passed in 0.13s
+< PASS test_agent_stream_sse :: 11 passed in 5.74s
+---
+> PASS test_agent_session_search_cascade :: 26 passed in 0.12s
+> PASS test_agent_stream_sse :: 11 passed in 6.65s
+31,32c33,34
+< PASS test_asset_deep_audio :: 32 passed in 8.37s
+< PASS test_asset_library :: 40 passed in 2.17s
+---
+> PASS test_asset_deep_audio :: 32 passed in 8.33s
+> PASS test_asset_library :: 40 passed in 2.00s
+36,42c38,43
+< PASS test_enhance_architecture_fixes :: 28 passed in 21.15s
+< PASS test_enhance_menu :: 24 passed in 121.54s (0:02:01)
+< PASS test_enhance_multi_select :: 20 passed in 82.87s (0:01:22)
+< PASS test_enhance_review_fixes :: 23 passed in 39.47s
+< PASS test_enhance_unify :: 20 passed in 61.71s (0:01:01)
+< PASS test_frontend_defaults :: 14 passed in 10.85s
+< PASS test_grid_flash :: 10 passed in 50.11s
+---
+> PASS test_enhance_architecture_fixes :: 28 passed in 21.18s
+> PASS test_enhance_menu :: 24 passed in 121.81s (0:02:01)
+> PASS test_enhance_multi_select :: 20 passed in 83.23s (0:01:23)
+> PASS test_enhance_review_fixes :: 23 passed in 39.76s
+> PASS test_enhance_unify :: 20 passed in 62.16s (0:01:02)
+> PASS test_frontend_defaults :: 14 passed in 10.84s
+44c45
+< PASS test_image_res_lora :: 24 passed in 30.18s
+---
+> PASS test_image_res_lora :: 24 passed in 30.66s
+46,48c47,49
+< PASS test_lora_ea :: 18 passed in 0.07s
+< PASS test_lora_effects :: 22 passed in 20.47s
+< PASS test_lora_mihoyo :: 25 passed in 3.01s
+---
+> PASS test_lora_ea :: 18 passed in 0.08s
+> PASS test_lora_effects :: 22 passed in 19.81s
+> PASS test_lora_mihoyo :: 25 passed in 3.06s
+50,52c51,53
+< PASS test_lora_nsfw :: 13 passed in 1.30s
+< PASS test_max_tokens :: 84 passed, 2 warnings in 0.10s
+< PASS test_moss_image :: 47 passed in 20.66s
+---
+> PASS test_lora_nsfw :: 13 passed in 1.28s
+> PASS test_max_tokens :: 84 passed, 2 warnings in 0.11s
+> PASS test_moss_image :: 47 passed in 20.62s
+55c56,57
+< PASS test_page_size :: 22 passed in 87.40s (0:01:27)
+---
+> PASS test_page_size :: 22 passed in 86.53s (0:01:26)
+> PASS test_panel_fallback :: 24 passed in 3.28s
+58c60
+< PASS test_qwen_image :: 36 passed, 1 skipped in 7.40s
+---
+> PASS test_qwen_image :: 36 passed, 1 skipped in 7.42s
+60,64c62,66
+< PASS test_responsive_mobile :: 16 passed in 132.26s (0:02:12)
+< PASS test_status_realtime :: 20 passed in 16.18s
+< PASS test_studio_server_cleanup :: 4 passed in 1.08s
+< PASS test_t2v_panel :: 37 passed in 0.41s
+< PASS test_t2v_panel_fix :: 38 passed in 0.62s
+---
+> PASS test_responsive_mobile :: 16 passed in 132.35s (0:02:12)
+> PASS test_status_realtime :: 20 passed in 16.47s
+> PASS test_studio_server_cleanup :: 4 passed in 0.87s
+> PASS test_t2v_panel :: 37 passed in 0.43s
+> PASS test_t2v_panel_fix :: 38 passed in 0.63s
+66c68
+< PASS test_yue2_schema :: 26 passed in 0.02s
+---
+> PASS test_yue2_schema :: 26 passed in 0.03s

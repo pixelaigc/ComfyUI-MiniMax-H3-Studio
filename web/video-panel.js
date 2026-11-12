@@ -39,6 +39,11 @@
     size_max: 16384,
     mp_table: [],
     default_mp: 0.4,
+    // 【2026-11-11 放宽】文生视频上限 2.0M 像素（服务端下发，别在前端写死）
+    max_pixels: 2 * 1024 * 1024,
+    max_pixels_mp: 2,
+    // 各模式各自的尺寸策略（不一刀切套用 2.0M）
+    mode_size_policy: {},
     size_presets: [],        // 服务端下发的合法尺寸预设（含宽高）
     accel_lora_single_select: true,
     accel_lora_default: "",
@@ -68,7 +73,17 @@
       w_min: 0.5,
       w_max: 1.0,
       upscaler_model: "",
+      cfg: 1.0,          // 【2026-11-11】二采专用 CFG（SelfLiftH3Sampler.cfg）
     },
+    // ---- 采样参数（与生图面板同级）----
+    // 取值全部来自服务端下发的 sampling 清单（/api/video-options），
+    // 前端不硬编码采样器/调度器名单 —— 那份清单来自本机 ComfyUI 的
+    // /object_info（KSamplerSelect 68 项 / BasicScheduler 14 项）。
+    steps: 4,
+    sampler: "",
+    scheduler: "",
+    shiftVideo: 12.0,
+    shiftAudio: 3.0,
   };
 
   const ASPECT_NUM = {
@@ -102,6 +117,18 @@
 
   // ------------------------------------------------------------ 尺寸
 
+  /** 当前模式的上限（像素），用于提示文案。 */
+  function maxPixels() {
+    const policy = (VIDEO_OPTIONS.mode_size_policy || {})[VIDEO_OPTIONS.mode || "t2v"];
+    if (policy && policy.max_pixels) return policy.max_pixels;
+    return VIDEO_OPTIONS.max_pixels || 2 * 1024 * 1024;
+  }
+
+  function formatMaxPixels() {
+    const px = maxPixels();
+    return `${(px / (1024 * 1024)).toFixed(1)}M 像素（${px.toLocaleString("en-US")} px）`;
+  }
+
   /** 比例 + 总像素 -> 像素宽高（与 ComfyUI 的 ResolutionSelector 同一算法） */
   function autoSize(aspect, megapixels) {
     const [wr, hr] = ASPECT_NUM[aspect] || [16, 9];
@@ -122,8 +149,11 @@
    */
   async function snapSize(rawW, rawH) {
     try {
+      // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算
+      // （t2v 放宽到 2.0M；flf / r2v 仍是 0.8MP 档位）。
+      const mode = encodeURIComponent(VIDEO_OPTIONS.mode || "t2v");
       const resp = await fetch(
-        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}`,
+        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}&mode=${mode}`,
         { cache: "no-store" });
       if (!resp.ok) return null;
       return await resp.json();
@@ -190,7 +220,7 @@
         const p = presets.find(x => x.key === want);
         note.textContent = p
           ? `官方档位 ${p.megapixels}MP · ${p.width}×${p.height}`
-            + `（H3 原生画布上限 768×1344，本项在限内）`
+            + `（上限 ${formatMaxPixels()}，本项在限内）`
           : "";
       }
     }
@@ -210,6 +240,8 @@
     const note = document.getElementById("vidSizeNote");
     if (note) {
       const parts = [`${mp.toFixed(2)} MP`];
+      // 【2026-11-11】把上限显式写出来 —— 用户看得见天花板在哪。
+      parts.push(`上限 ${formatMaxPixels()}`);
       if (videoState.custom) parts.push("自定义尺寸，点「自动」可恢复按比例计算的尺寸");
       note.textContent = parts.join(" · ");
     }
@@ -234,10 +266,20 @@
 
   async function applySize(rawW, rawH) {
     const snapped = await snapSize(rawW, rawH);
-    if (!snapped || !snapped.width) return;
+    if (!snapped) return;
+    videoState.sizeReasons = snapped.reasons || [];
+    if (!snapped.width || !snapped.height) {
+      // 【2026-11-11】服务端判定超限（strict）时返回 width=0 + 原因。
+      // 这里把原因原样显示，**不静默吞掉**（需求：超限要给出明确提示）。
+      videoState.width = null;
+      videoState.height = null;
+      videoState.sizePresetKey = "";
+      renderSizePresetSelect();
+      renderSizeFields();
+      return;
+    }
     videoState.width = snapped.width;
     videoState.height = snapped.height;
-    videoState.sizeReasons = snapped.reasons || [];
     // 手填之后就不再是任何预设 —— 预设下拉要切到「自定义」
     const presets = presetsForAspect(videoState.aspect);
     const hit = presets.find(p => p.width === snapped.width && p.height === snapped.height);
@@ -247,6 +289,25 @@
   }
 
   // ------------------------------------------------------------ 模型
+  //
+  // 【2026-11-11 改造】下拉的每一项都由**服务端下发的数据**驱动：
+  //   * 能不能选 —— 服务端用 ComfyUI 的模型列表 API 判定的 status
+  //     （available / external_missing / missing / unknown）；
+  //   * 显示什么 —— 服务端算好的 status_note（如实说明，不是写死常量）。
+  //
+  // 原来这里只认 `m.available`，且红字取自静态的 `m.warn` —— 那句
+  // 「盘未挂载时 ComfyUI 下拉里根本没有这个名字」是**写死的常量**，
+  // 在盘已挂载、ComfyUI 已收录权重的情况下依然整句显示，
+  // 让用户误以为「获取不到模型」（用户 2026-11-11 报的缺陷）。
+
+  /** 模型项在下拉里的显示文案：不可用时追加**如实**的状态后缀。 */
+  function modelOptionLabel(m) {
+    const status = m.status || (m.available === false ? "missing" : "available");
+    if (status === "available") return m.label;
+    if (status === "external_missing") return m.label + "（外置未挂载，当前不可选）";
+    if (status === "unknown") return m.label + "（未能确认，可用性未知）";
+    return m.label + "（权重缺失，不可用）";
+  }
 
   function renderModelSelect() {
     const sel = document.getElementById("vidModelSelect");
@@ -255,19 +316,28 @@
     Object.entries(VIDEO_OPTIONS.models).forEach(([key, m]) => {
       const opt = document.createElement("option");
       opt.value = key;
-      const unavailable = m.available === false;
-      opt.textContent = unavailable
-        ? m.label + "（权重缺失，不可用）" : m.label;
+      const status = m.status || (m.available === false ? "missing" : "available");
+      const unavailable = status !== "available";
+      opt.textContent = modelOptionLabel(m);
       opt.disabled = unavailable;
       opt.selected = key === videoState.model;
+      // title 里带上**真实**的权重文件名与状态，便于排查
+      opt.title = `${m.unet || ""}${m.status_note ? "\n" + m.status_note : ""}`;
       sel.appendChild(opt);
     });
-    // 当前选中的模型不可用 -> 回落到默认
+    // 当前选中的模型不可用 -> 回落到**第一个可用**的模型
     const model = currentModel();
-    if (!model || model.available === false) {
-      const fallback = VIDEO_OPTIONS.models[VIDEO_OPTIONS.default_model];
-      if (fallback) {
-        videoState.model = VIDEO_OPTIONS.default_model;
+    const curStatus = model
+      ? (model.status || (model.available === false ? "missing" : "available"))
+      : "missing";
+    if (!model || curStatus !== "available") {
+      const fallbackKey = Object.keys(VIDEO_OPTIONS.models).find(k => {
+        const m = VIDEO_OPTIONS.models[k];
+        const st = m.status || (m.available === false ? "missing" : "available");
+        return st === "available";
+      }) || VIDEO_OPTIONS.default_model;
+      if (fallbackKey && VIDEO_OPTIONS.models[fallbackKey]) {
+        videoState.model = fallbackKey;
         sel.value = videoState.model;
       }
     }
@@ -280,16 +350,65 @@
     const warn = document.getElementById("vidModelWarn");
     if (!model) {
       if (note) note.textContent = "";
-      if (warn) warn.textContent = "";
+      // 【2026-11-11】没有内容时**把元素藏掉**：
+      // .img-warn 自带橙色背景 + padding + 边框，空内容也会渲染成
+      // 一条橙色的空条（用户 21:06 实报的「模型框下面挂着橙色告警条」）。
+      if (warn) { warn.textContent = ""; warn.hidden = true; }
       return;
     }
+    const status = model.status
+      || (model.available === false ? "missing" : "available");
     if (note) {
       const bits = [model.note || ""];
       if (model.size_mb) bits.push(`本机体积 ${(model.size_mb / 1024).toFixed(1)} GB`);
       if (model.location) bits.push(`位置 ${model.location}`);
       note.textContent = bits.filter(Boolean).join(" · ");
     }
-    if (warn) warn.textContent = model.warn || "";
+    // 红字区域：**只显示当前真实状态**。
+    //   - status_note 是服务端按 ComfyUI 模型列表现算的，**不谎称**「获取不到模型」；
+    //   - 静态 warn 只保留与可用性无关的固有提醒（显存 / 兼容性）。
+    // 合并说明：panel-fallback 分支在此处额外要求「空内容必须把元素藏掉」
+    //（.img-warn 自带橙底，空内容也会渲染成一条空橙条），
+    // 故保留 hidden 逻辑 —— 两条规则同时满足。
+    if (warn) {
+      const parts = [];
+      if (status !== "available" && model.status_note) {
+        parts.push(model.status_note);
+      } else if (status === "available" && model.comfy_listed === true) {
+        parts.push("已确认在 ComfyUI 模型列表中可用。");
+      }
+      if (model.warn) parts.push(model.warn);
+      warn.textContent = parts.join(" ");
+      warn.hidden = !warn.textContent;
+    }
+  }
+
+  /**
+   * 模型清单的来源说明（显示在模型区顶部）。
+   * 「下拉里为什么少了一个模型」永远有答案：
+   *   - 正常：清单来自 ComfyUI 的模型列表 API（带条目数）
+   *   - 降级：连不上 ComfyUI，如实说明当前用的是磁盘扫描 + 原因
+   */
+  function renderModelSourceNote() {
+    const box = document.getElementById("vidModelSourceNote");
+    if (!box) return;
+    const src = VIDEO_OPTIONS.model_list_source;
+    const counts = VIDEO_OPTIONS.model_list_counts || {};
+    if (src === "comfyui_api") {
+      const n = counts.diffusion_models || 0;
+      const l = counts.loras || 0;
+      box.textContent = `清单来源：ComfyUI 模型列表 API（${n} 个扩散模型 / ${l} 个 LoRA）`;
+      box.className = "img-note";
+      box.hidden = false;
+      return;
+    }
+    const err = VIDEO_OPTIONS.model_list_error || "未知原因";
+    // 原因可能很长（三个接口各一条）—— 界面上只留第一条 + 截断，
+    // 完整原因在 /api/video-options 的 model_list_error 里。
+    const short = err.split("；")[0].slice(0, 160);
+    box.textContent = `未能连上 ComfyUI 模型列表（${short}）—— 当前清单来自本机磁盘扫描，可用性可能与 ComfyUI 下拉框不一致。`;
+    box.className = "img-warn";
+    box.hidden = false;
   }
 
   // ------------------------------------------------------------ 加速 LoRA
@@ -431,6 +550,170 @@
     if (note) note.textContent = active ? (active.note || "") : "";
   }
 
+  // ------------------------------------------------------------ 采样参数
+
+  /**
+   * 采样参数区（步数 / 采样器 / 调度器 / shift / CFG 只读说明）。
+   *
+   * 与生图面板同一套交互：滑块 + 下拉 + 「推荐 / 已改」提示。
+   * 所有候选值都来自服务端下发的 `sampling` 清单 ——
+   * 前端不硬编码采样器/调度器名单（那份清单实测自本机 ComfyUI 的
+   * /object_info：KSamplerSelect 68 项、BasicScheduler 14 项）。
+   */
+  function samplingCfg() {
+    return VIDEO_OPTIONS.sampling || {};
+  }
+
+  function renderSampling() {
+    const cfg = samplingCfg();
+    const model = currentModel();
+
+    // ---- 步数 ----
+    const stepsEl = document.getElementById("vidSteps");
+    const stepsVal = document.getElementById("vidStepsVal");
+    const stepsHint = document.getElementById("vidStepsHint");
+    if (stepsEl) {
+      const min = cfg.steps_min || 1;
+      const max = cfg.steps_max || 50;
+      stepsEl.min = String(min);
+      stepsEl.max = String(max);
+      stepsEl.value = videoState.steps;
+    }
+    if (stepsVal) stepsVal.textContent = videoState.steps;
+    if (stepsHint) {
+      const recommended = model && model.steps != null ? Number(model.steps) : null;
+      stepsHint.textContent = recommended == null
+        ? "—"
+        : (Number(videoState.steps) === recommended ? "推荐" : "已改");
+    }
+
+    // ---- 采样器 ----
+    const samplerSel = document.getElementById("vidSamplerSelect");
+    const samplerHint = document.getElementById("vidSamplerHint");
+    if (samplerSel) {
+      const list = cfg.samplers || [];
+      samplerSel.innerHTML = "";
+      list.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = name === videoState.sampler;
+        samplerSel.appendChild(opt);
+      });
+      if (!list.includes(videoState.sampler)) {
+        const opt = document.createElement("option");
+        opt.value = videoState.sampler || "";
+        opt.textContent = videoState.sampler || "—";
+        samplerSel.appendChild(opt);
+      }
+      samplerSel.value = videoState.sampler;
+    }
+    if (samplerHint) {
+      const recommended = model && model.sampler ? model.sampler : null;
+      samplerHint.textContent = recommended == null
+        ? "—"
+        : (videoState.sampler === recommended ? "推荐" : "已改");
+    }
+
+    // ---- 调度器 ----
+    const schedSel = document.getElementById("vidSchedulerSelect");
+    const schedHint = document.getElementById("vidSchedulerHint");
+    if (schedSel) {
+      const list = cfg.schedulers || [];
+      schedSel.innerHTML = "";
+      list.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = name === videoState.scheduler;
+        schedSel.appendChild(opt);
+      });
+      if (!list.includes(videoState.scheduler)) {
+        const opt = document.createElement("option");
+        opt.value = videoState.scheduler || "";
+        opt.textContent = videoState.scheduler || "—";
+        schedSel.appendChild(opt);
+      }
+      schedSel.value = videoState.scheduler;
+    }
+    if (schedHint) {
+      const recommended = model && model.scheduler ? model.scheduler : null;
+      schedHint.textContent = recommended == null
+        ? "—"
+        : (videoState.scheduler === recommended ? "推荐" : "已改");
+    }
+
+    // ---- shift（视频 / 音频）----
+    const svEl = document.getElementById("vidShiftVideo");
+    const saEl = document.getElementById("vidShiftAudio");
+    const svVal = document.getElementById("vidShiftVideoVal");
+    const saVal = document.getElementById("vidShiftAudioVal");
+    const svHint = document.getElementById("vidShiftVideoHint");
+    const saHint = document.getElementById("vidShiftAudioHint");
+    const shiftMin = cfg.shift_min != null ? cfg.shift_min : 0.01;
+    const shiftMax = cfg.shift_max != null ? cfg.shift_max : 100;
+    if (svEl) {
+      svEl.min = String(shiftMin);
+      svEl.max = String(shiftMax);
+      svEl.value = videoState.shiftVideo;
+    }
+    if (saEl) {
+      saEl.min = String(shiftMin);
+      saEl.max = String(shiftMax);
+      saEl.value = videoState.shiftAudio;
+    }
+    if (svVal) svVal.textContent = Number(videoState.shiftVideo).toFixed(2);
+    if (saVal) saVal.textContent = Number(videoState.shiftAudio).toFixed(2);
+    const defVideo = cfg.shift_default_video != null ? cfg.shift_default_video : 12.0;
+    const defAudio = cfg.shift_default_audio != null ? cfg.shift_default_audio : 3.0;
+    if (svHint) {
+      svHint.textContent = Number(videoState.shiftVideo) === Number(defVideo)
+        ? "推荐" : "已改";
+    }
+    if (saHint) {
+      saHint.textContent = Number(videoState.shiftAudio) === Number(defAudio)
+        ? "推荐" : "已改";
+    }
+
+    // 【2026-11-12】shift 节点本机不可用时 —— 滑杆必须**禁用**，
+    // 不能留一个「能拖但服务端会丢掉」的假控件。
+    // （本机实测该节点是 ComfyUI 核心节点恒在，但按「节点真在」原则处理。）
+    const shiftAvailable = cfg.sigma_shift_available !== false;
+    [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
+    if (svHint) {
+      svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
+      svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+    }
+    if (saHint) {
+      saHint.textContent = shiftAvailable ? saHint.textContent : "节点不可用";
+      saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+    }
+
+    // ---- CFG：标准路径是**只读说明**（H3 没有 CFG 槽位）----
+    const cfgEl = document.getElementById("vidCfg");
+    const cfgVal = document.getElementById("vidCfgVal");
+    const cfgHint = document.getElementById("vidCfgHint");
+    const cfgNote = document.getElementById("vidCfgFixedNote");
+    const fixed = cfg.cfg_fixed != null ? cfg.cfg_fixed : 1.0;
+    if (cfgEl) cfgEl.value = Number(fixed).toFixed(1);
+    if (cfgVal) cfgVal.textContent = Number(fixed).toFixed(1);
+    if (cfgHint) cfgHint.textContent = "H3 固定";
+    if (cfgNote) cfgNote.textContent = cfg.cfg_fixed_reason || "";
+
+    // ---- 说明行：实际生效值 ----
+    const note = document.getElementById("vidSamplingNote");
+    if (note) {
+      const bits = [
+        `步数 ${videoState.steps} → BasicScheduler.steps`,
+        `采样器 ${videoState.sampler || "—"} → KSamplerSelect.sampler_name`,
+        `调度器 ${videoState.scheduler || "—"} → BasicScheduler.scheduler`,
+        `shift ${Number(videoState.shiftVideo).toFixed(2)} / `
+          + `${Number(videoState.shiftAudio).toFixed(2)} → MiniMaxH3SigmaShift`,
+      ];
+      note.textContent = bits.join(" · ");
+    }
+  }
+
   // ------------------------------------------------------------ 二采
 
   function renderTwopass() {
@@ -493,6 +776,18 @@
       if (label) label.textContent = Number(videoState.twopass.rho).toFixed(2);
     }
 
+    // 二采 CFG（SelfLiftH3Sampler.cfg）—— H3 链路里唯一真正可调的 CFG
+    const tpCfg = document.getElementById("vidTwopassCfg");
+    if (tpCfg) {
+      tpCfg.value = videoState.twopass.cfg;
+      const label = document.getElementById("vidTwopassCfgVal");
+      if (label) label.textContent = Number(videoState.twopass.cfg).toFixed(1);
+    }
+    // 二采采样器：SelfLift 只支持标准 Euler（实测自 comfyui-SelfLift/nodes.py），
+    // 所以这里是**只读固定值**，不是可调控件 —— 不伪造假下拉。
+    const tpSampler = document.getElementById("vidTwopassSampler");
+    if (tpSampler) tpSampler.value = "euler";
+
     if (note) {
       const bits = [cfg.note || ""];
       if (videoState.twopass.enabled) {
@@ -543,15 +838,39 @@
   // ------------------------------------------------------------ 总渲染
 
   function renderVideoPanel() {
+    // 【2026-11-11】视频面板是 t2v 专用的（首尾帧 / 参考生视频走各自的老面板），
+    // 但仍把 mode 记下来 —— 尺寸策略按 mode 取，不写死。
+    VIDEO_OPTIONS.mode = "t2v";
     if (!optionsReady) return;
-    renderModelSelect();
-    renderAspectChips();
-    renderSizePresetSelect();
-    renderSizeFields();
-    renderFixedLoraNote();
-    renderAccelLoraSelect();
-    renderAttention();
-    renderTwopass();
+    // 【2026-11-11】每一段独立 try/catch —— **一个区块渲染失败不能
+    // 阻断其它区块**（原来任何一处抛错，后面的下拉全都不渲染，
+    // 于是整块面板空掉）。这正是「模型列表 API 失败不得阻断
+    // 尺寸预设 / LoRA / 注意力机制等其它下拉」的实现方式。
+    // 合并说明：本区块同时承接 panel-fallback 的逐段 try/catch 与
+    // t2v-sampler 新增的「采样参数」区块（renderSampling）——
+    // 两者语义可叠加，缺一不可，故两段都保留。
+    // model-list-fix 分支在此处额外调用 renderModelSourceNote()
+    // （显示「清单来源：ComfyUI 模型列表 API」）—— 独立于其它区块，
+    // 同样纳入 try/catch 保护，一并保留。
+    const steps = [
+      ["清单来源", renderModelSourceNote],
+      ["模型", renderModelSelect],
+      ["画面比例", renderAspectChips],
+      ["尺寸预设", renderSizePresetSelect],
+      ["输出尺寸", renderSizeFields],
+      ["固定加速LoRA", renderFixedLoraNote],
+      ["加速LoRA", renderAccelLoraSelect],
+      ["注意力", renderAttention],
+      ["采样参数", renderSampling],
+      ["二采", renderTwopass],
+    ];
+    steps.forEach(([name, fn]) => {
+      try {
+        fn();
+      } catch (e) {
+        console.error(`[视频面板] 渲染「${name}」失败:`, e);
+      }
+    });
   }
 
   // ------------------------------------------------------------ 配置持久化
@@ -573,6 +892,12 @@
       accel_lora_strength: Number(videoState.accelLoraStrength),
       attention: videoState.attention,
       twopass: { ...videoState.twopass },
+      // 【2026-11-11】采样参数
+      steps: videoState.steps,
+      sampler: videoState.sampler,
+      scheduler: videoState.scheduler,
+      shift_video: Number(videoState.shiftVideo),
+      shift_audio: Number(videoState.shiftAudio),
     };
   }
 
@@ -609,6 +934,12 @@
     if (cfg.twopass && typeof cfg.twopass === "object") {
       videoState.twopass = { ...videoState.twopass, ...cfg.twopass };
     }
+    // 【2026-11-11】采样参数
+    if (cfg.steps != null) videoState.steps = Number(cfg.steps) || videoState.steps;
+    if (cfg.sampler) videoState.sampler = cfg.sampler;
+    if (cfg.scheduler) videoState.scheduler = cfg.scheduler;
+    if (cfg.shift_video != null) videoState.shiftVideo = Number(cfg.shift_video);
+    if (cfg.shift_audio != null) videoState.shiftAudio = Number(cfg.shift_audio);
   }
 
   function saveVideoConfig() {
@@ -631,8 +962,105 @@
   }
 
   // ------------------------------------------------------------ 加载清单
+  //
+  // 【2026-11-11 修复 —— 下拉空白】
+  // 原来这里 catch 掉异常就**什么都不做**：
+  //   fetch 失败 -> 直接进 catch -> renderVideoPanel() 从未执行
+  // -> 尺寸预设 / 模型 / 加速 LoRA / 注意力机制**全是空下拉**
+  //   （控件在、选项没有），用户完全没法用。
+  // 触发场景实测：ComfyUI 正在启动（object_info 超时）时，
+  // /api/video-options 要 66 秒才返回，浏览器先放弃。
+  //
+  // 现在：**失败也要渲染**。
+  //   * 拿不到服务端清单 -> 用 web/video-panel-fallback.js 里的
+  //     静态兜底清单（同源实测数据），保证每个下拉都有选项；
+  //   * 同时显示明确的错误条，告诉用户「当前是兜底清单，
+  //     服务端没连上」—— 不静默、不假装正常；
+  //   * 其它面板（尺寸预设 / 加速 LoRA / 注意力）**互不阻断**：
+  //     各自的数据缺失只影响自己。
+
+  /** 取静态兜底清单（脚本没加载时返回 null）。 */
+  function fallbackManifest() {
+    return window.VIDEO_PANEL_FALLBACK || null;
+  }
+
+  /**
+   * 用静态兜底清单填 VIDEO_OPTIONS。
+   * 只填**缺的那部分** —— 服务端给了的以服务端为准。
+   *
+   * 【健壮性】整个函数**不能抛** —— 它跑在「已经出过一次错」的路径上，
+   * 再抛一次就会让整个面板初始化中断（比空下拉更糟）。
+   */
+  function applyFallbackManifest() {
+    let fb = null;
+    try {
+      fb = fallbackManifest();
+    } catch (e) {
+      fb = null;
+    }
+    if (!fb || typeof fb !== "object") return false;
+    try {
+      // models：服务端没给或给了空 -> 用兜底
+      if (!VIDEO_OPTIONS.models || !Object.keys(VIDEO_OPTIONS.models).length) {
+        const dict = {};
+        (fb.models || []).forEach(m => {
+          if (m && m.key) dict[m.key] = m;
+        });
+        VIDEO_OPTIONS.models = dict;
+        VIDEO_OPTIONS.default_model = fb.default_model || "";
+      }
+      if (!VIDEO_OPTIONS.size_presets || !VIDEO_OPTIONS.size_presets.length) {
+        // 服务端的 size_presets 是**扁平 list**（每条带 aspect 字段）——
+        // 兜底清单必须同形，否则 renderSizePresetSelect 里
+        // presets.filter(...) 会抛 "object is not iterable"。
+        VIDEO_OPTIONS.size_presets = Array.isArray(fb.size_presets)
+          ? fb.size_presets : [];
+      }
+      if (!VIDEO_OPTIONS.attention_modes || !VIDEO_OPTIONS.attention_modes.length) {
+        VIDEO_OPTIONS.attention_modes = Array.isArray(fb.attention_modes)
+          ? fb.attention_modes : [];
+        VIDEO_OPTIONS.default_attention = fb.default_attention || "default";
+      }
+      if (!VIDEO_OPTIONS.accel_lora_combos || !VIDEO_OPTIONS.accel_lora_combos.length) {
+        VIDEO_OPTIONS.accel_lora_combos = Array.isArray(fb.accel_lora_combos)
+          ? fb.accel_lora_combos : [];
+      }
+      if (!VIDEO_OPTIONS.fixed_accel_loras || !VIDEO_OPTIONS.fixed_accel_loras.length) {
+        VIDEO_OPTIONS.fixed_accel_loras = Array.isArray(fb.fixed_accel_loras)
+          ? fb.fixed_accel_loras : [];
+        VIDEO_OPTIONS.default_fixed_accel_lora = fb.default_fixed_accel_lora || "";
+      }
+      if (!VIDEO_OPTIONS.aspects || !VIDEO_OPTIONS.aspects.length) {
+        VIDEO_OPTIONS.aspects = Array.isArray(fb.aspects) ? fb.aspects : [];
+      }
+      if (!VIDEO_OPTIONS.size_multiple) VIDEO_OPTIONS.size_multiple = fb.size_multiple || 32;
+      if (!VIDEO_OPTIONS.size_min) VIDEO_OPTIONS.size_min = fb.size_min || 32;
+      if (!VIDEO_OPTIONS.size_max) VIDEO_OPTIONS.size_max = fb.size_max || 16384;
+      if (!VIDEO_OPTIONS.mp_table || !VIDEO_OPTIONS.mp_table.length) {
+        VIDEO_OPTIONS.mp_table = Array.isArray(fb.mp_table) ? fb.mp_table : [];
+      }
+      if (!VIDEO_OPTIONS.default_mp) VIDEO_OPTIONS.default_mp = fb.default_mp || 0.4;
+      return true;
+    } catch (e) {
+      console.error("[视频面板] 兜底清单填充失败:", e);
+      return false;
+    }
+  }
+
+  /** 兜底态的错误条：说清楚「现在显示的是兜底清单」而不是假装正常。 */
+  function renderFallbackNotice(reason) {
+    const box = document.getElementById("staleVideoBanner");
+    if (!box) return;
+    box.hidden = false;
+    // 不改 class —— 保留 .stale-backend-banner 的既有样式
+    box.innerHTML = "视频面板清单载入失败：<b>" + esc(reason)
+      + "</b>。已切换到<b>内置兜底清单</b>（下拉仍可选择），"
+      + "但服务端无法校验本机权重 —— 提交可能失败。"
+      + "请确认后端与 ComfyUI 已就绪（<code>systemctl status h3-studio comfyui</code>）。";
+  }
 
   async function loadVideoOptions() {
+    let reason = "";
     try {
       const resp = await fetch("/api/video-options", { cache: "no-store" });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -660,6 +1088,40 @@
       if (!videoState.megapixels) {
         videoState.megapixels = data.default_mp || 0.4;
       }
+      // 【2026-11-11】采样参数默认值 —— 取自服务端下发的 sampling 清单
+      // 与**当前底模**的推荐值（VIDEO_MODELS 里每个模型都带
+      // steps / sampler / scheduler）。所以面板默认显示的就是
+      // 「这个底模实际会用的值」，而不是拍脑袋的数。
+      const sampling = data.sampling || {};
+      const defModel = VIDEO_OPTIONS.models[videoState.model] || {};
+      if (!videoState.steps) {
+        videoState.steps = defModel.steps != null
+          ? Number(defModel.steps)
+          : (sampling.steps_default != null ? sampling.steps_default : 4);
+      }
+      if (!videoState.sampler) {
+        videoState.sampler = defModel.sampler
+          || (sampling.samplers && sampling.samplers[0]) || "";
+      }
+      if (!videoState.scheduler) {
+        videoState.scheduler = defModel.scheduler
+          || (sampling.schedulers && sampling.schedulers[0]) || "";
+      }
+      if (videoState.shiftVideo == null
+        || videoState.shiftVideo === 12.0) {
+        videoState.shiftVideo = sampling.shift_default_video != null
+          ? sampling.shift_default_video : 12.0;
+      }
+      if (videoState.shiftAudio == null
+        || videoState.shiftAudio === 3.0) {
+        videoState.shiftAudio = sampling.shift_default_audio != null
+          ? sampling.shift_default_audio : 3.0;
+      }
+      if (videoState.twopass.cfg == null
+        || videoState.twopass.cfg === 1.0) {
+        videoState.twopass.cfg = sampling.cfg_twopass_default != null
+          ? sampling.cfg_twopass_default : 1.0;
+      }
       // 恢复保存的配置
       try {
         const cfgResp = await fetch("/api/video-config", { cache: "no-store" });
@@ -668,12 +1130,37 @@
 
       renderVideoPanel();
     } catch (e) {
+      // 【关键】失败也必须渲染 —— 否则整个面板是空的
       console.error("[视频面板] 载入清单失败:", e.message);
-      const banner = document.getElementById("staleVideoBanner");
-      if (banner) {
-        banner.hidden = false;
-        banner.innerHTML = "视频面板清单载入失败：<b>" + esc(e.message)
-          + "</b>。请确认后端已重启（<code>systemctl restart h3-studio</code>）。";
+      reason = e.message || String(e);
+      optionsReady = true;                 // 让 renderVideoPanel() 能跑
+      const usedFallback = applyFallbackManifest();
+      // 兜底态：模型项标记为「可用性未知」，且默认选中第一个
+      if (!videoState.model) {
+        videoState.model = VIDEO_OPTIONS.default_model
+          || (Object.keys(VIDEO_OPTIONS.models || {})[0] || "");
+      }
+      if (!videoState.attention) {
+        videoState.attention = VIDEO_OPTIONS.default_attention || "default";
+      }
+      if (!videoState.megapixels) {
+        videoState.megapixels = VIDEO_OPTIONS.default_mp || 0.4;
+      }
+      try {
+        renderVideoPanel();
+      } catch (renderErr) {
+        console.error("[视频面板] 兜底渲染也失败:", renderErr);
+      }
+      if (usedFallback) {
+        renderFallbackNotice(reason);
+      } else {
+        const banner = document.getElementById("staleVideoBanner");
+        if (banner) {
+          banner.hidden = false;
+          banner.innerHTML = "视频面板清单载入失败：<b>" + esc(reason)
+            + "</b>，且没有内置兜底清单可用。请确认后端已启动"
+            + "（<code>systemctl restart h3-studio</code>）。";
+        }
       }
     }
   }
@@ -713,7 +1200,14 @@
       height: h,
       aspect: videoState.aspect,
       duration: state.duration,
-      steps: state.steps,
+      // 【2026-11-11】采样参数 —— 真正传进工作流。
+      // 注意：这里**不再**用全局 state.steps（旧面板的通用滑杆），
+      // 视频面板有自己的步数控件（vidSteps），服务端会用这里的值。
+      steps: videoState.steps,
+      sampler: videoState.sampler,
+      scheduler: videoState.scheduler,
+      shift_video: Number(videoState.shiftVideo),
+      shift_audio: Number(videoState.shiftAudio),
       seed: $("#seed").value.trim() || null,
       fixed_accel_lora: videoState.fixedAccelLora,
       // 【单选】最多一项
@@ -727,6 +1221,9 @@
         w_min: videoState.twopass.w_min,
         w_max: videoState.twopass.w_max,
         upscaler_model: videoState.twopass.upscaler_model,
+        // 二采 CFG（SelfLiftH3Sampler.cfg）—— 标准路径没有 CFG，
+        // 这是 H3 链路里唯一真正生效的 CFG。
+        cfg: Number(videoState.twopass.cfg),
       },
     };
   }
@@ -908,6 +1405,57 @@
         renderTwopass();
         saveVideoConfig();
       });
+    }
+    // 二采 CFG
+    const tpCfg = document.getElementById("vidTwopassCfg");
+    if (tpCfg) {
+      tpCfg.addEventListener("input", e => {
+        videoState.twopass.cfg = parseFloat(e.target.value);
+        renderTwopass();
+      });
+      tpCfg.addEventListener("change", saveVideoConfig);
+    }
+
+    // ---- 采样参数（步数 / 采样器 / 调度器 / shift）----
+    const steps = document.getElementById("vidSteps");
+    if (steps) {
+      steps.addEventListener("input", e => {
+        videoState.steps = parseInt(e.target.value);
+        renderSampling();
+      });
+      steps.addEventListener("change", saveVideoConfig);
+    }
+    const sampler = document.getElementById("vidSamplerSelect");
+    if (sampler) {
+      sampler.addEventListener("change", e => {
+        videoState.sampler = e.target.value;
+        renderSampling();
+        saveVideoConfig();
+      });
+    }
+    const scheduler = document.getElementById("vidSchedulerSelect");
+    if (scheduler) {
+      scheduler.addEventListener("change", e => {
+        videoState.scheduler = e.target.value;
+        renderSampling();
+        saveVideoConfig();
+      });
+    }
+    const shiftVideo = document.getElementById("vidShiftVideo");
+    if (shiftVideo) {
+      shiftVideo.addEventListener("input", e => {
+        videoState.shiftVideo = parseFloat(e.target.value);
+        renderSampling();
+      });
+      shiftVideo.addEventListener("change", saveVideoConfig);
+    }
+    const shiftAudio = document.getElementById("vidShiftAudio");
+    if (shiftAudio) {
+      shiftAudio.addEventListener("input", e => {
+        videoState.shiftAudio = parseFloat(e.target.value);
+        renderSampling();
+      });
+      shiftAudio.addEventListener("change", saveVideoConfig);
     }
   }
 

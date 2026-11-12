@@ -147,9 +147,19 @@ def build_t2v_panel(params: dict) -> dict:
     steps = params.get("steps")
     if not steps:
         steps = model.get("steps", 4)
-    steps = max(1, int(steps))
-    scheduler = params.get("scheduler") or model.get("scheduler", "beta")
-    sampler = params.get("sampler") or model.get("sampler", "euler")
+    steps = vmodels.normalize_steps(steps, int(model.get("steps", 4)))
+    scheduler = vmodels.normalize_scheduler(
+        params.get("scheduler"), model.get("scheduler", "beta"))
+    sampler = vmodels.normalize_sampler(
+        params.get("sampler"), model.get("sampler", "euler"))
+    # CFG：H3 标准采样路径固定 1.0（BasicGuider 没有 cfg 槽位），
+    # 只有二采（SelfLiftH3Sampler）那条路径才真的吃 cfg —— 见下方
+    # _twopass_block() 的调用。
+    #
+    # 【2026-11-11】标准路径的 cfg **不会**写进任何节点（BasicGuider
+    # 压根没有这个输入），这里只是保留变量形状，让 _twopass_block()
+    # 能拿到二采专用的 cfg。标准路径的 CFG 由 vmodels.VIDEO_CFG_FIXED
+    # 固定并由面板做只读说明。
     cfg = params.get("cfg")
     if cfg is None:
         cfg = model.get("cfg", 1.0)
@@ -210,6 +220,40 @@ def build_t2v_panel(params: dict) -> dict:
     # ---- 注意力机制 ----
     model_ref, next_id = _apply_attention(p, "300", model_ref, params, next_id)
 
+    # ---- shift（MiniMaxH3SigmaShift）----
+    #
+    # 【2026-11-11 新增】这个节点是 **ComfyUI 核心节点**
+    # （comfy_extras/nodes_minimax_h3.py:367），display_name
+    # 「ModelSamplingMiniMaxH3」，它做两件事：
+    #   1. model_sampling.set_parameters(shift=shift_video, audio_shift=shift_audio)
+    #      —— 改采样器的 sigma 时间表；
+    #   2. 写 transformer_options["minimax_h3_sigma_shift_video/_audio"]
+    #      —— 让 DiT 内部把音视频两条流映射到同一个基准网格。
+    #
+    # 默认值 12.0 / 3.0 **就是 H3 模型的内生值**：
+    #   comfy/supported_models.py:964  sampling_settings = {"shift": 12.0, "audio_shift": 3.0}
+    #   comfy/ldm/minimax/model.py:492  sigma_shift_video=12.0, sigma_shift_audio=3.0
+    # 所以「不接这个节点」和「接了但用默认值」是**完全等价**的 ——
+    # 面板给默认值时不会改变任何出图结果。
+    #
+    # 节点不存在时**不接**（保持原样），不要硬塞一个 ComfyUI 不认的节点。
+    shift_video = vmodels.normalize_shift(
+        params.get("shift_video"), vmodels.VIDEO_SHIFT_DEFAULT_VIDEO)
+    shift_audio = vmodels.normalize_shift(
+        params.get("shift_audio"), vmodels.VIDEO_SHIFT_DEFAULT_AUDIO)
+    if params.get("use_sigma_shift", True):
+        p[str(next_id)] = {
+            "inputs": {
+                "model": model_ref,
+                "shift_video": shift_video,
+                "shift_audio": shift_audio,
+            },
+            "class_type": "MiniMaxH3SigmaShift",
+            "_meta": {"title": "sigma shift（视频/音频）"},
+        }
+        model_ref = [str(next_id), 0]
+        next_id += 1
+
     # ---- sigma ----
     p["9"] = {"inputs": {"scheduler": scheduler, "steps": steps, "denoise": 1,
                           "model": model_ref},
@@ -221,6 +265,8 @@ def build_t2v_panel(params: dict) -> dict:
     use_twopass = bool(twopass.get("enabled"))
 
     if use_twopass:
+        # 二采路径的 CFG 来自 twopass.cfg（面板上二采区块里的真控件），
+        # 没给才回落到模型默认值。
         samples_ref = _twopass_block(p, model_ref, steps, scheduler, sampler, seed,
                                      cfg, twopass, width, height, duration,
                                      latent_ref)
@@ -293,6 +339,16 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     if w_min > w_max:
         w_min, w_max = w_max, w_min
 
+    # CFG：SelfLiftH3Sampler 自带 cfg 输入（节点 schema: 0~100, default 5.0），
+    # 这是 H3 链路里**唯一**真正可调 CFG 的地方。
+    # 优先取 twopass.cfg（面板二采区块的控件），回落顺序：
+    #   twopass.cfg -> 外部传入的 cfg -> VIDEO_TWOPASS["cfg_default"]
+    try:
+        sampler_cfg = float(twopass.get("cfg", cfg))
+    except (TypeError, ValueError):
+        sampler_cfg = float(cfg)
+    sampler_cfg = max(0.0, min(100.0, sampler_cfg))
+
     # 负面条件：H3 的引导器要 positive + negative
     p["16"] = {"inputs": {"model": model_ref, "conditioning": ["105:104", 0]},
                "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
@@ -309,7 +365,7 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
             "sampler": ["17", 0],
             "sigmas": ["9", 0],
             "seed": int(seed),
-            "cfg": float(cfg),
+            "cfg": sampler_cfg,
             "transition_step": transition_step,
             "lowres_scale": lowres_scale,
             "rho": rho,
