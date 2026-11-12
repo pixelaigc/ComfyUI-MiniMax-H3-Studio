@@ -1,0 +1,2 @@
+FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras
+FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
