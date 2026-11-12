@@ -131,6 +131,20 @@ MUTATIONS = [
         '    out.model_label = p.model ? `H3 + ${p.lora || "ckpt850"}` : (p.model_key || "");\n',
         "test_falls_back_to_local_summary_when_server_silent",
     ),
+    (
+        "前端把 Qwen 卡片挤出模型行（退回只判 t2i/t2i_moss）",
+        "web/app.js",
+        "      ${IMAGE_MODES.includes(job.mode) ? `<div class=\"row\"><span>分辨率</span>",
+        "      ${(job.mode === \"t2i\" || job.mode === \"t2i_moss\") ? `<div class=\"row\"><span>分辨率</span>",
+        "test_qwen_cards_must_render_model_row",
+    ),
+    (
+        "摘要把 r2v 的默认底模说成 FL2VA（实际是 Ref2VA）",
+        "h3studio/job_meta.py",
+        '        unet_key = "ref2va" if mode == "r2v" else "fl2va"\n',
+        '        unet_key = "fl2va"\n',
+        "test_r2v_default_model_is_ref2va_not_fl2va",
+    ),
 ]
 
 
