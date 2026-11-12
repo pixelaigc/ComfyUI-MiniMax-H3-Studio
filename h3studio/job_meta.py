@@ -126,6 +126,68 @@ def _effect_lora_display(name: str) -> str:
 # ------------------------------------------------------------------
 # 文生视频（t2v 新面板路径）
 # ------------------------------------------------------------------
+def _attention_label(key: str) -> str:
+    """注意力机制 key -> 显示名（**逐字**取面板下拉里的那个 label）。
+
+    与面板下拉同源（h3studio.video_models.VIDEO_ATTENTION_MODES），
+    所以「生成库显示的注意力机制」与「面板上能选到的那个」永远一致。
+
+    已被移除的机制（sol_scheduled）也会查到 —— 那时返回
+    「<label>（已下线）」，如实说明这条老任务当时用的是哪个机制，
+    而不是显示空白或编一个。
+    """
+    meta = vmodels.VIDEO_ATTENTION_MODES.get(key)
+    if meta:
+        return str(meta.get("label") or key)
+    removed = vmodels.VIDEO_REMOVED_ATTENTION_MODES.get(key)
+    if removed:
+        return f"{removed.get('label') or key}（已下线）"
+    return key or ""
+
+
+def attention_label(key: str) -> str:
+    """**公开**入口：注意力机制 key -> 显示名（与面板下拉逐字一致）。
+
+    素材库入库时要用它给条目打上「用的是哪种注意力机制」的标注，
+    所以对外暴露（内部实现仍是 _attention_label）。
+    """
+    return _attention_label(key)
+
+
+def _attention_summary(params: dict) -> dict:
+    """文生视频任务的「注意力机制」摘要。
+
+    【为什么要有】用户要求「媒体库/生成库标注所用注意力机制」——
+    每个视频条目要显示生成时**实际使用的**注意力机制。
+
+    字段来源：params["attention"]（面板真实提交的字段，
+    服务端归一层已校验过它在清单里）。
+
+    老任务没有这个字段 -> attention_key 为空、label 为空
+    （**不编造**：老任务确实没有记录注意力机制）。
+    """
+    key = str(params.get("attention") or "").strip()
+    out = {
+        "attention_key": key,
+        "attention_label": "",
+        "attention_speed_label": "",
+        "attention_available": True,
+    }
+    if not key:
+        return out
+    meta = vmodels.VIDEO_ATTENTION_MODES.get(key)
+    if meta is None:
+        removed = vmodels.VIDEO_REMOVED_ATTENTION_MODES.get(key)
+        out["attention_label"] = _attention_label(key)
+        out["attention_available"] = False
+        if removed:
+            out["attention_note"] = removed.get("reason", "")
+        return out
+    out["attention_label"] = str(meta.get("label") or key)
+    out["attention_speed_label"] = str(meta.get("speed_label") or "")
+    return out
+
+
 def _t2v_summary(params: dict) -> dict:
     """文生视频面板路径的模型 / LoRA 摘要。
 
@@ -146,7 +208,6 @@ def _t2v_summary(params: dict) -> dict:
         "fixed_lora_strength": None,
         "source": "t2v_panel",
     }
-
     model_key = str(params.get("model_key") or "").strip()
     if not model_key:
         return out
@@ -403,12 +464,18 @@ def summarize(mode: str, params: dict) -> dict:
     params = params or {}
     mode = str(mode or "")
     if mode == "t2v" and params.get("model_key"):
-        return _t2v_summary(params)
-    if mode in ("t2v", "flf", "r2v", "longfilm"):
-        return _legacy_video_summary(params, mode)
-    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
-        return _image_summary(params, mode)
-    if mode in ("t2a", "a2a"):
-        return _music_summary(params)
-    # 未知模式：尽力给出一个不编造的摘要
-    return _legacy_video_summary(params)
+        out = _t2v_summary(params)
+    elif mode in ("t2v", "flf", "r2v", "longfilm"):
+        out = _legacy_video_summary(params, mode)
+    elif mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+        out = _image_summary(params, mode)
+    elif mode in ("t2a", "a2a"):
+        out = _music_summary(params)
+    else:
+        # 未知模式：尽力给出一个不编造的摘要
+        out = _legacy_video_summary(params)
+    # 【2026-11-12】注意力机制摘要对**所有模式**统一附加 ——
+    # 保证 summarize() 返回的形状恒定（前端只渲染，不判断字段是否存在）。
+    # 图像 / 音乐模式本来就没有注意力机制，字段会是空值（不编造）。
+    out.update(_attention_summary(params))
+    return out

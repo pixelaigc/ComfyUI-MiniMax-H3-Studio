@@ -1337,12 +1337,22 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     # （见 reso_label.describe），这一行只是让落库的参数自洽。
     out["resolution"] = reso_label.tier_for_pixels(width, height)
 
-    # ---- 时长（H3 训练区间约 124~362 帧 = 5~15 秒）----
-    try:
-        duration = float(params.get("duration") or 5)
-    except (TypeError, ValueError):
-        duration = 5.0
-    duration = max(2.0, min(15.0, duration))
+    # ---- 时长（2026-11-12 放宽到 60 秒）----
+    #
+    # 【旧行为】`max(2.0, min(15.0, duration))` —— 硬卡 15 秒，
+    # 用户实测反馈「15 秒太短，一分钟都行，最多 OOM」。
+    # 【新行为】
+    #   * 上限放宽到 video_models.VIDEO_DURATION_MAX（60 秒 =
+    #     1440 帧；ComfyUI 节点 schema 的 length 上限是 3600 帧，
+    #     15 秒是我们自己的限制，不是模型能力上限）；
+    #   * **超上限不静默截断** —— 直接返回错误信息（含上限值与
+    #     当前请求值），提交被拒。静默截断会让用户以为生成了
+    #     60 秒、实际只拿到 15 秒，那是撒谎；
+    #   * 非法值（不是数字）-> 回落到默认 5 秒，不报错（老客户端兼容）。
+    duration, duration_error = video_models.normalize_video_duration(
+        params.get("duration"))
+    if duration_error:
+        return out, duration_error
     out["duration"] = duration
 
     # ---- 底模 ----
@@ -1418,6 +1428,15 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     attention = params.get("attention") or video_models.VIDEO_DEFAULT_ATTENTION
     mode_meta = video_models.VIDEO_ATTENTION_MODES.get(attention)
     if mode_meta is None:
+        # 【2026-11-12】已下线的机制（sol_scheduled —— 用户实测画面有叠影）
+        # 要给**明确**的原因，而不是笼统的「未知注意力机制」——
+        # 否则用户以为是面板 bug，不知道这个选项为什么消失了。
+        removed = video_models.VIDEO_REMOVED_ATTENTION_MODES.get(attention)
+        if removed:
+            return out, (f"注意力机制「{removed['label']}」已下线："
+                         f"{removed['reason']}"
+                         f"请改选其它注意力机制（当前默认 "
+                         f"{video_models.VIDEO_DEFAULT_ATTENTION}）。")
         return out, f"未知的注意力机制 {attention}"
     node = mode_meta.get("node")
     if node and node not in _COMFY_NODE_NAMES:
@@ -2515,7 +2534,9 @@ _VIDEO_PANEL_NODES = [
     "ModelAttentionBackend",
     "MiniMaxH3MemoryEfficientSageAttentionPatch",
     "MiniMaxH3MemoryEfficientSolAttentionPatch",
-    "MiniMaxH3ScheduledSolAttentionPatch",
+    # 【2026-11-12 移除】MiniMaxH3ScheduledSolAttentionPatch ——
+    # 对应的「Sol-Attn 渐进调度」选项已下线（用户实测画面有叠影）。
+    # 节点本机仍在，但从名单里移除后不再被面板探测（省一次 HTTP）。
     "H3SparseAttention",
     "SelfLiftH3Sampler",
     # 【2026-11-12 修】MiniMaxH3SigmaShift —— shift（视频/音频）参数对应的
