@@ -21,6 +21,7 @@ from __future__ import annotations
 import random
 
 from . import continuation as cont
+from . import continuation_service as cont_service
 from . import video_models as vmodels
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
@@ -288,23 +289,45 @@ def build_t2v_panel(params: dict) -> dict:
     if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
         # ---- 续接段：读回上游潜空间 -> 拷贝桥 ----
         #
-        # 【落盘目录】用 Relay-Kit 自己的目录结构
-        # （ComfyUI output/relay_kit/<run_id>/stage_<N>.safetensors）：
-        #   * H3RelayLatentSave / H3RelayLatentLoad 是成对的一对，
-        #     段号语义由节点自己管（本段号 N -> 读回第 N-1 段）；
-        #   * 外观锚（ref_anchor_stage=0）会自动去读同一个 run_id 的
-        #     stage_00000 —— 换成别的目录结构这个自动读取就断了。
-        # run_id 带 h3studio_ 前缀，避免和用户手工跑 Relay-Kit 建的目录撞车。
+        # 【读回哪一份 —— 这是本段最关键的一根线】
+        # 读回的是**上游自己那一份**潜空间，路径由服务端从上游任务记录
+        # 权威算出（`source_latent_path`），以 `explicit_path` 交给节点。
+        #
+        # 【为什么不用「按链段号推坐标」】用户需求第 7 条允许对同一段
+        # 反复接续 -> 同一条链会**分叉**成兄弟分支 B1 / B2。若按
+        # 「链目录 + 链段号」推坐标，B1 与 B2 的坐标完全相同 ->
+        # 写同一个文件、互相覆盖 -> 再接续时读到兄弟分支的潜空间，
+        # 产出**静默的错误内容**（实测 C1 首帧 vs B1末帧 MAE 38.65、
+        # vs B2末帧 2.08，偏离 18.6 倍）。
+        # 每段一个专属目录（run_id 由该段自己的任务 id 派生），
+        # 结构上就不可能互相覆盖 —— 详见 continuation.segment_run_id。
         p["300:load"] = {
             "inputs": {
-                "run_id": cont_state["run_id"],
-                # 本段段号 N -> 节点读回第 N-1 段（与 Relay-Kit 段号语义一致）
-                "stage_index": cont_state["stage_index"],
-                "explicit_path": "",
+                "run_id": cont_state["source_run_id"],
+                # 有 explicit_path 时节点直接读那个文件（不再按段号推）。
+                # 段号给「上游的段号 + 1」只为让节点内部的报错信息可读。
+                "stage_index": cont_state["source_stage"] + 1,
+                "explicit_path": cont_state["source_path"],
             },
             "class_type": "H3RelayLatentLoad",
             "_meta": {"title": "接续·读回上游潜空间"},
         }
+        # 外观锚：链首段那一份（防长程漂移）。
+        # 每段一个目录之后，链首段的潜空间在**另一个目录** —— 拷贝桥
+        # 靠 run_id 自动读锚的能力用不上了，必须显式读一份接进来。
+        # 锚是**可选**的：找不到就不接（缺锚只是漂移风险，不是接错段）。
+        anchor_latent_ref = None
+        if cont_state["anchor_path"]:
+            p["300:anchor_load"] = {
+                "inputs": {
+                    "run_id": cont_state["anchor_run_id"],
+                    "stage_index": cont_state["anchor_stage"] + 1,
+                    "explicit_path": cont_state["anchor_path"],
+                },
+                "class_type": "H3RelayLatentLoad",
+                "_meta": {"title": "接续·读回链首段潜空间（外观锚）"},
+            }
+            anchor_latent_ref = ["300:anchor_load", 0]
         p["300:bridge"] = {
             "inputs": {
                 "latent": latent_ref,
@@ -315,10 +338,11 @@ def build_t2v_panel(params: dict) -> dict:
                 "pin_audio": True,
                 # 段号 >= 1 且没有 context_latent 时拷贝桥会 raise ——
                 # 我们永远接了 context_latent，所以段号给真实值即可。
-                "stage_index": cont_state["stage_index"],
-                "run_id": cont_state["run_id"],
-                # 外观锚：读第 0 段当全局锚，防长程漂移。
-                "ref_anchor_stage": 0 if cont_state["stage_index"] > 0 else -1,
+                "stage_index": cont_state["source_stage"],
+                "run_id": cont_state["source_run_id"],
+                # 外观锚：显式接进来（每段一个目录后不能再靠自动读）。
+                "ref_anchor_latent": anchor_latent_ref,
+                "ref_anchor_stage": -1,
                 "ref_anchor_frames": cont_state["anchor_frames"],
                 # 第 4 路：conditioning 钉帧（管取景/构图）。
                 "conditioning": cond_ref,
@@ -382,12 +406,16 @@ def build_t2v_panel(params: dict) -> dict:
     # ---- 落盘接力棒 ----
     # 采样器的输出（latent）落盘，供下一段读回。
     # 节点名 H3RelayLatentSave：把本段 AV latent 存成文件，它是下一段的「接力棒」。
+    #
+    # 【写在哪】写进**本段自己的专属目录**（run_id 由本段任务 id 派生，
+    # 段号恒 0）。这样兄弟分支各写各的目录 —— 结构上不可能互相覆盖。
+    # 详见 continuation.segment_run_id 的说明。
     if cont_state["enabled"]:
         p["300:save"] = {
             "inputs": {
                 "latent": samples_ref,
-                "run_id": cont_state["run_id"],
-                "stage_index": cont_state["stage_index"],
+                "run_id": cont_state["own_run_id"],
+                "stage_index": 0,
                 "note": f"h3studio job {job_id}",
             },
             "class_type": "H3RelayLatentSave",
@@ -410,45 +438,81 @@ def _continuation_state(params: dict) -> dict:
       {
         "enabled":        本次任务是否参与接续（会落盘接力棒）,
         "has_source":     本次是否是「续接段」（有上游潜空间）,
-        "run_id":         Relay-Kit 的片子名（= 链 id）,
-        "stage_index":    本段段号（第 1 段 = 0）,
-        "explicit_path":  上游潜空间的绝对路径（有上游时必填）,
+        "own_run_id":     **本段自己**的落盘目录名（接力棒写这里）,
+        "source_run_id":  上游的落盘目录名（从那里读）,
+        "source_stage":   上游在那个目录里的段号,
+        "source_path":    上游潜空间文件的**绝对路径**（有上游时必填）,
+        "anchor_path":    链首段潜空间文件的绝对路径（外观锚用）,
         "context_frames": 钉住窗口（像素帧）,
         "anchor_frames":  外观锚帧数,
       }
 
-    【参数来源】前端回填的接续上下文会带 `continuation` 字段：
+    【参数来源】前端回填的接续上下文会带 `continuation` 字段，
+    服务端在提交前会**权威重算**并补齐其中的落盘坐标：
       {
         "chain_id":    链 id（同一链的所有段共用）,
         "stage_index": 本段段号,
         "source_job":  上游任务 id,
-        "source_segment": 上游段号,
+        "source_latent_run_id": 上游的落盘目录名,
+        "source_latent_stage":  上游在那个目录里的段号,
+        "source_latent_path":   上游潜空间文件的绝对路径,
+        "anchor_latent_path":   链首段潜空间文件的绝对路径,
         "context_frames": 钉住窗口,
       }
     没有这个字段 = 不接续（普通生成）。
+
+    【为什么「自己的目录」与「上游的目录」要分开】
+    本段要**读**上游那份、**写**自己那份。若两者共用一个目录 +
+    段号，兄弟分支（B1/B2）会撞同一个文件互相覆盖 ——
+    详见 continuation.segment_run_id 的说明。
     """
     info = (params or {}).get("continuation")
+    blank = {"enabled": False, "has_source": False, "own_run_id": "",
+             "source_run_id": "", "source_stage": 0, "source_path": "",
+             "anchor_path": "", "context_frames": 0,
+             "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
     if not isinstance(info, dict) or not info:
-        return {"enabled": False, "has_source": False, "run_id": "",
-                "stage_index": 0, "explicit_path": "", "context_frames": 0,
-                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
+        return dict(blank)
 
     chain_id = str(info.get("chain_id") or "").strip()
     if not chain_id:
-        return {"enabled": False, "has_source": False, "run_id": "",
-                "stage_index": 0, "explicit_path": "", "context_frames": 0,
-                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
+        return dict(blank)
 
-    # run_id 的规则在 continuation.chain_run_id（协议层，单一真源）——
-    # 落盘（H3RelayLatentSave）与读回（H3RelayLatentLoad + 外观锚自动读）
-    # 必须用同一个，否则会写到 A 目录、从 B 目录读。
-    run_id = cont.chain_run_id(chain_id)
+    # 本段自己的落盘目录：服务端写死 `latent_run_id`（由本段任务 id 派生）。
+    # 兜底：没有这个字段时用本段任务 id 现算（协议层单一真源）。
+    own_run_id = str(info.get("latent_run_id") or "").strip()
+    if not own_run_id:
+        job_id = str((params or {}).get("job_id") or "").strip()
+        own_run_id = cont.segment_run_id(job_id) if job_id else ""
 
+    # 上游的落盘坐标：服务端从上游任务记录**权威算出**后写在这里。
+    source_run_id = str(info.get("source_latent_run_id") or "").strip()
     try:
-        stage_index = int(info.get("stage_index", 0))
+        source_stage = int(info.get("source_latent_stage", 0))
     except (TypeError, ValueError):
-        stage_index = 0
-    stage_index = max(0, stage_index)
+        source_stage = 0
+    source_stage = max(0, source_stage)
+    if not source_run_id:
+        # 兼容旧任务：没有权威坐标时按老规则推（链目录 + 链段号）。
+        source_run_id, source_stage = cont.latent_coords(info)
+
+    source_job = str(info.get("source_job") or "").strip()
+    has_source = bool(source_job and source_run_id)
+
+    # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
+    source_path = str(info.get("source_latent_path") or "").strip()
+    if not source_path and source_run_id:
+        source_path = str(cont.stage_file_path(
+            cont_service.comfy_output_dir(), source_run_id, source_stage))
+
+    # 外观锚：链首段那份（防长程漂移）。
+    anchor_path = str(info.get("anchor_latent_path") or "").strip()
+    anchor_run_id = str(info.get("anchor_latent_run_id") or "").strip()
+    try:
+        anchor_stage = int(info.get("anchor_latent_stage", 0))
+    except (TypeError, ValueError):
+        anchor_stage = 0
+    anchor_stage = max(0, anchor_stage)
 
     # 钉住窗口：必须落在 5+17k 网格上，否则拷贝桥切不出来。
     raw_window = info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES
@@ -459,16 +523,10 @@ def _continuation_state(params: dict) -> dict:
     if not cont.valid_context_frames(window):
         window = cont.snap_context_frames(window) or cont.DEFAULT_CONTEXT_FRAMES
 
-    source_job = str(info.get("source_job") or "").strip()
     try:
         source_segment = int(info.get("source_segment", 0))
     except (TypeError, ValueError):
         source_segment = 0
-
-    has_source = bool(source_job)
-    # 显式路径：上游潜空间文件在 ComfyUI output 下的相对路径。
-    # 服务端在提交前会把它算成绝对路径写进这里。
-    explicit_path = str(info.get("explicit_path") or "").strip()
 
     anchor_frames = info.get("anchor_frames")
     try:
@@ -481,9 +539,13 @@ def _continuation_state(params: dict) -> dict:
     return {
         "enabled": True,
         "has_source": has_source,
-        "run_id": run_id,
-        "stage_index": stage_index,
-        "explicit_path": explicit_path,
+        "own_run_id": own_run_id,
+        "source_run_id": source_run_id,
+        "source_stage": source_stage,
+        "source_path": source_path,
+        "anchor_path": anchor_path,
+        "anchor_run_id": anchor_run_id,
+        "anchor_stage": anchor_stage,
         "context_frames": window,
         "anchor_frames": anchor_frames,
         "source_job": source_job,

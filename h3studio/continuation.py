@@ -266,10 +266,86 @@ def chain_run_id(chain_id: str) -> str:
     `output/relay_kit/<run_id>/` 目录 —— 不加前缀会和用户手工跑
     Relay-Kit 建的目录（例如 `fionia_base`）混在一起。
 
-    同一条链的所有段共用同一个 run_id（段号不同）——
-    这正是外观锚（ref_anchor_stage=0）能自动读到链首段的前提。
+    ⚠️ **这个函数只用于「链首段」**（第 0 段的外观锚）。
+    第 1 段起必须用 segment_run_id（每段一个目录）—— 见那里的说明。
     """
     return f"h3studio_{sanitize_run_id(chain_id)}"
+
+
+def segment_run_id(job_id: str) -> str:
+    """**一个段**的 Relay-Kit run_id（落盘目录名）。
+
+    【为什么第 1 段起必须按段分目录，而不是「一条链一个目录」】
+
+    用户需求第 7 条：「用户可以继续对这条完整视频再点接续，实现超长视频
+    连续生成」。这意味着**同一条链可以被分叉**：对同一段点两次「接续」，
+    就得到两个兄弟分支 B1 / B2。
+
+    如果「一条链一个目录 + 段号」，B1 和 B2 的落盘坐标
+    `(run_id=链id, stage_index=1)` **完全相同** —— 两者写同一个
+    `stage_00001.safetensors`，后完成者覆盖先完成者。
+
+    后果不是「报错」，而是**静默的错误内容**：再对 B1 接续时，
+    读回的 `stage_00001` 已经是 B2 的潜空间，于是新一段实际接的是
+    兄弟分支的画面（实测灰度 MAE：C1首帧 vs B1末帧 = 38.65，
+    vs B2末帧 = 2.08 —— 偏离 18.6 倍），而界面全程显示成功。
+
+    所以落盘坐标必须与**产出它的那一段**一一对应：
+    每个段用自己的任务 id 派生一个专属目录，谁也覆盖不了谁。
+
+    【与 nonebot「咏唱 h3」参考实现的差别】
+    咏唱 h3 用 `run_id = long_id`（一部片子一个目录）+ 长视频级互斥锁
+    防覆盖 —— 因为它的链是**线性**的（只允许从第 N 段接第 N+1 段，
+    并且禁止并发跑同一个长视频）。本项目的链**允许分叉**，所以不能
+    照搬「一个目录 + 段号」：互斥锁挡不住「先后两次」的分叉。
+
+    目录名带 `h3studio_s` 前缀，区别于链首段的 `h3studio_`，
+    且与用户手工跑 Relay-Kit 建的目录不撞。
+    """
+    return f"h3studio_s{sanitize_run_id(job_id)}"
+
+
+# ------------------------------------------------------------------
+# 潜空间坐标（run_id + 文件里的段号）
+# ------------------------------------------------------------------
+def latent_coords(info: dict, job_id: str = "") -> tuple[str, int]:
+    """一段的潜空间坐标：`(run_id, 文件里的段号)`。
+
+    【为什么坐标是「两元组」而不是一个段号】
+    Relay-Kit 的落盘路径是 `<output>/relay_kit/<run_id>/stage_<N>.safetensors`
+    —— N 由节点自己算（`H3RelayLatentLoad` 读第 `stage_index-1` 段，
+    `H3RelayLatentSave` 写第 `stage_index` 段）。所以「读回哪一份」
+    要同时知道**目录**和**段号**，少一个都读错。
+
+    【两种坐标制度】
+      * 新任务（`latent_run_id` 字段存在）—— **每段一个目录**，
+        段号恒为 0。目录名由该段自己的任务 id 派生，
+        所以兄弟分支各写各的目录，**结构上不可能互相覆盖**。
+      * 上线前的旧任务（没有 `latent_run_id`）—— 沿用当时的
+        「一条链一个目录 + 链段号」，以便继续接续老产物
+        （老产物的潜空间文件就在那个位置，不能假装它在新地方）。
+
+    这条函数是**唯一**的真源：工作流拼装（读回/落盘）与服务层
+    （存在性检查 / 错误提示）都必须调它 —— 两边各算一次必然漂移，
+    而漂移的后果是「写到 A 目录、从 B 目录读」= 静默接错段。
+    """
+    src = info or {}
+    run_id = str(src.get("latent_run_id") or "").strip()
+    if run_id:
+        try:
+            stage = int(src.get("latent_stage", 0))
+        except (TypeError, ValueError):
+            stage = 0
+        return run_id, max(0, stage)
+    # 旧任务：一条链一个目录 + 链上的段号
+    chain_id = str(src.get("chain_id") or "").strip()
+    if not chain_id:
+        return "", 0
+    try:
+        stage = int(src.get("stage_index", 0))
+    except (TypeError, ValueError):
+        stage = 0
+    return chain_run_id(chain_id), max(0, stage)
 
 
 # ------------------------------------------------------------------

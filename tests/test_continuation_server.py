@@ -182,7 +182,8 @@ class TestChainBookkeeping(ContinuationServerTestBase):
         """服务端自己算段号（前端传什么都不认）。"""
         # 造一个带潜空间的第 1 段
         seg1 = self._make_job("t2v", self._params())
-        run_id = cs.chain_run_id(seg1)
+        # 【D1】坐标是「每段一个目录」—— 目录由**该段自己的任务 id** 派生。
+        run_id = cs.segment_run_id(seg1)
         stage_file = cont.stage_file_path(srv.cont_service.comfy_output_dir()
                                           if hasattr(srv, "cont_service")
                                           else cs.comfy_output_dir(),
@@ -201,6 +202,10 @@ class TestChainBookkeeping(ContinuationServerTestBase):
                          "段号必须由服务端重算为 上游段号+1")
         self.assertEqual(info["source_job"], seg1)
         self.assertEqual(info["chain_id"], seg1, "链 id 沿用上游")
+        # 读回坐标必须是**上游自己那一份**
+        self.assertEqual(info["source_latent_run_id"], run_id)
+        self.assertEqual(info["source_latent_stage"], 0)
+        self.assertEqual(info["source_latent_path"], str(stage_file))
         stage_file.unlink()
 
 
@@ -273,6 +278,102 @@ class TestContinuationState(ContinuationServerTestBase):
         state = cs.continuation_state("t2v", params, "jobX")
         self.assertFalse(state["can_continue"])
         self.assertIn("潜空间", state["reason"])
+
+
+class TestBranchFinalize(ContinuationServerTestBase):
+    """【D1 关键】收尾拼接必须按**血缘**，兄弟分支不能混进完整视频。
+
+    这一层直接跑 worker 里的 `_finalize_continuation` ——
+    也就是真正产出「完整视频」的那一步。
+    """
+
+    def _make_video_file(self, name: str, seconds: float = 1.0) -> str:
+        """造一个测试视频，返回相对 OUT_DIR 的路径。"""
+        path = srv.VIDEO_DIR / name
+        ok = _make_video(path, seconds)
+        self.assertTrue(ok, "造测试视频失败")
+        return f"videos/{name}"
+
+    def _params(self, **extra):
+        base = {"prompt": "p", "model_key": "fl2va_int8", "width": 768,
+                "height": 448, "duration": 5, "steps": 4, "sampler": "euler",
+                "scheduler": "simple"}
+        base.update(extra)
+        return base
+
+    def _make_t2v_job(self, params: dict) -> str:
+        job_id = srv.create_job_record("t2v", params)
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='done' WHERE id=?", (job_id,))
+        return job_id
+
+    def _write_latent(self, job_id: str, content: bytes = b"latent"):
+        from h3studio import continuation as cont
+        from h3studio import continuation_service as cs
+        run_id = cs.segment_run_id(job_id)
+        path = cont.stage_file_path(cs.comfy_output_dir(), run_id, 0)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    def _branch(self, source_job: str) -> tuple[str, dict]:
+        params = self._params(continuation={"source_job": source_job,
+                                            "context_frames": 22,
+                                            "anchor_frames": 22})
+        error = srv._prepare_continuation_params(params)
+        self.assertEqual(error, "", f"接续校验不该报错: {error}")
+        job_id = srv.create_job_record("t2v", params)
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='done' WHERE id=?", (job_id,))
+        return job_id, params
+
+    def test_finalize_concat_uses_lineage_not_shared_ledger(self):
+        """A -> B1 -> C1，同时 A -> B2。
+
+        C1 的完整视频必须只含 A + B1 + C1，**不能**含 B2。
+        """
+        import asyncio
+
+        a = self._make_t2v_job(self._params())
+        self._write_latent(a)
+        a_rel = self._make_video_file("a.mp4")
+
+        b1, b1_params = self._branch(a)
+        b2, _b2_params = self._branch(a)
+        self._write_latent(b1)
+        self._write_latent(b2)
+        b1_rel = self._make_video_file("b1.mp4")
+        b2_rel = self._make_video_file("b2.mp4")
+
+        c1, c1_params = self._branch(b1)
+        self._write_latent(c1)
+        c1_rel = self._make_video_file("c1.mp4")
+
+        worker = srv.Worker()
+        # 先把上游三段的产物登记好（B2 也要登记 —— 它是兄弟分支，
+        # 共享账本模式下它会被混进 C1）
+        for job_id, rel in ((a, a_rel), (b1, b1_rel), (b2, b2_rel)):
+            asyncio.run(worker._finalize_continuation(
+                job_id, "t2v",
+                self._params_of(job_id),
+                [{"kind": "video", "file": rel, "name": Path(rel).name}]))
+
+        out = asyncio.run(worker._finalize_continuation(
+            c1, "t2v", c1_params,
+            [{"kind": "video", "file": c1_rel, "name": "c1.mp4"}]))
+
+        full = next((o for o in out if o.get("is_full")), None)
+        self.assertIsNotNone(full, "C1 应产出完整视频")
+        # 完整视频的拼接输入必须是 A + B1 + C1
+        used = srv._lineage_segment_rels(c1)
+        self.assertEqual(used, [a_rel, b1_rel, c1_rel])
+        self.assertNotIn(b2_rel, used,
+                         "兄弟分支 B2 不能混进 C1 的完整视频")
+
+    def _params_of(self, job_id: str) -> dict:
+        with srv.db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (job_id,)).fetchone()
+        return json.loads(row["params"])
 
 
 if __name__ == "__main__":

@@ -211,10 +211,61 @@ class TestChainPaths(unittest.TestCase):
         self.assertNotEqual(cont.chain_run_id("a/b"), cont.chain_run_id("ab"))
 
     def test_workflow_and_service_use_same_run_id(self):
-        """工作流拼装与服务层必须算出同一个 run_id。"""
-        chain = "CHAIN_X"
-        state = vw._continuation_state({"continuation": {"chain_id": chain}})
-        self.assertEqual(state["run_id"], cs.chain_run_id(chain))
+        """工作流拼装与服务层必须算出同一个 run_id。
+
+        【本段的落盘目录】由**本段自己的任务 id** 派生（每段一个目录），
+        工作流与协议层必须一致 —— 否则会写到 A 目录。
+        """
+        params = {"job_id": "JOB_1", "continuation": {"chain_id": "CHAIN_X"}}
+        state = vw._continuation_state(params)
+        self.assertEqual(state["own_run_id"], cont.segment_run_id("JOB_1"))
+        self.assertEqual(state["own_run_id"], cs.segment_run_id("JOB_1"))
+
+    def test_segment_run_id_differs_from_chain_run_id(self):
+        """段目录与链目录必须是**不同**的目录名。
+
+        否则链首段的外观锚会与某一段的接力棒撞在同一个文件上。
+        """
+        self.assertNotEqual(cont.segment_run_id("abc"), cont.chain_run_id("abc"))
+
+    def test_sibling_branches_get_different_latent_dirs(self):
+        """【D1 核心断言】两个兄弟分支的落盘目录必须不同。
+
+        同源接续两次 -> B1 / B2。若它们的落盘坐标相同，
+        就会写同一个文件、互相覆盖；再从 B1 接续时读到的是 B2 的内容
+        （静默的错误画面）。
+        """
+        b1 = cont.segment_run_id("B1")
+        b2 = cont.segment_run_id("B2")
+        self.assertNotEqual(b1, b2)
+        # 段号恒为 0（每段一个目录，目录本身就是身份）
+        self.assertEqual(cont.latent_coords(
+            {"latent_run_id": b1, "latent_stage": 0}), (b1, 0))
+        self.assertEqual(cont.latent_coords(
+            {"latent_run_id": b2, "latent_stage": 0}), (b2, 0))
+        # 两个坐标解析出的**文件路径**也必须不同
+        base = "/out"
+        self.assertNotEqual(
+            str(cont.stage_file_path(base, b1, 0)),
+            str(cont.stage_file_path(base, b2, 0)))
+
+    def test_latent_coords_falls_back_to_chain_for_legacy_jobs(self):
+        """上线前的旧任务没有 latent_run_id -> 沿用「链目录 + 链段号」。
+
+        老产物的潜空间文件就在那个位置，不能假装它在新地方。
+        """
+        run_id, stage = cont.latent_coords({"chain_id": "CH1", "stage_index": 2})
+        self.assertEqual(run_id, cont.chain_run_id("CH1"))
+        self.assertEqual(stage, 2)
+
+    def test_latent_coords_prefers_segment_dir_over_chain(self):
+        """有 latent_run_id 时用段目录（不看链段号）—— 分叉的关键。"""
+        run_id, stage = cont.latent_coords({
+            "latent_run_id": "h3studio_sJOB", "latent_stage": 0,
+            "chain_id": "CH1", "stage_index": 5,
+        })
+        self.assertEqual(run_id, "h3studio_sJOB")
+        self.assertEqual(stage, 0)
 
     def test_stage_relpath_matches_relay_kit_layout(self):
         """落盘路径必须与 Relay-Kit 的 _stage_path 完全一致。"""
@@ -238,7 +289,18 @@ class TestWorkflowWiring(unittest.TestCase):
     def _cont(self, stage=1):
         return dict(chain_id="CH1", stage_index=stage, source_job="J0",
                     source_segment=stage - 1, context_frames=22,
-                    anchor_frames=22)
+                    anchor_frames=22,
+                    # 上游的落盘坐标（服务端权威下发）
+                    source_latent_run_id="h3studio_sJ0",
+                    source_latent_stage=0,
+                    source_latent_path="/out/relay_kit/h3studio_sJ0/stage_00000.safetensors",
+                    # 外观锚（链首段那份）
+                    anchor_latent_run_id="h3studio_sHEAD",
+                    anchor_latent_stage=0,
+                    anchor_latent_path="/out/relay_kit/h3studio_sHEAD/stage_00000.safetensors",
+                    # 本段自己的落盘目录
+                    latent_run_id="h3studio_sJ2",
+                    latent_stage=0)
 
     def test_normal_generation_has_no_bridge(self):
         """普通生成不该有桥 —— 加了会改变普通生成的出图结果。"""
@@ -298,27 +360,64 @@ class TestWorkflowWiring(unittest.TestCase):
         self.assertTrue(p["300:bridge"]["inputs"]["pin_audio"])
 
     def test_bridge_and_save_share_same_run_id(self):
-        """读回与落盘必须同一个 run_id —— 否则写 A 读 B。"""
+        """【D1 关键】读回与落盘**不能**是同一个目录。
+
+        旧实现：读回和落盘共用「链目录 + 链段号」-> 兄弟分支 B1/B2
+        算出同一个坐标 -> 写同一个文件 -> 互相覆盖 -> 再接续时读到
+        兄弟分支的内容（静默错误画面）。
+        现在：本段**写自己的目录**，**读上游的目录** —— 两者必然不同。
+        """
         p = vw.build_t2v_panel({**self._base(), "job_id": "J2",
                                 "continuation": self._cont()})
-        self.assertEqual(p["300:load"]["inputs"]["run_id"],
-                         p["300:save"]["inputs"]["run_id"])
-        self.assertEqual(p["300:bridge"]["inputs"]["run_id"],
-                         p["300:save"]["inputs"]["run_id"])
+        load_run = p["300:load"]["inputs"]["run_id"]
+        save_run = p["300:save"]["inputs"]["run_id"]
+        self.assertNotEqual(load_run, save_run,
+                            "读回目录与落盘目录必须不同，否则分叉会互相覆盖")
+        self.assertEqual(load_run, "h3studio_sJ0", "从上游的目录读")
+        self.assertEqual(save_run, "h3studio_sJ2", "写自己的目录")
 
-    def test_load_reads_previous_stage(self):
-        """H3RelayLatentLoad 的 stage_index 语义是「读第 N-1 段」。"""
+    def test_load_reads_explicit_upstream_path(self):
+        """读回必须用上游的**精确文件路径**（explicit_path）。
+
+        不能按链段号推坐标 —— 那样兄弟分支会读到彼此的文件。
+        """
         p = vw.build_t2v_panel({**self._base(), "job_id": "J2",
-                                "continuation": self._cont(stage=3)})
-        # 本段段号 3 -> 节点读第 2 段（节点自己 idx = stage-1）
-        self.assertEqual(p["300:load"]["inputs"]["stage_index"], 3)
-        self.assertEqual(p["300:bridge"]["inputs"]["stage_index"], 3)
+                                "continuation": self._cont()})
+        self.assertEqual(
+            p["300:load"]["inputs"]["explicit_path"],
+            "/out/relay_kit/h3studio_sJ0/stage_00000.safetensors")
 
-    def test_appearance_anchor_enabled_from_stage_1(self):
-        """第 2 段起要读链首段当外观锚（防长程漂移）。"""
+    def test_save_writes_stage_zero_in_own_dir(self):
+        """落盘写在自己的目录、段号 0（目录本身就是身份）。"""
+        p = vw.build_t2v_panel({**self._base(), "job_id": "J2",
+                                "continuation": self._cont()})
+        self.assertEqual(p["300:save"]["inputs"]["stage_index"], 0)
+        self.assertEqual(p["300:save"]["inputs"]["run_id"], "h3studio_sJ2")
+
+    def test_appearance_anchor_is_loaded_explicitly(self):
+        """外观锚必须显式读进来（每段一个目录后不能再靠自动读）。"""
         p = vw.build_t2v_panel({**self._base(), "job_id": "J2",
                                 "continuation": self._cont(stage=1)})
-        self.assertEqual(p["300:bridge"]["inputs"]["ref_anchor_stage"], 0)
+        self.assertIn("300:anchor_load", p, "必须有锚的读取节点")
+        self.assertEqual(p["300:anchor_load"]["class_type"], "H3RelayLatentLoad")
+        self.assertEqual(
+            p["300:anchor_load"]["inputs"]["explicit_path"],
+            "/out/relay_kit/h3studio_sHEAD/stage_00000.safetensors")
+        # 拷贝桥的锚槽位必须接上那份
+        self.assertEqual(p["300:bridge"]["inputs"]["ref_anchor_latent"],
+                         ["300:anchor_load", 0])
+        # 自动读锚必须关掉（否则它会按 run_id 去读别的段）
+        self.assertEqual(p["300:bridge"]["inputs"]["ref_anchor_stage"], -1)
+
+    def test_anchor_is_optional(self):
+        """锚缺失时不接锚节点（缺锚只是漂移风险，不能让接续失败）。"""
+        cont_info = self._cont(stage=1)
+        cont_info["anchor_latent_path"] = ""
+        cont_info["anchor_latent_run_id"] = ""
+        p = vw.build_t2v_panel({**self._base(), "job_id": "J2",
+                                "continuation": cont_info})
+        self.assertNotIn("300:anchor_load", p)
+        self.assertIsNone(p["300:bridge"]["inputs"]["ref_anchor_latent"])
 
     def test_selflift_never_gets_bridge(self):
         """二采不走接续桥（潜空间不同源）。"""

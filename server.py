@@ -1178,12 +1178,15 @@ class Worker:
         # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
         segment_rel = str(video.get("file") or "")
 
-        # 链上已有的分段列表：从上游任务继承
-        segments = await asyncio.to_thread(
-            _chain_segments, chain_id, stage, segment_rel)
-        # 把本段写进链（供下一段继承）
-        await asyncio.to_thread(_append_chain_segment, chain_id, stage,
-                                 segment_rel, job_id)
+        # 把本段记到**自己**的任务记录里（不再往链首段的共享账本里塞 ——
+        # 共享账本会让兄弟分支互相污染，见 _record_segment_rel 的说明）。
+        await asyncio.to_thread(_record_segment_rel, job_id, segment_rel)
+
+        # 拼完整视频用**血缘**（沿 source_job 回溯）：本段 -> 上游 -> ...
+        # 兄弟分支不会混进来。
+        segments = await asyncio.to_thread(_lineage_segment_rels, job_id)
+        if segment_rel and segment_rel not in segments:
+            segments.append(segment_rel)
 
         # 只有**续接段**才需要拼完整视频（第 0 段本身就是完整视频）
         if stage <= 0:
@@ -1602,56 +1605,67 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     return out, ""
 
 
-def _chain_segments(chain_id: str, stage: int, current_rel: str) -> list[str]:
-    """取一条链到目前为止的全部分段视频（相对 OUT_DIR 的路径，按段号排序）。
+def _record_segment_rel(job_id: str, segment_rel: str) -> None:
+    """把本段的分段视频路径记到**本段自己的**任务记录里。
 
-    链的分段存在**链首段任务**的 params 里 —— 链首段是这条链的
-    「账本」。每接续一段就把本段追加进去。
+    【为什么记在自己身上，而不是链首段的共享账本】
+    旧实现把分段列表存在**链首段**的 params 里（一个共享的可变列表）。
+    同一条链分叉成 B1 / B2 时，两兄弟都会往这个列表里追加 ->
+    列表变成 [A, B1, B2]。再从 B1 接出 C1 时，按这个列表拼接得到的
+    「完整视频」会把 **B2 混进 C1** —— 又是一次静默的错误内容。
 
-    为什么用链首段的 params 存账本：链首段的任务 id 就是 chain_id，
-    永远存在（除非用户删了它）；而每段的 params 里只记「我是第几段」。
+    改成**每段记自己**、再用 `source_job` 指针**回溯血缘**：
+      * B1 的血缘 = A -> B1
+      * B2 的血缘 = A -> B2
+      * C1 的血缘 = A -> B1 -> C1   （B2 不在里面）
+    分支天然隔离，不需要任何共享可变状态。
     """
-    with db() as conn:
-        row = conn.execute("SELECT params FROM jobs WHERE id=?",
-                           (chain_id,)).fetchone()
-    if not row:
-        return [current_rel] if current_rel else []
-    params = json.loads(row["params"] or "{}")
-    info = cont_service.chain_info(params)
-    segments = info.get("segments")
-    if not isinstance(segments, list):
-        segments = []
-    out = [str(s) for s in segments if isinstance(s, str) and s]
-    # 本段如果还没在账本里（刚跑完还没写），补在末尾
-    if current_rel and current_rel not in out:
-        out.append(current_rel)
-    return out
-
-
-def _append_chain_segment(chain_id: str, stage: int, segment_rel: str,
-                           job_id: str) -> None:
-    """把本段追加到链首段任务的账本里（供下一段继承）。"""
     if not segment_rel:
         return
     with db() as conn:
         row = conn.execute("SELECT params FROM jobs WHERE id=?",
-                           (chain_id,)).fetchone()
+                           (job_id,)).fetchone()
         if not row:
             return
         params = json.loads(row["params"] or "{}")
         info = cont_service.chain_info(params)
         if not info:
             return
-        segments = info.get("segments")
-        if not isinstance(segments, list):
-            segments = []
-        segments = [str(s) for s in segments if isinstance(s, str) and s]
-        if segment_rel not in segments:
-            segments.append(segment_rel)
-        info["segments"] = segments
+        info["segment_rel"] = segment_rel
         params["continuation"] = info
         conn.execute("UPDATE jobs SET params=? WHERE id=?",
-                     (json.dumps(params, ensure_ascii=False), chain_id))
+                     (json.dumps(params, ensure_ascii=False), job_id))
+
+
+def _lineage_segment_rels(job_id: str) -> list[str]:
+    """本段的**血缘**分段视频列表（从链首段到本段，按顺序）。
+
+    沿 `source_job` 指针回溯 —— 每一步都指向**自己的上游**，
+    所以兄弟分支永远不会混进来。
+    """
+    rels: list[str] = []
+    seen: set[str] = set()
+    current = job_id
+    # 上限：防止脏数据造成死循环（链最多也就几十段）。
+    for _ in range(512):
+        if not current or current in seen:
+            break
+        seen.add(current)
+        with db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (current,)).fetchone()
+        if not row:
+            break
+        params = json.loads(row["params"] or "{}")
+        info = cont_service.chain_info(params)
+        if not info:
+            break
+        rel = str(info.get("segment_rel") or "").strip()
+        if rel:
+            rels.append(rel)
+        current = str(info.get("source_job") or "").strip()
+    rels.reverse()
+    return rels
 
 
 def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
@@ -1771,14 +1785,41 @@ def _prepare_continuation_params(params: dict) -> str:
         source_stage = 0
     source_chain = str(source_info.get("chain_id") or "").strip()
 
-    # 上游潜空间必须真的在
-    source_run_id = cont_service.chain_run_id_of(source_params)
+    # 上游潜空间必须真的在 —— 且必须是**它自己那一份**。
+    #
+    # 【关键：坐标从上游任务记录里算，不从链段号推】
+    # 每段一个专属目录（run_id 由该段任务 id 派生），所以坐标是
+    # 「上游是谁 -> 上游的目录 + 目录里的段号」。
+    # 若按链段号推，兄弟分支 B1/B2 会算出**同一个**坐标 ->
+    # 写同一个文件、互相覆盖 -> 再接续读到兄弟分支的内容（静默错误）。
+    source_run_id, source_latent_stage = cont.latent_coords(source_info)
     if not source_run_id:
         return ("接续的上游任务没有可用的潜空间（不是用「接续」生成的）—— "
                 "请改用「复用参数」重新生成一段。")
-    if not cont_service.stage_exists(source_run_id, source_stage):
+    if not cont_service.stage_exists(source_run_id, source_latent_stage):
         return cont.missing_reason(cont_service.comfy_output_dir(),
-                                   source_run_id, source_stage)
+                                   source_run_id, source_latent_stage)
+
+    # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
+    source_path = str(cont.stage_file_path(cont_service.comfy_output_dir(),
+                                           source_run_id, source_latent_stage))
+
+    # 外观锚：链首段那一份（防长程漂移）。链首段的坐标同样从它的记录算。
+    anchor_path = ""
+    anchor_run_id = ""
+    anchor_stage = 0
+    if source_chain:
+        with db() as conn:
+            head_row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                                    (source_chain,)).fetchone()
+        if head_row:
+            head_info = cont_service.chain_info(json.loads(head_row["params"] or "{}"))
+            head_run_id, head_stage = cont.latent_coords(head_info)
+            if head_run_id and cont_service.stage_exists(head_run_id, head_stage):
+                anchor_run_id = head_run_id
+                anchor_stage = head_stage
+                anchor_path = str(cont.stage_file_path(
+                    cont_service.comfy_output_dir(), head_run_id, head_stage))
 
     # 本段的段号 = 上游段号 + 1
     stage_index = source_stage + 1
@@ -1801,22 +1842,29 @@ def _prepare_continuation_params(params: dict) -> str:
     duration = float(params.get("duration") or 5)
     segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
 
-    # 累计帧数：上游已累计的 + 本段交付的
-    try:
-        chain_total = int(info.get("chain_total_frames") or 0)
-    except (TypeError, ValueError):
-        chain_total = 0
-    if not chain_total:
-        # 上游没给就按上游自己的记录重算
-        upstream_state = cont_service.continuation_state(source_mode,
-                                                         source_params, source_job)
-        chain_total = int(upstream_state.get("total_frames") or 0)
+    # 累计帧数：上游已累计的 + 本段交付的。
+    #
+    # 【为什么不能信前端传的 chain_total_frames】前端传的值来自上游的
+    # 卡片，可能过期。**权威值**是上游任务自己记录里的那份 ——
+    # 分叉时每个分支各自累计，互不干扰（上游的累计值只属于上游那条血缘）。
+    upstream_state = cont_service.continuation_state(source_mode,
+                                                     source_params, source_job)
+    chain_total = int(upstream_state.get("total_frames") or 0)
 
     params["continuation"] = {
         "chain_id": chain_id,
         "stage_index": stage_index,
         "source_job": source_job,
         "source_segment": source_stage,
+        # 接力棒的**精确坐标**（读回就靠它 —— 不能按链段号推）
+        "source_latent_run_id": source_run_id,
+        "source_latent_stage": source_latent_stage,
+        "source_latent_path": source_path,
+        # 外观锚（链首段那份）；找不到就留空 —— 锚是防漂移的加分项，
+        # 不能因为锚缺失就让整个接续失败。
+        "anchor_latent_path": anchor_path,
+        "anchor_latent_run_id": anchor_run_id,
+        "anchor_latent_stage": anchor_stage,
         "context_frames": window,
         "anchor_frames": anchor,
         "chain_total_frames": chain_total,
@@ -1860,6 +1908,13 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     # 链 id = **自己的任务 id**（链首段）。后续段沿用上游的链 id，
     # 于是「对完整视频再点接续」时链 id 不变、段号 +1 —— 无限接续。
     #
+    # 【潜空间坐标 = 每段一个专属目录】`latent_run_id` 由**本段自己的
+    # 任务 id** 派生，段号恒 0。这样兄弟分支（B1/B2，各自从同一段接出）
+    # 各写各的目录 —— 结构上不可能互相覆盖。
+    # 若沿用「一条链一个目录 + 链段号」，两个分支会算出同一个坐标 ->
+    # 写同一个文件 -> 后续接续读到兄弟分支的内容（静默错误内容）。
+    # 详见 continuation.segment_run_id。
+    #
     # 二采不建链（潜空间不同源，见 h3studio/continuation.py）。
     if mode == "t2v":
         info = params.get("continuation")
@@ -1871,11 +1926,20 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
                 "stage_index": 0,
                 "source_job": "",
                 "source_segment": -1,
+                # 本段自己的落盘目录（每段一个，防分叉覆盖）
+                "latent_run_id": cont.segment_run_id(job_id),
+                "latent_stage": 0,
                 "context_frames": cont.DEFAULT_CONTEXT_FRAMES,
                 "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES,
                 "chain_total_frames": 0,
                 "segment_frames": segment_total,
             }
+        else:
+            # 接续段：本段也要有**自己的**落盘目录（接力棒写这里）。
+            # 上游坐标由 _prepare_continuation_params 权威算好并带入。
+            info.setdefault("latent_run_id", cont.segment_run_id(job_id))
+            info.setdefault("latent_stage", 0)
+            params["continuation"] = info
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
     if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):

@@ -48,8 +48,18 @@ def chain_run_id(chain_id: str) -> str:
 
     规则本身在 continuation.py（协议层）—— 单一真源，
     工作流拼装与服务层必须用**同一个**规则，否则落盘与读回会对不上。
+
+    ⚠️ 只用于**链首段**（第 0 段）。第 1 段起用 segment_run_id_of。
     """
     return cont.chain_run_id(chain_id)
+
+
+def segment_run_id(job_id: str) -> str:
+    """一个段的 Relay-Kit run_id（落盘目录名）。
+
+    规则在 continuation.py（协议层）—— 单一真源。
+    """
+    return cont.segment_run_id(job_id)
 
 
 # ------------------------------------------------------------------
@@ -243,12 +253,30 @@ def next_stage_index(params: dict) -> int:
 
 
 def chain_run_id_of(params: dict) -> str:
-    """本段所属链的 run_id（落盘目录名）。"""
+    """本段所属链的 run_id（**链首段**的落盘目录名）。
+
+    ⚠️ 只有链首段（第 0 段）用它。第 1 段起用 latent_coords_of。
+    保留这个函数是因为「外观锚」要读链首段那一份。
+    """
     info = chain_info(params)
     chain_id = str(info.get("chain_id") or "").strip()
     if not chain_id:
         return ""
     return chain_run_id(chain_id)
+
+
+def latent_coords_of(params: dict) -> tuple[str, int]:
+    """本段的潜空间坐标 `(run_id, 文件里的段号)`。
+
+    唯一真源在 continuation.latent_coords —— 工作流拼装与服务层
+    必须用同一个，否则会「写到 A 目录、从 B 目录读」。
+    """
+    return cont.latent_coords(chain_info(params))
+
+
+def latent_run_id_of(params: dict) -> str:
+    """本段潜空间所在目录名（空 = 这段没有可接续的潜空间）。"""
+    return latent_coords_of(params)[0]
 
 
 # ------------------------------------------------------------------
@@ -278,17 +306,20 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
     allowed, reason = cont.continuation_allowed(mode, params)
     info = chain_info(params)
     stage = next_stage_index(params)
-    run_id = chain_run_id_of(params)
+    # 潜空间坐标（run_id + 文件里的段号）—— 唯一真源在 continuation.latent_coords。
+    # 新任务：每段一个目录，段号恒 0；旧任务：一条链一个目录 + 链段号。
+    run_id, latent_stage = cont.latent_coords(info)
 
     # 上传前的任务还没有 job_id -> 还没有落盘目录 -> 不能接续。
     # 上线前的历史任务同样没有 chain_id -> 也不可接续。
     has_chain = bool(run_id)
-    latent_ok = bool(run_id) and stage_exists(run_id, stage)
+    latent_ok = bool(run_id) and stage_exists(run_id, latent_stage)
 
     state = {
         "can_continue": bool(allowed and has_chain and latent_ok),
         "reason": "",
         "run_id": run_id,
+        "latent_stage": latent_stage,
         "stage_index": stage,
         "chain_id": str(info.get("chain_id") or ""),
         "has_latent": latent_ok,
@@ -306,11 +337,21 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
                            "或潜空间已被清理）—— 请改用「复用参数」重新生成一段。")
         return state
     if not latent_ok:
-        state["reason"] = cont.missing_reason(comfy_output_dir(), run_id, stage)
+        state["reason"] = cont.missing_reason(comfy_output_dir(), run_id,
+                                               latent_stage)
         return state
 
     # 累计帧数：本段交付的帧数 + 之前各段交付的帧数。
-    # 每段的交付帧数 = 该段总帧数 - 钉住帧数（钉住区被裁掉了）。
+    #
+    # 【钉住区只对「接续段」成立】接续段会把钉住区裁掉，所以它的交付
+    # 帧数 = 本段总帧数 - 钉住帧数；而**链首段**没有上游、根本没裁，
+    # 交付的就是整段。
+    #
+    # ⚠ 旧实现对链首段也减了钉住窗口 -> 显示的累计长度每段少 22 帧。
+    # 实测对照（真实产物）：2 段完整视频 ffprobe = 226 帧，
+    # 而旧算法报 204（= 102 + 102）；3 段 ffprobe = 328，旧算法报 306。
+    # 视频文件本身是对的（拼接用的是真实分段文件），错的只是这个**显示值**
+    # —— 它同时是 chain_total_frames 的来源，所以会一路带偏后面的每一段。
     chain_frames = info.get("chain_total_frames")
     try:
         chain_frames = int(chain_frames)
@@ -322,7 +363,10 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
         seg_frames = cont.align_frame_count(int(round(duration * cont.FPS)))
     window = cont.snap_context_frames(int(info.get("context_frames")
                                           or cont.DEFAULT_CONTEXT_FRAMES))
-    seg_frames = max(0, seg_frames - window)
+    # 只有接续段才裁了钉住区。
+    has_source = bool(str(info.get("source_job") or "").strip())
+    if has_source:
+        seg_frames = max(0, seg_frames - window)
     state["total_frames"] = chain_frames + seg_frames
     state["total_seconds"] = round(state["total_frames"] / cont.FPS, 3)
     return state
@@ -367,13 +411,25 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
     anchor = cont.snap_context_frames(int(info.get("anchor_frames")
                                           or cont.DEFAULT_CONTEXT_FRAMES))
 
+    # 【关键】接力棒的**精确坐标** = 上游自己那一份潜空间的位置。
+    #
+    # 新任务：上游有自己的专属目录（latent_run_id）+ 段号 0。
+    # 下一段必须去**那个目录**读 —— 不能自己按链段号推一个坐标，
+    # 否则兄弟分支会读到彼此的文件（分叉覆盖的根因）。
+    #
+    # 旧任务（上线前）：没有 latent_run_id -> 沿用「链目录 + 链段号」。
+    source_run_id, source_latent_stage = cont.latent_coords(info)
+
     continuation_info = {
         "chain_id": state["chain_id"],
-        # 下一段 = 本段 + 1
+        # 下一段 = 本段 + 1（链上的位置，用于拼完整视频）
         "stage_index": stage + 1,
         # 接力棒 = 本段
         "source_job": job_id,
         "source_segment": stage,
+        # 接力棒的**落盘坐标**（权威：服务端从上游任务记录算出来的）
+        "source_latent_run_id": source_run_id,
+        "source_latent_stage": source_latent_stage,
         "context_frames": window,
         "anchor_frames": anchor,
         # 累计帧数（用于算拼接后的总长）
