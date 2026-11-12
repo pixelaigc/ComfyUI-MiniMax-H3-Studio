@@ -97,12 +97,19 @@ MUTATIONS = [
     (
         "前端把「未选 LoRA」的显示改成编一个名字",
         "web/app.js",
-        '  } else {\n'
+        '  } else if (isVideo) {\n'
         '    // 用户没额外选加速 LoRA —— 如实显示「空」（不是留白，也不是编一个名字）\n'
         '    parts.push("空");\n'
         "  }\n",
         "  }\n",
         "test_no_accel_lora_shows_empty_marker",
+    ),
+    (
+        "前端把「空」也塞给图像模式（噪声行）",
+        "web/app.js",
+        "  } else if (isVideo) {\n",
+        "  } else if (true) {\n",
+        "test_image_mode_without_lora_has_no_lora_row",
     ),
     (
         "前端提交层又把遗留 lora 写回所有模式",
