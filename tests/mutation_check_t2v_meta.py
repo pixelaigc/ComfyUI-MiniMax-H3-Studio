@@ -127,6 +127,27 @@ MUTATIONS = [
 ]
 
 
+def _read_bytes(path: Path) -> bytes:
+    return path.read_bytes()
+
+
+def _write_bytes(path: Path, data: bytes) -> None:
+    """**按字节**写回。
+
+    【为什么不能用 write_text】write_text 走的是文本模式 + universal
+    newlines：读进来时 \r\n 已经被折成 \n，写回去时只写 \n ——
+    于是每跑一次变异验证，被测的 CRLF 文件（web/app.js）就被悄悄改成 LF。
+
+    实测后果：本脚本跑完后，tests/test_enhance_architecture_fixes.py::
+    TestLineEndings::test_worktree_bytes_are_crlf 与
+    tests/test_yue2_flow_review_fixes.py::TestCrlfFilesStayCrlf 双双变红
+    （4883 个裸 LF），而这与被测代码毫无关系 —— 是**验证脚本自己**弄坏的。
+
+    仓库有两条专门的 CRLF 守卫测试，说明这是硬约束。
+    """
+    path.write_bytes(data)
+
+
 def run_tests(repo: Path) -> tuple[int, str]:
     proc = subprocess.run(
         [PY, "-m", "pytest", *TESTS, "-q", "--no-header", "-p", "no:cacheprovider"],
@@ -146,13 +167,19 @@ def main() -> int:
     failures = []
     for name, rel, old, new, expect in MUTATIONS:
         target = REPO / rel
-        original = target.read_text(encoding="utf-8")
-        if old not in original:
+        # 【按字节读】保持 CRLF 文件的行尾不被 universal newlines 折掉
+        original_bytes = _read_bytes(target)
+        original = original_bytes.decode("utf-8")
+        # 变异串按**当前文件实际的行尾**构造：目标串里写的是 \n，
+        # 而文件里是 \r\n -> 这里统一换算
+        old_b = old.replace("\n", "\r\n").encode("utf-8") if b"\r\n" in original_bytes else old.encode("utf-8")
+        new_b = new.replace("\n", "\r\n").encode("utf-8") if b"\r\n" in original_bytes else new.encode("utf-8")
+        if old_b not in original_bytes:
             print(f"[SKIP] {name}: 目标串在 {rel} 里找不到（可能代码已变）")
             failures.append((name, "target-not-found"))
             continue
         try:
-            target.write_text(original.replace(old, new, 1), encoding="utf-8")
+            _write_bytes(target, original_bytes.replace(old_b, new_b, 1))
             code, out = run_tests(REPO)
             # 变红 = 有效变异；并且必须是**指定的那条** testcase 变红
             named_red = expect in out
@@ -163,8 +190,8 @@ def main() -> int:
                       f"named_red={named_red}")
                 failures.append((name, f"code={code} named_red={named_red}"))
         finally:
-            # restore：还原到变异前的状态
-            target.write_text(original, encoding="utf-8")
+            # restore：还原到变异前的状态（**按字节**，保住行尾）
+            _write_bytes(target, original_bytes)
 
     # 还原后必须全绿
     code, out = run_tests(REPO)
@@ -173,6 +200,19 @@ def main() -> int:
         failures.append(("restore", "still-failing"))
     else:
         print("[OK ] 还原后全绿")
+
+    # 行尾守卫：还原后被测文件的行尾必须与变异前**逐字节一致**
+    # （这正是 write_text 会悄悄弄坏 CRLF 文件的地方）
+    for name, rel, _old, _new, _expect in MUTATIONS:
+        target = REPO / rel
+        data = target.read_bytes()
+        bare_lf = data.count(b"\n") - data.count(b"\r\n")
+        if bare_lf:
+            print(f"[BAD] {name}: 还原后 {rel} 有 {bare_lf} 个裸 LF —— 行尾被弄坏了")
+            failures.append((name, f"bare-lf={bare_lf}"))
+            break
+    else:
+        print("[OK ] 还原后行尾与变异前一致（按字节写回）")
 
     if failures:
         print(f"\n变异验证失败 {len(failures)} 项：")
