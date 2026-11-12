@@ -1,0 +1,181 @@
+# -*- coding: utf-8 -*-
+"""变异验证：证明 test_t2v_meta_consistency.py 的断言**真的会红**。
+
+【为什么需要这个】
+一套全绿的测试可能**什么都没测**。本文件对被测逻辑做定点变异，
+每次只改一处，然后跑对应测试 —— 必须变红才算有效。
+
+【变异纪律】
+  * 每轮先 **restore**（git checkout -- <file>），改前先确认工作区干净；
+    否则变异会污染下一轮。
+  * 断言必须由「命名该行为的那条断言」抓住 —— 所以这里检查的是
+    具体那条 testcase 变红，而不是「随便红一个」。
+  * 测量点要挑**常量巧合抓不到**的位置：
+    这里刻意用「strength 0.65」（不是 0.5）——
+    0.5 在某些格式化路径下可能被四舍五入成同一个串。
+
+运行：python3 tests/mutation_check_t2v_meta.py
+"""
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+PY = "/home/ubuntu/comfyui/venv/bin/python"
+TEST = "tests/test_t2v_meta_consistency.py"
+
+#: (变异名, 目标文件, 原串, 变异串, 必须变红的 testcase 名)
+MUTATIONS = [
+    (
+        "摘要读错模型字段（退回遗留 model）",
+        "h3studio/job_meta.py",
+        '    model_key = str(params.get("model_key") or "").strip()\n'
+        '    if not model_key:\n'
+        '        return out\n',
+        '    model_key = str(params.get("model") or "").strip()\n'
+        '    if not model_key:\n'
+        '        return out\n',
+        "test_hybrid_model_and_dmad_lora",
+    ),
+    (
+        "摘要吞掉用户选的加速 LoRA（恒为空）",
+        "h3studio/job_meta.py",
+        '        out["lora_label"] = _accel_lora_display(key)\n',
+        '        out["lora_label"] = ""\n',
+        "test_hybrid_model_and_dmad_lora",
+    ),
+    (
+        "摘要把遗留 lora 字段当成用户选的加速 LoRA",
+        "h3studio/job_meta.py",
+        '    model_key = str(params.get("model_key") or "").strip()\n'
+        '    if not model_key:\n'
+        '        return out\n',
+        '    model_key = str(params.get("model_key") or "").strip()\n'
+        '    if not model_key:\n'
+        '        return out\n'
+        '    legacy = str(params.get("lora") or "").strip()\n'
+        '    if legacy and legacy != "none":\n'
+        '        out["lora_label"] = legacy\n',
+        "test_summary_never_reports_legacy_lora_key",
+    ),
+    (
+        "摘要丢掉 LoRA 强度（恒为 None）",
+        "h3studio/job_meta.py",
+        '        out["lora_strength"] = strength\n',
+        '        out["lora_strength"] = None\n',
+        "test_strength_is_preserved",
+    ),
+    (
+        "摘要无视 enabled=False（把停用的 LoRA 也算上）",
+        "h3studio/job_meta.py",
+        '        if item.get("enabled") is False:\n'
+        '            continue\n'
+        '        key = str(item.get("key") or "").strip()\n',
+        '        key = str(item.get("key") or "").strip()\n',
+        "test_disabled_accel_lora_is_ignored",
+    ),
+    (
+        "前端卡片不再读 model_info（退回读遗留字段）",
+        "web/app.js",
+        "function jobModelInfo(job) {\n"
+        '  const p = (job && job.params) || {};\n'
+        '  const info = (job && job.model_info) || null;\n'
+        '  if (info && (info.model_label || info.lora_label || info.model_key)) return info;\n'
+        "  return localModelInfo(job.mode || \"\", p);\n"
+        "}\n",
+        "function jobModelInfo(job) {\n"
+        '  const p = (job && job.params) || {};\n'
+        "  return localModelInfo(job.mode || \"\", p);\n"
+        "}\n",
+        "test_card_reads_model_info_not_legacy_fields",
+    ),
+    (
+        "前端删掉 LoRA 行",
+        "web/app.js",
+        '<span>LoRA</span>',
+        '<span>加速权重</span>',
+        "test_card_has_lora_row",
+    ),
+    (
+        "前端把 LoRA 行改成恒渲染（没有 LoRA 也显示空行）",
+        "web/app.js",
+        "  const loraRow = loraText\n"
+        "    ? `<div class=\"row\"><span>LoRA</span><b title=\"${escapeHtml(loraText)}\">"
+        "${escapeHtml(loraText)}</b></div>\"\n"
+        "    : \"\";\n",
+        "  const loraRow = `<div class=\"row\"><span>LoRA</span><b>${escapeHtml(loraText)}</b></div>`;\n",
+        "test_lora_row_omitted_when_empty",
+    ),
+    (
+        "前端提交层又把遗留 lora 写回所有模式",
+        "web/app.js",
+        '  if (mode === "flf" || mode === "r2v") {\n'
+        '    params.lora = state.model === "lora" ? state.lora : "none";\n'
+        "    params.lora_strength = state.loraStrength;\n"
+        "  }\n",
+        '  params.lora = state.model === "lora" ? state.lora : "none";\n'
+        "  params.lora_strength = state.loraStrength;\n",
+        "test_frontend_does_not_write_legacy_lora_for_all_modes",
+    ),
+]
+
+
+def run_tests(repo: Path) -> tuple[int, str]:
+    proc = subprocess.run(
+        [PY, "-m", "pytest", TEST, "-q", "--no-header", "-p", "no:cacheprovider"],
+        cwd=str(repo), capture_output=True, text=True, timeout=600)
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def main() -> int:
+    # 改前先确认工作区干净（变异纪律：每轮都要能干净地 restore）
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=str(REPO),
+                            capture_output=True, text=True).stdout.strip()
+    if status:
+        print("!! 工作区不干净，先提交或 stash 再跑变异验证：")
+        print(status)
+        return 2
+
+    failures = []
+    for name, rel, old, new, expect in MUTATIONS:
+        target = REPO / rel
+        original = target.read_text(encoding="utf-8")
+        if old not in original:
+            print(f"[SKIP] {name}: 目标串在 {rel} 里找不到（可能代码已变）")
+            failures.append((name, "target-not-found"))
+            continue
+        try:
+            target.write_text(original.replace(old, new, 1), encoding="utf-8")
+            code, out = run_tests(REPO)
+            # 变红 = 有效变异；并且必须是**指定的那条** testcase 变红
+            named_red = expect in out
+            if code != 0 and named_red:
+                print(f"[OK ] {name} -> 变红，且是 '{expect}' 抓住的")
+            else:
+                print(f"[BAD] {name} -> 期望 '{expect}' 变红，实际 code={code} "
+                      f"named_red={named_red}")
+                failures.append((name, f"code={code} named_red={named_red}"))
+        finally:
+            # restore：还原到变异前的状态
+            target.write_text(original, encoding="utf-8")
+
+    # 还原后必须全绿
+    code, out = run_tests(REPO)
+    if code != 0:
+        print("[BAD] 还原后测试仍不绿 —— restore 出了问题")
+        failures.append(("restore", "still-failing"))
+    else:
+        print("[OK ] 还原后全绿")
+
+    if failures:
+        print(f"\n变异验证失败 {len(failures)} 项：")
+        for name, why in failures:
+            print(f"  - {name}: {why}")
+        return 1
+    print("\n全部变异均被指定断言抓住（变异验证通过）")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

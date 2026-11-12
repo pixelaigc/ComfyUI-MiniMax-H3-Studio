@@ -2327,10 +2327,25 @@ $("#genBtn").addEventListener("click", async () => {
     duration: state.duration,
     steps: state.steps,
     model: state.model,
-    lora: state.model === "lora" ? state.lora : "none",
-    lora_strength: state.loraStrength,
     seed: $("#seed").value.trim() || null,
   };
+  // 【2026-11-12 修 —— 根因之一】旧实现对**所有模式**无条件写
+  //   lora: state.model === "lora" ? state.lora : "none"
+  //   lora_strength: state.loraStrength
+  // 而 state.lora / state.loraStrength 是**旧面板的遗留全局值**
+  // （恒为 "ckpt850" / 1.0）。
+  //
+  // 文生视频新面板有自己的模型与加速 LoRA（model_key / accel_loras），
+  // 但这段遗留赋值照样把 `lora = "ckpt850"` 一起提交、一起落库 ——
+  // 于是落库记录里同时躺着「正确的 accel_loras」与「错误的 lora=ckpt850」，
+  // 任何读 p.lora 的地方（卡片、Agent、导出）都会显示成 ckpt850。
+  //
+  // 修法：**只让真正走旧路径的模式**（flf / r2v）带这两个字段；
+  // 其它模式（t2v / 图像 / 音乐）不写 —— 让落库记录里只剩真实生效的字段。
+  if (mode === "flf" || mode === "r2v") {
+    params.lora = state.model === "lora" ? state.lora : "none";
+    params.lora_strength = state.loraStrength;
+  }
   if (IMAGE_MODES.includes(mode)) {
     // 图像模式：把档位 / 比例 / 实际宽高 / 采样参数一起带上去。
     // resolution 复用同一个字段，图像模式的值是分辨率档位（1mp / 480p…4k）。
@@ -2542,10 +2557,121 @@ function fmtElapsed(sec) {
   return sec < 90 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m${Math.round(sec % 60)}s`;
 }
 
-function modelLabel(p) {
-  const steps = p.steps || (p.model === "standard" ? 20 : 4);
-  if (p.model === "standard") return `标准 H3 · ${steps}步`;
-  return `H3 + ${p.lora === "ckpt850" ? "ckpt850" : "v4-step600"} · ${steps}步`;
+// ---------- 模型 / LoRA 显示（服务端摘要 = 唯一真源） ----------
+//
+// 【2026-11-12 修 —— 用户报出的核心缺陷】
+// 旧实现 modelLabel(p) 读的是**遗留字段** p.model / p.lora：
+//   return `H3 + ${p.lora === "ckpt850" ? "ckpt850" : "v4-step600"} · ${steps}步`;
+// 而新文生视频面板提交的是 model_key / accel_loras / fixed_accel_lora，
+// 于是用户选了「混合版 + DMAD 4 步（critic 版）」，卡片却恒显
+// 「H3 + ckpt850 · 4步」、LoRA 那一行永远是「空」。
+//
+// 现在：**只读服务端算好的 job.model_info**（h3studio/job_meta.py）。
+// 服务端按任务真实 params 算摘要 -> 面板所选 == 落库记录 == 卡片显示，
+// 三者同源，不会再各说各话。
+//
+// 服务端没给 model_info 的老数据（旧服务端 / 离线快照）走本地兜底，
+// 兜底也**优先读新字段**（model_key / accel_loras），不再只认遗留字段。
+function jobModelInfo(job) {
+  const p = (job && job.params) || {};
+  const info = (job && job.model_info) || null;
+  if (info && (info.model_label || info.lora_label || info.model_key)) return info;
+  return localModelInfo(job.mode || "", p);
+}
+
+// 本地兜底：与服务端 job_meta.summarize 同语义，但只用前端已有的清单。
+// 只在服务端没下发 model_info 时才会走到。
+function localModelInfo(mode, p) {
+  const out = {
+    model_key: "", model_label: "", model_unet: "",
+    lora_label: "", lora_strength: null, lora_name: "",
+    fixed_lora_label: "", fixed_lora_name: "", fixed_lora_strength: null,
+    source: "local_fallback",
+  };
+  if (mode === "t2v" && p.model_key) {
+    const m = VIDEO_OPTIONS.models
+      ? Object.values(VIDEO_OPTIONS.models).find(x => x.key === p.model_key)
+      : null;
+    const models = VIDEO_OPTIONS.models || {};
+    const entry = models[p.model_key] || m;
+    out.model_key = p.model_key;
+    out.model_label = entry ? (entry.label || p.model_key) : p.model_key;
+    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    for (const item of (p.accel_loras || [])) {
+      if (!item || item.enabled === false) continue;
+      const combo = combos.find(c => c.key === item.key);
+      if (!combo) continue;
+      out.lora_label = combo.display || item.key;
+      out.lora_strength = Number(item.strength);
+      out.lora_name = combo.name || "";
+      break;
+    }
+    const fixed = (VIDEO_OPTIONS.fixed_accel_loras || [])
+      .find(f => f.key === p.fixed_accel_lora);
+    if (fixed) {
+      out.fixed_lora_label = fixed.display || "";
+      out.fixed_lora_name = fixed.name || "";
+    }
+    return out;
+  }
+  // 旧路径视频：model = lora / standard，lora = ckpt850 / v4step600 / none
+  if (mode === "t2v" || mode === "flf" || mode === "r2v" || mode === "longfilm") {
+    const steps = p.steps || (p.model === "standard" ? 20 : 4);
+    out.model_label = p.model === "standard" ? `标准 H3 · ${steps}步`
+      : (p.model === "lora" ? `H3 + ${p.lora || "ckpt850"} · ${steps}步`
+                            : (p.model || ""));
+    if (p.lora && p.lora !== "none") {
+      out.lora_label = p.lora;
+      out.lora_strength = Number(p.lora_strength ?? 1);
+    }
+    return out;
+  }
+  if (mode === "t2i" || mode === "t2i_qwen" || mode === "i2i_qwen" || mode === "t2i_moss") {
+    out.model_label = imgModelLabel(p.model);
+    out.model_key = p.model || "";
+    const loras = (p.loras || []).filter(l => l && l.enabled !== false
+      && Number(l.strength) > 0);
+    if (loras.length) {
+      out.lora_label = loras.map(l => `${l.display || l.name} ×${Number(l.strength).toFixed(2)}`).join("、");
+      out.lora_strength = Number(loras[0].strength);
+      out.lora_name = loras[0].name || "";
+    }
+    return out;
+  }
+  if (mode === "t2a" || mode === "a2a") {
+    out.model_label = musicModelLabel(p.checkpoint);
+    out.model_key = p.checkpoint || "";
+    return out;
+  }
+  return out;
+}
+
+// 「模型」一行的文案。
+// 服务端摘要里的 model_label 已经是**面板下拉里的原文**（如
+// 「MiniMax-H3 混合版 · FL2VA+Ref2VA」），直接用，不自己拼。
+function modelLabel(job) {
+  const info = jobModelInfo(job);
+  const p = (job && job.params) || {};
+  const steps = p.steps;
+  const label = info.model_label || "—";
+  if (!label || label === "—") return "—";
+  // 旧路径摘要里已经带了步数（服务端已拼好），新路径不带 -> 这里补上。
+  if (/\d+\s*步/.test(label)) return label;
+  return steps ? `${label} · ${steps}步` : label;
+}
+
+// 「LoRA」一行的文案。
+// **没有 LoRA 时返回空字符串** -> 前端不渲染这一行（而不是显示「空」）。
+function loraLabel(job) {
+  const info = jobModelInfo(job);
+  const parts = [];
+  if (info.lora_label) {
+    parts.push(info.lora_strength != null
+      ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
+      : info.lora_label);
+  }
+  if (info.fixed_lora_label) parts.push(info.fixed_lora_label);
+  return parts.join(" + ");
 }
 
 // 图像模式：模型版本的可读名（清单来自 /api/image-options）
@@ -2940,6 +3066,15 @@ function jobCard(job) {
     ? `<div class="row reso-note"><span>尺寸差异</span><b>${escapeHtml(reso.note)}</b></div>`
     : "";
   const runningOrQueued = ["queued", "running"].includes(job.status);
+  // ---- 「LoRA」行 ----
+  //
+  // 【2026-11-12 修】这一行以前**根本不存在** —— 用户在面板上选的
+  // 加速 LoRA 在生成库里完全看不到，只能从「模型」一行里猜。
+  // 现在按服务端摘要渲染；**没有 LoRA 时整行不渲染**（不显示「空」）。
+  const loraText = loraLabel(job);
+  const loraRow = loraText
+    ? `<div class="row"><span>LoRA</span><b title="${escapeHtml(loraText)}">${escapeHtml(loraText)}</b></div>`
+    : "";
   const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
   const pctText = job.status === "queued" ? "排队中…"
     : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`;
@@ -2982,10 +3117,11 @@ function jobCard(job) {
       <div class="row"><span>模式</span><b>${info.name}</b></div>
       ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
       ${resoNote}
-      <div class="row"><span>模型</span><b>${escapeHtml(imgModelLabel(p.model))}</b></div>
+      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
+      ${loraRow}
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
-      <div class="row"><span>模型</span><b>${escapeHtml(musicModelLabel(p.checkpoint))}</b></div>
+      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
       <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
@@ -2993,7 +3129,8 @@ function jobCard(job) {
       <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
       ${resoNote}
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
-      <div class="row"><span>模型</span><b>${modelLabel(p)}</b></div>` : ""}`}
+      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
+      ${loraRow}` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? (info.kind === "audio" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整风格描述与歌词"><span>风格描述</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>`) : ""}
