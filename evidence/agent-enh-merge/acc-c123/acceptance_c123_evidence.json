@@ -1,0 +1,2318 @@
+{
+  "studio_base": "http://127.0.0.1:59145",
+  "mock_port": 8321,
+  "c1": {
+    "body 载体（前端现行形态）": {
+      "url": "/api/agent/chat",
+      "request_body": {
+        "message": "你好",
+        "stream": 1
+      },
+      "status": 200,
+      "content_type": "text/event-stream; charset=utf-8",
+      "has_event_stream": true,
+      "sse_event_count": 6,
+      "sse_events": [
+        "event: progress",
+        "event: progress",
+        "event: token",
+        "event: progress",
+        "event: done",
+        "event: result"
+      ],
+      "raw_head": "event: progress\ndata: {\"type\": \"progress\", \"stage\": \"start\", \"detail\": \"\", \"done\": 0, \"total\": 8, \"elapsed_ms\": 42}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 1/8 步\", \"done\": 0, \"total\": 8, \"elapsed_ms\": 42}\n\nevent: token\ndata: {\"text\": \"（结束）\", \"type\": \"token\", \"el"
+    },
+    "query 载体（旧前端形态）": {
+      "url": "/api/agent/chat?stream=1",
+      "request_body": {
+        "message": "你好"
+      },
+      "status": 200,
+      "content_type": "text/event-stream; charset=utf-8",
+      "has_event_stream": true,
+      "sse_event_count": 6,
+      "sse_events": [
+        "event: progress",
+        "event: progress",
+        "event: token",
+        "event: progress",
+        "event: done",
+        "event: result"
+      ],
+      "raw_head": "event: progress\ndata: {\"type\": \"progress\", \"stage\": \"start\", \"detail\": \"\", \"done\": 0, \"total\": 8, \"elapsed_ms\": 0}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 1/8 步\", \"done\": 0, \"total\": 8, \"elapsed_ms\": 0}\n\nevent: token\ndata: {\"text\": \"（结束）\", \"type\": \"token\", \"elap"
+    }
+  },
+  "browser": {
+    "viewports": {
+      "375": {
+        "c2_clarify": {
+          "stateOptions": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "stateQuestion": "你要生成视频的话，需要确认画面比例：想要竖屏还是横屏？",
+          "stateHint": "视频时长合法区间是 5~15 秒；比例我建议 16:9。",
+          "domChipCount": 3,
+          "domChipTexts": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "domChipClickable": true,
+          "domChipDataAct": [
+            "clarify-answer",
+            "clarify-answer",
+            "clarify-answer"
+          ],
+          "hasBubble": true,
+          "hasInput": true,
+          "hasSend": false
+        },
+        "c2_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c2-clarify-375.png",
+        "c2_click_result": {
+          "messages_before": 2,
+          "messages_after": 2,
+          "input_value_after_click": "9:16 竖屏"
+        },
+        "c3_toolcard": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "create_job",
+              "argsText": "mode=t2i · prompt=雨夜霓虹街道，积水反射粉紫色招牌光晕，电影级广角构图 · aspect=16:9 · resolution=1mp",
+              "resultText": "已创建任务 725f8225ecdd（t2i）",
+              "errText": "",
+              "stateText": "✓"
+            }
+          ],
+          "toolsWithArgs": 1,
+          "toolsWithResult": 1,
+          "toolsWithErrorText": 0,
+          "emptyResultBlocks": 0,
+          "rawResultText": [
+            "结果已创建任务 725f8225ecdd（t2i）"
+          ]
+        },
+        "c3_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-toolcard-375.png",
+        "c3_failed_tool": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "definitely_not_a_tool",
+              "argsText": "",
+              "resultText": "未知工具：definitely_not_a_tool",
+              "errText": "",
+              "stateText": "✕"
+            }
+          ],
+          "toolsWithErrorText": 1,
+          "emptyResultBlocks": 0
+        },
+        "c3_failed_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-failed-tool-375.png"
+      },
+      "390": {
+        "c2_clarify": {
+          "stateOptions": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "stateQuestion": "你要生成视频的话，需要确认画面比例：想要竖屏还是横屏？",
+          "stateHint": "视频时长合法区间是 5~15 秒；比例我建议 16:9。",
+          "domChipCount": 3,
+          "domChipTexts": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "domChipClickable": true,
+          "domChipDataAct": [
+            "clarify-answer",
+            "clarify-answer",
+            "clarify-answer"
+          ],
+          "hasBubble": true,
+          "hasInput": true,
+          "hasSend": false
+        },
+        "c2_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c2-clarify-390.png",
+        "c2_click_result": {
+          "messages_before": 2,
+          "messages_after": 2,
+          "input_value_after_click": "9:16 竖屏"
+        },
+        "c3_toolcard": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "create_job",
+              "argsText": "mode=t2i · prompt=雨夜霓虹街道，积水反射粉紫色招牌光晕，电影级广角构图 · aspect=16:9 · resolution=1mp",
+              "resultText": "已创建任务 cec0b9aae75e（t2i）",
+              "errText": "",
+              "stateText": "✓"
+            }
+          ],
+          "toolsWithArgs": 1,
+          "toolsWithResult": 1,
+          "toolsWithErrorText": 0,
+          "emptyResultBlocks": 0,
+          "rawResultText": [
+            "结果已创建任务 cec0b9aae75e（t2i）"
+          ]
+        },
+        "c3_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-toolcard-390.png",
+        "c3_failed_tool": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "definitely_not_a_tool",
+              "argsText": "",
+              "resultText": "未知工具：definitely_not_a_tool",
+              "errText": "",
+              "stateText": "✕"
+            }
+          ],
+          "toolsWithErrorText": 1,
+          "emptyResultBlocks": 0
+        },
+        "c3_failed_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-failed-tool-390.png"
+      },
+      "1280": {
+        "c2_clarify": {
+          "stateOptions": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "stateQuestion": "你要生成视频的话，需要确认画面比例：想要竖屏还是横屏？",
+          "stateHint": "视频时长合法区间是 5~15 秒；比例我建议 16:9。",
+          "domChipCount": 3,
+          "domChipTexts": [
+            "9:16 竖屏",
+            "16:9 横屏",
+            "1:1 方形"
+          ],
+          "domChipClickable": true,
+          "domChipDataAct": [
+            "clarify-answer",
+            "clarify-answer",
+            "clarify-answer"
+          ],
+          "hasBubble": true,
+          "hasInput": true,
+          "hasSend": false
+        },
+        "c2_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c2-clarify-1280.png",
+        "c2_click_result": {
+          "messages_before": 2,
+          "messages_after": 2,
+          "input_value_after_click": "9:16 竖屏"
+        },
+        "c3_toolcard": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "create_job",
+              "argsText": "mode=t2i · prompt=雨夜霓虹街道，积水反射粉紫色招牌光晕，电影级广角构图 · aspect=16:9 · resolution=1mp",
+              "resultText": "已创建任务 c2e04ff01edb（t2i）",
+              "errText": "",
+              "stateText": "✓"
+            }
+          ],
+          "toolsWithArgs": 1,
+          "toolsWithResult": 1,
+          "toolsWithErrorText": 0,
+          "emptyResultBlocks": 0,
+          "rawResultText": [
+            "结果已创建任务 c2e04ff01edb（t2i）"
+          ]
+        },
+        "c3_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-toolcard-1280.png",
+        "c3_failed_tool": {
+          "toolCount": 1,
+          "tools": [
+            {
+              "name": "definitely_not_a_tool",
+              "argsText": "",
+              "resultText": "未知工具：definitely_not_a_tool",
+              "errText": "",
+              "stateText": "✕"
+            }
+          ],
+          "toolsWithErrorText": 1,
+          "emptyResultBlocks": 0
+        },
+        "c3_failed_shot": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge/acc-c3-failed-tool-1280.png"
+      }
+    },
+    "console": [],
+    "pageErrors": [],
+    "requests": [
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions/f864810de5194726",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"帮我做个视频\",\"session_id\":\"7aa1ada1a4db4a96\",\"stream\":1}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"生成一张雨夜霓虹街道的图\",\"session_id\":\"85b0fd8e4d4d4a49\",\"stream\":1}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/725f8225ecdd",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"触发一个不存在的工具\",\"session_id\":\"706ddc5dfb4346f6\",\"stream\":1}"
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/725f8225ecdd",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 375,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions/706ddc5dfb4346f6",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"帮我做个视频\",\"session_id\":\"914edac73a2b4855\",\"stream\":1}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"生成一张雨夜霓虹街道的图\",\"session_id\":\"90e216ddf5bf4ebc\",\"stream\":1}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/cec0b9aae75e",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"触发一个不存在的工具\",\"session_id\":\"7ff1c925d88f4ffc\",\"stream\":1}"
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/cec0b9aae75e",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 390,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions/7ff1c925d88f4ffc",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"帮我做个视频\",\"session_id\":\"12de32dc21774884\",\"stream\":1}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"生成一张雨夜霓虹街道的图\",\"session_id\":\"63f01fc8f27c4c7f\",\"stream\":1}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/c2e04ff01edb",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "post_data": "{}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "POST",
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "post_data": "{\"message\":\"触发一个不存在的工具\",\"session_id\":\"7a02bc93a9ea45b1\",\"stream\":1}"
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs/c2e04ff01edb",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "post_data": ""
+      },
+      {
+        "width": 1280,
+        "method": "GET",
+        "url": "http://127.0.0.1:59145/api/system",
+        "post_data": ""
+      }
+    ],
+    "responses": [
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/",
+        "content_type": "text/html"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "content_type": "text/css"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "content_type": "text/css"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "content_type": "text/css"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "content_type": "text/event-stream"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions/f864810de5194726",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/725f8225ecdd",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/725f8225ecdd",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 375,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/",
+        "content_type": "text/html"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "content_type": "text/css"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "content_type": "text/css"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "content_type": "text/css"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "content_type": "text/event-stream"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions/706ddc5dfb4346f6",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/cec0b9aae75e",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/cec0b9aae75e",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 390,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/",
+        "content_type": "text/html"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/style.css?v=enh-unify8",
+        "content_type": "text/css"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/responsive.css?v=rs3",
+        "content_type": "text/css"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.css?v=assetlib1",
+        "content_type": "text/css"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/interaction-guard.js?v=guard1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music.js?v=musicyue2-2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/video-panel.js?v=videopanel1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/qwen-refs.js?v=refs1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/moss-layout.js?v=mosslayout2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/providers.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/assets.js?v=assetlib1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu-shared.js?v=shared2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/app.js?v=enh-unify2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/music-enhance.js?v=musicyue2-1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent.js?v=agent3",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/enhance-menu.js?v=enhancemulti1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent-media.js?v=agentmedia1",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/agent_sessions.js?v=agtsess2",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/static/prompt-history.js?v=ph4",
+        "content_type": "text/javascript"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Z-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/generation-types",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/music-options",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/status/stream",
+        "content_type": "text/event-stream"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/enhancer",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/video-config",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=Qwen-Image%202.1",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions/7ff1c925d88f4ffc",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/image-loras?base=MOSS-Image",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/c2e04ff01edb",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/chat",
+        "content_type": "text/event-stream; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/agent/sessions?limit=200",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs/c2e04ff01edb",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/jobs?status=all&page=1&page_size=12",
+        "content_type": "application/json; charset=utf-8"
+      },
+      {
+        "width": 1280,
+        "status": 200,
+        "url": "http://127.0.0.1:59145/api/system",
+        "content_type": "application/json; charset=utf-8"
+      }
+    ]
+  },
+  "verdict": {
+    "c1_sse_content_type_all_carriers": true,
+    "c2_clarify_clickable_options": true,
+    "c2_chip_click_fills_input": true,
+    "c3_toolcard_args_and_result": true,
+    "c3_failed_tool_shows_error_text": true,
+    "console_errors": 0,
+    "page_errors": 0,
+    "console_error_samples": []
+  }
+}
