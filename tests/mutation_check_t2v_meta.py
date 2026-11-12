@@ -48,17 +48,12 @@ MUTATIONS = [
         "test_hybrid_model_and_dmad_lora",
     ),
     (
-        "摘要把遗留 lora 字段当成用户选的加速 LoRA",
+        "摘要用遗留 lora 字段代替用户勾选的加速 LoRA",
         "h3studio/job_meta.py",
-        '    model_key = str(params.get("model_key") or "").strip()\n'
-        '    if not model_key:\n'
-        '        return out\n',
-        '    model_key = str(params.get("model_key") or "").strip()\n'
-        '    if not model_key:\n'
-        '        return out\n'
-        '    legacy = str(params.get("lora") or "").strip()\n'
-        '    if legacy and legacy != "none":\n'
-        '        out["lora_label"] = legacy\n',
+        '    for item in params.get("accel_loras") or []:\n',
+        '    _legacy_items = ([{"key": params.get("lora"), "strength": 1.0}]\n'
+        '                     if params.get("lora") else [])\n'
+        '    for item in _legacy_items:\n',
         "test_summary_never_reports_legacy_lora_key",
     ),
     (
@@ -102,12 +97,9 @@ MUTATIONS = [
     (
         "前端把 LoRA 行改成恒渲染（没有 LoRA 也显示空行）",
         "web/app.js",
-        "  const loraRow = loraText\n"
-        "    ? `<div class=\"row\"><span>LoRA</span><b title=\"${escapeHtml(loraText)}\">"
-        "${escapeHtml(loraText)}</b></div>`\n"
-        "    : \"\";\n",
-        "  const loraRow = `<div class=\"row\"><span>LoRA</span>"
-        "<b>${escapeHtml(loraText)}</b></div>`;\n",
+        "function loraRowHtml(loraText) {\n"
+        "  if (!loraText) return \"\";\n",
+        "function loraRowHtml(loraText) {\n",
         "test_no_accel_lora_means_no_lora_row",
     ),
     (
@@ -124,8 +116,10 @@ MUTATIONS = [
     (
         "前端本地兜底退回读遗留字段（model_key 被忽略）",
         "web/app.js",
-        '  if (mode === "t2v" && p.model_key) {\n',
-        '  if (mode === "t2v" && p.model) {\n',
+        '    out.model_key = p.model_key;\n'
+        '    out.model_label = entry ? (entry.label || p.model_key) : p.model_key;\n',
+        '    out.model_key = p.model || "";\n'
+        '    out.model_label = entry ? (entry.label || p.model_key) : (p.model || "");\n',
         "test_falls_back_to_local_summary_when_server_silent",
     ),
 ]

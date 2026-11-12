@@ -2646,6 +2646,20 @@ function localModelInfo(mode, p) {
   return out;
 }
 
+// 「LoRA」一行的 HTML。
+// **没有 LoRA 时返回空字符串** -> 卡片不渲染这一行（而不是显示「空」）。
+//
+// 抽成独立函数（而不是内联在 jobCard 里）的原因：
+// 这一行的「有就渲染、没有就不渲染」是一条**行为契约**，
+// 内联在模板字符串里就只能靠字符串断言去测 —— 而字符串断言抓不住
+// 「把三元表达式改成恒渲染」这种退化（实测变异跑绿了）。
+// 抽出来后可以在 Node 里真的调用它，断言返回值。
+function loraRowHtml(loraText) {
+  if (!loraText) return "";
+  return `<div class="row"><span>LoRA</span>`
+    + `<b title="${escapeHtml(loraText)}">${escapeHtml(loraText)}</b></div>`;
+}
+
 // 「模型」一行的文案。
 // 服务端摘要里的 model_label 已经是**面板下拉里的原文**（如
 // 「MiniMax-H3 混合版 · FL2VA+Ref2VA」），直接用，不自己拼。
@@ -3071,10 +3085,7 @@ function jobCard(job) {
   // 【2026-11-12 修】这一行以前**根本不存在** —— 用户在面板上选的
   // 加速 LoRA 在生成库里完全看不到，只能从「模型」一行里猜。
   // 现在按服务端摘要渲染；**没有 LoRA 时整行不渲染**（不显示「空」）。
-  const loraText = loraLabel(job);
-  const loraRow = loraText
-    ? `<div class="row"><span>LoRA</span><b title="${escapeHtml(loraText)}">${escapeHtml(loraText)}</b></div>`
-    : "";
+  const loraRow = loraRowHtml(loraLabel(job));
   const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
   const pctText = job.status === "queued" ? "排队中…"
     : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`;

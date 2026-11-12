@@ -78,7 +78,7 @@ def _extract_function(src: str, name: str) -> str:
 
 
 #: 待测的前端函数（必须逐个从 app.js 里抠出来，保证测的是**线上那份代码**）
-FUNCTIONS = ["jobModelInfo", "localModelInfo", "modelLabel", "loraLabel"]
+FUNCTIONS = ["jobModelInfo", "localModelInfo", "loraRowHtml", "modelLabel", "loraLabel"]
 
 _EXTRA_JS = """
 // ---- app.js 里被测函数依赖的极简替身 ----
@@ -183,7 +183,11 @@ console.log(JSON.stringify({{ lora: loraLabel({json.dumps(job)}) }}));
         self.assertIn("×1.00", out["lora"])
 
     def test_no_accel_lora_means_no_lora_row(self):
-        """没选加速 LoRA -> loraLabel 返回空串（前端据此不渲染该行）。"""
+        """没选加速 LoRA -> loraLabel 返回空串，loraRowHtml 返回空串。
+
+        两层都要断言：文本层（loraLabel）与渲染层（loraRowHtml）。
+        渲染层才是「卡片上到底出现不出现这一行」的那一层。
+        """
         info = dict(HYBRID_SUMMARY)
         info["lora_label"] = ""
         info["lora_strength"] = None
@@ -192,9 +196,24 @@ console.log(JSON.stringify({{ lora: loraLabel({json.dumps(job)}) }}));
         params["accel_loras"] = []
         job = {"mode": "t2v", "params": params, "model_info": info}
         out = _run_node(f"""
-console.log(JSON.stringify({{ lora: loraLabel({json.dumps(job)}) }}));
+console.log(JSON.stringify({{
+  lora: loraLabel({json.dumps(job)}),
+  row: loraRowHtml(loraLabel({json.dumps(job)})),
+}}));
 """)
         self.assertEqual(out["lora"], "")
+        self.assertEqual(out["row"], "", "没有 LoRA 时不能渲染这一行")
+
+    def test_lora_row_rendered_when_lora_present(self):
+        """有 LoRA 时必须渲染出带「LoRA」标签与内容的一行。"""
+        job = {"mode": "t2v", "params": HYBRID_PARAMS, "model_info": HYBRID_SUMMARY}
+        out = _run_node(f"""
+console.log(JSON.stringify({{
+  row: loraRowHtml(loraLabel({json.dumps(job)})),
+}}));
+""")
+        self.assertIn("<span>LoRA</span>", out["row"])
+        self.assertIn("DMAD 4 步（critic 版）", out["row"])
 
     def test_falls_back_to_local_summary_when_server_silent(self):
         """服务端没下发 model_info 时，本地兜底也必须读**新字段**。

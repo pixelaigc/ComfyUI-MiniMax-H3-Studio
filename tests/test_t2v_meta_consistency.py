@@ -267,9 +267,15 @@ class TestFrontendRendersSummary(unittest.TestCase):
         self.assertIn('<span>LoRA</span>', APP_JS_CODE)
 
     def test_lora_row_omitted_when_empty(self):
-        """没有 LoRA 时整行不渲染（不是显示「空」）。"""
-        self.assertIn("const loraRow = loraText", APP_JS_CODE)
-        self.assertIn('? `<div class="row"><span>LoRA</span>', APP_JS_CODE)
+        """没有 LoRA 时整行不渲染（不是显示「空」）。
+
+        渲染逻辑已抽成独立函数 loraRowHtml（见 test_t2v_card_dom.py 的
+        **真实执行**断言）；这里只做一道结构性检查，确保卡片用的是
+        那个函数，而不是自己内联拼一行。
+        """
+        self.assertIn("const loraRow = loraRowHtml(loraLabel(job));",
+                      APP_JS_CODE)
+        self.assertIn("function loraRowHtml(loraText)", APP_JS_CODE)
 
     def test_frontend_does_not_write_legacy_lora_for_all_modes(self):
         """提交层不能对**所有模式**无条件写遗留 lora 字段。
