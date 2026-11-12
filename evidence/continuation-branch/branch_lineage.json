@@ -1,0 +1,59 @@
+{
+  "scenario": "同源分支接续（A -> B1/B2 -> C1）",
+  "jobs": {
+    "A": {
+      "id": "d35172b58ae9",
+      "chain": "d35172b58ae9",
+      "stage": 0,
+      "src": "",
+      "own_latent_dir": "h3studio_sd35172b58ae9"
+    },
+    "B1": {
+      "id": "b02ebd2f67a9",
+      "chain": "d35172b58ae9",
+      "stage": 1,
+      "src": "d35172b58ae9",
+      "own_latent_dir": "h3studio_sb02ebd2f67a9"
+    },
+    "B2": {
+      "id": "4c17361ac818",
+      "chain": "d35172b58ae9",
+      "stage": 1,
+      "src": "d35172b58ae9",
+      "own_latent_dir": "h3studio_s4c17361ac818"
+    },
+    "C1": {
+      "id": "362488086cb1",
+      "chain": "d35172b58ae9",
+      "stage": 2,
+      "src": "b02ebd2f67a9",
+      "own_latent_dir": "h3studio_s362488086cb1"
+    }
+  },
+  "lineage": {
+    "C1": [
+      "videos/v-h3-studio-000001.mp4",
+      "videos/v-h3-studio-000002.mp4",
+      "videos/v-h3-studio-000006.mp4"
+    ],
+    "B2": [
+      "videos/v-h3-studio-000001.mp4",
+      "videos/v-h3-studio-000004.mp4"
+    ]
+  },
+  "frames": {
+    "000001_A_seg": 124,
+    "000002_B1_seg": 102,
+    "000003_B1_full": 226,
+    "000004_B2_seg": 102,
+    "000005_B2_full": 226,
+    "000006_C1_seg": 102,
+    "000007_C1_full": 328
+  },
+  "conclusion": {
+    "C1_lineage_excludes_B2": true,
+    "B2_lineage_excludes_B1": true,
+    "C1_full_frames": 328,
+    "frame_ledger": "124 + (124-22) + (124-22) = 328"
+  }
+}
