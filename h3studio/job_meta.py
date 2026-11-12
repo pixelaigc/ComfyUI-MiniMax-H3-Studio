@@ -201,6 +201,14 @@ def _legacy_video_summary(params: dict) -> dict:
     旧路径用的是 `model`（"lora" / "standard"）与 `lora`（"ckpt850" /
     "v4step600" / "none"）这两个**遗留但仍然有效**的字段 ——
     workflows._h3_video_workflow 读的就是它们。
+
+    【没有记录时怎么办】老任务（内置 Agent 建的）常常**根本没记** model
+    —— 工作流会走自己的默认值（workflows._h3_video_workflow:
+    `lora = params.get("lora", "ckpt850")`、`UNET["fl2va"][precision]`）。
+    这时摘要必须反映**实际跑的是哪个默认权重**，而不是显示空白 ——
+    否则用户看到「模型 | —」，仍然无法确认用了什么。
+
+    这些默认值全部取自**工作流源码里的真实常量**，不是编的。
     """
     out = {
         "model_key": "",
@@ -217,36 +225,58 @@ def _legacy_video_summary(params: dict) -> dict:
     model = str(params.get("model") or "").strip()
     lora = str(params.get("lora") or "").strip()
 
+    from . import workflows as wf
+
     if model == "standard":
         out["model_label"] = "标准 MiniMax-H3"
+        out["model_key"] = "standard"
     elif model == "lora":
         out["model_label"] = "MiniMax-H3 + LoRA"
+        out["model_key"] = "lora"
     elif model:
         # 未知的历史值 —— 如实显示原值，不编造
         out["model_label"] = model
+        out["model_key"] = model
+    else:
+        # 【没有记录 model】-> 工作流走默认值：UNET["fl2va"][precision]
+        precision = str(params.get("precision") or "int8").strip()
+        unet = wf.UNET.get("fl2va", {}).get(precision) or ""
+        out["model_label"] = f"MiniMax-H3 FL2VA（{precision}，默认档）"
+        out["model_key"] = "fl2va"
+        out["model_unet"] = unet
 
     if lora == "none":
         # 明确选了「不用加速 LoRA」
         out["lora_label"] = ""
     elif lora:
-        from .workflows import LORAS
         out["lora_label"] = lora
-        out["lora_name"] = str(LORAS.get(lora) or "")
+        out["lora_name"] = str(wf.LORAS.get(lora) or "")
         try:
             out["lora_strength"] = float(params.get("lora_strength", 1.0))
         except (TypeError, ValueError):
             out["lora_strength"] = 1.0
+    else:
+        # 【没有记录 lora】-> 工作流默认 ckpt850（workflows._h3_video_workflow:
+        # `lora = params.get("lora", "ckpt850")`），并且**确实挂上了**。
+        out["lora_label"] = "ckpt850"
+        out["lora_name"] = str(wf.LORAS.get("ckpt850") or "")
+        out["lora_strength"] = 1.0
     return out
 
 
 # ------------------------------------------------------------------
 # 图像模式
 # ------------------------------------------------------------------
-def _image_summary(params: dict) -> dict:
+def _image_summary(params: dict, mode: str = "") -> dict:
     """图像模式的模型 / LoRA 摘要。
 
     图像模式的 `model` 字段是**真实生效**的（workflows 读的就是它），
     落库的也是它 —— 所以图像模式这里没有错配，只是把显示统一到同一套形状。
+
+    【没有记录 model 时】老任务（内置 Agent 建的）常常没记 model，
+    工作流会走自己的默认值（workflows.build_t2i:
+    `model_key = params.get("model") or Z_IMAGE_DEFAULT_MODEL`）。
+    摘要要反映**实际跑的是哪个默认底模**，不能显示空白。
     """
     out = {
         "model_key": "",
@@ -261,10 +291,21 @@ def _image_summary(params: dict) -> dict:
         "source": "image",
     }
     model_key = str(params.get("model") or "").strip()
-    if not model_key:
-        return out
-    out["model_key"] = model_key
     table = _image_model_table()
+    if not model_key:
+        # 没记录 -> 用该模式的工作流默认底模（真实常量，不是编的）
+        from . import workflows as wf
+        default_key = {
+            "t2i": getattr(wf, "Z_IMAGE_DEFAULT_MODEL", ""),
+            "t2i_qwen": getattr(wf, "QWEN_IMAGE_DEFAULT_MODEL", ""),
+            "i2i_qwen": getattr(wf, "QWEN_IMAGE_DEFAULT_MODEL", ""),
+            "t2i_moss": getattr(wf, "MOSS_IMAGE_DEFAULT_MODEL", ""),
+        }.get(mode, "")
+        if not default_key:
+            return out
+        model_key = default_key
+        out["model_label_is_default"] = True
+    out["model_key"] = model_key
     meta = table.get(model_key) or {}
     out["model_label"] = str(meta.get("label") or model_key)
     out["model_unet"] = str(meta.get("unet") or meta.get("model_path") or "")
@@ -317,6 +358,12 @@ def _music_summary(params: dict) -> dict:
         "source": "music",
     }
     checkpoint = str(params.get("checkpoint") or "").strip()
+    if not checkpoint:
+        # 没记录 -> 工作流走默认 checkpoint（music_yue2:395
+        # `key = params.get("checkpoint") or YUE2_DEFAULT_CHECKPOINT`）
+        from . import music_yue2
+        checkpoint = str(getattr(music_yue2, "YUE2_DEFAULT_CHECKPOINT", "")
+                         or "")
     if checkpoint:
         out["model_key"] = checkpoint
         out["model_label"] = _music_model_label(checkpoint)
@@ -351,7 +398,7 @@ def summarize(mode: str, params: dict) -> dict:
     if mode in ("t2v", "flf", "r2v", "longfilm"):
         return _legacy_video_summary(params)
     if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
-        return _image_summary(params)
+        return _image_summary(params, mode)
     if mode in ("t2a", "a2a"):
         return _music_summary(params)
     # 未知模式：尽力给出一个不编造的摘要
