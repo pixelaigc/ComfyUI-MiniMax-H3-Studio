@@ -2412,6 +2412,20 @@ $("#genBtn").addEventListener("click", async () => {
     if (window.Continuation && window.Continuation.state) {
       const ctx = window.Continuation.state().current;
       if (ctx && ctx.continuation) {
+        // 【2026-11-12 修】提交前的**最后一道闸**：接续上下文与当前
+        // 面板尺寸必须一致。潜空间桥逐 token 拷贝上一段尾部，latent
+        // 分辨率固定 —— 跨分辨率接续会被 Relay-Kit 直接拒绝
+        // （「拷贝桥禁止跨分辨率：上段 WxH ≠ 本段 WxH」）。
+        //
+        // 用户**自己改尺寸**（手填宽高）也能造成同样的不一致，
+        // 所以「复用参数时清 context」之外还要在这里拦一次。
+        // 不一致就当场提示并中止提交 —— 不浪费一次生成。
+        if (typeof window.Continuation.checkSubmitConsistency === "function") {
+          const size = window.VIDEO_PANEL._debug
+            ? window.VIDEO_PANEL._debug.currentSize()
+            : null;
+          if (!window.Continuation.checkSubmitConsistency(size)) return;
+        }
         params.continuation = ctx.continuation;
       }
     }
@@ -3337,6 +3351,20 @@ function jobCard(job) {
     }
   });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
+    // 【2026-11-12 修】点「复用参数」必须**清掉接续上下文**。
+    //
+    // 【为什么】两个动作语义互斥：
+    //   * 复用参数 = 照这张卡片的全部参数（含提示词）独立重生成一段；
+    //   * 接续     = 拿某一段的潜空间当接力棒续下一段。
+    // 原来复用参数只改左侧控件、不清 context -> 用户点过「接续」之后
+    // 再点别的卡片的「复用参数」，提交时变成「B 的参数 + A 的接力棒」
+    // 的混合态。实测这会让 Relay-Kit 的拷贝桥直接 raise
+    // 「拷贝桥禁止跨分辨率：上段 768x448 ≠ 本段 1024x576」。
+    //
+    // 复用参数 = 用户表达「我要照这张重新生成」-> 接力棒不该再挂着。
+    if (window.Continuation && typeof window.Continuation.clearForReuse === "function") {
+      window.Continuation.clearForReuse();
+    }
     // 找到对应模式侧栏项并切换
     activateVideoMode(job.mode);
     $("#prompt").value = p.prompt || "";

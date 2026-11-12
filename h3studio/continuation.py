@@ -228,6 +228,50 @@ def mode_supported(mode: str) -> bool:
     return str(mode or "") in CONTINUABLE_MODES
 
 
+# ------------------------------------------------------------------
+# 接续的几何约束（分辨率必须一致）
+# ------------------------------------------------------------------
+def _size_of(params: dict) -> tuple[int, int]:
+    """取一个任务的输出尺寸（宽, 高）。取不到就返回 (0, 0)。
+
+    【为什么取不到就当「不知道」而不是「不匹配」】上层要区分
+    「明确不一致」与「无从比较」—— 后者不该拦用户。
+    """
+    src = params or {}
+    try:
+        width = int(src.get("width") or 0)
+        height = int(src.get("height") or 0)
+    except (TypeError, ValueError):
+        return 0, 0
+    if width <= 0 or height <= 0:
+        return 0, 0
+    return width, height
+
+
+def size_mismatch(source_params: dict, target_params: dict) -> str:
+    """接续时上游与本段的输出尺寸不一致 —— 返回中文原因（空串 = 一致/未知）。
+
+    【为什么这是硬约束】潜空间桥是**逐 token 拷贝**上一段的尾部，
+    latent 的空间分辨率固定。跨分辨率拷贝在 Relay-Kit 里直接 raise
+    （relay_core.py:2809「拷贝桥禁止跨分辨率：上段 WxH ≠ 本段 WxH」）。
+
+    【为什么要在提交前拦】让用户等一次生成（几十秒）才看到失败，
+    是把「参数冲突」伪装成「生成失败」。而且这条错误过去还会被
+    错误文本提取的缺陷吞掉 —— 用户只看到一句 Python 报错。
+    """
+    src_w, src_h = _size_of(source_params)
+    dst_w, dst_h = _size_of(target_params)
+    if not src_w or not dst_w:
+        # 无从比较 -> 放行（不臆造约束）
+        return ""
+    if (src_w, src_h) == (dst_w, dst_h):
+        return ""
+    return (f"接续失败：上一段是 {src_w}×{src_h}，本段是 {dst_w}×{dst_h} —— "
+            f"潜空间桥不能跨分辨率接续（逐 token 拷贝上一段尾部，"
+            f"latent 分辨率必须一致）。请把输出尺寸改成 {src_w}×{src_h}，"
+            f"或改用「复用参数」重新生成一段。")
+
+
 def continuation_allowed(mode: str, params: dict) -> tuple[bool, str]:
     """这个产物能不能被接续？返回 (能不能, 不能的原因)。
 

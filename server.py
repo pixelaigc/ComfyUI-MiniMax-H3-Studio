@@ -89,6 +89,10 @@ from h3studio import video_workflow
 from h3studio import job_meta
 from h3studio import continuation as cont
 from h3studio import continuation_service as cont_service
+# ComfyUI 执行错误的提取与中文化（2026-11-12 修：原来把
+# status.messages 的条目当「m[0] 是字典」读，导致真正的原因被
+# AttributeError 吞掉，用户只看到原始 Python 异常文本）。
+from h3studio import comfy_errors
 # 合并说明：video_categories（video-tabs 分支）、comfy_models
 # （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
 # 独立模块，三条 import 都保留。
@@ -544,6 +548,30 @@ async def comfy_submit(session: ClientSession, workflow: dict, client_id: str | 
     return body["prompt_id"]
 
 
+def _comfy_error_message(status_info: dict) -> str:
+    """把 ComfyUI 的执行错误变成**给用户看的中文原因**。
+
+    【为什么需要这个包装 —— 2026-11-12 独立复验发现的缺陷】
+    原实现把 `status.messages` 的条目当「`m[0]` 是字典」处理：
+
+        (m or [{}])[0].get("x", "")
+
+    但 ComfyUI 的真实形状是 **`[事件名, 数据字典]`** —— `m[0]` 是字符串
+    `"execution_error"`。于是 `.get()` 作用在 str 上抛 AttributeError，
+    真正的原因（例：拷贝桥禁止跨分辨率）**被彻底丢掉**，用户只看到
+    一句 `'str' object has no attribute 'get'`。
+
+    提取与中文化逻辑放在 h3studio/comfy_errors.py（纯函数，可离线测）。
+    本函数只负责：**取中文原因 + 把技术细节打进服务端日志**。
+    """
+    described = comfy_errors.extract_error(status_info)
+    if not described.get("found"):
+        return "ComfyUI 执行出错（未取到具体原因，详细信息见服务端日志）。"
+    # 技术细节只进日志，不进用户可见文案。
+    print(f"[worker] ComfyUI 错误详情: {described.get('detail', '')}")
+    return str(described.get("reason") or "ComfyUI 执行出错。")
+
+
 def _extract_outputs(history_entry):
     """从 history 条目提取输出文件列表 [{kind,filename,subfolder}]"""
     outs = []
@@ -932,7 +960,16 @@ async def ws_progress_listener(session: ClientSession, client_id: str, prompt_id
                             conn.execute("UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
                                          (frac, text, job_id))
                 elif etype == "execution_error":
-                    err = str(d.get("exception_message") or d.get("exception_type") or "执行出错")[:400]
+                    # 【2026-11-12 修】原来直接把 ComfyUI 的原始
+                    # exception_message 存进 job.error -> 前端展示的是
+                    # 英文/技术文本。现在统一走 comfy_errors：
+                    # 用户看到中文原因，技术细节进服务端日志。
+                    described = comfy_errors.describe_exception(
+                        d.get("node_type") or "",
+                        d.get("exception_type") or "",
+                        d.get("exception_message") or "")
+                    print(f"[ws] ComfyUI 错误详情: {described['detail']}")
+                    err = str(described.get("reason") or "执行出错")[:400]
                     with db() as conn:
                         if batch_id:
                             conn.execute("UPDATE job_batches SET error=? WHERE id=?", (err, batch_id))
@@ -1120,11 +1157,7 @@ class Worker:
                                 print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
                                 return
                             if status_info.get("status_str") == "error":
-                                msgs = "; ".join(
-                                    (m or [{}])[0].get("x", "") if isinstance(m, list) else str(m)
-                                    for m in status_info.get("messages", []) if m and m[0] == "execution_error"
-                                ) or "执行出错"
-                                raise RuntimeError(msgs[:400])
+                                raise RuntimeError(_comfy_error_message(status_info))
                 finally:
                     ws_task.cancel()
                     try:
@@ -1346,11 +1379,7 @@ class Worker:
                             return saved
                         status_info = hist.get("status") or {}
                         if status_info.get("status_str") == "error":
-                            msgs = "; ".join(
-                                (m or [{}])[0].get("x", "") if isinstance(m, list) else str(m)
-                                for m in status_info.get("messages", []) if m and m[0] == "execution_error"
-                            ) or "执行出错"
-                            raise RuntimeError(msgs[:400])
+                            raise RuntimeError(_comfy_error_message(status_info))
             finally:
                 ws_task.cancel()
                 try:
@@ -1738,6 +1767,15 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
                 pass
 
 
+def _continuation_size_mismatch(source_params: dict, target_params: dict) -> str:
+    """接续时上游与本段的分辨率不一致 -> 中文原因（空串 = 放行）。
+
+    规则实现放在协议层（h3studio/continuation.py 的 size_mismatch），
+    那里是纯函数、可离线单测；这里只做一次转发。
+    """
+    return cont.size_mismatch(source_params, target_params)
+
+
 def _prepare_continuation_params(params: dict) -> str:
     """校验并补全任务的接续参数。返回错误信息（空串 = 通过）。
 
@@ -1799,6 +1837,23 @@ def _prepare_continuation_params(params: dict) -> str:
     if not cont_service.stage_exists(source_run_id, source_latent_stage):
         return cont.missing_reason(cont_service.comfy_output_dir(),
                                    source_run_id, source_latent_stage)
+
+    # ---- 分辨率必须与上游一致（2026-11-12 修）----
+    #
+    # 【为什么必须在这里拦】潜空间桥是**逐 token 拷贝**上一段的尾部 ——
+    # 它的 latent 空间分辨率是固定的。跨分辨率接续在 Relay-Kit 里会直接
+    # raise：「拷贝桥禁止跨分辨率：上段 768x448 ≠ 本段 1024x576」。
+    #
+    # 【为什么以前会变成一句 Python 报错】用户点「接续」后 context 还挂着，
+    # 又点别的卡片的「复用参数」改了尺寸 —— 提交时 params 是新尺寸、
+    # continuation 还是旧段的。服务端此前**不校验**这一项，于是错误一路
+    # 跑到 ComfyUI；再加上错误文本提取本身有缺陷（把 m[0] 当 dict 读），
+    # 用户最终只看到 `'str' object has no attribute 'get'`。
+    #
+    # 现在：**提交前**就给出可执行的中文提示，不浪费一次生成。
+    mismatch = _continuation_size_mismatch(source_params, params)
+    if mismatch:
+        return mismatch
 
     # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
     source_path = str(cont.stage_file_path(cont_service.comfy_output_dir(),

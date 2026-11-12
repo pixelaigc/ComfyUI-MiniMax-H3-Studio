@@ -914,18 +914,29 @@
     if (cfg.size_preset_key) videoState.sizePresetKey = cfg.size_preset_key;
     if (cfg.fixed_accel_lora) videoState.fixedAccelLora = cfg.fixed_accel_lora;
     // 【单选】新格式
-    if (cfg.accel_lora !== undefined) {
+    //
+    // 【为什么用 `!== undefined` 判「显式给了」】`cfg.accel_lora` 为
+    // 空串是**有意义的**（「不额外挂加速 LoRA」）—— 不能与「没给这个
+    // 字段」混为一谈，否则「复用参数」一张没挂 LoRA 的卡片时，
+    // 上一张卡片挂的 LoRA 会**残留**在面板上（混合态的又一种形态）。
+    const hasNewAccel = cfg.accel_lora !== undefined;
+    if (hasNewAccel) {
       videoState.accelLora = cfg.accel_lora || "";
-    }
-    if (cfg.accel_lora_strength !== undefined) {
-      videoState.accelLoraStrength = Number(cfg.accel_lora_strength);
+      if (cfg.accel_lora_strength !== undefined) {
+        videoState.accelLoraStrength = Number(cfg.accel_lora_strength);
+      }
     }
     // 【兼容旧格式】老配置里存的是 accel_loras 数组（可能多项）——
     // 取第一项启用且强度 > 0 的，落到新的单选字段上。
-    if (Array.isArray(cfg.accel_loras) && cfg.accel_loras.length) {
+    //
+    // 【为什么要先归零】旧格式是「完整表达这个任务的加速 LoRA 配置」，
+    // 不是「增量」。数组为空 = 这个任务**没有**额外加速 LoRA，
+    // 此时必须把面板上残留的值清掉，否则会带上一张卡片的 LoRA。
+    if (!hasNewAccel && Array.isArray(cfg.accel_loras)) {
+      videoState.accelLora = "";
       const first = cfg.accel_loras.find(
         l => l && l.key && l.enabled !== false && Number(l.strength) > 0);
-      if (first && !cfg.accel_lora) {
+      if (first) {
         videoState.accelLora = first.key;
         videoState.accelLoraStrength = Number(first.strength || 1);
       }

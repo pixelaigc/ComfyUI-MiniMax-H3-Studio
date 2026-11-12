@@ -40,15 +40,29 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // 轻量 toast（复用素材库的 .al-toast 样式）。
+  //
+  // 【为什么不依赖全局 toast】项目里没有全局 window.toast /
+  // window.showToast —— 原实现会一路退到 alert()，而 alert 是**阻塞式**
+  // 的：它会卡住整个页面直到用户点掉。对自动化测试尤其致命（页面卡死，
+  // 后续断言全部超时）。
+  //
+  // 所以这里自带一个实现，**永不阻塞**。
   function toast(message) {
-    // 与项目里其它提示一致：优先用既有的全局提示函数，没有就退回 alert。
-    if (typeof window.showToast === "function") {
-      window.showToast(message);
-    } else if (typeof window.toast === "function") {
-      window.toast(message);
-    } else {
-      alert(message);
+    const text = String(message == null ? "" : message);
+    let box = document.getElementById("h3ContToast");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "h3ContToast";
+      box.className = "al-toast";
+      document.body.appendChild(box);
     }
+    box.textContent = text;
+    box.className = "al-toast show";
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => { box.className = "al-toast"; }, 4200);
+    // 顺带把文本挂到 body 上，方便验收脚本直接读（不必截屏认字）。
+    window.__h3ContinuationToast = text;
   }
 
   // ------------------------------------------------------------------
@@ -252,6 +266,43 @@
   }
 
   // ------------------------------------------------------------------
+  // 「复用参数」与「接续」的互斥（2026-11-12 修）
+  // ------------------------------------------------------------------
+  //
+  // 【原来为什么会形成混合态】
+  // 点「接续」后 context 挂在面板上；用户又点**另一张**卡片的「复用参数」，
+  // 复用参数只改左侧控件（尺寸/模型/步数…），**不清 context**。
+  // 于是提交时：params 来自 B 卡片、continuation 来自 A 卡片。
+  //
+  // 后果（实测）：本段按 B 的分辨率跑，接续却要接 A 的潜空间 ——
+  // Relay-Kit 的拷贝桥直接 raise「拷贝桥禁止跨分辨率：上段 768x448 ≠
+  // 本段 1024x576」。用户看到的是一次「生成失败」，完全不知道是
+  // 「接续」和「复用参数」打架。
+  //
+  // 【为什么选「复用参数时清掉接续上下文」】
+  // 两个动作的语义本来就互斥：
+  //   * 复用参数 = 拿一张卡片的**全部参数**（含提示词）独立重生成一段；
+  //   * 接续     = 拿一段的**潜空间**当接力棒，续下一段。
+  // 用户点「复用参数」= 表达「我要照这张重新生成」—— 此时留着别的
+  // 段落的接力棒只会制造混合态。**清掉它**是最符合直觉的语义。
+  //
+  // 反过来（点「接续」覆盖「复用参数」）不成立：复用参数已经把控件
+  // 填好了，接续又会用上一段的配置盖回去 —— 用户点「接续」时看到的
+  // 是「上一段的配置」，那正是接续该有的样子。
+  //
+  // 【服务端还有一道闸】即使前端状态被绕过（例如直接调 API），
+  // 服务端也会校验本段与上游的分辨率是否一致，不一致就明确报错。
+  function clearForReuse(reason) {
+    if (!current) return false;
+    const sourceId = (current.source || {}).job_id || "";
+    current = null;
+    renderPanel();
+    toast(reason
+      || `已清除接续上下文（来源「${sourceId}」）—— 「复用参数」是独立重生成，不与接续混用。`);
+    return true;
+  }
+
+  // ------------------------------------------------------------------
   // 主入口：点「接续」
   // ------------------------------------------------------------------
   async function start(job) {
@@ -271,6 +322,37 @@
   }
 
   // ------------------------------------------------------------------
+  // 提交前的**最后一道闸**：接续上下文与当前面板尺寸是否一致
+  // ------------------------------------------------------------------
+  //
+  // 【为什么要有这道闸】前端「复用参数清 context」已经解决了大部分
+  // 混合态，但用户**自己改尺寸**（手填宽高）同样能造成不一致 ——
+  // 上一段 768×448、用户改成 1024×576 再生成，一样会撞拷贝桥。
+  //
+  // 这里在提交前比对一次，不一致就**当场提示并中止提交**：
+  // 比起让用户等一次生成（几十秒）才看到失败，体验好得多。
+  //
+  // 【为什么不自己改尺寸】用户手填的尺寸是他的明确意图；
+  // 静默改掉等于替用户做决定。只提示、不改。
+  //
+  // 返回 true = 可以提交；false = 已提示并中止。
+  function checkSubmitConsistency(panelSize) {
+    if (!current) return true;
+    const source = current.source || {};
+    const params = current.params || {};
+    const srcW = Number(params.width || 0);
+    const srcH = Number(params.height || 0);
+    const dstW = Number((panelSize && panelSize[0]) || 0);
+    const dstH = Number((panelSize && panelSize[1]) || 0);
+    if (!srcW || !srcH || !dstW || !dstH) return true;
+    if (srcW === dstW && srcH === dstH) return true;
+    toast(`接续被拦下：接续自「${source.job_id || ""}」（${srcW}×${srcH}），`
+      + `当前面板是 ${dstW}×${dstH} —— 潜空间桥不能跨分辨率接续。`
+      + `请把输出尺寸改成 ${srcW}×${srcH}，或点「清除」改用独立生成。`);
+    return false;
+  }
+
+  // ------------------------------------------------------------------
   // 对外接口
   // ------------------------------------------------------------------
   window.Continuation = {
@@ -279,6 +361,8 @@
     buttonTitle,
     start,
     clear,
+    clearForReuse,
+    checkSubmitConsistency,
     renderPanel,
     state,
     // 供验收脚本直接读（证明「点接续 -> 上下文真的回填了」）
