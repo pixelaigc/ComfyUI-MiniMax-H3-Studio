@@ -149,11 +149,20 @@
    */
   async function snapSize(rawW, rawH) {
     try {
+      // 【2026-11-12 修 —— 只改一维时另一维变 null】
+      // 旧实现把 null 原样发给服务端 -> 服务端 float(None) 失败 ->
+      // 返回「宽高必须是数字」-> applySize 走 width=0 分支 ->
+      // **用户只改了宽度，高度却被静默清空**，两个框都归零。
+      // 现在：某一维没有有效输入时，用**当前生效值**补上，
+      // 保证请求里永远是两个合法数字（另一维保持不变）。
+      const [curW, curH] = currentSize();
+      const w = (rawW != null && rawW > 0) ? rawW : curW;
+      const h = (rawH != null && rawH > 0) ? rawH : curH;
       // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算
       // （t2v 放宽到 2.0M；flf / r2v 仍是 0.8MP 档位）。
       const mode = encodeURIComponent(VIDEO_OPTIONS.mode || "t2v");
       const resp = await fetch(
-        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}&mode=${mode}`,
+        `/api/video-size?width=${encodeURIComponent(w)}&height=${encodeURIComponent(h)}&mode=${mode}`,
         { cache: "no-store" });
       if (!resp.ok) return null;
       return await resp.json();

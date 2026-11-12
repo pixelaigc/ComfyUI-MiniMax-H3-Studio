@@ -153,8 +153,29 @@ global.REGISTRY = REGISTRY;
 global.FakeElement = FakeElement;
 global.fetch = async function (url) {
   const u = String(url);
+  // 【2026-11-12】记录每次请求的 URL —— 用来断言「吸附请求里带的是
+  // 两个合法数字」。旧实现只改一维时会把 null 发出去，服务端回
+  // 「宽高必须是数字」，高度被静默清空。
+  (global.FETCH_LOG = global.FETCH_LOG || []).push(u);
   if (u.indexOf("/api/video-options") === 0) {
     return { ok: true, status: 200, json: async () => global.VIDEO_OPTIONS_PAYLOAD };
+  }
+  if (u.indexOf("/api/video-size") === 0) {
+    // 模拟服务端吸附：宽高必须是 32 的倍数
+    const q = {};
+    u.replace(/[?&]([^=&]+)=([^&]*)/g, (_, k, v) => { q[k] = decodeURIComponent(v); return ''; });
+    const snap = n => Math.max(32, Math.round(Number(n) / 32) * 32);
+    const reasons = [];
+    let w = Number(q.width), h = Number(q.height);
+    if (!Number.isFinite(w) || !Number.isFinite(h)) {
+      return { ok: true, status: 200,
+               json: async () => ({ width: 0, height: 0, reasons: ["宽高必须是数字"] }) };
+    }
+    const aw = snap(w), ah = snap(h);
+    if (aw !== w) reasons.push("宽度 " + w + " 不是 32 的倍数 → " + aw);
+    if (ah !== h) reasons.push("高度 " + h + " 不是 32 的倍数 → " + ah);
+    return { ok: true, status: 200,
+             json: async () => ({ width: aw, height: ah, reasons: reasons }) };
   }
   return { ok: true, status: 200, json: async () => ({}) };
 };
@@ -912,6 +933,83 @@ class TestReuseParamsResolution(unittest.TestCase):
         self.assertIn("1344×768", out["presetText"],
                       "档位文案必须显示 1344×768")
         self.assertIn("1344×768", out["sizeHint"])
+
+
+# ==================================================================
+# 第 7 项（补）：只改一维宽高时，另一维不能被静默清空
+# ==================================================================
+#: 只改宽度 -> 断言吸附请求里 height 是**当前生效值**而不是空。
+_SNAP_ONE_DIM_SCRIPT = r"""
+(async () => {
+  const errors = [];
+  const origError = console.error;
+  console.error = (...a) => { errors.push(String(a[0])); };
+  global.FETCH_LOG = [];
+  try {
+    await window.VIDEO_PANEL.load();
+    window.VIDEO_PANEL.bind();
+  } catch (e) { errors.push('THROWN:' + e.message); }
+  console.error = origError;
+  const panel = window.VIDEO_PANEL;
+  // 当前生效尺寸：864x480
+  panel.state.width = 864;
+  panel.state.height = 480;
+  panel.state.custom = true;
+  panel.state.sizePresetKey = '16:9_0.4';
+  panel.render();
+  // 模拟用户只改宽度：1000（不是 32 的倍数）
+  const wEl = document.getElementById('vidWidth');
+  wEl.value = '1000';
+  wEl.dispatch('input', { target: { value: '1000' } });
+  await new Promise(r => setTimeout(r, 30));
+  const sizeReqs = (global.FETCH_LOG || []).filter(u => u.indexOf('/api/video-size') === 0);
+  console.log(JSON.stringify({
+    errors,
+    sizeReqs,
+    lastReq: sizeReqs[sizeReqs.length - 1] || '',
+    width: panel.state.width,
+    height: panel.state.height,
+    widthInput: wEl.value,
+    heightInput: document.getElementById('vidHeight').value,
+    sizeHint: document.getElementById('vidSizeHint').textContent,
+    adjust: document.getElementById('vidSizeAdjust').textContent,
+  }));
+})();
+"""
+
+
+class TestSnapOneDimensionKeepsOther(unittest.TestCase):
+    """只改一维宽高时，另一维必须保持不变（不能被静默清空）。
+
+    旧行为：只改宽度 -> rawHeight 仍是 null -> 原样发给服务端 ->
+    服务端 float(None) 失败 -> 回「宽高必须是数字」-> applySize 走
+    width=0 分支 -> **高度被清空、两个框归零**，用户看不出发生了什么。
+    """
+
+    def test_snap_request_never_sends_empty_dimension(self):
+        out = _node_panel(_SNAP_ONE_DIM_SCRIPT)
+        self.assertEqual(out["errors"], [])
+        self.assertTrue(out["sizeReqs"], "应该发出过一次吸附请求")
+        req = out["lastReq"]
+        self.assertNotIn("height=null", req,
+                         "吸附请求里不能有空的高度：%s" % req)
+        self.assertNotIn("height=undefined", req,
+                         "吸附请求里不能有空的高度：%s" % req)
+        self.assertIn("width=1000", req)
+
+    def test_height_is_preserved_when_only_width_changes(self):
+        out = _node_panel(_SNAP_ONE_DIM_SCRIPT)
+        self.assertEqual(out["height"], 480,
+                         "只改宽度时高度必须保持 480，实际 %s" % out["height"])
+        self.assertEqual(out["heightInput"], "480")
+        self.assertNotIn("宽高必须是数字", out["adjust"],
+                         "不该出现误导性的「宽高必须是数字」：%s" % out["adjust"])
+
+    def test_width_snaps_to_multiple_of_32(self):
+        out = _node_panel(_SNAP_ONE_DIM_SCRIPT)
+        self.assertEqual(out["width"], 992,
+                         "1000 应被吸附成 992（32 的倍数），实际 %s" % out["width"])
+        self.assertIn("1000", out["adjust"])
 
 
 if __name__ == "__main__":
