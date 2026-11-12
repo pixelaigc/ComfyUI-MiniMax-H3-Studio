@@ -5433,6 +5433,24 @@ async def main():
     app = make_app()
     await WORKER.start()
     runner = web.AppRunner(app)
+    # 【可选 access log —— 验收取证用】
+    #
+    # 默认**关闭**：8190 线上服务不写 access log（避免刷屏、避免改线上行为）。
+    # 只有独立验收实例设了 H3STUDIO_ACCESS_LOG=1 才开。
+    #
+    # 为什么要它：验收要的是「服务端自己的日志证据」——
+    # 光有客户端看到的 Content-Type 头还不够，
+    # 要能在服务端日志里看到它按 text/event-stream 回了 200。
+    if os.environ.get("H3STUDIO_ACCESS_LOG") == "1":
+        import logging
+        _alog = logging.getLogger("aiohttp.access")
+        _alog.setLevel(logging.INFO)
+        if not _alog.handlers:
+            _h = logging.StreamHandler(sys.stdout)
+            _h.setFormatter(logging.Formatter(
+                '[access] %(message)s'))
+            _alog.addHandler(_h)
+        print("[access] access log 已启用")
     await runner.setup()
     site = web.TCPSite(runner, CFG["host"], CFG["port"])
     await site.start()
