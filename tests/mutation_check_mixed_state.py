@@ -67,10 +67,14 @@ MUTATIONS = [
         "h3studio/continuation.py",
         '    if (src_w, src_h) == (dst_w, dst_h):\n'
         '        return ""\n'
-        '    return (f"接续失败：上一段是 {src_w}×{src_h}，本段是 {dst_w}×{dst_h} —— "',
+        '    return (f"接续失败：上一段是 {src_w}×{src_h}，本段是 {dst_w}×{dst_h} —— "\n'
+        '            f"潜空间桥不能跨分辨率接续（逐 token 拷贝上一段尾部，"\n'
+        '            f"latent 分辨率必须一致）。请把输出尺寸改成 {src_w}×{src_h}，"\n'
+        '            f"或改用「复用参数」重新生成一段。")\n',
         '    if (src_w, src_h) == (dst_w, dst_h):\n'
         '        return ""\n'
-        '    return ("") or (f"接续失败：上一段是 {src_w}×{src_h}，本段是 {dst_w}×{dst_h} —— "',
+        '    # 变异：不再拦跨分辨率\n'
+        '    return ""\n',
         ["tests/test_continuation_mixed_state.py"],
     ),
     (
@@ -100,6 +104,13 @@ MUTATIONS = [
         '    if (!hasNewAccel && Array.isArray(cfg.accel_loras)) {\n'
         '      videoState.accelLora = "";\n',
         '    if (!hasNewAccel && Array.isArray(cfg.accel_loras)) {\n',
+        ["tests/test_continuation_mixed_state.py"],
+    ),
+    (
+        "applyConfig 不再区分「显式给了空串」与「没给这个字段」",
+        "web/video-panel.js",
+        '    const hasNewAccel = cfg.accel_lora !== undefined;\n',
+        '    const hasNewAccel = false;\n',
         ["tests/test_continuation_mixed_state.py"],
     ),
     (

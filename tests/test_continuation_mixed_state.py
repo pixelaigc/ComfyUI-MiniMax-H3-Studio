@@ -163,10 +163,25 @@ class TestFrontendMixedStateContract(unittest.TestCase):
         旧格式 accel_loras 数组是「完整表达这个任务的配置」，不是增量。
         数组为空 = 这个任务没有额外加速 LoRA —— 若不清零，
         上一张卡片的 LoRA 会残留在面板上。
+
+        【为什么断言要带上下文】`videoState.accelLora = "";` 在本文件里
+        出现**两次**（另一处在「切了主模型后回落」的逻辑里，与本次修复
+        无关）。只断言字符串存在会**匹配到错误的那一处** ——
+        变异验证已经抓到过这个坑（变异改了归零，断言却没红）。
+        所以这里断言的是「归零那一行**紧跟在**旧格式分支的条件后面」。
         """
-        self.assertIn("videoState.accelLora = \"\";",
-                      self.panel_js,
-                      "applyConfig 的旧格式分支必须先归零 accel_lora")
+        code = _strip_js_comments(self.panel_js)
+        self.assertIn(
+            'if (!hasNewAccel && Array.isArray(cfg.accel_loras)) {\n'
+            '      videoState.accelLora = "";',
+            code,
+            "applyConfig 的旧格式分支必须先归零 accel_lora")
+
+    def test_has_new_accel_flag_exists(self):
+        """新格式的「显式给了」标记必须存在（区分「空串」与「没给」）。"""
+        code = _strip_js_comments(self.panel_js)
+        self.assertIn("const hasNewAccel = cfg.accel_lora !== undefined;",
+                      code)
 
 
 class TestContinuationContextPayload(unittest.TestCase):

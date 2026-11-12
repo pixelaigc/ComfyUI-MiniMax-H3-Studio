@@ -1,0 +1,87 @@
+{
+  "base_commit": "7fe724fede4228195fc75fec62ef767514028a2e",
+  "mutations": [
+    {
+      "mutation": "错误提取退回「把 m[0] 当 dict 读」（原始缺陷）",
+      "file": "h3studio/comfy_errors.py",
+      "applied": true,
+      "red": 6,
+      "failed_tests": [
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_detail_keeps_technical_information",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_error_from_history_entry",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_extracts_real_two_element_message_shape",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_reason_carries_real_cause",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_takes_first_error_as_root_cause",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorsModuleContract::test_real_sample_still_parses_after_refactor"
+      ]
+    },
+    {
+      "mutation": "错误文案不再中文化（直接回传原始 exception_message）",
+      "file": "h3studio/comfy_errors.py",
+      "applied": true,
+      "red": 5,
+      "failed_tests": [
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorExtraction::test_reason_carries_real_cause",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_empty_message_does_not_crash",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_oom_is_chinese",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_save_audio_mismatch_is_chinese",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_unknown_error_keeps_original_cause"
+      ]
+    },
+    {
+      "mutation": "错误文案只说「生成失败」（丢掉真正原因）",
+      "file": "h3studio/comfy_errors.py",
+      "applied": true,
+      "red": 2,
+      "failed_tests": [
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_multiline_message_uses_first_line",
+        "FAILED tests/test_comfy_errors.py::TestComfyErrorChinese::test_unknown_error_keeps_original_cause"
+      ]
+    },
+    {
+      "mutation": "接续不再校验分辨率一致性（混合态的根因）",
+      "file": "h3studio/continuation.py",
+      "applied": true,
+      "red": 0,
+      "failed_tests": []
+    },
+    {
+      "mutation": "「复用参数」不再清接续上下文（混合态的根因）",
+      "file": "web/app.js",
+      "applied": true,
+      "red": 1,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestFrontendMixedStateContract::test_reuse_handler_clears_continuation_context"
+      ]
+    },
+    {
+      "mutation": "提交前一致性闸被摘掉",
+      "file": "web/app.js",
+      "applied": true,
+      "red": 1,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestFrontendMixedStateContract::test_submit_guard_is_wired"
+      ]
+    },
+    {
+      "mutation": "applyConfig 不再归零加速 LoRA（混合态的又一种形态）",
+      "file": "web/video-panel.js",
+      "applied": true,
+      "red": 0,
+      "failed_tests": []
+    },
+    {
+      "mutation": "toast 退回阻塞式 alert",
+      "file": "web/continuation.js",
+      "applied": true,
+      "red": 1,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestFrontendMixedStateContract::test_toast_never_falls_back_to_alert"
+      ]
+    }
+  ],
+  "all_mutations_caught": false,
+  "workspace_restored": true,
+  "green_after_restore": true,
+  "verdict_pass": false
+}
