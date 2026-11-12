@@ -29,9 +29,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("H3_TEST_PORT", "8198"))
 DATA = Path(os.environ.get("H3_TEST_DATA", "/tmp/h3-moss-batch-e2e2"))
-OUT = Path("/tmp/h3-fix-evidence")
-SHOTS = Path("/root/.hermes-web-ui/.ekko/workspace/default/"
-              "person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge")
+OUT = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/h3-fix-evidence")
+OUT.mkdir(parents=True, exist_ok=True)
+#: 截图目录跟证据目录**同源**（硬编码到别处会让报告里的路径与实际落盘路径分家）
+SHOTS = OUT / "screenshots"
 COMFY = "http://127.0.0.1:8188"
 
 PANEL = {
@@ -170,6 +171,33 @@ def main():
             mine = [b for b in batches if b["job_id"] == job_id]
             print(f"  批次记录 {len(mine)} 条", flush=True)
             steps_seen = []
+            # 【单张（batch_count=1）走的是**非批次**分支】
+            # 它不写 job_batches 行，而是把 prompt_id 写在 jobs 表上。
+            # 所以单张的步数要从 **jobs.prompt_id** 读，
+            # 否则 batch_count=1 的步数集合永远是空 —— 那样就没法做
+            # 「1 张 vs 5 张」的对照（正是 C 项要的）。
+            if not mine:
+                job_row = next((j for j in jobs if j["id"] == job_id), None)
+                if job_row and job_row.get("prompt_id"):
+                    pp = comfy_params(job_row["prompt_id"])
+                    if pp:
+                        ks = pp["ksampler"]
+                        sd = pp.get("sampling") or {}
+                        steps_seen.append(ks.get("steps"))
+                        print(f"    [单张路径] prompt_id={job_row['prompt_id'][:12]} "
+                              f"steps={ks.get('steps')} cfg={ks.get('cfg')} "
+                              f"sampler={ks.get('sampler_name')} "
+                              f"sched={ks.get('scheduler')} shift={sd.get('shift')} "
+                              f"seed={ks.get('seed')}", flush=True)
+                        job_row["actual"] = {
+                            "steps": ks.get("steps"), "cfg": ks.get("cfg"),
+                            "sampler": ks.get("sampler_name"),
+                            "scheduler": ks.get("scheduler"),
+                            "shift": sd.get("shift"), "seed": ks.get("seed")}
+                    else:
+                        print("    [单张路径] 读不到 ComfyUI history")
+                else:
+                    print("    [单张路径] jobs 表里没有 prompt_id")
             for b in mine:
                 p = comfy_params(b["prompt_id"]) if b["prompt_id"] else None
                 if not p:
@@ -188,6 +216,10 @@ def main():
                                "shift": sd.get("shift"),
                                "seed": ks.get("seed")}
             report["cases"][str(count)]["batches"] = mine
+            if not mine:
+                job_row = next((j for j in jobs if j["id"] == job_id), None)
+                report["cases"][str(count)]["single_job_actual"] = (
+                    job_row.get("actual") if job_row else None)
             report["cases"][str(count)]["steps_set"] = sorted(set(steps_seen))
             print(f"  >>> 实际步数集合: {sorted(set(steps_seen))}", flush=True)
             jobs, batches = db_rows()

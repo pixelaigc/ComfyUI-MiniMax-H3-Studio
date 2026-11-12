@@ -1693,7 +1693,31 @@
     if (!activeSSE) return false;
     try { activeSSE.abort(); } catch (e) { /* 已断 */ }
     activeSSE = null;
-    if (reason) setHint(reason, "error");
+    // 【2026-11-13 修：真实缺陷】
+    //
+    // 原来这里调 `setHint(reason, "error")` ——
+    // 但 **agent.js 里从来没有定义过 setHint**（全文件只有这一处出现）。
+    // 于是**每次点「停止」都会抛 ReferenceError**：
+    //     Uncaught ReferenceError: setHint is not defined
+    // 后果很具体：
+    //   * abort() 本身已经执行了（流确实断了），但
+    //   * 异常从 cancelAgentSSE 抛出后，调用方拿不到 `true`，
+    //   * 界面也不会显示「已停止」—— 用户点了没反应。
+    //
+    // 【正确的做法】
+    // 取消是**针对某条正在流式的气泡**的，所以提示要写到那条消息上
+    // （msg.error），由 renderError() 渲染 —— 这跟 SSE 超时/失败
+    // 走的是同一条展示路径（send() 的 catch 里也是设 msg.error）。
+    // 这里不自己造第二套提示机制。
+    if (reason) {
+      const msg = state.streaming;
+      if (msg) {
+        msg.error = reason;
+        msg.streaming = false;
+        msg.result = msg.result || { status: "failed" };
+        renderMessages();
+      }
+    }
     return true;
   }
 

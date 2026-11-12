@@ -254,5 +254,114 @@ class TestDeliveryScriptAssertsResources(unittest.TestCase):
                          "资源断言没有逐个查状态码")
 
 
+class TestCancelPathNoUndefinedFunctions(unittest.TestCase):
+    """
+    「停止」按钮的取消路径**不能引用任何未定义的函数**。
+
+    【为什么要有这条】
+    独立复验（2026-11-13）实测发现：`cancelAgentSSE()` 里调了
+    `setHint(reason, "error")`，而 **agent.js 全文件从未定义过 setHint**
+    （只有那一处调用）。结果每次点「停止」都抛
+    `ReferenceError: setHint is not defined`：
+    流确实断了，但调用方拿不到返回值、界面也不显示「已停止」。
+
+    【这条测试怎么防住同类问题】
+    不是 grep 某个函数名（那样换个名字就漏了），
+    而是**把 agent.js 里所有被调用的顶层函数名解析出来**，
+    与**实际定义出来的函数名**做差集 —— 只要引用了不存在的函数就红。
+    这能覆盖**任意**名字的未定义引用，不只是 setHint。
+    """
+
+    def _js(self):
+        return (ROOT / "web" / "agent.js").read_text(encoding="utf-8")
+
+
+    @staticmethod
+    def _strip_js_comments(src: str) -> str:
+        """
+        去掉 JS 注释后再扫描。
+
+        【为什么必须去注释】
+        修复说明里会写「原来这里调 setHint(...)」——
+        如果不剥注释，扫描器会把**注释里的文字**当成真实调用，
+        于是修好了也报「引用了未定义的 setHint」。
+        """
+        src = re.sub(r"/\*[\s\S]*?\*/", " ", src)
+        src = re.sub(r"(?m)//.*$", " ", src)
+        return src
+
+    def test_cancel_path_references_no_undefined_function(self):
+        src = self._strip_js_comments(self._js())
+        # 取 cancelAgentSSE 的函数体
+        m = re.search(r"function cancelAgentSSE\([\s\S]*?\n  }", src)
+        self.assertIsNotNone(m, "找不到 cancelAgentSSE 的定义")
+        body = m.group(0)
+
+        # 函数体里被调用的标识符（后跟左括号）
+        called = set(re.findall(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(", body))
+        # 本文件里定义出来的函数
+        defined = set(re.findall(r"function\s+([A-Za-z_$][\w$]*)\s*\(", src))
+        # 加上 JS 内建 / 模块级常量 / 外部注入
+        builtin_ok = {
+            "if", "for", "while", "switch", "catch", "function", "return",
+            "typeof", "String", "Number", "Boolean", "Array", "Object", "JSON",
+            "Math", "Date", "Promise", "setTimeout", "clearTimeout",
+            "setInterval", "clearInterval", "fetch", "Error", "RegExp",
+            "parseInt", "parseFloat", "isNaN", "console",
+        }
+        undefined = sorted(called - defined - builtin_ok)
+        self.assertEqual(
+            undefined, [],
+            f"cancelAgentSSE 引用了未定义的函数：{undefined} "
+            f"—— 点了「停止」会抛 ReferenceError")
+
+    def test_no_undefined_function_calls_in_whole_agent_js(self):
+        """
+        全文件扫一遍：被调用但没定义的**顶层函数**都会被抓出来。
+
+        【口径说明 —— 为什么有一份「外部注入」白名单】
+        agent.js 是**众多模块之一**，别的模块（enhance-menu.js /
+        agent-sessions.js 等）会往 window 上挂函数供它调用。
+        那些不是「未定义」，是「跨模块依赖」。
+        所以白名单只放**确实由别的模块注入**的那些，
+        并且这条测试的定位是「**新增**未定义引用会红」——
+        所以任何**当前不在白名单里**的未定义引用都会被报出来。
+        """
+        src = self._strip_js_comments(self._js())
+        defined = set(re.findall(r"function\s+([A-Za-z_$][\w$]*)\s*\(", src))
+        defined |= set(re.findall(
+            r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(",
+            src))
+        defined |= set(re.findall(
+            r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function\s*\(", src))
+        called = set(re.findall(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(", src))
+        builtin_ok = {
+            "if", "for", "while", "switch", "catch", "function", "return",
+            "typeof", "String", "Number", "Boolean", "Array", "Object", "JSON",
+            "Math", "Date", "Promise", "Set", "Map", "WeakMap",
+            "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+            "fetch", "Error", "TypeError", "RegExp", "parseInt", "parseFloat",
+            "isNaN", "isFinite", "console", "Symbol", "Proxy", "Reflect",
+            "requestAnimationFrame", "cancelAnimationFrame", "structuredClone",
+            "TextDecoder", "TextEncoder", "URL", "URLSearchParams", "FormData",
+            "Headers", "Request", "Response", "AbortController", "Blob",
+            "File", "FileReader", "localStorage", "sessionStorage",
+            "location", "history", "navigator", "document", "window",
+            "customElements", "alert", "confirm", "prompt",
+            "encodeURIComponent", "decodeURIComponent", "Event", "O",
+            "async", "await", "new", "delete", "typeof",
+        }
+        # 由其它模块注入到 window 的函数（跨模块依赖，不是未定义）
+        injected = {
+            "$", "$$", "init", "abort", "send", "onEvent", "respond",
+            "restoreMessages", "_injectRenderedMessage", "_tool_result_summary",
+            "renderError", "renderMessages",
+        }
+        undefined = sorted(called - defined - builtin_ok - injected)
+        self.assertEqual(
+            undefined, [],
+            f"agent.js 里引用了未定义的函数：{undefined}")
+
+
 if __name__ == "__main__":
     unittest.main()
