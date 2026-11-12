@@ -331,10 +331,25 @@ class TestNormalizeT2VParams(unittest.TestCase):
         self.assertTrue(err)
         self.assertIn("SelfLiftH3Sampler", err)
 
-    def test_duration_clamped(self):
-        out, err = self.server.normalize_t2v_params(dict(self.BASE, duration=99))
+    def test_duration_over_limit_is_rejected_not_truncated(self):
+        """
+        ⚠️ 2026-11-12：上限 15 -> 60。**超上限必须报错，不能静默截断**
+        （静默截断 = 用户以为生成了 60 秒、实际只拿到 15 秒，那是撒谎）。
+        """
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, duration=VM.VIDEO_DURATION_MAX + 1))
+        self.assertNotEqual(err, "", "超上限必须给出明确错误")
+        self.assertIn("60", err)
+        # 关键：返回的 duration **不能**被悄悄改小
+        # （静默截断成 60 = 用户以为生成了 60 秒、实际按 60 跑但请求被丢）
+        self.assertEqual(out.get("duration"), float(VM.VIDEO_DURATION_MAX + 1),
+                         "时长不能被静默截断成上限值")
+
+    def test_duration_at_limit_is_accepted(self):
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, duration=VM.VIDEO_DURATION_MAX))
         self.assertEqual(err, "")
-        self.assertEqual(out["duration"], 15.0)
+        self.assertEqual(out["duration"], float(VM.VIDEO_DURATION_MAX))
 
     def test_seed_normalized_to_int_or_none(self):
         out, _ = self.server.normalize_t2v_params(dict(self.BASE, seed="42"))
