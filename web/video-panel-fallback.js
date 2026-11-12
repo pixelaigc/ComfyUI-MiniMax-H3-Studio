@@ -1130,6 +1130,8 @@ window.VIDEO_PANEL_FALLBACK = {
       "node": null,
       "inputs": {},
       "note": "不做任何 patch。速度基准，最稳。",
+      "speed_rank": 5,
+      "speed_label": "速度最慢",
       "key": "default"
     },
     {
@@ -1139,6 +1141,8 @@ window.VIDEO_PANEL_FALLBACK = {
         "attention": "comfy kitchen attention"
       },
       "note": "ComfyUI 内建的 INT8 量化稠密注意力，只支持 Nvidia / AMD。省显存、略掉精度，速度提升有限但最稳。",
+      "speed_rank": 3,
+      "speed_label": "速度一般",
       "key": "kitchen"
     },
     {
@@ -1146,6 +1150,8 @@ window.VIDEO_PANEL_FALLBACK = {
       "node": "MiniMaxH3MemoryEfficientSageAttentionPatch",
       "inputs": {},
       "note": "KJNodes 的 SageAttention patch，覆盖 H3 自注意力，降峰值显存。需要较新的 sageattention（本机已装）。",
+      "speed_rank": 4,
+      "speed_label": "速度较慢",
       "key": "sage"
     },
     {
@@ -1163,27 +1169,9 @@ window.VIDEO_PANEL_FALLBACK = {
         "dense_blocks": ""
       },
       "note": "按阈值把部分 block 走近似路径：tau 越高越快、保真越低（论文默认 1.0，本机调优值 1.3）。文本/条件 KV 仍走精确路径。",
+      "speed_rank": 2,
+      "speed_label": "速度很快",
       "key": "sol"
-    },
-    {
-      "label": "Sol-Attn 渐进调度（首尾密度不同）",
-      "node": "MiniMaxH3ScheduledSolAttentionPatch",
-      "inputs": {
-        "enabled": true,
-        "tau_start": 1.3,
-        "tau_end": 0.8,
-        "curve": "linear",
-        "min_tokens": 4096,
-        "strict": false,
-        "dense_percent": 0.0,
-        "thresh_type": "diag",
-        "int8_qk": false,
-        "int8_pv": false,
-        "sink_conditioning": "exact_kv",
-        "dense_blocks": ""
-      },
-      "note": "Sol-Attn 的调度版：高噪步 tau 1.3（更近似）、低噪步 tau 0.8（更稠密，细节成形更准）。比固定 tau 更稳。",
-      "key": "sol_scheduled"
     },
     {
       "label": "稀疏视频注意力（预算制）",
@@ -1193,6 +1181,8 @@ window.VIDEO_PANEL_FALLBACK = {
         "denser_early_late_steps": true
       },
       "note": "只保留一部分视频注意力连接：video_budget 越低越快，但提示词贴合度与运动细节会掉。没有「安全值」，每条提示词要自己试。",
+      "speed_rank": 1,
+      "speed_label": "速度最快",
       "key": "sparse"
     }
   ],

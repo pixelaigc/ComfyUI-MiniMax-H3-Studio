@@ -630,8 +630,12 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
             # 时长是**任意秒数**（后端 workflows 直接 float(params["duration"])），
             # 面板滑块给的是 5~15 秒。之前这里硬编码成 [5,10,15]，
             # 模型据此以为「8 秒不支持」而拒绝执行 —— 这是凭空造的约束。
-            entry["duration_range"] = [5, 15]
-            entry["duration_note"] = "单位：秒，取 5~15 之间的整数，面板滑块范围"
+            entry["duration_range"] = [int(agent_schema.VIDEO_DURATION_MIN),
+                                      int(agent_schema.VIDEO_DURATION_MAX)]
+            entry["duration_note"] = (
+                f"单位：秒，取 {int(agent_schema.VIDEO_DURATION_MIN)}"
+                f"~{int(agent_schema.VIDEO_DURATION_MAX)} 之间的整数，面板滑块范围"
+                "（2026-11-12 起上限放宽到 60 秒）")
         if mode == "t2i":
             entry["models"] = list(wf.Z_IMAGE_MODELS.keys())
             entry["resolutions"] = list(wf.Z_IMAGE_RES_TIERS.keys())
@@ -674,7 +678,8 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
                 "lora": "加速 LoRA：none / ckpt850（默认，4 步）/ v4step600",
                 "lora_strength": "LoRA 强度，默认 1.0",
                 "precision": "精度：int8（默认）/ nvfp4",
-                "duration": "时长（秒），5~15",
+                "duration": (f"时长（秒），{int(agent_schema.VIDEO_DURATION_MIN)}"
+                             f"~{int(agent_schema.VIDEO_DURATION_MAX)}"),
             }
         if mode == "flf":
             entry["asset_slots"] = {"single": ["first_frame", "last_frame"],
@@ -771,7 +776,8 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
         "modes": compact,
         # 共用参数（原来每个模式重复一份，撑爆了工具结果长度上限）
         "aspects": shared_aspects,
-        "video_duration_range": [5, 15],
+        "video_duration_range": [int(agent_schema.VIDEO_DURATION_MIN),
+                                 int(agent_schema.VIDEO_DURATION_MAX)],
         "music_duration_range": [4, 360],
         # 各族的真实取值集合（压缩成「key: 合法值」一行，省字符）
         "video_resolutions": ",".join(wf.RES_MP.keys()),
@@ -779,7 +785,8 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
         "image_families": families,
         "music_plan_modes": list(agent_schema.MUSIC_PLAN_MODES),
         "music_formats": list(agent_schema.MUSIC_FORMATS),
-        "notes": ("比例通用；视频 5~15 秒、音乐 4~360 秒；"
+        "notes": (f"比例通用；视频 {int(agent_schema.VIDEO_DURATION_MIN)}"
+                  f"~{int(agent_schema.VIDEO_DURATION_MAX)} 秒、音乐 4~360 秒；"
                   "未指定参数由工作台补官方默认值。"
                   "视频分辨率只有 544p/768p（传别的会静默落 768p）；"
                   "音乐时长用 max_duration（duration 无效）；"

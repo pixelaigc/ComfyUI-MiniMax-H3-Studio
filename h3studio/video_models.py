@@ -354,12 +354,42 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
 # ------------------------------------------------------------------
 # 注意力机制（实测本机 object_info 里存在的节点）
 # ------------------------------------------------------------------
+# 【2026-11-12 修 —— 两处按用户实测反馈调整】
+#
+#  1. **移除「Sol-Attn 渐进调度」（sol_scheduled）**
+#     用户实测画面有**叠影**（渐进 tau 调度让高噪步过于近似，
+#     运动主体糊成两层）。选项已从清单里**整个删掉** ——
+#     不是「列出来再置灰」（置灰等于「能选但会被服务端改写」，
+#     是假选项）。服务端清单是唯一真相源，前端只是渲染它。
+#
+#  2. **加速度标注（speed_rank / speed_label）**
+#     用户要求在下拉里直接看出快慢：
+#       稀疏视频注意力 = 速度最快
+#       sol-attn        = 速度很快
+#       comfy kitchen   = 速度一般
+#       sageattention   = 较慢
+#       pytorch         = 最慢
+#     排序 = speed_rank 升序（1 = 最快）。
+#
+# 【速度标注的依据】
+#   * 稀疏注意力（H3SparseAttention）直接砍掉视频注意力连接 ——
+#     计算量本身最少，节点自述「Lower video attention budgets are faster」。
+#   * sol-attn 走 Triton 近似 kernel（H3 自注意力专用路径），
+#     比稠密 PyTorch SDPA 快，但每个 block 仍有 kernel launch 开销。
+#   * comfy kitchen 是 INT8 **稠密**量化 —— 计算量与稠密相同，
+#     只是把 matmul 换成量化算子，**没有稀疏化**，所以只是「一般」。
+#   * sageattention 是**稠密**注意力换 kernel（省显存），计算量不变，
+#     且额外有 patch 开销 -> 较慢。
+#   * pytorch 稠密 SDPA 是基准 -> 最慢。
+#   （用户给定的排序与上述机制事实一致，故直接采用。）
 VIDEO_ATTENTION_MODES: dict[str, dict] = {
     "default": {
         "label": "默认（PyTorch 稠密注意力）",
         "node": None,
         "inputs": {},
         "note": "不做任何 patch。速度基准，最稳。",
+        "speed_rank": 5,
+        "speed_label": "速度最慢",
     },
     "kitchen": {
         "label": "Comfy Kitchen INT8 量化注意力",
@@ -367,6 +397,8 @@ VIDEO_ATTENTION_MODES: dict[str, dict] = {
         "inputs": {"attention": "comfy kitchen attention"},
         "note": "ComfyUI 内建的 INT8 量化稠密注意力，只支持 Nvidia / AMD。"
                 "省显存、略掉精度，速度提升有限但最稳。",
+        "speed_rank": 3,
+        "speed_label": "速度一般",
     },
     "sage": {
         "label": "SageAttention 显存优化",
@@ -374,6 +406,8 @@ VIDEO_ATTENTION_MODES: dict[str, dict] = {
         "inputs": {},
         "note": "KJNodes 的 SageAttention patch，覆盖 H3 自注意力，"
                 "降峰值显存。需要较新的 sageattention（本机已装）。",
+        "speed_rank": 4,
+        "speed_label": "速度较慢",
     },
     "sol": {
         "label": "Sol-Attn 近似路由",
@@ -391,26 +425,8 @@ VIDEO_ATTENTION_MODES: dict[str, dict] = {
         },
         "note": "按阈值把部分 block 走近似路径：tau 越高越快、保真越低"
                 "（论文默认 1.0，本机调优值 1.3）。文本/条件 KV 仍走精确路径。",
-    },
-    "sol_scheduled": {
-        "label": "Sol-Attn 渐进调度（首尾密度不同）",
-        "node": "MiniMaxH3ScheduledSolAttentionPatch",
-        "inputs": {
-            "enabled": True,
-            "tau_start": 1.3,
-            "tau_end": 0.8,
-            "curve": "linear",
-            "min_tokens": 4096,
-            "strict": False,
-            "dense_percent": 0.0,
-            "thresh_type": "diag",
-            "int8_qk": False,
-            "int8_pv": False,
-            "sink_conditioning": "exact_kv",
-            "dense_blocks": "",
-        },
-        "note": "Sol-Attn 的调度版：高噪步 tau 1.3（更近似）、低噪步 tau 0.8"
-                "（更稠密，细节成形更准）。比固定 tau 更稳。",
+        "speed_rank": 2,
+        "speed_label": "速度很快",
     },
     "sparse": {
         "label": "稀疏视频注意力（预算制）",
@@ -419,8 +435,85 @@ VIDEO_ATTENTION_MODES: dict[str, dict] = {
         "note": "只保留一部分视频注意力连接：video_budget 越低越快，"
                 "但提示词贴合度与运动细节会掉。没有「安全值」，"
                 "每条提示词要自己试。",
+        "speed_rank": 1,
+        "speed_label": "速度最快",
     },
 }
+
+#: **被移除**的注意力机制 key（2026-11-12 用户实测画面有叠影）。
+#:
+#: 保留这个常量（而不是彻底忘掉）是刻意的：
+#:   * 老任务落库的 params 里可能还有 `attention: "sol_scheduled"`；
+#:   * 面板配置（/api/video-config）里也可能存着这个 key；
+#:   * 这两处都要**明确降级**（回落到 default）而不是报错或静默失败，
+#:     否则老任务点「复用参数」会得到一个下拉里根本不存在的值。
+#:
+#: 节点名也一并登记 —— 服务端归一层遇到这个 key 时明确报错说明，
+#: 而不是当成「未知注意力机制」。
+VIDEO_REMOVED_ATTENTION_MODES: dict[str, dict] = {
+    "sol_scheduled": {
+        "label": "Sol-Attn 渐进调度（首尾密度不同）",
+        "node": "MiniMaxH3ScheduledSolAttentionPatch",
+        "reason": "用户实测该调度会让画面出现叠影（高噪步过于近似，"
+                  "运动主体糊成两层），已从选项中移除。",
+    },
+}
+#: 视频时长（秒）区间 —— **2026-11-12 放宽**。
+#:
+#: 旧值是 [2, 15]（server.normalize_t2v_params 里 `min(15.0, duration)`），
+#: 用户实测反馈「15 秒太短，一分钟都行，最多 OOM」。
+#:
+#: 【为什么放到 60】
+#:   * ComfyUI 的 MiniMaxH3ImageToVideo 节点 schema：
+#:       length = INT(min=5, max=3600, step=17)
+#:     节点本身允许 3600 帧（150 秒）—— 15 秒是**我们自己的**限制，
+#:     不是模型/节点的能力上限。
+#:   * 帧数表达式 `max(5, round(a*24)) + (5 - (... % 17)) % 17`
+#:     在任何秒数下都能算出合法帧数。
+#:   * 真正的瓶颈是显存 —— 长时长 = 线性增长的 latent 与注意力序列。
+#:     所以上限放宽到 60 秒（1440 帧），超显存时由 ComfyUI 抛 OOM，
+#:     **明确报错**（任务失败 + 错误文案），不做静默截断。
+#:
+#: 【为什么不静默截断】
+#: 用户明确要求「如超显存应给出明确报错而非静默截断」。
+#: 静默截断会让用户以为自己生成了 60 秒、实际只拿到 15 秒 —— 那是撒谎。
+#: 现在超上限**直接拒绝**并说明上限值。
+VIDEO_DURATION_MIN = 2.0
+VIDEO_DURATION_MAX = 60.0
+VIDEO_DURATION_DEFAULT = 5.0
+
+#: 视频时长超上限时的**可执行**提示（不静默截断）。
+VIDEO_DURATION_MAX_MESSAGE = (
+    "文生视频时长上限为 {limit:g} 秒。当前请求 {value:g} 秒，超出上限。"
+    "请把时长调小；显存不足时请改用更小的分辨率或更短的时长。"
+)
+
+
+def normalize_video_duration(value, default: float = VIDEO_DURATION_DEFAULT
+                             ) -> tuple[float, str]:
+    """把时长归一到 [VIDEO_DURATION_MIN, VIDEO_DURATION_MAX]。
+
+    返回 (生效时长, 错误信息)。**错误信息为空表示通过**。
+
+    非法输入（不是数字）-> 回落到默认时长，不报错（老任务/老客户端兼容）。
+    超过上限 -> **不截断**，返回错误信息（调用方据此拒绝提交）。
+    """
+    try:
+        duration = float(value)
+    except (TypeError, ValueError):
+        return default, ""
+    if duration != duration:  # NaN
+        return default, ""
+    if duration > VIDEO_DURATION_MAX:
+        return duration, VIDEO_DURATION_MAX_MESSAGE.format(
+            limit=VIDEO_DURATION_MAX, value=duration)
+    return max(VIDEO_DURATION_MIN, duration), ""
+
+
+#: 保留旧名别名（旧代码 / 旧测试引用它）。
+VIDEO_DURATION_MIN_OLD = 2.0
+VIDEO_DURATION_MAX_OLD = 15.0
+
 VIDEO_DEFAULT_ATTENTION = "default"
 
 # ------------------------------------------------------------------

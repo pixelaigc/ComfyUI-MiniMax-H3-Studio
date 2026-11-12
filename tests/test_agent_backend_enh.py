@@ -244,16 +244,24 @@ class TestParamValidation(_Base):
         self.assertIn("9:16", wf.ASPECT_MAP)
 
     def test_invalid_duration_reports_range_and_split_plan(self):
-        issues = agent_schema.validate_params("t2v", {"duration": 30})
+        """
+        ⚠️ 2026-11-12：时长上限从 15 放宽到 60，所以「30 秒」现在是**合法**的
+        （原来用 30 当越界样本，现在得用超过新上限的值）。
+        区间与拆段长度都**从 video_models 取**，不写死数字。
+        """
+        from h3studio import video_models as vm
+        low = int(vm.VIDEO_DURATION_MIN)
+        high = int(vm.VIDEO_DURATION_MAX)
+        issues = agent_schema.validate_params("t2v", {"duration": high + 30})
         self.assertEqual(len(issues), 1)
         issue = issues[0]
         self.assertEqual(issue.field, "duration")
-        self.assertIn("5~15", issue.allowed[0])
+        self.assertIn(f"{low}~{high}", issue.allowed[0])
         actions = {s["action"] for s in issue.suggestions}
         self.assertIn("clamp", actions)
         # 拆段方案必须每段都在合法区间内
         split = [s for s in issue.suggestions if s["action"] == "split"][0]
-        self.assertTrue(5 <= split["params"]["duration"] <= 15)
+        self.assertTrue(low <= split["params"]["duration"] <= high)
         self.assertEqual(split["params"]["segments"], 2)
 
     def test_invalid_model_reports_real_models(self):
@@ -336,11 +344,12 @@ class TestModeAndPresetTools(_Base):
         self.assertIn("未知模式", exc.message)
 
     def test_describe_mode_params_single_field(self):
+        from h3studio import video_models as vm
         result = self.call("describe_mode_params",
                                {"mode": "t2v", "field": "duration"})
         self.assertEqual(result["field"], "duration")
-        self.assertEqual(result["spec"]["min"], 5)
-        self.assertEqual(result["spec"]["max"], 15)
+        self.assertEqual(result["spec"]["min"], int(vm.VIDEO_DURATION_MIN))
+        self.assertEqual(result["spec"]["max"], int(vm.VIDEO_DURATION_MAX))
 
     def test_describe_mode_params_unknown_field(self):
         exc = self.call_expect_error("describe_mode_params",

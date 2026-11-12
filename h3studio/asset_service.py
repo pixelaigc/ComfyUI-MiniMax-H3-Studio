@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import asset_repo
 from . import assets as A
+from . import job_meta
 from . import media_probe
 from .assets import LibraryError
 
@@ -296,6 +297,12 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
         "scheduler": params.get("scheduler"),
         "cfg": params.get("cfg"),
         "shift": params.get("shift"),
+        # 【2026-11-12】注意力机制 —— 素材库条目要能显示「这条视频是
+        # 用哪种注意力机制生成的」（用户要求：媒体库/生成库标注注意力机制）。
+        # 存 **key**（不是显示名）—— 显示名由 job_meta 从清单里现算，
+        # 这样清单改了显示名，历史素材的标注也会跟着更新。
+        "attention": params.get("attention"),
+        "attention_label": job_meta.attention_label(params.get("attention") or ""),
         "batch_id": (batch or {}).get("id"),
         "batch_index": (batch or {}).get("idx"),
         "batch_seed": (batch or {}).get("seed"),

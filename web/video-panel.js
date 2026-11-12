@@ -149,11 +149,20 @@
    */
   async function snapSize(rawW, rawH) {
     try {
+      // 【2026-11-12 修 —— 只改一维时另一维变 null】
+      // 旧实现把 null 原样发给服务端 -> 服务端 float(None) 失败 ->
+      // 返回「宽高必须是数字」-> applySize 走 width=0 分支 ->
+      // **用户只改了宽度，高度却被静默清空**，两个框都归零。
+      // 现在：某一维没有有效输入时，用**当前生效值**补上，
+      // 保证请求里永远是两个合法数字（另一维保持不变）。
+      const [curW, curH] = currentSize();
+      const w = (rawW != null && rawW > 0) ? rawW : curW;
+      const h = (rawH != null && rawH > 0) ? rawH : curH;
       // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算
       // （t2v 放宽到 2.0M；flf / r2v 仍是 0.8MP 档位）。
       const mode = encodeURIComponent(VIDEO_OPTIONS.mode || "t2v");
       const resp = await fetch(
-        `/api/video-size?width=${encodeURIComponent(rawW)}&height=${encodeURIComponent(rawH)}&mode=${mode}`,
+        `/api/video-size?width=${encodeURIComponent(w)}&height=${encodeURIComponent(h)}&mode=${mode}`,
         { cache: "no-store" });
       if (!resp.ok) return null;
       return await resp.json();
@@ -521,6 +530,25 @@
 
   // ------------------------------------------------------------ 注意力
 
+  /**
+   * 注意力机制下拉。
+   *
+   * 【2026-11-12 两处调整】
+   *   1. **速度标注** —— 每项后面带「速度最快 / 速度很快 / 速度一般 /
+   *      速度较慢 / 速度最慢」。标注来自服务端下发的 `speed_label`
+   *      （与 video_models.VIDEO_ATTENTION_MODES 同源），前端不自己编。
+   *   2. **选项已下线的不出现** —— 「Sol-Attn 渐进调度」（sol_scheduled）
+   *      已从服务端清单里删掉（用户实测画面有叠影），所以这里根本
+   *      不会渲染它。**不是置灰** —— 置灰等于「能选但会被服务端改写」，
+   *      那是假选项。
+   */
+  function attentionOptionLabel(item) {
+    const base = item.label || item.key;
+    const speed = item.speed_label ? ` · ${item.speed_label}` : "";
+    const unavailable = item.available === false;
+    return unavailable ? base + "（本机无此节点，不可用）" + speed : base + speed;
+  }
+
   function renderAttention() {
     const sel = document.getElementById("vidAttentionSelect");
     const note = document.getElementById("vidAttentionNote");
@@ -531,9 +559,9 @@
       const opt = document.createElement("option");
       opt.value = item.key;
       const unavailable = item.available === false;
-      opt.textContent = unavailable
-        ? item.label + "（本机无此节点，不可用）" : item.label;
+      opt.textContent = attentionOptionLabel(item);
       opt.disabled = unavailable;
+      opt.title = item.note || "";
       opt.selected = item.key === videoState.attention;
       sel.appendChild(opt);
     });
@@ -901,6 +929,29 @@
     };
   }
 
+  /**
+   * 尺寸预设 key 的**反查**：按当前宽高在预设清单里找对应项。
+   *
+   * 【为什么需要它 —— 2026-11-12 修「复用参数不填分辨率」】
+   * applyConfig() 从老任务恢复宽高时，只改了 state.width/height，
+   * **没有重算 sizePresetKey**。于是：
+   *   - 左侧「输出尺寸」输入框显示的是回填后的宽高（对的）
+   *   - 但「尺寸预设」下拉仍停在**上一次**的档位（错的）
+   * 两者对不上 —— 用户看到「1344×768」配「480p · 864×480」。
+   * renderSizePresetSelect() 里虽然有一句「按当前宽高反查」的兜底，
+   * 但它只在 `!want || !presets.some(p => p.key === want)` 时才触发 ——
+   * 而 want 是**上一个任务的合法 key**，命中了 → 兜底不生效 → 旧档位留下。
+   *
+   * 修法：applyConfig() 回填宽高后**强制重算** sizePresetKey
+   * （用同一个反查函数，逻辑只有一份）。
+   */
+  function presetKeyForSize(width, height) {
+    if (!width || !height) return "";
+    const hit = presetsForAspect(videoState.aspect).find(
+      p => p.width === Number(width) && p.height === Number(height));
+    return hit ? hit.key : "";
+  }
+
   function applyConfig(cfg) {
     if (!cfg || typeof cfg !== "object") return;
     if (cfg.model && VIDEO_OPTIONS.models[cfg.model]) videoState.model = cfg.model;
@@ -911,7 +962,24 @@
     if (cfg.height) videoState.height = Number(cfg.height);
     if (cfg.rawWidth) videoState.rawWidth = Number(cfg.rawWidth);
     if (cfg.rawHeight) videoState.rawHeight = Number(cfg.rawHeight);
-    if (cfg.size_preset_key) videoState.sizePresetKey = cfg.size_preset_key;
+    // 【2026-11-12 修】回填宽高后**必须重算**尺寸预设档位 ——
+    // 否则「尺寸预设」下拉会停在上一条任务的档位上，与宽高对不上。
+    // 优先用配置里带的 size_preset_key（老配置可能有）；
+    // 但它必须与当前宽高一致，否则以宽高反查的结果为准。
+    if (cfg.size_preset_key) {
+      const preset = presetsForAspect(videoState.aspect).find(
+        p => p.key === cfg.size_preset_key);
+      if (preset && preset.width === videoState.width
+          && preset.height === videoState.height) {
+        videoState.sizePresetKey = cfg.size_preset_key;
+      } else {
+        videoState.sizePresetKey = presetKeyForSize(
+          videoState.width, videoState.height);
+      }
+    } else {
+      videoState.sizePresetKey = presetKeyForSize(
+        videoState.width, videoState.height);
+    }
     if (cfg.fixed_accel_lora) videoState.fixedAccelLora = cfg.fixed_accel_lora;
     // 【单选】新格式
     if (cfg.accel_lora !== undefined) {
@@ -1330,13 +1398,27 @@
     const accelSel = document.getElementById("vidAccelLoraSelect");
     if (accelSel) {
       accelSel.addEventListener("change", e => {
+        const previous = videoState.accelLora;
         videoState.accelLora = e.target.value || "";
         const meta = videoState.accelLora ? accelComboMeta(videoState.accelLora) : null;
         if (meta) {
-          // 切到某个 LoRA 时，强度回到它的推荐值（除非用户已经改过这项）
-          if (videoState.accelLoraStrength === undefined
-            || videoState.accelLoraStrength === null) {
-            videoState.accelLoraStrength = Number(meta.recommended_strength || 1);
+          // 【2026-11-12 修 —— DMAD 默认强度必须是 1.00】
+          //
+          // 旧逻辑：只有 strength 是 undefined/null 时才套用推荐值。
+          // 于是用户之前把强度调到 0.65，再切到 DMAD —— **0.65 被沿用**，
+          // 面板上显示「DMAD 4 步（critic 版）×0.65」，落库也是 0.65。
+          // 但 DMAD 的官方值是 1.00（safetensors 元数据：
+          //   sampling = 4 steps, video shift 12, audio shift 2,
+          //   1344x768, 124 frames at 24 fps, no CFG
+          //   lora_alpha = 128, alpha = rank everywhere (scale 1.0)
+          // —— 权重本身就是按 scale 1.0 训的，0.65 会明显偏离）。
+          //
+          // 新逻辑：**切换到另一枚 LoRA 时，强度重置为那枚的推荐值**。
+          // 只有「同一枚 LoRA 反复切换」（比如选回同一项）才保留用户
+          // 手动调过的值 —— 那样用户微调后不会莫名其妙被重置。
+          if (videoState.accelLora !== previous) {
+            videoState.accelLoraStrength = Number(
+              meta.recommended_strength != null ? meta.recommended_strength : 1);
           }
         }
         renderAccelLoraNote();

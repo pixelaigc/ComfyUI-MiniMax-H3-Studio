@@ -264,8 +264,13 @@
     </div>
 
     <div class="field" id="durField">
-      <div class="field-label">时长 <span id="durVal">5s</span></div>
-      <input type="range" id="duration" min="5" max="15" step="1" value="5">
+      <div class="field-label">时长 <span id="durVal">5s</span>
+        <span class="muted">上限 60 秒</span></div>
+      <!-- 【2026-11-12 放宽】max 15 -> 60。用户实测反馈「15 秒太短，
+           一分钟都行，最多 OOM」。服务端上限同步放宽到 60 秒
+           （h3studio/video_models.py 的 VIDEO_DURATION_MAX）——
+           超上限**不静默截断**，服务端直接报错。 -->
+      <input type="range" id="duration" min="2" max="60" step="1" value="5">
     </div>
 
     <div class="field" id="aspectField">
@@ -790,6 +795,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <option value="13">13 秒</option>
           <option value="14">14 秒</option>
           <option value="15">15 秒</option>
+          <!-- 【2026-11-12】时长上限放宽到 60 秒后，补齐常用档位。 -->
+          <option value="20">20 秒</option>
+          <option value="30">30 秒</option>
+          <option value="45">45 秒</option>
+          <option value="60">60 秒</option>
         </select>
         <button class="filter-reset" id="doneFilterReset">重置</button>
       </div>

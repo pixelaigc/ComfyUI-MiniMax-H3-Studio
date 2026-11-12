@@ -449,19 +449,30 @@ class TestDurationValidation(_Base):
     """时长校验 —— 视频上下限 + 音乐 max_duration。"""
 
     def test_video_duration_out_of_range_is_rejected_once(self):
-        issues = agent_schema.validate_params("t2v", {"duration": 40})
+        """
+        ⚠️ 2026-11-12：时长上限 15 -> 60，40 秒现在合法，
+        越界样本必须换成超过新上限的值。
+        """
+        from h3studio import video_models as vm
+        issues = agent_schema.validate_params(
+            "t2v", {"duration": int(vm.VIDEO_DURATION_MAX) + 10})
         duration_issues = [i for i in issues if i.field == "duration"]
         self.assertEqual(len(duration_issues), 1,
                          "同一条时长问题不该重复报两次")
         self.assertEqual(duration_issues[0].code, "invalid_duration")
 
     def test_video_duration_split_suggestion_is_executable(self):
-        issues = agent_schema.validate_params("t2v", {"duration": 40})
+        from h3studio import video_models as vm
+        low = int(vm.VIDEO_DURATION_MIN)
+        high = int(vm.VIDEO_DURATION_MAX)
+        issues = agent_schema.validate_params(
+            "t2v", {"duration": high + 10})
         split = [i for i in issues[0].suggestions if i["action"] == "split"][0]
-        self.assertTrue(5 <= split["params"]["duration"] <= 15)
+        self.assertTrue(low <= split["params"]["duration"] <= high)
 
     def test_video_duration_in_range_passes(self):
-        for value in (5, 8, 15):
+        from h3studio import video_models as vm
+        for value in (vm.VIDEO_DURATION_MIN, 8, 15, vm.VIDEO_DURATION_MAX):
             self.assertEqual(
                 agent_schema.validate_params("t2v", {"duration": value}), [])
 

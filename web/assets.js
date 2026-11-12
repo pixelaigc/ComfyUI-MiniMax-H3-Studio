@@ -133,6 +133,23 @@
     } catch (e) { /* 标签清单失败不阻塞主流程 */ }
   }
 
+  /**
+   * 素材详情里的「注意力机制」行（2026-11-12 新增）。
+   *
+   * 【为什么】用户要求「媒体库/生成库标注所用注意力机制」。
+   * 素材库里从生成结果入库的视频条目，source_meta.attention 记着
+   * 生成时用的机制 key，attention_label 是它的显示名
+   * （入库时由服务端 job_meta 按清单算好，逐字与面板下拉一致）。
+   * 没有记录的老素材 -> **整行不渲染**（不编造）。
+   */
+  function attentionMetaRow(sourceMeta) {
+    const meta = sourceMeta || {};
+    const label = meta.attention_label || "";
+    if (!label) return "";
+    return `<div class="kv"><span>注意力机制</span>
+      <b title="${esc(label)}">${esc(label)}</b></div>`;
+  }
+
   function thumbFor(asset) {
     if (asset.preview_url) {
       return `<img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}" loading="lazy">`;
@@ -396,8 +413,11 @@
       : `<div class="al-ref"><span>还没有任务引用这个素材</span></div>`;
 
     const sourceMeta = asset.source_meta || {};
-    const metaRows = Object.entries(sourceMeta).filter(([, v]) =>
-      v !== null && v !== undefined && v !== "" && typeof v !== "object");
+    // 【2026-11-12】attention / attention_label 由下面的「注意力机制」行
+    // 单独展示（带中文名），不在这里以原始 key 重复出现。
+    const metaRows = Object.entries(sourceMeta).filter(([k, v]) =>
+      k !== "attention" && k !== "attention_label"
+      && v !== null && v !== undefined && v !== "" && typeof v !== "object");
     const metaHtml = metaRows.length
       ? metaRows.map(([k, v]) => `<div class="kv"><span>${esc(k)}</span>
           <b title="${esc(String(v))}">${esc(String(v))}</b></div>`).join("")
@@ -428,6 +448,7 @@
           <div class="kv"><span>文件大小</span><b>${esc(fmtBytes(version.bytes))}</b></div>
           ${version.width ? `<div class="kv"><span>尺寸</span><b>${version.width}×${version.height}</b></div>` : ""}
           ${version.duration_sec != null ? `<div class="kv"><span>时长</span><b>${esc(fmtDuration(version.duration_sec))}</b></div>` : ""}
+          ${attentionMetaRow(sourceMeta)}
           ${version.fps ? `<div class="kv"><span>帧率</span><b>${version.fps} fps</b></div>` : ""}
           ${version.codec ? `<div class="kv"><span>视频/图像编码</span><b>${esc(version.codec)}</b></div>` : ""}
           ${version.audio_codec ? `<div class="kv"><span>音频编码</span><b>${esc(version.audio_codec)}</b></div>` : ""}
