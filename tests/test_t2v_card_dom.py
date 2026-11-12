@@ -289,6 +289,28 @@ console.log(JSON.stringify({{
         self.assertTrue(out["model"])
         self.assertIn("ckpt850", out["lora"])
 
+    def test_qwen_cards_must_render_model_row(self):
+        """Qwen 系卡片**必须有**「模型」行。
+
+        【实测抓到的错 —— 子代理审计 M3】卡片模板的图像分支原写死
+        `job.mode === "t2i" || job.mode === "t2i_moss"`，
+        而 Qwen-Image 2.1 的两个模式（t2i_qwen / i2i_qwen）落到最后的
+        else 分支 —— 那里只渲染 `info.kind === "video"` 的内容，
+        于是 Qwen 卡片**整块没有模型行**：
+        面板有真实模型下拉、服务端也读、落库也有，唯独展示层缺失。
+
+        判据：四个图像模式必须共用 IMAGE_MODES 这个常量，
+        不许再手写两个 mode 的字面量。
+        """
+        import re
+        from test_t2v_card_dom import _APP_JS
+        code = re.sub(r"//[^\n]*", "", _APP_JS)
+        # 卡片模板里不得再出现「只判 t2i / t2i_moss」的写法
+        self.assertNotIn('job.mode === "t2i" || job.mode === "t2i_moss"',
+                         code)
+        # 必须用 IMAGE_MODES（覆盖全部四个图像模式）
+        self.assertIn("IMAGE_MODES.includes(job.mode)", code)
+
     def test_image_mode_without_lora_has_no_lora_row(self):
         """图像模式没加效果 LoRA -> **不渲染** LoRA 行（不显示「空」）。
 

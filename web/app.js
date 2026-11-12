@@ -2632,10 +2632,15 @@ function localModelInfo(mode, p) {
     } else if (p.model) {
       out.model_label = p.model;
     } else {
-      // 没记录 model -> 工作流走默认档（workflows._h3_video_workflow）
+      // 没记录 model -> 工作流走默认档（workflows._h3_video_workflow）。
+      // 底模按 mode 区分：t2v/flf 用 fl2va，r2v 用 ref2va
+      // （workflows.build_r2v:477 `unet_name: UNET["ref2va"][precision]`）。
       const precision = p.precision || "int8";
-      out.model_label = `MiniMax-H3 FL2VA（${precision}，默认档）`;
-      out.model_key = "fl2va";
+      const ref2va = mode === "r2v";
+      out.model_label = ref2va
+        ? `MiniMax-H3 Ref2VA（${precision}，默认档）`
+        : `MiniMax-H3 FL2VA（${precision}，默认档）`;
+      out.model_key = ref2va ? "ref2va" : "fl2va";
     }
     if (p.lora && p.lora !== "none") {
       out.lora_label = p.lora;
@@ -3170,7 +3175,7 @@ function jobCard(job) {
       <div class="row"><span>片段</span><b>${(p.clips || []).length} 个</b></div>
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
-      ${(job.mode === "t2i" || job.mode === "t2i_moss") ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
+      ${IMAGE_MODES.includes(job.mode) ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
       ${resoNote}
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       ${loraRow}
