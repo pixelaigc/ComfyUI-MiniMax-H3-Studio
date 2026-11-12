@@ -114,12 +114,12 @@ MUTATIONS = [
         "test_legacy_lora_only_in_flf_r2v_branch",
     ),
     (
-        "前端本地兜底退回读遗留字段（model_key 被忽略）",
+        "前端本地兜底退回读遗留字段（复现原始 bug 的形状）",
         "web/app.js",
         '    out.model_key = p.model_key;\n'
         '    out.model_label = entry ? (entry.label || p.model_key) : p.model_key;\n',
         '    out.model_key = p.model || "";\n'
-        '    out.model_label = entry ? (entry.label || p.model_key) : (p.model || "");\n',
+        '    out.model_label = p.model ? `H3 + ${p.lora || "ckpt850"}` : (p.model_key || "");\n',
         "test_falls_back_to_local_summary_when_server_silent",
     ),
 ]
