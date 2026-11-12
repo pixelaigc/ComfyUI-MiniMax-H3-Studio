@@ -1585,7 +1585,21 @@
       // 失败也要让用户看到「到底怎么了」—— 不能只留一个空白的忙碌状态。
       stopProgress();
       msg.streaming = false;
-      msg.error = err.message || "未知错误";
+      // 【2026-11-13 修：用户主动取消时不要显示浏览器的原始报错】
+      //
+      // cancelAgentSSE() 会给 msg.error 写上「已停止生成」，
+      // 然后 abort() 让 fetch 抛 AbortError ——
+      // 于是这里**无条件**用 err.message 覆盖，
+      // 用户看到的是 "signal is aborted without reason"（浏览器原文），
+      // 而不是「已停止生成」。
+      //
+      // 判据：msg.error 已经被 cancel 路径写过 -> 说明是**用户主动取消**，
+      // 保留那条友好文案；否则才是真失败，用 err.message。
+      if (!msg.error) {
+        msg.error = err.message || "未知错误";
+      } else if (err.name === "AbortError" || /aborted/i.test(err.message || "")) {
+        // 保留 cancelAgentSSE 写的提示（用户主动取消）
+      }
       msg.result = { status: "failed" };
       // msg.retryRequest 保留 -> 渲染出「重试」按钮
     } finally {

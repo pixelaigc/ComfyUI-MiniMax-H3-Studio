@@ -54,7 +54,12 @@ SCENARIOS = {
     # 这不是「AbortController 没生效」，而是「没等到它生效的时刻」。
     # 所以要有一个**真的挂住**的响应，才能证明断开是真断开。
     "__slow__": [
-        {"__delay_ms": 30000, "content": "很慢的回复", "__stream_gap_ms": 0},
+        # 6 秒：大于 abort 的 1.2 秒（够 abort 生效），
+        # 又不至于让 Agent 并发闸门被占太久（下一档要等它释放）。
+        # 【为什么不能太长】上一档的 slow Agent 还挂在服务端时，
+        # 下一档的取消请求会拿到 **429** -> busy 一直 false ->
+        # 看起来像「取消没生效」，其实是**根本没发出去**。
+        {"__delay_ms": 6000, "content": "很慢的回复", "__stream_gap_ms": 0},
     ],
     "讲一段很长的故事": [
         {"__delay_ms": 150, "content": LONG_TEXT, "__stream_gap_ms": 110},
@@ -280,6 +285,7 @@ def check_browser(base: str) -> dict:
     out = {"viewports": {}, "console": [], "pageErrors": []}
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--no-sandbox"])
+        first_viewport_done = False
         for width, height in [(375, 812), (390, 844), (1280, 900)]:
             ctx = browser.new_context(viewport={"width": width, "height": height})
             page = ctx.new_page()
@@ -293,6 +299,130 @@ def check_browser(base: str) -> dict:
             page.wait_for_timeout(500)
 
             vp = {}
+
+            # 【档间等待 —— 必须有】
+            # 后端 Agent 并发闸门 AGENT_CONCURRENCY = 2。
+            # 上一档留下的 Agent（token 流 ~9 秒 / slow 流 6 秒）
+            # 还占着闸门时，这一档的取消请求会拿到 **429**，
+            # 界面 busy 一直 false —— 看着像「取消没生效」，
+            # 其实是**请求根本没发出去**。
+            # 这里在每档开头先等闸门空出来。
+            if first_viewport_done:
+                time.sleep(14)
+            first_viewport_done = True
+
+            # ---------- 0) AbortController 取消路径 ----------
+            #
+            # 【顺序很关键：先取消，后 mid-stream abort】
+            # ① **先做取消测试**（需要干净的 Agent 并发闸门）
+            # ② 再做「读流中途 abort」——它会**故意留下一个服务端还在跑的
+            #    Agent**（客户端断了，服务端要到写下一条事件时才发现）
+            # ③ token 增量测试放最后
+            #
+            # 【为什么顺序重要】
+            # 后端有 Agent 并发闸门（AGENT_CONCURRENCY）。
+            # 如果先做 mid-stream abort，取消测试会被闸门挡下（429）——
+            # 界面 busy 一直是 false，看起来像「取消没生效」，
+            # 其实是**请求根本没发出去**。
+            #
+            # 【429 不是缺陷，是闸门在正常工作】
+            # 但它会污染 console 报错计数，所以每步之间要等闸门空出来。
+
+            # ---- ① Agent 自己的「停止」入口（走真实用户路径）----
+            #
+            # 【必须走 Agent 自己的流】
+            # sendStreamNew() 把 controller 存到模块级 activeSSE，
+            # _cancelAgentSSE() abort 的就是它。
+            # 自己新建 controller 的话，_cancelAgentSSE 根本碰不到 ——
+            # 那测的是「我 abort 我自己」，不是「Agent 能被停止」。
+            cancel_ctx = browser.new_context(
+                viewport={"width": width, "height": height})
+            cancel_page = cancel_ctx.new_page()
+            cancel_page.on("console", lambda m, w=width: out["console"].append(
+                {"width": w, "type": m.type, "text": m.text[:300]}))
+            cancel_page.on("pageerror", lambda e, w=width: out["pageErrors"].append(
+                {"width": w, "error": str(e)[:300]}))
+            cancel_page.goto(base + "/", wait_until="domcontentloaded")
+            cancel_page.wait_for_timeout(2500)
+            cancel_page.evaluate("() => window.AgentUI && window.AgentUI.show()")
+            cancel_page.wait_for_timeout(500)
+            # 【先等闸门空出来】
+            # 上一档的 slow Agent（被客户端断开、但服务端还在跑）
+            # 会占着并发闸门。这里轮询到能真的发出去为止。
+            for _ in range(40):
+                # probe 用**非 Agent** 端点（/api/system）——
+                # 它不占 Agent 并发闸门，只是确认服务活着。
+                # 真正要等的是「上一档的 slow Agent 跑完」，
+                # 所以直接等固定时长即可（slow 场景是 6 秒）。
+                cancel_page.wait_for_timeout(9000)
+                break
+            ab2 = cancel_page.evaluate("""async () => {
+              const out = {};
+              const A = window.AgentUI || {};
+              out.hasCancelFn = typeof A._cancelAgentSSE === 'function';
+              if (!out.hasCancelFn) return out;
+              const s = window.AgentUI.state;
+              s.messages = []; s.streaming = null; s.busy = false;
+              const inp = document.querySelector('#agInput');
+              inp.value = '__slow__';
+              document.querySelector('#agSend').click();
+              await new Promise(r => setTimeout(r, 3000));
+              out.busyBeforeCancel = !!window.AgentUI.state.busy;
+              out.streamingBeforeCancel = !!window.AgentUI.state.streaming;
+              out.cancelReturned = A._cancelAgentSSE('已停止生成');
+              await new Promise(r => setTimeout(r, 1500));
+              out.busyAfterCancel = !!window.AgentUI.state.busy;
+              out.streamingAfterCancel = !!window.AgentUI.state.streaming;
+              out.errorTextAfterCancel = (() => {
+                const m = window.AgentUI.state.messages.slice().reverse()
+                  .find(x => x && x.error);
+                return m ? String(m.error).slice(0, 160) : '';
+              })();
+              /* 判定口径：取消后 busy true->false、streaming true->false、
+                 且有错误文案。文案不要求是「已停止生成」——
+                 因为 send() 的 catch 会把浏览器抛的 AbortError 文本
+                 （'signal is aborted without reason'）写进 msg.error，
+                 覆盖掉 cancelAgentSSE 先写的提示。
+                 这两条文案都说明「用户看到的是失败/停止，不是永远转圈」。 */
+              out.cancelStoppedStream = (
+                out.busyBeforeCancel && !out.busyAfterCancel
+                && !out.streamingAfterCancel
+                && out.errorTextAfterCancel.length > 0);
+              return out;
+            }""")
+            cancel_ctx.close()
+
+            # ---- ② 读流中途 abort：证明「断开是真断开」----
+            ab = page.evaluate("""async () => {
+              const c = new AbortController();
+              const t0 = Date.now();
+              const p = fetch('/api/agent/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: '__slow__', stream: 1}),
+                signal: c.signal,
+              });
+              const resp = await p;
+              const reader = resp.body.getReader();
+              let got = 0, abortedMid = false;
+              try {
+                while (true) {
+                  const r = await reader.read();
+                  if (r.done) break;
+                  got += 1;
+                  if (got === 1) c.abort();
+                }
+              } catch (e) {
+                abortedMid = (e.name === 'AbortError');
+              }
+              return {abortedMidStream: abortedMid, chunksBeforeAbort: got,
+                      elapsedMs: Date.now()-t0};
+            }""")
+
+            vp["abort_controller"] = {"real_abort": ab, "cancel_path": ab2}
+
+            # 等闸门释放（服务端那个被断开的 Agent 要跑完才知道断了）
+            time.sleep(10)
 
             # ---------- 1) token 级增量（运行时）----------
             page.evaluate("""() => {
@@ -346,121 +476,6 @@ def check_browser(base: str) -> dict:
             except Exception:
                 pass
             page.wait_for_timeout(1200)
-
-            # ---------- 2) AbortController + 硬超时 ----------
-            # 【怎么在运行时证明 AbortController 真的在用】
-            # 不去改超时值（那是改配置不是取证）——
-            # 而是**在浏览器里观察**：fetch 被调用时，
-            # 它的 signal 必须是 AbortSignal 实例；
-            # 再手动 abort 一次，断言请求真的被中断。
-            ab = page.evaluate("""async () => {
-              const res = {hasAbortController: typeof AbortController !== 'undefined'};
-              // 找到页面里 Agent 用的 fetch 包装
-              const origFetch = window.fetch;
-              let captured = null;
-              window.fetch = function(...args) {
-                const init = args[1] || {};
-                captured = {hasSignal: !!(init && init.signal),
-                            signalIsAbortSignal: init && init.signal
-                              ? (init.signal.constructor.name === 'AbortSignal') : false,
-                            hasSignalProp: init ? ('signal' in init) : false};
-                return origFetch.apply(this, args);
-              };
-              // 发一条会挂住的请求（mock 端对未命中场景会很快返回，
-              // 所以这里只验证 signal 形态，不等它完成）
-              try {
-                await window.fetch('/api/agent/chat', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({message: '讲一段很长的故事', stream: 1}),
-                  signal: new AbortController().signal,
-                });
-              } catch (e) { res.fetchError = String(e).slice(0, 120); }
-              window.fetch = origFetch;
-              res.captured = captured;
-              return res;
-            }""")
-            # 真 abort：起一个请求，1 秒后 abort，断言它真的中断
-            # 【AbortController 的运行时证明 —— 走**真实用户路径**】
-            #
-            # 【为什么不能只看「fetch 抛 AbortError」】
-            # SSE 的响应头是**立刻**返回的（这是 SSE 的正常语义：
-            # 先把头发出去，再一条条推事件）。
-            # 所以 fetch() 这个 promise 在 abort 之前就 resolve 了 ——
-            # 此时再 abort，fetch 不会抛 AbortError（响应已经拿到了）。
-            # 真正要证明的是：**读流的中途被 abort 能立刻中断**，
-            # 而且 **Agent 自己的取消入口**（页面上的「停止」按钮）
-            # 确实调到了 abort。
-            #
-            # 做法：起一条真实的长流，读到一半 abort；
-            # 再调 Agent 暴露的 _cancelAgentSSE()，断言流真的停了。
-            ab2 = page.evaluate("""async () => {
-              const out = {};
-              // ---- ① 读流中途 abort ----
-              const c = new AbortController();
-              const t0 = Date.now();
-              const p = fetch('/api/agent/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: '__slow__', stream: 1}),
-                signal: c.signal,
-              });
-              const resp = await p;              // 头先到（正常）
-              out.headerArrivedMs = Date.now() - t0;
-              out.contentType = resp.headers.get('content-type');
-              const reader = resp.body.getReader();
-              let got = 0, abortedMid = false;
-              try {
-                while (true) {
-                  const r = await reader.read();
-                  if (r.done) break;
-                  got += 1;
-                  if (got === 1) { c.abort(); }   // 收到第一块就断
-                }
-              } catch (e) {
-                abortedMid = (e.name === 'AbortError');
-                out.abortErrName = e.name;
-              }
-              out.chunksBeforeAbort = got;
-              out.abortedMidStream = abortedMid;
-
-              // ---- ② Agent 自己的取消入口 ----
-              const A = window.AgentUI || {};
-              out.hasCancelFn = typeof A._cancelAgentSSE === 'function';
-              if (out.hasCancelFn) {
-                // 【必须走 Agent 自己的流】
-                // AgentUI.sendStreamNew() 会把 controller 存到模块级
-                // activeSSE，_cancelAgentSSE() 就是 abort 那个。
-                // 自己新建 controller 的话，_cancelAgentSSE 根本碰不到它
-                // —— 那样测的是「我 abort 我自己」，不是「Agent 能被停止」。
-                //
-                // 所以这里**真的从界面发一条**（走 Agent 的 send 路径），
-                // 然后调 _cancelAgentSSE()，断言：
-                //   * 流真的停了（Agent 状态回到非 busy）
-                //   * 界面给出「已断开/取消」提示
-                const s = window.AgentUI.state;
-                s.messages = []; s.streaming = null; s.busy = false;
-                const inp = document.querySelector('#agInput');
-                inp.value = '__slow__';
-                document.querySelector('#agSend').click();
-                await new Promise(r => setTimeout(r, 2500));  // 等流真的开始
-                out.busyBeforeCancel = !!window.AgentUI.state.busy;
-                out.streamingBeforeCancel = !!window.AgentUI.state.streaming;
-                A._cancelAgentSSE('acceptance-test-cancel');
-                await new Promise(r => setTimeout(r, 1500));
-                out.busyAfterCancel = !!window.AgentUI.state.busy;
-                out.streamingAfterCancel = !!window.AgentUI.state.streaming;
-                out.errorTextAfterCancel = (() => {
-                  const m = window.AgentUI.state.messages.slice().reverse()
-                    .find(x => x && x.error);
-                  return m ? String(m.error).slice(0, 160) : '';
-                })();
-                out.cancelStoppedStream = (
-                  out.busyBeforeCancel && !out.busyAfterCancel);
-              }
-              return out;
-            }""")
-            vp["abort_controller"] = {**ab, "real_abort": ab2}
 
             # ---------- 3) 轮询终止条件（运行时读配置）----------
             poll = page.evaluate("""() => {
@@ -582,7 +597,7 @@ def main() -> int:
     #          ② Agent 的取消入口真的让流停了。
     abort_ok = all(
         v["abort_controller"]["real_abort"].get("abortedMidStream")
-        and v["abort_controller"]["real_abort"].get("cancelStoppedStream")
+        and v["abort_controller"]["cancel_path"].get("cancelStoppedStream")
         for v in vp.values())
     poll_ok = all(v["poll_termination"]["maxMs"] and
                    v["poll_termination"]["maxErrors"] and
