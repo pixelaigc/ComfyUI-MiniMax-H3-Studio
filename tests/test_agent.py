@@ -406,16 +406,22 @@ class TestAgentModeOptions(unittest.TestCase):
     def test_video_duration_is_a_range_not_a_fake_allowlist(self):
         """
         视频时长是任意秒数（后端 float(params["duration"])），
-        面板滑块是 5~15。之前硬编码成 [5,10,15]，
+        面板滑块是 2~60。之前硬编码成 [5,10,15]，
         模型据此以为「8 秒不支持」而拒绝执行 —— 凭空造的约束。
+
+        ⚠️ 2026-11-12：上限从 15 放宽到 60（用户实测「15 秒太短，
+        一分钟都行」）。区间必须**从 video_models 取**，不能写死数字 ——
+        写死就会在改区间时漏改这里（上一轮 5~15 就是这么挂的）。
         """
         import asyncio
+        from h3studio import video_models as vm
         ctx = agent_mod.AgentContext(server_module=None, provider={})
         result = asyncio.run(
             agent_mod.TOOLS["list_modes"]["handler"](ctx, {}))
         self.assertNotIn("durations", result,
                          "不该有硬编码时长白名单")
-        self.assertEqual(result["video_duration_range"], [5, 15])
+        self.assertEqual(result["video_duration_range"],
+                         [int(vm.VIDEO_DURATION_MIN), int(vm.VIDEO_DURATION_MAX)])
         self.assertEqual(result["music_duration_range"], [4, 360])
         # 每个模式条目里也不能再有白名单式的 durations
         for entry in result["modes"]:

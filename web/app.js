@@ -2700,6 +2700,35 @@ function modelLabel(job) {
   return steps ? `${label} · ${steps}步` : label;
 }
 
+// 「注意力机制」一行的文案（2026-11-12 新增）。
+//
+// 【为什么要有】用户要求「媒体库/生成库标注所用注意力机制」——
+// 每个视频条目要显示生成时**实际使用的**注意力机制。
+// 文案取**服务端摘要**（job.model_info.attention_label）——
+// 它与面板下拉里的 label 逐字同源（h3studio/job_meta.py 的
+// _attention_label -> video_models.VIDEO_ATTENTION_MODES），
+// 所以不会出现「面板写 Sol-Attn、卡片写 sol」这种对不上的情况。
+//
+// 老任务没有记录注意力机制 -> label 为空 -> **整行不渲染**
+// （不显示「空」，也不编一个）。
+function attentionLabel(job) {
+  const info = jobModelInfo(job);
+  const label = (info && info.attention_label) || "";
+  if (!label) return "";
+  const speed = info.attention_speed_label || "";
+  return speed ? `${label} · ${speed}` : label;
+}
+
+function attentionRowHtml(job) {
+  const text = attentionLabel(job);
+  if (!text) return "";
+  const p = (job && job.params) || {};
+  const note = p.attention === "sol_scheduled"
+    ? "（该机制已下线：实测画面有叠影）" : "";
+  return `<div class="row"><span>注意力</span>`
+    + `<b title="${escapeHtml(text + note)}">${escapeHtml(text + note)}</b></div>`;
+}
+
 // 「LoRA」一行的文案。
 //
 // 【语义 —— 2026-11-12】文生视频面板上有**两个** LoRA 概念：
@@ -3190,7 +3219,8 @@ function jobCard(job) {
       ${resoNote}
       ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
-      ${loraRow}` : ""}`}
+      ${loraRow}
+      ${attentionRowHtml(job)}` : ""}`}
       <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? (info.kind === "audio" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整风格描述与歌词"><span>风格描述</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>`) : ""}
@@ -3321,16 +3351,41 @@ function jobCard(job) {
     clearPromptEnhanced();
     if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
       // 文生视频新面板：还原宽高 / 模型 / 加速 LoRA / 注意力 / 二采
+      //
+      // 【2026-11-12 修 —— 「复用参数」不填分辨率】
+      // 旧实现只回填了 width/height，**没带 size_preset_key**，
+      // 于是 applyConfig() 里的「按宽高反查档位」拿不到基准 ——
+      // 「尺寸预设」下拉停在上一条任务的档位上（实测：宽高显示 1344×768，
+      // 下拉却显示「480p · 864×480」），用户以为分辨率没填上。
+      // 现在：**由宽高反查**出档位 key 一起传下去（唯一真相源仍是
+      // 服务端下发的 size_presets 清单，前端不自己编档位）。
+      const panelState = window.VIDEO_PANEL.state;
+      const reusedWidth = Number(p.width) || 0;
+      const reusedHeight = Number(p.height) || 0;
+      const reusedAspect = p.aspect || panelState.aspect || "16:9";
+      const presets = window.VIDEO_PANEL.options.size_presets || [];
+      const hit = presets.find(pp => pp.aspect === reusedAspect
+        && pp.width === reusedWidth && pp.height === reusedHeight);
       window.VIDEO_PANEL.applyConfig({
         model: p.model_key,
-        aspect: p.aspect || (window.VIDEO_PANEL ? window.VIDEO_PANEL.state.aspect : "16:9"),
+        aspect: reusedAspect,
         width: p.width, height: p.height,
         rawWidth: p.width, rawHeight: p.height,
         custom: true,
+        // 【2026-11-12】档位 key：优先用服务端记录的分辨率反查，
+        // 查不到就留空（applyConfig 会自己按宽高反查）。
+        size_preset_key: hit ? hit.key : "",
         fixed_accel_lora: p.fixed_accel_lora,
         accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
         attention: p.attention,
         twopass: p.twopass,
+        // 【2026-11-12】采样参数也要一起复用（原来没带，
+        // 于是「复用参数」后步数/采样器/调度器/shift 都丢回默认值）。
+        steps: p.steps,
+        sampler: p.sampler,
+        scheduler: p.scheduler,
+        shift_video: p.shift_video,
+        shift_audio: p.shift_audio,
       });
       window.VIDEO_PANEL.render();
       if (p.duration) {

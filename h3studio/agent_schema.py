@@ -46,10 +46,16 @@ from . import workflows as wf
 #:
 #: 为什么从面板约束取而不是从后端取：后端 workflows 里
 #: `float(params.get("duration", 5))` 接受**任意**秒数 —— 后端不拦。
-#: 真正的约束在面板滑块（5~15）。Agent 说「合法时长 5~15」才是对的，
+#: 真正的约束在面板滑块。Agent 说「合法时长 X~Y」才是对的，
 #: 因为用户也只能在面板里选到这个范围。
-VIDEO_DURATION_MIN = 5
-VIDEO_DURATION_MAX = 15
+#:
+#: 【2026-11-12 放宽】上限 15 -> 60。
+#: 用户实测反馈「15 秒太短，一分钟都行，最多 OOM」。
+#: 面板滑块已同步放宽到 2~60（web/index.html 的 #duration），
+#: 服务端上限也是 60（video_models.VIDEO_DURATION_MAX）——
+#: **服务端是唯一真相源**，这里从它取值，避免三处各写一个数字。
+VIDEO_DURATION_MIN = 2
+VIDEO_DURATION_MAX = 60
 
 #: 视频分辨率档位（对应 ComfyUI ResolutionSelector 的 megapixels）。
 #: 来源：workflows.RES_MP
@@ -63,13 +69,24 @@ VIDEO_LORAS = ("none",) + tuple(wf.LORAS.keys())
 #: 【为什么后端不限也要在这里限】
 #: 实测后端 `float(params.get("duration", 5))` **不设上下限** —— 传 40 秒
 #: 也能建出任务。但：
-#:   * 面板滑块只有 5~15 秒（web/index.html），用户没法在面板复现 40 秒的任务；
+#:   * 面板滑块只有 2~60 秒（web/index.html，2026-11-12 放宽），
+#:     用户没法在面板复现超出这个范围的任务；
 #:   * 帧数表达式 `max(5, round(a*24)) + (5 - (max(5, round(a*24)) % 17)) % 17`
-#:     会让长时长产生与用户预期不符的实际时长（偏差 0~0.7s，40 秒时更明显）；
+#:     会让长时长产生与用户预期不符的实际时长（偏差 0~0.7s）；
 #:   * 超长单段的一致性会漂移（模型能力和素材库都没有长镜头先例）。
-#: 所以 Agent 侧按**面板可复现区间**卡 5~15 秒，越界时给拆段替代方案。
-VIDEO_DURATION_HARD_MIN = 5
-VIDEO_DURATION_HARD_MAX = 15
+#: 所以 Agent 侧按**面板可复现区间**卡，越界时给拆段替代方案。
+#:
+#: 【数值来源】从 video_models 取（服务端唯一真相源），
+#: 避免「面板 60 / Agent 15 / 后端 15」三处各写一个数字。
+def _video_duration_bounds() -> tuple[float, float]:
+    try:
+        from . import video_models as vm
+        return float(vm.VIDEO_DURATION_MIN), float(vm.VIDEO_DURATION_MAX)
+    except Exception:
+        return 2.0, 60.0
+
+
+VIDEO_DURATION_HARD_MIN, VIDEO_DURATION_HARD_MAX = _video_duration_bounds()
 
 #: 音乐谱面模式。来源：music_yue2.YUE2_MODES
 def _music_modes() -> tuple:
