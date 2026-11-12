@@ -81,11 +81,19 @@ class TestContinuationFrontend(unittest.TestCase):
         服务端判「可接续」要三件事：t2v 模式 + 非二采 + 潜空间文件在。
         潜空间文件在 ComfyUI 的 output 目录下 —— 测试里造一个假的
         （内容无所谓，服务端只检查文件**存在**）。
+
+        【为什么要参数化 job_id】这个测试类共用**同一个浏览器页面**。
+        某个测试真的提交了任务（会新增卡片）之后，列表会变 —— 后面的
+        测试再按固定 id 找卡片就可能找不到（生成库是分页的）。
+        所以每个测试用**自己的** job_id，互不干扰。
         """
+        return self._seed_continuable_job_as("contfrontend01")
+
+    def _seed_continuable_job_as(self, job_id):
+        """造一条可接续记录（可指定 id —— 见 _seed_continuable_job 的说明）。"""
         import sqlite3
         from h3studio import continuation_service as cs
 
-        job_id = "contfrontend01"
         run_id = cs.chain_run_id(job_id)
         stage = cs.stage_path(run_id, 0)
         stage.parent.mkdir(parents=True, exist_ok=True)
@@ -223,7 +231,7 @@ class TestContinuationFrontend(unittest.TestCase):
         self._goto_jobs()
         has_button = self.page.evaluate("""(jid) => {
           const card = document.querySelector(`.job-card[data-jid="${jid}"]`);
-          if (!card) return None;
+          if (!card) return null;
           return !!card.querySelector('[data-act="continue"]');
         }""", job_id)
         self.assertIsNotNone(has_button, "生成库里没找到二采那条记录")
@@ -305,6 +313,92 @@ class TestContinuationFrontend(unittest.TestCase):
         self.assertEqual(panel["width"], 768, "宽度没回填")
         self.assertEqual(panel["height"], 448, "高度没回填")
         self.assertEqual(panel["steps"], 4, "步数没回填")
+
+    def test_continue_submit_payload_carries_continuation(self):
+        """【2026-11-12 第三轮】正常的接续提交**必须**仍然带 continuation。
+
+        【为什么要有这条】第三轮修「接续 + 复用参数」的混合态时，
+        加了「点复用参数清 context」与「提交前尺寸闸」两道闸。
+        这两道闸有可能**误伤正常路径** —— 例如尺寸闸算错导致
+        正常接续也被拦下、或者清 context 时把正常路径的 continuation
+        一起清了。
+
+        所以这里锁住：点「接续」-> 提交 -> 载荷里**有** continuation
+        且尺寸与来源段一致（闸放行）。
+        """
+        job_id = self._seed_continuable_job_as("contfrontend-submit")
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1500)
+
+        captured = self.page.evaluate("""async () => {
+          const orig = window.fetch;
+          let captured = null;
+          window.fetch = function (url, opts) {
+            if (opts && opts.method === 'POST'
+                && String(url).includes('/api/jobs')
+                && opts.body instanceof FormData) {
+              const raw = opts.body.get('params');
+              if (raw) captured = JSON.parse(raw);
+              // 【关键】**不真的发出去** —— 只看载荷长什么样。
+              // 真的提交会往库里加一条任务，把生成库的分页顶掉
+              // （每页 12 条），后面那些按固定 id 找卡片的测试就会
+              // 找不到自己的卡片 —— 变成**顺序依赖**的假失败。
+              return new Promise(() => {});
+            }
+            return orig.apply(this, arguments);
+          };
+          document.getElementById('prompt').value = 'next segment probe';
+          const btn = document.getElementById('genBtn');
+          if (!btn) { window.fetch = orig; return {noButton: true}; }
+          btn.click();
+          await new Promise(r => setTimeout(r, 1500));
+          window.fetch = orig;
+          return {captured};
+        }""")
+        params = (captured or {}).get("captured") or {}
+        self.assertTrue(params, "没抓到提交载荷（断言会空转）")
+        self.assertIn("continuation", params,
+                        "正常接续的提交载荷里必须有 continuation")
+        self.assertEqual(params.get("width"), 768,
+                         "接续提交的本段尺寸应与来源段一致")
+        self.assertEqual(params.get("height"), 448)
+
+    def test_mismatched_size_is_blocked_before_submit(self):
+        """【2026-11-12 第三轮】尺寸不一致时**提交前**就拦下。
+
+        这条守的是「提交前尺寸闸」：用户在点完接续之后自己改了宽高，
+        点生成时必须被拦下，且**不发出** /api/jobs 请求。
+        """
+        job_id = self._seed_continuable_job_as("contfrontend-mismatch")
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1500)
+
+        result = self.page.evaluate("""async () => {
+          const orig = window.fetch;
+          let posted = 0;
+          window.fetch = function (url, opts) {
+            if (opts && opts.method === 'POST'
+                && String(url).includes('/api/jobs')) posted += 1;
+            return orig.apply(this, arguments);
+          };
+          // 把面板尺寸改成与来源段不同
+          const vp = window.VIDEO_PANEL;
+          vp.state.width = 1024;
+          vp.state.height = 576;
+          document.getElementById('prompt').value = 'mismatched size probe';
+          const btn = document.getElementById('genBtn');
+          if (!btn) { window.fetch = orig; return {noButton: true}; }
+          btn.click();
+          await new Promise(r => setTimeout(r, 2000));
+          window.fetch = orig;
+          return {posted, toast: window.__h3ContinuationToast || ''};
+        }""")
+        self.assertEqual(result.get("posted"), 0,
+                         "尺寸不一致时不该发出 /api/jobs 请求")
+        self.assertIn("分辨率", result.get("toast", ""),
+                      f"拦下时必须给出中文原因，实际: {result.get('toast')!r}")
 
     def test_no_console_errors_after_interactions(self):
         """整套交互跑完，控制台仍然 0 报错。"""
