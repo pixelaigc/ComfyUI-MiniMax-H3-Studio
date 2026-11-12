@@ -109,7 +109,17 @@ class MockLLM(BaseHTTPRequestHandler):
             CAPTURED.append({"scenario": scenario,
                               "stream": bool(payload.get("stream"))})
         turns = SCENARIOS.get(scenario) or []
-        turn_index = sum(1 for m in messages if m.get("role") == "assistant")
+        # 【按 scenario 各自计数】
+        # 同一个 mock 进程服务全部档位，如果按全局 assistant 消息数算
+        # turn_index，第二档开始就一路越界 -> 直接返回「（结束）」，
+        # 于是「慢」场景根本不会慢，取消测试自然测不出来。
+        # 现在按「本 scenario 内已出现几个 assistant 回合」算。
+        turn_index = sum(
+            1 for m in messages
+            if m.get("role") == "assistant"
+            and scenario and scenario in str(m.get("content") or ""))
+        if not scenario:
+            turn_index = sum(1 for m in messages if m.get("role") == "assistant")
         turn = turns[turn_index] if turn_index < len(turns) else {
             "content": "（结束）", "tool_calls": []}
         delay = int(turn.get("__delay_ms") or 0)
@@ -342,6 +352,10 @@ def check_browser(base: str) -> dict:
                 {"width": w, "type": m.type, "text": m.text[:300]}))
             cancel_page.on("pageerror", lambda e, w=width: out["pageErrors"].append(
                 {"width": w, "error": str(e)[:300]}))
+            cancel_net = []
+            cancel_page.on("response", lambda r: cancel_net.append(
+                {"status": r.status, "url": r.url,
+                 "ct": r.headers.get("content-type", "")}))
             cancel_page.goto(base + "/", wait_until="domcontentloaded")
             cancel_page.wait_for_timeout(2500)
             cancel_page.evaluate("() => window.AgentUI && window.AgentUI.show()")
@@ -363,10 +377,57 @@ def check_browser(base: str) -> dict:
               if (!out.hasCancelFn) return out;
               const s = window.AgentUI.state;
               s.messages = []; s.streaming = null; s.busy = false;
+              /* 【关键】必须换成**全新会话**】
+              AgentUI 会从服务端恢复「最近一次会话」，
+              而会话是**存在服务端的 SQLite**里（跨浏览器 context 共享）。
+              于是第二档、第三档的请求带着**上一档的对话历史**发出去，
+              mock 看到 messages 里已有 assistant 回合 -> 直接返回「（结束）」
+              -> 响应瞬间完成 -> busy 一直是 false
+              -> 看着像「取消没生效」，其实是**慢场景根本没慢**。
+              这里显式清掉 sessionId，让服务端新建一个空会话。 */
+              s.sessionId = null;
+              if (window.AgentSessions && window.AgentSessions.state) {
+                window.AgentSessions.state.currentId = null;
+              }
               const inp = document.querySelector('#agInput');
               inp.value = '__slow__';
+              out.sendBtnExists = !!document.querySelector('#agSend');
+              out.inputExists = !!inp;
+              out.sendBtnDisabled = document.querySelector('#agSend')
+                ? document.querySelector('#agSend').disabled : null;
               document.querySelector('#agSend').click();
-              await new Promise(r => setTimeout(r, 3000));
+              /* send() 的第一步会把输入框清空 —— 用它判断 click 是否生效 */
+              await new Promise(r => setTimeout(r, 120));
+              out.inputValueAfterClick = (document.querySelector('#agInput')||{}).value;
+              out.userMsgCount = (window.AgentUI.state.messages||[]).length;
+              /* 每 300ms 采一次，看 busy 到底有没有起来过。
+                 如果全程 false，说明请求被 429 挡下了（并发闸门）
+                 或者根本没发出去 —— 用 samples 区分这两种情况。 */
+              const samples = [];
+              window.__cancelNet = [];
+              for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 300));
+                const st = window.AgentUI.state;
+                const lastMsg = (st.messages||[]).slice().reverse()
+                  .find(x => x && x.role === 'assistant');
+                samples.push({
+                  t: i*300, busy: !!st.busy, streaming: !!st.streaming,
+                  err: (lastMsg && lastMsg.error) || '',
+                });
+                if (st.busy) break;
+              }
+              out.samples = samples;
+              /* 直接打一条裸请求，看服务端返什么（区分「429 闸门」与
+                 「根本没发出去」）—— 只读诊断，不改界面状态。 */
+              try {
+                const probe = await fetch('/api/agent/chat', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({message: '__probe2__'}),
+                });
+                out.probeStatus = probe.status;
+                out.probeBody = (await probe.text()).slice(0, 200);
+              } catch (e) { out.probeError = String(e).slice(0, 120); }
               out.busyBeforeCancel = !!window.AgentUI.state.busy;
               out.streamingBeforeCancel = !!window.AgentUI.state.streaming;
               out.cancelReturned = A._cancelAgentSSE('已停止生成');
@@ -623,7 +684,8 @@ def main() -> int:
     ])
 
     evidence = {"base": base, "recall": recall, "steps": steps,
-                "browser": browser, "verdict": verdict}
+                "browser": browser, "verdict": verdict,
+                "mock_captured": list(CAPTURED)}
     (OUT / "acceptance_a_evidence.json").write_text(
         json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
     print("\n===== A 项运行时判定 =====")
