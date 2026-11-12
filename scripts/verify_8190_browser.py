@@ -146,47 +146,138 @@ def main():
         try:
             page.goto(BASE, wait_until="networkidle", timeout=60000)
             page.wait_for_timeout(2500)
-            card_info = page.evaluate("""async () => {
-              const r = await fetch('/api/jobs?limit=20');
+            # (a) API 层：resolution_info 与请求宽高一致
+            card_info["api"] = page.evaluate("""async () => {
+              const r = await fetch('/api/jobs?page_size=100');
               const j = await r.json();
-              const jobs = j.jobs || j.items || j.records || (Array.isArray(j) ? j : []);
+              const jobs = j.jobs || [];
               const out = [];
-              for (const job of jobs.slice(0, 20)) {
-                const o = job.outputs || [];
-                for (const it of (Array.isArray(o) ? o : [o])) {
-                  if (it && it.width && it.height) {
-                    out.push({
-                      id: job.id, w: it.width, h: it.height,
-                      res: job.resolution_info || null,
-                      params_w: (job.params||{}).width, params_h: (job.params||{}).height,
-                    });
-                  }
+              for (const job of jobs) {
+                const ri = job.resolution_info || {};
+                const p = job.params || {};
+                if (ri.width && ri.height) {
+                  out.push({
+                    id: job.id, mode: job.mode, status: job.status,
+                    res_w: ri.width, res_h: ri.height,
+                    req_w: p.width, req_h: p.height,
+                    tier: ri.tier, label: ri.label,
+                    old_resolution_param: p.resolution,
+                    out_file: (job.outputs && job.outputs[0] && job.outputs[0].file) || null,
+                    out_kind: (job.outputs && job.outputs[0] && job.outputs[0].kind) || null,
+                  });
                 }
               }
-              return {total_jobs: jobs.length, with_pixels: out.slice(0, 10)};
+              return {total_jobs: jobs.length, with_res_info: out.length,
+                      samples: out.slice(0, 8)};
             }""")
-            # 页面上找一张卡片看它显示的分辨率文字
+            # (b) 页面层：卡片上真正显示的分辨率文字
             card_info["card_text_samples"] = page.evaluate("""() => {
-              const cards = Array.from(document.querySelectorAll('.job-card, .card, [class*="job"]'));
-              return cards.slice(0, 8).map(c => {
+              const cards = Array.from(document.querySelectorAll(
+                '.job-card, .job-item, [class*="job"][class*="card"]'));
+              return cards.slice(0, 12).map(c => {
                 const t = (c.innerText || '').replace(/\\s+/g, ' ').trim();
-                return t.slice(0, 160);
-              }).filter(Boolean);
+                const m = t.match(/分辨率[^时模]*?\\s*(\\d+p\\s*·\\s*\\d+×\\d+[^ ]*\\s*·\\s*\\d+:\\d+)?/);
+                return {res: m ? m[0] : null, head: t.slice(0, 110)};
+              }).filter(x => x.res);
             }""")
+            # (c) 旧 bug 标记：卡片上的**档位与实际像素不符**。
+            #     注意：不能对整页 body 计数 —— 「544p」本身是**合法档位**
+            #     （960×544 就是 544p 档，见尺寸预设下拉与图像面板快捷按钮），
+            #     真正的 bug 是「1344×768 的卡片被标成 544p」。
+            #     档位规则与服务端 h3studio/reso_label.py 完全一致：
+            #     **档位名 = 短边像素**（_tier_label: f"{min(w,h)}p"）。
+            card_info["card_544p_wrong"] = page.evaluate("""() => {
+              const cards = Array.from(document.querySelectorAll(
+                '.job-card, .job-item, [class*="job"][class*="card"]'));
+              const bad = [];
+              for (const c of cards) {
+                const t = (c.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!t.includes('分辨率')) continue;
+                const m = t.match(/分辨率\\s*(\\d+)p\\s*·\\s*(\\d+)×(\\d+)/);
+                if (!m) continue;
+                const tier = m[1] + 'p', w = +m[2], h = +m[3];
+                const expect = Math.min(w, h) + 'p';   // 服务端真源规则
+                if (tier !== expect) bad.push({tier, w, h, expect, text: t.slice(0,120)});
+              }
+              return bad;
+            }""")
+            card_info["legacy_544p_hits"] = card_info.get("card_544p_wrong", [])
         except Exception as exc:
             card_info["error"] = str(exc)[:300]
-        # 断言：带像素的卡片，其 resolution_info 的宽高与实际一致
-        consistent = []
-        for it in card_info.get("with_pixels", []):
-            ri = it.get("res")
-            if isinstance(ri, dict) and ri.get("width") and ri.get("height"):
-                consistent.append(
-                    ri["width"] == it["w"] and ri["height"] == it["h"])
-        record("生成库卡片分辨率标签与实际输出一致",
-               bool(consistent) and all(consistent),
-               json.dumps(card_info, ensure_ascii=False)[:900])
+
+        # 断言 A：API 的 resolution_info 与请求宽高逐条一致
+        api = card_info.get("api") or {}
+        mism = [s for s in api.get("samples", [])
+                if s["res_w"] != s["req_w"] or s["res_h"] != s["req_h"]]
+        record("生成库卡片分辨率标签与实际输出一致（API 层）",
+               api.get("with_res_info", 0) > 0 and not mism,
+               "resolution_info 条数=%d, 与请求宽高不一致=%d, 样例=%s" % (
+                   api.get("with_res_info", 0), len(mism),
+                   json.dumps(api.get("samples", [])[:2], ensure_ascii=False)[:500]))
+
+        # 断言 B：页面上卡片显示的分辨率文字与 API 的 tier/pixels 一致
+        card_res = [c["res"] for c in card_info.get("card_text_samples", [])]
+        api_labels = [s["label"] for s in api.get("samples", [])]
+        label_ok = any(lbl and lbl in " ".join(card_res) for lbl in api_labels)
+        record("页面卡片显示的分辨率文字与服务端一致",
+               bool(card_res) and label_ok,
+               "卡片文字样例=%s | 服务端 label 样例=%s" % (
+                   json.dumps(card_res[:3], ensure_ascii=False),
+                   json.dumps(api_labels[:3], ensure_ascii=False)[:300]))
+
+        # 断言 C：卡片上不再出现「档位与实际像素不符」（旧 bug：1344×768 显示 544p）
+        wrong = card_info.get("card_544p_wrong", [])
+        record("生成库卡片无「档位与实际像素不符」的旧 bug",
+               len(wrong) == 0,
+               "错配卡片数=%d, 样例=%s" % (
+                   len(wrong), json.dumps(wrong[:3], ensure_ascii=False)[:400]))
         page.screenshot(path=os.path.join(OUTDIR, "04-gallery-resolution.png"),
                         full_page=True)
+
+        # ---------- 真实产物像素核对（ffprobe / PIL） ----------
+        print("== 检查 4b：真实产物像素 vs 卡片标签 ==")
+        real = []
+        try:
+            import subprocess
+            for s in api.get("samples", []):
+                if not s.get("out_file"):
+                    continue
+                url = "%s/files/%s" % (BASE, s["out_file"])
+                r = subprocess.run(
+                    ["curl", "-s", "-m", "60", "-o", "/tmp/_h3_out.bin", url],
+                    capture_output=True)
+                if r.returncode != 0:
+                    continue
+                dims = None
+                if s.get("out_kind") == "video":
+                    pr = subprocess.run(
+                        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                         "-show_entries", "stream=width,height",
+                         "-of", "csv=p=0", "/tmp/_h3_out.bin"],
+                        capture_output=True, text=True)
+                    if pr.stdout.strip():
+                        w, h = pr.stdout.strip().split(",")[:2]
+                        dims = (int(w), int(h))
+                else:
+                    try:
+                        from PIL import Image
+                        with Image.open("/tmp/_h3_out.bin") as im:
+                            dims = im.size
+                    except Exception:
+                        dims = None
+                if dims:
+                    real.append({"id": s["id"], "file": s["out_file"],
+                                 "actual": list(dims),
+                                 "card": [s["res_w"], s["res_h"]],
+                                 "label": s["label"],
+                                 "match": dims == (s["res_w"], s["res_h"])})
+        except Exception as exc:
+            real.append({"error": str(exc)[:300]})
+        card_info["real_output_pixels"] = real
+        good = [r for r in real if r.get("match")]
+        record("真实产物像素 == 卡片标签像素",
+               bool(good) and len(good) == len([r for r in real if "actual" in r]),
+               json.dumps(real, ensure_ascii=False)[:700])
 
         # ---------- console / pageError ----------
         errors = [c for c in console_log if c["type"] == "error"]
@@ -194,8 +285,20 @@ def main():
                f"errors={len(errors)} sample={json.dumps(errors[:3], ensure_ascii=False)[:400]}")
         record("pageErrors = 0", len(page_errors) == 0,
                f"pageErrors={len(page_errors)} sample={json.dumps(page_errors[:3], ensure_ascii=False)[:400]}")
-        record("失败请求 = 0", len(failed_requests) == 0,
-               f"failed={len(failed_requests)} sample={json.dumps(failed_requests[:3], ensure_ascii=False)[:400]}")
+
+        # 失败请求：**排除视频预加载被浏览器主动中断**（ERR_ABORTED）。
+        # 这是 <video preload> 在页面切换/卸载时正常取消 range 请求，
+        # 不是服务端错误 —— 单独把真失败与预加载中断分开统计。
+        benign_abort = [f for f in failed_requests
+                        if "ERR_ABORTED" in (f.get("err") or "")
+                        and ("/files/" in f.get("url", "")
+                             or f.get("url", "").endswith((".mp4", ".webm", ".wav", ".mp3")))]
+        real_failed = [f for f in failed_requests if f not in benign_abort]
+        record("真失败请求 = 0（排除视频预加载 ERR_ABORTED）",
+               len(real_failed) == 0,
+               "real_failed=%d, benign_abort=%d, 样例=%s" % (
+                   len(real_failed), len(benign_abort),
+                   json.dumps(real_failed[:3], ensure_ascii=False)[:400]))
 
         browser.close()
 
