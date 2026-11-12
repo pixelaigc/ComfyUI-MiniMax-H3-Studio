@@ -289,6 +289,28 @@ console.log(JSON.stringify({{
         self.assertTrue(out["model"])
         self.assertIn("ckpt850", out["lora"])
 
+    def test_image_mode_without_lora_has_no_lora_row(self):
+        """图像模式没加效果 LoRA -> **不渲染** LoRA 行（不显示「空」）。
+
+        图像面板的效果 LoRA 是「有就加、没有就不加」的可选列表，
+        没加是常态 —— 每张图卡都挂一行「LoRA：空」是噪声。
+        「空」只给视频模式（那里加速 LoRA 是一个明确的档位选择）。
+        """
+        info = {"model_key": "z_image_turbo_bf16",
+                "model_label": "Z-Image-Turbo · 官方加速版",
+                "lora_label": "", "lora_strength": None,
+                "fixed_lora_label": "", "fixed_lora_name": ""}
+        job = {"mode": "t2i", "params": {"model": "z_image_turbo_bf16"},
+               "model_info": info}
+        out = _run_node(f"""
+console.log(JSON.stringify({{
+  lora: loraLabel({json.dumps(job)}),
+  row: loraRowHtml(loraLabel({json.dumps(job)})),
+}}));
+""")
+        self.assertEqual(out["lora"], "")
+        self.assertEqual(out["row"], "", "图像卡不该有 LoRA 行")
+
     def test_image_mode_renders_model_and_lora(self):
         """图像模式：模型 + 效果 LoRA 都要显示。"""
         info = {"model_key": "z_image_turbo_bf16",

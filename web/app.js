@@ -2684,8 +2684,8 @@ function modelLabel(job) {
 
 // 「LoRA」一行的文案。
 //
-// 【语义 —— 2026-11-12】面板上有**两个** LoRA 概念：
-//   * 「加速 LoRA」下拉 —— **用户的选择**（可多选/单选，带强度）
+// 【语义 —— 2026-11-12】文生视频面板上有**两个** LoRA 概念：
+//   * 「加速 LoRA」下拉 —— **用户的选择**（单选，带强度）
 //   * 工作流固定的那枚 Turbo LoRA —— 常驻，不在可勾选列表里
 // 所以这一行要同时说清两件事：
 //   1. 用户选的那枚（带强度）；**没选时显示「空」**
@@ -2694,14 +2694,22 @@ function modelLabel(job) {
 //
 // 这样卡片显示与 ComfyUI prompt 里的 LoRA 节点**严格对应**：
 // prompt 里挂了几枚，这里就列几枚。
+//
+// 【为什么「空」只给视频模式】图像面板的「效果 LoRA」本来就是
+// 「有就加、没有就不加」的可选列表，没加是常态 —— 给每张图卡都加一行
+// 「LoRA：空」是噪声。视频面板的加速 LoRA 是一个**明确的档位选择**
+//（面板上有那个下拉），显示「空」才是在回答「用户选了哪档」。
 function loraLabel(job) {
   const info = jobModelInfo(job);
   const parts = [];
+  const mode = (job && job.mode) || "";
+  const isVideo = mode === "t2v" || mode === "flf" || mode === "r2v"
+                  || mode === "longfilm";
   if (info.lora_label) {
     parts.push(info.lora_strength != null
       ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
       : info.lora_label);
-  } else {
+  } else if (isVideo) {
     // 用户没额外选加速 LoRA —— 如实显示「空」（不是留白，也不是编一个名字）
     parts.push("空");
   }
