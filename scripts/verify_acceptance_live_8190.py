@@ -25,8 +25,10 @@ from pathlib import Path
 
 BASE = "http://127.0.0.1:8190"
 OUT_DIR = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/h3-acceptance-live")
-SHOTS = Path("/root/.hermes-web-ui/.ekko/workspace/default/"
-              "person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge")
+#: 截图目录跟证据目录**同源** —— 上一轮复验判过「证据文件不在报告所述路径」，
+#: 根因就是截图目录硬编码在别处、报告里写的又是第三个路径。
+#: 现在统一：证据目录 = OUT_DIR，截图目录 = OUT_DIR/screenshots。
+SHOTS = OUT_DIR / "screenshots"
 WIDTHS = [(375, 812), (390, 844), (1280, 900)]
 
 #: 9 个 API（验收口径：全部 200）
