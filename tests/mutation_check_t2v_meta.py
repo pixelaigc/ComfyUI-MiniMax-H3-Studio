@@ -165,6 +165,10 @@ def main() -> int:
         return 2
 
     failures = []
+    # 变异前的字节快照（用于还原后的逐字节比对）
+    before_bytes = {REPO / rel: (REPO / rel).read_bytes()
+                    for _n, rel, _o, _w, _e in MUTATIONS
+                    if (REPO / rel).exists()}
     for name, rel, old, new, expect in MUTATIONS:
         target = REPO / rel
         # 【按字节读】保持 CRLF 文件的行尾不被 universal newlines 折掉
@@ -203,16 +207,20 @@ def main() -> int:
 
     # 行尾守卫：还原后被测文件的行尾必须与变异前**逐字节一致**
     # （这正是 write_text 会悄悄弄坏 CRLF 文件的地方）
+    #
+    # 【判据】只有仓库 .gitattributes 标了 -text 的文件才必须是 CRLF；
+    # 其余新文件按仓库规则用 LF（见 .gitattributes 的「新文件用 LF」）。
+    # 所以这里比对的是「**还原后 vs 变异前**」的字节内容，而不是绝对断言 CRLF。
     for name, rel, _old, _new, _expect in MUTATIONS:
         target = REPO / rel
-        data = target.read_bytes()
-        bare_lf = data.count(b"\n") - data.count(b"\r\n")
-        if bare_lf:
-            print(f"[BAD] {name}: 还原后 {rel} 有 {bare_lf} 个裸 LF —— 行尾被弄坏了")
-            failures.append((name, f"bare-lf={bare_lf}"))
+        if target not in before_bytes:
+            continue
+        if target.read_bytes() != before_bytes[target]:
+            print(f"[BAD] {name}: 还原后 {rel} 的字节与变异前不一致")
+            failures.append((name, "bytes-changed"))
             break
     else:
-        print("[OK ] 还原后行尾与变异前一致（按字节写回）")
+        print("[OK ] 还原后被测文件与变异前逐字节一致")
 
     if failures:
         print(f"\n变异验证失败 {len(failures)} 项：")
