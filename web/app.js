@@ -2625,12 +2625,25 @@ function localModelInfo(mode, p) {
   // 旧路径视频：model = lora / standard，lora = ckpt850 / v4step600 / none
   if (mode === "t2v" || mode === "flf" || mode === "r2v" || mode === "longfilm") {
     const steps = p.steps || (p.model === "standard" ? 20 : 4);
-    out.model_label = p.model === "standard" ? `标准 H3 · ${steps}步`
-      : (p.model === "lora" ? `H3 + ${p.lora || "ckpt850"} · ${steps}步`
-                            : (p.model || ""));
+    if (p.model === "standard") {
+      out.model_label = `标准 H3 · ${steps}步`;
+    } else if (p.model === "lora") {
+      out.model_label = `H3 + ${p.lora || "ckpt850"} · ${steps}步`;
+    } else if (p.model) {
+      out.model_label = p.model;
+    } else {
+      // 没记录 model -> 工作流走默认档（workflows._h3_video_workflow）
+      const precision = p.precision || "int8";
+      out.model_label = `MiniMax-H3 FL2VA（${precision}，默认档）`;
+      out.model_key = "fl2va";
+    }
     if (p.lora && p.lora !== "none") {
       out.lora_label = p.lora;
       out.lora_strength = Number(p.lora_strength ?? 1);
+    } else if (!p.lora) {
+      // 没记录 lora -> 工作流默认 ckpt850（且确实挂上了）
+      out.lora_label = "ckpt850";
+      out.lora_strength = 1;
     }
     return out;
   }

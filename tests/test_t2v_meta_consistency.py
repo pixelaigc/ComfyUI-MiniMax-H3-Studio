@@ -250,6 +250,45 @@ class TestT2VModelLoraSummary(unittest.TestCase):
         info = job_meta.summarize("t2v", {"model_key": "totally_unknown_key"})
         self.assertEqual(info["model_label"], "totally_unknown_key")
 
+    def test_legacy_job_without_model_shows_workflow_default(self):
+        """老任务没记 model -> 摘要必须反映**工作流实际用的默认权重**。
+
+        【真实场景】内置 Agent 建的老任务常常根本没记 model，
+        工作流走的是自己的默认值（workflows._h3_video_workflow:
+        `lora = params.get("lora", "ckpt850")`、UNET["fl2va"][precision]）。
+        这时摘要不能是空白 —— 用户仍然需要知道实际用了什么。
+        """
+        from h3studio import workflows as wf
+        info = job_meta.summarize("t2v", {"precision": "int8"})
+        self.assertTrue(info["model_label"])
+        self.assertIn("默认档", info["model_label"])
+        self.assertEqual(info["model_unet"],
+                         wf.UNET["fl2va"]["int8"])
+        # 加速 LoRA：工作流默认挂了 ckpt850
+        self.assertEqual(info["lora_label"], "ckpt850")
+        self.assertEqual(info["lora_name"],
+                         wf.LORAS["ckpt850"])
+        self.assertEqual(info["lora_strength"], 1.0)
+
+    def test_legacy_job_with_explicit_none_lora_stays_empty(self):
+        """明确记了 lora=none 的任务，LoRA 仍是空（不被默认值覆盖）。"""
+        info = job_meta.summarize("t2v", {"model": "standard", "lora": "none"})
+        self.assertEqual(info["lora_label"], "")
+
+    def test_image_job_without_model_shows_workflow_default(self):
+        """图像老任务没记 model -> 用该模式工作流的默认底模。"""
+        from h3studio import workflows as wf
+        info = job_meta.summarize("t2i", {})
+        self.assertEqual(info["model_key"], wf.Z_IMAGE_DEFAULT_MODEL)
+        self.assertTrue(info["model_label"])
+
+    def test_music_job_without_checkpoint_shows_default(self):
+        """音乐老任务没记 checkpoint -> 用默认 checkpoint。"""
+        from h3studio import music_yue2
+        info = job_meta.summarize("t2a", {})
+        self.assertEqual(info["model_key"],
+                         music_yue2.YUE2_DEFAULT_CHECKPOINT)
+
 
 class TestFrontendRendersSummary(unittest.TestCase):
     """前端：卡片必须渲染服务端摘要，且有独立的「LoRA」行"""
