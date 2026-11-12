@@ -95,6 +95,13 @@ class BranchTestBase(unittest.TestCase):
                                (job_id,)).fetchone()
         return json.loads(row["params"])["continuation"]
 
+    def _params_of(self, job_id: str) -> dict:
+        """取任务落库的参数（含 continuation）。"""
+        with srv.db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (job_id,)).fetchone()
+        return json.loads(row["params"])
+
     def _write_latent(self, job_id: str, content: bytes = b"latent") -> Path:
         """在**该段自己的目录**里落一份假潜空间。
 
@@ -187,6 +194,45 @@ class TestBranchLatentCoords(BranchTestBase):
         b1 = self._branch(a)
         info = self._info(b1)
         self.assertEqual(info["source_latent_path"], str(latent_a))
+
+    def test_context_carries_the_exact_read_target(self):
+        """接续上下文必须带上「读的是哪一份」的精确路径。
+
+        服务端提交时会**重算**（不信任前端），但上下文里也要带上 ——
+        排查「到底读的是哪一份」时需要它。
+        """
+        a = self._make_job(self._params())
+        latent_a = self._write_latent(a)
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='done' WHERE id=?", (a,))
+        ctx = cs.build_continuation_context("t2v", self._params_of(a), a)
+        self.assertTrue(ctx["ok"], ctx.get("error"))
+        ci = ctx["continuation"]
+        self.assertEqual(ci["source_latent_run_id"], cs.segment_run_id(a))
+        self.assertEqual(ci["source_latent_stage"], 0)
+        self.assertEqual(ci["source_latent_path"], str(latent_a))
+
+    def test_full_video_card_continues_from_its_own_segment(self):
+        """对**完整视频**再点接续 -> 读回的是**那一段自己**的潜空间。
+
+        完整视频与分段视频是同一条任务的两个产物 —— 接力棒只有一个，
+        就是那一段自己的。（无限接续的路径）
+        """
+        a = self._make_job(self._params())
+        latent_a = self._write_latent(a)
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='done', outputs=? WHERE id=?",
+                         (json.dumps([{"kind": "video",
+                                       "file": "videos/full.mp4",
+                                       "is_full": True},
+                                      {"kind": "video",
+                                       "file": "videos/seg.mp4"}]), a,))
+        ctx = cs.build_continuation_context("t2v", self._params_of(a), a)
+        self.assertTrue(ctx["ok"])
+        ci = ctx["continuation"]
+        self.assertEqual(ci["source_latent_run_id"], cs.segment_run_id(a))
+        self.assertEqual(ci["source_latent_path"], str(latent_a))
+        self.assertEqual(ci["stage_index"], 1, "下一段 = 本段 + 1")
 
     def test_front_end_cannot_forge_the_read_target(self):
         """前端伪造坐标也无效 —— 服务端按上游任务记录重算。
@@ -325,12 +371,6 @@ class TestBranchTotals(BranchTestBase):
         self._write_latent(a)
         state = cs.continuation_state("t2v", self._params_of(a), a)
         self.assertEqual(state["total_frames"], 124)
-
-    def _params_of(self, job_id: str) -> dict:
-        with srv.db() as conn:
-            row = conn.execute("SELECT params FROM jobs WHERE id=?",
-                               (job_id,)).fetchone()
-        return json.loads(row["params"])
 
 
 class TestBranchStillWorksForLegacyJobs(BranchTestBase):

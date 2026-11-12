@@ -403,6 +403,14 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
     # 旧任务（上线前）：没有 latent_run_id -> 沿用「链目录 + 链段号」。
     source_run_id, source_latent_stage = cont.latent_coords(info)
 
+    # 接力棒文件的**绝对路径** —— 读回必须精确到这一个文件。
+    # 服务端提交时会用同样的规则重算（不信任前端），但这里也带上，
+    # 便于排查「到底读的是哪一份」。
+    source_path = ""
+    if source_run_id:
+        source_path = str(cont.stage_file_path(comfy_output_dir(), source_run_id,
+                                               source_latent_stage))
+
     continuation_info = {
         "chain_id": state["chain_id"],
         # 下一段 = 本段 + 1（链上的位置，用于拼完整视频）
@@ -413,6 +421,7 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
         # 接力棒的**落盘坐标**（权威：服务端从上游任务记录算出来的）
         "source_latent_run_id": source_run_id,
         "source_latent_stage": source_latent_stage,
+        "source_latent_path": source_path,
         "context_frames": window,
         "anchor_frames": anchor,
         # 累计帧数（用于算拼接后的总长）
