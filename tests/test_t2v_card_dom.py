@@ -78,7 +78,8 @@ def _extract_function(src: str, name: str) -> str:
 
 
 #: 待测的前端函数（必须逐个从 app.js 里抠出来，保证测的是**线上那份代码**）
-FUNCTIONS = ["jobModelInfo", "localModelInfo", "loraRowHtml", "modelLabel", "loraLabel"]
+FUNCTIONS = ["jobModelInfo", "videoOptions", "localModelInfo", "loraRowHtml",
+             "modelLabel", "loraLabel"]
 
 _EXTRA_JS = """
 // ---- app.js 里被测函数依赖的极简替身 ----
@@ -89,7 +90,10 @@ const IMG_OPTIONS = { models: {
 } };
 const MOSS_OPTIONS = { models: {} };
 const QWEN_OPTIONS = { models: {} };
-const VIDEO_OPTIONS = { models: {}, accel_lora_combos: [], fixed_accel_loras: [] };
+// 【重要】这里**刻意不**定义 VIDEO_OPTIONS ——
+// 在真浏览器里 web/video-panel.js 的 `const VIDEO_OPTIONS` 是 **IIFE 内部**的，
+// app.js（另一个 <script>）根本看不到它。
+// 如果这里给它定义一个全局，就等于替被测代码把 bug 遮住了。
 function imgModelLabel(key) {
   const m = IMG_OPTIONS.models[key] || MOSS_OPTIONS.models[key] || QWEN_OPTIONS.models[key];
   return m ? m.label : (key || "—");
@@ -238,9 +242,7 @@ console.log(JSON.stringify({{
         }
         job = {"mode": "t2v", "params": HYBRID_PARAMS}
         out = _run_node(f"""
-VIDEO_OPTIONS.models = {json.dumps(video_options["models"])};
-VIDEO_OPTIONS.accel_lora_combos = {json.dumps(video_options["accel_lora_combos"])};
-VIDEO_OPTIONS.fixed_accel_loras = {json.dumps(video_options["fixed_accel_loras"])};
+window.VIDEO_PANEL = {{ options: {json.dumps(video_options)} }};
 console.log(JSON.stringify({{
   model: modelLabel({json.dumps(job)}),
   lora: loraLabel({json.dumps(job)}),
@@ -249,6 +251,30 @@ console.log(JSON.stringify({{
         self.assertIn("混合版", out["model"])
         self.assertNotIn("ckpt850", out["model"])
         self.assertIn("DMAD 4 步（critic 版）", out["lora"])
+
+    def test_local_fallback_does_not_crash_without_video_panel(self):
+        """本地兜底**不能**依赖全局变量。
+
+        【真实踩过的坑】清单在 web/video-panel.js 里是 IIFE 内部的
+        `const VIDEO_OPTIONS` —— 不是全局。第一版兜底直接写 VIDEO_OPTIONS，
+        在浏览器里抛 ReferenceError，把整个 app.js 带崩
+        （实测症状：生成库的骨架卡片不出现，boot() 把异常静默吞掉）。
+
+        这条断言用**真浏览器**跑不到（app.js 是顶层脚本，异常会中断整个文件），
+        所以这里在 Node 里模拟「全局不存在」的情形：
+        兜底必须**不抛异常**，并返回空摘要而不是崩掉。
+        """
+        job = {"mode": "t2v", "params": HYBRID_PARAMS}
+        out = _run_node(f"""
+// 刻意**不**设置 window.VIDEO_PANEL —— 模拟清单还没加载完的情形
+console.log(JSON.stringify({{
+  model: modelLabel({json.dumps(job)}),
+  lora: loraLabel({json.dumps(job)}),
+}}));
+""")
+        # 关键：不抛异常、且返回可渲染的字符串
+        self.assertIsInstance(out["model"], str)
+        self.assertIsInstance(out["lora"], str)
 
     def test_legacy_task_still_renders(self):
         """老任务（只有遗留字段、没有 model_info）不能变成空白。"""

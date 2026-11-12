@@ -2581,6 +2581,17 @@ function jobModelInfo(job) {
 
 // 本地兜底：与服务端 job_meta.summarize 同语义，但只用前端已有的清单。
 // 只在服务端没下发 model_info 时才会走到。
+//
+// 【坑】清单在 web/video-panel.js 里是 **IIFE 内部的 const VIDEO_OPTIONS**，
+// 不是全局 —— 直接写 VIDEO_OPTIONS 会 ReferenceError，把整个 app.js 带崩
+// （实测表现为「骨架卡片不出现」，因为渲染在 boot() 里被静默吞掉）。
+// 正确入口是 window.VIDEO_PANEL.options（video-panel.js 导出的同一份对象）。
+function videoOptions() {
+  const panel = window.VIDEO_PANEL;
+  return (panel && panel.options) || { models: {}, accel_lora_combos: [],
+                                      fixed_accel_loras: [] };
+}
+
 function localModelInfo(mode, p) {
   const out = {
     model_key: "", model_label: "", model_unet: "",
@@ -2589,14 +2600,11 @@ function localModelInfo(mode, p) {
     source: "local_fallback",
   };
   if (mode === "t2v" && p.model_key) {
-    const m = VIDEO_OPTIONS.models
-      ? Object.values(VIDEO_OPTIONS.models).find(x => x.key === p.model_key)
-      : null;
-    const models = VIDEO_OPTIONS.models || {};
-    const entry = models[p.model_key] || m;
+    const opts = videoOptions();
+    const entry = (opts.models || {})[p.model_key];
     out.model_key = p.model_key;
     out.model_label = entry ? (entry.label || p.model_key) : p.model_key;
-    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    const combos = opts.accel_lora_combos || [];
     for (const item of (p.accel_loras || [])) {
       if (!item || item.enabled === false) continue;
       const combo = combos.find(c => c.key === item.key);
@@ -2606,7 +2614,7 @@ function localModelInfo(mode, p) {
       out.lora_name = combo.name || "";
       break;
     }
-    const fixed = (VIDEO_OPTIONS.fixed_accel_loras || [])
+    const fixed = (opts.fixed_accel_loras || [])
       .find(f => f.key === p.fixed_accel_lora);
     if (fixed) {
       out.fixed_lora_label = fixed.display || "";
