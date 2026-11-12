@@ -1,5 +1,5 @@
 {
-  "base_commit": "7fe724fede4228195fc75fec62ef767514028a2e",
+  "base_commit": "f984206e2280ed464f68a001a66bbfaa30cec19b",
   "mutations": [
     {
       "mutation": "错误提取退回「把 m[0] 当 dict 读」（原始缺陷）",
@@ -42,8 +42,12 @@
       "mutation": "接续不再校验分辨率一致性（混合态的根因）",
       "file": "h3studio/continuation.py",
       "applied": true,
-      "red": 0,
-      "failed_tests": []
+      "red": 3,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestSizeMismatchRule::test_mismatch_is_rejected_with_actionable_chinese",
+        "FAILED tests/test_continuation_mixed_state.py::TestSizeMismatchRule::test_only_width_differs_is_rejected",
+        "FAILED tests/test_continuation_mixed_state.py::TestServerSideGuard::test_guard_delegates_to_protocol_layer"
+      ]
     },
     {
       "mutation": "「复用参数」不再清接续上下文（混合态的根因）",
@@ -67,8 +71,19 @@
       "mutation": "applyConfig 不再归零加速 LoRA（混合态的又一种形态）",
       "file": "web/video-panel.js",
       "applied": true,
-      "red": 0,
-      "failed_tests": []
+      "red": 1,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestFrontendMixedStateContract::test_accel_lora_is_reset_not_merged"
+      ]
+    },
+    {
+      "mutation": "applyConfig 不再区分「显式给了空串」与「没给这个字段」",
+      "file": "web/video-panel.js",
+      "applied": true,
+      "red": 1,
+      "failed_tests": [
+        "FAILED tests/test_continuation_mixed_state.py::TestFrontendMixedStateContract::test_has_new_accel_flag_exists"
+      ]
     },
     {
       "mutation": "toast 退回阻塞式 alert",
@@ -80,8 +95,8 @@
       ]
     }
   ],
-  "all_mutations_caught": false,
+  "all_mutations_caught": true,
   "workspace_restored": true,
   "green_after_restore": true,
-  "verdict_pass": false
+  "verdict_pass": true
 }
