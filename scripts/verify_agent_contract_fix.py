@@ -560,30 +560,99 @@ def run_browser(studio: Studio):
             # 第二个场景的 turn_index 会接着第一个继续 —— 拿到错误的剧本，
             # 于是「澄清」场景跑出来的是「建任务」的剧本。
             # 换会话 = 历史清零 = 每个场景都从 turn 0 开始。
+            #
+            # 【2026-11-12 修正 —— 会话持久化上线后】
+            # 光清 state.sessionId **不够**了：send() 里有一段同步逻辑
+            # （web/agent.js:1252-1260）会把 state.sessionId 从
+            # window.AgentSessions.state.currentId 重新灌回来 ——
+            # 于是请求仍带着旧 session_id，服务端把历史一起喂给模型，
+            # mock 的 turn 游标继续往前走，「澄清」场景永远等不到。
+            #
+            # 正确做法：走**真实的**会话新建入口 AgentSessions.createSession()
+            #（服务端建库 + 落库 + 切 currentId），这样服务端那边
+            # 的 session 是真的空会话，历史为 0。
+            # 失败时退回纯前端清理（至少不会把旧 session_id 发出去）。
             def new_session():
-                page.evaluate("""() => {
-                    const s = window.AgentUI.state;
-                    s.sessionId = '';
-                    s.messages = [];
-                    s.lastResult = null;
-                    s.streaming = null;
-                    window.AgentUI.renderMessages();
+                ok = page.evaluate("""() => {
+                    if (window.AgentSessions && window.AgentSessions.createSession) {
+                      window.AgentSessions.createSession();
+                      return true;
+                    }
+                    return false;
                 }""")
-                page.wait_for_timeout(300)
+                # createSession() 是 async —— 必须等它真的建完
+                # （服务端建库 + loadSessions + 切 currentId），
+                # 否则下一条消息还带着旧 session_id。
+                try:
+                    page.wait_for_function(
+                        """() => {
+                            const s = window.AgentSessions && window.AgentSessions.state;
+                            return !!(s && s.currentId);
+                        }""",
+                        timeout=15000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(600)
+                if not ok:
+                    page.evaluate("""() => {
+                        const s = window.AgentUI.state;
+                        s.sessionId = '';
+                        s.messages = [];
+                        s.lastResult = null;
+                        s.streaming = null;
+                        if (window.AgentSessions && window.AgentSessions.state) {
+                          window.AgentSessions.state.currentId = '';
+                        }
+                        window.AgentUI.renderMessages();
+                    }""")
+                    page.wait_for_timeout(300)
+                else:
+                    # 清掉上一轮残留的界面消息（会话本身已经是新的）
+                    page.evaluate("""() => {
+                        const s = window.AgentUI.state;
+                        s.sessionId = window.AgentSessions.state.currentId;
+                        s.messages = [];
+                        s.lastResult = null;
+                        s.streaming = null;
+                        window.AgentUI.renderMessages();
+                    }""")
+                    page.wait_for_timeout(300)
 
             # ---------- 场景 A：工具链 + 任务卡 ----------
+            # 【2026-11-12 修正】必须**先建一个空会话**再发第一条 ——
+            # 否则会话持久化会把页面加载时恢复出来的历史一起发给模型，
+            # mock 的 turn 游标从 1 起跳（拿不到 turn 0 的 create_job），
+            # 于是「工具卡」永远不出现（实测 nMessages=6 / jobs=[]）。
+            new_session()
             page.fill("#agInput", "生成一张雨夜霓虹街道的图")
             page.click("#agSend")
             # 等这一轮彻底结束（busy 解除）+ 任务卡真的建出来了。
             # 【为什么等 state】折叠容器里的元素 Playwright 不算 visible。
-            page.wait_for_function(
-                """() => {
-                    const s = window.AgentUI && window.AgentUI.state;
-                    if (!s) return false;
-                    const last = s.messages[s.messages.length - 1];
-                    return !!(last && last.jobs && last.jobs.length);
-                }""",
-                timeout=60000)
+            try:
+                page.wait_for_function(
+                    """() => {
+                        const s = window.AgentUI && window.AgentUI.state;
+                        if (!s) return false;
+                        const last = s.messages[s.messages.length - 1];
+                        return !!(last && last.jobs && last.jobs.length);
+                    }""",
+                    timeout=60000)
+            except Exception as exc:
+                # 【诊断】超时时把现场打出来（否则只能看到一句 Timeout）
+                diag = page.evaluate("""() => {
+                  const s = window.AgentUI && window.AgentUI.state;
+                  const last = (s && s.messages[s.messages.length - 1]) || {};
+                  return {busy: s && s.busy, nMessages: s && s.messages.length,
+                          lastRole: last.role, lastContent: (last.content||'').slice(0,200),
+                          lastError: last.error, jobs: last.jobs, steps: last.steps,
+                          tools: last.tools,
+                          sessionId: s && s.sessionId,
+                          currentId: window.AgentSessions && window.AgentSessions.state
+                                     && window.AgentSessions.state.currentId};
+                }""")
+                print("   [场景A 超时诊断] " + json.dumps(diag, ensure_ascii=False)[:1500],
+                      flush=True)
+                raise
             page.wait_for_function(
                 "() => window.AgentUI && !window.AgentUI.state.busy",
                 timeout=60000)

@@ -83,6 +83,25 @@ class TestMusicFlowBrowser(unittest.TestCase):
             "() => localStorage.removeItem('h3studio.musicParams')")
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_timeout(1500)
+        # 【2026-11-12 修正】等 /api/music-options 真的回来再继续。
+        #
+        # 该接口内部要拉 ComfyUI 的 /object_info（实测本机 3.5 秒，
+        # ComfyUI 忙时更久），所以「固定等 1.5 秒」是不够的 ——
+        # 枚举没到，结构化风格的 7 个 <select> 还没渲染，
+        # 于是「展开」按钮点了等于没点（grid 是空的），
+        # 后面 select_option(#musicSF_genre) 永远等不到可见元素。
+        #
+        # 症状随机器负载浮动：ComfyUI 空闲时这条用例能过，
+        # ComfyUI 在跑图时必挂 —— 是**竞态**，不是产品缺陷。
+        try:
+            self.page.wait_for_function(
+                "() => document.querySelectorAll("
+                "'#musicStyleFieldsGrid select').length > 0",
+                timeout=30000)
+        except Exception:
+            # 拿不到枚举也不该让整个用例崩在这里 ——
+            # 让后面那条 select_option 去报更具体的错。
+            pass
 
     # 断点（responsive.css）：≤1100px 参数面板收进底部抽屉
     DRAWER_BP = 1100
