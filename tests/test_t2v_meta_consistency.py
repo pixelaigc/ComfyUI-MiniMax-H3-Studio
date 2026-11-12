@@ -275,6 +275,26 @@ class TestT2VModelLoraSummary(unittest.TestCase):
         info = job_meta.summarize("t2v", {"model": "standard", "lora": "none"})
         self.assertEqual(info["lora_label"], "")
 
+    def test_r2v_default_model_is_ref2va_not_fl2va(self):
+        """r2v 的默认底模是 **Ref2VA**，不是 FL2VA。
+
+        【实测抓到的错】workflows.build_r2v:477 用的是
+        `unet_name: UNET["ref2va"][precision]`，而 t2v/flf 用 UNET["fl2va"]。
+        摘要若不分 mode，r2v 卡片会显示成 FL2VA —— 底模说错，
+        与本次要修的「记录必须反映实际用的权重」同源。
+        """
+        from h3studio import workflows as wf
+        info = job_meta.summarize("r2v", {"precision": "int8"})
+        self.assertEqual(info["model_key"], "ref2va")
+        self.assertEqual(info["model_unet"], wf.UNET["ref2va"]["int8"])
+        self.assertIn("Ref2VA", info["model_label"])
+        self.assertNotIn("FL2VA", info["model_label"])
+        # t2v/flf 仍然是 fl2va
+        for mode in ("t2v", "flf"):
+            other = job_meta.summarize(mode, {"precision": "int8"})
+            self.assertEqual(other["model_key"], "fl2va", mode)
+            self.assertEqual(other["model_unet"], wf.UNET["fl2va"]["int8"], mode)
+
     def test_image_job_without_model_shows_workflow_default(self):
         """图像老任务没记 model -> 用该模式工作流的默认底模。"""
         from h3studio import workflows as wf

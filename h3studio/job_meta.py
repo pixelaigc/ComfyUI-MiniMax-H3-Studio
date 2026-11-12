@@ -195,7 +195,7 @@ def _t2v_summary(params: dict) -> dict:
 # ------------------------------------------------------------------
 # 旧版视频路径（flf / r2v，以及历史 t2v 任务）
 # ------------------------------------------------------------------
-def _legacy_video_summary(params: dict) -> dict:
+def _legacy_video_summary(params: dict, mode: str = "") -> dict:
     """旧路径视频模式的模型 / LoRA 摘要。
 
     旧路径用的是 `model`（"lora" / "standard"）与 `lora`（"ckpt850" /
@@ -207,6 +207,10 @@ def _legacy_video_summary(params: dict) -> dict:
     `lora = params.get("lora", "ckpt850")`、`UNET["fl2va"][precision]`）。
     这时摘要必须反映**实际跑的是哪个默认权重**，而不是显示空白 ——
     否则用户看到「模型 | —」，仍然无法确认用了什么。
+
+    【r2v 的底模不一样】参考生视频走 `UNET["ref2va"]`（不是 fl2va）——
+    workflows.build_r2v:477 `unet_name: UNET["ref2va"][precision]`。
+    所以默认值必须按 mode 区分，否则 r2v 卡片会显示成 FL2VA（错的）。
 
     这些默认值全部取自**工作流源码里的真实常量**，不是编的。
     """
@@ -238,11 +242,16 @@ def _legacy_video_summary(params: dict) -> dict:
         out["model_label"] = model
         out["model_key"] = model
     else:
-        # 【没有记录 model】-> 工作流走默认值：UNET["fl2va"][precision]
+        # 【没有记录 model】-> 工作流走默认值。
+        # 底模按 mode 区分：t2v/flf 用 UNET["fl2va"]，r2v 用 UNET["ref2va"]
+        # （workflows.build_r2v:477 `unet_name: UNET["ref2va"][precision]`）。
         precision = str(params.get("precision") or "int8").strip()
-        unet = wf.UNET.get("fl2va", {}).get(precision) or ""
-        out["model_label"] = f"MiniMax-H3 FL2VA（{precision}，默认档）"
-        out["model_key"] = "fl2va"
+        unet_key = "ref2va" if mode == "r2v" else "fl2va"
+        unet = wf.UNET.get(unet_key, {}).get(precision) or ""
+        out["model_label"] = (f"MiniMax-H3 Ref2VA（{precision}，默认档）"
+                             if unet_key == "ref2va" else
+                             f"MiniMax-H3 FL2VA（{precision}，默认档）")
+        out["model_key"] = unet_key
         out["model_unet"] = unet
 
     if lora == "none":
@@ -396,7 +405,7 @@ def summarize(mode: str, params: dict) -> dict:
     if mode == "t2v" and params.get("model_key"):
         return _t2v_summary(params)
     if mode in ("t2v", "flf", "r2v", "longfilm"):
-        return _legacy_video_summary(params)
+        return _legacy_video_summary(params, mode)
     if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
         return _image_summary(params, mode)
     if mode in ("t2a", "a2a"):
