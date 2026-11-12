@@ -1,0 +1,153 @@
+/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+........................................................................ [ 41%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+........................................................................ [ 58%]
+........................................................................ [ 62%]
+........................................................................ [ 66%]
+........................................................................ [ 71%]
+........................................................................ [ 75%]
+........................................................................ [ 79%]
+...................................................s.................... [ 83%]
+....F................................................................... [ 87%]
+.......................F................................s.s..s.......... [ 92%]
+........................................................................ [ 96%]
+................F...............................................         [100%]
+=================================== FAILURES ===================================
+__________ TestQwenPeEnhanceBrowser.test_dropdown_lists_four_methods ___________
+
+self = <test_qwen_pe_enhance.TestQwenPeEnhanceBrowser testMethod=test_dropdown_lists_four_methods>
+
+    def test_dropdown_lists_four_methods(self):
+        """下拉里同时有：普通增强 / 二次增强 / 视频导演提示词 / 结构化增强 / 官方PE。
+    
+        【为什么断言全表而不是前四项】
+          增强方式注册表会长大（本次新增了「视频导演提示词」）。
+          断言一个写死的 id 列表 = 每加一项就要改一次测试，
+          漏改就会得到一条**假失败**（功能是好的，只是清单变了）。
+          所以这里断言「注册表里的每一项都在下拉里、顺序一致、都有说明」，
+          再单独断言几个关键项的 label。
+        """
+        self.switch_mode("t2i_qwen")
+        self.open_menu()
+        items = self.menu_items()
+        ids = [i["id"] for i in items]
+        # 下拉里的项 = 注册表里的项（顺序一致，一个不多一个不少）
+        self.assertEqual(ids, self.all_method_ids())
+        # 音乐项在图像/视频面板必须禁用（复选框 disabled），
+        # 并在菜单项上写明归属。
+        yue2 = [i for i in items if i["id"] == "yue2_struct"]
+        self.assertTrue(yue2, f"下拉应包含 yue2_struct 项：{ids}")
+        self.assertTrue(yue2[0]["disabled"],
+                        "yue2_struct 在图像/视频面板应禁用（复选框 disabled）")
+        badge = self.page.eval_on_selector(
+            '#enhanceMenu .enhance-menu-item[data-method="yue2_struct"]',
+            "e => (e.querySelector('.enhance-menu-badge')||{}).textContent||''")
+>       self.assertIn("音乐专属", badge,
+                      f"yue2_struct 应写明是音乐专属：{badge!r}")
+E       AssertionError: '音乐专属' not found in 'YuE2 音乐 专属，本面板不可用' : yue2_struct 应写明是音乐专属：'YuE2 音乐 专属，本面板不可用'
+
+tests/test_qwen_pe_enhance.py:372: AssertionError
+___________ TestLoRARegistry.test_scanner_only_returns_z_image_loras ___________
+
+self = <test_studio.TestLoRARegistry testMethod=test_scanner_only_returns_z_image_loras>
+
+    def test_scanner_only_returns_z_image_loras(self):
+        """不能把 285 个 LoRA 全塞进来，只返回 Z-Image 相关的。
+    
+        判据有三条（2026-11-08 扩了一条，2026-11-09 再扩一条）：
+          1. 文件名含 z-image 字样（Z_IMAGE_MARKERS）
+          2. **或** 层结构与 Z-Image 完全对应 —— 实测 `dejpeg_v3.safetensors`
+             文件名毫无 z-image 痕迹，但层结构 100% 命中 Z-Image 底模，
+             实测在 ComfyUI 里 attach 出 180 patches、真实生效。
+             只按文件名过滤会把它整个漏掉（用户根本选不到）。
+          3. **或** 在族专属目录 `z-image-effects/` 下 —— 2026-11-09 接入
+             调研清单的效果 LoRA 时加的：那批文件统一放在这个目录里，
+             目录前缀本身就是族归属的**唯一真相源**
+             （`pytorch_lora_weights.safetensors` 三族同名，靠文件名分不出来）。
+    
+        真正的「不把 285 个都塞进来」由**数量上限**兜底断言。
+        """
+        items = lora_registry.list_z_image_loras()
+        for item in items:
+            lowered = item["name"].lower()
+            by_name = any(m in lowered for m in lora_registry.Z_IMAGE_MARKERS)
+            by_structure = item.get("discovered_by") == "layer_structure"
+            by_effect_dir = item.get("discovered_by") == "effect_dir"
+            self.assertTrue(by_name or by_structure or by_effect_dir,
+                            f"{item['name']} 既不靠文件名也不靠层结构"
+                            "也不靠族目录认定，说明判定条件有漏洞")
+            # 结构兜底找到的，层命中率必须 100%
+            if by_structure and not by_name:
+                self.assertEqual(float(item.get("attention_hit") or 0), 1.0,
+                                 f"{item['name']} 靠层结构认定，注意力命中率必须 100%")
+            # 族目录里的，族归属必须自洽（不能串到别的族）
+            if by_effect_dir:
+                self.assertTrue(item["name"].startswith("z-image-effects/"),
+                                f"{item['name']} 的族目录前缀不对")
+                self.assertEqual(lora_registry.effect_family_of(item["name"]),
+                                 "Z-Image",
+                                 f"{item['name']} 的族判定与所在目录不一致")
+        # 数量兜底：本机总共有 443 个 LoRA，Z-Image 相关的只有个位数。
+        # 2026-11-09 接入通用效果 LoRA 目录后，本族合法条目 35 个；
+        # 2026-11-10 再接入 NSFW 成人向效果类目录 45 个 -> 80 个
+        # （75 个 z-image-effects/ + 4 个既有 + 1 个 z-image/）。
+        # 判据仍然能挡住「把全机 443 个都塞进来」—— 443 >> 120。
+>       self.assertLess(len(items), 120,
+                        f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
+                        "结构兜底的判据放太宽了")
+E       AssertionError: 197 not less than 120 : Z-Image 相关 LoRA 不该有 197 个 —— 结构兜底的判据放太宽了
+
+tests/test_studio.py:74: AssertionError
+____ TestWriteContractDeclaration.test_every_method_declares_write_contract ____
+
+self = <test_yue2_flow_review_fixes.TestWriteContractDeclaration testMethod=test_every_method_declares_write_contract>
+
+    def test_every_method_declares_write_contract(self):
+        """每种增强方式都必须声明 write 契约（text 或 structured）。"""
+        # 取注册表里每个 id 对应的条目块
+        blocks = re.findall(
+            r"\{\s*id:\s*\"([a-z_]+)\",(.*?)\n    \},", self.raw, flags=re.S)
+        self.assertTrue(blocks, "没解析到 ENHANCE_METHODS 条目")
+        missing = []
+        for mid, body in blocks:
+            if "write:" not in body:
+                missing.append(mid)
+>       self.assertEqual(missing, [],
+                         f"这些增强方式没声明 write 契约: {missing}")
+E       AssertionError: Lists differ: ['director'] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       'director'
+E       
+E       - ['director']
+E       + [] : 这些增强方式没声明 write 契约: ['director']
+
+tests/test_yue2_flow_review_fixes.py:76: AssertionError
+=============================== warnings summary ===============================
+tests/test_max_tokens.py:807
+  /root/projects/h3studio-acc-baseline/tests/test_max_tokens.py:807: SyntaxWarning: invalid escape sequence '\-'
+    [A-Za-z][A-Za-z\-]{2,}
+
+tests/test_max_tokens.py:829
+  /root/projects/h3studio-acc-baseline/tests/test_max_tokens.py:829: SyntaxWarning: invalid escape sequence '\d'
+    WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/）
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_qwen_pe_enhance.py::TestQwenPeEnhanceBrowser::test_dropdown_lists_four_methods
+FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras
+FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
+3 failed, 1713 passed, 4 skipped, 2 warnings in 1574.90s (0:26:14)
