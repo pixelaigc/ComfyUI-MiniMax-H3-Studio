@@ -147,6 +147,11 @@ class TestT2VModelLoraSummary(unittest.TestCase):
         self.assertIn("混合版", info["model_label"])
         # 加速 LoRA 必须是用户选的那枚，而不是遗留字段里的 ckpt850
         self.assertEqual(info["lora_label"], "DMAD 4 步（critic 版）")
+        # 遗留字段不能污染「用户选的加速 LoRA」那一项：
+        # 遗留 lora = ckpt850 是**固定**加速 LoRA，不是用户勾选的那枚。
+        self.assertNotEqual(info["lora_label"], "ckpt850")
+        self.assertNotEqual(info["lora_name"],
+                            "minimax_h3_turbo_4step_ema_ckpt850.safetensors")
 
     def test_pure_fl2va_model(self):
         """纯 H3 底模（无混合版）也要正确。"""

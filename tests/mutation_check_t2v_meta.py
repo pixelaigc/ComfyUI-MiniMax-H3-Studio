@@ -23,7 +23,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 PY = "/home/ubuntu/comfyui/venv/bin/python"
-TEST = "tests/test_t2v_meta_consistency.py"
+#: 两个测试文件都要跑 —— 前者测服务端摘要，后者测前端**真实执行**的行为。
+#: 只跑前者会漏掉前端逻辑退化（第一版就是这么漏的：变异跑绿了）。
+TESTS = ["tests/test_t2v_meta_consistency.py", "tests/test_t2v_card_dom.py"]
 
 #: (变异名, 目标文件, 原串, 变异串, 必须变红的 testcase 名)
 MUTATIONS = [
@@ -88,7 +90,7 @@ MUTATIONS = [
         '  const p = (job && job.params) || {};\n'
         "  return localModelInfo(job.mode || \"\", p);\n"
         "}\n",
-        "test_card_reads_model_info_not_legacy_fields",
+        "test_model_row_shows_selected_model_not_legacy_lora",
     ),
     (
         "前端删掉 LoRA 行",
@@ -102,10 +104,11 @@ MUTATIONS = [
         "web/app.js",
         "  const loraRow = loraText\n"
         "    ? `<div class=\"row\"><span>LoRA</span><b title=\"${escapeHtml(loraText)}\">"
-        "${escapeHtml(loraText)}</b></div>\"\n"
+        "${escapeHtml(loraText)}</b></div>`\n"
         "    : \"\";\n",
-        "  const loraRow = `<div class=\"row\"><span>LoRA</span><b>${escapeHtml(loraText)}</b></div>`;\n",
-        "test_lora_row_omitted_when_empty",
+        "  const loraRow = `<div class=\"row\"><span>LoRA</span>"
+        "<b>${escapeHtml(loraText)}</b></div>`;\n",
+        "test_no_accel_lora_means_no_lora_row",
     ),
     (
         "前端提交层又把遗留 lora 写回所有模式",
@@ -116,14 +119,21 @@ MUTATIONS = [
         "  }\n",
         '  params.lora = state.model === "lora" ? state.lora : "none";\n'
         "  params.lora_strength = state.loraStrength;\n",
-        "test_frontend_does_not_write_legacy_lora_for_all_modes",
+        "test_legacy_lora_only_in_flf_r2v_branch",
+    ),
+    (
+        "前端本地兜底退回读遗留字段（model_key 被忽略）",
+        "web/app.js",
+        '  if (mode === "t2v" && p.model_key) {\n',
+        '  if (mode === "t2v" && p.model) {\n',
+        "test_falls_back_to_local_summary_when_server_silent",
     ),
 ]
 
 
 def run_tests(repo: Path) -> tuple[int, str]:
     proc = subprocess.run(
-        [PY, "-m", "pytest", TEST, "-q", "--no-header", "-p", "no:cacheprovider"],
+        [PY, "-m", "pytest", *TESTS, "-q", "--no-header", "-p", "no:cacheprovider"],
         cwd=str(repo), capture_output=True, text=True, timeout=600)
     return proc.returncode, proc.stdout + proc.stderr
 
