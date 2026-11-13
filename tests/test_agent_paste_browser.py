@@ -98,6 +98,34 @@ class TestPasteStaticContract(unittest.TestCase):
         self.assertIn("Ctrl+V", self.index_html,
                       "界面没告诉用户可以粘贴媒体")
 
+    def test_no_stray_block_comment_delimiters(self):
+        """
+        【防回归 —— 2026-11-14 实测踩过的大坑】
+
+        JS 注释里出现块注释的开闭定界符（斜杠 + 星号）会让引擎
+        把它当成**块注释开始**，把后面几百行代码全吞掉：
+        语法完全合法、浏览器**不报错**、页面能加载 ——
+        但所有函数定义都消失了（逻辑全哑）。
+
+        本文件原来有一行注释写了 MIME 通配符（image 斜杠 星号），
+        那个定界符吞掉了后半份 agent.js，
+        是 tests/test_agent_legacy_fixes.py 抓到的。
+
+        这里直接锁死：**注释里不许出现块注释定界符**。
+        """
+        opens = self.agent_js.count("/*")
+        closes = self.agent_js.count("*/")
+        self.assertEqual(opens, closes,
+                         f"agent.js 里块注释定界符不配对：/* = {opens}, "
+                         f"*/ = {closes} —— 注释里出现了定界符，"
+                         f"会把后面的代码全吞掉")
+        # 反向抽查：真实的块注释应该是成对且**有内容**的
+        import re
+        for match in re.finditer(r"/\*(.*?)\*/", self.agent_js, re.S):
+            body = match.group(1)
+            self.assertTrue(body.strip(),
+                            "agent.js 里有空块注释 —— 可能是定界符写错位了")
+
     def test_paste_accepts_audio_and_video_not_only_images(self):
         """
         粘贴必须支持**音视频**，不能只支持图片。
