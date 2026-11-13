@@ -280,6 +280,35 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
     if source_path is None:
         raise LibraryError(f"找不到生成结果文件：{relative}", status=404)
 
+    # ------------------------------------------------------------------
+    # LoRA 元数据（2026-11-13 修 —— 白名单语义）
+    # ------------------------------------------------------------------
+    #
+    # 【为什么不能直接抄 params】
+    # 用户 2026-11-13 实测报出：素材库条目的「LoRA」显示的根本不是该条目
+    # 用过的 LoRA —— 甚至是一段提示词
+    # （"integrated_multimodal_description: [Shot 1] ..."）。
+    #
+    # 根因有两处：
+    #   1. 落库端：agent_schema 的 LoRA 校验对图像/音乐模式是**空转**的
+    #      （mode_loras() 返回空列表 -> `if allowed and ...` 整个分支跳过），
+    #      所以 Agent 误填的提示词能进 params["lora"]；
+    #   2. 入库端：这里原本 `params.get("lora")` **原文**照抄进 source_meta，
+    #      前端素材抽屉把 source_meta 的每个键都原样印出来 ——
+    #      于是提示词被印在「lora」那一行。
+    #
+    # 修法：**按字段语义白名单取值**。
+    #   * 「这个模式的工作流真的会读 params.lora」吗？
+    #     - 视频（t2v / flf / r2v / longfilm）：读，且值必须是真实 LoRA key；
+    #     - 图像 / 音乐：工作流根本不读这个字段（图像读 params["loras"]，
+    #       音乐没有 LoRA 概念）-> 一律视为「没有 LoRA」。
+    #   * 值本身还要过 job_meta.is_real_lora_key() 白名单，
+    #     不在真实清单里的（提示词、乱填）一律当「没有」。
+    #
+    # 【与落库端共用同一份判定】
+    # 落库端（server.prepare_job_params）与显示端（这里）必须用**同一个**
+    # job_meta 白名单函数 —— 各写一套必然漂移，这正是本缺陷的成因。
+    lora_value = job_meta.resolve_job_lora(job.get("mode") or "", params)
     meta = {
         "job_id": job.get("id"),
         "job_mode": job.get("mode"),
@@ -290,8 +319,10 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
         "aspect": params.get("aspect"),
         "duration": params.get("duration"),
         "steps": params.get("steps"),
-        "lora": params.get("lora"),
-        "loras": params.get("loras"),
+        # 【2026-11-13】LoRA 两个字段统一由 job_meta.resolve_job_lora 判定，
+        # 不再原文照抄 params —— 否则提示词会被当成 LoRA 印出来。
+        "lora": lora_value["lora"],
+        "loras": lora_value["loras"],
         "negative_prompt": params.get("negative_prompt"),
         "sampler": params.get("sampler"),
         "scheduler": params.get("scheduler"),

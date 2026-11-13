@@ -2586,13 +2586,51 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     #
     # 读取侧还有第二道闸（job_meta._is_valid_legacy_lora_key），
     # 负责把**已经落库**的脏值在显示层挡掉 —— 两道闸互补。
-    if mode in ("t2v", "flf", "r2v", "longfilm"):
-        raw_lora = params.get("lora")
-        if raw_lora is not None:
-            raw_lora = str(raw_lora).strip()
-            if raw_lora and raw_lora != "none" and raw_lora not in H3_VIDEO_LORAS:
-                params.pop("lora", None)
-                params.pop("lora_strength", None)
+    #
+    # 【2026-11-13 修 —— 闸门扩到**全部生成模式**】
+    # 原实现只对视频模式（t2v / flf / r2v / longfilm）做白名单，
+    # 于是 **图像 / 音乐模式完全裸奔**：
+    #   * t2i / t2i_qwen / t2i_moss / t2a / a2a 的 `params["lora"]`
+    #     原样落库（实测落库值 = "integrated_multimodal_description: [Shot 1] ..."）；
+    #   * 素材库入库又把 params.lora 原文写进 source_meta -> 抽屉里原样印出来。
+    # 现在改成**按模式语义**统一处理：
+    #   * 该模式的工作流**真的读** params["lora"]（视频旧路径）
+    #     -> 值必须过白名单，否则丢弃；
+    #   * 该模式**不读**这个字段（图像 / 音乐）
+    #     -> 传了就是误填（提示词塞进了 lora 字段），一律丢弃。
+    # 【为什么丢弃而不是报错】
+    # 历史任务里已经躺着这类脏值；报错会让老任务无法复用，
+    # 而丢弃是「当作没传」——工作流走自己的默认档，行为可预期。
+    raw_lora = params.get("lora")
+    if raw_lora is not None:
+        safe_lora = job_meta.sanitize_legacy_lora_value(raw_lora)
+        if not safe_lora:
+            params.pop("lora", None)
+            params.pop("lora_strength", None)
+        elif safe_lora != str(raw_lora).strip():
+            params["lora"] = safe_lora
+
+    # 【2026-11-13 修 —— `params["loras"]` 数组同样要过白名单】
+    # 图像模式的 LoRA 入口是 `params["loras"]`（[{name, strength, trigger}]）。
+    # 它的 `name` 同样**没有落库校验** —— Agent 把提示词字段名塞进去时，
+    # 卡片 LoRA 行会显示整段提示词。
+    # 这里按「本机真实 LoRA 清单」逐项过滤：
+    #   * 不在清单里的（提示词 / 乱填）-> 整项丢掉；
+    #   * 清单里的 -> 原样保留（strength / trigger 都不动）。
+    raw_loras = params.get("loras")
+    if isinstance(raw_loras, list) and raw_loras:
+        kept = []
+        for item in raw_loras:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not job_meta.is_real_lora_key(name):
+                continue
+            kept.append(item)
+        if kept:
+            params["loras"] = kept
+        else:
+            params.pop("loras", None)
 
     if mode in ("flf", "r2v"):
         # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致**，
