@@ -1,7 +1,7 @@
 # ── 本地运行数据（任务库 / 成片 / 上传素材）────────────────────────
 data/
 data-dev/
-data-accept/
+data-live/
 outputs/
 *.db
 *.sqlite
@@ -79,3 +79,4 @@ Thumbs.db
 # 本轮本地验证用的独立实例配置（8198 端口，不影响线上 8190）
 /config.json
 /data/
+data-accept/
