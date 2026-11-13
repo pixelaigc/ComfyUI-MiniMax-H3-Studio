@@ -2985,18 +2985,41 @@ async def api_continuation_state(request):
     【为什么要先刷新节点清单】节点清单是**懒加载**的（只有
     /api/video-options 被调过才有值）。这里主动刷一次，
     否则刚启动时前端会拿到空清单 -> 误判「功能不可用」。
+
+    【⚠ 「探测不完整」不等于「节点缺失」—— 2026-11-13 修】
+    ComfyUI 被生成任务占满时，`/object_info/<节点>` 会**超时**。
+    超时说明「**没问到**」，不说明「**确实不在**」。
+    旧实现把两者都当成「不在」-> 明明节点都在，却报
+    「缺节点，接续功能不可用」-> 整个接续功能**在用户眼前消失**
+    （实测：全量回归期间并行跑 GPU 生成时必现，单独跑又通过）。
+
+    现在分三态：
+      * 节点确实不在 -> available=false + 明确列出缺哪些；
+      * 探测**没问全**（超时/异常）-> available=**true**（不阻断
+        功能）+ `probe_complete=false` + 说明「本机状态未探全」。
+      * 全部问到 -> available 按实际。
     """
     await refresh_comfy_node_names(force=True)
-    have = {name: name in _COMFY_NODE_NAMES
-            for name in ("H3RelayLatentSave", "H3RelayLatentLoad",
-                         "H3RelayCopyBridge", "H3RelayTrimAV")}
+    relay_nodes = ("H3RelayLatentSave", "H3RelayLatentLoad",
+                   "H3RelayCopyBridge", "H3RelayTrimAV")
+    have = {name: name in _COMFY_NODE_NAMES for name in relay_nodes}
+    # 「探测问全了」= 每个节点都问到了 -> 答案可信，可以断言「缺节点」。
+    probe_complete = _COMFY_PROBE_COMPLETE
     available = all(have.values())
     reason = ""
     if not available:
         missing = [name for name, ok in have.items() if not ok]
-        reason = ("本机 ComfyUI 里缺少接续所需的节点：" + "、".join(missing)
-                  + "（ComfyUI-H3-Relay-Kit）—— 接续功能不可用。")
-    return json_ok({"available": available, "nodes": have, "reason": reason})
+        if not probe_complete:
+            # 没问全 -> **不能**断言「缺节点」。
+            available = True
+            reason = ("本机 ComfyUI 暂时无响应，接续节点状态未探全 —— "
+                      "接续功能按可用处理。若确实未安装 Relay-Kit，"
+                      "点接续时会给出明确报错。")
+        else:
+            reason = ("本机 ComfyUI 里缺少接续所需的节点：" + "、".join(missing)
+                      + "（ComfyUI-H3-Relay-Kit）—— 接续功能不可用。")
+    return json_ok({"available": available, "nodes": have, "reason": reason,
+                    "probe_complete": probe_complete})
 
 
 async def api_cancel(request):
@@ -3064,6 +3087,14 @@ async def api_delete(request):
 #   面板只关心 6 个节点，按名单问就是 6 次 1 ms。
 _COMFY_NODE_NAMES: set[str] = set()
 _COMFY_NODES_TS = 0.0
+#: 上一次探测**是否问全**（True = 每个节点都问到了，答案可信）。
+#:
+#: 【为什么需要它】ComfyUI 被生成任务占满时 `/object_info/<节点>` 会超时。
+#: 超时 = 「**没问到**」，不等于「**确实不在**」。
+#: 没有这个标志的话，能力探测会把「ComfyUI 忙」误判成「Relay-Kit 没装」
+#: -> 整个接续功能在用户眼前消失（且不报错）。
+#: 详见 refresh_comfy_node_names 与 api_continuation_state。
+_COMFY_PROBE_COMPLETE = False
 
 # 面板关心的节点名（video_models.VIDEO_ATTENTION_MODES 里用到的 +
 # SelfLift 二采）。加新注意力机制时同步加到这里。
@@ -3120,17 +3151,33 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
         return _COMFY_NODE_NAMES
 
     async def _probe(s, name):
+        """问一次节点在不在。
+
+        返回三态而不是布尔 —— **「问不到」和「确实不在」是两回事**：
+          * name      —— 问到了，且这个节点在；
+          * None      —— 问到了，HTTP 200 但响应里没这个节点 -> 确实不在；
+          * "TIMEOUT" —— **没问到**（超时/连接错/响应坏）。
+
+        把「没问到」当成「不在」会让能力探测在 ComfyUI 忙的时候
+        假阴性 —— 明明节点都在，却报「缺节点，接续功能不可用」。
+        （实测：ComfyUI 被生成任务占满时，3 秒超时打满 -> 探测全空。）
+        """
         try:
             async with s.get(f"{COMFY}/object_info/{name}") as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     if isinstance(data, dict) and name in data:
                         return name
+                    return None          # 问到了 -> 确实不在
+                # 非 200：算「没问到」（服务异常），不当成「不在」
+                return "TIMEOUT"
         except Exception:
-            return None
-        return None
+            return "TIMEOUT"
+        return "TIMEOUT"
 
     found: set[str] = set()
+    unknown = False
+    asked = 0
     try:
         timeout = ClientTimeout(total=3)
         if session is None:
@@ -3140,9 +3187,22 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
         else:
             names = await asyncio.gather(*[_probe(session, n)
                                             for n in _VIDEO_PANEL_NODES])
-        found = {n for n in names if n}
+        found = {n for n in names if n and n != "TIMEOUT"}
+        unknown = any(n == "TIMEOUT" for n in names)
+        # 「问到了」的个数（不管在不在）—— 与 found 分开：
+        #   found  = 「在」的节点
+        #   asked  = 「问到了」的节点（在 + 确实不在）
+        asked = sum(1 for n in names if n != "TIMEOUT")
     except Exception:
         found = set()
+        unknown = True
+        asked = 0
+
+    # 【本轮修】记录「本次探测是否问全」——
+    # 这是区分「节点确实不在」与「没问到」的唯一依据。
+    # 只有「问全了」才允许据此断言「缺节点」。
+    global _COMFY_PROBE_COMPLETE
+    _COMFY_PROBE_COMPLETE = (not unknown) and asked >= len(_VIDEO_PANEL_NODES)
 
     if found:
         # 只有真问到东西才更新缓存 —— 全挂时保留上一次的（可能还有效）
@@ -3151,6 +3211,13 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     elif not _COMFY_NODE_NAMES:
         # 从来没成功过：记时间戳，避免每个请求都去撞一遍 3 秒超时
         _COMFY_NODES_TS = now
+    # 【本轮修】探测**不完整**（部分节点没问到）时，**不要**用残缺
+    # 的结果去断言「节点缺失」—— 那是假阴性。
+    #   做法：本次不更新缓存（保留上一次的完整结果），并把
+    #   「本次探测不完整」标记下来，让调用方知道「没问全」。
+    elif unknown:
+        # 保留 _COMFY_NODE_NAMES 原样（可能是空集 = 从没成功过）
+        pass
     return _COMFY_NODE_NAMES
 
 
