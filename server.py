@@ -548,7 +548,7 @@ async def comfy_submit(session: ClientSession, workflow: dict, client_id: str | 
     return body["prompt_id"]
 
 
-def _comfy_error_message(status_info: dict) -> str:
+def _comfy_error_message(status_info) -> str:
     """把 ComfyUI 的执行错误变成**给用户看的中文原因**。
 
     【为什么需要这个包装 —— 2026-11-12 独立复验发现的缺陷】
@@ -561,15 +561,99 @@ def _comfy_error_message(status_info: dict) -> str:
     真正的原因（例：拷贝桥禁止跨分辨率）**被彻底丢掉**，用户只看到
     一句 `'str' object has no attribute 'get'`。
 
+    【2026-11-13 补】本函数**对类型免疫**：
+      * `status_info` 传进来是 str / None / list 也不崩 ——
+        走「未取到具体原因」的兜底文案；
+      * 兜底文案里**不出现**原始 Python 异常文本。
+
     提取与中文化逻辑放在 h3studio/comfy_errors.py（纯函数，可离线测）。
     本函数只负责：**取中文原因 + 把技术细节打进服务端日志**。
     """
-    described = comfy_errors.extract_error(status_info)
+    try:
+        described = comfy_errors.extract_error(status_info)
+    except Exception as exc:
+        # 提取过程本身出错（形状超预期）-> 也不能把异常文本给用户。
+        print(f"[worker] ComfyUI 错误提取失败: {exc!r}")
+        return comfy_errors.UNPARSED_ERROR_REASON
     if not described.get("found"):
-        return "ComfyUI 执行出错（未取到具体原因，详细信息见服务端日志）。"
+        return comfy_errors.UNPARSED_ERROR_REASON
     # 技术细节只进日志，不进用户可见文案。
     print(f"[worker] ComfyUI 错误详情: {described.get('detail', '')}")
     return str(described.get("reason") or "ComfyUI 执行出错。")
+
+
+#: 兜底失败文案（用户可见）。
+#:
+#: 【为什么统一成一句话】用户遇到「生成失败」时需要知道的是
+#: **下一步做什么**，而不是一串 Python 异常。不同异常的根因差别很大，
+#: 但对用户而言可执行的动作是一样的：**看服务端日志 / 调整参数重试**。
+_GENERIC_FAILURE_REASON = ("生成失败（服务端未能给出具体原因）。"
+                            "请稍后重试；若反复失败，请查看服务端日志，"
+                            "或改用「复用参数」重新生成一段。")
+
+
+def _history_status(hist) -> tuple[dict, bool]:
+    """从一条 ComfyUI history 条目里取出 `(status_info, 是否执行失败)`。
+
+    【为什么抽成函数 —— 2026-11-13】
+    这个判断原本**内联**在 worker 的轮询循环里。它一旦被改回
+    `hist.get("status") or {}` + `status_info.get("status_str")`，
+    就只有「真跑一次 ComfyUI」才能发现（而且是在**失败路径**上，
+    平时根本走不到）。
+
+    抽成独立函数后：
+      * 单元测试可以直接喂各种畸形 history（status 是 str / None /
+        list / 缺字段）并断言「不抛异常」；
+      * worker 里只剩一行调用，类型判断**只此一处**。
+
+    【口径】
+      * `status` 不是 dict -> status_info 取空 dict（不抛）；
+      * `status_str == "error"` -> 判定为执行失败。
+    """
+    status_info = comfy_errors.coerce_status_info(
+        (hist or {}).get("status") if isinstance(hist, dict) else None)
+    return status_info, comfy_errors.status_is_error(status_info)
+
+
+def _user_facing_error(exc: BaseException | str) -> str:
+    """把任意异常变成**给用户看的中文文案**（不泄露原始 Python 异常文本）。
+
+    【为什么需要 —— 2026-11-13 修】
+
+    worker 的兜底是 `except Exception as e: ... (str(e)[:800], ...)` ——
+    把**原始异常文本**直接写进 `jobs.error`，前端又原样显示。
+    于是用户看到的是：
+
+        'str' object has no attribute 'get'
+        ValueError: ...
+
+    这类文本对用户**零信息量** —— 它是本项目的 bug，不是用户能修的东西。
+    用户真正需要知道的是「**发生了什么、接下来怎么办**」。
+
+    【本函数的口径】
+      * 已经是 RuntimeError 且带中文原因（来自 _comfy_error_message）
+        -> 原样保留（那是**已经中文化过**的原因）；
+      * 其余异常 -> 归类成一句可读中文 + 给出可执行建议；
+      * 原始异常文本**只进服务端日志**，不进用户文案。
+
+    【为什么不吞掉信息】技术细节（异常类型 + 原文）照样写日志，
+    只是不再摆到用户脸上 —— 需要排查时看日志即可。
+    """
+    text = str(exc).strip()
+    # 已经中文化过的原因（RuntimeError 里带中文标点/中文词）-> 直接用。
+    if isinstance(exc, RuntimeError) and text and _looks_chinese(text):
+        return text[:800]
+    # 空异常 -> 通用文案
+    if not text:
+        return _GENERIC_FAILURE_REASON
+    # 原始异常文本 -> 进日志，返回可读中文
+    print(f"[worker] 原始异常（仅日志）: {type(exc).__name__}: {text[:800]}")
+    return _GENERIC_FAILURE_REASON
+
+
+def _looks_chinese(text: str) -> bool:
+    """文本里有没有中文（用来判断「是不是已经中文化过的原因」）。"""
+    return any("\u4e00" <= ch <= "\u9fff" for ch in text)
 
 
 def _extract_outputs(history_entry):
@@ -1131,7 +1215,13 @@ class Worker:
 
                         hist = await comfy_history(session, prompt_id)
                         if hist:
-                            status_info = hist.get("status") or {}
+                            # 【2026-11-13 修】`status` 的类型**不保证**是 dict
+                            # （可能是 None / 字符串）。直接 `.get()` 会在
+                            # str 上抛 AttributeError —— 而这恰恰发生在
+                            # 「把失败原因翻译给用户」的错误处理路径上，
+                            # 结果用户只看到一句 Python 异常文本。
+                            # 详见 comfy_errors.coerce_status_info。
+                            status_info, is_error = _history_status(hist)
                             if hist.get("outputs"):
                                 outs = _extract_outputs(hist)
                                 saved = []
@@ -1156,7 +1246,7 @@ class Worker:
                                         (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
                                 print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
                                 return
-                            if status_info.get("status_str") == "error":
+                            if is_error:
                                 raise RuntimeError(_comfy_error_message(status_info))
                 finally:
                     ws_task.cancel()
@@ -1168,9 +1258,13 @@ class Worker:
             raise
         except Exception as e:
             print(f"[worker] 任务 {job_id} 失败: {e}")
+            # 【2026-11-13 修】**不要**把原始 Python 异常文本写进
+            # jobs.error —— 前端会原样显示给用户。
+            # 走 _user_facing_error：已中文化的 ComfyUI 原因保留，
+            # 其余归类成可读中文（技术细节只进上面的日志）。
             with db() as conn:
                 conn.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=? AND status='running'",
-                             (str(e)[:800], time.time(), job_id))
+                             (_user_facing_error(e), time.time(), job_id))
         finally:
             if self.current == job_id:
                 self.current = None
@@ -1306,10 +1400,11 @@ class Worker:
                 raise
             except Exception as e:
                 print(f"[worker] 批次 {batch_id} 失败: {e}")
+                # 【2026-11-13 修】同 worker 兜底：不写原始异常文本。
                 with db() as conn:
                     conn.execute(
                         "UPDATE job_batches SET status='failed', error=?, finished_at=? WHERE id=?",
-                        (str(e)[:800], time.time(), batch_id))
+                        (_user_facing_error(e), time.time(), batch_id))
             # 更新任务级进度
             with db() as conn:
                 conn.execute(
@@ -1392,8 +1487,9 @@ class Worker:
                                 saved.append({"kind": item["kind"], "file": fname,
                                               "name": item["filename"]})
                             return saved
-                        status_info = hist.get("status") or {}
-                        if status_info.get("status_str") == "error":
+                        # 【2026-11-13 修】同上文：status 类型免疫。
+                        status_info, is_error = _history_status(hist)
+                        if is_error:
                             raise RuntimeError(_comfy_error_message(status_info))
             finally:
                 ws_task.cancel()
@@ -2803,8 +2899,9 @@ async def run_longfilm(job_id: str):
         if output_path and output_path.exists():
             output_path.unlink()
         with db() as conn:
+            # 【2026-11-13 修】同 worker 兜底：不写原始异常文本。
             conn.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=? AND status IN ('queued','running')",
-                         (str(exc)[:1200], time.time(), job_id))
+                         (_user_facing_error(exc), time.time(), job_id))
     finally:
         LONGFILM_PROCESSES.pop(job_id, None)
         if list_path and list_path.exists():

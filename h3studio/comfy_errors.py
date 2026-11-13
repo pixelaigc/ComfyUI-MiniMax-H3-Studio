@@ -87,6 +87,20 @@ EVENT_EXECUTION_ERROR = "execution_error"
 #: 执行中断的事件名（用户主动取消 / 中断）。
 EVENT_EXECUTION_INTERRUPTED = "execution_interrupted"
 
+#: 取不到具体原因时给用户看的**兜底中文文案**。
+#:
+#: 【为什么是常量而不是各写各的】这条文案会出现在两处：
+#:   * `comfy_errors.extract_error` 找不到错误时；
+#:   * `server._comfy_error_message` 提取过程自身抛异常时。
+#: 两处必须**说同一句话** —— 否则用户会看到两种口径的「失败了但不知道
+#: 为什么」，无法判断是同一个问题。
+#:
+#: 【⚠ 这里绝不能出现原始 Python 异常文本】
+#: 用户看到 `'str' object has no attribute 'get'` 是**没有任何信息量**的
+#: —— 它是本项目的 bug，不是用户能修的东西。技术细节进服务端日志。
+UNPARSED_ERROR_REASON = ("生成失败，但没能取到具体原因（ComfyUI 侧未返回"
+                          "可解析的错误信息）。详细信息见服务端日志。")
+
 
 # ------------------------------------------------------------------
 # 已知错误的**中文映射**
@@ -256,6 +270,47 @@ def describe_exception(node_type: str, exception_type: str,
 # 从 ComfyUI 的 status 结构里提取错误
 # ------------------------------------------------------------------
 
+def coerce_status_info(status_info) -> dict:
+    """把 `history["status"]` **安全地**变成一个 dict。
+
+    【为什么需要这一层 —— 2026-11-13 修】
+
+    ComfyUI 的 history 条目里，`status` 的类型**不保证**是 dict：
+
+        {"prompt": [...], "outputs": {...}, "status": None}      # 正常
+        {"prompt": [...], "outputs": {...], "status": {...}}     # 正常
+        {"prompt": [...], "outputs": {...}, "status": "error"}  # <- 字符串！
+
+    上游实现直接写 `status_info = hist.get("status") or {}`，
+    紧接着 `status_info.get("status_str")` —— 当 `status` 是**字符串**时，
+    `.get()` 作用在 str 上 -> `AttributeError: 'str' object has no
+    attribute 'get'`。
+
+    这个 AttributeError 发生在**错误处理路径上** —— 本来要把
+    ComfyUI 的失败原因翻译成中文给用户，结果自己先崩了，
+    用户最终只看到一句 Python 异常文本。
+
+    【本函数的口径】
+      * 是 dict -> 原样返回（**不复制**，避免大对象拷贝）；
+      * 不是 dict（含 None / str / list）-> 返回**空 dict**，
+        调用方会走「未取到具体原因」的兜底文案，
+        **绝不**让类型错误冒到用户面前。
+    """
+    if isinstance(status_info, dict):
+        return status_info
+    return {}
+
+
+def status_is_error(status_info) -> bool:
+    """这条 history 是不是「执行失败」。
+
+    同样对**类型**免疫：`status` 是字符串时返回 False（调用方走兜底
+    文案），不会抛 AttributeError。
+    """
+    info = coerce_status_info(status_info)
+    return str(info.get("status_str") or "") == "error"
+
+
 def _iter_error_messages(status_info: dict | None):
     """从 `status.messages` 里逐条取出执行错误的数据字典。
 
@@ -308,7 +363,7 @@ def _iter_error_messages(status_info: dict | None):
         yield event, payload
 
 
-def extract_error(status_info: dict | None) -> dict:
+def extract_error(status_info) -> dict:
     """从 ComfyUI 的 `status` 里提取**唯一**一条执行错误。
 
     返回（无错误时 `reason` 为空串）：
@@ -324,8 +379,11 @@ def extract_error(status_info: dict | None) -> dict:
     【为什么用「找到的第一条」而不是拼接所有】一个工作流失败时
     ComfyUI 可能推多条 execution_error（例如级联失败）。用户需要的是
     **第一条真正的根因** —— 后面那些通常是它的连带反应。
+
+    【2026-11-13】**对类型免疫**：传进来的不是 dict（str / None / list）
+    时返回「没找到」，不抛异常 —— 错误处理路径本身绝不能崩。
     """
-    for event, payload in _iter_error_messages(status_info):
+    for event, payload in _iter_error_messages(coerce_status_info(status_info)):
         node_type = payload.get("node_type") or ""
         exception_type = payload.get("exception_type") or ""
         exception_message = payload.get("exception_message") or ""
@@ -355,11 +413,15 @@ def extract_error(status_info: dict | None) -> dict:
     }
 
 
-def error_from_history(history: dict | None) -> dict:
+def error_from_history(history) -> dict:
     """从 ComfyUI 的 history 条目里提取错误。
 
     `history` 就是 `/history/{prompt_id}` 返回的那一个 prompt 的字典。
+
+    【2026-11-13 修】`history["status"]` 的类型**不保证**是 dict ——
+    可能是字符串。原实现 `history.get("status") or {}` 在 status 是
+    字符串时会把字符串传下去，后面 `.get()` 就炸了。
     """
     if not isinstance(history, dict):
         return extract_error(None)
-    return extract_error(history.get("status") or {})
+    return extract_error(history.get("status"))
