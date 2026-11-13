@@ -1,6 +1,7 @@
 # ── 本地运行数据（任务库 / 成片 / 上传素材）────────────────────────
 data/
 data-dev/
+data-accept/
 outputs/
 *.db
 *.sqlite

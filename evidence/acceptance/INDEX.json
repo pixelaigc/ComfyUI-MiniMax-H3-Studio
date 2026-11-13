@@ -1,6 +1,6 @@
 {
   "判据声明": "本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。",
-  "生成时间": "2026-11-13T19:08:46+08:00",
+  "生成时间": "2026-11-13T20:07:03+08:00",
   "分支": "local/feature/t2v-continue",
   "仓库": "/root/projects/h3studio-t2v-continue",
   "验收实例": "8206 / 8199（独立实例，8190 线上未动）",
@@ -9,28 +9,28 @@
       "结论": "每个分支一个专属目录（run_id 由该段自己的 job_id 派生），目录不同 -> 结构上不可能互相覆盖",
       "兄弟分支": {
         "B1": {
-          "job_id": "a5d446b1605e",
+          "job_id": "ce08fcea5b16",
           "stage_index": 1,
-          "source_job": "f1569b50dee7",
-          "run_id": "h3studio_sa5d446b1605e",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000.safetensors",
+          "source_job": "5dff77dad082",
+          "run_id": "h3studio_sce08fcea5b16",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors",
-            "stage_00000_cb5250d8.safetensors"
+            "stage_00000_cf6e5a4c.safetensors"
           ],
           "fingerprint_suffixes": [
-            "cb5250d8"
+            "cf6e5a4c"
           ],
           "prompt": "b1 the swordsman raises his blade, camera pushes in"
         },
         "B2": {
-          "job_id": "e87e76812bf0",
+          "job_id": "0b6c59bbaa60",
           "stage_index": 1,
-          "source_job": "f1569b50dee7",
-          "run_id": "h3studio_se87e76812bf0",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0/stage_00000.safetensors",
+          "source_job": "5dff77dad082",
+          "run_id": "h3studio_s0b6c59bbaa60",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors"
           ],
@@ -40,44 +40,28 @@
       },
       "全部段": [
         {
-          "job_id": "f1569b50dee7",
+          "job_id": "5dff77dad082",
           "stage_index": 0,
           "source_job": "",
-          "run_id": "h3studio_sf1569b50dee7",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000.safetensors",
+          "run_id": "h3studio_s5dff77dad082",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors",
-            "stage_00000_418e1249.safetensors"
+            "stage_00000_4ba9a5ee.safetensors"
           ],
           "fingerprint_suffixes": [
-            "418e1249"
+            "4ba9a5ee"
           ],
           "prompt": "a lone swordsman in a bamboo forest, calm, wide shot"
         },
         {
-          "job_id": "a5d446b1605e",
+          "job_id": "0b6c59bbaa60",
           "stage_index": 1,
-          "source_job": "f1569b50dee7",
-          "run_id": "h3studio_sa5d446b1605e",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000.safetensors",
-          "stage_files_on_disk": [
-            "stage_00000.safetensors",
-            "stage_00000_cb5250d8.safetensors"
-          ],
-          "fingerprint_suffixes": [
-            "cb5250d8"
-          ],
-          "prompt": "b1 the swordsman raises his blade, camera pushes in"
-        },
-        {
-          "job_id": "e87e76812bf0",
-          "stage_index": 1,
-          "source_job": "f1569b50dee7",
-          "run_id": "h3studio_se87e76812bf0",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0/stage_00000.safetensors",
+          "source_job": "5dff77dad082",
+          "run_id": "h3studio_s0b6c59bbaa60",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors"
           ],
@@ -85,28 +69,44 @@
           "prompt": "b2 a red lantern festival at night, crowd celebrating"
         },
         {
-          "job_id": "c09b1c43cff1",
-          "stage_index": 2,
-          "source_job": "a5d446b1605e",
-          "run_id": "h3studio_sc09b1c43cff1",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000.safetensors",
+          "job_id": "ce08fcea5b16",
+          "stage_index": 1,
+          "source_job": "5dff77dad082",
+          "run_id": "h3studio_sce08fcea5b16",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors",
-            "stage_00000_208432ea.safetensors"
+            "stage_00000_cf6e5a4c.safetensors"
           ],
           "fingerprint_suffixes": [
-            "208432ea"
+            "cf6e5a4c"
+          ],
+          "prompt": "b1 the swordsman raises his blade, camera pushes in"
+        },
+        {
+          "job_id": "32b3cb99ad4a",
+          "stage_index": 2,
+          "source_job": "ce08fcea5b16",
+          "run_id": "h3studio_s32b3cb99ad4a",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a/stage_00000.safetensors",
+          "stage_files_on_disk": [
+            "stage_00000.safetensors",
+            "stage_00000_fc8a2cc6.safetensors"
+          ],
+          "fingerprint_suffixes": [
+            "fc8a2cc6"
           ],
           "prompt": "c1 continue the bamboo forest, the swordsman turns around"
         },
         {
-          "job_id": "c534c11e3c3a",
+          "job_id": "32648f3dd7a1",
           "stage_index": 3,
-          "source_job": "c09b1c43cff1",
-          "run_id": "h3studio_sc534c11e3c3a",
-          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc534c11e3c3a",
-          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc534c11e3c3a/stage_00000.safetensors",
+          "source_job": "32b3cb99ad4a",
+          "run_id": "h3studio_s32648f3dd7a1",
+          "stage_file_dir": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32648f3dd7a1",
+          "stage_file_plain": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32648f3dd7a1/stage_00000.safetensors",
           "stage_files_on_disk": [
             "stage_00000.safetensors"
           ],
@@ -117,9 +117,9 @@
     },
     "C2_接续首帧归属": {
       "结论": "C1 首帧来自 B1（正确分支），与 B2 显著拉开",
-      "灰度MAE_C1首帧_vs_B1末帧": 5.785,
-      "灰度MAE_C1首帧_vs_B2末帧": 63.988,
-      "偏离倍数": 11.06,
+      "灰度MAE_C1首帧_vs_B1末帧": 4.98,
+      "灰度MAE_C1首帧_vs_B2末帧": 65.187,
+      "偏离倍数": 13.09,
       "缺陷态对照_原始报告": {
         "说明": "D1 调研报告实测的缺陷态：C1首帧 vs B1末帧 = 2.08，vs B2末帧 = 38.65 —— 即接到了兄弟分支 B2，偏离 18.6 倍",
         "缺陷态_C1首帧_vs_B1末帧": 2.08,
@@ -127,32 +127,32 @@
         "缺陷态_偏离倍数": 18.58
       },
       "执行图级主判据": {
-        "C1实际读回路径": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors",
-        "B1落盘run_id": "h3studio_sa5d446b1605e",
-        "B2落盘run_id": "h3studio_se87e76812bf0",
+        "C1实际读回路径": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000_cf6e5a4c.safetensors",
+        "B1落盘run_id": "h3studio_sce08fcea5b16",
+        "B2落盘run_id": "h3studio_s0b6c59bbaa60",
         "读的是B1": true,
         "外观锚显式传入": true,
         "ref_anchor_latent": [
           "300:anchor_load",
           0
         ],
-        "锚读回路径": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+        "锚读回路径": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000_4ba9a5ee.safetensors"
       },
       "对比图": {
         "三联图_B1末_B2末_C1首": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/triptych-B1last-B2last-C1first.png",
-        "B1末帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/B1-v-h3-studio-000020-last.png",
-        "B2末帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/B2-v-h3-studio-000022-last.png",
-        "C1首帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/C1-v-h3-studio-000024-first.png"
+        "B1末帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/B1-v-h3-studio-000002-last.png",
+        "B2末帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/B2-v-h3-studio-000004-last.png",
+        "C1首帧": "/root/projects/h3studio-t2v-continue/evidence/acceptance/frames/C1-v-h3-studio-000006-first.png"
       }
     },
     "C3_链账本不按chain_id线性拼接": {
       "结论": "服务端按 source_job 指针回溯血缘，每条分支只含自己的前序段；B2 不出现在 B1 分支的完整视频里",
       "各分支": [
         {
-          "job_id": "f1569b50dee7",
+          "job_id": "5dff77dad082",
           "stage_index": 0,
           "血缘段序列": [
-            "videos/v-h3-studio-000019.mp4"
+            "videos/v-h3-studio-000001.mp4"
           ],
           "各段帧数": [
             124
@@ -161,7 +161,7 @@
             5.167
           ],
           "各段文件": [
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4"
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4"
           ],
           "完整视频文件": "",
           "完整视频帧数": null,
@@ -169,11 +169,11 @@
           "完整视频期望帧数": 124
         },
         {
-          "job_id": "a5d446b1605e",
+          "job_id": "0b6c59bbaa60",
           "stage_index": 1,
           "血缘段序列": [
-            "videos/v-h3-studio-000019.mp4",
-            "videos/v-h3-studio-000020.mp4"
+            "videos/v-h3-studio-000001.mp4",
+            "videos/v-h3-studio-000004.mp4"
           ],
           "各段帧数": [
             124,
@@ -184,20 +184,20 @@
             4.25
           ],
           "各段文件": [
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000020.mp4"
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000004.mp4"
           ],
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000021.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000005.mp4",
           "完整视频帧数": 226,
           "完整视频时长_s": 9.45,
           "完整视频期望帧数": 226
         },
         {
-          "job_id": "e87e76812bf0",
+          "job_id": "ce08fcea5b16",
           "stage_index": 1,
           "血缘段序列": [
-            "videos/v-h3-studio-000019.mp4",
-            "videos/v-h3-studio-000022.mp4"
+            "videos/v-h3-studio-000001.mp4",
+            "videos/v-h3-studio-000002.mp4"
           ],
           "各段帧数": [
             124,
@@ -208,21 +208,21 @@
             4.25
           ],
           "各段文件": [
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000022.mp4"
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000002.mp4"
           ],
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000023.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000003.mp4",
           "完整视频帧数": 226,
           "完整视频时长_s": 9.45,
           "完整视频期望帧数": 226
         },
         {
-          "job_id": "c09b1c43cff1",
+          "job_id": "32b3cb99ad4a",
           "stage_index": 2,
           "血缘段序列": [
-            "videos/v-h3-studio-000019.mp4",
-            "videos/v-h3-studio-000020.mp4",
-            "videos/v-h3-studio-000024.mp4"
+            "videos/v-h3-studio-000001.mp4",
+            "videos/v-h3-studio-000002.mp4",
+            "videos/v-h3-studio-000006.mp4"
           ],
           "各段帧数": [
             124,
@@ -235,23 +235,23 @@
             4.25
           ],
           "各段文件": [
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000020.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000024.mp4"
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000002.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000006.mp4"
           ],
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000025.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000007.mp4",
           "完整视频帧数": 328,
           "完整视频时长_s": 13.7,
           "完整视频期望帧数": 328
         },
         {
-          "job_id": "c534c11e3c3a",
+          "job_id": "32648f3dd7a1",
           "stage_index": 3,
           "血缘段序列": [
-            "videos/v-h3-studio-000019.mp4",
-            "videos/v-h3-studio-000020.mp4",
-            "videos/v-h3-studio-000024.mp4",
-            "videos/v-h3-studio-000026.mp4"
+            "videos/v-h3-studio-000001.mp4",
+            "videos/v-h3-studio-000002.mp4",
+            "videos/v-h3-studio-000006.mp4",
+            "videos/v-h3-studio-000008.mp4"
           ],
           "各段帧数": [
             124,
@@ -266,12 +266,12 @@
             4.25
           ],
           "各段文件": [
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000020.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000024.mp4",
-            "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000026.mp4"
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000002.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000006.mp4",
+            "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000008.mp4"
           ],
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000027.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000009.mp4",
           "完整视频帧数": 430,
           "完整视频时长_s": 17.95,
           "完整视频期望帧数": 430
@@ -300,51 +300,51 @@
       "落盘制度差异_说明": "nonebot 是「一部片子一个目录 + 长视频级互斥锁」（链线性）；本项目链允许分叉，互斥锁挡不住「先后两次」的分叉，所以用「每段一个专属目录」= 类型层面的不变量",
       "本机实际指纹副本": [
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "418e1249",
+          "fingerprint": "4ba9a5ee",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000_4ba9a5ee.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "418e1249",
+          "fingerprint": "4ba9a5ee",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60/stage_00000.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "cb5250d8",
+          "fingerprint": "d82bb874",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "cb5250d8",
+          "fingerprint": "cf6e5a4c",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0/stage_00000.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000_cf6e5a4c.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "8b2773a5",
+          "fingerprint": "cf6e5a4c",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a/stage_00000.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "208432ea",
+          "fingerprint": "fc8a2cc6",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000_208432ea.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a/stage_00000_fc8a2cc6.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "208432ea",
+          "fingerprint": "fc8a2cc6",
           "size_bytes": 4827267
         },
         {
-          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc534c11e3c3a/stage_00000.safetensors",
+          "path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s32648f3dd7a1/stage_00000.safetensors",
           "is_fingerprinted_copy": true,
-          "fingerprint": "070fdf79",
+          "fingerprint": "9d016c09",
           "size_bytes": 4827267
         }
       ]
@@ -353,82 +353,82 @@
       "结论": "A -> B1 -> C1 -> D1 四段真实跑通；第 1 轮完整视频 = A+B1+C1；第 2 轮对完整视频再接续 = A+B1+C1+D1",
       "逐段": [
         {
-          "job_id": "f1569b50dee7",
+          "job_id": "5dff77dad082",
           "stage_index": 0,
           "source_job": "",
           "prompt": "a lone swordsman in a bamboo forest, calm, wide shot",
-          "分段视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000019.mp4",
+          "分段视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000001.mp4",
           "分段帧数": 124,
           "分段时长_s": 5.167,
           "完整视频文件": "",
           "完整视频帧数": null,
           "完整视频时长_s": null,
           "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/f1569b50dee7_seg_v-h3-studio-000019.mp4"
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/5dff77dad082_seg_v-h3-studio-000001.mp4"
         },
         {
-          "job_id": "a5d446b1605e",
+          "job_id": "0b6c59bbaa60",
           "stage_index": 1,
-          "source_job": "f1569b50dee7",
-          "prompt": "b1 the swordsman raises his blade, camera pushes in",
-          "分段视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000020.mp4",
-          "分段帧数": 102,
-          "分段时长_s": 4.25,
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000021.mp4",
-          "完整视频帧数": 226,
-          "完整视频时长_s": 9.45,
-          "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/a5d446b1605e_seg_v-h3-studio-000020.mp4",
-          "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/a5d446b1605e_full_v-h3-studio-000021.mp4"
-        },
-        {
-          "job_id": "e87e76812bf0",
-          "stage_index": 1,
-          "source_job": "f1569b50dee7",
+          "source_job": "5dff77dad082",
           "prompt": "b2 a red lantern festival at night, crowd celebrating",
-          "分段视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000022.mp4",
+          "分段视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000004.mp4",
           "分段帧数": 102,
           "分段时长_s": 4.25,
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000023.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000005.mp4",
           "完整视频帧数": 226,
           "完整视频时长_s": 9.45,
           "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/e87e76812bf0_seg_v-h3-studio-000022.mp4",
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/0b6c59bbaa60_seg_v-h3-studio-000004.mp4",
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/e87e76812bf0_full_v-h3-studio-000023.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/0b6c59bbaa60_full_v-h3-studio-000005.mp4"
         },
         {
-          "job_id": "c09b1c43cff1",
-          "stage_index": 2,
-          "source_job": "a5d446b1605e",
-          "prompt": "c1 continue the bamboo forest, the swordsman turns around",
-          "分段视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000024.mp4",
+          "job_id": "ce08fcea5b16",
+          "stage_index": 1,
+          "source_job": "5dff77dad082",
+          "prompt": "b1 the swordsman raises his blade, camera pushes in",
+          "分段视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000002.mp4",
           "分段帧数": 102,
           "分段时长_s": 4.25,
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000025.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000003.mp4",
+          "完整视频帧数": 226,
+          "完整视频时长_s": 9.45,
+          "seg文件_是否存在": true,
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/ce08fcea5b16_seg_v-h3-studio-000002.mp4",
+          "full文件_是否存在": true,
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/ce08fcea5b16_full_v-h3-studio-000003.mp4"
+        },
+        {
+          "job_id": "32b3cb99ad4a",
+          "stage_index": 2,
+          "source_job": "ce08fcea5b16",
+          "prompt": "c1 continue the bamboo forest, the swordsman turns around",
+          "分段视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000006.mp4",
+          "分段帧数": 102,
+          "分段时长_s": 4.25,
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000007.mp4",
           "完整视频帧数": 328,
           "完整视频时长_s": 13.7,
           "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/c09b1c43cff1_seg_v-h3-studio-000024.mp4",
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/32b3cb99ad4a_seg_v-h3-studio-000006.mp4",
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/c09b1c43cff1_full_v-h3-studio-000025.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/32b3cb99ad4a_full_v-h3-studio-000007.mp4"
         },
         {
-          "job_id": "c534c11e3c3a",
+          "job_id": "32648f3dd7a1",
           "stage_index": 3,
-          "source_job": "c09b1c43cff1",
+          "source_job": "32b3cb99ad4a",
           "prompt": "d1 the swordsman leaps over a stream, wide cinematic",
-          "分段视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000026.mp4",
+          "分段视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000008.mp4",
           "分段帧数": 102,
           "分段时长_s": 4.25,
-          "完整视频文件": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000027.mp4",
+          "完整视频文件": "/root/projects/h3studio-t2v-continue/data-accept/outputs/videos/v-h3-studio-000009.mp4",
           "完整视频帧数": 430,
           "完整视频时长_s": 17.95,
           "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/c534c11e3c3a_seg_v-h3-studio-000026.mp4",
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/32648f3dd7a1_seg_v-h3-studio-000008.mp4",
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/c534c11e3c3a_full_v-h3-studio-000027.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/32648f3dd7a1_full_v-h3-studio-000009.mp4"
         }
       ],
       "帧数账": {
@@ -440,17 +440,17 @@
       "结论": "二采（SelfLift）产物服务端判定 can_continue=false，卡片**不渲染**「接续」按钮；普通 t2v 产物则渲染",
       "服务端判定": {
         "step": "server_verdict",
-        "selflift_job": "f3a65a82b9db",
+        "selflift_job": "e29a561a7f2b",
         "selflift_can_continue": false,
         "selflift_reason": "二采（SelfLift 渐进分辨率采样）的潜空间与标准采样路径不同源，接续会出现接缝位移 —— 二采产物不支持接续。",
-        "normal_job": "c3ac49a9cd05",
+        "normal_job": "9898c447acb6",
         "normal_can_continue": true
       },
       "DOM按钮清单": {
         "cards_375": {
           "step": "cards_375",
           "selflift": {
-            "jid": "f3a65a82b9db",
+            "jid": "e29a561a7f2b",
             "has_continue": false,
             "buttons": [
               "prompt",
@@ -460,7 +460,7 @@
             ]
           },
           "normal": {
-            "jid": "c3ac49a9cd05",
+            "jid": "9898c447acb6",
             "has_continue": true,
             "buttons": [
               "prompt",
@@ -474,7 +474,7 @@
         "cards_1280": {
           "step": "cards_1280",
           "selflift": {
-            "jid": "f3a65a82b9db",
+            "jid": "e29a561a7f2b",
             "has_continue": false,
             "buttons": [
               "prompt",
@@ -484,7 +484,7 @@
             ]
           },
           "normal": {
-            "jid": "c3ac49a9cd05",
+            "jid": "9898c447acb6",
             "has_continue": true,
             "buttons": [
               "prompt",
@@ -540,15 +540,18 @@
       ]
     },
     "C8_pytest": {
-      "结论": "接续相关 121 项全绿；全量 3 failed / 2289 passed，3 项失败全部与接续无关（2 项稳定存量 + 1 项时序 flake）",
+      "结论": "接续相关：121 passed in 54.06s；全量：未跑",
       "接续相关命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/test_continuation_branch.py tests/test_continuation_server.py tests/test_continuation.py tests/test_continuation_retry.py tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py tests/test_continuation_capability.py -q --no-header -p no:cacheprovider",
-      "接续相关结果": "121 passed in 60.65s (0:01:00)",
+      "接续相关结果": "121 passed in 54.06s",
+      "接续相关日志": "/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-continuation.log",
       "全量命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider",
-      "全量结果": "3 failed, 2289 passed, 4 skipped in 1515.35s (0:25:15)",
-      "全量失败的3项": {
+      "全量结果": "",
+      "全量日志": "",
+      "全量失败的项": {},
+      "全量失败判定": {
         "test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras": "稳定存量失败（maintainer 基线同样失败，与接续无关）",
         "test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract": "稳定存量失败（maintainer 基线同样失败，与接续无关）",
-        "test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled": "时序 flake —— 单独跑 3 次全过（22 passed x3）；该文件 0 处引用接续代码；本轮未改任何生产代码"
+        "test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled": "时序 flake —— 单独跑全过；该文件 0 处引用接续代码；本轮未改任何生产代码"
       }
     },
     "C9_浏览器截图与报错统计": {
@@ -599,7 +602,7 @@
           "console_errors": 0,
           "page_errors": 0,
           "real_failed_requests": 0,
-          "media_preload_aborts": 4,
+          "media_preload_aborts": 16,
           "media_preload_aborts说明": "卡片 <video preload=\"metadata\"> 被 Chrome 读完元数据后主动中止媒体流（net::ERR_ABORTED）—— 浏览器正常行为，非服务端错误（同一 URL 手动 fetch 返回 200 且字节完整）"
         },
         "continuation-d1(browser_report.json)": {

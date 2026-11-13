@@ -36,7 +36,12 @@ import urllib.request
 from pathlib import Path
 
 BASE = "http://127.0.0.1:8199"
-ROOT = Path("/tmp/h3-d1-four")
+
+#: 产物目录 —— **放在仓库内**（data-accept/），不放在 /tmp。
+#: 理由：2026-11-13 宿主重启清空了 /tmp，上一轮证据包的
+#: 视频绝对路径全部失效（0/9 可达）。验收产物必须扛得住宿主重启。
+ACCEPT_ROOT = Path(__file__).resolve().parent.parent / "data-accept"
+ROOT = ACCEPT_ROOT / "evidence-frames"
 FRAME_DIR = ROOT / "frames"
 
 # 底模用 w4a8（12.5 GB）—— 验收机上 GPU 0 被别的进程占了 47 GB，
@@ -47,6 +52,23 @@ BP = {"model_key": "fl2va_pruned_w4a8", "width": 768, "height": 448,
       "seed": 4242}
 
 REPORT: dict = {"steps": [], "ok": True, "failures": []}
+
+
+def accept_base(default="http://127.0.0.1:8199"):
+    """验收实例的 base URL。
+
+    端口写在 data-accept/PORT（启动脚本自动顺延时写的）——
+    8199 可能被并发 agent 占用，所以不能硬编码。
+    """
+    port_file = Path(__file__).resolve().parent.parent / "data-accept" / "PORT"
+    if port_file.is_file():
+        try:
+            port = port_file.read_text(encoding="utf-8").strip()
+            if port.isdigit():
+                return f"http://127.0.0.1:{port}"
+        except Exception:
+            pass
+    return default
 
 
 def _req(path, data=None, timeout=180):
@@ -88,8 +110,11 @@ def wait(jid, t=1800):
 
 
 def out_dir():
-    """本实例的 outputs 目录（H3STUDIO_DATA_DIR 派生）。"""
-    env = os.environ.get("H3STUDIO_DATA_DIR") or "/tmp/h3t2v-d1-data"
+    """本实例的 outputs 目录（H3STUDIO_DATA_DIR 派生）。
+
+    默认值指向仓库内的 data-accept/（持久化，扛得住宿主重启）。
+    """
+    env = os.environ.get("H3STUDIO_DATA_DIR") or str(ACCEPT_ROOT)
     return Path(env) / "outputs"
 
 
@@ -218,7 +243,7 @@ def fetch_graphs(job_ids: dict) -> dict:
     """
     import sqlite3
     db_path = Path(os.environ.get("H3STUDIO_DATA_DIR") or
-                   "/tmp/h3t2v-d1-data") / "jobs.db"
+                   str(ACCEPT_ROOT)) / "jobs.db"
     out = {}
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
@@ -274,7 +299,7 @@ def fetch_graphs(job_ids: dict) -> dict:
 def main():
     global BASE
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default=BASE)
+    ap.add_argument("--base", default=accept_base(BASE))
     args = ap.parse_args()
     BASE = args.base
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -461,7 +486,7 @@ def main():
     # 血缘级判据（主）：服务端沿 source_job 回溯出来的段序列
     import sqlite3 as _sq
     _db = Path(os.environ.get("H3STUDIO_DATA_DIR") or
-               "/tmp/h3t2v-d1-data") / "jobs.db"
+               str(ACCEPT_ROOT)) / "jobs.db"
     _c = _sq.connect(str(_db)); _c.row_factory = _sq.Row
     try:
         _rows = {r["id"]: json.loads(r["params"] or "{}")

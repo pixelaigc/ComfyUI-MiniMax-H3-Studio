@@ -47,6 +47,23 @@ except Exception:
 WIDTHS = (375, 1280)
 
 
+def accept_base(default="http://127.0.0.1:8199"):
+    """验收实例的 base URL。
+
+    端口写在 data-accept/PORT（启动脚本自动顺延时写的）——
+    8199 可能被并发 agent 占用，所以不能硬编码。
+    """
+    port_file = Path(__file__).resolve().parent.parent / "data-accept" / "PORT"
+    if port_file.is_file():
+        try:
+            port = port_file.read_text(encoding="utf-8").strip()
+            if port.isdigit():
+                return f"http://127.0.0.1:{port}"
+        except Exception:
+            pass
+    return default
+
+
 def _get(url, timeout=60):
     with urllib.request.urlopen(url, timeout=timeout) as resp:
         raw = resp.read().decode()
@@ -55,7 +72,8 @@ def _get(url, timeout=60):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="http://127.0.0.1:8206")
+    ap.add_argument("--base", default=accept_base(),
+                    help="验收实例（scripts/run_live_8199_d1.sh，端口见 data-accept/PORT）")
     ap.add_argument("--out", default=str(REPO / "evidence" / "continuation-selflift"))
     ap.add_argument("--selflift-job", default="")
     ap.add_argument("--normal-job", default="")

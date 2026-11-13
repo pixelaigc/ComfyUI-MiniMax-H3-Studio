@@ -84,6 +84,28 @@ def load_jobs(data_dir):
     return out
 
 
+def _tail_pytest(log_path):
+    """从 pytest 日志里解析出结果摘要与失败项（不手写数字）。"""
+    if not log_path.is_file():
+        return {}
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return {}
+    summary, failed = "", {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("FAILED "):
+            name = line[len("FAILED "):].split(" - ")[0].strip()
+            failed[name] = line
+        elif (line[0].isdigit() and " passed" in line) or \
+             (line[0].isdigit() and " failed" in line):
+            summary = line
+    return {"结果": summary, "失败项": failed}
+
+
 def _d1_browser_stats():
     """读前序轮次 continuation-d1 的浏览器报告统计。"""
     f = REPO / "evidence" / "continuation-d1" / "browser_report.json"
@@ -127,12 +149,14 @@ def lineage(jobs, job_id):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-dir", default="/tmp/h3t2v-d1-data")
-    ap.add_argument("--chain-root", default="f1569b50dee7",
-                    help="链首段 job id（那一轮的 A）")
+    ap.add_argument("--data-dir", default=str(REPO / "data-accept"),
+                    help="验收实例的数据目录（持久化，扛得住宿主重启）")
+    ap.add_argument("--chain-root", default="",
+                    help="链首段 job id（留空=自动取最长链的首段）")
     ap.add_argument("--selflift-report", default=str(
         REPO / "evidence" / "continuation-selflift" / "report.json"))
-    ap.add_argument("--four-report", default="/tmp/h3-d1-four/report.json")
+    ap.add_argument("--four-report", default=str(
+        REPO / "data-accept" / "evidence-frames" / "report.json"))
     ap.add_argument("--out", default=str(REPO / "evidence" / "acceptance"))
     args = ap.parse_args()
 
@@ -142,7 +166,23 @@ def main():
     outs = Path(args.data_dir) / "outputs"
 
     # ---- 找出这一轮的 5 段 ----
+    # 【自动定位链首段】不硬编码 job id —— 每次重跑的 id 都不同。
+    # 规则：找「段数最多」的链，它的 stage_index==0 那一段就是链首段。
     root = args.chain_root
+    if not root:
+        chains = {}
+        for jid, j in jobs.items():
+            info = j["params"].get("continuation") or {}
+            cid = str(info.get("chain_id") or "")
+            if not cid:
+                continue
+            chains.setdefault(cid, []).append((int(info.get("stage_index") or 0), jid))
+        if not chains:
+            print("❌ 库里没有带 continuation 的任务 —— 先跑 verify_d1_four_defects.py")
+            return 1
+        best = max(chains.values(), key=len)
+        root = min(best)[1]
+        print(f"自动定位链首段: {root}（链 {best[0][0] and jobs[root]['params']['continuation'].get('chain_id')}，{len(best)} 段）")
     a_info = jobs[root]["params"].get("continuation") or {}
     chain_id = a_info.get("chain_id") or root
     members = []
@@ -371,28 +411,36 @@ def main():
     }
 
     # ================= C8 pytest =================
+    # pytest 结论**从落盘日志读**，不手写 —— 免得数字与实际跑出来的不一致
+    cont_log = REPO / "data-accept" / "logs" / "pytest-continuation.log"
+    full_log = REPO / "data-accept" / "logs" / "pytest-full.log"
+    cont_tail = _tail_pytest(cont_log)
+    full_tail = _tail_pytest(full_log)
     index["判据"]["C8_pytest"] = {
-        "结论": "接续相关 121 项全绿；全量 3 failed / 2289 passed，"
-                "3 项失败全部与接续无关（2 项稳定存量 + 1 项时序 flake）",
+        "结论": f"接续相关：{cont_tail.get('结果', '未跑')}；"
+                f"全量：{full_tail.get('结果', '未跑')}",
         "接续相关命令": ("cd /root/projects/h3studio-t2v-continue && "
                    "/home/ubuntu/comfyui/venv/bin/python -m pytest "
                    "tests/test_continuation_branch.py tests/test_continuation_server.py "
                    "tests/test_continuation.py tests/test_continuation_retry.py "
                    "tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py "
                    "tests/test_continuation_capability.py -q --no-header -p no:cacheprovider"),
-        "接续相关结果": "121 passed in 60.65s (0:01:00)",
+        "接续相关结果": cont_tail.get("结果", ""),
+        "接续相关日志": str(cont_log.resolve()) if cont_log.is_file() else "",
         "全量命令": ("cd /root/projects/h3studio-t2v-continue && "
                  "/home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q "
                  "--no-header -p no:cacheprovider"),
-        "全量结果": "3 failed, 2289 passed, 4 skipped in 1515.35s (0:25:15)",
-        "全量失败的3项": {
+        "全量结果": full_tail.get("结果", ""),
+        "全量日志": str(full_log.resolve()) if full_log.is_file() else "",
+        "全量失败的项": full_tail.get("失败项", {}),
+        "全量失败判定": {
             "test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras":
                 "稳定存量失败（maintainer 基线同样失败，与接续无关）",
             "test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::"
             "test_every_method_declares_write_contract":
                 "稳定存量失败（maintainer 基线同样失败，与接续无关）",
             "test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled":
-                "时序 flake —— 单独跑 3 次全过（22 passed x3）；该文件 0 处引用接续代码；"
+                "时序 flake —— 单独跑全过；该文件 0 处引用接续代码；"
                 "本轮未改任何生产代码",
         },
     }
@@ -451,7 +499,7 @@ def main():
             row[f"{label}文件_可复制到"] = str((vdir / f"{jid}_{label}_{sp.name}").resolve())
 
     # ================= 把首/末帧对比图复制进证据包 =================
-    frame_src = Path("/tmp/h3-d1-four/frames")
+    frame_src = REPO / "data-accept" / "evidence-frames" / "frames"
     if frame_src.is_dir():
         fdir = out / "frames"
         fdir.mkdir(parents=True, exist_ok=True)
@@ -693,15 +741,29 @@ def main():
     A(b["接续相关命令"])
     A("```")
     A("")
+    if b.get("接续相关日志"):
+        A(f"日志落盘：`{b['接续相关日志']}`")
+        A("")
     A(f"**全量**：{b['全量结果']}")
     A("")
     A("```bash")
     A(b["全量命令"])
     A("```")
     A("")
-    A("**全量失败的 3 项**（逐项判定）：")
+    if b.get("全量日志"):
+        A(f"日志落盘：`{b['全量日志']}`")
+        A("")
+    if b.get("全量失败的项"):
+        A("**全量失败项**（逐条原始输出）：")
+        A("")
+        for k, v in b["全量失败的项"].items():
+            A(f"- `{k}`")
+            A(f"  - 原始行：`{v}`")
+            A(f"  - 判定：{b['全量失败判定'].get(k, '（未标注）')}")
+        A("")
+    A("**各项失败判定**：")
     A("")
-    for k, v in b["全量失败的3项"].items():
+    for k, v in b["全量失败判定"].items():
         A(f"- `{k}`")
         A(f"  - {v}")
     A("")
