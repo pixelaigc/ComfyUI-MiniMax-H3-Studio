@@ -3329,12 +3329,10 @@ function jobCard(job) {
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       ${loraRow}
       <div class="row"><span>采样</span><b>${samplingRow}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
-      <div class="row"><span>种子</span><b>${seedRow}</b></div>` : info.kind === "audio" ? `
+      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>` : info.kind === "audio" ? `
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       <div class="row"><span>采样</span><b>${samplingRow}</b></div>
       <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
-      <div class="row"><span>种子</span><b>${seedRow}</b></div>
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
