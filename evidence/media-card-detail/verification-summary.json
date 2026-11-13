@@ -1,0 +1,161 @@
+{
+  "verification_instance": "http://127.0.0.1:8207 (独立验收实例；线上 8190 未部署/未重启)",
+  "code_source": "/root/projects/h3studio-media-card @ 1185c54 (branch local/feature/media-card-detail)",
+  "data_dir": "/tmp/h3media-verify/data (线上 jobs.db 的独立副本；线上库未被修改)",
+  "browser": "Chromium via Playwright (browser_exec / CDP)",
+  "captured_at": "2026-11-13",
+  "scenarios": [
+    {
+      "id": "a",
+      "name": "确实没有 LoRA 的任务 -> 卡片 LoRA 行显示「无」",
+      "job_id": "poisonlora0001",
+      "setup": "params.lora = 'integrated_multimodal_description: [Shot 1] ...' (提示词字段名，被污染的夹具)",
+      "card_lora_row": "无",
+      "card_rows": {
+        "模型": "MiniMax-H3 + LoRA",
+        "LoRA": "无",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "4 · 1",
+        "尺寸": "—",
+        "时长": "5s",
+        "种子": "123456"
+      },
+      "detail_modal_lora_row": "无",
+      "verdict": "PASS —— 提示词内容出现在完整提示词区，但 LoRA 行不再显示该字符串"
+    },
+    {
+      "id": "b",
+      "name": "确实用了 LoRA 的任务 -> 显示该 LoRA 名称与强度",
+      "job_id": "6aa899285ef1",
+      "card_lora_row": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+      "detail_modal_lora_row": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+      "panel_accel_lora_key": "dmad_4step_critic",
+      "panel_accel_strength": "1",
+      "verdict": "PASS —— 卡片与模态框显示的名称、强度与后端 gen_params.lora 逐字一致"
+    }
+  ],
+  "c2_card_param_rows": [
+    "模型", "LoRA", "采样器", "调度器", "步数/CFG", "尺寸", "时长", "种子"
+  ],
+  "c2_missing_value_policy": "缺失显式渲染为「—」，不拿别的字段顶替（实测 poisonlora0001 的「尺寸」= 「—」）",
+  "c3_detail_modal": {
+    "rows": [
+      "模型", "步数", "调度器", "采样器", "shift", "CFG",
+      "LoRA", "尺寸", "时长", "种子", "注意力机制", "工作流名", "创建时间"
+    ],
+    "plus": "完整提示词（独立区块，非截断 80 字）",
+    "close_methods": {
+      "esc": "PASS",
+      "backdrop_click": "PASS",
+      "x_button": "PASS",
+      "bottom_close_button": "PASS"
+    },
+    "no_conflict_with_existing_buttons": {
+      "download": "PASS —— 点击后详情模态框未打开",
+      "reuse": "PASS —— 点击后详情模态框未打开",
+      "prompt_row": "PASS —— 点击后详情模态框未打开"
+    },
+    "polling_does_not_interrupt": {
+      "waited_seconds": 8,
+      "polling_cycles_covered": ">=3 (轮询周期 2s)",
+      "modal_still_open": true,
+      "params_text_unchanged": true,
+      "prompt_text_unchanged": true,
+      "verdict": "PASS"
+    }
+  },
+  "c4_reuse_params": {
+    "job_id": "6aa899285ef1",
+    "method": "先把面板改乱，再点卡片「复用参数」，比对是否回到卡片值",
+    "mutated_before_reuse": {
+      "vidShiftVideo": "99",
+      "duration": "30",
+      "seed": "999999"
+    },
+    "after_reuse": {
+      "vidWidth": "1280",
+      "vidHeight": "736",
+      "vidSizePreset": "16:9_0.9",
+      "vidModel": "fl2va_pruned_int8",
+      "vidAccelLora": "dmad_4step_critic",
+      "vidAccelStrength": "1",
+      "vidSteps": "6",
+      "vidCfg": "1.0",
+      "vidSampler": "euler",
+      "vidScheduler": "beta",
+      "vidShiftVideo": "12",
+      "vidShiftAudio": "3",
+      "vidAttention": "default",
+      "duration": "5"
+    },
+    "card_gen_params": {
+      "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+      "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+      "采样器": "euler",
+      "调度器": "beta",
+      "步数/CFG": "6 · 1",
+      "尺寸": "1280×736",
+      "时长": "5s",
+      "种子": "随机"
+    },
+    "verdict": "PASS —— 复用后配置区宽高 1280×736 与卡片「尺寸」行一致；shift 99→12、时长 30→5 均被复用覆盖"
+  },
+  "c5_viewports": {
+    "375x667": {
+      "dialog_wh": [375, 614],
+      "close_x_wh": [40, 40],
+      "bottom_button_wh": [347, 42],
+      "overflow_x": false,
+      "overflow_y": false,
+      "body_scrollable": true,
+      "body_overflow_y": "auto",
+      "prompt_white_space": "pre-wrap",
+      "page_scroll_x": false
+    },
+    "390x844": {
+      "dialog_wh": [390, 776],
+      "close_x_wh": [40, 40],
+      "bottom_button_wh": [362, 42],
+      "overflow_x": false,
+      "overflow_y": false,
+      "body_scrollable": true,
+      "body_overflow_y": "auto",
+      "prompt_white_space": "pre-wrap",
+      "page_scroll_x": false
+    },
+    "1280x720": {
+      "dialog_wh": [720, 590],
+      "close_x_wh": [40, 40],
+      "bottom_button_wh": [61, 37],
+      "overflow_x": false,
+      "overflow_y": false,
+      "body_scrollable": true,
+      "body_overflow_y": "auto",
+      "prompt_white_space": "pre-wrap",
+      "page_scroll_x": false
+    }
+  },
+  "console_pageerror": {
+    "method": "页面内注入 window.onerror / unhandledrejection / console.error 探针，再走完三档视口 × (开详情→Esc→复用→点提示词→Esc) 全流程",
+    "console_entries": 0,
+    "page_errors": 0,
+    "collected": []
+  },
+  "screenshots": [
+    "a-poison-lora-shows-none.png",
+    "b-lora-strength-real.png",
+    "b-lora-strength-065.png",
+    "c2-card-params-1280.png",
+    "c2-card-params-375.png",
+    "c3-detail-modal-1280.png",
+    "c3-detail-modal-375.png",
+    "c3-detail-modal-390.png",
+    "d-viewport-375-card.png",
+    "d-viewport-375-modal.png",
+    "d-viewport-390-card.png",
+    "d-viewport-390-modal.png",
+    "d-viewport-1280-card.png",
+    "d-viewport-1280-modal.png"
+  ]
+}

@@ -126,6 +126,47 @@ def _effect_lora_display(name: str) -> str:
 
 
 # ------------------------------------------------------------------
+# LoRA 值合法性判定（2026-11-13）
+# ------------------------------------------------------------------
+#
+# 【为什么需要这一层 —— 用户 2026-11-13 实测报出的 BUG 1】
+#
+# 用户看到生成库卡片上的「LoRA」行显示着
+#     integrated_multimodal_description: [Shot 1] ...
+# —— 一段**提示词**，而那个任务**根本没用任何 LoRA**。
+#
+# 【根因链（两端都有份）】
+#   1. 落库端：agent_schema.validate_params 的 LoRA 分支写成
+#      `if allowed and str(lora) not in allowed` ——
+#      图像 / 音乐模式的 `mode_loras()` 返回**空列表** ->
+#      `allowed` 为空 -> 整个校验分支被跳过 -> **任何**字符串都能进 params。
+#      所以 Agent 误把提示词填进 `lora` 时，任务照样建成功。
+#   2. 展示端：`_legacy_video_summary` 直接把 `params["lora"]` 的**原文**
+#      当成 LoRA 显示名（`out["lora_label"] = lora`）——
+#      没有做任何「这个值是不是真的 LoRA key」的判断。
+#      于是提示词原文被原样印在「LoRA」那一行。
+#
+# 【本函数的职责】**单一判定入口**：给一个字符串，回答
+# 「它是不是一个真实存在的 LoRA 标识符」。
+#
+# 判定标准（三条全过才算）：
+#   1. 长度上限 —— LoRA key 不可能是几百字的自然语言；
+#   2. 不含空白 —— 提示词必有换行/空格，LoRA key 没有；
+#   3. 在**真实清单**里 —— workflows.LORAS（视频加速 LoRA）+
+#      video_models.VIDEO_ACCEL_LORA_COMBOS / VIDEO_ACCEL_LORAS（视频面板）+ 
+#      loras.LORA_CATALOG（图像效果 LoRA）。
+#
+# 不在清单里 -> 返回 ""（不是 LoRA）。前端据此显示「无」。
+#
+# 【为什么用「清单」而不是「模式」来判断】
+# 历史落库数据里，图像模式也存过 `params["lora"] = "ckpt850"`
+# （前端旧实现无条件写遗留字段，见 web/app.js 的 params.lora 赋值）——
+# 但图像工作流**根本不读**这个字段（workflows.build_t2i 读的是 params["loras"]）。
+# 所以「ckpt850 在清单里」不能作为「这个任务用了 ckpt850」的证据。
+# 真正的判据是**该模式的工作流是否读这个字段**（见 _legacy_video_summary）。
+
+
+# ------------------------------------------------------------------
 # 文生视频（t2v 新面板路径）
 # ------------------------------------------------------------------
 def _attention_label(key: str) -> str:
@@ -455,20 +496,51 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
 
     # --- 视频模式 ---
     # 新面板路径（model_key + accel_loras）：字段本身就是结构化的，天然可信。
+    #
+    # 【2026-11-13 · 合并修正】这里同时读两种形状：
+    #   * `params["accel_loras"]` —— **数组**。服务端 prepare_job_params
+    #     落库的**唯一真实形状**（server.py: `out["accel_loras"] = combos`），
+    #     面板 submitParams() 提交的也是数组。
+    #   * `params["accel_lora"]` / `accel_lora_strength` —— **单数**。
+    #     面板 collectConfig() 的旧形状（仅本地配置态，不落库）。
+    #
+    # 【为什么必须都读】只读单数的话，真实落库任务（数组形状）会取不到
+    # 用户选的那枚加速 LoRA -> 卡片显示「无」，而实际明明用了。
+    # 只读数组的话，老任务（单数形状）又会丢。两边都读，按数组优先。
     model_key = str(params.get("model_key") or "").strip()
     if model_key:
         from . import video_models as vmodels
         combos = getattr(vmodels, "VIDEO_ACCEL_LORA_COMBOS", {}) or {}
-        combo = combos.get(str(params.get("accel_lora") or "")) or {}
-        if combo:
-            key = str(params.get("accel_lora") or "")
+        accel_key = ""
+        accel_strength = None
+        # 形状 1：数组（落库真实形状）
+        for item in params.get("accel_loras") or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("enabled") is False:
+                continue
+            key = str(item.get("key") or "").strip()
+            if not key:
+                continue
+            accel_key = key
             try:
-                strength = float(params.get("accel_lora_strength", 1.0))
+                accel_strength = float(item.get("strength", 1.0))
             except (TypeError, ValueError):
-                strength = 1.0
-            result["lora"] = key
-            result["strength"] = strength
-            result["labels"] = [f"{_accel_lora_display(key)} ×{strength:.2f}"]
+                accel_strength = 1.0
+            break
+        # 形状 2：单数（旧配置形状）
+        if not accel_key:
+            single = str(params.get("accel_lora") or "").strip()
+            if single and single in combos:
+                accel_key = single
+                try:
+                    accel_strength = float(params.get("accel_lora_strength", 1.0))
+                except (TypeError, ValueError):
+                    accel_strength = 1.0
+        if accel_key:
+            result["lora"] = accel_key
+            result["strength"] = accel_strength
+            result["labels"] = [f"{_accel_lora_display(accel_key)} ×{accel_strength:.2f}"]
         fixed_key = str(params.get("fixed_accel_lora") or "").strip()
         if fixed_key:
             try:
@@ -648,28 +720,43 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
     if lora == "none":
         # 明确选了「不用加速 LoRA」
         out["lora_label"] = ""
-    elif lora and _is_valid_legacy_lora_key(lora):
-        out["lora_label"] = lora
-        out["lora_name"] = str(wf.LORAS.get(lora) or "")
-        out["lora_key"] = lora
-        try:
-            out["lora_strength"] = float(params.get("lora_strength", 1.0))
-        except (TypeError, ValueError):
-            out["lora_strength"] = 1.0
     elif lora:
-        # 【2026-11-13 修】白名单外的值 —— 当作「没有 LoRA」。
+        # 【2026-11-13 修 —— 只认「真实存在的 LoRA key」】
+        # （media-card-detail 与 h3-model-meta 两分支在此冲突；按「以
+        #   media-card-detail 为准」取其语义，并**并入** h3-model-meta
+        #   独有的 lora_key / lora_rejected 两个字段 —— 两者不冲突，
+        #   各自承载不同信息，保留双方。）
         #
-        # 复现（用户 2026-11-13 截图）：params["lora"] 里躺的是
-        #   "integrated_multimodal_description"
-        # 那是 H3 三段式提示词的**字段名**，不是 LoRA。
-        # 旧实现把它原样塞进 lora_label，前端就把它当 LoRA 名渲染出来了。
+        # 旧实现：`out["lora_label"] = lora` —— 把 params["lora"] 的**原文**
+        # 直接当显示名。于是当 Agent 误把提示词填进 lora 字段时
+        # （agent_schema 的 LoRA 校验对图像/音乐模式是空转的，见那里的说明），
+        # 卡片「LoRA」行会显示
+        #     integrated_multimodal_description: [Shot 1] ...
+        # —— 一段提示词冒充 LoRA（用户 2026-11-13 实测报出）。
         #
-        # 这里**如实当没有 LoRA**（lora_label 留空 -> 前端显示「无」），
-        # 绝不把来路不明的字符串当 LoRA 展示，也不编一个名字。
-        out["lora_label"] = ""
-        out["lora_name"] = ""
-        out["lora_strength"] = None
-        out["lora_rejected"] = lora
+        # 现在：先过 is_real_lora_key() 白名单。
+        #   * 通过 -> 照旧显示（这是该模式工作流真的会读、真的会挂上的 LoRA）；
+        #   * 不通过 -> 视为「这个任务没有 LoRA」（lora_label 留空）。
+        #
+        # 【不猜、不补】被判定为非法时**不编造**一个 LoRA 名 ——
+        # 用户要看到的是「无」，而不是另一个错误的名字。
+        real = is_real_lora_key(lora)
+        if real:
+            out["lora_label"] = real
+            out["lora_name"] = str(wf.LORAS.get(real) or "")
+            # 【h3-model-meta】补 lora_key（key 形态，不是显示名）。
+            out["lora_key"] = real
+            try:
+                out["lora_strength"] = float(params.get("lora_strength", 1.0))
+            except (TypeError, ValueError):
+                out["lora_strength"] = 1.0
+        else:
+            # 【h3-model-meta】白名单外的值 —— 如实当「没有 LoRA」。
+            # 脏值记进 lora_rejected 留证据，但**绝不当 LoRA 展示**。
+            out["lora_label"] = ""
+            out["lora_name"] = ""
+            out["lora_strength"] = None
+            out["lora_rejected"] = lora
     else:
         # 【没有记录 lora】-> 工作流默认 ckpt850（workflows._h3_video_workflow:
         # `lora = params.get("lora", "ckpt850")`），并且**确实挂上了**。
@@ -935,4 +1022,172 @@ def _recommendations(summary: dict) -> dict:
         "lora_recommendation": mrec.accel_lora_recommendation(lora_key),
         "fixed_lora_recommendation": mrec.accel_lora_recommendation(fixed_key),
     }
+
+
+# ------------------------------------------------------------------
+# 【2026-11-13 · 合并】media-card-detail 分支的生成参数摘要（C2 卡片行 /
+# C3 详情模态框的唯一真源）—— 与上面的 _generation_params 并存：
+#   * _generation_params()  -> 挂进 summarize() 的 model_info（原始值，
+#     缺失即 None，前端 web/job-meta.js 渲染成「—」）；
+#   * gen_params()          -> 服务端 row_to_job 额外下发的 gen_params
+#     （已格式化成字符串，缺失即 ""，前端 genParamRowsHtml() 渲染成「—」）。
+# 两者字段名不同、形状不同，**不是重复实现**，不互相覆盖。
+# ------------------------------------------------------------------
+
+# 生成参数摘要（C2 卡片行 / C3 详情模态框）—— 2026-11-13
+# ------------------------------------------------------------------
+#
+# 【为什么要有这个模块】
+# 用户 2026-11-13 报出 BUG 2：卡片**不显示步数等参数**，显示区域也有限。
+# 要求：
+#   * 卡片补齐关键生成参数：模型、步数、调度器、采样器、尺寸、时长、seed；
+#   * 缺失的显式显示「—」，**不得拿别的字段顶替**。
+#
+# 【纪律 —— 与 model_info 同一套】
+# 前端不自己猜「这个任务的步数是多少」——服务端按任务真实 params 算好下发，
+# 前端只渲染。缺失就是 None，前端显示「—」。
+# **绝不用别的字段顶替**（例如时长缺失时不能拿 max_duration 顶，
+# 那是另一个模式的字段名，语义不同）。
+def _num(value):
+    """把参数值转成可显示的字符串；没有就返回 ""（空 = 缺失）。"""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, bool):
+        return ""
+    try:
+        if isinstance(value, float):
+            if value != value or value in (float("inf"), float("-inf")):
+                return ""
+            if float(value).is_integer():
+                return str(int(value))
+            return f"{value:.2f}".rstrip("0").rstrip(".")
+        return str(value)
+    except (TypeError, ValueError):
+        return ""
+
+
+def gen_params(mode: str, params: dict, model_info: dict | None = None,
+               resolution_info: dict | None = None) -> dict:
+    """算出任务的**完整生成参数**（C2 卡片行 + C3 详情模态框的唯一真源）。
+
+    返回固定形状，每个键要么是字符串（可能为 "" = 缺失），要么是列表：
+        {
+          "model":      模型显示名
+          "steps":      步数
+          "scheduler":  调度器
+          "sampler":    采样器
+          "shift":      shift
+          "cfg":        CFG
+          "seed":       种子（"随机" = 没指定）
+          "size":       尺寸（宽×高）
+          "duration":   时长
+          "lora":       LoRA 名称 + 强度（"无" = 确实没有）
+          "attention":  注意力机制
+          "workflow":   工作流名
+          "prompt":     完整提示词
+        }
+
+    【缺失 = ""，由前端渲染成「—」】
+    这里**不编造**、也**不顶替** —— 缺就是缺。
+    """
+    params = params or {}
+    mode = str(mode or "")
+    info = model_info if isinstance(model_info, dict) else summarize(mode, params)
+    reso = resolution_info if isinstance(resolution_info, dict) else {}
+
+    out = {
+        "model": str(info.get("model_label") or ""),
+        "steps": _num(params.get("steps")),
+        "scheduler": _num(params.get("scheduler")),
+        "sampler": _num(params.get("sampler")),
+        "shift": _num(params.get("shift")),
+        "cfg": _num(params.get("cfg")),
+        "seed": _num(params.get("seed")),
+        "size": "",
+        "duration": "",
+        "lora": "",
+        "attention": "",
+        "workflow": "",
+        "prompt": str(params.get("prompt") or ""),
+    }
+
+    # --- shift：视频用 shift_video / shift_audio，图像用 shift ---
+    # 视频面板提交的是 shift_video / shift_audio（两个都真实存在），
+    # 图像面板提交的是 shift。**不互相顶替** —— 各自只认自己的字段。
+    if not out["shift"]:
+        shift_video = _num(params.get("shift_video"))
+        shift_audio = _num(params.get("shift_audio"))
+        if shift_video or shift_audio:
+            parts = []
+            if shift_video:
+                parts.append(f"视频 {shift_video}")
+            if shift_audio:
+                parts.append(f"音频 {shift_audio}")
+            out["shift"] = " · ".join(parts)
+
+    # --- 尺寸：优先用服务端按产物实际像素算好的宽高 ---
+    #
+    # 【为什么 resolution_info 优先】reso_label.describe() 内部已经做过
+    # 「实际像素优先」的判定（source = actual / request / none），
+    # 它返回的 width/height 就是**卡片该显示的**那个尺寸。
+    # 如果这里先读 params.width/height，就会拿到**请求值**
+    # （1344×760），而卡片显示的是**实际值**（1344×768）——
+    # 同一张卡片两个数字对不上。
+    #
+    # 【为什么还要兜底 params】resolution_info.width 可能是 None
+    # （老任务既没有请求宽高也没有产物像素，source == "none"）。
+    width = reso.get("width")
+    height = reso.get("height")
+    if not (width and height):
+        width = params.get("width")
+        height = params.get("height")
+    if width and height:
+        out["size"] = f"{int(width)}×{int(height)}"
+
+    # --- 时长：视频/图像用 duration；音乐用 max_duration（字段名不同） ---
+    duration = _num(params.get("duration"))
+    if not duration and mode in ("t2a", "a2a"):
+        duration = _num(params.get("max_duration"))
+    if duration:
+        out["duration"] = f"{duration}s"
+
+    # --- 种子：没指定就是「随机」（这是真实语义，不是缺失） ---
+    if not out["seed"]:
+        out["seed"] = "随机"
+
+    # --- LoRA：走 resolve_job_lora（白名单判定） ---
+    lora = resolve_job_lora(mode, params)
+    if lora["labels"]:
+        out["lora"] = " · ".join(lora["labels"])
+    else:
+        # 确实没有 LoRA —— 显式写「无」，而不是留空让人猜。
+        out["lora"] = "无"
+
+    # --- 注意力机制 ---
+    attention = str(info.get("attention_label") or "")
+    if attention:
+        speed = str(info.get("attention_speed_label") or "")
+        out["attention"] = f"{attention} · {speed}" if speed else attention
+
+    # --- 工作流名：模式 -> 工作流键 ---
+    out["workflow"] = WORKFLOW_LABELS.get(mode, mode or "")
+
+    return out
+
+
+#: 模式 -> 工作流名（C3 详情模态框要显示「工作流名」）。
+#: 来源是 workflows.BUILDERS 的键名 —— 工作流构建器的真实名字，
+#: 不是编的营销名。
+WORKFLOW_LABELS = {
+    "t2v": "文生视频（_h3_video_workflow）",
+    "flf": "首尾帧生视频（_h3_video_workflow）",
+    "r2v": "参考图生视频（build_r2v）",
+    "longfilm": "长片拼接",
+    "t2i": "文生图（build_t2i）",
+    "t2i_qwen": "Qwen-Image 文生图（build_t2i_qwen）",
+    "i2i_qwen": "Qwen-Image 图片编辑（build_i2i_qwen）",
+    "t2i_moss": "MOSS-Image 文生图（build_t2i_moss）",
+    "t2a": "文生音乐（music_yue2）",
+    "a2a": "参考生音乐（music_yue2）",
+}
 
