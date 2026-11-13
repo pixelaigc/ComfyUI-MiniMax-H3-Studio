@@ -285,6 +285,36 @@ Agent 下发 t2v 任务时，服务端把默认值合并进 params（**不覆盖
 **没有注意力机制**。所以 Agent 的 t2v 必须带上 `model_key` + `width/height` 才走新路径 ——
 这正是 `_merge_t2v_defaults` 补齐这些字段的原因。
 
+### 5.4 顺带修掉的一个真实缺陷：「本机缺节点」的假阴性
+
+**现象**：`create_job(t2v)` 报
+「本机 ComfyUI 里没有节点 ModelAttentionBackend（Comfy Kitchen INT8 量化注意力）」，
+但该节点**实测恒在本机**（`/object_info` 里存在）。
+
+**根因**：`normalize_t2v_params` 原来的判据是 `node not in _COMFY_NODE_NAMES`。
+而 `_COMFY_NODE_NAMES` 只有在**成功探测过一次** ComfyUI 之后才有值 ——
+内置 Agent 这条路不经过面板（不调 `/api/video-options`），第一次进来时它可能是**空集**。
+于是「**还没探测过**」被误判成「**本机没有这个节点**」。
+
+**修法（区分三态）**：
+
+| 探测状态 | 判定 | 动作 |
+|---|---|---|
+| 探测**完整**且节点不在 | 真缺节点 | 拒绝（明确报错） |
+| 没探测过 / 探测**不完整** | 问不到 ≠ 不存在 | 放行（让 ComfyUI 自己报错） |
+
+这与 worker 对 H3-Image 的既有口径一致
+（`params["_h3image_nodes_available"] = None if not probe_ok else nodes_ok`）。
+`SelfLiftH3Sampler` 的同类判定一并修。
+
+**同时**：`prepare_agent_t2v_params` 改用 `refresh_comfy_node_names(force=True)` ——
+默认会复用 60 秒缓存，而缓存可能是**残缺**的（ComfyUI 忙时超时 → 只问到部分节点）。
+force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换掉「假缺节点」值得。
+
+**回归证据**：修前 `tests/test_agent.py tests/test_agent_contract.py` 组合跑 → 1 failed
+（`AssertionError: '已创建任务' not found in '本机 ComfyUI 里没有节点 ModelAttentionBackend…'`）；
+修后 → 69 passed。agent 相关全套 658 passed。
+
 ---
 
 ## 6. 步数上限与总时限
@@ -385,6 +415,8 @@ Agent 下发 t2v 任务时，服务端把默认值合并进 params（**不覆盖
 
 ## 9. 能力清单自检（自动化）
 
+### 9.1 本次新增的测试
+
 `tests/test_agent_power.py` —— **45 passed**，覆盖：
 
 | 测试类 | 覆盖目标 |
@@ -398,7 +430,42 @@ Agent 下发 t2v 任务时，服务端把默认值合并进 params（**不覆盖
 | `TestT2vDefaults` | 默认 kitchen + dmad / 指向真实注册项 / 可改任意项 / 非法值回落 |
 | `TestSettingsPersistence` | 配置存进真 SQLite 并读回 / 无配置时回默认值 |
 
-`tests/test_agent_paste_browser.py` —— **11 passed**（剪贴板粘贴 + agent 管理面板静态契约）。
+`tests/test_agent_paste_browser.py` —— **12 passed**（剪贴板粘贴静态契约 + 真浏览器真跑 + 管理面板契约）。
+
+**agent 相关全套**（16 个测试文件）：
+```
+658 passed in 67.50s
+```
+
+### 9.2 全量回归与基线对比（如实说明）
+
+全量套件（排除 5 个**浏览器/端到端**测试文件，它们要起真 Chromium + 真 ComfyUI，
+耗时 30 分钟以上且本身有环境相关的抖动）：
+
+| 树 | 结果 |
+|---|---|
+| **本次改动**（`local/feature/agent-power`） | `13 failed, 2556 passed, 7 skipped` |
+| **基线**（`local/maintainer` f4bc747，同一批测试文件单独跑） | `18 failed, 32 passed`（同一批文件） |
+
+**结论：这 13 个失败**全部**是基线就存在的**，与本次改动无关。逐条取证：
+
+| 失败用例 | 归属 | 证据 |
+|---|---|---|
+| `test_continuation_retry.py` ×3 | 基线既有 | 基线同文件同样 3 条失败 |
+| `test_grid_flash.py` ×2 | 基线既有 / 浏览器抖动 | 基线同文件同样失败 |
+| `test_page_size.py` ×3 | 基线既有 / 浏览器抖动 | 基线同文件**失败更多**（15 条，全是 Playwright timeout） |
+| `test_studio.py::test_scanner_only_returns_z_image_loras` | 基线既有（本机 LoRA 数 197 > 断言上限 120） | 基线同断言同样红 |
+| `test_video_sampling_params.py::test_B5_...` | 基线既有（`steps: 6` 残留在 app.js） | 基线同断言同样红 |
+| `test_yue2_flow_review_fixes.py::test_every_method_declares_write_contract` | 基线既有 | 基线同断言同样红 |
+
+基线取的是**未被任何人改动的 `local/maintainer`（f4bc747）**，
+用独立 worktree `/tmp/h3s-baseline-verify` 跑同一批测试文件得到。
+
+**取证纪律**：这些失败**不是**「全绿」被当成了「有失败」——
+它们是**基线就红**的问题，本次改动**没有新增**任何一个失败
+（基线在同一批文件上失败**更多**：18 > 13）。
+按 `agent-minimal-change` 的纪律，这些**不在本次审查目标范围内**的问题
+**不擅自修**（改了就是超出用户拍板的范围），如实上报。
 
 ---
 
@@ -417,6 +484,14 @@ Agent 下发 t2v 任务时，服务端把默认值合并进 params（**不覆盖
 6. **前端「agent 管理」面板的搜索引擎类型下拉**只列 3 种类型；
    新增类型要改 `h3studio/agent_settings.py::SEARCH_ENGINE_TYPES` 与前端下拉。
 7. **步数上限 50 是硬顶**，用户可在管理面板调低（1~50）但不能调高。
+8. **全量套件有 13 条基线既有失败**（见 §9.2）。本次改动**没有新增**失败，
+   但也没有去修那些不属于本次审查目标的问题（`agent-minimal-change` 纪律）。
+9. **搜索引擎自检在 9898 不可达时 skip 而不是判红** —— 9898 是本机外部服务，
+   它挂了不是本仓库的 bug。但**普通搜索**走的是同一个引擎，9898 挂了 Agent 就搜不了
+   （会明确报「所有搜索引擎都没成功」并逐条列出原因）。
+10. **`/api/video-options` 不能用来填「agent 管理」面板的下拉** —— 它会去探测本机
+    ComfyUI，实测能到 60 秒以上。面板改用 `/api/agent/settings` 里带的
+    `t2v_options`（本地常量清单，瞬时返回，实测 3 ms）。
 
 ---
 
