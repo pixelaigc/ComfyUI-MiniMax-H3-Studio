@@ -575,7 +575,21 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
                           "model": model_ref},
               "class_type": "BasicScheduler", "_meta": {"title": "调度器"}}
 
-    max_transition = max(1, steps - 1)
+    # 【2026-11-13】transition_step 上限按**精修后**的 sigma 表长度算。
+    # 精修参数在下面算（sigma_refine），但上限公式在这里就要用到它 ——
+    # 所以这里先读出 extra_steps（不插节点，只算长度）。
+    # 与 server.normalize_t2v_params 的算法保持一致（同一份公式）。
+    _refine_cfg = twopass.get("sigma_refine") or {}
+    _extra_steps = 0
+    if _refine_cfg.get("enabled"):
+        try:
+            _extra_steps = max(0, min(15, int(_refine_cfg.get(
+                "extra_steps",
+                vmodels.VIDEO_TWOPASS["sigma_refine_extra_steps_default"]))))
+        except (TypeError, ValueError):
+            _extra_steps = 0
+    _refined_len = steps + 1 + _extra_steps
+    max_transition = max(1, _refined_len - 2)
     transition_step = int(twopass.get("transition_step")
                           or vmodels.VIDEO_TWOPASS["transition_step_default"])
     transition_step = max(1, min(transition_step, max_transition))
@@ -610,6 +624,66 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     p["320"] = {"inputs": {"conditioning": ["105:104", 0]},
                 "class_type": "ConditioningZeroOut", "_meta": {"title": "负面条件"}}
 
+    # ---- 【2026-11-13 新增】sigma 精修节点（借鉴 nonebot H3 工作流）----
+    #
+    # 借鉴来源：/home/ubuntu/nonebotqq/plugins/nonebot_plugin_novelai/workflows/
+    #   minimax_h3_v1.json 的 node 346（class_type=H3SigmaRefiner）
+    # 节点源码：/home/ubuntu/comfyui/custom_nodes/ComfyUI-YCNodes-MiniMax-H3/
+    #   py/h3_sigma_refiner.py:52-98
+    #
+    # 它在 sigma 表的**低噪段局部加密采样步**（多花 NFE 换低噪阶段细节），
+    # 针对「高速运动边缘像素颗粒 / 闪烁」。
+    #
+    # 【本项目默认关闭】理由（实测，别照抄 nonebot 的参数）：
+    #   * nonebot 用 start_at_sigma=0.7，但本项目默认档 steps=4 / beta 下
+    #     sigma 尾段只有 0.7207 一档 > 0.7，之后直接跳到 0.0 ->
+    #     节点判定 idx == len-1 -> **原样返回（完全 no-op）**。
+    #   * 节点自己的 tooltip 写「H3 推荐设在 2.0 ~ 3.5 之间」，
+    #     所以本项目默认取 2.5（落在推荐区间内，真的会生效）。
+    #
+    # 【transition_step 必须重标定】
+    # SelfLift 把 sigma 表切成两段：
+    #     低分辨率一采 = sigmas[:transition_step + 1]
+    #     高分辨率二采 = sigmas[transition_step:]
+    # transition_step 是**索引**。精修后表长 +extra_steps，索引语义会变 ——
+    # 所以这里按「精修后的实际表长」重新夹一次范围，并保证
+    # transition_step <= len(sigmas) - 2（SelfLift 的硬约束）。
+    sigma_ref = twopass.get("sigma_refine") or {}
+    refine_enabled = bool(sigma_ref.get("enabled"))
+    sigmas_ref = ["9", 0]
+    extra_steps = int(sigma_ref.get(
+        "extra_steps", vmodels.VIDEO_TWOPASS["sigma_refine_extra_steps_default"]))
+    extra_steps = max(0, min(15, extra_steps))
+    if refine_enabled and extra_steps > 0:
+        start_at_sigma = float(sigma_ref.get(
+            "start_at_sigma",
+            vmodels.VIDEO_TWOPASS["sigma_refine_start_at_sigma_default"]))
+        end_at_sigma = float(sigma_ref.get(
+            "end_at_sigma",
+            vmodels.VIDEO_TWOPASS["sigma_refine_end_at_sigma_default"]))
+        spacing = str(sigma_ref.get(
+            "spacing",
+            vmodels.VIDEO_TWOPASS["sigma_refine_spacing_default"]))
+        if spacing not in ("cosine", "linear", "exponential"):
+            spacing = vmodels.VIDEO_TWOPASS["sigma_refine_spacing_default"]
+        p["346"] = {
+            "inputs": {
+                "sigmas": ["9", 0],
+                "extra_steps": extra_steps,
+                "start_at_sigma": max(0.0, min(20.0, start_at_sigma)),
+                "end_at_sigma": max(0.0, min(5.0, end_at_sigma)),
+                "spacing": spacing,
+            },
+            "class_type": "H3SigmaRefiner",
+            "_meta": {"title": "sigma 精修（低噪段加密采样）"},
+        }
+        sigmas_ref = ["346", 0]
+        # 精修后 sigma 表长度 = (steps + 1) + extra_steps
+        # （节点把尾段长度从 (len - idx) 扩成 (len - idx) + extra_steps）
+        refined_len = steps + 1 + extra_steps
+        max_transition = max(1, refined_len - 2)
+        transition_step = max(1, min(transition_step, max_transition))
+
     p["171"] = {
         "inputs": {
             "model": model_ref,
@@ -618,7 +692,7 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
             "vae": ["105:11", 0],
             "latent_image": latent_ref,
             "sampler": ["17", 0],
-            "sigmas": ["9", 0],
+            "sigmas": sigmas_ref,
             "seed": int(seed),
             "cfg": sampler_cfg,
             "transition_step": transition_step,

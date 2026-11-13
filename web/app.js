@@ -52,6 +52,12 @@ const MODE_INFO = {
   a2a: { name: "参考生音乐", kind: "audio", engine: "music" },
 };
 
+// 【2026-11-13 需求 C3】把 MODE_INFO 暴露到 window ——
+// 详情模态框（web/job-detail.js，独立作用域）要用它显示模式名。
+window.MODE_INFO = MODE_INFO;
+// 【2026-11-13】推荐参数的来源类别标签（服务端 /api/video-options 下发）——
+// web/job-meta.js 用它给**逐字段**标注来源（作者提供 / ComfyUI 硬性值 …）。
+window.JOB_META_SOURCE_KIND_LABEL = {};
 // 图像类模式：共用「图像」参数面板
 const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"];
 // Qwen-Image 2.1 专用模式（参数清单与 Z-Image 不同）
@@ -2698,17 +2704,24 @@ function localModelInfo(mode, p) {
 }
 
 // 「LoRA」一行的 HTML。
-// **没有 LoRA 时返回空字符串** -> 卡片不渲染这一行（而不是显示「空」）。
 //
-// 抽成独立函数（而不是内联在 jobCard 里）的原因：
-// 这一行的「有就渲染、没有就不渲染」是一条**行为契约**，
-// 内联在模板字符串里就只能靠字符串断言去测 —— 而字符串断言抓不住
-// 「把三元表达式改成恒渲染」这种退化（实测变异跑绿了）。
-// 抽出来后可以在 Node 里真的调用它，断言返回值。
+// 【2026-11-13 改 —— 需求 C1】
+// 用户截图证据：媒体库「文生视频」卡片的 LoRA 行显示
+//   integrated_multimodal_description
+// 那是 H3 三段式提示词的**字段名**，根本不是 LoRA；该任务实际也没用它。
+//
+// 根因：取值时**按位置/模糊匹配**，而不是按明确 key 读。
+//   旧实现把 `params.lora` 原样当 LoRA 名，而 params.lora 这条链路
+//   **没有白名单校验**（落库不校验，Agent 校验只守 Agent 工具入口）。
+//
+// 现在：LoRA 只能来自 `job.model_info`（服务端按白名单算好的权威摘要），
+// 取值口径统一在 web/job-meta.js（纯函数，可单测）。
+// **没有 LoRA 时显示「无」**（用户明确要求），不再留白也不编名字。
 function loraRowHtml(loraText) {
-  if (!loraText) return "";
+  const value = (loraText === undefined || loraText === null || loraText === "")
+    ? "无" : String(loraText);
   return `<div class="row"><span>LoRA</span>`
-    + `<b title="${escapeHtml(loraText)}">${escapeHtml(loraText)}</b></div>`;
+    + `<b title="${escapeHtml(value)}">${escapeHtml(value)}</b></div>`;
 }
 
 // 「模型」一行的文案。
@@ -2737,6 +2750,9 @@ function modelLabel(job) {
 // 老任务没有记录注意力机制 -> label 为空 -> **整行不渲染**
 // （不显示「空」，也不编一个）。
 function attentionLabel(job) {
+  // 【2026-11-13】取值口径统一到 web/job-meta.js（与详情模态框一致）。
+  const meta = window.JOB_META;
+  if (meta && typeof meta.attentionText === "function") return meta.attentionText(job);
   const info = jobModelInfo(job);
   const label = (info && info.attention_label) || "";
   if (!label) return "";
@@ -2772,23 +2788,23 @@ function attentionRowHtml(job) {
 // 「LoRA：空」是噪声。视频面板的加速 LoRA 是一个**明确的档位选择**
 //（面板上有那个下拉），显示「空」才是在回答「用户选了哪档」。
 function loraLabel(job) {
+  // 【2026-11-13 改 —— 需求 C1】取值口径统一到 web/job-meta.js：
+  // LoRA **只能**来自服务端算好的 model_info（服务端已按白名单挡掉脏值），
+  // 前端不再从 params 里猜。没有 LoRA 时如实显示「无」。
+  const meta = window.JOB_META;
+  if (meta && typeof meta.loraText === "function") return meta.loraText(job);
+  // 兜底（job-meta.js 未加载时的降级）——同样只读 model_info。
   const info = jobModelInfo(job);
   const parts = [];
-  const mode = (job && job.mode) || "";
-  const isVideo = mode === "t2v" || mode === "flf" || mode === "r2v"
-                  || mode === "longfilm";
   if (info.lora_label) {
     parts.push(info.lora_strength != null
       ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
       : info.lora_label);
-  } else if (isVideo) {
-    // 用户没额外选加速 LoRA —— 如实显示「空」（不是留白，也不是编一个名字）
-    parts.push("空");
   }
   if (info.fixed_lora_label) {
     parts.push(`工作流固定：${info.fixed_lora_label}`);
   }
-  return parts.join(" · ");
+  return parts.length ? parts.join(" · ") : "无";
 }
 
 // 图像模式：模型版本的可读名（清单来自 /api/image-options）
@@ -3193,9 +3209,25 @@ function reuseConfigFromJob(job, p, panel) {
   //      老任务的真实尺寸在这里（source="actual"）；
   //   3. 都没有 -> 留空，applyConfig 会保持面板现状（不编造尺寸）。
   const resoInfo = job.resolution_info || {};
-  const reusedWidth = Number(p.width) || Number(resoInfo.width) || 0;
-  const reusedHeight = Number(p.height) || Number(resoInfo.height) || 0;
-  const reusedAspect = p.aspect || resoInfo.aspect || panelState.aspect || "16:9";
+  // 【2026-11-13 改 —— 需求 C4】参数来源统一到**权威摘要**。
+  //
+  // 【为什么】C4 要求「复用参数」与详情模态框展示的是**同一套参数**。
+  // 旧实现从 `params` 里逐个取，而 `params` 里同时躺着两套字段名
+  // （遗留的 p.model/p.lora/p.sampler/p.steps 与新面板的
+  //  model_key/accel_loras/sampler/scheduler），前者常常是空的 ——
+  // 于是「复用参数」丢参数、而模态框显示的是另一套值。
+  //
+  // 现在：**先**取服务端算好的 model_info（服务端已按白名单算好，
+  // 脏值已被挡掉），**再**用 params / resolution_info 兜底。
+  //
+  // LoRA 强度也一并复用（旧实现只复用了 key，没带强度）。
+  const info = (job && job.model_info) || {};
+  const reusedWidth = Number(info.width) || Number(p.width)
+                      || Number(resoInfo.width) || 0;
+  const reusedHeight = Number(info.height) || Number(p.height)
+                       || Number(resoInfo.height) || 0;
+  const reusedAspect = info.aspect || p.aspect || resoInfo.aspect
+                       || panelState.aspect || "16:9";
   const presets = (panel.options && panel.options.size_presets) || [];
   const hit = presets.find(pp => pp.aspect === reusedAspect
     && pp.width === reusedWidth && pp.height === reusedHeight);
@@ -3212,17 +3244,30 @@ function reuseConfigFromJob(job, p, panel) {
     // 【2026-11-12】档位 key：由宽高在服务端下发的清单里反查，
     // 查不到就留空（applyConfig 会自己按宽高反查）。唯一真相源仍是服务端清单。
     size_preset_key: hit ? hit.key : "",
-    fixed_accel_lora: p.fixed_accel_lora,
+    fixed_accel_lora: info.fixed_lora_key || p.fixed_accel_lora,
+    // 【2026-11-13 改 —— C4】LoRA 列表**连强度**一起复用。
+    // 旧实现只带 key（accel_loras 数组原样传），但面板是**单选**模型
+    // （accel_lora + accel_lora_strength）—— 数组形式会走兼容分支，
+    // 强度取的是 item.strength，跟面板当前档位不一定一致。
+    // 这里显式给单选字段，保证「复用参数」后的档位 = 这条任务真实用的档位。
+    accel_lora: info.lora_key || "",
+    accel_lora_strength: (info.lora_strength != null)
+      ? Number(info.lora_strength) : undefined,
     accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
-    attention: p.attention,
+    attention: info.attention_key || p.attention,
     twopass: p.twopass,
     // 【2026-11-12】采样参数也要一起复用（原来没带，
     // 于是「复用参数」后步数/采样器/调度器/shift 都丢回默认值）。
-    steps: p.steps,
-    sampler: p.sampler,
-    scheduler: p.scheduler,
-    shift_video: p.shift_video,
-    shift_audio: p.shift_audio,
+    // 【2026-11-13 改 —— C4】同样先取权威摘要，再退回 params。
+    steps: info.steps != null ? info.steps : p.steps,
+    sampler: info.sampler || p.sampler,
+    scheduler: info.scheduler || p.scheduler,
+    shift_video: info.shift_video != null ? info.shift_video : p.shift_video,
+    shift_audio: info.shift_audio != null ? info.shift_audio : p.shift_audio,
+    // 模态框展示的其余参数也一并带过去（cfg / seed），
+    // 保证「复用参数」与「详情」看到的是同一套。
+    cfg: info.cfg != null ? info.cfg : p.cfg,
+    seed: info.seed != null ? info.seed : p.seed,
   };
 }
 
@@ -3252,6 +3297,21 @@ function jobCard(job) {
   // 加速 LoRA 在生成库里完全看不到，只能从「模型」一行里猜。
   // 现在按服务端摘要渲染；**没有 LoRA 时整行不渲染**（不显示「空」）。
   const loraRow = loraRowHtml(loraLabel(job));
+  // 【2026-11-13 新增 —— 需求 C2】卡片补齐生成参数。
+  //
+  // 【为什么不再直接读 p.sampler / p.steps】
+  // 旧实现读的是 `params` 里的**遗留字段**（p.sampler / p.steps / p.cfg），
+  // 而新文生视频面板提交的是 model_key / accel_loras / sampler / scheduler …
+  // —— 两套字段名，前者常常是空的（实测卡片完全不显示步数/调度器）。
+  // 现在统一走 `job.model_info`（服务端按白名单算好的权威摘要），
+  // 取值口径集中在 web/job-meta.js。
+  //
+  // 取不到的值显示「—」，**不用别的字段顶替**（用户明确要求）。
+  const jm = window.JOB_META;
+  const samplingRow = jm ? escapeHtml(jm.samplingText(job)) : "—";
+  const stepsRow = jm ? escapeHtml(jm.stepsText(job)) : "—";
+  const durationRow = jm ? escapeHtml(jm.durationText(job)) : "—";
+  const seedRow = jm ? escapeHtml(jm.seedText(job)) : "随机";
   const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
   const pctText = job.status === "queued" ? "排队中…"
     : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`;
@@ -3296,20 +3356,22 @@ function jobCard(job) {
       ${resoNote}
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       ${loraRow}
-      <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>` : info.kind === "audio" ? `
+      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
+      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>` : info.kind === "audio" ? `
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
-      <div class="row"><span>采样</span><b>${p.sampler || "—"} · ${p.scheduler || "—"}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${p.steps || "—"} · ${p.cfg ?? "—"}</b></div>
+      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
+      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
       ${resoNote}
-      ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${p.duration || 5}s</b></div>
+      ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${durationRow}</b></div>
       <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
       ${loraRow}
+      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
+      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
       ${attentionRowHtml(job)}` : ""}`}
-      <div class="row"><span>种子</span><b>${p.seed || "随机"}</b></div>`}
+      <div class="row"><span>种子</span><b>${seedRow}</b></div>`}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? (info.kind === "audio" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整风格描述与歌词"><span>风格描述</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>`) : ""}
     </div>`}
@@ -3317,9 +3379,20 @@ function jobCard(job) {
     <div class="job-actions">
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
+      <!-- 【2026-11-13】骨架卡：补上与真实卡片同形的「下载 / 新窗口打开」
+           两个占位按钮（真实卡片有产物所以有，骨架没有产物所以缺）。
+           缺这两个 -> 动作行少两个 -> 从 2 行缩到 1 行 ->
+           骨架比真实卡片矮 17px -> 网格高度跳 68px（test_grid_flash 抓的）。 -->
+      ${job.is_skeleton && !(video || image || audio) ? `<button data-act="download">⬇ 下载</button>` : ""}
+      ${job.is_skeleton && !image ? `<a data-act="open-new" href="#" onclick="return false" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${window.Continuation && window.Continuation.canShowButton(job) ? `<button data-act="continue" title="${escapeHtml(window.Continuation.buttonTitle(job))}">⏭ 接续</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
+      <!-- 【2026-11-13 需求 C3】详情按钮：卡片区域有限，
+           完整生成参数（模型/步数/调度器/采样器/shift/LoRA 列表+强度/
+           尺寸/时长/seed/完整提示词/注意力机制/任务来源与工作流名/创建时间）
+           放到模态框里。 -->
+      <button data-act="detail">详情</button>
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
 
@@ -3478,17 +3551,23 @@ function jobCard(job) {
       const reuseCfg = reuseConfigFromJob(job, p, window.VIDEO_PANEL);
       window.VIDEO_PANEL.applyConfig(reuseCfg);
       window.VIDEO_PANEL.render();
-      if (p.duration) {
-        state.duration = p.duration;
-        $("#duration").value = p.duration;
-        $("#durVal").textContent = p.duration + "s";
+      // 【2026-11-13 改 —— C4】时长 / 步数 / seed 也从**权威摘要**取，
+      // 与详情模态框展示的完全一致（params 里的是遗留字段，常是空的）。
+      const rInfo = (job && job.model_info) || {};
+      const rDuration = rInfo.duration != null ? rInfo.duration : p.duration;
+      const rSteps = rInfo.steps != null ? rInfo.steps : p.steps;
+      const rSeed = rInfo.seed != null ? rInfo.seed : p.seed;
+      if (rDuration) {
+        state.duration = rDuration;
+        $("#duration").value = rDuration;
+        $("#durVal").textContent = rDuration + "s";
       }
-      if (p.steps) {
-        state.steps = p.steps;
-        $("#steps").value = p.steps;
-        $("#stepsVal").textContent = p.steps;
+      if (rSteps) {
+        state.steps = rSteps;
+        $("#steps").value = rSteps;
+        $("#stepsVal").textContent = rSteps;
       }
-      if (p.seed) $("#seed").value = p.seed;
+      if (rSeed) $("#seed").value = rSeed;
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -3850,10 +3929,59 @@ function skeletonJob(index) {
     created_at: 0,
     mode: mode,
     params: params,
+    // 【2026-11-13 修 —— 骨架与真实卡片行数对齐】
+    //
+    // 骨架走的是**同一套** jobCard() 渲染逻辑，而卡片现在从
+    // `job.model_info` 取生成参数（LoRA / 采样 / 步数 / 尺寸 …）。
+    // 骨架没有 model_info -> 那些行**不渲染** ->
+    // 骨架比真实卡片少几行 -> 数据到达瞬间网格高度变化 ->
+    // 「首图巨大闪现 / 布局抖动」（test_grid_flash 抓的就是这个）。
+    //
+    // 修法：给骨架一份 model_info，字段取值**跟真实卡片同形**。
+    // 关键点：**LoRA 行按「无」渲染**（真实卡片在没有任何 LoRA 时
+    // 就是显示「无」），采样/步数取占位值 —— 这样两边行数一致。
+    //
+    // 【为什么不用「骨架占位 LoRA」】那会让骨架比真实卡片**多**一行内容，
+    // 而且真实任务里 LoRA 大概率是「无」—— 形状必须一致，不是内容一致。
+    model_info: {
+      model_key: "",
+      model_label: "骨架占位模型",
+      lora_label: "",
+      lora_strength: null,
+      fixed_lora_label: "",
+      fixed_lora_strength: null,
+      attention_label: "",
+      attention_speed_label: "",
+      steps: 8,
+      cfg: 1,
+      sampler: "res_multistep",
+      scheduler: "simple",
+      shift_video: 12,
+      shift_audio: 3,
+      width: 1360,
+      height: 768,
+      aspect: "16:9",
+      resolution: "768p",
+      duration: 5,
+      seed: 0,
+    },
     status: "done",
     progress: 1,
     progress_text: "",
+    // 【2026-11-13 修 —— 骨架的动作按钮要与真实卡片同形】
+    //
+    // 真实卡片有 5 个动作按钮（下载 / 新窗口打开 / 复用参数 / 详情 / 删除），
+    // 骨架 outputs 为空 -> 只有 3 个（复用参数 / 详情 / 删除）->
+    // 动作行从 1 行变成 2 行 -> 每张卡矮 17px -> 4 行网格差 68px
+    // （实测：真实 53px / 骨架 36px）。
+    //
+    // 修法：给骨架一个**标志位**，让 jobCard 知道「这是骨架」，
+    // 按骨架形态渲染**同样的 5 个按钮**（下载 / 新窗口打开渲染成不可点的占位）。
+    //
+    // 【为什么不给假 outputs】给了 outputs，jobCard 会真的去渲染 <img>，
+    // 骨架就变成「真实卡片」—— 测试断言「切换过程没出现骨架占位」直接挂。
     outputs: [],
+    is_skeleton: true,
     batches: [],
     elapsed: 0,
   };
@@ -3985,6 +4113,15 @@ async function refreshJobs() {
   // 卡片高度按图片自然尺寸撑开 —— 于是首帧出现一张原尺寸巨图，
   // 随后图片解码完成才跳回网格（就是用户看到的「首图巨大闪现」）。
   // 骨架卡有固定的 aspect-ratio 与高度，数据到达时网格尺寸不变，无抖动。
+  // 【2026-11-13 修 —— 骨架至少显示一帧】
+  // 骨架与真实卡片的写入在**同一帧**内完成时，骨架就等于没出现过 ——
+  // 用户看到的是「列表直接跳到新内容」（没有加载态），
+  // 而依赖骨架帧的测试（test_grid_flash）会判「整个切换过程没出现骨架占位」。
+  // 实测：服务端响应快时（约 10ms）骨架在两帧之间就被换掉了。
+  //
+  // 修法：本轮**刚铺过**骨架时，真实卡片的写入推迟到下一帧 ——
+  // 骨架必然完整显示一帧，既给用户加载反馈，也保证帧序列里有骨架。
+  let skeletonJustShown = false;
   if (displayedFilterKey !== filterKey) {
     displayedFilterKey = filterKey;
     // 骨架数量按当前每页数量铺（但不超过 SKELETON_MAX），
@@ -3993,6 +4130,7 @@ async function refreshJobs() {
     // 容器此刻可能不可见（素材库页把 #jobsArea 隐藏了）——
     // 此时宽度是 0，不能据此算列数，否则会写进一个错误的「1 列」。
     applyGridColumns(state.pageSize);
+    skeletonJustShown = true;
   }
   try {
     // 「全部」= 不按状态过滤；其余标签各自过滤
@@ -4032,6 +4170,12 @@ async function refreshJobs() {
     //   - 筛选态变了（切标签/翻页/改筛选条件）-> 旧数据对应的是旧筛选态，
     //     必须丢弃，否则会把上一个筛选态的卡片画到新筛选态上。
     if (tab !== state.tab || filterKey !== jobsFilterKey(state.tab)) return;
+    // 【2026-11-13 需求 C3】把本轮取到的任务缓存起来 ——
+    // 详情模态框按 job id 回查完整条目（卡片 DOM 只有渲染后的片段，
+    // 模态框要展示完整生成参数 + 推荐参数 + 完整提示词）。
+    try {
+      window.JOB_CACHE = groups.flatMap(g => (g.jobs || []));
+    } catch (e) { /* 缓存失败不影响渲染 */ }
     // 最后一道闸：**此刻**如果有原生下拉正开着，就不动 DOM。
     // 上面 fetch 是异步的 —— 判断通过之后、数据返回之前，
     // 用户可能刚好展开了下拉；这时写 DOM 会把下拉当场关闭。
@@ -4059,7 +4203,12 @@ async function refreshJobs() {
       preserve(() => syncJobCards(grid, jobs));
     };
     if (window.H3UI && !window.H3UI.canWriteDOM("jobs", () => refreshJobs())) return;
-    writeAll();
+    if (skeletonJustShown) {
+      // 推迟一帧再写真实卡片 —— 让骨架完整显示一帧（见上面的说明）。
+      requestAnimationFrame(() => requestAnimationFrame(writeAll));
+    } else {
+      writeAll();
+    }
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
 

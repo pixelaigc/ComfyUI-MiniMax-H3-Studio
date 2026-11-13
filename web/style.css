@@ -2607,3 +2607,127 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   background: rgba(120, 68, 168, .88);
 }
 
+
+/* ---------- 生成媒体库条目详情模态框（2026-11-13 需求 C3） ---------- */
+.job-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.job-detail-modal[hidden] { display: none; }
+.job-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 14, .62);
+  backdrop-filter: blur(2px);
+}
+.job-detail-panel {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  max-height: min(86vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: #171b21;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  overflow: hidden;
+}
+.job-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  flex: 0 0 auto;
+}
+.job-detail-head b { font-size: 14px; }
+.job-detail-x {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, .16);
+  color: #cfd6de;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  padding: 3px 10px;
+}
+.job-detail-x:hover { background: rgba(255, 255, 255, .08); }
+.job-detail-body {
+  overflow: auto;
+  padding: 14px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+.job-detail-group { margin-bottom: 16px; }
+.job-detail-group:last-child { margin-bottom: 0; }
+.job-detail-group-title {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: .02em;
+}
+.job-detail-kv {
+  display: grid;
+  grid-template-columns: minmax(88px, 30%) 1fr;
+  gap: 4px 12px;
+}
+.job-detail-kv > span { color: #8d97a3; }
+.job-detail-kv > b { font-weight: 500; word-break: break-word; }
+.job-detail-kv > b.is-missing { color: #6b7480; font-weight: 400; }
+.job-detail-prompt {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 8px;
+  padding: 9px 11px;
+  max-height: 260px;
+  overflow: auto;
+  font-family: inherit;
+}
+.job-detail-source {
+  font-size: 11.5px;
+  color: #8d97a3;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid rgba(255, 255, 255, .12);
+  padding-left: 9px;
+  margin-top: 5px;
+}
+.job-detail-reclist { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.job-detail-recchip {
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  color: #c3ccd6;
+  background: rgba(255, 255, 255, .04);
+}
+.job-detail-recchip.is-missing { color: #6b7480; }
+
+/* 卡片上的「详情」按钮 */
+.job-actions button[data-act="detail"] { margin-left: 2px; }
+
+/* 【小屏适配 —— 需求 C5】375 / 390 宽下模态框不溢出 */
+@media (max-width: 480px) {
+  .job-detail-modal { padding: 8px; }
+  .job-detail-panel {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 10px;
+  }
+  .job-detail-body { padding: 11px; font-size: 12px; }
+  .job-detail-kv { grid-template-columns: minmax(72px, 34%) 1fr; gap: 3px 9px; }
+}
+@media (max-width: 380px) {
+  .job-detail-kv { grid-template-columns: 1fr; gap: 1px 0; }
+  .job-detail-kv > span { margin-top: 6px; }
+}
