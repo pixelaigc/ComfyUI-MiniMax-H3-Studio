@@ -890,21 +890,29 @@ class TestReuseParamsResolution(unittest.TestCase):
         self.assertIn("preset.height === videoState.height", body)
 
     def test_reuse_handler_passes_size_preset_key(self):
-        """「复用参数」必须把档位 key 一起传下去。"""
-        body = _js_function_body(APP_JS, 'card.querySelector(\'[data-act="reuse"]\')')
+        """「复用参数」必须把档位 key 一起传下去。
+
+        【2026-11-13 调整】这段解析逻辑已抽成纯函数 reuseConfigFromJob
+        （这样才能被单测真正覆盖 —— 独立验收 P2 实测：
+        处理器零断言时，把宽高删掉 60 条测试仍全绿）。
+        所以断言的位置跟着搬到了新函数里。
+        """
+        body = _js_function_body(APP_JS, "function reuseConfigFromJob(")
         self.assertIn("size_preset_key", body,
                       "复用参数必须带 size_preset_key")
-        self.assertIn("applyConfig({", body)
+        handler = _js_function_body(APP_JS, 'card.querySelector(\'[data-act="reuse"]\')')
+        self.assertIn("reuseConfigFromJob(", handler,
+                      "处理器必须调用被测的纯函数")
 
     def test_reuse_handler_resolves_preset_from_server_manifest(self):
         """档位必须从服务端下发的 size_presets 里查（前端不自己编）。"""
-        body = _js_function_body(APP_JS, 'card.querySelector(\'[data-act="reuse"]\')')
-        self.assertIn("VIDEO_PANEL.options.size_presets", body)
+        body = _js_function_body(APP_JS, "function reuseConfigFromJob(")
+        self.assertIn("size_presets", body)
         self.assertIn("hit ? hit.key", body)
 
     def test_reuse_handler_also_restores_sampling_params(self):
         """复用参数要把采样参数一起带回去（步数/采样器/调度器/shift）。"""
-        body = _js_function_body(APP_JS, 'card.querySelector(\'[data-act="reuse"]\')')
+        body = _js_function_body(APP_JS, "function reuseConfigFromJob(")
         for field in ("steps:", "sampler:", "scheduler:",
                       "shift_video:", "shift_audio:"):
             self.assertIn(field, body, "复用参数缺字段 %s" % field)
