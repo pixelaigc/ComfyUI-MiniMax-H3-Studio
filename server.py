@@ -36,6 +36,7 @@ import aiohttp
 
 from h3studio.workflows import (
     build_workflow,
+    LORAS,
     QWEN_IMAGE_CLIP_COND,
     QWEN_IMAGE_DEFAULT_MODEL,
     QWEN_IMAGE_DEFAULT_TIER,
@@ -87,6 +88,7 @@ from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
 from h3studio import job_meta
+from h3studio import model_recommendations as model_recs
 # 合并说明：video_categories（video-tabs 分支）、comfy_models
 # （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
 # 独立模块，三条 import 都保留。
@@ -1994,6 +1996,11 @@ class JobValidationError(ValueError):
         self.extra = extra or {}
 
 
+#: 旧路径视频加速 LoRA 的**合法 key 白名单**（workflows.LORAS 的真源）。
+#: params["lora"] 只允许是这里的 key，或字面量 "none"。
+#: 【2026-11-13】见 prepare_job_params 里「落库前的 LoRA 白名单闸门」。
+H3_VIDEO_LORAS = dict(LORAS)
+
 #: 允许的生成模式（与 workflows.BUILDERS 一致 —— 后端真实注册的模式）
 JOB_MODES = ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
              "t2a", "a2a")
@@ -2028,6 +2035,30 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     # CFG 例外：H3 标准路径固定 1.0（BasicGuider 没有 cfg 槽位），
     # 面板只做只读说明 —— 这里也不写 params["cfg"]，
     # 免得旧路径的 params 看起来像有个可调的 cfg（实际没人读）。
+    # 【2026-11-13 修 —— 落库前的 LoRA 白名单闸门】
+    # `params["lora"]` 只可能是 workflows.LORAS 里的 key（ckpt850 /
+    # v4step600）或字面量 "none"。这条链路上**原本没有任何白名单校验**：
+    #   * prepare_job_params 只按 lora 决定采样档位，不校验它本身；
+    #   * Agent 的 validate_params 只守 Agent 工具入口，
+    #     面板提交 / 内置 Agent 批量 / 直接调 API 都不经过它。
+    # 于是**任意字符串**都能落进 params["lora"] 并被原样存进 jobs 表。
+    # 用户实测就遇到卡片 LoRA 行显示 `integrated_multimodal_description`
+    # —— 那是 H3 三段式提示词的**字段名**，根本不是 LoRA。
+    #
+    # 这里在**落库前**拦一道：白名单外的值直接丢弃（视为「没传」，
+    # 由工作流走自己的默认档），绝不让脏值进库、也不报错打断用户
+    # （历史任务里已经躺着这类脏值，报错会让老任务无法复用）。
+    #
+    # 读取侧还有第二道闸（job_meta._is_valid_legacy_lora_key），
+    # 负责把**已经落库**的脏值在显示层挡掉 —— 两道闸互补。
+    if mode in ("t2v", "flf", "r2v", "longfilm"):
+        raw_lora = params.get("lora")
+        if raw_lora is not None:
+            raw_lora = str(raw_lora).strip()
+            if raw_lora and raw_lora != "none" and raw_lora not in H3_VIDEO_LORAS:
+                params.pop("lora", None)
+                params.pop("lora_strength", None)
+
     if mode in ("flf", "r2v"):
         # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致**，
         # 否则老客户端（不传 sampler/scheduler）会被静默改画质：
@@ -3175,6 +3206,20 @@ async def api_video_options(request):
                 entry.get("available", True)
             combos.append(entry)
         payload["accel_lora_combos"] = combos
+
+    # 【2026-11-13 新增】作者推荐参数（需求 1 / 2 / 5）
+    #
+    # 每一条加速 LoRA / 主模型都带作者自己写的推荐参数：
+    #   步数 / 调度器 / 采样器 / 视频 shift / 音频 shift / 推荐主模型
+    # 值来自 LoRA 作者的说明（safetensors metadata / 目录 README /
+    # 官方示例工作流）或 ComfyUI 的模型硬性值，**每一项都带 source**。
+    # 作者没写的字段 = "not_provided" -> 前端显示「作者未提供」。
+    payload["accel_lora_recommendations"] = \
+        model_recs.accel_lora_recommendations_payload()
+    payload["model_recommendations"] = \
+        model_recs.model_recommendations_payload()
+    payload["rec_source_kind_label"] = dict(model_recs.SOURCE_KIND_LABEL)
+    payload["rec_field_label"] = dict(model_recs.REC_FIELD_LABEL)
     return json_ok(payload)
 
 

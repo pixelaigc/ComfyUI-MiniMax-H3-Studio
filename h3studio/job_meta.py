@@ -203,8 +203,10 @@ def _t2v_summary(params: dict) -> dict:
         "lora_label": "",
         "lora_strength": None,
         "lora_name": "",
+        "lora_key": "",
         "fixed_lora_label": "",
         "fixed_lora_name": "",
+        "fixed_lora_key": "",
         "fixed_lora_strength": None,
         "source": "t2v_panel",
     }
@@ -234,6 +236,7 @@ def _t2v_summary(params: dict) -> dict:
         out["lora_label"] = _accel_lora_display(key)
         out["lora_name"] = str(combo.get("name") or "")
         out["lora_strength"] = strength
+        out["lora_key"] = key
         break
 
     # 工作流固定的那枚 Turbo LoRA
@@ -242,6 +245,7 @@ def _t2v_summary(params: dict) -> dict:
         fixed = vmodels.VIDEO_ACCEL_LORAS.get(fixed_key) or {}
         out["fixed_lora_label"] = _fixed_accel_lora_display(fixed_key)
         out["fixed_lora_name"] = str(fixed.get("name") or "")
+        out["fixed_lora_key"] = fixed_key
         strength = params.get("fixed_accel_strength")
         if strength is None:
             strength = fixed.get("recommended_strength", 1.0)
@@ -256,7 +260,43 @@ def _t2v_summary(params: dict) -> dict:
 # ------------------------------------------------------------------
 # 旧版视频路径（flf / r2v，以及历史 t2v 任务）
 # ------------------------------------------------------------------
+
+def _is_valid_legacy_lora_key(value: str) -> bool:
+    """`params["lora"]` 是否是**真实存在**的加速 LoRA key。
+
+    【白名单的来源】workflows.LORAS —— 工作流里真正会挂上去的那张表。
+    只有那里的 key 才可能是「这条任务真的用了某枚加速 LoRA」。
+
+    【为什么必须有这道闸 —— 2026-11-13 用户报的真实 BUG】
+    用户在媒体库「文生视频」卡片上看到 LoRA 行显示
+        integrated_multimodal_description
+    那是 **H3 三段式提示词的字段名**（integrated_multimodal_description /
+    overall_soundscape / non_diegetic_music），**根本不是 LoRA**。
+    而该任务实际并没有使用这枚「LoRA」。
+
+    根因链（已逐环核实）：
+      1. 落库端 `params["lora"]` 这条路径**没有白名单校验** ——
+         `prepare_job_params` 不校验 lora（它只按 lora 决定采样档位），
+         Agent 的 `validate_params` 只管 Agent 工具入口，
+         面板提交 / 内置 Agent 批量 / 直接调 API 都不经过它。
+      2. 摘要层 `job_meta._legacy_video_summary` 把 `params["lora"]`
+         **原样透传**进 `lora_label`（没有查表、没有校验）。
+      3. 前端 `loraLabel()` 直接渲染 `lora_label` ->
+         提示词字段名就被当成 LoRA 名显示出来了。
+
+    本函数是第 2 环的闸门：不在白名单里的值一律**不认**。
+
+    【注意】字面量 "none"（明确选「不用加速 LoRA」）不在 workflows.LORAS 里，
+    但它是**合法语义**，由调用方单独处理（见 _legacy_video_summary）。
+    """
+    if not value:
+        return False
+    from . import workflows as wf
+    return value in (wf.LORAS or {})
+
+
 def _legacy_video_summary(params: dict, mode: str = "") -> dict:
+
     """旧路径视频模式的模型 / LoRA 摘要。
 
     旧路径用的是 `model`（"lora" / "standard"）与 `lora`（"ckpt850" /
@@ -274,7 +314,20 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
     所以默认值必须按 mode 区分，否则 r2v 卡片会显示成 FL2VA（错的）。
 
     这些默认值全部取自**工作流源码里的真实常量**，不是编的。
+
+    【2026-11-13 修 —— LoRA 字段白名单】
+    `params["lora"]` **必须**是工作流.LORAS 里的 key（ckpt850 / v4step600）
+    或字面量 "none"。但这条链路上**没有白名单校验**：
+      * prepare_job_params 不校验 lora（只按它决定采样档位）；
+      * Agent 的 validate_params 只校验 Agent 工具入口，
+        面板 / 内置 Agent 批量 / 直接调 API 都不经过它。
+    于是**任意字符串**都能落进 params["lora"]。用户实测就遇到
+    卡片 LoRA 行显示 `integrated_multimodal_description` ——
+    那是 H3 提示词的**字段名**（H3 三段式提示词的第一段），根本不是 LoRA。
+    根因就是这里**原样透传**，前端又把它当 LoRA 名渲染。
+    修法：只认白名单里的 key，其余一律当「没有 LoRA」（不是编一个名字）。
     """
+
     out = {
         "model_key": "",
         "model_label": "",
@@ -282,8 +335,10 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
         "lora_label": "",
         "lora_strength": None,
         "lora_name": "",
+        "lora_key": "",
         "fixed_lora_label": "",
         "fixed_lora_name": "",
+        "fixed_lora_key": "",
         "fixed_lora_strength": None,
         "source": "legacy_video",
     }
@@ -318,18 +373,34 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
     if lora == "none":
         # 明确选了「不用加速 LoRA」
         out["lora_label"] = ""
-    elif lora:
+    elif lora and _is_valid_legacy_lora_key(lora):
         out["lora_label"] = lora
         out["lora_name"] = str(wf.LORAS.get(lora) or "")
+        out["lora_key"] = lora
         try:
             out["lora_strength"] = float(params.get("lora_strength", 1.0))
         except (TypeError, ValueError):
             out["lora_strength"] = 1.0
+    elif lora:
+        # 【2026-11-13 修】白名单外的值 —— 当作「没有 LoRA」。
+        #
+        # 复现（用户 2026-11-13 截图）：params["lora"] 里躺的是
+        #   "integrated_multimodal_description"
+        # 那是 H3 三段式提示词的**字段名**，不是 LoRA。
+        # 旧实现把它原样塞进 lora_label，前端就把它当 LoRA 名渲染出来了。
+        #
+        # 这里**如实当没有 LoRA**（lora_label 留空 -> 前端显示「无」），
+        # 绝不把来路不明的字符串当 LoRA 展示，也不编一个名字。
+        out["lora_label"] = ""
+        out["lora_name"] = ""
+        out["lora_strength"] = None
+        out["lora_rejected"] = lora
     else:
         # 【没有记录 lora】-> 工作流默认 ckpt850（workflows._h3_video_workflow:
         # `lora = params.get("lora", "ckpt850")`），并且**确实挂上了**。
         out["lora_label"] = "ckpt850"
         out["lora_name"] = str(wf.LORAS.get("ckpt850") or "")
+        out["lora_key"] = "ckpt850"
         out["lora_strength"] = 1.0
     return out
 
@@ -355,8 +426,10 @@ def _image_summary(params: dict, mode: str = "") -> dict:
         "lora_label": "",
         "lora_strength": None,
         "lora_name": "",
+        "lora_key": "",
         "fixed_lora_label": "",
         "fixed_lora_name": "",
+        "fixed_lora_key": "",
         "fixed_lora_strength": None,
         "source": "image",
     }
@@ -422,8 +495,10 @@ def _music_summary(params: dict) -> dict:
         "lora_label": "",
         "lora_strength": None,
         "lora_name": "",
+        "lora_key": "",
         "fixed_lora_label": "",
         "fixed_lora_name": "",
+        "fixed_lora_key": "",
         "fixed_lora_strength": None,
         "source": "music",
     }
@@ -478,4 +553,102 @@ def summarize(mode: str, params: dict) -> dict:
     # 保证 summarize() 返回的形状恒定（前端只渲染，不判断字段是否存在）。
     # 图像 / 音乐模式本来就没有注意力机制，字段会是空值（不编造）。
     out.update(_attention_summary(params))
+    # 【2026-11-13 新增】完整生成参数 + 作者推荐参数 ——
+    # 需求 C2/C3：卡片要显示模型/步数/调度器/采样器/尺寸/时长/seed/
+    # LoRA 列表；模态框还要显示 shift、注意力、任务来源与工作流名。
+    #
+    # 【为什么要放在服务端算】前端只能读它**下发**的字段，
+    # 自己从 params 里猜就会回到「按位置/模糊匹配」的老毛病
+    # （用户 2026-11-13 报的 BUG 根因就是前端拿到脏值直接渲染）。
+    # 服务端算好 -> 前端只渲染，字段语义恒定。
+    out.update(_generation_params(params))
+    out.update(_recommendations(out))
     return out
+
+
+# ------------------------------------------------------------------
+# 完整生成参数（C2 / C3 / C4 的唯一真源）
+# ------------------------------------------------------------------
+
+#: 生成参数的字段白名单（前端只渲染这些键，不做模糊匹配）。
+#:
+#: 【为什么要白名单】用户 2026-11-13 报的 BUG：卡片的 LoRA 行显示了
+#: `integrated_multimodal_description`（H3 提示词字段名），且卡片完全不显示
+#: 步数/调度器。根因就是取值时**按位置/模糊匹配**，而不是按明确 key 读。
+#: 这里把「能显示什么」钉死成一个清单：前端遍历这份清单渲染，
+#: 清单外的 params 键**一律不显示**（提示词、描述、工作流节点名等）。
+GENERATION_PARAM_FIELDS = (
+    "steps", "sampler", "scheduler", "cfg",
+    "shift_video", "shift_audio",
+    "width", "height", "aspect", "resolution",
+    "duration", "seed",
+    "twopass",
+)
+
+#: 字段 -> 中文显示名（前端模态框用）。
+GENERATION_PARAM_LABEL = {
+    "steps": "步数",
+    "sampler": "采样器",
+    "scheduler": "调度器",
+    "cfg": "CFG",
+    "shift_video": "视频 shift",
+    "shift_audio": "音频 shift",
+    "width": "宽",
+    "height": "高",
+    "aspect": "画面比例",
+    "resolution": "分辨率档位",
+    "duration": "时长（秒）",
+    "seed": "种子",
+    "twopass": "二采（SelfLift）",
+}
+
+
+def _generation_params(params: dict) -> dict:
+    """从 params 里按**白名单**取出生成参数。
+
+    【铁律】
+      * 只认 `GENERATION_PARAM_FIELDS` 里的键 —— 提示词、描述、
+        工作流节点名等**不在白名单里**，因此永远不会被显示成参数。
+      * 取不到的值一律留 `None` -> 前端显示「—」，
+        **绝不用别的字段顶替**（用户明确要求：「取不到的值显示「—」，
+        不得用其它字段顶替」）。
+    """
+    params = params or {}
+    out: dict = {field: None for field in GENERATION_PARAM_FIELDS}
+
+    for field in ("steps", "sampler", "scheduler", "cfg",
+                  "shift_video", "shift_audio",
+                  "width", "height", "aspect", "resolution",
+                  "duration", "seed"):
+        if field not in params:
+            continue
+        value = params.get(field)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                continue
+        out[field] = value
+
+    twopass = params.get("twopass")
+    if isinstance(twopass, dict) and twopass:
+        out["twopass"] = twopass
+    return out
+
+
+def _recommendations(summary: dict) -> dict:
+    """挂上作者推荐参数（需求 1 / 2 / 5）。
+
+    底模与加速 LoRA 各自一份，字段形状固定，取不到就是 not_provided。
+    """
+    from . import model_recommendations as mrec
+    model_key = str(summary.get("model_key") or "")
+    lora_key = str(summary.get("lora_key") or "")
+    fixed_key = str(summary.get("fixed_lora_key") or "")
+    return {
+        "model_recommendation": mrec.model_recommendation(model_key),
+        "lora_recommendation": mrec.accel_lora_recommendation(lora_key),
+        "fixed_lora_recommendation": mrec.accel_lora_recommendation(fixed_key),
+    }
+
