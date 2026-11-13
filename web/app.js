@@ -3138,6 +3138,69 @@ function renderJobBatches(job) {
     <div class="job-batches" data-batches ${open ? "" : "hidden"}>${cells}</div>`;
 }
 
+/**
+ * 「复用参数」的配置解析 —— **纯函数**（无 DOM 依赖），供单测直接调用。
+ *
+ * 【为什么要抽出来】之前这段逻辑埋在 jobCard 的点击回调里，
+ * 测试只能覆盖 applyConfig 层，**处理器本身零覆盖** ——
+ * 于是「把宽高删掉」这种回归 60 条测试仍然全绿（独立验收实测）。
+ * 抽成纯函数后，单测可以喂真实形状的 job/params，直接断言回填结果。
+ *
+ * @param {object} job    任务对象（含 resolution_info —— 服务端按产物实际像素算好）
+ * @param {object} p      任务的 params（老任务可能没有 width/height / model_key）
+ * @param {object} panel  window.VIDEO_PANEL（拿 state 与 size_presets 清单）
+ * @returns {object} 给 VIDEO_PANEL.applyConfig() 的配置对象
+ */
+function reuseConfigFromJob(job, p, panel) {
+  job = job || {};
+  p = p || {};
+  panel = panel || {};
+  const panelState = panel.state || {};
+  //
+  // 【修复 2026-11-13 —— 宽高兜底，多种来源】
+  // params.width/height 是「真正的实配来源」，但**并非所有任务都有** ——
+  // 内置 Agent / 旧版变体创建的老任务里没有 width/height，model_key 也为空。
+  // 旧实现把 p.model_key 当门槛，导致这批任务**整个回填分支被跳过**，
+  // 宽高完全不回填（实测停在 640×352，档位停在「自定义」）。
+  // 现在按优先级取：
+  //   1. params.width/height —— 最新任务，真正的实配来源；
+  //   2. job.resolution_info.width/height —— 服务端按**产物实际像素**算好的，
+  //      老任务的真实尺寸在这里（source="actual"）；
+  //   3. 都没有 -> 留空，applyConfig 会保持面板现状（不编造尺寸）。
+  const resoInfo = job.resolution_info || {};
+  const reusedWidth = Number(p.width) || Number(resoInfo.width) || 0;
+  const reusedHeight = Number(p.height) || Number(resoInfo.height) || 0;
+  const reusedAspect = p.aspect || resoInfo.aspect || panelState.aspect || "16:9";
+  const presets = (panel.options && panel.options.size_presets) || [];
+  const hit = presets.find(pp => pp.aspect === reusedAspect
+    && pp.width === reusedWidth && pp.height === reusedHeight);
+  return {
+    model: p.model_key,
+    aspect: reusedAspect,
+    // 【修复 2026-11-13】用解析出的宽高（params → resolution_info），
+    // 不要再直接取 p.width/p.height —— 那两个参数对老任务是 undefined。
+    width: reusedWidth || undefined,
+    height: reusedHeight || undefined,
+    rawWidth: reusedWidth || undefined,
+    rawHeight: reusedHeight || undefined,
+    custom: true,
+    // 【2026-11-12】档位 key：由宽高在服务端下发的清单里反查，
+    // 查不到就留空（applyConfig 会自己按宽高反查）。唯一真相源仍是服务端清单。
+    size_preset_key: hit ? hit.key : "",
+    fixed_accel_lora: p.fixed_accel_lora,
+    accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
+    attention: p.attention,
+    twopass: p.twopass,
+    // 【2026-11-12】采样参数也要一起复用（原来没带，
+    // 于是「复用参数」后步数/采样器/调度器/shift 都丢回默认值）。
+    steps: p.steps,
+    sampler: p.sampler,
+    scheduler: p.scheduler,
+    shift_video: p.shift_video,
+    shift_audio: p.shift_audio,
+  };
+}
+
 function jobCard(job) {
   const p = job.params || {};
   const info = MODE_INFO[job.mode] || { name: job.mode };
@@ -3349,7 +3412,7 @@ function jobCard(job) {
     activateVideoMode(job.mode);
     $("#prompt").value = p.prompt || "";
     clearPromptEnhanced();
-    if (job.mode === "t2v" && p.model_key && window.VIDEO_PANEL) {
+    if (job.mode === "t2v" && window.VIDEO_PANEL) {
       // 文生视频新面板：还原宽高 / 模型 / 加速 LoRA / 注意力 / 二采
       //
       // 【2026-11-12 修 —— 「复用参数」不填分辨率】
@@ -3359,34 +3422,11 @@ function jobCard(job) {
       // 下拉却显示「480p · 864×480」），用户以为分辨率没填上。
       // 现在：**由宽高反查**出档位 key 一起传下去（唯一真相源仍是
       // 服务端下发的 size_presets 清单，前端不自己编档位）。
-      const panelState = window.VIDEO_PANEL.state;
-      const reusedWidth = Number(p.width) || 0;
-      const reusedHeight = Number(p.height) || 0;
-      const reusedAspect = p.aspect || panelState.aspect || "16:9";
-      const presets = window.VIDEO_PANEL.options.size_presets || [];
-      const hit = presets.find(pp => pp.aspect === reusedAspect
-        && pp.width === reusedWidth && pp.height === reusedHeight);
-      window.VIDEO_PANEL.applyConfig({
-        model: p.model_key,
-        aspect: reusedAspect,
-        width: p.width, height: p.height,
-        rawWidth: p.width, rawHeight: p.height,
-        custom: true,
-        // 【2026-11-12】档位 key：优先用服务端记录的分辨率反查，
-        // 查不到就留空（applyConfig 会自己按宽高反查）。
-        size_preset_key: hit ? hit.key : "",
-        fixed_accel_lora: p.fixed_accel_lora,
-        accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
-        attention: p.attention,
-        twopass: p.twopass,
-        // 【2026-11-12】采样参数也要一起复用（原来没带，
-        // 于是「复用参数」后步数/采样器/调度器/shift 都丢回默认值）。
-        steps: p.steps,
-        sampler: p.sampler,
-        scheduler: p.scheduler,
-        shift_video: p.shift_video,
-        shift_audio: p.shift_audio,
-      });
+      // 【修复 2026-11-13】复用配置的**解析**抽成独立函数（reuseConfigFromJob），
+      // 这样它能被单测直接调用 —— 上一轮 P1 漏网正是因为回填逻辑埋在
+      // DOM 事件回调里，测试只能测 applyConfig 层，处理器本身零覆盖。
+      const reuseCfg = reuseConfigFromJob(job, p, window.VIDEO_PANEL);
+      window.VIDEO_PANEL.applyConfig(reuseCfg);
       window.VIDEO_PANEL.render();
       if (p.duration) {
         state.duration = p.duration;
