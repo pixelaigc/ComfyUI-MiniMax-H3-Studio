@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import random
 
+from . import continuation as cont
+from . import continuation_service as cont_service
 from . import video_models as vmodels
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
@@ -264,38 +266,291 @@ def build_t2v_panel(params: dict) -> dict:
     twopass = params.get("twopass") or {}
     use_twopass = bool(twopass.get("enabled"))
 
+    # ---- 接续（continuation）----
+    #
+    # 【插在哪】拷贝桥改的是**采样器的 latent 输入**，所以它必须接在
+    # `latent_ref` 与采样器**之间**；裁重叠（TrimAV）改的是 **decode 之后
+    # 的像素帧**，所以它必须接在 VAEDecode 之后。两头都不能接错。
+    #
+    # 两种接续形态：
+    #   * 首段（无上游）：latent 直通采样器；采样器的输出**落盘**成接力棒。
+    #   * 续接段（有上游）：读回上游潜空间 -> 拷贝桥（逐位拷贝尾段 + 噪声掩码）
+    #     -> 采样器；采样器的输出**落盘**成下一段的接力棒；
+    #     decode 之后经裁重叠（裁掉钉住区）再合成视频。
+    #
+    # 【为什么二采不走这条路】见 h3studio/continuation.py 的模块说明：
+    # 二采的潜空间与标准采样路径不同源，接续会位移。服务端在
+    # continuation.continuation_allowed() 里已经拦掉了，这里再兜一次底。
+    cont_state = _continuation_state(params)
+    latent_in_ref = latent_ref
+    cond_ref = ["105:104", 0]
+    trim_ref = None
+
+    if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
+        # ---- 续接段：读回上游潜空间 -> 拷贝桥 ----
+        #
+        # 【读回哪一份 —— 这是本段最关键的一根线】
+        # 读回的是**上游自己那一份**潜空间，路径由服务端从上游任务记录
+        # 权威算出（`source_latent_path`），以 `explicit_path` 交给节点。
+        #
+        # 【为什么不用「按链段号推坐标」】用户需求第 7 条允许对同一段
+        # 反复接续 -> 同一条链会**分叉**成兄弟分支 B1 / B2。若按
+        # 「链目录 + 链段号」推坐标，B1 与 B2 的坐标完全相同 ->
+        # 写同一个文件、互相覆盖 -> 再接续时读到兄弟分支的潜空间，
+        # 产出**静默的错误内容**（实测 C1 首帧 vs B1末帧 MAE 38.65、
+        # vs B2末帧 2.08，偏离 18.6 倍）。
+        # 每段一个专属目录（run_id 由该段自己的任务 id 派生），
+        # 结构上就不可能互相覆盖 —— 详见 continuation.segment_run_id。
+        p["300:load"] = {
+            "inputs": {
+                "run_id": cont_state["source_run_id"],
+                # 有 explicit_path 时节点直接读那个文件（不再按段号推）。
+                # 段号给「上游的段号 + 1」只为让节点内部的报错信息可读。
+                "stage_index": cont_state["source_stage"] + 1,
+                "explicit_path": cont_state["source_path"],
+            },
+            "class_type": "H3RelayLatentLoad",
+            "_meta": {"title": "接续·读回上游潜空间"},
+        }
+        # 外观锚：链首段那一份（防长程漂移）。
+        # 每段一个目录之后，链首段的潜空间在**另一个目录** —— 拷贝桥
+        # 靠 run_id 自动读锚的能力用不上了，必须显式读一份接进来。
+        # 锚是**可选**的：找不到就不接（缺锚只是漂移风险，不是接错段）。
+        anchor_latent_ref = None
+        if cont_state["anchor_path"]:
+            p["300:anchor_load"] = {
+                "inputs": {
+                    "run_id": cont_state["anchor_run_id"],
+                    "stage_index": cont_state["anchor_stage"] + 1,
+                    "explicit_path": cont_state["anchor_path"],
+                },
+                "class_type": "H3RelayLatentLoad",
+                "_meta": {"title": "接续·读回链首段潜空间（外观锚）"},
+            }
+            anchor_latent_ref = ["300:anchor_load", 0]
+        p["300:bridge"] = {
+            "inputs": {
+                "latent": latent_ref,
+                "context_frames": cont_state["context_frames"],
+                "context_latent": ["300:load", 0],
+                # hard = 钉住区零重绘（真续接唯一推荐档）。
+                "mask_mode": "hard",
+                "pin_audio": True,
+                # 段号 >= 1 且没有 context_latent 时拷贝桥会 raise ——
+                # 我们永远接了 context_latent，所以段号给真实值即可。
+                "stage_index": cont_state["source_stage"],
+                "run_id": cont_state["source_run_id"],
+                # 外观锚：显式接进来（每段一个目录后不能再靠自动读）。
+                "ref_anchor_latent": anchor_latent_ref,
+                "ref_anchor_stage": -1,
+                "ref_anchor_frames": cont_state["anchor_frames"],
+                # 第 4 路：conditioning 钉帧（管取景/构图）。
+                "conditioning": cond_ref,
+            },
+            "class_type": "H3RelayCopyBridge",
+            "_meta": {"title": "接续·拷贝桥（零重编码潜空间桥）"},
+        }
+        latent_in_ref = ["300:bridge", 0]
+        cond_ref = ["300:bridge", 3]
+        trim_ref = ["300:bridge", 2]
+
     if use_twopass:
         # 二采路径的 CFG 来自 twopass.cfg（面板上二采区块里的真控件），
         # 没给才回落到模型默认值。
         samples_ref = _twopass_block(p, model_ref, steps, scheduler, sampler, seed,
                                      cfg, twopass, width, height, duration,
-                                     latent_ref)
+                                     latent_in_ref)
     else:
         p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
                    "_meta": {"title": "噪波"}}
-        p["16"] = {"inputs": {"model": model_ref, "conditioning": ["105:104", 0]},
+        p["16"] = {"inputs": {"model": model_ref, "conditioning": cond_ref},
                    "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
         p["14"] = {"inputs": {"noise": ["15", 0], "guider": ["16", 0],
                                "sampler": ["17", 0], "sigmas": ["9", 0],
-                               "latent_image": latent_ref},
+                               "latent_image": latent_in_ref},
                    "class_type": "SamplerCustomAdvanced", "_meta": {"title": "采样"}}
         samples_ref = ["14", 0]
 
     # ---- 解码 + 合成 + 保存 ----
     prefix = f"h3studio/t2v_{job_id}"
+
     p["10"] = {"inputs": {"samples": samples_ref, "vae": ["105:11", 0]},
                "class_type": "VAEDecode", "_meta": {"title": "解码视频"}}
     p["24"] = {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader",
                "_meta": {"title": "音频 VAE"}}
     p["23"] = {"inputs": {"samples": samples_ref, "vae": ["24", 0]},
                "class_type": "VAEDecodeAudio", "_meta": {"title": "解码音频"}}
-    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": ["10", 0],
-                          "audio": ["23", 0]},
+
+    # ---- 裁重叠：去掉钉住区（音画同裁，保住 A/V 同步）----
+    if trim_ref is not None:
+        p["300:trim"] = {
+            "inputs": {
+                "images": ["10", 0],
+                "audio": ["23", 0],
+                "trim_frames": trim_ref,
+                "fps": 24,
+                # 沉降帧保持 0：只裁钉住区。Relay-Kit 实测「裁沉降」才是
+                # 缝处跳帧的源头（裁 0 帧跳 0.020 几乎无感 / 裁 16 帧 0.055）。
+                "settle_frames": 0,
+                "seam_ghost": 0,
+            },
+            "class_type": "H3RelayTrimAV",
+            "_meta": {"title": "接续·裁重叠（裁掉钉住区，音画同裁）"},
+        }
+        video_images_ref = ["300:trim", 0]
+        video_audio_ref = ["300:trim", 1]
+    else:
+        video_images_ref = ["10", 0]
+        video_audio_ref = ["23", 0]
+
+    # ---- 落盘接力棒 ----
+    # 采样器的输出（latent）落盘，供下一段读回。
+    # 节点名 H3RelayLatentSave：把本段 AV latent 存成文件，它是下一段的「接力棒」。
+    #
+    # 【写在哪】写进**本段自己的专属目录**（run_id 由本段任务 id 派生，
+    # 段号恒 0）。这样兄弟分支各写各的目录 —— 结构上不可能互相覆盖。
+    # 详见 continuation.segment_run_id 的说明。
+    if cont_state["enabled"]:
+        p["300:save"] = {
+            "inputs": {
+                "latent": samples_ref,
+                "run_id": cont_state["own_run_id"],
+                "stage_index": 0,
+                "note": f"h3studio job {job_id}",
+            },
+            "class_type": "H3RelayLatentSave",
+            "_meta": {"title": "接续·落盘本段潜空间（下一段的接力棒）"},
+        }
+
+    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": video_images_ref,
+                          "audio": video_audio_ref},
                "class_type": "CreateVideo", "_meta": {"title": "合成视频"}}
     p["92"] = {"inputs": {"filename_prefix": prefix, "format": "auto", "codec": "auto",
                           "video": ["91", 0]},
                "class_type": "SaveVideo", "_meta": {"title": "保存视频"}}
     return p
+
+
+def _continuation_state(params: dict) -> dict:
+    """从任务参数算出「这次要不要接续、接谁的第几段」。
+
+    返回：
+      {
+        "enabled":        本次任务是否参与接续（会落盘接力棒）,
+        "has_source":     本次是否是「续接段」（有上游潜空间）,
+        "own_run_id":     **本段自己**的落盘目录名（接力棒写这里）,
+        "source_run_id":  上游的落盘目录名（从那里读）,
+        "source_stage":   上游在那个目录里的段号,
+        "source_path":    上游潜空间文件的**绝对路径**（有上游时必填）,
+        "anchor_path":    链首段潜空间文件的绝对路径（外观锚用）,
+        "context_frames": 钉住窗口（像素帧）,
+        "anchor_frames":  外观锚帧数,
+      }
+
+    【参数来源】前端回填的接续上下文会带 `continuation` 字段，
+    服务端在提交前会**权威重算**并补齐其中的落盘坐标：
+      {
+        "chain_id":    链 id（同一链的所有段共用）,
+        "stage_index": 本段段号,
+        "source_job":  上游任务 id,
+        "source_latent_run_id": 上游的落盘目录名,
+        "source_latent_stage":  上游在那个目录里的段号,
+        "source_latent_path":   上游潜空间文件的绝对路径,
+        "anchor_latent_path":   链首段潜空间文件的绝对路径,
+        "context_frames": 钉住窗口,
+      }
+    没有这个字段 = 不接续（普通生成）。
+
+    【为什么「自己的目录」与「上游的目录」要分开】
+    本段要**读**上游那份、**写**自己那份。若两者共用一个目录 +
+    段号，兄弟分支（B1/B2）会撞同一个文件互相覆盖 ——
+    详见 continuation.segment_run_id 的说明。
+    """
+    info = (params or {}).get("continuation")
+    blank = {"enabled": False, "has_source": False, "own_run_id": "",
+             "source_run_id": "", "source_stage": 0, "source_path": "",
+             "anchor_path": "", "context_frames": 0,
+             "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES}
+    if not isinstance(info, dict) or not info:
+        return dict(blank)
+
+    chain_id = str(info.get("chain_id") or "").strip()
+    if not chain_id:
+        return dict(blank)
+
+    # 本段自己的落盘目录：服务端写死 `latent_run_id`（由本段任务 id 派生）。
+    # 兜底：没有这个字段时用本段任务 id 现算（协议层单一真源）。
+    own_run_id = str(info.get("latent_run_id") or "").strip()
+    if not own_run_id:
+        job_id = str((params or {}).get("job_id") or "").strip()
+        own_run_id = cont.segment_run_id(job_id) if job_id else ""
+
+    # 上游的落盘坐标：服务端从上游任务记录**权威算出**后写在这里。
+    source_run_id = str(info.get("source_latent_run_id") or "").strip()
+    try:
+        source_stage = int(info.get("source_latent_stage", 0))
+    except (TypeError, ValueError):
+        source_stage = 0
+    source_stage = max(0, source_stage)
+    if not source_run_id:
+        # 兼容旧任务：没有权威坐标时按老规则推（链目录 + 链段号）。
+        source_run_id, source_stage = cont.latent_coords(info)
+
+    source_job = str(info.get("source_job") or "").strip()
+    has_source = bool(source_job and source_run_id)
+
+    # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
+    source_path = str(info.get("source_latent_path") or "").strip()
+    if not source_path and source_run_id:
+        source_path = str(cont.stage_file_path(
+            cont_service.comfy_output_dir(), source_run_id, source_stage))
+
+    # 外观锚：链首段那份（防长程漂移）。
+    anchor_path = str(info.get("anchor_latent_path") or "").strip()
+    anchor_run_id = str(info.get("anchor_latent_run_id") or "").strip()
+    try:
+        anchor_stage = int(info.get("anchor_latent_stage", 0))
+    except (TypeError, ValueError):
+        anchor_stage = 0
+    anchor_stage = max(0, anchor_stage)
+
+    # 钉住窗口：必须落在 5+17k 网格上，否则拷贝桥切不出来。
+    raw_window = info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES
+    try:
+        window = int(raw_window)
+    except (TypeError, ValueError):
+        window = cont.DEFAULT_CONTEXT_FRAMES
+    if not cont.valid_context_frames(window):
+        window = cont.snap_context_frames(window) or cont.DEFAULT_CONTEXT_FRAMES
+
+    try:
+        source_segment = int(info.get("source_segment", 0))
+    except (TypeError, ValueError):
+        source_segment = 0
+
+    anchor_frames = info.get("anchor_frames")
+    try:
+        anchor_frames = int(anchor_frames)
+    except (TypeError, ValueError):
+        anchor_frames = cont.DEFAULT_CONTEXT_FRAMES
+    if not cont.valid_context_frames(anchor_frames):
+        anchor_frames = cont.snap_context_frames(anchor_frames) or cont.DEFAULT_CONTEXT_FRAMES
+
+    return {
+        "enabled": True,
+        "has_source": has_source,
+        "own_run_id": own_run_id,
+        "source_run_id": source_run_id,
+        "source_stage": source_stage,
+        "source_path": source_path,
+        "anchor_path": anchor_path,
+        "anchor_run_id": anchor_run_id,
+        "anchor_stage": anchor_stage,
+        "context_frames": window,
+        "anchor_frames": anchor_frames,
+        "source_job": source_job,
+        "source_segment": source_segment,
+    }
 
 
 def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,

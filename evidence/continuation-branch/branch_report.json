@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "step": "A",
+      "job": "d35172b58ae9",
+      "seg_frames": 124,
+      "latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sd35172b58ae9/stage_00000.safetensors",
+      "latent_exists": true,
+      "latent_bytes": 4827267
+    },
+    {
+      "step": "B1_B2",
+      "b1_latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sb02ebd2f67a9/stage_00000.safetensors",
+      "b2_latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s4c17361ac818/stage_00000.safetensors",
+      "b1_bytes": 4827267,
+      "b2_bytes": 4827267,
+      "both_exist": true,
+      "contents_differ": true,
+      "b1_frames": 102,
+      "b2_frames": 102,
+      "b1_full": "/tmp/h3t2v-branch-data/outputs/videos/v-h3-studio-000003.mp4",
+      "b2_full": "/tmp/h3t2v-branch-data/outputs/videos/v-h3-studio-000005.mp4"
+    },
+    {
+      "step": "C1",
+      "job": "362488086cb1",
+      "seg_frames": 102,
+      "latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s362488086cb1/stage_00000.safetensors",
+      "latent_exists": true,
+      "full": "/tmp/h3t2v-branch-data/outputs/videos/v-h3-studio-000007.mp4",
+      "full_frames": 328,
+      "mae_vs_B1_last": 4.647,
+      "mae_vs_B2_last": 22.598,
+      "verdict": "B1(正确)",
+      "frames_b1": "/tmp/h3-branch-frames/v-h3-studio-000002-last.png",
+      "frames_b2": "/tmp/h3-branch-frames/v-h3-studio-000004-last.png",
+      "frames_c1": "/tmp/h3-branch-frames/v-h3-studio-000006-first.png"
+    }
+  ],
+  "ok": true,
+  "result": {
+    "ok": true,
+    "verdict": "B1(正确)",
+    "mae_b1": 4.647475469680059,
+    "mae_b2": 22.598350888206845,
+    "ratio": 4.86250030487252
+  }
+}

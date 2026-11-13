@@ -1,0 +1,100 @@
+{
+  "base": "http://127.0.0.1:8202",
+  "widths": {
+    "375": {
+      "width": 375,
+      "clicked_continue_on_A": true,
+      "after_continue": {
+        "hasContext": true,
+        "sourceJob": "af52f14f1e20",
+        "srcWidth": 768,
+        "srcHeight": 448,
+        "panelVisible": true,
+        "panelText": "接续上下文\n清除\n接续自生成库里的「af52f14f1e20」（t2v_af52f14f1e20_00001_.mp4）\n当前累计时长\n5.167s\n模型\nMiniMax-H3 FL2VA · 完整 int8（保真最高）\n固定加速 LoRA\nTurbo 4 步 · ckpt850（工作流固定）\n注意力机制\n默认（PyTorch 稠密注意力）\n二采\n关闭\n输出尺寸\n768×448\n时长\n5.0s\n采样步数\n4\n采样器\neuler\n调度器\nsimple\nshift（视频）\n12.00\nshift（音频）\n3.00\nCFG\n1.00\n种子\n4242\n提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。 生成结果会自动拼成完整视频。"
+      },
+      "clicked_reuse_on_B": true,
+      "after_reuse": {
+        "contextStillPresent": false,
+        "panelHidden": true,
+        "panelText": "",
+        "panelSize": [
+          1024,
+          576
+        ],
+        "prompt": "A red lantern festival at night with crowds walking",
+        "seed": "9999",
+        "toast": "已清除接续上下文（来源「af52f14f1e20」）—— 「复用参数」是独立重生成，不与接续混用。"
+      },
+      "payload_captured": true,
+      "submit_payload": {
+        "has_continuation": false,
+        "width": 1024,
+        "height": 576,
+        "prompt": "MIXED STATE BROWSER PROBE",
+        "seed": "9999"
+      },
+      "assertions": {
+        "payload_was_captured": true,
+        "context_cleared_after_reuse": true,
+        "context_panel_hidden": true,
+        "no_continuation_in_payload": true,
+        "panel_size_is_B": true,
+        "prompt_from_B": true
+      },
+      "console_errors": [],
+      "failed_requests": []
+    },
+    "1280": {
+      "width": 1280,
+      "clicked_continue_on_A": true,
+      "after_continue": {
+        "hasContext": true,
+        "sourceJob": "af52f14f1e20",
+        "srcWidth": 768,
+        "srcHeight": 448,
+        "panelVisible": true,
+        "panelText": "接续上下文\n清除\n接续自生成库里的「af52f14f1e20」（t2v_af52f14f1e20_00001_.mp4）\n当前累计时长\n5.167s\n模型\nMiniMax-H3 FL2VA · 完整 int8（保真最高）\n固定加速 LoRA\nTurbo 4 步 · ckpt850（工作流固定）\n注意力机制\n默认（PyTorch 稠密注意力）\n二采\n关闭\n输出尺寸\n768×448\n时长\n5.0s\n采样步数\n4\n采样器\neuler\n调度器\nsimple\nshift（视频）\n12.00\nshift（音频）\n3.00\nCFG\n1.00\n种子\n4242\n提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。 生成结果会自动拼成完整视频。"
+      },
+      "clicked_reuse_on_B": true,
+      "after_reuse": {
+        "contextStillPresent": false,
+        "panelHidden": true,
+        "panelText": "",
+        "panelSize": [
+          1024,
+          576
+        ],
+        "prompt": "A red lantern festival at night with crowds walking",
+        "seed": "9999",
+        "toast": "已清除接续上下文（来源「af52f14f1e20」）—— 「复用参数」是独立重生成，不与接续混用。"
+      },
+      "payload_captured": true,
+      "submit_payload": {
+        "has_continuation": false,
+        "width": 1024,
+        "height": 576,
+        "prompt": "MIXED STATE BROWSER PROBE",
+        "seed": "9999"
+      },
+      "assertions": {
+        "payload_was_captured": true,
+        "context_cleared_after_reuse": true,
+        "context_panel_hidden": true,
+        "no_continuation_in_payload": true,
+        "panel_size_is_B": true,
+        "prompt_from_B": true
+      },
+      "console_errors": [],
+      "failed_requests": []
+    }
+  },
+  "console_errors": [],
+  "failed_requests": [],
+  "cards": {
+    "A": "af52f14f1e20",
+    "B": "b7816bc549d9"
+  },
+  "no_console_errors": true,
+  "no_failed_requests": true,
+  "verdict_pass": true
+}
