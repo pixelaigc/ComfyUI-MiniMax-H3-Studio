@@ -56,7 +56,8 @@ SOURCE_KIND_LABEL = {
 
 def _rec(steps=None, scheduler=None, sampler=None,
          shift_video=None, shift_audio=None,
-         base_model=None, source_kind=None, source=None, note=""):
+         base_model=None, source_kind=None, source=None, note="",
+         field_sources=None):
     """构造一条推荐参数记录。
 
     字段语义固定（前端按这组 key 渲染，不要改）：
@@ -66,9 +67,16 @@ def _rec(steps=None, scheduler=None, sampler=None,
       shift_video  视频 shift（float 或 None）
       shift_audio  音频 shift（float 或 None）
       base_model   推荐搭配的主模型（str 或 None）
-      source_kind  见 SOURCE_KIND_LABEL
+      source_kind  见 SOURCE_KIND_LABEL（**整条**的来源类别）
       source       来源定位（绝对路径 + 原文锚点），可追溯
       note         补充说明
+      field_sources  {字段: 来源类别} —— **字段级**来源
+
+    【为什么要 field_sources】
+    一条记录的各字段**可能来自不同来源**：例如 speed_slider 的
+    「步数=作者未提供」但「shift=ComfyUI 模型硬性值」——
+    只有一个整条级的 source_kind 会让前端把 shift 也说成「作者提供」。
+    字段级来源让每个字段都能如实标出自己的出处。
 
     「未提供」一律写 `None`，由 `normalize()` 统一转成 NOT_PROVIDED。
     """
@@ -82,6 +90,7 @@ def _rec(steps=None, scheduler=None, sampler=None,
         "source_kind": source_kind or "not_provided",
         "source": source or "",
         "note": note or "",
+        "field_sources": dict(field_sources or {}),
     }
 
 
@@ -90,12 +99,24 @@ def _normalize(rec: dict) -> dict:
 
     这样前端只要判 `=== "not_provided"` 就知道该显示「作者未提供」，
     不会出现「undefined 显示成空白」和「作者写了 0 显示成 0」的混淆。
+
+    顺带补齐 `field_sources`：没单独标来源的字段，继承整条的 source_kind；
+    但**明确标成 not_provided 的字段**，其来源一律是 not_provided
+    （该字段本身就没值，来源无所谓）。
     """
     out = dict(rec)
     for field in ("steps", "scheduler", "sampler",
                   "shift_video", "shift_audio", "base_model"):
         if out.get(field) is None:
             out[field] = NOT_PROVIDED
+    whole = out.get("source_kind") or NOT_PROVIDED
+    field_sources = dict(out.get("field_sources") or {})
+    for field in ("steps", "scheduler", "sampler",
+                  "shift_video", "shift_audio", "base_model"):
+        if field_sources.get(field) is None:
+            field_sources[field] = (
+                NOT_PROVIDED if out[field] == NOT_PROVIDED else whole)
+    out["field_sources"] = field_sources
     return out
 
 
@@ -187,65 +208,83 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
     )),
     # ---- 可勾选的加速 LoRA 组合 ----
     "lightx2v_4step_768p": _normalize(_rec(
-        steps=None,
+        steps=4,
         scheduler=None,
-        sampler=None,
-        shift_video=12.0,
+        sampler="euler",
+        # ⚠️ 768p 系列作者给的 shift 是 **6/3**，不是 H3 内生的 12/3。
+        shift_video=6.0,
         shift_audio=3.0,
         base_model="Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）",
         source_kind="author",
         source=(
-            "/mnt/usb2t/comfyui-models/loras/h3_lightx2v/"
-            "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors"
-            " 的 __metadata__：base_model = "
+            "作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）："
+            "「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p (1344×768) | "
+            "6 / 3 | 4 | 4」-> 训练 shift 6/3、蒸馏 NFE 4、推荐推理 NFE 4。"
+            "采样器：「COMFYUI_SETUP_AND_INFERENCE.md」"
+            "「set lora_name, steps, shift_video, and shift_audio together to match "
+            "the model table. Sampler defaults to `euler`.」"
+            " + 本机权重 __metadata__：base_model = "
             "「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」"
-            " + /home/ubuntu/comfyui/comfy/supported_models.py:970-971（shift 12/3 内生值）"
         ),
         note=(
-            "作者在权重 metadata 里给了 base_model，但**没有给步数/调度器/采样器**。"
-            "文件名里的「4step」是权重自述的蒸馏档位，不是作者的参数表。"
-            "本机面板推荐的 4 步来自工作流档位（video_models.VIDEO_MODELS[].steps），"
-            "不冒充作者推荐值。"
+            "**shift 是 6/3（作者规格表），不是 H3 内生的 12/3** —— "
+            "LightX2V 的 768p 系列与 544p 系列 shift 不同，不能混用。"
+            "调度器作者未提供；采样器作者写的是「defaults to euler」（默认，不是强制）。"
         ),
     )),
     "lightx2v_4step_sla_768p": _normalize(_rec(
-        steps=None,
+        steps=4,
         scheduler=None,
-        sampler=None,
-        shift_video=12.0,
+        sampler="training_euler",
+        # ⚠️ SLA 768p 系列作者给的 shift 是 **6/3**。
+        shift_video=6.0,
         shift_audio=3.0,
         base_model="Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）",
         source_kind="author",
         source=(
-            "/mnt/usb2t/comfyui-models/loras/h3_lightx2v/"
-            "minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors"
-            " 的 __metadata__：base_model = "
+            "作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）"
+            "「Key SLA-related settings in this configuration include: "
+            "{ attn_type: dynamic_sparse_attn, "
+            "dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, "
+            "video_flow_shift: 6.0, audio_flow_shift: 3.0, "
+            "h3_step_update: training_euler }」"
+            " + 「**4-step distillation**」+「**768p FL2V** generation support」"
+            " + 本机权重 __metadata__：base_model = "
             "「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」"
-            " + /home/ubuntu/comfyui/comfy/supported_models.py:970-971（shift 12/3 内生值）"
         ),
         note=(
-            "SLA（Segment Level Attention）变体。作者只给了 base_model，"
-            "步数/调度器/采样器一律「作者未提供」。"
+            "SLA（Sparse-Linear Attention）变体，85% 稀疏率，作者实测 RTX 5090 约 2.5× 加速。"
+            "**shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）**，"
+            "不是 H3 内生的 12/3。"
+            "采样器作者写的是 `training_euler` —— 那是**训练时**的 step update 规则，"
+            "不是 ComfyUI 的 KSamplerSelect 取值 -> 面板的采样器仍应选 `euler`"
+            "（见同族 spec 表的「Sampler defaults to euler」）。调度器作者未提供。"
         ),
     )),
     "lightx2v_8step": _normalize(_rec(
-        steps=None,
+        steps=8,
         scheduler=None,
-        sampler=None,
+        sampler="euler",
+        # 544p mixed 系列作者给的 shift 是 **12/3**（与 768p 系列的 6/3 不同）。
         shift_video=12.0,
         shift_audio=3.0,
         base_model="Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）",
         source_kind="author",
         source=(
-            "/mnt/usb2t/comfyui-models/loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"
-            " 的 __metadata__：base_model = "
+            "作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）："
+            "「FL2VA Turbo 8-step v1.0 | FL2VA / T2VA | 544p mixed aspect ratio | "
+            "12 / 3 | 8 | 8 / 4」-> 训练 shift 12/3、蒸馏 NFE 8、推荐推理 NFE 8 或 4。"
+            "采样器：「COMFYUI_SETUP_AND_INFERENCE.md」"
+            "「Sampler defaults to `euler`.」"
+            " + 本机权重 __metadata__：base_model = "
             "「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」、"
             "training_alpha=8.0、training_scale=0.0625"
-            " + /home/ubuntu/comfyui/comfy/supported_models.py:970-971（shift 12/3 内生值）"
         ),
         note=(
-            "作者给了 base_model 与训练超参（alpha 8 / scale 0.0625），"
-            "但**没有给步数/调度器/采样器**；文件名里的「8step」是权重自述档位。"
+            "作者推荐推理 NFE 是「8 / 4」两档 —— 8 步质量更好，4 步更快；"
+            "本表给的是 8（质量档）。"
+            "**shift 是 12/3（544p 系列）**，与 768p 系列的 6/3 不同，不能混用。"
+            "调度器作者未提供。"
         ),
     )),
     "dmad_4step_critic": _normalize(_rec(
@@ -283,6 +322,17 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "（「作者提供了什么」表：步数 ❌ 未提供 / 采样器·scheduler ❌ 未提供；"
             "strength ±8 最优）+ /home/ubuntu/comfyui/comfy/supported_models.py:970-971"
         ),
+        field_sources={
+            # 步数 / 采样器 / 调度器：作者**明写未提供**
+            "steps": "not_provided",
+            "sampler": "not_provided",
+            "scheduler": "not_provided",
+            # shift：作者没提，用的是 ComfyUI 的 H3 模型硬性值
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            # base_model：本机权重头实测（作者没写）
+            "base_model": "comfyui",
+        },
         note=(
             "作者明写：步数、采样器、scheduler、分辨率、CFG **5 项一字未提**。"
             "strength 作者给了 ±8（这是「运动幅度」，不是 LoRA 权重强度）。"
@@ -302,6 +352,16 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "（「作者提供了什么」表：步数 ✅ 15~30 步 / 采样器·scheduler ❌ 未提供）"
             " + /home/ubuntu/comfyui/comfy/supported_models.py:970-971"
         ),
+        field_sources={
+            # 步数：作者给了（15~30）
+            "steps": "author",
+            "sampler": "not_provided",
+            "scheduler": "not_provided",
+            # shift：作者没提，用的是 ComfyUI 的 H3 模型硬性值
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            "base_model": "comfyui",
+        },
         note=(
             "作者原话「720x1280 resolution with 15-30 steps」、strength 0.4~0.8。"
             "**步数是区间**，本表给出的是区间上界（30）作为推荐档展示，"
@@ -348,64 +408,106 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
     "fl2va_pruned_int8": _normalize(_rec(
         steps=20,
         scheduler="simple",
-        sampler="euler",
+        sampler="res_multistep",
         shift_video=12.0,
         shift_audio=3.0,
         base_model=None,
         source_kind="comfyui",
         source=(
-            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，"
-            "H3 模型内生采样设置，量化/pruned 不改）"
-            " + ComfyUI 官方 H3 工作流（BasicScheduler simple / KSamplerSelect euler / steps 20）"
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/workflows.py:347-350"
+            "（default_steps = 4 if lora != 'none' else 20；"
+            "default_scheduler = 'beta' if lora != 'none' else 'simple'；"
+            "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
         note=(
-            "官方权重，**随权重没有作者说明文件** —— 作者未提供具体采样参数。"
-            "上表的 20 步 / simple / euler 是**官方工作流基准档**（不挂加速 LoRA 时的档位），"
-            "shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
-            "项目侧工作流档位：workflows._h3_video_workflow（lora==\"none\" -> 20 步）。"
+            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "（h3studio/workflows.py:347-350，lora=='none' 分支），"
+            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
+            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
     "fl2va_int8": _normalize(_rec(
         steps=20,
         scheduler="simple",
-        sampler="euler",
+        sampler="res_multistep",
         shift_video=12.0,
         shift_audio=3.0,
         base_model=None,
         source_kind="comfyui",
         source=(
-            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3）"
-            " + ComfyUI 官方 H3 工作流（simple / euler / 20 步）"
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/workflows.py:347-350"
+            "（default_steps = 4 if lora != 'none' else 20；"
+            "default_scheduler = 'beta' if lora != 'none' else 'simple'；"
+            "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
-        note="官方权重，未附作者说明文件。作者未提供具体采样参数。",
+        note=(
+            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "（h3studio/workflows.py:347-350，lora=='none' 分支），"
+            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
+            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "与本表（无 LoRA 档）不同，不要混用。"
+        ),
     )),
     "fl2va_pruned_w4a8": _normalize(_rec(
         steps=20,
         scheduler="simple",
-        sampler="euler",
+        sampler="res_multistep",
         shift_video=12.0,
         shift_audio=3.0,
         base_model=None,
         source_kind="comfyui",
         source=(
-            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3）"
-            " + ComfyUI 官方 H3 工作流（simple / euler / 20 步）"
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/workflows.py:347-350"
+            "（default_steps = 4 if lora != 'none' else 20；"
+            "default_scheduler = 'beta' if lora != 'none' else 'simple'；"
+            "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
-        note="官方权重，未附作者说明文件。作者未提供具体采样参数。",
+        note=(
+            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "（h3studio/workflows.py:347-350，lora=='none' 分支），"
+            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
+            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "与本表（无 LoRA 档）不同，不要混用。"
+        ),
     )),
     "fl2va_bf16": _normalize(_rec(
         steps=20,
         scheduler="simple",
-        sampler="euler",
+        sampler="res_multistep",
         shift_video=12.0,
         shift_audio=3.0,
         base_model=None,
         source_kind="comfyui",
         source=(
-            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3）"
-            " + ComfyUI 官方 H3 工作流（simple / euler / 20 步）"
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/workflows.py:347-350"
+            "（default_steps = 4 if lora != 'none' else 20；"
+            "default_scheduler = 'beta' if lora != 'none' else 'simple'；"
+            "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
-        note="官方权重，未附作者说明文件。作者未提供具体采样参数。",
+        note=(
+            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "（h3studio/workflows.py:347-350，lora=='none' 分支），"
+            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
+            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "与本表（无 LoRA 档）不同，不要混用。"
+        ),
     )),
     "hybrid_fl2va_ref2va": _normalize(_rec(
         steps=None,
@@ -455,7 +557,12 @@ def model_recommendation(key: str) -> dict:
 
 
 def accel_lora_recommendations_payload() -> dict:
-    """给前端下拉用的「加速 LoRA -> 推荐参数」映射。"""
+    """给前端下拉用的「加速 LoRA -> 推荐参数」映射。
+
+    每条都带 `field_sources`（逐字段的来源类别）—— 一条记录的各字段
+    可能来自不同来源（作者写了步数但没写 shift；shift 用的是 ComfyUI 的
+    H3 模型硬性值），前端要能逐项标出来。
+    """
     return {key: dict(value) for key, value in _ACCEL_LORA_RECOMMENDATIONS.items()}
 
 

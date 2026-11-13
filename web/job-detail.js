@@ -109,7 +109,10 @@
     const items = m.recItems(rec);
     const chips = items.map((it) => {
       const cls = it.provided ? "job-detail-recchip" : "job-detail-recchip is-missing";
-      return `<span class="${cls}">${esc(it.label)}：${esc(it.value)}</span>`;
+      // 逐字段的来源标注（如「（作者提供）」/「（ComfyUI 模型硬性值）」）
+      const src = it.source ? ` ${it.source}` : "";
+      const title = it.source ? ` title="${esc(it.source)}"` : "";
+      return `<span class="${cls}"${title}>${esc(it.label)}：${esc(it.value)}${esc(src)}</span>`;
     }).join("");
     const source = (m && typeof m.recSource === "function") ? m.recSource(rec) : "";
     const sourceHtml = source

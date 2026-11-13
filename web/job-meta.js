@@ -265,9 +265,29 @@
         provided = value !== MISSING;
         if (!provided) value = "作者未提供";
       }
-      out.push({ key, label: REC_LABEL[key], value, provided });
+      out.push({
+        key,
+        label: REC_LABEL[key],
+        value,
+        provided,
+        source: provided ? recFieldSource(rec, key) : "",
+      });
     }
     return out;
+  }
+
+  /**
+   * 逐字段的来源标注（可追溯）。
+   *
+   * 一条记录的各字段可能来自**不同来源**（如 speed_slider：步数作者未提供，
+   * 但 shift 是 ComfyUI 模型硬性值）。这里按 field_sources 逐项标注。
+   */
+  function recFieldSource(rec, key) {
+    const src = rec && rec.field_sources ? rec.field_sources[key] : null;
+    if (!src) return "";
+    const labels = window.JOB_META_SOURCE_KIND_LABEL || {};
+    const label = labels[src];
+    return label ? `（${label}）` : "";
   }
 
   /** 推荐参数的来源说明（可追溯）。 */
@@ -330,6 +350,7 @@
     seedText,
     recItems,
     recSource,
+    recFieldSource,
     attentionText,
   };
 })();

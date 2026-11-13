@@ -352,13 +352,31 @@
       if (raw === undefined || raw === null || raw === "not_provided") {
         parts.push(`${label}：作者未提供`);
       } else {
-        parts.push(`${label}：${raw}`);
+        parts.push(`${label}：${raw}${recFieldSource(rec, key)}`);
       }
     }
     const head = kindLabel ? `来源：${kindLabel}` : "";
     const where = rec.source ? `\n出处：${rec.source}` : "";
     const note = rec.note ? `\n${rec.note}` : "";
     return head + "\n" + parts.join("\n") + where + note;
+  }
+
+  /**
+   * 逐字段的来源标注。
+   *
+   * 【为什么需要】一条记录的各字段可能来自**不同来源** —— 比如
+   * speed_slider：步数/采样器/调度器**作者明写未提供**，但 shift 用的是
+   * ComfyUI 的 H3 模型硬性值。只标一个整条级的来源，会把 shift 也说成
+   * 「作者提供」。这里按字段各自的 field_sources 逐项标注。
+   *
+   * 形如：「推荐步数：4（作者提供）」「推荐视频 shift：6（作者提供）」
+   */
+  function recFieldSource(rec, field) {
+    const src = rec && rec.field_sources ? rec.field_sources[field] : null;
+    if (!src) return "";
+    const labels = VIDEO_OPTIONS.rec_source_kind_label || {};
+    const label = labels[src];
+    return label ? `（${label}）` : "";
   }
 
   /** 某个主模型的推荐参数（没有登记就是 null）。 */
@@ -1250,6 +1268,9 @@
       const dict = {};
       (data.models || []).forEach(m => { dict[m.key] = m; });
       VIDEO_OPTIONS.models = dict;
+      // 【2026-11-13】把来源类别标签表挂到 window —— web/job-meta.js 用它
+      // 给推荐参数的**逐字段**标注来源（作者提供 / ComfyUI 模型硬性值 …）。
+      window.JOB_META_SOURCE_KIND_LABEL = data.rec_source_kind_label || {};
       optionsReady = true;
 
       // 默认值

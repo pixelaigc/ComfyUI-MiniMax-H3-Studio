@@ -55,6 +55,9 @@ const MODE_INFO = {
 // 【2026-11-13 需求 C3】把 MODE_INFO 暴露到 window ——
 // 详情模态框（web/job-detail.js，独立作用域）要用它显示模式名。
 window.MODE_INFO = MODE_INFO;
+// 【2026-11-13】推荐参数的来源类别标签（服务端 /api/video-options 下发）——
+// web/job-meta.js 用它给**逐字段**标注来源（作者提供 / ComfyUI 硬性值 …）。
+window.JOB_META_SOURCE_KIND_LABEL = {};
 // 图像类模式：共用「图像」参数面板
 const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"];
 // Qwen-Image 2.1 专用模式（参数清单与 Z-Image 不同）
