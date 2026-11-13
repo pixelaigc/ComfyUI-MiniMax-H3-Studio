@@ -1,0 +1,69 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+........................................................................ [ 11%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+............................................................... [ 34%]
+........................................................................ [ 37%]
+..........................FFF...................................FFF..... [ 40%]
+................................................F....................... [ 43%]
+.............................F.................................. [ 45%]
+................F....................................................... [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+............................... [ 55%]
+........................................................................ [ 58%]
+................................................. [ 60%]
+.............................................. [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................F............................................... [ 73%]
+......................F..................F.............................. [ 76%]
+....................................................................s... [ 79%]
+.......................F..............................................FF [ 82%]
+F....................................................................... [ 85%]
+....................F................................s.s..s............. [ 88%]
+........................................................................ [ 91%]
+...................................... [ 92%]
+...............................................................F.......................................................................F...............................................                  [100%]
+=============================== warnings summary ===============================
+tests/test_max_tokens.py:803
+  /tmp/h3s-merge-check/tests/test_max_tokens.py:803: DeprecationWarning: invalid escape sequence '\-'
+    """
+
+tests/test_max_tokens.py:824
+  /tmp/h3s-merge-check/tests/test_max_tokens.py:824: DeprecationWarning: invalid escape sequence '\d'
+    """
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_continuation_segment_also_gets_its_own_dir
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_keeps_the_source_latent_file_untouched
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_of_a_job_does_not_reuse_the_source_latent_dir
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_01_multi_select_keeps_both_entries
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_02_each_entry_has_own_strength_slider
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_03_toggle_disable_removes_from_submit
+FAILED tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_no_console_errors_after_menu_exercise
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_no_console_errors
+FAILED tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_no_console_errors
+FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_screenshots_at_three_widths
+FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+FAILED tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled
+FAILED tests/test_qwen_pe_enhance.py::TestQwenPeEnhanceBrowser::test_no_console_errors_after_menu_exercise
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_desc_tag_renders_placeholder_text
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_remove_middle_drops_dangling_placeholder
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_smart_sort_keeps_placeholders
+FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default
+FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
+19 failed, 2467 passed, 4 skipped, 2 warnings, 445 subtests passed in 2084.88s (0:34:44)
+Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x799b891af460>
+EXIT=1

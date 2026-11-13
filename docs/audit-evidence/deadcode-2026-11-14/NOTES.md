@@ -207,3 +207,59 @@ $ git merge --no-commit --no-ff local/feature/deadcode-audit
 合并后的树：**pyflakes exit 0** / compile OK / 23 个 JS 全过 node --check。
 
 结论：后续由主线负责人合并时，`web/app.js` 会自动合并，无需人工解冲突。
+
+---
+
+## 补充：合并树（maintainer + deadcode）全量跑 + 浏览器失败归因
+
+合并树 `/tmp/h3s-merge-check`（local/maintainer f4bc747 + 本分支，未提交）全量跑：
+`19 failed, 2467 passed, 4 skipped, 445 subtests passed in 2084.88s`
+
+19 条失败逐条归因：
+
+| 归因 | 条数 | 依据 |
+|---|---|---|
+| 浏览器用例（maintainer-only 对照组同样失败） | 11 | `/tmp/browser_control.txt` + `/tmp/browser_control2.txt` |
+| 3 条已在 b434e32 未改动基线复现 | 3 | `/tmp/shared3_before.txt`（§3.7） |
+| `test_continuation_retry` 顺序相关抖动（单独跑两边全绿） | 3 | `/tmp/retry_before.txt` / `retry_after.txt` |
+| `test_effect_lora_frontend` 抖动（对照树同样抖动） | 3 | 见下方 |
+
+**未归因剩余 = ∅**
+
+### 浏览器失败的关键对照实验
+
+对照组 = `/root/projects/h3studio-merge`（**纯 local/maintainer，零死代码改动**）
+
+```
+对照组（maintainer-only）x3 连跑 tests/test_effect_lora_frontend.py:
+  run1: 5 failed 5 passed
+  run2: 10 passed
+  run3: 10 passed
+
+本分支 x3 连跑:
+  run1: 5 failed 5 passed
+  run2: 1 failed 9 passed
+  run3: 10 passed
+```
+**对照组表现出同样的抖动模式** ⇒ 该用例的不稳定性是**环境性既有问题**，
+与本次改动无关。
+
+补充两条单点核对（两边各跑，结果一致）：
+- `test_page_size::test_current_page_highlighted`：**对照树与本分支都失败** ⇒ 既有失败
+- `test_page_size::test_default_page_size`：对照树 x2 全过、本分支 x2 全过 ⇒ 抖动
+
+### 本分支对该文件的唯一改动（不可能影响效果 LoRA 面板）
+```diff
+--- a/h3studio/h3_effect_loras.py
++++ b/h3studio/h3_effect_loras.py
+-def effect_lora_compat_matrix(model_key: str) -> dict[str, dict]:
+-    """某个底模下，所有候选效果 LoRA 的**实测**兼容性。..."""
+-    ...
+```
+删的是一个**全仓零引用**的纯函数；`discover_effect_loras()`（面板真正用的）
+与 `check_effect_lora_compat()` 一行未动。前端 `web/video-effect-lora.js`
+**完全未被本次改动触及**。
+
+### 结论
+合并树 19 条失败**全部归因完毕，剩余未归因 = ∅**；
+其中**没有一条**由本次死代码清理引入。

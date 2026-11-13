@@ -1,0 +1,8 @@
+............................F.........................F............... [ 90%]
+...F...                                                                  [100%]
+=========================== short test summary info ============================
+FAILED tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_no_console_errors_after_menu_exercise
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_no_console_errors
+FAILED tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_no_console_errors
+3 failed, 74 passed, 2 subtests passed in 361.68s (0:06:01)
+EXIT=1

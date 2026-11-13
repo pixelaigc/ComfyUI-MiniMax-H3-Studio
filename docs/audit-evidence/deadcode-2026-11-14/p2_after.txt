@@ -1,0 +1,5 @@
+F.                                                                       [100%]
+=========================== short test summary info ============================
+FAILED tests/test_page_size.py::TestPageSize::test_current_page_highlighted
+1 failed, 1 passed in 36.62s
+EXIT=1
