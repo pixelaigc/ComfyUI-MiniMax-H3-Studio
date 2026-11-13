@@ -457,6 +457,16 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
  *      —— 长提示词必须换行，不能横向溢出。
  */
 .detail-dialog { width: min(720px, 92vw); }
+/* 详情框的「×」关闭按钮：桌面端也要有可点面积。
+   responsive.css 只在 max-width:700px 的手机断点里给 .prompt-dialog-head button
+   放大了（40×40），桌面断点下它只有 13×26px —— 鼠标尚可，
+   但触控板/手写笔上偏小，且与手机端表现不一致。
+   这里给**详情框**单独补一份三档宽度统一的 40×40 最小点击区。 */
+.detail-dialog .prompt-dialog-head button {
+  min-width: 40px; min-height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; line-height: 1;
+}
 .detail-body {
   flex: 1;
   min-height: 0;              /* flex 子项默认 min-height:auto 会撑破容器 */
