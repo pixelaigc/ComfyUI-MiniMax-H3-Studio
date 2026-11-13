@@ -334,8 +334,6 @@ let SERVER_FEATURES = {};
 let MOSS_BACKEND_READY = false;
 // 后端是否已支持 MiniMax-H3-Image（/api/image-options 有 h3image 字段才算）
 let H3IMAGE_BACKEND_READY = false;
-// 后端代码指纹（用于提示「后端没重启」）
-let SERVER_FINGERPRINT = "";
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -4480,7 +4478,6 @@ function jobSig(j) {
 }
 
 let jobsRequest = 0;
-let displayedTab = null;
 let displayedFilterKey = null;
 let filterDebounce = null;
 

@@ -128,8 +128,6 @@ body {
 .nav-cat-head.active { background: var(--accent-soft); color: var(--accent); }
 .nav-cat-head:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
 .nav-cat-head:disabled:hover { background: transparent; }
-.nav-cat-caret { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
-.nav-cat.active > .nav-cat-head .nav-cat-caret { color: var(--accent); }
 /* 折叠开关（2026-11-13）：与 .nav-cat-head 平级的兄弟节点。
    触控目标不得小于 32px（tests/test_responsive_mobile.py 的硬约束）。 */
 .nav-cat-toggle {
