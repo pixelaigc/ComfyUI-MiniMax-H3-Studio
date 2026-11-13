@@ -1458,7 +1458,53 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
             steps = int(params.get("steps") or 4)
         except (TypeError, ValueError):
             steps = 4
-        max_transition = max(1, steps - 1)
+        # ---- 【2026-11-13】sigma 精修参数（借鉴 nonebot H3 工作流）----
+        # 先算精修参数，**再**夹 transition_step ——
+        # 因为 transition_step 是 sigma 表里的**索引**，
+        # 精修后表长变了，索引上限也跟着变。
+        #
+        # 节点不在本机 -> 强制关闭（避免面板给出「能开但跑不了」的假选项）。
+        refine = twopass.get("sigma_refine") or {}
+        refine_enabled = bool(refine.get("enabled"))
+        if refine_enabled and "H3SigmaRefiner" not in _COMFY_NODE_NAMES:
+            refine_enabled = False
+        extra_steps = 0
+        start_at_sigma = video_models.VIDEO_TWOPASS[
+            "sigma_refine_start_at_sigma_default"]
+        end_at_sigma = video_models.VIDEO_TWOPASS[
+            "sigma_refine_end_at_sigma_default"]
+        spacing = video_models.VIDEO_TWOPASS["sigma_refine_spacing_default"]
+        if refine_enabled:
+            try:
+                extra_steps = int(refine.get(
+                    "extra_steps",
+                    video_models.VIDEO_TWOPASS["sigma_refine_extra_steps_default"]))
+            except (TypeError, ValueError):
+                extra_steps = video_models.VIDEO_TWOPASS[
+                    "sigma_refine_extra_steps_default"]
+            extra_steps = max(0, min(15, extra_steps))
+            if extra_steps <= 0:
+                refine_enabled = False
+        if refine_enabled:
+            try:
+                start_at_sigma = float(refine.get(
+                    "start_at_sigma", start_at_sigma))
+            except (TypeError, ValueError):
+                pass
+            try:
+                end_at_sigma = float(refine.get(
+                    "end_at_sigma", end_at_sigma))
+            except (TypeError, ValueError):
+                pass
+            spacing = str(refine.get("spacing", spacing))
+            if spacing not in ("cosine", "linear", "exponential"):
+                spacing = video_models.VIDEO_TWOPASS[
+                    "sigma_refine_spacing_default"]
+        # transition_step 上限 = 精修后 sigma 表长度 - 2
+        # （SelfLift 把表切成 sigmas[:ts+1] 与 sigmas[ts:]，
+        #  硬约束是 ts <= len(sigmas) - 2）。
+        refined_len = steps + 1 + (extra_steps if refine_enabled else 0)
+        max_transition = max(1, refined_len - 2)
         transition = int(twopass.get("transition_step")
                          or video_models.VIDEO_TWOPASS["transition_step_default"])
         if transition < 1 or transition > max_transition:
@@ -1493,6 +1539,13 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
             "w_max": w_max,
             "upscaler_model": upscaler,
             "cfg": twopass_cfg,
+            "sigma_refine": {
+                "enabled": refine_enabled,
+                "extra_steps": extra_steps,
+                "start_at_sigma": max(0.0, min(20.0, start_at_sigma)),
+                "end_at_sigma": max(0.0, min(5.0, end_at_sigma)),
+                "spacing": spacing,
+            },
         }
     else:
         out["twopass"] = {"enabled": False}
@@ -2581,6 +2634,12 @@ _VIDEO_PANEL_NODES = [
 # 永远为 False -> shift 节点永远不进工作流 -> 面板上的两个 shift 滑杆
     # 是**死控件**（能拖、但不生效）。这正是「假控件」纪律要禁止的。
     "MiniMaxH3SigmaShift",
+    # 【2026-11-13 新增 —— 借鉴 nonebot H3 工作流的 sigma 精修节点】
+    # H3SigmaRefiner（/object_info/H3SigmaRefiner -> 200，本机已装）：
+    # 在 sigma 表的低噪段局部加密采样步。
+    # 不在名单里 -> 面板不探测它 -> 服务端归一里它恒为不可用 ->
+    # 面板的对应控件不会出现（避免「假控件」）。
+    "H3SigmaRefiner",
 ]
 
 

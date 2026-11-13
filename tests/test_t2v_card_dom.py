@@ -186,12 +186,17 @@ console.log(JSON.stringify({{ lora: loraLabel({json.dumps(job)}) }}));
         self.assertIn("DMAD 4 步（critic 版）", out["lora"])
         self.assertIn("×1.00", out["lora"])
 
-    def test_no_accel_lora_shows_empty_marker(self):
-        """没选加速 LoRA -> 显示「空」，并标明工作流固定的那枚。
+    def test_only_fixed_lora_shows_only_that_one(self):
+        """没额外挂加速 LoRA -> 只列**工作流固定**的那枚。
 
-        需求原文：「未选 LoRA 时才显示「空」」。
-        「空」指的是**用户选的加速 LoRA**那一项 ——
-        工作流固定的那枚 Turbo LoRA 始终生效，必须单独标明。
+        【2026-11-13 契约变更 —— 需求 C1】
+        旧契约：显示「空」标记（表示「用户没额外挂」）。
+        新契约（用户 2026-11-13 C1 原文）：
+          「LoRA 行只能来自任务真实使用的 LoRA 列表（可含名称+强度），
+            没有 LoRA 时显示「无」」
+        -> 本例**确实用了**一枚 LoRA（工作流固定的 Turbo），
+           所以列表非空 -> 显示那一枚，**不再**显示「空」标记。
+        「无」只用于**一个 LoRA 都没有**的情况。
         """
         info = dict(HYBRID_SUMMARY)
         info["lora_label"] = ""
@@ -205,11 +210,12 @@ console.log(JSON.stringify({{
   row: loraRowHtml(loraLabel({json.dumps(job)})),
 }}));
 """)
-        self.assertIn("空", out["lora"])
+        self.assertNotIn("空", out["lora"],
+                        "新契约下不再用「空」标记")
         self.assertNotIn("DMAD", out["lora"])
-        # 固定那枚仍要标明（它始终生效）
+        # 固定那枚仍要标明（它确实被用了）
         self.assertIn("工作流固定", out["lora"])
-        # 仍然渲染这一行（用户能看见「没额外挂」这个事实）
+        # 仍然渲染这一行（用户能看见实际用了哪枚）
         self.assertIn("<span>LoRA</span>", out["row"])
 
     def test_lora_row_rendered_when_lora_present(self):
@@ -311,12 +317,17 @@ console.log(JSON.stringify({{
         # 必须用 IMAGE_MODES（覆盖全部四个图像模式）
         self.assertIn("IMAGE_MODES.includes(job.mode)", code)
 
-    def test_image_mode_without_lora_has_no_lora_row(self):
-        """图像模式没加效果 LoRA -> **不渲染** LoRA 行（不显示「空」）。
+    def test_image_mode_without_lora_shows_none(self):
+        """图像模式没加效果 LoRA -> 显示「无」（新契约 C1）。
 
-        图像面板的效果 LoRA 是「有就加、没有就不加」的可选列表，
-        没加是常态 —— 每张图卡都挂一行「LoRA：空」是噪声。
-        「空」只给视频模式（那里加速 LoRA 是一个明确的档位选择）。
+        【2026-11-13 契约变更 —— 需求 C1】
+        旧契约：图像模式**不渲染** LoRA 行（图像的效果 LoRA 是
+        「有就加、没有就不加」的可选列表，每张图挂一行是噪声）。
+        新契约（用户 2026-11-13 C1 原文）：
+          「生成媒体库卡片（以及**视频/图片/音频各类卡片**）的元数据
+            必须按字段语义白名单渲染 …… 没有 LoRA 时显示「无」」
+        -> 各类卡片的口径统一：没有 LoRA 就显示「无」，
+           不再按模式分叉（分叉本身就是「按位置判断」的老毛病）。
         """
         info = {"model_key": "z_image_turbo_bf16",
                 "model_label": "Z-Image-Turbo · 官方加速版",
@@ -330,8 +341,10 @@ console.log(JSON.stringify({{
   row: loraRowHtml(loraLabel({json.dumps(job)})),
 }}));
 """)
-        self.assertEqual(out["lora"], "")
-        self.assertEqual(out["row"], "", "图像卡不该有 LoRA 行")
+        self.assertEqual(out["lora"], "无")
+        self.assertIn("无", out["row"])
+        self.assertIn("<span>LoRA</span>", out["row"],
+                      "图像卡也要有 LoRA 行（显示「无」）")
 
     def test_image_mode_renders_model_and_lora(self):
         """图像模式：模型 + 效果 LoRA 都要显示。"""

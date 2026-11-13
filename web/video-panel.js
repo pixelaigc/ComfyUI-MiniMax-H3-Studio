@@ -74,6 +74,17 @@
       w_max: 1.0,
       upscaler_model: "",
       cfg: 1.0,          // 【2026-11-11】二采专用 CFG（SelfLiftH3Sampler.cfg）
+      // 【2026-11-13 新增 —— 借鉴 nonebot H3 工作流的 H3SigmaRefiner】
+      // sigma 精修：低噪段局部加密采样步（针对高速运动边缘颗粒 / 闪烁）。
+      // 默认**关闭** —— nonebot 模板的 start_at_sigma=0.7 在本项目默认档
+      // （steps=4 / beta）下是 no-op；节点 tooltip 推荐 2.0~3.5，这里取 2.5。
+      sigma_refine: {
+        enabled: false,
+        extra_steps: 1,
+        start_at_sigma: 2.5,
+        end_at_sigma: 0.0,
+        spacing: "cosine",
+      },
     },
     // ---- 采样参数（与生图面板同级）----
     // 取值全部来自服务端下发的 sampling 清单（/api/video-options），
@@ -318,6 +329,50 @@
     return m.label + "（权重缺失，不可用）";
   }
 
+  /**
+   * 作者推荐参数的**悬停提示**文本（需求 1 / 2 / 5）。
+   *
+   * 数据来自服务端 /api/video-options 的
+   *   model_recommendations / accel_lora_recommendations
+   * （见 h3studio/model_recommendations.py，每条都带来源）。
+   *
+   * 【铁律】作者没写的项显示「作者未提供」—— 绝不填一个猜测值。
+   */
+  function recTooltip(rec) {
+    if (!rec || typeof rec !== "object") return "";
+    const kindLabel = (VIDEO_OPTIONS.rec_source_kind_label || {})[rec.source_kind]
+      || rec.source_kind || "";
+    const fields = ["steps", "scheduler", "sampler", "shift_video",
+                    "shift_audio", "base_model"];
+    const labels = VIDEO_OPTIONS.rec_field_label || {};
+    const parts = [];
+    for (const key of fields) {
+      const raw = rec[key];
+      const label = labels[key] || key;
+      if (raw === undefined || raw === null || raw === "not_provided") {
+        parts.push(`${label}：作者未提供`);
+      } else {
+        parts.push(`${label}：${raw}`);
+      }
+    }
+    const head = kindLabel ? `来源：${kindLabel}` : "";
+    const where = rec.source ? `\n出处：${rec.source}` : "";
+    const note = rec.note ? `\n${rec.note}` : "";
+    return head + "\n" + parts.join("\n") + where + note;
+  }
+
+  /** 某个主模型的推荐参数（没有登记就是 null）。 */
+  function modelRecommendation(key) {
+    const map = VIDEO_OPTIONS.model_recommendations || {};
+    return map[key] || null;
+  }
+
+  /** 某枚加速 LoRA 的推荐参数（没有登记就是 null）。 */
+  function accelRecommendation(key) {
+    const map = VIDEO_OPTIONS.accel_lora_recommendations || {};
+    return map[key] || null;
+  }
+
   function renderModelSelect() {
     const sel = document.getElementById("vidModelSelect");
     if (!sel) return;
@@ -331,7 +386,11 @@
       opt.disabled = unavailable;
       opt.selected = key === videoState.model;
       // title 里带上**真实**的权重文件名与状态，便于排查
-      opt.title = `${m.unet || ""}${m.status_note ? "\n" + m.status_note : ""}`;
+      // 【2026-11-13 需求 2/5】再附上作者推荐参数（步数/调度器/采样器/shift）。
+      const rec = modelRecommendation(key);
+      const recText = recTooltip(rec);
+      opt.title = `${m.unet || ""}${m.status_note ? "\n" + m.status_note : ""}`
+        + (recText ? `\n\n—— 作者推荐参数 ——\n${recText}` : "");
       sel.appendChild(opt);
     });
     // 当前选中的模型不可用 -> 回落到**第一个可用**的模型
@@ -432,8 +491,13 @@
       return;
     }
     box.hidden = false;
+    // 【2026-11-13 需求 1/5】固定 LoRA 也附上作者推荐参数（悬停可见）。
+    const rec = fixedAccelMeta() ? accelRecommendation(fixedAccelMeta().key) : null;
+    const recText = recTooltip(rec);
+    box.title = recText || "";
     box.textContent = `工作流固定使用加速 LoRA「${meta.display}」`
-      + `（${meta.purpose}），不随上面的选择变化。`;
+      + `（${meta.purpose}），不随上面的选择变化。`
+      + (recText ? `\n作者推荐：${recText.split("\n").join(" · ")}` : "");
   }
 
   /**
@@ -472,7 +536,10 @@
       const opt = document.createElement("option");
       opt.value = item.key;
       opt.textContent = item.display;
-      opt.title = `${item.name}｜推荐强度 ${item.recommended_strength}`;
+      // 【2026-11-13 需求 1/5】title 里附上 LoRA 作者推荐的参数。
+      const recText = recTooltip(accelRecommendation(item.key));
+      opt.title = `${item.name}｜推荐强度 ${item.recommended_strength}`
+        + (recText ? `\n\n—— 作者推荐参数 ——\n${recText}` : "");
       sel.appendChild(opt);
     });
 
@@ -813,6 +880,42 @@
     }
     // 二采采样器：SelfLift 只支持标准 Euler（实测自 comfyui-SelfLift/nodes.py），
     // 所以这里是**只读固定值**，不是可调控件 —— 不伪造假下拉。
+    // ---- sigma 精修控件（2026-11-13 借鉴 nonebot H3 工作流）----
+    const refineOk = cfg.sigma_refine_node_available !== false;
+    const refineOn = !!(videoState.twopass.sigma_refine
+      && videoState.twopass.sigma_refine.enabled);
+    const refineBox = document.getElementById("vidSigmaRefineEnabled");
+    if (refineBox) {
+      refineBox.checked = refineOn;
+      refineBox.disabled = !refineOk;
+    }
+    const refineHint = document.getElementById("vidSigmaRefineHint");
+    if (refineHint) {
+      refineHint.textContent = refineOk
+        ? "低噪段加密采样（借鉴 nonebot H3 工作流）"
+        : "本机 ComfyUI 没有 H3SigmaRefiner 节点，不可用";
+    }
+    const refineSteps = document.getElementById("vidSigmaRefineSteps");
+    const refineStart = document.getElementById("vidSigmaRefineStart");
+    const refineSpacing = document.getElementById("vidSigmaRefineSpacing");
+    const refine = videoState.twopass.sigma_refine || {};
+    if (refineSteps) {
+      refineSteps.value = refine.extra_steps != null ? refine.extra_steps : 1;
+      refineSteps.disabled = !refineOk || !refineOn;
+      const label = document.getElementById("vidSigmaRefineStepsVal");
+      if (label) label.textContent = refine.extra_steps != null ? refine.extra_steps : 1;
+    }
+    if (refineStart) {
+      refineStart.value = refine.start_at_sigma != null ? refine.start_at_sigma : 2.5;
+      refineStart.disabled = !refineOk || !refineOn;
+      const label = document.getElementById("vidSigmaRefineStartVal");
+      if (label) label.textContent = Number(refine.start_at_sigma != null
+        ? refine.start_at_sigma : 2.5).toFixed(2);
+    }
+    if (refineSpacing) {
+      refineSpacing.value = refine.spacing || "cosine";
+      refineSpacing.disabled = !refineOk || !refineOn;
+    }
     const tpSampler = document.getElementById("vidTwopassSampler");
     if (tpSampler) tpSampler.value = "euler";
 
@@ -919,7 +1022,9 @@
       accel_lora: videoState.accelLora,
       accel_lora_strength: Number(videoState.accelLoraStrength),
       attention: videoState.attention,
-      twopass: { ...videoState.twopass },
+      twopass: { ...videoState.twopass,
+        sigma_refine: { ...(videoState.twopass.sigma_refine || {}) },
+      },
       // 【2026-11-11】采样参数
       steps: videoState.steps,
       sampler: videoState.sampler,
@@ -1000,6 +1105,12 @@
     }
     if (cfg.attention) videoState.attention = cfg.attention;
     if (cfg.twopass && typeof cfg.twopass === "object") {
+      if (cfg.twopass.sigma_refine && typeof cfg.twopass.sigma_refine === "object") {
+        videoState.twopass.sigma_refine = {
+          ...(videoState.twopass.sigma_refine || {}),
+          ...cfg.twopass.sigma_refine,
+        };
+      }
       videoState.twopass = { ...videoState.twopass, ...cfg.twopass };
     }
     // 【2026-11-11】采样参数
@@ -1292,6 +1403,18 @@
         // 二采 CFG（SelfLiftH3Sampler.cfg）—— 标准路径没有 CFG，
         // 这是 H3 链路里唯一真正生效的 CFG。
         cfg: Number(videoState.twopass.cfg),
+        // 【2026-11-13】sigma 精修（借鉴 nonebot H3 工作流的 H3SigmaRefiner）
+        sigma_refine: {
+          ...(videoState.twopass.sigma_refine || {}),
+          enabled: !!(videoState.twopass.sigma_refine
+            && videoState.twopass.sigma_refine.enabled),
+          extra_steps: Number((videoState.twopass.sigma_refine || {}).extra_steps || 0),
+          start_at_sigma: Number((videoState.twopass.sigma_refine || {})
+            .start_at_sigma != null ? videoState.twopass.sigma_refine.start_at_sigma : 2.5),
+          end_at_sigma: Number((videoState.twopass.sigma_refine || {})
+            .end_at_sigma != null ? videoState.twopass.sigma_refine.end_at_sigma : 0),
+          spacing: (videoState.twopass.sigma_refine || {}).spacing || "cosine",
+        },
       },
     };
   }
@@ -1455,6 +1578,52 @@
         renderTwopass();
         saveVideoConfig();
       });
+
+    // ---- sigma 精修控件（2026-11-13 借鉴 nonebot H3 工作流）----
+    const refineBox = document.getElementById("vidSigmaRefineEnabled");
+    if (refineBox) {
+      refineBox.addEventListener("change", () => {
+        videoState.twopass.sigma_refine = {
+          ...(videoState.twopass.sigma_refine || {}),
+          enabled: refineBox.checked,
+        };
+        renderTwopass();
+        saveVideoConfig();
+      });
+    }
+    const refineSteps = document.getElementById("vidSigmaRefineSteps");
+    if (refineSteps) {
+      refineSteps.addEventListener("input", e => {
+        videoState.twopass.sigma_refine = {
+          ...(videoState.twopass.sigma_refine || {}),
+          extra_steps: parseInt(e.target.value),
+        };
+        renderTwopass();
+      });
+      refineSteps.addEventListener("change", saveVideoConfig);
+    }
+    const refineStart = document.getElementById("vidSigmaRefineStart");
+    if (refineStart) {
+      refineStart.addEventListener("input", e => {
+        videoState.twopass.sigma_refine = {
+          ...(videoState.twopass.sigma_refine || {}),
+          start_at_sigma: parseFloat(e.target.value),
+        };
+        renderTwopass();
+      });
+      refineStart.addEventListener("change", saveVideoConfig);
+    }
+    const refineSpacing = document.getElementById("vidSigmaRefineSpacing");
+    if (refineSpacing) {
+      refineSpacing.addEventListener("change", e => {
+        videoState.twopass.sigma_refine = {
+          ...(videoState.twopass.sigma_refine || {}),
+          spacing: e.target.value,
+        };
+        renderTwopass();
+        saveVideoConfig();
+      });
+    }
     }
     const transition = document.getElementById("vidTransition");
     if (transition) {
