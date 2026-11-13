@@ -412,7 +412,7 @@
   //  1) 首选 clipboardData.items —— 里面有 image/png 之类的**文件条目**，
   //     getAsFile() 拿到的就是真文件（不是 dataURL 字符串）；
   //  2) 退路是 clipboardData.files（部分浏览器只给这个）；
-  //  3) 退路是 items 里的 string（image/* 的 base64 dataURL）——
+  //  3) 退路是 items 里的 string（image 类型 MIME 的 base64 dataURL）——
   //     手动转成 File 再上传。
   //
   // 【只处理媒体，纯文本照常粘贴】
@@ -445,7 +445,7 @@
       }
       if (out.length) return out;
     }
-    // 3) items 里的 image/* 字符串（dataURL）
+    // 3) items 里的 image 类型 MIME 字符串（dataURL）
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!item || item.kind !== "string") continue;

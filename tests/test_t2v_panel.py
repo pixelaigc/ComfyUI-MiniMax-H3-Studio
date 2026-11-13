@@ -319,12 +319,41 @@ class TestNormalizeT2VParams(unittest.TestCase):
         self.assertIn("不兼容", err)
 
     def test_rejects_attention_without_node(self):
+        """
+        探测**完整**时确认「本机真的没有这个节点」-> 必须拒绝。
+
+        【2026-11-14 语义补充】归一层的判定是三态：
+          * 探测完整 + 节点不在 -> 真缺节点 -> 拒绝（这条）；
+          * 没探测过 / 探测不完整 -> 问不到 != 不存在 -> 放行
+            （见 test_allows_attention_when_probe_incomplete）。
+        所以这里必须把 _COMFY_PROBE_COMPLETE 置 True 才代表「问全了」。
+        """
+        self.server._COMFY_PROBE_COMPLETE = True
         self.server._COMFY_NODE_NAMES.discard("H3SparseAttention")
         out, err = self.server.normalize_t2v_params(dict(self.BASE, attention="sparse"))
         self.assertTrue(err)
         self.assertIn("没有节点", err)
 
+    def test_allows_attention_when_probe_incomplete(self):
+        """
+        负控：**没探测过 / 探测不完整**时不得断言「缺节点」。
+
+        【为什么这条重要】`_COMFY_NODE_NAMES` 只有成功探测过一次后才有值。
+        内置 Agent 这条路不经过面板（不调 /api/video-options），
+        第一次进来时它是空集 —— 旧判据会把「还没探测过」误判成
+        「本机没有这个节点」，用户看到
+        「本机 ComfyUI 里没有节点 ModelAttentionBackend」，但节点其实在。
+        """
+        self.server._COMFY_PROBE_COMPLETE = False
+        self.server._COMFY_NODE_NAMES.clear()
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, attention="sparse"))
+        self.assertEqual(err, "", f"探测不完整时不该报缺节点：{err}")
+        self.assertEqual(out.get("attention"), "sparse")
+
     def test_rejects_twopass_without_node(self):
+        """同上：探测完整时确认缺 SelfLiftH3Sampler -> 必须拒绝。"""
+        self.server._COMFY_PROBE_COMPLETE = True
         self.server._COMFY_NODE_NAMES.discard("SelfLiftH3Sampler")
         out, err = self.server.normalize_t2v_params(
             dict(self.BASE, twopass={"enabled": True}))
