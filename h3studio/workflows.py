@@ -563,6 +563,26 @@ Z_IMAGE_SIZE_MIN = 16
 Z_IMAGE_SIZE_MAX = 16384
 
 
+def _js_round(x: float) -> int:
+    """按 JavaScript ``Math.round`` 的语义取整（.5 向上取整）。
+
+    为什么必须有这个函数：前端的尺寸吸附跑在浏览器里，用的是
+    ``Math.round``；后端要跑**同一套**吸附规则（否则界面显示的尺寸
+    和真正提交给 ComfyUI 的不一样），而 Python 内置 ``round()`` 是
+    「银行家舍入」（round-half-to-even）：
+
+        JS:   Math.round(62.5) === 63   ->  1008
+        Py:   round(62.5)      ==  62   ->   992
+
+    在「恰好 .5」时两者结果不同 -> 用户看到「已自动调整：宽度 1000
+    不是 16 的倍数 -> 1008」，实际出图宽度却是 992（静默差 16 像素）。
+
+    实测证据：evidence/compare_manual_size_fe_be.py
+    （15 组手填尺寸对比，修复前 2 组不一致：1000x563 / 2000x1000）。
+    """
+    return math.floor(x + 0.5)
+
+
 def normalize_z_image_size(width, height, multiple=Z_IMAGE_SIZE_MULTIPLE,
                             max_pixels=None):
     """把用户手填的宽高吸附到 ComfyUI 能接受的值。
@@ -591,8 +611,11 @@ def normalize_z_image_size(width, height, multiple=Z_IMAGE_SIZE_MULTIPLE,
         return 0, 0, ["宽高必须大于 0"]
 
     # -- 1. 倍数吸附 --
-    adj_w = max(multiple, int(round(w / multiple)) * multiple)
-    adj_h = max(multiple, int(round(h / multiple)) * multiple)
+    # ⚠️ 用 JS 语义的 round（.5 向上），不能用 Python 内置 round（银行家舍入）。
+    #    详见 _js_round() 的 docstring：两者在「恰好 .5」时结果不同，
+    #    会让界面显示的尺寸与真正提交给 ComfyUI 的尺寸静默差 16 像素。
+    adj_w = max(multiple, _js_round(w / multiple) * multiple)
+    adj_h = max(multiple, _js_round(h / multiple) * multiple)
     if adj_w != w:
         reasons.append(f"宽度 {w} 不是 {multiple} 的倍数 -> {adj_w}")
     if adj_h != h:
@@ -618,8 +641,8 @@ def normalize_z_image_size(width, height, multiple=Z_IMAGE_SIZE_MULTIPLE,
         limit = max_pixels * 1024 * 1024
         if w * h > limit:
             scale = (limit / float(w * h)) ** 0.5
-            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
-            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            nw = max(multiple, _js_round(w * scale / multiple) * multiple)
+            nh = max(multiple, _js_round(h * scale / multiple) * multiple)
             reasons.append(
                 f"总像素 {w * h / (1024 * 1024):.2f}MP 超过上限 {max_pixels}MP "
                 f"-> 按比例缩到 {nw}×{nh}")
@@ -1205,6 +1228,76 @@ QWEN_IMAGE_SIZE_MULTIPLE = 16
 # 超过这个总像素就不该直出（2.1 原生上限约 4MP / 2K）
 QWEN_IMAGE_MAX_DIRECT_MP = 4.2
 
+
+def normalize_qwen_image_size(width, height, multiple=QWEN_IMAGE_SIZE_MULTIPLE,
+                              max_megapixels=QWEN_IMAGE_MAX_DIRECT_MP):
+    """把用户手填的宽高吸附到 Qwen-Image 2.1 的合法值。
+
+    返回 (生效宽, 生效高, 调整原因列表)，不抛异常（界面要显示原因）。
+
+    规则与后端 MOSS 族一致、与前端 normalizeImgSize() 逐格一致：
+      1. 宽高必须是 16 的倍数（VAE 16 倍下采样）
+      2. 单边 16 ~ 16384（节点 schema 的 min / nodes.MAX_RESOLUTION）
+      3. 总像素不得超过 QWEN_IMAGE_MAX_DIRECT_MP（4.2MP）
+
+    ⚠️ 用 _js_round（JS Math.round 语义）而不是 Python 内置 round ——
+       理由见 _js_round() 的 docstring：两者在「恰好 .5」时不同，
+       会让界面显示的尺寸与真正提交给 ComfyUI 的尺寸对不上。
+    """
+    reasons: list[str] = []
+    try:
+        w = int(round(float(width)))
+        h = int(round(float(height)))
+    except (TypeError, ValueError):
+        return 0, 0, ["宽高必须是数字"]
+    if w <= 0 or h <= 0:
+        return 0, 0, ["宽高必须大于 0"]
+
+    # -- 1. 倍数吸附 --
+    adj_w = max(multiple, _js_round(w / multiple) * multiple)
+    adj_h = max(multiple, _js_round(h / multiple) * multiple)
+    if adj_w != w:
+        reasons.append(f"宽度 {w} 不是 {multiple} 的倍数 -> {adj_w}")
+    if adj_h != h:
+        reasons.append(f"高度 {h} 不是 {multiple} 的倍数 -> {adj_h}")
+    w, h = adj_w, adj_h
+
+    # -- 2. 范围钳制 --
+    if w > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"宽度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        w = Z_IMAGE_SIZE_MAX
+    if h > Z_IMAGE_SIZE_MAX:
+        reasons.append(f"高度超过上限 {Z_IMAGE_SIZE_MAX} -> 已钳到上限")
+        h = Z_IMAGE_SIZE_MAX
+    if w < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"宽度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        w = Z_IMAGE_SIZE_MIN
+    if h < Z_IMAGE_SIZE_MIN:
+        reasons.append(f"高度低于下限 {Z_IMAGE_SIZE_MIN} -> 已抬到下限")
+        h = Z_IMAGE_SIZE_MIN
+
+    # -- 3. 总像素上限 --
+    if max_megapixels:
+        max_pixels = max_megapixels * 1024 * 1024
+        if w * h > max_pixels:
+            scale = math.sqrt(max_pixels / float(w * h))
+            nw = max(multiple, _js_round(w * scale / multiple) * multiple)
+            nh = max(multiple, _js_round(h * scale / multiple) * multiple)
+            if nw * nh > max_pixels:
+                while nw * nh > max_pixels and nw > multiple and nh > multiple:
+                    nw -= multiple
+                    nh -= multiple
+                reasons.append(
+                    f"总像素 {w * h / (1024 * 1024):.2f}MP 超过官方直出上限 "
+                    f"{max_megapixels}MP -> 按比例缩到 {nw}×{nh}")
+            else:
+                reasons.append(
+                    f"总像素 {w * h / (1024 * 1024):.2f}MP 略超官方直出上限 "
+                    f"{max_megapixels}MP（对齐到 16 的倍数后已是最接近值 "
+                    f"{nw}×{nh} = {nw * nh / (1024 * 1024):.2f}MP）-> 保持不变")
+            w, h = nw, nh
+    return w, h, reasons
+
 # 参考图数量上限 —— 三个口径必须分清（官方 Blog / README / ComfyUI 官方文档）：
 #   模型官方能力  = 10 张（官方 Blog "Up to 10 Input Images"、README
 #                    "Support up to 10 reference images"）
@@ -1227,6 +1320,13 @@ def qwen_image_dimensions(aspect, tier, width=None, height=None):
     只是档位表与倍数换成 Qwen-Image 2.1 的：
       - VAE 是 16 倍下采样 -> 宽高取 16 的倍数
       - 默认档位 1MP（官方 1024x1024）
+
+    ⚠️ 手填宽高**必须**走 normalize_qwen_image_size（16 倍数 + 像素区间），
+       否则与前端界面显示的尺寸对不上：
+       - 前端 normalizeImgSize() 会把 1000 吸附成 1008（JS Math.round 语义），
+         而这里 int(round(1000/16)) 是 Python 银行家舍入 -> 992；
+       - 而且这里原本**完全没有**像素区间钳制（前端会钳到 4MP，这里不钳）。
+       两族（Z-Image / MOSS）都已经统一走吸附函数，Qwen 之前是漏网之鱼。
     """
     w_ratio, h_ratio = ASPECT_NUM.get(aspect, (16, 9))
     megapixels = QWEN_IMAGE_RES_TIERS.get(tier,
@@ -1234,14 +1334,16 @@ def qwen_image_dimensions(aspect, tier, width=None, height=None):
     mult = QWEN_IMAGE_SIZE_MULTIPLE
 
     if width and height:
-        final_w, final_h = int(width), int(height)
-    else:
-        total_pixels = megapixels * 1024 * 1024
-        scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
-        final_w = w_ratio * scale
-        final_h = h_ratio * scale
-    final_w = max(mult, int(round(final_w / mult)) * mult)
-    final_h = max(mult, int(round(final_h / mult)) * mult)
+        # 手填 -> 走吸附（16 倍数 + 像素区间），与前端一致
+        final_w, final_h, _ = normalize_qwen_image_size(width, height, mult)
+        return final_w, final_h
+
+    total_pixels = megapixels * 1024 * 1024
+    scale = math.sqrt(total_pixels / (w_ratio * h_ratio))
+    final_w = w_ratio * scale
+    final_h = h_ratio * scale
+    final_w = max(mult, _js_round(final_w / mult) * mult)
+    final_h = max(mult, _js_round(final_h / mult) * mult)
     return final_w, final_h
 
 
@@ -2033,8 +2135,15 @@ def normalize_moss_image_size(width, height, multiple=MOSS_IMAGE_SIZE_MULTIPLE,
         return 0, 0, ["宽高必须大于 0"]
 
     # -- 1. 倍数吸附 --
-    adj_w = max(multiple, int(round(w / multiple)) * multiple)
-    adj_h = max(multiple, int(round(h / multiple)) * multiple)
+    # ⚠️ 必须用 JS 语义的 round（.5 向上），**不能**用 Python 内置 round。
+    #    Python 的 round() 是「银行家舍入」（round-half-to-even）：
+    #        round(62.5) == 62  -> 992
+    #    而前端 JS 的 Math.round(62.5) == 63 -> 1008
+    #    两者在「恰好 .5」时不一致 -> 界面显示 1008、真正提交给 ComfyUI 的是 992，
+    #    静默差 16 像素宽度，用户完全看不出来。
+    #    实测证据：evidence/compare_manual_size_fe_be.py（15 组手填尺寸，2 组不一致）。
+    adj_w = max(multiple, _js_round(w / multiple) * multiple)
+    adj_h = max(multiple, _js_round(h / multiple) * multiple)
     if adj_w != w:
         reasons.append(f"宽度 {w} 不是 {multiple} 的倍数 -> {adj_w}")
     if adj_h != h:
@@ -2060,8 +2169,8 @@ def normalize_moss_image_size(width, height, multiple=MOSS_IMAGE_SIZE_MULTIPLE,
         min_pixels = min_megapixels * 1024 * 1024
         if w * h < min_pixels:
             scale = math.sqrt(min_pixels / float(w * h))
-            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
-            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
+            nw = max(multiple, _js_round(w * scale / multiple) * multiple)
+            nh = max(multiple, _js_round(h * scale / multiple) * multiple)
             reasons.append(
                 f"总像素 {w * h / (1024 * 1024):.2f}MP 低于官方下限 "
                 f"{min_megapixels}MP -> 按比例放大到 {nw}×{nh}")
@@ -2072,12 +2181,29 @@ def normalize_moss_image_size(width, height, multiple=MOSS_IMAGE_SIZE_MULTIPLE,
         max_pixels = max_megapixels * 1024 * 1024
         if w * h > max_pixels:
             scale = math.sqrt(max_pixels / float(w * h))
-            nw = max(multiple, int(round(w * scale / multiple)) * multiple)
-            nh = max(multiple, int(round(h * scale / multiple)) * multiple)
-            reasons.append(
-                f"总像素 {w * h / (1024 * 1024):.2f}MP 超过官方直出上限 "
-                f"{max_megapixels}MP -> 按比例缩到 {nw}×{nh}"
-                "（更大尺寸需挂 4MP+ hires LoRa）")
+            nw = max(multiple, _js_round(w * scale / multiple) * multiple)
+            nh = max(multiple, _js_round(h * scale / multiple) * multiple)
+            # 16 的倍数是**离散步长**：按比例缩到目标像素后，往回对齐到
+            # 16 的倍数可能又略微超出（例如 4.0MP -> 2736x1536 = 4.008MP）。
+            # 这种「一步之遥」的超出**不是**用户的错，也不该再往下缩 ——
+            # 再缩一格会掉到 3.8MP，反而离目标更远。
+            # 判定：以「缩放后是否仍超上限」为准：
+            #   仍超 -> 说明连最接近的 16 倍数都超了，真按比例缩（并可能再多一步）
+            #   不超 -> 已经是能表示的最接近值，保持它（只提示）
+            if nw * nh > max_pixels:
+                # 缩放后仍超：再退一格（16 的倍数）直到不超
+                while nw * nh > max_pixels and nw > multiple and nh > multiple:
+                    nw -= multiple
+                    nh -= multiple
+                reasons.append(
+                    f"总像素 {w * h / (1024 * 1024):.2f}MP 超过官方直出上限 "
+                    f"{max_megapixels}MP -> 按比例缩到 {nw}×{nh}"
+                    "（更大尺寸需挂 4MP+ hires LoRa）")
+            else:
+                reasons.append(
+                    f"总像素 {w * h / (1024 * 1024):.2f}MP 略超官方直出上限 "
+                    f"{max_megapixels}MP（对齐到 16 的倍数后已是最接近值 "
+                    f"{nw}×{nh} = {nw * nh / (1024 * 1024):.2f}MP）-> 保持不变")
             w, h = nw, nh
     return w, h, reasons
 
@@ -2260,7 +2386,17 @@ def build_moss_t2i(params):
     if raw_w and raw_h:
         width, height, _ = normalize_moss_image_size(raw_w, raw_h)
     else:
-        width, height = moss_image_dimensions(aspect, tier)
+        # ⚠️ 档位算出来的尺寸**也必须**过一遍像素区间钳制。
+        #    原因：MOSS_IMAGE_RES_TIERS["2k"] = 4.0（总像素目标），
+        #    但按比例拆成宽高后再各自对齐到 16 的倍数，会「略微超出」：
+        #        2k + 16:9 -> 2736x1536 = 4.008 MP（超 4.0MP）
+        #        2k + 21:9 -> 3136x1344 = 4.020 MP
+        #    而 MOSS_IMAGE_MAX_DIRECT_MP = 4.0 就是「官方直出上限」，
+        #    界面也是按这个上限提示用户的 —— 结果后端发出去的尺寸
+        #    却不满足自己声明的上限（而且档位路径完全绕过了吸附函数）。
+        #    修法：档位尺寸也走 normalize_moss_image_size（幂等，合法值原样通过）。
+        width, height, _ = normalize_moss_image_size(
+            *moss_image_dimensions(aspect, tier))
 
     sampler = params.get("sampler") or model["sampler"]
     scheduler = params.get("scheduler") or model["scheduler"]
