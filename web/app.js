@@ -2724,6 +2724,78 @@ function loraRowHtml(loraText) {
     + `<b title="${escapeHtml(value)}">${escapeHtml(value)}</b></div>`;
 }
 
+// ------------------------------------------------------------------
+// C2：卡片补齐关键生成参数（2026-11-13）
+// ------------------------------------------------------------------
+//
+// 【为什么要有】用户 2026-11-13 报出 BUG 2：卡片不显示步数等参数。
+//
+// 【取值纪律 —— 唯一真源在服务端】
+// 所有值都读服务端下发的 job.gen_params（h3studio/job_meta.gen_params）。
+// 前端**不自己拼** —— 因为：
+//   * 步数在 params.steps，但视频旧路径工作流会按 lora 档位给默认值；
+//   * shift 视频是 shift_video / 音频是 shift_audio，图像是 shift；
+//   * 时长音乐是 max_duration，视频图像是 duration；
+//   * 尺寸优先用「产物实际像素」，不是请求值。
+// 这些差异全在服务端算好了。
+//
+// 【缺失 = 「—」】
+// gen_params 里缺失的字段是空串 —— 这里显示「—」，
+// **不拿别的字段顶替**（这是本次需求的硬要求）。
+function paramOrDash(value) {
+  const text = String(value == null ? "" : value).trim();
+  return text || "—";
+}
+
+// 卡片的「生成参数」分组行。
+// 返回值是**整组 HTML**（一个 <div class="row-group"> 里多行）——
+// 这样卡片上多出来的行能整体折叠/统一排版，不打乱既有的 .row 样式。
+//
+// 【为什么用分组而不是一堆散行】
+// 用户报的是「显示区域有限」—— 卡片上要显示的东西变多了。
+// 分成「基础（模式/分辨率/时长/种子/耗时）」+「参数（模型/LoRA/采样/步数）」
+// 两组，视觉上更紧凑，也给「详情」按钮留出位置。
+function genParamRowsHtml(job) {
+  const gp = job.gen_params || null;
+  const p = job.params || {};
+  const info = jobModelInfo(job);
+  const rows = [];
+  // 模型：gen_params 里没有（老服务端）时退回既有的 modelLabel()
+  const modelText = gp ? gp.model : modelLabel(job);
+  rows.push(["模型", paramOrDash(modelText)]);
+  // LoRA：BUG 1 的修复落点 —— 只显示真实用到的 LoRA。
+  // 【关键】服务端 gen_params.lora 已经是白名单判定过的结果
+  // （job_meta.resolve_job_lora），没有就是字符串「无」。
+  // 前端**不再自己猜** lora 字段，也**不拿 prompt 顶替**。
+  const loraText = gp ? gp.lora : loraLabel(job);
+  rows.push(["LoRA", paramOrDash(loraText)]);
+  // 采样器 / 调度器
+  rows.push(["采样器", paramOrDash(gp ? gp.sampler : p.sampler)]);
+  rows.push(["调度器", paramOrDash(gp ? gp.scheduler : p.scheduler)]);
+  // 步数/CFG —— **标签沿用基线的「步数/CFG」**。
+  //
+  // 【为什么不改成「步数」】基线卡片上这一行的标签就叫「步数/CFG」，
+  // 而 tests/test_status_realtime.py::test_library_renders_status_and_params_of_new_entry
+  // 断言卡片 meta 里含「步数/CFG」。改成「步数」会把这条既有契约打破，
+  // 属于本次需求（补参数）之外的**回归**。
+  // 值里同时给出 CFG —— 基线那一行本来就是「步数 · CFG」两值，
+  // 这里保留这个语义，缺失的 CFG 显式渲染成「—」（不拿别的字段顶替）。
+  const stepsVal = gp ? gp.steps : p.steps;
+  const cfgVal = gp ? gp.cfg : p.cfg;
+  rows.push(["步数/CFG", `${paramOrDash(stepsVal)} · ${paramOrDash(cfgVal)}`]);
+  // 尺寸：卡片已有「分辨率」一行（带比例），这里只补纯像素尺寸
+  rows.push(["尺寸", paramOrDash(gp ? gp.size : "")]);
+  // 时长
+  rows.push(["时长", paramOrDash(gp ? gp.duration : p.duration)]);
+  // seed —— 沿用基线标签「种子」
+  rows.push(["种子", paramOrDash(gp ? gp.seed : p.seed)]);
+  return `<div class="row-group gen-params">`
+    + rows.map(([label, value]) =>
+        `<div class="row"><span>${escapeHtml(label)}</span>`
+        + `<b title="${escapeHtml(value)}">${escapeHtml(value)}</b></div>`).join("")
+    + `</div>`;
+}
+
 // 「模型」一行的文案。
 // 服务端摘要里的 model_label 已经是**面板下拉里的原文**（如
 // 「MiniMax-H3 混合版 · FL2VA+Ref2VA」），直接用，不自己拼。
@@ -2796,15 +2868,58 @@ function loraLabel(job) {
   // 兜底（job-meta.js 未加载时的降级）——同样只读 model_info。
   const info = jobModelInfo(job);
   const parts = [];
+  // 【2026-11-13 合并】前端**兜底**白名单（media-card-detail 引入）。
+  //
+  // 【为什么服务端已经挡住了、这里还要再挡一层】
+  // 主路径走 window.JOB_META.loraText(job) —— 服务端已按白名单算好，
+  // 脏值不可能出现。但这段兜底代码在 job-meta.js **未加载**时会被用到，
+  // 而 job-meta.js 缺失意味着前端拿到的 model_info 可能来自**旧服务端**
+  // （没有白名单闸门）—— 那时 lora_label 仍可能是提示词原文。
+  // 所以这里再按「来源」判一次：结构化字段（accel_loras / loras）天然可信；
+  // 遗留 params.lora 路径必须过「key 形态」白名单。
+  //
+  // 【为什么不能一刀切地看字符串形态】真实的 LoRA 显示名**带空格和全角括号**
+  // （"DMAD 4 步（critic 版）"、"Turbo 4 步 · ckpt850（工作流固定）"）——
+  // 按「不含空格」去判会把真 LoRA 也误杀。
+  const mode = (job && job.mode) || "";
+  const isVideo = mode === "t2v" || mode === "flf" || mode === "r2v"
+                  || mode === "longfilm";
+  const p = (job && job.params) || {};
+  const structured = Array.isArray(p.accel_loras)
+    && p.accel_loras.some(item => item && item.enabled !== false && item.key);
   if (info.lora_label) {
-    parts.push(info.lora_strength != null
-      ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
-      : info.lora_label);
+    if (!isVideo || structured || isLoraKeyLike(info.lora_label)) {
+      parts.push(info.lora_strength != null
+        ? `${info.lora_label} ×${Number(info.lora_strength).toFixed(2)}`
+        : info.lora_label);
+    }
   }
   if (info.fixed_lora_label) {
     parts.push(`工作流固定：${info.fixed_lora_label}`);
   }
   return parts.length ? parts.join(" · ") : "无";
+}
+
+// 「这段文本长得像一个 LoRA **key** 吗？」（前端兜底白名单）
+//
+// 【只对「遗留 params.lora」这条路径生效】
+// 遗留字段的值是 workflows.LORAS 的键（"ckpt850" / "v4step600"），
+// 或者权重文件名（如 "minimax_h3_turbo_4step_ema_ckpt850.safetensors"）——
+// 形态是**纯 ASCII 的标识符 / 文件名**。
+//
+// 而提示词形态完全相反：含空格、含中文、含标点、长。
+// 所以判据是「只允许 ASCII 标识符字符」。
+//
+// 【为什么不查清单】前端拿不到「真实 LoRA 清单」的全量（不同族的清单
+// 在 IMG_LORAS / QWEN_LORAS / MOSS_LORAS / videoOptions 里）。
+// 清单判据留给服务端；前端只做**形态**判据 ——
+// 足够挡住「提示词冒充 LoRA」这个具体缺陷，且不会误杀正常 LoRA 名。
+function isLoraKeyLike(text) {
+  const value = String(text == null ? "" : text).trim();
+  if (!value) return false;
+  if (value.length > 120) return false;
+  // LoRA key / 权重文件名：ASCII 字母数字 + 下划线 + 点 + 斜杠 + 连字符
+  return /^[A-Za-z0-9_.\/-]+$/.test(value);
 }
 
 // 图像模式：模型版本的可读名（清单来自 /api/image-options）
@@ -3258,7 +3373,13 @@ function reuseConfigFromJob(job, p, panel) {
     twopass: p.twopass,
     // 【2026-11-12】采样参数也要一起复用（原来没带，
     // 于是「复用参数」后步数/采样器/调度器/shift 都丢回默认值）。
-    // 【2026-11-13 改 —— C4】同样先取权威摘要，再退回 params。
+    // 【2026-11-13 改 —— C4】先取权威摘要，再退回 params。
+    //
+    // 【为什么不是直接读 p.*】media-card-detail 的版本直接读 p.steps /
+    // p.sampler …，但 params 里同时躺着两套字段名（遗留的 p.model/p.lora
+    // 与新面板的 model_key/accel_loras），前者常常是空的 —— 于是「复用参数」
+    // 丢参数、而详情模态框显示的是另一套值。
+    // 权威摘要（model_info）由服务端按白名单算好，两侧口径一致。
     steps: info.steps != null ? info.steps : p.steps,
     sampler: info.sampler || p.sampler,
     scheduler: info.scheduler || p.scheduler,
@@ -3268,6 +3389,8 @@ function reuseConfigFromJob(job, p, panel) {
     // 保证「复用参数」与「详情」看到的是同一套。
     cfg: info.cfg != null ? info.cfg : p.cfg,
     seed: info.seed != null ? info.seed : p.seed,
+    // 【media-card-detail】sigma 精修开关也要一起复用（h3-model-meta 没有）。
+    use_sigma_shift: p.use_sigma_shift,
   };
 }
 
@@ -3296,7 +3419,14 @@ function jobCard(job) {
   // 【2026-11-12 修】这一行以前**根本不存在** —— 用户在面板上选的
   // 加速 LoRA 在生成库里完全看不到，只能从「模型」一行里猜。
   // 现在按服务端摘要渲染；**没有 LoRA 时整行不渲染**（不显示「空」）。
-  const loraRow = loraRowHtml(loraLabel(job));
+  //
+  // 【2026-11-13 修 —— BUG 1】LoRA 行的取值改成「服务端白名单结果」：
+  // gen_params.lora 已经是 job_meta.resolve_job_lora 判定过的 ——
+  // 只可能是「真实用到的 LoRA（含强度）」或字符串「无」。
+  // 老服务端没有 gen_params 时才走本地兜底 loraLabel()。
+  const loraRow = loraRowHtml(job.gen_params
+    ? job.gen_params.lora
+    : loraLabel(job));
   // 【2026-11-13 新增 —— 需求 C2】卡片补齐生成参数。
   //
   // 【为什么不再直接读 p.sampler / p.steps】
@@ -3353,25 +3483,13 @@ function jobCard(job) {
       <div class="row longfilm-intro"><span>简介</span><b>${escapeHtml((p.intro || "—").slice(0, 80))}</b></div>` : `
       <div class="row"><span>模式</span><b>${info.name}</b></div>
       ${IMAGE_MODES.includes(job.mode) ? `<div class="row"><span>分辨率</span><b>${resoRow}</b></div>
-      ${resoNote}
-      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
-      ${loraRow}
-      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>` : info.kind === "audio" ? `
-      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
-      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
+      ${resoNote}` : info.kind === "audio" ? `
       <div class="row"><span>谱面</span><b>${(p.plan_mode || p.mode) === "melody" ? "仅旋律" : "完整谱面"}</b></div>
       <div class="row"><span>格式</span><b>${(p.format || "flac").toUpperCase()}</b></div>` : `
       <div class="row"><span>分辨率</span><b>${resoRow}</b></div>
       ${resoNote}
-      ${info.kind === "video" ? `<div class="row"><span>时长</span><b>${durationRow}</b></div>
-      <div class="row"><span>模型</span><b>${escapeHtml(modelLabel(job))}</b></div>
-      ${loraRow}
-      <div class="row"><span>采样</span><b>${samplingRow}</b></div>
-      <div class="row"><span>步数/CFG</span><b>${stepsRow}</b></div>
-      ${attentionRowHtml(job)}` : ""}`}
-      <div class="row"><span>种子</span><b>${seedRow}</b></div>`}
+      ${info.kind === "video" ? attentionRowHtml(job) : ""}`}`}
+      ${genParamRowsHtml(job)}
       <div class="row"><span>耗时</span><b>${job.status === "done" ? fmtElapsed(job.elapsed) : fmtElapsed(job.elapsed)}</b></div>
       ${job.mode !== "longfilm" ? (info.kind === "audio" ? `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整风格描述与歌词"><span>风格描述</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>` : `<button class="row prompt-row" data-act="prompt" title="点击查看并复制完整提示词"><span>提示词</span><b>${escapeHtml((p.prompt || "").slice(0, 80))}</b></button>`) : ""}
     </div>`}
@@ -3392,7 +3510,7 @@ function jobCard(job) {
            完整生成参数（模型/步数/调度器/采样器/shift/LoRA 列表+强度/
            尺寸/时长/seed/完整提示词/注意力机制/任务来源与工作流名/创建时间）
            放到模态框里。 -->
-      <button data-act="detail">详情</button>
+      ${!runningOrQueued ? `<button data-act="detail" title="查看完整生成参数">ℹ 详情</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
 
@@ -3489,6 +3607,36 @@ function jobCard(job) {
       openPromptModal(p.prompt || "");
     }
   });
+  // 「详情」按钮：打开生成参数详情模态框（C3）。
+  //
+  // 【为什么要 stopPropagation】卡片本身也会绑「点击开详情」
+  // （需求：点击卡片弹出模态框）。如果按钮不阻止冒泡，
+  // 点「详情」会触发两次 —— 开了又关，或者开了又开。
+  // **这正是「与下载 / 复用参数 / 删除按钮互不冲突」的关键**：
+  // 所有 .job-actions 里的按钮都要 stopPropagation，
+  // 否则点「删除」会同时弹出详情框（删除还要再点一次确认框，
+  // 用户体验是「弹了个看不懂的框」）。
+  card.querySelector('[data-act="detail"]')?.addEventListener("click", event => {
+    event.stopPropagation();
+    openDetailModal(job);
+  });
+  // 点击卡片其它位置 -> 也打开详情（需求原文）。
+  //
+  // 【排除项】不能挡住这些交互：
+  //   * 预览区的图片/视频（点它要放大/播放）
+  //   * 提示词行（点它要开提示词弹窗）
+  //   * 批次缩略图（点它要放大）
+  //   * .job-actions 里的所有按钮（下载 / 复用 / 接续 / 拼接 / 删除）
+  //   * 取消按钮
+  card.addEventListener("click", event => {
+    if (isDetailModalOpen()) return;
+    // 点在已有的交互元素上 -> 不开详情
+    if (event.target.closest("button, a, .job-preview, .prompt-row, "
+      + ".job-batches, .job-batch, .cancel-btn, input, select, textarea")) {
+      return;
+    }
+    openDetailModal(job);
+  });
   // 批次结果展开/折叠（点标题行任意位置或三角都可以）
   card.querySelector('[data-act="toggle-batches"]')?.addEventListener("click", event => {
     event.stopPropagation();
@@ -3567,7 +3715,42 @@ function jobCard(job) {
         $("#steps").value = rSteps;
         $("#stepsVal").textContent = rSteps;
       }
+      // 【2026-11-13 · C4】种子也一起复用（原任务用了固定种子，
+      // 复用后回到「随机」就复现不出同一个结果）。
+      // 优先用**权威摘要**里的 seed（与卡片/详情显示同一套），
+      // 摘要没有才退回 params.seed。
       if (rSeed) $("#seed").value = rSeed;
+      else if (p.seed) $("#seed").value = p.seed;
+      // 【2026-11-13 · C4】复用后配置区显示的分辨率/尺寸必须与卡片一致。
+      //
+      // 【为什么需要这一段】卡片上的尺寸是**产物实际像素**
+      // （resolution_info.source == "actual"，比如 1344×768），
+      // 而 params.width/height 可能压根没有（老任务）或者
+      // 是请求值（1344×760，实际出 1344×768）。
+      // 只按 params 回填 -> 用户看到「1344×760」，与卡片「1344×768」
+      // 不一致 —— 同一张卡片的两个数字对不上。
+      //
+      // 【规则】**产物实际像素优先**（与卡片的显示口径一致），
+      // 没有实际像素才用请求值。
+      const cardReso = job.resolution_info || {};
+      const reuseWidth = Number(cardReso.width) || Number(p.width) || 0;
+      const reuseHeight = Number(cardReso.height) || Number(p.height) || 0;
+      if (reuseWidth && reuseHeight) {
+        const cfg = window.VIDEO_PANEL.state || null;
+        if (cfg) {
+          cfg.width = reuseWidth;
+          cfg.height = reuseHeight;
+          cfg.rawWidth = reuseWidth;
+          cfg.rawHeight = reuseHeight;
+        }
+        // 档位 key 由宽高反查（唯一真源是服务端下发的 size_presets 清单）
+        const presets = (window.VIDEO_PANEL.options
+          && window.VIDEO_PANEL.options.size_presets) || [];
+        const hit = presets.find(pp => pp.width === reuseWidth
+          && pp.height === reuseHeight);
+        if (cfg) cfg.sizePresetKey = hit ? hit.key : "";
+        window.VIDEO_PANEL.render();
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -3752,6 +3935,125 @@ $("#promptModal").addEventListener("click", event => {
 });
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("#promptModal").hidden) closePromptModal();
+});
+
+// ------------------------------------------------------------------
+// C3：生成参数详情模态框（2026-11-13）
+// ------------------------------------------------------------------
+//
+// 【需求原文】点击卡片（或卡片上的「详情」按钮）弹出模态框，展示完整生成参数
+//   —— 步数、调度器、采样器、shift、LoRA 名称+强度、尺寸、时长、seed、
+//   完整提示词、注意力机制、工作流名、创建时间。
+//   要求：支持关闭按钮 / Esc / 点击遮罩关闭；与卡片上既有的下载、复用参数、
+//   删除按钮互不冲突；定时刷新不得打断已打开的模态框。
+//
+// 【取值纪律】全部读服务端下发的 job.gen_params（h3studio/job_meta.gen_params）。
+// 缺失的字段显示「—」，**不拿别的字段顶替**。
+//
+// 【定时刷新不打断】模态框内容在**打开时快照**一次 ——
+// 之后 2 秒一次的 refreshJobs 轮询不会改写它（用户正在看的内容不该被
+// 悄悄换掉）。想看最新的可以关掉再打开。
+const DETAIL_FIELDS = [
+  ["model", "模型"],
+  ["steps", "步数"],
+  ["scheduler", "调度器"],
+  ["sampler", "采样器"],
+  ["shift", "shift"],
+  ["cfg", "CFG"],
+  ["lora", "LoRA"],
+  ["size", "尺寸"],
+  ["duration", "时长"],
+  ["seed", "种子"],
+  ["attention", "注意力机制"],
+  ["workflow", "工作流名"],
+];
+
+// 详情模态框当前展示的任务 id（用于「刷新时不要改写」的判断）
+let detailOpenJobId = null;
+
+function detailParamValue(job, key) {
+  const gp = job.gen_params || {};
+  const value = gp[key];
+  // 【缺失 = 「—」】服务端没给就是没有 —— 不拿别的字段顶替。
+  const text = String(value == null ? "" : value).trim();
+  return text || "—";
+}
+
+function openDetailModal(job) {
+  if (!job) return;
+  const modal = $("#detailModal");
+  if (!modal) return;
+  // 【快照】把要展示的内容一次性渲染好 —— 后续轮询不会改写它。
+  const title = $("#detailModalTitle");
+  if (title) {
+    const info = MODE_INFO[job.mode] || { name: job.mode };
+    title.textContent = `${info.name} · 生成参数详情`;
+  }
+  const paramsBox = $("#detailParams");
+  if (paramsBox) {
+    const rows = DETAIL_FIELDS.map(([key, label]) => {
+      const value = detailParamValue(job, key);
+      return `<div class="detail-kv-row"><span>${escapeHtml(label)}</span>`
+        + `<b title="${escapeHtml(value)}">${escapeHtml(value)}</b></div>`;
+    });
+    // 创建时间：不在 gen_params 里（那是任务属性，不是生成参数）
+    rows.push(`<div class="detail-kv-row"><span>创建时间</span>`
+      + `<b>${escapeHtml(fmtTime(job.created_at))}</b></div>`);
+    paramsBox.innerHTML = rows.join("");
+  }
+  const promptBox = $("#detailPrompt");
+  if (promptBox) {
+    // 完整提示词（不是截断的 80 字）
+    promptBox.textContent = String((job.params && job.params.prompt) || "").trim()
+      || "（这条任务没有提示词）";
+  }
+  detailOpenJobId = job.id;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  // 滚回顶部（上次打开可能停在下面）
+  const body = $("#detailModalBody");
+  if (body) body.scrollTop = 0;
+}
+
+function closeDetailModal() {
+  const modal = $("#detailModal");
+  if (!modal) return;
+  modal.hidden = true;
+  detailOpenJobId = null;
+  syncModalOpenClass();
+}
+
+// body.modal-open 的统一维护。
+//
+// 【为什么需要】body.modal-open { overflow: hidden }（style.css:429）
+// 是「有模态框打开时锁住页面滚动」。但页面上有**多个**模态框
+// （提示词 / LoRA 说明 / 增强确认 / 详情），每个都各自 add/remove
+// 这个 class —— 关掉其中一个会把另一个的锁也解掉。
+// 所以关框时必须重新判断「还有没有别的框开着」。
+const MODAL_IDS = ["promptModal", "loraInfoModal", "enhanceGateModal",
+                   "detailModal"];
+function syncModalOpenClass() {
+  const anyOpen = MODAL_IDS.some(id => {
+    const el = $("#" + id);
+    return !!(el && !el.hidden);
+  });
+  document.body.classList.toggle("modal-open", anyOpen);
+}
+
+function isDetailModalOpen() {
+  const modal = $("#detailModal");
+  return !!(modal && !modal.hidden);
+}
+
+// 关闭方式 1/2：× 按钮 + 底部「关闭」按钮（底部按钮走 onclick 调上面的 close）
+$("#detailModalClose").addEventListener("click", closeDetailModal);
+// 关闭方式 3：点击遮罩（点到 .prompt-modal 本身才算，点对话框内部不算）
+$("#detailModal").addEventListener("click", event => {
+  if (event.target === $("#detailModal")) closeDetailModal();
+});
+// 关闭方式 4：Esc
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && isDetailModalOpen()) closeDetailModal();
 });
 $("#promptCopy").addEventListener("click", async () => {
   const textArea = $("#promptModalText");

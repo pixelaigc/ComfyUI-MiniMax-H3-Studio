@@ -1269,6 +1269,41 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 生成参数详情模态框（C3 · 2026-11-13） -->
+<!--
+  用户要求：点击卡片（或卡片上的「详情」按钮）弹出模态框，展示完整生成参数
+  —— 步数、调度器、采样器、shift、LoRA 名称+强度、尺寸、时长、seed、
+  完整提示词、注意力机制、工作流名、创建时间。
+
+  【为什么用独立 id 而不是复用 promptModal】
+  promptModal 只有一个 textarea（纯文本），而详情要**分区展示**
+  （参数表 + 完整提示词）。复用会把两种交互搅在一起。
+
+  【关闭方式】× 按钮 / 底部「关闭」按钮 / Esc / 点遮罩 —— 四种都要。
+-->
+<div class="prompt-modal" id="detailModal" hidden>
+  <div class="prompt-dialog detail-dialog" role="dialog" aria-modal="true"
+       aria-labelledby="detailModalTitle">
+    <div class="prompt-dialog-head">
+      <b id="detailModalTitle">生成参数详情</b>
+      <button id="detailModalClose" aria-label="关闭">×</button>
+    </div>
+    <div class="detail-body" id="detailModalBody">
+      <div class="detail-section">
+        <div class="detail-section-title">生成参数</div>
+        <div class="detail-kv" id="detailParams"></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">完整提示词</div>
+        <pre class="detail-prompt" id="detailPrompt"></pre>
+      </div>
+    </div>
+    <div class="prompt-dialog-actions">
+      <button onclick="document.getElementById('detailModalClose').click()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/qwen-refs.js?v=refs1"></script>
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=vpfb1"></script>

@@ -79,7 +79,11 @@ def _extract_function(src: str, name: str) -> str:
 
 #: 待测的前端函数（必须逐个从 app.js 里抠出来，保证测的是**线上那份代码**）
 FUNCTIONS = ["jobModelInfo", "videoOptions", "localModelInfo", "loraRowHtml",
-             "modelLabel", "loraLabel"]
+             "modelLabel", "loraLabel",
+             # 【2026-11-13】loraLabel 现在会调 isLoraKeyLike 做前端兜底白名单
+             # （挡住「提示词冒充 LoRA」）。它是 loraLabel 的直接依赖，
+             # 必须一起抠出来 —— 否则 loraLabel 在 Node 里会 ReferenceError。
+             "isLoraKeyLike"]
 
 _EXTRA_JS = """
 // ---- app.js 里被测函数依赖的极简替身 ----

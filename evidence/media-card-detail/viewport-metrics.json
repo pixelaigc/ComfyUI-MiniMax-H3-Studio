@@ -1,0 +1,81 @@
+{
+  "375px": {
+    "viewport": [
+      375,
+      667
+    ],
+    "dialog": {
+      "left": 0,
+      "top": 53,
+      "w": 375,
+      "h": 614
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": true,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      40,
+      40
+    ],
+    "doneBtnSize": [
+      347,
+      42
+    ],
+    "paramRowCount": 13
+  },
+  "390px": {
+    "viewport": [
+      390,
+      844
+    ],
+    "dialog": {
+      "left": 0,
+      "top": 68,
+      "w": 390,
+      "h": 776
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": true,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      40,
+      40
+    ],
+    "doneBtnSize": [
+      362,
+      42
+    ],
+    "paramRowCount": 13
+  },
+  "1280px": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dialog": {
+      "left": 280,
+      "top": 65,
+      "w": 720,
+      "h": 590
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": true,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      40,
+      40
+    ],
+    "doneBtnSize": [
+      61,
+      37
+    ],
+    "paramRowCount": 13
+  },
+  "_note": "closeBtnSize 1280px 这次是 40x40 —— 本轮补了 .detail-dialog .prompt-dialog-head button 的不限宽度 40x40 规则（commit 1185c54）；此前实测桌面为 13x26。"
+}

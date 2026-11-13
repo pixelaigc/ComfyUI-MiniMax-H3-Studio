@@ -319,10 +319,13 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
         "aspect": params.get("aspect"),
         "duration": params.get("duration"),
         "steps": params.get("steps"),
-        # 【2026-11-13】LoRA 两个字段统一由 job_meta.resolve_job_lora 判定，
+        # 【2026-11-13】LoRA 三个字段统一由 job_meta.resolve_job_lora 判定，
         # 不再原文照抄 params —— 否则提示词会被当成 LoRA 印出来。
+        # （以 media-card-detail 为准：它比 h3-model-meta 多带了 lora_strength；
+        #   两个旧字段 lora / loras 与 h3-model-meta 完全一致，保留即可。）
         "lora": lora_value["lora"],
         "loras": lora_value["loras"],
+        "lora_strength": lora_value["strength"],
         "negative_prompt": params.get("negative_prompt"),
         "sampler": params.get("sampler"),
         "scheduler": params.get("scheduler"),
