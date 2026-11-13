@@ -586,7 +586,7 @@
         ${err ? `<span class="ag-step-err">${err}</span>` : ""}
       </li>`;
     }).join("");
-    return `<details class="ag-block ag-steps" data-detail-key="m${mi}-steps">
+    return `<details class="ag-block ag-steps" data-detail-key="${detailScope()}m${mi}-steps">
       <summary class="ag-block-title">工具调用轨迹（${steps.length}）</summary>
       <ul class="ag-step-list">${rows}</ul>
     </details>`;
@@ -681,13 +681,21 @@
   function renderTools(tools, msgIndex) {
     if (!tools || !tools.length) return "";
     const mi = msgIndex == null ? 0 : msgIndex;
+    // 【会话作用域前缀 —— 2026-11-13 工具密度/折叠态修复】
+    // data-detail-key 原来只有消息序号（m0-tool-0）。切换会话后，
+    // 新会话的第一条消息又叫 m0-tool-0 —— **同一个 key**。
+    // 于是 captureDetailsState/restoreDetailsState 会把**上一个会话**
+    // 的折叠态贴到**新会话**的同名折叠块上：
+    // 用户在会话 A 展开的工具行，切到会话 B 仍然是展开的。
+    // 加上会话前缀后，key 全局唯一，跨会话不再串。
+    const scope = detailScope();
     const rows = tools.map((t, i) => {
       const ok = t.ok !== false;
       const cls = ok ? "ok" : "bad";
       const args = toolArgsPreview(t.arguments);
       const result = toolResultSummary(t.result);
       const err = t.error ? `<div class="ag-tool-err">${esc(t.error)}</div>` : "";
-      return `<details class="ag-tool ag-tool-${cls}" data-detail-key="m${mi}-tool-${i}" data-tool-index="${i}">
+      return `<details class="ag-tool ag-tool-${cls}" data-detail-key="${scope}m${mi}-tool-${i}" data-tool-index="${i}">
         <summary class="ag-tool-head">
           <span class="ag-tool-state" aria-hidden="true">${ok ? "✓" : "✕"}</span>
           <span class="ag-tool-name">${esc(t.name || "(未命名工具)")}</span>
@@ -703,32 +711,103 @@
     // 整体容器默认**展开**：工具轨迹是这次对话的重点，
     // 折起来等于把「Agent 干了什么」藏起来，用户只能看到一个标题。
     // 每个工具块仍可单独折叠 —— 粒度由用户控制。
-    return `<details class="ag-block ag-tools" data-detail-key="m${mi}-tools" open>
+    return `<details class="ag-block ag-tools" data-detail-key="${scope}m${mi}-tools" open>
       <summary class="ag-block-title">工具调用（${tools.length}）</summary>
       <div class="ag-tool-list">${rows}</div>
     </details>`;
   }
 
+  // 折叠态 key 的**会话作用域前缀**。
+  //
+  // 【为什么必须有 —— 2026-11-13 实测 BUG】
+  // data-detail-key 原来只有消息序号（m0-tool-0 / m0-steps / m0-tools）。
+  // 消息序号在**每个会话里都从 0 开始**，所以两个不同会话的第一条消息
+  // 共享同一个 key。
+  //
+  // 后果（真实浏览器实测）：
+  //   在会话 A 里展开 m0-tool-0 -> 切到会话 B -> B 的 m0-tool-0 **也是展开的**
+  //   -> 切回会话 A -> 又变回别的状态
+  // 这就是用户报的「切换 session 后工具区密度会变」的另一半根因：
+  // 折叠态跨会话串味，展开的折叠块一多，工具区自然就「变松」了。
+  //
+  // 前缀取**当前会话 id**；没有会话 id（刚开新会话、还没落库）时用一个
+  // 进程内自增的临时号，保证同一会话内稳定、不同会话间不撞。
+  function detailScope() {
+    const sid = state.sessionId || state._ephemeralScope || "";
+    if (!sid) {
+      // 没有会话 id -> 造一个临时的（同一轮渲染内保持不变）。
+      state._ephemeralScope = state._ephemeralScope
+        || ("tmp-" + Math.random().toString(36).slice(2, 10));
+      return state._ephemeralScope + "-";
+    }
+    return sid + "-";
+  }
+
   // 澄清式提问：Agent 用 respond(needs_clarification=true) 反问用户时，
   // 渲染成**可回答的提问气泡**（带快捷选项 + 自由输入）。
-  function renderClarify(msg) {
+  //
+  // 【为什么每个控件都要带 msg-index —— 2026-11-13 实测 BUG】
+  // 原来的点击处理是 `box.querySelector(".ag-clarify-input")` ——
+  // 那是**消息区里的第一个**输入框，与「点了哪条消息的选项」毫无关系。
+  // 于是页面上有两条 Agent 消息各自带一组快捷选项时，
+  // 点**下面**那条的选项，文本被填进了**上面**那条的输入框，
+  // 下面那条的输入框还停在「直接输入你的回答…」。
+  //
+  // 修法：每个选项按钮和输入框都带上**所属消息的序号**（data-msg-index），
+  // 点击时用 `closest("[data-msg-index]")` 反查自己的作用域，
+  // 只在自己那条消息的 .ag-clarify-input 里写值。
+  // 序号来自 bubbleHtml(msg, index) 的 index —— 与 DOM 上的
+  // `.ag-msg[data-msg-index]` 完全一致，是唯一可靠的「作用域锚点」。
+  function renderClarify(msg, msgIndex) {
     const q = msg.clarify;
     if (!q) return "";
+    const mi = msgIndex == null ? 0 : msgIndex;
     const options = (q.options || []).map((opt, i) => `
       <button type="button" class="ag-clarify-opt" data-act="clarify-answer"
-              data-value="${esc(opt)}">${esc(opt)}</button>`).join("");
+              data-msg-index="${mi}" data-value="${esc(opt)}">${esc(opt)}</button>`).join("");
     const hint = q.hint ? `<div class="ag-clarify-hint">${esc(q.hint)}</div>` : "";
-    return `<div class="ag-block ag-clarify">
+    return `<div class="ag-block ag-clarify" data-clarify-scope="${mi}">
       <div class="ag-block-title">Agent 需要你确认</div>
       <div class="ag-clarify-q">${esc(q.question || "")}</div>
       ${hint}
       ${options ? `<div class="ag-clarify-options">${options}</div>` : ""}
       <div class="ag-clarify-reply">
-        <input type="text" class="ag-clarify-input" placeholder="直接输入你的回答…"
+        <input type="text" class="ag-clarify-input" data-msg-index="${mi}"
+               placeholder="直接输入你的回答…"
                data-act="clarify-input" aria-label="回答 Agent 的提问">
-        <button type="button" class="ag-act" data-act="clarify-send">发送回答</button>
+        <button type="button" class="ag-act" data-act="clarify-send"
+                data-msg-index="${mi}">发送回答</button>
       </div>
     </div>`;
+  }
+
+  // 找出「某个快捷选项 / 发送按钮自己所属的那条澄清气泡」的输入框。
+  //
+  // 【为什么必须逐级向上查，不能用全局选择器】
+  // 页面上可能同时存在多条 Agent 消息的澄清气泡（甚至跨会话残留），
+  // 全局选择器（document.querySelector / box.querySelector 取第一个）
+  // 永远只会命中第一条 —— 这就是串填的根因。
+  // 这里从**被点击的元素自己**出发，沿 DOM 向上找最近的
+  // `.ag-clarify` 容器，容器内的第一个 `.ag-clarify-input`
+  // 才是这个选项真正的归属输入框。
+  function clarifyInputOf(btn) {
+    if (!btn) return null;
+    // 1) 优先：从按钮自身所在的 .ag-clarify 容器里取（最可靠 —— DOM 作用域）
+    const scope = btn.closest(".ag-clarify");
+    if (scope) {
+      const field = scope.querySelector(".ag-clarify-input");
+      if (field) return field;
+    }
+    // 2) 兜底：用 data-msg-index 定位（万一 DOM 结构变了，
+    //    但序号还在，仍能按消息作用域精确命中）。
+    const idx = btn.getAttribute("data-msg-index");
+    if (idx != null && idx !== "") {
+      const host = btn.closest("[data-msg-index]") || document;
+      const field = host.querySelector(
+        `.ag-clarify-input[data-msg-index="${CSS.escape(idx)}"]`);
+      if (field) return field;
+    }
+    return null;
   }
 
   // 用户气泡里的附件缩略图。
@@ -782,7 +861,7 @@
          ${renderAssets(msg.assets)}
          ${renderPrompt(msg.prompt)}
          ${toolBlock}
-         ${renderClarify(msg)}
+         ${renderClarify(msg, index)}
          ${renderStatusNote(msg)}
          ${renderError(msg)}
          ${renderFillButton(msg)}`;
@@ -856,25 +935,119 @@
     </div>`;
   }
 
+  // 当前会话 id 的**唯一**读取入口。
+  //
+  // 【为什么从这里读，而不是让调用方传 —— 2026-11-13】
+  // 折叠态 key 的作用域前缀依赖「当前是哪个会话」。
+  // 调用方（agent_sessions.js）在切会话时已经更新了自己的 state.currentId，
+  // 所以这里直接问会话层 —— 省掉「每个调用点都要记得传 sessionId」这种
+  // 容易漏的约定（漏一个 = 折叠态串到别的会话）。
+  //
+  // 返回 null = **问不到**（会话层还没加载 / 不存在）。
+  // null 与空串必须区分：问不到时**不能**把 state.sessionId 清空。
+  function currentSessionId() {
+    const sessions = window.AgentSessions;
+    if (sessions && sessions.state) return sessions.state.currentId || "";
+    return null;
+  }
+
+  // 切换会话作用域：换 sessionId + 换折叠态作用域。
+  //
+  // 【顺序很重要 —— 必须先抓旧会话的折叠态，再改 sessionId】
+  // captureDetailsState 会把当前 DOM 的折叠态存进「当前会话的桶」。
+  // 如果先改了 sessionId 再抓，DOM 里明明还是**旧会话**的折叠块，
+  // 却会被存进**新会话**的桶 -> 切回来时恢复成别的会话的状态，
+  // 工具区密度就会在会话之间乱跳。
+  //
+  // 【为什么要按会话分桶 —— 2026-11-13 工具密度一致性修复】
+  // data-detail-key 原来只有消息序号（m0-tool-0 / m0-steps / m0-tools）。
+  // 消息序号在**每个会话里都从 0 开始**，所以两个不同会话的第一条消息
+  // 共享同一个 key —— 折叠态跨会话串味。
+  //
+  // 加上会话作用域前缀后，key 全局唯一；再按会话分桶记住折叠态，
+  // 切走再切回来 -> 恢复成**离开前的样子** -> 密度完全一致。
+  function applySessionScope(nextSid) {
+    if (nextSid === null || nextSid === undefined) return;   // 问不到 -> 不动
+    const prev = state.sessionId || "";
+    if ((nextSid || "") === prev) return;                    // 没变 -> 不动
+    const box = $("#agMessages");
+    if (box) captureDetailsState(box);   // 先把旧会话的折叠态存进旧桶
+    state.sessionId = nextSid || "";
+    // 会话变了 -> 临时的折叠态作用域也要换（否则新会话沿用旧作用域）
+    state._ephemeralScope = "";
+  }
+
   // 折叠态的保存与恢复。
   //
   // 为什么要存：任何一次重绘都会重建 innerHTML，`<details>` 的 open 属性
   // 是**元素状态**，重建后默认收起 —— 用户刚展开的工具轨迹会在下一个
   // token 到来时「弹回去」。所以重绘前先把 open 态抓出来，重绘后再贴回去。
+  //
+  // 【按会话分桶 —— 2026-11-13 工具密度一致性修复】
+  // 原来只有一个全局 map。切会话时旧会话的 key 被清掉，而新会话渲染出来的
+  // key 也是 m0-tool-0，但 map 里已经没有它了 -> 恢复不了 -> 一律回到
+  // 默认展开态。结果就是「同一会话切走再切回来，工具区密度变了」。
+  // 现在按会话 id 分桶：每个会话记住自己的折叠态。
+  // 桶用 Map 而不是 localStorage（折叠态是**临时 UI 状态**，
+  // 不该跨页面刷新保留；刷新后回到默认展开态是合理的）。
+  const detailsStateBySession = new Map();
+
+  // 当前会话的折叠态桶。
+  //
+  // 【桶只服务于「有会话 id」的场景 —— 2026-11-13】
+  // 桶的用途是「切走再切回来时恢复这个会话自己的展开态」——
+  // **前提是这个会话有身份**（session id）。
+  //
+  // 没有会话 id 时（还没落库 / 自动化测试）返回 null：
+  //   · 折叠态只活在 DOM 里（由本次重绘前抓到的 map 负责）——
+  //     这正是修复前的行为，也正是「同一段对话内重绘不丢展开态」所需；
+  //   · **不跨段落继承**。如果无会话时也用桶，且桶的 key 是个共享的
+  //     "__none__"，上一段对话的展开态就会漏到下一段对话里。
+  //
+  // 【实测踩到过 —— 2026-11-13】
+  // 真实浏览器跑一批用例时，出现「工具块在点击前就已经是展开的」：
+  // 点一下 summary 反而把它**收起**了。
+  // 根因就是无会话场景共用一个桶，上一段的展开态漏了过来。
+  //
+  // 桶的 key 用 scope 前缀（有会话时就是 session id），
+  // 这样不同会话、以及不同临时作用域，都不会互相污染。
+  function currentDetailsBucket() {
+    if (!state.sessionId) return null;    // 没有会话身份 -> 不分桶
+    const key = detailScope();
+    if (!detailsStateBySession.has(key)) detailsStateBySession.set(key, new Map());
+    return detailsStateBySession.get(key);
+  }
+
   function captureDetailsState(root) {
     const map = new Map();
     if (!root) return map;
     root.querySelectorAll("details[data-detail-key]").forEach(d => {
       map.set(d.getAttribute("data-detail-key"), d.open);
     });
+    // 存进当前会话的桶（供下次切回本会话时恢复）。
+    // 没有会话 id -> 不存（见 currentDetailsBucket 的说明）。
+    const bucket = currentDetailsBucket();
+    if (bucket) map.forEach((v, k) => bucket.set(k, v));
     return map;
   }
 
+  // 把折叠态贴回去。
+  //
+  // 【为什么要合并「本次重绘的 map」和「当前会话的桶」—— 2026-11-13】
+  // 两种来源各有各的用：
+  //   · map（本次重绘前从 DOM 抓的）-> 同一会话内的**重绘**（流式 token
+  //     到达、任务状态刷新）必须用它，否则用户展开的工具行会弹回去；
+  //   · 桶（该会话历史上记住的）-> **切回该会话**时用它，
+  //     否则离开时展开的工具行回到默认收起态 -> 密度变了。
+  // 两者的 key 相同（都带会话作用域前缀），所以按「桶优先、map 兜底」
+  // 合并：桶里有的用桶的（那是用户最后确认过的状态），桶里没有的用 map。
   function restoreDetailsState(root, map) {
-    if (!root || !map || !map.size) return;
+    if (!root) return;
+    const bucket = currentDetailsBucket();
     root.querySelectorAll("details[data-detail-key]").forEach(d => {
       const key = d.getAttribute("data-detail-key");
-      if (map.has(key)) d.open = map.get(key);
+      if (bucket && bucket.has(key)) { d.open = bucket.get(key); return; }
+      if (map && map.has(key)) d.open = map.get(key);
     });
   }
 
@@ -1857,10 +2030,20 @@
   }
 
   async function newSession() {
+    // 【先把旧会话的折叠态存进旧会话的桶 —— 2026-11-13】
+    // 下面马上要把 state.sessionId 清空。清空之后再抓，抓到的就是
+    // 「空会话桶」而不是「旧会话桶」-> 旧会话的展开态丢了，
+    // 切回旧会话时工具区密度会变。
+    // 所以抓取必须**在**清 sessionId **之前**。
+    const box = $("#agMessages");
+    if (box) captureDetailsState(box);
     state.sessionId = "";
     state.messages = [];
     state.lastResult = null;
     state.streaming = null;
+    // 【会话变了 -> 折叠态作用域前缀也要换 —— 2026-11-13】
+    // 否则新会话沿用旧会话的 key 前缀，展开/收起状态会跨会话串味。
+    state._ephemeralScope = "";
     stopProgress();
     jobPoll.ids.clear();
     jobPoll.messages.clear();
@@ -2038,11 +2221,29 @@
           if (input2) input2.value = req.message || "";
           send();
         } else if (act === "clarify-answer") {
+          // 【作用域定位 —— 2026-11-13 实测 BUG 修复】
+          // 原来是 `box.querySelector(".ag-clarify-input")` —— 取的是
+          // 消息区里的**第一个**输入框，点下面那条的选项却填进了上面那条。
+          // 现在只写**这个选项自己所属**的那条澄清气泡的输入框。
           const value = btn.dataset.value || "";
-          const field = box.querySelector(".ag-clarify-input");
-          if (field) { field.value = value; field.focus(); }
+          const field = clarifyInputOf(btn);
+          if (field) {
+            field.value = value;
+            field.focus();
+            // 已选项高亮 + 本组其余选项禁用（避免重复提交同一个答案）。
+            // 只影响**本组**（同一个 .ag-clarify 容器），不碰别的消息。
+            const scope = btn.closest(".ag-clarify");
+            if (scope) {
+              scope.querySelectorAll(".ag-clarify-opt").forEach(opt => {
+                opt.disabled = true;
+                opt.classList.toggle("ag-clarify-opt-picked",
+                  opt === btn);
+              });
+            }
+          }
         } else if (act === "clarify-send") {
-          const field = box.querySelector(".ag-clarify-input");
+          // 同样按作用域取输入框 —— 否则「发送回答」会读到别的消息的输入框。
+          const field = clarifyInputOf(btn);
           const value = (field && field.value || "").trim();
           if (!value) return;
           const input2 = $("#agInput");
@@ -2101,6 +2302,25 @@
         state.streaming = null;
         state.lastResult = null;
       }
+      // 【会话作用域同步 —— 2026-11-13 工具密度修复】
+      // 还原的是**某个具体会话**的消息，所以当前会话作用域必须跟着换。
+      // 换作用域 = 换折叠态 key 的前缀 + 换折叠态桶，
+      // 否则不同会话的 m0-tool-0 撞成同一个 key -> 折叠态跨会话串味 ->
+      // 工具区展开/收起状态随会话乱跳，密度看起来就会「变」。
+      //
+      // 为什么以前没发现：agent.js 的 state.sessionId 只在**发消息**时被
+      // 赋值，切会话（loadSession -> restoreMessages）这条路**从不更新它**。
+      // 于是切会话后 state.sessionId 仍是旧会话 id（甚至是空串）。
+      //
+      // 【作用域从会话层读，不靠调用方传 —— 2026-11-13】
+      // 会话层在 loadSession() 里已经更新了自己的 state.currentId，
+      // 所以直接问它就行。少一个「调用方必须记得传 sessionId」的约定
+      // = 少一个漏传导致串味的机会。
+      // opts.sessionId 仍然被支持（测试与显式调用可以覆盖）。
+      const scopeSid = opts.sessionId !== undefined
+        ? opts.sessionId
+        : currentSessionId();
+      applySessionScope(scopeSid);
       // 恢复出来的消息**不该**再触发轮询（服务端已经落了状态）。
       // 但任务卡里的产物缩略图要能显示 —— 那依赖 msg.jobs[].outputs，
       // 由 meta 带过来（见 server._agent_message_meta）。

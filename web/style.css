@@ -2384,6 +2384,20 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ag-clarify-opt:hover { background: var(--accent-soft); }
+/* 已选中的选项：点中之后这一组就锁住（其余禁用），避免重复提交同一答案。
+   禁用态要保留可读性 —— 不能灰到看不出写了什么。 */
+.ag-clarify-opt:disabled { cursor: default; opacity: .45; }
+/* 【选中态必须压过禁用态 —— 2026-11-13】
+   上面那条 .ag-clarify-opt:disabled 的特异性是 (0,2,0)，
+   而 .ag-clarify-opt-picked 只有 (0,1,0) —— 禁用态会赢，
+   结果「已选中」那个按钮反而显示成最淡的一个（视觉上像禁用）。
+   用 :not() 把已选中的排除在禁用淡化之外，
+   并用双类名把特异性提到 (0,2,0) + 位置靠后 -> 选中态稳定生效。 */
+.ag-clarify-opt:disabled:not(.ag-clarify-opt-picked) { opacity: .45; }
+.ag-clarify-opt.ag-clarify-opt-picked {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  opacity: 1; font-weight: 600;
+}
 .ag-clarify-reply { display: flex; gap: 7px; margin-top: 8px; align-items: stretch; }
 .ag-clarify-input {
   flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px;

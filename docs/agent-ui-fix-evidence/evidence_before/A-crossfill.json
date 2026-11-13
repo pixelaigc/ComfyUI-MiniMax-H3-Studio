@@ -1,0 +1,13 @@
+{
+  "option_count": 5,
+  "clicked_option": "16:9 横屏·标红圆角边框开场",
+  "inputs_before": [
+    "",
+    ""
+  ],
+  "inputs_after": [
+    "16:9 横屏·标红圆角边框开场",
+    ""
+  ],
+  "bug_reproduced": true
+}
