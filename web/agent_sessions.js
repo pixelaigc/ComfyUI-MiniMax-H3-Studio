@@ -53,6 +53,46 @@
   // 不该往 URL 里塞状态（URL 会被分享、被收藏）。
   const STORAGE_KEY = "h3studio.agent.currentSession";
 
+  // ---------- URL 路由（Agent 会话） ----------
+  //
+  // 【为什么需要 —— 2026-11-13 用户需求「新建交互后立即跳转」】
+  // 需求原文：「点击后无反应：实际应创建新 session 并**立即跳转到该新 session**
+  // （前端路由与选中态同步更新），而不是停留在当前页面」。
+  //
+  // 本项目原本**没有任何 URL 路由**（app.js 里 0 处 location.hash 消费者），
+  // 所以「跳转到新 session」在 URL 上是**无处可跳**。
+  // 这里加一条**最小**路由：#/agent/<session_id>
+  //   · 只在 Agent 会话变化时写；
+  //   · 用 replaceState 而不是 pushState —— 新建会话不该在历史里堆一串
+  //     「后退」陷阱（用户按一次后退应该回上一页，不是回上一个会话）；
+  //   · 读取时**只认自己这个命名空间**（#/agent/...），
+  //     不动别人写的 hash（比如 app.js 里 locateJob 的 #job=xxx）。
+  const ROUTE_PREFIX = "#/agent/";
+
+  // 把当前会话写进 URL（路由 + 选中态同步）。
+  function syncRoute(sessionId) {
+    const sid = sessionId || "";
+    const target = sid ? ROUTE_PREFIX + encodeURIComponent(sid) : ROUTE_PREFIX;
+    try {
+      if (location.hash === target) return;
+      // replaceState：不产生新的历史记录（见上面的说明）。
+      history.replaceState(null, "", target);
+    } catch (e) {
+      // 某些环境禁用了 history API -> 退回 hash 赋值（至少有可视化反馈）。
+      try { location.hash = target; } catch (e2) { /* 忽略 */ }
+    }
+  }
+
+  // 从 URL 里读出会话 id（认自己的命名空间，别人的 hash 一律忽略）。
+  function readRouteSessionId() {
+    const hash = String(location.hash || "");
+    if (!hash.startsWith(ROUTE_PREFIX)) return "";
+    const raw = hash.slice(ROUTE_PREFIX.length);
+    if (!raw) return "";
+    try { return decodeURIComponent(raw); }
+    catch (e) { return raw; }
+  }
+
   // ---------- 工具 ----------
 
   function esc(text) {
@@ -114,6 +154,10 @@
     } catch (e) {
       // localStorage 可能被禁用（隐私模式）—— 不能因此让整个页面挂掉。
     }
+    // 【路由同步 —— 2026-11-13】见 syncRoute 的说明。
+    // 放这里而不是散在各个调用点，是因为 saveCurrentId 是
+    // 「当前会话变了」的**唯一**收敛点 —— 建会话、切会话、删会话都会经过它。
+    syncRoute(state.currentId);
   }
 
   // 创建时间用**绝对日期**，不用相对时间。
@@ -261,18 +305,48 @@
       }
       if (m.role === "tool") {
         // 工具消息恢复成工具轨迹里的一条（名字 + 结果摘要）。
+        //
+        // 【为什么必须**并进上一条 assistant 气泡**而不是各自成泡 —— 2026-11-13】
+        // 原来每条 tool 消息都被 push 成**一个独立的 assistant 气泡**，
+        // 每个气泡自带一个 .ag-tools 容器（margin-top:10px + padding:9px 11px
+        // + border + 圆角）。
+        //
+        // 实测后果（真实浏览器量测）：
+        //   实时路径（流式 tool_call）：2 个工具 -> 1 个容器，总高 104px
+        //   恢复路径（会话还原）    ：2 个工具 -> 2 个容器，总高 142px
+        // 同一段对话，**切换会话前后的「工具密度」差了 38px** —— 这正是
+        // 用户报的「当前 session 密度正常，切换别的 session 再切回来密度会变」。
+        //
+        // 服务端的落库顺序是：assistant(答案) -> tool -> tool -> ...
+        // 工具轨迹本来就属于**那条 assistant 消息**（见 server.py 的
+        // add_message("assistant", ...) 后紧跟 add_message("tool", ...)），
+        // 所以还原时把 tool 并进它前面的 assistant 气泡才是**忠实还原**，
+        // 不是「凑」出来的。
+        //
+        // 判定「上一条是不是 assistant」用 out 的最后一条：
+        //   - 是 assistant -> 并入它的 tools[]
+        //   - 不是（user 之后直接跟 tool，或列表开头就是 tool）
+        //     -> 自己开一个新气泡（保证工具不丢）
         const note = (m.content || "").split(":").slice(1).join(":").trim();
-        out.push({
-          role: "assistant",
-          content: "",
-          tools: [{
-            name: m.tool_name || "(工具)",
-            ok: note !== "error" && note !== "",
-            ms: null,
-            arguments: null,
-            result: note || "ok",
-          }],
-        });
+        const toolEntry = {
+          name: m.tool_name || "(工具)",
+          ok: note !== "error" && note !== "",
+          ms: null,
+          arguments: null,
+          result: note || "ok",
+        };
+        const prev = out.length ? out[out.length - 1] : null;
+        if (prev && prev.role === "assistant" && !prev._isUserTurnTail) {
+          // 上一条是 assistant（它就是这批工具的归属消息）-> 并入。
+          prev.tools = prev.tools || [];
+          prev.tools.push(toolEntry);
+        } else {
+          out.push({
+            role: "assistant",
+            content: "",
+            tools: [toolEntry],
+          });
+        }
         continue;
       }
       // assistant：还原状态徽章 / 任务卡 / 附件 / 错误
@@ -345,7 +419,44 @@
 
   // ---------- 新建 / 删除 ----------
 
-  async function createSession() {
+  // 让 Agent 面板**切到**指定会话。
+  //
+  // 【为什么必须有这个入口 —— 2026-11-13 实测 BUG：「新建交互」点了没反应】
+  // 原来 createSession() 只做了「会话层」的事：
+  //   服务端建会话 -> saveCurrentId -> state.messages = [] -> 刷列表
+  // 但**消息区**（#agMessages）里显示的还是**上一个会话**的消息，
+  // 因为消息区的内容由 agent.js 的 state.messages 渲染，
+  // 而 createSession 从没让 agent.js 也切过去。
+  //
+  // 实测（修复前，真实浏览器）：
+  //   点「＋ 新建交互」-> 会话确实建出来了（侧栏高亮了新会话）
+  //   但 URL 没变、AgentUI.state.sessionId 仍是空的、
+  //   #agMessages 里还是旧会话的 3 条消息 —— 用户看到的是「点了没反应」。
+  //
+  // 现在统一走这里：会话 id 同步给 agent.js + 消息区清空并重绘。
+  function switchAgentView(sessionId) {
+    const agent = window.AgentUI;
+    if (!agent || typeof agent.restoreMessages !== "function") return;
+    // sessionId 传下去 -> agent.js 用它做折叠态 key 的作用域前缀，
+    // 同时把消息区整段替换成这个会话的内容（这里是空的 = 新会话）。
+    agent.restoreMessages([], { merge: false, sessionId: sessionId || "" });
+  }
+
+  // 【createSession 的选项】
+  //   switchView  是否把 Agent 面板切到新会话（默认 true = 用户主动新建）
+  //
+  // 【为什么需要这个开关 —— 2026-11-13 修复自身引入的回归】
+  // init() 在「一个会话都没有」时会调 createSession() 建一个空会话。
+  // 如果那里也切视图（merge:false = 整段替换），就会把
+  // **init 还没跑完时用户刚发的那条消息抹掉** ——
+  // 这正是 restoreMessages 的 merge 模式当初要防的竞态
+  // （见 agent.js restoreMessages 里的说明）。
+  //
+  // 所以：**只有用户主动新建时**才切视图；
+  // init 里的自动建会话由 init 自己用 merge 模式接管。
+  async function createSession(options) {
+    const opts = options || {};
+    const switchView = opts.switchView !== false;
     try {
       const data = await apiJSON("POST", "/api/agent/sessions", {});
       const sid = data.session_id || "";
@@ -353,6 +464,9 @@
       saveCurrentId(sid);
       state.messages = [];
       state.artifacts = [];
+      // 【切到新会话 —— 2026-11-13】见 switchAgentView 的说明。
+      // 少了这一步，消息区还停在旧会话 -> 用户看到「点了没反应」。
+      if (switchView) switchAgentView(sid);
       await loadSessions();
       renderCurrentSessionLabel();
       renderArtifacts();
@@ -708,6 +822,7 @@
     await loadSessions();
 
     // 恢复当前会话：
+    //   0. URL 路由里有 id（#/agent/<sid>）-> 以它为准（深链）
     //   1. localStorage 里记着 id -> 拉详情
     //   2. 没有 id 但服务端有会话 -> 默认选最近一个（按 updated_at 倒序的第一个）
     //   3. 一个会话都没有 -> 建一个空会话，让用户直接开聊
@@ -715,7 +830,12 @@
     // 【为什么第 2 步要默认选最近的会话】
     // 用户刷新页面最常见的期待是「回到我刚才在聊的那个」。
     // 如果每次都落到空会话，用户得先点一次列表才能继续 —— 多余的一步。
-    let target = readCurrentId();
+    //
+    // 【为什么 URL 优先于 localStorage —— 2026-11-13】
+    // 需求要求「新建交互后立即跳转到该新 session（前端路由与选中态同步）」。
+    // 路由既然写了，就必须**能被读回来** —— 否则刷新后路由指向 A、
+    // 界面却显示 B，路由就成了摆设。
+    let target = readRouteSessionId() || readCurrentId();
     if (!target && state.sessions.length) target = state.sessions[0].id;
     if (target) {
       const messages = await loadSession(target);
@@ -725,7 +845,10 @@
         agent.restoreMessages(messages, { merge: true });
       }
     } else {
-      await createSession();
+      // 【不切视图 —— 2026-11-13】
+      // init 里的自动建会话不能切视图（会把用户刚发的消息抹掉，
+      // 见 createSession 的 switchView 说明）。下面用 merge 模式接管。
+      await createSession({ switchView: false });
       if (agent && agent.restoreMessages) {
         agent.restoreMessages([], { merge: true });
       }
@@ -784,7 +907,18 @@
         toggleDrawer(false);
         if (sid === state.currentId) return;
         const messages = await loadSession(sid);
-        if (agent && agent.restoreMessages) agent.restoreMessages(messages || []);
+        // 【会话作用域 —— 2026-11-13 工具密度修复】
+        // loadSession(sid) 里已经 saveCurrentId(sid)，
+        // 会话层的 state.currentId 已经是新会话；
+        // agent.js 的 restoreMessages 会自己去问会话层要当前会话 id
+        // （currentSessionId()），用它做折叠态 key 的作用域前缀。
+        //
+        // 以前 agent.js 的 state.sessionId 只在**发消息**时被赋值，
+        // 切会话这条路从不更新它 —— 于是新旧会话的 m0-tool-0
+        // 撞成同一个 key -> 折叠态跨会话串味 -> 工具区密度随切换乱跳。
+        if (agent && agent.restoreMessages) {
+          agent.restoreMessages(messages || []);
+        }
       });
     }
 
