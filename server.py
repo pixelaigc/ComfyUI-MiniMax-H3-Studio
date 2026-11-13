@@ -1811,7 +1811,28 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
                          f"{video_models.VIDEO_DEFAULT_ATTENTION}）。")
         return out, f"未知的注意力机制 {attention}"
     node = mode_meta.get("node")
-    if node and node not in _COMFY_NODE_NAMES:
+    # ---- 节点存在性判定：只在「探测完整」时才算数 ----
+    #
+    # 【2026-11-14 修 —— 这是个真实存在的坑，不是理论问题】
+    # `_COMFY_NODE_NAMES` 只有在**成功探测过一次** ComfyUI 之后才有值。
+    # 内置 Agent 这条路不经过面板（不调 /api/video-options），
+    # 所以第一次进来时它可能是**空集**。
+    #
+    # 原来的判据 `node not in _COMFY_NODE_NAMES` 会把「**还没探测过**」
+    # 误判成「**本机没有这个节点**」-> 用户看到
+    # 「本机 ComfyUI 里没有节点 ModelAttentionBackend」，
+    # 但节点其实**就在**（实测本机 /object_info 里恒在）。
+    #
+    # 修法：区分三态 ——
+    #   * 探测完整（_COMFY_PROBE_COMPLETE）且节点不在 -> 真缺节点 -> 拒绝；
+    #   * 没探测过 / 探测不完整 -> **不拦**（放行，让 ComfyUI 自己报错）。
+    #     这与 worker 的既有口径一致（见 server.py 里
+    #     `params["_h3image_nodes_available"] = None if not probe_ok else nodes_ok`）。
+    #
+    # 【为什么不能无条件放行】那会让「用户选了本机真没有的注意力机制」
+    # 变成任务建成了、跑到 ComfyUI 才炸 —— 那才是静默失效。
+    # 所以只在「问全了」时才敢断言「缺节点」。
+    if node and _COMFY_PROBE_COMPLETE and node not in _COMFY_NODE_NAMES:
         return out, (f"本机 ComfyUI 里没有节点 {node}"
                      f"（{mode_meta['label']}）—— 无法使用该注意力机制。")
     out["attention"] = attention
@@ -1822,7 +1843,9 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         twopass = {}
     enabled = bool(twopass.get("enabled"))
     if enabled:
-        if "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES:
+        # 同上：只在「探测完整」时才断言缺节点（见上面 attention 的说明）。
+        if (_COMFY_PROBE_COMPLETE
+                and "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES):
             return out, ("本机 ComfyUI 里没有 SelfLiftH3Sampler 节点 —— 无法开启二采。")
         try:
             steps = int(params.get("steps") or 4)
@@ -6159,7 +6182,17 @@ async def prepare_agent_t2v_params(params: dict) -> tuple[dict, str]:
         settings = agent_settings.load(conn)
     defaults = settings.get("t2v_defaults") or {}
     merged = _merge_t2v_defaults(params, defaults)
-    await refresh_comfy_node_names()
+    # 【强制刷新节点清单】
+    #
+    # 【为什么必须 force=True】refresh_comfy_node_names 默认会复用 60 秒缓存，
+    # 而缓存可能是**上一次探测的残缺结果**（比如 ComfyUI 忙时超时 ->
+    # 只问到了部分节点）。若拿到的是残缺缓存，normalize_t2v_params
+    # 就会把「没问全」当成「节点不存在」-> 报「本机 ComfyUI 里没有节点
+    # ModelAttentionBackend」—— 而节点其实在（实测本机恒在）。
+    #
+    # 代价：每次 Agent 建视频任务多问 11 个节点（每个 1 ms，实测几十毫秒）。
+    # 这个代价换掉「假缺节点」是值得的。
+    await refresh_comfy_node_names(force=True)
     return normalize_t2v_params(merged)
 
 

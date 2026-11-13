@@ -32,6 +32,13 @@ from pathlib import Path
 #: 单个引擎的请求超时（秒）。
 DEFAULT_TIMEOUT = 20.0
 
+#: 连通性自检用的超时（秒）。
+#
+#: 【为什么比普通搜索宽松】自检打的是**聚合**引擎（一次请求会触发
+#: 多个上游源），本机实测在有别的搜索并发时可能超过 20 秒。
+#: 自检本来就该给足时间 —— 判据是「能不能连通」，不是「多快」。
+CHECK_TIMEOUT = 45.0
+
 #: 单次搜索最多返回多少条。
 MAX_RESULTS = 10
 
@@ -312,7 +319,7 @@ async def run_search(engines: list[dict], query: str, count: int = 5,
         code="all_engines_failed", status=502)
 
 
-async def check_engine(engine: dict, timeout: float = 10.0) -> dict:
+async def check_engine(engine: dict, timeout: float = CHECK_TIMEOUT) -> dict:
     """
     连通性自检（用户要求「提供可填写的 URL/接口配置项与连通性自检」）。
 
