@@ -541,7 +541,15 @@ clip.tokenize(prompt, images=vision_images, picture_label="Picture %d: ")   # �
 | 浏览器证据 | `evidence/h3image-t2i-panel.png` / `evidence/h3image-i2i-panel.png` / `evidence/h3image_browser_console.json` |
 | 调研证据 | `evidence/h3image_comfy_backport_feasibility.md`（回移植可行性） / `evidence/h3image_studio_integration_points.md`（Studio 接入点清单） |
 
-**改动规模**：17 个文件（含 3 个测试文件），+2188 / −105 行（不含新文件 `h3image.py` 631 行）。
+**改动规模**：19 个文件，+2455 / −105 行（不含新文件 `h3image.py` 631 行）。
+
+| 类别 | 文件数 | 说明 |
+|---|---|---|
+| 新增 | 3 | `h3studio/h3image.py`、`tests/test_qwen_refs_profile.py`、`tests/verify_qwen_refs_profile.cjs` |
+| 后端修改 | 8 | `workflows.py` / `gen_types.py` / `enhancer.py` / `job_meta.py` / `agent_schema.py` / `agent.py` / `loras.py` / `server.py` |
+| 前端修改 | 5 | `web/app.js` / `web/index.html` / `web/qwen-refs.js` / `web/providers.js` / `web/agent-media.js` |
+| 测试修改 | 2 | `tests/test_agent_media_semantics_backend.py` / `tests/test_agent_media_semantics_frontend.py` |
+| 文档 | 1 | 本文件 |
 
 **分支**：`local/feature/h3-image`（两个提交）
 | 提交 | 内容 |
@@ -602,6 +610,24 @@ clip.tokenize(prompt, images=vision_images, picture_label="Picture %d: ")   # �
 被压缩的字段里有两个**没有压**，因为它们是公开契约：
 `duration_field`（测试断言 `by_mode["t2a"].get("duration_field") == "max_duration"`）
 与 `media`（保持语义清晰）。
+
+### 7.2 占位语法 profile 隔离回归测试
+
+参考图模块是**一份实现、两套语法**（Qwen 的 `<imageN>` 强制 / H3-Image 的 `<Picture N>` 建议）。
+这个「严格度不同 + 互不串族」的语义如果被后续改动破坏，
+表现是「用户写合法的 `<Picture 1>` 被误拒」—— 极难自查。
+
+`tests/test_qwen_refs_profile.py` 直接 `eval` **真实的** `web/qwen-refs.js`
+（不是复制一份逻辑到测试里），用 Node 跑 7 个行为用例 + 4 个隔离断言。
+
+**变异测试证据**（证明断言真的咬得住，不是空测试）：
+
+| 变异 | 结果 | 被哪条断言抓住 |
+|---|---|---|
+| `h3image.requirePlaceholders: false → true`（宽松规则泄漏） | **2 failed** | `test_h3image_does_not_force_all_placeholders` + `test_h3image_still_rejects_dangling_reference` |
+| `qwen.requirePlaceholders: true → false`（强制要求泄漏掉） | **1 failed** | `test_qwen_keeps_strict_placeholder_requirement` |
+| h3image 正则改成 qwen 的 `<imageN>`（两套语法合并） | **2 failed** | `test_h3image_still_rejects_dangling_reference` + `test_placeholder_syntaxes_do_not_cross` |
+| 还原 | **4 passed** | — |
 
 ---
 
