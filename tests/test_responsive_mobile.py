@@ -206,6 +206,88 @@ class TestResponsiveMobile(unittest.TestCase):
         opened = self.page.evaluate(FACT)
         self.assertTrue(opened["panelOpen"], "点浮动按钮后参数面板应展开")
 
+    def test_panel_fab_is_not_occluded_by_open_drawer(self):
+        """抽屉打开后，「参数」浮动按钮不能被抽屉本体盖住（点不动）。
+
+        【为什么要有这条 —— 它锁的是 2026-11-13 用户报的「MOSS-Image
+        文生图面板完全不可用」的直接根因】
+
+        缺陷现象：.panel-fab 的 z-index 是 930，而抽屉本体 .panel 是 950、
+        遮罩 .panel-mask 是 949 —— FAB 比抽屉**低 20 层**。
+        抽屉打开后 FAB 落在抽屉覆盖范围内，用户手指点 FAB 中心，
+        命中的是**面板里的控件**而不是 FAB 自己：
+          375px -> 命中 SMALL#imgCfgHint
+          390px -> 命中 DIV.compact-field
+        => 按钮点不动 -> 用户根本打不开参数面板 -> 表现为「面板完全不可用」。
+
+        为什么既有测试没抓到：test_panel_is_bottom_drawer_on_phone 只断言
+        「点 FAB 后 panelOpen == True」—— 那是**第一次**点（抽屉还关着，
+        FAB 此刻没被遮挡），而缺陷发生在**第二次**想点的时候（抽屉已开）。
+        这条测试用 elementFromPoint 做权威命中判定，锁住「抽屉开着时
+        FAB 要么自己可点、要么干净地隐藏起来」。
+
+        判定标准（两条都满足才算过）：
+          1. FAB 隐藏（hidden 或 display:none）—— 抽屉打开时它不该再露脸；
+          2. 或者 FAB 可见但 elementFromPoint 命中的是它自己 —— 仍可点。
+        """
+        for width in (375, 390):
+            self.resize(width)
+            self.page.evaluate("""() => {
+              const p = document.querySelector('#panel');
+              if (p) p.classList.remove('open');
+            }""")
+            self.page.wait_for_timeout(400)
+            # 点开抽屉
+            self.page.click("#panelFab")
+            self.page.wait_for_timeout(700)
+
+            hit = self.page.evaluate("""() => {
+              const fab = document.getElementById('panelFab');
+              if (!fab) return {exists: false};
+              const cs = getComputedStyle(fab);
+              const r = fab.getBoundingClientRect();
+              const visible = !!(fab.offsetWidth || fab.offsetHeight)
+                              && cs.display !== 'none' && !fab.hidden;
+              let hitTag = null, hitId = null, hitIsFab = null;
+              if (visible && r.width > 0 && r.height > 0) {
+                const h = document.elementFromPoint(
+                  r.left + r.width / 2, r.top + r.height / 2);
+                hitTag = h ? h.tagName : null;
+                hitId = h ? (h.id || '') : null;
+                hitIsFab = !!h && (h === fab || fab.contains(h));
+              }
+              const panel = document.querySelector('#panel');
+              return {
+                exists: true,
+                visible: visible,
+                fabZIndex: cs.zIndex,
+                panelZIndex: panel ? getComputedStyle(panel).zIndex : null,
+                hitTag: hitTag,
+                hitId: hitId,
+                hitIsFab: hitIsFab,
+              };
+            }""")
+
+            if hit["visible"]:
+                # FAB 还在显示 —— 必须自己可点，否则用户点了没反应
+                self.assertTrue(
+                    hit["hitIsFab"],
+                    "%dpx：抽屉打开后「参数」按钮被遮挡，点不动（"
+                    "命中的是 %s#%s）。FAB z-index=%s，"
+                    "抽屉 z-index=%s —— FAB 必须高于抽屉。"
+                    % (width, hit["hitTag"], hit["hitId"],
+                       hit["fabZIndex"], hit["panelZIndex"]))
+            # 隐藏也算通过（抽屉打开时 FAB 干净地让位）
+            self.assertTrue(
+                hit["exists"],
+                "%dpx：找不到 #panelFab" % width)
+            # 关掉抽屉，避免影响后续用例
+            self.page.evaluate("""() => {
+              const p = document.querySelector('#panel');
+              if (p) p.classList.remove('open');
+            }""")
+            self.page.wait_for_timeout(300)
+
     def test_sidebar_is_persistent_on_desktop(self):
         """桌面端（1280px）侧栏常驻，汉堡按钮与浮动按钮都隐藏。"""
         self.resize(DESKTOP_WIDTH)
