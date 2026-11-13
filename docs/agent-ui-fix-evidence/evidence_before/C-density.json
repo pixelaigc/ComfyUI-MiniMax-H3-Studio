@@ -1,0 +1,69 @@
+{
+  "baseline": {
+    "toolsBlocks": 1,
+    "toolRows": 1,
+    "blockH": [
+      71
+    ],
+    "rowH": [
+      29
+    ],
+    "listH": {
+      "h": 29,
+      "w": 938,
+      "top": 313
+    },
+    "gap": "4px"
+  },
+  "after_roundtrips": [
+    {
+      "toolsBlocks": 1,
+      "toolRows": 1,
+      "blockH": [
+        71
+      ],
+      "rowH": [
+        29
+      ],
+      "listH": {
+        "h": 29,
+        "w": 938,
+        "top": 313
+      },
+      "gap": "4px"
+    },
+    {
+      "toolsBlocks": 1,
+      "toolRows": 1,
+      "blockH": [
+        71
+      ],
+      "rowH": [
+        29
+      ],
+      "listH": {
+        "h": 29,
+        "w": 938,
+        "top": 313
+      },
+      "gap": "4px"
+    },
+    {
+      "toolsBlocks": 1,
+      "toolRows": 1,
+      "blockH": [
+        71
+      ],
+      "rowH": [
+        29
+      ],
+      "listH": {
+        "h": 29,
+        "w": 938,
+        "top": 313
+      },
+      "gap": "4px"
+    }
+  ],
+  "stable": true
+}
