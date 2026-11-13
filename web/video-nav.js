@@ -150,10 +150,31 @@
       head.title = hasModels
         ? `${cat.label}（${usable.length} 个模型）`
         : `${cat.label}：本机没有可用的模型`;
-      head.innerHTML =
-        `<span class="nav-cat-label">${esc(cat.label)}</span>`
-        + `<span class="nav-cat-caret" aria-hidden="true">${hasModels ? "▾" : "—"}</span>`;
+      head.innerHTML = `<span class="nav-cat-label">${esc(cat.label)}</span>`;
       catEl.appendChild(head);
+
+      // ---- 折叠开关（2026-11-13）----
+      // 【为什么与 head 平级，而不是塞进 head 里】
+      //   <button> 里再套 <button> 是非法 HTML —— 浏览器解析时会把内层
+      //   按钮从可交互树里摘掉（点击事件落到外层 head），折叠永远点不动。
+      //   所以开关必须是 head 的**兄弟节点**，靠 CSS grid 排在同一行右侧。
+      // 【谁来管它的状态】web/sidebar-fold.js（折叠状态 + localStorage 持久化）；
+      //   这里只负责把按钮造出来，状态一律由那个模块统一写，避免两处各写一份。
+      // 【为什么无条件创建】video-nav.js 比 sidebar-fold.js **先**加载
+      //   （index.html 里的 script 顺序），此时 window.SidebarFold 还不存在 ——
+      //   用它做条件判断会导致折叠开关**永远不被创建**。
+      //   sidebar-fold.js 里的 applyCats() 会兜住「按钮不存在」的情况并补建。
+      if (hasModels) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "nav-cat-toggle";
+        toggle.dataset.category = cat.key;
+        toggle.setAttribute("aria-expanded", "true");
+        toggle.setAttribute("aria-label", `收起「${cat.label}」下的模型`);
+        toggle.title = "收起子项";
+        toggle.textContent = "▾";
+        catEl.appendChild(toggle);
+      }
 
       // ---- 第二级：模型项 ----
       const list = document.createElement("div");
@@ -214,7 +235,10 @@
       const head = catEl.querySelector(".nav-cat-head");
       if (head) {
         head.classList.toggle("active", isActive);
-        head.setAttribute("aria-expanded", isActive ? "true" : "false");
+        // 【2026-11-13】head 的 aria-expanded 归**折叠模块**管
+        // （web/sidebar-fold.js），这里不再写 —— 否则切一次模式就会
+        // 把用户折好的类别重新展开（两处各写一份必然打架）。
+        // 选中态用 class="active" 表达，语义不冲突。
       }
     });
     container.querySelectorAll(".nav-model-item").forEach(item => {
@@ -315,6 +339,12 @@
         event.preventDefault();
         // 点类别标题 = 选中该类别（模型按回退规则选）
         select(head.dataset.category, "");
+        // 【2026-11-13 折叠】点类别标题时把该类别的模型列表展开 ——
+        // 否则选中态落在折起来的地方，用户看不到自己选了什么。
+        // （「收起」是点旁边的折叠开关，不是点标题 —— 两个动作分开。）
+        if (window.SidebarFold) {
+          window.SidebarFold.ensureExpanded("cat", head.dataset.category);
+        }
       }
     });
   }

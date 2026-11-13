@@ -55,9 +55,47 @@ body {
   width: 190px; flex: 0 0 190px; background: var(--panel);
   border-right: 1px solid var(--border); padding: 14px 10px;
   display: flex; flex-direction: column; gap: 2px;
+  /* 【2026-11-13】侧栏自身不滚动 —— 滚动交给内部的 .nav-scroll。
+     min-height:0 是 flex 子项能被压缩的前提（否则矮视口下
+     .nav-scroll 撑开侧栏，body 的 overflow:hidden 把底部几项直接截断）。 */
+  min-height: 0; overflow: hidden;
 }
+/* 导航滚动容器：矮视口（375/390 高）下靠它上下滚动看最下面几项。
+   overscroll-behavior:contain 防止滚到底后把滚动传给页面。 */
+.nav-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d8de transparent;
+}
+.nav-scroll::-webkit-scrollbar { width: 8px; }
+.nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: #d4d8de; border-radius: 4px;
+  border: 2px solid var(--panel);
+}
+.nav-scroll::-webkit-scrollbar-thumb:hover { background: #b7bec8; }
 .nav-label { font-size: 10px; letter-spacing: .12em; color: var(--muted); padding: 4px 10px 8px; }
-.nav-group { font-size: 11px; color: var(--muted); padding: 10px 10px 4px; font-weight: 600; }
+/* 分组标题现在是**可点击的折叠按钮**（2026-11-13）：
+   文案仍是纯文本（::after 画箭头，不进 textContent —— 既有测试
+   用 .nav-group 的 textContent 当分组名，箭头混进去会打破断言）。 */
+.nav-group {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; border: 0; background: transparent;
+  font-family: inherit; font-size: 11px; color: var(--muted); font-weight: 600;
+  padding: 10px 10px 4px; cursor: pointer; min-height: 32px;
+}
+.nav-group::after {
+  content: "▾"; font-size: 10px; color: var(--muted); flex: 0 0 auto;
+  transform: rotate(0deg);
+}
+.nav-group[aria-expanded="false"]::after { transform: rotate(-90deg); }
+.nav-group:hover { color: var(--text); }
+.nav-group:hover::after { color: var(--text); }
+/* 顶层分组折叠态：入口项与视频容器整块收起。
+   display:none（不是 height:0）—— 折叠掉的项不该再被 Tab 键聚焦到。 */
+.nav-item.is-folded { display: none; }
+.nav-categories.is-folded { display: none; }
 .nav-item {
   display: flex; align-items: center; gap: 9px; padding: 8px 10px;
   border-radius: 8px; cursor: pointer; color: var(--text); text-decoration: none; font-size: 13.5px;
@@ -71,8 +109,15 @@ body {
    清单由 web/video-nav.js 从服务端 /api/video-categories 渲染，
    这里的 CSS 只负责外观与展开/收起。 */
 .nav-categories { display: flex; flex-direction: column; gap: 2px; }
-.nav-cat { display: flex; flex-direction: column; }
+/* 类别 = 一行网格：左边标题、右边折叠开关（两者平级，见 video-nav.js 注释）。
+   model 列表另起一行并跨满整行。
+   grid-auto-flow: row —— 让 models 明确落到第 2 行（否则它可能被塞进第 1 行第 3 列）。 */
+.nav-cat {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  grid-auto-flow: row;
+}
 .nav-cat-head {
+  grid-column: 1; grid-row: 1;
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; width: 100%; text-align: left;
   padding: 8px 10px; border: 0; border-radius: 8px; background: transparent;
@@ -85,8 +130,27 @@ body {
 .nav-cat-head:disabled:hover { background: transparent; }
 .nav-cat-caret { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
 .nav-cat.active > .nav-cat-head .nav-cat-caret { color: var(--accent); }
+/* 折叠开关（2026-11-13）：与 .nav-cat-head 平级的兄弟节点。
+   触控目标不得小于 32px（tests/test_responsive_mobile.py 的硬约束）。 */
+.nav-cat-toggle {
+  grid-column: 2; grid-row: 1;
+  width: 32px; height: 32px; min-height: 32px; min-width: 32px;
+  margin-right: 2px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer;
+  font-family: inherit;
+}
+.nav-cat-toggle:hover { background: #f2f3f6; color: var(--text); }
+.nav-cat-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.nav-cat.active > .nav-cat-toggle { color: var(--accent); }
 /* 第二级：模型项 */
-.nav-cat-models { display: flex; flex-direction: column; gap: 1px; padding: 0 0 4px 14px; }
+.nav-cat-models {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; gap: 1px; padding: 0 0 4px 14px;
+}
+/* 折叠态：内容整块收起（display:none，不是 height:0 —— 后者仍可被 Tab 聚焦） */
+.nav-cat-models.is-folded { display: none; }
 .nav-model-item {
   width: 100%; border: 0; background: transparent; text-align: left;
   font-size: 12.5px; padding: 6px 10px; font-family: inherit;
@@ -860,6 +924,76 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .enhance-btn.busy { opacity: .8; cursor: progress; }
 .prompt-field textarea[readonly] { background: #f7f8fa; }
 
+/* ---------- 生成队列面板（2026-11-13 队列化需求） ---------- */
+/*
+ * 位置：任务区顶部（#queuePanel），状态标签行下方。
+ * 语义：显示「谁在跑、排第几、还剩几个」，让用户敢继续提交。
+ */
+.queue-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.queue-title { font-size: 12.5px; font-weight: 700; }
+.queue-summary { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+.queue-toggle {
+  padding: 4px 10px; font-size: 11.5px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff; color: var(--muted);
+  cursor: pointer;
+  /* 触控目标高度不得小于 32px（手机端契约，见 tests/test_responsive_mobile.py）。
+     这是一行真实回归：队列「明细」按钮默认渲染高度只有 26px。
+     写法对齐既有的 .enhance-spec-select（同一条契约的既有修法）。 */
+  min-height: 32px;
+}
+.queue-toggle:hover { color: var(--text); }
+
+/* 队列条目：序号 + 类型 + 提示词 + 状态 + 取消 */
+.queue-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.queue-list:empty { display: none; }
+.queue-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f3;
+  font-size: 12px;
+}
+.queue-item:last-child { border-bottom: none; }
+.queue-pos {
+  flex: 0 0 22px; text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted); font-weight: 700;
+}
+.queue-item.is-running .queue-pos { color: var(--accent); }
+.queue-label { flex: 0 0 auto; font-weight: 600; }
+.queue-prompt {
+  flex: 1; min-width: 0;
+  color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.queue-state { flex: 0 0 auto; font-size: 11.5px; font-weight: 600; }
+.queue-item.is-running .queue-state { color: var(--accent); }
+.queue-item.is-queued .queue-state { color: var(--muted); }
+.queue-cancel {
+  flex: 0 0 auto; padding: 3px 9px; font-size: 11px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: #fff; color: var(--muted); cursor: pointer;
+}
+.queue-cancel:hover { color: var(--danger); border-color: var(--danger); }
+
+/* 生成按钮的「已入队」态 —— 不阻塞、可继续点击提交 */
+.gen-btn.queued {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+.gen-btn.queued:hover { filter: brightness(1.02); }
+
 /* ---------- 图像面板：LoRA 配置 ---------- */
 .img-lora-list { display: flex; flex-direction: column; gap: 8px; }
 .img-lora-list:empty { display: none; }
@@ -916,6 +1050,61 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .img-lora-add { display: flex; gap: 6px; margin-top: 8px; }
 .img-lora-add .img-select { flex: 1; min-width: 0; }
 .img-lora-add .img-reset { flex: 0 0 auto; }
+
+/* ---------- 效果 LoRA 选择器（H3 文生视频面板）----------
+   交互对齐文生图的 LoRA 区：搜索框 -> 候选菜单（可多选）-> 已选列表
+   （每项带强度滑杆 + 触发词 + 启停 / 排序 / 删除）。
+   与图像面板的差别：图像面板用原生 <select>（选一个加一个），
+   这里用「输入即搜索 + 多选勾选」的下拉，因为 H3 效果 LoRA 有 27 枚，
+   原生下拉翻找成本太高。 */
+.vid-lora-picker { position: relative; margin-top: 8px; }
+.vid-lora-picker .img-input {
+  width: 100%; min-width: 0; height: 32px; border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; font-family: inherit;
+  background: #fff; color: var(--text);
+}
+.vid-lora-picker .img-input:focus { outline: none; border-color: var(--accent); }
+
+.vid-lora-picker-menu {
+  position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 260px; overflow-y: auto; background: #fff;
+  border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12); padding: 4px;
+}
+.vid-lora-picker-menu[hidden] { display: none !important; }
+.vid-lora-picker-empty {
+  padding: 10px 9px; font-size: 11px; color: var(--muted); line-height: 1.6;
+}
+.vid-lora-option {
+  display: flex; align-items: flex-start; gap: 7px; padding: 6px 7px;
+  border-radius: 7px; cursor: pointer; font-size: 11.5px; color: var(--text);
+}
+.vid-lora-option:hover { background: #f3f6fb; }
+.vid-lora-option.on { background: #eef4fd; }
+.vid-lora-option input[type=checkbox] { margin: 2px 0 0; flex: 0 0 auto; }
+.vid-lora-option-main { flex: 1; min-width: 0; }
+.vid-lora-option-name {
+  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-scene {
+  font-size: 10px; color: var(--muted); line-height: 1.45; margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-meta {
+  font-size: 9.5px; color: var(--muted); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-trig { color: var(--accent); }
+
+/* 「清空全部」按钮 —— 多选必须有全清的出口。
+   没选中任何项时整块隐藏（hidden），不占视觉空间。 */
+.vid-lora-clear {
+  margin-left: auto; border: 1px solid var(--border); background: #fff;
+  border-radius: 6px; padding: 1px 8px; font-size: 10.5px; color: var(--muted);
+  cursor: pointer; font-family: inherit; line-height: 1.6;
+}
+.vid-lora-clear:hover { color: var(--danger); border-color: var(--danger); }
+.vid-lora-clear[hidden] { display: none !important; }
 
 /* LoRA 说明弹窗 */
 .lora-info { padding: 16px; font-size: 12.5px; line-height: 1.8; color: var(--text); }

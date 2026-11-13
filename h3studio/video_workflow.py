@@ -123,6 +123,94 @@ def _apply_attention(p: dict, node_id: str, model_ref: list,
     return [str(next_id), 0], next_id + 1
 
 
+def _resolve_effect_chain(params: dict) -> list[dict]:
+    """效果 LoRA 链：用户勾选的**多枚**效果 LoRA，各自带强度。
+
+    返回 [{"name": ComfyUI 里的 lora_name, "strength": float, "trigger": str}]，
+    顺序 = 用户在界面上的排列顺序（先加的在前）。
+
+    【与加速 LoRA 的关系 —— 两者并列共存】
+    加速 LoRA（Turbo / LightX2V / DMAD）改的是**采样语义**（把 20 步压到
+    N 步），效果 LoRA 改的是**画面风格**。两者作用在不同层面，可以共存：
+    链路 = 底模 -> 加速 LoRA 链 -> 效果 LoRA 链 -> 注意力 -> sigma shift。
+    """
+    from . import h3_effect_loras as effect_registry
+
+    chain: list[dict] = []
+    for item in params.get("effect_loras") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("enabled") is False:
+            continue
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 1.0
+        if strength == 0:
+            # 强度 0 = 关闭该 LoRA（但仍要校验文件存在，避免静默吞掉错名）
+            resolved, path = effect_registry.lora_registry.resolve_lora(name)
+            if not resolved or path is None:
+                raise ValueError(f"本机不存在该效果 LoRA 文件：{name}")
+            continue
+        # 文件必须真实存在 —— 找不到就报错，不静默忽略
+        resolved, path = effect_registry.lora_registry.resolve_lora(name)
+        if not resolved or path is None:
+            raise ValueError(f"本机不存在该效果 LoRA 文件：{name}")
+        chain.append({
+            "name": resolved,
+            "strength": strength,
+            "trigger": (item.get("trigger") or "").strip(),
+        })
+    return chain
+
+
+def _apply_effect_loras(p: dict, model_ref: list, chain: list[dict],
+                        next_id: int) -> tuple[list, int]:
+    """把效果 LoRA 链插到模型链上。
+
+    返回 (新的模型引用, 下一个可用节点 id)。
+
+    【为什么用 `LoraLoaderModelOnly` 而不是 `MiniMaxH3TurboLoRA`】
+    加速 LoRA 用 Turbo 节点是因为它的键名是裸 `blocks.*`；效果 LoRA 的键名
+    带 `diffusion_model.` 前缀，Turbo 节点会 **静默失效**（实测日志：
+    "416 backbone modules, 0 weights patched"）。
+    核心 `LoraLoaderModelOnly` 走 `comfy.lora.model_lora_keys_unet()`，
+    同时认 `diffusion_model.blocks.*` / `lora_unet_blocks_*` / 裸 `blocks.*`
+    三种写法 —— 实测本机 27 枚效果 LoRA 全部命中 200~258 层、0 形状不匹配。
+
+    【为什么是 ModelOnly 而不是 LoraLoader】
+    H3 的文本编码器是独立的 CLIP 对象（qwen3vl_32b），H3 的效果 LoRA
+    全部只 patch DiT 的 blocks / token_refiner，**不 patch 文本编码器**。
+    用 `LoraLoader`（带 clip 输入）会让 ComfyUI 对 clip 侧记一堆
+    "NOT LOADED" 警告；而 `LoraLoaderModelOnly` 语义上就是
+    "只改扩散模型" —— 与实际权重内容完全一致。
+
+    【strength 真的生效吗】
+    `LoraLoaderModelOnly` 的 `strength_model` 直接进
+    `comfy.sd.load_lora_for_models(model, None, lora, strength_model, 0)`
+    -> `model_patcher.add_patches(loaded, strength_model)`
+    -> `LoRAAdapter.calculate_weight(...)` 里
+    `weight += function(((strength * alpha) * lora_diff))`。
+    即：强度是**乘在 LoRA 增量上**的线性系数，0 = 不加任何增量。
+    """
+    for index, item in enumerate(chain):
+        node_id = f"320:{index}"
+        p[node_id] = {
+            "inputs": {
+                "model": model_ref,
+                "lora_name": item["name"],
+                "strength_model": float(item["strength"]),
+            },
+            "class_type": "LoraLoaderModelOnly",
+            "_meta": {"title": f"效果 LoRA·{item['name']}"},
+        }
+        model_ref = [node_id, 0]
+    return model_ref, next_id
+
+
 def build_t2v_panel(params: dict) -> dict:
     """文生视频面板的工作流。
 
@@ -218,6 +306,23 @@ def build_t2v_panel(params: dict) -> dict:
                                 else f"加速 LoRA·{item.get('key')}")},
         }
         model_ref = [node_id, 0]
+
+    # ---- 效果 LoRA 链（用户可多选，各自带强度）----
+    #
+    # 【插在加速链之后、注意力之前】
+    # 加速 LoRA 改的是采样语义（20 步 -> 4 步），效果 LoRA 改的是画面风格；
+    # 顺序上「先把底模语义改对，再叠风格」与图像面板
+    # （加速在前、用户效果 LoRA 在后）保持一致。
+    effect_chain = _resolve_effect_chain(params)
+    if effect_chain:
+        model_ref, next_id = _apply_effect_loras(
+            p, model_ref, effect_chain, next_id)
+        # 触发词自动追加到提示词末尾（与图像面板同一套规则：
+        # 已存在的词不重复追加，多枚 LoRA 按顺序追加）
+        from . import workflows as wf
+        merged = wf.merge_lora_triggers(params.get("prompt", ""), effect_chain)
+        if merged != (params.get("prompt") or ""):
+            p["105:104"]["inputs"]["prompt"] = merged
 
     # ---- 注意力机制 ----
     model_ref, next_id = _apply_attention(p, "300", model_ref, params, next_id)

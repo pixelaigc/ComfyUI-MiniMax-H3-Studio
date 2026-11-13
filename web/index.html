@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=enh-unify8">
+<link rel="stylesheet" href="/static/style.css?v=efflora1">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
-<link rel="stylesheet" href="/static/responsive.css?v=rs3">
+<link rel="stylesheet" href="/static/responsive.css?v=sidebarfold2">
 </head>
 <body>
 <header class="topbar">
@@ -39,7 +39,16 @@
   <div class="sidebar-mask" id="sidebarMask"></div>
   <nav class="sidebar" id="sidebar">
     <div class="nav-label">CREATE</div>
-    <div class="nav-group">视频</div>
+    <!-- 【2026-11-13 左侧栏折叠 + 滚动】
+         导航内容放进独立滚动容器 .nav-scroll：
+           之前 .sidebar 自己没有滚动能力（body overflow:hidden），
+           矮视口（375/390 高）下最下面几项（智能/系统/释放显存）被直接截断，
+           看得到上面却够不着下面。
+         .nav-label（CREATE）与 .sidebar-foot（释放显存）留在滚动区外 —— 始终可见。
+         折叠逻辑在 web/sidebar-fold.js（顶层分组 + 视频类别两层）。 -->
+    <div class="nav-scroll" id="navScroll">
+    <!-- 分组标题是可点击的折叠按钮：data-nav-key 是持久化用的稳定 key -->
+    <button type="button" class="nav-group" data-nav-key="video" aria-expanded="true">视频</button>
     <!-- 【2026-11-11】视频导航改成两级：类别 -> 模型。
          清单由服务端 /api/video-categories 下发（web/video-nav.js 渲染），
          前端不硬编码任何 mode/model 映射。
@@ -53,7 +62,7 @@
       <a class="nav-item" data-mode="r2v">参考生视频</a>
       <a class="nav-item" id="navStitch" data-mode="longfilm">长片拼接</a>
     </noscript>
-    <div class="nav-group">文生图</div>
+    <button type="button" class="nav-group" data-nav-key="image" aria-expanded="true">文生图</button>
     <a class="nav-item" data-mode="t2i">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
       Z-IMAGE 文生图
@@ -66,12 +75,12 @@
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.6 2.2h4.2v4.2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
       MOSS-Image
     </a>
-    <div class="nav-group">图片编辑</div>
+    <button type="button" class="nav-group" data-nav-key="image-edit" aria-expanded="true">图片编辑</button>
     <a class="nav-item" data-mode="i2i_qwen">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9" width="5.5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.6 11.5h4.8M12 9.1v4.8" stroke="currentColor" stroke-width="1.4"/></svg>
       Qwen 图片编辑
     </a>
-    <div class="nav-group">音乐</div>
+    <button type="button" class="nav-group" data-nav-key="music" aria-expanded="true">音乐</button>
     <a class="nav-item" data-mode="t2a">
       <svg viewBox="0 0 16 16" width="15" height="15"><path d="M6 12.5a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM6 13V3l7-1.5V11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="10.7" cy="12.2" rx="1.7" ry="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
       文生音乐
@@ -80,17 +89,17 @@
       <svg viewBox="0 0 16 16" width="15" height="15"><path d="M2 8.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0zM8 8.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 8.5h0M1.5 12h13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       参考生音乐
     </a>
-    <div class="nav-group">素材</div>
+    <button type="button" class="nav-group" data-nav-key="assets" aria-expanded="true">素材</button>
     <a class="nav-item" id="navAssets">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9" width="5.5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5.5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
       素材库
     </a>
-    <div class="nav-group">智能</div>
+    <button type="button" class="nav-group" data-nav-key="agent" aria-expanded="true">智能</button>
     <a class="nav-item" id="navAgent">
       <svg viewBox="0 0 16 16" width="15" height="15"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.6" cy="6.4" r="1.05" fill="currentColor"/><circle cx="10.4" cy="6.4" r="1.05" fill="currentColor"/><path d="M5.4 10.2c1.6 1.1 3.6 1.1 5.2 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
       内置 Agent
     </a>
-    <div class="nav-group">系统</div>
+    <button type="button" class="nav-group" data-nav-key="system" aria-expanded="true">系统</button>
     <a class="nav-item" id="navProviders">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2.5" width="13" height="4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9.5" width="13" height="4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="4.5" r="1" fill="currentColor"/><circle cx="4" cy="11.5" r="1" fill="currentColor"/></svg>
       本地模型配置
@@ -99,6 +108,7 @@
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2.5" width="13" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 13.5h6M8 10.5v3" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 7.5l2-2 1.5 2.5 2-3 2 2.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
       硬件参数
     </a>
+    </div><!-- /.nav-scroll -->
     <div class="sidebar-foot">
       <button id="unloadBtn" title="释放 GPU 显存">释放显存</button>
     </div>
@@ -152,6 +162,26 @@
         </div>
         <div class="img-note" id="vidAccelLoraNote"></div>
         <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
+      </div>
+
+      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）——
+           交互对齐文生图的 LoRA 区（#imgLoraField）：
+           同一个「下拉添加 + 已选列表 + 每项滑杆」的结构。 -->
+      <div class="field" id="vidEffectLoraField">
+        <div class="field-label">
+          <span>效果 LoRA</span>
+          <span class="muted" id="vidEffectLoraHint">可多选 · 与加速 LoRA 并存</span>
+          <!-- 一键清空：多选必须有「全清」的出口，否则只能一项项删 -->
+          <button type="button" class="vid-lora-clear" id="vidEffectLoraClear" hidden>清空全部</button>
+        </div>
+        <div id="vidEffectLoraList" class="img-lora-list"></div>
+        <div class="vid-lora-picker">
+          <input type="text" id="vidEffectLoraSearch" class="img-input"
+                 placeholder="搜索效果 LoRA（名称 / 功能 / 触发词）" autocomplete="off">
+          <div class="vid-lora-picker-menu" id="vidEffectLoraMenu" hidden></div>
+        </div>
+        <div class="img-note" id="vidEffectLoraNote"></div>
+        <div class="img-lora-excluded" id="vidEffectLoraExcluded" hidden></div>
       </div>
 
       <div class="field">
@@ -852,6 +882,17 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <select id="pageSizeSelect" aria-label="每页作品数"></select>
       </div>
     </div>
+    <!-- 生成队列面板（2026-11-13 队列化需求） -->
+    <!-- 位置：任务区顶部、状态标签行下方 —— 用户提交后第一眼能看到自己排第几 -->
+    <section class="queue-panel" id="queuePanel" hidden aria-label="生成队列">
+      <div class="queue-head">
+        <span class="queue-title">生成队列</span>
+        <span class="queue-summary" id="queueSummary">队列为空</span>
+        <button type="button" class="queue-toggle" id="queueToggle"
+                aria-expanded="true" title="展开/收起队列明细">明细</button>
+      </div>
+      <ol class="queue-list" id="queueList"></ol>
+    </section>
     <div class="jobs-grid" id="jobsGrid"></div>
     <div class="jobs-pagination" id="jobsPagination" hidden></div>
   </main>
@@ -1316,11 +1357,25 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=videopanel2"></script>
+<script src="/static/video-panel.js?v=videopanel3"></script>
+<!-- 效果 LoRA 选择器（H3 文生视频面板）——
+     必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
+     调用（window.VIDEO_EFFECT_LORA）。 -->
+<script src="/static/video-effect-lora.js?v=efflora2"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
-<script src="/static/video-nav.js?v=videonav1"></script>
-<script src="/static/job-meta.js?v=jobmeta2"></script>
-<script src="/static/app.js?v=jobmeta1"></script>
+<!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
+     必须**先于** app.js 加载 —— app.js 的 boot() 里要读
+     window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
+<script src="/static/generation-queue.js?v=genqueue2"></script>
+<script src="/static/video-nav.js?v=sidebarfold2"></script>
+<!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
+     必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
+     而折叠开关按钮由 video-nav.js 渲染时创建、由 sidebar-fold.js 统一管状态。
+     sidebar-fold.js 在 DOMContentLoaded 时初始化（此时 video-nav 还没渲染视频类别），
+     所以它用 MutationObserver 盯着 #navVideoCategories，渲染完自动贴上折叠状态。 -->
+<script src="/static/sidebar-fold.js?v=sidebarfold2"></script>
+<script src="/static/job-meta.js?v=jobmeta3"></script>
+<script src="/static/app.js?v=efflora1"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/job-detail.js?v=jobdetail2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

@@ -1,0 +1,44 @@
+/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+==============================================================================
+LoRA: 3dsrx_minimax_h3.safetensors
+  ✓ ComfyUI 绑定到: diffusion_model.blocks.0.attn.out_proj.weight
+  底模权重 (5376, 7168)  ||W||=155669.52
+   strength |       ||dW|| |     rel %
+  --------------------------------------
+       0.00 |     0.000000 |   0.0000%
+       0.25 |     0.191414 |   0.0001%
+       0.50 |     0.382546 |   0.0002%
+       0.80 |     0.611648 |   0.0004%
+       1.00 |     0.764526 |   0.0005%
+  => dW(s)/s 恒定: False  (dW(1.0)=0.764526, 比值=[0.765656, 0.765093, 0.76456, 0.764526])
+  => strength=0 时增量 = 0.000000（恒为 0 = 完全关闭）
+==============================================================================
+LoRA: Minimax H3真实电影质感.safetensors
+  ✓ ComfyUI 绑定到: diffusion_model.blocks.0.attn.out_proj.weight
+  底模权重 (5376, 7168)  ||W||=155669.52
+   strength |       ||dW|| |     rel %
+  --------------------------------------
+       0.00 |     0.000000 |   0.0000%
+       0.25 |     1.412644 |   0.0009%
+       0.50 |     2.824944 |   0.0018%
+       0.80 |     4.517533 |   0.0029%
+       1.00 |     5.649806 |   0.0036%
+  => dW(s)/s 恒定: True  (dW(1.0)=5.649806, 比值=[5.650574, 5.649889, 5.646917, 5.649806])
+  => strength=0 时增量 = 0.000000（恒为 0 = 完全关闭）
+==============================================================================
+LoRA: pika_h3_flex_fl2va_v1_bf16.safetensors
+  ✓ ComfyUI 绑定到: diffusion_model.blocks.0.attn.out_proj.weight
+  底模权重 (5376, 7168)  ||W||=155669.52
+   strength |       ||dW|| |     rel %
+  --------------------------------------
+       0.00 |     0.000000 |   0.0000%
+       0.25 |     0.637228 |   0.0004%
+       0.50 |     1.273886 |   0.0008%
+       0.80 |     2.038642 |   0.0013%
+       1.00 |     2.547410 |   0.0016%
+  => dW(s)/s 恒定: True  (dW(1.0)=2.547410, 比值=[2.54891, 2.547772, 2.548303, 2.54741])
+  => strength=0 时增量 = 0.000000（恒为 0 = 完全关闭）
+
+结论: dW 随 strength 线性变化，strength=0 时增量为 0
+      => strength_model 真的生效（不是摆设）

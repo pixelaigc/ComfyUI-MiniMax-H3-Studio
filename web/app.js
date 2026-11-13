@@ -135,6 +135,10 @@ const state = {
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
   assetRefs: {},
   timer: null,
+  // 【2026-11-13 队列化改造】genBusy 不再表示「有任务在跑、不能提交」。
+  // 它现在只表示「本会话有任务还没到终态」，**不参与按钮的禁用判断**
+  // （按钮态见 updateActionButtons）。保留这个字段是为了不破坏
+  // 其它可能读它的代码路径。
   genBusy: false,
   // Qwen-Image 2.1 专属状态（与 Z-Image 分开，避免两个模型的参数互相污染）
   imgQwen: {
@@ -298,6 +302,35 @@ $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
   activateMode(el.dataset.mode, el);
 }));
 
+// ---------- 左侧栏折叠（2026-11-13）----------
+//
+// 【为什么在这里挂钩，而不是让 sidebar-fold.js 自己绑】
+// 折叠模块只管「展开/收起」这一个动作；
+// 「点了某个入口项 -> 先把它所在的分组/类别展开，再切模式」是**跨模块**的行为，
+// 必须由掌握 activateMode() 的这一层来串（sidebar-fold.js 不认识 activateMode）。
+//
+// 【只在这条路径展开】
+// 启动恢复路径（VideoNav.applyDefault / activateVideoMode）不展开 ——
+// 否则「刷新后保持折叠状态」会被打破。
+function expandNavForElement(el) {
+  if (!window.SidebarFold) return;
+  window.SidebarFold.ensureExpandedForElement(el);
+}
+
+// 【2026-11-13 折叠】点入口项前先把它所在的分组/类别展开 ——
+// 否则选中态落在看不见的地方，用户会以为没点中。
+// 用**事件委托**绑在 #sidebar 上：视频模型项是异步渲染的，
+// 逐个 addEventListener 绑不到后渲染出来的节点。
+(function bindNavFoldAwareClick() {
+  const sidebar = $("#sidebar");
+  if (!sidebar) return;
+  sidebar.addEventListener("click", event => {
+    const item = event.target.closest(".nav-item");
+    if (!item) return;
+    expandNavForElement(item);
+  }, true);   // 捕获阶段：早于 activateMode 的切换，先展开再切
+})();
+
 // ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
 //
 // 【为什么单独一个模块】
@@ -330,6 +363,12 @@ function activateVideoMode(mode) {
   }
   if (!navEl) {
     navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
+  }
+  // 【2026-11-13 折叠】老任务卡片的「复用」按钮会走到这里。
+  // 如果该视频类别正折着，选中态就落在看不见的地方 —— 先展开。
+  // （启动恢复路径 applyDefault **不**展开，否则刷新后折叠状态保不住。）
+  if (window.SidebarFold && navEl) {
+    window.SidebarFold.ensureExpandedForElement(navEl);
   }
   activateMode(mode, navEl);
   syncVideoNavActive();
@@ -2154,20 +2193,40 @@ $("#prompt").addEventListener("input", () => {
 
 // 增强中 / 生成中互斥：避免并发重复提交
 // 注意：一次增强与二次增强期间，生成按钮都必须禁用。
+//
+// 【2026-11-13 队列化改造】
+// 旧实现：生成任务一提交，state.genBusy=true -> 生成按钮 disabled + 文案
+// 「生成中…」-> 用户**无法继续添加**新任务（界面看起来像卡死）。
+//
+// 新实现：生成走**队列**，提交后按钮不再禁用，只把文案换成
+// 「已入队（队列 N）」，用户可以连续提交多个任务，它们依次排队执行。
+// 真正需要禁用按钮的只剩「提示词增强中」—— 增强会改写提示词，
+// 必须等它结束再提交，否则提交的是半成品提示词。
+//
+// 队列状态由 web/generation-queue.js 提供（它轮询 /api/queue），
+// 队列变化时它回调 onChange -> 这里重算按钮态。
 function updateActionButtons() {
   const enhanceBusy = promptEnhance.busy || promptVersions.busy;
-  const busy = enhanceBusy || state.genBusy;
   const genBtn = $("#genBtn");
   const enhBtn = $("#enhanceBtn");
   const enhText = $("#enhanceBtnText");
   const menuBtn = $("#enhanceMenuBtn");
+  // 队列里待处理的任务数（含正在跑的那条）
+  const queueCount = window.GenerationQueue
+    ? window.GenerationQueue.pendingCount : 0;
   if (genBtn) {
-    genBtn.disabled = busy;
-    genBtn.classList.toggle("busy", state.genBusy);
-    genBtn.textContent = state.genBusy ? "生成中…" : "生成";
+    // 【关键】队列非空时**不禁用**按钮 —— 用户要能继续提交。
+    genBtn.disabled = enhanceBusy;
+    genBtn.classList.toggle("busy", false);
+    genBtn.classList.toggle("queued", queueCount > 0);
+    genBtn.textContent = queueCount > 0
+      ? `已入队（队列 ${queueCount}）` : "生成";
+    genBtn.title = queueCount > 0
+      ? `当前队列 ${queueCount} 个任务（队首正在跑）。点击可继续加入队列。`
+      : "提交到生成队列（可连续提交多个任务）";
   }
   if (enhBtn) {
-    enhBtn.disabled = busy;
+    enhBtn.disabled = enhanceBusy;
     enhBtn.classList.toggle("busy", promptEnhance.busy);
   }
   // 主按钮文字随「当前增强方式」变化 —— 方式名由 enhance-menu.js 管，
@@ -2187,7 +2246,11 @@ function updateActionButtons() {
     }
   }
   // 下拉箭头同样要禁 —— 否则增强进行中还能切换方式
-  if (menuBtn) menuBtn.disabled = busy;
+  //
+  // 【2026-11-13 队列化改造】原来这里用的是 `busy`（增强中 **或** 生成中）。
+  // 生成改成队列后不再有「生成中」这个阻塞态，所以只按「增强中」禁用 ——
+  // 否则任务在队列里跑着的时候，增强方式的下拉会被莫名其妙地锁住。
+  if (menuBtn) menuBtn.disabled = enhanceBusy;
 }
 
 // ---------- 未增强拦截：确认用原始提示词生成 / 取消中止 ----------
@@ -2221,7 +2284,19 @@ document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("#enhanceGateModal").hidden) closeEnhanceGate(false);
 });
 
-// ---------- 生成中跟踪：任务到达终态后恢复按钮 ----------
+// ---------- 生成任务跟踪（2026-11-13 队列化改造） ----------
+//
+// 【旧行为】提交后 state.genBusy=true -> 生成按钮 disabled + 「生成中…」，
+// 任务到达终态才恢复。用户在这期间**无法继续添加**新任务。
+//
+// 【新行为】后端本来就有真正的队列（建任务即 status='queued'，Worker 串行
+// 取任务执行），所以前端**不需要**再自己维护一套「阻塞中」状态：
+//   * 提交成功后只登记一下，刷新队列视图；
+//   * 按钮的禁用与否交给 updateActionButtons()（只有「提示词增强中」才禁）；
+//   * 队列的进度 / 顺序 / 状态由 web/generation-queue.js 轮询 /api/queue 呈现。
+//
+// 保留 pendingJobs 只是为了在「任务结束」时刷新一次任务列表 ——
+// 队列面板每 1 秒自己会刷，但任务列表是 2 秒一轮，节奏不同。
 const pendingJobs = new Set();
 const JOB_POLL_MAX_MS = 30 * 60 * 1000;
 let jobPollStartedAt = 0;
@@ -2230,24 +2305,25 @@ function trackJob(jobId) {
   if (!jobId) return;
   pendingJobs.add(jobId);
   if (!jobPollStartedAt) jobPollStartedAt = Date.now();
+  // genBusy 只表示「本会话还有任务没到终态」——
+  // **不参与按钮的禁用判断**（见 updateActionButtons 的说明）。
   state.genBusy = true;
-  updateActionButtons();
+  // 队列面板刷新（顺带把按钮文案更新成「已入队（队列 N）」）
+  if (window.GenerationQueue) window.GenerationQueue.refresh();
   pollPendingJobs();
 }
 
 async function pollPendingJobs() {
   if (!pendingJobs.size) {
-    state.genBusy = false;
     jobPollStartedAt = 0;
-    updateActionButtons();
+    state.genBusy = false;
     return;
   }
-  // 安全上限：极端情况下（后端不回写状态）也不要永久锁死按钮
+  // 安全上限：极端情况下（后端不回写状态）也不要永久挂着轮询
   if (Date.now() - jobPollStartedAt > JOB_POLL_MAX_MS) {
     pendingJobs.clear();
-    state.genBusy = false;
     jobPollStartedAt = 0;
-    updateActionButtons();
+    state.genBusy = false;
     return;
   }
   for (const id of [...pendingJobs]) {
@@ -2259,14 +2335,17 @@ async function pollPendingJobs() {
     } catch (e) { /* 网络抖动则下一轮再试 */ }
   }
   state.genBusy = pendingJobs.size > 0;
-  if (!state.genBusy) jobPollStartedAt = 0;
-  updateActionButtons();
   if (pendingJobs.size) setTimeout(pollPendingJobs, 1500);
 }
 
 // ---------- 提交 ----------
 $("#genBtn").addEventListener("click", async () => {
-  if (state.genBusy || promptEnhance.busy) return;
+  // 【2026-11-13 队列化改造】不再因为「有任务在跑」而拒绝提交 ——
+  // 队列的意义就是让用户能连续添加。只有「提示词增强中」才拦
+  // （增强会改写提示词，提交半成品提示词没有意义）。
+  if (promptEnhance.busy || promptVersions.busy) return;
+  // 防连点：极短时间内的重复点击直接忽略（否则队列里会多出重复任务）
+  if (window.GenerationQueue && !window.GenerationQueue.shouldAcceptSubmit()) return;
   const mode = state.mode;
 
   // 音乐模式：描述来自音乐面板的「音乐描述」框（#musicPrompt），
@@ -2499,9 +2578,16 @@ $("#genBtn").addEventListener("click", async () => {
     const data = await resp.json();
     if (!resp.ok) { alert(data.error || "提交失败"); return; }
     trackJob(data.id);
-    // 清空文件选择（保留提示词便于连做）
-    state.files = { first: null, last: null, refs: [] };
-    state.assetRefs = {};
+    // 【2026-11-13 队列化改造】**不再清空**参考图/参考帧选择。
+    //
+    // 【为什么】旧行为在提交后清空文件槽位，是配合「提交一次就锁死按钮」
+    // 的阻塞式交互 —— 用户反正只能提交一次，清掉也就无所谓。
+    // 改成队列后，用户要能**连续提交多个任务**；如果第二次提交时
+    // 参考帧槽位已经被清空，flf / r2v 模式会直接被前置校验拦下
+    // （「首尾帧模式需要上传首帧图片」），连续提交根本走不通。
+    //
+    // 提示词本来就一直保留（便于连做），参考帧同理。
+    // 素材库引用（assetRefs）同样保留 —— 它只是 id，不会失效。
     renderMode();
     state.tab = "active";
     renderTabs();
@@ -2651,6 +2737,17 @@ function localModelInfo(mode, p) {
       out.fixed_lora_label = fixed.display || "";
       out.fixed_lora_name = fixed.name || "";
     }
+    // 效果 LoRA（可多选）—— 服务端没给 model_info 时（本地兜底路径）
+    // 从 params 直接读，标签用文件名（服务端权威清单已算好的 label 优先）。
+    out.effect_lora_labels = (p.effect_loras || [])
+      .filter(it => it && it.name && it.enabled !== false
+                    && Number(it.strength) > 0)
+      .map(it => ({
+        name: it.name,
+        label: it.display || it.name,
+        strength: Number(it.strength),
+        trigger: it.trigger || "",
+      }));
     return out;
   }
   // 旧路径视频：model = lora / standard，lora = ckpt850 / v4step600 / none
@@ -3369,6 +3466,10 @@ function reuseConfigFromJob(job, p, panel) {
     accel_lora_strength: (info.lora_strength != null)
       ? Number(info.lora_strength) : undefined,
     accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
+    // 【2026-11-13 效果 LoRA】复用参数时把效果 LoRA 一起带回
+    // （连强度 + 触发词），否则「复用参数」后效果 LoRA 会丢空。
+    // 字段与服务端落库的 params["effect_loras"] 同名同结构。
+    effect_loras: Array.isArray(p.effect_loras) ? p.effect_loras : [],
     attention: info.attention_key || p.attention,
     twopass: p.twopass,
     // 【2026-11-12】采样参数也要一起复用（原来没带，
@@ -5451,6 +5552,28 @@ boot("视频参数清单", async () => {
   window.VIDEO_PANEL.bind();
   window.VIDEO_PANEL.render();
 });
+boot("视频效果 LoRA 清单", async () => {
+  if (!window.VIDEO_EFFECT_LORA) return;
+  window.VIDEO_EFFECT_LORA.bind();
+  // 【2026-11-13 选中回显 —— 顺序很关键】
+  // VIDEO_PANEL.load() 内部会 applyConfig() 从 /api/video-config 恢复
+  // 上次选中的效果 LoRA。若这里不等它跑完就 load()，
+  // 「恢复」与「按当前底模剔除不兼容项」会并发 -> 恢复出来的选中项
+  // 可能还没被剔除就被渲染（或反之），表现为**选中项随机丢失**。
+  // 所以：**先等面板清单（含配置恢复）完成，再拉效果 LoRA 清单**。
+  if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady
+      && !window.VIDEO_PANEL.isReady()) {
+    // 面板还没就绪 -> 等它（最多 10 秒，避免卡死启动）
+    const t0 = Date.now();
+    while (Date.now() - t0 < 10000
+           && (!window.VIDEO_PANEL.isReady || !window.VIDEO_PANEL.isReady())) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  await window.VIDEO_EFFECT_LORA.load(
+    window.VIDEO_PANEL && window.VIDEO_PANEL.state
+      ? window.VIDEO_PANEL.state.model : "");
+});
 boot("视频采样参数清单", loadVideoSamplingOptions);
 boot("音乐参数清单", async () => {
   if (!window.MusicUI) return;
@@ -5472,6 +5595,17 @@ boot("长片片段", renderStitchClips);
 boot("任务列表", refreshJobs);
 boot("系统状态", refreshSystem);
 boot("状态实时推送", startStatusStream);
+// 【2026-11-13 队列化】生成队列：面板渲染 + 快照轮询。
+// 队列变化时回调 updateActionButtons()，让「生成」按钮的
+// 「已入队（队列 N）」文案跟着更新。
+boot("生成队列", () => {
+  if (!window.GenerationQueue) return;
+  window.GenerationQueue.onChange = () => {
+    try { updateActionButtons(); } catch (e) { /* 忽略 */ }
+  };
+  window.GenerationQueue.init();
+  updateActionButtons();
+});
 
 // ---------- 定时刷新调度 ----------
 //
