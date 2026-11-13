@@ -1,9 +1,13 @@
 # 内置 Agent 界面修复 — 交付说明
 
 > 仓库：`/root/projects/comfyui-minimax-h3-studio`
-> 分支：`local/feature/agent-ui-fix`（基于 `local/maintainer`，commit `d3c6f79`）
+> 分支：`local/feature/agent-ui-fix`（**已 rebase 到当前 `local/maintainer`**，可直接合并）
 > 独立 worktree：`/root/projects/h3studio-agent-ui`
-> 提交：`c85513b` fix(agent-ui): 快捷选项作用域定位 + 新建交互跳转 + 工具密度一致性
+> 提交（4 个）：
+> - `e5e664e` fix(agent-ui): 快捷选项作用域定位 + 新建交互跳转 + 工具密度一致性
+> - `6ed4d6b` docs(agent-ui): 内置 Agent 界面修复交付说明 + 验证证据
+> - `2041ac3` fix(agent-ui): 选中态必须压过禁用态（CSS 特异性）
+> - `4935947` fix(agent-ui): 折叠态桶只服务于「有会话 id」的场景（消除偶发串味）
 > 日期：2026-11-13
 
 ---
@@ -351,7 +355,8 @@ data-detail-key="${detailScope()}m${mi}-steps"
 const detailsStateBySession = new Map();
 
 function currentDetailsBucket() {
-  const key = state.sessionId || "__none__";
+  if (!state.sessionId) return null;    // 没有会话身份 -> 不分桶
+  const key = detailScope();
   if (!detailsStateBySession.has(key)) detailsStateBySession.set(key, new Map());
   return detailsStateBySession.get(key);
 }
@@ -363,7 +368,7 @@ function captureDetailsState(root) {
     map.set(d.getAttribute("data-detail-key"), d.open);
   });
   const bucket = currentDetailsBucket();
-  map.forEach((v, k) => bucket.set(k, v));
+  if (bucket) map.forEach((v, k) => bucket.set(k, v));   // 没会话 id -> 不存
   return map;
 }
 
@@ -372,8 +377,8 @@ function restoreDetailsState(root, map) {
   const bucket = currentDetailsBucket();
   root.querySelectorAll("details[data-detail-key]").forEach(d => {
     const key = d.getAttribute("data-detail-key");
-    if (bucket.has(key)) { d.open = bucket.get(key); return; }   // 桶优先
-    if (map && map.has(key)) d.open = map.get(key);              // map 兜底
+    if (bucket && bucket.has(key)) { d.open = bucket.get(key); return; }  // 桶优先
+    if (map && map.has(key)) d.open = map.get(key);                        // map 兜底
   });
 }
 ```
@@ -383,6 +388,28 @@ function restoreDetailsState(root, map) {
   必须用它，否则用户展开的工具行会弹回去；
 - **桶**（该会话历史上记住的）→ **切回该会话**时用它，
   否则离开时展开的工具行回到默认收起态 → 密度又变了。
+
+**【实现中踩到的坑 —— 桶只服务于「有会话 id」的场景】**
+
+第一版把桶的 key 写成裸 `sessionId || "__none__"`。这引入了一个**偶发失败**：
+
+```
+tests/test_agent_frontend_enh.py::test_tool_collapse_state_survives_redraw
+  AssertionError: False is not true : 前置条件：应已展开
+```
+
+用探针插桩抓到真实现象：**点之前工具块就已经是展开的**
+（`before click open = True`），点一下 summary 反而把它**收起**了。
+
+根因：没有会话 id 时（还没落库 / 自动化测试），所有场景共用一个 `"__none__"` 桶
+→ 上一段对话留下的展开态**漏到**下一段对话。
+
+修法：`currentDetailsBucket()` 在没有会话 id 时返回 `null`（不分桶）：
+- 折叠态只活在 DOM 里，由本次重绘前抓到的 map 负责 ——
+  这正是修复前的行为，也正是「同一段对话内重绘不丢展开态」所需；
+- 有会话 id 时才按 scope 前缀分桶 → 切走再切回来恢复成离开前的样子。
+
+修复后 `test_agent_frontend_enh.py` 连跑 5 次全绿。
 
 **(d) 会话作用域的读取与切换**（`web/agent.js`）：
 
@@ -482,17 +509,54 @@ function applySessionScope(nextSid) {
 ### 4.4 回归测试
 
 ```
-# Agent 相关全量
-715 passed, 1468 deselected, 8 subtests passed in 90.63s
+# Agent 相关全量（rebase 到新基线后）
+715 passed, 1611 deselected, 8 subtests passed in 87.24s
 
 # 会话/契约/前端相关
-136 passed in 35.27s
+162 passed in 35.70s
 ```
 
 其中 2 条**契约测试**（`tests/test_agent_session_search_cascade.py`）曾因我的改动
 把 `opts.merge` 推出其 1400 字符文本窗口而失败。处理方式**不是削弱断言**，
 而是把「merge 分支」代码提到 `restoreMessages` 靠前位置（语义等价、更好读），
 并把长解释下沉到 `applySessionScope` 辅助函数。现在全部通过。
+
+**基线前进的处理**
+
+开工时 `local/maintainer` 在 `d3c6f79`；干活期间别的 agent 往基线合了 22 个提交
+（t2v-continue 等），基线前进到 `161f9ea`。为保证可合并：
+1. 先用 `git cherry-pick` 在新基线上**试合并** → 4 个提交**零冲突**自动合入；
+2. 在试合并结果上跑验收 → **18/18 通过**；
+3. 再对本分支做 `git rebase local/maintainer` → 成功，无冲突。
+
+现在 `git diff --stat local/maintainer..HEAD` 只有
+**3 个源文件**（`web/agent.js` / `web/agent_sessions.js` / `web/style.css`）
++ 交付说明与证据。
+
+**全量套件：修复分支 vs 基线分支（同一台机器、同样命令）**
+
+为区分「我的改动引入的失败」与「仓库既有的失败」，在**基线 worktree**
+（`/root/projects/h3studio-merge`）上跑了同一条全量命令做对照：
+
+| | 修复分支 | 基线分支 |
+|---|---|---|
+| 结果 | 13 failed / 2166 passed | 13 failed + 22 errors / 2144 passed |
+| 我的改动引入的失败 | **0**（修复后） | — |
+
+修复过程中我引入过 **1 个真回归**
+（`test_tool_collapse_state_survives_redraw` 偶发失败），
+用探针插桩定位到折叠态桶的 key 设计缺陷 → 已修复（见第 3.2 节），
+修复后连跑 5 次全绿。
+
+最终两边剩余的 13 个失败**完全一致**，全部落在
+`test_enhance_*` / `test_qwen_pe_enhance` / `test_qwen_refs_browser` /
+`test_music_flow_browser` / `test_page_size` / `test_studio::TestLoRARegistry` /
+`test_yue2_flow_review_fixes` —— **与 Agent UI 无关，且在基线上同样失败**
+（已逐项在基线分支单独复现验证，例如
+`test_page_size::test_pager_boundary_buttons_disabled` 在基线单独跑也失败）。
+
+> 注：本机同时有**其他 agent 在跑各自的 pytest 套件**（实测同机 10+ 个 pytest 进程），
+> 并发跑全量套件时会有额外的时序/端口污染。逐项单独复现是这里的判据。
 
 ### 4.5 证据文件路径
 

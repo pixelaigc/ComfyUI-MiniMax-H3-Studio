@@ -30,19 +30,19 @@
     },
     "b1 URL 变了（路由跳转到新 session）": {
       "pass": true,
-      "detail": "http://127.0.0.1:54169/#/agent/d5d572f7f3f148de"
+      "detail": "http://127.0.0.1:56973/#/agent/5606af9c08f34d61"
     },
     "b2 URL 指向新 session": {
       "pass": true,
-      "detail": "http://127.0.0.1:54169/#/agent/d5d572f7f3f148de"
+      "detail": "http://127.0.0.1:56973/#/agent/5606af9c08f34d61"
     },
     "b3 AgentUI.sessionId 切到新 session": {
       "pass": true,
-      "detail": "d5d572f7f3f148de"
+      "detail": "5606af9c08f34d61"
     },
     "b4 侧栏选中态切到新 session": {
       "pass": true,
-      "detail": "['d5d572f7f3f148de']"
+      "detail": "['5606af9c08f34d61']"
     },
     "b5 消息区已清空（旧会话消息不再残留）": {
       "pass": true,
