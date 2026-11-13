@@ -129,9 +129,11 @@ def main():
         params = {
             "prompt": "A lone swordsman in black robes standing in a moonlit "
                       "bamboo forest, slow camera push-in, cold mist drifting",
-            "model_key": "fl2va_int8", "width": 768, "height": 448,
+            "model_key": os.environ.get("H3STUDIO_TEST_MODEL",
+                                        "fl2va_pruned_w4a8"),
+            "width": 768, "height": 448,
             "duration": 5, "steps": 4, "sampler": "euler",
-            "scheduler": "simple", "seed": 4242,
+            "scheduler": "beta", "seed": 4242,
         }
         job1 = _http_multipart(f"{base}/api/jobs",
                                {"mode": "t2v", "params": json.dumps(params)})["id"]
@@ -364,8 +366,9 @@ def main():
             for out_item in job.get("outputs") or []:
                 if out_item.get("kind") != "video":
                     continue
-                probe = _probe_video(Path("/tmp/h3t2v-data/outputs")
-                                     / out_item["file"])
+                out_root = Path(os.environ.get("H3STUDIO_DATA_DIR",
+                                              "/tmp/h3t2v-data")) / "outputs"
+                probe = _probe_video(out_root / out_item["file"])
                 log("probe", job=job["id"], file=out_item["file"],
                     is_full=out_item.get("is_full", False), **probe)
 
