@@ -3,7 +3,7 @@
 > 本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。C0 是**独立复核**（不采信被测脚本自证，从原始产物重算）。
 
 - 分支：`local/feature/t2v-continue`　仓库：`/root/projects/h3studio-t2v-continue`
-- 生成时间：2026-11-13T23:11:02+08:00
+- 生成时间：2026-11-14T01:07:36+08:00
 - 机器可读版：`evidence/acceptance/INDEX.json`
 - 验收实例：8206 / 8199（独立实例，8190 线上未动）
 
@@ -244,7 +244,7 @@
 
 ## C8　pytest 命令与结果
 
-**接续相关**：121 passed in 55.89s
+**接续相关**：126 passed, 2170 deselected in 64.47s (0:01:04)
 
 ```bash
 cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/test_continuation_branch.py tests/test_continuation_server.py tests/test_continuation.py tests/test_continuation_retry.py tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py tests/test_continuation_capability.py -q --no-header -p no:cacheprovider
@@ -252,13 +252,28 @@ cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python 
 
 日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-continuation.log`
 
-**全量**：
+**全量**：4 failed, 2288 passed, 4 skipped in 1647.11s (0:27:27)
 
 ```bash
 cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider
 ```
 
 日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-full.log`
+
+**全量失败项**（逐条原始输出）：
+
+- `tests/test_page_size.py::TestPageSize::test_batches_collapse_still_works`
+  - 原始行：`FAILED tests/test_page_size.py::TestPageSize::test_batches_collapse_still_works`
+  - 判定：（未标注）
+- `tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled`
+  - 原始行：`FAILED tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled`
+  - 判定：（未标注）
+- `tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
+  - 原始行：`FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
+  - 判定：（未标注）
+- `tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
+  - 原始行：`FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
+  - 判定：（未标注）
 
 **各项失败判定**：
 

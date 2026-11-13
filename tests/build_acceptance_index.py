@@ -527,7 +527,19 @@ def main():
                 row[f"{label}文件_是否存在"] = False
                 continue
             row[f"{label}文件_是否存在"] = True
-            row[f"{label}文件_可复制到"] = str((vdir / f"{jid}_{label}_{sp.name}").resolve())
+            dst = vdir / f"{jid}_{label}_{sp.name}"
+            # 【必须真的复制】只写「可复制到」路径而不复制文件 =>
+            # 索引里留下一个打不开的路径（上一轮就留下 9 个失效路径）。
+            # 复制后该路径可直接打开、可 ffprobe。
+            # mp4 不入库（.gitignore 的 *.mp4），但**文件在磁盘上真实存在**、
+            # 且在仓库内 —— 扛得住宿主重启。
+            try:
+                shutil.copy2(sp, dst)
+                row[f"{label}文件_可复制到"] = str(dst.resolve())
+                row[f"{label}文件_可复制到_是否存在"] = dst.is_file()
+            except OSError:
+                row[f"{label}文件_可复制到"] = ""
+                row[f"{label}文件_可复制到_是否存在"] = False
 
     # ================= 把首/末帧对比图复制进证据包 =================
     frame_src = REPO / "data-accept" / "evidence-frames" / "frames"

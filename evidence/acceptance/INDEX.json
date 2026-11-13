@@ -1,6 +1,6 @@
 {
   "判据声明": "本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。C0 是**独立复核**（不采信被测脚本自证，从原始产物重算）。",
-  "生成时间": "2026-11-13T23:11:02+08:00",
+  "生成时间": "2026-11-14T01:07:36+08:00",
   "分支": "local/feature/t2v-continue",
   "仓库": "/root/projects/h3studio-t2v-continue",
   "验收实例": "8206 / 8199（独立实例，8190 线上未动）",
@@ -661,7 +661,8 @@
           "完整视频帧数": null,
           "完整视频时长_s": null,
           "seg文件_是否存在": true,
-          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/5b540002f72d_seg_v-h3-studio-000001.mp4"
+          "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/5b540002f72d_seg_v-h3-studio-000001.mp4",
+          "seg文件_可复制到_是否存在": true
         },
         {
           "job_id": "4f9a3f07676c",
@@ -676,8 +677,10 @@
           "完整视频时长_s": 9.45,
           "seg文件_是否存在": true,
           "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/4f9a3f07676c_seg_v-h3-studio-000002.mp4",
+          "seg文件_可复制到_是否存在": true,
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/4f9a3f07676c_full_v-h3-studio-000003.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/4f9a3f07676c_full_v-h3-studio-000003.mp4",
+          "full文件_可复制到_是否存在": true
         },
         {
           "job_id": "a8f7555503f6",
@@ -692,8 +695,10 @@
           "完整视频时长_s": 9.45,
           "seg文件_是否存在": true,
           "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/a8f7555503f6_seg_v-h3-studio-000004.mp4",
+          "seg文件_可复制到_是否存在": true,
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/a8f7555503f6_full_v-h3-studio-000005.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/a8f7555503f6_full_v-h3-studio-000005.mp4",
+          "full文件_可复制到_是否存在": true
         },
         {
           "job_id": "38ad6e475f5e",
@@ -708,8 +713,10 @@
           "完整视频时长_s": 13.7,
           "seg文件_是否存在": true,
           "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/38ad6e475f5e_seg_v-h3-studio-000006.mp4",
+          "seg文件_可复制到_是否存在": true,
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/38ad6e475f5e_full_v-h3-studio-000007.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/38ad6e475f5e_full_v-h3-studio-000007.mp4",
+          "full文件_可复制到_是否存在": true
         },
         {
           "job_id": "63b70791fa9a",
@@ -724,8 +731,10 @@
           "完整视频时长_s": 17.95,
           "seg文件_是否存在": true,
           "seg文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/63b70791fa9a_seg_v-h3-studio-000008.mp4",
+          "seg文件_可复制到_是否存在": true,
           "full文件_是否存在": true,
-          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/63b70791fa9a_full_v-h3-studio-000009.mp4"
+          "full文件_可复制到": "/root/projects/h3studio-t2v-continue/evidence/acceptance/videos/63b70791fa9a_full_v-h3-studio-000009.mp4",
+          "full文件_可复制到_是否存在": true
         }
       ],
       "帧数账": {
@@ -837,14 +846,19 @@
       ]
     },
     "C8_pytest": {
-      "结论": "接续相关：121 passed in 55.89s；全量：",
+      "结论": "接续相关：126 passed, 2170 deselected in 64.47s (0:01:04)；全量：4 failed, 2288 passed, 4 skipped in 1647.11s (0:27:27)",
       "接续相关命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/test_continuation_branch.py tests/test_continuation_server.py tests/test_continuation.py tests/test_continuation_retry.py tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py tests/test_continuation_capability.py -q --no-header -p no:cacheprovider",
-      "接续相关结果": "121 passed in 55.89s",
+      "接续相关结果": "126 passed, 2170 deselected in 64.47s (0:01:04)",
       "接续相关日志": "/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-continuation.log",
       "全量命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider",
-      "全量结果": "",
+      "全量结果": "4 failed, 2288 passed, 4 skipped in 1647.11s (0:27:27)",
       "全量日志": "/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-full.log",
-      "全量失败的项": {},
+      "全量失败的项": {
+        "tests/test_page_size.py::TestPageSize::test_batches_collapse_still_works": "FAILED tests/test_page_size.py::TestPageSize::test_batches_collapse_still_works",
+        "tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled": "FAILED tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled",
+        "tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras": "FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras",
+        "tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract": "FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract"
+      },
       "全量失败判定": {
         "test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras": "稳定存量失败（maintainer 基线同样失败，与接续无关）",
         "test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract": "稳定存量失败（maintainer 基线同样失败，与接续无关）",
