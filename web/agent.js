@@ -992,9 +992,28 @@
   // 不该跨页面刷新保留；刷新后回到默认展开态是合理的）。
   const detailsStateBySession = new Map();
 
-  // 当前会话的折叠态桶（没有会话 id 时用一个固定的临时桶）。
+  // 当前会话的折叠态桶。
+  //
+  // 【桶只服务于「有会话 id」的场景 —— 2026-11-13】
+  // 桶的用途是「切走再切回来时恢复这个会话自己的展开态」——
+  // **前提是这个会话有身份**（session id）。
+  //
+  // 没有会话 id 时（还没落库 / 自动化测试）返回 null：
+  //   · 折叠态只活在 DOM 里（由本次重绘前抓到的 map 负责）——
+  //     这正是修复前的行为，也正是「同一段对话内重绘不丢展开态」所需；
+  //   · **不跨段落继承**。如果无会话时也用桶，且桶的 key 是个共享的
+  //     "__none__"，上一段对话的展开态就会漏到下一段对话里。
+  //
+  // 【实测踩到过 —— 2026-11-13】
+  // 真实浏览器跑一批用例时，出现「工具块在点击前就已经是展开的」：
+  // 点一下 summary 反而把它**收起**了。
+  // 根因就是无会话场景共用一个桶，上一段的展开态漏了过来。
+  //
+  // 桶的 key 用 scope 前缀（有会话时就是 session id），
+  // 这样不同会话、以及不同临时作用域，都不会互相污染。
   function currentDetailsBucket() {
-    const key = state.sessionId || "__none__";
+    if (!state.sessionId) return null;    // 没有会话身份 -> 不分桶
+    const key = detailScope();
     if (!detailsStateBySession.has(key)) detailsStateBySession.set(key, new Map());
     return detailsStateBySession.get(key);
   }
@@ -1006,8 +1025,9 @@
       map.set(d.getAttribute("data-detail-key"), d.open);
     });
     // 存进当前会话的桶（供下次切回本会话时恢复）。
+    // 没有会话 id -> 不存（见 currentDetailsBucket 的说明）。
     const bucket = currentDetailsBucket();
-    map.forEach((v, k) => bucket.set(k, v));
+    if (bucket) map.forEach((v, k) => bucket.set(k, v));
     return map;
   }
 
@@ -1026,7 +1046,7 @@
     const bucket = currentDetailsBucket();
     root.querySelectorAll("details[data-detail-key]").forEach(d => {
       const key = d.getAttribute("data-detail-key");
-      if (bucket.has(key)) { d.open = bucket.get(key); return; }
+      if (bucket && bucket.has(key)) { d.open = bucket.get(key); return; }
       if (map && map.has(key)) d.open = map.get(key);
     });
   }
