@@ -101,6 +101,18 @@ EVENT_EXECUTION_INTERRUPTED = "execution_interrupted"
 UNPARSED_ERROR_REASON = ("生成失败，但没能取到具体原因（ComfyUI 侧未返回"
                           "可解析的错误信息）。详细信息见服务端日志。")
 
+#: ComfyUI 的 history 记录形状超预期时给用户看的文案。
+#:
+#: 【为什么单独一条，而不是复用 UNPARSED_ERROR_REASON】
+#: 两种情况对用户是**不同的处境**：
+#:   * UNPARSED —— ComfyUI 正常返回了，但我们没解析出原因；
+#:   * MALFORMED —— ComfyUI 返回的**结构本身不对**（status 不是 dict）。
+#: 后者更可能是「中间有代理/网关改了响应」或「ComfyUI 升级改了形状」，
+#: 提示用户去看日志/换版本更有意义。
+MALFORMED_STATUS_REASON = ("生成失败（ComfyUI 返回的状态信息格式异常，"
+                            "无法判断执行结果）。请稍后重试；若反复失败，"
+                            "请查看服务端日志或确认 ComfyUI 版本。")
+
 
 # ------------------------------------------------------------------
 # 已知错误的**中文映射**

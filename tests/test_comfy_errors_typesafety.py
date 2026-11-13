@@ -133,36 +133,43 @@ class HistoryStatusHelperTest(unittest.TestCase):
 
     def test_string_status_does_not_raise(self):
         """`status` 是字符串 -> 不抛异常，且不判定为 error。"""
-        info, is_error = srv._history_status({"status": "execution_error"})
+        info, is_error, malformed = srv._history_status(
+            {"status": "execution_error"})
         self.assertIsInstance(info, dict)
         self.assertFalse(is_error)
+        self.assertTrue(malformed,
+                        "status 是字符串 -> 必须标记为「畸形」")
 
     def test_none_status_does_not_raise(self):
         """`status` 是 None -> 不抛异常。"""
-        info, is_error = srv._history_status({"status": None})
+        info, is_error, malformed = srv._history_status({"status": None})
         self.assertIsInstance(info, dict)
         self.assertFalse(is_error)
+        self.assertFalse(malformed, "status 是 None -> 不算畸形（缺字段而已）")
 
     def test_missing_status_key_does_not_raise(self):
         """history 里根本没有 status 键 -> 不抛异常。"""
-        info, is_error = srv._history_status({"outputs": {}})
+        info, is_error, malformed = srv._history_status({"outputs": {}})
         self.assertIsInstance(info, dict)
         self.assertFalse(is_error)
+        self.assertFalse(malformed, "没有 status 键 -> 不算畸形")
 
     def test_history_itself_is_not_dict(self):
         """history 本身不是 dict -> 不抛异常。"""
         for bad in (None, "x", [], 5):
-            info, is_error = srv._history_status(bad)
+            info, is_error, malformed = srv._history_status(bad)
             self.assertIsInstance(info, dict)
             self.assertFalse(is_error)
+            self.assertFalse(malformed)
 
     def test_real_error_status_is_detected(self):
         """真的 error 状态 -> is_error=True（类型判断不能吃掉真错误）。"""
-        info, is_error = srv._history_status(
+        info, is_error, malformed = srv._history_status(
             {"status": {"status_str": "error",
                         "messages": [["execution_error",
                                       {"exception_message": "boom"}]]}})
         self.assertTrue(is_error)
+        self.assertFalse(malformed, "status 是 dict -> 不算畸形")
         self.assertIn("boom", str(info))
 
 
@@ -409,6 +416,112 @@ class WorkerFailurePathTest(unittest.TestCase):
         self.assertNotIn("object has no attribute", row["error"] or "")
 
 
+class MalformedStatusFastFailTest(unittest.TestCase):
+    """【本轮自查发现的回归】畸形 status 必须**快速失败**，不能挂死。
+
+    【缺陷】
+    修复缺陷①时，`status` 是字符串 -> `status_is_error` 返回 False
+    -> worker 既没拿到 outputs（没成功）也没判定成 error（不是失败）
+    -> 轮询循环**没有任何退出条件** -> 任务永远卡在「生成中」。
+
+    这比原来的 AttributeError 更糟：原来至少会失败，现在会**挂死**
+    （占着 GPU 队列、用户看到永远转圈）。
+
+    【修法】
+    `_history_status` 增加第三个返回值 `malformed`：
+    `status` 存在但不是 dict -> 标记为畸形 -> worker **立即失败**
+    并给出可读原因。
+
+    【本机实测】ComfyUI 0.37 的 history 里 status **总是** dict
+    （实测 5 条历史全部如此）—— 畸形只来自代理改写/版本变更/假数据。
+    但「万一」也必须优雅降级。
+    """
+
+    def setUp(self):
+        self._orig_db = srv.DB_PATH
+        self.tmp = tempfile.mkdtemp(prefix="h3-malformed-")
+        srv.DB_PATH = Path(self.tmp) / "jobs.db"
+        srv.init_db()
+
+    def tearDown(self):
+        srv.DB_PATH = self._orig_db
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_malformed_status_is_flagged(self):
+        """status 是字符串 -> malformed=True。"""
+        _, _, malformed = srv._history_status({"status": "execution_error"})
+        self.assertTrue(malformed)
+
+    def test_none_status_is_not_malformed(self):
+        """status 是 None（ComfyUI 没给）-> 不算畸形（只是没信息）。"""
+        _, _, malformed = srv._history_status({"status": None})
+        self.assertFalse(malformed)
+
+    def test_missing_status_is_not_malformed(self):
+        """没有 status 键 -> 不算畸形。"""
+        _, _, malformed = srv._history_status({"outputs": {}})
+        self.assertFalse(malformed)
+
+    def test_dict_status_is_not_malformed(self):
+        """status 是 dict -> 不算畸形。"""
+        _, _, malformed = srv._history_status(
+            {"status": {"status_str": "error"}})
+        self.assertFalse(malformed)
+
+    def test_worker_fast_fails_on_malformed_status(self):
+        """**运行时**：畸形 status -> 任务落到 failed（不是永远 running）。
+
+        这条断言锁住「快速失败」这个行为 —— 单元测试只能证明
+        `malformed` 标志算对了，证明不了 worker 用上了它。
+        """
+        import asyncio
+
+        job_id = srv.create_job_record("t2v", {"prompt": "x", "duration": 5})
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='running' WHERE id=?", (job_id,))
+
+        worker = srv.Worker()
+        fake = _FakeComfyHistory("execution_error")
+        orig_hist = srv.comfy_history
+        orig_submit = srv.comfy_submit
+        orig_refresh = srv.refresh_comfy_node_names
+
+        async def _fake_submit(session, workflow, client_id=None):
+            return "fake-prompt-id"
+
+        async def _fake_refresh(session=None, force=False):
+            return set()
+
+        srv.comfy_history = fake
+        srv.comfy_submit = _fake_submit
+        srv.refresh_comfy_node_names = _fake_refresh
+        try:
+            async def _drive():
+                job_row = {"id": job_id, "mode": "t2v",
+                           "params": json.dumps({"prompt": "x", "duration": 5})}
+                await worker._run(job_row)
+            asyncio.run(_drive())
+        finally:
+            srv.comfy_history = orig_hist
+            srv.comfy_submit = orig_submit
+            srv.refresh_comfy_node_names = orig_refresh
+
+        with srv.db() as conn:
+            row = conn.execute("SELECT status, error FROM jobs WHERE id=?",
+                               (job_id,)).fetchone()
+        self.assertEqual(row["status"], "failed",
+                         "畸形 status 必须快速失败，不能一直 running")
+        self.assertIn("格式异常", row["error"] or "",
+                      f"失败原因应说明是格式异常: {row['error']!r}")
+
+    def test_malformed_reason_is_chinese(self):
+        """畸形文案必须中文 + 不含 Python 痕迹。"""
+        reason = comfy_errors.MALFORMED_STATUS_REASON
+        self.assertTrue(any("\u4e00" <= ch <= "\u9fff" for ch in reason))
+        self.assertNotIn("object has no attribute", reason)
+        self.assertNotIn("Traceback", reason)
+
+
 class WorkerRuntimeErrorTest(unittest.TestCase):
     """**真跑一次** worker 的失败路径，验证写进 jobs.error 的内容。
 
@@ -451,10 +564,11 @@ class WorkerRuntimeErrorTest(unittest.TestCase):
 
     def test_history_status_helper_returns_typed_pair(self):
         """helper 的返回形状固定：(dict, bool)。"""
-        info, is_error = srv._history_status(
+        info, is_error, malformed = srv._history_status(
             {"status": {"status_str": "error"}})
         self.assertIsInstance(info, dict)
         self.assertIsInstance(is_error, bool)
+        self.assertIsInstance(malformed, bool)
         self.assertTrue(is_error)
 
 

@@ -592,8 +592,8 @@ _GENERIC_FAILURE_REASON = ("生成失败（服务端未能给出具体原因）�
                             "或改用「复用参数」重新生成一段。")
 
 
-def _history_status(hist) -> tuple[dict, bool]:
-    """从一条 ComfyUI history 条目里取出 `(status_info, 是否执行失败)`。
+def _history_status(hist) -> tuple[dict, bool, bool]:
+    """从一条 ComfyUI history 条目里取出 `(status_info, 是否失败, 状态是否畸形)`。
 
     【为什么抽成函数 —— 2026-11-13】
     这个判断原本**内联**在 worker 的轮询循环里。它一旦被改回
@@ -606,13 +606,42 @@ def _history_status(hist) -> tuple[dict, bool]:
         list / 缺字段）并断言「不抛异常」；
       * worker 里只剩一行调用，类型判断**只此一处**。
 
-    【口径】
-      * `status` 不是 dict -> status_info 取空 dict（不抛）；
-      * `status_str == "error"` -> 判定为执行失败。
+    【三个返回值】
+      * `status_info`  —— 归一后的 dict（畸形时是空 dict）；
+      * `is_error`     —— `status_str == "error"` -> 判定为执行失败；
+      * `malformed`    —— `status` **存在但不是 dict**（形状超预期）。
+
+    【为什么要有第三个返回值 —— 2026-11-13 修】
+    `status` 畸形时，`is_error` 必然是 False（没有 status_str 可读）。
+    如果 worker 只看 `is_error`，就会**永远轮询下去** ——
+    既没有 outputs（没成功）也没有 error（不是失败），
+    循环没有任何退出条件 -> 任务永远卡在「生成中」。
+
+    这不是理论风险：畸形 history 会让任务**挂死**，比报错更糟。
+    所以畸形必须**当成失败处理**（快速失败 + 可读原因），
+    而不是当成「还在跑」。
+
+    【本机实测的正常形状】ComfyUI 0.37 的 history 里 `status` **总是**
+    dict（`status_str` / `completed` / `messages` 三个字段），
+    实测 5 条历史全部如此。畸形只可能来自：
+      * 中间代理/网关改了响应；
+      * 未来 ComfyUI 改了形状；
+      * 测试构造的假数据。
+    但「万一」也必须能优雅降级 —— 不能挂死。
     """
-    status_info = comfy_errors.coerce_status_info(
-        (hist or {}).get("status") if isinstance(hist, dict) else None)
-    return status_info, comfy_errors.status_is_error(status_info)
+    raw_status = (hist or {}).get("status") if isinstance(hist, dict) else None
+    # 畸形 = status **存在**但不是 dict。
+    #
+    # ⚠ `status` 是 None 的情况**不算畸形** —— ComfyUI 在任务还没跑完时
+    #    就会返回 `status: None`（execution.py 的 status_dict 初值就是
+    #    None，task_done 时才填成 dict）。那是「**还在跑**」，
+    #    不是「形状坏了」。
+    #
+    #    之前把 None 也当畸形是**错的**：会让所有「刚提交、还没跑完」
+    #    的任务立刻失败。
+    malformed = raw_status is not None and not isinstance(raw_status, dict)
+    status_info = comfy_errors.coerce_status_info(raw_status)
+    return status_info, comfy_errors.status_is_error(status_info), malformed
 
 
 def _user_facing_error(exc: BaseException | str) -> str:
@@ -1221,7 +1250,7 @@ class Worker:
                             # 「把失败原因翻译给用户」的错误处理路径上，
                             # 结果用户只看到一句 Python 异常文本。
                             # 详见 comfy_errors.coerce_status_info。
-                            status_info, is_error = _history_status(hist)
+                            status_info, is_error, malformed = _history_status(hist)
                             if hist.get("outputs"):
                                 outs = _extract_outputs(hist)
                                 saved = []
@@ -1246,6 +1275,9 @@ class Worker:
                                         (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
                                 print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
                                 return
+                            if malformed:
+                                # 形状超预期 -> **快速失败**，别挂死。
+                                raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
                             if is_error:
                                 raise RuntimeError(_comfy_error_message(status_info))
                 finally:
@@ -1488,7 +1520,10 @@ class Worker:
                                               "name": item["filename"]})
                             return saved
                         # 【2026-11-13 修】同上文：status 类型免疫。
-                        status_info, is_error = _history_status(hist)
+                        status_info, is_error, malformed = _history_status(hist)
+                        if malformed:
+                            # 形状超预期 -> **快速失败**，别挂死。
+                            raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
                         if is_error:
                             raise RuntimeError(_comfy_error_message(status_info))
             finally:

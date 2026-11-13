@@ -37,22 +37,30 @@ PY = sys.executable
 
 MUTATIONS = [
     (
-        "T1 helper 退回「status 直接当 dict」（原始缺陷①）",
+        "T1 【原始缺陷①·完整复原】status 既不归一也不判类型",
         "server.py",
-        '    status_info = comfy_errors.coerce_status_info(\r\n'
-        '        (hist or {}).get("status") if isinstance(hist, dict) else None)\r\n',
-        '    status_info = (hist or {}).get("status") or {}\r\n',
-        2,
+        '    status_info = comfy_errors.coerce_status_info(raw_status)\r\n'
+        '    return status_info, comfy_errors.status_is_error(status_info), malformed\r\n',
+        '    status_info = raw_status or {}\r\n'
+        '    return status_info, status_info.get("status_str") == "error", False\r\n',
+        3,
     ),
     (
-        "T2 helper 退回「status_str 直接取」（原始缺陷①）",
+        "T2 畸形 status 的**检测**失效（回归：worker 会无限轮询挂死）",
         "server.py",
-        '    status_info = comfy_errors.coerce_status_info(\r\n'
-        '        (hist or {}).get("status") if isinstance(hist, dict) else None)\r\n'
-        '    return status_info, comfy_errors.status_is_error(status_info)\r\n',
-        '    status_info = (hist or {}).get("status") or {}\r\n'
-        '    return status_info, status_info.get("status_str") == "error"\r\n',
-        2,
+        '    malformed = raw_status is not None and not isinstance(raw_status, dict)\r\n',
+        '    malformed = False\r\n',
+        1,
+    ),
+    (
+        "T2b 畸形 status 不再快速失败（回归：会无限轮询挂死）",
+        "server.py",
+        '                            if malformed:\r\n'
+        '                                # 形状超预期 -> **快速失败**，别挂死。\r\n'
+        '                                raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)\r\n',
+        '                            if False:\r\n'
+        '                                raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)\r\n',
+        1,
     ),
     (
         "T3 coerce_status_info 不做类型判断（str 原样返回）",
