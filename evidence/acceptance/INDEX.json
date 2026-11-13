@@ -1,6 +1,6 @@
 {
   "判据声明": "本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。",
-  "生成时间": "2026-11-13T19:07:35+08:00",
+  "生成时间": "2026-11-13T19:08:46+08:00",
   "分支": "local/feature/t2v-continue",
   "仓库": "/root/projects/h3studio-t2v-continue",
   "验收实例": "8206 / 8199（独立实例，8190 线上未动）",
@@ -497,14 +497,14 @@
         }
       },
       "截图": [
-        "evidence/continuation-selflift/selflift-375-gallery.png",
-        "evidence/continuation-selflift/selflift-375-card-zoom.png",
-        "evidence/continuation-selflift/normal-375-card-zoom.png",
-        "evidence/continuation-selflift/continuation-panel-375.png",
-        "evidence/continuation-selflift/selflift-1280-gallery.png",
-        "evidence/continuation-selflift/selflift-1280-card-zoom.png",
-        "evidence/continuation-selflift/normal-1280-card-zoom.png",
-        "evidence/continuation-selflift/continuation-panel-1280.png"
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/selflift-375-gallery.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/selflift-375-card-zoom.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/normal-375-card-zoom.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/continuation-panel-375.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/selflift-1280-gallery.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/selflift-1280-card-zoom.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/normal-1280-card-zoom.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/continuation-panel-1280.png"
       ],
       "报告": "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/report.json"
     },
@@ -535,11 +535,12 @@
         "服务端_接续上下文组装": "h3studio/continuation_service.py:493（build_continuation_context）"
       },
       "截图": [
-        "evidence/continuation-selflift/continuation-panel-375.png",
-        "evidence/continuation-selflift/continuation-panel-1280.png"
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/continuation-panel-375.png",
+        "/root/projects/h3studio-t2v-continue/evidence/continuation-selflift/continuation-panel-1280.png"
       ]
     },
     "C8_pytest": {
+      "结论": "接续相关 121 项全绿；全量 3 failed / 2289 passed，3 项失败全部与接续无关（2 项稳定存量 + 1 项时序 flake）",
       "接续相关命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/test_continuation_branch.py tests/test_continuation_server.py tests/test_continuation.py tests/test_continuation_retry.py tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py tests/test_continuation_capability.py -q --no-header -p no:cacheprovider",
       "接续相关结果": "121 passed in 60.65s (0:01:00)",
       "全量命令": "cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider",
@@ -551,6 +552,7 @@
       }
     },
     "C9_浏览器截图与报错统计": {
+      "结论": "375 / 1280 两档截图齐备；console_errors=0、page_errors=0、真实失败请求=0（媒体预载中止另列，非服务端错误）",
       "两档宽度": [
         375,
         1280
@@ -599,6 +601,12 @@
           "real_failed_requests": 0,
           "media_preload_aborts": 4,
           "media_preload_aborts说明": "卡片 <video preload=\"metadata\"> 被 Chrome 读完元数据后主动中止媒体流（net::ERR_ABORTED）—— 浏览器正常行为，非服务端错误（同一 URL 手动 fetch 返回 200 且字节完整）"
+        },
+        "continuation-d1(browser_report.json)": {
+          "console_errors": 0,
+          "page_errors": 0,
+          "failed_requests": 0,
+          "shots": 10
         }
       }
     }

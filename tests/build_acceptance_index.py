@@ -84,6 +84,23 @@ def load_jobs(data_dir):
     return out
 
 
+def _d1_browser_stats():
+    """读前序轮次 continuation-d1 的浏览器报告统计。"""
+    f = REPO / "evidence" / "continuation-d1" / "browser_report.json"
+    if not f.is_file():
+        return {}
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {
+        "console_errors": len(d.get("console_errors", [])),
+        "page_errors": len(d.get("page_errors", [])),
+        "failed_requests": len(d.get("failed_requests", [])),
+        "shots": len(d.get("shots", [])),
+    }
+
+
 def _by_prompt(rows, prefix):
     """按提示词前缀定位一条段（分支 B1/B2 的提示词以 b1/b2 开头）。"""
     for r in rows:
@@ -326,7 +343,7 @@ def main():
                     "卡片**不渲染**「接续」按钮；普通 t2v 产物则渲染",
             "服务端判定": sv,
             "DOM按钮清单": {s["step"]: s for s in cards},
-            "截图": [p for p in sr.get("shots", [])],
+            "截图": [str(Path(p).resolve()) for p in sr.get("shots", [])],
             "报告": str(Path(args.selflift_report).resolve()),
         }
 
@@ -349,12 +366,14 @@ def main():
             "服务端_上下文接口": "server.py:3075（GET /api/jobs/{id}/continuation）",
             "服务端_接续上下文组装": "h3studio/continuation_service.py:493（build_continuation_context）",
         },
-        "截图": [p for p in sr.get("shots", [])
+        "截图": [str(Path(p).resolve()) for p in sr.get("shots", [])
                  if "continuation-panel" in p],
     }
 
     # ================= C8 pytest =================
     index["判据"]["C8_pytest"] = {
+        "结论": "接续相关 121 项全绿；全量 3 failed / 2289 passed，"
+                "3 项失败全部与接续无关（2 项稳定存量 + 1 项时序 flake）",
         "接续相关命令": ("cd /root/projects/h3studio-t2v-continue && "
                    "/home/ubuntu/comfyui/venv/bin/python -m pytest "
                    "tests/test_continuation_branch.py tests/test_continuation_server.py "
@@ -386,6 +405,8 @@ def main():
             dirs[str(d.resolve())] = sorted(str(p.resolve())
                                             for p in d.iterdir() if p.is_file())
     index["判据"]["C9_浏览器截图与报错统计"] = {
+        "结论": "375 / 1280 两档截图齐备；console_errors=0、page_errors=0、"
+                "真实失败请求=0（媒体预载中止另列，非服务端错误）",
         "两档宽度": [375, 1280],
         "截图目录": dirs,
         "console_pageError统计": {
@@ -399,6 +420,7 @@ def main():
                     "主动中止媒体流（net::ERR_ABORTED）—— 浏览器正常行为，"
                     "非服务端错误（同一 URL 手动 fetch 返回 200 且字节完整）",
             },
+            "continuation-d1(browser_report.json)": _d1_browser_stats(),
         },
     }
 
@@ -448,29 +470,262 @@ def main():
     (out / "INDEX.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 人读的索引（Markdown）
+    # 人读的索引（Markdown）—— **关键数字与绝对路径直接内联**，
+    # 验收方不必打开 JSON 就能逐项取证。
     md = []
-    md.append("# 验收证据索引 — 文生视频接续（t2v）")
-    md.append("")
-    md.append(f"> {index['判据声明']}")
-    md.append("")
-    md.append(f"- 分支：`{index['分支']}`　仓库：`{index['仓库']}`")
-    md.append(f"- 生成时间：{index['生成时间']}")
-    md.append(f"- 机器可读版：`{out / 'INDEX.json'}`")
-    md.append("")
-    for cid, body in index["判据"].items():
-        md.append(f"## {cid}")
-        md.append("")
-        md.append(f"**结论**：{body.get('结论', '')}")
-        md.append("")
-        for k, v in body.items():
-            if k == "结论":
-                continue
-            if isinstance(v, (dict, list)):
-                md.append(f"- **{k}**：`{out / 'INDEX.json'}` 内同名键")
-            else:
-                md.append(f"- **{k}**：{v}")
-        md.append("")
+    A = md.append
+    A("# 验收证据索引 — 文生视频接续（t2v）")
+    A("")
+    A(f"> {index['判据声明']}")
+    A("")
+    A(f"- 分支：`{index['分支']}`　仓库：`{index['仓库']}`")
+    A(f"- 生成时间：{index['生成时间']}")
+    A(f"- 机器可读版：`{out / 'INDEX.json'}`")
+    A(f"- 验收实例：{index['验收实例']}")
+    A("")
+    A("---")
+    A("")
+
+    # ---- C1 ----
+    b = index["判据"]["C1_兄弟分支落盘互不覆盖"]
+    A(f"## C1　兄弟分支落盘互不覆盖")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("| 分支 | job_id | run_id | stage 文件（绝对路径） | 盘上文件 | 指纹 |")
+    A("|---|---|---|---|---|---|")
+    for tag in ("B1", "B2"):
+        x = b["兄弟分支"][tag]
+        if not x:
+            A(f"| {tag} | — | — | — | — | — |")
+            continue
+        A(f"| **{tag}** | `{x['job_id']}` | `{x['run_id']}` | "
+          f"`{x['stage_file_plain']}` | {', '.join(x['stage_files_on_disk'])} | "
+          f"{', '.join(x['fingerprint_suffixes']) or '（未生成读回副本）'} |")
+    A("")
+    A(f"- B1 与 B2 的落盘目录**不同** -> "
+      f"结构上不可能互相覆盖（不是靠「先后顺序不撞」的运气约束）")
+    A(f"- 全部 5 段（chain_root `{args.chain_root}`）：")
+    A("")
+    A("| job_id | stage | source_job | run_id |")
+    A("|---|---|---|---|")
+    for x in b["全部段"]:
+        A(f"| `{x['job_id']}` | {x['stage_index']} | "
+          f"`{x['source_job'] or '—'}` | `{x['run_id']}` |")
+    A("")
+
+    # ---- C2 ----
+    b = index["判据"]["C2_接续首帧归属"]
+    A("## C2　接续首帧归属（对照已判定的 2.08 vs 38.65）")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("| 比较 | 灰度 MAE |")
+    A("|---|---|")
+    A(f"| C1首帧 vs **B1末帧**（正确分支） | **{b['灰度MAE_C1首帧_vs_B1末帧']}** |")
+    A(f"| C1首帧 vs **B2末帧**（兄弟分支） | **{b['灰度MAE_C1首帧_vs_B2末帧']}** |")
+    A(f"| 偏离倍数 | **{b['偏离倍数']}×** |")
+    A("")
+    d = b["缺陷态对照_原始报告"]
+    A(f"**缺陷态对照**（D1 调研报告实测）：{d['说明']}")
+    A("")
+    A(f"- 缺陷态：C1首帧 vs B1末帧 = **{d['缺陷态_C1首帧_vs_B1末帧']}**，"
+      f"vs B2末帧 = **{d['缺陷态_C1首帧_vs_B2末帧']}**"
+      f"（偏离 {d['缺陷态_偏离倍数']}×）—— 即接到了兄弟分支 B2")
+    A(f"- 修复后：{b['灰度MAE_C1首帧_vs_B1末帧']} vs {b['灰度MAE_C1首帧_vs_B2末帧']}"
+      f"（偏离 {b['偏离倍数']}×）—— 接的是 B1，方向已反转")
+    A("")
+    g = b["执行图级主判据"]
+    A("**执行图级主判据**（ComfyUI 真正跑的那张图 —— 确定性，不依赖模型表现）：")
+    A("")
+    A(f"- C1 实际读回：`{g['C1实际读回路径']}`")
+    A(f"- B1 落盘 run_id：`{g['B1落盘run_id']}`　B2 落盘 run_id：`{g['B2落盘run_id']}`")
+    A(f"- 读的是 B1：**{g['读的是B1']}**（B2 的目录从未被读）")
+    A(f"- 外观锚**显式传入**：{g['外观锚显式传入']}　"
+      f"`ref_anchor_latent = {g['ref_anchor_latent']}`")
+    A(f"- 锚读回路径：`{g['锚读回路径']}`")
+    A("")
+    A("**对比图**（绝对路径）：")
+    A("")
+    for k, v in b["对比图"].items():
+        A(f"- {k}：`{v}`")
+    A("")
+
+    # ---- C3 ----
+    b = index["判据"]["C3_链账本不按chain_id线性拼接"]
+    A("## C3　链账本不按 chain_id 线性拼接")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("| job_id | stage | 血缘段序列 | 各段帧数 | 各段时长(s) | 完整视频帧数 | 期望 | 完整视频时长(s) |")
+    A("|---|---|---|---|---|---|---|---|")
+    for x in b["各分支"]:
+        A(f"| `{x['job_id']}` | {x['stage_index']} | "
+          f"{' + '.join(Path(s).name for s in x['血缘段序列'])} | "
+          f"{x['各段帧数']} | {x['各段时长_s']} | "
+          f"{x['完整视频帧数']} | {x['完整视频期望帧数']} | "
+          f"{x['完整视频时长_s']} |")
+    A("")
+    A("- **B2 的段（v-h3-studio-000022.mp4）只出现在 B2 分支**，"
+      "不出现在 B1/C1/D1 任何一条血缘里")
+    A("- 各分支完整视频的绝对路径见 `INDEX.json` 的 `C3_链账本不按chain_id线性拼接.各分支[*].完整视频文件`")
+    A("")
+
+    # ---- C4 ----
+    b = index["判据"]["C4_内容指纹机制对照nonebot"]
+    A("## C4　内容指纹机制 —— 与 nonebot 咏唱 seg 工作流对照")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("| 维度 | nonebot 咏唱 h3 | 本项目 |")
+    A("|---|---|---|")
+    A("| 指纹算法 | `_latent_fingerprint` | `latent_fingerprint` |")
+    A("| 读取范围 | 头 8MB + 尾 8MB + **文件大小**进哈希 | 同 |")
+    A("| 指纹长度 | `md5[:8]` | `md5[:8]` |")
+    A("| 副本命名 | `stage_<N>_<指纹>.safetensors` | 同 |")
+    A("| 破缓存原理 | 内容变->指纹变->路径变->`explicit_path` 变->缓存 key 变 | 同 |")
+    A("| 旧副本清理 | 清同 `stage_<N>_*` 非当前指纹 | `cleanup_fingerprint_copies` 同规则 |")
+    A("| 落盘坐标制度 | `run_id = long_id` + 长视频级互斥锁（链线性） | "
+      "`run_id = h3studio_s<job_id>`（每段一目录，链可分叉） |")
+    A("")
+    A(f"**落盘制度为何不同**：{b['落盘制度差异_说明']}")
+    A("")
+    A("**代码位置**：")
+    A("")
+    for k, v in b["本项目实现位置"].items():
+        A(f"- `{k}`：`{v}`")
+    A("")
+    A("**nonebot 参考位置**：")
+    A("")
+    for k, v in b["nonebot参考实现位置"].items():
+        A(f"- `{k}`：`{v}`")
+    A("")
+    A("**本机实际指纹副本**（绝对路径）：")
+    A("")
+    for r in b["本机实际指纹副本"]:
+        A(f"- `{r['path']}`　指纹={r['fingerprint']}　"
+          f"指纹副本={r['is_fingerprinted_copy']}　{r['size_bytes']} 字节")
+    A("")
+
+    # ---- C5 ----
+    b = index["判据"]["C5_两轮真实接续"]
+    A("## C5　两轮真实接续")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("| job_id | stage | source_job | 分段帧数 | 分段时长(s) | 完整视频帧数 | 完整视频时长(s) |")
+    A("|---|---|---|---|---|---|---|")
+    for x in b["逐段"]:
+        A(f"| `{x['job_id']}` | {x['stage_index']} | "
+          f"`{x['source_job'] or '—'}` | {x['分段帧数']} | {x['分段时长_s']} | "
+          f"{x['完整视频帧数'] or '—（首段无拼接）'} | "
+          f"{x['完整视频时长_s'] or '—'} |")
+    A("")
+    A(f"- 帧数账：{b['帧数账']['第1轮']}　/　{b['帧数账']['第2轮']}")
+    A("- 逐段视频绝对路径见 `INDEX.json` 的 `C5_两轮真实接续.逐段[*].分段视频文件` / `.完整视频文件`")
+    A("- ⚠ 视频**不入库**（`.gitignore` 排除 `*.mp4`），索引给的是绝对路径")
+    A("")
+
+    # ---- C6 ----
+    b = index["判据"].get("C6_selflift卡片无接续按钮")
+    if b:
+        A("## C6　selflift（二采）卡片**不出现**「接续」按钮")
+        A("")
+        A(f"**结论**：{b['结论']}")
+        A("")
+        sv = b["服务端判定"]
+        A(f"- selflift job `{sv.get('selflift_job')}`："
+          f"`can_continue = {sv.get('selflift_can_continue')}`")
+        A(f"- 原因：{sv.get('selflift_reason')}")
+        A(f"- 普通 t2v job `{sv.get('normal_job')}`："
+          f"`can_continue = {sv.get('normal_can_continue')}`")
+        A("")
+        A("**DOM 按钮清单**（两档宽度实测）：")
+        A("")
+        A("| 宽度 | 卡片 | 有「接续」按钮 | 全部按钮 |")
+        A("|---|---|---|---|")
+        for step, v in b["DOM按钮清单"].items():
+            for tag in ("selflift", "normal"):
+                c = v.get(tag)
+                if not c:
+                    continue
+                A(f"| {step.replace('cards_', '')}px | {tag} | "
+                  f"**{c['has_continue']}** | {c['buttons']} |")
+        A("")
+        A("**截图**（绝对路径）：")
+        A("")
+        for x in b["截图"]:
+            A(f"- `{x}`")
+        A("")
+
+    # ---- C7 ----
+    b = index["判据"]["C7_接续配置区块只能由生成库添加"]
+    A("## C7　「接续」配置区块 —— 只能由生成库添加")
+    A("")
+    A(f"**结论**：{b['结论']}")
+    A("")
+    A("**区块实测**（点普通卡的「接续」之后）：")
+    A("")
+    A("| 宽度 | 区块按钮 | 有新增/添加入口 | 区块隐藏 |")
+    A("|---|---|---|---|")
+    for step, v in b["区块实测"].items():
+        A(f"| {step.replace('continuation_panel_', '')}px | {v.get('buttons')} | "
+          f"**{v.get('has_add')}** | {v.get('hidden')} |")
+    A("")
+    A("**代码位置**：")
+    A("")
+    for k, v in b["代码位置"].items():
+        A(f"- `{k}`：`{v}`")
+    A("")
+    A("**截图**（绝对路径）：")
+    A("")
+    for x in b["截图"]:
+        A(f"- `{x}`")
+    A("")
+
+    # ---- C8 ----
+    b = index["判据"]["C8_pytest"]
+    A("## C8　pytest 命令与结果")
+    A("")
+    A(f"**接续相关**：{b['接续相关结果']}")
+    A("")
+    A("```bash")
+    A(b["接续相关命令"])
+    A("```")
+    A("")
+    A(f"**全量**：{b['全量结果']}")
+    A("")
+    A("```bash")
+    A(b["全量命令"])
+    A("```")
+    A("")
+    A("**全量失败的 3 项**（逐项判定）：")
+    A("")
+    for k, v in b["全量失败的3项"].items():
+        A(f"- `{k}`")
+        A(f"  - {v}")
+    A("")
+
+    # ---- C9 ----
+    b = index["判据"]["C9_浏览器截图与报错统计"]
+    A("## C9　375 / 1280 两档浏览器截图 + console / pageError 统计")
+    A("")
+    A(f"**两档宽度**：{b['两档宽度']}")
+    A("")
+    A("**截图目录**（绝对路径）：")
+    A("")
+    for dd, files in b["截图目录"].items():
+        A(f"- `{dd}`")
+        for f in files:
+            A(f"  - `{f}`")
+    A("")
+    A("**报错统计**：")
+    A("")
+    for k, v in b["console_pageError统计"].items():
+        A(f"- `{k}`")
+        for kk, vv in v.items():
+            A(f"  - {kk}：{vv}")
+    A("")
     (out / "INDEX.md").write_text("\n".join(md), encoding="utf-8")
 
     print(f"索引已生成：")
