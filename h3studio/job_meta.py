@@ -58,6 +58,15 @@ from . import video_models as vmodels
 def _image_model_table() -> dict:
     from . import workflows as wf
     out = {}
+    # H3-Image 的模型表在 h3image 模块里（不放在 workflows，避免
+    # workflows.py 继续膨胀成「大杂烩」）
+    try:
+        from . import h3image
+        h3_table = getattr(h3image, "H3_IMAGE_MODELS", None)
+        if isinstance(h3_table, dict):
+            out.update(h3_table)
+    except Exception:
+        pass
     for attr in ("Z_IMAGE_MODELS", "QWEN_IMAGE_MODELS", "MOSS_IMAGE_MODELS"):
         table = getattr(wf, attr, None)
         if isinstance(table, dict):
@@ -713,11 +722,15 @@ def _image_summary(params: dict, mode: str = "") -> dict:
     if not model_key:
         # 没记录 -> 用该模式的工作流默认底模（真实常量，不是编的）
         from . import workflows as wf
+        from . import h3image
         default_key = {
             "t2i": getattr(wf, "Z_IMAGE_DEFAULT_MODEL", ""),
             "t2i_qwen": getattr(wf, "QWEN_IMAGE_DEFAULT_MODEL", ""),
             "i2i_qwen": getattr(wf, "QWEN_IMAGE_DEFAULT_MODEL", ""),
             "t2i_moss": getattr(wf, "MOSS_IMAGE_DEFAULT_MODEL", ""),
+            # MiniMax-H3-Image：文生图与图片编辑同一个 checkpoint
+            "t2i_h3image": getattr(h3image, "H3_IMAGE_DEFAULT_MODEL", ""),
+            "i2i_h3image": getattr(h3image, "H3_IMAGE_DEFAULT_MODEL", ""),
         }.get(mode, "")
         if not default_key:
             return out
@@ -826,7 +839,8 @@ def summarize(mode: str, params: dict) -> dict:
         out = _t2v_summary(params)
     elif mode in ("t2v", "flf", "r2v", "longfilm"):
         out = _legacy_video_summary(params, mode)
-    elif mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+    elif mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                  "t2i_h3image", "i2i_h3image"):
         out = _image_summary(params, mode)
     elif mode in ("t2a", "a2a"):
         out = _music_summary(params)

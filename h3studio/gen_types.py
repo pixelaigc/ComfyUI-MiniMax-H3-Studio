@@ -28,8 +28,14 @@ GENERATION_TYPES: dict[str, dict] = {
     # (custom_nodes/moss-image).
     "t2i_moss": {"label": "MOSS-Image 文生图", "media": "image",
                  "group": "generation_type", "category": "t2i"},
+    # MiniMax-H3-Image: 一个 checkpoint 同时做文生图与图片编辑。
+    # 6 步蒸馏 / guidance 固定 1（无 CFG pass -> 无负面提示词）。
+    "t2i_h3image": {"label": "H3-Image 文生图", "media": "image",
+                    "group": "generation_type", "category": "t2i"},
     "i2i_qwen": {"label": "Qwen-Image 2.1 图片编辑", "media": "image",
                  "group": "generation_type", "category": "i2i"},
+    "i2i_h3image": {"label": "H3-Image 图片编辑", "media": "image",
+                    "group": "generation_type", "category": "i2i"},
     "t2v": {"label": "文生视频", "media": "video", "group": "generation_type",
             "category": "video"},
     "flf": {"label": "首尾帧生成", "media": "video", "group": "generation_type",

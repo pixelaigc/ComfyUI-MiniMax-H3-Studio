@@ -598,6 +598,8 @@ def _image_family(mode: str) -> str:
         "t2i_qwen": "qwen_image",
         "i2i_qwen": "qwen_image",
         "t2i_moss": "moss_image",
+        "t2i_h3image": "h3_image",
+        "i2i_h3image": "h3_image",
     }.get(mode, mode)
 
 
@@ -623,7 +625,7 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
             "label": info.get("label") or mode,
             "media": info.get("media") or "other",
         }
-        if mode in ("t2i", "t2i_qwen", "t2i_moss"):
+        if mode in ("t2i", "t2i_qwen", "t2i_moss", "t2i_h3image", "i2i_h3image"):
             entry["aspects"] = list(wf.ASPECT_MAP.keys())
         if mode in ("t2v", "flf", "r2v"):
             entry["aspects"] = list(wf.ASPECT_MAP.keys())
@@ -645,6 +647,17 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
         if mode == "t2i_moss":
             entry["models"] = list(wf.MOSS_IMAGE_MODELS.keys())
             entry["resolutions"] = list(wf.MOSS_IMAGE_RES_TIERS.keys())
+        if mode in ("t2i_h3image", "i2i_h3image"):
+            entry["models"] = list(wf.H3_IMAGE_MODELS.keys())
+            entry["resolutions"] = list(wf.H3_IMAGE_RES_TIERS.keys())
+            entry["negative_prompt_note"] = (
+                "H3-Image 的 guidance 固定为 1（无 CFG pass），"
+                "负面提示词数学上无效 —— 要避免什么请写进正面提示词")
+        if mode == "i2i_h3image":
+            entry["requires"] = "参考图来自素材库（asset_id），最多 16 张"
+            entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
+            entry["media_slots"] = {"image": "ref_image"}
+            entry["reference_placeholder"] = "<Picture N>"
         if mode == "i2i_qwen":
             entry["models"] = list(wf.QWEN_IMAGE_MODELS.keys())
             entry["requires"] = "参考图来自素材库（asset_id）"
@@ -700,6 +713,8 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
                                   "视频 -> ref_video，音频 -> ref_audio")
         if mode in ("t2i", "t2i_qwen", "t2i_moss"):
             # 负面提示词支持矩阵 —— 让模型知道「这个模式传了也没用」
+            # （H3-Image 不进这个矩阵：它的负面提示词**恒定无效**，
+            #   已在上面单独写了 negative_prompt_note）
             entry["negative_prompt_support"] = {
                 key: agent_schema.negative_support(mode, key)["effective"]
                 for key in agent_schema.mode_models(mode)
@@ -719,7 +734,8 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
     shared_aspects = list(wf.ASPECT_MAP.keys())
     # 图像族 -> 该族的模型清单 / 分辨率档位（顶层给一次，模式条目只引族名）
     families: dict = {}
-    for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+    for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                 "t2i_h3image", "i2i_h3image"):
         models = agent_schema.mode_models(mode)
         resolutions = agent_schema.mode_resolutions(mode)
         if models or resolutions:
@@ -2968,7 +2984,8 @@ def _extract_job_id_candidates(text: str) -> list[str]:
     """
     candidates = re.findall(r"[0-9a-f]{12,}", text)
     candidates += re.findall(
-        r"(?:job|t2v|t2i|t2i_qwen|i2i_qwen|t2i_moss|flf|r2v|t2a|a2a)"
+        r"(?:job|t2v|t2i|t2i_qwen|i2i_qwen|t2i_moss|t2i_h3image|i2i_h3image"
+        r"|flf|r2v|t2a|a2a)"
         r"[_-][A-Za-z0-9]{6,}", text)
     # 去掉可能的粘连前缀（如 "job_id=abc" -> "job_id" 已被上面吃掉）
     return [c for c in candidates if not c.endswith("_id")]

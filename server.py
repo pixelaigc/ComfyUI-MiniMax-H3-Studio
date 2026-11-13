@@ -73,6 +73,7 @@ from h3studio.workflows import (
     moss_image_model_available,
     normalize_moss_image_size,
 )
+from h3studio import h3image as h3img
 from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
@@ -158,6 +159,9 @@ SERVER_FEATURES = {
     "moss_image": True,
     "moss_image_loras": True,
     "moss_image_slg": True,
+    # MiniMax-H3-Image
+    "h3_image": True,
+    "h3_image_refs": True,
 }
 
 DEFAULT_CONFIG = {
@@ -1027,7 +1031,8 @@ class Worker:
         mode = job_row["mode"]
         print(f"[worker] 开始任务 {job_id} ({mode})")
         # 批次任务：逐个批次独立跑，单个批次失败不影响其它批次
-        if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss") and self._has_batches(job_id):
+        if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                    "t2i_h3image", "i2i_h3image") and self._has_batches(job_id):
             await self._run_batches(job_row)
             return
         try:
@@ -1052,19 +1057,22 @@ class Worker:
                             raise RuntimeError(f"找不到上传文件: {up}")
                         names.append(await comfy_upload_image(session, lp))
                     params["ref_images"] = names
-                elif mode == "i2i_qwen":
+                elif mode in ("i2i_qwen", "i2i_h3image"):
                     # Qwen 图片编辑：参考图**来自素材库**（asset_id + 版本快照），
                     # 这里把素材库里的文件上传到 ComfyUI input，
                     # LoadImage 节点按返回的 'subfolder/name' 引用。
                     # 顺序必须与占位标记 <imageN> 严格一致 —— 这里保持列表原序。
+                    #
+                    # 【2026-11-13】H3-Image 图片编辑复用同一条上传路径
+                    # （它的参考图也强制来自素材库，顺序即 <Picture N> 语义）。
                     names = await _upload_asset_refs(session, job_id, params)
                     params["ref_images"] = names
 
                 # 素材库引用：把素材库里的文件按槽位上传到 ComfyUI，
                 # 并在 params 里落成 ref_images / ref_videos / ref_audios。
-                # i2i_qwen 的参考图已经在上面按 <imageN> 顺序处理过了，
+                # i2i_qwen / i2i_h3image 的参考图已经在上面按占位顺序处理过了，
                 # 这里不能再覆盖（会打乱占位与插槽的对应关系）。
-                if params.get("asset_refs") and mode != "i2i_qwen":
+                if params.get("asset_refs") and mode not in ("i2i_qwen", "i2i_h3image"):
                     await _apply_asset_refs(session, job_id, params)
 
                 # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
@@ -1110,6 +1118,19 @@ class Worker:
                     params["use_sigma_shift"] = bool(
                         params.get("use_sigma_shift", True)
                         and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
+
+                # 【H3-Image 同理】节点可用性必须在**拼工作流前**确认，
+                # 否则用户提交后才收到 ComfyUI 的英文原文报错
+                # （"Node 'MiniMaxH3ImageConditioning' not found"）——
+                # 用户不知道那是 ComfyUI 版本不够，更不知道该升级还是装插件。
+                # 这里探测一次并把结果注入 params，由 h3image 的构建函数
+                # 转成中文错误。
+                if mode in ("t2i_h3image", "i2i_h3image"):
+                    nodes_ok, probe_ok = await probe_h3_image_nodes(session)
+                    # 只有「问全了」才敢断言缺节点；没问到就传 None
+                    # （构建函数会放行，让 ComfyUI 自己报错）。
+                    params["_h3image_nodes_available"] = (
+                        None if not probe_ok else nodes_ok)
 
                 workflow = build_workflow(mode, params)
                 client_id = f"h3studio-{job_id}"
@@ -1359,10 +1380,14 @@ class Worker:
         client_id = f"h3studio-{batch_id}"
         async with ClientSession(timeout=HTTP_TIMEOUT) as session:
             # 参考图要上传到 ComfyUI input，LoadImage 才能引用
-            if mode == "i2i_qwen":
+            if mode in ("i2i_qwen", "i2i_h3image"):
                 # 参考图来自素材库（asset_id + 版本快照），顺序即 <imageN> 语义
                 names = await _upload_asset_refs(session, job_id, batch_params)
                 batch_params["ref_images"] = names
+            if mode in ("t2i_h3image", "i2i_h3image"):
+                nodes_ok, probe_ok = await probe_h3_image_nodes(session)
+                batch_params["_h3image_nodes_available"] = (
+                    None if not probe_ok else nodes_ok)
             workflow = build_workflow(mode, batch_params)
             async with self.submit_lock:
                 with db() as conn:
@@ -2113,7 +2138,8 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
             params["continuation"] = info
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
-    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                "t2i_h3image", "i2i_h3image"):
         try:
             batch_count = int(params.get("batch_count") or 1)
         except (TypeError, ValueError):
@@ -2538,6 +2564,7 @@ H3_VIDEO_LORAS = dict(LORAS)
 
 #: 允许的生成模式（与 workflows.BUILDERS 一致 —— 后端真实注册的模式）
 JOB_MODES = ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+             "t2i_h3image", "i2i_h3image",
              "t2a", "a2a")
 
 
@@ -2726,6 +2753,62 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
         params["prompt"] = ref_imgs.inject_reference_block(prompt_text, refs)
         params["ref_images"] = refs
 
+    elif mode in ("t2i_h3image", "i2i_h3image"):
+        # MiniMax-H3-Image 文生图 / 图片编辑
+        #
+        # 【LoRA】官方暂未发布 H3-Image 的 LoRA —— 本轮**不支持**，
+        # 传了也一律丢弃（避免脏值进库，卡片上显示出一段乱码）。
+        params.pop("loras", None)
+        # 负面提示词：guidance 固定 1 -> 没有 CFG pass -> 数学上无效。
+        # 静默丢弃并回一条明确说明，而不是假装收下了。
+        if params.get("negative_prompt"):
+            params["negative_prompt_ignored"] = (
+                "H3-Image 的 guidance 固定为 1（无 CFG pass），"
+                "负面提示词不生效 —— 请把「不要什么」写进正面提示词。")
+            params.pop("negative_prompt", None)
+
+        if mode == "i2i_h3image":
+            # 参考图**强制来自素材库**（与 i2i_qwen 同一套约束）。
+            uploaded = saved_files.get("file_ref", [])
+            if uploaded:
+                raise JobValidationError(
+                    "图片编辑的参考图必须来自素材库，不能直接上传本地图片。"
+                    "请先在「素材库」页上传并入库，再从素材库选择参考图。",
+                    code="ref_must_come_from_library")
+            ref_specs = params.get("ref_images") or []
+            if not isinstance(ref_specs, list):
+                ref_specs = []
+            refs = ref_imgs.normalize_refs(ref_specs)
+            if len(refs) < h3img.H3_IMAGE_MIN_REF_IMAGES:
+                raise JobValidationError(
+                    f"H3-Image 图片编辑至少需要 {h3img.H3_IMAGE_MIN_REF_IMAGES} 张参考图，"
+                    f"当前 {len(refs)} 张（参考图必须来自素材库）",
+                    code="ref_required")
+            if len(refs) > h3img.H3_IMAGE_MAX_REF_IMAGES:
+                raise JobValidationError(
+                    f"H3-Image 参考图最多 {h3img.H3_IMAGE_MAX_REF_IMAGES} 张，"
+                    f"当前 {len(refs)} 张（官方能力上限 16 张）",
+                    code="ref_too_many")
+            prompt_text = (params.get("prompt") or "").strip()
+            # 【占位标记语义与 Qwen 不同 —— 不能复用 ref_imgs.validate_refs】
+            #   Qwen-Image 2.1 的官方 PE-I2I 模板用 `<image1>..<imageN>`；
+            #   H3-Image 的官方文档用 `<Picture 1>..<Picture N>`
+            #   （"the prompt addresses each one by its label"）。
+            #   拿 Qwen 那套校验去查 H3-Image，会把「用户写了 <Picture 1>」
+            #   的合法提示词判成「缺少 <image1> 占位标记」-> 误拒。
+            check = h3img.validate_h3_image_refs(refs, prompt=prompt_text)
+            if not check["ok"]:
+                raise JobValidationError(
+                    "参考图校验未通过：" + "；".join(check["errors"]),
+                    code="ref_invalid", extra={"errors": check["errors"]})
+            # H3-Image 的官方占位标记是 <Picture N>（不是 Qwen 的 <imageN>）
+            # -> 不注入 Qwen 那套占位块，改为提示用户自己写 <Picture 1>。
+            # 参考图数量与顺序由服务端保证（ref_images 列表原序即插槽顺序）。
+            params["ref_images"] = refs
+            params["picture_hint"] = (
+                "提示词里用 " + h3img.H3_IMAGE_PLACEHOLDER.format(n=1) +
+                " 这样的标记引用参考图（官方语法）")
+
     # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
     if mode == "a2a":
         audio_refs = [r for r in (asset_refs or [])
@@ -2829,7 +2912,8 @@ async def api_create(request):
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
-    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
+    if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                "t2i_h3image", "i2i_h3image"):
         try:
             batch_count = int(params.get("batch_count") or 1)
         except (TypeError, ValueError):
@@ -3374,6 +3458,126 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     return _COMFY_NODE_NAMES
 
 
+#: H3-Image 节点探测专用的**长连接 session**（模块级，复用连接池）。
+#:
+#: 【为什么必须复用连接 —— 实测根因，2026-11-13】
+#: 同一个 aiohttp ClientSession 内复用连接 -> 5/5 成功，每次 0.00s；
+#: 每次**新建** ClientSession -> 前几次卡满 3 秒超时（2/5 成功）。
+#: curl 同一 URL 始终 1ms。
+#: -> 慢的不是 ComfyUI，是「每次新建 session」的连接建立路径。
+#:
+#: 这与本项目其它地方一致（refresh_comfy_node_names 也复用 session）。
+#: 探测频率本来就不高（60 秒缓存），复用连接没有副作用。
+_H3_IMAGE_PROBE_SESSION: ClientSession | None = None
+
+
+async def _h3_image_probe_session() -> ClientSession:
+    """取（或建）探测专用的长连接 session。
+
+    session 失效时（ComfyUI 重启过）会自动重建 —— 探测失败会返回
+    TIMEOUT，下一次调用时这里检测到连接已关闭就换一个。
+    """
+    global _H3_IMAGE_PROBE_SESSION
+    sess = _H3_IMAGE_PROBE_SESSION
+    if sess is not None and not sess.closed:
+        return sess
+    sess = ClientSession(timeout=ClientTimeout(total=3))
+    _H3_IMAGE_PROBE_SESSION = sess
+    return sess
+
+
+#: H3-Image 节点探测的结果缓存（60 秒）。
+#:
+#: 【为什么需要缓存】
+#: 实测（2026-11-13）：直接用 aiohttp 打 /object_info，**大多数时候 1ms 返回**，
+#: 但**偶发**会整次卡到 3 秒超时（约 6 次里有 1 次）。curl 同样的 URL 始终 1ms
+#: -> 是 aiohttp 侧的连接建立/复用问题，不是 ComfyUI 慢。
+#:
+#: 这个偶发超时会让界面在「缺节点」与「暂时无法探测」之间**抖动** ——
+#: 用户刷新一次看到一种说法，再刷一次又变了，很难自查。
+#:
+#: 缓存把探测频率降到 1 次/60 秒，抖动就看不到了。
+_H3_IMAGE_NODES_CACHE: tuple[float, bool, bool] = (0.0, False, False)
+_H3_IMAGE_NODES_CACHE_TTL = 60.0
+
+
+async def probe_h3_image_nodes(session=None, force: bool = False) -> tuple:
+    """探测本机 ComfyUI 有没有 H3-Image 必需的核心节点。
+
+    返回 (nodes_available, probe_complete)：
+      * nodes_available —— MiniMaxH3ImageConditioning 在不在
+      * probe_complete  —— 本次探测**问全了**吗（区分「确实不在」
+        与「没问到」：ComfyUI 卡住时探测会超时，此时不能断言缺节点）
+
+    【为什么单独探测，不复用 refresh_comfy_node_names】
+    refresh_comfy_node_names 探的是**视频面板**关心的节点名单
+    （_VIDEO_PANEL_NODES），H3-Image 的节点不在那份名单里。
+    而且那份探测失败时返回**上一次成功的缓存**（可能是别的节点的集合），
+    拿它判断 H3-Image 会得到假结论。
+
+    单独探的好处：只多 1 次 HTTP（实测 1 ms/个），语义独立，
+    不会污染视频面板的缓存。
+
+    【60 秒缓存】
+    aiohttp 打 /object_info 偶发卡满 3 秒超时（约 1/6 概率）。
+    不缓存的话界面会在两种说法之间抖动。缓存后抖动不可见。
+    """
+    global _H3_IMAGE_NODES_CACHE
+    now = time.time()
+    cached_ts, cached_nodes, cached_complete = _H3_IMAGE_NODES_CACHE
+    if (not force and cached_ts
+            and (now - cached_ts) < _H3_IMAGE_NODES_CACHE_TTL):
+        return cached_nodes, cached_complete
+
+    async def _probe(s, name):
+        try:
+            async with s.get(f"{COMFY}/object_info/{name}") as resp:
+                if resp.status != 200:
+                    return "TIMEOUT"
+                data = await resp.json()
+                if isinstance(data, dict):
+                    return name if name in data else None
+                return None
+        except Exception:
+            return "TIMEOUT"
+
+    async def _run_probe(sess):
+        """**顺序**请求，不用 asyncio.gather 并发。
+
+        【为什么不用并发】
+        实测（2026-11-13）：gather 并发打 /object_info 会**偶发整次卡满
+        3 秒超时**（10 次里 3~6 次），而同样的 URL 用 curl 始终 1ms、
+        顺序请求也稳定在 20~60ms。
+        -> 慢的根因是并发下的连接建立竞争，不是 ComfyUI 慢。
+
+        H3-Image 只有 1 个必需节点，顺序请求的耗时与并发几乎一样
+        （1 个请求 vs 1 个请求），却稳定得多。
+        """
+        results = []
+        for name in h3img.H3_IMAGE_REQUIRED_NODES:
+            results.append(await _probe(sess, name))
+        return results
+
+    try:
+        sess = session if session is not None else await _h3_image_probe_session()
+        results = await _run_probe(sess)
+    except Exception:
+        results = ["TIMEOUT"]
+
+    if any(r == "TIMEOUT" for r in results):
+        # 没问全 -> 不能断言「缺节点」（那会给出假阴性结论）
+        # 但如果上一次**问全过**，沿用那次结论（节点清单不会突然消失）。
+        if cached_ts and cached_complete:
+            return cached_nodes, True
+        # 【失败也缓存 15 秒】—— 否则每次 /api/image-options 都会重新
+        # 撞一次 3 秒超时，把首屏接口拖慢（用户会看到面板迟迟不出）。
+        _H3_IMAGE_NODES_CACHE = (now, False, False)
+        return False, False
+    nodes_ok = all(r is not None for r in results)
+    _H3_IMAGE_NODES_CACHE = (now, nodes_ok, True)
+    return nodes_ok, True
+
+
 async def fetch_comfy_queue(session):
     """读 ComfyUI 的真实队列：{running: n, pending: n}。
 
@@ -3731,6 +3935,103 @@ def _parse_music_json(text: str):
     return None
 
 
+async def _h3_image_options_payload() -> dict:
+    """H3-Image 的前端可选项清单（含**实测**的本机可用性）。
+
+    【为什么要实测而不是写死】
+    H3-Image 要跑起来需要两样东西同时就位：
+      1. 本机 ComfyUI 的核心节点 MiniMaxH3ImageConditioning
+         （该节点需要 ComfyUI >= 0.45.0）
+      2. 3 个权重文件（DiT 21GB / Qwen3-VL-32B 27GB / Image VAE 1.17GB）
+         且**必须下完**（半截文件会被 safetensors 头检查漏判）
+
+    任一不满足时，前端把该模型标成「不可用」并显示**具体缺什么**，
+    而不是让用户选完才在跑图时炸掉、或静默失败。
+
+    【探测失败 ≠ 缺节点】
+    ComfyUI 忙的时候探测会超时。此时返回 probe_complete=False，
+    前端显示「暂时无法探测本机 ComfyUI 能力」而不是断言「缺节点」。
+    """
+    nodes_available, probe_complete = await probe_h3_image_nodes()
+    # 【没问全时传 None，而不是 False】
+    # False = 确认节点不在（可以断言「本机 ComfyUI 版本过低」）；
+    # None  = 探测超时、不知道（界面只能说「暂时无法探测」）。
+    # 权重探测是纯磁盘操作，不受 ComfyUI 忙闲影响 —— 照样如实报告。
+    node_state = (nodes_available if probe_complete else None)
+    models = {}
+    for key, m in h3img.H3_IMAGE_MODELS.items():
+        missing = h3img.missing_weights(m)
+        weights_available = not missing
+        cap = h3img.h3_image_capability(node_state, weights_available,
+                                        missing)
+        models[key] = {
+            "label": m["label"],
+            "unet": m["unet"],
+            "clip": m["clip"],
+            "vae": m["vae"],
+            "note": m["note"],
+            "warn": m["warn"],
+            "sampler": m["sampler"],
+            "scheduler": m["scheduler"],
+            "steps": m["steps"],
+            "cfg": m["cfg"],
+            "shift": m["shift"],
+            "supports_negative": m["supports_negative"],
+            "samplers": m["samplers"],
+            "schedulers": m["schedulers"],
+            # 实测可用性（前端据此置灰 + 显示缺失原因）
+            "available": cap["available"],
+            "nodes_available": cap["nodes_available"],
+            "weights_available": cap["weights_available"],
+            "missing": cap["missing"],
+            # 【锁定步数/CFG/采样器/调度器】
+            # H3-Image 的 guidance **固定为 1**（官方 6 步 PDD 蒸馏，
+            # 没有 CFG pass），步数与 PDD sigma 表绑定 —— 这两个参数
+            # 都不是「用户可调」的。
+            #
+            # 不锁的后果：用户把 CFG 拖到 8 -> ComfyUI 在 cfg>1 时会跑
+            # uncond 分支（负分支是 ConditioningZeroOut 零条件）
+            # -> 出图质量劣化，但界面零提示（Z-Image 踩过的同一个坑）。
+            #
+            # 复用前端已有的「params_locked_by_accel」机制 ——
+            # 那个开关本来是给「加速 LoRA 绑定的蒸馏档」用的，
+            # 语义完全一致（参数与模型内部 schedule 绑定，不能改）。
+            "params_locked_by_accel": True,
+        }
+    tiers = []
+    for key, megapixels in h3img.H3_IMAGE_RES_TIERS.items():
+        tiers.append({
+            "key": key,
+            "label": {"4mp": "4MP（官方模板默认）", "8mp": "8MP",
+                      "16mp": "16MP（原生直出上限）"}.get(key, key.upper()),
+            "megapixels": megapixels,
+            "max_direct_mp": h3img.H3_IMAGE_MAX_DIRECT_MP,
+        })
+    return {
+        "tiers": tiers,
+        "aspects": [{"key": k, "label": l, "ratio": list(ASPECT_NUM[k])}
+                    for k, l in ASPECT_MAP.items()],
+        "models": models,
+        "size_multiple": h3img.H3_IMAGE_SIZE_MULTIPLE,
+        "max_direct_mp": h3img.H3_IMAGE_MAX_DIRECT_MP,
+        "min_mp": h3img.H3_IMAGE_MIN_MP,
+        "default_tier": h3img.H3_IMAGE_DEFAULT_TIER,
+        "default_model": h3img.H3_IMAGE_DEFAULT_MODEL,
+        # 参考图上限（官方能力 16 张；官方占位标记是 <Picture N>）
+        "max_ref_images": h3img.H3_IMAGE_MAX_REF_IMAGES,
+        "min_ref_images": h3img.H3_IMAGE_MIN_REF_IMAGES,
+        "placeholder_example": h3img.H3_IMAGE_PLACEHOLDER,
+        # LoRA：官方暂未发布 H3-Image 的 LoRA —— 界面留位但明确说明
+        "lora_supported": False,
+        "lora_note": "MiniMax-H3-Image 官方暂未发布 LoRA，"
+                     "本面板已预留 LoRA 入口但暂无可选权重。",
+        # 本次探测是否问全（False = ComfyUI 忙/不可达，不能断言缺节点）
+        "probe_complete": probe_complete,
+        # 官方原生 16MP 各比例尺寸（界面提示用）
+        "native_sizes": {k: list(v) for k, v in h3img.H3_IMAGE_NATIVE_SIZES.items()},
+    }
+
+
 async def api_image_options(request):
     """GET /api/image-options —— 图像面板可选项（含每个模型版本的推荐参数）"""
     tiers = []
@@ -3850,6 +4151,12 @@ async def api_image_options(request):
         # min=16 max=16384 step=16）
         "size_min": Z_IMAGE_SIZE_MIN,
         "size_max": Z_IMAGE_SIZE_MAX,
+        # MiniMax-H3-Image 独立的一套（文生图 + 图片编辑共用）
+        "h3image": await _h3_image_options_payload(),
+        # 【功能位】前端 web/app.js 的 loadImageOptions() 读 data.features
+        # 来判断「后端是否已支持某族」—— 之前这个字段只在 /api/status 里，
+        # 两处不同源 -> 前端拿到的永远是旧值。
+        "features": SERVER_FEATURES,
         # Qwen-Image 2.1 独立的一套（文生图 + 图片编辑共用）
         "qwen": {
             "tiers": qwen_tiers,
@@ -4142,7 +4449,16 @@ async def api_image_loras(request):
     base = request.query.get("base", "") or ""
     qwen = lora_registry.is_qwen_base(base)
     moss = lora_registry.is_moss_base(base)
-    if moss:
+    h3image = lora_registry.is_h3image_base(base)
+    if h3image:
+        # 【MiniMax-H3-Image：官方暂未发布该模型的 LoRA】
+        # 返回**空清单**（而不是掉进 else 分支拿 Z-Image 族的清单 ——
+        # 那样用户能在 H3-Image 面板选到 Z-Image 的 LoRA：
+        # 底模结构不同，ComfyUI 会静默丢弃 = 选了等于没选）。
+        available = []
+        incompatible = []
+        acceleration = []
+    elif moss:
         available = lora_registry.list_moss_effect_loras()
         incompatible = lora_registry.list_moss_incompatible_loras()
         acceleration = [item for item in lora_registry.list_moss_image_loras()
@@ -6254,6 +6570,19 @@ async def main():
                 '[access] %(message)s'))
             _alog.addHandler(_h)
         print("[access] access log 已启用")
+    # 进程退出时关闭探测用的长连接 session（否则 aiohttp 会打
+    # "Unclosed client session" 警告）。
+    #
+    # 【注册时机】必须在 runner.setup() **之前** —— setup() 之后
+    # app.on_shutdown / on_cleanup 会被冻结（FrozenList），
+    # 再 append 会抛 "Cannot modify frozen list."。
+    async def _close_probe_session(_app):
+        global _H3_IMAGE_PROBE_SESSION
+        sess = _H3_IMAGE_PROBE_SESSION
+        _H3_IMAGE_PROBE_SESSION = None
+        if sess is not None and not sess.closed:
+            await sess.close()
+    app.on_cleanup.append(_close_probe_session)
     await runner.setup()
     site = web.TCPSite(runner, CFG["host"], CFG["port"])
     await site.start()
