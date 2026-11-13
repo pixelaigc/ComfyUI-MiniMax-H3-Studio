@@ -353,7 +353,38 @@ POST /api/jobs  mode=t2i_h3image
 | `evidence/h3image-i2i-panel.png` | H3-Image 图片编辑面板（含参考图区） |
 | `evidence/h3image_browser_console.json` | console 错误 / 网络请求 / 面板状态快照 |
 
-**（g）顺带修掉的既有 bug**
+**（g）提交链路端到端**
+
+```
+# 文生图：正常建单 -> worker 执行 -> 明确的中文失败原因
+POST /api/jobs  mode=t2i_h3image
+→ HTTP 200 {"id":"e536010d3ccb","status":"queued"}
+→ status: failed
+  error: 本机 ComfyUI 缺少 H3-Image 核心节点 MiniMaxH3ImageConditioning，无法运行 H3-Image。
+         原因：该节点需要 ComfyUI >= 0.45.0（本机版本过低）。
+         解决：升级 ComfyUI 到 0.45.0+，或安装提供该节点的插件，然后重试。
+
+# 图片编辑：参考图缺失 -> 正确的参数校验拦截（不是 500）
+POST /api/jobs  mode=i2i_h3image  （无参考图）
+→ HTTP 400 {"error":"H3-Image 图片编辑至少需要 1 张参考图，当前 0 张（参考图必须来自素材库）",
+             "code":"ref_required"}
+```
+
+**（h）节点探测稳定性**
+
+初版探测用「每次新建 ClientSession + 3 秒超时」，实测**约 1/6 概率整次卡满 3 秒超时**，
+界面因此在「缺节点」与「暂时无法探测」之间抖动（curl 同一 URL 始终 1ms —— 不是 ComfyUI 慢）。
+
+根因（实测定位）：**同一 session 内复用连接 5/5 成功、每次 0.00s；
+每次新建 session 则前几次卡满 3 秒**。
+改为**模块级长连接 session 复用 + 60 秒结果缓存**后：
+
+```
+连续 8 次探测：probe_complete=True nodes_available=False weights_available=True  (8/8 一致)
+/api/image-options 响应耗时：0.0015s / 0.0052s / 0.0013s
+```
+
+**（i）顺带修掉的既有 bug**
 
 截图里右侧任务区显示字面量 `undefined`。查证为**既有 bug**（`git show HEAD:web/app.js`
 确认 HEAD 就有）：空态文案映射表 `{active:..., done:...}[tab]` **没有 `all` 键** →
@@ -405,11 +436,65 @@ POST /api/jobs  mode=t2i_h3image
 | 浏览器证据 | `evidence/h3image-t2i-panel.png` / `evidence/h3image-i2i-panel.png` / `evidence/h3image_browser_console.json` |
 | 调研证据 | `evidence/h3image_comfy_backport_feasibility.md`（回移植可行性） / `evidence/h3image_studio_integration_points.md`（Studio 接入点清单） |
 
-**改动规模**：13 个文件，+814 / −83 行（不含新文件 `h3image.py` 约 600 行）。
+**改动规模**：15 个文件（含 2 个测试文件），+1990 / −83 行（不含新文件 `h3image.py` 631 行）。
 
-**分支**：`local/feature/h3-image`
+**分支**：`local/feature/h3-image`（两个提交）
+| 提交 | 内容 |
+|---|---|
+| `84da697` | `feat(h3-image): 文生图/图片编辑接入 MiniMax-H3-Image 模型` —— 主实现 |
+| `68b6f54` | `fix(agent): list_modes 超长 + H3-Image 缺 negative_ok + 模式数断言改动态` |
+
 **worktree**：`/root/projects/h3studio-h3image`（基于 `local/maintainer` @ `3ecbb13`）
 **未做**：未合并主线、未部署 8190、未重启任何线上服务、未改动 ComfyUI 任何文件。
+
+---
+
+## 7.1 回归测试对比
+
+同一批 20 个测试文件（覆盖后端生成类型 / Agent 契约 / 前端媒体语义 / LoRA 白名单 / 分页等），
+在**基线**（`local/maintainer` @ `3ecbb13`）与**本分支**分别跑：
+
+| | 结果 |
+|---|---|
+| 基线 `local/maintainer` | **2 failed / 534 passed / 4 skipped** |
+| 本分支 | **4 failed / 532 passed / 4 skipped** |
+| **新增失败** | **0 个** |
+
+失败的 4 项构成：
+
+| 失败项 | 归属 | 证据 |
+|---|---|---|
+| `test_studio.py::test_scanner_only_returns_z_image_loras` | **既有失败**（本机 LoRA 目录扩容：197 个 Z-Image 相关 LoRA > 断言阈值 120） | 在基线 `local/maintainer` 上跑同一测试**同样失败**（同样报 197 not less than 120） |
+| `test_page_size.py::test_current_page_highlighted` | **既有 flaky**（playwright `wait_for_function` 15s 超时） | 基线单独跑 `tests/test_page_size.py` 也失败 2 项 |
+| `test_page_size.py::test_auto_refresh_keeps_page_size` | **既有 flaky**（同上） | 本次 diff **完全未触及**任何分页代码（`git diff \| grep pageSize\|donePage\|renderDonePagination` → 0 命中） |
+| `test_page_size.py::test_change_page_size_resets_to_first_page` | **既有 flaky**（同上） | 基线 / 分支失败项在两次运行间有漂移 —— 典型的时序 flaky 特征 |
+
+开发过程中曾出现的 3 个**真实**失败（已全部修复）：
+
+| 失败 | 根因 | 修法 |
+|---|---|---|
+| `test_builders_and_job_modes_are_consistent`：`11 != 9` | 测试写死了「9 个模式」，新增 2 个 mode 后变成假失败 | 改成**动态断言**（与后端 `BUILDERS` 逐项一致 + 基础 9 个一个不能少）—— 写死数字会在每次新增模式时产生假失败 |
+| `test_list_modes_result_fits_tool_result_limit`：`2347 > 2000` | 新增 2 个 mode 让 `list_modes` 结果超出 `TOOL_RESULT_LIMIT`，**工具结果会被截断** —— Agent 会以为工具坏了然后重复调用（实测打转 3 次） | 压缩到 1998 字符（见下） |
+| `test_nine_modes_and_longfilm_marked_manual_only`：`11 != 9` | 同上（前端侧） | 同上 |
+
+`list_modes` 的压缩明细（信息不减）：
+
+| 手法 | 省下 |
+|---|---|
+| `image_families`：`dict` → 紧凑字符串 `"族:模型1,模型2 | 档位1,档位2"`（键名 `models`/`resolutions` 原本在 4 个族里重复 8 次） | ~120 字符 |
+| `notes`：删掉与顶层字段**完全重复**的三条（视频时长范围 / 音乐时长范围 / 视频分辨率都已有独立顶层字段） | ~44 字符 |
+| `requires`：去掉实现细节括号（`（asset_id）`）；槽位信息由 `slots` 承载 | ~35 字符 |
+| `aspects`：列表 → 字符串（Agent 内部用 `agent_schema.mode_aspects()`，不依赖结构） | ~23 字符 |
+| `family` → `f`（notes 里说明含义） | ~25 字符 |
+
+**同时修掉一个语义缺失**（比长度更严重）：H3-Image 的模式条目**没有 `negative_ok` 字段**
+（其它图像模式都有）—— 模型因此不知道「H3-Image 的负面提示词无效」，
+而这恰恰是最易踩的坑（guidance 固定 1，无 CFG pass）。改走标准
+`negative_prompt_support` 路径后自动得到 `negative_ok: false`。
+
+被压缩的字段里有两个**没有压**，因为它们是公开契约：
+`duration_field`（测试断言 `by_mode["t2a"].get("duration_field") == "max_duration"`）
+与 `media`（保持语义清晰）。
 
 ---
 
