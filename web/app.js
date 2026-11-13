@@ -3361,7 +3361,7 @@ function renderJobBatches(job) {
     const thumb = out && !failed
       ? `<div class="job-batch-thumb"><img src="${outputUrl(job, out)}" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
       : `<div class="job-batch-thumb ${failed ? "failed" : ""}">${
-          failed ? (batch.error || "失败").slice(0, 60)
+          failed ? friendlyError(batch.error).slice(0, 60)
           : batch.status === "running" ? `${Math.round((batch.progress || 0) * 100)}%`
           : batch.status === "canceled" ? "已取消"
           : "排队中"}</div>`;
@@ -3564,7 +3564,7 @@ function jobCard(job) {
       <div class="progress-text">${pctText}</div>
     </div>`;
   } else if (job.status === "failed") {
-    preview = `<div class="progress-wrap"><div class="err-text">✕ ${job.error || "生成失败"}</div></div>`;
+    preview = `<div class="progress-wrap"><div class="err-text">✕ ${friendlyError(job.error)}</div></div>`;
   } else if (job.status === "canceled") {
     preview = `<div class="progress-wrap"><div class="progress-text">已取消</div></div>`;
   }
@@ -5637,6 +5637,52 @@ setInterval(() => {
   if (state.page !== "system") return;
   scheduleRefresh("hardware", () => refreshHardware());
 }, 3000);
+
+// ---------- 错误文案（不展示原始 Python 异常文本）----------
+//
+// 【为什么前端也要做一层 —— 2026-11-13 修】
+// 服务端已经不再把原始异常文本写进 jobs.error（见 server.py 的
+// `_user_facing_error`）。但前端这一层是**兜底**：
+//   * 老任务（修复前建的）库里存的**就是**原始 Python 文本；
+//   * 任何新引入的写入路径都可能漏掉服务端那一层。
+//
+// 【判据】Python 异常文本的特征：
+//   * 形如 `ValueError: xxx` / `AttributeError: xxx`（异常类名 + 冒号）
+//   * 或含 `'str' object has no attribute 'get'` 这类**双引号包裹的
+//     类型名 + 属性名**。
+// 命中任一条 -> 不展示原文，换成可读中文。
+//
+// 【原则】宁可**信息少一点**，也不要给用户一段他看不懂也修不了的
+// Python 报错 —— 原始文本照样在服务端日志里。
+const PY_EXCEPTION_PATTERNS = [
+  /^[A-Z][A-Za-z_]*(Error|Exception|Interrupt|Warning)\b\s*[:：]/,  // ValueError: ...
+  /'[^']+' object has no attribute/,                                     // 'str' object has no attribute 'get'
+  /"[^"]+" object has no attribute/,
+  /\bTraceback \(most recent call last\)/,
+  /File "[^"]+", line \d+/,                                               // traceback 行
+];
+
+function looksLikePythonTraceback(text) {
+  if (!text) return false;
+  const t = String(text);
+  return PY_EXCEPTION_PATTERNS.some((re) => re.test(t));
+}
+
+function friendlyError(text) {
+  const raw = text == null ? "" : String(text).trim();
+  if (!raw) return "生成失败";
+  if (!looksLikePythonTraceback(raw)) return raw;
+  // 是原始 Python 异常文本 -> 不展示原文。
+  // 用户能做的动作：重试 / 改参数 / 看日志。
+  return "生成失败（服务端未返回可读原因）。请稍后重试；若反复失败，请改用「复用参数」重新生成，或查看服务端日志。";
+}
+
+// 【测试可见性】把这两个函数挂到 window 上 —— 让前端测试能**执行本文件里
+// 真实的实现**，而不是在测试里抄一份（抄一份的话，测试就测不到本文件的
+// 改动，变异「改 app.js」不会被抓住）。
+// 不影响生产行为（app.js 里没有同名全局变量）。
+window.__h3FriendlyError = friendlyError;
+window.__h3LooksLikePythonTraceback = looksLikePythonTraceback;
 
 // ---------- 接续生成（continuation）----------
 //
