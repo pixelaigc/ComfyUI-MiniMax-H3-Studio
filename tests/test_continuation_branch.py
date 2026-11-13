@@ -188,12 +188,25 @@ class TestBranchLatentCoords(BranchTestBase):
                             "C1 绝不能读兄弟分支 B2 的潜空间")
 
     def test_source_latent_path_is_the_upstream_file(self):
-        """读回路径必须精确指向上游那一个文件。"""
+        """读回路径必须精确指向上游那一个文件。
+
+        【带内容指纹】读回路径是上游那份潜空间的**带指纹副本**
+        （内容变 -> 路径变 -> 破 ComfyUI 节点缓存）。副本与原文件
+        在同一目录、同一份字节 —— 指的还是**上游那一个文件**。
+        """
         a = self._make_job(self._params())
         latent_a = self._write_latent(a)
         b1 = self._branch(a)
         info = self._info(b1)
-        self.assertEqual(info["source_latent_path"], str(latent_a))
+        read_target = info["source_latent_path"]
+        self.assertEqual(os.path.dirname(read_target),
+                         str(latent_a.parent),
+                         "读回路径必须落在上游自己的目录里")
+        self.assertTrue(os.path.basename(read_target).startswith("stage_00000_"),
+                        f"读回路径应带内容指纹后缀：{read_target}")
+        self.assertEqual(Path(read_target).read_bytes(),
+                         latent_a.read_bytes(),
+                         "读回的副本内容必须与上游那份一致")
 
     def test_context_carries_the_exact_read_target(self):
         """接续上下文必须带上「读的是哪一份」的精确路径。
@@ -210,7 +223,11 @@ class TestBranchLatentCoords(BranchTestBase):
         ci = ctx["continuation"]
         self.assertEqual(ci["source_latent_run_id"], cs.segment_run_id(a))
         self.assertEqual(ci["source_latent_stage"], 0)
-        self.assertEqual(ci["source_latent_path"], str(latent_a))
+        # 读回目标 = 上游那份的带指纹副本（同一目录、同一份字节）。
+        self.assertEqual(os.path.dirname(ci["source_latent_path"]),
+                         str(latent_a.parent))
+        self.assertEqual(Path(ci["source_latent_path"]).read_bytes(),
+                         latent_a.read_bytes())
 
     def test_full_video_card_continues_from_its_own_segment(self):
         """对**完整视频**再点接续 -> 读回的是**那一段自己**的潜空间。
@@ -231,7 +248,8 @@ class TestBranchLatentCoords(BranchTestBase):
         self.assertTrue(ctx["ok"])
         ci = ctx["continuation"]
         self.assertEqual(ci["source_latent_run_id"], cs.segment_run_id(a))
-        self.assertEqual(ci["source_latent_path"], str(latent_a))
+        self.assertEqual(os.path.dirname(ci["source_latent_path"]),
+                         str(latent_a.parent))
         self.assertEqual(ci["stage_index"], 1, "下一段 = 本段 + 1")
 
     def test_front_end_cannot_forge_the_read_target(self):
@@ -258,7 +276,11 @@ class TestBranchLatentCoords(BranchTestBase):
         info = params["continuation"]
         self.assertEqual(info["source_latent_run_id"], cs.segment_run_id(b1),
                          "服务端必须用上游记录里的真实坐标")
-        self.assertEqual(info["source_latent_path"], str(latent_b1))
+        # 读回目标落在**上游自己的目录**里（不是前端伪造的那个）。
+        self.assertEqual(os.path.dirname(info["source_latent_path"]),
+                         str(latent_b1.parent))
+        self.assertEqual(Path(info["source_latent_path"]).read_bytes(),
+                         latent_b1.read_bytes())
 
 
 class TestBranchLineage(BranchTestBase):

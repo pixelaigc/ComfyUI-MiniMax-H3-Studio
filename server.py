@@ -1211,6 +1211,21 @@ class Worker:
         # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
         segment_rel = str(video.get("file") or "")
 
+        # 【本段潜空间被重写后，清掉同坐标的旧指纹副本】
+        # 本段刚跑完 -> `H3RelayLatentSave` 重新写了 `stage_00000.safetensors`
+        # -> 内容变了 -> 旧指纹副本（内容指纹已过期）不再对应任何有效内容。
+        # 不清会随每次重跑堆积一份 4.8MB 的死副本。
+        try:
+            own_run_id, own_stage = cont.latent_coords(info)
+            if own_run_id:
+                removed = cont_service.cleanup_fingerprint_copies(own_run_id,
+                                                                  own_stage)
+                if removed:
+                    print(f"[接续] 清理本段旧指纹副本 {removed} 个 "
+                          f"({own_run_id}/stage_{own_stage:05d})")
+        except Exception as ce:
+            print(f"[worker] 清理指纹副本失败（不影响本段产物）: {ce}")
+
         # 把本段记到**自己**的任务记录里（不再往链首段的共享账本里塞 ——
         # 共享账本会让兄弟分支互相污染，见 _record_segment_rel 的说明）。
         await asyncio.to_thread(_record_segment_rel, job_id, segment_rel)
@@ -1856,8 +1871,16 @@ def _prepare_continuation_params(params: dict) -> str:
         return mismatch
 
     # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
-    source_path = str(cont.stage_file_path(cont_service.comfy_output_dir(),
-                                           source_run_id, source_latent_stage))
+    #
+    # 【⚠ 带内容指纹的副本 —— 破 ComfyUI 的节点缓存】
+    # ComfyUI 的缓存 key 只看**节点输入**（run_id / stage_index /
+    # explicit_path 三个字符串），**不看文件内容变没变**。
+    # 上一段潜空间被重跑替换后，这三个值一字未变 -> 命中缓存 ->
+    # `H3RelayLatentLoad` 压根没被调用 -> 返回**老 latent** ->
+    # 新一段实际接的是上一版的画面，且**不报错**。
+    # 把内容指纹编进路径即可破缓存（借鉴 nonebot 咏唱 h3）。
+    source_path = str(cont_service.ensure_fingerprinted_copy(
+        source_run_id, source_latent_stage))
 
     # 外观锚：链首段那一份（防长程漂移）。链首段的坐标同样从它的记录算。
     anchor_path = ""
@@ -1873,8 +1896,9 @@ def _prepare_continuation_params(params: dict) -> str:
             if head_run_id and cont_service.stage_exists(head_run_id, head_stage):
                 anchor_run_id = head_run_id
                 anchor_stage = head_stage
-                anchor_path = str(cont.stage_file_path(
-                    cont_service.comfy_output_dir(), head_run_id, head_stage))
+                # 锚同样带指纹 —— 它也是「读一个可能变过的文件」。
+                anchor_path = str(cont_service.ensure_fingerprinted_copy(
+                    head_run_id, head_stage))
 
     # 本段的段号 = 上游段号 + 1
     stage_index = source_stage + 1
@@ -1992,8 +2016,22 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
         else:
             # 接续段：本段也要有**自己的**落盘目录（接力棒写这里）。
             # 上游坐标由 _prepare_continuation_params 权威算好并带入。
-            info.setdefault("latent_run_id", cont.segment_run_id(job_id))
-            info.setdefault("latent_stage", 0)
+            #
+            # 【⚠ 这里必须**强制覆盖**，不能用 setdefault】
+            # `latent_run_id` 是「**本段自己**的落盘目录」—— 它必须由
+            # **本段的任务 id** 派生，一段一个目录。
+            #
+            # 旧实现用 setdefault：如果 params 里已经带了一个
+            # `latent_run_id`（例如「重试」把源任务的 params 整份拷过来，
+            # 或前端回传了带坐标的上下文），新任务就会**沿用别人的目录**
+            # -> 写同一个 `stage_00000.safetensors` -> **覆盖上游的潜空间**。
+            # 这与 D1 修掉的「分叉分支互相覆盖」是**同一类缺陷**：
+            # 落盘坐标必须与「产出它的那一段」一一对应。
+            #
+            # 证据（tests/test_continuation_retry.py）：
+            #   重试 A -> 新任务沿用 A 的 latent_run_id -> A 的潜空间被覆盖。
+            info["latent_run_id"] = cont.segment_run_id(job_id)
+            info["latent_stage"] = 0
             params["continuation"] = info
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1

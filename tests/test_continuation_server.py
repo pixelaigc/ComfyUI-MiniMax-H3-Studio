@@ -205,7 +205,15 @@ class TestChainBookkeeping(ContinuationServerTestBase):
         # 读回坐标必须是**上游自己那一份**
         self.assertEqual(info["source_latent_run_id"], run_id)
         self.assertEqual(info["source_latent_stage"], 0)
-        self.assertEqual(info["source_latent_path"], str(stage_file))
+        # 读回路径 = 上游那份的**带指纹副本**（内容变 -> 路径变 ->
+        # 破 ComfyUI 节点缓存）。目录必须落在上游自己的目录里。
+        self.assertEqual(os.path.dirname(info["source_latent_path"]),
+                         str(stage_file.parent))
+        self.assertTrue(
+            os.path.basename(info["source_latent_path"]).startswith("stage_00000_"),
+            f"读回路径应带内容指纹后缀：{info['source_latent_path']}")
+        self.assertEqual(Path(info["source_latent_path"]).read_bytes(),
+                         stage_file.read_bytes())
         stage_file.unlink()
 
 

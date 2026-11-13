@@ -34,7 +34,9 @@ Relay-Kit 建的目录撞车），段号就是 stage_index。
 
 from __future__ import annotations
 
+import hashlib
 import os
+import shutil
 from pathlib import Path
 
 from . import continuation as cont
@@ -220,6 +222,145 @@ def stage_exists(run_id: str, stage_index: int) -> bool:
 
 
 # ------------------------------------------------------------------
+# 内容指纹（破 ComfyUI 的节点缓存）
+# ------------------------------------------------------------------
+# 【为什么需要这一层 —— D1 调研报告第 4 项】
+#
+# ComfyUI 的节点缓存 key = 节点**输入**的哈希，**不看输入指向的文件
+# 内容有没有变**（见 comfy_execution/caching.py 的
+# `get_immediate_node_signature`：对每个 input 取「链路 or 字面值」，
+# 文件路径只是一个普通字符串）。
+#
+# 后果（nonebot 咏唱 h3 踩过并记录在案）：
+#   上一段潜空间被**重跑**替换后，`H3RelayLatentLoad` 的
+#   run_id / stage_index / explicit_path 三项**一字未变**
+#   -> 命中缓存 -> 节点**压根没被调用**（日志里连「已读 stage N」
+#   那一行都没有）-> 返回**老 latent** -> 新一段实际接的是**上一版**的
+#   画面。**不报错，界面全程显示成功。**
+#
+# 【解法 —— 借鉴 nonebot 的内容指纹机制】
+# 把「内容的指纹」编进**读回用的文件路径**：
+#   内容变 -> 指纹变 -> 路径变 -> `explicit_path` 这个输入必然变
+#   -> 缓存 key 必然变 -> 节点必然重跑。
+#
+# 本项目与 nonebot 的差异：nonebot 是「把上一段 latent 拷成
+# `stage_<N>_<指纹>.safetensors` 的副本」；本项目的落盘坐标是
+# **每段一个专属目录**（`h3studio_s<job_id>`），同一坐标**天然不会**
+# 被别的段覆盖 —— 所以只需给「读回路径」加指纹后缀：
+#   `stage_00000_<指纹>.safetensors`
+# 落盘仍写固定名 `stage_00000.safetensors`（Relay-Kit 节点自己算路径，
+# 改不了），读回时另存一份带指纹的副本并把那个路径交给节点。
+# 副本与原文件在同一目录、大小相同（硬链接优先，跨设备时退回复制）。
+def latent_fingerprint(path: str | os.PathLike) -> str:
+    """算潜空间文件的**内容指纹**（8 位 md5）。
+
+    与 nonebot 咏唱 h3 的 `_latent_fingerprint` 同一口径：
+      * 文件**大小**进指纹（追加 1 字节必变）；
+      * 大文件只读头 8MB + 尾 8MB（不必整份读完 —— 一份约 36MB，
+        每次执行都全读会明显拖慢）。
+
+    ⚠️ 指纹**不是**安全哈希，只是「内容变了大概率变」的缓存键。
+    碰撞概率对本用途（破节点缓存）完全够用。
+    """
+    p = Path(path)
+    try:
+        size = p.stat().st_size
+    except OSError:
+        return "missing"
+    h = hashlib.md5()
+    h.update(str(size).encode())
+    try:
+        with open(p, "rb") as f:
+            h.update(f.read(8 * 1024 * 1024))
+            if size > 16 * 1024 * 1024:
+                f.seek(-8 * 1024 * 1024, os.SEEK_END)
+                h.update(f.read(8 * 1024 * 1024))
+            else:
+                f.seek(size // 2)
+                h.update(f.read(8 * 1024 * 1024))
+    except OSError:
+        return "unreadable"
+    return h.hexdigest()[:8]
+
+
+def fingerprinted_stage_path(run_id: str, stage_index: int) -> Path:
+    """读回用的**带指纹副本**路径（不存在时返回原路径）。
+
+    原路径： `relay_kit/<run_id>/stage_00000.safetensors`
+    副本：   `relay_kit/<run_id>/stage_00000_<指纹>.safetensors`
+
+    原文件不存在 -> 直接返回原路径（让调用方按老路径报错，
+    错误信息里仍然是那个真实路径）。
+    """
+    src = stage_path(run_id, stage_index)
+    if not src.is_file():
+        return src
+    fp = latent_fingerprint(src)
+    if fp in ("missing", "unreadable"):
+        return src
+    return src.with_name(f"{src.stem}_{fp}{src.suffix}")
+
+
+def ensure_fingerprinted_copy(run_id: str, stage_index: int) -> Path:
+    """把段文件复制/硬链接成**带指纹的副本**，返回副本路径。
+
+    副本已存在且指纹一致时直接复用（幂等）。
+    写副本失败时返回**原路径**（不阻断接续 —— 退化成「可能命中缓存」
+    的旧行为，好过直接失败）。
+    """
+    src = stage_path(run_id, stage_index)
+    if not src.is_file():
+        return src
+    fp = latent_fingerprint(src)
+    if fp in ("missing", "unreadable"):
+        return src
+    dst = src.with_name(f"{src.stem}_{fp}{src.suffix}")
+    try:
+        if dst.is_file() and dst.stat().st_size == src.stat().st_size:
+            return dst
+    except OSError:
+        pass
+    try:
+        # 硬链接优先（同文件系统，零拷贝）；跨设备/失败则退回复制。
+        try:
+            if dst.exists():
+                dst.unlink()
+            os.link(src, dst)
+        except OSError:
+            shutil.copy2(src, dst)
+    except OSError:
+        return src
+    return dst
+
+
+def cleanup_fingerprint_copies(run_id: str, stage_index: int) -> int:
+    """清掉同坐标下**非当前指纹**的旧副本（防止无限堆积）。
+
+    返回清掉的个数。副本命名规则与 ensure_fingerprinted_copy 一致。
+    """
+    src = stage_path(run_id, stage_index)
+    if not src.parent.is_dir():
+        return 0
+    keep = ""
+    try:
+        fp = latent_fingerprint(src)
+        if fp not in ("missing", "unreadable"):
+            keep = f"{src.stem}_{fp}{src.suffix}"
+    except OSError:
+        keep = ""
+    removed = 0
+    for candidate in src.parent.glob(f"{src.stem}_*.safetensors"):
+        if candidate.name == keep:
+            continue
+        try:
+            candidate.unlink()
+            removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+# ------------------------------------------------------------------
 # 链状态（从任务记录反推）
 # ------------------------------------------------------------------
 def chain_info(params: dict) -> dict:
@@ -397,10 +538,13 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
     # 接力棒文件的**绝对路径** —— 读回必须精确到这一个文件。
     # 服务端提交时会用同样的规则重算（不信任前端），但这里也带上，
     # 便于排查「到底读的是哪一份」。
+    #
+    # 【带内容指纹】与 _prepare_continuation_params 同口径：内容变则
+    # 路径变 -> ComfyUI 节点缓存必然失效（否则会拿回上一版的 latent）。
     source_path = ""
     if source_run_id:
-        source_path = str(cont.stage_file_path(comfy_output_dir(), source_run_id,
-                                               source_latent_stage))
+        source_path = str(ensure_fingerprinted_copy(source_run_id,
+                                                    source_latent_stage))
 
     continuation_info = {
         "chain_id": state["chain_id"],
