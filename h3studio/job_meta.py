@@ -48,6 +48,7 @@ MiniMaxH3TurboLoRA.lora_name = DMAD 权重、strength = 1.0）。
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from . import video_models as vmodels
 
@@ -106,12 +107,29 @@ def _fixed_accel_lora_display(key: str) -> str:
 def _effect_lora_display(name: str) -> str:
     """效果 LoRA 的权重文件名 -> 显示名。
 
-    用 h3studio.loras 的真实目录（LORA_CATALOG）查 display ——
-    与图像面板下拉里显示的是同一份（前端拿的就是服务端下发的这份清单）。
+    两族分开查：
+      * **H3 视频**效果 LoRA -> `h3_effect_loras.discover_effect_loras()`
+        （它的显示名来自权重旁边的同名 .md 文档标题）
+      * **图像**效果 LoRA -> `loras.LORA_CATALOG` 的 display
+
     查不到时**原样返回文件名**（不编造名字）。
     """
     if not name:
         return ""
+    # H3 视频族
+    try:
+        from . import h3_effect_loras as effect_registry
+        for entry in effect_registry.discover_effect_loras():
+            if entry["name"] == name:
+                from . import h3_effect_lora_docs as doc_parser
+                doc = doc_parser.read_lora_doc(Path(entry["path"]))
+                display = str(doc.get("display") or "").strip()
+                if display:
+                    return display
+                return entry.get("display") or name
+    except Exception:
+        pass
+    # 图像族
     try:
         from . import loras as lora_registry
         catalog = getattr(lora_registry, "LORA_CATALOG", {}) or {}
@@ -210,6 +228,8 @@ def _t2v_summary(params: dict) -> dict:
         "fixed_lora_name": "",
         "fixed_lora_key": "",
         "fixed_lora_strength": None,
+        # 效果 LoRA（可多选）—— 列表，每项 {name, label, strength, trigger}
+        "effect_lora_labels": [],
         "source": "t2v_panel",
     }
     model_key = str(params.get("model_key") or "").strip()
@@ -255,6 +275,31 @@ def _t2v_summary(params: dict) -> dict:
             out["fixed_lora_strength"] = float(strength)
         except (TypeError, ValueError):
             out["fixed_lora_strength"] = float(fixed.get("recommended_strength", 1.0))
+
+    # 效果 LoRA（可多选，与加速 LoRA 并列共存）
+    #
+    # 任务卡片要显示「用了哪几枚效果 LoRA、各自强度」——
+    # 不显示的话用户无法从卡片确认效果 LoRA 是否真的挂上了。
+    for item in params.get("effect_loras") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("enabled") is False:
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 1.0
+        if strength <= 0:
+            continue
+        out["effect_lora_labels"].append({
+            "name": name,
+            "label": _effect_lora_display(name),
+            "strength": strength,
+            "trigger": str(item.get("trigger") or ""),
+        })
 
     return out
 
@@ -361,6 +406,14 @@ def _in_lora_registry(text: str) -> bool:
             return True
     except Exception:
         pass
+    # H3 视频效果 LoRA（扫盘发现的，不在静态注册表里）
+    try:
+        from . import h3_effect_loras as effect_registry
+        for entry in effect_registry.discover_effect_loras():
+            if entry["name"] == text:
+                return True
+    except Exception:
+        pass
     return False
 
 
@@ -420,7 +473,8 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
     if not isinstance(params, dict):
         params = {}
     mode = str(mode or "")
-    result = {"lora": None, "loras": None, "strength": None, "labels": []}
+    result = {"lora": None, "loras": None, "strength": None, "labels": [],
+              "effect_loras": None}
 
     # --- 图像模式：效果 LoRA 数组（params["loras"]） ---
     if mode.startswith("t2i") or mode.startswith("i2i"):
@@ -477,6 +531,30 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
                 strength = 1.0
             result["labels"].append(
                 f"工作流固定：{_fixed_accel_lora_display(fixed_key)} ×{strength:.2f}")
+        # 效果 LoRA（可多选，与加速 LoRA 并列共存）
+        raw_effect = params.get("effect_loras")
+        if isinstance(raw_effect, list) and raw_effect:
+            kept_effect = []
+            effect_labels = []
+            for item in raw_effect:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                if not name:
+                    continue
+                try:
+                    strength = float(item.get("strength", 1.0))
+                except (TypeError, ValueError):
+                    strength = 1.0
+                if strength <= 0:
+                    continue
+                kept_effect.append({"name": name, "strength": strength,
+                                    "trigger": str(item.get("trigger") or "")})
+                effect_labels.append(
+                    f"效果 {_effect_lora_display(name)} ×{strength:.2f}")
+            if kept_effect:
+                result["effect_loras"] = kept_effect
+                result["labels"].extend(effect_labels)
         return result
 
     # 旧路径：params["lora"]

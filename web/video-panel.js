@@ -64,6 +64,9 @@
     fixedAccelLora: "",
     accelLora: "",          // 【单选】当前选中的加速 LoRA key（空 = 不额外挂）
     accelLoraStrength: 1.0, // 【单选】该加速 LoRA 的强度
+    // 效果 LoRA（可多选，与加速 LoRA 并列共存）
+    // [{name, strength, enabled, trigger}] —— 顺序 = 界面上的排列顺序
+    effectLoras: [],
     attention: "",
     twopass: {
       enabled: false,
@@ -613,6 +616,30 @@
     if (label) label.textContent = Number(videoState.accelLoraStrength).toFixed(2);
   }
 
+  // ------------------------------------------------------------ 效果 LoRA
+
+  /**
+   * 效果 LoRA 区块的渲染入口。
+   *
+   * 清单由**独立模块** `web/video-effect-lora.js` 负责（它自己调
+   * /api/video-effect-loras）。这里只做两件事：
+   *   1. 确保清单已按当前底模加载过
+   *   2. 把已选列表渲染出来
+   *
+   * 【为什么要单独一个模块】效果 LoRA 的交互（搜索 + 多选勾选 +
+   * 逐项滑杆 + 触发词）自成一块，塞进 video-panel.js 会让那个文件
+   * 继续膨胀。模块之间只通过 window.VIDEO_EFFECT_LORA 通信。
+   */
+  function renderEffectLoras() {
+    const eff = window.VIDEO_EFFECT_LORA;
+    if (!eff) return;
+    // 底模换了要重拉（兼容性随底模变）
+    if (eff.store.model !== videoState.model) {
+      eff.load(videoState.model);
+    }
+    eff.render();
+  }
+
   // ------------------------------------------------------------ 注意力
 
   /**
@@ -1009,6 +1036,7 @@
       ["输出尺寸", renderSizeFields],
       ["固定加速LoRA", renderFixedLoraNote],
       ["加速LoRA", renderAccelLoraSelect],
+      ["效果LoRA", renderEffectLoras],
       ["注意力", renderAttention],
       ["采样参数", renderSampling],
       ["二采", renderTwopass],
@@ -1039,6 +1067,13 @@
       // 【单选】只存一个加速 LoRA + 它的强度
       accel_lora: videoState.accelLora,
       accel_lora_strength: Number(videoState.accelLoraStrength),
+      // 效果 LoRA（可多选，各自带强度 + 触发词）
+      effect_loras: (videoState.effectLoras || []).map(it => ({
+        name: it.name,
+        strength: Number(it.strength),
+        enabled: it.enabled !== false,
+        trigger: it.trigger || "",
+      })),
       attention: videoState.attention,
       twopass: { ...videoState.twopass,
         sigma_refine: { ...(videoState.twopass.sigma_refine || {}) },
@@ -1104,6 +1139,29 @@
         videoState.width, videoState.height);
     }
     if (cfg.fixed_accel_lora) videoState.fixedAccelLora = cfg.fixed_accel_lora;
+    // 效果 LoRA（可多选）—— 复用参数时一并恢复
+    //
+    // ⚠️ 【这里只「暂存」，不直接落地】
+    // 效果 LoRA 的清单是**另一个接口**（/api/video-effect-loras），
+    // 此刻还没到。直接落地的话，随后清单到达时的「按当前底模剔除」
+    // 无法区分「刚恢复的」和「本来就没有的」-> 会出现选中项随机丢失。
+    // 所以交给效果 LoRA 模块在清单到达后应用（stageRestore / restoreSelection）。
+    const eff = window.VIDEO_EFFECT_LORA;
+    if (eff && typeof eff.stageRestore === "function") {
+      eff.stageRestore(Array.isArray(cfg.effect_loras) ? cfg.effect_loras : []);
+    } else if (Array.isArray(cfg.effect_loras)) {
+      videoState.effectLoras = cfg.effect_loras
+        .filter(it => it && it.name)
+        .map(it => ({
+          name: String(it.name),
+          strength: Number(it.strength) || 1.0,
+          enabled: it.enabled !== false,
+          trigger: it.trigger || "",
+        }));
+    } else if (cfg.effect_loras === undefined) {
+      // 老配置没有这个字段 -> 清空（不能残留上一张卡片的值）
+      videoState.effectLoras = [];
+    }
     // 【单选】新格式
     //
     // 【为什么用 `!== undefined` 判「显式给了」】`cfg.accel_lora` 为
@@ -1150,14 +1208,20 @@
     if (cfg.shift_audio != null) videoState.shiftAudio = Number(cfg.shift_audio);
   }
 
-  function saveVideoConfig() {
+  function saveVideoConfig(override) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
       try {
+        // 【2026-11-13 效果 LoRA】override 是可选的「本次要写的配置」。
+        // 效果 LoRA 模块会传入它 —— 但**默认路径不传**，
+        // 此时用 collectConfig() 现读状态（它已经包含 effect_loras）。
+        const body = (override && typeof override === "object")
+          ? { ...collectConfig(), ...override }
+          : collectConfig();
         const resp = await fetch("/api/video-config", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(collectConfig()),
+          body: JSON.stringify(body),
         });
         if (!resp.ok) {
           const data = await resp.json().catch(() => ({}));
@@ -1405,6 +1469,17 @@
         enabled: true,
       });
     }
+    // 效果 LoRA（可多选）—— 与加速 LoRA 并列共存。
+    // 只带**启用且强度 > 0** 的项（强度 0 = 关闭，服务端也会再过滤一次）。
+    const effectLoras = (videoState.effectLoras || [])
+      .filter(it => it && it.name && it.enabled !== false
+                    && Number(it.strength) > 0)
+      .map(it => ({
+        name: it.name,
+        strength: Number(it.strength),
+        enabled: true,
+        trigger: it.trigger || "",
+      }));
     return {
       model_key: videoState.model,
       width: w,
@@ -1423,6 +1498,8 @@
       fixed_accel_lora: videoState.fixedAccelLora,
       // 【单选】最多一项
       accel_loras: accel,
+      // 效果 LoRA（可多选，与加速 LoRA 并列共存）
+      effect_loras: effectLoras,
       attention: videoState.attention,
       twopass: {
         enabled: !!videoState.twopass.enabled,
@@ -1545,6 +1622,9 @@
         videoState.model = e.target.value;
         renderModelNote();
         refreshAccelCompat();
+        // 效果 LoRA 的兼容性也随底模变 -> 重拉清单
+        const eff = window.VIDEO_EFFECT_LORA;
+        if (eff) eff.load(videoState.model);
         saveVideoConfig();
       });
     }

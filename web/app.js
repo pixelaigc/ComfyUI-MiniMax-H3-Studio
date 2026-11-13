@@ -2651,6 +2651,17 @@ function localModelInfo(mode, p) {
       out.fixed_lora_label = fixed.display || "";
       out.fixed_lora_name = fixed.name || "";
     }
+    // 效果 LoRA（可多选）—— 服务端没给 model_info 时（本地兜底路径）
+    // 从 params 直接读，标签用文件名（服务端权威清单已算好的 label 优先）。
+    out.effect_lora_labels = (p.effect_loras || [])
+      .filter(it => it && it.name && it.enabled !== false
+                    && Number(it.strength) > 0)
+      .map(it => ({
+        name: it.name,
+        label: it.display || it.name,
+        strength: Number(it.strength),
+        trigger: it.trigger || "",
+      }));
     return out;
   }
   // 旧路径视频：model = lora / standard，lora = ckpt850 / v4step600 / none
@@ -3254,6 +3265,10 @@ function reuseConfigFromJob(job, p, panel) {
     accel_lora_strength: (info.lora_strength != null)
       ? Number(info.lora_strength) : undefined,
     accel_loras: Array.isArray(p.accel_loras) ? p.accel_loras : [],
+    // 【2026-11-13 效果 LoRA】复用参数时把效果 LoRA 一起带回
+    // （连强度 + 触发词），否则「复用参数」后效果 LoRA 会丢空。
+    // 字段与服务端落库的 params["effect_loras"] 同名同结构。
+    effect_loras: Array.isArray(p.effect_loras) ? p.effect_loras : [],
     attention: info.attention_key || p.attention,
     twopass: p.twopass,
     // 【2026-11-12】采样参数也要一起复用（原来没带，
@@ -5148,6 +5163,28 @@ boot("视频参数清单", async () => {
   await window.VIDEO_PANEL.load();
   window.VIDEO_PANEL.bind();
   window.VIDEO_PANEL.render();
+});
+boot("视频效果 LoRA 清单", async () => {
+  if (!window.VIDEO_EFFECT_LORA) return;
+  window.VIDEO_EFFECT_LORA.bind();
+  // 【2026-11-13 选中回显 —— 顺序很关键】
+  // VIDEO_PANEL.load() 内部会 applyConfig() 从 /api/video-config 恢复
+  // 上次选中的效果 LoRA。若这里不等它跑完就 load()，
+  // 「恢复」与「按当前底模剔除不兼容项」会并发 -> 恢复出来的选中项
+  // 可能还没被剔除就被渲染（或反之），表现为**选中项随机丢失**。
+  // 所以：**先等面板清单（含配置恢复）完成，再拉效果 LoRA 清单**。
+  if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady
+      && !window.VIDEO_PANEL.isReady()) {
+    // 面板还没就绪 -> 等它（最多 10 秒，避免卡死启动）
+    const t0 = Date.now();
+    while (Date.now() - t0 < 10000
+           && (!window.VIDEO_PANEL.isReady || !window.VIDEO_PANEL.isReady())) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  await window.VIDEO_EFFECT_LORA.load(
+    window.VIDEO_PANEL && window.VIDEO_PANEL.state
+      ? window.VIDEO_PANEL.state.model : "");
 });
 boot("视频采样参数清单", loadVideoSamplingOptions);
 boot("音乐参数清单", async () => {

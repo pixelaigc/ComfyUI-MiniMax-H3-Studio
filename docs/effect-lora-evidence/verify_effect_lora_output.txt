@@ -1,0 +1,118 @@
+
+==============================================================================
+1. 发现机制 —— 清单来自真实扫盘
+==============================================================================
+发现效果 LoRA: 27 枚
+  PASS h3/3dsrx_minimax_h3.safetensors                          key=lora_unet        mods= 200
+  PASS h3/Anime2Realsim__H3.safetensors                         key=diffusion_model  mods= 208
+  PASS h3/Body_Breast_Minimax_h3_for_NSFW.safetensors           key=lora_unet        mods= 176
+  PASS h3/GOLDENBOY_H3_V1-step00012000.safetensors              key=lora_unet        mods= 200
+  PASS h3/H3_Ref2V_Anime_Slider_v1.safetensors                  key=diffusion_model  mods= 208
+  PASS h3/Handheld_Shaky_Cam_h3_100.safetensors                 key=diffusion_model  mods= 208
+  PASS h3/Minimax H3真实电影质感.safetensors                          key=diffusion_model  mods= 258
+  PASS h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors           key=diffusion_model  mods= 208
+  PASS h3/YOURNAME_H3_V1-step00009900.safetensors               key=lora_unet        mods= 200
+  PASS h3/h3-realism-people-t2v-i2v-r2v.safetensors             key=diffusion_model  mods= 104
+  PASS h3/h3_character_swap_pro4500_1000.safetensors            key=diffusion_model  mods= 208
+  PASS h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors  key=lora_unet        mods= 200
+  PASS h3/manga_tone_v2.safetensors                             key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_character_swap_v1.0_ref2va_r64_gl.safetensors key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_head_swap_v1.0_r32.safetensors             key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_live_wallpaper_v1.0_ref2va_r32.safetensors key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_live_wallpaper_v1.0_ref2va_r64.safetensors key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_lms_v1.0_r64.safetensors                   key=diffusion_model  mods= 258
+  PASS h3/minimax_h3_style_transfer_v1.0_r64.safetensors        key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_vfx_edit_v1.0_r128.safetensors             key=diffusion_model  mods= 208
+  PASS h3/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors         key=diffusion_model  mods= 208
+  PASS h3/nafasp_h3_lora_v2_500.safetensors                     key=diffusion_model  mods= 208
+  PASS h3_keyframe/h3_hero_step12000.safetensors                key=diffusion_model  mods= 200
+  PASS h3_keyframe/h3_seq_step12000.safetensors                 key=diffusion_model  mods= 200
+  PASS h3_keyframe/h3_tween_step12000.safetensors               key=diffusion_model  mods= 200
+  PASS minimax/pika_h3_flex_fl2va_v1_bf16.safetensors           key=diffusion_model  mods= 208
+  PASS minimax/pika_h3_flex_ref2va_v1_bf16.safetensors          key=diffusion_model  mods= 208
+
+==============================================================================
+2. 兼容性 —— 键绑定 + 形状比对（真实底模权重头）
+==============================================================================
+底模: minimax_h3_fl2va_pruned_int8_convrot.safetensors
+路径: /mnt/nvme1t_colorful/comfyui-models/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors
+  PASS h3/3dsrx_minimax_h3.safetensors                      命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/Anime2Realsim__H3.safetensors                     命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/Body_Breast_Minimax_h3_for_NSFW.safetensors       命中  176/176  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/GOLDENBOY_H3_V1-step00012000.safetensors          命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/H3_Ref2V_Anime_Slider_v1.safetensors              命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/Handheld_Shaky_Cam_h3_100.safetensors             命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/Minimax H3真实电影质感.safetensors                      命中  258/258  不匹配   0 缺层   0 adaln空转  50
+  PASS h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors       命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/YOURNAME_H3_V1-step00009900.safetensors           命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/h3-realism-people-t2v-i2v-r2v.safetensors         命中  104/104  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/h3_character_swap_pro4500_1000.safetensors        命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetens 命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/manga_tone_v2.safetensors                         命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_character_swap_v1.0_ref2va_r64_gl.safe 命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_head_swap_v1.0_r32.safetensors         命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_live_wallpaper_v1.0_ref2va_r32.safeten 命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_live_wallpaper_v1.0_ref2va_r64.safeten 命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_lms_v1.0_r64.safetensors               命中  258/258  不匹配   0 缺层   0 adaln空转  50
+  PASS h3/minimax_h3_style_transfer_v1.0_r64.safetensors    命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_vfx_edit_v1.0_r128.safetensors         命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors     命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3/nafasp_h3_lora_v2_500.safetensors                 命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS h3_keyframe/h3_hero_step12000.safetensors            命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3_keyframe/h3_seq_step12000.safetensors             命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS h3_keyframe/h3_tween_step12000.safetensors           命中  200/200  不匹配   0 缺层   0 adaln空转   0
+  PASS minimax/pika_h3_flex_fl2va_v1_bf16.safetensors       命中  208/208  不匹配   0 缺层   0 adaln空转   0
+  PASS minimax/pika_h3_flex_ref2va_v1_bf16.safetensors      命中  208/208  不匹配   0 缺层   0 adaln空转   0
+
+兼容: 27/27
+
+==============================================================================
+3. 工作流注入 —— LoraLoaderModelOnly + strength 映射
+==============================================================================
+生成 LoraLoaderModelOnly 节点: 2 个
+  320:0  lora_name=h3/3dsrx_minimax_h3.safetensors
+       strength_model=0.55
+       model=['138:0', 0]
+  320:1  lora_name=h3/Anime2Realsim__H3.safetensors
+       strength_model=0.7
+       model=['320:0', 0]
+
+模型链（采样器 -> 底模）：
+  100        MiniMaxH3SigmaShift        
+  320:1      LoraLoaderModelOnly        h3/Anime2Realsim__H3.safetensors
+  320:0      LoraLoaderModelOnly        h3/3dsrx_minimax_h3.safetensors
+  138:0      MiniMaxH3TurboLoRA         minimax_h3_turbo_4step_ema_ckpt850.safetensors
+  6          UNETLoader                 minimax_h3_fl2va_pruned_int8_convrot.safetensors
+
+提示词（触发词已合并）: a cat walking, 3dsrx, DY
+
+==============================================================================
+4. 服务端闸门 —— 脏值被拒绝
+==============================================================================
+  PASS 正常值                      -> 通过
+  PASS 不存在的文件                   -> 本机找不到该效果 LoRA 文件：h3/nope.safetensors
+  PASS 非数字强度                    -> 效果 LoRA 强度必须是数字：h3/3dsrx_minimax_h3.safetensors
+  PASS 图像 LoRA（键结构不对）           -> 「z-image-effects/AWPortrait-Z.safetensors」与当前底模不兼容：底模里没有该 LoRA 要 patch 的层（缺 240/240）—— ComfyUI 会静默丢弃，出片照跑但 LoRA 没生效。
+
+==============================================================================
+5. 任务卡片摘要 —— 显示用了哪几枚 + 强度
+==============================================================================
+[
+  {
+    "name": "h3/3dsrx_minimax_h3.safetensors",
+    "label": "3dsrx_minimax_h3 — 3D 动画电影质感 LoRA",
+    "strength": 0.55,
+    "trigger": ""
+  },
+  {
+    "name": "h3/Anime2Realsim__H3.safetensors",
+    "label": "Anime2RealsimH3 — 动漫转真人写实 LoRA",
+    "strength": 0.7,
+    "trigger": ""
+  }
+]
+
+==============================================================================
+结论
+==============================================================================
+PASS 全部通过
