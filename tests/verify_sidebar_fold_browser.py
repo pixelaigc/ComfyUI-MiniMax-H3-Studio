@@ -51,6 +51,23 @@ def run():
         if not cond:
             failures.append(f"{name} {detail}")
 
+    def wait_sidebar(page, timeout_ms=15000):
+        """等侧栏 DOM 就位。
+
+        【为什么需要】页面 reload 后到 DOM 重建完成之间有个窗口，
+        此时 evaluate 里 document.querySelector('#sidebar') 会拿到 null
+        —— 表现为「Cannot read properties of null」，是**脚本竞态**，
+        不是产品缺陷（实测同一份代码重跑即通过）。
+        """
+        try:
+            page.wait_for_function(
+                "() => !!document.getElementById('sidebar')"
+                " && !!document.getElementById('navScroll')",
+                timeout=timeout_ms)
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         ctx = browser.new_context(viewport={"width": 1280, "height": 900})
@@ -66,7 +83,7 @@ def run():
         page.wait_for_timeout(4000)
         page.evaluate("k => localStorage.removeItem(k)", FOLD_KEY)
         page.reload(wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)
+        wait_sidebar(page)
 
         groups = page.eval_on_selector_all(
             ".nav-group[data-nav-key]", "els => els.map(e => e.dataset.navKey)")
@@ -107,7 +124,7 @@ def run():
 
         # 持久化：刷新后仍折叠
         page.reload(wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)
+        wait_sidebar(page)
         st2 = page.evaluate("""() => ({
           expanded: document.querySelector('.nav-group[data-nav-key="image"]')
                      .getAttribute('aria-expanded'),
@@ -146,7 +163,7 @@ def run():
         print("\n[3] 视频类别折叠")
         page.evaluate("() => localStorage.removeItem('h3studio.sidebarFold')")
         page.reload(wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)
+        wait_sidebar(page)
 
         page.click('#navVideoCategories .nav-cat-toggle[data-category="t2v"]')
         page.wait_for_timeout(600)
@@ -169,7 +186,7 @@ def run():
               "t2v" in (st["stored"] or ""), f"stored={st['stored']}")
 
         page.reload(wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)
+        wait_sidebar(page)
         st2 = page.evaluate("""() => {
           const cat = document.querySelector('.nav-cat[data-category="t2v"]');
           return {
@@ -197,7 +214,7 @@ def run():
         print("\n[4] 左侧列独立滚动")
         page.evaluate("() => localStorage.removeItem('h3studio.sidebarFold')")
         page.reload(wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)
+        wait_sidebar(page)
 
         scroll_info = page.evaluate("""() => {
           const el = document.getElementById('navScroll');
@@ -366,7 +383,6 @@ def run():
         check("console 0 错误", not real_errors, f"errors={real_errors[:3]}")
 
         browser.close()
-
     print("\n" + "=" * 70)
     if failures:
         print(f"验收失败 {len(failures)} 项：")
