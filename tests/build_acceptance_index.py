@@ -203,7 +203,8 @@ def main():
 
     index = {
         "判据声明": ("本证据包验收的是「文生视频接续（t2v）」功能本身，"
-                  "不是 H3 视频面板的 7 项修复。"),
+                  "不是 H3 视频面板的 7 项修复。"
+                  "C0 是**独立复核**（不采信被测脚本自证，从原始产物重算）。"),
         "生成时间": subprocess.check_output(["date", "-Is"], text=True).strip(),
         "分支": "local/feature/t2v-continue",
         "仓库": str(REPO),
@@ -232,6 +233,36 @@ def main():
                                      for f in fps if f.count("_") >= 2],
             "prompt": jobs[jid]["params"].get("prompt", ""),
         })
+    # ================= C0 独立复核 =================
+    indep = REPO / "data-accept" / "independent-check" / "independent-report.json"
+    if indep.is_file():
+        ir = json.loads(indep.read_text(encoding="utf-8"))
+        c0 = {
+            "结论": "独立复核脚本（不 import 被测脚本的函数，全部从原始产物"
+                    "重算 md5/inode/ffprobe/MAE/ComfyUI history）—— "
+                    + ("全部通过" if not ir.get("failures") else
+                       f"有 {len(ir['failures'])} 项失败"),
+            "脚本": str((REPO / "tests" / "verify_d1_independent_check.py").resolve()),
+            "报告": str(indep.resolve()),
+            "失败项": ir.get("failures", []),
+        }
+        ch = ir.get("checks", {})
+        br = (ch.get("C1_落盘坐标") or {}).get("branches", [])
+        if br:
+            c0["兄弟分支潜空间"] = [{
+                "job_id": x["job_id"], "run_id": x["run_id"],
+                "stage_index": x["stage_index"],
+                "stage_file": x["stage_file"], "exists": x["exists"],
+                "size_bytes": x["size_bytes"], "inode": x["inode"],
+                "md5": x["md5"], "mtime": x["mtime"],
+            } for x in br]
+        for key, src_key in (("首帧归属", "C2_首帧归属"),
+                             ("血缘隔离", "C3_链账本血缘隔离"),
+                             ("执行图_显式锚与指纹", "C4_执行图_显式锚与指纹")):
+            if ch.get(src_key):
+                c0[key] = ch[src_key]
+        index["判据"]["C0_独立复核"] = c0
+
     index["判据"]["C1_兄弟分支落盘互不覆盖"] = {
         "结论": "每个分支一个专属目录（run_id 由该段自己的 job_id 派生），"
                 "目录不同 -> 结构上不可能互相覆盖",
@@ -533,6 +564,72 @@ def main():
     A("")
     A("---")
     A("")
+
+    # ---- C0 ----
+    if "C0_独立复核" in index["判据"]:
+        b = index["判据"]["C0_独立复核"]
+        A("## C0　独立复核（不采信被测脚本自证）")
+        A("")
+        A(f"**结论**：{b['结论']}")
+        A("")
+        A(f"- 脚本：`{b['脚本']}`")
+        A(f"- 报告：`{b['报告']}`")
+        A(f"- 失败项：{b['失败项'] or '无'}")
+        A("")
+        if b.get("兄弟分支潜空间"):
+            A("**① 兄弟分支潜空间**（inode 不同 = 两个独立文件，不是同一文件两次写）：")
+            A("")
+            A("| job_id | run_id | stage | 绝对路径 | 存在 | 字节 | inode | md5 |")
+            A("|---|---|---|---|---|---|---|---|")
+            for x in b["兄弟分支潜空间"]:
+                A(f"| `{x['job_id']}` | `{x['run_id']}` | {x['stage_index']} | "
+                  f"`{x['stage_file']}` | {x['exists']} | {x['size_bytes']} | "
+                  f"{x['inode']} | `{x['md5'][:16]}…` |")
+            A("")
+        if b.get("首帧归属"):
+            x = b["首帧归属"]
+            A("**② 首帧归属**：")
+            A("")
+            A(f"- C1首帧 vs B1末帧 MAE = **{x['mae_C1first_vs_B1last']}**")
+            A(f"- C1首帧 vs B2末帧 MAE = **{x['mae_C1first_vs_B2last']}**")
+            A(f"- 偏离倍数 = **{x['ratio']}×**　判定：**{x['verdict']}**")
+            d = x.get("defect_state_reference", {})
+            A(f"- 缺陷态对照（D1 报告）：vs B1 = {d.get('vs_B1')} / vs B2 = {d.get('vs_B2')}")
+            for k, v in (x.get("frames") or {}).items():
+                A(f"- {k}：`{v}`")
+            A("")
+        if b.get("血缘隔离"):
+            x = b["血缘隔离"]
+            A("**③ 血缘隔离 + 完整视频帧数账**：")
+            A("")
+            A("| job_id | 血缘段序列 | 完整视频帧数 | 时长(s) | 期望 | 吻合 |")
+            A("|---|---|---|---|---|---|")
+            for jid, rels in (x.get("lineage") or {}).items():
+                fv = (x.get("full_videos") or {}).get(jid, {})
+                A(f"| `{jid}` | {' + '.join(Path(r).name for r in rels)} | "
+                  f"{fv.get('frames')} | {fv.get('duration_s')} | "
+                  f"{fv.get('lineage_expected')} | "
+                  f"{'✅' if fv.get('match') else '❌'} |")
+            A("")
+            A(f"- B2 的段 `{x.get('b2_segment_rel')}` 不在 C1 血缘里 = "
+              f"**{x.get('b2_absent_from_c1')}**")
+            A("")
+        if b.get("执行图_显式锚与指纹"):
+            x = b["执行图_显式锚与指纹"]
+            A("**④ ComfyUI 实际执行图**：")
+            A("")
+            A(f"- `ref_anchor_latent` = `{x.get('ref_anchor_latent')}`")
+            A(f"- `ref_anchor_stage` = `{x.get('ref_anchor_stage')}`")
+            A(f"- 读回路径指纹后缀 = `{x.get('fingerprint_suffix')}`")
+            A("")
+            for jid, g in (x.get("graphs") or {}).items():
+                if g.get("load"):
+                    A(f"- `{jid}` 读回上游 = `{g['load'].get('explicit_path')}`")
+                if g.get("anchor_load"):
+                    A(f"- `{jid}` 读回外观锚 = `{g['anchor_load'].get('explicit_path')}`")
+                if g.get("save"):
+                    A(f"- `{jid}` 落盘 run_id = `{g['save'].get('run_id')}`")
+            A("")
 
     # ---- C1 ----
     b = index["判据"]["C1_兄弟分支落盘互不覆盖"]

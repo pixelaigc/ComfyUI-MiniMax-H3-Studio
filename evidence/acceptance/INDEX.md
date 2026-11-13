@@ -1,13 +1,70 @@
 # 验收证据索引 — 文生视频接续（t2v）
 
-> 本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。
+> 本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。C0 是**独立复核**（不采信被测脚本自证，从原始产物重算）。
 
 - 分支：`local/feature/t2v-continue`　仓库：`/root/projects/h3studio-t2v-continue`
-- 生成时间：2026-11-13T21:30:37+08:00
+- 生成时间：2026-11-13T23:11:02+08:00
 - 机器可读版：`evidence/acceptance/INDEX.json`
 - 验收实例：8206 / 8199（独立实例，8190 线上未动）
 
 ---
+
+## C0　独立复核（不采信被测脚本自证）
+
+**结论**：独立复核脚本（不 import 被测脚本的函数，全部从原始产物重算 md5/inode/ffprobe/MAE/ComfyUI history）—— 全部通过
+
+- 脚本：`/root/projects/h3studio-t2v-continue/tests/verify_d1_independent_check.py`
+- 报告：`/root/projects/h3studio-t2v-continue/data-accept/independent-check/independent-report.json`
+- 失败项：无
+
+**① 兄弟分支潜空间**（inode 不同 = 两个独立文件，不是同一文件两次写）：
+
+| job_id | run_id | stage | 绝对路径 | 存在 | 字节 | inode | md5 |
+|---|---|---|---|---|---|---|---|
+| `4f9a3f07676c` | `h3studio_s4f9a3f07676c` | 0 | `/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000.safetensors` | True | 4827267 | 11540021 | `55e49040b19663aa…` |
+| `a8f7555503f6` | `h3studio_sa8f7555503f6` | 0 | `/home/ubuntu/comfyui/output/relay_kit/h3studio_sa8f7555503f6/stage_00000.safetensors` | True | 4827267 | 11540023 | `fb60cf83adb84c3b…` |
+
+**② 首帧归属**：
+
+- C1首帧 vs B1末帧 MAE = **4.98**
+- C1首帧 vs B2末帧 MAE = **65.187**
+- 偏离倍数 = **13.09×**　判定：**B1(正确)**
+- 缺陷态对照（D1 报告）：vs B1 = 2.08 / vs B2 = 38.65
+- B1_last：`/root/projects/h3studio-t2v-continue/data-accept/evidence-frames/frames/B1-v-h3-studio-000002-last.png`
+- B2_last：`/root/projects/h3studio-t2v-continue/data-accept/evidence-frames/frames/B2-v-h3-studio-000004-last.png`
+- C1_first：`/root/projects/h3studio-t2v-continue/data-accept/evidence-frames/frames/C1-v-h3-studio-000006-first.png`
+
+**③ 血缘隔离 + 完整视频帧数账**：
+
+| job_id | 血缘段序列 | 完整视频帧数 | 时长(s) | 期望 | 吻合 |
+|---|---|---|---|---|---|
+| `5b540002f72d` | v-h3-studio-000001.mp4 | None | None | None | ❌ |
+| `4f9a3f07676c` | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 | 226 | 9.45 | 226 | ✅ |
+| `a8f7555503f6` | v-h3-studio-000001.mp4 + v-h3-studio-000004.mp4 | 226 | 9.45 | 226 | ✅ |
+| `38ad6e475f5e` | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 | 328 | 13.7 | 328 | ✅ |
+| `63b70791fa9a` | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 + v-h3-studio-000008.mp4 | 430 | 17.95 | 430 | ✅ |
+
+- B2 的段 `videos/v-h3-studio-000004.mp4` 不在 C1 血缘里 = **True**
+
+**④ ComfyUI 实际执行图**：
+
+- `ref_anchor_latent` = `['300:anchor_load', 0]`
+- `ref_anchor_stage` = `-1`
+- 读回路径指纹后缀 = `c4128683`
+
+- `5b540002f72d` 落盘 run_id = `h3studio_s5b540002f72d`
+- `4f9a3f07676c` 读回上游 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `4f9a3f07676c` 读回外观锚 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `4f9a3f07676c` 落盘 run_id = `h3studio_s4f9a3f07676c`
+- `a8f7555503f6` 读回上游 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `a8f7555503f6` 读回外观锚 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `a8f7555503f6` 落盘 run_id = `h3studio_sa8f7555503f6`
+- `38ad6e475f5e` 读回上游 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000_c4128683.safetensors`
+- `38ad6e475f5e` 读回外观锚 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `38ad6e475f5e` 落盘 run_id = `h3studio_s38ad6e475f5e`
+- `63b70791fa9a` 读回上游 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s38ad6e475f5e/stage_00000_1ca6677f.safetensors`
+- `63b70791fa9a` 读回外观锚 = `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
+- `63b70791fa9a` 落盘 run_id = `h3studio_s63b70791fa9a`
 
 ## C1　兄弟分支落盘互不覆盖
 
@@ -15,19 +72,19 @@
 
 | 分支 | job_id | run_id | stage 文件（绝对路径） | 盘上文件 | 指纹 |
 |---|---|---|---|---|---|
-| **B1** | `ce08fcea5b16` | `h3studio_sce08fcea5b16` | `/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000.safetensors` | stage_00000.safetensors, stage_00000_cf6e5a4c.safetensors | cf6e5a4c |
-| **B2** | `0b6c59bbaa60` | `h3studio_s0b6c59bbaa60` | `/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60/stage_00000.safetensors` | stage_00000.safetensors | （未生成读回副本） |
+| **B1** | `4f9a3f07676c` | `h3studio_s4f9a3f07676c` | `/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000.safetensors` | stage_00000.safetensors, stage_00000_c4128683.safetensors | c4128683 |
+| **B2** | `a8f7555503f6` | `h3studio_sa8f7555503f6` | `/home/ubuntu/comfyui/output/relay_kit/h3studio_sa8f7555503f6/stage_00000.safetensors` | stage_00000.safetensors | （未生成读回副本） |
 
 - B1 与 B2 的落盘目录**不同** -> 结构上不可能互相覆盖（不是靠「先后顺序不撞」的运气约束）
 - 全部 5 段（chain_root ``）：
 
 | job_id | stage | source_job | run_id |
 |---|---|---|---|
-| `5dff77dad082` | 0 | `—` | `h3studio_s5dff77dad082` |
-| `0b6c59bbaa60` | 1 | `5dff77dad082` | `h3studio_s0b6c59bbaa60` |
-| `ce08fcea5b16` | 1 | `5dff77dad082` | `h3studio_sce08fcea5b16` |
-| `32b3cb99ad4a` | 2 | `ce08fcea5b16` | `h3studio_s32b3cb99ad4a` |
-| `32648f3dd7a1` | 3 | `32b3cb99ad4a` | `h3studio_s32648f3dd7a1` |
+| `5b540002f72d` | 0 | `—` | `h3studio_s5b540002f72d` |
+| `4f9a3f07676c` | 1 | `5b540002f72d` | `h3studio_s4f9a3f07676c` |
+| `a8f7555503f6` | 1 | `5b540002f72d` | `h3studio_sa8f7555503f6` |
+| `38ad6e475f5e` | 2 | `4f9a3f07676c` | `h3studio_s38ad6e475f5e` |
+| `63b70791fa9a` | 3 | `38ad6e475f5e` | `h3studio_s63b70791fa9a` |
 
 ## C2　接续首帧归属（对照已判定的 2.08 vs 38.65）
 
@@ -46,11 +103,11 @@
 
 **执行图级主判据**（ComfyUI 真正跑的那张图 —— 确定性，不依赖模型表现）：
 
-- C1 实际读回：`/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000_cf6e5a4c.safetensors`
-- B1 落盘 run_id：`h3studio_sce08fcea5b16`　B2 落盘 run_id：`h3studio_s0b6c59bbaa60`
+- C1 实际读回：`/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000_c4128683.safetensors`
+- B1 落盘 run_id：`h3studio_s4f9a3f07676c`　B2 落盘 run_id：`h3studio_sa8f7555503f6`
 - 读的是 B1：**True**（B2 的目录从未被读）
 - 外观锚**显式传入**：True　`ref_anchor_latent = ['300:anchor_load', 0]`
-- 锚读回路径：`/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000_4ba9a5ee.safetensors`
+- 锚读回路径：`/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`
 
 **对比图**（绝对路径）：
 
@@ -65,11 +122,11 @@
 
 | job_id | stage | 血缘段序列 | 各段帧数 | 各段时长(s) | 完整视频帧数 | 期望 | 完整视频时长(s) |
 |---|---|---|---|---|---|---|---|
-| `5dff77dad082` | 0 | v-h3-studio-000001.mp4 | [124] | [5.167] | None | 124 | None |
-| `0b6c59bbaa60` | 1 | v-h3-studio-000001.mp4 + v-h3-studio-000004.mp4 | [124, 102] | [5.167, 4.25] | 226 | 226 | 9.45 |
-| `ce08fcea5b16` | 1 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 | [124, 102] | [5.167, 4.25] | 226 | 226 | 9.45 |
-| `32b3cb99ad4a` | 2 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 | [124, 102, 102] | [5.167, 4.25, 4.25] | 328 | 328 | 13.7 |
-| `32648f3dd7a1` | 3 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 + v-h3-studio-000008.mp4 | [124, 102, 102, 102] | [5.167, 4.25, 4.25, 4.25] | 430 | 430 | 17.95 |
+| `5b540002f72d` | 0 | v-h3-studio-000001.mp4 | [124] | [5.167] | None | 124 | None |
+| `4f9a3f07676c` | 1 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 | [124, 102] | [5.167, 4.25] | 226 | 226 | 9.45 |
+| `a8f7555503f6` | 1 | v-h3-studio-000001.mp4 + v-h3-studio-000004.mp4 | [124, 102] | [5.167, 4.25] | 226 | 226 | 9.45 |
+| `38ad6e475f5e` | 2 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 | [124, 102, 102] | [5.167, 4.25, 4.25] | 328 | 328 | 13.7 |
+| `63b70791fa9a` | 3 | v-h3-studio-000001.mp4 + v-h3-studio-000002.mp4 + v-h3-studio-000006.mp4 + v-h3-studio-000008.mp4 | [124, 102, 102, 102] | [5.167, 4.25, 4.25, 4.25] | 430 | 430 | 17.95 |
 
 - **B2 的段（v-h3-studio-000022.mp4）只出现在 B2 分支**，不出现在 B1/C1/D1 任何一条血缘里
 - 各分支完整视频的绝对路径见 `INDEX.json` 的 `C3_链账本不按chain_id线性拼接.各分支[*].完整视频文件`
@@ -107,14 +164,14 @@
 
 **本机实际指纹副本**（绝对路径）：
 
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000.safetensors`　指纹=4ba9a5ee　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5dff77dad082/stage_00000_4ba9a5ee.safetensors`　指纹=4ba9a5ee　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s0b6c59bbaa60/stage_00000.safetensors`　指纹=d82bb874　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000.safetensors`　指纹=cf6e5a4c　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_sce08fcea5b16/stage_00000_cf6e5a4c.safetensors`　指纹=cf6e5a4c　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a/stage_00000.safetensors`　指纹=fc8a2cc6　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s32b3cb99ad4a/stage_00000_fc8a2cc6.safetensors`　指纹=fc8a2cc6　指纹副本=True　4827267 字节
-- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s32648f3dd7a1/stage_00000.safetensors`　指纹=9d016c09　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000.safetensors`　指纹=51f91fba　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s5b540002f72d/stage_00000_51f91fba.safetensors`　指纹=51f91fba　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000.safetensors`　指纹=c4128683　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s4f9a3f07676c/stage_00000_c4128683.safetensors`　指纹=c4128683　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_sa8f7555503f6/stage_00000.safetensors`　指纹=0376a623　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s38ad6e475f5e/stage_00000.safetensors`　指纹=1ca6677f　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s38ad6e475f5e/stage_00000_1ca6677f.safetensors`　指纹=1ca6677f　指纹副本=True　4827267 字节
+- `/home/ubuntu/comfyui/output/relay_kit/h3studio_s63b70791fa9a/stage_00000.safetensors`　指纹=83d74cca　指纹副本=True　4827267 字节
 
 ## C5　两轮真实接续
 
@@ -122,11 +179,11 @@
 
 | job_id | stage | source_job | 分段帧数 | 分段时长(s) | 完整视频帧数 | 完整视频时长(s) |
 |---|---|---|---|---|---|---|
-| `5dff77dad082` | 0 | `—` | 124 | 5.167 | —（首段无拼接） | — |
-| `0b6c59bbaa60` | 1 | `5dff77dad082` | 102 | 4.25 | 226 | 9.45 |
-| `ce08fcea5b16` | 1 | `5dff77dad082` | 102 | 4.25 | 226 | 9.45 |
-| `32b3cb99ad4a` | 2 | `ce08fcea5b16` | 102 | 4.25 | 328 | 13.7 |
-| `32648f3dd7a1` | 3 | `32b3cb99ad4a` | 102 | 4.25 | 430 | 17.95 |
+| `5b540002f72d` | 0 | `—` | 124 | 5.167 | —（首段无拼接） | — |
+| `4f9a3f07676c` | 1 | `5b540002f72d` | 102 | 4.25 | 226 | 9.45 |
+| `a8f7555503f6` | 1 | `5b540002f72d` | 102 | 4.25 | 226 | 9.45 |
+| `38ad6e475f5e` | 2 | `4f9a3f07676c` | 102 | 4.25 | 328 | 13.7 |
+| `63b70791fa9a` | 3 | `38ad6e475f5e` | 102 | 4.25 | 430 | 17.95 |
 
 - 帧数账：A(124) + B1(102) + C1(102) = 328　/　328 + D1(102) = 430
 - 逐段视频绝对路径见 `INDEX.json` 的 `C5_两轮真实接续.逐段[*].分段视频文件` / `.完整视频文件`
@@ -136,9 +193,9 @@
 
 **结论**：二采（SelfLift）产物服务端判定 can_continue=false，卡片**不渲染**「接续」按钮；普通 t2v 产物则渲染
 
-- selflift job `e29a561a7f2b`：`can_continue = False`
+- selflift job `c1eb59bb9920`：`can_continue = False`
 - 原因：二采（SelfLift 渐进分辨率采样）的潜空间与标准采样路径不同源，接续会出现接缝位移 —— 二采产物不支持接续。
-- 普通 t2v job `9898c447acb6`：`can_continue = True`
+- 普通 t2v job `9a535e39359e`：`can_continue = True`
 
 **DOM 按钮清单**（两档宽度实测）：
 
@@ -187,7 +244,7 @@
 
 ## C8　pytest 命令与结果
 
-**接续相关**：121 passed in 54.06s
+**接续相关**：121 passed in 55.89s
 
 ```bash
 cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/test_continuation_branch.py tests/test_continuation_server.py tests/test_continuation.py tests/test_continuation_retry.py tests/test_continuation_frontend.py tests/test_continuation_mixed_state.py tests/test_continuation_capability.py -q --no-header -p no:cacheprovider
@@ -195,31 +252,13 @@ cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python 
 
 日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-continuation.log`
 
-**全量**：5 failed, 2287 passed, 4 skipped in 1876.67s (0:31:16)
+**全量**：
 
 ```bash
 cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider
 ```
 
 日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-full.log`
-
-**全量失败项**（逐条原始输出）：
-
-- `tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_write_contract_is_mode_scoped`
-  - 原始行：`FAILED tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_write_contract_is_mode_scoped`
-  - 判定：（未标注）
-- `tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_current_enhance_method_is_visible`
-  - 原始行：`FAILED tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_current_enhance_method_is_visible`
-  - 判定：（未标注）
-- `tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch`
-  - 原始行：`FAILED tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch`
-  - 判定：（未标注）
-- `tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
-  - 原始行：`FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
-  - 判定：（未标注）
-- `tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
-  - 原始行：`FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
-  - 判定：（未标注）
 
 **各项失败判定**：
 
@@ -275,7 +314,7 @@ cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python 
   - console_errors：0
   - page_errors：0
   - real_failed_requests：0
-  - media_preload_aborts：16
+  - media_preload_aborts：7
   - media_preload_aborts说明：卡片 <video preload="metadata"> 被 Chrome 读完元数据后主动中止媒体流（net::ERR_ABORTED）—— 浏览器正常行为，非服务端错误（同一 URL 手动 fetch 返回 200 且字节完整）
 - `continuation-d1(browser_report.json)`
   - console_errors：0
