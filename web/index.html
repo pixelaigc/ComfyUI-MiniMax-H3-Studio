@@ -200,6 +200,37 @@
               <input type="text" id="vidTwopassSampler" value="euler" readonly>
             </div>
           </div>
+          <!-- 【2026-11-13 新增 —— 借鉴 nonebot H3 工作流的 H3SigmaRefiner】
+               在 sigma 表的低噪段局部加密采样步，针对「高速运动边缘像素颗粒 / 闪烁」。
+               默认**关闭** —— nonebot 模板的 start_at_sigma=0.7 在本项目默认档
+               （steps=4 / beta）下是 no-op，节点自己的 tooltip 推荐 2.0~3.5。 -->
+          <div class="compact-pair">
+            <div class="compact-field">
+              <label class="switch-label">
+                <input type="checkbox" id="vidSigmaRefineEnabled">
+                <span>sigma 精修</span>
+                <span class="muted" id="vidSigmaRefineHint">低噪段加密采样</span>
+              </label>
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>加密步数</span><b id="vidSigmaRefineStepsVal">1</b></div>
+              <input type="range" id="vidSigmaRefineSteps" min="0" max="8" step="1" value="1">
+            </div>
+          </div>
+          <div class="compact-pair">
+            <div class="compact-field">
+              <div class="compact-label"><span>起始 sigma</span><b id="vidSigmaRefineStartVal">2.50</b></div>
+              <input type="range" id="vidSigmaRefineStart" min="0" max="8" step="0.05" value="2.5">
+            </div>
+            <div class="compact-field">
+              <div class="compact-label"><span>插值曲线</span></div>
+              <select class="img-select" id="vidSigmaRefineSpacing">
+                <option value="cosine">cosine（推荐）</option>
+                <option value="linear">linear</option>
+                <option value="exponential">exponential</option>
+              </select>
+            </div>
+          </div>
           <div class="img-note" id="vidTwopassNote"></div>
         </div>
       </div>
@@ -1168,6 +1199,24 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 生成媒体库条目详情模态框（2026-11-13 需求 C3）
+     展示该条目的**完整生成参数**：模型 / 步数 / 调度器 / 采样器 / shift /
+     LoRA 列表+强度 / 尺寸 / 时长 / seed / 完整提示词 / 注意力机制 /
+     任务来源与工作流名 / 创建时间。字段缺失显式标注「—」。
+     Esc 关闭、点遮罩关闭；不与卡片上的下载/复用参数/删除按钮冲突。 -->
+<div class="job-detail-modal" id="jobDetailModal" hidden>
+  <div class="job-detail-backdrop" id="jobDetailBackdrop"></div>
+  <div class="job-detail-panel" role="dialog" aria-modal="true"
+       aria-labelledby="jobDetailTitle" id="jobDetailPanel">
+    <div class="job-detail-head">
+      <b id="jobDetailTitle">生成参数详情</b>
+      <button type="button" class="job-detail-x" id="jobDetailClose"
+              title="关闭（Esc）" aria-label="关闭">×</button>
+    </div>
+    <div class="job-detail-body" id="jobDetailBody"></div>
+  </div>
+</div>
+
 <!-- 生成结果图片查看器（lightbox） -->
 <div class="lightbox" id="lightbox" hidden>
   <div class="lightbox-bar">
@@ -1227,11 +1276,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
 <script src="/static/music.js?v=musicyue2-2"></script>
-<script src="/static/video-panel.js?v=videopanel1"></script>
+<!-- 【2026-11-13 合并说明】video-panel.js 版本号取 h3-model-meta 一侧的
+     videopanel2 —— 该分支改了 video-panel.js（作者推荐参数注释 + sigma 精修），
+     必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
+     用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
+     接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
+<script src="/static/video-panel.js?v=videopanel2"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
 <script src="/static/video-nav.js?v=videonav1"></script>
-<script src="/static/app.js?v=enh-unify2"></script>
+<script src="/static/job-meta.js?v=jobmeta2"></script>
+<script src="/static/app.js?v=jobmeta1"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>
+<script src="/static/job-detail.js?v=jobdetail2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：

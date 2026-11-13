@@ -1,0 +1,13 @@
+{
+  "url_before": "http://127.0.0.1:47835/",
+  "url_after": "http://127.0.0.1:47835/",
+  "hash_before": "",
+  "hash_after": "",
+  "sid_before": "",
+  "sid_after": "",
+  "active_session_after": [
+    "e28def96a2bd4ce7"
+  ],
+  "url_changed": false,
+  "sid_changed": false
+}

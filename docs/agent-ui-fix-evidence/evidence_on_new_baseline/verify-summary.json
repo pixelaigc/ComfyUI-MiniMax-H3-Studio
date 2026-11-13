@@ -1,0 +1,78 @@
+{
+  "results": {
+    "a1 页面存在两组快捷选项": {
+      "pass": true,
+      "detail": "共 5 个"
+    },
+    "a2 两个澄清输入框初始为空": {
+      "pass": true,
+      "detail": "['', '']"
+    },
+    "a3 只填了第二条消息的输入框": {
+      "pass": true,
+      "detail": "['', '16:9 横屏·标红圆角边框开场']"
+    },
+    "a4 焦点落在第二条消息的输入框": {
+      "pass": true,
+      "detail": "index=1"
+    },
+    "a5 已选项被高亮且本组其余禁用": {
+      "pass": true,
+      "detail": "['16:9 横屏·标红圆角边框开场']"
+    },
+    "a5b 已选中的按钮计算样式与其它按钮明显不同": {
+      "pass": true,
+      "detail": "{\"picked\": {\"bg\": \"rgb(79, 110, 247)\", \"color\": \"rgb(255, 255, 255)\", \"opacity\": \"1\", \"weight\": \"600\"}, \"other\": {\"bg\": \"rgb(255, 255, 255)\", \"color\": \"rgb(79, 110, 247)\", \"opacity\": \"0.45\", \"weight\": \"400\"}}"
+    },
+    "a6 跨会话后仍不串填": {
+      "pass": true,
+      "detail": "['', ''] -> ['', '16:9 横屏·标红圆角边框开场']"
+    },
+    "b1 URL 变了（路由跳转到新 session）": {
+      "pass": true,
+      "detail": "http://127.0.0.1:44697/#/agent/53527a7106d54f72"
+    },
+    "b2 URL 指向新 session": {
+      "pass": true,
+      "detail": "http://127.0.0.1:44697/#/agent/53527a7106d54f72"
+    },
+    "b3 AgentUI.sessionId 切到新 session": {
+      "pass": true,
+      "detail": "53527a7106d54f72"
+    },
+    "b4 侧栏选中态切到新 session": {
+      "pass": true,
+      "detail": "['53527a7106d54f72']"
+    },
+    "b5 消息区已清空（旧会话消息不再残留）": {
+      "pass": true,
+      "detail": "2 -> 0"
+    },
+    "c1 往返 3 次后工具区几何完全一致": {
+      "pass": true,
+      "detail": "基准={'toolBlocks': 1, 'toolRows': 2, 'totalToolAreaH': 135, 'blockH': [135], 'rowH': [60, 29]} 实际=[{'toolBlocks': 1, 'toolRows': 2, 'totalToolAreaH': 135, 'blockH': [135], 'rowH': [60, 29]}, {'toolBlocks': 1, 'toolRows': 2, 'totalToolAreaH': 135, 'blockH': [135], 'rowH': [60, 29]}, {'toolBlocks': 1, 'toolRows': 2, 'totalToolAreaH': 135, 'blockH': [135], 'rowH': [60, 29]}]"
+    },
+    "c2 展开态被保留（切回来还是展开的）": {
+      "pass": true,
+      "detail": "基准 rowOpen=[True, False]"
+    },
+    "c3 恢复路径与实时路径密度一致（同为 1 个工具容器）": {
+      "pass": true,
+      "detail": "toolBlocks=1（修复前是 2）"
+    },
+    "c4 折叠态 key 带会话作用域（跨会话不撞）": {
+      "pass": true,
+      "detail": "B=['sess-bravo-m1-tool-0'] A=['sess-alpha-m1-tool-0', 'sess-alpha-m1-tool-1']"
+    },
+    "d1 无 pageerror": {
+      "pass": true,
+      "detail": ""
+    },
+    "d2 无 console error": {
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "failed": [],
+  "all_passed": true
+}

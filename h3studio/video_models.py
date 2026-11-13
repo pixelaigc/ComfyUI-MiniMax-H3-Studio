@@ -543,6 +543,25 @@ VIDEO_TWOPASS = {
         "h3_upscaler_lms_v0.1_fp32.safetensors",
     ],
     "upscaler_default": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+    # 【2026-11-13 新增 —— 借鉴 nonebot H3 工作流的 H3SigmaRefiner】
+    #
+    # 在 sigma 表的**低噪段局部加密采样步**，针对「高速运动边缘像素颗粒 / 闪烁」。
+    #
+    # 【为什么默认关闭】nonebot 模板里用的是 start_at_sigma=0.7，
+    # 但在本项目默认档（steps=4 / beta）下 0.7 落在 no-op 区 ——
+    # beta 档 sigma 尾段只有 0.7207 一档 > 0.7，然后直接跳到 0.0，
+    # 节点判定 idx == len-1 -> 直接原样返回（**完全无效**）。
+    # 节点自己的 tooltip 明确写「H3 推荐设在 2.0 ~ 3.5 之间」，
+    # 所以这里的默认值取 2.5（落在推荐区间内）。
+    #
+    # 【风险】插入后 sigma 表变长 -> NFE +extra_steps，
+    # 且 transition_step 是**索引**（指向 sigma 表里的位置），
+    # 语义会随表长变化 —— 见 video_workflow._twopass_block 的重标定。
+    "sigma_refine_enabled_default": False,
+    "sigma_refine_extra_steps_default": 1,
+    "sigma_refine_start_at_sigma_default": 2.5,
+    "sigma_refine_end_at_sigma_default": 0.0,
+    "sigma_refine_spacing_default": "cosine",
     "note": "二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。"
             "总步数不变，提速来自一采的面积更小。"
             "H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，"
@@ -1756,8 +1775,14 @@ def options_payload(node_available=None,
         # 避免出现「能拖但服务端会丢掉」的假控件。
         payload["sigma_shift_available"] = bool(
             node_available("MiniMaxH3SigmaShift"))
+        # 【2026-11-13 新增 —— 借鉴 nonebot H3 工作流的 sigma 精修节点】
+        # H3SigmaRefiner 本机可用性 —— 前端据此决定是否显示/启用该控件。
+        payload["twopass"]["sigma_refine_node_available"] = bool(
+            node_available("H3SigmaRefiner"))
     else:
         # 没传回调（单测直接调用 options_payload()）-> 按「可用」，
         # 因为该节点是 ComfyUI 核心节点，恒在。
         payload["sigma_shift_available"] = True
+        # 没传回调 -> 节点可用性按「可用」处理（单测路径）。
+        payload["twopass"]["sigma_refine_node_available"] = True
     return payload
