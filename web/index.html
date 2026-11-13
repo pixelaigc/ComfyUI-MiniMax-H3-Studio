@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=sidebarfold2">
+<link rel="stylesheet" href="/static/style.css?v=efflora1">
 <link rel="stylesheet" href="/static/assets.css?v=assetlib1">
 <link rel="stylesheet" href="/static/responsive.css?v=sidebarfold2">
 </head>
@@ -1357,11 +1357,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=videopanel2"></script>
+<script src="/static/video-panel.js?v=videopanel3"></script>
 <!-- 效果 LoRA 选择器（H3 文生视频面板）——
      必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
      调用（window.VIDEO_EFFECT_LORA）。 -->
-<script src="/static/video-effect-lora.js?v=efflora1"></script>
+<script src="/static/video-effect-lora.js?v=efflora2"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
 <!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
      必须**先于** app.js 加载 —— app.js 的 boot() 里要读
@@ -1374,8 +1374,8 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      sidebar-fold.js 在 DOMContentLoaded 时初始化（此时 video-nav 还没渲染视频类别），
      所以它用 MutationObserver 盯着 #navVideoCategories，渲染完自动贴上折叠状态。 -->
 <script src="/static/sidebar-fold.js?v=sidebarfold2"></script>
-<script src="/static/job-meta.js?v=jobmeta2"></script>
-<script src="/static/app.js?v=sidebarfold2"></script>
+<script src="/static/job-meta.js?v=jobmeta3"></script>
+<script src="/static/app.js?v=efflora1"></script>
 <script src="/static/providers.js?v=enh-unify2"></script>
 <script src="/static/job-detail.js?v=jobdetail2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>
