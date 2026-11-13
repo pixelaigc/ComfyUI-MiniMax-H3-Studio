@@ -298,6 +298,35 @@ $$(".nav-item[data-mode]").forEach(el => el.addEventListener("click", () => {
   activateMode(el.dataset.mode, el);
 }));
 
+// ---------- 左侧栏折叠（2026-11-13）----------
+//
+// 【为什么在这里挂钩，而不是让 sidebar-fold.js 自己绑】
+// 折叠模块只管「展开/收起」这一个动作；
+// 「点了某个入口项 -> 先把它所在的分组/类别展开，再切模式」是**跨模块**的行为，
+// 必须由掌握 activateMode() 的这一层来串（sidebar-fold.js 不认识 activateMode）。
+//
+// 【只在这条路径展开】
+// 启动恢复路径（VideoNav.applyDefault / activateVideoMode）不展开 ——
+// 否则「刷新后保持折叠状态」会被打破。
+function expandNavForElement(el) {
+  if (!window.SidebarFold) return;
+  window.SidebarFold.ensureExpandedForElement(el);
+}
+
+// 【2026-11-13 折叠】点入口项前先把它所在的分组/类别展开 ——
+// 否则选中态落在看不见的地方，用户会以为没点中。
+// 用**事件委托**绑在 #sidebar 上：视频模型项是异步渲染的，
+// 逐个 addEventListener 绑不到后渲染出来的节点。
+(function bindNavFoldAwareClick() {
+  const sidebar = $("#sidebar");
+  if (!sidebar) return;
+  sidebar.addEventListener("click", event => {
+    const item = event.target.closest(".nav-item");
+    if (!item) return;
+    expandNavForElement(item);
+  }, true);   // 捕获阶段：早于 activateMode 的切换，先展开再切
+})();
+
 // ---------- 视频两级导航（类别 -> 模型，2026-11-11）----------
 //
 // 【为什么单独一个模块】
@@ -330,6 +359,12 @@ function activateVideoMode(mode) {
   }
   if (!navEl) {
     navEl = document.querySelector(`.nav-item[data-mode="${mode}"]`);
+  }
+  // 【2026-11-13 折叠】老任务卡片的「复用」按钮会走到这里。
+  // 如果该视频类别正折着，选中态就落在看不见的地方 —— 先展开。
+  // （启动恢复路径 applyDefault **不**展开，否则刷新后折叠状态保不住。）
+  if (window.SidebarFold && navEl) {
+    window.SidebarFold.ensureExpandedForElement(navEl);
   }
   activateMode(mode, navEl);
   syncVideoNavActive();
