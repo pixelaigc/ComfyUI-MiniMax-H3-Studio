@@ -1,0 +1,119 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 22, "rankSpacing": 36, "htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 内置 Agent 交互流程（人工骨架 + 代码派生节点）
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-agent.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-agent.mmd，然后跑 `make flow`。
+flowchart TB
+
+  A_START["用户进入「内置 Agent」页（#agentPage）"]
+  A_NEW["☰ 会话抽屉 → ＋ 新建交互 / 搜索 / 切换 / 删除"]
+  A_INPUT["输入框（Enter 发送 · Shift+Enter 换行）"]
+  A_ATT["📎 媒体附件<br/>图片 ≤ 9 · 音视频 ≤ 4（分开计数）"]
+  A_UPLOAD["POST /api/agent/upload<br/>图片同步入库（多模态分析 + 打标签）<br/>音视频异步分析 job，前端轮询 status"]
+  A_SEND["POST /api/agent/chat/stream（SSE）"]
+  A_PROGRESS["流式进度：progress 事件<br/>阶段文案来自服务端 PROGRESS_STAGES / TOOL_STAGE_TEXT"]
+  A_TOOLS["Agent 工具调用"]
+  A_CLARIFY["澄清追问（用户可补充回答）"]
+  A_RESULT["result 事件 → 结论 + 任务列表"]
+  A_SESS_ART["本次会话产物（抽屉）"]
+  A_MEMORY["长期记忆（跨会话偏好）"]
+
+  A_START --> A_NEW --> A_INPUT
+  A_INPUT --> A_ATT --> A_UPLOAD --> A_INPUT
+  A_INPUT --> A_SEND
+  A_SEND --> A_PROGRESS
+  A_PROGRESS --> A_TOOLS
+  A_TOOLS --> A_CLARIFY
+  A_CLARIFY --> A_INPUT
+  A_TOOLS --> A_RESULT
+  A_RESULT --> A_SESS_ART
+  A_TOOLS -.-> A_MEMORY
+
+  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 23 个）"]
+    direction LR
+    subgraph TG1["素材类"]
+      direction TB
+      T_search_assets["正在检索素材库<br/><code>search_assets</code>"]
+      T_describe_asset["正在查看素材详情<br/><code>describe_asset</code>"]
+      T_upload_asset["正在上传素材到素材库<br/><code>upload_asset</code>"]
+      T_delete_asset["正在删除素材<br/><code>delete_asset</code>"]
+      T_tag_asset["正在更新素材标签<br/><code>tag_asset</code>"]
+      T_list_asset_tags["正在读取素材标签<br/><code>list_asset_tags</code>"]
+    end
+    subgraph TG2["任务类"]
+      direction TB
+      T_create_job["正在下发生成任务<br/><code>create_job</code>"]
+      T_cancel_job["正在取消任务<br/><code>cancel_job</code>"]
+      T_retry_job["正在重试任务<br/><code>retry_job</code>"]
+      T_batch_create_jobs["正在批量创建任务<br/><code>batch_create_jobs</code>"]
+      T_list_jobs["正在查询任务历史<br/><code>list_jobs</code>"]
+      T_get_job_status["正在查询任务进度<br/><code>get_job_status</code>"]
+    end
+    subgraph TG3["模式与参数类"]
+      direction TB
+      T_list_modes["正在读取可用生成模式<br/><code>list_modes</code>"]
+      T_describe_mode_params["正在读取模式参数<br/><code>describe_mode_params</code>"]
+      T_get_mode_schema["正在读取模式 schema<br/><code>get_mode_schema</code>"]
+    end
+    subgraph TG4["提示词类"]
+      direction TB
+      T_enhance_prompt["正在增强提示词<br/><code>enhance_prompt</code>"]
+      T_list_prompt_presets["正在读取提示词预设<br/><code>list_prompt_presets</code>"]
+      T_get_prompt_preset["正在读取预设详情<br/><code>get_prompt_preset</code>"]
+    end
+    subgraph TG5["会话与记忆类"]
+      direction TB
+      T_recall_memory["正在读取记忆<br/><code>recall_memory</code>"]
+      T_search_conversations["正在检索历史对话<br/><code>search_conversations</code>"]
+      T_search_asset_history["正在检索素材历史<br/><code>search_asset_history</code>"]
+      T_remember_preference["正在记住偏好<br/><code>remember_preference</code>"]
+    end
+    subgraph TG6["回应类"]
+      direction TB
+      T_respond["正在整理结论<br/><code>respond</code>"]
+    end
+  end
+
+  A_TOOLS <--> TOOLS
+
+  subgraph SIDE["工具落到哪一侧"]
+    direction LR
+    AS["素材侧<br/>素材库检索 / 入库 / 标签 / 选择器"]
+    JB["任务侧<br/>建任务 / 批量 / 取消 / 重试 / 查进度"]
+    MP["模式侧<br/>真实模式清单 / 合法参数 / schema"]
+    PP["提示词侧<br/>模板扩写 / 预设 / 二次增强"]
+    CM["会话侧<br/>跨会话检索 / 长期偏好 / 素材历史"]
+    RS["回应<br/>respond 提交最终结论"]
+  end
+
+  TG1 --> AS
+  TG2 --> JB
+  TG3 --> MP
+  TG4 --> PP
+  TG5 --> CM
+  TG6 --> RS
+
+  AS --> A_GRID["素材库（/api/assets/*）"]
+  JB --> J_CREATE["create_job → 创建任务进队列"]
+  J_CREATE --> J_STATUS["get_job_status → 实时进度"]
+  MP --> J_CREATE
+  PP --> A_INPUT
+  CM --> A_MEMORY
+  RS --> A_RESULT
+  AS --> A_ATT
+
+  NOTE["Agent 侧能力位由服务端下发（agent_schema.MODE_SLOTS / mode_slot_plan）<br/>前端不再硬编码「哪些模式建不了」"]
+
+  MP -.-> NOTE
+
+  classDef ui fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef agent fill:#fdf4ff,stroke:#a21caf,stroke-width:1px,color:#581c87;
+  classDef tool fill:#f5f3ff,stroke:#7c3aed,stroke-width:1px,color:#2e1065;
+  classDef side fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#064e3b;
+  classDef job fill:#fff7ed,stroke:#ea580c,stroke-width:1px,color:#7c2d12;
+  classDef note fill:#f8fafc,stroke:#475569,stroke-width:1px,color:#0f172a;
+
+  class A_START,A_NEW,A_INPUT,A_ATT,A_SEND,A_PROGRESS,A_RESULT,A_SESS_ART,A_MEMORY,A_UPLOAD,A_CLARIFY ui;
+  class A_TOOLS agent;
+  class AS,MP,PP,CM,RS side;
+  class J_CREATE,J_STATUS,A_GRID job;
+  class NOTE note;
