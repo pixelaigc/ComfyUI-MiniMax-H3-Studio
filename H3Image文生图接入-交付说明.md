@@ -442,13 +442,75 @@ POST /api/jobs  mode=i2i_h3image  （无参考图）
 
 **要跑官方 H3-Image checkpoint，本机 ComfyUI 必须支持 `MiniMaxH3ImageConditioning`。**
 
+#### 6.1.1 缺口不止「节点」—— 还有两处更隐蔽的硬依赖（实测确认）
+
+回移植调研（`evidence/h3image_comfy_backport_feasibility.md`，532 行）实测出**三处**缺一不可的改动，
+其中两处比「节点不存在」更隐蔽 —— **节点补上了但这两处没补，一样跑不出图**：
+
+| # | 缺什么 | 实测证据 | 不补的后果 |
+|---|---|---|---|
+| 1 | `comfy/ldm/minimax/sampling.py`（`MiniMaxH3ImageModelSampling`，32 行） | 本机该文件**不存在**；上游新增 | PDD sigma 网格采样器缺失 —— 6 步蒸馏的 sigma 表无处落地 |
+| 2 | `comfy/model_detection.py` 的 `minimax_h3_image` 分支 + `ce42de5f64ac`（PDD baked in） | 本机 `model_detection.py:390` 的条件是 `video_patch_proj` **且** `audio_patch_proj` 同时存在；而 H3-Image checkpoint **实测无 `audio_patch_proj`**（978 个张量里 0 命中）→ 检测返回 `None` → ComfyUI 报 `ERROR UNSUPPORTED DIFFUSION MODEL`（**加载即失败，不是运行时失败**） | **latent 通道数算错**：`final_layer.video_out.weight` 实测 shape = `[576, 5376]` → `576 // 4 = 144`（错）vs `576 // 24 = 24`（对，PDD 6 头）。latent 变成 144 通道 → **输出是垃圾** |
+| 3 | `comfy/ldm/minimax/model.py` 的 `MiniMaxH3ImageModel` + `comfy/ldm/minimax/vae.py` 的 2D ViT 单帧解码器 | 本机 `FinalLayer` 已有 PDD head 机制，但 `MiniMaxH3ImageModel` 子类不存在；H3-Image 的 DiT（无音频流 + PDD 6 头网格）与 VAE（2D ViT 单帧）改的是既有类的构造/方法语义 | DiT 与 VAE 不认识 H3-Image 权重 |
+
+**两笔前置提交本机缺失且必需**：
+`2d6b73283af2`（+44/−39，抽出 `_embed_and_pack` / `_time_embedding` / `_run_blocks`）、
+`ce42de5f64ac`（+9/−7 + model_detection +6/−2，PDD 堆叠头）。
+
+**回移植实测结果**（在 `/tmp` 副本树上三阶段真实 apply，非纸面推演）：
+
+| 文件 | 结果 |
+|---|---|
+| `comfy/ldm/minimax/sampling.py`、`comfy/model_base.py`、`comfy/supported_models.py`、`comfy/text_encoders/minimax.py` | **CLEAN**（可直接 apply） |
+| `comfy/ldm/minimax/model.py` | 1/12 hunk 冲突（需手工合并） |
+| `comfy/ldm/minimax/vae.py` | 4/7 hunk 冲突 |
+| `comfy_extras/nodes_minimax_h3.py` | 6/6 hunk 冲突（全需手工合并） |
+| `comfy/sd.py` | 1/1 hunk 冲突 |
+| `comfy/lora.py` | 1/1（可跳过） |
+
+总计**需手工合并 12 处**，约 **+400/−200 行跨 7 个核心文件**。
+
+**可做成独立 custom node（monkey-patch）**：`supported_models.py` / `model_base.py` /
+`model_detection.py` / `nodes_minimax_h3.py` / `text_encoders/minimax.py` 的 `picture_label`。
+**躲不掉的**：`ldm/minimax/model.py` + `ldm/minimax/vae.py` —— 改的是既有类的构造/方法语义。
+
+#### 6.1.2 占位标签的一处实现差异（回移植时必须注意）
+
+上游 `MiniMaxH3ImageConditioning` 调用：
+
+```python
+clip.tokenize(prompt, images=vision_images, picture_label="Picture %d: ")   # ← 不带尖括号
+```
+
+而上游 tokenizer 的**默认**值是 `"<Picture %d>: "`（带尖括号），
+本机 0.37.0 的 tokenizer **没有 `picture_label` 形参**（`tokenize_with_weights` 的
+`**kwargs` 会把它静默吞掉）→ 实际插入的是 `<Picture 1>: `。
+
+**这不影响本面板的实现** —— 本面板让用户写的是 `<Picture N>`，
+依据是官方模板的用户提示词原文（`image_minimax_h3_image_edit.json` 的
+`PrimitiveStringMultiline`）：
+
+> `Replace the vintage yellow taxi in <Picture 1> with a pastel pink ice-cream truck…`
+
+即**官方用户可见语法就是带尖括号的 `<Picture 1>`** ✓。
+
+但回移植时要留意：若不补 `picture_label` 形参，模型侧看到的视觉标签是
+`<Picture 1>: `（带尖括号），与上游 H3-Image 节点的 `Picture 1: `（不带）**不一致** ——
+不报错，但图文对齐度会下降。建议回移植时把该形参一并带上。
+
+
 三条路径（已量化评估，证据见 `evidence/h3image_comfy_backport_feasibility.md`）：
 
 | 路径 | 内容 | 代价 | 风险 |
 |---|---|---|---|
-| **A. 第三方 custom node** | `astropuzzo/ComfyUI-MiniMax-H3-Image-Studio`（230★，README 写死「Use ComfyUI 0.37.0 or newer」，`docs/validation-v24.md` 记录 0.37.0 实测） | 装插件即可 | ⚠️ **它用的是 H3 video checkpoint**（`minimax_h3_fl2va_*` + `minimax_h3_video_vae_*`），**不是官方 H3-Image 模型** —— 跑的是「H3 静帧」，画质与官方 H3-Image 有差距（其 README 自陈 "Still experimental"）。本机权重已齐（零下载） |
+| **A. 第三方 custom node** | `astropuzzo/ComfyUI-MiniMax-H3-Image-Studio`（230★，README 写死「Use ComfyUI 0.37.0 or newer」，`docs/validation-v24.md` 记录 0.37.0 实测） | 装插件即可 | ⚠️ **它用的是 H3 video checkpoint**（`minimax_h3_fl2va_*` + `minimax_h3_video_vae_*`），**不是官方 H3-Image 模型** —— 跑的是「H3 静帧」，画质与官方 H3-Image 有差距（其 README 自陈 "Still experimental"）。**本机权重已全齐，零下载**（实测 3/3）：`minimax_h3_fl2va_pruned_int8_convrot.safetensors`（nvme 外接盘）、`qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors`（本地 models/text_encoders，2026-08-05 就在）、`minimax_h3_video_vae_fp16.safetensors`（本地 models/vae） |
 | **B. 回移植上游 CORE-708** | 上游提交 `ede4e5fe8d15`（2026-11-10，首发于 v0.45.0）+ 两笔前置提交 `ce42de5f64ac`（PDD baked in）、`2d6b73283af2`（VRAM refactor） | **改 7 个 ComfyUI 核心文件 + 1 个新文件，约 +400/−200 行** | ⚠️ **无法做成纯 custom node**（monkey-patch 绕不开 `model_detection.py` + `sd.py`）；本机 `comfy/ldm/minimax/model.py` 有本地改动会冲突；**改 ComfyUI 主干超出本任务授权范围**（本任务限定在 Studio 仓库内） |
 | **C. 升级 ComfyUI 到 0.45.0+** | 直接升级 | 一次升级 | ⚠️ 本机有 100+ custom_nodes，很多依赖 diffusers 0.36，**升级主干风险很高** |
+
+**补充（2026-11-13 复核）**：官方 **Partner Node 不存在** —— 查过 Comfy-Org 92 个仓库
++ comfy registry + v0.45.0 release notes，没有官方 H3-Image Partner Node。
+第三方候选只有 3 个（`astropuzzo` 230★ / `thaakeno` 145★ alpha / `ethanfel` 39★），
+其中只有 `astropuzzo` 明确标注在 0.37.0 上验证过，但如上所述它跑的是 H3 video 权重。
 
 **本任务未执行 A/B/C 任何一条** —— 需求明确限定「本机缺模型权重文件或 ComfyUI 节点，须如实说明缺失项」，
 且改动 ComfyUI 主干 / 安装第三方插件属于超出授权范围的动作，**应由 willis 拍板**。
