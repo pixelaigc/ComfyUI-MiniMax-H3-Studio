@@ -1,214 +1,187 @@
-[
-  {
-    "jid": "6aa899285ef1",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "736p · 1280×736 · 16:9",
-      "注意力": "默认（PyTorch 稠密注意力） · 速度最慢",
-      "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
-      "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
-      "采样器": "euler",
-      "调度器": "beta",
-      "步数": "6",
-      "尺寸": "1280×736",
-      "时长": "5s",
-      "种子": "随机",
-      "耗时": "4m5s",
-      "提示词": "integrated_multimodal_description: [Shot 1] In a dimly lit ancient Chinese-style"
+{
+  "captured_at": "2026-11-13",
+  "instance": "http://127.0.0.1:8207",
+  "note": "每张卡的 gen-params 分组实测值；LoRA 行要么是真实 LoRA 名+强度，要么是「无」",
+  "cards": [
+    {
+      "id": "6aa899285ef1",
+      "mode": "文生视频 · 11/13 14:2411/13 14:24",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] In a dimly lit ancient Chi",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "6 · 1",
+        "尺寸": "1280×736",
+        "时长": "5s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "1b29c6628914",
+      "mode": "文生视频 · 11/13 14:1511/13 14:15",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] A medium shot of a dark, m",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "6 · 1",
+        "尺寸": "1280×736",
+        "时长": "5s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "a96aa049adb9",
+      "mode": "文生视频 · 11/13 14:0111/13 14:01",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] Static medium shot, eye-le",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "6 · 1",
+        "尺寸": "1280×736",
+        "时长": "5s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "fec6e25740b9",
+      "mode": "文生视频 · 11/13 13:5311/13 13:53",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chi",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "6 · 1",
+        "尺寸": "1280×736",
+        "时长": "5s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "poisonlora0001",
+      "mode": "文生视频 · 11/13 13:4011/13 13:40",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chi",
+      "gen_params": {
+        "模型": "MiniMax-H3 + LoRA",
+        "LoRA": "无",
+        "采样器": "euler",
+        "调度器": "beta",
+        "步数/CFG": "4 · 1",
+        "尺寸": "—",
+        "时长": "5s",
+        "种子": "123456"
+      }
+    },
+    {
+      "id": "6b6f6ad69d07",
+      "mode": "文生视频 · 11/13 11:2411/13 11:24",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] The shot begins as an extr",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA（int8，默认档）",
+        "LoRA": "ckpt850 ×1.00",
+        "采样器": "—",
+        "调度器": "—",
+        "步数/CFG": "— · —",
+        "尺寸": "1216×672",
+        "时长": "15s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "2ee8a0a8b878",
+      "mode": "文生音乐 · 11/13 07:4711/13 07:47",
+      "prompt_head": "一位年轻亚洲女性站立在繁忙的的香港街道街人行道边缘。港风，复古风格\n歌曲",
+      "gen_params": {
+        "模型": "YuE2 3B · BF16 完整版",
+        "LoRA": "无",
+        "采样器": "dpm_2",
+        "调度器": "sgm_uniform",
+        "步数/CFG": "32 · 1",
+        "尺寸": "—",
+        "时长": "—",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "4792f555f151",
+      "mode": "文生音乐 · 11/13 07:4511/13 07:45",
+      "prompt_head": "一位年轻亚洲女性站立在繁忙的的香港街道街人行道边缘。港风，复古风格\n歌曲",
+      "gen_params": {
+        "模型": "YuE2 3B · BF16 完整版",
+        "LoRA": "无",
+        "采样器": "dpm_2",
+        "调度器": "sgm_uniform",
+        "步数/CFG": "32 · 1",
+        "尺寸": "—",
+        "时长": "—",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "14ba4f34fd1e",
+      "mode": "文生音乐 · 11/13 07:3911/13 07:39",
+      "prompt_head": "一首温暖的华语流行歌，讲述夕阳下海边的回忆，吉他与钢琴伴奏，92 BPM",
+      "gen_params": {
+        "模型": "YuE2 3B · BF16 完整版",
+        "LoRA": "无",
+        "采样器": "dpm_2",
+        "调度器": "sgm_uniform",
+        "步数/CFG": "32 · 1",
+        "尺寸": "—",
+        "时长": "—",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "544bdfef23f3",
+      "mode": "文生视频 · 11/12 13:5411/12 13:54",
+      "prompt_head": "赵本山在乡村舞台上跳舞，戴灰色鸭舌帽，穿深色中山装和黑色布鞋，动作滑稽欢快，带有二人转式的身段和手势，步伐轻快逗趣，周围是喜庆的红灯笼和观众",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA（int8，默认档）",
+        "LoRA": "ckpt850 ×1.00",
+        "采样器": "—",
+        "调度器": "—",
+        "步数/CFG": "— · —",
+        "尺寸": "1216×672",
+        "时长": "10s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "78bf9c1af648",
+      "mode": "文生视频 · 11/12 13:4511/12 13:45",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] A medium-wide static shot ",
+      "gen_params": {
+        "模型": "MiniMax-H3 FL2VA（int8，默认档）",
+        "LoRA": "ckpt850 ×1.00",
+        "采样器": "—",
+        "调度器": "—",
+        "步数/CFG": "— · —",
+        "尺寸": "1216×672",
+        "时长": "10s",
+        "种子": "随机"
+      }
+    },
+    {
+      "id": "c6dd9a2e81b3",
+      "mode": "文生视频 · 11/12 13:3611/12 13:36",
+      "prompt_head": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chi",
+      "gen_params": {
+        "模型": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
+        "LoRA": "LightX2V SLA 4 步（768p 档） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
+        "采样器": "euler",
+        "调度器": "simple",
+        "步数/CFG": "4 · 1",
+        "尺寸": "1344×768",
+        "时长": "5s",
+        "种子": "随机"
+      }
     }
-  },
-  {
-    "jid": "1b29c6628914",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "736p · 1280×736 · 16:9",
-      "注意力": "默认（PyTorch 稠密注意力） · 速度最慢",
-      "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
-      "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
-      "采样器": "euler",
-      "调度器": "beta",
-      "步数": "6",
-      "尺寸": "1280×736",
-      "时长": "5s",
-      "种子": "随机",
-      "耗时": "2m32s",
-      "提示词": "integrated_multimodal_description: [Shot 1] A medium shot of a dark, misty arena"
-    }
-  },
-  {
-    "jid": "a96aa049adb9",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "736p · 1280×736 · 16:9",
-      "注意力": "默认（PyTorch 稠密注意力） · 速度最慢",
-      "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
-      "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
-      "采样器": "euler",
-      "调度器": "beta",
-      "步数": "6",
-      "尺寸": "1280×736",
-      "时长": "5s",
-      "种子": "随机",
-      "耗时": "3m14s",
-      "提示词": "integrated_multimodal_description: [Shot 1] Static medium shot, eye-level angle."
-    }
-  },
-  {
-    "jid": "fec6e25740b9",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "736p · 1280×736 · 16:9",
-      "注意力": "默认（PyTorch 稠密注意力） · 速度最慢",
-      "模型": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
-      "LoRA": "DMAD 4 步（critic 版） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
-      "采样器": "euler",
-      "调度器": "beta",
-      "步数": "6",
-      "尺寸": "1280×736",
-      "时长": "5s",
-      "种子": "随机",
-      "耗时": "1m47s",
-      "提示词": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia"
-    }
-  },
-  {
-    "jid": "poisonlora0001",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "768p · 16:9",
-      "模型": "MiniMax-H3 + LoRA",
-      "LoRA": "无",
-      "采样器": "euler",
-      "调度器": "beta",
-      "步数": "4",
-      "尺寸": "—",
-      "时长": "5s",
-      "种子": "123456",
-      "耗时": "1m40s",
-      "提示词": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia"
-    }
-  },
-  {
-    "jid": "6b6f6ad69d07",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "672p · 1216×672 · 16:9",
-      "模型": "MiniMax-H3 FL2VA（int8，默认档）",
-      "LoRA": "ckpt850 ×1.00",
-      "采样器": "—",
-      "调度器": "—",
-      "步数": "—",
-      "尺寸": "1216×672",
-      "时长": "15s",
-      "种子": "随机",
-      "耗时": "4m51s",
-      "提示词": "integrated_multimodal_description: [Shot 1] The shot begins as an extreme close-"
-    }
-  },
-  {
-    "jid": "2ee8a0a8b878",
-    "rows": {
-      "模式": "文生音乐",
-      "谱面": "完整谱面",
-      "格式": "FLAC",
-      "模型": "YuE2 3B · BF16 完整版",
-      "LoRA": "无",
-      "采样器": "dpm_2",
-      "调度器": "sgm_uniform",
-      "步数": "32",
-      "尺寸": "—",
-      "时长": "—",
-      "种子": "随机",
-      "耗时": "2m25s",
-      "风格描述": "一位年轻亚洲女性站立在繁忙的的香港街道街人行道边缘。港风，复古风格\n歌曲"
-    }
-  },
-  {
-    "jid": "4792f555f151",
-    "rows": {
-      "模式": "文生音乐",
-      "谱面": "完整谱面",
-      "格式": "FLAC",
-      "模型": "YuE2 3B · BF16 完整版",
-      "LoRA": "无",
-      "采样器": "dpm_2",
-      "调度器": "sgm_uniform",
-      "步数": "32",
-      "尺寸": "—",
-      "时长": "—",
-      "种子": "随机",
-      "耗时": "65s",
-      "风格描述": "一位年轻亚洲女性站立在繁忙的的香港街道街人行道边缘。港风，复古风格\n歌曲"
-    }
-  },
-  {
-    "jid": "14ba4f34fd1e",
-    "rows": {
-      "模式": "文生音乐",
-      "谱面": "完整谱面",
-      "格式": "FLAC",
-      "模型": "YuE2 3B · BF16 完整版",
-      "LoRA": "无",
-      "采样器": "dpm_2",
-      "调度器": "sgm_uniform",
-      "步数": "32",
-      "尺寸": "—",
-      "时长": "—",
-      "种子": "随机",
-      "耗时": "1m35s",
-      "风格描述": "一首温暖的华语流行歌，讲述夕阳下海边的回忆，吉他与钢琴伴奏，92 BPM"
-    }
-  },
-  {
-    "jid": "544bdfef23f3",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "672p · 1216×672 · 16:9",
-      "模型": "MiniMax-H3 FL2VA（int8，默认档）",
-      "LoRA": "ckpt850 ×1.00",
-      "采样器": "—",
-      "调度器": "—",
-      "步数": "—",
-      "尺寸": "1216×672",
-      "时长": "10s",
-      "种子": "随机",
-      "耗时": "2m28s",
-      "提示词": "赵本山在乡村舞台上跳舞，戴灰色鸭舌帽，穿深色中山装和黑色布鞋，动作滑稽欢快，带有二人转式的身段和手势，步伐轻快逗趣，周围是喜庆的红灯笼和观众欢笑鼓掌，暖色调灯光"
-    }
-  },
-  {
-    "jid": "78bf9c1af648",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "672p · 1216×672 · 16:9",
-      "模型": "MiniMax-H3 FL2VA（int8，默认档）",
-      "LoRA": "ckpt850 ×1.00",
-      "采样器": "—",
-      "调度器": "—",
-      "步数": "—",
-      "尺寸": "1216×672",
-      "时长": "10s",
-      "种子": "随机",
-      "耗时": "2m44s",
-      "提示词": "integrated_multimodal_description: [Shot 1] A medium-wide static shot captures a"
-    }
-  },
-  {
-    "jid": "c6dd9a2e81b3",
-    "rows": {
-      "模式": "文生视频",
-      "分辨率": "768p · 1344×768 · 16:9",
-      "注意力": "稀疏视频注意力（预算制） · 速度最快",
-      "模型": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
-      "LoRA": "LightX2V SLA 4 步（768p 档） ×1.00 · 工作流固定：Turbo 4 步 · ckpt850（工作流固定） ×1.00",
-      "采样器": "euler",
-      "调度器": "simple",
-      "步数": "4",
-      "尺寸": "1344×768",
-      "时长": "5s",
-      "种子": "随机",
-      "耗时": "46s",
-      "提示词": "integrated_multimodal_description: [Shot 1] Live-action, cinematic Chinese wuxia"
-    }
-  }
-]
+  ]
+}

@@ -65,16 +65,17 @@
     "overflowsViewport": false,
     "bodyScrollable": true,
     "promptScrollable": true,
-    "closeBtnClickable": false,
+    "closeBtnClickable": true,
     "doneBtnClickable": true,
     "closeBtnSize": [
-      13,
-      26
+      40,
+      40
     ],
     "doneBtnSize": [
       61,
       37
     ],
     "paramRowCount": 13
-  }
+  },
+  "_note": "closeBtnSize 1280px 这次是 40x40 —— 本轮补了 .detail-dialog .prompt-dialog-head button 的不限宽度 40x40 规则（commit 1185c54）；此前实测桌面为 13x26。"
 }
