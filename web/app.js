@@ -4409,7 +4409,13 @@ function detailRecommendHtml(job) {
     }).join("");
     let sourceHtml = "";
     if (typeof meta.recSource === "function") {
-      const source = meta.recSource(rec);
+      // 【为什么还要再洗一遍】recSource() 的来源类型在
+      // window.JOB_META_SOURCE_KIND_LABEL 没就位时（/api/video-options 还没返回，
+      // 或用户没打开过视频面板）会**回退成原始哨兵值** not_provided。
+      // c6 要求「作者未提供」显式标注 —— 所以这里把漏出来的哨兵值洗成中文，
+      // 不依赖标签表是否已加载。
+      const source = String(meta.recSource(rec) || "")
+        .replace(/\bnot_provided\b/g, "作者未提供");
       if (source) sourceHtml = `<div class="job-detail-source">${escapeHtml(source)}</div>`;
     }
     blocks.push(`<div class="detail-section-title">${escapeHtml(title)}</div>`
