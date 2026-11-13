@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import struct
+import time
 from pathlib import Path
 
 from . import loras as lora_registry
@@ -394,6 +395,40 @@ def _read_sidecar_doc(path: Path) -> str:
     return ""
 
 
+#: discover_effect_loras 的**结果缓存**（key = model_key）。
+#:
+#: 【为什么必须缓存 —— 2026-11-14 性能缺陷实测】
+#: discover_effect_loras() 要**扫全盘 663 个候选 LoRA 文件**，
+#: 逐个读 safetensors 头、逐模块比对 H3 底模权重键 —— 实测单次 **0.79s**。
+#:
+#: 而 job_meta._effect_lora_display() / job_meta.is_real_lora_key()
+#: 会在**每一条任务记录**里各调一次（`/api/jobs` 一次返回 184 条）
+#: -> 184 × 0.79s ≈ **145s**，且这些调用发生在 **aiohttp 事件循环里**
+#: （同步阻塞）-> 整个 8190 服务被卡住，其它请求（含
+#: PUT /api/video-config）全部排队 -> 用户看到「改了强度，20 秒后
+#: 才落盘」。
+#:
+#: 缓存策略：**TTL 60 秒 + 显式失效**。
+#:   * TTL：LoRA 目录在运行期基本不变（用户装新 LoRA 是低频事件），
+#:     60 秒内的陈旧最多让「刚装好的 LoRA 晚 60 秒出现在下拉里」。
+#:   * 显式失效：提供 invalidate_effect_lora_cache()，
+#:     装完 LoRA / 重启后可以主动刷。
+#:   * 缓存**只存只读派生数据**（名字/路径/形状统计），不缓存任何
+#:     用户配置，失效不影响正确性 —— 最坏情况是下拉列表少一项。
+_DISCOVER_CACHE: dict[str, tuple[float, list[dict]]] = {}
+
+#: 缓存有效期（秒）。
+_DISCOVER_CACHE_TTL = 60.0
+
+
+def invalidate_effect_lora_cache() -> None:
+    """主动作废 discover_effect_loras 的结果缓存。
+
+    装完 / 替换 LoRA 后调用，让下拉立刻反映新文件。
+    """
+    _DISCOVER_CACHE.clear()
+
+
 def discover_effect_loras(model_key: str | None = None) -> list[dict]:
     """本机真实存在的 H3 效果 LoRA 清单。
 
@@ -416,6 +451,15 @@ def discover_effect_loras(model_key: str | None = None) -> list[dict]:
       }
     """
     model_key = model_key or vmodels.VIDEO_DEFAULT_MODEL
+
+    # 【结果缓存】扫盘代价高（0.79s/次），而调用方是「每条任务记录一次」
+    # -> /api/jobs 一次 184 条 = 145s 阻塞。TTL 60s + 显式失效兜底。
+    now = time.time()
+    cached = _DISCOVER_CACHE.get(model_key)
+    if cached is not None and (now - cached[0]) < _DISCOVER_CACHE_TTL:
+        # 返回**副本**：调用方拿到的是 list，避免有人原地改坏缓存。
+        return [dict(item) for item in cached[1]]
+
     model = vmodels.VIDEO_MODELS.get(model_key)
     unet_path = vmodels.find_weight(model["unet"]) if model else None
     if unet_path is None:
@@ -480,7 +524,10 @@ def discover_effect_loras(model_key: str | None = None) -> list[dict]:
             "directory": directory,
         })
     found.sort(key=lambda item: (item["directory"], item["name"]))
-    return found
+    # 写缓存（TTL 60s）。缓存的是**只读派生数据**，
+    # 失效最坏后果只是「下拉少一项 / 晚 60 秒出现」，不影响正确性。
+    _DISCOVER_CACHE[model_key] = (time.time(), found)
+    return [dict(item) for item in found]
 
 
 def effect_lora_compat_matrix(model_key: str) -> dict[str, dict]:

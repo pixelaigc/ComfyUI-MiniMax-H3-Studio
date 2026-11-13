@@ -1208,9 +1208,20 @@
     if (cfg.shift_audio != null) videoState.shiftAudio = Number(cfg.shift_audio);
   }
 
-  function saveVideoConfig(override) {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
+  /**
+   * 保存文生视频面板配置。
+   *
+   * @param {object} [override] 本次要写的配置（与 collectConfig() 合并）。
+   * @param {object} [opts]
+   * @param {boolean} [opts.immediate] true = **不等节流**，立刻发请求。
+   *        （效果 LoRA 在页面卸载时要 flush，走这条路径。）
+   * @param {boolean} [opts.keepalive] true = 用 fetch keepalive，
+   *        让请求在页面关闭后仍能送达（最多 64KB，配置体积远小于此）。
+   */
+  function saveVideoConfig(override, opts) {
+    const immediate = !!(opts && opts.immediate);
+    const keepalive = !!(opts && opts.keepalive);
+    const doSave = async () => {
       try {
         // 【2026-11-13 效果 LoRA】override 是可选的「本次要写的配置」。
         // 效果 LoRA 模块会传入它 —— 但**默认路径不传**，
@@ -1222,6 +1233,8 @@
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          // 页面卸载时的兜底 flush：请求必须活过页面销毁。
+          keepalive: keepalive,
         });
         if (!resp.ok) {
           const data = await resp.json().catch(() => ({}));
@@ -1230,7 +1243,14 @@
       } catch (e) {
         console.warn("[视频面板] 配置保存失败:", e.message);
       }
-    }, 300);
+    };
+    if (immediate) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      return doSave();
+    }
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 300);
   }
 
   // ------------------------------------------------------------ 加载清单

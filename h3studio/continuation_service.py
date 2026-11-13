@@ -37,6 +37,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import time
 from pathlib import Path
 
 from . import continuation as cont
@@ -69,6 +70,35 @@ def segment_run_id(job_id: str) -> str:
 # ------------------------------------------------------------------
 # 落盘路径（ComfyUI output 目录）
 # ------------------------------------------------------------------
+#: comfy_output_dir 的**结果缓存**。
+#:
+#: 【为什么必须缓存 —— 2026-11-14 性能缺陷实测】
+#: comfy_output_dir() -> _comfy_candidates() -> _comfy_proc_cwds() ->
+#: _comfy_pids()，而 _comfy_pids() **fork 一个 `ss -ltnp` 子进程**来解析
+#: 端口 8188 的监听进程 —— 实测单次 **48ms**（fork+exec+等管道）。
+#:
+#: 调用方是 continuation_state()，而 continuation_state() 在
+#: **每一条任务记录**里各调一次（`/api/jobs` 一次返回 184 条）
+#: -> 184 × 48ms ≈ 9s，且发生在 **aiohttp 事件循环里**（同步阻塞）
+#: -> 整个 8190 服务被卡住 -> 用户看到「改了效果 LoRA 强度，
+#: 20 秒后才落盘」。
+#:
+#: 缓存策略：**TTL 60 秒**。ComfyUI 的安装目录 / 监听端口在运行期
+#: 不会变（重启 ComfyUI 也不换目录），60 秒内的陈旧无实际影响。
+#: 装 ComfyUI / 换端口后最坏 60 秒内解析不到 —— 那时兜底路径
+#: （/home/ubuntu/comfyui/output）仍然可用，不会报错。
+_COMFY_OUTPUT_CACHE: tuple[float, Path] | None = None
+
+#: 缓存有效期（秒）。
+_COMFY_OUTPUT_CACHE_TTL = 60.0
+
+
+def invalidate_comfy_output_cache() -> None:
+    """主动作废 comfy_output_dir 的缓存（ComfyUI 换目录/换端口后调用）。"""
+    global _COMFY_OUTPUT_CACHE
+    _COMFY_OUTPUT_CACHE = None
+
+
 def comfy_output_dir() -> Path:
     """ComfyUI 的 output 目录。
 
@@ -81,15 +111,28 @@ def comfy_output_dir() -> Path:
       2. ComfyUI 进程的 cwd（从 /proc 找监听 8188 的进程）；
       3. 常见安装位置 /home/ubuntu/comfyui。
     都找不到就返回空路径 —— 调用方据此**明确报错**，不静默。
+
+    【性能】解析要 fork `ss` 子进程（48ms），且被「每条任务记录一次」
+    地调用 -> 结果按 TTL 缓存（见 _COMFY_OUTPUT_CACHE 的说明）。
     """
     override = os.environ.get("H3STUDIO_COMFY_OUTPUT")
     if override:
         return Path(override)
+
+    # 命中缓存 -> 直接返回（省掉 fork `ss` 的 48ms）
+    global _COMFY_OUTPUT_CACHE
+    cached = _COMFY_OUTPUT_CACHE
+    if cached is not None and (time.time() - cached[0]) < _COMFY_OUTPUT_CACHE_TTL:
+        return cached[1]
+
+    resolved = Path("/home/ubuntu/comfyui/output")
     for candidate in _comfy_candidates():
         out = candidate / "output"
         if out.is_dir():
-            return out
-    return Path("/home/ubuntu/comfyui/output")
+            resolved = out
+            break
+    _COMFY_OUTPUT_CACHE = (time.time(), resolved)
+    return resolved
 
 
 def _comfy_candidates() -> list[Path]:

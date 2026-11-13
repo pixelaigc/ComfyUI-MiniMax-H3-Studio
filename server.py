@@ -1574,16 +1574,41 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     # （出片照跑但 LoRA 没生效），用户根本看不出来。
     effect_loras: list[dict] = []
     raw_effect = params.get("effect_loras")
+    if raw_effect is not None and not isinstance(raw_effect, list):
+        # 【2026-11-14 修 —— 顶层类型非法也要报错】
+        # 原来只有 `if isinstance(raw_effect, list):` 一层判断：
+        # 传 effect_loras="h3/xxx"（字符串）会**整段跳过** -> 200 + 落库 []，
+        # 同样收不到原因。与「item 不是 dict」同性质，一并明确报错。
+        return out, (
+            f"效果 LoRA 列表必须是数组（每项是对象），"
+            f"收到的是 {type(raw_effect).__name__}：{raw_effect!r}")
     if isinstance(raw_effect, list):
         from h3studio import h3_effect_loras as effect_registry
         unet_path = video_models.find_weight(model["unet"])
-        for item in raw_effect:
+        for index, item in enumerate(raw_effect):
+            # 【2026-11-14 修 —— 非法结构不能静默丢弃】
+            #
+            # 【原症状】`if not isinstance(item, dict): continue`
+            # —— 传 effect_loras=["h3/3dsrx_minimax_h3.safetensors"]（字符串数组）
+            # 会被**静默跳过**，HTTP 200 + 落库 effect_loras=[]，
+            # 客户端**收不到任何错误原因**。
+            # 用户看到的是「我明明选了 LoRA，生成库卡片上却什么都没有」，
+            # 完全无从判断是前端没提交、还是后端丢了。
+            #
+            # 【为什么要区分 item 和 name】
+            # 「item 不是 dict」= **结构非法**（传错了类型）-> 必须报错。
+            # 「item 是 dict 但 name 为空」= 用户主动清空了这一项
+            # （或停用），属于**合法输入** -> 跳过，不报错。
             if not isinstance(item, dict):
-                continue
+                return out, (
+                    f"效果 LoRA 第 {index + 1} 项必须是对象"
+                    f"（含 name / strength / enabled / trigger），"
+                    f"收到的是 {type(item).__name__}：{item!r}")
             if item.get("enabled") is False:
                 continue
             name = (item.get("name") or "").strip()
             if not name:
+                # 空名字 = 这一项没有内容（用户清空后提交的残项）-> 跳过。
                 continue
             resolved, path = effect_registry.lora_registry.resolve_lora(name)
             if not resolved or path is None:
@@ -4262,6 +4287,39 @@ async def api_video_config(request):
         return web.json_response({"error": "请求格式错误"}, status=400)
     if not isinstance(body, dict):
         return web.json_response({"error": "配置必须是对象"}, status=400)
+
+    # 【2026-11-14 修 —— 效果 LoRA 结构校验与提交链路保持一致】
+    #
+    # 【为什么】任务提交链路（normalize_t2v_params）现在会对
+    # 「非法结构的 effect_loras」明确 400（原来静默丢弃）。
+    # 但配置保存链路（PUT /api/video-config）原来**不校验**，
+    # 什么都能存进去 —— 于是：
+    #   * 前端存了非法结构 -> GET 读回来还是非法 -> 面板永远空白；
+    #   * 用户在提交时被 400 拦住，却**看不到**配置里存的是什么，
+    #     无法自查。
+    # 两边行为必须一致：**在入口就拒绝非法结构 + 给出中文原因**。
+    #
+    # 【校验口径与提交链路一致】
+    #   * 顶层不是数组            -> 400
+    #   * 某项不是对象            -> 400（指出第几项）
+    #   * name 为空 / enabled=false -> **合法**（用户清空/停用），跳过
+    #   * 文件不存在 / 强度非数字   -> 这里**不**查（那是提交时的闸门），
+    #     因为配置保存是「先存下来」，真正的效果校验在生成前。
+    raw_effect = body.get("effect_loras")
+    if raw_effect is not None:
+        if not isinstance(raw_effect, list):
+            return web.json_response({
+                "error": (f"效果 LoRA 列表必须是数组（每项是对象），"
+                          f"收到的是 {type(raw_effect).__name__}：{raw_effect!r}")},
+                status=400)
+        for index, item in enumerate(raw_effect):
+            if not isinstance(item, dict):
+                return web.json_response({
+                    "error": (f"效果 LoRA 第 {index + 1} 项必须是对象"
+                              f"（含 name / strength / enabled / trigger），"
+                              f"收到的是 {type(item).__name__}：{item!r}")},
+                    status=400)
+
     with db() as conn:
         prov.set_pref(conn, key, json.dumps(body, ensure_ascii=False))
     return json_ok({"ok": True, "config": body})
