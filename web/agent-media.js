@@ -38,6 +38,9 @@
     t2i_qwen: { label: "Qwen-Image 2.1 文生图", media: "image" },
     i2i_qwen: { label: "Qwen-Image 2.1 图片编辑", media: "image" },
     t2i_moss: { label: "MOSS-Image 文生图", media: "image" },
+    // MiniMax-H3-Image：文生图 + 图片编辑（2026-11-13 新增）
+    t2i_h3image: { label: "H3-Image 文生图", media: "image" },
+    i2i_h3image: { label: "H3-Image 图片编辑", media: "image" },
     t2v: { label: "文生视频", media: "video" },
     flf: { label: "首尾帧生成", media: "video" },
     r2v: { label: "参考图生成", media: "video" },
@@ -130,6 +133,10 @@
     t2i_qwen: ["480p", "1mp", "720p", "1080p", "1440p", "2k"],
     i2i_qwen: ["480p", "1mp", "720p", "1080p", "1440p", "2k"],
     t2i_moss: ["480p", "1mp", "720p", "1080p", "1440p", "2k"],
+    // MiniMax-H3-Image：档位名**完全不同**（总像素 4/8/16MP），
+    // 不是 480p/1mp 那一套 —— 写错会让 Agent 传一个不存在的档位。
+    t2i_h3image: ["4mp", "8mp", "16mp"],
+    i2i_h3image: ["4mp", "8mp", "16mp"],
   };
 
   // ------------------------------------------------------------------

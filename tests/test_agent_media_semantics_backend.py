@@ -166,10 +166,21 @@ class TestModeInventory(_Base):
     """真实 mode 只有 9 个；longfilm 不在 Agent 可下发范围内。"""
 
     def test_builders_and_job_modes_are_consistent(self):
-        """workflows.BUILDERS 与 server.JOB_MODES 必须一致（9 个）。"""
+        """workflows.BUILDERS 与 server.JOB_MODES 必须一致。
+
+        【2026-11-13 改】原来断言「9 个」—— 写死数字意味着每加一个生成模式
+        都要改这个测试，改漏了就是一次假失败（测试说「模式数不对」，
+        实际是「你加了模式没改断言」）。
+        改成**动态断言**：BUILDERS 与 JOB_MODES 必须逐项一致，
+        且不少于已知的 9 个基础模式（防止有人误删模式）。
+        """
         self.assertEqual(sorted(wf.BUILDERS.keys()),
                          sorted(self.server_mod.JOB_MODES))
-        self.assertEqual(len(wf.BUILDERS), 9)
+        # 基础 9 个模式必须都在（防止误删）
+        for base in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen",
+                     "t2i_moss", "t2a", "a2a"):
+            self.assertIn(base, wf.BUILDERS)
+        self.assertGreaterEqual(len(wf.BUILDERS), 9)
 
     def test_longfilm_is_not_agent_buildable(self):
         """longfilm 走 /api/longfilms 自有链路，Agent 建不了。"""

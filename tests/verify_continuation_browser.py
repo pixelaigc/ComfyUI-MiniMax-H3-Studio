@@ -46,6 +46,23 @@ WIDTHS = (375, 1280)
 CONSOLE_TAG = "[browser]"
 
 
+def accept_base(default="http://127.0.0.1:8199"):
+    """验收实例的 base URL。
+
+    端口写在 data-accept/PORT（启动脚本自动顺延时写的）——
+    8199 可能被并发 agent 占用，所以不能硬编码。
+    """
+    port_file = Path(__file__).resolve().parent.parent / "data-accept" / "PORT"
+    if port_file.is_file():
+        try:
+            port = port_file.read_text(encoding="utf-8").strip()
+            if port.isdigit():
+                return f"http://127.0.0.1:{port}"
+        except Exception:
+            pass
+    return default
+
+
 def _http_get(url, timeout=60):
     with urllib.request.urlopen(url, timeout=timeout) as resp:
         raw = resp.read().decode()
@@ -97,7 +114,7 @@ def _probe_video(path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default="http://127.0.0.1:8199")
+    parser.add_argument("--base", default=accept_base())
     parser.add_argument("--out", default=str(REPO / "evidence" / "continuation"))
     parser.add_argument("--skip-generate", action="store_true",
                         help="跳过真实生成（只走 UI 交互）")
@@ -129,9 +146,11 @@ def main():
         params = {
             "prompt": "A lone swordsman in black robes standing in a moonlit "
                       "bamboo forest, slow camera push-in, cold mist drifting",
-            "model_key": "fl2va_int8", "width": 768, "height": 448,
+            "model_key": os.environ.get("H3STUDIO_TEST_MODEL",
+                                        "fl2va_pruned_w4a8"),
+            "width": 768, "height": 448,
             "duration": 5, "steps": 4, "sampler": "euler",
-            "scheduler": "simple", "seed": 4242,
+            "scheduler": "beta", "seed": 4242,
         }
         job1 = _http_multipart(f"{base}/api/jobs",
                                {"mode": "t2v", "params": json.dumps(params)})["id"]
@@ -364,8 +383,10 @@ def main():
             for out_item in job.get("outputs") or []:
                 if out_item.get("kind") != "video":
                     continue
-                probe = _probe_video(Path("/tmp/h3t2v-data/outputs")
-                                     / out_item["file"])
+                out_root = Path(os.environ.get(
+                    "H3STUDIO_DATA_DIR",
+                    str(REPO / "data-accept"))) / "outputs"
+                probe = _probe_video(out_root / out_item["file"])
                 log("probe", job=job["id"], file=out_item["file"],
                     is_full=out_item.get("is_full", False), **probe)
 

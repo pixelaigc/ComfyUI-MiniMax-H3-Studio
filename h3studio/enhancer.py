@@ -253,6 +253,9 @@ MODE_MEDIA = {
     "i2i_qwen": "image",
     # MOSS-Image 文生图也是图像媒体
     "t2i_moss": "image",
+    # MiniMax-H3-Image：文生图 + 图片编辑都是图像媒体
+    "t2i_h3image": "image",
+    "i2i_h3image": "image",
     "t2v": "video",
     "flf": "video",
     "r2v": "video",
@@ -275,6 +278,8 @@ MODEL_FAMILY = {
     # MOSS-Image 的两个底模版本（Base / SFT）
     "moss_image_base": "moss_image",
     "moss_image_sft": "moss_image",
+    # MiniMax-H3-Image（官方目前只发布一个 checkpoint）
+    "h3_image_pruned_int8": "h3_image",
     # 视频侧的模型 key（MiniMax-H3 的 LoRA / 标准两档）
     "lora": "minimax_h3",
     "standard": "minimax_h3",
@@ -293,6 +298,8 @@ MODEL_FAMILY = {
 MODE_DEFAULT_MODEL = {
     "t2i": "z_image_turbo_bf16",
     "t2i_moss": "moss_image_base",
+    "t2i_h3image": "h3_image_pruned_int8",
+    "i2i_h3image": "h3_image_pruned_int8",
     "t2v": "lora",
     "flf": "lora",
     "r2v": "lora",
@@ -308,6 +315,10 @@ MODE_DEFAULT_SPEC = {
     "i2i_qwen": "qwen21-pe-i2i",
     # MOSS 用官方 Skill 的描述式扩写模板
     "t2i_moss": "moss-image",
+    # H3-Image 用通用图像扩写模板（官方没有专门的 PE system prompt，
+    # 它自己的 PE 模型是 Qwen3.5-9B，见 h3studio/h3image.py 的说明）
+    "t2i_h3image": "image",
+    "i2i_h3image": "image",
     # 文生视频默认走 H3 官方「导演提示词」档（video-director）
     "t2v": "video-director",
     "flf": "video-director",

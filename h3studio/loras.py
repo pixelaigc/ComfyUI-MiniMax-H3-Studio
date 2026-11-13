@@ -1602,11 +1602,18 @@ DEFAULT_PREF_KEY = "z_image_loras"
 QWEN_PREF_KEY = "qwen_image_2.1_loras"
 # MOSS-Image 的 LoRA 配置单独存一份（底模不同，不能混）
 MOSS_PREF_KEY = "moss_image_loras"
+# MiniMax-H3-Image 的 LoRA 配置 key（官方暂未发布该模型的 LoRA，
+# 但 key 必须独立 —— 否则会读写 Z-Image 那份配置，串族）。
+H3IMAGE_PREF_KEY = "h3_image_loras"
 # 界面上的底模族名 -> (配置 key, 清单函数)
 LORA_BASES = {
     "Z-Image": (DEFAULT_PREF_KEY, None),
     "Qwen-Image 2.1": (QWEN_PREF_KEY, None),
     "MOSS-Image": (MOSS_PREF_KEY, None),
+    # MiniMax-H3-Image：官方暂未发布该模型的 LoRA ——
+    # 但配置 key 仍要**独立**，否则 pref_key_for_base 会退回 Z-Image 的 key，
+    # 于是 H3-Image 面板的 LoRA 配置会读写 Z-Image 那份配置（串族）。
+    "H3-Image": (H3IMAGE_PREF_KEY, None),
 }
 
 
@@ -1622,6 +1629,18 @@ def is_qwen_base(base: str) -> bool:
 def is_moss_base(base: str) -> bool:
     """MOSS-Image 底模族判定（MOSS 的配置与清单都与其它族分开）。"""
     return (base or "") == "MOSS-Image" or (base or "").startswith("MOSS-Image")
+
+
+def is_h3image_base(base: str) -> bool:
+    """MiniMax-H3-Image 底模族判定。
+
+    【为什么必须有这个判定】api_image_loras 的分派是
+    moss -> qwen -> **else(Z-Image)**。多一族但不加判定，
+    `base=H3-Image` 会掉进 else 分支 -> 返回 **Z-Image 族的 LoRA 清单**
+    -> 用户在 H3-Image 面板能选到 Z-Image 的 LoRA（底模结构不同，
+    挂上去 ComfyUI 会静默丢弃 = 选了等于没选）。
+    """
+    return (base or "") == "H3-Image" or (base or "").startswith("H3-Image")
 
 
 def load_config(conn: sqlite3.Connection, key: str = DEFAULT_PREF_KEY) -> list[dict]:

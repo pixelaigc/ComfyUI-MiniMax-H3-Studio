@@ -46,6 +46,10 @@ const MODE_INFO = {
   // MOSS-Image：OpenMOSS 的 dense text-to-image transformer，底模是
   // diffusers 目录（transformer/ + text_encoder/ + tokenizer/ + vae/）。
   t2i_moss: { name: "MOSS-Image 文生图", kind: "image", engine: "moss" },
+  // MiniMax-H3-Image：一个 checkpoint 同时做文生图与图片编辑。
+  // 6 步蒸馏 / guidance 固定 1（无 CFG pass -> 无负面提示词）。
+  t2i_h3image: { name: "H3-Image 文生图", kind: "image", engine: "h3image" },
+  i2i_h3image: { name: "H3-Image 图片编辑", kind: "image", engine: "h3image" },
   longfilm: { name: "长片", kind: "video" },
   // 音乐（YuE2）：文生音乐 / 参考生音乐
   t2a: { name: "文生音乐", kind: "audio", engine: "music" },
@@ -59,11 +63,15 @@ window.MODE_INFO = MODE_INFO;
 // web/job-meta.js 用它给**逐字段**标注来源（作者提供 / ComfyUI 硬性值 …）。
 window.JOB_META_SOURCE_KIND_LABEL = {};
 // 图像类模式：共用「图像」参数面板
-const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"];
+const IMAGE_MODES = ["t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                    "t2i_h3image", "i2i_h3image"];
 // Qwen-Image 2.1 专用模式（参数清单与 Z-Image 不同）
 const QWEN_MODES = ["t2i_qwen", "i2i_qwen"];
 // MOSS-Image 专用模式（参数清单与 Z-Image / Qwen 都不同）
 const MOSS_MODES = ["t2i_moss"];
+// MiniMax-H3-Image 专用模式（文生图 + 图片编辑共用一套参数面板）
+// 规格差异：32 倍数宽高 / 6 步 PDD 蒸馏 / 无负面提示词 / 最多 16 张参考图
+const H3IMAGE_MODES = ["t2i_h3image", "i2i_h3image"];
 
 function isQwenMode(mode) {
   return QWEN_MODES.includes(mode || state.mode);
@@ -71,6 +79,10 @@ function isQwenMode(mode) {
 
 function isMossMode(mode) {
   return MOSS_MODES.includes(mode || state.mode);
+}
+
+function isH3ImageMode(mode) {
+  return H3IMAGE_MODES.includes(mode || state.mode);
 }
 
 // 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
@@ -201,6 +213,29 @@ const state = {
     // SLG（SkipLayerGuidance）skip layer —— 官方推荐 22；空 = 关
     slgSingle: "22",
   },
+  // MiniMax-H3-Image 专属状态（文生图与图片编辑共用一份）
+  imgH3Image: {
+    tier: "4mp",
+    aspect: "16:9",
+    // 自定义宽高（与其它族同一套逻辑，但倍数是 32 而不是 16）
+    custom: false,
+    width: null,
+    height: null,
+    rawWidth: null,
+    rawHeight: null,
+    model: "h3_image_pruned_int8",
+    // 官方模板：6 步 / cfg 1 / euler / simple
+    steps: 6,
+    cfg: 1,
+    shift: 1,
+    sampler: "euler",
+    scheduler: "simple",
+    // H3-Image guidance 固定 1 -> 无 CFG pass -> 负面提示词无效
+    negative: "",
+    batchCount: 1,
+    // LoRA：官方暂未发布 H3-Image 的 LoRA —— 入口留位但暂无可选权重
+    loras: [],
+  },
   // 图像模式（Z-Image 文生图）专属状态
   img: {
     tier: "1mp",
@@ -253,6 +288,21 @@ const QWEN_OPTIONS = {
   // 官方 PE 双档参数（presence_penalty 不可互换）
   peParams: {}, peDefaultMaxLength: 4096,
 };
+// MiniMax-H3-Image 的独立一套清单（服务端 /api/image-options 的 h3image 字段）
+const H3IMAGE_OPTIONS = {
+  tiers: [], aspects: [], models: {}, sizeMultiple: 32, maxDirectMp: 16,
+  minMp: 1, sizeMin: 32, sizeMax: 16384,
+  defaultTier: "4mp", defaultModel: "h3_image_pruned_int8",
+  // 参考图上限：官方能力 16 张（与 Qwen 的 10 张不同）
+  maxRefImages: 16, minRefImages: 1,
+  // 官方占位标记语法（H3-Image 用 <Picture N>，不是 Qwen 的 <imageN>）
+  placeholderExample: "<Picture 1>",
+  // 本机能力探测结果（后端没重启时为 false -> 面板显示明确提示）
+  probeComplete: true,
+  // LoRA：官方暂未发布 -> 界面留位 + 明确说明
+  loraSupported: false,
+  loraNote: "",
+};
 // MOSS-Image 的独立一套清单（服务端 /api/image-options 的 moss 字段）
 const MOSS_OPTIONS = {
   tiers: [], aspects: [], models: {}, sizeMultiple: 16, maxDirectMp: 4,
@@ -273,10 +323,17 @@ const IMG_LORAS = { available: [], acceleration: [], incompatible: [], config: [
 const QWEN_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
 // MOSS-Image 的 LoRA 清单（与其它族分开：底模结构不同，不能混用）
 const MOSS_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
+// MiniMax-H3-Image 的 LoRA 清单。
+// 【官方暂未发布 H3-Image 的 LoRA】—— 所以这份清单恒为空，
+// 但结构保留：以后官方出了 LoRA，只要后端 /api/image-loras 下发即可，
+// 前端不用改（见 renderLoraSelect 的「暂无可选 LoRA」分支）。
+const H3IMAGE_LORAS = { available: [], acceleration: [], incompatible: [], config: [] };
 // 服务端下发的功能位（后端重启后才有新位）
 let SERVER_FEATURES = {};
 // 后端是否已支持 MOSS-Image（/api/image-options 有 moss 字段才算）
 let MOSS_BACKEND_READY = false;
+// 后端是否已支持 MiniMax-H3-Image（/api/image-options 有 h3image 字段才算）
+let H3IMAGE_BACKEND_READY = false;
 // 后端代码指纹（用于提示「后端没重启」）
 let SERVER_FINGERPRINT = "";
 const IMG_ASPECT_NUM = {
@@ -640,6 +697,17 @@ function imgAutoSize(tier, aspect) {
 // 当前图像模式的「参数上下文」：Z-Image 与 Qwen-Image 2.1 两套清单 + 两份状态。
 // 面板所有控件都从这里取当前该用的那一套，避免两套参数互相污染。
 function imgCtx() {
+  if (isH3ImageMode()) {
+    return {
+      opts: H3IMAGE_OPTIONS,
+      st: state.imgH3Image,
+      tiers: H3IMAGE_OPTIONS.tiers,
+      models: H3IMAGE_OPTIONS.models,
+      multiple: H3IMAGE_OPTIONS.sizeMultiple,
+      maxMp: H3IMAGE_OPTIONS.maxDirectMp,
+      minMp: H3IMAGE_OPTIONS.minMp,
+    };
+  }
   if (isMossMode()) {
     return {
       opts: MOSS_OPTIONS,
@@ -714,6 +782,11 @@ function renderBatchChips() {
 // LoRA 面板上下文：Z-Image 与 Qwen-Image 2.1 是两套清单 + 两份已选列表。
 // 底模结构不同，兼容性要各自比对，不能混用。
 function imgLoraCtx() {
+  if (isH3ImageMode()) {
+    // H3-Image 官方暂未发布 LoRA -> 清单恒为空
+    // （界面仍显示 LoRA 区域 + 说明文字，见 renderLoraSelect 的留位分支）
+    return {store: H3IMAGE_LORAS, list: state.imgH3Image.loras, label: "H3-Image"};
+  }
   if (isMossMode()) {
     return {store: MOSS_LORAS, list: state.imgMoss.loras, label: "MOSS-Image"};
   }
@@ -762,6 +835,18 @@ function renderLoraSelect() {
   const otherHtml = withoutGroup.length
     ? `<optgroup label="其它效果 LoRA">${withoutGroup.map(optOf).join("")}</optgroup>`
     : "";
+  // 【H3-Image 的 LoRA 留位】
+  // 官方暂未发布 H3-Image 的 LoRA —— 需求是「界面需留位或明确说明」。
+  // 这里两者都做：下拉框**保留在面板上**（不隐藏），但显示
+  // 「官方暂未发布该模型的 LoRA」的说明，并把下拉置灰。
+  // 以后官方出了 LoRA，只要后端下发清单，这个分支自动失效。
+  if (isH3ImageMode() && !ctx.store.available.length) {
+    sel.innerHTML = `<option value="">官方暂未发布 H3-Image 的 LoRA</option>`;
+    sel.disabled = true;
+    const addBtn = $("#imgLoraAdd");
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
   sel.innerHTML = options.length
     ? groupsHtml + otherHtml
     : `<option value="">${ctx.store.available.length ? "全部已添加" : `本机未找到 ${ctx.label} LoRA`}</option>`;
@@ -804,7 +889,10 @@ function renderLoraList() {
         (accel ? `；另有 ${accel} 个加速/蒸馏类 LoRA 由工作流固定使用，不在此列表。` : "。") +
         (bad ? ` ${bad} 个 LoRA 因与底模不兼容被排除（见下方说明）。` : "") +
         " 强度 0 表示关闭。"
-      : `本机未检测到可用的效果类 ${ctx.label} LoRA 文件。`;
+      : (isH3ImageMode()
+          ? (H3IMAGE_OPTIONS.loraNote ||
+             "MiniMax-H3-Image 官方暂未发布 LoRA —— 面板已预留 LoRA 入口，暂无可选权重。")
+          : `本机未检测到可用的效果类 ${ctx.label} LoRA 文件。`);
     return;
   }
   box.innerHTML = ctx.list.map((item, index) => {
@@ -1007,6 +1095,9 @@ async function loadImageLoras() {
        set: v => { state.imgQwen.loras = v; }},
       {name: "MOSS-Image", store: MOSS_LORAS,
        set: v => { state.imgMoss.loras = v; }},
+      // H3-Image：官方暂未发布 LoRA -> 后端会返回空清单（不会报错）
+      {name: "H3-Image", store: H3IMAGE_LORAS,
+       set: v => { state.imgH3Image.loras = v; }},
     ];
     for (const base of bases) {
       const resp = await fetch("/api/image-loras?base=" + encodeURIComponent(base.name),
@@ -1070,13 +1161,24 @@ function updateNegativeNote() {
                   + "官方 USERGUIDE 推荐 CFG 3.0，并给出一组实测有效的负面标签"
                   + "（nsfw, worst quality, bad anatomy, watermark, jpeg artifact）。"
                 : "Base 非蒸馏，负面提示词生效（官方强烈建议）")))
-    : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。";
+    : (isH3ImageMode()
+        ? "H3-Image 的 guidance 固定为 1（官方 6 步蒸馏，无 CFG pass）——"
+          + "负面提示词**数学上无效**，已禁用。"
+          + "要把「不要什么」写进正面提示词里（例如「不要出现文字、不要模糊」）。"
+        : "当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。");
 }
 
 function renderImagePanel() {
   const ctx = imgCtx();
   const s = ctx.st;
   const model = ctx.models[s.model];
+  // 【参考图占位语法随模型族切换】—— 必须在这里**无条件**设置，
+  // 不能放进「显示参考图」的分支里：profile 是参考图模块的**模块级全局**，
+  // 漏切一次就会用另一族的占位语法去校验当前模式的提示词
+  // （比如切回 Qwen 文生图后仍用 H3-Image 的 <Picture N> 规则）。
+  if (window.QwenRefs && window.QwenRefs.setProfile) {
+    window.QwenRefs.setProfile(isH3ImageMode() ? "h3image" : "qwen");
+  }
 
   // 分辨率档位
   const resSel = $("#imgResSelect");
@@ -1122,13 +1224,34 @@ function renderImagePanel() {
   const modelLabel = $("#imgModelLabel");
   if (modelLabel) {
     modelLabel.textContent = isMossMode() ? "MOSS-Image 模型"
-      : (isQwenMode() ? "Qwen-Image 2.1 模型" : "Z-Image 模型");
+      : (isQwenMode() ? "Qwen-Image 2.1 模型"
+        : (isH3ImageMode() ? "H3-Image 模型" : "Z-Image 模型"));
   }
   Object.entries(ctx.models).forEach(([key, m]) => {
     const opt = document.createElement("option");
     opt.value = key;
     const unavailable = m.available === false;
-    opt.textContent = unavailable ? m.label + "（权重缺失，不可用）" : m.label;
+    // 【不可用原因要说准】原来是写死的「（权重缺失，不可用）」——
+    // 但 H3-Image 缺的是**核心节点**（ComfyUI 版本过低），权重齐全。
+    // 写死「权重缺失」会让用户去下载权重（那不是问题所在），
+    // 或者反过来以为权重没问题。按服务端给的真实原因分类显示。
+    let unavailableReason = "";
+    if (unavailable) {
+      // 【nodes_available 是三态】
+      //   true  = 节点在
+      //   false = 确认缺节点（可以断言「ComfyUI 版本过低」）
+      //   null  = 探测没问全（ComfyUI 忙 / 超时）—— 不能断言缺什么
+      if (m.nodes_available === false && m.weights_available === true) {
+        unavailableReason = "（本机 ComfyUI 缺 H3-Image 核心节点，不可用）";
+      } else if (m.weights_available === false) {
+        unavailableReason = "（权重缺失，不可用）";
+      } else if (m.nodes_available === null || m.nodes_available === undefined) {
+        unavailableReason = "（暂时无法确认本机 ComfyUI 能力，不可用）";
+      } else {
+        unavailableReason = "（不可用）";
+      }
+    }
+    opt.textContent = unavailable ? m.label + unavailableReason : m.label;
     opt.disabled = unavailable;
     opt.selected = key === s.model;
     modelSel.appendChild(opt);
@@ -1169,7 +1292,14 @@ function renderImagePanel() {
   // Qwen-Image 2.1 的 SHIFT 是 0.69 —— 用同一套量程会把 0.69 夹成 1，
   // 界面显示的值就和真正送出去的不一致。
   const stepsEl = $("#imgSteps"), cfgEl = $("#imgCfg"), shiftEl = $("#imgShift");
-  if (isMossMode()) {
+  if (isH3ImageMode()) {
+    // H3-Image 官方模板：steps=6 / cfg=1 / euler / simple
+    // 步数与 PDD sigma 表绑定（6 步蒸馏）-> 步数上限给到 12 便于对照，
+    // 但默认与推荐值都是 6；CFG 固定 1（guidance 固定，无 CFG pass）。
+    stepsEl.min = "1"; stepsEl.max = "12"; stepsEl.step = "1";
+    cfgEl.min = "1"; cfgEl.max = "8"; cfgEl.step = "0.5";
+    shiftEl.min = "0"; shiftEl.max = "3"; shiftEl.step = "0.1";
+  } else if (isMossMode()) {
     // MOSS-Image 官方 USERGUIDE：steps >= 50 / CFG 3.0~6.0 / shift 5.0
     // 量程要覆盖官方推荐值 —— steps 上限给到 100（官方下限 50 起步），
     // CFG 给到 0.1 步进（官方区间 3.0~6.0，需要能调到 3.5/4.0/4.5…），
@@ -1194,7 +1324,7 @@ function renderImagePanel() {
   // MOSS 的 shift 量程是 0~10 步进 0.1 -> 显示 1 位小数即可；
   // Qwen 是 0~3 步进 0.01 -> 要 2 位；Z-Image 是 1~7 步进 0.5 -> 1 位
   $("#imgShiftVal").textContent = Number(s.shift).toFixed(
-    isQwenMode() ? 2 : (isMossMode() ? 1 : 1));
+    isQwenMode() ? 2 : (isMossMode() ? 1 : (isH3ImageMode() ? 1 : 1)));
 
   // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
   const negSupported = !!(model && model.supports_negative);
@@ -1202,15 +1332,23 @@ function renderImagePanel() {
   updateNegativeNote();
   if (negSupported) $("#imgNegative").value = s.negative || "";
 
-  // Qwen-Image 2.1 专属：参考图区
+  // 参考图区：Qwen 图片编辑 + H3-Image 图片编辑共用同一块 DOM。
   //
   // 【官方 PE 提示词扩写不再有独立勾选框】——
   // 它已并入「增强」按钮的下拉菜单（「qwen21图片官方增强PE」）。
   // 这里只保留参考图区（图片编辑模式）。
+  //
+  // 【占位语法随模型切换】—— Qwen 用 <imageN>，H3-Image 用 <Picture N>。
+  // 参考图模块（web/qwen-refs.js）是一份实现两套语义，靠 setProfile 切换。
+  // 不切换的后果：用户写 <Picture 1> 会被 Qwen 的正则扫不到 ->
+  // 提交时报「缺少 <image1> 占位标记」（误拒合法提交）。
   const qwen = isQwenMode();
+  const h3img = isH3ImageMode();
   const refField = $("#imgRefField");
-  if (refField) refField.style.display = (qwen && state.mode === "i2i_qwen") ? "" : "none";
-  if (qwen) {
+  const showRefs = (qwen && state.mode === "i2i_qwen")
+    || (h3img && state.mode === "i2i_h3image");
+  if (refField) refField.style.display = showRefs ? "" : "none";
+  if (showRefs) {
     renderQwenRefs();
   }
 
@@ -1235,21 +1373,23 @@ function renderImagePanel() {
 function renderStaleBackendBanner() {
   const box = $("#staleBackendBanner");
   if (!box) return;
-  if (!isMossMode()) {
-    box.hidden = true;
-    box.innerHTML = "";
-    return;
-  }
-  if (MOSS_BACKEND_READY) {
+  // 【H3-Image 同理】后端没重启时 /api/image-options 里没有 h3image 字段
+  // -> H3-Image 面板的档位/模型下拉是空的，点生成会报
+  // 「未知模式 t2i_h3image」—— 症状与 MOSS 完全一样，且更难自查。
+  const mossStale = isMossMode() && !MOSS_BACKEND_READY;
+  const h3Stale = isH3ImageMode() && !H3IMAGE_BACKEND_READY;
+  if (!mossStale && !h3Stale) {
     box.hidden = true;
     box.innerHTML = "";
     return;
   }
   box.hidden = false;
+  const which = mossStale ? "MOSS-Image" : "H3-Image";
+  const modeName = mossStale ? "t2i_moss" : "t2i_h3image";
   box.innerHTML =
-    "<b>后端未重启，MOSS-Image 面板当前不可用。</b><br>"
+    `<b>后端未重启，${which} 面板当前不可用。</b><br>`
     + "页面资源（前端）已经是新的，但后端进程还是旧代码 —— "
-    + "所以分辨率档位/模型下拉是空的，点生成会报「未知模式 t2i_moss」。<br>"
+    + `所以分辨率档位/模型下拉是空的，点生成会报「未知模式 ${modeName}」。<br>`
     + "修复：<code>systemctl restart h3-studio.service</code> "
     + "（本机）或 <code>sudo systemctl restart h3-studio.service</code>，"
     + "然后刷新页面。";
@@ -1326,7 +1466,14 @@ function normalizeImgSize(w, h) {
       const scale = Math.sqrt(maxPixels / (nw * nh));
       const sw = Math.max(mult, Math.round(nw * scale / mult) * mult);
       const sh = Math.max(mult, Math.round(nh * scale / mult) * mult);
-      reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 超过官方直出上限 ${maxMp}MP → 按比例缩到 ${sw}×${sh}（更大尺寸需挂 4MP+ hires LoRa）`);
+      // 【按模式区分上限文案】
+      // MOSS 有 4MP+ hires LoRa 路径（可继续放大）；
+      // H3-Image **没有**官方放大链（官方模板只有单次直出），
+      // 写「更大尺寸需挂 hires LoRa」会指向一条不存在的路。
+      const overCapNote = isH3ImageMode()
+        ? "（H3-Image 无官方放大链，超出即按比例缩小）"
+        : "（更大尺寸需挂 4MP+ hires LoRa）";
+      reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 超过官方直出上限 ${maxMp}MP → 按比例缩到 ${sw}×${sh}${overCapNote}`);
       nw = sw; nh = sh;
     }
   }
@@ -1363,6 +1510,15 @@ function updateImageSizeFields() {
   } else {
     [w, h] = imgAutoSize(s.tier, s.aspect);
   }
+  // 【尺寸输入框的 step 随模式切换】
+  // H3-Image 的宽高必须是 **32** 的倍数（官方文档），其它族是 16。
+  // step 不跟着改的话，浏览器会允许输入 2721 这种非法值，
+  // 用户按回车才发现被吸附 —— 体验上像「输入框没生效」。
+  const mult = ctx.multiple || 16;
+  ["#imgWidth", "#imgHeight"].forEach(sel => {
+    const el = $(sel);
+    if (el) el.step = mult;
+  });
   // 用户正在输入时不要覆盖输入框里的原始文本（否则输入会被打断）
   if (!imgSizeTyping) {
     $("#imgWidth").value = w;
@@ -1432,6 +1588,47 @@ function updateImageModelNote() {
     imgWarn.textContent = m.warn || "";
     imgWarn.hidden = !m.warn;
   }
+  // 【H3-Image 不可用时的明确说明】
+  // 需求原文：「须如实说明缺失项，并保证选择该模型时前端不崩溃、
+  // 有明确提示，而不是静默失败」。
+  //
+  // 缺节点 / 缺权重两种情况都要说清楚具体缺什么 ——
+  // 「不可用」三个字对用户毫无用处。
+  const h3Note = $("#imgH3ImageNote");
+  if (h3Note) {
+    if (isH3ImageMode() && m.available === false) {
+      const missing = Array.isArray(m.missing) ? m.missing : [];
+      h3Note.hidden = false;
+      // 【三态判定】
+      //   nodes_available === false -> 确认缺节点，列出具体缺什么
+      //   nodes_available == null  -> 探测没问全，不能断言缺什么
+      //   权重缺失                  -> 无论节点探测结果如何都要说
+      const nodeUnknown = (m.nodes_available === null
+                           || m.nodes_available === undefined);
+      const weightsMissing = m.weights_available === false;
+      if (missing.length) {
+        // 服务端已把「确认缺的东西」列全（缺节点 + 缺权重）
+        h3Note.textContent =
+          "本机尚不具备 H3-Image 运行条件，缺以下项：\n"
+          + missing.map(x => "· " + x).join("\n")
+          + "\n补齐后即可正常出图（模型下拉里会自动变为可选）。";
+      } else if (nodeUnknown) {
+        h3Note.textContent =
+          "暂时无法探测本机 ComfyUI 是否具备 H3-Image 能力"
+          + "（ComfyUI 可能正忙或不可达）—— 请稍后刷新面板重试。\n"
+          + "已确认的部分："
+          + (weightsMissing ? "权重缺失。" : "权重齐全。");
+      } else if (weightsMissing) {
+        h3Note.textContent =
+          "本机缺少 H3-Image 所需的权重文件（见上方说明）。";
+      } else {
+        h3Note.textContent = "本机尚不具备 H3-Image 运行条件。";
+      }
+    } else {
+      h3Note.hidden = true;
+      h3Note.textContent = "";
+    }
+  }
   // MOSS-Image 专属：SLG（SkipLayerGuidance）skip layer 的当前值
   // 官方 USERGUIDE 推荐 22（0-indexed）；22/24/26 都有帮助，空 = 关。
   // 关掉 SLG 会让画面「非常写实」，但部分细节会崩 —— 所以这里显式告知。
@@ -1470,11 +1667,21 @@ function updateImageModelNote() {
   // 加速 LoRA 绑定的模型版本：步数/CFG/采样器/调度器锁定
   // （蒸馏 LoRA 是在 8 步 schedule 上训的，改了会破坏 schedule 出噪点）
   const locked = !!m.params_locked_by_accel;
-  ["#imgSteps", "#imgCfg", "#imgSamplerSelect", "#imgSchedulerSelect"].forEach(sel => {
+  // 【#imgShift 一并锁定】
+  // H3-Image 的 guidance 固定 1 -> shift 不参与计算；
+  // Z-Image Base-Distill 之类也把 shift 与蒸馏档绑定。
+  // 加进来是为了让「disabled」的真相只有一个地方 —— 之前 H3-Image
+  // 单独写了一段 shiftEl.disabled = true，两处会互相覆盖。
+  ["#imgSteps", "#imgCfg", "#imgSamplerSelect", "#imgSchedulerSelect",
+   "#imgShift"].forEach(sel => {
     const el = $(sel);
     if (!el) return;
     el.disabled = locked;
-    el.title = locked ? "已绑定加速 LoRA 的蒸馏档，不能修改" : "";
+    el.title = locked
+      ? (isH3ImageMode()
+          ? "H3-Image 的 guidance 固定为 1、步数与 PDD sigma 表绑定，不能修改"
+          : "已绑定加速 LoRA 的蒸馏档，不能修改")
+      : "";
   });
   if (locked) {
     $("#imgStepsHint").textContent = "锁定";
@@ -1547,7 +1754,7 @@ $("#imgShift").addEventListener("input", e => {
   const s = imgCtx().st;
   s.shift = parseFloat(e.target.value);
   $("#imgShiftVal").textContent = Number(s.shift).toFixed(
-    isQwenMode() ? 2 : (isMossMode() ? 1 : 1));
+    isQwenMode() ? 2 : (isMossMode() ? 1 : (isH3ImageMode() ? 1 : 1)));
   updateImageModelNote();
 });
 $("#imgNegative").addEventListener("input", e => {
@@ -1729,6 +1936,44 @@ async function loadImageOptions() {
       const mKnown = MOSS_OPTIONS.aspects.some(a => a.key === state.imgMoss.aspect);
       if (!mKnown && MOSS_OPTIONS.aspects.length) {
         state.imgMoss.aspect = MOSS_OPTIONS.aspects[0].key;
+      }
+    }
+    // MiniMax-H3-Image 的独立一套清单（服务端 h3image 字段）
+    const h = data.h3image || {};
+    // 服务端没下发 h3image 字段 = 后端还是旧代码（没重启）
+    H3IMAGE_BACKEND_READY = !!(h.tiers && h.tiers.length);
+    H3IMAGE_OPTIONS.tiers = h.tiers || [];
+    H3IMAGE_OPTIONS.aspects = h.aspects || [];
+    H3IMAGE_OPTIONS.models = h.models || {};
+    H3IMAGE_OPTIONS.sizeMultiple = h.size_multiple || 32;
+    H3IMAGE_OPTIONS.maxDirectMp = h.max_direct_mp || 16;
+    H3IMAGE_OPTIONS.minMp = h.min_mp || 1;
+    H3IMAGE_OPTIONS.sizeMin = 32;
+    H3IMAGE_OPTIONS.sizeMax = 16384;
+    H3IMAGE_OPTIONS.defaultTier = h.default_tier || "4mp";
+    H3IMAGE_OPTIONS.defaultModel = h.default_model || "h3_image_pruned_int8";
+    H3IMAGE_OPTIONS.maxRefImages = h.max_ref_images || 16;
+    H3IMAGE_OPTIONS.minRefImages = h.min_ref_images || 1;
+    H3IMAGE_OPTIONS.placeholderExample = h.placeholder_example || "<Picture 1>";
+    // 【probe_complete 的语义】服务端只在**问全了**的情况下才敢断言
+    // 「缺节点」。问不全（ComfyUI 忙/超时）时返回 false，
+    // 此时界面应该说「暂时无法探测」而不是断言缺什么。
+    H3IMAGE_OPTIONS.probeComplete = h.probe_complete === true;
+    H3IMAGE_OPTIONS.loraSupported = !!h.lora_supported;
+    H3IMAGE_OPTIONS.loraNote = h.lora_note || "";
+    // H3-Image 默认值对齐服务端推荐（官方模板：6 步 / cfg 1 / euler / simple）
+    const hm = H3IMAGE_OPTIONS.models[H3IMAGE_OPTIONS.defaultModel];
+    if (hm) {
+      state.imgH3Image.model = H3IMAGE_OPTIONS.defaultModel;
+      state.imgH3Image.steps = hm.steps;
+      state.imgH3Image.cfg = hm.cfg;
+      state.imgH3Image.shift = hm.shift;
+      state.imgH3Image.sampler = hm.sampler;
+      state.imgH3Image.scheduler = hm.scheduler;
+      state.imgH3Image.tier = H3IMAGE_OPTIONS.defaultTier;
+      const hKnown = H3IMAGE_OPTIONS.aspects.some(a => a.key === state.imgH3Image.aspect);
+      if (!hKnown && H3IMAGE_OPTIONS.aspects.length) {
+        state.imgH3Image.aspect = H3IMAGE_OPTIONS.aspects[0].key;
       }
     }
     if (data.default_model && IMG_OPTIONS.models[data.default_model]) {
@@ -2485,6 +2730,18 @@ $("#genBtn").addEventListener("click", async () => {
       // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关
       params.slg_single_layers = state.imgMoss.slgSingle || "";
     }
+    if (isH3ImageMode()) {
+      // MiniMax-H3-Image
+      //
+      // 【负面提示词】guidance 固定 1 -> 无 CFG pass -> 数学上无效。
+      // 前端直接**不提交**（而不是提交一个无效值）——
+      // 服务端也会再丢一次并回一条说明，双保险。
+      delete params.negative_prompt;
+      // 【LoRA】官方暂未发布 H3-Image 的 LoRA -> 不提交 loras。
+      // （提交空数组也行，但显式删掉更清楚：落库记录里不会留一个
+      //   「看起来支持 LoRA 其实不支持」的空字段。）
+      delete params.loras;
+    }
   }
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
@@ -2526,8 +2783,11 @@ $("#genBtn").addEventListener("click", async () => {
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
   // 服务端据此把素材库文件上传到 ComfyUI，并按 <imageN> 顺序接线。
-  if (mode === "i2i_qwen") {
-    const max = QWEN_OPTIONS.maxRefImages || 10;
+  if (mode === "i2i_qwen" || mode === "i2i_h3image") {
+    // 上限按模型族取：Qwen 10 张 / H3-Image 16 张（官方能力不同）
+    const max = mode === "i2i_h3image"
+      ? (H3IMAGE_OPTIONS.maxRefImages || 16)
+      : (QWEN_OPTIONS.maxRefImages || 10);
     const refList = window.QwenRefs ? window.QwenRefs.getRefs() : [];
     if (!refList.length) {
       alert("图片编辑的参考图必须来自素材库：请点「从素材库添加」选择至少 1 张。");
@@ -2537,7 +2797,9 @@ $("#genBtn").addEventListener("click", async () => {
       alert(`参考图最多 ${max} 张，当前 ${refList.length} 张。`);
       return;
     }
-    // 提交前一致性校验：占位标记 <imageN> 与参考图数量必须匹配
+    // 提交前一致性校验：占位标记与参考图数量必须匹配。
+    // 【占位语法随模型族切换】Qwen 是 <imageN>，H3-Image 是 <Picture N>
+    // —— 参考图模块已通过 setProfile 切到对应语法，这里直接调 validate()。
     const problems = window.QwenRefs.validate($("#prompt")?.value || "");
     if (problems) {
       alert("参考图校验未通过：\n\n" + problems.map(x => "· " + x).join("\n"));
@@ -2780,7 +3042,8 @@ function localModelInfo(mode, p) {
     }
     return out;
   }
-  if (mode === "t2i" || mode === "t2i_qwen" || mode === "i2i_qwen" || mode === "t2i_moss") {
+  if (mode === "t2i" || mode === "t2i_qwen" || mode === "i2i_qwen"
+      || mode === "t2i_moss" || mode === "t2i_h3image" || mode === "i2i_h3image") {
     out.model_label = imgModelLabel(p.model);
     out.model_key = p.model || "";
     const loras = (p.loras || []).filter(l => l && l.enabled !== false
@@ -3023,7 +3286,7 @@ function isLoraKeyLike(text) {
 function imgModelLabel(key) {
   // 三族模型各自的清单分开 —— key 在别的族里查不到就回落到原 key
   const m = IMG_OPTIONS.models[key] || MOSS_OPTIONS.models[key]
-            || QWEN_OPTIONS.models[key];
+            || QWEN_OPTIONS.models[key] || H3IMAGE_OPTIONS.models[key];
   return m ? m.label : (key || "—");
 }
 
@@ -3361,7 +3624,7 @@ function renderJobBatches(job) {
     const thumb = out && !failed
       ? `<div class="job-batch-thumb"><img src="${outputUrl(job, out)}" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
       : `<div class="job-batch-thumb ${failed ? "failed" : ""}">${
-          failed ? (batch.error || "失败").slice(0, 60)
+          failed ? friendlyError(batch.error).slice(0, 60)
           : batch.status === "running" ? `${Math.round((batch.progress || 0) * 100)}%`
           : batch.status === "canceled" ? "已取消"
           : "排队中"}</div>`;
@@ -3564,7 +3827,7 @@ function jobCard(job) {
       <div class="progress-text">${pctText}</div>
     </div>`;
   } else if (job.status === "failed") {
-    preview = `<div class="progress-wrap"><div class="err-text">✕ ${job.error || "生成失败"}</div></div>`;
+    preview = `<div class="progress-wrap"><div class="err-text">✕ ${friendlyError(job.error)}</div></div>`;
   } else if (job.status === "canceled") {
     preview = `<div class="progress-wrap"><div class="progress-text">已取消</div></div>`;
   }
@@ -3886,6 +4149,33 @@ function jobCard(job) {
           strength_cap: 1.0,
         }));
       }
+      renderImagePanel();
+      return;
+    }
+    if (job.mode === "t2i_h3image" || job.mode === "i2i_h3image") {
+      // MiniMax-H3-Image：还原档位 / 比例 / 实际宽高 / 采样参数
+      //
+      // 【必须带 return】—— 否则会掉进后面的 else 分支（视频回填），
+      // 那一支会把 p.resolution 写进 state.res（视频分辨率档），
+      // 污染视频面板的状态。
+      const s = state.imgH3Image;
+      if (p.resolution) s.tier = p.resolution;
+      if (p.aspect) s.aspect = p.aspect;
+      if (p.width && p.height) {
+        s.width = p.width; s.height = p.height;
+        s.rawWidth = p.width; s.rawHeight = p.height;
+        s.custom = true;      // 复用旧任务的尺寸 -> 也是自定义模式
+      }
+      if (p.model && H3IMAGE_OPTIONS.models[p.model]) applyModelDefaults(p.model);
+      if (p.sampler) s.sampler = p.sampler;
+      if (p.scheduler) s.scheduler = p.scheduler;
+      if (p.steps) s.steps = p.steps;
+      if (p.cfg != null) s.cfg = p.cfg;
+      if (p.shift != null) s.shift = p.shift;
+      if (p.batch_count) s.batchCount = Number(p.batch_count);
+      // 【负面提示词不还原】H3-Image 的 guidance 固定 1 -> 负面无效，
+      // 落库的记录里本来也没有 negative_prompt（服务端已丢弃）。
+      // 【LoRA 不还原】官方暂未发布 H3-Image 的 LoRA。
       renderImagePanel();
       return;
     }
@@ -4599,7 +4889,21 @@ async function refreshJobs() {
       };
       if (!jobs.length) {
         preserve(() => {
-          grid.innerHTML = '<div class="empty-hint">' + ({active:"当前没有排队或生成中的任务", done:"暂无已完成的任务", longfilm:"暂无已合成的长片", failed:"暂无失败的任务", canceled:"暂无已取消的任务"}[tab]) + '</div>';
+          // 【修既有 bug：tab="all" 时映射表没有 "all" 键 -> 文案变成字符串
+          //   "undefined"】。之前只在 active/done 等子页签上出现过，
+          //   切到「全部」且一条任务都没有时，任务区中央就显示字面量
+          //   "undefined"（截图证据：evidence/h3image-t2i-panel.png）。
+          //   兜底成「暂无任务」而不是 undefined。
+          const EMPTY_TEXT = {
+            active: "当前没有排队或生成中的任务",
+            done: "暂无已完成的任务",
+            longfilm: "暂无已合成的长片",
+            failed: "暂无失败的任务",
+            canceled: "暂无已取消的任务",
+            all: "暂无任务",
+          };
+          grid.innerHTML = '<div class="empty-hint">'
+            + (EMPTY_TEXT[tab] || EMPTY_TEXT.all) + '</div>';
         });
         return;
       }
@@ -5637,6 +5941,52 @@ setInterval(() => {
   if (state.page !== "system") return;
   scheduleRefresh("hardware", () => refreshHardware());
 }, 3000);
+
+// ---------- 错误文案（不展示原始 Python 异常文本）----------
+//
+// 【为什么前端也要做一层 —— 2026-11-13 修】
+// 服务端已经不再把原始异常文本写进 jobs.error（见 server.py 的
+// `_user_facing_error`）。但前端这一层是**兜底**：
+//   * 老任务（修复前建的）库里存的**就是**原始 Python 文本；
+//   * 任何新引入的写入路径都可能漏掉服务端那一层。
+//
+// 【判据】Python 异常文本的特征：
+//   * 形如 `ValueError: xxx` / `AttributeError: xxx`（异常类名 + 冒号）
+//   * 或含 `'str' object has no attribute 'get'` 这类**双引号包裹的
+//     类型名 + 属性名**。
+// 命中任一条 -> 不展示原文，换成可读中文。
+//
+// 【原则】宁可**信息少一点**，也不要给用户一段他看不懂也修不了的
+// Python 报错 —— 原始文本照样在服务端日志里。
+const PY_EXCEPTION_PATTERNS = [
+  /^[A-Z][A-Za-z_]*(Error|Exception|Interrupt|Warning)\b\s*[:：]/,  // ValueError: ...
+  /'[^']+' object has no attribute/,                                     // 'str' object has no attribute 'get'
+  /"[^"]+" object has no attribute/,
+  /\bTraceback \(most recent call last\)/,
+  /File "[^"]+", line \d+/,                                               // traceback 行
+];
+
+function looksLikePythonTraceback(text) {
+  if (!text) return false;
+  const t = String(text);
+  return PY_EXCEPTION_PATTERNS.some((re) => re.test(t));
+}
+
+function friendlyError(text) {
+  const raw = text == null ? "" : String(text).trim();
+  if (!raw) return "生成失败";
+  if (!looksLikePythonTraceback(raw)) return raw;
+  // 是原始 Python 异常文本 -> 不展示原文。
+  // 用户能做的动作：重试 / 改参数 / 看日志。
+  return "生成失败（服务端未返回可读原因）。请稍后重试；若反复失败，请改用「复用参数」重新生成，或查看服务端日志。";
+}
+
+// 【测试可见性】把这两个函数挂到 window 上 —— 让前端测试能**执行本文件里
+// 真实的实现**，而不是在测试里抄一份（抄一份的话，测试就测不到本文件的
+// 改动，变异「改 app.js」不会被抓住）。
+// 不影响生产行为（app.js 里没有同名全局变量）。
+window.__h3FriendlyError = friendlyError;
+window.__h3LooksLikePythonTraceback = looksLikePythonTraceback;
 
 // ---------- 接续生成（continuation）----------
 //
