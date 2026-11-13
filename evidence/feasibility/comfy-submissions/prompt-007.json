@@ -1,0 +1,152 @@
+{
+  "seq": 7,
+  "ts": 1794605790.0760067,
+  "iso": "2026-11-14 05:36:30",
+  "upstream_status": 200,
+  "upstream_response": "{\"prompt_id\": \"7e572044-01ff-48df-af73-1fc205333d89\", \"number\": 226, \"node_errors\": {}}",
+  "request_body": "{\"prompt\": {\"15\": {\"inputs\": {\"ckpt_name\": \"yue2_3b_bf16.safetensors\"}, \"class_type\": \"CheckpointLoaderSimple\", \"_meta\": {\"title\": \"\\u52a0\\u8f7d YuE2\"}}, \"24\": {\"inputs\": {\"clip\": [\"15\", 1], \"style\": \"English, piano pop, intimate, warm female vocal, acoustic piano, rounded bass and light drums, 88 BPM, mid energy, radio-length song, about two to three minutes, lyrical memorable melody, unhurried phrasing, FEASIBILITY-MUSIC-PROBE \\u4e00\\u9996\\u5173\\u4e8e\\u96ea\\u591c\\u67f4\\u72ac\\u7684\\u94a2\\u7434\\u66f2\", \"lyrics\": \"[Verse]\\nFirst verse\\n\\n[Chorus]\\nHook\\n\\n[Verse]\\nSecond verse\\n\\n[Chorus]\\nHook\\n\\n[Bridge]\\nContrast the chorus here\\n\\n[Chorus]\\nFinal hook\", \"seed\": 31415926, \"mode\": \"full\", \"max_abc_tokens\": 4096, \"temperature\": 0.7, \"top_p\": 0.9, \"top_k\": 30, \"repetition_penalty\": 1.005, \"penalty_window\": 100}, \"class_type\": \"YuE2GenerateABC\", \"_meta\": {\"title\": \"\\u751f\\u6210 ABC \\u8c31\\u9762\"}}, \"25\": {\"inputs\": {\"clip\": [\"15\", 1], \"style\": \"English, piano pop, intimate, warm female vocal, acoustic piano, rounded bass and light drums, 88 BPM, mid energy, radio-length song, about two to three minutes, lyrical memorable melody, unhurried phrasing, FEASIBILITY-MUSIC-PROBE \\u4e00\\u9996\\u5173\\u4e8e\\u96ea\\u591c\\u67f4\\u72ac\\u7684\\u94a2\\u7434\\u66f2\", \"lyrics\": \"[Verse]\\nFirst verse\\n\\n[Chorus]\\nHook\\n\\n[Verse]\\nSecond verse\\n\\n[Chorus]\\nHook\\n\\n[Bridge]\\nContrast the chorus here\\n\\n[Chorus]\\nFinal hook\", \"abc\": [\"24\", 0], \"seed\": 31415926, \"mode\": \"full\", \"max_duration\": 900.0, \"temperature\": 0.85, \"top_p\": 0.88, \"top_k\": 42, \"repetition_penalty\": 1.05}, \"class_type\": \"YuE2GenerateMusic\", \"_meta\": {\"title\": \"\\u751f\\u6210\\u97f3\\u4e50\"}}, \"18\": {\"inputs\": {\"conditioning\": [\"25\", 0]}, \"class_type\": \"ConditioningZeroOut\", \"_meta\": {\"title\": \"\\u8d1f\\u6761\\u4ef6\"}}, \"5\": {\"inputs\": {\"seconds\": [\"25\", 1], \"batch_size\": 1}, \"class_type\": \"EmptyYuE2LatentAudio\", \"_meta\": {\"title\": \"\\u7a7a\\u97f3\\u9891 latent\"}}, \"8\": {\"inputs\": {\"model\": [\"15\", 0], \"positive\": [\"25\", 0], \"negative\": [\"18\", 0], \"latent_image\": [\"5\", 0], \"seed\": 31415926, \"steps\": 12, \"cfg\": 2.5, \"sampler_name\": \"dpm_2\", \"scheduler\": \"sgm_uniform\", \"denoise\": 1}, \"class_type\": \"KSampler\", \"_meta\": {\"title\": \"\\u91c7\\u6837\"}}, \"9\": {\"inputs\": {\"samples\": [\"8\", 0], \"vae\": [\"15\", 2]}, \"class_type\": \"VAEDecodeAudio\", \"_meta\": {\"title\": \"\\u89e3\\u7801\\u97f3\\u9891\"}}, \"10\": {\"inputs\": {\"audio\": [\"9\", 0], \"filename_prefix\": \"h3studio/yue2_a9e3761927ac\", \"format\": \"flac\"}, \"class_type\": \"SaveAudioAdvanced\", \"_meta\": {\"title\": \"\\u4fdd\\u5b58\\u97f3\\u9891\"}}}, \"client_id\": \"h3studio-a9e3761927ac\"}",
+  "workflow": {
+    "15": {
+      "inputs": {
+        "ckpt_name": "yue2_3b_bf16.safetensors"
+      },
+      "class_type": "CheckpointLoaderSimple",
+      "_meta": {
+        "title": "加载 YuE2"
+      }
+    },
+    "24": {
+      "inputs": {
+        "clip": [
+          "15",
+          1
+        ],
+        "style": "English, piano pop, intimate, warm female vocal, acoustic piano, rounded bass and light drums, 88 BPM, mid energy, radio-length song, about two to three minutes, lyrical memorable melody, unhurried phrasing, FEASIBILITY-MUSIC-PROBE 一首关于雪夜柴犬的钢琴曲",
+        "lyrics": "[Verse]\nFirst verse\n\n[Chorus]\nHook\n\n[Verse]\nSecond verse\n\n[Chorus]\nHook\n\n[Bridge]\nContrast the chorus here\n\n[Chorus]\nFinal hook",
+        "seed": 31415926,
+        "mode": "full",
+        "max_abc_tokens": 4096,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 30,
+        "repetition_penalty": 1.005,
+        "penalty_window": 100
+      },
+      "class_type": "YuE2GenerateABC",
+      "_meta": {
+        "title": "生成 ABC 谱面"
+      }
+    },
+    "25": {
+      "inputs": {
+        "clip": [
+          "15",
+          1
+        ],
+        "style": "English, piano pop, intimate, warm female vocal, acoustic piano, rounded bass and light drums, 88 BPM, mid energy, radio-length song, about two to three minutes, lyrical memorable melody, unhurried phrasing, FEASIBILITY-MUSIC-PROBE 一首关于雪夜柴犬的钢琴曲",
+        "lyrics": "[Verse]\nFirst verse\n\n[Chorus]\nHook\n\n[Verse]\nSecond verse\n\n[Chorus]\nHook\n\n[Bridge]\nContrast the chorus here\n\n[Chorus]\nFinal hook",
+        "abc": [
+          "24",
+          0
+        ],
+        "seed": 31415926,
+        "mode": "full",
+        "max_duration": 900.0,
+        "temperature": 0.85,
+        "top_p": 0.88,
+        "top_k": 42,
+        "repetition_penalty": 1.05
+      },
+      "class_type": "YuE2GenerateMusic",
+      "_meta": {
+        "title": "生成音乐"
+      }
+    },
+    "18": {
+      "inputs": {
+        "conditioning": [
+          "25",
+          0
+        ]
+      },
+      "class_type": "ConditioningZeroOut",
+      "_meta": {
+        "title": "负条件"
+      }
+    },
+    "5": {
+      "inputs": {
+        "seconds": [
+          "25",
+          1
+        ],
+        "batch_size": 1
+      },
+      "class_type": "EmptyYuE2LatentAudio",
+      "_meta": {
+        "title": "空音频 latent"
+      }
+    },
+    "8": {
+      "inputs": {
+        "model": [
+          "15",
+          0
+        ],
+        "positive": [
+          "25",
+          0
+        ],
+        "negative": [
+          "18",
+          0
+        ],
+        "latent_image": [
+          "5",
+          0
+        ],
+        "seed": 31415926,
+        "steps": 12,
+        "cfg": 2.5,
+        "sampler_name": "dpm_2",
+        "scheduler": "sgm_uniform",
+        "denoise": 1
+      },
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "采样"
+      }
+    },
+    "9": {
+      "inputs": {
+        "samples": [
+          "8",
+          0
+        ],
+        "vae": [
+          "15",
+          2
+        ]
+      },
+      "class_type": "VAEDecodeAudio",
+      "_meta": {
+        "title": "解码音频"
+      }
+    },
+    "10": {
+      "inputs": {
+        "audio": [
+          "9",
+          0
+        ],
+        "filename_prefix": "h3studio/yue2_a9e3761927ac",
+        "format": "flac"
+      },
+      "class_type": "SaveAudioAdvanced",
+      "_meta": {
+        "title": "保存音频"
+      }
+    }
+  },
+  "extra_data": null
+}

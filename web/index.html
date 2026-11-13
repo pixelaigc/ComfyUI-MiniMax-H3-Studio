@@ -433,6 +433,13 @@
         <select class="img-select" id="imgSchedulerSelect"></select>
       </div>
 
+      <!-- 【2026-11-14 可实现性核查修复】>=3MP 时后端会切到「生成 + 官方放大」
+           路径，那条路径把 steps/cfg/采样器/调度器**全部写死**成官方 2K 模板的
+           值（workflows.py 的 _z_image_upscale_nodes）。用户在这里调的值会
+           被静默丢弃 —— 之前只在尺寸栏提示「改走放大路径」，没提示采样参数
+           也不生效。这里明确说出来，避免用户以为拖了滑杆就生效。 -->
+      <div class="img-warn" id="imgUpscaleParamWarn" hidden></div>
+
       <div class="field" id="imgNegField" style="display:none">
         <div class="field-label">负面提示词 <span class="muted">Base 建议填写</span></div>
         <textarea id="imgNegative" rows="2" placeholder="extra fingers, poorly drawn hands, deformed, disfigured"></textarea>
@@ -1395,7 +1402,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      h3-image 分支改了这两个文件（H3-Image 文生图/图片编辑面板与模型联动），
      必须升版号才能破掉浏览器缓存；mainline 一侧的 efflora1 / enh-unify2
      会让用户拿到旧文件。 -->
-<script src="/static/app.js?v=h3image2"></script>
+<script src="/static/app.js?v=feasibility1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
 <script src="/static/job-detail.js?v=jobdetail2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

@@ -1,0 +1,281 @@
+{
+  "seq": 2,
+  "ts": 1794604346.1977086,
+  "iso": "2026-11-14 05:12:26",
+  "upstream_status": 200,
+  "upstream_response": "{\"prompt_id\": \"877caff8-0d60-40c4-a744-a26d310898ad\", \"number\": 217, \"node_errors\": {}}",
+  "request_body": "{\"prompt\": {\"105:107\": {\"inputs\": {\"expression\": \"max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17\", \"values.a\": [\"105:111\", 0]}, \"class_type\": \"ComfyMathExpression\", \"_meta\": {\"title\": \"\\u65f6\\u957f->\\u5e27\\u6570\"}}, \"105:111\": {\"inputs\": {\"value\": 3.0}, \"class_type\": \"PrimitiveFloat\", \"_meta\": {\"title\": \"\\u65f6\\u957f(\\u79d2)\"}}, \"105:11\": {\"inputs\": {\"vae_name\": \"minimax_h3_video_vae_fp16.safetensors\"}, \"class_type\": \"VAELoader\", \"_meta\": {\"title\": \"\\u89c6\\u9891 VAE\"}}, \"13\": {\"inputs\": {\"clip_name\": \"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors\", \"type\": \"minimax\", \"device\": \"default\"}, \"class_type\": \"CLIPLoader\", \"_meta\": {\"title\": \"\\u52a0\\u8f7d\\u6587\\u672c\\u7f16\\u7801\\u5668\"}}, \"105:104\": {\"inputs\": {\"clip\": [\"13\", 0], \"vae\": [\"105:11\", 0], \"prompt\": \"FEASIBILITY-VIDEO-PROBE-888 \\u67f4\\u72ac\\u5728\\u96ea\\u5730\\u5954\\u8dd1\", \"width\": 768, \"height\": 448, \"length\": [\"105:107\", 1]}, \"class_type\": \"MiniMaxH3ImageToVideo\", \"_meta\": {\"title\": \"H3 \\u6761\\u4ef6\"}}, \"6\": {\"inputs\": {\"unet_name\": \"minimax_h3_fl2va_int8_convrot.safetensors\", \"weight_dtype\": \"default\"}, \"class_type\": \"UNETLoader\", \"_meta\": {\"title\": \"\\u52a0\\u8f7dDiT\"}}, \"138:0\": {\"inputs\": {\"model\": [\"6\", 0], \"lora_name\": \"minimax_h3_turbo_4step_ema_ckpt850.safetensors\", \"strength\": 1.0, \"low_vram\": true}, \"class_type\": \"MiniMaxH3TurboLoRA\", \"_meta\": {\"title\": \"Turbo LoRA\\uff08\\u56fa\\u5b9a\\uff09\"}}, \"100\": {\"inputs\": {\"model\": [\"138:0\", 0], \"shift_video\": 9.0, \"shift_audio\": 4.0}, \"class_type\": \"MiniMaxH3SigmaShift\", \"_meta\": {\"title\": \"sigma shift\\uff08\\u89c6\\u9891/\\u97f3\\u9891\\uff09\"}}, \"9\": {\"inputs\": {\"scheduler\": \"sgm_uniform\", \"steps\": 7, \"denoise\": 1, \"model\": [\"100\", 0]}, \"class_type\": \"BasicScheduler\", \"_meta\": {\"title\": \"\\u8c03\\u5ea6\\u5668\"}}, \"17\": {\"inputs\": {\"sampler_name\": \"dpm_2_ancestral\"}, \"class_type\": \"KSamplerSelect\", \"_meta\": {\"title\": \"\\u91c7\\u6837\\u5668\"}}, \"15\": {\"inputs\": {\"noise_seed\": 555000111}, \"class_type\": \"RandomNoise\", \"_meta\": {\"title\": \"\\u566a\\u6ce2\"}}, \"16\": {\"inputs\": {\"model\": [\"100\", 0], \"conditioning\": [\"105:104\", 0]}, \"class_type\": \"BasicGuider\", \"_meta\": {\"title\": \"\\u5f15\\u5bfc\\u5668\"}}, \"14\": {\"inputs\": {\"noise\": [\"15\", 0], \"guider\": [\"16\", 0], \"sampler\": [\"17\", 0], \"sigmas\": [\"9\", 0], \"latent_image\": [\"105:104\", 1]}, \"class_type\": \"SamplerCustomAdvanced\", \"_meta\": {\"title\": \"\\u91c7\\u6837\"}}, \"10\": {\"inputs\": {\"samples\": [\"14\", 0], \"vae\": [\"105:11\", 0]}, \"class_type\": \"VAEDecode\", \"_meta\": {\"title\": \"\\u89e3\\u7801\\u89c6\\u9891\"}}, \"24\": {\"inputs\": {\"vae_name\": \"minimax_h3_audio_vae_fp32.safetensors\"}, \"class_type\": \"VAELoader\", \"_meta\": {\"title\": \"\\u97f3\\u9891 VAE\"}}, \"23\": {\"inputs\": {\"samples\": [\"14\", 0], \"vae\": [\"24\", 0]}, \"class_type\": \"VAEDecodeAudio\", \"_meta\": {\"title\": \"\\u89e3\\u7801\\u97f3\\u9891\"}}, \"300:save\": {\"inputs\": {\"latent\": [\"14\", 0], \"run_id\": \"h3studio_saf7a3123ed9a\", \"stage_index\": 0, \"note\": \"h3studio job af7a3123ed9a\"}, \"class_type\": \"H3RelayLatentSave\", \"_meta\": {\"title\": \"\\u63a5\\u7eed\\u00b7\\u843d\\u76d8\\u672c\\u6bb5\\u6f5c\\u7a7a\\u95f4\\uff08\\u4e0b\\u4e00\\u6bb5\\u7684\\u63a5\\u529b\\u68d2\\uff09\"}}, \"91\": {\"inputs\": {\"fps\": 24, \"bit_depth\": 8, \"images\": [\"10\", 0], \"audio\": [\"23\", 0]}, \"class_type\": \"CreateVideo\", \"_meta\": {\"title\": \"\\u5408\\u6210\\u89c6\\u9891\"}}, \"92\": {\"inputs\": {\"filename_prefix\": \"h3studio/t2v_af7a3123ed9a\", \"format\": \"auto\", \"codec\": \"auto\", \"video\": [\"91\", 0]}, \"class_type\": \"SaveVideo\", \"_meta\": {\"title\": \"\\u4fdd\\u5b58\\u89c6\\u9891\"}}}, \"client_id\": \"h3studio-af7a3123ed9a\"}",
+  "workflow": {
+    "105:107": {
+      "inputs": {
+        "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+        "values.a": [
+          "105:111",
+          0
+        ]
+      },
+      "class_type": "ComfyMathExpression",
+      "_meta": {
+        "title": "时长->帧数"
+      }
+    },
+    "105:111": {
+      "inputs": {
+        "value": 3.0
+      },
+      "class_type": "PrimitiveFloat",
+      "_meta": {
+        "title": "时长(秒)"
+      }
+    },
+    "105:11": {
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+      },
+      "class_type": "VAELoader",
+      "_meta": {
+        "title": "视频 VAE"
+      }
+    },
+    "13": {
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      },
+      "class_type": "CLIPLoader",
+      "_meta": {
+        "title": "加载文本编码器"
+      }
+    },
+    "105:104": {
+      "inputs": {
+        "clip": [
+          "13",
+          0
+        ],
+        "vae": [
+          "105:11",
+          0
+        ],
+        "prompt": "FEASIBILITY-VIDEO-PROBE-888 柴犬在雪地奔跑",
+        "width": 768,
+        "height": 448,
+        "length": [
+          "105:107",
+          1
+        ]
+      },
+      "class_type": "MiniMaxH3ImageToVideo",
+      "_meta": {
+        "title": "H3 条件"
+      }
+    },
+    "6": {
+      "inputs": {
+        "unet_name": "minimax_h3_fl2va_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      },
+      "class_type": "UNETLoader",
+      "_meta": {
+        "title": "加载DiT"
+      }
+    },
+    "138:0": {
+      "inputs": {
+        "model": [
+          "6",
+          0
+        ],
+        "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "strength": 1.0,
+        "low_vram": true
+      },
+      "class_type": "MiniMaxH3TurboLoRA",
+      "_meta": {
+        "title": "Turbo LoRA（固定）"
+      }
+    },
+    "100": {
+      "inputs": {
+        "model": [
+          "138:0",
+          0
+        ],
+        "shift_video": 9.0,
+        "shift_audio": 4.0
+      },
+      "class_type": "MiniMaxH3SigmaShift",
+      "_meta": {
+        "title": "sigma shift（视频/音频）"
+      }
+    },
+    "9": {
+      "inputs": {
+        "scheduler": "sgm_uniform",
+        "steps": 7,
+        "denoise": 1,
+        "model": [
+          "100",
+          0
+        ]
+      },
+      "class_type": "BasicScheduler",
+      "_meta": {
+        "title": "调度器"
+      }
+    },
+    "17": {
+      "inputs": {
+        "sampler_name": "dpm_2_ancestral"
+      },
+      "class_type": "KSamplerSelect",
+      "_meta": {
+        "title": "采样器"
+      }
+    },
+    "15": {
+      "inputs": {
+        "noise_seed": 555000111
+      },
+      "class_type": "RandomNoise",
+      "_meta": {
+        "title": "噪波"
+      }
+    },
+    "16": {
+      "inputs": {
+        "model": [
+          "100",
+          0
+        ],
+        "conditioning": [
+          "105:104",
+          0
+        ]
+      },
+      "class_type": "BasicGuider",
+      "_meta": {
+        "title": "引导器"
+      }
+    },
+    "14": {
+      "inputs": {
+        "noise": [
+          "15",
+          0
+        ],
+        "guider": [
+          "16",
+          0
+        ],
+        "sampler": [
+          "17",
+          0
+        ],
+        "sigmas": [
+          "9",
+          0
+        ],
+        "latent_image": [
+          "105:104",
+          1
+        ]
+      },
+      "class_type": "SamplerCustomAdvanced",
+      "_meta": {
+        "title": "采样"
+      }
+    },
+    "10": {
+      "inputs": {
+        "samples": [
+          "14",
+          0
+        ],
+        "vae": [
+          "105:11",
+          0
+        ]
+      },
+      "class_type": "VAEDecode",
+      "_meta": {
+        "title": "解码视频"
+      }
+    },
+    "24": {
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      },
+      "class_type": "VAELoader",
+      "_meta": {
+        "title": "音频 VAE"
+      }
+    },
+    "23": {
+      "inputs": {
+        "samples": [
+          "14",
+          0
+        ],
+        "vae": [
+          "24",
+          0
+        ]
+      },
+      "class_type": "VAEDecodeAudio",
+      "_meta": {
+        "title": "解码音频"
+      }
+    },
+    "300:save": {
+      "inputs": {
+        "latent": [
+          "14",
+          0
+        ],
+        "run_id": "h3studio_saf7a3123ed9a",
+        "stage_index": 0,
+        "note": "h3studio job af7a3123ed9a"
+      },
+      "class_type": "H3RelayLatentSave",
+      "_meta": {
+        "title": "接续·落盘本段潜空间（下一段的接力棒）"
+      }
+    },
+    "91": {
+      "inputs": {
+        "fps": 24,
+        "bit_depth": 8,
+        "images": [
+          "10",
+          0
+        ],
+        "audio": [
+          "23",
+          0
+        ]
+      },
+      "class_type": "CreateVideo",
+      "_meta": {
+        "title": "合成视频"
+      }
+    },
+    "92": {
+      "inputs": {
+        "filename_prefix": "h3studio/t2v_af7a3123ed9a",
+        "format": "auto",
+        "codec": "auto",
+        "video": [
+          "91",
+          0
+        ]
+      },
+      "class_type": "SaveVideo",
+      "_meta": {
+        "title": "保存视频"
+      }
+    }
+  },
+  "extra_data": null
+}

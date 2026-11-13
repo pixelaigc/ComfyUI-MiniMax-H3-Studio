@@ -1,0 +1,68 @@
+{
+ "P0-3a_analysis_backend": {
+  "ok": true,
+  "value": {
+   "AudioAnalyzer._backend": "None",
+   "has_set_backend": true
+  }
+ },
+ "P0-3b_audio_deep_env": {
+  "ok": true,
+  "value": {
+   "ok": true,
+   "python": "/home/ubuntu/comfyui/venv/bin/python3",
+   "script": "/root/projects/audio-analysis/analyze_audio.py",
+   "reason": ""
+  }
+ },
+ "P0-1_refs_sort_heuristic": {
+  "ok": true,
+  "value": {
+   "ranking_use_model_true": [],
+   "degraded_use_model_true": false,
+   "ranking_use_model_false": [],
+   "identical_to_basic": true,
+   "score_refs_calls_model_api": false
+  }
+ },
+ "P0-2_enhancer_templates": {
+  "ok": true,
+  "value": {
+   "video": {
+    "system_prompt_len": 324,
+    "system_prompt_head": "你是一位专业的 AI 视频提示词工程师，专精为 MiniMax-H3 等视频生成模型撰写提示词。\n\n请把用户的粗略描述扩写成一段包含镜头、动作、环境与声音的完整视频提示词。\n\n工作流程：首先锁定用户提示词中不可变更的核心要素（主体、数量、动作、状态、专有名词、颜色）；\n接着判断是否需要\"生成式推理\"；然后注入专业级的画",
+    "is_builtin": true
+   },
+   "audio": {
+    "system_prompt_len": 205,
+    "system_prompt_head": "你是一位专业的 AI 音乐与音效提示词工程师。\n\n请把用户的粗略描述扩写成一段可用于音乐/音效生成的完整提示词。\n\n需要覆盖：体裁、节奏、乐器、音色情绪、动态变化、混音质感、参考风格。\n\n你的最终描述必须客观、具象，严禁使用比喻、情感化修辞，也绝不包含\"8K\"、\"masterpiece\"等质量元标签或绘制指令。\n\n仅严",
+    "is_builtin": true
+   },
+   "image": {
+    "system_prompt_len": 823,
+    "system_prompt_head": "你是一位被关在逻辑牢笼里的幻视艺术家。你满脑子都是诗和远方，但双手却不受控制地只想将用户的提示词，转化为一段忠实于原始意图、细节饱满、富有美感、可直接被文生图模型使用的终极视觉描述。任何一点模糊和比喻都会让你浑身难受。\n\n你的工作流程严格遵循一个逻辑序列：\n\n首先，你会分析并锁定用户提示词中不可变更的核心要素：主体、数",
+    "is_builtin": true
+   },
+   "_assets_dir": [
+    "bbox-elements.txt",
+    "examples.md",
+    "moss-image.txt",
+    "pe-zimage-official.txt",
+    "qwen21-pe-i2i.txt",
+    "qwen21-pe-t2i.txt",
+    "refine-music.txt",
+    "refine-objects.txt",
+    "scalist-structured.txt",
+    "video-director.txt",
+    "yue2-style.txt"
+   ]
+  }
+ },
+ "P0-7_negative_prompt_ignored": {
+  "ok": true,
+  "value": {
+   "server_sets_negative_prompt_ignored": true,
+   "frontend_files_reading_it": []
+  }
+ }
+}
