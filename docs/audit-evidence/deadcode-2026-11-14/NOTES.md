@@ -134,3 +134,43 @@ baseline 与 after 两条全量跑都在 86% 处被 2400s timeout 截断（EXIT=
 
 ## 报告
 `死代码与冗余清理报告.md`（仓库根目录）
+
+---
+
+## 第二轮 A/B 复跑（run2）—— 交叉验证
+
+同样 63 个非浏览器 test_*.py，两条树同时跑：
+
+| 树 | 结果 |
+|---|---|
+| baseline `b434e32` | 2400s 超时截断于 **85%**（EXIT=124） |
+| after `ab80070` | 2400s 超时截断于 **85%**（EXIT=124） |
+
+逐进度点累计 F/E 计数对照（脚本比对 `/tmp/unit_baseline_run2.txt` 与 `/tmp/unit_after_run2.txt`）：
+
+```
+pct   base_F  after_F  match
+ 40       0        0  OK
+ 43       2        1  DIFF   <- after 少 1
+ 45       4        3  DIFF   <- after 少 1
+ ...
+ 74       5        4  DIFF
+ 77       9        7  DIFF   <- after 少 2
+ 83      14       11  DIFF   <- after 少 3
+ 85      14       11  DIFF
+```
+
+**关键结论：after 的累计失败数在每一个检查点都 ≤ baseline**，
+即 after 不可能引入任何 baseline 没有的新失败。
+（差值全部来自 `test_continuation_retry.py::RetryLatentCoordTest` 这 3 条
+顺序相关抖动用例 —— 单独跑两边都 15 passed。）
+
+## 失败集合的集合运算（run1，跑完整套）
+
+```
+AFTER ⊆ BASELINE ?  True
+新增失败（after 有 baseline 没有）: 无
+baseline 多出: test_continuation_retry.py::RetryLatentCoordTest 的 3 条（顺序相关抖动）
+```
+
+**新增失败差集 = ∅（严格成立，非「抽样未发现」）**
