@@ -73,6 +73,13 @@ function isMossMode(mode) {
   return MOSS_MODES.includes(mode || state.mode);
 }
 
+// Z-Image 专用模式（目前只有 t2i；它是唯一有「官方 2K 放大路径」的族 ——
+// 见 workflows.build_t2i 里超过 Z_IMAGE_MAX_DIRECT_MP 时的分支）。
+function isZImageMode(mode) {
+  const m = mode || state.mode;
+  return m === "t2i";
+}
+
 // 默认模式：整个应用只有这一个来源（导航高亮 / 参数面板 / state.mode 都用它）
 const DEFAULT_MODE = "t2i";
 
@@ -614,15 +621,14 @@ function renderMode() {
 }
 
 // ---------- 图像模式（Z-Image 文生图） ----------
-// 档位 + 比例 -> 像素宽高。规则与后端 z_image_dimensions 一致：
-// 档位值给到**短边**，横图给高度、竖图给宽度，宽高对齐到 8 的倍数。
-function imgAutoSize(tier, aspect) {
-  // 与后端 z_image_dimensions / qwen_image_dimensions / ComfyUI
-  // ResolutionSelector 同一算法：
-  //   total = megapixels * 1024^2; scale = sqrt(total / (wr*hr))
-  //   w = round(wr*scale/mult)*mult;  h = round(hr*scale/mult)*mult
-  // multiple 用 16（Z-Image / Qwen-Image 2.1 都要求宽高是 16 的倍数：
-  // Qwen-Image 2.1 的 VAE 是 16 倍下采样）。
+// 档位 + 比例 -> 像素宽高。**原始值**（不做像素区间钳制）。
+// 规则与后端 z_image_dimensions / qwen_image_dimensions / ComfyUI
+// ResolutionSelector 同一算法：
+//   total = megapixels * 1024^2; scale = sqrt(total / (wr*hr))
+//   w = round(wr*scale/mult)*mult;  h = round(hr*scale/mult)*mult
+// multiple 用 16（Z-Image / Qwen-Image 2.1 都要求宽高是 16 的倍数：
+// Qwen-Image 2.1 的 VAE 是 16 倍下采样）。
+function imgTierSizeRaw(tier, aspect) {
   const ctx = imgCtx();
   const tierOpt = ctx.tiers.find(t => t.key === tier);
   const megapixels = (tierOpt && tierOpt.megapixels) || 1.0;
@@ -635,6 +641,28 @@ function imgAutoSize(tier, aspect) {
   w = Math.max(mult, w);
   h = Math.max(mult, h);
   return [w, h];
+}
+
+// 档位 -> **最终生效**宽高 + 调整原因。
+//
+// ⚠️ 为什么 Z-Image 要区别对待：
+//   - Z-Image：超过 3MP 是**故意的** —— 后端 build_t2i 会切到官方 2K 放大路径
+//     （低分辨率生成 + RealESRGAN 放大 + 二次细化），最终输出尺寸 = 档位尺寸。
+//     所以这里**绝不能**钳制，钳了就永远走不到放大路径。
+//   - MOSS / Qwen：后端**没有**放大路径，超限尺寸会被后端钳到官方直出上限
+//     （MOSS 4MP / Qwen 4.2MP）。前端必须**用同一套规则**钳制，
+//     否则界面显示 2736×1536、真正提交给 ComfyUI 的却是 2720×1520
+//     —— 用户看到的尺寸是假的（实测证据：evidence/e2e_size_consistency.json）。
+function imgTierSize(tier, aspect) {
+  const [rw, rh] = imgTierSizeRaw(tier, aspect);
+  if (isZImageMode()) return [rw, rh, []];
+  return normalizeImgSize(rw, rh);
+}
+
+// 只取宽高（兼容旧调用点）
+function imgAutoSize(tier, aspect) {
+  const s = imgTierSize(tier, aspect);
+  return [s[0], s[1]];
 }
 
 // 当前图像模式的「参数上下文」：Z-Image 与 Qwen-Image 2.1 两套清单 + 两份状态。
@@ -680,10 +708,16 @@ function imgCurrentSize() {
 // 档位下拉：显示具体像素，例如 "1080P · 1920×1088 (2.0MP)"
 function imgTierLabel(tier) {
   const ctx = imgCtx();
-  const [w, h] = imgAutoSize(tier.key, ctx.st.aspect);
+  // 用 imgTierSize（生效值）而不是原始档位值 —— 否则 MOSS/Qwen 超限档位
+  // 会显示一个**永远不会被真正提交**的尺寸（如 2736×1536，实际是 2720×1520）。
+  const size = imgTierSize(tier.key, ctx.st.aspect);
+  const [w, h] = size;
   const mp = (w * h) / (1024 * 1024);
   const up = mp > (ctx.maxMp || 3);
-  return `${tier.label} · ${w}×${h} (${mp.toFixed(1)}MP)${up ? " · 放大" : ""}`;
+  // 「放大」标记只对 Z-Image 成立（它真的有官方 2K 放大路径）；
+  // MOSS / Qwen 超限是「直接按此尺寸出图」，标成「放大」会误导用户。
+  const upTag = up ? (isZImageMode() ? " · 放大" : " · 超限直出") : "";
+  return `${tier.label} · ${w}×${h} (${mp.toFixed(1)}MP)${upTag}`;
 }
 
 // ---------- 生成批次（1-5） ----------
@@ -1319,14 +1353,34 @@ function normalizeImgSize(w, h) {
       nw = sw; nh = sh;
     }
   }
-  const maxMp = ctx.maxMp;
+  // ⚠️ Z-Image **不做**像素上限钳制。
+  //   原因：后端 build_t2i 对 >3MP 的目标尺寸会切到**官方 2K 放大路径**
+  //   （workflows._z_image_upscale_nodes：低分辨率生成 -> RealESRGAN ->
+  //   ImageScale(width=目标宽, height=目标高) -> 低 denoise 二次细化），
+  //   最终输出就是用户要的**原始尺寸**。
+  //   如果这里先钳掉，用户要 2048x2048 却被改成 1760x1760，
+  //   界面显示的尺寸和实际出图就不一致了（实测：后端 ImageScale 给的是 2048x2048）。
+  //   MOSS / Qwen 没有放大路径，超限必须钳 —— 那才是官方直出上限。
+  const maxMp = isZImageMode() ? null : ctx.maxMp;
   if (maxMp) {
     const maxPixels = maxMp * 1024 * 1024;
     if (nw * nh > maxPixels) {
       const scale = Math.sqrt(maxPixels / (nw * nh));
-      const sw = Math.max(mult, Math.round(nw * scale / mult) * mult);
-      const sh = Math.max(mult, Math.round(nh * scale / mult) * mult);
-      reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 超过官方直出上限 ${maxMp}MP → 按比例缩到 ${sw}×${sh}（更大尺寸需挂 4MP+ hires LoRa）`);
+      let sw = Math.max(mult, Math.round(nw * scale / mult) * mult);
+      let sh = Math.max(mult, Math.round(nh * scale / mult) * mult);
+      // ⚠️ 16 的倍数是离散步长：按比例缩到目标像素后再对齐到 16 的倍数，
+      //    可能又略微超出（例如 4.0MP -> 2736x1536 = 4.008MP）。
+      //    缩放后仍超 -> 再退一格直到不超（后端 normalize_moss_image_size 同逻辑）。
+      //    不超 -> 已是能表示的最接近值，保持不变（只提示）。
+      //    规则必须与后端逐格一致，否则界面显示的尺寸 != 实际提交的尺寸。
+      if (sw * sh > maxPixels) {
+        while (sw * sh > maxPixels && sw > mult && sh > mult) {
+          sw -= mult; sh -= mult;
+        }
+        reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 超过官方直出上限 ${maxMp}MP → 按比例缩到 ${sw}×${sh}（更大尺寸需挂 4MP+ hires LoRa）`);
+      } else {
+        reasons.push(`总像素 ${(nw * nh / 1048576).toFixed(2)}MP 略超官方直出上限 ${maxMp}MP（对齐到 16 的倍数后已是最接近值 ${sw}×${sh} = ${(sw * sh / 1048576).toFixed(2)}MP）→ 保持不变`);
+      }
       nw = sw; nh = sh;
     }
   }
@@ -1361,7 +1415,11 @@ function updateImageSizeFields() {
     // 吸附结果写回 state —— 提交给 ComfyUI 的必须是吸附后的值
     s.width = w; s.height = h;
   } else {
-    [w, h] = imgAutoSize(s.tier, s.aspect);
+    // 档位路径：Z-Image 不钳制（要走官方 2K 放大路径），MOSS/Qwen 按官方直出上限钳制
+    const tierSize = imgTierSize(s.tier, s.aspect);
+    w = tierSize[0]; h = tierSize[1]; reasons = tierSize[2];
+    // 生效值写回 state —— 提交给 ComfyUI 的必须是这个值
+    s.width = w; s.height = h;
   }
   // 用户正在输入时不要覆盖输入框里的原始文本（否则输入会被打断）
   if (!imgSizeTyping) {
@@ -1372,7 +1430,24 @@ function updateImageSizeFields() {
   const mp = (w * h) / (1024 * 1024);
   const up = mp > (ctx.maxMp || 3);
   const parts = [`${mp.toFixed(2)} MP`];
-  if (up) parts.push(`超过 ${ctx.maxMp}MP，改走「生成 + 官方放大」路径（输出像素为近似值）`);
+  // ⚠️ 「超过上限」的处置方式**因族而异**，不能一句话套用：
+  //   - Z-Image：后端 build_t2i 确实会切到官方 2K 放大路径
+  //     （workflows._z_image_upscale_nodes），所以「改走生成+放大」是真的。
+  //   - MOSS / Qwen：后端**没有**放大路径，超限尺寸是原样发给 ComfyUI 的
+  //     （build_moss_t2i / build_qwen_t2i 里都没有 upscale 分支）。
+  //     之前这里统一显示「改走「生成 + 官方放大」路径」= 对用户撒了谎，
+  //     用户以为会走放大，实际拿到的是未放大的原尺寸图。
+  //     现在改成如实说明「超限直出」。
+  if (up) {
+    parts.push(isZImageMode()
+      ? `超过 ${ctx.maxMp}MP，改走「生成 + 官方放大」路径（输出像素为近似值）`
+      : `超过 ${ctx.maxMp}MP 官方直出区间，本模式无放大路径，将按此尺寸直接出图`);
+  }
+  // 档位路径被钳到官方直出上限时，要**如实告诉用户**被调了多少
+  // （档位原始值 -> 生效值），否则用户选了 2K 却拿到 2720×1520 却不知情。
+  if (!manual && reasons.length) {
+    parts.push(`档位原始值已按官方直出上限调整为 ${w}×${h}`);
+  }
   if (manual) parts.push("自定义尺寸，点「自动」可恢复档位计算值");
   $("#imgSizeManualNote").textContent = parts.join(" · ");
 
@@ -5411,6 +5486,15 @@ function setPanelOpen(open) {
   if (!panel) return;
   panel.classList.toggle("open", open);
   if (mask) mask.classList.toggle("open", open);
+  // 抽屉打开时把悬浮「参数」按钮藏掉：
+  //  .panel-fab 的 z-index(960) 必须高于抽屉本体(950) 才能保证**可点**
+  //  （实测 390px 下按钮被抽屉里溢出的滑块挡住 -> 完全点不动），
+  //  但这样一来按钮就会浮在打开的抽屉上面，盖住面板内容。
+  //  所以：关闭时显示（唯一作用是打开抽屉），打开时隐藏。
+  const fab = $("#panelFab");
+  if (fab && window.innerWidth <= BREAKPOINTS.tablet) {
+    fab.hidden = !!open;
+  }
 }
 
 // 浮动「参数」按钮：只在**参数面板处于抽屉模式**时出现。
@@ -5470,6 +5554,9 @@ function initResponsive() {
       panel.classList.toggle("open", open);
       const mask = $("#panelMask");
       if (mask) mask.classList.toggle("open", open);
+      // 打开抽屉时把 FAB 藏掉（它会浮在抽屉上方挡住面板内容，
+      // 原因见 setPanelOpen 里的注释）。
+      fab.hidden = open;
       if (open) setSidebarOpen(false);
     });
   }

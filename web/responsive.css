@@ -136,7 +136,17 @@
     display: flex; align-items: center; gap: 6px;
     position: fixed; right: 14px;
     bottom: calc(16px + env(safe-area-inset-bottom));
-    z-index: 930;
+    /* ⚠️ z-index 必须**高于**抽屉本体（.panel = 950）与遮罩（.panel-mask = 949）。
+     *    原来这里是 930 —— 比抽屉低 20 层。
+     *    实测后果（elementFromPoint 权威验证）：
+     *      390px 视口下，用户手指点 FAB 中心，命中的是
+     *      <input id="imgShift">（抽屉里溢出来的 SHIFT 滑块），
+     *      不是 FAB 自己 -> 按钮**点不动**，用户根本打不开参数面板，
+     *      表现为「MOSS-Image 文生图面板完全不可用」。
+     *      375px 视口下碰巧命中 FAB 自己能点开 -> 这是尺寸相关的竞态，
+     *      不能靠「有时能点」当没 bug。
+     *    现在提到 960（高于 .panel 的 950），保证 FAB 永远可点。 */
+    z-index: 960;
     height: 44px; padding: 0 18px;
     border: none; border-radius: 22px;
     background: var(--accent); color: #fff;
@@ -145,6 +155,12 @@
   }
   .panel-fab:active { filter: brightness(.94); }
   .panel-fab svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  /* ⚠️ 必须显式写这条：`display: flex` 是作者样式，优先级高于浏览器默认的
+     `[hidden] { display: none }`（UA 样式），所以只设 `hidden` 属性是**藏不住**
+     这个按钮的 —— 实测过：JS 设了 fab.hidden=true，但 computed display 仍是 flex，
+     按钮照样浮在打开的抽屉上面。
+     （同仓库其它地方也是这么处理的，见 .jobs-tools[hidden] / .lightbox[hidden]。） */
+  .panel-fab[hidden] { display: none; }
 
   /* 抽屉内部：多列改单列 */
   .compact-pair { grid-template-columns: 1fr; }
