@@ -1207,10 +1207,36 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                     code="invalid_duration"))
 
     # --- LoRA ---
+    #
+    # 【2026-11-13 修 —— 非视频模式也要拦「不认识的 LoRA 值」】
+    #
+    # 旧实现：`if allowed and str(lora) not in allowed` ——
+    #   `mode_loras(mode)` 对**图像 / 音乐模式返回空列表**，
+    #   于是 `allowed` 为空 -> 整个校验分支被跳过 -> **任何**字符串都能进 params。
+    #
+    # 【后果（用户 2026-11-13 实测报出的 BUG 1）】Agent 把提示词误填进
+    # `lora` 字段（例如 "integrated_multimodal_description: [Shot 1] ..."），
+    # 任务照样建成功、照样出片，而生成库卡片把这段提示词**当成 LoRA 显示**。
+    #
+    # 【修法】把「这个模式有合法 LoRA 集合」与「集合为空」分开处理：
+    #   * 有合法集合（视频模式）-> 值不在集合里 = 非法（原有行为不变）；
+    #   * 集合为空（图像 / 音乐模式）-> **该模式根本不用 lora 字段**，
+    #     传了就是误填 -> 报 invalid_lora，并明确提示「这个模式不支持加速 LoRA」。
     lora = params.get("lora")
     if lora:
         allowed = mode_loras(mode)
-        if allowed and str(lora) not in allowed:
+        if not allowed:
+            # 该模式没有 LoRA 概念（图像 / 音乐）—— 传了就是误填。
+            issues.append(ValidationIssue(
+                "lora",
+                f"{mode} 模式不支持 LoRA 参数（收到：{str(lora)[:60]}）",
+                allowed=[],
+                suggestions=[{"action": "drop",
+                              "params": {"lora": None},
+                              "reason": f"{mode} 模式没有加速 LoRA 概念，"
+                                        "请删掉 lora 参数（提示词请写进 prompt）"}],
+                code="invalid_lora"))
+        elif str(lora) not in allowed:
             issues.append(ValidationIssue(
                 "lora",
                 f"LoRA「{lora}」不是 {mode} 的合法取值",

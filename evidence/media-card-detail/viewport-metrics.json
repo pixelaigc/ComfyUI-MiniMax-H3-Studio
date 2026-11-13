@@ -1,0 +1,80 @@
+{
+  "375px": {
+    "viewport": [
+      375,
+      667
+    ],
+    "dialog": {
+      "left": 0,
+      "top": 53,
+      "w": 375,
+      "h": 614
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": true,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      40,
+      40
+    ],
+    "doneBtnSize": [
+      347,
+      42
+    ],
+    "paramRowCount": 13
+  },
+  "390px": {
+    "viewport": [
+      390,
+      844
+    ],
+    "dialog": {
+      "left": 0,
+      "top": 68,
+      "w": 390,
+      "h": 776
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": true,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      40,
+      40
+    ],
+    "doneBtnSize": [
+      362,
+      42
+    ],
+    "paramRowCount": 13
+  },
+  "1280px": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dialog": {
+      "left": 280,
+      "top": 65,
+      "w": 720,
+      "h": 590
+    },
+    "overflowsViewport": false,
+    "bodyScrollable": true,
+    "promptScrollable": true,
+    "closeBtnClickable": false,
+    "doneBtnClickable": true,
+    "closeBtnSize": [
+      13,
+      26
+    ],
+    "doneBtnSize": [
+      61,
+      37
+    ],
+    "paramRowCount": 13
+  }
+}

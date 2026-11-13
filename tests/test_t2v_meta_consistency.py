@@ -337,9 +337,12 @@ class TestFrontendRendersSummary(unittest.TestCase):
         **真实执行**断言）；这里只做一道结构性检查，确保卡片用的是
         那个函数，而不是自己内联拼一行。
         """
-        self.assertIn("const loraRow = loraRowHtml(loraLabel(job));",
-                      APP_JS_CODE)
+        # 【2026-11-13 更新】卡片现在优先读服务端白名单判定过的
+        # job.gen_params.lora（BUG 1 修复点），老服务端没有该字段时才
+        # 回落到本地兜底 loraLabel(job)。
         self.assertIn("function loraRowHtml(loraText)", APP_JS_CODE)
+        self.assertIn("loraRowHtml(job.gen_params", APP_JS_CODE)
+        self.assertIn(": loraLabel(job));", APP_JS_CODE)
 
     def test_frontend_does_not_write_legacy_lora_for_all_modes(self):
         """提交层不能对**所有模式**无条件写遗留 lora 字段。
@@ -363,8 +366,36 @@ class TestServerWiresModelInfo(unittest.TestCase):
     """服务端：每个 job 都带上 model_info"""
 
     def test_row_to_job_includes_model_info(self):
-        src = (REPO / "server.py").read_text(encoding="utf-8")
-        self.assertIn('"model_info": job_meta.summarize(mode, job_params),', src)
+        """服务端必须下发 model_info。
+
+        【2026-11-13 更新】原来的断言是逐字匹配
+        `"model_info": job_meta.summarize(mode, job_params),`。
+        现在 row_to_job 先把摘要算进局部变量（因为 gen_params 也要复用它），
+        所以字面量变成了 `"model_info": model_info,`。
+        断言改成「**行为**」而不是「**字面量**」—— 用 row_to_job 的
+        真实输出断言 model_info 存在且形状正确。
+        """
+        import server  # noqa: E402
+
+        row = {
+            "id": "meta_probe_001",
+            "created_at": 1700000000.0,
+            "mode": "t2v",
+            "status": "done",
+            "progress": 1.0,
+            "progress_text": "",
+            "error": None,
+            "started_at": 1700000000.0,
+            "finished_at": 1700000010.0,
+            "params": json.dumps({"model_key": "fl2va_pruned_int8"}),
+            "outputs": "[]",
+            "session_id": "",
+        }
+        job = server.row_to_job(row)
+        self.assertIn("model_info", job)
+        self.assertIn("model_label", job["model_info"])
+        # 【2026-11-13】gen_params 也必须下发（卡片参数行 + 详情模态框用）
+        self.assertIn("gen_params", job)
 
     def test_job_meta_module_imported(self):
         src = (REPO / "server.py").read_text(encoding="utf-8")

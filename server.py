@@ -328,6 +328,8 @@ def row_to_job(r):
     gen_type = (gen_types.type_for_mode(stored_type) if stored_type
                 else gen_types.type_for_mode(mode))
     outputs = json.loads(r["outputs"] or "[]")
+    model_info = job_meta.summarize(mode, job_params)
+    resolution_info = _job_resolution_info(job_params, outputs)
     return {
         "id": r["id"],
         "created_at": r["created_at"],
@@ -344,7 +346,17 @@ def row_to_job(r):
         # 而新面板提交的是 model_key / accel_loras。
         # 现在由服务端按任务真实参数算好摘要下发，前端只渲染这一份，
         # 「面板所选 == 落库记录 == 卡片显示」三者必然同源。
-        "model_info": job_meta.summarize(mode, job_params),
+        "model_info": model_info,
+        # 【2026-11-13 新增】完整生成参数摘要（C2 卡片行 + C3 详情模态框）。
+        # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
+        #
+        # 【为什么要单独一份】BUG 2 报的是「卡片不显示步数等参数」。
+        # 步数 / 调度器 / 采样器 / shift / 尺寸 / 时长 / seed 分散在
+        # 不同字段里（视频用 shift_video、图像用 shift；音乐时长是
+        # max_duration），前端自己去拼必然漏、也必然串。
+        # **缺失的字段这里是空串 —— 前端显示「—」，不拿别的字段顶替。**
+        "gen_params": job_meta.gen_params(mode, job_params,
+                                          model_info, resolution_info),
         # 【2026-11-12 新增】接续状态（能否被接续 / 为什么不能 / 累计帧数）。
         # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
         "continuation_info": cont_service.continuation_state(mode, job_params, r["id"]),
@@ -354,7 +366,7 @@ def row_to_job(r):
         "error": r["error"],
         "outputs": outputs,
         # 【2026-11-11】卡片显示用的分辨率 / 比例标签（服务端算好的唯一真源）
-        "resolution_info": _job_resolution_info(job_params, outputs),
+        "resolution_info": resolution_info,
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
         # 任务归属的 Agent 会话（面板侧建的任务为空）。
         # row["session_id"] 在**迁移前**的老库上不存在 —— 用 keys 兜底，

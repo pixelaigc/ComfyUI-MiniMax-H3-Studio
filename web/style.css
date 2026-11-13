@@ -415,6 +415,101 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .job-meta button.prompt-row:hover { background: var(--accent-soft); }
 .job-meta button.prompt-row:hover span { color: var(--accent); }
 
+/* ---------- C2：卡片「生成参数」分组（2026-11-13） ---------- */
+/*
+ * 卡片上新增的生成参数行（模型 / LoRA / 采样器 / 调度器 / 步数 / 尺寸 /
+ * 时长 / 种子）。它们放在一个 .gen-params 分组里 —— 分组不改变
+ * .job-meta 的 3 列网格，只是让这一组在视觉上连续（用一条细分隔线
+ * 隔开「基础信息」和「生成参数」）。
+ *
+ * 【为什么不加边框】卡片本身已经很花（预览图 + 标题 + 参数网格 +
+ * 操作条）；再加框会让窄屏（375/390px）上每张卡多出好几个像素的
+ * 内边距，参数值被截断得更厉害。
+ */
+.job-meta .gen-params {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+/* 卡片变窄时，参数分组从 3 列降到 2 列（与 .job-meta 的降列规则一致） */
+@container (max-width: 340px) {
+  .job-meta .gen-params { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- C3：生成参数详情模态框（2026-11-13） ---------- */
+/*
+ * 需求：375 / 390 / 1280px 三档宽度下模态框**不溢出、可滚动、按钮可点**。
+ *
+ * 实现要点：
+ *   1. .prompt-dialog 已有 `max-height: 82vh` + `overflow: hidden`；
+ *      详情框在此基础上把**中间内容区**（.detail-body）设为
+ *      `overflow: auto` + `flex: 1` —— 头尾固定，中间滚动。
+ *      这是「不溢出 + 可滚动」的关键：不能给整个对话框加 overflow:auto，
+ *      否则标题栏也会跟着滚走。
+ *   2. 宽度用 `min(720px, 92vw)`（继承自 .prompt-dialog）——
+ *      375px 视口下 = 345px，不溢出。
+ *   3. 参数表用两列网格（标签 + 值），窄屏降为一列。
+ *   4. 提示词用 <pre> + `white-space: pre-wrap; word-break: break-word`
+ *      —— 长提示词必须换行，不能横向溢出。
+ */
+.detail-dialog { width: min(720px, 92vw); }
+.detail-body {
+  flex: 1;
+  min-height: 0;              /* flex 子项默认 min-height:auto 会撑破容器 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.detail-section + .detail-section { margin-top: 16px; }
+.detail-section-title {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.detail-kv-row { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.detail-kv-row span { font-size: 10px; line-height: 1.1; color: var(--muted); }
+.detail-kv-row b {
+  color: var(--text); font-weight: 500; font-size: 12px;
+  max-width: 100%; text-align: left;
+  overflow-wrap: anywhere;      /* 长 LoRA 名换行，不横向溢出 */
+  line-height: 1.4;
+}
+.detail-prompt {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  background: #f7f8fa;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;        /* 保留换行 + 自动换行 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+/* 窄屏：参数表降为一列（标签在上、值在下） */
+@media (max-width: 560px) {
+  .detail-dialog { width: 94vw; max-height: 88vh; }
+  .detail-body { padding: 12px; }
+  .detail-kv { grid-template-columns: minmax(0, 1fr); }
+  .detail-prompt { max-height: 34vh; }
+}
+
 /* 完整提示词弹窗 */
 .prompt-modal[hidden] { display: none; }
 .prompt-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(18, 22, 30, .52); display: flex; align-items: center; justify-content: center; padding: 24px; }
