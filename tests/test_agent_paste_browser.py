@@ -98,6 +98,33 @@ class TestPasteStaticContract(unittest.TestCase):
         self.assertIn("Ctrl+V", self.index_html,
                       "界面没告诉用户可以粘贴媒体")
 
+    def test_paste_accepts_audio_and_video_not_only_images(self):
+        """
+        粘贴必须支持**音视频**，不能只支持图片。
+
+        kindForFile 是上传路径与粘贴路径**共用**的类型判定 ——
+        它已经认 audio/* 与 video/*；这里锁住「粘贴路径确实用了它」。
+        """
+        idx = self.agent_js.index("function handlePaste")
+        body = self.agent_js[idx:idx + 1200]
+        self.assertIn("kindForFile", body,
+                      "粘贴路径没用 kindForFile —— 可能只支持图片")
+        # kindForFile 本身必须认音频与视频
+        kidx = self.agent_js.index("function kindForFile")
+        kbody = self.agent_js[kidx:kidx + 700]
+        self.assertIn('type.startsWith("audio/")', kbody,
+                      "kindForFile 不认 audio/*")
+        self.assertIn('type.startsWith("video/")', kbody,
+                      "kindForFile 不认 video/*")
+
+    def test_server_accepts_audio_and_video_uploads(self):
+        """服务端的上传白名单必须含音视频（粘贴走的是同一条链路）。"""
+        from h3studio import agent_media
+        self.assertTrue(agent_media.ALLOWED_AUDIO_SUFFIXES)
+        self.assertTrue(agent_media.ALLOWED_VIDEO_SUFFIXES)
+        self.assertIn(".mp4", agent_media.ALLOWED_VIDEO_SUFFIXES)
+        self.assertIn(".mp3", agent_media.ALLOWED_AUDIO_SUFFIXES)
+
 
 class TestAgentManageStaticContract(unittest.TestCase):
     """静态契约：agent 管理面板文件 / 入口 / 接口都在。"""
