@@ -122,7 +122,8 @@ def main() -> int:
         if cc.get("reason"):
             print(f"  reason: {cc['reason'][:160]}")
 
-    dest = Path("/tmp/h3-fix-evidence")
+    dest = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/h3-fix-evidence")
+    dest.mkdir(parents=True, exist_ok=True)
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "moss_lora_key_shapes.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")

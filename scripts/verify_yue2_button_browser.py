@@ -27,13 +27,16 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-OUT = Path("/tmp/h3-fix-evidence")
-SHOTS = Path("/root/.hermes-web-ui/.ekko/workspace/default/"
-              "person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence/agent-enh-merge")
+OUT = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/h3-fix-evidence")
+OUT.mkdir(parents=True, exist_ok=True)
+#: 截图目录跟证据目录**同源** —— 硬编码到别处会让「报告里写的路径」
+#: 与「实际落盘路径」分家（上一轮复验就因为这个判过「证据不在路径上」）。
+SHOTS = OUT / "screenshots"
 PORT = int(os.environ.get("H3_TEST_PORT", "8197"))
 DATA_DIR = Path(os.environ.get("H3_TEST_DATA", "/tmp/h3-yue2-d-e2e"))
 

@@ -8,7 +8,7 @@ load_lora + comfy/lora_convert.convert_lora）判定每个 MOSS 系 LoRA：
 
 并且对比「修复前（原文件）」与「修复后（归一化派生文件）」。
 
-输出 /tmp/moss_attach_verified.json
+输出目录由 argv[1] 决定（默认 /tmp/moss_attach_verified.json）
 """
 import glob
 import json
@@ -90,7 +90,9 @@ def main():
     print(f"待测 {len(files)} 个 MOSS 系 LoRA", flush=True)
 
     tmpdir = tempfile.mkdtemp(prefix="moss-verify-")
-    out = Path("/tmp/moss_attach_verified.json")
+    out_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "moss_attach_verified.json"
     report = []
     t0 = time.time()
     for i, f in enumerate(files):

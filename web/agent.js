@@ -1585,7 +1585,21 @@
       // 失败也要让用户看到「到底怎么了」—— 不能只留一个空白的忙碌状态。
       stopProgress();
       msg.streaming = false;
-      msg.error = err.message || "未知错误";
+      // 【2026-11-13 修：用户主动取消时不要显示浏览器的原始报错】
+      //
+      // cancelAgentSSE() 会给 msg.error 写上「已停止生成」，
+      // 然后 abort() 让 fetch 抛 AbortError ——
+      // 于是这里**无条件**用 err.message 覆盖，
+      // 用户看到的是 "signal is aborted without reason"（浏览器原文），
+      // 而不是「已停止生成」。
+      //
+      // 判据：msg.error 已经被 cancel 路径写过 -> 说明是**用户主动取消**，
+      // 保留那条友好文案；否则才是真失败，用 err.message。
+      if (!msg.error) {
+        msg.error = err.message || "未知错误";
+      } else if (err.name === "AbortError" || /aborted/i.test(err.message || "")) {
+        // 保留 cancelAgentSSE 写的提示（用户主动取消）
+      }
       msg.result = { status: "failed" };
       // msg.retryRequest 保留 -> 渲染出「重试」按钮
     } finally {
@@ -1693,7 +1707,31 @@
     if (!activeSSE) return false;
     try { activeSSE.abort(); } catch (e) { /* 已断 */ }
     activeSSE = null;
-    if (reason) setHint(reason, "error");
+    // 【2026-11-13 修：真实缺陷】
+    //
+    // 原来这里调 `setHint(reason, "error")` ——
+    // 但 **agent.js 里从来没有定义过 setHint**（全文件只有这一处出现）。
+    // 于是**每次点「停止」都会抛 ReferenceError**：
+    //     Uncaught ReferenceError: setHint is not defined
+    // 后果很具体：
+    //   * abort() 本身已经执行了（流确实断了），但
+    //   * 异常从 cancelAgentSSE 抛出后，调用方拿不到 `true`，
+    //   * 界面也不会显示「已停止」—— 用户点了没反应。
+    //
+    // 【正确的做法】
+    // 取消是**针对某条正在流式的气泡**的，所以提示要写到那条消息上
+    // （msg.error），由 renderError() 渲染 —— 这跟 SSE 超时/失败
+    // 走的是同一条展示路径（send() 的 catch 里也是设 msg.error）。
+    // 这里不自己造第二套提示机制。
+    if (reason) {
+      const msg = state.streaming;
+      if (msg) {
+        msg.error = reason;
+        msg.streaming = false;
+        msg.result = msg.result || { status: "failed" };
+        renderMessages();
+      }
+    }
     return true;
   }
 
