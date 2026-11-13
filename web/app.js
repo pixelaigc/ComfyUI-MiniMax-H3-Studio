@@ -4370,6 +4370,64 @@ function detailParamValue(job, key) {
   return text || "—";
 }
 
+/**
+ * 【2026-11-14 · c6】详情模态框里的「作者推荐参数」分组。
+ *
+ * 与 web/job-detail.js 的 recBlock() 同源同口径，但只依赖公开的
+ * window.JOB_META.recItems / recSource —— 不碰 job-detail.js 的 IIFE 私有实现。
+ *
+ * - recItems() 已把「作者未提供」的项标成 provided=false、value="作者未提供"
+ *   （绝不把原始哨兵值 not_provided 显示给用户）；
+ * - recSource() 给出「来源类型 / 出处 / note」，保证来源可追溯；
+ * - 任一推荐对象为空 -> 不渲染该分组；三个都空 -> 返回 ""（不渲染空区块）。
+ */
+function detailRecommendHtml(job) {
+  const meta = window.JOB_META;
+  if (!meta || typeof meta.recItems !== "function") return "";
+  const info = (job && job.model_info && typeof job.model_info === "object")
+    ? job.model_info : {};
+  const groups = [
+    ["主模型推荐参数（作者 / ComfyUI 硬性值）", info.model_recommendation],
+    ["加速 LoRA 推荐参数（作者）", info.lora_recommendation],
+    ["工作流固定 LoRA 推荐参数（作者）", info.fixed_lora_recommendation],
+  ];
+  const blocks = [];
+  for (const [title, rec] of groups) {
+    if (!rec || typeof rec !== "object") continue;
+    let items = [];
+    try {
+      items = meta.recItems(rec) || [];
+    } catch (e) {
+      items = [];
+    }
+    if (!items.length) continue;
+    const chips = items.map((it) => {
+      const cls = it.provided ? "job-detail-recchip" : "job-detail-recchip is-missing";
+      const src = it.source ? ` ${it.source}` : "";
+      const titleAttr = it.source ? ` title="${escapeHtml(it.source)}"` : "";
+      return `<span class="${cls}"${titleAttr}>${escapeHtml(it.label)}：${escapeHtml(it.value)}${escapeHtml(src)}</span>`;
+    }).join("");
+    let sourceHtml = "";
+    if (typeof meta.recSource === "function") {
+      // 【为什么还要再洗一遍】recSource() 的来源类型在
+      // window.JOB_META_SOURCE_KIND_LABEL 没就位时（/api/video-options 还没返回，
+      // 或用户没打开过视频面板）会**回退成原始哨兵值** not_provided。
+      // c6 要求「作者未提供」显式标注 —— 所以这里把漏出来的哨兵值洗成中文，
+      // 不依赖标签表是否已加载。
+      const source = String(meta.recSource(rec) || "")
+        .replace(/\bnot_provided\b/g, "作者未提供");
+      if (source) sourceHtml = `<div class="job-detail-source">${escapeHtml(source)}</div>`;
+    }
+    blocks.push(`<div class="detail-section-title">${escapeHtml(title)}</div>`
+      + `<div class="job-detail-reclist">${chips}</div>${sourceHtml}`);
+  }
+  if (!blocks.length) return "";
+  // 用 detail-section —— 复用 style.css 里现成的
+  // `.detail-section + .detail-section { margin-top: 16px }` 与
+  // `.detail-section-title` 样式，**零新增 CSS**。
+  return `<div class="detail-section detail-rec-section" data-detail-rec>${blocks.join("")}</div>`;
+}
+
 function openDetailModal(job) {
   if (!job) return;
   const modal = $("#detailModal");
@@ -4390,7 +4448,42 @@ function openDetailModal(job) {
     // 创建时间：不在 gen_params 里（那是任务属性，不是生成参数）
     rows.push(`<div class="detail-kv-row"><span>创建时间</span>`
       + `<b>${escapeHtml(fmtTime(job.created_at))}</b></div>`);
+    // 【2026-11-14 · c6】作者推荐参数分组（需求 1 / 2 / 5）。
+    //
+    // 【为什么加在这里】h3-model-meta 把「作者推荐参数」做在 web/job-detail.js
+    // （recBlock -> #jobDetailModal），但线上真正弹出的是 app.js 内联的
+    // #detailModal（media-card-detail 版），而 job-detail.js 那套**没有调用方**
+    // —— app.js 的 [data-act="detail"] 监听器先 stopPropagation()，
+    // job-detail.js 的 document 级委托收不到该点击。
+    // => 推荐参数在「详情区」里看不到。本段把同一份数据接进实际弹的那套。
+    //
+    // 【数据来源】服务端已在 model_info 里下发（h3studio/job_meta.py:
+    //   model_recommendation / lora_recommendation / fixed_lora_recommendation），
+    //   **服务端不用改**。取值口径统一走 window.JOB_META.recItems / recSource
+    //   （web/job-meta.js，与卡片 / 面板下拉 tooltip 完全同源）。
+    //
+    // 【为什么不用 job-detail.js 的 recBlock】它是 IIFE 私有、没导出，
+    //   依赖它就得改它的导出面（改动面更大）。recBlock 本身也只是
+    //   recItems + recSource 的薄封装，这里直接用公开 API 重新拼，
+    //   复用 style.css 里已有的 .job-detail-reclist / .job-detail-recchip
+    //   / .is-missing / .job-detail-source 样式（零新增 CSS）。
     paramsBox.innerHTML = rows.join("");
+    // 【2026-11-14 · c6】推荐参数分组作为**兄弟 section** 插在「生成参数」之后
+    // —— 不能塞进 #detailParams（那是 .detail-kv，两列 grid，塞进去会被当网格单元）。
+    //
+    // 先无条件清掉上一次的（换一条任务重开时不能叠加；新任务没有推荐参数时也不能留旧的）。
+    const stale = document.querySelector("[data-detail-rec]");
+    if (stale) stale.remove();
+    const recHtml = detailRecommendHtml(job);
+    if (recHtml) {
+      const section = paramsBox.closest(".detail-section");
+      if (section) {
+        const holder = document.createElement("div");
+        holder.innerHTML = recHtml;
+        const node = holder.firstElementChild;
+        if (node) section.insertAdjacentElement("afterend", node);
+      }
+    }
   }
   const promptBox = $("#detailPrompt");
   if (promptBox) {
