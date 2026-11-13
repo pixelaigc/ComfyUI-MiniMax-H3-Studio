@@ -164,6 +164,26 @@
         <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
       </div>
 
+      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）——
+           交互对齐文生图的 LoRA 区（#imgLoraField）：
+           同一个「下拉添加 + 已选列表 + 每项滑杆」的结构。 -->
+      <div class="field" id="vidEffectLoraField">
+        <div class="field-label">
+          <span>效果 LoRA</span>
+          <span class="muted" id="vidEffectLoraHint">可多选 · 与加速 LoRA 并存</span>
+          <!-- 一键清空：多选必须有「全清」的出口，否则只能一项项删 -->
+          <button type="button" class="vid-lora-clear" id="vidEffectLoraClear" hidden>清空全部</button>
+        </div>
+        <div id="vidEffectLoraList" class="img-lora-list"></div>
+        <div class="vid-lora-picker">
+          <input type="text" id="vidEffectLoraSearch" class="img-input"
+                 placeholder="搜索效果 LoRA（名称 / 功能 / 触发词）" autocomplete="off">
+          <div class="vid-lora-picker-menu" id="vidEffectLoraMenu" hidden></div>
+        </div>
+        <div class="img-note" id="vidEffectLoraNote"></div>
+        <div class="img-lora-excluded" id="vidEffectLoraExcluded" hidden></div>
+      </div>
+
       <div class="field">
         <div class="field-label">注意力机制 <span class="muted">生成加速</span></div>
         <select class="img-select" id="vidAttentionSelect"></select>
@@ -1338,6 +1358,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
 <script src="/static/video-panel.js?v=videopanel2"></script>
+<!-- 效果 LoRA 选择器（H3 文生视频面板）——
+     必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
+     调用（window.VIDEO_EFFECT_LORA）。 -->
+<script src="/static/video-effect-lora.js?v=efflora1"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
 <!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
      必须**先于** app.js 加载 —— app.js 的 boot() 里要读

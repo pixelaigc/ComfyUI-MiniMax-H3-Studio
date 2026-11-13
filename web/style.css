@@ -1051,6 +1051,61 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .img-lora-add .img-select { flex: 1; min-width: 0; }
 .img-lora-add .img-reset { flex: 0 0 auto; }
 
+/* ---------- 效果 LoRA 选择器（H3 文生视频面板）----------
+   交互对齐文生图的 LoRA 区：搜索框 -> 候选菜单（可多选）-> 已选列表
+   （每项带强度滑杆 + 触发词 + 启停 / 排序 / 删除）。
+   与图像面板的差别：图像面板用原生 <select>（选一个加一个），
+   这里用「输入即搜索 + 多选勾选」的下拉，因为 H3 效果 LoRA 有 27 枚，
+   原生下拉翻找成本太高。 */
+.vid-lora-picker { position: relative; margin-top: 8px; }
+.vid-lora-picker .img-input {
+  width: 100%; min-width: 0; height: 32px; border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; font-family: inherit;
+  background: #fff; color: var(--text);
+}
+.vid-lora-picker .img-input:focus { outline: none; border-color: var(--accent); }
+
+.vid-lora-picker-menu {
+  position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 260px; overflow-y: auto; background: #fff;
+  border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12); padding: 4px;
+}
+.vid-lora-picker-menu[hidden] { display: none !important; }
+.vid-lora-picker-empty {
+  padding: 10px 9px; font-size: 11px; color: var(--muted); line-height: 1.6;
+}
+.vid-lora-option {
+  display: flex; align-items: flex-start; gap: 7px; padding: 6px 7px;
+  border-radius: 7px; cursor: pointer; font-size: 11.5px; color: var(--text);
+}
+.vid-lora-option:hover { background: #f3f6fb; }
+.vid-lora-option.on { background: #eef4fd; }
+.vid-lora-option input[type=checkbox] { margin: 2px 0 0; flex: 0 0 auto; }
+.vid-lora-option-main { flex: 1; min-width: 0; }
+.vid-lora-option-name {
+  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-scene {
+  font-size: 10px; color: var(--muted); line-height: 1.45; margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-meta {
+  font-size: 9.5px; color: var(--muted); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vid-lora-option-trig { color: var(--accent); }
+
+/* 「清空全部」按钮 —— 多选必须有全清的出口。
+   没选中任何项时整块隐藏（hidden），不占视觉空间。 */
+.vid-lora-clear {
+  margin-left: auto; border: 1px solid var(--border); background: #fff;
+  border-radius: 6px; padding: 1px 8px; font-size: 10.5px; color: var(--muted);
+  cursor: pointer; font-family: inherit; line-height: 1.6;
+}
+.vid-lora-clear:hover { color: var(--danger); border-color: var(--danger); }
+.vid-lora-clear[hidden] { display: none !important; }
+
 /* LoRA 说明弹窗 */
 .lora-info { padding: 16px; font-size: 12.5px; line-height: 1.8; color: var(--text); }
 .lora-info dl { margin: 0; display: grid; grid-template-columns: 88px 1fr; gap: 8px 12px; }

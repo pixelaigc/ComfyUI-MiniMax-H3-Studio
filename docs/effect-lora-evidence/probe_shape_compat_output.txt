@@ -1,0 +1,34 @@
+/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+LoRA                                                       | pruned_int8                        | full_int8
+--------------------------------------------------------------------------------------------------------------------------------------------
+h3/3dsrx_minimax_h3.safetensors                            | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3/Anime2Realsim__H3.safetensors                           | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/Body_Breast_Minimax_h3_for_NSFW.safetensors             | ok=176 mismatch=0 miss=0 adaln=0   | ok=176 mismatch=0 miss=0 adaln=0
+h3/GOLDENBOY_H3_V1-step00012000.safetensors                | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3/H3_Ref2V_Anime_Slider_v1.safetensors                    | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/Handheld_Shaky_Cam_h3_100.safetensors                   | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/Minimax H3真实电影质感.safetensors                            | ok=208 mismatch=0 miss=0 adaln=50  | ok=208 mismatch=0 miss=0 adaln=50
+h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors             | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/YOURNAME_H3_V1-step00009900.safetensors                 | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3/h3-realism-people-t2v-i2v-r2v.safetensors               | ok=104 mismatch=0 miss=0 adaln=0   | ok=104 mismatch=0 miss=0 adaln=0
+h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.safetensors | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/h3_character_swap_pro4500_1000.safetensors              | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors    | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3/h3_speed_slider_1.1.safetensors                         | ok=1 mismatch=0 miss=0 adaln=0     | ok=1 mismatch=0 miss=0 adaln=0
+h3/manga_tone_v2.safetensors                               | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax-h3_fl2v_8Step_motion_enhancer_for_NSFW.safetensors | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_character_swap_v1.0_ref2va_r64_gl.safetensors | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_head_swap_v1.0_r32.safetensors               | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_live_wallpaper_v1.0_ref2va_r32.safetensors   | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_live_wallpaper_v1.0_ref2va_r64.safetensors   | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_lms_v1.0_r64.safetensors                     | ok=208 mismatch=0 miss=0 adaln=50  | ok=208 mismatch=0 miss=0 adaln=50
+h3/minimax_h3_style_transfer_v1.0_r64.safetensors          | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_vfx_edit_v1.0_r128.safetensors               | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors           | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3/nafasp_h3_lora_v2_500.safetensors                       | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+h3_keyframe/h3_hero_step12000.safetensors                  | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3_keyframe/h3_seq_step12000.safetensors                   | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+h3_keyframe/h3_tween_step12000.safetensors                 | ok=200 mismatch=0 miss=0 adaln=0   | ok=200 mismatch=0 miss=0 adaln=0
+pika_h3_flex_fl2va_v1_bf16.safetensors                     | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0
+pika_h3_flex_ref2va_v1_bf16.safetensors                    | ok=208 mismatch=0 miss=0 adaln=0   | ok=208 mismatch=0 miss=0 adaln=0

@@ -1562,6 +1562,54 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         break
     out["accel_loras"] = combos
 
+    # ---- 效果 LoRA（可多选，与加速 LoRA 并列共存）----
+    #
+    # 【为什么这里要再卡一道】
+    # 前端下拉只列「本机真实存在且实测兼容」的条目，但**绕过前端直接调
+    # API** 就能塞任意字符串进来。所以服务端必须自己验：
+    #   1. 文件必须真实存在（resolve_lora）
+    #   2. 必须与当前底模**实测兼容**（check_effect_lora_compat）
+    #   3. 强度必须在合理区间
+    # 不兼容的坚决拒绝 —— 因为 ComfyUI 会**静默丢弃**键结构对不上的 LoRA
+    # （出片照跑但 LoRA 没生效），用户根本看不出来。
+    effect_loras: list[dict] = []
+    raw_effect = params.get("effect_loras")
+    if isinstance(raw_effect, list):
+        from h3studio import h3_effect_loras as effect_registry
+        unet_path = video_models.find_weight(model["unet"])
+        for item in raw_effect:
+            if not isinstance(item, dict):
+                continue
+            if item.get("enabled") is False:
+                continue
+            name = (item.get("name") or "").strip()
+            if not name:
+                continue
+            resolved, path = effect_registry.lora_registry.resolve_lora(name)
+            if not resolved or path is None:
+                return out, f"本机找不到该效果 LoRA 文件：{name}"
+            check = effect_registry.check_effect_lora_compat(
+                Path(path), unet_path)
+            if not check.get("compatible"):
+                return out, (f"「{resolved}」与当前底模不兼容："
+                             f"{check.get('reason') or '未知原因'}")
+            try:
+                strength = float(item.get("strength", 1.0))
+            except (TypeError, ValueError):
+                return out, f"效果 LoRA 强度必须是数字：{name}"
+            if strength <= 0:
+                continue
+            # 上限 2.0（与 ComfyUI 节点的取值域一致；作者推荐值更低时
+            # 由前端滑杆上限体现）
+            strength = min(2.0, strength)
+            effect_loras.append({
+                "name": resolved,
+                "strength": strength,
+                "enabled": True,
+                "trigger": (item.get("trigger") or "").strip(),
+            })
+    out["effect_loras"] = effect_loras
+
     # ---- 注意力机制 ----
     attention = params.get("attention") or video_models.VIDEO_DEFAULT_ATTENTION
     mode_meta = video_models.VIDEO_ATTENTION_MODES.get(attention)
@@ -4094,6 +4142,102 @@ async def api_video_options(request):
     return json_ok(payload)
 
 
+async def api_video_effect_loras(request):
+    """GET /api/video-effect-loras —— 本机真实的 H3 效果 LoRA 清单
+
+    【为什么单独一个接口，不复用 /api/image-loras】
+    `/api/image-loras` 是**图像**基座（Z-Image / Qwen-Image / MOSS）的效果
+    LoRA 清单：它的兼容性判据是「与图像底模的层结构比对」，白名单也来自
+    `loras.LORA_CATALOG`。
+
+    H3 是**视频**基座，层结构完全不同（`blocks.N.attn.qkv_proj` vs
+    `layers.N.attention.to_q`），且加载节点也不同（核心
+    `LoraLoaderModelOnly` vs `LoraLoader`）。硬塞进图像接口会让：
+      * 图像清单混进 H3 条目（键结构不同，必然静默失效）
+      * H3 条目混进图像清单（同样静默失效）
+    所以**分开两个接口，各自按自己的底模实测**。
+
+    【数据来源 —— 真实扫盘，不硬编码】
+    `h3_effect_loras.discover_effect_loras()`：
+      1. 扫 ComfyUI 的 loras 目录（本地 + extra_model_paths.yaml 的外接盘）
+      2. 读每个 safetensors 的头，判断键结构
+      3. 用 ComfyUI 自己的 key_map 规则判定「能不能绑到 H3 底模」
+      4. 形状（in/out 维）与底模权重逐一比对
+    每条都带 `compatible` / `compatible_reason`，前端据此过滤。
+
+    可选参数 `?model=<model_key>` 指定按哪个底模测兼容性（默认剪枝 int8）。
+    """
+    from h3studio import h3_effect_loras as effect_registry
+    from h3studio import h3_effect_lora_docs as doc_parser
+
+    model_key = (request.query.get("model")
+                 or video_models.VIDEO_DEFAULT_MODEL)
+    model = video_models.VIDEO_MODELS.get(model_key)
+    if model is None:
+        return web.json_response(
+            {"error": f"未知的视频模型 {model_key}"}, status=400)
+
+    entries = effect_registry.discover_effect_loras(model_key)
+    unet_path = video_models.find_weight(model["unet"])
+    available: list[dict] = []
+    incompatible: list[dict] = []
+    for entry in entries:
+        path = Path(entry["path"])
+        check = effect_registry.check_effect_lora_compat(path, unet_path)
+        doc = doc_parser.read_lora_doc(path)
+        item = {
+            "name": entry["name"],
+            "path": entry["path"],
+            "display": doc.get("display") or entry["display"],
+            "size_mb": entry["size_mb"],
+            "key_format": entry["key_format"],
+            "modules": entry["modules"],
+            "bound_modules": entry["bound_modules"],
+            "rank": entry["rank"],
+            "directory": entry["directory"],
+            "base_model": entry["base_model"],
+            # 作者文档里解析出来的元信息（解析不到就是空 —— 不编造）
+            "scene": doc.get("scene", ""),
+            "trigger": doc.get("trigger", ""),
+            "recommended_strength": doc.get("recommended_strength", 0.0),
+            "strength_source": doc.get("strength_source", ""),
+            "author": doc.get("author", ""),
+            "source": doc.get("source", ""),
+            "has_doc": doc.get("has_doc", False),
+            # 实测兼容性
+            "compatible": bool(check.get("compatible")),
+            "compatible_reason": check.get("reason", ""),
+            "shape_ok": check.get("shape_ok", 0),
+            "shape_mismatch": check.get("shape_mismatch", 0),
+            "missing": check.get("missing", 0),
+            "adaln_spin": check.get("adaln_spin", 0),
+            "total": check.get("total", 0),
+            # 强度上限：默认 1.5（与图像面板一致）；作者给了推荐值就以它为准
+            "strength_cap": 1.5,
+        }
+        if item["recommended_strength"]:
+            item["strength_cap"] = max(1.5,
+                                       float(item["recommended_strength"]))
+        (available if item["compatible"] else incompatible).append(item)
+
+    return json_ok({
+        "model": model_key,
+        "model_label": model.get("label", ""),
+        "unet": model.get("unet", ""),
+        "available": available,
+        "incompatible": incompatible,
+        # 节点说明：效果 LoRA 走核心节点，**不是** Turbo 节点
+        "loader_node": "LoraLoaderModelOnly",
+        "loader_note": (
+            "效果 LoRA 走 ComfyUI 核心节点 LoraLoaderModelOnly —— "
+            "它的键名带 diffusion_model. 前缀，MiniMaxH3TurboLoRA 节点对它"
+            "会「0 weights patched」静默失效（实测）。"),
+        "source_note": (
+            "清单来自扫盘 + safetensors 头实测（键绑定 + 形状比对），"
+            "不是硬编码列表；作者说明与触发词来自同名 .md 文档。"),
+    })
+
+
 async def api_video_config(request):
     """GET /api/video-config —— 读回文生视频面板保存的配置（局域网共用）
 
@@ -6306,6 +6450,8 @@ def make_app():
 
     # 文生视频面板（模型 / 加速 LoRA / 注意力 / 二采 / 宽高吸附）
     app.router.add_get("/api/video-options", api_video_options)
+    # H3 效果 LoRA 清单（独立于 /api/image-loras —— 视频基座层结构不同）
+    app.router.add_get("/api/video-effect-loras", api_video_effect_loras)
     # 合并说明：/api/video-categories（video-tabs）与 /api/comfy-models
     # （model-list-fix）是两个独立路由，都保留。
     app.router.add_get("/api/video-categories", api_video_categories)

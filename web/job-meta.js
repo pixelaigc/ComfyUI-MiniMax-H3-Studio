@@ -149,6 +149,21 @@
         fixed: true,
       });
     }
+    // 效果 LoRA（可多选）—— 每项独立显示，带各自强度
+    const effects = info.effect_lora_labels || [];
+    for (const item of effects) {
+      if (!item || !item.label) continue;
+      const strength = item.strength === null || item.strength === undefined
+        ? null : Number(item.strength);
+      if (strength !== null && !Number.isFinite(strength)) continue;
+      if (strength !== null && strength <= 0) continue;
+      out.push({
+        label: String(item.label).trim(),
+        strength,
+        fixed: false,
+        effect: true,
+      });
+    }
     return out;
   }
 
@@ -162,7 +177,9 @@
     const list = loraList(job);
     if (!list.length) return "无";
     return list.map((item) => {
-      const name = item.fixed ? `工作流固定：${item.label}` : item.label;
+      // 效果 LoRA 标注「效果：」前缀 —— 与加速 LoRA 区分开
+      const name = item.fixed ? `工作流固定：${item.label}`
+        : (item.effect ? `效果：${item.label}` : item.label);
       if (item.strength === null || !Number.isFinite(item.strength)) return name;
       return `${name} ×${item.strength.toFixed(2)}`;
     }).join(" · ");
