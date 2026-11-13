@@ -2759,13 +2759,22 @@ function genParamRowsHtml(job) {
   // 采样器 / 调度器
   rows.push(["采样器", paramOrDash(gp ? gp.sampler : p.sampler)]);
   rows.push(["调度器", paramOrDash(gp ? gp.scheduler : p.scheduler)]);
-  // 步数
-  rows.push(["步数", paramOrDash(gp ? gp.steps : p.steps)]);
+  // 步数/CFG —— **标签沿用基线的「步数/CFG」**。
+  //
+  // 【为什么不改成「步数」】基线卡片上这一行的标签就叫「步数/CFG」，
+  // 而 tests/test_status_realtime.py::test_library_renders_status_and_params_of_new_entry
+  // 断言卡片 meta 里含「步数/CFG」。改成「步数」会把这条既有契约打破，
+  // 属于本次需求（补参数）之外的**回归**。
+  // 值里同时给出 CFG —— 基线那一行本来就是「步数 · CFG」两值，
+  // 这里保留这个语义，缺失的 CFG 显式渲染成「—」（不拿别的字段顶替）。
+  const stepsVal = gp ? gp.steps : p.steps;
+  const cfgVal = gp ? gp.cfg : p.cfg;
+  rows.push(["步数/CFG", `${paramOrDash(stepsVal)} · ${paramOrDash(cfgVal)}`]);
   // 尺寸：卡片已有「分辨率」一行（带比例），这里只补纯像素尺寸
   rows.push(["尺寸", paramOrDash(gp ? gp.size : "")]);
   // 时长
   rows.push(["时长", paramOrDash(gp ? gp.duration : p.duration)]);
-  // seed
+  // seed —— 沿用基线标签「种子」
   rows.push(["种子", paramOrDash(gp ? gp.seed : p.seed)]);
   return `<div class="row-group gen-params">`
     + rows.map(([label, value]) =>
