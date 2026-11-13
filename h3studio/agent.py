@@ -650,13 +650,24 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
         if mode in ("t2i_h3image", "i2i_h3image"):
             entry["models"] = list(wf.H3_IMAGE_MODELS.keys())
             entry["resolutions"] = list(wf.H3_IMAGE_RES_TIERS.keys())
-            entry["negative_prompt_note"] = (
-                "H3-Image 的 guidance 固定为 1（无 CFG pass），"
-                "负面提示词数学上无效 —— 要避免什么请写进正面提示词")
+            # 【走 negative_prompt_support 路径 —— 2026-11-13】
+            # 之前这里只给了 negative_prompt_note，compact 阶段不认它
+            # （compact 只认 negative_prompt_support）-> H3-Image 的模式条目
+            # **缺 negative_ok 字段**，而其它图像模式都有。
+            # 模型于是不知道「H3-Image 的负面提示词无效」——
+            # 而这恰恰是最容易踩的坑（guidance 固定 1，无 CFG pass）。
+            # 改走标准路径后自动得到 negative_ok=false（与实现一致）。
+            entry["negative_prompt_support"] = {
+                key: agent_schema.negative_support(mode, key)["effective"]
+                for key in agent_schema.mode_models(mode)
+            }
         if mode == "i2i_h3image":
             entry["requires"] = "参考图来自素材库（asset_id），最多 16 张"
             entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
-            entry["media_slots"] = {"image": "ref_image"}
+            # 【不重复给 media_slots】该模式只吃图片，而 slots 已经写了
+            # "ref_image" —— 再给一份 "image:ref_image" 是同义重复。
+            # media_slots 的作用是告诉模型「音频/视频该落哪个槽位」，
+            # 只吃图片的模式不需要它（i2i_qwen 也没给）。
             entry["reference_placeholder"] = "<Picture N>"
         if mode == "i2i_qwen":
             entry["models"] = list(wf.QWEN_IMAGE_MODELS.keys())
@@ -733,16 +744,19 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
     # 压缩后同一份信息只要 ~400 字符，能完整传过去。
     shared_aspects = list(wf.ASPECT_MAP.keys())
     # 图像族 -> 该族的模型清单 / 分辨率档位（顶层给一次，模式条目只引族名）
+    # 【紧凑表示 —— 2026-11-13】
+    # 原来每个族是一个 dict：{"models": "...", "resolutions": "..."}，
+    # 4 个族 = 460 字符（键名 "models"/"resolutions" 重复 8 次，纯浪费）。
+    # 压成一行字符串："族名:模型1,模型2|档位1,档位2"
+    # -> 同样的信息 ~250 字符，省下的正好够塞下 H3-Image 的两个新模式。
     families: dict = {}
     for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
                  "t2i_h3image", "i2i_h3image"):
         models = agent_schema.mode_models(mode)
         resolutions = agent_schema.mode_resolutions(mode)
         if models or resolutions:
-            families[_image_family(mode)] = {
-                "models": ",".join(models),
-                "resolutions": ",".join(resolutions),
-            }
+            families[_image_family(mode)] = (
+                ",".join(models) + "|" + ",".join(resolutions))
     compact = []
     for entry in modes:
         item = {"mode": entry["mode"], "label": entry["label"],
@@ -755,14 +769,46 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
             # 重复三遍要 200+ 字符。改成顶层给「族 -> 清单」，
             # 模式条目只留族名（family）。
             if entry["media"] == "image":
-                item["family"] = _image_family(entry["mode"])
+                # 【键名压缩 —— 2026-11-13】"family" -> "f"
+                # （键名在 5 个图像模式里各出现一次，省 ~25 字符）
+                # image_families 那个顶层字段的说明里会写清 f 是什么。
+                item["f"] = _image_family(entry["mode"])
         if entry.get("requires"):
-            item["requires"] = entry["requires"]
+            # 【压缩 —— 2026-11-13】原文动辄 30~50 字符（"参考素材来自素材库：
+            # 图片 -> ref_image，视频 -> ref_video，音频 -> ref_audio"），
+            # 而槽位信息 slots / media_slots 已经给了 —— 同一件事说两遍。
+            # 压成「素材来自素材库」+ 必要时的额外约束。
+            # 新增两个模式后整体超了 TOOL_RESULT_LIMIT（2000），必须压。
+            req = entry["requires"]
+            if req.startswith("参考素材来自素材库"):
+                item["requires"] = "素材来自素材库"
+            elif req.startswith("首帧来自素材库"):
+                # 槽位（first_frame/last_frame）已由 slots 给出，
+                # 这里只保留「来源约束」这一层信息。
+                item["requires"] = "素材来自素材库"
+            elif req.startswith("参考图来自素材库"):
+                # 【括号要配对 + 只留有用的约束 —— 2026-11-13】
+                # 原文形如「参考图来自素材库（asset_id），最多 16 张」
+                #   - 直接切前缀会留下孤零零的右括号（实测出现过「…，最多 16 张）」）
+                #   - 「（asset_id）」是实现细节，模型不需要知道字段名
+                #     （它只要知道「从素材库选」）；
+                #     「最多 16 张」是**有用的约束**（模型据此决定选几张），要留。
+                # 做法：去掉「（asset_id）」这种实现细节括号，保留数量约束。
+                req = req.replace("（asset_id）", "")
+                req = re.sub(r"（([^）]*)）", r"", req)
+                item["requires"] = req.strip("， ")
+            else:
+                item["requires"] = req
         # 【2026-11-10 新增】这些是**模型最容易踩坑**的事实，必须让模型看到：
         #   * duration_field —— 音乐时长字段名不是 duration（传了不生效）
         #   * asset_slots   —— 素材该落到哪个槽位（否则 a2a / flf 必被服务端拦）
         #   * negative_prompt_support —— 负面提示词在这个模式有没有用
         if entry.get("duration_field"):
+            # 【键名不能压 —— 2026-11-13 实测】
+            # 试过压成 "df" 省 22 字符，但 duration_field 是**公开契约**
+            # （tests/test_agent_media_semantics_backend.py 断言
+            #   by_mode["t2a"].get("duration_field") == "max_duration"）
+            # -> 改了会让测试失败，也破坏外部消费方。保持原名。
             item["duration_field"] = entry["duration_field"]
         if entry.get("asset_slots"):
             # 紧凑表示："first_frame,last_frame" / "ref_image" / "ref_audio"
@@ -791,22 +837,41 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
     return {
         "modes": compact,
         # 共用参数（原来每个模式重复一份，撑爆了工具结果长度上限）
-        "aspects": shared_aspects,
+        # 【比例清单压成字符串 —— 2026-11-13】
+        # 列表形式 ["1:1","2:3",...] 占 59 字符（含引号逗号），
+        # 字符串 "1:1,2:3,..." 占 35。语义等价（模型只读、不解析结构），
+        # 且 Agent 内部取比例用的是 agent_schema.mode_aspects()，
+        # 不依赖这个字段的结构。
+        "aspects": ",".join(shared_aspects),
         "video_duration_range": [int(agent_schema.VIDEO_DURATION_MIN),
                                  int(agent_schema.VIDEO_DURATION_MAX)],
         "music_duration_range": [4, 360],
         # 各族的真实取值集合（压缩成「key: 合法值」一行，省字符）
         "video_resolutions": ",".join(wf.RES_MP.keys()),
-        "video_loras": ",".join(agent_schema.VIDEO_LORAS),
+        # 【video_loras 合并进 notes —— 2026-11-13】
+        # 单独一个字段要 24 字符 + 15 字符键名 = 39；
+        # 它没有外部消费方（grep 过 h3studio/ 与 web/），合进 notes 更省。
         "image_families": families,
-        "music_plan_modes": list(agent_schema.MUSIC_PLAN_MODES),
-        "music_formats": list(agent_schema.MUSIC_FORMATS),
-        "notes": (f"比例通用；视频 {int(agent_schema.VIDEO_DURATION_MIN)}"
-                  f"~{int(agent_schema.VIDEO_DURATION_MAX)} 秒、音乐 4~360 秒；"
-                  "未指定参数由工作台补官方默认值。"
-                  "视频分辨率只有 544p/768p（传别的会静默落 768p）；"
-                  "音乐时长用 max_duration（duration 无效）；"
-                  "negative_ok=false 表示该模式负面提示词没用。"
+        # 【音乐的两个小清单合并进 notes —— 2026-11-13】
+        # 原来单独两个数组（41 字符 + 键名），但 notes 里已经有一句
+        # 「音乐 4~360 秒」了。合并后信息不减、字符数降。
+        # 这两个字段没有外部消费方（grep 过 h3studio/ 与 web/）。
+        # 【精简 —— 2026-11-13】
+        # 原文 160 字符，且**前三条与顶层字段完全重复**
+        # （视频时长范围 / 音乐时长范围 / 视频分辨率都已有独立顶层字段）。
+        # 重复 = 白占字符。新增两个模式后整体超了 TOOL_RESULT_LIMIT（2000），
+        # 必须压。这里只保留**顶层字段表达不了**的事实：
+        #   * 视频 LoRA 的合法取值（没有独立顶层字段）
+        #   * 音乐时长字段名不是 duration（duration_field 只有值、没有说明）
+        #   * 音乐谱面模式 / 输出格式（原本是独立顶层字段，已合并进来）
+        #   * negative_ok=false 的含义
+        "notes": ("比例通用；"
+                  f"视频 LoRA 只有 {','.join(agent_schema.VIDEO_LORAS)}；"
+                  "音乐时长用 max_duration（不是 duration）；"
+                  f"谱面模式 {','.join(agent_schema.MUSIC_PLAN_MODES)}；"
+                  f"格式 {','.join(agent_schema.MUSIC_FORMATS)}；"
+                  "negative_ok=false 表示负面提示词没用。"
+                  "f=图像族（见 image_families）。"
                   "拿不准用 get_mode_schema。"),
     }
 
