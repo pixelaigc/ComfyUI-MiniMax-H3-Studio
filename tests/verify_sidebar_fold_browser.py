@@ -68,6 +68,26 @@ def run():
             pass
         page.wait_for_timeout(300)
 
+    def wait_video_cats(page, timeout_ms=30000):
+        """等视频两级类别渲染完（.nav-cat / .nav-cat-toggle 出现）。
+
+        【为什么必须单独等】视频类别是**异步渲染**的：video-nav.js 拉
+        /api/video-categories 后才建 .nav-cat 节点。而这个接口会逐个模型
+        检查 H3 底模权重是否落盘（磁盘 IO），冷缓存时实测要 0.44s ~ 3.14s
+        不等 —— 只等 #sidebar 就位是不够的，会出现「类别还没渲染出来就断言」
+        的假失败（实测线上 got=[]，但随后单独探测 cats=4 / toggles=4，
+        console 0 错误 —— 纯等待条件不足，不是产品缺陷）。
+
+        【为什么要独立超时】默认 15s 偏紧：接口慢 + 页面并发加载时可能不够。
+        这里给 30s，并且**不吞异常** —— 真的渲染不出来时要报出来，
+        不能像 wait_sidebar 那样 except: pass 后静默通过。
+        """
+        page.wait_for_function(
+            "() => document.querySelectorAll("
+            "'#navVideoCategories .nav-cat-toggle').length >= 4",
+            timeout=timeout_ms)
+        page.wait_for_timeout(300)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         ctx = browser.new_context(viewport={"width": 1280, "height": 900})
@@ -84,6 +104,7 @@ def run():
         page.evaluate("k => localStorage.removeItem(k)", FOLD_KEY)
         page.reload(wait_until="domcontentloaded")
         wait_sidebar(page)
+        wait_video_cats(page)
 
         groups = page.eval_on_selector_all(
             ".nav-group[data-nav-key]", "els => els.map(e => e.dataset.navKey)")
@@ -164,6 +185,7 @@ def run():
         page.evaluate("() => localStorage.removeItem('h3studio.sidebarFold')")
         page.reload(wait_until="domcontentloaded")
         wait_sidebar(page)
+        wait_video_cats(page)
 
         page.click('#navVideoCategories .nav-cat-toggle[data-category="t2v"]')
         page.wait_for_timeout(600)
@@ -187,6 +209,7 @@ def run():
 
         page.reload(wait_until="domcontentloaded")
         wait_sidebar(page)
+        wait_video_cats(page)
         st2 = page.evaluate("""() => {
           const cat = document.querySelector('.nav-cat[data-category="t2v"]');
           return {
