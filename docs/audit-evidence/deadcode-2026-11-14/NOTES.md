@@ -174,3 +174,36 @@ baseline 多出: test_continuation_retry.py::RetryLatentCoordTest 的 3 条（�
 ```
 
 **新增失败差集 = ∅（严格成立，非「抽样未发现」）**
+
+---
+
+## 补充：主线已前进（审计期间 local/maintainer 从 b434e32 → f4bc747）
+
+审计进行期间，另一条线往 `local/maintainer` 合了 3 个 commit：
+```
+f4bc747 merge(c6): 详情模态框补「作者推荐参数」分组
+fe6a090 fix(c6): 来源类型不得漏出 not_provided 哨兵值 + 补 c6 专项测试
+5e41e0e fix(c6): 详情模态框补「作者推荐参数」分组
+```
+改动文件：`tests/test_c6_detail_recommend.py`（新增）、`web/app.js`（+93）、`web/index.html`（-1/+1）
+
+### 冲突面核对
+- 与本分支改动文件的**交集只有 1 个**：`web/app.js`
+- maintainer 的新代码**不引用**本分支删掉的任何符号
+  （`qwenRefLimit` / `promptIsEnhanced` / `showAgent` / `SERVER_FINGERPRINT` / `displayedTab`
+  在新 app.js 里各只出现 1 次 = 各自的定义处残留，即 maintainer 也没动它们）
+- maintainer 的 app.js 改动 hunk 位于 `@@ -4370` 与 `@@ -4390`（详情模态框），
+  与本分支删除的 `qwenRefLimit`(1816) / `promptIsEnhanced`(2287) / `showAgent`(5342)
+  **行区间不重叠**
+
+### 实测合并（在 /tmp/h3s-merge-check 一次性 worktree，未碰任何真实分支）
+```
+$ git merge-tree --write-tree local/maintainer HEAD
+a54dff8baf06b28ea4deef4bcf158e91ab959534        # 无冲突
+$ git merge --no-commit --no-ff local/feature/deadcode-audit
+自动合并 web/app.js
+自动合并进展顺利，按要求在提交前停止
+```
+合并后的树：**pyflakes exit 0** / compile OK / 23 个 JS 全过 node --check。
+
+结论：后续由主线负责人合并时，`web/app.js` 会自动合并，无需人工解冲突。
