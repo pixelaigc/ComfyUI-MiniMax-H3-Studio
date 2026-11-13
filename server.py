@@ -2987,6 +2987,131 @@ async def api_longfilm_create(request):
     return json_ok({"id": job_id, "status": "queued"})
 
 
+# ------------------------------------------------------------------ 生成队列
+#
+# 【为什么需要这一层 —— 2026-11-13 生成队列化需求】
+#
+# 后端**本来就有**真正的队列：建任务时 status='queued'，Worker 单协程
+# 循环按 created_at 顺序取一个跑完再取下一个（Worker._loop / _next_queued）。
+# 缺的不是「串行执行」，而是**队列的可观测性**：
+#   * 前端不知道某个排队任务排在第几位 -> 按钮只能显示「生成中」，
+#     用户以为界面卡住了，就不敢再提交第二个；
+#   * 前端不知道队列里一共有多少个 -> 无法显示「已入队（队列 N）」。
+#
+# 所以这里补的是**只读的队列视图**，不改动 Worker 的调度语义
+# （不改「一次只跑一个」「按 created_at FIFO」这两条既有行为）。
+
+#: 队列视图里最多返回多少条任务。
+#: 队列是用户自己排的，条数有限；上限防止异常情况下一次拉太多。
+QUEUE_VIEW_LIMIT = 50
+
+
+def queue_snapshot(recent_limit: int = 12) -> dict:
+    """
+    生成队列的**只读快照** —— 队列顺序 + 每条任务的状态 + 待处理计数。
+
+    返回形状（前端 /api/queue 直接消费）：
+        {
+          "running": "任务 id" 或 None,      # 正在跑的那个
+          "running_mode": "t2v" 或 "",        # 正在跑的任务的模式
+          "pending": 3,                       # 排队中（还没开始跑）的条数
+          "total": 4,                         # 排队中 + 正在跑
+          "items": [                          # 按执行顺序（队首在前）
+            {"id": "...", "mode": "t2v", "status": "running"|"queued",
+             "position": 1,                   # 1 = 下一个就跑；排队中的从 1 开始
+             "created_at": 1234.5,
+             "label": "文生视频",             # 生成类型标签
+             "prompt": "……"},                 # 提示词摘要（前端列表用）
+          ],
+          "recent": [                         # 刚跑完的几条（成功/失败/取消）
+            {"id": "...", "mode": "t2v", "status": "done"|"failed"|"canceled",
+             "created_at": ..., "label": "文生视频", "prompt": "……",
+             "error": "……"},
+          ]
+        }
+
+    【为什么 position 从 1 开始且包含正在跑的那条】
+    正在跑的那条排在最前面（position=1），排队中的依次是 2、3……
+    这样前端可以直接把 position 显示成「第 N 位」，用户一眼看出
+    「我刚才提交的那个排在第几」。running 的那条单独用 status 区分，
+    前端据此显示「运行中」而不是「排队中」。
+
+    【为什么只算 mode != 'longfilm'】
+    longfilm 走自己的 asyncio.create_task + LONGFILM_LOCK 通道，
+    不经过 Worker。它塞进同一个队列视图会给出「排在第 N 位但永远轮不到」
+    的假信息 —— 所以排除掉，在 longfilm 卡片上另有提示。
+
+    【为什么 recent 只取刚跑完的有限条】
+    队列面板要能看到「成功 / 失败」，但不能把整个任务库都拉出来
+    （生成库里可能有几百条历史）。取最近 N 条终态任务即可。
+    """
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, mode, params, status, created_at FROM jobs "
+            "WHERE status IN ('queued','running') AND mode!='longfilm' "
+            "ORDER BY created_at ASC").fetchall()
+    items = []
+    running_id = None
+    running_mode = ""
+    pending = 0
+    for index, row in enumerate(rows, start=1):
+        job_params = json.loads(row["params"] or "{}")
+        status = row["status"]
+        if status == "running":
+            running_id = row["id"]
+            running_mode = row["mode"] or ""
+        else:
+            pending += 1
+        items.append({
+            "id": row["id"],
+            "mode": row["mode"],
+            "status": status,
+            "position": index,
+            "created_at": row["created_at"],
+            "label": gen_types.type_for_mode(row["mode"])["label"],
+            "prompt": str(job_params.get("prompt") or "")[:120],
+        })
+    recent = []
+    if recent_limit > 0:
+        with db() as conn:
+            recent_rows = conn.execute(
+                "SELECT id, mode, params, status, created_at, error FROM jobs "
+                "WHERE status IN ('done','failed','canceled') AND mode!='longfilm' "
+                "ORDER BY created_at DESC LIMIT ?", (recent_limit,)).fetchall()
+        for row in recent_rows:
+            job_params = json.loads(row["params"] or "{}")
+            recent.append({
+                "id": row["id"],
+                "mode": row["mode"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "label": gen_types.type_for_mode(row["mode"])["label"],
+                "prompt": str(job_params.get("prompt") or "")[:120],
+                "error": row["error"] or "",
+            })
+    return {
+        "running": running_id,
+        "running_mode": running_mode,
+        "pending": pending,
+        "total": len(items),
+        "items": items,
+        "recent": recent,
+    }
+
+
+async def api_queue(request):
+    """GET /api/queue —— 生成队列快照（顺序 / 状态 / 计数）。
+
+    前端轮询它来渲染队列面板与「已入队（队列 N）」按钮文案。
+    纯只读：不建任务、不改状态。
+    """
+    snapshot = queue_snapshot()
+    items = snapshot["items"]
+    if len(items) > QUEUE_VIEW_LIMIT:
+        snapshot["items"] = items[:QUEUE_VIEW_LIMIT]
+    return json_ok(snapshot)
+
+
 async def api_list(request):
     status = request.query.get("status")
     conditions = []
@@ -6151,6 +6276,8 @@ def make_app():
     app.router.add_post("/api/longfilms", api_longfilm_create)
     app.router.add_get("/api/jobs", api_list)
     app.router.add_get("/api/jobs/{id}", api_get)
+    # 生成队列快照（队列顺序 / 状态 / 计数）—— 队列化需求的只读视图
+    app.router.add_get("/api/queue", api_queue)
     # 接续生成：上下文回填 + 功能可用性探测
     app.router.add_get("/api/jobs/{id}/continuation", api_continuation_context)
     app.router.add_get("/api/continuation/state", api_continuation_state)
