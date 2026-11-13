@@ -924,6 +924,72 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .enhance-btn.busy { opacity: .8; cursor: progress; }
 .prompt-field textarea[readonly] { background: #f7f8fa; }
 
+/* ---------- 生成队列面板（2026-11-13 队列化需求） ---------- */
+/*
+ * 位置：任务区顶部（#queuePanel），状态标签行下方。
+ * 语义：显示「谁在跑、排第几、还剩几个」，让用户敢继续提交。
+ */
+.queue-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.queue-title { font-size: 12.5px; font-weight: 700; }
+.queue-summary { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+.queue-toggle {
+  padding: 4px 10px; font-size: 11.5px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff; color: var(--muted);
+  cursor: pointer;
+}
+.queue-toggle:hover { color: var(--text); }
+
+/* 队列条目：序号 + 类型 + 提示词 + 状态 + 取消 */
+.queue-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.queue-list:empty { display: none; }
+.queue-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f3;
+  font-size: 12px;
+}
+.queue-item:last-child { border-bottom: none; }
+.queue-pos {
+  flex: 0 0 22px; text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted); font-weight: 700;
+}
+.queue-item.is-running .queue-pos { color: var(--accent); }
+.queue-label { flex: 0 0 auto; font-weight: 600; }
+.queue-prompt {
+  flex: 1; min-width: 0;
+  color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.queue-state { flex: 0 0 auto; font-size: 11.5px; font-weight: 600; }
+.queue-item.is-running .queue-state { color: var(--accent); }
+.queue-item.is-queued .queue-state { color: var(--muted); }
+.queue-cancel {
+  flex: 0 0 auto; padding: 3px 9px; font-size: 11px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: #fff; color: var(--muted); cursor: pointer;
+}
+.queue-cancel:hover { color: var(--danger); border-color: var(--danger); }
+
+/* 生成按钮的「已入队」态 —— 不阻塞、可继续点击提交 */
+.gen-btn.queued {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+.gen-btn.queued:hover { filter: brightness(1.02); }
+
 /* ---------- 图像面板：LoRA 配置 ---------- */
 .img-lora-list { display: flex; flex-direction: column; gap: 8px; }
 .img-lora-list:empty { display: none; }

@@ -370,8 +370,14 @@ class TestFrontendDefaults(unittest.TestCase):
         conn.close()
 
         # 不做任何用户操作 —— 只能靠 setInterval(refreshJobs, 2000) 自己刷新
+        #
+        # 【2026-11-13 队列化改造】等待条件**收窄到 #jobsGrid**。
+        # 队列面板（#queuePanel）也显示任务提示词，且轮询更快（1 秒），
+        # 用 body 做等待条件会被队列面板提前满足 —— 那时任务列表还没重画。
+        # 这里要验的是「卡片渲染出来了没有」，所以条件指向卡片所在容器。
         self.page.wait_for_function(
-            "t => document.body.innerText.includes(t)", arg=probe, timeout=15000)
+            "t => (document.getElementById('jobsGrid')?.innerText || '').includes(t)",
+            arg=probe, timeout=15000)
 
     def test_no_console_errors_on_load(self):
         """首屏无 JS 报错（脚本被中断会在这里暴露）。"""

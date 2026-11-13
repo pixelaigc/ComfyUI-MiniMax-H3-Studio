@@ -862,6 +862,17 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <select id="pageSizeSelect" aria-label="每页作品数"></select>
       </div>
     </div>
+    <!-- 生成队列面板（2026-11-13 队列化需求） -->
+    <!-- 位置：任务区顶部、状态标签行下方 —— 用户提交后第一眼能看到自己排第几 -->
+    <section class="queue-panel" id="queuePanel" hidden aria-label="生成队列">
+      <div class="queue-head">
+        <span class="queue-title">生成队列</span>
+        <span class="queue-summary" id="queueSummary">队列为空</span>
+        <button type="button" class="queue-toggle" id="queueToggle"
+                aria-expanded="true" title="展开/收起队列明细">明细</button>
+      </div>
+      <ol class="queue-list" id="queueList"></ol>
+    </section>
     <div class="jobs-grid" id="jobsGrid"></div>
     <div class="jobs-pagination" id="jobsPagination" hidden></div>
   </main>
@@ -1328,6 +1339,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
 <script src="/static/video-panel.js?v=videopanel2"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
+<!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
+     必须**先于** app.js 加载 —— app.js 的 boot() 里要读
+     window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
+<script src="/static/generation-queue.js?v=genqueue1"></script>
 <script src="/static/video-nav.js?v=videonav1"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，

@@ -464,8 +464,20 @@ class TestStatusRealtime(unittest.TestCase):
         conn.close()
 
         # 不做任何页面操作 —— 只能靠 setInterval(refreshJobs, 2000) 自己刷新
+        #
+        # 【2026-11-13 队列化改造】等待条件**收窄到 #jobsGrid**。
+        #
+        # 【为什么】队列面板（#queuePanel）也会显示任务的提示词，而且它的
+        # 轮询更快（1 秒 vs 任务列表的 2 秒）。原来用
+        # `document.body.innerText.includes(probe)` 做等待条件，
+        # 会被**队列面板**提前满足 —— 那时任务列表还没重画，
+        # 于是「任务是否出现在列表里」这条断言就变成了假失败。
+        #
+        # 这里要验的本来就是「卡片渲染出来了没有」，所以条件应该指向
+        # 卡片所在的容器 #jobsGrid，而不是整个 body。
         self.page.wait_for_function(
-            "t => document.body.innerText.includes(t)", arg=probe, timeout=15000)
+            "t => (document.getElementById('jobsGrid')?.innerText || '').includes(t)",
+            arg=probe, timeout=15000)
 
         after = set(self.page.evaluate(
             "() => Array.from(document.querySelectorAll('#jobsGrid > *')).map(e=>e.dataset.jid)"))
@@ -501,8 +513,12 @@ class TestStatusRealtime(unittest.TestCase):
              "running", 0.42, "采样中", "[]"))
         conn.commit()
         conn.close()
+        # 【2026-11-13 队列化改造】等待条件收窄到 #jobsGrid ——
+        # 队列面板也会显示提示词且轮询更快，用 body 会提前满足等待条件，
+        # 那时任务列表还没重画。理由同上。
         self.page.wait_for_function(
-            "() => document.body.innerText.includes('运行中探针')", timeout=15000)
+            "() => (document.getElementById('jobsGrid')?.innerText || '')"
+            ".includes('运行中探针')", timeout=15000)
         html = self.page.evaluate(
             "() => document.querySelector('#jobsGrid').innerHTML")
         self.assertIn("progress-bar", html, "生成中的卡片应有进度条")
@@ -557,8 +573,10 @@ class TestStatusRealtime(unittest.TestCase):
         conn.commit()
         conn.close()
 
+        # 【2026-11-13 队列化改造】等待条件收窄到 #jobsGrid（理由同上）
         self.page.wait_for_function(
-            "() => document.body.innerText.includes('批次探针')", timeout=15000)
+            "() => (document.getElementById('jobsGrid')?.innerText || '')"
+            ".includes('批次探针')", timeout=15000)
         # 展开批次
         self.page.evaluate("""
             const btn = Array.from(document.querySelectorAll('#jobsGrid [data-act="toggle-batches"]'))[0];
