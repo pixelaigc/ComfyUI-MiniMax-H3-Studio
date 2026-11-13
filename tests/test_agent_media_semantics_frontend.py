@@ -4,10 +4,14 @@ Agent 媒体语义前端层 —— 回归测试。
 
 锁定三条**会误导用户**的展示规则：
 
-1. **模式白名单只有 9 个**
-   【事实】workflows.BUILDERS = t2v/flf/r2v/t2i/t2i_qwen/i2i_qwen/t2i_moss/t2a/a2a
-   （workflows.py:2234）。longfilm 走 /api/longfilms 自有链路，Agent 建不了 ——
+1. **模式白名单 = 后端 workflows.BUILDERS（动态，不是写死的个数）**
+   【事实】workflows.BUILDERS = t2v/flf/r2v/t2i/t2i_qwen/i2i_qwen/t2i_moss/
+   t2i_h3image/i2i_h3image/t2a/a2a（2026-11-13 起加了 H3-Image 两个模式）。
+   longfilm 走 /api/longfilms 自有链路，Agent 建不了 ——
    基线 Agent 曾误报 longfilm，前端不得把它当可下发模式展示。
+   【2026-11-13 改】断言从「写死 9 个」改成「与后端 BUILDERS 逐项一致」——
+   写死数字会在新增模式时产生假失败（测试说「模式数不对」，
+   实际是「你加了模式没改断言」）。
 
 2. **静默回落必须可见**
    【事实】视频分辨率只有 544p/768p（RES_MP，workflows.py:63），
@@ -130,8 +134,19 @@ class TestAgentMediaBehaviour(unittest.TestCase):
 
     # -------------------------------------------------- 模式白名单
     def test_nine_modes_and_longfilm_marked_manual_only(self):
+        # 【2026-11-13 改】原来断言「9 个」—— 写死数字会在新增生成模式时
+        # 产生假失败。改成**动态断言**：AGENT_MODES 必须与后端
+        # workflows.BUILDERS 逐项一致（前端清单是后端清单的投影），
+        # 且基础 9 个模式一个都不能少。
         modes = self.media("Object.keys(M.AGENT_MODES)")
-        self.assertEqual(len(modes), 9, f"模式数不对：{modes}")
+        # 后端 BUILDERS（真实清单来源）—— 动态断言，前端清单必须与它一致
+        from h3studio import workflows as _wf
+        backend_modes = sorted(_wf.BUILDERS.keys())
+        self.assertEqual(sorted(modes), backend_modes,
+                         f"前端 AGENT_MODES 与后端 BUILDERS 不一致：{modes}")
+        for base in ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen",
+                     "t2i_moss", "t2a", "a2a"):
+            self.assertIn(base, modes)
         self.assertNotIn("longfilm", modes, "longfilm 不该在 Agent 可下发模式里")
         self.assertIn("longfilm", self.media("Object.keys(M.MANUAL_ONLY_MODES)"))
         # longfilm 的标签必须带「Agent 不能下发」
