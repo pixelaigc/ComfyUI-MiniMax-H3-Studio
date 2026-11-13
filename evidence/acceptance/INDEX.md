@@ -3,7 +3,7 @@
 > 本证据包验收的是「文生视频接续（t2v）」功能本身，不是 H3 视频面板的 7 项修复。
 
 - 分支：`local/feature/t2v-continue`　仓库：`/root/projects/h3studio-t2v-continue`
-- 生成时间：2026-11-13T20:07:03+08:00
+- 生成时间：2026-11-13T21:30:37+08:00
 - 机器可读版：`evidence/acceptance/INDEX.json`
 - 验收实例：8206 / 8199（独立实例，8190 线上未动）
 
@@ -195,11 +195,31 @@ cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python 
 
 日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-continuation.log`
 
-**全量**：
+**全量**：5 failed, 2287 passed, 4 skipped in 1876.67s (0:31:16)
 
 ```bash
 cd /root/projects/h3studio-t2v-continue && /home/ubuntu/comfyui/venv/bin/python -m pytest tests/ -q --no-header -p no:cacheprovider
 ```
+
+日志落盘：`/root/projects/h3studio-t2v-continue/data-accept/logs/pytest-full.log`
+
+**全量失败项**（逐条原始输出）：
+
+- `tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_write_contract_is_mode_scoped`
+  - 原始行：`FAILED tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_write_contract_is_mode_scoped`
+  - 判定：（未标注）
+- `tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_current_enhance_method_is_visible`
+  - 原始行：`FAILED tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_current_enhance_method_is_visible`
+  - 判定：（未标注）
+- `tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch`
+  - 原始行：`FAILED tests/test_grid_flash.py::TestGridFlash::test_grid_height_stable_across_switch`
+  - 判定：（未标注）
+- `tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
+  - 原始行：`FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras`
+  - 判定：（未标注）
+- `tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
+  - 原始行：`FAILED tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract`
+  - 判定：（未标注）
 
 **各项失败判定**：
 
