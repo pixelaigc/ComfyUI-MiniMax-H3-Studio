@@ -146,11 +146,6 @@ def resolve_mode(category: str, model_key: str | None = None) -> str:
     return items[0].get("mode", "")
 
 
-def resolve_category(mode: str) -> str:
-    """mode -> 类别 key（带兜底：认不出就回落到第一个视频类别）。"""
-    return category_for_mode(mode) or (VIDEO_CATEGORY_ORDER[0] if VIDEO_CATEGORY_ORDER else "")
-
-
 def list_categories() -> list[dict]:
     """前端导航要的两级清单（顺序 = 需求的固定四项）。
 

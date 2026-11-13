@@ -43,7 +43,6 @@ attach 成功、0 漏载、0 报错），但在强度 1.0 时配合长中文结�
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 
 # 阻尼系数 —— 实测标定：
@@ -123,7 +122,6 @@ def _ctx_damping_needed(lora_path: Path, unet_path: Path | None) -> float | None
     if unet_path is None:
         return None
     try:
-        import torch
         from safetensors import safe_open
     except Exception:
         return None
@@ -195,10 +193,6 @@ def _frob_sq_of_product(a, b) -> float | None:
     数值上与 `float((b @ a).norm().item()) ** 2` 等价到 fp32 精度
     （实测相对误差 < 1e-6）。
     """
-    try:
-        import torch
-    except Exception:
-        return None
     try:
         if b.dim() != 2 or a.dim() != 2:
             return None

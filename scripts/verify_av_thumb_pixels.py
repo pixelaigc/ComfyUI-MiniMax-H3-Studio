@@ -41,18 +41,6 @@ def count_color(image, rgb, region, tol=42, step=1):
     return count
 
 
-def find_thumb_regions(image):
-    """定位附件缩略图方块（62 CSS px -> 124 设备像素）。
-
-    【怎么定位而不写死坐标】
-    缩略图是等宽高的方块，左上角对齐附件条。我们扫描整张图，
-    找「连续的行里，出现大量非背景色像素块」的起始位置。
-    更稳的办法：直接用 CSS 的几何信息 —— 这里用「附件条左侧起
-    固定边距 + 卡片宽」的经验值 + 颜色搜索兜底。
-    """
-    return None
-
-
 def main():
     from PIL import Image
 

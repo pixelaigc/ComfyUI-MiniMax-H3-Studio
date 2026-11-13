@@ -18,7 +18,6 @@ H3 Studio 资产素材库 —— 存储层 + 数据模型。
   - 删除素材前服务端强制检查 asset_refs + asset_job_refs，有引用 -> 409 + 引用清单
   - 删任务 -> 素材不受影响（引用关系随任务删除而清理，素材本体保留）
 """
-import hashlib
 import json
 import os
 import shutil
@@ -154,14 +153,6 @@ def ensure_layout(root: Path | None = None) -> dict:
     return report
 
 
-def _mount_device(path: Path) -> str | None:
-    """返回 path 所在挂载点的设备标识（stat.st_dev 字符串）。"""
-    try:
-        return str(path.stat().st_dev)
-    except OSError:
-        return None
-
-
 def _nearest_existing(path: Path) -> Path:
     """向上找第一个真实存在的祖先目录。"""
     current = path
@@ -239,14 +230,6 @@ def check_disk_mounted(path: Path) -> tuple[bool, str]:
 # ------------------------------------------------------------------ 落盘
 
 
-def sha256_file(path: Path, chunk: int = 1024 * 1024) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(chunk), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 def original_relpath(sha256: str, filename: str) -> str:
     """
     原始文件区的相对路径：按 sha256 前 2 层分目录，避免单目录堆十万文件。
@@ -291,20 +274,6 @@ def resolve_inside(root: Path, relative: str) -> Path | None:
         return target
     except (ValueError, OSError):
         return None
-
-
-def atomic_write_bytes(target: Path, data: bytes) -> None:
-    """原子落盘：先写同目录临时文件，再 rename（同文件系统内 rename 是原子的）。"""
-    target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.parent / f".{target.name}.{uuid.uuid4().hex}.tmp"
-    try:
-        with tmp.open("wb") as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        tmp.replace(target)
-    finally:
-        tmp.unlink(missing_ok=True)
 
 
 def atomic_move(source: Path, target: Path) -> None:

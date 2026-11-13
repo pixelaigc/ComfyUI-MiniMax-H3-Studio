@@ -1813,9 +1813,6 @@ $("#imgSizeReset").addEventListener("click", () => {
 //     官方 PE-I2I system prompt 要求多图必须用 <image1>/<image2>，
 //     单图不要用标签；ComfyUI 的 qwen_image21.py 也用 "<image{n}>" 前缀。
 //   * 顺序即语义：第 N 张 <-> <imageN> <-> ComfyUI 的 image_N 插槽。
-function qwenRefLimit() {
-  return QWEN_OPTIONS.maxRefImages || 10;
-}
 
 function renderQwenRefs() {
   if (window.QwenRefs) window.QwenRefs.render();
@@ -2283,10 +2280,6 @@ const promptVersions = {
 };
 
 const PROMPT_LEVEL_LABEL = {0: "原始", 1: "一次增强", 2: "二次增强"};
-
-function promptIsEnhanced() {
-  return promptEnhance.text !== null && $("#prompt").value === promptEnhance.text;
-}
 
 function markPromptEnhanced() {
   promptEnhance.text = $("#prompt").value;
@@ -5336,26 +5329,6 @@ function showProviders() {
   loadAgentConfig();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
-}
-
-// 内置多模态 Agent 页（实现见 agent.js）
-function showAgent() {
-  state.page = "agent";
-  $$(".nav-item").forEach(x => x.classList.remove("active"));
-  const nav = $("#navAgent");
-  if (nav) nav.classList.add("active");
-  showPage($("#jobsArea"), false);
-  showPage($("#panel"), false);
-  showPage($("#stitchPanel"), false);
-  showPage($("#systemPage"), false);
-  showPage($("#providersPage"), false);
-  showPage($("#assetsPage"), false);
-  showPage($("#agentPage"), true);
-  closePanelDrawerOnPageChange();
-  updateResponsiveChrome();
-  if (window.AgentUI && typeof window.AgentUI.renderMessages === "function") {
-    window.AgentUI.renderMessages();
-  }
 }
 
 $("#navSystem").addEventListener("click", showSystem);

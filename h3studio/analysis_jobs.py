@@ -88,16 +88,6 @@ def _audio_progress_for(stage: str) -> tuple[float, str]:
     return base, label
 
 
-def _audio_progress(stage_index: int, frac: float = 0.5) -> tuple[float, str]:
-    """按阶段推进进度条。"""
-    if stage_index < 0:
-        return 0.0, "准备中"
-    idx = min(stage_index, len(AUDIO_STAGES) - 1)
-    _, label, base = AUDIO_STAGES[idx]
-    span = (AUDIO_STAGES[idx + 1][2] - base) if idx + 1 < len(AUDIO_STAGES) else (1.0 - base)
-    return round(base + span * frac, 3), label
-
-
 # ------------------------------------------------------------------ 工具
 
 
@@ -152,7 +142,6 @@ def _run_audio_deep(job_id: int, asset_id: str, source: Path,
 
         conn = _library_conn()
         try:
-            version = asset_repo.current_version(conn, asset_id)
             revision = asset_repo.next_revision(conn, asset_id)
             extra = dict(result["extra"])
             extra["analyzer_mode"] = "deep_audio_pipeline"

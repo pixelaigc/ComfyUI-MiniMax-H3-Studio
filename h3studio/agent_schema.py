@@ -156,11 +156,6 @@ REF_IMAGE_MIN, REF_IMAGE_MAX = _ref_image_range()
 # ------------------------------------------------------------------ 模式分类
 
 #: 各模式的媒体类型（来自 gen_types 注册表，**不硬编码**）
-def _media_of(mode: str) -> str:
-    try:
-        return gen_types.type_for_mode(mode).get("media") or "other"
-    except Exception:
-        return "other"
 
 
 def is_video_mode(mode: str) -> bool:
@@ -958,11 +953,6 @@ def mode_schema(mode: str) -> dict:
                          "ref_images 的真实常量推导，没有硬编码白名单",
     }
     return schema
-
-
-def all_mode_schemas() -> list[dict]:
-    """所有可下发模式的 schema 列表。"""
-    return [mode_schema(mode) for mode in sorted(wf.BUILDERS.keys())]
 
 
 # ------------------------------------------------------------------ 校验

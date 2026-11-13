@@ -467,16 +467,6 @@ def _in_lora_registry(text: str) -> bool:
     return False
 
 
-def mode_reads_legacy_lora(mode: str) -> bool:
-    """该模式的工作流**真的会读** `params["lora"]` 吗？
-
-    True  -> 只有视频旧路径（t2v / flf / r2v / longfilm）；
-    False -> 图像 / 音乐模式**根本没有**这个字段的概念，
-             传了就是误填（提示词塞进了 lora 字段）。
-    """
-    return str(mode or "") in VIDEO_MODES_WITH_LEGACY_LORA
-
-
 def resolve_job_lora(mode: str, params: dict) -> dict:
     """算出「这个任务真实用到的 LoRA」—— **唯一入口**（2026-11-13 · C1）。
 
