@@ -3351,6 +3351,12 @@ function jobCard(job) {
     <div class="job-actions">
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
+      <!-- 【2026-11-13】骨架卡：补上与真实卡片同形的「下载 / 新窗口打开」
+           两个占位按钮（真实卡片有产物所以有，骨架没有产物所以缺）。
+           缺这两个 -> 动作行少两个 -> 从 2 行缩到 1 行 ->
+           骨架比真实卡片矮 17px -> 网格高度跳 68px（test_grid_flash 抓的）。 -->
+      ${job.is_skeleton && !(video || image || audio) ? `<button data-act="download">⬇ 下载</button>` : ""}
+      ${job.is_skeleton && !image ? `<a data-act="open-new" href="#" onclick="return false" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       <!-- 【2026-11-13 需求 C3】详情按钮：卡片区域有限，
@@ -3870,10 +3876,59 @@ function skeletonJob(index) {
     created_at: 0,
     mode: mode,
     params: params,
+    // 【2026-11-13 修 —— 骨架与真实卡片行数对齐】
+    //
+    // 骨架走的是**同一套** jobCard() 渲染逻辑，而卡片现在从
+    // `job.model_info` 取生成参数（LoRA / 采样 / 步数 / 尺寸 …）。
+    // 骨架没有 model_info -> 那些行**不渲染** ->
+    // 骨架比真实卡片少几行 -> 数据到达瞬间网格高度变化 ->
+    // 「首图巨大闪现 / 布局抖动」（test_grid_flash 抓的就是这个）。
+    //
+    // 修法：给骨架一份 model_info，字段取值**跟真实卡片同形**。
+    // 关键点：**LoRA 行按「无」渲染**（真实卡片在没有任何 LoRA 时
+    // 就是显示「无」），采样/步数取占位值 —— 这样两边行数一致。
+    //
+    // 【为什么不用「骨架占位 LoRA」】那会让骨架比真实卡片**多**一行内容，
+    // 而且真实任务里 LoRA 大概率是「无」—— 形状必须一致，不是内容一致。
+    model_info: {
+      model_key: "",
+      model_label: "骨架占位模型",
+      lora_label: "",
+      lora_strength: null,
+      fixed_lora_label: "",
+      fixed_lora_strength: null,
+      attention_label: "",
+      attention_speed_label: "",
+      steps: 8,
+      cfg: 1,
+      sampler: "res_multistep",
+      scheduler: "simple",
+      shift_video: 12,
+      shift_audio: 3,
+      width: 1360,
+      height: 768,
+      aspect: "16:9",
+      resolution: "768p",
+      duration: 5,
+      seed: 0,
+    },
     status: "done",
     progress: 1,
     progress_text: "",
+    // 【2026-11-13 修 —— 骨架的动作按钮要与真实卡片同形】
+    //
+    // 真实卡片有 5 个动作按钮（下载 / 新窗口打开 / 复用参数 / 详情 / 删除），
+    // 骨架 outputs 为空 -> 只有 3 个（复用参数 / 详情 / 删除）->
+    // 动作行从 1 行变成 2 行 -> 每张卡矮 17px -> 4 行网格差 68px
+    // （实测：真实 53px / 骨架 36px）。
+    //
+    // 修法：给骨架一个**标志位**，让 jobCard 知道「这是骨架」，
+    // 按骨架形态渲染**同样的 5 个按钮**（下载 / 新窗口打开渲染成不可点的占位）。
+    //
+    // 【为什么不给假 outputs】给了 outputs，jobCard 会真的去渲染 <img>，
+    // 骨架就变成「真实卡片」—— 测试断言「切换过程没出现骨架占位」直接挂。
     outputs: [],
+    is_skeleton: true,
     batches: [],
     elapsed: 0,
   };
@@ -4005,6 +4060,15 @@ async function refreshJobs() {
   // 卡片高度按图片自然尺寸撑开 —— 于是首帧出现一张原尺寸巨图，
   // 随后图片解码完成才跳回网格（就是用户看到的「首图巨大闪现」）。
   // 骨架卡有固定的 aspect-ratio 与高度，数据到达时网格尺寸不变，无抖动。
+  // 【2026-11-13 修 —— 骨架至少显示一帧】
+  // 骨架与真实卡片的写入在**同一帧**内完成时，骨架就等于没出现过 ——
+  // 用户看到的是「列表直接跳到新内容」（没有加载态），
+  // 而依赖骨架帧的测试（test_grid_flash）会判「整个切换过程没出现骨架占位」。
+  // 实测：服务端响应快时（约 10ms）骨架在两帧之间就被换掉了。
+  //
+  // 修法：本轮**刚铺过**骨架时，真实卡片的写入推迟到下一帧 ——
+  // 骨架必然完整显示一帧，既给用户加载反馈，也保证帧序列里有骨架。
+  let skeletonJustShown = false;
   if (displayedFilterKey !== filterKey) {
     displayedFilterKey = filterKey;
     // 骨架数量按当前每页数量铺（但不超过 SKELETON_MAX），
@@ -4013,6 +4077,7 @@ async function refreshJobs() {
     // 容器此刻可能不可见（素材库页把 #jobsArea 隐藏了）——
     // 此时宽度是 0，不能据此算列数，否则会写进一个错误的「1 列」。
     applyGridColumns(state.pageSize);
+    skeletonJustShown = true;
   }
   try {
     // 「全部」= 不按状态过滤；其余标签各自过滤
@@ -4085,7 +4150,12 @@ async function refreshJobs() {
       preserve(() => syncJobCards(grid, jobs));
     };
     if (window.H3UI && !window.H3UI.canWriteDOM("jobs", () => refreshJobs())) return;
-    writeAll();
+    if (skeletonJustShown) {
+      // 推迟一帧再写真实卡片 —— 让骨架完整显示一帧（见上面的说明）。
+      requestAnimationFrame(() => requestAnimationFrame(writeAll));
+    } else {
+      writeAll();
+    }
   } catch (e) { if (ticket === jobsRequest && tab === state.tab) grid.textContent = "任务列表读取失败，正在重试…"; }
 }
 
