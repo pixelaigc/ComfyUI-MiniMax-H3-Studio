@@ -1,0 +1,113 @@
+{
+  "base": "http://127.0.0.1:8200",
+  "steps": [
+    {
+      "step": "server_verdict",
+      "selflift_job": "c1eb59bb9920",
+      "selflift_can_continue": false,
+      "selflift_reason": "二采（SelfLift 渐进分辨率采样）的潜空间与标准采样路径不同源，接续会出现接缝位移 —— 二采产物不支持接续。",
+      "normal_job": "9a535e39359e",
+      "normal_can_continue": true
+    },
+    {
+      "step": "cards_375",
+      "selflift": {
+        "jid": "c1eb59bb9920",
+        "has_continue": false,
+        "buttons": [
+          "prompt",
+          "download",
+          "reuse",
+          "delete"
+        ]
+      },
+      "normal": {
+        "jid": "9a535e39359e",
+        "has_continue": true,
+        "buttons": [
+          "prompt",
+          "download",
+          "continue",
+          "reuse",
+          "delete"
+        ]
+      }
+    },
+    {
+      "step": "continuation_panel_375",
+      "hidden": false,
+      "text": "接续上下文\n清除\n接续自生成库里的「9a535e39359e」（t2v_9a535e39359e_00001_.mp4）\n当前累计时长\n5.167s\n模型\nMiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）\n固定加速 LoRA\nTurbo 4 步 · ckpt850（工作流固定）\n注意力机制\n默认（PyTorch 稠密注意力）\n二采\n关闭\n输出尺寸\n768×448\n时长\n5.0s\n采样步数\n4\n采样器\neuler\n调度器\nbeta\nshift（视频）\n12.00\nshift（音频）\n3.00\nCFG\n1.00\n种子\n4242\n提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。 生成结果会自动拼成完整视频。",
+      "buttons": [
+        "清除"
+      ],
+      "has_add": false
+    },
+    {
+      "step": "request_failures_375",
+      "media_preload_aborts": 7,
+      "real_failures": 0,
+      "real_failure_list": []
+    },
+    {
+      "step": "cards_1280",
+      "selflift": {
+        "jid": "c1eb59bb9920",
+        "has_continue": false,
+        "buttons": [
+          "prompt",
+          "download",
+          "reuse",
+          "delete"
+        ]
+      },
+      "normal": {
+        "jid": "9a535e39359e",
+        "has_continue": true,
+        "buttons": [
+          "prompt",
+          "download",
+          "continue",
+          "reuse",
+          "delete"
+        ]
+      }
+    },
+    {
+      "step": "continuation_panel_1280",
+      "hidden": false,
+      "text": "接续上下文\n清除\n接续自生成库里的「9a535e39359e」（t2v_9a535e39359e_00001_.mp4）\n当前累计时长\n5.167s\n模型\nMiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）\n固定加速 LoRA\nTurbo 4 步 · ckpt850（工作流固定）\n注意力机制\n默认（PyTorch 稠密注意力）\n二采\n关闭\n输出尺寸\n768×448\n时长\n5.0s\n采样步数\n4\n采样器\neuler\n调度器\nbeta\nshift（视频）\n12.00\nshift（音频）\n3.00\nCFG\n1.00\n种子\n4242\n提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。 生成结果会自动拼成完整视频。",
+      "buttons": [
+        "清除"
+      ],
+      "has_add": false
+    },
+    {
+      "step": "request_failures_1280",
+      "media_preload_aborts": 0,
+      "real_failures": 0,
+      "real_failure_list": []
+    }
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "failed_requests": [],
+  "media_preload_aborts": [
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000011.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000010.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000009.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000007.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000005.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000003.mp4 net::ERR_ABORTED",
+    "http://127.0.0.1:8200/files/videos/v-h3-studio-000001.mp4 net::ERR_ABORTED"
+  ],
+  "shots": [
+    "evidence/continuation-selflift/selflift-375-gallery.png",
+    "evidence/continuation-selflift/selflift-375-card-zoom.png",
+    "evidence/continuation-selflift/normal-375-card-zoom.png",
+    "evidence/continuation-selflift/continuation-panel-375.png",
+    "evidence/continuation-selflift/selflift-1280-gallery.png",
+    "evidence/continuation-selflift/selflift-1280-card-zoom.png",
+    "evidence/continuation-selflift/normal-1280-card-zoom.png",
+    "evidence/continuation-selflift/continuation-panel-1280.png"
+  ]
+}

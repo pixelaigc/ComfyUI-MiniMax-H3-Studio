@@ -1,0 +1,258 @@
+{
+  "base": "http://127.0.0.1:8200",
+  "steps": [
+    {
+      "step": "capability",
+      "available": true,
+      "nodes": {
+        "H3RelayLatentSave": true,
+        "H3RelayLatentLoad": true,
+        "H3RelayCopyBridge": true,
+        "H3RelayTrimAV": true
+      },
+      "reason": "",
+      "probe_complete": true
+    },
+    {
+      "step": "segment1_submitted",
+      "job_id": "fb20b811a7a4"
+    },
+    {
+      "step": "segment1_done",
+      "status": "done",
+      "outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000017.mp4",
+          "name": "t2v_fb20b811a7a4_00001_.mp4",
+          "width": 768,
+          "height": 448
+        }
+      ],
+      "continuation_info": {
+        "can_continue": true,
+        "reason": "",
+        "run_id": "h3studio_sfb20b811a7a4",
+        "latent_stage": 0,
+        "stage_index": 0,
+        "chain_id": "fb20b811a7a4",
+        "has_latent": true,
+        "latent_exists": true,
+        "context_frames": 22,
+        "total_frames": 124,
+        "total_seconds": 5.167
+      }
+    },
+    {
+      "step": "gallery_375",
+      "continue_card": {
+        "jid": "fb20b811a7a4"
+      },
+      "diag": {
+        "all": 11,
+        "real": 11,
+        "capability": {
+          "available": true,
+          "reason": "",
+          "nodes": {
+            "H3RelayLatentSave": true,
+            "H3RelayLatentLoad": true,
+            "H3RelayCopyBridge": true,
+            "H3RelayTrimAV": true
+          }
+        }
+      }
+    },
+    {
+      "step": "drawer_opened_375",
+      "opened": true
+    },
+    {
+      "step": "after_continue_375",
+      "panelHidden": false,
+      "panelText": "\n      \n        接续上下文\n        清除\n      \n      \n        接续自生成库里的「fb20b811a7a4」（t2v_fb20b811a7a4_00001_.mp4）\n      \n      当前累计时长5.167s\n      模型MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）固定加速 LoRATurbo 4 步 · ckpt850（工作流固定）注意力机制默认（PyTorch 稠密注意力）二采关闭输出尺寸768×448时长5.0s采样步数4采样器euler调度器betashift（视频）12.00shift（音频）3.00CFG1.00种子4242\n      \n        提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。\n        生成结果会自动拼成完整视频。\n      ",
+      "hasClear": true,
+      "addButtons": [
+        "清除"
+      ],
+      "model": "fl2va_pruned_w4a8",
+      "width": 768,
+      "height": 448,
+      "steps": 4,
+      "prompt": ""
+    },
+    {
+      "step": "gallery_1280",
+      "continue_card": {
+        "jid": "fb20b811a7a4"
+      },
+      "diag": {
+        "all": 11,
+        "real": 11,
+        "capability": {
+          "available": false,
+          "reason": ""
+        }
+      }
+    },
+    {
+      "step": "after_continue_1280",
+      "panelHidden": false,
+      "panelText": "\n      \n        接续上下文\n        清除\n      \n      \n        接续自生成库里的「fb20b811a7a4」（t2v_fb20b811a7a4_00001_.mp4）\n      \n      当前累计时长5.167s\n      模型MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）固定加速 LoRATurbo 4 步 · ckpt850（工作流固定）注意力机制默认（PyTorch 稠密注意力）二采关闭输出尺寸768×448时长5.0s采样步数4采样器euler调度器betashift（视频）12.00shift（音频）3.00CFG1.00种子4242\n      \n        提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。\n        生成结果会自动拼成完整视频。\n      ",
+      "hasClear": true,
+      "addButtons": [
+        "清除"
+      ],
+      "model": "fl2va_pruned_w4a8",
+      "width": 768,
+      "height": 448,
+      "steps": 4,
+      "prompt": ""
+    },
+    {
+      "step": "continuation_context",
+      "ok": true,
+      "params_keys": [
+        "accel_loras",
+        "attention",
+        "cfg",
+        "duration",
+        "fixed_accel_lora",
+        "height",
+        "model_key",
+        "sampler",
+        "scheduler",
+        "seed",
+        "shift_audio",
+        "shift_video",
+        "steps",
+        "twopass",
+        "width"
+      ],
+      "summary_len": 13
+    },
+    {
+      "step": "segment2_done",
+      "job_id": "8033011736d0",
+      "status": "done",
+      "outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000019.mp4",
+          "name": "v-h3-studio-000019.mp4",
+          "is_full": true
+        },
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000018.mp4",
+          "name": "t2v_8033011736d0_00001_.mp4",
+          "width": 768,
+          "height": 448
+        }
+      ],
+      "continuation_info": {
+        "can_continue": true,
+        "reason": "",
+        "run_id": "h3studio_s8033011736d0",
+        "latent_stage": 0,
+        "stage_index": 1,
+        "chain_id": "fb20b811a7a4",
+        "has_latent": true,
+        "latent_exists": true,
+        "context_frames": 22,
+        "total_frames": 226,
+        "total_seconds": 9.417
+      }
+    },
+    {
+      "step": "segment3_done",
+      "job_id": "ed9d16700f6d",
+      "status": "done",
+      "outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000021.mp4",
+          "name": "v-h3-studio-000021.mp4",
+          "is_full": true
+        },
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000020.mp4",
+          "name": "t2v_ed9d16700f6d_00001_.mp4",
+          "width": 768,
+          "height": 448
+        }
+      ],
+      "continuation_info": {
+        "can_continue": true,
+        "reason": "",
+        "run_id": "h3studio_sed9d16700f6d",
+        "latent_stage": 0,
+        "stage_index": 2,
+        "chain_id": "fb20b811a7a4",
+        "has_latent": true,
+        "latent_exists": true,
+        "context_frames": 22,
+        "total_frames": 328,
+        "total_seconds": 13.667
+      }
+    },
+    {
+      "step": "probe",
+      "job": "fb20b811a7a4",
+      "file": "videos/v-h3-studio-000017.mp4",
+      "is_full": false,
+      "frames": 124,
+      "duration": 5.167
+    },
+    {
+      "step": "probe",
+      "job": "8033011736d0",
+      "file": "videos/v-h3-studio-000019.mp4",
+      "is_full": true,
+      "frames": 226,
+      "duration": 9.449678
+    },
+    {
+      "step": "probe",
+      "job": "8033011736d0",
+      "file": "videos/v-h3-studio-000018.mp4",
+      "is_full": false,
+      "frames": 102,
+      "duration": 4.25
+    },
+    {
+      "step": "probe",
+      "job": "ed9d16700f6d",
+      "file": "videos/v-h3-studio-000021.mp4",
+      "is_full": true,
+      "frames": 328,
+      "duration": 13.699678
+    },
+    {
+      "step": "probe",
+      "job": "ed9d16700f6d",
+      "file": "videos/v-h3-studio-000020.mp4",
+      "is_full": false,
+      "frames": 102,
+      "duration": 4.25
+    }
+  ],
+  "console_errors": [],
+  "failed_requests": [],
+  "shots": [
+    "evidence/continuation-d1/cont-375-01-gallery.png",
+    "evidence/continuation-d1/cont-375-02-backfilled.png",
+    "evidence/continuation-d1/cont-375-02b-context-panel.png",
+    "evidence/continuation-d1/cont-375-02c-left-panel.png",
+    "evidence/continuation-d1/cont-375-03-prompt.png",
+    "evidence/continuation-d1/cont-1280-01-gallery.png",
+    "evidence/continuation-d1/cont-1280-02-backfilled.png",
+    "evidence/continuation-d1/cont-1280-02b-context-panel.png",
+    "evidence/continuation-d1/cont-1280-02c-left-panel.png",
+    "evidence/continuation-d1/cont-1280-03-prompt.png"
+  ],
+  "segment1_job": "fb20b811a7a4",
+  "segment2_job": "8033011736d0",
+  "segment3_job": "ed9d16700f6d"
+}

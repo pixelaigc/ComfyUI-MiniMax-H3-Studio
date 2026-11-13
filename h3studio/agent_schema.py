@@ -172,7 +172,8 @@ def is_music_mode(mode: str) -> bool:
 
 
 def is_image_mode(mode: str) -> bool:
-    return mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss")
+    return mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
+                    "t2i_h3image", "i2i_h3image")
 
 
 #: 「图像模式 -> (模型表, 分辨率档位表)」。**来源：workflows 的真实常量**。
@@ -181,6 +182,9 @@ _IMAGE_MODEL_TABLES = {
     "t2i_qwen": ("QWEN_IMAGE_MODELS", "QWEN_IMAGE_RES_TIERS"),
     "i2i_qwen": ("QWEN_IMAGE_MODELS", "QWEN_IMAGE_RES_TIERS"),
     "t2i_moss": ("MOSS_IMAGE_MODELS", "MOSS_IMAGE_RES_TIERS"),
+    # MiniMax-H3-Image：文生图与图片编辑同一个 checkpoint
+    "t2i_h3image": ("H3_IMAGE_MODELS", "H3_IMAGE_RES_TIERS"),
+    "i2i_h3image": ("H3_IMAGE_MODELS", "H3_IMAGE_RES_TIERS"),
 }
 
 
@@ -469,6 +473,10 @@ def mode_defaults(mode: str) -> dict:
                             getattr(wf, "MOSS_IMAGE_DEFAULT_MODEL", ""))
         defaults.setdefault("resolution",
                             getattr(wf, "MOSS_IMAGE_DEFAULT_TIER", ""))
+    elif mode in ("t2i_h3image", "i2i_h3image"):
+        defaults.setdefault("model",
+                            getattr(wf, "H3_IMAGE_DEFAULT_MODEL", ""))
+        defaults.setdefault("resolution", "4mp")
 
     # 3. 比例默认值：builder 里写死的优先
     aspects = mode_aspects(mode)
@@ -517,6 +525,8 @@ def _default_model_of(mode: str) -> str:
         "t2i_qwen": "QWEN_IMAGE_DEFAULT_MODEL",
         "i2i_qwen": "QWEN_IMAGE_DEFAULT_MODEL",
         "t2i_moss": "MOSS_IMAGE_DEFAULT_MODEL",
+        "t2i_h3image": "H3_IMAGE_DEFAULT_MODEL",
+        "i2i_h3image": "H3_IMAGE_DEFAULT_MODEL",
     }.get(mode)
     if not const:
         return ""
@@ -550,6 +560,8 @@ def negative_support(mode: str, model_key: str = "") -> dict:
         "t2i_qwen": "QWEN_IMAGE_MODELS",
         "i2i_qwen": "QWEN_IMAGE_MODELS",
         "t2i_moss": "MOSS_IMAGE_MODELS",
+        "t2i_h3image": "H3_IMAGE_MODELS",
+        "i2i_h3image": "H3_IMAGE_MODELS",
     }.get(mode)
     table = getattr(wf, table_const, None) if table_const else None
     if not isinstance(table, dict) or key not in table:
@@ -629,6 +641,9 @@ MODE_SLOTS = {
     "t2i":    ([], []),
     "t2i_qwen": ([], []),
     "t2i_moss": ([], []),
+    # MiniMax-H3-Image：文生图无素材；图片编辑走参考图（多条）
+    "t2i_h3image": ([], []),
+    "i2i_h3image": ([], ["ref_image"]),
     # 图片编辑：参考图 -> ref_images（多条）
     "i2i_qwen": ([], ["ref_image"]),
     # 首尾帧：first_frame（必需）+ last_frame（可选）
@@ -721,9 +736,12 @@ MODE_MEDIA_SLOTS = {
     "t2i": {},
     "t2i_qwen": {},
     "t2i_moss": {},
+    "t2i_h3image": {},
     "t2a": {},
     # 图片编辑：只吃参考图
     "i2i_qwen": {"image": "ref_image"},
+    # H3-Image 图片编辑：同样只吃参考图（官方上限 16 张）
+    "i2i_h3image": {"image": "ref_image"},
     # 首尾帧：首帧/尾帧都是图片通道（具名槽位）
     "flf": {"image": "first_frame"},
     # 参考生音乐：只吃参考音频（1 段）

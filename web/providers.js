@@ -47,6 +47,9 @@ function enhanceCurrentModelKey() {
   if (mode === "t2i_moss") {
     return (state.imgMoss && state.imgMoss.model) || "";
   }
+  if (mode === "t2i_h3image" || mode === "i2i_h3image") {
+    return (state.imgH3Image && state.imgH3Image.model) || "";
+  }
   // 音乐（YuE2）：模型是 checkpoint key，取自音乐面板自己的状态。
   // 漏了它会掉到 state.model（视频的 MiniMax-H3），
   // 于是模型族过滤按 minimax_h3 走，YuE2 专用模板会被整条滤掉。

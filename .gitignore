@@ -79,3 +79,5 @@ Thumbs.db
 # 本轮本地验证用的独立实例配置（8198 端口，不影响线上 8190）
 /config.json
 /data/
+data-accept/
+data-accept-live-verify/

@@ -1,0 +1,231 @@
+{
+  "steps": [
+    {
+      "step": "A",
+      "job": "f1569b50dee7",
+      "seg_frames": 124,
+      "seg_seconds": 5.167,
+      "latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000.safetensors",
+      "latent_exists": true
+    },
+    {
+      "step": "1_latent_coords",
+      "b1_latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000.safetensors",
+      "b2_latent": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se87e76812bf0/stage_00000.safetensors",
+      "b1_run_id": "h3studio_sa5d446b1605e",
+      "b2_run_id": "h3studio_se87e76812bf0",
+      "paths_differ": true,
+      "contents_differ": true
+    },
+    {
+      "step": "2_first_frame_origin",
+      "mae_c1first_vs_B1last": 5.785,
+      "mae_c1first_vs_B2last": 63.988,
+      "ratio": 11.06,
+      "verdict": "B1(正确)",
+      "graph_verdict": "C1读的是B1",
+      "graph_read_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors",
+      "graph_b1_run": "h3studio_sa5d446b1605e",
+      "graph_b2_run": "h3studio_se87e76812bf0",
+      "anchor_explicit": true,
+      "anchor_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors",
+      "ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "frame_B1_last": "/tmp/h3-d1-four/frames/B1-v-h3-studio-000020-last.png",
+      "frame_B2_last": "/tmp/h3-d1-four/frames/B2-v-h3-studio-000022-last.png",
+      "frame_C1_first": "/tmp/h3-d1-four/frames/C1-v-h3-studio-000024-first.png",
+      "triptych": "/tmp/h3-d1-four/frames/triptych-B1last-B2last-C1first.png"
+    },
+    {
+      "step": "3_lineage_isolation",
+      "seg_frames": {
+        "A": 124,
+        "B1": 102,
+        "B2": 102,
+        "C1": 102
+      },
+      "full_c1_frames": 328,
+      "expect_c1": 328,
+      "full_b1_frames": 226,
+      "expect_b1": 226,
+      "full_b2_frames": 226,
+      "expect_b2": 226,
+      "c1_full": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000025.mp4",
+      "b1_full": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000021.mp4",
+      "b2_full": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000023.mp4",
+      "b2_min_mae_in_c1_full": 28.285,
+      "b2_absent_from_c1": true,
+      "lineage_c1": [
+        "videos/v-h3-studio-000019.mp4",
+        "videos/v-h3-studio-000020.mp4",
+        "videos/v-h3-studio-000024.mp4"
+      ],
+      "lineage_b1": [
+        "videos/v-h3-studio-000019.mp4",
+        "videos/v-h3-studio-000020.mp4"
+      ],
+      "lineage_b2": [
+        "videos/v-h3-studio-000019.mp4",
+        "videos/v-h3-studio-000022.mp4"
+      ],
+      "lineage_isolated": true
+    },
+    {
+      "step": "4_two_round_continuation",
+      "A": "f1569b50dee7",
+      "B1": "a5d446b1605e",
+      "C1": "c09b1c43cff1",
+      "D1": "c534c11e3c3a",
+      "d1_seg_frames": 102,
+      "d1_full_frames": 430,
+      "expect_d1": 430,
+      "d1_full": "/tmp/h3t2v-d1-data/outputs/videos/v-h3-studio-000027.mp4",
+      "round1_full_frames": 328,
+      "round2_full_frames": 430,
+      "growth": 102
+    },
+    {
+      "step": "5_fingerprint",
+      "source_read_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors",
+      "anchor_read_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors",
+      "fingerprint_suffix_present": true,
+      "bridge_ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "latent_paths": {
+        "A": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000.safetensors",
+        "B1": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000.safetensors",
+        "C1": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000.safetensors"
+      },
+      "graph": {
+        "A": {
+          "save": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 0
+          }
+        },
+        "B1": {
+          "load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "anchor_load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "bridge": {
+            "ref_anchor_latent": [
+              "300:anchor_load",
+              0
+            ],
+            "ref_anchor_stage": -1,
+            "context_latent": [
+              "300:load",
+              0
+            ],
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 0
+          },
+          "save": {
+            "run_id": "h3studio_sa5d446b1605e",
+            "stage_index": 0
+          }
+        },
+        "B2": {
+          "load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "anchor_load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "bridge": {
+            "ref_anchor_latent": [
+              "300:anchor_load",
+              0
+            ],
+            "ref_anchor_stage": -1,
+            "context_latent": [
+              "300:load",
+              0
+            ],
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 0
+          },
+          "save": {
+            "run_id": "h3studio_se87e76812bf0",
+            "stage_index": 0
+          }
+        },
+        "C1": {
+          "load": {
+            "run_id": "h3studio_sa5d446b1605e",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors"
+          },
+          "anchor_load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "bridge": {
+            "ref_anchor_latent": [
+              "300:anchor_load",
+              0
+            ],
+            "ref_anchor_stage": -1,
+            "context_latent": [
+              "300:load",
+              0
+            ],
+            "run_id": "h3studio_sa5d446b1605e",
+            "stage_index": 0
+          },
+          "save": {
+            "run_id": "h3studio_sc09b1c43cff1",
+            "stage_index": 0
+          }
+        },
+        "D1": {
+          "load": {
+            "run_id": "h3studio_sc09b1c43cff1",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000_208432ea.safetensors"
+          },
+          "anchor_load": {
+            "run_id": "h3studio_sf1569b50dee7",
+            "stage_index": 1,
+            "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+          },
+          "bridge": {
+            "ref_anchor_latent": [
+              "300:anchor_load",
+              0
+            ],
+            "ref_anchor_stage": -1,
+            "context_latent": [
+              "300:load",
+              0
+            ],
+            "run_id": "h3studio_sc09b1c43cff1",
+            "stage_index": 0
+          },
+          "save": {
+            "run_id": "h3studio_sc534c11e3c3a",
+            "stage_index": 0
+          }
+        }
+      }
+    }
+  ],
+  "ok": true,
+  "failures": []
+}

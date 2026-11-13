@@ -19,9 +19,73 @@
 
   const $ = s => document.querySelector(s);
 
-  // ---------- 常量 ----------
-  const MAX_REFS = 10;          // 模型官方能力 10 张（与后端 ref_images.MAX_REF_IMAGES 一致）
-  const PLACEHOLDER_RE = /<image(\d+)>/g;
+  // ---------- 占位语法档案（profile） ----------
+  //
+  // 【为什么要参数化】
+  // 这个模块原本只服务 Qwen-Image 2.1（占位标记 `<imageN>`、上限 10 张）。
+  // MiniMax-H3-Image 用的是**另一套**语法：
+  //   * 占位标记 `<Picture N>`（官方文档：the prompt addresses each one by its label）
+  //   * 上限 16 张（官方文档：up to 16 input images）
+  // 两套语法不能混用 —— 用 Qwen 的正则去扫 H3-Image 的 `<Picture 1>` 会扫不到，
+  // 于是「用户写了合法标记」被判成「缺少占位标记」-> 误拒。
+  //
+  // 所以这里把「语法 + 上限 + 文案」抽成 profile，由 app.js 在切换模式时
+  // 调 setProfile() 切换。**一份实现，两套语义**。
+  const PROFILES = {
+    qwen: {
+      key: "qwen",
+      maxRefs: 10,
+      // 官方 PE-I2I system prompt：多图必须用 <image1>..<imageN>
+      placeholder: i => `<image${i + 1}>`,
+      regex: /<image(\d+)>/g,
+      // 官方模板的说法，用于界面文案
+      markerName: "<imageN>",
+      // 官方能力上限（用于说明文案）
+      officialCap: 10,
+      nodeSlots: 16,
+      // 【官方 PE-I2I system prompt 原文】"the rewritten instruction MUST use
+      //  <image1>, <image2>, ..." -> 多图时占位标记是**强制**的。
+      requirePlaceholders: true,
+      singleTagAdvice:
+        "只有 1 张参考图：官方 PE-I2I 模板要求单图**不要**用 <imageN> 标签，会以自然表述引用。",
+      multiTagAdvice:
+        "图序即语义：第 N 张对应提示词里的 <imageN>，官方 PE-I2I 模板要求多图必须用 <imageN> 引用。",
+    },
+    h3image: {
+      key: "h3image",
+      maxRefs: 16,
+      // 官方文档：<Picture 1>..<Picture N>，按图片在提示词里的称呼引用
+      placeholder: i => `<Picture ${i + 1}>`,
+      regex: /<Picture\s*(\d+)\s*>/gi,
+      markerName: "<Picture N>",
+      officialCap: 16,
+      nodeSlots: 100,      // ComfyUI 侧 io.Autogrow max=100
+      // 【官方语义是「用 <Picture N> 引用」而非「必须引用」】
+      // 官方文档原文：the prompt addresses each one by its label。
+      // 标签是**建议** —— 用户写「把图1里的猫换成雪豹」这种自然语言
+      // 也是合法的，不能因为没写 <Picture N> 就误拒。
+      requirePlaceholders: false,
+      singleTagAdvice:
+        "只有 1 张参考图：可以直接用自然表述描述它（<Picture 1> 标记是可选的）。",
+      multiTagAdvice:
+        "图序即语义：第 N 张对应提示词里的 <Picture N>，官方文档要求用 <Picture N> 引用每张图。",
+    },
+  };
+
+  // 当前生效的 profile（默认 Qwen —— 保持既有行为不变）
+  let profile = PROFILES.qwen;
+
+  /** 切换占位语法档案。由 app.js 在模式切换时调用。 */
+  function setProfile(key) {
+    const p = PROFILES[key];
+    if (!p) return false;
+    profile = p;
+    return true;
+  }
+
+  function maxRefs() {
+    return profile.maxRefs;
+  }
 
   // ---------- 状态 ----------
   // refs: [{asset_id, version, name, description, description_source, tags,
@@ -89,13 +153,13 @@
   }
 
   function placeholderFor(index) {
-    return `<image${index + 1}>`;
+    return profile.placeholder(index);
   }
 
   function parsePlaceholders(text) {
     const found = new Set();
     let m;
-    const re = new RegExp(PLACEHOLDER_RE.source, "g");
+    const re = new RegExp(profile.regex.source, profile.regex.flags);
     while ((m = re.exec(text || "")) !== null) found.add(parseInt(m[1], 10));
     return [...found].sort((a, b) => a - b);
   }
@@ -105,9 +169,10 @@
     // 不能用「先替换大的再替换小的」—— 那会连环替换
     // （先把 <image3> 变成 <image2>，再被当成 <image2> 变成 <image1>）。
     if (!mapping || !Object.keys(mapping).length) return text || "";
-    return (text || "").replace(/<image(\d+)>/g, (whole, num) => {
+    const re = new RegExp(profile.regex.source, profile.regex.flags);
+    return (text || "").replace(re, (whole, num) => {
       const next = mapping[Number(num)];
-      return next === undefined ? whole : `<image${next}>`;
+      return next === undefined ? whole : profile.placeholder(next - 1);
     });
   }
 
@@ -118,7 +183,7 @@
   }
 
   function setRefs(list) {
-    refs = (list || []).slice(0, MAX_REFS);
+    refs = (list || []).slice(0, maxRefs());
     refs.forEach(ensureUid);
     syncSlots();
     render();
@@ -136,9 +201,9 @@
   // ---------- 添加：从素材库选择 ----------
 
   function openLibraryPicker() {
-    const max = MAX_REFS - refs.length;
+    const max = maxRefs() - refs.length;
     if (max <= 0) {
-      alert(`参考图最多 ${MAX_REFS} 张，已达上限，请先移除一些。`);
+      alert(`参考图最多 ${maxRefs()} 张，已达上限，请先移除一些。`);
       return;
     }
     if (!window.ASSETLIB || !window.ASSETLIB.openPicker) {
@@ -154,7 +219,7 @@
   }
 
   async function addAssets(ids) {
-    const room = MAX_REFS - refs.length;
+    const room = maxRefs() - refs.length;
     const chosen = ids.slice(0, room);
     const overflow = ids.length - chosen.length;
     if (!chosen.length) return;
@@ -175,12 +240,12 @@
       if (existing.has(item.asset_id)) return;   // 同一素材不重复加
       added.push(item);
     });
-    refs = refs.concat(added).slice(0, MAX_REFS);
+    refs = refs.concat(added).slice(0, maxRefs());
     // 新加入的图要发身份标记（uid）—— 后续移除/排序按身份追踪
     syncSlots();
     render();
     if (overflow > 0) {
-      alert(`参考图最多 ${MAX_REFS} 张，超出的 ${overflow} 张未添加。`);
+      alert(`参考图最多 ${maxRefs()} 张，超出的 ${overflow} 张未添加。`);
     }
     // 素材库没给描述 -> 提示用户补写（不编造描述）
     const noDesc = added.filter(r => !r.description);
@@ -253,7 +318,7 @@
     }
     sortBusy = false;
     const before = refs.map(r => r.asset_id).join(",");
-    refs = adoptSorted((data.refs || refs).slice(0, MAX_REFS));
+    refs = adoptSorted((data.refs || refs).slice(0, maxRefs()));
     const after = refs.map(r => r.asset_id).join(",");
     if (before !== after) reindexPrompt(oldLayout);
     render();
@@ -304,11 +369,12 @@
     });
 
     // 单遍替换：被移除的槽位 -> 标记删掉
-    box.value = (text || "").replace(/<image(\d+)>/g, (whole, num) => {
+    const re = new RegExp(profile.regex.source, profile.regex.flags);
+    box.value = (text || "").replace(re, (whole, num) => {
       const n = Number(num);
       if (removedSlots.has(n)) return "";
       const next = mapping[n];
-      return next === undefined ? whole : `<image${next}>`;
+      return next === undefined ? whole : profile.placeholder(next - 1);
     });
     // 清理删除标记后留下的多余空格 / 连续空行
     box.value = box.value.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
@@ -341,8 +407,8 @@
     if (refs.length < 1) {
       errors.push("图片编辑至少需要 1 张参考图（参考图必须来自素材库）");
     }
-    if (refs.length > MAX_REFS) {
-      errors.push(`参考图最多 ${MAX_REFS} 张，当前 ${refs.length} 张`);
+    if (refs.length > maxRefs()) {
+      errors.push(`参考图最多 ${maxRefs()} 张，当前 ${refs.length} 张`);
     }
     refs.forEach((ref, i) => {
       if (!ref.asset_id) {
@@ -356,15 +422,26 @@
       const found = parsePlaceholders(promptText || "");
       const expected = [];
       for (let i = 1; i <= refs.length; i++) expected.push(i);
-      const missing = expected.filter(x => !found.includes(x));
-      const extra = found.filter(x => !expected.includes(x));
-      if (!found.length) {
-        errors.push(`有 ${refs.length} 张参考图，提示词里必须有 ${expected.map(n => `<image${n}>`).join(" ")} 占位标记（官方 PE-I2I 多图模板要求用 <imageN> 引用每张图）`);
-      } else if (missing.length || extra.length) {
-        const parts = [];
-        if (missing.length) parts.push(`缺少 ${missing.map(n => `<image${n}>`).join("、")}`);
-        if (extra.length) parts.push(`多出 ${extra.map(n => `<image${n}>`).join("、")}`);
-        errors.push(`提示词里的占位标记与参考图数量不一致（${refs.length} 张参考图，应为 1..${refs.length} 连续）：${parts.join("，")}`);
+      if (profile.requirePlaceholders) {
+        // ---- Qwen-Image 2.1：官方 PE-I2I 多图模板要求写全 <image1>..<imageN> ----
+        const missing = expected.filter(x => !found.includes(x));
+        const extra = found.filter(x => !expected.includes(x));
+        if (!found.length) {
+          errors.push(`有 ${refs.length} 张参考图，提示词里必须有 ${expected.map(n => placeholderFor(n - 1)).join(" ")} 占位标记（官方要求用 ${profile.markerName} 引用每张图）`);
+        } else if (missing.length || extra.length) {
+          const parts = [];
+          if (missing.length) parts.push(`缺少 ${missing.map(n => placeholderFor(n - 1)).join("、")}`);
+          if (extra.length) parts.push(`多出 ${extra.map(n => placeholderFor(n - 1)).join("、")}`);
+          errors.push(`提示词里的占位标记与参考图数量不一致（${refs.length} 张参考图，应为 1..${refs.length} 连续）：${parts.join("，")}`);
+        }
+      } else {
+        // ---- H3-Image：官方语义是「用 <Picture N> 引用」而非「必须引用」。
+        //      只拦「悬空引用」（引用了不存在的第 N 张）。
+        //      没写标记 -> 只是建议，不拦（服务端同样只拦悬空引用）。
+        const extra = found.filter(n => n > refs.length);
+        if (extra.length) {
+          errors.push(`提示词里引用了不存在的参考图：${extra.map(n => placeholderFor(n - 1)).join("、")}（当前只有 ${refs.length} 张）`);
+        }
       }
     }
     return errors.length ? errors : null;
@@ -393,10 +470,10 @@
     if (!box) return;
     const hint = $("#imgRefHint");
     if (hint) {
-      hint.textContent = refs.length ? `${refs.length} / ${MAX_REFS} 张` : `最多 ${MAX_REFS} 张`;
+      hint.textContent = refs.length ? `${refs.length} / ${maxRefs()} 张` : `最多 ${maxRefs()} 张`;
     }
     const addBtn = $("#imgRefAdd");
-    if (addBtn) addBtn.disabled = refs.length >= MAX_REFS;
+    if (addBtn) addBtn.disabled = refs.length >= maxRefs();
     const sortBtn = $("#imgRefSort");
     if (sortBtn) {
       sortBtn.disabled = refs.length < 2 || sortBusy;
@@ -469,18 +546,19 @@
     const n = refs.length;
     const missing = refs.filter(r => r.missing).length;
     const noDesc = refs.filter(r => !r.description && !r.missing).length;
-    const slots = 16;
+    const cap = maxRefs();
+    const slots = profile.nodeSlots;
     const parts = [];
-    if (n >= MAX_REFS) {
-      parts.push(`已达上限 ${MAX_REFS} 张（模型官方能力上限 10 张；ComfyUI 节点侧有 ${slots} 个 image 插槽，本面板取两者较小值 ${MAX_REFS}）。`);
+    if (n >= cap) {
+      parts.push(`已达上限 ${cap} 张（模型官方能力上限 ${profile.officialCap} 张；ComfyUI 节点侧有 ${slots} 个 image 插槽，本面板取两者较小值 ${cap}）。`);
     } else if (n) {
-      parts.push(`还可以再加 ${MAX_REFS - n} 张（上限 ${MAX_REFS} 张，模型官方能力 10 张）。`);
+      parts.push(`还可以再加 ${cap - n} 张（上限 ${cap} 张，模型官方能力 ${profile.officialCap} 张）。`);
     } else {
-      parts.push(`至少 1 张、最多 ${MAX_REFS} 张（模型官方能力上限 10 张）。`);
+      parts.push(`至少 1 张、最多 ${cap} 张（模型官方能力上限 ${profile.officialCap} 张）。`);
     }
     parts.push("参考图**强制来自素材库**：先在「素材库」页上传入库，再从这里选择。");
     if (n >= 2) {
-      parts.push("图序即语义：第 N 张对应提示词里的 <imageN>，官方 PE-I2I 模板要求多图必须用 <imageN> 引用。");
+      parts.push(profile.multiTagAdvice);
     }
     if (missing) parts.push(`⚠ 有 ${missing} 张参考图的素材已从素材库删除，请移除后再生成。`);
     if (noDesc) parts.push(`有 ${noDesc} 张素材库未提供描述，请手动补充（不会替你编造描述）。`);
@@ -503,8 +581,8 @@
     if (markerNote) {
       const multi = refs.length >= 2;
       markerNote.innerHTML = multi
-        ? `当前占位标记：${refs.map((r, i) => `<code>&lt;image${i + 1}&gt;</code>`).join("、")}（与送入模型的第 1…${refs.length} 张参考图一一对应）。`
-        : `只有 1 张参考图：官方 PE-I2I 模板要求单图**不要**用 <imageN> 标签，会以自然表述引用。`;
+        ? `当前占位标记：${refs.map((r, i) => `<code>${esc(placeholderFor(i))}</code>`).join("、")}（与送入模型的第 1…${refs.length} 张参考图一一对应）。`
+        : profile.singleTagAdvice;
     }
 
     wrap.innerHTML = refs.map((r, i) => {
@@ -540,7 +618,7 @@
     removeAt, smartSort, move,
     reindexPrompt, buildPromptPreview, validate, toPayload,
     render,
-    MAX_REFS,
+    setProfile, maxRefs,
     placeholderFor, parsePlaceholders, renumber,
   };
 })();

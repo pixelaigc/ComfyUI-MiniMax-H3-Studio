@@ -19,6 +19,7 @@ from . import lora_damping
 from . import moss_lora_split
 from . import enhancer
 from . import music_yue2
+from . import h3image
 
 # ------------------------------------------------------------------
 # 模型清单（与 d:\cfup\ComfyUI\models 实际文件一致）
@@ -2331,9 +2332,30 @@ def build_moss_t2i(params):
     return p
 
 
+# ------------------------------------------------------------------
+# H3-Image 的模型表 / 档位表别名
+# ------------------------------------------------------------------
+# 真源在 h3studio/h3image.py（独立模块）。这里做别名导出是为了让所有
+# 「按名字从 workflows 取常量表」的地方（agent_schema._table /
+# job_meta._image_model_table 等）都能用同一套写法取到，不用每个地方
+# 都额外 import h3image。
+H3_IMAGE_MODELS = h3image.H3_IMAGE_MODELS
+H3_IMAGE_RES_TIERS = h3image.H3_IMAGE_RES_TIERS
+H3_IMAGE_DEFAULT_MODEL = h3image.H3_IMAGE_DEFAULT_MODEL
+H3_IMAGE_SIZE_MULTIPLE = h3image.H3_IMAGE_SIZE_MULTIPLE
+H3_IMAGE_MAX_DIRECT_MP = h3image.H3_IMAGE_MAX_DIRECT_MP
+H3_IMAGE_MIN_MP = h3image.H3_IMAGE_MIN_MP
+H3_IMAGE_MAX_REF_IMAGES = h3image.H3_IMAGE_MAX_REF_IMAGES
+H3_IMAGE_MIN_REF_IMAGES = h3image.H3_IMAGE_MIN_REF_IMAGES
+
+
 BUILDERS = {"t2v": build_t2v, "flf": build_flf, "r2v": build_r2v, "t2i": build_t2i,
              "t2i_qwen": build_qwen_t2i, "i2i_qwen": build_qwen_i2i,
              "t2i_moss": build_moss_t2i,
+             # MiniMax-H3-Image：一个 checkpoint 同时做文生图 + 图片编辑
+             # （规格与可用性探测见 h3studio/h3image.py）
+             "t2i_h3image": h3image.build_h3_image_t2i,
+             "i2i_h3image": h3image.build_h3_image_i2i,
              # 音乐（YuE2）：文生音乐 / 参考生音乐
              "t2a": music_yue2.build_t2a, "a2a": music_yue2.build_a2a}
 

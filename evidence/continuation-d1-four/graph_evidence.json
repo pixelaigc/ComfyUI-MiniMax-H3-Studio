@@ -1,0 +1,124 @@
+{
+  "A": {
+    "save": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 0
+    }
+  },
+  "B1": {
+    "load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "anchor_load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "bridge": {
+      "ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "ref_anchor_stage": -1,
+      "context_latent": [
+        "300:load",
+        0
+      ],
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 0
+    },
+    "save": {
+      "run_id": "h3studio_sa5d446b1605e",
+      "stage_index": 0
+    }
+  },
+  "B2": {
+    "load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "anchor_load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "bridge": {
+      "ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "ref_anchor_stage": -1,
+      "context_latent": [
+        "300:load",
+        0
+      ],
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 0
+    },
+    "save": {
+      "run_id": "h3studio_se87e76812bf0",
+      "stage_index": 0
+    }
+  },
+  "C1": {
+    "load": {
+      "run_id": "h3studio_sa5d446b1605e",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sa5d446b1605e/stage_00000_cb5250d8.safetensors"
+    },
+    "anchor_load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "bridge": {
+      "ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "ref_anchor_stage": -1,
+      "context_latent": [
+        "300:load",
+        0
+      ],
+      "run_id": "h3studio_sa5d446b1605e",
+      "stage_index": 0
+    },
+    "save": {
+      "run_id": "h3studio_sc09b1c43cff1",
+      "stage_index": 0
+    }
+  },
+  "D1": {
+    "load": {
+      "run_id": "h3studio_sc09b1c43cff1",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sc09b1c43cff1/stage_00000_208432ea.safetensors"
+    },
+    "anchor_load": {
+      "run_id": "h3studio_sf1569b50dee7",
+      "stage_index": 1,
+      "explicit_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf1569b50dee7/stage_00000_418e1249.safetensors"
+    },
+    "bridge": {
+      "ref_anchor_latent": [
+        "300:anchor_load",
+        0
+      ],
+      "ref_anchor_stage": -1,
+      "context_latent": [
+        "300:load",
+        0
+      ],
+      "run_id": "h3studio_sc09b1c43cff1",
+      "stage_index": 0
+    },
+    "save": {
+      "run_id": "h3studio_sc534c11e3c3a",
+      "stage_index": 0
+    }
+  }
+}
