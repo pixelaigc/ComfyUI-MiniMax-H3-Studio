@@ -1207,16 +1207,68 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                     code="invalid_duration"))
 
     # --- LoRA ---
+    #
+    # 【2026-11-13 修 —— 非视频模式也要拦「不认识的 LoRA 值」】
+    #
+    # 旧实现：`if allowed and str(lora) not in allowed` ——
+    #   `mode_loras(mode)` 对**图像 / 音乐模式返回空列表**，
+    #   于是 `allowed` 为空 -> 整个校验分支被跳过 -> **任何**字符串都能进 params。
+    #
+    # 【后果（用户 2026-11-13 实测报出的 BUG 1）】Agent 把提示词误填进
+    # `lora` 字段（例如 "integrated_multimodal_description: [Shot 1] ..."），
+    # 任务照样建成功、照样出片，而生成库卡片把这段提示词**当成 LoRA 显示**。
+    #
+    # 【修法】把「这个模式有合法 LoRA 集合」与「集合为空」分开处理：
+    #   * 有合法集合（视频模式）-> 值不在集合里 = 非法（原有行为不变）；
+    #   * 集合为空（图像 / 音乐模式）-> **该模式根本不用 lora 字段**，
+    #     传了就是误填 -> 报 invalid_lora，并明确提示「这个模式不支持加速 LoRA」。
     lora = params.get("lora")
     if lora:
         allowed = mode_loras(mode)
-        if allowed and str(lora) not in allowed:
+        if not allowed:
+            # 该模式没有 LoRA 概念（图像 / 音乐）—— 传了就是误填。
+            issues.append(ValidationIssue(
+                "lora",
+                f"{mode} 模式不支持 LoRA 参数（收到：{str(lora)[:60]}）",
+                allowed=[],
+                suggestions=[{"action": "drop",
+                              "params": {"lora": None},
+                              "reason": f"{mode} 模式没有加速 LoRA 概念，"
+                                        "请删掉 lora 参数（提示词请写进 prompt）"}],
+                code="invalid_lora"))
+        elif str(lora) not in allowed:
             issues.append(ValidationIssue(
                 "lora",
                 f"LoRA「{lora}」不是 {mode} 的合法取值",
                 allowed=allowed,
                 suggestions=_suggest_enum("lora", str(lora), allowed, mode),
                 code="invalid_lora"))
+
+    # 【2026-11-13 修 —— 图像模式的效果 LoRA 数组也要过白名单】
+    # `params["loras"]`（[{name, strength, trigger}]）是图像模式的 LoRA 入口，
+    # 它的 `name` 同样没有校验 —— Agent 塞进提示词字段名时，
+    # 卡片 LoRA 行会显示整段提示词（与上面的 lora 字段同一个 BUG 的另一个入口）。
+    # 这里按「本机真实 LoRA 清单」逐项判定：不在清单里的 -> 报 invalid_loras。
+    raw_loras = params.get("loras")
+    if isinstance(raw_loras, list) and raw_loras:
+        from . import job_meta as _job_meta
+        bad_names = []
+        for item in raw_loras:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if name and not _job_meta.is_real_lora_key(name):
+                bad_names.append(name)
+        if bad_names:
+            issues.append(ValidationIssue(
+                "loras",
+                f"LoRA「{bad_names[0][:60]}」不在本机 LoRA 清单里",
+                allowed=[],
+                suggestions=[{"action": "drop",
+                              "params": {"loras": None},
+                              "reason": "这些名字不是本机已注册的 LoRA 权重"
+                                        "（提示词请写进 prompt）"}],
+                code="invalid_loras"))
 
     # --- 参考图数量 ---
     asset_ids = params.get("asset_ids") or params.get("asset_id")

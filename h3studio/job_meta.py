@@ -47,6 +47,8 @@ MiniMaxH3TurboLoRA.lora_name = DMAD 权重、strength = 1.0）。
 
 from __future__ import annotations
 
+import json
+
 from . import video_models as vmodels
 
 
@@ -261,6 +263,279 @@ def _t2v_summary(params: dict) -> dict:
 # 旧版视频路径（flf / r2v，以及历史 t2v 任务）
 # ------------------------------------------------------------------
 
+# ------------------------------------------------------------------
+# LoRA 值白名单（2026-11-13 · C1 全模式统一）
+# ------------------------------------------------------------------
+#
+# 【为什么要从「视频专用」升级成「全模式统一」】
+# 最初这道闸只管**视频旧路径**的 `params["lora"]`（ckpt850 / v4step600）。
+# 但 2026-11-13 上线前的复核实测发现：**图像 / 音乐模式完全没有闸门**：
+#
+#   * 落库端 `prepare_job_params` 只对视频模式做白名单拦截，
+#     t2i / t2i_qwen / t2i_moss / t2a / a2a 的 `params["lora"]`
+#     **原样落库** —— 实测落库值 = "integrated_multimodal_description: [Shot 1] ..."；
+#   * `agent_schema.validate_params` 写的是 `if allowed and str(lora) not in allowed`，
+#     而 `mode_loras()` 对图像 / 音乐模式返回**空列表** -> `allowed` 为空
+#     -> 整个校验分支被跳过 -> **任何**字符串都能过；
+#   * 素材库入库 `asset_service.add_from_media_output` 又把
+#     `params["lora"]` / `params["loras"]` **原文**写进 source_meta，
+#     前端素材抽屉把 source_meta 的每个键原样印出来。
+#
+# 结果：Agent 产出的**图像 / 音频**条目仍会把提示词字段名当 LoRA 显示。
+#
+# 【本模块的职责】给「一个字符串」一个**统一判定**：
+# 它是不是本机真实存在的 LoRA 标识符。
+# 落库端（server.prepare_job_params / agent_schema.validate_params）
+# 与显示端（job_meta 摘要 / asset_service 入库）**共用**这一份判定，
+# 不再各写一套 —— 两套必然漂移（这正是本次缺陷的成因）。
+
+#: 走 `params["lora"]`（单枚加速 LoRA）这条**旧**路径的**视频**模式。
+#: 只有这些模式的工作流真的读 `params["lora"]`：
+#:   workflows._h3_video_workflow:344 `lora = params.get("lora", "ckpt850")`
+#:   workflows.build_r2v:481     `lora_name: LORAS[lora]`
+#: 图像模式读的是 `params["loras"]`（效果 LoRA 数组），音乐模式没有 LoRA 概念。
+VIDEO_MODES_WITH_LEGACY_LORA = ("t2v", "flf", "r2v", "longfilm")
+
+
+def is_real_lora_key(value: str) -> str:
+    """给一个字符串，判断它是不是**真实存在**的 LoRA 标识符。
+
+    是 -> 原样返回（去空白）；不是 -> 返回 ""。
+
+    【判定顺序 —— 必须「先查清单，再查形状」】
+    顺序**不能反**。本机真实 LoRA 里有 23 个文件名**带空格**
+    （例："z-image-effects/CYBORG FACTORY 🦾 BY STX_epoch_13.safetensors"、
+    "moss-effects/moss Hsin2.safetensors"）—— 所以「不含空白」这条
+    粗判若排在清单判定**前面**，会把这 23 个真实 LoRA 全部误杀。
+    因此顺序是：
+      1. **在真实清单里** -> 直接认（清单是权威，形状不参与）；
+      2. 不在清单里 -> 再用形状判据兜底：
+         长度上限（LoRA key 是短标识符，提示词超长）
+         + 不含冒号 / 换行（提示词正文必带，文件名不带）；
+      3. 两条都不满足 -> 返回 ""（不是 LoRA）。
+
+    【白名单的来源】
+      * 视频加速 LoRA：workflows.LORAS
+      * 视频面板加速 LoRA：video_models.VIDEO_ACCEL_LORAS /
+        VIDEO_ACCEL_LORA_COMBOS
+      * 图像效果 LoRA：loras.LORA_CATALOG（= 面板下拉的同源清单）
+
+    【为什么形状判据要用「冒号/换行」而不是「任意空白」】
+    因为真实 LoRA 文件名里**确实有空格**（见上）。提示词正文则必然带
+    冒号（"integrated_multimodal_description: ..."）或换行 ——
+    用这两条既能挡住提示词，又不会误杀带空格的真 LoRA。
+    """
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if not text:
+        return ""
+
+    # 1) 清单优先 —— 权威判定，形状不参与
+    if _in_lora_registry(text):
+        return text
+
+    # 2) 不在清单里 -> 形状兜底判据
+    #    长度上限：LoRA key / 权重文件名都是短标识符
+    if len(text) > 120:
+        return ""
+    #    冒号 / 换行：提示词正文必带，LoRA 文件名不带
+    if ":" in text or "\n" in text or "\r" in text:
+        return ""
+    return ""
+
+
+def _in_lora_registry(text: str) -> bool:
+    """text 是否在本机真实 LoRA 清单里（四个来源）。"""
+    from . import workflows as wf
+    if text in (getattr(wf, "LORAS", {}) or {}):
+        return True
+    from . import video_models as vmodels
+    if text in (getattr(vmodels, "VIDEO_ACCEL_LORAS", {}) or {}):
+        return True
+    if text in (getattr(vmodels, "VIDEO_ACCEL_LORA_COMBOS", {}) or {}):
+        return True
+    try:
+        from . import loras as lora_registry
+        if text in (getattr(lora_registry, "LORA_CATALOG", {}) or {}):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def mode_reads_legacy_lora(mode: str) -> bool:
+    """该模式的工作流**真的会读** `params["lora"]` 吗？
+
+    True  -> 只有视频旧路径（t2v / flf / r2v / longfilm）；
+    False -> 图像 / 音乐模式**根本没有**这个字段的概念，
+             传了就是误填（提示词塞进了 lora 字段）。
+    """
+    return str(mode or "") in VIDEO_MODES_WITH_LEGACY_LORA
+
+
+def resolve_job_lora(mode: str, params: dict) -> dict:
+    """算出「这个任务真实用到的 LoRA」—— **唯一入口**（2026-11-13 · C1）。
+
+    返回固定形状：
+        {
+          "lora":      str | None   视频旧路径的单枚加速 LoRA key（没有则 None）
+          "loras":     list | None  图像模式的效果 LoRA 数组（没有则 None）
+          "strength":  float | None 强度（没有则 None）
+          "labels":    list[str]    给卡片/抽屉直接显示的文案（每项含强度）
+        }
+
+    【为什么必须有这个函数】
+    「这个任务用了什么 LoRA」必须由**服务端按白名单**算好下发，
+    前端只渲染 —— 前端自己去 params 里翻，必然把提示词字段名当 LoRA
+    （用户 2026-11-13 实测报出的 BUG 1）。
+
+    【判定规则】
+      1. 视频旧路径（t2v / flf / r2v / longfilm）：
+         读 `params["lora"]`，但值必须过 `is_real_lora_key()` 白名单；
+         "none" = 明确不用；非法值 = 视为没有。
+         **注意**：`params["lora"]` 缺省时，工作流会走自己的默认
+         （workflows._h3_video_workflow: `params.get("lora", "ckpt850")`），
+         且**确实挂上了** -> 所以这里返回 ckpt850，而不是空。
+      2. 视频新面板（params 里有 model_key）：读 `params["accel_loras"]`
+         + `params["fixed_accel_lora"]`（这两个字段本身就是结构化的，
+         key 来自服务端下发的清单，天然可信）。
+      3. 图像模式：读 `params["loras"]`（效果 LoRA 数组），
+         逐项过白名单；`params["lora"]` **一律不看**（工作流不读它）。
+      4. 音乐模式：没有 LoRA 概念 -> 空。
+
+    【与落库端的分工】
+    落库端（server.prepare_job_params）负责**不让脏值进库**；
+    本函数负责**不让脏值被显示**（包括历史库里已经躺着的脏值）。
+    两道闸互补，都基于同一份 `is_real_lora_key()` 判定。
+    """
+    params = params or {}
+    if not isinstance(params, dict):
+        # 防御：某些调用方可能传 JSON 字符串（asset_service 的 job["params"]
+        # 在真实链路上是 dict，但别让一条脏数据把入库路径炸掉）。
+        try:
+            params = json.loads(params)
+        except Exception:
+            params = {}
+    if not isinstance(params, dict):
+        params = {}
+    mode = str(mode or "")
+    result = {"lora": None, "loras": None, "strength": None, "labels": []}
+
+    # --- 图像模式：效果 LoRA 数组（params["loras"]） ---
+    if mode.startswith("t2i") or mode.startswith("i2i"):
+        raw = params.get("loras")
+        if isinstance(raw, list) and raw:
+            kept = []
+            labels = []
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                if not is_real_lora_key(name):
+                    continue
+                try:
+                    strength = float(item.get("strength", 1.0))
+                except (TypeError, ValueError):
+                    strength = 1.0
+                if strength <= 0:
+                    continue
+                kept.append({"name": name, "strength": strength,
+                             "trigger": str(item.get("trigger") or "")})
+                labels.append(f"{_effect_lora_display(name)} ×{strength:.2f}")
+            if kept:
+                result["loras"] = kept
+                result["strength"] = kept[0]["strength"]
+                result["labels"] = labels
+        return result
+
+    # --- 音乐模式：没有 LoRA 概念 ---
+    if mode in ("t2a", "a2a"):
+        return result
+
+    # --- 视频模式 ---
+    # 新面板路径（model_key + accel_loras）：字段本身就是结构化的，天然可信。
+    model_key = str(params.get("model_key") or "").strip()
+    if model_key:
+        from . import video_models as vmodels
+        combos = getattr(vmodels, "VIDEO_ACCEL_LORA_COMBOS", {}) or {}
+        combo = combos.get(str(params.get("accel_lora") or "")) or {}
+        if combo:
+            key = str(params.get("accel_lora") or "")
+            try:
+                strength = float(params.get("accel_lora_strength", 1.0))
+            except (TypeError, ValueError):
+                strength = 1.0
+            result["lora"] = key
+            result["strength"] = strength
+            result["labels"] = [f"{_accel_lora_display(key)} ×{strength:.2f}"]
+        fixed_key = str(params.get("fixed_accel_lora") or "").strip()
+        if fixed_key:
+            try:
+                strength = float(params.get("fixed_accel_strength", 1.0))
+            except (TypeError, ValueError):
+                strength = 1.0
+            result["labels"].append(
+                f"工作流固定：{_fixed_accel_lora_display(fixed_key)} ×{strength:.2f}")
+        return result
+
+    # 旧路径：params["lora"]
+    raw_lora = params.get("lora")
+    if raw_lora is None:
+        # 没有记录 -> 工作流默认 ckpt850（workflows._h3_video_workflow:
+        # `lora = params.get("lora", "ckpt850")`），且**确实挂上了**。
+        from . import workflows as wf
+        default_key = "ckpt850" if "ckpt850" in (getattr(wf, "LORAS", {}) or {}) else ""
+        if default_key:
+            result["lora"] = default_key
+            result["strength"] = 1.0
+            result["labels"] = [f"{_accel_lora_display(default_key)} ×1.00"]
+        return result
+
+    text = str(raw_lora).strip()
+    if text == "none":
+        # 明确选「不用加速 LoRA」-> 没有 LoRA（不是缺失，是明确语义）
+        return result
+    if not is_real_lora_key(text):
+        # 脏值（提示词字段名 / 乱填）-> 视为没有
+        return result
+
+    from . import workflows as wf
+    try:
+        strength = float(params.get("lora_strength", 1.0))
+    except (TypeError, ValueError):
+        strength = 1.0
+    result["lora"] = text
+    result["strength"] = strength
+    result["labels"] = [f"{_accel_lora_display(text)} ×{strength:.2f}"]
+    return result
+
+
+def sanitize_legacy_lora_value(value) -> str:
+    """把 `params["lora"]` 归一成「可安全落库」的值。
+
+    返回 "" 表示**丢弃**（调用方应把该字段删掉）。
+    合法值原样返回（去空白）。
+
+    【判定顺序 —— 刻意与显示层一致】
+      1. 不是字符串 / 空 -> 丢弃；
+      2. 字面量 "none"（明确选「不用加速 LoRA」）-> **保留**；
+         它是合法语义，只是不在 workflows.LORAS 清单里；
+      3. 该模式不读 params["lora"]（图像 / 音乐）-> 丢弃；
+      4. 值不在真实清单里 -> 丢弃（提示词 / 乱填）。
+    """
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if not text:
+        return ""
+    if text == "none":
+        return text
+    if not is_real_lora_key(text):
+        return ""
+    return text
+
+
 def _is_valid_legacy_lora_key(value: str) -> bool:
     """`params["lora"]` 是否是**真实存在**的加速 LoRA key。
 
@@ -472,6 +747,15 @@ def _image_summary(params: dict, mode: str = "") -> dict:
             names = []
             for item, strength in enabled:
                 raw_name = str(item.get("name") or "")
+                # 【2026-11-13 修 —— C1 显示层闸门（效果 LoRA 也要过白名单）】
+                # `params["loras"][].name` 是**图像模式的 LoRA 入口**，
+                # 同样没有落库校验（prepare_job_params 不校验 loras 的 name）。
+                # 实测：Agent 把提示词字段名塞进 loras[].name 时，
+                # 卡片 LoRA 行会显示整段提示词。
+                # 这里过 is_real_lora_key() —— 不在真实清单里的
+                # 一律**不认**（不显示、不编名字）。
+                if not is_real_lora_key(raw_name):
+                    continue
                 display = str(item.get("display") or "").strip() or \
                     _effect_lora_display(raw_name)
                 if not display:

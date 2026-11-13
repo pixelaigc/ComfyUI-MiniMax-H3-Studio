@@ -232,10 +232,26 @@ class TestT2VModelLoraSummary(unittest.TestCase):
         self.assertEqual(info["lora_label"], "")
 
     def test_image_mode_with_lora(self):
-        """图像模式带效果 LoRA 时，摘要里要带 LoRA 显示名 + 强度。"""
+        """图像模式带效果 LoRA 时，摘要里要带 LoRA 显示名 + 强度。
+
+        【2026-11-13 修 —— 为什么 LoRA 名字换了】
+        原来这里用的是合成名 "z-image-effects/zzz_test.safetensors" ——
+        那个文件**本机并不存在**。C1 的白名单闸门（落库端 + 显示端）
+        按「本机真实 LoRA 清单」判定，合成名自然被当成脏值挡掉
+        （这正是闸门该做的事）。
+
+        现在改用**本机真实存在**的 LoRA：
+        "Kook_Zimage_瑶光.safetensors"（在 loras.LORA_CATALOG 里，
+        也是图像面板下拉里的真实选项）。
+
+        【断言为什么这么写】
+        「LoRA 摘要要带显示名 + 强度」这条**行为契约**不变；
+        只是输入换成一个真实存在的权重 —— 否则这条用例测的是
+        「不存在的 LoRA 该不该显示」，而不是「真实 LoRA 该不该显示」。
+        """
         info = job_meta.summarize("t2i", {
             "model": "z_image_turbo_bf16",
-            "loras": [{"name": "z-image-effects/zzz_test.safetensors",
+            "loras": [{"name": "Kook_Zimage_瑶光.safetensors",
                        "strength": 0.6, "enabled": True}],
         })
         self.assertIn("×0.60", info["lora_label"])
