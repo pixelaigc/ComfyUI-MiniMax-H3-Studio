@@ -87,6 +87,12 @@ from h3studio import asset_api
 from h3studio import video_models
 from h3studio import video_workflow
 from h3studio import job_meta
+from h3studio import continuation as cont
+from h3studio import continuation_service as cont_service
+# ComfyUI 执行错误的提取与中文化（2026-11-12 修：原来把
+# status.messages 的条目当「m[0] 是字典」读，导致真正的原因被
+# AttributeError 吞掉，用户只看到原始 Python 异常文本）。
+from h3studio import comfy_errors
 # 合并说明：video_categories（video-tabs 分支）、comfy_models
 # （model-list-fix 分支）、reso_label（reso-label-fix 分支）是三个
 # 独立模块，三条 import 都保留。
@@ -339,6 +345,9 @@ def row_to_job(r):
         # 现在由服务端按任务真实参数算好摘要下发，前端只渲染这一份，
         # 「面板所选 == 落库记录 == 卡片显示」三者必然同源。
         "model_info": job_meta.summarize(mode, job_params),
+        # 【2026-11-12 新增】接续状态（能否被接续 / 为什么不能 / 累计帧数）。
+        # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
+        "continuation_info": cont_service.continuation_state(mode, job_params, r["id"]),
         "status": r["status"],
         "progress": r["progress"],
         "progress_text": r["progress_text"],
@@ -537,6 +546,30 @@ async def comfy_submit(session: ClientSession, workflow: dict, client_id: str | 
     if resp.status != 200 or "prompt_id" not in body:
         raise RuntimeError(f"ComfyUI 提交失败: {json.dumps(body, ensure_ascii=False)[:500]}")
     return body["prompt_id"]
+
+
+def _comfy_error_message(status_info: dict) -> str:
+    """把 ComfyUI 的执行错误变成**给用户看的中文原因**。
+
+    【为什么需要这个包装 —— 2026-11-12 独立复验发现的缺陷】
+    原实现把 `status.messages` 的条目当「`m[0]` 是字典」处理：
+
+        (m or [{}])[0].get("x", "")
+
+    但 ComfyUI 的真实形状是 **`[事件名, 数据字典]`** —— `m[0]` 是字符串
+    `"execution_error"`。于是 `.get()` 作用在 str 上抛 AttributeError，
+    真正的原因（例：拷贝桥禁止跨分辨率）**被彻底丢掉**，用户只看到
+    一句 `'str' object has no attribute 'get'`。
+
+    提取与中文化逻辑放在 h3studio/comfy_errors.py（纯函数，可离线测）。
+    本函数只负责：**取中文原因 + 把技术细节打进服务端日志**。
+    """
+    described = comfy_errors.extract_error(status_info)
+    if not described.get("found"):
+        return "ComfyUI 执行出错（未取到具体原因，详细信息见服务端日志）。"
+    # 技术细节只进日志，不进用户可见文案。
+    print(f"[worker] ComfyUI 错误详情: {described.get('detail', '')}")
+    return str(described.get("reason") or "ComfyUI 执行出错。")
 
 
 def _extract_outputs(history_entry):
@@ -927,7 +960,16 @@ async def ws_progress_listener(session: ClientSession, client_id: str, prompt_id
                             conn.execute("UPDATE jobs SET progress=?, progress_text=? WHERE id=?",
                                          (frac, text, job_id))
                 elif etype == "execution_error":
-                    err = str(d.get("exception_message") or d.get("exception_type") or "执行出错")[:400]
+                    # 【2026-11-12 修】原来直接把 ComfyUI 的原始
+                    # exception_message 存进 job.error -> 前端展示的是
+                    # 英文/技术文本。现在统一走 comfy_errors：
+                    # 用户看到中文原因，技术细节进服务端日志。
+                    described = comfy_errors.describe_exception(
+                        d.get("node_type") or "",
+                        d.get("exception_type") or "",
+                        d.get("exception_message") or "")
+                    print(f"[ws] ComfyUI 错误详情: {described['detail']}")
+                    err = str(described.get("reason") or "执行出错")[:400]
                     with db() as conn:
                         if batch_id:
                             conn.execute("UPDATE job_batches SET error=? WHERE id=?", (err, batch_id))
@@ -1100,6 +1142,14 @@ class Worker:
                                 # 卡片要显示真实输出，而不是请求值（请求值可能
                                 # 被画布上限 / 放大链 / 模型限制改写过）。
                                 annotate_outputs_with_size(saved)
+                                # 【2026-11-12 新增】接续：把本段登记进链，
+                                # 并拼接出**完整视频**（上一段 + 本段）。
+                                # 失败**不影响**本段本身的产物 —— 拼接是附加产物。
+                                try:
+                                    saved = await self._finalize_continuation(
+                                        job_id, mode, params, saved)
+                                except Exception as ce:
+                                    print(f"[worker] 接续拼接失败（不影响本段产物）: {ce}")
                                 with db() as conn:
                                     conn.execute(
                                         "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
@@ -1107,11 +1157,7 @@ class Worker:
                                 print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
                                 return
                             if status_info.get("status_str") == "error":
-                                msgs = "; ".join(
-                                    (m or [{}])[0].get("x", "") if isinstance(m, list) else str(m)
-                                    for m in status_info.get("messages", []) if m and m[0] == "execution_error"
-                                ) or "执行出错"
-                                raise RuntimeError(msgs[:400])
+                                raise RuntimeError(_comfy_error_message(status_info))
                 finally:
                     ws_task.cancel()
                     try:
@@ -1129,6 +1175,84 @@ class Worker:
             if self.current == job_id:
                 self.current = None
 
+
+    async def _finalize_continuation(self, job_id: str, mode: str, params: dict,
+                                     saved: list[dict]) -> list[dict]:
+        """接续收尾：登记本段 + 拼接**完整视频**。
+
+        用户需求第 6 条：「最终媒体库中得到的是**完整视频**
+        （上一段 + 本段完整长度）」。所以每接续一段，都要产出
+        一个包含**整条链**的完整视频。
+
+        返回加了「完整视频」条目的产物列表。
+
+        【为什么拼接失败不影响本段产物】本段视频本身是好的，
+        拼接只是附加产物。拼接失败（比如 ffmpeg 不可用）时，
+        本段仍然要出现在生成库里 —— 只是没有完整视频。
+        """
+        if mode != "t2v":
+            return saved
+        info = cont_service.chain_info(params)
+        if not info:
+            return saved
+
+        video = next((o for o in saved if o.get("kind") == "video"), None)
+        if not video:
+            return saved
+
+        chain_id = str(info.get("chain_id") or "")
+        try:
+            stage = int(info.get("stage_index", 0))
+        except (TypeError, ValueError):
+            stage = 0
+        if not chain_id:
+            return saved
+
+        # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
+        segment_rel = str(video.get("file") or "")
+
+        # 【本段潜空间被重写后，清掉同坐标的旧指纹副本】
+        # 本段刚跑完 -> `H3RelayLatentSave` 重新写了 `stage_00000.safetensors`
+        # -> 内容变了 -> 旧指纹副本（内容指纹已过期）不再对应任何有效内容。
+        # 不清会随每次重跑堆积一份 4.8MB 的死副本。
+        try:
+            own_run_id, own_stage = cont.latent_coords(info)
+            if own_run_id:
+                removed = cont_service.cleanup_fingerprint_copies(own_run_id,
+                                                                  own_stage)
+                if removed:
+                    print(f"[接续] 清理本段旧指纹副本 {removed} 个 "
+                          f"({own_run_id}/stage_{own_stage:05d})")
+        except Exception as ce:
+            print(f"[worker] 清理指纹副本失败（不影响本段产物）: {ce}")
+
+        # 把本段记到**自己**的任务记录里（不再往链首段的共享账本里塞 ——
+        # 共享账本会让兄弟分支互相污染，见 _record_segment_rel 的说明）。
+        await asyncio.to_thread(_record_segment_rel, job_id, segment_rel)
+
+        # 拼完整视频用**血缘**（沿 source_job 回溯）：本段 -> 上游 -> ...
+        # 兄弟分支不会混进来。
+        segments = await asyncio.to_thread(_lineage_segment_rels, job_id)
+        if segment_rel and segment_rel not in segments:
+            segments.append(segment_rel)
+
+        # 只有**续接段**才需要拼完整视频（第 0 段本身就是完整视频）
+        if stage <= 0:
+            return saved
+
+        full = await asyncio.to_thread(_concat_chain_video, segments, chain_id)
+        if not full:
+            return saved
+        full_rel = full.relative_to(OUT_DIR).as_posix()
+        annotate_outputs_with_size([{"kind": "video", "file": full_rel,
+                                     "name": full.name}])
+        # 完整视频放在产物列表**前面** —— 生成库卡片取第一个视频显示，
+        # 用户看到的第一眼就该是完整视频。
+        out = [{"kind": "video", "file": full_rel, "name": full.name,
+                "is_full": True}]
+        out.extend(saved)
+        print(f"[worker] 接续完整视频: {full_rel} ({len(segments)} 段拼接)")
+        return out
 
     def _has_batches(self, job_id: str) -> bool:
         with db() as conn:
@@ -1270,11 +1394,7 @@ class Worker:
                             return saved
                         status_info = hist.get("status") or {}
                         if status_info.get("status_str") == "error":
-                            msgs = "; ".join(
-                                (m or [{}])[0].get("x", "") if isinstance(m, list) else str(m)
-                                for m in status_info.get("messages", []) if m and m[0] == "execution_error"
-                            ) or "执行出错"
-                            raise RuntimeError(msgs[:400])
+                            raise RuntimeError(_comfy_error_message(status_info))
             finally:
                 ws_task.cancel()
                 try:
@@ -1548,11 +1668,312 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     return out, ""
 
 
+def _record_segment_rel(job_id: str, segment_rel: str) -> None:
+    """把本段的分段视频路径记到**本段自己的**任务记录里。
+
+    【为什么记在自己身上，而不是链首段的共享账本】
+    旧实现把分段列表存在**链首段**的 params 里（一个共享的可变列表）。
+    同一条链分叉成 B1 / B2 时，两兄弟都会往这个列表里追加 ->
+    列表变成 [A, B1, B2]。再从 B1 接出 C1 时，按这个列表拼接得到的
+    「完整视频」会把 **B2 混进 C1** —— 又是一次静默的错误内容。
+
+    改成**每段记自己**、再用 `source_job` 指针**回溯血缘**：
+      * B1 的血缘 = A -> B1
+      * B2 的血缘 = A -> B2
+      * C1 的血缘 = A -> B1 -> C1   （B2 不在里面）
+    分支天然隔离，不需要任何共享可变状态。
+    """
+    if not segment_rel:
+        return
+    with db() as conn:
+        row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                           (job_id,)).fetchone()
+        if not row:
+            return
+        params = json.loads(row["params"] or "{}")
+        info = cont_service.chain_info(params)
+        if not info:
+            return
+        info["segment_rel"] = segment_rel
+        params["continuation"] = info
+        conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                     (json.dumps(params, ensure_ascii=False), job_id))
+
+
+def _lineage_segment_rels(job_id: str) -> list[str]:
+    """本段的**血缘**分段视频列表（从链首段到本段，按顺序）。
+
+    沿 `source_job` 指针回溯 —— 每一步都指向**自己的上游**，
+    所以兄弟分支永远不会混进来。
+    """
+    rels: list[str] = []
+    seen: set[str] = set()
+    current = job_id
+    # 上限：防止脏数据造成死循环（链最多也就几十段）。
+    for _ in range(512):
+        if not current or current in seen:
+            break
+        seen.add(current)
+        with db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (current,)).fetchone()
+        if not row:
+            break
+        params = json.loads(row["params"] or "{}")
+        info = cont_service.chain_info(params)
+        if not info:
+            break
+        rel = str(info.get("segment_rel") or "").strip()
+        if rel:
+            rels.append(rel)
+        current = str(info.get("source_job") or "").strip()
+    rels.reverse()
+    return rels
+
+
+def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
+    """把链上的分段视频按序拼成**完整视频**。返回输出路径（失败返回 None）。
+
+    【为什么用 concat demuxer 而不是 filter_complex】
+    concat demuxer 直接拼流，不重新编码 —— 快、不掉画质。
+    分辨率/帧率不一致时 ffmpeg concat 会出问题，所以先探测第一段的
+    尺寸并统一（与 run_longfilm 的做法一致）。
+
+    【音画同步】分段视频各自已经是音画同裁的（TrimAV 裁重叠时
+    音画一起裁），所以直接拼接不会累积 A/V 偏移。
+    """
+    if not segments:
+        return None
+    paths: list[Path] = []
+    for rel in segments:
+        candidate = (OUT_DIR / rel).resolve()
+        try:
+            candidate.relative_to(OUT_DIR.resolve())
+        except ValueError:
+            continue
+        if candidate.is_file():
+            paths.append(candidate)
+    if not paths:
+        return None
+    if len(paths) == 1:
+        # 只有一段 —— 完整视频就是它自己
+        return paths[0]
+    if not FFMPEG:
+        print("[接续] 未找到 FFmpeg，无法拼接完整视频")
+        return None
+    width, height = _probe_video_size(paths[0])
+    list_path = DATA / f"concat-cont-{cont.sanitize_run_id(chain_id)}.txt"
+
+    def quote_concat(path: Path) -> str:
+        return str(path).replace("'", "'\\''")
+
+    try:
+        list_path.write_text(
+            "\n".join(f"file '{quote_concat(p)}'" for p in paths),
+            encoding="utf-8")
+        output_path = _next_output_path("video", ".mp4")
+        vf = (f"scale={width}:{height}:force_original_aspect_ratio=decrease:"
+              f"force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
+              f"setsar=1,fps={cont.FPS},format=yuv420p")
+        command = [FFMPEG, "-y", "-f", "concat", "-safe", "0",
+                   "-i", str(list_path), "-vf", vf,
+                   "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                   "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+                   "-movflags", "+faststart", str(output_path)]
+        result = subprocess.run(command, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, timeout=600,
+                                creationflags=CREATE_NO_WINDOW)
+        if result.returncode != 0:
+            message = result.stderr.decode("utf-8", errors="replace")[-800:]
+            print(f"[接续] 拼接失败: {message}")
+            if output_path.exists():
+                output_path.unlink()
+            return None
+        return output_path
+    except Exception as exc:
+        print(f"[接续] 拼接异常: {exc}")
+        return None
+    finally:
+        if list_path.exists():
+            try:
+                list_path.unlink()
+            except OSError:
+                pass
+
+
+def _continuation_size_mismatch(source_params: dict, target_params: dict) -> str:
+    """接续时上游与本段的分辨率不一致 -> 中文原因（空串 = 放行）。
+
+    规则实现放在协议层（h3studio/continuation.py 的 size_mismatch），
+    那里是纯函数、可离线单测；这里只做一次转发。
+    """
+    return cont.size_mismatch(source_params, target_params)
+
+
+def _prepare_continuation_params(params: dict) -> str:
+    """校验并补全任务的接续参数。返回错误信息（空串 = 通过）。
+
+    前端提交时带的 `continuation` 字段来自「接续上下文」回填 —— 它描述的是
+    **上一段**。本段是**新的一段**，所以段号要 +1、接力棒指向上一段。
+
+    服务端在这里做四件事：
+      1. 校验上游产物支持接续（不是二采 —— 二采潜空间不同源）；
+      2. 校验上游潜空间文件**真的在**（不在就明确报错）；
+      3. 算本段的段号（上游段号 + 1）；
+      4. 算累计帧数（用于拼接出完整视频的总长）。
+
+    【为什么不信任前端传来的 chain_id / stage_index】前端可以随便填。
+    段号与累计帧数必须由服务端按**任务记录**重算，否则用户改个数字
+    就能让接缝错位（表现为整体位移的接缝）。
+    """
+    info = params.get("continuation")
+    if not isinstance(info, dict) or not info:
+        return ""
+
+    source_job = str(info.get("source_job") or "").strip()
+    if not source_job:
+        return ("接续上下文缺少来源任务（source_job）—— "
+                "请在生成库里重新点一次「接续」。")
+
+    with db() as conn:
+        row = conn.execute("SELECT mode, params, status FROM jobs WHERE id=?",
+                           (source_job,)).fetchone()
+    if not row:
+        return f"接续的上游任务 {source_job} 不存在（可能已被删除）。"
+
+    source_mode = row["mode"]
+    source_params = json.loads(row["params"] or "{}")
+
+    # 上游必须支持接续
+    allowed, reason = cont.continuation_allowed(source_mode, source_params)
+    if not allowed:
+        return ("接续失败：" + reason)
+
+    # 上游的段号（权威值来自上游任务自己的记录，不是前端传的）
+    source_info = cont_service.chain_info(source_params)
+    try:
+        source_stage = int(source_info.get("stage_index", 0))
+    except (TypeError, ValueError):
+        source_stage = 0
+    source_chain = str(source_info.get("chain_id") or "").strip()
+
+    # 上游潜空间必须真的在 —— 且必须是**它自己那一份**。
+    #
+    # 【关键：坐标从上游任务记录里算，不从链段号推】
+    # 每段一个专属目录（run_id 由该段任务 id 派生），所以坐标是
+    # 「上游是谁 -> 上游的目录 + 目录里的段号」。
+    # 若按链段号推，兄弟分支 B1/B2 会算出**同一个**坐标 ->
+    # 写同一个文件、互相覆盖 -> 再接续读到兄弟分支的内容（静默错误）。
+    source_run_id, source_latent_stage = cont.latent_coords(source_info)
+    if not source_run_id:
+        return ("接续的上游任务没有可用的潜空间（不是用「接续」生成的）—— "
+                "请改用「复用参数」重新生成一段。")
+    if not cont_service.stage_exists(source_run_id, source_latent_stage):
+        return cont.missing_reason(cont_service.comfy_output_dir(),
+                                   source_run_id, source_latent_stage)
+
+    # ---- 分辨率必须与上游一致（2026-11-12 修）----
+    #
+    # 【为什么必须在这里拦】潜空间桥是**逐 token 拷贝**上一段的尾部 ——
+    # 它的 latent 空间分辨率是固定的。跨分辨率接续在 Relay-Kit 里会直接
+    # raise：「拷贝桥禁止跨分辨率：上段 768x448 ≠ 本段 1024x576」。
+    #
+    # 【为什么以前会变成一句 Python 报错】用户点「接续」后 context 还挂着，
+    # 又点别的卡片的「复用参数」改了尺寸 —— 提交时 params 是新尺寸、
+    # continuation 还是旧段的。服务端此前**不校验**这一项，于是错误一路
+    # 跑到 ComfyUI；再加上错误文本提取本身有缺陷（把 m[0] 当 dict 读），
+    # 用户最终只看到 `'str' object has no attribute 'get'`。
+    #
+    # 现在：**提交前**就给出可执行的中文提示，不浪费一次生成。
+    mismatch = _continuation_size_mismatch(source_params, params)
+    if mismatch:
+        return mismatch
+
+    # 上游潜空间文件的**绝对路径** —— 读回必须精确到这一个文件。
+    #
+    # 【⚠ 带内容指纹的副本 —— 破 ComfyUI 的节点缓存】
+    # ComfyUI 的缓存 key 只看**节点输入**（run_id / stage_index /
+    # explicit_path 三个字符串），**不看文件内容变没变**。
+    # 上一段潜空间被重跑替换后，这三个值一字未变 -> 命中缓存 ->
+    # `H3RelayLatentLoad` 压根没被调用 -> 返回**老 latent** ->
+    # 新一段实际接的是上一版的画面，且**不报错**。
+    # 把内容指纹编进路径即可破缓存（借鉴 nonebot 咏唱 h3）。
+    source_path = str(cont_service.ensure_fingerprinted_copy(
+        source_run_id, source_latent_stage))
+
+    # 外观锚：链首段那一份（防长程漂移）。链首段的坐标同样从它的记录算。
+    anchor_path = ""
+    anchor_run_id = ""
+    anchor_stage = 0
+    if source_chain:
+        with db() as conn:
+            head_row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                                    (source_chain,)).fetchone()
+        if head_row:
+            head_info = cont_service.chain_info(json.loads(head_row["params"] or "{}"))
+            head_run_id, head_stage = cont.latent_coords(head_info)
+            if head_run_id and cont_service.stage_exists(head_run_id, head_stage):
+                anchor_run_id = head_run_id
+                anchor_stage = head_stage
+                # 锚同样带指纹 —— 它也是「读一个可能变过的文件」。
+                anchor_path = str(cont_service.ensure_fingerprinted_copy(
+                    head_run_id, head_stage))
+
+    # 本段的段号 = 上游段号 + 1
+    stage_index = source_stage + 1
+
+    # 链 id：链首段用**自己的任务 id**做链 id，后续段沿用上游的链 id。
+    # 这样「用户对完整视频再点接续」时链 id 不变、段号 +1 —— 无限接续。
+    chain_id = source_chain or source_job
+
+    # 钉住窗口 / 外观锚帧数：必须落在 5+17k 网格上
+    window = cont.snap_context_frames(
+        int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    if not window:
+        window = cont.DEFAULT_CONTEXT_FRAMES
+    anchor = cont.snap_context_frames(
+        int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    if not anchor:
+        anchor = cont.DEFAULT_CONTEXT_FRAMES
+
+    # 本段总帧数（17k+5 网格）与本段交付帧数（总帧数 - 钉住帧数）
+    duration = float(params.get("duration") or 5)
+    segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
+
+    # 累计帧数：上游已累计的 + 本段交付的。
+    #
+    # 【为什么不能信前端传的 chain_total_frames】前端传的值来自上游的
+    # 卡片，可能过期。**权威值**是上游任务自己记录里的那份 ——
+    # 分叉时每个分支各自累计，互不干扰（上游的累计值只属于上游那条血缘）。
+    upstream_state = cont_service.continuation_state(source_mode,
+                                                     source_params, source_job)
+    chain_total = int(upstream_state.get("total_frames") or 0)
+
+    params["continuation"] = {
+        "chain_id": chain_id,
+        "stage_index": stage_index,
+        "source_job": source_job,
+        "source_segment": source_stage,
+        # 接力棒的**精确坐标**（读回就靠它 —— 不能按链段号推）
+        "source_latent_run_id": source_run_id,
+        "source_latent_stage": source_latent_stage,
+        "source_latent_path": source_path,
+        # 外观锚（链首段那份）；找不到就留空 —— 锚是防漂移的加分项，
+        # 不能因为锚缺失就让整个接续失败。
+        "anchor_latent_path": anchor_path,
+        "anchor_latent_run_id": anchor_run_id,
+        "anchor_latent_stage": anchor_stage,
+        "context_frames": window,
+        "anchor_frames": anchor,
+        "chain_total_frames": chain_total,
+        "segment_frames": segment_total,
+    }
+    return ""
+
+
 def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     """
     建一条生成任务记录，返回 job_id。
-
-    【为什么要抽成独立函数】
     POST /api/jobs（面板点「生成」）与内置 Agent 的 create_job 工具
     必须是**同一套**建任务逻辑 —— 两份实现必然漂移：
       * 生成类型（gen_type）写不进去 -> 任务列表标签变成「其它生成」
@@ -1574,6 +1995,63 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     asset_refs = params.get("asset_refs")
     if asset_refs:
         params["asset_refs"] = asset_refs
+
+    # ---- 接续链的建立 ----
+    #
+    # 【为什么每个 t2v 任务都要有链信息】用户需求：「每次生成自动把
+    # 可接续的潜空间文件落盘保存，与产物记录关联并可在生成库中识别」。
+    # 所以**每一个** t2v 任务都是一条链的第 0 段：它会落盘自己的潜空间，
+    # 从而可以被继续接续。
+    #
+    # 链 id = **自己的任务 id**（链首段）。后续段沿用上游的链 id，
+    # 于是「对完整视频再点接续」时链 id 不变、段号 +1 —— 无限接续。
+    #
+    # 【潜空间坐标 = 每段一个专属目录】`latent_run_id` 由**本段自己的
+    # 任务 id** 派生，段号恒 0。这样兄弟分支（B1/B2，各自从同一段接出）
+    # 各写各的目录 —— 结构上不可能互相覆盖。
+    # 若沿用「一条链一个目录 + 链段号」，两个分支会算出同一个坐标 ->
+    # 写同一个文件 -> 后续接续读到兄弟分支的内容（静默错误内容）。
+    # 详见 continuation.segment_run_id。
+    #
+    # 二采不建链（潜空间不同源，见 h3studio/continuation.py）。
+    if mode == "t2v":
+        info = params.get("continuation")
+        if not isinstance(info, dict) or not info:
+            duration = float(params.get("duration") or 5)
+            segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
+            params["continuation"] = {
+                "chain_id": job_id,
+                "stage_index": 0,
+                "source_job": "",
+                "source_segment": -1,
+                # 本段自己的落盘目录（每段一个，防分叉覆盖）
+                "latent_run_id": cont.segment_run_id(job_id),
+                "latent_stage": 0,
+                "context_frames": cont.DEFAULT_CONTEXT_FRAMES,
+                "anchor_frames": cont.DEFAULT_CONTEXT_FRAMES,
+                "chain_total_frames": 0,
+                "segment_frames": segment_total,
+            }
+        else:
+            # 接续段：本段也要有**自己的**落盘目录（接力棒写这里）。
+            # 上游坐标由 _prepare_continuation_params 权威算好并带入。
+            #
+            # 【⚠ 这里必须**强制覆盖**，不能用 setdefault】
+            # `latent_run_id` 是「**本段自己**的落盘目录」—— 它必须由
+            # **本段的任务 id** 派生，一段一个目录。
+            #
+            # 旧实现用 setdefault：如果 params 里已经带了一个
+            # `latent_run_id`（例如「重试」把源任务的 params 整份拷过来，
+            # 或前端回传了带坐标的上下文），新任务就会**沿用别人的目录**
+            # -> 写同一个 `stage_00000.safetensors` -> **覆盖上游的潜空间**。
+            # 这与 D1 修掉的「分叉分支互相覆盖」是**同一类缺陷**：
+            # 落盘坐标必须与「产出它的那一段」一一对应。
+            #
+            # 证据（tests/test_continuation_retry.py）：
+            #   重试 A -> 新任务沿用 A 的 latent_run_id -> A 的潜空间被覆盖。
+            info["latent_run_id"] = cont.segment_run_id(job_id)
+            info["latent_stage"] = 0
+            params["continuation"] = info
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
     if mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss"):
@@ -2206,6 +2684,22 @@ async def api_create(request):
         payload.update(exc.extra or {})
         return web.json_response(payload, status=400)
 
+    # ---- 接续（continuation）----
+    #
+    # 前端提交时带 `continuation` 字段（来自「接续上下文」回填）。
+    # 服务端在这里**校验并补全**它：
+    #   * 校验上游潜空间真的在（不在就明确报错，不静默退化成普通生成）；
+    #   * 校验上游产物支持接续（不是二采）；
+    #   * 算出本段的段号、链 id、累计帧数。
+    #
+    # 【为什么不信任前端传来的 chain_id / stage_index】前端回填的内容
+    # 是**上一段**的链信息，本段是新的一段 —— 段号必须 +1、
+    # 接力棒必须指向上一段。这两件事只能由服务端算。
+    if mode == "t2v" and params.get("continuation"):
+        cont_error = _prepare_continuation_params(params)
+        if cont_error:
+            return web.json_response({"error": cont_error}, status=400)
+
 
     # 生成批次：文生图支持一次出 N 张（各自独立种子）
     batch_count = 1
@@ -2462,6 +2956,91 @@ async def api_get(request):
     return json_ok(job)
 
 
+# ------------------------------------------------------------------
+# 接续生成（continuation）
+# ------------------------------------------------------------------
+async def api_continuation_context(request):
+    """GET /api/jobs/{id}/continuation —— 取「接续上下文」（回填用）。
+
+    用户在生成库点「接续」-> 前端调这个接口 -> 服务端把该任务的
+    全部配置/参数/模型/素材（**提示词除外**）组装好下发 ->
+    前端回填到左侧配置区。
+
+    返回 ok:false 的情况有两种：
+      * 该产物不支持接续（二采 / 非视频 / 老任务）；
+      * 潜空间文件已不在。
+    两种都**明确说明原因** —— 不静默失败，也不让用户点了才知道。
+    """
+    jid = request.match_info["id"]
+    with db() as conn:
+        r = conn.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone()
+    if not r:
+        return web.json_response({"ok": False, "error": "找不到这个任务。"}, status=404)
+    mode = r["mode"]
+    params = json.loads(r["params"] or "{}")
+    context = cont_service.build_continuation_context(mode, params, jid)
+    # 附带来源信息（前端要显示「接续自哪条产物」）
+    outputs = json.loads(r["outputs"] or "[]")
+    video = next((o for o in outputs if o.get("kind") == "video"), None)
+    context["source"] = {
+        "job_id": jid,
+        "mode": mode,
+        "created_at": r["created_at"],
+        "video_file": (video or {}).get("file", ""),
+        "video_name": (video or {}).get("name", ""),
+        "prompt_preview": str(params.get("prompt") or "")[:80],
+    }
+    return json_ok(context)
+
+
+async def api_continuation_state(request):
+    """GET /api/continuation/state —— 接续功能是否可用（本机能力探测）。
+
+    前端用它决定「接续」入口要不要出现：
+      * Relay-Kit 节点没装 -> 整个功能不可用，入口隐藏；
+      * 节点在 -> 入口可用；具体某个产物能不能接续看卡片上的
+        continuation_info（服务端逐任务算好）。
+
+    【为什么要先刷新节点清单】节点清单是**懒加载**的（只有
+    /api/video-options 被调过才有值）。这里主动刷一次，
+    否则刚启动时前端会拿到空清单 -> 误判「功能不可用」。
+
+    【⚠ 「探测不完整」不等于「节点缺失」—— 2026-11-13 修】
+    ComfyUI 被生成任务占满时，`/object_info/<节点>` 会**超时**。
+    超时说明「**没问到**」，不说明「**确实不在**」。
+    旧实现把两者都当成「不在」-> 明明节点都在，却报
+    「缺节点，接续功能不可用」-> 整个接续功能**在用户眼前消失**
+    （实测：全量回归期间并行跑 GPU 生成时必现，单独跑又通过）。
+
+    现在分三态：
+      * 节点确实不在 -> available=false + 明确列出缺哪些；
+      * 探测**没问全**（超时/异常）-> available=**true**（不阻断
+        功能）+ `probe_complete=false` + 说明「本机状态未探全」。
+      * 全部问到 -> available 按实际。
+    """
+    await refresh_comfy_node_names(force=True)
+    relay_nodes = ("H3RelayLatentSave", "H3RelayLatentLoad",
+                   "H3RelayCopyBridge", "H3RelayTrimAV")
+    have = {name: name in _COMFY_NODE_NAMES for name in relay_nodes}
+    # 「探测问全了」= 每个节点都问到了 -> 答案可信，可以断言「缺节点」。
+    probe_complete = _COMFY_PROBE_COMPLETE
+    available = all(have.values())
+    reason = ""
+    if not available:
+        missing = [name for name, ok in have.items() if not ok]
+        if not probe_complete:
+            # 没问全 -> **不能**断言「缺节点」。
+            available = True
+            reason = ("本机 ComfyUI 暂时无响应，接续节点状态未探全 —— "
+                      "接续功能按可用处理。若确实未安装 Relay-Kit，"
+                      "点接续时会给出明确报错。")
+        else:
+            reason = ("本机 ComfyUI 里缺少接续所需的节点：" + "、".join(missing)
+                      + "（ComfyUI-H3-Relay-Kit）—— 接续功能不可用。")
+    return json_ok({"available": available, "nodes": have, "reason": reason,
+                    "probe_complete": probe_complete})
+
+
 async def api_cancel(request):
     jid = request.match_info["id"]
     async with WORKER.submit_lock:
@@ -2527,6 +3106,14 @@ async def api_delete(request):
 #   面板只关心 6 个节点，按名单问就是 6 次 1 ms。
 _COMFY_NODE_NAMES: set[str] = set()
 _COMFY_NODES_TS = 0.0
+#: 上一次探测**是否问全**（True = 每个节点都问到了，答案可信）。
+#:
+#: 【为什么需要它】ComfyUI 被生成任务占满时 `/object_info/<节点>` 会超时。
+#: 超时 = 「**没问到**」，不等于「**确实不在**」。
+#: 没有这个标志的话，能力探测会把「ComfyUI 忙」误判成「Relay-Kit 没装」
+#: -> 整个接续功能在用户眼前消失（且不报错）。
+#: 详见 refresh_comfy_node_names 与 api_continuation_state。
+_COMFY_PROBE_COMPLETE = False
 
 # 面板关心的节点名（video_models.VIDEO_ATTENTION_MODES 里用到的 +
 # SelfLift 二采）。加新注意力机制时同步加到这里。
@@ -2550,6 +3137,16 @@ _VIDEO_PANEL_NODES = [
 # 永远为 False -> shift 节点永远不进工作流 -> 面板上的两个 shift 滑杆
     # 是**死控件**（能拖、但不生效）。这正是「假控件」纪律要禁止的。
     "MiniMaxH3SigmaShift",
+    # 【2026-11-12 新增】接续生成所需的 Relay-Kit 节点。
+    # 这四个节点是**接续功能的硬依赖**（读回潜空间 / 拷贝桥 / 裁重叠 / 落盘）。
+    # 放进这份名单 -> /api/continuation/state 能准确告诉前端
+    # 「本机具备接续能力」还是「缺节点，功能不可用」。
+    # 放在这里而不是另建一份名单：这份名单已经有并发探测 + 60 秒缓存
+    # + 失败不拖慢的机制，另建一份会重复那套逻辑。
+    "H3RelayLatentSave",
+    "H3RelayLatentLoad",
+    "H3RelayCopyBridge",
+    "H3RelayTrimAV",
 ]
 
 
@@ -2575,17 +3172,33 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
         return _COMFY_NODE_NAMES
 
     async def _probe(s, name):
+        """问一次节点在不在。
+
+        返回三态而不是布尔 —— **「问不到」和「确实不在」是两回事**：
+          * name      —— 问到了，且这个节点在；
+          * None      —— 问到了，HTTP 200 但响应里没这个节点 -> 确实不在；
+          * "TIMEOUT" —— **没问到**（超时/连接错/响应坏）。
+
+        把「没问到」当成「不在」会让能力探测在 ComfyUI 忙的时候
+        假阴性 —— 明明节点都在，却报「缺节点，接续功能不可用」。
+        （实测：ComfyUI 被生成任务占满时，3 秒超时打满 -> 探测全空。）
+        """
         try:
             async with s.get(f"{COMFY}/object_info/{name}") as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     if isinstance(data, dict) and name in data:
                         return name
+                    return None          # 问到了 -> 确实不在
+                # 非 200：算「没问到」（服务异常），不当成「不在」
+                return "TIMEOUT"
         except Exception:
-            return None
-        return None
+            return "TIMEOUT"
+        return "TIMEOUT"
 
     found: set[str] = set()
+    unknown = False
+    asked = 0
     try:
         timeout = ClientTimeout(total=3)
         if session is None:
@@ -2595,9 +3208,22 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
         else:
             names = await asyncio.gather(*[_probe(session, n)
                                             for n in _VIDEO_PANEL_NODES])
-        found = {n for n in names if n}
+        found = {n for n in names if n and n != "TIMEOUT"}
+        unknown = any(n == "TIMEOUT" for n in names)
+        # 「问到了」的个数（不管在不在）—— 与 found 分开：
+        #   found  = 「在」的节点
+        #   asked  = 「问到了」的节点（在 + 确实不在）
+        asked = sum(1 for n in names if n != "TIMEOUT")
     except Exception:
         found = set()
+        unknown = True
+        asked = 0
+
+    # 【本轮修】记录「本次探测是否问全」——
+    # 这是区分「节点确实不在」与「没问到」的唯一依据。
+    # 只有「问全了」才允许据此断言「缺节点」。
+    global _COMFY_PROBE_COMPLETE
+    _COMFY_PROBE_COMPLETE = (not unknown) and asked >= len(_VIDEO_PANEL_NODES)
 
     if found:
         # 只有真问到东西才更新缓存 —— 全挂时保留上一次的（可能还有效）
@@ -2606,6 +3232,13 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     elif not _COMFY_NODE_NAMES:
         # 从来没成功过：记时间戳，避免每个请求都去撞一遍 3 秒超时
         _COMFY_NODES_TS = now
+    # 【本轮修】探测**不完整**（部分节点没问到）时，**不要**用残缺
+    # 的结果去断言「节点缺失」—— 那是假阴性。
+    #   做法：本次不更新缓存（保留上一次的完整结果），并把
+    #   「本次探测不完整」标记下来，让调用方知道「没问全」。
+    elif unknown:
+        # 保留 _COMFY_NODE_NAMES 原样（可能是空集 = 从没成功过）
+        pass
     return _COMFY_NODE_NAMES
 
 
@@ -5372,6 +6005,9 @@ def make_app():
     app.router.add_post("/api/longfilms", api_longfilm_create)
     app.router.add_get("/api/jobs", api_list)
     app.router.add_get("/api/jobs/{id}", api_get)
+    # 接续生成：上下文回填 + 功能可用性探测
+    app.router.add_get("/api/jobs/{id}/continuation", api_continuation_context)
+    app.router.add_get("/api/continuation/state", api_continuation_state)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
     app.router.add_get("/api/system", api_system)

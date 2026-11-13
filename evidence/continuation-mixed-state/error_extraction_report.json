@@ -1,0 +1,9 @@
+{
+  "user_visible_reason": "接续失败：上一段与本段的分辨率不一致（拷贝桥禁止跨分辨率：上段 768×448 ≠ 本段 1024×576）。潜空间桥不能跨分辨率接续 —— 请让本段沿用上一段的尺寸，或改用「复用参数」重新生成一段。",
+  "server_log_detail": "[worker] ComfyUI 错误详情: exception_type=ValueError | node_type=H3RelayCopyBridge | exception_message=拷贝桥禁止跨分辨率：上段 768x448 ≠ 本段 1024x576",
+  "raw_python_leak": false,
+  "is_chinese": true,
+  "has_real_cause": true,
+  "detail_in_log": true,
+  "verdict_pass": true
+}

@@ -1,0 +1,45 @@
+{
+  "base": "http://127.0.0.1:8202",
+  "steps": [
+    {
+      "step": "created",
+      "A": "baec4b75ef4c",
+      "A_size": [
+        768,
+        448
+      ],
+      "B": "b27c2089931d",
+      "B_size": [
+        1024,
+        576
+      ],
+      "A_continuation_ok": true
+    },
+    {
+      "step": "mixed_submit",
+      "rejected_at_submit": true,
+      "reject_detail": {
+        "http_status": 400,
+        "body": "{\"error\": \"\\u63a5\\u7eed\\u5931\\u8d25\\uff1a\\u4e0a\\u4e00\\u6bb5\\u662f 768\\u00d7448\\uff0c\\u672c\\u6bb5\\u662f 1024\\u00d7576 \\u2014\\u2014 \\u6f5c\\u7a7a\\u95f4\\u6865\\u4e0d\\u80fd\\u8de8\\u5206\\u8fa8\\u7387\\u63a5\\u7eed\\uff08\\u9010 token \\u62f7\\u8d1d\\u4e0a\\u4e00\\u6bb5\\u5c3e\\u90e8\\uff0clatent \\u5206\\u8fa8\\u7387\\u5fc5\\u987b\\u4e00\\u81f4\\uff09\\u3002\\u8bf7\\u628a\\u8f93\\u51fa\\u5c3a\\u5bf8\\u6539\\u6210 768\\u00d7448\\uff0c\\u6216\\u6539\\u7528\\u300c\\u590d\\u7528\\u53c2\\u6570\\u300d\\u91cd\\u65b0\\u751f\\u6210\\u4e00\\u6bb5\\u3002\"}"
+      },
+      "created_job": null
+    },
+    {
+      "step": "normal_continuation",
+      "job": "4758a66f9583",
+      "status": "done",
+      "error": null,
+      "has_full_video": true,
+      "full_frames": 226
+    }
+  ],
+  "no_raw_python_exception": true,
+  "leaked_tokens": [],
+  "user_visible_text": "接续失败：上一段是 768×448，本段是 1024×576 —— 潜空间桥不能跨分辨率接续（逐 token 拷贝上一段尾部，latent 分辨率必须一致）。请把输出尺寸改成 768×448，或改用「复用参数」重新生成一段。",
+  "error_is_chinese": true,
+  "error_has_real_cause": true,
+  "normal_continuation_ok": true,
+  "extractor_ok": true,
+  "extractor_reason": "接续失败：上一段与本段的分辨率不一致（拷贝桥禁止跨分辨率：上段 768×448 ≠ 本段 1024×576）。潜空间桥不能跨分辨率接续 —— 请让本段沿用上一段的尺寸，或改用「复用参数」重新生成一段。",
+  "verdict_pass": true
+}

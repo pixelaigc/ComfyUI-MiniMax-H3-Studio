@@ -2404,6 +2404,31 @@ $("#genBtn").addEventListener("click", async () => {
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+    // 【接续】把接续上下文一起提交（服务端据此校验并算段号）。
+    //
+    // 【为什么这里原样透传而不自己算段号】前端回填的 continuation
+    // 描述的是**上一段**；本段是新的一段，段号必须 +1 —— 那只能由
+    // 服务端按任务记录算（前端改个数字就能让接缝错位）。
+    if (window.Continuation && window.Continuation.state) {
+      const ctx = window.Continuation.state().current;
+      if (ctx && ctx.continuation) {
+        // 【2026-11-12 修】提交前的**最后一道闸**：接续上下文与当前
+        // 面板尺寸必须一致。潜空间桥逐 token 拷贝上一段尾部，latent
+        // 分辨率固定 —— 跨分辨率接续会被 Relay-Kit 直接拒绝
+        // （「拷贝桥禁止跨分辨率：上段 WxH ≠ 本段 WxH」）。
+        //
+        // 用户**自己改尺寸**（手填宽高）也能造成同样的不一致，
+        // 所以「复用参数时清 context」之外还要在这里拦一次。
+        // 不一致就当场提示并中止提交 —— 不浪费一次生成。
+        if (typeof window.Continuation.checkSubmitConsistency === "function") {
+          const size = window.VIDEO_PANEL._debug
+            ? window.VIDEO_PANEL._debug.currentSize()
+            : null;
+          if (!window.Continuation.checkSubmitConsistency(size)) return;
+        }
+        params.continuation = ctx.continuation;
+      }
+    }
   } else if (mode === "flf" || mode === "r2v") {
     // 【2026-11-11】首尾帧 / 参考生视频：采样参数（采样器 / 调度器 / shift）
     // 与文生视频同链路，同样是真参数。CFG 在 H3 标准路径固定 1.0
@@ -3293,6 +3318,7 @@ function jobCard(job) {
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
+      ${window.Continuation && window.Continuation.canShowButton(job) ? `<button data-act="continue" title="${escapeHtml(window.Continuation.buttonTitle(job))}">⏭ 接续</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
@@ -3407,7 +3433,31 @@ function jobCard(job) {
       lightboxShow(url, name, el.naturalWidth, el.naturalHeight);
     });
   });
+  // 「接续」：把这一段的全部配置回填到左侧配置区（提示词除外），
+  // 用户写下一段提示词即可继续生成。
+  //
+  // 【与「复用参数」的区别】复用参数把提示词也带过去（独立重生成一段）；
+  // 接续**不带**提示词 —— 上一段被潜空间桥真正接上，拼出完整视频。
+  card.querySelector('[data-act="continue"]')?.addEventListener("click", () => {
+    if (window.Continuation && typeof window.Continuation.start === "function") {
+      window.Continuation.start(job);
+    }
+  });
   card.querySelector('[data-act="reuse"]')?.addEventListener("click", () => {
+    // 【2026-11-12 修】点「复用参数」必须**清掉接续上下文**。
+    //
+    // 【为什么】两个动作语义互斥：
+    //   * 复用参数 = 照这张卡片的全部参数（含提示词）独立重生成一段；
+    //   * 接续     = 拿某一段的潜空间当接力棒续下一段。
+    // 原来复用参数只改左侧控件、不清 context -> 用户点过「接续」之后
+    // 再点别的卡片的「复用参数」，提交时变成「B 的参数 + A 的接力棒」
+    // 的混合态。实测这会让 Relay-Kit 的拷贝桥直接 raise
+    // 「拷贝桥禁止跨分辨率：上段 768x448 ≠ 本段 1024x576」。
+    //
+    // 复用参数 = 用户表达「我要照这张重新生成」-> 接力棒不该再挂着。
+    if (window.Continuation && typeof window.Continuation.clearForReuse === "function") {
+      window.Continuation.clearForReuse();
+    }
     // 找到对应模式侧栏项并切换
     activateVideoMode(job.mode);
     $("#prompt").value = p.prompt || "";
@@ -5002,3 +5052,27 @@ setInterval(() => {
   if (state.page !== "system") return;
   scheduleRefresh("hardware", () => refreshHardware());
 }, 3000);
+
+// ---------- 接续生成（continuation）----------
+//
+// web/continuation.js 需要访问三样东西：
+//   * state            —— 时长 / 步数在全局 state 里（不在 VIDEO_PANEL 里）
+//   * activateVideoMode —— 切换到文生视频面板
+//   * refreshJobs      —— 回填后刷新卡片（「接续」按钮的显隐依赖卡片数据）
+//
+// 这里集中暴露，避免 continuation.js 去猜内部结构。
+// 【为什么不直接把 continuation.js 合并进 app.js】app.js 已 3800+ 行；
+// 接续是一条独立链路（按钮 -> 取上下文 -> 回填 -> 展示 -> 清除），
+// 独立成模块才能单独测，也才不至于和「复用参数」逻辑搅在一起。
+window.__h3State = state;
+window.activateVideoMode = activateVideoMode;
+window.refreshJobs = refreshJobs;
+
+// 接续能力探测：Relay-Kit 节点在不在。
+//
+// 【为什么不据此决定按钮显隐】按钮显隐完全听服务端的逐任务判定
+// （continuation_info.can_continue）—— 那是权威，且没有异步竞态。
+// 能力探测只用于「本机到底缺不缺节点」的诊断信息。
+if (window.Continuation && typeof window.Continuation.loadCapability === "function") {
+  window.Continuation.loadCapability();
+}
