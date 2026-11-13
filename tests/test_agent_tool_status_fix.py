@@ -191,7 +191,8 @@ class _Base(unittest.TestCase):
         spec = agent_mod.TOOLS[tool_name]
         return asyncio.run(spec["handler"](ctx or self.ctx(), args))
 
-    def run_agent_with_turns(self, turns, message="最后用 qwen-image21 试试"):
+    def run_agent_with_turns(self, turns, message="最后用 qwen-image21 试试",
+                             max_steps=None):
         """按预设的模型轮次跑一次完整 Agent 编排。"""
         original = agent_mod.llm_client.call_provider_with_tools
         calls = {"n": 0}
@@ -207,7 +208,8 @@ class _Base(unittest.TestCase):
         try:
             return asyncio.run(agent_mod.run_agent(
                 self.server, message,
-                session_store=agent_sessions.get_store()))
+                session_store=agent_sessions.get_store(),
+                max_steps=max_steps or agent_mod.MAX_STEPS))
         finally:
             agent_mod.llm_client.call_provider_with_tools = original
 
@@ -330,6 +332,11 @@ class TestTruncatedIsNotRenderedAsFailure(_Base):
         # 用**不同**参数调同一个工具 —— 否则会先撞上「重复调用打转」
         # （signature 相同 -> repeat_count -> REPEAT_LIMIT），
         # 那样截断原因就变成「重复调用」而不是「步骤上限」。
+        #
+        # 【2026-11-13 审查目标 4 语义变化】步数上限从 8 提到 50 之后，
+        # 「跑满默认步数」需要 50 轮 —— 这里**显式**把上限调回 8，
+        # 让本用例继续测「撞步数上限 -> truncated + notice」这条路径。
+        # （默认上限另有专门用例覆盖，见 tests/test_agent_power.py。）
         modes = ["t2i", "t2i_qwen", "t2i_moss", "t2v", "flf", "r2v",
                  "t2a", "a2a", "i2i_qwen"]
         turns = [
@@ -338,7 +345,7 @@ class TestTruncatedIsNotRenderedAsFailure(_Base):
                  "arguments": {"mode": m}}]}
             for i, m in enumerate(modes)
         ]
-        result = self.run_agent_with_turns(turns)
+        result = self.run_agent_with_turns(turns, max_steps=8)
         self.assertEqual(result["status"], "truncated",
                          f"预期截断，实际 {result['status']} / {result.get('error')}")
         self.assertTrue(result.get("notice"),

@@ -130,7 +130,7 @@
     if (!items.length && !state.attachError && !state.attachBusy) {
       box.hidden = true;
       box.innerHTML = "";
-      if (hint) hint.textContent = "上传的图片 / 音频 / 视频会入库素材库后交给 Agent";
+      if (hint) hint.textContent = "上传的图片 / 音频 / 视频会入库素材库后交给 Agent（也可以直接 Ctrl+V 粘贴）";
       if (btn) btn.disabled = false;
       return;
     }
@@ -399,6 +399,94 @@
     renderAttachments();
   }
 
+  // ------------------------------------------------------------------
+  // 剪贴板粘贴媒体（2026-11-13 审查目标 3）
+  // ------------------------------------------------------------------
+  //
+  // 【为什么不能只支持文本粘贴】
+  // 用户的真实工作流是「在别的应用里复制一段视频/一张图/一段音频，
+  // 回到工作台直接 Ctrl+V」—— 原来只有文件选择器与拖拽，
+  // 粘贴这一条最顺手的路是断的。
+  //
+  // 【怎么拿媒体】
+  //  1) 首选 clipboardData.items —— 里面有 image/png 之类的**文件条目**，
+  //     getAsFile() 拿到的就是真文件（不是 dataURL 字符串）；
+  //  2) 退路是 clipboardData.files（部分浏览器只给这个）；
+  //  3) 退路是 items 里的 string（image/* 的 base64 dataURL）——
+  //     手动转成 File 再上传。
+  //
+  // 【只处理媒体，纯文本照常粘贴】
+  // 文本走浏览器默认行为（不 preventDefault），
+  // 否则用户粘贴一段话会没反应。
+
+  const PASTE_EXT_BY_TYPE = {
+    "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp",
+    "image/bmp": "bmp", "image/gif": "gif",
+  };
+
+  function filesFromClipboard(event) {
+    const dt = event.clipboardData;
+    if (!dt) return [];
+    const out = [];
+    // 1) items 里的文件条目
+    const items = dt.items || [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item || !item.kind || item.kind !== "file") continue;
+      const file = item.getAsFile && item.getAsFile();
+      if (file && file.size > 0) out.push(file);
+    }
+    if (out.length) return out;
+    // 2) files 列表
+    if (dt.files && dt.files.length) {
+      for (let i = 0; i < dt.files.length; i++) {
+        const file = dt.files[i];
+        if (file && file.size > 0) out.push(file);
+      }
+      if (out.length) return out;
+    }
+    // 3) items 里的 image/* 字符串（dataURL）
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item || item.kind !== "string") continue;
+      const type = String(item.type || "");
+      if (!type.startsWith("image/")) continue;
+      const text = item.getAsString && item.getAsString();
+      if (!text || !text.startsWith("data:")) continue;
+      const comma = text.indexOf(",");
+      if (comma < 0) continue;
+      const meta = text.slice(5, comma);
+      const mime = meta.split(";")[0] || "image/png";
+      const isBase64 = meta.indexOf("base64") >= 0;
+      const payload = text.slice(comma + 1);
+      try {
+        const binary = isBase64 ? atob(payload) : decodeURIComponent(payload);
+        const bytes = new Uint8Array(binary.length);
+        for (let k = 0; k < binary.length; k++) bytes[k] = binary.charCodeAt(k);
+        const ext = PASTE_EXT_BY_TYPE[mime] || "png";
+        out.push(new File([bytes], `pasted_${Date.now()}_${k || i}.${ext}`,
+                          { type: mime }));
+      } catch (e) {
+        // dataURL 解不开就跳过这一项，不影响其它项
+      }
+    }
+    return out;
+  }
+
+  function handlePaste(event) {
+    if (!event.clipboardData) return;
+    const files = filesFromClipboard(event);
+    if (!files.length) return;   // 纯文本 -> 走浏览器默认粘贴
+    event.preventDefault();
+    const media = files.filter(f => kindForFile(f));
+    if (!media.length) {
+      state.attachError = "剪贴板里没有可用的图片 / 音频 / 视频";
+      renderAttachments();
+      return;
+    }
+    uploadAttachments(media);
+  }
+
   // ---------- 工具 ----------
 
   function esc(text) {
@@ -406,7 +494,6 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
-
   function apiJSON(method, path, body) {
     const opts = { method, headers: { "Content-Type": "application/json" } };
     if (body !== undefined) opts.body = JSON.stringify(body);
@@ -2145,6 +2232,10 @@
           send();
         }
       });
+      // 【2026-11-13 审查目标 3】剪贴板粘贴媒体（图片 / 音频 / 视频）。
+      // 绑在输入框上（不是 document）—— 只有焦点在输入框时才接管粘贴，
+      // 否则用户从别处复制一段话粘到别的地方也会被劫持。
+      input.addEventListener("paste", handlePaste);
     }
     const fresh = $("#agNew");
     if (fresh) fresh.addEventListener("click", newSession);
