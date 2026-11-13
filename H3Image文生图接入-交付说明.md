@@ -384,7 +384,50 @@ POST /api/jobs  mode=i2i_h3image  （无参考图）
 /api/image-options 响应耗时：0.0015s / 0.0052s / 0.0013s
 ```
 
-**（i）顺带修掉的既有 bug**
+**（i）子代理接入点清单的逐项复核**
+
+实现过程中并行派了子代理做「新增第四套图像模型需要改哪些位置」的独立调研
+（产出 `evidence/h3image_studio_integration_points.md`，498 行、每条带行号）。
+该报告在实现过程中被逐项消费，交付后又做了一次**提交后实测复核**（不是靠 grep 印象）：
+
+| 报告项 | 复核方式 | 结果 |
+|---|---|---|
+| P0-1 stale backend banner 未管 H3-Image | grep + 浏览器实测 | ✅ 已修 |
+| P0-2 占位校验过严（前后端） | **行为验证**（见下） | ✅ 已修 |
+| P0-3 `setProfile()` 只在 refs 分支调用 | grep（确认在 `renderImagePanel` 最开头无条件调用） | ✅ 已修 |
+| P1-1 CFG/步数未锁 | 浏览器实测（三个控件 `disabled: true`） | ✅ 已修 |
+| P1-2 卡片模型名 / localModelInfo | grep + 浏览器实测 | ✅ 已修 |
+| P1-3 「复用参数」缺分支 | grep | ✅ 已修 |
+| P1-4 LoRA 清单越界 | grep（`is_h3image_base` + 服务端空清单分支） | ✅ 已修 |
+| P1-5 `SERVER_FEATURES` / `features` 字段 | grep + API 实测 | ✅ 已修 |
+| P2-1 `enhanceCurrentModelKey` | grep | ✅ 已修 |
+| P2-2 `agent-media.js` 模式与档位 | grep | ✅ 已修 |
+| **CRLF→LF 假 diff 警告** | 行尾符逐文件比对基线 + `git diff --stat` | ✅ 已还原（`server.py`/`web/app.js`/`web/index.html` 均与基线同为 CRLF；三次提交合计真实规模 **17 文件 / +2188 / −105**） |
+
+**占位校验的行为级验证**（前后端各跑一遍真实代码）：
+
+```
+后端 h3image.validate_h3_image_refs():
+  2 张 + 自然语言（无标记）   -> 通过（仅 warning：「建议写上 <Picture 1>」）
+  2 张 + 写全 <Picture 1..2>  -> 通过
+  2 张 + 悬空 <Picture 3>     -> 拒绝（「引用了不存在的参考图」）
+  1 张 + 无标记              -> 通过
+  3 张 + 只写 <Picture 1>     -> 通过（不强制写全）
+  0 张                       -> 拒绝（「至少需要 1 张」）
+
+前端 web/qwen-refs.js（真实代码，Node 加载）：
+  h3image 2张+自然语言   -> 通过
+  h3image 2张+悬空       -> 拒绝
+  qwen    2张+自然语言   -> 拒绝（官方 PE-I2I 强制要求 <imageN>）
+  占位隔离：h3image 通道解析 <imageN> -> []；qwen 通道解析 <Picture N> -> []（互不串族）
+```
+
+这套行为已固化成回归测试：`tests/test_qwen_refs_profile.py` +
+`tests/verify_qwen_refs_profile.cjs`（4 passed）——
+直接加载**真实的** `web/qwen-refs.js`，防止后续有人把两套语法合并、
+或把宽松规则泄漏到 Qwen 通道。
+
+**（j）顺带修掉的既有 bug**
 
 截图里右侧任务区显示字面量 `undefined`。查证为**既有 bug**（`git show HEAD:web/app.js`
 确认 HEAD 就有）：空态文案映射表 `{active:..., done:...}[tab]` **没有 `all` 键** →
@@ -436,13 +479,15 @@ POST /api/jobs  mode=i2i_h3image  （无参考图）
 | 浏览器证据 | `evidence/h3image-t2i-panel.png` / `evidence/h3image-i2i-panel.png` / `evidence/h3image_browser_console.json` |
 | 调研证据 | `evidence/h3image_comfy_backport_feasibility.md`（回移植可行性） / `evidence/h3image_studio_integration_points.md`（Studio 接入点清单） |
 
-**改动规模**：15 个文件（含 2 个测试文件），+1990 / −83 行（不含新文件 `h3image.py` 631 行）。
+**改动规模**：17 个文件（含 3 个测试文件），+2188 / −105 行（不含新文件 `h3image.py` 631 行）。
 
 **分支**：`local/feature/h3-image`（两个提交）
 | 提交 | 内容 |
 |---|---|
 | `84da697` | `feat(h3-image): 文生图/图片编辑接入 MiniMax-H3-Image 模型` —— 主实现 |
 | `68b6f54` | `fix(agent): list_modes 超长 + H3-Image 缺 negative_ok + 模式数断言改动态` |
+| `2ea42dd` | `docs(h3-image): 补回归对比结果 + 节点探测稳定性根因与修法` |
+| `ac1c97b` | `test(h3-image): 补占位语法 profile 隔离回归测试` |
 
 **worktree**：`/root/projects/h3studio-h3image`（基于 `local/maintainer` @ `3ecbb13`）
 **未做**：未合并主线、未部署 8190、未重启任何线上服务、未改动 ComfyUI 任何文件。
