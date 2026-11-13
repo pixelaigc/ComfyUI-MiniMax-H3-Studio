@@ -461,8 +461,15 @@
         <div class="img-ref-list" id="imgRefList"></div>
         <div class="img-ref-actions">
           <button type="button" class="img-ref-add" id="imgRefAdd">+ 从素材库添加</button>
+          <!-- 【2026-11-14 可实现性核查修复】按钮文案原为「智能排序」，但后端
+               /api/refs/sort **不做模型打分** —— ref_images.py:score_refs 的
+               4 个信号全是本地可算的（词重叠/标签相关度/入库时间/有无描述），
+               实测 use_model=true 与 false 返回**完全相同**的顺序，且每条
+               signals.model_score 恒为 0.0。函数名与 API 契约里的「智能」是
+               历史叫法，不是模型智能。改成如实描述行为，避免用户以为在调用
+               模型打分。 -->
           <button type="button" class="img-ref-sort" id="imgRefSort" disabled
-                  title="按与提示词的匹配度、标签相关度、入库时间给出建议顺序">智能排序</button>
+                  title="按与提示词的匹配度、标签相关度、入库时间给出建议顺序（本地启发式，不调用模型）">按匹配度排序</button>
         </div>
         <div class="img-note" id="imgRefNote"></div>
         <details class="img-ref-detail" id="imgRefDetail" hidden>
@@ -1368,7 +1375,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 【2026-11-14 合并说明】qwen-refs.js 版本号取 h3image1 —— 该分支改了
      qwen-refs.js（H3-Image 参考图占位语法隔离），必须升版号破缓存；
      mainline 一侧的 refs1 会让用户拿到旧文件。 -->
-<script src="/static/qwen-refs.js?v=h3image1"></script>
+<script src="/static/qwen-refs.js?v=feasibility1"></script>
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=vpfb1"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
