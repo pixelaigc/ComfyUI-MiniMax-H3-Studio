@@ -359,29 +359,87 @@
 
   // ------------------------------------------------------------ 持久化
 
+  // 【2026-11-14 缺陷 B —— 落盘延迟修复（前端侧）】
+  //
+  // 【原症状】改完效果 LoRA 强度后，轮询 GET /api/video-config 要等
+  // **18–25 秒**才看到新值；这段时间里用户刷新页面会看到**旧值**，
+  // 表现为「回显没生效」。
+  //
+  // 【根因有两层，本文件修的是前端这一层】
+  //   1. 服务端层：/api/jobs 同步阻塞事件循环（已在本轮另一处修复）
+  //      -> PUT /api/video-config 排队 -> 秒级延迟。
+  //   2. 前端层（本文件）：改动只是**排了一个 250ms 定时器**，
+  //      若用户在这 250ms 内切走/刷新页面，变更**根本没发出去**。
+  //      另外 VIDEO_PANEL.save() 内部还有一层 300ms 节流。
+  //
+  // 【本文件的做法】
+  //   a) 保留短节流（滑杆连续拖动时不至于发几十个请求）；
+  //   b) 记录「有未落盘变更」的状态；
+  //   c) 在 pagehide / beforeunload / visibilitychange(hidden) 时
+  //      **强制 flush** —— 用 fetch(keepalive:true) 直发 PUT，
+  //      绕过 VIDEO_PANEL.save 的节流，保证页面关闭前变更已发出。
+
   let saveTimer = null;
+  //: 是否有「已改但还没落盘」的变更（用于 flush 判断）。
+  let pendingSave = false;
+
+  function effectLoraPayload() {
+    return selectedList().map(it => ({
+      name: it.name,
+      strength: Number(it.strength),
+      enabled: it.enabled !== false,
+      trigger: it.trigger || "",
+    }));
+  }
+
   function saveEffectLoraConfig() {
     renderEffectLoraList();
     const st = window.VIDEO_PANEL && window.VIDEO_PANEL.state;
     if (!st) return;
+    pendingSave = true;
     // 存进视频面板自己的配置（局域网共用，与加速 LoRA 一致）
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-      try {
-        const cfg = (typeof window.VIDEO_PANEL.collectConfig === "function")
-          ? window.VIDEO_PANEL.collectConfig() : {};
-        cfg.effect_loras = selectedList().map(it => ({
-          name: it.name,
-          strength: Number(it.strength),
-          enabled: it.enabled !== false,
-          trigger: it.trigger || "",
-        }));
-        await window.VIDEO_PANEL.save(cfg);
-      } catch (e) {
-        /* 存不上不影响本次生成（提交时会带上） */
-      }
-    }, 250);
+    saveTimer = setTimeout(() => { flushEffectLoraConfig(); }, 120);
   }
+
+  /**
+   * 立刻把当前选中态落盘（不等节流）。
+   *
+   * @param {boolean} keepalive true = 页面正在卸载，用 keepalive 让
+   *                        请求在页面关闭后仍能送达。
+   */
+  async function flushEffectLoraConfig(keepalive) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    const st = window.VIDEO_PANEL && window.VIDEO_PANEL.state;
+    if (!st) return;
+    try {
+      const cfg = (typeof window.VIDEO_PANEL.collectConfig === "function")
+        ? window.VIDEO_PANEL.collectConfig() : {};
+      cfg.effect_loras = effectLoraPayload();
+      await window.VIDEO_PANEL.save(cfg, { immediate: true, keepalive: !!keepalive });
+      pendingSave = false;
+    } catch (e) {
+      /* 存不上不影响本次生成（提交时会带上） */
+    }
+  }
+
+  // ---- 页面卸载/隐藏时的兜底 flush ------------------------------
+  //
+  // 【为什么必须有】用户改完强度**立刻刷新**是最高频的操作，
+  // 而刷新 = 页面卸载 = 未落盘的变更可能丢失。
+  // visibilitychange(hidden) 比 beforeunload 更可靠（移动端、切标签页
+  // 都会触发，且不阻塞卸载），所以两个都挂上。
+  function flushOnLeave() {
+    if (!pendingSave) return;
+    pendingSave = false;   // 防重复触发
+    flushEffectLoraConfig(true);
+  }
+  window.addEventListener("pagehide", flushOnLeave);
+  window.addEventListener("beforeunload", flushOnLeave);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushOnLeave();
+  });
 
   // ------------------------------------------------------------ 加载
 

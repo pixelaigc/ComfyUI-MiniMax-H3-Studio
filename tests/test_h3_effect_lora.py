@@ -48,6 +48,60 @@ class TestEffectLoraDiscovery(unittest.TestCase):
         items = effect_registry.discover_effect_loras()
         self.assertIsInstance(items, list)
 
+    # ------------------------------------------------------------
+    # 【2026-11-14 缺陷 B】扫盘结果必须被缓存
+    #
+    # 【为什么】discover_effect_loras() 要扫 663 个候选文件，实测 0.79s/次。
+    # 而 job_meta._effect_lora_display() 在**每条任务记录**里各调一次
+    # -> /api/jobs 一次 184 条 = 145s 阻塞事件循环
+    # -> 整个 8190 服务卡住 -> 用户「改了强度 20 秒后才落盘」。
+    #
+
+    def test_discovery_is_cached(self):
+        """第二次调用必须命中缓存（不重新扫盘）。"""
+        effect_registry.invalidate_effect_lora_cache()
+        first = effect_registry.discover_effect_loras()
+        second = effect_registry.discover_effect_loras()
+        self.assertEqual(len(first), len(second))
+        # 缓存命中后，返回的是**副本** —— 改它不能污染缓存
+        if second:
+            original = second[0]["display"]
+            second[0]["display"] = "__MUTATED__"
+            third = effect_registry.discover_effect_loras()
+            self.assertEqual(third[0]["display"], original,
+                             "缓存必须返回副本，不能被调用方改坏")
+
+    def test_cache_can_be_invalidated(self):
+        """显式作废后仍然要能拿到正确结果。"""
+        effect_registry.invalidate_effect_lora_cache()
+        items = effect_registry.discover_effect_loras()
+        self.assertIsInstance(items, list)
+        effect_registry.invalidate_effect_lora_cache()
+        again = effect_registry.discover_effect_loras()
+        self.assertEqual([i["name"] for i in items],
+                         [i["name"] for i in again],
+                         "作废后重扫的结果必须一致")
+
+    def test_discovery_is_fast_when_warm(self):
+        """热缓存下连续调用必须显著快于冷扫描。
+
+        这条断言的是「缓存真的生效」，不是「扫盘快不快」——
+        冷扫描受磁盘状态影响大，用**相对倍数**判定才稳。
+        """
+        import time
+        effect_registry.invalidate_effect_lora_cache()
+        cold_start = time.time()
+        effect_registry.discover_effect_loras()
+        cold = time.time() - cold_start
+
+        warm_start = time.time()
+        for _ in range(5):
+            effect_registry.discover_effect_loras()
+        warm = (time.time() - warm_start) / 5
+
+        self.assertLess(warm, cold / 2,
+                        f"热缓存必须明显快于冷扫描（cold={cold:.3f}s warm={warm:.3f}s）")
+
     def test_every_entry_has_real_file_on_disk(self):
         """每一条都必须对应一个**真实存在**的文件（不能是假条目）。"""
         for entry in effect_registry.discover_effect_loras():
@@ -316,6 +370,77 @@ class TestEffectLoraServerGate(unittest.TestCase):
         self.assertEqual(error, "")
         self.assertEqual(len(out["effect_loras"]), 1)
         self.assertEqual(out["effect_loras"][0]["strength"], 0.8)
+
+    # ------------------------------------------------------------
+    # 【2026-11-14 缺陷 A】非法结构必须被拒绝，不能静默丢弃
+    #
+    # 【原症状】`if not isinstance(item, dict): continue`
+    # -> 传 effect_loras=["h3/xxx"]（字符串数组）-> HTTP 200 +
+    #    落库 effect_loras=[]，客户端**收不到任何错误原因**。
+    #    用户看到「我明明选了 LoRA，生成库卡片上却什么都没有」。
+    #
+
+    def test_normalize_rejects_string_item(self):
+        """字符串数组项 -> 明确报错（原来静默丢弃）。"""
+        out, error = self._normalize(["h3/3dsrx_minimax_h3.safetensors"])
+        self.assertNotEqual(error, "", "字符串数组项必须被拒绝")
+        self.assertIn("必须是对象", error)
+        self.assertIn("第 1 项", error, "报错要指出是第几项")
+        # error 非空 -> api_create 直接 400 返回，params 不会被落库。
+        # （out 里仍是原始入参，这是与「文件不存在」「强度非数字」
+        #   两条既有闸门**一致**的返回口径 —— 不单独断言 out 的内容。）
+        self.assertTrue(error.strip(), "错误原因不能是空串")
+
+    def test_normalize_rejects_non_dict_item_in_middle(self):
+        """第 2 项是字符串 -> 报错要指出正确序号。"""
+        items = effect_registry.discover_effect_loras()
+        if not items:
+            self.skipTest("本机没有真实效果 LoRA")
+        out, error = self._normalize([
+            {"name": items[0]["name"], "strength": 0.5}, "oops"])
+        self.assertNotEqual(error, "")
+        self.assertIn("第 2 项", error)
+
+    def test_normalize_rejects_numeric_item(self):
+        """数字项 -> 拒绝（并报出类型）。"""
+        out, error = self._normalize([123])
+        self.assertNotEqual(error, "")
+        self.assertIn("必须是对象", error)
+        self.assertIn("int", error)
+
+    def test_normalize_rejects_non_list_effect_loras(self):
+        """顶层不是数组（字符串/对象）-> 拒绝。"""
+        for bad in ("h3/3dsrx_minimax_h3.safetensors", {"name": "x"}):
+            out, error = self._normalize(bad)
+            self.assertNotEqual(error, "", f"{bad!r} 必须被拒绝")
+            self.assertIn("必须是数组", error)
+
+    def test_normalize_still_accepts_disabled_and_empty_name(self):
+        """【回归护栏】停用 / 空名字是**合法**输入，不能被新闸门误伤。"""
+        items = effect_registry.discover_effect_loras()
+        if not items:
+            self.skipTest("本机没有真实效果 LoRA")
+        # enabled=false -> 跳过，不报错
+        out, error = self._normalize([
+            {"name": items[0]["name"], "strength": 0.8, "enabled": False}])
+        self.assertEqual(error, "")
+        self.assertEqual(out["effect_loras"], [])
+        # name 为空 -> 跳过，不报错
+        out, error = self._normalize([{"name": "", "strength": 0.8}])
+        self.assertEqual(error, "")
+        self.assertEqual(out["effect_loras"], [])
+
+    def test_normalize_still_rejects_missing_file_and_bad_strength(self):
+        """【回归护栏】c4 已通过的两个 400 用例不能被修坏。"""
+        out, error = self._normalize([
+            {"name": "h3/nope-not-here.safetensors", "strength": 1.0}])
+        self.assertIn("找不到", error)
+        items = effect_registry.discover_effect_loras()
+        if not items:
+            self.skipTest("本机没有真实效果 LoRA")
+        out, error = self._normalize([
+            {"name": items[0]["name"], "strength": "abc"}])
+        self.assertIn("强度必须是数字", error)
 
     def test_normalize_rejects_missing_file(self):
         out, error = self._normalize([
