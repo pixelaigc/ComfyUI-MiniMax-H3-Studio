@@ -419,13 +419,33 @@ class TestOtherModesNotLoosened(unittest.TestCase):
         self.assertTrue(reasons)
 
     def test_non_t2v_workflows_still_use_resolution_selector(self):
-        """flf / r2v 的工作流仍走 ResolutionSelector 的比例+总像素档位。"""
-        flf = WF.build_flf({"job_id": "x", "aspect": "16:9", "resolution": "768p"})
-        node = flf.get("115")
-        self.assertIsNotNone(node, "flf 工作流应有 ResolutionSelector 节点")
-        self.assertEqual(node["class_type"], "ResolutionSelector")
-        self.assertEqual(node["inputs"]["multiple"], 32)
-        self.assertLessEqual(node["inputs"]["megapixels"], 0.8,
+        """flf / r2v 的工作流仍按 ResolutionSelector 的比例+总像素档位算尺寸。
+
+        【2026-11-15 更新 —— 工作流形态变了，断言的口径跟着变】
+
+        原来这条断言的是「flf 工作流里有 ResolutionSelector 节点」。
+        但 B1/B2 重构（a2c3622）把 flf / r2v 换成了 T8 条件节点
+        （MiniMaxH3AudioConditioningT8），那条节点的 width/height 是
+        **直接写死的整数**，不再由 ResolutionSelector 节点算出来。
+
+        断言口径因此改成「**结果**必须符合 ResolutionSelector 的算法」：
+          * width/height 由「档位 x 比例」按官方公式算出；
+          * 面积不超过 flf/r2v 自己的 0.8 MP 上限（没被放宽到 t2v 的 2.0 MP）。
+
+        这才是这条用例**真正想守**的东西（见类名 TestOtherModesNotLoosened）：
+        flf / r2v 不许跟着 t2v 一起放宽。
+        """
+        from h3studio import h3_video_size as vsize
+        flf = WF.build_flf({"job_id": "x", "aspect": "16:9", "resolution": "768p",
+                            "first_frame": "f.png"})
+        cond = flf["136"]["inputs"]
+        self.assertEqual(cond["width"] % 32, 0, "宽高必须是 32 的倍数")
+        self.assertEqual(cond["height"] % 32, 0, "宽高必须是 32 的倍数")
+        want_w, want_h = vsize.dimensions_for("768p", "16:9", mode="flf")
+        self.assertEqual((cond["width"], cond["height"]), (want_w, want_h),
+                         "flf 的尺寸必须按 ResolutionSelector 的公式算")
+        self.assertLessEqual(cond["width"] * cond["height"],
+                             int(0.8 * 1024 * 1024),
                              "flf 的总像素档位不该被放宽到 2.0")
 
 

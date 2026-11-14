@@ -121,6 +121,7 @@ from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import h3_audio_track as h3audio
+from h3studio import h3_video_size
 from h3studio import h3_video_modes as h3modes
 from h3studio import music_yue2
 from h3studio import music_style
@@ -277,6 +278,15 @@ LIVE_STATE_CACHE_TTL = 3.0
 DATA = Path(CFG["data_dir"])
 OUT_DIR = DATA / "outputs"
 UPLOAD_DIR = DATA / "uploads"
+#: 【2026-11-15】本地直传的**视频 / 音频**后缀白名单。
+#: 参考视频与参考音乐现在也能从面板直接上传（缺口 1），
+#: 这两个后缀不能走图片白名单（save_uploaded_image 会把 .mp4 改成 .png）。
+MEDIA_SUFFIXES = {
+    # 视频
+    ".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v", ".gif",
+    # 音频
+    ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus",
+}
 VIDEO_DIR = OUT_DIR / "videos"
 IMAGE_DIR = OUT_DIR / "images"
 # 音乐（YuE2）产物目录 —— 与视频/图片同级，产物统一走 /files/ 路由
@@ -824,6 +834,59 @@ async def comfy_upload_media(session: ClientSession, path: Path) -> str:
     sub = r.get("subfolder", "")
     name = r["name"]
     return f"{sub}/{name}" if sub else name
+
+
+async def _extract_video_soundtrack(session: ClientSession, job_id: str,
+                                    video_name: str) -> str | None:
+    """从参考视频里抽出音轨，上传到 ComfyUI input，返回文件名。
+
+    【为什么需要这一步 —— 缺口 2 的后半段】
+    音轨三选一的 (c)「使用参考视频的背景音乐作为成片音轨」，
+    在 T8 节点里对应的是 ``ref_video_audios`` 槽位 ——
+    **那是一个音频输入**，不是视频输入。节点不会自己从视频里抽音轨
+    （它只要求「第 N 个背景音配第 N 个参考视频」）。
+
+    所以「用户选了一个带音轨的参考视频」要变成 (c) 可用，
+    必须由我们把视频里的音轨**抽出来**单独喂给那个槽位。
+
+    【抽不出音轨怎么办】视频本来就没有音轨（无声视频很常见），
+    这时返回 None —— 上层会把 (c) 归回「使用生成的音乐」，
+    **不报错**：用户想要的是视频，音轨退化成默认即可
+    （与 h3studio/h3_audio_track.py 的归一策略一致）。
+
+    【为什么用 ffmpeg 而不是 VHS 节点】VHS_LoadVideo 的 audio 输出
+    是个 LazyAudioMap，必须挂在 ComfyUI 图里；我们要的是
+    一个**独立文件**（因为节点要求音轨与视频是**两个**槽位）。
+    """
+    if not FFMPEG:
+        return None
+    # ComfyUI 侧的文件名 -> 本地路径（input 目录）
+    local = None
+    for folder in (Path("/home/ubuntu/comfyui/input"),
+                   Path("/root/ComfyUI/input")):
+        candidate = folder / video_name
+        if candidate.exists():
+            local = candidate
+            break
+    if local is None:
+        return None
+    out_dir = UPLOAD_DIR / "soundtracks"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(video_name.encode("utf-8")).hexdigest()[:16]
+    out_path = out_dir / f"sb-{digest}.m4a"
+    if not out_path.exists():
+        # -vn 丢掉视频流；没有音轨时 ffmpeg 会失败 -> 返回 None
+        proc = await asyncio.create_subprocess_exec(
+            FFMPEG, "-y", "-i", str(local), "-vn", "-c:a", "aac",
+            "-b:a", "192k", str(out_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE)
+        _out, err = await proc.communicate()
+        if proc.returncode != 0 or not out_path.exists():
+            detail = (err or b"").decode("utf-8", "ignore")[-300:]
+            print(f"[soundtrack] 抽音轨失败（{video_name}）：{detail}")
+            return None
+    return await comfy_upload_media(session, out_path)
 
 
 async def _upload_ref_audio_flat(session: ClientSession, job_id: str,
@@ -1385,6 +1448,37 @@ async def save_uploaded_image(part) -> str:
     return canonical.name
 
 
+async def save_uploaded_media(part) -> str:
+    """保存上传的视频 / 音频；内容相同则复用 uploads 中已有文件。
+
+    【为什么不能复用 save_uploaded_image】
+    那个函数按**图片后缀白名单**处理（.png/.jpg/…），遇到 .mp4 会
+    强制改名成 .png —— 文件内容还是视频，扩展名却成了图片，
+    下游 ffmpeg / ComfyUI 按后缀判断类型就会炸。
+
+    这里保留原始后缀（白名单：视频 + 音频常见格式），其余原样落盘。
+    """
+    suffix = Path(part.filename or "media.bin").suffix.lower()
+    if suffix not in MEDIA_SUFFIXES:
+        suffix = ".bin"
+    temp = UPLOAD_DIR / f".upload-{uuid.uuid4().hex}.tmp"
+    digest = hashlib.sha256()
+    with temp.open("wb") as handle:
+        while True:
+            chunk = await part.read_chunk(1024 * 256)
+            if not chunk:
+                break
+            digest.update(chunk)
+            handle.write(chunk)
+    fingerprint = digest.hexdigest()
+    canonical = UPLOAD_DIR / f"media-{fingerprint[:20]}{suffix}"
+    if canonical.exists():
+        temp.unlink(missing_ok=True)
+        return canonical.name
+    temp.replace(canonical)
+    return canonical.name
+
+
 async def comfy_history(session: ClientSession, prompt_id: str):
     async with session.get(f"{COMFY}/history/{prompt_id}") as resp:
         data = await resp.json()
@@ -1527,6 +1621,24 @@ class Worker:
                             raise RuntimeError(f"找不到上传文件: {up}")
                         names.append(await comfy_upload_image(session, lp))
                     params["ref_images"] = names
+                    # 【2026-11-15】参考视频 / 参考音乐的**本地直传**上传。
+                    # （缺口 1：面板补了槽位 -> 这里必须有对应的上传路径。）
+                    if params.get("ref_videos"):
+                        uploaded = []
+                        for up in params["ref_videos"]:
+                            lp = UPLOAD_DIR / up
+                            if not lp.exists():
+                                raise RuntimeError(f"找不到上传文件: {up}")
+                            uploaded.append(await comfy_upload_media(session, lp))
+                        params["ref_videos"] = uploaded
+                    if params.get("ref_audios"):
+                        uploaded = []
+                        for up in params["ref_audios"]:
+                            lp = UPLOAD_DIR / up
+                            if not lp.exists():
+                                raise RuntimeError(f"找不到上传文件: {up}")
+                            uploaded.append(await comfy_upload_media(session, lp))
+                        params["ref_audios"] = uploaded
                 elif mode in ("i2i_qwen", "i2i_h3image"):
                     # Qwen 图片编辑：参考图**来自素材库**（asset_id + 版本快照），
                     # 这里把素材库里的文件上传到 ComfyUI input，
@@ -1557,6 +1669,41 @@ class Worker:
                                 # 已经是 ComfyUI 侧的上传名（素材库路径）-> 跳过
                                 continue
                             params[key] = await comfy_upload_image(session, lp)
+
+                # 【2026-11-15 —— 缺口 2 后半段：参考视频的背景音】
+                #
+                # 音轨三选一的 (c) 对应 T8 节点的 `ref_video_audios` 槽位，
+                # 那是一个**独立的音频输入** —— 节点不会自己从参考视频里
+                # 抽音轨。所以「用户选了一个带音轨的参考视频」要变成 (c)
+                # 真的可用，必须在这里把音轨**抽出来**。
+                #
+                # 只有当用户确实选了 (c) 时才抽 —— 抽音轨要跑 ffmpeg，
+                # 不选就不该付这个开销。
+                if mode in ("flf", "r2v"):
+                    _track = params.get("audio_track_source")
+                    if _track == h3audio.TRACK_VIDEO_BG:
+                        _videos = list(params.get("ref_videos") or [])
+                        _existing = list(params.get("ref_video_audios") or [])
+                        _soundtracks = list(_existing)
+                        for _idx, _vname in enumerate(_videos):
+                            # 第 N 个背景音配第 N 个参考视频（节点硬要求）
+                            if _idx < len(_existing):
+                                continue
+                            _sb = await _extract_video_soundtrack(
+                                session, job_id, _vname)
+                            if _sb:
+                                _soundtracks.append(_sb)
+                            else:
+                                print(f"[soundtrack] 参考视频 {_vname} 没有音轨，"
+                                      "该项回落到生成的音乐")
+                                break
+                        params["ref_video_audios"] = _soundtracks
+                        if not _soundtracks:
+                            # 抽不出音轨 -> (c) 不可用 -> 归回生成的音乐
+                            params["audio_track_source"] = (
+                                h3audio.normalize_track_source(
+                                    _track, has_reference_audio=True,
+                                    has_reference_video_audio=False))
 
                 # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
                 # 里落进 params["ref_audios"]。这里取第一段，转成
@@ -3396,7 +3543,23 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             params.pop("loras", None)
 
     if mode in ("flf", "r2v"):
-        # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致**，
+        # 【2026-11-15 修 —— 分辨率/比例语义失真】
+        #
+        # 【原来错在哪】normalize_t2v_params **只对 t2v 跑**，
+        # 于是 flf / r2v 的 params 里可能压根没有 width/height；
+        # 而 h3studio/h3_video_modes.py 的 build_flf / build_r2v
+        # 只读 params["width"] / params["height"]，**缺失时硬回退
+        # 1344×768**。
+        #
+        # 结果：面板显示「544p · 16:9」，工作流实际跑 1344×768 ——
+        # 1344×768 不是 544p 的任何合法组合（544p = 0.4MP -> 736×416）。
+        # 用户看到的是「说谎的分辨率」。
+        #
+        # 【修法】flf / r2v 也走**同一套**宽高归一
+        # （h3studio/h3_video_size.py，与 t2v 同一份公式与上限策略），
+        # 并把真实生效的宽高**写回 params** —— 工作流读到的就是面板选的。
+        h3_video_size.apply_size(params, mode)
+        # 【2026-11-12 修】默认值必须与工作流里的硬编码档位**完全一致，
         # 否则老客户端（不传 sampler/scheduler）会被静默改画质：
         #   workflows._h3_video_workflow 的规则是
         #     lora != "none" -> steps 4 / scheduler beta   / sampler euler
@@ -3439,7 +3602,15 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                     code="frame_required")
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
-        if not refs:
+        # 【2026-11-15】参考视频 / 参考音乐的本地直传通道。
+        # （缺口 1：面板补了槽位 -> 服务端必须有对应的接收与上传路径。）
+        ref_videos = saved_files.get("file_refvid", [])
+        ref_audios = saved_files.get("file_refaud", [])
+        if ref_videos:
+            params["ref_videos"] = ref_videos[:h3modes.MAX_REF_VIDEOS]
+        if ref_audios:
+            params["ref_audios"] = ref_audios[:h3modes.MAX_REF_AUDIOS]
+        if not refs and not ref_videos and not ref_audios:
             # 素材库来源的参考素材也算（worker 会按 asset_refs 上传）
             #
             # 【2026-11-11 音视频扩展】参考模式现在也接受参考视频/参考音频
@@ -3457,7 +3628,16 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             # —— H3 参考生成节点的 ref_images 槽位上限就是 9
             #（实测 object_info：COMFY_AUTOGROW_V3 min=0 max=9）。
             # 原来卡 3 张是历史遗留，把能力人为砍掉了。
-            params["ref_images"] = refs[:h3modes.MAX_REF_IMAGES]
+            #
+            # 【2026-11-15】这里**不再静默截断**：
+            # 原来 `refs[:9]` 会把第 10 张悄悄丢掉，用户以为 10 张都进去了。
+            # 超上限直接报错（前端也做了同样的校验，两边一致）。
+            if len(refs) > h3modes.MAX_REF_IMAGES:
+                raise JobValidationError(
+                    f"参考图最多 {h3modes.MAX_REF_IMAGES} 张，当前 {len(refs)} 张。",
+                    code="ref_too_many")
+            if refs:
+                params["ref_images"] = refs
 
     # ---- 音轨三选一（首尾帧 / 参考生视频）----
     #
@@ -3490,6 +3670,24 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             _has_ref_audio = True
         if "ref_video_audio" in _slots:
             _has_ref_video_audio = True
+        # 【2026-11-15】本地直传的参考视频 / 参考音乐也算「有素材」。
+        #
+        # 【为什么必须加这一段】参考视频槽位（slot=ref_video）此前
+        # **不会**产生 ref_video_audios —— 那个键只在用户显式提供
+        # 「视频的背景音文件」时才有值。于是：
+        #   * 用户只选了参考视频、没单独选背景音 ->
+        #     (c)「用参考视频背景音」在提交阶段被判为「没有素材」-> 被归一成
+        #     「生成的音乐」-> 用户选了却被改掉（正是本次要修的缺陷）。
+        #   * 服务端随后会**从参考视频里抽出音轨**（见 worker 的
+        #     _extract_video_soundtrack），所以 (c) 其实是**有**素材的。
+        #
+        # 现在：有参考视频 -> (c) 可选（worker 抽不出音轨时再归回生成）。
+        if _slots & {"ref_video", "source_video"}:
+            _has_ref_video_audio = True
+        if saved_files.get("file_refvid"):
+            _has_ref_video_audio = True
+        if saved_files.get("file_refaud"):
+            _has_ref_audio = True
         params["audio_track_source"] = h3audio.normalize_track_source(
             params.get("audio_track_source"),
             has_reference_audio=_has_ref_audio,
@@ -3658,6 +3856,17 @@ async def api_create(request):
                 asset_refs = []
         elif part.name in ("file_first", "file_last", "file_ref"):
             fname = await save_uploaded_image(part)
+            saved_files.setdefault(part.name, []).append(fname)
+        elif part.name in ("file_refvid", "file_refaud"):
+            # 【2026-11-15】参考视频 / 参考音频的**本地直传**通道。
+            #
+            # 【为什么要有这条通道】参考视频与参考音乐之前**只能**从素材库选
+            # （面板上连槽位都没有，见缺口 1）。现在面板补了槽位，
+            # 本地直传也得有对应的落盘路径，否则用户选了本地文件就被丢掉。
+            #
+            # 视频 / 音频不能走 save_uploaded_image（那个按图片后缀白名单
+            # 处理，会把 .mp4 改名成 .png）—— 这里原样落盘。
+            fname = await save_uploaded_media(part)
             saved_files.setdefault(part.name, []).append(fname)
 
     # 文生视频新面板：服务端校验并归一全部参数。

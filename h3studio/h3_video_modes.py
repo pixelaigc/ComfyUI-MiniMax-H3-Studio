@@ -135,12 +135,49 @@ def _ref_image_nodes(p: dict, filenames: list) -> dict:
 
 
 def _ref_video_nodes(p: dict, filenames: list) -> dict:
-    """参考视频 -> 节点引用（最多 3 个）。"""
+    """参考视频 -> 节点引用（最多 3 个）。
+
+    【2026-11-15 修 —— VHS_LoadVideo 的 6 个 required 输入必须显式给】
+
+    原来这里只给了 `video` 和 `format`：
+        {"inputs": {"video": filename, "format": "None"}, ...}
+
+    但 VHS_LoadVideo（ComfyUI-VideoHelperSuite）的 schema 里
+    **required** 有 7 项（实测 /object_info）：
+        video / force_rate / custom_width / custom_height /
+        frame_load_cap / skip_first_frames / select_every_nth
+
+    ComfyUI 通过 API 提交工作流时**不套用** schema 默认值 ——
+    缺任何一个 -> 提交被拒（"Required input is missing"）。
+    （这些输入在 UI 上带 `disable: 0`，所以只有走 API 才暴露。）
+
+    实测证据：先用只给 video+format 的版本提交，ComfyUI 返回
+        node_errors: {"1": {"errors": [
+            {"type": "required_input_missing", "details": "custom_width"},
+            ... 共 6 项 ]}}
+    补齐后同一个视频正常解码出帧（status: success）。
+
+    【为什么之前没暴露】参考视频这条路径**从来没有被真实跑过** ——
+    线上 24 条 r2v 任务全部只用参考图 + 参考音乐。
+    """
     out = {}
     for index, filename in enumerate(filenames[:MAX_REF_VIDEOS]):
         node_id = f"136:{301 + index}"
         p[node_id] = {
-            "inputs": {"video": filename, "format": "None"},
+            "inputs": {
+                "video": filename,
+                # 【以下 6 项是 VHS_LoadVideo 的 required 输入，必须显式给】
+                # force_rate 0 = 保持原帧率；custom_width/height 0 = 不改尺寸；
+                # frame_load_cap 0 = 不限帧数；skip_first_frames 0 = 从头开始；
+                # select_every_nth 1 = 每帧都取。
+                "force_rate": 0,
+                "custom_width": 0,
+                "custom_height": 0,
+                "frame_load_cap": 0,
+                "skip_first_frames": 0,
+                "select_every_nth": 1,
+                "format": "None",
+            },
             "class_type": "VHS_LoadVideo",
             "_meta": {"title": f"加载参考视频 {index + 1}"},
         }
@@ -357,8 +394,16 @@ def build_flf(params: dict) -> dict:
     # 首尾帧用 FL2VA 权重（它有 I2VA / FL2VA / L2VA 任务类型）
     unet_name = _vm.model_for_mode("flf", params.get("model_key"))["unet"]
 
-    width = int(params.get("width") or 1344)
-    height = int(params.get("height") or 768)
+    # 【2026-11-15】宽高走**统一归一**（h3studio/h3_video_size.py）：
+    # 面板选了「544p · 9:16」就必须真的跑那个尺寸，
+    # 而不是硬回退 1344×768（那个回退是「面板说谎」的根因）。
+    from . import h3_video_size as _vsize
+    width, height = _vsize.dimensions_for(
+        params.get("resolution"), params.get("aspect"), mode="flf")
+    explicit_w = params.get("width")
+    explicit_h = params.get("height")
+    if explicit_w and explicit_h:
+        width, height = int(explicit_w), int(explicit_h)
     duration = float(params.get("duration") or 5)
 
     p: dict = {}
@@ -414,8 +459,16 @@ def build_r2v(params: dict) -> dict:
     # model_for_mode() 会按模式挑（用户选了 FL2VA 权重时自动换 Ref2VA）。
     unet_name = _vm.model_for_mode("r2v", params.get("model_key"))["unet"]
 
-    width = int(params.get("width") or 1344)
-    height = int(params.get("height") or 768)
+    # 【2026-11-15】宽高走**统一归一**（h3studio/h3_video_size.py）：
+    # 面板选了「544p · 9:16」就必须真的跑那个尺寸，
+    # 而不是硬回退 1344×768（那个回退是「面板说谎」的根因）。
+    from . import h3_video_size as _vsize
+    width, height = _vsize.dimensions_for(
+        params.get("resolution"), params.get("aspect"), mode="r2v")
+    explicit_w = params.get("width")
+    explicit_h = params.get("height")
+    if explicit_w and explicit_h:
+        width, height = int(explicit_w), int(explicit_h)
     duration = float(params.get("duration") or 5)
 
     p: dict = {}
