@@ -364,6 +364,10 @@
     EFFECT_STORE.pendingRestore = null;
     EFFECT_STORE.restored = true;
     renderEffectLoraList();
+    // 【2026-11-14 需求 9】恢复完选中项后也要刷新下拉 ——
+    // 已选的要从候选里剔除（filterCandidates 按 selectedList 过滤），
+    // 不刷新的话下拉里会出现「已经加过了」的项。
+    renderPickerMenu();
   }
 
   // ------------------------------------------------------------ 持久化
@@ -488,6 +492,16 @@
       } else {
         renderEffectLoraList();
       }
+      // 【2026-11-14 需求 9 · 修 bug】清单到了必须**填下拉**。
+      //
+      // 【原缺陷】改造前下拉是「点搜索框才弹出的浮层」，浮层的渲染由
+      // openPicker() 触发，所以清单到达时不需要重绘。
+      // 改成原生 <select> 之后，下拉的选项**只在 renderPickerMenu() 里写**，
+      // 而 loadEffectLoras 没调它 —— 于是清单有 27 枚、下拉却是空的，
+      // 「添加」按钮点了没反应（实测 optCount=0 / items=0）。
+      //
+      // 修法：清单落地后立刻渲染一次下拉。
+      renderPickerMenu();
       renderExcludedEffectLoras();
       const hint = document.getElementById("vidEffectLoraHint");
       if (hint) {
