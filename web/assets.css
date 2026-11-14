@@ -116,6 +116,38 @@
   border-radius: 5px; padding: 1px 5px; font-size: 10.5px;
 }
 .al-card-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+
+/* ---------- 多选（2026-11-14 需求 13）---------- */
+.al-selbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 4px 10px 4px 12px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 9px;
+}
+.al-selbar[hidden] { display: none !important; }
+.al-selcount {
+  font-size: 12.5px; font-weight: 600; color: var(--accent);
+  white-space: nowrap;
+}
+.al-selbox-wrap {
+  /* 左下角：右上角已被「引用 N」徽章占用（.al-thumb .badge.right），
+     左上角被「已分析」徽章占用（.al-thumb .badge）—— 三个角互不重叠。 */
+  position: absolute; bottom: 6px; left: 6px; z-index: 2;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.55);
+  border-radius: 6px;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+}
+.al-selbox-wrap:hover { background: rgba(0,0,0,.75); }
+.al-selbox {
+  width: 14px; height: 14px; margin: 0; cursor: pointer;
+  accent-color: var(--accent);
+}
+.al-card.selected .al-selbox-wrap { background: var(--accent); }
+
 .al-name {
   font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap;

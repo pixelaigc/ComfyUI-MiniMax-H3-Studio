@@ -937,8 +937,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <div class="al-sub" id="alStats">加载中…</div>
       </div>
       <div class="al-actions">
+        <!-- 【2026-11-14 需求 13】多选 + 批量删除 + 播放器模式入口。
+             选中数量为 0 时这一整块隐藏（不占视觉空间）。 -->
+        <div class="al-selbar" id="alSelBar" hidden>
+          <span class="al-selcount" id="alSelCount">已选 0 项</span>
+          <button class="al-btn" id="alSelClear">取消选择</button>
+          <button class="al-btn" id="alSelAll">全选当前页</button>
+          <button class="al-btn danger" id="alSelDelete">删除所选</button>
+        </div>
         <button class="al-btn" id="alTrashBtn">查看回收站</button>
         <button class="al-btn" id="alRefBtn">只看被引用的</button>
+        <!-- 【2026-11-14 需求 14】播放器模式：从素材库挑素材进播放器 -->
+        <button class="al-btn" id="alPlayerBtn">▶ 播放器模式</button>
         <button class="al-btn primary" id="alUploadBtn">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3m0 0L5 6m3-3 3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           上传素材
