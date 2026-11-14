@@ -946,6 +946,8 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <span class="al-selcount" id="alSelCount">已选 0 项</span>
           <button class="al-btn" id="alSelClear">取消选择</button>
           <button class="al-btn" id="alSelAll">全选当前页</button>
+          <!-- 【2026-11-14 A2】添加到播放器清单：播放器只播这里挑过的条目 -->
+          <button class="al-btn" id="alSelPlayer">▶ 添加到播放器</button>
           <button class="al-btn danger" id="alSelDelete">删除所选</button>
         </div>
         <button class="al-btn" id="alTrashBtn">查看回收站</button>
@@ -1013,15 +1015,19 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="al-drawer-body" id="alDrawerBody"></div>
   </aside>
 
-  <!-- 素材库「播放器模式」（2026-11-14 需求 14）
-       图片播放（每张可配停止时间 + 列表内循环 + 可叠背景音）/
+  <!-- 素材库「播放器模式」（2026-11-14 需求 14 / A2 修订）
+       图片播放（顶部统一「每张停止时间」+ 列表内循环 + 可叠背景音）/
        音频播放（单曲循环 / 列表循环 / 列表随机）/
-       视频播放（同音频）。实现见 web/asset-player.js。 -->
+       视频播放（同音频）。
+       播放列表 = 用户在素材库里主动「添加到播放器」的条目（服务端持久化），
+       不再是「当前页全部素材」。实现见 web/asset-player.js。 -->
   <div class="al-player-overlay" id="alPlayer" hidden>
     <div class="al-player-panel" role="dialog" aria-modal="true" aria-label="素材播放器">
       <div class="al-player-head">
         <b>素材播放器</b>
         <div class="al-player-tabs" id="alPlayerTabs"></div>
+        <!-- 【A2】清空播放清单 -->
+        <button type="button" class="al-btn" id="alPlayerClear">清空清单</button>
         <button type="button" class="al-drawer-close" id="alPlayerClose" aria-label="关闭">×</button>
       </div>
       <div class="al-player-body" id="alPlayerBody"></div>

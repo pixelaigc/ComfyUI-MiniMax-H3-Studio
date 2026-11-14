@@ -403,6 +403,34 @@ CREATE TABLE IF NOT EXISTS asset_analysis_jobs (
     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
 );
 
+-- 播放器清单（2026-11-14 需求 A2）
+--
+-- 【为什么要单独建表，而不是在 assets 上加字段】
+--   「添加到播放器」是用户的**主动选择**：一个有序、去重、跨重启保留的集合。
+--   挂在 assets 上就成了 1:1 关系（一个素材只能有一个标记），
+--   而清单天然是 1:N（同一个素材可以出现在不同清单里、不同位置）。
+--   另外 assets 主表正在被并发需求改动 —— 不去动它的 17 列结构，
+--   冲突面最小。
+--   外键级联：素材被彻底删除时，清单条目自动消失，不留悬空引用。
+CREATE TABLE IF NOT EXISTS player_playlists (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL DEFAULT '默认清单',
+    img_seconds   REAL NOT NULL DEFAULT 5,   -- 图片模式「每张停止时间」（秒）
+    created_at    REAL NOT NULL,
+    updated_at    REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS player_entries (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    playlist_id   INTEGER NOT NULL,
+    asset_id      TEXT NOT NULL,
+    category      TEXT NOT NULL DEFAULT 'other',   -- 加进来时的素材大类
+    position      INTEGER NOT NULL DEFAULT 0,      -- 清单内的顺序
+    added_at      REAL NOT NULL,
+    FOREIGN KEY (playlist_id) REFERENCES player_playlists(id) ON DELETE CASCADE,
+    FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_cat_created ON assets(category, subtype, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_assets_deleted ON assets(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_assets_source ON assets(source, created_at DESC);
@@ -412,6 +440,12 @@ CREATE INDEX IF NOT EXISTS idx_refs_asset ON asset_refs(asset_id);
 CREATE INDEX IF NOT EXISTS idx_refs_ref ON asset_refs(ref_kind, ref_id);
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON asset_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_analyses_asset ON asset_analyses(asset_id, revision DESC);
+
+-- 同一素材在同一个清单里只能出现一次（重复添加是幂等的，不是报错）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_player_entries_asset
+    ON player_entries(playlist_id, asset_id);
+CREATE INDEX IF NOT EXISTS idx_player_entries_order
+    ON player_entries(playlist_id, position, id);
 """
 
 
