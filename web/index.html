@@ -1010,6 +1010,22 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="al-drawer-body" id="alDrawerBody"></div>
   </aside>
 
+  <!-- 素材库「播放器模式」（2026-11-14 需求 14）
+       图片播放（每张可配停止时间 + 列表内循环 + 可叠背景音）/
+       音频播放（单曲循环 / 列表循环 / 列表随机）/
+       视频播放（同音频）。实现见 web/asset-player.js。 -->
+  <div class="al-player-overlay" id="alPlayer" hidden>
+    <div class="al-player-panel" role="dialog" aria-modal="true" aria-label="素材播放器">
+      <div class="al-player-head">
+        <b>素材播放器</b>
+        <div class="al-player-tabs" id="alPlayerTabs"></div>
+        <button type="button" class="al-drawer-close" id="alPlayerClose" aria-label="关闭">×</button>
+      </div>
+      <div class="al-player-body" id="alPlayerBody"></div>
+      <div class="al-player-note" id="alPlayerNote"></div>
+    </div>
+  </div>
+
   <!-- 素材选择器 -->
   <div class="al-picker-mask" id="alPickerMask">
     <div class="al-picker" role="dialog" aria-modal="true" aria-label="选择素材">
@@ -1434,6 +1450,8 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <script src="/static/providers.js?v=h3image1"></script>
 <script src="/static/job-detail.js?v=uxbatch1"></script>
 <script src="/static/assets.js?v=uxbatch1"></script>
+<!-- 素材库播放器模式（2026-11-14 需求 14） -->
+<script src="/static/asset-player.js?v=uxbatch1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
