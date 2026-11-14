@@ -111,6 +111,24 @@
       内置 Agent
     </a>
     <button type="button" class="nav-group" data-nav-key="system" aria-expanded="true">系统</button>
+    <!-- 【2026-11-15 D12】交互流程图入口。
+         放在「系统」分组里，而不是新开一个分组 ——
+         tests/test_sidebar_fold.py 断言顶层分组**恰好 7 个**
+         （video/image/image-edit/music/assets/agent/system），
+         新开分组会直接打破那条契约。新增分组属于另一个需求。
+
+         【位置为什么排在「本地模型配置」之前】
+         test_sidebar_fold.py 的 test_short_viewport_can_scroll_to_bottom_items
+         会把侧栏滚到底，然后断言 #navSystem（硬件参数）**完整可见**。
+         如果新条目排在它后面，滚动到底时硬件参数可能被顶出可视区。
+         排在前面则「硬件参数」仍是最后一项，滚动契约不变。
+
+         入口本身是 .nav-item（不是 .nav-item[data-mode]），
+         所以不会被 activateMode() 的模式切换逻辑接管。 -->
+    <a class="nav-item" id="navFlowDocs" title="查看交互流程图与说明文档">
+      <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2.5" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2.5" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9.5" width="5.5" height="5.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.4 9.5v5.5M11.6 11.2h3.2M11.6 13.3h2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      交互流程图
+    </a>
     <a class="nav-item" id="navProviders">
       <svg viewBox="0 0 16 16" width="15" height="15"><rect x="1.5" y="2.5" width="13" height="4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9.5" width="13" height="4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="4.5" r="1" fill="currentColor"/><circle cx="4" cy="11.5" r="1" fill="currentColor"/></svg>
       本地模型配置
@@ -1359,6 +1377,28 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
   </div>
 </div>
 
+<!-- 交互流程图面板（2026-11-15 D12 线上可达）
+     列出 5 套交互流程图（缩略图 + 标题 + .mmd 源文件链接）+ 说明文档入口。
+     清单由 /api/docs/flows 下发（服务端按磁盘实际内容生成），
+     前端不硬编码文件名 —— 流程图改名/增删时不会出现坏链接。 -->
+<div class="prompt-modal" id="fdModal" hidden>
+  <div class="prompt-dialog fd-dialog" role="dialog" aria-modal="true" aria-labelledby="fdTitle">
+    <div class="prompt-dialog-head">
+      <b id="fdTitle">交互流程图</b>
+      <button id="fdClose" aria-label="关闭">×</button>
+    </div>
+    <div class="fd-body" id="fdBody"></div>
+    <!-- 点缩略图后的大图层（叠在面板里，不开新窗口） -->
+    <div class="fd-stage" id="fdStage" hidden>
+      <button type="button" class="fd-stage-close" id="fdStageClose" aria-label="关闭大图">×</button>
+      <img id="fdStageImg" alt="流程图大图">
+    </div>
+    <div class="prompt-dialog-actions">
+      <button id="fdDone">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- LoRA 简易说明 -->
 <div class="prompt-modal" id="loraInfoModal" hidden>
   <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="loraInfoTitle">
@@ -1532,6 +1572,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 生成媒体库「管理」（2026-11-14 需求 11） -->
 <script src="/static/media-manage.js?v=uxbatch1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
+<!-- 【2026-11-15 D12】交互流程图入口模块。
+     必须**先于** app.js 加载：它只依赖 DOMContentLoaded 与自己的 fetch，
+     不依赖 app.js 的任何函数；放在这里是为了让入口在 app.js 启动
+     之前就绑好（app.js 的 boot() 会重绘导航区域）。 -->
+<script src="/static/flow-docs.js?v=fd1"></script>
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
 <script src="/static/enhance-menu-shared.js?v=shared2"></script>

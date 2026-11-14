@@ -83,6 +83,7 @@ from h3studio import gen_types
 from h3studio import gen_defaults
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
+from h3studio import docs_static
 from h3studio import prompt_history as ph
 from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
@@ -8263,6 +8264,12 @@ def make_app():
     ref_api.register(app)
     app.router.add_get("/files/{path:.+}", files_handler)
     app.router.add_static("/static", BASE / "web")
+    # 【2026-11-15 D12 流程图线上可达】文档目录挂到 /docs。
+    # 之前只挂了 /static（前端资源），docs/ 下的 5 套交互流程图与
+    # 《交互流程图说明.md》虽然已经随 D12 进了主线，但线上 404 —— 用户
+    # 看不到、也没法打开。挂载后 /docs/ 直接是目录索引，
+    # /docs/交互流程图-总览.png 直接出图（见 h3studio/docs_static.py）。
+    docs_static.register(app, BASE / "docs")
     app.router.add_get("/", index_handler)
     return app
 

@@ -124,6 +124,11 @@ class StudioServer:
         shutil.copytree(REPO / "h3studio", self.tmp / "h3studio")
         shutil.copy2(REPO / "server.py", self.tmp / "server.py")
         shutil.copytree(REPO / "web", self.tmp / "web")
+        # 【2026-11-15 D12】文档目录也要复制过去 —— /docs 挂载的是
+        # server.py 同级的 docs/，不复制的话测试实例里 /docs 整个目录不存在，
+        # 「流程图能点开」这条断言就没法在浏览器里验证。
+        if (REPO / "docs").is_dir():
+            shutil.copytree(REPO / "docs", self.tmp / "docs")
         if self.app_js_override is not None:
             (self.tmp / "web" / "app.js").write_bytes(self.app_js_override)
         cfg = {

@@ -4889,8 +4889,12 @@ function closeDetailModal() {
 // （提示词 / LoRA 说明 / 增强确认 / 详情），每个都各自 add/remove
 // 这个 class —— 关掉其中一个会把另一个的锁也解掉。
 // 所以关框时必须重新判断「还有没有别的框开着」。
+//
+// 【2026-11-15 D12】新增 fdModal（交互流程图面板）——
+// 它由 web/flow-docs.js 打开/关闭，但**滚动锁必须走这一份**：
+// 流程图面板与其它模态框互斥时，关掉其中一个不能把另一个的锁解掉。
 const MODAL_IDS = ["promptModal", "loraInfoModal", "enhanceGateModal",
-                   "detailModal"];
+                   "detailModal", "fdModal"];
 function syncModalOpenClass() {
   const anyOpen = MODAL_IDS.some(id => {
     const el = $("#" + id);
@@ -6128,6 +6132,10 @@ window.BREAKPOINTS = BREAKPOINTS;
 window.H3Studio = Object.assign(window.H3Studio || {}, {
   locateJobInLibrary,
   lightboxShow,
+  // 【2026-11-15 D12】滚动锁的统一维护入口 ——
+  // web/flow-docs.js 打开/关闭自己的模态框时要走这一份，
+  // 否则关掉流程图面板会把其它模态框的锁一起解掉。
+  syncModalOpenClass,
 });
 
 function isPhoneViewport() {
