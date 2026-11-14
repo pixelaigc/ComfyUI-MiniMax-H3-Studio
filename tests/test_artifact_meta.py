@@ -707,8 +707,12 @@ console.log(JSON.stringify({
         self.assertIn("0.65", result["recorded"])
         self.assertIn("MiniMaxH3TurboLoRA", result["recorded"])
         self.assertIn("未使用 LoRA", result["noneUsed"])
-        self.assertIn("未记录", result["notRecorded"])
-        # 三者互不相同
+        # 【2026-11-15 修】文案统一为「未使用 LoRA」（用户要求）；
+        # 精确区分放进 title（悬停可见）。
+        self.assertIn("未使用 LoRA", result["notRecorded"])
+        # title 里的精确说明（「未把 LoRA 记录到产物元数据」）
+        self.assertIn("记录到产物元数据", result["notRecorded"])
+        # 两者的 title 不同（「确实没用」vs「没记录到」）
         self.assertNotEqual(result["noneUsed"], result["notRecorded"])
 
     def test_detail_modal_loads_from_artifact_meta_endpoint(self):
