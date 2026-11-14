@@ -290,6 +290,33 @@ class TestRealWorkflowRoundTrip(unittest.TestCase):
 class TestResolveJobLoraTruth(unittest.TestCase):
     """job_meta.resolve_job_lora —— 显示层的唯一取值入口。"""
 
+    def test_artifact_branch_is_reachable(self):
+        """【防回归】artifact_loras 分支必须**真的可达**。
+
+        为什么这样断言：2026-11-15 本轮实测遇到过工作区被注入
+        `if False and "artifact_loras" in params:` —— 分支永不执行，
+        而所有「产物实际优先」的断言**照样绿**（因为它们断言的是
+        回落路径的结果）。所以必须有一条**直接针对分支可达性**的断言。
+
+        做法：造一个「产物实际」与「提交参数」**矛盾**的样本 ——
+        产物实际是 ckpt850，提交参数说 v4step600。
+        只有分支真的执行，才会返回 ckpt850。
+        """
+        resolved = job_meta.resolve_job_lora("t2v", {
+            "artifact_loras": [{
+                "name": "minimax_h3_turbo_4step_ema_ckpt850",
+                "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+                "strength": 1.0,
+                "loader": "MiniMaxH3TurboLoRA",
+            }],
+            # 提交参数说另一枚 —— 产物实际必须压过它
+            "accel_loras": [{"key": "v4step600", "strength": 1.0,
+                             "enabled": True}],
+            "fixed_accel_lora": "v4step600",
+        })
+        self.assertEqual("Turbo 4 步 · ckpt850", resolved["lora"],
+                         "artifact_loras 分支未执行（被短路了？）")
+
     def test_artifact_loras_take_priority_and_are_mapped_correctly(self):
         """产物实际清单优先，且名字反查成友好显示名（BUG 1 的核心断言）。
 

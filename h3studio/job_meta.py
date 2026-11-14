@@ -544,7 +544,7 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
     # 【为什么放最前面】这是唯一「看过真正会跑的那份工作流」的来源。
     # 提交参数只是「用户填了什么」，工作流才是「实际跑了什么」。
     # 有了它，显示的就是产物实际用到的 LoRA —— 一个字都不会差。
-    if False and "artifact_loras" in params:
+    if "artifact_loras" in params:
         raw_artifact = params.get("artifact_loras")
         from . import artifact_meta as am
         kept = []
