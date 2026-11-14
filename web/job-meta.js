@@ -170,12 +170,18 @@
   /**
    * LoRA 行的显示文本。
    *
-   * 【C1】没有 LoRA 时显示「**无**」（用户明确要求：「没有 LoRA 时显示「无」」），
-   * 不用「空」也不用留白。
+   * 【C1】没有 LoRA 时显示「**未使用 LoRA**」
+   * （2026-11-15 文案变更 —— 用户要求：「缺失时应显示『未使用 LoRA』
+   * 而不是错名」；原来的「无」太短、也容易被读成「数据缺失」）。
+   *
+   * 【2026-11-15 · 口径统一】这里的值来自服务端 model_info，
+   * 而 model_info 的 LoRA 字段已被「产物实际挂载清单」覆盖 ——
+   * 三套取值路径（model_info / gen_params / 详情接口）现在同源，
+   * 不会再出现「卡片一行说无、详情区说有」的情况。
    */
   function loraText(job) {
     const list = loraList(job);
-    if (!list.length) return "无";
+    if (!list.length) return "未使用 LoRA";
     return list.map((item) => {
       // 效果 LoRA 标注「效果：」前缀 —— 与加速 LoRA 区分开
       const name = item.fixed ? `工作流固定：${item.label}`

@@ -206,9 +206,14 @@ class TestGenParams(unittest.TestCase):
         self.assertIn("3", gp["shift"])
 
     def test_lora_is_explicitly_none_when_absent(self):
-        """没有 LoRA 时显式写「无」—— 不是空串。"""
+        """没有 LoRA 时显式写「未使用 LoRA」—— 不是空串。
+
+        【2026-11-15 文案变更】用户要求：「缺失时应显示『未使用 LoRA』
+        而不是错名」。「无」容易被读成「数据缺失」，
+        「未使用 LoRA」明确说的是「这条产物没有用 LoRA」。
+        """
         gp = job_meta.gen_params("t2a", {})
-        self.assertEqual("无", gp["lora"])
+        self.assertEqual("未使用 LoRA", gp["lora"])
 
     def test_lora_shows_name_and_strength(self):
         """有 LoRA 时显示名称 + 强度。"""
@@ -217,9 +222,14 @@ class TestGenParams(unittest.TestCase):
         self.assertIn("1.00", gp["lora"])
 
     def test_prompt_as_lora_yields_none(self):
-        """BUG 1 的端到端断言：提示词冒充 LoRA 时，gen_params.lora 必须是「无」。"""
+        """BUG 1 的端到端断言：提示词冒充 LoRA 时，gen_params.lora 必须是「未使用 LoRA」。
+
+        【2026-11-15 文案变更】用户明确要求：「缺失时应显示『未使用 LoRA』
+        而不是错名」。原来的「无」太短、也容易被读成「数据缺失」，
+        这里改成明确表述。断言的**行为**没变（仍是「不显示假 LoRA」）。
+        """
         gp = job_meta.gen_params("t2v", {"lora": PROMPT_AS_LORA})
-        self.assertEqual("无", gp["lora"])
+        self.assertEqual("未使用 LoRA", gp["lora"])
 
     def test_seed_defaults_to_random(self):
         """没指定种子 -> 「随机」（这是真实语义，不是缺失）。"""
@@ -389,7 +399,8 @@ class TestServerJobPayload(unittest.TestCase):
         }
         job = server.row_to_job(row)
         self.assertIn("gen_params", job)
-        self.assertEqual("无", job["gen_params"]["lora"])
+        # 【2026-11-15 文案变更】「无」->「未使用 LoRA」（用户要求）。
+        self.assertEqual("未使用 LoRA", job["gen_params"]["lora"])
         self.assertEqual("4", job["gen_params"]["steps"])
         # 老的 model_info 也要一起在（前端两处都用）
         self.assertIn("model_info", job)
