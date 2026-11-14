@@ -1191,6 +1191,13 @@ def gen_params(mode: str, params: dict, model_info: dict | None = None,
         "attention": "",
         "workflow": "",
         "prompt": str(params.get("prompt") or ""),
+        # 【2026-11-14 需求 2d】原始提示词 + 是否增强过。
+        # Agent 生成时 params["prompt"] 存的是**增强后**的那一份
+        # （= 实际送进工作流的），params["original_prompt"] 存用户的原话。
+        # 这里把两者都带出来 —— 媒体库卡片/详情能显示「原始 -> 增强后」，
+        # 也能看出这条到底有没有走增强流程。
+        "original_prompt": str(params.get("original_prompt") or ""),
+        "prompt_enhanced": "1" if params.get("prompt_enhanced") else "",
     }
 
     # --- shift：视频用 shift_video / shift_audio，图像用 shift ---

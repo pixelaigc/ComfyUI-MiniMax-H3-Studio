@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=agentpower1">
-<link rel="stylesheet" href="/static/assets.css?v=agentpower1">
+<link rel="stylesheet" href="/static/style.css?v=uxbatch1">
+<link rel="stylesheet" href="/static/assets.css?v=uxbatch1">
 <link rel="stylesheet" href="/static/responsive.css?v=agentpower1">
 </head>
 <body>
@@ -175,9 +175,12 @@
         <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
       </div>
 
-      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）——
-           交互对齐文生图的 LoRA 区（#imgLoraField）：
-           同一个「下拉添加 + 已选列表 + 每项滑杆」的结构。 -->
+      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）—— 2026-11-14 需求 9：
+           视觉与交互统一到文生图的 LoRA 区（#imgLoraField）：
+           同一套「下拉添加 + 已选列表 + 每项滑杆」结构。
+           【与文生图的唯一差别】多了一个搜索框 —— 本机 H3 效果 LoRA
+           有 27 枚，原生下拉翻找成本太高；搜索框只是**过滤**下拉，
+           不改变「下拉选一项 → 点添加 → 进已选列表」的主交互。 -->
       <div class="field" id="vidEffectLoraField">
         <div class="field-label">
           <span>效果 LoRA</span>
@@ -186,10 +189,11 @@
           <button type="button" class="vid-lora-clear" id="vidEffectLoraClear" hidden>清空全部</button>
         </div>
         <div id="vidEffectLoraList" class="img-lora-list"></div>
-        <div class="vid-lora-picker">
+        <div class="img-lora-add vid-lora-add-row">
           <input type="text" id="vidEffectLoraSearch" class="img-input"
                  placeholder="搜索效果 LoRA（名称 / 功能 / 触发词）" autocomplete="off">
-          <div class="vid-lora-picker-menu" id="vidEffectLoraMenu" hidden></div>
+          <select class="img-select" id="vidEffectLoraSelect"></select>
+          <button type="button" class="img-reset" id="vidEffectLoraAdd">添加</button>
         </div>
         <div class="img-note" id="vidEffectLoraNote"></div>
         <div class="img-lora-excluded" id="vidEffectLoraExcluded" hidden></div>
@@ -544,14 +548,15 @@
 
       <!-- 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
            第三方用 12 个字段拼 style，比一整段自由文本表达力强。
-           这里是「增强」的产物区：增强后自动填好，可逐项改；
-           点「重新生成」= 以当前内容为底稿让模型再改一版。 -->
+           这里是「增强」的产物区：增强后自动填好，可逐项改。
+           【2026-11-14 需求 7】原先这里有一个「重新生成」按钮 ——
+           已移除：想重新生成直接点上面的「生成风格+歌词」即可，
+           不需要第二条「基于当前内容改一版」的入口（两条路
+           产出的是同一种东西，只是底稿不同，容易让人困惑）。 -->
       <div class="field" id="musicStyleStructField">
         <div class="field-label">
           结构化风格 <span class="muted">Style Fields · 对齐第三方 YuE2StylePrompt</span>
           <button type="button" id="musicStyleFieldsToggle" class="music-toggle">展开</button>
-          <button type="button" class="img-ref-add" id="musicStyleRegenBtn"
-                  title="基于当前内容重新生成结构化风格">重新生成</button>
         </div>
         <div id="musicStyleFields" style="display:none">
           <div class="music-sf-grid" id="musicStyleFieldsGrid"></div>
@@ -568,8 +573,6 @@
       <div class="field">
         <div class="field-label">
           歌词 <span class="muted">Lyrics · 可留空（留空 = 纯器乐）</span>
-          <button type="button" class="img-ref-add" id="musicLyricsRegenBtn"
-                  title="基于当前内容重新生成歌词">重新生成</button>
         </div>
         <textarea id="musicLyrics" rows="6"
                   placeholder="[Verse]&#10;Morning light across the window&#10;City waking down below&#10;&#10;[Chorus]&#10;Run with me into the sunlight&#10;Leave the shadows far behind"></textarea>
@@ -649,7 +652,7 @@
             <input type="range" id="musicRep" min="0.1" max="2" step="0.01" value="1.2">
           </div>
         </div>
-        <div class="img-note" id="musicAdvNote">以上 4 项是<strong>音乐生成阶段</strong>的采样参数（官方模板：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2）。谱面（ABC）规划阶段还有一组独立参数，本面板固定用官方推荐值（温度 0.7 / top_p 0.9 / top_k 30），不开放调整。改动这些值会改变曲子的「随机性」，一般保持默认即可。</div>
+        <div class="img-note" id="musicAdvNote">以上 4 项是<strong>音乐生成阶段</strong>的采样参数，会真实写进工作流的 <code>YuE2GenerateMusic</code> 节点（温度 / top_p / top_k / 重复惩罚），可以自由调整。官方节点默认值：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2。谱面（ABC）规划阶段另有一组独立参数（温度 0.7 / top_p 0.9 / top_k 30 / 重复惩罚 1.005），本面板<strong>不开放</strong>调整 —— 它固定用官方推荐值。改动这些值会改变曲子的「随机性」，一般保持默认即可。</div>
       </details>
     </div>
 
@@ -907,6 +910,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <div class="jobs-tools page-size-tools">
         <label class="page-size-label" for="pageSizeSelect">每页</label>
         <select id="pageSizeSelect" aria-label="每页作品数"></select>
+        <!-- 【2026-11-14 需求 11】生成媒体库「管理」入口 -->
+        <button type="button" class="filter-reset" id="mediaManageBtn"
+                title="清理本工作台的生成媒体库产物">管理</button>
       </div>
     </div>
     <!-- 生成队列面板（2026-11-13 队列化需求） -->
@@ -916,9 +922,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <span class="queue-title">生成队列</span>
         <span class="queue-summary" id="queueSummary">队列为空</span>
         <button type="button" class="queue-toggle" id="queueToggle"
-                aria-expanded="true" title="展开/收起队列明细">明细</button>
+                aria-expanded="false" title="展开队列明细">明细</button>
       </div>
-      <ol class="queue-list" id="queueList"></ol>
+      <!-- 默认收起（2026-11-14 需求 1）：明细列表 style=display:none，
+           JS 初始化时会再 applyDetailState() 一次，保证与模块级状态一致。 -->
+      <ol class="queue-list" id="queueList" style="display:none"></ol>
     </section>
     <div class="jobs-grid" id="jobsGrid"></div>
     <div class="jobs-pagination" id="jobsPagination" hidden></div>
@@ -932,8 +940,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <div class="al-sub" id="alStats">加载中…</div>
       </div>
       <div class="al-actions">
+        <!-- 【2026-11-14 需求 13】多选 + 批量删除 + 播放器模式入口。
+             选中数量为 0 时这一整块隐藏（不占视觉空间）。 -->
+        <div class="al-selbar" id="alSelBar" hidden>
+          <span class="al-selcount" id="alSelCount">已选 0 项</span>
+          <button class="al-btn" id="alSelClear">取消选择</button>
+          <button class="al-btn" id="alSelAll">全选当前页</button>
+          <button class="al-btn danger" id="alSelDelete">删除所选</button>
+        </div>
         <button class="al-btn" id="alTrashBtn">查看回收站</button>
         <button class="al-btn" id="alRefBtn">只看被引用的</button>
+        <!-- 【2026-11-14 需求 14】播放器模式：从素材库挑素材进播放器 -->
+        <button class="al-btn" id="alPlayerBtn">▶ 播放器模式</button>
         <button class="al-btn primary" id="alUploadBtn">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3m0 0L5 6m3-3 3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           上传素材
@@ -994,6 +1012,68 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     </div>
     <div class="al-drawer-body" id="alDrawerBody"></div>
   </aside>
+
+  <!-- 素材库「播放器模式」（2026-11-14 需求 14）
+       图片播放（每张可配停止时间 + 列表内循环 + 可叠背景音）/
+       音频播放（单曲循环 / 列表循环 / 列表随机）/
+       视频播放（同音频）。实现见 web/asset-player.js。 -->
+  <div class="al-player-overlay" id="alPlayer" hidden>
+    <div class="al-player-panel" role="dialog" aria-modal="true" aria-label="素材播放器">
+      <div class="al-player-head">
+        <b>素材播放器</b>
+        <div class="al-player-tabs" id="alPlayerTabs"></div>
+        <button type="button" class="al-drawer-close" id="alPlayerClose" aria-label="关闭">×</button>
+      </div>
+      <div class="al-player-body" id="alPlayerBody"></div>
+      <div class="al-player-note" id="alPlayerNote"></div>
+    </div>
+  </div>
+
+  <!-- 生成媒体库「管理」模态框（2026-11-14 需求 11）
+       三种清理口径：全部 / 指定月数之前 / 失败与取消。
+       只影响本工作台（不含 ComfyUI 自身产物）。 -->
+  <div class="prompt-modal" id="mediaManageModal" hidden>
+    <div class="prompt-dialog detail-dialog" role="dialog" aria-modal="true"
+         aria-labelledby="mediaManageTitle">
+      <div class="prompt-dialog-head">
+        <b id="mediaManageTitle">生成媒体库管理</b>
+        <button id="mediaManageClose" aria-label="关闭">×</button>
+      </div>
+      <div class="detail-body">
+        <div class="detail-section">
+          <div class="detail-section-title">清理范围</div>
+          <div class="mg-scope-list" id="mgScopeList">
+            <label class="mg-scope">
+              <input type="radio" name="mgScope" value="all" checked>
+              <span><b>清理本工作台内的所有生成媒体库产物</b>
+                <i>只删本工作台的任务记录与产物文件，不含 ComfyUI 自身的产物目录，也不含素材库。</i></span>
+            </label>
+            <label class="mg-scope">
+              <input type="radio" name="mgScope" value="older">
+              <span><b>清理指定月数之前的历史产物</b>
+                <i>按「月」折算 30 天。1 = 30 天前，3 = 90 天前。</i></span>
+              <input type="number" id="mgMonths" min="1" max="120" step="1" value="1"
+                     title="要清理多少个月之前的历史产物">
+              <span class="mg-unit">个月</span>
+            </label>
+            <label class="mg-scope">
+              <input type="radio" name="mgScope" value="failed">
+              <span><b>清理失败 / 取消的产物</b>
+                <i>状态为「失败」或「已取消」的任务记录与产物文件。</i></span>
+            </label>
+          </div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-section-title">将要清理</div>
+          <div class="mg-preview" id="mgPreview">正在统计…</div>
+        </div>
+      </div>
+      <div class="prompt-dialog-actions">
+        <button onclick="document.getElementById('mediaManageClose').click()">取消</button>
+        <button class="danger" id="mgRunBtn">确认清理</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 素材选择器 -->
   <div class="al-picker-mask" id="alPickerMask">
@@ -1359,6 +1439,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <button id="detailModalClose" aria-label="关闭">×</button>
     </div>
     <div class="detail-body" id="detailModalBody">
+      <!-- 【2026-11-14 需求 3】产物预览（图片 / 视频 / 音频）+ 下载。
+           放在最上面 —— 用户点开详情第一眼要看的就是「这条长什么样」，
+           而不是一屏参数。没有产物时这一整块由 JS 隐藏。 -->
+      <div class="detail-preview" id="detailPreview" hidden></div>
       <div class="detail-section">
         <div class="detail-section-title">生成参数</div>
         <div class="detail-kv" id="detailParams"></div>
@@ -1383,22 +1467,22 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <script src="/static/interaction-guard.js?v=guard1"></script>
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
-<script src="/static/music.js?v=musicyue2-2"></script>
+<script src="/static/music.js?v=uxbatch1"></script>
 <!-- 【2026-11-13 合并说明】video-panel.js 版本号取 h3-model-meta 一侧的
      videopanel2 —— 该分支改了 video-panel.js（作者推荐参数注释 + sigma 精修），
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=videopanel4"></script>
+<script src="/static/video-panel.js?v=uxbatch1"></script>
 <!-- 效果 LoRA 选择器（H3 文生视频面板）——
      必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
      调用（window.VIDEO_EFFECT_LORA）。 -->
-<script src="/static/video-effect-lora.js?v=efflora3"></script>
+<script src="/static/video-effect-lora.js?v=uxbatch1"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
 <!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
      必须**先于** app.js 加载 —— app.js 的 boot() 里要读
      window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
-<script src="/static/generation-queue.js?v=genqueue2"></script>
+<script src="/static/generation-queue.js?v=uxbatch1"></script>
 <script src="/static/video-nav.js?v=sidebarfold2"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
@@ -1411,18 +1495,22 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      h3-image 分支改了这两个文件（H3-Image 文生图/图片编辑面板与模型联动），
      必须升版号才能破掉浏览器缓存；mainline 一侧的 efflora1 / enh-unify2
      会让用户拿到旧文件。 -->
-<script src="/static/app.js?v=feasibility1"></script>
+<script src="/static/app.js?v=uxbatch1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
-<script src="/static/job-detail.js?v=jobdetail2"></script>
-<script src="/static/assets.js?v=assetlib1"></script>
+<script src="/static/job-detail.js?v=uxbatch1"></script>
+<script src="/static/assets.js?v=uxbatch1"></script>
+<!-- 素材库播放器模式（2026-11-14 需求 14） -->
+<script src="/static/asset-player.js?v=uxbatch1"></script>
+<!-- 生成媒体库「管理」（2026-11-14 需求 11） -->
+<script src="/static/media-manage.js?v=uxbatch1"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
 <script src="/static/enhance-menu-shared.js?v=shared2"></script>
-<script src="/static/enhance-menu.js?v=enhancemulti1"></script>
+<script src="/static/enhance-menu.js?v=uxbatch1"></script>
 <!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
      window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
-<script src="/static/music-enhance.js?v=musicyue2-1"></script>
+<script src="/static/music-enhance.js?v=uxbatch1"></script>
 <!-- agent-media.js 必须在 agent.js **之前**：agent.js 的任务卡渲染要用
      AgentMedia 判定「实际生效参数」与静默回落（视频分辨率 / 音乐时长） -->
 <script src="/static/agent-media.js?v=h3image1"></script>
@@ -1450,6 +1538,6 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 内置 Agent「agent 管理」面板（2026-11-13 审查目标 4/5）
      版本号必须随内容变化递增 —— 静态资源被浏览器缓存时，
      旧版面板会一直用旧的慢端点（实测表现为「读取中…」卡住）。 -->
-<script src="/static/agent-manage.js?v=agmanage3"></script>
+<script src="/static/agent-manage.js?v=uxbatch1"></script>
 </body>
 </html>

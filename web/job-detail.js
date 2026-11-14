@@ -279,19 +279,33 @@
         return;
       }
       // 卡片信息区点击 -> 也弹模态框（用户要求「点击卡片任意信息区」）
+      //
+      // 【2026-11-14 需求 3 · 停用这套卡片委托】
+      //
+      // 【为什么停用】app.js 的卡片监听器已经处理了同一件事
+      // （打开 #detailModal，浅色、字段与卡片一致），而且仓库既有的
+      // tests/test_c6_detail_recommend.py 明确断言：
+      // 「点详情只能弹 detailModal，jobDetailModal 必须保持 hidden」。
+      //
+      // 两套同时响应的后果（实测）：app.js 的监听器没有 stopPropagation，
+      // 事件冒泡到 document 后这里又开一次 #jobDetailModal。
+      // 而 #jobDetailModal 是**深色**面板（#171b21）且没有自己的文字色，
+      // 值文字继承全局 --text（近黑）=> 近黑画在近黑上 = 看不见。
+      // 它的 z-index（10050）又高于 #detailModal（1000），
+      // 于是它盖在正确的那套上面 —— 用户看到的就是「详情大部分空白」。
+      //
+      // 【现在】详情弹层统一由 app.js 的 #detailModal 承担。
+      // 本模块的 open()/close()/renderBody() 仍然保留并导出
+      // （tests/test_job_meta_frontend.py 等既有用例依赖它的 API），
+      // 只是不再响应卡片点击。
       const metaBox = target.closest(".job-meta");
       if (metaBox) {
         // 【C3】不与按钮冲突：.job-actions 里的按钮不在 .job-meta 里；
         // 这里再排一次「提示词」按钮（它在 .job-meta 里，自己有独立行为）。
         if (target.closest('[data-act="prompt"]')) return;
         if (target.closest("button, a")) return;
-        const card = metaBox.closest(".job-card");
-        const jid = card && card.dataset ? card.dataset.jid : null;
-        const job = jid ? findJobById(jid) : null;
-        if (job) {
-          event.preventDefault();
-          open(job);
-        }
+        // 【2026-11-14 需求 3】不再打开本模块的 #jobDetailModal ——
+        // 交给 app.js 的 #detailModal（浅色、唯一）。
       }
     });
     // Esc 关闭

@@ -51,6 +51,19 @@ MAX_TOOL_CALLS = 120
 #: 所以总时限必须跟着抬 —— 否则步数上限提到 50 也跑不完第 20 步。
 TOTAL_TIMEOUT = 2400.0
 
+#: 总时限的**可调区间**（秒）—— 2026-11-14 需求 6。
+#:
+#: 【为什么要有上下限】
+#:   * 下限 60 秒：比这更短的时限连一次模型调用都跑不完（实测单步 20~120 秒），
+#:     等于「一进 Agent 就超时」，必然是误配置。
+#:   * 上限 14400 秒（4 小时）：再长也只是让一个卡死的会话占用并发闸门更久
+#:     （AGENT_CONCURRENCY 是全局闸门），对用户没有实际意义。
+#:
+#: 【为什么默认还是 2400】保持既有行为不变 —— 用户不改就是老样子。
+TOTAL_TIMEOUT_MIN = 60
+TOTAL_TIMEOUT_MAX = 14400
+TOTAL_TIMEOUT_DEFAULT = int(TOTAL_TIMEOUT)
+
 #: 能力清单（key -> 中文名 + 说明 + 是否需要外部依赖）。
 #:
 #: 「是否内置」= 代码在本仓库里（不需要额外装插件）；
@@ -178,6 +191,10 @@ def defaults() -> dict:
         "file_roots": [],
         "code_exec_timeout_sec": 30,
         "ffmpeg_path": "",
+        # 【2026-11-14 需求 6】总时限（秒）—— 以前是写死的模块常量，
+        # 用户在「agent 管理」里看得到但改不了（灰色 disabled）。
+        # 现在它是一份**可持久化**的配置：改了 -> 存库 -> 下次运行按新值生效。
+        "total_timeout": TOTAL_TIMEOUT_DEFAULT,
     }
 
 
@@ -311,6 +328,15 @@ def normalize(payload: dict | None) -> dict:
         timeout = base["code_exec_timeout_sec"]
     base["code_exec_timeout_sec"] = max(5, min(300, timeout))
     base["ffmpeg_path"] = _clean_str(payload.get("ffmpeg_path"), 400)
+    # 【2026-11-14 需求 6】总时限归一：夹到 [60, 14400]，
+    # 非法值（None / 字符串 / 0）回落到默认值 —— 不整体拒绝整份配置。
+    raw_timeout = payload.get("total_timeout")
+    try:
+        total_timeout = int(raw_timeout) if raw_timeout is not None else base["total_timeout"]
+    except (TypeError, ValueError):
+        total_timeout = base["total_timeout"]
+    base["total_timeout"] = max(TOTAL_TIMEOUT_MIN,
+                                min(TOTAL_TIMEOUT_MAX, total_timeout))
     return base
 
 

@@ -699,6 +699,79 @@ def register(agent_mod, create_job_handler):
         return {"ok": True, "key": result["key"], "scope": result["scope"],
                 "value": result["value"], "created": result.get("created")}
 
+    @tool(
+        "manage_media_library",
+        "清理生成媒体库（只影响本工作台，不含 ComfyUI 自身产物与素材库）。"
+        "三种口径：all=全部产物；older=指定月数之前的历史产物（用 months）；"
+        "failed=失败/取消的产物。"
+        "先用 dry_run=true 预览会删多少条/多少文件，确认后再用 confirm=true 执行。",
+        _schema({
+            "scope": {"type": "string",
+                      "description": "清理口径：all / older / failed",
+                      "enum": ["all", "older", "failed"]},
+            "months": {"type": "integer",
+                       "description": "scope=older 时：要清理多少个月之前（1 = 30 天前）"},
+            "dry_run": {"type": "boolean",
+                        "description": "只预览不删除（默认 true）"},
+            "confirm": {"type": "boolean",
+                        "description": "真正执行删除时必须为 true"},
+        }, ["scope"]),
+    )
+    async def _tool_manage_media_library(ctx, args: dict) -> dict:
+        """内置 Agent 的媒体库管理工具（2026-11-14 需求 12）。
+
+        【为什么默认 dry_run】这是**不可逆**的删除操作。
+        Agent 不应该一上来就删 —— 先预览，把「会删多少」告诉用户，
+        用户确认后才执行。所以 confirm 不是默认参数而是显式参数。
+        """
+        from . import media_cleanup
+        server = ctx.server
+        if server is None:
+            raise AgentError("Agent 未接入服务端环境，无法管理媒体库", status=500)
+        scope = str(args.get("scope") or "all").strip()
+        if scope not in ("all", "older", "failed"):
+            raise AgentError(
+                "scope 只能是 all（全部产物）/ older（指定月数之前）/ failed（失败与取消）",
+                status=400, code="bad_scope")
+        try:
+            months = int(args.get("months") or 0)
+        except (TypeError, ValueError):
+            months = 0
+        if scope == "older" and months <= 0:
+            raise AgentError(
+                "scope=older 时必须给 months（正整数，按 30 天/月折算，"
+                "例：1 = 30 天前）", status=400, code="bad_request")
+
+        db_fn = getattr(server, "db", None)
+        out_dir = getattr(server, "OUT_DIR", None)
+        if db_fn is None or out_dir is None:
+            raise AgentError("服务端缺少 db / OUT_DIR，无法管理媒体库", status=500)
+
+        dry_run = args.get("dry_run")
+        confirm = bool(args.get("confirm"))
+        # 没显式 dry_run=false 且没 confirm -> 走预览
+        if not confirm and dry_run is not False:
+            with db_fn() as conn:
+                info = media_cleanup.preview(conn, out_dir, scope, months)
+            return {
+                "ok": True, "dry_run": True,
+                "message": (f"预览：将清理 {info['jobs']} 条任务记录、"
+                            f"{info['files']} 个产物文件（口径：{scope}）。"
+                            f"确认无误后用 confirm=true 再次调用即可执行。"),
+                **info,
+            }
+        if not confirm:
+            raise AgentError("执行删除需要 confirm=true", status=400,
+                             code="confirm_required")
+        with db_fn() as conn:
+            result = media_cleanup.cleanup(conn, out_dir, scope, months)
+        return {
+            "ok": True, "dry_run": False,
+            "message": (f"已清理 {result['deleted_jobs']} 条任务记录、"
+                        f"{result['deleted_files']} 个产物文件。"),
+            **result,
+        }
+
 
 # ------------------------------------------------------------------ 辅助
 

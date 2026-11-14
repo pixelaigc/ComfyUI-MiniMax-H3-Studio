@@ -42,6 +42,19 @@
   let lastSubmitAt = 0;              // 上次提交时间戳（防连点刷屏）
   const MIN_SUBMIT_INTERVAL_MS = 800;
 
+  // ------------------------------------------------------------------
+  // 明细区的展开态（2026-11-14 需求 1）
+  //
+  // 【为什么默认收起】生成队列面板在右侧「生成媒体库」里常驻，
+  // 明细列表会把媒体库首屏往下推 —— 用户默认只想知道「排第几」，
+  // 不想每次都看一长串明细。
+  //
+  // 【为什么用模块级变量而不是 DOM style】面板在「队列为空」时会被
+  // 整体 hidden 掉又放出来（render() 每秒跑一次），如果展开态只存在
+  // DOM 的 inline style 上，任何一次重绘都可能把它重置。放在模块级
+  // 变量里 = 「本次会话内记住用户的选择」，重绘不影响。
+  let detailExpanded = false;        // 默认收起
+
   // ------------------------------------------------------------------ 取数
 
   /**
@@ -110,6 +123,24 @@
     recent.forEach(item => { rows.push(itemHtml(item, false)); });
     list.innerHTML = rows.join("");
     bindCancelButtons(list);
+    // 每秒重绘都重新套一次展开态 —— 保证「用户展开后本次会话内保持」
+    applyDetailState();
+  }
+
+  /**
+   * 把模块级的展开态套到 DOM 上（列表显隐 + 按钮文案 + aria-expanded）。
+   *
+   * 单独抽出来是因为 render() 每秒跑一次会整体重写 list.innerHTML，
+   * 重写后 inline style 会丢 —— 必须在每次渲染后重新应用。
+   */
+  function applyDetailState() {
+    const list = document.getElementById("queueList");
+    const toggle = document.getElementById("queueToggle");
+    if (!list || !toggle) return;
+    list.style.display = detailExpanded ? "" : "none";
+    toggle.setAttribute("aria-expanded", detailExpanded ? "true" : "false");
+    toggle.textContent = detailExpanded ? "收起" : "明细";
+    toggle.setAttribute("title", detailExpanded ? "收起队列明细" : "展开队列明细");
   }
 
   function itemHtml(item, inQueue) {
@@ -181,12 +212,14 @@
     const list = document.getElementById("queueList");
     if (toggle && list) {
       toggle.addEventListener("click", () => {
-        const collapsed = list.style.display === "none";
-        list.style.display = collapsed ? "" : "none";
-        toggle.setAttribute("aria-expanded", collapsed ? "true" : "false");
-        toggle.textContent = collapsed ? "明细" : "收起";
+        // 反转模块级状态 —— 不是「读 DOM 再改 DOM」。
+        // 读 DOM 的写法在 render() 重写 innerHTML 后会失同步。
+        detailExpanded = !detailExpanded;
+        applyDetailState();
       });
     }
+    // 初始就是收起（detailExpanded 默认 false）
+    applyDetailState();
     refresh();
     // 队列比任务列表变化更快 —— 1 秒一次
     setInterval(() => refresh(), 1000);

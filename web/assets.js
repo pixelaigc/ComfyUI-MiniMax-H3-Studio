@@ -43,7 +43,112 @@
     current: null,        // 当前详情抽屉的素材
     picker: null,        // 选择器状态
     uploads: new Map(),  // 上传进度
+    // 【2026-11-14 需求 13】多选集合（素材 id）。
+    // 用 Set 而不是数组：增删查都是 O(1)，且天然去重。
+    selected: new Set(),
   };
+
+  // ---------------------------------------------------------------- 多选（需求 13）
+
+  /**
+   * 多选状态的唯一入口：改完必须调 renderSelection() 把界面同步上。
+   *
+   * 【为什么要多选】素材库一屏 60 张，逐张点删除不现实。
+   * 勾选 -> 顶部出现「已选 N 项 / 取消选择 / 全选当前页 / 删除所选」。
+   */
+  function selectedIds() {
+    return Array.from(state.selected);
+  }
+
+  function toggleSelected(assetId, on) {
+    if (!assetId) return;
+    const has = state.selected.has(assetId);
+    const want = on === undefined ? !has : !!on;
+    if (want) state.selected.add(assetId);
+    else state.selected.delete(assetId);
+    renderSelection();
+  }
+
+  function clearSelection() {
+    state.selected.clear();
+    renderSelection();
+  }
+
+  /** 全选当前页（当前筛选下已加载的那些）。 */
+  function selectAllVisible() {
+    (state.items || []).forEach(a => state.selected.add(a.id));
+    renderSelection();
+  }
+
+  /**
+   * 把多选状态同步到界面：
+   *   * 顶部选择条（已选 N 项 + 三个按钮）
+   *   * 每张卡上的勾选框状态
+   */
+  function renderSelection() {
+    const bar = $("#alSelBar");
+    const count = $("#alSelCount");
+    const n = state.selected.size;
+    if (bar) bar.hidden = n === 0;
+    if (count) count.textContent = `已选 ${n} 项`;
+    // 同步每张卡的勾选态
+    $$("#alGrid .al-card").forEach(card => {
+      const id = card.dataset.id;
+      const box = card.querySelector(".al-selbox");
+      if (box) box.checked = state.selected.has(id);
+      card.classList.toggle("selected", state.selected.has(id));
+    });
+  }
+
+  /**
+   * 批量删除（需求 13）。
+   *
+   * 【为什么要逐个删而不是一个批量接口】
+   * 服务端只有单条删除接口（DELETE /api/assets/{id}）。
+   * 逐条调用的好处：服务端对「被引用」的素材会返回 409 + 引用清单，
+   * 逐条调能**如实告诉用户哪几条删不掉、为什么**。
+   *
+   * 【确认】删之前必须确认 —— 这是不可逆操作（进回收站，可还原）。
+   */
+  async function deleteSelected() {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    const names = ids.map(id => {
+      const a = (state.items || []).find(x => x.id === id);
+      return a ? a.name : id;
+    });
+    const preview = names.slice(0, 8).join("、")
+      + (names.length > 8 ? ` 等 ${names.length} 项` : "");
+    if (!window.confirm(`确认删除选中的 ${ids.length} 项素材？\n\n${preview}\n\n（会移到回收站，可从回收站还原）`)) {
+      return;
+    }
+    let ok = 0;
+    const blocked = [];
+    for (const id of ids) {
+      try {
+        await api("/api/assets/" + encodeURIComponent(id), { method: "DELETE" });
+        ok++;
+      } catch (e) {
+        if (e.status === 409) {
+          const refs = (e.payload && e.payload.refs) || [];
+          const a = (state.items || []).find(x => x.id === id);
+          blocked.push(`${a ? a.name : id}（被 ${refs.length} 个任务引用）`);
+        } else {
+          blocked.push(`${id}（${e.message || "删除失败"}）`);
+        }
+      }
+    }
+    state.selected.clear();
+    renderSelection();
+    loadAssets();
+    if (blocked.length) {
+      toast(`已删除 ${ok} 项；${blocked.length} 项没删掉：${blocked.slice(0, 3).join("；")}`, "err");
+      alert("以下素材没能删除：\n\n" + blocked.join("\n")
+        + "\n\n被任务引用的素材需要先删除引用它的任务。");
+    } else {
+      toast(`已删除 ${ok} 项素材（已移到回收站）`, "ok");
+    }
+  }
 
   // ---------------------------------------------------------------- 工具
 
@@ -169,8 +274,16 @@
     const analyzed = asset.analyzed
       ? `<span class="badge" title="已有模型分析">已分析</span>` : "";
     const inTrash = asset.deleted_at ? `<span class="badge" style="background:rgba(200,50,55,.85)">回收站</span>` : "";
-    return `<div class="al-card" data-id="${esc(asset.id)}" draggable="true">
-      <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}</div>
+    return `<div class="al-card${state.selected.has(asset.id) ? " selected" : ""}" data-id="${esc(asset.id)}" draggable="true">
+      <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}
+        <!-- 【2026-11-14 需求 13】多选勾选框。放在缩略图左上角，
+             单独一个 .al-selbox-wrap，避免和卡片的「点开详情」冲突。 -->
+        <label class="al-selbox-wrap" title="选中（可多选后批量删除）" onclick="return false;">
+          <input type="checkbox" class="al-selbox" data-sel-id="${esc(asset.id)}"
+                 ${state.selected.has(asset.id) ? "checked" : ""}
+                 aria-label="选择 ${esc(asset.name)}">
+        </label>
+      </div>
       <div class="al-card-body">
         <div class="al-name" title="${esc(asset.name)}">${esc(asset.name)}</div>
         <div class="al-meta">
@@ -194,6 +307,10 @@
       asset.width || "", asset.height || "", asset.duration_sec ?? "",
       asset.ref_count || 0, asset.analyzed ? 1 : 0, asset.deleted_at || "",
       (asset.tags || []).join(","),
+      // 【2026-11-14 需求 13】选中态也要进签名 ——
+      // 否则「勾选后卡片被重建」时，勾选框会回到未选的样子
+      // （增量渲染只在签名变化时重建卡片）。
+      state.selected.has(asset.id) ? "sel" : "",
     ].join("|");
   }
 
@@ -265,6 +382,29 @@
       card.dataset.h3Bound = "1";
       const assetId = card.dataset.id;
       card.addEventListener("click", () => openDrawer(assetId));
+      // 【2026-11-14 需求 13】勾选框：点它只切换选中，**不开详情**。
+      // （勾选框在 .al-thumb 里，click 会冒泡到卡片 -> 打开详情抽屉，
+      //   所以必须 stopPropagation。）
+      //
+      // 【为什么用 change 而不是 click 来改状态】
+      // input[type=checkbox] 的 checked 在 click 处理器里**已经是新值**
+      // （浏览器先改 checkedness 再派发 click），但如果此时调用
+      // preventDefault()，浏览器会在处理器跑完之后**把 checked 还原**。
+      // 于是：Set 里记了选中、DOM 上的框却显示没勾 —— 界面与状态不一致
+      // （实测：selectedCards=3 但 checkedBoxes=2）。
+      //
+      // 正确做法：click 只做 stopPropagation（不阻止默认行为），
+      // 真正改状态用 change —— 它在 checkedness 最终确定后才派发。
+      const selBox = card.querySelector(".al-selbox");
+      if (selBox) {
+        selBox.addEventListener("click", event => {
+          event.stopPropagation();
+        });
+        selBox.addEventListener("change", event => {
+          event.stopPropagation();
+          toggleSelected(assetId, selBox.checked);
+        });
+      }
       card.addEventListener("contextmenu", event => {
         event.preventDefault();
         showAssetContext(event, assetId);
@@ -397,11 +537,40 @@
     const analysis = asset.latest_analysis;
     const refs = asset.references || { refs: [], count: 0 };
 
-    const preview = asset.preview_url
-      ? `<img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}">`
-      : (asset.category === "video"
-        ? `<video src="${esc(asset.content_url)}" controls preload="metadata"></video>`
-        : `<span class="ph">${CATEGORY_ICON[asset.category] || "📦"}</span>`);
+    // 【2026-11-14 需求 4】详情面板要能**直接看到 / 播放**素材本身。
+    //
+    // 【原来的缺陷】预览只按「有没有 preview_url」二分：
+    //   有 preview_url -> <img>（图片能看）
+    //   没有           -> 只给 video 放播放器，**音频**掉进兜底分支
+    //                    -> 只有一个 📦 占位符，**音频根本没法播**。
+    // 而「没有 preview_url」在音频上是常态（缩略图只给图片生成）。
+    //
+    // 【现在的做法】按 category 分派：
+    //   image -> <img> 用 preview_url（512 宽缩略图，省流量）
+    //   video -> <video> 用 content_url（原始文件）
+    //   audio -> <audio> 用 content_url（原始文件）
+    //   其它 -> 占位符
+    // 三类都能在详情里直接看 / 播。
+    const contentUrl = asset.content_url || "";
+    let preview;
+    if (asset.category === "video") {
+      preview = contentUrl
+        ? `<video class="al-preview-video" src="${esc(contentUrl)}" controls preload="metadata"></video>`
+        : `<span class="ph">🎬</span>`;
+    } else if (asset.category === "audio") {
+      preview = contentUrl
+        ? `<audio class="al-preview-audio" src="${esc(contentUrl)}" controls preload="metadata"></audio>`
+        : `<span class="ph">🎵</span>`;
+    } else if (asset.preview_url) {
+      preview = `<img class="al-preview-img" src="${esc(asset.preview_url)}"
+                      alt="${esc(asset.name)}">`;
+    } else if (contentUrl) {
+      // 图片没有缩略图但有原图 —— 退而用原图
+      preview = `<img class="al-preview-img" src="${esc(contentUrl)}"
+                      alt="${esc(asset.name)}">`;
+    } else {
+      preview = `<span class="ph">${CATEGORY_ICON[asset.category] || "📦"}</span>`;
+    }
 
     const tagsHtml = (asset.tags || []).map(tag =>
       `<span class="al-tag">${esc(tag)}<button data-rmtag="${esc(tag)}" title="删除标签">×</button></span>`
@@ -1023,6 +1192,19 @@
     const nav = $("#navAssets");
     if (nav) nav.addEventListener("click", showAssets);
 
+    // ---- 多选（2026-11-14 需求 13）----
+    const selClear = $("#alSelClear");
+    if (selClear) selClear.addEventListener("click", () => clearSelection());
+    const selAll = $("#alSelAll");
+    if (selAll) selAll.addEventListener("click", () => selectAllVisible());
+    const selDelete = $("#alSelDelete");
+    if (selDelete) selDelete.addEventListener("click", () => { deleteSelected(); });
+    // 【需求 14】播放器模式入口
+    const playerBtn = $("#alPlayerBtn");
+    if (playerBtn && window.AssetPlayer) {
+      playerBtn.addEventListener("click", () => window.AssetPlayer.open());
+    }
+
     const search = $("#alSearch");
     if (search) {
       let timer = null;
@@ -1206,5 +1388,11 @@
     loadAssets,
     toast,
     esc,
+    // 【2026-11-14 需求 14】素材库播放器模式需要「按 id 打开某张素材详情」
+    // （玩家面板里点某一项要能跳到详情）。openDrawer 原本是模块私有的，
+    // 这里导出为公开 API。
+    openDrawer,
+    // 【2026-11-14 需求 13】多选批量删除需要「当前已加载的素材清单」。
+    getItems: () => (state.items || []).slice(),
   };
 })();

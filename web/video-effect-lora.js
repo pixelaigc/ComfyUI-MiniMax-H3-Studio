@@ -91,48 +91,57 @@
     });
   }
 
+  /**
+   * 候选下拉的渲染（2026-11-14 需求 9：统一到文生图的原生下拉样式）。
+   *
+   * 【为什么改成原生 <select>】原先是「搜索框 + 自绘多选弹层」，
+   * 视觉与交互跟同页的文生图 LoRA 区（#imgLoraField）不一致 ——
+   * 一个是原生下拉 + 「添加」按钮，一个是自绘浮层 + 复选框。
+   * 同一个页面里两套 LoRA 选择控件，用户要学两遍。
+   *
+   * 【搜索能力保留在哪】搜索框降级为「下拉的过滤器」：
+   * 输入关键字 -> 只显示匹配项的原生下拉 -> 选一项 -> 点「添加」。
+   * 27 枚 LoRA 依然能快速定位，但主交互与文生图完全一致。
+   */
   function renderPickerMenu() {
-    const menu = document.getElementById("vidEffectLoraMenu");
+    const sel = document.getElementById("vidEffectLoraSelect");
     const search = document.getElementById("vidEffectLoraSearch");
-    if (!menu) return;
+    const addBtn = document.getElementById("vidEffectLoraAdd");
+    if (!sel) return;
     const kw = search ? search.value : "";
     const items = filterCandidates(kw);
+    const total = EFFECT_STORE.available.length;
+
     if (!items.length) {
-      const total = EFFECT_STORE.available.length;
-      menu.innerHTML = `<div class="vid-lora-picker-empty">${
-        total
-          ? (kw ? "没有匹配「" + esc(kw) + "」的效果 LoRA。" : "本机没有可选的效果 LoRA。")
-          : "本机未检测到可用的 H3 效果 LoRA 文件。"
-      }</div>`;
+      const label = total
+        ? (kw ? `没有匹配「${kw}」的效果 LoRA` : "全部已添加")
+        : "本机未检测到可用的 H3 效果 LoRA 文件";
+      sel.innerHTML = `<option value="">${esc(label)}</option>`;
+      sel.disabled = true;
+      if (addBtn) addBtn.disabled = true;
       return;
     }
-    menu.innerHTML = items.map(item => {
-      const rec = recommendedStrength(item);
-      const trig = item.trigger
-        ? `<span class="vid-lora-option-trig">触发词 ${esc(item.trigger)}</span>`
-        : `<span>上游未标注触发词</span>`;
+
+    // 下拉选项文案与文生图一致：显示名 + 一句话功能说明（title 挂完整说明）
+    sel.innerHTML = items.map(item => {
       const scene = (item.scene || "").split(/[。；\n]/)[0].trim();
-      return `<label class="vid-lora-option" title="${esc(item.name)}">
-        <input type="checkbox" data-lora-name="${esc(item.name)}">
-        <span class="vid-lora-option-main">
-          <span class="vid-lora-option-name">${esc(item.display || item.name)}</span>
-          ${scene ? `<span class="vid-lora-option-scene">${esc(scene)}</span>` : ""}
-          <span class="vid-lora-option-meta">推荐强度 ${rec} · ${trig}</span>
-        </span>
-      </label>`;
+      const brief = scene ? ` — ${scene.slice(0, 28)}` : "";
+      const title = item.scene ? ` title="${esc(item.scene)}"` : "";
+      const rec = recommendedStrength(item);
+      return `<option value="${esc(item.name)}"${title}>${esc(item.display || item.name)}${esc(brief)}</option>`;
     }).join("");
+    sel.disabled = false;
+    if (addBtn) addBtn.disabled = false;
+    // 供调试与测试核对（推荐强度等信息不在下拉文本里，避免撑太长）
+    sel.dataset.recommendedStrength = String(recommendedStrength(items[0]));
   }
 
   function openPicker() {
-    const menu = document.getElementById("vidEffectLoraMenu");
-    if (!menu) return;
     renderPickerMenu();
-    menu.hidden = false;
   }
 
   function closePicker() {
-    const menu = document.getElementById("vidEffectLoraMenu");
-    if (menu) menu.hidden = true;
+    // 原生下拉没有「浮层」需要关闭 —— 保留空实现以兼容旧调用点。
   }
 
   // ------------------------------------------------------------ 已选列表
@@ -496,13 +505,12 @@
   function bind() {
     const search = document.getElementById("vidEffectLoraSearch");
     if (search) {
-      search.addEventListener("focus", openPicker);
+      // 搜索框现在只是「下拉的过滤器」：输入即刷新下拉内容。
       search.addEventListener("input", () => {
-        openPicker();
         renderPickerMenu();
       });
       search.addEventListener("keydown", e => {
-        if (e.key === "Escape") { closePicker(); search.blur(); }
+        if (e.key === "Escape") { search.value = ""; renderPickerMenu(); search.blur(); }
       });
     }
     // 「清空全部」
@@ -510,35 +518,26 @@
     if (clearBtn) {
       clearBtn.addEventListener("click", () => { clearAll(); });
     }
-    const menu = document.getElementById("vidEffectLoraMenu");
-    if (menu) {
-      menu.addEventListener("change", e => {
-        const box = e.target.closest("input[data-lora-name]");
-        if (!box) return;
-        const name = box.getAttribute("data-lora-name");
+    // 「添加」按钮：把下拉里选中的一项加进已选列表（与文生图同一套交互）
+    const addBtn = document.getElementById("vidEffectLoraAdd");
+    const sel = document.getElementById("vidEffectLoraSelect");
+    if (addBtn && sel) {
+      addBtn.addEventListener("click", () => {
+        const name = sel.value;
+        if (!name) return;
         const meta = metaOf(name);
-        if (box.checked) {
-          const rec = recommendedStrength(meta);
-          selectedList().push({
-            name,
-            strength: rec,
-            enabled: true,
-            trigger: meta && meta.trigger ? meta.trigger : "",
-          });
-        } else {
-          const idx = selectedList().findIndex(x => x.name === name);
-          if (idx >= 0) selectedList().splice(idx, 1);
-        }
+        const rec = recommendedStrength(meta);
+        selectedList().push({
+          name,
+          strength: rec,
+          enabled: true,
+          trigger: meta && meta.trigger ? meta.trigger : "",
+        });
         renderEffectLoraList();
         renderPickerMenu();
         saveEffectLoraConfig();
       });
     }
-    // 点到别处关掉菜单
-    document.addEventListener("click", e => {
-      const picker = document.querySelector(".vid-lora-picker");
-      if (picker && !picker.contains(e.target)) closePicker();
-    });
   }
 
   // ------------------------------------------------------------ 导出
