@@ -4105,11 +4105,51 @@ function jobCard(job) {
   // 所有 .job-actions 里的按钮都要 stopPropagation，
   // 否则点「删除」会同时弹出详情框（删除还要再点一次确认框，
   // 用户体验是「弹了个看不懂的框」）。
+  //
+  // 【2026-11-14 需求 3】改为**不自己开** #detailModal ——
+  // job-detail.js 的 document 级委托已经处理了 [data-act="detail"]
+  // （它 open() 的是字段更全的 #jobDetailModal）。
+  // 两边都开 = 两个模态框叠在一起。
+  // 这里保留 stopPropagation（防止冒泡到卡片监听器再被当成「点卡片」）。
   card.querySelector('[data-act="detail"]')?.addEventListener("click", event => {
     event.stopPropagation();
+    // 【2026-11-14 需求 3】
+    // #detailModal（浅色、字段完整）是本工作台**唯一**的详情弹层。
+    //
+    // 【曾经的双开缺陷】web/job-detail.js 里还有一套 document 级委托，
+    // 也会响应卡片点击并打开它自己的 #jobDetailModal（深色）。
+    // app.js 的卡片监听器没有 stopPropagation -> 事件冒泡到 document
+    // -> 两套都开。而 #jobDetailModal 的 z-index（10050）更高，
+    // 于是它盖在正确的 #detailModal（z-index 1000）上面 ——
+    // 而它自己的文字色是坏的（深色面板 + 近黑文字 = 看不见），
+    // 用户看到的就是一个「大部分空白」的弹层。
+    //
+    // 【现在】详情按钮只开 #detailModal；job-detail.js 那套的
+    // 卡片委托已停用（见该文件的改动说明）。
     openDetailModal(job);
   });
   // 点击卡片其它位置 -> 也打开详情（需求原文）。
+  //
+  // 【2026-11-14 需求 3 · 修复「两个模态框同时弹出 + 弹层空白」】
+  //
+  // 【原缺陷链】
+  //   1. app.js 这段监听器在点 .job-meta 时打开 #detailModal（浅色、可读）；
+  //   2. 但它**没有** stopPropagation -> 事件冒泡到 document；
+  //   3. web/job-detail.js 的 document 级委托又响应一次，
+  //      打开它自己的 #jobDetailModal（**深色**，z-index 10050 > 1000）；
+  //   4. 于是深色弹层盖在浅色弹层上面，而它的文字色继承全局
+  //      --text（近黑）画在 #171b21（近黑）面板上 = **看不见**；
+  //   5. 用户看到的就是「详情弹层大部分空白」。
+  //
+  // 【修法】stopPropagation —— 事件不再到达 document，
+  // job-detail.js 的委托收不到，两套不会同时开。
+  //
+  // 【为什么保留 #detailModal 而不是改用 job-detail.js 那套】
+  // #detailModal 是浅色主题、字段与卡片一致、并且仓库既有的
+  // tests/test_c6_detail_recommend.py 明确断言「点详情只能弹
+  // detailModal，jobDetailModal 必须保持 hidden」。
+  // => 保留它作为唯一详情弹层，同时把 job-detail.js 那套的
+  //    卡片委托停用（见 job-detail.js 的改动说明）。
   //
   // 【排除项】不能挡住这些交互：
   //   * 预览区的图片/视频（点它要放大/播放）
@@ -4125,6 +4165,9 @@ function jobCard(job) {
       return;
     }
     openDetailModal(job);
+    // 【2026-11-14 需求 3】阻止事件冒泡到 document ——
+    // 否则 job-detail.js 的委托会再开一套 #jobDetailModal 叠上来。
+    event.stopPropagation();
   });
   // 批次结果展开/折叠（点标题行任意位置或三角都可以）
   card.querySelector('[data-act="toggle-batches"]')?.addEventListener("click", event => {
@@ -4615,6 +4658,49 @@ function openDetailModal(job) {
     // 完整提示词（不是截断的 80 字）
     promptBox.textContent = String((job.params && job.params.prompt) || "").trim()
       || "（这条任务没有提示词）";
+  }
+  // 【2026-11-14 需求 3】缩略图 + 下载。
+  //
+  // 【为什么原来没有】弹层只有参数表和提示词，没有任何**产物本身**的信息 ——
+  // 用户点开详情是为了「这条到底是长什么样的」，却只能看到一堆参数。
+  //
+  // 【数据来源】job.outputs（服务端在任务完成时写回的产物清单），
+  // 与卡片上的预览用的是**同一份**（outputUrl(job, output)）。
+  // 视频给 <video controls>，音频给 <audio controls>，图片给 <img>。
+  const previewBox = $("#detailPreview");
+  if (previewBox) {
+    const outputs = Array.isArray(job.outputs) ? job.outputs : [];
+    // 先取第一个能显示的产物（按图片 -> 视频 -> 音频）
+    const pick = (kinds) => outputs.find(o => o && kinds.includes(o.kind));
+    const img = pick(["image"]);
+    const vid = pick(["video"]);
+    const aud = pick(["audio"]);
+    const primary = img || vid || aud;
+    if (!primary) {
+      previewBox.hidden = true;
+      previewBox.innerHTML = "";
+    } else {
+      previewBox.hidden = false;
+      const url = outputUrl(job, primary);
+      const name = String(primary.name || primary.file || "").split(/[\\/]/).pop();
+      let media;
+      if (primary.kind === "image") {
+        media = `<img class="detail-preview-img" src="${escapeHtml(url)}"
+                       alt="${escapeHtml(name)}" loading="lazy">`;
+      } else if (primary.kind === "video") {
+        media = `<video class="detail-preview-media" src="${escapeHtml(url)}"
+                        controls preload="metadata"></video>`;
+      } else {
+        media = `<audio class="detail-preview-audio" src="${escapeHtml(url)}"
+                        controls preload="metadata"></audio>`;
+      }
+      previewBox.innerHTML = media
+        + `<div class="detail-preview-actions">
+             <a class="detail-preview-dl" href="${escapeHtml(url)}" download
+                title="下载原文件">⬇ 下载原文件</a>
+             <span class="detail-preview-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+           </div>`;
+    }
   }
   detailOpenJobId = job.id;
   modal.hidden = false;
