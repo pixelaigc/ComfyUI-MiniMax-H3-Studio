@@ -394,14 +394,25 @@ COMPAT_CTX_DAMPING_THRESHOLD = 0.03
 
 
 def _read_safetensors_header(path: Path) -> dict:
-    """只读 safetensors 头部（不加载权重本体，快）。"""
-    import struct
-    try:
-        with open(path, "rb") as handle:
-            size = struct.unpack("<Q", handle.read(8))[0]
-            return json.loads(handle.read(size))
-    except Exception:
-        return {}
+    """只读 safetensors 头部（不加载权重本体，快）。
+
+    ⚠️ **必须带完整性校验**（2026-11-15 补）：
+    safetensors 的布局是「8 字节长度 + JSON 头 + 数据区」，**头部本身完整
+    并不代表权重完整**。下载中断 / 拷贝未完成会留下一个「头完好、数据区被
+    截断」的文件 —— 旧逻辑「头部能读 = 文件正常」会把它当成好文件。
+
+    实测（2026-11-15）：`ip-adapter-faceid-plus_sd15_lora.safetensors`
+    头部声明数据区到 51,059,544 字节，实际文件只有 50,818,772 字节
+    （缺 240,772 字节）；`AWPortrait-QW.safetensors` 与
+    `Qwen-Image-Edit-Semi-Realistic-Detailer-v1.safetensors` 是 0 字节空文件。
+    ComfyUI 加载它们会抛
+    `SafetensorError: Error while deserializing header: incomplete metadata,
+    file not fully covered` —— 用户选了必然报错。
+
+    所以这里复用 MOSS 侧已经做好的完整性判定（`moss_lora_compat`），
+    **不自己再写一份**：两份实现漂移 = 同类缺陷在不同族复发。
+    """
+    return moss_lora_compat.read_safetensors_header(path)
 
 
 # Z-Image 底模独有的模块前缀（实测 z_image_turbo / z_image_bf16 的键集）
@@ -837,6 +848,31 @@ def check_compatibility(path: Path, unet_path: Path | None = None,
         "verified": True,
         "deep_analyzed": False,
     }
+
+    # ⚠️ **fail closed：LoRA 权重文件本体读不出 -> 明确不兼容**
+    # （2026-11-15 补，与 MOSS 侧的口径对齐）
+    #
+    # `_read_safetensors_header` 现在带**完整性校验**（头部声明的数据区
+    # 必须被文件实际大小完整覆盖）。所以「读不出头部」有两种含义：
+    #   1. 文件被截断 / 是 0 字节空文件 -> ComfyUI 加载必然抛
+    #      `SafetensorError: incomplete metadata, file not fully covered`
+    #   2. 文件根本不是 safetensors
+    # 两种都意味着「用户选了必然报错」。
+    #
+    # 旧逻辑：header 为空 -> bases 为空 -> total=0 -> 跳过判定 ->
+    # compatible=True / attention_hit=1.0 -> **照常下发**，用户选中即崩。
+    # 这里改成明确不兼容并给出如实原因。
+    if not lora_header:
+        detail = moss_lora_compat.read_safetensors_header_detail(path)
+        result["compatible"] = False
+        result["verified"] = True
+        result["attention_hit"] = 0.0
+        result["reason"] = (
+            f"{detail['reason']} "
+            "这个 LoRA 无法在本机上使用，已从可选列表中排除。")
+        _COMPAT_CACHE[key] = dict(result)
+        _UNET_CACHE_KEY = unet_key
+        return result
 
     if total and hit_ratio < COMPAT_MIN_ATTENTION_HIT:
         result["compatible"] = False
