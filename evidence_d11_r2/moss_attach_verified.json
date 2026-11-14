@@ -1,0 +1,4303 @@
+[
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss/moss_hires_lora_v0.1_qkv_split.safetensors",
+  "file": "moss_hires_lora_v0.1_qkv_split.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss/moss_hires_lora_v0.2_qkv_split.safetensors",
+  "file": "moss_hires_lora_v0.2_qkv_split.safetensors",
+  "before": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss/moss_hires_lora_v0.3_qkv_split.safetensors",
+  "file": "moss_hires_lora_v0.3_qkv_split.safetensors",
+  "before": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss/moss_hires_lora_v0.4_qkv_split.safetensors",
+  "file": "moss_hires_lora_v0.4_qkv_split.safetensors",
+  "before": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss/moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors",
+  "file": "moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Asian handsome guy.safetensors",
+  "file": "Asian handsome guy.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/AsianGirlMix-Moss-177p44e.safetensors",
+  "file": "AsianGirlMix-Moss-177p44e.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/BackgroundSharpness_MOSS-sft_v1.safetensors",
+  "file": "BackgroundSharpness_MOSS-sft_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/C500.safetensors",
+  "file": "C500.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Cinematic_MossSFT_c1-st6000.safetensors",
+  "file": "Cinematic_MossSFT_c1-st6000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Cissia_MOSS.safetensors",
+  "file": "Cissia_MOSS.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Eldreda_Sunbringer_moss_12138.safetensors",
+  "file": "Eldreda_Sunbringer_moss_12138.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors",
+  "file": "Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors",
+  "file": "Flat Color Anime Lineart Style-dora_1600.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Kodachrome1970s_000002000.safetensors",
+  "file": "Kodachrome1970s_000002000.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MKAI_Lindvern_Sunbringer_v1_MOSS.safetensors",
+  "file": "MKAI_Lindvern_Sunbringer_v1_MOSS.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-Animated-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-Animated-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-Anime-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-Anime-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-Beauty-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-Beauty-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-Gouache-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-Gouache-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-NSFW-Uncensored-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-NSFW-Uncensored-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-Psychedelic-LoRA-ComfyUI.safetensors",
+  "file": "MOSS-Image-Psychedelic-LoRA-ComfyUI.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors",
+  "file": "MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors",
+  "file": "MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSSRealisticSnapshotV1.safetensors",
+  "file": "MOSSRealisticSnapshotV1.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "有 82 个键的形态无法无歧义归一，未转换（不猜）",
+  "after": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "used_original": true,
+  "verdict": "partial"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MOSS_detailer_v051.safetensors",
+  "file": "MOSS_detailer_v051.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Moss-RealismEnhancer-V1.safetensors",
+  "file": "Moss-RealismEnhancer-V1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Moss_danica_v2step400_azusa.safetensors",
+  "file": "Moss_danica_v2step400_azusa.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Moss_v1.safetensors",
+  "file": "Moss_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/MysticXXX-Moss-V1.safetensors",
+  "file": "MysticXXX-Moss-V1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/NexBlend01MossImage.safetensors",
+  "file": "NexBlend01MossImage.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors",
+  "file": "Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/PhotoSlider_MOSS-sft_v1.safetensors",
+  "file": "PhotoSlider_MOSS-sft_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/PornMaster_Moss_Detail_Slider_V1.safetensors",
+  "file": "PornMaster_Moss_Detail_Slider_V1.safetensors",
+  "before": {
+   "patched": 210,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 210,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/PornMaster_Moss_Realism_slider_V1.safetensors",
+  "file": "PornMaster_Moss_Realism_slider_V1.safetensors",
+  "before": {
+   "patched": 114,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 114,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/RAW_Upscale_MOSS_v1.safetensors",
+  "file": "RAW_Upscale_MOSS_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Remielle.safetensors",
+  "file": "Remielle.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Ronova.safetensors",
+  "file": "Ronova.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Soft Pastel Photography MOSS.safetensors",
+  "file": "Soft Pastel Photography MOSS.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Suoming.safetensors",
+  "file": "Suoming.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Tribios.safetensors",
+  "file": "Tribios.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Tsaritsa.safetensors",
+  "file": "Tsaritsa.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/TsaritsaMI.safetensors",
+  "file": "TsaritsaMI.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Ultra-real-moss.safetensors",
+  "file": "Ultra-real-moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/Vesna.safetensors",
+  "file": "Vesna.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/ViRealismMoss_V1.safetensors",
+  "file": "ViRealismMoss_V1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/anime screenscap_mossimage_v1.safetensors",
+  "file": "anime screenscap_mossimage_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/anireal_moss_lora_v1.safetensors",
+  "file": "anireal_moss_lora_v1.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/asianathman.safetensors",
+  "file": "asianathman.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/atmospheric photography.safetensors",
+  "file": "atmospheric photography.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/betmanimestyle-moss-990steps.safetensors",
+  "file": "betmanimestyle-moss-990steps.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/betmillustrationstyle-700steps.safetensors",
+  "file": "betmillustrationstyle-700steps.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/blue-archive-style-base-moss-image-base-epoch-10.safetensors",
+  "file": "blue-archive-style-base-moss-image-base-epoch-10.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/canon_moss.safetensors",
+  "file": "canon_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/chenbin_style_v2_blush_1500step_rank32.safetensors",
+  "file": "chenbin_style_v2_blush_1500step_rank32.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/cinematic-photography-moss-image-sft-epoch-10.safetensors",
+  "file": "cinematic-photography-moss-image-sft-epoch-10.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/cndamiph_Candid_Amateur_iPhone_MOSS_v1.safetensors",
+  "file": "cndamiph_Candid_Amateur_iPhone_MOSS_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/concept-moss-image-base-epoch-11.safetensors",
+  "file": "concept-moss-image-base-epoch-11.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/darkFantasyStyleMOSS_v1.safetensors",
+  "file": "darkFantasyStyleMOSS_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/dracaene-moss-v1.safetensors",
+  "file": "dracaene-moss-v1.safetensors",
+  "before": {
+   "patched": 192,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 192,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/facediff.safetensors",
+  "file": "facediff.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/firefly26710_Moss.safetensors",
+  "file": "firefly26710_Moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/gjb_v1_MOSS.safetensors",
+  "file": "gjb_v1_MOSS.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/grainscape_moss.safetensors",
+  "file": "grainscape_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Cinematic_MossSFT_c1-st6000.safetensors",
+  "file": "h3studio_mossnorm__Cinematic_MossSFT_c1-st6000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Cissia_MOSS.safetensors",
+  "file": "h3studio_mossnorm__Cissia_MOSS.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Eldreda_Sunbringer_moss_12138.safetensors",
+  "file": "h3studio_mossnorm__Eldreda_Sunbringer_moss_12138.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors",
+  "file": "h3studio_mossnorm__Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Kodachrome1970s_000002000.safetensors",
+  "file": "h3studio_mossnorm__Kodachrome1970s_000002000.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors",
+  "file": "h3studio_mossnorm__MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors",
+  "file": "h3studio_mossnorm__MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Moss_danica_v2step400_azusa.safetensors",
+  "file": "h3studio_mossnorm__Moss_danica_v2step400_azusa.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors",
+  "file": "h3studio_mossnorm__Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__Ultra-real-moss.safetensors",
+  "file": "h3studio_mossnorm__Ultra-real-moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__anireal_moss_lora_v1.safetensors",
+  "file": "h3studio_mossnorm__anireal_moss_lora_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__betmanimestyle-moss-990steps.safetensors",
+  "file": "h3studio_mossnorm__betmanimestyle-moss-990steps.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__betmillustrationstyle-700steps.safetensors",
+  "file": "h3studio_mossnorm__betmillustrationstyle-700steps.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__blue-archive-style-base-moss-image-base-epoch-10.safetensors",
+  "file": "h3studio_mossnorm__blue-archive-style-base-moss-image-base-epoch-10.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__canon_moss.safetensors",
+  "file": "h3studio_mossnorm__canon_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__cinematic-photography-moss-image-sft-epoch-10.safetensors",
+  "file": "h3studio_mossnorm__cinematic-photography-moss-image-sft-epoch-10.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__grainscape_moss.safetensors",
+  "file": "h3studio_mossnorm__grainscape_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__instagram_aesthetic_moss_v1.safetensors",
+  "file": "h3studio_mossnorm__instagram_aesthetic_moss_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__krealistick_MOSS.safetensors",
+  "file": "h3studio_mossnorm__krealistick_MOSS.safetensors",
+  "before": {
+   "patched": 462,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 462,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__lenovo_moss.safetensors",
+  "file": "h3studio_mossnorm__lenovo_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__lucia elowen.safetensors",
+  "file": "h3studio_mossnorm__lucia elowen.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__lumine_v3_1_s2000.safetensors",
+  "file": "h3studio_mossnorm__lumine_v3_1_s2000.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__lunhuimoss1_c1-st1000.safetensors",
+  "file": "h3studio_mossnorm__lunhuimoss1_c1-st1000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__mamimi_c1-st6000_comfyui.safetensors",
+  "file": "h3studio_mossnorm__mamimi_c1-st6000_comfyui.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__men-hanm-epoch-09.safetensors",
+  "file": "h3studio_mossnorm__men-hanm-epoch-09.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__mitya_v4_s1000.safetensors",
+  "file": "h3studio_mossnorm__mitya_v4_s1000.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss-cn-uncle-moss-image-base-2000.safetensors",
+  "file": "h3studio_mossnorm__moss-cn-uncle-moss-image-base-2000.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss-image-pixelart-16x16.safetensors",
+  "file": "h3studio_mossnorm__moss-image-pixelart-16x16.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_alpha_v1.safetensors",
+  "file": "h3studio_mossnorm__moss_alpha_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "file": "h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "before": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_matcha_style_v1_c1-st1000.safetensors",
+  "file": "h3studio_mossnorm__moss_matcha_style_v1_c1-st1000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_pussy_lora_v3.0_face.safetensors",
+  "file": "h3studio_mossnorm__moss_pussy_lora_v3.0_face.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_realistic_candid_lora.safetensors",
+  "file": "h3studio_mossnorm__moss_realistic_candid_lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_style_v1-comfy(1).safetensors",
+  "file": "h3studio_mossnorm__moss_style_v1-comfy(1).safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__mossps1_c1-st1000.safetensors",
+  "file": "h3studio_mossnorm__mossps1_c1-st1000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__nekometaru-moss_c1-st1000.safetensors",
+  "file": "h3studio_mossnorm__nekometaru-moss_c1-st1000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__nicegirls_v2_moss.safetensors",
+  "file": "h3studio_mossnorm__nicegirls_v2_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__odette_v5_s2200.safetensors",
+  "file": "h3studio_mossnorm__odette_v5_s2200.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__phone_photography_2025_moss.safetensors",
+  "file": "h3studio_mossnorm__phone_photography_2025_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__samsung_moss.safetensors",
+  "file": "h3studio_mossnorm__samsung_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__sandrone_mmd_v7_s4100.safetensors",
+  "file": "h3studio_mossnorm__sandrone_mmd_v7_s4100.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__style-moss-image-base-epoch-07.safetensors",
+  "file": "h3studio_mossnorm__style-moss-image-base-epoch-07.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__style-moss-image-base-epoch-10.safetensors",
+  "file": "h3studio_mossnorm__style-moss-image-base-epoch-10.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__ultra_real_moss_v2.safetensors",
+  "file": "h3studio_mossnorm__ultra_real_moss_v2.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__vesna_v2_s2500.safetensors",
+  "file": "h3studio_mossnorm__vesna_v2_s2500.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__vody_v2_s2500.safetensors",
+  "file": "h3studio_mossnorm__vody_v2_s2500.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__xiaoyuChineseAIWoman_v1.safetensors",
+  "file": "h3studio_mossnorm__xiaoyuChineseAIWoman_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__zshfmoss_c1-st1000.safetensors",
+  "file": "h3studio_mossnorm__zshfmoss_c1-st1000.safetensors",
+  "before": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/helives3d_dora_r64_s00006400_comfy.safetensors",
+  "file": "helives3d_dora_r64_s00006400_comfy.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors",
+  "file": "hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors",
+  "before": {
+   "error": "SafetensorError: Error while deserializing header: incomplete metadata, file not fully covered"
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "读不到 safetensors 头部",
+  "after": {
+   "error": "SafetensorError: Error while deserializing header: incomplete metadata, file not fully covered"
+  },
+  "used_original": true,
+  "verdict": "error"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/hina_MOSSImageSFT_AsianMix_v1.0-lora.safetensors",
+  "file": "hina_MOSSImageSFT_AsianMix_v1.0-lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/hina_MOSSImageSFT_MixArmor_v1.0_lora.safetensors",
+  "file": "hina_MOSSImageSFT_MixArmor_v1.0_lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/imagefinish-sft-epoch0150-step000150.safetensors",
+  "file": "imagefinish-sft-epoch0150-step000150.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/instagram_aesthetic_moss_v1.safetensors",
+  "file": "instagram_aesthetic_moss_v1.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/kafgwoman-moss-moss-image-base-epoch-05.safetensors",
+  "file": "kafgwoman-moss-moss-image-base-epoch-05.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/krealistick_MOSS.safetensors",
+  "file": "krealistick_MOSS.safetensors",
+  "before": {
+   "patched": 336,
+   "missing": 126,
+   "missing_proj_qkv": 126,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.lora_down.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 462,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/kuukiikan_style_moss_v1-step0003200_3314586.safetensors",
+  "file": "kuukiikan_style_moss_v1-step0003200_3314586.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lenovo_moss.safetensors",
+  "file": "lenovo_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lighting-slider-epoch0150-step000450.safetensors",
+  "file": "lighting-slider-epoch0150-step000450.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lily_lora.safetensors",
+  "file": "lily_lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lokr-moss-kodachrome-v1.safetensors",
+  "file": "lokr-moss-kodachrome-v1.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "有 82 个键的形态无法无歧义归一，未转换（不猜）",
+  "after": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "used_original": true,
+  "verdict": "partial"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lokr-moss-kodachrome-v2.safetensors",
+  "file": "lokr-moss-kodachrome-v2.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "有 82 个键的形态无法无歧义归一，未转换（不猜）",
+  "after": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "used_original": true,
+  "verdict": "partial"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lora_MOSS_mylow_beta01.safetensors",
+  "file": "lora_MOSS_mylow_beta01.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lucia elowen.safetensors",
+  "file": "lucia elowen.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lumine_v3_1_s2000.safetensors",
+  "file": "lumine_v3_1_s2000.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/luna_style_moss_v1.safetensors",
+  "file": "luna_style_moss_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/lunhuimoss1_c1-st1000.safetensors",
+  "file": "lunhuimoss1_c1-st1000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/mamimi_c1-st6000_comfyui.safetensors",
+  "file": "mamimi_c1-st6000_comfyui.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 84,
+   "missing_proj_qkv": 84,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/men-hanm-epoch-09.safetensors",
+  "file": "men-hanm-epoch-09.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/mitya_v4_s1000.safetensors",
+  "file": "mitya_v4_s1000.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss Cantarella.safetensors",
+  "file": "moss Cantarella.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss Hsin2.safetensors",
+  "file": "moss Hsin2.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss base_000007750.safetensors",
+  "file": "moss base_000007750.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-cn-uncle-moss-image-base-2000.safetensors",
+  "file": "moss-cn-uncle-moss-image-base-2000.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-image-impressionism-lora.safetensors",
+  "file": "moss-image-impressionism-lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-image-pixelart-16x16.safetensors",
+  "file": "moss-image-pixelart-16x16.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 504,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.weight",
+    "layers.0.proj.ffn_down.lora_B.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-image-reality-lora-preview-step73250.safetensors",
+  "file": "moss-image-reality-lora-preview-step73250.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-pixelart-v.0.3.safetensors",
+  "file": "moss-pixelart-v.0.3.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss-sharp-v1_000000400.safetensors",
+  "file": "moss-sharp-v1_000000400.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_alpha_v1.safetensors",
+  "file": "moss_alpha_v1.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 84,
+   "missing_proj_qkv": 84,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_base_background_tweaker.safetensors",
+  "file": "moss_base_background_tweaker.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_d3style_v1.safetensors",
+  "file": "moss_d3style_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_danbooru40k_v1.safetensors",
+  "file": "moss_danbooru40k_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_east_asian_girl_v2.safetensors",
+  "file": "moss_east_asian_girl_v2.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_image_charref_v2.safetensors",
+  "file": "moss_image_charref_v2.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_image_sft_look_lora.safetensors",
+  "file": "moss_image_sft_look_lora.safetensors",
+  "before": {
+   "patched": 137,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_matcha_style_v1_c1-st1000.safetensors",
+  "file": "moss_matcha_style_v1_c1-st1000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_morereal.safetensors",
+  "file": "moss_morereal.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_pussy_lora_v3.0.safetensors",
+  "file": "moss_pussy_lora_v3.0.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_pussy_lora_v3.0_face.safetensors",
+  "file": "moss_pussy_lora_v3.0_face.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 84,
+   "missing_proj_qkv": 84,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_r32_v2-comfy.safetensors",
+  "file": "moss_r32_v2-comfy.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_realistic_candid_lora.safetensors",
+  "file": "moss_realistic_candid_lora.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 123,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_sabikaze_v1.safetensors",
+  "file": "moss_sabikaze_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_sft_destripe_top64_bf16.safetensors",
+  "file": "moss_sft_destripe_top64_bf16.safetensors",
+  "before": {
+   "patched": 25,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 25,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_style_v1-comfy(1).safetensors",
+  "file": "moss_style_v1-comfy(1).safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/mossps1_c1-st1000.safetensors",
+  "file": "mossps1_c1-st1000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/mss_photoQuality_-2to2.safetensors",
+  "file": "mss_photoQuality_-2to2.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/n_h_lora_v1.safetensors",
+  "file": "n_h_lora_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/naturskinx-moss-image-sft-epoch-08.safetensors",
+  "file": "naturskinx-moss-image-sft-epoch-08.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/nekometaru-moss_c1-st1000.safetensors",
+  "file": "nekometaru-moss_c1-st1000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/nelux_Realism_v2.safetensors",
+  "file": "nelux_Realism_v2.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/nicegirls_v2_moss.safetensors",
+  "file": "nicegirls_v2_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/nike.safetensors",
+  "file": "nike.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/noyu_moss.safetensors",
+  "file": "noyu_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/odette_v5_s2200.safetensors",
+  "file": "odette_v5_s2200.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/ohstyle_moss_v1.safetensors",
+  "file": "ohstyle_moss_v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/phone_photography_2025_moss.safetensors",
+  "file": "phone_photography_2025_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/qingxiao.safetensors",
+  "file": "qingxiao.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/ral-truskin_moss.safetensors",
+  "file": "ral-truskin_moss.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/realskin_r32_comfy.safetensors",
+  "file": "realskin_r32_comfy.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/samsung_moss.safetensors",
+  "file": "samsung_moss.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/sandrone_mmd_v7_s4100.safetensors",
+  "file": "sandrone_mmd_v7_s4100.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/shuiwu22-moss-image-lora.safetensors",
+  "file": "shuiwu22-moss-image-lora.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/silver_wolf_moss.safetensors",
+  "file": "silver_wolf_moss.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/skin_tone_moss_NW.safetensors",
+  "file": "skin_tone_moss_NW.safetensors",
+  "before": {
+   "patched": 41,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "有 82 个键的形态无法无歧义归一，未转换（不猜）",
+  "after": {
+   "patched": 41,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lokr_w1",
+    "diffusion_model.layers.0.proj.qkv.lokr_w2",
+    "diffusion_model.layers.1.proj.qkv.lokr_w1"
+   ]
+  },
+  "used_original": true,
+  "verdict": "partial"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/style-moss-image-base-epoch-07.safetensors",
+  "file": "style-moss-image-base-epoch-07.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/style-moss-image-base-epoch-10.safetensors",
+  "file": "style-moss-image-base-epoch-10.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/target-epoch0150-step000150.safetensors",
+  "file": "target-epoch0150-step000150.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/transparent-lora-for-moss-image-v1.safetensors",
+  "file": "transparent-lora-for-moss-image-v1.safetensors",
+  "before": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/ultra_real_moss_v2.safetensors",
+  "file": "ultra_real_moss_v2.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/vesna_v2_s2500.safetensors",
+  "file": "vesna_v2_s2500.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/vody_v2_s2500.safetensors",
+  "file": "vody_v2_s2500.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/wangzhe_moss.safetensors",
+  "file": "wangzhe_moss.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/xiaoyuChineseAIWoman_v1.safetensors",
+  "file": "xiaoyuChineseAIWoman_v1.safetensors",
+  "before": {
+   "patched": 123,
+   "missing": 82,
+   "missing_proj_qkv": 82,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.lora_A.weight",
+    "diffusion_model.layers.0.proj.qkv.lora_B.weight",
+    "diffusion_model.layers.1.proj.qkv.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/yixuanZzz_v1.safetensors",
+  "file": "yixuanZzz_v1.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/yomistyle_v3.safetensors",
+  "file": "yomistyle_v3.safetensors",
+  "before": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "前缀形态可被 ComfyUI 的别名直接命中，无需转换",
+  "after": {
+   "patched": 246,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "name": "/mnt/usb2t/comfyui-models/loras/moss-effects/zshfmoss_c1-st1000.safetensors",
+  "file": "zshfmoss_c1-st1000.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 524,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "layers.0.proj.ffn_down.lora_A.default.weight",
+    "layers.0.proj.ffn_down.lora_B.default.weight",
+    "layers.0.proj.ffn_up_gate.lora_A.default.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 262,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/home/ubuntu/comfyui/models/_lora_source_peft/MOSS_image_MAX_ULTRA_hires_lora_test/moss_hires_lora_test_v0.1.safetensors",
+  "file": "moss_hires_lora_test_v0.1.safetensors",
+  "before": {
+   "patched": 126,
+   "missing": 210,
+   "missing_proj_qkv": 210,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_a",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_b"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/home/ubuntu/comfyui/models/_lora_source_peft/MOSS_image_MAX_ULTRA_hires_lora_test/moss_hires_lora_test_v0.2.safetensors",
+  "file": "moss_hires_lora_test_v0.2.safetensors",
+  "before": {
+   "patched": 78,
+   "missing": 210,
+   "missing_proj_qkv": 210,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_a",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_b"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/home/ubuntu/comfyui/models/_lora_source_peft/MOSS_image_MAX_ULTRA_hires_lora_test/moss_hires_lora_test_v0.3.safetensors",
+  "file": "moss_hires_lora_test_v0.3.safetensors",
+  "before": {
+   "patched": 78,
+   "missing": 210,
+   "missing_proj_qkv": 210,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_a",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_b"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/home/ubuntu/comfyui/models/_lora_source_peft/MOSS_image_MAX_ULTRA_hires_lora_test/moss_hires_lora_test_v0.4.safetensors",
+  "file": "moss_hires_lora_test_v0.4.safetensors",
+  "before": {
+   "patched": 78,
+   "missing": 210,
+   "missing_proj_qkv": 210,
+   "missing_sample": [
+    "diffusion_model.layers.0.proj.qkv.alpha",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_a",
+    "diffusion_model.layers.0.proj.qkv.hada_w1_b"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 204,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ },
+ {
+  "name": "/home/ubuntu/comfyui/models/_lora_source_peft/Moss-image-nsfw-uncensored-lora__pytorch_lora_weights.safetensors",
+  "file": "Moss-image-nsfw-uncensored-lora__pytorch_lora_weights.safetensors",
+  "before": {
+   "patched": 0,
+   "missing": 504,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "transformer.layers.0.proj.ffn_down.lora_A.weight",
+    "transformer.layers.0.proj.ffn_down.lora_B.weight",
+    "transformer.layers.0.proj.ffn_up_gate.lora_A.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "after": {
+   "patched": 252,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "verdict": "attached"
+ }
+]

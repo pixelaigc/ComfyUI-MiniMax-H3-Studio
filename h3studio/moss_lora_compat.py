@@ -754,5 +754,50 @@ def check_moss_compatibility(path) -> dict:
             f"投影模块命中率 {hit}/{total}：有 {miss_fused} 个融合 qkv 模块"
             "在 MOSS-Image 底模里不存在（底模是分离 q/k/v），"
             "ComfyUI 会静默丢弃这些权重。")
+        return base
+
+    # ⚠️ **2026-11-15 修复（缺陷 A 收口）：compatible 必须建立在
+    # 「用户路径可行」之上，而不只是「结构对得上」。
+    #
+    # 到这里为止，compatible=true 的含义只是「**结构**判定通过」。
+    # 但用户选了这个 LoRA 之后能不能真生效，取决于**另一件事**：
+    # 这份权重是不是**融合 qkv** 形态 —— 是的话，ComfyUI 会静默丢弃它
+    # （只打 "lora key not loaded"，出图照跑但 LoRA 没生效），
+    # 必须先转换成派生文件才能用。
+    #
+    # `convertible` 只按**头部形态**推断（shape==fused 且无未命中模块），
+    # **从来没有验证过转换真的可行** —— 而转换要读整个权重本体并写出
+    # 2GB 级别的派生文件，是完全可能失败的（磁盘满、权限、权重读不出）。
+    #
+    # 于是「结构兼容但转换不可行」的 LoRA 会以 compatible=true 照常下发，
+    # 用户选了才知道不行 —— 这就是半静默失效。
+    #
+    # 修法：兼容判定**叠加**用户路径可行性（moss_lora_split.conversion_status）：
+    #   direct    分离形态，原样可挂          -> compatible=true 成立
+    #   derived   融合形态，派生文件已验证    -> compatible=true 成立
+    #   unverified 融合形态，转换未验证      -> compatible=false（如实说明）
+    #   broken    文件本体损坏               -> compatible=false（如实说明）
+    # `moss_lora_split` 反过来 import 本模块（做归一化派生），
+    # 所以这里**必须延迟导入** —— 模块级 import 会成环。
+    from . import moss_lora_split as split
+
+    conv = split.conversion_status(path)
+    base["conversion_status"] = conv.get("status", "")
+    base["needs_conversion"] = bool(conv.get("needs_conversion"))
+    base["conversion_reason"] = conv.get("reason", "")
+
+    if conv.get("status") == split.STATUS_BROKEN:
+        base["compatible"] = False
+        base["reason"] = conv.get("reason") or "权重文件本体损坏，无法使用。"
+        return base
+
+    if conv.get("status") == split.STATUS_UNVERIFIED:
+        base["compatible"] = False
+        base["reason"] = (
+            f"{conv.get('reason')} "
+            "在完成无损转换并验证之前，本条目不会作为「可用」下发 —— "
+            "否则用户选中后会遇到 LoRA 不生效（半静默失效）。"
+            "服务端在后台自动完成转换，转换成功后本条目会自动恢复可选。")
+        return base
 
     return base

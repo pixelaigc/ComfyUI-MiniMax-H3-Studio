@@ -1,0 +1,45 @@
+/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+============================= test session starts ==============================
+platform linux -- Python 3.13.7, pytest-8.4.2, pluggy-1.6.0 -- /home/ubuntu/comfyui/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /root/projects/h3studio-agent-enh-final
+plugins: langsmith-0.4.37, typeguard-2.13.3, torchtyping-0.1.5, hydra-core-1.3.2, anyio-4.12.0
+collecting ... collected 34 items
+
+tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_broken_file_is_broken PASSED [  2%]
+tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_with_valid_derived_is_derived PASSED [  5%]
+tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_without_derived_is_unverified PASSED [  8%]
+tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_split_shape_is_direct PASSED [ 11%]
+tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_broken_file_is_not_compatible PASSED [ 14%]
+tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_derived_fused_is_compatible PASSED [ 17%]
+tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_unverified_fused_is_not_compatible PASSED [ 20%]
+tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_moss_entries_carry_conversion_fields PASSED [ 23%]
+tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_no_available_entry_has_broken_file PASSED [ 26%]
+tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_no_available_entry_is_unverified PASSED [ 29%]
+tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_css_defines_qkv_tag PASSED [ 32%]
+tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_does_not_fake_native_verdict PASSED [ 35%]
+tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_has_three_tier_labels PASSED [ 38%]
+tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_reads_conversion_status PASSED [ 41%]
+tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d1_is_available_and_fully_attachable PASSED [ 44%]
+tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible PASSED [ 47%]
+tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_ctx_derived_prefix_is_never_in_available_list PASSED [ 50%]
+tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_d1_and_its_derived_do_not_both_appear PASSED [ 52%]
+tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_derived_filter_uses_filename_not_relative_path PASSED [ 55%]
+tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_moss_derived_prefix_is_never_in_available_list PASSED [ 58%]
+tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d1_conversion_produces_split_shape PASSED [ 61%]
+tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d1_is_compatible_and_fully_attachable PASSED [ 64%]
+tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible PASSED [ 67%]
+tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_no_available_entry_has_damaged_file PASSED [ 70%]
+tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_api_payload_carries_qkv_shape_fields PASSED [ 73%]
+tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_renders_qkv_tag PASSED [ 76%]
+tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_style_defines_qkv_tag PASSED [ 79%]
+tests/test_d11_moss_lora_final.py::TestNoRegressionOtherFamilies::test_other_families_have_no_moss_derived_leak PASSED [ 82%]
+tests/test_d11_moss_lora_final.py::TestNoRegressionOtherFamilies::test_qwen_list_still_populated PASSED [ 85%]
+tests/test_d11_moss_lora_final.py::TestNoRegressionOtherFamilies::test_z_image_list_still_populated PASSED [ 88%]
+tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_convertible_gets_auto_convert_badge PASSED [ 91%]
+tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_not_convertible_gets_unusable_badge PASSED [ 94%]
+tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_info_modal_shows_weight_shape_row PASSED [ 97%]
+tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_split_shape_gets_no_qkv_badge PASSED [100%]
+
+======================== 34 passed in 190.42s (0:03:10) ========================
