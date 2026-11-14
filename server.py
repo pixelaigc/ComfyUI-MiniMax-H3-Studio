@@ -77,6 +77,7 @@ from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import moss_layout
 from h3studio import qwen_pe
+from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
@@ -6042,6 +6043,93 @@ async def api_qwen_pe_expand(request):
     })
 
 
+async def api_h3image_pe_expand(request):
+    """
+    POST /api/h3image-pe/expand —— MiniMax H3-Image 自带 PE 提示词扩写
+
+    【需求 16】H3-Image 此前**没有**接入提示词扩写（PE）——
+    官方模板里本来就有 PE（TextGenerateV2 + qwen3.5_9b_w4a8 + 官方
+    system prompt），但它一直在出图链路内部，前端看不到、Agent 也没法用。
+
+    body:
+      prompt      要扩写的原始提示词
+      mode        t2i_h3image（文生图）| i2i_h3image（图片编辑）
+      refs        可选，图片编辑的参考图（素材库条目列表）；顺序即 <imageN> 顺序
+      task_prompt 可选，用户编辑过的官方 PE task prompt
+
+    返回:
+      expanded      扩写后的提示词（前端写回提示词框，可继续编辑）
+      aspect_ratio  PE 选出的画面比例（官方 PE 会自己选比例）
+      clip_name     实际用的官方 PE checkpoint 文件名
+      ref_count     参考图数量
+    失败一律 4xx/5xx + 可读原因，**不返回半成品**。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+
+    mode = str(payload.get("mode") or "t2i_h3image").strip()
+    if mode not in ("t2i_h3image", "i2i_h3image"):
+        return web.json_response(
+            {"error": "H3-Image 官方 PE 扩写只适用于文生图 / 图片编辑模式"}, status=400)
+    is_edit = mode == "i2i_h3image"
+
+    # 参考图：素材库来源，顺序严格保持（= <imageN> 顺序）。
+    # 只上传、**不登记** asset_refs —— 扩写只是读一次图，不是出图任务。
+    ref_images: list[str] = []
+    raw_refs = payload.get("refs") or []
+    if is_edit and raw_refs:
+        try:
+            async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+                ref_images = await _upload_ref_images(session, raw_refs)
+        except Exception as exc:
+            return web.json_response(
+                {"error": f"参考图上传失败：{exc}"[:300], "degraded": True}, status=502)
+
+    task_prompt = payload.get("task_prompt")
+    if task_prompt is not None:
+        task_prompt = str(task_prompt)
+        if not task_prompt.strip():
+            return web.json_response(
+                {"error": "官方 PE 的 task prompt 不能为空"}, status=400)
+
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
+            result = await h3image_pe.run_pe_expansion(
+                session, COMFY, original, ref_images or None,
+                task_prompt=task_prompt)
+    except h3image_pe.PEError as exc:
+        return web.json_response(
+            {"error": str(exc), "degraded": True}, status=502)
+    except Exception as exc:
+        return web.json_response(
+            {"error": f"H3-Image 官方 PE 扩写失败：{type(exc).__name__} {exc}"[:300],
+             "degraded": True}, status=502)
+
+    # 【提示词历史】官方 PE 的扩写结果也进历史
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original, "prompt": result["expanded"]},
+            source=ph.SOURCE_ENHANCE)
+    return json_ok({
+        "ok": True,
+        "original": original,
+        "expanded": result["expanded"],
+        "aspect_ratio": result.get("aspect_ratio", ""),
+        "clip_name": result["clip_name"],
+        "ref_count": result["ref_count"],
+        "mode": mode,
+    })
+
+
 # ------------------------------------------------------------------ LLM 代理
 # ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload（没有 chat_template_kwargs），
 # 对 Qwen3 这类 thinking 模型关不掉思考，接口返回 content=null，节点再
@@ -7390,6 +7478,8 @@ def make_app():
     app.router.add_post("/api/moss-layout", api_moss_layout)
     # Qwen-Image 2.1 官方 PE 扩写（「增强」下拉里的 qwen21图片官方增强PE）
     app.router.add_post("/api/qwen-pe/expand", api_qwen_pe_expand)
+    # H3-Image 自带 PE（2026-11-14 需求 16）
+    app.router.add_post("/api/h3image-pe/expand", api_h3image_pe_expand)
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)

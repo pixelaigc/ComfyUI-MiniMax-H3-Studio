@@ -1360,6 +1360,85 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
                 raise AgentError(error, status=400, code="invalid_params")
             params = normalized
 
+    # ------------------------------------------------------------------
+    # 【2026-11-14 需求 2a】默认参数：用户没说的才用默认
+    #
+    # 【语义 —— 必须严格】
+    #   * 用户**显式指定**的参数（画面比例、时长、模型、LoRA、风格…）
+    #     一律以用户指定值为准，**默认参数不得覆盖**；
+    #   * 用户**什么都没说**的参数，用本模式的内置默认值。
+    #
+    # 【实现】agent_schema.mode_defaults(mode) 给出该模式的默认值
+    # （合法值全部来自真实配置），这里**只填用户没给的键**。
+    # 判定「用户给了」= args 里有这个键且值非空 —— 所以模型显式传了
+    # aspect="9:16"，默认的 16:9 不会覆盖它。
+    #
+    # 【为什么放这里而不是 prepare_job_params】
+    # 服务端那条链路是给「面板提交」用的（面板总是提交全量参数）；
+    # Agent 这条链路的参数是**稀疏的**（模型可能只给 prompt），
+    # 缺省要在这里补齐。t2v 是个例外 —— 它走服务端归一（见下），
+    # 因为注意力机制 / dmad 加速 LoRA 只存在于新面板路径。
+    #
+    # 【为什么默认参数要在这里而不是让模型自己填】
+    # 小模型经常「懒得」填参数 —— 结果每个任务都落到工作流的隐式默认
+    # （分辨率档位、步数、CFG 全是硬编码常量）。显式写进 params，
+    # 媒体库里才看得到「这条到底用什么参数生成的」。
+    defaults_applied: list[str] = []
+    try:
+        from . import agent_schema
+        mode_defaults = agent_schema.mode_defaults(mode)
+    except Exception:
+        mode_defaults = {}
+    for key, value in (mode_defaults or {}).items():
+        # 用户显式给了 -> 跳过（**默认不覆盖用户**）
+        raw = args.get(key)
+        if raw is not None and str(raw).strip() != "":
+            continue
+        # params 里已经有值（别的分支已经填过）-> 也跳过
+        if key in params and params.get(key) not in (None, ""):
+            continue
+        params[key] = value
+        defaults_applied.append(key)
+
+    # ------------------------------------------------------------------
+    # 【2026-11-14 需求 2c】增强提示词路线
+    #
+    # 【硬要求】所有 Agent 发起的生成都必须走「增强提示词」路线：
+    #   用户的自然语言 -> 整理成普通提示词 -> 该模型专用的增强流程
+    #   -> 增强后的提示词**作为实际生成提示词**写进工作流与媒体库记录。
+    #
+    # 【为什么在这里做，而不是让模型自己先调 enhance_prompt】
+    # 模型经常忘记调增强工具（或者调了但把原提示词传进来）。
+    # 在建任务前统一走一次增强管线，保证「Agent 生成 = 增强过的」。
+    #
+    # 【增强失败怎么办】降级到原始提示词继续生成，并在结果里如实告知
+    # （agent_enhance.enhance_for_mode 负责记 notice）——
+    # 绝不假装增强过。
+    enhance_plan = None
+    enhance_notices: list[str] = []
+    try:
+        from . import agent_enhance
+        enhance_plan = await agent_enhance.enhance_for_mode(
+            ctx, mode, prompt, ref_images=None)
+        if enhance_plan and enhance_plan.prompt:
+            params["prompt"] = enhance_plan.prompt
+            # 用户原始提示词也记一份 —— 媒体库/提示词历史要能看到
+            # 「原始 -> 增强后」的对照（需求 2c 的最后一环）。
+            params["original_prompt"] = enhance_plan.original or prompt
+            # 【需求 2d】标记「这条是增强过的」—— 媒体库/详情要能看出来。
+            params["prompt_enhanced"] = bool(enhance_plan.enhanced)
+            if enhance_plan.extra_params.get("aspect"):
+                # PE 选出的比例：只在用户**没指定**比例时才用
+                if not args.get("aspect"):
+                    params["aspect"] = enhance_plan.extra_params["aspect"]
+            if enhance_plan.extra_params.get("lyrics"):
+                params.setdefault("lyrics", enhance_plan.extra_params["lyrics"])
+        if enhance_plan:
+            enhance_notices = list(enhance_plan.notices or [])
+    except Exception as exc:
+        # 增强管线本身出错（不该发生 —— 内部已兜底）-> 记下来，继续用原提示词
+        enhance_notices = [f"增强提示词管线异常（{exc}），本次用原始提示词生成"]
+
     # 走服务端**同一套**校验（与面板点「生成」完全一致）：
     # 模式白名单 / 参考图数量 / <imageN> 占位注入 / 参考音频数量 / 提示词非空。
     # 这里不重写一份 —— 两份实现必然漂移（见 server.prepare_job_params 的说明）。
@@ -1398,16 +1477,27 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 【提示词历史】Agent 建的任务也进历史表（source = generate）。
     # 面板侧钩子只挂在 server.api_create 上，Agent 走自己的工具链 ——
     # 不在这里补一笔，Agent 生成的提示词在「历史」浮层里查不到。
+    #
+    # 【2026-11-14 需求 2c/2d】历史里记的是**增强后**的提示词
+    # （= 实际送进工作流的那一份），原始提示词单独记在
+    # original_prompt 字段里 —— 媒体库/历史都能看到「原始 -> 增强后」。
     _record_agent_prompt_history(
         ctx, mode,
-        {"original_prompt": prompt, "prompt": prompt,
+        {"original_prompt": params.get("original_prompt") or prompt,
+         "prompt": params.get("prompt") or prompt,
          "model_key": params.get("model") or params.get("checkpoint") or ""},
         _ph_source_generate())
     entry = {
         "job_id": job_id,
         "mode": mode,
         "label": gen_types.type_for_mode(mode).get("label") or mode,
-        "prompt": prompt,
+        "prompt": params.get("prompt") or prompt,
+        # 【需求 2d】把增强与默认参数的事实一起带出去，
+        # 让界面能显示「用的哪份提示词、默认了哪些参数」。
+        "original_prompt": params.get("original_prompt") or prompt,
+        "prompt_enhanced": bool(enhance_plan and enhance_plan.enhanced),
+        "enhance_notices": enhance_notices,
+        "defaults_applied": defaults_applied,
         "params": {k: v for k, v in params.items() if k != "asset_refs"},
         "asset_refs": asset_refs,
         "status": "queued",
@@ -1417,6 +1507,18 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     ctx.jobs.append(entry)
     result = {"job_id": job_id, "mode": mode, "status": "queued",
               "label": entry["label"]}
+    # 【需求 2c/2d】如实告诉模型与用户：用的哪份提示词、默认了哪些参数。
+    # 关键：这不是错误，只是事实说明 —— ok 仍然是 True。
+    enhance_info = []
+    if enhance_plan and enhance_plan.enhanced:
+        enhance_info.append(
+            f"提示词已增强（{enhance_plan.spec_id or '通用'}）并作为实际生成提示词使用")
+    elif enhance_notices:
+        enhance_info.extend(enhance_notices)
+    if defaults_applied:
+        enhance_info.append("已套用默认参数：" + "、".join(defaults_applied))
+    if enhance_info:
+        result["enhance_info"] = enhance_info
     # 【软问题如实告知 —— 2026-11-11】
     # 任务**建出来了**（job_id 有效、记录已入库），只是某个参数的效果
     # 没达到预期（例如负面提示词在该族默认不生效）。

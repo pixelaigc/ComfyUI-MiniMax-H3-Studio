@@ -174,6 +174,33 @@
         },
       ],
     },
+    {
+      // 【2026-11-14 需求 16】H3-Image 自带的 PE。
+      //
+      // 【为什么需要单独一项】H3-Image 的官方模板里本来就有 PE
+      // （TextGenerateV2 + qwen3.5_9b_w4a8 + 官方 system prompt），
+      // 但它一直在出图链路内部 —— 用户看不到扩写结果、也改不了。
+      // 这一项把官方 PE 暴露成可预览 / 可编辑的「增强」方式，
+      // 与 Qwen 官方 PE 同一套交互。
+      //
+      // 【与 Qwen PE 的差别】H3-Image 的 PE 输出是 **JSON**
+      // （expanded_caption + aspect_ratio），比例也是 PE 的一部分。
+      id: "h3image_pe",
+      label: "H3-Image 官方增强PE",
+      hint: "用 MiniMax H3-Image 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑）",
+      // 只对 H3-Image 开放：官方 PE checkpoint 是 H3-Image 专用的
+      modes: ["t2i_h3image", "i2i_h3image"],
+      specId: "",
+      busyFlag: "enhance",
+      buttonText: "官方PE扩写",
+      recommended: true,
+      kind: "h3image-pe",
+      // 【写回契约 · 文本路线】产物是扩写后的提示词文本
+      // （比例由后端单独返回，不进文本框）。
+      write: { kind: "text" },
+      // 归属功能（禁用原因的唯一真相源，见 unavailableReason）
+      owner: "MiniMax-H3-Image",
+    },
   ];
 
   // 当前选中的增强方式 id 集合（多选）。默认只选「普通增强」。
@@ -1504,6 +1531,9 @@
     if (method.id === "qwen_pe") {
       return runQwenPe(method, opts);
     }
+    if (method.id === "h3image_pe") {
+      return runH3ImagePe(method, opts);
+    }
     if (method.id === "refine") {
       return runRefine(method, opts);
     }
@@ -1927,6 +1957,97 @@
     if (d.pe_params) {
       parts.push(`已套用参数：presence_penalty=${esc(d.pe_params.presence_penalty)}、`
         + `max_new_tokens=${esc(d.pe_params.max_new_tokens)}`);
+    }
+    parts.push(`字数：${(d.expanded || "").length}`);
+    return parts.join(" · ");
+  }
+
+  // ---- H3-Image 官方 PE 扩写 —— 调 /api/h3image-pe/expand ----
+  //
+  // 【2026-11-14 需求 16】与 Qwen 官方 PE 同一套交互（弹窗 / 替换追加按钮 /
+  // 版本历史），只是接口与产物形态不同：
+  //   * 接口：/api/h3image-pe/expand
+  //   * 产物：H3-Image 的 PE 还会给出一个**画面比例**（aspect_ratio）——
+  //     它是 PE 的一部分，不进文本框，单独显示在 meta 行里。
+  async function runH3ImagePe(method, opts) {
+    const btn = document.querySelector(targets().btn);
+    const text = document.querySelector(targets().btnText);
+    const prompt = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : currentInputValue();
+    if (!prompt) {
+      const { el } = resolveTarget(targets().inputSelectors);
+      if (!el) {
+        setHint(`本面板没有可增强的${targets().label}输入框，无法执行官方 PE 扩写`, "error");
+        return null;
+      }
+      setHint(`请先输入要增强的${targets().label}`, "error");
+      el.focus();
+      return null;
+    }
+    const mode = (typeof state !== "undefined" && state) ? (state.mode || "") : "";
+    if (mode !== "t2i_h3image" && mode !== "i2i_h3image") {
+      setHint("官方 PE 扩写只在 H3-Image 的文生图 / 图片编辑模式下可用", "error");
+      return null;
+    }
+    // 参考图：素材库来源，顺序即 <imageN> 顺序
+    let refs = [];
+    if (mode === "i2i_h3image" && window.QwenRefs
+        && typeof window.QwenRefs.toPayload === "function") {
+      refs = window.QwenRefs.toPayload();
+    }
+
+    btn.disabled = true;
+    text.textContent = "官方PE扩写中…";
+    promptEnhance.busy = true;
+    updateActionButtons();
+    setHint("H3-Image 官方 PE 扩写中（9B 模型 + thinking，约需半分钟）…", "busy");
+    try {
+      const d = await apiJSON("POST", "/api/h3image-pe/expand",
+                              { prompt, mode, refs });
+      const expanded = d.expanded || "";
+      if (!expanded) throw new Error("官方 PE 返回了空结果");
+      const meta = buildH3ImagePeMeta(d);
+      if (opts.collect) {
+        return { expanded, meta, isPe: true };
+      }
+      document.querySelector("#enhanceResult").value = expanded;
+      document.querySelector("#enhanceMeta").innerHTML = meta;
+      document.querySelector("#enhanceModal").hidden = false;
+      if (typeof provState !== "undefined") {
+        provState.lastEnhanceKind = "h3image_pe";
+      }
+      if (expanded) {
+        pushPromptVersion(0, prompt, "原始提示词");
+        pushPromptVersion(1, expanded, "H3-Image 官方 PE", "h3image-pe");
+      }
+      setHint(`H3-Image 官方 PE 扩写完成：${expanded.length} 字；`
+        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+      return { expanded, meta };
+    } catch (e) {
+      const detail = e.payload && e.payload.error ? e.payload.error : e.message;
+      setHint(`H3-Image 官方 PE 扩写失败：${detail}`, "error");
+      alert(`H3-Image 官方 PE 扩写失败\n\n${detail}\n\n`
+        + `请确认 ComfyUI 正在运行，且官方 PE 权重（qwen3.5_9b_w4a8_gptq.safetensors）已就位。`);
+      return null;
+    } finally {
+      promptEnhance.busy = false;
+      btn.disabled = false;
+      updateButton();
+      updateActionButtons();
+    }
+  }
+
+  /** H3-Image 官方 PE 的 meta 行。 */
+  function buildH3ImagePeMeta(d) {
+    const parts = [];
+    parts.push(`<b>H3-Image 官方 PE</b>：${esc(d.mode || "-")}`);
+    if (d.clip_name) {
+      parts.push(`checkpoint：<code>${esc(d.clip_name)}</code>`);
+    }
+    if (d.ref_count) parts.push(`参考图：${Number(d.ref_count)} 张`);
+    if (d.aspect_ratio) {
+      parts.push(`PE 选出的画面比例：<b>${esc(d.aspect_ratio)}</b>`);
     }
     parts.push(`字数：${(d.expanded || "").length}`);
     return parts.join(" · ");
