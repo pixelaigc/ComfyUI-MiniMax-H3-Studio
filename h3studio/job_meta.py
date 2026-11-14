@@ -109,6 +109,16 @@ def _accel_lora_display(key: str) -> str:
     return key or ""
 
 
+def accel_lora_display_name(key: str) -> str:
+    """加速 LoRA key -> 面板上显示的那个 display（**公开**入口）。
+
+    【为什么要有公开入口】服务端接口（api_artifact_meta）也要把
+    权重文件名反查成**同一个**友好名下发 —— 否则接口返回权重名、
+    卡片显示友好名，用户对照两处会觉得「说的不是同一枚」。
+    """
+    return _accel_lora_display(key)
+
+
 def _fixed_accel_lora_display(key: str) -> str:
     """加速 LoRA key -> 面板上显示的那个 display（逐字一致）。
 
@@ -529,6 +539,46 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
     result = {"lora": None, "loras": None, "strength": None, "labels": [],
               "effect_loras": None}
 
+    # --- 【最高优先级】产物实际挂载的 LoRA（worker 从 workflow 反解回写） ---
+    #
+    # 【为什么放最前面】这是唯一「看过真正会跑的那份工作流」的来源。
+    # 提交参数只是「用户填了什么」，工作流才是「实际跑了什么」。
+    # 有了它，显示的就是产物实际用到的 LoRA —— 一个字都不会差。
+    if "artifact_loras" in params:
+        raw_artifact = params.get("artifact_loras")
+        from . import artifact_meta as am
+        kept = []
+        labels = []
+        for item in raw_artifact if isinstance(raw_artifact, list) else []:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            strength = item.get("strength")
+            try:
+                strength = float(strength) if strength is not None else 1.0
+            except (TypeError, ValueError):
+                strength = 1.0
+            raw_name = str(item.get("raw_name") or "").strip()
+            # 【口径统一】权重名反查回本机 key -> 显示友好名；
+            # 查不到就用清洗后的权重名（如实显示，不编）。
+            # 这样 model_info.lora_label 与 gen_params.lora 是同一个名字。
+            key = am.lora_key_for_weight(raw_name or name)
+            display = _accel_lora_display(key) if key else name
+            kept.append({"name": display, "raw_name": raw_name,
+                         "strength": strength,
+                         "loader": str(item.get("loader") or "")})
+            labels.append(f"{display} ×{strength:.2f}")
+        if kept:
+            result["loras"] = kept
+            result["strength"] = kept[0]["strength"]
+            result["labels"] = labels
+            result["lora"] = kept[0]["name"]
+        # 空清单 = 工作流里确实没有 LoRA 节点 -> labels 为空
+        # -> 显示「未使用 LoRA」（不是猜一个名字）。
+        return result
+
     # --- 图像模式：效果 LoRA 数组（params["loras"]） ---
     if mode.startswith("t2i") or mode.startswith("i2i"):
         raw = params.get("loras")
@@ -561,115 +611,64 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
         return result
 
     # --- 视频模式 ---
-    # 新面板路径（model_key + accel_loras）：字段本身就是结构化的，天然可信。
     #
-    # 【2026-11-13 · 合并修正】这里同时读两种形状：
-    #   * `params["accel_loras"]` —— **数组**。服务端 prepare_job_params
-    #     落库的**唯一真实形状**（server.py: `out["accel_loras"] = combos`），
-    #     面板 submitParams() 提交的也是数组。
-    #   * `params["accel_lora"]` / `accel_lora_strength` —— **单数**。
-    #     面板 collectConfig() 的旧形状（仅本地配置态，不落库）。
+    # 【2026-11-15 修 —— 口径统一到「工作流的同一个函数」】
     #
-    # 【为什么必须都读】只读单数的话，真实落库任务（数组形状）会取不到
-    # 用户选的那枚加速 LoRA -> 卡片显示「无」，而实际明明用了。
-    # 只读数组的话，老任务（单数形状）又会丢。两边都读，按数组优先。
-    model_key = str(params.get("model_key") or "").strip()
-    if model_key:
-        from . import video_models as vmodels
-        combos = getattr(vmodels, "VIDEO_ACCEL_LORA_COMBOS", {}) or {}
-        accel_key = ""
-        accel_strength = None
-        # 形状 1：数组（落库真实形状）
-        for item in params.get("accel_loras") or []:
+    # 旧实现在这里**自己发明**了一套取值逻辑（读 accel_loras 数组 /
+    # accel_lora 单数 / fixed_accel_lora / lora），**唯独没有兜底**。
+    # 而工作流真正用的是
+    #     video_models.resolve_accel_lora_slot(params)
+    # 它在「四套历史字段都没有」时会**返回默认 ckpt850** 并且**确实挂上**。
+    #
+    # 于是出现了用户报的现象（2026-11-15 实测）：
+    #   * r2v / t2v 任务提交时没传任何 LoRA 字段；
+    #   * 工作流照常挂了 ckpt850（ComfyUI /history 实测证实：
+    #     `MiniMaxH3TurboLoRA(lora_name=minimax_h3_turbo_4step_ema_ckpt850.safetensors)`）；
+    #   * 但卡片显示「无」—— 因为旧实现没有兜底分支。
+    #   * 同一张卡片上，详情/面板那套（summarize -> _legacy_video_summary）
+    #     又显示「ckpt850」-> **两个地方对不上**。
+    #
+    # 现在：**视频分支统一走 resolve_accel_lora_slot()**，
+    # 显示口径 == 工作流口径，不可能再错配。
+    # 「固定枚」单独展示仍在（工作流固定的那枚），不与用户选的混为一谈。
+    from . import video_models as vmodels
+    accel_key, accel_strength = vmodels.resolve_accel_lora_slot(params)
+    if accel_key:
+        result["lora"] = accel_key
+        result["strength"] = accel_strength
+        result["labels"] = [f"{_accel_lora_display(accel_key)} ×{accel_strength:.2f}"]
+    fixed_key = str(params.get("fixed_accel_lora") or "").strip()
+    if fixed_key and fixed_key != accel_key:
+        try:
+            strength = float(params.get("fixed_accel_strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 1.0
+        result["labels"].append(
+            f"工作流固定：{_fixed_accel_lora_display(fixed_key)} ×{strength:.2f}")
+    # 效果 LoRA（可多选，与加速 LoRA 并列共存）
+    raw_effect = params.get("effect_loras")
+    if isinstance(raw_effect, list) and raw_effect:
+        kept_effect = []
+        effect_labels = []
+        for item in raw_effect:
             if not isinstance(item, dict):
                 continue
-            if item.get("enabled") is False:
+            name = str(item.get("name") or "").strip()
+            if not name:
                 continue
-            key = str(item.get("key") or "").strip()
-            if not key:
-                continue
-            accel_key = key
             try:
-                accel_strength = float(item.get("strength", 1.0))
-            except (TypeError, ValueError):
-                accel_strength = 1.0
-            break
-        # 形状 2：单数（旧配置形状）
-        if not accel_key:
-            single = str(params.get("accel_lora") or "").strip()
-            if single and single in combos:
-                accel_key = single
-                try:
-                    accel_strength = float(params.get("accel_lora_strength", 1.0))
-                except (TypeError, ValueError):
-                    accel_strength = 1.0
-        if accel_key:
-            result["lora"] = accel_key
-            result["strength"] = accel_strength
-            result["labels"] = [f"{_accel_lora_display(accel_key)} ×{accel_strength:.2f}"]
-        fixed_key = str(params.get("fixed_accel_lora") or "").strip()
-        if fixed_key:
-            try:
-                strength = float(params.get("fixed_accel_strength", 1.0))
+                strength = float(item.get("strength", 1.0))
             except (TypeError, ValueError):
                 strength = 1.0
-            result["labels"].append(
-                f"工作流固定：{_fixed_accel_lora_display(fixed_key)} ×{strength:.2f}")
-        # 效果 LoRA（可多选，与加速 LoRA 并列共存）
-        raw_effect = params.get("effect_loras")
-        if isinstance(raw_effect, list) and raw_effect:
-            kept_effect = []
-            effect_labels = []
-            for item in raw_effect:
-                if not isinstance(item, dict):
-                    continue
-                name = str(item.get("name") or "").strip()
-                if not name:
-                    continue
-                try:
-                    strength = float(item.get("strength", 1.0))
-                except (TypeError, ValueError):
-                    strength = 1.0
-                if strength <= 0:
-                    continue
-                kept_effect.append({"name": name, "strength": strength,
-                                    "trigger": str(item.get("trigger") or "")})
-                effect_labels.append(
-                    f"效果 {_effect_lora_display(name)} ×{strength:.2f}")
-            if kept_effect:
-                result["effect_loras"] = kept_effect
-                result["labels"].extend(effect_labels)
-        return result
-
-    # 旧路径：params["lora"]
-    raw_lora = params.get("lora")
-    if raw_lora is None:
-        # 没有记录 -> 工作流默认 ckpt850（workflows._h3_video_workflow:
-        # `lora = params.get("lora", "ckpt850")`），且**确实挂上了**。
-        from . import workflows as wf
-        default_key = "ckpt850" if "ckpt850" in (getattr(wf, "LORAS", {}) or {}) else ""
-        if default_key:
-            result["lora"] = default_key
-            result["strength"] = 1.0
-            result["labels"] = [f"{_accel_lora_display(default_key)} ×1.00"]
-        return result
-
-    text = str(raw_lora).strip()
-    if text == "none":
-        # 明确选「不用加速 LoRA」-> 没有 LoRA（不是缺失，是明确语义）
-        return result
-    if not is_real_lora_key(text):
-        # 脏值（提示词字段名 / 乱填）-> 视为没有
-        return result
-
-    from . import workflows as wf
-    try:
-        strength = float(params.get("lora_strength", 1.0))
-    except (TypeError, ValueError):
-        strength = 1.0
-    result["lora"] = text
-    result["strength"] = strength
-    result["labels"] = [f"{_accel_lora_display(text)} ×{strength:.2f}"]
+            if strength <= 0:
+                continue
+            kept_effect.append({"name": name, "strength": strength,
+                                "trigger": str(item.get("trigger") or "")})
+            effect_labels.append(
+                f"效果 {_effect_lora_display(name)} ×{strength:.2f}")
+        if kept_effect:
+            result["effect_loras"] = kept_effect
+            result["labels"].extend(effect_labels)
     return result
 
 
@@ -989,6 +988,79 @@ def _music_summary(params: dict) -> dict:
 # ------------------------------------------------------------------
 # 统一入口
 # ------------------------------------------------------------------
+def _artifact_lora_overlay(params: dict) -> dict:
+    """用「产物实际挂载的 LoRA」覆盖摘要里的 LoRA 字段。
+
+    【什么时候生效】params 里有 `artifact_loras`（worker 在构建完工作流
+    之后从 workflow 反解回写的 —— 见 h3studio/artifact_meta.py）。
+    没有这个字段 -> 返回空 dict（不覆盖，走原有路径）。
+
+    【覆盖哪些字段】
+      * lora_label      —— 友好显示名（权重名反查回 key 再转显示名；
+                          查不到就用清洗后的权重名，如实显示）
+      * lora_name       —— 权重文件名（可与 ComfyUI prompt 逐字核对）
+      * lora_key        —— 本机清单里的 key（认不出来就是空串）
+      * lora_strength   —— 强度
+      * fixed_lora_*    —— 清空（工作流层面无法区分「用户选的」与
+                          「固定的」，两者写同一个值即可；
+                          见 artifact_meta.apply_to_params 的说明）
+
+    【为什么不清空 fixed_lora_* 就直接覆盖】前端把「用户选的那枚」与
+    「工作流固定的那枚」分开呈现（job-meta.js 的 loraList）。
+    产物层面我们只知道「挂了几枚」，分不清谁是谁 ——
+    所以两处都填**同一枚**，前端显示成「Turbo 4 步 · ckpt850」，
+    而不是编一个「用户选了 X / 工作流固定了 Y」。
+    """
+    raw = params.get("artifact_loras")
+    if not isinstance(raw, list):
+        return {}
+    from . import artifact_meta as am
+
+    kept = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        raw_name = str(item.get("raw_name") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        strength = item.get("strength")
+        try:
+            strength = float(strength) if strength is not None else 1.0
+        except (TypeError, ValueError):
+            strength = 1.0
+        kept.append({"name": name, "raw_name": raw_name, "strength": strength})
+
+    if not kept:
+        # 产物里确实没有 LoRA -> 摘要里也不要显示任何 LoRA。
+        return {
+            "lora_label": "",
+            "lora_name": "",
+            "lora_key": "",
+            "lora_strength": None,
+            "fixed_lora_label": "",
+            "fixed_lora_name": "",
+            "fixed_lora_key": "",
+            "fixed_lora_strength": None,
+        }
+
+    first = kept[0]
+    key = am.lora_key_for_weight(first["raw_name"] or first["name"])
+    label = _accel_lora_display(key) if key else first["name"]
+    return {
+        "lora_label": label,
+        "lora_name": first["raw_name"] or first["name"],
+        "lora_key": key,
+        "lora_strength": first["strength"],
+        # 「用户选的」与「工作流固定的」在产物层面无法区分 ——
+        # 两处填同一枚，保证显示不编造。
+        "fixed_lora_label": label,
+        "fixed_lora_name": first["raw_name"] or first["name"],
+        "fixed_lora_key": key,
+        "fixed_lora_strength": first["strength"],
+    }
+
+
 def summarize(mode: str, params: dict) -> dict:
     """给一个任务算「模型 / LoRA」摘要（**唯一入口**）。
 
@@ -1021,6 +1093,19 @@ def summarize(mode: str, params: dict) -> dict:
     else:
         # 未知模式：尽力给出一个不编造的摘要
         out = _legacy_video_summary(params)
+    # 【2026-11-15 新增】产物实际 LoRA 覆盖层。
+    #
+    # 【为什么要在最外面覆盖】summarize 与 resolve_job_lora 是两套
+    # 独立的取值路径（前者给 model_info，后者给 gen_params.lora）。
+    # 历史上它们各自演化、**口径曾经不一致** —— 同一张卡片上
+    # 「LoRA 行」显示「无」、详情区显示「ckpt850」。
+    # 现在：只要 worker 回写过产物实际 LoRA（params["artifact_loras"]），
+    # **两套口径都由这一个来源决定**，不可能再对不上。
+    #
+    # 【覆盖什么】lora_label / lora_name / lora_key / lora_strength /
+    # fixed_lora_* —— 即「这枚 LoRA 是哪枚、有多强」。
+    # 模型、注意力等其余字段不动。
+    out.update(_artifact_lora_overlay(params))
     # 【2026-11-12】注意力机制摘要对**所有模式**统一附加 ——
     # 保证 summarize() 返回的形状恒定（前端只渲染，不判断字段是否存在）。
     # 图像 / 音乐模式本来就没有注意力机制，字段会是空值（不编造）。
@@ -1196,7 +1281,7 @@ def gen_params(mode: str, params: dict, model_info: dict | None = None,
     info = model_info if isinstance(model_info, dict) else summarize(mode, params)
     reso = resolution_info if isinstance(resolution_info, dict) else {}
 
-    out = {
+    out: dict = {
         "model": str(info.get("model_label") or ""),
         "steps": _num(params.get("steps")),
         "scheduler": _num(params.get("scheduler")),
@@ -1263,13 +1348,39 @@ def gen_params(mode: str, params: dict, model_info: dict | None = None,
     if not out["seed"]:
         out["seed"] = "随机"
 
-    # --- LoRA：走 resolve_job_lora（白名单判定） ---
+    # --- LoRA：走 resolve_job_lora（白名单 + 产物实际判定） ---
     lora = resolve_job_lora(mode, params)
     if lora["labels"]:
         out["lora"] = " · ".join(lora["labels"])
     else:
-        # 确实没有 LoRA —— 显式写「无」，而不是留空让人猜。
-        out["lora"] = "无"
+        # 【2026-11-15 修 —— 文案从「无」改成「未使用 LoRA」】
+        # 用户原话：「缺失时应显示『未使用 LoRA』而不是错名」。
+        # 「无」太短、也容易被读成「数据缺失」；
+        # 「未使用 LoRA」明确说的是「这条产物没有用 LoRA」。
+        out["lora"] = "未使用 LoRA"
+
+    # --- 产物实际挂载的 LoRA 清单（详情模态框用，多枚全列） ---
+    #
+    # 【为什么单独一份】上面 out["lora"] 是**一行摘要**（多枚用 · 拼一起）。
+    # 详情模态框要**逐枚**列出（含强度与加载节点），所以这里给一份列表。
+    # 只有 worker 回写过 artifact_loras 的任务才有这个列表；
+    # 没有就是空列表（前端显示「未使用 LoRA」）。
+    artifact_loras = []
+    raw_artifact = params.get("artifact_loras")
+    if isinstance(raw_artifact, list):
+        for item in raw_artifact:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            artifact_loras.append({
+                "name": name,
+                "raw_name": str(item.get("raw_name") or ""),
+                "strength": item.get("strength"),
+                "loader": str(item.get("loader") or ""),
+            })
+    out["artifact_loras"] = artifact_loras
 
     # --- 注意力机制 ---
     attention = str(info.get("attention_label") or "")

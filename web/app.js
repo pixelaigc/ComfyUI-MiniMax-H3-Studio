@@ -3403,10 +3403,14 @@ function localModelInfo(mode, p) {
 //
 // 现在：LoRA 只能来自 `job.model_info`（服务端按白名单算好的权威摘要），
 // 取值口径统一在 web/job-meta.js（纯函数，可单测）。
-// **没有 LoRA 时显示「无」**（用户明确要求），不再留白也不编名字。
+//
+// 【2026-11-15 文案统一】没有 LoRA 时显示「未使用 LoRA」（用户明确要求：
+// 「缺失时应显示『未使用 LoRA』而不是错名」）。
+// 服务端 gen_params.lora 已经给的是这个文案；这里的兜底同步，
+// 避免任何一条路径漏出去又变回「无」。
 function loraRowHtml(loraText) {
   const value = (loraText === undefined || loraText === null || loraText === "")
-    ? "无" : String(loraText);
+    ? "未使用 LoRA" : String(loraText);
   return `<div class="row"><span>LoRA</span>`
     + `<b title="${escapeHtml(value)}">${escapeHtml(value)}</b></div>`;
 }
@@ -4740,6 +4744,113 @@ function detailParamValue(job, key) {
   return text || "—";
 }
 
+// ------------------------------------------------------------------
+// 【2026-11-15 新增】产物实际元数据的渲染（详情模态框数据源）
+// ------------------------------------------------------------------
+//
+// 【为什么数据源换成接口】`job.gen_params` 是**卡片行**用的摘要（值都
+// 压成一行字符串）。用户要的是「点开看详细内容」—— 需要：
+//   * 逐枚列出 LoRA（含强度、加载节点），而不是「A · B」拼一起；
+//   * 区分「确实没有」与「没记录到」两种语义；
+//   * 字段缺失时明确写「未知」，不拿别的字段顶替。
+// 所以详情弹层改读 `GET /api/jobs/{id}/artifact-meta`（服务端算好的产物实际值）。
+//
+// 【降级】接口拿不到（老服务端 / 网络失败）-> 退回 job.gen_params，
+// 保证详情框**永远能打开**（这是既有契约：点详情必须有反应）。
+
+//: 详情模态框的字段定义（顺序即展示顺序）。
+//: value 取自 artifact-meta 接口的字段名。
+const ARTIFACT_META_FIELDS = [
+  ["model", "模型"],
+  ["model_file", "权重文件"],
+  ["steps", "步数"],
+  ["scheduler", "调度器"],
+  ["sampler", "采样器"],
+  ["cfg", "CFG"],
+  ["seed", "种子"],
+  ["width", "宽度"],
+  ["height", "高度"],
+  ["resolution", "分辨率档位"],
+  ["aspect", "画面比例"],
+  ["duration", "时长"],
+  ["attention", "注意力机制"],
+  ["workflow", "工作流名"],
+];
+
+//: 「未知」的统一文案。
+const ARTIFACT_UNKNOWN = "未知";
+
+/**
+ * 把 artifact-meta 接口的返回值渲染成「生成参数」区的 HTML。
+ *
+ * @param {object} meta 接口返回值（artifact-meta）
+ * @returns {string} HTML
+ */
+function artifactMetaRowsHtml(meta) {
+  const data = meta || {};
+  const rows = ARTIFACT_META_FIELDS.map(([key, label]) => {
+    let value = data[key];
+    if (value === null || value === undefined || value === "") {
+      value = ARTIFACT_UNKNOWN;
+    }
+    const missing = value === ARTIFACT_UNKNOWN;
+    const cls = missing ? ' class="is-missing"' : "";
+    return `<div class="detail-kv-row"><span>${escapeHtml(label)}</span>`
+      + `<b${cls} title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</b></div>`;
+  });
+  return rows.join("");
+}
+
+/**
+ * LoRA 区：逐枚列出产物实际挂载的 LoRA。
+ *
+ * 三种状态（服务端 lora_status 决定）：
+ *   recorded     -> 逐枚列出（名字 + 强度 + 加载节点）
+ *   none_used    -> 「未使用 LoRA」（工作流里确实没有 LoRA 节点）
+ *   not_recorded -> 「未知（该任务生成时未记录 LoRA）」
+ *
+ * 【为什么不复用卡片行的「无」】卡片行要紧凑（一个字），
+ * 详情框要明确 —— 「未记录」和「确实没用」是两回事，混成一个字
+ * 就是在撒谎。
+ *
+ * 【DOM 结构 —— 必须保持 .detail-kv 的两列 grid】
+ * `#detailParams` 的 class 是 `.detail-kv`（display:grid，两列）。
+ * 每一行必须是 `<span>标签</span><b>值</b>` —— 值那一格只能放**行内**内容。
+ * 早前一版把 chips 装进 `<div>` 里塞进第二格 -> 破坏了 grid，
+ * 而且 `<b>` 缺失导致值读不出来（浏览器验收实测抓到）。
+ * 所以这里多枚 LoRA 用 ` · ` 连接放在 `<b>` 里（与卡片行同款），
+ * 加载节点放进 title（悬停可见，不占版面）。
+ */
+function artifactLoraHtml(meta) {
+  const data = meta || {};
+  const loras = Array.isArray(data.loras) ? data.loras : [];
+  const status = String(data.lora_status || "");
+  if (status === "none_used" || (status !== "not_recorded" && !loras.length)) {
+    return `<div class="detail-kv-row"><span>LoRA</span>`
+      + `<b>未使用 LoRA</b></div>`;
+  }
+  if (status === "not_recorded" && !loras.length) {
+    return `<div class="detail-kv-row"><span>LoRA</span>`
+      + `<b class="is-missing" title="该任务生成时未把 LoRA 记录到产物元数据">`
+      + `未知（该任务生成时未记录 LoRA）</b></div>`;
+  }
+  if (!loras.length) {
+    return `<div class="detail-kv-row"><span>LoRA</span>`
+      + `<b class="is-missing">${ARTIFACT_UNKNOWN}</b></div>`;
+  }
+  const text = loras.map((item) => {
+    const name = String(item.name || "");
+    const strength = (item.strength === null || item.strength === undefined)
+      ? "" : ` ×${Number(item.strength).toFixed(2)}`;
+    return name + strength;
+  }).join(" · ");
+  const loaders = loras.map((item) => String(item.loader || "")).filter(Boolean);
+  const titleAttr = loaders.length
+    ? ` title="加载节点：${escapeHtml(loaders.join(" / "))}"` : "";
+  return `<div class="detail-kv-row"><span>LoRA</span>`
+    + `<b${titleAttr}>${escapeHtml(text)}</b></div>`;
+}
+
 /**
  * 【2026-11-14 · c6】详情模态框里的「作者推荐参数」分组。
  *
@@ -4910,6 +5021,44 @@ function openDetailModal(job) {
   // 滚回顶部（上次打开可能停在下面）
   const body = $("#detailModalBody");
   if (body) body.scrollTop = 0;
+
+  // 【2026-11-15 新增】异步拉「产物实际元数据」并刷新参数区。
+  //
+  // 【为什么先开框再拉数据】详情框必须**立刻**有反应（既有契约：
+  // 点详情就有东西出现）。先渲染卡片摘要（job.gen_params），
+  // 再用接口的真实值替换 —— 用户看到的是「先有骨架，再变准」。
+  //
+  // 【为什么用 job.id 做竞态保护】用户可能连续点不同卡片。
+  // 只有当前打开的那条才允许写 DOM。
+  loadArtifactMeta(job.id);
+}
+
+/**
+ * 拉取产物实际元数据并渲染到详情模态框。
+ *
+ * @param {string} jobId
+ */
+async function loadArtifactMeta(jobId) {
+  let meta = null;
+  try {
+    const resp = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/artifact-meta`);
+    if (resp.ok) meta = await resp.json();
+  } catch (e) {
+    meta = null;
+  }
+  // 竞态保护：用户已经切到别的卡片了 -> 丢弃这份数据。
+  if (!meta || detailOpenJobId !== jobId) return;
+  const paramsBox = $("#detailParams");
+  if (!paramsBox) return;
+  // 【不整块替换】推荐参数分组是**另一个** section（[data-detail-rec]），
+  // 整块替换 #detailParams 不会碰到它 —— 但创建时间行是 #detailParams
+  // 里的，所以这里把「生成参数」行与「创建时间」行分开重建。
+  const createdRow = paramsBox.querySelector(".detail-kv-row:last-child");
+  const createdHtml = createdRow && createdRow.textContent.includes("创建时间")
+    ? createdRow.outerHTML : "";
+  const rows = artifactMetaRowsHtml(meta);
+  const loraRow = artifactLoraHtml(meta);
+  paramsBox.innerHTML = rows + loraRow + createdHtml;
 }
 
 function closeDetailModal() {
