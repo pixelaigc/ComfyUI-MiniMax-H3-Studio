@@ -78,20 +78,51 @@ e1912ad fix(server): 节点探测不完整时不得断言「本机缺节点」+ 
 
 ## 本轮待办（收尾）
 
-- [ ] **T1 节点探测三态语义判定 + 负向对照**
-      现状：`tests/test_t2v_panel.py` + `tests/test_h3_panel_tune.py` 已绿（99 passed），
-      但**缺负向对照** —— 没证明「两条 reject 断言仍咬住真实错误路径」。
-      语义判定（三态，见 server.py:1814-1837）：
-        * 探测完整 + 节点不在 -> 拒绝（真缺节点）
-        * 探测不完整/没探测过 -> 放行（问不到 != 不存在）
-      判定结论：**新语义正确且更安全** —— 旧语义会把「还没探测过」误判成「本机缺节点」
-      （内置 Agent 不走面板，首次进来缓存是空集，实测报「本机 ComfyUI 里没有节点 ModelAttentionBackend」，
-      而节点恒在）。新语义**没有**放松「真缺节点」的拒绝路径。
-      待做：写**变异脚本**证明两条断言仍会咬住错误路径（把三态退回旧语义 -> 必须变红）。
-- [ ] **T2 完整 agent 回归 + 基线差集**（新增失败应为 0）
+- [x] **T1 节点探测三态语义判定 + 负向对照** —— 已完成（commit `a0be5d1`）
+      **判定结论：新语义（三态）正确且更安全。**
+      旧语义有**真实触发路径**：内置 Agent 不走面板（不调 /api/video-options），
+      首次进来 `_COMFY_NODE_NAMES` 是空集 -> 旧判据 `node not in _COMFY_NODE_NAMES`
+      报「本机 ComfyUI 里没有节点 ModelAttentionBackend」，
+      而该节点**实测恒在**（`curl /object_info/ModelAttentionBackend` -> HTTP 200）。
+      新语义**没有放松**「真缺节点」的拒绝路径 —— M3/M4 变异证明。
+      证据：`docs/agent-power/evidence/T1_mutation_node_probe.txt`（5/5 变异全被抓住）
+            `docs/agent-power/evidence/T1_three_state_tests.txt`（108 passed）
+      本轮补的测试（4 条）：
+        1. `test_allows_twopass_when_probe_incomplete` —— twopass 侧负控（原来**没有**）
+        2. `test_rejects_attention_without_node_even_when_other_nodes_present` —— 正控加强
+        3. `test_rejects_twopass_without_node_even_when_other_nodes_present` —— 正控加强
+        4. `tests/test_node_probe_completeness.py`（新增 6 条）—— 探测定律**直接**测试
+      **M5 变异暴露的真实缺口**：`_COMFY_PROBE_COMPLETE` 的**计算逻辑**
+      从来没被直接测过（三态断言全靠手动赋值绕过）-> 标志恒为 False 时
+      三态退化成「永远放行」，真缺节点也不再拒绝 = 静默失效。
+      新文件用**可控的假 ComfyUI**（真 HTTP / 真超时）补上这一层。
+
+- [x] **T2 完整 agent 回归 + 基线差集** —— 已完成
+      改动树 `901 passed, 0 failed`；基线树 `845 passed, 0 failed`；
+      **新增失败差集 = 0**。
+      通过数差 56 逐项可解释：845 -> 850（`test_agent.py` +1 步数断言、
+      `test_t2v_panel.py` +4）+ 新增 2 文件 51 条 = 901。
+      证据：`docs/agent-power/evidence/T2_changed_tree.txt`
+            `docs/agent-power/evidence/T2_baseline_tree.txt`
+            `docs/agent-power/evidence/T2_diff_summary.txt`
+      回归脚本：`scripts/run_agent_regression.sh`（**两边跑同一份清单**，
+      基线不存在的文件显式 SKIP 并打印 -> 差集 apples-to-apples）
+
 - [ ] **T3 六项目标逐项重跑真实证据**，落盘 `docs/agent-power/evidence/`
 - [ ] **T4 能力清单文档补齐验证证据 + 已知边界**
 - [ ] **T5 提交 + 给绝对路径清单**（不签验收结论）
+
+## 本轮踩坑（不要再踩）
+
+1. **变异脚本会原地改写 `server.py`** -> 不得与测试**并发**跑在同一棵树上。
+   本轮第一次跑新测试时 3 条**假红**，原因就是另一个
+   `mutation_check_capability.py` 在后台同时改同一个文件，
+   测试读到了变异中的代码。单独跑即 6 passed。
+2. **基线树没有本分支新增的测试文件** -> 直接跑会报 "file not found"
+   （不是失败，是不存在）。脚本显式剔除并打印 SKIP。
+3. Studio plan MCP 工具仍命中 harness `item` 注入 bug
+   -> 用 `HERMES_PROFILE=coding /root/studio_plan.py <context_id> "<说明>" <plan.json>`
+   （注意 profile 必须是 **coding**，默认的 research token 已失效）。
 
 ## 已知边界（沿用上一轮，需在文档复核）
 
