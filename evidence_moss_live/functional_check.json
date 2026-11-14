@@ -1,0 +1,46 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "results": [
+    {
+      "check": "MOSS-Image 面板可打开",
+      "ok": true,
+      "detail": "mode=t2i_moss panelDisplay=flex panelWidth=330 hasMossState=True tier=1mp (点击左侧导航 a.nav-item[data-mode='t2i_moss'])"
+    },
+    {
+      "check": "LoRA 列表可用 (MOSS 族)",
+      "ok": true,
+      "detail": "/api/image-loras?base=MOSS-Image available 共 139 项, 示例: moss/moss_hires_lora_v0.1_qkv_split.safetensors"
+    },
+    {
+      "check": "LoRA 选择生效（前端 state 回写）",
+      "ok": true,
+      "detail": "select={'id': 'imgLoraSelect', 'opts': 134, 'found': True, 'first': 'Asian Face Mix - Moss（随机亚洲脸） — 方向：东亚女性写实/时尚/影棚人像', 'second': 'Cinematic Photography（MossSFT c1） — 方向：影棚/电影感人像 + 电影感布光'} picked={'picked': True, 'value': 'moss-effects/Cinematic_MossSFT_c1-st6000.safetensors', 'stateLoras': 5}"
+    },
+    {
+      "check": "提交生成（点击 #genBtn）",
+      "ok": true,
+      "detail": "{'ok': True, 'btnId': 'genBtn', 'promptSet': True}"
+    },
+    {
+      "check": "增强确认门已确认",
+      "ok": true,
+      "detail": "#enhanceGateModal 弹出 -> 点击 #enhanceGateConfirm（门状态 {'exists': True, 'hidden': False}）"
+    },
+    {
+      "check": "真实提交产生新任务 (API 层)",
+      "ok": true,
+      "detail": "提交前 100 个 job -> 提交后新增 1 个: ['0f8f2e4f959a']"
+    },
+    {
+      "check": "新任务真实状态可见 (MOSS 模式)",
+      "ok": true,
+      "detail": "{\"id\": \"0f8f2e4f959a\", \"mode\": \"t2i_moss\", \"status\": \"done\", \"error\": null, \"has_output\": true, \"keys\": [\"batches\", \"continuation_info\", \"created_at\", \"elapsed\", \"error\", \"gen_params\", \"gen_type\", \"gen_type_label\", \"gen_type_media\", \"id\", \"mode\", \"model_info\", \"outputs\", \"params\", \"progress\", \"progress_text\", \"resolution_info\", \"session_id\", \"status\"]}"
+    },
+    {
+      "check": "375px 窄屏 FAB 未被抽屉遮挡",
+      "ok": true,
+      "detail": "{\"exists\": true, \"visible\": false, \"fabZIndex\": \"960\", \"fabRect\": {\"x\": 0, \"y\": 0, \"w\": 0, \"h\": 0}, \"panelZIndex\": \"950\", \"panelOpen\": true, \"panelRect\": {\"x\": 0, \"y\": 86, \"w\": 375, \"h\": 634}, \"hitTag\": null, \"hitId\": null, \"hitIsFab\": null, \"viewport\": {\"w\": 375, \"h\": 720}}"
+    }
+  ],
+  "all_pass": true
+}

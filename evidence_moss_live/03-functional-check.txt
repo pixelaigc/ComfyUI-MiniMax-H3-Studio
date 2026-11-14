@@ -1,0 +1,95 @@
+===== MOSS-Image 上线 · 功能抽查证据（打线上真实 8190）=====
+脚本: evidence_moss_live/functional_check.py
+      evidence_moss_live/narrow_fab_check.py
+结果: ALL_PASS = True  (见 functional_check.json / narrow_fab_check.json)
+
+--- 1. MOSS-Image 面板可打开 ---
+[PASS] MOSS-Image 面板可打开: mode=t2i_moss panelDisplay=flex panelWidth=330
+       hasMossState=True tier=1mp
+       (入口: 左侧导航 a.nav-item[data-mode='t2i_moss'] 真实点击)
+
+--- 2. LoRA 选择生效 ---
+[PASS] LoRA 列表可用 (MOSS 族): /api/image-loras?base=MOSS-Image available 共 139 项
+       示例: moss/moss_hires_lora_v0.1_qkv_split.safetensors
+[PASS] LoRA 选择生效（前端 state 回写）:
+       select={'id': 'imgLoraSelect', 'opts': 134, 'found': True}
+       选中项 value='moss-effects/Cinematic_MossSFT_c1-st6000.safetensors'
+       state.imgMoss.loras 回写数量 = 5
+
+--- 3. 真实提交一次生成并看到结果卡片 ---
+[PASS] 提交生成（点击 #genBtn）: {'ok': True, 'btnId': 'genBtn', 'promptSet': True}
+[PASS] 增强确认门已确认: #enhanceGateModal 弹出 -> 点击 #enhanceGateConfirm
+       （说明：图像模式 + 提示词未增强时前端会弹「增强确认」门，
+         这是产品既定行为，不点确认就永远不会 POST /api/jobs。
+         第一次排查时因未处理此门而误判为「提交无反应」。）
+[PASS] 真实提交产生新任务 (API 层): 提交前 100 个 job -> 提交后新增 1 个: ['0f8f2e4f959a']
+       （只认**新增** job id，避免被历史任务骗过）
+[PASS] 新任务真实状态可见 (MOSS 模式):
+       {"id": "0f8f2e4f959a", "mode": "t2i_moss", "status": "done", "error": null,
+        "has_output": true}
+
+新任务完整落库内容（GET /api/jobs 实测）：
+  id                : 0f8f2e4f959a
+  mode              : t2i_moss
+  gen_type_label    : MOSS-Image 文生图
+  status            : done
+  elapsed           : 85.25 秒
+  params.prompt     : 上线闭环抽查测试图：一只戴着宇航员头盔的橘猫，蓝色渐变背景
+  params.width/height: 1360 x 768
+  params.resolution : 1mp   aspect: 16:9
+  params.loras      : [{"name":"moss/moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors",
+                         "strength":0.7,"trigger":"moss_xvstyle"},
+                        {"name":"moss/moss_hires_lora_v0.4_qkv_split.safetensors","strength":1,"trigger":""},
+                        {"name":"moss-effects/mss_photoQuality_-2to2.safetensors","strength":1,...}]
+  params.slg_single_layers : 22      (MOSS 专属参数，官方推荐 22)
+  outputs           : [{"kind":"image","file":"images/i-zimage-000141.png",
+                       "name":"moss_0f8f2e4f959a_00001_.png","width":1360,"height":768}]
+
+出图文件落盘 + 可访问：
+  磁盘: /root/projects/comfyui-minimax-h3-studio/data/outputs/images/i-zimage-000141.png
+        1,172,526 bytes，PNG image data, 1360 x 768, 8-bit/color RGB
+  线上: GET /files/images/i-zimage-000141.png -> HTTP 200, bytes=1172526, image/png
+        served md5 9537c6fe5ef1f95dd4938fa6510e5523 == 磁盘 md5（逐字节一致）
+  视觉核验（vision_analyze）: 确认是**有效且连贯**的生成图 ——
+        橘色虎斑猫戴宇航员头盔、白色宇航服、蓝色纯色背景，
+        写实渲染、毛发/面罩反光/胡须细节完整，无破图/崩坏/空白。
+  截图: 04-moss-generated-output.png（出图原图）
+        05-moss-result-card.png（作品库里的 MOSS 结果卡片，含出图缩略图与参数）
+
+--- 4. 窄屏 375px / 390px FAB 不再被抽屉遮挡 ---
+[PASS] 375px 抽屉关闭: FAB visible=True z=960 hit=SPAN# hitIsFab=True
+[PASS] 375px 点 FAB 能打开抽屉: True
+[PASS] 375px 抽屉打开: FAB visible=False hiddenAttr=True display=none z=960
+       drawerZ=950 hit=None#None hitIsFab=None
+[PASS] 390px 抽屉关闭: FAB visible=True z=960 hit=SPAN# hitIsFab=True
+[PASS] 390px 点 FAB 能打开抽屉: True
+[PASS] 390px 抽屉打开: FAB visible=False hiddenAttr=True display=none z=960
+       drawerZ=950 hit=None#None hitIsFab=None
+ALL_PASS = True
+
+像素/元素重叠判定（实测几何，不靠肉眼）：
+  修复前 (z-index 930): 抽屉打开后 FAB 仍可见 (display=flex, hiddenAttr=False)，
+    元素命中判定 elementFromPoint(FAB 中心 318,682) 命中的是 **INPUT#imgSteps**
+    —— 也就是抽屉里溢出来的控件，而不是 FAB 自己 -> 用户点 FAB 点不动。
+    结论: FAIL(FAB 被抽屉遮挡，点不动)
+  修复后 (z-index 960 + .panel-fab[hidden]{display:none}):
+    抽屉打开时 FAB 被 JS 置 hidden，且显式规则保证 display:none，
+    几何 rect = {0,0,0,0}，不再覆盖抽屉可视区。
+    结论: PASS(FAB 干净让位)
+  层级关系（线上实测 computed style）:
+    .panel-fab  z-index = 960
+    .panel      z-index = 950   (抽屉本体)
+    .panel-mask z-index = 949   (遮罩)
+    FAB 高于抽屉 10 层、高于遮罩 11 层。
+
+--- A/B 对照：证明这条断言抓得住缺陷（不是恒绿）---
+在独立端口 8191 起了一个**修复前**的实例（backup/live-before-moss-20261114-124027
+的代码），用**同一份** probe 脚本跑两边：
+  修复前 (8191): FAB z=930 抽屉 z=950 -> elementFromPoint 命中 INPUT#imgSteps
+                  hitIsFab=False -> FAIL   (期望值 False ✅)
+  修复后 (8190): FAB z=960 -> hidden/display:none -> PASS          (期望值 True  ✅)
+  断言能变红 -> True
+对照实例已在取完证据后停掉（8191 已 CLOSED，8190 服务不受影响）。
+
+截图: 06-narrow-375-closed.png / 03-narrow-375-fab.png
+      06-narrow-390-closed.png / 03-narrow-390-fab.png
