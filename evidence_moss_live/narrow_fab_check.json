@@ -1,0 +1,162 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "results": [
+    {
+      "viewport": 375,
+      "state": "drawer-closed",
+      "ok": true,
+      "probe": {
+        "exists": true,
+        "visible": true,
+        "fabZIndex": "960",
+        "fabDisplay": "flex",
+        "fabHiddenAttr": false,
+        "fabRect": {
+          "x": 275,
+          "y": 660,
+          "w": 86,
+          "h": 44
+        },
+        "panelZIndex": "950",
+        "panelOpen": false,
+        "panelRect": {
+          "x": 0,
+          "y": 720,
+          "w": 375,
+          "h": 634
+        },
+        "hitTag": "SPAN",
+        "hitId": "",
+        "hitIsFab": true,
+        "hitRect": {
+          "x": 315,
+          "y": 672,
+          "w": 28,
+          "h": 20
+        },
+        "viewport": {
+          "w": 375,
+          "h": 720
+        }
+      }
+    },
+    {
+      "viewport": 375,
+      "state": "click-fab-opens-drawer",
+      "ok": true
+    },
+    {
+      "viewport": 375,
+      "state": "drawer-open",
+      "ok": true,
+      "probe": {
+        "exists": true,
+        "visible": false,
+        "fabZIndex": "960",
+        "fabDisplay": "none",
+        "fabHiddenAttr": true,
+        "fabRect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "panelZIndex": "950",
+        "panelOpen": true,
+        "panelRect": {
+          "x": 0,
+          "y": 86,
+          "w": 375,
+          "h": 634
+        },
+        "hitTag": null,
+        "hitId": null,
+        "hitIsFab": null,
+        "hitRect": null,
+        "viewport": {
+          "w": 375,
+          "h": 720
+        }
+      }
+    },
+    {
+      "viewport": 390,
+      "state": "drawer-closed",
+      "ok": true,
+      "probe": {
+        "exists": true,
+        "visible": true,
+        "fabZIndex": "960",
+        "fabDisplay": "flex",
+        "fabHiddenAttr": false,
+        "fabRect": {
+          "x": 290,
+          "y": 660,
+          "w": 86,
+          "h": 44
+        },
+        "panelZIndex": "950",
+        "panelOpen": false,
+        "panelRect": {
+          "x": 0,
+          "y": 720,
+          "w": 390,
+          "h": 634
+        },
+        "hitTag": "SPAN",
+        "hitId": "",
+        "hitIsFab": true,
+        "hitRect": {
+          "x": 330,
+          "y": 672,
+          "w": 28,
+          "h": 20
+        },
+        "viewport": {
+          "w": 390,
+          "h": 720
+        }
+      }
+    },
+    {
+      "viewport": 390,
+      "state": "click-fab-opens-drawer",
+      "ok": true
+    },
+    {
+      "viewport": 390,
+      "state": "drawer-open",
+      "ok": true,
+      "probe": {
+        "exists": true,
+        "visible": false,
+        "fabZIndex": "960",
+        "fabDisplay": "none",
+        "fabHiddenAttr": true,
+        "fabRect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "panelZIndex": "950",
+        "panelOpen": true,
+        "panelRect": {
+          "x": 0,
+          "y": 86,
+          "w": 390,
+          "h": 634
+        },
+        "hitTag": null,
+        "hitId": null,
+        "hitIsFab": null,
+        "hitRect": null,
+        "viewport": {
+          "w": 390,
+          "h": 720
+        }
+      }
+    }
+  ],
+  "all_pass": true
+}

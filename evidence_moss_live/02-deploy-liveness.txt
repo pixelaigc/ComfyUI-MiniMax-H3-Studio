@@ -1,0 +1,80 @@
+===== MOSS-Image 上线 · 部署与探活证据 =====
+生成时间: 2026-11-14 (CST)
+线上: h3-studio.service @ 8190
+
+--- 部署前 live HEAD (回滚点) ---
+dadbf8a58c33c641503430b0cc049ecfd0334532  merge(deploy): D9+D10+D12 批次上线 8190
+backup 分支: backup/live-before-moss-20261114-124027
+（另建 backup/maintainer-before-moss-20261114-124027 -> 367a169，主线回滚点）
+
+--- 部署后 live HEAD ---
+250c71e  Merge commit '7ac7bc8' into local/deploy/qwen-ref-assets-live
+  父提交: dadbf8a（部署前 live） + 7ac7bc8（合并后主线）
+  -> 沿用本仓库既有 deploy 模式：主线合入部署分支，保留部署分支上的
+     历史交付文档（docs/D2-上线交付说明.md 等），不丢内容。
+
+--- 部署步骤 ---
+1. git worktree add /root/projects/h3studio-moss-merge -b local/feature/moss-live-merge 367a169
+2. cd /root/projects/h3studio-moss-merge && git merge --no-ff --no-commit 102adf0
+   -> 1 处冲突 (web/app.js)，逐处人工处置（详见 01-merge-and-tests.txt）
+3. git commit  -> 7ac7bc8 (parents: 367a169 102adf0)
+4. git update-ref refs/heads/local/maintainer 7ac7bc8 367a169   (CAS 原子推进主线)
+5. git branch backup/live-before-moss-20261114-124027 dadbf8a
+   git branch backup/maintainer-before-moss-20261114-124027 367a169
+6. cd /root/projects/h3studio-live && git merge --no-ff --no-commit 7ac7bc8 -> 无冲突
+7. git commit -> 250c71e
+8. systemctl restart h3-studio.service
+
+--- systemctl ---
+is-active: active
+MainPID  : 2440286
+ActiveAt : Sat 2026-11-14 12:40:52 CST
+监听      : LISTEN 0.0.0.0:8190 (pid=2440286)
+
+--- HTTP 探活 (首页 + 9 关键 API) ---
+  /                          -> 200
+  /api/jobs                  -> 200
+  /api/queue                 -> 200
+  /api/image-options         -> 200
+  /api/video-options         -> 200
+  /api/generation-types      -> 200
+  /api/comfy-models          -> 200
+  /api/continuation/state    -> 200
+  /api/system                -> 200
+  /api/providers             -> 200
+
+首页含文生图入口: 抓取 / 得到 t2i_moss 与 moss 字样
+/api/generation-types 含: {"key": "t2i_moss", "label": "MOSS-Image 文生图", "media": "image"}
+
+--- 静态资源 md5 (served /static/... vs live worktree 磁盘文件) ---
+  MATCH    app.js                   6b9d43ba3a4787c0fc450fc2b3e52674
+  MATCH    style.css                2211d490ff33effb0bcdedc8c98b8d3d
+  MATCH    assets.css               a3abdab214cb836bcb5b60362ef04b2b
+  MATCH    responsive.css           4a908a67b10207253511cd21bdf76c37
+  MATCH    index.html               a65c267b70c0b89e12dff58fed88ebdb
+  MATCH    qwen-refs.js             85d965fb53c91efce900010fc16eb1f4
+  MATCH    agent.js                 7f2cc3ba5913b819216a8f0742766057
+  MATCH    providers.js             21e423d8df32961cb3596e3bbbdaab94
+  MATCH    job-detail.js            d043eacd5707f2911109af407e214495
+  MATCH    assets.js                9b28863ad9fcd20cc1fafb96964034f2
+  MATCH    video-panel.js           71d7f7b3f679814b2acc0bf711db2a1d
+  MATCH    video-effect-lora.js     9471d22f3ad1c53a9298b6ff8d9ab2f7
+  MATCH    music.js                 d0866538c93941a35a7a004b83984010
+  MATCH    interaction-guard.js     9c6c633f49dc70e6067bee5b17240792
+  MATCH    moss-layout.js           defad905dea49b089a5dfa6b84170c10
+15/15 全部逐字节一致。
+
+--- journal error 级 (自 12:40:52 重启起) ---
+journalctl -u h3-studio.service --since "2026-11-14 12:40:52" -p err --no-pager
+  -> -- No entries --
+error 级日志条数 = 0
+（含 error|traceback|exception 关键字的条数 = 0）
+
+--- 本次上线实际生效的改动 (live HEAD vs 回滚点) ---
+ evidence_moss_live/parity_probe.py    |  116 +++++  (新增: 前后端尺寸口径探针)
+ evidence_moss_live/parity_probe_js.py |  134 ++++  (新增: 直接 eval 真实 app.js 的探针)
+ h3studio/workflows.py                |  182 +++  (尺寸链路后端修复)
+ tests/test_responsive_mobile.py      |   82 ++   (窄屏 FAB 遮挡回归断言)
+ web/app.js                           |  147 ++   (尺寸链路前端修复)
+ web/responsive.css                   |   18 +    (FAB z-index 930->960 + [hidden] 规则)
+ 6 files changed, 631 insertions(+), 48 deletions(-)

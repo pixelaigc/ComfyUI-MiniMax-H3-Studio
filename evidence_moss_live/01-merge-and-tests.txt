@@ -1,0 +1,69 @@
+===== MOSS-Image 上线 · 合并与测试 A/B 证据 =====
+生成时间: 2026-11-14 (CST)
+工作区: /root/projects/h3studio-moss-merge
+
+--- 合并前主线核实 ---
+local/maintainer HEAD (合并前) = 367a169 merge(d11): 内置 Agent 能力增强上线主线
+线上 live HEAD (合并前)      = dadbf8a merge(deploy): D9+D10+D12 批次上线 8190
+
+git merge-base --is-ancestor 102adf0 local/maintainer  -> NO  (不在主线祖先链)
+git merge-base --is-ancestor 102adf0 dadbf8a           -> NO  (不在线上祖先链)
+git branch -a --contains 102adf0 ->
+    local/feature/moss-ui-merged
+    local/feature/moss-ui-verify
+
+结论: 102adf0 是**已提交**的正式 commit（不是他人未提交 WIP），但从未进入
+      local/maintainer，也从未部署到 8190。需要真实合并。
+
+--- 合并前基线树 (baseline) ---
+worktree: /root/projects/h3studio-moss-base367  (detached @ 367a169, 干净)
+基线测试命令:
+  /home/ubuntu/comfyui/venv/bin/python -m pytest \
+    tests/test_moss_image.py tests/test_moss_layout.py tests/test_responsive_mobile.py \
+    tests/test_qwen_image.py tests/test_page_size.py tests/test_image_res_lora.py \
+    -p no:cacheprovider -q
+
+基线结果:  2 failed, 195 passed, 1 skipped
+基线失败清单 (2 条, 均为 playwright 超时, 与本次合并无关):
+  FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+  FAILED tests/test_page_size.py::TestPageSize::test_current_page_highlighted
+  (playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 15000ms exceeded)
+
+--- 合并后改动树 (merged) ---
+worktree: /root/projects/h3studio-moss-merge
+合并 commit: 7ac7bc8  (parents: 367a169 102adf0)
+  git log --oneline --parents -1 -> 7ac7bc8 367a169 102adf0
+
+合并后测试命令: 同上（同一份清单，两棵树跑）
+合并后结果:  2 failed, 196 passed, 1 skipped
+合并后失败清单 (2 条, 与基线**完全相同**):
+  FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+  FAILED tests/test_page_size.py::TestPageSize::test_current_page_highlighted
+
+--- 新增失败差集 ---
+基线失败集合 = {test_auto_refresh_keeps_page_size, test_current_page_highlighted}
+改动失败集合 = {test_auto_refresh_keeps_page_size, test_current_page_highlighted}
+差集 (改动 - 基线) = {}   空集
+新增失败差集 = 0   ✅
+
+通过数: 195 -> 196 (+1)
++1 的来源: tests/test_responsive_mobile.py::test_panel_fab_is_not_occluded_by_open_drawer
+           (102adf0 新增的窄屏 FAB 遮挡回归断言, 合并后在改动树通过)
+
+--- 前后端尺寸口径一致性 (合并冲突处置的实测依据) ---
+脚本: evidence_moss_live/parity_probe_js.py
+      (直接 eval 合并后真实 web/app.js 的 normalizeImgSize, 再与真实后端
+       normalize_moss_image_size / normalize_qwen_image_size /
+       normalize_h3_image_size / normalize_z_image_size 逐格对比)
+
+family    input        backend       frontend(merged js) match
+MOSS      8192x4096    2880x1440     2880x1440           True
+MOSS      6144x3456    2720x1520     2720x1520           True
+MOSS      2736x1536    2720x1520     2720x1520           True
+Qwen      8192x4096    2944x1472     2944x1472           True
+Qwen      6144x3456    2800x1568     2800x1568           True
+H3-Image  8192x4096    5792x2912     5792x2912           True
+H3-Image  6144x3456    5472x3072     5472x3072           True
+H3-Image  5760x3240    5472x3072     5472x3072           True
+Z-Image   10000x10000  10000x10000   10000x10000         True
+TOTAL=48  MISMATCH=0
