@@ -397,11 +397,40 @@
     const analysis = asset.latest_analysis;
     const refs = asset.references || { refs: [], count: 0 };
 
-    const preview = asset.preview_url
-      ? `<img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}">`
-      : (asset.category === "video"
-        ? `<video src="${esc(asset.content_url)}" controls preload="metadata"></video>`
-        : `<span class="ph">${CATEGORY_ICON[asset.category] || "📦"}</span>`);
+    // 【2026-11-14 需求 4】详情面板要能**直接看到 / 播放**素材本身。
+    //
+    // 【原来的缺陷】预览只按「有没有 preview_url」二分：
+    //   有 preview_url -> <img>（图片能看）
+    //   没有           -> 只给 video 放播放器，**音频**掉进兜底分支
+    //                    -> 只有一个 📦 占位符，**音频根本没法播**。
+    // 而「没有 preview_url」在音频上是常态（缩略图只给图片生成）。
+    //
+    // 【现在的做法】按 category 分派：
+    //   image -> <img> 用 preview_url（512 宽缩略图，省流量）
+    //   video -> <video> 用 content_url（原始文件）
+    //   audio -> <audio> 用 content_url（原始文件）
+    //   其它 -> 占位符
+    // 三类都能在详情里直接看 / 播。
+    const contentUrl = asset.content_url || "";
+    let preview;
+    if (asset.category === "video") {
+      preview = contentUrl
+        ? `<video class="al-preview-video" src="${esc(contentUrl)}" controls preload="metadata"></video>`
+        : `<span class="ph">🎬</span>`;
+    } else if (asset.category === "audio") {
+      preview = contentUrl
+        ? `<audio class="al-preview-audio" src="${esc(contentUrl)}" controls preload="metadata"></audio>`
+        : `<span class="ph">🎵</span>`;
+    } else if (asset.preview_url) {
+      preview = `<img class="al-preview-img" src="${esc(asset.preview_url)}"
+                      alt="${esc(asset.name)}">`;
+    } else if (contentUrl) {
+      // 图片没有缩略图但有原图 —— 退而用原图
+      preview = `<img class="al-preview-img" src="${esc(contentUrl)}"
+                      alt="${esc(asset.name)}">`;
+    } else {
+      preview = `<span class="ph">${CATEGORY_ICON[asset.category] || "📦"}</span>`;
+    }
 
     const tagsHtml = (asset.tags || []).map(tag =>
       `<span class="al-tag">${esc(tag)}<button data-rmtag="${esc(tag)}" title="删除标签">×</button></span>`
@@ -1206,5 +1235,11 @@
     loadAssets,
     toast,
     esc,
+    // 【2026-11-14 需求 14】素材库播放器模式需要「按 id 打开某张素材详情」
+    // （玩家面板里点某一项要能跳到详情）。openDrawer 原本是模块私有的，
+    // 这里导出为公开 API。
+    openDrawer,
+    // 【2026-11-14 需求 13】多选批量删除需要「当前已加载的素材清单」。
+    getItems: () => (state.items || []).slice(),
   };
 })();

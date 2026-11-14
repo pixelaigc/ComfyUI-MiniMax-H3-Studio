@@ -156,6 +156,12 @@
 }
 .al-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .al-preview-box video { max-width: 100%; max-height: 100%; }
+/* 【2026-11-14 需求 4】音频素材的详情预览。
+   音频没有画面，用 16/10 的固定比例框会留一大块黑 —— 改成自动高度，
+   让播放器自己撑开。 */
+.al-preview-box:has(.al-preview-audio) { aspect-ratio: auto; padding: 12px; }
+.al-preview-audio { width: 100%; display: block; }
+.al-preview-box .ph { font-size: 30px; color: #7d8794; }
 .al-section-title {
   font-size: 11px; letter-spacing: .08em; color: var(--muted); font-weight: 700;
   margin-bottom: 6px; text-transform: uppercase;
