@@ -425,10 +425,19 @@ class TestC7NoRegressionOnSharedAssets(unittest.TestCase):
     """C7：合并 enh-unify 后，两边的能力都要在（不回退任一方）。"""
 
     def test_music_structured_fields_present(self):
+        """C7：结构化风格区 / 歌词区必须在。
+
+        【2026-11-14 需求 7】原先这里还断言「重新生成」按钮存在
+        （#musicStyleRegenBtn）—— 用户明确要求移除它们，
+        改为断言「生成风格+歌词」主按钮仍在（重新生成的唯一入口）。
+        """
         html = read(WEB / "index.html")
         self.assertIn('id="musicStyleFieldsGrid"', html)
         self.assertIn('id="musicLyrics"', html)
-        self.assertIn('id="musicStyleRegenBtn"', html)
+        self.assertNotIn('id="musicStyleRegenBtn"', html,
+                         "需求 7：「重新生成」按钮已移除")
+        self.assertIn('id="musicEnhanceBtn"', html,
+                      "「生成风格+歌词」主按钮必须保留")
 
     def test_enhunify_features_present(self):
         """enh-unify 的能力不能被合并覆盖掉。"""

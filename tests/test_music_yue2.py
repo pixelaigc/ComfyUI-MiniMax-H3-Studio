@@ -552,12 +552,40 @@ class TestMusicFrontend(unittest.TestCase):
                          "前端不得再提交 max_duration（后端也不再按时长截断）")
 
     def test_structured_style_and_regen_exist(self):
-        """【用户要求 5】可编辑的结构化风格区 + 歌词区 + 「重新生成」。"""
+        """【用户要求 5】可编辑的结构化风格区 + 歌词区。
+
+        【2026-11-14 需求 7 更新】原先这里还断言两个「重新生成」按钮存在
+        （#musicStyleRegenBtn / #musicLyricsRegenBtn）—— 但用户明确要求
+        **移除**它们（想重新生成直接点上面的「生成风格+歌词」即可，
+        两条入口产出的是同一种东西，只是底稿不同，容易让人困惑）。
+
+        所以这里改成断言：
+          * 结构化风格区与歌词区**仍在**（要求 5 的核心没动）；
+          * 两个「重新生成」按钮**已移除**（需求 7）；
+          * 「生成风格+歌词」主按钮**仍在**（重新生成的唯一入口）。
+        """
         html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="musicStyleStructField"', html)
         self.assertIn('id="musicStyleFieldsGrid"', html)
-        self.assertIn('id="musicStyleRegenBtn"', html)
-        self.assertIn('id="musicLyricsRegenBtn"', html)
+        self.assertIn('id="musicLyrics"', html)
+        # 【需求 7】两个「重新生成」入口已移除
+        self.assertNotIn('id="musicStyleRegenBtn"', html,
+                         "需求 7：结构化风格的「重新生成」按钮已移除")
+        self.assertNotIn('id="musicLyricsRegenBtn"', html,
+                         "需求 7：歌词的「重新生成」按钮已移除")
+        # 重新生成的唯一入口仍在
+        self.assertIn('id="musicEnhanceBtn"', html,
+                      "「生成风格+歌词」主按钮必须保留（重新生成的唯一入口）")
+        # JS 侧的绑定也要一并清掉（不能留下指向不存在 DOM 的死代码）。
+        # 【注意】比对前先剥掉注释 —— 注释里为了说明「删了什么」会提到
+        # 这两个 id，那是**说明文字**不是绑定代码。
+        js = (REPO / "web" / "music-enhance.js").read_text(encoding="utf-8")
+        code = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        code = re.sub(r"//[^\n]*", "", code)
+        self.assertNotIn("musicStyleRegenBtn", code,
+                         "music-enhance.js 里不能还绑着已移除的按钮")
+        self.assertNotIn("musicLyricsRegenBtn", code,
+                         "music-enhance.js 里不能还绑着已移除的按钮")
 
     def test_music_enhance_uses_shared_component(self):
         """
