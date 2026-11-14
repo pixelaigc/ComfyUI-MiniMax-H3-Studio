@@ -578,13 +578,34 @@ class TestAgentLimits(unittest.TestCase):
 
     def test_limits_are_bounded(self):
         self.assertGreater(agent_mod.TOTAL_TIMEOUT, 0)
-        self.assertLessEqual(agent_mod.TOTAL_TIMEOUT, 900)
+        # 【2026-11-13 审查目标 4 语义反转】步数上限 8 -> 50，总时限必须跟着抬
+        # （50 步 × 单步 20~120 秒 = 1000~6000 秒；总时限留在 420 秒的话
+        #   「50 步上限」只是纸面数字，第 8 步之后必然被总时限掐断）。
+        # 上界从 900 抬到 3600（60 分钟）—— 仍然是有限值，不会无限跑。
+        self.assertLessEqual(agent_mod.TOTAL_TIMEOUT, 3600)
         self.assertGreater(agent_mod.MAX_STEPS, 0)
-        self.assertLessEqual(agent_mod.MAX_STEPS, 10)
+        # 步数上限：从「<= 10」改成「>= 50 且 <= 硬顶 50」
+        # （用户 2026-11-13 审查目标 4 明确要求至少 50 步）。
+        self.assertGreaterEqual(agent_mod.MAX_STEPS, 50)
+        self.assertLessEqual(agent_mod.MAX_STEPS, 50)
         self.assertGreater(agent_mod.MAX_TOOL_CALLS, 0)
-        self.assertLessEqual(agent_mod.MAX_TOOL_CALLS, 20)
+        self.assertGreaterEqual(agent_mod.MAX_TOOL_CALLS, 100)
+        self.assertLessEqual(agent_mod.MAX_TOOL_CALLS, 200)
         self.assertGreater(agent_mod.MAX_CONCURRENT, 0)
         self.assertLessEqual(agent_mod.MAX_CONCURRENT, 8)
+
+    def test_total_timeout_covers_the_step_budget(self):
+        """
+        【关键不变量】总时限必须**够跑完**步数上限。
+
+        这一条是「50 步上限」能不能落地的判据：单步最坏 180 秒
+        （STEP_TIMEOUT），总时限至少要能覆盖步数上限的下限区间，
+        否则步数上限是纸面数字。
+
+        实测口径：50 步 × 平均 48 秒 = 2400 秒 -> TOTAL_TIMEOUT 必须 >= 2400。
+        """
+        self.assertGreaterEqual(agent_mod.TOTAL_TIMEOUT,
+                                agent_mod.MAX_STEPS * 48)
 
     def test_repeat_limit_is_at_least_two(self):
         """第 2 次重复要先给提示，所以上限至少 3。"""

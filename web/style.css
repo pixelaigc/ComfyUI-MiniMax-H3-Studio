@@ -2342,6 +2342,77 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   color: var(--text); font-family: inherit;
 }
 .ag-artifacts-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 【2026-11-13 审查目标 4/5】内置 Agent「agent 管理」按钮 + 面板样式 */
+.ag-manage-btn {
+  flex: 0 0 auto; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  color: var(--text); font-family: inherit;
+}
+.ag-manage-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.agm-dialog { width: min(880px, 94vw); }
+.agm-body {
+  padding: 14px 16px; overflow: auto; max-height: 68vh;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.agm-section { display: flex; flex-direction: column; gap: 8px; }
+.agm-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+.agm-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.agm-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.agm-field.wide { flex: 1 1 260px; min-width: 200px; }
+.agm-field > span { color: var(--muted); }
+.agm-field input, .agm-field select {
+  padding: 6px 8px; font-size: 12px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  color: var(--text);
+}
+.agm-field input:disabled { background: #f4f5f7; color: var(--muted); }
+.agm-hint { font-size: 11px; color: var(--muted); line-height: 1.55; }
+.agm-hint code {
+  background: #f4f5f7; padding: 1px 4px; border-radius: 4px;
+  font-size: 11px; word-break: break-all;
+}
+.agm-warn {
+  font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 8px;
+  background: #fff6e5; border: 1px solid #f0c98a; color: #8a5a12;
+}
+.agm-cap-list { display: flex; flex-direction: column; gap: 10px; }
+.agm-cap {
+  border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.agm-cap-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.agm-cap-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.agm-cap-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.agm-cap-req { display: flex; flex-wrap: wrap; gap: 6px; }
+.agm-tag {
+  font-size: 10px; padding: 2px 7px; border-radius: 999px;
+  background: #f0f2f5; color: #5b6470;
+}
+.agm-tag.builtin { background: #e7f3ff; color: #1c5d99; }
+.agm-engine-list { display: flex; flex-direction: column; gap: 10px; }
+.agm-engine {
+  border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.agm-engine-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.agm-engine-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.agm-engine-toggle span { font-size: 12px; font-weight: 600; }
+.agm-btn {
+  padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  color: var(--text);
+}
+.agm-btn:hover { border-color: var(--accent); color: var(--accent); }
+.agm-btn.danger:hover { border-color: #c0392b; color: #c0392b; }
+.agm-engine-test { font-size: 11px; }
+.agm-testing { color: var(--muted); }
+.agm-test-ok { color: #1f7a3d; }
+.agm-test-fail { color: #c0392b; }
 .ag-current-session {
   font-size: 11px; color: var(--muted); margin-top: 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

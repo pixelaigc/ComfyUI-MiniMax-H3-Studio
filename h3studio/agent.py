@@ -49,6 +49,7 @@ from . import providers as prov
 from . import workflows as wf
 from . import agent_safety
 from . import agent_schema
+from . import agent_settings
 
 #: 音乐模式判定（时长字段名不同：max_duration 而非 duration）
 def is_music_mode(mode: str) -> bool:
@@ -59,7 +60,14 @@ def is_music_mode(mode: str) -> bool:
 #: 单次请求总超时（秒）。实测单步 60~120 秒（iq3 量化小模型 + 大工具 schema），
 #: 4~5 步的正常流程就要 4~6 分钟。给到 420 秒是「够跑完正常流程」与
 #: 「不让请求无限挂着」之间的平衡点。
-TOTAL_TIMEOUT = 420.0
+#:
+#: 【2026-11-13 审查目标 4 改：420 -> 2400】
+#: 步数上限提到 50 之后，总时限**必须**跟着抬：
+#: 50 步 × 单步 20~120 秒 = 1000~6000 秒。
+#: 如果总时限还留在 420 秒，那么第 8 步之后无论步数上限多大都跑不完 ——
+#: 「50 步上限」就成了纸面数字。2400 秒（40 分钟）能覆盖
+#: 50 步 × 平均 48 秒，留出余量。
+TOTAL_TIMEOUT = 2400.0
 #: 是否启用真 token 级增量流式（2026-11-10）。
 #:
 #: 关掉的话 Agent 退回到「整段返回 + 一次 token 事件」——
@@ -74,34 +82,20 @@ STREAM_REPLAY_ENABLED = True
 STEP_TIMEOUT = 180.0
 #: 最大步骤数（= 模型轮数，含最后一轮「给结论」）。
 #:
-#: 为什么是 8 而不是 6：实测一条**成功**的完整链路要 6 轮
-#:   search_assets ×2（第一次没命中，换关键词再搜）
-#:   -> list_modes（查有哪些模式）
-#:   -> enhance_prompt（扩写提示词）
-#:   -> create_job（下发任务）
-#:   -> respond（交结论）
-#: 上限卡在 6 的话，这条链路**刚好**用完，一点余量都没有 ——
-#: 模型只要多搜一次就拿不到结论，用户看到的是「已截断」而不是一个完整的回答。
-#: 真正兜底的是 TOTAL_TIMEOUT（420 秒），所以步数上限给到 8 不会让请求无限跑。
-MAX_STEPS = 8
+#: 【2026-11-13 审查目标 4/5/6/7 改：8 -> 50】
+#: 用户要求「agent 工具调用步数上限从 8 步提升到至少 50 步」。
+#: 8 步只够跑「search_assets ×2 -> list_modes -> enhance_prompt ->
+#: create_job -> respond」这一条最短链路；一碰到需要查外部资料、
+#: 处理音视频、多次试错的活就撞墙（实测撞 8 步上限 -> 任务没建出来）。
+#:
+#: 真正的兜底是 TOTAL_TIMEOUT（不是步数）—— 所以步数上限可以放大。
+MAX_STEPS = 50
 #: 最大工具调用数。
 #:
-#: 为什么第二轮从 8 提到 12：
-#: 实测一条**成功**的完整链路要 8~10 次工具调用：
-#:   search_assets ×2（第一次没完全命中，换关键词）
-#:   -> list_modes / get_mode_schema（确认参数边界）
-#:   -> enhance_prompt
-#:   -> create_job
-#:   -> get_job_status（播报进度）
-#:   -> respond
-#: 加上澄清式多轮（要先问一次再答）容易到 10 次。
-#: 8 次预算会在「模型多搜两次」时被吃光 —— 实测有一次任务因为
-#: 重复搜索耗尽预算，任务没建出来（用户看到的是「已达工具调用上限」）。
-#:
-#: 为什么不是更大：每多一次工具调用就多一次模型轮次（本地小模型单步
-#: 20~120 秒）。12 次是「够跑完正常链路 + 留 2~4 次余量」的上限。
-#: 真正的兜底仍是 TOTAL_TIMEOUT（420 秒）。
-MAX_TOOL_CALLS = 12
+#: 【为什么跟着步数走】50 步里每步平均 1.5 次工具调用 -> 75 次。
+#: 给 120 是「够跑完长链路 + 留余量」；写类工具不重试，所以误重试
+#: 造成重复副作用的风险不随这个数放大。
+MAX_TOOL_CALLS = 120
 #: 同时运行的 Agent 会话数上限。本地模型单卡，并发只会互相拖慢。
 MAX_CONCURRENT = 2
 #: 素材检索结果里**描述**的最大字符数。
@@ -200,6 +194,16 @@ TOOL_STAGE_TEXT = {
     "search_conversations": "正在检索历史对话",
     "search_asset_history": "正在检索素材历史",
     "remember_preference": "正在记住偏好",
+    # --- 额外能力（受「agent 管理」的能力开关控制）---
+    "read_file": "正在读取文件",
+    "web_search": "正在搜索外部资料",
+    "run_code": "正在执行代码",
+    "media_probe": "正在探测媒体参数",
+    "media_concat": "正在拼接音视频",
+    "media_transcode": "正在转码",
+    "media_extract_frames": "正在抽帧",
+    "media_mix_audio": "正在混音",
+    "media_merge_av": "正在音视频合流",
 }
 
 
@@ -249,6 +253,18 @@ SYSTEM_PROMPT = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多�
 - search_conversations(query, ...)          检索历史会话内容
 - search_asset_history(asset_id?/query?)    检索素材历史
 - respond(summary, ...)          提交最终结论
+
+【额外能力】（由「agent 管理」里的能力开关决定 —— 关掉时这些工具不存在）
+- read_file(path)               读文本文件（仅限允许目录内）
+- web_search(query, count?)     外部搜索（DDG / 局域网聚合引擎）
+- run_code(code)                执行一段 Python（默认关闭，需用户启用）
+- media_probe(asset_id)         探测音视频参数（时长/分辨率/编码）
+- media_concat(asset_ids[])     拼接多个视频
+- media_transcode(asset_id, output_format?)  转码
+- media_extract_frames(asset_id, interval_sec?, max_frames?)  抽帧
+- media_mix_audio(video_asset_id, audio_asset_ids[], volumes?, replace?)
+                            混音（可替换原音轨）
+- media_merge_av(video_asset_id, audio_asset_id)  音视频合流
 
 ## 工作方式
 1. 需要素材时先 search_assets；**同一工具不要连续重复调用超过 2 次**，
@@ -1321,6 +1337,29 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 硬问题（取值非法）在这里抛 AgentError，不建任务。
     soft_notice = _validate_create_job_args(mode, args, params)
 
+    # --- 文生视频（t2v）默认参数 — 2026-11-13 审查目标 5 --------------
+    #
+    # 【为什么单独处理】注意力机制与 dmad 加速 LoRA 只存在于**新面板路径**
+    # （video_workflow.build_t2v_panel），旧路径（_h3_video_workflow）没有
+    # 这两个概念。所以 Agent 的 t2v 必须走服务端的归一入口
+    # （server.prepare_agent_t2v_params），否则默认参数落不下去。
+    #
+    # 【服务端是权威】归一入口会校验：LoRA 文件在本机存在吗、注意力节点
+    # 在本机 ComfyUI 里吗、宽高超上限吗。服务端不在（单测替身）时跳过 ——
+    # 那时 params 保持原样，行为与改动前一致。
+    if mode == "t2v":
+        prepare_t2v = getattr(ctx.server, "prepare_agent_t2v_params", None)
+        if prepare_t2v is not None:
+            try:
+                normalized, error = await prepare_t2v(params)
+            except Exception as exc:
+                message = getattr(exc, "message", None) or str(exc)
+                raise AgentError(message, status=400,
+                                 code="bad_request") from exc
+            if error:
+                raise AgentError(error, status=400, code="invalid_params")
+            params = normalized
+
     # 走服务端**同一套**校验（与面板点「生成」完全一致）：
     # 模式白名单 / 参考图数量 / <imageN> 占位注入 / 参考音频数量 / 提示词非空。
     # 这里不重写一份 —— 两份实现必然漂移（见 server.prepare_job_params 的说明）。
@@ -1588,8 +1627,13 @@ def _infer_clarify_options(ctx: AgentContext) -> list[str]:
 # 为什么要单独文件：agent.py 是编排器，工具实现塞进来会让它超过 1500 行，
 # 难以阅读。注册点集中在这里，一个函数看清「有哪些工具」。
 from . import agent_tools  # noqa: E402
+from . import agent_extra_tools  # noqa: E402
 
 agent_tools.register(sys.modules[__name__], _tool_create_job)
+# 【2026-11-13 审查目标 4】额外能力（文件读取/外部搜索/代码执行/ffmpeg 音视频）。
+# 它们由「agent 管理」里的能力开关控制 —— 关掉的工具**不会**出现在
+# 给模型的工具清单里（不是「调用时报错」，模型连看都看不到）。
+agent_extra_tools.register(sys.modules[__name__])
 
 
 # ------------------------------------------------------------------ 辅助
@@ -2777,6 +2821,27 @@ def _tool_result_summary(name: str, result, ok: bool) -> str:
         return "提示词已增强"
     if name == "respond":
         return "已给出结论"
+    # --- 额外能力（2026-11-13 审查目标 4）---
+    if name == "read_file":
+        return f"已读取 {result.get('lines', 0)} 行（{result.get('path')}）"
+    if name == "web_search":
+        return (f"外部搜索命中 {result.get('total', 0)} 条"
+                f"（引擎：{result.get('engine')}）")
+    if name == "run_code":
+        if result.get("timed_out"):
+            return f"代码执行超时（{result.get('timeout_sec')} 秒）"
+        return f"代码已执行（退出码 {result.get('exit_code')}）"
+    if name == "media_probe":
+        info = result.get("asset") or {}
+        return (f"已探测 {info.get('name')}："
+                f"{result.get('duration', 0)} 秒 / "
+                f"{result.get('width')}×{result.get('height')}")
+    if name in ("media_concat", "media_transcode", "media_mix_audio",
+                "media_merge_av"):
+        output = result.get("output") or {}
+        return f"已生成：{output.get('name')}（{output.get('asset_id')}）"
+    if name == "media_extract_frames":
+        return f"已抽取 {result.get('frame_count', 0)} 帧"
     return "已完成"
 
 
@@ -2805,16 +2870,32 @@ def _job_event_payload(job: dict) -> dict:
     return payload
 
 
-def _tool_specs() -> list[dict]:
-    """给模型的工具定义（OpenAI tools 协议格式）。"""
-    return [{
-        "type": "function",
-        "function": {
-            "name": spec["name"],
-            "description": spec["description"],
-            "parameters": spec["parameters"],
-        },
-    } for spec in TOOLS.values()]
+def _tool_specs(capabilities: dict | None = None) -> list[dict]:
+    """
+    给模型的工具定义（OpenAI tools 协议格式）。
+
+    【能力闸门 —— 2026-11-13 审查目标 4】
+    capabilities 为 None 时**不过滤**（调试/单测用默认全开）；
+    传入能力开关 dict 时，依赖**已关闭能力**的工具不会出现在清单里 ——
+    模型连工具名都看不到，就不会去调一个用不了的工具。
+    """
+    caps = None
+    if capabilities is not None:
+        caps = agent_extra_tools.normalize_enabled(capabilities)
+    out = []
+    for spec in TOOLS.values():
+        capability = agent_extra_tools.TOOL_CAPABILITIES.get(spec["name"])
+        if caps is not None and capability and not caps.get(capability):
+            continue
+        out.append({
+            "type": "function",
+            "function": {
+                "name": spec["name"],
+                "description": spec["description"],
+                "parameters": spec["parameters"],
+            },
+        })
+    return out
 
 
 #: 判定「模型只是在叙述接下来要做什么」的关键词。
@@ -3324,7 +3405,10 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": message})
 
-    tools = _tool_specs()
+    # 【2026-11-13 审查目标 4】工具清单按「agent 管理」里的能力开关过滤。
+    # 关掉的能力 -> 对应工具**不出现在**清单里（模型连名字都看不到）。
+    capabilities = agent_extra_tools.enabled_capabilities(ctx)
+    tools = _tool_specs(capabilities)
     started = time.time()
     # 本次运行的起点 —— 权威任务查询的时间窗基准。
     # 【为什么要在最早就记下来 —— 2026-11-11】

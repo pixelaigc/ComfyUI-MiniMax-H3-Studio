@@ -319,16 +319,107 @@ class TestNormalizeT2VParams(unittest.TestCase):
         self.assertIn("不兼容", err)
 
     def test_rejects_attention_without_node(self):
+        """
+        探测**完整**时确认「本机真的没有这个节点」-> 必须拒绝。
+
+        【2026-11-14 语义补充】归一层的判定是三态：
+          * 探测完整 + 节点不在 -> 真缺节点 -> 拒绝（这条）；
+          * 没探测过 / 探测不完整 -> 问不到 != 不存在 -> 放行
+            （见 test_allows_attention_when_probe_incomplete）。
+        所以这里必须把 _COMFY_PROBE_COMPLETE 置 True 才代表「问全了」。
+        """
+        self.server._COMFY_PROBE_COMPLETE = True
         self.server._COMFY_NODE_NAMES.discard("H3SparseAttention")
         out, err = self.server.normalize_t2v_params(dict(self.BASE, attention="sparse"))
         self.assertTrue(err)
         self.assertIn("没有节点", err)
 
+    def test_allows_attention_when_probe_incomplete(self):
+        """
+        负控：**没探测过 / 探测不完整**时不得断言「缺节点」。
+
+        【为什么这条重要】`_COMFY_NODE_NAMES` 只有成功探测过一次后才有值。
+        内置 Agent 这条路不经过面板（不调 /api/video-options），
+        第一次进来时它是空集 —— 旧判据会把「还没探测过」误判成
+        「本机没有这个节点」，用户看到
+        「本机 ComfyUI 里没有节点 ModelAttentionBackend」，但节点其实在。
+        """
+        self.server._COMFY_PROBE_COMPLETE = False
+        self.server._COMFY_NODE_NAMES.clear()
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, attention="sparse"))
+        self.assertEqual(err, "", f"探测不完整时不该报缺节点：{err}")
+        self.assertEqual(out.get("attention"), "sparse")
+
     def test_rejects_twopass_without_node(self):
+        """同上：探测完整时确认缺 SelfLiftH3Sampler -> 必须拒绝。"""
+        self.server._COMFY_PROBE_COMPLETE = True
         self.server._COMFY_NODE_NAMES.discard("SelfLiftH3Sampler")
         out, err = self.server.normalize_t2v_params(
             dict(self.BASE, twopass={"enabled": True}))
         self.assertTrue(err)
+        self.assertIn("SelfLiftH3Sampler", err)
+
+    def test_allows_twopass_when_probe_incomplete(self):
+        """
+        负控：**没探测过 / 探测不完整**时不得断言「缺 SelfLiftH3Sampler」。
+
+        【为什么必须补这条】上一轮只给 attention 侧补了负控，
+        twopass 侧**只有正控没有负控** —— 那意味着：
+        若有人把 twopass 的三态判据也退回「节点不在就拒」，
+        测试套件**一条都不会红**（负控缺失 = 变异逃逸）。
+        本条把「三态」钉在 twopass 侧。
+
+        变异验证：把 server.py 的
+          `if (_COMFY_PROBE_COMPLETE and "SelfLiftH3Sampler" not in ...):`
+        退回成
+          `if "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES:`
+        -> 本条必须变红。
+        """
+        self.server._COMFY_PROBE_COMPLETE = False
+        self.server._COMFY_NODE_NAMES.clear()
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, twopass={"enabled": True}))
+        self.assertEqual(err, "",
+                         f"探测不完整时不该报缺节点：{err}")
+        self.assertTrue(out.get("twopass", {}).get("enabled"),
+                        "探测不完整时二采仍应被接受（交给 ComfyUI 自己报错）")
+
+    def test_rejects_attention_without_node_even_when_other_nodes_present(self):
+        """
+        正控加强：探测完整 + **节点集合非空**（只是不含目标节点）
+        -> 仍必须拒绝。
+
+        【为什么这条重要】上一条负控把 `_COMFY_NODE_NAMES` **整个清空**。
+        如果实现写成「集合为空才放行 / 非空就按成员判定」，
+        上一条负控仍会红，但**真缺节点**那条也会因为「集合被清空」
+        而变成假通过 —— 两边都判红就没法区分「判据对不对」。
+
+        这条把集合填成「有别的节点、就是没有目标节点」，
+        确保 reject 判据是**按成员**判定，而不是按集合是否为空。
+        """
+        self.server._COMFY_PROBE_COMPLETE = True
+        self.server._COMFY_NODE_NAMES.clear()
+        self.server._COMFY_NODE_NAMES.add("ModelAttentionBackend")
+        self.server._COMFY_NODE_NAMES.add("SelfLiftH3Sampler")
+        # 目标节点 H3SparseAttention 故意**不**加
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, attention="sparse"))
+        self.assertTrue(err, "集合非空但缺目标节点时必须拒绝")
+        self.assertIn("H3SparseAttention", err)
+
+    def test_rejects_twopass_without_node_even_when_other_nodes_present(self):
+        """
+        正控加强：同上，twopass 侧。
+        集合非空（只是不含 SelfLiftH3Sampler）-> 仍必须拒绝。
+        """
+        self.server._COMFY_PROBE_COMPLETE = True
+        self.server._COMFY_NODE_NAMES.clear()
+        self.server._COMFY_NODE_NAMES.add("ModelAttentionBackend")
+        # SelfLiftH3Sampler 故意**不**加
+        out, err = self.server.normalize_t2v_params(
+            dict(self.BASE, twopass={"enabled": True}))
+        self.assertTrue(err, "集合非空但缺 SelfLiftH3Sampler 时必须拒绝")
         self.assertIn("SelfLiftH3Sampler", err)
 
     def test_duration_over_limit_is_rejected_not_truncated(self):

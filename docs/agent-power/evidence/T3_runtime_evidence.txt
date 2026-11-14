@@ -1,0 +1,78 @@
+
+==============================================================================
+目标 1 —— 工具调用步数上限 >= 50（前后端一致）
+==============================================================================
+[PASS] 1.1 /api/agent/tools 的 limits.max_steps >= 50: limits.max_steps = 50, max_steps_cap = 50, max_tool_calls = 120, total_timeout = 2400.0
+[PASS] 1.2 步数硬顶（前后端一致）>= 50: limits.max_steps_cap = 50, settings.max_steps = 50
+[PASS] 1.3 源码 MAX_STEPS 常量 >= 50: MAX_STEPS = 50
+[PASS] 1.4 前端管理面板声明的上限与后端一致（>= 50）: web/agent-manage.js 含上限 50 声明
+      步数实测返回: {"max_steps_constant": 50, "rounds_requested": 12, "status": "completed", "rounds": 13, "error": null, "status_at_8": "truncated", "rounds_at_8": 8, "error_at_8": "已达到步骤上限（8 步），返回已完成的部分结果"}
+[PASS] 1.5 超过 8 步的任务在 max_steps=50 下跑完（status=completed）: status = completed，实际步数 = 13
+[PASS] 1.6 实际步数 > 8（确实跑过了旧上限）: rounds = 13
+[PASS] 1.7 负控：同一任务在 max_steps=8 下被截断: status_at_8 = truncated, error = 已达到步骤上限（8 步），返回已完成的部分结果
+
+==============================================================================
+目标 2 —— ffmpeg 音视频工具（真实调用本机 ffmpeg）
+==============================================================================
+[PASS] 2.1 本机 ffmpeg 可用: ffmpeg version 7.1.1-1ubuntu4.2 Copyright (c) 2000-2025 the FFmpeg developers
+[PASS] 2.2 六个 ffmpeg 工具全部注册: 注册到：['media_concat', 'media_extract_frames', 'media_merge_av', 'media_mix_audio', 'media_probe', 'media_transcode']
+      造出素材: a.mp3  16526 bytes
+      造出素材: v0.mp4  3154 bytes
+      造出素材: v1.mp4  3154 bytes
+      上传返回: {"ok": true, "results": [{"asset_id": "asset_8f4b5a31ddf1", "name": "v0.mp4", "preview_url": "/api/assets/asset_8f4b5a31ddf1/preview", "duplicated": true, "bytes": 3154, "kind": "video", "category": "video", "width": 320, "height": 240, "duration_sec": 1.0, "mime": "video/mp4", "codec": "h264", "sample_rate": 44100, "channels": 2, "analyzed": false, "description": "", "tags": [], "preprocessed": false, "analysis_job_id": 29, "analysis_status": "queued", "available": false, "analysis_pending": true}, {"asset_id": "asset_aeb81ba5f119", "name": "v1.mp4", "preview_url": "/api/assets/asset_aeb81ba5
+      拿到的 asset_id: {"v0.mp4": "asset_8f4b5a31ddf1", "video1": "asset_8f4b5a31ddf1", "v1.mp4": "asset_aeb81ba5f119", "video3": "asset_aeb81ba5f119", "a.mp3": "asset_b2c557aa186e"}
+[PASS] 2.3 上传端点接受图片/音视频并返回 asset_id: 视频 2 个、音频 1 个
+[PASS] 2.4 media_probe 返回真实探测信息: duration = 1.0, has_video = True, size = 320x240
+[PASS] 2.5 media_concat 产出真实视频并入素材库: asset_id = asset_df266f49f99b, bytes = 5007, duration = 2.023023, size = 320x240
+[PASS] 2.6 media_extract_frames 抽出真实帧并入素材库: 抽出 3 帧，首帧 asset_id = asset_abcd917d2d71
+[PASS] 2.7 media_transcode 产出真实文件: asset_id = asset_b636907e398c, bytes = 2570, format = mkv
+[PASS] 2.8 media_mix_audio 产出真实混音: asset_id = asset_fae94a7af743, bytes = 51403
+[PASS] 2.9 media_merge_av 产出真实合流: asset_id = asset_c7b3bbcc3be1, bytes = 20656
+
+==============================================================================
+目标 3 —— 剪贴板粘贴媒体（图片/音频/视频）
+==============================================================================
+[PASS] 3.1 agent.js 监听 paste 事件: 找到 paste 监听
+[PASS] 3.2 处理 clipboardData.items 的文件项: clipboardData.items 已处理
+[PASS] 3.3 处理 clipboardData.files: clipboardData.files 已处理
+[PASS] 3.4 支持音频类型: audio/* 已识别
+[PASS] 3.5 支持视频类型: video/* 已识别
+      图片上传返回: {"ok": true, "results": [{"asset_id": "asset_eb43277e4e6b", "name": "paste.png", "preview_url": "/api/assets/asset_eb43277e4e6b/preview", "duplicated": true, "bytes": 70, "kind": "image", "category": "image", "width": 1, "height": 1, "duration_sec": null, "mime": "image/png", "codec": null, "sample_rate": null, "channels": null, "analyzed": true, "description": "基于您提供的图片（文件名：paste.png，尺寸极小），以下是针对该
+[PASS] 3.6 图片走粘贴同一条上传链路成功入库: results = [('image', True)]
+
+==============================================================================
+目标 4 —— agent 管理面板可配置 + 搜索引擎（含自检）
+==============================================================================
+[PASS] 4.1 至少 4 项能力可配置: 能力列表: ['code_exec', 'file_read', 'media_tools', 'web_search']
+[PASS] 4.1.code_exec 能力存在且带 enabled 状态: code_exec -> {'key': 'code_exec', 'label': '代码生成与执行', 'builtin': True, 'requires': '无（默认关闭，需用户显式启用）', 'description': '运行一段 Python 代码并拿回 stdout/stderr。有副作用，默认关闭。', 'enabled': False}
+[PASS] 4.1.file_read 能力存在且带 enabled 状态: file_read -> {'key': 'file_read', 'label': '文件读取', 'builtin': True, 'requires': '无（受 file_roots 路径白名单限制）', 'description': '读取工作台/仓库/素材库派生目录下的文本文件，供 Agent 查配置、日志、脚本。', 'enabled': True}
+[PASS] 4.1.media_tools 能力存在且带 enabled 状态: media_tools -> {'key': 'media_tools', 'label': 'ffmpeg 音视频处理', 'builtin': True, 'requires': '本机 ffmpeg / ffprobe（见 ffmpeg_path）', 'description': '音视频合并拼接、转码、抽帧、混音、AV 合流（真实调用本机 ffmpeg，非模拟）。', 'enabled': True}
+[PASS] 4.1.web_search 能力存在且带 enabled 状态: web_search -> {'key': 'web_search', 'label': '外部搜索', 'builtin': True, 'requires': '网络可达的搜索引擎（DDG 或局域网 9898 聚合引擎）', 'description': '按配置的搜索引擎做外部检索，把结果作为参考资料。', 'enabled': True}
+[PASS] 4.2 搜索引擎列表 >= 2 个（DDG + 聚合）: 3 个: ['局域网聚合引擎（9898）', 'DuckDuckGo（经 9898 代理）', 'DuckDuckGo（直连，可能被反爬拦截）']
+[PASS] 4.3 至少含 DDG 与 9898/聚合两类: types = ['openwebui', 'custom', 'ddg']
+[PASS] 4.4 每个搜索引擎都有可填写的 URL 配置项: 字段样例: ['enabled', 'id', 'method', 'name', 'type', 'url']
+[PASS] 4.4b 至少一个引擎的 URL 指向局域网 9898: urls = ['http://127.0.0.1:9898/api/openwebui/tools/search_general', 'http://127.0.0.1:9898/api/openwebui/search/ddg', 'https://html.duckduckgo.com/html/']
+[PASS] 4.5 聚合引擎连通性自检真实发起请求: 自检返回: {"ok": true, "engine": "局域网聚合引擎（9898）", "engine_type": "openwebui", "url": "http://127.0.0.1:9898/api/openwebui/tools/search_general", "result_count": 1, "note": "连通性正常（真发了一次请求）", "status": 200}
+[PASS] 4.6 DDG（经 9898 代理）连通性自检成功: 自检返回: {"ok": true, "engine": "DuckDuckGo（经 9898 代理）", "engine_type": "custom", "url": "http://127.0.0.1:9898/api/openwebui/search/ddg", "result_count": 1, "note": "连通性正常（真发了一次请求）", "status": 200}
+[PASS] 4.6b DDG 直连自检如实报告被反爬拦截（而非谎报连通）: 自检返回: {"ok": false, "engine": "DuckDuckGo（直连，可能被反爬拦截）", "error": "所有搜索引擎都没成功：\n- DuckDuckGo（直连，可能被反爬拦截）: DuckDuckGo 返回 HTTP 202", "status": 502}
+[PASS] 4.9 外部搜索真的返回结果（非模拟）: engine = 局域网聚合引擎（9898）, total = 3, 首条 = {'title': 'github.com· cnrock · h3-studioGitHub - cnrock/h3-studio: 自托管的 MiniMax H3 视频生成站：邮箱注...', 'url': 'https://rd.se
+[PASS] 4.7a web_search 能力下确实挂着工具: web_search 工具: ['web_search']
+[PASS] 4.7b 禁用 web_search 后 enabled_tool_count 下降: enabled_tool_count 31 -> 30
+[PASS] 4.7c 禁用后 web_search 的工具全部标为 disabled: [('web_search', False)]
+[PASS] 4.8 重新启用后 enabled_tool_count 恢复: 30 -> 31（原 31）
+
+==============================================================================
+目标 5 —— t2v 默认参数（kitchen 注意力 + dmad LoRA）
+==============================================================================
+[PASS] 5.1 默认注意力机制 = kitchen: attention = kitchen
+[PASS] 5.2 默认加速 LoRA = dmad_4step_critic: accel_lora = dmad_4step_critic
+[PASS] 5.3 默认模型 = fl2va_pruned_int8: model_key = fl2va_pruned_int8
+[PASS] 5.4 默认参数能通过服务端归一: err = ''
+[PASS] 5.5 归一后 attention 仍是 kitchen: attention = kitchen
+[PASS] 5.6 默认参数可被用户改写并持久化: 改后 attention = default
+[PASS] 5.7 恢复默认后仍是 kitchen: 恢复后 attention = kitchen
+
+==============================================================================
+汇总
+==============================================================================
+通过 46 / 46
