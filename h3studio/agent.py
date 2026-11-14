@@ -194,6 +194,8 @@ TOOL_STAGE_TEXT = {
     "search_conversations": "正在检索历史对话",
     "search_asset_history": "正在检索素材历史",
     "remember_preference": "正在记住偏好",
+    # --- 媒体库管理（2026-11-14 需求 12）---
+    "manage_media_library": "正在清理生成媒体库",
     # --- 额外能力（受「agent 管理」的能力开关控制）---
     "read_file": "正在读取文件",
     "web_search": "正在搜索外部资料",
