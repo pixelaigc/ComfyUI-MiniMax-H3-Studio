@@ -46,6 +46,14 @@
     // 【2026-11-14 需求 13】多选集合（素材 id）。
     // 用 Set 而不是数组：增删查都是 O(1)，且天然去重。
     selected: new Set(),
+    // 【2026-11-15 A3 补漏】多选**模式**开关。
+    //
+    // 【为什么要有这个开关】需求原话：「提供「多选」按钮，点击后卡片才显示
+    // 复选框，默认不显示」。原来的实现把复选框**直接写进卡片 HTML**，
+    // 于是每张卡默认都带一个勾选框 —— 与需求相反，而且用户点卡片
+    // （看详情）时会被勾选框抢走点击。
+    // 现在复选框**默认不渲染**；点「多选」按钮进入多选模式后才渲染。
+    multiMode: false,
   };
 
   // ---------------------------------------------------------------- 多选（需求 13）
@@ -74,6 +82,31 @@
     renderSelection();
   }
 
+  /**
+   * 【2026-11-15 A3 补漏】多选模式开关。
+   *
+   * 【语义】默认关闭 -> 卡片**不渲染**复选框；打开 -> 卡片渲染复选框。
+   * 关闭时**清空**已选（否则退出多选模式后卡片上留着「已选」高亮，
+   * 用户会以为还在多选中）。
+   *
+   * 【为什么必须重渲染网格】复选框是卡片 HTML 的一部分（见卡片模板），
+   * 开关一变就得重新画一遍卡片 —— 只切 CSS class 做不到「不渲染」。
+   */
+  function setMultiMode(on) {
+    const next = !!on;
+    if (state.multiMode === next) return;
+    state.multiMode = next;
+    if (!next) state.selected.clear();
+    renderSelection();
+    // 网格重画：复选框是卡片 HTML 的一部分，多选模式一变就要重建卡片。
+    // （assetSig 里带了 multiMode -> 增量渲染会重建所有卡片。）
+    renderAssets();
+  }
+
+  function toggleMultiMode() {
+    setMultiMode(!state.multiMode);
+  }
+
   /** 全选当前页（当前筛选下已加载的那些）。 */
   function selectAllVisible() {
     (state.items || []).forEach(a => state.selected.add(a.id));
@@ -89,8 +122,18 @@
     const bar = $("#alSelBar");
     const count = $("#alSelCount");
     const n = state.selected.size;
-    if (bar) bar.hidden = n === 0;
+    // 【2026-11-15 A3 补漏】多选模式下选择条**始终可见**（哪怕还没勾任何），
+    // 否则用户点了「多选」按钮却看不到任何变化，会以为按钮坏了。
+    // 非多选模式下仍然「没勾选就隐藏」—— 不占视觉空间。
+    if (bar) bar.hidden = !(state.multiMode || n > 0);
     if (count) count.textContent = `已选 ${n} 项`;
+    // 多选按钮自身的状态（文案 + aria-pressed + 高亮）
+    const multiToggle = $("#alMultiToggle");
+    if (multiToggle) {
+      multiToggle.setAttribute("aria-pressed", state.multiMode ? "true" : "false");
+      multiToggle.textContent = state.multiMode ? "多选中 ✓" : "多选";
+      multiToggle.classList.toggle("primary", state.multiMode);
+    }
     // 同步每张卡的勾选态
     $$("#alGrid .al-card").forEach(card => {
       const id = card.dataset.id;
@@ -343,13 +386,15 @@
     const inTrash = asset.deleted_at ? `<span class="badge" style="background:rgba(200,50,55,.85)">回收站</span>` : "";
     return `<div class="al-card${state.selected.has(asset.id) ? " selected" : ""}" data-id="${esc(asset.id)}" draggable="true">
       <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}
-        <!-- 【2026-11-14 需求 13】多选勾选框。放在缩略图左上角，
-             单独一个 .al-selbox-wrap，避免和卡片的「点开详情」冲突。 -->
-        <label class="al-selbox-wrap" title="选中（可多选后批量删除）" onclick="return false;">
+        <!-- 【2026-11-15 A3 补漏】多选勾选框：**只在多选模式下**才渲染。
+             默认不显示 —— 用户点「多选」按钮进入多选模式后才出现。
+             放在缩略图左下角，单独一个 .al-selbox-wrap，
+             避免和卡片的「点开详情」冲突。 -->
+        ${state.multiMode ? `<label class="al-selbox-wrap" title="选中（可多选后批量删除）" onclick="return false;">
           <input type="checkbox" class="al-selbox" data-sel-id="${esc(asset.id)}"
                  ${state.selected.has(asset.id) ? "checked" : ""}
                  aria-label="选择 ${esc(asset.name)}">
-        </label>
+        </label>` : ""}
       </div>
       <div class="al-card-body">
         <div class="al-name" title="${esc(asset.name)}">${esc(asset.name)}</div>
@@ -378,6 +423,10 @@
       // 否则「勾选后卡片被重建」时，勾选框会回到未选的样子
       // （增量渲染只在签名变化时重建卡片）。
       state.selected.has(asset.id) ? "sel" : "",
+      // 【2026-11-15 A3 补漏】多选模式也要进签名 ——
+      // 增量渲染只在签名变化时重建卡片；不进签名的话，
+      // 开关多选模式后旧卡片会被复用，**复选框不会出现**。
+      state.multiMode ? "multi" : "",
     ].join("|");
   }
 
@@ -1268,6 +1317,16 @@
     if (nav) nav.addEventListener("click", showAssets);
 
     // ---- 多选（2026-11-14 需求 13）----
+    // 【2026-11-15 A3 补漏】多选模式开关按钮。
+    const multiToggle = $("#alMultiToggle");
+    if (multiToggle) {
+      multiToggle.addEventListener("click", () => toggleMultiMode());
+      // 进入多选模式时按钮本身要给出状态（aria-pressed + 文案），
+      // 否则用户不知道现在是「多选中」还是「浏览中」。
+      multiToggle.setAttribute("aria-pressed", state.multiMode ? "true" : "false");
+      multiToggle.textContent = state.multiMode ? "多选中 ✓" : "多选";
+      multiToggle.classList.toggle("primary", state.multiMode);
+    }
     const selClear = $("#alSelClear");
     if (selClear) selClear.addEventListener("click", () => clearSelection());
     const selAll = $("#alSelAll");
