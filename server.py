@@ -108,6 +108,7 @@ from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
+from h3studio import media_cleanup
 from h3studio import agent as agent_mod
 from h3studio import agent_memory
 from h3studio import agent_sessions
@@ -3669,6 +3670,60 @@ async def api_delete(request):
             target.unlink()
     shutil.rmtree(OUT_DIR / jid, ignore_errors=True)
     return json_ok({"deleted": jid})
+
+
+async def api_media_manage(request):
+    """生成媒体库「管理」（2026-11-14 需求 11 / 12）。
+
+    GET  /api/media/manage?scope=all|older|failed&months=1
+        -> 预览「会删多少」（不删任何东西）
+    POST /api/media/manage  {"scope": "...", "months": 1, "confirm": true}
+        -> 执行清理
+
+    【只影响本工作台】
+    只删本项目 jobs / job_batches 表的记录 + 本项目 outputs 目录里的文件。
+    **不碰** ComfyUI 自身的 output 目录、不碰素材库（assets）、不碰其它项目。
+    """
+    if request.method == "GET":
+        scope = request.query.get("scope", "all") or "all"
+        months = int(request.query.get("months", "0") or 0)
+        if scope not in ("all", "older", "failed"):
+            return web.json_response({"error": "scope 只能是 all / older / failed"},
+                                     status=400)
+        with db() as conn:
+            info = media_cleanup.preview(conn, OUT_DIR, scope, months)
+        return json_ok(info)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求体必须是 JSON"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "请求体必须是对象"}, status=400)
+    scope = str(body.get("scope") or "all")
+    if scope not in ("all", "older", "failed"):
+        return web.json_response({"error": "scope 只能是 all / older / failed"},
+                                 status=400)
+    try:
+        months = int(body.get("months") or 0)
+    except (TypeError, ValueError):
+        months = 0
+    if scope == "older" and months <= 0:
+        return web.json_response({"error": "清理指定月数之前的历史产物时，"
+                                              "months 必须大于 0（例：1 = 30 天前）"},
+                                 status=400)
+    # 【必须显式确认】这是不可逆操作（删记录 + 删文件）。
+    # 没有 confirm=true 一律拒绝 —— 宁可多一次点击，也不要误删。
+    if not body.get("confirm"):
+        with db() as conn:
+            info = media_cleanup.preview(conn, OUT_DIR, scope, months)
+        return web.json_response({
+            "error": "需要 confirm=true 才会执行清理",
+            "preview": info,
+        }, status=400)
+    with db() as conn:
+        result = media_cleanup.cleanup(conn, OUT_DIR, scope, months)
+    return json_ok(result)
 
 
 # ------------------------------------------------------------------ ComfyUI 节点名探测
@@ -7291,6 +7346,9 @@ def make_app():
     app.router.add_get("/api/continuation/state", api_continuation_state)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
+    # 生成媒体库「管理」（2026-11-14 需求 11 / 12）
+    app.router.add_get("/api/media/manage", api_media_manage)
+    app.router.add_post("/api/media/manage", api_media_manage)
     app.router.add_get("/api/system", api_system)
     app.router.add_get("/api/status/stream", api_status_stream)
     app.router.add_get("/api/hardware", api_hardware)
