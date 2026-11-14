@@ -31,13 +31,12 @@ H3 Studio 资产素材库 —— HTTP 接口层。
 """
 import hashlib
 import json
-import time
 import uuid
 from pathlib import Path
 
 from aiohttp import web
 
-from h3studio import analysis, analysis_jobs, asset_repo, asset_service
+from h3studio import analysis_jobs, asset_repo, asset_service
 from h3studio import assets as A
 from h3studio.assets import LibraryError
 
@@ -523,7 +522,6 @@ async def api_asset_analyze(request):
         "no_separation": bool(payload.get("no_separation", False)),
         "studio_url": payload.get("studio_url"),
     }
-    provider_id = payload.get("provider_id")
 
     with _library_conn() as conn:
         asset = asset_repo.get_asset(conn, asset_id)

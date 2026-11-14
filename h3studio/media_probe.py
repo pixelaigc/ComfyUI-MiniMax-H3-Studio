@@ -331,10 +331,3 @@ def make_waveform(audio: Path, dest: Path, width: int = 900, height: int = 180) 
         return dest.is_file() and dest.stat().st_size > 0
     except Exception:
         return False
-
-
-def make_audio_preview(audio: Path, dest: Path) -> bool:
-    """音频预览：优先波形图，失败则退化成可播放的原始音频副本引用。"""
-    if make_waveform(audio, dest):
-        return True
-    return False

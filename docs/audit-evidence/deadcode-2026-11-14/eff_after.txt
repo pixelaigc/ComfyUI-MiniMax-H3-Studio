@@ -1,0 +1,9 @@
+FFFFF.....                                                               [100%]
+=========================== short test summary info ============================
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_01_multi_select_keeps_both_entries
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_02_each_entry_has_own_strength_slider
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_03_toggle_disable_removes_from_submit
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_04_selection_restored_after_reload
+FAILED tests/test_effect_lora_frontend.py::TestEffectLoraFrontend::test_05_clear_all_button_exists_and_toggles
+5 failed, 5 passed in 117.53s (0:01:57)
+EXIT=1

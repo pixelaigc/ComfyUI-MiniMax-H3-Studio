@@ -341,10 +341,6 @@ def normalize_h3_image_size(width, height, multiple=H3_IMAGE_SIZE_MULTIPLE,
     return w, h, reasons
 
 
-def h3_image_megapixels(width, height) -> float:
-    return (width * height) / (1024.0 * 1024.0)
-
-
 # ------------------------------------------------------------------
 # 可用性探测
 # ------------------------------------------------------------------
@@ -404,13 +400,6 @@ def h3_image_weight_available(filename: str) -> bool:
     return False
 
 
-def h3_image_model_available(model: dict) -> bool:
-    """该模型版本需要的权重是否全部就位（DiT + 文本编码器 + VAE）。"""
-    return (h3_image_weight_available(model.get("unet", ""))
-            and h3_image_weight_available(model.get("clip", ""))
-            and h3_image_weight_available(model.get("vae", "")))
-
-
 def missing_weights(model: dict) -> list[str]:
     """列出缺失（或没下完）的权重文件名 + 人类可读的原因。"""
     missing = []
@@ -423,16 +412,6 @@ def missing_weights(model: dict) -> list[str]:
         elif not h3_image_weight_available(name):
             missing.append(f"{label}：{name}（未在本机 ComfyUI 模型目录找到，或文件未下完）")
     return missing
-
-
-def h3_image_nodes_available(node_names) -> bool:
-    """本机 ComfyUI 是否具备 H3-Image 必需的核心节点。
-
-    `node_names` 是 ComfyUI /object_info 拉到的节点名集合。
-    """
-    if not node_names:
-        return False
-    return all(name in node_names for name in H3_IMAGE_REQUIRED_NODES)
 
 
 def h3_image_capability(nodes_available, model_available: bool,

@@ -25,7 +25,6 @@ Skill 目录（遵循 Agent Skills 规范的渐进式披露）：
     assets/               模板与示例（按需加载）
     scripts/validate.py   校验器（只跑不读）
 """
-import json
 import re
 from pathlib import Path
 
@@ -1256,8 +1255,8 @@ def check_truncation(enhanced: str, finish_reason: str = "",
 
     # 信号 1：后端明确说「因为长度停止」
     if finish_reason == "length":
-        reason = (f"输出被 max_tokens 上限硬切（finish_reason=length），"
-                  f"内容不完整")
+        reason = ("输出被 max_tokens 上限硬切（finish_reason=length），"
+                  "内容不完整")
         if missing_sections:
             reason += "，缺失分段：" + "、".join(missing_sections)
         return {"truncated": True, "reason": reason,

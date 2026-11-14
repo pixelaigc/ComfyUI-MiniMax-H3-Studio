@@ -1,0 +1,15 @@
+.F..F..F..F...F......F.......F.....................F.........FFF........                                                                 [100%]
+=========================== short test summary info ============================
+FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_enhance_request_carries_live_mode
+FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_no_duration_control
+FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_screenshots_at_three_widths
+FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+FAILED tests/test_page_size.py::TestPageSize::test_change_page_size_resets_to_first_page
+FAILED tests/test_page_size.py::TestPageSize::test_filters_still_work - Asser...
+FAILED tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled
+FAILED tests/test_qwen_pe_enhance.py::TestQwenPeEnhanceBrowser::test_no_console_errors_after_menu_exercise
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_desc_tag_renders_placeholder_text
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_remove_middle_drops_dangling_placeholder
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_smart_sort_keeps_placeholders
+11 failed, 61 passed, 8 subtests passed in 747.96s (0:12:27)
+EXIT=1

@@ -87,13 +87,6 @@ def _extract_tokenizer_json_from_comfy() -> str:
     raise FileNotFoundError("找不到含 yue2_tokenizer_json 的 checkpoint")
 
 
-def hdr_keys(path: Path) -> list[str]:
-    with open(path, "rb") as f:
-        n = struct.unpack("<Q", f.read(8))[0]
-        h = json.loads(f.read(n))
-    return [k for k in h if k != "__metadata__"]
-
-
 def main() -> int:
     print("=== 载入源权重 ===")
     mot = safe_open(str(HF_MOT), framework="pt")

@@ -528,20 +528,3 @@ def discover_effect_loras(model_key: str | None = None) -> list[dict]:
     # 失效最坏后果只是「下拉少一项 / 晚 60 秒出现」，不影响正确性。
     _DISCOVER_CACHE[model_key] = (time.time(), found)
     return [dict(item) for item in found]
-
-
-def effect_lora_compat_matrix(model_key: str) -> dict[str, dict]:
-    """某个底模下，所有候选效果 LoRA 的**实测**兼容性。
-
-    返回 {lora_name: {compatible, reason, shape_ok, total, ...}}。
-    缓存键含权重文件的 mtime/size —— 文件变了结论自动重算。
-    """
-    model = vmodels.VIDEO_MODELS.get(model_key)
-    if not model:
-        return {}
-    unet_path = vmodels.find_weight(model["unet"])
-    out: dict[str, dict] = {}
-    for entry in discover_effect_loras(model_key):
-        out[entry["name"]] = check_effect_lora_compat(
-            Path(entry["path"]), unet_path)
-    return out

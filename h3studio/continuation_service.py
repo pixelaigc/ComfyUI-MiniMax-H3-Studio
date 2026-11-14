@@ -93,12 +93,6 @@ _COMFY_OUTPUT_CACHE: tuple[float, Path] | None = None
 _COMFY_OUTPUT_CACHE_TTL = 60.0
 
 
-def invalidate_comfy_output_cache() -> None:
-    """主动作废 comfy_output_dir 的缓存（ComfyUI 换目录/换端口后调用）。"""
-    global _COMFY_OUTPUT_CACHE
-    _COMFY_OUTPUT_CACHE = None
-
-
 def comfy_output_dir() -> Path:
     """ComfyUI 的 output 目录。
 

@@ -41,14 +41,12 @@ import json
 import re
 import sys
 import time
-import uuid
 
 from . import llm as llm_client
 from . import enhancer as enh
 from . import gen_types
 from . import providers as prov
 from . import workflows as wf
-from . import agent_memory
 from . import agent_safety
 from . import agent_schema
 
@@ -2528,7 +2526,6 @@ def _record_agent_prompt_history(ctx: AgentContext, mode: str, params: dict,
     if server is None:
         return
     try:
-        from . import prompt_history as ph
         from . import prompt_history_hooks as ph_hooks
         db = getattr(server, "db", None)
         if db is None:
