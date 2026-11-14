@@ -198,7 +198,12 @@ with sync_playwright() as p:
     page.screenshot(path=f"{SHOTS}_item4_asset_detail.png")
 
     # 播放器模式（先关详情抽屉 —— 它是右侧浮层，会挡住右上角的按钮）
-    page.evaluate("() => { const d=document.querySelector('#alDrawer'); if(d) d.classList.remove('open'); }")
+    page.evaluate("""() => {
+      const d = document.querySelector('#alDrawer');
+      const m = document.querySelector('#alDrawerMask');
+      if (d) d.classList.remove('open');
+      if (m) m.classList.remove('open');
+    }""")
     time.sleep(0.6)
     page.click("#alPlayerBtn")
     time.sleep(2.5)
@@ -239,6 +244,9 @@ with sync_playwright() as p:
 
     # ---------- 项 11：媒体库管理 ----------
     print("\n### 项11 媒体库管理 ###")
+    # 「管理」按钮在**生成媒体库**页（任务区），不在素材库页 —— 先切回去
+    page.click('[data-mode="t2i"]')
+    time.sleep(3.0)
     page.click("#mediaManageBtn")
     time.sleep(2.5)
     r = page.evaluate("""() => {
@@ -277,9 +285,16 @@ with sync_playwright() as p:
     print("   YuE2:", json.dumps(r, ensure_ascii=False))
     check("项7", "结构化风格「重新生成」按钮已移除", r["styleRegen"] is False)
     check("项7", "歌词「重新生成」按钮已移除", r["lyricsRegen"] is False)
+    # innerText 会把 <strong>/<code> 渲染成换行 -> 用 textContent 连续比对
+    r["advNoteRaw"] = page.evaluate(
+        "() => (document.querySelector('#musicAdvNote')||{}).textContent || ''")
     check("项7", "采样参数说明与实际一致（可调 + 写进节点）",
-          "写进" in r["advNote"] and "YuE2GenerateMusic" in r["advNote"],
-          (r["advNote"] or "")[:120])
+          "写进工作流" in r["advNoteRaw"] and "YuE2GenerateMusic" in r["advNoteRaw"]
+          and "可以自由调整" in r["advNoteRaw"],
+          (r["advNoteRaw"] or "")[:150])
+    check("项7", "说明清楚 ABC 阶段固定官方值（不开放调整）",
+          "不开放" in r["advNoteRaw"] and "官方推荐值" in r["advNoteRaw"],
+          (r["advNoteRaw"] or "")[-120:])
     check("项7", "采样参数滑杆确实可调（未 disabled）", r["tempDisabled"] is False,
           f"temp={r['temp']}")
 
