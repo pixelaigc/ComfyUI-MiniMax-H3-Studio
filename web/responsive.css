@@ -506,3 +506,15 @@
   .ag-messages { padding: 16px 18px; }
   .ag-composer { padding: 9px 18px 11px; }
 }
+
+/* ---------- 交互流程图面板（2026-11-15 D12）----------
+   窄屏：网格降为 1 列（两列在 375px 下每列只有 ~160px，
+   缩略图看不清）；大图层的关闭按钮放大到 40px（触屏点得准）。 */
+@media (max-width: 700px) {
+  .fd-dialog { width: 100vw; max-width: 100vw; }
+  .fd-body { padding: 12px 12px; max-height: 66vh; }
+  .fd-grid { grid-template-columns: 1fr; gap: 10px; }
+  .fd-thumb { height: 160px; }
+  .fd-stage { padding: 12px; }
+  .fd-stage-close { width: 40px; height: 40px; top: 8px; right: 10px; }
+}

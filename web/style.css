@@ -3217,3 +3217,66 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-color: var(--danger); background: var(--danger); color: #fff;
 }
 .prompt-dialog-actions .danger:hover:not(:disabled) { background: #c83237; color: #fff; }
+
+/* ============================================================
+   交互流程图面板（2026-11-15 D12 线上可达）
+   ------------------------------------------------------------
+   5 套流程图的列表 + 缩略图 + 源文件链接。缩略图是长图
+   （总览 1390×3156），所以缩略图要**限制高度并保持比例**，
+   否则一张图就把整个面板撑到几千像素高、其它 4 套图被推到
+   屏幕外 —— 用户根本看不到「一共 5 套」。
+
+   窄屏（≤700px）：网格降为 1 列，缩略图上限再收一点。
+   ============================================================ */
+.fd-dialog { width: min(980px, 94vw); }
+.fd-body {
+  padding: 14px 16px; overflow: auto; max-height: 70vh;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.fd-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.fd-card {
+  margin: 0; border: 1px solid var(--border); border-radius: 10px;
+  background: #fafbfc; overflow: hidden; cursor: zoom-in;
+  display: flex; flex-direction: column;
+}
+.fd-card:hover { border-color: var(--accent); }
+.fd-thumb {
+  display: block; width: 100%; height: 190px; object-fit: contain;
+  object-position: top center; background: #fff; cursor: zoom-in;
+}
+.fd-cap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 9px 11px; border-top: 1px solid var(--border);
+  background: #fff; flex-wrap: wrap;
+}
+.fd-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.fd-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.fd-link { font-size: 11.5px; color: var(--accent); text-decoration: none; }
+.fd-link:hover { text-decoration: underline; }
+.fd-link.disabled { color: var(--muted); }
+.fd-guide { font-size: 12px; }
+.fd-guide a { color: var(--accent); text-decoration: none; }
+.fd-guide a:hover { text-decoration: underline; }
+.fd-empty { padding: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
+
+/* 大图层：叠在面板内部，不开新窗口（用户不用来回切标签页） */
+.fd-stage {
+  position: absolute; inset: 0; background: rgba(10, 12, 16, .94);
+  display: flex; align-items: center; justify-content: center;
+  padding: 28px; z-index: 5;
+}
+.fd-stage[hidden] { display: none; }
+.fd-stage img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  background: #fff; border-radius: 6px;
+}
+.fd-stage-close {
+  position: absolute; top: 10px; right: 12px;
+  width: 36px; height: 36px; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, .14); color: #fff;
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.fd-stage-close:hover { background: rgba(255, 255, 255, .26); }
