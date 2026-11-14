@@ -165,7 +165,7 @@
       </div>
 
       <div class="field">
-        <div class="field-label">加速 LoRA <span class="muted">单选 · 按主模型适配过滤</span></div>
+        <div class="field-label">加速 LoRA <span class="muted">单选 · 工作流只挂你选的那枚 · 按主模型适配过滤</span></div>
         <select class="img-select" id="vidAccelLoraSelect"></select>
         <div class="compact-field" id="vidAccelLoraStrengthField">
           <div class="compact-label"><span>加速 LoRA 强度</span><b id="vidAccelLoraStrengthVal">1.00</b></div>
@@ -744,7 +744,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <button data-v="standard"><b>标准 MiniMax-H3</b><small>20 步 · 质量优先</small></button>
       </div>
       <div class="subfield" id="loraField">
-        <div class="field-label">LoRA 选择</div>
+        <div class="field-label">加速 LoRA 选择 <span class="muted">与文生视频同一份清单 · 工作流只挂你选的那枚</span></div>
+        <!-- 【2026-11-14】这里原来写死了两张卡片（ckpt850 / v4step600）——
+             旧面板因此选不到 LightX2V / DMAD，与文生视频面板行为不一致。
+             现在由 renderLegacyAccelLoraCards() 用统一清单渲染；
+             下面的静态卡片只是**首屏占位**（清单还没到时显示）。 -->
         <div class="cards2" id="loraCards">
           <button data-v="ckpt850" class="active"><b>Turbo ckpt850</b><small>EMA 权重</small></button>
           <button data-v="v4step600"><b>v4-step600</b><small>4 步 · 推荐</small></button>
@@ -770,7 +774,21 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <small class="muted" id="vidLegacyStepsHint">推荐</small>
     </div>
 
-    <!-- 【2026-11-11 新增】首尾帧 / 参考生视频的采样参数。
+    <!-- 【2026-11-14 新增】音轨来源（首尾帧 / 参考生视频）
+         B2 需求：「音轨三选一」：
+           (a) 使用生成的音乐
+           (b) 使用参考音乐作为成片音轨
+           (c) 使用参考视频的背景音乐作为成片音轨
+         没有参考音乐 / 参考视频时 (b)/(c) **不出现**（不是置灰 ——
+         置灰等于「能选但会被服务端改写」，那是假选项）。
+         可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。 -->
+    <div class="field" id="audioTrackField" style="display:none">
+      <div class="field-label">成片音轨 <span class="muted">三选一 · 没有对应素材的选项不出现</span></div>
+      <select class="img-select" id="audioTrackSelect"></select>
+      <div class="img-note" id="audioTrackNote"></div>
+    </div>
+
+    <!-- 【2026-11-14 新增】首尾帧 / 参考生视频的采样参数。
          这两个模式走的是**旧工作流路径**（h3studio/workflows.py 的
          _h3_video_workflow / build_r2v），但采样链路与文生视频完全相同 ——
          同样是 BasicScheduler + KSamplerSelect + BasicGuider，
@@ -946,6 +964,8 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <span class="al-selcount" id="alSelCount">已选 0 项</span>
           <button class="al-btn" id="alSelClear">取消选择</button>
           <button class="al-btn" id="alSelAll">全选当前页</button>
+          <!-- 【2026-11-14 A2】添加到播放器清单：播放器只播这里挑过的条目 -->
+          <button class="al-btn" id="alSelPlayer">▶ 添加到播放器</button>
           <button class="al-btn danger" id="alSelDelete">删除所选</button>
         </div>
         <button class="al-btn" id="alTrashBtn">查看回收站</button>
@@ -1013,15 +1033,19 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
     <div class="al-drawer-body" id="alDrawerBody"></div>
   </aside>
 
-  <!-- 素材库「播放器模式」（2026-11-14 需求 14）
-       图片播放（每张可配停止时间 + 列表内循环 + 可叠背景音）/
+  <!-- 素材库「播放器模式」（2026-11-14 需求 14 / A2 修订）
+       图片播放（顶部统一「每张停止时间」+ 列表内循环 + 可叠背景音）/
        音频播放（单曲循环 / 列表循环 / 列表随机）/
-       视频播放（同音频）。实现见 web/asset-player.js。 -->
+       视频播放（同音频）。
+       播放列表 = 用户在素材库里主动「添加到播放器」的条目（服务端持久化），
+       不再是「当前页全部素材」。实现见 web/asset-player.js。 -->
   <div class="al-player-overlay" id="alPlayer" hidden>
     <div class="al-player-panel" role="dialog" aria-modal="true" aria-label="素材播放器">
       <div class="al-player-head">
         <b>素材播放器</b>
         <div class="al-player-tabs" id="alPlayerTabs"></div>
+        <!-- 【A2】清空播放清单 -->
+        <button type="button" class="al-btn" id="alPlayerClear">清空清单</button>
         <button type="button" class="al-drawer-close" id="alPlayerClose" aria-label="关闭">×</button>
       </div>
       <div class="al-player-body" id="alPlayerBody"></div>

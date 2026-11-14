@@ -61,45 +61,101 @@ def _resolve_model(params: dict) -> dict:
 
 
 def _resolve_accel_chain(params: dict, model: dict) -> list[dict]:
-    """加速 LoRA 链：固定 Turbo LoRA + 用户勾选的组合。
+    """加速 LoRA 链 —— **一个槽位**，前端选哪枚就只挂哪枚。
 
-    返回 [{"name": ComfyUI 里的 lora_name, "strength": float}]，
-    顺序 = 固定加速 LoRA 在前、用户组合在后。
+    返回 [{"name": ComfyUI 里的 lora_name, "strength": float,
+            "key": key, "loader": 节点名}]，最多一项。
+
+    【2026-11-14 重构 —— 这段是「选了不生效」的根因所在】
+    旧实现返回的是「固定枚 + 用户选的组合枚」**两枚叠加**：
+        chain = [fixed_accel_lora（恒为 ckpt850）] + [用户选的那枚]
+    于是前端选 LightX2V，工作流里仍然是 ckpt850 在前面挡着。
+
+    现在只解析**一个**槽位（vmodels.resolve_accel_lora_slot 负责
+    三套历史字段的换算），前端选什么就是什么。
+
+    【loader 字段为什么必须有】
+    每枚 LoRA 的权重键名形态不同，必须用对应的加载节点，否则
+    ComfyUI 会**静默丢弃**（Turbo 节点拿到 diffusion_model. 前缀权重时
+    一个都 patch 不上，出片照跑但 LoRA 没生效）。
+    路由判据是权重的实测键名形态，见 vmodels.detect_accel_lora_loader。
     """
     chain: list[dict] = []
 
-    # 固定加速 LoRA（工作流硬性必需，不出现在用户可勾选列表里）
-    fixed_key = params.get("fixed_accel_lora") or vmodels.VIDEO_FIXED_ACCEL_LORA_DEFAULT
-    fixed = vmodels.VIDEO_ACCEL_LORAS.get(fixed_key)
-    if fixed:
-        strength = params.get("fixed_accel_strength")
-        if strength is None:
-            strength = fixed.get("recommended_strength", 1.0)
-        chain.append({"name": fixed["name"], "strength": float(strength),
-                      "key": fixed_key, "fixed": True})
+    key, strength = vmodels.resolve_accel_lora_slot(params)
+    if not key:
+        # 显式「不挂加速 LoRA」-> 空链（工作流走标准多步采样）
+        return chain
 
-    # 用户勾选的加速 LoRA 组合
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = item.get("key") or ""
-        meta = vmodels.VIDEO_ACCEL_LORA_COMBOS.get(key)
-        if meta is None:
-            continue
-        try:
-            strength = float(item.get("strength", meta.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        if strength <= 0:
-            continue
-        chain.append({"name": meta["name"], "strength": strength,
-                      "key": key, "fixed": False})
-        # 【2026-11-11】单选：用户选的加速 LoRA 只能有一个 ——
-        # 拿到第一个就停，后面的忽略（两枚 4 步蒸馏 LoRA 叠加没有意义）。
-        break
+    meta = vmodels.accel_lora_meta(key)
+    if not meta:
+        # 未知 key -> 不挂（服务端归一层会提前拦掉并报错，
+        # 这里只是兜底，避免工作流构建阶段抛异常）
+        return chain
+
+    try:
+        strength = float(strength)
+    except (TypeError, ValueError):
+        strength = float(meta.get("recommended_strength", 1.0))
+    if strength <= 0:
+        return chain
+
+    name = meta["name"]
+    chain.append({
+        "name": name,
+        "strength": strength,
+        "key": key,
+        "loader": vmodels.detect_accel_lora_loader(name),
+    })
     return chain
+
+
+def apply_accel_lora_nodes(p: dict, model_ref: list, chain: list[dict],
+                           node_prefix: str = "138:") -> list:
+    """把加速 LoRA 链插到模型链上，按**权重形态**选加载节点。
+
+    返回新的模型引用。
+
+    【为什么必须分流到两个节点】
+    加速 LoRA 的权重键名形态不同，而两个加载节点各自只认一种：
+      * 裸键名（Turbo 系 ckpt850 / v4step600）
+        -> MiniMaxH3TurboLoRA
+           它额外做剪枝底模的 AdaLN 运行期重注入（_inject_adaln_egrid），
+           核心节点没这个能力 —— 用核心节点挂 ckpt850 会丢掉 51 个 AdaLN 层。
+      * diffusion_model. 前缀（LightX2V / DMAD / better_motion）
+        -> 核心 LoraLoaderModelOnly
+           Turbo 节点会把模块名当成 diffusion_model.diffusion_model.xxx，
+           **一个权重都 patch 不上**（静默失效，出片照跑但 LoRA 没生效）。
+
+    用错节点的后果不是报错，而是「看起来正常但没生效」——
+    这是「前端选了加速 LoRA 却不生效」的根因之一。
+    """
+    for index, item in enumerate(chain):
+        node_id = f"{node_prefix}{index}"
+        loader = item.get("loader") or vmodels.ACCEL_LOADER_TURBO
+        if loader == vmodels.ACCEL_LOADER_CORE:
+            p[node_id] = {
+                "inputs": {
+                    "model": model_ref,
+                    "lora_name": item["name"],
+                    "strength_model": item["strength"],
+                },
+                "class_type": vmodels.ACCEL_LOADER_CORE,
+                "_meta": {"title": f"加速 LoRA·{item.get('key')}"},
+            }
+        else:
+            p[node_id] = {
+                "inputs": {
+                    "model": model_ref,
+                    "lora_name": item["name"],
+                    "strength": item["strength"],
+                    "low_vram": True,
+                },
+                "class_type": vmodels.ACCEL_LOADER_TURBO,
+                "_meta": {"title": f"加速 LoRA·{item.get('key')}"},
+            }
+        model_ref = [node_id, 0]
+    return model_ref
 
 
 def _apply_attention(p: dict, node_id: str, model_ref: list,
@@ -236,12 +292,36 @@ def build_t2v_panel(params: dict) -> dict:
     # 步数：用户没给就用模型推荐的；有加速 LoRA 时按 4 步档
     steps = params.get("steps")
     if not steps:
-        steps = model.get("steps", 4)
+        # 【2026-11-14】默认步数要看**实际挂了哪枚加速 LoRA**：
+        #   挂了加速 LoRA -> 该 LoRA 推荐的步数（4 步蒸馏 / 8 步蒸馏各不同）
+        #   没挂           -> 20 步标准采样
+        #
+        # 旧实现恒取 model["steps"]（= 4），于是「不挂加速 LoRA」时
+        # 也会跑 4 步 —— 那是蒸馏档的步数，配非蒸馏采样必然糊。
+        # 旧实现之所以「碰巧」没错，是因为加速 LoRA 恒定存在（写死的 ckpt850）。
+        # 现在加速 LoRA 由用户选，步数默认值必须跟着变。
+        if accel_chain:
+            item = accel_chain[0]
+            meta = vmodels.accel_lora_meta(item.get("key") or "") or {}
+            default_steps = int(meta.get("recommended_steps") or 4) or 4
+        else:
+            default_steps = vmodels.VIDEO_STEPS_WITHOUT_ACCEL
+        steps = default_steps
     steps = vmodels.normalize_steps(steps, int(model.get("steps", 4)))
+    # 调度器 / 采样器同理：加速 LoRA 档用 beta/euler（蒸馏档的配套），
+    # 标准多步采样用 simple/res_multistep（官方非蒸馏模板的配套）。
+    # 加速 LoRA 的 recommended_scheduler / recommended_sampler 优先。
+    if accel_chain:
+        meta = vmodels.accel_lora_meta(accel_chain[0].get("key") or "") or {}
+        default_scheduler = meta.get("recommended_scheduler") or model.get("scheduler", "beta")
+        default_sampler = meta.get("recommended_sampler") or model.get("sampler", "euler")
+    else:
+        default_scheduler = vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL
+        default_sampler = vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL
     scheduler = vmodels.normalize_scheduler(
-        params.get("scheduler"), model.get("scheduler", "beta"))
+        params.get("scheduler"), default_scheduler)
     sampler = vmodels.normalize_sampler(
-        params.get("sampler"), model.get("sampler", "euler"))
+        params.get("sampler"), default_sampler)
     # CFG：H3 标准采样路径固定 1.0（BasicGuider 没有 cfg 槽位），
     # 只有二采（SelfLiftH3Sampler）那条路径才真的吃 cfg —— 见下方
     # _twopass_block() 的调用。
@@ -291,21 +371,14 @@ def build_t2v_panel(params: dict) -> dict:
               "class_type": "UNETLoader", "_meta": {"title": "加载DiT"}}
     model_ref: list = ["6", 0]
 
-    # ---- 加速 LoRA 链（固定 Turbo LoRA + 用户组合）----
-    for index, item in enumerate(accel_chain):
-        node_id = f"138:{index}"
-        p[node_id] = {
-            "inputs": {
-                "model": model_ref,
-                "lora_name": item["name"],
-                "strength": item["strength"],
-                "low_vram": True,
-            },
-            "class_type": "MiniMaxH3TurboLoRA",
-            "_meta": {"title": ("Turbo LoRA（固定）" if item.get("fixed")
-                                else f"加速 LoRA·{item.get('key')}")},
-        }
-        model_ref = [node_id, 0]
+    # ---- 加速 LoRA 链（**一个槽位**：前端选哪枚就只挂哪枚）----
+    #
+    # 节点选择逻辑见 apply_accel_lora_nodes 的说明：
+    # Turbo 系（裸键名）走 Turbo 节点（要 AdaLN 运行期重注入），
+    # 前缀族（diffusion_model.*）走核心 LoraLoaderModelOnly。
+    # 用错节点 = 静默失效（出片照跑但 LoRA 没生效）。
+    if accel_chain:
+        model_ref = apply_accel_lora_nodes(p, model_ref, accel_chain)
 
     # ---- 效果 LoRA 链（用户可多选，各自带强度）----
     #

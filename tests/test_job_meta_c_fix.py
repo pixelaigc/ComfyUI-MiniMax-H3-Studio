@@ -286,15 +286,19 @@ class TestModelRecommendations(unittest.TestCase):
     def test_base_model_no_lora_tier_matches_project_workflow(self):
         """主模型「无加速 LoRA」档位必须与本项目工作流的默认值**一致**。
 
-        【为什么这条断言重要】第一版写的是 euler，但
-        h3studio/workflows.py:347-350 写的是：
-            default_steps     = 4  if lora != "none" else 20
-            default_scheduler = "beta"   if lora != "none" else "simple"
-            default_sampler   = "euler"  if lora != "none" else "res_multistep"
-        euler 是**挂了加速 LoRA**时的档位；无 LoRA 档位是 res_multistep。
-        填错 -> 用户照注释设采样器，得到与工作流默认不同的结果。
+        【为什么这条断言重要】推荐参数里的档位必须等于工作流实际会用的值 ——
+        填错 -> 用户照推荐设采样器，得到与工作流默认不同的结果。
+
+        【2026-11-14 重构】工作流里的档位常量搬到了
+        h3studio/video_models.py（VIDEO_STEPS_WITHOUT_ACCEL 等），
+        因为加速 LoRA 从「恒定存在」变成「用户可选」之后，
+        档位要看**实际挂了哪枚**。
+        所以这里断言的是「推荐参数 == 工作流常量」，
+        并且**额外**验证工作流构建器真的用了这个常量
+        （不能只是「两处碰巧写对了」）。
         """
-        from h3studio import workflows as wf
+        from h3studio import video_workflow as vworkflow
+        from h3studio import video_models as vmodels
         for key in ("fl2va_pruned_int8", "fl2va_int8",
                     "fl2va_pruned_w4a8", "fl2va_bf16"):
             with self.subTest(key=key):
@@ -303,24 +307,25 @@ class TestModelRecommendations(unittest.TestCase):
                 self.assertEqual(rec["scheduler"], "simple")
                 self.assertEqual(rec["sampler"], "res_multistep")
                 self.assertEqual(rec["source_kind"], "comfyui")
-                # 值必须真的等于**工作流源码里的常量**（不能只是「碰巧写对了」）。
-                # 用源码文本断言：直接抓 workflows.py 里的 default_* 三行。
-                import inspect
-                import re as _re
-                src = inspect.getsource(wf._h3_video_workflow)
-                # 空白无关的匹配（源码里是对齐过的等号）
-                m = _re.search(
-                    r'default_sampler\s*=\s*"euler"\s+if\s+lora\s*!=\s*'
-                    r'"none"\s+else\s*"res_multistep"', src)
-                self.assertIsNotNone(
-                    m, "工作流源码里的无 LoRA 档位采样器应为 res_multistep")
-                # 步数与调度器同理
-                self.assertIsNotNone(_re.search(
-                    r'default_steps\s*=\s*4\s+if\s+lora\s*!=\s*"none"\s+'
-                    r'else\s*20', src))
-                self.assertIsNotNone(_re.search(
-                    r'default_scheduler\s*=\s*"beta"\s+if\s+lora\s*!=\s*'
-                    r'"none"\s+else\s*"simple"', src))
+                # 推荐值必须等于工作流的常量（不能只是「碰巧写对了」）
+                self.assertEqual(rec["steps"],
+                                 vmodels.VIDEO_STEPS_WITHOUT_ACCEL)
+                self.assertEqual(rec["scheduler"],
+                                 vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL)
+                self.assertEqual(rec["sampler"],
+                                 vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL)
+                # 而且工作流构建器真的用了这个常量（不是另写一份字面量）
+                params = {"job_id": "probe", "prompt": "x",
+                          "width": 864, "height": 480, "duration": 2,
+                          "model_key": key, "accel_lora": "",
+                          "attention": "default"}
+                built = vworkflow.build_t2v_panel(params)
+                self.assertEqual(built["9"]["inputs"]["steps"],
+                                 vmodels.VIDEO_STEPS_WITHOUT_ACCEL)
+                self.assertEqual(built["9"]["inputs"]["scheduler"],
+                                 vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL)
+                self.assertEqual(built["17"]["inputs"]["sampler_name"],
+                                 vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL)
 
     def test_hybrid_model_author_provided_nothing(self):
         """hybrid 底模的作者明说没给采样参数 -> 步数等必须是「作者未提供」。"""

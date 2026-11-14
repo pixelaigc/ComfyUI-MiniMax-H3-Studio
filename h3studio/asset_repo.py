@@ -633,6 +633,264 @@ def stats(conn) -> dict:
     }
 
 
+# ------------------------------------------------------------------ 播放器清单
+#
+# 【为什么清单单独一层，不复用 search_assets】
+#   播放器的语义是「用户主动挑出来的一组东西」，与素材库的浏览/筛选语义
+#   完全不同：清单有**顺序**、**去重**、**跨重启保留**。
+#   如果复用列表接口，就又变成「当前页的全部素材」（这正是要修的 bug）。
+
+#: 默认清单的名字。清单 id 固定为 1（第一个自动创建的）。
+DEFAULT_PLAYLIST_NAME = "默认清单"
+
+
+def default_playlist(conn) -> dict:
+    """
+    取默认清单（不存在则创建）。
+
+    为什么固定一份而不是让前端传 playlist_id：
+    素材库只有一个「播放器」，多清单是以后的事。
+    固定 id 让前端不必先查再建，少一次往返、少一类 404。
+
+    【读路径不要写库】
+    只读的地方（GET /api/assets/player）用 find_playlist()，
+    它只查不建 —— 否则「看一眼清单」会在外接盘上写一次，
+    盘只读或满了的时候 GET 直接 500（读操作不该因为写失败而失败）。
+    """
+    row = conn.execute(
+        "SELECT * FROM player_playlists ORDER BY id LIMIT 1").fetchone()
+    if row is None:
+        stamp = A.now()
+        cur = conn.execute(
+            "INSERT INTO player_playlists (name, img_seconds, created_at, updated_at) "
+            "VALUES (?,?,?,?)",
+            (DEFAULT_PLAYLIST_NAME, 5, stamp, stamp))
+        row = conn.execute("SELECT * FROM player_playlists WHERE id=?",
+                           (cur.lastrowid,)).fetchone()
+    return _row_to_playlist(row)
+
+
+def find_playlist(conn) -> dict | None:
+    """只查不建：取默认清单（不存在返回 None）。给读路径用。"""
+    row = conn.execute(
+        "SELECT * FROM player_playlists ORDER BY id LIMIT 1").fetchone()
+    return _row_to_playlist(row) if row else None
+
+
+def _row_to_playlist(row) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "img_seconds": row["img_seconds"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _resolve_pid_write(conn, playlist_id: int | None, create: bool = True) -> int | None:
+    """
+    写路径用的 id 解析。
+
+    【为什么要分 create 两种】
+      create=True  -> 清单不存在就建（add / settings 需要写进去）
+      create=False -> 清单不存在返回 None（remove / clear 不该为了删
+                     一个不存在的东西而新建清单）
+      返回 None 时调用方要自己处理「没有可操作的对象」这个情况。
+    """
+    if playlist_id is not None:
+        return int(playlist_id)
+    if not create:
+        playlist = find_playlist(conn)
+        return int(playlist["id"]) if playlist else None
+    return int(default_playlist(conn)["id"])
+
+
+def player_entries(conn, playlist_id: int | None = None) -> list[dict]:
+    """
+    清单条目（含素材的播放地址）。
+
+    【为什么要在这里就把 url 拼好】
+      播放器前端只认「能直接播的 URL」，不想知道素材库内部怎么存路径。
+      图片给 preview_url（缩略图，幻灯片不需要原图，省流量），
+      音视频给 content_url（原文件）。
+    """
+    # 【读路径不写库】
+    # playlist_id 为 None 且清单还不存在时 -> 返回空列表，不建清单。
+    # （GET /api/assets/player 走的是这条路，不能在读的时候写外接盘。）
+    if playlist_id is None:
+        playlist = find_playlist(conn)
+        if playlist is None:
+            return []
+        pid = int(playlist["id"])
+    else:
+        pid = int(playlist_id)
+    rows = conn.execute(
+        "SELECT e.id, e.asset_id, e.category, e.position, e.added_at, "
+        "       a.name, a.category AS asset_category, a.deleted_at, "
+        "       (SELECT v.preview_path FROM asset_versions v "
+        "         WHERE v.asset_id = a.id ORDER BY v.version DESC LIMIT 1) AS preview_path "
+        "FROM player_entries e "
+        "LEFT JOIN assets a ON a.id = e.asset_id "
+        "WHERE e.playlist_id=? "
+        "ORDER BY e.position ASC, e.id ASC", (pid,)).fetchall()
+    items = []
+    for row in rows:
+        asset_id = row["asset_id"]
+        # 素材被软删除（进回收站）时条目保留，但前端不播 —— 留着它是为了
+        # 用户还原素材后清单能自动恢复，而不是把用户的编排弄丢。
+        deleted = row["deleted_at"] is not None
+        preview_url = (f"/api/assets/{asset_id}/preview"
+                       if row["preview_path"] else None)
+        items.append({
+            "entry_id": row["id"],
+            "asset_id": asset_id,
+            "name": row["name"] or asset_id,
+            "category": row["asset_category"] or row["category"],
+            "position": row["position"],
+            "added_at": row["added_at"],
+            "deleted": deleted,
+            "preview_url": preview_url,
+            "content_url": f"/api/assets/{asset_id}/content",
+        })
+    return items
+
+
+def player_add(conn, asset_ids, playlist_id: int | None = None) -> dict:
+    """
+    把素材加进清单（幂等：已在清单里的跳过，不报错）。
+
+    返回 {"added": [...], "skipped": [...], "missing": [...]}：
+      added   真正新增的素材 id
+      skipped 已经在清单里（重复添加）
+      missing 库里找不到的素材 id（前端要如实告诉用户哪几个没加上）
+    """
+    pid = _resolve_pid_write(conn, playlist_id, create=True)
+    added, skipped, missing = [], [], []
+    stamp = A.now()
+    # 位置接在当前最大位置之后 —— 用户「按添加顺序」就是「按播放顺序」。
+    row = conn.execute(
+        "SELECT COALESCE(MAX(position), -1) p FROM player_entries WHERE playlist_id=?",
+        (pid,)).fetchone()
+    next_pos = int(row["p"]) + 1
+    for asset_id in asset_ids or []:
+        asset_id = str(asset_id or "").strip()
+        if not asset_id:
+            continue
+        asset = conn.execute(
+            "SELECT id, category FROM assets WHERE id=? AND deleted_at IS NULL",
+            (asset_id,)).fetchone()
+        if asset is None:
+            missing.append(asset_id)
+            continue
+        exists = conn.execute(
+            "SELECT id FROM player_entries WHERE playlist_id=? AND asset_id=?",
+            (pid, asset_id)).fetchone()
+        if exists is not None:
+            skipped.append(asset_id)
+            continue
+        conn.execute(
+            "INSERT INTO player_entries "
+            "(playlist_id, asset_id, category, position, added_at) VALUES (?,?,?,?,?)",
+            (pid, asset_id, asset["category"], next_pos, stamp))
+        next_pos += 1
+        added.append(asset_id)
+    if added:
+        conn.execute("UPDATE player_playlists SET updated_at=? WHERE id=?", (stamp, pid))
+    return {"added": added, "skipped": skipped, "missing": missing}
+
+
+def player_remove(conn, asset_ids, playlist_id: int | None = None) -> dict:
+    """从清单里移除（不存在也不算错 —— 幂等）。返回被移除的 id 列表。"""
+    # 清单还没建过 -> 无从移除，直接返回空（**不**为此新建清单）。
+    pid = _resolve_pid_write(conn, playlist_id, create=False)
+    if pid is None:
+        return {"removed": []}
+    removed = []
+    for asset_id in asset_ids or []:
+        asset_id = str(asset_id or "").strip()
+        if not asset_id:
+            continue
+        cur = conn.execute(
+            "DELETE FROM player_entries WHERE playlist_id=? AND asset_id=?",
+            (pid, asset_id))
+        if cur.rowcount:
+            removed.append(asset_id)
+    if removed:
+        conn.execute("UPDATE player_playlists SET updated_at=? WHERE id=?", (A.now(), pid))
+    return {"removed": removed}
+
+
+def player_clear(conn, playlist_id: int | None = None) -> dict:
+    """清空清单。返回被清掉的条目数。"""
+    # 同 player_remove：清单不存在就不建，直接返回 0。
+    pid = _resolve_pid_write(conn, playlist_id, create=False)
+    if pid is None:
+        return {"cleared": 0}
+    cur = conn.execute("DELETE FROM player_entries WHERE playlist_id=?", (pid,))
+    conn.execute("UPDATE player_playlists SET updated_at=? WHERE id=?", (A.now(), pid))
+    return {"cleared": int(cur.rowcount or 0)}
+
+
+def player_set_img_seconds(conn, seconds, playlist_id: int | None = None) -> dict:
+    """改图片模式的「每张停止时间」（秒）。持久化，重启后仍是这个值。"""
+    pid = _resolve_pid_write(conn, playlist_id, create=True)
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        raise LibraryError("停止时间必须是数字（秒）", status=400)
+    value = max(1.0, min(600.0, value))
+    conn.execute("UPDATE player_playlists SET img_seconds=?, updated_at=? WHERE id=?",
+                 (value, A.now(), pid))
+    return {"img_seconds": value}
+
+
+def player_state(conn, playlist_id: int | None = None) -> dict:
+    """
+    播放器打开时一次性拿全：清单条目 + 图片模式默认停止时间。
+
+    【读路径不写库】
+    清单还没建过（用户还没加过任何素材）时返回**空清单**，
+    不在这里 INSERT —— 否则「打开播放器看一眼」会在外接盘上写一次。
+    真正要写的时候（add / remove / clear / settings）才建默认清单。
+    """
+    if playlist_id is None:
+        playlist = find_playlist(conn)
+        if playlist is None:
+            return {
+                "playlist_id": 0,
+                "name": DEFAULT_PLAYLIST_NAME,
+                "img_seconds": 5.0,
+                "entries": [],
+                "counts": {"image": 0, "audio": 0, "video": 0, "total": 0},
+            }
+        pid = int(playlist["id"])
+        name = playlist["name"]
+    else:
+        pid = int(playlist_id)
+        row = conn.execute("SELECT name FROM player_playlists WHERE id=?",
+                           (pid,)).fetchone()
+        name = row["name"] if row else DEFAULT_PLAYLIST_NAME
+    entries = player_entries(conn, pid)
+    return {
+        "playlist_id": pid,
+        "name": name,
+        "img_seconds": _playlist_img_seconds(conn, pid),
+        "entries": entries,
+        "counts": {
+            "image": sum(1 for e in entries if e["category"] == "image"),
+            "audio": sum(1 for e in entries if e["category"] == "audio"),
+            "video": sum(1 for e in entries if e["category"] == "video"),
+            "total": len(entries),
+        },
+    }
+
+
+def _playlist_img_seconds(conn, playlist_id: int) -> float:
+    row = conn.execute("SELECT img_seconds FROM player_playlists WHERE id=?",
+                       (playlist_id,)).fetchone()
+    return float(row["img_seconds"]) if row else 5.0
+
+
 # ------------------------------------------------------------------ 异步分析任务
 
 

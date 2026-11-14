@@ -121,8 +121,11 @@ class TestT2VModelLoraSummary(unittest.TestCase):
         self.assertEqual(info["lora_strength"], 1.0)
         self.assertEqual(info["lora_name"],
                          "dmad_minimax_h3_4step_full_critic_comfyui.safetensors")
-        # 工作流固定的那枚
-        self.assertEqual(info["fixed_lora_label"], "Turbo 4 步 · ckpt850（工作流固定）")
+        # 【2026-11-14】加速 LoRA 只有一个槽位 —— fixed_lora_* 是
+        # 「槽位那枚」的兼容镜像（老读侧还看这个字段）。
+        # 显示名不再带「（工作流固定）」—— 那句描述的是**旧语义**
+        #（恒生效、无法关闭），现在加速 LoRA 是用户选的、可关。
+        self.assertEqual(info["fixed_lora_label"], "Turbo 4 步 · ckpt850")
         self.assertEqual(info["fixed_lora_name"],
                          "minimax_h3_turbo_4step_ema_ckpt850.safetensors")
 
@@ -168,7 +171,7 @@ class TestT2VModelLoraSummary(unittest.TestCase):
                   "fixed_accel_lora": "v4step600",
                   "accel_loras": []}
         info = job_meta.summarize("t2v", params)
-        self.assertEqual(info["fixed_lora_label"], "Turbo 4 步 · v4-step600（工作流固定）")
+        self.assertEqual(info["fixed_lora_label"], "Turbo 4 步 · v4-step600")
         self.assertEqual(info["fixed_lora_name"],
                          "minimax_h3_turbo_v4_step600_ema.safetensors")
 
@@ -374,8 +377,13 @@ class TestFrontendRendersSummary(unittest.TestCase):
             '    lora_strength: state.loraStrength,',
             APP_JS_CODE)
         self.assertIn('if (mode === "flf" || mode === "r2v") {', APP_JS_CODE)
-        self.assertIn('params.lora = state.model === "lora" ? state.lora : "none";',
+        # 【2026-11-14】旧路径现在也走**统一槽位**：
+        # 提交 accel_lora（key）+ accel_lora_strength，
+        # params.lora 只是从槽位派生的兼容镜像（不再是独立输入源）。
+        self.assertIn('params.accel_lora = accelKey;', APP_JS_CODE)
+        self.assertIn('params.accel_lora_strength = state.loraStrength;',
                       APP_JS_CODE)
+        self.assertIn('params.lora = accelKey || "none";', APP_JS_CODE)
 
 
 class TestServerWiresModelInfo(unittest.TestCase):

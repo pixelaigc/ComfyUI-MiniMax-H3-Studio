@@ -27,9 +27,14 @@
   const VIDEO_OPTIONS = {
     models: {},
     default_model: "",
+    // 【2026-11-14】加速 LoRA 统一成一组可选项（不再分「固定枚/组合枚」）。
+    // accel_loras 是**唯一真源**；fixed_accel_loras 保留为同内容别名
+    // （老代码读它不会炸），accel_lora_combos 保留为空数组。
+    accel_loras: [],
     fixed_accel_loras: [],
     accel_lora_combos: [],
     default_fixed_accel_lora: "",
+    default_accel_lora: "",
     attention_modes: [],
     default_attention: "",
     twopass: {},
@@ -61,9 +66,10 @@
     rawWidth: null,         // 用户原始输入（未经吸附）
     rawHeight: null,
     sizePresetKey: "",      // 当前选中的尺寸预设（空 = 自定义）
-    fixedAccelLora: "",
-    accelLora: "",          // 【单选】当前选中的加速 LoRA key（空 = 不额外挂）
-    accelLoraStrength: 1.0, // 【单选】该加速 LoRA 的强度
+    // 【2026-11-14】加速 LoRA 是**一个槽位**：选哪枚就只挂哪枚。
+    // 空串 = 不挂加速 LoRA（走标准多步采样）。
+    accelLora: "",
+    accelLoraStrength: 1.0, // 该加速 LoRA 的强度
     // 效果 LoRA（可多选，与加速 LoRA 并列共存）
     // [{name, strength, enabled, trigger}] —— 顺序 = 界面上的排列顺序
     effectLoras: [],
@@ -120,13 +126,29 @@
     return VIDEO_OPTIONS.models[videoState.model] || null;
   }
 
-  function fixedAccelMeta() {
-    return VIDEO_OPTIONS.fixed_accel_loras.find(
-      l => l.key === videoState.fixedAccelLora) || null;
+  /**
+   * 加速 LoRA 清单 —— **一个列表**（2026-11-14 重构）。
+   *
+   * 旧实现分两栏：fixed_accel_loras（不在下拉里、恒生效）+
+   * accel_lora_combos（下拉里选的、额外叠加）。于是「选什么」不决定
+   * 「加载什么」—— 用户报的「选了加速 LoRA 却没生效」就是这么来的。
+   * 现在两栏合并，下拉里选的那枚就是工作流里唯一挂的那枚。
+   */
+  function accelLoraList() {
+    if (Array.isArray(VIDEO_OPTIONS.accel_loras)
+        && VIDEO_OPTIONS.accel_loras.length) {
+      return VIDEO_OPTIONS.accel_loras;
+    }
+    // 兜底：服务端还没下发新字段时读老字段
+    if (Array.isArray(VIDEO_OPTIONS.fixed_accel_loras)
+        && VIDEO_OPTIONS.fixed_accel_loras.length) {
+      return VIDEO_OPTIONS.fixed_accel_loras;
+    }
+    return [];
   }
 
-  function accelComboMeta(key) {
-    return VIDEO_OPTIONS.accel_lora_combos.find(l => l.key === key) || null;
+  function accelMeta(key) {
+    return accelLoraList().find(l => l.key === key) || null;
   }
 
   // ------------------------------------------------------------ 尺寸
@@ -502,37 +524,41 @@
 
   // ------------------------------------------------------------ 加速 LoRA
 
+  /**
+   * 加速 LoRA 的说明文案。
+   *
+   * 【2026-11-14 重写 —— 文案必须与实际行为一致】
+   * 旧文案说「工作流固定使用 Turbo LoRA，这一枚始终生效、无法关闭，
+   * 下拉里选的是额外叠加的第二枚」。那是**当时的真实行为**，但它正是
+   * 用户报的缺陷本身（选了不生效）。现在加速 LoRA 变成一个槽位，
+   * 所以文案也必须改成「你选哪枚，工作流就只挂哪枚」。
+   *
+   * 还要如实说明**加载节点**（哪些权重用哪个节点加载）——
+   * 因为用错节点会导致 LoRA 静默失效（出片照跑但没生效）。
+   */
   function renderFixedLoraNote() {
     const box = document.getElementById("vidFixedLoraNote");
     if (!box) return;
-    const meta = fixedAccelMeta();
+    const meta = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
     if (!meta) {
-      box.hidden = true;
-      box.textContent = "";
+      box.hidden = false;
+      box.textContent = "当前**不挂**加速 LoRA —— 工作流走标准多步采样"
+        + "（默认 20 步 / simple 调度器 / res_multistep 采样器）。"
+        + "想要 4 步出片，请在上方下拉里选一枚加速 LoRA。";
+      box.title = "";
       return;
     }
     box.hidden = false;
-    // 【2026-11-13 需求 1/5】固定 LoRA 也附上作者推荐参数（悬停可见）。
-    const rec = fixedAccelMeta() ? accelRecommendation(fixedAccelMeta().key) : null;
+    const rec = accelRecommendation(videoState.accelLora);
     const recText = recTooltip(rec);
     box.title = recText || "";
-    // 【2026-11-14 需求 8】文案与实际行为对齐。
-    //
-    // 【实测事实（本地跑 build_t2v_panel 验证）】
-    //   * 固定 Turbo LoRA **始终**挂在模型链上（_resolve_accel_chain
-    //     无条件把 params["fixed_accel_lora"] 或默认值 ckpt850 塞进
-    //     链首），它**不在**上面的下拉里，也**不能**被下拉关掉。
-    //   * 上面下拉里选的那枚是**额外叠加**在固定枚之后的第二枚
-    //     加速 LoRA（链 = 固定 Turbo -> 用户选的组合）。
-    //   * 所以原文案「不随上面的选择变化」只说了前半句，
-    //     没说清「选了之后是两枚一起生效」—— 容易被读成
-    //     「选了会替换掉固定的那枚」。
-    //
-    // 【改写原则】如实说明两件事：固定枚恒生效 + 下拉是额外叠加。
-    box.textContent = `工作流固定使用加速 LoRA「${meta.display}」`
-      + `（${meta.purpose}）—— 这一枚始终生效，不在下拉里、也无法关闭。`
-      + `上面下拉里选的加速 LoRA 是「额外叠加」在它之后的第二枚`
-      + `（链路 = 固定 Turbo → 你选的那枚），两者同时生效。`
+    const loaderText = meta.loader === "LoraLoaderModelOnly"
+      ? "核心 LoraLoaderModelOnly 加载"
+      : "Turbo 节点加载";
+    box.textContent = `当前加速 LoRA：「${meta.display}」`
+      + `（${loaderText}，强度 ${Number(videoState.accelLoraStrength).toFixed(2)}）`
+      + `—— 工作流里**只挂这一枚**，你选什么就加载什么。`
+      + (meta.note ? `\n${meta.note}` : "")
       + (recText ? `\n作者推荐：${recText.split("\n").join(" · ")}` : "");
   }
 
@@ -546,8 +572,7 @@
    * 被服务端改写」，那是假选项）。
    */
   function selectableAccelLoras() {
-    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
-    return combos.filter(item => {
+    return accelLoraList().filter(item => {
       if (item.available === false) return false;
       if (item.selectable === false) return false;
       if (item.compatible === false) return false;
@@ -558,15 +583,14 @@
   function renderAccelLoraSelect() {
     const sel = document.getElementById("vidAccelLoraSelect");
     if (!sel) return;
-    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
     const selectable = selectableAccelLoras();
 
     sel.innerHTML = "";
-    // 「不额外挂加速 LoRA」—— 工作流里已经有固定的那枚 Turbo LoRA，
-    // 这里选的是**额外叠加**的第二枚，不是替换固定枚。
+    // 「不挂加速 LoRA」—— 工作流里**只挂你选的那一枚**，
+    // 选这一项就是一枚都不挂（走标准多步采样）。
     const noneOpt = document.createElement("option");
     noneOpt.value = "";
-    noneOpt.textContent = "不额外挂加速 LoRA（仅用工作流固定的那枚 Turbo）";
+    noneOpt.textContent = "不挂加速 LoRA（走标准多步采样）";
     sel.appendChild(noneOpt);
 
     selectable.forEach(item => {
@@ -575,12 +599,17 @@
       opt.textContent = item.display;
       // 【2026-11-13 需求 1/5】title 里附上 LoRA 作者推荐的参数。
       const recText = recTooltip(accelRecommendation(item.key));
+      // 附上**加载节点** —— 用错节点会导致 LoRA 静默失效
+      // （出片照跑但没生效），用户需要能看见这一点。
+      const loaderText = item.loader === "LoraLoaderModelOnly"
+        ? "核心 LoraLoaderModelOnly" : "Turbo 节点";
       opt.title = `${item.name}｜推荐强度 ${item.recommended_strength}`
+        + `｜加载节点：${loaderText}`
         + (recText ? `\n\n—— 作者推荐参数 ——\n${recText}` : "");
       sel.appendChild(opt);
     });
 
-    // 当前选中的不再适配（切了主模型）-> 自动回落成「不额外挂」
+    // 当前选中的不再适配（切了主模型）-> 自动回落成「不挂」
     if (videoState.accelLora && !selectable.some(x => x.key === videoState.accelLora)) {
       videoState.accelLora = "";
     }
@@ -593,21 +622,23 @@
   function renderAccelLoraNote() {
     const note = document.getElementById("vidAccelLoraNote");
     if (!note) return;
-    const combos = VIDEO_OPTIONS.accel_lora_combos || [];
+    const all = accelLoraList();
     const selectable = selectableAccelLoras();
     const parts = [];
 
-    const meta = videoState.accelLora ? accelComboMeta(videoState.accelLora) : null;
+    const meta = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
     if (meta) {
-      parts.push(`已选「${meta.display}」×${Number(videoState.accelLoraStrength).toFixed(2)}`);
-      if (meta.note) parts.push(meta.note);
+      const loaderText = meta.loader === "LoraLoaderModelOnly"
+        ? "核心 LoraLoaderModelOnly" : "Turbo 节点";
+      parts.push(`已选「${meta.display}」×${Number(videoState.accelLoraStrength).toFixed(2)}`
+        + `（${loaderText}加载，工作流里只挂这一枚）`);
     } else {
-      parts.push("未额外挂加速 LoRA（工作流固定的那枚 Turbo LoRA 仍然生效）。");
+      parts.push("未挂加速 LoRA —— 工作流走标准多步采样。");
     }
     // 被过滤掉的数量 + 原因（说清楚「为什么少了几项」）
-    const blocked = combos.length - selectable.length;
+    const blocked = all.length - selectable.length;
     if (blocked > 0) {
-      const reasons = combos
+      const reasons = all
         .filter(c => !selectable.some(s => s.key === c.key))
         .map(c => {
           if (c.available === false) return `${c.display}（本机缺少文件）`;
@@ -1066,6 +1097,31 @@
     });
   }
 
+  // ------------------------------------------------------------ 对外接口
+  /**
+   * 暴露给其它模块（首尾帧 / 参考生视频的旧面板）使用。
+   *
+   * 【为什么需要】flf / r2v 走的是旧面板（index.html 的 #modelCards /
+   * #loraCards），但**加速 LoRA 必须与文生视频同一套语义**
+   * （一个槽位、同一份清单、同一套兼容性过滤）——
+   * 否则同一个 LoRA 在两个面板里行为不同，用户会以为「时灵时不灵」。
+   *
+   * 返回 [{key, display, name, recommended_strength, loader, loader_label, ...}]
+   */
+  function accelOptions() {
+    return selectableAccelLoras().map(item => ({
+      key: item.key,
+      display: item.display,
+      name: item.name,
+      recommended_strength: item.recommended_strength,
+      recommended_steps: item.recommended_steps,
+      loader: item.loader,
+      loader_label: item.loader_label,
+      note: item.note,
+      purpose: item.purpose,
+    }));
+  }
+
   // ------------------------------------------------------------ 配置持久化
 
   function collectConfig() {
@@ -1079,8 +1135,8 @@
       rawWidth: videoState.rawWidth,
       rawHeight: videoState.rawHeight,
       size_preset_key: videoState.sizePresetKey,
-      fixed_accel_lora: videoState.fixedAccelLora,
-      // 【单选】只存一个加速 LoRA + 它的强度
+      // 【2026-11-14】加速 LoRA 是**一个槽位**：只存「选的那枚」+ 强度。
+      // 不再存 fixed_accel_lora（那是「恒生效的那枚」的旧语义，已废）。
       accel_lora: videoState.accelLora,
       accel_lora_strength: Number(videoState.accelLoraStrength),
       // 效果 LoRA（可多选，各自带强度 + 触发词）
@@ -1154,7 +1210,12 @@
       videoState.sizePresetKey = presetKeyForSize(
         videoState.width, videoState.height);
     }
-    if (cfg.fixed_accel_lora) videoState.fixedAccelLora = cfg.fixed_accel_lora;
+    // 【2026-11-14】加速 LoRA 只有一个槽位。
+    // 老配置里存的是 fixed_accel_lora（恒生效的那枚）—— 迁移成槽位值，
+    // 这样老配置恢复后语义仍然对（那一枚就是要挂的那枚）。
+    if (cfg.fixed_accel_lora && !cfg.accel_lora) {
+      videoState.accelLora = cfg.fixed_accel_lora;
+    }
     // 效果 LoRA（可多选）—— 复用参数时一并恢复
     //
     // ⚠️ 【这里只「暂存」，不直接落地】
@@ -1329,14 +1390,12 @@
           ? fb.attention_modes : [];
         VIDEO_OPTIONS.default_attention = fb.default_attention || "default";
       }
-      if (!VIDEO_OPTIONS.accel_lora_combos || !VIDEO_OPTIONS.accel_lora_combos.length) {
-        VIDEO_OPTIONS.accel_lora_combos = Array.isArray(fb.accel_lora_combos)
-          ? fb.accel_lora_combos : [];
-      }
-      if (!VIDEO_OPTIONS.fixed_accel_loras || !VIDEO_OPTIONS.fixed_accel_loras.length) {
-        VIDEO_OPTIONS.fixed_accel_loras = Array.isArray(fb.fixed_accel_loras)
-          ? fb.fixed_accel_loras : [];
-        VIDEO_OPTIONS.default_fixed_accel_lora = fb.default_fixed_accel_lora || "";
+      // 【2026-11-14】兜底清单也统一成一组（accel_loras）。
+      if (!VIDEO_OPTIONS.accel_loras || !VIDEO_OPTIONS.accel_loras.length) {
+        const fbList = Array.isArray(fb.accel_loras) ? fb.accel_loras
+          : (Array.isArray(fb.fixed_accel_loras) ? fb.fixed_accel_loras : []);
+        VIDEO_OPTIONS.accel_loras = fbList;
+        VIDEO_OPTIONS.fixed_accel_loras = fbList;
       }
       if (!VIDEO_OPTIONS.aspects || !VIDEO_OPTIONS.aspects.length) {
         VIDEO_OPTIONS.aspects = Array.isArray(fb.aspects) ? fb.aspects : [];
@@ -1386,8 +1445,10 @@
 
       // 默认值
       if (!videoState.model) videoState.model = data.default_model || "";
-      if (!videoState.fixedAccelLora) {
-        videoState.fixedAccelLora = data.default_fixed_accel_lora || "";
+      // 【2026-11-14】默认加速 LoRA 槽位 = 空（不挂）——
+      // 「不挂」必须能选出来，所以不能默认给 ckpt850。
+      if (!videoState.accelLora && data.default_accel_lora) {
+        videoState.accelLora = data.default_accel_lora;
       }
       if (!videoState.attention) {
         videoState.attention = data.default_attention || "";
@@ -1485,7 +1546,9 @@
         { cache: "no-store" });
       if (!resp.ok) return;
       const data = await resp.json();
-      VIDEO_OPTIONS.accel_lora_combos = data.accel_lora_combos || [];
+      VIDEO_OPTIONS.accel_loras = data.accel_loras
+        || data.fixed_accel_loras || data.accel_lora_combos || [];
+      VIDEO_OPTIONS.fixed_accel_loras = VIDEO_OPTIONS.accel_loras;
       if (data.accel_lora_compat) {
         VIDEO_OPTIONS.accel_lora_compat = data.accel_lora_compat;
       }
@@ -1531,8 +1594,7 @@
       shift_video: Number(videoState.shiftVideo),
       shift_audio: Number(videoState.shiftAudio),
       seed: $("#seed").value.trim() || null,
-      fixed_accel_lora: videoState.fixedAccelLora,
-      // 【单选】最多一项
+      // 【2026-11-14】加速 LoRA 槽位（单选，最多一项；空 = 不挂）
       accel_loras: accel,
       // 效果 LoRA（可多选，与加速 LoRA 并列共存）
       effect_loras: effectLoras,
@@ -1671,7 +1733,7 @@
       accelSel.addEventListener("change", e => {
         const previous = videoState.accelLora;
         videoState.accelLora = e.target.value || "";
-        const meta = videoState.accelLora ? accelComboMeta(videoState.accelLora) : null;
+        const meta = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
         if (meta) {
           // 【2026-11-12 修 —— DMAD 默认强度必须是 1.00】
           //
@@ -1871,6 +1933,16 @@
     applyConfig: applyConfig,
     collectConfig: collectConfig,
     save: saveVideoConfig,
+    /**
+     * 加速 LoRA 清单（已按当前底模过滤）。
+     *
+     * 【为什么对外暴露】首尾帧 / 参考生视频走的是旧面板
+     * （index.html 的 #modelCards / #loraCards），但加速 LoRA 必须
+     * 与文生视频**同一套语义**（一个槽位 / 同一份清单 / 同一套兼容性
+     * 过滤）—— 否则同一个 LoRA 在两个面板里行为不同，
+     * 用户会以为「时灵时不灵」。
+     */
+    accelOptions,
     // 供验收脚本直接读状态（证明「界面值 == 提交值」）
     _debug: {
       selectableAccelLoras,

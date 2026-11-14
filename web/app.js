@@ -153,6 +153,12 @@ const state = {
   files: { first: null, last: null, refs: [] },
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
   assetRefs: {},
+  // 【2026-11-14】音轨来源（B2 音轨三选一）：
+  //   "" = 使用生成的音乐
+  //   "reference" = 使用参考音乐作为成片音轨
+  //   "video_bg" = 使用参考视频的背景音乐作为成片音轨
+  // 合法值与可见性判据见 h3studio/h3_audio_track.py（服务端与前端同一套）。
+  audioTrackSource: "",
   timer: null,
   // 【2026-11-13 队列化改造】genBusy 不再表示「有任务在跑、不能提交」。
   // 它现在只表示「本会话有任务还没到终态」，**不参与按钮的禁用判断**
@@ -595,13 +601,19 @@ function renderMode() {
     row.appendChild(slot);
   };
   if (mode === "flf") {
-    $("#uploadTitle").textContent = "上传首帧与尾帧，或从已完成图片拖入（尾帧可省略）";
+    // 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
+    $("#uploadTitle").textContent =
+      "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可）";
     zone.style.display = "block";
     mk("first", "首帧"); mk("last", "尾帧");
   } else if (mode === "r2v") {
-    $("#uploadTitle").textContent = "上传参考图，或从已完成图片拖入（1~3 张）";
+    // 【2026-11-14】参考图上限从 3 张提升到 **9 张**
+    // —— H3 参考生成节点的 ref_images 槽位上限就是 9（实测 object_info）。
+    // 原来卡 3 张是历史遗留，把能力人为砍掉了。
+    $("#uploadTitle").textContent =
+      "上传参考图，或从素材库选（最多 9 张）";
     zone.style.display = "block";
-    mk("ref0", "参考 1"); mk("ref1", "参考 2"); mk("ref2", "参考 3");
+    for (let i = 0; i < 9; i++) mk("ref" + i, "参考 " + (i + 1));
   } else {
     zone.style.display = "none";
   }
@@ -638,12 +650,20 @@ function renderMode() {
     if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
   }
 
+  // 音轨来源（首尾帧 / 参考生视频）
+  renderAudioTrackSelect();
+
   // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
   const legacyVideoSampling = $("#videoSamplingField");
   if (legacyVideoSampling) {
     const show = mode === "flf" || mode === "r2v";
     legacyVideoSampling.style.display = show ? "" : "none";
-    if (show) renderLegacyVideoSampling();
+    if (show) {
+      // 【2026-11-14】旧面板的加速 LoRA 卡片也用统一清单渲染 ——
+      // 否则旧面板只能选写死的两枚，与文生视频面板行为不一致。
+      renderLegacyAccelLoraCards();
+      renderLegacyVideoSampling();
+    }
   }
 
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
@@ -674,6 +694,86 @@ function renderMode() {
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
 }
+
+// ---------- 音轨来源（首尾帧 / 参考生视频） ----------
+//
+// 【2026-11-14 新增 · B2 需求「音轨三选一」】
+//   (a) 使用生成的音乐
+//   (b) 使用参考音乐作为成片音轨
+//   (c) 使用参考视频的背景音乐作为成片音轨
+//
+// 【为什么「没有素材就不出现」而不是置灰】
+// 置灰等于「能选但服务端会把它改掉」—— 那是假选项。
+// 所以这里**按实际有没有对应素材**来生成选项。
+//
+// 【判据必须与服务端一致】
+// 服务端用 h3studio/h3_audio_track.py 归一（同一个 key 集合），
+// 前端这里用同一套 key 字符串 —— 两边一致才不会
+// 「界面能选、提交后被改掉」。
+const AUDIO_TRACK_OPTIONS = [
+  { key: "", label: "使用生成的音乐",
+    note: "音轨由 H3 与画面一同采样生成，音画天然同步。" },
+  { key: "reference", label: "使用参考音乐作为成片音轨",
+    note: "参考音乐被贴到成片上（不参与采样），"
+        + "长度不足会补静音、超出会裁到画面时长。" },
+  { key: "video_bg", label: "使用参考视频的背景音乐作为成片音轨",
+    note: "参考视频的背景音乐被贴到成片上（不参与采样），"
+        + "长度不足会补静音、超出会裁到画面时长。" },
+];
+
+/** 当前有没有参考音乐 / 参考视频背景音（决定哪些选项出现）。 */
+function audioTrackAvailability() {
+  const slots = state.assetRefs || {};
+  let hasRefAudio = false;
+  let hasVideoAudio = false;
+  for (const [key, item] of Object.entries(slots)) {
+    if (!item || !item.asset_id) continue;
+    const cat = item.category || "";
+    if (cat === "audio") {
+      if (key.startsWith("refvid")) hasVideoAudio = true;
+      else hasRefAudio = true;
+    }
+  }
+  return { hasRefAudio, hasVideoAudio };
+}
+
+function renderAudioTrackSelect() {
+  const field = $("#audioTrackField");
+  const sel = $("#audioTrackSelect");
+  const note = $("#audioTrackNote");
+  if (!field || !sel) return;
+  const isF2V = state.mode === "flf" || state.mode === "r2v";
+  field.style.display = isF2V ? "" : "none";
+  if (!isF2V) return;
+
+  const { hasRefAudio, hasVideoAudio } = audioTrackAvailability();
+  const available = AUDIO_TRACK_OPTIONS.filter(o => {
+    if (o.key === "reference") return hasRefAudio;
+    if (o.key === "video_bg") return hasVideoAudio;
+    return true;
+  });
+  sel.innerHTML = available.map(o =>
+    `<option value="${esc(o.key)}"${o.key === state.audioTrackSource ? " selected" : ""}>`
+    + `${esc(o.label)}</option>`).join("");
+  // 当前选中的不再可用（素材被删了）-> 回落成「使用生成的音乐」
+  if (!available.some(o => o.key === state.audioTrackSource)) {
+    state.audioTrackSource = "";
+    sel.value = "";
+  }
+  const cur = available.find(o => o.key === state.audioTrackSource);
+  if (note) {
+    note.textContent = cur ? cur.note
+      : "成片音轨由 H3 与画面一同采样生成。";
+  }
+}
+
+// 音轨来源下拉的事件绑定
+document.addEventListener("change", event => {
+  if (event.target && event.target.id === "audioTrackSelect") {
+    state.audioTrackSource = event.target.value || "";
+    renderAudioTrackSelect();
+  }
+});
 
 // ---------- 图像模式（Z-Image 文生图） ----------
 // 档位 + 比例 -> 像素宽高。**原始值**（不做像素区间钳制）。
@@ -2142,6 +2242,42 @@ bindSeg("#loraCards", "lora", () => {
   // 【2026-11-12】LoRA 卡片换了 -> 同样要重算 legacy 采样参数的推荐基准
   if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
 });
+
+/**
+ * 渲染首尾帧 / 参考生视频（旧面板）的加速 LoRA 卡片。
+ *
+ * 【2026-11-14 重构】旧实现是在 index.html 里**写死**两张卡片
+ * （ckpt850 / v4step600），所以旧面板根本选不到 LightX2V / DMAD ——
+ * 而文生视频面板能选。两个面板对同一件事给出不同选项，
+ * 用户会以为「选了不生效」。
+ *
+ * 现在旧面板也读**同一份**清单（window.VIDEO_PANEL.accelOptions()），
+ * 语义统一为「一个槽位，选哪枚工作流就只挂哪枚」。
+ */
+function renderLegacyAccelLoraCards() {
+  const host = $("#loraCards");
+  if (!host) return;
+  const options = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
+    ? window.VIDEO_PANEL.accelOptions() : [];
+  if (!options.length) return;   // 清单还没到 -> 保留静态占位
+  host.innerHTML = options.map(o => `
+    <button data-v="${esc(o.key)}"${o.key === state.lora ? " class=\"active\"" : ""}>
+      <b>${esc(o.display)}</b>
+      <small>${esc(o.loader === "LoraLoaderModelOnly" ? "核心节点加载" : "Turbo 节点")}</small>
+    </button>`).join("");
+  $$("#loraCards button").forEach(b => b.addEventListener("click", () => {
+    $$("#loraCards button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    state.lora = b.dataset.v;
+    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+  }));
+  // 当前选中项若已不在清单里 -> 回落默认
+  if (state.lora && !options.some(o => o.key === state.lora)) {
+    state.lora = options[0].key;
+    const btn = $(`#loraCards button[data-v="${state.lora}"]`);
+    if (btn) btn.classList.add("active");
+  }
+}
 // 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
 // （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
 // 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
@@ -2238,7 +2374,11 @@ function videoSamplingDefaults() {
  * 所以判据不能只看 state.lora。
  */
 function effectiveLegacyLora() {
-  return state.model === "lora" ? (state.lora || "ckpt850") : "none";
+  // 【2026-11-14】旧路径的加速 LoRA 现在也走**统一槽位**：
+  //   state.model === "lora" -> 用 state.lora 那一枚
+  //   state.model === "standard" -> 一枚都不挂（空串）
+  // 旧的 "none" 字面量保留成空串之外不再使用。
+  return state.model === "lora" ? (state.lora || "") : "";
 }
 
 /**
@@ -2253,11 +2393,24 @@ function effectiveLegacyLora() {
  * 面板上写「默认 6 步」，工作流跑的是 4 步 = 假提示。
  */
 function legacySamplingDefaults() {
-  const withLora = effectiveLegacyLora() !== "none";
+  const key = effectiveLegacyLora();
+  const withLora = !!key;
+  if (!withLora) {
+    return {
+      steps: 20,
+      sampler: "res_multistep",
+      scheduler: "simple",
+    };
+  }
+  // 【2026-11-14】步数按**所选那枚**的推荐值 —— 不同加速 LoRA 的
+  // 推荐步数不同（4 步蒸馏 / 8 步蒸馏），写死 4 就是假提示。
+  const opts = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
+    ? window.VIDEO_PANEL.accelOptions() : [];
+  const meta = opts.find(o => o.key === key);
   return {
-    steps: withLora ? 4 : 20,
-    sampler: withLora ? "euler" : "res_multistep",
-    scheduler: withLora ? "beta" : "simple",
+    steps: (meta && meta.recommended_steps) ? Number(meta.recommended_steps) : 4,
+    sampler: "euler",
+    scheduler: "beta",
   };
 }
 
@@ -2798,7 +2951,16 @@ $("#genBtn").addEventListener("click", async () => {
   // 修法：**只让真正走旧路径的模式**（flf / r2v）带这两个字段；
   // 其它模式（t2v / 图像 / 音乐）不写 —— 让落库记录里只剩真实生效的字段。
   if (mode === "flf" || mode === "r2v") {
-    params.lora = state.model === "lora" ? state.lora : "none";
+    // 【2026-11-14】旧路径（首尾帧 / 参考生视频）也走**统一槽位**：
+    // 提交 accel_lora（key）+ accel_lora_strength，
+    // 服务端按同一套换算逻辑决定挂哪枚、用哪个节点加载。
+    //
+    // 仍然保留 params.lora —— 老任务 / 老读侧（job_meta）还要看它，
+    // 但它是**从槽位派生的**，不再是独立的输入源。
+    const accelKey = effectiveLegacyLora();
+    params.accel_lora = accelKey;
+    params.accel_lora_strength = state.loraStrength;
+    params.lora = accelKey || "none";
     params.lora_strength = state.loraStrength;
   }
   if (IMAGE_MODES.includes(mode)) {
@@ -2904,6 +3066,8 @@ $("#genBtn").addEventListener("click", async () => {
     params.scheduler = state.vidScheduler;
     params.shift_video = Number(state.vidShiftVideo);
     params.shift_audio = Number(state.vidShiftAudio);
+    // 【2026-11-14】音轨三选一（B2）
+    params.audio_track_source = state.audioTrackSource || "";
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，

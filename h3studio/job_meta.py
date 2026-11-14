@@ -98,19 +98,25 @@ def _video_model_label(model_key: str) -> str:
 
 
 def _accel_lora_display(key: str) -> str:
-    """加速 LoRA 组合 key -> 面板上显示的那个 display（逐字一致）。"""
-    meta = vmodels.VIDEO_ACCEL_LORA_COMBOS.get(key)
+    """加速 LoRA key -> 面板上显示的那个 display（逐字一致）。
+
+    【2026-11-14】加速 LoRA 统一成一个槽位，Turbo 系与组合枚都在
+    同一张表里查（vmodels.accel_lora_meta）。
+    """
+    meta = vmodels.accel_lora_meta(key)
     if meta:
         return str(meta.get("display") or key)
     return key or ""
 
 
 def _fixed_accel_lora_display(key: str) -> str:
-    """固定加速 LoRA key -> 面板上显示的那个 display（逐字一致）。"""
-    meta = vmodels.VIDEO_ACCEL_LORAS.get(key)
-    if meta:
-        return str(meta.get("display") or key)
-    return key or ""
+    """加速 LoRA key -> 面板上显示的那个 display（逐字一致）。
+
+    【2026-11-14】字段名保留「fixed」是为了兼容老读侧，
+    语义已经变成「槽位那枚」—— 现在加速 LoRA 由用户选，不再有
+    「恒生效的固定枚」。
+    """
+    return _accel_lora_display(key)
 
 
 def _effect_lora_display(name: str) -> str:
@@ -278,6 +284,8 @@ def _t2v_summary(params: dict) -> dict:
         "fixed_lora_name": "",
         "fixed_lora_key": "",
         "fixed_lora_strength": None,
+        # 加速 LoRA 的加载节点（MiniMaxH3TurboLoRA / LoraLoaderModelOnly）
+        "accel_lora_loader": "",
         # 效果 LoRA（可多选）—— 列表，每项 {name, label, strength, trigger}
         "effect_lora_labels": [],
         "source": "t2v_panel",
@@ -290,31 +298,36 @@ def _t2v_summary(params: dict) -> dict:
     meta = vmodels.VIDEO_MODELS.get(model_key) or {}
     out["model_unet"] = str(meta.get("unet") or "")
 
-    # 用户勾选的加速 LoRA（单选；老任务里可能是多项，取第一个生效的）
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = str(item.get("key") or "").strip()
-        if not key:
-            continue
-        combo = vmodels.VIDEO_ACCEL_LORA_COMBOS.get(key) or {}
-        try:
-            strength = float(item.get("strength",
-                                    combo.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(combo.get("recommended_strength", 1.0))
-        out["lora_label"] = _accel_lora_display(key)
-        out["lora_name"] = str(combo.get("name") or "")
-        out["lora_strength"] = strength
-        out["lora_key"] = key
-        break
+    # 【2026-11-14】加速 LoRA 只有一个槽位 —— 用**同一套**换算函数
+    # （与服务端归一层、工作流构建器完全一致），避免三处各理解一遍。
+    #
+    # 【为什么显示层用 include_fixed_fallback=False】
+    # 老记录里 accel_loras 是「用户选的那枚」，fixed_accel_lora 是
+    # 「恒生效的那枚」—— 两者语义不同。若显示层把 fixed 那一枚也
+    # 当成槽位值，卡片会显示成「用户选了 ckpt850」，
+    # 而用户实际选的是别的 —— 那是**谎报**。
+    # 新记录里两者是同一枚（服务端归一时同步了），所以显示结果一致。
+    slot_key, slot_strength = vmodels.resolve_accel_lora_slot(
+        params, include_fixed_fallback=False)
+    if slot_key:
+        meta = vmodels.accel_lora_meta(slot_key) or {}
+        out["lora_label"] = _accel_lora_display(slot_key)
+        out["lora_name"] = str(meta.get("name") or "")
+        out["lora_strength"] = float(slot_strength)
+        out["lora_key"] = slot_key
+        # 加载节点（Turbo / 核心 LoraLoader）—— 便于排查静默失效
+        out["accel_lora_loader"] = vmodels.detect_accel_lora_loader(
+            str(meta.get("name") or ""))
 
-    # 工作流固定的那枚 Turbo LoRA
+    # 「工作流挂的那枚」—— 独立于「用户选的那枚」：
+    #   * 新记录：两者相同（服务端归一时同步了 fixed_accel_lora）
+    #   * 老记录：fixed 那一枚是恒生效的，与用户的选择分开呈现
     fixed_key = str(params.get("fixed_accel_lora") or "").strip()
+    if not fixed_key and slot_key:
+        # 新记录里服务端已同步 fixed_accel_lora；老记录可能缺 -> 用槽位值兜底
+        fixed_key = slot_key
     if fixed_key:
-        fixed = vmodels.VIDEO_ACCEL_LORAS.get(fixed_key) or {}
+        fixed = vmodels.accel_lora_meta(fixed_key) or {}
         out["fixed_lora_label"] = _fixed_accel_lora_display(fixed_key)
         out["fixed_lora_name"] = str(fixed.get("name") or "")
         out["fixed_lora_key"] = fixed_key
@@ -764,6 +777,8 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
         "fixed_lora_name": "",
         "fixed_lora_key": "",
         "fixed_lora_strength": None,
+        # 加速 LoRA 的加载节点（MiniMaxH3TurboLoRA / LoraLoaderModelOnly）
+        "accel_lora_loader": "",
         "source": "legacy_video",
     }
     model = str(params.get("model") or "").strip()
@@ -870,6 +885,8 @@ def _image_summary(params: dict, mode: str = "") -> dict:
         "fixed_lora_name": "",
         "fixed_lora_key": "",
         "fixed_lora_strength": None,
+        # 加速 LoRA 的加载节点（MiniMaxH3TurboLoRA / LoraLoaderModelOnly）
+        "accel_lora_loader": "",
         "source": "image",
     }
     model_key = str(params.get("model") or "").strip()
@@ -952,6 +969,8 @@ def _music_summary(params: dict) -> dict:
         "fixed_lora_name": "",
         "fixed_lora_key": "",
         "fixed_lora_strength": None,
+        # 加速 LoRA 的加载节点（MiniMaxH3TurboLoRA / LoraLoaderModelOnly）
+        "accel_lora_loader": "",
         "source": "music",
     }
     checkpoint = str(params.get("checkpoint") or "").strip()
