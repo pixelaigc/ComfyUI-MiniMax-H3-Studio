@@ -248,7 +248,7 @@ class TestAccelLoraSingleSelect(unittest.TestCase):
         self.assertEqual(out["accel_loras"][0]["key"], "lightx2v_4step_768p")
 
     def test_workflow_has_at_most_one_user_accel_lora(self):
-        """工作流里最多一个「用户选的」加速 LoRA（固定的那枚不算）。"""
+        """工作流里最多一个「用户选的」加速 LoRA。"""
         params = {
             "job_id": "j", "prompt": "p", "duration": 5,
             "model_key": "fl2va_pruned_int8", "width": 864, "height": 480,
@@ -259,8 +259,13 @@ class TestAccelLoraSingleSelect(unittest.TestCase):
             ],
         }
         wf = VW.build_t2v_panel(params)
+        # 【2026-11-15】加载节点按**权重键名形态**分流：
+        #   lightx2v / dmad 是 diffusion_model. 前缀族 -> 核心 LoraLoaderModelOnly
+        #   ckpt850 / v4step600 是裸键名族          -> MiniMaxH3TurboLoRA
+        # 所以这里数的是**两个节点合起来**的「加速 LoRA·」标题。
         lora_nodes = [n for n in wf.values()
-                      if n["class_type"] == "MiniMaxH3TurboLoRA"]
+                      if n["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                             VM.ACCEL_LOADER_CORE)]
         titles = [n.get("_meta", {}).get("title", "") for n in lora_nodes]
         user_nodes = [t for t in titles if t.startswith("加速 LoRA·")]
         self.assertLessEqual(len(user_nodes), 1,
@@ -277,11 +282,17 @@ class TestAccelLoraSingleSelect(unittest.TestCase):
             ],
         }
         wf = VW.build_t2v_panel(params)
+        # 【2026-11-15】lightx2v 是 diffusion_model. 前缀族 ->
+        # 走核心 LoraLoaderModelOnly，强度字段叫 strength_model；
+        # Turbo 节点那边叫 strength。两个节点都要认。
         user = [n for n in wf.values()
-                if n["class_type"] == "MiniMaxH3TurboLoRA"
+                if n["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                       VM.ACCEL_LOADER_CORE)
                 and n.get("_meta", {}).get("title", "").startswith("加速 LoRA·")]
         self.assertEqual(len(user), 1)
-        self.assertAlmostEqual(user[0]["inputs"]["strength"], 0.75)
+        ins = user[0]["inputs"]
+        strength = ins.get("strength", ins.get("strength_model"))
+        self.assertAlmostEqual(strength, 0.75)
 
 
 class TestAccelLoraModelFiltering(unittest.TestCase):
@@ -329,11 +340,40 @@ class TestAccelLoraModelFiltering(unittest.TestCase):
                          "w4a8 下实测只有 speed_slider 可用")
 
     def test_pruned_int8_keeps_all(self):
-        """剪枝 int8（默认底模）不该过滤掉任何一条。"""
+        """剪枝 int8（默认底模）不该过滤掉任何一条。
+
+        【2026-11-15 更新】**带 AdaLN 的 LoRA 在剪枝底模上确实不可用**：
+        它们的 AdaLN 层是 2688 维输入，剪枝底模把它折叠成 8 维曲线，
+        而这种重注入只有 Turbo 节点（MiniMaxH3TurboLoRA）做得到。
+        带 diffusion_model. 前缀的 AdaLN LoRA 会走核心节点 ->
+        核心节点做不到 -> AdaLN 贡献被静默丢弃（实测 core 节点数学在
+        [96768, 8] 上直接抛 reshape 异常，被 lora.py:284 的 try/except 吞掉）。
+
+        所以「剪枝底模下全部可选」**不再成立**，而且它本来就不该成立 ——
+        让用户选一个 AdaLN 会静默失效的组合，正是本次要消灭的缺陷。
+        这里改成断言：**不可用的那几条确实被剔除，且原因说清楚**；
+        不含 AdaLN 的加速 LoRA 仍应全部可选。
+        """
         matrix = VM.accel_lora_compat_matrix("fl2va_pruned_int8")
-        selectable = [k for k, v in matrix.items() if v["compatible"]]
-        self.assertEqual(len(selectable), len(matrix),
-                         "剪枝 int8 下不该有加速 LoRA 被剔除")
+        # 不含 AdaLN 的加速 LoRA：剪枝底模下应全部可选
+        no_adaln = ["lightx2v_4step_768p", "lightx2v_4step_sla_768p",
+                    "lightx2v_8step", "dmad_4step_critic",
+                    "speed_slider", "better_motion",
+                    "lightx2v_4step_v01_comfy", "lightx2v_sla_768p_root"]
+        for key in no_adaln:
+            with self.subTest(lora=key):
+                self.assertTrue(matrix[key]["compatible"],
+                                matrix[key].get("reason", ""))
+        # 含 AdaLN 的前缀族 LoRA：剪枝底模下必须被剔除，并给出原因
+        for key in ("turbo_4step_cn", "turbo_4step_cn_ema"):
+            with self.subTest(lora=key):
+                self.assertFalse(matrix[key]["compatible"])
+                self.assertIn("AdaLN", matrix[key]["reason"])
+        # Turbo 族（裸键名，走 Turbo 节点）仍应可选
+        for key in ("ckpt850", "v4step600"):
+            with self.subTest(lora=key):
+                self.assertTrue(matrix[key]["compatible"],
+                                matrix[key].get("reason", ""))
 
     def test_lightx2v_8step_points_to_real_h3_weight(self):
         """8 步 LoRA 必须指向真 H3 权重（实测 208/208 命中）。
