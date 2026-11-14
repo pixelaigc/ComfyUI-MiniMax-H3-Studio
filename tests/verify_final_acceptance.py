@@ -75,11 +75,16 @@ with sync_playwright() as p:
              return c.length > 0 && Array.from(c).some(x => x.querySelector('.job-meta'));
            }""", timeout=40000)
     time.sleep(2.5)
+    # 【要挑一张**已完成**的卡】运行中的卡没有「详情」按钮
+    # （按钮只在 !runningOrQueued 时渲染）—— 之前取第一张卡，
+    # 碰上还没跑完的就点不开，验收会误报。
     r = page.evaluate("""() => {
-      const card = document.querySelector('.job-card');
-      const btn = card.querySelector('[data-act="detail"]');
-      if (btn) btn.click();
-      return {hasBtn: !!btn};
+      const cards = Array.from(document.querySelectorAll('.job-card'));
+      for (const card of cards) {
+        const btn = card.querySelector('[data-act="detail"]');
+        if (btn) { btn.click(); return {hasBtn: true, jid: card.dataset.jid}; }
+      }
+      return {hasBtn: false};
     }""")
     time.sleep(2.0)
     r = page.evaluate("""() => {
