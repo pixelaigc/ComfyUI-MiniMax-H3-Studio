@@ -24,6 +24,7 @@ from pathlib import Path
 
 from . import lora_damping
 from . import moss_lora_compat
+from . import moss_lora_split
 from .lora_catalog_effects import ALL_EFFECTS as _EFFECT_CATALOG
 from .lora_catalog_effects import FAMILY_PREFIXES as _EFFECT_FAMILY_PREFIXES
 from .lora_catalog_ea import EA_ALL_EFFECTS as _EA_CATALOG
@@ -1228,7 +1229,24 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
         for path in candidates:
             rel = path.relative_to(d).as_posix()
             lowered = rel.lower()
-            if lowered.startswith(lora_damping.DERIVED_PREFIX):
+            # ⚠️ **2026-11-15 修复（派生文件混进用户可选列表）**：
+            # 本服务自己生成的派生文件（`h3studio_ctx_*` 阻尼版 /
+            # `h3studio_mossnorm__*` MOSS 归一版）是**工作流内部副本**，
+            # 不是用户可选的 LoRA —— 它们是原文件的**下游**。
+            #
+            # ⚠️ **判据必须看文件名，不能看相对路径**：派生文件放在
+            # **族专属子目录**里（实测 `moss-effects/h3studio_mossnorm__*.safetensors`，
+            # 3 个文件），`rel.startswith(prefix)` 永远不成立
+            # -> 派生文件以 compatible=true 原样下发。
+            #
+            # 实测后果（8190 线上）：同一条 LoRA 在 MOSS 面板下拉里出现
+            # **两次**，而且两条的 display 完全相同（都继承原文件的
+            # 「Fizgig Look LoRA（HF 原生）」）—— 用户分不清哪条是哪条。
+            #
+            # 修法：按**文件名**排掉两种派生前缀。用户选原文件即可，
+            # 提交工作流时 `workflows.py` 的 `ensure_normalized()` 会自动用归一版。
+            if (path.name.startswith(lora_damping.DERIVED_PREFIX)
+                    or path.name.startswith(moss_lora_split.DERIVED_PREFIX)):
                 continue
             # 族归属：目录前缀优先（唯一真相源），否则退回文件名 marker
             by_prefix = any(rel.startswith(prefix) for prefix in effect_prefixes)
