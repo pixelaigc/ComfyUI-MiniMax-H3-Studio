@@ -385,9 +385,73 @@ studio 日志无 traceback / error / exception。
 
 ---
 
-## 6. 交付物清单
+## 6. 回归测试（不只看自己改的那条）
 
-### 6.1 代码
+### 6.1 改动本身的测试
+
+```
+$ pytest tests/ -k "h3image or h3_image" -q
+2 passed, 2636 deselected in 0.38s
+```
+
+### 6.2 全量套件：与改动前逐条对比（不是"跑一遍看着还行"）
+
+在同一 venv、同一组 pytest flags 下，分别在**改动前的基线**（`7ac7bc8`，
+独立 worktree `/tmp/h3-baseline-045`）和**改动后**（`45fb17e`）跑同一批用例：
+
+```
+baseline  7ac7bc8 : 4 failed, 97 passed
+mine      45fb17e : 4 failed, 97 passed
+```
+
+**失败项完全相同**，且失败文件完全相同：
+
+```
+FAILED tests/test_flow_diagram.py::FlowDiagramSyncTest::test_agent_tools_appear_in_diagram
+FAILED tests/test_flow_diagram.py::FlowDiagramSyncTest::test_api_routes_appear_in_derived_list
+FAILED tests/test_flow_diagram.py::FlowDiagramSyncTest::test_gen_flow_check_passes
+FAILED tests/test_flow_diagram.py::FlowDiagramCoverageTest::test_agent_tools_are_grouped
+```
+
+根因（与本次改动无关，是**已提交主线上的文档漂移**）：
+
+```
+AssertionError: 1 != 0 : 流程图已与代码不一致，需重跑 `make flow`：
+  [gen_flow] 提示：以下工具未归入任何分组，已放进「其它工具」分栏 ——
+    ['read_file', 'web_search', 'run_code', 'media_probe', 'media_concat',
+     'media_transcode', 'media_extract_frames', 'media_mix_audio', 'media_merge_av']
+  [gen_flow] 检查未通过：
+    - docs/交互流程图-内置Agent.mmd 与当前代码不一致（需重跑 make flow）
+    - docs/交互流程图-派生清单.md 与当前代码不一致（需重跑 make flow）
+```
+
+—— 内置 Agent 新增的 9 个媒体工具没归组，流程图没重跑。
+
+**为什么确定与本次改动无关**（三重论证，不靠"应该没事"）：
+
+1. 两个 tree 的失败**集合完全相同**（同样的 4 个用例、同样的文件）。
+2. 我的改动**只碰 `h3studio/h3image.py`** 的 docstring 与 2 条提示文案；
+   `git diff 7ac7bc8 45fb17e -- server.py web/ docs/` 为**空** ——
+   而 `test_flow_diagram.py` 检查的正是 `server.py` / `web/*.js` / `docs/交互流程图-*`。
+3. 4 个失败用例单独跑也是**同样失败**（不是顺序污染），跑 `make flow` 即可修 ——
+   属于另一条线（内置 Agent 能力增强）的遗留。
+
+**未处理**：重跑 `make flow` 会改动 `docs/交互流程图-*`，而这些文件正被
+另一个 agent 的 WIP 触碰（`docs/内置Agent能力清单与配置说明.md` 等）。
+在共享仓库有他人 WIP 时改这批文件有冲突风险 —— **不在本次任务范围内，
+不在他人未完成的工作上抢改**。已在此记录，供该线收尾时一并处理。
+
+### 6.3 ComfyUI 侧回归
+
+`custom_nodes` import 失败集合与升级前**逐个相同**（8 个，见 3.5），
+节点总数 7027 → 7129（+102，含 8 个 H3 新节点与 14 个 Drama3 节点回归）。
+ComfyUI 自身启动日志无新报错。
+
+---
+
+## 7. 交付物清单
+
+### 7.1 代码
 
 | 仓库 | 分支 | commit | 内容 |
 |---|---|---|---|
@@ -396,7 +460,7 @@ studio 日志无 traceback / error / exception。
 | `/root/projects/comfyui-minimax-h3-studio` | `local/deploy/qwen-ref-assets-live` | `e75cdfa` | 回灌线上分支 |
 | `custom_nodes/ComfyUI-Drama3` | main | `cb44d7c` | 升级到上游修 FixedKVBias 移除 |
 
-### 6.2 证据
+### 7.2 证据
 
 ```
 /root/projects/comfyui-minimax-h3-studio/evidence/h3image-upgrade-20261114/
@@ -409,7 +473,7 @@ studio 日志无 traceback / error / exception。
 /root/comfyui-upgrade-backup-20261114/            ← 升级前备份（可回滚）
 ```
 
-### 6.3 回滚方法
+### 7.3 回滚方法
 
 ```bash
 # ComfyUI 回滚到 0.37.0
@@ -422,7 +486,7 @@ systemctl restart comfyui.service
 
 ---
 
-## 7. 遗留与注意事项
+## 8. 遗留与注意事项
 
 1. **ComfyUI 仓库的 `origin` 远端是 jihulab 镜像（0.44.0），`official` 才是官方。**
    本次升级基线取自 `official`（`v0.45.3` tag = `official/release/v0.45` 分支 tip）。
