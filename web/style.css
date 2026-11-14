@@ -559,6 +559,55 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
   overflow-wrap: anywhere;      /* 长 LoRA 名换行，不横向溢出 */
   line-height: 1.4;
 }
+
+/* ---------- 详情弹层的产物预览（2026-11-14 需求 3）---------- */
+.detail-preview {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-preview[hidden] { display: none !important; }
+.detail-preview-img,
+.detail-preview-media {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  background: #f2f3f5;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.detail-preview-audio {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+}
+.detail-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.detail-preview-dl {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 11px;
+  font-size: 12px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.detail-preview-dl:hover { border-color: var(--accent); color: var(--accent); }
+.detail-preview-name {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
 .detail-prompt {
   margin: 0;
   font-size: 12px;
@@ -1050,49 +1099,29 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .img-lora-add .img-reset { flex: 0 0 auto; }
 
 /* ---------- 效果 LoRA 选择器（H3 文生视频面板）----------
-   交互对齐文生图的 LoRA 区：搜索框 -> 候选菜单（可多选）-> 已选列表
-   （每项带强度滑杆 + 触发词 + 启停 / 排序 / 删除）。
-   与图像面板的差别：图像面板用原生 <select>（选一个加一个），
-   这里用「输入即搜索 + 多选勾选」的下拉，因为 H3 效果 LoRA 有 27 枚，
-   原生下拉翻找成本太高。 */
-.vid-lora-picker { position: relative; margin-top: 8px; }
-.vid-lora-picker .img-input {
-  width: 100%; min-width: 0; height: 32px; border: 1.5px solid var(--border);
+   【2026-11-14 需求 9】统一到文生图的 LoRA 区（#imgLoraField）样式：
+   一行 = 搜索框 + 原生 <select> + 「添加」按钮。
+   搜索框只是下拉的过滤器（输入即过滤下拉选项），
+   主交互「下拉选一项 -> 点添加 -> 进已选列表」与文生图完全一致。
+
+   旧版是「搜索框 + 自绘多选浮层」，与同页文生图的两套控件并存，
+   用户要学两遍 —— 已删除（.vid-lora-picker / -menu / -option 样式全删）。 */
+.vid-lora-add-row {
+  display: flex; gap: 6px; margin-top: 8px; align-items: center;
+}
+.vid-lora-add-row .img-input {
+  flex: 0 1 150px; min-width: 96px; height: 32px; border: 1.5px solid var(--border);
   border-radius: 8px; padding: 4px 9px; font-size: 12px; font-family: inherit;
   background: #fff; color: var(--text);
 }
-.vid-lora-picker .img-input:focus { outline: none; border-color: var(--accent); }
-
-.vid-lora-picker-menu {
-  position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
-  max-height: 260px; overflow-y: auto; background: #fff;
-  border: 1px solid var(--border); border-radius: 9px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .12); padding: 4px;
+.vid-lora-add-row .img-input:focus { outline: none; border-color: var(--accent); }
+.vid-lora-add-row .img-select { flex: 1 1 auto; min-width: 0; }
+.vid-lora-add-row .img-reset { flex: 0 0 auto; }
+@media (max-width: 520px) {
+  .vid-lora-add-row { flex-wrap: wrap; }
+  .vid-lora-add-row .img-input { flex: 1 1 100%; }
+  .vid-lora-add-row .img-select { flex: 1 1 auto; }
 }
-.vid-lora-picker-menu[hidden] { display: none !important; }
-.vid-lora-picker-empty {
-  padding: 10px 9px; font-size: 11px; color: var(--muted); line-height: 1.6;
-}
-.vid-lora-option {
-  display: flex; align-items: flex-start; gap: 7px; padding: 6px 7px;
-  border-radius: 7px; cursor: pointer; font-size: 11.5px; color: var(--text);
-}
-.vid-lora-option:hover { background: #f3f6fb; }
-.vid-lora-option.on { background: #eef4fd; }
-.vid-lora-option input[type=checkbox] { margin: 2px 0 0; flex: 0 0 auto; }
-.vid-lora-option-main { flex: 1; min-width: 0; }
-.vid-lora-option-name {
-  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vid-lora-option-scene {
-  font-size: 10px; color: var(--muted); line-height: 1.45; margin-top: 1px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vid-lora-option-meta {
-  font-size: 9.5px; color: var(--muted); margin-top: 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vid-lora-option-trig { color: var(--accent); }
 
 /* 「清空全部」按钮 —— 多选必须有全清的出口。
    没选中任何项时整块隐藏（hidden），不占视觉空间。 */
@@ -3000,6 +3029,23 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-radius: 12px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
   overflow: hidden;
+  /* 【2026-11-14 需求 3 · 修复「详情弹层大部分空白」】
+     这个面板是**深色**的（#171b21），但它没有自己的文字色 ——
+     于是继承了全局浅色主题的 --text: #1a1d21（近黑）。
+     结果 = 近黑文字画在近黑背景上 = 肉眼完全看不见 = 「弹层是空的」。
+
+     实测（Playwright 取 computed style）：
+       panel background-color = rgb(23, 27, 33)
+       值文字 color         = rgb(26, 29, 33)   ← 跟背景几乎一样
+       标签文字 color       = rgb(141, 151, 163)（这个是好的，所以界面看着「有结构」）
+
+     也就是说：**标签可见、值全隐形** —— 用户看到一堆标题却读不到内容，
+     正是「大部分为空白」的现象。
+
+     修法：给这个深色面板显式声明浅色文字，不再依赖全局变量。
+     （.job-detail-kv > span / .is-missing / .recchip 等已各自带浅色，
+       不受影响；这里补的是**继承链的根**。） */
+  color: #e6eaef;
 }
 .job-detail-head {
   display: flex;
@@ -3094,3 +3140,39 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   .job-detail-kv { grid-template-columns: 1fr; gap: 1px 0; }
   .job-detail-kv > span { margin-top: 6px; }
 }
+
+/* ==================================================================
+ * 生成媒体库「管理」（2026-11-14 需求 11）
+ * ================================================================== */
+.mg-scope-list { display: flex; flex-direction: column; gap: 10px; }
+.mg-scope {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--border); border-radius: 10px;
+  cursor: pointer; background: #fff;
+}
+.mg-scope:hover { border-color: var(--accent); }
+.mg-scope input[type=radio] { margin: 3px 0 0; flex: 0 0 auto; accent-color: var(--accent); }
+.mg-scope > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mg-scope b { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.mg-scope i {
+  font-style: normal; font-size: 11.5px; color: var(--muted); line-height: 1.55;
+}
+.mg-scope input[type=number] {
+  width: 66px; height: 28px; border: 1.5px solid var(--border);
+  border-radius: 7px; padding: 2px 7px; font-size: 12px; font-family: inherit;
+  background: #fff; color: var(--text); flex: 0 0 auto; align-self: center;
+}
+.mg-unit { flex: 0 0 auto !important; align-self: center; font-size: 12px; color: var(--muted); }
+.mg-preview {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 13px; background: #fafbfc;
+  font-size: 12.5px; line-height: 1.7;
+}
+.mg-stat b { color: var(--accent); font-size: 14px; }
+.mg-stat.error { color: var(--danger); }
+.mg-note { margin-top: 5px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+.prompt-dialog-actions .danger {
+  border-color: var(--danger); background: var(--danger); color: #fff;
+}
+.prompt-dialog-actions .danger:hover:not(:disabled) { background: #c83237; color: #fff; }

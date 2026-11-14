@@ -77,6 +77,7 @@ from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import moss_layout
 from h3studio import qwen_pe
+from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import hardware as hw
@@ -108,6 +109,7 @@ from h3studio import ref_images as ref_imgs
 from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
+from h3studio import media_cleanup
 from h3studio import agent as agent_mod
 from h3studio import agent_memory
 from h3studio import agent_sessions
@@ -3671,6 +3673,60 @@ async def api_delete(request):
     return json_ok({"deleted": jid})
 
 
+async def api_media_manage(request):
+    """生成媒体库「管理」（2026-11-14 需求 11 / 12）。
+
+    GET  /api/media/manage?scope=all|older|failed&months=1
+        -> 预览「会删多少」（不删任何东西）
+    POST /api/media/manage  {"scope": "...", "months": 1, "confirm": true}
+        -> 执行清理
+
+    【只影响本工作台】
+    只删本项目 jobs / job_batches 表的记录 + 本项目 outputs 目录里的文件。
+    **不碰** ComfyUI 自身的 output 目录、不碰素材库（assets）、不碰其它项目。
+    """
+    if request.method == "GET":
+        scope = request.query.get("scope", "all") or "all"
+        months = int(request.query.get("months", "0") or 0)
+        if scope not in ("all", "older", "failed"):
+            return web.json_response({"error": "scope 只能是 all / older / failed"},
+                                     status=400)
+        with db() as conn:
+            info = media_cleanup.preview(conn, OUT_DIR, scope, months)
+        return json_ok(info)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求体必须是 JSON"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "请求体必须是对象"}, status=400)
+    scope = str(body.get("scope") or "all")
+    if scope not in ("all", "older", "failed"):
+        return web.json_response({"error": "scope 只能是 all / older / failed"},
+                                 status=400)
+    try:
+        months = int(body.get("months") or 0)
+    except (TypeError, ValueError):
+        months = 0
+    if scope == "older" and months <= 0:
+        return web.json_response({"error": "清理指定月数之前的历史产物时，"
+                                              "months 必须大于 0（例：1 = 30 天前）"},
+                                 status=400)
+    # 【必须显式确认】这是不可逆操作（删记录 + 删文件）。
+    # 没有 confirm=true 一律拒绝 —— 宁可多一次点击，也不要误删。
+    if not body.get("confirm"):
+        with db() as conn:
+            info = media_cleanup.preview(conn, OUT_DIR, scope, months)
+        return web.json_response({
+            "error": "需要 confirm=true 才会执行清理",
+            "preview": info,
+        }, status=400)
+    with db() as conn:
+        result = media_cleanup.cleanup(conn, OUT_DIR, scope, months)
+    return json_ok(result)
+
+
 # ------------------------------------------------------------------ ComfyUI 节点名探测
 #
 # 文生视频面板的「注意力机制」「二采」都是 ComfyUI 侧的节点。
@@ -4956,7 +5012,24 @@ async def api_image_loras(request):
         acceleration = []
     elif moss:
         available = lora_registry.list_moss_effect_loras()
-        incompatible = lora_registry.list_moss_incompatible_loras()
+        # 【2026-11-14 需求 15】MOSS-Image 的「已排除」清单**不再下发**。
+        #
+        # 【为什么不兼容】这批 LoRA（Realistic Snapshot / Kodachrome /
+        # Kodachrome V2 / Skin tone slider [MOSS | Krea 2]）的融合 qkv
+        # 部分是 LoKR（Kronecker）权重，无法无损拆成 MOSS 底模需要的
+        # 分离 q/k/v（Kronecker 分解的行映射与三等分不对应，实测数值
+        # 不等价）。也就是说它们在 MOSS-Image 上**根本不可能生效**。
+        #
+        # 【为什么不只是前端隐藏】「已排除」面板把一批永远用不了的
+        # 权重摆在用户面前，占界面、还要用户理解「为什么被排除」——
+        # 但答案永远是「用不了」，没有可操作性。接口层直接不下发，
+        # 前端也就无从展示（两端口径一致，不会出现「接口说有、
+        # 界面没有」的漂移）。
+        #
+        # 【对已保存配置的影响】下面 filter 掉 config 里指向这批
+        # LoRA 的条目 —— 否则它们会以「已排除」条目留在用户已选列表里，
+        # 仍然出现在界面上（且提交时会被服务端拒绝）。
+        incompatible = []
         acceleration = [item for item in lora_registry.list_moss_image_loras()
                         if item["kind"] == lora_registry.KIND_ACCELERATION]
     elif qwen:
@@ -4970,6 +5043,20 @@ async def api_image_loras(request):
         acceleration = lora_registry.list_acceleration_loras()
     with db() as conn:
         config = lora_registry.load_config(conn, lora_registry.pref_key_for_base(base))
+    # 【2026-11-14 需求 15】MOSS-Image：把「已排除」批次从**已保存配置**里
+    # 也一并去掉（见上面那段注释）。
+    #
+    # 【为什么要额外做这一步】incompatible 列表不下发之后，
+    # excluded_by_name 查不到这批 LoRA -> 它们会被判成
+    # 「missing = 文件不在了」，然后仍然出现在用户的已选列表里
+    # （带一个「文件缺失」标签）。但文件其实**在** —— 只是不兼容。
+    # 直接从 config 里剔除，才是真的「不再展示」。
+    if moss:
+        excluded_names = {item["name"]
+                          for item in lora_registry.list_moss_incompatible_loras()}
+        if excluded_names:
+            config = [item for item in config
+                      if (item.get("name") or "") not in excluded_names]
     # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
     by_name = {item["name"]: item for item in available}
     # 已被排除的（不兼容）也要能对上 —— 前端要显示「为什么被排除」
@@ -5956,6 +6043,93 @@ async def api_qwen_pe_expand(request):
     })
 
 
+async def api_h3image_pe_expand(request):
+    """
+    POST /api/h3image-pe/expand —— MiniMax H3-Image 自带 PE 提示词扩写
+
+    【需求 16】H3-Image 此前**没有**接入提示词扩写（PE）——
+    官方模板里本来就有 PE（TextGenerateV2 + qwen3.5_9b_w4a8 + 官方
+    system prompt），但它一直在出图链路内部，前端看不到、Agent 也没法用。
+
+    body:
+      prompt      要扩写的原始提示词
+      mode        t2i_h3image（文生图）| i2i_h3image（图片编辑）
+      refs        可选，图片编辑的参考图（素材库条目列表）；顺序即 <imageN> 顺序
+      task_prompt 可选，用户编辑过的官方 PE task prompt
+
+    返回:
+      expanded      扩写后的提示词（前端写回提示词框，可继续编辑）
+      aspect_ratio  PE 选出的画面比例（官方 PE 会自己选比例）
+      clip_name     实际用的官方 PE checkpoint 文件名
+      ref_count     参考图数量
+    失败一律 4xx/5xx + 可读原因，**不返回半成品**。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    if len(original) > 4000:
+        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+
+    mode = str(payload.get("mode") or "t2i_h3image").strip()
+    if mode not in ("t2i_h3image", "i2i_h3image"):
+        return web.json_response(
+            {"error": "H3-Image 官方 PE 扩写只适用于文生图 / 图片编辑模式"}, status=400)
+    is_edit = mode == "i2i_h3image"
+
+    # 参考图：素材库来源，顺序严格保持（= <imageN> 顺序）。
+    # 只上传、**不登记** asset_refs —— 扩写只是读一次图，不是出图任务。
+    ref_images: list[str] = []
+    raw_refs = payload.get("refs") or []
+    if is_edit and raw_refs:
+        try:
+            async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+                ref_images = await _upload_ref_images(session, raw_refs)
+        except Exception as exc:
+            return web.json_response(
+                {"error": f"参考图上传失败：{exc}"[:300], "degraded": True}, status=502)
+
+    task_prompt = payload.get("task_prompt")
+    if task_prompt is not None:
+        task_prompt = str(task_prompt)
+        if not task_prompt.strip():
+            return web.json_response(
+                {"error": "官方 PE 的 task prompt 不能为空"}, status=400)
+
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
+            result = await h3image_pe.run_pe_expansion(
+                session, COMFY, original, ref_images or None,
+                task_prompt=task_prompt)
+    except h3image_pe.PEError as exc:
+        return web.json_response(
+            {"error": str(exc), "degraded": True}, status=502)
+    except Exception as exc:
+        return web.json_response(
+            {"error": f"H3-Image 官方 PE 扩写失败：{type(exc).__name__} {exc}"[:300],
+             "degraded": True}, status=502)
+
+    # 【提示词历史】官方 PE 的扩写结果也进历史
+    with db() as conn:
+        ph_hooks.record_prompt_history(
+            conn, mode,
+            {"original_prompt": original, "prompt": result["expanded"]},
+            source=ph.SOURCE_ENHANCE)
+    return json_ok({
+        "ok": True,
+        "original": original,
+        "expanded": result["expanded"],
+        "aspect_ratio": result.get("aspect_ratio", ""),
+        "clip_name": result["clip_name"],
+        "ref_count": result["ref_count"],
+        "mode": mode,
+    })
+
+
 # ------------------------------------------------------------------ LLM 代理
 # ComfyUI 的 VRGDG_LocalLLM 节点自己拼 payload（没有 chat_template_kwargs），
 # 对 Qwen3 这类 thinking 模型关不掉思考，接口返回 content=null，节点再
@@ -6111,6 +6285,30 @@ def _resolve_max_steps(requested=None) -> int:
     except (TypeError, ValueError):
         return ceiling
     return max(agent_settings.MAX_STEPS_MIN, min(ceiling, value))
+
+
+def _resolve_total_timeout() -> float:
+    """本次请求的总时限（秒）。
+
+    【2026-11-14 需求 6】「agent 管理」页的「总时限」现在是**可编辑**
+    的 —— 以前它是 agent 模块里写死的常量，界面上灰着改不了。
+    这里从持久化配置里读出来，交给 run_agent 作为 asyncio.wait_for
+    的超时值 —— 改了真的生效，不只是显示变了。
+
+    读不到 / 坏了 -> 回落到模块默认值（行为与改动前一致）。
+    """
+    try:
+        with db() as conn:
+            settings = agent_settings.load(conn)
+    except Exception:
+        return float(agent_mod.TOTAL_TIMEOUT)
+    try:
+        raw_value = settings.get("total_timeout")
+        value = int(raw_value) if raw_value is not None else int(agent_mod.TOTAL_TIMEOUT)
+    except (TypeError, ValueError):
+        return float(agent_mod.TOTAL_TIMEOUT)
+    return float(max(agent_settings.TOTAL_TIMEOUT_MIN,
+                     min(agent_settings.TOTAL_TIMEOUT_MAX, value)))
 
 
 def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
@@ -6345,7 +6543,9 @@ async def api_agent_chat(request):
                 sys.modules[__name__], message, session_id=session_id,
                 provider_id=provider_id, max_steps=max_steps, history=history,
                 session_store=store, memory_store=_agent_memory_store(),
-                attachments=attachments)
+                attachments=attachments,
+                # 【2026-11-14 需求 6】总时限来自可编辑配置
+                total_timeout=_resolve_total_timeout())
         except agent_mod.AgentError as exc:
             # 【为什么要带 meta —— 2026-11-12】
             # 不带 meta 的话，这条失败消息的 meta 是空的 -> 会话列表的
@@ -6482,7 +6682,9 @@ async def api_agent_chat_stream(request):
                     history=history, on_progress=_on_progress,
                     on_event=_on_event, session_store=store,
                     memory_store=_agent_memory_store(),
-                    attachments=attachments)
+                    attachments=attachments,
+                    # 【2026-11-14 需求 6】总时限来自可编辑配置
+                    total_timeout=_resolve_total_timeout())
             return result
         except agent_mod.AgentError as exc:
             await _write("error", {"error": exc.message, "code": exc.code})
@@ -6936,7 +7138,13 @@ async def api_agent_settings(request):
                 "max_steps": agent_mod.MAX_STEPS,
                 "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
                 "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
-                "total_timeout": agent_mod.TOTAL_TIMEOUT,
+                # 【2026-11-14 需求 6】总时限现在是**可配置**的 ——
+                # 下发的是当前生效值（不是写死的常量），
+                # 并把可调区间一起给前端做校验。
+                "total_timeout": int(settings.get("total_timeout")
+                                     or agent_mod.TOTAL_TIMEOUT),
+                "total_timeout_min": agent_settings.TOTAL_TIMEOUT_MIN,
+                "total_timeout_max": agent_settings.TOTAL_TIMEOUT_MAX,
             },
             "dependencies": {
                 "ffmpeg_path": snapshot.get("ffmpeg_path") or "",
@@ -7226,6 +7434,9 @@ def make_app():
     app.router.add_get("/api/continuation/state", api_continuation_state)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
+    # 生成媒体库「管理」（2026-11-14 需求 11 / 12）
+    app.router.add_get("/api/media/manage", api_media_manage)
+    app.router.add_post("/api/media/manage", api_media_manage)
     app.router.add_get("/api/system", api_system)
     app.router.add_get("/api/status/stream", api_status_stream)
     app.router.add_get("/api/hardware", api_hardware)
@@ -7267,6 +7478,8 @@ def make_app():
     app.router.add_post("/api/moss-layout", api_moss_layout)
     # Qwen-Image 2.1 官方 PE 扩写（「增强」下拉里的 qwen21图片官方增强PE）
     app.router.add_post("/api/qwen-pe/expand", api_qwen_pe_expand)
+    # H3-Image 自带 PE（2026-11-14 需求 16）
+    app.router.add_post("/api/h3image-pe/expand", api_h3image_pe_expand)
     # OpenAI 兼容代理（给 ComfyUI 的 LLM 节点用，可关 thinking）
     app.router.add_get("/api/llm/p/{id}/v1/models", api_llm_proxy_models)
     app.router.add_post("/api/llm/p/{id}/v1/chat/completions", api_llm_proxy_chat)

@@ -12,9 +12,11 @@
  *    window.EnhanceMenuShared）。
  * 3. 移除「最长时长」参数 -> index.html 里的 #musicDuration 已删除，
  *    后端 music_yue2 也不再按时长上限截断（生成自然完成）。
- * 5. 结果形态：增强后可逐项编辑结构化风格 / 歌词；
- *    也可「基于当前内容重新生成/修改」（#musicStyleRegenBtn /
- *    #musicLyricsRegenBtn）。
+ * 5. 结果形态：增强后可逐项编辑结构化风格 / 歌词。
+ *    【2026-11-14 需求 7】原先还有「基于当前内容重新生成/修改」的两个
+ *    按钮（#musicStyleRegenBtn / #musicLyricsRegenBtn）——
+ *    已移除（HTML + 绑定都删了）：想重新生成直接点上面的
+ *    「生成风格+歌词」按钮即可，不需要第二条重复入口。
  *
  * 独立成文件（不塞进 app.js）的原因：app.js 已 3800 行，音乐面板自成一块
  * 逻辑（模型清单 / 参考音频选择 / 参数持久化），单独放更清楚，也避免和

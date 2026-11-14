@@ -516,8 +516,23 @@
     const rec = fixedAccelMeta() ? accelRecommendation(fixedAccelMeta().key) : null;
     const recText = recTooltip(rec);
     box.title = recText || "";
+    // 【2026-11-14 需求 8】文案与实际行为对齐。
+    //
+    // 【实测事实（本地跑 build_t2v_panel 验证）】
+    //   * 固定 Turbo LoRA **始终**挂在模型链上（_resolve_accel_chain
+    //     无条件把 params["fixed_accel_lora"] 或默认值 ckpt850 塞进
+    //     链首），它**不在**上面的下拉里，也**不能**被下拉关掉。
+    //   * 上面下拉里选的那枚是**额外叠加**在固定枚之后的第二枚
+    //     加速 LoRA（链 = 固定 Turbo -> 用户选的组合）。
+    //   * 所以原文案「不随上面的选择变化」只说了前半句，
+    //     没说清「选了之后是两枚一起生效」—— 容易被读成
+    //     「选了会替换掉固定的那枚」。
+    //
+    // 【改写原则】如实说明两件事：固定枚恒生效 + 下拉是额外叠加。
     box.textContent = `工作流固定使用加速 LoRA「${meta.display}」`
-      + `（${meta.purpose}），不随上面的选择变化。`
+      + `（${meta.purpose}）—— 这一枚始终生效，不在下拉里、也无法关闭。`
+      + `上面下拉里选的加速 LoRA 是「额外叠加」在它之后的第二枚`
+      + `（链路 = 固定 Turbo → 你选的那枚），两者同时生效。`
       + (recText ? `\n作者推荐：${recText.split("\n").join(" · ")}` : "");
   }
 
@@ -547,10 +562,11 @@
     const selectable = selectableAccelLoras();
 
     sel.innerHTML = "";
-    // 「不额外挂加速 LoRA」—— 工作流里已经有固定的那枚 Turbo LoRA
+    // 「不额外挂加速 LoRA」—— 工作流里已经有固定的那枚 Turbo LoRA，
+    // 这里选的是**额外叠加**的第二枚，不是替换固定枚。
     const noneOpt = document.createElement("option");
     noneOpt.value = "";
-    noneOpt.textContent = "不额外挂加速 LoRA（仅用工作流固定的 Turbo）";
+    noneOpt.textContent = "不额外挂加速 LoRA（仅用工作流固定的那枚 Turbo）";
     sel.appendChild(noneOpt);
 
     selectable.forEach(item => {
@@ -586,7 +602,7 @@
       parts.push(`已选「${meta.display}」×${Number(videoState.accelLoraStrength).toFixed(2)}`);
       if (meta.note) parts.push(meta.note);
     } else {
-      parts.push("未额外挂加速 LoRA（工作流固定的 Turbo LoRA 仍然生效）。");
+      parts.push("未额外挂加速 LoRA（工作流固定的那枚 Turbo LoRA 仍然生效）。");
     }
     // 被过滤掉的数量 + 原因（说清楚「为什么少了几项」）
     const blocked = combos.length - selectable.length;

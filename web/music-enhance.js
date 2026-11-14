@@ -269,16 +269,11 @@
     // 菜单的**渲染**也交给统一注册表（renderMenu 由 enhance-menu.js 调），
     // 本模块不再单独渲染一份，避免互相覆盖。
 
-    // 「基于当前内容重新生成」—— 这两个按钮是音乐面板独有的，
-    // 不属于统一增强入口，所以仍由本模块绑定。
-    const styleRegen = $("#musicStyleRegenBtn");
-    if (styleRegen) {
-      styleRegen.addEventListener("click", () => run({ base: true, intent: "style" }));
-    }
-    const lyricsRegen = $("#musicLyricsRegenBtn");
-    if (lyricsRegen) {
-      lyricsRegen.addEventListener("click", () => run({ base: true, intent: "lyrics" }));
-    }
+    // 【2026-11-14 需求 7】原先这里绑了 #musicStyleRegenBtn /
+    // #musicLyricsRegenBtn（「基于当前内容重新生成」）。
+    // 两个按钮都已从 HTML 移除 —— 想重新生成直接点上面的
+    // 「生成风格+歌词」按钮即可（用户明确要求去掉这两个重复入口）。
+    // 绑定代码一并删除，避免留下指向不存在 DOM 的死代码。
   }
 
   // ------------------------------------------------------------------ 启动
