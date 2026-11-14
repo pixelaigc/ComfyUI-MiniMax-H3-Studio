@@ -278,7 +278,11 @@
 }
 .al-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .al-toast.err { background: rgba(200,50,55,.96); }
+/* 「error」是 agent-manage.js 实际传的 kind —— 与 .err 等价（别名），
+   之前只有 .err，导致保存失败的提示是默认深色而不是红色。 */
+.al-toast.error { background: rgba(200,50,55,.96); }
 .al-toast.ok { background: rgba(38,150,90,.96); }
+.al-toast.warn { background: rgba(196,132,32,.96); }
 
 /* ---------------------------------------------------------------- 分析状态条 */
 .al-anstatus {

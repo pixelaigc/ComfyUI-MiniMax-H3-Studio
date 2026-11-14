@@ -146,7 +146,15 @@
   function renderLimits() {
     const cap = Number(state.limits.max_steps_cap || 50);
     const cur = Number(state.settings.max_steps || cap);
-    const timeout = Math.round(Number(state.limits.total_timeout || 0));
+    // 【2026-11-14 需求 6】总时限现在是**可编辑**的 ——
+    // 以前这个 input 是 disabled 的（灰着改不了），值还是写死的常量。
+    // 现在读的是「当前生效值」，区间由服务端下发（limits.total_timeout_min/max）。
+    const timeoutMin = Number(state.limits.total_timeout_min || 60);
+    const timeoutMax = Number(state.limits.total_timeout_max || 14400);
+    const timeout = Math.round(Number(
+      state.settings.total_timeout != null
+        ? state.settings.total_timeout
+        : (state.limits.total_timeout || 2400)));
     return `
       <div class="agm-section">
         <div class="agm-section-title">工具调用步数上限</div>
@@ -158,13 +166,15 @@
           </label>
           <label class="agm-field">
             <span>总时限（秒）</span>
-            <input type="number" id="agmTimeout" disabled
-                   value="${esc(timeout)}">
+            <input type="number" id="agmTimeout" min="${timeoutMin}" max="${timeoutMax}"
+                   step="1" value="${esc(timeout)}">
           </label>
         </div>
         <div class="agm-hint">
           范围 1 ~ ${esc(cap)}。总时限随步数自动放大（单步实测 20~120 秒），
-          步数上限与总时限必须匹配，否则上限只是纸面数字。
+          步数上限与总时限必须匹配，否则上限只是纸面数字。<br>
+          总时限可调范围 ${esc(timeoutMin)} ~ ${esc(timeoutMax)} 秒，
+          改完点「保存配置」即生效（单次 Agent 运行超过该时限会返回已完成的部分结果）。
         </div>
       </div>`;
   }
@@ -333,6 +343,28 @@
     const settings = JSON.parse(JSON.stringify(state.settings || {}));
     const steps = Number(($("#agmMaxSteps") || {}).value);
     if (Number.isFinite(steps)) settings.max_steps = steps;
+
+    // 【2026-11-14 需求 6】总时限：读输入框 -> 校验区间 -> 写进提交体。
+    // 校验在**前端**做一次（给出即时反馈），服务端 normalize() 还会再夹一次
+    // （前端校验只是 UX，服务端才是权威）。
+    const timeoutEl = $("#agmTimeout");
+    if (timeoutEl) {
+      const min = Number(state.limits.total_timeout_min || 60);
+      const max = Number(state.limits.total_timeout_max || 14400);
+      const raw = Number(timeoutEl.value);
+      if (Number.isFinite(raw)) {
+        if (raw < min || raw > max) {
+          // 越界就夹回去（而不是发一个非法值让服务端夹）——
+          // 用户能立刻在输入框里看到被夹成的值。
+          const clamped = Math.max(min, Math.min(max, Math.round(raw)));
+          timeoutEl.value = String(clamped);
+          toast(`总时限已调整到 ${clamped} 秒（允许范围 ${min}~${max}）`, "warn");
+          settings.total_timeout = clamped;
+        } else {
+          settings.total_timeout = Math.round(raw);
+        }
+      }
+    }
 
     settings.capabilities = settings.capabilities || {};
     document.querySelectorAll("[data-cap]").forEach(el => {

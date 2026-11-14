@@ -83,7 +83,13 @@ class TestEffectLoraFrontend(unittest.TestCase):
     # ------------------------------------------------------------ 工具
 
     def _menu_open(self):
-        self.page.click("#vidEffectLoraSearch")
+        """【2026-11-14 需求 9】控件改成原生下拉后，搜索框不再「弹层」。
+
+        现在的交互是：输入搜索词 -> 原生下拉只剩匹配项 -> 点「添加」。
+        旧版的「点搜索框弹出多选浮层」已经不存在，保留这个方法名是为了
+        不改动其余用例的调用点。
+        """
+        self.page.fill("#vidEffectLoraSearch", "")
         self.page.wait_for_timeout(500)
 
     def _search(self, keyword):
@@ -91,13 +97,18 @@ class TestEffectLoraFrontend(unittest.TestCase):
         self.page.wait_for_timeout(700)
 
     def _pick_first(self):
-        """勾选候选菜单里的第一项。"""
+        """把下拉里选中的一项加进已选列表（点「添加」按钮）。
+
+        【2026-11-14 需求 9】原来这里勾选浮层里的 checkbox；
+        控件统一到原生下拉后，交互变成「下拉选一项 + 点添加」。
+        """
         self.page.evaluate("""() => {
-          const b = document.querySelector('#vidEffectLoraMenu input[data-lora-name]');
-          if (!b) throw new Error('no candidate');
-          b.checked = true;
-          b.dispatchEvent(new Event('change', {bubbles: true}));
+          const sel = document.querySelector('#vidEffectLoraSelect');
+          if (!sel) throw new Error('no select');
+          if (!sel.options.length) throw new Error('no candidate option');
+          sel.selectedIndex = 0;
         }""")
+        self.page.click("#vidEffectLoraAdd")
         self.page.wait_for_timeout(600)
 
     def _state(self):

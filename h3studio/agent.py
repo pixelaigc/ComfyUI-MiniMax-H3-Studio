@@ -3237,7 +3237,8 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                     memory_store=None,
                     attachments: list | None = None,
                     on_progress=None,
-                    on_event=None) -> dict:
+                    on_event=None,
+                    total_timeout: float | None = None) -> dict:
     """
     跑一次 Agent。返回结构化结果。
 
@@ -3267,6 +3268,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
         error       错误            {"error": str, "code": str}
       回调异常同样被吞掉。
 
+    total_timeout:
+      本次运行的**总时限**（秒）。None = 用模块默认值 TOTAL_TIMEOUT。
+      【2026-11-14 需求 6】这个值现在来自「agent 管理」页的可编辑配置
+      （持久化在 model_provider_prefs.agent_settings 里），
+      调用方（server.py）读出来传进来 —— 运行时真的按新值兜底。
+
     返回结构（这是对外契约，前端按这个渲染）：
     {
       "session_id": str,
@@ -3289,6 +3296,18 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                          code="bad_request")
 
     steps_limit = max(1, min(int(max_steps or MAX_STEPS), MAX_STEPS))
+    # 【2026-11-14 需求 6】总时限：优先用调用方传入的配置值，
+    # 没传就用模块默认值。夹到 [MIN, MAX] 防止 0 或天文数字。
+    if total_timeout is None:
+        timeout_seconds = float(TOTAL_TIMEOUT)
+    else:
+        try:
+            timeout_seconds = float(total_timeout)
+        except (TypeError, ValueError):
+            timeout_seconds = float(TOTAL_TIMEOUT)
+    timeout_seconds = max(float(agent_settings.TOTAL_TIMEOUT_MIN),
+                          min(float(agent_settings.TOTAL_TIMEOUT_MAX),
+                              timeout_seconds))
     provider = _resolve_provider(provider_id, server_module)
     _check_provider_supports_tools(provider)
     ctx = AgentContext(server_module=server_module, provider=provider)
@@ -3834,12 +3853,14 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     try:
         # 整体超时用 wait_for 兜住 —— 不用「每步都很快」来假设总时长可控
         # （实测单步就能到 120 秒）。
+        # 【2026-11-14 需求 6】用 timeout_seconds（来自可编辑配置），
+        # 不再直接用写死的 TOTAL_TIMEOUT —— 用户改了总时限就真的生效。
         status, truncated_reason = await asyncio.wait_for(
-            _loop(), timeout=TOTAL_TIMEOUT)
+            _loop(), timeout=timeout_seconds)
     except asyncio.TimeoutError:
         status = "truncated"
         truncated_reason = (
-            f"单次请求超过总时限（{int(TOTAL_TIMEOUT)} 秒），已返回已完成的部分结果")
+            f"单次请求超过总时限（{int(timeout_seconds)} 秒），已返回已完成的部分结果")
     except llm_client.ProviderError as exc:
         raise AgentError(str(exc), status=502, code="provider_error") from exc
 

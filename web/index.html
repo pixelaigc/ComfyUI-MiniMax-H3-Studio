@@ -175,9 +175,12 @@
         <div class="img-accel-note" id="vidFixedLoraNote" hidden></div>
       </div>
 
-      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）——
-           交互对齐文生图的 LoRA 区（#imgLoraField）：
-           同一个「下拉添加 + 已选列表 + 每项滑杆」的结构。 -->
+      <!-- 效果 LoRA（可搜索 / 可多选 / 逐项强度）—— 2026-11-14 需求 9：
+           视觉与交互统一到文生图的 LoRA 区（#imgLoraField）：
+           同一套「下拉添加 + 已选列表 + 每项滑杆」结构。
+           【与文生图的唯一差别】多了一个搜索框 —— 本机 H3 效果 LoRA
+           有 27 枚，原生下拉翻找成本太高；搜索框只是**过滤**下拉，
+           不改变「下拉选一项 → 点添加 → 进已选列表」的主交互。 -->
       <div class="field" id="vidEffectLoraField">
         <div class="field-label">
           <span>效果 LoRA</span>
@@ -186,10 +189,11 @@
           <button type="button" class="vid-lora-clear" id="vidEffectLoraClear" hidden>清空全部</button>
         </div>
         <div id="vidEffectLoraList" class="img-lora-list"></div>
-        <div class="vid-lora-picker">
+        <div class="img-lora-add vid-lora-add-row">
           <input type="text" id="vidEffectLoraSearch" class="img-input"
                  placeholder="搜索效果 LoRA（名称 / 功能 / 触发词）" autocomplete="off">
-          <div class="vid-lora-picker-menu" id="vidEffectLoraMenu" hidden></div>
+          <select class="img-select" id="vidEffectLoraSelect"></select>
+          <button type="button" class="img-reset" id="vidEffectLoraAdd">添加</button>
         </div>
         <div class="img-note" id="vidEffectLoraNote"></div>
         <div class="img-lora-excluded" id="vidEffectLoraExcluded" hidden></div>
@@ -544,14 +548,15 @@
 
       <!-- 结构化风格（对齐第三方 YuE2StylePrompt，2026-11-09）
            第三方用 12 个字段拼 style，比一整段自由文本表达力强。
-           这里是「增强」的产物区：增强后自动填好，可逐项改；
-           点「重新生成」= 以当前内容为底稿让模型再改一版。 -->
+           这里是「增强」的产物区：增强后自动填好，可逐项改。
+           【2026-11-14 需求 7】原先这里有一个「重新生成」按钮 ——
+           已移除：想重新生成直接点上面的「生成风格+歌词」即可，
+           不需要第二条「基于当前内容改一版」的入口（两条路
+           产出的是同一种东西，只是底稿不同，容易让人困惑）。 -->
       <div class="field" id="musicStyleStructField">
         <div class="field-label">
           结构化风格 <span class="muted">Style Fields · 对齐第三方 YuE2StylePrompt</span>
           <button type="button" id="musicStyleFieldsToggle" class="music-toggle">展开</button>
-          <button type="button" class="img-ref-add" id="musicStyleRegenBtn"
-                  title="基于当前内容重新生成结构化风格">重新生成</button>
         </div>
         <div id="musicStyleFields" style="display:none">
           <div class="music-sf-grid" id="musicStyleFieldsGrid"></div>
@@ -568,8 +573,6 @@
       <div class="field">
         <div class="field-label">
           歌词 <span class="muted">Lyrics · 可留空（留空 = 纯器乐）</span>
-          <button type="button" class="img-ref-add" id="musicLyricsRegenBtn"
-                  title="基于当前内容重新生成歌词">重新生成</button>
         </div>
         <textarea id="musicLyrics" rows="6"
                   placeholder="[Verse]&#10;Morning light across the window&#10;City waking down below&#10;&#10;[Chorus]&#10;Run with me into the sunlight&#10;Leave the shadows far behind"></textarea>
@@ -649,7 +652,7 @@
             <input type="range" id="musicRep" min="0.1" max="2" step="0.01" value="1.2">
           </div>
         </div>
-        <div class="img-note" id="musicAdvNote">以上 4 项是<strong>音乐生成阶段</strong>的采样参数（官方模板：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2）。谱面（ABC）规划阶段还有一组独立参数，本面板固定用官方推荐值（温度 0.7 / top_p 0.9 / top_k 30），不开放调整。改动这些值会改变曲子的「随机性」，一般保持默认即可。</div>
+        <div class="img-note" id="musicAdvNote">以上 4 项是<strong>音乐生成阶段</strong>的采样参数，会真实写进工作流的 <code>YuE2GenerateMusic</code> 节点（温度 / top_p / top_k / 重复惩罚），可以自由调整。官方节点默认值：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2。谱面（ABC）规划阶段另有一组独立参数（温度 0.7 / top_p 0.9 / top_k 30 / 重复惩罚 1.005），本面板<strong>不开放</strong>调整 —— 它固定用官方推荐值。改动这些值会改变曲子的「随机性」，一般保持默认即可。</div>
       </details>
     </div>
 
@@ -916,9 +919,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <span class="queue-title">生成队列</span>
         <span class="queue-summary" id="queueSummary">队列为空</span>
         <button type="button" class="queue-toggle" id="queueToggle"
-                aria-expanded="true" title="展开/收起队列明细">明细</button>
+                aria-expanded="false" title="展开队列明细">明细</button>
       </div>
-      <ol class="queue-list" id="queueList"></ol>
+      <!-- 默认收起（2026-11-14 需求 1）：明细列表 style=display:none，
+           JS 初始化时会再 applyDetailState() 一次，保证与模块级状态一致。 -->
+      <ol class="queue-list" id="queueList" style="display:none"></ol>
     </section>
     <div class="jobs-grid" id="jobsGrid"></div>
     <div class="jobs-pagination" id="jobsPagination" hidden></div>

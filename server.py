@@ -6113,6 +6113,30 @@ def _resolve_max_steps(requested=None) -> int:
     return max(agent_settings.MAX_STEPS_MIN, min(ceiling, value))
 
 
+def _resolve_total_timeout() -> float:
+    """本次请求的总时限（秒）。
+
+    【2026-11-14 需求 6】「agent 管理」页的「总时限」现在是**可编辑**
+    的 —— 以前它是 agent 模块里写死的常量，界面上灰着改不了。
+    这里从持久化配置里读出来，交给 run_agent 作为 asyncio.wait_for
+    的超时值 —— 改了真的生效，不只是显示变了。
+
+    读不到 / 坏了 -> 回落到模块默认值（行为与改动前一致）。
+    """
+    try:
+        with db() as conn:
+            settings = agent_settings.load(conn)
+    except Exception:
+        return float(agent_mod.TOTAL_TIMEOUT)
+    try:
+        raw_value = settings.get("total_timeout")
+        value = int(raw_value) if raw_value is not None else int(agent_mod.TOTAL_TIMEOUT)
+    except (TypeError, ValueError):
+        return float(agent_mod.TOTAL_TIMEOUT)
+    return float(max(agent_settings.TOTAL_TIMEOUT_MIN,
+                     min(agent_settings.TOTAL_TIMEOUT_MAX, value)))
+
+
 def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
     """
     把「agent 管理」里的文生视频默认参数套进 params（**不覆盖已给的**）。
@@ -6345,7 +6369,9 @@ async def api_agent_chat(request):
                 sys.modules[__name__], message, session_id=session_id,
                 provider_id=provider_id, max_steps=max_steps, history=history,
                 session_store=store, memory_store=_agent_memory_store(),
-                attachments=attachments)
+                attachments=attachments,
+                # 【2026-11-14 需求 6】总时限来自可编辑配置
+                total_timeout=_resolve_total_timeout())
         except agent_mod.AgentError as exc:
             # 【为什么要带 meta —— 2026-11-12】
             # 不带 meta 的话，这条失败消息的 meta 是空的 -> 会话列表的
@@ -6482,7 +6508,9 @@ async def api_agent_chat_stream(request):
                     history=history, on_progress=_on_progress,
                     on_event=_on_event, session_store=store,
                     memory_store=_agent_memory_store(),
-                    attachments=attachments)
+                    attachments=attachments,
+                    # 【2026-11-14 需求 6】总时限来自可编辑配置
+                    total_timeout=_resolve_total_timeout())
             return result
         except agent_mod.AgentError as exc:
             await _write("error", {"error": exc.message, "code": exc.code})
@@ -6936,7 +6964,13 @@ async def api_agent_settings(request):
                 "max_steps": agent_mod.MAX_STEPS,
                 "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
                 "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
-                "total_timeout": agent_mod.TOTAL_TIMEOUT,
+                # 【2026-11-14 需求 6】总时限现在是**可配置**的 ——
+                # 下发的是当前生效值（不是写死的常量），
+                # 并把可调区间一起给前端做校验。
+                "total_timeout": int(settings.get("total_timeout")
+                                     or agent_mod.TOTAL_TIMEOUT),
+                "total_timeout_min": agent_settings.TOTAL_TIMEOUT_MIN,
+                "total_timeout_max": agent_settings.TOTAL_TIMEOUT_MAX,
             },
             "dependencies": {
                 "ffmpeg_path": snapshot.get("ffmpeg_path") or "",
