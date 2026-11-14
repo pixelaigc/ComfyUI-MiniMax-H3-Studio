@@ -360,11 +360,49 @@ def normalize(payload: dict | None) -> dict:
     # 【为什么先归一 legacy 再归一 gen】老结构 t2v_defaults 是**兼容镜像**：
     # 客户端显式给了的键优先于 gen_defaults["t2v"]，没给的键由 gen_defaults 补。
     # 两边都归一后才合并 —— 脏值不会落库。
+    #
+    # 【2026-11-15 修 —— 管理页改的值存不住】
+    #
+    # 【原来错在哪】legacy_explicit = raw_legacy.keys() —— 只要请求里带了
+    # t2v_defaults，它的**每一个键**都算「显式给出」，于是合并时 legacy
+    # 全量覆盖 gen_defaults["t2v"]。
+    # 而 GET /api/agent/settings 的响应里**总是带着 t2v_defaults**（它是
+    # 兼容镜像，随 gen_defaults 一起下发）—— 于是前端「读 -> 改 -> 存」
+    # 的一次往返里，用户在管理页改的 gen_defaults["t2v"].steps
+    # 被自己刚读到的旧镜像覆盖回去，存不进去。
+    # 实测：GET 拿到 t2v.steps=4 -> 改 7 -> PUT -> GET 仍是 4。
+    #
+    # 【怎么区分老客户端和新客户端 —— 靠 legacy 载荷的「形状」】
+    #   * 老客户端（只懂 t2v_defaults）只发**原来那 6 个字段**：
+    #     model_key / attention / accel_lora / aspect / megapixels / duration。
+    #   * 新客户端（懂 gen_defaults）会**把自己的 gen_defaults 原样回传**，
+    #     并且它的兼容镜像是服务端下发的**完整 11 字段**那一份。
+    # 于是「legacy 只带 6 个老字段」= 老客户端 -> legacy 全量生效；
+    # 「legacy 带完整字段」= 新客户端回声 -> legacy **不参与合并**，
+    # 以 gen_defaults 为准（legacy 只当镜像，写库时从 gen_defaults 同步）。
+    #
+    # 【为什么不能只看「有没有 gen_defaults」】老客户端也可能顺带把整份
+    # settings 回传（里面有服务端下发的 gen_defaults），此时若按
+    # 「有 gen_defaults 就算新客户端」判，老客户端的 t2v_defaults
+    # 就会被忽略 —— 那会破掉既有契约（tests/test_a4_gen_defaults.py
+    # 里 TestLegacyT2vCompat 那几条）。
+    # 「legacy 载荷的形状」才是可靠的判据：老客户端**不可能**发出
+    # 带 steps/sampler/scheduler 的 t2v_defaults（那 5 个字段是 A4 才加的）。
+    _LEGACY6 = {"model_key", "attention", "accel_lora", "aspect",
+                "megapixels", "duration"}
+    raw_gen = payload.get("gen_defaults")
     raw_legacy = payload.get("t2v_defaults")
-    legacy_explicit = (raw_legacy.keys()
-                        if isinstance(raw_legacy, dict) else ())
-    base["gen_defaults"] = normalize_gen_defaults(
-        payload.get("gen_defaults"), raw_legacy, legacy_explicit)
+    legacy_keys = (set(raw_legacy.keys())
+                   if isinstance(raw_legacy, dict) else set())
+    legacy_is_old_client = bool(legacy_keys) and legacy_keys <= _LEGACY6
+    if legacy_is_old_client:
+        # 老客户端：只有 t2v_defaults，按它的键集显式合并
+        base["gen_defaults"] = normalize_gen_defaults(
+            raw_gen, raw_legacy, legacy_keys)
+    else:
+        # 新客户端（或没给 legacy）：gen_defaults 是权威源，
+        # legacy 只当兼容镜像 —— 不反向覆盖用户改过的值。
+        base["gen_defaults"] = normalize_gen_defaults(raw_gen)
     # 写库时两者同步 —— 老客户端 / 老脚本读到的永远是最新值。
     base["t2v_defaults"] = dict(base["gen_defaults"].get("t2v") or {})
     base["file_roots"] = normalize_file_roots(payload.get("file_roots"))

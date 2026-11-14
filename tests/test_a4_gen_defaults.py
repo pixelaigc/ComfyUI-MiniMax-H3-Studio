@@ -528,6 +528,66 @@ class TestRuntimeEffect(unittest.TestCase):
         self.assertEqual(merged["shift_audio"], 2.5)
 
 
+class TestGenDefaultsRoundTrip(unittest.TestCase):
+    """管理页「读 -> 改 -> 存」往返后，用户改的值必须真的存住。
+
+    【缺陷复现路径】GET /api/agent/settings 的响应里**总是**带着
+    t2v_defaults（它是随 gen_defaults 一起下发的兼容镜像）。
+    前端拿整份响应改一项再 PUT 回去时，如果服务端把 t2v_defaults 的
+    键全算「显式给出」，用户改的 gen_defaults["t2v"].steps 就会被
+    自己刚读到的旧镜像覆盖回去 —— 界面显示存好了，实际没变。
+
+    【断言的是「那一行断言本身能抓住这个缺陷」】
+    这里模拟前端的真实往返：读全量 settings -> 改一项 -> 存 -> 再读。
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="a4-roundtrip-"))
+        self.conn = _make_conn(self.tmp)
+
+    def tearDown(self):
+        self.conn.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_edited_gen_defaults_survive_full_settings_roundtrip(self):
+        """带整份 settings（含 t2v_defaults 镜像）往返，改动必须留住。"""
+        # 第一次存：建立基线
+        agent_settings.save(self.conn, {
+            "gen_defaults": {"t2v": {"steps": 4}, "t2i": {"steps": 8}}})
+        self.conn.commit()
+
+        # 模拟前端：GET 全量 settings
+        loaded = agent_settings.load(self.conn)
+        payload = dict(loaded)
+        payload["gen_defaults"] = dict(loaded["gen_defaults"])
+        payload["gen_defaults"]["t2v"] = dict(loaded["gen_defaults"]["t2v"])
+        payload["gen_defaults"]["t2v"]["steps"] = 7          # 用户改了这一项
+        payload["gen_defaults"]["t2i"] = dict(loaded["gen_defaults"]["t2i"])
+        payload["gen_defaults"]["t2i"]["steps"] = 5          # 以及这一项
+
+        # PUT 回去
+        agent_settings.save(self.conn, payload)
+        self.conn.commit()
+
+        # 再读 —— 必须还是用户改的值
+        after = agent_settings.load(self.conn)
+        self.assertEqual(after["gen_defaults"]["t2v"]["steps"], 7,
+                         "t2v.steps 被兼容镜像覆盖回去了")
+        self.assertEqual(after["gen_defaults"]["t2i"]["steps"], 5,
+                         "t2i.steps 没存住")
+
+    def test_legacy_only_client_still_works(self):
+        """老客户端（只发 t2v_defaults）仍然生效 —— 兼容不能破。"""
+        agent_settings.save(self.conn, {
+            "t2v_defaults": {"attention": "sparse", "duration": 8.0}})
+        self.conn.commit()
+        loaded = agent_settings.load(self.conn)
+        self.assertEqual(loaded["gen_defaults"]["t2v"]["attention"], "sparse")
+        self.assertEqual(loaded["gen_defaults"]["t2v"]["duration"], 8.0)
+        # 兼容镜像同步出去了
+        self.assertEqual(loaded["t2v_defaults"]["attention"], "sparse")
+
+
 def _load_server_module():
     import importlib
     sys.modules.pop("server", None)
