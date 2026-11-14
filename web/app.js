@@ -643,7 +643,12 @@ function renderMode() {
   if (legacyVideoSampling) {
     const show = mode === "flf" || mode === "r2v";
     legacyVideoSampling.style.display = show ? "" : "none";
-    if (show) renderLegacyVideoSampling();
+    if (show) {
+      // 【2026-11-14】旧面板的加速 LoRA 卡片也用统一清单渲染 ——
+      // 否则旧面板只能选写死的两枚，与文生视频面板行为不一致。
+      renderLegacyAccelLoraCards();
+      renderLegacyVideoSampling();
+    }
   }
 
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
@@ -2142,6 +2147,42 @@ bindSeg("#loraCards", "lora", () => {
   // 【2026-11-12】LoRA 卡片换了 -> 同样要重算 legacy 采样参数的推荐基准
   if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
 });
+
+/**
+ * 渲染首尾帧 / 参考生视频（旧面板）的加速 LoRA 卡片。
+ *
+ * 【2026-11-14 重构】旧实现是在 index.html 里**写死**两张卡片
+ * （ckpt850 / v4step600），所以旧面板根本选不到 LightX2V / DMAD ——
+ * 而文生视频面板能选。两个面板对同一件事给出不同选项，
+ * 用户会以为「选了不生效」。
+ *
+ * 现在旧面板也读**同一份**清单（window.VIDEO_PANEL.accelOptions()），
+ * 语义统一为「一个槽位，选哪枚工作流就只挂哪枚」。
+ */
+function renderLegacyAccelLoraCards() {
+  const host = $("#loraCards");
+  if (!host) return;
+  const options = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
+    ? window.VIDEO_PANEL.accelOptions() : [];
+  if (!options.length) return;   // 清单还没到 -> 保留静态占位
+  host.innerHTML = options.map(o => `
+    <button data-v="${esc(o.key)}"${o.key === state.lora ? " class=\"active\"" : ""}>
+      <b>${esc(o.display)}</b>
+      <small>${esc(o.loader === "LoraLoaderModelOnly" ? "核心节点加载" : "Turbo 节点")}</small>
+    </button>`).join("");
+  $$("#loraCards button").forEach(b => b.addEventListener("click", () => {
+    $$("#loraCards button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    state.lora = b.dataset.v;
+    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
+  }));
+  // 当前选中项若已不在清单里 -> 回落默认
+  if (state.lora && !options.some(o => o.key === state.lora)) {
+    state.lora = options[0].key;
+    const btn = $(`#loraCards button[data-v="${state.lora}"]`);
+    if (btn) btn.classList.add("active");
+  }
+}
 // 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
 // （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
 // 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
@@ -2238,7 +2279,11 @@ function videoSamplingDefaults() {
  * 所以判据不能只看 state.lora。
  */
 function effectiveLegacyLora() {
-  return state.model === "lora" ? (state.lora || "ckpt850") : "none";
+  // 【2026-11-14】旧路径的加速 LoRA 现在也走**统一槽位**：
+  //   state.model === "lora" -> 用 state.lora 那一枚
+  //   state.model === "standard" -> 一枚都不挂（空串）
+  // 旧的 "none" 字面量保留成空串之外不再使用。
+  return state.model === "lora" ? (state.lora || "") : "";
 }
 
 /**
@@ -2253,11 +2298,24 @@ function effectiveLegacyLora() {
  * 面板上写「默认 6 步」，工作流跑的是 4 步 = 假提示。
  */
 function legacySamplingDefaults() {
-  const withLora = effectiveLegacyLora() !== "none";
+  const key = effectiveLegacyLora();
+  const withLora = !!key;
+  if (!withLora) {
+    return {
+      steps: 20,
+      sampler: "res_multistep",
+      scheduler: "simple",
+    };
+  }
+  // 【2026-11-14】步数按**所选那枚**的推荐值 —— 不同加速 LoRA 的
+  // 推荐步数不同（4 步蒸馏 / 8 步蒸馏），写死 4 就是假提示。
+  const opts = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
+    ? window.VIDEO_PANEL.accelOptions() : [];
+  const meta = opts.find(o => o.key === key);
   return {
-    steps: withLora ? 4 : 20,
-    sampler: withLora ? "euler" : "res_multistep",
-    scheduler: withLora ? "beta" : "simple",
+    steps: (meta && meta.recommended_steps) ? Number(meta.recommended_steps) : 4,
+    sampler: "euler",
+    scheduler: "beta",
   };
 }
 
@@ -2798,7 +2856,16 @@ $("#genBtn").addEventListener("click", async () => {
   // 修法：**只让真正走旧路径的模式**（flf / r2v）带这两个字段；
   // 其它模式（t2v / 图像 / 音乐）不写 —— 让落库记录里只剩真实生效的字段。
   if (mode === "flf" || mode === "r2v") {
-    params.lora = state.model === "lora" ? state.lora : "none";
+    // 【2026-11-14】旧路径（首尾帧 / 参考生视频）也走**统一槽位**：
+    // 提交 accel_lora（key）+ accel_lora_strength，
+    // 服务端按同一套换算逻辑决定挂哪枚、用哪个节点加载。
+    //
+    // 仍然保留 params.lora —— 老任务 / 老读侧（job_meta）还要看它，
+    // 但它是**从槽位派生的**，不再是独立的输入源。
+    const accelKey = effectiveLegacyLora();
+    params.accel_lora = accelKey;
+    params.accel_lora_strength = state.loraStrength;
+    params.lora = accelKey || "none";
     params.lora_strength = state.loraStrength;
   }
   if (IMAGE_MODES.includes(mode)) {

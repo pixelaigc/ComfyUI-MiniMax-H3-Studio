@@ -339,16 +339,41 @@ def _video_decode_save_block(p, samples_ref):
 def _h3_video_workflow(params, image_inputs=None):
     """t2v / flf 共用骨架。image_inputs: {'first_frame': fname, 'last_frame': fname}"""
     from . import video_models as vmodels
+    from . import video_workflow as vworkflow
     job_id = params["job_id"]
     seed = params.get("seed") or random.randint(0, 2**48)
     precision = params.get("precision", "int8")
-    lora = params.get("lora", "ckpt850")          # none / ckpt850 / v4step600
-    # 【2026-11-11】采样参数改为「用户可调」：没给才回落到原来的硬编码档位。
-    #   steps 4 / scheduler beta / sampler euler（有加速 LoRA 时）
-    #   steps 20 / scheduler simple / sampler res_multistep（无加速 LoRA 时）
-    default_steps = 4 if lora != "none" else 20
-    default_scheduler = "beta" if lora != "none" else "simple"
-    default_sampler = "euler" if lora != "none" else "res_multistep"
+    # 【2026-11-14 重构】加速 LoRA 从「写死的一枚」改成「用户选的槽位」。
+    #
+    # 旧实现：lora = params.get("lora", "ckpt850") -> 恒挂 ckpt850，
+    # 前端在旧面板选的「LoRA 选择」（ckpt850 / v4step600）只是把
+    # params["lora"] 换成另一个 key，链路里挂的还是 LORAS[lora]。
+    # 现在统一走 vmodels.resolve_accel_lora_slot()：三套历史字段
+    # （accel_lora / accel_loras / fixed_accel_lora / lora）一次性换算，
+    # 前端选什么就挂什么。
+    accel_key, accel_strength = vmodels.resolve_accel_lora_slot(params)
+    accel_chain = []
+    if accel_key:
+        meta = vmodels.accel_lora_meta(accel_key)
+        if meta:
+            accel_chain.append({
+                "name": meta["name"],
+                "strength": float(accel_strength),
+                "key": accel_key,
+                "loader": vmodels.detect_accel_lora_loader(meta["name"]),
+            })
+    # 【2026-11-11】采样参数改为「用户可调」：没给才回落到默认档位。
+    #   有加速 LoRA -> 该 LoRA 推荐的步数 / 调度器 / 采样器
+    #   无加速 LoRA -> 20 步 / simple / res_multistep（标准多步采样）
+    if accel_chain:
+        meta = vmodels.accel_lora_meta(accel_chain[0]["key"]) or {}
+        default_steps = int(meta.get("recommended_steps") or 4)
+        default_scheduler = meta.get("recommended_scheduler") or "beta"
+        default_sampler = meta.get("recommended_sampler") or "euler"
+    else:
+        default_steps = vmodels.VIDEO_STEPS_WITHOUT_ACCEL
+        default_scheduler = vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL
+        default_sampler = vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL
     steps = vmodels.normalize_steps(params.get("steps"), default_steps)
     scheduler = vmodels.normalize_scheduler(
         params.get("scheduler"), default_scheduler)
@@ -369,12 +394,11 @@ def _h3_video_workflow(params, image_inputs=None):
               "class_type": "UNETLoader", "_meta": {"title": "加载DiT"}}
     model_ref = ["6", 0]
 
-    if lora != "none":
-        p["138"] = {"inputs": {"model": ["6", 0], "lora_name": LORAS[lora],
-                               "strength": float(params.get("lora_strength", 1.0)),
-                               "low_vram": True},
-                    "class_type": "MiniMaxH3TurboLoRA", "_meta": {"title": "Turbo LoRA"}}
-        model_ref = ["138", 0]
+    # 加速 LoRA：按权重形态选加载节点（Turbo 系走 Turbo 节点，
+    # diffusion_model. 前缀族走核心 LoraLoaderModelOnly）。
+    # 用错节点 = 静默失效 —— 出片照跑但 LoRA 根本没生效。
+    if accel_chain:
+        model_ref = vworkflow.apply_accel_lora_nodes(p, model_ref, accel_chain)
 
     p["13"] = {"inputs": {"clip_name": CLIP[precision], "type": "minimax", "device": "default"},
                "class_type": "CLIPLoader", "_meta": {"title": "加载文本编码器"}}
@@ -455,14 +479,33 @@ def build_flf(params):
 
 def build_r2v(params):
     from . import video_models as vmodels
+    from . import video_workflow as vworkflow
     job_id = params["job_id"]
     seed = params.get("seed") or random.randint(0, 2**48)
     precision = params.get("precision", "int8")
-    lora = params.get("lora", "ckpt850")
+    # 【2026-11-14 重构】加速 LoRA 走统一槽位（与 flf / t2v 同一套换算），
+    # 并按权重形态选加载节点 —— 见 _h3_video_workflow 的说明。
+    accel_key, accel_strength = vmodels.resolve_accel_lora_slot(params)
+    accel_chain = []
+    if accel_key:
+        meta = vmodels.accel_lora_meta(accel_key)
+        if meta:
+            accel_chain.append({
+                "name": meta["name"],
+                "strength": float(accel_strength),
+                "key": accel_key,
+                "loader": vmodels.detect_accel_lora_loader(meta["name"]),
+            })
     # 【2026-11-11】采样参数可调（同 flf / t2v）
-    default_steps = 4 if lora != "none" else 20
-    default_scheduler = "beta" if lora != "none" else "simple"
-    default_sampler = "euler" if lora != "none" else "res_multistep"
+    if accel_chain:
+        meta = vmodels.accel_lora_meta(accel_chain[0]["key"]) or {}
+        default_steps = int(meta.get("recommended_steps") or 4)
+        default_scheduler = meta.get("recommended_scheduler") or "beta"
+        default_sampler = meta.get("recommended_sampler") or "euler"
+    else:
+        default_steps = vmodels.VIDEO_STEPS_WITHOUT_ACCEL
+        default_scheduler = vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL
+        default_sampler = vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL
     steps = vmodels.normalize_steps(params.get("steps"), default_steps)
     scheduler = vmodels.normalize_scheduler(
         params.get("scheduler"), default_scheduler)
@@ -478,12 +521,8 @@ def build_r2v(params):
     p["127"] = {"inputs": {"unet_name": UNET["ref2va"][precision], "weight_dtype": "default"},
                 "class_type": "UNETLoader"}
     model_ref = ["127", 0]
-    if lora != "none":
-        p["138"] = {"inputs": {"model": ["127", 0], "lora_name": LORAS[lora],
-                               "strength": float(params.get("lora_strength", 1.0)),
-                               "low_vram": True},
-                    "class_type": "MiniMaxH3TurboLoRA"}
-        model_ref = ["138", 0]
+    if accel_chain:
+        model_ref = vworkflow.apply_accel_lora_nodes(p, model_ref, accel_chain)
     p["128"] = {"inputs": {"clip_name": CLIP[precision], "type": "minimax", "device": "default"},
                 "class_type": "CLIPLoader"}
     p["119"] = {"inputs": {"vae_name": VAE_VIDEO}, "class_type": "VAELoader"}

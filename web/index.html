@@ -165,7 +165,7 @@
       </div>
 
       <div class="field">
-        <div class="field-label">加速 LoRA <span class="muted">单选 · 按主模型适配过滤</span></div>
+        <div class="field-label">加速 LoRA <span class="muted">单选 · 工作流只挂你选的那枚 · 按主模型适配过滤</span></div>
         <select class="img-select" id="vidAccelLoraSelect"></select>
         <div class="compact-field" id="vidAccelLoraStrengthField">
           <div class="compact-label"><span>加速 LoRA 强度</span><b id="vidAccelLoraStrengthVal">1.00</b></div>
@@ -744,7 +744,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
         <button data-v="standard"><b>标准 MiniMax-H3</b><small>20 步 · 质量优先</small></button>
       </div>
       <div class="subfield" id="loraField">
-        <div class="field-label">LoRA 选择</div>
+        <div class="field-label">加速 LoRA 选择 <span class="muted">与文生视频同一份清单 · 工作流只挂你选的那枚</span></div>
+        <!-- 【2026-11-14】这里原来写死了两张卡片（ckpt850 / v4step600）——
+             旧面板因此选不到 LightX2V / DMAD，与文生视频面板行为不一致。
+             现在由 renderLegacyAccelLoraCards() 用统一清单渲染；
+             下面的静态卡片只是**首屏占位**（清单还没到时显示）。 -->
         <div class="cards2" id="loraCards">
           <button data-v="ckpt850" class="active"><b>Turbo ckpt850</b><small>EMA 权重</small></button>
           <button data-v="v4step600"><b>v4-step600</b><small>4 步 · 推荐</small></button>

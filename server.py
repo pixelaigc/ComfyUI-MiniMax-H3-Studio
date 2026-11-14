@@ -1676,51 +1676,50 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         out["model_status_note"] = video_models.model_status_note(model_key)
     out["model_key"] = model_key
 
-    # ---- 固定加速 LoRA ----
-    fixed_key = params.get("fixed_accel_lora") or video_models.VIDEO_FIXED_ACCEL_LORA_DEFAULT
-    fixed = video_models.VIDEO_ACCEL_LORAS.get(fixed_key)
-    if fixed is None:
-        return out, f"未知的固定加速 LoRA {fixed_key}"
-    if not video_models.lora_available(fixed["name"]):
-        return out, f"本机找不到固定加速 LoRA {fixed['name']}"
-    out["fixed_accel_lora"] = fixed_key
-
-    # ---- 可勾选的加速 LoRA 组合（**单选**：一个主模型只能挑一个）----
+    # ---- 加速 LoRA（**一个槽位**，2026-11-14 重构）----
     #
-    # 【2026-11-11 改】原来是「可多选叠加」。现在前端是下拉单选，
-    # 服务端这里也必须收紧 —— 否则绕过前端直接调 API 仍能塞多个，
-    # 两枚 4 步蒸馏 LoRA 叠在一起没有意义（都是把 20 步压到 4 步的
-    # 蒸馏权重，叠加只会互相打架）。
+    # 【旧行为的问题】
+    # 旧实现分两段：「固定加速 LoRA」（恒为 ckpt850，永远生效）+ 「可勾选的
+    # 组合枚」（前端下拉里选的，额外叠加）。于是前端选 LightX2V，工作流里
+    # 仍然是 ckpt850 + LightX2V —— 「选了不生效」就是这么来的。
     #
-    # 兼容旧客户端：老任务里存的是 accel_loras 数组（可能多项）。
-    #   * 全部不兼容 / 未启用 -> 空
-    #   * 有多项 -> 取**第一个可用且兼容的**（保持老任务能重放）
-    combos = []
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = item.get("key") or ""
-        meta = video_models.VIDEO_ACCEL_LORA_COMBOS.get(key)
+    # 【新行为】
+    # 只有一个槽位：前端选哪枚，工作流里就**只挂哪枚**。
+    # 换算由 video_models.resolve_accel_lora_slot 统一做
+    # （兼容 accel_lora / accel_loras / fixed_accel_lora / lora 四套历史字段）。
+    # 显式选「不挂」= 空槽位 -> 工作流走标准多步采样。
+    accel_key, accel_strength = video_models.resolve_accel_lora_slot(params)
+    if accel_key:
+        meta = video_models.accel_lora_meta(accel_key)
         if meta is None:
-            return out, f"未知的加速 LoRA 组合 {key}"
+            return out, f"未知的加速 LoRA {accel_key}"
         if not video_models.lora_available(meta["name"]):
             return out, f"本机找不到加速 LoRA {meta['name']}"
+        # 兼容性必须**实测**（逐层比对权重头）：
+        # 键结构对不上的 LoRA 会被 ComfyUI 静默丢弃 —— 出片照跑但没生效。
         check = video_models.check_h3_lora_compat(meta["name"], model["unet"])
         if not check["compatible"]:
             return out, (f"「{meta['display']}」与当前底模不兼容："
                          f"{check['reason']}")
-        try:
-            strength = float(item.get("strength", meta.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        if strength <= 0:
-            continue
-        combos.append({"key": key, "strength": strength, "enabled": True})
-        # 单选：拿到第一个就停 —— 后面的忽略
-        break
-    out["accel_loras"] = combos
+        if accel_strength <= 0:
+            return out, (f"加速 LoRA「{meta['display']}」的强度必须大于 0"
+                         f"（当前 {accel_strength}）")
+        # 加载节点路由（按权重键名形态实测决定）—— 记进 params，
+        # 让任务卡片能显示「这枚是用哪个节点加载的」，便于排查静默失效。
+        loader = video_models.detect_accel_lora_loader(meta["name"])
+        out["accel_lora"] = accel_key
+        out["accel_lora_strength"] = accel_strength
+        out["accel_lora_loader"] = loader
+        # 兼容老读侧（job_meta / 前端）仍看 accel_loras 数组
+        out["accel_loras"] = [{"key": accel_key, "strength": accel_strength,
+                               "enabled": True}]
+        # 固定枚字段同步（老读侧把它当「工作流固定的那枚」）
+        out["fixed_accel_lora"] = accel_key
+    else:
+        # 显式「不挂加速 LoRA」
+        out["accel_lora"] = ""
+        out["accel_loras"] = []
+        out["fixed_accel_lora"] = ""
 
     # ---- 效果 LoRA（可多选，与加速 LoRA 并列共存）----
     #
@@ -4643,21 +4642,19 @@ async def api_video_options(request):
     snapshot = await video_models.refresh_comfy_snapshot_async()
     payload = video_models.options_payload(node_available=node_available,
                                            snapshot=snapshot)
-    # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
-    # 前端据此把对不上的组合从**下拉里剔除**（不是置灰）。
+    # 附带「当前底模下每个加速 LoRA 的实测兼容性」—— 前端据此把对不上的
+    # 从**下拉里剔除**（不是置灰）。
     #
-    # 【2026-11-11 改】加速 LoRA 改成单选：一个主模型只能挑一个加速 LoRA。
-    #   互斥单选的语义：两枚 4 步蒸馏 LoRA 叠在一起没有意义
-    #   （都是把 20 步压到 4 步的蒸馏权重，叠加只会互相打架），
-    #   而「固定 Turbo LoRA」已经在工作流里常驻，用户这一栏选的是
-    #   **额外**的那一枚。
+    # 【2026-11-14 重构】加速 LoRA 统一成一组可选项（不再分「固定枚 /
+    # 组合枚」两栏）。每一项都带 loader（用哪个节点加载）——
+    # 前端在提示里显示它，用户能确认「这枚真的挂上了、用的哪个节点」。
     model_key = request.query.get("model") or payload["default_model"]
     model = video_models.VIDEO_MODELS.get(model_key)
     payload["selected_model"] = model_key
     if model:
         matrix = video_models.accel_lora_compat_matrix(model_key)
-        combos = []
-        for item in payload["accel_lora_combos"]:
+        accels = []
+        for item in payload.get("accel_loras") or []:
             entry = dict(item)
             check = matrix.get(item["key"], {})
             entry["compatible"] = bool(check.get("compatible"))
@@ -4668,8 +4665,10 @@ async def api_video_options(request):
             # 不适配当前底模的**不出现**在下拉里（前端据此过滤）
             entry["selectable"] = bool(entry["compatible"]) and \
                 entry.get("available", True)
-            combos.append(entry)
-        payload["accel_lora_combos"] = combos
+            accels.append(entry)
+        payload["accel_loras"] = accels
+        payload["fixed_accel_loras"] = accels
+        payload["accel_lora_combos"] = []
 
     # 【2026-11-13 新增】作者推荐参数（需求 1 / 2 / 5）
     #

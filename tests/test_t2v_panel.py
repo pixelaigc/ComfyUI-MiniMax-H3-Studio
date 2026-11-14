@@ -128,13 +128,40 @@ class TestVideoOptionsPayload(unittest.TestCase):
                     "size_multiple", "size_min", "size_max"):
             self.assertIn(key, payload)
 
-    def test_fixed_accel_lora_not_in_combo_list(self):
-        """工作流硬性必需的加速 LoRA 不出现在用户可勾选列表里。"""
-        _fixed, combos = VM.list_accel_loras()
-        combo_names = {c["name"] for c in combos}
-        for fixed in VM.VIDEO_ACCEL_LORAS.values():
-            self.assertNotIn(fixed["name"], combo_names,
-                             "固定加速 LoRA 不该出现在可勾选列表里")
+    def test_accel_lora_list_is_unified(self):
+        """【2026-11-14 重构】加速 LoRA 是一组可选项，不再分「固定枚/组合枚」。
+
+        旧设计：固定枚（ckpt850）不在下拉里、恒生效；下拉里选的是**额外叠加**。
+        于是「选什么」不决定「加载什么」—— 用户报的「选了不生效」就是这么来的。
+
+        现在两集合合并，下拉里选的那枚就是工作流里唯一挂的那枚。
+        """
+        accels, combos = VM.list_accel_loras()
+        self.assertEqual(combos, [], "组合枚清单已并入统一列表")
+        keys = {a["key"] for a in accels}
+        # Turbo 系与组合枚都在同一个列表里
+        for key in VM.VIDEO_ACCEL_LORAS:
+            self.assertIn(key, keys, "Turbo 系必须在统一列表里")
+        for key in VM.VIDEO_ACCEL_LORA_COMBOS:
+            self.assertIn(key, keys, "组合枚必须在统一列表里")
+
+    def test_accel_lora_entries_carry_loader_routing(self):
+        """每一项都必须带 loader（用哪个节点加载）。
+
+        【为什么重要】Turbo 节点只认**裸键名**的权重；带
+        `diffusion_model.` 前缀的权重（LightX2V / DMAD / better_motion）
+        用 Turbo 节点会被**静默丢弃**（实测 416 backbone modules,
+        0 weights patched）—— 出片照跑但 LoRA 没生效。
+        所以 loader 字段必须有，且两类权重必须分到不同节点。
+        """
+        accels, _ = VM.list_accel_loras()
+        by_key = {a["key"]: a for a in accels}
+        # Turbo 系 = 裸键名 -> Turbo 节点
+        for key in ("ckpt850", "v4step600"):
+            self.assertEqual(by_key[key]["loader"], VM.ACCEL_LOADER_TURBO)
+        # 前缀族 -> 核心 LoraLoaderModelOnly
+        for key in ("lightx2v_4step_768p", "dmad_4step_critic"):
+            self.assertEqual(by_key[key]["loader"], VM.ACCEL_LOADER_CORE)
 
     def test_attention_modes_have_real_node_or_none(self):
         """每个注意力机制要么没有节点（默认），要么指向一个真实存在的节点名。"""
@@ -180,38 +207,68 @@ class TestT2VWorkflow(unittest.TestCase):
         self.assertEqual(wf["105:104"]["inputs"]["height"], 480)
         self.assertNotIn("115", wf, "不再走 ResolutionSelector")
 
-    def test_fixed_accel_lora_always_present(self):
+    def test_default_accel_lora_is_ckpt850(self):
+        """没指定加速 LoRA 槽位时，默认挂 ckpt850（保持老行为）。"""
         wf = VW.build_t2v_panel(dict(self.BASE_PARAMS))
-        lora_nodes = [n for n in wf.values() if n["class_type"] == "MiniMaxH3TurboLoRA"]
-        self.assertTrue(lora_nodes, "工作流里必须有固定加速 LoRA")
-        self.assertEqual(
-            lora_nodes[0]["inputs"]["lora_name"],
-            VM.VIDEO_ACCEL_LORAS["ckpt850"]["name"])
+        lora_nodes = [n for n in wf.values()
+                      if n["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                            VM.ACCEL_LOADER_CORE)]
+        self.assertEqual(len(lora_nodes), 1, "默认只挂一枚")
+        self.assertEqual(lora_nodes[0]["class_type"], VM.ACCEL_LOADER_TURBO)
+        self.assertEqual(lora_nodes[0]["inputs"]["lora_name"],
+                         VM.VIDEO_ACCEL_LORAS["ckpt850"]["name"])
 
-    def test_user_combos_are_chained_after_fixed(self):
+    def test_selected_accel_lora_replaces_instead_of_stacking(self):
+        """【2026-11-14 核心断言】选了哪枚就**只挂哪枚**。
+
+        旧实现是「固定枚 + 用户选的那枚」两枚叠加 ——
+        用户选 LightX2V，工作流里仍然是 ckpt850 在前面挡着。
+        这就是「前端选了加速 LoRA 却不生效」的根因之一。
+        """
         params = dict(self.BASE_PARAMS)
-        params["accel_loras"] = [
-            {"key": "lightx2v_4step_768p", "strength": 0.9, "enabled": True},
-        ]
+        params["accel_lora"] = "lightx2v_4step_768p"
+        params["accel_lora_strength"] = 0.9
         wf = VW.build_t2v_panel(params)
-        lora_nodes = [wf[k] for k in wf if wf[k]["class_type"] == "MiniMaxH3TurboLoRA"]
-        self.assertEqual(len(lora_nodes), 2)
-        # 固定的在前，模型链串起来
-        self.assertEqual(lora_nodes[0]["inputs"]["model"], ["6", 0])
-        self.assertEqual(lora_nodes[1]["inputs"]["model"], ["138:0", 0])
-        self.assertEqual(
-            lora_nodes[1]["inputs"]["lora_name"],
-            VM.VIDEO_ACCEL_LORA_COMBOS["lightx2v_4step_768p"]["name"])
-        self.assertAlmostEqual(lora_nodes[1]["inputs"]["strength"], 0.9)
+        lora_nodes = [wf[k] for k in wf
+                      if wf[k]["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                                VM.ACCEL_LOADER_CORE)]
+        self.assertEqual(len(lora_nodes), 1, "只能有一枚（不是叠加）")
+        node = lora_nodes[0]
+        self.assertEqual(node["class_type"], VM.ACCEL_LOADER_CORE)
+        self.assertEqual(node["inputs"]["lora_name"],
+                         VM.VIDEO_ACCEL_LORA_COMBOS["lightx2v_4step_768p"]["name"])
+        self.assertEqual(node["inputs"]["strength_model"], 0.9)
+
+    def test_explicit_none_accel_lora_mounts_nothing(self):
+        """显式选「不挂加速 LoRA」-> 工作流里一枚都不挂，且走标准采样档。"""
+        params = dict(self.BASE_PARAMS)
+        params["accel_lora"] = ""
+        params.pop("steps", None)
+        wf = VW.build_t2v_panel(params)
+        lora_nodes = [n for n in wf.values()
+                      if n["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                            VM.ACCEL_LOADER_CORE)]
+        self.assertEqual(lora_nodes, [], "显式「不挂」时不能挂任何 LoRA")
+        # 步数/调度器/采样器回落到标准多步采样档
+        self.assertEqual(wf["9"]["inputs"]["steps"], VM.VIDEO_STEPS_WITHOUT_ACCEL)
+        self.assertEqual(wf["9"]["inputs"]["scheduler"],
+                         VM.VIDEO_SCHEDULER_WITHOUT_ACCEL)
+        self.assertEqual(wf["17"]["inputs"]["sampler_name"],
+                         VM.VIDEO_SAMPLER_WITHOUT_ACCEL)
 
     def test_disabled_combo_is_skipped(self):
+        """enabled=False 的组合不进工作流（回落到默认槽位）。"""
         params = dict(self.BASE_PARAMS)
         params["accel_loras"] = [
             {"key": "lightx2v_4step_768p", "strength": 1.0, "enabled": False},
         ]
         wf = VW.build_t2v_panel(params)
-        lora_nodes = [n for n in wf.values() if n["class_type"] == "MiniMaxH3TurboLoRA"]
+        lora_nodes = [n for n in wf.values()
+                      if n["class_type"] in (VM.ACCEL_LOADER_TURBO,
+                                            VM.ACCEL_LOADER_CORE)]
         self.assertEqual(len(lora_nodes), 1, "enabled=False 的组合不该进工作流")
+        self.assertEqual(lora_nodes[0]["inputs"]["lora_name"],
+                         VM.VIDEO_ACCEL_LORAS["ckpt850"]["name"])
 
     def test_attention_node_inserted(self):
         params = dict(self.BASE_PARAMS)
