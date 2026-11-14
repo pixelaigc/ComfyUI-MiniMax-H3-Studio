@@ -431,6 +431,82 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
         "note": "208 个层全部命中（实测）。它训练时的步数区间是 15-30，"
                 "配 4 步蒸馏档属于超出训练分布的用法。",
     },
+    # ---- 【2026-11-15 新增】本机实测存在、但此前未登记的加速 LoRA ----
+    #
+    # 【为什么加这一批】用户指出「LoRA 与 UNET 都应该可自由定义」，
+    # 并给了两个参考工作流：
+    #   /home/ubuntu/nonebotqq/plugins/nonebot_plugin_novelai/workflows/
+    #     minimax_h3_v1.json  -> UNET=minimax_h3_fl2va_int8_convrot.safetensors
+    #                              LORA=minimax_h3_turbo_v4_step600_ema.safetensors
+    #     minimax_h3_v2.json  -> UNET=minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors
+    #                              LORA=dmad_minimax_h3_4step_full_critic_comfyui.safetensors
+    # 两个参考工作流的 LORA 节点都是**核心 LoraLoaderModelOnly**，
+    # 而本产品此前把加速 LoRA 固定成 Turbo 节点。
+    #
+    # 本机实测（2026-11-15，ComfyUI /models/loras 共 735 条）还有这些
+    # H3 加速权重此前没进清单，用户无法选：
+    #   * minimax_h3_turbo_4步加速_comfyui.safetensors        （中文名 Turbo 4 步）
+    #   * minimax_h3_turbo_4步加速ema_comfyui.safetensors      （中文名 Turbo 4 步 EMA）
+    #   * minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors
+    #   * minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors
+    #     （根目录那一份；h3_lightx2v/ 下还有同名的 768p 版本）
+    #
+    # 【键名形态 —— 决定用哪个加载节点】
+    #   中文名两份是 diffusion_model. 前缀 -> 核心 LoraLoaderModelOnly
+    #   LightX2V 两份也是 diffusion_model. 前缀 -> 核心 LoraLoaderModelOnly
+    # （判据是 safetensors 头部实测，不是文件名硬编 —— 见
+    #   detect_accel_lora_loader）
+    "turbo_4step_cn": {
+        "name": "minimax_h3_turbo_4步加速_comfyui.safetensors",
+        "display": "Turbo 4 步（中文名加速版）",
+        "purpose": "官方 Turbo 4 步蒸馏权重的**中文名发行版**，"
+                   "键名带 diffusion_model. 前缀 —— 与 ckpt850 是同族，"
+                   "但必须用核心 LoraLoaderModelOnly 加载。",
+        "recommended_strength": 1.0,
+        "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
+        "note": "518 个层全部命中（实测，键名带 diffusion_model. 前缀）。"
+                "剪枝底模的 AdaLN 层（51 个）**不会**被核心节点重注入 —— "
+                "核心节点没有 Turbo 节点那套运行期 AdaLN 机制，"
+                "所以它配**未剪枝**底模（int8 / bf16）才是完整命中。",
+    },
+    "turbo_4step_cn_ema": {
+        "name": "minimax_h3_turbo_4步加速ema_comfyui.safetensors",
+        "display": "Turbo 4 步（中文名 EMA 版）",
+        "purpose": "Turbo 4 步的中文名 EMA 权重，"
+                   "键名带 diffusion_model. 前缀。",
+        "recommended_strength": 1.0,
+        "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
+        "note": "518 个层全部命中（实测，键名带 diffusion_model. 前缀）。"
+                "同 turbo_4step_cn：剪枝底模的 AdaLN 不会被运行期重注入。",
+    },
+    "lightx2v_4step_v01_comfy": {
+        "name": "minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors",
+        "display": "LightX2V 4 步（v0.1 comfy 版）",
+        "purpose": "LightX2V Turbo 4 步 v0.1 的 comfy 打包版，"
+                   "键名带 diffusion_model. 前缀。",
+        "recommended_strength": 1.0,
+        "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
+        "note": "416 个层全部命中（实测）。它不含 AdaLN，"
+                "配剪枝底模时 AdaLN 更新不会生效（核心节点无重注入机制）。",
+    },
+    "lightx2v_sla_768p_root": {
+        "name": "minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors",
+        "display": "LightX2V SLA 4 步（768p · 根目录版）",
+        "purpose": "与 h3_lightx2v/ 目录里那份同名的 SLA 权重"
+                   "（键名形态一致），此处登记**根目录**那一份，"
+                   "它才是 h3_lightx2v/ 目录版之外真实存在的第二份。",
+        "recommended_strength": 1.0,
+        "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
+        "note": "624 个层全部命中（实测）。它不含 AdaLN。",
+    },
 }
 
 # ------------------------------------------------------------------
@@ -1479,7 +1555,8 @@ def _match_module(base: str, unet_modules: dict) -> str | None:
     return None
 
 
-def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
+def check_h3_lora_compat(lora_name: str, unet_name: str,
+                         loader: str | None = None) -> dict:
     """实测某个加速 LoRA 与某个 H3 底模的层结构能不能对上。
 
     返回：
@@ -1490,6 +1567,7 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
         "shape_mismatch": int,   # 层名对得上但形状对不上（真不兼容）
         "missing": int,          # 底模里根本没这个层
         "total": int,
+        "loader": str,           # 实际会用哪个加载节点（判定 AdaLN 能否生效的依据）
         "reason": str,           # 不兼容原因（给界面显示）
       }
 
@@ -1500,11 +1578,38 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
     `use_adaln_curves` 后，会用 `_inject_adaln_egrid()` 把 AdaLN 更新在
     运行期重新注入（custom_nodes/ComfyUI-MiniMax-H3-Turbo/__init__.py:378）。
     把这些层算成「不兼容」会把剪枝底模整条路封死。
+
+    【2026-11-15 修 —— AdaLN 的运行期重注入是「Turbo 节点专属」能力】
+    上面那段「不算不兼容」的前提是**用 Turbo 节点加载**。实测（ComfyUI
+    0.45.3 / comfy/weight_adapter/lora.py:268-283）核心节点的权重数学是：
+
+        lora_diff = torch.mm(mat1, mat2).reshape(weight.shape)
+
+    其中 mat1 = lora_B [96768, 16]、mat2 = lora_A [16, 2688]。
+    对剪枝底模（AdaLN 权重 [96768, 8]）这一步直接抛
+    「shape '[96768, 8]' is invalid for input of size 260112384」，
+    而 comfy/weight_adapter/lora.py:284 用 try/except 吞掉异常 ->
+    **AdaLN 的贡献被静默丢弃**，只留一条 ERROR 日志。
+
+    也就是说：带 AdaLN 的 LoRA 用**核心 LoraLoaderModelOnly** 加载到
+    剪枝底模上时，那 51 个 AdaLN 层**不会生效**，但兼容性检查此前仍
+    把它们记成「runtime_injected」并判 compatible=True —— 这正是
+    「静默失效」的另一种形态。
+
+    所以这里必须**按加载节点分别判定**：
+      * Turbo 节点（裸键名族）-> AdaLN 记 runtime_injected，compatible
+      * 核心节点（diffusion_model. 前缀族）-> AdaLN 记 shape_mismatch，
+        并给出明确原因（而不是默默当作可用）
+    loader 传 None 时按实测键名形态自动判定（与
+    detect_accel_lora_loader 同一判据）。
     """
     lora_path = find_weight(lora_name, kind="loras")
     unet_path = find_weight(unet_name)
+    if loader is None:
+        loader = detect_accel_lora_loader(lora_name)
     empty = {"compatible": False, "matched": 0, "runtime_injected": 0,
-             "shape_mismatch": 0, "missing": 0, "total": 0, "reason": ""}
+             "shape_mismatch": 0, "missing": 0, "total": 0,
+             "loader": loader, "reason": ""}
     if lora_path is None:
         empty["reason"] = f"本机找不到 LoRA 文件 {lora_name}"
         return empty
@@ -1518,6 +1623,9 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
         empty["reason"] = "该 LoRA 的权重结构无法解析（未识别到标准 LoRA 键名）"
         return empty
     modules = _unet_modules(_read_header(unet_path))
+    # AdaLN 的运行期重注入是 **Turbo 节点专属**能力 —— 核心节点做不到
+    # （见上面 docstring 的实测结论）。所以判定必须按加载节点分流。
+    turbo_loader = (loader == ACCEL_LOADER_TURBO)
     matched = injected = mismatch = missing = 0
     for base, shapes in bases.items():
         target = _match_module(base, modules)
@@ -1529,7 +1637,8 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
         if (a_shape and len(weight) == 2 and len(a_shape) == 2
                 and a_shape[1] != weight[1]):
             # AdaLN 在剪枝底模上是 8 维曲线 -> 由 Turbo 节点运行期重注入
-            if "adaln_proj" in target and len(weight) == 2 and weight[1] == 8:
+            if ("adaln_proj" in target and len(weight) == 2 and weight[1] == 8
+                    and turbo_loader):
                 injected += 1
                 continue
             mismatch += 1
@@ -1543,6 +1652,7 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
         "shape_mismatch": mismatch,
         "missing": missing,
         "total": total,
+        "loader": loader,
         "reason": "",
     }
     if total and (matched + injected + mismatch) == total \
@@ -1553,8 +1663,32 @@ def check_h3_lora_compat(lora_name: str, unet_name: str) -> dict:
         result["reason"] = (f"底模里没有该 LoRA 要 patch 的层（缺 {missing}/{total}）"
                             "—— ComfyUI 会静默丢弃，出片照跑但加速 LoRA 没生效。")
     elif mismatch:
-        result["reason"] = (f"{mismatch}/{total} 个层的形状对不上"
-                            "（底模把隐藏维折叠过）—— 加载了也不会按预期生效。")
+        # 【2026-11-15】区分两种「形状对不上」：
+        #   * AdaLN 层 + 核心加载节点 -> 运行期重注入做不到（静默失效）
+        #   * 其它形状不匹配          -> 底模把隐藏维折叠过
+        adaln_mismatch = 0
+        for base, shapes in bases.items():
+            if "adaln_proj" not in base:
+                continue
+            s = shapes.get("A")
+            if not (s and len(s) == 2):
+                continue
+            target = _match_module(base, modules)
+            if target is None:
+                continue
+            w = modules.get(target) or []
+            if len(w) == 2 and w[1] != s[1]:
+                adaln_mismatch += 1
+        if adaln_mismatch and not turbo_loader:
+            result["reason"] = (
+                f"该 LoRA 带 {adaln_mismatch} 个 AdaLN 层，而当前底模把它们折叠成 "
+                "8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，"
+                "而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 "
+                "LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被"
+                "静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。")
+        else:
+            result["reason"] = (f"{mismatch}/{total} 个层的形状对不上"
+                                "（底模把隐藏维折叠过）—— 加载了也不会按预期生效。")
     else:
         result["reason"] = "无法确认该 LoRA 与底模兼容。"
     return result
@@ -1584,10 +1718,15 @@ def accel_lora_compat_matrix(model_key: str) -> dict[str, dict]:
         meta = accel_lora_meta(key)
         if not meta:
             continue
-        check = check_h3_lora_compat(meta["name"], model["unet"])
+        # 【2026-11-15】把**实际会用的加载节点**传进去 ——
+        # AdaLN 的运行期重注入只有 Turbo 节点做得到，核心节点做不到。
+        # 不传 loader 的话，核心节点加载带 AdaLN 的 LoRA 会被误判成兼容。
+        loader = detect_accel_lora_loader(meta["name"])
+        check = check_h3_lora_compat(meta["name"], model["unet"], loader=loader)
         out[key] = {
             "compatible": bool(check["compatible"]),
             "reason": check["reason"],
+            "loader": loader,
             "matched": check["matched"],
             "runtime_injected": check["runtime_injected"],
             "shape_mismatch": check["shape_mismatch"],

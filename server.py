@@ -2185,7 +2185,14 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
             return out, f"本机找不到加速 LoRA {meta['name']}"
         # 兼容性必须**实测**（逐层比对权重头）：
         # 键结构对不上的 LoRA 会被 ComfyUI 静默丢弃 —— 出片照跑但没生效。
-        check = video_models.check_h3_lora_compat(meta["name"], model["unet"])
+        #
+        # 【2026-11-15】把**实际会用的加载节点**传进去 ——
+        # AdaLN 的运行期重注入只有 Turbo 节点做得到，核心节点做不到。
+        # 不传 loader 的话，「核心节点 + 带 AdaLN 的 LoRA + 剪枝底模」
+        # 会被误判成兼容，而实际那 51 个 AdaLN 层会被静默丢弃。
+        loader = video_models.detect_accel_lora_loader(meta["name"])
+        check = video_models.check_h3_lora_compat(meta["name"], model["unet"],
+                                                  loader=loader)
         if not check["compatible"]:
             return out, (f"「{meta['display']}」与当前底模不兼容："
                          f"{check['reason']}")
@@ -2194,7 +2201,6 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
                          f"（当前 {accel_strength}）")
         # 加载节点路由（按权重键名形态实测决定）—— 记进 params，
         # 让任务卡片能显示「这枚是用哪个节点加载的」，便于排查静默失效。
-        loader = video_models.detect_accel_lora_loader(meta["name"])
         out["accel_lora"] = accel_key
         out["accel_lora_strength"] = accel_strength
         out["accel_lora_loader"] = loader
@@ -5589,7 +5595,12 @@ async def api_video_options(request):
             entry["compat_reason"] = check.get("reason", "")
             entry["compat_matched"] = check.get("matched", 0)
             entry["compat_runtime_injected"] = check.get("runtime_injected", 0)
+            entry["compat_shape_mismatch"] = check.get("shape_mismatch", 0)
             entry["compat_total"] = check.get("total", 0)
+            # 【2026-11-15】把**实际会用的加载节点**一起下发 ——
+            # 前端提示里要显示它（用错节点 = 静默失效），
+            # 而「AdaLN 能否运行期重注入」也取决于它。
+            entry["loader"] = check.get("loader") or entry.get("loader", "")
             # 不适配当前底模的**不出现**在下拉里（前端据此过滤）
             entry["selectable"] = bool(entry["compatible"]) and \
                 entry.get("available", True)
