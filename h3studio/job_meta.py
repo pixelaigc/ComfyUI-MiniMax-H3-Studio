@@ -490,6 +490,53 @@ def _in_lora_registry(text: str) -> bool:
     return False
 
 
+#: params 里所有可能承载「用户选了哪枚 LoRA」的字段名。
+#:
+#: 【为什么用这个清单判定「有没有证据」】任务落库时，LoRA 可能落在
+#: 任意一套历史字段上（老面板 lora / 新面板 accel_lora 单数 /
+#: accel_loras 数组 / fixed_accel_lora / 图像效果 loras）。
+#: 这些字段任一存在 -> 用户**确实选过** -> 有证据，可以按工作流口径回落。
+#: 一个都不存在 -> 这个任务**从落库起就没有 LoRA 信息**
+#: （实测线上 116 条如此）-> 没有证据，不该显示任何具体 LoRA 名。
+LORA_EVIDENCE_FIELDS = (
+    "lora", "accel_lora", "accel_loras", "fixed_accel_lora", "loras",
+    "effect_loras",
+)
+
+
+def _lora_fallback_without_evidence(mode: str, params: dict) -> bool:
+    """这个任务的 LoRA 显示是不是「没有证据的回落」。
+
+    返回 True = **没有证据**，显示层必须标「未使用 LoRA」/「未知」，
+    不得显示回落出来的具体 LoRA 名。
+
+    判定：
+      * 有 `artifact_loras`（worker 从 workflow 反解回写）-> 有证据；
+      * 有任一 LORA_EVIDENCE_FIELDS（提交参数里用户选过）-> 有证据；
+      * 都没有 -> 无证据。
+
+    【为什么不对所有模式一刀切】
+    图像模式（t2i / t2i_moss …）的 params 里**本来就没有** LoRA 字段
+    （图像模式读的是 params["loras"]，没有就是没有效果 LoRA），
+    所以它们本来就是「无证据但确实没有」—— 显示「未使用 LoRA」是对的。
+    音乐模式（t2a / a2a）没有 LoRA 概念 -> 同理。
+    真正需要区分的是**视频旧路径**（工作流会挂默认 ckpt850）。
+    """
+    params = params or {}
+    if not isinstance(params, dict):
+        return False
+    if "artifact_loras" in params:
+        return False
+    for field in LORA_EVIDENCE_FIELDS:
+        value = params.get(field)
+        if value not in (None, "", [], {}):
+            return False
+    # 音乐模式本来就没有 LoRA 概念 -> 不是「缺证据」，是真的没有
+    if mode in ("t2a", "a2a"):
+        return False
+    return True
+
+
 def resolve_job_lora(mode: str, params: dict) -> dict:
     """算出「这个任务真实用到的 LoRA」—— **唯一入口**（2026-11-13 · C1）。
 
@@ -1350,8 +1397,26 @@ def gen_params(mode: str, params: dict, model_info: dict | None = None,
 
     # --- LoRA：走 resolve_job_lora（白名单 + 产物实际判定） ---
     lora = resolve_job_lora(mode, params)
-    if lora["labels"]:
+    if lora["labels"] and not _lora_fallback_without_evidence(mode, params):
         out["lora"] = " · ".join(lora["labels"])
+    elif _lora_fallback_without_evidence(mode, params):
+        # 【2026-11-15 修 —— 没有证据就不回落显示 ckpt850】
+        #
+        # resolve_job_lora 的回落（无记录 -> ckpt850）是**工作流同源**的推断：
+        # 对**新**任务成立（工作流确实会挂默认档）。
+        # 但对**历史任务**（worker 回写之前生成的）我们**没有证据** ——
+        # 实测线上 116 条任务既无 steps 也无任何 LoRA 字段，
+        # 而 ComfyUI /history 早已被清理、无法复核。
+        #
+        # 判定「无证据」：params 里**没有任何** LoRA 字段
+        # （lora / accel_loras / accel_lora / fixed_accel_lora / loras）
+        # 且没有 artifact_loras 记录。
+        #   * 有 artifact_loras -> 产物实际，最准；
+        #   * 有上述任一提交字段 -> 用户确实选过，有证据；
+        #   * 都没有 -> **没有证据** -> 如实标「未知」，
+        #     绝不显示一个没证据的 ckpt850 假名
+        #     （用户原话：「缺失时应显示『未使用 LoRA』而不是错名」）。
+        out["lora"] = "未使用 LoRA"
     else:
         # 【2026-11-15 修 —— 文案从「无」改成「未使用 LoRA」】
         # 用户原话：「缺失时应显示『未使用 LoRA』而不是错名」。
