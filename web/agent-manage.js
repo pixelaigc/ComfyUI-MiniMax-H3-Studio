@@ -1,10 +1,12 @@
 /* H3 Studio —— 内置 Agent「agent 管理」面板（前端）
  *
  * 【这一块管什么】
- *  1) 步数上限（1~50）
+ *  1) 步数上限 / 总时限
  *  2) 额外能力开关（文件读取 / 外部搜索 / 代码执行 / ffmpeg 音视频）
  *  3) 外部搜索引擎配置（DDG / 局域网 9898 聚合引擎 / 自定义接口）+ 连通性自检
- *  4) 文生视频默认参数（comfy kitchen 注意力 + dmad 加速 LoRA，可改任意一项）
+ *  4) **按生成类型分别配置的默认参数**（2026-11-14 需求 A4）
+ *     —— 每个生成类型一份：Z-IMAGE 文生图 / MOSS-Image 文生图 /
+ *     YuE2 音乐生成 / MiniMax H3 文生视频 / ……
  *
  * 【为什么单独一个文件】
  * agent.js 是聊天交互（2400+ 行），providers.js 是本地模型配置。
@@ -12,7 +14,7 @@
  *
  * 【数据来源】
  * 全部来自服务端 /api/agent/settings —— 前端不硬编码任何取值集合
- * （合法值、默认���、能力清单都由服务端下发）。
+ * （合法值、默认值、能力清单、每个生成类型的字段规格都由服务端下发）。
  */
 (function () {
   "use strict";
@@ -25,6 +27,9 @@
     limits: {},
     deps: {},
     options: { models: [], attentions: [], accels: [], aspects: [], mps: [] },
+    // 【A4】按生成类型分别配置的默认参数 + 字段规格
+    genDefaults: {},
+    genSpec: {},
     loading: false,
     saving: false,
   };
@@ -85,6 +90,13 @@
       state.t2v = d.t2v_defaults || {};
       state.limits = d.limits || {};
       state.deps = d.dependencies || {};
+      // 【A4】每个生成类型一份的默认参数 + 字段规格。
+      //
+      // 【为什么两个都要】genDefaults 是「当前生效值」（每个生成类型一份），
+      // genSpec 是「这个生成类型有哪些参数、合法取值是什么」——
+      // 控件全部按 spec 渲染，前端不硬编码任何取值集合。
+      state.genDefaults = d.gen_defaults || {};
+      state.genSpec = d.gen_defaults_spec || {};
       state.loading = false;
       // 可选值清单随同一次响应下发（本地常量，瞬时）—— 不再单独等一个
       // 会去探测 ComfyUI 的慢端点。
@@ -138,7 +150,12 @@
       renderLimits(),
       renderCapabilities(),
       renderEngines(),
-      renderT2vDefaults(),
+      // 【2026-11-14 需求 A4】原来这里还有一个独立的「文生视频默认参数」区块，
+      // 现在它并入 renderGenDefaults() 的「文生视频」一节（沿用历史控件 id：
+      // agmT2vModel / agmT2vAttention / agmT2vAccel）。
+      // 【为什么不留第二份控件】两份控件指向同一份配置 = 两个真相源，
+      // 用户改 A 处、B 处显示旧值，是典型的「看起来能改但存不进去」。
+      renderGenDefaults(),
     ].join("");
     bind();
   }
@@ -265,75 +282,142 @@
           「9898 聚合引擎」默认指向本机
           <code>http://127.0.0.1:9898/api/openwebui/tools/search_general</code>；
           局域网其它机器访问本 Studio 时把它改成
-          <code>http://192.168.3.78:9898/...</code>。
+          <code>http://192.168.3.78:9898/api/openwebui/tools/search_general</code>。
           连通性自检会**真发一次请求**，不是只校验 URL 格式。
         </div>
       </div>`;
   }
 
-  function renderT2vDefaults() {
-    const t = state.t2v || {};
-    const o = state.options || {};
-    // 【下拉值要能落到「当前生效值」上】
-    // 可选值清单是异步拉来的（/api/video-options 会探测 ComfyUI，可能 60 秒+），
-    // 第一次渲染时清单还没到 —— 这时如果下拉是空的，**当前生效值就没了**，
-    // 用户会以为配置丢了。所以：把当前值**兜底**进选项里。
-    const withCurrent = (list, current, label) => {
-      const items = (list || []).slice();
-      if (current && !items.some(i => i.key === current)) {
-        items.unshift({ key: current, label: label || current });
+  // ------------------------------------------------------------------ A4
+  // 按生成类型分别配置的默认参数
+
+  // t2v 的历史控件 id（浏览器验收脚本 scripts/verify_manage_panel_browser.py
+  // 按这些 id 取值）—— 保留它们，避免改动既有验收脚本。
+  const LEGACY_T2V_IDS = {
+    model_key: "agmT2vModel",
+    attention: "agmT2vAttention",
+    accel_lora: "agmT2vAccel",
+    aspect: "agmT2vAspect",
+    megapixels: "agmT2vMp",
+    duration: "agmT2vDuration",
+  };
+
+  function fieldId(mode, name) {
+    if (mode === "t2v" && LEGACY_T2V_IDS[name]) return LEGACY_T2V_IDS[name];
+    return `agmGen_${mode}_${name}`;
+  }
+
+  // 【下拉值要能落到「当前生效值」上】
+  // 可选值清单可能与库里存的旧值不一致（模型下线 / 清单更新）——
+  // 这时把当前值**兜底**进选项里，否则用户看到的下拉会是空的，
+  // 以为配置丢了。
+  function withCurrent(options, current) {
+    const items = (options || []).slice();
+    const text = current == null ? "" : String(current);
+    if (text && !items.some(o => String(o.value) === text)) {
+      items.unshift({ value: text, label: text + "（已下线 / 不在当前清单）" });
+    }
+    return items;
+  }
+
+  function renderField(mode, field, value) {
+    const id = fieldId(mode, field.name);
+    const label = field.label || field.name;
+    const note = field.note ? ` title="${esc(field.note)}"` : "";
+    const type = field.type || "string";
+    let control = "";
+    if (type === "enum") {
+      const options = withCurrent(field.options, value)
+        .map(o => `<option value="${esc(o.value)}"${String(o.value) === String(value) ? " selected" : ""}>${esc(o.label)}</option>`)
+        .join("");
+      control = `<select id="${esc(id)}"${note}>${options}</select>`;
+    } else if (type === "number" || type === "integer") {
+      const min = field.min != null ? ` min="${esc(field.min)}"` : "";
+      const max = field.max != null ? ` max="${esc(field.max)}"` : "";
+      const step = field.step != null ? ` step="${esc(field.step)}"` : " step=\"1\"";
+      control = `<input type="number" id="${esc(id)}"${min}${max}${step}`
+        + ` value="${esc(value == null ? "" : value)}"${note}>`;
+    } else if (type === "boolean") {
+      control = `<input type="checkbox" id="${esc(id)}"${value ? " checked" : ""}${note}>`;
+    } else {
+      control = `<input type="text" id="${esc(id)}" value="${esc(value == null ? "" : value)}"${note}>`;
+    }
+    const hint = field.note ? `<div class="agm-field-note">${esc(field.note)}</div>` : "";
+    return `
+      <label class="agm-field">
+        <span>${esc(label)}</span>
+        ${control}
+        ${hint}
+      </label>`;
+  }
+
+  function renderGenDefaults() {
+    const spec = state.genSpec || {};
+    const modes = Object.keys(spec);
+    if (!modes.length) {
+      return '<div class="agm-section"><div class="agm-hint">服务端未下发生成类型规格</div></div>';
+    }
+    const sections = modes.map(mode => {
+      const info = spec[mode] || {};
+      const label = info.label || mode;
+      const supported = !!info.supported;
+      const values = (state.genDefaults || {})[mode] || {};
+      const fields = info.fields || [];
+      if (!supported) {
+        // 【为什么要显式标注「无参数」而不是留空白】
+        // 留空白 = 用户以为「这里还没配」；显式标注 = 用户知道
+        // 这个生成类型**本来就没有**可调的生成参数。
+        return `
+          <details class="agm-gen">
+            <summary class="agm-gen-head">
+              <span class="agm-gen-title">${esc(label)}</span>
+              <span class="agm-tag">${esc(mode)}</span>
+              <span class="agm-tag req">无可调参数</span>
+            </summary>
+            <div class="agm-gen-body">
+              <div class="agm-hint">${esc(info.note || "该生成类型没有可调的生成参数。")}</div>
+            </div>
+          </details>`;
       }
-      return items;
-    };
-    const modelOpts = withCurrent(o.models, t.model_key).map(m =>
-      `<option value="${esc(m.key)}"${t.model_key === m.key ? " selected" : ""}>${esc(m.label)}</option>`
-    ).join("");
-    const attnOpts = withCurrent(o.attentions, t.attention).map(a =>
-      `<option value="${esc(a.key)}"${t.attention === a.key ? " selected" : ""}>${esc(a.label)}</option>`
-    ).join("");
-    const accelOpts = withCurrent(o.accels, t.accel_lora).map(a =>
-      `<option value="${esc(a.key)}"${t.accel_lora === a.key ? " selected" : ""}>${esc(a.label)}</option>`
-    ).join("");
-    const aspectOpts = withCurrent(o.aspects, t.aspect).map(a =>
-      `<option value="${esc(a.key)}"${t.aspect === a.key ? " selected" : ""}>${esc(a.key)}</option>`
-    ).join("");
-    const mp = Number(t.megapixels || 0.4);
-    const dur = Number(t.duration || 5);
+      const controls = fields.map(f => {
+        const value = values[f.name] !== undefined ? values[f.name] : f.default;
+        return renderField(mode, f, value);
+      }).join("");
+      let note = info.note ? `<div class="agm-hint">${esc(info.note)}</div>` : "";
+      if (mode === "t2v") {
+        // 【兼容说明】这一节的控件沿用**历史 id**（agmT2vModel /
+        // agmT2vAttention / agmT2vAccel / agmT2vAspect / agmT2vMp /
+        // agmT2vDuration）—— 外部验收脚本与老脚本按这些 id 取值，
+        // 改了会让它们失效。值与「t2v_defaults」是同一份。
+        note += `<div class="agm-hint">这一节的控件沿用历史 id`
+          + `（agmT2vModel / agmT2vAttention / agmT2vAccel / agmT2vAspect /`
+          + ` agmT2vMp / agmT2vDuration），与老配置项 <code>t2v_defaults</code>`
+          + ` 是同一份数据 —— 保存时两边同步。</div>`;
+      }
+      // 【为什么 t2v 默认展开】它是历史上唯一的默认参数入口，
+      // 折叠起来会让用户以为「文生视频的默认参数不见了」。
+      const open = mode === "t2v" ? " open" : "";
+      return `
+        <details class="agm-gen"${open}>
+          <summary class="agm-gen-head">
+            <span class="agm-gen-title">${esc(label)}</span>
+            <span class="agm-tag">${esc(mode)}</span>
+          </summary>
+          <div class="agm-gen-body">
+            <div class="agm-row">${controls}</div>
+            ${note}
+          </div>
+        </details>`;
+    }).join("");
     return `
       <div class="agm-section">
-        <div class="agm-section-title">文生视频默认参数（MiniMax H3）</div>
-        <div class="agm-row">
-          <label class="agm-field">
-            <span>底模</span>
-            <select id="agmT2vModel">${modelOpts}</select>
-          </label>
-          <label class="agm-field">
-            <span>注意力机制</span>
-            <select id="agmT2vAttention">${attnOpts}</select>
-          </label>
-          <label class="agm-field">
-            <span>加速 LoRA</span>
-            <select id="agmT2vAccel">${accelOpts}</select>
-          </label>
-          <label class="agm-field">
-            <span>画面比例</span>
-            <select id="agmT2vAspect">${aspectOpts}</select>
-          </label>
-          <label class="agm-field">
-            <span>总像素（MP）</span>
-            <input type="number" id="agmT2vMp" min="0.2" max="2" step="0.1"
-                   value="${esc(mp)}">
-          </label>
-          <label class="agm-field">
-            <span>时长（秒）</span>
-            <input type="number" id="agmT2vDuration" min="2" max="60" step="1"
-                   value="${esc(dur)}">
-          </label>
-        </div>
+        <div class="agm-section-title">按生成类型配置默认参数</div>
         <div class="agm-hint">
-          默认 = comfy kitchen 注意力机制 + dmad 加速 LoRA（用户 2026-11-13 审查目标 5）。
-          每一项都可以改 —— 改完立即生效，不用重启服务。
+          每个生成类型一份默认参数。Agent 建任务时：<b>用户/模型显式给的参数优先</b>，
+          没给的用这里的值；再没有才用工作流内置默认值。
+          改完点「保存配置」即生效（不用重启服务）。
         </div>
+        <div class="agm-gen-list">${sections}</div>
       </div>`;
   }
 
@@ -389,23 +473,62 @@
     });
     settings.search_engines = engines;
 
-    settings.t2v_defaults = settings.t2v_defaults || {};
-    const pick = (id, key, cast) => {
-      const el = $(id);
-      if (!el) return;
-      const value = cast(el.value);
-      if (value !== null && value !== undefined && !Number.isNaN(value)) {
-        settings.t2v_defaults[key] = value;
-      }
+    // ---- A4：按生成类型分别配置的默认参数 ----
+    //
+    // 【为什么要按 spec 的字段表来读】服务端下发的字段规格是**唯一真源**，
+    // 前端不硬编码任何字段名/类型/取值 —— 加一个新生成类型时，
+    // 前端一行代码都不用改。
+    const spec = state.genSpec || {};
+    const genDefaults = {};
+    Object.keys(spec).forEach(mode => {
+      const info = spec[mode] || {};
+      if (!info.supported) return;
+      const values = {};
+      (info.fields || []).forEach(f => {
+        const el = $("#" + CSS.escape(fieldId(mode, f.name)));
+        if (!el) return;
+        values[f.name] = readField(f, el);
+      });
+      genDefaults[mode] = values;
+    });
+    settings.gen_defaults = genDefaults;
+
+    // ---- 兼容镜像：老的 t2v_defaults ----
+    //
+    // 【为什么还要写它】老客户端 / 老脚本只认 t2v_defaults。
+    // 服务端会把两者同步（写入时以 gen_defaults 为准，
+    // 但**显式给出**的老字段优先），所以这里照旧提交一份。
+    //
+    // 【注意】t2v 的控件用的是**历史 id**（agmT2vModel 等），
+    // 所以上面的采集已经把值读进 gen_defaults.t2v 了 ——
+    // 这里只是把它投影成老结构（6 个字段）。
+    const t2vValues = genDefaults.t2v || {};
+    settings.t2v_defaults = {
+      model_key: t2vValues.model_key || (state.t2v || {}).model_key || "",
+      attention: t2vValues.attention || (state.t2v || {}).attention || "",
+      accel_lora: t2vValues.accel_lora || (state.t2v || {}).accel_lora || "",
+      aspect: t2vValues.aspect || (state.t2v || {}).aspect || "",
+      megapixels: t2vValues.megapixels != null
+        ? t2vValues.megapixels : (state.t2v || {}).megapixels,
+      duration: t2vValues.duration != null
+        ? t2vValues.duration : (state.t2v || {}).duration,
     };
-    pick("#agmT2vModel", "model_key", v => String(v));
-    pick("#agmT2vAttention", "attention", v => String(v));
-    pick("#agmT2vAccel", "accel_lora", v => String(v));
-    pick("#agmT2vAspect", "aspect", v => String(v));
-    pick("#agmT2vMp", "megapixels", v => Number(v));
-    pick("#agmT2vDuration", "duration", v => Number(v));
 
     return settings;
+  }
+
+  function readField(field, el) {
+    const type = field.type || "string";
+    if (type === "enum") return el.value;
+    if (type === "number" || type === "integer") {
+      const raw = el.value;
+      if (raw === "" || raw == null) return field.default;
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return field.default;
+      return type === "integer" ? Math.round(num) : num;
+    }
+    if (type === "boolean") return !!el.checked;
+    return el.value;
   }
 
   // ------------------------------------------------------------------ 交互
@@ -456,6 +579,8 @@
       state.capabilities = d.capabilities || state.capabilities;
       state.engines = state.settings.search_engines || state.engines;
       state.t2v = state.settings.t2v_defaults || state.t2v;
+      state.genDefaults = d.gen_defaults || state.settings.gen_defaults || {};
+      if (d.gen_defaults_spec) state.genSpec = d.gen_defaults_spec;
       toast("已保存 Agent 管理配置", "ok");
     } catch (e) {
       toast("保存失败：" + (e.message || e), "error");

@@ -1100,6 +1100,45 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> dict | Non
                                for s in i.get("suggestions", [])]})
 
 
+def _user_gen_defaults(ctx) -> dict:
+    """
+    读「agent 管理」里**按生成类型配置**的默认参数。
+
+    【为什么单独一个函数】配置存在服务端的 model_provider_prefs 表里，
+    Agent 侧只能通过 ctx.server 拿 —— 单测里 ctx.server 是替身，
+    没有这个方法时返回空 dict（行为与改动前一致：只用内置默认值）。
+    """
+    server = getattr(ctx, "server", None)
+    getter = getattr(server, "agent_settings_snapshot", None)
+    if getter is None:
+        return {}
+    try:
+        snapshot = getter()
+    except Exception:
+        return {}
+    if not isinstance(snapshot, dict):
+        return {}
+    settings = snapshot.get("settings")
+    if not isinstance(settings, dict):
+        settings = snapshot
+    values = settings.get("gen_defaults")
+    return values if isinstance(values, dict) else {}
+
+
+def _explicit_args(args: dict) -> set:
+    """本次请求里**用户/模型显式给出**的参数名集合（值非空才算）。"""
+    out: set = set()
+    for key, value in (args or {}).items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        if isinstance(value, (list, dict)) and not value:
+            continue
+        out.add(key)
+    return out
+
+
 @tool(
     "create_job",
     "创建一个生成任务并放进 ComfyUI 队列。任务会出现在工作台的「生成」列表里。"
@@ -1437,6 +1476,7 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
         mode_defaults = agent_schema.mode_defaults(mode)
     except Exception:
         mode_defaults = {}
+    builtin_filled: set = set()
     for key, value in (mode_defaults or {}).items():
         # 用户显式给了 -> 跳过（**默认不覆盖用户**）
         raw = args.get(key)
@@ -1447,6 +1487,39 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
             continue
         params[key] = value
         defaults_applied.append(key)
+        builtin_filled.add(key)
+
+    # ------------------------------------------------------------------
+    # 【2026-11-14 需求 A4】管理页里「每个生成类型分别配置的默认参数」
+    #
+    # 【优先级 —— 谁赢】
+    #   1) 用户/模型**显式传**的值        （最高）
+    #   2) 管理页里该生成类型的默认参数   （本段）
+    #   3) 工作流的内置默认值              （agent_schema.mode_defaults，上面那段）
+    #
+    # 【为什么放在内置默认值之后】管理页的值是**用户显式配过的**，
+    # 必须压过工作流内置默认值；而用户这次请求里显式传的值又必须压过
+    # 管理页的值 —— 三层优先级，顺序不能反。
+    #
+    # 【t2v 单独处理】t2v 的默认参数走服务端归一入口
+    # （server.prepare_agent_t2v_params），那里还要做节点探测与
+    # accel_loras 数组转换 —— 这里不能重复套。
+    if mode != "t2v":
+        try:
+            from . import gen_defaults
+            user_defaults = _user_gen_defaults(ctx)
+            if user_defaults:
+                explicit = _explicit_args(args)
+                applied = gen_defaults.merge_into_params(
+                    mode, params, user_defaults, explicit=explicit,
+                    overridable=builtin_filled)
+                for key in applied:
+                    if key not in defaults_applied:
+                        defaults_applied.append(key)
+        except Exception:
+            # 默认参数套用失败**不能阻断建任务** ——
+            # 少几个默认值只是「用了工作流内置值」，总比任务建不出来好。
+            pass
 
     # ------------------------------------------------------------------
     # 【2026-11-14 需求 2c】增强提示词路线
