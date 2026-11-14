@@ -1,0 +1,26 @@
+=== D11 收口轮：失败名单 diff（baseline -> after fix）===
+baseline: 9 条失败
+after:    0 条失败
+
+--- diff（1,9d0 = baseline 的 9 条失败全部被修复，无新增失败）---
+1,9d0
+< FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_d1_and_its_derived_do_not_both_appear
+< FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_derived_filter_uses_filename_not_relative_path
+< FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_moss_derived_prefix_is_never_in_available_list
+< FAILED tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_renders_qkv_tag
+< FAILED tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_style_defines_qkv_tag
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_convertible_gets_auto_convert_badge
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_not_convertible_gets_unusable_badge
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_info_modal_shows_weight_shape_row
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_split_shape_gets_no_qkv_badge
+
+--- baseline 失败明细 ---
+FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_d1_and_its_derived_do_not_both_appear
+FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_derived_filter_uses_filename_not_relative_path
+FAILED tests/test_d11_moss_lora_final.py::TestDerivedFilesNotListed::test_moss_derived_prefix_is_never_in_available_list
+FAILED tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_renders_qkv_tag
+FAILED tests/test_d11_moss_lora_final.py::TestShapeIsReportedAndSurfaced::test_frontend_style_defines_qkv_tag
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_convertible_gets_auto_convert_badge
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_not_convertible_gets_unusable_badge
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_info_modal_shows_weight_shape_row
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_split_shape_gets_no_qkv_badge
