@@ -226,9 +226,10 @@ def main():
                          if "/files/" not in r.get("url", "")]
         record("无失败请求（排除媒体预览中止）", len(real_failures) == 0,
                json.dumps(real_failures[:5], ensure_ascii=False))
-        record("媒体预览中止数（正常现象）",
-               len(failed_requests) - len(real_failures),
-               f"共 {len(failed_requests)} 条 /files/ 中止")
+        media_aborts = len(failed_requests) - len(real_failures)
+        record("媒体预览中止（正常现象，0 或多条均可）", True,
+               f"共 {media_aborts} 条 /files/ 中止"
+               f"{'（本次为 0，说明没有资源被中途回收）' if media_aborts == 0 else ''}")
 
         browser.close()
     _dump()
