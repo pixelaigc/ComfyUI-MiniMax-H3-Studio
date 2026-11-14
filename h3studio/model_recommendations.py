@@ -457,6 +457,52 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
+    # 【2026-11-14 新增】Ref2VA 专用权重（参考生视频用）。
+    # 官方 ref2va 权重同样不附作者说明文件 -> 与 fl2va 系同一套口径：
+    # 20 步 / simple / res_multistep 是**本项目工作流的默认档位**
+    # （无加速 LoRA 时），不是作者推荐值。
+    "ref2va_pruned_int8": _normalize(_rec(
+        steps=20,
+        scheduler="simple",
+        sampler="res_multistep",
+        shift_video=12.0,
+        shift_audio=3.0,
+        base_model=None,
+        source_kind="comfyui",
+        source=(
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/h3_video_modes.py"
+            "（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）"
+        ),
+        note=(
+            "Ref2VA 权重（参考生视频专用）**不附作者说明文件** -> 作者未提供采样参数。"
+            "上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，"
+            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值。"
+            "⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），"
+            "与本表（无 LoRA 档）不同，不要混用。"
+        ),
+    )),
+    "ref2va_int8": _normalize(_rec(
+        steps=20,
+        scheduler="simple",
+        sampler="res_multistep",
+        shift_video=12.0,
+        shift_audio=3.0,
+        base_model=None,
+        source_kind="comfyui",
+        source=(
+            "/home/ubuntu/comfyui/comfy/supported_models.py:969-972"
+            "（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改）"
+            " + 本项目工作流档位：h3studio/h3_video_modes.py"
+            "（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）"
+        ),
+        note=(
+            "Ref2VA 权重（参考生视频专用 · 未剪枝）**不附作者说明文件**。"
+            "上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，"
+            "不是作者推荐值；shift 12/3 是 ComfyUI 的模型硬性值。"
+        ),
+    )),
     "fl2va_pruned_w4a8": _normalize(_rec(
         steps=20,
         scheduler="simple",

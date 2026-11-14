@@ -1187,7 +1187,31 @@ window.VIDEO_PANEL_FALLBACK = {
     }
   ],
   "default_attention": "default",
-  "accel_lora_combos": [
+  "accel_loras": [
+    {
+      "name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+      "display": "Turbo 4 步 · ckpt850",
+      "purpose": "H3 Turbo 4 步路径的加速 LoRA：把 20 步压到 4 步。",
+      "recommended_strength": 1.0,
+      "recommended_steps": 4,
+      "note": "259 个层全部命中（实测），AdaLN 输入 2688 维，与未剪枝 int8 / BF16 完全匹配。",
+      "key": "ckpt850",
+      "available": true,
+      "loader": "MiniMaxH3TurboLoRA",
+      "loader_label": "Turbo 节点（支持剪枝底模 AdaLN 运行期重注入）"
+    },
+    {
+      "name": "minimax_h3_turbo_v4_step600_ema.safetensors",
+      "display": "Turbo 4 步 · v4-step600",
+      "purpose": "同族的另一枚 EMA 权重，官方 4 步档的推荐版本。",
+      "recommended_strength": 1.0,
+      "recommended_steps": 4,
+      "note": "259 个层全部命中（实测），与 ckpt850 等价。",
+      "key": "v4step600",
+      "available": true,
+      "loader": "MiniMaxH3TurboLoRA",
+      "loader_label": "Turbo 节点（支持剪枝底模 AdaLN 运行期重注入）"
+    },
     {
       "name": "h3_lightx2v/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
       "display": "LightX2V 4 步（768p 档）",
@@ -1196,7 +1220,9 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 4,
       "note": "208 个层全部命中（实测，形状也对得上），但不含 AdaLN —— 它假设底模是完整的 BF16/INT8 版本。",
       "key": "lightx2v_4step_768p",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     },
     {
       "name": "minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors",
@@ -1206,7 +1232,9 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 4,
       "note": "208 个层全部命中（实测）。本机的 MiniMaxH3LightX2VSLAKJSageComposerT8Advanced 节点默认就指向它。",
       "key": "lightx2v_4step_sla_768p",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     },
     {
       "name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
@@ -1216,7 +1244,9 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 8,
       "note": "208 个层全部命中（实测），训练 alpha=8 / scale=0.0625。这是官方模板 Note 指向的 8 步权重（根目录那一份）。",
       "key": "lightx2v_8step",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     },
     {
       "name": "dmad_minimax_h3_4step_full_critic_comfyui.safetensors",
@@ -1226,7 +1256,9 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 4,
       "note": "208 个层全部命中（实测），不含 AdaLN。",
       "key": "dmad_4step_critic",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     },
     {
       "name": "h3/h3_speed_slider_1.1.safetensors",
@@ -1236,7 +1268,9 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 0,
       "note": "体积极小（9 MB），只动 1 个层（实测），与其它加速 LoRA 不冲突。",
       "key": "speed_slider",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     },
     {
       "name": "h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.safetensors",
@@ -1246,34 +1280,12 @@ window.VIDEO_PANEL_FALLBACK = {
       "recommended_steps": 20,
       "note": "208 个层全部命中（实测）。它训练时的步数区间是 15-30，配 4 步蒸馏档属于超出训练分布的用法。",
       "key": "better_motion",
-      "available": true
+      "available": true,
+      "loader": "LoraLoaderModelOnly",
+      "loader_label": "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）"
     }
   ],
-  "fixed_accel_loras": [
-    {
-      "name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
-      "display": "Turbo 4 步 · ckpt850（工作流固定）",
-      "purpose": "H3 Turbo 4 步路径的固定加速 LoRA：把 20 步压到 4 步。",
-      "recommended_strength": 1.0,
-      "recommended_steps": 4,
-      "fixed": true,
-      "note": "259 个层全部命中（实测），AdaLN 输入 2688 维，与未剪枝 int8 / BF16 完全匹配。",
-      "key": "ckpt850",
-      "available": true
-    },
-    {
-      "name": "minimax_h3_turbo_v4_step600_ema.safetensors",
-      "display": "Turbo 4 步 · v4-step600（工作流固定）",
-      "purpose": "同族的另一枚 EMA 权重，官方 4 步档的推荐版本。",
-      "recommended_strength": 1.0,
-      "recommended_steps": 4,
-      "fixed": true,
-      "note": "259 个层全部命中（实测），与 ckpt850 等价。",
-      "key": "v4step600",
-      "available": true
-    }
-  ],
-  "default_fixed_accel_lora": "ckpt850",
+  "default_accel_lora": "",
   "aspects": [
     {
       "key": "1:1",

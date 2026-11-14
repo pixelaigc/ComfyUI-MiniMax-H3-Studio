@@ -1033,6 +1033,24 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 }
 .queue-cancel:hover { color: var(--danger); border-color: var(--danger); }
 
+/* ---------- A5：状态异常的队列条目 ----------
+   【为什么要有这一组样式】
+   「运行中」不再是一个绝对可信的状态 —— 它可能是：
+     * 已超时（跑太久了）
+     * 已丢失（ComfyUI 队列与历史里都没有它）
+     * 状态未知（ComfyUI 读不到，判定不了）
+   这三种都必须**看起来和正常的「运行中」不一样**，
+   否则用户还是在干等。已丢失/已超时用 danger 色（出事了），
+   状态未知用 muted 色（不确定，但不是明确的失败）。 */
+.queue-item.is-warn-timeout .queue-state,
+.queue-item.is-warn-lost .queue-state { color: var(--danger); }
+.queue-item.is-warn-timeout .queue-pos,
+.queue-item.is-warn-lost .queue-pos { color: var(--danger); }
+.queue-item.is-warn-unknown .queue-state { color: var(--muted); }
+.queue-item.is-warn-unknown .queue-pos { color: var(--muted); }
+.queue-item.is-warn-timeout,
+.queue-item.is-warn-lost { background: #fdf3f3; }
+
 /* 生成按钮的「已入队」态 —— 不阻塞、可继续点击提交 */
 .gen-btn.queued {
   background: var(--accent-soft);
@@ -2442,6 +2460,29 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 .agm-testing { color: var(--muted); }
 .agm-test-ok { color: #1f7a3d; }
 .agm-test-fail { color: #c0392b; }
+
+/* 【2026-11-14 需求 A4】按生成类型配置默认参数的折叠区块 */
+.agm-gen-list { display: flex; flex-direction: column; gap: 8px; }
+.agm-gen {
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+}
+.agm-gen[open] { border-color: var(--accent); }
+.agm-gen-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 11px; cursor: pointer; list-style: none;
+}
+.agm-gen-head::-webkit-details-marker { display: none; }
+.agm-gen-head::before {
+  content: "\25B8"; color: var(--muted); font-size: 11px;
+  transition: transform .15s ease;
+}
+.agm-gen[open] .agm-gen-head::before { transform: rotate(90deg); }
+.agm-gen-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.agm-gen-body {
+  padding: 4px 11px 11px; display: flex; flex-direction: column; gap: 8px;
+  border-top: 1px solid var(--border);
+}
+.agm-field-note { font-size: 10px; color: var(--muted); line-height: 1.45; }
 .ag-current-session {
   font-size: 11px; color: var(--muted); margin-top: 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

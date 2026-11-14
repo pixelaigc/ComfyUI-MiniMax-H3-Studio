@@ -30,6 +30,8 @@ import json
 import shutil
 from pathlib import Path
 
+from . import gen_defaults
+
 #: 配置在 model_provider_prefs 表里的 key。
 PREF_KEY = "agent_settings"
 
@@ -181,13 +183,27 @@ def default_t2v_defaults() -> dict:
     return dict(DEFAULT_T2V_DEFAULTS)
 
 
+#: t2v 的**完整**默认参数（= gen_defaults["t2v"]）。
+#:
+#: 【为什么要两个函数】DEFAULT_T2V_DEFAULTS 是老的 6 字段结构（外部脚本
+#: 按这些键取值），而 gen_defaults["t2v"] 现在是 11 字段的完整集
+#: （多了步数 / 采样器 / 调度器 / 两个 sigma shift）。
+#: 老结构保留为**兼容镜像**的一部分 —— 两者取值一致。
+def default_t2v_mirror() -> dict:
+    return dict(gen_defaults.default_values("t2v"))
+
+
 #: 默认配置全量。
 def defaults() -> dict:
     return {
         "max_steps": MAX_STEPS_HARD_CAP,
         "capabilities": dict(DEFAULT_CAPABILITIES),
         "search_engines": [dict(e) for e in DEFAULT_SEARCH_ENGINES],
-        "t2v_defaults": default_t2v_defaults(),
+        # 【2026-11-14 需求 A4】按生成类型分别配置的默认参数。
+        "gen_defaults": gen_defaults.default_gen_defaults(),
+        # 兼容镜像：老结构（t2v_defaults）。读取时它**优先**于
+        # gen_defaults["t2v"]；写入时两者同步。
+        "t2v_defaults": default_t2v_mirror(),
         "file_roots": [],
         "code_exec_timeout_sec": 30,
         "ffmpeg_path": "",
@@ -266,24 +282,43 @@ def normalize_search_engines(raw) -> list[dict]:
 
 
 def normalize_t2v_defaults(raw) -> dict:
-    """文生视频默认参数归一（非法值回落到默认值，不报错）。"""
-    out = default_t2v_defaults()
-    if not isinstance(raw, dict):
-        return out
-    for key in ("model_key", "attention", "accel_lora", "aspect"):
-        value = _clean_str(raw.get(key), 80)
-        if value:
-            out[key] = value
-    for key in ("megapixels", "duration"):
-        try:
-            value = float(raw.get(key))
-        except (TypeError, ValueError):
-            continue
-        if key == "megapixels":
-            value = max(0.2, min(2.0, value))
-        else:
-            value = max(2.0, min(60.0, value))
-        out[key] = value
+    """
+    文生视频默认参数归一（非法值回落到默认值，不报错）。
+
+    【2026-11-14 需求 A4】现在走 gen_defaults 的字段表归一 ——
+    字段比老的 6 个多（步数 / 采样器 / 调度器 / 两个 sigma shift），
+    但**老字段的语义与取值范围完全不变**（老库里的值照样读得出来）。
+    """
+    return gen_defaults.normalize_t2v_legacy(raw)
+
+
+def normalize_gen_defaults(raw, legacy_t2v=None,
+                            legacy_explicit=None) -> dict:
+    """
+    按生成类型分别配置的默认参数归一。
+
+    【为什么需要 legacy_explicit】
+    归一时必须知道「客户端**真的**给了 t2v_defaults 的哪些键」。
+    只有**显式给出的键**才优先于 gen_defaults["t2v"] ——
+    否则老客户端只 PUT 一个 t2v_defaults（6 个字段）时，
+    会把 gen_defaults["t2v"] 里新增的字段（步数/采样器/…）覆盖成默认值，
+    用户在管理页里刚配好的值就被悄悄冲掉了。
+
+    legacy_t2v 是**原始**（未归一）的 t2v_defaults；这里只取它的**键集合**
+    来判断「显式」，取值仍然走同一套字段归一（脏值不进库）。
+    """
+    explicit = legacy_explicit
+    if explicit is None:
+        explicit = (legacy_t2v.keys()
+                    if isinstance(legacy_t2v, dict) else ())
+    out = gen_defaults.normalize_gen_defaults(raw)
+    if "t2v" in out:
+        # 【关键】老结构的取值先归一再合并 —— 不能把**脏值**原样搬进
+        # gen_defaults["t2v"]（脏值会跟着落库，还会覆盖用户新配的值）。
+        legacy_clean = gen_defaults.normalize_t2v_legacy(legacy_t2v)
+        merged = gen_defaults.merge_t2v_with_gen(
+            out["t2v"], legacy_clean, explicit)
+        out["t2v"] = merged
     return out
 
 
@@ -320,7 +355,18 @@ def normalize(payload: dict | None) -> dict:
     base["search_engines"] = (normalize_search_engines(engines)
                                if isinstance(engines, list)
                                else base["search_engines"])
-    base["t2v_defaults"] = normalize_t2v_defaults(payload.get("t2v_defaults"))
+    # 【2026-11-14 需求 A4】按生成类型分别配置的默认参数。
+    #
+    # 【为什么先归一 legacy 再归一 gen】老结构 t2v_defaults 是**兼容镜像**：
+    # 客户端显式给了的键优先于 gen_defaults["t2v"]，没给的键由 gen_defaults 补。
+    # 两边都归一后才合并 —— 脏值不会落库。
+    raw_legacy = payload.get("t2v_defaults")
+    legacy_explicit = (raw_legacy.keys()
+                        if isinstance(raw_legacy, dict) else ())
+    base["gen_defaults"] = normalize_gen_defaults(
+        payload.get("gen_defaults"), raw_legacy, legacy_explicit)
+    # 写库时两者同步 —— 老客户端 / 老脚本读到的永远是最新值。
+    base["t2v_defaults"] = dict(base["gen_defaults"].get("t2v") or {})
     base["file_roots"] = normalize_file_roots(payload.get("file_roots"))
     try:
         timeout = int(payload.get("code_exec_timeout_sec"))

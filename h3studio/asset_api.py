@@ -28,6 +28,11 @@ H3 Studio 资产素材库 —— HTTP 接口层。
   POST   /api/assets/{id}/corrections 追加交互纠错（多轮）
   POST   /api/assets/import/from-media  从媒体库（生成结果）右键入库
   GET    /api/assets/{id}/analyses    分析修订历史
+  GET    /api/assets/player          播放器清单（只含用户主动「添加到播放器」的条目）
+  POST   /api/assets/player/add      加进播放器清单（支持批量）
+  POST   /api/assets/player/remove   从播放器清单移除（支持批量）
+  POST   /api/assets/player/clear    清空播放器清单
+  POST   /api/assets/player/settings 改播放器设置（图片模式每张停止时间）
 """
 import hashlib
 import json
@@ -811,6 +816,134 @@ async def api_job_assets(request):
     return web.json_response({"job_id": job_id, "inputs": input_items, "outputs": output_items})
 
 
+# ------------------------------------------------------------------ 播放器清单
+#
+# 【为什么清单要独立成一套接口，而不是给素材列表加个 filter 参数】
+#   播放列表是「用户主动挑出来的一组东西」，必须**持久化、有序、跨重启保留**。
+#   如果走列表接口的 filter（?in_player=1），清单就退化成「当前筛选条件」，
+#   一关页面就没了 —— 这正是原实现「播放列表 = 当前页全部素材」的病根。
+
+
+def _asset_ids_from_payload(payload) -> list[str]:
+    """
+    从请求体里取素材 id 列表。
+
+    接受两种写法（前端两种都用得上）：
+      {"asset_ids": ["a", "b"]}   批量
+      {"asset_id": "a"}          单个
+    """
+    if not isinstance(payload, dict):
+        return []
+    raw = payload.get("asset_ids")
+    if raw is None:
+        raw = payload.get("asset_id")
+    if raw is None:
+        raw = payload.get("ids")
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        raw = [part.strip() for part in raw.replace("，", ",").split(",")]
+    if not isinstance(raw, (list, tuple)):
+        return []
+    return [str(item).strip() for item in raw if str(item).strip()]
+
+
+async def api_player_get(request):
+    """GET /api/assets/player —— 播放器清单（条目 + 图片模式默认停止时间）"""
+    with _library_conn() as conn:
+        state = asset_repo.player_state(conn)
+    return web.json_response(state)
+
+
+async def api_player_add(request):
+    """
+    POST /api/assets/player/add —— 加进播放器清单。
+
+    body: {"asset_ids": ["asset_a", "asset_b"]} 或 {"asset_id": "asset_a"}
+
+    返回 added / skipped / missing 三个列表 —— 前端要**如实告诉用户**
+    哪几个没加上（素材不存在或已在回收站），而不是笼统报「已添加」。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    ids = _asset_ids_from_payload(payload)
+    if not ids:
+        return web.json_response({"error": "请提供素材 id"}, status=400)
+    with _library_conn() as conn:
+        result = asset_repo.player_add(conn, ids)
+        state = asset_repo.player_state(conn)
+    result["ok"] = True
+    result["counts"] = state["counts"]
+    result["message"] = _player_add_message(result)
+    return web.json_response(result)
+
+
+def _player_add_message(result: dict) -> str:
+    """把 added/skipped/missing 翻译成一句人话。"""
+    added = len(result.get("added") or [])
+    skipped = len(result.get("skipped") or [])
+    missing = len(result.get("missing") or [])
+    parts = []
+    if added:
+        parts.append(f"已添加 {added} 项")
+    if skipped:
+        parts.append(f"{skipped} 项已在清单中")
+    if missing:
+        parts.append(f"{missing} 项不存在")
+    return "；".join(parts) or "没有可添加的素材"
+
+
+async def api_player_remove(request):
+    """POST /api/assets/player/remove —— 从清单移除（批量）"""
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    ids = _asset_ids_from_payload(payload)
+    if not ids:
+        return web.json_response({"error": "请提供素材 id"}, status=400)
+    with _library_conn() as conn:
+        result = asset_repo.player_remove(conn, ids)
+        state = asset_repo.player_state(conn)
+    result["ok"] = True
+    result["counts"] = state["counts"]
+    return web.json_response(result)
+
+
+async def api_player_clear(request):
+    """POST /api/assets/player/clear —— 清空清单"""
+    with _library_conn() as conn:
+        result = asset_repo.player_clear(conn)
+        state = asset_repo.player_state(conn)
+    result["ok"] = True
+    result["counts"] = state["counts"]
+    return web.json_response(result)
+
+
+async def api_player_settings(request):
+    """
+    POST /api/assets/player/settings —— 改播放器设置。
+
+    body: {"img_seconds": 5}
+    图片模式的「每张停止时间」存在清单表里，重启后仍生效。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+    if "img_seconds" not in payload:
+        return web.json_response({"error": "缺少 img_seconds"}, status=400)
+    try:
+        with _library_conn() as conn:
+            result = asset_repo.player_set_img_seconds(conn, payload.get("img_seconds"))
+    except LibraryError as exc:
+        return _err(exc)
+    result["ok"] = True
+    return web.json_response(result)
+
+
 # ------------------------------------------------------------------ 接线
 
 
@@ -868,6 +1001,18 @@ def register(app, server_module=None):
     app.router.add_post("/api/assets/{id}/corrections", api_asset_correction)
     app.router.add_get("/api/assets/{id}/analyses", api_asset_analyses)
     app.router.add_post("/api/assets/import/from-media", api_asset_from_media)
+    # 播放器清单（2026-11-14 需求 A2）
+    #
+    # 【为什么 /api/assets/player 不会被 /api/assets/{id} 抢走】
+    #   aiohttp 的 UrlDispatcher.resolve 是**从右往左**逐段回退匹配的
+    #   （url_part = url_part.rpartition("/")[0]），先命中**更具体**的那一段。
+    #   "/api/assets/player" 会先在 resource_index 里精确命中 player 路由，
+    #   根本不会退化到 "/api/assets/{id}"。实测确认（见 tests/test_a23_player.py）。
+    app.router.add_get("/api/assets/player", api_player_get)
+    app.router.add_post("/api/assets/player/add", api_player_add)
+    app.router.add_post("/api/assets/player/remove", api_player_remove)
+    app.router.add_post("/api/assets/player/clear", api_player_clear)
+    app.router.add_post("/api/assets/player/settings", api_player_settings)
     app.router.add_get("/api/jobs/{id}/assets", api_job_assets)
 
 

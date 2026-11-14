@@ -191,6 +191,24 @@
         ? MISSING : `${Math.round(job.elapsed)}s`],
     ]));
 
+    // ---- 【A5 需求】运行状态：真的在跑吗？----
+    //
+    // 【为什么详情框要显示这个】生成库卡片上写着「运行中」时，
+    // 用户点开详情最想确认的就是「它到底还在不在跑」。
+    // 判定**全部来自服务端**（job.running_truth），前端不自己判断。
+    const truth = job.running_truth || null;
+    const truthRows = [];
+    if (truth && truth.state) {
+      truthRows.push(["运行状态", truth.label || truth.state]);
+      if (truth.elapsed_sec !== null && truth.elapsed_sec !== undefined) {
+        truthRows.push(["已运行", `${Math.round(truth.elapsed_sec)} 秒`]);
+      }
+      if (truth.timeout_sec) {
+        truthRows.push(["运行上限", `${Math.round(truth.timeout_sec / 60)} 分钟`]);
+      }
+    }
+    const truthGroup = truthRows.length ? group("运行状态", kv(truthRows)) : "";
+
     // ---- 作者推荐参数（需求 1 / 2 / 5） ----
     const recGroup =
       recBlock(i.model_recommendation, "主模型推荐参数（作者 / ComfyUI 硬性值）") +
@@ -198,7 +216,7 @@
       recBlock(i.fixed_lora_recommendation, "工作流固定 LoRA 推荐参数（作者）");
 
     return modelGroup + loraGroup + sizeGroup + attentionGroup
-      + promptGroup + sourceGroup + recGroup;
+      + promptGroup + sourceGroup + truthGroup + recGroup;
   }
 
   // ------------------------------------------------------------------

@@ -80,6 +80,7 @@ from h3studio import qwen_pe
 from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
+from h3studio import gen_defaults
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import prompt_history as ph
@@ -93,6 +94,17 @@ from h3studio import continuation_service as cont_service
 # status.messages 的条目当「m[0] 是字典」读，导致真正的原因被
 # AttributeError 吞掉，用户只看到原始 Python 异常文本）。
 from h3studio import comfy_errors
+# 【2026-11-14 A5 需求】「运行中」状态的**真实性**判定（纯函数层）。
+#
+# 【为什么要有这一层】worker 的轮询循环原本是 `while True:` ——
+# 只等 comfy_history 出结果，**既没有超时上限，也不看 ComfyUI 的队列**。
+# 于是有两种「永远运行中」：
+#   1. 服务重启后 DB 里残留 status='running' 的行（进程里的 worker 没了，
+#      行还在）-> 卡片永远转圈；
+#   2. ComfyUI 侧的任务已经被取消 / 被清队列 / ComfyUI 重启过
+#      -> history 里没有、队列里也没有 -> worker 永远等下去。
+# 判定逻辑放在纯函数模块里（可离线穷举），server.py 只负责取数。
+from h3studio import running_truth
 # 【2026-11-13 合并说明】model_recommendations（h3-model-meta 分支）：
 # 主模型 / 加速 LoRA 的作者推荐参数元数据（步数/调度器/采样器/音视频 shift）。
 # 与上面的 continuation / comfy_errors 是**互不相关的独立模块**，
@@ -106,6 +118,8 @@ from h3studio import comfy_models
 from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
+from h3studio import h3_audio_track as h3audio
+from h3studio import h3_video_modes as h3modes
 from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
@@ -175,6 +189,13 @@ DEFAULT_CONFIG = {
     "data_dir": str(BASE / "data"),
     "models_dir": "",
     "poll_interval": 1.5,
+    # 【2026-11-14 A5】单个任务的运行上限（秒）。
+    # 超过它就判定为「超时失败」并给出中文原因 —— 不再无限期「运行中」。
+    # 0 = 不限制（不推荐：会退回「永远运行中」的旧行为）。
+    "running_timeout_sec": running_truth.DEFAULT_TIMEOUT_SEC,
+    # 【2026-11-14 A5】「刚提交」的宽限期（秒）：
+    # 提交后这段时间内不判定「任务已丢失」（ComfyUI 可能还没把它放进队列）。
+    "running_lost_grace_sec": running_truth.DEFAULT_LOST_GRACE_SEC,
 }
 
 
@@ -209,6 +230,48 @@ def load_config():
 
 
 CFG = load_config()
+
+
+def _cfg_float(key: str, default: float) -> float:
+    """从配置里取一个浮点数，非法值回落到默认值。
+
+    【为什么需要】config.json 是用户手改的 JSON —— 写成 "1800"（字符串）
+    或写成 "abc" 都会让朴素的 float() 抛异常，把整个服务拖挂。
+    这里统一兜底：配置坏了就当默认值用，并打印一行提示。
+    """
+    try:
+        value = float(CFG.get(key, default))
+    except (TypeError, ValueError):
+        print(f"[config] {key} 不是数字，回落到默认值 {default}")
+        return float(default)
+    if value < 0:
+        print(f"[config] {key} 不能为负，回落到默认值 {default}")
+        return float(default)
+    return value
+
+
+#: 任务运行上限（秒）。0 = 不限制（不推荐 —— 会退回「永远运行中」）。
+RUNNING_TIMEOUT_SEC = _cfg_float("running_timeout_sec",
+                                running_truth.DEFAULT_TIMEOUT_SEC)
+#: 「刚提交」的宽限期（秒）：这段时间内不判定「任务已丢失」。
+RUNNING_LOST_GRACE_SEC = _cfg_float("running_lost_grace_sec",
+                                    running_truth.DEFAULT_LOST_GRACE_SEC)
+
+#: worker 多久查一次 ComfyUI 的 /queue（秒）。
+#:
+#: 【为什么节流】worker 的轮询循环每 poll_interval（1.5 秒）查一次 history；
+#: 再每轮都查 /queue 会让 ComfyUI 多收 60% 的请求。
+#: 【为什么不能太大】判定「任务已丢失」会因此延迟 —— 用户会多等一会儿
+#: 才看到明确失败。10 秒是个平衡点：延迟感知不到，负载可以忽略。
+QUEUE_CHECK_INTERVAL = 10.0
+
+#: 实时观测缓存的有效期（秒）。
+#:
+#: 【为什么是 3 秒】前端每 2 秒刷一次任务列表。3 秒的缓存意味着
+#: ComfyUI 收到的 /queue 请求最多是前端的 1/1.5，而不是 1:1 ——
+#: ComfyUI 正在跑模型，那边的 HTTP 处理是要排队的，不该被观测拖慢。
+LIVE_STATE_CACHE_TTL = 3.0
+
 DATA = Path(CFG["data_dir"])
 OUT_DIR = DATA / "outputs"
 UPLOAD_DIR = DATA / "uploads"
@@ -273,6 +336,236 @@ def init_db():
         _ensure_jobs_session_column(conn)
         # 迁移可能刚补上这一列 -> 让列名判断重新算一次
         _JOBS_HAS_SESSION_COL.pop(str(DB_PATH), None)
+
+
+# ------------------------------------------------------------------
+# 重启自愈：残留的 status='running'
+# ------------------------------------------------------------------
+#
+# 【为什么需要这一步 —— A5 需求】
+#
+# 「运行中」原本只是一个**声明**（DB 里 status='running'）。
+# 服务重启后：
+#   * 进程里的 worker 没了（内存里的 WORKER.current 变成 None）；
+#   * 但 SQLite 里那些 status='running' 的行**还在**。
+# 于是生成库里的卡片永远显示「运行中」—— 而实际上**没有任何进程在跑它**。
+# 用户看到的界面在骗人。
+#
+# 【修法】服务启动时（init_db 之后）做一次自愈：
+#   1. 把 DB 里所有 status='running' 的行捞出来；
+#   2. 逐条问 ComfyUI：「这个 prompt_id 还在你的队列里吗？还在历史里吗？」；
+#   3. 按结果处置：
+#        * 还在队列里 -> **接管**（起一个观察任务，等 ComfyUI 出结果）；
+#        * 历史里已经有结果 -> **收尾**（落盘产物 + 标记 done/failed）；
+#        * 都没有 -> **标记失败**并写清原因（不再假装在跑）。
+#
+# 【为什么放在启动时而不是每次列表请求时】
+# 自愈是**改状态**的动作 —— 而 /api/jobs 是只读列表接口，
+# 在那里改状态会让「刷新列表」变成「有副作用的写操作」（前端轮询极频繁）。
+# 启动时做一次是幂等且安全的。
+#
+# 【为什么 ComfyUI 不可达时也要处理】
+# 判定不了不等于「还在跑」。留着「运行中」就是留着那个 bug ——
+# 所以明确标记失败 + 说明「ComfyUI 无响应，无法确认」。
+
+def _residual_running_rows() -> list[dict]:
+    """捞出 DB 里所有 status='running' 的行（重启后的残留）。"""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, mode, params, prompt_id, started_at FROM jobs "
+            "WHERE status='running' ORDER BY created_at").fetchall()
+    return [dict(r) for r in rows]
+
+
+async def _finalize_residual_with_outputs(job_id: str, row: dict,
+                                          history_entry) -> None:
+    """把「服务重启期间 ComfyUI 已经跑完」的任务收尾（落盘产物 + 标记终态）。
+
+    失败也不抛 —— 收尾失败就把任务标成 failed（附带原因），
+    绝不能让这一行继续挂在「运行中」。
+    """
+    if not history_entry:
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                "WHERE id=? AND status='running'",
+                (running_truth.RESTART_STALE_REASON, time.time(), job_id))
+        return
+    saved = []
+    try:
+        async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+            for item in _extract_outputs(history_entry):
+                fname = await comfy_download_output(session, item)
+                saved.append({"kind": item["kind"], "file": fname,
+                              "name": item["filename"]})
+        annotate_outputs_with_size(saved)
+    except Exception as exc:
+        print(f"[自愈] 任务 {job_id} 产物下载失败: {exc}")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                "WHERE id=? AND status='running'",
+                (f"服务重启后回收产物失败（{type(exc).__name__}）—— "
+                 f"ComfyUI 已完成该任务，但产物未能取回，请重新提交生成。",
+                 time.time(), job_id))
+        return
+    status_info, is_error, malformed = _history_status(history_entry)
+    if is_error or malformed or not saved:
+        if is_error:
+            reason = _comfy_error_message(status_info)
+        elif malformed:
+            reason = comfy_errors.MALFORMED_STATUS_REASON
+        else:
+            reason = ("服务重启后回收产物失败：ComfyUI 未返回任何产物，"
+                      "请重新提交生成。")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                "WHERE id=? AND status='running'",
+                (reason, time.time(), job_id))
+        return
+    with db() as conn:
+        conn.execute(
+            "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? "
+            "WHERE id=? AND status='running'",
+            (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
+    print(f"[自愈] 任务 {job_id} 已回收 {len(saved)} 个产物并标记成功")
+
+
+async def _adopt_residual_running(job_id: str, row: dict) -> None:
+    """接管「服务重启后仍在 ComfyUI 队列里」的任务。
+
+    起一个后台协程，等 ComfyUI 出结果后收尾；同样有超时上限。
+    它**不占用 worker 的串行队列**（worker 只处理 status='queued'），
+    所以不会挡住其它任务。
+    """
+    prompt_id = row.get("prompt_id") or ""
+    started_at = row.get("started_at") or time.time()
+    try:
+        async with ClientSession(timeout=HTTP_TIMEOUT) as session:
+            deadline = started_at + (RUNNING_TIMEOUT_SEC or 1e9)
+            while True:
+                if time.time() > deadline:
+                    reason = running_truth.timeout_reason(RUNNING_TIMEOUT_SEC)
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                            "WHERE id=? AND status='running'",
+                            (reason, time.time(), job_id))
+                    print(f"[自愈] 接管的任务 {job_id} 超过运行上限，已标记失败")
+                    return
+                await asyncio.sleep(CFG["poll_interval"])
+                with db() as conn:
+                    st = conn.execute("SELECT status FROM jobs WHERE id=?",
+                                      (job_id,)).fetchone()
+                if not st or st["status"] != "running":
+                    return   # 用户取消了 / 别的流程已经收尾
+                hist = await comfy_history(session, prompt_id)
+                if not hist:
+                    continue
+                if hist.get("outputs"):
+                    outs = _extract_outputs(hist)
+                    saved = []
+                    for item in outs:
+                        fname = await comfy_download_output(session, item)
+                        saved.append({"kind": item["kind"], "file": fname,
+                                      "name": item["filename"]})
+                    annotate_outputs_with_size(saved)
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='done', progress=1, outputs=?, "
+                            "finished_at=? WHERE id=? AND status='running'",
+                            (json.dumps(saved, ensure_ascii=False),
+                             time.time(), job_id))
+                    print(f"[自愈] 接管的任务 {job_id} 已完成，回收 {len(saved)} 个产物")
+                    return
+                status_info, is_error, malformed = _history_status(hist)
+                if malformed:
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                            "WHERE id=? AND status='running'",
+                            (comfy_errors.MALFORMED_STATUS_REASON,
+                             time.time(), job_id))
+                    return
+                if is_error:
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                            "WHERE id=? AND status='running'",
+                            (_comfy_error_message(status_info), time.time(), job_id))
+                    return
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        print(f"[自愈] 接管的任务 {job_id} 失败: {exc}")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                "WHERE id=? AND status='running'",
+                (f"服务重启后接管该任务失败（{type(exc).__name__}）—— "
+                 f"请重新提交生成。", time.time(), job_id))
+
+
+async def _heal_residual_running() -> dict:
+    """服务启动时的「残留 running」自愈（见上面的说明）。
+
+    返回统计：{"healed": n, "failed": n, "adopted": n, "finalized": n}
+    """
+    report = {"healed": 0, "failed": 0, "adopted": 0, "finalized": 0}
+    rows = _residual_running_rows()
+    if not rows:
+        return report
+    print(f"[自愈] 发现 {len(rows)} 条重启前残留的「运行中」任务，开始核对 ComfyUI")
+    queue_ids = None
+    history_cache: dict[str, object] = {}
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=8)) as session:
+            queue_ids = await fetch_comfy_queue_ids(session)
+            for row in rows:
+                job_id = row["id"]
+                prompt_id = row.get("prompt_id") or ""
+                history_entry = None
+                if prompt_id:
+                    if prompt_id not in history_cache:
+                        try:
+                            history_cache[prompt_id] = await comfy_history(
+                                session, prompt_id)
+                        except Exception:
+                            history_cache[prompt_id] = None
+                    history_entry = history_cache[prompt_id]
+                plan = running_truth.plan_residual_running(
+                    prompt_id=prompt_id,
+                    history_entry=history_entry,
+                    queue_ids=queue_ids,
+                    started_at=row.get("started_at"),
+                    now=time.time(),
+                )
+                action = plan["action"]
+                if action == "fail":
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                            "WHERE id=? AND status='running'",
+                            (plan["reason"], time.time(), job_id))
+                    report["failed"] += 1
+                    print(f"[自愈] 任务 {job_id} 已标记失败：{plan['reason']}")
+                elif action == "finalize":
+                    # ComfyUI 那边**已经跑完了**（服务重启期间出的结果）。
+                    # 把产物落盘并收尾 —— 不能白扔一次已经算好的生成。
+                    await _finalize_residual_with_outputs(job_id, row, history_entry)
+                    report["finalized"] += 1
+                elif action == "adopt":
+                    # 任务**还在 ComfyUI 队列里** -> 接管它。
+                    # 不接管 = 任务永远卡在「运行中」（这正是要修的坑）。
+                    asyncio.create_task(_adopt_residual_running(job_id, row))
+                    report["adopted"] += 1
+                    print(f"[自愈] 任务 {job_id} 仍在 ComfyUI 队列中，已接管等待结果")
+    except Exception as exc:
+        # 自愈本身失败**不能**让服务起不来 —— 只打印日志。
+        print(f"[自愈] 核对 ComfyUI 失败（残留 running 保持原状）: {exc}")
+    report["healed"] = report["failed"] + report["finalized"] + report["adopted"]
+    return report
 
 
 def _ensure_jobs_session_column(conn) -> None:
@@ -375,13 +668,41 @@ def row_to_job(r):
         # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
         "continuation_info": cont_service.continuation_state(mode, job_params, r["id"]),
         "status": r["status"],
+        # 【2026-11-14 A5】prompt_id 必须下发：实时判定「任务是不是真的还在
+        # ComfyUI 里跑」**必须**拿它去查 /queue。
+        # （ComfyUI 的队列项里 prompt_id 在下标 1，见 running_truth 模块说明。）
+        #
+        # 【为什么要 keys() 兜底】测试里经常直接构造**精简结构**的行
+        # （只挑几列）—— 与下面 session_id 的处理同一个道理：
+        # 缺列就当空串，绝不能 KeyError（那会让「读一条任务」直接崩）。
+        "prompt_id": (r["prompt_id"] if "prompt_id" in r.keys() else "") or "",
         "progress": r["progress"],
         "progress_text": r["progress_text"],
         "error": r["error"],
         "outputs": outputs,
+        # 【2026-11-14 A5】「这条任务**真的**在跑吗」的唯一真源（服务端算好）。
+        #
+        # 【为什么必须由服务端算】前端原来只看 job.status 就渲染「运行中」——
+        # 而 status 是 worker 写进去的**声明**，不是观测：
+        #   * 服务重启后 DB 里残留 status='running' -> 卡片永远转圈；
+        #   * ComfyUI 侧任务已被取消/丢失 -> worker 永远等 -> 永远 running。
+        # 现在服务端把「状态 / 已跑多久 / 运行上限 / 超时时刻」一起下发，
+        # 前端据此兜底显示「已超时 / 状态未知」，**不再自己瞎猜时间**。
+        "running_truth": running_truth.job_running_truth(
+            status=r["status"],
+            started_at=(r["started_at"] if "started_at" in r.keys() else None),
+            now=time.time(),
+            timeout_sec=RUNNING_TIMEOUT_SEC,
+        ),
+        # 运行上限（秒）也单独下发一份 —— 前端队列面板要显示「上限」，
+        # 且老前端（不认识 running_truth）也能用它做最朴素的兜底。
+        "running_timeout_sec": RUNNING_TIMEOUT_SEC,
         # 【2026-11-11】卡片显示用的分辨率 / 比例标签（服务端算好的唯一真源）
         "resolution_info": resolution_info,
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
+        # 【2026-11-14 A5】开始时间要下发：前端据此算「已跑多久」，
+        # 并且在**没有** running_truth 字段时也能自己做最朴素的兜底判定。
+        "started_at": (r["started_at"] if "started_at" in r.keys() else None),
         # 任务归属的 Agent 会话（面板侧建的任务为空）。
         # row["session_id"] 在**迁移前**的老库上不存在 —— 用 keys 兜底，
         # 否则老库一读就 KeyError（init_db 的迁移在进程启动时跑，
@@ -885,6 +1206,11 @@ _ASSET_SLOT_PARAM = {
     "character_ref": "ref_images",
     "ref_video": "ref_videos",
     "source_video": "ref_videos",
+    # 【2026-11-14】参考视频的背景音单独一个槽位 ——
+    # 音轨三选一的 (c) 项要用它。
+    # 以前它被塞进 ref_audios（和独立参考音乐混在一起），
+    # 于是「用参考音乐」与「用参考视频背景音」分不清。
+    "ref_video_audio": "ref_video_audios",
     "ref_audio": "ref_audios",
     "bgm": "ref_audios",
     "voice": "ref_audios",
@@ -911,6 +1237,11 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
         return
 
     grouped: dict[str, list] = {}
+    # 【2026-11-14】参考视频背景音要按**序号**与参考视频配对
+    #（节点的 ref_video_audio_N 必须对应 ref_video_N，否则会报
+    #  "Reference-video soundtrack(s) have no same-numbered video"）。
+    # 所以这里单独记一份带 ordinal 的列表，按 ordinal 排序后回填。
+    video_audio_with_ordinal: list[tuple[int, str]] = []
     with _assets.connect() as conn:
         for item in refs:
             if not isinstance(item, dict):
@@ -938,6 +1269,9 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
 
             key = _ASSET_SLOT_PARAM.get(slot, "ref_images")
             grouped.setdefault(key, []).append(uploaded)
+            if key == "ref_video_audios":
+                video_audio_with_ordinal.append(
+                    (int(item.get("ordinal") or 0), uploaded))
             # 登记引用关系（引用次数因此 +1；删除素材时会被 409 保护）
             _repo.add_ref(conn, asset_id, "job", job_id, slot=slot,
                           ordinal=int(item.get("ordinal") or 0),
@@ -948,6 +1282,11 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
             params[key] = values[0]
         else:
             params[key] = values
+    # 参考视频背景音：按 ordinal 排序（与参考视频的顺序一致）
+    if video_audio_with_ordinal:
+        video_audio_with_ordinal.sort(key=lambda pair: pair[0])
+        params["ref_video_audios"] = [name for _ordinal, name
+                                      in video_audio_with_ordinal]
 
 
 async def _upload_asset_refs(session: ClientSession, job_id: str, params: dict) -> list[str]:
@@ -1203,6 +1542,19 @@ class Worker:
                 # 这里不能再覆盖（会打乱占位与插槽的对应关系）。
                 if params.get("asset_refs") and mode not in ("i2i_qwen", "i2i_h3image"):
                     await _apply_asset_refs(session, job_id, params)
+                    # 【2026-11-14】首尾帧：素材库选的首帧 / 尾帧
+                    # 已在 _apply_asset_refs 里上传成 ComfyUI 文件名，
+                    # 这里补上「本地直接上传」那条路径（两者取其一）。
+                    if mode == "flf":
+                        for key in ("first_frame", "last_frame"):
+                            fname = params.get(key)
+                            if not fname:
+                                continue
+                            lp = UPLOAD_DIR / fname
+                            if not lp.exists():
+                                # 已经是 ComfyUI 侧的上传名（素材库路径）-> 跳过
+                                continue
+                            params[key] = await comfy_upload_image(session, lp)
 
                 # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
                 # 里落进 params["ref_audios"]。这里取第一段，转成
@@ -1275,7 +1627,31 @@ class Worker:
                     ws_progress_listener(session, client_id, prompt_id, job_id, len(workflow)))
 
                 # 轮询 history
+                #
+                # 【2026-11-14 A5 需求】这里原本是**裸的 `while True:`** ——
+                # 只等 comfy_history 出结果，既没有超时上限，也不看 ComfyUI 的队列。
+                # 于是有两种「永远运行中」：
+                #   1. ComfyUI 侧任务已被取消 / 被清队列 / ComfyUI 重启过
+                #      -> history 里没有、队列里也没有 -> 这里永远等下去；
+                #   2. ComfyUI 侧卡死 / 显存不足挂住 -> 同样永远等下去。
+                # 而且它还**占着 Studio 的串行队列**（worker 一次只跑一个），
+                # 后面所有任务全部排队等着，用户看到的是「整个队列不动了」。
+                #
+                # 现在加两道闸：
+                #   * 超时上限（RUNNING_TIMEOUT_SEC，默认 30 分钟）-> 明确失败；
+                #   * 队列核查（/queue）-> prompt_id 既不在 running 也不在 pending、
+                #     且 history 里也没有 -> 判定「任务已丢失」-> 明确失败。
                 try:
+                    # 本次运行的计时基准（DB 里的 started_at；取不到就用当前时间）。
+                    with db() as conn:
+                        started_row = conn.execute(
+                            "SELECT started_at FROM jobs WHERE id=?", (job_id,)).fetchone()
+                    run_started_at = (started_row["started_at"]
+                                      if started_row and started_row["started_at"]
+                                      else time.time())
+                    # 队列核查的节流：不必每轮轮询都打一次 /queue
+                    # （history 每 1.5 秒查一次已经够密了，/queue 稍后再查）。
+                    next_queue_check = 0.0
                     while True:
                         await asyncio.sleep(CFG["poll_interval"])
                         # 检查取消
@@ -1323,6 +1699,45 @@ class Worker:
                                 raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
                             if is_error:
                                 raise RuntimeError(_comfy_error_message(status_info))
+                            # history 有记录但既没产物也不是错误 -> 继续等
+                            # （ComfyUI 还在跑，status 还没落定）。
+
+                        # ---- history 里没有结果 ----
+                        #
+                        # 【A5 需求】这里要判定「这个任务是不是**真的**还在跑」。
+                        # history 为空有两种可能：
+                        #   a) 任务还在 ComfyUI 里跑（正常）；
+                        #   b) 任务在 ComfyUI 里**已经不存在**了
+                        #      （被取消 / 被清队列 / ComfyUI 重启过）
+                        #      -> 旧代码在这里会**永远等下去**。
+                        # 区分 a/b 只能查 ComfyUI 的**队列**：
+                        # prompt_id 既不在 queue_running 也不在 queue_pending
+                        # -> 判定为「已丢失」。
+                        #
+                        # 【为什么不能每轮都查 /queue】那是多一次 HTTP 往返。
+                        # 这里节流成 QUEUE_CHECK_INTERVAL 秒一次 —— 「丢失」
+                        # 最多晚几十秒被判定出来，对用户没有区别。
+                        now = time.time()
+                        if now >= next_queue_check:
+                            next_queue_check = now + QUEUE_CHECK_INTERVAL
+                            state, reason = await resolve_running_state(
+                                session, prompt_id, run_started_at, False)
+                            if state == running_truth.STATE_LOST:
+                                print(f"[worker] 任务 {job_id} 在 ComfyUI 队列中已消失，"
+                                      f"判定为丢失: {reason}")
+                                raise RuntimeError(reason)
+                            if state == running_truth.STATE_TIMEOUT:
+                                print(f"[worker] 任务 {job_id} 超过运行上限"
+                                      f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                                raise RuntimeError(reason)
+                        elif (RUNNING_TIMEOUT_SEC > 0
+                              and now - run_started_at > RUNNING_TIMEOUT_SEC):
+                            # 超时判定**不依赖**队列 —— 队列读不到（ComfyUI 无响应）
+                            # 时也必须能超时退出，否则又会变成「永远运行中」。
+                            print(f"[worker] 任务 {job_id} 超过运行上限"
+                                  f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                            raise RuntimeError(
+                                running_truth.timeout_reason(RUNNING_TIMEOUT_SEC))
                 finally:
                     ws_task.cancel()
                     try:
@@ -1544,6 +1959,10 @@ class Worker:
             ws_task = asyncio.create_task(
                 ws_progress_listener(session, client_id, prompt_id, batch_id, len(workflow),
                                      batch_id=batch_id))
+            # 【A5】批次任务的轮询循环同样需要超时上限与「队列核查」——
+            # 否则一个批次卡住 = 整个任务永远「运行中」（与单张任务同病）。
+            batch_started_at = time.time()
+            next_queue_check = 0.0
             try:
                 while True:
                     await asyncio.sleep(CFG["poll_interval"])
@@ -1573,6 +1992,29 @@ class Worker:
                             raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
                         if is_error:
                             raise RuntimeError(_comfy_error_message(status_info))
+
+                    # ---- history 里没有结果 -> 判定「是否真的还在跑」----
+                    # 同 Worker._run 的 A5 逻辑：队列里也没有 = 任务已丢失；
+                    # 超过运行上限 = 超时。两者都要**明确失败**，不许无限等待。
+                    now = time.time()
+                    if now >= next_queue_check:
+                        next_queue_check = now + QUEUE_CHECK_INTERVAL
+                        state, reason = await resolve_running_state(
+                            session, prompt_id, batch_started_at, False)
+                        if state == running_truth.STATE_LOST:
+                            print(f"[worker] 批次 {batch_id} 在 ComfyUI 队列中已消失，"
+                                  f"判定为丢失: {reason}")
+                            raise RuntimeError(reason)
+                        if state == running_truth.STATE_TIMEOUT:
+                            print(f"[worker] 批次 {batch_id} 超过运行上限"
+                                  f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                            raise RuntimeError(reason)
+                    elif (RUNNING_TIMEOUT_SEC > 0
+                          and now - batch_started_at > RUNNING_TIMEOUT_SEC):
+                        print(f"[worker] 批次 {batch_id} 超过运行上限"
+                              f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                        raise RuntimeError(
+                            running_truth.timeout_reason(RUNNING_TIMEOUT_SEC))
             finally:
                 ws_task.cancel()
                 try:
@@ -1676,51 +2118,50 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         out["model_status_note"] = video_models.model_status_note(model_key)
     out["model_key"] = model_key
 
-    # ---- 固定加速 LoRA ----
-    fixed_key = params.get("fixed_accel_lora") or video_models.VIDEO_FIXED_ACCEL_LORA_DEFAULT
-    fixed = video_models.VIDEO_ACCEL_LORAS.get(fixed_key)
-    if fixed is None:
-        return out, f"未知的固定加速 LoRA {fixed_key}"
-    if not video_models.lora_available(fixed["name"]):
-        return out, f"本机找不到固定加速 LoRA {fixed['name']}"
-    out["fixed_accel_lora"] = fixed_key
-
-    # ---- 可勾选的加速 LoRA 组合（**单选**：一个主模型只能挑一个）----
+    # ---- 加速 LoRA（**一个槽位**，2026-11-14 重构）----
     #
-    # 【2026-11-11 改】原来是「可多选叠加」。现在前端是下拉单选，
-    # 服务端这里也必须收紧 —— 否则绕过前端直接调 API 仍能塞多个，
-    # 两枚 4 步蒸馏 LoRA 叠在一起没有意义（都是把 20 步压到 4 步的
-    # 蒸馏权重，叠加只会互相打架）。
+    # 【旧行为的问题】
+    # 旧实现分两段：「固定加速 LoRA」（恒为 ckpt850，永远生效）+ 「可勾选的
+    # 组合枚」（前端下拉里选的，额外叠加）。于是前端选 LightX2V，工作流里
+    # 仍然是 ckpt850 + LightX2V —— 「选了不生效」就是这么来的。
     #
-    # 兼容旧客户端：老任务里存的是 accel_loras 数组（可能多项）。
-    #   * 全部不兼容 / 未启用 -> 空
-    #   * 有多项 -> 取**第一个可用且兼容的**（保持老任务能重放）
-    combos = []
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = item.get("key") or ""
-        meta = video_models.VIDEO_ACCEL_LORA_COMBOS.get(key)
+    # 【新行为】
+    # 只有一个槽位：前端选哪枚，工作流里就**只挂哪枚**。
+    # 换算由 video_models.resolve_accel_lora_slot 统一做
+    # （兼容 accel_lora / accel_loras / fixed_accel_lora / lora 四套历史字段）。
+    # 显式选「不挂」= 空槽位 -> 工作流走标准多步采样。
+    accel_key, accel_strength = video_models.resolve_accel_lora_slot(params)
+    if accel_key:
+        meta = video_models.accel_lora_meta(accel_key)
         if meta is None:
-            return out, f"未知的加速 LoRA 组合 {key}"
+            return out, f"未知的加速 LoRA {accel_key}"
         if not video_models.lora_available(meta["name"]):
             return out, f"本机找不到加速 LoRA {meta['name']}"
+        # 兼容性必须**实测**（逐层比对权重头）：
+        # 键结构对不上的 LoRA 会被 ComfyUI 静默丢弃 —— 出片照跑但没生效。
         check = video_models.check_h3_lora_compat(meta["name"], model["unet"])
         if not check["compatible"]:
             return out, (f"「{meta['display']}」与当前底模不兼容："
                          f"{check['reason']}")
-        try:
-            strength = float(item.get("strength", meta.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        if strength <= 0:
-            continue
-        combos.append({"key": key, "strength": strength, "enabled": True})
-        # 单选：拿到第一个就停 —— 后面的忽略
-        break
-    out["accel_loras"] = combos
+        if accel_strength <= 0:
+            return out, (f"加速 LoRA「{meta['display']}」的强度必须大于 0"
+                         f"（当前 {accel_strength}）")
+        # 加载节点路由（按权重键名形态实测决定）—— 记进 params，
+        # 让任务卡片能显示「这枚是用哪个节点加载的」，便于排查静默失效。
+        loader = video_models.detect_accel_lora_loader(meta["name"])
+        out["accel_lora"] = accel_key
+        out["accel_lora_strength"] = accel_strength
+        out["accel_lora_loader"] = loader
+        # 兼容老读侧（job_meta / 前端）仍看 accel_loras 数组
+        out["accel_loras"] = [{"key": accel_key, "strength": accel_strength,
+                               "enabled": True}]
+        # 固定枚字段同步（老读侧把它当「工作流固定的那枚」）
+        out["fixed_accel_lora"] = accel_key
+    else:
+        # 显式「不挂加速 LoRA」
+        out["accel_lora"] = ""
+        out["accel_loras"] = []
+        out["fixed_accel_lora"] = ""
 
     # ---- 效果 LoRA（可多选，与加速 LoRA 并列共存）----
     #
@@ -2933,8 +3374,17 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             params["first_frame"] = saved_files["file_first"][0]
         if saved_files.get("file_last"):
             params["last_frame"] = saved_files["file_last"][0]
-        if not params.get("first_frame"):
-            raise JobValidationError("首尾帧模式需要至少上传首帧图片")
+        # 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
+        # 只要给了其中一张就能生成 —— H3 的 I2VA / L2VA 任务类型
+        # 就是「只有首帧」/「只有尾帧」。
+        _flf_slots = {r.get("slot") for r in (asset_refs or [])
+                      if isinstance(r, dict)}
+        if not params.get("first_frame") and "first_frame" not in _flf_slots:
+            if not params.get("last_frame") and "last_frame" not in _flf_slots:
+                raise JobValidationError(
+                    "首尾帧模式需要至少提供首帧或尾帧图片。"
+                    "请从素材库选择首帧 / 尾帧，或直接上传图片。",
+                    code="frame_required")
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
         if not refs:
@@ -2951,7 +3401,27 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                 raise JobValidationError(
                     "参考模式需要至少 1 个参考素材（图片 / 视频 / 音频）")
         else:
-            params["ref_images"] = refs[:3]
+            # 【2026-11-14】参考图上限从 3 张提升到 **9 张**
+            # —— H3 参考生成节点的 ref_images 槽位上限就是 9
+            #（实测 object_info：COMFY_AUTOGROW_V3 min=0 max=9）。
+            # 原来卡 3 张是历史遗留，把能力人为砍掉了。
+            params["ref_images"] = refs[:h3modes.MAX_REF_IMAGES]
+
+    # ---- 音轨三选一（首尾帧 / 参考生视频）----
+    #
+    # 【2026-11-14】B2 需求：音轨三选一
+    #   (a) 使用生成的音乐
+    #   (b) 使用参考音乐作为成片音轨
+    #   (c) 使用参考视频的背景音乐作为成片音轨
+    # 没有参考音乐 / 参考视频时 (b)/(c) **不出现** ——
+    # 可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。
+    if mode in ("flf", "r2v"):
+        _has_ref_audio = bool(params.get("ref_audios"))
+        _has_ref_video_audio = bool(params.get("ref_video_audios"))
+        params["audio_track_source"] = h3audio.normalize_track_source(
+            params.get("audio_track_source"),
+            has_reference_audio=_has_ref_audio,
+            has_reference_video_audio=_has_ref_video_audio)
     elif mode == "i2i_qwen":
         # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
         #
@@ -3375,13 +3845,14 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
     """
     with db() as conn:
         rows = conn.execute(
-            "SELECT id, mode, params, status, created_at FROM jobs "
-            "WHERE status IN ('queued','running') AND mode!='longfilm' "
+            "SELECT id, mode, params, status, created_at, started_at, prompt_id "
+            "FROM jobs WHERE status IN ('queued','running') AND mode!='longfilm' "
             "ORDER BY created_at ASC").fetchall()
     items = []
     running_id = None
     running_mode = ""
     pending = 0
+    now = time.time()
     for index, row in enumerate(rows, start=1):
         job_params = json.loads(row["params"] or "{}")
         status = row["status"]
@@ -3398,6 +3869,16 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
             "created_at": row["created_at"],
             "label": gen_types.type_for_mode(row["mode"])["label"],
             "prompt": str(job_params.get("prompt") or "")[:120],
+            # 【2026-11-14 A5】队列面板也要能区分「真的在跑」与「卡住的 running」。
+            # 这里先给**本地判定**（零 IO）；实时判定由 api_queue 补上。
+            "started_at": row["started_at"],
+            "prompt_id": row["prompt_id"] or "",
+            "running_truth": running_truth.job_running_truth(
+                status=status,
+                started_at=row["started_at"],
+                now=now,
+                timeout_sec=RUNNING_TIMEOUT_SEC,
+            ),
         })
     recent = []
     if recent_limit > 0:
@@ -3432,11 +3913,34 @@ async def api_queue(request):
 
     前端轮询它来渲染队列面板与「已入队（队列 N）」按钮文案。
     纯只读：不建任务、不改状态。
+
+    【2026-11-14 A5】对「运行中」的那一条补上**实时**判定 ——
+    队列面板是这个工作台里最直观的「在不在跑」的展示位，
+    它必须说真话（真在跑 / 已丢失 / 已超时 / 判定不了）。
     """
     snapshot = queue_snapshot()
     items = snapshot["items"]
     if len(items) > QUEUE_VIEW_LIMIT:
         snapshot["items"] = items[:QUEUE_VIEW_LIMIT]
+    # 【A5】实时判定（对**所有**运行中的条目 —— 残留 running 可能有多条）。
+    now = time.time()
+    live_map = await live_states_for_jobs(snapshot["items"], now=now)
+    live_state = ""
+    for item in snapshot["items"]:
+        if item.get("status") != "running":
+            continue
+        state = live_map.get(item.get("id"))
+        item["running_truth"] = running_truth.job_running_truth(
+            status=item["status"],
+            started_at=item.get("started_at"),
+            now=now,
+            timeout_sec=RUNNING_TIMEOUT_SEC,
+            live_state=state,
+        )
+        if not live_state and state:
+            live_state = state
+    snapshot["running_state"] = live_state
+    snapshot["running_timeout_sec"] = RUNNING_TIMEOUT_SEC
     return json_ok(snapshot)
 
 
@@ -3519,9 +4023,41 @@ async def api_list(request):
         job = row_to_job(r)
         job["batches"] = batches_of(r["id"])
         jobs.append(job)
+    # 【2026-11-14 A5】给「正在跑」的**那些**补上**实时**判定。
+    #
+    # 【为什么要「那些」而不是「那一条」—— A5 的核心场景】
+    # 正常情况下 worker 一次只跑一个，running 只有一条；
+    # 但**残留** running 恰恰会出现多条（服务重启前排着几个，
+    # 重启后它们全都卡在 running）。只判定第一条 -> 其余继续显示
+    # 「运行中」-> 缺陷没修干净。
+    #
+    # 【前端据此区分】「真的在跑」vs「卡住的 running」：
+    #   running_truth.state == "active" -> 真的在 ComfyUI 队列里；
+    #   == "lost"                      -> ComfyUI 里已经没了（取消/丢失）；
+    #   == "timeout"                   -> 超过运行上限；
+    #   == "unknown"                   -> 判定不了（ComfyUI 读不到）。
+    now = time.time()
+    live_map = await live_states_for_jobs(jobs, now=now)
+    live_state = ""
+    for job in jobs:
+        if job.get("status") != "running":
+            continue
+        state = live_map.get(job.get("id"))
+        job["running_truth"] = running_truth.job_running_truth(
+            status=job["status"],
+            started_at=job.get("started_at"),
+            now=now,
+            timeout_sec=RUNNING_TIMEOUT_SEC,
+            live_state=state,
+        )
+        if not live_state and state:
+            live_state = state
     return json_ok({"jobs": jobs,
                     "total": total, "page": page, "page_size": page_size,
-                    "running": WORKER.current})
+                    "running": WORKER.current,
+                    # 【A5】实时判定结果（空串 = 没有运行中的任务 / 判定不了）。
+                    "running_state": live_state or "",
+                    "running_timeout_sec": RUNNING_TIMEOUT_SEC})
 
 
 async def api_get(request):
@@ -3532,6 +4068,16 @@ async def api_get(request):
         return web.json_response({"error": "not found"}, status=404)
     job = row_to_job(r)
     job["batches"] = batches_of(jid)
+    # 【2026-11-14 A5】详情接口也要能区分「真的在跑」与「卡住的 running」。
+    if job.get("status") == "running":
+        live_state = await live_state_for_job(job)
+        job["running_truth"] = running_truth.job_running_truth(
+            status=job["status"],
+            started_at=job.get("started_at"),
+            now=time.time(),
+            timeout_sec=RUNNING_TIMEOUT_SEC,
+            live_state=live_state,
+        )
     return json_ok(job)
 
 
@@ -4019,6 +4565,168 @@ async def fetch_comfy_queue(session):
         }
     except Exception:
         return None
+
+
+async def fetch_comfy_queue_ids(session) -> set[str] | None:
+    """读 ComfyUI 队列里**全部** prompt_id（running + pending）。
+
+    【为什么要 prompt_id 而不是个数 —— A5 需求】
+    状态栏只要「在跑几个」（fetch_comfy_queue 就够），但 A5 要回答的是
+    「**我这个**任务还在不在 ComfyUI 里」—— 那必须精确到 prompt_id。
+
+    【为什么返回 None 而不是空集合】
+    空集合 = 「ComfyUI 读到了，队列确实是空的」；
+    None     = 「ComfyUI 读不到（不可达 / 超时）」。
+    这两者的含义**完全不同**：
+      * 把「读不到」当成「空」-> 正在跑的任务会被全部误判成「已丢失」
+        并被杀掉 —— 比原来的 bug 更糟；
+      * 把「空」当成「读不到」-> 卡死的任务永远不会被判定为丢失。
+    判定层必须能区分这两者，所以这里用 None 表达「不知道」。
+
+    【顺带】/queue 的响应体同时给出数量，状态栏可以复用同一次请求
+    （省一次 HTTP 往返）—— 所以这里返回的是 prompt_id 集合，
+    数量由调用方按需要算。
+    """
+    try:
+        async with session.get(f"{COMFY}/queue") as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+    except Exception:
+        return None
+    return running_truth.queue_prompt_ids(data)
+
+
+#: 实时观测（ComfyUI 队列）的缓存有效期（秒）。
+#:
+#: 【为什么要缓存】前端每 2 秒刷一次 /api/jobs。如果每次都去查
+#: ComfyUI 的 /queue，等于把 ComfyUI 的请求量翻倍 —— 而 ComfyUI
+#: 正在跑模型，那边的每一次 HTTP 都要排队。
+#: 3 秒的缓存对「任务是不是还在跑」这个判断来说完全够用
+#: （人眼分辨不出 3 秒的差别），但负载降到 1/6。
+_LIVE_STATE_CACHE: dict = {"at": 0.0, "ids": None}
+
+
+async def live_comfy_queue_ids(force: bool = False) -> set[str] | None:
+    """取 ComfyUI 队列里的 prompt_id 集合（带短缓存）。
+
+    返回 None = ComfyUI 读不到（不可达）—— 与「队列为空」是两件事。
+    """
+    now = time.time()
+    if not force and (now - _LIVE_STATE_CACHE["at"]) < LIVE_STATE_CACHE_TTL:
+        return _LIVE_STATE_CACHE["ids"]
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=5)) as session:
+            ids = await fetch_comfy_queue_ids(session)
+    except Exception:
+        ids = None
+    _LIVE_STATE_CACHE["at"] = now
+    _LIVE_STATE_CACHE["ids"] = ids
+    return ids
+
+
+async def live_state_for_job(row, now: float | None = None,
+                             queue_ids=None) -> str | None:
+    """对一条 status='running' 的任务做**实时**判定（真的在跑？）。
+
+    返回 running_truth.STATE_* 或 None（判定不了 / 不是运行态）。
+
+    【为什么要做实时判定 —— A5 需求 e】
+    「已超时」只说明「跑太久了」；但「ComfyUI 队列里已经没有它了」
+    是更明确的事实（任务已被取消 / 丢失）。两者要能分开。
+
+    【为什么要对 history 也查一次】
+    ComfyUI 的 history 里已经有结果 = 任务其实**跑完了**
+    （只是 Studio 还没来得及收尾）。这种情况不该再显示「运行中」。
+
+    【成本】一次 /queue（走缓存）+ 一次 /history/{prompt_id}。
+    `queue_ids` 可以由调用方传入以复用同一次 /queue 取数。
+    """
+    if str(row["status"] if isinstance(row, dict) else "") != "running":
+        return None
+    data = row if isinstance(row, dict) else dict(row)
+    prompt_id = data.get("prompt_id") or ""
+    if not prompt_id:
+        return running_truth.STATE_UNKNOWN
+    history_present = False
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=5)) as session:
+            hist = await comfy_history(session, prompt_id)
+        history_present = bool(hist)
+    except Exception:
+        hist = None
+    if queue_ids is None:
+        queue_ids = await live_comfy_queue_ids()
+    return running_truth.classify(
+        prompt_id=prompt_id,
+        history_present=history_present,
+        queue_ids=queue_ids,
+        now=now if now is not None else time.time(),
+        started_at=data.get("started_at"),
+        timeout_sec=RUNNING_TIMEOUT_SEC,
+        grace_sec=RUNNING_LOST_GRACE_SEC,
+    )
+
+
+async def live_states_for_jobs(rows, now: float | None = None) -> dict:
+    """对**所有** status='running' 的任务做实时判定。
+
+    返回 {job_id: state}。
+
+    【为什么要「所有」而不是「第一条」—— A5 的核心场景】
+    正常情况下 worker 一次只跑一个，running 只有一条。
+    但**残留** running 恰恰可能出现**多条**（服务重启前排着几个，
+    重启后它们全都卡在 running）。如果只判定第一条，
+    其余的会继续显示「运行中」—— 缺陷没修干净。
+
+    【成本】/queue 只查一次（走缓存 + 同一批复用），
+    history 每个 prompt_id 查一次（残留通常只有 1-3 条）。
+    """
+    result: dict = {}
+    running_rows = [r for r in rows
+                    if str((r.get("status") if isinstance(r, dict) else "") or "")
+                    == "running"]
+    if not running_rows:
+        return result
+    queue_ids = await live_comfy_queue_ids()
+    for row in running_rows:
+        data = row if isinstance(row, dict) else dict(row)
+        job_id = data.get("id")
+        if not job_id:
+            continue
+        result[job_id] = await live_state_for_job(data, now=now,
+                                                  queue_ids=queue_ids)
+    return result
+
+
+async def resolve_running_state(session, prompt_id: str, started_at: float | None,
+                                history_present: bool) -> tuple[str, str]:
+    """判定「这个声称在运行的任务」**真实**处于什么状态。
+
+    返回 `(state, reason)`：
+      * state  —— running_truth.STATE_* 之一；
+      * reason —— 判定为失败态时的中文原因（成功态是空串）。
+
+    【为什么 history_present 由调用方传进来】
+    history 的取数在 worker 的轮询循环里（它已经在查了），再查一次
+    是白白多一次 HTTP 往返。这里只负责**队列**那一份的取数 + 判定。
+    """
+    queue_ids = await fetch_comfy_queue_ids(session)
+    state = running_truth.classify(
+        prompt_id=prompt_id,
+        history_present=history_present,
+        queue_ids=queue_ids,
+        now=time.time(),
+        started_at=started_at,
+        timeout_sec=RUNNING_TIMEOUT_SEC,
+        grace_sec=RUNNING_LOST_GRACE_SEC,
+    )
+    reason = ""
+    if state == running_truth.STATE_LOST:
+        reason = running_truth.LOST_REASON
+    elif state == running_truth.STATE_TIMEOUT:
+        reason = running_truth.timeout_reason(RUNNING_TIMEOUT_SEC)
+    return state, reason
 
 
 async def status_snapshot(session=None):
@@ -4643,21 +5351,19 @@ async def api_video_options(request):
     snapshot = await video_models.refresh_comfy_snapshot_async()
     payload = video_models.options_payload(node_available=node_available,
                                            snapshot=snapshot)
-    # 附带「当前底模下每个加速 LoRA 的实测兼容性」——
-    # 前端据此把对不上的组合从**下拉里剔除**（不是置灰）。
+    # 附带「当前底模下每个加速 LoRA 的实测兼容性」—— 前端据此把对不上的
+    # 从**下拉里剔除**（不是置灰）。
     #
-    # 【2026-11-11 改】加速 LoRA 改成单选：一个主模型只能挑一个加速 LoRA。
-    #   互斥单选的语义：两枚 4 步蒸馏 LoRA 叠在一起没有意义
-    #   （都是把 20 步压到 4 步的蒸馏权重，叠加只会互相打架），
-    #   而「固定 Turbo LoRA」已经在工作流里常驻，用户这一栏选的是
-    #   **额外**的那一枚。
+    # 【2026-11-14 重构】加速 LoRA 统一成一组可选项（不再分「固定枚 /
+    # 组合枚」两栏）。每一项都带 loader（用哪个节点加载）——
+    # 前端在提示里显示它，用户能确认「这枚真的挂上了、用的哪个节点」。
     model_key = request.query.get("model") or payload["default_model"]
     model = video_models.VIDEO_MODELS.get(model_key)
     payload["selected_model"] = model_key
     if model:
         matrix = video_models.accel_lora_compat_matrix(model_key)
-        combos = []
-        for item in payload["accel_lora_combos"]:
+        accels = []
+        for item in payload.get("accel_loras") or []:
             entry = dict(item)
             check = matrix.get(item["key"], {})
             entry["compatible"] = bool(check.get("compatible"))
@@ -4668,8 +5374,10 @@ async def api_video_options(request):
             # 不适配当前底模的**不出现**在下拉里（前端据此过滤）
             entry["selectable"] = bool(entry["compatible"]) and \
                 entry.get("available", True)
-            combos.append(entry)
-        payload["accel_lora_combos"] = combos
+            accels.append(entry)
+        payload["accel_loras"] = accels
+        payload["fixed_accel_loras"] = accels
+        payload["accel_lora_combos"] = []
 
     # 【2026-11-13 新增】作者推荐参数（需求 1 / 2 / 5）
     #
@@ -6346,6 +7054,20 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
         width, height = video_models.video_dimensions(str(out["aspect"]), mp)
         out["width"] = width
         out["height"] = height
+    # 【2026-11-14 需求 A4】通用采样字段：用户（模型）显式给了的值优先，
+    # 没给的才用默认值。
+    #
+    # 【为什么不直接用 gen_defaults.merge_into_params】那个函数给
+    # 「非视频模式」用（字段名直接就是 params 的键）。t2v 的
+    # accel_lora / megapixels 是**专用语义**（要转成 accel_loras 数组 /
+    # 换算成宽高），上面已经处理完了，这里只补通用的那几个键。
+    for key in ("steps", "sampler", "scheduler",
+                "shift_video", "shift_audio"):
+        value = defaults.get(key)
+        if value in (None, ""):
+            continue
+        if out.get(key) in (None, ""):
+            out[key] = value
     return out
 
 
@@ -7134,6 +7856,15 @@ async def api_agent_settings(request):
             "capabilities": agent_settings.capability_state(settings),
             "search_engines": settings.get("search_engines") or [],
             "t2v_defaults": settings.get("t2v_defaults") or {},
+            # 【2026-11-14 需求 A4】按生成类型分别配置的默认参数。
+            #
+            # 【为什么两个都下发】gen_defaults 是**完整**结构（每个生成类型
+            # 一份），t2v_defaults 是**兼容镜像**（老客户端读它）。
+            # 两份都发，前端用 gen_defaults 渲染，老脚本用 t2v_defaults。
+            "gen_defaults": settings.get("gen_defaults") or {},
+            # 字段规格（合法取值清单 + 类型 + 区间）——
+            # 前端**不硬编码**任何取值集合，全部从这里来。
+            "gen_defaults_spec": gen_defaults.spec_payload(),
             "limits": {
                 "max_steps": agent_mod.MAX_STEPS,
                 "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
@@ -7180,7 +7911,12 @@ async def api_agent_settings(request):
     # 立刻把 ffmpeg 路径推给媒体工具模块（下次调用就用新路径）
     agent_media_tools.configure(agent_settings.ffmpeg_path(saved))
     return json_ok({"ok": True, "settings": saved,
-                    "capabilities": agent_settings.capability_state(saved)})
+                    "capabilities": agent_settings.capability_state(saved),
+                    # 【A4】保存后把最新的默认值与规格一起回给前端 ——
+                    # 前端据此刷新界面（归一后的值可能与提交值不同，
+                    # 比如越界的时长被夹回区间）。
+                    "gen_defaults": saved.get("gen_defaults") or {},
+                    "gen_defaults_spec": gen_defaults.spec_payload()})
 
 
 async def api_agent_settings_test_engine(request):
@@ -7513,6 +8249,24 @@ def make_app():
 
 async def main():
     init_db()
+    # 【2026-11-14 A5 需求】服务启动时做一次「残留 running」自愈。
+    #
+    # 【为什么必须在这里做】DB 里 status='running' 的行是**声明**，
+    # 不是观测 —— 进程重启后没有任何 worker 在跑它们了。
+    # 不自愈的话，生成库里的卡片会永远显示「运行中」。
+    #
+    # 【为什么放在 worker.start() 之前】自愈会把「还在 ComfyUI 队列里」的
+    # 任务**接管**（起后台协程等结果）；先自愈再启动 worker，
+    # 接管与正常调度不会互相抢同一个任务。
+    try:
+        heal_report = await _heal_residual_running()
+        if heal_report.get("healed"):
+            print(f"[自愈] 共处理 {heal_report['healed']} 条残留「运行中」任务 "
+                  f"（失败 {heal_report['failed']} / 接管 {heal_report['adopted']} / "
+                  f"回收 {heal_report['finalized']}）")
+    except Exception as exc:
+        # 自愈失败**不能**让服务起不来 —— 只打印日志。
+        print(f"[自愈] 启动自愈异常（不影响服务启动）: {exc}")
     # 资产素材库自检：磁盘是否挂载可用、目录是否可写。
     # 不可用时只打印明确错误，**不破坏既有数据**（不删目录、不清库）。
     lib_report = asset_store.init_db()

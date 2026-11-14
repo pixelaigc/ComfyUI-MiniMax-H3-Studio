@@ -229,6 +229,42 @@ VIDEO_MODELS: dict[str, dict] = {
         "warn": "48 GB 显存的卡单靠这个权重放不下（实测 66.3 GB），"
                 "只适合多卡或换机器时选。",
     },
+    # ---- Ref2VA 专用权重（参考生视频用）----
+    #
+    # 【为什么必须有】参考生视频（r2v）走 Ref2VA 通道 ——
+    # FL2VA 权重没有 Ref2VA 那条路径，用它做参考生成等于没有参考。
+    # 本机实测 ComfyUI 的 UNETLoader 下拉里有 3 个 ref2va 权重
+    # （/models/diffusion_models），之前没登记进清单，
+    # 于是参考生视频只能拿 fl2va 权重凑合 —— 能力被悄悄阉割了。
+    "ref2va_pruned_int8": {
+        "label": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+        "size_mb": 20970,
+        "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+        "pruned": True,
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "cfg": 1.0,
+        "note": "参考生视频（Ref2VA）专用权重，剪枝 int8（20.9 GB）。"
+                "层结构与 FL2VA 同族，Turbo 系加速 LoRA 全部命中。",
+        "supports_ref2va": True,
+    },
+    "ref2va_int8": {
+        "label": "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+        "unet": "minimax_h3_ref2va_int8_convrot.safetensors",
+        "size_mb": 34039,
+        "location": "/home/ubuntu/comfyui/models/diffusion_models",
+        "pruned": False,
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "cfg": 1.0,
+        "note": "未剪枝 int8（34.0 GB），AdaLN 完整 2688 维，"
+                "Turbo 系加速 LoRA 259/259 全部命中。",
+        "supports_ref2va": True,
+        "warn": "体积接近完整版的一半，显存占用比剪枝版高约 12 GB。",
+    },
     "hybrid_fl2va_ref2va": {
         "label": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
         "unet": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
@@ -241,6 +277,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "cfg": 1.0,
         "note": "把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。"
                 "Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。",
+        "supports_ref2va": True,
         "warn": "参考通道（Ref2VA）在文生视频面板里不暴露。",
     },
 }
@@ -249,28 +286,65 @@ VIDEO_DEFAULT_MODEL = "fl2va_pruned_int8"
 # ------------------------------------------------------------------
 # 加速 LoRA
 # ------------------------------------------------------------------
-# 【固定加速 LoRA】—— 工作流硬性必需，始终接上，不出现在可勾选列表里。
-#   ckpt850：H3 Turbo 4 步路径的标配（259 层，AdaLN 2688 维）。
-#   v4step600：同族的另一枚 EMA 权重，官方推荐 4 步档。
-# 「模型版本」里选的是它（与图像面板「模型版本 = 工作流固定挂什么加速 LoRA」
-# 是同一套语义）；下面 VIDEO_ACCEL_LORAS 是**可叠加**的那一批。
+# 【2026-11-14 重构 —— 加速 LoRA 槽位由前端选择驱动】
+#
+# 【旧设计的问题（用户实测报出）】
+#   1. 工作流里把 Turbo 加速 LoRA「ckpt850」**写死**了：
+#      _resolve_accel_chain() 无条件把 fixed_accel_lora（或默认值 ckpt850）
+#      塞进链首，前端在下拉里选的那枚是**额外叠加**在它之后的第二枚。
+#      用户在前端选了 LightX2V / DMAD，工作流里仍然是「ckpt850 + 选的那枚」。
+#   2. 更严重的是**加载节点选错了**：
+#      MiniMaxH3TurboLoRA 节点把 LoRA 的模块名原样当模块路径用
+#      （key_map = {"<module>": "diffusion_model.<module>.weight"}），
+#      所以它**只认裸键名**（`blocks.*` / `token_refiner.*`）。
+#      而 LightX2V / DMAD / better_motion 这一族的键名带 `diffusion_model.`
+#      前缀 —— 节点会把模块名当成 `diffusion_model.diffusion_model.xxx`，
+#      **一个权重都 patch 不上**（实测：416 backbone modules, 0 weights patched）。
+#      出片照跑，但那枚 LoRA 根本没生效 —— 而界面完全看不出来。
+#   3. 结论：「前端选了加速 LoRA，实际不生效」是**两个 bug 叠加**的结果，
+#      光改文案没用，必须同时改「选哪枚」和「用哪个节点加载」。
+#
+# 【新设计】
+#   * 加速 LoRA 变成**一个槽位**（不是固定枚 + 叠加枚）：
+#     前端选哪枚，工作流里就**只挂哪枚**；选「不挂」就不挂。
+#   * 每枚 LoRA 按自己的**键名形态**选加载节点：
+#       - 裸键名（Turbo 系 ckpt850 / v4step600）-> MiniMaxH3TurboLoRA
+#         （它额外处理剪枝底模的 AdaLN 运行期重注入，必须用它）
+#       - 带 diffusion_model. 前缀（LightX2V / DMAD / better_motion …）
+#         -> 核心 LoraLoaderModelOnly
+#         （comfy/lora.py 的 model_lora_keys_unet 对 MiniMaxH3 专门注册了
+#           `key_map[bare] = "diffusion_model.<bare>.weight"`，
+#           所以它**正好**认这一族前缀权重）
+#   * 兼容：老的 params 仍可能带 fixed_accel_lora / accel_loras，
+#     归一时会换算到新槽位（见 resolve_accel_lora_slot）。
+#
+# 【为什么不能一律用 LoraLoaderModelOnly】
+#   剪枝底模（fl2va_pruned_int8 / hybrid）的 adaln_proj 被折叠成 8 维曲线，
+#   Turbo LoRA 的 AdaLN 更新（2688 维）没法做成权重 patch ——
+#   MiniMaxH3TurboLoRA 节点会用 _inject_adaln_egrid() 在运行期重注入。
+#   核心 LoraLoaderModelOnly 没有这个机制，用它挂 ckpt850 会丢掉 51 个
+#   AdaLN 层。所以**按形态分流**是必须的，不是偷懒。
 VIDEO_ACCEL_LORAS: dict[str, dict] = {
     "ckpt850": {
         "name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
-        "display": "Turbo 4 步 · ckpt850（工作流固定）",
-        "purpose": "H3 Turbo 4 步路径的固定加速 LoRA：把 20 步压到 4 步。",
+        "display": "Turbo 4 步 · ckpt850",
+        "purpose": "H3 Turbo 4 步路径的标配：把 20 步压到 4 步。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "fixed": True,
         "note": "259 个层全部命中（实测），AdaLN 输入 2688 维，"
                 "与未剪枝 int8 / BF16 完全匹配。",
     },
     "v4step600": {
         "name": "minimax_h3_turbo_v4_step600_ema.safetensors",
-        "display": "Turbo 4 步 · v4-step600（工作流固定）",
+        "display": "Turbo 4 步 · v4-step600",
         "purpose": "同族的另一枚 EMA 权重，官方 4 步档的推荐版本。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "fixed": True,
         "note": "259 个层全部命中（实测），与 ckpt850 等价。",
     },
@@ -288,6 +362,8 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
                    "在该分辨率下比 Turbo ckpt850 更稳。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "note": "208 个层全部命中（实测，形状也对得上），但不含 AdaLN —— "
                 "它假设底模是完整的 BF16/INT8 版本。",
     },
@@ -298,6 +374,8 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
                    "4 步同时保住长时一致性。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "note": "208 个层全部命中（实测）。本机的 "
                 "MiniMaxH3LightX2VSLAKJSageComposerT8Advanced 节点默认就指向它。",
     },
@@ -319,6 +397,8 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
                    "适合最终成片而不是快速试片。",
         "recommended_strength": 1.0,
         "recommended_steps": 8,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "note": "208 个层全部命中（实测），训练 alpha=8 / scale=0.0625。"
                 "这是官方模板 Note 指向的 8 步权重（根目录那一份）。",
     },
@@ -328,6 +408,8 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
         "purpose": "DMAD 蒸馏 + 判别器 critic：4 步里质量更接近多步采样。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,
+        "recommended_scheduler": "beta",
+        "recommended_sampler": "euler",
         "note": "208 个层全部命中（实测），不含 AdaLN。",
     },
     "speed_slider": {
@@ -515,6 +597,26 @@ VIDEO_DURATION_MIN_OLD = 2.0
 VIDEO_DURATION_MAX_OLD = 15.0
 
 VIDEO_DEFAULT_ATTENTION = "default"
+
+# ------------------------------------------------------------------
+# 「不挂加速 LoRA」时的标准采样档（2026-11-14）
+# ------------------------------------------------------------------
+# 【为什么需要这三个常量】
+# 加速 LoRA 从「恒定存在」变成「用户可选」之后，采样档位必须跟着变：
+#   挂加速 LoRA -> 蒸馏档（4~8 步 / beta / euler）
+#   不挂        -> 标准多步采样（20 步 / simple / res_multistep）
+#
+# 旧实现恒取 model["steps"] = 4（蒸馏档的步数），
+# 于是「不挂加速 LoRA」也会跑 4 步 —— 那是**蒸馏档**的步数，
+# 配非蒸馏权重必然糊（旧实现之所以没暴露这个问题，
+# 是因为加速 LoRA 恒定存在）。
+#
+# 取值依据：官方非蒸馏 H3 模板的默认档
+# （comfy/supported_models.py 的 shift=12 / audio_shift=3 是模型内生值，
+#  调度器与采样器取社区通用组合 simple + res_multistep）。
+VIDEO_STEPS_WITHOUT_ACCEL = 20
+VIDEO_SCHEDULER_WITHOUT_ACCEL = "simple"
+VIDEO_SAMPLER_WITHOUT_ACCEL = "res_multistep"
 
 # ------------------------------------------------------------------
 # 二采（SelfLift 渐进式两段采样）
@@ -1466,6 +1568,10 @@ def accel_lora_compat_matrix(model_key: str) -> dict[str, dict]:
     这是「按主模型过滤加速 LoRA 下拉」的**唯一判据** —— 全部来自
     check_h3_lora_compat() 对本机权重头的逐层实测，不是查表硬编。
 
+    【2026-11-14】覆盖**全部**加速 LoRA（Turbo 系 + 组合枚）。
+    旧实现只遍历 VIDEO_ACCEL_LORA_COMBOS，Turbo 系那两枚永远查不到
+    兼容性 —— 于是前端无法按底模过滤它们。
+
     缓存：兼容性只跟「权重文件的字节」有关，不随时间变，
     所以按 (model_key, lora_name, 文件 mtime/size) 缓存，
     切来切去模型不会反复读盘。
@@ -1474,7 +1580,10 @@ def accel_lora_compat_matrix(model_key: str) -> dict[str, dict]:
     if model is None:
         return {}
     out: dict[str, dict] = {}
-    for key, meta in VIDEO_ACCEL_LORA_COMBOS.items():
+    for key in all_accel_lora_keys():
+        meta = accel_lora_meta(key)
+        if not meta:
+            continue
         check = check_h3_lora_compat(meta["name"], model["unet"])
         out[key] = {
             "compatible": bool(check["compatible"]),
@@ -1607,31 +1716,258 @@ def list_models(snapshot: ComfyModelSnapshot | None = None) -> list[dict]:
 
 def list_accel_loras(snapshot: ComfyModelSnapshot | None = None
                      ) -> tuple[list[dict], list[dict]]:
-    """固定加速 LoRA（不进可勾选列表）+ 可勾选的加速 LoRA 组合。
+    """加速 LoRA 清单 —— **统一成一组可选项**（2026-11-14 重构）。
 
-    可用性同样以 ComfyUI 的 `/models/loras` 为准（实测 686 条）。
+    【为什么不再分「固定枚 / 组合枚」两栏】
+    旧设计里固定枚（ckpt850 / v4step600）不在下拉里、永远生效，
+    下拉里的那枚是**额外叠加**的第二枚 —— 于是「选什么」不决定
+    「加载什么」，用户报的「选了不生效」就是这么来的。
+    现在两个集合合并成一个可选项列表：
+      * 每项带 loader（用哪个节点加载）—— 按实测键名形态分流；
+      * 每项带 available / compatible —— 前端据此过滤；
+      * 「不挂加速 LoRA」是一个显式选项（原来没有）。
+
+    返回 (accel_loras, combos)：
+      accel_loras —— 全部可选项（含 loader / 可用性 / 兼容性）
+      combos      —— 空列表（保留字段形状，老前端读它不会炸）
     """
     if snapshot is None:
         snapshot = comfy_snapshot()
-    fixed = []
-    for key, meta in VIDEO_ACCEL_LORAS.items():
+    out = []
+    for key in all_accel_lora_keys():
+        meta = accel_lora_meta(key) or {}
         item = dict(meta)
         item["key"] = key
         item["available"] = _lora_available(meta["name"], snapshot)
-        fixed.append(item)
-    combos = []
-    for key, meta in VIDEO_ACCEL_LORA_COMBOS.items():
-        item = dict(meta)
-        item["key"] = key
-        item["available"] = _lora_available(meta["name"], snapshot)
-        combos.append(item)
-    return fixed, combos
+        # 加载节点路由：按权重的实测键名形态决定（Turbo / 核心 LoraLoader）
+        item["loader"] = detect_accel_lora_loader(meta["name"])
+        item["loader_label"] = (
+            "Turbo 节点（支持剪枝底模 AdaLN 运行期重注入）"
+            if item["loader"] == ACCEL_LOADER_TURBO
+            else "核心 LoraLoaderModelOnly（认 diffusion_model. 前缀权重）")
+        out.append(item)
+    return out, []
 
 
 def _lora_available(name: str, snapshot: ComfyModelSnapshot | None) -> bool:
     if snapshot is not None:
         return snapshot.has_lora(name)
     return find_weight(name, kind="loras") is not None
+
+
+# ------------------------------------------------------------------
+# 加速 LoRA 的加载节点路由（2026-11-14）
+# ------------------------------------------------------------------
+#
+# 【为什么需要路由】
+# 不同的加速 LoRA 权重**键名形态不同**，而 ComfyUI 的两个加载节点
+# 各自只认一种形态：
+#
+#   MiniMaxH3TurboLoRA（ComfyUI-MiniMax-H3-Turbo 插件）
+#     key_map = {"<module>": "diffusion_model.<module>.weight"}
+#     -> 只认**裸键名**（blocks.* / token_refiner.* / final_layer.*）
+#     -> 额外能力：剪枝底模的 AdaLN 运行期重注入（_inject_adaln_egrid）
+#
+#   LoraLoaderModelOnly（ComfyUI 核心）
+#     key_map 里对 MiniMaxH3 专门注册了
+#       key_map[bare] = "diffusion_model.<bare>.weight"
+#     -> 认**带 diffusion_model. 前缀**的权重（LightX2V / DMAD / better_motion）
+#     -> 没有 AdaLN 运行期重注入能力
+#
+# 用错节点的后果**不是报错，是静默失效**：Turbo 节点拿到前缀权重时
+# 会把模块名当成 `diffusion_model.diffusion_model.xxx`，一个都 patch 不上
+# （实测日志 "416 backbone modules, 0 weights patched"），
+# 出片照跑但 LoRA 根本没生效 —— 用户完全看不出来。
+#
+# 所以这里按**实测键名形态**分流，而不是按「哪个更常用」拍脑袋。
+# 判据来自 safetensors 头部（前缀 + 模块名），不是写死的文件名清单。
+
+#: Turbo 节点（裸键名族）
+ACCEL_LOADER_TURBO = "MiniMaxH3TurboLoRA"
+#: 核心 LoraLoaderModelOnly（diffusion_model. 前缀族）
+ACCEL_LOADER_CORE = "LoraLoaderModelOnly"
+
+
+def detect_accel_lora_loader(lora_name: str) -> str:
+    """按权重的**实测键名形态**决定用哪个加载节点。
+
+    返回 ACCEL_LOADER_TURBO 或 ACCEL_LOADER_CORE。
+
+    读不到文件时**保守回落**到 Turbo 节点（Turbo 系两枚权重都在本机
+    默认目录，形态已知）；读到了但两种形态都不像时也回落 Turbo ——
+    因为「Turbo 节点加载失败」会打日志，而核心节点加载失败是静默的，
+    宁可要一个能看见的失败。
+    """
+    path = find_weight(lora_name, kind="loras")
+    if path is None:
+        return ACCEL_LOADER_TURBO
+    header = _read_header(path)
+    if not header:
+        return ACCEL_LOADER_TURBO
+    prefixes = set()
+    for key in header:
+        if key == "__metadata__":
+            continue
+        prefixes.add(key.split(".", 1)[0])
+    if "diffusion_model" in prefixes:
+        return ACCEL_LOADER_CORE
+    return ACCEL_LOADER_TURBO
+
+
+def accel_lora_meta(key: str) -> dict | None:
+    """按 key 取加速 LoRA 的元信息（固定枚与组合枚合并成一个表）。"""
+    return VIDEO_ACCEL_LORAS.get(key) or VIDEO_ACCEL_LORA_COMBOS.get(key)
+
+
+def all_accel_lora_keys() -> list[str]:
+    """全部可选的加速 LoRA key（Turbo 系 + 组合枚）。
+
+    顺序：Turbo 系在前（它们是 H3 的原生加速路径），组合枚在后。
+    """
+    return list(VIDEO_ACCEL_LORAS.keys()) + list(VIDEO_ACCEL_LORA_COMBOS.keys())
+
+
+def resolve_accel_lora_slot(params: dict,
+                            include_fixed_fallback: bool = True
+                            ) -> tuple[str, float]:
+    """从任务参数里解析出「加速 LoRA 槽位」。
+
+    返回 (key, strength)。key 为空串 = 不挂加速 LoRA。
+
+    【include_fixed_fallback 的两种用法】
+      * True（工作流构建 / 提交归一用）：老任务里只有 fixed_accel_lora
+        时，把那一枚当成槽位值 —— 老工作流本来就是恒挂它，
+        这样老任务重放的行为不变。
+      * False（**显示层**用）：老记录里 fixed_accel_lora 的语义是
+        「恒生效的那枚」，而 accel_loras 才是「用户选的那枚」。
+        显示层要分开呈现两者，不能把恒生效的那枚说成用户的选择 ——
+        否则卡片会显示成「用户选了 ckpt850」，而用户实际选的是别的。
+
+    【为什么需要这个函数 —— 兼容三套历史字段】
+    新面板提交 `accel_lora`（单选 key）+ `accel_lora_strength`；
+    老任务落库的是 `accel_loras`（数组）+ `fixed_accel_lora`（固定枚 key）；
+    更老的视频路径提交的是 `lora`（"ckpt850" / "none"）。
+    三者语义不同（叠加 vs 替换），必须在这里**一次性换算**，
+    否则工作流构建器要同时理解三套语义 —— 那是 bug 温床。
+
+    换算规则（**替换**语义，不是叠加）：
+      * 新字段 accel_lora **存在** -> 用它（空串 = 显式「不挂加速 LoRA」）
+      * 老字段 accel_loras 数组里有可用项 -> 取第一项（老面板本来就是单选）
+      * 再退到 fixed_accel_lora（老任务里这是「工作流固定的那枚」）
+      * 再退到 lora（"none" -> 不挂）
+      * 都没有 -> 默认 ckpt850（保持老行为：新任务默认还是 4 步 Turbo）
+
+    【为什么用「键存在」而不是「值非空」判断 accel_lora】
+    空串在旧语义里表示「不挂加速 LoRA」，是一个**有效选择**。
+    如果按「值非空」判断，`accel_lora=""` 会掉到兜底分支 ->
+    反而挂上 ckpt850 —— 用户明明选了「不挂」，工作流里却挂着 LoRA。
+    所以这里用 `"accel_lora" in params` 判断「用户显式表达过意图」。
+    """
+    # 【显式槽位】键存在即为用户显式选择（空串 = 不挂）
+    if "accel_lora" in params:
+        raw = params.get("accel_lora")
+        key = str(raw or "").strip()
+        if not key:
+            return "", 1.0
+        meta = accel_lora_meta(key) or {}
+        strength = params.get("accel_lora_strength")
+        if strength is None:
+            strength = meta.get("recommended_strength", 1.0)
+        try:
+            strength = float(strength)
+        except (TypeError, ValueError):
+            strength = float(meta.get("recommended_strength", 1.0))
+        return key, strength
+
+    # 老格式：accel_loras 数组（取第一个启用的）
+    for item in params.get("accel_loras") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("enabled") is False:
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        meta = accel_lora_meta(key) or {}
+        try:
+            strength = float(item.get("strength",
+                                    meta.get("recommended_strength", 1.0)))
+        except (TypeError, ValueError):
+            strength = float(meta.get("recommended_strength", 1.0))
+        return key, strength
+
+    # 老格式：fixed_accel_lora（老任务里这枚是「工作流固定的那枚」）
+    fixed = str(params.get("fixed_accel_lora") or "").strip()
+    if fixed and include_fixed_fallback:
+        meta = VIDEO_ACCEL_LORAS.get(fixed) or {}
+        strength = params.get("fixed_accel_strength")
+        if strength is None:
+            strength = meta.get("recommended_strength", 1.0)
+        try:
+            strength = float(strength)
+        except (TypeError, ValueError):
+            strength = float(meta.get("recommended_strength", 1.0))
+        return fixed, strength
+
+    # 更老格式：lora（"none" = 不挂）
+    legacy = str(params.get("lora") or "").strip()
+    if legacy == "none":
+        return "", 1.0
+    if legacy and include_fixed_fallback:
+        meta = VIDEO_ACCEL_LORAS.get(legacy) or VIDEO_ACCEL_LORA_COMBOS.get(legacy) or {}
+        strength = params.get("lora_strength")
+        if strength is None:
+            strength = meta.get("recommended_strength", 1.0)
+        try:
+            strength = float(strength)
+        except (TypeError, ValueError):
+            strength = float(meta.get("recommended_strength", 1.0))
+        return legacy, strength
+
+    # 都没有 -> 默认 Turbo ckpt850（与老行为一致）
+    #
+    # 【include_fixed_fallback=False 时不能给默认值】
+    # 显示层用它区分「用户选了哪枚」与「工作流恒挂哪枚」：
+    # 老记录里只有 fixed_accel_lora（恒生效的那枚），
+    # 若这里返回默认值 ckpt850，卡片就会显示成「用户选了 ckpt850」——
+    # 而用户其实什么都没选。那是谎报。
+    if not include_fixed_fallback:
+        return "", 1.0
+    return VIDEO_FIXED_ACCEL_LORA_DEFAULT, 1.0
+
+
+def model_for_mode(mode: str, preferred_key: str | None = None) -> dict:
+    """按生成模式挑底模。
+
+    【为什么需要】参考生视频必须用 **Ref2VA 权重** —— FL2VA 权重没有
+    Ref2VA 通道，用它做参考生成等于「参考没生效」。
+    首尾帧用 FL2VA 权重（它有 I2VA / FL2VA / L2VA 任务类型）。
+
+    preferred_key 优先（如果它支持该模式）；否则按模式挑默认权重。
+    """
+    if preferred_key:
+        meta = VIDEO_MODELS.get(preferred_key)
+        if meta:
+            if mode == "r2v" and not meta.get("supports_ref2va"):
+                # 用户选的是 FL2VA 权重 -> 参考模式改用 Ref2VA 权重
+                # （静默换权重 = 静默改行为，必须在摘要里说明）
+                return _default_ref2va_model()
+            return meta
+    if mode == "r2v":
+        return _default_ref2va_model()
+    return VIDEO_MODELS[VIDEO_DEFAULT_MODEL]
+
+
+def _default_ref2va_model() -> dict:
+    """默认的 Ref2VA 权重（优先本机可用的剪枝 int8）。"""
+    for key in ("ref2va_pruned_int8", "ref2va_int8",
+                "hybrid_fl2va_ref2va"):
+        meta = VIDEO_MODELS.get(key)
+        if meta and model_status(key) == "available":
+            return meta
+    # 都不在 ComfyUI 列表里 -> 仍返回第一个登记项（提交时会报错说明）
+    return VIDEO_MODELS.get("ref2va_pruned_int8") \
+        or VIDEO_MODELS[VIDEO_DEFAULT_MODEL]
 
 
 def model_status(model_key: str,
@@ -1693,13 +2029,22 @@ def options_payload(node_available=None,
     """
     if snapshot is None:
         snapshot = comfy_snapshot()
-    fixed, combos = list_accel_loras(snapshot)
+    accels, combos = list_accel_loras(snapshot)
     payload = {
         "models": list_models(snapshot),
         "default_model": VIDEO_DEFAULT_MODEL,
-        "fixed_accel_loras": fixed,
+        # 【2026-11-14 重构】加速 LoRA 统一成一组可选项。
+        # fixed_accel_loras 保留这个键名（老前端读它不会炸），但内容
+        # 现在是**全部**可选项（含 ckpt850 / v4step600）。
+        # 另给 accel_loras 这个新键，前端优先读它。
+        "accel_loras": accels,
+        "fixed_accel_loras": accels,
         "accel_lora_combos": combos,
         "default_fixed_accel_lora": VIDEO_FIXED_ACCEL_LORA_DEFAULT,
+        # 「不挂加速 LoRA」是显式选项，默认空（= 不挂）。
+        # 【为什么默认空而不是 ckpt850】新面板不挂加速 LoRA 时走 20 步
+        # 标准采样；默认给 ckpt850 会让「不挂」这个语义永远选不出来。
+        "default_accel_lora": "",
         "attention_modes": list_attention_modes(),
         "default_attention": VIDEO_DEFAULT_ATTENTION,
         "twopass": twopass_defaults(),
