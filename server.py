@@ -4956,7 +4956,24 @@ async def api_image_loras(request):
         acceleration = []
     elif moss:
         available = lora_registry.list_moss_effect_loras()
-        incompatible = lora_registry.list_moss_incompatible_loras()
+        # 【2026-11-14 需求 15】MOSS-Image 的「已排除」清单**不再下发**。
+        #
+        # 【为什么不兼容】这批 LoRA（Realistic Snapshot / Kodachrome /
+        # Kodachrome V2 / Skin tone slider [MOSS | Krea 2]）的融合 qkv
+        # 部分是 LoKR（Kronecker）权重，无法无损拆成 MOSS 底模需要的
+        # 分离 q/k/v（Kronecker 分解的行映射与三等分不对应，实测数值
+        # 不等价）。也就是说它们在 MOSS-Image 上**根本不可能生效**。
+        #
+        # 【为什么不只是前端隐藏】「已排除」面板把一批永远用不了的
+        # 权重摆在用户面前，占界面、还要用户理解「为什么被排除」——
+        # 但答案永远是「用不了」，没有可操作性。接口层直接不下发，
+        # 前端也就无从展示（两端口径一致，不会出现「接口说有、
+        # 界面没有」的漂移）。
+        #
+        # 【对已保存配置的影响】下面 filter 掉 config 里指向这批
+        # LoRA 的条目 —— 否则它们会以「已排除」条目留在用户已选列表里，
+        # 仍然出现在界面上（且提交时会被服务端拒绝）。
+        incompatible = []
         acceleration = [item for item in lora_registry.list_moss_image_loras()
                         if item["kind"] == lora_registry.KIND_ACCELERATION]
     elif qwen:
@@ -4970,6 +4987,20 @@ async def api_image_loras(request):
         acceleration = lora_registry.list_acceleration_loras()
     with db() as conn:
         config = lora_registry.load_config(conn, lora_registry.pref_key_for_base(base))
+    # 【2026-11-14 需求 15】MOSS-Image：把「已排除」批次从**已保存配置**里
+    # 也一并去掉（见上面那段注释）。
+    #
+    # 【为什么要额外做这一步】incompatible 列表不下发之后，
+    # excluded_by_name 查不到这批 LoRA -> 它们会被判成
+    # 「missing = 文件不在了」，然后仍然出现在用户的已选列表里
+    # （带一个「文件缺失」标签）。但文件其实**在** —— 只是不兼容。
+    # 直接从 config 里剔除，才是真的「不再展示」。
+    if moss:
+        excluded_names = {item["name"]
+                          for item in lora_registry.list_moss_incompatible_loras()}
+        if excluded_names:
+            config = [item for item in config
+                      if (item.get("name") or "") not in excluded_names]
     # 配置里的 LoRA 若已从磁盘移除，标记 missing 而不是静默丢弃
     by_name = {item["name"]: item for item in available}
     # 已被排除的（不兼容）也要能对上 —— 前端要显示「为什么被排除」
