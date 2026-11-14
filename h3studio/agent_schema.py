@@ -39,6 +39,9 @@ from __future__ import annotations
 from . import enhancer as enh
 from . import gen_types
 from . import workflows as wf
+# 【2026-11-14 需求 2a/2b 补齐】采样器/调度器的合法值清单来自
+# video_models（它记着本机 ComfyUI 核心节点的真实 COMBO 取值）。
+from . import video_models
 
 # ------------------------------------------------------------------ 视频时长
 
@@ -292,6 +295,27 @@ def mode_param_keys(mode: str) -> set[str]:
     if is_image_mode(mode):
         keys.add("batch_count")
         keys.add("negative_prompt")
+        # 【2026-11-14 需求 2a 补齐】图像模式的采样参数。
+        #
+        # 【为什么它们本来不在集合里】早期 mode_schema 只展开了「用户能在
+        # 面板上改的那几项」，采样参数当时只存在于工作流内部（模型表），
+        # 没进 Agent 的参数集合 —— 于是 Agent 建的任务 params 里没有它们，
+        # 媒体库卡片「步数/采样器/调度器/shift」全显示「—」。
+        #
+        # 【现在】采样参数是**图像模式真实存在**的参数（builder 确实读它们），
+        # 所以必须进这个集合 —— 否则 mode_defaults 的白名单过滤会把它们丢掉
+        # （默认值给了也传不下去）。
+        #
+        # 【只对图像模式加】视频模式的 steps/sampler/scheduler 走
+        # prepare_agent_t2v_params 那条路（服务端归一），不重复塞。
+        keys.update({"steps", "sampler", "scheduler", "shift"})
+        # 【cfg 也要进集合】cfg 本来就是 Agent 能在 schema 里传的参数
+        # （create_job 的 schema 里一直有 cfg），只是 mode_param_keys
+        # 没收录它 —— 于是 mode_defaults 给不出 cfg 的默认值，
+        # Agent 建的任务 params 里没有 cfg，媒体库卡片「CFG」行显示「—」。
+        # 图像 builder 读的是 `params.get("cfg") if ... is not None else model["cfg"]`
+        # —— 也就是模型表里那个官方值，补上它卡片显示的就是实际用的值。
+        keys.add("cfg")
     if is_music_mode(mode):
         keys.add("max_duration")
         keys.add("plan_mode")
@@ -424,6 +448,49 @@ def _resolve_default_literal(raw: str):
     return None
 
 
+def _image_sampling_defaults(mode: str) -> dict:
+    """图像模式**默认模型**的采样参数默认值（steps / sampler / scheduler / shift / cfg）。
+
+    【数据来源 —— 唯一真源，不抄第二份】
+    各族的模型表都在 h3studio/workflows.py（Z_IMAGE_MODELS / QWEN_IMAGE_MODELS /
+    MOSS_IMAGE_MODELS）与 h3studio/h3image.py（H3_IMAGE_MODELS），
+    每一项都带 steps / sampler / scheduler / shift / cfg —— 那就是
+    **工作流实际会用的值**（builder 里 `params.get("steps") or model["steps"]`）。
+
+    【为什么不能只靠 builder 源码解析】
+    _builder_defaults() 解析的是 `params.get(k, default)` 这种**字面量**写法，
+    而图像 builder 写的是 `params.get("steps") or model["steps"]` ——
+    默认值在**模型表**里，源码里看不到。所以这条路径拿不到，只能直接读表。
+
+    【返回什么】
+    只返回该模式**默认模型**的那一组。非图像模式返回空 dict。
+    """
+    if mode == "t2i":
+        table, default_key = getattr(wf, "Z_IMAGE_MODELS", {}), \
+            getattr(wf, "Z_IMAGE_DEFAULT_MODEL", "")
+    elif mode in ("t2i_qwen", "i2i_qwen"):
+        table, default_key = getattr(wf, "QWEN_IMAGE_MODELS", {}), \
+            getattr(wf, "QWEN_IMAGE_DEFAULT_MODEL", "")
+    elif mode == "t2i_moss":
+        table, default_key = getattr(wf, "MOSS_IMAGE_MODELS", {}), \
+            getattr(wf, "MOSS_IMAGE_DEFAULT_MODEL", "")
+    elif mode in ("t2i_h3image", "i2i_h3image"):
+        table, default_key = getattr(wf, "H3_IMAGE_MODELS", {}), \
+            getattr(wf, "H3_IMAGE_DEFAULT_MODEL", "")
+    else:
+        return {}
+    model = table.get(default_key)
+    if not isinstance(model, dict):
+        return {}
+    out: dict = {}
+    for key in ("steps", "sampler", "scheduler", "shift", "cfg"):
+        value = model.get(key)
+        if value is None or value == "":
+            continue
+        out[key] = value
+    return out
+
+
 def mode_defaults(mode: str) -> dict:
     """
     该模式各参数的默认值（来源：真实常量 + 真实 builder 源码）。
@@ -472,6 +539,30 @@ def mode_defaults(mode: str) -> dict:
         defaults.setdefault("model",
                             getattr(wf, "H3_IMAGE_DEFAULT_MODEL", ""))
         defaults.setdefault("resolution", "4mp")
+
+    # 2b. 【2026-11-14 需求 2a 补齐】图像模式的**采样参数**默认值。
+    #
+    # 【为什么需要】图像 builder 读的是
+    #     steps    = int(params.get("steps") or model["steps"])
+    #     sampler  = params.get("sampler") or model["sampler"]
+    #     ... cfg / shift 同理
+    # 这些默认值**只存在于模型表里，不写回 params**。
+    # 于是 Agent 建的任务（params 里没有这些键）落库后
+    # job_meta.gen_params 读到空 -> 媒体库卡片「步数/采样器/调度器/shift」
+    # 全显示「—」，而实际出图用的确是模型表里那组值。
+    # 表现为「卡片参数行空白」，但图是照常出了的。
+    #
+    # 【修法】把**该模式默认模型**在模型表里的采样参数取出来当默认值。
+    # 这样 Agent 建任务时 params 里就有真实的 steps/sampler/scheduler/shift，
+    # 卡片与详情显示的就是「实际用的那组值」。
+    #
+    # 【为什么用默认模型而不是用户选的模型】
+    # mode_defaults() 是**按模式**的静态表（默认模型）——
+    # 用户显式选了别的模型时，由 create_job 里「用户值优先」的合并规则
+    # 覆盖掉这里的默认值（见 agent.py 的默认参数填充逻辑）。
+    # 所以这里给「模式默认模型」的采样参数是对的。
+    for key, value in _image_sampling_defaults(mode).items():
+        defaults.setdefault(key, value)
 
     # 3. 比例默认值：builder 里写死的优先
     aspects = mode_aspects(mode)
@@ -881,6 +972,53 @@ def mode_schema(mode: str) -> dict:
                 for key in mode_models(mode)
             },
             "source": "workflows.*_MODELS 的 supports_negative / cfg",
+        }
+        # 【2026-11-14 需求 2a/2b 补齐】采样参数。
+        #
+        # 【为什么要加到 schema 里】get_mode_schema 是模型**主动调用**的
+        # 「这个模式有哪些参数」的工具。采样参数以前根本不在这个 schema 里，
+        # 模型看不到也就不会去设 —— 现在开放了，就得让它能看到
+        # （合法取值 + 默认值 + 来源），否则模型只能瞎猜。
+        #
+        # 【取值来源 —— 与 validate_params 同一份】
+        #   * sampler / scheduler -> video_models.VIDEO_SAMPLERS / VIDEO_SCHEDULERS
+        #     （本机 ComfyUI 核心节点 KSamplerSelect / BasicScheduler 的
+        #      真实 COMBO 清单，/object_info 实测）
+        #   * steps / shift / cfg -> 该模式默认模型在模型表里的值
+        schema["params"]["sampler"] = {
+            "type": "string",
+            "values": list(video_models.VIDEO_SAMPLERS),
+            "default": defaults.get("sampler", ""),
+            "source": "video_models.VIDEO_SAMPLERS"
+                      "（ComfyUI KSamplerSelect.sampler_name 真实清单）",
+        }
+        schema["params"]["scheduler"] = {
+            "type": "string",
+            "values": list(video_models.VIDEO_SCHEDULERS),
+            "default": defaults.get("scheduler", ""),
+            "source": "video_models.VIDEO_SCHEDULERS"
+                      "（ComfyUI BasicScheduler.scheduler 真实清单）",
+        }
+        schema["params"]["steps"] = {
+            "type": "integer",
+            "min": 1,
+            "max": 150,
+            "default": defaults.get("steps", ""),
+            "source": "workflows.*_MODELS 的 steps（该模型版本的官方推荐步数）",
+        }
+        schema["params"]["shift"] = {
+            "type": "number",
+            "min": 0.0,
+            "max": 100.0,
+            "default": defaults.get("shift", ""),
+            "source": "workflows.*_MODELS 的 shift（该模型版本的官方值）",
+        }
+        schema["params"]["cfg"] = {
+            "type": "number",
+            "min": 0.0,
+            "max": 20.0,
+            "default": defaults.get("cfg", ""),
+            "source": "workflows.*_MODELS 的 cfg（该模型版本的官方值）",
         }
 
     # --- 音乐专属 ---
@@ -1357,7 +1495,67 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                               "reason": f"改用默认模型「{MUSIC_CHECKPOINTS[0]}」"}],
                 code="invalid_checkpoint"))
 
-    # --- 负面提示词生效性 ---
+    # --- 采样器 / 调度器 / 步数 / shift ---
+    # 【2026-11-14 需求 2a/2b 补齐】
+    #
+    # 【为什么现在才校验】Agent 的 create_job 以前**没有**这几项，
+    # 所以也不需要校验。现在 schema 开放了它们，就必须校验 ——
+    # 否则模型传一个不存在的采样器名，会一路进到工作流，
+    # ComfyUI 那边报「Sampler not found」这种难懂的错。
+    #
+    # 【合法值来源】video_models.VIDEO_SAMPLERS / VIDEO_SCHEDULERS ——
+    # 那是本机 ComfyUI 核心节点 KSamplerSelect.sampler_name（68 项）
+    # 与 BasicScheduler.scheduler（14 项）的真实 COMBO 清单（/object_info 实测）。
+    # 图像工作流的采样器/调度器节点与视频是**同一批**核心节点，所以直接复用。
+    sampler = params.get("sampler")
+    if sampler:
+        allowed = list(video_models.VIDEO_SAMPLERS)
+        if str(sampler) not in allowed:
+            issues.append(ValidationIssue(
+                "sampler",
+                f"采样器「{sampler}」不是 ComfyUI 的合法取值",
+                allowed=allowed,
+                suggestions=_suggest_enum("sampler", str(sampler), allowed, mode),
+                code="invalid_sampler"))
+    scheduler = params.get("scheduler")
+    if scheduler:
+        allowed = list(video_models.VIDEO_SCHEDULERS)
+        if str(scheduler) not in allowed:
+            issues.append(ValidationIssue(
+                "scheduler",
+                f"调度器「{scheduler}」不是 ComfyUI 的合法取值",
+                allowed=allowed,
+                suggestions=_suggest_enum("scheduler", str(scheduler),
+                                          allowed, mode),
+                code="invalid_scheduler"))
+    steps = params.get("steps")
+    if steps is not None:
+        try:
+            steps_int = int(steps)
+        except (TypeError, ValueError):
+            issues.append(ValidationIssue(
+                "steps", "步数必须是整数", code="invalid_steps"))
+        else:
+            if steps_int < 1 or steps_int > 150:
+                issues.append(ValidationIssue(
+                    "steps",
+                    f"步数 {steps_int} 超出合理范围（1~150）",
+                    code="invalid_steps"))
+    shift = params.get("shift")
+    if shift is not None:
+        try:
+            shift_f = float(shift)
+        except (TypeError, ValueError):
+            issues.append(ValidationIssue(
+                "shift", "shift 必须是数字", code="invalid_shift"))
+        else:
+            if shift_f < 0.0 or shift_f > 100.0:
+                issues.append(ValidationIssue(
+                    "shift",
+                    f"shift {shift_f} 超出合理范围（0~100）",
+                    code="invalid_shift"))
+
+    # --- 负面提示词 ---
     #
     # 关键：**不因为「该族不支持负面提示词」就拒绝任务** ——
     # 用户要的是图/片/曲，负面提示词只是附加诉求。

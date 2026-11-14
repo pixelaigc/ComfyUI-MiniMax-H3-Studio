@@ -164,6 +164,46 @@ def _step_timeout() -> float:
     return float(getattr(agent_mod, "STEP_TIMEOUT", 120))
 
 
+def _server_self_url(ctx) -> str:
+    """取服务端自己的可访问地址。
+
+    【为什么不能写死】ctx.server 是**服务端模块**（server.py 那个 module），
+    不是某个实例。地址要从模块里拿。
+
+    【取值顺序】
+      1. server.self_url —— 公开属性（若将来改成公开命名）
+      2. server._studio_self_url() —— server.py 里现有的那个（带下划线，
+         是给 ComfyUI 节点回连用的同一个地址）
+      3. 都没有 -> 抛错（**不猜端口** —— 猜错了会打到别人的服务上）
+
+    【为什么必须有兜底】H3-Image 官方 PE 与 YuE2 结构化风格这两条路线
+    都是**服务端自己**的 HTTP 接口（/api/h3image-pe/expand、
+    /api/music-enhance），Agent 要回调它们。地址拿不到就调不了。
+    """
+    server = getattr(ctx, "server", None)
+    if server is None:
+        raise RuntimeError("Agent 未接入服务端环境")
+    url = getattr(server, "self_url", None)
+    if callable(url):
+        try:
+            value = url()
+        except Exception:
+            value = None
+        if value:
+            return str(value)
+    elif isinstance(url, str) and url:
+        return url
+    helper = getattr(server, "_studio_self_url", None)
+    if callable(helper):
+        try:
+            value = helper()
+        except Exception:
+            value = None
+        if value:
+            return str(value)
+    raise RuntimeError("服务端未提供可回访的自身地址，无法调用服务端增强接口")
+
+
 async def _run_h3image_pe(ctx, prompt: str, mode: str,
                           ref_images: list[str] | None = None) -> dict:
     """跑 H3-Image 官方 PE（需求 16）。
@@ -171,13 +211,8 @@ async def _run_h3image_pe(ctx, prompt: str, mode: str,
     走**服务端**的 /api/h3image-pe/expand —— 那边已经封装了
     ComfyUI 提交 + 轮询 + 解析。与前端「增强」按钮走同一条链路。
     """
-    server = getattr(ctx, "server", None)
-    if server is None:
-        raise RuntimeError("Agent 未接入服务端环境，无法调用 H3-Image 官方 PE")
+    url = _server_self_url(ctx)
     import aiohttp
-    url = getattr(server, "self_url", None)
-    if not url:
-        raise RuntimeError("服务端未提供 self_url，无法调用 H3-Image 官方 PE")
     payload = {"prompt": prompt, "mode": mode}
     if ref_images:
         payload["refs"] = ref_images
@@ -254,13 +289,8 @@ async def _structured_music(ctx, original: str) -> dict:
     走服务端已有的 /api/music-enhance —— 与前端「生成风格+歌词」按钮
     **同一条链路**，产物形状一致（12 个风格字段 + 歌词 + 合成好的 style 串）。
     """
-    server = getattr(ctx, "server", None)
-    if server is None:
-        raise RuntimeError("Agent 未接入服务端环境，无法生成结构化音乐风格")
+    url = _server_self_url(ctx)
     import aiohttp
-    url = getattr(server, "self_url", None)
-    if not url:
-        raise RuntimeError("服务端未提供 self_url，无法生成结构化音乐风格")
     async with aiohttp.ClientSession() as session:
         async with session.post(f"{url}/api/music-enhance",
                                 json={"prompt": original, "mode": "t2a"}) as resp:
