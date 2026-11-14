@@ -1827,6 +1827,37 @@ def all_accel_lora_keys() -> list[str]:
     return list(VIDEO_ACCEL_LORAS.keys()) + list(VIDEO_ACCEL_LORA_COMBOS.keys())
 
 
+def _is_known_accel_lora_key(key: str) -> bool:
+    """key 是不是本机**真实存在**的加速 LoRA 标识符。
+
+    【为什么需要这道闸 —— 2026-11-15】
+    `params["lora"]` 这条历史链路**落库时可能被塞进任意字符串**
+    （Agent 把提示词误填进去）。读取侧如果不过白名单，
+    这段提示词就会被：
+      * 当成 LoRA 返回给工作流（污染工作流参数）；
+      * 原样印在卡片「LoRA」行 ——
+        用户报出的「根本就没这个 LORA」正是这个。
+
+    【判定口径】必须在本机真实清单里：
+      * VIDEO_ACCEL_LORAS / VIDEO_ACCEL_LORA_COMBOS —— 视频加速 LoRA；
+      * workflows.LORAS —— 旧路径视频 LoRA（ckpt850 / v4step600）。
+
+    清单是**权威**（不是靠形态猜）—— 所以带空格的真实 LoRA 名不会被误杀。
+    """
+    text = str(key or "").strip()
+    if not text:
+        return False
+    if text in VIDEO_ACCEL_LORAS or text in VIDEO_ACCEL_LORA_COMBOS:
+        return True
+    try:
+        from . import workflows as wf
+        if text in (getattr(wf, "LORAS", {}) or {}):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def resolve_accel_lora_slot(params: dict,
                             include_fixed_fallback: bool = True
                             ) -> tuple[str, float]:
@@ -1897,7 +1928,13 @@ def resolve_accel_lora_slot(params: dict,
         return key, strength
 
     # 老格式：fixed_accel_lora（老任务里这枚是「工作流固定的那枚」）
+    #
+    # 【2026-11-15 修 —— 白名单闸门】与 legacy 分支同理：
+    # fixed_accel_lora 同样可能被塞进脏值。
+    # 脏值 -> 明确「不挂」（旧行为是挂一个不存在的文件 = 等于没挂）。
     fixed = str(params.get("fixed_accel_lora") or "").strip()
+    if fixed and not _is_known_accel_lora_key(fixed):
+        return "", 1.0
     if fixed and include_fixed_fallback:
         meta = VIDEO_ACCEL_LORAS.get(fixed) or {}
         strength = params.get("fixed_accel_strength")
@@ -1910,19 +1947,47 @@ def resolve_accel_lora_slot(params: dict,
         return fixed, strength
 
     # 更老格式：lora（"none" = 不挂）
+    #
+    # 【2026-11-15 修 —— 白名单闸门】
+    # 旧实现：legacy 非空就返回（`if legacy and include_fixed_fallback:`），
+    # **完全没过白名单**。于是 Agent 把提示词误填进 params["lora"] 时
+    # （`integrated_multimodal_description: [Shot 1] ...`），
+    #   * 这里把它当成一枚 LoRA 返回 ->
+    #   * 工作流真的去挂它（ComfyUI 会静默丢弃，但工作流参数已被污染）
+    #   * 卡片「LoRA」行原样印出这段提示词 ——
+    #     这正是用户 2026-11-13 / 2026-11-15 两次报出的
+    #     「卡片显示的 LoRA 根本就没这个 LORA」。
+    #
+    # 【脏值 -> 明确「不挂」，而不是回落默认】
+    # 这条链路上「传了脏值」在语义上等于「用户没选加速 LoRA」。
+    # 旧行为（脏值被当 LoRA 挂上去，ComfyUI 静默丢弃）**实际效果就是没挂**，
+    # 所以显示层必须说「没挂」—— 既有测试
+    # tests/test_media_card_detail.py::test_prompt_as_lora_yields_none
+    # 守的就是这条。
+    #
+    # 【为什么不回落 ckpt850】回落会让「传了脏值」与「什么都没传」变成同一件事，
+    # 但两者在旧任务里**实际跑出来是不同的**：
+    #   * 什么都没传 -> 工作流挂默认 ckpt850（真的挂了）；
+    #   * 传了脏值   -> 工作流挂那个不存在的文件（等于没挂）。
+    # 混为一谈就是在撒谎。
     legacy = str(params.get("lora") or "").strip()
     if legacy == "none":
         return "", 1.0
-    if legacy and include_fixed_fallback:
-        meta = VIDEO_ACCEL_LORAS.get(legacy) or VIDEO_ACCEL_LORA_COMBOS.get(legacy) or {}
-        strength = params.get("lora_strength")
-        if strength is None:
-            strength = meta.get("recommended_strength", 1.0)
-        try:
-            strength = float(strength)
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        return legacy, strength
+    if legacy:
+        if not _is_known_accel_lora_key(legacy):
+            # 脏值 -> 明确「不挂」（与旧行为实际效果一致）
+            return "", 1.0
+        if include_fixed_fallback:
+            meta = (VIDEO_ACCEL_LORAS.get(legacy)
+                    or VIDEO_ACCEL_LORA_COMBOS.get(legacy) or {})
+            strength = params.get("lora_strength")
+            if strength is None:
+                strength = meta.get("recommended_strength", 1.0)
+            try:
+                strength = float(strength)
+            except (TypeError, ValueError):
+                strength = float(meta.get("recommended_strength", 1.0))
+            return legacy, strength
 
     # 都没有 -> 默认 Turbo ckpt850（与老行为一致）
     #

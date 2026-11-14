@@ -89,6 +89,7 @@ from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
 from h3studio import job_meta
+from h3studio import artifact_meta
 from h3studio import continuation as cont
 from h3studio import continuation_service as cont_service
 # ComfyUI 执行错误的提取与中文化（2026-11-12 修：原来把
@@ -1615,6 +1616,29 @@ class Worker:
                         None if not probe_ok else nodes_ok)
 
                 workflow = build_workflow(mode, params)
+
+                # 【2026-11-15 新增】把**产物实际生成参数**回写进 params。
+                #
+                # 【为什么必须在这里回写】构建器已经把所有默认值都算完了
+                # （步数按「实际挂了哪枚加速 LoRA」回落、调度器/采样器同理），
+                # 所以**构建好的 workflow 才是产物实际元数据的权威来源**。
+                # 落库的 params 只是「用户填了什么」，两者会脱钩 ——
+                # 这正是媒体库卡片 LoRA 误显示 + 步数为空的根因。
+                #
+                # 【回写什么】steps / scheduler / sampler / cfg / seed /
+                # 实际挂载的 LoRA 清单。缺失就不写（**不编造**）。
+                try:
+                    extracted = artifact_meta.extract_from_workflow(workflow)
+                    artifact_meta.apply_to_params(params, extracted)
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET params=? WHERE id=?",
+                            (json.dumps(params, ensure_ascii=False), job_id))
+                except Exception as exc:  # noqa: BLE001
+                    # 回写失败**不能**让生成失败 —— 产物照跑，
+                    # 只是显示层拿不到精确值（退回到「—」）。
+                    print(f"[worker] 任务 {job_id} 产物元数据回写失败: {exc}")
+
                 client_id = f"h3studio-{job_id}"
                 async with self.submit_lock:
                     with db() as conn:
@@ -1948,6 +1972,27 @@ class Worker:
                 batch_params["_h3image_nodes_available"] = (
                     None if not probe_ok else nodes_ok)
             workflow = build_workflow(mode, batch_params)
+
+            # 【2026-11-15 新增】批次路径也要回写产物实际参数。
+            #
+            # 【为什么要单独处理】批次任务（一次出 N 张）在 jobs 表里只有
+            # **一条**记录、**一个** params，而每张产物各有自己的 seed。
+            # 所以这里：
+            #   * 回写采样参数（步数 / 调度器 / 采样器 / LoRA）—— 批次间一致；
+            #   * **不写 seed**（include_seed=False）—— 否则第一批的 seed
+            #     会盖掉 job 记录里的种子信息（每张的 seed 记在
+            #     job_batches 表里，那才是对的落点）。
+            try:
+                batch_extracted = artifact_meta.extract_from_workflow(workflow)
+                artifact_meta.apply_to_params(params, batch_extracted,
+                                               include_seed=False)
+                with db() as conn:
+                    conn.execute(
+                        "UPDATE jobs SET params=? WHERE id=?",
+                        (json.dumps(params, ensure_ascii=False), job_id))
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker] 批次 {batch_id} 产物元数据回写失败: {exc}")
+
             async with self.submit_lock:
                 with db() as conn:
                     row = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -4100,6 +4145,139 @@ async def api_get(request):
             live_state=live_state,
         )
     return json_ok(job)
+
+
+# ------------------------------------------------------------------
+# 产物实际生成参数（2026-11-15 媒体库卡片详情模态框）
+# ------------------------------------------------------------------
+async def api_artifact_meta(request):
+    """GET /api/jobs/{id}/artifact-meta —— 返回该产物的**完整生成参数**。
+
+    【为什么单独一个接口】
+    用户需求：「点击卡片弹出该产物的模态框，展示详细内容
+    （步数、调度器、采样器、模型/LoRA 列表、种子、尺寸等实际元数据）」。
+
+    列表接口 `/api/jobs` 已经带 `gen_params`（卡片行用的那份），
+    但详情模态框要的是**字段齐全、带来源标注、能区分「未记录」与
+    「确实没有」**的一份。所以这里单独给一份结构化的产物元数据。
+
+    【数据来源 —— 产物实际，不是提交参数】
+      * `params["artifact_loras"]` —— worker 在构建完工作流之后
+        从 workflow 反解回写的「实际挂载的 LoRA 清单」
+        （见 h3studio/artifact_meta.py）。这是权威来源。
+      * `params["steps"] / ["scheduler"] / ["sampler"] / ["cfg"] / ["seed"]`
+        —— 同样是 worker 回写的**实际生效值**。
+      * `params["width"] / ["height"]` —— 优先用产物实际像素
+        （outputs 里带的 width/height），其次用落库的请求值。
+
+    【缺失 = 「未知」】
+    字段取不到就返回 `null`，**不编造、不拿别的字段顶替**。
+    前端把 null 渲染成「未知」。
+
+    【为什么老任务也返回结构】
+    老任务（worker 回写之前生成的）没有 `artifact_loras` ->
+    LoRA 列表为空数组、`loora_status` = "not_recorded" ->
+    前端显示「未知（该任务生成时未记录 LoRA）」而不是假名。
+    """
+    jid = request.match_info["id"]
+    with db() as conn:
+        r = conn.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone()
+    if not r:
+        return web.json_response({"error": "not found"}, status=404)
+
+    job_params = json.loads(r["params"] or "{}")
+    if not isinstance(job_params, dict):
+        job_params = {}
+    outputs = json.loads(r["outputs"] or "[]")
+    mode = r["mode"]
+
+    model_info = job_meta.summarize(mode, job_params)
+    resolution_info = _job_resolution_info(job_params, outputs)
+    gen_params = job_meta.gen_params(mode, job_params, model_info, resolution_info)
+
+    # ---- LoRA：产物实际挂载清单 ----
+    loras = []
+    raw_artifact = job_params.get("artifact_loras")
+    has_artifact_record = isinstance(raw_artifact, list)
+    if has_artifact_record:
+        for item in raw_artifact:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            strength = item.get("strength")
+            try:
+                strength = float(strength) if strength is not None else None
+            except (TypeError, ValueError):
+                strength = None
+            # 【显示名反查】权重文件名 -> 本机清单里的 key -> 友好显示名。
+            # 查不到就如实用清洗后的权重名（**不编**）。
+            # 这样接口返回的 name 与卡片 / 详情显示的是同一个名字。
+            raw_name = str(item.get("raw_name") or "")
+            key = artifact_meta.lora_key_for_weight(raw_name or name)
+            display = job_meta.accel_lora_display_name(key) if key else name
+            loras.append({
+                "name": display,
+                "key": key,
+                "raw_name": raw_name,
+                "strength": strength,
+                "loader": str(item.get("loader") or ""),
+            })
+
+    if loras:
+        lora_status = "recorded"
+    elif has_artifact_record:
+        # worker 回写过、且工作流里确实没有 LoRA 节点 -> 确实没用
+        lora_status = "none_used"
+    else:
+        # 没有产物级记录 -> 不知道（不编）
+        lora_status = "not_recorded"
+
+    # ---- 尺寸：优先产物实际像素 ----
+    width = resolution_info.get("width")
+    height = resolution_info.get("height")
+    if not (width and height):
+        width = job_params.get("width")
+        height = job_params.get("height")
+
+    def _int_or_none(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    return json_ok({
+        "id": jid,
+        "mode": mode,
+        "status": r["status"],
+        "created_at": r["created_at"],
+        "finished_at": r["finished_at"],
+        # ---- 生成参数（缺失 = null -> 前端显示「未知」）----
+        "model": gen_params.get("model") or None,
+        "model_file": job_params.get("artifact_model_file") or None,
+        "steps": _int_or_none(job_params.get("steps")),
+        "scheduler": job_params.get("scheduler") or None,
+        "sampler": job_params.get("sampler") or None,
+        "cfg": job_params.get("cfg"),
+        "seed": gen_params.get("seed") or None,
+        "width": _int_or_none(width),
+        "height": _int_or_none(height),
+        "duration": gen_params.get("duration") or None,
+        "resolution": job_params.get("resolution") or None,
+        "aspect": job_params.get("aspect") or None,
+        "attention": gen_params.get("attention") or None,
+        "workflow": gen_params.get("workflow") or None,
+        # ---- LoRA（产物实际）----
+        "loras": loras,
+        "lora_status": lora_status,
+        "lora_summary": gen_params.get("lora") or None,
+        # ---- 提示词 ----
+        "prompt": str(job_params.get("prompt") or ""),
+        "original_prompt": str(job_params.get("original_prompt") or ""),
+        # ---- 产物清单 ----
+        "outputs": outputs,
+    })
 
 
 # ------------------------------------------------------------------
@@ -8184,6 +8362,8 @@ def make_app():
     app.router.add_post("/api/longfilms", api_longfilm_create)
     app.router.add_get("/api/jobs", api_list)
     app.router.add_get("/api/jobs/{id}", api_get)
+    # 【2026-11-15】产物实际生成参数（卡片详情模态框用）
+    app.router.add_get("/api/jobs/{id}/artifact-meta", api_artifact_meta)
     # 生成队列快照（队列顺序 / 状态 / 计数）—— 队列化需求的只读视图
     app.router.add_get("/api/queue", api_queue)
     # 接续生成：上下文回填 + 功能可用性探测
