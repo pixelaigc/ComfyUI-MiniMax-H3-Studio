@@ -763,9 +763,19 @@ async def api_job_assets(request):
 
     输入素材：asset_refs 里登记的引用（素材库 -> 任务）。
     产物素材：source=job_output 且 source_ref=该任务 id 的素材。
-    """
-    from h3studio import asset_repo as _repo
 
+    【2026-11-14 可实现性核查修复】这个端点此前**必然 500**，两个真 bug：
+
+    1. `SELECT ... preview_path ... FROM assets` —— `assets` 表**没有**
+       `preview_path` 列（它在 `asset_versions` 表里），sqlite 直接抛
+       `OperationalError: no such column: preview_path` -> 整个请求 500。
+    2. `_repo.refs_of(lib, job_id)` 用 job_id 去查 `asset_refs.asset_id` ——
+       但 job_id 存在 `asset_refs.ref_id` 列里（`asset_id` 是素材自己的 id），
+       所以「输入素材」永远查不到任何东西。
+
+    修法：preview 走 `asset_versions` 的当前版本（与 asset_repo.list_assets
+    同一套口径）；refs 改按 `ref_id=job_id AND ref_kind='job'` 查。
+    """
     job_id = request.match_info["id"]
     with db_conn() as conn:
         row = conn.execute("SELECT id, mode FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -773,17 +783,32 @@ async def api_job_assets(request):
         return web.json_response({"error": "任务不存在"}, status=404)
 
     with _library_conn() as lib:
-        inputs = _repo.refs_of(lib, job_id)
-        inputs = [r for r in inputs if r["kind"] == "job"]
+        # 输入素材：任务 id 在 ref_id 列（ref_kind='job' 表示「素材 -> 任务」）
+        inputs = lib.execute(
+            "SELECT id, asset_id, ref_kind, ref_id, slot, ordinal, label, created_at "
+            "FROM asset_refs WHERE ref_id=? AND ref_kind='job' ORDER BY created_at DESC",
+            (job_id,)).fetchall()
+        input_items = [{
+            "ref_id": r["id"], "asset_id": r["asset_id"], "kind": r["ref_kind"],
+            "job_id": r["ref_id"], "slot": r["slot"], "ordinal": r["ordinal"],
+            "label": r["label"], "created_at": r["created_at"],
+        } for r in inputs]
+
+        # 产物素材：preview 走当前版本（asset_versions 表）
         outputs = lib.execute(
-            "SELECT id, name, category, subtype, preview_path, total_bytes FROM assets "
-            "WHERE source='job_output' AND source_ref=?", (job_id,)).fetchall()
+            "SELECT a.id, a.name, a.category, a.subtype, a.total_bytes, "
+            "       v.preview_path "
+            "FROM assets a "
+            "LEFT JOIN asset_versions v "
+            "  ON v.asset_id = a.id AND v.version = a.latest_version "
+            "WHERE a.source='job_output' AND a.source_ref=?",
+            (job_id,)).fetchall()
         output_items = [{
             "id": r["id"], "name": r["name"], "category": r["category"],
             "subtype": r["subtype"], "bytes": r["total_bytes"],
             "preview_url": (f"/api/assets/{r['id']}/preview" if r["preview_path"] else None),
         } for r in outputs]
-    return web.json_response({"job_id": job_id, "inputs": inputs, "outputs": output_items})
+    return web.json_response({"job_id": job_id, "inputs": input_items, "outputs": output_items})
 
 
 # ------------------------------------------------------------------ 接线

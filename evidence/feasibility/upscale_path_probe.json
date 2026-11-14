@@ -1,0 +1,166 @@
+{
+ "user_params": {
+  "steps": 37,
+  "cfg": 6.5,
+  "sampler": "dpmpp_3m_sde",
+  "scheduler": "karras",
+  "shift": 8.0
+ },
+ "cases": {
+  "1MP 直出路径 (1360x768)": {
+   "node_count": 10,
+   "ksampler": {
+    "id": "57:3",
+    "steps": 37,
+    "cfg": 6.5,
+    "sampler_name": "dpmpp_3m_sde",
+    "scheduler": "karras",
+    "denoise": 1
+   },
+   "upscale_nodes": [],
+   "has_upscale_chain": false,
+   "shift_node": [
+    [
+     "57:11",
+     8.0
+    ]
+   ],
+   "latent_wh": [
+    [
+     "57:13",
+     1360,
+     768
+    ]
+   ]
+  },
+  "3.5MP 1440p (2560x1440)": {
+   "node_count": 17,
+   "ksampler": {
+    "id": "57:75",
+    "steps": 5,
+    "cfg": 1.0,
+    "sampler_name": "dpmpp_2m_sde",
+    "scheduler": "beta",
+    "denoise": 0.33
+   },
+   "upscale_nodes": [
+    [
+     "57:70",
+     "ImageScaleToTotalPixels"
+    ],
+    [
+     "57:71",
+     "UpscaleModelLoader"
+    ],
+    [
+     "57:72",
+     "ImageUpscaleWithModel"
+    ],
+    [
+     "57:76",
+     "ImageScale"
+    ]
+   ],
+   "has_upscale_chain": true,
+   "shift_node": [
+    [
+     "57:11",
+     3.0
+    ]
+   ],
+   "latent_wh": [
+    [
+     "57:13",
+     1360,
+     768
+    ]
+   ]
+  },
+  "4.2MP 2K (2800x1568)": {
+   "node_count": 17,
+   "ksampler": {
+    "id": "57:75",
+    "steps": 5,
+    "cfg": 1.0,
+    "sampler_name": "dpmpp_2m_sde",
+    "scheduler": "beta",
+    "denoise": 0.33
+   },
+   "upscale_nodes": [
+    [
+     "57:70",
+     "ImageScaleToTotalPixels"
+    ],
+    [
+     "57:71",
+     "UpscaleModelLoader"
+    ],
+    [
+     "57:72",
+     "ImageUpscaleWithModel"
+    ],
+    [
+     "57:76",
+     "ImageScale"
+    ]
+   ],
+   "has_upscale_chain": true,
+   "shift_node": [
+    [
+     "57:11",
+     3.0
+    ]
+   ],
+   "latent_wh": [
+    [
+     "57:13",
+     1360,
+     768
+    ]
+   ]
+  },
+  "8.3MP 4K (3936x2208)": {
+   "node_count": 17,
+   "ksampler": {
+    "id": "57:75",
+    "steps": 5,
+    "cfg": 1.0,
+    "sampler_name": "dpmpp_2m_sde",
+    "scheduler": "beta",
+    "denoise": 0.33
+   },
+   "upscale_nodes": [
+    [
+     "57:70",
+     "ImageScaleToTotalPixels"
+    ],
+    [
+     "57:71",
+     "UpscaleModelLoader"
+    ],
+    [
+     "57:72",
+     "ImageUpscaleWithModel"
+    ],
+    [
+     "57:76",
+     "ImageScale"
+    ]
+   ],
+   "has_upscale_chain": true,
+   "shift_node": [
+    [
+     "57:11",
+     3.0
+    ]
+   ],
+   "latent_wh": [
+    [
+     "57:13",
+     1360,
+     768
+    ]
+   ]
+  }
+ }
+}

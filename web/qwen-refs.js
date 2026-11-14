@@ -313,7 +313,7 @@
       refs = sorted;
       reindexPrompt(oldLayout);
       render();
-      alert("智能排序不可用，已降级为「入库时间倒序」：" + e.message);
+      alert("按匹配度排序不可用，已降级为「入库时间倒序」：" + e.message);
       return;
     }
     sortBusy = false;
@@ -477,7 +477,7 @@
     const sortBtn = $("#imgRefSort");
     if (sortBtn) {
       sortBtn.disabled = refs.length < 2 || sortBusy;
-      sortBtn.textContent = sortBusy ? "排序中…" : "智能排序";
+      sortBtn.textContent = sortBusy ? "排序中…" : "按匹配度排序";
     }
 
     box.innerHTML = refs.map((r, i) => {

@@ -1,0 +1,34 @@
+{
+ "t2v": {
+  "mode_models": [
+   "lora"
+  ]
+ },
+ "flf": {
+  "mode_models": [
+   "lora"
+  ]
+ },
+ "r2v": {
+  "mode_models": [
+   "lora"
+  ]
+ },
+ "t2i": {
+  "mode_models": [
+   "z_image_turbo_bf16",
+   "z_image_bf16",
+   "z_image_base_distill",
+   "darkbeast_z6_blitz_fp8"
+  ]
+ },
+ "t2i_qwen": {
+  "mode_models": [
+   "qwen_image_2.1_bf16",
+   "qwen_image_2.1_turbo_bf16"
+  ]
+ },
+ "validate_t2v_with_video_model": {
+  "error": "TypeError: Object of type ValidationIssue is not JSON serializable"
+ }
+}
