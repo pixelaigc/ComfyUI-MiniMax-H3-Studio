@@ -192,8 +192,6 @@ def main() -> int:
             check("模型下拉含 fl2va_pruned_int8",
                   opts.get("model") and "fl2va_pruned_int8" in opts["model"],
                   f"model 选项 = {opts.get('model')}")
-            page.screenshot(path=str(OUT / "T3_manage_t2v.png"),
-                            full_page=False)
 
             # 真改一个值 -> PUT -> 读回（真实 id：agmT2vAttention / agmSave）
             page.evaluate("""() => {
@@ -210,6 +208,26 @@ def main() -> int:
             }""")
             page.wait_for_timeout(2500)
             check("保存按钮存在并点击", saved, f"clicked={saved}")
+
+            # 【截图补强】弹窗内容比视口高 —— 「文生视频默认参数」区块在**下方**，
+            # 不滚动就截不到。滚到该区块再截一张（否则三张截图会完全一样，
+            # 看起来像没渲染）。
+            page.evaluate("""() => {
+                const el = document.querySelector('#agmT2vAttention');
+                if (el) el.scrollIntoView({block: 'center'});
+            }""")
+            page.wait_for_timeout(700)
+            t2v_visible = page.evaluate("""() => {
+                const el = document.querySelector('#agmT2vAttention');
+                if (!el) return false;
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0
+                    && r.top >= 0 && r.bottom <= window.innerHeight;
+            }""")
+            check("滚动后 t2v 默认参数下拉在视口内可见",
+                  t2v_visible, f"visible={t2v_visible}")
+            page.screenshot(path=str(OUT / "T3_manage_t2v.png"),
+                            full_page=False)
 
             import urllib.request
             with urllib.request.urlopen(

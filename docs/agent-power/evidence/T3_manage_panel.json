@@ -1,5 +1,5 @@
 {
-  "port": 53249,
+  "port": 56289,
   "checks": [
     {
       "name": "管理按钮存在并可点击",
@@ -70,6 +70,11 @@
       "name": "保存按钮存在并点击",
       "ok": true,
       "detail": "clicked=True"
+    },
+    {
+      "name": "滚动后 t2v 默认参数下拉在视口内可见",
+      "ok": true,
+      "detail": "visible=True"
     },
     {
       "name": "改后的值真的持久化（读回 = default）",
