@@ -505,13 +505,12 @@ systemctl restart comfyui.service
    ComfyUI-QwenVL3-image / comfyui_vlm_nodes / deps / indextts-mw / teacache。
    本次未处理（超出本任务范围），但**已记录基线**，后续升级可直接对比有无新增。
 
-4. **`ComfyUI-H3VAE_TRT` 缺两个节点的事实未变** —— 本次升级没有触碰它，
+4. **ComfyUI-H3VAE_TRT 缺两个节点的事实未变** —— 本次升级没有触碰它，
    也没有新增缺失。
 
 5. **本机 ComfyUI 的 `custom_nodes/` 有 247 个目录**，其中大量是他人维护的。
    升级只动了 ComfyUI core（`/home/ubuntu/comfyui` 的上游代码），
    custom_nodes 一律没改（除 Drama3 跟随上游升级）。
-
 6. **`h3studio/h3image.py` 里还有两处注释提到 0.37.0**（`server.py:648` 的
    "ComfyUI 0.37 的 history 里 status 总是 dict"、`comfy_models.py` 的
    "ComfyUI 0.37.0 的模型目录接口"）—— 那是**当时实测的观察记录**，
@@ -525,3 +524,95 @@ systemctl restart comfyui.service
      仍返回 200 —— `comfy_models.py` 的用法不变。
    - `POST /free` 返回 500（需 `unload_models` 参数），0.37.0 时也是这个行为
      —— ComfyUI 自身语义，非升级引入。
+
+---
+
+## 9. 补充：H3-Optimizations 的运行时破坏（子 agent 审计发现，已自行复核）
+
+升级后对 22+ 个 H3 相关 custom_nodes 做了兼容性审计（AST 静态比对 +
+仿真 ComfyUI 加载器实测 import 差分）。结论：**import 层零回归**（31 个包
+26 个可加载，107 个节点名集合 0.37 与 0.45.3 完全一致），但发现 **1 个
+import 通过、运行时才炸**的高危项。
+
+### 9.1 根因（已用源码 + 实测双重复核）
+
+上游 0.45.3 把 `comfy/ldm/minimax/model.py` 的 `FinalLayer.forward`
+第 7 个位置参数从 `shifts`（两个 float 的 flow shift）改成了 `grids`
+（每条流一条 `pdd_steps+1` 点的 sigma grid **列表**）：
+
+```python
+# 上游 v0.45.3
+def forward(self, x, t_emb, video_seg, audio_seg, sigma, sample_sigmas, grids):
+```
+
+而 `custom_nodes/H3-Optimizations/h3_optimizations/memory/final_layer.py`
+的契约探测集合仍写着旧名：
+
+```python
+_CURRENT_FORWARD_PARAMETERS = frozenset({'sigma', 'sample_sigmas', 'shifts'})   # :19
+```
+
+→ `_accepts_current_contract()` 判定上游是"旧契约" → 走只传 4 个参数的
+fallback 分支（`:161` `return original_forward(x, t_emb, video_seg, audio_seg)`），
+**参数不够**。
+
+### 9.2 实测复现（在已升级的 0.45.3 上跑）
+
+```
+upstream 0.45.3 FinalLayer.forward params:
+  ['self','x','t_emb','video_seg','audio_seg','sigma','sample_sigmas','grids']
+  'shifts' present: False | 'grids' present: True
+
+plugin _CURRENT_FORWARD_PARAMETERS = ['sample_sigmas','shifts','sigma']
+plugin _accepts_current_contract(upstream FinalLayer.forward) = False
+
+--> 上游 7 个位置参数调用补丁后的 forward:
+    TypeError: FinalLayer.forward() missing 4 required positional arguments:
+               'audio_seg', 'sigma', 'sample_sigmas', and 'grids'
+--> 改成关键字传 grids:
+    TypeError: patched() got an unexpected keyword argument 'grids'
+```
+
+**两条路都炸** —— 位置参数走错分支数量不够，关键字参数直接被拒。
+
+### 9.3 影响范围（已核实，不是"整个 H3 都不能用了"）
+
+| 项 | 结论 |
+|---|---|
+| 触发节点 | 只有 `H3MemoryOptimization`（`memory_migration_node.py:179`，node_id `H3MemoryOptimization`）会经 `apply.py:1147` → `install_final_layer()` 装这个 patch |
+| **本工作台 8190** | **不受影响** —— 全仓库 grep `H3MemoryOptimization` / `chunk_rows` / `H3Optim` **零命中**；studio 用的是 `MiniMaxH3ImageToVideo` / `MiniMaxH3SigmaShift` / `MiniMaxH3TurboLoRA`，都不经过 `install_final_layer` |
+| studio 的 H3 视频链路 | **实测通过** —— 升级后跑了一次真实 t2v（job `f4ce0203a54e`，1280×768 mp4），`status=done`，ComfyUI 日志无任何 `grids`/`shifts`/`FinalLayer` 报错 |
+| studio 引用的 `MiniMaxH3MemoryEfficientSolAttentionPatch` | **不受影响** —— 该节点来自 `custom_nodes/ComfyUI-sol-attn/minimax.py`，与 H3-Optimizations 是两个包 |
+| import 层面 | 无影响（插件照常加载，`H3MemoryOptimization` 在 /object_info 可见） |
+
+**结论：这是一个"用户主动挂上 `H3MemoryOptimization` 节点才会炸"的潜在雷，
+不是本次升级引入的现存故障，也不是工作台的故障。**
+
+### 9.4 上游状态与建议
+
+上游 `Zironic/H3-Optimizations` 最新 `f195ca4`（version 0.3.0，
+`requires-comfyui = '>=0.40.0'`）**仍未适配 `grids`**（源码里还是 `shifts`），
+所以「升级到上游最新版」不能解决，得等上游改或自己打补丁。
+
+**本次未擅自修改**（理由）：
+1. 这是**他人维护的第三方包**，本机版本 0.2.45 → 上游 0.3.0 跨越多个版本，
+   升级它会连带引入别的行为变化，超出"升级 ComfyUI 支撑 H3-Image 出图"的范围；
+2. 它不影响本工作台的任何链路（已实测）；
+3. 打补丁要改的是 `FinalLayer` 的调用契约，属于需要独立测试覆盖的改动。
+
+**建议（供 willis 拍板，不擅自执行）**：
+- 若要用 `H3MemoryOptimization`：按上游 0.45.3 的 `grids` 语义打补丁 ——
+  `_CURRENT_FORWARD_PARAMETERS` 同时接受 `shifts` 与 `grids`；
+  `_call_original` 改成按 `inspect.signature` 动态构造调用；
+  `chunked_final_layer` 增 `grids` 分支（用上游
+  `min(range(n+1), key=lambda k: abs(grids[0][k]-float(s)))` 替代 `time_shift_sigma`）。
+- 或：直接不用这个节点（H3 出图/出视频都不需要它）。
+- 或：等上游适配后再整体升到 0.3.0。
+
+**审计留下的可复用脚本**（只读探针，未改动任何文件）：
+```
+/root/h3_probe2.py                  保真 import 探针
+/root/h3_probe3.py                  带 PromptServer stub 的变体
+/root/h3_opt_contract_test.py       H3-Optimizations 契约实测
+/root/h3_final_layer_contract_test.py  FinalLayer 参数契约实测
+```
