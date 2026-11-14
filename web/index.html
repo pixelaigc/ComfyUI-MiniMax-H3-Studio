@@ -1506,7 +1506,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
      必须**先于** app.js 加载 —— app.js 的 boot() 里要读
      window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
-<script src="/static/generation-queue.js?v=uxbatch1"></script>
+<!-- 【2026-11-14 A5】升版号到 a5truth1 —— generation-queue.js 改了（新增「运行真相」兜底：已超时 / 状态未知 / 已丢失），
+     必须破缓存，否则用户拿到的还是旧文件（永远显示「运行中」）。 -->
+<script src="/static/generation-queue.js?v=a5truth1"></script>
 <script src="/static/video-nav.js?v=sidebarfold2"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
@@ -1521,7 +1523,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      会让用户拿到旧文件。 -->
 <script src="/static/app.js?v=uxbatch1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
-<script src="/static/job-detail.js?v=uxbatch1"></script>
+<!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
+     「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
+<script src="/static/job-detail.js?v=a5truth1"></script>
 <script src="/static/assets.js?v=uxbatch1"></script>
 <!-- 素材库播放器模式（2026-11-14 需求 14） -->
 <script src="/static/asset-player.js?v=uxbatch1"></script>
