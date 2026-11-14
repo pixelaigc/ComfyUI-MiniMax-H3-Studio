@@ -4271,7 +4271,28 @@ async def api_artifact_meta(request):
         # ---- LoRA（产物实际）----
         "loras": loras,
         "lora_status": lora_status,
-        "lora_summary": gen_params.get("lora") or None,
+        # 【2026-11-15 修 —— lora_summary 必须与 lora_status 一致】
+        #
+        # 【为什么要改】gen_params.lora 走的是 resolve_job_lora 的**回落路径**：
+        # 「params 里没有 LoRA 记录」时它回落成 ckpt850（那是工作流的默认
+        # 档，对**新**任务确实成立）。但对**历史**任务（worker 回写之前
+        # 生成的），我们**没有证据**说它挂了 ckpt850 —— 接口已经如实标了
+        # lora_status="not_recorded"，lora_summary 却还显示 ckpt850，
+        # 两个字段自相矛盾 = 仍在显示「没证据的假名」。
+        #
+        # 现在：有产物实际记录 -> 显示实际；明确没用 -> 「未使用 LoRA」；
+        # 没记录到 -> 「未知（该任务生成时未记录 LoRA）」。
+        # 三态与前端 artifactLoraHtml() 完全对齐。
+        "lora_summary": (
+            " · ".join(
+                (f"{item['name']} ×{float(item['strength']):.2f}"
+                 if item.get("strength") is not None else str(item["name"]))
+                for item in loras
+            ) if loras else (
+                "未使用 LoRA" if lora_status == "none_used"
+                else "未知（该任务生成时未记录 LoRA）"
+            )
+        ),
         # ---- 提示词 ----
         "prompt": str(job_params.get("prompt") or ""),
         "original_prompt": str(job_params.get("original_prompt") or ""),
