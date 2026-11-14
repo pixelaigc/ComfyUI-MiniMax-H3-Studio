@@ -317,9 +317,12 @@ class TestMusicFlowBrowser(unittest.TestCase):
         self.assertIn("[Verse]", lyrics)
         self.assertIn("雨还在下", lyrics)
 
-        # 两个「重新生成」入口都在
-        self.assertTrue(self.page.is_visible("#musicStyleRegenBtn"))
-        self.assertTrue(self.page.is_visible("#musicLyricsRegenBtn"))
+        # 【2026-11-14 需求 7】两个「重新生成」按钮已移除 ——
+        # 想重新生成直接点上面的「生成风格+歌词」即可。
+        self.assertFalse(self.page.is_visible("#musicStyleRegenBtn"))
+        self.assertFalse(self.page.is_visible("#musicLyricsRegenBtn"))
+        # 重新生成的唯一入口仍在
+        self.assertTrue(self.page.is_visible("#musicEnhanceBtn"))
 
     def test_structured_fields_are_editable(self):
         """【要求 5】结构化风格的字段可逐项编辑，改动进入提交参数。"""
@@ -335,7 +338,13 @@ class TestMusicFlowBrowser(unittest.TestCase):
                          "改过的字段必须进入提交参数")
 
     def test_regen_uses_current_content_as_base(self):
-        """【要求 5】「重新生成」= 以当前内容为底稿（请求里带 base + 现有内容）。"""
+        """【要求 5】「重新生成」= 以当前内容为底稿（请求里带 base + 现有内容）。
+
+        【2026-11-14 需求 7】两个「重新生成」按钮已被移除 ——
+        重新生成的唯一入口是上面的「生成风格+歌词」按钮。
+        本用例改为验证：点「生成风格+歌词」时，
+        请求带上了当前内容作为上下文（style / lyrics）。
+        """
         self.reset()
         self.switch_mode("t2a")
         self.page.evaluate("""() => {
@@ -366,17 +375,22 @@ class TestMusicFlowBrowser(unittest.TestCase):
         self.page.select_option("#musicSF_genre", "jazz")
         self.page.wait_for_timeout(300)
 
-        self.page.click("#musicLyricsRegenBtn")
+        # 【需求 7】改点唯一的「生成风格+歌词」入口
+        self.page.click("#musicEnhanceBtn")
         self.page.wait_for_timeout(2000)
         payloads = self.page.evaluate("() => window.__payloads || []")
-        self.assertTrue(payloads, "「重新生成」应发起请求")
+        self.assertTrue(payloads, "「生成风格+歌词」应发起请求")
         p = payloads[-1]
+        # 【需求 7】重新生成的唯一入口是「生成风格+歌词」——
+        # 面板上已有内容时，它就是「以当前内容为底稿再生成一版」：
+        # 请求里必须带 base + 当前 style + 当前 lyrics。
+        # （否则用户改了 genre 再点，修改会被静默丢掉。）
         self.assertEqual(p.get("base"), "当前内容",
-                         "「重新生成」必须带 base（以当前内容为底稿）")
+                         "重新生成必须带 base（以当前内容为底稿）")
         self.assertIn("旧内容", json.dumps(p, ensure_ascii=False),
-                      "「重新生成」必须把当前歌词作为上下文")
+                      "重新生成必须把当前歌词作为上下文")
         self.assertEqual(p.get("style", {}).get("genre"), "jazz",
-                         "「重新生成」必须把当前结构化风格作为上下文")
+                         "重新生成必须把当前结构化风格作为上下文")
 
     def test_enhance_request_carries_live_mode(self):
         """

@@ -122,7 +122,22 @@
     const hasStyle = Object.keys(styleFields).length > 0;
     const lyrics = music.getLyrics() || "";
     const hasLyrics = lyrics.trim().length > 0;
-    const base = opts.base === true ? (hasStyle || hasLyrics) : false;
+    // 【2026-11-14 需求 7】重新生成的唯一入口是「生成风格+歌词」按钮
+    // （原先还有两个「基于当前内容重新生成」按钮，已移除）。
+    //
+    // 【语义】只要面板上**已经有**当前内容（结构化风格字段或歌词），
+    // 这次生成就是「在当前内容基础上再生成一版」—— 必须把当前内容
+    // 作为上下文带上（base + style + lyrics）。
+    //
+    // 【为什么不靠调用方传 base】旧的两个按钮传的是 opts.base=true，
+    // 现在它们没了，主按钮的调用点不会传这个标志 —— 如果这里还只看
+    // opts.base，用户改了 genre 再点「生成风格+歌词」，修改就被**静默丢掉**
+    // （模型拿到的是空 style，重新生成一份全新的）。这正是需求 7
+    // 想保留的「重新生成」能力。
+    const hasCurrent = hasStyle || hasLyrics;
+    // 只要面板上已有当前内容，这次生成就以它为底稿
+    // （不管调用方传没传 opts.base —— 唯一的入口就是「生成风格+歌词」）。
+    const base = hasCurrent;
 
     if (!prompt && !base) {
       setHint("请先输入音乐描述", "error");
