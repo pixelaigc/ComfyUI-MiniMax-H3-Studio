@@ -250,7 +250,20 @@ class TestEffectLorasVisibleInPanel(unittest.TestCase):
         与三等分不对应，实测数值不等价 —— 见 moss_lora_compat 的说明）。
         这类条目**必须**被判不兼容并给出原因（界面如实标注），
         否则就是「照常列出让用户误以为已生效」的静默失效。
+
+        ⚠️ 2026-11-15 第二类例外：**权重文件本体损坏**。
+        实测 hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors 被截断
+        （实际 5,369,856 字节 / 头部声明需要 297,355,184 字节），
+        ComfyUI 加载时抛 SafetensorError: incomplete metadata。
+        旧逻辑只读 safetensors **头部**，而截断文件的**头部是完整的** ——
+        于是被判成 compatible=true 下发，用户选中必然报错。
+        现在 fail closed：读不出完整文件 = 明确不兼容 + 如实原因。
         """
+        # 允许的不兼容「类别」——每一类都必须如实说明自己为什么不可用
+        allowed_reason_markers = (
+            ("LoKR", "无法无损拆分"),      # 融合 qkv 不可无损拆分
+            ("截断", "无法使用"),            # 权重文件本体损坏（截断/不完整）
+        )
         allowed_incompatible = 0
         for family in FAMILIES:
             for item in _list_for(family):
@@ -259,13 +272,20 @@ class TestEffectLorasVisibleInPanel(unittest.TestCase):
                 if item.get("compatible", True):
                     continue
                 reason = item.get("incompatible_reason", "")
-                # 只允许「LoKR 融合 qkv 不可拆分」这一类
-                self.assertIn("LoKR", reason,
-                              f"{item['name']} 被判不兼容但原因不是 LoKR 不可拆分："
-                              f"{reason}")
-                self.assertIn("无法无损拆分", reason,
-                              f"{item['name']} 不兼容原因没说明「无法无损拆分」："
-                              f"{reason}")
+                # 只允许上面列出的这两类，且必须**每一类都命中**
+                matched = [markers for markers in allowed_reason_markers
+                           if all(marker in reason for marker in markers)]
+                self.assertTrue(
+                    matched,
+                    f"{item['name']} 被判不兼容但原因不属于任何已知类别："
+                    f"{reason}")
+                # 命中了哪一类，就要有哪一类的完整说明
+                for markers in matched:
+                    for marker in markers:
+                        self.assertIn(
+                            marker, reason,
+                            f"{item['name']} 不兼容原因没说明「{marker}」："
+                            f"{reason}")
                 allowed_incompatible += 1
         # 台账里记录的被挡条目数应该有限（防止规则放宽成「什么都行」）
         self.assertLessEqual(allowed_incompatible, 20,
