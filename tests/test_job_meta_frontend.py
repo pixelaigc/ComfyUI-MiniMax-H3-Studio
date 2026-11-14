@@ -179,9 +179,11 @@ console.log(JSON.stringify({{label, row}}));
         self.assertNotIn(BOGUS, out["label"],
                          "提示词字段名被当成 LoRA 显示了")
         self.assertNotIn(BOGUS, out["row"])
-        self.assertEqual(out["label"], "无",
-                         "没有 LoRA 时必须显示「无」")
-        self.assertIn("无", out["row"])
+        # 【2026-11-15 文案变更】「无」->「未使用 LoRA」（用户要求）。
+        # 行为保护不变：提示词字段名**仍然不得**被当成 LoRA 显示。
+        self.assertEqual(out["label"], "未使用 LoRA",
+                         "没有 LoRA 时必须显示「未使用 LoRA」")
+        self.assertIn("未使用 LoRA", out["row"])
 
     def test_real_lora_is_shown_with_strength(self):
         job = {
@@ -213,8 +215,11 @@ console.log(JSON.stringify({
   ok: loraRowHtml("DMAD"),
 }));
 """)
+        # 【2026-11-15 文案变更】用户要求：「缺失时应显示『未使用 LoRA』
+        # 而不是错名」。原来的「无」太短、也容易被读成「数据缺失」。
         for key in ("empty", "nul", "undef"):
-            self.assertIn("无", out[key], f"{key} 应显示「无」")
+            self.assertIn("未使用 LoRA", out[key],
+                          f"{key} 应显示「未使用 LoRA」")
             self.assertNotIn("空", out[key])
         self.assertIn("DMAD", out["ok"])
 
