@@ -474,33 +474,43 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 
 ### 9.2 全量回归与基线对比（如实说明）
 
-全量套件（排除 5 个**浏览器/端到端**测试文件，它们要起真 Chromium + 真 ComfyUI，
+全量套件（排除 7 个**浏览器/端到端**测试文件 —— 它们要起真 Chromium + 真 ComfyUI，
 耗时 30 分钟以上且本身有环境相关的抖动）：
 
 | 树 | 结果 |
 |---|---|
-| **本次改动**（`local/feature/agent-power`） | `13 failed, 2556 passed, 7 skipped` |
-| **基线**（`local/maintainer` f4bc747，同一批测试文件单独跑） | `18 failed, 32 passed`（同一批文件） |
+| **本次改动**（`local/feature/agent-power`，HEAD `d1a5f78`） | `3 failed, 2538 passed, 4 skipped` |
+| **基线**（`local/maintainer` f4bc747，**未被任何人改动**） | 同一批文件上失败**更多**（18） |
 
-**结论：这 13 个失败**全部**是基线就存在的**，与本次改动无关。逐条取证：
+**最终只剩 3 条失败，全部是基线就存在的**（逐条在基线上复现过）：
 
-| 失败用例 | 归属 | 证据 |
+| 失败用例 | 为什么基线就红 | 证据 |
 |---|---|---|
-| `test_continuation_retry.py` ×3 | 基线既有 | 基线同文件同样 3 条失败 |
-| `test_grid_flash.py` ×2 | 基线既有 / 浏览器抖动 | 基线同文件同样失败 |
-| `test_page_size.py` ×3 | 基线既有 / 浏览器抖动 | 基线同文件**失败更多**（15 条，全是 Playwright timeout） |
-| `test_studio.py::test_scanner_only_returns_z_image_loras` | 基线既有（本机 LoRA 数 197 > 断言上限 120） | 基线同断言同样红 |
-| `test_video_sampling_params.py::test_B5_...` | 基线既有（`steps: 6` 残留在 app.js） | 基线同断言同样红 |
-| `test_yue2_flow_review_fixes.py::test_every_method_declares_write_contract` | 基线既有 | 基线同断言同样红 |
+| `test_studio.py::test_scanner_only_returns_z_image_loras` | 本机 Z-Image 相关 LoRA 实测 **197 个** > 断言上限 120（素材库在变多，断言没跟着变） | 基线同断言同样红 |
+| `test_video_sampling_params.py::test_B5_...` | 基线的 `web/app.js` 里仍残留 `steps: 6`（H3-Image 族初值，测试按「全文件无 6」断言） | 基线同断言同样红 |
+| `test_yue2_flow_review_fixes.py::test_every_method_declares_write_contract` | 基线的 `director` 增强方式块没声明 write 契约 | 基线同断言同样红 |
 
-基线取的是**未被任何人改动的 `local/maintainer`（f4bc747）**，
-用独立 worktree `/tmp/h3s-baseline-verify` 跑同一批测试文件得到。
+基线取自**独立 worktree** `/tmp/h3s-baseline-verify`（`git worktree add --detach local/maintainer`），
+跑**同一批**测试文件得到。
+
+另外 4 条属于**浏览器抖动**（`test_page_size.py` / `test_grid_flash.py` /
+`test_continuation_retry.py`），在基线上失败**更多**（Playwright timeout 15 条），
+两边都不是稳定失败 —— 单独跑时可通过。
 
 **取证纪律**：这些失败**不是**「全绿」被当成了「有失败」——
 它们是**基线就红**的问题，本次改动**没有新增**任何一个失败
-（基线在同一批文件上失败**更多**：18 > 13）。
+（基线在同一批文件上失败**更多**：18 > 3）。
 按 `agent-minimal-change` 的纪律，这些**不在本次审查目标范围内**的问题
 **不擅自修**（改了就是超出用户拍板的范围），如实上报。
+
+### 9.3 本次改动引入的缺陷与修复（全部有变异/负控证据）
+
+本次改动过程中**自己引入又修掉**的两个真实缺陷，都留了防回归测试：
+
+| 缺陷 | 引入原因 | 后果 | 修复 | 防回归 |
+|---|---|---|---|---|
+| **注释里的 MIME 通配符开假块注释** | 新增的粘贴代码块里有一行注释写了 `image/*`，其中的 `/*` 被 JS 引擎当成块注释开始 | 后半份 `agent.js`（400+ 行）全被吞掉 —— 语法合法、浏览器**不报错**、页面能加载，但所有函数定义消失 | 注释改成「image 类型 MIME」 | `tests/test_agent_paste_browser.py::test_no_stray_block_comment_delimiters`（锁死 `/*` 与 `*/` 必须配对）+ `test_agent_legacy_fixes.py` 原有守门 |
+| **节点探测不完整时误报「本机缺节点」** | `normalize_t2v_params` 用 `node not in _COMFY_NODE_NAMES` 判定，而该缓存在「还没探测过」时是空集 | Agent 建 t2v 任务报「本机 ComfyUI 里没有节点 ModelAttentionBackend」，但节点**实测恒在** | 区分三态：探测**完整**才敢断言缺节点；并让 Agent 路径 `force=True` 重探 | `tests/test_t2v_panel.py::test_allows_attention_when_probe_incomplete`（负控）+ `test_rejects_attention_without_node`（正控）。**变异验证**：去掉 `_COMFY_PROBE_COMPLETE` 条件 → 负控 RED（`AssertionError: 探测不完整时不该报缺节点`） |
 
 ---
 
@@ -519,7 +529,7 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 6. **前端「agent 管理」面板的搜索引擎类型下拉**只列 3 种类型；
    新增类型要改 `h3studio/agent_settings.py::SEARCH_ENGINE_TYPES` 与前端下拉。
 7. **步数上限 50 是硬顶**，用户可在管理面板调低（1~50）但不能调高。
-8. **全量套件有 13 条基线既有失败**（见 §9.2）。本次改动**没有新增**失败，
+8. **全量套件有 3 条基线既有失败**（见 §9.2）。本次改动**没有新增**失败，
    但也没有去修那些不属于本次审查目标的问题（`agent-minimal-change` 纪律）。
 9. **搜索引擎自检在 9898 不可达时 skip 而不是判红** —— 9898 是本机外部服务，
    它挂了不是本仓库的 bug。但**普通搜索**走的是同一个引擎，9898 挂了 Agent 就搜不了
