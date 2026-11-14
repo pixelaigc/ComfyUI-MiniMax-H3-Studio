@@ -1,0 +1,36 @@
+{
+  "d1_name": "moss-effects/moss_image_sft_look_lora.safetensors",
+  "resolved_name": "moss-effects/moss_image_sft_look_lora.safetensors",
+  "original_path": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_image_sft_look_lora.safetensors",
+  "ensure_normalized": {
+    "path": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+    "derived": true,
+    "reason": ""
+  },
+  "workflow_lora_name": "moss-effects/h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "workflow_lora_name_is_original": false,
+  "attach_original": {
+    "patched": 137,
+    "missing": 126,
+    "missing_proj_qkv": 0,
+    "missing_sample": [
+      "lora_unet_layers_0_proj_qkv.alpha",
+      "lora_unet_layers_0_proj_qkv.lora_down.weight",
+      "lora_unet_layers_0_proj_qkv.lora_up.weight"
+    ]
+  },
+  "attach_effective": {
+    "patched": 263,
+    "missing": 0,
+    "missing_proj_qkv": 0,
+    "missing_sample": []
+  },
+  "verdict": {
+    "user_path_fully_attaches": true,
+    "user_path_key_not_loaded_warnings": 0,
+    "original_file_alone_would_silently_fail": true,
+    "original_file_alone_missing": 126,
+    "effective_patched": 263,
+    "effective_missing": 0
+  }
+}

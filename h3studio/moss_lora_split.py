@@ -198,8 +198,119 @@ def ensure_normalized(lora_path) -> dict:
     return {"path": None, "derived": False, "reason": r["reason"]}
 
 
+#: 转换状态的三个取值（conversion_status 返回 status 字段）
+STATUS_DIRECT = "direct"        # 分离形态 —— 原样就能挂，用户路径无需转换
+STATUS_DERIVED = "derived"      # 融合形态 —— 派生文件已存在且完整，转换曾成功过
+STATUS_UNVERIFIED = "unverified"  # 融合形态 —— 还没有派生文件，转换可行性**未验证**
+STATUS_BROKEN = "broken"        # 文件本体读不出 / 被截断 —— 必然失效
+
+
+def conversion_status(lora_path) -> dict:
+    """判定「用户选这个 LoRA 之后能不能真的完整生效」。
+
+    ⚠️ **为什么需要这个判定**（2026-11-15 缺陷 A 复核）：
+    兼容性判定（`check_moss_compatibility`）只看 **safetensors 头部**，
+    判出 compatible=true 的含义是「**结构**对得上底模」。
+    但用户实际能不能用，取决于**另一件事**：这份权重是不是融合 qkv 形态
+    —— 是的话，ComfyUI 会静默丢弃它（只打 "lora key not loaded"，
+    出图照跑但 LoRA 没生效），必须**先转换成派生文件**才能用。
+
+    这两件事是**两套独立逻辑**，中间有真实缺口：
+    `check_moss_compatibility` 从来**没有验证过转换是否可行**
+    （`convertible` 只按头部形态推断），于是「结构兼容但转换会失败」
+    的 LoRA 也会以 compatible=true 照常下发。
+
+    本函数给出的是**用户路径**的可行性，四个状态：
+
+    | status | 含义 | 用户能不能用 |
+    |---|---|---|
+    | `direct` | 分离形态，原样可挂 | 能，且**无需任何转换** |
+    | `derived` | 融合形态，派生文件已存在且完整 | 能（服务端自动挂派生文件） |
+    | `unverified` | 融合形态，尚无派生文件 | **未验证** —— 必须先转换 |
+    | `broken` | 文件本体损坏 | 不能 |
+
+    `unverified` 的判定是**保守**的：只有当派生文件**确实存在且读得出完整头部**
+    时才认为转换曾成功过。没验证过 ≠ 不可用，但**不能当作已验证来下发**。
+
+    返回：{"status": str, "needs_conversion": bool, "derived_path": str|None,
+            "reason": str}
+    """
+    src = Path(lora_path)
+    result = {"status": STATUS_UNVERIFIED, "needs_conversion": False,
+              "derived_path": None, "reason": ""}
+
+    header = compat.read_safetensors_header(src)
+    if not header:
+        detail = compat.read_safetensors_header_detail(src)
+        result["status"] = STATUS_BROKEN
+        result["reason"] = detail.get("reason") or "读不出 safetensors 头部"
+        return result
+
+    shape = compat.detect_qkv_shape(header)
+    raw_keys = [k for k in header if k != "__metadata__"]
+    needs_prefix = any(compat.normalize_key(k) != k for k in raw_keys)
+    needs_split = (shape == compat.QKV_SHAPE_FUSED)
+
+    # ⚠️ **前缀归一不等于需要转换**：
+    # `normalize_key` 会把 `lora_unet_` 前缀改写成 `diffusion_model.`，
+    # 所以 `needs_prefix` 为 True —— 但 ComfyUI **同时登记了
+    # `lora_unet_<层名>` 别名**，这类文件**原样就能挂**，
+    # 生成派生文件纯属多一份副本干扰用户。
+    # 判据必须跟 `normalize_lora` 一致（见那里的 prefix_directly_hits 分支）：
+    # 归一后的键能被 ComfyUI 的别名规则直接命中 -> 不需要转换。
+    if needs_prefix and not needs_split:
+        unnormalized = [k for k in raw_keys if compat.normalize_key(k) is None]
+        if not unnormalized and compat.prefix_directly_hits(raw_keys):
+            needs_prefix = False
+
+    if not needs_prefix and not needs_split:
+        # 已经是 ComfyUI 能直接命中的形态 —— 用户路径无需转换
+        result["status"] = STATUS_DIRECT
+        result["reason"] = "权重形态与本机底模一致，可直接挂载"
+        return result
+
+    # 需要转换：查派生文件是否已经存在且完整
+    target = src.parent / derived_name(src.name)
+    try:
+        if target.is_file():
+            t_header = compat.read_safetensors_header(target)
+            if t_header:
+                t_shape = compat.detect_qkv_shape(t_header)
+                t_keys = [k for k in t_header if k != "__metadata__"]
+                t_needs = any(compat.normalize_key(k) != k for k in t_keys)
+                # 同上：前缀能被 ComfyUI 别名直接命中 -> 视为归一完成
+                if t_needs and t_shape != compat.QKV_SHAPE_FUSED:
+                    t_unnorm = [k for k in t_keys if compat.normalize_key(k) is None]
+                    if not t_unnorm and compat.prefix_directly_hits(t_keys):
+                        t_needs = False
+                if t_shape != compat.QKV_SHAPE_FUSED and not t_needs:
+                    result["status"] = STATUS_DERIVED
+                    result["derived_path"] = str(target)
+                    result["needs_conversion"] = True
+                    result["reason"] = (
+                        "权重是融合 qkv 形态，服务端会在提交时自动使用已生成的"
+                        "归一版（转换已验证可用）")
+                    return result
+    except Exception:
+        pass
+
+    result["status"] = STATUS_UNVERIFIED
+    result["needs_conversion"] = True
+    if needs_split:
+        result["reason"] = (
+            "权重是融合 qkv 形态，与本机底模的分离 q/k/v 结构不一致。"
+            "本服务在提交任务时会自动做无损转换（转换后完整生效），"
+            "但该转换**尚未在本机验证过**。")
+    else:
+        result["reason"] = (
+            "权重的键名前缀与本机 ComfyUI 的登记写法不一致，"
+            "需要先做前缀归一才能挂载。"
+            "本服务在提交任务时会自动完成归一，但该归一**尚未在本机验证过**。")
+    return result
+
+
 def cleanup_stale_derived(lora_dirs=None) -> int:
-    """清理过期的派生文件（源文件比派生文件新时，派生文件失效）。"""
+    """清理过期的派生文件（源文件比派生文件更新时，派生文件失效）。"""
     from .loras import comfyui_lora_dirs
     dirs = lora_dirs or comfyui_lora_dirs()
     removed = 0
@@ -220,3 +331,61 @@ def cleanup_stale_derived(lora_dirs=None) -> int:
             except Exception:
                 continue
     return removed
+
+
+def prewarm_derived(lora_paths, progress=None, should_stop=None) -> dict:
+    """批量生成归一化派生文件，把「未验证」变成「已验证」。
+
+    ⚠️ **为什么需要它**（2026-11-15 缺陷 A 收口）：
+    `check_moss_compatibility` 现在要求融合 qkv 形态的 LoRA **转换已验证**
+    才发 compatible=true（否则就是半静默失效 —— 用户以为能用，实际不生效）。
+    而「转换已验证」的证据就是**派生文件确实存在且完整**。
+    没有预热，36 条融合形态的 LoRA 会一直停在「未验证」状态。
+
+    代价：每个文件要读全量权重 + 写出等大的派生文件
+    （实测 36 条合计 6.64 GB，USB 盘上约 10-20 分钟）。
+    所以这是**后台任务**，绝不能放在 HTTP 请求里。
+
+    参数：
+      lora_paths  待预热的 LoRA 绝对路径列表
+      progress    进度回调 (done, total, current_path, ok, reason)
+      should_stop 可选的停止回调 -> 返回 True 时提前中止
+
+    返回：{"attempted": int, "converted": int, "reused": int,
+           "failed": int, "results": [...], "stopped": bool}
+    """
+    total = len(list(lora_paths))
+    out = {"attempted": 0, "converted": 0, "reused": 0, "failed": 0,
+           "results": [], "stopped": False}
+    done = 0
+    for path in lora_paths:
+        if should_stop is not None and should_stop():
+            out["stopped"] = True
+            break
+        src = Path(path)
+        out["attempted"] += 1
+        row = {"name": src.name, "ok": False, "reason": ""}
+        try:
+            r = normalize_lora(src)
+            row["ok"] = bool(r.get("ok"))
+            row["reason"] = r.get("reason", "")
+            row["target"] = r.get("target")
+            if r.get("ok"):
+                if r.get("reused"):
+                    out["reused"] += 1
+                else:
+                    out["converted"] += 1
+            else:
+                out["failed"] += 1
+        except Exception as exc:  # noqa: BLE001
+            row["ok"] = False
+            row["reason"] = f"{type(exc).__name__}: {exc}"[:200]
+            out["failed"] += 1
+        out["results"].append(row)
+        done += 1
+        if progress is not None:
+            try:
+                progress(done, total, str(src), row["ok"], row["reason"])
+            except Exception:
+                pass
+    return out

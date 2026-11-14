@@ -1332,6 +1332,15 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 # 前端据此如实标注「融合 qkv（自动转换）」，不装作原生。
                 "qkv_shape": compat.get("qkv_shape", ""),
                 "qkv_convertible": bool(compat.get("convertible", False)),
+                # ⚠️ 2026-11-15 缺陷 A 收口：**用户路径**的可行性状态。
+                # direct     分离形态，原样可挂
+                # derived    融合形态，派生文件已验证（服务端自动挂归一版）
+                # unverified 融合形态，转换未验证 -> 不下发（compatible=false）
+                # broken     文件本体损坏
+                # 前端据此如实标注，不让用户误以为「原生就能直接挂」。
+                "conversion_status": compat.get("conversion_status", ""),
+                "needs_conversion": bool(compat.get("needs_conversion", False)),
+                "conversion_reason": compat.get("conversion_reason", ""),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 # 认定方式：filename（文件名含族关键词）/
@@ -1578,6 +1587,15 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 # 前端据此如实标注「融合 qkv（自动转换）」，不装作原生。
                 "qkv_shape": compat.get("qkv_shape", ""),
                 "qkv_convertible": bool(compat.get("convertible", False)),
+                # ⚠️ 2026-11-15 缺陷 A 收口：**用户路径**的可行性状态。
+                # direct     分离形态，原样可挂
+                # derived    融合形态，派生文件已验证（服务端自动挂归一版）
+                # unverified 融合形态，转换未验证 -> 不下发（compatible=false）
+                # broken     文件本体损坏
+                # 前端据此如实标注，不让用户误以为「原生就能直接挂」。
+                "conversion_status": compat.get("conversion_status", ""),
+                "needs_conversion": bool(compat.get("needs_conversion", False)),
+                "conversion_reason": compat.get("conversion_reason", ""),
                 "scene": info.get("scene", ""),
                 "source": info.get("source", ""),
                 # 认定方式：filename（文件名含 z-image 字样）/

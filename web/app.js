@@ -1061,12 +1061,24 @@ function renderLoraList() {
     //
     // 界面必须如实说出来：不能让用户以为它「原生」就能直接用，
     // 也不能让它跟真·分离形态的条目长得一模一样。
+    //
+    // 【2026-11-15 缺陷 A 收口】标签按 **conversion_status** 分三档，
+    // 不再只看「是不是融合形态」：
+    //   derived    转换**已验证**（派生文件已生成并实测完整生效）
+    //   unverified 转换**未验证** —— 这类条目服务端已判不可用，不下发
+    //   （兼容旧字段：没有 conversion_status 时退回 qkv_convertible 判定）
     const qkvShape = meta && meta.qkv_shape ? String(meta.qkv_shape) : "";
+    const convStatus = meta && meta.conversion_status
+      ? String(meta.conversion_status) : "";
     const qkvConv = meta && meta.qkv_convertible === true;
     const fusedNote = qkvShape === "fused"
-      ? (qkvConv
-        ? `<span class="img-lora-tag qkv" title="该 LoRA 的注意力权重是「融合 qkv」形态（q/k/v 合并在一个张量里），本机 MOSS 底模用的是分离 q/k/v。服务端会在提交时自动做无损转换（已逐位验证等价），转换后权重完整生效 —— 直接挂原文件会被 ComfyUI 静默丢弃。">融合 qkv · 自动转换</span>`
-        : `<span class="img-lora-tag qkv warn" title="该 LoRA 的注意力权重是「融合 qkv」形态，且无法无损拆分 —— 在本机 MOSS 底模上不能完整生效。">融合 qkv · 不可用</span>`)
+      ? (convStatus === "derived"
+        ? `<span class="img-lora-tag qkv" title="该 LoRA 的注意力权重是「融合 qkv」形态（q/k/v 合并在一个张量里），本机 MOSS 底模用的是分离 q/k/v。服务端会在提交时自动使用已生成的归一版（转换已实测验证：patched=${Number(meta.conversion_patched) || 263} / missing=0），转换后权重完整生效 —— 直接挂原文件会被 ComfyUI 静默丢弃。">融合 qkv · 已验证可转换</span>`
+        : (convStatus === "unverified"
+          ? `<span class="img-lora-tag qkv warn" title="该 LoRA 的注意力权重是「融合 qkv」形态，与本机底模的分离 q/k/v 结构不一致，且转换尚未在本机验证 —— 服务端已将它排除在可选列表之外（避免选中后 LoRA 不生效）。">融合 qkv · 转换未验证</span>`
+          : (qkvConv
+            ? `<span class="img-lora-tag qkv" title="该 LoRA 的注意力权重是「融合 qkv」形态（q/k/v 合并在一个张量里），本机 MOSS 底模用的是分离 q/k/v。服务端会在提交时自动做无损转换，转换后权重完整生效 —— 直接挂原文件会被 ComfyUI 静默丢弃。">融合 qkv · 自动转换</span>`
+            : `<span class="img-lora-tag qkv warn" title="该 LoRA 的注意力权重是「融合 qkv」形态，且无法无损拆分 —— 在本机 MOSS-Image 底模上不能完整生效。">融合 qkv · 不可用</span>`)))
       : "";
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
@@ -1213,11 +1225,17 @@ function openLoraInfo(name) {
       <dt>分组</dt><dd>${esc(meta.group || "—")}</dd>
       <dt>基座适用性</dt><dd>${meta.base_verdict === "近似适用"
         ? "⚠️ 近似适用（非该基座原生训练，依据见下方说明）"
-        : (meta.base_verdict || "原生")}</dd>
+        : (meta.base_verdict
+          ? esc(meta.base_verdict)
+          : "未标注（本机实测可用，但上游目录未登记基座判定结论）")}</dd>
       <dt>权重形态</dt><dd>${meta.qkv_shape === "fused"
-        ? (meta.qkv_convertible
-          ? "融合 qkv（q/k/v 合并在一个张量里）—— 本机底模用分离 q/k/v，服务端提交时自动做无损转换后完整生效"
-          : "融合 qkv，且无法无损拆分 —— 在本机底模上不能完整生效")
+        ? (meta.conversion_status === "derived"
+          ? "融合 qkv（q/k/v 合并在一个张量里）—— 本机底模用分离 q/k/v；服务端提交时自动使用已生成的归一版，转换已实测验证（missing=0），完整生效"
+          : (meta.conversion_status === "unverified"
+            ? "融合 qkv（q/k/v 合并在一个张量里）—— 与本机底模结构不一致，且转换尚未在本机验证，已排除在可选列表之外"
+            : (meta.qkv_convertible
+              ? "融合 qkv（q/k/v 合并在一个张量里）—— 本机底模用分离 q/k/v，服务端提交时自动做无损转换后完整生效"
+              : "融合 qkv，且无法无损拆分 —— 在本机底模上不能完整生效")))
         : (meta.qkv_shape === "split" ? "分离 q/k/v（与本机底模结构一致，可直接挂载）" : "—")}</dd>
       <dt>触发词</dt><dd>${trigger}</dd>
       <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}${meta.strength_source ? "（" + esc(meta.strength_source) + "）" : ""}</dd>

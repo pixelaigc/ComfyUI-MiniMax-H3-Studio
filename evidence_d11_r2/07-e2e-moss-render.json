@@ -1,0 +1,36 @@
+{
+  "with_d1": {
+    "prompt_id": "00787b45-feb9-4756-9b46-2d610dd9d753",
+    "status": "success",
+    "completed": true,
+    "images": [
+      {
+        "filename": "moss_e2e-probe_00001_.png",
+        "subfolder": "h3studio",
+        "type": "output"
+      }
+    ]
+  },
+  "without": {
+    "prompt_id": "22864604-0dd9-4dd7-8f0c-770e3f8c0999",
+    "status": "success",
+    "completed": true,
+    "images": [
+      {
+        "filename": "moss_e2e-probe_00002_.png",
+        "subfolder": "h3studio",
+        "type": "output"
+      }
+    ]
+  },
+  "diff": {
+    "mean_abs_diff": 45.4402,
+    "max_abs_diff": 166,
+    "changed_pixel_ratio": 0.999862,
+    "identical": false
+  },
+  "verdict": {
+    "lora_had_effect": true,
+    "note": "同一 prompt / 同一 seed，带 D1 与不带 D1 的两张图 99.99% 像素不同 -> LoRA 确实生效"
+  }
+}

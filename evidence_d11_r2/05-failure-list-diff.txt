@@ -1,0 +1,36 @@
+=== D11 收口第二轮：失败名单 diff（baseline d0b70f9 -> 本轮修复后）===
+baseline: 14 条失败
+after:    0 条失败
+
+--- diff（1,14d0 = baseline 的 14 条失败全部被修复，无新增失败行）---
+1,14d0
+< FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_broken_file_is_broken
+< FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_with_valid_derived_is_derived
+< FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_without_derived_is_unverified
+< FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_split_shape_is_direct
+< FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_does_not_fake_native_verdict
+< FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_has_three_tier_labels
+< FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_reads_conversion_status
+< FAILED tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_moss_entries_carry_conversion_fields
+< FAILED tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_no_available_entry_is_unverified
+< FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d1_is_available_and_fully_attachable
+< FAILED tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_derived_fused_is_compatible
+< FAILED tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_unverified_fused_is_not_compatible
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_not_convertible_gets_unusable_badge
+< FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_info_modal_shows_weight_shape_row
+
+--- baseline 失败明细 ---
+FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_broken_file_is_broken
+FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_with_valid_derived_is_derived
+FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_fused_without_derived_is_unverified
+FAILED tests/test_d11_defect_a_conversion.py::TestConversionStatus::test_split_shape_is_direct
+FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_does_not_fake_native_verdict
+FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_has_three_tier_labels
+FAILED tests/test_d11_defect_a_conversion.py::TestFrontendAnnotatesConversionStatus::test_frontend_reads_conversion_status
+FAILED tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_moss_entries_carry_conversion_fields
+FAILED tests/test_d11_defect_a_conversion.py::TestManifestCarriesConversionStatus::test_no_available_entry_is_unverified
+FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d1_is_available_and_fully_attachable
+FAILED tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_derived_fused_is_compatible
+FAILED tests/test_d11_defect_a_conversion.py::TestUnverifiedNotServedAsCompatible::test_unverified_fused_is_not_compatible
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_fused_not_convertible_gets_unusable_badge
+FAILED tests/test_d11_moss_lora_frontend.py::TestMossLoraShapeBadge::test_info_modal_shows_weight_shape_row

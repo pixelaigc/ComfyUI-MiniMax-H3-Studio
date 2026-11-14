@@ -288,12 +288,54 @@ class TestCheckMossCompatibilityFailsClosed(unittest.TestCase):
         self.assertTrue(result["reason"])
 
     def test_compatible_file_stays_compatible(self):
-        """回归：正常的（可转换的）LoRA 不能被误杀。"""
+        """回归：正常的 LoRA 不能被误杀。
+
+        ⚠️ **2026-11-15 缺陷 A 收口后语义变了**：
+        融合 qkv 形态的 LoRA，**结构**判定能过，但**能不能用**取决于
+        「无损转换是否可行」—— 转换要读全量权重 + 写派生文件，
+        是可能失败的。所以「结构兼容」不再等于「compatible=true」。
+
+        因此本测试改成两段：
+          1. 转换**未验证**（没有派生文件）-> 不下发，但必须给出可读原因；
+          2. 转换**已验证**（派生文件存在）-> compatible=true 成立。
+
+        这不是把断言放宽 —— 是把「结构兼容」与「用户真能用」区分开，
+        后者才是界面对用户的承诺。
+        """
+        from h3studio import moss_lora_split as split
+
         path = write_minimal_safetensors(
             self.dir / "ok.safetensors", fused_qkv_tensors(layers=1))
+
+        # (1) 转换未验证 -> 不下发，但要说清楚为什么
         result = mlc.check_moss_compatibility(path)
-        self.assertTrue(result["compatible"], result["reason"])
-        self.assertEqual(result["reason"], "")
+        self.assertFalse(result["compatible"],
+                         "转换未验证的融合形态不得以 compatible=true 下发")
+        self.assertTrue(result["reason"], "必须给出可读的原因")
+        self.assertEqual(result.get("conversion_status"),
+                         split.STATUS_UNVERIFIED)
+
+        # (2) 派生文件存在（转换已验证）-> compatible=true 成立
+        derived = self.dir / split.derived_name("ok.safetensors")
+        write_minimal_safetensors(
+            derived,
+            {k: v for k, v in fused_qkv_tensors(layers=1).items()},
+        )
+        # 派生文件必须是「已归一形态」才会被认作已验证：
+        # 这里直接写一个分离形态的最小文件。
+        split_tensors = {}
+        for i in range(1):
+            for proj in ("q", "k", "v"):
+                stem = f"lora_unet_layers_{i}_proj_{proj}"
+                split_tensors[f"{stem}.alpha"] = ((), "F32")
+                split_tensors[f"{stem}.lora_down.weight"] = ((4, 8), "F16")
+                split_tensors[f"{stem}.lora_up.weight"] = ((8, 4), "F16")
+        write_minimal_safetensors(derived, split_tensors)
+        result2 = mlc.check_moss_compatibility(path)
+        self.assertTrue(result2["compatible"], result2["reason"])
+        self.assertEqual(result2["reason"], "")
+        self.assertEqual(result2.get("conversion_status"),
+                         split.STATUS_DERIVED)
 
 
 class TestOtherFamiliesUnaffected(unittest.TestCase):
