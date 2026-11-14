@@ -1,0 +1,19 @@
+=== T2 差集结论 ===
+改动树 (local/feature/agent-power, HEAD a0be5d1): 901 passed, 0 failed
+基线树 (local/maintainer f4bc747):              845 passed, 0 failed
+
+=== 新增失败差集 ===
+改动树失败 - 基线树失败 = 0 - 0 = 0
+
+=== 通过数差 56 的完整分解（必须每一项可解释）===
+  基线有的 25 个文件，共同部分：845 -> 850   (+5)
+    tests/test_agent.py        41 -> 42  (+1)  步数上限断言 8->50 / 超时 420->2400
+    tests/test_t2v_panel.py    38 -> 42  (+4)  上轮 +1 负控(attention) + 本轮 +3
+  本分支新增的 2 个文件：                  +51
+    tests/test_agent_power.py            45
+    tests/test_node_probe_completeness.py  6
+  ----------------------------------------------------------------
+  845 + 5 + 51 = 901  ✅ 与实测一致
+
+=== 结论 ===
+新增失败 = 0。通过数增加 56 全部由本次新增/更新的测试解释，无一条是「意外通过」。

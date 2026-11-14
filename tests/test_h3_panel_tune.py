@@ -517,8 +517,17 @@ class TestSolApproxRoutingUsable(unittest.TestCase):
                         % sorted(required - actual))
 
     def test_missing_node_gives_explicit_error(self):
-        """本机没有该节点时必须明确报错，不能静默忽略（假控件）。"""
+        """
+        本机没有该节点时必须明确报错，不能静默忽略（假控件）。
+
+        【2026-11-14 语义补充】归一层的判定是三态：
+          * 探测**完整** + 节点不在 -> 真缺节点 -> 明确报错（这条）；
+          * 没探测过 / 探测不完整 -> 问不到 != 不存在 -> 放行
+            （见 tests/test_t2v_panel.py::test_allows_attention_when_probe_incomplete）。
+        所以这里必须把 _COMFY_PROBE_COMPLETE 置 True 才代表「问全了」。
+        """
         import server as srv
+        srv._COMFY_PROBE_COMPLETE = True
         srv._COMFY_NODE_NAMES.discard(
             "MiniMaxH3MemoryEfficientSolAttentionPatch")
         base = {

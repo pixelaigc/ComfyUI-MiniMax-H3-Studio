@@ -1,0 +1,237 @@
+{
+  "base": "http://127.0.0.1:8091",
+  "results": [
+    {
+      "name": "1.1 /api/agent/tools 的 limits.max_steps >= 50",
+      "status": "PASS",
+      "detail": "limits.max_steps = 50, max_steps_cap = 50, max_tool_calls = 120, total_timeout = 2400.0"
+    },
+    {
+      "name": "1.2 步数硬顶（前后端一致）>= 50",
+      "status": "PASS",
+      "detail": "limits.max_steps_cap = 50, settings.max_steps = 50"
+    },
+    {
+      "name": "1.3 源码 MAX_STEPS 常量 >= 50",
+      "status": "PASS",
+      "detail": "MAX_STEPS = 50"
+    },
+    {
+      "name": "1.4 前端管理面板声明的上限与后端一致（>= 50）",
+      "status": "PASS",
+      "detail": "web/agent-manage.js 含上限 50 声明"
+    },
+    {
+      "name": "1.5 超过 8 步的任务在 max_steps=50 下跑完（status=completed）",
+      "status": "PASS",
+      "detail": "status = completed，实际步数 = 13"
+    },
+    {
+      "name": "1.6 实际步数 > 8（确实跑过了旧上限）",
+      "status": "PASS",
+      "detail": "rounds = 13"
+    },
+    {
+      "name": "1.7 负控：同一任务在 max_steps=8 下被截断",
+      "status": "PASS",
+      "detail": "status_at_8 = truncated, error = 已达到步骤上限（8 步），返回已完成的部分结果"
+    },
+    {
+      "name": "2.1 本机 ffmpeg 可用",
+      "status": "PASS",
+      "detail": "ffmpeg version 7.1.1-1ubuntu4.2 Copyright (c) 2000-2025 the FFmpeg developers"
+    },
+    {
+      "name": "2.2 六个 ffmpeg 工具全部注册",
+      "status": "PASS",
+      "detail": "注册到：['media_concat', 'media_extract_frames', 'media_merge_av', 'media_mix_audio', 'media_probe', 'media_transcode']"
+    },
+    {
+      "name": "2.3 上传端点接受图片/音视频并返回 asset_id",
+      "status": "PASS",
+      "detail": "视频 2 个、音频 1 个"
+    },
+    {
+      "name": "2.4 media_probe 返回真实探测信息",
+      "status": "PASS",
+      "detail": "duration = 1.0, has_video = True, size = 320x240"
+    },
+    {
+      "name": "2.5 media_concat 产出真实视频并入素材库",
+      "status": "PASS",
+      "detail": "asset_id = asset_df266f49f99b, bytes = 5007, duration = 2.023023, size = 320x240"
+    },
+    {
+      "name": "2.6 media_extract_frames 抽出真实帧并入素材库",
+      "status": "PASS",
+      "detail": "抽出 3 帧，首帧 asset_id = asset_abcd917d2d71"
+    },
+    {
+      "name": "2.7 media_transcode 产出真实文件",
+      "status": "PASS",
+      "detail": "asset_id = asset_b636907e398c, bytes = 2570, format = mkv"
+    },
+    {
+      "name": "2.8 media_mix_audio 产出真实混音",
+      "status": "PASS",
+      "detail": "asset_id = asset_fae94a7af743, bytes = 51403"
+    },
+    {
+      "name": "2.9 media_merge_av 产出真实合流",
+      "status": "PASS",
+      "detail": "asset_id = asset_c7b3bbcc3be1, bytes = 20656"
+    },
+    {
+      "name": "3.1 agent.js 监听 paste 事件",
+      "status": "PASS",
+      "detail": "找到 paste 监听"
+    },
+    {
+      "name": "3.2 处理 clipboardData.items 的文件项",
+      "status": "PASS",
+      "detail": "clipboardData.items 已处理"
+    },
+    {
+      "name": "3.3 处理 clipboardData.files",
+      "status": "PASS",
+      "detail": "clipboardData.files 已处理"
+    },
+    {
+      "name": "3.4 支持音频类型",
+      "status": "PASS",
+      "detail": "audio/* 已识别"
+    },
+    {
+      "name": "3.5 支持视频类型",
+      "status": "PASS",
+      "detail": "video/* 已识别"
+    },
+    {
+      "name": "3.6 图片走粘贴同一条上传链路成功入库",
+      "status": "PASS",
+      "detail": "results = [('image', True)]"
+    },
+    {
+      "name": "4.1 至少 4 项能力可配置",
+      "status": "PASS",
+      "detail": "能力列表: ['code_exec', 'file_read', 'media_tools', 'web_search']"
+    },
+    {
+      "name": "4.1.code_exec 能力存在且带 enabled 状态",
+      "status": "PASS",
+      "detail": "code_exec -> {'key': 'code_exec', 'label': '代码生成与执行', 'builtin': True, 'requires': '无（默认关闭，需用户显式启用）', 'description': '运行一段 Python 代码并拿回 stdout/stderr。有副作用，默认关闭。', 'enabled': False}"
+    },
+    {
+      "name": "4.1.file_read 能力存在且带 enabled 状态",
+      "status": "PASS",
+      "detail": "file_read -> {'key': 'file_read', 'label': '文件读取', 'builtin': True, 'requires': '无（受 file_roots 路径白名单限制）', 'description': '读取工作台/仓库/素材库派生目录下的文本文件，供 Agent 查配置、日志、脚本。', 'enabled': True}"
+    },
+    {
+      "name": "4.1.media_tools 能力存在且带 enabled 状态",
+      "status": "PASS",
+      "detail": "media_tools -> {'key': 'media_tools', 'label': 'ffmpeg 音视频处理', 'builtin': True, 'requires': '本机 ffmpeg / ffprobe（见 ffmpeg_path）', 'description': '音视频合并拼接、转码、抽帧、混音、AV 合流（真实调用本机 ffmpeg，非模拟）。', 'enabled': True}"
+    },
+    {
+      "name": "4.1.web_search 能力存在且带 enabled 状态",
+      "status": "PASS",
+      "detail": "web_search -> {'key': 'web_search', 'label': '外部搜索', 'builtin': True, 'requires': '网络可达的搜索引擎（DDG 或局域网 9898 聚合引擎）', 'description': '按配置的搜索引擎做外部检索，把结果作为参考资料。', 'enabled': True}"
+    },
+    {
+      "name": "4.2 搜索引擎列表 >= 2 个（DDG + 聚合）",
+      "status": "PASS",
+      "detail": "3 个: ['局域网聚合引擎（9898）', 'DuckDuckGo（经 9898 代理）', 'DuckDuckGo（直连，可能被反爬拦截）']"
+    },
+    {
+      "name": "4.3 至少含 DDG 与 9898/聚合两类",
+      "status": "PASS",
+      "detail": "types = ['openwebui', 'custom', 'ddg']"
+    },
+    {
+      "name": "4.4 每个搜索引擎都有可填写的 URL 配置项",
+      "status": "PASS",
+      "detail": "字段样例: ['enabled', 'id', 'method', 'name', 'type', 'url']"
+    },
+    {
+      "name": "4.4b 至少一个引擎的 URL 指向局域网 9898",
+      "status": "PASS",
+      "detail": "urls = ['http://127.0.0.1:9898/api/openwebui/tools/search_general', 'http://127.0.0.1:9898/api/openwebui/search/ddg', 'https://html.duckduckgo.com/html/']"
+    },
+    {
+      "name": "4.5 聚合引擎连通性自检真实发起请求",
+      "status": "PASS",
+      "detail": "自检返回: {\"ok\": true, \"engine\": \"局域网聚合引擎（9898）\", \"engine_type\": \"openwebui\", \"url\": \"http://127.0.0.1:9898/api/openwebui/tools/search_general\", \"result_count\": 1, \"note\": \"连通性正常（真发了一次请求）\", \"status\": 200}"
+    },
+    {
+      "name": "4.6 DDG（经 9898 代理）连通性自检成功",
+      "status": "PASS",
+      "detail": "自检返回: {\"ok\": true, \"engine\": \"DuckDuckGo（经 9898 代理）\", \"engine_type\": \"custom\", \"url\": \"http://127.0.0.1:9898/api/openwebui/search/ddg\", \"result_count\": 1, \"note\": \"连通性正常（真发了一次请求）\", \"status\": 200}"
+    },
+    {
+      "name": "4.6b DDG 直连自检如实报告被反爬拦截（而非谎报连通）",
+      "status": "PASS",
+      "detail": "自检返回: {\"ok\": false, \"engine\": \"DuckDuckGo（直连，可能被反爬拦截）\", \"error\": \"所有搜索引擎都没成功：\\n- DuckDuckGo（直连，可能被反爬拦截）: DuckDuckGo 返回 HTTP 202\", \"status\": 502}"
+    },
+    {
+      "name": "4.9 外部搜索真的返回结果（非模拟）",
+      "status": "PASS",
+      "detail": "engine = 局域网聚合引擎（9898）, total = 3, 首条 = {'title': 'github.com· cnrock · h3-studioGitHub - cnrock/h3-studio: 自托管的 MiniMax H3 视频生成站：邮箱注...', 'url': 'https://rd.se"
+    },
+    {
+      "name": "4.7a web_search 能力下确实挂着工具",
+      "status": "PASS",
+      "detail": "web_search 工具: ['web_search']"
+    },
+    {
+      "name": "4.7b 禁用 web_search 后 enabled_tool_count 下降",
+      "status": "PASS",
+      "detail": "enabled_tool_count 31 -> 30"
+    },
+    {
+      "name": "4.7c 禁用后 web_search 的工具全部标为 disabled",
+      "status": "PASS",
+      "detail": "[('web_search', False)]"
+    },
+    {
+      "name": "4.8 重新启用后 enabled_tool_count 恢复",
+      "status": "PASS",
+      "detail": "30 -> 31（原 31）"
+    },
+    {
+      "name": "5.1 默认注意力机制 = kitchen",
+      "status": "PASS",
+      "detail": "attention = kitchen"
+    },
+    {
+      "name": "5.2 默认加速 LoRA = dmad_4step_critic",
+      "status": "PASS",
+      "detail": "accel_lora = dmad_4step_critic"
+    },
+    {
+      "name": "5.3 默认模型 = fl2va_pruned_int8",
+      "status": "PASS",
+      "detail": "model_key = fl2va_pruned_int8"
+    },
+    {
+      "name": "5.4 默认参数能通过服务端归一",
+      "status": "PASS",
+      "detail": "err = ''"
+    },
+    {
+      "name": "5.5 归一后 attention 仍是 kitchen",
+      "status": "PASS",
+      "detail": "attention = kitchen"
+    },
+    {
+      "name": "5.6 默认参数可被用户改写并持久化",
+      "status": "PASS",
+      "detail": "改后 attention = default"
+    },
+    {
+      "name": "5.7 恢复默认后仍是 kitchen",
+      "status": "PASS",
+      "detail": "恢复后 attention = kitchen"
+    }
+  ],
+  "passed": 46,
+  "total": 46
+}

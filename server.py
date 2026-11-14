@@ -115,6 +115,11 @@ from h3studio import agent as agent_mod
 from h3studio import agent_memory
 from h3studio import agent_sessions
 from h3studio import agent_media
+# 【2026-11-13 审查目标 4/5】Agent 管理配置 + 额外能力工具 + 外部搜索 + 媒体工具
+from h3studio import agent_settings
+from h3studio import agent_extra_tools
+from h3studio import agent_websearch
+from h3studio import agent_media_tools
 
 
 BASE = Path(__file__).resolve().parent
@@ -1806,7 +1811,28 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
                          f"{video_models.VIDEO_DEFAULT_ATTENTION}）。")
         return out, f"未知的注意力机制 {attention}"
     node = mode_meta.get("node")
-    if node and node not in _COMFY_NODE_NAMES:
+    # ---- 节点存在性判定：只在「探测完整」时才算数 ----
+    #
+    # 【2026-11-14 修 —— 这是个真实存在的坑，不是理论问题】
+    # `_COMFY_NODE_NAMES` 只有在**成功探测过一次** ComfyUI 之后才有值。
+    # 内置 Agent 这条路不经过面板（不调 /api/video-options），
+    # 所以第一次进来时它可能是**空集**。
+    #
+    # 原来的判据 `node not in _COMFY_NODE_NAMES` 会把「**还没探测过**」
+    # 误判成「**本机没有这个节点**」-> 用户看到
+    # 「本机 ComfyUI 里没有节点 ModelAttentionBackend」，
+    # 但节点其实**就在**（实测本机 /object_info 里恒在）。
+    #
+    # 修法：区分三态 ——
+    #   * 探测完整（_COMFY_PROBE_COMPLETE）且节点不在 -> 真缺节点 -> 拒绝；
+    #   * 没探测过 / 探测不完整 -> **不拦**（放行，让 ComfyUI 自己报错）。
+    #     这与 worker 的既有口径一致（见 server.py 里
+    #     `params["_h3image_nodes_available"] = None if not probe_ok else nodes_ok`）。
+    #
+    # 【为什么不能无条件放行】那会让「用户选了本机真没有的注意力机制」
+    # 变成任务建成了、跑到 ComfyUI 才炸 —— 那才是静默失效。
+    # 所以只在「问全了」时才敢断言「缺节点」。
+    if node and _COMFY_PROBE_COMPLETE and node not in _COMFY_NODE_NAMES:
         return out, (f"本机 ComfyUI 里没有节点 {node}"
                      f"（{mode_meta['label']}）—— 无法使用该注意力机制。")
     out["attention"] = attention
@@ -1817,7 +1843,9 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
         twopass = {}
     enabled = bool(twopass.get("enabled"))
     if enabled:
-        if "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES:
+        # 同上：只在「探测完整」时才断言缺节点（见上面 attention 的说明）。
+        if (_COMFY_PROBE_COMPLETE
+                and "SelfLiftH3Sampler" not in _COMFY_NODE_NAMES):
             return out, ("本机 ComfyUI 里没有 SelfLiftH3Sampler 节点 —— 无法开启二采。")
         try:
             steps = int(params.get("steps") or 4)
@@ -6076,6 +6104,98 @@ def _agent_error(exc: agent_mod.AgentError) -> web.Response:
     return web.json_response(payload, status=exc.status)
 
 
+def _resolve_max_steps(requested=None) -> int:
+    """
+    本次请求的步数上限。
+
+    【2026-11-13 审查目标 4】口径：
+      * 「agent 管理」里配置的 max_steps 是**默认值也是上限**；
+      * 请求里带 max_steps -> 以请求为准，但仍然被夹在配置上限内；
+      * 没配置 -> 回落到 agent_mod.MAX_STEPS（50）。
+    """
+    with db() as conn:
+        settings = agent_settings.load(conn)
+    ceiling = int(settings.get("max_steps") or agent_mod.MAX_STEPS)
+    ceiling = max(agent_settings.MAX_STEPS_MIN,
+                  min(agent_settings.MAX_STEPS_HARD_CAP, ceiling))
+    if requested is None or requested == "":
+        return ceiling
+    try:
+        value = int(requested)
+    except (TypeError, ValueError):
+        return ceiling
+    return max(agent_settings.MAX_STEPS_MIN, min(ceiling, value))
+
+
+def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
+    """
+    把「agent 管理」里的文生视频默认参数套进 params（**不覆盖已给的**）。
+
+    【2026-11-13 审查目标 5】默认使用
+      * comfy kitchen 注意力机制（VIDEO_ATTENTION_MODES["kitchen"]）
+      * dmad 加速 LoRA（VIDEO_ACCEL_LORA_COMBOS["dmad_4step_critic"]）
+    两者都是**默认值** —— 用户在「agent 管理」里改任意一项都立刻生效。
+
+    【为什么走新面板路径】注意力机制与 dmad 只存在于
+    video_workflow.build_t2v_panel（新路径）；旧路径（_h3_video_workflow）
+    只有 ckpt850/v4step600 两枚固定 LoRA、且**没有**注意力机制。
+    所以 Agent 的 t2v 必须带上 model_key + width/height 才能走新路径。
+    """
+    out = dict(params)
+    if not out.get("model_key"):
+        out["model_key"] = (defaults.get("model_key")
+                            or video_models.VIDEO_DEFAULT_MODEL)
+    if not out.get("attention"):
+        out["attention"] = (defaults.get("attention")
+                            or video_models.VIDEO_DEFAULT_ATTENTION)
+    if not out.get("accel_loras"):
+        key = str(defaults.get("accel_lora") or "").strip()
+        if key and key in video_models.VIDEO_ACCEL_LORA_COMBOS:
+            out["accel_loras"] = [{"key": key, "strength": 1.0,
+                                    "enabled": True}]
+    if not out.get("aspect"):
+        out["aspect"] = defaults.get("aspect") or "16:9"
+    if out.get("duration") in (None, ""):
+        out["duration"] = defaults.get("duration") or video_models.VIDEO_DURATION_DEFAULT
+    if not out.get("width") or not out.get("height"):
+        mp = defaults.get("megapixels") or video_models.VIDEO_DEFAULT_MP
+        width, height = video_models.video_dimensions(str(out["aspect"]), mp)
+        out["width"] = width
+        out["height"] = height
+    return out
+
+
+async def prepare_agent_t2v_params(params: dict) -> tuple[dict, str]:
+    """
+    Agent 的文生视频参数：套默认参数 -> 探测节点 -> 服务端归一。
+
+    与面板走**同一套** normalize_t2v_params（校验 LoRA 文件是否存在、
+    注意力节点是否在本机 ComfyUI 里、宽高是否超上限）。
+    返回 (归一后的 params, 错误信息)；错误信息为空表示通过。
+
+    【为什么先探测节点】normalize_t2v_params 会断言注意力机制的节点
+    在本机 ComfyUI 里（`node not in _COMFY_NODE_NAMES`）。而
+    _COMFY_NODE_NAMES 只有在 /api/video-options 或 worker 刷新后才有值 ——
+    Agent 这条路不经过面板，不探测就会把 kitchen 误判成「节点不存在」。
+    """
+    with db() as conn:
+        settings = agent_settings.load(conn)
+    defaults = settings.get("t2v_defaults") or {}
+    merged = _merge_t2v_defaults(params, defaults)
+    # 【强制刷新节点清单】
+    #
+    # 【为什么必须 force=True】refresh_comfy_node_names 默认会复用 60 秒缓存，
+    # 而缓存可能是**上一次探测的残缺结果**（比如 ComfyUI 忙时超时 ->
+    # 只问到了部分节点）。若拿到的是残缺缓存，normalize_t2v_params
+    # 就会把「没问全」当成「节点不存在」-> 报「本机 ComfyUI 里没有节点
+    # ModelAttentionBackend」—— 而节点其实在（实测本机恒在）。
+    #
+    # 代价：每次 Agent 建视频任务多问 11 个节点（每个 1 ms，实测几十毫秒）。
+    # 这个代价换掉「假缺节点」是值得的。
+    await refresh_comfy_node_names(force=True)
+    return normalize_t2v_params(merged)
+
+
 
 async def api_agent_upload(request):
     """
@@ -6202,10 +6322,10 @@ async def api_agent_chat(request):
     provider_id = str(payload.get("provider_id") or "").strip() or None
     # 附件（用户随消息上传的图片）
     attachments = payload.get("attachments") or []
-    try:
-        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
-    except (TypeError, ValueError):
-        max_steps = agent_mod.MAX_STEPS
+    # 【2026-11-13 审查目标 4】步数上限来自「agent 管理」的配置
+    # （默认 = agent_mod.MAX_STEPS = 50，用户可在管理面板调低）。
+    # 请求里带 max_steps 时以请求为准，但仍被夹在配置的上限内。
+    max_steps = _resolve_max_steps(payload.get("max_steps"))
 
     store = _agent_store()
     session_id = store.create(session_id or None)
@@ -6313,10 +6433,10 @@ async def api_agent_chat_stream(request):
     provider_id = str(payload.get("provider_id") or "").strip() or None
     # 附件（用户随消息上传的图片）
     attachments = payload.get("attachments") or []
-    try:
-        max_steps = int(payload.get("max_steps") or agent_mod.MAX_STEPS)
-    except (TypeError, ValueError):
-        max_steps = agent_mod.MAX_STEPS
+    # 【2026-11-13 审查目标 4】步数上限来自「agent 管理」的配置
+    # （默认 = agent_mod.MAX_STEPS = 50，用户可在管理面板调低）。
+    # 请求里带 max_steps 时以请求为准，但仍被夹在配置的上限内。
+    max_steps = _resolve_max_steps(payload.get("max_steps"))
 
     store = _agent_store()
     session_id = store.create(session_id or None)
@@ -6699,18 +6819,28 @@ async def api_agent_session_delete(request):
 
 async def api_agent_tools(request):
     """GET /api/agent/tools —— 列出 Agent 的工具清单（调试 / 前端展示用）。"""
+    with db() as conn:
+        snapshot = agent_settings.snapshot(conn)
+    capabilities = agent_settings.normalize_capabilities(
+        snapshot["settings"].get("capabilities"))
     specs = []
     for name, spec in agent_mod.TOOLS.items():
+        capability = agent_extra_tools.TOOL_CAPABILITIES.get(name)
         specs.append({
             "name": name,
             "description": spec["description"],
             "parameters": spec["parameters"],
+            "capability": capability or "",
+            # 「当前是否可用」—— 取决于能力开关，不是「注册了就是能用」
+            "enabled": True if not capability else bool(capabilities.get(capability)),
         })
     return json_ok({
         "tools": specs,
         "tool_count": len(specs),
+        "enabled_tool_count": sum(1 for s in specs if s["enabled"]),
         "limits": {
             "max_steps": agent_mod.MAX_STEPS,
+            "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
             "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
             "total_timeout": agent_mod.TOTAL_TIMEOUT,
             "step_timeout": agent_mod.STEP_TIMEOUT,
@@ -6727,6 +6857,171 @@ async def api_agent_tools(request):
         "events": ["token", "tool_call", "tool_result", "job", "done", "error",
                    "progress", "result"],
     })
+
+
+# ------------------------------------------------------------------ Agent 管理
+#
+# 【2026-11-13 审查目标 4/5】内置 Agent 的「agent 管理」配置接口。
+#
+#  1) GET  /api/agent/settings     读配置（能力开关 / 搜索引擎 / 默认参数）
+#  2) PUT  /api/agent/settings     写配置
+#  3) POST /api/agent/settings/test-engine   搜索引擎连通性自检
+#
+# 【为什么单独一个端点而不是复用 /api/enhancer】
+# /api/enhancer 是「提示词增强 Agent」的模板配置，语义完全不同。
+# 混在一起会让两个 Agent 的配置互相污染。
+
+
+def agent_settings_snapshot() -> dict:
+    """
+    Agent 运行期读配置的入口（h3studio.agent_extra_tools 通过它拿能力开关）。
+
+    每次调用都读一次库 —— 配置改完**立刻生效**，不需要重启服务。
+    """
+    with db() as conn:
+        return agent_settings.snapshot(conn)
+
+
+def _t2v_default_options() -> dict:
+    """
+    文生视频默认参数的合法取值清单（**本地常量**，不需要探测 ComfyUI）。
+
+    【为什么单独给一份】前端「agent 管理」面板要渲染四个下拉
+    （底模 / 注意力机制 / 加速 LoRA / 画面比例）。
+    而 /api/video-options 会去**探测本机 ComfyUI**（拉模型列表 + 问节点
+    是否存在），实测能到 60 秒以上 —— 用它填下拉会让面板长时间空白。
+
+    这四个清单都是 `video_models` 里的**注册表常量**，列全不需要 IO。
+    可用性/兼容性的**实测**判断仍然走 /api/video-options 与
+    prepare_agent_t2v_params（服务端在真正建任务前做最终校验）。
+
+    返回：
+      models       [{key,label}]
+      attentions   [{key,label,note}]
+      accels       [{key,label}]
+      aspects      [{key,label}]
+    """
+    return {
+        "models": [
+            {"key": key, "label": meta.get("label") or key}
+            for key, meta in video_models.VIDEO_MODELS.items()
+        ],
+        "attentions": [
+            {"key": key, "label": meta.get("label") or key,
+             "note": meta.get("note") or ""}
+            for key, meta in video_models.VIDEO_ATTENTION_MODES.items()
+            if key not in video_models.VIDEO_REMOVED_ATTENTION_MODES
+        ],
+        "accels": [
+            {"key": key, "label": meta.get("display") or key}
+            for key, meta in video_models.VIDEO_ACCEL_LORA_COMBOS.items()
+        ],
+        "aspects": [
+            {"key": key, "label": key}
+            for key in video_models.VIDEO_ASPECTS.keys()
+        ],
+    }
+
+
+async def api_agent_settings(request):
+    """
+    GET /api/agent/settings —— 读「agent 管理」配置
+    PUT /api/agent/settings —— 写「agent 管理」配置
+
+    body（PUT）：
+      max_steps              步数上限（1~50）
+      capabilities           {file_read/web_search/code_exec/media_tools: bool}
+      search_engines         [{id,name,type,url,method,enabled}]
+      t2v_defaults           {model_key,attention,accel_lora,aspect,megapixels,duration}
+      file_roots             允许 read_file 读取的目录（绝对路径）
+      code_exec_timeout_sec  代码执行超时
+      ffmpeg_path            ffmpeg 可执行文件路径（留空 = 用 PATH）
+    """
+    if request.method == "GET":
+        with db() as conn:
+            snapshot = agent_settings.snapshot(conn)
+        settings = snapshot["settings"]
+        return json_ok({
+            "settings": settings,
+            "capabilities": agent_settings.capability_state(settings),
+            "search_engines": settings.get("search_engines") or [],
+            "t2v_defaults": settings.get("t2v_defaults") or {},
+            "limits": {
+                "max_steps": agent_mod.MAX_STEPS,
+                "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
+                "max_tool_calls": agent_mod.MAX_TOOL_CALLS,
+                "total_timeout": agent_mod.TOTAL_TIMEOUT,
+            },
+            "dependencies": {
+                "ffmpeg_path": snapshot.get("ffmpeg_path") or "",
+                "ffprobe_path": snapshot.get("ffprobe_path") or "",
+                "ffmpeg_available": bool(snapshot.get("ffmpeg_path")),
+            },
+            # 【文生视频默认参数的合法取值清单 —— 2026-11-14】
+            #
+            # 【为什么要在这里给一份】前端「agent 管理」面板要渲染
+            # 「注意力机制 / 加速 LoRA / 底模 / 比例」四个下拉。
+            # 而 /api/video-options 会去**探测本机 ComfyUI**（拉模型列表 +
+            # 问节点是否存在），实测能到 60 秒以上 —— 用它填下拉会让面板
+            # 长时间空白。
+            #
+            # 这四个清单都是**本地常量**（video_models 的注册表），
+            # 不需要探测 ComfyUI 就能列全，所以直接在这里给一份快的。
+            # （可用性/兼容性的实测判断仍然走 /api/video-options，
+            #   服务端在 prepare_agent_t2v_params 里做最终校验。）
+            "t2v_options": _t2v_default_options(),
+        })
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+    if not isinstance(payload, dict):
+        return web.json_response({"error": "配置必须是对象", "code": "bad_request"},
+                                 status=400)
+    with db() as conn:
+        prov.ensure_tables(conn)
+        saved = agent_settings.save(conn, payload)
+    # 立刻把 ffmpeg 路径推给媒体工具模块（下次调用就用新路径）
+    agent_media_tools.configure(agent_settings.ffmpeg_path(saved))
+    return json_ok({"ok": True, "settings": saved,
+                    "capabilities": agent_settings.capability_state(saved)})
+
+
+async def api_agent_settings_test_engine(request):
+    """
+    POST /api/agent/settings/test-engine —— 搜索引擎连通性自检。
+
+    body: {"engine": {...}} 或 {"engine_id": "xxx"}
+    真发一次请求（不是只校验 URL 格式）。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+    if not isinstance(payload, dict):
+        return web.json_response({"error": "请求必须是对象", "code": "bad_request"},
+                                 status=400)
+    engine = payload.get("engine")
+    if not isinstance(engine, dict):
+        engine_id = str(payload.get("engine_id") or "").strip()
+        if not engine_id:
+            return web.json_response(
+                {"error": "需要 engine 或 engine_id", "code": "bad_request"},
+                status=400)
+        with db() as conn:
+            settings = agent_settings.load(conn)
+        found = next((e for e in settings.get("search_engines") or []
+                      if e.get("id") == engine_id), None)
+        if not found:
+            return web.json_response(
+                {"error": f"找不到搜索引擎 {engine_id}", "code": "not_found"},
+                status=404)
+        engine = found
+    result = await agent_websearch.check_engine(engine)
+    return json_ok(result, status=200 if result.get("ok") else 502)
 
 
 async def api_agent_memory(request):
@@ -6995,6 +7290,11 @@ def make_app():
     app.router.add_get("/api/agent/media/{id}/status", api_agent_media_status)
     app.router.add_post("/api/agent/chat/stream", api_agent_chat_stream)
     app.router.add_get("/api/agent/tools", api_agent_tools)
+    # 【2026-11-13 审查目标 4/5】「agent 管理」配置端点
+    app.router.add_get("/api/agent/settings", api_agent_settings)
+    app.router.add_put("/api/agent/settings", api_agent_settings)
+    app.router.add_post("/api/agent/settings/test-engine",
+                        api_agent_settings_test_engine)
     app.router.add_get("/api/agent/memory", api_agent_memory)
     app.router.add_post("/api/agent/memory", api_agent_memory_set)
     app.router.add_post("/api/agent/sessions", api_agent_sessions_create)

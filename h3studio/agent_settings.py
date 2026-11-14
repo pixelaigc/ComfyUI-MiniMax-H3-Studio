@@ -1,0 +1,408 @@
+# -*- coding: utf-8 -*-
+"""
+内置 Agent 的**能力管理配置**（能力开关 / 搜索引擎 / 默认参数 / 步数上限）。
+
+【为什么单独一个模块】
+agent.py 是编排器（跑几轮、怎么喂工具结果），agent_tools.py 是工具实现。
+「哪些能力开着、搜索引擎指向哪、文生视频默认用什么」是**配置**，
+既不是编排逻辑也不是工具逻辑 —— 混进那两个文件会让两边都难读。
+所以这里只放四件事：
+  1. 配置的**单一真源**（默认值 + 合法取值 + 归一）
+  2. 持久化（复用 server 的 jobs.db -> model_provider_prefs 表）
+  3. 能力开关的**闸门**（关掉的工具模型连看都看不到）
+  4. 搜索引擎的**目录**（DDG / 局域网 9898 聚合引擎 / 自定义 HTTP 接口）
+
+【持久化口径】
+存 server 的 model_provider_prefs 表，key = "agent_settings"。
+理由与 /api/video-config 一致：局域网客户端共用同一份配置，
+不依赖浏览器 localStorage —— 换台电脑打开还是同一份设置。
+
+【默认值为什么是这个】
+  * file_read  默认开：只读、且路径被限制在允许根目录内（配置项 file_roots）。
+  * web_search 默认开：外部搜索是只读能力，失败也只是返回错误。
+  * code_exec  默认**关**：执行任意代码是本清单里唯一有副作用的能力，
+    必须由用户显式打开（打开前会看到明确的风险提示）。
+  * media_tools 默认开：ffmpeg 音视频处理是本工作台的核心场景。
+"""
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+#: 配置在 model_provider_prefs 表里的 key。
+PREF_KEY = "agent_settings"
+
+#: 步数上限的**硬顶**。用户只能在 [1, MAX_STEPS_HARD_CAP] 里调。
+#:
+#: 【为什么硬顶是 50】用户 2026-11-13 审查目标 4/5/6/7 明确要求
+#: 「agent 工具调用步数上限从 8 步提升到至少 50 步」。
+#: 50 是**上限**不是默认值 —— 用户可以在「agent 管理」里调低（省时间）。
+MAX_STEPS_HARD_CAP = 50
+MAX_STEPS_MIN = 1
+
+#: 工具调用次数上限（跨所有步骤累计）。
+#:
+#: 【为什么跟着步数走】50 步里每步平均 1.5 次工具调用 -> 75 次。
+#: 给 120 是「够跑完长链路 + 留余量」，真正的兜底仍是 TOTAL_TIMEOUT。
+MAX_TOOL_CALLS = 120
+
+#: 单次请求总超时（秒）。50 步 × 单步 20~120 秒 = 1000~6000 秒，
+#: 所以总时限必须跟着抬 —— 否则步数上限提到 50 也跑不完第 20 步。
+TOTAL_TIMEOUT = 2400.0
+
+#: 能力清单（key -> 中文名 + 说明 + 是否需要外部依赖）。
+#:
+#: 「是否内置」= 代码在本仓库里（不需要额外装插件）；
+#: 「外部依赖」= 需要本机装了什么（ffmpeg / 网络）。
+CAPABILITIES: dict[str, dict] = {
+    "file_read": {
+        "label": "文件读取",
+        "builtin": True,
+        "requires": "无（受 file_roots 路径白名单限制）",
+        "description": "读取工作台/仓库/素材库派生目录下的文本文件，"
+                       "供 Agent 查配置、日志、脚本。",
+    },
+    "web_search": {
+        "label": "外部搜索",
+        "builtin": True,
+        "requires": "网络可达的搜索引擎（DDG 或局域网 9898 聚合引擎）",
+        "description": "按配置的搜索引擎做外部检索，把结果作为参考资料。",
+    },
+    "code_exec": {
+        "label": "代码生成与执行",
+        "builtin": True,
+        "requires": "无（默认关闭，需用户显式启用）",
+        "description": "运行一段 Python 代码并拿回 stdout/stderr。"
+                       "有副作用，默认关闭。",
+    },
+    "media_tools": {
+        "label": "ffmpeg 音视频处理",
+        "builtin": True,
+        "requires": "本机 ffmpeg / ffprobe（见 ffmpeg_path）",
+        "description": "音视频合并拼接、转码、抽帧、混音、AV 合流"
+                       "（真实调用本机 ffmpeg，非模拟）。",
+    },
+}
+
+#: 能力 -> 依赖的外部命令/网络要求（给「能力清单」文档生成用）。
+CAPABILITY_REQUIRES = {key: meta["requires"] for key, meta in CAPABILITIES.items()}
+
+#: 默认启用的能力。code_exec 默认关（见模块 docstring）。
+DEFAULT_CAPABILITIES = {
+    "file_read": True,
+    "web_search": True,
+    "code_exec": False,
+    "media_tools": True,
+}
+
+#: 搜索引擎类型白名单。
+SEARCH_ENGINE_TYPES = ("ddg", "openwebui", "custom")
+
+#: 默认搜索引擎清单。
+#:
+#: 【为什么默认带上 9898】用户自建的局域网聚合引擎就在本机 9898，
+#: 它聚合了 Bing / Playwright 等多个源，比裸 DDG 稳定得多。
+#: 【URL 用 127.0.0.1 还是 192.168.3.78】两者都通（同一个进程）。
+#: 默认写 127.0.0.1（本机自用），局域网其它机器访问这台 Studio 时，
+#: 用户可以在「agent 管理」里改成 192.168.3.78 —— 这就是为什么
+#: URL 必须是**可填写**的字段，而不是写死的常量。
+DEFAULT_SEARCH_ENGINES = [
+    {
+        "id": "local_9898",
+        "name": "局域网聚合引擎（9898）",
+        "type": "openwebui",
+        "url": "http://127.0.0.1:9898/api/openwebui/tools/search_general",
+        "method": "POST",
+        "enabled": True,
+    },
+    {
+        # DDG 的**裸 HTML** 端点在本机会被反爬拦（实测 HTTP 202 + anomaly
+        # challenge，见 agent_websearch._search_ddg 的报错文案）。
+        # 但 9898 聚合引擎背后**有** DDG 源，并且提供了单引擎入口 ——
+        # 所以这里指向 9898 的 DDG 单引擎端点，既满足「支持接入 DDG」，
+        # 又真的能出结果。
+        "id": "ddg",
+        "name": "DuckDuckGo（经 9898 代理）",
+        "type": "custom",
+        "url": "http://127.0.0.1:9898/api/openwebui/search/ddg",
+        "method": "POST",
+        "enabled": True,
+    },
+    {
+        # 直连 DDG（备用）。本机实测会被反爬拦（HTTP 202 + anomaly），
+        # 留在这里是为了「换个网络环境 / 反爬策略变了」时能直接切过去，
+        # 也是「DDG 是可配置 URL 而不是硬编码」的证据。
+        "id": "ddg_direct",
+        "name": "DuckDuckGo（直连，可能被反爬拦截）",
+        "type": "ddg",
+        "url": "https://html.duckduckgo.com/html/",
+        "method": "GET",
+        "enabled": False,
+    },
+]
+
+#: 搜索引擎数量上限（防止配置被塞爆）。
+MAX_SEARCH_ENGINES = 8
+
+#: 文生视频（MiniMax H3）**默认参数**。
+#:
+#: 【为什么默认是 kitchen + dmad】用户 2026-11-13 审查目标 5 明确要求：
+#: 「agent 调用文生视频默认使用 comfy kitchen 注意力机制 + dmad 加速 LoRA」。
+#:   * kitchen = video_models.VIDEO_ATTENTION_MODES["kitchen"]
+#:     （节点 ModelAttentionBackend，inputs {"attention": "comfy kitchen attention"}）
+#:   * dmad   = video_models.VIDEO_ACCEL_LORA_COMBOS["dmad_4step_critic"]
+#:     （dmad_minimax_h3_4step_full_critic_comfyui.safetensors）
+#: 两者都只是**默认值** —— 用户可以在「agent 管理」里改任意一项。
+DEFAULT_T2V_DEFAULTS = {
+    "model_key": "fl2va_pruned_int8",
+    "attention": "kitchen",
+    "accel_lora": "dmad_4step_critic",
+    "aspect": "16:9",
+    "megapixels": 0.4,
+    "duration": 5.0,
+}
+
+#: 默认的文生视频默认值（函数形式，方便测试注入）。
+def default_t2v_defaults() -> dict:
+    return dict(DEFAULT_T2V_DEFAULTS)
+
+
+#: 默认配置全量。
+def defaults() -> dict:
+    return {
+        "max_steps": MAX_STEPS_HARD_CAP,
+        "capabilities": dict(DEFAULT_CAPABILITIES),
+        "search_engines": [dict(e) for e in DEFAULT_SEARCH_ENGINES],
+        "t2v_defaults": default_t2v_defaults(),
+        "file_roots": [],
+        "code_exec_timeout_sec": 30,
+        "ffmpeg_path": "",
+    }
+
+
+# ------------------------------------------------------------------ 归一
+
+
+def _clean_str(value, limit: int = 300) -> str:
+    return str(value if value is not None else "").strip()[:limit]
+
+
+def normalize_capabilities(raw) -> dict:
+    """能力开关归一：只认登记过的 key，缺省用默认值。"""
+    out = dict(DEFAULT_CAPABILITIES)
+    if isinstance(raw, dict):
+        for key in CAPABILITIES:
+            if key in raw:
+                out[key] = _as_bool(raw[key])
+    return out
+
+
+def _as_bool(value) -> bool:
+    """把「看起来像布尔」的值规整成真 bool（模型/前端都可能传字符串）。"""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    return text not in ("", "0", "false", "no", "off", "none", "null")
+
+
+def normalize_search_engines(raw) -> list[dict]:
+    """搜索引擎清单归一：类型白名单 + URL 必填 + 数量上限 + id 去重。"""
+    out: list[dict] = []
+    seen: set[str] = set()
+    items = raw if isinstance(raw, list) else []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url = _clean_str(item.get("url"), 400)
+        if not url:
+            continue
+        etype = _clean_str(item.get("type"), 20).lower()
+        if etype not in SEARCH_ENGINE_TYPES:
+            etype = "custom"
+        method = _clean_str(item.get("method"), 8).upper()
+        if method not in ("GET", "POST"):
+            method = "POST" if etype == "openwebui" else "GET"
+        raw_id = _clean_str(item.get("id"), 60)
+        eng_id = raw_id or f"engine_{len(out) + 1}"
+        base = eng_id
+        suffix = 2
+        while eng_id in seen:
+            eng_id = f"{base}_{suffix}"
+            suffix += 1
+        seen.add(eng_id)
+        out.append({
+            "id": eng_id,
+            "name": _clean_str(item.get("name"), 80) or eng_id,
+            "type": etype,
+            "url": url,
+            "method": method,
+            "enabled": _as_bool(item.get("enabled", True)),
+        })
+        if len(out) >= MAX_SEARCH_ENGINES:
+            break
+    return out
+
+
+def normalize_t2v_defaults(raw) -> dict:
+    """文生视频默认参数归一（非法值回落到默认值，不报错）。"""
+    out = default_t2v_defaults()
+    if not isinstance(raw, dict):
+        return out
+    for key in ("model_key", "attention", "accel_lora", "aspect"):
+        value = _clean_str(raw.get(key), 80)
+        if value:
+            out[key] = value
+    for key in ("megapixels", "duration"):
+        try:
+            value = float(raw.get(key))
+        except (TypeError, ValueError):
+            continue
+        if key == "megapixels":
+            value = max(0.2, min(2.0, value))
+        else:
+            value = max(2.0, min(60.0, value))
+        out[key] = value
+    return out
+
+
+def normalize_file_roots(raw) -> list[str]:
+    """文件读取允许的根目录。绝对路径，去重，最多 8 个。"""
+    out: list[str] = []
+    for item in (raw if isinstance(raw, list) else []):
+        text = _clean_str(item, 400)
+        if not text:
+            continue
+        try:
+            resolved = str(Path(text).expanduser().resolve())
+        except (OSError, RuntimeError):
+            continue
+        if resolved not in out:
+            out.append(resolved)
+        if len(out) >= 8:
+            break
+    return out
+
+
+def normalize(payload: dict | None) -> dict:
+    """把前端提交的配置归一成合法形状（非法项回落默认值，不整体拒绝）。"""
+    base = defaults()
+    if not isinstance(payload, dict):
+        return base
+    try:
+        steps = int(payload.get("max_steps"))
+    except (TypeError, ValueError):
+        steps = base["max_steps"]
+    base["max_steps"] = max(MAX_STEPS_MIN, min(MAX_STEPS_HARD_CAP, steps))
+    base["capabilities"] = normalize_capabilities(payload.get("capabilities"))
+    engines = payload.get("search_engines")
+    base["search_engines"] = (normalize_search_engines(engines)
+                               if isinstance(engines, list)
+                               else base["search_engines"])
+    base["t2v_defaults"] = normalize_t2v_defaults(payload.get("t2v_defaults"))
+    base["file_roots"] = normalize_file_roots(payload.get("file_roots"))
+    try:
+        timeout = int(payload.get("code_exec_timeout_sec"))
+    except (TypeError, ValueError):
+        timeout = base["code_exec_timeout_sec"]
+    base["code_exec_timeout_sec"] = max(5, min(300, timeout))
+    base["ffmpeg_path"] = _clean_str(payload.get("ffmpeg_path"), 400)
+    return base
+
+
+# ------------------------------------------------------------------ 持久化
+
+
+def load(conn) -> dict:
+    """从 model_provider_prefs 读配置（读不到/坏了都回默认值）。"""
+    try:
+        row = conn.execute("SELECT value FROM model_provider_prefs WHERE key=?",
+                           (PREF_KEY,)).fetchone()
+    except Exception:
+        return defaults()
+    if not row or not row["value"]:
+        return defaults()
+    try:
+        raw = json.loads(row["value"])
+    except (TypeError, ValueError):
+        return defaults()
+    return normalize(raw)
+
+
+def save(conn, payload: dict) -> dict:
+    """写配置（归一后写库），返回真正生效的配置。"""
+    clean = normalize(payload)
+    conn.execute(
+        "INSERT INTO model_provider_prefs (key,value) VALUES (?,?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (PREF_KEY, json.dumps(clean, ensure_ascii=False)))
+    return clean
+
+
+# ------------------------------------------------------------------ 派生信息
+
+
+def ffmpeg_path(settings: dict | None = None) -> str:
+    """
+    ffmpeg 可执行文件路径。
+
+    优先级：配置里的 ffmpeg_path > PATH 里的 ffmpeg > /usr/bin/ffmpeg。
+    返回空串 = 本机找不到（工具会明确报错，不静默假装）。
+    """
+    configured = ""
+    if isinstance(settings, dict):
+        configured = _clean_str(settings.get("ffmpeg_path"), 400)
+    if configured and Path(configured).exists():
+        return configured
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    fallback = Path("/usr/bin/ffmpeg")
+    return str(fallback) if fallback.exists() else ""
+
+
+def ffprobe_path(settings: dict | None = None) -> str:
+    """ffprobe 可执行文件路径（与 ffmpeg 同源目录优先）。"""
+    configured = ""
+    if isinstance(settings, dict):
+        configured = _clean_str(settings.get("ffmpeg_path"), 400)
+    if configured:
+        sibling = Path(configured).parent / "ffprobe"
+        if sibling.exists():
+            return str(sibling)
+    found = shutil.which("ffprobe")
+    if found:
+        return found
+    fallback = Path("/usr/bin/ffprobe")
+    return str(fallback) if fallback.exists() else ""
+
+
+def capability_state(settings: dict | None) -> dict:
+    """能力开关的**权威视图**（给 API 与前端渲染用）。"""
+    caps = normalize_capabilities(
+        (settings or {}).get("capabilities") if isinstance(settings, dict) else None)
+    out = {}
+    for key, meta in CAPABILITIES.items():
+        out[key] = {
+            "key": key,
+            "label": meta["label"],
+            "builtin": meta["builtin"],
+            "requires": meta["requires"],
+            "description": meta["description"],
+            "enabled": bool(caps.get(key)),
+        }
+    return out
+
+
+def snapshot(conn) -> dict:
+    """给 Agent 运行期用的一次性快照（读配置 + 派生依赖路径）。"""
+    settings = load(conn)
+    return {
+        "settings": settings,
+        "ffmpeg_path": ffmpeg_path(settings),
+        "ffprobe_path": ffprobe_path(settings),
+    }

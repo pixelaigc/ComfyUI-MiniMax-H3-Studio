@@ -1,0 +1,163 @@
+{
+  "port": 59449,
+  "server_ready": true,
+  "provider_model": "qwen3.8-flash-next-iq3_xxs",
+  "agent_ui_shown": true,
+  "handlePaste_present": true,
+  "paste_dispatched_at": 1794624506.9820063,
+  "samples": [
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 20.0
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 25.0
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 30.0
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 35.0
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 40.0
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 45.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 50.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 55.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 60.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 65.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 70.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 75.1
+    },
+    {
+      "hint": "正在入库素材库…",
+      "thumbs": 0,
+      "boxes": 3,
+      "attachHtmlLen": 175,
+      "busy": true,
+      "t": 80.1
+    },
+    {
+      "hint": "已附 1 个（图片），Agent 会引用它们",
+      "thumbs": 1,
+      "boxes": 5,
+      "attachHtmlLen": 553,
+      "busy": false,
+      "t": 85.1
+    }
+  ],
+  "upload_requests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:59449/api/agent/upload",
+      "post_data_len": 0
+    }
+  ],
+  "upload_responses": [
+    {
+      "status": 200,
+      "body": "{\"ok\": true, \"results\": [{\"asset_id\": \"asset_40582ef2ec2d\", \"name\": \"clipboard_pasted.png\", \"preview_url\": \"/api/assets/asset_40582ef2ec2d/preview\", \"duplicated\": false, \"bytes\": 70, \"kind\": \"image\", \"category\": \"image\", \"width\": 1, \"height\": 1, \"duration_sec\": null, \"mime\": \"image/png\", \"codec\": null, \"sample_rate\": null, \"channels\": null, \"analyzed\": true, \"description\": \"\\u57fa\\u4e8e\\u60a8\\u63d0\\u4f9b\\u7684\\u56fe\\u7247\\uff0c\\u4ee5\\u4e0b\\u662f\\u8be6\\u5c3d\\u7684\\u5185\\u5bb9\\u63cf\\u8ff0\\uff1a\", \"tags\": [\"\\u4e3b\\u4f53\\u4eba\\u7269\", \"\\u65e0\\u666f\\u6df1\", \"\\u65e0\\u6784\\u56fe\\u5c42\\u6b21\", \"\\u660e\\u6697\\u8fc7\\u6e21\", \"\\u670d\\u88c5\\u4e0e\\u914d\\u9970\", \"\\u6ca1\\u6709\\u4efb\\u4f55\\u5149\\u5f71\\u53d8\\u5316\", \"\\u753b\\u9762\", \"\\u8272\\u5f69\\u5206\\u5e03\\u7edd\\u5bf9\\u5747\\u5300\"], \"preprocessed\": true, \"analysis_status\": \"done\", \"available\": true}], \"errors\": [], \"uploaded\": 1, \"failed\": 0, \"max_images\": 9, \"max_media_files\": 4, \"max_bytes\": 20971520, \"max_audio_bytes\": 104857600, \"max_video_bytes\": 524288000}"
+    }
+  ],
+  "errors": [],
+  "found_thumb": true,
+  "elapsed": 85.1,
+  "asset_ids": [
+    "asset_40582ef2ec2d"
+  ],
+  "asset_names": [
+    "clipboard_pasted.png",
+    "clipboard_pasted.png",
+    "v0.mp4_00706bef.mkv",
+    "v0.mp4_2ca67516.mkv",
+    "v0.mp4_av_d4f1a614.mp4",
+    "v0.mp4_mix_12d764de.mp4",
+    "v0.mp4_7e417e76.mkv",
+    "v0.mp4_frame1_edb08dfb.mp4",
+    "agp_concat.mp4_215c99d4.mp4",
+    "a.mp3",
+    "v1.mp4",
+    "v0.mp4",
+    "v1.mp4_25ba80f7.webm",
+    "v1.mp4_954861a2.webm",
+    "v1.mp4_15e9faa4.webm",
+    "v1.mp4_bc5f2a69.webm",
+    "clipboard_pasted.png",
+    "clipboard_pasted.png",
+    "clipboard_pasted.png",
+    "v1.mp4_f2afcbc4.webm"
+  ]
+}

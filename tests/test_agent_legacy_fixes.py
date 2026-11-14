@@ -350,6 +350,10 @@ class TestCancelPathNoUndefinedFunctions(unittest.TestCase):
             "customElements", "alert", "confirm", "prompt",
             "encodeURIComponent", "decodeURIComponent", "Event", "O",
             "async", "await", "new", "delete", "typeof",
+            # 剪贴板粘贴媒体用到的浏览器内建（2026-11-13 审查目标 3）：
+            #   Uint8Array —— 把 base64 解出来的二进制装进字节数组
+            #   atob      —— base64 -> 二进制字符串
+            "Uint8Array", "atob", "btoa",
         }
         # 由其它模块注入到 window 的函数（跨模块依赖，不是未定义）
         injected = {
