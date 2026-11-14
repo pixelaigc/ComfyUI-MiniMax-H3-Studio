@@ -1199,10 +1199,20 @@
     if (selAll) selAll.addEventListener("click", () => selectAllVisible());
     const selDelete = $("#alSelDelete");
     if (selDelete) selDelete.addEventListener("click", () => { deleteSelected(); });
-    // 【需求 14】播放器模式入口
+    // 【需求 14】播放器模式入口。
+    //
+    // 【为什么要先关抽屉】素材详情抽屉（#alDrawer）是**右侧浮层**，
+    // 展开时盖住页面右侧 —— 而「播放器模式」按钮正好在右上角那排。
+    // 实测：抽屉开着时点「播放器模式」按钮，click 被抽屉里的 <video>
+    // 拦截（Playwright 报 "subtree intercepts pointer events"），
+    // 用户也会遇到「点了没反应」。
+    // 打开播放器前先关抽屉，两个浮层不叠在一起。
     const playerBtn = $("#alPlayerBtn");
     if (playerBtn && window.AssetPlayer) {
-      playerBtn.addEventListener("click", () => window.AssetPlayer.open());
+      playerBtn.addEventListener("click", () => {
+        closeDrawer();
+        window.AssetPlayer.open();
+      });
     }
 
     const search = $("#alSearch");
