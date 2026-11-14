@@ -436,6 +436,31 @@ class TestResolveJobLoraTruth(unittest.TestCase):
 class TestGenParamsTruth(unittest.TestCase):
     """job_meta.gen_params —— 卡片行与详情模态框的唯一真源。"""
 
+    def test_legacy_task_without_any_lora_field_does_not_show_ckpt850(self):
+        """**老任务**（params 里一个 LoRA 字段都没有）-> 不显示 ckpt850 假名。
+
+        为什么这样断言：实测线上 116 条任务既无 steps 也无任何 LoRA
+        字段，而 ComfyUI /history 早已清理、无法复核它们到底挂了哪枚。
+        此时回落显示 ckpt850 = 显示一个**没有证据**的名字，正是用户报的
+        「根本就没这个 LORA」。用户要求「缺失时应显示『未使用 LoRA』」。
+        """
+        gp = job_meta.gen_params("t2v", {"prompt": "x", "duration": 5})
+        self.assertEqual("未使用 LoRA", gp["lora"])
+        self.assertNotIn("ckpt850", gp["lora"])
+
+    def test_task_with_lora_field_still_shows_real_lora(self):
+        """**有 LoRA 提交字段**的任务 -> 照常显示（不能被上面的规则误伤）。
+
+        为什么这样断言：用户确实选过 -> 有证据 -> 工作流口径成立。
+        """
+        gp = job_meta.gen_params("t2v", {"lora": "ckpt850", "lora_strength": 1.0})
+        self.assertIn("ckpt850", gp["lora"])
+
+    def test_music_mode_shows_not_used_lora(self):
+        """音乐模式没有 LoRA 概念 -> 「未使用 LoRA」（不是「未知」）。"""
+        gp = job_meta.gen_params("t2a", {})
+        self.assertEqual("未使用 LoRA", gp["lora"])
+
     def test_missing_lora_renders_explicit_not_used_text(self):
         """**产物记录为空** -> 显示「未使用 LoRA」（用户原话）。
 
