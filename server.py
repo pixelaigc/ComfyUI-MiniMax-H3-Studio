@@ -3416,8 +3416,28 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     # 没有参考音乐 / 参考视频时 (b)/(c) **不出现** ——
     # 可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。
     if mode in ("flf", "r2v"):
+        # 【2026-11-14 修 —— B2「音轨三选一」选了不生效】
+        #
+        # 【原来错在哪】这里的可见性判据只看 params["ref_audios"] /
+        # params["ref_video_audios"] —— 那两个键只有在**已经上传**时才有值。
+        # 而参考素材通常来自素材库：前端提交的是 asset_refs（slot=ref_audio），
+        # 真正的 ref_audios 要到 worker 里 _apply_asset_refs 跑完才有。
+        # 于是提交时算出「没有参考音乐」-> 用户选的 "reference" 被归一成
+        # "generated" -> 音轨来源被永久改掉 -> 成片音轨不是用户选的那条。
+        #
+        # 【修法】可见性判据要**同时**看「已上传的」和「素材库引用里声明的」：
+        # asset_refs 里出现 slot=ref_audio / bgm / voice 表示**会有**参考音乐；
+        # 出现 slot=ref_video_audio 表示**会有**参考视频背景音。
+        # 真正的最终判定仍在 worker 里（_pick_audio_track 用真实 ref_audios
+        # 再归一一次），这里只是不让提交阶段把用户的选择提前改掉。
         _has_ref_audio = bool(params.get("ref_audios"))
         _has_ref_video_audio = bool(params.get("ref_video_audios"))
+        _slots = {str(r.get("slot") or "").strip()
+                  for r in (asset_refs or []) if isinstance(r, dict)}
+        if _slots & {"ref_audio", "bgm", "voice"}:
+            _has_ref_audio = True
+        if "ref_video_audio" in _slots:
+            _has_ref_video_audio = True
         params["audio_track_source"] = h3audio.normalize_track_source(
             params.get("audio_track_source"),
             has_reference_audio=_has_ref_audio,

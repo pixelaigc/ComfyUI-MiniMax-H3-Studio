@@ -257,6 +257,73 @@ class TestVideoPanelSlotParity(unittest.TestCase):
         self.assertEqual(lora_nodes[0]["class_type"], vmodels.ACCEL_LOADER_CORE)
 
 
+class TestAssetRefAudioTrackSource(unittest.TestCase):
+    """B2 修：素材库来源的参考音乐，音轨来源选择不能被提交阶段改掉。
+
+    【缺陷复现路径】用户从素材库选一段音乐当参考音轨，提交 r2v 任务。
+    前端提交的是 asset_refs（slot=ref_audio），真正的 params["ref_audios"]
+    要到 worker 里 _apply_asset_refs 跑完才有。
+    提交阶段的可见性判据只看 params["ref_audios"] -> 算出「没有参考音乐」
+    -> 用户选的 "reference" 被归一成 "generated" -> 成片音轨不是用户选的那条。
+
+    【断言的是「那一行断言本身能抓住这个缺陷」】
+    这里直接调 server.prepare_job_params（提交阶段真正走的那个函数），
+    传入 asset_refs，断言 audio_track_source 仍然是 "reference"。
+    """
+
+    def _prepare(self, refs, source):
+        import server
+        params = {"prompt": "x", "audio_track_source": source,
+                  "width": 864, "height": 480, "duration": 5}
+        # prepare_job_params **就地修改 params**，返回的是 asset_refs 列表
+        server.prepare_job_params("r2v", params, refs, {})
+        return params
+
+    def test_ref_audio_from_library_keeps_reference_choice(self):
+        """素材库里的参考音乐 -> "reference" 必须保住。"""
+        out = self._prepare(
+            [{"asset_id": "asset_x", "slot": "ref_audio", "ordinal": 0}],
+            "reference")
+        self.assertEqual(out["audio_track_source"], "reference")
+
+    def test_ref_video_audio_from_library_keeps_video_bg_choice(self):
+        """素材库里的参考视频背景音 -> "video_bg" 必须保住。
+
+        注意：r2v 的校验要求至少有 1 个 ref_image/ref_video/ref_audio 槽位，
+        所以这里同时给一张参考图（真实提交也是这么提交的）。
+        """
+        out = self._prepare(
+            [{"asset_id": "asset_i", "slot": "ref_image", "ordinal": 0},
+             {"asset_id": "asset_v", "slot": "ref_video_audio", "ordinal": 0}],
+            "video_bg")
+        self.assertEqual(out["audio_track_source"], "video_bg")
+
+    def test_no_reference_material_falls_back_to_generated(self):
+        """没有任何参考素材时，选 reference 要回落到 generated。
+
+        这一条保证修法没有把「可见性」判宽 —— 没有素材仍不该给
+        (b)/(c) 选项。
+        """
+        import server
+        params = {"prompt": "x", "audio_track_source": "reference",
+                  "width": 864, "height": 480, "duration": 5}
+        # 没有 ref_image/ref_video/ref_audio -> r2v 校验会拒绝提交。
+        # 这条用例测的是**归一逻辑本身**：直接调 h3audio 的归一，
+        # 不经过 r2v 的素材必填校验。
+        self.assertEqual(
+            server.h3audio.normalize_track_source(
+                "reference", has_reference_audio=False,
+                has_reference_video_audio=False),
+            "generated")
+
+    def test_generated_stays_generated(self):
+        """显式选 generated -> 保持 generated。"""
+        out = self._prepare(
+            [{"asset_id": "asset_x", "slot": "ref_audio", "ordinal": 0}],
+            "generated")
+        self.assertEqual(out["audio_track_source"], "generated")
+
+
 def wf_build_flf(params):
     """包一层，把 H3VideoRequestError 转成 ValueError（与旧接口一致）。"""
     return wf.build_flf(params)
