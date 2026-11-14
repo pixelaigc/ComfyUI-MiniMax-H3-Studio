@@ -1054,6 +1054,20 @@ function renderLoraList() {
     const nearNote = near
       ? `<span class="img-lora-tag near" title="${esc(meta.scene || "")}">近似适用</span>`
       : "";
+    // ⚠️ **2026-11-15 修复（形态不实标注）**：MOSS 底模的注意力投影是
+    // **分离 q/k/v**，而上游有一批 LoRA 用的是**融合 qkv** 形态。
+    // 直接挂上去 ComfyUI 会静默丢弃（只打 "lora key not loaded"，
+    // 出图照跑但 LoRA 没生效）—— 所以服务端在提交工作流前会**自动转换**。
+    //
+    // 界面必须如实说出来：不能让用户以为它「原生」就能直接用，
+    // 也不能让它跟真·分离形态的条目长得一模一样。
+    const qkvShape = meta && meta.qkv_shape ? String(meta.qkv_shape) : "";
+    const qkvConv = meta && meta.qkv_convertible === true;
+    const fusedNote = qkvShape === "fused"
+      ? (qkvConv
+        ? `<span class="img-lora-tag qkv" title="该 LoRA 的注意力权重是「融合 qkv」形态（q/k/v 合并在一个张量里），本机 MOSS 底模用的是分离 q/k/v。服务端会在提交时自动做无损转换（已逐位验证等价），转换后权重完整生效 —— 直接挂原文件会被 ComfyUI 静默丢弃。">融合 qkv · 自动转换</span>`
+        : `<span class="img-lora-tag qkv warn" title="该 LoRA 的注意力权重是「融合 qkv」形态，且无法无损拆分 —— 在本机 MOSS 底模上不能完整生效。">融合 qkv · 不可用</span>`)
+      : "";
     // 触发词：可编辑 —— 用户能改 / 删 / 手输；留空即不追加该 LoRA 的触发词
     const triggerText = item.trigger !== undefined && item.trigger !== null
       ? item.trigger : (meta && meta.trigger ? meta.trigger : "");
@@ -1072,6 +1086,7 @@ function renderLoraList() {
         ${missing ? `<span class="img-lora-tag miss">文件缺失</span>` : ""}
         ${rec ? `<span class="img-lora-tag rec">推荐强度</span>` : ""}
         ${nearNote}
+        ${fusedNote}
         ${dampNote}
         <button type="button" class="img-lora-btn up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
         <button type="button" class="img-lora-btn down" title="下移" ${index === ctx.list.length - 1 ? "disabled" : ""}>↓</button>
@@ -1199,6 +1214,11 @@ function openLoraInfo(name) {
       <dt>基座适用性</dt><dd>${meta.base_verdict === "近似适用"
         ? "⚠️ 近似适用（非该基座原生训练，依据见下方说明）"
         : (meta.base_verdict || "原生")}</dd>
+      <dt>权重形态</dt><dd>${meta.qkv_shape === "fused"
+        ? (meta.qkv_convertible
+          ? "融合 qkv（q/k/v 合并在一个张量里）—— 本机底模用分离 q/k/v，服务端提交时自动做无损转换后完整生效"
+          : "融合 qkv，且无法无损拆分 —— 在本机底模上不能完整生效")
+        : (meta.qkv_shape === "split" ? "分离 q/k/v（与本机底模结构一致，可直接挂载）" : "—")}</dd>
       <dt>触发词</dt><dd>${trigger}</dd>
       <dt>推荐强度</dt><dd>${Number(meta.recommended_strength).toFixed(2)}${meta.strength_source ? "（" + esc(meta.strength_source) + "）" : ""}</dd>
       <dt>类型</dt><dd>${meta.kind === "acceleration" ? "加速 / 蒸馏类（工作流固定使用，不可选）" : "效果类（可自行选用）"}</dd>
@@ -6136,6 +6156,23 @@ window.H3Studio = Object.assign(window.H3Studio || {}, {
   // web/flow-docs.js 打开/关闭自己的模态框时要走这一份，
   // 否则关掉流程图面板会把其它模态框的锁一起解掉。
   syncModalOpenClass,
+  // 【2026-11-15 D11 收口】LoRA 面板的**测试钩子**。
+  //
+  // 用途：真实浏览器测试要能在不依赖本机真实 LoRA 文件的前提下，
+  // 驱动前端的 LoRA 清单渲染（喂假条目 -> 看 DOM 里有没有如实标注）。
+  //
+  // 为什么必须暴露：前一轮用「源码里有没有某个字符串」断言形态标注，
+  // 变异测试证明那是**空洞的** —— 把渲染插值改成空串，断言照样全绿。
+  // 只有真的把页面渲染出来、在 DOM 里找标签，才能抓住这种回归。
+  //
+  // 只读暴露（不改变任何业务行为）：外部只能取到 store 与渲染函数。
+  __loraTestHooks: {
+    stores: { Z: IMG_LORAS, Qwen: QWEN_LORAS, MOSS: MOSS_LORAS, H3: H3IMAGE_LORAS },
+    renderLoraList,
+    renderLoraSelect,
+    openLoraInfo,
+    imgLoraMeta,
+  },
 });
 
 function isPhoneViewport() {

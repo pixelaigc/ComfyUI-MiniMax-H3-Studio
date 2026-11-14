@@ -1086,6 +1086,12 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
 /* 「近似适用」：清单里标的是非该基座原生训练的条目，
    必须一眼可辨 —— 不能跟「原生」条目长得一样。 */
 .img-lora-tag.near { background: #fdf3e0; color: #a2660a; }
+/* 「融合 qkv · 自动转换」：权重形态与本机底模不一致，
+   服务端会自动做无损转换。必须如实标注 —— 让用户知道
+   这条不是「直接就能挂」的原生形态。 */
+.img-lora-tag.qkv { background: #e8f0fb; color: #2f6fd0; }
+/* 「融合 qkv · 不可用」：无法无损拆分，在本机底模上不完整生效。 */
+.img-lora-tag.qkv.warn { background: #fbeaea; color: var(--danger); }
 .img-lora-cap {
   font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
   background: #eef1f5; color: var(--muted); white-space: nowrap;
