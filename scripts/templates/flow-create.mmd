@@ -1,0 +1,123 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 26, "rankSpacing": 40, "htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 交互流程图 · ① 创作链路（文生图 / 图片编辑 / 文生视频 / 音乐 / 长片拼接）
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-create.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-create.mmd，然后跑 `make flow`。
+flowchart TD
+
+  %% ---------- 模式选择（节点内容派生自 gen_types.py）----------
+  subgraph MODES["① 选生成模式（左侧导航 → mode，共 @STAT_TYPES@ 种）"]
+    direction TB
+    subgraph MV["视频"]
+      direction LR
+@MODE_NODES_VIDEO@
+    end
+    subgraph MI["文生图"]
+      direction LR
+@MODE_NODES_T2I@
+    end
+    subgraph ME["图片编辑"]
+      direction LR
+@MODE_NODES_I2I@
+    end
+    subgraph MM["音乐"]
+      direction LR
+@MODE_NODES_MUSIC@
+    end
+  end
+
+  %% ---------- 面板 ----------
+  subgraph PANELS["② 参数面板（同一套骨架，按 mode 换内容）"]
+    direction LR
+    P_VIDEO["文生视频面板 #videoPanel<br/>尺寸预设 / 输出尺寸 / 画面比例<br/>MiniMax-H3 模型 / 加速 LoRA / 效果 LoRA<br/>注意力机制 / 二采 / 采样参数"]
+    P_IMAGE["图像面板 #imagePanel<br/>分辨率档位 / 画面比例 / 输出尺寸 / 生成批次<br/>Z-Image 模型 / 调度器 / 负面提示词<br/>SLG（MOSS 专属）/ 参考图 / LoRA"]
+    P_MUSIC["音乐面板 #musicPanel<br/>YuE2 音乐模型 / 音频编码器 / 音乐描述<br/>结构化风格 / 歌词 / 参考音频 / 谱面规划<br/>输出格式 / 种子"]
+    P_STITCH["长片拼接面板 #stitchPanel<br/>长片标题 / 简介 / 片段列表（≥2）/ 合成长片"]
+    P_UPLOAD["上传区 #uploadZone<br/>flf 首帧+尾帧 · r2v 参考图×3<br/>i2i / a2a 参考素材必须来自素材库"]
+  end
+
+@MODE_TO_PANEL@
+
+  P_VIDEO --> P_UPLOAD
+  P_IMAGE --> P_UPLOAD
+  P_MUSIC --> P_UPLOAD
+
+  %% ---------- 提示词 + 增强 ----------
+  subgraph PROMPT["③ 提示词与增强"]
+    direction TB
+    PT["提示词框<br/>#prompt / #musicPrompt"]
+    ENH_BTN["增强按钮<br/>（分裂按钮）"]
+    ENH_MENU["增强方式下拉<br/>多选 · 按注册表顺序链式执行"]
+    subgraph ENH_SPECS["增强方式（派生自 web/enhance-menu.js）"]
+      direction TB
+@ENHANCE_NODES@
+    end
+    HIST["提示词历史<br/>按面板隔离（panel_key = mode）"]
+    VER["版本历史<br/>原始 / 一次增强 / 二次增强"]
+    MOSS["结构化增强（layout）<br/>仅 MOSS-Image"]
+  end
+
+  PT --> ENH_BTN
+  ENH_BTN --> ENH_MENU
+  ENH_MENU --> ENH_SPECS
+  ENH_SPECS -.->|"写回提示词框"| PT
+  PT -.-> HIST
+  ENH_MENU -.-> VER
+  ENH_MENU -.-> MOSS
+
+  P_VIDEO --> PT
+  P_IMAGE --> PT
+  P_MUSIC --> PT
+
+  %% ---------- 提交与执行 ----------
+  subgraph RUN["④ 提交与执行"]
+    direction LR
+    SEED["种子 / 采样参数"]
+    GEN["点「生成」<br/>POST /api/jobs"]
+    QUEUE["生成队列<br/>SQLite FIFO · 单 Worker"]
+    COMFY["ComfyUI 执行<br/>progress → done / failed"]
+    SSE["状态推送<br/>GET /api/status/stream（SSE）"]
+  end
+
+  SEED --> GEN
+  GEN --> QUEUE --> COMFY
+  COMFY --> SSE
+
+  P_UPLOAD --> GEN
+  PT --> GEN
+  ENH_SPECS --> GEN
+  P_STITCH --> GEN
+
+  %% ---------- 产物侧 ----------
+  subgraph OUT["⑤ 生成库（媒体库）"]
+    direction LR
+    LIB["任务卡片<br/>状态标签 + 生成类型标签"]
+    ACTS["卡片动作：@JOB_CARD_ACTIONS@"]
+    DETAIL["ℹ 详情模态框<br/>完整生成参数 + 作者推荐参数"]
+    REUSE["复用参数<br/>回填模式/模型/尺寸/LoRA/采样参数"]
+    CONT["⏭ 接续<br/>GET /api/jobs/{id}/continuation"]
+    STITCH["＋ 拼接<br/>加入长片拼接区"]
+    ASSET["添加到素材库<br/>POST /api/assets/import/from-media"]
+  end
+
+  COMFY --> LIB
+  LIB --> ACTS
+  ACTS --> DETAIL
+  ACTS --> REUSE
+  ACTS --> CONT
+  ACTS --> STITCH
+  ACTS --> ASSET
+  REUSE -.->|"回填"| PT
+  CONT -.->|"回填接续上下文（提示词自己写）"| PT
+  STITCH --> P_STITCH
+
+  classDef mode fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#064e3b;
+  classDef panel fill:#fff7ed,stroke:#ea580c,stroke-width:1px,color:#7c2d12;
+  classDef prompt fill:#fdf4ff,stroke:#a21caf,stroke-width:1px,color:#581c87;
+  classDef run fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef out fill:#fef2f2,stroke:#dc2626,stroke-width:1px,color:#7f1d1d;
+
+  class M_t2v,M_flf,M_r2v,M_longfilm,M_t2i,M_t2i_qwen,M_t2i_moss,M_t2i_h3image,M_i2i_qwen,M_i2i_h3image,M_t2a,M_a2a mode;
+  class P_VIDEO,P_IMAGE,P_MUSIC,P_STITCH,P_UPLOAD panel;
+  class PT,ENH_BTN,ENH_MENU,ENH_SPECS,HIST,VER,MOSS prompt;
+  class SEED,GEN,QUEUE,COMFY,SSE run;
+  class LIB,ACTS,DETAIL,REUSE,CONT,STITCH,ASSET out;

@@ -1,0 +1,81 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 26, "rankSpacing": 40, "htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 交互流程图 · ④ 系统配置（本地模型 Provider / 提示词增强 Agent 模板 / 硬件参数）
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-system.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-system.mmd，然后跑 `make flow`。
+flowchart TD
+
+  NAV_SYS["左侧导航 → 系统"]
+
+  subgraph PROV["本地模型配置页（#providersPage）"]
+    direction TB
+    P_LIST["Provider 列表<br/>GET /api/providers"]
+    P_DEFAULT["默认项区<br/>默认 Provider / 默认多模态 Provider"]
+    P_ADD["＋ 添加 Provider"]
+    P_ACTIONS["Provider 动作：`default`、`del`、`edit`、`mmdefault`<br/>`test`"]
+    P_FORM["编辑表单<br/>显示名 / 类型 / Base URL / LLM 地址 / 模型名<br/>API Key / 多模态 / 启用"]
+    P_TEST["连通性测试<br/>POST /api/providers/{id}/test（不生成内容）"]
+    P_MODAL["Provider 弹窗<br/>#provModal（新增 / 编辑共用）"]
+  end
+
+  NAV_SYS --> P_LIST
+  NAV_SYS --> P_DEFAULT
+  P_ADD --> P_MODAL
+  P_ACTIONS --> P_MODAL
+  P_ACTIONS --> P_TEST
+  P_MODAL -->|"保存<br/>POST / PUT /api/providers"| P_LIST
+  P_TEST -.-> P_LIST
+
+  subgraph ENH["提示词增强 Agent（模板与参数，可编辑）"]
+    direction TB
+    E_TPL["模板清单（后端 12 个模板，派生自 /api/enhancer）<br/>前端增强方式 6 种（派生自 web/enhance-menu.js）"]
+    E_OVER["模板覆盖<br/>system_prompt / user_template<br/>留空 = 恢复内置模板"]
+    E_PARAM["参数<br/>temperature / top_p / max_tokens / length<br/>sampling / language / max_tokens_ceiling / do_sample"]
+    E_LEN["长度档 / 采样档"]
+    E_DEFAULT["各模式默认模板<br/>t2i→image · t2i_qwen→qwen21-pe-t2i<br/>i2i_qwen→qwen21-pe-i2i<br/>t2i_moss→moss-image · t2v/flf/r2v→video-director<br/>t2a/a2a→yue2-style"]
+  end
+
+  E_TPL --> E_OVER
+  E_TPL --> E_PARAM
+  E_TPL --> E_LEN
+  E_TPL --> E_DEFAULT
+  E_OVER -->|"保存<br/>PUT /api/enhancer"| E_TPL
+
+  subgraph HW["硬件参数页（#systemPage）"]
+    direction TB
+    H_LIST["本机硬件清单<br/>GET /api/hardware"]
+    H_PL["GPU 功耗上限<br/>POST /api/gpu/power-limit"]
+    H_UNLOAD["释放显存<br/>POST /api/unload"]
+  end
+
+  NAV_SYS --> H_LIST
+  H_LIST --> H_PL
+  H_UNLOAD --- H_LIST
+
+  subgraph EFFECT["这些配置影响哪里"]
+    direction LR
+    X_ENH["增强下拉里的可用方式与默认项"]
+    X_PROV["增强 / Agent 走哪个 Provider"]
+    X_MM["多模态能力（图片 / 音视频分析）"]
+  end
+
+  E_DEFAULT -.-> X_ENH
+  E_PARAM -.-> X_ENH
+  P_DEFAULT -.-> X_PROV
+  P_FORM -.-> X_PROV
+  P_FORM -.-> X_MM
+
+  NOTE["配置落库：model_provider_prefs 表（key = 'enhancer' 等）<br/>Agent 未配置任何启用中的 Provider 时会明确报错并指向本页"]
+
+  P_LIST -.-> NOTE
+
+  classDef sys fill:#f8fafc,stroke:#475569,stroke-width:1px,color:#0f172a;
+  classDef prov fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef enh fill:#fdf4ff,stroke:#a21caf,stroke-width:1px,color:#581c87;
+  classDef eff fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#064e3b;
+  classDef note fill:#f8fafc,stroke:#475569,stroke-width:1px,color:#0f172a;
+
+  class NAV_SYS,H_LIST,H_PL,H_UNLOAD sys;
+  class P_LIST,P_DEFAULT,P_ADD,P_ACTIONS,P_FORM,P_TEST,P_MODAL prov;
+  class E_TPL,E_OVER,E_PARAM,E_LEN,E_DEFAULT enh;
+  class X_ENH,X_PROV,X_MM eff;
+  class NOTE note;

@@ -1,0 +1,44 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 46, "rankSpacing": 60, "htmlLabels": true, "padding": 12}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 交互流程图 · 全局总览（人工骨架 + 代码派生节点）
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-overview.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-overview.mmd，然后跑 `make flow`。
+%% 【设计说明】总览只画**主干链路**（无交叉）；横向联动关系写进节点文字，
+%% 具体箭头在各自子图里画 —— 这是为了让总览在 A4 / 屏幕上都读得清。
+flowchart TB
+
+  NAV["左侧导航 · web/index.html"]
+
+  subgraph P1["① 创作区"]
+    direction LR
+    M1["生成模式<br/>@STAT_TYPES@ 种"]
+    PNL["参数面板<br/>视频 / 图像 / 音乐 / 拼接"]
+    ENH["提示词 + 增强"]
+    GEN["点「生成」"]
+  end
+
+  subgraph P2["② 执行与产物"]
+    direction LR
+    Q["生成队列<br/>SQLite FIFO · 单 Worker"]
+    CF["ComfyUI 执行"]
+    LB["生成库（媒体库）<br/>卡片 + 状态标签 + 类型标签"]
+  end
+
+  subgraph P3["③ 素材 · 工具 · 配置（横向联动，详见对应子图）"]
+    direction LR
+    AS["素材库<br/>/api/assets/*<br/>↕ 选参考图 / 参考音频 → 参数面板<br/>↑ 生成库「添加到素材库」"]
+    AG["内置 Agent<br/>/api/agent/chat<br/>→ create_job 工具 → 点「生成」<br/>→ search_assets 工具 → 素材库"]
+    SY["系统配置<br/>Provider / 硬件<br/>→ 增强模板 → 增强下拉<br/>→ Provider → 增强与 Agent"]
+  end
+
+  NAV --> M1 --> PNL --> ENH --> GEN
+  GEN --> Q --> CF --> LB
+
+  classDef nav fill:#eef2ff,stroke:#4f46e5,stroke-width:1px,color:#1e1b4b;
+  classDef create fill:#fff7ed,stroke:#ea580c,stroke-width:1px,color:#7c2d12;
+  classDef run fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef side fill:#f5f3ff,stroke:#7c3aed,stroke-width:1px,color:#2e1065;
+
+  class NAV nav;
+  class M1,PNL,ENH,GEN create;
+  class Q,CF,LB run;
+  class AS,AG,SY side;
