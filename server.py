@@ -80,6 +80,7 @@ from h3studio import qwen_pe
 from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
+from h3studio import gen_defaults
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import prompt_history as ph
@@ -6407,6 +6408,20 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
         width, height = video_models.video_dimensions(str(out["aspect"]), mp)
         out["width"] = width
         out["height"] = height
+    # 【2026-11-14 需求 A4】通用采样字段：用户（模型）显式给了的值优先，
+    # 没给的才用默认值。
+    #
+    # 【为什么不直接用 gen_defaults.merge_into_params】那个函数给
+    # 「非视频模式」用（字段名直接就是 params 的键）。t2v 的
+    # accel_lora / megapixels 是**专用语义**（要转成 accel_loras 数组 /
+    # 换算成宽高），上面已经处理完了，这里只补通用的那几个键。
+    for key in ("steps", "sampler", "scheduler",
+                "shift_video", "shift_audio"):
+        value = defaults.get(key)
+        if value in (None, ""):
+            continue
+        if out.get(key) in (None, ""):
+            out[key] = value
     return out
 
 
@@ -7195,6 +7210,15 @@ async def api_agent_settings(request):
             "capabilities": agent_settings.capability_state(settings),
             "search_engines": settings.get("search_engines") or [],
             "t2v_defaults": settings.get("t2v_defaults") or {},
+            # 【2026-11-14 需求 A4】按生成类型分别配置的默认参数。
+            #
+            # 【为什么两个都下发】gen_defaults 是**完整**结构（每个生成类型
+            # 一份），t2v_defaults 是**兼容镜像**（老客户端读它）。
+            # 两份都发，前端用 gen_defaults 渲染，老脚本用 t2v_defaults。
+            "gen_defaults": settings.get("gen_defaults") or {},
+            # 字段规格（合法取值清单 + 类型 + 区间）——
+            # 前端**不硬编码**任何取值集合，全部从这里来。
+            "gen_defaults_spec": gen_defaults.spec_payload(),
             "limits": {
                 "max_steps": agent_mod.MAX_STEPS,
                 "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
@@ -7241,7 +7265,12 @@ async def api_agent_settings(request):
     # 立刻把 ffmpeg 路径推给媒体工具模块（下次调用就用新路径）
     agent_media_tools.configure(agent_settings.ffmpeg_path(saved))
     return json_ok({"ok": True, "settings": saved,
-                    "capabilities": agent_settings.capability_state(saved)})
+                    "capabilities": agent_settings.capability_state(saved),
+                    # 【A4】保存后把最新的默认值与规格一起回给前端 ——
+                    # 前端据此刷新界面（归一后的值可能与提交值不同，
+                    # 比如越界的时长被夹回区间）。
+                    "gen_defaults": saved.get("gen_defaults") or {},
+                    "gen_defaults_spec": gen_defaults.spec_payload()})
 
 
 async def api_agent_settings_test_engine(request):
