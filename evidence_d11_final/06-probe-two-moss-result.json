@@ -1,0 +1,66 @@
+[
+ {
+  "file": "/mnt/usb2t/comfyui-models/loras/moss-effects/moss_image_sft_look_lora.safetensors",
+  "name": "moss_image_sft_look_lora.safetensors",
+  "before": {
+   "patched": 137,
+   "missing": 126,
+   "missing_proj_qkv": 0,
+   "missing_sample": [
+    "lora_unet_layers_0_proj_qkv.alpha",
+    "lora_unet_layers_0_proj_qkv.lora_down.weight",
+    "lora_unet_layers_0_proj_qkv.lora_up.weight"
+   ]
+  },
+  "convert_ok": true,
+  "convert_changed": true,
+  "convert_reason": "",
+  "convert_unhandled": [],
+  "after": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "after_target": "/tmp/moss-probe-592gd5sj/h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "verdict": "attached"
+ },
+ {
+  "file": "/mnt/usb2t/comfyui-models/loras/moss-effects/h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "name": "h3studio_mossnorm__moss_image_sft_look_lora.safetensors",
+  "before": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "convert_ok": true,
+  "convert_changed": false,
+  "convert_reason": "已是 ComfyUI 兼容形态，无需转换",
+  "convert_unhandled": [],
+  "after": {
+   "patched": 263,
+   "missing": 0,
+   "missing_proj_qkv": 0,
+   "missing_sample": []
+  },
+  "used_original": true,
+  "verdict": "attached"
+ },
+ {
+  "file": "/mnt/usb2t/comfyui-models/loras/moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors",
+  "name": "hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors",
+  "before": {
+   "error": "SafetensorError: Error while deserializing header: incomplete metadata, file not fully covered"
+  },
+  "convert_ok": false,
+  "convert_changed": false,
+  "convert_reason": "读不到 safetensors 头部",
+  "convert_unhandled": [],
+  "after": {
+   "error": "SafetensorError: Error while deserializing header: incomplete metadata, file not fully covered"
+  },
+  "used_original": true,
+  "verdict": "error"
+ }
+]
