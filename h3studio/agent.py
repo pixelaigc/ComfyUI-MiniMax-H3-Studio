@@ -1069,7 +1069,11 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> dict | Non
     for field in ("aspect", "resolution", "model", "lora", "duration",
                   "max_duration", "cfg", "seed", "precision", "plan_mode",
                   "format", "checkpoint", "negative_prompt", "lyrics",
-                  "lora_strength"):
+                  "lora_strength",
+                  # 【2026-11-14 需求 2a/2b 补齐】采样参数也要校验 ——
+                  # 用户/模型显式给了非法采样器名，不能让它悄悄进工作流。
+                  # 合法值集合来自 agent_schema.validate_params（真实配置）。
+                  "steps", "sampler", "scheduler", "shift"):
         if args.get(field) is not None:
             check[field] = args[field]
     # 时长字段名按 mode 归一（音乐是 max_duration）
@@ -1141,6 +1145,26 @@ def _validate_create_job_args(mode: str, args: dict, params: dict) -> dict | Non
         "lora_strength": {"type": "number", "description": "LoRA 强度，默认 1.0"},
         "cfg": {"type": "number",
                 "description": "CFG。图像模式；Qwen 负面提示词需 cfg>1 才生效"},
+        # 【2026-11-14 需求 2a/2b 补齐】采样参数透传。
+        #
+        # 【为什么原来没有】Agent 的 create_job 只能传 prompt/aspect/resolution/
+        # model/lora/cfg 等少数几项，采样参数（步数/采样器/调度器/shift）
+        # 压根不在 schema 里 —— 模型想指定也传不了，媒体库卡片对应行
+        # 只能显示「—」（实际出图用的是模型表里的默认值）。
+        #
+        # 【现在】这四项进了 schema，用户/模型可以显式指定；
+        # 不指定时由默认参数补上（见 agent.py 的默认参数填充），
+        # 媒体库卡片显示的就是**实际用的那组值**。
+        "steps": {"type": "integer",
+                  "description": "采样步数（图像模式）。"
+                                 "不填则用该模型的推荐步数"},
+        "sampler": {"type": "string",
+                    "description": "采样器（图像模式），合法值用 get_mode_schema 查"},
+        "scheduler": {"type": "string",
+                      "description": "调度器（图像模式），合法值用 get_mode_schema 查"},
+        "shift": {"type": "number",
+                  "description": "shift（图像模式；Qwen 族默认 0.69，"
+                                 "Z-Image/MOSS/H3 各不相同）"},
         "seed": {"type": "integer", "description": "随机种子（不填则随机）"},
         "negative_prompt": {"type": "string",
                             "description": "负面提示词。**只在 t2i_moss 与 "
@@ -1220,6 +1244,28 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
             params["cfg"] = float(args["cfg"])
         except (TypeError, ValueError):
             raise AgentError("cfg 必须是数字")
+    # 【2026-11-14 需求 2a/2b 补齐】采样参数透传。
+    #
+    # 【为什么原来没有】create_job 的 schema 里没有这四项，模型传不了，
+    # Agent 建的任务 params 里也就没有它们 —— 媒体库卡片对应行只能显示「—」。
+    # 现在 schema 有了，这里负责把它们写进 params（用户显式给的值优先，
+    # 没给的话下面「默认参数填充」会补上模型表的推荐值）。
+    if args.get("steps") is not None:
+        try:
+            params["steps"] = int(args["steps"])
+        except (TypeError, ValueError):
+            raise AgentError("steps 必须是整数")
+    sampler = str(args.get("sampler") or "").strip()
+    if sampler:
+        params["sampler"] = sampler
+    scheduler = str(args.get("scheduler") or "").strip()
+    if scheduler:
+        params["scheduler"] = scheduler
+    if args.get("shift") is not None:
+        try:
+            params["shift"] = float(args["shift"])
+        except (TypeError, ValueError):
+            raise AgentError("shift 必须是数字")
     if args.get("seed") is not None:
         try:
             params["seed"] = int(args["seed"])
