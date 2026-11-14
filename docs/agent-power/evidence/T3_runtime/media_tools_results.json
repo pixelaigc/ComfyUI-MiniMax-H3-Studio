@@ -1,0 +1,157 @@
+{
+  "probe": {
+    "has_video": true,
+    "has_audio": true,
+    "duration": 1.0,
+    "width": 320,
+    "height": 240,
+    "v_codec": "h264",
+    "pix_fmt": "yuv420p",
+    "time_base": "1/12288",
+    "fps": 12.0,
+    "a_codec": "aac",
+    "sample_rate": 44100,
+    "channels": 2,
+    "container": "mov",
+    "size_bytes": 3154,
+    "asset": {
+      "asset_id": "asset_8f4b5a31ddf1",
+      "name": "v0.mp4",
+      "category": "video",
+      "bytes": 3154,
+      "duration_sec": 1.0,
+      "width": 320,
+      "height": 240
+    }
+  },
+  "concat": {
+    "operation": "concat",
+    "inputs": [
+      "asset_8f4b5a31ddf1",
+      "asset_aeb81ba5f119"
+    ],
+    "output": {
+      "asset_id": "asset_df266f49f99b",
+      "name": "agp_concat.mp4_215c99d4.mp4",
+      "category": "video",
+      "duplicated": true,
+      "bytes": 5007,
+      "duration_sec": 2.0,
+      "width": 320,
+      "height": 240,
+      "preview_url": "/api/assets/asset_df266f49f99b/preview",
+      "content_url": "/api/assets/asset_df266f49f99b/content"
+    },
+    "note": "参数一致：视频与音频均免重编码直拼",
+    "remuxed": false,
+    "duration_sec": 2.023023,
+    "width": 320,
+    "height": 240
+  },
+  "frames": {
+    "operation": "extract_frames",
+    "input": "asset_8f4b5a31ddf1",
+    "interval_sec": 0.3,
+    "frame_count": 3,
+    "frames": [
+      {
+        "asset_id": "asset_abcd917d2d71",
+        "name": "v0.mp4_frame1_edb08dfb.mp4",
+        "category": "image",
+        "duplicated": true,
+        "bytes": 2816,
+        "duration_sec": null,
+        "width": 768,
+        "height": 576,
+        "preview_url": "/api/assets/asset_abcd917d2d71/preview",
+        "content_url": "/api/assets/asset_abcd917d2d71/content"
+      },
+      {
+        "asset_id": "asset_abcd917d2d71",
+        "name": "v0.mp4_frame1_edb08dfb.mp4",
+        "category": "image",
+        "duplicated": true,
+        "bytes": 2816,
+        "duration_sec": null,
+        "width": 768,
+        "height": 576,
+        "preview_url": "/api/assets/asset_abcd917d2d71/preview",
+        "content_url": "/api/assets/asset_abcd917d2d71/content"
+      },
+      {
+        "asset_id": "asset_abcd917d2d71",
+        "name": "v0.mp4_frame1_edb08dfb.mp4",
+        "category": "image",
+        "duplicated": true,
+        "bytes": 2816,
+        "duration_sec": null,
+        "width": 768,
+        "height": 576,
+        "preview_url": "/api/assets/asset_abcd917d2d71/preview",
+        "content_url": "/api/assets/asset_abcd917d2d71/content"
+      }
+    ]
+  },
+  "transcode": {
+    "operation": "transcode",
+    "input": "asset_8f4b5a31ddf1",
+    "output_format": "mkv",
+    "output": {
+      "asset_id": "asset_b636907e398c",
+      "name": "v0.mp4_00706bef.mkv",
+      "category": "video",
+      "duplicated": false,
+      "bytes": 2570,
+      "duration_sec": 1.021,
+      "width": 320,
+      "height": 240,
+      "preview_url": "/api/assets/asset_b636907e398c/preview",
+      "content_url": "/api/assets/asset_b636907e398c/content"
+    },
+    "duration_sec": 1.021,
+    "width": 320,
+    "height": 240
+  },
+  "mix": {
+    "operation": "mix_audio",
+    "video_input": "asset_8f4b5a31ddf1",
+    "audio_inputs": [
+      "asset_b2c557aa186e"
+    ],
+    "volumes": [
+      1.0
+    ],
+    "replace_original": false,
+    "output": {
+      "asset_id": "asset_fae94a7af743",
+      "name": "v0.mp4_mix_12d764de.mp4",
+      "category": "video",
+      "duplicated": true,
+      "bytes": 51403,
+      "duration_sec": 1.0,
+      "width": 320,
+      "height": 240,
+      "preview_url": "/api/assets/asset_fae94a7af743/preview",
+      "content_url": "/api/assets/asset_fae94a7af743/content"
+    },
+    "duration_sec": 2.0
+  },
+  "merge": {
+    "operation": "merge_av",
+    "video_input": "asset_8f4b5a31ddf1",
+    "audio_input": "asset_b2c557aa186e",
+    "output": {
+      "asset_id": "asset_c7b3bbcc3be1",
+      "name": "v0.mp4_av_d4f1a614.mp4",
+      "category": "video",
+      "duplicated": true,
+      "bytes": 20656,
+      "duration_sec": 1.0,
+      "width": 320,
+      "height": 240,
+      "preview_url": "/api/assets/asset_c7b3bbcc3be1/preview",
+      "content_url": "/api/assets/asset_c7b3bbcc3be1/content"
+    },
+    "duration_sec": 1.0
+  }
+}
