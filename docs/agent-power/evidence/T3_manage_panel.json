@@ -1,0 +1,86 @@
+{
+  "port": 53249,
+  "checks": [
+    {
+      "name": "管理按钮存在并可点击",
+      "ok": true,
+      "detail": "open 方式 = clicked"
+    },
+    {
+      "name": "管理面板弹窗可见",
+      "ok": true,
+      "detail": "visible=True"
+    },
+    {
+      "name": "4 个能力开关渲染出来",
+      "ok": true,
+      "detail": "能力开关 = ['file_read', 'web_search', 'code_exec', 'media_tools']"
+    },
+    {
+      "name": "code_exec 默认未勾选（默认关闭）",
+      "ok": true,
+      "detail": "开关状态 = [{'key': 'file_read', 'checked': True}, {'key': 'web_search', 'checked': True}, {'key': 'code_exec', 'checked': False}, {'key': 'media_tools', 'checked': True}]"
+    },
+    {
+      "name": "搜索引擎 URL 输入框渲染出来（>= 3 个）",
+      "ok": true,
+      "detail": "URL 框 = ['http://127.0.0.1:9898/api/openwebui/tools/search_general', 'http://127.0.0.1:9898/api/openwebui/search/ddg', 'https://html.duckduckgo.com/html/']"
+    },
+    {
+      "name": "至少一个 URL 指向局域网 9898",
+      "ok": true,
+      "detail": "URL 框 = ['http://127.0.0.1:9898/api/openwebui/tools/search_general', 'http://127.0.0.1:9898/api/openwebui/search/ddg', 'https://html.duckduckgo.com/html/']"
+    },
+    {
+      "name": "步数上限输入框存在且值为 50",
+      "ok": true,
+      "detail": "步数框 = {'value': '50', 'max': '50', 'min': '1'}"
+    },
+    {
+      "name": "步数上限的 max 属性 = 50（前端硬顶与后端一致）",
+      "ok": true,
+      "detail": "max = 50"
+    },
+    {
+      "name": "注意力机制下拉含 kitchen",
+      "ok": true,
+      "detail": "attention 选项 = ['default', 'kitchen', 'sage', 'sol', 'sparse']"
+    },
+    {
+      "name": "注意力下拉当前值 = kitchen",
+      "ok": true,
+      "detail": "当前值 = kitchen"
+    },
+    {
+      "name": "加速 LoRA 下拉含 dmad_4step_critic",
+      "ok": true,
+      "detail": "lora 选项 = ['lightx2v_4step_768p', 'lightx2v_4step_sla_768p', 'lightx2v_8step', 'dmad_4step_critic', 'speed_slider', 'better_motion']"
+    },
+    {
+      "name": "加速 LoRA 下拉当前值 = dmad_4step_critic",
+      "ok": true,
+      "detail": "当前值 = dmad_4step_critic"
+    },
+    {
+      "name": "模型下拉含 fl2va_pruned_int8",
+      "ok": true,
+      "detail": "model 选项 = ['fl2va_pruned_int8', 'fl2va_int8', 'fl2va_pruned_w4a8', 'fl2va_bf16', 'hybrid_fl2va_ref2va']"
+    },
+    {
+      "name": "保存按钮存在并点击",
+      "ok": true,
+      "detail": "clicked=True"
+    },
+    {
+      "name": "改后的值真的持久化（读回 = default）",
+      "ok": true,
+      "detail": "服务端读回 attention = default"
+    },
+    {
+      "name": "页面无 JS 报错",
+      "ok": true,
+      "detail": "errors = []"
+    }
+  ],
+  "errors": []
+}

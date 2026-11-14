@@ -324,7 +324,17 @@ class TestPasteInRealBrowser(unittest.TestCase):
         #
         # 【选择器口径】附件卡片的真实 class 是 .ag-attach-thumb
         # （web/agent.js 的 renderAttachments），里面带 .ag-attach-remove 按钮。
-        deadline = time.time() + 240
+        # 【等待窗口为什么是 420 秒 —— 2026-11-14 实测修正】
+        # 图片上传走**同步**多模态分析（服务端 _preprocess_asset），
+        # 本机 Qwen 桥的实测耗时：
+        #   * 空闲时：约 60~90 秒（实测 85.1 秒出卡片）
+        #   * 并发/模型热时：可超过 240 秒（实测有一轮 400 秒仍未返回）
+        # 原来写 240 秒 -> 环境一抖就假红（2026-11-14 实测复现过一次：
+        # hint 停在「正在入库素材库…」，但服务端其实在正常跑）。
+        # 放宽到 420 秒，让这条断言只被**真缺陷**打红，不被环境抖动打红。
+        # 注意：这条测的是「粘贴 -> 上传 -> 入库 -> 渲染卡片」整条链路，
+        # 它**本来就慢**（本地推理），不是性能回归。
+        deadline = time.time() + 420
         found = False
         while time.time() < deadline:
             count = page.evaluate(

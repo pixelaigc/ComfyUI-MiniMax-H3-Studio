@@ -312,8 +312,48 @@ Agent 下发 t2v 任务时，服务端把默认值合并进 params（**不覆盖
 force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换掉「假缺节点」值得。
 
 **回归证据**：修前 `tests/test_agent.py tests/test_agent_contract.py` 组合跑 → 1 failed
-（`AssertionError: '已创建任务' not found in '本机 ComfyUI 里没有节点 ModelAttentionBackend…'`）；
-修后 → 69 passed。agent 相关全套 658 passed。
+（「AssertionError: '已创建任务' not found in '本机 ComfyUI 里没有节点 ModelAttentionBackend…」」）；
+修后 → 69 passed。
+
+### 5.5 三态语义的判定 + 负向对照（本轮补齐）
+
+上一轮把三态语义写进了实现，但**只给 attention 侧补了负控**（twopass 侧只有正控没有负控），
+而且**没有任何测试碰过 `_COMFY_PROBE_COMPLETE` 的计算逻辑** ——
+三态断言全都**手动**把标志设成 True / False，绕过了计算。
+
+**语义判定结论：新语义（三态）正确且更安全。**
+
+| 论据 | 证据 |
+|---|---|
+| 旧语义有**真实触发路径** | 内置 Agent 不经面板（不调 `/api/video-options`），首次进来 `_COMFY_NODE_NAMES` 是空集 -> 旧判据报「本机 ComfyUI 里没有节点 ModelAttentionBackend」，而该节点**实测恒在**：`curl /object_info/ModelAttentionBackend` -> HTTP 200 |
+| 新语义**没有放松**真缺节点的拒绝路径 | 变异 M3/M4 证明：把节点校验改成 `if False:`（完全不校验）-> 对应断言立刻变红（见下表） |
+
+**本轮补的 4 条测试**：
+
+| 测试 | 作用 |
+|---|---|
+| `test_allows_twopass_when_probe_incomplete` | twopass 侧**负控**（原来**没有** —— 若把 twopass 三态退回旧语义，套件一条都不会红） |
+| `test_rejects_attention_without_node_even_when_other_nodes_present` | 正控加强：集合**非空**但缺目标节点仍必须拒绝（否则「集合为空才放行」的错误实现也能骗过负控） |
+| `test_rejects_twopass_without_node_even_when_other_nodes_present` | 同上，twopass 侧 |
+| `tests/test_node_probe_completeness.py`（6 条） | 用**可控的假 ComfyUI**（真 HTTP / 真超时 / 真 500）直接测标志取值：问全 -> True；问到了但节点不在 -> **仍 True**；超时/500/连不上 -> False；端到端验证「不完整 -> 放行」「完整 + 真缺 -> 拒绝」 |
+
+**变异验证**（`tests/mutation_check_t2v_node_probe.py`，**5/5 全被抓住**）：
+
+| 变异 | 含义 | 变红条数 |
+|---|---|---|
+| M1 | 注意力侧退回旧语义（去掉 `_COMFY_PROBE_COMPLETE` 前提） | 2 |
+| M2 | 二采侧退回旧语义 | 2 |
+| M3 | 注意力侧**完全不校验**节点（静默接受本机没有的机制 = 假控件） | 4 |
+| M4 | 二采侧完全不校验节点 | 2 |
+| M5 | 探测完整标志恒为 False（三态退化成「永远放行」，真缺节点也放过） | 3 |
+
+**M5 第一轮是 0 条变红** —— 那暴露了**真实缺口**：标志的计算逻辑从没被测过。
+补上 `tests/test_node_probe_completeness.py` 之后 M5 变红 3 条。
+（若没有这一轮，M5 就是一个**逃逸的变异** —— 标志恒为 False 时真缺节点也不再拒绝，
+面板给出假控件、任务建成了跑到 ComfyUI 才炸。）
+
+证据：`docs/agent-power/evidence/T1_mutation_node_probe.txt`、
+`T1_three_state_tests.txt`。
 
 ---
 
@@ -465,12 +505,39 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 | `TestT2vDefaults` | 默认 kitchen + dmad / 指向真实注册项 / 可改任意项 / 非法值回落 |
 | `TestSettingsPersistence` | 配置存进真 SQLite 并读回 / 无配置时回默认值 |
 
-`tests/test_agent_paste_browser.py` —— **12 passed**（剪贴板粘贴静态契约 + 真浏览器真跑 + 管理面板契约）。
+`tests/test_agent_paste_browser.py` —— **13 passed**（剪贴板粘贴静态契约 + 真浏览器真跑 + 管理面板契约）；
+其中真 Chromium 那条见 §7.5 的**如实说明**。
 
-**agent 相关全套**（16 个测试文件）：
+`tests/test_node_probe_completeness.py` —— **6 passed**（本轮新增），
+直接测 `_COMFY_PROBE_COMPLETE` 这个标志**本身算得对不对**（详见 §5.4）。
+
+`tests/mutation_check_t2v_node_probe.py` —— 变异验证脚本，**5/5 全被抓住**（详见 §5.4）。
+
+**agent 相关全套**（27 个测试文件，`scripts/run_agent_regression.sh` 固定清单）：
 ```
-658 passed in 67.50s
+改动树 (local/feature/agent-power, HEAD 76c733e): 901 passed, 0 failed
+基线树 (local/maintainer f4bc747):                 845 passed, 0 failed
+新增失败差集 = 0
 ```
+
+**为什么必须用固定脚本跑两边**：基线树**没有**本分支新增的测试文件
+（`test_agent_power.py` / `test_node_probe_completeness.py`），
+手敲清单容易漏文件 -> 差集数字不可信。脚本会显式剔除并**打印** SKIP 项，
+两边跑**同一份清单**。
+
+**通过数差 56 的逐项分解**（每一项都可解释，无「意外通过」）：
+
+| 项 | 数量 | 来源 |
+|---|---|---|
+| 基线 25 个共有文件 | 845 | — |
+| `tests/test_agent.py` +1 | 846 | 步数上限断言 8->50 / 超时 420->2400 |
+| `tests/test_t2v_panel.py` +4 | 850 | 上轮 +1 负控（attention）；本轮 +3（twopass 负控 + 2 条正控加强） |
+| `tests/test_agent_power.py` +45 | 895 | 本分支新增文件 |
+| `tests/test_node_probe_completeness.py` +6 | 901 | 本轮新增文件 |
+| **合计** | **901** | 与实测一致 |
+
+证据：`docs/agent-power/evidence/T2_changed_tree.txt`、
+`T2_baseline_tree.txt`、`T2_diff_summary.txt`。
 
 ### 9.2 全量回归与基线对比（如实说明）
 
