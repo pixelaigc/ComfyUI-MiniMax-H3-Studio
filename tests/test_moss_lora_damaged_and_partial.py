@@ -312,6 +312,48 @@ class TestOtherFamiliesUnaffected(unittest.TestCase):
         self.assertFalse(lora_registry.is_moss_family_lora("nonexistent.safetensors"))
 
 
+class TestDerivedFileInheritsCatalogInfo(unittest.TestCase):
+    """派生文件（归一版）必须继承原文件的目录元数据。
+
+    派生文件跟原文件是**同一个 LoRA**，但 LORA_CATALOG 只登记原文件
+    —— 查不到条目 -> display / scene / trigger / 推荐强度全丢
+    -> 界面显示空白条目（实测 test_effect_entries_carry_trigger_and_description
+    报「缺场景说明」）。
+    """
+
+    def test_derived_name_is_inherited(self):
+        from h3studio.moss_lora_split import DERIVED_PREFIX, derived_name
+        source = "moss-effects/Cinematic_MossSFT_c1-st6000.safetensors"
+        derived = derived_name("Cinematic_MossSFT_c1-st6000.safetensors")
+        self.assertTrue(derived.startswith(DERIVED_PREFIX))
+        info = lora_registry._inherit_catalog_info(
+            "moss-effects/" + derived)
+        self.assertTrue(info, "派生文件必须能继承到原文件的目录条目")
+        self.assertTrue(info.get("display"), info)
+
+    def test_non_derived_file_returns_empty(self):
+        self.assertEqual(
+            lora_registry._inherit_catalog_info(
+                "moss-effects/Cinematic_MossSFT_c1-st6000.safetensors"),
+            {})
+
+    def test_unknown_derived_file_returns_empty(self):
+        self.assertEqual(
+            lora_registry._inherit_catalog_info(
+                "moss-effects/h3studio_mossnorm__does_not_exist.safetensors"),
+            {})
+
+    def test_derived_entries_in_list_have_scene(self):
+        """真实清单里的派生条目必须有说明（界面要显示）。"""
+        for item in lora_registry.list_moss_effect_loras():
+            if "mossnorm" not in item["name"]:
+                continue
+            self.assertTrue(item.get("display"),
+                            f"{item['name']} 缺显示名")
+            self.assertTrue(item.get("scene"),
+                            f"{item['name']} 缺场景说明（界面要显示）")
+
+
 class TestRealMachineFiles(unittest.TestCase):
     """本机真的装了这两个文件时，做真文件回归（没装就跳过）。"""
 

@@ -1002,6 +1002,39 @@ def _relative_perturbation(lora_path: Path, unet_path: Path) -> float | None:
     return sum(ratios) / len(ratios) if ratios else None
 
 
+def _inherit_catalog_info(rel: str) -> dict:
+    """派生 LoRA 文件**继承**原文件的目录条目。
+
+    派生文件（本服务自己产出的归一版）的文件名规则是
+    `h3studio_mossnorm__<原文件名>`（见
+    `h3studio.moss_lora_split.derived_name`），跟原文件是**同一个 LoRA**，
+    但 LORA_CATALOG 只登记了原文件 —— 派生文件查不到条目 ->
+    display / scene / trigger / 推荐强度全丢 -> 界面显示空白条目。
+
+    这里按同一规则反查：把目录里的每个登记条目的**文件名**按
+    derived_name 展开一遍，看有没有正好等于这个派生文件名。
+    （比对文件名而不是全路径 —— 派生产物落在原文件**同目录**下，
+    目录前缀保持不变。）
+    找不到就返回空 dict（不猜）。
+    """
+    try:
+        from .moss_lora_split import DERIVED_PREFIX, derived_name
+    except Exception:
+        return {}
+    name = rel or ""
+    if not Path(name).name.startswith(DERIVED_PREFIX):
+        return {}
+    for key, entry in LORA_CATALOG.items():
+        if not key:
+            continue
+        try:
+            if derived_name(Path(key).name) == Path(name).name:
+                return dict(entry)
+        except Exception:
+            continue
+    return {}
+
+
 def classify_kind(name: str, info: dict) -> str:
     """判定 LoRA 属于「效果类」还是「加速/蒸馏类」。
 
@@ -1181,6 +1214,19 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
             seen.add(rel)
             meta = _read_safetensors_metadata(path)
             info = LORA_CATALOG.get(rel) or LORA_CATALOG.get(path.name) or {}
+            # ⚠️ **2026-11-15 修复（派生文件丢失目录元数据）**：
+            # 派生文件（`h3studio_mossnorm__<原名>`）是本服务自己产出的
+            # **归一版**，它跟原文件是同一个 LoRA —— 但 LORA_CATALOG 里
+            # 只登记了原文件的条目（`moss-effects/Cinematic_...safetensors`），
+            # 派生文件的键（`moss-effects/h3studio_mossnorm__Cinematic_...`）
+            # 查不到 -> info={} -> display / scene / trigger / 推荐强度全丢
+            # -> 界面显示空白条目（实测
+            # test_effect_entries_carry_trigger_and_description 报「缺场景说明」）。
+            # 修法：查不到时**回落到原文件的条目**（按派生命名规则反解原名）。
+            if not info:
+                inherited = _inherit_catalog_info(rel)
+                if inherited:
+                    info = inherited
             kind = classify_kind(rel, info)
             compat = {"compatible": True, "reason": "", "attention_hit": 1.0,
                       "relative_perturbation": None, "suggested_strength": 1.0,
