@@ -153,6 +153,12 @@ const state = {
   files: { first: null, last: null, refs: [] },
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
   assetRefs: {},
+  // 【2026-11-14】音轨来源（B2 音轨三选一）：
+  //   "" = 使用生成的音乐
+  //   "reference" = 使用参考音乐作为成片音轨
+  //   "video_bg" = 使用参考视频的背景音乐作为成片音轨
+  // 合法值与可见性判据见 h3studio/h3_audio_track.py（服务端与前端同一套）。
+  audioTrackSource: "",
   timer: null,
   // 【2026-11-13 队列化改造】genBusy 不再表示「有任务在跑、不能提交」。
   // 它现在只表示「本会话有任务还没到终态」，**不参与按钮的禁用判断**
@@ -595,13 +601,19 @@ function renderMode() {
     row.appendChild(slot);
   };
   if (mode === "flf") {
-    $("#uploadTitle").textContent = "上传首帧与尾帧，或从已完成图片拖入（尾帧可省略）";
+    // 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
+    $("#uploadTitle").textContent =
+      "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可）";
     zone.style.display = "block";
     mk("first", "首帧"); mk("last", "尾帧");
   } else if (mode === "r2v") {
-    $("#uploadTitle").textContent = "上传参考图，或从已完成图片拖入（1~3 张）";
+    // 【2026-11-14】参考图上限从 3 张提升到 **9 张**
+    // —— H3 参考生成节点的 ref_images 槽位上限就是 9（实测 object_info）。
+    // 原来卡 3 张是历史遗留，把能力人为砍掉了。
+    $("#uploadTitle").textContent =
+      "上传参考图，或从素材库选（最多 9 张）";
     zone.style.display = "block";
-    mk("ref0", "参考 1"); mk("ref1", "参考 2"); mk("ref2", "参考 3");
+    for (let i = 0; i < 9; i++) mk("ref" + i, "参考 " + (i + 1));
   } else {
     zone.style.display = "none";
   }
@@ -637,6 +649,9 @@ function renderMode() {
     $("#stepsField").style.display = "none";
     if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
   }
+
+  // 音轨来源（首尾帧 / 参考生视频）
+  renderAudioTrackSelect();
 
   // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
   const legacyVideoSampling = $("#videoSamplingField");
@@ -679,6 +694,86 @@ function renderMode() {
   // 时长标签
   $("#durVal").textContent = state.duration + "s";
 }
+
+// ---------- 音轨来源（首尾帧 / 参考生视频） ----------
+//
+// 【2026-11-14 新增 · B2 需求「音轨三选一」】
+//   (a) 使用生成的音乐
+//   (b) 使用参考音乐作为成片音轨
+//   (c) 使用参考视频的背景音乐作为成片音轨
+//
+// 【为什么「没有素材就不出现」而不是置灰】
+// 置灰等于「能选但服务端会把它改掉」—— 那是假选项。
+// 所以这里**按实际有没有对应素材**来生成选项。
+//
+// 【判据必须与服务端一致】
+// 服务端用 h3studio/h3_audio_track.py 归一（同一个 key 集合），
+// 前端这里用同一套 key 字符串 —— 两边一致才不会
+// 「界面能选、提交后被改掉」。
+const AUDIO_TRACK_OPTIONS = [
+  { key: "", label: "使用生成的音乐",
+    note: "音轨由 H3 与画面一同采样生成，音画天然同步。" },
+  { key: "reference", label: "使用参考音乐作为成片音轨",
+    note: "参考音乐被贴到成片上（不参与采样），"
+        + "长度不足会补静音、超出会裁到画面时长。" },
+  { key: "video_bg", label: "使用参考视频的背景音乐作为成片音轨",
+    note: "参考视频的背景音乐被贴到成片上（不参与采样），"
+        + "长度不足会补静音、超出会裁到画面时长。" },
+];
+
+/** 当前有没有参考音乐 / 参考视频背景音（决定哪些选项出现）。 */
+function audioTrackAvailability() {
+  const slots = state.assetRefs || {};
+  let hasRefAudio = false;
+  let hasVideoAudio = false;
+  for (const [key, item] of Object.entries(slots)) {
+    if (!item || !item.asset_id) continue;
+    const cat = item.category || "";
+    if (cat === "audio") {
+      if (key.startsWith("refvid")) hasVideoAudio = true;
+      else hasRefAudio = true;
+    }
+  }
+  return { hasRefAudio, hasVideoAudio };
+}
+
+function renderAudioTrackSelect() {
+  const field = $("#audioTrackField");
+  const sel = $("#audioTrackSelect");
+  const note = $("#audioTrackNote");
+  if (!field || !sel) return;
+  const isF2V = state.mode === "flf" || state.mode === "r2v";
+  field.style.display = isF2V ? "" : "none";
+  if (!isF2V) return;
+
+  const { hasRefAudio, hasVideoAudio } = audioTrackAvailability();
+  const available = AUDIO_TRACK_OPTIONS.filter(o => {
+    if (o.key === "reference") return hasRefAudio;
+    if (o.key === "video_bg") return hasVideoAudio;
+    return true;
+  });
+  sel.innerHTML = available.map(o =>
+    `<option value="${esc(o.key)}"${o.key === state.audioTrackSource ? " selected" : ""}>`
+    + `${esc(o.label)}</option>`).join("");
+  // 当前选中的不再可用（素材被删了）-> 回落成「使用生成的音乐」
+  if (!available.some(o => o.key === state.audioTrackSource)) {
+    state.audioTrackSource = "";
+    sel.value = "";
+  }
+  const cur = available.find(o => o.key === state.audioTrackSource);
+  if (note) {
+    note.textContent = cur ? cur.note
+      : "成片音轨由 H3 与画面一同采样生成。";
+  }
+}
+
+// 音轨来源下拉的事件绑定
+document.addEventListener("change", event => {
+  if (event.target && event.target.id === "audioTrackSelect") {
+    state.audioTrackSource = event.target.value || "";
+    renderAudioTrackSelect();
+  }
+});
 
 // ---------- 图像模式（Z-Image 文生图） ----------
 // 档位 + 比例 -> 像素宽高。**原始值**（不做像素区间钳制）。
@@ -2971,6 +3066,8 @@ $("#genBtn").addEventListener("click", async () => {
     params.scheduler = state.vidScheduler;
     params.shift_video = Number(state.vidShiftVideo);
     params.shift_audio = Number(state.vidShiftAudio);
+    // 【2026-11-14】音轨三选一（B2）
+    params.audio_track_source = state.audioTrackSource || "";
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，

@@ -774,7 +774,21 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <small class="muted" id="vidLegacyStepsHint">推荐</small>
     </div>
 
-    <!-- 【2026-11-11 新增】首尾帧 / 参考生视频的采样参数。
+    <!-- 【2026-11-14 新增】音轨来源（首尾帧 / 参考生视频）
+         B2 需求：「音轨三选一」：
+           (a) 使用生成的音乐
+           (b) 使用参考音乐作为成片音轨
+           (c) 使用参考视频的背景音乐作为成片音轨
+         没有参考音乐 / 参考视频时 (b)/(c) **不出现**（不是置灰 ——
+         置灰等于「能选但会被服务端改写」，那是假选项）。
+         可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。 -->
+    <div class="field" id="audioTrackField" style="display:none">
+      <div class="field-label">成片音轨 <span class="muted">三选一 · 没有对应素材的选项不出现</span></div>
+      <select class="img-select" id="audioTrackSelect"></select>
+      <div class="img-note" id="audioTrackNote"></div>
+    </div>
+
+    <!-- 【2026-11-14 新增】首尾帧 / 参考生视频的采样参数。
          这两个模式走的是**旧工作流路径**（h3studio/workflows.py 的
          _h3_video_workflow / build_r2v），但采样链路与文生视频完全相同 ——
          同样是 BasicScheduler + KSamplerSelect + BasicGuider，

@@ -229,6 +229,42 @@ VIDEO_MODELS: dict[str, dict] = {
         "warn": "48 GB 显存的卡单靠这个权重放不下（实测 66.3 GB），"
                 "只适合多卡或换机器时选。",
     },
+    # ---- Ref2VA 专用权重（参考生视频用）----
+    #
+    # 【为什么必须有】参考生视频（r2v）走 Ref2VA 通道 ——
+    # FL2VA 权重没有 Ref2VA 那条路径，用它做参考生成等于没有参考。
+    # 本机实测 ComfyUI 的 UNETLoader 下拉里有 3 个 ref2va 权重
+    # （/models/diffusion_models），之前没登记进清单，
+    # 于是参考生视频只能拿 fl2va 权重凑合 —— 能力被悄悄阉割了。
+    "ref2va_pruned_int8": {
+        "label": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+        "size_mb": 20970,
+        "location": "/mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+        "pruned": True,
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "cfg": 1.0,
+        "note": "参考生视频（Ref2VA）专用权重，剪枝 int8（20.9 GB）。"
+                "层结构与 FL2VA 同族，Turbo 系加速 LoRA 全部命中。",
+        "supports_ref2va": True,
+    },
+    "ref2va_int8": {
+        "label": "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+        "unet": "minimax_h3_ref2va_int8_convrot.safetensors",
+        "size_mb": 34039,
+        "location": "/home/ubuntu/comfyui/models/diffusion_models",
+        "pruned": False,
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "cfg": 1.0,
+        "note": "未剪枝 int8（34.0 GB），AdaLN 完整 2688 维，"
+                "Turbo 系加速 LoRA 259/259 全部命中。",
+        "supports_ref2va": True,
+        "warn": "体积接近完整版的一半，显存占用比剪枝版高约 12 GB。",
+    },
     "hybrid_fl2va_ref2va": {
         "label": "MiniMax-H3 混合版 · FL2VA+Ref2VA",
         "unet": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
@@ -241,6 +277,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "cfg": 1.0,
         "note": "把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。"
                 "Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。",
+        "supports_ref2va": True,
         "warn": "参考通道（Ref2VA）在文生视频面板里不暴露。",
     },
 }
@@ -1897,6 +1934,40 @@ def resolve_accel_lora_slot(params: dict,
     if not include_fixed_fallback:
         return "", 1.0
     return VIDEO_FIXED_ACCEL_LORA_DEFAULT, 1.0
+
+
+def model_for_mode(mode: str, preferred_key: str | None = None) -> dict:
+    """按生成模式挑底模。
+
+    【为什么需要】参考生视频必须用 **Ref2VA 权重** —— FL2VA 权重没有
+    Ref2VA 通道，用它做参考生成等于「参考没生效」。
+    首尾帧用 FL2VA 权重（它有 I2VA / FL2VA / L2VA 任务类型）。
+
+    preferred_key 优先（如果它支持该模式）；否则按模式挑默认权重。
+    """
+    if preferred_key:
+        meta = VIDEO_MODELS.get(preferred_key)
+        if meta:
+            if mode == "r2v" and not meta.get("supports_ref2va"):
+                # 用户选的是 FL2VA 权重 -> 参考模式改用 Ref2VA 权重
+                # （静默换权重 = 静默改行为，必须在摘要里说明）
+                return _default_ref2va_model()
+            return meta
+    if mode == "r2v":
+        return _default_ref2va_model()
+    return VIDEO_MODELS[VIDEO_DEFAULT_MODEL]
+
+
+def _default_ref2va_model() -> dict:
+    """默认的 Ref2VA 权重（优先本机可用的剪枝 int8）。"""
+    for key in ("ref2va_pruned_int8", "ref2va_int8",
+                "hybrid_fl2va_ref2va"):
+        meta = VIDEO_MODELS.get(key)
+        if meta and model_status(key) == "available":
+            return meta
+    # 都不在 ComfyUI 列表里 -> 仍返回第一个登记项（提交时会报错说明）
+    return VIDEO_MODELS.get("ref2va_pruned_int8") \
+        or VIDEO_MODELS[VIDEO_DEFAULT_MODEL]
 
 
 def model_status(model_key: str,

@@ -291,6 +291,10 @@ MODEL_FAMILY = {
     "fl2va_pruned_w4a8": "minimax_h3",
     "fl2va_bf16": "minimax_h3",
     "hybrid_fl2va_ref2va": "minimax_h3",
+    # 【2026-11-14 新增】Ref2VA 专用权重（参考生视频用）——
+    # 同属 H3 家族，所以增强模板的过滤结果不变。
+    "ref2va_pruned_int8": "minimax_h3",
+    "ref2va_int8": "minimax_h3",
 }
 
 # 模式 -> 默认模型 key（用于解上下文；前端会传实际选中的模型）

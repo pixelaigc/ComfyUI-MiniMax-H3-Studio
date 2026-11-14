@@ -106,6 +106,8 @@ from h3studio import comfy_models
 from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
+from h3studio import h3_audio_track as h3audio
+from h3studio import h3_video_modes as h3modes
 from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
@@ -885,6 +887,11 @@ _ASSET_SLOT_PARAM = {
     "character_ref": "ref_images",
     "ref_video": "ref_videos",
     "source_video": "ref_videos",
+    # 【2026-11-14】参考视频的背景音单独一个槽位 ——
+    # 音轨三选一的 (c) 项要用它。
+    # 以前它被塞进 ref_audios（和独立参考音乐混在一起），
+    # 于是「用参考音乐」与「用参考视频背景音」分不清。
+    "ref_video_audio": "ref_video_audios",
     "ref_audio": "ref_audios",
     "bgm": "ref_audios",
     "voice": "ref_audios",
@@ -911,6 +918,11 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
         return
 
     grouped: dict[str, list] = {}
+    # 【2026-11-14】参考视频背景音要按**序号**与参考视频配对
+    #（节点的 ref_video_audio_N 必须对应 ref_video_N，否则会报
+    #  "Reference-video soundtrack(s) have no same-numbered video"）。
+    # 所以这里单独记一份带 ordinal 的列表，按 ordinal 排序后回填。
+    video_audio_with_ordinal: list[tuple[int, str]] = []
     with _assets.connect() as conn:
         for item in refs:
             if not isinstance(item, dict):
@@ -938,6 +950,9 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
 
             key = _ASSET_SLOT_PARAM.get(slot, "ref_images")
             grouped.setdefault(key, []).append(uploaded)
+            if key == "ref_video_audios":
+                video_audio_with_ordinal.append(
+                    (int(item.get("ordinal") or 0), uploaded))
             # 登记引用关系（引用次数因此 +1；删除素材时会被 409 保护）
             _repo.add_ref(conn, asset_id, "job", job_id, slot=slot,
                           ordinal=int(item.get("ordinal") or 0),
@@ -948,6 +963,11 @@ async def _apply_asset_refs(session: ClientSession, job_id: str, params: dict):
             params[key] = values[0]
         else:
             params[key] = values
+    # 参考视频背景音：按 ordinal 排序（与参考视频的顺序一致）
+    if video_audio_with_ordinal:
+        video_audio_with_ordinal.sort(key=lambda pair: pair[0])
+        params["ref_video_audios"] = [name for _ordinal, name
+                                      in video_audio_with_ordinal]
 
 
 async def _upload_asset_refs(session: ClientSession, job_id: str, params: dict) -> list[str]:
@@ -1203,6 +1223,19 @@ class Worker:
                 # 这里不能再覆盖（会打乱占位与插槽的对应关系）。
                 if params.get("asset_refs") and mode not in ("i2i_qwen", "i2i_h3image"):
                     await _apply_asset_refs(session, job_id, params)
+                    # 【2026-11-14】首尾帧：素材库选的首帧 / 尾帧
+                    # 已在 _apply_asset_refs 里上传成 ComfyUI 文件名，
+                    # 这里补上「本地直接上传」那条路径（两者取其一）。
+                    if mode == "flf":
+                        for key in ("first_frame", "last_frame"):
+                            fname = params.get(key)
+                            if not fname:
+                                continue
+                            lp = UPLOAD_DIR / fname
+                            if not lp.exists():
+                                # 已经是 ComfyUI 侧的上传名（素材库路径）-> 跳过
+                                continue
+                            params[key] = await comfy_upload_image(session, lp)
 
                 # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
                 # 里落进 params["ref_audios"]。这里取第一段，转成
@@ -2932,8 +2965,17 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             params["first_frame"] = saved_files["file_first"][0]
         if saved_files.get("file_last"):
             params["last_frame"] = saved_files["file_last"][0]
-        if not params.get("first_frame"):
-            raise JobValidationError("首尾帧模式需要至少上传首帧图片")
+        # 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
+        # 只要给了其中一张就能生成 —— H3 的 I2VA / L2VA 任务类型
+        # 就是「只有首帧」/「只有尾帧」。
+        _flf_slots = {r.get("slot") for r in (asset_refs or [])
+                      if isinstance(r, dict)}
+        if not params.get("first_frame") and "first_frame" not in _flf_slots:
+            if not params.get("last_frame") and "last_frame" not in _flf_slots:
+                raise JobValidationError(
+                    "首尾帧模式需要至少提供首帧或尾帧图片。"
+                    "请从素材库选择首帧 / 尾帧，或直接上传图片。",
+                    code="frame_required")
     elif mode == "r2v":
         refs = saved_files.get("file_ref", [])
         if not refs:
@@ -2950,7 +2992,27 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                 raise JobValidationError(
                     "参考模式需要至少 1 个参考素材（图片 / 视频 / 音频）")
         else:
-            params["ref_images"] = refs[:3]
+            # 【2026-11-14】参考图上限从 3 张提升到 **9 张**
+            # —— H3 参考生成节点的 ref_images 槽位上限就是 9
+            #（实测 object_info：COMFY_AUTOGROW_V3 min=0 max=9）。
+            # 原来卡 3 张是历史遗留，把能力人为砍掉了。
+            params["ref_images"] = refs[:h3modes.MAX_REF_IMAGES]
+
+    # ---- 音轨三选一（首尾帧 / 参考生视频）----
+    #
+    # 【2026-11-14】B2 需求：音轨三选一
+    #   (a) 使用生成的音乐
+    #   (b) 使用参考音乐作为成片音轨
+    #   (c) 使用参考视频的背景音乐作为成片音轨
+    # 没有参考音乐 / 参考视频时 (b)/(c) **不出现** ——
+    # 可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。
+    if mode in ("flf", "r2v"):
+        _has_ref_audio = bool(params.get("ref_audios"))
+        _has_ref_video_audio = bool(params.get("ref_video_audios"))
+        params["audio_track_source"] = h3audio.normalize_track_source(
+            params.get("audio_track_source"),
+            has_reference_audio=_has_ref_audio,
+            has_reference_video_audio=_has_ref_video_audio)
     elif mode == "i2i_qwen":
         # Qwen-Image 2.1 图片编辑：**参考图强制来自素材库**。
         #

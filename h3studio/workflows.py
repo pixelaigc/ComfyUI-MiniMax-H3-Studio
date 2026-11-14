@@ -471,13 +471,44 @@ def build_t2v(params):
 
 
 def build_flf(params):
-    return _h3_video_workflow(params, image_inputs={
-        "first_frame": params.get("first_frame"),
-        "last_frame": params.get("last_frame"),
-    })
+    """首尾帧生视频。
+
+    【2026-11-14 重构】改用 h3studio.h3_video_modes.build_flf ——
+    它用 T8 条件节点（MiniMaxH3AudioConditioningT8），因此：
+      * 支持**音轨三选一**（生成的音乐 / 参考音乐 / 参考视频背景音）；
+      * 首帧与尾帧**都可以单独给**（只要给一张就行）；
+      * 报错文案明确指出缺什么。
+    旧的 _h3_video_workflow 路径只支持「首帧必填 + 尾帧可省」，
+    而且音轨只能用 H3 自己生成的那条。
+    """
+    from . import h3_video_modes
+    try:
+        return h3_video_modes.build_flf(params)
+    except h3_video_modes.H3VideoRequestError as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def build_r2v(params):
+    """参考生视频。
+
+    【2026-11-14 重构】改用 h3studio.h3_video_modes.build_r2v：
+      * 参考图上限从 3 张提升到 **9 张**（节点真实上限）；
+      * 支持参考视频（≤3）+ 独立参考音乐（≤3）+ 参考视频背景音；
+      * 支持**音轨三选一**。
+    """
+    from . import h3_video_modes
+    try:
+        return h3_video_modes.build_r2v(params)
+    except h3_video_modes.H3VideoRequestError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _build_r2v_legacy(params):
+    """【保留】旧版参考生视频构建器（核心节点路径）。
+
+    为什么保留：T8 条件节点依赖 comfyui-minimax-h3-audio-T8 插件；
+    该插件不在时新路径会失败，此时回落到旧路径（功能少但能出片）。
+    """
     from . import video_models as vmodels
     from . import video_workflow as vworkflow
     job_id = params["job_id"]
