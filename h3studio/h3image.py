@@ -24,11 +24,16 @@ available 标记与后端跑图时的校验用的是同一份数据。
 2) Comfy-Org/workflow_templates 官方模板
    - image_minimax_h3_image_t2i.json
    - image_minimax_h3_image_edit.json
-3) 本机 ComfyUI 实测（2026-11-13）
-   - 本机 ComfyUI 是 **0.37.0**，**没有** MiniMaxH3ImageConditioning 节点、
+3) 本机 ComfyUI 实测
+   - 2026-11-13：ComfyUI 是 **0.37.0**，**没有** MiniMaxH3ImageConditioning 节点、
      没有 MiniMaxH3Image 模型类型、也没有 pdd_sigmas 的模型探测分支
      -> H3-Image 需要 ComfyUI **>= 0.45.0**（上游才有这套核心支持）
-   - 权重需 4 个文件（见 H3_IMAGE_WEIGHTS）
+   - 2026-11-14：本机 ComfyUI 已升级到 **0.45.3**（上游 tag v0.45.3），
+     MiniMaxH3ImageConditioning 是上游 core 节点
+     （comfy_extras/nodes_minimax_h3.py，v0.45.0 起），
+     **不需要**任何第三方节点包 —— 之前「安装官方节点包」的说法是错的：
+     ComfyUI 本身就是官方，节点随 core 走。
+   - 权重需 4 个文件（见 H3_IMAGE_WEIGHTS），本机已全部就位
 """
 from __future__ import annotations
 
@@ -64,7 +69,8 @@ H3_IMAGE_EXPECTED_SIZES = {
 }
 
 #: 本机 ComfyUI **必须**有的节点（H3-Image 的条件编码入口）。
-#: 这个节点在 ComfyUI >= 0.45.0 才有 —— 0.37.0 上跑不了。
+#: 这个节点在 ComfyUI >= 0.45.0 才有 —— 随 ComfyUI core 提供，
+#: 不需要额外安装任何第三方节点包。
 H3_IMAGE_REQUIRED_NODES = ("MiniMaxH3ImageConditioning",)
 
 # ------------------------------------------------------------------
@@ -438,7 +444,7 @@ def h3_image_capability(nodes_available, model_available: bool,
     if node_confirmed_missing:
         reasons.append(
             "本机 ComfyUI 缺少 H3-Image 核心节点 MiniMaxH3ImageConditioning"
-            "（该节点需要 ComfyUI >= 0.45.0；本机版本过低）")
+            "（该节点需要 ComfyUI >= 0.45.0）")
     reasons.extend(missing)
     return {
         # None = 没问全；False = 确认不在；True = 在
@@ -503,9 +509,9 @@ def build_h3_image_workflow(params: dict, ref_files: list[str] | None = None,
         raise ValueError(
             "本机 ComfyUI 缺少 H3-Image 核心节点 "
             "MiniMaxH3ImageConditioning，无法运行 H3-Image。\n"
-            "原因：该节点需要 ComfyUI >= 0.45.0（本机版本过低）。\n"
-            "解决：升级 ComfyUI 到 0.45.0+，或安装提供该节点的插件，"
-            "然后重试。")
+            "原因：该节点需要 ComfyUI >= 0.45.0。\n"
+            "解决：把 ComfyUI 升级到 0.45.0+（该节点随 ComfyUI core 提供，"
+            "不需要额外安装插件），然后重试。")
 
     seed = params.get("seed") or random.randint(0, 2 ** 48)
     aspect = params.get("aspect", "16:9")
