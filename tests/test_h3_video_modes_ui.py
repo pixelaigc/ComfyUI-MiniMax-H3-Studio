@@ -329,6 +329,42 @@ class TestReferenceMediaSlots(unittest.TestCase):
         self.assertEqual(h3modes.MAX_REF_VIDEOS, 3)
         self.assertEqual(h3modes.MAX_REF_AUDIOS, 3)
 
+    def test_ref_video_node_gives_all_required_inputs(self):
+        """VHS_LoadVideo 的 7 个 required 输入必须**全部**显式给。
+
+        【这是实测踩到的坑】
+        VHS_LoadVideo 的 schema required 有 7 项（/object_info 实测）：
+            video / force_rate / custom_width / custom_height /
+            frame_load_cap / skip_first_frames / select_every_nth
+        ComfyUI 通过 API 提交工作流时**不套用** schema 默认值 ——
+        漏任何一个 -> 提交被拒（"Required input is missing"）。
+
+        实测：只给 video + format 时 ComfyUI 返回
+            node_errors: {"1": {"errors": [
+                {"type": "required_input_missing", "details": "custom_width"},
+                ... 共 6 项 ]}}
+        这条路径之前**从来没被真实跑过**（线上 24 条 r2v 全是图+音乐）。
+        """
+        wf_ = wf.build_r2v({"job_id": "t", "prompt": "x",
+                            "ref_images": ["a.png"],
+                            "ref_videos": ["v.mp4"]})
+        node = wf_["136:301"]
+        self.assertEqual(node["class_type"], "VHS_LoadVideo")
+        required = ("video", "force_rate", "custom_width", "custom_height",
+                    "frame_load_cap", "skip_first_frames", "select_every_nth")
+        for key in required:
+            self.assertIn(key, node["inputs"],
+                          f"VHS_LoadVideo 缺 required 输入：{key}")
+
+    def test_ref_audio_node_gives_required_inputs(self):
+        """VHS_LoadAudioUpload 的 required 是 audio（实测）。"""
+        wf_ = wf.build_r2v({"job_id": "t", "prompt": "x",
+                            "ref_images": ["a.png"],
+                            "ref_audios": ["m.flac"]})
+        node = wf_["136:401"]
+        self.assertEqual(node["class_type"], "VHS_LoadAudioUpload")
+        self.assertIn("audio", node["inputs"])
+
 
 # ------------------------------------------------------------------
 # 缺口 2：音轨三选一
