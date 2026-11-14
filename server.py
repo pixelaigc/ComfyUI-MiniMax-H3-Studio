@@ -4289,8 +4289,7 @@ async def api_artifact_meta(request):
                  if item.get("strength") is not None else str(item["name"]))
                 for item in loras
             ) if loras else (
-                "未使用 LoRA" if lora_status == "none_used"
-                else "未知（该任务生成时未记录 LoRA）"
+                "未使用 LoRA"
             )
         ),
         # ---- 提示词 ----

@@ -4826,13 +4826,23 @@ function artifactLoraHtml(meta) {
   const loras = Array.isArray(data.loras) ? data.loras : [];
   const status = String(data.lora_status || "");
   if (status === "none_used" || (status !== "not_recorded" && !loras.length)) {
+    // 「确实没用」与「没记录到」都显示「未使用 LoRA」（用户要求统一文案），
+    // 但 title 区分开：一个是实证结论，一个是缺证据。
+    const tip = status === "none_used"
+      ? "该产物的工作流里没有 LoRA 节点（已实证）"
+      : "该任务生成时未把 LoRA 记录到产物元数据，无法确认是否使用过 LoRA";
     return `<div class="detail-kv-row"><span>LoRA</span>`
-      + `<b>未使用 LoRA</b></div>`;
+      + `<b class="is-missing" title="${escapeHtml(tip)}">未使用 LoRA</b></div>`;
   }
   if (status === "not_recorded" && !loras.length) {
+    // 【2026-11-15 修 —— 文案与卡片行统一为「未使用 LoRA」】
+    // 用户原话：「缺失时应显示『未使用 LoRA』而不是错名」。
+    // 之前这里写「未知（该任务生成时未记录 LoRA）」，与卡片行的
+    // 「未使用 LoRA」字面不一致 -> 同一张卡片两个地方说法不同。
+    // 现在统一文案，精确说明放进 title（悬停可见，不占版面）。
     return `<div class="detail-kv-row"><span>LoRA</span>`
-      + `<b class="is-missing" title="该任务生成时未把 LoRA 记录到产物元数据">`
-      + `未知（该任务生成时未记录 LoRA）</b></div>`;
+      + `<b class="is-missing" title="该任务生成时未把 LoRA 记录到产物元数据，`
+      + `无法确认是否使用过 LoRA">未使用 LoRA</b></div>`;
   }
   if (!loras.length) {
     return `<div class="detail-kv-row"><span>LoRA</span>`
