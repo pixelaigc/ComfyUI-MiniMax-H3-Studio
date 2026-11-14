@@ -128,9 +128,7 @@ def main():
                    [c for c in card_infos if c["lora"] is not None]),
                f"有 LoRA 行的卡片 {len(done_cards)} / 共 {len(card_infos)}"
                f"（其余为失败/取消任务，既有行为不渲染参数行）")
-        record("逐张卡片都有 LoRA 行",
-               bool(card_infos) and all(c["lora"] for c in card_infos),
-               json.dumps(card_infos, ensure_ascii=False))
+        # （失败/取消任务不渲染参数行，已由上面的「已完成卡片都有 LoRA 行」覆盖）
 
         # 不该出现「提示词冒充 LoRA」（含冒号 + 长文本）
         prompt_impostor = [c for c in card_infos
