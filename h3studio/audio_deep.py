@@ -400,7 +400,6 @@ def run_analyzer(audio_path: Path, stages=None, asr_model="medium",
         t_out.join(timeout=10)
         t_err.join(timeout=10)
         stderr_text = "".join(stderr_parts)
-        stdout_text = "".join(out_parts)
         stderr_log.write_text(stderr_text, encoding="utf-8")
         returncode = proc.returncode
     except subprocess.TimeoutExpired as exc:
@@ -554,7 +553,6 @@ def render_text(payload: dict) -> str:
     """
     lines: list[str] = []
     media = payload.get("media") or {}
-    errors = payload.get("errors") or []
 
     lines.append("## 一、音频基本信息")
     if media.get("container"):
@@ -714,7 +712,7 @@ def render_text(payload: dict) -> str:
     else:
         lines.append("- 源文件校验：未通过")
     if problems:
-        lines.append(f"- 以下阶段失败（不影响其它阶段结果）：")
+        lines.append("- 以下阶段失败（不影响其它阶段结果）：")
         for err in problems:
             lines.append(f"    - {err}")
     else:

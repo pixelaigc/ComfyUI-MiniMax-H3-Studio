@@ -760,14 +760,6 @@ def _cache_key(path: Path) -> tuple:
         return (str(path), 0, 0)
 
 
-def clear_compat_cache() -> None:
-    """清空兼容性缓存（换模型 / 换 LoRA 后调用）。"""
-    global _UNET_CACHE_KEY
-    _COMPAT_CACHE.clear()
-    _UNET_CACHE_KEY = None
-    _PERTURB_TENSOR_CACHE.clear()
-
-
 def check_compatibility(path: Path, unet_path: Path | None = None,
                          family: str = "Z-Image",
                          deep: bool = False) -> dict:
@@ -960,7 +952,6 @@ def _relative_perturbation(lora_path: Path, unet_path: Path) -> float | None:
     旧实现整体 load 12GB 底模，是 /api/image-loras 慢到 150 秒的根因。
     """
     try:
-        import torch
         from safetensors import safe_open
     except Exception:
         return None

@@ -766,7 +766,6 @@ def _preprocess_asset(asset_id: str) -> dict:
     前端轮询 /api/assets/{id}/analysis-status。
     """
     from h3studio import analysis as analysis_mod
-    from h3studio import asset_service
 
     try:
         with asset_store.connect() as conn:

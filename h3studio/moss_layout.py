@@ -88,14 +88,6 @@ class LayoutError(ValueError):
 # ------------------------------------------------------------------ 基础校验工具
 
 
-def _require(condition, message: str, errors: list | None = None) -> bool:
-    if not condition:
-        if errors is not None:
-            errors.append(message)
-        return False
-    return True
-
-
 def _is_number(value) -> bool:
     return type(value) in (int, float) and math.isfinite(value)
 

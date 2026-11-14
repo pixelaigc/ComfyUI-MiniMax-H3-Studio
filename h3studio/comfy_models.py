@@ -58,7 +58,6 @@ import json
 import time
 import urllib.error
 import urllib.request
-from typing import Iterable
 
 #: ComfyUI 里「模型目录」的真实名字。
 #: 实测 `/models/unet` 返回 404（unet 是 diffusion_models 的旧别名，
@@ -197,15 +196,6 @@ def fetch_object_info_enum(base_url: str,
             f"节点 {node_name}.{input_name} 不是枚举（类型 "
             f"{type(options).__name__}）")
     return [str(x) for x in options]
-
-
-def names_present(names: Iterable[str], wanted: Iterable[str]) -> dict[str, bool]:
-    """wanted 里每个名字是否出现在 names 里。
-
-    返回 {name: bool}，用来回答「ComfyUI 的下拉框里到底有没有这个东西」。
-    """
-    pool = set(names)
-    return {name: (name in pool) for name in wanted}
 
 
 # ------------------------------------------------------------------

@@ -334,8 +334,6 @@ let SERVER_FEATURES = {};
 let MOSS_BACKEND_READY = false;
 // 后端是否已支持 MiniMax-H3-Image（/api/image-options 有 h3image 字段才算）
 let H3IMAGE_BACKEND_READY = false;
-// 后端代码指纹（用于提示「后端没重启」）
-let SERVER_FINGERPRINT = "";
 const IMG_ASPECT_NUM = {
   "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
   "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
@@ -1532,6 +1530,23 @@ function updateImageSizeFields() {
   if (manual) parts.push("自定义尺寸，点「自动」可恢复档位计算值");
   $("#imgSizeManualNote").textContent = parts.join(" · ");
 
+  // 【2026-11-14 可实现性核查修复】放大路径不仅换尺寸，还会**写死采样参数**
+  // （workflows.py:_z_image_upscale_nodes -> steps=8/cfg=1.0/res_multistep/
+  // simple + 二次细化 5 步 dpmpp_2m_sde）。用户在这里调的步数/CFG/采样器/
+  // 调度器在放大路径下**不生效** —— 尺寸栏只说了「改走放大路径」，
+  // 没说不生效，这里补一条明确说明。
+  const upWarn = $("#imgUpscaleParamWarn");
+  if (upWarn) {
+    const upActive = up && !isQwenMode() && !isMossMode() && !isH3ImageMode();
+    upWarn.hidden = !upActive;
+    upWarn.textContent = upActive
+      ? `当前尺寸超过 ${ctx.maxMp}MP：后端改走「低分辨率生成 + 官方放大」路径，`
+        + "该路径使用官方 2K 模板的固定采样参数（8 步 / CFG 1.0 / res_multistep / simple），"
+        + "本页的步数、CFG、采样器、调度器不生效。需要自定义采样参数请把尺寸降到 "
+        + `${ctx.maxMp}MP 以内。`
+      : "";
+  }
+
   // 「自定义」标记
   // 用 class 切换而不是 hidden 属性 —— .img-tag 是 inline-block，
   // hidden 会被 CSS 的 display 盖掉（与历史踩过的「hidden 被 display:grid
@@ -1667,6 +1682,14 @@ function updateImageModelNote() {
   // 加速 LoRA 绑定的模型版本：步数/CFG/采样器/调度器锁定
   // （蒸馏 LoRA 是在 8 步 schedule 上训的，改了会破坏 schedule 出噪点）
   const locked = !!m.params_locked_by_accel;
+  // 【2026-11-14 可实现性核查修复】Qwen-Image 2.1 Turbo 走**固定 sigma 表**
+  // （workflows.py 的 ManualSigmas 分支）—— 图里根本没有 `steps` 键，
+  // 用户拖到 40 步实际还是 8 步。之前 steps 滑杆**可拖但不生效**（假控件）。
+  // 服务端早就下发了 `manual_sigmas_steps`（server.py:4444 注释明写
+  // 「前端据此提示『步数与 schedule 绑定』」），但前端一直没消费它。
+  // 修法：与 params_locked_by_accel 同一套约定 —— 锁定控件 + 说明原因。
+  const manualSigmasSteps = m.manual_sigmas_steps;
+  const stepsLockedBySigma = manualSigmasSteps != null && manualSigmasSteps > 0;
   // 【#imgShift 一并锁定】
   // H3-Image 的 guidance 固定 1 -> shift 不参与计算；
   // Z-Image Base-Distill 之类也把 shift 与蒸馏档绑定。
@@ -1683,6 +1706,28 @@ function updateImageModelNote() {
           : "已绑定加速 LoRA 的蒸馏档，不能修改")
       : "";
   });
+  // 固定 sigma 表的模型：只锁「步数」（cfg/sampler/scheduler 仍可调 ——
+  // Turbo 的 CFGGuider 读 cfg、KSamplerSelect 读 sampler_name，
+  // 只有 scheduler 被 ManualSigmas 顶掉）。
+  if (stepsLockedBySigma) {
+    const stepsEl = $("#imgSteps");
+    if (stepsEl) {
+      stepsEl.disabled = true;
+      stepsEl.title = `该模型使用固定 ${manualSigmasSteps} 步 sigma 表（ManualSigmas），`
+        + "步数与蒸馏 schedule 绑定，不能修改";
+      // 把值拉回固定步数，避免界面上留着「已改 40」这种不存在的状态
+      if (Number(s.steps) !== Number(manualSigmasSteps)) {
+        s.steps = Number(manualSigmasSteps);
+        stepsEl.value = String(manualSigmasSteps);
+        $("#imgStepsVal").textContent = s.steps;
+      }
+    }
+    const sh = $("#imgStepsHint");
+    if (sh) {
+      sh.textContent = "锁定";
+      sh.title = `固定 ${manualSigmasSteps} 步 sigma 表`;
+    }
+  }
   if (locked) {
     $("#imgStepsHint").textContent = "锁定";
     $("#imgCfgHint").textContent = "锁定";
@@ -1813,9 +1858,6 @@ $("#imgSizeReset").addEventListener("click", () => {
 //     官方 PE-I2I system prompt 要求多图必须用 <image1>/<image2>，
 //     单图不要用标签；ComfyUI 的 qwen_image21.py 也用 "<image{n}>" 前缀。
 //   * 顺序即语义：第 N 张 <-> <imageN> <-> ComfyUI 的 image_N 插槽。
-function qwenRefLimit() {
-  return QWEN_OPTIONS.maxRefImages || 10;
-}
 
 function renderQwenRefs() {
   if (window.QwenRefs) window.QwenRefs.render();
@@ -2283,10 +2325,6 @@ const promptVersions = {
 };
 
 const PROMPT_LEVEL_LABEL = {0: "原始", 1: "一次增强", 2: "二次增强"};
-
-function promptIsEnhanced() {
-  return promptEnhance.text !== null && $("#prompt").value === promptEnhance.text;
-}
 
 function markPromptEnhanced() {
   promptEnhance.text = $("#prompt").value;
@@ -4580,7 +4618,6 @@ function jobSig(j) {
 }
 
 let jobsRequest = 0;
-let displayedTab = null;
 let displayedFilterKey = null;
 let filterDebounce = null;
 
@@ -5429,26 +5466,6 @@ function showProviders() {
   loadAgentConfig();
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
-}
-
-// 内置多模态 Agent 页（实现见 agent.js）
-function showAgent() {
-  state.page = "agent";
-  $$(".nav-item").forEach(x => x.classList.remove("active"));
-  const nav = $("#navAgent");
-  if (nav) nav.classList.add("active");
-  showPage($("#jobsArea"), false);
-  showPage($("#panel"), false);
-  showPage($("#stitchPanel"), false);
-  showPage($("#systemPage"), false);
-  showPage($("#providersPage"), false);
-  showPage($("#assetsPage"), false);
-  showPage($("#agentPage"), true);
-  closePanelDrawerOnPageChange();
-  updateResponsiveChrome();
-  if (window.AgentUI && typeof window.AgentUI.renderMessages === "function") {
-    window.AgentUI.renderMessages();
-  }
 }
 
 $("#navSystem").addEventListener("click", showSystem);

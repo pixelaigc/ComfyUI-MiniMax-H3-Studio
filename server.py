@@ -60,8 +60,6 @@ from h3studio.workflows import (
     Z_IMAGE_SIZE_MULTIPLE,
     Z_IMAGE_SIZE_MIN,
     Z_IMAGE_SIZE_MAX,
-    z_image_dimensions,
-    z_image_megapixels,
     MOSS_IMAGE_DEFAULT_MODEL,
     MOSS_IMAGE_DEFAULT_TIER,
     MOSS_IMAGE_MAX_DIRECT_MP,
@@ -87,7 +85,6 @@ from h3studio import prompt_history as ph
 from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
-from h3studio import video_workflow
 from h3studio import job_meta
 from h3studio import continuation as cont
 from h3studio import continuation_service as cont_service
@@ -5093,17 +5090,6 @@ async def api_image_loras_save(request):
 _HW_CACHE = {"t": 0, "data": None}
 _MODEL_CACHE = {"t": 0, "data": None}
 psutil.cpu_percent(interval=None)  # 预热，避免首次全 0
-
-
-def _cpu_name():
-    """CPU 型号名。
-
-    旧实现只读 Windows 注册表，Linux 上必然失败；回退到 platform.processor()
-    在 Linux 上返回空串，于是页面上显示「未知 CPU」。
-    现在统一走 h3studio.hardware.detect_cpu()，多级来源降级，
-    最差也返回「架构 · 核心数」的可辨识兜底。
-    """
-    return hw.detect_cpu()["name"]
 
 
 def _gpu_info():

@@ -1,0 +1,3 @@
+.                                                                        [100%]
+1 passed in 9.86s
+run1 EXIT=0

@@ -1,0 +1,78 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 26, "rankSpacing": 40, "htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 交互流程图 · ② 素材库（assets）与生成库（jobs）的双向联动
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-assets.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-assets.mmd，然后跑 `make flow`。
+flowchart TD
+
+  subgraph LIB["素材库（#assetsPage）"]
+    direction TB
+    A_TOOLBAR["工具条<br/>搜索 / 分类芯片 / 标签筛选 / 来源 / 排序"]
+    A_UP["上传素材<br/>Web 上传 · 拖拽 · 可带标签与备注"]
+    A_GRID["素材卡片网格<br/>动作：`analyze`、`copy-id`、`delete`、`download`<br/>`open`"]
+    A_DRAWER["素材详情抽屉<br/>元数据 / 引用关系 / 分析历史"]
+    A_TAG["标签管理<br/>添加 / 删除 / 重命名"]
+    A_ANALYZE["AI 分析<br/>图片同步 · 音视频异步 job"]
+    A_TRASH["回收站<br/>可恢复"]
+    A_PICKER["素材选择器<br/>（供参考图 / 参考音频 / 首尾帧）"]
+  end
+
+  A_TOOLBAR --> A_GRID
+  A_UP --> A_GRID
+  A_GRID --> A_DRAWER
+  A_DRAWER --> A_TAG
+  A_DRAWER --> A_ANALYZE
+  A_DRAWER --> A_TRASH
+
+  subgraph JOBS["生成库 / 媒体库（#jobsArea）"]
+    direction TB
+    J_TABS["状态标签<br/>全部 / 进行中 / 已完成 / 长片 / 失败 / 已取消"]
+    J_TYPES["生成类型标签<br/>（派生自 /api/generation-types，12 种）"]
+    J_FILTER["已完成筛选<br/>搜索 / 作品类型 / 画面比例 / 作品时长"]
+    J_GRID["任务卡片网格<br/>动作：`add-asset`、`add-stitch`、`cancel`、`continue`<br/>`delete`、`detail`、`download`、`open-new`<br/>`prompt`、`reuse`、`toggle-batches`"]
+    J_QUEUE["生成队列面板<br/>GET /api/queue（顺序 / 状态 / 计数）"]
+  end
+
+  J_TABS --> J_GRID
+  J_TYPES --> J_GRID
+  J_FILTER --> J_GRID
+  J_QUEUE --> J_GRID
+  subgraph FLOW["两条回边"]
+    direction LR
+    J2A["生成库 → 素材库<br/>右键「添加到素材库」<br/>POST /api/assets/import/from-media"]
+    A2J["素材库 → 创作面板<br/>素材选择器回填<br/>ref_image / ref_audio / first_frame / last_frame"]
+  end
+
+  J_GRID --> J2A --> A_GRID
+  A_GRID --> A_PICKER --> A2J
+
+  subgraph CONSUMERS["素材被谁消费"]
+    direction LR
+    C_IMG["图片编辑<br/>i2i_qwen / i2i_h3image<br/>参考图 ≤ 10（H3-Image 官方 16）"]
+    C_VID["参考生视频 / 首尾帧<br/>r2v / flf"]
+    C_AUD["参考生音乐<br/>a2a · 参考音频 1 段"]
+    C_AG["内置 Agent<br/>search_assets / describe_asset"]
+    C_STITCH["长片拼接<br/>已完成的视频片段"]
+  end
+
+  A2J --> C_IMG
+  A2J --> C_VID
+  A2J --> C_AUD
+  A_GRID --> C_AG
+  J_GRID --> C_STITCH
+
+  NOTE["素材来源标注<br/>upload（Web 上传）<br/>job_output（媒体库添加）<br/>import（导入）<br/>comfy_workflow（工作流）"]
+
+  A_UP -.-> NOTE
+  J2A -.-> NOTE
+
+  classDef lib fill:#f5f3ff,stroke:#7c3aed,stroke-width:1px,color:#2e1065;
+  classDef jobs fill:#fef2f2,stroke:#dc2626,stroke-width:1px,color:#7f1d1d;
+  classDef flow fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef use fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#064e3b;
+  classDef note fill:#f8fafc,stroke:#475569,stroke-width:1px,color:#0f172a;
+
+  class A_TOOLBAR,A_UP,A_GRID,A_DRAWER,A_TAG,A_ANALYZE,A_TRASH,A_PICKER lib;
+  class J_TABS,J_TYPES,J_FILTER,J_GRID,J_QUEUE jobs;
+  class J2A,A2J flow;
+  class C_IMG,C_VID,C_AUD,C_AG,C_STITCH use;
+  class NOTE note;

@@ -1,0 +1,74 @@
+%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 22, "rankSpacing": 36, "htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Noto Sans SC, DejaVu Sans, sans-serif"}}}%%
+%% 内置 Agent 交互流程（人工骨架 + 代码派生节点）
+%% 本文件由 scripts/gen_flow.py 从 scripts/templates/flow-agent.mmd 生成，请勿手改。
+%% 要改流程形状请改 scripts/templates/flow-agent.mmd，然后跑 `make flow`。
+flowchart TB
+
+  A_START["用户进入「内置 Agent」页（#agentPage）"]
+  A_NEW["☰ 会话抽屉 → ＋ 新建交互 / 搜索 / 切换 / 删除"]
+  A_INPUT["输入框（Enter 发送 · Shift+Enter 换行）"]
+  A_ATT["📎 媒体附件<br/>图片 ≤ 9 · 音视频 ≤ 4（分开计数）"]
+  A_UPLOAD["POST /api/agent/upload<br/>图片同步入库（多模态分析 + 打标签）<br/>音视频异步分析 job，前端轮询 status"]
+  A_SEND["POST /api/agent/chat/stream（SSE）"]
+  A_PROGRESS["流式进度：progress 事件<br/>阶段文案来自服务端 PROGRESS_STAGES / TOOL_STAGE_TEXT"]
+  A_TOOLS["Agent 工具调用"]
+  A_CLARIFY["澄清追问（用户可补充回答）"]
+  A_RESULT["result 事件 → 结论 + 任务列表"]
+  A_SESS_ART["本次会话产物（抽屉）"]
+  A_MEMORY["长期记忆（跨会话偏好）"]
+
+  A_START --> A_NEW --> A_INPUT
+  A_INPUT --> A_ATT --> A_UPLOAD --> A_INPUT
+  A_INPUT --> A_SEND
+  A_SEND --> A_PROGRESS
+  A_PROGRESS --> A_TOOLS
+  A_TOOLS --> A_CLARIFY
+  A_CLARIFY --> A_INPUT
+  A_TOOLS --> A_RESULT
+  A_RESULT --> A_SESS_ART
+  A_TOOLS -.-> A_MEMORY
+
+  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 @STAT_TOOLS@ 个）"]
+    direction LR
+@AGENT_TOOL_NODES@
+  end
+
+  A_TOOLS <--> TOOLS
+
+  subgraph SIDE["工具落到哪一侧"]
+    direction LR
+    AS["素材侧<br/>素材库检索 / 入库 / 标签 / 选择器"]
+    JB["任务侧<br/>建任务 / 批量 / 取消 / 重试 / 查进度"]
+    MP["模式侧<br/>真实模式清单 / 合法参数 / schema"]
+    PP["提示词侧<br/>模板扩写 / 预设 / 二次增强"]
+    CM["会话侧<br/>跨会话检索 / 长期偏好 / 素材历史"]
+    RS["回应<br/>respond 提交最终结论"]
+  end
+
+@AGENT_TOOL_SIDE_EDGES@
+
+  AS --> A_GRID["素材库（/api/assets/*）"]
+  JB --> J_CREATE["create_job → 创建任务进队列"]
+  J_CREATE --> J_STATUS["get_job_status → 实时进度"]
+  MP --> J_CREATE
+  PP --> A_INPUT
+  CM --> A_MEMORY
+  RS --> A_RESULT
+  AS --> A_ATT
+
+  NOTE["Agent 侧能力位由服务端下发（agent_schema.MODE_SLOTS / mode_slot_plan）<br/>前端不再硬编码「哪些模式建不了」"]
+
+  MP -.-> NOTE
+
+  classDef ui fill:#eff6ff,stroke:#2563eb,stroke-width:1px,color:#1e3a8a;
+  classDef agent fill:#fdf4ff,stroke:#a21caf,stroke-width:1px,color:#581c87;
+  classDef tool fill:#f5f3ff,stroke:#7c3aed,stroke-width:1px,color:#2e1065;
+  classDef side fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#064e3b;
+  classDef job fill:#fff7ed,stroke:#ea580c,stroke-width:1px,color:#7c2d12;
+  classDef note fill:#f8fafc,stroke:#475569,stroke-width:1px,color:#0f172a;
+
+  class A_START,A_NEW,A_INPUT,A_ATT,A_SEND,A_PROGRESS,A_RESULT,A_SESS_ART,A_MEMORY,A_UPLOAD,A_CLARIFY ui;
+  class A_TOOLS agent;
+  class AS,MP,PP,CM,RS side;
+  class J_CREATE,J_STATUS,A_GRID job;
+  class NOTE note;

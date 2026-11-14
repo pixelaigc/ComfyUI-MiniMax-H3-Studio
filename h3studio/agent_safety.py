@@ -480,15 +480,6 @@ def safe_join(root: Path, relative: str) -> Path:
     return target
 
 
-def is_inside(root: Path, target: Path) -> bool:
-    """target 是否在 root 之内（不抛异常版本）。"""
-    try:
-        Path(target).resolve().relative_to(Path(root).resolve())
-        return True
-    except (ValueError, OSError):
-        return False
-
-
 # ------------------------------------------------------------------ 敏感内容
 
 #: NSFW / 敏感请求的识别词。

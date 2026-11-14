@@ -17,7 +17,6 @@ Qwen-Image 2.1「图片编辑」的参考图 —— 素材库来源的 HTTP 接�
 """
 from __future__ import annotations
 
-import json
 
 from aiohttp import web
 
@@ -248,9 +247,16 @@ async def api_refs_resolve(request):
 
 async def api_refs_sort(request):
     """
-    POST /api/refs/sort —— 智能排序。
+    POST /api/refs/sort —— 参考图按匹配度排序（本地启发式，**不调用模型**）。
 
     body: {"refs": [...], "prompt": "...", "use_model": true/false}
+
+    【2026-11-14 可实现性核查澄清】「智能排序」是历史叫法，不是模型智能。
+    `RI.score_refs` 的 4 个信号全是本地可算的：词重叠 / 标签相关度 /
+    入库时间 / 有无描述；`use_model_score` 预留但**没有接模型打分** ——
+    真正的模型分要由调用方塞进 `ref["model_score"]`。
+    实测：use_model=true 与 false 返回**完全相同**的顺序，每条
+    `signals.model_score` 恒为 0.0。前端按钮文案已同步改为「按匹配度排序」。
 
     **降级保证**：use_model=false 或内部异常时，退化为确定性基础排序
     （入库时间倒序），返回 degraded=true，**不报错**。

@@ -331,39 +331,6 @@ def library_probe(asset_id: str) -> dict:
     }
 
 
-def _region_has_pixels(screenshot, box_ratio, rgb, min_pixels=120):
-    """数截图指定区域里符合 RGB 条件的像素数。
-
-    【为什么要像素级断言】
-    DOM 断言会假通过：「有 <img> 且 src 指向 /api/assets/...」全绿，
-    但界面可能是**空白方框**（窄屏下缩略图只有 52px，截图时还没解码完）。
-    """
-    if not screenshot:
-        return 0
-    path = Path(screenshot)
-    if not path.is_file():
-        return 0
-    try:
-        from PIL import Image
-        image = Image.open(path).convert("RGB")
-    except Exception:  # noqa: BLE001
-        return 0
-    width, height = image.size
-    x0 = int(width * box_ratio[0])
-    x1 = int(width * box_ratio[1])
-    y0 = int(height * box_ratio[2])
-    y1 = int(height * box_ratio[3])
-    target = rgb
-    count = 0
-    for y in range(y0, y1, 2):
-        for x in range(x0, x1, 2):
-            r, g, b = image.getpixel((x, y))
-            if abs(r - target[0]) < 45 and abs(g - target[1]) < 45 \
-                    and abs(b - target[2]) < 45:
-                count += 1
-    return count
-
-
 def main():
     from playwright.sync_api import sync_playwright
 

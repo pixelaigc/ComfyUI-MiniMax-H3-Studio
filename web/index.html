@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=efflora2">
-<link rel="stylesheet" href="/static/assets.css?v=assetlib1">
-<link rel="stylesheet" href="/static/responsive.css?v=sidebarfold2">
+<link rel="stylesheet" href="/static/style.css?v=agentpower1">
+<link rel="stylesheet" href="/static/assets.css?v=agentpower1">
+<link rel="stylesheet" href="/static/responsive.css?v=agentpower1">
 </head>
 <body>
 <header class="topbar">
@@ -433,6 +433,13 @@
         <select class="img-select" id="imgSchedulerSelect"></select>
       </div>
 
+      <!-- 【2026-11-14 可实现性核查修复】>=3MP 时后端会切到「生成 + 官方放大」
+           路径，那条路径把 steps/cfg/采样器/调度器**全部写死**成官方 2K 模板的
+           值（workflows.py 的 _z_image_upscale_nodes）。用户在这里调的值会
+           被静默丢弃 —— 之前只在尺寸栏提示「改走放大路径」，没提示采样参数
+           也不生效。这里明确说出来，避免用户以为拖了滑杆就生效。 -->
+      <div class="img-warn" id="imgUpscaleParamWarn" hidden></div>
+
       <div class="field" id="imgNegField" style="display:none">
         <div class="field-label">负面提示词 <span class="muted">Base 建议填写</span></div>
         <textarea id="imgNegative" rows="2" placeholder="extra fingers, poorly drawn hands, deformed, disfigured"></textarea>
@@ -454,8 +461,15 @@
         <div class="img-ref-list" id="imgRefList"></div>
         <div class="img-ref-actions">
           <button type="button" class="img-ref-add" id="imgRefAdd">+ 从素材库添加</button>
+          <!-- 【2026-11-14 可实现性核查修复】按钮文案原为「智能排序」，但后端
+               /api/refs/sort **不做模型打分** —— ref_images.py:score_refs 的
+               4 个信号全是本地可算的（词重叠/标签相关度/入库时间/有无描述），
+               实测 use_model=true 与 false 返回**完全相同**的顺序，且每条
+               signals.model_score 恒为 0.0。函数名与 API 契约里的「智能」是
+               历史叫法，不是模型智能。改成如实描述行为，避免用户以为在调用
+               模型打分。 -->
           <button type="button" class="img-ref-sort" id="imgRefSort" disabled
-                  title="按与提示词的匹配度、标签相关度、入库时间给出建议顺序">智能排序</button>
+                  title="按与提示词的匹配度、标签相关度、入库时间给出建议顺序（本地启发式，不调用模型）">按匹配度排序</button>
         </div>
         <div class="img-note" id="imgRefNote"></div>
         <details class="img-ref-detail" id="imgRefDetail" hidden>
@@ -1363,7 +1377,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 【2026-11-14 合并说明】qwen-refs.js 版本号取 h3image1 —— 该分支改了
      qwen-refs.js（H3-Image 参考图占位语法隔离），必须升版号破缓存；
      mainline 一侧的 refs1 会让用户拿到旧文件。 -->
-<script src="/static/qwen-refs.js?v=h3image1"></script>
+<script src="/static/qwen-refs.js?v=feasibility1"></script>
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=vpfb1"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
@@ -1397,7 +1411,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      h3-image 分支改了这两个文件（H3-Image 文生图/图片编辑面板与模型联动），
      必须升版号才能破掉浏览器缓存；mainline 一侧的 efflora1 / enh-unify2
      会让用户拿到旧文件。 -->
-<script src="/static/app.js?v=h3image2"></script>
+<script src="/static/app.js?v=feasibility1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
 <script src="/static/job-detail.js?v=jobdetail2"></script>
 <script src="/static/assets.js?v=assetlib1"></script>

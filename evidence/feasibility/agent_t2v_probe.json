@@ -1,0 +1,40 @@
+{
+ "A_Agent形态": {
+  "nodes": 20,
+  "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+  "w": [
+   "115",
+   0
+  ],
+  "h": [
+   "115",
+   1
+  ],
+  "shift": 12.0,
+  "steps": 4,
+  "scheduler": "beta",
+  "sampler": "euler",
+  "path": "旧路径 _h3_video_workflow",
+  "params": {
+   "seed": 12345,
+   "duration": 5,
+   "steps": 4,
+   "sampler": "euler",
+   "scheduler": "beta",
+   "job_id": "agentprobe03",
+   "model": "fl2va_bf16"
+  }
+ },
+ "B_面板形态": {
+  "normalize_error": "",
+  "nodes": 17,
+  "w": 1344,
+  "h": 768,
+  "unet": "minimax_h3_fl2va_bf16.safetensors",
+  "steps": 4,
+  "scheduler": "beta",
+  "sampler": "euler",
+  "path": "新路径 build_t2v_panel（video_workflow）",
+  "prepared_model_key": "fl2va_bf16"
+ }
+}

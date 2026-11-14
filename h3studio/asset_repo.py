@@ -5,9 +5,6 @@ H3 Studio 资产素材库 —— 仓库层（CRUD / 检索 / 标签 / 引用 / �
 所有写操作都在事务里做；所有对外可见的引用计数都是**实时算**的，
 不存冗余计数，避免计数与事实漂移。
 """
-import json
-import time
-import uuid
 
 from . import assets as A
 from .assets import LibraryError
@@ -703,10 +700,3 @@ def active_job_of(conn, asset_id: str) -> dict | None:
         "AND status IN ('queued','running') ORDER BY id DESC LIMIT 1",
         (asset_id,)).fetchone()
     return _row_to_job(row) if row else None
-
-
-def running_jobs(conn) -> list[dict]:
-    rows = conn.execute(
-        "SELECT * FROM asset_analysis_jobs WHERE status IN ('queued','running') "
-        "ORDER BY id").fetchall()
-    return [_row_to_job(r) for r in rows]

@@ -42,7 +42,6 @@ ComfyUI 登记的 892 条 key_map 里含 `qkv` 的只有文本塔的 2 条。
 from __future__ import annotations
 
 import json
-import re
 import struct
 from pathlib import Path
 
@@ -335,11 +334,6 @@ def moss_base_layer_keys() -> set[str] | None:
             break
     _MOSS_KEYS_CACHE = keys
     return keys or None
-
-
-def reset_moss_keys_cache() -> None:
-    global _MOSS_KEYS_CACHE
-    _MOSS_KEYS_CACHE = None
 
 
 # ------------------------------------------------------------------ 归一 + 拆分

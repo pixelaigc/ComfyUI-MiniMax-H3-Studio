@@ -16,7 +16,6 @@ H3 Studio 资产素材库 —— 入库服务层。
     不修改 jobs 表结构 —— 并发任务正在改这块。
 """
 import hashlib
-import os
 import shutil
 import uuid
 from pathlib import Path
@@ -376,28 +375,6 @@ def add_from_media_output(conn, *, job: dict, output: dict, batch: dict | None =
 
 
 # ------------------------------------------------------------------ 引用登记
-
-
-def register_job_input_refs(conn, job_id: str, refs: list[dict]) -> list[dict]:
-    """
-    登记任务对素材的输入引用。
-
-    refs: [{"asset_id":..., "slot":"first_frame"|"ref_image"|..., "ordinal":0}]
-    """
-    registered = []
-    for item in refs or []:
-        asset_id = str(item.get("asset_id") or "").strip()
-        if not asset_id:
-            continue
-        asset = asset_repo.get_asset(conn, asset_id)
-        if not asset:
-            raise LibraryError(f"素材不存在：{asset_id}", status=400, code="asset_not_found")
-        slot = str(item.get("slot") or "ref")[:40]
-        ordinal = int(item.get("ordinal") or 0)
-        asset_repo.add_ref(conn, asset_id, "job", job_id, slot=slot, ordinal=ordinal,
-                           label=f"任务 {job_id} 的 {slot} 输入")
-        registered.append({"asset_id": asset_id, "slot": slot, "ordinal": ordinal})
-    return registered
 
 
 def asset_reference_summary(conn, asset_id: str) -> dict:

@@ -39,10 +39,6 @@ def derived_name(original: str) -> str:
     return f"{DERIVED_PREFIX}{original.replace('/', '__')}"
 
 
-def is_derived(name: str) -> bool:
-    return Path(name).name.lower().startswith(DERIVED_PREFIX)
-
-
 def _load_state(path: Path):
     try:
         from safetensors.torch import load_file
