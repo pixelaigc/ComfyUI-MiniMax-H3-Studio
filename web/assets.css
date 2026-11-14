@@ -412,6 +412,9 @@
 .al-player-media {
   display: block; width: 100%; max-height: 56vh;
 }
+/* 媒体插槽：切歌时媒体节点被「摘下来暂存 -> 重排 HTML -> 放回插槽」，
+   播放不中断。槽本身只是个占位容器，不需要额外样式。 */
+.al-player-media-slot { width: 100%; display: flex; justify-content: center; }
 .al-player-caption {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 12px; color: #d7dde5; font-size: 12px;
@@ -464,11 +467,10 @@
   font-size: 11px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.al-pitem-sec {
-  width: 100%; height: 24px; border: 1px solid var(--border);
-  border-radius: 6px; padding: 1px 6px; font-size: 11px; font-family: inherit;
-  background: #fff; color: var(--text);
-}
+/* 【A2】图片模式**不再有**每张一个小输入框（.al-pitem-sec）。
+   停止时间统一由顶部那个「每张停止时间」输入框控制 ——
+   两个入口改同一个值会经常显示不一致（实测顶部 2 / 列表 5），
+   界面自相矛盾。规则已移除，对应样式一并清掉，避免留死代码。 */
 .al-player-note {
   padding: 0 14px 12px; font-size: 11.5px; color: var(--muted);
   min-height: 0;

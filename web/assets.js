@@ -150,6 +150,73 @@
     }
   }
 
+  // ---------------------------------------------------------------- 播放器清单（A2）
+  //
+  // 【为什么「添加到播放器」必须落到服务端】
+  //   播放列表是用户**主动**挑出来的一组东西，必须：
+  //     * 跨页面（关掉素材库再回来还在）
+  //     * 跨重启（服务重启后还在）
+  //     * 有序（添加顺序 = 播放顺序）
+  //   如果只存在前端的 Set 里，一刷新就没了 —— 这正是老播放器
+  //   「播放列表 = 当前页全部素材」的病根。
+
+  /**
+   * 把选中的素材加进播放器清单。
+   *
+   * 【为什么逐个调接口而不是一个批量接口】
+   *   服务端接口本身就是批量的（asset_ids 数组），这里一次调用即可。
+   *   返回的 added/skipped/missing 要**如实**告诉用户 ——
+   *   「3 项已在清单中，1 项不存在」比笼统的「已添加」有用得多。
+   */
+  async function addToPlayer(assetIds) {
+    const ids = (assetIds || []).filter(Boolean);
+    if (!ids.length) { toast("没有可添加的素材", "err"); return null; }
+    try {
+      const result = await api("/api/assets/player/add", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_ids: ids }),
+      });
+      toast(result.message || "已添加到播放器", "ok");
+      // 清单变了，播放器面板里的计数也要跟着变（如果它正开着）。
+      if (window.AssetPlayer && window.AssetPlayer.loadPlaylist) {
+        await window.AssetPlayer.loadPlaylist();
+        window.AssetPlayer.render();
+      }
+      return result;
+    } catch (e) {
+      toast(e.message || "添加到播放器失败", "err");
+      return null;
+    }
+  }
+
+  /** 把选中的素材从播放器清单移除。 */
+  async function removeFromPlayer(assetIds) {
+    const ids = (assetIds || []).filter(Boolean);
+    if (!ids.length) { toast("没有可移除的素材", "err"); return null; }
+    try {
+      const result = await api("/api/assets/player/remove", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_ids: ids }),
+      });
+      toast(`已从播放器移除 ${(result.removed || []).length} 项`, "ok");
+      if (window.AssetPlayer && window.AssetPlayer.loadPlaylist) {
+        await window.AssetPlayer.loadPlaylist();
+        window.AssetPlayer.render();
+      }
+      return result;
+    } catch (e) {
+      toast(e.message || "移除失败", "err");
+      return null;
+    }
+  }
+
+  /** 多选条上的「添加到播放器」：把当前选中的全部加进去。 */
+  async function addSelectedToPlayer() {
+    const ids = selectedIds();
+    if (!ids.length) { toast("请先勾选素材", "err"); return; }
+    await addToPlayer(ids);
+  }
+
   // ---------------------------------------------------------------- 工具
 
   function toast(message, kind = "") {
@@ -902,6 +969,10 @@
       <button data-act="copy-id">复制素材 ID</button>
       <button data-act="download">下载原文件</button>
       <div class="ctx-sep"></div>
+      <!-- 【A2】添加到播放器清单：播放器只播用户主动挑的条目 -->
+      <button data-act="add-player">▶ 添加到播放器</button>
+      <button data-act="remove-player">✕ 从播放器移除</button>
+      <div class="ctx-sep"></div>
       <button data-act="analyze">深度分析</button>
       <button data-act="delete" class="danger">删除</button>`;
     menu.classList.add("open");
@@ -917,6 +988,10 @@
           catch (e) { toast(assetId); }
         } else if (act === "download" && asset) {
           window.open(asset.content_url, "_blank");
+        } else if (act === "add-player") {
+          await addToPlayer([assetId]);
+        } else if (act === "remove-player") {
+          await removeFromPlayer([assetId]);
         } else if (act === "analyze") {
           try {
             toast("分析中…");
@@ -1199,6 +1274,9 @@
     if (selAll) selAll.addEventListener("click", () => selectAllVisible());
     const selDelete = $("#alSelDelete");
     if (selDelete) selDelete.addEventListener("click", () => { deleteSelected(); });
+    // 【A2】多选条上的「添加到播放器」：把勾选的全部加进播放清单。
+    const selPlayer = $("#alSelPlayer");
+    if (selPlayer) selPlayer.addEventListener("click", () => { addSelectedToPlayer(); });
     // 【需求 14】播放器模式入口。
     //
     // 【为什么要先关抽屉】素材详情抽屉（#alDrawer）是**右侧浮层**，
@@ -1404,5 +1482,8 @@
     openDrawer,
     // 【2026-11-14 需求 13】多选批量删除需要「当前已加载的素材清单」。
     getItems: () => (state.items || []).slice(),
+    // 【A2】播放器清单：对外暴露增删，供其它模块（如媒体库右键）复用。
+    addToPlayer,
+    removeFromPlayer,
   };
 })();
