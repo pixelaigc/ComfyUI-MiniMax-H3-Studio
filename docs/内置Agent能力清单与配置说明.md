@@ -427,7 +427,34 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 * 断言附件区真的出现了 `.ag-attach-thumb` 卡片，且带 `data-asset-id`；
 * 断言服务端素材库里真的能查到这张图（`/api/assets` 返回的名字含 `clipboard_pasted`）。
 
-**13 passed**（含静态契约 9 条 + 浏览器真跑 1 条 + 管理面板契约 3 条）。
+**14 passed**（含静态契约 + 浏览器真跑 + 管理面板契约）。
+
+**真浏览器实测细节（2026-11-14 复测）**：
+
+| 项 | 实测值 |
+|---|---|
+| 上传响应 | HTTP 200，`{"ok":true,"results":[{"asset_id":"asset_40582ef2ec2d","name":"clipboard_pasted.png","analyzed":true,...}],"errors":[],"uploaded":1,"failed":0}` |
+| 前端出卡片耗时 | **85.1 秒**（图片走**同步**多模态分析：服务端 `_preprocess_asset`） |
+| 附件卡片 | `.ag-attach-thumb` 出现，`data-asset-id = asset_40582ef2ec2d` |
+
+**等待窗口为什么是 420 秒（2026-11-14 实测修正）**：
+图片上传走**同步**多模态分析，本机 Qwen 桥实测：
+
+* 空闲时 ~60~90 秒（实测 85.1 秒）；
+* **并发 / 模型热时可超过 240 秒** —— 实测复现过一轮 400 秒仍未返回
+  （服务端在正常跑，前端 hint 停在「正在入库素材库…」）。
+
+原来写 240 秒 -> 环境一抖就**假红**（2026-11-14 实测复现过一次）。
+放宽到 420 秒，让这条断言**只被真缺陷打红**，不被环境抖动打红。
+注意：这条测的是「粘贴 -> 上传 -> 入库 -> 渲染卡片」整条链路，
+它**本来就慢**（本地推理），不是性能回归。
+
+**音视频粘贴**：走**异步**分析 job（深度音频管线 / 视频抽帧多模态），
+上传立刻返回，前端轮询 `/api/agent/media/{id}/status`。
+（实测音频深度分析 ~600 秒 / 116 秒素材 —— 所以**必须**异步。）
+
+证据：`docs/agent-power/evidence/T3_paste_browser_diag.json`（含逐 5 秒采样）、
+`T3_paste_browser.png`。
 
 ### 7.4 顺带抓到一个真实缺陷：注释里的 `image/*` 吞掉了半份 agent.js
 
@@ -604,6 +631,107 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 10. **`/api/video-options` 不能用来填「agent 管理」面板的下拉** —— 它会去探测本机
     ComfyUI，实测能到 60 秒以上。面板改用 `/api/agent/settings` 里带的
     `t2v_options`（本地常量清单，瞬时返回，实测 3 ms）。
+11. **图片粘贴/上传是「同步多模态分析」** —— 上传请求要等分析跑完才返回
+    （实测 60~90 秒，模型热时更久）。这是既有设计（图片量小、必须拿到描述），
+    但它意味着**上传接口是慢接口**：代理/CDN 层的短超时会打断它。
+    音视频已改成异步 job（实测音频深度分析 ~600 秒）。
+12. **`_COMFY_PROBE_COMPLETE` 只有三态，没有「部分缺节点」的中间态** ——
+    探测不完整时一律**放行**（交给 ComfyUI 自己报错）。
+    代价：ComfyUI 恰好在探测中途挂掉时，可能出现「任务建成了、跑起来才报错」。
+    这是刻意取舍（宁可 ComfyUI 报错，也不可误报「本机缺节点」把功能整个藏掉）。
+13. **DDG 直连（`ddg_direct`）默认禁用** —— 本机被 anomaly challenge 拦截（HTTP 202）。
+    自检会**如实报错**（不会谎报连通）。可用路径是 `ddg`（经 9898 代理）。
+14. **管理面板的「文生视频默认参数」下拉只列本机注册表里的选项** ——
+    底模列表来自 `video_models` 的静态注册表，**不是**本机 ComfyUI 的实时模型清单。
+    真实可用性由服务端在 `prepare_agent_t2v_params` 里最终校验
+    （模型文件存在 + LoRA 兼容性 + 注意力节点在本机）。
+15. **`code_exec` 的超时是「墙钟超时」**（默认 30 秒，可配），
+    超时后**杀掉整个进程组** —— 但如果用户代码自己 fork 出守护进程并脱离进程组，
+    那就杀不掉。这是「没有沙箱」的必然结果（见边界 2）。
+
+---
+
+## 10bis. 本轮（收尾轮）的运行时实测证据
+
+> 采集器：`scripts/collect_agent_power_evidence.py`
+> 每个断言的**期望值写成字面量**，从真实响应取值比对，任何一条不符即**非零退出**。
+> 隔离实例：`H3STUDIO_PORT=8091` + `H3STUDIO_DATA_DIR=/tmp/agp-data`。
+> **线上 8190 未动**（实测 `tool_count=23` / `limits.max_steps=8` / service active）。
+
+**46 / 46 全绿**，逐条：
+
+| # | 断言 | 实测值 |
+|---|---|---|
+| 1.1 | `limits.max_steps >= 50` | 50（`max_steps_cap=50`、`max_tool_calls=120`、`total_timeout=2400.0`） |
+| 1.2 | 前后端硬顶一致 | `limits.max_steps_cap=50`，`settings.max_steps=50` |
+| 1.3 | 源码 `MAX_STEPS` | `MAX_STEPS = 50` |
+| 1.4 | 前端声明上限 | `web/agent-manage.js` 含 50 |
+| 1.5 | **超 8 步任务跑完** | `status=completed`，实际 **13 步** |
+| 1.6 | 步数 > 8 | 13 > 8 |
+| 1.7 | **负控**：上限压回 8 | `status_at_8=truncated`，error=「已达到步骤上限（8 步），返回已完成的部分结果」 |
+| 2.1 | 本机 ffmpeg | `ffmpeg version 7.1.1-1ubuntu4.2` |
+| 2.2 | 6 个 ffmpeg 工具注册 | `media_concat / media_extract_frames / media_merge_av / media_mix_audio / media_probe / media_transcode` |
+| 2.3 | 上传端点收音视频 | 视频 2 个 + 音频 1 个，返回 asset_id |
+| 2.4 | `media_probe` 真探测 | `duration=1.0`、`has_video=True`、`320x240` |
+| 2.5 | `media_concat` 真产物 | `asset_df266f49f99b`，**5007 bytes**，`duration=2.023023` |
+| 2.6 | `media_extract_frames` | 抽 3 帧，首帧 `asset_abcd917d2d71` |
+| 2.7 | `media_transcode` -> mkv | `asset_b32fee5edd9a`，2570 bytes |
+| 2.8 | `media_mix_audio` | `asset_fae94a7af743`，**51403 bytes** |
+| 2.9 | `media_merge_av` | `asset_c7b3bbcc3be1`，20656 bytes |
+| 3.1~3.5 | 粘贴静态契约 | paste 监听 / `clipboardData.items` / `.files` / `audio/*` / `video/*` 全部命中 |
+| 3.6 | **图片真实入库** | `asset_eb43277e4e6b`，`kind=image` |
+| 4.1 | 4 项能力可配 | `code_exec / file_read / media_tools / web_search`（`code_exec` 默认 **enabled=False**） |
+| 4.2~4.4b | 搜索引擎 | 3 条，types=`openwebui / custom / ddg`，每条都有可填 URL，2 条指向 9898 |
+| 4.5 | 聚合引擎自检 | `ok=true`、`status=200`、`result_count=1`、「连通性正常（真发了一次请求）」 |
+| 4.6 | **DDG（经 9898）自检** | `ok=true`、`status=200`、`result_count=1` |
+| 4.6b | DDG 直连**如实报错** | `ok=false`，error=「DuckDuckGo 返回 HTTP 202」（**不谎报连通**） |
+| 4.7 | 禁用能力真的生效 | `enabled_tool_count 31 -> 30`，且 `web_search` 工具 `enabled=false` |
+| 4.8 | 重新启用 | 30 -> 31（恢复原值） |
+| 4.9 | **外部搜索真出结果** | `engine=局域网聚合引擎（9898）`、`total=3`、首条含真实 URL |
+| 5.1~5.3 | t2v 默认 | `attention=kitchen` / `accel_lora=dmad_4step_critic` / `model_key=fl2va_pruned_int8` |
+| 5.4~5.5 | 默认参数过归一 | `err=''`，归一后 `attention=kitchen` |
+| 5.6~5.7 | **默认参数可改可改回** | 改成 `default` 持久化成功 -> 恢复 `kitchen` 成功 |
+
+**管理面板真浏览器**（`scripts/verify_manage_panel_browser.py`）—— **17 / 17 全绿**：
+
+| 断言 | 实测 |
+|---|---|
+| 管理按钮可点 + 弹窗可见 | `#agManageBtn` 点击后 `#agManageModal` 可见 |
+| 4 个能力开关渲染 | `file_read / web_search / code_exec / media_tools`；`code_exec` **未勾选** |
+| 搜索引擎 URL 输入框 | 3 个：9898 聚合 / 9898 DDG 代理 / DDG 直连 |
+| 步数上限 | `#agmMaxSteps` value=**50**、max=**50**、min=1（前端硬顶 = 后端硬顶） |
+| 注意力下拉 | 5 项 `default/kitchen/sage/sol/sparse`，当前值 **kitchen** |
+| 加速 LoRA 下拉 | 6 项，当前值 **dmad_4step_critic** |
+| 模型下拉 | 5 项，含 `fl2va_pruned_int8` |
+| 改值 -> 保存 -> 读回 | 服务端读回 `attention=default`（**真的持久化**） |
+| 页面无 JS 报错 | `errors=[]` |
+
+截图经 `vision_analyze` **视觉核验**（截图文件名不算证据）：
+`T3_manage_panel.png` 可见步数 50 / 总时限 2400 秒 / 4 个能力开关（代码执行未勾选）；
+`T3_manage_t2v.png` 可见「外部搜索引擎」三条 + 「文生视频默认参数（MiniMax H3）」
+四个下拉框（底模 / 注意力机制 / 加速 LoRA / 画面比例）。
+
+> **一个取证教训**：第一版三张截图的 sha256 **完全相同** —— 说明都没截到弹窗
+> 下半部分（「文生视频默认参数」在弹窗下方，不滚动就看不到）。
+> 已加「滚动到该区块再截」+ 可见性断言。**截图文件名不是证据。**
+
+证据文件（绝对路径）：
+
+```
+/root/projects/h3studio-agent-power/docs/agent-power/evidence/
+  T1_mutation_node_probe.txt        5/5 变异全被抓住
+  T1_three_state_tests.txt          三态测试 108 passed
+  T2_changed_tree.txt                改动树 901 passed / 0 failed
+  T2_baseline_tree.txt               基线树 845 passed / 0 failed
+  T2_diff_summary.txt                差集分解（新增失败 = 0）
+  T3_runtime_evidence.txt            46/46 逐条断言输出
+  T3_runtime/                        media_tools_results.json + evidence_results.json + media_outputs/
+  T3_paste_browser_diag.json         粘贴逐 5 秒采样 + 上传响应体
+  T3_paste_browser.png               粘贴后界面
+  T3_manage_panel.json               管理面板 17/17
+  T3_manage_panel.png / _engines.png / _t2v.png
+```
+
 
 ---
 
@@ -622,4 +750,13 @@ force=True 每次多问 11 个节点（每个 1 ms，实测几十毫秒），换
 | `web/agent.js` | 剪贴板粘贴（handlePaste） |
 | `web/index.html` / `web/style.css` | 管理按钮 / 模态框 / 样式 |
 | `tests/test_agent_power.py` | 能力清单自检（45 条） |
-| `tests/test_agent_paste_browser.py` | 剪贴板粘贴真浏览器验证（11 条） |
+| `tests/test_agent_paste_browser.py` | 剪贴板粘贴真浏览器验证（14 条） |
+| `tests/test_node_probe_completeness.py` | 节点探测定律**直接**测试（6 条，本轮新增） |
+| `tests/mutation_check_t2v_node_probe.py` | 三态语义变异验证（5 项，本轮新增） |
+| `scripts/run_agent_regression.sh` | agent 回归固定清单（改动树 / 基线树**跑同一份**） |
+| `scripts/collect_agent_power_evidence.py` | 六项目标运行时证据采集器（46 条断言） |
+| `scripts/step_limit_probe.py` | 步数上限实测（>8 步跑完 + max_steps=8 负控） |
+| `scripts/diag_paste_browser.py` | 粘贴链路真浏览器诊断（逐 5 秒采样 + 上传响应体） |
+| `scripts/verify_manage_panel_browser.py` | 管理面板真浏览器验证（17 条断言 + 截图） |
+| `docs/agent-power/NOTES.md` | 跨上下文续接笔记（已完成 / 待办 / 关键数字 / 踩坑） |
+| `docs/agent-power/evidence/` | 全部原始证据输出 |

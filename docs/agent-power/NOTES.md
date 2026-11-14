@@ -66,11 +66,17 @@ e1912ad fix(server): 节点探测不完整时不得断言「本机缺节点」+ 
 | Agent 工具总数 | 32（启用 31，代码执行默认禁用） |
 | 步数上限 | 50（上限硬顶，可调 1~50） |
 | 总时限 | 2400s |
-| 全量回归（改动树） | `3 failed, 2538 passed, 4 skipped` |
+| 全量回归（改动树） | `3 failed, 2538 passed, 4 skipped`（全部基线既有） |
 | 全量回归（基线同批文件） | 失败更多（18 > 3） |
-| agent 相关测试 | 784 passed（上一轮记录） |
+| **agent 回归（改动树）** | **901 passed, 0 failed**（27 个文件，固定清单） |
+| **agent 回归（基线树）** | **845 passed, 0 failed** |
+| **新增失败差集** | **0** |
 | `tests/test_agent_power.py` | 45 passed |
-| `tests/test_agent_paste_browser.py` | 14 passed（含真 Chromium 粘贴 PNG 入库断言） |
+| `tests/test_node_probe_completeness.py` | 6 passed（本轮新增） |
+| `tests/test_agent_paste_browser.py` | 14 passed（真 Chromium 粘贴 PNG 入库） |
+| 变异验证 | 5/5 全被抓住 |
+| 运行时证据采集 | 46/46 全绿 |
+| 管理面板真浏览器 | 17/17 全绿 |
 | ffmpeg | `/usr/bin/ffmpeg` 7.1.1，`/usr/bin/ffprobe` |
 | 9898 聚合引擎 | `http://127.0.0.1:9898`（LAN `http://192.168.3.78:9898`） |
 | DDG 直连 | **本机被 anomaly challenge 拦截**（HTTP 202）—— 可用路径是「经 9898 的 DDG 路由」 |
@@ -108,9 +114,17 @@ e1912ad fix(server): 节点探测不完整时不得断言「本机缺节点」+ 
       回归脚本：`scripts/run_agent_regression.sh`（**两边跑同一份清单**，
       基线不存在的文件显式 SKIP 并打印 -> 差集 apples-to-apples）
 
-- [ ] **T3 六项目标逐项重跑真实证据**，落盘 `docs/agent-power/evidence/`
-- [ ] **T4 能力清单文档补齐验证证据 + 已知边界**
-- [ ] **T5 提交 + 给绝对路径清单**（不签验收结论）
+- [x] **T3 六项目标逐项重跑真实证据** —— 已完成（commit `76c733e` / `09693e4` / `5ad5fc9`）
+      **46/46 全绿**（`scripts/collect_agent_power_evidence.py`，隔离实例 8091）
+      + 管理面板真浏览器 **17/17** + 粘贴真浏览器 **14 passed**
+      证据：`docs/agent-power/evidence/T3_runtime_evidence.txt`、
+            `T3_paste_browser_diag.json`、`T3_manage_panel.json` + 3 张截图
+      **线上 8190 未动**：实测 `tool_count=23` / `limits.max_steps=8` / service active
+- [x] **T4 能力清单文档补齐验证证据 + 已知边界** —— 已完成
+      新增 §10bis（运行时实测证据 46 条逐条 + 管理面板 17 条）、
+      §5.5（三态语义判定 + 变异证据）、已知边界补到 15 条、
+      §7.3 补真浏览器实测细节、§11 相关文件补本轮新增文件。
+- [ ] **T5 提交 + 给绝对路径清单**（不签验收结论）—— 进行中
 
 ## 本轮踩坑（不要再踩）
 
