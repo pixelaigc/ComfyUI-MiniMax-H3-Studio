@@ -477,22 +477,38 @@ function renderMode() {
   // 上传区
   const zone = $("#uploadZone"), row = $("#uploadRow");
   row.innerHTML = "";
-  const mk = (key, label) => {
+  const mk = (key, label, kind = "image") => {
     const slot = document.createElement("div");
     slot.className = "up-slot";
+    slot.dataset.kind = kind;
     slot.innerHTML = `+<span class="tag">${label}</span>`;
     const inp = document.createElement("input");
-    inp.type = "file"; inp.accept = "image/*";
+    inp.type = "file";
+    // 【2026-11-15】参考视频 / 参考音频槽位：accept 必须按类型收窄，
+    // 否则用户能选一个 .png 塞进「参考视频」槽位 —— 服务端会按
+    // 视频槽位去 ffmpeg 解它，直接失败。
+    inp.accept = kind === "video" ? "video/*"
+      : kind === "audio" ? "audio/*" : "image/*";
     const fillSlot = (file, previewUrl) => {
       const url = previewUrl || URL.createObjectURL(file);
       slot.replaceChildren();
-      const image = document.createElement("img");
-      image.src = url;
-      image.alt = label;
+      if (kind === "image") {
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = label;
+        slot.append(image);
+      } else {
+        // 视频 / 音频不做缩略图（预览图对素材库条目才有），
+        // 放一个类型徽标，让用户看得见这个槽位放的是什么。
+        const badge = document.createElement("span");
+        badge.className = "tag asset-badge";
+        badge.textContent = kind === "video" ? "视频" : "音频";
+        slot.append(badge);
+      }
       const tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = label;
-      slot.append(image, tag);
+      slot.append(tag);
       slot.classList.add("filled");
       state.files[key] = file;
       delete state.assetRefs[key];
@@ -500,16 +516,19 @@ function renderMode() {
     // 用素材库里的素材填这个槽位：只存 asset_id，不复制文件
     const fillFromAsset = (asset) => {
       slot.replaceChildren();
-      const image = document.createElement("img");
-      image.src = asset.preview_url || asset.content_url;
-      image.alt = label;
+      if (kind === "image") {
+        const image = document.createElement("img");
+        image.src = asset.preview_url || asset.content_url;
+        image.alt = label;
+        slot.append(image);
+      }
       const tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = label;
       const badge = document.createElement("span");
       badge.className = "tag asset-badge";
       badge.textContent = "素材库";
-      slot.append(image, tag, badge);
+      slot.append(tag, badge);
       slot.classList.add("filled");
       state.files[key] = null;
       state.assetRefs[key] = {asset_id: asset.id, name: asset.name, category: asset.category};
@@ -582,10 +601,16 @@ function renderMode() {
         alert("素材库模块未加载");
         return;
       }
+      // 【2026-11-15】按槽位类型限定可选类别：
+      //   图片槽 -> categories ["image"]
+      //   视频槽 -> categories ["video"]   ← 之前**根本没有**这个入口
+      //   音频槽 -> categories ["audio"]
+      // 之前全仓只有 ["image"] / ["audio"] 两种写死值，
+      // 于是「参考视频」在面板上**没有任何入口**（缺口 1）。
       window.ASSETLIB.openPicker({
-        categories: ["image"], multiple: false, limit: 1,
+        categories: [kind], multiple: false, limit: 1,
         onDone: (ids) => {
-          if (!ids.length) return;
+          if (!ids || !ids.length) return;
           const assetId = ids[0];
           fetch(`/api/assets/${encodeURIComponent(assetId)}`).then(r => r.json()).then(asset => {
             fillFromAsset({
@@ -610,10 +635,20 @@ function renderMode() {
     // 【2026-11-14】参考图上限从 3 张提升到 **9 张**
     // —— H3 参考生成节点的 ref_images 槽位上限就是 9（实测 object_info）。
     // 原来卡 3 张是历史遗留，把能力人为砍掉了。
+    //
+    // 【2026-11-15 补齐缺口 1】参考视频（≤3）与参考音乐（≤3）
+    // 之前**在面板上没有任何入口** —— 槽位不存在，
+    // 于是 openPicker 的 categories 里也就不会出现 ["video"]。
+    // 现在按 H3 节点的真实上限补上三组槽位：
+    //   ref0..ref8  -> 参考图    (node schema: ref_images max=9)
+    //   refvid0..2  -> 参考视频  (node schema: ref_videos max=3)
+    //   refaud0..2  -> 参考音乐  (node schema: ref_audios max=3)
     $("#uploadTitle").textContent =
-      "上传参考图，或从素材库选（最多 9 张）";
+      "上传参考素材，或从素材库选（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
     for (let i = 0; i < 9; i++) mk("ref" + i, "参考 " + (i + 1));
+    for (let i = 0; i < 3; i++) mk("refvid" + i, "参考视频 " + (i + 1), "video");
+    for (let i = 0; i < 3; i++) mk("refaud" + i, "参考音乐 " + (i + 1), "audio");
   } else {
     zone.style.display = "none";
   }
@@ -652,6 +687,8 @@ function renderMode() {
 
   // 音轨来源（首尾帧 / 参考生视频）
   renderAudioTrackSelect();
+  // 【2026-11-15 缺口 5】旧面板的「实际输出尺寸」提示
+  renderLegacySizeNote();
 
   // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
   const legacyVideoSampling = $("#videoSamplingField");
@@ -721,7 +758,35 @@ const AUDIO_TRACK_OPTIONS = [
         + "长度不足会补静音、超出会裁到画面时长。" },
 ];
 
-/** 当前有没有参考音乐 / 参考视频背景音（决定哪些选项出现）。 */
+/**
+ * 当前有没有参考音乐 / 参考视频背景音（决定哪些选项出现）。
+ *
+ * 【2026-11-15 修 —— 缺口 2：「使用参考视频的背景音乐」选项永不出现】
+ *
+ * 【原来错在哪】
+ *   for (const [key, item] of Object.entries(slots)) {
+ *     const cat = item.category || "";
+ *     if (cat === "audio") {
+ *       if (key.startsWith("refvid")) hasVideoAudio = true;
+ *       else hasRefAudio = true;
+ *     }
+ *   }
+ *
+ * 判据是「素材类别是 audio」**且**槽位名以 refvid 开头。
+ * 但 refvid* 槽位装的是**参考视频**（category = "video"），
+ * 不是音频 —— 所以 `cat === "audio"` 永远不成立，
+ * `hasVideoAudio` 永远是 false ->
+ * 「使用参考视频的背景音乐作为成片音轨」这一项**从来就没出现过**。
+ *
+ * 【正确的判据】
+ *   (b) 参考音乐   -> 有独立的参考音乐素材（refaud* 槽位，category=audio）
+ *   (c) 参考视频背景音 -> 有参考视频素材（refvid* 槽位，category=video），
+ *      并且它**带音轨**（服务端会从视频里抽音轨作为 ref_video_audios）。
+ *
+ * 视频**有没有音轨**由服务端在上传时判定（ffprobe），
+ * 前端拿不到探测结果 —— 所以这里以「有参考视频」为可见性判据，
+ * 真没有音轨时服务端会把它归一成生成的音乐（不报错）。
+ */
 function audioTrackAvailability() {
   const slots = state.assetRefs || {};
   let hasRefAudio = false;
@@ -729,9 +794,28 @@ function audioTrackAvailability() {
   for (const [key, item] of Object.entries(slots)) {
     if (!item || !item.asset_id) continue;
     const cat = item.category || "";
-    if (cat === "audio") {
-      if (key.startsWith("refvid")) hasVideoAudio = true;
-      else hasRefAudio = true;
+    if (key.startsWith("refvid")) {
+      // 参考视频槽位：它的背景音就是 (c) 的素材来源。
+      // 视频本身没有音轨时，服务端会抽不出 ref_video_audios，
+      // 那一路自然归回「生成的音乐」。
+      if (cat === "video") hasVideoAudio = true;
+      else if (cat === "audio") hasVideoAudio = true;  // 兼容：直接放了音频
+      continue;
+    }
+    if (key.startsWith("refaud")) {
+      if (cat === "audio") hasRefAudio = true;
+      continue;
+    }
+    // 其它槽位（ref0..ref8 参考图 / first / last）：不是音轨素材
+    if (cat === "audio" && !key.startsWith("ref")) {
+      hasRefAudio = true;
+    }
+  }
+  // 本地上传的参考音频 / 参考视频（不走素材库）也算
+  if (state.files) {
+    for (let i = 0; i < 3; i++) {
+      if (state.files["refaud" + i]) hasRefAudio = true;
+      if (state.files["refvid" + i]) hasVideoAudio = true;
     }
   }
   return { hasRefAudio, hasVideoAudio };
@@ -2263,8 +2347,8 @@ function bindSeg(sel, key, cb) {
     if (cb) cb();
   }));
 }
-bindSeg("#resSeg", "res");
-bindSeg("#aspectChips", "aspect");
+bindSeg("#resSeg", "res", renderLegacySizeNote);
+bindSeg("#aspectChips", "aspect", renderLegacySizeNote);
 bindSeg("#modelCards", "model", () => {
   $("#loraField").style.display = state.model === "lora" ? "" : "none";
   updateSeedStrengthLayout();
@@ -2417,6 +2501,95 @@ function effectiveLegacyLora() {
   //   state.model === "standard" -> 一枚都不挂（空串）
   // 旧的 "none" 字面量保留成空串之外不再使用。
   return state.model === "lora" ? (state.lora || "") : "";
+}
+
+/**
+ * 旧面板（首尾帧 / 参考生视频）的「分辨率档位 + 画面比例」-> 真实像素宽高。
+ *
+ * 【2026-11-15 修 —— 缺口 5：分辨率/比例语义失真】
+ *
+ * 【原来错在哪】
+ * 面板上有两个控件：「分辨率」档位（544p / 768p）与「画面比例」
+ * （16:9 / 9:16 / 4:3 / 3:4 / 1:1）。但提交时**只提交档位字符串与比例**，
+ * 不提交真实宽高；服务端那条归一（normalize_t2v_params）**只对 t2v 跑**。
+ * 于是 flf / r2v 的 params 里没有 width/height，
+ * 工作流构建器（h3_video_modes.build_flf / build_r2v）只读这两个键，
+ * 缺失时**硬回退 1344×768**。
+ *
+ * 结果：面板显示「544p · 16:9」，产物实际 1344×768 ——
+ * 而 1344×768 不是 544p 的任何合法组合（544p = 0.4MP -> 864×480）。
+ * 这就是「面板说谎」。
+ *
+ * 【算法 —— 与服务端 h3studio/h3_video_size.py 必须是同一套】
+ *   total = megapixels * 1024^2
+ *   scale = sqrt(total / (w_ratio * h_ratio))
+ *   width  = round(w_ratio * scale / multiple) * multiple
+ *   height = round(h_ratio * scale / multiple) * multiple
+ * multiple = 32（H3 的 CANVAS_MULTIPLE，节点 schema step=32）。
+ * 这与 ComfyUI 自带的 ResolutionSelector 完全一致（实测源码）。
+ *
+ * 【为什么前端也算一遍而不是全交给服务端】
+ *  * 前端要**显示**「这次会跑多少 × 多少」，不能等提交后才知道；
+ *  * 服务端仍会用**自己那份实现**再算一次并以服务端为准 ——
+ *    两边公式一致，所以结果一致；真不一致时服务端说了算。
+ *
+ * 【纯函数 —— 无 DOM 依赖】
+ * 这样它能被 tests/test_h3_video_size.py 用 **Node 真跑这段源码**断言，
+ * 而不是靠字符串匹配（字符串出现过 != 那条断言在守行为）。
+ */
+function legacyVideoSize(resolution, aspect, mode) {
+  const RES_MP = { "544p": 0.4, "768p": 0.8 };
+  const ASPECT_NUM = {
+    "1:1": [1, 1], "2:3": [2, 3], "3:2": [3, 2], "3:4": [3, 4],
+    "4:3": [4, 3], "9:16": [9, 16], "16:9": [16, 9], "21:9": [21, 9],
+  };
+  const MULT = 32;
+  const mp = RES_MP[resolution] != null ? RES_MP[resolution] : RES_MP["768p"];
+  const ratio = ASPECT_NUM[aspect] || ASPECT_NUM["16:9"];
+  const total = mp * 1024 * 1024;
+  const scale = Math.sqrt(total / (ratio[0] * ratio[1]));
+  let width = Math.max(MULT, Math.round(ratio[0] * scale / MULT) * MULT);
+  let height = Math.max(MULT, Math.round(ratio[1] * scale / MULT) * MULT);
+  // 面积上限按模式（flf / r2v = 0.8 MP；t2v = 2.0 MP）
+  const maxMp = (mode === "t2v") ? 2.0 : 0.8;
+  const limit = maxMp * 1024 * 1024;
+  if (width * height > limit) {
+    const s = Math.sqrt(limit / (width * height));
+    width = Math.max(MULT, Math.round(width * s / MULT) * MULT);
+    height = Math.max(MULT, Math.round(height * s / MULT) * MULT);
+    // 吸附后可能又超回上限 -> 逐次收一档
+    while (width * height > limit && (width > MULT || height > MULT)) {
+      if (width >= height && width > MULT) width -= MULT;
+      else if (height > MULT) height -= MULT;
+      else break;
+    }
+  }
+  return { width, height, megapixels: mp };
+}
+
+/** 当前旧面板状态下应当生效的宽高（读全局 state）。 */
+function currentLegacyVideoSize() {
+  return legacyVideoSize(state.res, state.aspect, state.mode);
+}
+
+/**
+ * 在旧面板的「分辨率」下方显示**这次真的会跑的像素尺寸**。
+ *
+ * 【2026-11-15 缺口 5】
+ * 旧面板只显示「544p」这种档位字符串，用户看不到具体像素 ——
+ * 而工作流跑的就是那个像素。显示真实尺寸，用户才能核对产物对不对。
+ *
+ * 只在 flf / r2v 显示（t2v 有自己那块独立的尺寸区）。
+ */
+function renderLegacySizeNote() {
+  const note = $("#legacySizeNote");
+  if (!note) return;
+  const isLegacyVideo = state.mode === "flf" || state.mode === "r2v";
+  if (!isLegacyVideo) { note.textContent = ""; return; }
+  const size = currentLegacyVideoSize();
+  if (!size) { note.textContent = ""; return; }
+  const mp = (size.width * size.height) / (1024 * 1024);
+  note.textContent = `实际输出 ${size.width}×${size.height}（${mp.toFixed(2)} MP）`;
 }
 
 /**
@@ -3106,6 +3279,25 @@ $("#genBtn").addEventListener("click", async () => {
     params.shift_audio = Number(state.vidShiftAudio);
     // 【2026-11-14】音轨三选一（B2）
     params.audio_track_source = state.audioTrackSource || "";
+    // 【2026-11-15 修 —— 缺口 5：面板选的分辨率/比例必须真的生效】
+    //
+    // 【原来错在哪】旧面板只提交 `resolution`（档位字符串）与 `aspect`，
+    // **不提交 width/height**。而服务端 normalize_t2v_params **只对 t2v 跑**，
+    // flf / r2v 的 params 里于是没有 width/height；
+    // h3studio/h3_video_modes.py 里 build_flf / build_r2v 只读这两个键，
+    // 缺失时**硬回退 1344×768**。
+    //
+    // 结果：面板显示「544p · 16:9」，产物却是 1344×768 ——
+    // 而 1344×768 不是 544p 的任何合法组合（544p=0.4MP -> 864×480）。
+    //
+    // 【修法】前端按与服务端**同一套公式**算出真实宽高一起提交
+    // （服务端 h3studio/h3_video_size.py 是唯一真源，前端这份是
+    //   同一公式的镜像；服务端仍会用自己的实现再算一次并以服务端为准）。
+    const legacySize = currentLegacyVideoSize();
+    if (legacySize) {
+      params.width = legacySize.width;
+      params.height = legacySize.height;
+    }
   }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
@@ -3137,31 +3329,115 @@ $("#genBtn").addEventListener("click", async () => {
   fd.append("params", JSON.stringify(params));
   try {
     // 素材库引用：槽位 -> asset_id，随任务一起提交（服务端按槽位上传到 ComfyUI）
+    //
+    // 【2026-11-15】槽位表补全：
+    //   ref0..ref8  -> ref_image    （参考图，节点上限 9）
+    //   refvid0..2  -> ref_video    （参考视频，节点上限 3）
+    //   refaud0..2  -> ref_audio    （独立参考音乐，节点上限 3）
+    //
+    // 【为什么 ordinal 要按组内序号算，而不是全局 index】
+    // 服务端 _apply_asset_refs 对 ref_video_audios 按 ordinal 排序，
+    // 且 T8 节点要求「第 N 个参考视频的背景音必须配第 N 个参考视频」。
+    // 全局 index 会让「第 2 个参考视频」拿到 ordinal=5 之类的值，
+    // 与视频槽位的序号对不上 -> 节点直接报
+    // 「Reference-video soundtrack(s) have no same-numbered video」。
+    // 所以**每一组内部**单独编号。
     const assetRefs = [];
     const SLOT_FOR_KEY = {
       first: "first_frame", last: "last_frame",
-      ref0: "ref_image", ref1: "ref_image", ref2: "ref_image",
     };
-    Object.entries(state.assetRefs || {}).forEach(([key, item], index) => {
+    const GROUP_OF_KEY = (key) => {
+      if (/^ref\d+$/.test(key)) return "ref_image";
+      if (/^refvid\d+$/.test(key)) return "ref_video";
+      if (/^refaud\d+$/.test(key)) return "ref_audio";
+      return null;
+    };
+    const groupCounter = {};
+    Object.entries(state.assetRefs || {}).forEach(([key, item]) => {
       if (!item || !item.asset_id) return;
+      const group = GROUP_OF_KEY(key);
+      const slot = SLOT_FOR_KEY[key] || group;
+      if (!slot) return;
+      groupCounter[slot] = (groupCounter[slot] || 0) + 1;
       assetRefs.push({
         asset_id: item.asset_id,
-        slot: SLOT_FOR_KEY[key] || "ref_image",
-        ordinal: index,
+        slot,
+        ordinal: groupCounter[slot] - 1,
       });
     });
     if (assetRefs.length) fd.append("asset_refs", JSON.stringify(assetRefs));
 
     if (mode === "flf") {
+      // 【2026-11-15 修 —— 缺口 4：首帧/尾帧都能单独给】
+      //
+      // 【原来错在哪】前端硬性要求「必须上传首帧」：
+      //   if (!hasFirst) { alert("首尾帧模式需要上传首帧图片"); return; }
+      // 而后端（2026-11-14 起）已经改成「首帧或尾帧给一张即可」
+      // —— H3 的 I2VA / L2VA 任务类型本来就是「只有首帧」/「只有尾帧」。
+      // 于是「只给尾帧」的用户在前端就被挡住了，
+      // 后端放宽的那条能力**永远用不到**。
+      //
+      // 现在：首帧、尾帧**都不给**才拦；给哪张都放行。
       const hasFirst = state.files.first || (state.assetRefs && state.assetRefs.first);
-      if (!hasFirst) { alert("首尾帧模式需要上传首帧图片"); return; }
+      const hasLast = state.files.last || (state.assetRefs && state.assetRefs.last);
+      if (!hasFirst && !hasLast) {
+        alert("首尾帧模式需要至少提供首帧或尾帧图片（给其中一张即可）。");
+        return;
+      }
       if (state.files.first) fd.append("file_first", state.files.first);
       if (state.files.last) fd.append("file_last", state.files.last);
     } else if (mode === "r2v") {
-      const refs = [state.files.ref0, state.files.ref1, state.files.ref2].filter(Boolean);
-      const assetCount = Object.keys(state.assetRefs || {}).filter(k => k.startsWith("ref")).length;
-      if (!refs.length && !assetCount) { alert("参考模式至少需要 1 张参考图"); return; }
+      // 【2026-11-15 修 —— 缺口 3：本地直传上限与后端 ≤9 对齐】
+      //
+      // 【原来错在哪】只提交 ref0 / ref1 / ref2 三张：
+      //   const refs = [state.files.ref0, state.files.ref1, state.files.ref2]
+      // 面板明明渲染了 9 个参考图槽位，但用户放第 4 张时
+      // **提交时被静默丢掉** —— 用户以为 9 张都进去了，实际只有 3 张。
+      // 这就是「不得出现提交被截断」要求指向的那个缺陷。
+      //
+      // 现在：9 个槽位**全部**提交，并按节点真实上限（9）显式校验，
+      // 超了直接报错而不是截断。
+      const REF_IMAGE_LIMIT = 9;
+      const REF_VIDEO_LIMIT = 3;
+      const REF_AUDIO_LIMIT = 3;
+      const refs = [];
+      for (let i = 0; i < REF_IMAGE_LIMIT; i++) {
+        const f = state.files["ref" + i];
+        if (f) refs.push(f);
+      }
+      const refVids = [];
+      for (let i = 0; i < REF_VIDEO_LIMIT; i++) {
+        const f = state.files["refvid" + i];
+        if (f) refVids.push(f);
+      }
+      const refAuds = [];
+      for (let i = 0; i < REF_AUDIO_LIMIT; i++) {
+        const f = state.files["refaud" + i];
+        if (f) refAuds.push(f);
+      }
+      // 素材库来源的参考素材同样算「已提供」
+      const assetSlotSet = new Set(assetRefs.map(r => r.slot));
+      const assetCount = assetSlotSet.size;
+      if (!refs.length && !refVids.length && !refAuds.length && !assetCount) {
+        alert("参考模式至少需要 1 个参考素材（参考图 / 参考视频 / 参考音乐）");
+        return;
+      }
+      // 上限显式校验（不静默截断）
+      if (refs.length > REF_IMAGE_LIMIT) {
+        alert(`参考图最多 ${REF_IMAGE_LIMIT} 张，当前 ${refs.length} 张。`);
+        return;
+      }
+      if (refVids.length > REF_VIDEO_LIMIT) {
+        alert(`参考视频最多 ${REF_VIDEO_LIMIT} 个，当前 ${refVids.length} 个。`);
+        return;
+      }
+      if (refAuds.length > REF_AUDIO_LIMIT) {
+        alert(`参考音乐最多 ${REF_AUDIO_LIMIT} 段，当前 ${refAuds.length} 段。`);
+        return;
+      }
       refs.forEach(f => fd.append("file_ref", f));
+      refVids.forEach(f => fd.append("file_refvid", f));
+      refAuds.forEach(f => fd.append("file_refaud", f));
     }
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
     const data = await resp.json();
@@ -4489,6 +4765,59 @@ function jobCard(job) {
         if (cfg) cfg.sizePresetKey = hit ? hit.key : "";
         window.VIDEO_PANEL.render();
       }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (job.mode === "flf" || job.mode === "r2v") {
+      // 【2026-11-15 补齐缺口 5 的另一半：旧面板的「复用参数」也要回填尺寸】
+      //
+      // 【原来错在哪】上面那一整块「复用参数」的回填逻辑
+      // **只在 job.mode === "t2v" 分支里**。flf / r2v 走不到 ->
+      // 点「复用参数」后，旧面板的分辨率档位与画面比例**保持原样**
+      // （或者压根不是这次任务的），用户以为复用了参数，
+      // 实际跑出来的是另一个尺寸。
+      //
+      // 现在：flf / r2v 也把档位 + 比例（以及由它们决定的真实宽高）
+      // 回填到旧面板，并刷新「实际输出尺寸」提示。
+      const legacyReso = job.resolution_info || {};
+      if (p.resolution) {
+        setSeg("#resSeg", p.resolution);
+        state.res = p.resolution;
+      }
+      if (p.aspect) {
+        setSeg("#aspectChips", p.aspect);
+        state.aspect = p.aspect;
+      }
+      // 产物实际像素优先（与卡片显示口径一致），没有才用请求值。
+      const legacyWidth = Number(legacyReso.width) || Number(p.width) || 0;
+      const legacyHeight = Number(legacyReso.height) || Number(p.height) || 0;
+      if (legacyWidth && legacyHeight) {
+        const size = legacyVideoSize(state.res, state.aspect, job.mode);
+        // 只有当「档位+比例」算出来的尺寸与产物一致时才用档位；
+        // 不一致（比如老任务的手填尺寸）就以产物为准。
+        if (size.width === legacyWidth && size.height === legacyHeight) {
+          state.res = p.resolution || state.res;
+          state.aspect = p.aspect || state.aspect;
+        }
+      }
+      renderLegacySizeNote();
+      // 时长 / 步数 / seed 与 t2v 一样复用
+      const legacyInfo = (job && job.model_info) || {};
+      const legacyDuration = legacyInfo.duration != null
+        ? legacyInfo.duration : p.duration;
+      if (legacyDuration) {
+        state.duration = legacyDuration;
+        $("#duration").value = legacyDuration;
+        $("#durVal").textContent = legacyDuration + "s";
+      }
+      const legacySteps = legacyInfo.steps != null ? legacyInfo.steps : p.steps;
+      if (legacySteps) {
+        state.steps = legacySteps;
+        $("#steps").value = legacySteps;
+        $("#stepsVal").textContent = legacySteps;
+      }
+      const legacySeed = legacyInfo.seed != null ? legacyInfo.seed : p.seed;
+      if (legacySeed) $("#seed").value = legacySeed;
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }

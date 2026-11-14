@@ -355,6 +355,12 @@
         <button data-v="544p" class="active"><b>544p</b><small>快速</small></button>
         <button data-v="768p"><b>768p</b><small>高清</small></button>
       </div>
+      <!-- 【2026-11-15 缺口 5】显示**这次真的会跑**的像素尺寸。
+           旧面板只显示档位字符串，用户看不到 544p + 9:16 到底
+           等于多少 × 多少 —— 而工作流跑的就是这个尺寸。
+           服务端 h3studio/h3_video_size.py 是唯一真源，
+           前端 legacyVideoSize() 是同公式的镜像。 -->
+      <div class="img-note" id="legacySizeNote"></div>
     </div>
 
     <div class="field" id="durField">

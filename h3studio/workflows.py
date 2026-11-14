@@ -503,130 +503,32 @@ def build_r2v(params):
         raise ValueError(str(exc)) from exc
 
 
-def _build_r2v_legacy(params):
-    """【保留】旧版参考生视频构建器（核心节点路径）。
-
-    为什么保留：T8 条件节点依赖 comfyui-minimax-h3-audio-T8 插件；
-    该插件不在时新路径会失败，此时回落到旧路径（功能少但能出片）。
-    """
-    from . import video_models as vmodels
-    from . import video_workflow as vworkflow
-    job_id = params["job_id"]
-    seed = params.get("seed") or random.randint(0, 2**48)
-    precision = params.get("precision", "int8")
-    # 【2026-11-14 重构】加速 LoRA 走统一槽位（与 flf / t2v 同一套换算），
-    # 并按权重形态选加载节点 —— 见 _h3_video_workflow 的说明。
-    accel_key, accel_strength = vmodels.resolve_accel_lora_slot(params)
-    accel_chain = []
-    if accel_key:
-        meta = vmodels.accel_lora_meta(accel_key)
-        if meta:
-            accel_chain.append({
-                "name": meta["name"],
-                "strength": float(accel_strength),
-                "key": accel_key,
-                "loader": vmodels.detect_accel_lora_loader(meta["name"]),
-            })
-    # 【2026-11-11】采样参数可调（同 flf / t2v）
-    if accel_chain:
-        meta = vmodels.accel_lora_meta(accel_chain[0]["key"]) or {}
-        default_steps = int(meta.get("recommended_steps") or 4)
-        default_scheduler = meta.get("recommended_scheduler") or "beta"
-        default_sampler = meta.get("recommended_sampler") or "euler"
-    else:
-        default_steps = vmodels.VIDEO_STEPS_WITHOUT_ACCEL
-        default_scheduler = vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL
-        default_sampler = vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL
-    steps = vmodels.normalize_steps(params.get("steps"), default_steps)
-    scheduler = vmodels.normalize_scheduler(
-        params.get("scheduler"), default_scheduler)
-    sampler = vmodels.normalize_sampler(params.get("sampler"), default_sampler)
-    aspect = ASPECT_MAP.get(params.get("aspect", "16:9"), ASPECT_MAP["16:9"])
-    mp = RES_MP.get(params.get("resolution", "768p"), 0.8)
-    duration = float(params.get("duration", 5))
-
-    p = {"_seed": int(seed), "_job_id": job_id, "_mode": "r2v", "_p": "", "_cond": None}
-
-    p["115"] = {"inputs": {"aspect_ratio": aspect, "megapixels": mp, "multiple": 32},
-                "class_type": "ResolutionSelector"}
-    p["127"] = {"inputs": {"unet_name": UNET["ref2va"][precision], "weight_dtype": "default"},
-                "class_type": "UNETLoader"}
-    model_ref = ["127", 0]
-    if accel_chain:
-        model_ref = vworkflow.apply_accel_lora_nodes(p, model_ref, accel_chain)
-    p["128"] = {"inputs": {"clip_name": CLIP[precision], "type": "minimax", "device": "default"},
-                "class_type": "CLIPLoader"}
-    p["119"] = {"inputs": {"vae_name": VAE_VIDEO}, "class_type": "VAELoader"}
-    p["120"] = {"inputs": {"vae_name": VAE_AUDIO}, "class_type": "VAELoader"}
-
-    ref_inputs = {}
-    # 【2026-11-11 音视频扩展】ref_images 可能**不存在** ——
-    # 用户可以只上传参考视频/参考音频（不传参考图）。
-    # 原来写死 params["ref_images"] -> KeyError: 'ref_images'
-    # -> 任务已经建成了，worker 跑起来才炸（静默失效，最难查）。
-    # 所以这里用 .get() 兜底。
-    for index, filename in enumerate((params.get("ref_images") or [])[:3]):
-        node_id = f"136:{201 + index}"
-        p[node_id] = {
-            "inputs": {"image": filename},
-            "class_type": "LoadImage",
-            "_meta": {"title": f"加载参考图 {index + 1}"},
-        }
-        ref_inputs[f"ref_image_{index}"] = [node_id, 0]
-
-    # 参考视频 / 参考音频（素材库引用）。
-    # H3 节点 MiniMaxH3ReferenceToVideo 的真实槽位上限（实测 /object_info）：
-    #   ref_images 0~9 / ref_videos 0~3 / ref_video_audios 0~3 / ref_audios 0~3
-    ref_video_inputs = {}
-    for index, filename in enumerate(params.get("ref_videos", [])[:3]):
-        node_id = f"136:{301 + index}"
-        p[node_id] = {
-            "inputs": {"video": filename, "format": "None"},
-            "class_type": "VHS_LoadVideo",
-            "_meta": {"title": f"加载参考视频 {index + 1}"},
-        }
-        ref_video_inputs[f"ref_video_{index}"] = [node_id, 0]
-
-    ref_audio_inputs = {}
-    for index, filename in enumerate(params.get("ref_audios", [])[:3]):
-        node_id = f"136:{401 + index}"
-        p[node_id] = {
-            "inputs": {"audio": filename},
-            "class_type": "VHS_LoadAudioUpload",
-            "_meta": {"title": f"加载参考音频 {index + 1}"},
-        }
-        ref_audio_inputs[f"ref_audio_{index}"] = [node_id, 0]
-
-    p["136"] = {
-        "inputs": {
-            "clip": ["128", 0], "vae": ["119", 0], "audio_vae": ["120", 0],
-            "prompt": params.get("prompt", ""),
-            "width": ["115", 0], "height": ["115", 1],
-            "ref_image_size": "match",
-            **{f"ref_images.{k}": v for k, v in ref_inputs.items()},
-            **{f"ref_videos.{k}": v for k, v in ref_video_inputs.items()},
-            **{f"ref_audios.{k}": v for k, v in ref_audio_inputs.items()},
-        },
-        "class_type": "MiniMaxH3ReferenceToVideo",
-        "_meta": {"title": "H3 参考生成"},
-    }
-    p["_cond"] = "136"
-
-    expr = _frame_expr_node("131", "132")
-    expr["132"]["inputs"]["value"] = duration
-    p.update(expr)
-    p["136"]["inputs"]["length"] = ["131", 1]
-
-    # shift（MiniMaxH3SigmaShift）—— 与 t2v 新面板同一套逻辑
-    model_ref = _apply_sigma_shift(p, model_ref, params, node_id="139")
-
-    samples = _video_sampler_block(p, model_ref, steps, scheduler, sampler)
-    _video_decode_save_block(p, [samples, 0])
-
-    for k in ["_p", "_seed", "_job_id", "_mode", "_cond"]:
-        p.pop(k, None)
-    return p
-
+# 【2026-11-15 删除】_build_r2v_legacy（旧版核心节点路径的参考生视频构建器）
+#
+# 【为什么删掉】
+# 它的 docstring 声称「T8 条件节点插件不在时会切到旧路径」——
+# 但**那不是真的**：全仓 grep 确认它**没有任何调用点**
+# （build_r2v 直接委派给 h3studio.h3_video_modes.build_r2v，
+#   BUILDERS["r2v"] 指向的也是 build_r2v）。
+# 也就是说，这段 120 行死代码里描述的降级能力
+# **从来没有被接上** —— 用户真遇到插件缺失时，得到的是
+# 「提交失败」，而不是一条功能更少的备用链路。
+#
+# 留着它有两个害处：
+#   1. 误导性注释：让人以为存在降级能力，实际没有；
+#   2. 维护陷阱：它是**旧节点语义**（MiniMaxH3ReferenceToVideo +
+#      ResolutionSelector）的另一份实现，与现在的 T8 路径
+#      （MiniMaxH3AudioConditioningT8）必然漂移 —— 改一处忘一处，
+#      迟早有人改错那一份。
+#
+# 【现在的行为】
+# T8 插件（comfyui-minimax-h3-audio-T8）是**硬依赖**：
+# 参考生视频 / 首尾帧生视频都需要它的音轨三选一能力。
+# 插件缺失时 ComfyUI 会直接报「节点不存在」，并说明缺哪个插件 ——
+# 这比「悄悄切到功能更少的备用链路」更诚实（用户知道自己少了什么）。
+#
+# 【回归保护】tests/test_h3_video_modes_ui.py::TestDeadCodeRemoved
+# 断言本模块**不再**定义 _build_r2v_legacy，且 build_r2v 走 T8 路径。
 
 # 自定义分辨率：宽高的合法范围
 # （ComfyUI EmptySD3LatentImage 的节点 schema：min=16 max=16384 step=16）

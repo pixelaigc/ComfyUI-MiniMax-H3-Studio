@@ -357,8 +357,16 @@ def build_flf(params: dict) -> dict:
     # 首尾帧用 FL2VA 权重（它有 I2VA / FL2VA / L2VA 任务类型）
     unet_name = _vm.model_for_mode("flf", params.get("model_key"))["unet"]
 
-    width = int(params.get("width") or 1344)
-    height = int(params.get("height") or 768)
+    # 【2026-11-15】宽高走**统一归一**（h3studio/h3_video_size.py）：
+    # 面板选了「544p · 9:16」就必须真的跑那个尺寸，
+    # 而不是硬回退 1344×768（那个回退是「面板说谎」的根因）。
+    from . import h3_video_size as _vsize
+    width, height = _vsize.dimensions_for(
+        params.get("resolution"), params.get("aspect"), mode="flf")
+    explicit_w = params.get("width")
+    explicit_h = params.get("height")
+    if explicit_w and explicit_h:
+        width, height = int(explicit_w), int(explicit_h)
     duration = float(params.get("duration") or 5)
 
     p: dict = {}
@@ -414,8 +422,16 @@ def build_r2v(params: dict) -> dict:
     # model_for_mode() 会按模式挑（用户选了 FL2VA 权重时自动换 Ref2VA）。
     unet_name = _vm.model_for_mode("r2v", params.get("model_key"))["unet"]
 
-    width = int(params.get("width") or 1344)
-    height = int(params.get("height") or 768)
+    # 【2026-11-15】宽高走**统一归一**（h3studio/h3_video_size.py）：
+    # 面板选了「544p · 9:16」就必须真的跑那个尺寸，
+    # 而不是硬回退 1344×768（那个回退是「面板说谎」的根因）。
+    from . import h3_video_size as _vsize
+    width, height = _vsize.dimensions_for(
+        params.get("resolution"), params.get("aspect"), mode="r2v")
+    explicit_w = params.get("width")
+    explicit_h = params.get("height")
+    if explicit_w and explicit_h:
+        width, height = int(explicit_w), int(explicit_h)
     duration = float(params.get("duration") or 5)
 
     p: dict = {}
