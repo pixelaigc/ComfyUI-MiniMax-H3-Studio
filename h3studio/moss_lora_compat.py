@@ -42,6 +42,7 @@ ComfyUI 登记的 892 条 key_map 里含 `qkv` 的只有文本塔的 2 条。
 from __future__ import annotations
 
 import json
+import os
 import struct
 from pathlib import Path
 
@@ -117,13 +118,95 @@ TARGET_PREFIX = "diffusion_model."
 # ------------------------------------------------------------------ 基础工具
 
 def read_safetensors_header(path) -> dict:
-    """只读 safetensors 头部（不加载权重本体）。"""
+    """只读 safetensors 头部（不加载权重本体）。
+
+    ⚠️ **只读头部会漏掉「文件被截断」**：safetensors 的头部是
+    「8 字节长度 + JSON + 数据区」，**头部本身完整**并不代表权重完整。
+    实测 D2（hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors）：
+    文件只有 5,369,856 字节，但头部声明数据区要 297,355,184 字节
+    —— 缺 291,985,328 字节。ComfyUI 加载时抛
+    `SafetensorError: incomplete metadata, file not fully covered`，
+    但本函数照样能读出完整头部 —— 于是旧逻辑「头部能读 = 文件正常」
+    -> 判成 compatible=true -> 用户选了必然报错。
+    所以这里额外做**完整性校验**：实际文件大小必须覆盖头部声明的数据区。
+    """
     try:
         with open(path, "rb") as handle:
             size = struct.unpack("<Q", handle.read(8))[0]
-            return json.loads(handle.read(size))
+            header = json.loads(handle.read(size))
     except Exception:
         return {}
+    if not header:
+        return {}
+    # 完整性校验：文件实际大小必须 >= 头部声明的完整长度
+    if not _header_covers_file(path, size, header):
+        return {}
+    return header
+
+
+def _header_covers_file(path, header_size: int, header: dict) -> bool:
+    """头部声明的数据区是否被文件实际大小完整覆盖。
+
+    截断文件（下载中断 / 拷贝未完成）返回 False。
+    """
+    try:
+        actual = os.path.getsize(path)
+    except OSError:
+        return False
+    max_end = 0
+    for name, meta in header.items():
+        if name == "__metadata__" or not isinstance(meta, dict):
+            continue
+        offsets = meta.get("data_offsets")
+        if isinstance(offsets, (list, tuple)) and len(offsets) == 2:
+            try:
+                max_end = max(max_end, int(offsets[1]))
+            except (TypeError, ValueError):
+                continue
+    # 期望的完整文件长度 = 8（长度头）+ JSON 头 + 数据区
+    expected = 8 + header_size + max_end
+    return actual >= expected
+
+
+def read_safetensors_header_detail(path) -> dict:
+    """带完整性结论的头部读取（给「为什么不可用」用）。
+
+    返回: {"header": dict, "ok": bool, "reason": str}
+    """
+    path = Path(path)
+    try:
+        with open(path, "rb") as handle:
+            size = struct.unpack("<Q", handle.read(8))[0]
+            header = json.loads(handle.read(size))
+    except Exception as exc:
+        return {"header": {}, "ok": False,
+                "reason": f"读不出 safetensors 头部：{type(exc).__name__}: {exc}"[:160]}
+    if not header:
+        return {"header": {}, "ok": False, "reason": "safetensors 头部为空"}
+    try:
+        actual = os.path.getsize(path)
+    except OSError as exc:
+        return {"header": {}, "ok": False,
+                "reason": f"读不到文件大小：{type(exc).__name__}: {exc}"[:160]}
+    max_end = 0
+    for name, meta in header.items():
+        if name == "__metadata__" or not isinstance(meta, dict):
+            continue
+        offsets = meta.get("data_offsets")
+        if isinstance(offsets, (list, tuple)) and len(offsets) == 2:
+            try:
+                max_end = max(max_end, int(offsets[1]))
+            except (TypeError, ValueError):
+                continue
+    expected = 8 + size + max_end
+    if actual < expected:
+        return {"header": header, "ok": False,
+                "reason": (f"权重文件被截断（实际 {actual:,} 字节，"
+                           f"头部声明需要 {expected:,} 字节，"
+                           f"缺 {expected - actual:,} 字节）："
+                           "ComfyUI 加载时会抛 SafetensorError"
+                           "（incomplete metadata），这个 LoRA 无法使用。")}
+    return {"header": header, "ok": True, "reason": ""}
 
 
 def _strip_diffusion_prefix(name: str) -> str:
@@ -150,13 +233,51 @@ def _lora_unet_to_dots(name: str) -> str | None:
     body = name[len("lora_unet_"):] if name.startswith("lora_unet_") else name
     parts = body.split("_")
     # 文本塔：text_embedder_blocks_N_<模块>
-    if parts and parts[0] == "text_embedder":
-        if len(parts) < 3 or parts[1] != "blocks" or not parts[2].isdigit():
+    #
+    # ⚠️ **2026-11-15 修复（死分支）**：旧代码写的是
+    #    `if parts[0] == "text_embedder"`，但 body 是用**下划线**切分的，
+    #    `text_embedder_blocks_0_ffn_down` 切出来是
+    #    ['text','embedder','blocks','0','ffn','down'] ——
+    #    `parts[0]` 永远等于 'text'，**这个分支永远进不去**。
+    #    后果：凡是带文本塔键的 LoRA（实测 D1
+    #    moss_image_sft_look_lora.safetensors 的 30 个
+    #    `lora_unet_text_embedder_blocks_*` 键）都被判成
+    #    「无法无歧义归一」-> normalize_lora 整体放弃转换
+    #    -> 融合 qkv 保持原样 -> ComfyUI 挂上 137 层、
+    #    丢弃 126 层（实测 patched=137 / missing=126）。
+    #    修法：按**下划线段**重切（text/embedder/blocks/N/...），
+    #    并把 ffn_down / ffn_gate 还原成底模里的真实模块名。
+    if len(parts) >= 4 and parts[0] == "text" and parts[1] == "embedder":
+        # text_embedder.blocks.N.<tail>
+        if parts[2] != "blocks" or not parts[3].isdigit():
             return None
-        tail = "_".join(parts[3:])
-        if tail in ("ffn_down", "ffn_gate", "ffn_up", "proj", "qkv",
-                    "k_norm", "norm1", "norm2", "q_norm"):
-            return f"text_embedder.blocks.{parts[2]}.{tail}"
+        tail_parts = parts[4:]
+        if not tail_parts:
+            return None
+        # ffn_down / ffn_gate / ffn_up —— **两段**（ffn + down/gate/up）
+        if len(tail_parts) == 2 and tail_parts[0] == "ffn" \
+                and tail_parts[1] in ("down", "gate", "up"):
+            return f"text_embedder.blocks.{parts[3]}.ffn_{tail_parts[1]}"
+        # proj / qkv —— 单段模块名
+        if len(tail_parts) == 1 and tail_parts[0] in ("proj", "qkv"):
+            return f"text_embedder.blocks.{parts[3]}.{tail_parts[0]}"
+        # k_norm / q_norm —— 两段（k/q + norm）
+        if len(tail_parts) == 2 and tail_parts[0] in ("k", "q") \
+                and tail_parts[1] == "norm":
+            return f"text_embedder.blocks.{parts[3]}.{tail_parts[0]}_norm"
+        # norm1 / norm2 —— 两段（norm + 数字）
+        if len(tail_parts) == 2 and tail_parts[0] == "norm" \
+                and tail_parts[1].isdigit():
+            return f"text_embedder.blocks.{parts[3]}.norm{tail_parts[1]}"
+        # norm1 / norm2 —— **单段**（有些上游写成 norm1 而不是 norm_1）
+        if len(tail_parts) == 1 and tail_parts[0] in ("norm1", "norm2"):
+            return f"text_embedder.blocks.{parts[3]}.{tail_parts[0]}"
+        # k_norm / q_norm —— 单段（有些上游写成 knorm）
+        if len(tail_parts) == 1 and tail_parts[0] in ("knorm", "qnorm"):
+            return f"text_embedder.blocks.{parts[3]}.{tail_parts[0]}"
+        # 非 blocks.* 的顶层：text_embedder.proj（底模有 proj / blocks.*）
+        if len(tail_parts) == 1 and tail_parts[0] == "proj":
+            return "text_embedder.proj"
         return None
     # 找 "layers" 锚点
     if "layers" not in parts:
@@ -474,7 +595,26 @@ def check_moss_compatibility(path) -> dict:
     if not base_keys:
         return base
 
-    header = read_safetensors_header(path)
+    # ⚠️ **2026-11-15 修复（损坏文件被当成兼容）**：
+    # 旧逻辑是「读不到头部 -> return base」，而 base 的 compatible=True。
+    # 于是**文件本体损坏**（读头抛异常 / 文件被截断）的 LoRA
+    # 会以 compatible=true 下发 —— 用户选中后 ComfyUI 必然抛错。
+    # 实测 D2（hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors）：
+    # 文件被截断（5,369,856 / 297,355,184 字节），
+    # ComfyUI 抛 SafetensorError: incomplete metadata，
+    # 但旧代码仍判 attention_hit=1.0 / compatible=true。
+    # 修法：**fail closed** —— 读不出完整文件 = 明确不兼容 + 如实原因。
+    detail = read_safetensors_header_detail(path)
+    if not detail["ok"]:
+        base["compatible"] = False
+        base["verified"] = True
+        base["attention_hit"] = 0.0
+        base["reason"] = (
+            f"{detail['reason']} "
+            "这个 LoRA 无法在本机上使用，已从可选列表中排除。")
+        return base
+
+    header = detail["header"]
     if not header:
         return base
 
@@ -489,6 +629,25 @@ def check_moss_compatibility(path) -> dict:
     modules = lora_modules(header)
     if not modules:
         return base
+
+    # 每个模块的载体 -> 形状（从头部拿，不读权重本体）
+    # 用途：判定「融合 qkv 拆开后**必然**命中」这个前提是否真的成立
+    #       —— 行映射载体（lora_B / hada_w1_a ...）的第 0 维必须能被 3 整除，
+    #       否则 _row_split3 会抛 ValueError，转换就做不成。
+    module_carriers: dict[str, dict[str, tuple]] = {}
+    for key in raw_keys:
+        norm = normalize_key(key)
+        if norm is None:
+            continue
+        module = module_name_of(norm)
+        if not module:
+            continue
+        suffix = norm[len(module):].lstrip(".")
+        # ⚠️ 变量名不要叫 `shape` —— 外面已经有一个 `shape`（QKV 形态字符串
+        #    "fused"/"split"）了，在这里被元组覆盖会导致后面的
+        #    `shape == QKV_SHAPE_FUSED` 永远为 False（实测 D1 命中率算成 0.75）。
+        tshape = tuple(header[key].get("shape", ())) if isinstance(header[key], dict) else ()
+        module_carriers.setdefault(module, {})[suffix] = tshape
 
     # LoKR 直接形态的融合 qkv **不可无损拆分**（Kronecker 分解的行映射
     # 与三等分不对应，实测数值不等价）-> 明确判不兼容。
@@ -535,7 +694,28 @@ def check_moss_compatibility(path) -> dict:
             hit += 1
             continue
         if module.endswith(".proj.qkv") and shape == QKV_SHAPE_FUSED:
-            # 可无损拆分 -> 拆开后必然命中
+            # 可无损拆分 -> 拆开后必然命中。
+            #
+            # ⚠️ **2026-11-15 修复（命中率口径失真）**：
+            # 旧代码这里只 `continue`（不计入 hit），但 total 已经 +1
+            # —— 于是「拆开后**能**命中」的融合 qkv 被算成了「没命中」。
+            # 实测 D1（moss_image_sft_look_lora.safetensors）：
+            # 42 层融合 qkv 全被算成 miss -> 命中率只有 126/168 = 0.75，
+            # 而实际上转换后 ComfyUI 挂上 **263/0**（实测 patched=263,
+            # missing=0）。命中率必须按「**转换后**的真实结果」算。
+            # 前提：行映射载体的第 0 维必须能被 3 整除（否则拆分会失败），
+            # 这里用头部的 shape 直接校验 —— 不读权重本体。
+            carriers = module_carriers.get(module, {})
+            splittable = True
+            for suffix, tshape in carriers.items():
+                if suffix in _ROW_SPLIT_SUFFIXES:
+                    if not tshape or tshape[0] % 3 != 0:
+                        splittable = False
+                        break
+            if splittable:
+                hit += 1
+                continue
+            miss_other += 1
             continue
         if ".proj.qkv." in module:
             miss_fused += 1
