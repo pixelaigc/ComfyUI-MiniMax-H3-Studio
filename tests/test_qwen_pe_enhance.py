@@ -558,8 +558,14 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
 
     def test_qwen_pe_disable_double_expansion_on_generate(self):
         """
-        手动跑过官方 PE 并**写回提示词框**后，出图时不再二次扩写
-        （提示词框里已经是官方 PE 结果，再扩会冲掉用户的编辑）。
+        【2026-11-15 修复①】出图链路里**根本不存在** PE 扩写，
+        所以「二次扩写」这个状态已经不存在了 —— 没有开关可关。
+
+        原来这条用例断言的是两态语义：
+          还没写回 -> state.imgQwen.usePe 为 true（出图仍走 PE 接线）
+          写回之后 -> state.imgQwen.usePe 为 false（关掉二次扩写）
+        现在 `usePe` 字段整个被删除了（出图链路已无 PE 节点），
+        所以两条断言都换成了「字段不存在」+「出图参数里没有 PE 字段」。
         """
         self.switch_mode("t2i_qwen")
         self.select_only_qwen_pe()
@@ -567,14 +573,28 @@ class TestQwenPeEnhanceBrowser(unittest.TestCase):
         self._stub_pe_endpoint()
         self.page.click("#enhanceBtn")
         self.page.wait_for_selector("#enhanceModal:not([hidden])", timeout=20000)
-        # 只是弹窗里预览、还没写回 -> 不应改变出图语义
-        self.assertTrue(self.page.evaluate("() => state.imgQwen.usePe"),
-                        "还没写回提示词框时，出图仍应走官方 PE 接线")
-        # 写回之后才关掉二次扩写
+
+        # 弹窗里预览（还没写回）时，出图语义不受影响 ——
+        # 因为出图链路里压根没有 PE 节点可被影响。
+        self.assertIsNone(self.page.evaluate("() => state.imgQwen.usePe"),
+                          "state.imgQwen.usePe 应已删除（出图链路无 PE 节点）")
+        # 出图参数里也不该再有 use_pe 字段
+        has_params_fn = self.page.evaluate(
+            "() => typeof buildImgParams === 'function'")
+        if has_params_fn:
+            param_keys = self.page.evaluate(
+                "() => Object.keys(buildImgParams() || {})")
+            self.assertNotIn("use_pe", param_keys,
+                             "出图参数里不应再有 use_pe 字段")
+
+        # 写回之后仍然一样：出图链路里没有 PE，不存在「二次扩写」。
         self.page.click("#enhanceReplace")
         self.page.wait_for_timeout(400)
-        self.assertFalse(self.page.evaluate("() => state.imgQwen.usePe"),
-                         "写回官方 PE 结果后，出图不应再二次扩写")
+        self.assertIsNone(self.page.evaluate("() => state.imgQwen.usePe"),
+                          "写回后也不该出现 usePe（字段已删除）")
+        self.assertEqual(self.page.input_value("#prompt").strip(),
+                         "A warm photograph of an orange tabby cat.".strip(),
+                         "写回后提示词框应是官方 PE 结果")
 
     def test_qwen_pe_failure_shows_error_not_silent(self):
         """官方 PE 失败必须明确报错，提示词框不被改动。"""
