@@ -1,0 +1,89 @@
+{
+  "checks": [
+    {
+      "name": "素材库有 video 类别素材（参考视频入口有东西可选）",
+      "ok": true,
+      "detail": "video=76"
+    },
+    {
+      "name": "素材库有 audio 类别素材（参考音乐入口有东西可选）",
+      "ok": true,
+      "detail": "audio=9"
+    },
+    {
+      "name": "素材库有 image 类别素材（参考图入口有东西可选）",
+      "ok": true,
+      "detail": "image=67"
+    },
+    {
+      "name": "r2v 任务跑完",
+      "ok": true,
+      "detail": "status=done err="
+    },
+    {
+      "name": "r2v 产物文件可定位",
+      "ok": false,
+      "detail": "找不到产物文件"
+    },
+    {
+      "name": "flf 仅尾帧被接受（前端已放宽，后端也接受）",
+      "ok": true,
+      "detail": "job=8c02b4a28fda"
+    },
+    {
+      "name": "flf 仅尾帧跑完",
+      "ok": true,
+      "detail": "status=done err="
+    },
+    {
+      "name": "flf 仅尾帧产物可定位",
+      "ok": false,
+      "detail": "找不到产物文件"
+    },
+    {
+      "name": "flf 首+尾跑完",
+      "ok": true,
+      "detail": "status=done err="
+    },
+    {
+      "name": "flf 首+尾产物可定位",
+      "ok": false,
+      "detail": "找不到产物文件"
+    },
+    {
+      "name": "flf 仅首帧跑完",
+      "ok": true,
+      "detail": "status=done err="
+    },
+    {
+      "name": "r2v 落库 params.width/height = 864×480",
+      "ok": true,
+      "detail": "width=864 height=480 resolution=544p aspect=16:9"
+    },
+    {
+      "name": "r2v 落库 params.audio_track_source 已保留",
+      "ok": true,
+      "detail": "video_bg"
+    },
+    {
+      "name": "flf 落库 params.width/height = 864×480",
+      "ok": true,
+      "detail": "width=864 height=480 resolution=544p aspect=16:9"
+    },
+    {
+      "name": "flf 落库 params.audio_track_source 已保留",
+      "ok": true,
+      "detail": "generated"
+    }
+  ],
+  "jobs": {
+    "r2v_video_bg": "c7ce7f92b1b0",
+    "r2v_video_bg_status": "done",
+    "flf_last_only": "8c02b4a28fda",
+    "flf_last_only_status": "done",
+    "flf_both": "eea057e98f75",
+    "flf_both_status": "done",
+    "flf_first_only": "245a87f896fe",
+    "flf_first_only_status": "done"
+  }
+}
