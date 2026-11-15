@@ -3073,6 +3073,29 @@ $("#genBtn").addEventListener("click", async () => {
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+    // 加速 LoRA：把「不挂」**显式表达**出来（与 flf/r2v 分支同一写法）。
+    //
+    // 【2026-11-15 代码审查修 —— 「不挂」被静默反转成「挂 ckpt850」】
+    // 共享面板提交的是**数组** `accel_loras`（空数组 = 不挂），
+    // 而后端 `resolve_accel_lora_slot()` 的显式槽位判据是**键存在**
+    // （`"accel_lora" in params`）。t2v 分支原先**不补**这个键 ->
+    // 后端四条分支全不命中 -> 落到兜底 `VIDEO_FIXED_ACCEL_LORA_DEFAULT`
+    // = "ckpt850" —— 用户明确选了「不挂加速 LoRA（走标准多步采样）」，
+    // 工作流里却挂着 4 步蒸馏 LoRA，界面文案变成假文案。
+    //
+    // 【为什么在前端修，而不是改后端判据】
+    // 后端「**完全没有**加速信息 -> 默认 ckpt850」是**老任务重放**的语义
+    // （历史落库数据没有加速字段，它们的工作流本来就恒挂 ckpt850）。
+    // 把后端判据改成「空数组 = 不挂」会让那些老任务重放出来的画面**变样** ——
+    // 那比原缺陷更严重。tests/test_t2v_panel.py::test_default_accel_lora_is_ckpt850
+    // 正是钉这条契约的（实测：该测试在基线 8bcc3d0 通过，在改后端判据后失败）。
+    // 所以：**前端补上显式键**，后端语义不动。
+    const accelList = params.accel_loras || [];
+    const firstAccel = accelList.find(
+      it => it && it.key && it.enabled !== false && Number(it.strength) > 0);
+    params.accel_lora = firstAccel ? firstAccel.key : "";
+    params.accel_lora_strength = firstAccel
+      ? Number(firstAccel.strength) : 1.0;
     // 【接续】把接续上下文一起提交（服务端据此校验并算段号）。
     //
     // 【为什么这里原样透传而不自己算段号】前端回填的 continuation
