@@ -1,0 +1,12 @@
+{
+  "job_id": "09baa05e717a",
+  "mode": "r2v",
+  "submitted_via": "浏览器真实面板路径（素材库选择器 + 音轨下拉 + #genBtn）",
+  "audio_track_source": "video_bg",
+  "artifact": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_09baa05e717a_00001_.mp4",
+  "corr_vs_reference_video": 0.9996,
+  "corr_vs_reference_music": 0.0278,
+  "verdict": "音轨来自参考视频背景音",
+  "reference_video_path": "/mnt/usb2t/asset_library/originals/b9/ce/b9ce51dc755c75a2__v-h3-studio-000167.mp4",
+  "reference_music_path": "/mnt/usb2t/asset_library/originals/78/ee/78ee4cfeda3d36d3__H3短片配乐_YuE2生成.flac"
+}

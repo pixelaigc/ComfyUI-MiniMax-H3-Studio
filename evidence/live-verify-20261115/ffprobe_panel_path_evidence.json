@@ -1,0 +1,36 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "jobs": {
+    "09baa05e717a": {
+      "job_id": "09baa05e717a",
+      "mode": "r2v",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "video_bg",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_09baa05e717a_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.166667",
+        "size_bytes": "1235667",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.000000"
+        }
+      }
+    }
+  }
+}
