@@ -1,0 +1,178 @@
+[
+ {
+  "ok": true,
+  "elapsed": 15.6,
+  "status": "completed",
+  "answer_head": "本工作台共支持 11 个生成模式：\n\n【视频】t2v 文生视频、flf 首尾帧生成（需首/尾帧素材）、r2v 参考图生成视频（需素材库参考图/视频）\n【图像】t2i Z-Image 文生图、t2i_qwen Qwen-Image 2.1 文生图、i2i_qwen Qwen 图片编辑、t2i_moss MOSS-Image 文生图、t2i_h3image H3-Image 文生图、i2i_h3image H3-Image 图片编辑（最多 16 张参考图）\n【音乐】t2a 文生音乐、a2a 参考生音乐（需 1 段参考音频）\n\n通用参数：比例 1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9；视频分辨率仅 544p、768p，时长 2~60 秒，加速 LoRA 为 none / ckpt850 / v4step600；音乐时长用 max_durat",
+  "mentions_tool": true,
+  "tool": "list_modes",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 4.2,
+  "status": "completed",
+  "answer_head": "素材库中检索到 2 个与「火星」相关的素材：1）视频《H3Studio_火星基地_2分钟_480P.mp4》（asset_61f1b6fd9a1d）；2）图片《火星基地_宇航员_参考图.png》（asset_21f5d051d841）。两者目前都没有标签和已分析的详细描述。如需基于它们做生成（如参考生视频、图片编辑）或查看某素材详情，告诉我即可。",
+  "mentions_tool": true,
+  "tool": "search_assets",
+  "args": {
+   "query": "火星"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 4.2,
+  "status": "completed",
+  "answer_head": "已列出素材库全部标签：共 215 个标签，返回了使用频次最高的前 30 个。高频标签集中在「主体人物」(139)、「光线与色彩」「场景与环境」「冷色调为主」「独自站在桥上」「雨夜的石桥」(各 78) 等，看起来素材库里有一批\"雨夜石桥+人物\"主题的素材；另有一组纯色/RGB 色卡类标签（如「画面为纯色背景」「FF0000」「RGB近似值」）。需要的话我可以按这些标签检索素材，或用 tag_asset 给素材补标。",
+  "mentions_tool": true,
+  "tool": "list_asset_tags",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 14.3,
+  "status": "completed",
+  "answer_head": "已获取 t2v（文生视频）模式的参数 schema：\n\n- **比例 aspect**：1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9（默认 16:9）\n- **分辨率 resolution**：仅 544p / 768p（默认 768p，无 1080p）\n- **时长 duration**：2~60 秒，步进 1（默认 5 秒）\n- **模型 model**：lora（唯一取值）\n- **加速 LoRA lora**：none / ckpt850 / v4step600（默认 ckpt850），强度 lora_strength 0~2（默认 1.0）\n- **精度 precision**：int8（默认）/ nvfp4\n\n未列出的参数留空即由工作台用官方默认值补齐；该模式无参考素材槽位、无负面提示词通道。取值均来自 workflows 真",
+  "mentions_tool": true,
+  "tool": "get_mode_schema",
+  "args": {
+   "mode": "t2v"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 41.1,
+  "status": "completed",
+  "answer_head": "已获取 r2v（参考图生成视频）模式的参数说明：\n\n- **比例 aspect**：1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9，默认 16:9\n- **分辨率 resolution**：仅 544p / 768p，默认 768p\n- **时长 duration**：2~60 秒（步长 1），默认 5 秒\n- **模型 model**：lora（唯一取值）\n- **加速 LoRA lora**：none / ckpt850 / v4step600，默认 ckpt850；强度 lora_strength 0.0~2.0，默认 1.0\n- **精度 precision**：int8（默认）/ nvfp4\n- **参考素材 asset_id**：必填，1~10 张，槽位 ref_image（可多张），必须来自素材库\n\n未列出的参数留空即由工作台",
+  "mentions_tool": true,
+  "tool": "describe_mode_params",
+  "args": {
+   "mode": "r2v"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 37.9,
+  "status": "completed",
+  "answer_head": "get_prompt_preset 需要 spec_id 参数（不能传空对象）。我先列出了可用的 12 个预设供你选择：\n\n**图像类**\n- image — Z-Image 官方 PE（用于 t2i / i2i_h3image / t2i_h3image）\n- image-refine — 物体细化二次增强\n- image-scalist — SCALIST 结构化\n- image-bbox — FLUX 3 官方 bbox 元素表格式\n- qwen21-pe-t2i — Qwen-Image 2.1 文生图结构化描述（t2i_qwen）\n- qwen21-pe-i2i — Qwen-Image 2.1 图片编辑「修改X保持Y」（i2i_qwen）\n- moss-image — MOSS-Image 官方 Skill 描述式扩写（t2i_moss）\n\n**视频类**\n- video — ",
+  "mentions_tool": true,
+  "tool": "get_prompt_preset",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 10.5,
+  "status": "completed",
+  "answer_head": "工作台内置 12 个提示词增强预设，按媒体类型分组：\n\n【图像 6 个】\n- image — Z-Image 官方 PE（适用 i2i_h3image / t2i / t2i_h3image）\n- image-refine — 物体细化二次增强\n- image-scalist — SCALIST 结构化\n- image-bbox — FLUX 3 官方 bbox 元素表格式\n- qwen21-pe-t2i — Qwen-Image 2.1 文生图结构化描述（t2i_qwen）\n- qwen21-pe-i2i — Qwen-Image 2.1 图片编辑「修改X保持Y」（i2i_qwen）\n- moss-image — MOSS-Image 官方 Skill 描述式扩写（t2i_moss）\n\n【视频 2 个】\n- video — MiniMax-H3 通用视频提示词\n- video-direc",
+  "mentions_tool": true,
+  "tool": "list_prompt_presets",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 28.1,
+  "status": "completed",
+  "answer_head": "已查询最近任务列表：共 10 条记录。其中可见多条文生视频（t2v）任务处于排队中（queued），提示词为占位符「x」，时长 5s；另有已完成的任务产物为 672p · 1216×672 · 16:9，使用加速 LoRA minimax_h3_turbo_4step_ema_ckpt850。需要看某条任务的详细进度或产物路径，告诉我 job_id，我用 get_job_status 查。",
+  "mentions_tool": true,
+  "tool": "list_jobs",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 40.0,
+  "status": "completed",
+  "answer_head": "已调用 recall_memory（参数 {}）。当前跨会话偏好记忆为空：total=0，没有任何已保存的偏好记录（如常用比例、默认模型等）。如需我记住某些偏好，告诉我即可，我会用 remember_preference 保存。",
+  "mentions_tool": true,
+  "tool": "recall_memory",
+  "args": {}
+ },
+ {
+  "ok": true,
+  "elapsed": 9.0,
+  "status": "completed",
+  "answer_head": "已检索关键词「视频」的历史会话，共命中 10 条（返回前 7 条）。主要内容：①历史任务列表里有多条 t2v 文生视频任务在排队（prompt 为占位符「x」、5s），已完成产物为 1216×672 · 16:9 · 672p，使用 LoRA minimax_h3_turbo_4step_ema_ckpt850；②提示词预设中与视频相关的是 video（MiniMax-H3 通用视频提示词）和 video-director（官方三段式导演提示词，适用 t2v / flf / r2v / longfilm）。未找到你本人的真实创作会话记录。",
+  "mentions_tool": true,
+  "tool": "search_conversations",
+  "args": {
+   "query": "视频"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 7.8,
+  "status": "completed",
+  "answer_head": "在素材历史里检索「火星」，共命中 2 条：\n\n1. **H3Studio_火星基地_2分钟_480P.mp4**（视频，asset_61f1b6fd9a1d）— 未做内容分析，无标签。\n2. **火星基地_宇航员_参考图.png**（图片，asset_21f5d051d841）— 未做内容分析，无标签。\n\n两条都没有历史生成任务的引用记录。需要的话我可以进一步探测视频参数、给它们补标签，或用那张参考图下发一次生成任务。",
+  "mentions_tool": true,
+  "tool": "search_asset_history",
+  "args": {
+   "query": "火星"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 13.9,
+  "status": "completed",
+  "answer_head": "已用「video-director」视频导演模板对提示词完成增强（校验通过）。原始提示词 \"a girl walking in the rain\" 被扩写为包含镜头调度、画面细节、环境声与配乐的完整分镜描述。如需我据此直接下发 t2v 生成任务，告诉我即可。",
+  "mentions_tool": true,
+  "tool": "enhance_prompt",
+  "args": {
+   "prompt": "a girl walking in the rain",
+   "mode": "t2v"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 4.5,
+  "status": "completed",
+  "answer_head": "已查看素材 asset_21f5d051d841：「火星基地_宇航员_参考图.png」，类型为图片（photo），尺寸 1360×768，无标签，尚无模型分析结论（描述为空）。如需我基于它做图像编辑或参考生视频，告诉我用途即可。",
+  "mentions_tool": true,
+  "tool": "describe_asset",
+  "args": {
+   "asset_id": "asset_21f5d051d841"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 5.7,
+  "status": "completed",
+  "answer_head": "任务 bd344e7aa852（文生视频）已完成，进度 19/19 节点，耗时约 73 秒。产物：videos/v-h3-studio-000192.mp4（864×480，16:9）。提示词为「a red kite over a calm river at dusk, cinematic」，模型 fl2va_pruned_int8 + turbo 4step LoRA，时长参数记录为 2.0s。无报错。",
+  "mentions_tool": true,
+  "tool": "get_job_status",
+  "args": {
+   "job_id": "bd344e7aa852"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 4.6,
+  "status": "completed",
+  "answer_head": "已按 failed 口径预览清理：共涉及 3 条失败/取消的任务记录（cfcd9dccf7de、54ab20ffc30c、c49ce61c8d6c），产物文件 0 个。当前为 dry_run 预览，未实际删除。如需执行，请回复确认，我会用 confirm=true 再跑一次。",
+  "mentions_tool": true,
+  "tool": "manage_media_library",
+  "args": {
+   "scope": "failed"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 4.3,
+  "status": "completed",
+  "answer_head": "已探测素材「H3Studio_火星基地_2分钟_480P.mp4」(asset_61f1b6fd9a1d)：视频 864×480、h264/yuv420p、24fps；音频 aac、44.1kHz 立体声；时长约 120 秒；容器 mov，大小约 27.2 MB。",
+  "mentions_tool": true,
+  "tool": "media_probe",
+  "args": {
+   "asset_id": "asset_61f1b6fd9a1d"
+  }
+ },
+ {
+  "ok": true,
+  "elapsed": 15.8,
+  "status": "completed",
+  "answer_head": "已完成「MiniMax H3」的外部检索（局域网聚合引擎），共 5 条结果：\n\n1. **MiniMax 官方博客**（minimax.io/blog/minimax-h3，2026-07-31）：H3 是官方正式发布的通用全模态生成模型，支持精确可控的多模态生成与编辑，面向广告、品牌、电商、产品设计、UI/UX、游戏等场景。\n2. **minimaxh3.ai**：H3 作为 AI 视频生成器的介绍——支持图像/视频/音频输入，单次请求最多可混合 9 张图、3 段视频、3 段音频。\n3. **MiniMax 中文站**（minimaxzh.com）：公司背景，2021 年 12 月由前商汤副总裁闫俊杰创立。\n4. **维基百科（闫俊杰）**：MiniMax 港股上市首日涨 54%，IPO 募集 6.19 亿美元；与智谱市值突破 3000 亿港元。\n\n注：以上为外部检索数据，仅作信息参考，",
+  "mentions_tool": true,
+  "tool": "web_search",
+  "args": {
+   "query": "MiniMax H3"
+  }
+ }
+]
