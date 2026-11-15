@@ -1,0 +1,12 @@
+[
+ {"id":"p1","step":"盘点主线 HEAD / 线上 HEAD / quota / 工作区 audits+evidence 现状","status":"in_progress"},
+ {"id":"p2","step":"A1 核对：前端基础模型+加速LoRA 是否真实下发 UNET/LoRA 槽位，工作流是否写死 ckpt850","status":"pending"},
+ {"id":"p3","step":"A2/A3 核对：素材库播放器模式（手动播放列表/图片模式无输入框/音乐单曲列表随机）+ 多选复选框默认不显示","status":"pending"},
+ {"id":"p4","step":"A4/A5 核对：内置 Agent 默认参数按生成类型持久化生效 + 运行态依 ComfyUI 队列/历史真实判定","status":"pending"},
+ {"id":"p5","step":"B1/B2 核对：首尾帧三种模式 + 参考生视频(≤9图/N视频/1音乐, 音轨三选一)","status":"pending"},
+ {"id":"p6","step":"C 项：内置 Agent 全功能逐项审查，修复失效路径并回归","status":"pending"},
+ {"id":"p7","step":"D 项：核验并行任务 ec6c150d 产出（ffprobe/素材库/播放器），不重复造片","status":"pending"},
+ {"id":"p8","step":"补缺开发（独立 worktree+分支）+ 定向测试回归 + merge-tree 检查","status":"pending"},
+ {"id":"p9","step":"合并 local/maintainer 并部署 8190 探活（HTTP 200 + 日志 + 回滚点）","status":"pending"},
+ {"id":"p10","step":"落盘中文收口报告到 audits/，evidence/ 收截图与产物","status":"pending"}
+]

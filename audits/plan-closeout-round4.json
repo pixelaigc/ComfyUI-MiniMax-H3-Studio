@@ -1,0 +1,9 @@
+[
+ {"id":"m1","step":"额度复采（15:02 快照 99%）+ 主线/线上 HEAD 盘点","status":"completed"},
+ {"id":"m2","step":"只读定位媒体库缺陷根因（前端筛选状态粘滞 + 后端 media 缺 audio）","status":"completed"},
+ {"id":"m3","step":"修复：长片拼接页改页面级覆盖 + 后端 media 支持 audio + 下拉补音频选项","status":"completed"},
+ {"id":"m4","step":"定向回归 + 变异检查（8 条新增测试，撤修复 6 红）+ 全量 pytest 与基线对跑","status":"in_progress"},
+ {"id":"m5","step":"合并主线 + 回灌 live 8190 探活（已 HTTP 200 + app.js?v=mediadef1）","status":"completed"},
+ {"id":"m6","step":"线上实测：文生图 job a6d673fb1e51 + 文生视频 job 6aab66058a79 同时出现在媒体库","status":"completed"},
+ {"id":"m7","step":"逐条 A1/A2/A3/A4/A5/B1/B2/C/D 三态结论写中文收口报告到 audits/","status":"pending"}
+]
