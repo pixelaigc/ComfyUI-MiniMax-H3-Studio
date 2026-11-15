@@ -187,6 +187,11 @@ def ensure_normalized(lora_path) -> dict:
     - 已经是兼容形态 -> 直接返回原路径
     - 需要转换 -> 转换并返回派生路径
     - 转换失败 -> path=None + reason（调用方必须报错，不静默）
+
+    ⚠️ **2026-11-15（L-B）**：本函数是**派生文件生成成功**的那条路径
+    （工作流提交时 `workflows.py` 会调它）。派生文件生成后必须清理
+    一次过期派生文件 —— 源文件被更新后，旧派生文件带着**旧权重**，
+    ComfyUI 会照常加载它 -> 用户以为加载了新 LoRA，实际生效的是旧副本。
     """
     src = Path(lora_path)
     header = compat.read_safetensors_header(src)
@@ -194,6 +199,13 @@ def ensure_normalized(lora_path) -> dict:
         return {"path": None, "derived": False, "reason": "读不到 safetensors 头部"}
     r = normalize_lora(src)
     if r["ok"]:
+        # 派生文件生成/复用成功 -> 顺手清掉过期的派生文件。
+        # 清理失败不影响本次提交（派生文件已经就位），
+        # 失败就等下次预热再清。
+        try:
+            cleanup_stale_derived()
+        except Exception:
+            pass
         return {"path": Path(r["target"]), "derived": bool(r["changed"]), "reason": ""}
     return {"path": None, "derived": False, "reason": r["reason"]}
 
@@ -310,7 +322,34 @@ def conversion_status(lora_path) -> dict:
 
 
 def cleanup_stale_derived(lora_dirs=None) -> int:
-    """清理过期的派生文件（源文件比派生文件更新时，派生文件失效）。"""
+    """清理过期的派生文件（源文件比派生文件更新时，派生文件失效）。
+
+    ⚠️ **2026-11-15 修复（L-B：此函数此前没有任何调用点）**：
+    派生文件是「源文件的后代」—— 源文件被更新（重下 / 替换）后，
+    旧派生文件就是垃圾：它带着**旧权重**的归一结果，ComfyUI 会照常
+    加载它 -> 用户以为加载了新 LoRA，实际生效的是旧副本。
+    所以派生文件生成成功后必须清理一次。
+
+    【源文件怎么找 —— 必须用派生文件自己的目录】
+    派生文件名是 `h3studio_mossnorm__<原名扁平化>`（`/` 换成 `__`），
+    派生文件**就放在源文件同一个目录里**（见 normalize_lora 的
+    `target_dir = src.parent`）。所以反解源文件必须用
+    `candidate.parent / <原名>`，**不能**用 `lora_dir / <原名>` ——
+    后者会拿 lora 根目录去找，源文件明明在 `moss-effects/` 子目录里，
+    于是「源文件不存在」-> 判定「派生文件过期」-> **把全部有效派生
+    文件删光**（实测 48 个 MOSS 派生文件全部会被误删）。
+
+    【什么时候删 —— 只删两种】
+      1. 源文件已经不在了（被删了 / 改名了）-> 派生文件是孤儿
+      2. 源文件比派生文件新（mtime 更晚）-> 派生文件带着旧权重
+
+    【什么时候不删 —— 正在使用的】
+    源文件与派生文件 mtime 相同或派生文件更新 -> **保留**。
+    派生文件刚生成时（mtime == 源文件 mtime，或因写盘顺序偶发
+    派生文件更新）绝不能被删。
+
+    返回：删除数量。
+    """
     from .loras import comfyui_lora_dirs
     dirs = lora_dirs or comfyui_lora_dirs()
     removed = 0
@@ -323,12 +362,19 @@ def cleanup_stale_derived(lora_dirs=None) -> int:
             try:
                 if not candidate.is_file():
                     continue
-                original = candidate.name[len(DERIVED_PREFIX):].replace("__", "/")
-                source = Path(directory) / original
-                if not source.is_file() or source.stat().st_mtime > candidate.stat().st_mtime:
+                # ⚠️ 源文件在**派生文件自己的目录**里找（不是 lora 根目录）
+                original = candidate.name[len(DERIVED_PREFIX):]
+                source = candidate.parent / original
+                if not source.is_file():
+                    # 源文件没了 -> 孤儿派生文件
                     candidate.unlink()
                     removed += 1
-            except Exception:
+                    continue
+                # 源文件比派生文件新 -> 派生文件带着旧权重，失效
+                if source.stat().st_mtime > candidate.stat().st_mtime:
+                    candidate.unlink()
+                    removed += 1
+            except OSError:
                 continue
     return removed
 
@@ -352,11 +398,12 @@ def prewarm_derived(lora_paths, progress=None, should_stop=None) -> dict:
       should_stop 可选的停止回调 -> 返回 True 时提前中止
 
     返回：{"attempted": int, "converted": int, "reused": int,
-           "failed": int, "results": [...], "stopped": bool}
+           "failed": int, "results": [...], "stopped": bool,
+           "stale_removed": int}
     """
     total = len(list(lora_paths))
     out = {"attempted": 0, "converted": 0, "reused": 0, "failed": 0,
-           "results": [], "stopped": False}
+           "results": [], "stopped": False, "stale_removed": 0}
     done = 0
     for path in lora_paths:
         if should_stop is not None and should_stop():
@@ -388,4 +435,21 @@ def prewarm_derived(lora_paths, progress=None, should_stop=None) -> dict:
                 progress(done, total, str(src), row["ok"], row["reason"])
             except Exception:
                 pass
+    # ⚠️ **2026-11-15（L-B）：派生文件生成成功后的清理路径**。
+    #
+    # 派生文件是「源文件的后代」—— 源文件被更新（重下 / 替换）后，
+    # 旧派生文件带着**旧权重**的归一结果，ComfyUI 会照常加载它 ->
+    # 用户以为加载了新 LoRA，实际生效的是旧副本。
+    # 所以每次预热（派生文件生成/复用）之后必须清理一次。
+    #
+    # 放在循环**之后**而不是循环里：批量转换期间源文件与派生文件的
+    # mtime 关系是乱的（正在写的派生文件 mtime 可能比源文件更早），
+    # 循环中途清理会把**刚生成**的派生文件误删。
+    #
+    # 清理失败（磁盘忙 / 权限）不能影响预热结果 —— 派生文件已经
+    # 正常生成了，清理只是「顺手去掉垃圾」，失败就下次再清。
+    try:
+        out["stale_removed"] = cleanup_stale_derived()
+    except Exception:
+        out["stale_removed"] = 0
     return out
