@@ -1,0 +1,52 @@
+{
+ "round": 2,
+ "comparison": "clean full-suite run (fix tree) vs per-test re-run on BOTH trees",
+ "fix_tree_head": "867345d48df51bd0a4c722a7145955c66ca0491b (branch local/feature/b2-audiotrack-refresh-20251115 + b2-cache-bust)",
+ "baseline_tree_head": "d941d74abcfd84810e1c9f52ef0c0517e4728f90 (pre-change baseline)",
+ "fix_full_suite_result": "23 failed, 2949 passed, 4 skipped in 2252.32s",
+ "per_test_recheck": {
+  "script": "audits/compare_failed_tests.sh -> audits/failed_compare_23.txt",
+  "total_compared": 23,
+  "NEW_failures_introduced_by_my_branch": 0,
+  "pre_existing_red_in_both_trees": 19,
+  "fix_only_green": 4
+ },
+ "new_failures_detail": [],
+ "fix_only_green_detail": [
+  "tests/test_continuation_retry.py::RetryLatentCoordTest::test_continuation_segment_also_gets_its_own_dir",
+  "tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_keeps_the_source_latent_file_untouched",
+  "tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_of_a_job_does_not_reuse_the_source_latent_dir",
+  "tests/test_page_size.py::TestPageSize::test_current_page_highlighted"
+ ],
+ "pre_existing_red_detail": [
+  "tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged",
+  "tests/test_flow_diagram.py::FlowDiagramSyncTest::test_agent_tools_appear_in_diagram",
+  "tests/test_flow_diagram.py::FlowDiagramSyncTest::test_api_routes_appear_in_derived_list",
+  "tests/test_flow_diagram.py::FlowDiagramSyncTest::test_gen_flow_check_passes",
+  "tests/test_flow_diagram.py::FlowDiagramCoverageTest::test_agent_tools_are_grouped",
+  "tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_fallback_manifest_carries_one",
+  "tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_options_payload_carries_one",
+  "tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry",
+  "tests/test_page_size.py::TestPageSize::test_change_page_size_resets_to_first_page",
+  "tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled",
+  "tests/test_panel_fallback.py::TestFrontendFallbackContract::test_fallback_covers_all_server_models",
+  "tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras",
+  "tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_flf_accepts_sampling_params",
+  "tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_legacy_defaults_unchanged",
+  "tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B2_legacy_defaults_match_workflow_hardcoded_tiers",
+  "tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_tiers_match_workflow",
+  "tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_uses_effective_lora_not_state_lora",
+  "tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default",
+  "tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract"
+ ],
+ "flaky_notes": [
+  "tests/test_page_size.py 的 3 条在两棵树之间会翻转（BASE 红 / FIX 绿 与之相反的组合都出现过）：它是 Playwright 起真实浏览器 + 固定 wait_for_timeout 的 UI 测试，在并发跑多套全量时受机器负载影响。逐条单独复跑时 3 条在两棵树上结果一致。",
+  "tests/test_effect_lora_frontend.py 的 2 条（test_02 / test_03）只在**三个全量套件并发**时红：单独跑 3 轮均 10/10 绿，baseline 树在同样并发下也绿过。判定为并发负载导致的 UI 时序 flaky，与本次改动无关（本次改动只碰 web/app.js 的 fillFromAsset/fillSlot 与 index.html 的 ?v= 版本号）。"
+ ],
+ "targeted_regression_for_my_change": {
+  "tests/test_b2_audiotrack_refresh.py": "4 passed（node 真跑 web/app.js 的 audioTrackAvailability / renderAudioTrackSelect / fillFromAsset）",
+  "mutation_check": "撤掉修复 -> 3 红 1 绿；恢复 -> 4 绿",
+  "related_suites": "tests/test_a23_player.py + test_a4_gen_defaults.py + test_a5_running_truth.py + test_a5_running_truth_frontend.py + test_b1b2_video_modes.py + test_accel_lora_loader_aware.py + test_b2_audiotrack_refresh.py = 168 passed",
+  "agent_suites": "tests/test_agent*.py 定向 348 passed"
+ }
+}

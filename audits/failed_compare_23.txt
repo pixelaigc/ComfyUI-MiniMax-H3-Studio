@@ -1,0 +1,69 @@
+### tests/test_continuation_retry.py::RetryLatentCoordTest::test_continuation_segment_also_gets_its_own_dir
+  BASE: 1 failed in 0.07s
+  FIX: 1 passed in 0.08s
+### tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_keeps_the_source_latent_file_untouched
+  BASE: 1 failed in 0.07s
+  FIX: 1 passed in 0.08s
+### tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_of_a_job_does_not_reuse_the_source_latent_dir
+  BASE: 1 failed in 0.07s
+  FIX: 1 passed in 0.08s
+### tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+  BASE: 1 failed in 0.01s
+  FIX: 1 failed in 0.01s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_agent_tools_appear_in_diagram
+  BASE: 1 failed in 0.07s
+  FIX: 1 failed in 0.08s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_api_routes_appear_in_derived_list
+  BASE: 1 failed in 0.05s
+  FIX: 1 failed in 0.05s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_gen_flow_check_passes
+  BASE: 1 failed in 0.15s
+  FIX: 1 failed in 0.16s
+### tests/test_flow_diagram.py::FlowDiagramCoverageTest::test_agent_tools_are_grouped
+  BASE: 1 failed in 0.05s
+  FIX: 1 failed in 0.05s
+### tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_fallback_manifest_carries_one
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.01s
+### tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_options_payload_carries_one
+  BASE: 1 failed in 1.86s
+  FIX: 1 failed in 1.61s
+### tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.03s
+### tests/test_page_size.py::TestPageSize::test_change_page_size_resets_to_first_page
+  BASE: 1 passed in 27.53s
+  FIX: 1 passed in 22.88s
+### tests/test_page_size.py::TestPageSize::test_current_page_highlighted
+  BASE: 1 failed in 25.54s
+  FIX: 1 passed in 19.98s
+### tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled
+  BASE: 1 failed in 16.21s
+  FIX: 1 failed in 16.68s
+### tests/test_panel_fallback.py::TestFrontendFallbackContract::test_fallback_covers_all_server_models
+  BASE: 1 failed in 0.01s
+  FIX: 1 failed in 0.01s
+### tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras
+  BASE: 1 failed in 1.51s
+  FIX: 1 failed in 1.71s
+### tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_flf_accepts_sampling_params
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.02s
+### tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_legacy_defaults_unchanged
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.04s
+### tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B2_legacy_defaults_match_workflow_hardcoded_tiers
+  BASE: 1 failed in 0.14s
+  FIX: 1 failed in 0.08s
+### tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_tiers_match_workflow
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.02s
+### tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_uses_effective_lora_not_state_lora
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.03s
+### tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.02s
+### tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
+  BASE: 1 failed in 0.01s
+  FIX: 1 failed in 0.03s
