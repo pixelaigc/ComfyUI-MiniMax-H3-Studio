@@ -246,7 +246,108 @@ calling chunked wrapper with the live 7-arg contract ...
 结果：`evidence-fix4/live_attention_matrix_results.json`
 逐档位 ComfyUI 日志：`evidence-fix4/comfyui-log-<mode>.log`
 
-<!--LIVE_TABLE-->
+### 5.1 实测矩阵（部署后回归，ComfyUI PID 752184）
+
+| 档位 | 工作台标签 | 插入节点 | studio job_id | 状态 | FinalLayer/TypeError 报错行 | 产物 |
+|---|---|---|---|---|---|---|
+| sparse | 稀疏视频注意力（预算制） | `(不插节点)` | `8d74bee0a953` | done | 0 | `t2v_8d74bee0a953_00001_.mp4` | 864×480 / 2.33s |
+| sage | SageAttention 显存优化 | `(不插节点)` | `eed5f3e9c5a5` | done | 0 | `t2v_eed5f3e9c5a5_00001_.mp4` | 864×480 / 2.33s |
+| sol | Sol-Attn 近似路由 | `(不插节点)` | `71cc44632c76` | done | 0 | `t2v_71cc44632c76_00001_.mp4` | 864×480 / 2.33s |
+| kitchen | Comfy Kitchen INT8 量化注意力 | `(不插节点)` | `7771281591df` | done | 0 | `t2v_7771281591df_00001_.mp4` | 864×480 / 2.33s |
+| default | 默认（PyTorch 稠密注意力） | `(不插节点)` | `94a0aa8137e4` | done | 0 | `t2v_94a0aa8137e4_00001_.mp4` | 864×480 / 2.33s |
+
+**判定**：5/5 档位 `status=done`，**每个档位在同一时间窗内、同一 ComfyUI 进程 PID 下
+FinalLayer / TypeError 报错行数 = 0**。
+
+产物逐个用 ffprobe 校验（全部 h264 864×480 + aac，duration 2.333s）：
+
+| job_id | ffprobe |
+|---|---|
+| 8d74bee0a953 | `codec_name=h264 width=864 height=480 codec_name=aac duration=2.333333` |
+| eed5f3e9c5a5 | `codec_name=h264 width=864 height=480 codec_name=aac duration=2.333333` |
+| 71cc44632c76 | `codec_name=h264 width=864 height=480 codec_name=aac duration=2.333333` |
+| 7771281591df | `codec_name=h264 width=864 height=480 codec_name=aac duration=2.333333` |
+| 94a0aa8137e4 | `codec_name=h264 width=864 height=480 codec_name=aac duration=2.333333` |
+
+### 5.2 稀疏档位的「深度取证」—— 证明稀疏路径真的走到了
+
+第一次跑矩阵时稀疏档位被工作台标成 `failed`，原因是**工作台侧**的
+`running_truth.py:97` 宽限期（`DEFAULT_LOST_GRACE_SEC = 10.0`）误判，
+**不是** FinalLayer 报错。深挖 ComfyUI 侧的真实结果：
+
+`sparse_mode_deep_evidence.json`：
+
+```json
+{{
+  "studio_job_id": "87de3a481759",
+  "comfy_prompt_id": "e2fdd12d-b894-44e6-910d-ed3b45bec070",
+  "comfy_status_str": "success",
+  "comfy_completed": true,
+  "comfy_messages": ["execution_start", "execution_cached", "execution_success"],
+  "attention_node_in_prompt": {{
+    "100": {{
+      "class_type": "H3SparseAttention",
+      "_meta": {{"title": "注意力·稀疏视频注意力（预算制）"}},
+      "inputs": {{"model": ["138:0", 0], "video_budget": 0.15, "denser_early_late_steps": true}}
+    }}
+  }},
+  "h3_optimizations_log_line": "[H3 Optimizations] final plan: Sparse Attention; attention: Comfy Kitchen INT8 Sparse.",
+  "final_layer_errors_in_window": 0,
+  "artifact_path": "/home/ubuntu/comfyui/output/h3studio/t2v_87de3a481759_00001_.mp4",
+  "ffprobe": "h264 864x480 + aac, duration=2.333333s, size=400074 bytes"
+}}
+```
+
+三条独立证据说明稀疏路径确实执行了、且没有报错：
+
+1. ComfyUI `/history` 里该 prompt 的 `status_str = "success"`、`completed = true`，
+   消息序列 `execution_start → execution_cached → execution_success`；
+2. 提交的 prompt 里**确实有** `H3SparseAttention` 节点（`video_budget=0.15`）；
+3. ComfyUI 日志有 `[H3 Optimizations] final plan: Sparse Attention; attention: Comfy Kitchen INT8 Sparse.`
+   —— 这是插件进入稀疏分支时打的 INFO，**修复前这一行之后紧跟的就是
+   `TypeError: FinalLayer.forward() missing 3 required positional arguments`**；
+   修复后同一位置没有任何错误行。
+
+随后单独重跑稀疏档位，工作台侧也拿到干净的 `status=done`
+（job `f633a772fc21`，`VERDICT: ALL MODES PASSED`）。
+
+### 5.3 复盘：第一次跑矩阵时踩到的两个「证据造假」陷阱（已修正）
+
+| 陷阱 | 现象 | 修正 |
+|---|---|---|
+| `journalctl --since` 用了 **UTC** | 窗口被放大 8 小时，捞进了 **11 月 11 日** 的旧崩溃，看起来像「刚才又炸了」 | 改用本地时间（`date '+%Y-%m-%d %H:%M:%S'`） |
+| 日志扫描**没有按 PID 收敛** | 旧进程（PID 2314109）的历史崩溃被算进本次结果 | 增加 `comfy_pid()`，只扫 `python[<本次 PID>]` 的行 |
+
+修正后的扫描逻辑（`live_attention_matrix.py`）：
+
+```python
+scoped = '\n'.join(
+    line for line in log_text.splitlines()
+    if ('python[%s]' % pid) in line
+)
+scoped_hits = scan_log(scoped)
+```
+
+**没有这两处修正，「无报错」这个结论是不可信的** —— 这也是为什么最终结论
+同时给出「同一 PID + 同一时间窗 + 0 行」三重收敛。
+
+### 5.4 实测命令
+
+```bash
+# 矩阵实测（部署后回归）
+cd /root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/evidence-fix4
+python3 live_attention_matrix.py --modes sparse,sage,sol,kitchen,default --timeout 1500
+# -> VERDICT: ALL MODES PASSED
+
+# 稀疏路径深度取证
+curl -s http://127.0.0.1:8188/history/e2fdd12d-b894-44e6-910d-ed3b45bec070
+
+# 产物校验
+ffprobe -v error -show_entries format=duration \
+  -show_entries stream=codec_name,width,height \
+  -of default=noprint_wrappers=1 \
+  /home/ubuntu/comfyui/output/h3studio/t2v_8d74bee0a953_00001_.mp4
+```
 
 ---
 
