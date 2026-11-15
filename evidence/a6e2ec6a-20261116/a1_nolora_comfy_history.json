@@ -1,0 +1,32 @@
+{
+  "prompt_id": "ca62a515-9d11-4192-a4df-f2af40d98dd9",
+  "status": "success",
+  "job_id": "d2d9c06c9fc2",
+  "nodes": {
+    "6": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "9": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "scheduler": "simple",
+        "steps": 20,
+        "denoise": 1.0,
+        "model": [
+          "100",
+          0
+        ]
+      }
+    },
+    "17": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "res_multistep"
+      }
+    }
+  }
+}
