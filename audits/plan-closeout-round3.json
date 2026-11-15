@@ -1,0 +1,9 @@
+[
+ {"id":"m1","step":"额度复采 + 主线/线上 HEAD 盘点（live 部署基线为准）","status":"in_progress"},
+ {"id":"m2","step":"只读定位媒体库缺陷根因：前端数据源/过滤 + 后端落盘/查询（图片/音频产物是否落盘与索引）","status":"pending"},
+ {"id":"m3","step":"修复媒体库：所有类型产物（图片/音频/视频）都能显示，含无批次与有批次","status":"pending"},
+ {"id":"m4","step":"定向回归 + 变异检查 + 全量 pytest 与基线对跑（新增失败 0 条）","status":"pending"},
+ {"id":"m5","step":"合并主线 + 回灌 live 8190 探活（HTTP 200 + 日志 + 回滚点）","status":"pending"},
+ {"id":"m6","step":"线上实测：文生图 + 文生视频各一次，接口返回 + 页面截图证明媒体库同时显示两类产物","status":"pending"},
+ {"id":"m7","step":"逐条 A1–A9 三态结论 + 证据清单写中文收口报告到 audits/","status":"pending"}
+]

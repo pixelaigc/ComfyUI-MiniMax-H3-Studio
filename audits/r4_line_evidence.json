@@ -1,0 +1,199 @@
+{
+ "round": 4,
+ "sampled_at": "2026-11-15T15:33:00+08:00",
+ "live_head": "613341c315d4a84bcc387eaab50fe28a042512f1",
+ "mainline_head": "4dea76785de20893453aee11bd85f838fd371b18",
+ "A1": {
+  "verdict": "已上线可用",
+  "C1": {
+   "job_id": "b48e9a06a50d",
+   "comfyui_prompt_id": "94573d97-00dd-403c-964f-366417c1e99c",
+   "requested": {
+    "model_key": "fl2va_pruned_int8",
+    "accel_lora": "ckpt850",
+    "steps": 4
+   },
+   "comfyui_actual": {
+    "UNETLoader": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "lora_node": "MiniMaxH3TurboLoRA -> minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+    "BasicScheduler": "beta steps=4",
+    "KSamplerSelect": "euler"
+   },
+   "artifact": "data/outputs/videos/v-h3-studio-000243.mp4 (864x480)"
+  },
+  "C2": {
+   "job_id": "27d947e1edf8",
+   "comfyui_prompt_id": "e10f6161-0b04-41c3-a2a9-c2a41fe109f8",
+   "requested": {
+    "model_key": "fl2va_bf16",
+    "accel_lora": "",
+    "steps": 8
+   },
+   "comfyui_actual": {
+    "UNETLoader": "minimax_h3_fl2va_bf16.safetensors",
+    "lora_node": "(无 LoRA 节点 —— 显式不挂加速 LoRA)",
+    "BasicScheduler": "beta steps=8",
+    "KSamplerSelect": "euler"
+   },
+   "artifact": "data/outputs/videos/v-h3-studio-000244.mp4 (864x480)"
+  }
+ },
+ "A2": {
+  "verdict": "已上线可用",
+  "playlist_api": "GET /api/assets/player -> counts {image:1, audio:1, video:1, total:3}",
+  "asset_library_total": "210 (audio 9 / image 104 / video 97) —— 播放列表只含手动添加的 3 条",
+  "image_mode_inputs": "只有 alPSeconds / alPLoop / alPAudio（顶部每张停止时间），每张卡片下方无独立输入框",
+  "audio_modes": "single 单曲循环 / list 播放列表循环 / shuffle 播放列表随机"
+ },
+ "A3": {
+  "verdict": "已上线可用（部署后复测）",
+  "default": {
+   "cards": 60,
+   "selboxes": 0,
+   "btn": "多选"
+  },
+  "after_toggle": {
+   "selboxes": 60,
+   "btn": "多选中 ✓"
+  }
+ },
+ "A4": {
+  "verdict": "已上线可用",
+  "gen_defaults_types": 11,
+  "gen_defaults_spec_types": 12,
+  "types": [
+   "a2a",
+   "flf",
+   "i2i_h3image",
+   "i2i_qwen",
+   "r2v",
+   "t2a",
+   "t2i",
+   "t2i_h3image",
+   "t2i_moss",
+   "t2i_qwen",
+   "t2v"
+  ],
+  "t2v_defaults": {
+   "model_key": "fl2va_pruned_int8",
+   "attention": "kitchen",
+   "accel_lora": "dmad_4step_critic",
+   "aspect": "16:9",
+   "duration": 5.0
+  }
+ },
+ "A5": {
+  "verdict": "已上线可用",
+  "live_running_job": {
+   "id": "49f79047d1cb",
+   "mode": "t2i_qwen",
+   "running_truth": {
+    "state": "active",
+    "label": "运行中（已确认在 ComfyUI 队列中）"
+   }
+  },
+  "non_running": "queued/done 任务的 running_truth.state 为空串"
+ },
+ "B1": {
+  "verdict": "已上线可用",
+  "flf_last_only": {
+   "job": "d756748ab263",
+   "prompt_id": "8ca824ae-a759-4298-9c30-7cfa4a332d9b",
+   "task_type": "L2VA",
+   "LoadImage": [
+    "105:202"
+   ],
+   "artifact": "v-h3-studio-000235.mp4 864x480"
+  },
+  "flf_first_only": {
+   "job": "87b5a5a55539",
+   "prompt_id": "57251391-41a0-4ca9-abe7-55f61c3ecede",
+   "slots": [
+    "first_frame"
+   ]
+  },
+  "flf_first_plus_last": {
+   "job": "4b3ec50cdcc8",
+   "prompt_id": "af9233e2-3e20-42fe-a144-9ae2a1503a00",
+   "slots": [
+    "first_frame",
+    "last_frame"
+   ]
+  },
+  "flf_with_ref_media": {
+   "job": "7309347fd60c",
+   "prompt_id": "5d3f2085-645f-40e6-9716-ae09d1528cd1",
+   "slots": [
+    "last_frame",
+    "ref_audio",
+    "ref_video"
+   ],
+   "track": "video_bg",
+   "artifact": "v-h3-studio-000232.mp4"
+  },
+  "resolution_semantics": "落库 width/height 与产物实际像素一致（672x1216 那条也一致）"
+ },
+ "B2": {
+  "verdict": "已上线可用",
+  "r2v_job": {
+   "id": "09baa05e717a",
+   "prompt_id": "4e0000c0-be34-4d22-bafb-10e8bcf8a569",
+   "asset_slots": [
+    "ref_image",
+    "ref_audio",
+    "ref_video"
+   ],
+   "audio_track_source": "video_bg",
+   "comfyui_actual": {
+    "LoadImage 136:201": "参考图",
+    "VHS_LoadVideo 136:301": "参考视频",
+    "UNETLoader": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+    "MiniMaxH3AudioConditioningT8": "task_type=Ref2VA"
+   }
+  },
+  "limits": "MAX_REF_IMAGES=9 / MAX_REF_VIDEOS=3 / MAX_REF_AUDIOS=3；前端 9 槽位全量提交（不截断）",
+  "frontend_fix_commit": "2839079"
+ },
+ "C": {
+  "verdict": "已上线可用",
+  "tools_count": 33,
+  "conversation_probe_round4": "见 audits/r4_c_agent.json"
+ },
+ "D": {
+  "verdict": "已上线可用（并行任务 ec6c150d 产出，本轮独立核验）",
+  "asset_id": "asset_61f1b6fd9a1d",
+  "name": "H3Studio_火星基地_2分钟_480P.mp4",
+  "sha256": "3fe4cc2ee6b97c4071b7c1672607042532837b9acb5d5cb367f69aa4bad6a86a",
+  "my_own_ffprobe": {
+   "width": 864,
+   "height": 480,
+   "fps": "24/1",
+   "nb_frames": 2879,
+   "video_duration_s": 119.958333,
+   "audio_codec": "aac",
+   "audio_duration_s": 120.0,
+   "sample_rate": 44100,
+   "channels": 2,
+   "bytes": 27239595
+  },
+  "player_playable": "浏览器实测 video src=/api/assets/asset_61f1b6fd9a1d/content, readyState=4, duration=120, videoWidth=864, videoHeight=480",
+  "playlist_restored": "测完已把播放清单恢复成原来的 3 条"
+ },
+ "mediadef": {
+  "verdict": "有缺陷 -> 已修复并上线",
+  "fix_commit": "2839079e61ff186e7be1364a9e3f73abbb07df2c",
+  "mainline_after": "4dea76785de20893453aee11bd85f838fd371b18",
+  "live_after": "613341c315d4a84bcc387eaab50fe28a042512f1",
+  "root_causes": [
+   "前端：showStitch() 写死全局 state.doneFilters.media=video 且离开时不复位 -> 筛选永久粘滞",
+   "后端：api_list 的 media 分支只有 image/video/longfilm -> media=audio 直接 400（注册表里 t2a/a2a 的 media 就是 audio）",
+   "前端：#doneMedia 下拉缺音频选项"
+  ],
+  "live_proof": {
+   "backend": "media=audio -> total=51（修复前 400）；media=image -> 132；media=video -> 219；media=bogus -> 仍 400",
+   "browser": "长片拼接页 query 仍带 media=video（该页行为不变）；离开该页 query 不再带 media；网格 12 张 = 5 IMG + 7 VID",
+   "new_jobs": "文生图 job a6d673fb1e51 (prompt 1d378c23e-da0e-4efc-ivea19-195723e5de53, images/i-zimage-000189.png 1024x1024) + 文生视频 job 6aab66058a79 (prompt 0e7fb69b-8e5a-dea1-a2de-a128012c405f, videos/v-h3-studio-000242.mp4 864x480) 同时出现在媒体库第 1 页（img 元素 5 个 / video 元素 5 个）"
+  },
+  "regression": "tests/test_mediadef_all_types.py 8 条；变异检查撤掉修复 -> 6 条断言红，恢复 -> 8 条全绿"
+ }
+}

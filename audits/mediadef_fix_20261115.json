@@ -1,0 +1,56 @@
+{
+  "round": 4,
+  "task": "线上缺陷修复：生成媒体库只有视频，看不到文生图/音频产物",
+  "quota": {"sampled_at": "2026-11-15T15:02:30+08:00", "remaining_5h": 99, "dispatch": "可派单"},
+  "heads": {
+    "before": {"maintainer": "8314f4358f10a0100030262a830c9cc00c9270e9", "live": "8c2d4db8b380efac6872484ad267d88ea92e1545"},
+    "fix_commit": "2839079e61ff186e7be1364a9e3f73abbb07df2c",
+    "after": {"maintainer": "4dea76785de20893453aee11bd85f838fd371b18", "live": "613341c315d4a84bcc387eaab50fe28a042512f1"}
+  },
+  "root_cause": {
+    "defect_1_frontend_sticky_filter": {
+      "code": "web/app.js::showStitch() 写死 state.doneFilters.media='video' + $('#doneMedia').value='video'",
+      "why_sticky": "state.doneFilters 是模块级单例；renderTabs()/showCreate() 都不复位它；refreshJobs() 直接读它拼 query",
+      "live_repro_before": "新开页点「生成」-> 12 卡含 5 图；点「长片拼接」-> doneMedia 变 video；回「生成」-> doneMedia 仍 video -> 全是视频",
+      "fix": "改用页面级 state.stitchMediaOverride；refreshJobs() 仅在 state.page==='stitch' 时叠加；showCreate() 离开时清空",
+      "commit": "2839079"
+    },
+    "defect_2_backend_missing_audio": {
+      "code": "server.py::api_list 的 media 分支只有 image/video/longfilm -> media=audio 直接 400",
+      "evidence": "gen_types 注册表里 t2a/a2a 的 media 就是 audio，但无分支消费",
+      "fix": "media 分支统一成 media in (image, video, audio)，按注册表推导 mode 列表",
+      "commit": "2839079"
+    },
+    "defect_3_frontend_dropdown": {
+      "code": "web/index.html 的 #doneMedia 只有 全部类型/视频/图片",
+      "fix": "补 <option value=\"audio\">音频</option>",
+      "commit": "2839079"
+    },
+    "ruled_out": "落盘/索引/后端返回 —— jobs.db 里 image/audio/video 三类都真实落盘且 outputs 带 kind；无筛选时 API 返回 total=406 含 t2i/t2i_moss/i2i_qwen/t2a；多批次任务(633923eaec4a)渲染出 2 张图"
+  },
+  "regression": {
+    "new_test": "tests/test_mediadef_all_types.py（8 条）",
+    "mutation_check": "撤掉修复 -> 6 条断言红；恢复 -> 8 条全绿",
+    "related_targeted": "tests/test_mediadef_all_types.py + test_media_card_detail.py + test_page_size.py + test_batches_collapse.py + test_grid_flash.py -> 77 passed / 4 failed（4 条全在 test_page_size.py，基线树同样红且失败集合不同 -> 该文件既有 Playwright UI 时序 flaky，与本次改动无关）"
+  },
+  "live_verification_after_deploy": {
+    "deploy": "systemctl restart h3-studio.service -> HTTP 200 -> service active；线上 app.js?v=mediadef1",
+    "backend_api": {
+      "media=audio": "total=51（修复前 400）",
+      "media=image": "total=132",
+      "media=video": "total=219",
+      "media=bogus": "仍 400（非法值继续被拒）"
+    },
+    "browser": {
+      "stitch_page": "查询 = /api/jobs?status=done&page=1&page_size=12&media=video（长片拼接页仍只看视频，行为不变）",
+      "after_leaving_stitch": "查询 = /api/jobs?status=done&page=1&page_size=12（不再带 media 过滤）",
+      "grid": "12 张卡 = 5 IMG + 7 VID；img 元素 7 个 / video 元素 7 个",
+      "screenshot": "evidence/closeout-20261115/mediadef_fixed_media_library_mixed.png"
+    }
+  },
+  "live_generation_proof": {
+    "img_job": "a6d673fb1e51 (mode=t2i, Z-IMAGE)",
+    "vid_job": "6aab66058a79 (mode=t2v, H3 FL2VA pruned int8 + ckpt850)",
+    "purpose": "跑一次文生图 + 一次文生视频，证明两类产物同时出现在媒体库"
+  }
+}
