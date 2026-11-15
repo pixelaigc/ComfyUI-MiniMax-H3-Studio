@@ -78,8 +78,25 @@ TOTAL_TIMEOUT = 2400.0
 #: OpenAI 兼容端点带 tools 时会丢掉 tool_calls。
 STREAM_REPLAY_ENABLED = True
 
-#: 单次模型调用超时（秒）。与 llm.CHAT_TIMEOUT 一致。
-STEP_TIMEOUT = 180.0
+#: 单次模型调用超时（秒）。
+#:
+#: 【2026-11-16 修 c9】**不再写死 180**。
+#: 旧值 180 的问题：Agent 走的是 `llm.call_provider_with_tools()`，
+#: 而那条路径原本也把 timeout 写死成 180 —— 两处都写死 ⇒
+#: `compute_timeout(max_tokens)` 完全用不上。
+#: 独立验收实测：本机共享单槽 Provider（Strata）上，我们自己的请求
+#: **实际算力只要 0.5 秒**（prompt 434ms + predict 67ms，
+#: `reasoning_content` 长度 = 0 ⇒ `enable_thinking=false` 被尊重），
+#: 但 HTTP 端到端 **90.5 秒** —— 差额全是**排队等别人的大 prompt 请求**。
+#: 180s 卡在这种排队上必然超时。
+#:
+#: 现在：STEP_TIMEOUT 由 `compute_timeout(max_tokens)` 推导，
+#: 而 `compute_timeout` 已经含 `QUEUE_WAIT_ALLOWANCE`（240s 排队余量）。
+#: Agent 用 max_tokens=1024 ⇒ 120 + 122.88 + 240 ≈ **483 秒**。
+#: Agent 走的是**工具调用**路径（共享单槽 Provider，排队时间真实存在），
+#: 所以超时 = compute_timeout(max_tokens) + 共享单槽排队余量。
+STEP_TIMEOUT = (llm_client.compute_timeout(1024)
+                + llm_client.QUEUE_WAIT_ALLOWANCE)
 #: 最大步骤数（= 模型轮数，含最后一轮「给结论」）。
 #:
 #: 【2026-11-13 审查目标 4/5/6/7 改：8 -> 50】
@@ -968,11 +985,12 @@ async def _tool_enhance_prompt(ctx: AgentContext, args: dict) -> dict:
     try:
         raw = await llm_client.call_provider(
             provider, messages,
+            # 【2026-11-16 修 c9】不再传写死的 timeout ——
+            # 由 llm 层按本次 max_tokens 推导（含共享单槽 Provider 排队余量）。
             options={"temperature": params["temperature"],
                      "top_p": params["top_p"],
                      "max_tokens": params["max_tokens"],
-                     "do_sample": params.get("do_sample", True),
-                     "timeout": STEP_TIMEOUT})
+                     "do_sample": params.get("do_sample", True)})
     except llm_client.ProviderError as exc:
         raise AgentError(f"提示词增强失败：{exc}", status=502,
                          code="provider_error") from exc
@@ -3706,8 +3724,9 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
 
         result = await llm_client.call_provider_with_tools_stream(
             provider, messages, tools,
+            # 【2026-11-16 修 c9】不再传写死的 timeout ——
+            # 由 llm 层按 max_tokens 推导（含共享单槽 Provider 的排队余量）。
             options={"temperature": 0.2, "top_p": 0.95, "max_tokens": 1024,
-                     "timeout": STEP_TIMEOUT,
                      "stream_replay": bool(on_event) and STREAM_REPLAY_ENABLED},
             on_token=_on_token)
         # 流式已经推过增量 -> 不要再补一次整段（否则前端会重复渲染）
