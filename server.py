@@ -4736,7 +4736,24 @@ async def api_delete(request):
         if "/" not in relative:
             continue
         target = (OUT_DIR / relative).resolve()
-        if str(target).startswith(str(OUT_DIR.resolve())) and target.is_file():
+        # 【2026-11-15 代码审查修 —— 越界 unlink】
+        # 原来用的是 `str(target).startswith(str(OUT_DIR.resolve()))` ——
+        # 那是**字符串前缀**判定，不是路径边界判定：
+        # 同级目录 `outputs_secret` 的前缀是 `.../outputs` -> 判定为 True。
+        #
+        # 【当前可达性】实测 `outputs[].file` 的来源是
+        # `comfy_download_output()` 的 `dest.relative_to(OUT_DIR).as_posix()`
+        # —— 服务端自己生成的文件名，**不是用户可控**，
+        # 所以这条路径目前不可被利用。
+        # 但它与 `/files/` 的读取口（files_handler）用的是同一套脆弱判据，
+        # 而 `/files/` 那条**确实可被 %2F 编码绕过**（已修）。
+        # 同一份数据走两条路径，其中一条判据错 —— 迟早出问题。
+        # 这里统一改成路径边界判定（relative_to），与 files_handler 一致。
+        try:
+            target.relative_to(OUT_DIR.resolve())
+        except ValueError:
+            continue
+        if target.is_file():
             target.unlink()
     shutil.rmtree(OUT_DIR / jid, ignore_errors=True)
     return json_ok({"deleted": jid})
@@ -8558,7 +8575,27 @@ MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
 async def files_handler(request):
     path = request.match_info.get("path", "")
     full = (OUT_DIR / path).resolve()
-    if not str(full).startswith(str(OUT_DIR.resolve())) or not full.is_file():
+    # 【2026-11-15 代码审查修 —— 路径穿越】
+    #
+    # 原来这里用的是 `str(full).startswith(str(OUT_DIR.resolve()))` ——
+    # 那是**字符串前缀**判定，不是路径边界判定。
+    # 同级目录 `outputs_secret` 的字符串前缀是 `.../outputs` ->
+    # startswith 判定为 True -> 越界文件被当成产物返回。
+    #
+    # 实测（8190 线上，2026-11-15）：
+    #   /files/..%2Foutputs_secret%2Fcreds.txt        -> 200（读到了越界文件）
+    #   /files/%2e%2e%2Foutputs_secret%2Fcreds.txt    -> 200（同上）
+    #   /files/../outputs_secret/creds.txt             -> 404（aiohttp 规范化掉了裸 ../）
+    # 裸 ../ 被 aiohttp 规范化，所以**必须用 %2F 编码**才能逃逸 ——
+    # 这正是它容易被漏掉的原因。
+    #
+    # 修法：用仓库里已有的正确判据 `h3studio/assets.py::resolve_inside`
+    # （relative_to 是路径边界判定，不是字符串前缀）。
+    try:
+        full.relative_to(OUT_DIR.resolve())
+    except ValueError:
+        raise web.HTTPNotFound()
+    if not full.is_file():
         raise web.HTTPNotFound()
     # 显式给 Content-Type —— 音频产物没有它的话浏览器会当成下载而不是播放
     mime = MEDIA_TYPES.get(full.suffix.lower())

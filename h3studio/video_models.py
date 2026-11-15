@@ -2050,21 +2050,46 @@ def resolve_accel_lora_slot(params: dict,
         return key, strength
 
     # 老格式：accel_loras 数组（取第一个启用的）
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = str(item.get("key") or "").strip()
-        if not key:
-            continue
-        meta = accel_lora_meta(key) or {}
-        try:
-            strength = float(item.get("strength",
-                                    meta.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        return key, strength
+    #
+    # 【2026-11-15 代码审查修 —— 空数组被静默反转成「挂 ckpt850」】
+    # 前端 web/video-panel.js::submitParams() 对「不挂加速 LoRA」提交的是
+    # `accel_loras: []`（**没有** `accel_lora` 键）。
+    # 于是本函数的四条分支全不命中：
+    #   * "accel_lora" in params -> False（键不存在）
+    #   * accel_loras 数组     -> 空，for 循环不执行
+    #   * fixed_accel_lora     -> 没有
+    #   * lora                 -> 没有
+    # 最后落到兜底 `return VIDEO_FIXED_ACCEL_LORA_DEFAULT` = "ckpt850"
+    # —— **用户明确选了「不挂」，工作流里却挂着 4 步蒸馏 LoRA**。
+    #
+    # 实测（基线代码）：
+    #   resolve_accel_lora_slot({"accel_loras": []})  -> ("ckpt850", 1.0)   # 错
+    #   resolve_accel_lora_slot({"accel_lora": ""})   -> ("", 1.0)          # 对
+    #
+    # 【修法】**键存在**即视为用户显式表达过意图（与 accel_lora 的判据同源）：
+    # 数组存在但为空 = 显式「不挂」，返回 ("", 1.0)。
+    #
+    # 【为什么不能改判据为「值非空」】
+    # 空串 / 空数组在旧语义里都是**有效选择**（「不挂」）。
+    # 若按「有可用项」判断，空就会掉到兜底分支 -> 反而挂上 ckpt850。
+    if "accel_loras" in params:
+        for item in params.get("accel_loras") or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("enabled") is False:
+                continue
+            key = str(item.get("key") or "").strip()
+            if not key:
+                continue
+            meta = accel_lora_meta(key) or {}
+            try:
+                strength = float(item.get("strength",
+                                        meta.get("recommended_strength", 1.0)))
+            except (TypeError, ValueError):
+                strength = float(meta.get("recommended_strength", 1.0))
+            return key, strength
+        # 键在、但没有可用项 -> 显式「不挂」
+        return "", 1.0
 
     # 老格式：fixed_accel_lora（老任务里这枚是「工作流固定的那枚」）
     #
