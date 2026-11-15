@@ -417,11 +417,139 @@ $ python3 -m pytest tests/test_qwen_image.py tests/test_qwen_ref_assets.py tests
 
 ---
 
-## 八、合并与部署（见第八节补充说明）
+## 八、合并与部署
 
-- 合并目标：`local/maintainer`（`8c81169`）→ 回灌线上 `local/deploy/qwen-ref-assets-live`（`faaff36`）。
-- 部署脚本：`scripts/deploy_to_8190.sh`（merge → 回灌 live → 重启 `h3-studio.service` → 探活）。
-- 部署前后探活 + 四面板回归结果见下节。
+### 8.1 合并路径（现场核实，非历史摘要）
+
+现场 `git log` 核实到的真实分支关系：
+
+```
+main                             = da9d5c6（与 maintainer 不同源）
+local/maintainer                = a383099（修复②：媒体库类型过滤串台 + 图片编辑素材描述只传第一行）
+local/deploy/qwen-ref-assets-live = 262fd9b（线上分支，含修复②的回灌）
+faaff36                          = 修复①开发时的线上基线
+```
+
+`git merge-base --is-ancestor` 验证：
+- `local/maintainer` → `local/deploy/qwen-ref-assets-live`：**YES**（线上分支含 maintainer）
+- `faaff36` → `local/maintainer`：**YES**（maintainer 含我的开发基线）
+
+**合并动作**（全程未 reset / stash / force push / 提交他人分支 / 清理他人改动）：
+1. 在**临时干净 worktree**（`/tmp/h3s-pe-merge-test`，`git worktree add --detach local/maintainer`）
+   做合并测试 → `自动合并 server.py` / `自动合并 web/app.js`，**0 冲突**，
+   且合并后 PE 改动仍完整（`Qwen t2i PE nodes: NONE` / `t2i_h3image default: h3image-pe-t2i`）。
+2. 在该 worktree 提交合并 → `a905c4f merge(pe-externalize): 修复① ...`。
+3. `git branch -f local/maintainer a905c4f` **被 Git 拒绝** ——
+   `fatal: cannot force update the branch 'local/maintainer' used by worktree at '/root/projects/h3studio-merge'`
+   （该 worktree 里是**另一 agent 的 259 项未提交 WIP**，不能在那里做合并）。
+   → 改为直接合并进**线上分支** `local/deploy/qwen-ref-assets-live`
+   （它已含 maintainer，等价于「maintainer + 修复①」）：
+   ```
+   git -C /root/projects/h3studio-live merge --no-ff a905c4f
+   → 01fe952 merge(deploy): 回灌 修复① PE 全量外置 + H3-IMAGE 专属 PE 模板
+   ```
+4. **他人 WIP 未受影响**（合并前后逐项核对）：
+   ```
+   合并前 git status --porcelain:
+     M "docs/多模态Agent-增强汇报-20261115.md"
+     ?? --help/  ?? .deploy_ts
+     ?? "docs/独立复验报告-deeff606-c1只c8c与第十ABCD.md"
+     ?? scripts/scan_damaged_loras.py
+   合并后 git status --porcelain:  ← 完全一致
+     M "docs/多模态Agent-增强汇报-20261115.md"（仍是「已修改未提交」）
+     ?? --help/  ?? .deploy_ts
+     ?? "docs/独立复验报告-deeff606-c1只c8c与第十ABCD.md"
+     ?? scripts/scan_damaged_loras.py
+   git diff --stat 仍是 1 file changed, 148 insertions(+)
+   ```
+   主工作树 `/root/projects/comfyui-minimax-h3-studio` 的他人 WIP 哈希
+   合并前后一致：`ae536b49bc848cebbf3e3e197181b04f50cc1276ac2af8c176c7a8aa0d28b0d0`。
+
+> **并发说明**：合并期间另一 agent 又推了 修复③（`01a2cd4`）到同一线上分支。
+> 我的合并 `01fe952` 仍是当前 HEAD 的祖先 —— 两份改动共存，没有互相覆盖。
+> 修复③ 未触碰 PE 相关代码（`git diff 01fe952 01a2cd4 -- web/app.js web/providers.js web/enhance-menu.js`
+> 对 PE 关键字**零改动**）。
+
+### 8.2 部署
+
+```
+$ systemctl restart h3-studio.service
+启动完成（第 1 秒），HTTP 200
+PID before = 252109 -> PID after = 523708
+```
+（部署后又因另一 agent 的 修复③ 部署而再次重启，当前 PID 581642，起始 20:16:12。）
+
+**部署前后探活**（全部 200）：
+```
+/  /api/enhancer  /api/image-options  /api/jobs  /api/providers  /api/system
+/api/video-options  /api/comfy-models  /api/image-loras  /api/generation-types
+/api/music-options  /api/prompt-history  /api/agent/tools  /api/agent/sessions
+/api/hardware  /api/media/manage
+/static/app.js  /static/enhance-menu.js  /static/providers.js
+```
+
+**部署后线上 API 状态核对**：
+```
+/api/enhancer:
+  h3image defaults: {'t2i_h3image': 'h3image-pe-t2i', 'i2i_h3image': 'h3image-pe-i2i'}
+  h3image specs:    [('h3image-pe-t2i', ['h3_image']), ('h3image-pe-i2i', ['h3_image'])]
+/api/agent/settings:
+  t2i_qwen use_pe present = False
+  i2i_qwen use_pe present = False
+```
+**部署后静态资源里的 PE 代码确认已清除**（注意：文件里仍有若干**注释**提到这些符号 ——
+那是本次刻意留下的「为什么删掉了它」的说明，不是代码）：
+```
+$ curl -s 8190/static/app.js | grep -nE "^\s*params\.use_pe\s*="        -> NONE ✅
+$ curl -s 8190/static/providers.js | grep -nE "^\s*function applyQwenPeWritebackFlag" -> NONE ✅
+```
+
+### 8.3 部署后四面板回归（真实浏览器跑在 8190 线上）
+
+| # | 面板 | 增强方式 | job id | 产物 | 尺寸 | 状态 |
+|---|---|---|---|---|---|---|
+| 1 | Qwen-Image 2.1 文生图 | `qwen21图片官方增强PE`（3809 字） | `5f6cc46e8a53` | `qwen_5f6cc46e8a53_00001_.png` | 1360×768 | ✅ done |
+| 2 | Qwen-Image 2.1 图片编辑 | `qwen21图片官方增强PE`（929 字，1 参考图） | `a282d4e25d90` | `qwen_a282d4e25d90_00001_.png` | 1824×2272 | ✅ done |
+| 3 | MiniMax-H3-Image 文生图 | `H3-Image 官方增强PE`（811 字，比例 16:9） | `f39884a8f426` | `h3image_f39884a8f426_00001_.png` | 2720×1536 | ✅ done |
+| 4 | MiniMax-H3-Image 图片编辑 | `H3-Image 官方增强PE`（511 字，比例 3:4） | `14c73fb4fd75` | `h3image_14c73fb4fd75_00001_.png` | 2720×1536 | ✅ done |
+
+产物落盘（线上外置盘 `/mnt/usb2t_toshiba/comfyui/output/h3studio/`）：
+```
+20:15:47  qwen_5f6cc46e8a53_00001_.png     1.9 MB
+20:33:21  qwen_a282d4e25d90_00001_.png     6.1 MB
+20:31:11  h3image_f39884a8f426_00001_.png  7.2 MB
+20:44:19  h3image_14c73fb4fd75_00001_.png  5.5 MB
+```
+视觉复核 `qwen_5f6cc46e8a53_00001_.png`：「一只红狐在夕阳映照下的雪林中行走」—— 与提示词一致。
+
+**四个 job 的出图参数里 PE 相关字段全部不存在**（`/api/jobs` 实测）：
+```
+job=5f6cc46e8a53 mode=t2i_qwen     use_pe=False pe_params=False pe_system_prompt=False
+job=a282d4e25d90 mode=i2i_qwen     use_pe=False pe_params=False pe_system_prompt=False
+job=f39884a8f426 mode=t2i_h3image  use_pe=False pe_params=False pe_system_prompt=False
+job=14c73fb4fd75 mode=i2i_h3image  use_pe=False pe_params=False pe_system_prompt=False
+```
+
+**部署后 ComfyUI 侧工作流核验**（`14c73fb4fd75` 的 prompt JSON）：
+```
+MiniMax-H3-Image 图片编辑  job=14c73fb4fd75 prompt_id=b17e6342 status=success
+   nodes(9): ['UNETLoader','CLIPLoader','VAELoader','MiniMaxH3ImageConditioning',
+              'ConditioningZeroOut','KSampler','VAEDecode','SaveImage','LoadImage']
+   PE 节点: NONE ✅    PE 权重: NONE ✅
+
+>>> 我部署后跑的四个面板，出图工作流含 PE 动作的条数: 0  ✅ 通过
+```
+（另三个 job 的 ComfyUI history 条目在 20:38 ComfyUI 崩溃重启后被清空，
+故以 `/api/jobs` 的 params 证明 + 开发实例上的完整 history 解析互相印证。）
+
+**部署后浏览器控制台**：四个面板全流程走完，`console errors: []`。
+
+> **过程中的一次外部故障（如实记录）**：20:38 左右 ComfyUI（8188）进程崩溃，
+> `comfyui-watchdog.service` 于 20:38:37 自动重启了它。
+> 原因是同时并发跑多个视频任务（本机只有一张 4090D），**与本次改动无关** ——
+> 崩溃前的 ComfyUI 队列里全是 `MiniMaxH3ImageToVideo` / `YuE2*` 节点，没有我的任务。
+> 受影响的是第 4 个面板的**首次** H3 PE 扩写（报 `ClientConnectorError`），
+> ComfyUI 恢复后重跑即成功。
 
 ---
 
