@@ -240,6 +240,37 @@ calling chunked wrapper with the live 7-arg contract ...
 
 ---
 
+### 4.5 工作台侧回归对跑（本轮工作台只加了 docs，不改运行时代码）
+
+工作台本轮的改动**只有一份 markdown 报告**（`docs/修复④-...md`），
+不碰任何 `.py` / `.js` / `.html`。为证明这一点，做了**合并前基线对跑**：
+
+| 树 | commit | 结果 |
+|---|---|---|
+| 合并前基线 | `01a2cd4`（修复③ 合入后的上游点） | **7 failed, 217 passed** |
+| 合并后线上 | `f625e0a`（本轮 merge） | **7 failed, 217 passed** |
+
+失败集**逐条完全相同**：
+
+```
+FAILED tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_fallback_manifest_carries_one
+FAILED tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_options_payload_carries_one
+FAILED tests/test_h3_panel_tune.py::TestReuseParamsResolution::test_apply_config_recomputes_size_preset_key
+FAILED tests/test_h3_panel_tune.py::TestReuseParamsResolution::test_stale_preset_key_is_rejected
+FAILED tests/test_panel_fallback.py::TestFrontendFallbackContract::test_fallback_covers_all_server_models
+FAILED tests/test_panel_fallback.py::TestPanelRendersOnApiFailure::test_empty_warn_not_shown_when_no_warning
+FAILED tests/test_t2v_meta_consistency.py::TestFrontendRendersSummary::test_frontend_does_not_write_legacy_lora_for_all_modes
+```
+
+这 7 条是**并发任务「修复③」遗留的前端断言**（源码字符串断言 vs 重构后的实现），
+与本缺陷**无关**，本轮**未修**（不在本缺陷范围内，且属于他人正在推进的分支）。
+
+> 工作台**全量** pytest 单独跑需要 15 分钟以上（本次 900s 超时只跑到 27%），
+> 因此只对与视频/面板/注意力相关的 6 个测试文件做了对跑。
+> 这 6 个文件覆盖了本缺陷涉及的全部工作台代码路径
+> （`VIDEO_ATTENTION_MODES` 映射、`_apply_attention` 节点插入、面板回退、
+> t2v 元信息一致性）。
+
 ## 5. 真机实测（8190 各注意力档位）
 
 脚本：`evidence-fix4/live_attention_matrix.py`
@@ -368,11 +399,86 @@ ffprobe -v error -show_entries format=duration \
 | 上游 `Zironic/H3-Optimizations` 仍未适配 `grids` | **未修**（第三方上游仓库，本轮打的是本机补丁；建议把本补丁 PR 回上游） |
 | `h3_optimizations/memory/embedding.py:243-246` 里的 `final_layer` 调用仍写死 `(shift_v, shift_a)` | **未修**：该文件属于「embedding memory release」实验路径，本机未启用（`UPSTREAM_FORWARDS` 白名单只覆盖 0.34/0.35，当前 0.45.3 直接拒绝安装），且它调用的是 `model.final_layer` 而非包装器，不在本次崩溃链路上 |
 | `h3_optimizations/memory/embedding.py` 的 `UPSTREAM_FORWARDS` 白名单不含 0.45.3 | **未修**（既存问题，与本缺陷无关） |
+| 工作台 6 个视频/面板测试文件里的 7 条既存失败 | **未修**：是并发任务「修复③」遗留的**前端源码字符串断言**（`test_h3_panel_tune.py` / `test_panel_fallback.py` / `test_t2v_meta_consistency.py`）。已用**合并前基线对跑**证明与本轮无关（合并前后都是 7 failed / 217 passed，失败集逐条相同）。本轮工作台只加了 docs，不碰运行时代码 |
 | ComfyUI 侧 `MiniMaxH3ImageModel`（H3-Image）也用 grids | **已覆盖**：本补丁对 grids/shifts 双方言都成立，已实测 |
 
 ---
 
-## 8. 证据索引
+---
+
+## 8. 合并与部署（已上线）
+
+### 8.1 插件仓（缺陷本体）
+
+仓库：`/home/ubuntu/comfyui/custom_nodes/H3-Optimizations`（origin = `Zironic/H3-Optimizations`）
+
+```
+bf9f011 fix(final-layer): 支持 ComfyUI 0.45.3 的 grids 契约，修掉稀疏注意力 TypeError
+2bc9ac5 test(final-layer): 补稀疏注意力端到端回归（真实上游签名 + 真实安装路径）
+8627749 Add FastH3 VSA attention and release 0.2.45   <- 修复前的基线
+```
+
+- `main` 与 `local/feature/h3-final-layer-compat` 现在指向**同一组 commit**（`2bc9ac5`）。
+- 开发 worktree `/root/projects/h3opt-final-layer-fix` 保留，供后续追溯。
+- **未 push 到 origin**（第三方上游仓库，推送需要 maintainer 权限与 PR 流程）。
+
+### 8.2 工作台仓
+
+```
+f625e0a merge(fix4): 回灌 修复④ 报告实测矩阵补充（5 档位部署后回归 + 稀疏路径深度取证）
+2e5591a docs(fix4): 报告补部署后 5 档位回归实测矩阵 + 稀疏路径深度取证 + 两个证据造假陷阱复盘
+4c585eb merge(fix4): 回灌 修复④ 交付报告 —— 稀疏注意力 FinalLayer 参数不匹配
+b1c8f00 docs(fix4): 修复④ 交付报告 —— 稀疏注意力 FinalLayer 参数不匹配
+01a2cd4 merge(deploy): 回灌 修复③ ...            <- 并发任务的上游点
+```
+
+上线分支：`local/deploy/qwen-ref-assets-live`（= `/root/projects/h3studio-live`，systemd `h3-studio.service`）
+
+**并发纪律自证**：合并前后 `/root/projects/h3studio-live` 的未提交改动**完全没变**：
+
+```
+$ git status --short            # 合并后
+ M "docs/内置多模态Agent-增强汇报-20261115.md"   <- 别人的未提交改动，原样保留
+?? --help/
+?? .deploy_ts
+?? "docs/独立复验报告-deeff606-c1至c8与线上ABCD.md"
+?? scripts/scan_damaged_loras.py
+
+$ git diff --stat
+ ...内置多模态Agent-增强汇报-20261115.md | 148 +++++++++++++++++++++++++
+ 1 file changed, 148 insertions(+)
+```
+
+本轮**没有** `git reset` / `stash` / `checkout -- .` / `force push`，
+**没有**碰别人的分支，**没有**提交别人的改动。
+
+### 8.3 部署动作
+
+1. 插件文件已覆盖到安装目录：
+   `sha256 = 60c8f6163f998e006efaa136d8e0ed0a426411880ec0285a8b20030473cfbd26`
+2. `systemctl restart comfyui.service`（脚本 `evidence-fix4/restart_comfyui_and_probe.sh`，
+   会先等 ComfyUI 队列排空再重启 —— 避免打断并发任务正在跑的任务）
+3. 探活：
+
+```
+comfyui.service  active (running)  MainPID=752184   8188 HTTP 200
+h3-studio.service active (running)  MainPID=581642   8190 HTTP 200
+H3SparseAttention registered: True
+```
+
+4. 部署后在安装目录跑插件测试：
+   `53 passed`（`test_final_layer_contract.py` + `test_sparse_final_layer_e2e.py`
+   + `test_final_layer.py` + `test_cube_order.py`）
+
+5. 部署后各注意力档位回归各一次 → 见 §5.1，**5/5 通过**。
+
+### 8.4 重启的取舍说明
+
+插件没有热重载端点（`/api/manager/reload` 返回 405，`/manager/reload` 404），
+所以必须重启 ComfyUI 才能让新代码生效。重启前脚本**等队列排空**，
+避免杀掉并发任务正在跑的任务。重启窗口内并发任务如有排队，等待后自动继续。
+
+## 9. 证据索引
 
 | 路径 | 内容 |
 |---|---|
@@ -383,6 +489,11 @@ ffprobe -v error -show_entries format=duration \
 | `evidence-fix4/comfyui-log-*.log` | 各档位运行时 ComfyUI 日志 |
 | `evidence-fix4/restart_comfyui_and_probe.sh` | 部署后重启 + 探活脚本 |
 | `evidence-fix4/final_layer.py.installed-backup` | 部署前的插件原文件备份（可回滚） |
+| `evidence-fix4/sparse_mode_deep_evidence.json` | 稀疏档位深度取证（ComfyUI 侧 success + 真实 `H3SparseAttention` 节点 + 产物 ffprobe） |
+| `evidence-fix4/live_attention_matrix_postdeploy.log` | **部署后**回归矩阵日志（5/5 PASSED） |
+| `evidence-fix4/live_attention_sparse_rerun.log` | 稀疏档位单独重跑日志（`VERDICT: ALL MODES PASSED`） |
+| `evidence-fix4/comfyui-log-*.log` | 部署后各档位 ComfyUI 日志（含 `[H3 Optimizations] final plan: Sparse Attention`） |
+| `evidence-fix4/restart_comfyui_and_probe.sh` / `.log` | 部署重启脚本与日志（含等队列排空 + 探活输出） |
 
 插件仓提交：
 
