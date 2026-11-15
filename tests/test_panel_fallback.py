@@ -386,9 +386,16 @@ def _run_node(script: str, timeout: int = 60) -> dict:
     tmp.mkdir(parents=True, exist_ok=True)
     shim = tmp / "shim.js"
     shim.write_text(_DOM_SHIM, encoding="utf-8")
+    # 【为什么写文件而不是 `node -e <script>`】
+    # 内核对**单个**进程参数有 MAX_ARG_STRLEN = 32 * PAGE_SIZE = 131072 字节硬上限。
+    # 本用例把 video-panel.js + video-panel-fallback.js 整段拼进 argv，
+    # 面板重构后该串已达 131134 字节（超 62 字节）→ posix_spawn 直接
+    # OSError(E2BIG, "Argument list too long")，**测试根本没跑到断言**。
+    # 写进 .js 文件再 `node <file>` 既绕过上限，又不改变被测行为。
+    runner = tmp / "runner.js"
+    runner.write_text(f"require({str(shim)!r});\n" + script, encoding="utf-8")
     proc = subprocess.run(
-        [node, "--input-type=commonjs", "-e",
-         f"require({str(shim)!r});\n" + script],
+        [node, str(runner)],
         capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0:
         raise AssertionError(
