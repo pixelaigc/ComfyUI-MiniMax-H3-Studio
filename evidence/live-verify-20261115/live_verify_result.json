@@ -3,7 +3,7 @@
     {
       "name": "素材库有 video 类别素材（参考视频入口有东西可选）",
       "ok": true,
-      "detail": "video=76"
+      "detail": "video=92"
     },
     {
       "name": "素材库有 audio 类别素材（参考音乐入口有东西可选）",
@@ -13,7 +13,7 @@
     {
       "name": "素材库有 image 类别素材（参考图入口有东西可选）",
       "ok": true,
-      "detail": "image=67"
+      "detail": "image=98"
     },
     {
       "name": "r2v 任务跑完",
@@ -21,14 +21,34 @@
       "detail": "status=done err="
     },
     {
-      "name": "r2v 产物文件可定位",
-      "ok": false,
-      "detail": "找不到产物文件"
+      "name": "r2v 产物分辨率 = 面板所选 544p+16:9 (864×480)",
+      "ok": true,
+      "detail": "864×480"
+    },
+    {
+      "name": "r2v 产物有音轨",
+      "ok": true,
+      "detail": "codec=aac"
+    },
+    {
+      "name": "r2v 音轨来源 = 参考视频背景音（时长贴近 8s 视频）",
+      "ok": true,
+      "detail": "音轨时长 5.00s（参考视频 8s / 参考音乐 149.88s）"
+    },
+    {
+      "name": "r2v 产物时长约 5 秒（面板所选）",
+      "ok": true,
+      "detail": "5.166667s"
+    },
+    {
+      "name": "r2v 音轨来源 = 参考视频背景音（内容级指纹）",
+      "ok": true,
+      "detail": "corr(视频)=0.9996 corr(音乐)=0.0278"
     },
     {
       "name": "flf 仅尾帧被接受（前端已放宽，后端也接受）",
       "ok": true,
-      "detail": "job=8c02b4a28fda"
+      "detail": "job=fb4d37ed0d8b"
     },
     {
       "name": "flf 仅尾帧跑完",
@@ -36,9 +56,9 @@
       "detail": "status=done err="
     },
     {
-      "name": "flf 仅尾帧产物可定位",
-      "ok": false,
-      "detail": "找不到产物文件"
+      "name": "flf 产物分辨率 = 面板所选 544p+16:9 (864×480)",
+      "ok": true,
+      "detail": "864×480"
     },
     {
       "name": "flf 首+尾跑完",
@@ -46,14 +66,34 @@
       "detail": "status=done err="
     },
     {
-      "name": "flf 首+尾产物可定位",
-      "ok": false,
-      "detail": "找不到产物文件"
+      "name": "flf 首+尾产物分辨率 = 864×480",
+      "ok": true,
+      "detail": "864×480"
     },
     {
       "name": "flf 仅首帧跑完",
       "ok": true,
       "detail": "status=done err="
+    },
+    {
+      "name": "flf 带参考视频/参考音乐跑完",
+      "ok": true,
+      "detail": "status=done err="
+    },
+    {
+      "name": "flf 参考媒体产物分辨率 = 面板所选 544p+16:9 (864×480)",
+      "ok": true,
+      "detail": "864×480"
+    },
+    {
+      "name": "flf 参考媒体产物有音轨",
+      "ok": true,
+      "detail": "codec=aac"
+    },
+    {
+      "name": "flf 音轨来源 = 参考视频背景音（内容级指纹）",
+      "ok": true,
+      "detail": "corr(视频)=0.9996 corr(音乐)=0.0278"
     },
     {
       "name": "r2v 落库 params.width/height = 864×480",
@@ -77,13 +117,67 @@
     }
   ],
   "jobs": {
-    "r2v_video_bg": "c7ce7f92b1b0",
+    "r2v_video_bg": "8f322390a006",
     "r2v_video_bg_status": "done",
-    "flf_last_only": "8c02b4a28fda",
+    "r2v_video_bg_probe": {
+      "width": 864,
+      "height": 480,
+      "fps": "24/1",
+      "nb_frames": "124",
+      "duration": "5.166667",
+      "has_audio": true,
+      "audio_codec": "aac",
+      "audio_duration": "5.000000",
+      "audio_channels": 2
+    },
+    "r2v_audio_corr": {
+      "vs_reference_video": 0.9996,
+      "vs_reference_music": 0.0278
+    },
+    "flf_last_only": "fb4d37ed0d8b",
     "flf_last_only_status": "done",
-    "flf_both": "eea057e98f75",
+    "flf_last_only_probe": {
+      "width": 864,
+      "height": 480,
+      "fps": "24/1",
+      "nb_frames": "124",
+      "duration": "5.167000",
+      "has_audio": true,
+      "audio_codec": "aac",
+      "audio_duration": "5.167000",
+      "audio_channels": 2
+    },
+    "flf_both": "4b3ec50cdcc8",
     "flf_both_status": "done",
-    "flf_first_only": "245a87f896fe",
-    "flf_first_only_status": "done"
+    "flf_both_probe": {
+      "width": 864,
+      "height": 480,
+      "fps": "24/1",
+      "nb_frames": "124",
+      "duration": "5.167000",
+      "has_audio": true,
+      "audio_codec": "aac",
+      "audio_duration": "5.167000",
+      "audio_channels": 2
+    },
+    "flf_first_only": "87b5a5a55539",
+    "flf_first_only_status": "done",
+    "flf_refmedia_video_bg": "7309347fd60c",
+    "flf_refmedia_video_bg_status": "done",
+    "flf_refmedia_video_bg_probe": {
+      "width": 864,
+      "height": 480,
+      "fps": "24/1",
+      "nb_frames": "124",
+      "duration": "5.166667",
+      "has_audio": true,
+      "audio_codec": "aac",
+      "audio_duration": "5.000000",
+      "audio_channels": 2
+    },
+    "flf_refmedia_audio_corr": {
+      "vs_reference_video": 0.9996,
+      "vs_reference_music": 0.0278
+    }
   }
 }

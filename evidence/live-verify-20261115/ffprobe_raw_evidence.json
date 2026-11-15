@@ -1,0 +1,160 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "jobs": {
+    "8f322390a006": {
+      "job_id": "8f322390a006",
+      "mode": "r2v",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "video_bg",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_8f322390a006_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.166667",
+        "size_bytes": "1346219",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.000000"
+        }
+      }
+    },
+    "fb4d37ed0d8b": {
+      "job_id": "fb4d37ed0d8b",
+      "mode": "flf",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "generated",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/flf_fb4d37ed0d8b_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.167000",
+        "size_bytes": "1548050",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.167000"
+        }
+      }
+    },
+    "4b3ec50cdcc8": {
+      "job_id": "4b3ec50cdcc8",
+      "mode": "flf",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "generated",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/flf_4b3ec50cdcc8_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.167000",
+        "size_bytes": "1577373",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.167000"
+        }
+      }
+    },
+    "87b5a5a55539": {
+      "job_id": "87b5a5a55539",
+      "mode": "flf",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "generated",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/flf_87b5a5a55539_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.167000",
+        "size_bytes": "1704104",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.167000"
+        }
+      }
+    },
+    "7309347fd60c": {
+      "job_id": "7309347fd60c",
+      "mode": "flf",
+      "status": "done",
+      "params_resolution": "544p",
+      "params_aspect": "16:9",
+      "params_width": 864,
+      "params_height": 480,
+      "params_audio_track_source": "video_bg",
+      "artifact_path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/flf_7309347fd60c_00001_.mp4",
+      "ffprobe": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_sec": "5.166667",
+        "size_bytes": "1514413",
+        "video": {
+          "codec_name": "h264",
+          "width": 864,
+          "height": 480,
+          "r_frame_rate": "24/1",
+          "nb_frames": "124",
+          "duration": "5.166667",
+          "pix_fmt": "yuv420p"
+        },
+        "audio": {
+          "codec_name": "aac",
+          "sample_rate": "32000",
+          "channels": 2,
+          "duration": "5.000000"
+        }
+      }
+    }
+  }
+}
