@@ -4273,25 +4273,31 @@ async def api_list(request):
         conditions.append("status=?")
         args.append(status)
     media = request.query.get("media", "").strip()
-    if media == "image":
+    if media in ("image", "video", "audio"):
         # 媒体维度按「生成类型注册表」的 media 字段推导，而不是硬编码 mode 列表 ——
         # 硬编码会把 t2i_qwen / i2i_qwen 这类新增的图像模式漏掉
         # （实测漏了 9 条 Qwen 出图记录：生成库「图片」筛选里一条都看不到）。
-        image_modes = [m for m in gen_types.registered_modes()
-                       if gen_types.type_for_mode(m).get("media") == "image"]
-        if not image_modes:
-            image_modes = ["t2i"]
-        conditions.append("mode IN (%s)" % ",".join("?" * len(image_modes)))
-        args.extend(image_modes)
-    elif media == "video":
-        video_modes = [m for m in gen_types.registered_modes()
-                       if gen_types.type_for_mode(m).get("media") == "video"]
-        conditions.append("mode IN (%s)" % ",".join("?" * len(video_modes)))
-        args.extend(video_modes)
+        #
+        # 【2026-11-15 修 —— 补 audio】
+        # 注册表里 t2a（文生音乐）/ a2a（参考生音乐）的 media 就是 audio，
+        # 但原来**没有**任何分支消费它 -> media=audio 直接 400，
+        # 于是音乐产物在生成库里**无法按类型筛出**（只能靠「全部类型」看到）。
+        media_modes = [m for m in gen_types.registered_modes()
+                       if gen_types.type_for_mode(m).get("media") == media]
+        if media == "image" and not media_modes:
+            media_modes = ["t2i"]
+        if not media_modes:
+            # 注册表里没有该媒体类型（极端情况）-> 不加条件，
+            # 别把整个查询变成空结果（那比不过滤更难排查）。
+            pass
+        else:
+            conditions.append("mode IN (%s)" % ",".join("?" * len(media_modes)))
+            args.extend(media_modes)
     elif media == "longfilm":
         conditions.append("mode='longfilm'")
     elif media:
-        return web.json_response({"error": "media 只能是 image、video 或 longfilm"}, status=400)
+        return web.json_response(
+            {"error": "media 只能是 image、video、audio 或 longfilm"}, status=400)
     # 生成类型筛选（与 status 叠加）：type key -> 对应的 mode 列表
     gen_type = request.query.get("gen_type", "").strip()
     if gen_type:
