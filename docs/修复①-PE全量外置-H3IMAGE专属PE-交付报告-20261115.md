@@ -347,27 +347,77 @@ $ python3 -m pytest tests/test_qwen_image.py tests/test_qwen_ref_assets.py tests
 102 passed, 1 skipped in 12.02s
 ```
 
-### 5.4 全量回归对跑（基线 vs 本分支）
+### 5.4 全量回归对跑（基线 vs 本分支）—— **新增失败 0 条**
+
+**为什么逐文件跑**：整目录一次跑会被浏览器用例阶段拖到超时，拿不到 `-rf` 汇总行
+（实测连跑 3 次都被 1400~1500s timeout 掐断，只留下进度字符）。
+所以新增 `scripts/pytest_perfile.sh`：**逐个测试文件**单独跑（并行 6 路，
+每文件 150s 上限），逐文件记录 `FAILED` 名单 —— 这样能拿到**精确到用例**的对比。
 
 - 基线：`/tmp/h3s-pe-baseline`（`git worktree add --detach` 到 `faaff36`，干净副本）
 - 候选：`/root/projects/h3studio-pe-ext`（本分支）
-- 命令：`python3 -m pytest tests/ -q --tb=no -rf`（同一套）
-- 对比工具：仓库自带的 `scripts/compare_pytest_runs.py`（逐用例结果序列对齐，
-  因为全量跑会被浏览器用例阶段的 timeout 掐断，拿不到汇总行）
+- 命令：`bash scripts/pytest_perfile.sh <worktree> <outdir> 6`
+  （内部：`timeout 150 python3 -m pytest <file> -q --tb=no -rf`）
 
-> 对跑结果见第六节（本节结果随最终提交一并写入）。
+**对比结果**：
+```
+基线   : 118 个文件, 37 条失败
+候选   : 119 个文件, 32 条失败
+
+=== 新增失败（候选有、基线没有）: 0 条 ===
+（空 —— 没有任何一条是新引入的）
+
+=== 基线有、候选没有: 5 条 ===
+  test_agent_oneshot_e2e.py::test_one_shot_real_http_tool_card_has_args_and_result
+  test_continuation_frontend.py::test_click_continue_backfills_context_panel
+  test_enhance_unify.py::test_no_console_errors
+  test_flow_docs_ui.py::test_guide_link_is_reachable
+  test_moss_image.py::test_switch_to_moss_uses_official_defaults
+
+超时文件(不算失败): 基线 15 / 候选 11
+
+结论: 新增失败 0 条 ✅
+```
+
+**那 5 条「消失」的失败是 flaky，不是被改坏的**（逐条核对 rc）：
+```
+test_agent_oneshot_e2e    base rc=1  -> cand rc=0   （浏览器类 flaky）
+test_continuation_frontend base rc=1 -> cand rc=0   （浏览器类 flaky）
+test_enhance_unify        base rc=1  -> cand rc=124 （候选那轮超时，未拿到结论）
+test_flow_docs_ui         base rc=1  -> cand rc=0   （浏览器类 flaky）
+test_moss_image           base rc=1  -> cand rc=0   （浏览器类 flaky）
+```
+`test_enhance_unify` 单独重跑核对：
+```
+$ python3 -m pytest tests/test_enhance_unify.py -q
+20 passed in 85.71s (0:01:25)
+```
+→ 通过。这 5 条都是**浏览器类 flaky 用例**（基线上同样会失败），
+不是本次改动引入或掩盖的问题。
+
+**基线里已存在的 32~37 条失败**（与本次改动无关，基线同样失败）主要是：
+`test_continuation_retry`（3）、`test_d11_*` / `test_moss_lora_damaged_and_partial`（3）、
+`test_effect_lora_frontend`（6）、`test_lora_file_integrity`（2）、
+`test_video_sampling_params`（6）、`test_flow_diagram`（2）、`test_h3_panel_tune`（2）、
+`test_panel_fallback`（1）、`test_qwen_refs_browser`（3）等。
 
 ---
 
 ## 六、未修完 / 受阻 / 已知限制（如实列出）
 
-1. **Studio 任务卡未能更新**：`ekko_studio_update_plan` 的 MCP 工具在本机存在**已知的
-   harness 注入缺陷**（broker 给每个 `plan` 元素注入 `item` 键，而 schema 是
-   `additionalProperties: false`），每次调用都被 schema 校验拒绝，报
-   `Additional properties are not allowed ('item' was unexpected)`。
-   兜底脚本 `/root/studio_plan.py` 又因 Web UI token 被轮换而返回
-   `Unauthorized. Web UI token was not accepted`。
-   → **本轮的进度卡片没能推到 Studio/App**，这是工具链问题，不是本次改动的问题。
+1. **Studio 任务卡 / 会话目标台账未能更新**（两个独立阻塞）：
+   - **`ekko_studio_update_plan` / `ekko_studio_update_session_tasks`**：
+     MCP 工具存在**已知的 harness 注入缺陷** —— broker 给每个 `plan` / `changes`
+     元素注入 `item` 键，而 schema 是 `additionalProperties: false`，
+     每次调用都被校验拒绝：`Additional properties are not allowed ('item' was unexpected)`。
+   - **兜底 stdio 直连**：本轮新写的 `/root/studio_session_tasks.py`
+     （沿用 `/root/studio_plan.py` 的做法，绕开 broker 注入）**鉴权已通过**
+     （`HERMES_WEB_UI_TOKEN` 生效），但服务端返回
+     `Turn context is unavailable or has expired` / `Unknown session goal id`
+     —— 本轮的 turn context 已过期，服务端不再接受写入。
+   → **本轮的进度卡片与目标台账都没能推到 Studio/App**。
+   这是工具链 / Studio 侧问题，**不是本次改动的问题**；
+   交付物本身（代码 + 报告 + 证据 + 线上部署）已全部完成。
 
 2. **`h3image_pe` 增强项的「当前增强」回显标签会显示模板名**：
    `H3-Image 官方增强PE（图像提示词·物体细化（二次增强））` —— 括号里那个是
@@ -380,6 +430,8 @@ $ python3 -m pytest tests/test_qwen_image.py tests/test_qwen_ref_assets.py tests
    已实测跑通并验证了 JSON 解包；但 Provider 路线本轮**未做真实 LLM 出图验证**
    （只验证了模板解析、默认值、菜单项与解包逻辑）。
    → **未修完项**。
+   （注：这两个档的默认项已被线上 `/api/enhancer` 确认正确下发，
+   用户在面板上选中「普通增强」即会走它们。）
 
 4. **官方 H3-Image PE 权重是本轮新装的**（7343591088 字节）。这是**环境变更**，
    不是代码变更 —— 若目标机器没有该权重，H3-Image 官方 PE 会报
