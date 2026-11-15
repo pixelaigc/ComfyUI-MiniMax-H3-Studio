@@ -2646,13 +2646,36 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     # CFG 单独处理：H3 **标准采样路径没有 CFG**（BasicGuider 无 cfg 槽位），
     # 所以 out["cfg"] 固定为 1.0（VIDEO_CFG_FIXED）；面板只做只读说明。
     # 真正可调的 CFG 是二采路径的 twopass.cfg -> SelfLiftH3Sampler.cfg。
-    steps = video_models.normalize_steps(
-        params.get("steps"), int(model.get("steps", 4)))
+    # 【2026-11-15 修 AC-1】默认采样档跟着**实际挂的加速 LoRA**走：
+    #   挂了 -> 该 LoRA 的 recommended_steps / scheduler / sampler
+    #           （4 步蒸馏档 = beta + euler）
+    #   没挂 -> 标准多步采样档（VIDEO_STEPS_WITHOUT_ACCEL=20 步
+    #           + VIDEO_SCHEDULER_WITHOUT_ACCEL=simple
+    #           + VIDEO_SAMPLER_WITHOUT_ACCEL=res_multistep）
+    #
+    # 旧实现恒取 model["steps"]（= 4，蒸馏档）=> 显式「不挂加速 LoRA」时
+    # 也跑 4 步，那是非蒸馏权重配蒸馏步数，画面必然糊。
+    # 后端 video_workflow._resolve_accel_chain 的默认档本来就是对的
+    # （它按 accel_chain 走），但那条分支只在 params["steps"] 为空时可达；
+    # 这里先把**默认值**补对，两边口径一致。
+    _accel_meta = video_models.accel_lora_meta(out.get("accel_lora") or "") or {}
+    if out.get("accel_lora"):
+        _default_steps = (int(_accel_meta.get("recommended_steps") or 0)
+                          or int(model.get("steps", 4)))
+        _default_scheduler = (_accel_meta.get("recommended_scheduler")
+                              or model.get("scheduler", "beta"))
+        _default_sampler = (_accel_meta.get("recommended_sampler")
+                            or model.get("sampler", "euler"))
+    else:
+        _default_steps = video_models.VIDEO_STEPS_WITHOUT_ACCEL
+        _default_scheduler = video_models.VIDEO_SCHEDULER_WITHOUT_ACCEL
+        _default_sampler = video_models.VIDEO_SAMPLER_WITHOUT_ACCEL
+    steps = video_models.normalize_steps(params.get("steps"), _default_steps)
     out["steps"] = steps
     out["sampler"] = video_models.normalize_sampler(
-        params.get("sampler"), model.get("sampler", "euler"))
+        params.get("sampler"), _default_sampler)
     out["scheduler"] = video_models.normalize_scheduler(
-        params.get("scheduler"), model.get("scheduler", "beta"))
+        params.get("scheduler"), _default_scheduler)
     # 标准路径 CFG：固定 1.0（见 video_models.VIDEO_CFG_FIXED_REASON）
     out["cfg"] = video_models.VIDEO_CFG_FIXED
 

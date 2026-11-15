@@ -2099,6 +2099,7 @@ def resolve_accel_lora_slot(params: dict,
         return key, strength
 
     # 老格式：accel_loras 数组（取第一个启用的）
+    #
     for item in params.get("accel_loras") or []:
         if not isinstance(item, dict):
             continue
@@ -2336,6 +2337,14 @@ def options_payload(node_available=None,
             "steps_default": VIDEO_STEPS_DEFAULT,
             "samplers": list(VIDEO_SAMPLERS),
             "schedulers": list(VIDEO_SCHEDULERS),
+            # 【2026-11-15 修 AC-1】**不挂加速 LoRA** 时的标准多步采样档。
+            # 以前这三个值只存在于后端（video_workflow._resolve_accel_chain），
+            # 前端拿不到 => 切换加速 LoRA 后步数/采样器/调度器**不重算**，
+            # 于是「不挂加速 LoRA」时仍然跑 4 步蒸馏档（画面糊）。
+            # 现在下发给前端，前端在切换加速 LoRA 时按同一套规则重算。
+            "steps_without_accel": VIDEO_STEPS_WITHOUT_ACCEL,
+            "scheduler_without_accel": VIDEO_SCHEDULER_WITHOUT_ACCEL,
+            "sampler_without_accel": VIDEO_SAMPLER_WITHOUT_ACCEL,
             "shift_min": VIDEO_SHIFT_MIN,
             "shift_max": VIDEO_SHIFT_MAX,
             "shift_default_video": VIDEO_SHIFT_DEFAULT_VIDEO,
