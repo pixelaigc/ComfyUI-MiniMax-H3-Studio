@@ -1,0 +1,37 @@
+{
+  "baseline_file": "/tmp/pytest_base4.txt",
+  "candidate_file": "/tmp/pytest_mine4.txt",
+  "note": "两次全量跑都在浏览器用例阶段被 timeout 掐断（没跑到汇总行），所以用 pytest -q 的逐用例结果字符序列做精确对比：找出候选相对基线插入的那一段，看它是否全过，并验证去掉该段后两边逐位完全一致。",
+  "baseline_summary": {
+    "total": 2613,
+    "passed": 2399,
+    "failed": 43,
+    "error": 170,
+    "skipped": 1,
+    "xfail": 0
+  },
+  "candidate_summary": {
+    "total": 2633,
+    "passed": 2419,
+    "failed": 43,
+    "error": 170,
+    "skipped": 1,
+    "xfail": 0
+  },
+  "baseline_len": 2613,
+  "candidate_len": 2633,
+  "delta_len": 20,
+  "common_prefix_len": 1530,
+  "common_suffix_len": 1083,
+  "baseline_middle": "",
+  "candidate_middle": "....................",
+  "inserted_len": 20,
+  "inserted_all_passed": true,
+  "inserted_failures_count": 0,
+  "inserted_failures_positions": [],
+  "removed_failures_count": 0,
+  "identical_after_removing_inserted": true,
+  "new_failures_count": 0,
+  "count_delta_failed_plus_error": 0,
+  "verdict": "PASS: 候选相对基线只新增了 20 个用例（全部通过），去掉后逐位完全一致 —— 新增失败 0 条"
+}
