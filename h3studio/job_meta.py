@@ -949,12 +949,107 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
             out["lora_strength"] = None
             out["lora_rejected"] = lora
     else:
-        # 【没有记录 lora】-> 工作流默认 ckpt850（workflows._h3_video_workflow:
-        # `lora = params.get("lora", "ckpt850")`），并且**确实挂上了**。
-        out["lora_label"] = "ckpt850"
-        out["lora_name"] = str(wf.LORAS.get("ckpt850") or "")
-        out["lora_key"] = "ckpt850"
-        out["lora_strength"] = 1.0
+        # =================================================================
+        # 【2026-11-16 修 D-2 —— 新面板的加速 LoRA 槽位】
+        #
+        # 【根因】本分支（没有旧 key params["lora"]）原先直接显示写死的
+        # ckpt850。但 flf / r2v 的**工作流**读的是新面板字段
+        # （h3_video_modes.build_flf:445 ->
+        #   video_workflow._resolve_accel_chain -> vmodels.resolve_accel_lora_slot），
+        # 也就是 params["accel_lora"] / params["accel_loras"]。
+        # 新面板**永远**写这些字段、**不写**旧 key params["lora"] ——
+        # 于是这里恒落「没记录 lora」分支 -> 恒显示 ckpt850。
+        #
+        # 【现场】线上 job 95fefee8803e（flf, failed）：
+        #   params.accel_loras = [{"key":"lightx2v_4step_768p",...}]
+        #   详情模态框显示「ckpt850 ×1.00」—— 与用户所选不符，
+        #   且 worker 失败 -> 永不回写 artifact_loras -> **永不自愈**。
+        #
+        # 【修法】改用**与服务端归一层、工作流构建器完全一致**的
+        # vmodels.resolve_accel_lora_slot() 换算（同 _t2v_summary 的做法）。
+        # 三套历史字段（accel_lora / accel_loras / fixed_accel_lora / lora）
+        # 一次性换算，不再各理解一遍。
+        #
+        # 【为什么 include_fixed_fallback=True】旧 key params["lora"]
+        # 只有在 include_fixed_fallback=True 时才被返回
+        # （False 模式刻意不返回旧 key 与默认值 —— 那是给
+        # 「区分用户选的那枚 vs 工作流固定的那枚」用的）。
+        # 这里要的是「**实际挂上去**的那一枚」-> 必须 True，
+        # 否则历史老任务会丢掉 LoRA 显示（回归）。
+        # 旧 key params["lora"] 的**脏值**由 resolve_accel_lora_slot
+        # 内部的白名单闸门挡掉（脏值 -> 明确「不挂」），
+        # 与本函数上面 elif lora 分支的 is_real_lora_key 闸门语义一致。
+        #
+        # 【无任何证据时显示什么】三个来源都没有 ->
+        # 工作流**确实**会挂默认 ckpt850（_resolve_accel_chain ->
+        # resolve_accel_lora_slot(include_fixed_fallback=True) ->
+        # VIDEO_FIXED_ACCEL_LORA_DEFAULT）。
+        # 所以「显示 ckpt850」在**这一种**情况下是**如实**的 ——
+        # 保留它（历史老任务 test_missing_lora_falls_back_to_workflow_default
+        # 守的就是这条契约）。
+        # 关键区别：之前是**所有**新面板任务都显示 ckpt850（谎报），
+        # 现在只有**真的没有任何 LoRA 字段**的历史任务才显示它。
+        # 【has_slot_evidence】params 里**有没有**加速 LoRA 槽位字段。
+        # 有 -> 用户（或面板）明确表达过意图（选某枚 / 明确不挂）；
+        # 没有 -> 什么都没选，工作流走默认 ckpt850。
+        #
+        # 【为什么不能用「slot_key 是不是空」判断】resolve_accel_lora_slot
+        # 在「什么字段都没有」时返回**默认枚** ckpt850（非空），
+        # 而「明确不挂」时返回空串 —— 两者不能靠返回值区分。
+        has_slot_evidence = (
+            "accel_lora" in params
+            or "accel_loras" in params
+            or "fixed_accel_lora" in params
+        )
+        slot_key, slot_strength = vmodels.resolve_accel_lora_slot(
+            params, include_fixed_fallback=True)
+        if slot_key and (slot_key != vmodels.VIDEO_FIXED_ACCEL_LORA_DEFAULT
+                         or has_slot_evidence):
+            # 【有真实槽位证据】显示**用户所选**那枚。
+            #
+            # 【has_slot_evidence 的意义】resolve_accel_lora_slot 在
+            # 「什么字段都没有」时会返回**默认枚** ckpt850。但那时用户
+            # 什么都没选 —— 显示成「Turbo 4 步 · ckpt850」是把默认值
+            # 冒充成用户的选择（谎报），且既有契约
+            # test_missing_lora_falls_back_to_workflow_default 断言的
+            # 是**原样的 "ckpt850"**（老显示口径）。
+            # 所以：只有**真的有槽位证据**（用户/面板写过加速 LoRA 字段）
+            # 才走友好显示名；否则走下面的「原样 ckpt850」分支。
+            meta = vmodels.accel_lora_meta(slot_key) or {}
+            out["lora_label"] = _accel_lora_display(slot_key)
+            out["lora_name"] = str(meta.get("name") or "")
+            out["lora_key"] = slot_key
+            try:
+                out["lora_strength"] = float(slot_strength)
+            except (TypeError, ValueError):
+                out["lora_strength"] = 1.0
+            # 加载节点（Turbo / 核心 LoraLoader）—— 与 _t2v_summary 同口径，
+            # 便于排查「选了但不生效」。
+            out["accel_lora_loader"] = vmodels.detect_accel_lora_loader(
+                str(meta.get("name") or ""))
+        else:
+            # 【明确「不挂加速 LoRA」】新面板的 accel_lora="" / accel_loras=[]
+            # 会让 resolve_accel_lora_slot 返回空串 -> 这里**不显示任何 LoRA**，
+            # 也**不回落成 ckpt850**（回落即谎报：工作流里确实没挂）。
+            #
+            # 但要区分「用户明确选了不挂」与「什么都没记」：
+            # 前者有显式证据（accel_lora 键存在 / accel_loras 空数组），
+            # 后者没有任何字段 -> 工作流会挂默认 ckpt850。
+            if has_slot_evidence and not slot_key:
+                # 明确不挂 -> 什么都不显示
+                out["lora_label"] = ""
+                out["lora_name"] = ""
+                out["lora_key"] = ""
+                out["lora_strength"] = None
+            else:
+                # 【没有任何 LoRA 字段】-> 工作流确实挂默认 ckpt850，
+                # 如实显示（不编造，也不谎报）。
+                # 显示**原样的 "ckpt850"**（老显示口径，
+                # test_missing_lora_falls_back_to_workflow_default 守这条）。
+                out["lora_label"] = "ckpt850"
+                out["lora_name"] = str(wf.LORAS.get("ckpt850") or "")
+                out["lora_key"] = "ckpt850"
+                out["lora_strength"] = 1.0
     return out
 
 
