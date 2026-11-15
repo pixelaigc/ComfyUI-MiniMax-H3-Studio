@@ -117,13 +117,39 @@ def local_output(job: dict) -> Path | None:
     原来只找「data_dir/outputs/videos/<file>」把 file 当成完整相对路径，
     于是拼成了 data_dir/videos/xxx.mp4 —— 找不到（产物其实在
     data_dir/outputs/videos/xxx.mp4）。
+
+    【2026-11-15 修 —— ComfyUI 输出盘】本机 ComfyUI 的 output 目录挂在外置盘：
+    /mnt/usb2t_toshiba/comfyui/output/h3studio/<name>.mp4
+    落库的 outputs[].file 是 "videos/<原名>.mp4"（ComfyUI 侧的相对路径），
+    而 file[].name 才是真实文件名（flf_<jobid>_00001_.mp4）。
+    所以这里**优先**用 name 去 ComfyUI 的 output 根目录里找。
     """
     outs = job.get("outputs") or []
+    # ComfyUI 真实输出盘（外置盘挂载点）
+    comfy_roots = [
+        Path("/mnt/usb2t_toshiba/comfyui/output"),
+        Path("/home/ubuntu/comfyui/output"),
+    ]
     roots = [
         Path("/root/projects/comfyui-minimax-h3-studio/data") / "outputs",
         Path("/root/projects/h3studio-live/data") / "outputs",
         Path("/root/projects/h3studio-r2vflf/data") / "outputs",
-    ]
+    ] + comfy_roots
+
+    # 1) 优先按真实文件名（name 字段）在 ComfyUI 输出盘里找
+    for item in outs:
+        if item.get("kind") != "video":
+            continue
+        base = item.get("name")
+        if not base:
+            continue
+        for root in comfy_roots:
+            for sub in ("h3studio", ""):
+                candidate = root / sub / base
+                if candidate.exists():
+                    return candidate
+
+    # 2) 再按 file 相对路径拼
     for item in outs:
         if item.get("kind") != "video":
             continue
@@ -134,14 +160,15 @@ def local_output(job: dict) -> Path | None:
             candidate = root / name
             if candidate.exists():
                 return candidate
-    # 兜底：在候选根目录里按 basename 扫
+
+    # 3) 兜底：在候选根目录里按 basename 扫
     for item in outs:
-        name = item.get("file") or ""
+        name = item.get("file") or item.get("name") or ""
         if not name:
             continue
         base = Path(name).name
         for root in roots:
-            for sub in ("videos", "images", "audio", ""):
+            for sub in ("videos", "images", "audio", "h3studio", ""):
                 candidate = root / sub / base
                 if candidate.exists():
                     return candidate
