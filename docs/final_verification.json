@@ -1,0 +1,30 @@
+{
+  "measured_at": "2026-11-16T03:26:19+08:00",
+  "target": "http://127.0.0.1:8190/  (live, systemd h3-studio.service)",
+  "live_head": "cb34583 docs(audit): 补回归对跑结论 —— 基线与线上失败名单逐条一致，新增失败 0 条",
+  "browser_behaviour_check": {
+    "A-2_prompt_textarea_value_length": 0,
+    "B-1_flf_submitted": "1088x608 / resolution=608p  (修复前 864x480)",
+    "C-2_t2v_submitted_accel_lora": "\"\"  (修复前被反转成 ckpt850)",
+    "alerts": []
+  },
+  "pollution_sweep_15_panels": {
+    "hits": 0,
+    "console_errors": 0
+  },
+  "health_18_endpoints": "18/18 HTTP 200",
+  "regression_targeted_comparison": {
+    "baseline_8bcc3d0": "4 failed, 234 passed, 43 subtests passed",
+    "live": "4 failed, 234 passed, 43 subtests passed",
+    "new_failures": 0,
+    "the_4_failures_are_pre_existing": true
+  },
+  "new_tests_on_live": "42 passed, 1 skipped, 4 subtests passed",
+  "mutation_testing": {
+    "test_visible_text_pollution": "22/22",
+    "test_flf_r2v_size_not_overridden": "5/5",
+    "test_accel_lora_none_not_inverted": "2/2",
+    "test_output_path_traversal": "2/2",
+    "test_size_limit_message": "4/4"
+  }
+}
