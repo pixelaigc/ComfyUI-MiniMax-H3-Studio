@@ -137,11 +137,31 @@ VIDEO_MAX_PIXELS_LITERAL = 2_000_000
 VIDEO_MAX_PIXELS = VIDEO_MAX_CANVAS_PIXELS
 
 #: 超限时给用户的可执行提示（需求：说明上限与当前请求值，不静默截断）。
+#:
+#: 【2026-11-15 代码审查修 —— 文案与实际上限对不上】
+#: 原来这里把「2.0M」「文生视频」**写死**在文案里，但这个函数是通用的，
+#: 首尾帧 / 参考生视频的实际上限是 **0.8MP**（max_pixels_for_mode("flf")=0.8）。
+#: 结果用户做首尾帧时看到的是：
+#:   「文生视频分辨率上限为 2.0M 像素（838,860 px）。当前请求 1,032,192 px…」
+#: —— 括号里是 838,860（=0.8MP），句首却说 2.0M，还称「文生视频」。
+#: 三个信息互相矛盾，用户没法据此判断该调小到多少。
+#:
+#: 【修法】上限值与模式名都从参数来，由调用方按实际 max_pixels 填。
 VIDEO_MAX_PIXELS_MESSAGE = (
-    "文生视频分辨率上限为 2.0M 像素（{limit} px）。"
+    "{mode_label}分辨率上限为 {limit_mp}M 像素（{limit} px）。"
     "当前请求 {pixels} px（{width}×{height}），超出上限。"
     "请把宽度或高度调小，或改用更小的画面比例。"
 )
+
+#: 各生成模式的**中文名**（用于错误文案）。
+#: 【为什么放在这里】错误文案要与「用户正在做的那个模式」对上 ——
+#: 模式名散落在各处时，文案就会说错模式（本次审查实测到）。
+VIDEO_MODE_LABELS = {
+    "t2v": "文生视频",
+    "flf": "首尾帧生视频",
+    "r2v": "参考生视频",
+    "longfilm": "长片拼接",
+}
 
 # 画面比例（与 ResolutionSelector 的下拉项一一对应，实测 object_info）
 VIDEO_ASPECTS = {
@@ -868,7 +888,8 @@ def normalize_shift(value, default: float) -> float:
 def normalize_video_size(width, height,
                           multiple: int = VIDEO_SIZE_MULTIPLE,
                           max_pixels: float | None = None,
-                          strict_over_limit: bool = False):
+                          strict_over_limit: bool = False,
+                          mode: str | None = None):
     """把用户手填的宽高吸附到 H3 能接受的值。
 
     返回 (生效宽, 生效高, 调整原因列表)。**不抛异常** —— 界面要把
@@ -887,6 +908,11 @@ def normalize_video_size(width, height,
             reasons 里给出「上限是多少 + 当前请求是多少 + 怎么改」的可执行提示。
       需求要求「超限时给出明确可执行的错误/提示，不要静默截断」，
       提交链路（normalize_t2v_params）用 True，前端预览用 False。
+
+    【mode】(2026-11-15 代码审查新增)
+      只用于**错误文案**：让提示说「首尾帧生视频分辨率上限为 0.8M …」
+      而不是把「文生视频 / 2.0M」写死（首尾帧的实际上限是 0.8MP）。
+      不影响任何计算结果。
     """
     reasons: list[str] = []
     try:
@@ -933,6 +959,8 @@ def normalize_video_size(width, height,
             if strict_over_limit:
                 # 不静默截断：原样保留请求值，把可执行的提示交给上层。
                 reasons.append(VIDEO_MAX_PIXELS_MESSAGE.format(
+                    mode_label=VIDEO_MODE_LABELS.get(mode) or "视频",
+                    limit_mp=f"{max_pixels:g}",
                     limit=f"{int(limit):,}",
                     pixels=f"{w * h:,}",
                     width=w, height=h))
@@ -2050,21 +2078,46 @@ def resolve_accel_lora_slot(params: dict,
         return key, strength
 
     # 老格式：accel_loras 数组（取第一个启用的）
-    for item in params.get("accel_loras") or []:
-        if not isinstance(item, dict):
-            continue
-        if item.get("enabled") is False:
-            continue
-        key = str(item.get("key") or "").strip()
-        if not key:
-            continue
-        meta = accel_lora_meta(key) or {}
-        try:
-            strength = float(item.get("strength",
-                                    meta.get("recommended_strength", 1.0)))
-        except (TypeError, ValueError):
-            strength = float(meta.get("recommended_strength", 1.0))
-        return key, strength
+    #
+    # 【2026-11-15 代码审查修 —— 空数组被静默反转成「挂 ckpt850」】
+    # 前端 web/video-panel.js::submitParams() 对「不挂加速 LoRA」提交的是
+    # `accel_loras: []`（**没有** `accel_lora` 键）。
+    # 于是本函数的四条分支全不命中：
+    #   * "accel_lora" in params -> False（键不存在）
+    #   * accel_loras 数组     -> 空，for 循环不执行
+    #   * fixed_accel_lora     -> 没有
+    #   * lora                 -> 没有
+    # 最后落到兜底 `return VIDEO_FIXED_ACCEL_LORA_DEFAULT` = "ckpt850"
+    # —— **用户明确选了「不挂」，工作流里却挂着 4 步蒸馏 LoRA**。
+    #
+    # 实测（基线代码）：
+    #   resolve_accel_lora_slot({"accel_loras": []})  -> ("ckpt850", 1.0)   # 错
+    #   resolve_accel_lora_slot({"accel_lora": ""})   -> ("", 1.0)          # 对
+    #
+    # 【修法】**键存在**即视为用户显式表达过意图（与 accel_lora 的判据同源）：
+    # 数组存在但为空 = 显式「不挂」，返回 ("", 1.0)。
+    #
+    # 【为什么不能改判据为「值非空」】
+    # 空串 / 空数组在旧语义里都是**有效选择**（「不挂」）。
+    # 若按「有可用项」判断，空就会掉到兜底分支 -> 反而挂上 ckpt850。
+    if "accel_loras" in params:
+        for item in params.get("accel_loras") or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("enabled") is False:
+                continue
+            key = str(item.get("key") or "").strip()
+            if not key:
+                continue
+            meta = accel_lora_meta(key) or {}
+            try:
+                strength = float(item.get("strength",
+                                        meta.get("recommended_strength", 1.0)))
+            except (TypeError, ValueError):
+                strength = float(meta.get("recommended_strength", 1.0))
+            return key, strength
+        # 键在、但没有可用项 -> 显式「不挂」
+        return "", 1.0
 
     # 老格式：fixed_accel_lora（老任务里这枚是「工作流固定的那枚」）
     #
