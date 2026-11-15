@@ -68,7 +68,11 @@ class TestSizeLimitMessage(unittest.TestCase):
         # 上游用 `_format_limit_mp()` 渲染（2.0 -> "2.0M"、0.8 -> "0.8M"）；
         # 测试里自己写 f"{max_pixels:g}" 会得到 "2" —— 与实际文案不一致，
         # 断言就会误报（实测踩过）。
-        expected = vm._format_limit_mp(max_pixels) + "M"
+        # 【为什么要自己算期望值，而不是用 vm._format_limit_mp()】
+        # 用被测模块自己的格式化函数算期望值 = **自指** ——
+        # 把那个函数改坏（`:g` 退化成整数）测试照样通过（实测踩过）。
+        # 这里独立地按「一位小数」算期望值。
+        expected = f"{float(max_pixels):.1f}" + "M"
         self.assertIn(expected, msg,
                       f"文生视频的文案 MP 数与实际上限不符：{msg}")
         self.assertIn("文生视频", msg, f"文生视频的文案没说模式名：{msg}")
@@ -81,7 +85,8 @@ class TestSizeLimitMessage(unittest.TestCase):
         """
         for mode in ("flf", "r2v"):
             msg, max_pixels = self._message(mode)
-            self.assertIn(vm._format_limit_mp(max_pixels) + "M", msg,
+            expected = f"{float(max_pixels):.1f}" + "M"
+            self.assertIn(expected, msg,
                           f"{mode} 的文案 MP 数与实际上限 {max_pixels}MP 不符：{msg}")
             # 括号里的 px 必须等于 上限 * 1024 * 1024
             import re
@@ -129,11 +134,32 @@ class TestSizeLimitMessage(unittest.TestCase):
         self.assertIn("0.8M", reasons[0])
 
     def test_all_limits_have_a_chinese_label(self):
-        """每个有上限的模式都必须有中文名（否则文案会说「视频」这种泛称）。"""
+        """每个有上限的模式都必须有中文名（否则文案会说「视频」这种泛称）。
+
+        【为什么要显式断言这三条】
+        变异「把 VIDEO_MODE_LABELS 置空」时，如果测试只检查「文案里有模式名」，
+        而文案退化成「视频…」（泛称）也含「视频」二字 -> 断言放过。
+        这里直接钉住映射表本身。
+        """
         for mode in ("t2v", "flf", "r2v"):
             self.assertIn(mode, vm.VIDEO_MODE_LABELS,
                           f"{mode} 缺少中文名，错误文案会说得不准")
             self.assertTrue(vm.VIDEO_MODE_LABELS[mode].strip())
+        # 每个模式的文案必须**含自己的中文名**（不是泛称「视频」）
+        # 【注意尺寸】t2v 的上限是 2.0MP，1344×768（1.03MP）**不超限** ->
+        # 必须用更大的尺寸才能拿到 t2v 的超限文案。
+        for mode, label, size in (("t2v", "文生视频", (2560, 1440)),
+                                  ("flf", "首尾帧生视频", (1344, 768)),
+                                  ("r2v", "参考生视频", (1344, 768))):
+            max_pixels = vm.max_pixels_for_mode(mode)
+            _w, _h, reasons = vm.normalize_video_size(
+                size[0], size[1], max_pixels=max_pixels,
+                strict_over_limit=True, mode=mode)
+            self.assertTrue(reasons,
+                            f"{mode} 的 {size[0]}×{size[1]} 应当触发超限提示")
+            self.assertIn(label, reasons[0],
+                          f"{mode} 的文案里没有出现它自己的中文名「{label}」："
+                          f"{reasons[0]}")
 
 
 if __name__ == "__main__":
