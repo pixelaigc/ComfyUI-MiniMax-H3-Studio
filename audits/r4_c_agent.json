@@ -1,0 +1,114 @@
+[
+ {
+  "ok": true,
+  "elapsed": 90.7,
+  "status": "completed",
+  "mentions": true,
+  "answer": "已调用 list_modes，工作台共支持 11 个生成模式：视频类 t2v / flf / r2v；图像类 t2i(Z-Image)、t2i_qwen、i2i_qwen、t2i_moss、t2i_h3image、i2i_h3image；音频类 t2a / a2a。通用比例 8 档（1:1、2:3、3:2、3:4、4:3、9:16、16:9、21:9）；视频分辨率仅 544p/768p，时长 2~",
+  "tool": "list_modes"
+ },
+ {
+  "ok": true,
+  "elapsed": 170.7,
+  "status": "completed",
+  "mentions": true,
+  "answer": "已按要求只调用一次 search_assets（query=\"火星\"），命中 2 个素材：视频「H3Studio_火星基地_2分钟_480P.mp4」(asset_61f1b6fd9a1d) 和图片「火星基地_宇航员_参考图.png」(asset_21f5d051d841)。未创建生成任务。",
+  "tool": "search_assets"
+ },
+ {
+  "ok": true,
+  "elapsed": 132.0,
+  "status": "completed",
+  "mentions": true,
+  "answer": "已获取 r2v（参考图生成）模式 schema：必须提供至少 1 张、最多 10 张素材库参考图；比例支持 8 档固定值（默认 16:9）；分辨率仅 544p/768p（默认 768p）；时长 2~60 秒（默认 5 秒）；LoRA none/ckpt850/v4step600（默认 ckpt850，强度 0~2）；精度 int8/nvfp4。未列参数留空即用官方默认值。",
+  "tool": "get_mode_schema"
+ },
+ {
+  "ok": true,
+  "elapsed": 71.3,
+  "status": "completed",
+  "mentions": true,
+  "answer": "已查询历史生成任务：共 10 条记录。最近一条为「Qwen-Image 2.1 图片编辑」（job_id: 4c22187d6bc7），状态 done，产物 768×1024（3:4）。如需查看某条任务的详情或产物路径，告诉我 job_id 即可。",
+  "tool": "list_jobs"
+ },
+ {
+  "ok": true,
+  "elapsed": 25.5,
+  "status": "completed",
+  "mentions": true,
+  "answer": "已查看素材 asset_21f5d051d841：「火星基地_宇航员_参考图.png」，图片类型（photo），尺寸 1360×768，无标签，尚无模型分析结论、描述为空。需要的话我可以基于它做图像编辑或参考生视频任务。",
+  "tool": "describe_asset"
+ },
+ {
+  "ok": true,
+  "elapsed": 55.8,
+  "status": "completed",
+  "mentions": true,
+  "answer": "任务 b48e9a06a50d（文生视频）已完成：进度 19/19，耗时约 45 秒，产物 videos/v-h3-studio-000243.mp4（864×480，16:9）。无报错。",
+  "tool": "get_job_status"
+ },
+ {
+  "ok": false,
+  "err": "TimeoutError: timed out",
+  "tool": "media_probe"
+ },
+ {
+  "ok": false,
+  "err": "TimeoutError: timed out",
+  "tool": "list_prompt_presets"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "list_asset_tags"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "enhance_prompt"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "search_conversations"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "recall_memory"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "describe_mode_params"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "manage_media_library"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "get_prompt_preset"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "web_search"
+ },
+ {
+  "ok": false,
+  "http": 429,
+  "body": "{\"error\": \"\\u5f53\\u524d\\u5df2\\u6709 2 \\u4e2a Agent \\u4efb\\u52a1\\u5728\\u8fd0\\u884c\\uff0c\\u8bf7\\u7a0d\\u5019\\u518d\\u8bd5\\u3002\", \"code\": \"too_many_requests\"}",
+  "tool": "search_asset_history"
+ }
+]

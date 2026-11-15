@@ -1,0 +1,61 @@
+{
+  "defect": "生成媒体库（生成结果）只显示视频条目，看不到图片/音频等其他类型产物",
+  "analysis_at": "2026-11-15T14:55:00+08:00",
+  "baseline": {"live_head": "8c2d4db8b380efac6872484ad267d88ea92e1545", "port": 8190},
+  "verdict": "前端筛选状态粘滞 + 后端 media 维度缺 audio —— 两个独立缺陷叠加。不是落盘/索引问题。",
+  "layer_by_layer": {
+    "L1_backend_storage": {
+      "verdict": "正常",
+      "evidence": "jobs.db 里 image / audio / video 三类产物都真实落盘且 outputs 字段带 kind：t2i -> images/i-zimage-000180.png (kind=image)；i2i_qwen -> images/i-zimage-000181.png；t2i_moss -> images/i-zimage-000182.png + i-zimage-000183.png（同任务多批次）；t2a -> audio/a-yue2-000051.flac (kind=audio)；t2v -> videos/v-h3-studio-000241.mp4 (kind=video)"
+    },
+    "L2_backend_query_api": {
+      "verdict": "部分缺陷",
+      "defect_2a": {
+        "id": "media=audio 被拒",
+        "code": "server.py::api_list 的 media 分支只有 image / video / longfilm 三个分支，落到 elif media: 直接 400",
+        "evidence": "GET /api/jobs?status=done&media=audio -> 400 media 只能是 image、video 或 longfilm",
+        "impact": "音频产物在 API 层无法被「音频」维度筛出（虽然无筛选时能取到）"
+      },
+      "defect_2b": {
+        "id": "gen_types 注册表已有 media=audio，但 media 过滤分支没接它",
+        "code": "server.py::api_list 的 media==image/video 分支用 gen_types.type_for_mode(m).get(media) 推导 mode 列表 —— 注册表里 t2a/a2a 的 media 确实是 audio，但没有任何分支消费它",
+        "evidence": "GET /api/generation-types -> t2a 文生音乐 media=audio；a2a 参考生音乐 media=audio"
+      },
+      "no_media_filter_works": {
+        "evidence": "GET /api/jobs?status=all&page=1&page_size=400 -> total=406，modes 含 t2v32/flf26/r2v28/t2i6/t2i_moss4/i2i_qwen2/longfilm1/t2a1 —— 无 media 筛选时图片与音频都返回"
+      }
+    },
+    "L3_frontend_filter_state": {
+      "verdict": "缺陷 1（用户看到「只有视频」的直接原因）",
+      "root_cause": "web/app.js::showStitch() 里写死了 state.doneFilters.media = video 与 $(\"#doneMedia\").value = video，用于长片拼接页只看视频；但离开长片拼接页时没有任何地方把它复位。",
+      "exact_code": {
+        "file": "web/app.js",
+        "lines": "6339-6341 (showStitch)",
+        "snippet": "state.tab = done; state.doneFilters.media = video; $(\"#doneMedia\").value = video;"
+      },
+      "why_sticky": "state.doneFilters 是模块级单例；renderTabs() 只切 tab 高亮与 #doneFilters 的显隐，不碰 doneMedia；showCreate() 也不碰；刷新路径 refreshJobs() 直接读 state.doneFilters.media 拼 query。",
+      "live_reproduction": [
+        "① 新开页面 -> 点「生成」-> doneMedia 为空 -> 媒体库同时显示 12 张卡（含 5 张图：a8e71e85daf7 / 633923eaec4a / 2fc7109dc179 / 16e7f233d889 / e17e95eb58fb）",
+        "② 点左侧「长片拼接」-> showStitch() -> doneMedia 变成 video -> 12 张全是 videos/",
+        "③ 再点「生成」回到媒体库 -> doneMedia 仍是 video -> 12 张仍然全是 videos/，图片全部消失"
+      ],
+      "secondary_note": "前端 #doneMedia 下拉只有「全部类型/视频/图片」两项，没有「音频」 —— 即使修好粘滞，音频产物也只能靠「全部类型」看到，无法单独筛选。"
+    },
+    "L4_frontend_card_render": {
+      "verdict": "正常",
+      "evidence": "图片卡渲染 img src=/files/images/i-zimage-000184.png，视频卡渲染 video；同一任务多批次（633923eaec4a）渲染出 2 张图 —— 说明「有批次」与「无批次」两条路都通"
+    }
+  },
+  "conclusion": {
+    "primary_defect": "showStitch() 写死 doneFilters.media=video 且离开时不复位 —— 用户的「只有视频」由此而来",
+    "secondary_defect": "后端 api_list 的 media 分支缺 audio；前端 #doneMedia 缺「音频」选项 —— 音频产物无法按类型筛出",
+    "not_the_cause": "落盘/索引/后端返回 —— 三类产物都真实落盘且无筛选时都能返回"
+  },
+  "fix_plan": {
+    "F1": "showStitch() 不再写全局 doneFilters.media；长片拼接页用局部筛选（query 里带 media=video），不污染全局筛选状态。",
+    "F2": "所有进入 done/all 标签的路径确保 doneMedia 与 state.doneFilters.media 一致且不被长片拼接残留污染。",
+    "F3": "后端 api_list 增加 media==audio 分支，用 gen_types 注册表的 media==audio 推导 mode 列表；错误文案改为 image、video、audio 或 longfilm。",
+    "F4": "前端 #doneMedia 下拉加「音频」选项。",
+    "F5": "回归测试：新增用例断言「从长片拼接页离开后媒体库不只剩视频」+「media=audio 可筛出音频任务」。"
+  }
+}
