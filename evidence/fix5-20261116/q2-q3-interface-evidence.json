@@ -1,0 +1,209 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "captured_at": "2026-11-16 (线上 8190)",
+  "q2_media_x_gentype_total_matrix": {
+    "(全部类型)": {
+      "(全部类型)": 473,
+      "video": 277,
+      "image": 145,
+      "audio": 51
+    },
+    "t2v": {
+      "(全部类型)": 193,
+      "video": 193,
+      "image": 0,
+      "audio": 0
+    },
+    "flf": {
+      "(全部类型)": 30,
+      "video": 30,
+      "image": 0,
+      "audio": 0
+    },
+    "r2v": {
+      "(全部类型)": 52,
+      "video": 52,
+      "image": 0,
+      "audio": 0
+    },
+    "t2i": {
+      "(全部类型)": 71,
+      "video": 0,
+      "image": 71,
+      "audio": 0
+    },
+    "t2i_qwen": {
+      "(全部类型)": 14,
+      "video": 0,
+      "image": 14,
+      "audio": 0
+    },
+    "i2i_qwen": {
+      "(全部类型)": 16,
+      "video": 0,
+      "image": 16,
+      "audio": 0
+    },
+    "t2i_moss": {
+      "(全部类型)": 35,
+      "video": 0,
+      "image": 35,
+      "audio": 0
+    },
+    "t2i_h3image": {
+      "(全部类型)": 6,
+      "video": 0,
+      "image": 6,
+      "audio": 0
+    },
+    "i2i_h3image": {
+      "(全部类型)": 3,
+      "video": 0,
+      "image": 3,
+      "audio": 0
+    },
+    "t2a": {
+      "(全部类型)": 45,
+      "video": 0,
+      "image": 0,
+      "audio": 45
+    },
+    "a2a": {
+      "(全部类型)": 6,
+      "video": 0,
+      "image": 0,
+      "audio": 6
+    },
+    "longfilm": {
+      "(全部类型)": 2,
+      "video": 2,
+      "image": 0,
+      "audio": 0
+    },
+    "__other__": {
+      "(全部类型)": 0,
+      "video": 0,
+      "image": 0,
+      "audio": 0
+    }
+  },
+  "q2_sample_response_trimmed": {
+    "total": 473,
+    "page": 1,
+    "jobs": [
+      {
+        "id": "c96429520a98",
+        "mode": "flf",
+        "status": "done",
+        "gen_type": "flf",
+        "gen_type_label": "首尾帧生成",
+        "gen_type_media": "video",
+        "output_kinds": [
+          "video"
+        ]
+      },
+      {
+        "id": "d647494d5741",
+        "mode": "r2v",
+        "status": "done",
+        "gen_type": "r2v",
+        "gen_type_label": "参考图生成",
+        "gen_type_media": "video",
+        "output_kinds": [
+          "video"
+        ]
+      },
+      {
+        "id": "fa59a81fc8a6",
+        "mode": "flf",
+        "status": "done",
+        "gen_type": "flf",
+        "gen_type_label": "首尾帧生成",
+        "gen_type_media": "video",
+        "output_kinds": [
+          "video"
+        ]
+      },
+      {
+        "id": "8e68ed929e55",
+        "mode": "flf",
+        "status": "done",
+        "gen_type": "flf",
+        "gen_type_label": "首尾帧生成",
+        "gen_type_media": "video",
+        "output_kinds": [
+          "video"
+        ]
+      },
+      {
+        "id": "4d2a56551a56",
+        "mode": "t2v",
+        "status": "done",
+        "gen_type": "t2v",
+        "gen_type_label": "文生视频",
+        "gen_type_media": "video",
+        "output_kinds": [
+          "video"
+        ]
+      }
+    ]
+  },
+  "q3_refs_asset": {
+    "endpoint": "/api/refs/assets?category=image&page=1&page_size=60",
+    "total": 134,
+    "target": {
+      "id": "asset_6d2f4a96364d",
+      "name": "clipboard_pasted.png",
+      "category": "image",
+      "subtype": "photo",
+      "width": 1,
+      "height": 1,
+      "preview_url": "/api/assets/asset_6d2f4a96364d/preview",
+      "description": "基于您提供的图片（文件名为 clipboard_pasted.png），以下是针对该图片素材的详细视觉分析：\n\n【主体人物】无\n\n【服装与配饰】无\n\n【发型与妆容】无\n\n【表情与神态】无\n\n【动作与姿态】无\n\n【场景与环境】画面为纯色的二维平面，没有任何空间深度、背景物体或环境元素。\n\n【光线与色彩】\n*   **颜色**：画面完全被高饱和度的红色覆盖。该红色非常鲜艳且明亮，接近于色值 #FF0000 的标准正红色（纯红）。\n*   **光线**：无光源方向，无阴影，无高光反射，整体亮度均匀一致。\n\n【构图与镜头】无任何构图元素，画面为单一色块的填充，没有焦点、透视或线条分割。\n\n【画面风格与质感】\n*   **风格**：极简主义（Minimalism）纯色背景。\n*   **质感**：完全平滑的数字图像表面，无纹理、无噪点、无颗粒感，呈现绝对的均质状态。\n\n【文字与标识】无\n\n【其他值得注意的细节】\n1.  **文件属性异常**：用户提供的元数据中显示尺寸为“1×1”，但实际预览图呈现为正方形比例（如1:1）。这通常意味着该图片是一个极小的纯色像素点被放大，或者元数据描述有误。\n2.  **用途推测**：此类素材通常用于视频制作中的转场遮罩、背景底板、色度键测试（绿幕/红幕）或UI设计中的纯色填充块。",
+      "description_source": "analysis",
+      "tags": [
+        "FF0000",
+        "主体人物",
+        "光线",
+        "接近于色值",
+        "无光源方向",
+        "服装与配饰",
+        "没有任何空间深度",
+        "纯红"
+      ],
+      "created_at": 1794762747.4027073,
+      "analyzed": true,
+      "analysis_revision": 1,
+      "ref_count": 0
+    },
+    "target_description_len": 560,
+    "target_description_lines": 29
+  },
+  "q3_refs_resolve": {
+    "refs": [
+      {
+        "asset_id": "asset_6d2f4a96364d",
+        "version": 1,
+        "name": "clipboard_pasted.png",
+        "description": "基于您提供的图片（文件名为 clipboard_pasted.png），以下是针对该图片素材的详细视觉分析：\n\n【主体人物】无\n\n【服装与配饰】无\n\n【发型与妆容】无\n\n【表情与神态】无\n\n【动作与姿态】无\n\n【场景与环境】画面为纯色的二维平面，没有任何空间深度、背景物体或环境元素。\n\n【光线与色彩】\n*   **颜色**：画面完全被高饱和度的红色覆盖。该红色非常鲜艳且明亮，接近于色值 #FF0000 的标准正红色（纯红）。\n*   **光线**：无光源方向，无阴影，无高光反射，整体亮度均匀一致。\n\n【构图与镜头】无任何构图元素，画面为单一色块的填充，没有焦点、透视或线条分割。\n\n【画面风格与质感】\n*   **风格**：极简主义（Minimalism）纯色背景。\n*   **质感**：完全平滑的数字图像表面，无纹理、无噪点、无颗粒感，呈现绝对的均质状态。\n\n【文字与标识】无\n\n【其他值得注意的细节】\n1.  **文件属性异常**：用户提供的元数据中显示尺寸为“1×1”，但实际预览图呈现为正方形比例（如1:1）。这通常意味着该图片是一个极小的纯色像素点被放大，或者元数据描述有误。\n2.  **用途推测**：此类素材通常用于视频制作中的转场遮罩、背景底板、色度键测试（绿幕/红幕）或UI设计中的纯色填充块。",
+        "description_source": "analysis",
+        "tags": [
+          "FF0000",
+          "主体人物",
+          "光线",
+          "接近于色值",
+          "无光源方向",
+          "服装与配饰",
+          "没有任何空间深度",
+          "纯红"
+        ],
+        "created_at": 1794762747.4027073,
+        "preview_url": "/api/assets/asset_6d2f4a96364d/preview",
+        "missing": false,
+        "ordinal": null
+      }
+    ],
+    "max_ref_images": 10,
+    "min_ref_images": 1
+  }
+}
