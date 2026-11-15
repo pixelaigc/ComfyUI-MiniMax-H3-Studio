@@ -398,6 +398,73 @@ def main() -> int:
         except Exception as exc:
             record("flf 仅首帧被接受", False, str(exc))
 
+        # ---------------- 4b) flf：参考视频 + 参考音乐（新增能力）----------------
+        #
+        # 【2026-11-15 新增】上一轮只给 **r2v** 面板补了参考视频 / 参考音乐入口，
+        # flf 面板仍然只有首帧 / 尾帧两个槽位 ——
+        # 于是 flf 模式下「用参考音乐作音轨」/「用参考视频背景音作音轨」
+        # 这两项**永远不会出现**（后端 build_flf 早就支持，只是面板够不着）。
+        #
+        # 本用例验证新补齐的那条链路：
+        #   flf + 尾帧 + 参考视频 + 参考音乐，音轨选 (c) 参考视频背景音
+        # -> 产物音轨必须来自**参考视频的原声**（内容级指纹），而不是参考音乐。
+        print("\n== 4b) flf：尾帧 + 参考视频 + 参考音乐，音轨选 (c) ==", flush=True)
+        params_refmedia = dict(params)
+        params_refmedia["audio_track_source"] = "video_bg"
+        try:
+            resp = _post_multipart({
+                "mode": "flf", "params": json.dumps(params_refmedia),
+                "asset_refs": json.dumps([
+                    {"asset_id": LAST_FRAME_ASSET, "slot": "last_frame",
+                     "ordinal": 0},
+                    {"asset_id": REF_AUDIO_ASSET, "slot": "ref_audio",
+                     "ordinal": 0},
+                    {"asset_id": REF_VIDEO_ASSET, "slot": "ref_video",
+                     "ordinal": 0}])})
+            jid = resp["id"]
+            results["jobs"]["flf_refmedia_video_bg"] = jid
+            print(f"  job={jid}", flush=True)
+            job = wait_job(jid)
+            results["jobs"]["flf_refmedia_video_bg_status"] = job.get("status")
+            record("flf 带参考视频/参考音乐跑完", job.get("status") == "done",
+                   f"status={job.get('status')} "
+                   f"err={(job.get('error') or '')[:200]}")
+            if job.get("status") == "done":
+                out = local_output(job)
+                if out:
+                    summary = probe_summary(out)
+                    results["jobs"]["flf_refmedia_video_bg_probe"] = summary
+                    print(f"  ffprobe: {json.dumps(summary, ensure_ascii=False)}",
+                          flush=True)
+                    record("flf 参考媒体产物分辨率 = 面板所选 544p+16:9 (864×480)",
+                           (summary["width"], summary["height"]) == (864, 480),
+                           f"{summary['width']}×{summary['height']}")
+                    record("flf 参考媒体产物有音轨", summary["has_audio"],
+                           f"codec={summary['audio_codec']}")
+                    # 音轨来源：必须来自参考视频原声，而不是参考音乐
+                    ref_video_path = Path(
+                        "/mnt/usb2t/asset_library/originals/b9/ce/"
+                        "b9ce51dc755c75a2__v-h3-studio-000167.mp4")
+                    ref_music_path = Path(
+                        "/mnt/usb2t/asset_library/originals/78/ee/"
+                        "78ee4cfeda3d36d3__H3短片配乐_YuE2生成.flac")
+                    if ref_video_path.exists() and ref_music_path.exists():
+                        c_ref = audio_fingerprint_corr(out, ref_video_path)
+                        c_mus = audio_fingerprint_corr(out, ref_music_path)
+                        results["jobs"]["flf_refmedia_audio_corr"] = {
+                            "vs_reference_video": round(c_ref, 4),
+                            "vs_reference_music": round(c_mus, 4),
+                        }
+                        print(f"  音轨指纹相关：vs 参考视频原声 {c_ref:.4f} / "
+                              f"vs 参考音乐 {c_mus:.4f}", flush=True)
+                        record("flf 音轨来源 = 参考视频背景音（内容级指纹）",
+                               c_ref > 0.9 and c_mus < 0.5,
+                               f"corr(视频)={c_ref:.4f} corr(音乐)={c_mus:.4f}")
+                else:
+                    record("flf 参考媒体产物可定位", False, "找不到产物文件")
+        except Exception as exc:
+            record("flf 带参考视频/参考音乐被接受", False, str(exc))
+
     # ---------------- 5) 落库参数核对 ----------------
     print("\n== 5) 落库参数核对（面板选的档位/比例真的进了 params）==",
           flush=True)
