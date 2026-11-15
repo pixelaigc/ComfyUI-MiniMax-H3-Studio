@@ -128,62 +128,75 @@ class TestQwenBackend(unittest.TestCase):
         self.assertAlmostEqual(node["inputs"]["base_shift"], 0.69, places=4)
 
     # ---------------------------------------------- 缺陷 2：PE 接线
-    def test_pe_encoder_feeds_prompt_expansion_node(self):
-        """PE 编码器接 TextGenerateLTX2Prompt，不接 TextEncodeQwenImage21.clip。"""
+    # 【2026-11-15 修复①】PE 已全量外置到 WEBUI ——
+    # 工作流内**不存在**任何 PE 节点。原来的四个用例
+    # （test_pe_encoder_feeds_prompt_expansion_node /
+    #   test_pe_t2i_and_i2i_use_different_encoders /
+    #   test_prompt_expansion_node_api_shape /
+    #   test_use_pe_off_skips_expansion）
+    # 断言的都是「工作流内有 PE 扩写节点」这个**已被移除**的行为，
+    # 现在改为断言「工作流内没有 PE 节点，且提示词原样进模型」。
+    # 官方 PE 档位（pe_t2i / pe_i2i 权重）的接线现在只存在于
+    # WEBUI 侧 /api/qwen-pe/expand（见 h3studio/qwen_pe.py）。
+    def test_workflow_has_no_pe_encoder(self):
+        """工作流内不得再加载官方 PE 权重（PE 编码器已移除）。"""
+        for builder, kwargs in ((self.build_t2i, {}),
+                                (self.build_i2i, {"n": 1})):
+            p = builder(**kwargs)
+            for node_id, node in p.items():
+                clip_name = (node.get("inputs") or {}).get("clip_name") or ""
+                self.assertNotIn("pe_t2i", clip_name,
+                                 f"{node_id} 仍加载 PE-T2I 权重")
+                self.assertNotIn("pe_i2i", clip_name,
+                                 f"{node_id} 仍加载 PE-I2I 权重")
+
+    def test_conditional_encoder_feeds_text_encoder(self):
+        """条件编码器 -> TextEncodeQwenImage21.clip（这条接线不变）。"""
         p = self.build_t2i()
-        pe_loader = next(n for n in p.values()
-                         if n["class_type"] == "CLIPLoader"
-                         and "pe_t2i" in n["inputs"]["clip_name"])
         cond_loader = next(n for n in p.values()
-                           if n["class_type"] == "CLIPLoader"
-                           and n["inputs"]["clip_name"] != pe_loader["inputs"]["clip_name"])
-        # PE 编码器 -> 扩写节点
-        pe_id = next(k for k, n in p.items() if n is pe_loader)
-        expand = next((k for k, n in p.items()
-                       if n["class_type"] == "TextGenerate"), None)
-        self.assertIsNotNone(expand, "缺少 TextGenerate（PE 扩写节点）")
-        self.assertEqual(p[expand]["inputs"]["clip"], [pe_id, 0],
-                         "PE 编码器应接扩写节点的 clip")
-        # 条件编码器 -> TextEncodeQwenImage21.clip
+                           if n["class_type"] == "CLIPLoader")
         cond_id = next(k for k, n in p.items() if n is cond_loader)
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
         self.assertEqual(te["inputs"]["clip"], [cond_id, 0],
                          "条件编码器应接 TextEncodeQwenImage21 的 clip")
-        # 扩写后的文本 -> TextEncodeQwenImage21.prompt
-        self.assertEqual(te["inputs"]["prompt"], [expand, 0],
-                         "扩写节点输出应接 TextEncodeQwenImage21 的 prompt")
 
-    def test_pe_t2i_and_i2i_use_different_encoders(self):
-        """文生图用 pe_t2i，图片编辑用 pe_i2i —— 两个是不同的权重。"""
-        t2i = self.build_t2i()
-        i2i = self.build_i2i(n=1)
-        t2i_clip = next(n["inputs"]["clip_name"] for n in t2i.values()
-                        if n["class_type"] == "CLIPLoader" and "pe_" in n["inputs"]["clip_name"])
-        i2i_clip = next(n["inputs"]["clip_name"] for n in i2i.values()
-                        if n["class_type"] == "CLIPLoader" and "pe_" in n["inputs"]["clip_name"])
-        self.assertIn("pe_t2i", t2i_clip)
-        self.assertIn("pe_i2i", i2i_clip)
-        self.assertNotEqual(t2i_clip, i2i_clip)
-
-    def test_prompt_expansion_node_api_shape(self):
-        """TextGenerate 的 API 格式：sampling_mode 是选项 key 字符串。"""
+    def test_prompt_reaches_encoder_verbatim(self):
+        """提示词**原样**进编码器（扩写只发生在 WEBUI 侧一次）。"""
         p = self.build_t2i()
-        expand = next(n for n in p.values() if n["class_type"] == "TextGenerate")
-        self.assertEqual(expand["inputs"]["sampling_mode"], "on")
-        for key in ("sampling_mode.temperature", "sampling_mode.top_k",
-                    "sampling_mode.top_p", "sampling_mode.min_p",
-                    "sampling_mode.repetition_penalty", "sampling_mode.seed"):
-            self.assertIn(key, expand["inputs"], f"缺少 {key}")
-
-    def test_use_pe_off_skips_expansion(self):
-        """关掉 PE 开关 -> 不建扩写节点，提示词原样进模型。"""
-        p = self.build_t2i(use_pe=False)
-        classes = {n["class_type"] for n in p.values()}
-        self.assertNotIn("TextGenerate", classes,
-                         "关掉 PE 后不该有扩写节点")
         te = next(n for n in p.values() if n["class_type"] == "TextEncodeQwenImage21")
         self.assertIsInstance(te["inputs"]["prompt"], str,
-                              "关掉 PE 后 prompt 应是原字符串")
+                              "prompt 应是原字符串，而不是某个节点的输出引用")
+        self.assertNotIn("TextGenerate",
+                         {n["class_type"] for n in p.values()})
+
+    def test_no_pe_node_api_shape_needed(self):
+        """工作流内无扩写节点 -> 不再需要 TextGenerate 的 API 格式断言。
+
+        保留这条作为「反证」：万一以后有人又把 PE 节点加回来，
+        这条会立刻失败，提醒他 PE 已外置。
+        """
+        p = self.build_t2i()
+        classes = {n["class_type"] for n in p.values()}
+        self.assertNotIn("TextGenerate", classes,
+                         "TextGenerate 是 PE 扩写节点 —— PE 必须留在 WEBUI 侧")
+        self.assertNotIn("TextGenerateV2", classes,
+                         "TextGenerateV2 是 PE 扩写节点 —— PE 必须留在 WEBUI 侧")
+
+    def test_use_pe_off_skips_expansion(self):
+        """【2026-11-15 修复①】无论 use_pe 传什么，工作流内都没有扩写节点。
+
+        PE 已从「开关」变成「不存在」：不再有「关掉 PE」这个状态，
+        只有「工作流里根本没有 PE」这个事实。
+        """
+        for flag in (True, False):
+            p = self.build_t2i(use_pe=flag)
+            classes = {n["class_type"] for n in p.values()}
+            self.assertNotIn("TextGenerate", classes,
+                             f"use_pe={flag} 时工作流里出现了 PE 节点")
+            te = next(n for n in p.values()
+                      if n["class_type"] == "TextEncodeQwenImage21")
+            self.assertIsInstance(te["inputs"]["prompt"], str,
+                                  f"use_pe={flag} 时 prompt 应是原字符串")
 
     # ---------------------------------------------- 官方事实核对
     def test_tiers_stop_at_native_2k(self):
@@ -229,6 +242,13 @@ class TestQwenBackend(unittest.TestCase):
                                msg="官方路径默认 cfg=1")
 
     # ---------------------------------------------- PE 双档参数
+    # 【2026-11-15 修复①】PE 已外置到 WEBUI ——
+    # 下面四条断言的「官方 PE 档位参数 / 官方 system prompt / 扩写节点类型」
+    # 仍然成立，但它们现在描述的是 **WEBUI 侧**的扩写工作流
+    # （h3studio/qwen_pe.py 的 build_pe_workflow），
+    # 而不是出图工作流。所以把断言对象换到 qwen_pe.build_pe_workflow ——
+    # 断言的**内容**没放松，只是搬到了它现在该在的地方。
+
     def test_pe_presence_penalty_differs_by_tier(self):
         """PE-T2I 与 PE-I2I 的 presence_penalty 不可互换。
 
@@ -237,16 +257,17 @@ class TestQwenBackend(unittest.TestCase):
           PE-I2I  presence_penalty=0    max_new_tokens=24000
         填错不报错，只会让采样分布悄悄变 —— 所以档位必须随模式走。
         """
-        t2i = self.build_t2i()
-        i2i = self.build_i2i(n=2)
-        pe_t2i = next(n for n in t2i.values() if n["class_type"] == "TextGenerate")
-        pe_i2i = next(n for n in i2i.values() if n["class_type"] == "TextGenerate")
-        self.assertAlmostEqual(pe_t2i["inputs"]["sampling_mode.presence_penalty"],
-                               1.5, places=3)
-        self.assertAlmostEqual(pe_i2i["inputs"]["sampling_mode.presence_penalty"],
-                               0.0, places=3)
-        self.assertEqual(pe_t2i["inputs"]["max_length"], 16256)
-        self.assertEqual(pe_i2i["inputs"]["max_length"], 24000)
+        from h3studio import qwen_pe
+        pe_t2i = qwen_pe.build_pe_workflow("x", is_edit=False)
+        pe_i2i = qwen_pe.build_pe_workflow("x", is_edit=True)
+        self.assertAlmostEqual(
+            pe_t2i["pe:gen"]["inputs"]["sampling_mode.presence_penalty"],
+            1.5, places=3)
+        self.assertAlmostEqual(
+            pe_i2i["pe:gen"]["inputs"]["sampling_mode.presence_penalty"],
+            0.0, places=3)
+        self.assertEqual(pe_t2i["pe:gen"]["inputs"]["max_length"], 16256)
+        self.assertEqual(pe_i2i["pe:gen"]["inputs"]["max_length"], 24000)
 
     def test_pe_max_length_uses_official_card_value(self):
         """max_length 不能压到 4096（官方模板的做法）—— 会让 PE 静默返回空串。
@@ -256,38 +277,38 @@ class TestQwenBackend(unittest.TestCase):
            and the enhancer returns an empty string."
         官方 ComfyUI 模板把 max_length 压到 4096，本面板用官方卡值。
         """
+        from h3studio import qwen_pe
         params = self.W.QWEN_IMAGE_PE_PARAMS
         self.assertEqual(params["t2i"]["max_new_tokens"], 16256)
         self.assertEqual(params["i2i"]["max_new_tokens"], 24000)
-        p = self.build_t2i()
-        pe = next(n for n in p.values() if n["class_type"] == "TextGenerate")
+        pe = qwen_pe.build_pe_workflow("x", is_edit=False)["pe:gen"]
         self.assertGreater(pe["inputs"]["max_length"], 4096,
                            "max_length 必须大于 4096，否则开 thinking 会静默返回空串")
         # thinking 必须开（官方 PE model card: thinking 必开）
         self.assertTrue(pe["inputs"]["thinking"], "官方 PE 的 thinking 必须开")
 
     def test_pe_uses_official_system_prompt(self):
-        """PE 节点要带官方 PE 的 system prompt（不是模型内置模板）。
+        """PE 扩写要带官方 PE 的 system prompt（不是模型内置模板）。
 
         官方工作流用 TextGenerate + PrimitiveStringMultiline 接的官方
         system prompt；本面板把两份官方 prompt 落盘到 skill assets 里。
         """
-        p = self.build_t2i()
-        pe = next(n for n in p.values() if n["class_type"] == "TextGenerate")
+        from h3studio import qwen_pe
+        pe = qwen_pe.build_pe_workflow("x", is_edit=False)["pe:gen"]
         sp = pe["inputs"].get("system_prompt", "")
         self.assertGreater(len(sp), 5000,
                            f"PE system prompt 长度异常：{len(sp)}（应为官方 PE 原文）")
         self.assertIn("Image Prompt Rewriting Expert", sp,
                       "应是官方 PE-T2I 的 system prompt")
-        p2 = self.build_i2i(n=2)
-        pe2 = next(n for n in p2.values() if n["class_type"] == "TextGenerate")
+        pe2 = qwen_pe.build_pe_workflow("x", is_edit=True)["pe:gen"]
         sp2 = pe2["inputs"].get("system_prompt", "")
         self.assertNotEqual(sp, sp2, "文生图与编辑档的 system prompt 必须不同")
 
     def test_pe_node_is_textgenerate_not_ltx2(self):
         """不能用 TextGenerateLTX2Prompt —— 那是 LTX2 视频节点，会套错模板。"""
-        p = self.build_t2i()
-        classes = {n["class_type"] for n in p.values()}
+        from h3studio import qwen_pe
+        wf = qwen_pe.build_pe_workflow("x", is_edit=False)
+        classes = {n["class_type"] for n in wf.values()}
         self.assertIn("TextGenerate", classes)
         self.assertNotIn("TextGenerateLTX2Prompt", classes,
                          "TextGenerateLTX2Prompt 会塞入 LTX2 视频提示词 system prompt")

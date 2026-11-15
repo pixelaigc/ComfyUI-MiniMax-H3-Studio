@@ -1445,13 +1445,12 @@
     document.querySelector("#enhanceMeta").innerHTML = metas.join("<br>");
     document.querySelector("#enhanceModal").hidden = false;
 
-    // 【写回标记】合并结果里若含官方 PE 的产出，写回提示词框后
-    // 出图就不该再二次扩写（提示词框里已经是官方 PE 结果）。
-    // 这个标记必须在**所有项都跑完之后**统一设置 —— 否则先跑的普通增强
-    // 会把后跑的官方 PE 标记冲掉（两处生效 = 出图扩写两次）。
-    if (anyPe && typeof provState !== "undefined") {
-      provState.lastEnhanceKind = "qwen_pe";
-    }
+    // 【2026-11-15 修复①】原先这里会打一个 provState.lastEnhanceKind = "qwen_pe"
+    // 标记，写回提示词框时用它关掉「出图时的二次官方 PE 扩写」。
+    // 现在出图链路里**根本没有 PE 节点**（h3studio/workflows.py 已移除），
+    // 不存在二次扩写 -> 这个标记没有存在意义，整条删除。
+    // （anyPe 变量随之不再被消费，但保留它无害 —— 它记录了
+    //  多选链路里是否含 PE 产出，将来若要显示「本次含官方 PE」可以用。）
 
     // 【2026-11-09 修复】多选路径写版本历史 + 打「已增强」徽标。
     //
@@ -1594,7 +1593,6 @@
         mode_ctx: enhanceCurrentMode(),
         model_key: enhanceCurrentModelKey(),
       });
-      if (!opts.collect) provState.lastEnhanceKind = "";
       const enhanced = d.enhanced || "";
       if (!enhanced) throw new Error("本地模型返回了空结果");
       if (opts.collect) {
@@ -1656,7 +1654,6 @@
       provState.lastEnhance = d;
       // 只有**单独**跑普通增强时才清标记；多选时由 run() 统一设置，
       // 否则先跑的普通增强会把后跑的官方 PE 标记冲掉。
-      if (!opts.collect) provState.lastEnhanceKind = "";   // 普通增强，不是官方 PE
       // 【2026-11-09】不再写 provState.specId ——
       // 那是「本地模型配置」页用来决定「当前编辑哪条模板」的全局单值，
       // 与本文件的 selectedSpecByMethod（按 mode::method 存）**双状态并存**，
@@ -1740,7 +1737,6 @@
         model_key: enhanceCurrentModelKey(),
       });
       // 【2026-11-09】不再写 provState.specId（见 runBasic 的同名注释）
-      if (!opts.collect) provState.lastEnhanceKind = "";   // 二次增强，不是官方 PE
       const refined = d.enhanced || "";
       if (!refined) throw new Error("本地模型返回了空结果");
       if (opts.collect) {
@@ -1913,13 +1909,9 @@
       document.querySelector("#enhanceResult").value = expanded;
       document.querySelector("#enhanceMeta").innerHTML = meta;
       document.querySelector("#enhanceModal").hidden = false;
-      // 记录「这次结果是官方 PE 的」—— 真正**写回提示词框**时
-      // （用户在弹窗里点「替换提示词框 / 追加到原提示词」）
-      // 才把出图时的二次扩写关掉。providers.js 那边消费这个标记。
-      // （不能在拿到结果时就关：那只是弹窗里的预览，用户可能直接取消。）
-      if (typeof provState !== "undefined") {
-        provState.lastEnhanceKind = "qwen_pe";
-      }
+      // 【2026-11-15 修复①】原先这里会打 lastEnhanceKind = "qwen_pe"，
+      // 用来在写回提示词框时关掉「出图时的二次扩写」。
+      // 现在出图链路里没有 PE 节点 -> 不需要这个标记，删除。
       // 进版本历史（与普通增强一致）：
       //   level 0 = 原始提示词，level 1 = 官方 PE 扩写结果。
       // 不做这一步的话，写回提示词框后「已增强」徽标不会出现
@@ -1930,7 +1922,7 @@
           `官方 PE：${d.tier_label || d.tier || ""}`.trim(), "qwen21-pe");
       }
       setHint(`官方 PE 扩写完成（${d.tier_label || d.tier}）：${expanded.length} 字；`
-        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+        + `点「替换提示词框」写回后即可出图（工作流不再二次扩写）`, "ok");
       return { expanded, meta };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
@@ -2014,15 +2006,15 @@
       document.querySelector("#enhanceResult").value = expanded;
       document.querySelector("#enhanceMeta").innerHTML = meta;
       document.querySelector("#enhanceModal").hidden = false;
-      if (typeof provState !== "undefined") {
-        provState.lastEnhanceKind = "h3image_pe";
-      }
+      // 【2026-11-15 修复①】原先这里会打 lastEnhanceKind = "h3image_pe"，
+      // 用来在写回提示词框时关掉「出图时的二次扩写」——
+      // 现在出图链路里没有 PE 节点 -> 不需要这个标记，删除。
       if (expanded) {
         pushPromptVersion(0, prompt, "原始提示词");
         pushPromptVersion(1, expanded, "H3-Image 官方 PE", "h3image-pe");
       }
       setHint(`H3-Image 官方 PE 扩写完成：${expanded.length} 字；`
-        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+        + `点「替换提示词框」写回后即可出图（工作流不再二次扩写）`, "ok");
       return { expanded, meta };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
