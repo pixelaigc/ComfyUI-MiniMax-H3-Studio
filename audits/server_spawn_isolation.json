@@ -1,0 +1,379 @@
+[
+  {
+    "line": 63,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/diag_paste_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 138,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/live_real_task.py",
+    "risk": "MED"
+  },
+  {
+    "line": 126,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/probe_session_drawer_layout.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 612,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_acceptance_a_runtime.py",
+    "risk": "MED"
+  },
+  {
+    "line": 298,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_acceptance_c123.py",
+    "risk": "MED"
+  },
+  {
+    "line": 165,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_acceptance_c4_injection.py",
+    "risk": "MED"
+  },
+  {
+    "line": 72,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_acceptance_d_yue2.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 382,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_agent_contract_fix.py",
+    "risk": "MED"
+  },
+  {
+    "line": 117,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_agent_frontend_enh.py",
+    "risk": "MED"
+  },
+  {
+    "line": 63,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_fabricated_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 85,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_jobcard_live_update.py",
+    "risk": "MED"
+  },
+  {
+    "line": 58,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_manage_panel_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 141,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_media_av_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 106,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_media_upload_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 63,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_moss_batch_e2e.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 63,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_moss_batch_e2e2.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 50,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_moss_batch_panel_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 118,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_session_mgmt_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 44,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_tool_status_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 78,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "scripts/verify_yue2_button_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 77,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/_run_sidebar_server.py",
+    "risk": "MED"
+  },
+  {
+    "line": 806,
+    "func": "run",
+    "cwd": "REPO",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/test_agent_media_av_upload.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 769,
+    "func": "run",
+    "cwd": "REPO",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/test_agent_media_upload.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 211,
+    "func": "Popen",
+    "cwd": "str(REPO)",
+    "env_src": "cls.env",
+    "env_isolated": false,
+    "cwd_is_repo": true,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/test_agent_paste_browser.py",
+    "risk": "HIGH"
+  },
+  {
+    "line": 144,
+    "func": "Popen",
+    "cwd": "str(self.tmp)",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/test_frontend_defaults.py",
+    "risk": "MED"
+  },
+  {
+    "line": 107,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/verify_a3_multiselect_gate_browser.py",
+    "risk": "MED"
+  },
+  {
+    "line": 104,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/verify_a5_queue_panel_browser.py",
+    "risk": "MED"
+  },
+  {
+    "line": 132,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "env",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/verify_a5_running_truth_live.py",
+    "risk": "MED"
+  },
+  {
+    "line": 205,
+    "func": "Popen",
+    "cwd": "str(tmp)",
+    "env_src": "",
+    "env_isolated": false,
+    "cwd_is_repo": false,
+    "cmd_strs": [
+      "server.py"
+    ],
+    "file": "tests/verify_typesafety_runtime.py",
+    "risk": "MED"
+  }
+]
