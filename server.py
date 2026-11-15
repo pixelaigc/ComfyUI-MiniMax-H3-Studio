@@ -2287,7 +2287,11 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     width, height, reasons = video_models.normalize_video_size(
         params.get("width"), params.get("height"),
         max_pixels=video_models.max_pixels_for_mode(vid_mode),
-        strict_over_limit=True)
+        strict_over_limit=True,
+        # 【2026-11-15 代码审查修】把模式传给尺寸归一 ——
+        # 错误文案要说「首尾帧生视频分辨率上限为 0.8M …」，
+        # 而不是写死的「文生视频…2.0M」（首尾帧的实际上限是 0.8MP）。
+        mode=vid_mode)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
     out["width"] = width
@@ -4773,7 +4777,16 @@ async def api_media_manage(request):
     """
     if request.method == "GET":
         scope = request.query.get("scope", "all") or "all"
-        months = int(request.query.get("months", "0") or 0)
+        # 【2026-11-15 代码审查修 —— months 非法值导致 500】
+        # 原来这里直接 `int(request.query.get("months", "0") or 0)`，
+        # 没有 try/except —— 而下面 POST 分支的同一参数**有** try/except。
+        # 结果：`GET /api/media/manage?months=abc` 直接抛 ValueError ->
+        # HTTP 500 + 堆栈进日志（实测 8191：HTTP 500）。
+        # 修法：与 POST 分支同口径 —— 非法值退回 0。
+        try:
+            months = int(request.query.get("months", "0") or 0)
+        except (TypeError, ValueError):
+            months = 0
         if scope not in ("all", "older", "failed"):
             return web.json_response({"error": "scope 只能是 all / older / failed"},
                                      status=400)
