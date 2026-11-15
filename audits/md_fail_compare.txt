@@ -1,0 +1,51 @@
+### tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+  BASE: 1 failed in 0.04s
+  FIX: 1 failed in 0.03s
+### tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.03s
+### tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.02s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_agent_tools_appear_in_diagram
+  BASE: 1 failed in 0.14s
+  FIX: 1 failed in 0.05s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_api_routes_appear_in_derived_list
+  BASE: 1 failed in 0.06s
+  FIX: 1 failed in 0.05s
+### tests/test_flow_diagram.py::FlowDiagramSyncTest::test_gen_flow_check_passes
+  BASE: 1 failed in 0.15s
+  FIX: 1 failed in 0.14s
+### tests/test_flow_diagram.py::FlowDiagramCoverageTest::test_agent_tools_are_grouped
+  BASE: 1 failed in 0.05s
+  FIX: 1 failed in 0.05s
+### tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_fallback_manifest_carries_one
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.01s
+### tests/test_h3_panel_tune.py::TestDmadDefaultStrength::test_options_payload_carries_one
+  BASE: 1 failed in 0.63s
+  FIX: 1 failed in 0.65s
+### tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+  BASE: 1 failed in 0.02s
+  FIX: 1 failed in 0.01s
+### tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_are_rejected_by_generic_reader
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.02s
+### tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_not_surfaced_as_compatible
+  BASE: 1 failed in 1.81s
+  FIX: 1 failed in 1.82s
+### tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+  BASE: 1 failed in 0.03s
+  FIX: 1 failed in 0.03s
+### tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+  BASE: 1 failed in 0.70s
+  FIX: 1 failed in 0.60s
+### tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+  BASE: 
+  FIX: 
+### tests/test_page_size.py::TestPageSize::test_current_page_highlighted
+  BASE: 
+  FIX: 
+### tests/test_page_size.py::TestPageSize::test_pager_boundary_buttons_disabled
+  BASE: 
+  FIX: 1 failed in 11.19s
