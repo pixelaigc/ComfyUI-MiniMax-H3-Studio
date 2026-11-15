@@ -556,6 +556,50 @@ $ curl -s 8190/static/app.js | grep -nE "^\s*params\.use_pe\s*="        -> NONE 
 $ curl -s 8190/static/providers.js | grep -nE "^\s*function applyQwenPeWritebackFlag" -> NONE ✅
 ```
 
+### 8.2.1 最终部署（补最后两个提交后）实测
+
+合并期间另一 agent 又推了 修复③ / 修复④ 到同一线上分支。同步我的最后两个提交
+（`ad2e046` 测试更新 + `df757fa` 报告补回归结果）后做最终部署：
+
+```
+$ git -C /root/projects/h3studio-live merge --no-ff df757fa
+Merge made by the 'ort' strategy.
+$ systemctl restart h3-studio.service
+启动完成（第 1 秒）HTTP 200
+PID: 1335238
+```
+- 合并零冲突，他人 WIP 仍完好（4 项脏文件逐项核对一致）
+- 探活 19 个端点**全 200**
+- 线上 HEAD `7414bd2`；`01fe952`（修复① 主体）仍是其祖先 ✅
+
+**最终部署后浏览器实测（8190 线上）**：
+```
+四面板「普通增强」默认模板:
+  t2i_qwen     -> qwen21-pe-t2i  "Qwen-Image 2.1 官方 PE·文生图（结构化描述）"
+  i2i_qwen     -> qwen21-pe-i2i  "Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y）"
+  t2i_h3image  -> h3image-pe-t2i "H3-Image 官方 PE·文生图（画面扩写+比例）"
+  i2i_h3image  -> h3image-pe-i2i "H3-Image 官方 PE·图片编辑（参考图条件扩写）"
+
+独立 PE 勾选框扫描:
+  {"totalCheckboxes": 11, "peLikeOutsideDropdown": []}   ← 独立 PE 勾选框 0 个 ✅
+  （11 个勾选框全是增强下拉里各项的多选框 + 视频/Provider 的无关开关）
+
+console errors: []
+```
+
+**最终部署后跑一次完整生成（Qwen 文生图）**：
+```
+增强（qwen21图片官方增强PE）→ 1989 字 → 写回 → 生成
+job=3884a291bc27  status=done  qwen_3884a291bc27_00001_.png  1360x768
+
+ComfyUI 侧 prompt JSON 核验（prompt_id=f41da779, status=success）:
+  nodes(10): ['CLIPLoader','VAELoader','UNETLoader','ModelSamplingFlux','QwenImage21Cache',
+              'TextEncodeQwenImage21','EmptyLatentImage','KSampler','VAEDecode','SaveImage']
+  PE 节点: NONE ✅
+  PE 权重: NONE ✅
+  prompt 输入是原字符串? str (长度 1989)
+```
+
 ### 8.3 部署后四面板回归（真实浏览器跑在 8190 线上）
 
 | # | 面板 | 增强方式 | job id | 产物 | 尺寸 | 状态 |
