@@ -635,10 +635,26 @@ function renderMode() {
   };
   if (mode === "flf") {
     // 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
+    //
+    // 【2026-11-15 补齐 —— 缺口 1 的 flf 半边】
+    // 后端 build_flf 支持 ref_audios / ref_video_audios
+    // （音轨三选一的素材来源，见 h3studio/h3_video_modes.py），
+    // 但面板**只渲染首帧 / 尾帧两个槽位** ——
+    // 于是 flf 模式下「用参考音乐作音轨」「用参考视频背景音作音轨」
+    // 这两项**永远不可能出现**：没有槽位 -> 没有素材 -> 选项被隐藏。
+    // 后端能力白白浪费。
+    //
+    // 现在按 T8 节点的真实上限补上：
+    //   refvid0..2 -> 参考视频 (node schema: ref_videos max=3)
+    //   refaud0..2 -> 参考音乐 (node schema: ref_audios max=3)
+    // 注意：flf **不**有参考图槽位（首尾帧就是它的图条件）。
     $("#uploadTitle").textContent =
-      "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可）";
+      "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可；"
+      + "参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
     mk("first", "首帧"); mk("last", "尾帧");
+    for (let i = 0; i < 3; i++) mk("refvid" + i, "参考视频 " + (i + 1), "video");
+    for (let i = 0; i < 3; i++) mk("refaud" + i, "参考音乐 " + (i + 1), "audio");
   } else if (mode === "r2v") {
     // 【2026-11-14】参考图上限从 3 张提升到 **9 张**
     // —— H3 参考生成节点的 ref_images 槽位上限就是 9（实测 object_info）。
@@ -3394,6 +3410,27 @@ $("#genBtn").addEventListener("click", async () => {
       }
       if (state.files.first) fd.append("file_first", state.files.first);
       if (state.files.last) fd.append("file_last", state.files.last);
+      // 【2026-11-15 补齐 —— 缺口 1 的 flf 半边：本地直传参考视频 / 参考音乐】
+      //
+      // 面板在 flf 下渲染了 refvid0..2 / refaud0..2 槽位（音轨三选一的素材），
+      // 那本地直传也必须有对应的提交通道 —— 否则用户选了本地文件就被丢掉，
+      // 而素材库路径（asset_refs）却是通的，两条路行为不一致。
+      //
+      // 服务端接收字段与 r2v 相同：file_refvid / file_refaud。
+      const REF_VIDEO_LIMIT = 3;
+      const REF_AUDIO_LIMIT = 3;
+      const flfRefVids = [];
+      for (let i = 0; i < REF_VIDEO_LIMIT; i++) {
+        const f = state.files["refvid" + i];
+        if (f) flfRefVids.push(f);
+      }
+      const flfRefAuds = [];
+      for (let i = 0; i < REF_AUDIO_LIMIT; i++) {
+        const f = state.files["refaud" + i];
+        if (f) flfRefAuds.push(f);
+      }
+      flfRefVids.forEach(f => fd.append("file_refvid", f));
+      flfRefAuds.forEach(f => fd.append("file_refaud", f));
     } else if (mode === "r2v") {
       // 【2026-11-15 修 —— 缺口 3：本地直传上限与后端 ≤9 对齐】
       //
