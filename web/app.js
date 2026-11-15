@@ -3165,10 +3165,28 @@ $("#genBtn").addEventListener("click", async () => {
     // 【修法】前端按与服务端**同一套公式**算出真实宽高一起提交
     // （服务端 h3studio/h3_video_size.py 是唯一真源，前端这份是
     //   同一公式的镜像；服务端仍会用自己的实现再算一次并以服务端为准）。
+    //
+    // 【2026-11-15 代码审查修 —— 这段曾**覆盖**掉上面的正确值】
+    // 本段原本无条件执行 `params.width = legacySize.width`，但它在
+    // **共享面板分支之后**，而共享面板分支刚刚写进去的正是
+    // `params.width = shared.width`（用户的真实选择）。
+    // 于是这一行把用户选的尺寸**覆盖**成了 legacySize ——
+    // 而 legacySize 读的是 `state.res` / `state.aspect`，
+    // 这两个字段**全仓从未被写过**（只在 state 初始化时定死
+    // "544p" / "16:9"），恒定算出 864×480。
+    //
+    // 后果（实测）：用户在共享面板选「608p · 16:9」（1088×608），
+    // 首尾帧 / 参考生视频实跑 864×480 —— **面板说一套、产物另一套**，
+    // 正是本段注释要修的那个毛病的翻版。
+    //
+    // 【修法】legacySize 只在**共享面板没就绪**时兜底（下面的 else 分支
+    // 已经做了），就绪时一律用共享面板给的真实宽高。
+    // 这里的 resolution 档位标签仍按 legacySize 反算（与服务端
+    // reso_label 同口径），但**不再回写 width / height**。
     const legacySize = currentLegacyVideoSize();
     if (legacySize) {
-      params.width = legacySize.width;
-      params.height = legacySize.height;
+      params.resolution = legacyTierForPixels(
+        Number(params.width) || 0, Number(params.height) || 0);
     }
   }
   // 图片编辑的参考图：**必须来自素材库**。
@@ -4361,19 +4379,11 @@ function jobCard(job) {
     <div class="job-actions">
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
-      <!-- 【2026-11-13】骨架卡：补上与真实卡片同形的「下载 / 新窗口打开」
-           两个占位按钮（真实卡片有产物所以有，骨架没有产物所以缺）。
-           缺这两个 -> 动作行少两个 -> 从 2 行缩到 1 行 ->
-           骨架比真实卡片矮 17px -> 网格高度跳 68px（test_grid_flash 抓的）。 -->
       ${job.is_skeleton && !(video || image || audio) ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${job.is_skeleton && !image ? `<a data-act="open-new" href="#" onclick="return false" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${window.Continuation && window.Continuation.canShowButton(job) ? `<button data-act="continue" title="${escapeHtml(window.Continuation.buttonTitle(job))}">⏭ 接续</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
-      <!-- 【2026-11-13 需求 C3】详情按钮：卡片区域有限，
-           完整生成参数（模型/步数/调度器/采样器/shift/LoRA 列表+强度/
-           尺寸/时长/seed/完整提示词/注意力机制/任务来源与工作流名/创建时间）
-           放到模态框里。 -->
       ${!runningOrQueued ? `<button data-act="detail" title="查看完整生成参数">ℹ 详情</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
@@ -5477,7 +5487,11 @@ function skeletonJob(index) {
   const isImage = IMAGE_MODES.includes(mode);
   const params = {
     mode: mode,
-    prompt: "骨架占位提示词，用于让元信息区高度与真实卡片保持一致，长度对齐真实内容。",
+    // 【文案纪律】骨架卡的文案必须**不含开发者措辞**。
+    // 这段文本会真的进 DOM（<b> 文本节点），CSS 只是用 color:transparent 把它涂掉，
+    // 但「复制页面内容」/读屏软件照样能拿到 —— 用户看到的是开发者内部说法。
+    // 提示词行的长度要和真实卡片对齐（见上面的说明），所以这里用等长中文占位。
+    prompt: "正在载入任务内容，模型与参数稍后显示，此处的临时文字仅用于对齐布局。",
     aspect: "16:9",
     resolution: "768p",
     duration: 5,
@@ -5521,7 +5535,7 @@ function skeletonJob(index) {
     // 而且真实任务里 LoRA 大概率是「无」—— 形状必须一致，不是内容一致。
     model_info: {
       model_key: "",
-      model_label: "骨架占位模型",
+      model_label: "载入中",
       lora_label: "",
       lora_strength: null,
       fixed_lora_label: "",
@@ -5573,6 +5587,11 @@ function renderGridSkeleton(grid, count) {
     delete card.dataset.sig;
     card.classList.add("job-skeleton");
     card.setAttribute("aria-hidden", "true");
+    // 【文案纪律】骨架卡的 title 是**原生 tooltip**（悬停即显示），
+    // 与 CSS 的 color:transparent 无关 —— 骨架里的 title 全是占位值
+    // （模型名 / 采样器 / 步数…），留着只会在悬停时闪出假信息。
+    // 这里把骨架卡内的 title 全部摘掉。
+    card.querySelectorAll("[title]").forEach(el => el.removeAttribute("title"));
     // 预览区换成占位块（真实卡片这里是 <img>/<video>）
     const preview = card.querySelector(".job-preview");
     if (preview) {
