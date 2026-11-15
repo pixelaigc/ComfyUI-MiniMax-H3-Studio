@@ -250,6 +250,35 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .stitch-remove { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 18px; }
 .stitch-remove:hover { color: var(--danger); }
 
+/* 【2026-11-15 修②】长片拼接自己的视频候选池。
+   原来「只收视频片段」是给共享媒体库强加 media=video 实现的，
+   于是媒体库被串台（只剩视频），且「生成类型=文生图」与 media=video
+   互斥 -> 选中文生图反而显示为空。
+   现在候选池独立成一块，只列视频产物，不影响媒体库。 */
+.stitch-candidates-wrap { display: flex; flex-direction: column; gap: 6px; }
+.stitch-candidates-wrap[hidden] { display: none; }
+.stitch-candidates-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; color: var(--muted);
+}
+.stitch-candidates {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  max-height: 190px; overflow-y: auto;
+}
+.stitch-candidate {
+  min-width: 0; display: flex; flex-direction: column; gap: 3px;
+  padding: 4px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; cursor: pointer; text-align: left;
+}
+.stitch-candidate:hover { border-color: var(--accent); background: var(--accent-soft); }
+.stitch-candidate video {
+  width: 100%; height: 44px; border-radius: 5px; object-fit: cover; background: #101216;
+}
+.stitch-candidate span {
+  font-size: 9.5px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* 上传区 */
 .upload-zone { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 12px; }
 .upload-title { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }

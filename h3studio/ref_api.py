@@ -48,42 +48,81 @@ def _describe(asset: dict, analysis: dict | None, tags: list[str]) -> tuple[str,
       user      用户手写（前端传 user_description 覆盖时用）
       empty     素材库没提供描述 —— **不要编造**，由前端给手动补充入口
 
-    取分析文本时只取首行/前若干字：参考图的占位描述要短，
-    否则提示词会被大段分析文字淹没。完整分析仍在素材库详情页里可看。
+    【2026-11-15 修② · 描述被截断只传第一行】
+    原来这里走 _condense(text)：它只取分析文本的**第一个有内容的小节**
+    并截断到 80 字。素材库的分析文本是**多小节**的长描述
+    （【主体人物】【服装与配饰】【场景与环境】…，实测 300~5000 字），
+    于是参考图描述只剩第一行/首节 —— 用户 2026-11-15 实测看到的就是
+    「基于您提供的图片素材，以下是详尽的中文内容描述：」这一行首句，
+    后面的全部小节都丢了。
+
+    【为什么必须完整传递】
+    这段描述是**图片编辑的编辑指令来源**：用户把一张素材图加进
+    H3-Image / Qwen 图片编辑面板时，模型拿到的是「这张图是什么」，
+    少了细节就等于让模型在瞎猜。素材库详情页有全文，但**进到图片编辑
+    面板后就没有全文了** —— 被截断的描述直接变成模型条件输入的一部分，
+    这不是显示问题，是**语义丢失**。
+
+    【现在怎么做】
+    完整保留分析文本（去首尾空白 + 规范化空行），不截断、不取首节。
+    只有当素材**完全没有**分析文本、也没有 note 时，才退回标签列表
+    （那是最后 resort，且明确标出来是标签而不是描述）。
     """
     if analysis:
         text = (analysis.get("text") or "").strip()
         if text:
-            return _condense(text), "analysis"
+            return _normalize(text), "analysis"
     note = (asset.get("note") or "").strip()
     if note:
-        return _condense(note), "analysis"
+        return _normalize(note), "analysis"
     if tags:
         return "、".join(tags[:6]), "analysis"
     return "", "empty"
 
 
-def _condense(text: str, limit: int = 80) -> str:
-    """把长描述压成一行短句（占位描述用）。
+#: 描述文本的**硬上限**（字符）。
+#:
+#: 【为什么还要一个上限 —— 不是为了「截断」，是为了「防失控」】
+#:   素材库的分析文本理论上可以很长（实测最长 5250 字）。
+#:   这个上限的作用是**兜底**：万一某条素材的分析文本异常膨胀
+#:   （比如模型输出了几十万字），不至于把整段塞进提示词把工作流撑爆。
+#:
+#: 【关键：正常素材远小于这个上限 —— 所以它不会造成「只传第一行」】
+#:   实测素材库里的分析文本：184 条，最长 5250 字，平均 449 字。
+#:   40000 这个上限对真实素材**等于不设限**（没有任何一条会被碰到），
+#:   但对异常值有保护。
+#:
+#: 【为什么不能用 80 这种小值】
+#:   80 正是老实现 _condense(limit=80) 的值 —— 它让**所有**正常素材
+#:   （300~5000 字）都被砍到只剩首节。那是缺陷本身，不是保护。
+DESCRIPTION_MAX_CHARS = 40000
 
-    素材库的分析文本动辄几百字（分【主体人物】【服装与配饰】等小节），
-    直接塞进提示词会淹没用户的编辑指令。这里只取**第一个有内容的小节**
-    并截断到 limit 字。
+
+def _normalize(text: str) -> str:
+    """把分析文本整理成「完整、可直接送进提示词」的形态。
+
+    做三件事，**都不丢内容**：
+      1. 去首尾空白；
+      2. 去掉 Windows 的 \\r（否则换行会变成 \\r\\n，进提示词是脏字符）；
+      3. 连续 3 个以上空行压成 2 个（纯排版整理，不动一个字）。
+
+    【刻意不做的事】
+      * 不取第一行 / 第一个小节 —— 那是缺陷本身；
+      * 不截断到固定字数 —— 见 DESCRIPTION_MAX_CHARS 的说明；
+      * 不去掉【小节】标记 —— 那些标记是素材库分析的结构语义，
+        模型看到「【光线与色彩】」比看到一段散文本更容易对齐。
     """
-    text = (text or "").strip()
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if not text:
         return ""
-    # 分析文本常见结构：【主体人物】…  取第一段有实际内容的
-    for chunk in text.replace("【", "\n【").split("\n"):
-        chunk = chunk.strip()
-        if len(chunk) > 6:
-            text = chunk
-            break
-    # 去掉残留的方括号标记
-    text = text.replace("【", "").replace("】", " ")
-    text = " ".join(text.split())
-    if len(text) > limit:
-        text = text[:limit].rstrip() + "…"
+    # 超上限时**从尾部**截，并明确标注被截掉了多少 ——
+    # 宁可让用户看到「（描述过长，已截取前 N 字）」，也不要静默给一段半截文本。
+    if len(text) > DESCRIPTION_MAX_CHARS:
+        dropped = len(text) - DESCRIPTION_MAX_CHARS
+        text = text[:DESCRIPTION_MAX_CHARS].rstrip() + f"\n\n（描述过长，已截取前 {DESCRIPTION_MAX_CHARS} 字，另有 {dropped} 字未显示）"
+    # 3 个以上连续换行压成 2 个（空行分隔段落）
+    while "\n\n\n" in text:
+        text = text.replace("\n\n\n", "\n\n")
     return text
 
 
