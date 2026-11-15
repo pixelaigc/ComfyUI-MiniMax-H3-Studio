@@ -1922,7 +1922,7 @@
           `官方 PE：${d.tier_label || d.tier || ""}`.trim(), "qwen21-pe");
       }
       setHint(`官方 PE 扩写完成（${d.tier_label || d.tier}）：${expanded.length} 字；`
-        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+        + `点「替换提示词框」写回后即可出图（工作流不再二次扩写）`, "ok");
       return { expanded, meta };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
@@ -2014,7 +2014,7 @@
         pushPromptVersion(1, expanded, "H3-Image 官方 PE", "h3image-pe");
       }
       setHint(`H3-Image 官方 PE 扩写完成：${expanded.length} 字；`
-        + `点「替换提示词框」写回后，出图将不再二次扩写`, "ok");
+        + `点「替换提示词框」写回后即可出图（工作流不再二次扩写）`, "ok");
       return { expanded, meta };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;
