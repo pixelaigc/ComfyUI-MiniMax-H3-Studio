@@ -227,6 +227,82 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
             {"file_last": ["last.png"], "file_refaud": ["a.flac"]})
         self.assertEqual(params["ref_audios"], ["a.flac"])
 
+    def test_workflow_wires_reference_video_into_node_slots(self):
+        """build_flf 必须把 ref_videos 接进 T8 节点的 ref_videos 槽位。
+
+        【为什么这条最重要】线上实测踩到的真实缺陷：
+        flf 选了参考视频 -> 服务端把它的音轨抽出来贴上去
+        （ref_video_audios）-> 但 build_flf **没有**把 ref_videos 接进节点 ->
+        节点硬要求「第 N 个背景音必须配第 N 个参考视频」->
+        任务直接失败：
+          ValueError: Reference-video soundtrack(s) have no same-numbered
+          video: 0
+
+        build_r2v 一直是接的；flf 漏了 —— 因为 flf 之前没有参考视频入口，
+        漏了也没人发现。这次把面板入口补上，缺陷才浮出来。
+        """
+        from h3studio import h3_video_modes as h3modes
+        wf = h3modes.build_flf({
+            "first_frame": "f.png",
+            "last_frame": "l.png",
+            "ref_videos": ["v.mp4"],
+            "ref_video_audios": ["sb.m4a"],
+            "ref_audios": ["a.flac"],
+            "width": 864, "height": 480, "duration": 5,
+            "job_id": "testjob",
+        })
+        # 参考素材是 T8 节点的**直接输入**（键名形如 "ref_videos.ref_video_0"）
+        node = None
+        for nid, spec in wf.items():
+            if spec.get("class_type") == "MiniMaxH3AudioConditioningT8":
+                node = spec
+                break
+        self.assertIsNotNone(node, "找不到 T8 音频条件节点")
+        inputs = node.get("inputs", {})
+        self.assertIn("ref_videos.ref_video_0", inputs,
+                      "build_flf 没把 ref_videos 接进节点槽位 "
+                      "（音轨三选一的 (c) 会因「音轨无对应视频」而失败）")
+        # 参考音乐那一路也必须在
+        self.assertTrue(
+            any(k.startswith("ref_audios.ref_audio_") for k in inputs),
+            "build_flf 没把 ref_audios 接进节点槽位")
+        # 参考视频背景音那一路也必须在
+        self.assertTrue(
+            any(k.startswith("ref_video_audios.ref_video_audio_")
+                for k in inputs),
+            "build_flf 没把 ref_video_audios 接进节点槽位")
+        # 引用的必须是真实存在的节点（不能指向空）
+        for key in ("ref_videos.ref_video_0",):
+            ref = inputs[key]
+            self.assertEqual(len(ref), 2, "槽位引用格式应为 [node_id, output]")
+            self.assertIn(ref[0], wf,
+                          f"{key} 指向了不存在的节点 {ref[0]}")
+
+    def test_workflow_without_reference_video_has_no_ref_video_slots(self):
+        """没有参考视频时，节点里不能凭空出现 ref_videos 槽位。
+
+        【为什么锁这条】防止有人为了「让音轨三选一能用」把
+        ref_videos 无条件接进去 —— 那样节点又会报
+        「soundtrack has no same-numbered video」。
+        """
+        from h3studio import h3_video_modes as h3modes
+        wf = h3modes.build_flf({
+            "first_frame": "f.png",
+            "last_frame": "l.png",
+            "width": 864, "height": 480, "duration": 5,
+            "job_id": "testjob",
+        })
+        node = None
+        for nid, spec in wf.items():
+            if spec.get("class_type") == "MiniMaxH3AudioConditioningT8":
+                node = spec
+                break
+        self.assertIsNotNone(node)
+        inputs = node.get("inputs", {})
+        self.assertFalse(
+            any(k.startswith("ref_videos.") for k in inputs),
+            "没有参考视频时不应出现 ref_videos 槽位")
+
     def test_reference_media_without_any_frame_is_still_rejected(self):
         """只给参考音乐、没给首尾帧 -> 仍然报错。
 
