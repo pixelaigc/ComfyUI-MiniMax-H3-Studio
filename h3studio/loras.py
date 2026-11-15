@@ -1090,6 +1090,81 @@ def classify_kind(name: str, info: dict) -> str:
     return KIND_EFFECT
 
 
+# ------------------------------------------------------------------ 基座判定
+#
+# `base_verdict` = 「这个 LoRA 与本机底模的适配结论」。
+#
+# 【为什么要有这个字段】目录（LORA_CATALOG）里只有 77 条登记了结论
+# （原生 / 近似适用），其余 112 + 85 条**目录里没有** —— 界面只能显示
+# 「未标注」。但「目录没登记」不等于「本机不适配」：**本机实测**
+# （compatible / attention_hit / conversion_status）已经给出了结论，
+# 把它如实下发，用户就能看到真实适配状态，而不是一句「未标注」。
+#
+# 【取值 —— 必须由实测结论推导，绝不是常量】
+#   原生      目录登记了结论，且本机实测也判定为可用
+#   近似适用  目录登记了结论，且本机实测也判定为可用
+#   已适配    目录没登记，但本机实测判定为**可用**（compatible=true
+#             且 attention_hit 达标 且 转换状态不是 broken）
+#   不适配    本机实测判定为**不可用**（compatible=false）
+#   不可用    本机实测判定为文件本体损坏（conversion_status=broken）
+#
+# ⚠️ **绝不能新增常量为 true 的假值**：不可用 / 不适配的条目
+# 必须如实显示成不可用，不能因为「要有个值」就写成「原生」。
+# 判定完全落在既有 compatible / attention_hit / conversion_status
+# 三条实测结论上（见 _resolve_base_verdict）。
+
+#: 目录登记过的两个结论（人工核对过的上游声明）
+BASE_VERDICT_NATIVE = "原生"
+BASE_VERDICT_NEAR = "近似适用"
+#: 目录没登记、但本机实测判定为可用的结论
+BASE_VERDICT_VERIFIED = "已适配"
+#: 本机实测判定为不可用
+BASE_VERDICT_INCOMPATIBLE = "不适配"
+#: 本机实测判定为文件本体损坏
+BASE_VERDICT_BROKEN = "不可用"
+
+
+def _resolve_base_verdict(info: dict, compat: dict) -> str:
+    """按既有实测结论推导 base_verdict（绝不返回常量 true 的假值）。
+
+    参数:
+      info    目录条目（可能没有 base_verdict）
+      compat  兼容性判定结果（compatible / attention_hit / conversion_status）
+
+    返回：见上面的 BASE_VERDICT_* 常量。
+    """
+    # 1) 本机实测先判「不可用」—— 这是最硬的结论，优先于目录登记。
+    #    文件本体损坏（broken）-> 不可用。
+    #    结构/命中/转换不可行（compatible=false）-> 不适配。
+    conversion_status = (compat.get("conversion_status") or "").strip()
+    if conversion_status == "broken":
+        return BASE_VERDICT_BROKEN
+    if not compat.get("compatible", True):
+        return BASE_VERDICT_INCOMPATIBLE
+
+    # 2) 本机实测判定为可用。目录登记过的结论优先（它带上游声明，
+    #    比「本机实测可用」信息量更大）—— 但**只在这条实测结论
+    #    成立时**才采信，目录说了「原生」而实测说不行，以实测为准
+    #    （第 1 步已经返回了）。
+    declared = (info.get("base_verdict") or "").strip()
+    if declared in (BASE_VERDICT_NATIVE, BASE_VERDICT_NEAR):
+        return declared
+
+    # 3) 目录没登记 -> 按本机实测如实标注「已适配」。
+    #    注意力层命中率必须是满的才算「适配」—— 半命中意味着
+    #    ComfyUI 会静默丢弃一部分权重（半静默失效）。
+    hit = compat.get("attention_hit")
+    if hit is None:
+        return BASE_VERDICT_VERIFIED
+    try:
+        hit_f = float(hit)
+    except (TypeError, ValueError):
+        return BASE_VERDICT_VERIFIED
+    if hit_f < 1.0:
+        return BASE_VERDICT_INCOMPATIBLE
+    return BASE_VERDICT_VERIFIED
+
+
 # ------------------------------------------------------------------ 扫描本机
 def _comfyui_root() -> Path | None:
     """定位本机 ComfyUI 根目录（不写死 /root/ComfyUI）。"""
@@ -1354,7 +1429,11 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 # 分组标签（东亚人像目录用）：界面下拉按它分组，
                 # 85 条同一个下拉不分组根本没法找。
                 "group": info.get("group", ""),
-                "base_verdict": info.get("base_verdict", ""),
+                # ⚠️ 2026-11-15（L-C）：base_verdict 由**本机实测结论**
+                # 推导（compatible / attention_hit / conversion_status），
+                # 目录没登记的条目也如实给出结论，不再一律「未标注」。
+                # 不可用 / 不适配的条目如实显示不可用 —— 绝不兜底成「原生」。
+                "base_verdict": _resolve_base_verdict(info, compat),
                 "metadata": meta,
             })
     return found
@@ -1609,7 +1688,11 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 # 分组标签（东亚人像目录用）：界面下拉按它分组，
                 # 85 条同一个下拉不分组根本没法找。
                 "group": info.get("group", ""),
-                "base_verdict": info.get("base_verdict", ""),
+                # ⚠️ 2026-11-15（L-C）：base_verdict 由**本机实测结论**
+                # 推导（compatible / attention_hit / conversion_status），
+                # 目录没登记的条目也如实给出结论，不再一律「未标注」。
+                # 不可用 / 不适配的条目如实显示不可用 —— 绝不兜底成「原生」。
+                "base_verdict": _resolve_base_verdict(info, compat),
                 "metadata": meta,
             })
     return found
