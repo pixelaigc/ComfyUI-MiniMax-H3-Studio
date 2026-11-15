@@ -70,8 +70,31 @@
   const ROUTE_PREFIX = "#/agent/";
 
   // 把当前会话写进 URL（路由 + 选中态同步）。
+  //
+  // 【2026-11-15 修② · 媒体库类型过滤串台】只在**用户真的打开了 Agent 页**
+  // 时才写路由。
+  //
+  // 【原来为什么是错的】
+  //   syncRoute() 在 saveCurrentId() 里被无条件调用，而 saveCurrentId()
+  //   在 **init() 恢复会话**时也会走 —— 于是**用户从没点过 Agent**，
+  //   只是打开工作台，URL 就被写成 `#/agent/<某个会话id>`。
+  //   这正是用户 2026-11-15 报的「我没访问过 agent，URL 却变成
+  //   http://192.168.3.78:8190/#/agent/50269d359dfa4106」。
+  //
+  // 【它为什么还会串台媒体库】
+  //   见 web/agent.js::show() 的说明（state.page 没被正确更新）
+  //   —— 两个问题叠在一起，才出现「媒体库只剩视频」。
+  //
+  // 【现在的规则】
+  //   只有「Agent 面板当前是显示状态」才写路由。
+  //   后台恢复会话（页面刚加载、用户还没点 Agent）**不写**路由 ——
+  //   那只是把上次的会话内容准备好，不是「用户正在 Agent 页」。
   function syncRoute(sessionId) {
     const sid = sessionId || "";
+    // Agent 页当前可见吗？不可见就别改 URL。
+    const agentPage = document.querySelector("#agentPage");
+    const agentVisible = !!(agentPage && !agentPage.classList.contains("page-hidden"));
+    if (!agentVisible) return;
     const target = sid ? ROUTE_PREFIX + encodeURIComponent(sid) : ROUTE_PREFIX;
     try {
       if (location.hash === target) return;

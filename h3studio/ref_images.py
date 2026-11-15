@@ -174,6 +174,35 @@ def build_reference_block(refs: list[dict], style: str = "inline") -> str:
     return "\n".join(lines)
 
 
+def build_reference_description_block(refs: list[dict]) -> str:
+    """构造「只有描述、没有占位标记」的说明块。
+
+    【什么时候用】
+    用户自己写了 <imageN> 占位时用 —— 见 inject_reference_block 的说明。
+
+    【为什么不能直接用 build_reference_block】
+    build_reference_block 带占位标记（<image1> 猫 / <image2> 狗）。
+    用户已经写了 <image2> 时再追加一份带标记的块，
+    提示词里就会出现**两个 <image2>** —— 占位重复会让模型困惑，
+    也破坏了「用户写的编号不被改写」这条约定。
+
+    所以这里只给描述文本：
+      * N>=2：每张图一行，**行首不带标记**（模型靠上下文顺序对应）；
+      * N==1：直接一段描述。
+    """
+    lines = []
+    for ref in refs:
+        if ref.get("missing"):
+            continue
+        desc = (ref.get("description") or "").strip()
+        line = desc or (ref.get("name") or "")
+        if line:
+            lines.append(line)
+    if not lines:
+        return ""
+    return "\n".join(lines)
+
+
 def inject_reference_block(prompt: str, refs: list[dict], style: str = "inline") -> str:
     """
     把参考图占位块注入提示词。
@@ -182,16 +211,29 @@ def inject_reference_block(prompt: str, refs: list[dict], style: str = "inline")
     官方 PE-I2I 的多图模板本身就是「<image1> 是画布图…」起手的，
     占位在前更符合官方写法。
 
-    幂等：若提示词里已经有占位标记（用户自己写了 <image1>），**不重复注入**。
-    这时**不动**用户写的编号 —— 用户写 <image2> 就是想指第 2 张，
-    强行重编号会改坏用户的语义。编号对齐由前端在增删参考图时负责
+    幂等：若提示词里已经有占位标记（用户自己写了 <image1>），**不重复注入**
+    占位块 —— 不动用户写的编号（用户写 <image2> 就是想指第 2 张，
+    强行重编号会改坏用户的语义）。编号对齐由前端在增删参考图时负责
     （见 web/qwen-refs.js 的 reindexPrompt）。
+
+    【2026-11-15 修② · 用户写了占位时，描述也必须给模型】
+    原来「用户已写占位 -> 直接原样返回 prompt」，于是**描述整段丢失**：
+    用户自己写 <image1> 把雪豹放进图里，模型看到的是「<image1> 把雪豹放进图里」
+    —— 它知道有图1，但**不知道图1是什么**（那只戴红蝴蝶结的动漫少女？
+    一张纯红方块？）。素材描述恰恰是图片编辑的**指令来源**，丢了就是语义丢失。
+
+    现在：用户已写占位时，把**纯描述**（不含标记）追加在提示词后面
+    —— 模型拿到描述，用户写的编号原样保留，提示词里也不会出现重复标记。
     """
     prompt = prompt or ""
-    block = build_reference_block(refs, style=style)
     if parse_placeholders(prompt):
-        # 用户手写了占位 -> 不注入第二份，也不动他的编号
-        return prompt
+        # 用户自己写了占位 -> 不在前面重复注入占位块，也不动他的编号；
+        # 但描述**必须**给模型 -> 以「纯描述块」追加到后面。
+        desc_block = build_reference_description_block(refs)
+        if not desc_block:
+            return prompt
+        return f"{prompt}\n{desc_block}" if prompt else desc_block
+    block = build_reference_block(refs, style=style)
     if not block:
         return prompt
     return f"{block}\n{prompt}" if prompt else block
