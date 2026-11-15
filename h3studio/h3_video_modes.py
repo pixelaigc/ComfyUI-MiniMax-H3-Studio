@@ -417,9 +417,25 @@ def build_flf(params: dict) -> dict:
                         "_meta": {"title": "加载尾帧"}}
         condition_inputs["last_frame"] = ["105:202", 0]
 
-    # 参考音乐 / 参考视频背景音（音轨三选一的素材）
+    # 参考视频 / 参考音乐 / 参考视频背景音（音轨三选一的素材）
+    #
+    # 【2026-11-15 修 —— 线上实测暴露的真实缺陷】
+    # 原来 build_flf 只接了 ref_audios 与 ref_video_audios，
+    # **没有接 ref_videos** —— 于是 flf 模式下选了参考视频，
+    # 服务端把它的音轨抽出来贴上去（ref_video_audios），
+    # 但 T8 节点的 ref_videos 槽位是空的。
+    # 节点随即抛：
+    #   ValueError: Reference-video soundtrack(s) have no same-numbered video: 0
+    # （节点硬要求「第 N 个背景音必须配第 N 个参考视频」）
+    #
+    # build_r2v 一直是接的（见下面 build_r2v 里的 ref_videos 分支），
+    # flf 漏了 —— 因为 flf 之前根本没有参考视频的入口，
+    # 漏了也没人发现。这次把面板入口补上，缺陷就浮出来了。
+    ref_videos = list(params.get("ref_videos") or [])[:MAX_REF_VIDEOS]
     ref_audios = list(params.get("ref_audios") or [])[:MAX_REF_AUDIOS]
     ref_video_audios = list(params.get("ref_video_audios") or [])[:MAX_REF_VIDEOS]
+    if ref_videos:
+        condition_inputs.update(_ref_video_nodes(p, ref_videos))
     if ref_audios:
         condition_inputs.update(_ref_audio_nodes(p, ref_audios))
     if ref_video_audios:
