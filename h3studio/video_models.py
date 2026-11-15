@@ -153,6 +153,27 @@ VIDEO_MAX_PIXELS_MESSAGE = (
     "请把宽度或高度调小，或改用更小的画面比例。"
 )
 
+
+def _format_limit_mp(max_pixels) -> str:
+    """把上限像素数格式化成「2.0」「0.8」这样的**一位小数**文案。
+
+    【为什么不能用 f"{max_pixels:g}"]
+    `:g` 会在去掉尾随零的同时把整数值的浮点写法也压成整数 ——
+    `f"{2.0:g}"` 得到 `"2"`（不是 `"2.0"`），于是错误文案变成
+    「文生视频分辨率上限为 2M 像素」而不是「2.0M 像素」，
+    与产品既有文案（2.0M / 0.8M）不一致。
+    这里统一保留一位小数：2.0 -> "2.0"、0.8 -> "0.8"。
+    """
+    try:
+        value = float(max_pixels)
+    except (TypeError, ValueError):
+        return str(max_pixels)
+    text = f"{value:.1f}"
+    # 去掉 0.80 这种多余尾零，但仍保留 "2.0" 这类整数值的小数位
+    if text.endswith(".0") and value != int(value):
+        text = text[:-2]
+    return text
+
 #: 各生成模式的**中文名**（用于错误文案）。
 #: 【为什么放在这里】错误文案要与「用户正在做的那个模式」对上 ——
 #: 模式名散落在各处时，文案就会说错模式（本次审查实测到）。
@@ -960,7 +981,7 @@ def normalize_video_size(width, height,
                 # 不静默截断：原样保留请求值，把可执行的提示交给上层。
                 reasons.append(VIDEO_MAX_PIXELS_MESSAGE.format(
                     mode_label=VIDEO_MODE_LABELS.get(mode) or "视频",
-                    limit_mp=f"{max_pixels:g}",
+                    limit_mp=_format_limit_mp(max_pixels),
                     limit=f"{int(limit):,}",
                     pixels=f"{w * h:,}",
                     width=w, height=h))
