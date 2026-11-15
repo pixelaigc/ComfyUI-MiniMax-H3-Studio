@@ -174,6 +174,40 @@
         <div class="chips" id="vidAspectChips"></div>
       </div>
 
+      <!-- 【2026-11-15 修复③ 交付项 3】本模式特有的**素材字段**。
+           放在共享面板的「画面比例」之后、「模型」之前 ——
+           素材是这一模式的**输入**，排在尺寸/比例之后、参数之前，
+           与文生视频面板的分块逻辑一致（先说输入，再说参数）。
+
+           【这三个面板的差异**只有**这里】
+           * 文生视频（t2v）：没有素材字段 —— 整块不显示；
+           * 首尾帧（flf）：首帧 / 尾帧 + 参考视频 + 参考音乐；
+           * 参考生视频（r2v）：参考图 + 参考视频 + 参考音乐。
+           其余分块、控件顺序、样式与文生视频**完全一致**。 -->
+      <div class="field" id="vidMediaField" style="display:none">
+        <div class="field-label"><span id="vidMediaLabel">参考素材</span>
+          <span class="muted" id="vidMediaHint"></span></div>
+        <div class="upload-zone" id="uploadZone" style="display:none">
+          <div id="uploadTitle" class="upload-title">上传图片</div>
+          <div class="upload-row" id="uploadRow"></div>
+        </div>
+        <div class="img-note" id="vidMediaNote"></div>
+      </div>
+
+      <!-- 【2026-11-14 新增】音轨来源（首尾帧 / 参考生视频）
+           B2 需求：「音轨三选一」：
+             (a) 使用生成的音乐
+             (b) 使用参考音乐作为成片音轨
+             (c) 使用参考视频的背景音乐作为成片音轨
+           没有参考音乐 / 参考视频时 (b)/(c) **不出现**（不是置灰 ——
+           置灰等于「能选但会被服务端改写」，那是假选项）。
+           可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。 -->
+      <div class="field" id="audioTrackField" style="display:none">
+        <div class="field-label">成片音轨 <span class="muted">三选一 · 没有对应素材的选项不出现</span></div>
+        <select class="img-select" id="audioTrackSelect"></select>
+        <div class="img-note" id="audioTrackNote"></div>
+      </div>
+
       <div class="field">
         <div class="field-label"><span id="vidModelLabel">MiniMax-H3 模型</span> <span class="muted">本机已安装</span></div>
         <div class="img-note" id="vidModelSourceNote"></div>
@@ -349,19 +383,12 @@
       </div>
     </div>
 
-    <div class="field" id="resField">
-      <div class="field-label">分辨率</div>
-      <div class="seg" id="resSeg">
-        <button data-v="544p" class="active"><b>544p</b><small>快速</small></button>
-        <button data-v="768p"><b>768p</b><small>高清</small></button>
-      </div>
-      <!-- 【2026-11-15 缺口 5】显示**这次真的会跑**的像素尺寸。
-           旧面板只显示档位字符串，用户看不到 544p + 9:16 到底
-           等于多少 × 多少 —— 而工作流跑的就是这个尺寸。
-           服务端 h3studio/h3_video_size.py 是唯一真源，
-           前端 legacyVideoSize() 是同公式的镜像。 -->
-      <div class="img-note" id="legacySizeNote"></div>
-    </div>
+    <!-- 【2026-11-15 修复③ 交付项 3】「快捷选分辨率」卡片**已删除**。
+         首尾帧 / 参考生视频 / 文生视频现在**共用**同一套视频面板
+         （尺寸预设下拉 + 宽高直填），不再有第二套「分辨率档位」控件。
+         原来这里只显示档位字符串（544p / 768p），用户看不到
+         544p + 9:16 到底等于多少 × 多少 —— 而工作流跑的就是那个尺寸。
+         真实像素现在由共享面板的「输出尺寸」区直接显示。 -->
 
     <div class="field" id="durField">
       <div class="field-label">时长 <span id="durVal">5s</span>
@@ -373,16 +400,8 @@
       <input type="range" id="duration" min="2" max="60" step="1" value="5">
     </div>
 
-    <div class="field" id="aspectField">
-      <div class="field-label">画面比例</div>
-      <div class="chips" id="aspectChips">
-        <button data-v="16:9" class="active">16:9</button>
-        <button data-v="9:16">9:16</button>
-        <button data-v="4:3">4:3</button>
-        <button data-v="3:4">3:4</button>
-        <button data-v="1:1">1:1</button>
-      </div>
-    </div>
+    <!-- 【2026-11-15 修复③ 交付项 3】旧「画面比例」chips 已删除 ——
+         三个视频模式共用共享面板里的「画面比例」（#vidAspectChips）。 -->
 
     <!-- 图像模式专属：分辨率档位 / 比例 / Z-Image 参数 -->
     <div id="imagePanel" style="display:none">
@@ -755,62 +774,13 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 
     <button class="gen-btn" id="genBtn">生成</button>
 
-    <!-- 次要参数和图片输入放在主要创作项之后 -->
-    <div class="upload-zone" id="uploadZone" style="display:none">
-      <div id="uploadTitle" class="upload-title">上传图片</div>
-      <div class="upload-row" id="uploadRow"></div>
-    </div>
-
-    <div class="field" id="modelField">
-      <div class="field-label">模型 <span class="muted">基础模型随模式自动切换</span></div>
-      <div class="cards2" id="modelCards">
-        <button data-v="lora" class="active"><b>MiniMax-H3 + LoRA</b><small>Turbo 加速 · 默认 4 步</small></button>
-        <button data-v="standard"><b>标准 MiniMax-H3</b><small>20 步 · 质量优先</small></button>
-      </div>
-      <div class="subfield" id="loraField">
-        <div class="field-label">加速 LoRA 选择 <span class="muted">与文生视频同一份清单 · 工作流只挂你选的那枚</span></div>
-        <!-- 【2026-11-14】这里原来写死了两张卡片（ckpt850 / v4step600）——
-             旧面板因此选不到 LightX2V / DMAD，与文生视频面板行为不一致。
-             现在由 renderLegacyAccelLoraCards() 用统一清单渲染；
-             下面的静态卡片只是**首屏占位**（清单还没到时显示）。 -->
-        <div class="cards2" id="loraCards">
-          <button data-v="ckpt850" class="active"><b>Turbo ckpt850</b><small>EMA 权重</small></button>
-          <button data-v="v4step600"><b>v4-step600</b><small>4 步 · 推荐</small></button>
-        </div>
-        <!-- 【2026-11-11】LoRA 强度控件从「生成按钮下方」搬到这里 ——
-             生成按钮下方那个是重复控件（与文生视频面板「加速 LoRA」旁的
-             强度控件指的是同一件事），而这里才是唯一一处。
-             放在一起也符合直觉：强度就是跟着「选哪枚 LoRA」走的。
-             flf / r2v 走旧工作流路径（读 params.lora_strength），
-             文生视频走新面板（读 accel_loras[].strength）—— 两边各一处。 -->
-        <div class="compact-field" id="loraStrengthField">
-          <div class="compact-label"><span>LoRA 强度</span><b id="loraStrengthVal">1.00</b></div>
-          <input type="range" id="loraStrength" min="0" max="1.5" step="0.05" value="1">
-        </div>
-      </div>
-    </div>
-
-    <div class="field" id="stepsField">
-      <div class="field-label">步数 <span id="stepsVal">4</span> <span class="muted">4~20，步多质量高但更慢</span></div>
-      <input type="range" id="steps" min="4" max="20" step="1" value="4">
-      <!-- 【2026-11-12】步数的「推荐 / 已改」提示。
-           默认档位与工作流硬编码一致：挂加速 LoRA -> 4 步，不用 LoRA -> 20 步。 -->
-      <small class="muted" id="vidLegacyStepsHint">推荐</small>
-    </div>
-
-    <!-- 【2026-11-14 新增】音轨来源（首尾帧 / 参考生视频）
-         B2 需求：「音轨三选一」：
-           (a) 使用生成的音乐
-           (b) 使用参考音乐作为成片音轨
-           (c) 使用参考视频的背景音乐作为成片音轨
-         没有参考音乐 / 参考视频时 (b)/(c) **不出现**（不是置灰 ——
-         置灰等于「能选但会被服务端改写」，那是假选项）。
-         可见性判据与归一都在 h3studio/h3_audio_track.py（唯一真源）。 -->
-    <div class="field" id="audioTrackField" style="display:none">
-      <div class="field-label">成片音轨 <span class="muted">三选一 · 没有对应素材的选项不出现</span></div>
-      <select class="img-select" id="audioTrackSelect"></select>
-      <div class="img-note" id="audioTrackNote"></div>
-    </div>
+        <!-- 【2026-11-15 修复③ 交付项 3】旧「模型 / 加速 LoRA / 步数」区块
+         **已删除** —— 三个视频模式（文生视频 / 首尾帧 / 参考生视频）
+         现在共用同一套视频面板（#videoPanel）：模型下拉 + 加速 LoRA
+         下拉与强度 + 效果 LoRA + 采样参数（含步数）。
+         旧区块与共享面板**功能重复**，留着就会出现两处步数、
+         两处 LoRA 强度 —— 用户改了一处、另一处没变，
+         提交时不知道该听谁的。 -->
 
     <!-- 【2026-11-14 新增】首尾帧 / 参考生视频的采样参数。
          这两个模式走的是**旧工作流路径**（h3studio/workflows.py 的
@@ -819,50 +789,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
          所以步数 / 采样器 / 调度器 / shift 一样是真参数、一样能调。
          （文生视频面板在自己那块独立的「采样参数」区里。）
          CFG 同样是 H3 固定 1.0 —— 只做只读说明。 -->
-    <div class="field" id="videoSamplingField" style="display:none">
-      <div class="field-label">采样参数 <span class="muted">与文生视频面板一致</span></div>
+        <!-- 【2026-11-15 修复③ 交付项 3】旧「采样参数」区块**已删除** ——
+         采样参数（采样器 / 调度器 / shift / CFG 说明 / 步数）现在由
+         共享的视频面板提供，与文生视频**同一处、同一套控件**。 -->
 
-      <div class="compact-pair">
-        <div class="compact-field">
-          <div class="compact-label"><span>采样器</span><small id="vidLegacySamplerHint">推荐</small></div>
-          <select class="img-select" id="vidLegacySamplerSelect"></select>
-        </div>
-        <div class="compact-field">
-          <div class="compact-label"><span>调度器</span><small id="vidLegacySchedulerHint">推荐</small></div>
-          <select class="img-select" id="vidLegacySchedulerSelect"></select>
-        </div>
-      </div>
-
-      <div class="compact-pair">
-        <div class="compact-field">
-          <div class="compact-label"><span>shift（视频）</span><b id="vidLegacyShiftVideoVal">12.0</b></div>
-          <input type="range" id="vidLegacyShiftVideo" min="0.01" max="100" step="0.01" value="12">
-          <small class="muted" id="vidLegacyShiftVideoHint">推荐</small>
-        </div>
-        <div class="compact-field">
-          <div class="compact-label"><span>shift（音频）</span><b id="vidLegacyShiftAudioVal">3.0</b></div>
-          <input type="range" id="vidLegacyShiftAudio" min="0.01" max="100" step="0.01" value="3">
-          <small class="muted" id="vidLegacyShiftAudioHint">推荐</small>
-        </div>
-      </div>
-
-      <div class="compact-pair">
-        <div class="compact-field">
-          <div class="compact-label"><span>CFG</span><b id="vidLegacyCfgVal">1.0</b></div>
-          <input type="text" id="vidLegacyCfg" value="1.0" readonly>
-          <small class="muted" id="vidLegacyCfgHint">H3 固定</small>
-        </div>
-        <div class="compact-field">
-          <div class="compact-label"><span>二采</span><small id="vidLegacyTwopassHint">不适用</small></div>
-          <input type="text" id="vidLegacyTwopassNote" value="此模式无二采" readonly>
-        </div>
-      </div>
-
-      <div class="img-note" id="vidLegacySamplingNote"></div>
-      <div class="img-note" id="vidLegacyCfgFixedNote"></div>
-    </div>
-
-    <!-- 【2026-11-11】这里原来是一个 compact-pair：左边「LoRA 强度」滑杆
+<!-- 【2026-11-11】这里原来是一个 compact-pair：左边「LoRA 强度」滑杆
          + 右边「种子」。「LoRA 强度」是重复控件（与文生视频面板「加速 LoRA」
          旁的强度控件指的是同一件事），已搬到上面「LoRA 选择」旁边 ——
          现在全站只有唯一一处强度控件。种子单独一行。 -->
@@ -1538,23 +1469,34 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 【2026-11-14 合并说明】qwen-refs.js 版本号取 h3image1 —— 该分支改了
      qwen-refs.js（H3-Image 参考图占位语法隔离），必须升版号破缓存；
      mainline 一侧的 refs1 会让用户拿到旧文件。 -->
-<script src="/static/qwen-refs.js?v=feasibility1"></script>
+<script src="/static/qwen-refs.js?v=fix3preview1"></script>
+<!-- 【2026-11-15 修复③ 交付项 1】滑杆 + 数值直输共用组件。
+     必须**先于** app.js / video-panel.js / music.js 加载 —— 它在
+     DOMContentLoaded 时扫描全部 range 并装上数字输入框，
+     动态生成的滑杆由 MutationObserver 兜底。
+     它**不改**各面板的状态与提交逻辑：输入框只是另一个入口，
+     最终仍然写回同一个 range 的 value 并派发 input/change 事件。 -->
+<script src="/static/numeric-slider.js?v=numslider3"></script>
+<!-- 【2026-11-15 修复③ 交付项 2】媒体预览模态框。
+     图片分支复用 app.js 已有的 lightbox（window.H3Studio.lightboxShow），
+     视频 / 音频分支用本模块自己的模态框。 -->
+<script src="/static/media-preview.js?v=mediapreview2"></script>
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=vpfb1"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
-<script src="/static/music.js?v=uxbatch1"></script>
+<script src="/static/music.js?v=fix3preview1"></script>
 <!-- 【2026-11-13 合并说明】video-panel.js 版本号取 h3-model-meta 一侧的
      videopanel2 —— 该分支改了 video-panel.js（作者推荐参数注释 + sigma 精修），
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=uxbatch1"></script>
+<script src="/static/video-panel.js?v=fix3panel1"></script>
 <!-- 效果 LoRA 选择器（H3 文生视频面板）——
      必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
      调用（window.VIDEO_EFFECT_LORA）。 -->
-<script src="/static/video-effect-lora.js?v=uxbatch1"></script>
+<script src="/static/video-effect-lora.js?v=fix3panel1"></script>
 <script src="/static/continuation.js?v=continuation1"></script>
 <!-- 生成队列（2026-11-13 队列化需求）：队列面板 + 队列快照轮询。
      必须**先于** app.js 加载 —— app.js 的 boot() 里要读
@@ -1584,7 +1526,7 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 【2026-11-15 媒体库全类型】升版号到 mediadef1 —— app.js 改了
      （长片拼接页不再污染全局 media 筛选；媒体库恢复显示图片/音频产物）。
      必须破缓存，否则用户拿到的还是旧 app.js，媒体库仍然只剩视频。 -->
-<script src="/static/app.js?v=mediadef1"></script>
+<script src="/static/app.js?v=fix3panel1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->

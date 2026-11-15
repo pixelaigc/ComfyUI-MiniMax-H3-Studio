@@ -66,7 +66,21 @@
     rawWidth: null,         // 用户原始输入（未经吸附）
     rawHeight: null,
     sizePresetKey: "",      // 当前选中的尺寸预设（空 = 自定义）
-    // 【2026-11-14】加速 LoRA 是**一个槽位**：选哪枚就只挂哪枚。
+    // 【2026-11-15 修复③ 交付项 3】当前面板服务的生成模式。
+    //
+    // 【为什么要有它】首尾帧（flf）/ 参考生视频（r2v）现在**共用**
+    // 文生视频（t2v）这一套面板 —— 同一份渲染代码、同一套分块、
+    // 同一套控件顺序。区别只在：
+    //   * 尺寸上限（flf / r2v = 0.8MP，t2v = 2.0MP）；
+    //   * 可选的底模（r2v 必须用 Ref2VA 权重）；
+    //   * 本模式特有的素材字段（首帧 / 尾帧 / 参考图 / 参考视频 / 参考音乐）。
+    //
+    // 「快捷选分辨率」这类**额外布局元素**已按要求删除 —— flf / r2v
+    // 不再有独立的档位卡片，而是与 t2v 一样用「尺寸预设下拉 + 宽高直填」。
+    mode: "t2v",
+    // 【2026-11-15 修复③ 交付项 3】逐模式的配置片段（见 modeConfigs()）。
+    modeConfigs: {},
+    // 【2026-11-15 修复③ 交付项 3】加速 LoRA 是**一个槽位**：选哪枚就只挂哪枚。
     // 空串 = 不挂加速 LoRA（走标准多步采样）。
     accelLora: "",
     accelLoraStrength: 1.0, // 该加速 LoRA 的强度
@@ -124,6 +138,35 @@
 
   function currentModel() {
     return VIDEO_OPTIONS.models[videoState.model] || null;
+  }
+
+  /**
+   * 【2026-11-15 修复③ 交付项 3】当前模式下**可选**的底模清单。
+   *
+   * 【为什么按模式过滤】
+   *   * r2v（参考生视频）必须用 **Ref2VA 权重** —— FL2VA 权重没有
+   *     Ref2VA 通道，用它做参考生成等于「参考没生效」
+   *     （服务端 model_for_mode() 会静默换权重，但那是**事后**换，
+   *     面板上先不让用户选错才是对的）。
+   *   * flf（首尾帧）用 FL2VA / 混合权重（它有 I2VA / FL2VA / L2VA
+   *     三种任务类型）；Ref2VA 权重**没有**首尾帧通道。
+   *   * t2v（文生视频）用 FL2VA / 混合权重。
+   *
+   * 【判据来源】服务端 /api/video-options 下发的 models 条目里带
+   * `supports_ref2va` 标记（h3studio/video_models.py 的 VIDEO_MODELS）。
+   * 前端不自己维护第二张映射表 —— 那正是本项目反复踩过的坑。
+   */
+  function modelsForMode(mode) {
+    const m = mode || videoState.mode || "t2v";
+    const all = Object.entries(VIDEO_OPTIONS.models || {});
+    if (m === "r2v") {
+      // 只保留支持 Ref2VA 的权重
+      const ok = all.filter(([, meta]) => meta.supports_ref2va === true);
+      return ok.length ? ok : all;
+    }
+    // flf / t2v：排除「只有 Ref2VA 通道」的权重
+    const ok = all.filter(([, meta]) => meta.supports_ref2va !== true);
+    return ok.length ? ok : all;
   }
 
   /**
@@ -216,7 +259,16 @@
 
   /** 当前比例下的合法尺寸预设（服务端下发的清单里筛） */
   function presetsForAspect(aspect) {
-    return (VIDEO_OPTIONS.size_presets || []).filter(p => p.aspect === aspect);
+    // 【2026-11-15 修复③ 交付项 3】按**当前模式**的面积上限过滤。
+    // flf / r2v 的上限是 0.8MP（服务端 mode_size_policy 下发）——
+    // 超出上限的档位**不出现**在下拉里（不是列出来再置灰，
+    // 那是「用户能选、选了必然被服务端改写」的假选项）。
+    const cap = maxPixels();
+    return (VIDEO_OPTIONS.size_presets || []).filter(p => {
+      if (p.aspect !== aspect) return false;
+      if (!cap) return true;
+      return (p.width * p.height) <= cap;
+    });
   }
 
   /**
@@ -420,7 +472,10 @@
     const sel = document.getElementById("vidModelSelect");
     if (!sel) return;
     sel.innerHTML = "";
-    Object.entries(VIDEO_OPTIONS.models).forEach(([key, m]) => {
+    // 【2026-11-15 修复③ 交付项 3】按当前模式过滤底模
+    // （r2v 只列 Ref2VA 权重；flf / t2v 排除 Ref2VA 专用权重）。
+    const entries = modelsForMode();
+    entries.forEach(([key, m]) => {
       const opt = document.createElement("option");
       opt.value = key;
       const status = m.status || (m.available === false ? "missing" : "available");
@@ -436,17 +491,19 @@
         + (recText ? `\n\n—— 作者推荐参数 ——\n${recText}` : "");
       sel.appendChild(opt);
     });
-    // 当前选中的模型不可用 -> 回落到**第一个可用**的模型
+    // 当前选中的模型在**本模式**下不可用 -> 回落到第一个可用模型
     const model = currentModel();
     const curStatus = model
       ? (model.status || (model.available === false ? "missing" : "available"))
       : "missing";
-    if (!model || curStatus !== "available") {
-      const fallbackKey = Object.keys(VIDEO_OPTIONS.models).find(k => {
+    const modeModels = entries.map(([key]) => key);
+    const inMode = modeModels.includes(videoState.model);
+    if (!model || curStatus !== "available" || !inMode) {
+      const fallbackKey = modeModels.find(k => {
         const m = VIDEO_OPTIONS.models[k];
         const st = m.status || (m.available === false ? "missing" : "available");
         return st === "available";
-      }) || VIDEO_OPTIONS.default_model;
+      }) || modeModels[0] || VIDEO_OPTIONS.default_model;
       if (fallbackKey && VIDEO_OPTIONS.models[fallbackKey]) {
         videoState.model = fallbackKey;
         sel.value = videoState.model;
@@ -1060,10 +1117,15 @@
 
   // ------------------------------------------------------------ 总渲染
 
-  function renderVideoPanel() {
-    // 【2026-11-11】视频面板是 t2v 专用的（首尾帧 / 参考生视频走各自的老面板），
-    // 但仍把 mode 记下来 —— 尺寸策略按 mode 取，不写死。
-    VIDEO_OPTIONS.mode = "t2v";
+  function renderVideoPanel(mode) {
+    // 【2026-11-15 修复③ 交付项 3】首尾帧（flf）/ 参考生视频（r2v）
+    // 现在**共用**文生视频这一套面板 —— 同一份渲染代码、同一套分块、
+    // 同一套控件顺序，只在必要处多出本模式特有的素材字段。
+    //
+    // 尺寸策略按 mode 取，不写死（服务端 /api/video-options 的
+    // mode_size_policy 逐模式下发：t2v 2.0MP / flf·r2v 0.8MP）。
+    VIDEO_OPTIONS.mode = mode || videoState.mode || "t2v";
+    videoState.mode = VIDEO_OPTIONS.mode;
     if (!optionsReady) return;
     // 【2026-11-11】每一段独立 try/catch —— **一个区块渲染失败不能
     // 阻断其它区块**（原来任何一处抛错，后面的下拉全都不渲染，
@@ -1095,6 +1157,19 @@
         console.error(`[视频面板] 渲染「${name}」失败:`, e);
       }
     });
+    // 【2026-11-15 修复③】上面的渲染会**程序化**写 range.value
+    // （不触发 input/change 事件），配套的数字输入框会停留在旧值 ——
+    // 界面上出现「滑杆 8、数字框 4」的自相矛盾。
+    // 这里统一同步一次（共用组件的入口，见 web/numeric-slider.js）。
+    syncNumericInputs();
+  }
+
+  /** 把所有滑杆的当前值刷进配套的数字输入框（渲染后调用）。 */
+  function syncNumericInputs() {
+    const ns = window.NumericSlider;
+    if (ns && typeof ns.syncAll === "function") {
+      try { ns.syncAll(); } catch (e) { /* 忽略：不影响面板本身 */ }
+    }
   }
 
   // ------------------------------------------------------------ 对外接口
@@ -1135,11 +1210,44 @@
       rawWidth: videoState.rawWidth,
       rawHeight: videoState.rawHeight,
       size_preset_key: videoState.sizePresetKey,
-      // 【2026-11-14】加速 LoRA 是**一个槽位**：只存「选的那枚」+ 强度。
-      // 不再存 fixed_accel_lora（那是「恒生效的那枚」的旧语义，已废）。
+      // 【2026-11-15 修复③ 交付项 3】按模式存**各自**的配置 ——
+        // flf / r2v 与 t2v 共用同一套面板，但**尺寸上限不同**
+        // （0.8MP vs 2.0MP），底模可选集也不同。
+        // 存成 per-mode 的一份，回填时按当前模式取 ——
+        // 否则切到 flf 看到的是 t2v 的 2.0MP 尺寸（超上限），
+        // 切回 t2v 又变成 flf 的 0.8MP（白白浪费画质）。
+        mode_configs: modeConfigs(),
+      };
+  }
+
+  /**
+   * 逐模式的配置片段（只存「与模式相关」的字段）。
+   *
+   * 【为什么要拆开存】
+   * 三个视频模式共用一套面板，但：
+   *   * 尺寸上限不同（t2v 2.0MP / flf·r2v 0.8MP）；
+   *   * 底模可选集不同（r2v 只能用 Ref2VA 权重）；
+   *   * 采样默认值不同（跟着实际挂的加速 LoRA 走）。
+   * 用**一份**共享配置的话，切换模式会互相污染 ——
+   * 在 t2v 选了 1920×1088，切到 flf 就超上限；
+   * 切回 t2v 又被 flf 的 0.8MP 覆盖。
+   */
+  function modeConfigs() {
+    const configs = (videoState.modeConfigs && typeof videoState.modeConfigs === "object")
+      ? videoState.modeConfigs : {};
+    const key = videoState.mode || "t2v";
+    configs[key] = {
+      model: videoState.model,
+      aspect: videoState.aspect,
+      megapixels: videoState.megapixels,
+      custom: videoState.custom,
+      width: videoState.width,
+      height: videoState.height,
+      rawWidth: videoState.rawWidth,
+      rawHeight: videoState.rawHeight,
+      size_preset_key: videoState.sizePresetKey,
       accel_lora: videoState.accelLora,
       accel_lora_strength: Number(videoState.accelLoraStrength),
-      // 效果 LoRA（可多选，各自带强度 + 触发词）
       effect_loras: (videoState.effectLoras || []).map(it => ({
         name: it.name,
         strength: Number(it.strength),
@@ -1150,13 +1258,13 @@
       twopass: { ...videoState.twopass,
         sigma_refine: { ...(videoState.twopass.sigma_refine || {}) },
       },
-      // 【2026-11-11】采样参数
       steps: videoState.steps,
       sampler: videoState.sampler,
       scheduler: videoState.scheduler,
       shift_video: Number(videoState.shiftVideo),
       shift_audio: Number(videoState.shiftAudio),
     };
+    return configs;
   }
 
   /**
@@ -1182,7 +1290,136 @@
     return hit ? hit.key : "";
   }
 
+  /**
+   * 【2026-11-15 修复③ 交付项 3】切换面板服务的生成模式。
+   *
+   * 首尾帧（flf）/ 参考生视频（r2v）与文生视频（t2v）**共用同一套面板**，
+   * 切模式时要：
+   *   1. 记住**上一个模式**的配置片段（否则切回来参数全丢）；
+   *   2. 载入**新模式**的配置片段（没有就用默认值）；
+   *   3. 按新模式的尺寸上限 / 底模可选集重算。
+   *
+   * 【为什么尺寸要重算】flf / r2v 的上限是 0.8MP，t2v 是 2.0MP。
+   * 在 t2v 选了 1920×1088（2.0MP）切到 flf -> 超上限，
+   * 服务端会按比例缩回去（面板说的和实际跑的不一样 —— 那正是
+   * 「面板说谎」的老毛病）。所以这里**在切模式时就收进上限内**。
+   */
+  function setMode(mode) {
+    const next = mode || "t2v";
+    const prev = videoState.mode || "t2v";
+    if (next === prev) {
+      VIDEO_OPTIONS.mode = next;
+      return;
+    }
+    // 1) 记住上一个模式
+    if (videoState.modeConfigs) {
+      const configs = videoState.modeConfigs;
+      configs[prev] = {
+        model: videoState.model,
+        aspect: videoState.aspect,
+        megapixels: videoState.megapixels,
+        custom: videoState.custom,
+        width: videoState.width,
+        height: videoState.height,
+        rawWidth: videoState.rawWidth,
+        rawHeight: videoState.rawHeight,
+        size_preset_key: videoState.sizePresetKey,
+        accel_lora: videoState.accelLora,
+        accel_lora_strength: Number(videoState.accelLoraStrength),
+        effect_loras: (videoState.effectLoras || []).map(it => ({
+          name: it.name,
+          strength: Number(it.strength),
+          enabled: it.enabled !== false,
+          trigger: it.trigger || "",
+        })),
+        attention: videoState.attention,
+        twopass: { ...videoState.twopass,
+                   sigma_refine: { ...(videoState.twopass.sigma_refine || {}) } },
+        steps: videoState.steps,
+        sampler: videoState.sampler,
+        scheduler: videoState.scheduler,
+        shift_video: Number(videoState.shiftVideo),
+        shift_audio: Number(videoState.shiftAudio),
+      };
+    }
+    // 2) 载入新模式
+    videoState.mode = next;
+    VIDEO_OPTIONS.mode = next;
+    const cfg = (videoState.modeConfigs || {})[next];
+    if (cfg && typeof cfg === "object") {
+      applyModeConfig(cfg);
+    } else {
+      // 新模式第一次用：清掉「上一个模式特有」的值，落到默认值。
+      videoState.custom = false;
+      videoState.width = null;
+      videoState.height = null;
+      videoState.rawWidth = null;
+      videoState.rawHeight = null;
+      videoState.sizePresetKey = "";
+      videoState.sizeReasons = [];
+    }
+    // 3) 尺寸收进本模式的上限
+    clampSizeToModeLimit();
+  }
+
+  /**
+   * 把当前宽高收进**本模式**的面积上限（与 /api/video-size 同口径：
+   * 超限就按比例缩小并吸附到 32 的倍数）。
+   *
+   * 【为什么前端也要做一遍】服务端 h3_video_size.apply_size 也会做 ——
+   * 但那是**提交时**的静默修正。面板上先收进来，用户看到的尺寸
+   * 就等于真正会跑的尺寸（不再「面板说一套、工作流跑另一套」）。
+   */
+  function clampSizeToModeLimit() {
+    const cap = maxPixels();
+    if (!cap) return;
+    const [w, h] = currentSize();
+    if (!w || !h) return;
+    if (w * h <= cap) return;
+    const mult = VIDEO_OPTIONS.size_multiple || 32;
+    const scale = Math.sqrt(cap / (w * h));
+    let nw = Math.max(mult, Math.round(w * scale / mult) * mult);
+    let nh = Math.max(mult, Math.round(h * scale / mult) * mult);
+    // 吸附后可能又超回上限 -> 逐次收一档
+    while (nw * nh > cap && (nw > mult || nh > mult)) {
+      if (nw >= nh && nw > mult) nw -= mult;
+      else if (nh > mult) nh -= mult;
+      else break;
+    }
+    videoState.width = nw;
+    videoState.height = nh;
+    videoState.rawWidth = nw;
+    videoState.rawHeight = nh;
+    videoState.sizePresetKey = presetKeyForSize(nw, nh);
+    videoState.sizeReasons = [
+      `已按 ${videoState.mode} 模式的上限 `
+      + `${(cap / (1024 * 1024)).toFixed(1)}MP 收进 ${nw}×${nh}`,
+    ];
+  }
+
   function applyConfig(cfg) {
+    if (!cfg || typeof cfg !== "object") return;
+    // 【2026-11-15 修复③ 交付项 3】先把 mode_configs 里的**其它模式**
+    // 的片段收进来（供切换模式时取用），再按**当前模式**回填。
+    if (cfg.mode_configs && typeof cfg.mode_configs === "object") {
+      videoState.modeConfigs = {
+        ...(videoState.modeConfigs || {}),
+        ...cfg.mode_configs,
+      };
+    }
+    // 当前模式的专属片段（若有）优先于顶层字段 ——
+    // 顶层字段是老配置（只有 t2v 一套）的兼容路径。
+    const modeKey = videoState.mode || "t2v";
+    const modeCfg = (videoState.modeConfigs || {})[modeKey];
+    if (modeCfg && typeof modeCfg === "object") {
+      applyModeConfig(modeCfg);
+      return;
+    }
+    applyModeConfig(cfg);
+  }
+
+  /** 把一份配置片段落到状态上（顶层字段与 mode_configs 片段共用）。 */
+  function applyModeConfig(cfg) {
     if (!cfg || typeof cfg !== "object") return;
     if (cfg.model && VIDEO_OPTIONS.models[cfg.model]) videoState.model = cfg.model;
     if (cfg.aspect) videoState.aspect = cfg.aspect;
@@ -1933,6 +2170,12 @@
     applyConfig: applyConfig,
     collectConfig: collectConfig,
     save: saveVideoConfig,
+    // 【2026-11-15 修复③ 交付项 3】切换面板服务的生成模式
+    // （t2v / flf / r2v 共用同一套面板）。
+    setMode: setMode,
+    // 【2026-11-15 修复③ 交付项 3】当前模式下可选的底模清单
+    // （r2v 只列 Ref2VA 权重）—— 供 app.js 判断要不要显示模式说明。
+    modelsForMode: modelsForMode,
     /**
      * 加速 LoRA 清单（已按当前底模过滤）。
      *
