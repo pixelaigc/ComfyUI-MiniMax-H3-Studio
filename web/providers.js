@@ -646,18 +646,6 @@ function buildEnhanceMeta(d) {
 $("#enhanceModalClose").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
 $("#enhanceCancel").addEventListener("click", () => { $("#enhanceModal").hidden = true; });
 
-// 【PE 已外置到 WEBUI（2026-11-15 修复①）】
-// 原先这里有个 applyQwenPeWritebackFlag()：官方 PE 扩写结果写回提示词框后，
-// 把 state.imgQwen.usePe 置成 false，从而**关掉出图链路里的二次扩写**。
-//
-// 现在**整段删除**，因为它要关的那条路已经不存在了：
-//   工作流内的 PE 节点已被移除（h3studio/workflows.py 的 _qwen_common_nodes
-//   不再构建 TextGenerate），出图时提示词**原样**进模型 ——
-//   不存在「二次扩写」，也就不需要「关掉它」的开关。
-//
-// 保留这段死代码反而有害：它会写一个已不存在的 state.imgQwen.usePe，
-// 让人误以为出图链路还受 PE 开关控制。
-
 // ------------------------------------------------------------------
 // 增强结果写回：按**能力契约**解析目标，而不是硬编码 DOM id
 // ------------------------------------------------------------------
