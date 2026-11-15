@@ -242,8 +242,13 @@ def _image_fields(kind: str) -> list:
         default_model = wf.QWEN_IMAGE_DEFAULT_MODEL
         default_tier = wf.QWEN_IMAGE_DEFAULT_TIER
         aspects = [(key, key) for key in wf.ASPECT_MAP.keys()]
-        extra = [_bool("use_pe", "启用官方 PE 扩写", True,
-                       "Qwen-Image 官方提示词扩写（关掉则直接用原提示词）")]
+        # 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+        # 这里**不再**有 "use_pe" 这个布尔开关 —— 它在 Agent 默认参数面板里
+        # 表现为一个**独立勾选框**，与「增强」下拉里的官方 PE 选项语义打架
+        # （用户明确要求：官方 PE 必须是「增强」下拉列表中的一项，
+        #  点增强按钮即执行，不保留独立勾选框形式）。
+        # 且工作流内已无 PE 动作，这个开关本就没有可作用的对象。
+        extra = []
     elif kind == "moss":
         table = wf.MOSS_IMAGE_MODELS
         tiers = wf.MOSS_IMAGE_RES_TIERS

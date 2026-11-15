@@ -25,6 +25,7 @@ Skill 目录（遵循 Agent Skills 规范的渐进式披露）：
     assets/               模板与示例（按需加载）
     scripts/validate.py   校验器（只跑不读）
 """
+import json
 import re
 from pathlib import Path
 
@@ -196,6 +197,68 @@ TEMPLATE_SPECS = {
                         "光线", "材质", "配色", "氛围", "图内文字（逐字）"],
         "source": "ComfyUI-Moss 插件内置官方 MOSS Skill（defaults/SKILL.md）",
     },
+    # ---- MiniMax-H3-Image 官方 PE 两档（文生图 / 图片编辑） ----
+    #
+    # 【为什么必须是 H3-Image 专属的，而不是复用通用图像扩写】
+    # 用户实测事实：H3-IMAGE 文生图与图片编辑面板的「增强」下拉默认项是
+    # 「普通增强（图像提示词·物体细化（二次增强））」—— 这是**错的**。
+    # 根因（2026-11-15 现场复核）：H3-Image 的模型族是 "h3_image"，
+    # 而通用档 "image"（Z-Image 官方 PE）的 families 只有 ["z_image"]，
+    # 于是 filter_specs() 把它过滤掉了；MODE_DEFAULT_SPEC 里写的
+    # "t2i_h3image": "image" 根本不在过滤结果里 ->
+    # default_spec_for_mode() 回落到过滤结果里的第一个 ->
+    # "image-refine"（物体细化·二次增强）。
+    # 所以「H3-IMAGE 用的是通用二次增强」不是配置疏漏，而是**过滤后回落**
+    # 的必然结果 —— 除非给 H3-Image 自己的 PE 档位。
+    #
+    # 【这两个档位是什么】
+    # 它们是 **MiniMax H3-Image 官方 PE 的 prompt 模板**（不是通用二次增强）：
+    #   h3image-pe-t2i = 官方文生图 PE 的 task prompt（15831 字节）
+    #   h3image-pe-i2i = 官方图片编辑 PE 的 task prompt（38527 字节）
+    # 正文取自本机 ComfyUI 官方工作流模板
+    #   comfyui_workflow_templates_json/templates/image_minimax_h3_image_t2i.json
+    #   comfyui_workflow_templates_json/templates/image_minimax_h3_image_edit.json
+    # 里的 PrimitiveStringMultiline 节点（标题 "Text (task_prompt)"）。
+    #
+    # 【与官方 checkpoint PE 的关系 —— 两层，别混】
+    # 官方 H3-Image PE 走的是 **TextGenerateV2 + qwen3.5_9b_w4a8_gptq 权重**
+    #   （见 h3studio/h3image_pe.py）：那是「官方模型自己扩写」那条路，
+    #   对应前端「增强」下拉里的「H3-Image 官方增强PE」项。
+    # 而这里这两个 spec 是**同一份官方 task prompt**，但走本项目的
+    # Provider（本地 LLM）通道 —— 用于 Agent 侧与「普通增强」并列的场景。
+    # 两者共用同一份官方写作规则，所以产物风格一致。
+    "h3image-pe-t2i": {
+        "id": "h3image-pe-t2i",
+        "label": "H3-Image 官方 PE·文生图（画面扩写+比例）",
+        "media": "image",
+        "families": ["h3_image"],
+        "template": "h3image-pe-t2i.txt",
+        # 官方 PE 的 task prompt 自己定义了「用户请求」的角色，
+        # user 消息直接放原始提示词，不加「用户输入 prompt:」前缀
+        "user_template": "{prompt}",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["主体与动作", "环境与场景", "构图与取景", "光线与材质",
+                        "配色与氛围", "画面文字（逐字）"],
+        "source": "官方 MiniMax-H3-Image PE task prompt（ComfyUI 官方模板 "
+                  "image_minimax_h3_image_t2i.json）",
+    },
+    "h3image-pe-i2i": {
+        "id": "h3image-pe-i2i",
+        "label": "H3-Image 官方 PE·图片编辑（参考图条件扩写）",
+        "media": "image",
+        "families": ["h3_image"],
+        "template": "h3image-pe-i2i.txt",
+        "user_template": "{prompt}",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["编辑指令", "保持不变项", "不要顺手改", "<Picture N> 引用",
+                        "目标比例", "新增内容描述"],
+        "source": "官方 MiniMax-H3-Image PE task prompt（ComfyUI 官方模板 "
+                  "image_minimax_h3_image_edit.json）",
+    },
     "video": {
         "id": "video",
         "label": "视频提示词（MiniMax-H3）",
@@ -318,10 +381,17 @@ MODE_DEFAULT_SPEC = {
     "i2i_qwen": "qwen21-pe-i2i",
     # MOSS 用官方 Skill 的描述式扩写模板
     "t2i_moss": "moss-image",
-    # H3-Image 用通用图像扩写模板（官方没有专门的 PE system prompt，
-    # 它自己的 PE 模型是 Qwen3.5-9B，见 h3studio/h3image.py 的说明）
-    "t2i_h3image": "image",
-    "i2i_h3image": "image",
+    # H3-Image 用**自己的**官方 PE 档（2026-11-15 修复①）。
+    #
+    # 【为什么不能写 "image"】—— 写了也没用：
+    #   "image"（Z-Image 官方 PE）的 families 是 ["z_image"]，
+    #   H3-Image 的模型族是 "h3_image" -> filter_specs() 会把它过滤掉，
+    #   default_spec_for_mode() 发现首选不在过滤结果里 ->
+    #   回落到过滤结果里的第一个 = "image-refine"（物体细化·二次增强）。
+    #   这正是用户看到的「H3-IMAGE 默认项是普通增强（物体细化）」的根因。
+    # 现在给了 H3-Image 专属的两档官方 PE 模板，首选必然命中。
+    "t2i_h3image": "h3image-pe-t2i",
+    "i2i_h3image": "h3image-pe-i2i",
     # 文生视频默认走 H3 官方「导演提示词」档（video-director）
     "t2v": "video-director",
     "flf": "video-director",
@@ -886,6 +956,72 @@ def strip_wrapping(text: str) -> str:
     if len(result) >= 2 and result[0] in "\"'“" and result[-1] in "\"'”":
         result = result[1:-1].strip()
     return result
+
+
+#: 需要「JSON 契约」解包的模板 id 集合。
+#:
+#: 【为什么需要这一步】
+#: MiniMax-H3-Image 的官方 PE task prompt 要求模型输出
+#: **一个两键 JSON 对象**（expanded_caption + 比例键），
+#: 而本项目的文本增强路线（/api/enhance）期望的是**一段纯文本**
+#: —— 产物要直接写回提示词框。
+#: 模型忠实按官方契约输出 JSON 时，提示词框里就会出现
+#: 一坨 {"expanded_caption": "...", "aspect_ratio": "16:9"}，
+#: 看起来完全不像提示词。
+#:
+#: 所以这两个模板的产物在落地前要**解包**：取 expanded_caption
+#: 作为写回文本，比例作为附加信息。
+#:
+#: 【为什么只对这两个模板开】
+#: 其余模板（Qwen 官方 PE 两档、MOSS、Z-Image 等）本身就是「纯文本契约」
+#: —— 官方明确写了 "No JSON, no braces, no key names"。
+#: 对它们解包反而会破坏正常产物。
+JSON_CONTRACT_SPEC_IDS = frozenset({"h3image-pe-t2i", "h3image-pe-i2i"})
+
+#: H3-Image 官方 PE 的比例键（文生图 aspect_ratio / 编辑 target_aspect_ratio）
+H3IMAGE_PE_RATIO_KEYS = ("aspect_ratio", "target_aspect_ratio")
+
+
+def unwrap_json_contract(text: str, spec_id: str = "") -> tuple[str, str]:
+    """把「JSON 契约」产物解成 (纯文本提示词, 画面比例)。
+
+    非 JSON 契约的模板 -> 原样返回 (text, "")。
+    契约模板但产物不是 JSON -> 原样返回（模型没按格式输出时不猜、不改）。
+
+    【为什么解包后还要保留比例】比例是 PE 的一部分（官方 PE 自己选比例），
+    写回提示词框的只是 caption；比例单独回给调用方，由它决定要不要对齐出图尺寸。
+    """
+    if spec_id not in JSON_CONTRACT_SPEC_IDS:
+        return text, ""
+    raw = (text or "").strip()
+    if not raw:
+        return raw, ""
+    # 去掉 ```json 围栏
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1] if raw.count("```") >= 2 else raw
+        if raw.lstrip().lower().startswith("json"):
+            raw = raw.lstrip()[4:]
+        raw = raw.strip()
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end <= start:
+        return raw, ""
+    try:
+        data = json.loads(raw[start:end + 1])
+    except json.JSONDecodeError:
+        return raw, ""
+    if not isinstance(data, dict):
+        return raw, ""
+    caption = str(data.get("expanded_caption") or "").strip()
+    if not caption:
+        return raw, ""
+    ratio = ""
+    for key in H3IMAGE_PE_RATIO_KEYS:
+        value = str(data.get(key) or "").strip()
+        if value:
+            ratio = value
+            break
+    return caption, ratio
 
 
 def strip_thinking(text: str) -> str:

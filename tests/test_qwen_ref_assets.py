@@ -344,20 +344,28 @@ class TestWorkflowWiring(unittest.TestCase):
             self.assertEqual(load["class_type"], "LoadImage")
             self.assertEqual(load["inputs"]["image"], f"h3studio/ref{i}.png")
 
-    def test_reference_images_also_feed_the_pe_node(self):
-        """官方 PE-I2I 工作流：参考图也喂给 PE 扩写节点（PE 要能看图）。"""
+    def test_reference_images_no_longer_feed_a_pe_node(self):
+        """【2026-11-15 修复①】参考图**不再**喂给工作流内的 PE 节点。
+
+        原来官方 PE-I2I 会把参考图也喂给 PE 扩写节点（PE 要能看图）。
+        现在 PE 已全量外置到 WEBUI：扩写在「增强」按钮处做一次，
+        工作流内不存在 PE 节点 -> 参考图只接 TextEncodeQwenImage21。
+        """
         p = self.build(3)
-        batch = next((n for n in p.values() if n["class_type"] == "BatchImagesNode"), None)
-        self.assertIsNotNone(batch, "参考图没有喂给 PE 节点")
-        self.assertEqual(batch["inputs"]["images.image0"], ["qw:ref0", 0])
-        self.assertEqual(batch["inputs"]["images.image2"], ["qw:ref2", 0])
-        pe = next(n for n in p.values() if n["class_type"] == "TextGenerate")
-        batch_id = next(k for k, v in p.items() if v is batch)
-        self.assertEqual(pe["inputs"]["image"], [batch_id, 0])
+        classes = {n["class_type"] for n in p.values()}
+        self.assertNotIn("BatchImagesNode", classes,
+                         "工作流里不应再有 BatchImagesNode（PE 批次图节点）")
+        self.assertNotIn("TextGenerate", classes,
+                         "工作流里不应再有 TextGenerate（PE 扩写节点）")
+        # 参考图仍然完整接进模型的 images 输入
+        te = next(n for n in p.values()
+                  if n["class_type"] == "TextEncodeQwenImage21")
+        for i in range(3):
+            self.assertIn(f"images.image_{i + 1}", te["inputs"])
 
     def test_no_pe_no_batch_node(self):
-        """关掉 PE 就不建 BatchImagesNode。"""
-        p = self.build(2, use_pe=False)
+        """PE 已移除 -> 任何情况下都没有 BatchImagesNode。"""
+        p = self.build(2)
         classes = {n["class_type"] for n in p.values()}
         self.assertNotIn("BatchImagesNode", classes)
 
