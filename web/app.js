@@ -1337,9 +1337,13 @@ function openLoraInfo(name) {
       <dt>分组</dt><dd>${esc(meta.group || "—")}</dd>
       <dt>基座适用性</dt><dd>${meta.base_verdict === "近似适用"
         ? "⚠️ 近似适用（非该基座原生训练，依据见下方说明）"
-        : (meta.base_verdict
-          ? esc(meta.base_verdict)
-          : "未标注（本机实测可用，但上游目录未登记基座判定结论）")}</dd>
+        : (meta.base_verdict === "不适配"
+          ? "⚠️ 不适配（本机实测与当前底模结构对不上，已排除在可选列表之外）"
+          : (meta.base_verdict === "不可用"
+            ? "⚠️ 不可用（权重文件本体损坏，无法使用）"
+            : (meta.base_verdict
+              ? esc(meta.base_verdict)
+              : "未标注（本机实测可用，但上游目录未登记基座判定结论）")))}</dd>
       <dt>权重形态</dt><dd>${meta.qkv_shape === "fused"
         ? (meta.conversion_status === "derived"
           ? "融合 qkv（q/k/v 合并在一个张量里）—— 本机底模用分离 q/k/v；服务端提交时自动使用已生成的归一版，转换已实测验证（missing=0），完整生效"
