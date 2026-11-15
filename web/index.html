@@ -919,6 +919,9 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
           <option value="">全部类型</option>
           <option value="video">视频</option>
           <option value="image">图片</option>
+          <!-- 【2026-11-15 修】补「音频」—— 注册表里 t2a/a2a 的 media 就是 audio，
+               原来下拉里没有这一项，音乐产物只能靠「全部类型」看到。 -->
+          <option value="audio">音频</option>
         </select>
         <select id="doneAspect" aria-label="画面比例">
           <option value="">全部比例</option>
@@ -1578,7 +1581,10 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
      参考视频（≤3）/ 参考音乐（≤3）槽位与提交通道。
      不破缓存的话，flf 模式下「用参考音乐作音轨」/「用参考视频背景音作音轨」
      这两项在用户浏览器里**永远不会出现**（后端早就支持，只是面板够不着）。 -->
-<script src="/static/app.js?v=flfrefmedia1"></script>
+<!-- 【2026-11-15 媒体库全类型】升版号到 mediadef1 —— app.js 改了
+     （长片拼接页不再污染全局 media 筛选；媒体库恢复显示图片/音频产物）。
+     必须破缓存，否则用户拿到的还是旧 app.js，媒体库仍然只剩视频。 -->
+<script src="/static/app.js?v=mediadef1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->

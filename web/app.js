@@ -149,6 +149,10 @@ const state = {
   // 每页作品数（可配置，持久化在 localStorage）
   pageSize: loadPageSize(),
   doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
+  // 【2026-11-15 修】长片拼接页的页面级 media 覆盖（"video"）——
+  // 只在 state.page === "stitch" 时叠加到 query，离开该页即清空。
+  // 绝不能写进 doneFilters：那是全局筛选状态，粘滞会让媒体库只剩视频。
+  stitchMediaOverride: "",
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
@@ -5882,6 +5886,13 @@ async function refreshJobs() {
         query.set("page_size", state.pageSize);
         if (tab === "longfilm") query.set("media", "longfilm");
         else Object.entries(state.doneFilters).forEach(([key, value]) => { if (value) query.set(key, value); });
+        // 【2026-11-15 修】长片拼接页的「只看视频」是**页面级覆盖**，
+        // 不是全局筛选状态 —— 叠加在用户自己的筛选之上，离开该页即失效。
+        // （原实现把 media=video 写进 state.doneFilters + #doneMedia，
+        //   导致用户离开长片拼接页后媒体库永远只剩视频。）
+        if (state.page === "stitch" && state.stitchMediaOverride) {
+          query.set("media", state.stitchMediaOverride);
+        }
       }
       const response = await fetch("/api/jobs?" + query.toString(), {cache: "no-store"});
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -6309,6 +6320,10 @@ $("#unloadBtn").addEventListener("click", async () => {
 // ---------- 硬件参数页 ----------
 function showCreate() {
   state.page = "create";
+  // 【2026-11-15 修】离开长片拼接页 -> 清掉页面级 media 覆盖。
+  // （覆盖只在 stitch 页生效；不清的话 media=video 会一直叠加在
+  //   媒体库的 query 上，图片/音频产物又看不见了。）
+  state.stitchMediaOverride = "";
   showPage($("#jobsArea"), true);
   showPage($("#panel"), true);
   showPage($("#stitchPanel"), false);
@@ -6337,8 +6352,22 @@ function showStitch() {
   showPage($("#assetsPage"), false);
   showPage($("#agentPage"), false);
   state.tab = "done";
-  state.doneFilters.media = "video";
-  $("#doneMedia").value = "video";
+  // 【2026-11-15 修 —— 媒体库只剩视频的根因】
+  //
+  // 原来这里写死了：
+  //     state.doneFilters.media = "video";
+  //     $("#doneMedia").value = "video";
+  //
+  // 那是给「长片拼接」页用的**局部**筛选（拼接只收视频片段），但它写的是
+  // **全局**筛选状态 state.doneFilters + DOM 控件 #doneMedia。
+  // 于是用户只要点过一次左侧「长片拼接」，再回到「生成」页的媒体库，
+  // #doneMedia 就一直是「视频」-> 媒体库只剩视频条目，
+  // 文生图 / 音频产物全部看不到（用户 2026-11-15 报的缺陷）。
+  //
+  // 修法：长片拼接的「只看视频」改成**页面级**覆盖（state.stitchMediaOverride），
+  // 由 refreshJobs() 在拼 query 时临时叠加；**不再**碰全局 doneFilters / #doneMedia。
+  // 这样离开长片拼接页后，媒体库恢复「全部类型」。
+  state.stitchMediaOverride = "video";
   renderTabs();
   renderStitchClips();
   refreshJobs();
