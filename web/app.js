@@ -512,6 +512,10 @@ function renderMode() {
       slot.classList.add("filled");
       state.files[key] = file;
       delete state.assetRefs[key];
+      // 【2026-11-15 B2 补漏】槽位内容变了 -> 音轨来源下拉要重算。
+      // 本地直传的参考音乐 / 参考视频同样会改变「哪些音轨选项出现」，
+      // 不重算的话下拉会一直停在「只有使用生成的音乐」。
+      if (typeof renderAudioTrackSelect === "function") renderAudioTrackSelect();
     };
     // 用素材库里的素材填这个槽位：只存 asset_id，不复制文件
     const fillFromAsset = (asset) => {
@@ -532,6 +536,10 @@ function renderMode() {
       slot.classList.add("filled");
       state.files[key] = null;
       state.assetRefs[key] = {asset_id: asset.id, name: asset.name, category: asset.category};
+      // 【2026-11-15 B2 补漏】素材库填入参考音乐 / 参考视频后，
+      // 音轨来源下拉必须重算 —— 否则「使用参考音乐作为成片音轨」/
+      // 「使用参考视频的背景音乐」这两项**永远不会出现**（实测缺陷）。
+      if (typeof renderAudioTrackSelect === "function") renderAudioTrackSelect();
     };
     inp.addEventListener("change", e => {
       const file = e.target.files[0];
