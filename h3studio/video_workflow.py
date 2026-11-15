@@ -734,7 +734,8 @@ def _continuation_state(params: dict) -> dict:
 def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
                    sampler: str, seed: int, cfg: float, twopass: dict,
                    width: int, height: int, duration: float,
-                   latent_ref: list) -> list:
+                   latent_ref: list,
+                   cond_node_id: str = "105:104") -> list:
     """二采（SelfLift）采样块。
 
     **硬约束**（实测自 comfyui-SelfLift/nodes.py）：
@@ -743,6 +744,12 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
       * transition_step 必须落在 [1, len(sigmas)-2]，
         len(sigmas) = steps + 1 -> 上限是 steps - 1；
       * rho=0 且 upscaler_model=none 会被节点直接拒绝 -> 这时给一个非零 rho。
+
+    【2026-11-15 修复③ 交付项 3】cond_node_id 参数化：
+    文生视频的条件节点是 105:104（MiniMaxH3ImageToVideo），
+    首尾帧 / 参考生视频是 136（MiniMaxH3AudioConditioningT8）——
+    之前这里写死 105:104，给 flf/r2v 接二采就会引用一个**不存在的节点**
+    （工作流提交时报 "value not in list"）。
     """
     forced_sampler = "euler"
     p["17"] = {"inputs": {"sampler_name": forced_sampler}, "class_type": "KSamplerSelect",
@@ -797,9 +804,9 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     sampler_cfg = max(0.0, min(100.0, sampler_cfg))
 
     # 负面条件：H3 的引导器要 positive + negative
-    p["16"] = {"inputs": {"model": model_ref, "conditioning": ["105:104", 0]},
+    p["16"] = {"inputs": {"model": model_ref, "conditioning": [cond_node_id, 0]},
                "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
-    p["320"] = {"inputs": {"conditioning": ["105:104", 0]},
+    p["320"] = {"inputs": {"conditioning": [cond_node_id, 0]},
                 "class_type": "ConditioningZeroOut", "_meta": {"title": "负面条件"}}
 
     # ---- 【2026-11-13 新增】sigma 精修节点（借鉴 nonebot H3 工作流）----
@@ -865,7 +872,7 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     p["171"] = {
         "inputs": {
             "model": model_ref,
-            "positive": ["105:104", 0],
+            "positive": [cond_node_id, 0],
             "negative": ["320", 0],
             "vae": ["105:11", 0],
             "latent_image": latent_ref,

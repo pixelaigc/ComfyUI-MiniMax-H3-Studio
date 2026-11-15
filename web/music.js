@@ -364,6 +364,13 @@
     }
     const seedBox = $("#musicSeed");
     if (seedBox && document.activeElement !== seedBox) seedBox.value = st.seed || "";
+
+    // 【2026-11-15 修复③】渲染后同步滑杆旁的数字输入框
+    // （上面是程序化写 range.value，不触发 input/change 事件，
+    //  数字框会停留在旧值 -> 界面上两个数对不上）。
+    if (window.NumericSlider && typeof window.NumericSlider.syncAll === "function") {
+      try { window.NumericSlider.syncAll(); } catch (e) { /* 忽略 */ }
+    }
   }
 
   function fillSelect(sel, values, current) {
@@ -413,7 +420,32 @@
       refAudio = null;
       renderRefAudio();
     });
-    card.append(name, remove);
+    // 【2026-11-15 修复③ 交付项 2】点击参考音频条目 -> 打开媒体预览模态框
+    // （音频可播放 / 静音 / 拖进度）。
+    //
+    // 【为什么要这个】参考音频填进去之后，界面上只有一个名字 ——
+    // 用户没法确认自己选的是哪一段。点一下就能听，是最基本的确认动作。
+    const previewBtn = document.createElement("button");
+    previewBtn.type = "button";
+    previewBtn.className = "img-ref-sort";
+    previewBtn.textContent = "预览";
+    previewBtn.title = "播放这段参考音频";
+    previewBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      const preview = window.MediaPreview;
+      if (!preview || typeof preview.show !== "function") return;
+      preview.show({
+        url: `/api/assets/${encodeURIComponent(refAudio.asset_id)}/content`,
+        kind: "audio",
+        name: refAudio.name || "参考音频",
+        category: "audio",
+      });
+    });
+    card.append(name, previewBtn, remove);
+    card.addEventListener("click", event => {
+      if (event.target.closest("button")) return;
+      previewBtn.click();
+    });
     box.appendChild(card);
     if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id)
       + "（仅提取旋律线；成曲时长由歌词段落与 BPM 决定）";

@@ -2256,8 +2256,8 @@ def json_ok(payload=None, **kw):
     return web.json_response(payload)
 
 
-def normalize_t2v_params(params: dict) -> tuple[dict, str]:
-    """文生视频面板参数的**服务端归一**（唯一入口）。
+def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
+    """视频面板参数的**服务端归一**（唯一入口）。
 
     返回 (归一后的 params, 错误信息)。错误信息为空表示通过。
 
@@ -2267,15 +2267,26 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
       * 加速 LoRA -> 逐个查文件是否存在 + 与底模的层结构是否对得上
       * 注意力 -> 必须是本机 ComfyUI 里真有的节点
       * 二采 -> SelfLift 的硬约束（Euler / transition_step 范围 / rho 与 upscaler 组合）
+
+    【2026-11-15 修复③ 交付项 3】现在**三个视频模式共用这一套归一**：
+    t2v（文生视频）/ flf（首尾帧）/ r2v（参考生视频）走**同一份**面板，
+    参数语义也就必须走**同一个入口** —— 否则面板上能调的参数
+    在服务端会被静默丢掉（界面说一套、工作流跑另一套）。
+
+    mode 决定两处**真实差异**：
+      * 面积上限（t2v = 2.0MP / flf·r2v = 0.8MP，见
+        video_models.mode_size_policy）；
+      * 底模通道（r2v 必须用 Ref2VA 权重，见 video_models.model_for_mode）。
     """
     out = dict(params)
+    vid_mode = mode if mode in ("t2v", "flf", "r2v") else "t2v"
 
     # ---- 宽高 ----
     # 【2026-11-11】strict_over_limit=True —— 超限时**不静默截断**，
-    # 直接返回可执行的错误提示（说明 2.0M 上限与当前请求值）。
+    # 直接返回可执行的错误提示（说明上限与当前请求值）。
     width, height, reasons = video_models.normalize_video_size(
         params.get("width"), params.get("height"),
-        max_pixels=video_models.max_pixels_for_mode("t2v"),
+        max_pixels=video_models.max_pixels_for_mode(vid_mode),
         strict_over_limit=True)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
@@ -2318,6 +2329,18 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     model = video_models.VIDEO_MODELS.get(model_key)
     if model is None:
         return out, f"未知的视频模型 {model_key}"
+    # 【2026-11-15 修复③ 交付项 3】按模式校验**底模通道**。
+    #
+    # r2v（参考生视频）必须用 Ref2VA 权重 —— FL2VA 权重没有 Ref2VA
+    # 通道，用它做参考生成等于「参考没生效」。
+    # （原来这里不校验，model_for_mode() 会在**构建工作流时**静默换权重 ——
+    #   用户在面板上选了 A，工作流里跑的是 B，面板还在显示 A。）
+    # 现在在**提交入口**就拦下并说清楚。
+    if vid_mode == "r2v" and not model.get("supports_ref2va"):
+        return out, (f"模型「{model['label']}」不支持参考生成（Ref2VA）通道 —— "
+                     "参考生视频必须用 Ref2VA 权重"
+                     "（Ref2VA · 剪枝 int8 / Ref2VA · 完整 int8 / "
+                     "混合版 · FL2VA+Ref2VA）。")
     # 【2026-11-11】可用性判定与面板**同源** —— 都以 ComfyUI 的模型列表
     # API 为准（面板显示什么，这里就按什么判）。
     # 原来这里只扫盘（model_available），面板与提交走两条路，
@@ -3925,8 +3948,16 @@ async def api_create(request):
     # 这一段是**唯一**的参数入口 —— 前端传什么都不认，只认这里算出来的值。
     # 必须在 prepare_job_params **之前**跑：归一会改写 params，
     # 而 prepare 的占位/素材校验依赖归一后的宽高。
-    if mode == "t2v":
-        normalized, error = normalize_t2v_params(params)
+    if mode in ("t2v", "flf", "r2v"):
+        # 【2026-11-15 修复③ 交付项 3】三个视频模式共用同一套面板，
+        # 参数也就必须走**同一个归一入口** —— 否则面板上能调的参数
+        # （步数 / 采样器 / 调度器 / shift / 加速 LoRA / 效果 LoRA /
+        #  注意力 / 二采 / 宽高）在服务端会被静默丢掉。
+        #
+        # 【mode 的两处真实差异】面积上限（t2v 2.0MP / flf·r2v 0.8MP）
+        # 与底模通道（r2v 必须 Ref2VA）—— 都在 normalize_t2v_params 内
+        # 按 mode 处理。
+        normalized, error = normalize_t2v_params(params, mode=mode)
         if error:
             return web.json_response({"error": error}, status=400)
         params = normalized

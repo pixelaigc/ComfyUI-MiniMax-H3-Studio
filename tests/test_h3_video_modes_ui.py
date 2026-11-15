@@ -39,6 +39,7 @@ from h3studio import h3_video_size as vsize             # noqa: E402
 from h3studio import workflows as wf                    # noqa: E402
 
 APP_JS = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+VIDEO_PANEL_JS = (REPO / "web" / "video-panel.js").read_text(encoding="utf-8")
 INDEX_HTML = (REPO / "web" / "index.html").read_text(encoding="utf-8")
 
 
@@ -271,16 +272,36 @@ class TestResolutionSemantics(unittest.TestCase):
                              f"前端与服务端对 {res} + {aspect} 的计算不一致")
 
     def test_frontend_submits_width_height_for_flf_r2v(self):
-        """前端提交时必须带 width/height（否则服务端只能算档位）。"""
-        self.assertIn("params.width = legacySize.width",
-                      APP_JS)
-        self.assertIn("params.height = legacySize.height",
-                      APP_JS)
+        """前端提交时必须带 width/height（否则服务端只能算档位）。
+
+        【2026-11-15 修复③ 交付项 3】三个视频模式现在共用同一套面板，
+        flf / r2v 的宽高由**共享面板**给出（window.VIDEO_PANEL.submitParams()），
+        提交时写进 params.width / params.height；
+        共享面板还没就绪时的兜底路径仍走 legacyVideoSize()。
+        """
+        self.assertIn("params.width = shared.width", APP_JS)
+        self.assertIn("params.height = shared.height", APP_JS)
+        # 兜底路径（共享面板未就绪）仍按旧公式算真实宽高
+        self.assertIn("currentLegacyVideoSize().width", APP_JS)
+        self.assertIn("currentLegacyVideoSize().height", APP_JS)
 
     def test_panel_shows_real_output_size(self):
-        """面板必须显示真实像素（用户要能核对产物对不对）。"""
-        self.assertIn('id="legacySizeNote"', INDEX_HTML)
-        self.assertIn("实际输出", APP_JS)
+        """面板必须显示真实像素（用户要能核对产物对不对）。
+
+        【2026-11-15 修复③ 交付项 3】旧面板的「分辨率档位」区块
+        （含 #legacySizeNote）**已删除** —— 首尾帧 / 参考生视频现在
+        与文生视频共用同一套面板，真实像素由共享面板的
+        「输出尺寸」区（#vidSizeHint / #vidSizeNote）显示。
+        """
+        # 共享面板的输出尺寸区必须存在（三个模式共用）
+        self.assertIn('id="vidSizeHint"', INDEX_HTML)
+        self.assertIn('id="vidSizeNote"', INDEX_HTML)
+        # 旧控件确实已经移除（不得留两套尺寸控件）
+        self.assertNotIn('id="legacySizeNote"', INDEX_HTML)
+        self.assertNotIn('id="resSeg"', INDEX_HTML)
+        # 共享面板里显示真实像素
+        self.assertIn("vidSizeHint", VIDEO_PANEL_JS)
+        self.assertIn("vidSizeNote", VIDEO_PANEL_JS)
 
 
 # ------------------------------------------------------------------
