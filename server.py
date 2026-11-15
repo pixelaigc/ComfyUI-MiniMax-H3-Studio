@@ -2256,8 +2256,8 @@ def json_ok(payload=None, **kw):
     return web.json_response(payload)
 
 
-def normalize_t2v_params(params: dict) -> tuple[dict, str]:
-    """文生视频面板参数的**服务端归一**（唯一入口）。
+def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
+    """视频面板参数的**服务端归一**（唯一入口）。
 
     返回 (归一后的 params, 错误信息)。错误信息为空表示通过。
 
@@ -2267,16 +2267,31 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
       * 加速 LoRA -> 逐个查文件是否存在 + 与底模的层结构是否对得上
       * 注意力 -> 必须是本机 ComfyUI 里真有的节点
       * 二采 -> SelfLift 的硬约束（Euler / transition_step 范围 / rho 与 upscaler 组合）
+
+    【2026-11-15 修复③ 交付项 3】现在**三个视频模式共用这一套归一**：
+    t2v（文生视频）/ flf（首尾帧）/ r2v（参考生视频）走**同一份**面板，
+    参数语义也就必须走**同一个入口** —— 否则面板上能调的参数
+    在服务端会被静默丢掉（界面说一套、工作流跑另一套）。
+
+    mode 决定两处**真实差异**：
+      * 面积上限（t2v = 2.0MP / flf·r2v = 0.8MP，见
+        video_models.mode_size_policy）；
+      * 底模通道（r2v 必须用 Ref2VA 权重，见 video_models.model_for_mode）。
     """
     out = dict(params)
+    vid_mode = mode if mode in ("t2v", "flf", "r2v") else "t2v"
 
     # ---- 宽高 ----
     # 【2026-11-11】strict_over_limit=True —— 超限时**不静默截断**，
-    # 直接返回可执行的错误提示（说明 2.0M 上限与当前请求值）。
+    # 直接返回可执行的错误提示（说明上限与当前请求值）。
     width, height, reasons = video_models.normalize_video_size(
         params.get("width"), params.get("height"),
-        max_pixels=video_models.max_pixels_for_mode("t2v"),
-        strict_over_limit=True)
+        max_pixels=video_models.max_pixels_for_mode(vid_mode),
+        strict_over_limit=True,
+        # 【2026-11-15 代码审查修】把模式传给尺寸归一 ——
+        # 错误文案要说「首尾帧生视频分辨率上限为 0.8M …」，
+        # 而不是写死的「文生视频…2.0M」（首尾帧的实际上限是 0.8MP）。
+        mode=vid_mode)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
     out["width"] = width
@@ -2318,6 +2333,18 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     model = video_models.VIDEO_MODELS.get(model_key)
     if model is None:
         return out, f"未知的视频模型 {model_key}"
+    # 【2026-11-15 修复③ 交付项 3】按模式校验**底模通道**。
+    #
+    # r2v（参考生视频）必须用 Ref2VA 权重 —— FL2VA 权重没有 Ref2VA
+    # 通道，用它做参考生成等于「参考没生效」。
+    # （原来这里不校验，model_for_mode() 会在**构建工作流时**静默换权重 ——
+    #   用户在面板上选了 A，工作流里跑的是 B，面板还在显示 A。）
+    # 现在在**提交入口**就拦下并说清楚。
+    if vid_mode == "r2v" and not model.get("supports_ref2va"):
+        return out, (f"模型「{model['label']}」不支持参考生成（Ref2VA）通道 —— "
+                     "参考生视频必须用 Ref2VA 权重"
+                     "（Ref2VA · 剪枝 int8 / Ref2VA · 完整 int8 / "
+                     "混合版 · FL2VA+Ref2VA）。")
     # 【2026-11-11】可用性判定与面板**同源** —— 都以 ComfyUI 的模型列表
     # API 为准（面板显示什么，这里就按什么判）。
     # 原来这里只扫盘（model_available），面板与提交走两条路，
@@ -2619,13 +2646,36 @@ def normalize_t2v_params(params: dict) -> tuple[dict, str]:
     # CFG 单独处理：H3 **标准采样路径没有 CFG**（BasicGuider 无 cfg 槽位），
     # 所以 out["cfg"] 固定为 1.0（VIDEO_CFG_FIXED）；面板只做只读说明。
     # 真正可调的 CFG 是二采路径的 twopass.cfg -> SelfLiftH3Sampler.cfg。
-    steps = video_models.normalize_steps(
-        params.get("steps"), int(model.get("steps", 4)))
+    # 【2026-11-15 修 AC-1】默认采样档跟着**实际挂的加速 LoRA**走：
+    #   挂了 -> 该 LoRA 的 recommended_steps / scheduler / sampler
+    #           （4 步蒸馏档 = beta + euler）
+    #   没挂 -> 标准多步采样档（VIDEO_STEPS_WITHOUT_ACCEL=20 步
+    #           + VIDEO_SCHEDULER_WITHOUT_ACCEL=simple
+    #           + VIDEO_SAMPLER_WITHOUT_ACCEL=res_multistep）
+    #
+    # 旧实现恒取 model["steps"]（= 4，蒸馏档）=> 显式「不挂加速 LoRA」时
+    # 也跑 4 步，那是非蒸馏权重配蒸馏步数，画面必然糊。
+    # 后端 video_workflow._resolve_accel_chain 的默认档本来就是对的
+    # （它按 accel_chain 走），但那条分支只在 params["steps"] 为空时可达；
+    # 这里先把**默认值**补对，两边口径一致。
+    _accel_meta = video_models.accel_lora_meta(out.get("accel_lora") or "") or {}
+    if out.get("accel_lora"):
+        _default_steps = (int(_accel_meta.get("recommended_steps") or 0)
+                          or int(model.get("steps", 4)))
+        _default_scheduler = (_accel_meta.get("recommended_scheduler")
+                              or model.get("scheduler", "beta"))
+        _default_sampler = (_accel_meta.get("recommended_sampler")
+                            or model.get("sampler", "euler"))
+    else:
+        _default_steps = video_models.VIDEO_STEPS_WITHOUT_ACCEL
+        _default_scheduler = video_models.VIDEO_SCHEDULER_WITHOUT_ACCEL
+        _default_sampler = video_models.VIDEO_SAMPLER_WITHOUT_ACCEL
+    steps = video_models.normalize_steps(params.get("steps"), _default_steps)
     out["steps"] = steps
     out["sampler"] = video_models.normalize_sampler(
-        params.get("sampler"), model.get("sampler", "euler"))
+        params.get("sampler"), _default_sampler)
     out["scheduler"] = video_models.normalize_scheduler(
-        params.get("scheduler"), model.get("scheduler", "beta"))
+        params.get("scheduler"), _default_scheduler)
     # 标准路径 CFG：固定 1.0（见 video_models.VIDEO_CFG_FIXED_REASON）
     out["cfg"] = video_models.VIDEO_CFG_FIXED
 
@@ -3925,8 +3975,16 @@ async def api_create(request):
     # 这一段是**唯一**的参数入口 —— 前端传什么都不认，只认这里算出来的值。
     # 必须在 prepare_job_params **之前**跑：归一会改写 params，
     # 而 prepare 的占位/素材校验依赖归一后的宽高。
-    if mode == "t2v":
-        normalized, error = normalize_t2v_params(params)
+    if mode in ("t2v", "flf", "r2v"):
+        # 【2026-11-15 修复③ 交付项 3】三个视频模式共用同一套面板，
+        # 参数也就必须走**同一个归一入口** —— 否则面板上能调的参数
+        # （步数 / 采样器 / 调度器 / shift / 加速 LoRA / 效果 LoRA /
+        #  注意力 / 二采 / 宽高）在服务端会被静默丢掉。
+        #
+        # 【mode 的两处真实差异】面积上限（t2v 2.0MP / flf·r2v 0.8MP）
+        # 与底模通道（r2v 必须 Ref2VA）—— 都在 normalize_t2v_params 内
+        # 按 mode 处理。
+        normalized, error = normalize_t2v_params(params, mode=mode)
         if error:
             return web.json_response({"error": error}, status=400)
         params = normalized
@@ -4705,7 +4763,24 @@ async def api_delete(request):
         if "/" not in relative:
             continue
         target = (OUT_DIR / relative).resolve()
-        if str(target).startswith(str(OUT_DIR.resolve())) and target.is_file():
+        # 【2026-11-15 代码审查修 —— 越界 unlink】
+        # 原来用的是 `str(target).startswith(str(OUT_DIR.resolve()))` ——
+        # 那是**字符串前缀**判定，不是路径边界判定：
+        # 同级目录 `outputs_secret` 的前缀是 `.../outputs` -> 判定为 True。
+        #
+        # 【当前可达性】实测 `outputs[].file` 的来源是
+        # `comfy_download_output()` 的 `dest.relative_to(OUT_DIR).as_posix()`
+        # —— 服务端自己生成的文件名，**不是用户可控**，
+        # 所以这条路径目前不可被利用。
+        # 但它与 `/files/` 的读取口（files_handler）用的是同一套脆弱判据，
+        # 而 `/files/` 那条**确实可被 %2F 编码绕过**（已修）。
+        # 同一份数据走两条路径，其中一条判据错 —— 迟早出问题。
+        # 这里统一改成路径边界判定（relative_to），与 files_handler 一致。
+        try:
+            target.relative_to(OUT_DIR.resolve())
+        except ValueError:
+            continue
+        if target.is_file():
             target.unlink()
     shutil.rmtree(OUT_DIR / jid, ignore_errors=True)
     return json_ok({"deleted": jid})
@@ -4725,7 +4800,16 @@ async def api_media_manage(request):
     """
     if request.method == "GET":
         scope = request.query.get("scope", "all") or "all"
-        months = int(request.query.get("months", "0") or 0)
+        # 【2026-11-15 代码审查修 —— months 非法值导致 500】
+        # 原来这里直接 `int(request.query.get("months", "0") or 0)`，
+        # 没有 try/except —— 而下面 POST 分支的同一参数**有** try/except。
+        # 结果：`GET /api/media/manage?months=abc` 直接抛 ValueError ->
+        # HTTP 500 + 堆栈进日志（实测 8191：HTTP 500）。
+        # 修法：与 POST 分支同口径 —— 非法值退回 0。
+        try:
+            months = int(request.query.get("months", "0") or 0)
+        except (TypeError, ValueError):
+            months = 0
         if scope not in ("all", "older", "failed"):
             return web.json_response({"error": "scope 只能是 all / older / failed"},
                                      status=400)
@@ -6887,6 +6971,9 @@ async def api_enhance(request):
             attempts.append(ceiling)
 
         last = None
+        # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
+        # 在循环外初始化：attempts 至少有一次，但保持「一定已绑定」更稳。
+        pe_ratio = ""
         for attempt_idx, mt in enumerate(attempts):
             try:
                 res = await llm_client.call_provider_full(
@@ -6912,6 +6999,12 @@ async def api_enhance(request):
                     {"error": "模型返回了空内容，未做修改",
                      "provider": item["name"],
                      "degraded": True}, status=502)
+            # 【JSON 契约解包（2026-11-15 修复①）】
+            # H3-Image 官方 PE 的 task prompt 要求模型输出一个两键 JSON
+            # （expanded_caption + 比例键），而写回提示词框要的是**纯文本**。
+            # 这里解包：caption 进提示词框，比例单独回给调用方。
+            # 非 JSON 契约的模板原样通过（不动其它面板的行为）。
+            enhanced, pe_ratio = enh.unwrap_json_contract(enhanced, spec_id)
             # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
             #
             # 【2026-11-11】错误文案要**可读、可操作**：
@@ -7005,6 +7098,11 @@ async def api_enhance(request):
         "used_multimodal": bool(images),
         "validation": validation,
         "elements": elements,
+        # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
+        # H3-Image 官方 PE 会自己选比例；解包后单独回给前端，
+        # 前端可据此提示用户「PE 建议的比例是 X」。
+        # 非 JSON 契约模板恒为空串。
+        "pe_aspect_ratio": pe_ratio or "",
         # 要素覆盖 + 截断检测结果（前端可显示保留率）
         "coverage": coverage,
         "finish_reason": finish_reason,
@@ -7309,7 +7407,7 @@ async def api_h3image_pe_expand(request):
         async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
             result = await h3image_pe.run_pe_expansion(
                 session, COMFY, original, ref_images or None,
-                task_prompt=task_prompt)
+                task_prompt=task_prompt, is_edit=is_edit)
     except h3image_pe.PEError as exc:
         return web.json_response(
             {"error": str(exc), "degraded": True}, status=502)
@@ -8513,7 +8611,27 @@ MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".png": "image/png",
 async def files_handler(request):
     path = request.match_info.get("path", "")
     full = (OUT_DIR / path).resolve()
-    if not str(full).startswith(str(OUT_DIR.resolve())) or not full.is_file():
+    # 【2026-11-15 代码审查修 —— 路径穿越】
+    #
+    # 原来这里用的是 `str(full).startswith(str(OUT_DIR.resolve()))` ——
+    # 那是**字符串前缀**判定，不是路径边界判定。
+    # 同级目录 `outputs_secret` 的字符串前缀是 `.../outputs` ->
+    # startswith 判定为 True -> 越界文件被当成产物返回。
+    #
+    # 实测（8190 线上，2026-11-15）：
+    #   /files/..%2Foutputs_secret%2Fcreds.txt        -> 200（读到了越界文件）
+    #   /files/%2e%2e%2Foutputs_secret%2Fcreds.txt    -> 200（同上）
+    #   /files/../outputs_secret/creds.txt             -> 404（aiohttp 规范化掉了裸 ../）
+    # 裸 ../ 被 aiohttp 规范化，所以**必须用 %2F 编码**才能逃逸 ——
+    # 这正是它容易被漏掉的原因。
+    #
+    # 修法：用仓库里已有的正确判据 `h3studio/assets.py::resolve_inside`
+    # （relative_to 是路径边界判定，不是字符串前缀）。
+    try:
+        full.relative_to(OUT_DIR.resolve())
+    except ValueError:
+        raise web.HTTPNotFound()
+    if not full.is_file():
         raise web.HTTPNotFound()
     # 显式给 Content-Type —— 音频产物没有它的话浏览器会当成下载而不是播放
     mime = MEDIA_TYPES.get(full.suffix.lower())

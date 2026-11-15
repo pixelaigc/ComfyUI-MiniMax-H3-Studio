@@ -152,7 +152,8 @@ def resolve_size(params: dict, mode: str) -> tuple[int, int, list[str]]:
             limit = max_pixels * 1024 * 1024
             if width * height > limit:
                 snapped_w, snapped_h, reasons = vmodels.normalize_video_size(
-                    width, height, max_pixels=max_pixels, strict_over_limit=False)
+                    width, height, max_pixels=max_pixels, strict_over_limit=False,
+                    mode=mode)
                 if snapped_w > 0 and snapped_h > 0:
                     notes.append(
                         f"请求尺寸 {width}×{height} 超过 {mode} 模式上限 "

@@ -23,6 +23,7 @@ import sqlite3
 from pathlib import Path
 
 from . import lora_damping
+from . import lora_text_sanitize
 from . import moss_lora_compat
 from . import moss_lora_split
 from .lora_catalog_effects import ALL_EFFECTS as _EFFECT_CATALOG
@@ -1379,7 +1380,8 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 "path": str(path),
                 "size_mb": round(path.stat().st_size / (1024 * 1024), 1),
                 "display": info.get("display") or path.stem,
-                "base": info.get("base") or base_label,
+                "base": lora_text_sanitize.sanitize_user_text(
+                    info.get("base") or base_label),
                 "trigger": info.get("trigger", ""),
                 # 推荐强度：**目录里人工核对的 upstream 值优先**。
                 # 兼容性检测算出的 suggested_strength 只是「这个权重扰动
@@ -1396,7 +1398,8 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 "strength_cap": compat.get("strength_cap", 1.0),
                 "ctx_perturbation": compat.get("ctx_perturbation"),
                 "ctx_damping": compat.get("ctx_damping"),
-                "strength_source": info.get("strength_source", ""),
+                "strength_source": lora_text_sanitize.sanitize_strength_source(
+                    info.get("strength_source", "")),
                 "kind": kind,
                 "compatible": bool(compat.get("compatible", True)),
                 "incompatible_reason": compat.get("reason", ""),
@@ -1416,8 +1419,8 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 "conversion_status": compat.get("conversion_status", ""),
                 "needs_conversion": bool(compat.get("needs_conversion", False)),
                 "conversion_reason": compat.get("conversion_reason", ""),
-                "scene": info.get("scene", ""),
-                "source": info.get("source", ""),
+                "scene": lora_text_sanitize.sanitize_scene(info.get("scene", "")),
+                "source": lora_text_sanitize.sanitize_user_text(info.get("source", "")),
                 # 认定方式：filename（文件名含族关键词）/
                 # effect_dir（族专属目录前缀，最可靠）/
                 # layer_structure（靠层结构比对认出来的）
@@ -1641,7 +1644,9 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 "path": str(path),
                 "size_mb": round(path.stat().st_size / (1024 * 1024), 1),
                 "display": info.get("display") or path.stem,
-                "base": info.get("base") or (meta.get("modelspec.architecture") or meta.get("ss_base_model_version") or "Z-Image"),
+                "base": lora_text_sanitize.sanitize_user_text(
+                    info.get("base") or (meta.get("modelspec.architecture")
+                                       or meta.get("ss_base_model_version") or "Z-Image")),
                 "trigger": info.get("trigger", ""),
                 # 推荐强度：**目录里人工核对的 upstream 值优先**；
                 # 目录没给才用兼容性检测算出的安全值（理由同 _list_loras_for_base）
@@ -1655,7 +1660,8 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 # context_refiner 阻尼信息（界面提示用）
                 "ctx_perturbation": compat.get("ctx_perturbation"),
                 "ctx_damping": compat.get("ctx_damping"),
-                "strength_source": info.get("strength_source", ""),
+                "strength_source": lora_text_sanitize.sanitize_strength_source(
+                    info.get("strength_source", "")),
                 "kind": kind,
                 "compatible": bool(compat.get("compatible", True)),
                 "incompatible_reason": compat.get("reason", ""),
@@ -1675,8 +1681,8 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 "conversion_status": compat.get("conversion_status", ""),
                 "needs_conversion": bool(compat.get("needs_conversion", False)),
                 "conversion_reason": compat.get("conversion_reason", ""),
-                "scene": info.get("scene", ""),
-                "source": info.get("source", ""),
+                "scene": lora_text_sanitize.sanitize_scene(info.get("scene", "")),
+                "source": lora_text_sanitize.sanitize_user_text(info.get("source", "")),
                 # 认定方式：filename（文件名含 z-image 字样）/
                 # effect_dir（族专属目录前缀，最可靠）/
                 # layer_structure（靠层结构比对认出来的）

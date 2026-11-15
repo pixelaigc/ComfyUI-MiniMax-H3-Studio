@@ -85,10 +85,19 @@ def _frame_expr_node(length_node_id: str, dur_node_id: str, duration: float) -> 
 
 
 def _model_chain(p: dict, params: dict, model: dict) -> list:
-    """底模 + 加速 LoRA 链 -> 模型引用。
+    """底模 + 加速 LoRA + 效果 LoRA + 注意力 -> 模型引用。
 
     与文生视频面板**完全同一套**逻辑（统一槽位 + 按权重形态选加载节点），
     否则「同一个 LoRA 在文生视频里生效、在首尾帧里不生效」。
+
+    【2026-11-15 修复③ 交付项 3】这里补上了**效果 LoRA 链**与
+    **注意力机制** —— 三个视频模式现在共用同一套面板，
+    面板上能调的效果 LoRA / 注意力必须**真的生效**；
+    否则就成了「界面有控件、拖了没反应」的假控件。
+
+    链路顺序与文生视频**完全一致**：
+        底模 -> 加速 LoRA 链 -> 效果 LoRA 链 -> 注意力 -> sigma shift
+    （加速 LoRA 改采样语义，效果 LoRA 改画面风格，两者并列共存。）
     """
     p["6"] = {"inputs": {"unet_name": model["unet"], "weight_dtype": "default"},
               "class_type": "UNETLoader", "_meta": {"title": "加载DiT"}}
@@ -96,6 +105,23 @@ def _model_chain(p: dict, params: dict, model: dict) -> list:
     chain = vworkflow._resolve_accel_chain(params, model)
     if chain:
         model_ref = vworkflow.apply_accel_lora_nodes(p, model_ref, chain)
+
+    # ---- 效果 LoRA 链（用户可多选，各自带强度）----
+    effect_chain = vworkflow._resolve_effect_chain(params)
+    if effect_chain:
+        model_ref, _next_id = vworkflow._apply_effect_loras(
+            p, model_ref, effect_chain, 320)
+        # 触发词自动追加到提示词末尾（与文生视频同一套规则：
+        # 已存在的词不重复追加，多枚 LoRA 按顺序追加）
+        from . import workflows as wf
+        merged = wf.merge_lora_triggers(params.get("prompt", ""), effect_chain)
+        if merged != (params.get("prompt") or ""):
+            params["prompt"] = merged
+            params["_prompt_merged_with_triggers"] = True
+
+    # ---- 注意力机制 ----
+    model_ref, _next_id = vworkflow._apply_attention(
+        p, "300", model_ref, params, 301)
     return model_ref
 
 
@@ -272,24 +298,48 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
     # shift（MiniMaxH3SigmaShift）
     model_ref = _shift_node(p, model_ref, params)
 
+    # 【2026-11-15 修复③ 交付项 3】二采（SelfLift）——
+    # 三个视频模式共用同一套面板，面板上的「二采」开关必须**真的生效**。
+    #
+    # 【为什么原来没有】build_flf / build_r2v 走的是 T8 条件节点
+    # （136），而 SelfLiftH3Sampler 的输入里写死了文生视频的条件节点
+    # id（105:104）—— 直接接会引用一个不存在的节点。
+    # 现在把条件节点 id 参数化传给 _twopass_block（见 video_workflow.py）。
+    twopass = params.get("twopass") or {}
+    use_twopass = bool(isinstance(twopass, dict) and twopass.get("enabled"))
+
     p["9"] = {"inputs": {"scheduler": scheduler, "steps": steps, "denoise": 1,
                           "model": model_ref},
               "class_type": "BasicScheduler", "_meta": {"title": "调度器"}}
-    p["17"] = {"inputs": {"sampler_name": sampler}, "class_type": "KSamplerSelect",
-               "_meta": {"title": "采样器"}}
-    p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
-               "_meta": {"title": "噪波"}}
-    p["16"] = {"inputs": {"model": model_ref, "conditioning": ["136", 0]},
-               "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
-    p["14"] = {"inputs": {"noise": ["15", 0], "guider": ["16", 0],
-                           "sampler": ["17", 0], "sigmas": ["9", 0],
-                           "latent_image": ["136", 1]},
-               "class_type": "SamplerCustomAdvanced", "_meta": {"title": "采样"}}
+    if use_twopass:
+        # 二采固定用 Euler（SelfLift 只支持标准 Euler）
+        p["17"] = {"inputs": {"sampler_name": "euler"},
+                   "class_type": "KSamplerSelect",
+                   "_meta": {"title": "采样器（二采固定 Euler）"}}
+        cfg_value = params.get("cfg")
+        if cfg_value is None:
+            cfg_value = vmodels.VIDEO_CFG_FIXED
+        samples_ref = vworkflow._twopass_block(
+            p, model_ref, steps, scheduler, sampler, seed,
+            float(cfg_value), twopass, width, height, duration,
+            ["136", 1], cond_node_id="136")
+    else:
+        p["17"] = {"inputs": {"sampler_name": sampler}, "class_type": "KSamplerSelect",
+                   "_meta": {"title": "采样器"}}
+        p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
+                   "_meta": {"title": "噪波"}}
+        p["16"] = {"inputs": {"model": model_ref, "conditioning": ["136", 0]},
+                   "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
+        p["14"] = {"inputs": {"noise": ["15", 0], "guider": ["16", 0],
+                               "sampler": ["17", 0], "sigmas": ["9", 0],
+                               "latent_image": ["136", 1]},
+                   "class_type": "SamplerCustomAdvanced", "_meta": {"title": "采样"}}
+        samples_ref = ["14", 0]
 
     # ---- 解码 + 合成 ----
-    p["10"] = {"inputs": {"samples": ["14", 0], "vae": ["105:11", 0]},
+    p["10"] = {"inputs": {"samples": samples_ref, "vae": ["105:11", 0]},
                "class_type": "VAEDecode", "_meta": {"title": "解码视频"}}
-    p["23"] = {"inputs": {"samples": ["14", 0], "vae": ["24", 0]},
+    p["23"] = {"inputs": {"samples": samples_ref, "vae": ["24", 0]},
                "class_type": "VAEDecodeAudio", "_meta": {"title": "解码音频"}}
 
     # ---- 音轨三选一 ----

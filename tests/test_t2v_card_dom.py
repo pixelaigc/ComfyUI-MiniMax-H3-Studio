@@ -372,9 +372,21 @@ class TestSubmitParamsDoNotPolluteOtherModes(unittest.TestCase):
     """提交层：遗留 lora 字段只能出现在真走旧路径的模式里"""
 
     def _submit_block(self) -> str:
-        """抠出提交层的 params 构造块（含 flf/r2v 的 lora 分支）。"""
+        """抠出提交层的 params 构造块（含 flf/r2v 的 lora 分支）。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        三个视频模式共用同一套面板后，提交层的结构变成：
+            if (mode === "t2v" && ...) { ... }
+            else if (mode === "flf" || mode === "r2v") { ... }   ← lora 分支在这
+            if (IMAGE_MODES.includes(mode)) { ... }
+        旧的 `end` 标记（IMAGE_MODES 那行）落在 flf/r2v 分支**之后**，
+        会把要断言的分支整段切掉 —— 所以改用「params.lora 赋值之后」
+        作为终点。终点取图片编辑的参考图提交块起点。
+        """
         start = _APP_JS.index("const params = {\n    prompt,")
-        end = _APP_JS.index("if (IMAGE_MODES.includes(mode)) {", start)
+        # 终点：图片编辑（i2i_*）的参考图提交块 —— 它在 flf/r2v 分支之后。
+        end = _APP_JS.index('if (mode === "i2i_qwen" || mode === "i2i_h3image") {',
+                            start)
         return _APP_JS[start:end]
 
     @staticmethod
@@ -386,17 +398,28 @@ class TestSubmitParamsDoNotPolluteOtherModes(unittest.TestCase):
         """params.lora 赋值必须落在 flf / r2v 的守卫块**内部**。
 
         判据：块里每一条 `params.lora` 赋值语句，都必须出现在
-        `if (mode === "flf" || mode === "r2v") {` 之后，且该守卫本身存在。
+        flf / r2v 的守卫块之后，且该守卫本身存在。
         守卫被删掉（= 又变成对所有模式无条件写）时，本条断言必须红。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        守卫块的写法从 `if (mode === "flf" || mode === "r2v") {`
+        变成了 `} else if (mode === "flf" || mode === "r2v") {`
+        —— 因为三个视频模式现在共用同一套面板，t2v 那一支自己也是一个
+        `if` 分支，flf/r2v 成了它的 `else if`。
+        语义**完全不变**：仍然只有 flf / r2v 写 params.lora。
         """
         code = self._strip_comments(self._submit_block())
-        guard = 'if (mode === "flf" || mode === "r2v") {'
+        guard = 'else if (mode === "flf" || mode === "r2v") {'
         self.assertIn(
             guard, code,
             "flf/r2v 的守卫必须存在 —— 没有它，遗留 lora 字段会回到所有模式")
         guard_at = code.index(guard)
+        # 只认**遗留**字段 params.lora / params.lora_strength ——
+        # params.loras（图像模式的**效果 LoRA 数组**，复数）是另一个字段，
+        # 不能被当成遗留字段误判。
         lora_lines = [ln.strip() for ln in code.splitlines()
-                      if "params.lora" in ln]
+                      if re.search(r"params\.lora(_strength)?\b", ln)
+                      and "params.loras" not in ln]
         self.assertTrue(lora_lines, "flf/r2v 分支应该还写 params.lora")
         for line in lora_lines:
             self.assertGreater(
@@ -409,11 +432,13 @@ class TestSubmitParamsDoNotPolluteOtherModes(unittest.TestCase):
         守卫块**之前**（即所有模式共用的那段）不允许出现 params.lora。
         """
         code = self._strip_comments(self._submit_block())
-        guard = 'if (mode === "flf" || mode === "r2v") {'
+        guard = 'else if (mode === "flf" || mode === "r2v") {'
         self.assertIn(guard, code)
         outside = code[:code.index(guard)]
-        self.assertNotIn("params.lora", outside)
-        self.assertNotIn("params.lora_strength", outside)
+        # 只查**遗留**字段（params.loras 是图像模式的效果 LoRA 数组，
+        # 与遗留的 params.lora 不是一回事）。
+        self.assertIsNone(re.search(r"params\.lora(_strength)?\b", outside),
+                          "守卫块之前不允许出现遗留的 params.lora")
 
 
 if __name__ == "__main__":

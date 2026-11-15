@@ -1,0 +1,66 @@
+# 修复② 全量回归对跑 —— 基线（修复前 faaff36） vs 修复后（b3e859b）
+# 对比文件集合（8 个与本次改动有交集的测试文件）
+# 命令: python3 -m pytest <FILES> -q --tb=no -p no:cacheprovider
+# 基线 worktree: /tmp/fix2_baseline  (detached @ faaff36)
+# 修复 worktree: /root/projects/h3s-assetlib-fix (local/feature/asset-lib-fix @ b3e859b)
+
+==================== BASELINE (修复前) ====================
+.......................... [ 12%]
+................................. [ 28%]
+................................FF...............FFF.......F.... [ 58%]
+.............F....FF.............FFF............................. [ 89%]
+.....................                                                    [100%]
+=========================== short test summary info ============================
+SUBFAILED(key='turbo_4step_cn_ema') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='lightx2v_sla_768p_root') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='turbo_4step_cn') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='lightx2v_4step_v01_comfy') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+FAILED tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_flf_accepts_sampling_params
+FAILED tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_legacy_defaults_unchanged
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B2_legacy_defaults_match_workflow_hardcoded_tiers
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_tiers_match_workflow
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_uses_effective_lora_not_state_lora
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default
+FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestFusedQkvHitRatio::test_fused_qkv_counts_as_hit_when_splittable
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestFusedQkvHitRatio::test_unsplittable_row_dimension_is_detected
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d1_is_fully_attachable_after_fix
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+16 failed, 197 passed, 312 subtests passed in 9.40s
+
+==================== FIX2 (修复后, 同一批文件) ====================
+.......................... [ 12%]
+................................. [ 28%]
+................................FF...............FFF.......F.... [ 58%]
+.............F....FF.............FFF............................. [ 89%]
+......................                                                   [100%]
+=========================== short test summary info ============================
+SUBFAILED(key='turbo_4step_cn_ema') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='lightx2v_sla_768p_root') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='turbo_4step_cn') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='lightx2v_4step_v01_comfy') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+FAILED tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_flf_accepts_sampling_params
+FAILED tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_legacy_defaults_unchanged
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B2_legacy_defaults_match_workflow_hardcoded_tiers
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_tiers_match_workflow
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_uses_effective_lora_not_state_lora
+FAILED tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default
+FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestFusedQkvHitRatio::test_fused_qkv_counts_as_hit_when_splittable
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestFusedQkvHitRatio::test_unsplittable_row_dimension_is_detected
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d1_is_fully_attachable_after_fix
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+16 failed, 198 passed, 312 subtests passed in 10.13s
+
+==================== 本轮新增的 24 条回归测试 ====================
+........................                                                 [100%]
+24 passed in 0.14s
+
+==================== 结论 ====================
+失败集合 diff: 仅 baseline 失败 = 0 条；仅 fix2 失败 = 0 条；两边都失败 = 12 条（全部为既有失败）
+-> 本轮修复 **新增失败 0 条**。
+-> 12 条既有失败全部集中在 LoRA 兼容性 (test_moss_lora_damaged_and_partial) 与
+   文生视频采样档位 (test_video_sampling_params)，与本次改动无交集（未碰
+   h3studio/loras.py / h3studio/workflows.py / h3studio/comfy_models.py）。

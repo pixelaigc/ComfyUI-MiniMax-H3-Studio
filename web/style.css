@@ -3315,3 +3315,134 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   font-size: 22px; line-height: 1; cursor: pointer;
 }
 .fd-stage-close:hover { background: rgba(255, 255, 255, .26); }
+
+/* ============================================================
+   【2026-11-15 修复③ 交付项 1】滑杆 + 数值直输（共用组件样式）
+   ------------------------------------------------------------
+   web/numeric-slider.js 给每个 range 控件在**紧邻位置**插入一个
+   .num-input 文本框。样式目标：
+     * 与滑杆同一行（滑杆弹性占位，数值框固定宽度）；
+     * 数值框宽度够放 "12.50" 这类值，但不抢滑杆的视觉重心；
+     * 聚焦时用 accent 色描边，和项目其它输入框一致。
+   ============================================================ */
+
+/* 数值框与滑杆同处一行时，滑杆自己撑开 */
+.num-input {
+  flex: 0 0 auto;
+  width: 62px;
+  height: 24px;
+  padding: 2px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11.5px;
+  font-family: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+.num-input:hover { border-color: #b9c0c9; }
+.num-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(93, 95, 239, .12);
+}
+/* 滑杆被禁用时，配套数值框也要禁用（同步状态由 JS 处理，这里只做视觉） */
+.num-input:disabled { opacity: .5; cursor: default; background: #f4f5f7; }
+
+/* .compact-field 里的滑杆（宽高较窄）用小一号数值框 */
+.compact-field .num-input { width: 54px; height: 22px; font-size: 11px; }
+/* LoRA 强度行（.img-lora-slider）里的数值框更紧凑 */
+.img-lora-slider .num-input { width: 52px; height: 20px; font-size: 10.5px; margin-left: 4px; }
+/* 面板里顶格使用的滑杆（不���在 compact-field / lora-slider 内）*/
+.panel input[type=range].num-plain { width: calc(100% - 68px); display: inline-block; }
+
+/* ============================================================
+   【2026-11-15 修复③ 交付项 2】媒体预览模态框
+   ------------------------------------------------------------
+   web/media-preview.js：
+     * 图片分支复用既有 lightbox（#lightbox）；
+     * 视频 / 音频分支用本模态框（原生 controls 提供播放/暂停/静音/
+       进度/音量，另加一个显式「静音」按钮）。
+   ============================================================ */
+.media-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(10, 12, 16, .88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.media-preview-modal[hidden] { display: none; }
+
+.media-preview-box {
+  width: min(1000px, 94vw);
+  max-height: 92vh;
+  background: #14171c;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.media-preview-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  background: rgba(24, 28, 34, .95);
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: #e8ecf1;
+}
+.media-preview-head b {
+  font-size: 13px;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-preview-tools { display: flex; align-items: center; gap: 7px; }
+.media-preview-tools button {
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .07);
+  color: #e8ecf1;
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.media-preview-tools button:hover {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .34);
+}
+.media-preview-tools #mediaPreviewClose { font-size: 18px; line-height: 1; padding: 2px 11px; }
+
+.media-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+.media-preview-media {
+  max-width: 100%;
+  max-height: calc(92vh - 90px);
+  display: block;
+  background: #000;
+  border-radius: 8px;
+}
+.media-preview-image {
+  max-width: 100%;
+  max-height: calc(92vh - 90px);
+  display: block;
+  object-fit: contain;
+}

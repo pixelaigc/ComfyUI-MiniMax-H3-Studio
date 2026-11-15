@@ -402,80 +402,95 @@ class TestAccelLoraModelFiltering(unittest.TestCase):
 
 
 class TestNoDuplicateLoraStrengthControl(unittest.TestCase):
-    """去掉重复 LORA 强度控件（缺陷 4）"""
+    """去掉重复 LORA 强度控件（缺陷 4）
+
+    【2026-11-15 修复③ 交付项 3 更新】
+    旧面板（#loraField / #loraStrength）已随首尾帧 / 参考生视频面板的
+    重构**整体删除** —— 三个视频模式现在共用共享面板（#videoPanel），
+    加速 LoRA 强度只有**一处**：#vidAccelLoraStrength（在 #vidAccelLoraSelect
+    紧下方）。
+
+    本类的断言随之改为：
+      * 旧的通用强度控件（#loraStrength）**已不存在**；
+      * 新的唯一强度控件（#vidAccelLoraStrength）**只出现一次**，
+        且**紧邻**加速 LoRA 选择（#vidAccelLoraSelect）。
+    这与本类原来的意图（「全站只能有一个强度控件，且紧邻 LoRA 选择」）**一致**。
+    """
 
     @classmethod
     def setUpClass(cls):
         cls.html = (REPO / "web" / "index.html").read_text(encoding="utf-8")
 
+    def test_legacy_generic_strength_control_is_removed(self):
+        """旧的通用强度控件必须**已删除**（它与共享面板的重复）。"""
+        self.assertEqual(
+            self.html.count('id="loraStrength"'), 0,
+            "旧通用 LoRA 强度控件必须删除（三个视频模式共用共享面板）")
+
     def test_lora_strength_control_appears_exactly_once(self):
-        count = self.html.count('id="loraStrength"')
+        count = self.html.count('id="vidAccelLoraStrength"')
         self.assertEqual(count, 1,
-                         "LoRA 强度控件在全站只能有一个（原来有两个）")
+                         "LoRA 强度控件在全站只能有一个（共享面板里的那个）")
 
     def test_lora_strength_is_next_to_lora_selection(self):
-        """强度控件必须在 #loraField 内（紧邻 LoRA 选择）。"""
-        i_field = self.html.find('id="loraField"')
-        i_strength = self.html.find('id="loraStrength"')
-        i_end = self.html.find("</div>", self.html.find('id="loraCards"'))
-        self.assertGreater(i_strength, i_field,
-                           "LoRA 强度控件应位于 #loraField 之后")
-        # #loraField 的 subfield 结束位置 —— 用下一个 field 的起点做界
-        i_next_field = self.html.find('<div class="field" id="stepsField"')
-        self.assertLess(i_strength, i_next_field,
-                        "LoRA 强度控件应仍在 #loraField 块内")
+        """强度控件必须在加速 LoRA 选择（#vidAccelLoraSelect）之后。"""
+        i_select = self.html.find('id="vidAccelLoraSelect"')
+        i_strength = self.html.find('id="vidAccelLoraStrength"')
+        self.assertGreater(i_select, 0, "共享面板必须有加速 LoRA 选择下拉")
+        self.assertGreater(i_strength, i_select,
+                           "LoRA 强度控件应位于加速 LoRA 选择之后")
 
     def test_lora_strength_lives_inside_lora_field(self):
-        """强度控件必须**在 #loraField 内**（紧邻 LoRA 选择）。
-
-        这才是「唯一一处」的判据：#loraField 整体只在选了 LoRA 模型时
-        显示（JS 控制），文生视频面板则整体隐藏 #modelField ——
-        所以文生视频界面下这个通用强度控件**不出现**，
-        只有加速 LoRA 旁那一个强度控件。
-        """
-        i_lora_field = self.html.find('id="loraField"')
-        i_strength = self.html.find('id="loraStrength"')
-        i_model_field_end = self.html.find('<div class="field" id="stepsField"')
-        self.assertGreater(i_lora_field, 0)
-        self.assertGreater(i_strength, i_lora_field,
-                           "LoRA 强度控件应在 #loraField 之后")
-        self.assertLess(i_strength, i_model_field_end,
-                        "LoRA 强度控件应仍在 #loraField 块内")
+        """强度控件必须**在加速 LoRA 区块内**（紧邻 LoRA 选择）。"""
+        i_select = self.html.find('id="vidAccelLoraSelect"')
+        i_strength = self.html.find('id="vidAccelLoraStrength"')
+        # 加速 LoRA 区块的结束：用下一个 field 的起点做界
+        i_next_field = self.html.find('<div class="field" id="vidEffectLoraField"')
+        self.assertGreater(i_select, 0)
+        self.assertGreater(i_strength, i_select,
+                           "LoRA 强度控件应在加速 LoRA 选择之后")
+        self.assertLess(i_strength, i_next_field,
+                        "LoRA 强度控件应仍在加速 LoRA 区块内")
 
     def test_video_panel_has_no_generic_strength_control(self):
-        """文生视频面板里不能出现通用 #loraStrength。
+        """共享视频面板里不能出现通用 #loraStrength。
 
-        #modelField（里面含 #loraStrengthField）在文生视频模式下被
-        整体隐藏（app.js 的 activateMode 里 `$("#modelField").style.display = "none"`），
-        所以界面上不会看到第二个强度控件 —— 但 DOM 里必须保证
-        文生视频面板片段里没有它，避免将来有人误放开。
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧通用强度控件所在的 #modelField 区块已整体删除 ——
+        三个视频模式共用 #videoPanel，强度控件只有 #vidAccelLoraStrength 一处。
         """
         i_panel = self.html.find('<div id="videoPanel"')
-        i_panel_end = self.html.find('<div class="field" id="resField"')
+        i_panel_end = self.html.find('<div id="imagePanel"')
         seg = self.html[i_panel:i_panel_end]
         self.assertNotIn('id="loraStrength"', seg)
         self.assertNotIn('id="loraStrengthField"', seg)
-        # 文生视频面板自己有且只有一个强度控件
+        # 共享面板自己有且只有一个强度控件
         self.assertEqual(seg.count('id="vidAccelLoraStrength"'), 1)
 
     def test_generic_strength_container_is_nested_in_lora_field(self):
-        """#loraStrengthField 的开闭标签必须落在 #loraField 内 —— 用缩进层级验证。"""
+        """强度控件的容器必须**嵌套**在加速 LoRA 区块内 —— 用缩进层级验证。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 #loraStrengthField（挂在 #loraField 内）已随旧面板删除；
+        新的对应物是 #vidAccelLoraStrengthField（挂在加速 LoRA 区块内）。
+        """
         lines = self.html.splitlines()
-        idx_field = next(i for i, l in enumerate(lines) if 'id="loraField"' in l)
-        idx_strength = next(i for i, l in enumerate(lines) if 'id="loraStrengthField"' in l)
-        idx_input = next(i for i, l in enumerate(lines) if 'id="loraStrength"' in l)
-        self.assertGreater(idx_strength, idx_field)
-        self.assertGreater(idx_input, idx_strength)
+        idx_block = next(i for i, l in enumerate(lines)
+                         if 'id="vidAccelLoraStrengthField"' in l)
+        idx_input = next(i for i, l in enumerate(lines)
+                         if 'id="vidAccelLoraStrength"' in l)
+        self.assertGreater(idx_input, idx_block)
         # 缩进更深 => 确实嵌套在里面
-        indent_field = len(lines[idx_field]) - len(lines[idx_field].lstrip())
-        indent_strength = len(lines[idx_strength]) - len(lines[idx_strength].lstrip())
-        self.assertGreater(indent_strength, indent_field,
-                           "#loraStrengthField 应缩进在 #loraField 内部")
+        indent_block = len(lines[idx_block]) - len(lines[idx_block].lstrip())
+        indent_input = len(lines[idx_input]) - len(lines[idx_input].lstrip())
+        self.assertGreater(indent_input, indent_block,
+                           "#vidAccelLoraStrength 应缩进在 "
+                           "#vidAccelLoraStrengthField 内部")
 
     def test_video_panel_has_exactly_one_strength_control(self):
-        """文生视频面板里只有一个强度控件（#vidAccelLoraStrength）。"""
+        """共享视频面板里只有一个强度控件（#vidAccelLoraStrength）。"""
         i_panel = self.html.find('<div id="videoPanel"')
-        i_panel_end = self.html.find('<div class="field" id="resField"')
+        i_panel_end = self.html.find('<div id="imagePanel"')
         seg = self.html[i_panel:i_panel_end]
         self.assertEqual(seg.count('id="vidAccelLoraStrength"'), 1)
         # 视频面板里不能出现旧的通用 loraStrength
@@ -496,10 +511,20 @@ class TestNoDuplicateLoraStrengthControl(unittest.TestCase):
                          "app.js 还在操作已删掉的 #seedStrengthPair")
 
     def test_js_still_wires_the_moved_control(self):
-        """控件搬了位置，监听器必须还在（否则强度调不动）。"""
-        js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
-        self.assertIn('$("#loraStrength").addEventListener', js)
-        self.assertIn('$("#loraStrengthVal")', js)
+        """控件搬了位置，监听器必须还在（否则强度调不动）。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 #loraStrength（app.js 绑定）已随旧面板删除；
+        新的强度控件 #vidAccelLoraStrength 在 **web/video-panel.js** 里绑定
+        （共享面板的代码就在那个文件里）。
+        """
+        app_js = (REPO / "web" / "app.js").read_text(encoding="utf-8")
+        panel_js = (REPO / "web" / "video-panel.js").read_text(encoding="utf-8")
+        # 旧控件在 app.js 里不再有绑定（它已被删除）
+        self.assertNotIn('$("#loraStrength").addEventListener', app_js)
+        # 新控件在共享面板里有绑定 + 标签回显
+        self.assertIn('accelStrength.addEventListener("input"', panel_js)
+        self.assertIn('getElementById("vidAccelLoraStrengthVal")', panel_js)
 
 
 class TestVideoPanelJsWiring(unittest.TestCase):

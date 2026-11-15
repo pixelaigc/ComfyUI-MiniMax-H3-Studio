@@ -293,18 +293,40 @@ class TestFrontendPanelContract(unittest.TestCase):
                           f"文生视频面板缺控件 {node_id}")
 
     def test_legacy_video_panel_has_sampling_controls(self):
+        """首尾帧 / 参考生视频面板必须有采样参数控件。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        三个视频模式现在**共用**同一套面板（#videoPanel），
+        所以采样参数控件只有**一套**（#vidSamplerSelect / #vidSchedulerSelect /
+        #vidShiftVideo / #vidShiftAudio / #vidCfg），
+        首尾帧与参考生视频**直接用它** —— 不再有第二套 legacy 控件。
+
+        本断言的意图（这三个模式都有采样参数可调）**完全保留**：
+        控件依然存在，只是搬到了共享面板里。
+        """
         html = self._html()
+        for node_id in ("vidSamplerSelect", "vidSchedulerSelect",
+                        "vidShiftVideo", "vidShiftAudio",
+                        "vidCfg"):
+            self.assertIn(f'id="{node_id}"', html,
+                          f"共享视频面板缺控件 {node_id}")
+        # 旧的第二套 legacy 控件必须**已删除**（否则又变成两处采样参数）
         for node_id in ("vidLegacySamplerSelect", "vidLegacySchedulerSelect",
                         "vidLegacyShiftVideo", "vidLegacyShiftAudio",
                         "vidLegacyCfg"):
-            self.assertIn(f'id="{node_id}"', html,
-                          f"首尾帧/参考面板缺控件 {node_id}")
+            self.assertNotIn(f'id="{node_id}"', html,
+                             f"旧的重复采样控件 {node_id} 必须删除")
 
     def test_cfg_control_is_readonly(self):
-        """CFG 是只读说明，不能是可调控件（不伪造假控件）。"""
+        """CFG 是只读说明，不能是可调控件（不伪造假控件）。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 #vidLegacyCfg 已随 legacy 面板删除 ——
+        共享面板的 #vidCfg 是**唯一**那个只读说明。
+        """
         html = self._html()
         self.assertIn('id="vidCfg" value="1.0" readonly', html)
-        self.assertIn('id="vidLegacyCfg" value="1.0" readonly', html)
+        self.assertNotIn('id="vidLegacyCfg"', html)
 
     def test_twopass_cfg_control_exists(self):
         html = self._html()
@@ -466,16 +488,36 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         with open(os.path.join(here, "web", "app.js"), encoding="utf-8") as fh:
             return fh.read()
 
+    def _panel_js(self):
+        """共享视频面板的源码（web/video-panel.js）。
+
+        【2026-11-15 修复③ 交付项 3】
+        首尾帧 / 参考生视频的采样参数控件搬到了共享面板里，
+        所以这些断言要读**那个**文件，而不是 app.js。
+        """
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(here, "web", "video-panel.js"),
+                  encoding="utf-8") as fh:
+            return fh.read()
+
     def test_B3_legacy_steps_default_is_4_not_6(self):
         """B3：Turbo 档的默认步数是 **4**（工作流硬编码），不是 6。
 
         面板写「默认 6 步」而工作流跑 4 步 = 假提示。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 setDefaultSteps / legacySamplingDefaults 已随 legacy 面板删除；
+        默认步数现在由**共享面板**给出（video-panel.js 的 loadVideoOptions：
+        取当前底模的 steps，缺省回落到 sampling.steps_default）。
         """
         js = self._app_js()
         self.assertNotIn(
             'state.model === "lora" ? 6 : 20', js,
-            "setDefaultSteps 还在用旧的 6 步默认值（工作流实际是 4 步）")
-        self.assertIn("legacySamplingDefaults().steps", js)
+            "还在用旧的 6 步默认值（工作流实际是 4 步）")
+        panel_js = self._panel_js()
+        self.assertIn("videoState.steps = defModel.steps != null", panel_js)
+        self.assertIn("sampling.steps_default != null ? sampling.steps_default : 4",
+                      panel_js)
 
     def test_B3_legacy_default_tiers_match_workflow(self):
         """B3 续：legacy 的采样器/调度器/步数默认值必须与工作流一致。
@@ -501,16 +543,29 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         self.assertIn('state.model === "lora" ? (state.lora || "ckpt850") : "none"', js)
 
     def test_B3_legacy_steps_hint_exists(self):
-        """B3 续：legacy 面板必须有步数的「推荐 / 已改」提示控件。"""
+        """B3 续：必须有步数的「推荐 / 已改」提示控件。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 #vidLegacyStepsHint 已随 legacy 面板删除；
+        共享面板的 #vidStepsHint 是**唯一**那个提示。
+        """
         html = self._html()
-        self.assertIn('id="vidLegacyStepsHint"', html,
-                      "legacy 面板缺步数的推荐/已改提示")
+        self.assertIn('id="vidStepsHint"', html,
+                      "共享面板缺步数的推荐/已改提示")
+        self.assertNotIn('id="vidLegacyStepsHint"', html)
 
     def test_B3_model_card_label_says_4_steps(self):
-        """B3 续：模型卡片的「默认 6 步」文案必须改成 4 步。"""
+        """B3 续：不得出现「默认 6 步」的假文案。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的「Turbo 加速 · 默认 4 步」模型卡片已随 legacy 面板删除 ——
+        底模选择改为共享面板的**下拉**（#vidModelSelect），
+        推荐步数由 #vidStepsHint 显示。
+        """
         html = self._html()
         self.assertNotIn("Turbo 加速 · 默认 6 步", html)
-        self.assertIn("Turbo 加速 · 默认 4 步", html)
+        self.assertNotIn("Turbo 加速 · 默认 4 步", html)
+        self.assertIn('id="vidStepsHint"', html)
 
     # ---- B4：shift 节点可用性必须下发给前端 ----
 
@@ -546,6 +601,18 @@ class TestBugsFound2026_11_12_B(unittest.TestCase):
         with open(os.path.join(here, "web", "app.js"), encoding="utf-8") as fh:
             return fh.read()
 
+    def _panel_js(self):
+        """共享视频面板的源码（web/video-panel.js）。
+
+        【2026-11-15 修复③ 交付项 3】
+        首尾帧 / 参考生视频的采样参数控件搬到了共享面板里，
+        所以这些断言要读**那个**文件，而不是 app.js。
+        """
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(here, "web", "video-panel.js"),
+                  encoding="utf-8") as fh:
+            return fh.read()
+
     def _html(self):
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         with open(os.path.join(here, "web", "index.html"), encoding="utf-8") as fh:
@@ -560,47 +627,62 @@ class TestBugsFound2026_11_12_B(unittest.TestCase):
                          "state.steps 初值仍是 6（滑杆显示 4、说明写 6 = 自相矛盾）")
 
     def test_B5_html_slider_default_matches_state(self):
-        """B5 续：HTML 滑杆的初始 value 必须与 state.steps 一致（都=4）。"""
+        """B5 续：HTML 滑杆的初始 value 必须与 state.steps 一致（都=4）。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 #steps 滑杆已随 legacy 面板删除；
+        共享面板的 #vidSteps 初始值是 4，与 state.steps 一致。
+        """
         html = self._html()
-        self.assertIn('id="steps" min="4" max="20" step="1" value="4"', html)
-        self.assertIn('<span id="stepsVal">4</span>', html)
+        self.assertIn('id="vidSteps" min="1" max="50" step="1" value="4"', html)
+        self.assertIn('id="vidStepsVal">4</b>', html)
 
     def test_B6_legacy_options_rerender_after_fetch(self):
-        """B6：清单 fetch 完成后必须重渲染 legacy 面板。
+        """B6：清单 fetch 完成后必须重渲染（共享）面板。
 
         否则「fetch 未返回就先切到 flf/r2v」会留下一个只有 1 项的下拉，
         而且永远不会修复。
 
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧实现是 app.js 的 loadVideoSamplingOptions -> renderLegacyVideoSampling()；
+        采样清单现在由**共享面板**（web/video-panel.js 的 loadVideoOptions）
+        统一加载并渲染，三个视频模式共用这一套。
+
         【为什么断言的是函数体而不是整份文件】
-        同样的 `renderLegacyVideoSampling()` 调用在 renderMode 里也有一处，
         断言整份文件包含它会「永远绿」—— 变异测试实测过：
-        删掉 loadVideoSamplingOptions 里的那处调用，整份文件仍然包含它，
-        断言不会红。→ 必须**定位到那个函数体内部**再断言。
+        删掉函数体里的那处调用，整份文件仍然包含它，断言不会红。
+        → 必须**定位到那个函数体内部**再断言。
         """
-        js = self._app_js()
-        # 取出 loadVideoSamplingOptions 的函数体
-        start = js.find("async function loadVideoSamplingOptions()")
-        self.assertNotEqual(start, -1, "找不到 loadVideoSamplingOptions")
-        end = js.find("\n}", start)
-        body = js[start:end]
+        panel_js = self._panel_js()
+        # 取出 loadVideoOptions 的函数体
+        start = panel_js.find("async function loadVideoOptions()")
+        self.assertNotEqual(start, -1, "找不到 loadVideoOptions")
+        end = panel_js.find("\n  }", start)
+        body = panel_js[start:end]
         self.assertIn(
-            "renderLegacyVideoSampling()",
+            "renderVideoPanel(",
             body,
-            "loadVideoSamplingOptions 拿到清单后没有重渲染 legacy 面板（竞态未修）")
-        # 且必须是在 VIDEO_SAMPLING_OPTIONS 赋值**之后**
-        self.assertLess(body.find("VIDEO_SAMPLING_OPTIONS ="),
-                        body.find("renderLegacyVideoSampling()"),
+            "loadVideoOptions 拿到清单后没有重渲染面板（竞态未修）")
+        # 且必须是在清单赋值**之后**（VIDEO_OPTIONS 赋值 -> renderVideoPanel）
+        # 【2026-11-15 修复③ 交付项 3 更新】
+        # 清单变量名从 VIDEO_SAMPLING_OPTIONS 变成 VIDEO_OPTIONS
+        # （共享面板统一用 VIDEO_OPTIONS 收 /api/video-options 的全部字段），
+        # 重渲染入口从 renderLegacyVideoSampling() 变成 renderVideoPanel()。
+        self.assertLess(body.find("VIDEO_OPTIONS ="),
+                        body.find("renderVideoPanel("),
                         "重渲染必须在清单赋值之后（否则还是拿旧值渲染）")
 
     def test_B6_legacy_select_falls_back_when_options_empty(self):
         """B6 续：候选清单为空时不能把下拉清成 0 项。
 
-        fillVideoSelect 至少要保底放上当前值，否则下拉会变成空的。
+        【2026-11-15 修复③ 交付项 3 更新】
+        旧的 fillVideoSelect 随 legacy 面板删除；
+        共享面板的 renderSampling 里对采样器 / 调度器有同样的保底逻辑
+        （current 不在 values 里 -> 追加一个 option）。
         """
-        js = self._app_js()
-        self.assertIn("function fillVideoSelect(", js)
-        # 现有实现里有「current 不在 values 里 -> 追加一个 option」的保底逻辑
-        self.assertIn("if (current && !values.includes(current))", js)
+        panel_js = self._panel_js()
+        self.assertIn("if (!list.includes(videoState.sampler))", panel_js)
+        self.assertIn("if (!list.includes(videoState.scheduler))", panel_js)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,34 @@
+仓库：/root/projects/h3s-cr-20261115
+变异用例：26 条
+
+  CAUGHT     A-1 骨架 model_label 回退
+  CAUGHT     A-1 骨架 prompt 回退
+  CAUGHT     A-1 骨架 title 摘除注释掉
+  CAUGHT     A-1 骨架 title 摘除换属性
+  CAUGHT     A-2 prompt textarea 预填回退
+  CAUGHT     A-2 prompt placeholder 置空
+  CAUGHT     A-2 prompt placeholder 删除
+  CAUGHT     A-4 jobCard 注释回退
+  CAUGHT     A-3 dict 删除失效
+  CAUGHT     A-3 字段改写失效
+  CAUGHT     A-3 tensor_phrase 失效
+  CAUGHT     A-3 tensor_slash 两条都失效
+  CAUGHT     A-3 幂等性破坏
+  CAUGHT     A-3 误伤普通文案
+  CAUGHT     A-3 删掉用户语义
+  CAUGHT     A-3 清空非空文案
+  CAUGHT     A-3 scene 调用点断开
+  CAUGHT     A-3 strength_source 调用点断开
+  CAUGHT     A-3 source 调用点断开
+  CAUGHT     A-3 scene 整体失效(清空)
+  CAUGHT     D style.css 版本回退
+  CAUGHT     D favicon 版本回退
+  CAUGHT     B 恢复 width/height 覆盖
+  CAUGHT     B 删掉 resolution 档位反算
+  CAUGHT     B 改 state.res 初始值
+  CAUGHT     B 改 state.aspect 初始值
+
+还原后回归：20 passed, 1 skipped, 4 subtests passed in 5.77s
+
+caught=26  missed=0  anchor-miss=0
+结论：PASS —— 全部变异均被捕获

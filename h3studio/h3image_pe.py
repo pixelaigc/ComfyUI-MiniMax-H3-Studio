@@ -50,6 +50,7 @@ from __future__ import annotations
 import asyncio
 import json
 
+from h3studio import enhancer
 from h3studio import h3image as H3
 
 #: 扩写一次的最长等待（秒）。官方 PE 是 9B 模型 + thinking，
@@ -74,68 +75,111 @@ SYSTEM_PROMPT = (
     '\\". Do not output text outside that object.'
 )
 
-#: 官方 task_prompt 的**开头**（写作规则的完整正文见官方模板文件）。
+#: 官方 task prompt 的资产文件（来自 ComfyUI 官方工作流模板）。
 #:
-#: 【为什么这里只放开头而不是整份】
-#: 官方 task_prompt 有 200+ 行、约 12KB —— 全量塞进代码里会让本模块
-#: 无法审阅、也无法与官方模板保持同步。
-#: 本模块的定位是**接 H3-Image 的 PE**（需求 16），不是复刻官方的
-#: 全部写作规则 —— 官方的完整规则仍然由官方 checkpoint 自己在
-#: 出图链路里使用（面板「H3-Image」那一侧的 use_pe 语义不变）。
+#: 【为什么要落盘成文件，而不是像以前那样把正文抄进代码】
+#: 官方 task prompt 有 15831（文生图）/ 38527（图片编辑）字节 —— 抄进代码
+#: 既无法审阅，也无法与官方模板保持同步。
+#: 落盘后：正文与官方模板**逐字节一致**（可 diff 验证），
+#: 用户还能在「本地模型配置」里编辑并持久化。
 #:
-#: 这里保留的是「契约部分」：模型该产出什么 JSON、怎么填 input_text、
-#: 以及 caption 与 aspect_ratio 的取值范围 —— 这些是**解析端**必须知道的。
-TASK_PROMPT_HEAD = (
-    "You are a caption-expansion and canvas-selection model for still-image\n"
-    "text-to-image generation. Rewrite input_text into a natural English detailed\n"
-    "caption and choose one aspect ratio for the requested final image. After private\n"
-    "reasoning, serialize the complete caption and aspect ratio together as the one\n"
-    "required two-key JSON object; no visible analysis, markdown, or self-talk.\n"
-    "The caption may be long when the requested image is a complex information or "
-    "design artifact.\n\n"
-    "Role: act like an expert visual designer and technical illustrator, not a word\n"
-    "expander. Preserve every hard fact from the input, then complete the image with\n"
-    "visible, inspectable content. The goal is not more words; the goal is that a\n"
-    "viewer can inspect each important part of the image and find meaningful subjects,\n"
-    "labels, relationships, materials, data, and hierarchy.\n\n"
-    "Aspect-ratio decision policy:\n"
-    "Choose exactly one of these allowed ratios: 1:1, 5:4, 4:3, 3:2, 16:9, 21:9,\n"
-    "4:5, 3:4, 2:3, or 9:16. Decide in the following order; earlier evidence\n"
-    "overrides later evidence.\n\n"
-    "Universal hard rules:\n"
-    "1. Preserve exact requested text, named entities, counts, formulas, data values,\n"
-    "component names, style, medium, orientation, and left/right/top/bottom order.\n"
-    "2. Required content must be visible, not implied.\n"
-    "3. Respect requested subject count.\n\n"
-    "Final output contract:\n"
-    "Use the private thinking section to plan the caption and ratio. After thinking,\n"
-    "the visible final answer must be exactly one JSON object with exactly these two\n"
-    "keys:\n\n"
-    '{{"expanded_caption":"ONE_DETAILED_ENGLISH_CAPTION","aspect_ratio":"ALLOWED_RATIO"}}\n\n'
-    "Replace ONE_DETAILED_ENGLISH_CAPTION with one fluent English caption paragraph\n"
-    "that follows every rule above, and ALLOWED_RATIO with exactly one allowed ratio\n"
-    "string. Keep expanded_caption as one valid JSON string. Every ASCII double\n"
-    "quotation mark used as caption content inside expanded_caption must be\n"
-    "serialized as the JSON escape sequence \\\". Escape all other characters as valid\n"
-    "JSON requires. Do not add or omit keys. Do not put thinking or think tags inside\n"
-    "the object. Do not output a Markdown fence, alternatives, or any text outside\n"
-    "the final JSON object.\n\n"
-    "input_text: {input text}\n"
-    "output_text:\n"
-)
+#: 资产文件来源（本机 ComfyUI 官方模板的 PrimitiveStringMultiline 节点）：
+#:   comfyui_workflow_templates_json/templates/image_minimax_h3_image_t2i.json
+#:   comfyui_workflow_templates_json/templates/image_minimax_h3_image_edit.json
+H3_IMAGE_PE_TASK_PROMPT_FILES = {
+    "t2i": "h3image-pe-t2i.txt",
+    "i2i": "h3image-pe-i2i.txt",
+}
 
-#: PE 允许选的比例（官方 task_prompt 里列的）
+#: 官方 task prompt 里**替换用户提示词**的占位符。
+#:
+#: 【关键：官方 ComfyUI 模板用的是 "{input text}"，不是 "input_text: {}"】
+#: 官方模板的接法是：
+#:   PrimitiveStringMultiline(task_prompt) -> StringReplace(find="{input text}")
+#:       -> TextGenerateV2.prompt
+#: 所以占位符必须与官方模板**逐字符一致**，否则 StringReplace 什么都不替换，
+#: PE 会拿着「带占位符的模板」去扩写 —— 产物里出现 "{input text}" 字样。
+#: （HF 仓库 MiniMaxAI/MiniMax-H3-Image-PE 的 prompt/t2i/task_prompt.txt
+#:   是给 Transformers 用的，那份把占位符写成了 "input_text: {}"；
+#:   ComfyUI 模板那份才是本机要用的，权威性更高 —— 它就是 ComfyUI 实际跑的。）
+TASK_PROMPT_PLACEHOLDER = "{input text}"
+
+#: 官方 PE 输出 JSON 的**比例键名**：文生图用 aspect_ratio，
+#: 图片编辑用 target_aspect_ratio（官方编辑模板的契约，两键是
+#: expanded_caption + target_aspect_ratio —— 与文生图不同名！）。
+#: 用错键名 -> JsonExtractString 取不到比例 -> 比例静默丢失。
+PE_RATIO_KEYS = {
+    "t2i": "aspect_ratio",
+    "i2i": "target_aspect_ratio",
+}
+
+#: PE 允许选的比例（官方**文生图** task_prompt 里列的固定档位）
 ALLOWED_RATIOS = ("1:1", "5:4", "4:3", "3:2", "16:9", "21:9",
                   "4:5", "3:4", "2:3", "9:16")
+
+
+def _valid_ratio(ratio: str, is_edit: bool) -> str:
+    """校验 PE 给出的比例；不合法返回空串。
+
+    【两种模式的约束不同 —— 不能用同一把尺子】
+    * 文生图（官方 t2i task_prompt）：
+      「Choose exactly one of these allowed ratios: 1:1, 5:4, 4:3, 3:2, 16:9,
+      21:9, 4:5, 3:4, 2:3, or 9:16」—— **固定档位白名单**。
+    * 图片编辑（官方 edit task_prompt）：
+      「Any positive-integer W:H ratio is allowed; it is not limited to a
+      preset list.」「Serialize target_aspect_ratio as two positive integers
+      in W:H form」—— **任意正整数 W:H**，还要约成最简整数比。
+
+    用错尺子的后果：编辑档拿到 "16:9" 之外的合法比例（比如 "137:83"）
+    会被当成非法而**静默丢弃**；反之文生图档拿到 "137:83" 应当丢弃
+    （官方只允许那 10 个档）。
+    """
+    value = (ratio or "").strip()
+    if not value:
+        return ""
+    if not is_edit:
+        return value if value in ALLOWED_RATIOS else ""
+    # 编辑档：W:H，两个正整数
+    if ":" not in value:
+        return ""
+    left, _, right = value.partition(":")
+    try:
+        w, h = int(left.strip()), int(right.strip())
+    except ValueError:
+        return ""
+    if w <= 0 or h <= 0:
+        return ""
+    return f"{w}:{h}"
 
 
 class PEError(RuntimeError):
     """H3-Image 官方 PE 扩写失败。message 面向用户，直接可读。"""
 
 
+def task_prompt_for(is_edit: bool) -> str:
+    """读官方 task prompt 资产文件；文件缺失时抛 PEError。
+
+    【为什么不回落】官方 task prompt 是 PE 的**规则本体**（15831 / 38527 字节）。
+    没有它，PE 就不是官方 PE 了 —— 必须报错，不能拿模型内置模板冒充。
+    """
+    key = "i2i" if is_edit else "t2i"
+    filename = H3_IMAGE_PE_TASK_PROMPT_FILES[key]
+    path = enhancer.ASSETS_DIR / filename
+    try:
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+    except Exception:
+        text = ""
+    if not text.strip():
+        raise PEError(
+            f"H3-Image 官方 PE 的 task prompt 缺失：{filename}。"
+            "请检查 h3studio/skills/prompt-enhancer/assets/ 下的模板文件是否完整。")
+    return text
+
+
 def build_pe_workflow(prompt: str,
                       ref_images: list[str] | None = None,
-                      task_prompt: str | None = None) -> dict:
+                      task_prompt: str | None = None,
+                      is_edit: bool = False) -> dict:
     """构造 H3-Image 官方 PE 扩写的 ComfyUI 工作流（API 格式）。
 
     链路（照抄官方模板的子图）：
@@ -152,13 +196,17 @@ def build_pe_workflow(prompt: str,
     【为什么带 PreviewAny】ComfyUI 要求工作流里必须有输出节点，
     否则报 prompt_no_outputs。
 
+    【占位符必须逐字符一致】官方模板用 "{input text}"，
+    StringReplace 的 find 参数必须与之一致（见 TASK_PROMPT_PLACEHOLDER）。
+
     【参考图】图片编辑时官方把参考图**同时**喂给 PE（TextGenerateV2 的
     images.imageN），这样 PE 才能「看着图」改写编辑指令。
     本模块保持同样接法；顺序必须与占位标记 <imageN> 严格一致。
     """
-    task = (task_prompt if task_prompt is not None else TASK_PROMPT_HEAD)
-    if "{input text}" not in task:
-        raise PEError("H3-Image PE 的 task prompt 缺少 {input text} 占位符")
+    task = (task_prompt if task_prompt is not None else task_prompt_for(is_edit))
+    if TASK_PROMPT_PLACEHOLDER not in task:
+        raise PEError(
+            f"H3-Image PE 的 task prompt 缺少 {TASK_PROMPT_PLACEHOLDER} 占位符")
 
     workflow: dict = {
         "pe:clip": {
@@ -180,7 +228,8 @@ def build_pe_workflow(prompt: str,
         },
         # 把 {input text} 换成用户原提示词（官方用的是 StringReplace）
         "pe:replace": {
-            "inputs": {"string": ["pe:task", 0], "find": "{input text}",
+            "inputs": {"string": ["pe:task", 0],
+                       "find": TASK_PROMPT_PLACEHOLDER,
                        "replace": ["pe:user", 0]},
             "class_type": "StringReplace",
         },
@@ -231,11 +280,15 @@ def build_pe_workflow(prompt: str,
         "class_type": "JsonExtractString",
     }
     # 【为什么还要第二个提取器】官方 PE 的输出是一个 JSON 对象
-    # （expanded_caption + aspect_ratio），JsonExtractString 一次只取一个键。
-    # caption 是主产物（走 PreviewAny 出去），aspect_ratio 是附加信息
+    # （expanded_caption + 比例键），JsonExtractString 一次只取一个键。
+    # caption 是主产物（走 PreviewAny 出去），比例是附加信息
     # （单独取一份，供出图时对齐比例）。
+    #
+    # 【比例键名随模式不同】官方文生图模板用 "aspect_ratio"，
+    # 官方图片编辑模板用 "target_aspect_ratio" —— 用错键名会静默取不到。
+    ratio_key = PE_RATIO_KEYS["i2i" if is_edit else "t2i"]
     workflow["pe:json_ratio"] = {
-        "inputs": {"json_string": ["pe:gen", 0], "key": "aspect_ratio"},
+        "inputs": {"json_string": ["pe:gen", 0], "key": ratio_key},
         "class_type": "JsonExtractString",
     }
     workflow["pe:out"] = {
@@ -346,9 +399,18 @@ def parse_pe_json(text: str) -> tuple[str, str]:
     if not caption:
         # JSON 里没有 expanded_caption -> 整段当 caption
         return raw, ""
-    ratio = str(data.get("aspect_ratio") or "").strip()
+    # 比例键名随模式不同（aspect_ratio / target_aspect_ratio）。
+    # 两个键都试一遍：模型偶尔会串键名，两个都取到更稳。
+    ratio = ""
+    for key in ("aspect_ratio", "target_aspect_ratio"):
+        value = str(data.get(key) or "").strip()
+        if value:
+            ratio = value
+            break
     if ratio not in ALLOWED_RATIOS:
-        ratio = ""
+        # 不在固定档位白名单里 —— 交给调用方按模式再判一次
+        # （编辑档允许任意正整数 W:H，这里先原样带出去）。
+        ratio = ratio if ratio else ""
     return caption, ratio
 
 
@@ -375,13 +437,20 @@ def validate_pe_output(caption: str, original: str) -> str:
 
 async def run_pe_expansion(session, comfy_url: str, prompt: str,
                            ref_images: list[str] | None = None,
-                           task_prompt: str | None = None) -> dict:
+                           task_prompt: str | None = None,
+                           is_edit: bool = False) -> dict:
     """跑一次 H3-Image 官方 PE 扩写。
 
     返回 {"expanded": str, "aspect_ratio": str, ...}。
     失败一律抛 PEError（带可读原因），**不返回半成品**。
+
+    is_edit：文生图（False）还是图片编辑（True）。
+    两者用**不同的官方 task prompt** 与**不同的比例键名**
+    （aspect_ratio vs target_aspect_ratio），且比例的取值约束也不同
+    （见下方 ALLOWED_RATIOS 与 _valid_ratio 的说明）。
     """
-    workflow = build_pe_workflow(prompt, ref_images, task_prompt=task_prompt)
+    workflow = build_pe_workflow(prompt, ref_images, task_prompt=task_prompt,
+                                 is_edit=is_edit)
 
     payload = {"prompt": workflow}
     async with session.post(f"{comfy_url}/prompt", json=payload) as resp:
@@ -426,8 +495,7 @@ async def run_pe_expansion(session, comfy_url: str, prompt: str,
             caption, ratio_from_json = parse_pe_json(caption)
             if not ratio:
                 ratio = ratio_from_json
-            if ratio not in ALLOWED_RATIOS:
-                ratio = ""
+            ratio = _valid_ratio(ratio, is_edit)
             expanded = validate_pe_output(caption, prompt)
             return {
                 "expanded": expanded,

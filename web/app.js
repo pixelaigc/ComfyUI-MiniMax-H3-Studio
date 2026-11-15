@@ -200,16 +200,17 @@ const state = {
     scheduler: "simple",
     negative: "",
     batchCount: 1,
-    // 官方 PE 提示词扩写：出图时**始终**走官方 PE 接线（官方最佳实践）。
-    // 「手动扩写」入口已并入「增强」下拉菜单（「qwen21图片官方增强PE」），
-    // 不再是面板上的独立勾选框 —— 避免两处开关语义打架。
-    usePe: true,
+    // 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+    // 出图链路里**不再**有「是否再扩写一次」的开关（usePe 已删除）：
+    //   提示词扩写只由「增强」下拉里的官方 PE 项做一次，结果写回提示词框，
+    //   出图时提示词原样进模型 —— 不存在「二次扩写」这条路。
     // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
     // 由「增强」多选列表里官方 PE 那一项**自动套用**（选中即套用，可再改）。
     // 多项共存时是叠加结果 —— 后一项不会清掉前一项已套用的参数。
+    // 这些参数现在**只**作用于扩写那一次（/api/qwen-pe/expand）。
     peParams: null,
     // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
-    // 与手动扩写用同一份文本 -> 扩写与出图走同一套规则。
+    // 扩写侧自己带 —— 不再随出图参数回传（出图链路已无 PE 节点）。
     peSystemPrompt: "",
     loras: [],
     // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
@@ -492,10 +493,67 @@ function renderMode() {
   // 上传区
   const zone = $("#uploadZone"), row = $("#uploadRow");
   row.innerHTML = "";
+
+  /**
+   * 【2026-11-15 修复③ 交付项 3】设置共享面板里「本模式特有素材字段」
+   * 的标题与说明；传 null 表示**没有**特有素材字段（整块隐藏）。
+   *
+   * 【为什么要有这个】三个视频模式共用同一套面板，差异**只在**素材字段 ——
+   * 文生视频没有，首尾帧有首尾帧 + 参考视频 + 参考音乐，
+   * 参考生视频有参考图 + 参考视频 + 参考音乐。
+   */
+  function setVideoMediaLabels(label, hint) {
+    const field = $("#vidMediaField");
+    if (!field) return;
+    if (!label) {
+      field.style.display = "none";
+      return;
+    }
+    field.style.display = "";
+    const labelEl = $("#vidMediaLabel");
+    const hintEl = $("#vidMediaHint");
+    if (labelEl) labelEl.textContent = label;
+    if (hintEl) hintEl.textContent = hint || "";
+  }
+
+  /**
+   * 【2026-11-15 修复③ 交付项 2】打开已填槽位里媒体的预览。
+   *
+   * 槽位上记着它引用的素材（state.assetRefs[key]）或本地文件
+   * （state.files[key]），据此找到可播放 / 可放大的地址：
+   *   * 素材库来源 -> /api/assets/<id>/content
+   *   * 本地文件   -> blob: URL（由 fillSlot 记在 slot.dataset.previewUrl）
+   *
+   * 图片走 lightbox（可缩放），视频 / 音频走媒体预览模态框（可播放）。
+   */
+  function openSlotPreview(slot, kind) {
+    const preview = window.MediaPreview;
+    if (!preview || typeof preview.show !== "function") return;
+    // 槽位 key：从 DOM 顺序拿不到，直接用 dataset（mk 时写入）
+    const key = slot.dataset.key || "";
+    const ref = key ? (state.assetRefs || {})[key] : null;
+    const localUrl = slot.dataset.previewUrl || "";
+    const url = ref
+      ? `/api/assets/${encodeURIComponent(ref.asset_id)}/content`
+      : localUrl;
+    if (!url) return;
+    const label = slot.dataset.label || "素材";
+    preview.show({
+      url,
+      kind: kind === "image" ? "image" : kind,
+      name: ref ? (ref.name || label) : label,
+      category: ref ? ref.category : kind,
+    });
+  }
+
   const mk = (key, label, kind = "image") => {
     const slot = document.createElement("div");
     slot.className = "up-slot";
     slot.dataset.kind = kind;
+    // 【2026-11-15 修复③ 交付项 2】记下槽位标识与标签 ——
+    // 预览模态框要用它们（标题 + 定位素材）。
+    slot.dataset.key = key;
+    slot.dataset.label = label;
     slot.innerHTML = `+<span class="tag">${label}</span>`;
     const inp = document.createElement("input");
     inp.type = "file";
@@ -506,6 +564,9 @@ function renderMode() {
       : kind === "audio" ? "audio/*" : "image/*";
     const fillSlot = (file, previewUrl) => {
       const url = previewUrl || URL.createObjectURL(file);
+      // 【2026-11-15 修复③ 交付项 2】本地直传的素材也���能预览 ——
+      // 记下 blob 地址，点槽位时用它播放 / 放大。
+      slot.dataset.previewUrl = url;
       slot.replaceChildren();
       if (kind === "image") {
         const image = document.createElement("img");
@@ -534,6 +595,8 @@ function renderMode() {
     };
     // 用素材库里的素材填这个槽位：只存 asset_id，不复制文件
     const fillFromAsset = (asset) => {
+      // 素材库来源 -> 预览走 /api/assets/<id>/content（不是 blob）
+      delete slot.dataset.previewUrl;
       slot.replaceChildren();
       if (kind === "image") {
         const image = document.createElement("img");
@@ -610,6 +673,17 @@ function renderMode() {
     });
     slot.addEventListener("click", event => {
       if (event.target.closest(".pick-asset")) return;
+      // 【2026-11-15 修复③ 交付项 2】槽位**已填**时 -> 打开媒体预览模态框
+      // （图片可放大、视频/音频可播放）；未填时 -> 打开文件选择器。
+      //
+      // 【为什么要这个】参考视频 / 参考音乐填进去之后，槽位只有一个类型徽标
+      // （"视频" / "音频"），用户**看不到自己选了什么**、也没法确认内容。
+      // 点一下就能看 / 播，是最基本的「确认我选对了」操作。
+      if (slot.classList.contains("filled")) {
+        event.preventDefault();
+        openSlotPreview(slot, kind);
+        return;
+      }
       inp.click();
     });
     // 「从素材库选」按钮
@@ -667,6 +741,9 @@ function renderMode() {
       "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可；"
       + "参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
+    // 【2026-11-15 修复③ 交付项 3】本模式特有素材字段的标题与说明
+    // （与共享面板其余区块的措辞风格一致）。
+    setVideoMediaLabels("首尾帧素材", "首帧 / 尾帧任给其一 · 参考视频 ≤3 · 参考音乐 ≤3");
     mk("first", "首帧"); mk("last", "尾帧");
     for (let i = 0; i < 3; i++) mk("refvid" + i, "参考视频 " + (i + 1), "video");
     for (let i = 0; i < 3; i++) mk("refaud" + i, "参考音乐 " + (i + 1), "audio");
@@ -685,21 +762,24 @@ function renderMode() {
     $("#uploadTitle").textContent =
       "上传参考素材，或从素材库选（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
+    setVideoMediaLabels("参考素材", "参考图 ≤9 · 参考视频 ≤3 · 参考音乐 ≤3");
     for (let i = 0; i < 9; i++) mk("ref" + i, "参考 " + (i + 1));
     for (let i = 0; i < 3; i++) mk("refvid" + i, "参考视频 " + (i + 1), "video");
     for (let i = 0; i < 3; i++) mk("refaud" + i, "参考音乐 " + (i + 1), "audio");
   } else {
     zone.style.display = "none";
+    // 【2026-11-15 修复③ 交付项 3】文生视频没有特有素材字段 ——
+    // 整块隐藏（与共享面板其它区块的显隐口径一致）。
+    setVideoMediaLabels(null, null);
   }
-  // 文生图隐藏时长 / 模型 / 步数
+  // 文生图隐藏时长
+  //
+  // 【2026-11-15 修复③ 交付项 3】旧面板的「分辨率档位 / 画面比例 /
+  // 模型 / 加速 LoRA / 步数 / 采样参数」区块**已从 DOM 删除** ——
+  // 三个视频模式共用共享面板（#videoPanel），图像模式用 #imagePanel。
+  // 所以这里只剩「时长」需要按模式显隐。
   const isVideo = info.kind === "video";
   $("#durField").style.display = isVideo ? "" : "none";
-  // 图像页用自己的「分辨率档位 + 画面比例」联动控件，顶部快捷分辨率卡片不显示
-  $("#resField").style.display = isVideo ? "" : "none";
-  $("#modelField").style.display = isVideo ? "" : "none";
-  $("#stepsField").style.display = isVideo ? "" : "none";
-  // 图像模式用自己的一套比例/分辨率控件，隐藏视频模式的那套
-  $("#aspectField").style.display = isVideo ? "" : "none";
   // 音频模式（kind === "audio"）也自带面板：若沿用 isVideo 判断，
   // 整个 Z-Image 参数块（分辨率档位 / 画面比例 / 输出尺寸 / 生成批次 /
   // Z-Image 模型 / LoRA …）会整块漏进音乐面板。
@@ -707,21 +787,42 @@ function renderMode() {
   const isImageMode = info.kind === "image";
   $("#imagePanel").style.display = isImageMode ? "" : "none";
   if (isImageMode) renderImagePanel();
+  // 【2026-11-15 修复③】渲染后同步滑杆旁的数字输入框
+  // （renderImagePanel 会程序化写 range.value，不触发事件）。
+  if (window.NumericSlider && typeof window.NumericSlider.syncAll === "function") {
+    try { window.NumericSlider.syncAll(); } catch (e) { /* 忽略 */ }
+  }
 
-  // 文生视频（t2v）用自己的一套面板：宽高直填 + 模型 / 加速 LoRA 组合 /
-  // 注意力机制 / 二采 / 采样参数。flf / r2v 走旧面板，但**采样参数**
-  // （采样器 / 调度器 / shift / CFG 说明）同样补齐 —— 它们的采样链路
-  // 与 t2v 完全相同。longfilm 只做拼接，不采样，不需要这些参数。
-  const isT2V = mode === "t2v";
+  // 【2026-11-15 修复③ 交付项 3】三个视频模式（t2v 文生视频 /
+  // flf 首尾帧 / r2v 参考生视频）现在**共用同一套面板**：
+  //   宽高直填 + 尺寸预设下拉 + 画面比例 + 模型 + 加速 LoRA +
+  //   效果 LoRA + 注意力机制 + 二采 + 采样参数。
+  //
+  // 【为什么要合并】用户要求「首尾帧 / 参考生视频两个面板的界面
+  // **完全参照文生视频面板的布局**重构」——
+  //   * 分块、控件顺序、参数组织、样式全部一致；
+  //   * 不保留「快捷选分辨率」之类的**额外布局元素**；
+  //   * 只在必要处增加本模式特有字段（首帧 / 尾帧 / 参考图 /
+  //     参考视频 / 参考音乐）。
+  //
+  // 【实现方式】走**同一份渲染代码**（window.VIDEO_PANEL.render(mode)），
+  // 而不是「复制一份 t2v 的 HTML 改成 flf」—— 复制必然漂移。
+  // 本模式特有的素材槽位由 #uploadZone 渲染（见上面的 mk(...)），
+  // 风格与文生视频面板协调（同一套 .field / .compact-field 样式）。
+  const isVideoPanelMode = mode === "t2v" || mode === "flf" || mode === "r2v";
   const videoPanel = $("#videoPanel");
-  if (videoPanel) videoPanel.style.display = isT2V ? "" : "none";
-  if (isT2V) {
-    // 旧面板的控件全部让位（分辨率快捷档 / 比例 / 模型 / LoRA / 步数）
-    $("#resField").style.display = "none";
-    $("#aspectField").style.display = "none";
-    $("#modelField").style.display = "none";
-    $("#stepsField").style.display = "none";
-    if (window.VIDEO_PANEL) window.VIDEO_PANEL.render();
+  if (videoPanel) videoPanel.style.display = isVideoPanelMode ? "" : "none";
+  if (isVideoPanelMode) {
+    // 旧面板的控件全部让位（分辨率快捷档 / 比例 / 模型 / LoRA / 步数 /
+    // 采样参数）—— 这正是「不得保留『快捷选分辨率』之类的额外布局元素」。
+    // 那些区块**已从 DOM 删除**，共享面板提供全部同类控件。
+    if (window.VIDEO_PANEL) {
+      // 切模式（记住上一个模式的配置 / 载入本模式的配置 / 收进本模式上限）
+      if (typeof window.VIDEO_PANEL.setMode === "function") {
+        window.VIDEO_PANEL.setMode(mode);
+      }
+      window.VIDEO_PANEL.render(mode);
+    }
   }
 
   // 音轨来源（首尾帧 / 参考生视频）
@@ -729,29 +830,14 @@ function renderMode() {
   // 【2026-11-15 缺口 5】旧面板的「实际输出尺寸」提示
   renderLegacySizeNote();
 
-  // 首尾帧 / 参考生视频：显示「采样参数」区块（步数沿用上面的通用滑杆）
-  const legacyVideoSampling = $("#videoSamplingField");
-  if (legacyVideoSampling) {
-    const show = mode === "flf" || mode === "r2v";
-    legacyVideoSampling.style.display = show ? "" : "none";
-    if (show) {
-      // 【2026-11-14】旧面板的加速 LoRA 卡片也用统一清单渲染 ——
-      // 否则旧面板只能选写死的两枚，与文生视频面板行为不一致。
-      renderLegacyAccelLoraCards();
-      renderLegacyVideoSampling();
-    }
-  }
-
   // 音乐模式（YuE2）：用自己的面板，图像/视频那套全部让位
   const music = isMusicMode(mode);
   const musicPanel = $("#musicPanel");
   if (musicPanel) musicPanel.style.display = music ? "" : "none";
   if (music) {
     // 音乐面板自带模型/步数/采样器，通用那套全部隐藏
-    $("#resField").style.display = "none";
+    // （旧「分辨率档位 / 模型 / 步数」区块已在 2026-11-15 修复③ 中删除）
     $("#durField").style.display = "none";
-    $("#modelField").style.display = "none";
-    $("#stepsField").style.display = "none";
     // 【2026-11-11】原来这里隐藏 #seedStrengthPair —— 该容器已删除
     // 提示词框搬进了音乐面板（#musicPrompt），通用「提示词」区让位。
     // 【2026-11-09】音乐模式下用户用音乐面板里那套「增强」分裂按钮
@@ -2390,161 +2476,9 @@ function bindSeg(sel, key, cb) {
     if (cb) cb();
   }));
 }
-bindSeg("#resSeg", "res", renderLegacySizeNote);
-bindSeg("#aspectChips", "aspect", renderLegacySizeNote);
-bindSeg("#modelCards", "model", () => {
-  $("#loraField").style.display = state.model === "lora" ? "" : "none";
-  updateSeedStrengthLayout();
-  setDefaultSteps();
-  // 【2026-11-12】模型卡片换了 -> legacy 采样参数的「推荐」基准也变了
-  // （Turbo 档 4 步 / euler / beta，标准档 20 步 / res_multistep / simple），
-  // 必须重渲染，否则提示停留在旧基准。
-  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
-  // 视频模型换了 -> 增强模板按新模型的模型族重新过滤
-  if (typeof refreshEnhanceSpecForMode === "function") refreshEnhanceSpecForMode();
-});
-bindSeg("#loraCards", "lora", () => {
-  // 【2026-11-12】LoRA 卡片换了 -> 同样要重算 legacy 采样参数的推荐基准
-  if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
-});
-
-/**
- * 渲染首尾帧 / 参考生视频（旧面板）的加速 LoRA 卡片。
- *
- * 【2026-11-14 重构】旧实现是在 index.html 里**写死**两张卡片
- * （ckpt850 / v4step600），所以旧面板根本选不到 LightX2V / DMAD ——
- * 而文生视频面板能选。两个面板对同一件事给出不同选项，
- * 用户会以为「选了不生效」。
- *
- * 现在旧面板也读**同一份**清单（window.VIDEO_PANEL.accelOptions()），
- * 语义统一为「一个槽位，选哪枚工作流就只挂哪枚」。
- */
-function renderLegacyAccelLoraCards() {
-  const host = $("#loraCards");
-  if (!host) return;
-  const options = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
-    ? window.VIDEO_PANEL.accelOptions() : [];
-  if (!options.length) return;   // 清单还没到 -> 保留静态占位
-  host.innerHTML = options.map(o => `
-    <button data-v="${esc(o.key)}"${o.key === state.lora ? " class=\"active\"" : ""}>
-      <b>${esc(o.display)}</b>
-      <small>${esc(o.loader === "LoraLoaderModelOnly" ? "核心节点加载" : "Turbo 节点")}</small>
-    </button>`).join("");
-  $$("#loraCards button").forEach(b => b.addEventListener("click", () => {
-    $$("#loraCards button").forEach(x => x.classList.remove("active"));
-    b.classList.add("active");
-    state.lora = b.dataset.v;
-    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
-  }));
-  // 当前选中项若已不在清单里 -> 回落默认
-  if (state.lora && !options.some(o => o.key === state.lora)) {
-    state.lora = options[0].key;
-    const btn = $(`#loraCards button[data-v="${state.lora}"]`);
-    if (btn) btn.classList.add("active");
-  }
-}
-// 【2026-11-11】LoRA 强度滑杆从「生成按钮下方」搬到了「LoRA 选择」旁边
-// （index.html 的 #loraField 内）。控件没删，只是换了位置 ——
-// 底部那个是重复控件（与文生视频面板「加速 LoRA」旁的强度控件同指一事）。
-// flf / r2v 走旧工作流路径，读的就是 params.lora_strength。
-$("#loraStrength").addEventListener("input", e => {
-  state.loraStrength = parseFloat(e.target.value);
-  $("#loraStrengthVal").textContent = state.loraStrength.toFixed(2);
-});
-$("#steps").addEventListener("input", e => {
-  state.steps = parseInt(e.target.value);
-  $("#stepsVal").textContent = state.steps;
-  renderLegacyVideoSampling();
-});
-// ---- 首尾帧 / 参考生视频的采样参数事件 ----
-(function bindLegacyVideoSampling() {
-  const sampler = $("#vidLegacySamplerSelect");
-  if (sampler) {
-    sampler.addEventListener("change", e => {
-      state.vidSampler = e.target.value;
-      renderLegacyVideoSampling();
-    });
-  }
-  const scheduler = $("#vidLegacySchedulerSelect");
-  if (scheduler) {
-    scheduler.addEventListener("change", e => {
-      state.vidScheduler = e.target.value;
-      renderLegacyVideoSampling();
-    });
-  }
-  const shiftVideo = $("#vidLegacyShiftVideo");
-  if (shiftVideo) {
-    shiftVideo.addEventListener("input", e => {
-      state.vidShiftVideo = parseFloat(e.target.value);
-      renderLegacyVideoSampling();
-    });
-  }
-  const shiftAudio = $("#vidLegacyShiftAudio");
-  if (shiftAudio) {
-    shiftAudio.addEventListener("input", e => {
-      state.vidShiftAudio = parseFloat(e.target.value);
-      renderLegacyVideoSampling();
-    });
-  }
-})();
-/**
- * 通用「步数」滑杆的默认值。
- *
- * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位一致：
- *   params.lora != "none" -> steps 4
- *   params.lora == "none" -> steps 20
- * 而 params.lora = state.model === "lora" ? state.lora : "none"。
- *
- * 之前 LoRA 档写的是 6 —— 面板显示 6 步，工作流实际跑 4 步。
- * 卡片上的文案「Turbo 加速 · 默认 6 步」也一并改成 4 步（index.html）。
- */
-function setDefaultSteps() {
-  const def = legacySamplingDefaults().steps;
-  state.steps = def;
-  $("#steps").value = def;
-  $("#stepsVal").textContent = def;
-}
-
-// ---------- 【2026-11-11】首尾帧 / 参考生视频的采样参数 ----------
-// 这两个模式走旧工作流路径，但采样链路与文生视频完全相同
-// （BasicScheduler + KSamplerSelect + BasicGuider），
-// 所以采样器 / 调度器 / shift 一样是真参数。
-//
-// 候选项来自 /api/video-options 的 sampling 清单 —— 服务端从本机
-// ComfyUI 的 /object_info 取（KSamplerSelect 68 项 / BasicScheduler 14 项），
-// 前端不硬编码名单。清单拉不到时降级为「不显示这两项」，
-// 不阻塞其它功能。
-let VIDEO_SAMPLING_OPTIONS = null;
-
-function videoSamplingDefaults() {
-  const cfg = (VIDEO_SAMPLING_OPTIONS && VIDEO_SAMPLING_OPTIONS.sampling) || {};
-  return {
-    samplers: cfg.samplers || [],
-    schedulers: cfg.schedulers || [],
-    cfg_fixed: cfg.cfg_fixed != null ? cfg.cfg_fixed : 1.0,
-    cfg_reason: cfg.cfg_fixed_reason || "",
-    shift_default_video: cfg.shift_default_video != null ? cfg.shift_default_video : 12.0,
-    shift_default_audio: cfg.shift_default_audio != null ? cfg.shift_default_audio : 3.0,
-    // 【2026-11-12】shift 节点本机可用性 —— 不可用时禁用滑杆（不做假控件）
-    sigma_shift_available: cfg.sigma_shift_available !== false,
-  };
-}
-
-/**
- * 旧路径视频模式提交时**真正用的** params.lora 值。
- *
- * 必须与提交路径（app.js 的 params.lora）完全一致：
- *   lora: state.model === "lora" ? state.lora : "none"
- * 「标准 MiniMax-H3」卡片也会把 params.lora 置成 "none"（= 不用 LoRA），
- * 所以判据不能只看 state.lora。
- */
-function effectiveLegacyLora() {
-  // 【2026-11-14】旧路径的加速 LoRA 现在也走**统一槽位**：
-  //   state.model === "lora" -> 用 state.lora 那一枚
-  //   state.model === "standard" -> 一枚都不挂（空串）
-  // 旧的 "none" 字面量保留成空串之外不再使用。
-  return state.model === "lora" ? (state.lora || "") : "";
-}
+// 【2026-11-15 修复③ 交付项 3】旧面板的 seg 绑定（#resSeg / #aspectChips /
+// #modelCards / #loraCards）已随对应 DOM 一起删除 —— 三个视频模式现在
+// 共用共享面板（web/video-panel.js），那里的绑定才是唯一入口。
 
 /**
  * 旧面板（首尾帧 / 参考生视频）的「分辨率档位 + 画面比例」-> 真实像素宽高。
@@ -2616,6 +2550,29 @@ function currentLegacyVideoSize() {
 }
 
 /**
+ * 【2026-11-15 修复③ 交付项 3】真实像素 -> 档位标签（短边像素）。
+ *
+ * 【为什么需要】共享面板提交的是**真实宽高**（不提交「544p」这种
+ * 档位字符串），但落库的 params.resolution 会被旧读侧
+ * （job_meta / 任务卡片）拿去显示 —— 不写回的话，卡片上显示的
+ * 还是旧面板的遗留默认值「544p」，而实际产物是别的尺寸
+ * （又是「面板说一套、产物另一套」的老毛病）。
+ *
+ * 【算法与服务端同口径】服务端 h3studio/reso_label.py 的
+ * tier_for_pixels(width, height) = `f"{min(width, height)}p"`
+ * —— 取**短边像素原样**作标签（官方预设里的短边是 352 / 416 /
+ * 480 / 544 / 608 / 640 / 672 / 736 / 768，都不是 10 的倍数；
+ * 四舍五入会把 768 变成 770，与面板自己的预设标签对不上）。
+ * 这里是同一套公式的前端镜像（服务端仍会以自己的实现为准）。
+ */
+function legacyTierForPixels(width, height) {
+  const w = Math.round(Number(width));
+  const h = Math.round(Number(height));
+  if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) return "";
+  return `${Math.min(w, h)}p`;
+}
+
+/**
  * 在旧面板的「分辨率」下方显示**这次真的会跑的像素尺寸**。
  *
  * 【2026-11-15 缺口 5】
@@ -2625,179 +2582,31 @@ function currentLegacyVideoSize() {
  * 只在 flf / r2v 显示（t2v 有自己那块独立的尺寸区）。
  */
 function renderLegacySizeNote() {
-  const note = $("#legacySizeNote");
-  if (!note) return;
-  const isLegacyVideo = state.mode === "flf" || state.mode === "r2v";
-  if (!isLegacyVideo) { note.textContent = ""; return; }
-  const size = currentLegacyVideoSize();
-  if (!size) { note.textContent = ""; return; }
-  const mp = (size.width * size.height) / (1024 * 1024);
-  note.textContent = `实际输出 ${size.width}×${size.height}（${mp.toFixed(2)} MP）`;
+  // 【2026-11-15 修复③ 交付项 3】#legacySizeNote 这个 DOM 节点
+  // 随旧「分辨率档位」区块一起删除了 —— 现在真实像素由**共享面板**的
+  // 「输出尺寸」区直接显示（#vidSizeHint / #vidSizeNote）。
+  // 这个函数保留为一个**空操作**，让仍在调用它的旧路径不会报错。
+  return;
 }
 
 /**
- * 旧路径视频模式的采样参数默认值。
+ * 【2026-11-15 修复③ 交付项 3】旧面板的采样参数清单加载 ——
+ **已退役**。
  *
- * 【2026-11-12 修】必须与 workflows._h3_video_workflow 的硬编码档位
- * **逐项一致**，否则「推荐」标记是假的：
- *   lora != "none" -> steps 4  / sampler euler          / scheduler beta
- *   lora == "none" -> steps 20 / sampler res_multistep  / scheduler simple
- *
- * 之前 steps 默认写的是 6，而工作流实际用 4（Turbo 档）——
- * 面板上写「默认 6 步」，工作流跑的是 4 步 = 假提示。
- */
-function legacySamplingDefaults() {
-  const key = effectiveLegacyLora();
-  const withLora = !!key;
-  if (!withLora) {
-    return {
-      steps: 20,
-      sampler: "res_multistep",
-      scheduler: "simple",
-    };
-  }
-  // 【2026-11-14】步数按**所选那枚**的推荐值 —— 不同加速 LoRA 的
-  // 推荐步数不同（4 步蒸馏 / 8 步蒸馏），写死 4 就是假提示。
-  const opts = (window.VIDEO_PANEL && window.VIDEO_PANEL.accelOptions)
-    ? window.VIDEO_PANEL.accelOptions() : [];
-  const meta = opts.find(o => o.key === key);
-  return {
-    steps: (meta && meta.recommended_steps) ? Number(meta.recommended_steps) : 4,
-    sampler: "euler",
-    scheduler: "beta",
-  };
-}
-
-function fillVideoSelect(sel, values, current) {
-  if (!sel) return;
-  sel.innerHTML = "";
-  values.forEach(name => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    opt.selected = name === current;
-    sel.appendChild(opt);
-  });
-  if (current && !values.includes(current)) {
-    const opt = document.createElement("option");
-    opt.value = current;
-    opt.textContent = current;
-    sel.appendChild(opt);
-  }
-  sel.value = current;
-}
-
-function renderLegacyVideoSampling() {
-  const field = $("#videoSamplingField");
-  if (!field) return;
-  const cfg = videoSamplingDefaults();
-  const defaults = legacySamplingDefaults();
-
-  if (!state.vidSampler) state.vidSampler = defaults.sampler;
-  if (!state.vidScheduler) state.vidScheduler = defaults.scheduler;
-
-  fillVideoSelect($("#vidLegacySamplerSelect"), cfg.samplers, state.vidSampler);
-  fillVideoSelect($("#vidLegacySchedulerSelect"), cfg.schedulers, state.vidScheduler);
-
-  const sHint = $("#vidLegacySamplerHint");
-  if (sHint) sHint.textContent = state.vidSampler === defaults.sampler ? "推荐" : "已改";
-  const scHint = $("#vidLegacySchedulerHint");
-  if (scHint) scHint.textContent = state.vidScheduler === defaults.scheduler ? "推荐" : "已改";
-
-  const svEl = $("#vidLegacyShiftVideo");
-  const saEl = $("#vidLegacyShiftAudio");
-  if (svEl) svEl.value = state.vidShiftVideo;
-  if (saEl) saEl.value = state.vidShiftAudio;
-  const svVal = $("#vidLegacyShiftVideoVal");
-  if (svVal) svVal.textContent = Number(state.vidShiftVideo).toFixed(2);
-  const saVal = $("#vidLegacyShiftAudioVal");
-  if (saVal) saVal.textContent = Number(state.vidShiftAudio).toFixed(2);
-  const svHint = $("#vidLegacyShiftVideoHint");
-  if (svHint) {
-    svHint.textContent = Number(state.vidShiftVideo) === Number(cfg.shift_default_video)
-      ? "推荐" : "已改";
-  }
-  const saHint = $("#vidLegacyShiftAudioHint");
-  if (saHint) {
-    saHint.textContent = Number(state.vidShiftAudio) === Number(cfg.shift_default_audio)
-      ? "推荐" : "已改";
-  }
-
-  // 【2026-11-12】shift 节点本机不可用时禁用滑杆（不制造假控件）
-  const shiftAvailable = cfg.sigma_shift_available !== false;
-  [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
-  if (svHint) {
-    svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
-    svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
-  }
-  if (saHint) {
-    saHint.textContent = shiftAvailable ? saHint.textContent : "节点不可用";
-    saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
-  }
-
-  // CFG：H3 标准路径固定 1.0 —— 只读说明，不做假控件
-  const cfgEl = $("#vidLegacyCfg");
-  const cfgVal = $("#vidLegacyCfgVal");
-  const cfgHint = $("#vidLegacyCfgHint");
-  const cfgNote = $("#vidLegacyCfgFixedNote");
-  if (cfgEl) cfgEl.value = Number(cfg.cfg_fixed).toFixed(1);
-  if (cfgVal) cfgVal.textContent = Number(cfg.cfg_fixed).toFixed(1);
-  if (cfgHint) cfgHint.textContent = "H3 固定";
-  if (cfgNote) cfgNote.textContent = cfg.cfg_reason;
-
-  // 步数的「推荐 / 已改」提示 —— 文生视频面板有 vidStepsHint，
-  // 这里必须也有（否则用户看不到步数是不是被改过）。
-  const stepsHint = $("#vidLegacyStepsHint");
-  if (stepsHint) {
-    stepsHint.textContent = Number(state.steps) === Number(defaults.steps)
-      ? "推荐" : "已改";
-  }
-
-  const note = $("#vidLegacySamplingNote");
-  if (note) {
-    note.textContent = [
-      `步数 ${state.steps} → BasicScheduler.steps`,
-      `采样器 ${state.vidSampler} → KSamplerSelect.sampler_name`,
-      `调度器 ${state.vidScheduler} → BasicScheduler.scheduler`,
-      `shift ${Number(state.vidShiftVideo).toFixed(2)} / `
-        + `${Number(state.vidShiftAudio).toFixed(2)} → MiniMaxH3SigmaShift`,
-    ].join(" · ");
-  }
-}
-
-/**
- * 拉一次 /api/video-options，只为拿 sampling 清单（首尾帧/参考模式用）。
- *
- * 【2026-11-12 修】这个 fetch 是异步的，而 boot() 不 await 它。
- * 用户在 fetch 返回前切到 flf/r2v 时：
- *   renderLegacyVideoSampling() 拿到的 VIDEO_SAMPLING_OPTIONS 还是 null
- *   -> 候选清单是空数组 -> 下拉只剩 1 个当前值（不是 68 / 14 个候选）
- * 而且 fetch 完成后没人重渲染 -> 残缺的下拉一直留着。
- * 修法：拿到清单后主动重渲染一次 legacy 面板。
+ * 采样参数（采样器 / 调度器 / shift / 步数）现在由**共享面板**
+ * （web/video-panel.js 的 VIDEO_OPTIONS.sampling）提供，
+ * 它自己会拉 /api/video-options。
+ * 这里保留为一个**空操作**，让仍在调用它的旧路径不会报错。
  */
 async function loadVideoSamplingOptions() {
-  try {
-    const resp = await fetch("/api/video-options", { cache: "no-store" });
-    if (!resp.ok) return;
-    VIDEO_SAMPLING_OPTIONS = await resp.json();
-    const cfg = videoSamplingDefaults();
-    if (!state.vidShiftVideo) state.vidShiftVideo = cfg.shift_default_video;
-    if (!state.vidShiftAudio) state.vidShiftAudio = cfg.shift_default_audio;
-    // 清单到位后重渲染（补上「fetch 未返回就先切模式」造成的残缺下拉）
-    if (state.mode === "flf" || state.mode === "r2v") renderLegacyVideoSampling();
-  } catch (e) {
-    console.warn("[视频采样参数] 清单拉取失败:", e.message);
-  }
+  return;
 }
-// 【2026-11-11】原来这个函数控制「生成按钮下方」的 LoRA 强度滑杆显隐。
-// 那个滑杆已搬到「LoRA 选择」旁边（#loraField 内），所以这里改成控制
-// #loraStrengthField —— 它现在住在 #loraField 里，而 #loraField 只在
-// 选了 lora 模型时显示，因此两者的显隐天然一致。
-// （#seedStrengthPair 容器已不存在，不再操作。）
+// 【2026-11-15 修复③ 交付项 3】旧「LoRA 强度」区块（#loraStrengthField）
+// 随旧面板一起删除 —— 加速 LoRA 强度现在由**共享面板**的
+// 「加速 LoRA 强度」控件提供（与文生视频同一处）。
+// 这里保留为一个**空操作**，让仍在调用它的旧路径不会报错。
 function updateSeedStrengthLayout() {
-  const showStrength = MODE_INFO[state.mode].kind === "video" && state.model === "lora";
-  const field = $("#loraStrengthField");
-  if (field) field.style.display = showStrength ? "" : "none";
+  return;
 }
 $("#duration").addEventListener("input", e => {
   state.duration = parseInt(e.target.value);
@@ -3204,19 +3013,10 @@ $("#genBtn").addEventListener("click", async () => {
   //
   // 修法：**只让真正走旧路径的模式**（flf / r2v）带这两个字段；
   // 其它模式（t2v / 图像 / 音乐）不写 —— 让落库记录里只剩真实生效的字段。
-  if (mode === "flf" || mode === "r2v") {
-    // 【2026-11-14】旧路径（首尾帧 / 参考生视频）也走**统一槽位**：
-    // 提交 accel_lora（key）+ accel_lora_strength，
-    // 服务端按同一套换算逻辑决定挂哪枚、用哪个节点加载。
-    //
-    // 仍然保留 params.lora —— 老任务 / 老读侧（job_meta）还要看它，
-    // 但它是**从槽位派生的**，不再是独立的输入源。
-    const accelKey = effectiveLegacyLora();
-    params.accel_lora = accelKey;
-    params.accel_lora_strength = state.loraStrength;
-    params.lora = accelKey || "none";
-    params.lora_strength = state.loraStrength;
-  }
+  // 【2026-11-15 修复③ 交付项 3】flf / r2v 的加速 LoRA 现在由
+  // **共享面板**提交（见下面 mode === "flf" || mode === "r2v" 分支），
+  // 这里**不再**单独赋值 —— 否则会用旧面板的 state.loraStrength
+  // 覆盖掉用户在共享面板上刚调的值。
   if (IMAGE_MODES.includes(mode)) {
     // 图像模式：把档位 / 比例 / 实际宽高 / 采样参数一起带上去。
     // resolution 复用同一个字段，图像模式的值是分辨率档位（1mp / 480p…4k）。
@@ -3246,26 +3046,12 @@ $("#genBtn").addEventListener("click", async () => {
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
       }));
     if (isQwenMode()) {
-      // Qwen-Image 2.1：出图时是否再走一次官方 PE 扩写。
-      // 默认 true（官方最佳实践，官方工作流就是这么走的）；
-      // 用户在「增强」下拉里手动跑过「qwen21图片官方增强PE」后变 false ——
-      // 此时提示词框里已经是官方 PE 结果，再扩一次会冲掉用户的编辑。
-      params.use_pe = !!state.imgQwen.usePe;
-      // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
-      // 由「增强」多选列表里官方 PE 那一项自动套用（选中即套用，可再改）。
-      // 多项共存时是**叠加**结果，后一项不会清掉前一项已套用的参数。
-      if (state.imgQwen.peParams) {
-        params.pe_params = {
-          presence_penalty: state.imgQwen.peParams.presence_penalty,
-          max_new_tokens: state.imgQwen.peParams.max_new_tokens,
-        };
-      }
-      // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
-      // 与手动扩写用的是同一份文本 -> 扩写与出图走同一套规则。
-      const peSp = state.imgQwen.peSystemPrompt;
-      if (peSp && String(peSp).trim()) {
-        params.pe_system_prompt = String(peSp);
-      }
+      // 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+      // 这里**不再**提交 params.use_pe —— 工作流内已无 PE 节点，
+      // 提示词原样进模型（扩写只在「增强」下拉里做一次）。
+      // 官方 PE 的档位参数（presence_penalty / max_new_tokens）不再随
+      // 出图提交 —— 它们只作用于 WEBUI 侧 /api/qwen-pe/expand 那一次扩写。
+      // 官方 PE 的 system prompt 同理（扩写侧自己带，不回传给出图链路）。
     }
     if (isMossMode()) {
       // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关
@@ -3287,6 +3073,29 @@ $("#genBtn").addEventListener("click", async () => {
   if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
+    // 加速 LoRA：把「不挂」**显式表达**出来（与 flf/r2v 分支同一写法）。
+    //
+    // 【2026-11-15 代码审查修 —— 「不挂」被静默反转成「挂 ckpt850」】
+    // 共享面板提交的是**数组** `accel_loras`（空数组 = 不挂），
+    // 而后端 `resolve_accel_lora_slot()` 的显式槽位判据是**键存在**
+    // （`"accel_lora" in params`）。t2v 分支原先**不补**这个键 ->
+    // 后端四条分支全不命中 -> 落到兜底 `VIDEO_FIXED_ACCEL_LORA_DEFAULT`
+    // = "ckpt850" —— 用户明确选了「不挂加速 LoRA（走标准多步采样）」，
+    // 工作流里却挂着 4 步蒸馏 LoRA，界面文案变成假文案。
+    //
+    // 【为什么在前端修，而不是改后端判据】
+    // 后端「**完全没有**加速信息 -> 默认 ckpt850」是**老任务重放**的语义
+    // （历史落库数据没有加速字段，它们的工作流本来就恒挂 ckpt850）。
+    // 把后端判据改成「空数组 = 不挂」会让那些老任务重放出来的画面**变样** ——
+    // 那比原缺陷更严重。tests/test_t2v_panel.py::test_default_accel_lora_is_ckpt850
+    // 正是钉这条契约的（实测：该测试在基线 8bcc3d0 通过，在改后端判据后失败）。
+    // 所以：**前端补上显式键**，后端语义不动。
+    const accelList = params.accel_loras || [];
+    const firstAccel = accelList.find(
+      it => it && it.key && it.enabled !== false && Number(it.strength) > 0);
+    params.accel_lora = firstAccel ? firstAccel.key : "";
+    params.accel_lora_strength = firstAccel
+      ? Number(firstAccel.strength) : 1.0;
     // 【接续】把接续上下文一起提交（服务端据此校验并算段号）。
     //
     // 【为什么这里原样透传而不自己算段号】前端回填的 continuation
@@ -3313,13 +3122,56 @@ $("#genBtn").addEventListener("click", async () => {
       }
     }
   } else if (mode === "flf" || mode === "r2v") {
-    // 【2026-11-11】首尾帧 / 参考生视频：采样参数（采样器 / 调度器 / shift）
-    // 与文生视频同链路，同样是真参数。CFG 在 H3 标准路径固定 1.0
-    // （BasicGuider 无 cfg 槽位），面板只做只读说明，不提交。
-    params.sampler = state.vidSampler;
-    params.scheduler = state.vidScheduler;
-    params.shift_video = Number(state.vidShiftVideo);
-    params.shift_audio = Number(state.vidShiftAudio);
+    // 【2026-11-15 修复③ 交付项 3】首尾帧 / 参考生视频现在**共用**
+    // 文生视频那一套面板，所以参数也走**同一个出口**：
+    // window.VIDEO_PANEL.submitParams()（宽高 / 模型 / 加速 LoRA /
+    // 效果 LoRA / 注意力 / 采样参数）。
+    //
+    // 【为什么不能沿用旧的 state.vidSampler 等字段】
+    // 那些字段属于**旧面板**的控件，而旧面板的「采样参数」区块
+    // 已经被共享面板取代（界面上不再显示它）—— 继续读它，
+    // 提交的就是「界面上看不见、用户改不到」的值。
+    //
+    // 【服务端语义不变】build_flf / build_r2v 读的仍是同一批键
+    // （sampler / scheduler / shift_video / shift_audio / width /
+    // height / accel_lora / accel_lora_strength）—— 这里只是把
+    // 「值的来源」从旧面板换成共享面板，**参数语义不变**。
+    if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+      const shared = window.VIDEO_PANEL.submitParams();
+      Object.assign(params, shared);
+      // 加速 LoRA：共享面板提交的是**数组**（accel_loras），
+      // 而旧工作流构建器（_resolve_accel_chain）认的是**单选槽位**
+      // （accel_lora + accel_lora_strength）。两者都提交：
+      // 数组给服务端的新归一层，槽位给旧构建器。
+      const accelList = shared.accel_loras || [];
+      const firstAccel = accelList.find(
+        it => it && it.key && it.enabled !== false && Number(it.strength) > 0);
+      params.accel_lora = firstAccel ? firstAccel.key : "";
+      params.accel_lora_strength = firstAccel
+        ? Number(firstAccel.strength) : 1.0;
+      // 旧读侧（job_meta / 老任务卡片）还要看 params.lora ——
+      // 它是**从槽位派生的**，不是独立输入源。
+      params.lora = params.accel_lora || "none";
+      params.lora_strength = params.accel_lora_strength;
+      // 尺寸：共享面板已给出**真实生效**的宽高（并按本模式
+      // 的 0.8MP 上限收过）—— 服务端 h3_video_size.apply_size
+      // 会再用它自己的实现算一遍并以服务端为准。
+      if (shared.width) params.width = shared.width;
+      if (shared.height) params.height = shared.height;
+      // 档位标签：由真实像素反算（与服务端 reso_label 同口径），
+      // 免得落库的 resolution 还是旧面板的遗留默认值。
+      params.resolution = legacyTierForPixels(
+        Number(shared.width) || 0, Number(shared.height) || 0);
+    } else {
+      // 【兜底】共享面板还没就绪（清单接口未到）—— 用旧面板的值，
+      // 保证**功能可用**（只是布局还没切过去）。
+      params.sampler = state.vidSampler;
+      params.scheduler = state.vidScheduler;
+      params.shift_video = Number(state.vidShiftVideo);
+      params.shift_audio = Number(state.vidShiftAudio);
+      params.width = currentLegacyVideoSize().width;
+      params.height = currentLegacyVideoSize().height;
+    }
     // 【2026-11-14】音轨三选一（B2）
     params.audio_track_source = state.audioTrackSource || "";
     // 【2026-11-15 修 —— 缺口 5：面板选的分辨率/比例必须真的生效】
@@ -3336,10 +3188,28 @@ $("#genBtn").addEventListener("click", async () => {
     // 【修法】前端按与服务端**同一套公式**算出真实宽高一起提交
     // （服务端 h3studio/h3_video_size.py 是唯一真源，前端这份是
     //   同一公式的镜像；服务端仍会用自己的实现再算一次并以服务端为准）。
+    //
+    // 【2026-11-15 代码审查修 —— 这段曾**覆盖**掉上面的正确值】
+    // 本段原本无条件执行 `params.width = legacySize.width`，但它在
+    // **共享面板分支之后**，而共享面板分支刚刚写进去的正是
+    // `params.width = shared.width`（用户的真实选择）。
+    // 于是这一行把用户选的尺寸**覆盖**成了 legacySize ——
+    // 而 legacySize 读的是 `state.res` / `state.aspect`，
+    // 这两个字段**全仓从未被写过**（只在 state 初始化时定死
+    // "544p" / "16:9"），恒定算出 864×480。
+    //
+    // 后果（实测）：用户在共享面板选「608p · 16:9」（1088×608），
+    // 首尾帧 / 参考生视频实跑 864×480 —— **面板说一套、产物另一套**，
+    // 正是本段注释要修的那个毛病的翻版。
+    //
+    // 【修法】legacySize 只在**共享面板没就绪**时兜底（下面的 else 分支
+    // 已经做了），就绪时一律用共享面板给的真实宽高。
+    // 这里的 resolution 档位标签仍按 legacySize 反算（与服务端
+    // reso_label 同口径），但**不再回写 width / height**。
     const legacySize = currentLegacyVideoSize();
     if (legacySize) {
-      params.width = legacySize.width;
-      params.height = legacySize.height;
+      params.resolution = legacyTierForPixels(
+        Number(params.width) || 0, Number(params.height) || 0);
     }
   }
   // 图片编辑的参考图：**必须来自素材库**。
@@ -4532,19 +4402,11 @@ function jobCard(job) {
     <div class="job-actions">
       ${video || image || audio ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${image ? `<a data-act="open-new" href="${outputUrl(job, image)}" target="_blank" rel="noopener" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
-      <!-- 【2026-11-13】骨架卡：补上与真实卡片同形的「下载 / 新窗口打开」
-           两个占位按钮（真实卡片有产物所以有，骨架没有产物所以缺）。
-           缺这两个 -> 动作行少两个 -> 从 2 行缩到 1 行 ->
-           骨架比真实卡片矮 17px -> 网格高度跳 68px（test_grid_flash 抓的）。 -->
       ${job.is_skeleton && !(video || image || audio) ? `<button data-act="download">⬇ 下载</button>` : ""}
       ${job.is_skeleton && !image ? `<a data-act="open-new" href="#" onclick="return false" title="在新窗口打开原图">↗ 新窗口打开</a>` : ""}
       ${video && job.status === "done" && state.page === "stitch" ? `<button data-act="add-stitch">＋ 拼接</button>` : ""}
       ${window.Continuation && window.Continuation.canShowButton(job) ? `<button data-act="continue" title="${escapeHtml(window.Continuation.buttonTitle(job))}">⏭ 接续</button>` : ""}
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
-      <!-- 【2026-11-13 需求 C3】详情按钮：卡片区域有限，
-           完整生成参数（模型/步数/调度器/采样器/shift/LoRA 列表+强度/
-           尺寸/时长/seed/完整提示词/注意力机制/任务来源与工作流名/创建时间）
-           放到模态框里。 -->
       ${!runningOrQueued ? `<button data-act="detail" title="查看完整生成参数">ℹ 详情</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
     </div>`;
@@ -4788,11 +4650,9 @@ function jobCard(job) {
         $("#duration").value = rDuration;
         $("#durVal").textContent = rDuration + "s";
       }
-      if (rSteps) {
-        state.steps = rSteps;
-        $("#steps").value = rSteps;
-        $("#stepsVal").textContent = rSteps;
-      }
+      // 【2026-11-15 修复③ 交付项 3】步数控件已移入**共享面板**
+      // （#vidSteps）—— 旧的 #steps / #stepsVal 已随旧面板删除。
+      // 步数的复用由上面的 VIDEO_PANEL.applyConfig(reuseCfg) 完成。
       // 【2026-11-13 · C4】种子也一起复用（原任务用了固定种子，
       // 复用后回到「随机」就复现不出同一个结果）。
       // 优先用**权威摘要**里的 seed（与卡片/详情显示同一套），
@@ -4833,40 +4693,36 @@ function jobCard(job) {
       return;
     }
     if (job.mode === "flf" || job.mode === "r2v") {
-      // 【2026-11-15 补齐缺口 5 的另一半：旧面板的「复用参数」也要回填尺寸】
+      // 【2026-11-15 修复③ 交付项 3】首尾帧 / 参考生视频现在**共用**
+      // 文生视频那一套面板 —— 所以「复用参数」也走**同一个出口**
+      // （window.VIDEO_PANEL.applyConfig + render），与 t2v 完全一致。
       //
-      // 【原来错在哪】上面那一整块「复用参数」的回填逻辑
-      // **只在 job.mode === "t2v" 分支里**。flf / r2v 走不到 ->
-      // 点「复用参数」后，旧面板的分辨率档位与画面比例**保持原样**
-      // （或者压根不是这次任务的），用户以为复用了参数，
-      // 实际跑出来的是另一个尺寸。
-      //
-      // 现在：flf / r2v 也把档位 + 比例（以及由它们决定的真实宽高）
-      // 回填到旧面板，并刷新「实际输出尺寸」提示。
+      // 【原来错在哪】整块回填逻辑只在 job.mode === "t2v" 分支里，
+      // flf / r2v 走的是旧面板的档位回填（#resSeg / #aspectChips）——
+      // 而那两个控件在重构后**已经不再显示**了，回填了也看不见。
       const legacyReso = job.resolution_info || {};
-      if (p.resolution) {
-        setSeg("#resSeg", p.resolution);
-        state.res = p.resolution;
-      }
-      if (p.aspect) {
-        setSeg("#aspectChips", p.aspect);
-        state.aspect = p.aspect;
-      }
-      // 产物实际像素优先（与卡片显示口径一致），没有才用请求值。
-      const legacyWidth = Number(legacyReso.width) || Number(p.width) || 0;
-      const legacyHeight = Number(legacyReso.height) || Number(p.height) || 0;
-      if (legacyWidth && legacyHeight) {
-        const size = legacyVideoSize(state.res, state.aspect, job.mode);
-        // 只有当「档位+比例」算出来的尺寸与产物一致时才用档位；
-        // 不一致（比如老任务的手填尺寸）就以产物为准。
-        if (size.width === legacyWidth && size.height === legacyHeight) {
-          state.res = p.resolution || state.res;
-          state.aspect = p.aspect || state.aspect;
-        }
-      }
-      renderLegacySizeNote();
-      // 时长 / 步数 / seed 与 t2v 一样复用
       const legacyInfo = (job && job.model_info) || {};
+      const legacyCfg = {
+        model: p.model_key || p.model || "",
+        aspect: p.aspect || state.aspect,
+        width: Number(legacyReso.width) || Number(p.width) || 0,
+        height: Number(legacyReso.height) || Number(p.height) || 0,
+        steps: legacyInfo.steps != null ? legacyInfo.steps : p.steps,
+        sampler: p.sampler,
+        scheduler: p.scheduler,
+        shift_video: p.shift_video,
+        shift_audio: p.shift_audio,
+        accel_lora: p.accel_lora || "",
+        accel_lora_strength: p.accel_lora_strength,
+        effect_loras: Array.isArray(p.effect_loras) ? p.effect_loras : [],
+        attention: p.attention || "",
+        seed: p.seed,
+      };
+      if (window.VIDEO_PANEL) {
+        window.VIDEO_PANEL.applyConfig(legacyCfg);
+        window.VIDEO_PANEL.render(job.mode);
+      }
+      // 时长 / 步数 / seed 与 t2v 一样复用
       const legacyDuration = legacyInfo.duration != null
         ? legacyInfo.duration : p.duration;
       if (legacyDuration) {
@@ -4874,14 +4730,9 @@ function jobCard(job) {
         $("#duration").value = legacyDuration;
         $("#durVal").textContent = legacyDuration + "s";
       }
-      const legacySteps = legacyInfo.steps != null ? legacyInfo.steps : p.steps;
-      if (legacySteps) {
-        state.steps = legacySteps;
-        $("#steps").value = legacySteps;
-        $("#stepsVal").textContent = legacySteps;
-      }
       const legacySeed = legacyInfo.seed != null ? legacyInfo.seed : p.seed;
       if (legacySeed) $("#seed").value = legacySeed;
+      renderLegacySizeNote();
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -4975,14 +4826,18 @@ function jobCard(job) {
       }
       renderImagePanel();
     } else {
-      if (p.resolution) setSeg("#resSeg", p.resolution), state.res = p.resolution;
-      if (p.aspect) setSeg("#aspectChips", p.aspect), state.aspect = p.aspect;
+      // 【2026-11-15 修复③ 交付项 3】旧面板的档位 / 比例控件已删除 ——
+      // 尺寸与比例由**共享面板**接管（VIDEO_PANEL.applyConfig + render）。
+      if (window.VIDEO_PANEL && job.mode !== "t2i"
+          && job.mode !== "t2v" && job.mode !== "flf" && job.mode !== "r2v") {
+        // 图像 / 音乐模式不用视频面板 —— 保持原样（各自有面板）。
+      }
     }
     if (p.duration) { state.duration = p.duration; $("#duration").value = p.duration; $("#durVal").textContent = p.duration + "s"; }
-    if (p.steps && job.mode !== "t2i") { state.steps = p.steps; $("#steps").value = p.steps; $("#stepsVal").textContent = p.steps; }
+    // 【2026-11-15 修复③ 交付项 3】#steps / #stepsVal 已删除（步数在共享面板里）。
     if (p.seed) $("#seed").value = p.seed;
-    if (p.model && job.mode !== "t2i") { setSeg("#modelCards", p.model); state.model = p.model; $("#loraField").style.display = p.model === "lora" ? "" : "none"; updateSeedStrengthLayout(); }
-    if (p.lora) { setSeg("#loraCards", p.lora); state.lora = p.lora; }
+    // 【2026-11-15 修复③ 交付项 3】旧「模型卡片 / LoRA 卡片」已删除 ——
+    // 底模与加速 LoRA 由**共享面板**接管。
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
   bindMediaContextMenu(card, job);
@@ -5655,7 +5510,11 @@ function skeletonJob(index) {
   const isImage = IMAGE_MODES.includes(mode);
   const params = {
     mode: mode,
-    prompt: "骨架占位提示词，用于让元信息区高度与真实卡片保持一致，长度对齐真实内容。",
+    // 【文案纪律】骨架卡的文案必须**不含开发者措辞**。
+    // 这段文本会真的进 DOM（<b> 文本节点），CSS 只是用 color:transparent 把它涂掉，
+    // 但「复制页面内容」/读屏软件照样能拿到 —— 用户看到的是开发者内部说法。
+    // 提示词行的长度要和真实卡片对齐（见上面的说明），所以这里用等长中文占位。
+    prompt: "正在载入任务内容，模型与参数稍后显示，此处的临时文字仅用于对齐布局。",
     aspect: "16:9",
     resolution: "768p",
     duration: 5,
@@ -5699,7 +5558,7 @@ function skeletonJob(index) {
     // 而且真实任务里 LoRA 大概率是「无」—— 形状必须一致，不是内容一致。
     model_info: {
       model_key: "",
-      model_label: "骨架占位模型",
+      model_label: "载入中",
       lora_label: "",
       lora_strength: null,
       fixed_lora_label: "",
@@ -5751,6 +5610,11 @@ function renderGridSkeleton(grid, count) {
     delete card.dataset.sig;
     card.classList.add("job-skeleton");
     card.setAttribute("aria-hidden", "true");
+    // 【文案纪律】骨架卡的 title 是**原生 tooltip**（悬停即显示），
+    // 与 CSS 的 color:transparent 无关 —— 骨架里的 title 全是占位值
+    // （模型名 / 采样器 / 步数…），留着只会在悬停时闪出假信息。
+    // 这里把骨架卡内的 title 全部摘掉。
+    card.querySelectorAll("[title]").forEach(el => el.removeAttribute("title"));
     // 预览区换成占位块（真实卡片这里是 <img>/<video>）
     const preview = card.querySelector(".job-preview");
     if (preview) {

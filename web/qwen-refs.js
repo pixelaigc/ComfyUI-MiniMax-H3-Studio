@@ -509,6 +509,37 @@
         removeAt(Number(btn.dataset.del));
       });
     });
+    // 【2026-11-15 修复③ 交付项 2】点击已添加的媒体条目 -> 弹出预览模态框。
+    //
+    // 【为什么图片编辑类能力要这个】从素材库添加素材后，用户**看不到**素材
+    // 长什么样 —— 缩略图只有 100px 出头，想看清细节只能去素材库翻。
+    // 点一下就放大 / 播放，是「确认我选对了素材」的基本操作。
+    //
+    // 【复用既有组件】图片走 window.H3Studio.lightboxShow（app.js 已有的
+    // 大图查看器，支持缩放 / 拖拽 / 适应屏幕 / 原始尺寸）；
+    // 视频 / 音频走 window.MediaPreview 的模态框。
+    //
+    // 【不与删除/拖拽冲突】点 × 移除与拖拽排序各自 stopPropagation，
+    // 只有点在缩略图本体上才开预览。
+    box.querySelectorAll(".img-ref-item").forEach(item => {
+      item.addEventListener("click", e => {
+        if (e.target.closest("[data-del]")) return;
+        const index = Number(item.dataset.idx);
+        const ref = refs[index];
+        if (!ref || ref.missing) return;
+        const preview = window.MediaPreview;
+        if (!preview || typeof preview.show !== "function") return;
+        preview.show({
+          url: ref.content_url
+            || (ref.asset_id
+                ? `/api/assets/${encodeURIComponent(ref.asset_id)}/content`
+                : ref.preview_url),
+          kind: ref.category || "image",
+          name: ref.name || `参考图 ${index + 1}`,
+          mime: ref.mime,
+        });
+      });
+    });
     // 拖拽排序
     box.querySelectorAll(".img-ref-item").forEach(item => {
       item.addEventListener("dragstart", e => {

@@ -137,11 +137,52 @@ VIDEO_MAX_PIXELS_LITERAL = 2_000_000
 VIDEO_MAX_PIXELS = VIDEO_MAX_CANVAS_PIXELS
 
 #: 超限时给用户的可执行提示（需求：说明上限与当前请求值，不静默截断）。
+#:
+#: 【2026-11-15 代码审查修 —— 文案与实际上限对不上】
+#: 原来这里把「2.0M」「文生视频」**写死**在文案里，但这个函数是通用的，
+#: 首尾帧 / 参考生视频的实际上限是 **0.8MP**（max_pixels_for_mode("flf")=0.8）。
+#: 结果用户做首尾帧时看到的是：
+#:   「文生视频分辨率上限为 2.0M 像素（838,860 px）。当前请求 1,032,192 px…」
+#: —— 括号里是 838,860（=0.8MP），句首却说 2.0M，还称「文生视频」。
+#: 三个信息互相矛盾，用户没法据此判断该调小到多少。
+#:
+#: 【修法】上限值与模式名都从参数来，由调用方按实际 max_pixels 填。
 VIDEO_MAX_PIXELS_MESSAGE = (
-    "文生视频分辨率上限为 2.0M 像素（{limit} px）。"
+    "{mode_label}分辨率上限为 {limit_mp}M 像素（{limit} px）。"
     "当前请求 {pixels} px（{width}×{height}），超出上限。"
     "请把宽度或高度调小，或改用更小的画面比例。"
 )
+
+
+def _format_limit_mp(max_pixels) -> str:
+    """把上限像素数格式化成「2.0」「0.8」这样的**一位小数**文案。
+
+    【为什么不能用 f"{max_pixels:g}"]
+    `:g` 会在去掉尾随零的同时把整数值的浮点写法也压成整数 ——
+    `f"{2.0:g}"` 得到 `"2"`（不是 `"2.0"`），于是错误文案变成
+    「文生视频分辨率上限为 2M 像素」而不是「2.0M 像素」，
+    与产品既有文案（2.0M / 0.8M）不一致。
+    这里统一保留一位小数：2.0 -> "2.0"、0.8 -> "0.8"。
+    """
+    try:
+        value = float(max_pixels)
+    except (TypeError, ValueError):
+        return str(max_pixels)
+    text = f"{value:.1f}"
+    # 去掉 0.80 这种多余尾零，但仍保留 "2.0" 这类整数值的小数位
+    if text.endswith(".0") and value != int(value):
+        text = text[:-2]
+    return text
+
+#: 各生成模式的**中文名**（用于错误文案）。
+#: 【为什么放在这里】错误文案要与「用户正在做的那个模式」对上 ——
+#: 模式名散落在各处时，文案就会说错模式（本次审查实测到）。
+VIDEO_MODE_LABELS = {
+    "t2v": "文生视频",
+    "flf": "首尾帧生视频",
+    "r2v": "参考生视频",
+    "longfilm": "长片拼接",
+}
 
 # 画面比例（与 ResolutionSelector 的下拉项一一对应，实测 object_info）
 VIDEO_ASPECTS = {
@@ -868,7 +909,8 @@ def normalize_shift(value, default: float) -> float:
 def normalize_video_size(width, height,
                           multiple: int = VIDEO_SIZE_MULTIPLE,
                           max_pixels: float | None = None,
-                          strict_over_limit: bool = False):
+                          strict_over_limit: bool = False,
+                          mode: str | None = None):
     """把用户手填的宽高吸附到 H3 能接受的值。
 
     返回 (生效宽, 生效高, 调整原因列表)。**不抛异常** —— 界面要把
@@ -887,6 +929,11 @@ def normalize_video_size(width, height,
             reasons 里给出「上限是多少 + 当前请求是多少 + 怎么改」的可执行提示。
       需求要求「超限时给出明确可执行的错误/提示，不要静默截断」，
       提交链路（normalize_t2v_params）用 True，前端预览用 False。
+
+    【mode】(2026-11-15 代码审查新增)
+      只用于**错误文案**：让提示说「首尾帧生视频分辨率上限为 0.8M …」
+      而不是把「文生视频 / 2.0M」写死（首尾帧的实际上限是 0.8MP）。
+      不影响任何计算结果。
     """
     reasons: list[str] = []
     try:
@@ -933,6 +980,8 @@ def normalize_video_size(width, height,
             if strict_over_limit:
                 # 不静默截断：原样保留请求值，把可执行的提示交给上层。
                 reasons.append(VIDEO_MAX_PIXELS_MESSAGE.format(
+                    mode_label=VIDEO_MODE_LABELS.get(mode) or "视频",
+                    limit_mp=_format_limit_mp(max_pixels),
                     limit=f"{int(limit):,}",
                     pixels=f"{w * h:,}",
                     width=w, height=h))
@@ -2050,6 +2099,7 @@ def resolve_accel_lora_slot(params: dict,
         return key, strength
 
     # 老格式：accel_loras 数组（取第一个启用的）
+    #
     for item in params.get("accel_loras") or []:
         if not isinstance(item, dict):
             continue
@@ -2061,7 +2111,7 @@ def resolve_accel_lora_slot(params: dict,
         meta = accel_lora_meta(key) or {}
         try:
             strength = float(item.get("strength",
-                                    meta.get("recommended_strength", 1.0)))
+                                meta.get("recommended_strength", 1.0)))
         except (TypeError, ValueError):
             strength = float(meta.get("recommended_strength", 1.0))
         return key, strength
@@ -2287,6 +2337,14 @@ def options_payload(node_available=None,
             "steps_default": VIDEO_STEPS_DEFAULT,
             "samplers": list(VIDEO_SAMPLERS),
             "schedulers": list(VIDEO_SCHEDULERS),
+            # 【2026-11-15 修 AC-1】**不挂加速 LoRA** 时的标准多步采样档。
+            # 以前这三个值只存在于后端（video_workflow._resolve_accel_chain），
+            # 前端拿不到 => 切换加速 LoRA 后步数/采样器/调度器**不重算**，
+            # 于是「不挂加速 LoRA」时仍然跑 4 步蒸馏档（画面糊）。
+            # 现在下发给前端，前端在切换加速 LoRA 时按同一套规则重算。
+            "steps_without_accel": VIDEO_STEPS_WITHOUT_ACCEL,
+            "scheduler_without_accel": VIDEO_SCHEDULER_WITHOUT_ACCEL,
+            "sampler_without_accel": VIDEO_SAMPLER_WITHOUT_ACCEL,
             "shift_min": VIDEO_SHIFT_MIN,
             "shift_max": VIDEO_SHIFT_MAX,
             "shift_default_video": VIDEO_SHIFT_DEFAULT_VIDEO,

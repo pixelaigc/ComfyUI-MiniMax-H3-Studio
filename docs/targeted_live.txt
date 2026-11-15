@@ -1,0 +1,9 @@
+................................................................................................. [ 41%]
+........................................................................ [ 72%]
+.................................................................        [100%]
+=========================== short test summary info ============================
+SUBFAILED(key='lightx2v_sla_768p_root') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='lightx2v_4step_v01_comfy') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='turbo_4step_cn') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+SUBFAILED(key='turbo_4step_cn_ema') tests/test_job_meta_c_fix.py::TestModelRecommendations::test_every_accel_lora_has_a_recommendation_entry
+4 failed, 234 passed, 43 subtests passed in 93.20s (0:01:33)
