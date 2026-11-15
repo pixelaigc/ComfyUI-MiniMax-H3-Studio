@@ -1418,11 +1418,9 @@ def _apply_pe_overrides(target: dict, overrides) -> dict:
     return target
 
 
-def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
+def _qwen_common_nodes(model, cond_clip_name, width, height, seed,
                        sampler, scheduler, steps, cfg, shift, negative_text, prompt,
-                       job_id, filename_prefix=None, loras=None, is_edit=False,
-                       use_pe=True, pe_params=None, pe_image_nodes=None,
-                       pe_system_prompt=None):
+                       job_id, filename_prefix=None, loras=None, is_edit=False):
     """Qwen-Image 2.1 公共链路。
 
     文生图与参考图生图共用同一套节点，区别只在：
@@ -1434,18 +1432,23 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                    -> KSampler（基座：40 步）
                    -> RandomNoise -> CFGGuider -> KSamplerSelect
                    -> ManualSigmas -> SamplerCustomAdvanced（Turbo：固定 8 步）
-        CLIPLoader(PE) -> TextGenerate（官方 PE 扩写）-> TextEncodeQwenImage21
         CLIPLoader(条件) -> TextEncodeQwenImage21 的 clip 输入
         VAELoader -> TextEncodeQwenImage21 的 vae 输入（参考图编码成 ref_latents）
 
-    pe_image_nodes:
-      参考图节点列表（[node_id, ...]）。官方 PE-I2I 工作流里，
-      **参考图会同时喂给 PE 提示词扩写节点**（BatchImagesNode -> TextGenerate.image），
-      这样 PE 才能「看着图」改写编辑指令、并在输出里写 <image1>/<image2>。
-      官方模板的接法是：
-        BatchImagesNode(images.image0..imageN) -> TextGenerate.image
-      这里用同样的语义：把参考图按顺序拼成一批，喂给 PE。
-      文生图没有参考图 -> None。
+    【PE 已全量外置到 WEBUI（2026-11-15 修复①）】
+    本函数**不再**构建任何 PE 节点（CLIPLoader(PE) / TextGenerate / BatchImagesNode）。
+    职责单一化：提示词扩写（PE）只由 WEBUI 侧完成 —— 用户在「增强」下拉里
+    选中官方 PE，点「增强」即扩写并**写回提示词框**，出图时提示词原样进模型。
+
+    【为什么必须移除，而不是留个开关】
+    用户实测事实：Qwen-Image 2.1 文生图与图片编辑面板里，点「增强」选官方 PE
+    后再点「生成」，工作流里**仍然又执行了一次 PE 提示词扩写** ——
+    重复扩写、白花一次 9B 推理额度，还污染提示词。
+    根因就是本函数里的 `if use_pe:` 分支：它无条件在出图链路里再建一遍
+    TextGenerate 扩写节点（默认 use_pe=True）。
+    保留「出图时再扩写」这条路，任何时候用户手动扩写过都会被扩第二次。
+    -> 所以不是把默认值改成 False，而是**整条分支删掉**，
+       让「工作流内不存在 PE 动作」成为结构上的事实（而非开关状态）。
 
     SHIFT 说明（实测踩过坑）：Qwen-Image 2.1 走 model_type=FLUX
     （comfy/model_base.py:2672），采样类是 ModelSamplingFlux，sigma 公式
@@ -1461,10 +1464,6 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
     而 flux_time_shift 没有这一层 -> sigma 表被放大 1000 倍，出图退化成噪点。
     """
     p = {}
-    # PE 编码器（Qwen3.5 9B）—— 接提示词扩写节点
-    p["qw:30"] = {"inputs": {"clip_name": pe_clip_name, "type": "qwen_image",
-                             "device": "default"},
-                  "class_type": "CLIPLoader"}
     # 条件编码器 —— 接 TextEncodeQwenImage21 的 clip 输入
     p["qw:31"] = {"inputs": {"clip_name": cond_clip_name, "type": "qwen_image",
                              "device": "default"},
@@ -1495,80 +1494,23 @@ def _qwen_common_nodes(model, pe_clip_name, cond_clip_name, width, height, seed,
                   "class_type": "QwenImage21Cache"}
     model_ref = ["qw:12", 0]
 
-    # 提示词扩写（官方 PE）：PE 编码器 -> TextGenerate -> 文本
+    # 【PE 已外置到 WEBUI（2026-11-15 修复①）】—— 这里**不再**有任何
+    # PE 节点（CLIPLoader(PE) / TextGenerate / BatchImagesNode）。
+    # 提示词原样进 TextEncodeQwenImage21 —— 扩写由 WEBUI 的「增强」下拉完成，
+    # 结果写回提示词框，用户可继续编辑。
     #
-    # 【为什么是 TextGenerate 而不是 TextGenerateLTX2Prompt】
-    #   TextGenerateLTX2Prompt 是 LTX2 视频用的节点：它会强制套 Gemma 的
-    #   <|turn|system / <|turn|>user / <|turn|>model 对话模板，
-    #   并在 system 为空时塞入 LTX2 的视频提示词 system prompt
-    #   （comfy_extras/nodes_textgen.py:238-265）。
-    #   官方 Qwen PE 工作流用的是 **TextGenerate** + 官方 PE 自己的
-    #   system prompt（PrimitiveStringMultiline 节点接 system_prompt 输入），
-    #   见 image_qwen_image_2_1_t2i.json / image_qwen_image_2_1_image_edit.json。
-    #   两者混用会得到「用视频提示词规则改写图像提示词」的结果。
-    #
-    # 【PE 双档参数】官方 prompt_rewrite/README + HF model card：
-    #   PE-T2I: presence_penalty=1.5, max_new_tokens=16256
-    #   PE-I2I: presence_penalty=0,   max_new_tokens=24000
-    #   填错不报错，只会让采样分布悄悄变 —— 所以档位随模式写死。
-    #
-    # 【max_length 的坑】官方 ComfyUI 模板把 max_length 压到 4096，
-    #   而模型卡值是 16256/24000。官方文档原文警告：
-    #     "When the reasoning block uses up the 4096 budget, it never closes
-    #      and the enhancer returns an empty string."
-    #   -> 开 thinking 前必须调高 max_length，否则 PE 静默返回空串，
-    #      表现为「编辑几乎原样返回」「文生图丢掉需求」。
-    #   所以这里默认取官方卡值（不压低），并允许用户按需下调换速度。
-    if use_pe:
-        pe = pe_params or QWEN_IMAGE_PE_PARAMS["i2i" if is_edit else "t2i"]
-        pe_inputs = {
-            "clip": ["qw:30", 0],
-            "prompt": prompt,
-            # max_length 上限 32768（TextGenerate 节点 schema），官方卡值 16256/24000 都在范围内
-            "max_length": int(pe.get("max_new_tokens") or 4096),
-            # COMFY_DYNAMICCOMBO_V3 在 API 格式下：主字段是选项 key，
-            # 子输入扁平化成 sampling_mode.xxx
-            "sampling_mode": "on",
-            "sampling_mode.temperature": 1.0,
-            "sampling_mode.top_k": 20,
-            "sampling_mode.top_p": 0.95,
-            "sampling_mode.min_p": 0,
-            "sampling_mode.repetition_penalty": 1,
-            "sampling_mode.seed": 0,
-            # 官方 PE 的 presence_penalty：T2I=1.5 / I2I=0
-            "sampling_mode.presence_penalty": float(pe.get("presence_penalty", 0.0)),
-            # thinking 必须开（官方 PE 模型卡：thinking 必开）
-            "thinking": True,
-            "use_default_template": True,
-            "mtp": "auto",
-        }
-        # 官方 PE 的 system prompt：让 PE 节点用官方那套「观察者式描述」规则，
-        # 而不是模型内置的默认 system prompt。
-        # 文生图档 = PE-T2I 的 system prompt；编辑档 = PE-I2I 的。
-        #
-        # pe_system_prompt：用户在「增强」多选列表里编辑过的版本
-        # （与手动扩写用的是同一份文本 -> 扩写与出图走同一套规则）。
-        # 传 None = 用官方内置模板（向后兼容）。
-        system_prompt = (pe_system_prompt if pe_system_prompt is not None
-                         else _qwen_pe_system_prompt(is_edit))
-        if system_prompt:
-            pe_inputs["system_prompt"] = system_prompt
-        # 参考图也喂给 PE（官方 PE-I2I 工作流就是这么接的）：
-        #   BatchImagesNode(images.image0..imageN) -> TextGenerate.image
-        # 这样 PE 才能「看着图」改写编辑指令，并在输出里写 <image1>/<image2>。
-        # PE checkpoint（qwen3.5_*_pe_*）自带 visual tower，实测权重里有
-        # 549 个 model.visual.* 张量 -> 支持读图。
-        if pe_image_nodes:
-            p["qw:25"] = {
-                "inputs": {f"images.image{i}": [node_id, 0]
-                           for i, node_id in enumerate(pe_image_nodes)},
-                "class_type": "BatchImagesNode",
-            }
-            pe_inputs["image"] = ["qw:25", 0]
-        p["qw:26"] = {"inputs": pe_inputs, "class_type": "TextGenerate"}
-        prompt_ref = ["qw:26", 0]
-    else:
-        prompt_ref = prompt
+    # 【被删掉的那条链路（留档，说明为什么不能恢复）】
+    #   CLIPLoader(PE qwen3.5_*_pe_*) -> TextGenerate(官方 system prompt + thinking)
+    #        -> (编辑档) BatchImagesNode(参考图) -> TextGenerate.image
+    #   -> TextEncodeQwenImage21.prompt
+    # 官方 Qwen PE 工作流确实是这样接的（见 image_qwen_image_2_1_t2i.json /
+    # image_qwen_image_2_1_image_edit.json），但把它留在出图链路里就必然
+    # 与 WEBUI 的「增强」重复：用户手动扩写一次，出图时再扩写一次。
+    # 官方档位参数（PE-T2I: presence_penalty=1.5 / max_new_tokens=16256；
+    # PE-I2I: presence_penalty=0 / max_new_tokens=24000）现在**只**作用于
+    # WEBUI 侧的 /api/qwen-pe/expand（见 h3studio/qwen_pe.py），
+    # 两边共用同一套 checkpoint、同一套 system prompt、同一套采样参数。
+    prompt_ref = prompt
 
     # 文本编码
     te_inputs = {
@@ -1786,21 +1728,16 @@ def build_qwen_t2i(params):
     loras = _qwen_collect_loras(params)
     prompt = merge_lora_triggers(prompt, loras)
 
-    # PE 开关：关掉 PE 就跳过提示词扩写，提示词原样进模型
-    use_pe = bool(params.get("use_pe", True))
-    pe_clip = model["clip_t2i"]
+    # 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+    # 这里**不再**读 params["use_pe"]，也不再传 PE 节点参数 ——
+    # 工作流内不存在任何 PE 动作，提示词原样进模型。
+    # 官方 PE 档位参数（presence_penalty / max_new_tokens）由 WEBUI 侧
+    # /api/qwen-pe/expand 独占使用。
     cond_clip = QWEN_IMAGE_CLIP_COND
-    # PE-T2I 档（presence_penalty=1.5 / max_new_tokens=16256）
-    pe_params = dict(QWEN_IMAGE_PE_PARAMS["t2i"])
-    _apply_pe_overrides(pe_params, params.get("pe_params"))
-    # 用户在「增强」多选列表里编辑过的官方 PE system prompt（None = 官方内置）
-    pe_system_prompt = params.get("pe_system_prompt")
 
-    return _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
+    return _qwen_common_nodes(model, cond_clip, width, height, seed, sampler,
                                scheduler, steps, cfg, shift, negative_text,
-                               prompt, job_id, loras=loras, use_pe=use_pe,
-                               pe_params=pe_params,
-                               pe_system_prompt=pe_system_prompt)
+                               prompt, job_id, loras=loras)
 
 
 def build_qwen_i2i(params):
@@ -1857,23 +1794,15 @@ def build_qwen_i2i(params):
     loras = _qwen_collect_loras(params)
     prompt = merge_lora_triggers(prompt, loras)
 
-    # PE 开关：关掉 PE 就跳过提示词扩写，提示词原样进模型
-    use_pe = bool(params.get("use_pe", True))
-    pe_clip = model["clip_i2i"]
+    # 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+    # 这里**不再**读 params["use_pe"]，也不再传 PE 节点参数 ——
+    # 工作流内不存在任何 PE 动作，提示词原样进模型。
     cond_clip = QWEN_IMAGE_CLIP_COND
-    # PE-I2I 档（presence_penalty=0 / max_new_tokens=24000）
-    pe_params = dict(QWEN_IMAGE_PE_PARAMS["i2i"])
-    _apply_pe_overrides(pe_params, params.get("pe_params"))
-    # 用户在「增强」多选列表里编辑过的官方 PE system prompt（None = 官方内置）
-    pe_system_prompt = params.get("pe_system_prompt")
 
     # ---- 第一步：把参考图做成 LoadImage 节点 -------------------------
     #
-    # 参考图**必须先建节点**，因为它有两个去向：
-    #   1. TextEncodeQwenImage21 的 images 输入（模型看图）
-    #   2. TextGenerate（PE 扩写）的 image 输入（PE 看图，
-    #      官方 PE-I2I 工作流就是这么接的：
-    #      BatchImagesNode -> TextGenerate.image）
+    # 参考图**必须先建节点**，因为它要接进
+    # TextEncodeQwenImage21 的 images 输入（模型看图）。
     #
     # 【API 格式：必须用扁平点号键，不能用嵌套字典】—— 实测结论（2026-11-08）
     #   TextEncodeQwenImage21 的 images 是 COMFY_AUTOGROW_V3，ComfyUI 在
@@ -1907,13 +1836,10 @@ def build_qwen_i2i(params):
         ref_nodes.append(node_id)
         ref_files.append(filename)
 
-    # ---- 第二步：建公共链路（PE 节点会用到参考图节点） ----------------
-    p = _qwen_common_nodes(model, pe_clip, cond_clip, width, height, seed, sampler,
+    # ---- 第二步：建公共链路 -------------------------------------------
+    p = _qwen_common_nodes(model, cond_clip, width, height, seed, sampler,
                             scheduler, steps, cfg, shift, negative_text,
-                            prompt, job_id, loras=loras, is_edit=True, use_pe=use_pe,
-                            pe_params=pe_params,
-                            pe_system_prompt=pe_system_prompt,
-                            pe_image_nodes=(ref_nodes if use_pe else None))
+                            prompt, job_id, loras=loras, is_edit=True)
 
     # ---- 第三步：把 LoadImage 节点挂进工作流 -------------------------
     # 参考图 -> LoadImage -> TextEncodeQwenImage21 的 images 输入

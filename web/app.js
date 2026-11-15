@@ -200,16 +200,17 @@ const state = {
     scheduler: "simple",
     negative: "",
     batchCount: 1,
-    // 官方 PE 提示词扩写：出图时**始终**走官方 PE 接线（官方最佳实践）。
-    // 「手动扩写」入口已并入「增强」下拉菜单（「qwen21图片官方增强PE」），
-    // 不再是面板上的独立勾选框 —— 避免两处开关语义打架。
-    usePe: true,
+    // 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+    // 出图链路里**不再**有「是否再扩写一次」的开关（usePe 已删除）：
+    //   提示词扩写只由「增强」下拉里的官方 PE 项做一次，结果写回提示词框，
+    //   出图时提示词原样进模型 —— 不存在「二次扩写」这条路。
     // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
     // 由「增强」多选列表里官方 PE 那一项**自动套用**（选中即套用，可再改）。
     // 多项共存时是叠加结果 —— 后一项不会清掉前一项已套用的参数。
+    // 这些参数现在**只**作用于扩写那一次（/api/qwen-pe/expand）。
     peParams: null,
     // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
-    // 与手动扩写用同一份文本 -> 扩写与出图走同一套规则。
+    // 扩写侧自己带 —— 不再随出图参数回传（出图链路已无 PE 节点）。
     peSystemPrompt: "",
     loras: [],
     // 参考图（图片编辑用）**已搬到 web/qwen-refs.js**（window.QwenRefs）——
@@ -3246,26 +3247,12 @@ $("#genBtn").addEventListener("click", async () => {
         trigger: l.trigger !== undefined && l.trigger !== null ? l.trigger : "",
       }));
     if (isQwenMode()) {
-      // Qwen-Image 2.1：出图时是否再走一次官方 PE 扩写。
-      // 默认 true（官方最佳实践，官方工作流就是这么走的）；
-      // 用户在「增强」下拉里手动跑过「qwen21图片官方增强PE」后变 false ——
-      // 此时提示词框里已经是官方 PE 结果，再扩一次会冲掉用户的编辑。
-      params.use_pe = !!state.imgQwen.usePe;
-      // 官方 PE 的档位参数（presence_penalty / max_new_tokens）：
-      // 由「增强」多选列表里官方 PE 那一项自动套用（选中即套用，可再改）。
-      // 多项共存时是**叠加**结果，后一项不会清掉前一项已套用的参数。
-      if (state.imgQwen.peParams) {
-        params.pe_params = {
-          presence_penalty: state.imgQwen.peParams.presence_penalty,
-          max_new_tokens: state.imgQwen.peParams.max_new_tokens,
-        };
-      }
-      // 官方 PE 的 system prompt（用户在「增强」多选列表里编辑过的那份）：
-      // 与手动扩写用的是同一份文本 -> 扩写与出图走同一套规则。
-      const peSp = state.imgQwen.peSystemPrompt;
-      if (peSp && String(peSp).trim()) {
-        params.pe_system_prompt = String(peSp);
-      }
+      // 【PE 已外置到 WEBUI（2026-11-15 修复①）】
+      // 这里**不再**提交 params.use_pe —— 工作流内已无 PE 节点，
+      // 提示词原样进模型（扩写只在「增强」下拉里做一次）。
+      // 官方 PE 的档位参数（presence_penalty / max_new_tokens）不再随
+      // 出图提交 —— 它们只作用于 WEBUI 侧 /api/qwen-pe/expand 那一次扩写。
+      // 官方 PE 的 system prompt 同理（扩写侧自己带，不回传给出图链路）。
     }
     if (isMossMode()) {
       // MOSS-Image：SLG（SkipLayerGuidance）skip layer —— 官方推荐 22，空 = 关

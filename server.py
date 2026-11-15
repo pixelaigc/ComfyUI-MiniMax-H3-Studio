@@ -6887,6 +6887,9 @@ async def api_enhance(request):
             attempts.append(ceiling)
 
         last = None
+        # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
+        # 在循环外初始化：attempts 至少有一次，但保持「一定已绑定」更稳。
+        pe_ratio = ""
         for attempt_idx, mt in enumerate(attempts):
             try:
                 res = await llm_client.call_provider_full(
@@ -6912,6 +6915,12 @@ async def api_enhance(request):
                     {"error": "模型返回了空内容，未做修改",
                      "provider": item["name"],
                      "degraded": True}, status=502)
+            # 【JSON 契约解包（2026-11-15 修复①）】
+            # H3-Image 官方 PE 的 task prompt 要求模型输出一个两键 JSON
+            # （expanded_caption + 比例键），而写回提示词框要的是**纯文本**。
+            # 这里解包：caption 进提示词框，比例单独回给调用方。
+            # 非 JSON 契约的模板原样通过（不动其它面板的行为）。
+            enhanced, pe_ratio = enh.unwrap_json_contract(enhanced, spec_id)
             # 小模型可能把系统提示词复读回来 —— 这不是有效的提示词，按失败处理
             #
             # 【2026-11-11】错误文案要**可读、可操作**：
@@ -7005,6 +7014,11 @@ async def api_enhance(request):
         "used_multimodal": bool(images),
         "validation": validation,
         "elements": elements,
+        # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
+        # H3-Image 官方 PE 会自己选比例；解包后单独回给前端，
+        # 前端可据此提示用户「PE 建议的比例是 X」。
+        # 非 JSON 契约模板恒为空串。
+        "pe_aspect_ratio": pe_ratio or "",
         # 要素覆盖 + 截断检测结果（前端可显示保留率）
         "coverage": coverage,
         "finish_reason": finish_reason,
@@ -7309,7 +7323,7 @@ async def api_h3image_pe_expand(request):
         async with ClientSession(timeout=ClientTimeout(total=HTTP_TIMEOUT.total)) as session:
             result = await h3image_pe.run_pe_expansion(
                 session, COMFY, original, ref_images or None,
-                task_prompt=task_prompt)
+                task_prompt=task_prompt, is_edit=is_edit)
     except h3image_pe.PEError as exc:
         return web.json_response(
             {"error": str(exc), "degraded": True}, status=502)
