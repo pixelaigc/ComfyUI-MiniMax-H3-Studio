@@ -35,13 +35,15 @@ TARGETS = [
 ]
 #: 顺带带上一个**已知可用**的 MOSS LoRA 作为正对照
 # 正对照：MOSS 的 LoRA（挂到 SDXL 上必然 0，但证明探针链路本身是活的）
-CONTROL = LORAS / "ipadapter" / "ip-adapter-faceid-plusv2_sd15_lora.safetensors"
+CONTROL = LORAS / "ipadapter" / "ip-adapter-faceid-plusv2_sdxl_lora.safetensors"
 
 BASES = {
     "qwen_image_2.1_bf16":
         "/home/ubuntu/comfyui/models/diffusion_models/qwen_image_2.1_bf16.safetensors",
     "sd_xl_base_unet_fp16":
         "/home/ubuntu/comfyui/models/diffusion_models/sd_xl_base_unet_fp16.safetensors",
+    "Qwen_Image_Edit_2509_FP8":
+        "/mnt/nvme1t_colorful/comfyui-models/diffusion_models/Qwen_Image_Edit_2509_FP8.safetensors",
 }
 
 
