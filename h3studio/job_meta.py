@@ -109,6 +109,92 @@ def _accel_lora_display(key: str) -> str:
     return key or ""
 
 
+#: 加载节点「未知」的显示值。
+#:
+#: 【为什么不回落成 Turbo 节点】见 _accel_lora_loader_of 的说明。
+ACCEL_LOADER_UNKNOWN = "未知"
+
+
+def _accel_lora_key_for_any_form(value: str) -> str:
+    """把「任意形态」的加速 LoRA 标识归一到本机清单的目录 key。
+
+    归一（**保守、不编造**）按顺序试三种形态：
+      1. 直接就是目录 key（如 "ckpt850" / "lightx2v_4step_768p"）；
+      2. 完整权重文件名（含目录前缀与扩展名，如
+         "h3_lightx2v/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors"）；
+      3. **裸权重名**（无扩展名，如 "minimax_h3_turbo_4step_ema_ckpt850"）——
+         这是**存量落库数据**的实际形态（实测 253/253 个 job 的
+         params["accel_lora"] 都是裸名），工作流构建器按裸名去
+         find_weight() 也能找到文件，所以它是**真实有效**的标识。
+
+    归一不到 -> 返回 ""（调用方据实显示，不编造 key）。
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    # 形态 1：已经是目录 key
+    if vmodels.accel_lora_meta(text):
+        return text
+    # 形态 2 / 3：先试完整文件名，再试裸名
+    from . import artifact_meta as am
+    key = am.lora_key_for_weight(text)
+    if key:
+        return key
+    cleaned = am._clean_weight_name(text)
+    if cleaned and cleaned != text:
+        key = am.lora_key_for_weight(cleaned)
+        if key:
+            return key
+    # 裸名 -> 与清单里各枚的「清洗名」逐一比对
+    for table in (getattr(vmodels, "VIDEO_ACCEL_LORAS", {}) or {},
+                  getattr(vmodels, "VIDEO_ACCEL_LORA_COMBOS", {}) or {}):
+        for cand_key, meta in table.items():
+            if not isinstance(meta, dict):
+                continue
+            name = str(meta.get("name") or "")
+            if name and am._clean_weight_name(name) == cleaned:
+                return cand_key
+    return ""
+
+
+def _accel_lora_loader_of(value: str) -> str:
+    """加速 LoRA 标识 -> **实际使用的加载节点**（显示层口径）。
+
+    【D-4 根因与修法】
+    旧实现直接 `vmodels.detect_accel_lora_loader(meta["name"])`，
+    而 meta 来自 `accel_lora_meta(key)` —— 当 key 是**权重名形式**
+    （存量落库数据的实际形态）时，meta 返回 None ->
+    detect_accel_lora_loader("") 走「读不到文件 -> 保守回落 Turbo 节点」
+    分支 -> **显示 Turbo 节点**，而工作流实际挂的是核心 LoraLoaderModelOnly。
+
+    实测：534 个 job 里有 26 条卡片显示的加载节点与工作流实际相反
+    （LightX2V×13 / DMAD×9 / 更好运动×2 / SLA×1 / 中文名×1）。
+
+    修法：
+      1. 先用 `_accel_lora_key_for_any_form` 把权重名归一到目录 key，
+         再查清单拿**真实权重名** -> detect 出的加载节点必然与工作流一致；
+      2. 归一不到 -> 显示「未知」，**不回落 Turbo 节点**
+         （回落即谎报：会把「不知道」说成「用 Turbo 节点加载」，
+          而 Turbo 节点加载失败会打日志、核心节点失败是静默的 ——
+          正是这个保守回落造成了误导性显示）。
+
+    【为什么不改 detect_accel_lora_loader 本身】
+    那个函数的保守回落是**工作流构建侧**的正确防御（宁可要一个
+    能看见的失败，也不要静默失败）。显示侧要的是「事实」，
+    两边语义不同，故在显示层单独归一，不动工作流侧。
+    """
+    key = _accel_lora_key_for_any_form(value)
+    if not key:
+        return ACCEL_LOADER_UNKNOWN
+    meta = vmodels.accel_lora_meta(key)
+    if not meta:
+        return ACCEL_LOADER_UNKNOWN
+    name = str(meta.get("name") or "")
+    if not name:
+        return ACCEL_LOADER_UNKNOWN
+    return vmodels.detect_accel_lora_loader(name)
+
+
 def accel_lora_display_name(key: str) -> str:
     """加速 LoRA key -> 面板上显示的那个 display（**公开**入口）。
 
@@ -325,9 +411,10 @@ def _t2v_summary(params: dict) -> dict:
         out["lora_name"] = str(meta.get("name") or "")
         out["lora_strength"] = float(slot_strength)
         out["lora_key"] = slot_key
-        # 加载节点（Turbo / 核心 LoraLoader）—— 便于排查静默失效
-        out["accel_lora_loader"] = vmodels.detect_accel_lora_loader(
-            str(meta.get("name") or ""))
+        # 加载节点（Turbo / 核心 LoraLoader）—— 便于排查静默失效。
+        # 【D-4】用显示层归一口径：权重名形式的 key 也能归一到目录 key，
+        # 拿真实权重名去 detect -> 显示与工作流实际挂载一致。
+        out["accel_lora_loader"] = _accel_lora_loader_of(slot_key)
 
     # 「工作流挂的那枚」—— 独立于「用户选的那枚」：
     #   * 新记录：两者相同（服务端归一时同步了 fixed_accel_lora）
@@ -941,6 +1028,17 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
                 out["lora_strength"] = float(params.get("lora_strength", 1.0))
             except (TypeError, ValueError):
                 out["lora_strength"] = 1.0
+            # 【D-4】加载节点 —— 显示实际使用的那个。
+            # 【为什么这里也要按「实际生效的那枚」而不是旧 key】
+            # 存量数据里**同时**有旧 key params["lora"] 与新字段
+            # params["accel_lora"] 的 job 实测有 15 个（如
+            # 09baa05e717a: lora="ckpt850" + accel_lora=
+            # "minimax_h3_turbo_4step_ema_ckpt850"）。此时工作流实际挂的是
+            # **新字段**那枚（resolve_accel_lora_slot 优先读 accel_lora），
+            # 旧 key 只是历史遗留。所以加载节点必须按新字段算 ——
+            # 否则会显示成「旧 key 那枚的加载节点」，与实际相反。
+            loader_source = str(params.get("accel_lora") or "").strip() or real
+            out["accel_lora_loader"] = _accel_lora_loader_of(loader_source)
         else:
             # 【h3-model-meta】白名单外的值 —— 如实当「没有 LoRA」。
             # 脏值记进 lora_rejected 留证据，但**绝不当 LoRA 展示**。
@@ -1025,8 +1123,10 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
                 out["lora_strength"] = 1.0
             # 加载节点（Turbo / 核心 LoraLoader）—— 与 _t2v_summary 同口径，
             # 便于排查「选了但不生效」。
-            out["accel_lora_loader"] = vmodels.detect_accel_lora_loader(
-                str(meta.get("name") or ""))
+            # 【D-4】用显示层归一口径：存量数据的 accel_lora 存的是
+            # **权重名**形式（实测 253/253 个 job），归一到目录 key 后
+            # 拿真实权重名去 detect -> 显示与工作流实际挂载一致。
+            out["accel_lora_loader"] = _accel_lora_loader_of(slot_key)
         else:
             # 【明确「不挂加速 LoRA」】新面板的 accel_lora="" / accel_loras=[]
             # 会让 resolve_accel_lora_slot 返回空串 -> 这里**不显示任何 LoRA**，

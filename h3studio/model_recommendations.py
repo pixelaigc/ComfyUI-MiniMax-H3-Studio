@@ -368,6 +368,226 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "区间本身写在 note 里。采样器/调度器作者未提供。"
         ),
     )),
+
+    # ==============================================================
+    # 【2026-11-16 补 —— A1 引入的 4 枚加速 LoRA】
+    #
+    # 【为什么补这 4 条】A1 提交 0616abb 把 accel_loras 从 8 枚扩到 12 枚
+    # （新增 turbo_4step_cn / turbo_4step_cn_ema /
+    #   lightx2v_4step_v01_comfy / lightx2v_sla_768p_root），
+    # 但**没有同步本表** -> 这 4 枚在前端下拉的 tooltip 里
+    # 「作者推荐参数」整段缺失（其余 8 枚都有）。
+    #
+    # 【来源纪律】只用**可追溯的第一手依据**：
+    #   * 权重自身的 `__metadata__`（作者写进权重里的说明）；
+    #   * 同一家族**已有条目**已验证的作者规格（同一作者的同族权重，
+    #     规格表里同一行 —— 但只在该族**同规格档位**时才沿用）。
+    # 任何一项没有依据就写 None（前端显示「作者未提供」），
+    # **不编造采样参数**。
+    # ==============================================================
+
+    # ---- turbo_4step_cn / turbo_4step_cn_ema ----
+    # 作者依据（本机权重 __metadata__，第一手）：
+    #   sampler_steps: 4
+    #   base_model: MiniMax-H3
+    #   compatible_base: MiniMax-H3 non-pruned bf16 or int8_convrot
+    #   incompatible_base: MiniMax-H3 pruned_* (AdaLN input is 8, LoRA input is 2688)
+    #   comfyui_loader: Load LoRA (Bypass, Model Only)
+    #   comfyui_key_prefix: diffusion_model.
+    #   conversion_source_file: minimax_h3_turbo_4步加速.safetensors
+    #   conversion_tool: convert_minimax_h3_lora_for_comfyui.py
+    # 作者**没有**写 scheduler / sampler / shift -> 那三项写 None。
+    # shift 用 ComfyUI 的 H3 模型硬性值 12/3（supported_models.py:992-993），
+    # 标 `comfyui`（不是作者提供）。
+    "turbo_4step_cn": _normalize(_rec(
+        steps=4,
+        scheduler=None,
+        sampler=None,
+        shift_video=12.0,
+        shift_audio=3.0,
+        base_model="MiniMax-H3（非剪枝 bf16 / int8_convrot）",
+        source_kind="author",
+        source=(
+            "/mnt/usb2t/comfyui-models/loras/"
+            "minimax_h3_turbo_4步加速_comfyui.safetensors 的 __metadata__："
+            "sampler_steps = 「4」；base_model = 「MiniMax-H3」；"
+            "compatible_base = 「MiniMax-H3 non-pruned bf16 or int8_convrot」；"
+            "incompatible_base = 「MiniMax-H3 pruned_* (AdaLN input is 8, "
+            "LoRA input is 2688)」；comfyui_loader = 「Load LoRA (Bypass, "
+            "Model Only)」；comfyui_key_prefix = 「diffusion_model.」；"
+            "conversion_source_file = 「minimax_h3_turbo_4步加速.safetensors」；"
+            "conversion_tool = 「convert_minimax_h3_lora_for_comfyui.py」"
+            " + /home/ubuntu/comfyui/comfy/supported_models.py:992-993（H3 内生 shift）"
+        ),
+        field_sources={
+            # 步数：作者写进权重元数据（sampler_steps=4）
+            "steps": "author",
+            # 调度器 / 采样器：作者未写
+            "scheduler": "not_provided",
+            "sampler": "not_provided",
+            # shift：作者未写，用 ComfyUI 的 H3 模型硬性值
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            # 适用底模：作者写明（compatible_base / incompatible_base）
+            "base_model": "author",
+        },
+        note=(
+            "官方 Turbo 4 步蒸馏权重的**中文名发行版**（源文件 "
+            "minimax_h3_turbo_4步加速.safetensors，由 "
+            "convert_minimax_h3_lora_for_comfyui.py 转换）。"
+            "作者写明步数 4 与适用底模，**但没写 scheduler / sampler / shift** "
+            "-> 那三项如实标「作者未提供 / ComfyUI 模型硬性值」。"
+            "**键名带 diffusion_model. 前缀** -> 必须用核心 "
+            "LoraLoaderModelOnly 加载（Turbo 节点一个都 patch 不上）。"
+            "作者明确写 incompatible_base = pruned_*（AdaLN 输入 8 vs "
+            "LoRA 输入 2688）—— 剪枝底模下核心节点没有 Turbo 节点那套"
+            "运行期 AdaLN 重注入机制，**配未剪枝底模**（bf16 / int8_convrot）"
+            "才是完整命中。"
+        ),
+    )),
+    "turbo_4step_cn_ema": _normalize(_rec(
+        steps=4,
+        scheduler=None,
+        sampler=None,
+        shift_video=12.0,
+        shift_audio=3.0,
+        base_model="MiniMax-H3（非剪枝 bf16 / int8_convrot）",
+        source_kind="author",
+        source=(
+            "/mnt/usb2t/comfyui-models/loras/"
+            "minimax_h3_turbo_4步加速ema_comfyui.safetensors 的 __metadata__："
+            "sampler_steps = 「4」；base_model = 「MiniMax-H3」；"
+            "compatible_base = 「MiniMax-H3 non-pruned bf16 or int8_convrot」；"
+            "incompatible_base = 「MiniMax-H3 pruned_* (AdaLN input is 8, "
+            "LoRA input is 2688)」；comfyui_loader = 「Load LoRA (Bypass, "
+            "Model Only)」；comfyui_key_prefix = 「diffusion_model.」；"
+            "conversion_source_file = 「minimax_h3_turbo_4步加速ema.safetensors」"
+            " + /home/ubuntu/comfyui/comfy/supported_models.py:992-993（H3 内生 shift）"
+        ),
+        field_sources={
+            "steps": "author",
+            "scheduler": "not_provided",
+            "sampler": "not_provided",
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            "base_model": "author",
+        },
+        note=(
+            "Turbo 4 步的中文名 **EMA** 权重（源文件 "
+            "minimax_h3_turbo_4步加速ema.safetensors）。"
+            "作者写明的规格与 turbo_4step_cn **同族同值**（步数 4、"
+            "适用非剪枝底模、键名带 diffusion_model. 前缀）-> 逐项沿用同一族"
+            "的来源，不另编。调度器 / 采样器 / shift 作者未写。"
+        ),
+    )),
+
+    # ---- lightx2v_4step_v01_comfy ----
+    # 作者依据（本机权重 __metadata__，第一手）：
+    #   source: .../dmd_minimax_h3_t2va4/checkpointing/00000650/gen-base_dit.pt
+    #   baked_scale: 0.125（peft alpha/r=0.125 baked into lora_B）
+    #   converted_layout: comfyui_minimax_h3
+    #   无 base_model / 无 sampling 字段 -> 作者**没有**给采样参数。
+    # 这枚是 **DMD 蒸馏**（源路径 dmd_minimax_h3_t2va4）-> 步数 4 是
+    # 该蒸馏族的固有属性；shift 沿用**同族已有条目** lightx2v_4step_768p
+    # 的 768p 档 shift 6/3（同一作者 ModelTC/Minimax-H3-Turbo 规格表）。
+    "lightx2v_4step_v01_comfy": _normalize(_rec(
+        steps=4,
+        scheduler=None,
+        sampler="euler",
+        shift_video=6.0,
+        shift_audio=3.0,
+        base_model="Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）",
+        source_kind="author",
+        source=(
+            "/mnt/usb2t/comfyui-models/loras/"
+            "minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors "
+            "的 __metadata__：source = 「.../dmd_minimax_h3_t2va4/"
+            "checkpointing/00000650/gen-base_dit.pt」（DMD 4 步蒸馏）；"
+            "baked_scale = 「0.125」（peft alpha/r=0.125 baked into lora_B）；"
+            "converted_layout = 「comfyui_minimax_h3」"
+            " + 同族已有条目 lightx2v_4step_768p 的作者规格表"
+            "（ModelTC/Minimax-H3-Turbo README「1. Model specs」）："
+            "「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p | 6 / 3 | 4 | 4」"
+            " -> 同族 768p 档的 shift 6/3 与 NFE 4；采样器「Sampler defaults to `euler`.」"
+        ),
+        field_sources={
+            # 步数 4：DMD 4 步蒸馏（源路径 dmd_..._t2va4）+ 同族规格表 NFE 4
+            "steps": "author",
+            # 调度器：作者未提供
+            "scheduler": "not_provided",
+            # 采样器：作者规格表「Sampler defaults to euler」
+            "sampler": "author",
+            # shift 6/3：同族 768p 档的作者规格表（不是 H3 内生的 12/3）
+            "shift_video": "author",
+            "shift_audio": "author",
+            # 底模：同族规格表的 base_model
+            "base_model": "author",
+        },
+        note=(
+            "LightX2V Turbo 4 步 **v0.1 的 comfy 打包版**"
+            "（源 checkpoint 是 DMD 4 步蒸馏 `dmd_minimax_h3_t2va4`）。"
+            "作者规格表里 v0.1 与 v1.0 的 768p 档同属一行规格"
+            "（shift 6/3、NFE 4、采样器默认 euler）-> 逐项沿用"
+            "**同族已有条目** lightx2v_4step_768p 的已验证来源，不另编。"
+            "调度器作者未提供。"
+            "**shift 是 6/3（768p 系列），不是 H3 内生的 12/3。**"
+        ),
+    )),
+
+    # ---- lightx2v_sla_768p_root ----
+    # 这枚与已有条目 lightx2v_4step_sla_768p 是**同一份权重**的
+    # 两个登记位（目录版 vs 根目录版）-> 规格完全相同，
+    # 逐项沿用同族已有条目的作者规格（HF lightx2v/Minimax-h3-Turbo-SLA
+    # 模型卡：video_flow_shift 6.0 / audio_flow_shift 3.0 /
+    # h3_step_update training_euler / 4-step distillation / 768p FL2V）。
+    "lightx2v_sla_768p_root": _normalize(_rec(
+        steps=4,
+        scheduler=None,
+        sampler="euler",
+        shift_video=6.0,
+        shift_audio=3.0,
+        base_model="Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）",
+        source_kind="author",
+        source=(
+            "/mnt/usb2t/comfyui-models/loras/"
+            "minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors "
+            "的 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 "
+            "minimax_h3_fl2va_bf16.safetensors」；training_rank = 「128」；"
+            "training_alpha = 「128.0」；training_scale = 「1.0」"
+            " + 同族已有条目 lightx2v_4step_sla_768p 的作者模型卡"
+            "（HF lightx2v/Minimax-h3-Turbo-SLA）："
+            "「Key SLA-related settings in this configuration include: "
+            "{ attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: "
+            "{ sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, "
+            "audio_flow_shift: 3.0, h3_step_update: training_euler }」"
+            " + 「**4-step distillation**」+「**768p FL2V** generation support」"
+        ),
+        field_sources={
+            # 步数 4：作者模型卡「4-step distillation」
+            "steps": "author",
+            # 调度器：作者未提供
+            "scheduler": "not_provided",
+            # 采样器：作者写的是 training_euler（训练时 step update 规则）
+            # -> 面板采样器按同族 spec 表「Sampler defaults to euler」
+            "sampler": "author",
+            # shift 6/3：作者模型卡给的 video_flow_shift / audio_flow_shift
+            "shift_video": "author",
+            "shift_audio": "author",
+            # 底模：权重 __metadata__ 的 base_model
+            "base_model": "author",
+        },
+        note=(
+            "与 h3_lightx2v/ 目录里那份**同名同规格**的 SLA 权重"
+            "（键名形态一致），此处登记**根目录**那一份 —— "
+            "它是该目录版之外真实存在的第二份文件。"
+            "作者模型卡给的规格（4 步蒸馏 / shift 6/3 / 85% 稀疏率 / "
+            "sage2 / RTX 5090 实测约 2.5× 加速）**与同族已有条目完全相同**"
+            " -> 逐项沿用同一份已验证来源，不另编。"
+            "作者写的是 `training_euler`（训练时 step update 规则），"
+            "不是 ComfyUI 的 KSamplerSelect 取值 -> 面板采样器仍选 `euler`。"
+            "调度器作者未提供。"
+        ),
+    )),
 }
 
 

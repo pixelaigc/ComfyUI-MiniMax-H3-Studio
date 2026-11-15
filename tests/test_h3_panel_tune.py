@@ -552,16 +552,21 @@ class TestDmadDefaultStrength(unittest.TestCase):
         self.assertEqual(meta["recommended_strength"], 1.0)
 
     def test_options_payload_carries_one(self):
+        # 【2026-11-16 迁移】加速 LoRA 已统一成**单一 accel_loras 结构**
+        # （options_payload 的 accel_lora_combos 现在为空 —— 那是旧
+        # 「固定枚 + 组合枚」双结构的遗留键）。断言改读 accel_loras。
         payload = VM.options_payload()
-        by_key = {c["key"]: c for c in payload["accel_lora_combos"]}
+        by_key = {c["key"]: c for c in payload["accel_loras"]}
         self.assertEqual(by_key["dmad_4step_critic"]["recommended_strength"], 1.0)
 
     def test_fallback_manifest_carries_one(self):
-        m = re.search(r"window\.VIDEO_PANEL_FALLBACK\s*=\s*(\{.*\});?\s*$",
+        # 【2026-11-16 迁移】同上：前端 FALLBACK manifest 现在用
+        # accel_loras（旧的 accel_lora_combos 键已不存在）。
+        m = re.search(r"window\.VIDEO_PANEL_FALLBACK\s*=\s*(\{.*?\});?\s*$",
                       FALLBACK_JS, re.S)
         self.assertIsNotNone(m)
         data = json.loads(m.group(1))
-        by_key = {c["key"]: c for c in data["accel_lora_combos"]}
+        by_key = {c["key"]: c for c in data["accel_loras"]}
         self.assertEqual(by_key["dmad_4step_critic"]["recommended_strength"], 1.0)
 
     def test_switching_lora_resets_strength_to_recommended(self):
