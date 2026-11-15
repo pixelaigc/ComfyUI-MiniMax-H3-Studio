@@ -376,14 +376,18 @@ class TestFrontendRendersSummary(unittest.TestCase):
             'lora: state.model === "lora" ? state.lora : "none",\n'
             '    lora_strength: state.loraStrength,',
             APP_JS_CODE)
-        self.assertIn('if (mode === "flf" || mode === "r2v") {', APP_JS_CODE)
+        # 【2026-11-15 修复③ 交付项 3】三个视频模式共用同一套面板后，
+        # flf/r2v 分支成了 t2v 分支的 `else if`。
+        self.assertIn('else if (mode === "flf" || mode === "r2v") {', APP_JS_CODE)
         # 【2026-11-14】旧路径现在也走**统一槽位**：
         # 提交 accel_lora（key）+ accel_lora_strength，
         # params.lora 只是从槽位派生的兼容镜像（不再是独立输入源）。
-        self.assertIn('params.accel_lora = accelKey;', APP_JS_CODE)
-        self.assertIn('params.accel_lora_strength = state.loraStrength;',
+        # 【2026-11-15 修复③】槽位的值改由**共享面板**给出
+        # （VIDEO_PANEL.submitParams()），不再读旧面板的 state.loraStrength。
+        self.assertIn('params.accel_lora = firstAccel ? firstAccel.key : "";',
                       APP_JS_CODE)
-        self.assertIn('params.lora = accelKey || "none";', APP_JS_CODE)
+        self.assertIn('params.accel_lora_strength = firstAccel', APP_JS_CODE)
+        self.assertIn('params.lora = params.accel_lora || "none";', APP_JS_CODE)
 
 
 class TestServerWiresModelInfo(unittest.TestCase):

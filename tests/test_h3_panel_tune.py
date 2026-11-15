@@ -879,12 +879,21 @@ class TestReuseParamsResolution(unittest.TestCase):
     """第 7 项：复用参数后分辨率（宽高 + 尺寸预设档位）正确回填。"""
 
     def test_apply_config_recomputes_size_preset_key(self):
-        """applyConfig 回填宽高后必须**重算**档位（核心修复）。"""
-        body = _js_function_body(PANEL_JS, "function applyConfig(")
+        """applyConfig 回填宽高后必须**重算**档位（核心修复）。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        applyConfig 现在是「按模式分发」的薄壳（先取 mode_configs 片段，
+        再交给 applyModeConfig 落地）；真正回填宽高 + 重算档位的逻辑
+        在 **applyModeConfig** 里。断言跟着搬过去。
+        """
+        body = _js_function_body(PANEL_JS, "function applyModeConfig(")
         self.assertIn("presetKeyForSize", body,
-                      "applyConfig 必须按宽高重算尺寸预设档位")
+                      "applyModeConfig 必须按宽高重算尺寸预设档位")
         self.assertIn("videoState.sizePresetKey = presetKeyForSize(",
                       body)
+        # 外壳必须真的把片段交给 applyModeConfig（否则重算逻辑永远不跑）
+        shell = _js_function_body(PANEL_JS, "function applyConfig(")
+        self.assertIn("applyModeConfig(", shell)
 
     def test_preset_key_helper_exists(self):
         body = _js_function_body(PANEL_JS, "function presetKeyForSize(")
@@ -893,8 +902,12 @@ class TestReuseParamsResolution(unittest.TestCase):
         self.assertIn("p.height", body)
 
     def test_stale_preset_key_is_rejected(self):
-        """配置里带的档位 key 与宽高不一致时，必须以宽高为准。"""
-        body = _js_function_body(PANEL_JS, "function applyConfig(")
+        """配置里带的档位 key 与宽高不一致时，必须以宽高为准。
+
+        【2026-11-15 修复③ 交付项 3 更新】
+        逻辑搬到 applyModeConfig（见上一条的说明）。
+        """
+        body = _js_function_body(PANEL_JS, "function applyModeConfig(")
         self.assertIn("preset.width === videoState.width", body)
         self.assertIn("preset.height === videoState.height", body)
 
