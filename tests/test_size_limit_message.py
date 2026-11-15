@@ -63,7 +63,9 @@ class TestSizeLimitMessage(unittest.TestCase):
             2560, 1440, max_pixels=max_pixels, strict_over_limit=True, mode="t2v")
         self.assertTrue(reasons, "2560x1440 应当触发 t2v 超限提示")
         msg = reasons[0]
-        self.assertIn("2M", msg, f"文生视频的文案没写 2M：{msg}")
+        # 上限是 2.0 MP —— 文案里的数字必须与 max_pixels 一致
+        self.assertIn(f"{max_pixels:g}M", msg,
+                      f"文生视频的文案 MP 数与实际上限 {max_pixels}MP 不符：{msg}")
         self.assertIn("文生视频", msg, f"文生视频的文案没说模式名：{msg}")
 
     def test_message_limit_number_matches_actual_limit(self):
