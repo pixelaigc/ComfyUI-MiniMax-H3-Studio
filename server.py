@@ -1613,6 +1613,31 @@ class Worker:
                             image_inputs[key] = await comfy_upload_image(session, lp)
                     params["first_frame"] = image_inputs.get("first_frame")
                     params["last_frame"] = image_inputs.get("last_frame")
+                    # 【2026-11-15 补齐 —— 缺口 1 的 flf 半边】
+                    # 参考视频 / 参考音乐的**本地直传**上传到 ComfyUI input。
+                    #
+                    # 【为什么必须在这里做】上面的 prepare_job_params 只是把
+                    # 上传目录里的文件名写进 params；ComfyUI 的 LoadVideo /
+                    # LoadAudio 节点只认 ComfyUI input 里的名字。
+                    # r2v 分支早就做了这件事，flf 分支没做 ——
+                    # 于是 flf 的本地参考视频/音乐即使提交成功，
+                    # 到了工作流那一步也会「找不到文件」。
+                    if params.get("ref_videos"):
+                        uploaded = []
+                        for up in params["ref_videos"]:
+                            lp = UPLOAD_DIR / up
+                            if not lp.exists():
+                                raise RuntimeError(f"找不到上传文件: {up}")
+                            uploaded.append(await comfy_upload_media(session, lp))
+                        params["ref_videos"] = uploaded
+                    if params.get("ref_audios"):
+                        uploaded = []
+                        for up in params["ref_audios"]:
+                            lp = UPLOAD_DIR / up
+                            if not lp.exists():
+                                raise RuntimeError(f"找不到上传文件: {up}")
+                            uploaded.append(await comfy_upload_media(session, lp))
+                        params["ref_audios"] = uploaded
                 elif mode == "r2v":
                     names = []
                     for up in params.get("ref_images", []):
@@ -3589,6 +3614,21 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             params["first_frame"] = saved_files["file_first"][0]
         if saved_files.get("file_last"):
             params["last_frame"] = saved_files["file_last"][0]
+        # 【2026-11-15 补齐 —— 缺口 1 的 flf 半边】
+        # 参考视频 / 参考音乐的**本地直传**通道（音轨三选一的素材来源）。
+        #
+        # 【为什么 flf 也要】后端 build_flf 本来就支持 ref_audios /
+        # ref_video_audios，但面板之前只渲染首帧 / 尾帧两个槽位，
+        # 于是这两路素材**没有任何入口** —— 能力存在但用不到。
+        # 现在面板补了 refvid0..2 / refaud0..2 槽位，
+        # 服务端这里也必须接住对应的上传文件，
+        # 否则用户选的文件会被静默丢掉（本地路径通、素材库路径不通）。
+        flf_ref_videos = saved_files.get("file_refvid", [])
+        flf_ref_audios = saved_files.get("file_refaud", [])
+        if flf_ref_videos:
+            params["ref_videos"] = flf_ref_videos[:h3modes.MAX_REF_VIDEOS]
+        if flf_ref_audios:
+            params["ref_audios"] = flf_ref_audios[:h3modes.MAX_REF_AUDIOS]
         # 【2026-11-14】首帧与尾帧**都可以单独给**（原来只认首帧）。
         # 只要给了其中一张就能生成 —— H3 的 I2VA / L2VA 任务类型
         # 就是「只有首帧」/「只有尾帧」。

@@ -1574,7 +1574,11 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
 <!-- 【2026-11-15 B2】升版号到 b2audiotrack1 —— app.js 改了（素材库/本地填参考素材槽位后
      立刻重算「成片音轨」下拉）。必须破缓存，否则用户拿到的还是旧 app.js，
      「使用参考音乐作为成片音轨」/「使用参考视频的背景音乐」两项仍然不会出现。 -->
-<script src="/static/app.js?v=b2audiotrack1"></script>
+<!-- 【2026-11-15 flfrefmedia1】升版号 —— app.js 又改了：**首尾帧面板**补上了
+     参考视频（≤3）/ 参考音乐（≤3）槽位与提交通道。
+     不破缓存的话，flf 模式下「用参考音乐作音轨」/「用参考视频背景音作音轨」
+     这两项在用户浏览器里**永远不会出现**（后端早就支持，只是面板够不着）。 -->
+<script src="/static/app.js?v=flfrefmedia1"></script>
 <script src="/static/providers.js?v=h3image1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
