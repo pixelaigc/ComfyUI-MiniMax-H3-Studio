@@ -1,10 +1,10 @@
 [
  {"id":"q1","step":"额度复采（10:05 新窗口）+ 主线/线上 HEAD 现状盘点","status":"completed"},
- {"id":"q2","step":"A1 线上复核：两种模型+加速LoRA 组合真实下发 UNET/LoRA 槽位并出片","status":"in_progress"},
- {"id":"q3","step":"A2/A3 线上复核：播放器清单只含手动条目 / 多选复选框默认不显示","status":"pending"},
- {"id":"q4","step":"A4/A5 线上复核：按生成类型默认参数持久化生效 / 运行态依 ComfyUI 队列真值","status":"pending"},
- {"id":"q5","step":"C 项复核：内置 Agent 工具清单与定向测试","status":"pending"},
- {"id":"q6","step":"等待并行任务 b2587d5c（7条缺口）与 ec6c150d（D项成片）产出并核验其证据","status":"pending"},
- {"id":"q7","step":"全量 pytest 与基线对跑，确认新增失败 0 条","status":"pending"},
- {"id":"q8","step":"写中文收口报告到 audits/，evidence/ 归集截图与产物","status":"pending"}
+ {"id":"q2","step":"A1 线上复核：两种模型+加速LoRA 组合真实下发 UNET/LoRA 槽位并出片","status":"completed"},
+ {"id":"q3","step":"A2/A3 线上复核：播放器清单只含手动条目 / 多选复选框默认不显示","status":"completed"},
+ {"id":"q4","step":"A4/A5 线上复核：按生成类型默认参数持久化生效 / 运行态依 ComfyUI 队列真值","status":"completed"},
+ {"id":"q5","step":"C 项复核：内置 Agent 工具清单与定向测试","status":"completed"},
+ {"id":"q6","step":"核验并行任务 b2587d5c 与 ec6c150d 产出（D 项成片已独立 ffprobe + 播放器复核）","status":"completed"},
+ {"id":"q7","step":"全量 pytest 与基线对跑，确认新增失败 0 条","status":"completed"},
+ {"id":"q8","step":"写中文收口报告到 audits/，evidence/ 归集截图与产物","status":"completed"}
 ]
