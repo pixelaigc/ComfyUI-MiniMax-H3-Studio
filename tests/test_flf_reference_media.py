@@ -303,6 +303,78 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
             any(k.startswith("ref_videos.") for k in inputs),
             "没有参考视频时不应出现 ref_videos 槽位")
 
+    def test_task_type_switches_to_hybrid_when_reference_media_present(self):
+        """带参考素材时，task_type 必须是 Hybrid（节点的硬规则）。
+
+        【节点的硬规则 —— 2026-11-15 线上实测暴露】
+        T8 的 resolve_task_type() 里：
+            requirements = {
+                "t2va":   (False, False, False),
+                "i2va":   (True,  False, False),
+                "fl2va":  (True,  True,  False),
+                "l2va":   (False, True,  False),
+                "ref2va": (False, False, True),
+                "hybrid": (None,  None,  True),
+            }
+            if requested not in {"ref2va", "hybrid"} and has_refs:
+                raise ValueError(f"{requested.upper()} cannot include
+                                  reference media; use Auto or Hybrid")
+
+        原来 build_flf 恒定按「有首尾帧 -> FL2VA / 只有首帧 -> I2VA /
+        只有尾帧 -> L2VA」定类型，于是 flf + 参考视频时线上直接失败：
+            ValueError: L2VA cannot include reference media; use Auto or Hybrid
+        """
+        from h3studio import h3_video_modes as h3modes
+
+        def task_type_of(params):
+            wf = h3modes.build_flf(params)
+            for nid, spec in wf.items():
+                if spec.get("class_type") == "MiniMaxH3AudioConditioningT8":
+                    return spec["inputs"].get("task_type")
+            self.fail("找不到 T8 音频条件节点")
+
+        base = {"width": 864, "height": 480, "duration": 5, "job_id": "t"}
+
+        # 无参考素材：保持原来的三档
+        self.assertEqual(
+            task_type_of({**base, "first_frame": "f.png", "last_frame": "l.png"}),
+            "FL2VA")
+        self.assertEqual(
+            task_type_of({**base, "first_frame": "f.png"}), "I2VA")
+        self.assertEqual(
+            task_type_of({**base, "last_frame": "l.png"}), "L2VA")
+
+        # 有参考素材：必须切到 Hybrid
+        for extra in ({"ref_videos": ["v.mp4"]},
+                      {"ref_audios": ["a.flac"]},
+                      {"ref_video_audios": ["sb.m4a"]}):
+            self.assertEqual(
+                task_type_of({**base, "last_frame": "l.png", **extra}),
+                "Hybrid",
+                f"带 {list(extra)} 时 task_type 必须是 Hybrid，"
+                f"否则节点会抛「cannot include reference media」")
+
+    def test_task_type_value_is_in_node_combo_options(self):
+        """task_type 的字面量必须在节点 combo 的合法选项里。
+
+        【为什么锁这条】节点的 combo 是
+        ["auto", "T2VA", "I2VA", "FL2VA", "L2VA", "Ref2VA", "Hybrid"]
+        —— 写 "HYBRID"（全大写）不在选项里，ComfyUI 会拒掉。
+        这条锁住大小写，防止以后有人手滑写成全大写。
+        """
+        from h3studio import h3_video_modes as h3modes
+        wf = h3modes.build_flf({
+            "last_frame": "l.png", "ref_videos": ["v.mp4"],
+            "width": 864, "height": 480, "duration": 5, "job_id": "t",
+        })
+        tt = None
+        for nid, spec in wf.items():
+            if spec.get("class_type") == "MiniMaxH3AudioConditioningT8":
+                tt = spec["inputs"].get("task_type")
+        self.assertIn(tt, ["auto", "T2VA", "I2VA", "FL2VA", "L2VA",
+                           "Ref2VA", "Hybrid"],
+                      f"task_type={tt!r} 不在节点的 combo 选项里")
+
     def test_reference_media_without_any_frame_is_still_rejected(self):
         """只给参考音乐、没给首尾帧 -> 仍然报错。
 

@@ -441,7 +441,40 @@ def build_flf(params: dict) -> dict:
     if ref_video_audios:
         condition_inputs.update(_ref_video_audio_nodes(p, ref_video_audios))
 
-    task_type = "FL2VA" if (first and last) else ("I2VA" if first else "L2VA")
+    # 【2026-11-15 修 —— 线上实测暴露的第二处真实缺陷】
+    #
+    # T8 节点的 resolve_task_type() 有硬规则：
+    #   requirements = {
+    #     "t2va":  (无首帧, 无尾帧, 不带参考),
+    #     "i2va":  (有首帧, 无尾帧, 不带参考),
+    #     "fl2va": (有首帧, 有尾帧, 不带参考),
+    #     "l2va":  (无首帧, 有尾帧, 不带参考),
+    #     "ref2va":(无首帧, 无尾帧, 必须带参考),
+    #     "hybrid":(首尾随意, 必须带参考),
+    #   }
+    # 并且明确：
+    #   if requested not in {"ref2va", "hybrid"} and has_refs:
+    #       raise ValueError(f"{requested.upper()} cannot include reference
+    #                         media; use Auto or Hybrid")
+    #
+    # 也就是说：**只要带了参考素材，任务类型必须是 hybrid（或 ref2va）**。
+    # 原来 build_flf 恒定按「有首尾帧 -> FL2VA / 只有首帧 -> I2VA /
+    # 只有尾帧 -> L2VA」来定类型，于是 flf + 参考视频 时报：
+    #   ValueError: L2VA cannot include reference media; use Auto or Hybrid
+    #
+    # 修法：带参考素材时用 HYBRID（首尾帧 + 参考素材共存正是 hybrid 的定义）。
+    has_refs = bool(ref_videos or ref_audios or ref_video_audios)
+    if has_refs:
+        # HYBRID 要求至少给一张首尾帧（build_flf 开头已经校验过）
+        #
+        # 【大小写】节点 combo 的选项是
+        #   ["auto", "T2VA", "I2VA", "FL2VA", "L2VA", "Ref2VA", "Hybrid"]
+        # 必须严格用 "Hybrid"（和 build_r2v 用 "Ref2VA" 一样），
+        # 写成 "HYBRID" 会被 ComfyUI 的 combo 校验拒掉。
+        task_type = "Hybrid"
+    else:
+        task_type = ("FL2VA" if (first and last)
+                     else ("I2VA" if first else "L2VA"))
     p.update(_build_common(p, params, condition_inputs=condition_inputs,
                             duration=duration, width=width, height=height,
                             unet_name=unet_name, task_type=task_type))
