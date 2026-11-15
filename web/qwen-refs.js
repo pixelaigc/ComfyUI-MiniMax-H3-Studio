@@ -590,12 +590,24 @@
       const srcLabel = src === "analysis" ? "素材库描述"
         : src === "user" ? "手动补充" : "素材库未提供描述";
       const cls = r.missing ? "img-ref-desc-row missing" : "img-ref-desc-row";
+      // 【2026-11-15 修②】文本框的行数按描述长度给。
+      //
+      // 【原来为什么只有 2 行】原来写死 rows="2"，而素材库的分析描述是
+      // **多小节长文本**（实测 300~5000 字）—— 2 行只露出开头一小截，
+      // 用户看到的就是「只有第一行」，以为描述被系统截断了。
+      //
+      // 【现在怎么给行数】
+      //   按换行行数与字符数共同估算，短描述仍然紧凑（2~4 行），
+      //   长描述给足行数并允许滚动 —— 描述**完整可读、可编辑**。
+      const descText = r.description || "";
+      const lineCount = descText.split("\n").length;
+      const rows = Math.max(2, Math.min(18, lineCount + 1));
       return `
         <div class="${cls}">
           <span class="img-ref-desc-tag" title="${esc(srcLabel)}">${esc(placeholderFor(i))}</span>
-          <textarea data-desc-idx="${i}" rows="2"
+          <textarea data-desc-idx="${i}" rows="${rows}" spellcheck="false"
             placeholder="${r.missing ? "素材已失效，无法编辑" : "素材库未提供描述 —— 请手动补充这张图的内容描述"}"
-            ${r.missing ? "disabled" : ""}>${esc(r.description || "")}</textarea>
+            ${r.missing ? "disabled" : ""}>${esc(descText)}</textarea>
         </div>`;
     }).join("");
 

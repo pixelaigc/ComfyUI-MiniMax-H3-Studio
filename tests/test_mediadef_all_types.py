@@ -237,15 +237,38 @@ class TestStitchDoesNotPolluteGlobalMediaFilter(unittest.TestCase):
             "回到媒体库后下拉仍停在「视频」，图片/音频产物看不到")
 
     def test_leaving_stitch_restores_all_types(self):
-        """离开长片拼接页后，媒体库的 query 必须不带 media=video。
+        """媒体库的 query 在**任何**面板下都不得被面板强加 media 过滤。
 
-        这条是**行为**断言（用户视角）：回到媒体库应该重新看到全部类型。
+        这条是**行为**断言（用户视角）：媒体库是所有面板共享的那一个列表，
+        它必须只反映**用户自己**的筛选条件。
+
+        【2026-11-15 修② · 这条断言改了方向】
+        原来这里断言的是「长片拼接页的 query **必须**带 media=video」
+        —— 那正是缺陷本身：长片拼接把「只看视频」强加给了共享媒体库，
+        于是媒体库只剩视频，且 media=video 与「生成类型=文生图」互斥 ->
+        选中文生图反而显示为空（用户 2026-11-15 实测报的两个症状）。
+
+        现在长片拼接要的「只收视频片段」由它**自己**的候选池实现
+        （collectStitchCandidates / renderStitchCandidatePool），
+        不再通过对共享媒体库下 media=video 来实现。
         """
-        self.assertIn("media=video", self.data["stitch_query"],
-                      "长片拼接页本身应当只看视频（页面级覆盖），否则拼接页会拿到图片")
+        self.assertNotIn("media=video", self.data["stitch_query"],
+                         "长片拼接页仍在给**共享的**媒体库强加 media=video —— "
+                         "媒体库会只剩视频，且与「生成类型=文生图」互斥导致空列表")
         self.assertNotIn("media=", self.data["back_query"],
                          "离开长片拼接页后媒体库 query 仍带 media 过滤 —— "
                          "图片/音频产物仍然看不到（这正是用户报的缺陷）")
+
+    def test_stitch_page_query_has_no_media_filter_at_all(self):
+        """长片拼接页的媒体库 query **完全不带** media 过滤。
+
+        媒体库是共享的：长片拼接页看媒体库时，用户看到的也应该是
+        「全部类型 + 用户自己的筛选」，而不是被面板改过的窄化列表。
+        """
+        self.assertNotIn(
+            "media=", self.data["stitch_query"],
+            "长片拼接页的媒体库 query 仍带 media 过滤 —— "
+            "共享媒体库被面板局部视图污染（用户 2026-11-15 实测缺陷）")
 
     def test_media_filter_control_shows_all_types_after_return(self):
         """回到媒体库后下拉回到「全部类型」。"""

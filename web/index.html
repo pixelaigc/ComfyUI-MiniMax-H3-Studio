@@ -891,6 +891,18 @@ non_diegetic_music: Sparse low guqin notes over a sustained bowed-string drone, 
       <b>把右侧视频卡片拖到这里</b>
       <span>也可点击卡片下方“＋拼接” · 至少 2 个片段</span>
     </div>
+    <!-- 【2026-11-15 修②】长片拼接**自己的**视频候选池。
+         原来「只收视频片段」是靠给共享媒体库强加 media=video 实现的，
+         于是媒体库被串台（只剩视频），且「生成类型=文生图」与 media=video
+         互斥 -> 选中文生图反而显示为空。
+         现在候选池独立成一块，只列视频产物，不影响媒体库。 -->
+    <div class="stitch-candidates-wrap" id="stitchCandidatesWrap">
+      <div class="stitch-candidates-head">
+        <span>视频候选（当前页）</span>
+        <span id="stitchCandidatesCount"></span>
+      </div>
+      <div class="stitch-candidates" id="stitchCandidates"></div>
+    </div>
     <div class="stitch-list" id="stitchList"></div>
     <div class="stitch-summary" id="stitchSummary">尚未选择片段</div>
     <button class="gen-btn" id="stitchBtn">合成长片</button>

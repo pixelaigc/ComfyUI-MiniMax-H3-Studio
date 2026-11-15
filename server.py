@@ -3828,6 +3828,18 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             # -> 不注入 Qwen 那套占位块，改为提示用户自己写 <Picture 1>。
             # 参考图数量与顺序由服务端保证（ref_images 列表原序即插槽顺序）。
             params["ref_images"] = refs
+            # 【2026-11-15 修② · 素材描述必须真正进到提示词里】
+            # worker 跑 i2i_h3image 时会用**上传后的文件名列表**覆盖
+            # params["ref_images"]（见 _run 的 i2i_h3image 分支），
+            # description 随之丢失 —— 而 build_h3_image_workflow 只把
+            # params["prompt"] 送进 MiniMaxH3ImageConditioning。
+            # 结果：模型**从来没看到**素材描述（用户 2026-11-15 报的
+            # 「图片编辑素材描述只传第一行」在 H3-Image 这条路上的**更严重**形态：
+            # 描述根本没进模型）。
+            #
+            # 现在在**覆盖发生之前**把描述按 <Picture N> 写进提示词。
+            params["prompt"] = h3img.inject_h3_image_reference_block(
+                prompt_text, refs)
             params["picture_hint"] = (
                 "提示词里用 " + h3img.H3_IMAGE_PLACEHOLDER.format(n=1) +
                 " 这样的标记引用参考图（官方语法）")

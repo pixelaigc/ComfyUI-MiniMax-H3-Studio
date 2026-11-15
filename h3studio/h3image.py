@@ -171,6 +171,102 @@ def h3_image_placeholders(text: str) -> list[int]:
     return sorted(found)
 
 
+def build_h3_image_reference_block(refs: list[dict], style: str = "inline") -> str:
+    """构造 H3-Image 图片编辑的「参考图说明」文本块。
+
+    【2026-11-15 修② · 素材描述必须真正进到提示词里】
+    原来 H3-Image 这条路**根本没有注入描述**：
+      · server.py 的 i2i_h3image 分支只做了校验，然后把
+        `params["ref_images"] = refs`（带 description）交出去；
+      · 但 worker 跑的时候（server.py::_run 的 i2i_h3image 分支）
+        会调用 `_upload_asset_refs(...)`，**用上传后的文件名列表**
+        覆盖 `params["ref_images"]` —— description 就此丢失；
+      · h3image.build_h3_image_workflow 只把 `params["prompt"]` 送进
+        MiniMaxH3ImageConditioning —— 所以模型**从来没看到**素材描述。
+
+    结果：用户在 H3-Image 图片编辑面板加一张素材图，素材是「一只戴红蝴蝶结的
+    动漫少女」还是「一张纯红方块」，模型完全不知道 —— 只能靠 PE 扩写器
+    自己看着图猜（而本面板默认**关闭** PE）。
+
+    【现在怎么做】
+    与 Qwen 那条路（ref_imgs.inject_reference_block）对称：把每张参考图的
+    **完整描述**按 `<Picture N>` 占位写成说明块，注到提示词**前面**。
+
+    【为什么放前面】
+    官方 H3-Image 文档说「the prompt addresses each one by its label」——
+    先给「图 1 是什么 / 图 2 是什么」，再给用户的编辑指令，
+    模型的指代关系最清楚。
+
+    【单图时不用占位标记】
+    与 Qwen 的官方 PE-I2I 模板一致：只有 N>=2 时才需要 <Picture N> 区分
+    多张图；单图直接给描述（官方 tokenizer 本来也会自动加 "<Picture 1>: "）。
+    """
+    total = len(refs)
+    lines = []
+    for index, ref in enumerate(refs):
+        if ref.get("missing"):
+            continue
+        desc = (ref.get("description") or "").strip()
+        marker = H3_IMAGE_PLACEHOLDER.format(n=index + 1)
+        if total < 2:
+            # 单图：不用占位标记，直接给描述（与 Qwen 官方模板同款语义）
+            line = desc or (ref.get("name") or "")
+        elif style == "bullet":
+            line = f"- {marker} {desc}".rstrip()
+        else:
+            line = f"{marker} {desc}".rstrip()
+        if line:
+            lines.append(line)
+    if not lines:
+        return ""
+    return "\n".join(lines)
+
+
+def build_h3_image_description_block(refs: list[dict]) -> str:
+    """构造「只有描述、没有 <Picture N> 标记」的说明块。
+
+    【什么时候用】
+    用户自己写了 <Picture N> 时用 —— 见 inject_h3_image_reference_block。
+
+    【为什么不能直接用 build_h3_image_reference_block】
+    那个函数带 <Picture N> 标记。用户已经写了 <Picture 1> 时再追加一份
+    带标记的块，提示词里就会出现**两个 <Picture 1>** —— 标记重复会让
+    模型困惑，也破坏「用户写的编号不被改写」这条约定。
+    """
+    lines = []
+    for ref in refs:
+        if ref.get("missing"):
+            continue
+        desc = (ref.get("description") or "").strip()
+        line = desc or (ref.get("name") or "")
+        if line:
+            lines.append(line)
+    if not lines:
+        return ""
+    return "\n".join(lines)
+
+
+def inject_h3_image_reference_block(prompt: str, refs: list[dict],
+                                   style: str = "inline") -> str:
+    """把 H3-Image 的参考图说明块注到提示词前面。
+
+    幂等：提示词里已经有 <Picture N> 时**不重复注入**占位块
+    （用户自己写了引用标记，不动他的编号）。但描述仍然应该给模型
+    —— 所以这种情况下把**纯描述**（不含标记）追加在提示词后面，
+    保证「模型看到了这张图是什么」不会因为用户写了占位就丢掉。
+    """
+    prompt = prompt or ""
+    if h3_image_placeholders(prompt):
+        desc_block = build_h3_image_description_block(refs)
+        if not desc_block:
+            return prompt
+        return f"{prompt}\n{desc_block}" if prompt else desc_block
+    block = build_h3_image_reference_block(refs, style=style)
+    if not block:
+        return prompt
+    return f"{block}\n{prompt}" if prompt else block
+
+
 def validate_h3_image_refs(refs: list[dict], prompt: str = "") -> dict:
     """H3-Image 参考图一致性校验（与 ref_imgs.validate_refs 同结构）。
 

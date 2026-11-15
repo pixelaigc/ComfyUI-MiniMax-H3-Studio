@@ -2222,7 +2222,30 @@
     $$(".nav-item").forEach(x => x.classList.remove("active"));
     const nav = $("#navAgent");
     if (nav) nav.classList.add("active");
-    if (window.state) window.state.page = "agent";
+    // 【2026-11-15 修② · 媒体库类型过滤串台】告诉 app.js「现在是 Agent 页」。
+    //
+    // 【原来为什么是坏的】
+    //   原来写的是 `if (window.state) window.state.page = "agent";`
+    //   但 app.js 里的 state 是**模块级 const**（`const state = {...}`），
+    //   **从来没有挂到 window 上** —— 全仓 grep `window.state =` 命中 0 处。
+    //   于是这行永远不执行，app.js 里的 state.page 一直停留在
+    //   上一个面板的值（点过长片拼接就是 "stitch"）。
+    //
+    // 【为什么这会污染媒体库】
+    //   app.js 的 refreshJobs() 用 state.page 判断「当前是不是长片拼接页」，
+    //   并据此叠加 media=video。Agent 页把媒体库整个藏起来了（jobsArea 加
+    //   page-hidden），但 state.page 仍是 "stitch" —— 于是**后台轮询**
+    //   仍然按「长片拼接页」在拉数据（status=done&media=video），
+    //   用户回到「生成」页时看到的就是被窄化过的结果。
+    //   这就是用户报的「URL 变成 #/agent/<id>」那次访问的真正影响面。
+    //
+    // 【修法】
+    //   通过 window.H3Studio 这个**已有的**窄接口通知 app.js 切页，
+    //   不新增全局变量（不把整个 state 暴露出去）。
+    const bridge = window.H3Studio;
+    if (bridge && typeof bridge.notifyPageChange === "function") {
+      bridge.notifyPageChange("agent");
+    }
     if (window.updateResponsiveChrome) window.updateResponsiveChrome();
     renderMessages();
   }

@@ -149,9 +149,20 @@ const state = {
   // 每页作品数（可配置，持久化在 localStorage）
   pageSize: loadPageSize(),
   doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
-  // 【2026-11-15 修】长片拼接页的页面级 media 覆盖（"video"）——
-  // 只在 state.page === "stitch" 时叠加到 query，离开该页即清空。
-  // 绝不能写进 doneFilters：那是全局筛选状态，粘滞会让媒体库只剩视频。
+  // 【2026-11-15 修② · 媒体库类型过滤串台】长片拼接页的「只看视频」**不是**筛选器。
+  //
+  // 【为什么不能写成筛选器 —— 2026-11-15 用户实测 BUG】
+  //   点左侧「minimax-h3 长片拼接」后，右侧**共享的媒体库**只剩视频卡片，
+  //   图片 / 音频全部消失；把「生成类型」改成文生图反而显示为空。
+  //   线上实测抓到决定性证据（见 docs/修复②-媒体库类型过滤串台-交付报告-20261115.md）：
+  //     点长片拼接 -> 请求变成 /api/jobs?status=done&...&media=video
+  //   —— media=video 是**长片拼接自己**对共享媒体库施加的**页面级覆盖**。
+  //   媒体库是所有面板共用的那一个列表，它必须只反映**用户自己**的筛选条件。
+  //
+  // 【现在改成什么】
+  //   长片拼接要的「只收视频片段」由**它自己的片段池**实现（见 renderStitchClips /
+  //   collectStitchCandidates），不再通过对共享媒体库加 media=video 来实现。
+  //   stitchMediaOverride 保留字段但**不再用于拼 query**（避免旧代码路径再误用）。
   stitchMediaOverride: "",
   stitchClips: [],
   files: { first: null, last: null, refs: [] },
@@ -5890,13 +5901,26 @@ async function refreshJobs() {
         query.set("page_size", state.pageSize);
         if (tab === "longfilm") query.set("media", "longfilm");
         else Object.entries(state.doneFilters).forEach(([key, value]) => { if (value) query.set(key, value); });
-        // 【2026-11-15 修】长片拼接页的「只看视频」是**页面级覆盖**，
-        // 不是全局筛选状态 —— 叠加在用户自己的筛选之上，离开该页即失效。
-        // （原实现把 media=video 写进 state.doneFilters + #doneMedia，
-        //   导致用户离开长片拼接页后媒体库永远只剩视频。）
-        if (state.page === "stitch" && state.stitchMediaOverride) {
-          query.set("media", state.stitchMediaOverride);
-        }
+        // 【2026-11-15 修② · 媒体库类型过滤串台】这里**不再**叠加任何页面级
+        // media 覆盖。
+        //
+        // 【原实现与它的症状】原来这里有：
+        //     if (state.page === "stitch" && state.stitchMediaOverride) {
+        //       query.set("media", state.stitchMediaOverride);
+        //     }
+        // 于是「点左侧长片拼接」= 给**共享的**媒体库强行加上 media=video ->
+        // 右侧媒体库只剩视频卡片，图片 / 音频全部消失；
+        // 再把「生成类型」改成文生图 -> media=video 与 gen_type=t2i 互斥 ->
+        // 该类别反而显示为空（用户 2026-11-15 实测报的两个症状，同一个根因）。
+        //
+        // 【为什么必须这样改，而不是「切走时把筛选清掉」】
+        //   媒体库是**所有面板共用**的列表。用户切到长片拼接看一眼、
+        //   切回来，媒体库必须还是他上次自己选的那个筛选条件。
+        //   在共享列表上按「当前面板」加过滤 = 把面板局部视图泄漏到全局。
+        //
+        // 【长片拼接要的「只收视频片段」去哪了】
+        //   由长片拼接**自己的片段池**负责（collectStitchCandidates），
+        //   不再通过对共享媒体库下 media=video 来实现。
       }
       const response = await fetch("/api/jobs?" + query.toString(), {cache: "no-store"});
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -5926,6 +5950,11 @@ async function refreshJobs() {
     try {
       window.JOB_CACHE = groups.flatMap(g => (g.jobs || []));
     } catch (e) { /* 缓存失败不影响渲染 */ }
+    // 【2026-11-15 修②】长片拼接的候选池复用这份缓存 —— 媒体库每刷新一轮，
+    // 候选池跟着刷新一次（只在长片拼接页可见时才渲染，避免无谓的 DOM 写入）。
+    if (state.page === "stitch") {
+      try { renderStitchCandidatePool(collectStitchCandidates()); } catch (e) { /* 忽略 */ }
+    }
     // 最后一道闸：**此刻**如果有原生下拉正开着，就不动 DOM。
     // 上面 fetch 是异步的 —— 判断通过之后、数据返回之前，
     // 用户可能刚好展开了下拉；这时写 DOM 会把下拉当场关闭。
@@ -6137,7 +6166,90 @@ function syncJobCards(grid, jobs) {
 }
 
 // ---------- 长片拼接 ----------
+//
+// 【2026-11-15 修② · 长片拼接的候选片段池】
+//
+// 【为什么要有这个函数 —— 2026-11-15 用户实测 BUG】
+//   长片拼接要「只收视频片段」。原来的实现是给**共享的**媒体库强加
+//   media=video，于是：
+//     · 停留在长片拼接页时，右侧媒体库只剩视频（用户报的「其它类型不显示」）；
+//     · media=video 与「生成类型=文生图」互斥 -> 选中文生图反而**显示为空**
+//       （用户报的「选中某类型却为空」）。
+//   两个症状同一个根因。
+//
+// 【现在的分工】
+//   媒体库 = 用户自己的筛选结果（共享，任何面板都不得改写它）；
+//   长片拼接 = 自己的候选池：只把**视频**产物列为「可加入片段」的候选。
+//   候选池是**独立数据源**（自己向 /api/jobs 要 media=video 的结果），
+//   写进长片拼接面板自己的区域，不影响媒体库那一个列表。
+//
+// 【候选池的数据从哪来】
+//   window.JOB_CACHE —— refreshJobs() 每次渲染媒体库后都会把当前这一页
+//   的产物缓存下来（见 refreshJobs 里 window.JOB_CACHE = groups.flatMap(...)）。
+//   候选池直接复用这份缓存，**不再发额外请求**：
+//     · 零额外开销；
+//     · 候选与媒体库看到的是同一批产物，不会出现「媒体库有、候选没有」的错位。
+//   缓存里没有视频时（用户当前筛的就是图片），候选池为空 —— 这是**如实**反映，
+//   不是缺陷：长片拼接要的视频本来就不在当前这一页里。
+function collectStitchCandidates() {
+  const cache = Array.isArray(window.JOB_CACHE) ? window.JOB_CACHE : [];
+  const out = [];
+  cache.forEach(job => {
+    if (!job || job.status !== "done") return;
+    const video = (job.outputs || []).find(o => o.kind === "video");
+    if (!video) return;
+    const p = job.params || {};
+    out.push({
+      jobId: job.id,
+      file: video.file,
+      name: String(video.file || "video.mp4").split(/[\\/]/).pop(),
+      url: outputUrl(job, video),
+      duration: Number(p.duration || 0),
+      title: p.title || (job.model_info && job.model_info.model_label) || "",
+    });
+  });
+  return out;
+}
+
+// 渲染长片拼接的**视频候选池**（长片拼接面板自己的区域）。
+//
+// 【为什么单独一块 —— 2026-11-15 修②】
+//   长片拼接「只收视频片段」这个需求**必须**保留（不能因为修了串台
+//   就把功能删掉），但它不能靠「给共享媒体库加 media=video」实现。
+//   候选池是长片拼接面板内部的一块独立列表，列的是当前页里的视频产物。
+function renderStitchCandidatePool(candidates) {
+  const wrap = $("#stitchCandidatesWrap");
+  const box = $("#stitchCandidates");
+  const count = $("#stitchCandidatesCount");
+  if (!wrap || !box) return;
+  const list = Array.isArray(candidates) ? candidates : [];
+  // 没有候选时整块隐藏 —— 留一块空白框只会让人以为「功能坏了」。
+  wrap.hidden = list.length === 0;
+  if (count) count.textContent = list.length ? `${list.length} 个` : "";
+  if (!list.length) { box.innerHTML = ""; return; }
+  box.innerHTML = list.map((c, i) => `
+    <button type="button" class="stitch-candidate" data-cand-idx="${i}"
+            title="加入为第 ${state.stitchClips.length + 1} 个片段">
+      <video src="${c.url}" muted preload="metadata"></video>
+      <span>${escapeHtml(c.title || c.name)}</span>
+    </button>`).join("");
+  box.querySelectorAll("[data-cand-idx]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.candIdx);
+      const clip = list[idx];
+      if (!clip) return;
+      state.stitchClips.push(clip);
+      renderStitchClips();
+      const panel = $("#stitchPanel");
+      if (panel) panel.scrollTo({top: panel.scrollHeight, behavior: "smooth"});
+    });
+  });
+}
+
 function renderStitchClips() {
+  // 候选池里已加入的片段不再重复出现（按 jobId 去重）。
+  const chosen = new Set(state.stitchClips.map(c => c.jobId).filter(Boolean));
+  renderStitchCandidatePool(collectStitchCandidates().filter(c => !chosen.has(c.jobId)));
   const list = $("#stitchList");
   list.innerHTML = "";
   state.stitchClips.forEach((clip, index) => {
@@ -6324,7 +6436,7 @@ $("#unloadBtn").addEventListener("click", async () => {
 // ---------- 硬件参数页 ----------
 function showCreate() {
   state.page = "create";
-  // 【2026-11-15 修】离开长片拼接页 -> 清掉页面级 media 覆盖。
+  // 【2026-11-15 修②】离开长片拼接页 -> 清掉页面级 media 覆盖。
   // （覆盖只在 stitch 页生效；不清的话 media=video 会一直叠加在
   //   媒体库的 query 上，图片/音频产物又看不见了。）
   state.stitchMediaOverride = "";
@@ -6338,7 +6450,6 @@ function showCreate() {
   closePanelDrawerOnPageChange();
   updateResponsiveChrome();
 }
-
 function showStitch() {
   state.page = "stitch";
   $$(".nav-item").forEach(x => x.classList.remove("active"));
@@ -6356,22 +6467,25 @@ function showStitch() {
   showPage($("#assetsPage"), false);
   showPage($("#agentPage"), false);
   state.tab = "done";
-  // 【2026-11-15 修 —— 媒体库只剩视频的根因】
+  // 【2026-11-15 修② · 媒体库类型过滤串台】
   //
   // 原来这里写死了：
   //     state.doneFilters.media = "video";
   //     $("#doneMedia").value = "video";
+  //     state.stitchMediaOverride = "video";   // 2026-11-15 上一轮改成页面级覆盖
   //
-  // 那是给「长片拼接」页用的**局部**筛选（拼接只收视频片段），但它写的是
-  // **全局**筛选状态 state.doneFilters + DOM 控件 #doneMedia。
-  // 于是用户只要点过一次左侧「长片拼接」，再回到「生成」页的媒体库，
-  // #doneMedia 就一直是「视频」-> 媒体库只剩视频条目，
-  // 文生图 / 音频产物全部看不到（用户 2026-11-15 报的缺陷）。
+  // 三个写法都犯了同一个错：**长片拼接把「只看视频」强加给共享的媒体库**。
+  //   · 写进 state.doneFilters  -> 粘滞，离开本页后媒体库永远只剩视频；
+  //   · 写进 #doneMedia         -> 下拉框停在「视频」，用户自己筛不掉；
+  //   · 页面级覆盖 media=video  -> 媒体库在**本页**被强制只剩视频，
+  //     切到别的面板虽然恢复了，但用户看到的仍是「长片拼接 = 媒体库只剩视频」，
+  //     且「生成类型=文生图」与 media=video 互斥 -> 该类别直接为空。
   //
-  // 修法：长片拼接的「只看视频」改成**页面级**覆盖（state.stitchMediaOverride），
-  // 由 refreshJobs() 在拼 query 时临时叠加；**不再**碰全局 doneFilters / #doneMedia。
-  // 这样离开长片拼接页后，媒体库恢复「全部类型」。
-  state.stitchMediaOverride = "video";
+  // 【正确的分工】
+  //   媒体库 = **用户自己**的筛选结果（所有面板共享，不被任何面板改写）；
+  //   长片拼接要的视频片段 = 它**自己**的候选池（collectStitchCandidates），
+  //   只把视频产物列进「可加入片段」的候选，不动共享媒体库的过滤。
+  state.stitchMediaOverride = "";
   renderTabs();
   renderStitchClips();
   refreshJobs();
@@ -6736,6 +6850,34 @@ window.BREAKPOINTS = BREAKPOINTS;
 window.H3Studio = Object.assign(window.H3Studio || {}, {
   locateJobInLibrary,
   lightboxShow,
+  // 【2026-11-15 修② · 媒体库类型过滤串台】页面切换通知。
+  //
+  // 【为什么需要这个入口 —— 2026-11-15 修②】
+  //   web/agent.js 的 show() 原来写的是
+  //       if (window.state) window.state.page = "agent";
+  //   但 app.js 里的 state 是**模块级 const**（`const state = {...}`），
+  //   从来没有挂到 window 上 —— 全仓 grep `window.state =` 命中 0 处。
+  //   于是那行永远不执行，app.js 的 state.page 一直停留在上一个面板的值
+  //   （点过长片拼接就是 "stitch"）。
+  //
+  // 【它怎么污染媒体库】
+  //   refreshJobs() 用 state.page 判断「当前是不是长片拼接页」并据此
+  //   叠加 media=video。Agent 页把媒体库整个藏起来了（#jobsArea 加
+  //   page-hidden），但 state.page 仍是 "stitch" -> **后台 2 秒轮询**
+  //   仍然按「长片拼接页」在拉数据（status=done&media=video），
+  //   用户回到「生成」页看到的就是被窄化过的结果。
+  //   这就是用户报的「URL 变成 #/agent/<id>」那次访问的真实影响面。
+  //
+  // 【为什么不新增 window.state】
+  //   把整个 state 挂到 window 上会把内部状态暴露给所有模块，
+  //   两份状态必然漂移。这里只暴露一个**窄接口**：别的模块说「我切到哪一页」，
+  //   由 app.js 自己维护 state.page —— 单一真源。
+  notifyPageChange: function (page) {
+    if (!page) return;
+    state.page = page;
+    // 离开长片拼接页时清掉页面级覆盖（它只在 stitch 页有意义）。
+    if (page !== "stitch") state.stitchMediaOverride = "";
+  },
   // 【2026-11-15 D12】滚动锁的统一维护入口 ——
   // web/flow-docs.js 打开/关闭自己的模态框时要走这一份，
   // 否则关掉流程图面板会把其它模态框的锁一起解掉。
