@@ -194,6 +194,47 @@
     return accelLoraList().find(l => l.key === key) || null;
   }
 
+  /**
+   * 【2026-11-15 修 AC-1】按**当前挂的加速 LoRA** 重算采样档
+   * （步数 / 采样器 / 调度器）。
+   *
+   * 【为什么必须有这个函数】
+   * 后端 video_workflow._resolve_accel_chain 的默认档本来就是对的：
+   *   挂了加速 LoRA -> 该 LoRA 的 recommended_steps / scheduler / sampler；
+   *   没挂           -> 20 步标准多步采样（simple + res_multistep）。
+   * 但那条分支只在 `params["steps"]` **为空**时才会走到。
+   * 前端 `videoState.steps` 有初值（4），而且**每次提交都显式带上**，
+   * 于是后端永远拿到一个非空 steps => 标准多步档那条分支**永远走不到**
+   * => 用户选「不挂加速 LoRA」时，跑的仍然是 4 步蒸馏档（画面必然糊）。
+   * 同一问题也出现在「从 ckpt850 切到 lightx2v_8step」：面板不会跳到 8 步。
+   *
+   * 【修法】前端在切换加速 LoRA 时，按服务端下发的同一份清单重算，
+   * 保证「面板显示的采样档」与「工作流里实际生效的采样档」一致。
+   * 标准多步档的三个值由 /api/video-options 的 sampling.*_without_accel 下发
+   * （与后端 video_models 的常量同源，不在前端硬编码第二份）。
+   */
+  function recomputeSamplingForAccel() {
+    const cfg = samplingCfg();
+    const meta = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
+    if (meta) {
+      const steps = Number(meta.recommended_steps);
+      if (Number.isFinite(steps) && steps > 0) videoState.steps = steps;
+      const sched = meta.recommended_scheduler;
+      if (sched) videoState.scheduler = sched;
+      const smp = meta.recommended_sampler;
+      if (smp) videoState.sampler = smp;
+    } else {
+      // 不挂加速 LoRA -> 标准多步采样档（20 步 / simple / res_multistep）
+      const steps = Number(cfg.steps_without_accel);
+      if (Number.isFinite(steps) && steps > 0) videoState.steps = steps;
+      const sched = cfg.scheduler_without_accel;
+      if (sched) videoState.scheduler = sched;
+      const smp = cfg.sampler_without_accel;
+      if (smp) videoState.sampler = smp;
+    }
+    renderSampling();
+  }
+
   // ------------------------------------------------------------ 尺寸
 
   /** 当前模式的上限（像素），用于提示文案。 */
@@ -825,7 +866,13 @@
     }
     if (stepsVal) stepsVal.textContent = videoState.steps;
     if (stepsHint) {
-      const recommended = model && model.steps != null ? Number(model.steps) : null;
+      // 【2026-11-15 修 AC-1】「推荐步数」的基准是**当前加速 LoRA**
+      // （有 LoRA -> 它的 recommended_steps；不挂 -> 20 步标准多步档），
+      // 而不是底模的 steps（底模恒为 4 = 蒸馏档，写死它会一直显示错）。
+      const accelMetaNow = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
+      const recommended = accelMetaNow
+        ? (accelMetaNow.recommended_steps != null ? Number(accelMetaNow.recommended_steps) : null)
+        : (cfg.steps_without_accel != null ? Number(cfg.steps_without_accel) : null);
       stepsHint.textContent = recommended == null
         ? "—"
         : (Number(videoState.steps) === recommended ? "推荐" : "已改");
@@ -1734,7 +1781,15 @@
       // 恢复保存的配置
       try {
         const cfgResp = await fetch("/api/video-config", { cache: "no-store" });
-        if (cfgResp.ok) applyConfig(await cfgResp.json());
+        if (cfgResp.ok) {
+          const saved = await cfgResp.json();
+          applyConfig(saved);
+          // 【2026-11-15 修 AC-1】保存的配置里**没有**采样档
+          // （= 用户从没手动调过）=> 按当前加速 LoRA 的推荐档重算一次，
+          // 否则「不挂加速 LoRA」的首屏仍然是 4 步蒸馏档。
+          // 若保存的配置里带 steps，则那是用户自己的选择，**不覆盖**。
+          if (saved.steps == null) recomputeSamplingForAccel();
+        }
       } catch (e) { /* 没有保存过配置，用默认值 */ }
 
       renderVideoPanel();
@@ -1833,6 +1888,20 @@
       seed: $("#seed").value.trim() || null,
       // 【2026-11-14】加速 LoRA 槽位（单选，最多一项；空 = 不挂）
       accel_loras: accel,
+      // 【2026-11-15 修 AC-1】显式槽位字段（含空串 = 明确「不挂」）。
+      //
+      // 服务端 video_models.resolve_accel_lora_slot() 的换算链是：
+      //   1. "accel_lora" 键**存在** -> 用它（空串 = 显式「不挂」）
+      //   2. accel_loras 数组里有可用项 -> 取第一项
+      //   3. fixed_accel_lora -> 再退到 lora -> 最后**默认 ckpt850**
+      // 只提交 `accel_loras: []`（空数组）时第 2 步被跳过 -> 一路掉到兜底
+      // -> 挂上了 ckpt850（用户明确选了「不挂」却被反转）。
+      //
+      // 【与 app.js 的分工】app.js 在提交入口也补一份（提交后写回 params，
+      // 覆盖面板直传的路径）。这里补一份是为了让**面板自身**的提交体
+      // 自洽（面板也用于首尾帧 / 参考生视频等旧面板路径）。
+      accel_lora: videoState.accelLora || "",
+      accel_lora_strength: Number(videoState.accelLoraStrength),
       // 效果 LoRA（可多选，与加速 LoRA 并列共存）
       effect_loras: effectLoras,
       attention: videoState.attention,
@@ -1989,7 +2058,15 @@
           if (videoState.accelLora !== previous) {
             videoState.accelLoraStrength = Number(
               meta.recommended_strength != null ? meta.recommended_strength : 1);
+            // 【2026-11-15 修 AC-1】切换加速 LoRA 时**同步重算采样档**
+            // （步数 / 采样器 / 调度器），否则「选了 8 步 LoRA 仍跑 4 步」
+            // 「不挂 LoRA 仍跑 4 步蒸馏档」两个坑都还在。
+            // 与后端 video_workflow._resolve_accel_chain 的默认档同源。
+            recomputeSamplingForAccel();
           }
+        } else if (videoState.accelLora !== previous) {
+          // 切到「不挂加速 LoRA」-> 标准多步采样档（20 步 / simple / res_multistep）
+          recomputeSamplingForAccel();
         }
         renderAccelLoraNote();
         renderAccelLoraStrength();
