@@ -827,12 +827,65 @@ def _legacy_video_summary(params: dict, mode: str = "") -> dict:
         "accel_lora_loader": "",
         "source": "legacy_video",
     }
+    # 【2026-11-16 修 D-1 —— 底模取值：model_key 优先】
+    #
+    # 【根因】flf / r2v 走本函数，但这里只读**旧 key** `params["model"]`。
+    # 新面板提交的是 `params["model_key"]`（VIDEO_MODELS 的 key，如
+    # "fl2va_int8"）—— 取不到 -> 落默认分支 -> 卡片显示「剪枝 int8（默认档）」，
+    # 而工作流**实际跑的是用户选的那枚**（h3_video_modes.build_flf:445
+    # `model_for_mode("flf", params.get("model_key"))["unet"]`）。
+    # 实测现场：ComfyUI 跑 minimax_h3_fl2va_int8_convrot.safetensors，
+    # 卡片显示 minimax_h3_fl2va_pruned_int8_convrot.safetensors。
+    # 不影响出片（工作流真实生效），但**可见性谎报** —— 误导显存/画质判断
+    # （完整 int8 比剪枝 int8 多约 12 GB 显存）。
+    #
+    # 【修法】与 _t2v_summary() 对齐：`model_key` 优先、`model` 兜底。
+    # `model_key` 是**本机底模清单**的 key，能直接查到 label + 权重文件名；
+    # 查不到（如历史脏值）则如实退回旧 key 语义，**不编造**。
+    model_key_param = str(params.get("model_key") or "").strip()
     model = str(params.get("model") or "").strip()
+
+    # 底模清单里的 key（如 "fl2va_int8"）—— 与 t2v 面板下拉同一套。
+    video_model_meta = vmodels.VIDEO_MODELS.get(model_key_param) or {}
+    resolved_by_model_key = bool(video_model_meta)
+    if resolved_by_model_key:
+        # 用户显式选的那枚 —— 显示它的 label 与**实际权重文件名**。
+        out["model_key"] = model_key_param
+        out["model_label"] = _video_model_label(model_key_param)
+        out["model_unet"] = str(video_model_meta.get("unet") or "")
+    else:
+        # 【2026-11-16 修 D-1 ② 产物级兜底】没有 model_key，但 worker
+        # 从**构建好的 workflow** 反解回了实际底模权重文件名
+        # （params["artifact_model_file"]，见 artifact_meta.apply_to_params）。
+        # 那才是**真正跑起来**的权重 —— 用它反查回本机底模 key。
+        #
+        # 【为什么需要这一层】model_key 是「用户填了什么」，
+        # artifact_model_file 是「实际跑了什么」。两者可能不一致
+        # （例如 r2v 模式：用户选的 FL2VA 权重会被 model_for_mode
+        # 换成 Ref2VA 权重 —— 那是**有意的**行为）。
+        # 显示层要报的是后者。
+        artifact_unet = str(params.get("artifact_model_file") or "").strip()
+        if artifact_unet:
+            for key, meta in (vmodels.VIDEO_MODELS or {}).items():
+                if str(meta.get("unet") or "") == artifact_unet:
+                    out["model_key"] = key
+                    out["model_label"] = _video_model_label(key)
+                    out["model_unet"] = artifact_unet
+                    resolved_by_model_key = True
+                    break
+            else:
+                # 权重不在本机清单里（如外部目录的权重）——
+                # 如实显示文件名，**不编造** key。
+                out["model_unet"] = artifact_unet
     lora = str(params.get("lora") or "").strip()
 
     from . import workflows as wf
 
-    if model == "standard":
+    if resolved_by_model_key:
+        # 已由 model_key 口径决定（上面已填好 model_key/label/unet）——
+        # 不再走旧 key 分支，也**不**回落默认档。
+        pass
+    elif model == "standard":
         out["model_label"] = "标准 MiniMax-H3"
         out["model_key"] = "standard"
     elif model == "lora":
