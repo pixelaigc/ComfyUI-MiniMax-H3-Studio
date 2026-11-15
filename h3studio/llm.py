@@ -47,6 +47,23 @@ MIN_TIMEOUT = 120.0
 #: 最坏情况 = 并发上限 × 600 秒。
 MAX_TIMEOUT = 600.0
 
+#: 【2026-11-16 修 c9】共享单槽 Provider 的**排队余量**（秒）。
+#:
+#: 实测（本机 Strata，pid 15495，单槽串行）：我们自己的请求实际算力开销只有
+#: `prompt_ms=434 + predicted_ms=67` ⇒ **0.5 秒**（`reasoning_content` 长度 = 0，
+#: 说明 `enable_thinking=false` 是被上游尊重的），
+#: 但 HTTP 端到端耗时 **90.5 秒** —— 差额全是**排队等别人的请求**。
+#: 同期上游日志显示别的请求在跑 54,178 / 97,429 / 65,473 tokens 的 prompt、
+#: 思考预算 24,000，单个请求能占槽好几分钟。
+#:
+#: ⇒ 「超时」不是模型慢，是**共享单槽 Provider 的排队时间**。
+#: 超时预算里**必须**有这一项，否则一个只要 0.5 秒算力的请求
+#: 也会因为排在别人后面而被我们自己掐断。
+#:
+#: 取值依据：实测单次占槽最久见过 ~5 分钟（65K prompt + 24K 思考预算），
+#: 这里给 **240 秒**，覆盖绝大多数排队情形；再大就会让「真挂了」迟迟不报。
+QUEUE_WAIT_ALLOWANCE = 240.0
+
 
 def compute_timeout(max_tokens: int) -> float:
     """
@@ -67,6 +84,10 @@ def compute_timeout(max_tokens: int) -> float:
     except (TypeError, ValueError):
         mt = 1024
     est = BASE_TIMEOUT + max(0, mt) * PER_TOKEN_TIMEOUT
+    # 【2026-11-16 修 c9】加上共享单槽 Provider 的排队余量。
+    # 不加这一项：max_tokens=1024 时只有 242.88s，而实测**排队**就可能吃掉
+    # 90s+（别人的大 prompt 占槽），于是我们会在模型还没轮到之前就超时。
+    est += QUEUE_WAIT_ALLOWANCE
     return max(MIN_TIMEOUT, min(est, MAX_TIMEOUT))
 
 # ComfyUI 节点名（vrgamedevgirl 插件的本地 LLM 节点，支持图片输入）
@@ -410,8 +431,9 @@ async def call_provider_full(provider: dict, messages: list, images: list | None
         except asyncio.TimeoutError:
             raise ProviderError(
                 f"调用 Provider「{name}」超时（max_tokens={max_tokens}，"
-                f"超时上限 {compute_timeout(max_tokens):.0f} 秒，"
-                f"模型可能未加载或过慢）")
+                f"超时上限 {compute_timeout(max_tokens):.0f} 秒；"
+                f"模型可能未加载、推理过慢，"
+                f"或在**排队等待**前面的请求（共享单槽 Provider）")
         except json.JSONDecodeError as exc:
             raise ProviderError(f"Provider「{name}」返回的不是合法 JSON：{exc}")
         except Exception as exc:
@@ -510,7 +532,15 @@ async def call_provider_with_tools(provider: dict, messages: list,
         raise ProviderError(
             f"Provider「{name}」未标记多模态能力，无法读图。")
 
-    timeout = ClientTimeout(total=float(options.get("timeout", 180)), connect=10)
+    # 【2026-11-16 修 c9】超时**必须**按 max_tokens 推导，不能写死 180。
+    # 写死 180 的后果：Agent 走的就是这条工具调用路径，
+    # 于是 `compute_timeout(1024)=243s` 形同虚设，实际卡在 180s 上，
+    # 而上游共享单槽排队实测就要 90s+ ⇒ 必然超时。
+    # 调用方显式传了 timeout 就以调用方为准。
+    _explicit_timeout = options.get("timeout")
+    timeout_sec = (float(_explicit_timeout) if _explicit_timeout is not None
+                   else compute_timeout(max_tokens))
+    timeout = ClientTimeout(total=timeout_sec, connect=10)
     async with ClientSession(timeout=timeout) as session:
         try:
             if ptype == "ollama":
@@ -606,7 +636,9 @@ async def call_provider_with_tools(provider: dict, messages: list,
         except asyncio.TimeoutError:
             raise ProviderError(
                 f"调用 Provider「{name}」超时（{max_tokens} tokens 上限，"
-                f"模型可能未加载或过慢）")
+                f"超时上限 {timeout_sec:.0f} 秒；"
+                f"模型可能未加载、推理过慢，"
+                f"或在**排队等待**前面的请求（共享单槽 Provider）")
         except json.JSONDecodeError as exc:
             raise ProviderError(f"Provider「{name}」返回的不是合法 JSON：{exc}")
         except Exception as exc:
@@ -691,7 +723,11 @@ async def _replay_stream_text(provider: dict, messages: list,
     }
     payload["chat_template_kwargs"] = {"enable_thinking": False}
 
-    timeout = ClientTimeout(total=float(options.get("timeout", 180)), connect=10)
+    # 【2026-11-16 修 c9】同工具调用路径：按 max_tokens 推导，不写死 180。
+    _explicit_timeout = options.get("timeout")
+    timeout_sec = (float(_explicit_timeout) if _explicit_timeout is not None
+                   else compute_timeout(max_tokens))
+    timeout = ClientTimeout(total=timeout_sec, connect=10)
     async with ClientSession(timeout=timeout) as session:
         async with session.post(f"{base}/v1/chat/completions", json=payload,
                                  headers=_auth_headers(provider)) as resp:
