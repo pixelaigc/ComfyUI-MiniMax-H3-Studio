@@ -63,9 +63,14 @@ class TestSizeLimitMessage(unittest.TestCase):
             2560, 1440, max_pixels=max_pixels, strict_over_limit=True, mode="t2v")
         self.assertTrue(reasons, "2560x1440 应当触发 t2v 超限提示")
         msg = reasons[0]
-        # 上限是 2.0 MP —— 文案里的数字必须与 max_pixels 一致
-        self.assertIn(f"{max_pixels:g}M", msg,
-                      f"文生视频的文案 MP 数与实际上限 {max_pixels}MP 不符：{msg}")
+        # 上限是 2.0 MP —— 文案里的数字必须与 max_pixels 一致。
+        # 【为什么用模块自己的格式化函数而不是自己拼字符串】
+        # 上游用 `_format_limit_mp()` 渲染（2.0 -> "2.0M"、0.8 -> "0.8M"）；
+        # 测试里自己写 f"{max_pixels:g}" 会得到 "2" —— 与实际文案不一致，
+        # 断言就会误报（实测踩过）。
+        expected = vm._format_limit_mp(max_pixels) + "M"
+        self.assertIn(expected, msg,
+                      f"文生视频的文案 MP 数与实际上限不符：{msg}")
         self.assertIn("文生视频", msg, f"文生视频的文案没说模式名：{msg}")
 
     def test_message_limit_number_matches_actual_limit(self):
@@ -76,7 +81,7 @@ class TestSizeLimitMessage(unittest.TestCase):
         """
         for mode in ("flf", "r2v"):
             msg, max_pixels = self._message(mode)
-            self.assertIn(f"{max_pixels:g}M", msg,
+            self.assertIn(vm._format_limit_mp(max_pixels) + "M", msg,
                           f"{mode} 的文案 MP 数与实际上限 {max_pixels}MP 不符：{msg}")
             # 括号里的 px 必须等于 上限 * 1024 * 1024
             import re
