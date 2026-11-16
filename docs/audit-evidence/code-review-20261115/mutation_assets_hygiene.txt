@@ -17,12 +17,14 @@
               -> test_bumped_static_assets_are_not_stale 失败
   ✓ CAUGHT  D-2c video-panel-fallback.js ?v= 回退到 vpfb1
               -> test_bumped_static_assets_are_not_stale 失败
-  ✓ CAUGHT  D-2d 顺手把不该动的 app.js 也升了（过度升版）
+  ✓ CAUGHT  D-2d 顺手把不该动的 video-panel.js 也升了（过度升版）
               -> test_untouched_assets_keep_their_version 失败
+  ✓ CAUGHT  D-2d2 app.js ?v= 回退到 ac1steps1（B-2 修复对老缓存用户失效）
+              -> test_bumped_static_assets_are_not_stale 失败
   ✓ CAUGHT  D-2e 漏掉一个 ?v= 参数
               -> test_every_static_ref_has_version_param 失败
   ✓ CAUGHT  D-2f 静态引用指向不存在的文件
               -> test_static_ref_points_to_existing_file 失败
 ------------------------------------------------------------------------------
-总计 11 个变异，捕获 11，漏网 0
+总计 12 个变异，捕获 12，漏网 0
 还原后回归: rc=0 | 12 passed in 0.03s
