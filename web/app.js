@@ -3265,9 +3265,44 @@ $("#genBtn").addEventListener("click", async () => {
       if (/^refaud\d+$/.test(key)) return "ref_audio";
       return null;
     };
+    // 【2026-11-16 第 3 轮审查 · B-2 修复】**按当前模式限定素材槽位**。
+    //
+    // 【原来错在哪】state.assetRefs 是全局的，切模式时从不清空
+    // （renderMode 只重建 DOM，不重置 state）。而上面这段
+    // Object.entries(state.assetRefs) **无模式判断地全量提交**。
+    // 于是：用户在首尾帧模式选了首帧/尾帧 -> 切到参考生视频
+    // -> 界面上的槽位全是「参考 1..9 / 参考视频 / 参考音乐」，
+    //    **一个首帧槽位都没有**（实测 uiSlots 无「首帧」），
+    //    但提交体里仍然带着 first_frame / last_frame。
+    //
+    // 【实测后果（8190 现场复现）】
+    //   asset_refs = [{"asset_id":"FAKE-1","slot":"first_frame"},
+    //                 {"asset_id":"FAKE-2","slot":"last_frame"}]
+    //   mode = r2v
+    // 前端守卫（app.js:3355）按「有素材引用」判定为「已提供参考素材」
+    // -> 放行；服务端（server.py:3715）按 slot 判定
+    // （只认 ref_image / ref_video / ref_audio）-> 拒绝，
+    // 报「参考模式需要至少 1 个参考素材（图片 / 视频 / 音频）」。
+    // 用户看到的是：界面一片空白（没选任何参考素材），
+    // 点生成却报「缺少参考素材」—— **界面与报错互相矛盾**。
+    //
+    // 【修法】按模式白名单过滤槽位 key。口径与 renderMode 里
+    // 真正 mk() 出来的槽位严格一致（app.js:747-768）：
+    //   flf  -> first / last / refvid0..2 / refaud0..2
+    //   r2v  -> ref0..8 / refvid0..2 / refaud0..2
+    //   其它 -> 无（文生视频等模式没有素材槽位）
+    const MODE_ALLOWED_SLOT_KEYS = {
+      flf: (key) => key === "first" || key === "last"
+        || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
+      r2v: (key) => /^ref\d+$/.test(key)
+        || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
+    };
+    const slotKeyAllowed = MODE_ALLOWED_SLOT_KEYS[mode] || (() => false);
     const groupCounter = {};
     Object.entries(state.assetRefs || {}).forEach(([key, item]) => {
       if (!item || !item.asset_id) return;
+      // 当前模式不渲染这个槽位 -> 不提交（否则是「看不见却带上去」的幽灵输入）
+      if (!slotKeyAllowed(key)) return;
       const group = GROUP_OF_KEY(key);
       const slot = SLOT_FOR_KEY[key] || group;
       if (!slot) return;

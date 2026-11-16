@@ -384,12 +384,12 @@
     const analyzed = asset.analyzed
       ? `<span class="badge" title="已有模型分析">已分析</span>` : "";
     const inTrash = asset.deleted_at ? `<span class="badge" style="background:rgba(200,50,55,.85)">回收站</span>` : "";
+    // 多选勾选框：**只在多选模式下**才渲染。
+    // 默认不显示 —— 用户点「多选」按钮进入多选模式后才出现。
+    // 放在缩略图左下角，单独一个 .al-selbox-wrap，
+    // 避免和卡片的「点开详情」冲突。
     return `<div class="al-card${state.selected.has(asset.id) ? " selected" : ""}" data-id="${esc(asset.id)}" draggable="true">
       <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}
-        <!-- 【2026-11-15 A3 补漏】多选勾选框：**只在多选模式下**才渲染。
-             默认不显示 —— 用户点「多选」按钮进入多选模式后才出现。
-             放在缩略图左下角，单独一个 .al-selbox-wrap，
-             避免和卡片的「点开详情」冲突。 -->
         ${state.multiMode ? `<label class="al-selbox-wrap" title="选中（可多选后批量删除）" onclick="return false;">
           <input type="checkbox" class="al-selbox" data-sel-id="${esc(asset.id)}"
                  ${state.selected.has(asset.id) ? "checked" : ""}
@@ -1013,12 +1013,12 @@
     const menu = $("#alContext");
     if (!menu) return;
     const asset = state.items.find(a => a.id === assetId);
+    // 添加到播放器清单：播放器只播用户主动挑的条目
     menu.innerHTML = `
       <button data-act="open">查看详情</button>
       <button data-act="copy-id">复制素材 ID</button>
       <button data-act="download">下载原文件</button>
       <div class="ctx-sep"></div>
-      <!-- 【A2】添加到播放器清单：播放器只播用户主动挑的条目 -->
       <button data-act="add-player">▶ 添加到播放器</button>
       <button data-act="remove-player">✕ 从播放器移除</button>
       <div class="ctx-sep"></div>

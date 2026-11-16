@@ -1,0 +1,22 @@
+==============================================================================
+变异自证结果：B-2 跨模式槽位串台修复
+==============================================================================
+  ✓ CAUGHT  B2-a 删除模式闸门整行
+              -> test_r2v_submission_excludes_flf_only_slots 失败
+  ✓ CAUGHT  B2-b 闸门恒真（改成 if (true) return 之外的写法）
+              -> test_r2v_submission_excludes_flf_only_slots 失败
+  ✓ CAUGHT  B2-c flf 白名单误加参考图槽位
+              -> test_r2v_then_flf_excludes_ref_image_slots 失败
+  ✓ CAUGHT  B2-d r2v 白名单误加首尾帧槽位
+              -> test_r2v_submission_excludes_flf_only_slots 失败
+  ✓ CAUGHT  B2-e r2v 白名单退化成恒真
+              -> test_r2v_submission_excludes_flf_only_slots 失败
+  ✓ CAUGHT  B2-f 未知模式默认放行
+              -> test_t2v_submits_no_assets 失败
+  ✓ CAUGHT  B2-g 共享槽位被误过滤
+              -> test_shared_slots_work_in_both_modes 失败
+  ✓ CAUGHT  B2-h flf 首尾帧被误过滤
+              -> test_flf_submission_still_includes_its_own_slots 失败
+------------------------------------------------------------------------------
+总计 8 个变异，捕获 8，漏网 0
+还原后回归: rc=0 | 8 passed in 0.18s

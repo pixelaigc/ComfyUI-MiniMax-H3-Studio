@@ -1,0 +1,28 @@
+==============================================================================
+变异自证结果：A-6 / D-2 新断言
+==============================================================================
+  ✓ CAUGHT  A-6a 注入 HTML 注释到 assets.js
+              -> test_no_html_comment_in_any_js_template 失败
+  ✓ CAUGHT  A-6b 注入 HTML 注释到 app.js
+              -> test_no_html_comment_in_any_js_template 失败
+  ✓ CAUGHT  A-6c 注入 HTML 注释到 providers.js
+              -> test_no_html_comment_in_any_js_template 失败
+  ✓ CAUGHT  A-6d 注释「移到模板外」被整个删掉
+              -> test_assets_js_comment_moved_outside_template 失败
+  ✓ CAUGHT  A-6e 右键菜单注释被整个删掉
+              -> test_assets_js_comment_moved_outside_template 失败
+  ✓ CAUGHT  D-2a assets.js ?v= 回退到 uxbatch1
+              -> test_bumped_static_assets_are_not_stale 失败
+  ✓ CAUGHT  D-2b agent_sessions.js ?v= 回退到 agtsess2
+              -> test_bumped_static_assets_are_not_stale 失败
+  ✓ CAUGHT  D-2c video-panel-fallback.js ?v= 回退到 vpfb1
+              -> test_bumped_static_assets_are_not_stale 失败
+  ✓ CAUGHT  D-2d 顺手把不该动的 app.js 也升了（过度升版）
+              -> test_untouched_assets_keep_their_version 失败
+  ✓ CAUGHT  D-2e 漏掉一个 ?v= 参数
+              -> test_every_static_ref_has_version_param 失败
+  ✓ CAUGHT  D-2f 静态引用指向不存在的文件
+              -> test_static_ref_points_to_existing_file 失败
+------------------------------------------------------------------------------
+总计 11 个变异，捕获 11，漏网 0
+还原后回归: rc=0 | 12 passed in 0.03s
