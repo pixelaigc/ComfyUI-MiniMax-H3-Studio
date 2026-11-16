@@ -3670,6 +3670,21 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     if mode not in JOB_MODES:
         raise JobValidationError(f"未知模式 {mode}")
 
+    # 【2026-11-16 新增】素材引用必须是**素材库里已入库**的素材。
+    #
+    # 【为什么必须查库，而不是只看 id 格式】素材 id 形如
+    # `asset_<12 位 hex>`。只查前缀的话，一个**根本不存在**的 id 也能过 ——
+    # 错误会推迟到 worker 里「素材不存在或已删除」，用户看到的又是兜底文案。
+    # 查库才能给出「该媒体尚未入库素材库，请先上传到素材库后再引用」
+    # 这种能照着改的中文原因。
+    #
+    # 【线上探针实测】这一条之前**漏接**了：伪造的
+    # asset_000000000000 提交后返回 200 并建了任务（worker 才去报「素材不存在」）。
+    try:
+        asset_ref_guard.check_asset_refs(asset_refs)
+    except asset_ref_guard.AssetLibraryError as exc:
+        raise JobValidationError(exc.message, code=exc.code) from exc
+
     # 【2026-11-16 新增】随机种子：只允许正整数。
     #
     # 【原来错在哪】种子**一路不校验**地流到 worker：

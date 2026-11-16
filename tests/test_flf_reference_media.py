@@ -249,12 +249,18 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
     def test_asset_library_reference_media_is_accepted(self):
         """素材库来源的参考视频 / 参考音乐 -> 放行。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
-             {"asset_id": "v", "slot": "ref_video", "ordinal": 0},
-             {"asset_id": "au", "slot": "ref_audio", "ordinal": 0}], {})
+        with temp_asset_library(image=1, video=1, audio=1) as ids:
+            refs = [{"asset_id": ids["image"][0], "slot": "last_frame",
+                     "ordinal": 0}]
+            if ids["video"]:
+                refs.append({"asset_id": ids["video"][0],
+                             "slot": "ref_video", "ordinal": 0})
+            if ids["audio"]:
+                refs.append({"asset_id": ids["audio"][0],
+                             "slot": "ref_audio", "ordinal": 0})
+            server.prepare_job_params("flf", params, refs, {})
         # 素材库来源在提交阶段不写 params（worker 上传后才落），
         # 但也不能因此报错。
         self.assertNotIn("ref_videos", params)
@@ -425,12 +431,18 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
         【2026-11-16】本地直传已被拒绝 -> 改用素材库引用验证。
         """
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "r2v", params,
-            [{"asset_id": "img", "slot": "ref_image", "ordinal": 0},
-             {"asset_id": "vid", "slot": "ref_video", "ordinal": 0},
-             {"asset_id": "aud", "slot": "ref_audio", "ordinal": 0}], {})
+        with temp_asset_library(image=1, video=1, audio=1) as ids:
+            refs = [{"asset_id": ids["image"][0], "slot": "ref_image",
+                     "ordinal": 0}]
+            if ids["video"]:
+                refs.append({"asset_id": ids["video"][0],
+                             "slot": "ref_video", "ordinal": 0})
+            if ids["audio"]:
+                refs.append({"asset_id": ids["audio"][0],
+                             "slot": "ref_audio", "ordinal": 0})
+            server.prepare_job_params("r2v", params, refs, {})
         self.assertNotIn("first_frame", params)
         self.assertNotIn("last_frame", params)
 
@@ -444,34 +456,46 @@ class TestFlfAudioTrackVisibility(unittest.TestCase):
     def test_asset_reference_video_enables_video_bg_option(self):
         """素材库参考视频 -> (c) 可选，且提交阶段不把选择改掉。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "video_bg"}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
-             {"asset_id": "v", "slot": "ref_video", "ordinal": 0}], {})
+        with temp_asset_library(image=1, video=1) as ids:
+            refs = [{"asset_id": ids["image"][0], "slot": "last_frame",
+                     "ordinal": 0}]
+            if ids["video"]:
+                refs.append({"asset_id": ids["video"][0],
+                             "slot": "ref_video", "ordinal": 0})
+            server.prepare_job_params("flf", params, refs, {})
         self.assertEqual(params["audio_track_source"], "video_bg")
 
     def test_asset_reference_audio_enables_reference_option(self):
         """素材库参考音乐 -> (b) 可选。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "reference"}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
-             {"asset_id": "au", "slot": "ref_audio", "ordinal": 0}], {})
+        with temp_asset_library(image=1, audio=1) as ids:
+            refs = [{"asset_id": ids["image"][0], "slot": "last_frame",
+                     "ordinal": 0}]
+            if ids["audio"]:
+                refs.append({"asset_id": ids["audio"][0],
+                             "slot": "ref_audio", "ordinal": 0})
+            server.prepare_job_params("flf", params, refs, {})
         self.assertEqual(params["audio_track_source"], "reference")
 
     def test_asset_library_reference_media_enables_options(self):
         """素材库来源的参考音乐 / 参考视频 -> (b)/(c) 也可选。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "reference"}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "ref_audio", "ordinal": 0},
-             {"asset_id": "b", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1, audio=1) as ids:
+            refs = [{"asset_id": ids["image"][0], "slot": "last_frame",
+                     "ordinal": 0}]
+            if ids["audio"]:
+                refs.append({"asset_id": ids["audio"][0],
+                             "slot": "ref_audio", "ordinal": 0})
+            server.prepare_job_params("flf", params, refs, {})
         self.assertEqual(params["audio_track_source"], "reference")
 
     def test_no_reference_media_falls_back_to_generated(self):
@@ -481,12 +505,15 @@ class TestFlfAudioTrackVisibility(unittest.TestCase):
         不是空串 —— 空串是**前端**下拉的占位值（没有 option.value）。
         """
         import server
+        from assetlib_fixture import temp_asset_library
         from h3studio import h3_audio_track as h3audio
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "video_bg"}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "last_frame",
+                  "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"],
                          h3audio.TRACK_GENERATED)
 

@@ -33,6 +33,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "tests"))
 
 APP_JS = (REPO / "web" / "app.js").read_text(encoding="utf-8")
 SEED_GUARD_JS = (REPO / "web" / "seed-guard.js").read_text(encoding="utf-8")
@@ -374,13 +375,16 @@ class TestSeedGuardBackend(unittest.TestCase):
 
     def _expect_rejected(self, bad):
         import server
+        from assetlib_fixture import temp_asset_library
         params = self._params()
         params["seed"] = bad
-        with self.assertRaises(server.JobValidationError) as ctx:
-            # flf 需要至少一帧 -> 用一个素材库引用占位（它只查槽位，不查库）
-            server.prepare_job_params(
-                "flf", params,
-                [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            with self.assertRaises(server.JobValidationError) as ctx:
+                # flf 需要至少一帧 -> 用素材库里**真实**的素材占位
+                server.prepare_job_params(
+                    "flf", params,
+                    [{"asset_id": ids["image"][0], "slot": "last_frame",
+                      "ordinal": 0}], {})
         return ctx.exception
 
     def test_zero_is_rejected(self):
@@ -429,31 +433,40 @@ class TestSeedGuardBackend(unittest.TestCase):
     def test_valid_positive_integer_is_accepted(self):
         """正整数 -> 放行，并归一成 int。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = self._params()
         params["seed"] = "4242"
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "last_frame",
+                  "ordinal": 0}], {})
         self.assertEqual(params["seed"], 4242)
         self.assertIsInstance(params["seed"], int)
 
     def test_empty_seed_means_random(self):
         """留空 = 随机（面板上写着「留空随机」）。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = self._params()
         params["seed"] = ""
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "last_frame",
+                  "ordinal": 0}], {})
         self.assertIsNone(params["seed"])
 
     def test_missing_seed_key_is_fine(self):
         """根本没传 seed -> 放行（走随机）。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = self._params()
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "last_frame",
+                  "ordinal": 0}], {})
         self.assertIsNone(params.get("seed"))
 
     def test_random_token_is_accepted(self):
