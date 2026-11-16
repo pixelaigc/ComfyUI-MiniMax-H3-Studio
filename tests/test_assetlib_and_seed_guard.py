@@ -314,6 +314,76 @@ class TestBackendAcceptsLibraryAssets(unittest.TestCase):
         self.assertIn("素材库", ctx.exception.message)
 
 
+class TestImageEditRefsAreLibraryChecked(unittest.TestCase):
+    """图片编辑（i2i_qwen / i2i_h3image）的参考图也必须**真的在库里**。
+
+    【为什么单独立一组】参考图走的是 **params["ref_images"]**（带描述 /
+    标签的元数据），而 flf / r2v / a2a 走的是 **asset_refs**
+    （{asset_id, slot, ordinal}）—— **两条不同的通道**。
+
+    h3studio/ref_images.py 的 normalize_refs / validate_refs 都是
+    **纯 dict 处理**（该文件里没有任何 DB 访问），`missing` 标记还是
+    **前端传什么就信什么**。所以这条通道原本**完全没查过库**：
+    库里不存在的 id 也能通过校验、任务建成，直到 worker 里
+    _upload_ref_images 才抛 RuntimeError —— 用户看到的是兜底文案。
+    """
+
+    def _i2i_params(self, asset_id):
+        return {"prompt": "改成夜景",
+                "ref_images": [{"asset_id": asset_id, "description": "x"}]}
+
+    def test_i2i_qwen_rejects_unknown_asset_id(self):
+        """i2i_qwen：库里不存在的 asset_id -> 提交前就拒。"""
+        import server
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "i2i_qwen", self._i2i_params("asset_ffffffffffff"), [], {})
+        self.assertEqual(ctx.exception.code, "asset_not_in_library")
+        self.assertIn("素材库", ctx.exception.message)
+
+    def test_i2i_h3image_rejects_unknown_asset_id(self):
+        """i2i_h3image：同样在提交前拒。"""
+        import server
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "i2i_h3image", self._i2i_params("asset_ffffffffffff"), [], {})
+        self.assertEqual(ctx.exception.code, "asset_not_in_library")
+
+    def test_i2i_rejects_category_mismatch(self):
+        """拿视频当参考图 -> 类型错配被拒（不能到 worker 才炸）。"""
+        import server
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(video=1) as ids:
+            if not ids["video"]:
+                self.skipTest("建不出视频素材")
+            with self.assertRaises(server.JobValidationError) as ctx:
+                server.prepare_job_params(
+                    "i2i_qwen", self._i2i_params(ids["video"][0]), [], {})
+            self.assertEqual(ctx.exception.code, "asset_category_mismatch")
+
+    def test_i2i_accepts_real_library_asset(self):
+        """库里真有的图片 -> 正常通过（不能误杀）。"""
+        import server
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(image=1) as ids:
+            if not ids["image"]:
+                self.skipTest("建不出图片素材")
+            params = self._i2i_params(ids["image"][0])
+            server.prepare_job_params("i2i_qwen", params, [], {})
+            self.assertEqual(params["ref_images"][0]["asset_id"], ids["image"][0])
+
+    def test_a2a_reference_audio_is_library_checked(self):
+        """a2a 的参考音频（走 asset_refs）也必须查库。"""
+        import server
+        params = {"prompt": "一段摇滚"}
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "a2a", params,
+                [{"asset_id": "asset_ffffffffffff", "slot": "ref_audio",
+                  "ordinal": 0}], {})
+        self.assertEqual(ctx.exception.code, "asset_not_in_library")
+
+
 # ==================================================================
 # 2) 素材库强制引用 —— 前端
 # ==================================================================
