@@ -1557,7 +1557,10 @@
 <!-- enhance-menu-shared.js 是**共用**增强组件（渲染 / 定位 / 开合 / 写回能力契约）：
      图像面板与音乐面板都用它 —— 必须**先于** enhance-menu.js 加载。 -->
 <script src="/static/enhance-menu-shared.js?v=cr20261115b"></script>
-<script src="/static/enhance-menu.js?v=cr20261115b"></script>
+<!-- 【2026-11-16 S5】升 enhance-menu.js 的 ?v= 到 cr20261116b ——
+     S5 给 director 条目补了显式 write 契约声明（行为不变，
+     但内容变了）⇒ 必须破缓存，否则老用户拿到的还是旧文件。 -->
+<script src="/static/enhance-menu.js?v=cr20261116b"></script>
 <!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
      window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
 <script src="/static/music-enhance.js?v=cr20261115b"></script>

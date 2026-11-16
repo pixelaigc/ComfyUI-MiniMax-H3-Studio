@@ -474,6 +474,34 @@ class _E2EBase(unittest.TestCase):
 
     # ------------------------------------------------------------ 模型打桩
     def _patch_model(self, turns):
+        """把**两条** LLM 调用链都打桩。
+
+        【2026-11-16 S5 修 —— 补上第二条链】
+        原来只打桩了 Agent 主循环用的
+          ``agent_mod.llm_client.call_provider_with_tools``
+        但 **create_job 工具在建任务前会走一次「提示词增强管线」**：
+          ``h3studio/agent.py:1581`` -> ``agent_enhance.enhance_for_mode``
+          -> ``agent_enhance._text_enhance`` -> ``h3studio/llm.py::call_provider``
+        —— 那是**另一个模块**（``h3studio.llm``）、**另一个函数**
+        （``call_provider`` 而不是 ``call_provider_with_tools``），
+        原来没被打桩 -> 增强管线**真的去调本机 LLM**
+        （替身里注册的 provider 指向 ``http://127.0.0.1:5000``）。
+
+        实测证据（本轮现场插桩）：
+          总耗时 17.06s，其中 ``call_provider`` = **10.50s**（占 62%）
+          单独测同一 provider 的真实响应：10.5s ~ 27.9s（随本机负载波动）
+        而用例的等待预算是 ``page.expect_response(timeout=90000)`` ——
+        本机 LLM 忙一点 + 其它测试抢资源 -> 90s 被击穿 -> 偶发失败。
+
+        这不是「预算不够」，是**测试隔离缺陷**：E2E 用例不该依赖
+        本机 LLM 的**可用性**和**速度**。补上打桩后，
+        增强管线返回固定文本 -> 用例只测它该测的东西
+        （一次性 JSON 路径 + 工具卡的「参数」「结果」两行）。
+
+        【为什么不用 skip / xfail】
+        那是掩盖缺陷。真实缺陷在**测试自身**（没隔离外部依赖），
+        修测试隔离才是正解 —— 产品代码一行没动。
+        """
         original = agent_mod.llm_client.call_provider_with_tools
         calls = {"n": 0}
 
@@ -488,6 +516,25 @@ class _E2EBase(unittest.TestCase):
         self.addCleanup(
             lambda: setattr(agent_mod.llm_client,
                             "call_provider_with_tools", original))
+
+        # ---- 第二条链：提示词增强管线的 llm.call_provider ----
+        import h3studio.llm as enhance_llm
+        original_enhance = enhance_llm.call_provider
+
+        async def fake_enhance_call(provider, messages, options=None, **kw):
+            """增强管线的 LLM 返回固定扩写文本。
+
+            返回值必须能通过增强管线的校验：
+              * 非空
+              * 不是系统提示词复读（echo 检测）
+              * 不违反提示词硬约束（validate_output）
+            """
+            return ("雨夜霓虹街道，霓虹招牌倒映在湿润的柏油路面上，"
+                    "镜头缓慢向前推进，赛博朋克都市夜景，细节丰富。")
+
+        enhance_llm.call_provider = fake_enhance_call
+        self.addCleanup(
+            lambda: setattr(enhance_llm, "call_provider", original_enhance))
 
     # ------------------------------------------------------------ 一次性路径
     def _run_one_shot(self, turns):
