@@ -63,6 +63,13 @@ DEV_MARKERS = [
 ]
 DEV_RE = re.compile("|".join(DEV_MARKERS))
 
+#: 【变异防护 —— 防止断言恒失败】
+#: 原写法 `DEV_RE.search(m)` 在**单个 marker 字符串**上搜它自己 ->
+#: 必然命中 -> 「DOM 无开发者措辞标记」恒为 FAIL。
+#: 这里留一条**反向变异样本**：把这段污染文案注入 DOM 内容后，
+#: 断言必须报出命中（否则说明断言根本没在查内容）。
+_MUTATION_SENTINEL = "【2026-11-16 变异哨兵】TODO: 此处仅用于对齐布局"
+
 console_log = []
 page_errors = []
 unhandled = []
@@ -196,16 +203,33 @@ def main():
         record("骨架卡旧文案不在 DOM 中", not exact_hits,
                f"命中: {exact_hits}" if exact_hits else "0 命中")
 
+        # 【2026-11-16 第5轮 修 —— 这个断言原本恒失败】
+        # 原写法：`found = DEV_RE.search(m)` —— m 是**单个 marker 字符串**，
+        # 在它自己身上搜它自己 -> **必然命中** -> dev_hits 永远非空
+        # -> 「DOM 无开发者措辞标记」这个断言恒为 FAIL。
+        # （第4轮同一处也是这么写的，所以那一轮的这条结论不可信。）
+        #
+        # 正确写法：在**真实 DOM 内容**（combined）里搜每个 marker。
         dev_hits = []
         for m in DEV_MARKERS:
-            found = DEV_RE.search(m)
+            found = re.search(m, combined)
             if found:
                 # 定位上下文
-                idx = combined.find(found.group(0))
+                idx = found.start()
                 ctx = combined[max(0, idx - 60): idx + 60].replace("\n", " ")
                 dev_hits.append(f"{found.group(0)!r} :: {ctx}")
         record("DOM 无开发者措辞标记", not dev_hits,
                "; ".join(dev_hits[:8]) if dev_hits else "0 命中")
+
+        # 【变异防护】把污染文案注入 DOM 内容后，这道断言必须报出命中。
+        # 少了这一条，断言可能因为「搜错了对象」而恒 PASS —— 那样「0 命中」
+        # 根本不能证明 DOM 干净。
+        mutation_hits = [m for m in DEV_MARKERS
+                         if re.search(m, combined + "\n" + _MUTATION_SENTINEL)]
+        record("【变异防护】注入污染后断言必须报命中", len(mutation_hits) > 0,
+               f"注入样本命中 {len(mutation_hits)} 个 marker —— "
+               + ("断言确实在查 DOM 内容" if mutation_hits
+                  else "!! 断言没在查内容（恒 PASS 风险）"))
 
         record("DOM 注释节点数（对照基线）", True,
                f"commentNodes={dom['commentNodes']} "
