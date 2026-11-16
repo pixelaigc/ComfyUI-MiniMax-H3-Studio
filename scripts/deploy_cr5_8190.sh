@@ -109,6 +109,7 @@ git checkout "$MERGE_COMMIT" -- \
   scripts/compare_suite_cr5.sh \
   scripts/cr5_scan_text_candidates.py \
   scripts/serial_recheck_cr5.sh \
+  scripts/deploy_cr5_8190.sh \
   tests/test_cr5_c_segment.py \
   tests/test_cr5_text_scanner.py \
   tests/test_visible_text_pollution.py \
@@ -116,6 +117,45 @@ git checkout "$MERGE_COMMIT" -- \
 git -C "$LIVE" status --porcelain | grep -v '^??' | head -20
 echo "(上面应只列出本轮改的文件 = 部署成功)"
 echo "live HEAD = $(git -C "$LIVE" rev-parse HEAD)"
+
+# 【部署后的完整性自检 —— 2026-11-16 第5轮实测踩坑】
+# `git checkout <commit> -- <files>` 只更新**清单里列的路径**；
+# 清单外的路径若在 live 的 index 里是「tracked 且工作区缺失」的状态，
+# 会被 git 当成「该路径在新 commit 里不存在」而**删除**。
+# 本轮就踩到了：脚本把自己（deploy_cr5_8190.sh）漏在清单外，
+# 结果脚本在运行途中把自己删了（live 工作区出现 D scripts/deploy_cr5_8190.sh）。
+# 修法：① 清单里包含自己；② 部署后逐个核「本轮文件都在工作区」。
+echo
+echo "=== 部署完整性自检 ==="
+MISSING=0
+for f in h3studio/agent.py h3studio/agent_settings.py h3studio/analysis_jobs.py \
+         h3studio/assets.py h3studio/frame_expr.py h3studio/gen_normalize.py \
+         h3studio/h3_video_modes.py h3studio/video_models.py \
+         h3studio/video_workflow.py h3studio/workflows.py server.py \
+         web/app.js web/index.html \
+         scripts/verify_cr5_8190_browser.py scripts/compare_suite_cr5.sh \
+         scripts/cr5_scan_text_candidates.py scripts/serial_recheck_cr5.sh \
+         scripts/deploy_cr5_8190.sh \
+         tests/test_cr5_c_segment.py tests/test_cr5_text_scanner.py \
+         tests/test_visible_text_pollution.py tests/test_frontend_assets_hygiene.py; do
+  if [ ! -f "$LIVE/$f" ]; then
+    echo "  缺失: $f"
+    MISSING=$((MISSING + 1))
+  fi
+done
+if [ "$MISSING" -eq 0 ]; then
+  echo "  本轮 23 个文件全部就位"
+else
+  echo "  !! 缺失 $MISSING 个文件 —— 需要补 checkout"
+  exit 1
+fi
+# 工作区与 HEAD 必须完全一致（tracked）
+if [ -n "$(git -C "$LIVE" diff --name-only HEAD)" ]; then
+  echo "  !! live 工作区与 HEAD 不一致："
+  git -C "$LIVE" diff --name-only HEAD
+  exit 1
+fi
+echo "  live 工作区与 HEAD 完全一致"
 
 echo
 echo "=== 5) 重启服务 + 探活 ==="
