@@ -1,0 +1,875 @@
+[
+ {
+  "tool": "list_modes",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 173.5,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "list_modes",
+    "ok": true,
+    "ms": 57299,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 116181,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "本工作台共支持 11 个生成模式：\n\n**视频**：t2v（文生视频）、flf（首尾帧生成，需 first_frame/last_frame）、r2v（参考图生成视频）\n**图像**：t2i（Z-Image 文生图）、t2i_qwen（Qwen-Image 2.1 文生图）、i2i_qwen（Qwen 图片编辑）、t2i_moss（MOSS-Image 文生图）、t2i_h3image（H3-Image 文生图）、i2i_h3image"
+ },
+ {
+  "tool": "search_assets",
+  "args": {
+   "query": "雨夜"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 191.1,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "search_assets",
+    "ok": true,
+    "ms": 18546,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 172581,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已按你的要求只调用 search_assets（query=\"雨夜\"），共命中 5 个素材：1 个视频「雨夜霓虹-2分钟480P-端到端实测成片.mp4」（asset_06420314cd7a，标签含 120秒/480p/H3/YuE2/Z-IMAGE/成片）+ 4 张由该视频抽出的帧图（asset_f32b833f30e0 / asset_9c2af7fe8969 / asset_f65c87f58dee / asset_2703a8"
+ },
+ {
+  "tool": "describe_asset",
+  "args": {
+   "asset_id": "asset_21f5d051d841"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 176.4,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "describe_asset",
+    "ok": true,
+    "ms": 9369,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 166977,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已查看素材 asset_21f5d051d841：名称「火星基地_宇航员_参考图.png」，类型为图片（photo），尺寸 1360×768，无标签，尚无模型分析结论（素材描述为空）。如需基于它做图像编辑或参考生视频，可直接告诉我用途。"
+ },
+ {
+  "tool": "enhance_prompt",
+  "args": {
+   "prompt": "a girl walking in the rain",
+   "mode": "t2v"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 305.8,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "enhance_prompt",
+    "ok": true,
+    "ms": 124317,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 181424,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 enhance_prompt（prompt=\"a girl walking in the rain\"，mode=\"t2v\"），使用工作台内置的 video-director 增强模板，校验通过（validation_ok=true）。扩写结果包含分镜描述（[Shot 1] 平视固定镜头 + 00:06 低角度跟拍）、整体声景（雨声白噪、脚步水花、远处车流）以及非叙事音乐（慢速氛围钢琴 + 低频 drone）。原始提示词与增强后完"
+ },
+ {
+  "tool": "list_prompt_presets",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 219.5,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "list_prompt_presets",
+    "ok": true,
+    "ms": 62302,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 157134,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "工作台内置 14 个提示词增强预设，按媒体类型分组：\n\n**图像（9）**\n- image — Z-Image 官方 PE（t2i）\n- image-refine — 物体细化二次增强\n- image-scalist — SCALIST 结构化\n- image-bbox — FLUX 3 官方 bbox 元素表格式\n- qwen21-pe-t2i / qwen21-pe-i2i — Qwen-Image 2.1 官方 PE（文生图 / "
+ },
+ {
+  "tool": "get_prompt_preset",
+  "args": {
+   "spec_id": "cinematic"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 19.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "get_prompt_preset",
+    "ok": false,
+    "ms": 8559,
+    "error": "未知预设 cinematic。可用预设：image、image-refine、image-scalist、image-bbox、yue2-style、music-refine、qwen21-pe-t2i、qwen21-pe-i2i、moss-image、h3image-pe-t2i、h3image-pe-i2i、vid"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 10716,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 get_prompt_preset(spec_id=\"cinematic\")，但工作台没有名为 cinematic 的预设。可用的预设有：image、image-refine、image-scalist、image-bbox、yue2-style、music-refine、qwen21-pe-t2i、qwen21-pe-i2i、moss-image、h3image-pe-t2i、h3image-pe-i2i、video、vide"
+ },
+ {
+  "tool": "describe_mode_params",
+  "args": {
+   "mode": "r2v"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 17.0,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "describe_mode_params",
+    "ok": true,
+    "ms": 3781,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 13238,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已查询 r2v（参考生视频）模式的参数说明：\n\n- **比例 aspect**：1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9，默认 16:9\n- **分辨率 resolution**：仅 544p / 768p，默认 768p\n- **时长 duration**：2~60 秒（步长 1），默认 5 秒\n- **模型 model**：lora（唯一取值）\n- **加速 LoRA lora"
+ },
+ {
+  "tool": "get_mode_schema",
+  "args": {
+   "mode": "t2v"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 104.4,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "get_mode_schema",
+    "ok": true,
+    "ms": 76679,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 27748,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已获取 t2v（文生视频）模式的参数 schema：\n\n- **比例 aspect**：1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9（默认 16:9）\n- **分辨率 resolution**：仅 544p / 768p（默认 768p，无 1080p）\n- **时长 duration**：2~60 秒，步进 1（界面滑块默认 5s）\n- **模型 model**：lora（唯一取值）"
+ },
+ {
+  "tool": "recall_memory",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 29.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "recall_memory",
+    "ok": true,
+    "ms": 19130,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 10036,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已读取记忆库，共 4 条全局偏好记录：audit_probe_pref=v1、audit_probe_key=v1、audit_tmp_20261116=probe、acceptance_probe_tmp=tmp。这些看起来都是探测/验收用的临时条目，没有实际的创作偏好（如常用比例、模型）。如需我按你的习惯默认参数生成，可以告诉我常用配置，我会记住。"
+ },
+ {
+  "tool": "search_conversations",
+  "args": {
+   "query": "视频"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 21.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "search_conversations",
+    "ok": true,
+    "ms": 7965,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 13310,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已检索历史会话中关于「视频」的内容，共命中 10 条（返回前 7 条）。主要内容为之前的工具调用审计记录：t2v / r2v 模式的参数 schema 查询（比例 8 档、分辨率仅 544p/768p）、提示词预设列表（含 video-director 视频导演向模板）、生成模式清单（视频类 t2v/flf/r2v），以及一次已下发的文生视频任务 job d39a24826295（提示词「审计探针批量 1」，状态 queued）。未发现"
+ },
+ {
+  "tool": "search_asset_history",
+  "args": {
+   "query": "雨夜"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 75.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "search_asset_history",
+    "ok": true,
+    "ms": 19803,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 55426,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已按你的要求只调用 search_asset_history（query=\"雨夜\"），命中 5 条素材记录：\n\n1. **asset_06420314cd7a**（video）「雨夜霓虹-2分钟480P-端到端实测成片.mp4」— 标签：120秒 / 480p / H3 / YuE2 / Z-IMAGE / e2e2min / 成片\n2. **asset_f32b833f30e0**（image）同名视频抽帧 frame1\n3. **a"
+ },
+ {
+  "tool": "list_asset_tags",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 50.1,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "list_asset_tags",
+    "ok": true,
+    "ms": 24291,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 25767,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 list_asset_tags，素材库共 288 个标签。使用最多的前几个：主体人物(200)、服装与配饰(122)、画面(91)、光线与色彩(79)、场景与环境(79)、冷色调为主(78)、独自站在桥上(78)、雨夜的石桥(78)、色彩(56)。此外还有大量颜色类标签（RGB近似值、FF0000 等）和「纯色背景/无光影变化」这类描述性标签。需要的话我可以把这些标签打到指定素材上（tag_asset）。"
+ },
+ {
+  "tool": "list_jobs",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 35.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "list_jobs",
+    "ok": true,
+    "ms": 16290,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 18755,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已查询历史生成任务：共 10 条记录。最近一条为 t2i（Z-IMAGE 文生图）任务 1c2ec646db1f，状态已完成（进度 12/12 节点），产物 images/i-zimage-000217.png（1360×768，16:9），原始提示词为「中国漂亮女性。随手街拍风格」，模型 z_image_bf16、resolution 1mp、steps 25、cfg 4.0。其余任务详情在返回结果中被截断，如需逐条展开可用 get_"
+ },
+ {
+  "tool": "get_job_status",
+  "args": {
+   "job_id": "8771898a7480"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 166.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "get_job_status",
+    "ok": true,
+    "ms": 21711,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 144069,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "任务 8771898a7480（r2v 参考生视频）已完成，耗时约 56 秒。产物：videos/v-h3-studio-000364.mp4（512×288，288p，时长 2.0s），使用了参考图 asset_21f5d051d841 与参考音频 asset_bfaca307e2cf（音轨来源=reference）。无报错。"
+ },
+ {
+  "tool": "manage_media_library",
+  "args": {
+   "scope": "failed",
+   "dry_run": true
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 14.0,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "manage_media_library",
+    "ok": true,
+    "ms": 10097,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 3854,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已做失败/取消产物的清理预览（未实际删除）：共命中 14 条任务记录、0 个产物文件（其中 13 条 failed、1 条 canceled，均无产物文件）。如需真正执行清理，回复确认后我会用 confirm=true 再跑一次。"
+ },
+ {
+  "tool": "read_file",
+  "args": {
+   "path": "/etc/hostname"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 74.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "read_file",
+    "ok": false,
+    "ms": 67990,
+    "error": "文件读取能力已启用但没有配置允许读取的目录（请在「agent 管理」里填写 file_roots）"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 6271,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 read_file 读取 /etc/hostname，但工具返回错误：文件读取能力虽已启用，但未配置允许读取的目录（需在「agent 管理」中填写 file_roots）。因此无法读取该文件。若需要读取，请先在「agent 管理」里配置允许读取的目录后再试。"
+ },
+ {
+  "tool": "web_search",
+  "args": {
+   "query": "ComfyUI MiniMax H3"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 43.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "web_search",
+    "ok": true,
+    "ms": 31681,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 11601,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已完成对「ComfyUI MiniMax H3」的外部检索，要点如下：\n\n1. **官方入口**：comfy.org/minimax-h3/ —— Comfy 提供 MiniMax H3 工作流模板，可在画布上直接加载或把 H3 节点加入任意工作流；走 Comfy Cloud 时不需要本地 GPU。\n2. **模型权重**：HuggingFace 上有 Comfy-Org/MiniMax-H3，是为 ComfyUI 重新打包的模型文件（"
+ },
+ {
+  "tool": "media_probe",
+  "args": {
+   "asset_id": "asset_61f1b6fd9a1d"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 25.4,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_probe",
+    "ok": true,
+    "ms": 12844,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 12561,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已探测素材「H3Studio_火星基地_2分钟_480P.mp4」（asset_61f1b6fd9a1d）：视频 864×480、24fps、h264/yuv420p，时长约 120 秒；音轨 aac、44.1kHz 立体声；容器 mov，大小约 27.2 MB。"
+ },
+ {
+  "tool": "media_concat",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 112.7,
+  "status": "needs_clarification",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_concat",
+    "ok": false,
+    "ms": 15994,
+    "error": "media_concat 需要 asset_ids 数组"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 96705,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 media_concat，但该工具必须提供 asset_ids（按顺序排列的视频素材 ID 列表）才能执行拼接，空参数无法运行。请告诉我要拼接哪些视频素材（名称或 asset_id），我再帮你拼接。"
+ },
+ {
+  "tool": "media_transcode",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 174.3,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_transcode",
+    "ok": false,
+    "ms": 93034,
+    "error": "缺少 asset_id"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 81249,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已按要求调用 media_transcode（参数为空），返回错误：缺少 asset_id。转码需要指定素材库中的某个素材 ID，请提供要转码的素材（或先告诉我它的名称/关键词，我帮你检索）。"
+ },
+ {
+  "tool": "media_extract_frames",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 46.8,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_extract_frames",
+    "ok": false,
+    "ms": 38368,
+    "error": "缺少 asset_id"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 8387,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 media_extract_frames（参数为空），但该工具必须提供视频素材的 asset_id，因此返回错误「缺少 asset_id」。请告诉我要抽帧的视频素材名称或 asset_id，我可以先搜索素材库再执行抽帧。"
+ },
+ {
+  "tool": "media_mix_audio",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 12.0,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_mix_audio",
+    "ok": false,
+    "ms": 9872,
+    "error": "media_mix_audio 需要 audio_asset_ids 数组"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 2152,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 media_mix_audio（参数为空），但该工具必须提供 video_asset_id 与 audio_asset_ids 才能执行，因此返回错误：「media_mix_audio 需要 audio_asset_ids 数组」。如需混音，请告诉我视频素材和要混入的音频素材（或让我先在素材库里检索）。"
+ },
+ {
+  "tool": "media_merge_av",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 22.8,
+  "status": "needs_clarification",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_merge_av",
+    "ok": false,
+    "ms": 20713,
+    "error": "缺少 asset_id"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 2091,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已按要求调用 media_merge_av（参数为空），但工具返回错误：缺少 asset_id。该工具需要 video_asset_id 与 audio_asset_id 两个素材 ID 才能执行音视频合流。请提供要合成的视频素材和音频素材（或告诉我素材名称，我先在素材库里检索）。"
+ },
+ {
+  "tool": "run_code",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 33.6,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "run_code",
+    "ok": false,
+    "ms": 27812,
+    "error": "能力「代码生成与执行」已关闭。请在「agent 管理」里启用它。"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 5795,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 run_code，但该能力当前未开启：工作台返回「能力『代码生成与执行』已关闭」。请在「agent 管理」中启用该能力开关后我再重试；启用前我无法执行 Python 代码。"
+ },
+ {
+  "tool": "respond",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 19.6,
+  "status": "truncated",
+  "error": "模型没有给出最终结论",
+  "tool_calls": [
+   {
+    "tool": "respond",
+    "ok": false,
+    "ms": 19535,
+    "error": "respond 需要 summary 参数"
+   }
+  ],
+  "called_target": true,
+  "answer_head": ""
+ },
+ {
+  "tool": "create_job",
+  "args": {
+   "mode": "t2v",
+   "prompt": "审计探针：雨夜桥上的人"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 31.1,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "create_job",
+    "ok": true,
+    "ms": 19402,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 11660,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已下发生成任务：文生视频「雨夜桥上的人」，任务 ID cbe099079ee5，当前状态 queued（排队中）。提示词已套用 video-director 增强模板，参数使用工作台默认值。可在「生成」列表查看进度。"
+ },
+ {
+  "tool": "batch_create_jobs",
+  "args": {
+   "jobs": [
+    {
+     "mode": "t2v",
+     "prompt": "审计探针批量 1"
+    }
+   ]
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 51.4,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "batch_create_jobs",
+    "ok": true,
+    "ms": 33595,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 17759,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已通过 batch_create_jobs 创建 1 个文生视频任务：job_id 7b172a412268（mode=t2v，prompt「审计探针批量 1」），当前状态 queued。提示词已按 video-director 模板增强并套用默认 lora 参数。"
+ },
+ {
+  "tool": "cancel_job",
+  "args": {
+   "job_id": "no_such_job"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 21.7,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "cancel_job",
+    "ok": false,
+    "ms": 10156,
+    "error": "任务不存在：no_such_job"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 11555,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 cancel_job（job_id: no_such_job），工作台返回错误：任务不存在。请确认任务 ID 是否正确，或让我先用 list_jobs 查一下当前排队/运行中的任务。"
+ },
+ {
+  "tool": "retry_job",
+  "args": {
+   "job_id": "no_such_job"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 12.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "retry_job",
+    "ok": false,
+    "ms": 4524,
+    "error": "任务不存在：no_such_job"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 7642,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 retry_job（job_id=\"no_such_job\"），工作台返回错误：任务不存在（code: job_not_found）。该 ID 在任务记录中查不到，无法重试。如果你要重试的是某个真实任务，请提供正确的 job_id（可用 list_jobs 查看历史任务）。"
+ },
+ {
+  "tool": "upload_asset",
+  "args": {
+   "path": "no/such/file.png"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 10.0,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "upload_asset",
+    "ok": false,
+    "ms": 8401,
+    "error": "文件不存在：no/such/file.png"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 1558,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 upload_asset（path=\"no/such/file.png\"），结果失败：文件不存在（错误码 file_not_found）。素材库中没有该路径的文件，无法入库。请提供素材库目录内的真实相对路径（例如 originals/2026/xxx.png）。"
+ },
+ {
+  "tool": "delete_asset",
+  "args": {
+   "asset_id": "asset_does_not_exist"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 28.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "delete_asset",
+    "ok": false,
+    "ms": 1135,
+    "error": "素材不存在：asset_does_not_exist"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 27050,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 delete_asset（asset_id: asset_does_not_exist），返回错误：素材不存在（code: asset_not_found）。该素材不在素材库中，可能已被删除或 ID 有误。如需删除其他素材，请提供正确的 asset_id。"
+ },
+ {
+  "tool": "tag_asset",
+  "args": {
+   "asset_id": "asset_does_not_exist",
+   "add": [
+    "审计临时标签"
+   ]
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 18.1,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "tag_asset",
+    "ok": false,
+    "ms": 10540,
+    "error": "素材不存在：asset_does_not_exist"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 7505,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已调用 tag_asset，但素材 asset_does_not_exist 不存在（错误码 asset_not_found），标签未添加。请提供正确的素材 ID。"
+ },
+ {
+  "tool": "remember_preference",
+  "args": {
+   "key": "audit_probe_pref",
+   "value": "v1"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 56.6,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "remember_preference",
+    "ok": true,
+    "ms": 4860,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 51692,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已更新偏好记忆 audit_probe_pref = v1（该键此前已存在，本次为覆盖写入，未新建）。"
+ }
+]
