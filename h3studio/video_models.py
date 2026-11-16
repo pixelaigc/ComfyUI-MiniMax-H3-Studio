@@ -129,12 +129,19 @@ VIDEO_SIZE_PRESET_MPS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.98,
 #: 但那时 1920x1088 必须同步降级为不可达 —— 二者不可兼得。
 VIDEO_MAX_CANVAS_PIXELS = 2 * 1024 * 1024
 
-#: 需求里写的字面数值（2,000,000），保留供提示文案与测试引用。
-VIDEO_MAX_PIXELS_LITERAL = 2_000_000
-
-#: 保留旧名别名（旧代码 / 旧测试引用它），值已改为 2.0M。
-#: 【注意】它**不再等于** ComfyUI 源码里的 MAX_PIXELS —— 那是参考视频画布上限。
-VIDEO_MAX_PIXELS = VIDEO_MAX_CANVAS_PIXELS
+# 【2026-11-16 第5轮代码审查 C-11 / C-12 修 —— 死常量清理】
+# 下面两个常量已删除（现场核实：全仓引用计数 = 1，即只有定义处）：
+#   * VIDEO_MAX_PIXELS_LITERAL = 2_000_000
+#     —— 需求里写的字面数值。它**从未**被任何代码或测试引用
+#        （第4轮报告 C-12 已确认）；真源是 VIDEO_MAX_CANVAS_PIXELS。
+#        保留它 = 留一个「看起来像上限、其实没人用」的第二真源。
+#   * VIDEO_MAX_PIXELS = VIDEO_MAX_CANVAS_PIXELS
+#     —— 「保留旧名别名」，但旧代码早已不引用它。
+#        VIDEO_MAX_CANVAS_PIXELS 本身被 tests/test_video_tabs_resolution.py
+#        与 scripts/mutation_check_video_tabs.py 引用，**保留**。
+#
+# 【删除前核实过的外部调用方】scripts/ audits/ projects/ evidence/ 全扫过：
+# 只有 docs/report_C_backend.md 提到它们（审查报告本身，不是调用方）。
 
 #: 超限时给用户的可执行提示（需求：说明上限与当前请求值，不静默截断）。
 #:
@@ -709,9 +716,15 @@ def normalize_video_duration(value, default: float = VIDEO_DURATION_DEFAULT
     return max(VIDEO_DURATION_MIN, duration), ""
 
 
-#: 保留旧名别名（旧代码 / 旧测试引用它）。
-VIDEO_DURATION_MIN_OLD = 2.0
-VIDEO_DURATION_MAX_OLD = 15.0
+# 【2026-11-16 第5轮代码审查 C-12 修 —— 死常量清理】
+# VIDEO_DURATION_MIN_OLD = 2.0 / VIDEO_DURATION_MAX_OLD = 15.0 已删除。
+# 【现场核实】全仓引用计数 = 1（只有定义处）；scripts/ audits/ projects/
+# evidence/ 全扫过，只有 docs/report_C_backend.md 提到（审查报告，不是调用方）。
+# 【为什么它们是危险的】注释写着「保留旧名别名（旧代码 / 旧测试引用它）」，
+# 但旧代码早已不引用 —— 时长下限的真源是 VIDEO_DURATION_MIN、
+# 上限是 VIDEO_DURATION_MAX（60 秒，2026-11-12 放宽后）。
+# 留着一份「看起来像上限、其实是 15 秒」的常量 = 下一个改动它的人
+# 会改错地方（15 秒早就不是上限了）。
 
 VIDEO_DEFAULT_ATTENTION = "default"
 

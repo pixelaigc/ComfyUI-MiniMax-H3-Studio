@@ -81,6 +81,7 @@ from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import gen_defaults
+from h3studio import gen_normalize
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import docs_static
@@ -1786,6 +1787,36 @@ class Worker:
                     # （构建函数会放行，让 ComfyUI 自己报错）。
                     params["_h3image_nodes_available"] = (
                         None if not probe_ok else nodes_ok)
+
+                # 【2026-11-16 第5轮代码审查 C-10 修 —— 老任务重放的尺寸兜底】
+                #
+                # 【为什么需要】
+                # 面板提交与 Agent 建任务都会先过归一层（补上 width/height），
+                # 但**历史任务**的落库 params 里可能压根没有 width/height
+                # （那是老版本前端只提交 resolution + aspect 的产物）。
+                # worker 直接拿这份 params 调 build_workflow ->
+                # video_workflow.build_t2v_panel 算出 0×0 ->
+                # 提交 0×0 的 latent 给 ComfyUI。
+                #
+                # 【怎么兜】
+                # 用**与面板完全同一套**公式（h3_video_size.resolve_size）
+                # 把「档位 + 比例」算成真实宽高写回 params ——
+                # 这样重放出来的产物尺寸与当年面板上选的**一致**，
+                # 而不是编一个 768p/16:9 的默认值。
+                #
+                # 【为什么不是直接抛错】
+                # 抛错 = 那些老任务**永久无法复用**（用户点「复用参数」
+                # 或重试旧任务一律失败）。而这里有真实依据（resolution +
+                # aspect 都在），算出来就是用户当年选的那个尺寸。
+                # 只有**连档位和比例都没有**时才让 build_t2v_panel 抛错
+                # （那时真的没有任何依据推断尺寸）。
+                if mode in ("t2v", "flf", "r2v"):
+                    try:
+                        gen_normalize.normalize_video_size_fallback(
+                            params, mode, [])
+                    except ValueError:
+                        # 没有任何尺寸依据 -> 交给 build_t2v_panel 抛明确错误
+                        pass
 
                 workflow = build_workflow(mode, params)
 
@@ -3526,6 +3557,58 @@ JOB_MODES = ("t2v", "flf", "r2v", "t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
              "t2a", "a2a")
 
 
+#: 图像模式 -> (模型表, 该模式的默认模型 key)
+#:
+#: 【2026-11-16 第5轮代码审查 C-5 / C-6 新增】
+#: 图像模式的采样参数归一需要「当前模型的 samplers / schedulers 白名单」。
+#: 白名单**必须来自模型表本身**（面板下拉就是从它渲染的）——
+#: 新造一份常量就会与模型表漂移。
+#:
+#: 【注意 H3-Image 的模型表在 h3studio.h3image 里，不在 workflows】
+#: 所以这一族用字符串标记，由 _image_model_for_mode 走 h3img 分支取。
+_IMAGE_MODE_TABLES = {
+    "t2i": ("zimage", Z_IMAGE_MODELS, Z_IMAGE_DEFAULT_MODEL),
+    "t2i_qwen": ("qwen", QWEN_IMAGE_MODELS, QWEN_IMAGE_DEFAULT_MODEL),
+    "i2i_qwen": ("qwen", QWEN_IMAGE_MODELS, QWEN_IMAGE_DEFAULT_MODEL),
+    "t2i_moss": ("moss", MOSS_IMAGE_MODELS, MOSS_IMAGE_DEFAULT_MODEL),
+    "t2i_h3image": ("h3image", None, ""),
+    "i2i_h3image": ("h3image", None, ""),
+}
+
+
+def _image_model_for_mode(mode: str, params: dict) -> dict | None:
+    """取图像模式**当前选中模型**的定义（供采样参数归一取白名单）。
+
+    返回 None 表示「这个模式不是图像模式」或「找不到模型表」——
+    调用方据此跳过归一（不报错）。
+
+    【为什么按 params["model"] 取而不是固定用默认模型】
+    白名单是**按模型**的：Z-Image Turbo 的 schedulers 里没有 "exponential"
+    （Turbo 8 步下崩图），但 Z-Image Base 有。用默认模型的白名单去校验
+    用户实际选的模型 = 误拒合法值。
+
+    【为什么找不到就返回 None 而不是抛错】
+    归一层是**加固**，不是**准入**。模型表查不到时放行（让 builder 自己
+    回落默认值），行为与改动前一致 —— 归一不该把一个能跑的任务变成跑不了。
+    """
+    spec = _IMAGE_MODE_TABLES.get(mode)
+    if not spec:
+        return None
+    family, table, default_key = spec
+
+    if family == "h3image":
+        table = getattr(h3img, "H3_IMAGE_MODELS", None)
+        default_key = getattr(h3img, "H3_IMAGE_DEFAULT_MODEL", "")
+    if not isinstance(table, dict) or not table:
+        return None
+
+    model_key = str(params.get("model") or "").strip()
+    model = table.get(model_key) if model_key else None
+    if model is None:
+        model = table.get(default_key) or next(iter(table.values()))
+    return model if isinstance(model, dict) else None
+
+
 def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                        saved_files: dict | None = None) -> list:
     """
@@ -3893,6 +3976,51 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             params["picture_hint"] = (
                 "提示词里用 " + h3img.H3_IMAGE_PLACEHOLDER.format(n=1) +
                 " 这样的标记引用参考图（官方语法）")
+
+    # 【2026-11-16 第5轮代码审查 C-5 / C-6 修 —— 图像模式的采样参数归一】
+    #
+    # 【原来错在哪】
+    # 图像模式（t2i / t2i_qwen / i2i_qwen / t2i_moss / t2i_h3image）的
+    # steps / cfg / shift / sampler / scheduler **完全不归一**：
+    #   * workflows.build_t2i / build_qwen_t2i / build_moss_t2i 都是
+    #     ``params.get("sampler") or model["sampler"]`` 这种写法 ——
+    #     它**信任** params 里的值，直接塞进 KSamplerSelect 的
+    #     sampler_name / scheduler 槽位；
+    #   * 绕过面板直接调 API（POST /api/jobs）传
+    #     {"sampler": "不存在的采样器"} -> 一路送到 ComfyUI ->
+    #     用户收到一句英文的 "value not in list"，
+    #     既不知道是哪个字段、也不知道合法值是什么；
+    #   * steps=9999 / cfg=-1 / shift=0 也是同理 ——
+    #     要么被 ComfyUI 拒绝，要么静默跑出一张废图。
+    #
+    # 【为什么放在这里而不是 builder 里】
+    # 三个图像 builder 各自读各自的字段 —— 在 builder 里改就是三处各改一遍
+    # （又是一次必然漂移）。归一层是**三条链路的唯一公共点**
+    # （面板提交 / Agent 建任务 / 老任务重放都过这里），
+    # 放这里 = 改一次，三条链路同时生效。
+    #
+    # 【白名单从哪来 —— 不新造常量】
+    # 采样器 / 调度器的合法集合来自**各模型表自己**的 samplers / schedulers
+    # 字段（Z_IMAGE_MODELS / QWEN_IMAGE_MODELS / MOSS_IMAGE_MODELS /
+    # H3_IMAGE_MODELS）—— 它们本来就是面板下拉的数据源。
+    # 新造一份白名单就会与模型表漂移（模型表改了、白名单没改 = 又一次静默失效）。
+    #
+    # 【为什么回落而不是报错 —— 老任务重放语义安全】
+    # 历史任务 params 里可能躺着当年合法的采样器名。若这里报错，
+    # 那些老任务会**永久无法复用**。所以：非法值回落到该模型的官方推荐值，
+    # 并把「改了什么」记进 params["normalize_notes"]（任务详情如实展示）。
+    # 合法值**一个字节都不动**（契约 R1）。
+    _image_model = _image_model_for_mode(mode, params)
+    if _image_model is not None:
+        _notes: list[str] = []
+        gen_normalize.normalize_image_sampling(params, _image_model, _notes)
+        if _notes:
+            existing = params.get("normalize_notes")
+            merged = list(existing) if isinstance(existing, list) else []
+            for note in _notes:
+                if note not in merged:
+                    merged.append(note)
+            params["normalize_notes"] = merged
 
     # 参考生音乐（a2a）：参考音频必须来自素材库（asset_refs, slot=ref_audio）
     if mode == "a2a":
@@ -7709,9 +7837,10 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
     return out
 
 
-async def prepare_agent_t2v_params(params: dict) -> tuple[dict, str]:
+async def prepare_agent_t2v_params(params: dict,
+                                   mode: str = "t2v") -> tuple[dict, str]:
     """
-    Agent 的文生视频参数：套默认参数 -> 探测节点 -> 服务端归一。
+    Agent 的**视频**参数：套默认参数 -> 探测节点 -> 服务端归一。
 
     与面板走**同一套** normalize_t2v_params（校验 LoRA 文件是否存在、
     注意力节点是否在本机 ComfyUI 里、宽高是否超上限）。
@@ -7721,6 +7850,25 @@ async def prepare_agent_t2v_params(params: dict) -> tuple[dict, str]:
     在本机 ComfyUI 里（`node not in _COMFY_NODE_NAMES`）。而
     _COMFY_NODE_NAMES 只有在 /api/video-options 或 worker 刷新后才有值 ——
     Agent 这条路不经过面板，不探测就会把 kitchen 误判成「节点不存在」。
+
+    【2026-11-16 第5轮代码审查 C-9 修 —— 加 mode 形参】
+    原来本函数**硬写死** ``normalize_t2v_params(merged)``（mode 默认 "t2v"）。
+    于是 Agent 建**首尾帧 / 参考生视频**任务时，归一层跑的是 t2v 的口径：
+
+      * 面积上限按 t2v 的 2.0MP 判（flf / r2v 的真实上限是 0.8MP）
+        -> Agent 建的 flf 任务能被放行到超限尺寸；
+      * 底模通道按 t2v 判（r2v 必须 Ref2VA 权重）
+        -> Agent 建的 r2v 任务可以选到 FL2VA 权重，「参考没生效」。
+
+    现在 mode 由调用方传入，与面板路径（POST /api/jobs 的
+    ``normalize_t2v_params(params, mode=mode)``）**完全同口径**。
+
+    【为什么默认参数仍只套 t2v 的】
+    ``_merge_t2v_defaults`` 读的是 agent_settings 里的 ``t2v_defaults`` ——
+    那是**文生视频**专用的默认参数镜像（model_key / attention / accel_lora）。
+    flf / r2v 没有对应的默认参数表（管理页只配了 t2v），
+    硬套 t2v 的 model_key 会给 flf/r2v 塞一个不相干的底模。
+    所以：**默认参数只对 t2v 套**，但**归一（校验）对三个视频模式都跑**。
     """
     with db() as conn:
         settings = agent_settings.load(conn)
@@ -7737,7 +7885,7 @@ async def prepare_agent_t2v_params(params: dict) -> tuple[dict, str]:
     # 代价：每次 Agent 建视频任务多问 11 个节点（每个 1 ms，实测几十毫秒）。
     # 这个代价换掉「假缺节点」是值得的。
     await refresh_comfy_node_names(force=True)
-    return normalize_t2v_params(merged)
+    return normalize_t2v_params(merged, mode=mode)
 
 
 

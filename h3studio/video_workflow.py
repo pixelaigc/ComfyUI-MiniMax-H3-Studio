@@ -23,6 +23,7 @@ import random
 from . import continuation as cont
 from . import continuation_service as cont_service
 from . import video_models as vmodels
+from . import frame_expr as frame_expr_mod
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
 CLIP_H3 = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
@@ -30,25 +31,17 @@ VAE_VIDEO = "minimax_h3_video_vae_fp16.safetensors"
 VAE_AUDIO = "minimax_h3_audio_vae_fp32.safetensors"
 
 # 帧数 -> 帧数的表达式（与官方工作流一致：24fps，17k+5 网格）
-_FRAME_EXPR = "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17"
-
-
+# 【2026-11-16 第5轮代码审查 C-13 修 —— 三份重复实现合一】
+# 真正的实现见 h3studio/frame_expr.py（零依赖模块，避免
+# workflows <-> video_workflow 的循环 import）。
 def _frame_expr_node(length_node_id: str, dur_node_id: str, duration: float):
-    return {
-        length_node_id: {
-            "inputs": {
-                "expression": _FRAME_EXPR,
-                "values.a": [dur_node_id, 0],
-            },
-            "class_type": "ComfyMathExpression",
-            "_meta": {"title": "时长->帧数"},
-        },
-        dur_node_id: {
-            "inputs": {"value": float(duration)},
-            "class_type": "PrimitiveFloat",
-            "_meta": {"title": "时长(秒)"},
-        },
-    }
+    """秒数 -> 帧数节点（**唯一真源**在 h3studio/frame_expr.py）。
+
+    【2026-11-16 第5轮代码审查 C-13 修 —— 三份重复实现合一】
+    原来这里有第三份 _frame_expr_node 实现，与 workflows.py / h3_video_modes.py
+    的两份重复（公式相同、签名分叉）。现在统一走 frame_expr.frame_expr_node。
+    """
+    return frame_expr_mod.frame_expr_node(length_node_id, dur_node_id, duration)
 
 
 def _resolve_model(params: dict) -> dict:
@@ -336,8 +329,40 @@ def build_t2v_panel(params: dict) -> dict:
     cfg = float(cfg)
 
     # 宽高：服务端已经吸附过，这里再兜一次（防止绕过服务端的直接调用）
+    #
+    # 【2026-11-16 第5轮代码审查 C-10 修 —— 0×0 latent】
+    #
+    # 【原来错在哪】
+    # ``vmodels.normalize_video_size(None, None)`` 返回 ``(0, 0, ["宽高必须是数字"])``，
+    # 而这个函数的返回值**只用了前两个**（``_reasons`` 被丢弃）——
+    # 于是 width=height=0 一路写进 MiniMaxH3ImageToVideo 的
+    # width / height 槽位，产出 **0×0 的 latent**。
+    #
+    # 实测（可复现）：
+    #   params = {"job_id":"x","duration":5,"model_key":"fl2va_pruned_int8","prompt":"p"}
+    #   build_t2v_panel(params) -> 节点 105:104 的 width=0 / height=0
+    #
+    # 触发路径：**老任务重放**（worker 里 build_workflow 直接拿落库的 params）——
+    # 面板提交与 Agent 建任务都会先过归一层（补上宽高），
+    # 只有「历史任务 params 里压根没有 width/height」这一条会漏过来。
+    #
+    # 【为什么这里抛错而不是编一个尺寸】
+    # 编尺寸 = 悄悄跑出一个用户没要求的分辨率（正是本项目反复修的
+    # 「界面说谎」类缺陷）。而 0×0 提交给 ComfyUI 会得到一句英文底层报错，
+    # 用户既不知道是哪个字段、也不知道怎么改。
+    # 明确抛错（由调用方转成可读文案）比编造或崩在 ComfyUI 都更可执行。
+    #
+    # 【为什么不用 h3_video_size.resolve_size 的「面板默认 768p/16:9」回落】
+    # 那个回落是给 flf/r2v 用的（它们的前端**一定**会提交档位或比例）。
+    # t2v 老任务的 params 里可能两个都没有 -> 此时没有任何依据推断尺寸，
+    # 只能如实说「缺尺寸」。
     width, height, _reasons = vmodels.normalize_video_size(
         params.get("width"), params.get("height"))
+    if width <= 0 or height <= 0:
+        raise ValueError(
+            "缺少画面尺寸：width/height 均为空，且 resolution / aspect 也没给 —— "
+            "请在面板上选一个分辨率档位与画面比例，或直接填宽高。"
+            "（这是历史任务的兼容保护：宁可明确报错，也不编一个尺寸。）")
 
     p: dict = {}
     next_id = 100

@@ -178,10 +178,6 @@ DEFAULT_T2V_DEFAULTS = {
     "duration": 5.0,
 }
 
-#: 默认的文生视频默认值（函数形式，方便测试注入）。
-def default_t2v_defaults() -> dict:
-    return dict(DEFAULT_T2V_DEFAULTS)
-
 
 #: t2v 的**完整**默认参数（= gen_defaults["t2v"]）。
 #:
@@ -189,6 +185,14 @@ def default_t2v_defaults() -> dict:
 #: 按这些键取值），而 gen_defaults["t2v"] 现在是 11 字段的完整集
 #: （多了步数 / 采样器 / 调度器 / 两个 sigma shift）。
 #: 老结构保留为**兼容镜像**的一部分 —— 两者取值一致。
+#:
+#: 【2026-11-16 第5轮代码审查 C-16 修正】
+#: 第4轮报告把 ``default_t2v_mirror`` 记成「零引用」—— **现场核实不成立**：
+#: 它被本文件下方的 ``defaults()`` 调用（``"t2v_defaults": default_t2v_mirror()``），
+#: 是落库初始值的来源，不能删。
+#: 真正零引用的只有 ``default_t2v_defaults()``（老结构的函数式包装），
+#: 那个已在本轮删除 —— DEFAULT_T2V_DEFAULTS 常量本身保留
+#: （tests/test_agent_power.py 仍在引用它，且它是对外承诺的兼容镜像）。
 def default_t2v_mirror() -> dict:
     return dict(gen_defaults.default_values("t2v"))
 
@@ -279,17 +283,6 @@ def normalize_search_engines(raw) -> list[dict]:
         if len(out) >= MAX_SEARCH_ENGINES:
             break
     return out
-
-
-def normalize_t2v_defaults(raw) -> dict:
-    """
-    文生视频默认参数归一（非法值回落到默认值，不报错）。
-
-    【2026-11-14 需求 A4】现在走 gen_defaults 的字段表归一 ——
-    字段比老的 6 个多（步数 / 采样器 / 调度器 / 两个 sigma shift），
-    但**老字段的语义与取值范围完全不变**（老库里的值照样读得出来）。
-    """
-    return gen_defaults.normalize_t2v_legacy(raw)
 
 
 def normalize_gen_defaults(raw, legacy_t2v=None,
