@@ -129,7 +129,9 @@ STALE_BUMPED = {
     "assets.js":               ("uxbatch1",     "cr20261115b"),
     "asset-player.js":         ("uxbatch1",     "cr20261115b"),
     "enhance-menu-shared.js":  ("shared2",      "cr20261115b"),
-    "enhance-menu.js":         ("uxbatch1",     "cr20261115b"),
+    # 【2026-11-16 S5】enhance-menu.js 内容又变了（director 补显式
+    # write 契约声明）⇒ ?v= 必须再升一次（cr20261115b -> cr20261116b）。
+    "enhance-menu.js":         ("uxbatch1",     "cr20261116b"),
     "music-enhance.js":        ("uxbatch1",     "cr20261115b"),
     "agent.js":                ("agent4",       "cr20261115b"),
     "agent_sessions.js":       ("agtsess2",     "cr20261115b"),

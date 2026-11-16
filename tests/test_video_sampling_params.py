@@ -207,6 +207,13 @@ class TestLegacyVideoPaths(unittest.TestCase):
         wf = W.build_flf({
             "job_id": "flf", "prompt": "x", "resolution": "768p",
             "aspect": "16:9", "duration": 5,
+            # 【2026-11-16 S5 修 —— 补必填字段，不改任何期望值】
+            # flf 自 a2c3622（flf 功能上线）起就要求「首帧或尾帧至少给一个」
+            # （h3studio/h3_video_modes.py:429-433 抛 H3VideoRequestError）。
+            # 这条用例写的时候还没有这个校验，所以夹具缺 first_frame ->
+            # 建工作流前就被 400 掉，根本走不到采样参数断言。
+            # 这里是**补齐夹具**，期望值一个都没动。
+            "first_frame": "a.png",
             "steps": 9, "sampler": "res_multistep", "scheduler": "simple",
             "shift_video": 11.0, "shift_audio": 2.0})
         self.assertEqual(wf["9"]["inputs"]["steps"], 9)
@@ -233,14 +240,18 @@ class TestLegacyVideoPaths(unittest.TestCase):
         """
         with_lora = W.build_flf({
             "job_id": "a", "prompt": "x", "resolution": "768p",
-            "aspect": "16:9", "duration": 5, "lora": "ckpt850"})
+            "aspect": "16:9", "duration": 5, "lora": "ckpt850",
+            # 【2026-11-16 S5 修】补必填字段（见 test_flf_accepts_sampling_params
+            # 的注释）—— 期望值一个都没动。
+            "first_frame": "a.png"})
         self.assertEqual(with_lora["9"]["inputs"]["steps"], 4)
         self.assertEqual(with_lora["9"]["inputs"]["scheduler"], "beta")
         self.assertEqual(with_lora["17"]["inputs"]["sampler_name"], "euler")
 
         without_lora = W.build_flf({
             "job_id": "b", "prompt": "x", "resolution": "768p",
-            "aspect": "16:9", "duration": 5, "lora": "none"})
+            "aspect": "16:9", "duration": 5, "lora": "none",
+            "first_frame": "a.png"})
         self.assertEqual(without_lora["9"]["inputs"]["steps"], 20)
         self.assertEqual(without_lora["9"]["inputs"]["scheduler"], "simple")
         self.assertEqual(without_lora["17"]["inputs"]["sampler_name"], "res_multistep")
@@ -477,7 +488,11 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         params = {"prompt": "x", "lora": "none"}
         srv.prepare_job_params("flf", params, None, {"file_first": ["a.png"]})
         wf = W.build_flf({"job_id": "b", "prompt": "x", "resolution": "768p",
-                          "aspect": "16:9", "duration": 5, "lora": "none"})
+                          "aspect": "16:9", "duration": 5, "lora": "none",
+                          # 【2026-11-16 S5 修】补必填字段（见
+                          # TestLegacyVideoPaths.test_flf_accepts_sampling_params
+                          # 的注释）—— 期望值一个都没动。
+                          "first_frame": "a.png"})
         self.assertEqual(wf["17"]["inputs"]["sampler_name"], "res_multistep")
         self.assertEqual(wf["9"]["inputs"]["scheduler"], "simple")
 
@@ -520,27 +535,122 @@ class TestBugsFound2026_11_12(unittest.TestCase):
                       panel_js)
 
     def test_B3_legacy_default_tiers_match_workflow(self):
-        """B3 续：legacy 的采样器/调度器/步数默认值必须与工作流一致。
+        """B3 续：默认采样档位必须与工作流一致。
 
-        工作流（workflows._h3_video_workflow）：
-          lora != "none" -> steps 4 / euler / beta
-          lora == "none" -> steps 20 / res_multistep / simple
+        工作流（h3studio/workflows.py 的 _h3_video_workflow）：
+          有加速 LoRA -> 该 LoRA 的 recommended_*（4 步 / euler / beta）
+          无加速 LoRA -> 20 步 / res_multistep / simple
+
+        【2026-11-16 S5 修 —— 断言过期，不是掩盖缺陷】
+        原来这条断言读 `app.js` 里的旧字面量
+          `sampler: withLora ? "euler" : "res_multistep"` 等三行。
+        那套 legacy 面板代码在第 4 轮 B-11（步数/采样真源搬到共享面板
+        `web/video-panel.js`）时**已随旧面板一起删除** ——
+        `grep -n 'withLora' web/app.js` 现在 0 命中。
+        同批的 `test_B3_legacy_steps_default_is_4_not_6` 已经改读
+        `_panel_js()`（共享面板），**这两条是同一批改造里漏改的**。
+
+        修法：断言**新真源的等价语义**（共享面板 + 服务端下发的档位），
+        期望的档位值一个都没动：
+          有加速 LoRA -> 4 / euler / beta
+          无加速 LoRA -> 20 / res_multistep / simple
         """
-        js = self._app_js()
-        self.assertIn('sampler: withLora ? "euler" : "res_multistep"', js)
-        self.assertIn('scheduler: withLora ? "beta" : "simple"', js)
-        self.assertIn("steps: withLora ? 4 : 20", js)
+        panel_js = self._panel_js()
+        # ---- 共享面板：档位取值口径 ----
+        self.assertIn("videoState.accelLora ? accelMeta(videoState.accelLora) : null",
+                      panel_js,
+                      "共享面板不再按「当前加速 LoRA」取推荐档位")
+        self.assertIn("videoState.steps = steps", panel_js,
+                      "共享面板没把推荐步数写回 videoState")
+        self.assertIn("videoState.scheduler = sched", panel_js,
+                      "共享面板没把推荐调度器写回 videoState")
+        self.assertIn("videoState.sampler = smp", panel_js,
+                      "共享面板没把推荐采样器写回 videoState")
+        # ---- 无加速 LoRA 档：读服务端下发（不硬编码） ----
+        self.assertIn("cfg.steps_without_accel", panel_js)
+        self.assertIn("cfg.scheduler_without_accel", panel_js)
+        self.assertIn("cfg.sampler_without_accel", panel_js)
+        # ---- 档位值必须与工作流一致（服务端真源） ----
+        self.assertEqual(vmodels.VIDEO_STEPS_WITHOUT_ACCEL, 20)
+        self.assertEqual(vmodels.VIDEO_SCHEDULER_WITHOUT_ACCEL, "simple")
+        self.assertEqual(vmodels.VIDEO_SAMPLER_WITHOUT_ACCEL, "res_multistep")
+        # 有加速 LoRA 档：**档位来自模型表**（不是硬编码常量）。
+        # 实测各枚的推荐值并不统一：lightx2v_8step = 8 步，
+        # speed_slider / better_motion 没有推荐值（None -> 工作流回落默认档）。
+        # 所以这里断言「表里有值时，值必须合法；工作流按表取」，
+        # 而不是把所有枚都钉死成 4/beta/euler（那是把断言写死成假）。
+        for key in vmodels.all_accel_lora_keys():
+            meta = vmodels.accel_lora_meta(key) or {}
+            steps = meta.get("recommended_steps")
+            if steps is not None:
+                # 0 = 「这枚没有固定步数档」—— 工作流用
+                # `int(meta.get("recommended_steps") or 4)` 兜底
+                # （h3studio/workflows.py:365）-> 0 会被当成「没有」而回落。
+                self.assertGreaterEqual(steps, 0, f"{key} 的推荐步数非法")
+                self.assertLessEqual(steps, vmodels.VIDEO_STEPS_MAX,
+                                     f"{key} 的推荐步数超出上限")
+            sched = meta.get("recommended_scheduler")
+            if sched is not None:
+                self.assertIn(sched, vmodels.VIDEO_SCHEDULERS,
+                              f"{key} 的推荐调度器不在白名单里")
+            smp = meta.get("recommended_sampler")
+            if smp is not None:
+                self.assertIn(smp, vmodels.VIDEO_SAMPLERS,
+                              f"{key} 的推荐采样器不在白名单里")
+        # 关键档位：Turbo 4 步系必须推荐 4 / beta / euler
+        for key in ("ckpt850", "v4step600", "dmad_4step_critic"):
+            meta = vmodels.accel_lora_meta(key) or {}
+            self.assertEqual(meta.get("recommended_steps"), 4, f"{key}")
+            self.assertEqual(meta.get("recommended_scheduler"), "beta", f"{key}")
+            self.assertEqual(meta.get("recommended_sampler"), "euler", f"{key}")
+        # 工作流侧必须按表取（而不是自己写死档位）
+        import inspect as _inspect
+        wf_src = _inspect.getsource(W)
+        self.assertIn("accel_lora_meta(accel_chain[0][\"key\"])", wf_src,
+                      "工作流没有按「当前加速 LoRA」的推荐档取值")
+        self.assertIn("VIDEO_STEPS_WITHOUT_ACCEL", wf_src,
+                      "工作流没有用服务端下发的无加速档位常量")
 
     def test_B3_legacy_default_uses_effective_lora_not_state_lora(self):
-        """B3 续：判据必须是**提交时真正用的** params.lora。
+        """B3 续：判据必须是**提交时真正用的**加速 LoRA。
 
-        提交路径：lora = state.model === "lora" ? state.lora : "none"
-        —— 「标准模型」卡片也会把 params.lora 置成 "none"。
-        只看 state.lora 会判错档位。
+        【2026-11-16 S5 修 —— 断言过期，不是掩盖缺陷】
+        原来这条断言读 `app.js` 里的
+          `effectiveLegacyLora()` 与
+          `state.model === "lora" ? (state.lora || "ckpt850") : "none"`
+        —— 那套 legacy 面板代码在第 4 轮 B-11 已随旧面板删除
+        （`grep -n 'effectiveLegacyLora' web/app.js` 现在 0 命中）。
+
+        迁移后的真源（**服务端**统一换算）：
+          * 面板提交 `accel_lora`（单选 key）+ `accel_lora_strength`
+            —— web/video-panel.js:1304-1305
+          * 服务端 `h3studio/video_models.py::resolve_accel_lora_slot`
+            （:2062）把三套历史字段（accel_lora / accel_loras /
+            fixed_accel_lora / lora）一次性换算成 (key, strength)
+          * 工作流构建器读的就是这个换算结果
+            —— h3studio/workflows.py:349 `resolve_accel_lora_slot(params)`
+
+        所以「判据必须是提交时真正用的那个」这条语义现在由
+        **resolve_accel_lora_slot** 保证。这条用例改成断言它，
+        并额外断言「面板提交的就是这个字段」——
+        判据依旧严格，且比原来更贴近真实链路。
         """
-        js = self._app_js()
-        self.assertIn("effectiveLegacyLora()", js)
-        self.assertIn('state.model === "lora" ? (state.lora || "ckpt850") : "none"', js)
+        panel_js = self._panel_js()
+        # 面板提交的就是 accel_lora（单选 key）这一套字段
+        self.assertIn("accel_lora: videoState.accelLora", panel_js)
+        self.assertIn("accel_lora_strength:", panel_js)
+        # 服务端统一换算（判据的真源）
+        import inspect
+        src = inspect.getsource(vmodels.resolve_accel_lora_slot)
+        self.assertIn("accel_lora", src)
+        self.assertIn("accel_loras", src)
+        self.assertIn("fixed_accel_lora", src)
+        self.assertIn("lora", src)
+        # 换算顺序：accel_lora -> accel_loras -> fixed_accel_lora -> lora
+        self.assertLess(src.index('"accel_lora"'), src.index('"accel_loras"'))
+        self.assertLess(src.index('"accel_loras"'), src.index('"fixed_accel_lora"'))
+        # 「空串 = 显式不挂」—— 不能回落成默认 ckpt850
+        self.assertIn("不挂加速 LoRA", src)
 
     def test_B3_legacy_steps_hint_exists(self):
         """B3 续：必须有步数的「推荐 / 已改」提示控件。
