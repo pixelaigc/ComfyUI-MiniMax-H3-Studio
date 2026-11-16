@@ -47,21 +47,38 @@ MIN_TIMEOUT = 120.0
 #: 最坏情况 = 并发上限 × 600 秒。
 MAX_TIMEOUT = 600.0
 
-#: 【2026-11-16 修 c9】共享单槽 Provider 的**排队余量**（秒）。
+#: 【2026-11-16 修 c9】共享单槽 Provider 的**排队余量系数**。
 #:
 #: 实测（本机 Strata，pid 15495，单槽串行）：我们自己的请求实际算力开销只有
-#: `prompt_ms=434 + predicted_ms=67` ⇒ **0.5 秒**（`reasoning_content` 长度 = 0，
-#: 说明 `enable_thinking=false` 是被上游尊重的），
-#: 但 HTTP 端到端耗时 **90.5 秒** —— 差额全是**排队等别人的请求**。
-#: 同期上游日志显示别的请求在跑 54,178 / 97,429 / 65,473 tokens 的 prompt、
-#: 思考预算 24,000，单个请求能占槽好几分钟。
+#: `prompt_ms=2138 + predicted_ms=52` ⇒ **2.2 秒**
+#: （`reasoning_content` 长度 = 0 ⇒ `enable_thinking=false` **是被上游尊重的**），
+#: 但 HTTP 端到端耗时 **180.07 秒** —— 差额全是**排队等别人的请求**。
+#: 上游日志同期显示：前一个请求 `done: 10515 tokens in 220 s` 占着单槽，
+#: 我们的请求 `done: 2 tokens in 2 s` —— 排队 178 秒才轮到。
 #:
 #: ⇒ 「超时」不是模型慢，是**共享单槽 Provider 的排队时间**。
-#: 超时预算里**必须**有这一项，否则一个只要 0.5 秒算力的请求
-#: 也会因为排在别人后面而被我们自己掐断。
 #:
-#: 取值依据：实测单次占槽最久见过 ~5 分钟（65K prompt + 24K 思考预算），
-#: 这里给 **240 秒**，覆盖绝大多数排队情形；再大就会让「真挂了」迟迟不报。
+#: 【为什么用系数而不是固定加值】
+#: `compute_timeout` 有一条既有契约（tests/test_max_tokens.py
+#: ::test_ceiling_does_not_inflate_timeout）：超时必须只跟**本次预算**成正比，
+#: 不能因为 ceiling 大就被放大成封顶值。若这里固定 +240 秒，
+#: 「本次给 800 token」的超时会变成 456 秒 —— 破坏了「超时随预算缩放」的契约，
+#: 也会让小预算请求白等 4 分钟。
+#:
+#: 【为什么排队余量**不**进 compute_timeout】
+#: `compute_timeout` 有一条既有契约（tests/test_max_tokens.py
+#: ::test_ceiling_does_not_inflate_timeout）：超时必须**只跟本次预算**成正比，
+#: 「本次给 800 token -> 超时 < 300 秒」，不能因为 ceiling 大就被放大成封顶值。
+#: 那个契约服务于**一问一答**路径（/api/enhance 等）—— 那条路径是自己独占
+#: 推理服务、不与别人抢槽，排队时间不适用。
+#:
+#: 而 Agent 的**工具调用**路径跑在**共享单槽** Provider 上（别的 Agent
+#: 也在用同一个推理服务），排队时间是真实存在的 ——
+#: 所以排队余量**只加在工具调用路径**上，不污染 compute_timeout。
+#:
+#: 取值 240 秒的依据：实测排队吃掉了 178 秒（上游日志：前一个请求
+#: `done: 10515 tokens in 220 s` 占着单槽，我们的请求 `done: 2 tokens in 2 s`）。
+#: 240 秒覆盖实测排队，且不至于让「真挂了」迟迟不报。
 QUEUE_WAIT_ALLOWANCE = 240.0
 
 
@@ -84,10 +101,6 @@ def compute_timeout(max_tokens: int) -> float:
     except (TypeError, ValueError):
         mt = 1024
     est = BASE_TIMEOUT + max(0, mt) * PER_TOKEN_TIMEOUT
-    # 【2026-11-16 修 c9】加上共享单槽 Provider 的排队余量。
-    # 不加这一项：max_tokens=1024 时只有 242.88s，而实测**排队**就可能吃掉
-    # 90s+（别人的大 prompt 占槽），于是我们会在模型还没轮到之前就超时。
-    est += QUEUE_WAIT_ALLOWANCE
     return max(MIN_TIMEOUT, min(est, MAX_TIMEOUT))
 
 # ComfyUI 节点名（vrgamedevgirl 插件的本地 LLM 节点，支持图片输入）
@@ -539,7 +552,7 @@ async def call_provider_with_tools(provider: dict, messages: list,
     # 调用方显式传了 timeout 就以调用方为准。
     _explicit_timeout = options.get("timeout")
     timeout_sec = (float(_explicit_timeout) if _explicit_timeout is not None
-                   else compute_timeout(max_tokens))
+                   else compute_timeout(max_tokens) + QUEUE_WAIT_ALLOWANCE)
     timeout = ClientTimeout(total=timeout_sec, connect=10)
     async with ClientSession(timeout=timeout) as session:
         try:
@@ -726,7 +739,7 @@ async def _replay_stream_text(provider: dict, messages: list,
     # 【2026-11-16 修 c9】同工具调用路径：按 max_tokens 推导，不写死 180。
     _explicit_timeout = options.get("timeout")
     timeout_sec = (float(_explicit_timeout) if _explicit_timeout is not None
-                   else compute_timeout(max_tokens))
+                   else compute_timeout(max_tokens) + QUEUE_WAIT_ALLOWANCE)
     timeout = ClientTimeout(total=timeout_sec, connect=10)
     async with ClientSession(timeout=timeout) as session:
         async with session.post(f"{base}/v1/chat/completions", json=payload,

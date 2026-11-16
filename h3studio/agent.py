@@ -93,7 +93,10 @@ STREAM_REPLAY_ENABLED = True
 #: 现在：STEP_TIMEOUT 由 `compute_timeout(max_tokens)` 推导，
 #: 而 `compute_timeout` 已经含 `QUEUE_WAIT_ALLOWANCE`（240s 排队余量）。
 #: Agent 用 max_tokens=1024 ⇒ 120 + 122.88 + 240 ≈ **483 秒**。
-STEP_TIMEOUT = llm_client.compute_timeout(1024)
+#: Agent 走的是**工具调用**路径（共享单槽 Provider，排队时间真实存在），
+#: 所以超时 = compute_timeout(max_tokens) + 共享单槽排队余量。
+STEP_TIMEOUT = (llm_client.compute_timeout(1024)
+                + llm_client.QUEUE_WAIT_ALLOWANCE)
 #: 最大步骤数（= 模型轮数，含最后一轮「给结论」）。
 #:
 #: 【2026-11-13 审查目标 4/5/6/7 改：8 -> 50】
