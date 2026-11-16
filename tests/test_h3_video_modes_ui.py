@@ -330,19 +330,35 @@ class TestReferenceMediaSlots(unittest.TestCase):
                               APP_JS.index("openPicker({") + 400]
         self.assertNotIn('categories: ["image"]', picker_block)
 
-    def test_slot_accept_attribute_is_type_scoped(self):
-        """文件选择框的 accept 必须按类型收窄。"""
-        self.assertIn('inp.accept = kind === "video" ? "video/*"', APP_JS)
-        self.assertIn(': kind === "audio" ? "audio/*" : "image/*";', APP_JS)
+    def test_no_file_input_accept_attribute_anymore(self):
+        """【2026-11-16 需求】文件选择框**已移除** —— 媒体只能从素材库选。
 
-    def test_backend_accepts_local_reference_video_and_audio(self):
-        """服务端必须有本地直传的接收与上传路径。"""
+        原来这里锁的是「文件选择框的 accept 按类型收窄」。
+        现在那个文件选择框**根本不存在**了（需求：媒体必须先入库素材库），
+        所以断言反过来：源码里不许再有它。
+        """
+        self.assertNotIn('inp.accept = kind === "video" ? "video/*"', APP_JS)
+        self.assertNotIn('inp.type = "file"', APP_JS)
+
+    def test_asset_picker_limits_category_by_slot_kind(self):
+        """素材库选择器必须按槽位类型限定类别（替代原来的 accept 收窄）。"""
+        self.assertIn("categories: [kind]", APP_JS)
+        self.assertIn("openAssetPickerForSlot", APP_JS)
+
+    def test_backend_rejects_local_reference_video_and_audio(self):
+        """【2026-11-16 需求】服务端**拒绝**本地直传的参考视频 / 参考音乐。
+
+        原来这里锁的是「服务端必须有本地直传的接收与上传路径」。
+        现在直传通道被**关闭**（媒体必须先入库素材库）——
+        服务端必须明确报错，而不是静默接受。
+        """
         import server
-        src = (REPO / "server.py").read_text(encoding="utf-8")
-        self.assertIn("file_refvid", src)
-        self.assertIn("file_refaud", src)
-        self.assertIn("save_uploaded_media", src)
-        self.assertTrue(hasattr(server, "save_uploaded_media"))
+        for key in ("file_refvid", "file_refaud"):
+            params = {"prompt": "x", "width": 864, "height": 480,
+                      "duration": 5}
+            with self.assertRaises(server.JobValidationError) as ctx:
+                server.prepare_job_params("r2v", params, [], {key: ["x.bin"]})
+            self.assertIn("素材库", ctx.exception.message)
 
     def test_reference_limits_match_node_schema(self):
         """上限必须与 T8 节点 schema 一致（图/9，视频/3，音频/3）。"""
@@ -429,11 +445,15 @@ class TestAudioTrackChoiceFrontend(unittest.TestCase):
         self.assertTrue(got["hasVideoAudio"])
         self.assertFalse(got["hasRefAudio"])
 
-    def test_local_uploads_also_enable_options(self):
-        """本地直传的参考音频 / 参考视频也算「有素材」。"""
+    def test_local_uploads_no_longer_enable_options(self):
+        """【2026-11-16 需求】本地直传的参考音频 / 参考视频**不再**算「有素材」。
+
+        媒体必须先入库素材库才能引用 —— 所以音轨来源的判据
+        **只**看 state.assetRefs（素材库引用）。
+        """
         got = self._availability({}, files={"refaud0": "x", "refvid0": "y"})
-        self.assertTrue(got["hasRefAudio"])
-        self.assertTrue(got["hasVideoAudio"])
+        self.assertFalse(got["hasRefAudio"])
+        self.assertFalse(got["hasVideoAudio"])
 
     def test_selected_source_is_submitted_to_backend(self):
         """选择结果必须真的提交给后端（params.audio_track_source）。"""
@@ -494,35 +514,47 @@ class TestReferenceImageLimit(unittest.TestCase):
     """缺口 3：本地直传上限必须与后端 ≤9 对齐，且不得静默截断。"""
 
     def test_frontend_submits_all_nine_slots(self):
-        """前端必须提交 ref0..ref8 全部九张（原来只提交 3 张）。"""
-        self.assertIn('for (let i = 0; i < REF_IMAGE_LIMIT; i++)',
-                      APP_JS_CODE)
-        self.assertIn('const f = state.files["ref" + i];', APP_JS_CODE)
+        """【2026-11-16 需求】前端提交的是**素材库引用**，上限仍是 9。
+
+        原来这里锁的是「前端提交 ref0..ref8 全部九张」（走本地直传）。
+        现在直传通道关闭，改由素材库引用承载 —— 但**上限不能变**：
+        节点 schema 就是 9 张。
+        """
+        self.assertIn("const REF_IMAGE_LIMIT = 9;", APP_JS_CODE)
         # 旧的「只取 3 张」写法必须已经消失（只看**代码**，不看注释）
         self.assertNotIn(
             "const refs = [state.files.ref0, state.files.ref1, state.files.ref2]",
             APP_JS_CODE)
+        # 按 slot 分组计数（不能用 Set 大小 —— 同组多张共用一个 slot 名）
+        self.assertIn("countBySlot", APP_JS_CODE)
 
     def test_frontend_limit_is_nine(self):
         self.assertIn("const REF_IMAGE_LIMIT = 9;", APP_JS)
 
     def test_backend_rejects_more_than_nine_instead_of_truncating(self):
-        """超过 9 张必须**报错**，不能悄悄截断。"""
+        """超过 9 张必须**报错**，不能悄悄截断。
+
+        【2026-11-16】素材库引用承载了参考图，所以上限校验落在**引用**这一侧。
+        （原来校验的是本地直传的 file_ref 列表。）
+        """
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        with self.assertRaises(server.JobValidationError):
-            server.prepare_job_params(
-                "r2v", params, [],
-                {"file_ref": [f"r{i}.png" for i in range(10)]})
+        refs = [{"asset_id": f"a{i}", "slot": "ref_image", "ordinal": i}
+                for i in range(10)]
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params("r2v", params, refs, {})
+        self.assertEqual(ctx.exception.code, "ref_too_many")
+        self.assertIn("9", ctx.exception.message)
 
     def test_backend_accepts_exactly_nine(self):
         """正好 9 张必须放行（节点上限就是 9）。"""
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "r2v", params, [],
-            {"file_ref": [f"r{i}.png" for i in range(9)]})
-        self.assertEqual(len(params["ref_images"]), 9)
+        refs = [{"asset_id": f"a{i}", "slot": "ref_image", "ordinal": i}
+                for i in range(9)]
+        server.prepare_job_params("r2v", params, refs, {})
+        # 不抛异常 = 放行
+        self.assertEqual(len(refs), 9)
 
 
 # ------------------------------------------------------------------
@@ -555,14 +587,17 @@ class TestFlfFrameValidation(unittest.TestCase):
             [{"asset_id": "a", "slot": "first_frame", "ordinal": 0}], {})
         self.assertNotIn("last_frame", params)
 
-    def test_backend_accepts_local_last_frame_only(self):
-        """本地直传的尾帧（file_last）必须放行。"""
+    def test_backend_rejects_local_last_frame(self):
+        """【2026-11-16 需求】本地直传的尾帧（file_last）必须被拒。
+
+        媒体必须先入库素材库 —— 直传通道对首尾帧同样关闭。
+        """
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "flf", params, [], {"file_last": ["last.png"]})
-        self.assertEqual(params["last_frame"], "last.png")
-        self.assertNotIn("first_frame", params)
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "flf", params, [], {"file_last": ["last.png"]})
+        self.assertIn("素材库", ctx.exception.message)
 
     def test_backend_rejects_no_frame_at_all(self):
         """一张都不给必须报错。"""

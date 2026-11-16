@@ -1324,10 +1324,21 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
         except (TypeError, ValueError):
             raise AgentError("shift 必须是数字")
     if args.get("seed") is not None:
-        try:
-            params["seed"] = int(args["seed"])
-        except (TypeError, ValueError):
-            raise AgentError("seed 必须是整数")
+        # 【2026-11-16 新增】种子只允许**正整数** —— 与面板同一套口径。
+        #
+        # 【原来错在哪】这里只有 int() 转换：
+        #   * "abc" -> ValueError -> AgentError("seed 必须是整数")（尚可）
+        #   * 0 / -5 / 1.9 -> int() **成功** -> 一路流到 worker
+        #     -> workflow 里 int(seed) 才炸 -> 用户看到兜底文案
+        #
+        # 现在统一走 seed_guard（与后端 prepare_job_params、
+        # 前端 window.SeedGuard 三方同口径），非法值在这里就被拦下，
+        # 并给出**可执行**的中文原因。
+        from . import seed_guard as _seed_guard
+        _seed, _seed_err = _seed_guard.parse_seed(args.get("seed"))
+        if _seed_err:
+            raise AgentError(_seed_err, status=400, code="invalid_seed")
+        params["seed"] = _seed
     negative = str(args.get("negative_prompt") or "").strip()
     if negative:
         params["negative_prompt"] = negative

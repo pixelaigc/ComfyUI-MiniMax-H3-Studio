@@ -463,7 +463,9 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         srv = self._server_module()
         srv._COMFY_NODE_NAMES = {"MiniMaxH3SigmaShift"}
         params = {"prompt": "x", "lora": "none"}
-        srv.prepare_job_params("flf", params, None, {"file_first": ["a.png"]})
+        srv.prepare_job_params(
+            "flf", params,
+            [{"asset_id": "a", "slot": "first_frame", "ordinal": 0}], {})
         # 客户端没传 -> 服务端**不该**凭空写一个值
         self.assertNotIn("sampler", params,
                          "客户端没传 sampler 时服务端不该写回（会改老任务画质）")
@@ -476,7 +478,9 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         srv._COMFY_NODE_NAMES = {"MiniMaxH3SigmaShift"}
         params = {"prompt": "x", "lora": "none",
                   "sampler": "bogus_sampler", "scheduler": "bogus_scheduler"}
-        srv.prepare_job_params("flf", params, None, {"file_first": ["a.png"]})
+        srv.prepare_job_params(
+            "flf", params,
+            [{"asset_id": "a", "slot": "first_frame", "ordinal": 0}], {})
         self.assertIn(params["sampler"], vmodels.VIDEO_SAMPLERS)
         self.assertIn(params["scheduler"], vmodels.VIDEO_SCHEDULERS)
 
@@ -486,7 +490,9 @@ class TestBugsFound2026_11_12(unittest.TestCase):
         srv._COMFY_NODE_NAMES = {"MiniMaxH3SigmaShift"}
         # lora == "none" -> 工作流用 res_multistep / simple
         params = {"prompt": "x", "lora": "none"}
-        srv.prepare_job_params("flf", params, None, {"file_first": ["a.png"]})
+        srv.prepare_job_params(
+            "flf", params,
+            [{"asset_id": "a", "slot": "first_frame", "ordinal": 0}], {})
         wf = W.build_flf({"job_id": "b", "prompt": "x", "resolution": "768p",
                           "aspect": "16:9", "duration": 5, "lora": "none",
                           # 【2026-11-16 S5 修】补必填字段（见

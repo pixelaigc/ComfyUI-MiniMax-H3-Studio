@@ -164,35 +164,46 @@ class TestFlfPanelRendersReferenceSlots(unittest.TestCase):
 # 2) flf 提交带上了参考视频 / 参考音乐
 # ------------------------------------------------------------------
 class TestFlfSubmissionCarriesReferenceMedia(unittest.TestCase):
-    """flf 的提交表单必须带上 file_refvid / file_refaud。"""
+    """flf 的提交表单必须只带**素材库引用**（不再有本地直传）。
 
-    def test_flf_submit_appends_local_reference_media(self):
-        """flf 分支里必须有 file_refvid / file_refaud 的 append。"""
-        start = APP_JS_CODE.index('if (mode === "flf") {')
-        # 提交段里的 flf 分支（第二个出现）
-        second = APP_JS_CODE.index('if (mode === "flf") {', start + 10)
-        end = APP_JS_CODE.index('} else if (mode === "r2v")', second)
-        flf_submit = APP_JS_CODE[second:end]
-        self.assertIn('fd.append("file_refvid"', flf_submit)
-        self.assertIn('fd.append("file_refaud"', flf_submit)
+    【2026-11-16 需求变更】所有媒体引用必须先进入素材库 ——
+    界面只能从素材库挑选并引用，不允许功能直接引用外部文件路径。
+    所以本类从「必须有 file_refvid / file_refaud 的 append」
+    改成「**不许**有任何 file_* 的 append」。
+    """
 
-    def test_flf_submit_reads_the_same_slot_keys(self):
-        """提交时读的槽位键必须与渲染时一致（refvid0..2 / refaud0..2）。"""
+    def test_flf_submit_does_not_append_local_reference_media(self):
+        """flf 分支里**不许**有 file_refvid / file_refaud 的 append。"""
         second = APP_JS_CODE.index('if (mode === "flf") {',
                                    APP_JS_CODE.index('if (mode === "flf") {') + 10)
         end = APP_JS_CODE.index('} else if (mode === "r2v")', second)
         flf_submit = APP_JS_CODE[second:end]
-        self.assertIn('state.files["refvid" + i]', flf_submit)
-        self.assertIn('state.files["refaud" + i]', flf_submit)
+        self.assertNotIn('fd.append("file_refvid"', flf_submit)
+        self.assertNotIn('fd.append("file_refaud"', flf_submit)
 
-    def test_flf_local_reference_limits_are_three(self):
-        """本地直传上限与节点 schema 一致（视频 3 / 音频 3）。"""
+    def test_flf_submit_does_not_append_local_frames(self):
+        """首帧 / 尾帧也不许直传。"""
         second = APP_JS_CODE.index('if (mode === "flf") {',
                                    APP_JS_CODE.index('if (mode === "flf") {') + 10)
         end = APP_JS_CODE.index('} else if (mode === "r2v")', second)
         flf_submit = APP_JS_CODE[second:end]
-        self.assertIn("const REF_VIDEO_LIMIT = 3;", flf_submit)
-        self.assertIn("const REF_AUDIO_LIMIT = 3;", flf_submit)
+        self.assertNotIn('fd.append("file_first"', flf_submit)
+        self.assertNotIn('fd.append("file_last"', flf_submit)
+
+    def test_flf_submit_reads_slot_keys_from_asset_refs(self):
+        """提交时读的槽位键必须与渲染时一致（first / last / refvid* / refaud*）。"""
+        second = APP_JS_CODE.index('if (mode === "flf") {',
+                                   APP_JS_CODE.index('if (mode === "flf") {') + 10)
+        end = APP_JS_CODE.index('} else if (mode === "r2v")', second)
+        flf_submit = APP_JS_CODE[second:end]
+        self.assertIn("state.assetRefs", flf_submit)
+        self.assertNotIn('state.files["refvid" + i]', flf_submit)
+        self.assertNotIn('state.files["refaud" + i]', flf_submit)
+
+    def test_flf_reference_limits_are_three(self):
+        """参考视频 / 参考音乐上限与节点 schema 一致（各 3）。"""
+        self.assertIn("const REF_VIDEO_LIMIT = 3;", APP_JS_CODE)
+        self.assertIn("const REF_AUDIO_LIMIT = 3;", APP_JS_CODE)
 
     def test_asset_refs_slot_mapping_covers_flf_and_reference_media(self):
         """素材库路径的槽位映射必须同时覆盖首尾帧与三类参考素材。"""
@@ -209,23 +220,44 @@ class TestFlfSubmissionCarriesReferenceMedia(unittest.TestCase):
 # 3) 服务端 flf 分支真的接住了
 # ------------------------------------------------------------------
 class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
-    """服务端 flf 分支必须把 file_refvid / file_refaud 写进 params。"""
+    """服务端 flf 分支：参考媒体**必须来自素材库**（直传被拒）。"""
 
-    def test_local_reference_video_reaches_params(self):
+    def test_local_reference_video_is_rejected(self):
+        """【2026-11-16 需求】本地直传参考视频 -> 明确拒绝。
+
+        原来这里是「本地直传能进 params」—— 现在必须被拒，
+        因为媒体引用只能来自素材库。
+        """
+        import server
+        params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "flf", params, [],
+                {"file_last": ["last.png"], "file_refvid": ["v.mp4"]})
+        self.assertIn("素材库", ctx.exception.message)
+
+    def test_local_reference_audio_is_rejected(self):
+        """本地直传参考音乐 -> 明确拒绝。"""
+        import server
+        params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
+        with self.assertRaises(server.JobValidationError) as ctx:
+            server.prepare_job_params(
+                "flf", params, [],
+                {"file_last": ["last.png"], "file_refaud": ["a.flac"]})
+        self.assertIn("素材库", ctx.exception.message)
+
+    def test_asset_library_reference_media_is_accepted(self):
+        """素材库来源的参考视频 / 参考音乐 -> 放行。"""
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
         server.prepare_job_params(
-            "flf", params, [],
-            {"file_last": ["last.png"], "file_refvid": ["v.mp4"]})
-        self.assertEqual(params["ref_videos"], ["v.mp4"])
-
-    def test_local_reference_audio_reaches_params(self):
-        import server
-        params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "flf", params, [],
-            {"file_last": ["last.png"], "file_refaud": ["a.flac"]})
-        self.assertEqual(params["ref_audios"], ["a.flac"])
+            "flf", params,
+            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
+             {"asset_id": "v", "slot": "ref_video", "ordinal": 0},
+             {"asset_id": "au", "slot": "ref_audio", "ordinal": 0}], {})
+        # 素材库来源在提交阶段不写 params（worker 上传后才落），
+        # 但也不能因此报错。
+        self.assertNotIn("ref_videos", params)
 
     def test_workflow_wires_reference_video_into_node_slots(self):
         """build_flf 必须把 ref_videos 接进 T8 节点的 ref_videos 槽位。
@@ -388,17 +420,19 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
                 "flf", params, [], {"file_refaud": ["a.flac"]})
 
     def test_reference_media_does_not_leak_into_r2v_params(self):
-        """r2v 的 ref_images 语义不受影响（首尾帧键不该出现在 r2v）。"""
+        """r2v 的语义不受影响（首尾帧键不该出现在 r2v）。
+
+        【2026-11-16】本地直传已被拒绝 -> 改用素材库引用验证。
+        """
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
         server.prepare_job_params(
-            "r2v", params, [],
-            {"file_ref": ["a.png"], "file_refvid": ["v.mp4"],
-             "file_refaud": ["a.flac"]})
-        self.assertEqual(params["ref_images"], ["a.png"])
-        self.assertEqual(params["ref_videos"], ["v.mp4"])
-        self.assertEqual(params["ref_audios"], ["a.flac"])
+            "r2v", params,
+            [{"asset_id": "img", "slot": "ref_image", "ordinal": 0},
+             {"asset_id": "vid", "slot": "ref_video", "ordinal": 0},
+             {"asset_id": "aud", "slot": "ref_audio", "ordinal": 0}], {})
         self.assertNotIn("first_frame", params)
+        self.assertNotIn("last_frame", params)
 
 
 # ------------------------------------------------------------------
@@ -407,24 +441,26 @@ class TestServerFlfAcceptsReferenceMedia(unittest.TestCase):
 class TestFlfAudioTrackVisibility(unittest.TestCase):
     """flf 选了参考素材后，音轨三选一的 (b)/(c) 必须可选。"""
 
-    def test_local_reference_media_enables_video_bg_option(self):
-        """本地直传参考视频 -> (c) 可选，且提交阶段不把选择改掉。"""
+    def test_asset_reference_video_enables_video_bg_option(self):
+        """素材库参考视频 -> (c) 可选，且提交阶段不把选择改掉。"""
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "video_bg"}
         server.prepare_job_params(
-            "flf", params, [],
-            {"file_last": ["last.png"], "file_refvid": ["v.mp4"]})
+            "flf", params,
+            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
+             {"asset_id": "v", "slot": "ref_video", "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"], "video_bg")
 
-    def test_local_reference_audio_enables_reference_option(self):
-        """本地直传参考音乐 -> (b) 可选。"""
+    def test_asset_reference_audio_enables_reference_option(self):
+        """素材库参考音乐 -> (b) 可选。"""
         import server
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "reference"}
         server.prepare_job_params(
-            "flf", params, [],
-            {"file_last": ["last.png"], "file_refaud": ["a.flac"]})
+            "flf", params,
+            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0},
+             {"asset_id": "au", "slot": "ref_audio", "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"], "reference")
 
     def test_asset_library_reference_media_enables_options(self):
@@ -449,8 +485,8 @@ class TestFlfAudioTrackVisibility(unittest.TestCase):
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5,
                   "audio_track_source": "video_bg"}
         server.prepare_job_params(
-            "flf", params, [],
-            {"file_last": ["last.png"]})
+            "flf", params,
+            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"],
                          h3audio.TRACK_GENERATED)
 
