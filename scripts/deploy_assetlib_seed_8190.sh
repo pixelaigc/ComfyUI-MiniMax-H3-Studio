@@ -40,6 +40,7 @@ DEPLOY_FILES=(
   docs/优化-素材库强制引用与种子正整数校验-20261116.md
   tests/assetlib_fixture.py
   tests/test_assetlib_and_seed_guard.py
+  tests/test_b1b2_video_modes.py
   tests/test_flf_reference_media.py
   tests/test_h3_video_modes_ui.py
   tests/test_slot_state_reset.py
