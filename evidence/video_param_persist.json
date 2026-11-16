@@ -1,0 +1,231 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "steps": {
+    "problems": [],
+    "before_change": {
+      "steps": "4",
+      "sampler": "euler",
+      "scheduler": "beta"
+    },
+    "after_change": {
+      "steps": "30",
+      "sampler": "euler",
+      "scheduler": "simple"
+    },
+    "saved_config": {
+      "top_level_has_steps": false,
+      "top_level_keys": [
+        "aspect",
+        "custom",
+        "height",
+        "megapixels",
+        "mode_configs",
+        "model",
+        "rawHeight",
+        "rawWidth",
+        "size_preset_key",
+        "width"
+      ],
+      "mode_configs_steps": {
+        "t2v": 30,
+        "flf": 50,
+        "r2v": 1
+      },
+      "mode_configs_sampler": {
+        "t2v": "euler",
+        "flf": "euler",
+        "r2v": "euler"
+      }
+    },
+    "after_reload": {
+      "steps": "30",
+      "sampler": "euler",
+      "scheduler": "simple"
+    },
+    "reuse_target": {
+      "found": true,
+      "job_id": "7b172a412268",
+      "mode": "t2v",
+      "expected_steps": "4",
+      "expected_sampler": "euler",
+      "expected_scheduler": "beta"
+    },
+    "reuse_click": "clicked",
+    "after_reuse": {
+      "steps": "4",
+      "sampler": "euler",
+      "scheduler": "beta"
+    }
+  },
+  "problems": [],
+  "original_config": {
+    "model": "fl2va_pruned_int8",
+    "aspect": "16:9",
+    "megapixels": 0.4,
+    "custom": false,
+    "width": null,
+    "height": null,
+    "rawWidth": null,
+    "rawHeight": null,
+    "size_preset_key": "16:9_0.4",
+    "mode_configs": {
+      "t2v": {
+        "model": "fl2va_pruned_int8",
+        "aspect": "16:9",
+        "megapixels": 0.4,
+        "custom": false,
+        "width": null,
+        "height": null,
+        "rawWidth": null,
+        "rawHeight": null,
+        "size_preset_key": "16:9_0.4",
+        "accel_lora": "",
+        "accel_lora_strength": 1,
+        "effect_loras": [],
+        "attention": "default",
+        "twopass": {
+          "enabled": false,
+          "transition_step": 3,
+          "lowres_scale": 0.5,
+          "rho": 0,
+          "w_min": 0.5,
+          "w_max": 1,
+          "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+          "cfg": 1,
+          "sigma_refine": {
+            "enabled": false,
+            "extra_steps": 1,
+            "start_at_sigma": 2.5,
+            "end_at_sigma": 0,
+            "spacing": "cosine"
+          }
+        },
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "shift_video": 12,
+        "shift_audio": 3
+      },
+      "flf": {
+        "model": "fl2va_pruned_int8",
+        "aspect": "16:9",
+        "megapixels": 0.9,
+        "custom": true,
+        "width": 1088,
+        "height": 608,
+        "rawWidth": 1088,
+        "rawHeight": 608,
+        "size_preset_key": "",
+        "accel_lora": "dmad_4step_critic",
+        "accel_lora_strength": 1,
+        "effect_loras": [
+          {
+            "name": "h3/minimax_h3_lms_v1.0_r64.safetensors",
+            "strength": 1,
+            "enabled": true,
+            "trigger": "lms:"
+          },
+          {
+            "name": "h3/Minimax H3真实电影质感.safetensors",
+            "strength": 0.7,
+            "enabled": true,
+            "trigger": "DY"
+          },
+          {
+            "name": "h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors",
+            "strength": 0.6,
+            "enabled": true,
+            "trigger": "nsgirl"
+          }
+        ],
+        "attention": "kitchen",
+        "twopass": {
+          "enabled": true,
+          "transition_step": 6,
+          "lowres_scale": 0.75,
+          "rho": 0,
+          "w_min": 0.5,
+          "w_max": 1,
+          "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+          "cfg": 1,
+          "sigma_refine": {
+            "enabled": true,
+            "extra_steps": 1,
+            "start_at_sigma": 2.5,
+            "end_at_sigma": 0,
+            "spacing": "cosine"
+          }
+        },
+        "steps": 50,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift_video": 12,
+        "shift_audio": 3.46
+      },
+      "r2v": {
+        "model": "ref2va_pruned_int8",
+        "aspect": "16:9",
+        "megapixels": 0.9,
+        "custom": false,
+        "width": 1184,
+        "height": 704,
+        "rawWidth": 1184,
+        "rawHeight": 704,
+        "size_preset_key": "",
+        "accel_lora": "dmad_4step_critic",
+        "accel_lora_strength": 1,
+        "effect_loras": [
+          {
+            "name": "h3/minimax_h3_lms_v1.0_r64.safetensors",
+            "strength": 0.7,
+            "enabled": true,
+            "trigger": "lms:"
+          },
+          {
+            "name": "h3/Minimax H3真实电影质感.safetensors",
+            "strength": 0.7,
+            "enabled": true,
+            "trigger": "DY"
+          },
+          {
+            "name": "h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors",
+            "strength": 0.6,
+            "enabled": true,
+            "trigger": "nsgirl"
+          }
+        ],
+        "attention": "kitchen",
+        "twopass": {
+          "enabled": true,
+          "transition_step": 6,
+          "lowres_scale": 0.35,
+          "rho": 0,
+          "w_min": 0.5,
+          "w_max": 1,
+          "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+          "cfg": 0.4,
+          "sigma_refine": {
+            "enabled": true,
+            "extra_steps": 1,
+            "start_at_sigma": 2.5,
+            "end_at_sigma": 0,
+            "spacing": "cosine"
+          }
+        },
+        "steps": 1,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift_video": 12,
+        "shift_audio": 3
+      }
+    },
+    "isTrusted": false
+  },
+  "pageErrors": [],
+  "restored_ok": true,
+  "facts": {
+    "saved_config_has_top_level_steps": false,
+    "sampling_is_stored_per_mode": true
+  },
+  "verdict": "NO-DEFECT-FOUND"
+}
