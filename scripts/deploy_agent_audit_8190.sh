@@ -48,6 +48,7 @@ DEPLOY_FILES=(
   tests/test_agent_frontend_enh.py
   tests/test_agent_contract.py
   tests/test_frontend_assets_hygiene.py
+  docs/内置Agent审查报告-20261116.md
 )
 
 echo "=== 0) 现状 ==="
