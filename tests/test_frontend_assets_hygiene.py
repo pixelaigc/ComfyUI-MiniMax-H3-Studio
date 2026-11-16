@@ -135,7 +135,12 @@ STALE_BUMPED = {
     "agent_sessions.js":       ("agtsess2",     "cr20261115b"),
     # app.js 承载第 3 轮的 Critical B-2 修复（提交 c6676e6 改了它 +35 行），
     # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
-    "app.js":                  ("ac1steps1",    "cr20261115c"),
+    # 【2026-11-16 第 4 轮】app.js 再次改内容（B-3/B-4/B-6/B-7/B-9/B-10/
+    #   B-11/B-12）⇒ ?v= 必须再升一次（cr20261115c -> cr20261115d）。
+    "app.js":                  ("ac1steps1",    "cr20261115d"),
+    # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
+    # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
+    "video-panel.js":          ("ac1steps1",    "ac1steps2"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
@@ -150,7 +155,6 @@ STALE_BUMPED = {
 # ⇒ app.js 已改到 STALE_BUMPED；NOT_STALE_OK 里只留「本轮及之后
 #    内容确实没再变过」的资源。判定仍然用 git 历史 + 内容 diff 实测。
 NOT_STALE_OK = {
-    "video-panel.js":   "ac1steps1",
     "style.css":        "cr20261115a",
     "favicon.svg":      "cr20261115a",
     "media-manage.js":  "uxbatch1",

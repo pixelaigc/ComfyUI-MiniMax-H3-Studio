@@ -59,6 +59,14 @@
   const videoState = {
     model: "",
     aspect: "16:9",
+    // 【2026-11-16 审查 B-5 修复】时长镜像值。
+    //
+    // 【为什么需要】submitParams() 原来写 `duration: state.duration`，
+    // 裸引用 app.js 的全局 state —— 本文件是 IIFE，内部没有 state，
+    // 那是一次跨文件的隐式耦合（app.js 一改名就 ReferenceError）。
+    // 现在时长有自己的落点，由 app.js 在「用户改时长」和
+    // 「复用老任务参数」两条路径上显式同步过来。
+    duration: 5,
     megapixels: 0.4,
     custom: false,          // 用户手填过宽高
     width: null,
@@ -1470,6 +1478,12 @@
     if (!cfg || typeof cfg !== "object") return;
     if (cfg.model && VIDEO_OPTIONS.models[cfg.model]) videoState.model = cfg.model;
     if (cfg.aspect) videoState.aspect = cfg.aspect;
+    // 【2026-11-16 审查 B-5 修复】时长回填 —— 与 app.js 的 state.duration
+    // 保持一致（app.js 那边是唯一真源，这里是镜像）。
+    if (cfg.duration != null) {
+      const d = Number(cfg.duration);
+      if (Number.isFinite(d) && d > 0) videoState.duration = d;
+    }
     if (cfg.megapixels) videoState.megapixels = Number(cfg.megapixels);
     if (cfg.custom !== undefined) videoState.custom = !!cfg.custom;
     if (cfg.width) videoState.width = Number(cfg.width);
@@ -1876,7 +1890,21 @@
       width: w,
       height: h,
       aspect: videoState.aspect,
-      duration: state.duration,
+      // 【2026-11-16 审查 B-5 修复】时长从**本模块自己的** videoState 读，
+      // 不再裸引用 app.js 的全局 `state`。
+      //
+      // 【原来错在哪】本文件是 IIFE（顶层 `(() => { ... })();`），
+      // 内部**没有** state 这个变量；1879 行写的 `state.duration` 实际是
+      // 引用 app.js 里那个**模块级 const state**（script 作用域跨文件可见）。
+      // 加载顺序还是反的（index.html 先加载 video-panel.js，后加载 app.js），
+      // 只因 submitParams() 只在运行时调用才没触发 TDZ。
+      // 任何一次「谁把 app.js 的 state 改名 / 包进 IIFE / 改成 let」的
+      // 改动，都会让这一行立刻 ReferenceError -> submitParams() 抛错
+      // -> 叠加 B-10 修好之前的「无顶层 try/catch」= 生成按钮彻底无响应。
+      //
+      // 【修法】时长是**视频面板自己的参数**，就该在 videoState 里。
+      // app.js 那边在切换/复用参数时同步过来（见 setMode / applyConfig）。
+      duration: Number(videoState.duration) || 0,
       // 【2026-11-11】采样参数 —— 真正传进工作流。
       // 注意：这里**不再**用全局 state.steps（旧面板的通用滑杆），
       // 视频面板有自己的步数控件（vidSteps），服务端会用这里的值。
@@ -2263,11 +2291,19 @@
      * 用户会以为「时灵时不灵」。
      */
     accelOptions,
+    // 【2026-11-16 审查 B-7 修复】currentSize 提为**正式 API**。
+    //
+    // 【原来错在哪】currentSize 只挂在 _debug 下，而 app.js 的提交前置
+    // 闸门（接续分辨率一致性校验）在**生产代码**里读 window.VIDEO_PANEL._debug
+    // —— 把「调试出口」当正常 API 用。后果：
+    //   * _debug 一旦被当成「可以随便删的测试钩子」清掉，生产链路直接断；
+    //   * 命名撒谎 —— 读它的人以为自己在读调试数据，其实读的是业务数据。
+    // 现在 currentSize 是正式接口；_debug 只保留真正的测试钩子。
+    currentSize,
     // 供验收脚本直接读状态（证明「界面值 == 提交值」）
     _debug: {
       selectableAccelLoras,
       presetsForAspect,
-      currentSize,
     },
   };
 })();
