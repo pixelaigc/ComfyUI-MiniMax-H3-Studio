@@ -137,7 +137,9 @@ STALE_BUMPED = {
     # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
     # 【2026-11-16 第 4 轮】app.js 再次改内容（B-3/B-4/B-6/B-7/B-9/B-10/
     #   B-11/B-12）⇒ ?v= 必须再升一次（cr20261115c -> cr20261115d）。
-    "app.js":                  ("ac1steps1",    "cr20261115d"),
+    # 【2026-11-16 第 5 轮】app.js 再次改内容（A 段骨架卡文案泄漏修复）
+    #   ⇒ ?v= 必须再升一次（cr20261115d -> cr20261116a）。
+    "app.js":                  ("ac1steps1",    "cr20261116a"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     "video-panel.js":          ("ac1steps1",    "ac1steps2"),
