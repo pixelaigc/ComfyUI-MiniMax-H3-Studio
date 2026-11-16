@@ -131,12 +131,19 @@ const state = {
   loraStrength: 1.0,
   aspect: "16:9",
   duration: 5,
-  // 【2026-11-12 修】初值必须与工作流档位一致。
-  // 工作流（workflows._h3_video_workflow）：params.lora != "none" -> steps 4。
-  // 之前这里写 6、HTML 滑杆写 6，但工作流实际跑 4 步；
-  // 后来 HTML 改成 4 之后，state.steps 还是 6
-  // -> 滑杆显示 4、说明行写「步数 6」= 界面自相矛盾。
-  steps: 4,
+  // 【2026-11-16 审查 B-11 修复】步数**不再**由 state 持有。
+  //
+  // 【原来错在哪】state.steps 是个写死的常量（4），全仓**没有任何一处
+  // 写过它**（grep `state.steps\s*=` 命中 0 处），而 params 基线里
+  // 无条件写 `steps: state.steps`。于是：
+  //   * t2v / flf / r2v 的**正常路径**都会被 VIDEO_PANEL.submitParams()
+  //     覆盖成 videoState.steps（面板真值）—— 这一支没问题；
+  //   * 但**降级路径**（VIDEO_PANEL.isReady() 为 false）不写 steps，
+  //     就落到这个写死的 4 —— 8190 实测：面板显示 50、提交 4。
+  //
+  // 【修法】步数的唯一真源是视频面板的 videoState.steps；
+  // state 这一层不再持有它，避免「两份步数、面板用一份、提交用另一份」。
+  // 降级路径现在也显式取面板步数（见降级分支）。
   // 【2026-11-11】首尾帧 / 参考生视频的采样参数（走旧工作流路径，
   // 但采样链路与文生视频相同，所以这些参数一样是真参数）。
   // 候选项来自 /api/video-options 的 sampling 清单（服务端从本机
@@ -168,6 +175,13 @@ const state = {
   files: { first: null, last: null, refs: [] },
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
   assetRefs: {},
+  // 【2026-11-16 审查 B-4】本地直传槽位的预览地址（blob URL）。
+  //
+  // 【为什么存 state 而不是只存在 DOM 上】切模式时 #uploadRow 被整块重建
+  // （row.innerHTML = ""），slot.dataset.previewUrl 会随之丢失。
+  // 存进 state 才能在重建后**如实恢复**槽位的缩略图与预览能力，
+  // 避免「界面显示空槽位、提交却带着值」的鬼素材。
+  slotPreviewUrls: {},
   // 【2026-11-14】音轨来源（B2 音轨三选一）：
   //   "" = 使用生成的音乐
   //   "reference" = 使用参考音乐作为成片音轨
@@ -458,6 +472,89 @@ function activateVideoMode(mode) {
   syncVideoNavActive();
 }
 
+/**
+ * 【2026-11-16 审查 B-3 修复】素材槽位白名单 —— **模块级唯一真源**。
+ *
+ * 【口径 —— 与 renderMode 里真正 mk() 出来的槽位严格一致】
+ *   flf -> first / last / refvid0..2 / refaud0..2
+ *   r2v -> ref0..ref8 / refvid0..2 / refaud0..2
+ *   其它 -> 无（文生视频 / 图像 / 音乐模式没有素材槽位）
+ *
+ * 【为什么要提到模块级】这份口径原来**只存在于提交处**（try 块内部），
+ * 而 renderMode 渲染槽位时用的是另一套硬编码（mk("first",...) /
+ * mk("ref"+i,...) …）。两套口径一旦漂移，就会出现：
+ *   * 界面渲染了某个槽位，提交却被白名单挡掉 -> 用户填了却没进去；
+ *   * 提交放行了某个槽位，界面上根本没有它 -> 幽灵输入（B-2 的根因）。
+ * 现在渲染侧（resetSlotsForMode）与提交侧共用这一份。
+ */
+const MODE_ALLOWED_SLOT_KEYS = {
+  flf: (key) => key === "first" || key === "last"
+    || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
+  r2v: (key) => /^ref\d+$/.test(key)
+    || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
+};
+
+/**
+ * 【2026-11-16 审查 B-3 / B-4 / B-12 修复】按模式清空槽位状态。
+ *   flf -> first / last / refvid0..2 / refaud0..2
+ *   r2v -> ref0..ref8 / refvid0..2 / refaud0..2
+ *   其它 -> 无素材槽位（文生视频 / 图像 / 音乐）
+ *
+ * 这份口径与提交处（app.js 里的 MODE_ALLOWED_SLOT_KEYS）**必须一致** ——
+ * 不一致就会出现「界面有槽位但提交被挡」或「提交有值但界面没有」。
+ * 两者都指向同一份真源：MODE_ALLOWED_SLOT_KEYS。
+ *
+ * 【为什么「其它模式」也要清】文生视频 / 图像 / 音乐模式没有素材槽位，
+ * 上一模式残留的 state.files / state.assetRefs 如果留着，提交时会被
+ * flf/r2v 分支之外的路径带上去（或者让音轨下拉误判）。
+ *
+ * 【为什么连同 key 也清（refvid* / refaud*）】flf 与 r2v 共用 refvid* /
+ * refaud* 槽位名，但它们是**两个不同面板的槽位**。用户在 flf 选了
+ * 参考视频 1，切到 r2v 后界面上的「参考视频 1」是另一个槽位 ——
+ * 如果沿用旧值，界面显示「参考视频 1 已填」但用户以为是 r2v 里选的，
+ * 提交时也会把它当成 r2v 的参考视频。语义错位。
+ */
+function resetSlotsForMode(mode, keepSlots) {
+  const allowed = MODE_ALLOWED_SLOT_KEYS[mode];
+  const keep = (key) => allowed ? allowed(key) : false;
+  // 【2026-11-16 审查 B-3 修复 · 同模式重渲染例外】
+  // keepSlots = true 时**不清**槽位状态 —— 用于「提交成功后刷新界面」
+  // （app.js 里 renderMode() 的那次调用）。
+  //
+  // 【为什么需要这个例外】队列化改造（2026-11-13）明确要求
+  // 「提交后**不再清空**参考图 / 参考帧选择」—— 用户要能连续提交多个
+  // 任务，第二次提交时槽位还在才能走通。
+  // 如果这里无条件清，第二次提交会被前置校验拦下，
+  // 「连续提交」这个已交付的能力直接坏掉。
+  //
+  // 【与「切模式要清」的区分】
+  //   切模式 -> 界面换成另一套槽位 -> 旧值必须清（否则串台）；
+  //   同模式重渲染 -> 界面还是同一套槽位 -> 值必须保留（否则连做断）。
+  // 两者的区别就是「界面是不是同一套槽位」，用 keepSlots 显式表达。
+  if (keepSlots) return;
+  // state.files：只保留白名单内的 key，且把值置空（本地 File 对象
+  // 不能跨模式沿用 —— 那是上一模式的直传文件）。
+  for (const key of Object.keys(state.files || {})) {
+    if (keep(key)) {
+      // 仍然白名单内的 key：也要清 —— 理由见上面的「为什么连同 key 也清」。
+      state.files[key] = null;
+    } else {
+      delete state.files[key];
+    }
+  }
+  // state.assetRefs：整块清掉（素材库引用同样不跨模式沿用）。
+  state.assetRefs = {};
+  // state.slotPreviewUrls：本地预览 blob URL 跟着槽位一起失效。
+  state.slotPreviewUrls = {};
+  // 音轨来源也要复位 —— 它是「基于当前模式素材」的派生状态。
+  state.audioTrackSource = "";
+}
+
+// 【2026-11-16 审查 B-3 修复】同模式重渲染时保留槽位状态的标记。
+// 由提交处（onGenerateClick 末尾）在调 renderMode() 前置 true，
+// 调用完复位 —— 避免「切模式时也误保留」。
+let renderModeKeepSlots = false;
+
 function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
   queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
@@ -492,6 +589,33 @@ function renderMode() {
   const info = MODE_INFO[mode];
   // 上传区
   const zone = $("#uploadZone"), row = $("#uploadRow");
+  // 【2026-11-16 审查 B-3 / B-4 / B-12 修复】切模式前**清掉上一模式的槽位状态**。
+  //
+  // 【原来错在哪】renderMode() 只重建 DOM（row.innerHTML = ""），
+  // 但 state.files / state.assetRefs **从不清空** —— 全仓唯一的清理点
+  // 只有 fillSlot 里的 `delete state.assetRefs[key]`（同一槽位被覆盖时）。
+  // 于是切模式后：
+  //   * 新模式界面上没有任何槽位，state 里却还留着旧模式的值；
+  //   * 提交时这些值会跟着一起走（B-2 的白名单守卫只能挡住「槽位 key
+  //     不属于当前模式」的那部分，挡不住**同 key 跨模式复用**）；
+  //   * 音轨下拉（audioTrackAvailability）读的就是 state.assetRefs /
+  //     state.files -> 新模式里错误地出现「使用参考音乐作为成片音轨」。
+  //
+  // 【修法】切模式时按**新模式实际渲染的槽位**重建 state：
+  //   1) 清掉不在新模式白名单里的槽位 key；
+  //   2) 同一 key 跨模式（refvid* / refaud* 在 flf 与 r2v 都存在）
+  //      也**不保留** —— 新模式的槽位是新的，界面显示必须与提交一致；
+  //   3) 重建后由 mk() 按 state 如实回填缩略图 / filled class。
+  //
+  // 【为什么不按 key 保留】界面语义要求「界面上有什么，提交才有什么」。
+  // 保留同 key 的旧值会造成「界面是空槽位、提交却带着值」——
+  // 那正是 B-2 修复要消灭的那类不一致。
+  //
+  // 【keepSlots 的口径】renderMode() 有两类调用方：
+  //   1) 切模式（activateMode / 启动恢复）-> keepSlots 未传 -> 清空；
+  //   2) 提交成功后的同模式重渲染 -> keepSlots = true -> 保留。
+  //   第二类由提交处显式传入（见 onGenerateClick 末尾）。
+  resetSlotsForMode(mode, renderModeKeepSlots);
   row.innerHTML = "";
 
   /**
@@ -546,6 +670,54 @@ function renderMode() {
     });
   }
 
+  /**
+   * 【2026-11-16 审查 B-4 修复】按 state 里的值回填一个槽位。
+   *
+   * 【三条来源，与 fillSlot / fillFromAsset 严格对齐】
+   *   1) state.assetRefs[key]  -> 素材库来源（缩略图走 asset.preview_url）
+   *   2) state.files[key]      -> 本地直传 File（缩略图走 blob URL）
+   *   3) 都没有                -> 空槽位（保持初始的「+ 标签 + 素材库」形态）
+   *
+   * 【为什么不能只靠 dataset】slot.dataset.previewUrl 存在 DOM 上，
+   * 重建就丢；state.slotPreviewUrls 才是跨重建的落点。
+   */
+  function restoreSlotContent(slot, key, kind, label) {
+    const ref = (state.assetRefs || {})[key];
+    const file = (state.files || {})[key];
+    const localUrl = (state.slotPreviewUrls || {})[key] || "";
+    if (!ref && !file) return;
+    slot.replaceChildren();
+    let url = "";
+    if (ref) {
+      url = `/api/assets/${encodeURIComponent(ref.asset_id)}/content`;
+    } else if (file) {
+      url = localUrl;
+    }
+    if (url) slot.dataset.previewUrl = url;
+    if (kind === "image" && url) {
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = label;
+      slot.append(image);
+    } else if (kind === "video" || kind === "audio") {
+      const badge = document.createElement("span");
+      badge.className = "tag asset-badge";
+      badge.textContent = kind === "video" ? "视频" : "音频";
+      slot.append(badge);
+    }
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = label;
+    slot.append(tag);
+    if (ref) {
+      const badge = document.createElement("span");
+      badge.className = "tag asset-badge";
+      badge.textContent = "素材库";
+      slot.append(badge);
+    }
+    slot.classList.add("filled");
+  }
+
   const mk = (key, label, kind = "image") => {
     const slot = document.createElement("div");
     slot.className = "up-slot";
@@ -567,6 +739,9 @@ function renderMode() {
       // 【2026-11-15 修复③ 交付项 2】本地直传的素材也���能预览 ——
       // 记下 blob 地址，点槽位时用它播放 / 放大。
       slot.dataset.previewUrl = url;
+      // 【2026-11-16 审查 B-4 修复】预览地址同时存进 state ——
+      // 槽位重建后 DOM 上的 dataset 会丢，state 里的才留得住。
+      state.slotPreviewUrls[key] = url;
       slot.replaceChildren();
       if (kind === "image") {
         const image = document.createElement("img");
@@ -597,6 +772,9 @@ function renderMode() {
     const fillFromAsset = (asset) => {
       // 素材库来源 -> 预览走 /api/assets/<id>/content（不是 blob）
       delete slot.dataset.previewUrl;
+      // 【2026-11-16 审查 B-4 修复】state 里的旧 blob 地址也要清 ——
+      // 否则重建回填时会拿一个已经失效的 blob URL 当缩略图。
+      delete state.slotPreviewUrls[key];
       slot.replaceChildren();
       if (kind === "image") {
         const image = document.createElement("img");
@@ -720,6 +898,17 @@ function renderMode() {
       });
     });
     slot.appendChild(pickBtn);
+    // 【2026-11-16 审查 B-4 修复】按 state 里已有的值**如实回填**槽位。
+    //
+    // 【原来错在哪】#uploadRow 每次切模式 / 重渲染都被整块重建
+    // （row.innerHTML = ""），重建出来的槽位是「空的」—— 没有 filled
+    // class、没有缩略图、没有 dataset.previewUrl。
+    // 而 openSlotPreview() 只从 state.assetRefs[key] 或
+    // slot.dataset.previewUrl 取 URL —— 于是：
+    //   * 界面显示空槽位，用户以为自己没选过；
+    //   * 提交时 state 里却**带着**那个值（幽灵输入）。
+    // 现在重建时按 state 回填，界面与提交**始终一致**。
+    restoreSlotContent(slot, key, kind, label);
     row.appendChild(slot);
   };
   if (mode === "flf") {
@@ -2321,15 +2510,15 @@ $("#imgRefSort")?.addEventListener("click", () => {
 // 「这两个哪个算数」。所以这里**只保留出图时的官方 PE 接线**，
 // 手动扩写统一从「增强」下拉进。
 //
-// 【出图时到底扩不扩 —— 两态，与「普通增强」同语义】
-//   默认（没做过手动官方 PE 扩写）：usePe=true -> 出图时链路内部再扩写一次
-//     （官方最佳实践：Qwen-Image 2.1 官方工作流就是这么走的）
-//   做过手动官方 PE 扩写后：usePe=false -> 提示词框里**已经是**官方 PE 结果，
-//     出图时不再二次扩写（否则会把用户的编辑冲掉、白白多花一次 9B 推理）
-//   两条路都能拿到官方 PE 效果，区别只在「谁来扩写」。
-//
-// 注：原先读取官方 PE 档位的辅助函数，随独立 PE 勾选框（及其档位徽标）
-//     一起删除后已无调用点，故不再保留。
+// 【2026-11-16 审查 B-9 修复】本段原来描述的是「出图时到底扩不扩」
+//   —— usePe 两态（默认出图时内部再扩写一次 / 手动扩写过则不再扩写）。
+//   但那套语义**已随修复①（PE 全量外置到 WEBUI）整体删除**：
+//     * 出图链路里已无 PE 节点，也没有 usePe 这个开关；
+//     * 扩写只在「增强」下拉里做一次（/api/qwen-pe/expand）；
+//     * 官方 PE 的档位参数（presence_penalty / max_new_tokens）
+//       只作用于扩写那一次，不再随出图提交。
+//   留着这段会让人以为「出图时还会自动再扩写一次」，与实际行为不符。
+//   —— 过期注释比没有注释更危险：它描述的是一个不存在的功能。
 
 // 拉取服务端下发的档位 / 比例 / 模型清单
 async function loadImageOptions() {
@@ -2610,6 +2799,13 @@ function updateSeedStrengthLayout() {
 }
 $("#duration").addEventListener("input", e => {
   state.duration = parseInt(e.target.value);
+  // 【2026-11-16 审查 B-5 修复】时长控件在 app.js（#duration），
+  // 而 video-panel.js 的 submitParams() 现在读自己的 videoState.duration
+  // （不再裸引用 app.js 的全局 state）。这里做**显式同步** ——
+  // app.js 是时长的唯一真源，videoState 只是它的镜像。
+  if (window.VIDEO_PANEL && window.VIDEO_PANEL.state) {
+    window.VIDEO_PANEL.state.duration = state.duration;
+  }
   $("#durVal").textContent = state.duration + "s";
 });
 
@@ -2925,7 +3121,24 @@ async function pollPendingJobs() {
 }
 
 // ---------- 提交 ----------
-$("#genBtn").addEventListener("click", async () => {
+// 【2026-11-16 审查 B-10 修复】整个提交流程包一层顶层 try/catch。
+//
+// 【原来错在哪】handler 主体是 async 箭头函数，但**顶层没有 try/catch**：
+//   try { ...fetch... } catch { alert } 只包住了最后的 fetch 段（app.js 原 3243 起）。
+//   在它之前的这些调用**一旦抛错就是未捕获的 promise rejection**：
+//     * await askEnhanceGate()      —— 模态框操作
+//     * imgCtx() / imgCurrentSize() —— 图像模式参数计算
+//     * window.VIDEO_PANEL.submitParams() —— 共享面板参数收集
+//     * currentPromptLevel() / currentOriginalPrompt()
+//   未捕获的 rejection **不会白屏**，但用户看到的是「点生成毫无反应」——
+//   比报错更难排查（控制台里只有一条 unhandledrejection）。
+//
+// 【为什么拆成两个函数而不是把原 body 整体缩进一层】
+// 整个 handler 有 500 行；整体重新缩进会产生一个巨大的伪 diff，
+// 掩盖真实改动、放大 review 风险。这里把原 body **原样**搬进
+// onGenerateClick()，只加一层壳 —— 语义变化只在「异常从
+// 「静默丢弃」变成「明确告知用户」。
+async function onGenerateClick() {
   // 【2026-11-13 队列化改造】不再因为「有任务在跑」而拒绝提交 ——
   // 队列的意义就是让用户能连续添加。只有「提示词增强中」才拦
   // （增强会改写提示词，提交半成品提示词没有意义）。
@@ -2996,7 +3209,13 @@ $("#genBtn").addEventListener("click", async () => {
     resolution: state.res,
     aspect: state.aspect,
     duration: state.duration,
-    steps: state.steps,
+    // 【2026-11-16 审查 B-11 修复】基线里**不再**写 steps。
+    // 步数由各模式分支自己负责：
+    //   * t2v / flf / r2v -> VIDEO_PANEL.submitParams()（面板真值）；
+    //   * 降级路径 -> 显式取 window.VIDEO_PANEL.state.steps；
+    //   * 图像 / 音乐模式 -> 各自的分支写 s.steps / 不需要步数。
+    // 基线里挂一个写死的 state.steps（恒 4）只会让「没人负责」的模式
+    // 悄悄用错步数 —— 那正是 B-11 实测到的「面板 50 / 提交 4」。
     model: state.model,
     seed: $("#seed").value.trim() || null,
   };
@@ -3113,8 +3332,9 @@ $("#genBtn").addEventListener("click", async () => {
         // 所以「复用参数时清 context」之外还要在这里拦一次。
         // 不一致就当场提示并中止提交 —— 不浪费一次生成。
         if (typeof window.Continuation.checkSubmitConsistency === "function") {
-          const size = window.VIDEO_PANEL._debug
-            ? window.VIDEO_PANEL._debug.currentSize()
+          // 【2026-11-16 审查 B-7 修复】读正式 API，不再读 _debug。
+          const size = typeof window.VIDEO_PANEL.currentSize === "function"
+            ? window.VIDEO_PANEL.currentSize()
             : null;
           if (!window.Continuation.checkSubmitConsistency(size)) return;
         }
@@ -3163,14 +3383,37 @@ $("#genBtn").addEventListener("click", async () => {
       params.resolution = legacyTierForPixels(
         Number(shared.width) || 0, Number(shared.height) || 0);
     } else {
-      // 【兜底】共享面板还没就绪（清单接口未到）—— 用旧面板的值，
-      // 保证**功能可用**（只是布局还没切过去）。
+      // 【兜底】共享面板还没就绪（清单接口未到）—— 保证**功能可用**
+      // （只是布局还没切过去）。
       params.sampler = state.vidSampler;
       params.scheduler = state.vidScheduler;
       params.shift_video = Number(state.vidShiftVideo);
       params.shift_audio = Number(state.vidShiftAudio);
-      params.width = currentLegacyVideoSize().width;
-      params.height = currentLegacyVideoSize().height;
+      // 【2026-11-16 审查 B-6 修复】尺寸**优先取视频面板的真实宽高**。
+      //
+      // 【原来错在哪】这里用的是 currentLegacyVideoSize()，它读
+      // state.res / state.aspect —— 这两个字段全仓**从未被写过**
+      // （恒为 "544p" / "16:9"），所以恒算出 864×480。
+      // 而视频面板自己的 videoState.width/height 是**真实值**
+      // （用户在共享面板里选的真实像素）。
+      //
+      // 【实测后果】清单接口未返回时用户点生成 -> 面板显示的尺寸与
+      // 实际提交/实跑的不一致（又是「面板说一套、产物另一套」）。
+      //
+      // 【修法】先取面板真实宽高；面板也没有（还没初始化）时才回退到
+      // legacy 计算 —— 那时至少是个自洽的默认值。
+      const panelW = window.VIDEO_PANEL && window.VIDEO_PANEL.state
+        ? Number(window.VIDEO_PANEL.state.width) : 0;
+      const panelH = window.VIDEO_PANEL && window.VIDEO_PANEL.state
+        ? Number(window.VIDEO_PANEL.state.height) : 0;
+      if (panelW > 0 && panelH > 0) {
+        params.width = panelW;
+        params.height = panelH;
+        params.resolution = legacyTierForPixels(panelW, panelH);
+      } else {
+        params.width = currentLegacyVideoSize().width;
+        params.height = currentLegacyVideoSize().height;
+      }
     }
     // 【2026-11-14】音轨三选一（B2）
     params.audio_track_source = state.audioTrackSource || "";
@@ -3291,12 +3534,9 @@ $("#genBtn").addEventListener("click", async () => {
     //   flf  -> first / last / refvid0..2 / refaud0..2
     //   r2v  -> ref0..8 / refvid0..2 / refaud0..2
     //   其它 -> 无（文生视频等模式没有素材槽位）
-    const MODE_ALLOWED_SLOT_KEYS = {
-      flf: (key) => key === "first" || key === "last"
-        || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
-      r2v: (key) => /^ref\d+$/.test(key)
-        || /^refvid\d+$/.test(key) || /^refaud\d+$/.test(key),
-    };
+    // 【2026-11-16 审查 B-3 修复】槽位白名单提到**模块级唯一真源**
+    // （见文件上方 MODE_ALLOWED_SLOT_KEYS）—— 渲染侧与提交侧共用一份，
+    // 杜绝「界面渲染的槽位」与「提交允许的槽位」两套口径漂移。
     const slotKeyAllowed = MODE_ALLOWED_SLOT_KEYS[mode] || (() => false);
     const groupCounter = {};
     Object.entries(state.assetRefs || {}).forEach(([key, item]) => {
@@ -3422,12 +3662,38 @@ $("#genBtn").addEventListener("click", async () => {
     //
     // 提示词本来就一直保留（便于连做），参考帧同理。
     // 素材库引用（assetRefs）同样保留 —— 它只是 id，不会失效。
-    renderMode();
+    //
+    // 【2026-11-16 审查 B-3 修复】这里要**保留**槽位状态，所以给
+    // renderMode 传 keepSlots=true —— 否则「连续提交」会因槽位被清
+    // 而被前置校验拦下（见 resetSlotsForMode 的说明）。
+    renderModeKeepSlots = true;
+    try {
+      renderMode();
+    } finally {
+      renderModeKeepSlots = false;
+    }
     state.tab = "active";
     renderTabs();
     refreshJobs();
   } catch (e) {
     alert("提交失败: " + e.message);
+  }
+}
+
+// 【2026-11-16 审查 B-10 修复】事件绑定 + 顶层兜底 try/catch。
+//
+// 【语义要点】
+//   * handler 内部**主动 return**（参数校验不通过、用户取消增强等）
+//     不是异常 —— 它们正常退出，不会被这里的 catch 误报成错误。
+//   * 只有**真正抛出的异常**才会走到 catch，给用户一句明确的话，
+//     而不是「点生成毫无反应」。
+$("#genBtn").addEventListener("click", async () => {
+  try {
+    await onGenerateClick();
+  } catch (e) {
+    // 【兜底文案要能定位】把错误类型也带上，方便用户截图反馈。
+    console.error("[generate] 提交流程异常:", e);
+    alert("提交失败: " + (e && e.message ? e.message : String(e)));
   }
 });
 
@@ -4684,6 +4950,11 @@ function jobCard(job) {
         state.duration = rDuration;
         $("#duration").value = rDuration;
         $("#durVal").textContent = rDuration + "s";
+        // 【2026-11-16 审查 B-5 修复】同步镜像到视频面板
+        // （submitParams() 现在读 videoState.duration，不再裸引用全局 state）。
+        if (window.VIDEO_PANEL && window.VIDEO_PANEL.state) {
+          window.VIDEO_PANEL.state.duration = rDuration;
+        }
       }
       // 【2026-11-15 修复③ 交付项 3】步数控件已移入**共享面板**
       // （#vidSteps）—— 旧的 #steps / #stepsVal 已随旧面板删除。
@@ -4764,6 +5035,10 @@ function jobCard(job) {
         state.duration = legacyDuration;
         $("#duration").value = legacyDuration;
         $("#durVal").textContent = legacyDuration + "s";
+        // 【2026-11-16 审查 B-5 修复】同步镜像到视频面板（同上）。
+        if (window.VIDEO_PANEL && window.VIDEO_PANEL.state) {
+          window.VIDEO_PANEL.state.duration = legacyDuration;
+        }
       }
       const legacySeed = legacyInfo.seed != null ? legacyInfo.seed : p.seed;
       if (legacySeed) $("#seed").value = legacySeed;

@@ -1500,7 +1500,7 @@
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=ac1steps1"></script>
+<script src="/static/video-panel.js?v=ac1steps2"></script>
 <!-- 效果 LoRA 选择器（H3 文生视频面板）——
      必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
      调用（window.VIDEO_EFFECT_LORA）。 -->
@@ -1531,10 +1531,14 @@
      参考视频（≤3）/ 参考音乐（≤3）槽位与提交通道。
      不破缓存的话，flf 模式下「用参考音乐作音轨」/「用参考视频背景音作音轨」
      这两项在用户浏览器里**永远不会出现**（后端早就支持，只是面板够不着）。 -->
-<!-- 【2026-11-15 媒体库全类型】升版号到 mediadef1 —— app.js 改了
-     （长片拼接页不再污染全局 media 筛选；媒体库恢复显示图片/音频产物）。
-     必须破缓存，否则用户拿到的还是旧 app.js，媒体库仍然只剩视频。 -->
-<script src="/static/app.js?v=cr20261115c"></script>
+<!-- 【2026-11-16 第 4 轮代码审查】升版号到 cr20261115d / ac1steps2 ——
+     app.js 改了（B-3/B-4/B-6/B-7/B-9/B-10/B-11/B-12：切模式清槽位状态、
+     重建如实回填、降级路径取面板真值、_debug 提正式 API、过期注释清理、
+     提交顶层 try/catch、步数双轨收敛）；
+     video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
+     时长改读本模块的 videoState.duration）。
+     必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
+<script src="/static/app.js?v=cr20261115d"></script>
 <script src="/static/providers.js?v=cr20261115b"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
