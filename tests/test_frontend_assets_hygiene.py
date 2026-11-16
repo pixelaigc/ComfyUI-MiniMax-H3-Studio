@@ -133,11 +133,23 @@ STALE_BUMPED = {
     "music-enhance.js":        ("uxbatch1",     "cr20261115b"),
     "agent.js":                ("agent4",       "cr20261115b"),
     "agent_sessions.js":       ("agtsess2",     "cr20261115b"),
+    # app.js 承载第 3 轮的 Critical B-2 修复（提交 c6676e6 改了它 +35 行），
+    # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
+    "app.js":                  ("ac1steps1",    "cr20261115c"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
+#
+# 【app.js 的口径修正 —— 第 3 轮收口时踩到的自指坑】
+# app.js 曾在 NOT_STALE_OK 里（?v=ac1steps1），理由是「它的内容在
+# cd7f175 升版号之后没再变过」。但第 3 轮收口的 B-2 修复**本身**
+# 就改在 web/app.js 里（+35 行，提交 c6676e6）—— 于是 app.js 在
+# 同一个提交里「内容变了、版本号没变」，正是 D-2 要消灭的那类缺陷：
+# 浏览器拿到的仍是旧 app.js（Critical 的跨模式槽位串台修复不生效），
+# 而 /static/* 没有 Cache-Control，浏览器会按启发式新鲜度缓存。
+# ⇒ app.js 已改到 STALE_BUMPED；NOT_STALE_OK 里只留「本轮及之后
+#    内容确实没再变过」的资源。判定仍然用 git 历史 + 内容 diff 实测。
 NOT_STALE_OK = {
-    "app.js":           "ac1steps1",
     "video-panel.js":   "ac1steps1",
     "style.css":        "cr20261115a",
     "favicon.svg":      "cr20261115a",

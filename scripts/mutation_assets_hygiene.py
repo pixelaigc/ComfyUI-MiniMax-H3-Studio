@@ -90,11 +90,26 @@ MUTATIONS = [
      '/static/video-panel-fallback.js?v=vpfb1',
      "test_bumped_static_assets_are_not_stale"),
 
-    ("D-2d 顺手把不该动的 app.js 也升了（过度升版）",
+    # 【D-2d 口径修正 —— 第 3 轮收口时踩到的自指坑】
+    # 这一条原本把「app.js 被顺手升版」当成缺陷来防（过度升版）。
+    # 但第 3 轮的 Critical B-2 修复就在 web/app.js 里（提交 c6676e6
+    # 改了它 +35 行）—— app.js 恰恰**必须**升版，否则浏览器拿到旧
+    # app.js、修复不生效。把 app.js 当成「不该动的」是错的。
+    # ⇒ 「过度升版」这条守卫改用 video-panel.js —— 它在本轮之后
+    #    内容确实没再变过（git 历史 + 内容 diff 实测），不该被顺手升。
+    ("D-2d 顺手把不该动的 video-panel.js 也升了（过度升版）",
      "web/index.html",
-     '/static/app.js?v=ac1steps1',
-     '/static/app.js?v=cr20261115b',
+     '/static/video-panel.js?v=ac1steps1',
+     '/static/video-panel.js?v=cr20261115c',
      "test_untouched_assets_keep_their_version"),
+
+    # 【D-2d2 新增】app.js 回到旧版本号 ⇒ Critical 的 B-2 修复对
+    # 老缓存用户不生效，必须被抓住。
+    ("D-2d2 app.js ?v= 回退到 ac1steps1（B-2 修复对老缓存用户失效）",
+     "web/index.html",
+     '/static/app.js?v=cr20261115c',
+     '/static/app.js?v=ac1steps1',
+     "test_bumped_static_assets_are_not_stale"),
 
     ("D-2e 漏掉一个 ?v= 参数",
      "web/index.html",
