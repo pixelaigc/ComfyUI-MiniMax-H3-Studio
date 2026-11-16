@@ -1,0 +1,15 @@
+[baseline] tests pass = True
+[CAUGHT] M1-reset-assetRefs resetSlotsForMode 不再清空 state.assetRefs
+[CAUGHT] M2-reset-previewUrls resetSlotsForMode 不再清空 state.slotPreviewUrls
+[CAUGHT] M3-reset-audioTrack resetSlotsForMode 不再复位 state.audioTrackSource
+[CAUGHT] M4-keepSlots-ignored keepSlots 参数被忽略（提交后重渲染也会清槽位）
+[CAUGHT] M5-files-not-deleted 白名单外的 state.files key 不再删除（只置 null）
+[CAUGHT] M6-restore-no-filled restoreSlotContent 不再标记 filled class
+[CAUGHT] M7-restore-no-img restoreSlotContent 不再插入缩略图 <img>
+[CAUGHT] M8-restore-no-previewUrl restoreSlotContent 不再写 dataset.previewUrl
+[CAUGHT] M9-restore-early-return restoreSlotContent 遇到素材直接 return（不回填）
+[CAUGHT] M10-whitelist-drop-first flf 白名单去掉 first 槽位
+[CAUGHT] M11-whitelist-drop-refaud flf 白名单去掉 refaud* 槽位
+[CAUGHT] M12-whitelist-two-copies 白名单被复制成两份（渲染侧与提交侧口径漂移）
+============================================================
+变异总数 12 / 捕获 12 / 漏网 0

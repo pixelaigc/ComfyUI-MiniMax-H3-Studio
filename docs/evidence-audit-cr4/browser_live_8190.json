@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "date": "2026-11-16",
+    "task": "5b45bcae-dda1-49c0-ac43-a631e4793dbe",
+    "round": "4",
+    "live_head": "3f8c8511fd11e3de808938db99c5ee156df84d10",
+    "service": "h3-studio.service",
+    "port": 8190,
+    "pid_after_deploy": 846270
+  },
+  "url": "http://127.0.0.1:8190/",
+  "title": "🐴 OmniStudio · 多模型图像 / 视频 / 音频创作工作台",
+  "app_js_src": "http://127.0.0.1:8190/static/app.js?v=cr20261115d",
+  "video_panel_src": "http://127.0.0.1:8190/static/video-panel.js?v=ac1steps2",
+  "symbols": {
+    "resetSlotsForMode": true,
+    "onGenerateClick": true,
+    "VIDEO_PANEL.currentSize": true,
+    "VIDEO_PANEL._debug.currentSize": false
+  },
+  "panel_traversal": {
+    "note": "12 面板遍历，四路劫持 console.error / console.warn / window.error / unhandledrejection",
+    "results": [
+      { "mode": "t2v", "active": "t2v", "console_errors": [] },
+      { "mode": "flf", "active": "flf", "console_errors": [] },
+      { "mode": "r2v", "active": "r2v", "console_errors": [] },
+      { "mode": "longfilm", "active": "longfilm", "console_errors": [] },
+      { "mode": "t2i", "active": "t2i", "console_errors": [] },
+      { "mode": "t2i_qwen", "active": "t2i_qwen", "console_errors": [] },
+      { "mode": "t2i_moss", "active": "t2i_moss", "console_errors": [] },
+      { "mode": "t2i_h3image", "active": "t2i_h3image", "console_errors": [] },
+      { "mode": "i2i_qwen", "active": "i2i_qwen", "console_errors": [] },
+      { "mode": "i2i_h3image", "active": "i2i_h3image", "console_errors": [] },
+      { "mode": "t2a", "active": "t2a", "console_errors": [] },
+      { "mode": "a2a", "active": "a2a", "console_errors": [] }
+    ],
+    "total_errors": 0
+  },
+  "b3_state_reset": {
+    "note": "B-3 / B-12：切模式后槽位状态必须清空",
+    "after_seed_flf": { "mode": "flf", "refs": ["first", "refvid0"], "audio": "reference" },
+    "after_switch_r2v": {
+      "mode": "r2v",
+      "files": [],
+      "refs": [],
+      "prev": [],
+      "audio": "",
+      "audioOptions": [""]
+    }
+  },
+  "b4_slot_refill": {
+    "note": "B-4：keepSlots 同模式重渲染后槽位必须如实回填",
+    "after_keep_render": {
+      "filled": ["ref0"],
+      "withImg": ["ref0"],
+      "previewUrls": ["ref0"]
+    }
+  },
+  "b5_duration_sync": {
+    "note": "B-5：时长三方一致（滑杆 / app state / 视频面板 state）",
+    "slider": "12",
+    "appState": 12,
+    "panelState": 12,
+    "durVal": "12s"
+  },
+  "b10_error_fallback": {
+    "note": "B-10：提交前抛错 -> 顶层 try/catch 兜底（干净页面复测，alert 恰好 1 次）",
+    "alerts": ["提交失败: PANEL_BROKE"],
+    "console_errors": ["[generate] 提交流程异常: Error: PANEL_BROKE"]
+  },
+  "developer_marker_scan": {
+    "note": "A 段复验：可见文本 + 全部属性里的开发者标记命中数",
+    "markers": ["【2026-11-15", "A2】", "A3 补漏", "待实现", "暂不支持", "TODO:", "FIXME", "HACK", "XXX"],
+    "hits": 0
+  },
+  "dom_comment_nodes": {
+    "note": "A 段复验：DOM 注释节点数（== index.html 静态注释数，JS 注入归零）",
+    "count": 109
+  },
+  "final_console_errors": []
+}
