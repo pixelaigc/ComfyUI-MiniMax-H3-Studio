@@ -2656,18 +2656,16 @@ async function loadImageOptions() {
   } catch (e) { /* 忽略：保持内置默认值 */ }
 }
 
-// ---------- 通用分段选择 ----------
-function bindSeg(sel, key, cb) {
-  $$(sel + " button").forEach(b => b.addEventListener("click", () => {
-    $$(sel + " button").forEach(x => x.classList.remove("active"));
-    b.classList.add("active");
-    state[key] = b.dataset.v;
-    if (cb) cb();
-  }));
-}
-// 【2026-11-15 修复③ 交付项 3】旧面板的 seg 绑定（#resSeg / #aspectChips /
-// #modelCards / #loraCards）已随对应 DOM 一起删除 —— 三个视频模式现在
-// 共用共享面板（web/video-panel.js），那里的绑定才是唯一入口。
+// 【2026-11-16 审查 B-14 修复】删除 bindSeg。
+//
+// 【为什么删】旧面板的 seg 绑定（#resSeg / #aspectChips / #modelCards /
+// #loraCards）已随修复③ 的对应 DOM 一起删除 —— 三个视频模式现在共用
+// 共享面板（web/video-panel.js），那里的绑定才是唯一入口。
+// 复核 agent 现场核实：全仓 `grep -n "bindSeg" web/*.js` -> **仅 1 命中
+//（定义行本身）**，零调用点；index.html 里 resSeg / aspectChips /
+// modelCards / loraCards 也全部 0 命中。
+// 留着它 = 一段永远不会被执行的死代码 + 一个误导后来人的「通用分段选择」
+// 入口（真正的那套在 video-panel.js 里）。
 
 /**
  * 旧面板（首尾帧 / 参考生视频）的「分辨率档位 + 画面比例」-> 真实像素宽高。
