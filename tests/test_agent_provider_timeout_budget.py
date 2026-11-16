@@ -132,7 +132,7 @@ class TestAgentTimeoutBudget(unittest.TestCase):
     def test_11_step_timeout_budget_covers_queue_wait(self):
         """Agent 的单步超时预算必须含排队余量（共享单槽 Provider）。"""
         self.assertTrue(hasattr(llm_client, "compute_timeout"))
-        # 排队余量常量必须存在且为正
+        # 排队余量参数必须存在且为正
         self.assertTrue(
             hasattr(llm_client, "QUEUE_WAIT_ALLOWANCE"),
             "llm.py 必须定义 QUEUE_WAIT_ALLOWANCE（共享单槽 Provider 的排队余量）")
@@ -143,22 +143,31 @@ class TestAgentTimeoutBudget(unittest.TestCase):
 
         （排队余量已经**含在** compute_timeout 里，不重复加。）
         """
-        need = llm_client.compute_timeout(1024)
+        need = (llm_client.compute_timeout(1024)
+                + llm_client.QUEUE_WAIT_ALLOWANCE)
         from h3studio import agent as agent_mod
         self.assertGreaterEqual(
             getattr(agent_mod, "STEP_TIMEOUT", 0.0), need,
-            "Agent 的 STEP_TIMEOUT 必须覆盖 compute_timeout(max_tokens)")
+            "Agent 的 STEP_TIMEOUT 必须覆盖 compute_timeout + 排队余量")
 
-    def test_13_compute_timeout_includes_queue_allowance(self):
-        """compute_timeout 必须含排队余量（否则共享单槽 Provider 必超时）。"""
+    def test_13_queue_allowance_only_on_tools_path(self):
+        """排队余量**只**加在工具调用路径，不得污染 compute_timeout。
+
+        既有契约（tests/test_max_tokens.py::test_ceiling_does_not_inflate_timeout）
+        要求「本次给 800 token -> 超时 < 300 秒」——
+        那条路径是自己独占推理服务、不与别人抢槽，排队时间不适用。
+        """
+        # compute_timeout 保持纯「随预算缩放」语义
         base = llm_client.BASE_TIMEOUT + 1024 * llm_client.PER_TOKEN_TIMEOUT
-        self.assertAlmostEqual(
-            llm_client.compute_timeout(1024),
-            base + llm_client.QUEUE_WAIT_ALLOWANCE,
-            delta=0.01)
-        # 排队余量必须真的起作用：不加余量时旧值是 242.88，远小于实测的 90s+ 排队
-        self.assertGreater(llm_client.compute_timeout(1024), 480.0)
+        self.assertAlmostEqual(llm_client.compute_timeout(1024),
+                               base, delta=0.01)
+        self.assertLess(llm_client.compute_timeout(800), 300,
+                        "compute_timeout(800) 必须 < 300（既有契约）")
+        # 但工具调用路径必须有排队余量
+        tools_timeout = (llm_client.compute_timeout(1024)
+                         + llm_client.QUEUE_WAIT_ALLOWANCE)
+        self.assertGreater(tools_timeout, 480.0,
+                           "工具调用路径的超时必须覆盖实测的 178s 排队")
+        self.assertGreater(tools_timeout, llm_client.compute_timeout(1024))
 
 
-if __name__ == "__main__":
-    unittest.main()
