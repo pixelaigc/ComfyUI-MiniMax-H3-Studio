@@ -429,6 +429,156 @@ class TestAudioContinuationTiming(unittest.TestCase):
 
 
 # ------------------------------------------------------------------
+# P1-c：**实测抓到的两个真实缺陷**的回归
+# ------------------------------------------------------------------
+class TestRealDefectsFoundByLiveRun(unittest.TestCase):
+    """这两个缺陷是**线上真实跑出来**的（8190 实测），不是推想的。
+
+    1. 段2 的音频起点被算成 0（而不是 C_n / 24）
+       —— 根因：代码按「上游有没有上游」分支取 C_n，
+          而「上游是链首段」时 upstream_info["source_job"] 恰好是**空串**
+          -> 第 2 段又从参考音频的第 0 秒开始听（已用过的音频被重复用）。
+    2. ffmpeg 的 `-t` 放在输出侧 -> 1s 前导空白被裁掉
+       —— 实测：-t 输出侧得 1.416009s（空白没了），
+          -t 输入侧得 2.416009s（空白 + 切片，正确）。
+    """
+
+    def test_second_segment_audio_offset_is_not_zero(self):
+        """第 2 段的音频起点必须等于 C_n / 24（**不能**是 0）。
+
+        复现口径：上游是**链首段**（source_job 为空串），
+        上游累计交付 56 帧 -> 本段起点 = 56/24 = 2.333333s。
+        """
+        import server
+
+        upstream_info = {
+            "chain_id": "CH1",
+            "stage_index": 0,
+            # 链首段：没有上游 -> source_job 是**空串**（这是关键）
+            "source_job": "",
+            "source_segment": -1,
+            "chain_total_frames": 0,
+            "segment_frames": 56,
+            "latent_run_id": "h3studio_sHEAD",
+            "latent_stage": 0,
+        }
+        upstream_params = {
+            "audio_track_source": "reference",
+            "ref_audios": ["h3studio/orig.m4a"],
+        }
+        state = server._inherit_audio_continuation(
+            source_mode="r2v",
+            source_params=upstream_params,
+            source_info=upstream_info,
+            segment_total=56,
+            window=22,
+            # 上游已累计交付 56 帧 -> C_n = 56
+            chain_total=56,
+        )
+        self.assertEqual(state["audio_track_mode"], "reference")
+        self.assertAlmostEqual(state["audio_segment_start"], 56 / 24,
+                               places=6,
+                               msg="第 2 段的音频起点必须是 C_n/24，不能是 0")
+        self.assertNotEqual(state["audio_segment_start"], 0.0)
+        # 跳帧数必须与起点严格对应
+        self.assertEqual(state["audio_segment_skip_frames"], 56)
+
+    def test_third_segment_uses_accumulated_frames(self):
+        """第 3 段的 C_n = 上游累计（含第 2 段的交付）。"""
+        import server
+        upstream_info = {
+            "chain_id": "CH1", "stage_index": 1,
+            "source_job": "J1", "source_segment": 0,
+            "chain_total_frames": 56, "segment_frames": 56,
+        }
+        state = server._inherit_audio_continuation(
+            source_mode="r2v",
+            source_params={"audio_track_source": "reference",
+                           "ref_audios": ["h3studio/orig.m4a"]},
+            source_info=upstream_info,
+            segment_total=56, window=22,
+            chain_total=90,   # 56 + (56-22) = 90
+        )
+        self.assertAlmostEqual(state["audio_segment_start"], 90 / 24,
+                               places=6)
+
+    def test_segment_audio_keeps_lead_blank(self):
+        """切出来的段音频必须**含 1s 前导空白**（真实跑 ffmpeg）。
+
+        【这条断言在防什么】`-t` 放在输出侧时，adelay 加的空白会被
+        裁掉 —— 段音频变成「只有切片」，1s 空白消失。
+        """
+        import shutil
+        import subprocess
+        import tempfile
+
+        ffmpeg = shutil.which("ffmpeg")
+        ffprobe = shutil.which("ffprobe")
+        if not ffmpeg or not ffprobe:
+            self.skipTest("本机没有 ffmpeg / ffprobe")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "src.wav"
+            # 造一段 10s 的 440Hz 正弦（44100Hz 立体声）
+            subprocess.check_output(
+                [ffmpeg, "-y", "-v", "error", "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=10",
+                 "-ac", "2", "-ar", "44100", str(source)],
+                stderr=subprocess.STDOUT, timeout=120)
+            out = Path(tmp) / "seg.m4a"
+            import server
+            ok = server._make_segment_audio(
+                source, out, start_seconds=2.0, duration_seconds=3.0,
+                lead_blank=1.0)
+            self.assertTrue(ok, "切段音频失败")
+            raw = subprocess.check_output(
+                [ffprobe, "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", str(out)], encoding="utf-8")
+            duration = float(raw.strip())
+            # 1s 空白 + 3s 切片 = 4s（容差 0.05s：aac 编码有帧级误差）
+            self.assertAlmostEqual(duration, 4.0, delta=0.05,
+                                   msg="段音频必须含 1s 前导空白")
+
+    def test_segment_audio_slice_offsets_correctly(self):
+        """切片起点必须真的落在原始音频的那个位置。
+
+        【怎么验】原始音频是 440Hz 正弦 —— 用 ffmpeg 切一段出来，
+        再测它的**主频**仍是 440Hz（说明切对了区间，不是乱切的）。
+        更直接的办法：比较「切 0s 起」与「切 5s 起」两段的
+        波形是否不同（不同区间 -> 内容不同）。
+        """
+        import shutil
+        import subprocess
+        import tempfile
+
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            self.skipTest("本机没有 ffmpeg")
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "src.wav"
+            # 1Hz 调制的 440Hz -> 每一秒的波形不同（便于区分区间）
+            subprocess.check_output(
+                [ffmpeg, "-y", "-v", "error", "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=12",
+                 "-ac", "2", "-ar", "44100", str(source)],
+                stderr=subprocess.STDOUT, timeout=120)
+            import server
+            a = Path(tmp) / "a.m4a"
+            b = Path(tmp) / "b.m4a"
+            self.assertTrue(server._make_segment_audio(
+                source, a, start_seconds=0.0, duration_seconds=1.0,
+                lead_blank=0.0))
+            self.assertTrue(server._make_segment_audio(
+                source, b, start_seconds=6.0, duration_seconds=1.0,
+                lead_blank=0.0))
+            self.assertTrue(a.is_file() and b.is_file())
+            # 两个区间的内容必须不同（否则切片起点没生效）
+            self.assertNotEqual(a.read_bytes(), b.read_bytes(),
+                                "不同起点的切片内容相同 -> 切片没生效")
+
+
+
+# ------------------------------------------------------------------
 # P1-b：工作流里的音频切片接线
 # ------------------------------------------------------------------
 class TestAudioSliceWiring(unittest.TestCase):

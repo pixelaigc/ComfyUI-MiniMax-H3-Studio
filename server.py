@@ -3149,9 +3149,15 @@ def _make_segment_audio(source: Path, out_path: Path, *,
     `adelay` 在音频**前面**插入静音（延迟），正好就是「1s 空白 ⊕ 切片」
     的结构，且只跑一次 ffmpeg。`apad` 是**尾部**补静音，方向相反。
 
-    【为什么切片用 -ss（输入侧）而不是 -ss（输出侧）】
-    输入侧 seek 快且精确；输出侧要解码整条。1s 空白用 adelay 加在
-    **切片之后** —— 于是顺序是「空白 → 切片」，正是题面口径。
+    【⚠ -t 必须放在输入侧（实测抓到的坑）】
+    `ffmpeg -ss S -i IN -t D ...`（-t 在输出侧）会**先解码整条**再截断，
+    而 `adelay` 加的 1s 空白在解码之后 —— 于是 `-t D` 把「1s 空白 +
+    切片」整体截成 D 秒，**1s 空白被裁掉了**。
+    实测（149.88s 的 flac，切 2.333333s 起、1.416667s 长）：
+      -t 在输出侧 -> 1.416009s（空白没了）
+      -t 在输入侧 -> 2.416009s（空白 + 切片，正确）
+    `-ss` 与 `-t` 都在输入侧时，ffmpeg 只解码需要的那一段，
+    既快又不会裁掉前导空白。
 
     返回 True = 成功；False = 失败（调用方必须报错，不静默）。
     """
@@ -3162,8 +3168,10 @@ def _make_segment_audio(source: Path, out_path: Path, *,
     except OSError:
         return False
     delay_ms = max(0, int(round(float(lead_blank) * 1000)))
-    args = [FFMPEG, "-y", "-ss", f"{max(0.0, float(start_seconds)):.6f}",
-            "-i", str(source), "-t", f"{max(0.0, float(duration_seconds)):.6f}"]
+    args = [FFMPEG, "-y",
+            "-ss", f"{max(0.0, float(start_seconds)):.6f}",
+            "-t", f"{max(0.0, float(duration_seconds)):.6f}",
+            "-i", str(source)]
     if delay_ms > 0:
         args += ["-af", f"adelay=delays={delay_ms}:all=1"]
     args += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
@@ -3401,12 +3409,25 @@ def _inherit_audio_continuation(*, source_mode: str, source_params: dict,
         # 生成音频：音画同源，不切。
         return {}
 
-    # C_n：上游已累计交付的帧数。
-    # 链首段 -> 0；续接段 -> 上游的 chain_total_frames。
-    if str(upstream_info.get("source_job") or "").strip():
-        consumed = int(chain_total or 0)
-    else:
-        consumed = 0
+    # ---- C_n：上游已累计交付的帧数。
+    #
+    # 【为什么恒取 chain_total】
+    # chain_total 来自上游任务自己的记录（continuation_state 的
+    # total_frames）—— 它就是「上游已累计交付的帧数」，也就是口径 B 的
+    # C_n，**不需要**再按「上游有没有上游」分支。
+    #
+    # 【原来的 bug（实测抓到）】这里写的是
+    #   if upstream_info["source_job"]: consumed = chain_total
+    #   else:                          consumed = 0
+    # —— 而「上游是链首段」时，upstream_info["source_job"] 恰好是**空串**
+    # （链首段没有上游）。于是**第 2 段的音频起点被算成 0**，
+    # 也就是「第 2 段又从参考音频的第 0 秒开始听」——
+    # 前一段已用过的音频被重复用了一遍（实测：段2 的
+    # audio_segment_start = 0.0，而正确值是 56/24 = 2.333s）。
+    #
+    # C_n 的定义只跟「上游链上累计了多少帧」有关，与上游自己是不是
+    # 链首段无关 —— 所以这里恒取 chain_total。
+    consumed = int(chain_total or 0)
 
     plan = h3acont.segment_audio_plan(
         consumed_frames=consumed,
