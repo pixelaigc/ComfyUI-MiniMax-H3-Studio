@@ -106,6 +106,10 @@ H3_IMAGE_MODELS = {
 }
 H3_IMAGE_DEFAULT_MODEL = "h3_image_pruned_int8"
 
+# 【2026-11-16】族标记（量程按族取，见 workflows.py 里 Z_IMAGE_MODELS 处的同款说明）
+for _m in H3_IMAGE_MODELS.values():
+    _m.setdefault("param_family", "h3image")
+
 # ------------------------------------------------------------------
 # 分辨率档位
 # ------------------------------------------------------------------

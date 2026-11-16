@@ -169,6 +169,13 @@ Z_IMAGE_MODELS = {
 }
 Z_IMAGE_DEFAULT_MODEL = "z_image_turbo_bf16"
 
+# 【2026-11-16】给每个模型打上「族」标记 —— 采样参数量程按族取。
+# 【为什么用程序打而不是逐个手写】模型表条目会增删（DarkBeast / 蒸馏档…），
+# 逐条手写 ``"param_family": "zimage"`` 必然漏 —— 漏一条 = 该模型又用回
+# 扁平的默认量程（就是本次那个 BUG 的形态）。程序打标不会漏。
+for _m in Z_IMAGE_MODELS.values():
+    _m.setdefault("param_family", "zimage")
+
 # ------------------------------------------------------------------
 # 加速 / 蒸馏 LoRA：**固定接在工作流里，界面不暴露**
 # ------------------------------------------------------------------
@@ -821,7 +828,9 @@ def _z_image_t2i_nodes(model, width, height, seed, sampler, scheduler, steps,
 
 
 def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, prompt, job_id,
-                            loras=None, accel_lora=None):
+                            loras=None, accel_lora=None,
+                            sampler=None, scheduler=None, steps=None,
+                            cfg=None, shift=None):
     """官方 2K 放大路径（utility_z_image_turbo_2k_upscaler.app.json 的做法）。
 
     链路：T2I 出图 -> ImageScaleToTotalPixels(lanczos) -> ImageUpscaleWithModel
@@ -830,26 +839,50 @@ def _z_image_upscale_nodes(model, width, height, target_w, target_h, seed, promp
 
     用途：4K 这类 >=4MP 的目标尺寸直出会崩（社区实测「too high for this
     model natively」），所以改成「低分辨率生成 + 放大 + 二次细化」。
+
+    【2026-11-16 修 —— 第一段用用户的采样参数，不再写死 8 步 / cfg 1.0】
+    旧实现把「57:3」节点的 steps/cfg/sampler/scheduler **全部写死**
+    （steps=8 / cfg=1.0 / res_multistep / simple），用户面板上改的
+    步数 / CFG / 采样器 / 调度器 / shift 在 >=3MP 的档位上**全部无效**。
+    用户症状：面板显示「30 步」，实际跑 8 步 —— 与 MOSS-Image
+    那个 BUG 同类（面板改了不生效），只是发生在 Z-Image 的放大分支。
+
+    修法：调用方把用户当前值传进来；**没传**时才回落到官方 Turbo 推荐档
+    （保证老调用方 / 老任务重放的行为不变）。
+
+    【第二段（57:75）保持官方参数不变】
+    二次细化段是「低 denoise 补细节」，官方模板固定
+    dpmpp_2m_sde / beta / 5 步 / cfg 1 / denoise 0.33。
+    那不是「用户的出图参数」，而是放大链的固定工艺参数 —— 改了会破坏
+    官方放大链的预期（低 denoise + 强采样器）。所以它继续读
+    ``Z_IMAGE_UPSCALE``。
     """
     up = Z_IMAGE_UPSCALE
+    # 用户参数缺省时的兜底 = 官方 Turbo 推荐档（历史行为）
+    eff_sampler = sampler or "res_multistep"
+    eff_scheduler = scheduler or "simple"
+    eff_steps = int(steps) if steps else 8
+    eff_cfg = float(cfg) if cfg is not None else 1.0
+    eff_shift = float(shift) if shift is not None else 3.0
     p = {
-        "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8", 0]},
+        "9": {"inputs": {"filename_prefix": f"h3studio/t2i_{job_id}", "images": ["57:8b", 0]},
               "class_type": "SaveImage"},
         "57:30": {"inputs": {"clip_name": Z_IMAGE_CLIP, "type": "lumina2", "device": "default"},
                   "class_type": "CLIPLoader"},
         "57:29": {"inputs": {"vae_name": Z_IMAGE_VAE}, "class_type": "VAELoader"},
         "57:28": {"inputs": {"unet_name": model["unet"], "weight_dtype": model["weight_dtype"]},
                   "class_type": "UNETLoader"},
-        "57:11": {"inputs": {"shift": 3.0, "model": ["57:28", 0]},
+        "57:11": {"inputs": {"shift": eff_shift, "model": ["57:28", 0]},
                   "class_type": "ModelSamplingAuraFlow"},
         "57:27": {"inputs": {"text": prompt, "clip": ["57:30", 0]},
                   "class_type": "CLIPTextEncode"},
         "57:33": {"inputs": {"conditioning": ["57:27", 0]}, "class_type": "ConditioningZeroOut"},
-        # 第一段：低分辨率生成
+        # 第一段：低分辨率生成（**用用户的采样参数**）
         "57:13": {"inputs": {"width": width, "height": height, "batch_size": 1},
                   "class_type": "EmptySD3LatentImage"},
-        "57:3": {"inputs": {"seed": int(seed), "steps": 8, "cfg": 1.0,
-                            "sampler_name": "res_multistep", "scheduler": "simple", "denoise": 1,
+        "57:3": {"inputs": {"seed": int(seed), "steps": eff_steps, "cfg": eff_cfg,
+                            "sampler_name": eff_sampler, "scheduler": eff_scheduler,
+                            "denoise": 1,
                             "model": ["57:11", 0], "positive": ["57:27", 0],
                             "negative": ["57:33", 0], "latent_image": ["57:13", 0]},
                  "class_type": "KSampler"},
@@ -979,11 +1012,17 @@ def build_t2i(params):
     # 触发词自动追加到最终提示词（用户可在界面上编辑/删除）
     prompt = merge_lora_triggers(prompt, loras)
 
-    # 目标过大 -> 走官方 2K 放大路径（生成端固定用官方 Turbo 推荐参数）
+    # 目标过大 -> 走官方 2K 放大路径
+    # 【2026-11-16 修 —— 把用户的采样参数传进去】
+    # 旧实现这条分支**完全忽略**用户的 steps/cfg/sampler/scheduler/shift
+    # （放大路径内部写死 8 步 / cfg 1.0）-> 面板改了不生效。
+    # 现在第一段生成用用户的参数；第二段细化仍是官方固定工艺参数。
     if z_image_megapixels(width, height) > Z_IMAGE_MAX_DIRECT_MP:
         base_w, base_h = z_image_dimensions(aspect, "1mp")
         p = _z_image_upscale_nodes(model, base_w, base_h, width, height, seed, prompt,
-                                   job_id, loras=loras, accel_lora=accel_lora)
+                                   job_id, loras=loras, accel_lora=accel_lora,
+                                   sampler=sampler, scheduler=scheduler,
+                                   steps=steps, cfg=cfg, shift=shift)
         # 放大链输出接回最终 SaveImage
         p["9"]["inputs"]["images"] = ["57:8b", 0]
         return p
@@ -1144,6 +1183,10 @@ QWEN_IMAGE_MODELS = {
     },
 }
 QWEN_IMAGE_DEFAULT_MODEL = "qwen_image_2.1_bf16"
+
+# 【2026-11-16】族标记（量程按族取，见 Z_IMAGE_MODELS 处的同款说明）
+for _m in QWEN_IMAGE_MODELS.values():
+    _m.setdefault("param_family", "qwen")
 
 # 官方 PE 两个 checkpoint 的采样参数（官方 prompt_rewrite/README + HF model card）：
 #   T2I: presence_penalty=1.5, max_new_tokens=16256
@@ -1951,6 +1994,10 @@ MOSS_IMAGE_MODELS = {
     },
 }
 MOSS_IMAGE_DEFAULT_MODEL = "moss_image_base"
+
+# 【2026-11-16】族标记（量程按族取，见 Z_IMAGE_MODELS 处的同款说明）
+for _m in MOSS_IMAGE_MODELS.values():
+    _m.setdefault("param_family", "moss")
 
 # 官方推荐负面提示词（USERGUIDE 给的实测有效标签）
 MOSS_IMAGE_DEFAULT_NEGATIVE = "nsfw, worst quality, bad anatomy, watermark, jpeg artifact"
