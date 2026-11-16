@@ -1,0 +1,14 @@
+11月 16 08:05:19 ubuntu python[15495]: [strata] writing a tool call: mcp__ekko-studio-interaction__ekko_studio_update_plan: 10369 of max 32000 tokens, 48.1 tok/s, 2
+11月 16 08:05:20 ubuntu python[15495]: [strata] writing a tool call: mcp__ekko-studio-interaction__ekko_studio_update_plan: 10456 of max 32000 tokens, 48.2 tok/s, 2
+11月 16 08:05:21 ubuntu python[15495]: [strata] done: 10515 tokens in 220 s (48.4 tok/s) (stop, cancel=False), expert cache 99.4% hit
+11月 16 08:05:21 ubuntu python[15495]: [strata] thinking limited to 24000 of max_tokens 32000 so the answer has room ("answer_room": false in the config turns this 
+11月 16 08:05:23 ubuntu python[15495]: [strata] reading the prompt: 238 of 245 tokens, 2 s so far
+11月 16 08:05:23 ubuntu python[15495]: [strata] done: 2 tokens in 2 s (60.9 tok/s) (stop, cancel=False), expert cache 94.4% hit
+11月 16 08:05:24 ubuntu python[15495]: [strata] answering: 53 of max 1024 tokens, 71.7 tok/s, 1 s
+11月 16 08:05:24 ubuntu python[15495]: [strata] done: 108 tokens in 2 s (80.1 tok/s) (stop, cancel=False), expert cache 98.6% hit
+11月 16 08:05:27 ubuntu python[15495]: [strata] reading the prompt: 843 of 848 tokens, 2 s so far
+11月 16 08:05:28 ubuntu python[15495]: [strata] thinking: 27 of budget 49152 (max 65536) tokens, 80.5 tok/s, 3 s
+11月 16 08:05:29 ubuntu python[15495]: [strata] thinking: 98 of budget 49152 (max 65536) tokens, 72.7 tok/s, 4 s
+11月 16 08:05:30 ubuntu python[15495]: [strata] thinking: 182 of budget 49152 (max 65536) tokens, 76.8 tok/s, 5 s
+11月 16 08:05:31 ubuntu python[15495]: [strata] thinking: 243 of budget 49152 (max 65536) tokens, 71.5 tok/s, 7 s
+11月 16 08:05:31 ubuntu python[15495]: [strata] done: 265 tokens in 7 s (72.7 tok/s) (stop, cancel=False), expert cache 97.9% hit

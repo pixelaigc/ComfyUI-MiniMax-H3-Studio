@@ -1,0 +1,13 @@
+{
+  "case": "c9_final_live_sampling_after_fix",
+  "samples": 4,
+  "http_200": 4,
+  "failed": 0,
+  "elapsed_ms": [
+    67307,
+    61387,
+    219466,
+    8031
+  ],
+  "note": "all HTTP 200 / status=completed / error=null"
+}
