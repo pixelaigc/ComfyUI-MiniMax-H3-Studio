@@ -1522,8 +1522,8 @@
     // 仍会落到 mode_configs 的片段上，行为不变。
     const modeKey = videoState.mode || "t2v";
     const modeCfg = (videoState.modeConfigs || {})[modeKey];
-    const merged = {};
-    if (modeCfg && typeof modeCfg === "object") merged = { ...modeCfg };
+    let merged = {};
+    if (modeCfg && typeof modeCfg === "object") Object.assign(merged, modeCfg);
     // 顶层字段覆盖 mode_configs 的片段（顶层 = 调用方的显式意图）
     for (const key of Object.keys(cfg)) {
       if (key === "mode_configs") continue;

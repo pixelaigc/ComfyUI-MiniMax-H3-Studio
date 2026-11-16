@@ -136,6 +136,51 @@ class TestD2ReuseParamsWins(unittest.TestCase):
             body, r"applyModeConfig\(modeCfg\);\s*\n\s*return;",
             "旧的「mode_configs 优先并 return」写法仍在 -> 顶层字段被忽略")
 
+    def test_apply_config_merged_is_mutable(self):
+        """【回归护栏】merged 不能被**整体重新赋值**。
+
+        【为什么需要这条 —— 2026-11-16 实测踩到的坑】
+        D-2 的第一版实现写成::
+
+            const merged = {};
+            if (modeCfg && ...) merged = { ...modeCfg };   // <- 给 const 赋值
+            for (...) merged[key] = cfg[key];
+
+        给 const **重新赋值** ->
+        `TypeError: Assignment to constant variable.`
+        -> applyConfig() 抛异常 -> **整段配置恢复静默失效**
+        （外层 try/catch 把异常吞了，页面无任何报错），
+        表现就是「刷新后用户改的步数又变回默认」。
+
+        【断言怎么写才抓得住】
+        注意区分两种赋值：
+          * ``merged[key] = v``  —— 给**属性**赋值，const 对象是允许的；
+          * ``merged = v``        —— 给**变量本身**赋值，const 禁止。
+        本条盯的是第二种（真正会抛的那一种）。
+        """
+        js = _read("web/video-panel.js")
+        block = re.search(r"function applyConfig\(cfg\)\s*\{([\s\S]*?)\n  \}",
+                          js)
+        self.assertIsNotNone(block, "找不到 applyConfig()")
+        body = block.group(1)
+        # 找到 merged 的声明
+        decl = re.search(r"(const|let|var)\s+merged\s*=", body)
+        self.assertIsNotNone(decl, "找不到 merged 的声明")
+        self.assertNotEqual(
+            decl.group(1), "const",
+            "merged 被声明为 const —— 后续整体重新赋值会抛 "
+            "TypeError，整段配置恢复静默失效（改成 let）")
+        # 且不允许出现「整体重新赋值」这一形态（排除声明行本身）
+        decl_assign = re.search(r"(?:const|let|var)\s+merged\s*=\s*", body)
+        decl_end = decl_assign.end() if decl_assign else 0
+        reassign = []
+        for m in re.finditer(r"(?<![\w.\[])merged\s*=\s*[^=]", body):
+            if m.start() >= decl_end:
+                reassign.append(m.group(0))
+        self.assertEqual(
+            reassign, [],
+            "不允许对 merged 做整体重新赋值（只允许 merged[key]=... 属性赋值）")
+
     def test_reuse_config_carries_sampling_fields(self):
         """reuseConfigFromJob 必须带齐采样字段（app.js 侧）。"""
         js = _read("web/app.js")
