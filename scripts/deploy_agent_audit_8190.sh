@@ -80,6 +80,17 @@ DEPLOY_FILES=(
   audits/retry_probe3/B_sse_error.png
   audits/retry_probe3/C_sse_done_failed.png
   audits/retry_probe3/retry_probe.json
+  # 【2026-11-16 终稿轮】部署后复验证据也要上线
+  audits/agent_tools_live_probe_postdeploy.json
+  audits/browser_audit_live/01_agent_page.png
+  audits/browser_audit_live/02_drawer.png
+  audits/browser_audit_live/05_stream.png
+  audits/browser_audit_live/05b_token.png
+  audits/browser_audit_live/08_clarify.png
+  audits/browser_audit_live/09_error_retry.png
+  audits/browser_audit_live/10_manage.png
+  audits/browser_audit_live/15_artifacts.png
+  audits/browser_audit_live/browser_audit.json
 )
 
 echo "=== 0) 现状 ==="
