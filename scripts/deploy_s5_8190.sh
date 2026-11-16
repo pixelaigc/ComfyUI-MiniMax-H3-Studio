@@ -109,8 +109,20 @@ echo "live       -> $(git rev-parse local/deploy/qwen-ref-assets-live)"
 echo
 echo "=== 4) live worktree 精确 checkout（只部署本轮改的文件）==="
 git -C "$LIVE" checkout "$MERGE_COMMIT" -- "${DEPLOY_FILES[@]}"
-git -C "$LIVE" status --porcelain | grep -v '^??' | head -20
-echo "(上面应只列出本轮改的文件 = 部署成功)"
+# 【2026-11-16 S5 修 —— set -e 下 grep 无匹配会静默退出整个脚本】
+# 原来这行是 `git status --porcelain | grep -v '^??' | head -20`：
+#   当**没有 tracked 改动**时 grep 无输出、退出码 1
+#   -> 在 `set -euo pipefail` 下整个脚本**静默退出**（第 4 步之后就断了，
+#      完整性自检与重启都没跑，但 exit code 仍是 0）。
+# 本轮实测就踩到了（输出停在第 4 步标题，服务 PID 没变）。
+# 修法：`|| true` 兜住 grep 的「无匹配」，并把展示与判定分开。
+CHANGED=$(git -C "$LIVE" status --porcelain | grep -v '^??' || true)
+if [ -n "$CHANGED" ]; then
+  echo "$CHANGED" | head -20
+  echo "(上面应只列出本轮改的文件 = 部署成功)"
+else
+  echo "(无 tracked 改动 —— 文件内容与 HEAD 已一致)"
+fi
 echo "live HEAD = $(git -C "$LIVE" rev-parse HEAD)"
 
 # 【加固 2】部署完整性自检
