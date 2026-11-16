@@ -129,13 +129,30 @@ def _run_audio_deep(job_id: int, asset_id: str, source: Path,
         # 分阶段回调 -> 更新进度条
         def progress_cb(stage: str, frac: float):
             """脚本每进入一个新阶段回调一次。"""
+            # 【2026-11-16 第5轮代码审查 C-15 修 —— 连接泄漏】
+            #
+            # 【原来错在哪】
+            # ``c.close()`` 在 try 块**内部**、且在 ``asset_repo.update_job``
+            # **之后**。而 update_job 是会抛异常的（数据库锁、字段超长…）。
+            # 一旦它抛异常，控制流直接跳到 except -> ``c.close()`` **被跳过**
+            # -> sqlite 连接泄漏。深度音频分析有多个阶段回调，
+            # 每次泄漏一个连接 -> 长跑下来把文件描述符耗光。
+            #
+            # 【修法】连接用 try/finally 兜住 —— 无论 update_job 成功还是抛错，
+            # 连接一定被关掉。
+            c = None
             try:
                 c = _library_conn()
                 _, label = _audio_progress_for(stage)
                 asset_repo.update_job(c, job_id, stage=label, progress=frac)
-                c.close()
             except Exception:
                 pass
+            finally:
+                if c is not None:
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
 
         result = audio_deep.analyze(source, dict(options or {},
                                                  progress=progress_cb))

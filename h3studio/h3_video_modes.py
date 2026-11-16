@@ -43,6 +43,7 @@ import random
 from . import h3_audio_track
 from . import video_models as vmodels
 from . import video_workflow as vworkflow
+from . import frame_expr as frame_expr_mod
 
 #: T8 条件节点的类名（comfyui-minimax-h3-audio-T8 插件）
 T8_CONDITIONING = "MiniMaxH3AudioConditioningT8"
@@ -66,22 +67,13 @@ class H3VideoRequestError(ValueError):
 
 
 def _frame_expr_node(length_node_id: str, dur_node_id: str, duration: float) -> dict:
-    """秒数 -> 帧数（24fps，H3 的 17k+5 网格）。"""
-    return {
-        length_node_id: {
-            "inputs": {
-                "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
-                "values.a": [dur_node_id, 0],
-            },
-            "class_type": "ComfyMathExpression",
-            "_meta": {"title": "时长->帧数"},
-        },
-        dur_node_id: {
-            "inputs": {"value": float(duration)},
-            "class_type": "PrimitiveFloat",
-            "_meta": {"title": "时长(秒)"},
-        },
-    }
+    """秒数 -> 帧数节点（**唯一真源**在 h3studio/frame_expr.py）。
+
+    【2026-11-16 第5轮代码审查 C-13 修 —— 三份重复实现合一】
+    原来这里有第二份 _frame_expr_node 实现，与 video_workflow.py /
+    workflows.py 的两份重复。现在统一走 frame_expr.frame_expr_node。
+    """
+    return frame_expr_mod.frame_expr_node(length_node_id, dur_node_id, duration)
 
 
 def _model_chain(p: dict, params: dict, model: dict) -> list:

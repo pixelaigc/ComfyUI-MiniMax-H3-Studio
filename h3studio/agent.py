@@ -1442,7 +1442,7 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 硬问题（取值非法）在这里抛 AgentError，不建任务。
     soft_notice = _validate_create_job_args(mode, args, params)
 
-    # --- 文生视频（t2v）默认参数 — 2026-11-13 审查目标 5 --------------
+    # --- 视频模式（t2v / flf / r2v）的服务端归一 — 2026-11-13 审查目标 5 ---
     #
     # 【为什么单独处理】注意力机制与 dmad 加速 LoRA 只存在于**新面板路径**
     # （video_workflow.build_t2v_panel），旧路径（_h3_video_workflow）没有
@@ -1452,11 +1452,32 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 【服务端是权威】归一入口会校验：LoRA 文件在本机存在吗、注意力节点
     # 在本机 ComfyUI 里吗、宽高超上限吗。服务端不在（单测替身）时跳过 ——
     # 那时 params 保持原样，行为与改动前一致。
-    if mode == "t2v":
+    #
+    # 【2026-11-16 第5轮代码审查 C-9 修 —— 归一扩到 flf / r2v】
+    # 原来只有 t2v 走归一，flf / r2v 的 Agent 任务**完全绕过**：
+    #   * 宽高不吸附（面板路径会吸附，Agent 路径不会 -> 同一份需求，
+    #     面板跑 736×416、Agent 跑 1344×768 —— 界面说谎的另一种形态）；
+    #   * 面积上限按 t2v 的 2.0MP 判（flf / r2v 的真实上限是 0.8MP）；
+    #   * r2v 的底模通道不校验（可以选到 FL2VA 权重 -> 参考没生效）。
+    # 现在三个视频模式**统一**走归一，且**按各自 mode 的口径**判。
+    #
+    # 【为什么默认参数仍然只对 t2v 套】
+    # ``_merge_t2v_defaults`` 读的是 agent_settings 的 ``t2v_defaults``
+    # —— 那是**文生视频专用**的默认参数镜像（model_key / attention /
+    # accel_lora）。flf / r2v 没有对应的默认参数表，硬套 t2v 的 model_key
+    # 会给它们塞一个不相干的底模。归一（校验）与默认参数（填充）
+    # 是两件事，这里只把**归一**扩到三个模式。
+    if mode in ("t2v", "flf", "r2v"):
         prepare_t2v = getattr(ctx.server, "prepare_agent_t2v_params", None)
         if prepare_t2v is not None:
             try:
-                normalized, error = await prepare_t2v(params)
+                # 【2026-11-16 C-9】传 mode —— 服务端按本模式的口径判上限与通道。
+                # （老服务端替身没有 mode 形参 -> TypeError -> 回落成「跳过归一」，
+                #   行为与改动前一致，不破坏老单测。）
+                try:
+                    normalized, error = await prepare_t2v(params, mode=mode)
+                except TypeError:
+                    normalized, error = await prepare_t2v(params)
             except Exception as exc:
                 message = getattr(exc, "message", None) or str(exc)
                 raise AgentError(message, status=400,

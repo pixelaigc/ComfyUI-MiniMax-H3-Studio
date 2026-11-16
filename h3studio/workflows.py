@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 import random
 
+from . import frame_expr as frame_expr_mod
 from . import loras as lora_registry
 from . import lora_damping
 from . import moss_lora_split
@@ -257,23 +258,17 @@ Z_IMAGE_UPSCALE = {
 }
 
 
-def _frame_expr_node(length_node_id, dur_node_id):
-    """秒数 -> 帧数（24fps，对齐 17 帧约束），与官方工作流一致"""
-    return {
-        length_node_id: {
-            "inputs": {
-                "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
-                "values.a": [dur_node_id, 0],
-            },
-            "class_type": "ComfyMathExpression",
-            "_meta": {"title": "时长->帧数"},
-        },
-        dur_node_id: {
-            "inputs": {"value": 5},
-            "class_type": "PrimitiveFloat",
-            "_meta": {"title": "时长(秒)"},
-        },
-    }
+def _frame_expr_node(length_node_id, dur_node_id, duration: float = 5):
+    """秒数 -> 帧数节点（**唯一真源**在 h3studio/frame_expr.py）。
+
+    【2026-11-16 第5轮代码审查 C-13 修 —— 三份重复实现合一】
+    原来这里的第一份实现**没有 duration 形参**：它把时长写死成 5 秒，
+    靠调用方事后覆盖那个 PrimitiveFloat 节点的 value 槽位。
+    那是「值正确但形状脆弱」—— 哪天调用方忘了覆盖，就会静默用 5 秒出片。
+
+    现在统一走 frame_expr.frame_expr_node（duration 必填）。
+    """
+    return frame_expr_mod.frame_expr_node(length_node_id, dur_node_id, duration)
 
 
 def _video_sampler_block(p, model_ref, steps, scheduler, sampler):
@@ -431,8 +426,7 @@ def _h3_video_workflow(params, image_inputs=None):
     p["_cond"] = "105:104"
 
     # 时长 -> 帧数
-    expr = _frame_expr_node("105:107", "105:111")
-    expr["105:111"]["inputs"]["value"] = duration
+    expr = _frame_expr_node("105:107", "105:111", duration)
     p.update(expr)
     img_node_inputs["length"] = ["105:107", 1]
 

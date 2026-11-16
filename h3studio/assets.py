@@ -277,13 +277,50 @@ def resolve_inside(root: Path, relative: str) -> Path | None:
 
 
 def atomic_move(source: Path, target: Path) -> None:
-    """原子移动（同盘 rename）。跨盘时退化为 copy + replace。"""
+    """原子移动（同盘 rename）。跨盘时退化为「同盘临时文件 + 原子替换」。
+
+    【2026-11-16 第5轮代码审查 C-17 修 —— 跨盘回退也必须原子】
+    原来跨盘回退是 ``shutil.copy2(source, target)`` + ``source.unlink()``：
+    ``copy2`` **直接写 target 的最终路径** —— 复制过程中（素材动辄几百 MB）
+    target 上会**出现一个半成品文件**。此时另一个进程/请求去读 target，
+    拿到的是**截断的、坏掉的文件**。而且 copy2 中途失败 -> target 留着
+    一个半成品，源文件还在 —— 数据没丢，但 target 已经是脏的。
+
+    现在跨盘回退走「**同盘临时文件 + 原子替换**」：
+      1. copy2 到 target 同目录下的临时文件（``.<name>.part-<pid>``）
+         —— 同盘，所以下一步的 rename 是原子的；
+      2. ``os.replace(tmp, target)`` —— **原子替换**，读者永远看到
+         「完整的旧文件」或「完整的新文件」，不会看到半成品；
+      3. 删源文件；
+      4. 任何一步失败都清掉临时文件（不留下垃圾）。
+
+    同盘路径（``os.replace(source, target)``）本来就是原子的，不变。
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.replace(source, target)
+        return
     except OSError:
-        shutil.copy2(source, target)
+        # 跨盘（或其它 rename 失败）-> 走「同盘临时文件 + 原子替换」
+        pass
+
+    # 临时文件必须与 target **同目录**（同盘）—— 否则 replace 又不是原子的。
+    tmp = target.parent / f".{target.name}.part-{os.getpid()}"
+    try:
+        shutil.copy2(source, tmp)
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+    # 只有 target 已经是完整的新文件，才敢删源文件。
+    try:
         source.unlink(missing_ok=True)
+    except Exception:
+        # 源文件删不掉不算失败（数据已经在 target 上了）
+        pass
 
 
 # ------------------------------------------------------------------ 数据库

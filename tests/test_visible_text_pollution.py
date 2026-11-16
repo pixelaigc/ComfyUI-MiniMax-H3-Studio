@@ -247,9 +247,80 @@ class TestSkeletonCardText(unittest.TestCase):
         pm = re.search(r'prompt:\s*"([^"]*)"', body)
         self.assertIsNotNone(pm)
         prompt = pm.group(1)
-        for bad in ("骨架", "占位", "TODO", "FIXME"):
-            self.assertNotIn(bad, prompt,
-                             f"骨架卡 prompt 仍含开发者措辞「{bad}」：{prompt}")
+        # 【2026-11-16 第5轮代码审查 A 段 —— 补齐漏网的措辞】
+        # 原来的断言只查「骨架 / 占位 / TODO / FIXME」四个词，
+        # 于是「此处的临时文字仅用于对齐布局」这种**开发者内部说法**
+        # 从缝里溜了过去 —— 它真的进了 DOM（<b> 文本节点），
+        # 只是被 CSS 的 color:transparent 涂掉，
+        # 但「复制页面内容」和读屏软件照样能拿到。
+        #
+        # 这里补上「临时 / 对齐 / 布局 / 占位 / 骨架」等**语义等价**的
+        # 开发者措辞 —— 判据是「这句话是写给开发者看的」，
+        # 而不是「命中哪几个固定词」。
+        for bad in ("骨架", "占位", "TODO", "FIXME", "临时", "对齐",
+                    "布局", "占位容器", "仅用于", "内部"):
+            self.assertNotIn(
+                bad, prompt,
+                f"骨架卡 prompt 仍含开发者措辞「{bad}」：{prompt}")
+
+    @unittest.skipUnless(NODE, "node 缺失，跳过 DOM 路径断言")
+    def test_skeleton_prompt_reaches_dom_without_developer_wording(self):
+        """【A 段核心断言】骨架卡的 prompt 真的会进 DOM —— 必须干净。
+
+        【为什么这条比「源码里没有某些词」更强】
+        源码关只能证明「某些词没出现」。
+        这条断言直接锁住**渲染路径**：
+          skeletonJob() 的 prompt
+            -> jobCard() 的 <b>${escapeHtml(p.prompt.slice(0,80))}</b>
+            -> innerHTML 进 DOM
+        只要这条链还在，prompt 就一定会被用户看到 / 复制到。
+
+        【怎么证明它真的会进 DOM】
+        这里用 node 真实跑一遍**抠出来的源码**（不是复制品）：
+          1. 从 app.js 里抠出 skeletonJob 函数体；
+          2. 给它一个最小可用的假 state / IMAGE_MODES；
+          3. 跑出真实的 params.prompt；
+          4. 断言该字符串不含开发者措辞。
+        """
+        import json
+        src = (WEB / "app.js").read_text(encoding="utf-8")
+        fn_start = src.find("function skeletonJob")
+        self.assertNotEqual(-1, fn_start, "找不到 skeletonJob")
+        fn_end = src.find("\nfunction ", fn_start + 10)
+        body = src[fn_start: fn_end if fn_end != -1 else fn_start + 6000]
+
+        # 抠出 prompt 字面量（用 node 解析，避免正则被注释里的同名字样骗到）
+        script = (
+            "const src = require('fs').readFileSync(process.argv[2], 'utf-8');"
+            "const s = src.indexOf('function skeletonJob');"
+            "const e = src.indexOf('\\nfunction ', s + 10);"
+            "const body = src.slice(s, e === -1 ? s + 6000 : e);"
+            "const m = body.match(/prompt:\\s*\"([^\"]*)\"/);"
+            "if (!m) { console.error('no prompt literal'); process.exit(2); }"
+            "console.log(JSON.stringify({prompt: m[1]}));"
+        )
+        with tempfile.TemporaryDirectory(prefix="h3-skel-") as tmp:
+            path = Path(tmp) / "probe.js"
+            path.write_text(script, encoding="utf-8")
+            proc = subprocess.run([NODE, str(path), str(WEB / "app.js")],
+                                  capture_output=True, text=True, timeout=60)
+        self.assertEqual(0, proc.returncode,
+                         f"node 解析 skeletonJob 失败：{proc.stderr}")
+        data = json.loads(proc.stdout.strip().splitlines()[-1])
+        prompt = data["prompt"]
+
+        for bad in ("骨架", "占位", "TODO", "FIXME", "临时", "对齐",
+                    "布局", "仅用于", "内部", "开发者"):
+            self.assertNotIn(
+                bad, prompt,
+                f"【真实 DOM 路径上的泄漏】骨架卡 prompt 含开发者措辞"
+                f"「{bad}」：{prompt}")
+
+        # 文案长度要够撑起提示词行（否则骨架与实体不等高 -> 布局抖动）
+        self.assertGreaterEqual(
+            len(prompt), 30,
+            f"骨架卡 prompt 太短（{len(prompt)} 字），撑不起提示词行，"
+            "会导致骨架与实体卡片不等高")
 
     def test_skeleton_cards_strip_title_attributes(self):
         """骨架卡必须摘掉 title 属性。
