@@ -487,6 +487,66 @@ class TestSeedGuardBackend(unittest.TestCase):
         from h3studio import seed_guard
         self.assertEqual(seed_guard.SEED_MAX, 2 ** 53 - 1)
 
+    def test_video_normalize_does_not_swallow_invalid_seed(self):
+        """【真实缺陷 · 线上探针发现】视频归一层不能把非法种子吞成「随机」。
+
+        【现象】normalize_t2v_params 在 prepare_job_params **之前**跑
+        （api_create 的顺序），而它原来只做 int() 转换、失败就置 None：
+        用户填 "abc" -> 归一成 None -> prepare_job_params 看到的是「随机」
+        -> 种子校验**根本没机会生效** -> POST /api/jobs 返回 200 并建了任务。
+
+        线上探针实测（部署后）：
+            POST /api/jobs (mode=t2v, seed="abc") -> 200 {"id":..., "status":"queued"}
+
+        现在：归一层对非法种子**直接报错**。
+        """
+        import server
+        # r2v 必须用 Ref2VA 权重（否则会先撞上「模型不支持 Ref2VA 通道」
+        # 那条更早的校验，看不到种子这条）—— 给它一个合法的 model_key。
+        cases = (("t2v", {}), ("flf", {}),
+                 ("r2v", {"model_key": "ref2va_int8"}))
+        for mode, extra in cases:
+            params = {"prompt": "x", "width": 864, "height": 480,
+                      "duration": 5, "seed": "abc"}
+            params.update(extra)
+            normalized, error = server.normalize_t2v_params(params, mode=mode)
+            self.assertTrue(error, f"{mode} 模式没有拦住非法种子")
+            self.assertIn("正整数", error)
+
+    def test_video_normalize_keeps_valid_seed(self):
+        """合法种子在归一层里**原样保留**（不被改成 None）。"""
+        import server
+        params = {"prompt": "x", "width": 864, "height": 480,
+                  "duration": 5, "seed": "4242"}
+        normalized, error = server.normalize_t2v_params(params, mode="t2v")
+        self.assertEqual(error, "")
+        self.assertEqual(normalized["seed"], 4242)
+
+    def test_video_normalize_empty_seed_means_random(self):
+        """留空 = 随机（归一层输出 None）。"""
+        import server
+        params = {"prompt": "x", "width": 864, "height": 480,
+                  "duration": 5, "seed": ""}
+        normalized, error = server.normalize_t2v_params(params, mode="t2v")
+        self.assertEqual(error, "")
+        self.assertIsNone(normalized["seed"])
+
+    def test_music_seed_does_not_silently_fall_back_to_random(self):
+        """【真实缺陷】音乐工作流的种子不能静默回落成随机。
+
+        原来 h3studio/music_yue2._seed 的 except 分支直接
+        `return random.randint(...)` —— 用户填 "abc"，实际跑随机结果，
+        界面显示的种子与实际用的对不上。
+        """
+        from h3studio import music_yue2
+        with self.assertRaises(ValueError) as ctx:
+            music_yue2._seed({"seed": "abc"})
+        self.assertIn("正整数", str(ctx.exception))
+        # 合法值照常返回
+        self.assertEqual(music_yue2._seed({"seed": 4242}), 4242)
+        # 留空 -> 随机（int）
+        self.assertIsInstance(music_yue2._seed({"seed": None}), int)
+
 
 # ==================================================================
 # 4) 种子正整数 —— 前端

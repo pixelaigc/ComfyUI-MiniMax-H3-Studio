@@ -406,13 +406,27 @@ def _sampling(params: dict, prefix: str, defaults: dict) -> dict:
 
 
 def _seed(params: dict) -> int:
+    """取种子。留空 = 随机。
+
+    【2026-11-16 新增】非法种子**不再**静默回落成随机。
+    原来这里 except 分支直接 `return random.randint(...)` ——
+    用户填了 "abc"，实际跑了个随机结果，且**没有任何提示**
+    （正是「界面说谎」那一类）。
+
+    现在：非法值抛 ValueError，由调用方（worker）转成可读原因。
+    正常路径下 params["seed"] 已经被 server.prepare_job_params 校验过
+    （只可能是正整数或 None），所以这里只是**最后一道防线**。
+    """
     seed = params.get("seed")
-    try:
-        if seed is None or str(seed).strip() == "":
-            return random.randint(0, 2**31)
-        return int(seed)
-    except (TypeError, ValueError):
+    if seed is None or str(seed).strip() == "":
         return random.randint(0, 2**31)
+    from . import seed_guard as _seed_guard
+    value, error = _seed_guard.parse_seed(seed)
+    if error:
+        raise ValueError(error)
+    # parse_seed 只在值合法时返回 int（非空串不会走到这里）——
+    # 但它用 None 表示「随机」，这里兜成随机，保持原语义。
+    return value if value is not None else random.randint(0, 2**31)
 
 
 def build_music_workflow(params: dict) -> dict:

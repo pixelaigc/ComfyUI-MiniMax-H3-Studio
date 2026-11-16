@@ -2314,6 +2314,33 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     out = dict(params)
     vid_mode = mode if mode in ("t2v", "flf", "r2v") else "t2v"
 
+    # ---- 种子（**最先**校验）----
+    #
+    # 【2026-11-16 新增】非法种子必须**最先**被拦下。
+    #
+    # 【为什么放最前面】归一层后面还有一长串校验（宽高 / 模型 /
+    # 加速 LoRA / 注意力 / 二采）。如果种子校验排在它们后面，
+    # 用户填了非法种子 + 某个模型在���机不兼容 -> 报的是
+    # 「Turbo 4 步与当前底模不兼容」，用户完全不知道自己**还**填错了种子。
+    # 一次只说一件事：种子的错就是种子的错。
+    #
+    # 【原来错在哪】这段只做 int() 转换，失败就 out["seed"] = None ——
+    # 用户填了 "abc"，归一后变成「随机」，用户以为固定了随机性，
+    # 实际跑了个随机结果，且**没有任何提示**。
+    # 更糟的是：normalize_t2v_params 在 prepare_job_params **之前**跑
+    # （api_create 的顺序），所以归一后 prepare_job_params 看到的
+    # 已经是 None —— 种子校验根本没机会生效（线上实测：POST /api/jobs
+    # 传 seed="abc" 返回 200 并建了任务）。
+    #
+    # 归一后的 out["seed"] 恒为合法正整数或 None（随机）。
+    if params.get("seed") not in (None, ""):
+        _seed, _seed_err = seed_guard.parse_seed(params.get("seed"))
+        if _seed_err:
+            return out, _seed_err
+        out["seed"] = _seed
+    else:
+        out["seed"] = None
+
     # ---- 宽高 ----
     # 【2026-11-11】strict_over_limit=True —— 超限时**不静默截断**，
     # 直接返回可执行的错误提示（说明上限与当前请求值）。
@@ -2731,15 +2758,7 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     # （本机实测该节点是 ComfyUI 核心节点，恒在 —— 但不能假设。）
     out["sigma_shift_available"] = "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES
 
-    # 种子：留空则随机（worker 里再兜一次）
-    if params.get("seed") not in (None, ""):
-        try:
-            out["seed"] = int(params["seed"])
-        except (TypeError, ValueError):
-            out["seed"] = None
-    else:
-        out["seed"] = None
-
+    # 种子已在**函数最前面**校验并归一（见上面「---- 种子（**最先**校验）----」）
     return out, ""
 
 
