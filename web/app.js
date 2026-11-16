@@ -352,6 +352,51 @@ const MOSS_OPTIONS = {
   // 官方推荐的负面提示词（首次进入该模式时预填）
   defaultNegative: "",
 };
+// 【2026-11-16 新增】采样参数量程（steps / cfg / shift 的 min/max/step）。
+//
+// 【真源】服务端 /api/image-options 的 param_ranges 字段
+// （h3studio/gen_normalize.py 的 IMAGE_PARAM_RANGES）。
+//
+// 【前端不再有任何第二份量程表 —— 这是本次修复的关键】
+// 旧实现前端按模式分支硬编码四套量程、后端另有一套扁平的全局区间，
+// 两套必然漂移；漂移的后果是「面板允许、后端不允许」-> 用户改的值
+// 被静默改回默认值（MOSS-Image steps=100 被夹回 50 就是这么来的）。
+//
+// 【服务端没下发时怎么办】
+// 保持 web/index.html 里 range 标签**自带的**量程不动 ——
+// 那套 (steps 1~60 / cfg 1~8 / shift 1~7) 正好是**旧后端**的全局区间，
+// 也就是说：后端没升级时，滑杆允许的正好是旧后端接受的。
+// 这样即便前后端版本暂时不一致，也不会出现「面板允许、后端不允许」。
+let IMG_PARAM_RANGES = {};   // 服务端下发（loadImageOptions 写入）
+
+// 当前图像模式对应的族 key（与后端 _IMAGE_MODE_TABLES / IMAGE_PARAM_RANGES 同名）
+function imgParamFamily() {
+  if (isH3ImageMode()) return "h3image";
+  if (isMossMode()) return "moss";
+  if (isQwenMode()) return "qwen";
+  return "zimage";
+}
+
+// 取当前模式的采样参数量程。
+// 返回 null = 服务端还没下发（后端未重启）-> 调用方保持滑杆原样。
+function imgParamRanges() {
+  const family = imgParamFamily();
+  const served = IMG_PARAM_RANGES && IMG_PARAM_RANGES[family];
+  if (served && served.steps && served.cfg && served.shift) return served;
+  return null;
+}
+
+// 由步进推出显示小数位：0.01 -> 2 位；0.1 / 0.5 -> 1 位；1 -> 0 位
+function imgShiftDecimals(shiftRange, el) {
+  let step = Number(shiftRange && shiftRange.step);
+  if (!Number.isFinite(step) || step <= 0) {
+    // 没有服务端量程 -> 读滑杆自己的 step 属性（同样是「不另造一份」）
+    step = Number(el && el.step);
+  }
+  if (!Number.isFinite(step) || step <= 0) return 1;
+  if (step >= 1) return 0;
+  return Math.min(4, Math.max(1, Math.ceil(-Math.log10(step))));
+}
 // 本机实际存在的 Z-Image LoRA（服务端下发），以及当前配置
 // available = 效果类 LoRA（用户可选）
 // acceleration = 加速/蒸馏类（工作流固定使用，不进下拉）
@@ -1818,40 +1863,52 @@ function renderImagePanel() {
   // 滑块量程按模式切换：Z-Image 的 SHIFT 是 3（min=1），
   // Qwen-Image 2.1 的 SHIFT 是 0.69 —— 用同一套量程会把 0.69 夹成 1，
   // 界面显示的值就和真正送出去的不一致。
+  //
+  // 【2026-11-16 修 —— 量程不再在前端硬编码】
+  // 旧实现按模式分支写死四套 min/max/step（与后端各写一套）。
+  // 后端那套是**扁平的全局区间**（steps<=60 / cfg>=1 / shift 1~7），
+  // 于是 MOSS-Image 面板允许 steps=100、后端却判越界 -> 静默回落 50：
+  // 面板显示 100、实际跑 50（用户报的 BUG）。
+  // 现在量程由 /api/image-options 的 param_ranges 下发
+  // （真源 h3studio/gen_normalize.py 的 IMAGE_PARAM_RANGES），
+  // **前后端同一份**。后端没下发时（旧后端未重启）才回落到本地兜底表。
   const stepsEl = $("#imgSteps"), cfgEl = $("#imgCfg"), shiftEl = $("#imgShift");
-  if (isH3ImageMode()) {
-    // H3-Image 官方模板：steps=6 / cfg=1 / euler / simple
-    // 步数与 PDD sigma 表绑定（6 步蒸馏）-> 步数上限给到 12 便于对照，
-    // 但默认与推荐值都是 6；CFG 固定 1（guidance 固定，无 CFG pass）。
-    stepsEl.min = "1"; stepsEl.max = "12"; stepsEl.step = "1";
-    cfgEl.min = "1"; cfgEl.max = "8"; cfgEl.step = "0.5";
-    shiftEl.min = "0"; shiftEl.max = "3"; shiftEl.step = "0.1";
-  } else if (isMossMode()) {
-    // MOSS-Image 官方 USERGUIDE：steps >= 50 / CFG 3.0~6.0 / shift 5.0
-    // 量程要覆盖官方推荐值 —— steps 上限给到 100（官方下限 50 起步），
-    // CFG 给到 0.1 步进（官方区间 3.0~6.0，需要能调到 3.5/4.0/4.5…），
-    // shift 给到 0.1 步进（官方推荐 5.0）。
-    stepsEl.min = "1"; stepsEl.max = "100"; stepsEl.step = "1";
-    cfgEl.min = "0"; cfgEl.max = "10"; cfgEl.step = "0.1";
-    shiftEl.min = "0"; shiftEl.max = "10"; shiftEl.step = "0.1";
-  } else if (isQwenMode()) {
-    stepsEl.min = "1"; stepsEl.max = "60"; stepsEl.step = "1";
-    cfgEl.min = "0"; cfgEl.max = "8"; cfgEl.step = "0.1";
-    shiftEl.min = "0"; shiftEl.max = "3"; shiftEl.step = "0.01";
-  } else {
-    stepsEl.min = "1"; stepsEl.max = "60"; stepsEl.step = "1";
-    cfgEl.min = "1"; cfgEl.max = "8"; cfgEl.step = "0.5";
-    shiftEl.min = "1"; shiftEl.max = "7"; shiftEl.step = "0.5";
+  const ranges = imgParamRanges();
+  // ranges === null = 服务端没下发（后端未重启）-> **不动滑杆**，
+  // 保持 web/index.html 里 range 标签自带的量程。
+  //
+  // 【为什么不本地兜底一份量程】两份量程必然漂移，而漂移的后果就是
+  // 「面板允许、后端不允许」。index.html 自带的那套 (steps 1~60 /
+  // cfg 1~8 / shift 1~7) 恰好等于**旧后端**的全局区间 —— 也就是说
+  // 版本不一致期间，滑杆允许的正好是后端接受的，不会出现错配。
+  if (ranges) {
+    if (ranges.steps) {
+      stepsEl.min = String(ranges.steps.min);
+      stepsEl.max = String(ranges.steps.max);
+      stepsEl.step = String(ranges.steps.step);
+    }
+    if (ranges.cfg) {
+      cfgEl.min = String(ranges.cfg.min);
+      cfgEl.max = String(ranges.cfg.max);
+      cfgEl.step = String(ranges.cfg.step);
+    }
+    if (ranges.shift) {
+      shiftEl.min = String(ranges.shift.min);
+      shiftEl.max = String(ranges.shift.max);
+      shiftEl.step = String(ranges.shift.step);
+    }
   }
   stepsEl.value = s.steps;
   $("#imgStepsVal").textContent = s.steps;
   cfgEl.value = s.cfg;
   $("#imgCfgVal").textContent = Number(s.cfg).toFixed(isQwenMode() ? 1 : 1);
   shiftEl.value = s.shift;
-  // MOSS 的 shift 量程是 0~10 步进 0.1 -> 显示 1 位小数即可；
-  // Qwen 是 0~3 步进 0.01 -> 要 2 位；Z-Image 是 1~7 步进 0.5 -> 1 位
+  // 小数位跟着**实际步进**走：Qwen 的 shift 步进 0.01 -> 2 位；
+  // MOSS 0.1 -> 1 位；Z-Image 0.5 -> 1 位。
+  // 【为什么不能写死】步进由服务端下发，写死就会出现「面板显示 0.7、
+  // 真正送出去的是 0.69」这种不一致（Qwen 内置 shift 就是 0.69）。
   $("#imgShiftVal").textContent = Number(s.shift).toFixed(
-    isQwenMode() ? 2 : (isMossMode() ? 1 : (isH3ImageMode() ? 1 : 1)));
+    imgShiftDecimals(ranges && ranges.shift, shiftEl));
 
   // 负面提示词：Turbo 在 CFG=1 下负面被跳过（samplers.py:610）-> 禁用
   const negSupported = !!(model && model.supports_negative);
@@ -2491,6 +2548,13 @@ async function loadImageOptions() {
     IMG_OPTIONS.models = data.models || {};
     IMG_OPTIONS.sizeMultiple = data.size_multiple || 16;
     IMG_OPTIONS.maxDirectMp = data.max_direct_mp || 3;
+    // 【2026-11-16 修 —— 采样参数量程由服务端下发】
+    // 真源 h3studio/gen_normalize.py 的 IMAGE_PARAM_RANGES。
+    // 前端不再自己写一套 min/max —— 两套量程必然漂移，而漂移的后果是
+    // 「面板允许、后端不允许」-> 用户改的值被静默改回默认值。
+    if (data.param_ranges && typeof data.param_ranges === "object") {
+      IMG_PARAM_RANGES = data.param_ranges;
+    }
     // 自定义宽高的合法范围（服务端从 ComfyUI 节点 schema 下发）
     IMG_OPTIONS.sizeMin = data.size_min || 16;
     IMG_OPTIONS.sizeMax = data.size_max || 16384;
@@ -5478,6 +5542,22 @@ function openDetailModal(job) {
     // 创建时间：不在 gen_params 里（那是任务属性，不是生成参数）
     rows.push(`<div class="detail-kv-row"><span>创建时间</span>`
       + `<b>${escapeHtml(fmtTime(job.created_at))}</b></div>`);
+    // 【2026-11-16 新增】服务端归一说明 —— 「你的哪个参数被改成了什么」。
+    //
+    // 【为什么必须有这一段】
+    // 服务端归一层会把越界/非法值**静默回落**到模型推荐值（例如把
+    // 「采样步数 100」夹回 50），并把说明记进 params["normalize_notes"]。
+    // 此前这个字段只落在数据库里，前端从不读它 —— 于是「面板改了值、
+    // 实际跑的是另一个值」这件事在界面上完全看不出来。
+    //
+    // 现在明确列出来：用户能一眼看到「步数：100 不是合法取值，已改用 50」，
+    // 而不是只能对着参数卡猜。
+    const normalizeNotes = (job.gen_params && job.gen_params.normalize_notes) || [];
+    if (Array.isArray(normalizeNotes) && normalizeNotes.length) {
+      rows.push(`<div class="detail-kv-row"><span>参数已调整</span>`
+        + `<b title="${escapeHtml(normalizeNotes.join("；"))}">`
+        + `${escapeHtml(normalizeNotes.join("；"))}</b></div>`);
+    }
     // 【2026-11-14 · c6】作者推荐参数分组（需求 1 / 2 / 5）。
     //
     // 【为什么加在这里】h3-model-meta 把「作者推荐参数」做在 web/job-detail.js

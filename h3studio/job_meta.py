@@ -1597,6 +1597,18 @@ def gen_params(mode: str, params: dict, model_info: dict | None = None,
         # 也能看出这条到底有没有走增强流程。
         "original_prompt": str(params.get("original_prompt") or ""),
         "prompt_enhanced": "1" if params.get("prompt_enhanced") else "",
+        # 【2026-11-16 新增】服务端归一说明（「改了什么、为什么」）。
+        #
+        # 【为什么必须下发到前端】
+        # 归一层（gen_normalize）会把越界/非法值**静默回落**到模型推荐值
+        # 并记进 params["normalize_notes"]。但那个字段此前**只落在数据库里**，
+        # 前端任何地方都不读它 —— 于是「用户提交 100 步 -> 实际跑 50 步」
+        # 这件事在界面上**完全看不出来**：面板显示 100、参数卡显示 50、
+        # 没有任何一行说明为什么。
+        #
+        # 现在把它下发到 gen_params，任务详情会明确列出「哪一项被改了、
+        # 改成了什么」。这样「参数被服务端改过」这件事就不再是静默的。
+        "normalize_notes": list(params.get("normalize_notes") or []),
     }
 
     # --- shift：视频用 shift_video / shift_audio，图像用 shift ---

@@ -3649,6 +3649,33 @@ def _reject_external_media_or_raise(saved_files: dict | None, mode: str) -> None
         raise JobValidationError(exc.message, code=exc.code) from exc
 
 
+def _image_family_for_mode(mode: str) -> str:
+    """取图像模式所属的**模型族** key（决定采样参数的合法量程）。
+
+    【为什么需要】
+    各族的官方参数域差别很大（MOSS steps 上限 100 / Qwen shift 步进 0.01 /
+    H3-Image steps 上限 12）。用一套扁平的全局区间去卡所有族 =
+    「用户拖得动、后端不认」—— 2026-11-16 用户报的 MOSS-Image
+    steps=100 被后端静默夹回 50 就是这么来的。
+
+    【真源】
+    ``gen_normalize.IMAGE_PARAM_RANGES`` 的键名与
+    ``_IMAGE_MODE_TABLES`` 的族名**同名**（zimage / qwen / moss / h3image），
+    前端滑杆量程也由同一份下发（/api/image-options 的 param_ranges）。
+
+    【未知模式】
+    回落 ``zimage``（历史行为：旧的全局区间就是 Z-Image 那套）。
+    """
+    spec = _IMAGE_MODE_TABLES.get(mode)
+    if not spec:
+        return gen_normalize.DEFAULT_PARAM_RANGES_FAMILY
+    family = spec[0]
+    if family == "h3image":
+        return "h3image"
+    return family if family in gen_normalize.IMAGE_PARAM_RANGES else \
+        gen_normalize.DEFAULT_PARAM_RANGES_FAMILY
+
+
 def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                        saved_files: dict | None = None) -> list:
     """
@@ -4130,7 +4157,15 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     _image_model = _image_model_for_mode(mode, params)
     if _image_model is not None:
         _notes: list[str] = []
-        gen_normalize.normalize_image_sampling(params, _image_model, _notes)
+        # 【2026-11-16 修 —— 按模型族取量程】
+        # 旧实现不传 family -> 归一层用一套扁平的全局区间
+        # （steps<=60 / cfg>=1 / shift 1~7）去卡所有族。
+        # MOSS-Image 面板量程是 steps 1~100 / cfg 0~10 / shift 0~10，
+        # 于是 steps=100 被判越界 -> 静默回落 50（本次用户报的 BUG）。
+        # 现在把「族」明确传进去 —— 区间真源在 gen_normalize.IMAGE_PARAM_RANGES，
+        # 与前端滑杆共用同一份（前端量程由 /api/image-options 下发）。
+        gen_normalize.normalize_image_sampling(
+            params, _image_model, _notes, _image_family_for_mode(mode))
         if _notes:
             existing = params.get("normalize_notes")
             merged = list(existing) if isinstance(existing, list) else []
@@ -6103,6 +6138,16 @@ async def api_image_options(request):
         # min=16 max=16384 step=16）
         "size_min": Z_IMAGE_SIZE_MIN,
         "size_max": Z_IMAGE_SIZE_MAX,
+        # 【2026-11-16 修 —— 采样参数量程下发前端】
+        # 面板滑杆的 min/max/step 从这里取，**不再在前端硬编码**。
+        #
+        # 【为什么必须下发 —— 这就是本次用户报的 BUG 的根因】
+        # 旧实现前端按模式分支硬编码量程（MOSS steps 1~100），
+        # 后端却用一套扁平的全局上限（steps<=60）去判「越界 -> 回落默认值」。
+        # 于是用户拖到 100 提交后被静默夹回 50：面板显示 100、实际跑 50。
+        # 量程只有一份真源（gen_normalize.IMAGE_PARAM_RANGES），
+        # 前后端都读它 —— 这类「前端允许、后端不允许」的断链就不可能再发生。
+        "param_ranges": gen_normalize.IMAGE_PARAM_RANGES,
         # MiniMax-H3-Image 独立的一套（文生图 + 图片编辑共用）
         "h3image": await _h3_image_options_payload(),
         # 【功能位】前端 web/app.js 的 loadImageOptions() 读 data.features

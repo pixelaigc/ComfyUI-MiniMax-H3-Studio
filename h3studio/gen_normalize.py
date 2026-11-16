@@ -38,28 +38,94 @@
      MOSS_IMAGE_MODELS / H3_IMAGE_MODELS），**不新造常量** ——
      新造就会与模型表漂移（模型表改了、白名单没改 = 又一次静默失效）。
 
-【数值区间从哪来】
-  steps / cfg / shift 的区间取自**前端真实控件的取值域**
-  （web/index.html 的 range 标签 min/max），因为那是用户能拖出来的范围。
-  越界值（Agent 传 9999 步、直接调 API 传 -1）回落到模型推荐值。
+【数值区间从哪来 —— R4：区间必须与前端滑杆**同一份真源**】
+  steps / cfg / shift 的合法区间**按模型族**区分（Z-Image / Qwen-Image /
+  MOSS-Image / H3-Image 四套），真源是本模块底部的
+  ``IMAGE_PARAM_RANGES`` —— 前端滑杆的 min/max/step 也从这里下发
+  （/api/image-options 的 ``param_ranges`` 字段）。
+
+  【为什么必须同源 —— 这就是本次缺陷的根因】
+  2026-11-16 实测：MOSS-Image 面板的「采样步数」滑杆量程是
+  **1~100**（web/app.js 的 isMossMode() 分支），而本模块当时写死
+  ``IMAGE_STEPS_MAX = 60``（Z-Image 的量程）-> 用户拖到 100 提交后，
+  后端判「越界」-> 静默回落模型推荐值 50，
+  面板显示 100、实际跑 50（队列参数卡如实显示 50）。
+  根因 = **前端允许、后端不允许** —— 两套量程各写一份，必然漂移。
+
+  修法：区间只写一份（``IMAGE_PARAM_RANGES``），前后端都读它。
+  前端不再硬编码量程；后端不再用一套扁平的全局上限。
+  越界值（Agent 传 9999 步、直接调 API 传 -1）仍回落到模型推荐值。
 """
 
 from __future__ import annotations
 
 
-#: 前端「采样步数」滑杆区间（web/index.html#imgSteps min=1 max=60）
-#: 与视频族 video_models.VIDEO_STEPS_* 并列但**独立** ——
-#: 图像族有自己的推荐步数档（8 / 25 / 15 步），不该被视频族的 50 步上限管。
+#: 图像族**按模型族**划分的采样参数合法区间。
+#:
+#: 【唯一真源 —— 前后端共用】
+#:   * 后端：``normalize_image_sampling()`` 用它判「越界 -> 回落」；
+#:   * 前端：``/api/image-options`` 的 ``param_ranges`` 下发它，
+#:     web/app.js 的 ``renderImagePanel()`` 用它设滑杆 min/max/step。
+#:
+#: 【为什么按族分而不是一套全局值】
+#: 各族的**官方推荐**参数域差别很大：
+#:   * MOSS-Image 官方 USERGUIDE：steps >= 50（面板量程给到 100）、
+#:     CFG 3.0~6.0、shift 5.0；
+#:   * Qwen-Image 2.1 内置 shift=0.69（面板量程 0~3、步进 0.01）、
+#:     CFG 可到 0；
+#:   * H3-Image 官方模板：steps=6（6 步蒸馏，上限 12）、shift 0~3；
+#:   * Z-Image Turbo/Base：steps 8/25、CFG 1~8、shift 1~7。
+#: 拿任何一族的量程去卡别的族，就是「用户拖得动、后端不认」。
+#:
+#: 【键名 = 模型族 key】
+#: 与 ``/api/image-options`` 里的 ``zimage`` / ``qwen`` / ``moss`` /
+#: ``h3image`` 四个子清单**同名** —— 前端按当前模式取对应那一份。
+IMAGE_PARAM_RANGES: dict[str, dict[str, dict[str, float]]] = {
+    # Z-Image（Turbo 8 步 / Base 25 步 / DarkBeast 15 步）
+    "zimage": {
+        "steps": {"min": 1, "max": 60, "step": 1},
+        "cfg": {"min": 1.0, "max": 8.0, "step": 0.5},
+        "shift": {"min": 1.0, "max": 7.0, "step": 0.5},
+    },
+    # Qwen-Image 2.1（基座 40 步 / Turbo 8 步固定 sigma 表）
+    # shift 内置 0.69 -> 步进必须 0.01，否则面板显示的值与送出的值不一致
+    "qwen": {
+        "steps": {"min": 1, "max": 60, "step": 1},
+        "cfg": {"min": 0.0, "max": 8.0, "step": 0.1},
+        "shift": {"min": 0.0, "max": 3.0, "step": 0.01},
+    },
+    # MOSS-Image（官方 USERGUIDE：steps >= 50 / CFG 3.0~6.0 / shift 5.0）
+    "moss": {
+        "steps": {"min": 1, "max": 100, "step": 1},
+        "cfg": {"min": 0.0, "max": 10.0, "step": 0.1},
+        "shift": {"min": 0.0, "max": 10.0, "step": 0.1},
+    },
+    # MiniMax-H3-Image（官方模板 6 步蒸馏 / guidance 固定 1）
+    "h3image": {
+        "steps": {"min": 1, "max": 12, "step": 1},
+        "cfg": {"min": 1.0, "max": 8.0, "step": 0.5},
+        "shift": {"min": 0.0, "max": 3.0, "step": 0.1},
+    },
+}
+
+#: 模型表里没有的族 -> 用 Z-Image 的量程兜底（历史行为，不放宽也不收紧）
+DEFAULT_PARAM_RANGES_FAMILY = "zimage"
+
+
+def param_ranges_for_family(family: str) -> dict[str, dict[str, float]]:
+    """取某个模型族的采样参数合法区间（未知族回落到默认族）。"""
+    return IMAGE_PARAM_RANGES.get(family) or IMAGE_PARAM_RANGES[DEFAULT_PARAM_RANGES_FAMILY]
+
+
+#: 兼容旧引用（外部脚本 / 老测试按模块级常量取区间）。
+#: 注意：这三个常量现在只是**Z-Image 族**的区间（历史上它们被当全局上限用，
+#: 那是本次缺陷的根因）。新代码请用 ``param_ranges_for_family()``。
 IMAGE_STEPS_MIN = 1
-IMAGE_STEPS_MAX = 60
-
-#: 前端「CFG」滑杆区间（web/index.html#imgCfg min=1 max=8）
-IMAGE_CFG_MIN = 1.0
-IMAGE_CFG_MAX = 8.0
-
-#: 前端「shift」滑杆区间（web/index.html#imgShift min=1 max=7）
-IMAGE_SHIFT_MIN = 1.0
-IMAGE_SHIFT_MAX = 7.0
+IMAGE_STEPS_MAX = IMAGE_PARAM_RANGES["zimage"]["steps"]["max"]
+IMAGE_CFG_MIN = IMAGE_PARAM_RANGES["zimage"]["cfg"]["min"]
+IMAGE_CFG_MAX = IMAGE_PARAM_RANGES["zimage"]["cfg"]["max"]
+IMAGE_SHIFT_MIN = IMAGE_PARAM_RANGES["zimage"]["shift"]["min"]
+IMAGE_SHIFT_MAX = IMAGE_PARAM_RANGES["zimage"]["shift"]["max"]
 
 
 def _note(notes: list[str], field: str, raw, fallback) -> None:
@@ -102,7 +168,8 @@ def _as_float(value, default: float) -> float:
     return out
 
 
-def normalize_image_sampling(params: dict, model: dict, notes: list[str]) -> None:
+def normalize_image_sampling(params: dict, model: dict, notes: list[str],
+                            family: str | None = None) -> None:
     """就地归一**图像模式**的采样参数。
 
     参数
@@ -111,6 +178,10 @@ def normalize_image_sampling(params: dict, model: dict, notes: list[str]) -> Non
               scheduler 字段；``samplers`` / ``schedulers`` 是白名单，
               缺失时视为「该模型不限制」）
       notes   归一说明收集列表（本函数 append，不清空）
+      family  模型族 key（"zimage" / "qwen" / "moss" / "h3image"）——
+              决定 steps / cfg / shift 的合法区间。**省略时**按 model
+              里有没有 ``param_family`` 字段推断，都没有则用 Z-Image 的
+              量程（历史行为）。
 
     【为什么放在 builder 之外、归一层之内】
     builder（build_t2i / build_qwen_t2i / build_moss_t2i）读的是
@@ -120,16 +191,33 @@ def normalize_image_sampling(params: dict, model: dict, notes: list[str]) -> Non
 
     【注意】本函数**不改** model 自己的推荐值 ——
     它只保证 params 里若存在「非法值」就被换掉。
+
+    【2026-11-16 修 —— 区间按族取，不再用一套扁平全局值】
+    旧实现用模块级 IMAGE_STEPS_MAX=60 / IMAGE_CFG_MIN=1.0 /
+    IMAGE_SHIFT_MIN=1.0 去卡**所有**族。MOSS-Image 面板量程是
+    steps 1~100 / cfg 0~10 / shift 0~10 —— 于是 steps=100 被判越界、
+    静默回落 50（本次用户报的那个 BUG）。
+    现在区间从 ``IMAGE_PARAM_RANGES[family]`` 取 ——
+    与前端滑杆**同一份真源**（前端量程由 /api/image-options 下发）。
     """
     if not isinstance(params, dict) or not isinstance(model, dict):
         return
+
+    # ---- 量程（按族）----
+    if not family:
+        family = model.get("param_family") or DEFAULT_PARAM_RANGES_FAMILY
+    ranges = param_ranges_for_family(str(family))
+
+    steps_range = ranges["steps"]
+    cfg_range = ranges["cfg"]
+    shift_range = ranges["shift"]
 
     # ---- 步数 ----
     default_steps = _as_int(model.get("steps"), 8)
     if "steps" in params and params.get("steps") is not None:
         raw = params.get("steps")
         steps = _as_int(raw, default_steps)
-        if steps < IMAGE_STEPS_MIN or steps > IMAGE_STEPS_MAX:
+        if steps < steps_range["min"] or steps > steps_range["max"]:
             _note(notes, "steps", raw, default_steps)
             steps = default_steps
         elif not _is_int_like(raw):
@@ -145,7 +233,7 @@ def normalize_image_sampling(params: dict, model: dict, notes: list[str]) -> Non
     if "cfg" in params and params.get("cfg") is not None:
         raw = params.get("cfg")
         cfg = _as_float(raw, default_cfg)
-        if cfg < IMAGE_CFG_MIN or cfg > IMAGE_CFG_MAX:
+        if cfg < cfg_range["min"] or cfg > cfg_range["max"]:
             _note(notes, "cfg", raw, default_cfg)
             cfg = default_cfg
         elif not _is_float_like(raw):
@@ -157,7 +245,7 @@ def normalize_image_sampling(params: dict, model: dict, notes: list[str]) -> Non
     if "shift" in params and params.get("shift") is not None:
         raw = params.get("shift")
         shift = _as_float(raw, default_shift)
-        if shift < IMAGE_SHIFT_MIN or shift > IMAGE_SHIFT_MAX:
+        if shift < shift_range["min"] or shift > shift_range["max"]:
             _note(notes, "shift", raw, default_shift)
             shift = default_shift
         elif not _is_float_like(raw):
