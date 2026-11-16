@@ -30,6 +30,9 @@ DEPLOY_FILES=(
   tests/test_agent_oneshot_e2e.py
   tests/test_frontend_assets_hygiene.py
   scripts/deploy_s5_8190.sh
+  # 第 5 轮部署脚本本轮也改了（set -e + grep 无匹配会静默退出）
+  # -> 必须一起部署，否则 live 工作区与 HEAD 不一致（完整性自检会拦）
+  scripts/deploy_cr5_8190.sh
 )
 
 echo "=== 0) 现状 ==="
