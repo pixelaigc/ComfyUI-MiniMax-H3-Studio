@@ -43,6 +43,9 @@ flowchart TB
     PP["提示词侧<br/>模板扩写 / 预设 / 二次增强"]
     CM["会话侧<br/>跨会话检索 / 长期偏好 / 素材历史"]
     RS["回应<br/>respond 提交最终结论"]
+    ML["媒体库侧<br/>生成产物清理（dry_run / confirm）"]
+    EX["外部能力侧<br/>文件读取 / 外部搜索 / 代码执行<br/>（受「agent 管理」能力开关控制）"]
+    FF["ffmpeg 侧<br/>探测 / 拼接 / 转码 / 抽帧 / 混音 / 合流"]
   end
 
 @AGENT_TOOL_SIDE_EDGES@
@@ -55,6 +58,9 @@ flowchart TB
   CM --> A_MEMORY
   RS --> A_RESULT
   AS --> A_ATT
+  ML --> A_RESULT
+  EX --> A_RESULT
+  FF --> A_RESULT
 
   NOTE["Agent 侧能力位由服务端下发（agent_schema.MODE_SLOTS / mode_slot_plan）<br/>前端不再硬编码「哪些模式建不了」"]
 
@@ -69,6 +75,6 @@ flowchart TB
 
   class A_START,A_NEW,A_INPUT,A_ATT,A_SEND,A_PROGRESS,A_RESULT,A_SESS_ART,A_MEMORY,A_UPLOAD,A_CLARIFY ui;
   class A_TOOLS agent;
-  class AS,MP,PP,CM,RS side;
+  class AS,MP,PP,CM,RS,ML,EX,FF side;
   class J_CREATE,J_STATUS,A_GRID job;
   class NOTE note;

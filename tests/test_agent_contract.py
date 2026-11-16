@@ -175,6 +175,49 @@ class _ContractBase(unittest.TestCase):
         srv.agent_sessions.reset_store(self.tmp / "agent_sessions.db")
         return srv.make_app(), srv
 
+    def _put(self, app, path: str, payload):
+        """与 _post 同款，只是 method=PUT（PUT /api/agent/settings 用）。"""
+        import threading
+
+        from aiohttp.test_utils import TestClient, TestServer
+
+        async def _run():
+            server = TestServer(app)
+            client = TestClient(server)
+            await client.start_server()
+            raw = ""
+            status = 0
+            ctype = ""
+            async with client.put(path, json=payload) as resp:
+                status = resp.status
+                ctype = resp.headers.get("Content-Type", "")
+                raw = await resp.text()
+            await client.close()
+            return status, ctype, raw, []
+
+        box = {}
+
+        def _runner():
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                box["value"] = loop.run_until_complete(_run())
+            except Exception as exc:          # pragma: no cover - 诊断用
+                box["error"] = exc
+            finally:
+                try:
+                    asyncio.set_event_loop(None)
+                    loop.close()
+                except Exception:
+                    pass
+
+        th = threading.Thread(target=_runner)
+        th.start()
+        th.join(timeout=60)
+        if "error" in box:
+            raise box["error"]
+        return box.get("value", (0, "", "", []))
+
     def _post(self, app, path: str, payload: dict):
         """
         真的 POST，返回 (status, content_type, raw_body, events)。
@@ -407,6 +450,7 @@ class TestStreamCarrierContract(_ContractBase):
         self.assertEqual(status, 200, raw[:300])
         self.assertIn("text/event-stream", ctype,
                       f"query 载体没有拿到 SSE（ct={ctype!r}）")
+
 
     def test_frontend_really_sends_stream_in_body(self):
         """
@@ -1009,6 +1053,89 @@ class TestOneShotToolResultContract(_ContractBase):
                         f"一次性路径 tools[].result 是空串：{tools}")
         self.assertTrue(tools[0].get("call_id"),
                         f"一次性路径 tools[].call_id 是空的：{tools}")
+
+
+# ==================================================================== 契约 ⑦
+class TestNonObjectPayloadContract(_ContractBase):
+    """
+    契约 ⑦：**请求体不是对象**时，必须返回 400 而不是 500。
+
+    【为什么要有这条契约 —— 2026-11-16 内置 Agent 审查发现的真实缺陷】
+    POST /api/agent/chat 与 POST /api/agent/chat/stream 缺了
+    `isinstance(payload, dict)` 检查。传一个合法 JSON 数组
+    （`[1,2]`）时，`payload.get("stream")` 抛 AttributeError，
+    冒泡到 aiohttp 的兜底处理器 → 返回 **500 Internal Server Error**，
+    而且响应体是 aiohttp 的默认错误页（不是本项目的 JSON 契约），
+    把 Python 栈信息泄给了客户端。
+
+    对照：同一批接口里的 PUT /api/agent/settings、
+    POST /api/agent/settings/test-engine、POST /api/agent/sessions、
+    POST /api/agent/memory **都有**这道检查并返回 400 ——
+    只有两个 chat 端点漏了。
+
+    判据：HTTP 状态必须是 400，且响应体是**本项目的 JSON 契约**
+    （含 error + code 字段），不能是 aiohttp 的默认错误页。
+    """
+
+    def _assert_bad_request(self, status, ctype, raw):
+        self.assertEqual(status, 400,
+                         f"非对象请求体应返回 400，实际 {status}：{raw[:300]}")
+        self.assertIn("application/json", ctype,
+                      f"非对象请求体应返回 JSON，实际 ctype={ctype!r}")
+        self.assertNotIn("Traceback", raw,
+                         "响应体泄漏了 Python 栈信息")
+        try:
+            body = json.loads(raw)
+        except Exception:
+            self.fail(f"响应体不是合法 JSON：{raw[:300]}")
+        self.assertIn("error", body, f"缺少 error 字段：{body}")
+        self.assertIn("code", body, f"缺少 code 字段：{body}")
+
+    def test_chat_rejects_non_object_payload(self):
+        """POST /api/agent/chat 传数组 -> 400 + JSON 契约。"""
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._post(app, "/api/agent/chat", [1, 2])
+        self._assert_bad_request(status, ctype, raw)
+
+    def test_chat_stream_rejects_non_object_payload(self):
+        """POST /api/agent/chat/stream 传数组 -> 400 + JSON 契约。"""
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._post(app, "/api/agent/chat/stream", [1, 2])
+        self._assert_bad_request(status, ctype, raw)
+
+    def test_chat_rejects_string_payload(self):
+        """传字符串同样要 400（JSON 合法但不是对象）。"""
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._post(app, "/api/agent/chat", "hello")
+        self._assert_bad_request(status, ctype, raw)
+
+    def test_settings_rejects_non_object_payload(self):
+        """对照项：PUT /api/agent/settings 已有检查，行为一致。"""
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._put(app, "/api/agent/settings", [1, 2])
+        self._assert_bad_request(status, ctype, raw)
+
+    def test_memory_rejects_non_object_payload(self):
+        """
+        POST /api/agent/memory 传数组 -> 400 + JSON 契约。
+
+        【同源缺陷】它与两个 chat 端点一样缺 isinstance 检查 ——
+        实测线上传 [1,2] 返回 500 + Python 栈泄漏。
+        """
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._post(app, "/api/agent/memory", [1, 2])
+        self._assert_bad_request(status, ctype, raw)
+
+    def test_sessions_accepts_non_object_payload(self):
+        """
+        对照项：POST /api/agent/sessions 的 body 是**可选**的，
+        传非对象时按「空 body」处理并正常建会话 —— 这是既有契约，不改。
+        """
+        app, _ = self._make_app()
+        status, ctype, raw, _ = self._post(app, "/api/agent/sessions", [1, 2])
+        self.assertEqual(status, 200, raw[:300])
+        body = json.loads(raw)
+        self.assertTrue(body.get("session_id"), f"没有返回 session_id：{body}")
 
 
 if __name__ == "__main__":

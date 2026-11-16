@@ -1848,7 +1848,26 @@
       // 任务卡状态轮询启动
       startJobPolling(msg);
       // 成功了就清掉这条消息的重试上下文 —— 成功的消息不该挂着重试按钮
-      msg.retryRequest = null;
+      //
+      // 【2026-11-16 修：不能无条件清 —— SSE 失败也走这条路】
+      //
+      // 服务端把 Agent 执行失败发成 **SSE error 事件**（HTTP 200）或
+      // **done 事件里 status=failed** —— 两者 HTTP 状态都是 200，
+      // 于是 fetch 不抛错、sendStreamNew 正常返回，控制流就落进
+      // 上面这个「成功」分支。原来这里无条件 `msg.retryRequest = null`，
+      // 结果是：**红色错误条正常显示，但「重试」按钮消失** ——
+      // 用户看到失败却没有一键重发的入口，只能手打一遍。
+      //
+      // 修法：只有**真成功**才清。真成功的判据 =
+      //   没有 error 字段 且 status 不是 failed
+      // （needs_clarification 不算失败 —— 那是正常追问，要保留重试入口）。
+      const failedStatus = data.status === "failed"
+        || data.status === "error"
+        || data.status === "aborted";
+      const isRealSuccess = !data.error && !failedStatus;
+      if (isRealSuccess) {
+        msg.retryRequest = null;
+      }
     } catch (err) {
       // 失败也要让用户看到「到底怎么了」—— 不能只留一个空白的忙碌状态。
       stopProgress();

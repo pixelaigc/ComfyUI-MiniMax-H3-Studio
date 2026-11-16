@@ -28,7 +28,7 @@ flowchart TB
   A_RESULT --> A_SESS_ART
   A_TOOLS -.-> A_MEMORY
 
-  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 23 个）"]
+  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 33 个）"]
     direction LR
     subgraph TG1["素材类"]
       direction TB
@@ -71,6 +71,25 @@ flowchart TB
       direction TB
       T_respond["正在整理结论<br/><code>respond</code>"]
     end
+    subgraph TG7["媒体库管理类"]
+      direction TB
+      T_manage_media_library["正在清理生成媒体库<br/><code>manage_media_library</code>"]
+    end
+    subgraph TG8["外部能力类"]
+      direction TB
+      T_read_file["正在读取文件<br/><code>read_file</code>"]
+      T_web_search["正在搜索外部资料<br/><code>web_search</code>"]
+      T_run_code["正在执行代码<br/><code>run_code</code>"]
+    end
+    subgraph TG9["ffmpeg 音视频类"]
+      direction TB
+      T_media_probe["正在探测媒体参数<br/><code>media_probe</code>"]
+      T_media_concat["正在拼接音视频<br/><code>media_concat</code>"]
+      T_media_transcode["正在转码<br/><code>media_transcode</code>"]
+      T_media_extract_frames["正在抽帧<br/><code>media_extract_frames</code>"]
+      T_media_mix_audio["正在混音<br/><code>media_mix_audio</code>"]
+      T_media_merge_av["正在音视频合流<br/><code>media_merge_av</code>"]
+    end
   end
 
   A_TOOLS <--> TOOLS
@@ -83,6 +102,9 @@ flowchart TB
     PP["提示词侧<br/>模板扩写 / 预设 / 二次增强"]
     CM["会话侧<br/>跨会话检索 / 长期偏好 / 素材历史"]
     RS["回应<br/>respond 提交最终结论"]
+    ML["媒体库侧<br/>生成产物清理（dry_run / confirm）"]
+    EX["外部能力侧<br/>文件读取 / 外部搜索 / 代码执行<br/>（受「agent 管理」能力开关控制）"]
+    FF["ffmpeg 侧<br/>探测 / 拼接 / 转码 / 抽帧 / 混音 / 合流"]
   end
 
   TG1 --> AS
@@ -91,6 +113,9 @@ flowchart TB
   TG4 --> PP
   TG5 --> CM
   TG6 --> RS
+  TG7 --> ML
+  TG8 --> EX
+  TG9 --> FF
 
   AS --> A_GRID["素材库（/api/assets/*）"]
   JB --> J_CREATE["create_job → 创建任务进队列"]
@@ -100,6 +125,9 @@ flowchart TB
   CM --> A_MEMORY
   RS --> A_RESULT
   AS --> A_ATT
+  ML --> A_RESULT
+  EX --> A_RESULT
+  FF --> A_RESULT
 
   NOTE["Agent 侧能力位由服务端下发（agent_schema.MODE_SLOTS / mode_slot_plan）<br/>前端不再硬编码「哪些模式建不了」"]
 
@@ -114,6 +142,6 @@ flowchart TB
 
   class A_START,A_NEW,A_INPUT,A_ATT,A_SEND,A_PROGRESS,A_RESULT,A_SESS_ART,A_MEMORY,A_UPLOAD,A_CLARIFY ui;
   class A_TOOLS agent;
-  class AS,MP,PP,CM,RS side;
+  class AS,MP,PP,CM,RS,ML,EX,FF side;
   class J_CREATE,J_STATUS,A_GRID job;
   class NOTE note;

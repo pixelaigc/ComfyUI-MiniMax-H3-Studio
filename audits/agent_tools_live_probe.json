@@ -1,0 +1,108 @@
+[
+ {
+  "tool": "list_modes",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 60.7,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "list_modes",
+    "ok": true,
+    "ms": 18590,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 42050,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "本工作台共支持 11 个生成模式：\n\n**视频**：文生视频 t2v、首尾帧生成 flf（需首/尾帧素材）、参考图生成 r2v（需参考素材）\n**图像**：Z-IMAGE 文生图 t2i、Qwen-Image 2.1 文生图 t2i_qwen、Qwen-Image 2.1 图片编辑 i2i_qwen（需参考图）、MOSS-Image 文生图 t2i_moss、H3-Image 文生图 t2i_h3image、H3-Image 图片编辑 "
+ },
+ {
+  "tool": "read_file",
+  "args": {
+   "path": "/etc/hostname"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 23.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "read_file",
+    "ok": false,
+    "ms": 7079,
+    "error": "文件读取能力已启用但没有配置允许读取的目录（请在「agent 管理」里填写 file_roots）"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 16067,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已尝试调用 read_file 读取 /etc/hostname，但工具返回错误：文件读取能力虽已启用，但未配置允许读取的目录（需在「agent 管理」中填写 file_roots）。因此无法读取该文件。若需要读取，请先在「agent 管理」里配置允许读取的目录后再试。"
+ },
+ {
+  "tool": "web_search",
+  "args": {
+   "query": "ComfyUI MiniMax H3"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 26.6,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "web_search",
+    "ok": true,
+    "ms": 19881,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 6653,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已完成对「ComfyUI MiniMax H3」的外部检索，要点如下：\n\n1. **官方页面** comfy.org/minimax-h3/ —— MiniMax H3 已登陆 Comfy，可在画布上打开 MiniMax workflow 模板或直接接入任意工作流；支持 Comfy Cloud 运行，无需本地 GPU。\n2. **官方教程** docs.comfy.org/tutorials/video/minimax/minimax-"
+ },
+ {
+  "tool": "media_probe",
+  "args": {
+   "asset_id": "asset_61f1b6fd9a1d"
+  },
+  "ok": true,
+  "http": 200,
+  "elapsed": 4.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "media_probe",
+    "ok": true,
+    "ms": 1215,
+    "error": ""
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 3005,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "已探测素材 asset_61f1b6fd9a1d（H3Studio_火星基地_2分钟_480P.mp4）：视频 864×480、24fps、h264/yuv420p，时长约 120 秒；音轨 aac、44.1kHz 立体声；容器 mov，大小约 27.2 MB。"
+ }
+]

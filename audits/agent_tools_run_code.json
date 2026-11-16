@@ -1,0 +1,27 @@
+[
+ {
+  "tool": "run_code",
+  "args": {},
+  "ok": true,
+  "http": 200,
+  "elapsed": 2.2,
+  "status": "completed",
+  "error": null,
+  "tool_calls": [
+   {
+    "tool": "run_code",
+    "ok": false,
+    "ms": 445,
+    "error": "能力「代码生成与执行」已关闭。请在「agent 管理」里启用它。"
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 1682,
+    "error": ""
+   }
+  ],
+  "called_target": true,
+  "answer_head": "run_code 工具当前不可用：本工作台的「代码生成与执行」能力开关处于关闭状态。请在「agent 管理」中启用该能力后我再重试；如果你原本想做的是某段计算或脚本处理，也可以告诉我具体目标，我用现有工具（素材/媒体处理类）帮你完成。"
+ }
+]

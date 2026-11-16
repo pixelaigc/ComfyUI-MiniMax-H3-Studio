@@ -312,6 +312,15 @@ def derive_agent_tools() -> list[dict]:
 #: Agent 工具分组（用于流程图里的分栏）。
 #: 归类依据是工具**实际作用对象**，不是名字长相 —— 新增工具时，
 #: 只要落在下面任一分组规则里就自动进对应分栏；都不匹配则进「其它工具」。
+#:
+# 【2026-11-16 内置 Agent 审查修复】补齐 10 个工具的归属。
+#:
+# 背景：这 10 个工具（媒体库管理 / 额外能力 / ffmpeg 音视频）分别在
+# b7c8bdc（媒体库管理）与 367a169（额外能力 + ffmpeg）加入，
+# 但**没有同步更新本表** —— 于是它们全被推进「其它工具」分栏，
+# 而 docs/ 里的流程图更是自那以后就没再重跑，
+# 导致 tests/test_flow_diagram.py 的「每个 Agent 工具都必须有节点」
+# 断言转红（线上遗留失败，本轮修复）。
 TOOL_GROUP_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("素材类", ("search_assets", "describe_asset", "upload_asset",
                 "delete_asset", "tag_asset", "list_asset_tags")),
@@ -322,6 +331,12 @@ TOOL_GROUP_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("会话与记忆类", ("recall_memory", "remember_preference",
                       "search_conversations", "search_asset_history")),
     ("回应类", ("respond",)),
+    # 2026-11-16 新增分栏 ——
+    ("媒体库管理类", ("manage_media_library",)),
+    ("外部能力类", ("read_file", "web_search", "run_code")),
+    ("ffmpeg 音视频类", ("media_probe", "media_concat", "media_transcode",
+                         "media_extract_frames", "media_mix_audio",
+                         "media_merge_av")),
 ]
 
 
@@ -837,6 +852,8 @@ def build_context(data: dict) -> dict:
     group_side = {
         "素材类": "AS", "任务类": "JB", "模式与参数类": "MP",
         "提示词类": "PP", "会话与记忆类": "CM", "回应类": "RS",
+        # 2026-11-16 新增分栏的落地侧（见 templates/flow-agent.mmd 的 SIDE 子图）
+        "媒体库管理类": "ML", "外部能力类": "EX", "ffmpeg 音视频类": "FF",
         "其它工具": "AS",
     }
     idx = 0

@@ -1,0 +1,77 @@
+{
+ "original_snapshot_keys": [
+  "capabilities",
+  "code_exec_timeout_sec",
+  "ffmpeg_path",
+  "file_roots",
+  "gen_defaults",
+  "max_steps",
+  "search_engines",
+  "t2v_defaults",
+  "total_timeout"
+ ],
+ "put": {
+  "http": 200,
+  "ok": true
+ },
+ "gen_defaults_roundtrip": {
+  "mode": "t2v",
+  "field": "steps",
+  "sent": 7,
+  "got": 7,
+  "match": true
+ },
+ "gen_defaults_field_diffs": [],
+ "max_steps_clamped": {
+  "sent": 9999,
+  "stored": 50,
+  "hard_cap": 50
+ },
+ "max_steps_min_clamped": {
+  "sent": 0,
+  "stored": 1
+ },
+ "engine_normalize": {
+  "sent": 3,
+  "stored_ids": [
+   "dup",
+   "dup_2"
+  ]
+ },
+ "restored": {
+  "max_steps": 50,
+  "gen_defaults_t2v_steps": 4,
+  "engines": [
+   "local_9898",
+   "ddg",
+   "ddg_direct"
+  ]
+ },
+ "spec_payload_keys": [
+  "a2a",
+  "flf",
+  "i2i_h3image",
+  "i2i_qwen",
+  "longfilm",
+  "r2v",
+  "t2a",
+  "t2i",
+  "t2i_h3image",
+  "t2i_moss",
+  "t2i_qwen",
+  "t2v"
+ ],
+ "spec_modes_in_settings": [
+  "a2a",
+  "flf",
+  "i2i_h3image",
+  "i2i_qwen",
+  "r2v",
+  "t2a",
+  "t2i",
+  "t2i_h3image",
+  "t2i_moss",
+  "t2i_qwen",
+  "t2v"
+ ]
+}

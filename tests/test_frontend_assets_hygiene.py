@@ -133,7 +133,11 @@ STALE_BUMPED = {
     # write 契约声明）⇒ ?v= 必须再升一次（cr20261115b -> cr20261116b）。
     "enhance-menu.js":         ("uxbatch1",     "cr20261116b"),
     "music-enhance.js":        ("uxbatch1",     "cr20261115b"),
-    "agent.js":                ("agent4",       "cr20261115b"),
+    # 【2026-11-16 内置 Agent 审查】agent.js 内容又变了（SSE 失败路径
+    #   保留「重试」入口的修复）⇒ ?v= 必须再升一次
+    #   （cr20261115b -> cr20261116b）。漏升 = 老缓存用户拿不到修复。
+    # 口径与 enhance-menu.js 一致：记「最初的旧值」与「当前最新值」。
+    "agent.js":                ("agent4",       "cr20261116b"),
     "agent_sessions.js":       ("agtsess2",     "cr20261115b"),
     # app.js 承载第 3 轮的 Critical B-2 修复（提交 c6676e6 改了它 +35 行），
     # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
