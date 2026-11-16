@@ -4103,6 +4103,32 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                 f"模型官方能力上限 10 张）",
                 code="ref_too_many")
 
+        # 【2026-11-16 新增】参考图必须**真的在素材库里**（不只是「长得像 id」）。
+        #
+        # 【为什么这里要单独查 —— 这条路与 asset_refs 是两条通道】
+        #   * flf / r2v / a2a 的媒体走 asset_refs（{asset_id, slot, ordinal}）
+        #     -> 上面的 check_asset_refs 已经查过库了；
+        #   * i2i_qwen / i2i_h3image 的参考图走 **params["ref_images"]**
+        #     （带描述 / 标签的元数据）-> **完全没被查过库**。
+        #
+        # 【原来错在哪】ref_images.normalize_refs / validate_refs 都是
+        # **纯 dict 处理**（h3studio/ref_images.py 里没有任何 DB 访问），
+        # `missing` 标记还是**前端传什么就信什么**。于是：
+        #   * 库里不存在的 asset_id -> 通过校验、任务建成，
+        #     直到 worker 里 _upload_ref_images 才抛 RuntimeError；
+        #   * 已删除（软删）的素材 -> 同上；
+        #   * 类型不符（拿视频当参考图）-> 一路到 worker 才炸。
+        # 用户看到的是「生成失败（服务端未能给出具体原因）」那类兜底文案。
+        #
+        # 查库后才能给出「该媒体尚未入库素材库，请先上传到素材库后再引用」
+        # 这种能照着改的中文原因 —— 与 flf / r2v 完全同一套口径。
+        try:
+            asset_ref_guard.check_asset_refs(
+                [{"asset_id": r["asset_id"], "slot": "ref_image"}
+                 for r in refs])
+        except asset_ref_guard.AssetLibraryError as exc:
+            raise JobValidationError(exc.message, code=exc.code) from exc
+
         # 一致性校验：素材失效 / 占位符与图片数不匹配 -> 阻止提交并说明原因
         prompt_text = (params.get("prompt") or "").strip()
         check = ref_imgs.validate_refs(refs, prompt=prompt_text, require=True)
@@ -4151,6 +4177,15 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                     f"H3-Image 参考图最多 {h3img.H3_IMAGE_MAX_REF_IMAGES} 张，"
                     f"当前 {len(refs)} 张（官方能力上限 16 张）",
                     code="ref_too_many")
+            # 【2026-11-16 新增】同 i2i_qwen：参考图必须**真的在素材库里**。
+            # （ref_images 这条通道与 asset_refs 是两条路，asset_refs 查过库，
+            #   这条没有 —— 详见 i2i_qwen 分支里同一段说明。）
+            try:
+                asset_ref_guard.check_asset_refs(
+                    [{"asset_id": r["asset_id"], "slot": "ref_image"}
+                     for r in refs])
+            except asset_ref_guard.AssetLibraryError as exc:
+                raise JobValidationError(exc.message, code=exc.code) from exc
             prompt_text = (params.get("prompt") or "").strip()
             # 【占位标记语义与 Qwen 不同 —— 不能复用 ref_imgs.validate_refs】
             #   Qwen-Image 2.1 的官方 PE-I2I 模板用 `<image1>..<imageN>`；
