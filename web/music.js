@@ -164,10 +164,20 @@
       if (!st.format) st.format = OPTIONS.default_format;
       if (!st.lyrics_template) st.lyrics_template = OPTIONS.lyric_template_default;
       const ms = OPTIONS.music_sampling;
-      if (!st.temperature) st.temperature = ms.temperature;
-      if (!st.top_p) st.top_p = ms.top_p;
-      if (!st.top_k) st.top_k = ms.top_k;
-      if (!st.repetition_penalty) st.repetition_penalty = ms.repetition_penalty;
+      // 【2026-11-16 修 D-7 —— 「0」是合法取值，不能用 falsy 判空】
+      // 旧实现用 `if (!st.temperature)` 判「用户没设过」。
+      // 但温度滑杆的量程是 **0~3**（index.html:681）—— 0 是合法取值
+      // （确定性采样），却是 falsy -> 被当成「没设过」-> 静默回默认 0.8。
+      // 用户把温度拖到 0 -> 刷新 -> 变回 0.8。
+      //
+      // 修法：只判 null / undefined（真正的「没设过」）。
+      // top_p / top_k / repetition_penalty 的合法下界分别是
+      // 0.05 / 1 / 0.1（都非 0），但**同样**改成显式判空 ——
+      // 否则哪天量程放宽到 0，会踩同一个坑。
+      if (st.temperature == null) st.temperature = ms.temperature;
+      if (st.top_p == null) st.top_p = ms.top_p;
+      if (st.top_k == null) st.top_k = ms.top_k;
+      if (st.repetition_penalty == null) st.repetition_penalty = ms.repetition_penalty;
       saveState();
       return true;
     } catch (e) {
