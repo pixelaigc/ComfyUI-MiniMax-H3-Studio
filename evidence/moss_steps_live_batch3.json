@@ -1,0 +1,51 @@
+{
+  "job_id": "e2867455e09c",
+  "submitted_steps": 100,
+  "batch_count": 3,
+  "status": "done",
+  "stored_params": {
+    "steps": 100,
+    "cfg": 3.0,
+    "shift": 5.0,
+    "sampler": "euler",
+    "scheduler": "sgm_uniform",
+    "seed": 2081206678357
+  },
+  "normalize_notes": null,
+  "comfy_ksampler_nodes": [
+    {
+      "node": "moss:16",
+      "steps": 100,
+      "cfg": 3.0,
+      "sampler_name": "euler",
+      "scheduler": "sgm_uniform",
+      "seed": 2081206678357,
+      "denoise": 1.0
+    }
+  ],
+  "outputs": [
+    {
+      "kind": "image",
+      "file": "images/i-zimage-000228.png",
+      "name": "moss_e2867455e09c_ecebd38c7652_00001_.png",
+      "width": 1360,
+      "height": 768
+    },
+    {
+      "kind": "image",
+      "file": "images/i-zimage-000229.png",
+      "name": "moss_e2867455e09c_20487aea37fe_00001_.png",
+      "width": 1360,
+      "height": 768
+    },
+    {
+      "kind": "image",
+      "file": "images/i-zimage-000230.png",
+      "name": "moss_e2867455e09c_04cd35c72010_00001_.png",
+      "width": 1360,
+      "height": 768
+    }
+  ],
+  "problems": [],
+  "verdict": "PASS"
+}

@@ -102,18 +102,27 @@ def comfy_prompt_for(job_id: str) -> dict:
 
     【为什么这是权威证据】/history 里的内容是 ComfyUI **真正收到并
     执行**的 prompt —— 不是我们自己 build 出来的 dict，也不是落库记录。
+
+    【ComfyUI 的 prompt 结构】
+    ``entry["prompt"]`` 是一个列表：
+        [prompt_number, prompt_id, {node_id: node}, extra, outputs_to_execute]
+    —— 节点表在**下标 2**（不是 1！下标 1 是 prompt_id 字符串）。
     """
     history = _get(COMFY + "/history")
     for _pid, entry in history.items():
-        prompt = entry.get("prompt") or []
-        # prompt 形如 [number, {node_id: node}, extra, outputs]
-        if isinstance(prompt, list) and len(prompt) > 1 and isinstance(prompt[1], dict):
-            nodes = prompt[1]
-            for nid, node in nodes.items():
-                inputs = node.get("inputs") or {}
-                prefix = inputs.get("filename_prefix") or ""
-                if job_id in str(prefix):
-                    return nodes
+        prompt = entry.get("prompt")
+        if not isinstance(prompt, list) or len(prompt) < 3:
+            continue
+        nodes = prompt[2]
+        if not isinstance(nodes, dict):
+            continue
+        for nid, node in nodes.items():
+            if not isinstance(node, dict):
+                continue
+            inputs = node.get("inputs") or {}
+            prefix = inputs.get("filename_prefix") or ""
+            if job_id in str(prefix):
+                return nodes
     return {}
 
 
