@@ -49,12 +49,22 @@ echo "无冲突"
 
 echo
 echo "=== 2) 造合并提交（基于 live 最新 tip）==="
-git checkout -B tmp/merge-cr4 local/deploy/qwen-ref-assets-live
-git merge --no-ff "$BRANCH" \
-  -m "merge(audit-cr4): 第4轮代码审查收口 —— 切模式清槽位状态 + 重建如实回填 + 提交兜底 + 步数/尺寸双轨收敛
+# 【为什么不用 git checkout -B】live worktree 里有大量未跟踪文件
+# （audits/ evidence/ docs/ 等，都是别人的取证产物），
+# `git checkout -B` 会尝试切分支并被未跟踪文件阻塞。
+# 改用 `git commit-tree` 在**不碰任何 worktree** 的前提下造合并提交：
+#   tree   = git merge-tree 的结果
+#   parents = live tip + 审查分支
+#   message = 合并说明
+MERGE_TREE=$(cat /tmp/cr4_mergetree.txt)
+MERGE_COMMIT=$(git commit-tree "$MERGE_TREE" \
+  -p local/deploy/qwen-ref-assets-live \
+  -p "$BRANCH" \
+  -F - <<'MSG'
+merge(audit-cr4): 第4轮代码审查收口 —— 切模式清槽位状态 + 重建如实回填 + 提交兜底 + 步数/尺寸双轨收敛
 
 基线：live 3380f37（含 8190 event-loop 阻塞修复）
-合并：local/feature/code-review-20261115（0de2afb + a03c248）
+合并：local/feature/code-review-20261115（0de2afb + a03c248 + b7a4ec6）
 
 本轮修复（全部有现场实测证据）：
 - B-3【High】切模式不清 state.files / state.assetRefs（幽灵输入根因）
@@ -70,11 +80,11 @@ git merge --no-ff "$BRANCH" \
 
 验证：新增 tests/test_slot_state_reset.py（6 用例）+ 变异 12/12 全捕获；
 回归对跑：基线 15 failed / 1427 passed -> 本轮 14 failed / 1434 passed
-（新增失败 0 条，额外修好 1 条）；浏览器 12 面板 console 报错 0。" || { echo "!! 合并冲突"; exit 1; }
-MERGE_COMMIT=$(git rev-parse HEAD)
-git log --oneline -1
-git checkout "$BRANCH"
-git branch -D tmp/merge-cr4
+（新增失败 0 条，额外修好 1 条）；浏览器 12 面板 console 报错 0。
+MSG
+)
+echo "MERGE_COMMIT=$MERGE_COMMIT"
+git log --oneline -1 "$MERGE_COMMIT"
 
 echo
 echo "=== 3) 原子移动分支指针 ==="
