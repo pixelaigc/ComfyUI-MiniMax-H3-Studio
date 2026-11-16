@@ -324,7 +324,12 @@ OK  抓住了 M9 模型表族标记漏掉（param_family 不再打）           
 | 基线 run 1 | `46838de`（`/root/projects/h3s-imgparams-baseline`） | 12 | 3290 | 34m09s |
 | **基线 run 2** | `46838de`（同上） | **11** | 3291 | 33m59s |
 | 改动后 run 1 | 本轮分支 tip | 16 | 3363 | 55m41s |
-| **改动后 run 2** | 本轮分支 tip | **11** | 3368 | 35m47s |
+| 改动后 run 2 | 本轮分支 tip | 11 | 3368 | 35m47s |
+| **改动后 run 3（最终，含视频族修复）** | 本轮分支 tip | **12** | **3388** | 24m50s |
+
+> 说明：run 1 跑在**只有图像族修复**的中间状态上；run 3 才是**图像族 + 视频族/音乐族
+> 全部修复**后的最终状态 —— 它与基线 run 2 的失败数一致（12 vs 11，差的那 1 条是
+> `test_page_size` 这条自身不稳定的 flaky，基线同代码连跑两次分别是 1 failed / 22 passed）。
 
 **基线 run 2 与改动后 run 2 同为 11 条失败**，逐条集合比对：
 
@@ -353,6 +358,37 @@ OK  抓住了 M9 模型表族标记漏掉（param_family 不再打）           
 **结论：新增失败 = 0。**
 两次「候选新增」全部是**依赖共享可变状态 / 浏览器时序**的既有 flaky，
 在本分支上**隔离跑全部通过**，且其中一条已由并行任务在 `1dcfdf8` 正式修好。
+
+### 5.5·二 最终一轮（run 3）的逐条核对
+
+最终一轮 **12 failed / 3388 passed**。把这 12 条与基线**同一批文件**的失败逐条对比：
+
+```
+=== 基线（46838de）失败集合 ===
+FAILED tests/test_d11_defect_a_conversion.py::...::test_d2_not_available_and_incompatible
+FAILED tests/test_d11_moss_lora_final.py::...::test_d2_is_not_in_available_and_is_incompatible
+FAILED tests/test_lora_file_integrity.py::...::test_real_damaged_files_are_rejected_by_generic_reader
+FAILED tests/test_lora_file_integrity.py::...::test_real_damaged_files_not_surfaced_as_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::...::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::...::test_d2_not_in_moss_available_list
+FAILED tests/test_panel_fallback.py::...::test_fallback_covers_all_server_models
+FAILED tests/test_studio.py::...::test_scanner_only_returns_z_image_loras
+（本分支：完全相同的 8 条 + 4 条浏览器/共享库 flaky）
+```
+
+**新增失败 = 0**：这 8 条在基线与本分支上**逐字相同**（本机 LoRA 权重真实损坏状态、
+兜底清单缺 `ref2va_*` 等既有缺陷）；另外 4 条是 `test_page_size` /
+`test_agent_paste_browser` / `test_enhance_*` 这类**依赖共享可变状态与浏览器时序**的 flaky。
+
+### 5.5·三 本轮自己引入并修掉的两个「自己造成的回归」
+
+诚实记录（都由本轮改动引起、已修、且都有回归护栏）：
+
+| # | 问题 | 后果 | 修法 + 护栏 |
+|---|---|---|---|
+| 1 | 编辑 `web/index.html` 时把 **CRLF 行尾转成 LF** | 整个文件在 git diff 里全变（**伪冲突**），且 `test_yue2_flow_review_fixes` 两条 CRLF 契约断言变红 | 恢复 CRLF；`git diff` 现在只剩 3 行（`?v=` 版本号）。`tests/test_yue2_flow_review_fixes.py::TestCrlfFilesStayCrlf` 钉住 |
+| 2 | D-1/D-6 的**注释过长**，把 `loadVideoOptions` 的外层 `catch` 推出 `test_panel_fallback` 的 4000/2500 字符定位窗口 | 两条 catch 契约断言变红（代码本身没问题，是窗口被挤掉了） | 收敛注释长度，catch 回到窗口内；细节移入本报告 |
+| 3 | D-2 第一版给 `const merged` **整体重新赋值** | `TypeError` 被外层 try/catch 吞掉 -> **整段配置恢复静默失效**（页面零报错），看起来像 D-1 没修好 | 改 `let` + `Object.assign`；新增 `test_apply_config_merged_is_mutable` 断言 + 变异自证 M2b |
 
 ### 5.5 既有失败（两边一致，与本轮无关）
 
@@ -397,13 +433,18 @@ $ pytest tests/test_image_param_ranges.py tests/test_cr5_c_segment.py \
 ### 本轮提交链
 
 ```
-c5c07ce  fix(MOSS-Image): 采样参数量程前后端同源 —— 面板 steps=100 不再被夹回 50
-2840094  docs(MOSS-Image): 参数生效性修复报告 + 线上实测证据
-e9e3f61  verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标
-74d8ea2  fix(视频族+音乐族): 面板改值被静默覆盖的 8 处断链（并行审计 D-1~D-8）
-56152fd  fix(web): 抬升前端资源版本号 —— 让浏览器拿到修好的 JS
-370ae98  fix(视频族): D-2 第一版有 const 重新赋值 —— 整段配置恢复静默失效
-82d2b9e  verify(视频族): 真实浏览器取证脚本 —— D-1/D-2 修复前后各跑一遍
+  547c15c fix(web/video-panel.js): 收敛注释长度 —— 保持 catch 块在既有契约窗口内
+  adfa29a fix(web/index.html): 恢复 CRLF 行尾 —— 编辑时 LF 化会造成伪冲突
+  923f1db evidence(视频族): D-1/D-2 修复后的真实浏览器实测 JSON（NO-DEFECT-FOUND）
+  fabc112 docs(MOSS-Image): 报告补上视频族/音乐族 8 处断链的修复与实测证据
+  82d2b9e verify(视频族): 真实浏览器取证脚本 —— D-1/D-2 修复前后各跑一遍
+  370ae98 fix(视频族): D-2 的第一版实现有 const 重新赋值 —— 整段配置恢复静默失效
+  56152fd fix(web): 抬升前端资源版本号 —— 让浏览器拿到修好的 video-panel/music/app.js
+  74d8ea2 fix(视频族+音乐族): 面板改值被静默覆盖的 8 处断链（并行审计 D-1~D-8）
+  842f6c4 docs(MOSS-Image): 报告补上 4 轮回归实测数据与浏览器证据
+  e9e3f61 verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标
+  2840094 docs(MOSS-Image): 参数生效性修复报告 + 线上实测证据
+  c5c07ce fix(MOSS-Image): 采样参数量程前后端同源 —— 面板 steps=100 不再被夹回 50
 ```
 
 （`ff3f832` 是 rebase 前的中间 WIP 提交，已被 amend 进 `c5c07ce`。）
