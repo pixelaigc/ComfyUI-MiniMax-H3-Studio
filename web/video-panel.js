@@ -977,7 +977,19 @@
     // 【2026-11-12】shift 节点本机不可用时 —— 滑杆必须**禁用**，
     // 不能留一个「能拖但服务端会丢掉」的假控件。
     // （本机实测该节点是 ComfyUI 核心节点恒在，但按「节点真在」原则处理。）
-    const shiftAvailable = cfg.sigma_shift_available !== false;
+    //
+    // 【2026-11-16 修 D-6 —— 读错了层级，禁用判据恒不生效】
+    // 后端把 `sigma_shift_available` 放在 payload **顶层**
+    // （h3studio/video_models.py:2396），而 `cfg` 在这里是
+    // `samplingCfg()` = `VIDEO_OPTIONS.sampling`（**子对象**）。
+    // 旧实现读 `cfg.sigma_shift_available` -> 恒 undefined
+    // -> `undefined !== false` -> **恒 true** -> 滑杆永远不禁用。
+    //
+    // 修法：优先读顶层（VIDEO_OPTIONS.sigma_shift_available），
+    // 保留对 sampling 子对象的兼容（万一后端改位置）。
+    const shiftAvailable = (VIDEO_OPTIONS.sigma_shift_available !== undefined
+      ? VIDEO_OPTIONS.sigma_shift_available
+      : cfg.sigma_shift_available) !== false;
     [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
     if (svHint) {
       svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
@@ -1122,6 +1134,33 @@
     }
     const tpSampler = document.getElementById("vidTwopassSampler");
     if (tpSampler) tpSampler.value = "euler";
+
+    // 【2026-11-16 修 D-3 —— 主采样器下拉在二采开启时必须置灰】
+    // SelfLift 节点只支持标准 Euler，所以二采开启时工作流里的
+    // KSamplerSelect 是**写死 euler** 的（h3studio/video_workflow.py:779
+    // `forced_sampler = "euler"`；flf/r2v 同理见 h3_video_modes.py:308）。
+    //
+    // 旧实现不管这个：主流采样器下拉 `#vidSamplerSelect` 照常可拖，
+    // 用户选 dpm_2 -> 后端**保留**用户的 sampler（不报错、不夹回）
+    // -> 落库与参数卡都显示「采样器 dpm_2」-> 实际跑的却是 euler。
+    // **界面说谎**。
+    //
+    // 修法：二采开启时把主采样器下拉**置灰 + 说明原因**。
+    // 不改后端（euler 是节点硬约束，不是可以协商的参数），
+    // 改的是「让界面如实反映实际执行」。
+    const mainSampler = document.getElementById("vidSamplerSelect");
+    const twopassOn = !!videoState.twopass.enabled && nodeOk;
+    if (mainSampler) {
+      mainSampler.disabled = twopassOn;
+      mainSampler.title = twopassOn
+        ? "二采（SelfLift）只支持标准 Euler 采样器 —— 开启二采时实际使用 euler"
+        : "";
+    }
+    const mainSamplerHint = document.getElementById("vidSamplerHint");
+    if (mainSamplerHint && twopassOn) {
+      mainSamplerHint.textContent = "二采固定 euler";
+      mainSamplerHint.title = "二采（SelfLift）节点只支持标准 Euler 采样器";
+    }
 
     if (note) {
       const bits = [cfg.note || ""];
@@ -1464,13 +1503,33 @@
     }
     // 当前模式的专属片段（若有）优先于顶层字段 ——
     // 顶层字段是老配置（只有 t2v 一套）的兼容路径。
+    //
+    // 【2026-11-16 修 D-2 —— 顶层字段被 mode_configs 整块盖掉】
+    // 旧实现：只要 mode_configs[当前模式] 存在，就用它并 return，
+    // **完全忽略**调用方传入的顶层字段。
+    // 于是「复用参数」（app.js 的 reuseConfigFromJob 传的是**平铺**的
+    // steps/sampler/scheduler/shift_video/shift_audio）会被面板**自己上次**
+    // 的 mode_configs 覆盖 -> 用户点「复用参数」看到的是面板旧状态，
+    // 不是那条任务的参数。
+    //
+    // 实测（修复前，线上真实浏览器）：把面板改成 7 步 -> 点某条任务的
+    // 「复用参数」（那条任务是 4 步）-> 面板仍是 7 步（期望 4）。
+    //
+    // 【修法】顶层字段**优先**；mode_configs 里当前模式的片段只补充
+    // 顶层没给的字段（尺寸类字段顶层不给，只能靠 mode_configs）。
+    // 「复用参数」走的就是顶层路径 -> 用户的意图被尊重；
+    // 载入保存配置（saved）时顶层本来就没有采样档 ->
+    // 仍会落到 mode_configs 的片段上，行为不变。
     const modeKey = videoState.mode || "t2v";
     const modeCfg = (videoState.modeConfigs || {})[modeKey];
-    if (modeCfg && typeof modeCfg === "object") {
-      applyModeConfig(modeCfg);
-      return;
+    const merged = {};
+    if (modeCfg && typeof modeCfg === "object") merged = { ...modeCfg };
+    // 顶层字段覆盖 mode_configs 的片段（顶层 = 调用方的显式意图）
+    for (const key of Object.keys(cfg)) {
+      if (key === "mode_configs") continue;
+      merged[key] = cfg[key];
     }
-    applyModeConfig(cfg);
+    applyModeConfig(merged);
   }
 
   /** 把一份配置片段落到状态上（顶层字段与 mode_configs 片段共用）。 */
@@ -1802,7 +1861,27 @@
           // （= 用户从没手动调过）=> 按当前加速 LoRA 的推荐档重算一次，
           // 否则「不挂加速 LoRA」的首屏仍然是 4 步蒸馏档。
           // 若保存的配置里带 steps，则那是用户自己的选择，**不覆盖**。
-          if (saved.steps == null) recomputeSamplingForAccel();
+          //
+          // 【2026-11-16 修 D-1 —— 守卫读错了层级】
+          // 采样档是存在 **mode_configs[当前模式]** 里的（collectConfig() 的
+          // 顶层不写 steps —— 三个视频模式共用面板，采样档按模式存才对）。
+          // 旧实现读的是顶层 `saved.steps` -> 恒为 undefined -> **条件恒真**
+          // -> 每次刷新都无条件调 recomputeSamplingForAccel()，
+          // 把用户改的步数/采样器/调度器覆写成加速 LoRA 的推荐档。
+          //
+          // 实测（修复前，线上真实浏览器）：用户把步数改成 30 -> 保存 ->
+          // 刷新 -> 面板变回 4 步 / euler / beta。
+          // 与 MOSS-Image 那条「前端允许、后端夹回」是同一类形态：
+          // 面板上显示的值与真正生效的值不是一回事。
+          //
+          // 【修法】守卫改读 mode_configs 里的**当前模式**片段；
+          // 老配置（顶层就有 steps）也一并兼容。
+          const savedModeKey = videoState.mode || "t2v";
+          const savedModeCfg = (saved.mode_configs
+                               && saved.mode_configs[savedModeKey]) || {};
+          const savedSteps = savedModeCfg.steps != null
+            ? savedModeCfg.steps : saved.steps;
+          if (savedSteps == null) recomputeSamplingForAccel();
         }
       } catch (e) { /* 没有保存过配置，用默认值 */ }
 

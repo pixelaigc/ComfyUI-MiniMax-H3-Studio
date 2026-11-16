@@ -2289,6 +2289,49 @@ def json_ok(payload=None, **kw):
     return web.json_response(payload)
 
 
+def _video_note(params: dict, field: str, raw, effective, why: str = "") -> None:
+    """记一条视频族归一说明（「改了什么、为什么」）。
+
+    【为什么需要 —— 2026-11-16 修 D-8】
+    视频族的 ``normalize_t2v_params`` 里有三处**静默**改写：
+      * steps 越界 -> 夹到 [1, 50]
+      * sampler / scheduler 不在本机 COMBO 清单里 -> 回落到默认档
+      * twopass.transition_step 被步数档的 sigma 表长度夹回
+      * twopass.rho=0 且不用放大器 -> 提到 0.6（否则节点直接 reject）
+    这些改写此前**不留任何痕** -> 参数卡显示的回落值与用户填的值
+    对不上，用户无从判断原因。
+
+    图像族已经有同一套机制（``gen_normalize`` 的 ``params["normalize_notes"]``），
+    这里沿用**同样的字段名与同样的展示入口**（任务详情的「参数已调整」行），
+    两族口径一致。
+
+    【只在真的改了值时才记】
+    合法值一个字节都不动 —— 契约与图像族 R1 相同。
+    """
+    if not isinstance(params, dict):
+        return
+    if raw is None:
+        return
+    # 值没变 -> 不是一次「改动」，不记
+    try:
+        if isinstance(raw, (int, float)) and isinstance(effective, (int, float)):
+            if float(raw) == float(effective):
+                return
+        elif str(raw).strip() == str(effective).strip():
+            return
+    except (TypeError, ValueError):
+        pass
+    note = f"{field}：{raw!r} 不是合法取值，已改用 {effective!r}"
+    if why:
+        note += why
+    notes = params.get("normalize_notes")
+    if not isinstance(notes, list):
+        notes = []
+    if note not in notes:
+        notes.append(note)
+    params["normalize_notes"] = notes
+
+
 def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     """视频面板参数的**服务端归一**（唯一入口）。
 
@@ -2652,6 +2695,14 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
         transition = int(twopass.get("transition_step")
                          or video_models.VIDEO_TWOPASS["transition_step_default"])
         if transition < 1 or transition > max_transition:
+            # 【2026-11-16 修 D-8 —— 静默夹回要留痕】
+            # 夹回是**必要**的（SelfLift 的硬约束），但「用户拖了 6、
+            # 实际跑 3」这件事必须让用户看得见，否则参数卡与面板对不上，
+            # 用户无从判断原因。归一说明记进 params["normalize_notes"]，
+            # 由任务详情展示（与图像族同一套机制）。
+            _video_note(out, "twopass.transition_step", transition,
+                        max(1, min(transition, max_transition)),
+                        "（上限受当前步数档的 sigma 表长度限制）")
             transition = max(1, min(transition, max_transition))
         lowres = float(twopass.get("lowres_scale")
                        or video_models.VIDEO_TWOPASS["lowres_scale_default"])
@@ -2661,6 +2712,9 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
             or video_models.VIDEO_TWOPASS["upscaler_default"]
         if rho <= 0 and upscaler == "none":
             # SelfLift 节点会直接 raise：两条路都关掉了
+            # 【2026-11-16 修 D-8】同样是静默改写 —— 留痕。
+            _video_note(out, "twopass.rho", rho, 0.6,
+                        "（ρ=0 且不使用放大器会被 SelfLift 节点拒绝）")
             rho = 0.6
         w_min = float(twopass.get("w_min", video_models.VIDEO_TWOPASS["w_min_default"]))
         w_max = float(twopass.get("w_max", video_models.VIDEO_TWOPASS["w_max_default"]))
@@ -2736,6 +2790,14 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
         params.get("sampler"), _default_sampler)
     out["scheduler"] = video_models.normalize_scheduler(
         params.get("scheduler"), _default_scheduler)
+    # 【2026-11-16 修 D-8 —— 越界回落要留痕】
+    # 这三个值被夹回时（用户传了越界 steps / 不存在的采样器 / 调度器），
+    # 此前**完全没有说明** -> 参数卡显示的回落值与用户填的值对不上，
+    # 用户无从判断原因。现在统一记进 params["normalize_notes"]，
+    # 由任务详情展示（与图像族 gen_normalize 同一套机制）。
+    _video_note(out, "steps", params.get("steps"), steps)
+    _video_note(out, "sampler", params.get("sampler"), out["sampler"])
+    _video_note(out, "scheduler", params.get("scheduler"), out["scheduler"])
     # 标准路径 CFG：固定 1.0（见 video_models.VIDEO_CFG_FIXED_REASON）
     out["cfg"] = video_models.VIDEO_CFG_FIXED
 
