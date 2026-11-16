@@ -24,6 +24,7 @@ cd "$REPO"
 DEPLOY_FILES=(
   server.py
   h3studio/agent.py
+  h3studio/music_yue2.py
   h3studio/asset_ref_guard.py
   h3studio/seed_guard.py
   web/app.js
