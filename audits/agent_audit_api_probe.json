@@ -1,0 +1,339 @@
+{
+ "tools": {
+  "http": 200,
+  "count": 33,
+  "names": [
+   "search_assets",
+   "list_modes",
+   "describe_asset",
+   "enhance_prompt",
+   "create_job",
+   "respond",
+   "upload_asset",
+   "delete_asset",
+   "tag_asset",
+   "list_asset_tags",
+   "cancel_job",
+   "retry_job",
+   "batch_create_jobs",
+   "list_jobs",
+   "get_job_status",
+   "list_prompt_presets",
+   "get_prompt_preset",
+   "describe_mode_params",
+   "get_mode_schema",
+   "recall_memory",
+   "search_conversations",
+   "search_asset_history",
+   "remember_preference",
+   "manage_media_library",
+   "read_file",
+   "web_search",
+   "run_code",
+   "media_probe",
+   "media_concat",
+   "media_transcode",
+   "media_extract_frames",
+   "media_mix_audio",
+   "media_merge_av"
+  ],
+  "disabled": [
+   "run_code"
+  ],
+  "caps": [
+   "code_exec",
+   "file_read",
+   "media_tools",
+   "web_search"
+  ],
+  "limits": {
+   "max_steps": 50,
+   "max_steps_cap": 50,
+   "max_tool_calls": 120,
+   "total_timeout": 2400.0,
+   "step_timeout": 482.88,
+   "max_concurrent": 2,
+   "no_tool_retry": 1,
+   "tool_retry": 1,
+   "repeat_limit": 3
+  },
+  "events": [
+   "token",
+   "tool_call",
+   "tool_result",
+   "job",
+   "done",
+   "error",
+   "progress",
+   "result"
+  ]
+ },
+ "settings_get": {
+  "http": 200,
+  "keys": [
+   "capabilities",
+   "dependencies",
+   "gen_defaults",
+   "gen_defaults_spec",
+   "limits",
+   "search_engines",
+   "settings",
+   "t2v_defaults",
+   "t2v_options"
+  ],
+  "capabilities": {
+   "file_read": {
+    "key": "file_read",
+    "label": "文件读取",
+    "builtin": true,
+    "requires": "无（受 file_roots 路径白名单限制）",
+    "description": "读取工作台/仓库/素材库派生目录下的文本文件，供 Agent 查配置、日志、脚本。",
+    "enabled": true
+   },
+   "web_search": {
+    "key": "web_search",
+    "label": "外部搜索",
+    "builtin": true,
+    "requires": "网络可达的搜索引擎（DDG 或局域网 9898 聚合引擎）",
+    "description": "按配置的搜索引擎做外部检索，把结果作为参考资料。",
+    "enabled": true
+   },
+   "code_exec": {
+    "key": "code_exec",
+    "label": "代码生成与执行",
+    "builtin": true,
+    "requires": "无（默认关闭，需用户显式启用）",
+    "description": "运行一段 Python 代码并拿回 stdout/stderr。有副作用，默认关闭。",
+    "enabled": false
+   },
+   "media_tools": {
+    "key": "media_tools",
+    "label": "ffmpeg 音视频处理",
+    "builtin": true,
+    "requires": "本机 ffmpeg / ffprobe（见 ffmpeg_path）",
+    "description": "音视频合并拼接、转码、抽帧、混音、AV 合流（真实调用本机 ffmpeg，非模拟）。",
+    "enabled": true
+   }
+  },
+  "gen_defaults_modes": [
+   "a2a",
+   "flf",
+   "i2i_h3image",
+   "i2i_qwen",
+   "r2v",
+   "t2a",
+   "t2i",
+   "t2i_h3image",
+   "t2i_moss",
+   "t2i_qwen",
+   "t2v"
+  ],
+  "gen_defaults_spec_modes": [
+   "a2a",
+   "flf",
+   "i2i_h3image",
+   "i2i_qwen",
+   "longfilm",
+   "r2v",
+   "t2a",
+   "t2i",
+   "t2i_h3image",
+   "t2i_moss",
+   "t2i_qwen",
+   "t2v"
+  ],
+  "limits": {
+   "max_steps": 50,
+   "max_steps_cap": 50,
+   "max_tool_calls": 120,
+   "total_timeout": 2400,
+   "total_timeout_min": 60,
+   "total_timeout_max": 14400
+  },
+  "dependencies": {
+   "ffmpeg_path": "/usr/bin/ffmpeg",
+   "ffprobe_path": "/usr/bin/ffprobe",
+   "ffmpeg_available": true
+  },
+  "t2v_options_keys": [
+   "accels",
+   "aspects",
+   "attentions",
+   "models"
+  ]
+ },
+ "settings_put_roundtrip": {
+  "http": 200,
+  "body": "{\"ok\": true, \"settings\": {\"max_steps\": 50, \"capabilities\": {\"file_read\": true, \"web_search\": true, \"code_exec\": false, \"media_tools\": true}, \"search_engines\": [{\"id\": \"local_9898\", \"name\": \"局域网聚合引擎（9898）\", \"type\": \"openwebui\", \"url\": \"http://127.0.0.1:9898/api/openwebui/tools/search_general\", \"method\": \"POST\", \"enabled\": true}, {\"id\": \"ddg\", \"name\": \"DuckDuckGo（经 9898 代理）\", \"type\": \"custom\", \"url\": \"http://127.0.0.1:9898/api/openwebui/search/ddg\", \"method\": \"POST\", \"enabled\": true}, {\"id\": \"ddg_direct\", \"name\": \"DuckDuckGo（直连，可能被反爬拦截）\", \"type\": \"ddg\", \"url\": \"https://html.duckduckgo.com/html/\""
+ },
+ "test_engine_local9898": {
+  "http": 200,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "ok": true,
+   "engine": "局域网聚合引擎（9898）",
+   "engine_type": "openwebui",
+   "url": "http://127.0.0.1:9898/api/openwebui/tools/search_general",
+   "result_count": 1,
+   "note": "连通性正常（真发了一次请求）",
+   "status": 200
+  }
+ },
+ "test_engine_missing": {
+  "http": 404,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "error": "找不到搜索引擎 no_such_engine",
+   "code": "not_found"
+  }
+ },
+ "test_engine_ddg_direct": {
+  "http": 200,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "ok": false,
+   "engine": "DuckDuckGo（直连，可能被反爬拦截）",
+   "error": "所有搜索引擎都没成功：\n- DuckDuckGo（直连，可能被反爬拦截）: DuckDuckGo 返回 HTTP 202",
+   "status": 502
+  }
+ },
+ "memory_get": "{\"http\": 200, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"memories\": [{\"key\": \"audit_tmp_20261116\", \"scope\": \"global\", \"value\": \"probe\", \"source\": \"http\", \"updated_at\": 1794821798.048803}, {\"key\": \"acceptance_probe_tmp\", \"scope\": \"global\", \"value\": \"tmp\", \"source\": \"tool:remember_preference\", \"updated_at\": 1794713255.2358553}], \"total\": 2, \"stats\": {\"total\": 2, \"global\": 2, \"session_scoped\": 0, \"max_entries\": 500, \"max_value_chars\": 2000}}}",
+ "memory_set": {
+  "http": 200,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "key": "audit_probe_key",
+   "scope": "global",
+   "value": "v1",
+   "created": true,
+   "evicted": 0
+  }
+ },
+ "memory_get_after": "{\"http\": 200, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"memories\": [{\"key\": \"audit_probe_key\", \"scope\": \"global\", \"value\": \"v1\", \"source\": \"http\", \"updated_at\": 1794821917.6614676}], \"total\": 1, \"stats\": {\"total\": 3, \"global\": 3, \"session_scoped\": 0, \"max_entries\": 500, \"max_value_chars\": 2000}}}",
+ "session_create": {
+  "http": 200,
+  "session_id": "f73278ccdbe845a0"
+ },
+ "session_get": "{\"http\": 200, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"session_id\": \"f73278ccdbe845a0\", \"title\": \"\", \"messages\": [], \"jobs\": []}}",
+ "session_jobs": "{\"http\": 200, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"session_id\": \"f73278ccdbe845a0\", \"jobs\": [], \"count\": 0}}",
+ "session_list": "{\"http\": 200, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"sessions\": [{\"id\": \"f73278ccdbe845a0\", \"title\": \"新会话\", \"preview\": \"\", \"created_at\": 1794821917.6669383, \"updated_at\": 1794821917.6669383, \"message_count\": 0, \"status\": \"empty\", \"status_label\": \"空会话\", \"artifact_count\": 0, \"pending_count\": 0}, {\"id\": \"b2c98a13b2b94c36\", \"title\": \"新会话\", \"preview\": \"\", \"created_at\": 1794821784.189204, \"updated_at\": 1794821784.189204, \"message_count\": 0, \"status\": \"empty\", \"status_label\": \"空会话\", \"artifact_count\": 0, \"pending_count\": 0}, {\"id\": \"accept-c-tool-get_job_status-1794791639\", \"title\": \"请调用工具 get_job_status（参数：{\\\"job_id\\\": \\\"8771\", \"preview\": \"请调用工具 get_job_status（参数：{\\\"job_id\\\": \\\"8771898a7480\\\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。\", \"created_at\": 1794791639.6619277, \"updated_at\": 179479",
+ "media_status_missing": {
+  "http": 200,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "asset_id": "nonexist",
+   "status": "failed",
+   "stage": "",
+   "progress": 0,
+   "message": "素材不存在",
+   "available": false,
+   "description": "",
+   "tags": [],
+   "kind": "",
+   "duration_sec": null,
+   "width": null,
+   "height": null,
+   "error": "素材不存在"
+  }
+ },
+ "chat_no_message": {
+  "http": 400,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "error": "请输入要处理的内容",
+   "code": "bad_request"
+  }
+ },
+ "chat_bad_json": {
+  "http": null,
+  "note": "见 raw probe"
+ },
+ "chat_sse_body_stream": {
+  "http": 200,
+  "ctype": "text/event-stream; charset=utf-8",
+  "events": [
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event"
+  ],
+  "raw_head": "event: progress\ndata: {\"type\": \"progress\", \"stage\": \"start\", \"detail\": \"\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 5}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 1/50 步\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 5}\n\n: keep-alive\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"tool\", \"detail\": \"正在读取可用生成模式\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 8561}\n\nevent: tool_call\ndata: {\"tool\": \"list_modes\", \"args\": {}, \"call_id\": \"call_9d59ff981aed40c99e3c9108\", \"type\": \"tool_call\", \"elapsed_ms\": 8561}\n\nevent: tool_result\ndata: {\"tool\": \"list_modes\", \"ok\": true, \"call_id\": \"call_9d59ff981aed40c99e3c9108\", \"summary\": \"已完成\", \"type\": \"tool_result\", \"elapsed_ms\": 8561}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 2/50 步\", \"done\": 1, \"total\": 50, \"elapsed_ms\": 8561}\n\n: keep-alive\n\n: keep-alive\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"tool\", \"detail\": \"正在整理结论\", \"done\": 1, \"total\": 50, \"elapsed_ms\": 16669}\n\nevent: tool_call\ndata: {\"tool\": \"respond\", \"args\": {\"summary\": \"本工作台共支持 11 个生成模式：\\n\\n**视频**：文生视频 t2v、首尾帧生成 flf（需首/尾帧素材）、参考图生成 r2v（需参考素材）\\n**图像**：Z-IMAGE 文生图 t2i、Qwen-Image 2.1 文生图 t2i_qwen、Qwen 图片编辑 i2i_qwen、MOSS-Imag"
+ },
+ "chat_sse_query_stream": {
+  "http": 200,
+  "ctype": "text/event-stream; charset=utf-8",
+  "events": [
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event",
+   "event"
+  ],
+  "raw_head": "event: progress\ndata: {\"type\": \"progress\", \"stage\": \"start\", \"detail\": \"\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 1}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 1/50 步\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 1}\n\n: keep-alive\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"tool\", \"detail\": \"正在读取提示词预设\", \"done\": 0, \"total\": 50, \"elapsed_ms\": 6066}\n\nevent: tool_call\ndata: {\"tool\": \"list_prompt_presets\", \"args\": {}, \"call_id\": \"call_65d448a9671e4db4b277f236\", \"type\": \"tool_call\", \"elapsed_ms\": 6066}\n\nevent: tool_result\ndata: {\"tool\": \"list_prompt_presets\", \"ok\": true, \"call_id\": \"call_65d448a9671e4db4b277f236\", \"summary\": \"共 14 个提示词预设\", \"type\": \"tool_result\", \"elapsed_ms\": 6066}\n\nevent: progress\ndata: {\"type\": \"progress\", \"stage\": \"thinking\", \"detail\": \"第 "
+ },
+ "chat_oneshot": {
+  "http": 200,
+  "keys": [
+   "answer",
+   "assets",
+   "attachments",
+   "clarify_hint",
+   "clarify_options",
+   "error",
+   "jobs",
+   "memory",
+   "notice",
+   "prompt",
+   "provider",
+   "provider_name",
+   "session_id",
+   "status",
+   "steps",
+   "usage"
+  ],
+  "status": "completed",
+  "steps": [
+   {
+    "tool": "list_asset_tags",
+    "ok": true,
+    "ms": 6630
+   },
+   {
+    "tool": "respond",
+    "ok": true,
+    "ms": 16490
+   }
+  ],
+  "answer_head": "已读取素材库标签统计：共 277 个标签。使用最多的前几个为「主体人物」(193)、「服装与配饰」(115)、「画面」(85)、「光线与色彩」(79)、「场景与环境」(79)、「冷色调为主」(78)、「独自站在桥上」(78)、「雨夜的石桥」(78)。另有大量纯色/RGB 色值类标签（如 FF0000、RGB近似值），看起来是测试或色卡素材留下的。需要的话我可以按这些标签检索素材，或帮你清理低价值的",
+  "usage": {
+   "steps": 2,
+   "tool_calls": 2,
+   "elapsed_ms": 23121
+  }
+ },
+ "session_delete": {
+  "http": 200,
+  "ctype": "application/json; charset=utf-8",
+  "json": {
+   "deleted": "f73278ccdbe845a0",
+   "ok": true,
+   "cleared_job_refs": 0
+  }
+ },
+ "session_get_after_delete": "{\"http\": 404, \"ctype\": \"application/json; charset=utf-8\", \"json\": {\"error\": \"会话不存在\", \"code\": \"not_found\"}}",
+ "memory_cleanup_probe": {
+  "note": "audit_probe_key 保留（memory 无删除端点）"
+ }
+}

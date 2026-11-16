@@ -1,0 +1,55 @@
+[
+ {
+  "name": "01-附件输入框存在",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "02-附件按钮存在",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "03-上传后出现附件卡片",
+  "ok": false,
+  "detail": {
+   "cards": 1,
+   "text": "图片\n128×128\n×"
+  }
+ },
+ {
+  "name": "04-拿到 asset_id",
+  "ok": true,
+  "detail": {
+   "asset_ids": [
+    "asset_8791bb7822fd"
+   ]
+  }
+ },
+ {
+  "name": "05-服务端素材状态可查",
+  "ok": true,
+  "detail": {
+   "status": "none",
+   "kind": "image",
+   "available": false,
+   "has_description": true
+  }
+ },
+ {
+  "name": "06-移除附件",
+  "ok": true,
+  "detail": {
+   "before": 1,
+   "after": 0,
+   "remove_btns": 1
+  }
+ },
+ {
+  "name": "07-无页面 JS 异常",
+  "ok": true,
+  "detail": {
+   "errors": []
+  }
+ }
+]

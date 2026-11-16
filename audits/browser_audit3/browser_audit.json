@@ -1,0 +1,173 @@
+[
+ {
+  "name": "01-Agent页可见",
+  "ok": true,
+  "detail": {
+   "agentPage_hidden_attr": "agent-page"
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/01_agent_page.png"
+ },
+ {
+  "name": "02-会话抽屉可打开",
+  "ok": true,
+  "detail": {
+   "session_items": 200
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/02_drawer.png"
+ },
+ {
+  "name": "03-新建会话",
+  "ok": true,
+  "detail": {
+   "before": 200,
+   "after": 200
+  },
+  "shot": null
+ },
+ {
+  "name": "04-会话搜索可用",
+  "ok": true,
+  "detail": {
+   "search_visible": true
+  },
+  "shot": null
+ },
+ {
+  "name": "05-流式正文渲染",
+  "ok": true,
+  "detail": {
+   "snippet": "我\n用雨夜素材做一个视频\nAgent\n完成\n已找到并下发任务。\n已下发的生成任务（1）\n文生视频\nauditjob0001\n生成中\n刷新\n雨夜里的桥\n比例 16:9\n分辨率 768p\n时长 5 秒\n工具调用（1）\n✓\nsearch_assets\n填入创作面板"
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/05_stream.png"
+ },
+ {
+  "name": "06-工具调用卡片",
+  "ok": true,
+  "detail": {
+   "tool_in_dom": true
+  },
+  "shot": null
+ },
+ {
+  "name": "07-作业卡片",
+  "ok": true,
+  "detail": {
+   "job_in_dom": true
+  },
+  "shot": null
+ },
+ {
+  "name": "05b-token增量累加",
+  "ok": true,
+  "detail": {
+   "text": "第一段，第二段，第三段"
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/05b_token.png"
+ },
+ {
+  "name": "08-澄清气泡",
+  "ok": true,
+  "detail": {
+   "options": [
+    "16:9",
+    "9:16"
+   ]
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/08_clarify.png"
+ },
+ {
+  "name": "09-错误条+重试按钮",
+  "ok": false,
+  "detail": {
+   "err_text": "Agent 执行失败：模型超时",
+   "has_retry_btn": false,
+   "retry_btn_text": ""
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/09_error_retry.png"
+ },
+ {
+  "name": "10-管理面板打开",
+  "ok": true,
+  "detail": {
+   "capability_checkboxes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "controls": 131,
+   "gen_default_sections": 12,
+   "max_steps_input": true
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/10_manage.png"
+ },
+ {
+  "name": "11-管理面板含能力开关",
+  "ok": true,
+  "detail": {
+   "checkboxes": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ]
+  },
+  "shot": null
+ },
+ {
+  "name": "12-管理面板含默认参数分区",
+  "ok": true,
+  "detail": {
+   "sections": 12
+  },
+  "shot": null
+ },
+ {
+  "name": "13-管理面板含步数上限",
+  "ok": true,
+  "detail": null,
+  "shot": null
+ },
+ {
+  "name": "14-搜索引擎自检按钮",
+  "ok": true,
+  "detail": {
+   "engine_ids": [
+    "local_9898",
+    "ddg",
+    "ddg_direct"
+   ]
+  },
+  "shot": null
+ },
+ {
+  "name": "15-本次会话产物面板",
+  "ok": true,
+  "detail": {
+   "text_head": "本次会话还没有产生任务。"
+  },
+  "shot": "/root/projects/h3studio-agent-audit/audits/browser_audit3/15_artifacts.png"
+ },
+ {
+  "name": "16-无 Agent 相关控制台错误",
+  "ok": true,
+  "detail": {
+   "agent_errors": [],
+   "all_console_errors_count": 5,
+   "all_console_errors_sample": [
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)"
+   ]
+  },
+  "shot": null
+ }
+]

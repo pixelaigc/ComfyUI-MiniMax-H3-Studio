@@ -7987,6 +7987,20 @@ async def api_agent_chat(request):
         return web.json_response({"error": "请求格式错误", "code": "bad_request"},
                                  status=400)
 
+    # 【2026-11-16 修：请求体必须是对象】
+    #
+    # 原来缺这道检查 -> 传一个**合法 JSON 数组**（[1,2]）时，
+    # 下面的 payload.get("stream") 抛 AttributeError，冒泡到 aiohttp
+    # 的兜底处理器 -> 返回 500 + aiohttp 默认错误页（不是本项目
+    # JSON 契约），还把 Python 栈信息泄给了客户端。
+    #
+    # 对照：PUT /api/agent/settings、POST /api/agent/settings/test-engine、
+    # POST /api/agent/sessions、POST /api/agent/memory 都有这道检查，
+    # 只有两个 chat 端点漏了。
+    if not isinstance(payload, dict):
+        return web.json_response({"error": "请求必须是对象", "code": "bad_request"},
+                                 status=400)
+
     # stream=1 -> 走 SSE（与 /api/agent/chat/stream 完全一致的契约）。
     #
     # 为什么要同一个端点也支持 stream：前端只需要一个 URL，
@@ -8116,6 +8130,11 @@ async def api_agent_chat_stream(request):
         payload = await request.json()
     except Exception:
         return web.json_response({"error": "请求格式错误", "code": "bad_request"},
+                                 status=400)
+
+    # 【2026-11-16 修：请求体必须是对象】—— 同 api_agent_chat 的说明。
+    if not isinstance(payload, dict):
+        return web.json_response({"error": "请求必须是对象", "code": "bad_request"},
                                  status=400)
 
     message = str(payload.get("message") or "").strip()
@@ -8771,6 +8790,14 @@ async def api_agent_memory_set(request):
     except Exception:
         return web.json_response({"error": "请求格式错误", "code": "bad_request"},
                                  status=400)
+    # 【2026-11-16 修：请求体必须是对象】
+    # 原来缺这道检查 -> 传一个**合法 JSON 数组**时，
+    # 下面的 payload.get("key") 抛 AttributeError -> 500 + 栈泄漏。
+    # （与 api_agent_chat / api_agent_chat_stream 同源缺陷，同批修复。）
+    if not isinstance(payload, dict):
+        return web.json_response({"error": "请求必须是对象", "code": "bad_request"},
+                                 status=400)
+
     key = str(payload.get("key") or "").strip()
     value = payload.get("value")
     scope = str(payload.get("scope") or "").strip() or None

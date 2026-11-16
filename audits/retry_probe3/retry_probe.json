@@ -1,0 +1,24 @@
+{
+ "A_http_500": {
+  "err_text": "服务端炸了",
+  "has_retry_btn": true,
+  "retry_btn_text": "重试",
+  "ag_error_count": 1,
+  "retry_btn_count": 1
+ },
+ "B_sse_error_event": {
+  "err_text": "Agent 执行失败：模型超时",
+  "has_retry_btn": true,
+  "retry_btn_text": "重试",
+  "ag_error_count": 2,
+  "retry_btn_count": 1
+ },
+ "C_sse_done_failed": {
+  "err_text": "Agent 执行失败：服务端返回 failed",
+  "has_retry_btn": true,
+  "retry_btn_text": "重试",
+  "ag_error_count": 3,
+  "retry_btn_count": 1
+ },
+ "failed_requests": []
+}

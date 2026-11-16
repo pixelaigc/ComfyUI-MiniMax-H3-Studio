@@ -724,6 +724,90 @@ class TestAgentFrontendEnhBrowser(unittest.TestCase):
         self.assertTrue(info["hasBtn"], "失败后没有重试入口")
         self.assertIn("重试", info["btnText"], "重试按钮没有文案")
 
+    def test_sse_error_event_keeps_retry_entry(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】
+        SSE `error` 事件（HTTP 200 + event:error）必须同样保留重试入口。
+
+        【为什么要有这条断言 —— 真实缺陷】
+        服务端把 Agent 执行失败发成 **SSE error 事件**，HTTP 状态是 200，
+        于是前端的 send() 走进「成功」分支 —— 而那条分支无条件执行
+        `msg.retryRequest = null`（web/agent.js）。于是：
+          * 红色错误条**正常显示**（msg.error 由 applyStreamEvent 设过）
+          * 但「重试」按钮**消失**（canRetry = !!msg.retryRequest 为假）
+        结果：用户看到失败却没有一键重发的入口，只能手打一遍。
+
+        已有用例 test_failure_shows_error_and_retry_button 只覆盖
+        **HTTP 500** 那条路径（fetch 抛错 -> catch 分支 -> 保留 retryRequest），
+        抓不到这条 SSE 事件路径 —— 所以缺陷能长期存活。
+
+        判据：这条消息自己（最后一条）必须同时有错误条和重试按钮。
+        """
+        self.send([{"event": "error",
+                   "data": {"type": "error", "error": "Agent 执行失败：模型超时"}}])
+        info = self.page.evaluate("""() => {
+          const msgs = document.querySelectorAll('.ag-msg-bot');
+          const last = msgs.length ? msgs[msgs.length - 1] : null;
+          const err = last ? last.querySelector('.ag-error-text') : null;
+          const btn = last ? last.querySelector('[data-act="retry"]') : null;
+          return {err: err ? err.textContent : '',
+                  hasBtn: !!btn,
+                  btnText: btn ? btn.textContent : ''};
+        }""")
+        self.assertIn("模型超时", info["err"], f"SSE error 事件没有渲染错误条：{info}")
+        self.assertTrue(info["hasBtn"],
+                        "SSE error 事件之后没有重试入口（失败消息的重试按钮被清掉了）")
+        self.assertIn("重试", info["btnText"], "重试按钮没有文案")
+
+    def test_sse_done_failed_keeps_retry_entry(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】
+        SSE `done` 事件但 status=failed 时，也必须保留重试入口。
+
+        与 test_sse_error_event_keeps_retry_entry 同源：
+        两条路径都是「HTTP 200 + 流里带失败语义」，
+        都走 send() 的成功分支 -> retryRequest 被清空。
+        """
+        self.send([{"event": "done",
+                   "data": {"type": "done", "status": "failed",
+                            "error": "Agent 执行失败：服务端返回 failed",
+                            "answer": "", "jobs": [], "assets": [], "steps": []}}])
+        info = self.page.evaluate("""() => {
+          const msgs = document.querySelectorAll('.ag-msg-bot');
+          const last = msgs.length ? msgs[msgs.length - 1] : null;
+          const err = last ? last.querySelector('.ag-error-text') : null;
+          const btn = last ? last.querySelector('[data-act="retry"]') : null;
+          return {err: err ? err.textContent : '', hasBtn: !!btn,
+                  btnText: btn ? btn.textContent : ''};
+        }""")
+        self.assertIn("failed", info["err"], f"done(failed) 没有渲染错误条：{info}")
+        self.assertTrue(info["hasBtn"],
+                        "done(status=failed) 之后没有重试入口")
+        self.assertIn("重试", info["btnText"], "重试按钮没有文案")
+
+    def test_successful_message_has_no_retry_entry(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】配套的**反向**判据：
+        真正成功的消息**不能**挂着重试按钮。
+
+        【为什么要反向判据】
+        修「SSE error 丢了重试入口」很容易顺手把 retryRequest 永远留住 ——
+        那会让每条成功消息都挂一个无用的「重试」按钮。
+        所以必须同时钉住两侧：失败有、成功没有。
+        """
+        self.send([
+            {"event": "token", "data": {"text": "结论"}},
+            {"event": "done", "data": {"status": "completed", "answer": "结论"}},
+        ])
+        info = self.page.evaluate("""() => {
+          const msgs = document.querySelectorAll('.ag-msg-bot');
+          const last = msgs.length ? msgs[msgs.length - 1] : null;
+          const btn = last ? last.querySelector('[data-act="retry"]') : null;
+          return {hasBtn: !!btn};
+        }""")
+        self.assertFalse(info["hasBtn"],
+                         "成功的消息不该挂着重试按钮")
+
     def test_business_failure_is_not_masked_by_fallback(self):
         """
         服务端执行失败时**不能**降级重跑。

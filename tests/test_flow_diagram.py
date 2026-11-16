@@ -180,7 +180,7 @@ class FlowDiagramCoverageTest(unittest.TestCase):
                                   f"路径「{path_name}」的关键内容「{kw}」不在图里")
 
     def test_agent_tools_are_grouped(self):
-        """23 个工具必须都出现在内置 Agent 图里（按作用对象分栏）。"""
+        """每个 Agent 工具必须都出现在内置 Agent 图里（按作用对象分栏）。"""
         from h3studio import agent
         agent_mmd = _read(DOCS / "交互流程图-内置Agent.mmd")
         missing = [n for n in agent.TOOLS if f"T_{n}[" not in agent_mmd]
@@ -188,6 +188,92 @@ class FlowDiagramCoverageTest(unittest.TestCase):
         for group in ("素材类", "任务类", "模式与参数类", "提示词类", "会话与记忆类"):
             with self.subTest(group=group):
                 self.assertIn(group, agent_mmd, f"工具分栏缺「{group}」")
+
+    def test_every_agent_tool_has_a_named_group(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】每个 Agent 工具都必须归入
+        **正式命名**的分栏，不能掉进「其它工具」。
+
+        【为什么要有这条断言】
+        2026-11-14 有 10 个工具（媒体库管理 / 外部能力 / ffmpeg 音视频）
+        加进 agent.TOOLS，但 scripts/gen_flow.py 的 TOOL_GROUP_RULES
+        没同步更新 —— 它们被推进「其它工具」分栏，图里的语义分类就丢了。
+        更糟的是 docs/ 里的流程图自那以后没再重跑，
+        于是「每个 Agent 工具都必须有节点」这条断言**直接转红**，
+        一直没人发现（线上遗留失败）。
+
+        判据必须由「命名该行为的那条断言」抓住：
+        这里断言的是「**没有工具掉进兜底分栏**」，
+        而不是「某个具体工具在某个具体分栏」（那会变成第二份要同步的清单）。
+        """
+        import importlib.util as u
+        spec = u.spec_from_file_location("gen_flow_group",
+                                        REPO / "scripts" / "gen_flow.py")
+        mod = u.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        from h3studio import agent
+        tools = [{"name": name, "stage": "", "description": ""}
+                 for name in agent.TOOLS]
+        groups = mod.group_agent_tools(tools)
+        others = [t["name"] for t in groups.get("其它工具", [])]
+        self.assertEqual(
+            others, [],
+            "这些 Agent 工具没归入任何正式分栏（掉进「其它工具」兜底）："
+            f"{others}。请在 scripts/gen_flow.py 的 TOOL_GROUP_RULES 里补归属，"
+            "然后跑 `make flow` 重生成流程图。")
+
+    def test_agent_tool_side_nodes_exist(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】工具分栏的「落地侧」节点必须真实存在。
+
+        背景：新增分栏时如果只在 TOOL_GROUP_RULES 加名字、忘了在
+        templates/flow-agent.mmd 的 SIDE 子图里加对应节点，
+        Mermaid 会画出**指向不存在节点**的连线 —— 图看着有，实际是断的。
+        """
+        import re
+        import importlib.util as u
+        spec = u.spec_from_file_location("gen_flow_group2",
+                                        REPO / "scripts" / "gen_flow.py")
+        mod = u.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        agent_mmd = _read(DOCS / "交互流程图-内置Agent.mmd")
+        # 分栏 -> 落地侧的连线：TG1 --> AS
+        edges = re.findall(r"^\s*(TG\d+)\s*-->\s*([A-Z]{2,})\s*$",
+                           agent_mmd, re.M)
+        self.assertTrue(edges, "内置 Agent 图里没有「工具分栏 → 落地侧」连线")
+        for gid, side in edges:
+            with self.subTest(group=gid, side=side):
+                self.assertRegex(
+                    agent_mmd, rf"\b{re.escape(side)}\[",
+                    f"落地侧节点 {side}（被 {gid} 指向）在图里不存在 —— "
+                    "分栏连线是断的")
+
+    def test_new_agent_tool_groups_have_side_nodes(self):
+        """
+        【2026-11-16 内置 Agent 审查新增】TOOL_GROUP_RULES 里声明的每个分栏，
+        都必须能映射到一个存在的落地侧节点 id。
+        """
+        import re
+        import importlib.util as u
+        spec = u.spec_from_file_location("gen_flow_group3",
+                                        REPO / "scripts" / "gen_flow.py")
+        mod = u.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        agent_mmd = _read(DOCS / "交互流程图-内置Agent.mmd")
+        group_side = {
+            "素材类": "AS", "任务类": "JB", "模式与参数类": "MP",
+            "提示词类": "PP", "会话与记忆类": "CM", "回应类": "RS",
+            "媒体库管理类": "ML", "外部能力类": "EX", "ffmpeg 音视频类": "FF",
+            "其它工具": "AS",
+        }
+        for group, _names in mod.TOOL_GROUP_RULES:
+            side = group_side.get(group)
+            with self.subTest(group=group):
+                self.assertIsNotNone(
+                    side, f"分栏「{group}」没有声明落地侧节点 id")
+                self.assertRegex(
+                    agent_mmd, rf"\b{re.escape(side)}\[",
+                    f"分栏「{group}」指向的落地侧节点 {side} 在图里不存在")
 
 
 if __name__ == "__main__":
