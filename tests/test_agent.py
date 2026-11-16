@@ -206,17 +206,27 @@ class TestAgentJobValidation(unittest.TestCase):
         self.assertIn("参考音频", ctx.exception.message)
 
     def test_repeated_identical_asset_refs_are_deduplicated_by_ordinal(self):
-        """多个参考图必须保持顺序（占位语义与插槽顺序一一对应）。"""
-        result = self._call({
-            "mode": "r2v", "prompt": "参考这两张",
-            "asset_ids": ["asset_a", "asset_b"],
-        })
-        self.assertEqual(len(self.server.created), 1)
-        params = self.server.created[0][2]
-        refs = params.get("asset_refs") or []
-        self.assertEqual([r["asset_id"] for r in refs], ["asset_a", "asset_b"])
-        self.assertEqual([r["ordinal"] for r in refs], [0, 1])
-        self.assertIn("job_id", result)
+        """多个参考图必须保持顺序（占位语义与插槽顺序一一对应）。
+
+        【2026-11-16】素材引用现在**查库**（server.prepare_job_params ->
+        asset_ref_guard.check_asset_refs），编造的 asset_id 会被正确拒绝。
+        所以这里用临时素材库里**真实入库**的两张图 ——
+        本用例验的是「顺序 / ordinal 语义」，与素材 id 本身无关。
+        """
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(image=2) as ids:
+            if len(ids["image"]) < 2:
+                self.skipTest("建不出两张图片素材")
+            result = self._call({
+                "mode": "r2v", "prompt": "参考这两张",
+                "asset_ids": list(ids["image"]),
+            })
+            self.assertEqual(len(self.server.created), 1)
+            params = self.server.created[0][2]
+            refs = params.get("asset_refs") or []
+            self.assertEqual([r["asset_id"] for r in refs], ids["image"])
+            self.assertEqual([r["ordinal"] for r in refs], [0, 1])
+            self.assertIn("job_id", result)
 
 
 class TestAgentOrchestration(unittest.TestCase):
