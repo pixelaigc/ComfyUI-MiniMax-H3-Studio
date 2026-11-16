@@ -619,12 +619,33 @@ class TestBugsFound2026_11_12_B(unittest.TestCase):
             return fh.read()
 
     def test_B5_state_steps_initial_matches_workflow_default(self):
-        """B5：state.steps 初值必须是 4（工作流 Turbo 档），不是 6。"""
+        """B5：步数的唯一真源是视频面板的 videoState.steps，state 不再持有它。
+
+        【2026-11-16 第 4 轮审查 · B-11 修复后的契约】
+        旧断言是「state.steps 初值必须是 4（不是 6）」，钉的是一个
+        **写死的常量**（state.steps 全仓零写入）。它有两个问题：
+          1. 写死的 4 在**降级路径**会被当成真实步数提交
+             （8190 实测：面板显示 50、提交 4）；
+          2. `assertNotIn("  steps: 6,", js)` 是**子串匹配**——
+             H3-Image 的 `steps: 6,`（缩进 4 空格）也含这个子串，
+             所以这条断言在基线就会误报失败（实测 6de4a42 同样失败）。
+
+        现在的契约（修复后）：
+          * app.js 的 state 里**不再有** steps 字段；
+          * 步数真源在 web/video-panel.js 的 videoState.steps；
+          * 提交时由 VIDEO_PANEL.submitParams() 带出，
+            降级路径显式取 window.VIDEO_PANEL.state.steps。
+        """
         js = self._app_js()
-        self.assertIn("  steps: 4,", js,
-                      "state.steps 初值应为 4（与工作流 Turbo 档一致）")
-        self.assertNotIn("  steps: 6,", js,
-                         "state.steps 初值仍是 6（滑杆显示 4、说明写 6 = 自相矛盾）")
+        # 1) state 里不再持有 steps（顶层 state 对象的字段里没有它）
+        self.assertNotRegex(js, r"(?m)^  steps: \d+,",
+                            "app.js 的 state 里仍有写死的 steps —— "
+                            "步数真源必须是视频面板的 videoState.steps")
+        # 2) 步数真源在视频面板
+        vp = self._panel_js()
+        self.assertRegex(vp, r"(?m)^\s+steps:\s*\d+,",
+                         "web/video-panel.js 的 videoState 里没有 steps —— "
+                         "步数真源必须是 videoState.steps")
 
     def test_B5_html_slider_default_matches_state(self):
         """B5 续：HTML 滑杆的初始 value 必须与 state.steps 一致（都=4）。
