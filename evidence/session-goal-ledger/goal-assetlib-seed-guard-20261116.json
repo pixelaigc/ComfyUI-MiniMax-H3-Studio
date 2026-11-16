@@ -1,0 +1,14 @@
+{
+  "context_id": "1115ce3e-a0ee-4dd9-9d82-f54b0681cb0a",
+  "revision": 0,
+  "note": "Studio 的 ekko_studio_update_session_tasks 工具在本轮不可用：MCP tool_call 被 harness 注入了 schema 不允许的 'item' 键（additionalProperties:false），stdio 直连的 plan toolset 又只导出 ekko_studio_update_plan。按 AGENTS.md 的既定 fallback，把目标账本落盘。",
+  "goals": [
+    {
+      "id": "goal-assetlib-seed-guard",
+      "title": "素材库强制引用 + 种子正整数校验已交付上线 8190",
+      "summary": "首尾帧/参考生等媒体引用全部改为只能从素材库挑选（前端去掉本地文件直传入口，后端拒直传并查库核实 asset_id）；种子只允许正整数，前端提交前拦截、后端统一校验并给中文原因。已合并到 local/maintainer 并部署 live，探活全 200。",
+      "status": "completed",
+      "completion_evidence": "部署 commit 7ba1e25ad3be41382cdb61ae9b9e4e23635842a0（local/maintainer = local/deploy/qwen-ref-assets-live = live HEAD 三者一致）；h3-studio.service active，/ 与 8 个 API + 5 个静态资源全部 200；线上探针：非法种子 6 模式×4 输入=24 组全 400；外部媒体 5 通道全 400（media_must_come_from_library）；伪造 asset_id 400（asset_not_in_library）；真实素材引用 200 建任务成功；浏览器实测 8 槽位 0 个 file input、非法种子 alert 且 0 个 POST。新增用例 47 例全绿，全量 pytest 对拍基线 10 失败/分支 10 失败，唯一残留为已证明的既有 flake（基线同环境 5 跑 2 失败）。报告 docs/优化-素材库强制引用与种子正整数校验-20261116.md 已上线。"
+    }
+  ]
+}

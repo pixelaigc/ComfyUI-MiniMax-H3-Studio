@@ -38,6 +38,7 @@ DEPLOY_FILES=(
   docs/交互流程图-创作链路.svg
   docs/交互流程图-创作链路.png
   docs/优化-素材库强制引用与种子正整数校验-20261116.md
+  evidence/session-goal-ledger/goal-assetlib-seed-guard-20261116.json
   tests/assetlib_fixture.py
   tests/test_agent.py
   tests/test_assetlib_and_seed_guard.py
