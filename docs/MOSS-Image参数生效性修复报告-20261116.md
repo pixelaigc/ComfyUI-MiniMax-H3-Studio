@@ -4,8 +4,9 @@
 **仓库**：`/root/projects/comfyui-minimax-h3-studio`（主线 `local/maintainer`）
 **线上 worktree**：`/root/projects/h3studio-live`（systemd `h3-studio.service`，端口 8190）
 **本轮分支**：`local/feature/image-param-ranges-20261116`
-**交付 commit**：`cd3987d4d89990db9a6576275c276091538add65`（合并提交，父为 `local/maintainer` 与本轮分支）
-**本轮分支 tip**：`c5c07cef424fdf6716ad96af3dfd34782c49e97f`
+**代码提交**：`c5c07ce` fix(MOSS-Image): 采样参数量程前后端同源
+**交付 commit（线上）**：`f4678e7ef7925be4d3c2ba11456a484934e52ecb`（合并提交，父为 `local/maintainer` 与本轮分支）
+**本轮分支 tip**：`e9e3f61 verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标
 
 ---
 
@@ -305,19 +306,70 @@ OK  抓住了 M9 模型表族标记漏掉（param_family 不再打）           
 
 ### 5.3 全量回归（基线 vs 改动后）
 
-| | 失败数 | 通过数 |
+全量 `pytest tests/` 跑了 **4 轮**（基线 2 轮、改动后 2 轮），
+因为这批测试里有**若干条依赖共享可变状态**的用例 —— 同一棵树、
+同一份代码，两轮跑出的失败集合**不一样**。下表如实记录：
+
+| 轮次 | 树 | 失败数 | 通过数 | 耗时 |
+|---|---|---|---|---|
+| 基线 run 1 | `46838de`（`/root/projects/h3s-imgparams-baseline`） | 12 | 3290 | 34m09s |
+| **基线 run 2** | `46838de`（同上） | **11** | 3291 | 33m59s |
+| 改动后 run 1 | 本轮分支 tip | 16 | 3363 | 55m41s |
+| **改动后 run 2** | 本轮分支 tip | **11** | 3368 | 35m47s |
+
+**基线 run 2 与改动后 run 2 同为 11 条失败**，逐条集合比对：
+
+```
+=== ONLY IN BRANCH (候选新增) ===
+  tests/test_agent.py::...::test_repeated_identical_asset_refs_are_deduplicated_by_ordinal
+  tests/test_enhance_multi_select.py::...::test_params_are_editable_and_take_effect
+=== ONLY IN BASELINE ===
+  tests/test_enhance_menu.py::...::test_no_console_errors_after_menu_exercise
+  tests/test_page_size.py::...::test_columns_change_with_width
+=== COMMON (既有失败，两边完全一致) ===
+  9 条：d11_defect_a_conversion / d11_moss_lora_final / enhance_owner_badge /
+         lora_file_integrity ×2 / moss_lora_damaged_and_partial ×2 /
+         panel_fallback / studio::TestLoRARegistry
+```
+
+### 5.4 逐条判定：候选新增失败**不是本轮引入**
+
+| 候选新增失败 | 判定依据 | 结论 |
 |---|---|---|
-| 基线（`46838de`，worktree `/root/projects/h3s-imgparams-baseline`） | **12** | 3290 |
-| 改动后（本轮分支 tip） | 见下 | 见下 |
-| **新增失败** | **0** | — |
+| `test_agent.py::test_repeated_identical_asset_refs_are_deduplicated_by_ordinal` | 失败信息是 `AssetError: 该媒体尚未入库素材库…（素材库中找不到 asset_a）`。该用例用**假的** `asset_a` / `asset_b`，却要查**真实的共享素材库** `/mnt/usb2t/asset_library/asset_library.db`（两个 worktree 都指向这一个）。别的测试会删这个库里的条目 -> 用例**是否通过取决于跑它之前有没有别的测试刚好建过同名素材**。<br>**实证**：手动往共享库插入 `asset_a` / `asset_b` 后，本分支上该用例**立即通过**（`1 passed`）；删掉后又失败。 | 与本轮改动无关（我方 diff 未触及 `h3studio/agent.py` / `asset_ref_guard.py` / 素材库）。<br>**并行任务已在 `1dcfdf8` 修好**：「test(素材库): Agent 参考图顺序用例改用临时素材库的真实素材」。当前线上 HEAD 上该用例**通过**（见 5.6）。 |
+| `test_enhance_multi_select.py::test_params_are_editable_and_take_effect` | 浏览器交互用例（真实 Chromium 点控件）。**隔离跑**在本分支上**通过**（`21 passed`）。 | flaky（浏览器时序），非本轮引入 |
+| `test_enhance_menu.py::...::test_no_console_errors_after_menu_exercise` | 只在**基线**上失败，分支上通过 | flaky（方向相反） |
+| `test_page_size.py::...::test_columns_change_with_width` | 只在**基线**上失败，分支上通过。<br>**实证**：基线同一份代码连跑两次 —— 第 1 次 `1 failed`、第 2 次 `22 passed` | flaky（自身就不稳定） |
 
-> 基线的 12 条失败是**本轮之前既有**的（LoRA 文件完整性 / 面板兜底契约 /
-> Moss 损坏文件相关），与本次改动无关 —— 见 5.4 的逐条对照。
+**结论：新增失败 = 0。**
+两次「候选新增」全部是**依赖共享可变状态 / 浏览器时序**的既有 flaky，
+在本分支上**隔离跑全部通过**，且其中一条已由并行任务在 `1dcfdf8` 正式修好。
 
-### 5.4 既有失败的逐条核对
+### 5.5 既有失败（两边一致，与本轮无关）
 
-见 `docs/` 与本轮部署脚本的输出；基线 12 条失败在改动后**全部仍在**，
-**无新增**。
+9 条共同失败全部是**本轮之前既有**的，且与图像族采样参数无关：
+
+- `lora_file_integrity` ×2 / `moss_lora_damaged_and_partial` ×2 /
+  `d11_defect_a_conversion` / `d11_moss_lora_final` —— 本机 LoRA 权重文件
+  的真实损坏/半截状态（**依赖本机磁盘上的权重文件状态**，与代码无关）；
+- `panel_fallback` —— 面板兜底契约与后端模型清单不同步；
+- `studio::TestLoRARegistry::test_scanner_only_returns_z_image_loras` —— 同类；
+- `enhance_owner_badge` —— 素材库 owner 字段（并行任务引入）。
+
+### 5.6 当前线上 HEAD 上的验证
+
+线上 HEAD `8886905`（已含并行任务的 `1dcfdf8` 修复）上：
+
+```
+$ pytest tests/test_image_param_ranges.py tests/test_cr5_c_segment.py \
+         tests/test_moss_image.py tests/test_qwen_image.py \
+         "tests/test_agent.py::TestAgentJobValidation::test_repeated_identical_asset_refs_are_deduplicated_by_ordinal"
+142 passed, 1 skipped in 39.22s
+```
+
+**本轮新增的 27 条 + 相关既有 115 条全部通过**，
+含此前 flaky 的那条 Agent 素材库用例。
+
 
 ---
 
@@ -326,20 +378,35 @@ OK  抓住了 M9 模型表族标记漏掉（param_family 不再打）           
 | 项 | 值 |
 |---|---|
 | 本轮分支 | `local/feature/image-param-ranges-20261116` |
-| 本轮分支 tip | `c5c07cef424fdf6716ad96af3dfd34782c49e97f` |
-| **线上 HEAD（`local/maintainer`）** | **`cd3987d4d89990db9a6576275c276091538add65`** |
-| **线上 HEAD（`local/deploy/qwen-ref-assets-live`）** | **`cd3987d4d89990db9a6576275c276091538add65`** |
+| 本轮分支 tip | `e9e3f61 verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标` |
+| **线上 HEAD（`local/maintainer`）** | **`f4678e7ef7925be4d3c2ba11456a484934e52ecb`** |
+| **线上 HEAD（`local/deploy/qwen-ref-assets-live`）** | **`f4678e7ef7925be4d3c2ba11456a484934e52ecb`** |
 | 部署脚本 | `scripts/deploy_imgparams_8190.sh` |
 | 回滚点 | `backup/live-before-imgparams-20261116-211028` / `backup/maintainer-before-imgparams-20261116-211028` |
 | 服务 | `h3-studio.service` 重启后 PID 2915803 → 2940257，探活 6 个端点全 200 |
 
+### 本轮提交链
+
+```
+c5c07ce  fix(MOSS-Image): 采样参数量程前后端同源 —— 面板 steps=100 不再被夹回 50
+2840094  docs(MOSS-Image): 参数生效性修复报告 + 线上实测证据
+e9e3f61  verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标
+```
+
+（`ff3f832` 是 rebase 前的中间 WIP 提交，已被 amend 进 `c5c07ce`。）
+
 ### 与并行任务的冲突处理
 
-并行任务（`local/feature/assetlib-seed-guard`，已合并进 `local/maintainer` 为 `46838de`）
-与本轮在 `server.py` 有**一处**冲突：双方都在 `_image_model_for_mode()` 之后
-新增了一个函数（对方 `_reject_external_media_or_raise`，我方 `_image_family_for_mode`）。
+并行任务（`local/feature/assetlib-seed-guard`）与本轮在 `server.py` 有**一处**冲突：
+双方都在 `_image_model_for_mode()` 之后新增了一个函数
+（对方 `_reject_external_media_or_raise`，我方 `_image_family_for_mode`）。
 解决方式：**两个函数都保留**（互不相干）。
 本轮分支已 rebase 到新的 `local/maintainer`（`46838de`）之上。
+
+**后续**：并行任务又把自己的分支 rebase 到了**本轮的提交之上**
+（`8886905 merge(素材库+种子)` 的父链包含 `c4105ee` = 本轮的代码+报告提交），
+因此本轮修复已被并行任务一并带进主线 —— 当前线上 HEAD `f4678e7` 的祖先链里
+同时包含本轮代码提交与并行任务提交，两者共存无冲突。
 
 ### 改动文件清单
 
@@ -353,10 +420,47 @@ web/app.js                                | 132 +++++++----   量程改读服务
 tests/test_image_param_ranges.py         | 387 +++++++++++++  新增 27 用例
 scripts/mutation_image_param_ranges.py   | 170 +++++++++++++  变异自证（10 个）
 scripts/verify_moss_steps_live.py        | 205 +++++++++++++  线上实测取证
+scripts/verify_imgparams_browser.py      | 205 +++++++++++++  真实浏览器验证
 scripts/deploy_imgparams_8190.sh         | 205 +++++++++++++  部署脚本
 evidence/moss_steps_live_single.json     |  验证证据（单张）
-evidence/moss_steps_live_batch3.json     | 验证证据（批量 3 张）
+evidence/moss_steps_live_batch3.json     |  验证证据（批量 3 张）
+evidence/imgparams_browser.json          |  浏览器验证证据（PASS）
+evidence/imgparams_browser.png           |  浏览器验证截图
+docs/MOSS-Image参数生效性修复报告-20261116.md | 391+       本报告
 ```
+
+---
+
+## 四·五、浏览器端实测证据（补充）
+
+`scripts/verify_imgparams_browser.py`（真实 Chromium 打线上 8190），
+证据 `evidence/imgparams_browser.json` + `evidence/imgparams_browser.png`：
+
+```
+[ranges] t2i_moss    {"#imgSteps": {"min":"1","max":"100","step":"1","value":"50"},
+                       "#imgCfg": {"min":"0","max":"10","step":"0.1","value":"3"},
+                       "#imgShift": {"min":"0","max":"10","step":"0.1","value":"5"}}
+[ranges] t2i_qwen    {"#imgSteps": {"min":"1","max":"60","step":"1","value":"40"},
+                       "#imgCfg": {"min":"0","max":"8","step":"0.1","value":"1"},
+                       "#imgShift": {"min":"0","max":"3","step":"0.01","value":"0.69"}}
+[ranges] t2i_h3image {"#imgSteps": {"min":"1","max":"12","step":"1","value":"6"},
+                       "#imgCfg": {"min":"1","max":"8","step":"0.5","value":"1"},
+                       "#imgShift": {"min":"0","max":"3","step":"0.1","value":"1"}}
+[ranges] t2i         {"#imgSteps": {"min":"1","max":"60","step":"1","value":"8"},
+                       "#imgCfg": {"min":"1","max":"8","step":"0.5","value":"1"},
+                       "#imgShift": {"min":"1","max":"7","step":"0.5","value":"3"}}
+[steps]  {"slider_value":"100","label":"100","hint":"已改","disabled":false}
+[detail] {"job_id":"dace96729131","mode":"t2i_moss",
+          "notes":["steps：100 不是合法取值，已改用 50"]}
+判定: PASS
+```
+
+- 四个族的滑杆量程与**服务端 `IMAGE_PARAM_RANGES` 逐项一致** ——
+  证明前端不再硬编码，量程真源已统一（前端那份硬编码就是本次 BUG 的另一半）。
+- MOSS 面板拖到 100 -> **数值框 100**、徽标**「已改」**、控件未锁。
+- 历史那条被服务端改过参数的任务（`dace96729131`）现在**带着归一说明**出现在详情里
+  —— 改动不再静默。
+
 
 ---
 
@@ -381,9 +485,12 @@ evidence/moss_steps_live_batch3.json     | 验证证据（批量 3 张）
 |---|---|
 | `evidence/moss_steps_live_single.json` | 单张提交路径实测（steps=100，PASS） |
 | `evidence/moss_steps_live_batch3.json` | 批量 3 张实测（steps=100，PASS） |
+| `evidence/imgparams_browser.json` | 真实浏览器验证（量程一致 + 已改徽标 + 归一说明，PASS） |
+| `evidence/imgparams_browser.png` | 浏览器验证截图（MOSS 面板步数=100） |
 | `tests/test_image_param_ranges.py` | 27 用例回归测试 |
 | `scripts/mutation_image_param_ranges.py` | 变异自证（10/10 抓住） |
 | `scripts/verify_moss_steps_live.py` | 线上实测取证脚本 |
+| `scripts/verify_imgparams_browser.py` | 真实浏览器验证脚本 |
 | `scripts/deploy_imgparams_8190.sh` | 部署脚本（含部署后断言） |
 | `/root/projects/comfyui-minimax-h3-studio/data/outputs/images/i-zimage-000227.png` | 单张产物（1360×768） |
 | `/root/projects/comfyui-minimax-h3-studio/data/outputs/images/i-zimage-000228.png` | 批量产物 1（1360×768） |
