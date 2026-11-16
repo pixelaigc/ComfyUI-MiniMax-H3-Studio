@@ -16,6 +16,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from h3studio import h3_audio_track as h3audio          # noqa: E402
 from h3studio import h3_video_modes as h3modes          # noqa: E402
@@ -280,11 +281,21 @@ class TestAssetRefAudioTrackSource(unittest.TestCase):
         return params
 
     def test_ref_audio_from_library_keeps_reference_choice(self):
-        """素材库里的参考音乐 -> "reference" 必须保住。"""
-        out = self._prepare(
-            [{"asset_id": "asset_x", "slot": "ref_audio", "ordinal": 0}],
-            "reference")
-        self.assertEqual(out["audio_track_source"], "reference")
+        """素材库里的参考音乐 -> "reference" 必须保住。
+
+        【2026-11-16】素材引用必须是**库里真的有**的素材
+        （prepare_job_params 现在查库），所以这里用临时素材库里
+        真实入库的素材，而不是编造的 asset_id。
+        """
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(audio=1) as ids:
+            if not ids["audio"]:
+                self.skipTest("本机建不出音频素材（ffmpeg 不可用）")
+            out = self._prepare(
+                [{"asset_id": ids["audio"][0], "slot": "ref_audio",
+                  "ordinal": 0}],
+                "reference")
+            self.assertEqual(out["audio_track_source"], "reference")
 
     def test_ref_video_audio_from_library_keeps_video_bg_choice(self):
         """素材库里的参考视频背景音 -> "video_bg" 必须保住。
@@ -292,11 +303,17 @@ class TestAssetRefAudioTrackSource(unittest.TestCase):
         注意：r2v 的校验要求至少有 1 个 ref_image/ref_video/ref_audio 槽位，
         所以这里同时给一张参考图（真实提交也是这么提交的）。
         """
-        out = self._prepare(
-            [{"asset_id": "asset_i", "slot": "ref_image", "ordinal": 0},
-             {"asset_id": "asset_v", "slot": "ref_video_audio", "ordinal": 0}],
-            "video_bg")
-        self.assertEqual(out["audio_track_source"], "video_bg")
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(image=1, audio=1) as ids:
+            if not ids["image"]:
+                self.skipTest("建不出图片素材")
+            out = self._prepare(
+                [{"asset_id": ids["image"][0], "slot": "ref_image",
+                  "ordinal": 0},
+                 {"asset_id": ids["audio"][0], "slot": "ref_video_audio",
+                  "ordinal": 0}],
+                "video_bg")
+            self.assertEqual(out["audio_track_source"], "video_bg")
 
     def test_no_reference_material_falls_back_to_generated(self):
         """没有任何参考素材时，选 reference 要回落到 generated。
@@ -317,11 +334,20 @@ class TestAssetRefAudioTrackSource(unittest.TestCase):
             "generated")
 
     def test_generated_stays_generated(self):
-        """显式选 generated -> 保持 generated。"""
-        out = self._prepare(
-            [{"asset_id": "asset_x", "slot": "ref_audio", "ordinal": 0}],
-            "generated")
-        self.assertEqual(out["audio_track_source"], "generated")
+        """显式选 generated -> 保持 generated。
+
+        【2026-11-16】用临时素材库里真实入库的音频素材
+        （素材引用现在会查库，编造的 id 会被正确拒绝）。
+        """
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(audio=1) as ids:
+            if not ids["audio"]:
+                self.skipTest("本机建不出音频素材（ffmpeg 不可用）")
+            out = self._prepare(
+                [{"asset_id": ids["audio"][0], "slot": "ref_audio",
+                  "ordinal": 0}],
+                "generated")
+            self.assertEqual(out["audio_track_source"], "generated")
 
 
 def wf_build_flf(params):

@@ -239,13 +239,18 @@ class TestResolutionSemantics(unittest.TestCase):
         flf/r2v 的 params 里没有 width/height -> 工作流硬回退 1344×768。
         """
         import server
-        for mode, extra in (("flf", {"asset_refs": [
-            {"asset_id": "a", "slot": "last_frame", "ordinal": 0}]}),
-            ("r2v", {"asset_refs": [
-                {"asset_id": "a", "slot": "ref_image", "ordinal": 0}]})):
-            params = {"prompt": "x", "resolution": "544p", "aspect": "9:16"}
-            server.prepare_job_params(mode, params, extra.get("asset_refs"),
-                                      {})
+        from assetlib_fixture import temp_asset_library
+        with temp_asset_library(image=1) as ids:
+            asset_id = ids["image"][0]
+            for mode, extra in (("flf", {"asset_refs": [
+                {"asset_id": asset_id, "slot": "last_frame", "ordinal": 0}]}),
+                ("r2v", {"asset_refs": [
+                    {"asset_id": asset_id, "slot": "ref_image",
+                     "ordinal": 0}]})):
+                params = {"prompt": "x", "resolution": "544p",
+                          "aspect": "9:16"}
+                server.prepare_job_params(mode, params,
+                                          extra.get("asset_refs"), {})
             self.assertEqual((params.get("width"), params.get("height")),
                              (480, 864),
                              f"{mode} 模式没有归一出真实宽高")
@@ -463,31 +468,44 @@ class TestAudioTrackChoiceFrontend(unittest.TestCase):
     def test_backend_keeps_video_bg_when_reference_video_present(self):
         """服务端提交阶段不得把 (c) 改掉（有参考视频时）。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "audio_track_source": "video_bg",
                   "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "r2v", params,
-            [{"asset_id": "a", "slot": "ref_video", "ordinal": 0}], {})
+        with temp_asset_library(video=1) as ids:
+            if not ids["video"]:
+                self.skipTest("建不出视频素材")
+            server.prepare_job_params(
+                "r2v", params,
+                [{"asset_id": ids["video"][0], "slot": "ref_video",
+                  "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"], "video_bg")
 
     def test_backend_keeps_reference_when_reference_audio_present(self):
         """有参考音乐时 (b) 不得被改掉。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "audio_track_source": "reference",
                   "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "r2v", params,
-            [{"asset_id": "a", "slot": "ref_audio", "ordinal": 0}], {})
+        with temp_asset_library(audio=1) as ids:
+            if not ids["audio"]:
+                self.skipTest("本机建不出音频素材（ffmpeg 不可用）")
+            server.prepare_job_params(
+                "r2v", params,
+                [{"asset_id": ids["audio"][0], "slot": "ref_audio",
+                  "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"], "reference")
 
     def test_backend_falls_back_when_nothing_available(self):
         """既没有参考音乐也没有参考视频 -> (b)/(c) 归回生成的音乐。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "audio_track_source": "video_bg",
                   "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "r2v", params,
-            [{"asset_id": "a", "slot": "ref_image", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "r2v", params,
+                [{"asset_id": ids["image"][0], "slot": "ref_image",
+                  "ordinal": 0}], {})
         self.assertEqual(params["audio_track_source"], "generated")
 
     def test_video_soundtrack_extraction_helper_exists(self):
@@ -538,21 +556,27 @@ class TestReferenceImageLimit(unittest.TestCase):
         （原来校验的是本地直传的 file_ref 列表。）
         """
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        refs = [{"asset_id": f"a{i}", "slot": "ref_image", "ordinal": i}
-                for i in range(10)]
-        with self.assertRaises(server.JobValidationError) as ctx:
-            server.prepare_job_params("r2v", params, refs, {})
-        self.assertEqual(ctx.exception.code, "ref_too_many")
-        self.assertIn("9", ctx.exception.message)
+        with temp_asset_library(image=1) as ids:
+            asset_id = ids["image"][0]
+            refs = [{"asset_id": asset_id, "slot": "ref_image", "ordinal": i}
+                    for i in range(10)]
+            with self.assertRaises(server.JobValidationError) as ctx:
+                server.prepare_job_params("r2v", params, refs, {})
+            self.assertEqual(ctx.exception.code, "ref_too_many")
+            self.assertIn("9", ctx.exception.message)
 
     def test_backend_accepts_exactly_nine(self):
         """正好 9 张必须放行（节点上限就是 9）。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        refs = [{"asset_id": f"a{i}", "slot": "ref_image", "ordinal": i}
-                for i in range(9)]
-        server.prepare_job_params("r2v", params, refs, {})
+        with temp_asset_library(image=1) as ids:
+            asset_id = ids["image"][0]
+            refs = [{"asset_id": asset_id, "slot": "ref_image", "ordinal": i}
+                    for i in range(9)]
+            server.prepare_job_params("r2v", params, refs, {})
         # 不抛异常 = 放行
         self.assertEqual(len(refs), 9)
 
@@ -571,20 +595,26 @@ class TestFlfFrameValidation(unittest.TestCase):
         上传之后才落的。提交阶段只校验「槽位在不在」。
         """
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "last_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "last_frame",
+                  "ordinal": 0}], {})
         # 不抛异常 = 放行；且不能凭空塞一个 first_frame
         self.assertNotIn("first_frame", params)
 
     def test_backend_accepts_first_frame_only(self):
         """只给首帧 -> I2VA。"""
         import server
+        from assetlib_fixture import temp_asset_library
         params = {"prompt": "x", "width": 864, "height": 480, "duration": 5}
-        server.prepare_job_params(
-            "flf", params,
-            [{"asset_id": "a", "slot": "first_frame", "ordinal": 0}], {})
+        with temp_asset_library(image=1) as ids:
+            server.prepare_job_params(
+                "flf", params,
+                [{"asset_id": ids["image"][0], "slot": "first_frame",
+                  "ordinal": 0}], {})
         self.assertNotIn("last_frame", params)
 
     def test_backend_rejects_local_last_frame(self):
