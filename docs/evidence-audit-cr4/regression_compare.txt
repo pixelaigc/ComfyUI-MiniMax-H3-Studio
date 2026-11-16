@@ -1,0 +1,20 @@
+=== 只在 AFTER（我引入的新失败） ===
+
+=== 只在 BASELINE（我修好的） ===
+tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_no_console_errors
+
+=== 共有失败（基线已有） ===
+tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_no_console_errors
+tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_no_console_errors_after_menu_exercise
+tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_no_console_errors
+tests/test_panel_fallback.py::TestFrontendFallbackContract::test_fallback_covers_all_server_models
+tests/test_qwen_pe_enhance.py::TestQwenPeEnhanceBrowser::test_no_console_errors_after_menu_exercise
+tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B2_legacy_defaults_match_workflow_hardcoded_tiers
+tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_tiers_match_workflow
+tests/test_video_sampling_params.py::TestBugsFound2026_11_12::test_B3_legacy_default_uses_effective_lora_not_state_lora
+tests/test_video_sampling_params.py::TestBugsFound2026_11_12_B::test_B5_state_steps_initial_matches_workflow_default
+tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_flf_accepts_sampling_params
+tests/test_video_sampling_params.py::TestLegacyVideoPaths::test_legacy_defaults_unchanged
+tests/test_yue2_flow_review_fixes.py::TestWriteContractDeclaration::test_every_method_declares_write_contract
