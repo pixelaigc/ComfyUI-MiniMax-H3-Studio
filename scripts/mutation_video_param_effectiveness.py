@@ -55,8 +55,8 @@ MUTATIONS = [
     (
         "M2 applyConfig 改回「mode_configs 优先并 return」（还原 D-2 根因）",
         "web/video-panel.js",
-        "    const merged = {};\n"
-        "    if (modeCfg && typeof modeCfg === \"object\") merged = { ...modeCfg };\n"
+        "    let merged = {};\n"
+        "    if (modeCfg && typeof modeCfg === \"object\") Object.assign(merged, modeCfg);\n"
         "    // 顶层字段覆盖 mode_configs 的片段（顶层 = 调用方的显式意图）\n"
         "    for (const key of Object.keys(cfg)) {\n"
         "      if (key === \"mode_configs\") continue;\n"
@@ -69,6 +69,15 @@ MUTATIONS = [
         "    }\n"
         "    applyModeConfig(cfg);",
         "test_apply_config_top_level_overrides_mode_configs",
+    ),
+    (
+        "M2b merged 改成 const 后整体重新赋值（2026-11-16 实测踩到的坑）",
+        "web/video-panel.js",
+        "    let merged = {};\n"
+        "    if (modeCfg && typeof modeCfg === \"object\") Object.assign(merged, modeCfg);",
+        "    const merged = {};\n"
+        "    if (modeCfg && typeof modeCfg === \"object\") merged = { ...modeCfg };",
+        "test_apply_config_merged_is_mutable",
     ),
     (
         "M3 二采时不再置灰主采样器下拉（还原 D-3 根因）",
