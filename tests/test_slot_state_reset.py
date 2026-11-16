@@ -285,7 +285,12 @@ console.log(JSON.stringify(res));
     # ---------------------------------------------------------------- 清空语义
 
     def test_switch_mode_clears_all_slot_state(self):
-        """切模式必须清空 assetRefs / previewUrls / audioTrackSource。"""
+        """切模式必须清空 assetRefs / audioTrackSource。
+
+        【2026-11-16 需求】本地直传槽位（state.files / state.slotPreviewUrls）
+        已被移除 —— 媒体必须先入库素材库。所以现在只剩 assetRefs
+        与派生的 audioTrackSource 要清。
+        """
         out = self._exec("""
 const mk = (n) => ({asset_id: 'A'+n, name: n+'.png', category: 'image'});
 const st = () => ({
@@ -309,13 +314,16 @@ console.log(JSON.stringify(res));
         for scenario, r in out.items():
             self.assertEqual(r["refs"], [],
                              f"{scenario}: assetRefs 没清空 -> {r['refs']}")
-            self.assertEqual(r["prev"], [],
-                             f"{scenario}: slotPreviewUrls 没清空 -> {r['prev']}")
             self.assertEqual(r["audio"], "",
                              f"{scenario}: audioTrackSource 没复位 -> {r['audio']}")
 
-    def test_switch_mode_deletes_non_whitelisted_file_keys(self):
-        """白名单外的 state.files key 必须被**删除**（不是留 null）。"""
+    def test_switch_mode_removes_local_file_slots_entirely(self):
+        """【2026-11-16 需求】state.files 这一路**彻底消失**。
+
+        原来这里锁的是「白名单外的 state.files key 必须被删除」。
+        现在本地直传通道整体关闭 —— resetSlotsForMode **不再碰**
+        state.files（素材只能从素材库来，没有「本地文件槽位」这回事）。
+        """
         out = self._exec("""
 const st = () => ({
   files: {first: {n:1}, last: {n:2}, ref0: {n:3}, ref1: {n:4}, refvid0: {n:5}, refaud0: {n:6}},
@@ -329,12 +337,11 @@ for (const m of ['flf','r2v','t2v','t2i']) {
 }
 console.log(JSON.stringify(res));
 """)
-        self.assertEqual(out["flf"], sorted(["first", "last", "refvid0", "refaud0"]),
-                         f"flf 的 files key 应只剩白名单内的 -> {out['flf']}")
-        self.assertEqual(out["r2v"], sorted(["ref0", "ref1", "refvid0", "refaud0"]),
-                         f"r2v 的 files key 应只剩白名单内的 -> {out['r2v']}")
-        self.assertEqual(out["t2v"], [], f"t2v 不该有槽位 -> {out['t2v']}")
-        self.assertEqual(out["t2i"], [], f"t2i 不该有槽位 -> {out['t2i']}")
+        # state.files 不再被 resetSlotsForMode 触碰 —— 原样保留
+        # （那是测试替身注入的旧状态；产品代码里这个字段已不存在）
+        for mode, keys in out.items():
+            self.assertTrue(keys, f"{mode}: files key 不该被凭空造出来")
+            self.assertNotIn("__file", keys)
 
     def test_keep_slots_preserves_state_for_continuous_submit(self):
         """keepSlots=true（提交成功后的同模式重渲染）必须**保留**状态。
@@ -434,10 +441,14 @@ console.log(JSON.stringify(res));
         self.assertTrue(out["assetVideo"]["filled"], "素材库视频槽位没标记 filled")
         self.assertIn("视频", out["assetVideo"]["tags"],
                       f"素材库视频槽位缺类型徽标 -> {out['assetVideo']['tags']}")
-        self.assertTrue(out["localImage"]["filled"], "本地直传槽位没标记 filled")
-        self.assertEqual(out["localImage"]["previewUrl"], "blob:http://x/1",
-                         f"本地直传 previewUrl 没从 state 恢复 -> {out['localImage']}")
-        self.assertTrue(out["localImage"]["hasImg"], "本地直传槽位没有缩略图")
+        # 【2026-11-16 需求】本地直传通道已移除 —— 只有素材库引用能填槽位。
+        # state.files 里还留着本地文件时，槽位**必须仍是空的**，
+        # 否则界面会显示一个「已填」的槽位，而提交时并没有那个素材
+        # （那正是「界面说谎」类缺陷）。
+        self.assertFalse(out["localImage"]["filled"],
+                         "本地文件不该能填槽位（媒体必须先入库素材库）")
+        self.assertIsNone(out["localImage"]["previewUrl"],
+                          "本地文件不该有 previewUrl")
         self.assertFalse(out["empty"]["filled"], "空槽位不该被标记 filled")
         self.assertIsNone(out["empty"]["previewUrl"], "空槽位不该有 previewUrl")
 

@@ -1913,6 +1913,16 @@
       scheduler: videoState.scheduler,
       shift_video: Number(videoState.shiftVideo),
       shift_audio: Number(videoState.shiftAudio),
+      // 【2026-11-16】种子只允许正整数 —— 校验实现见 web/seed-guard.js
+      // （与后端 h3studio/seed_guard.py 同口径）。
+      //
+      // 【为什么这里原样带出、让上层拦】submitParams() 是**纯收集**
+      // 函数。它若在这里把非法值「归一成 null」（= 随机），上层
+      // （app.js 的提交入口）拿到的就是「随机」—— 非法值被**静默吞掉**，
+      // 用户填了「abc」，系统当成「没填」，跑出一个随机结果。
+      //
+      // 真正的拦截在 app.js 的提交入口：它先校验 #seed，非法就报错
+      // 并**不发起请求**；合法则被归一成数字再提交。
       seed: $("#seed").value.trim() || null,
       // 【2026-11-14】加速 LoRA 槽位（单选，最多一项；空 = 不挂）
       accel_loras: accel,

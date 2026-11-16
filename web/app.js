@@ -172,16 +172,14 @@ const state = {
   //   stitchMediaOverride 保留字段但**不再用于拼 query**（避免旧代码路径再误用）。
   stitchMediaOverride: "",
   stitchClips: [],
-  files: { first: null, last: null, refs: [] },
+  // 【2026-11-16 新增】本地直传槽位（state.files）**已移除**。
+  //
+  // 需求：所有媒体引用必须先进入素材库 —— 界面只能从素材库挑选并引用，
+  // 不允许功能直接引用外部文件路径。所以槽位里不再存 File 对象，
+  // 只有下面这一个来源：
+  //
   // 素材库引用：{ 槽位: {asset_id, name, category} } —— 只存 id，不复制文件
   assetRefs: {},
-  // 【2026-11-16 审查 B-4】本地直传槽位的预览地址（blob URL）。
-  //
-  // 【为什么存 state 而不是只存在 DOM 上】切模式时 #uploadRow 被整块重建
-  // （row.innerHTML = ""），slot.dataset.previewUrl 会随之丢失。
-  // 存进 state 才能在重建后**如实恢复**槽位的缩略图与预览能力，
-  // 避免「界面显示空槽位、提交却带着值」的鬼素材。
-  slotPreviewUrls: {},
   // 【2026-11-14】音轨来源（B2 音轨三选一）：
   //   "" = 使用生成的音乐
   //   "reference" = 使用参考音乐作为成片音轨
@@ -515,8 +513,14 @@ const MODE_ALLOWED_SLOT_KEYS = {
  * 提交时也会把它当成 r2v 的参考视频。语义错位。
  */
 function resetSlotsForMode(mode, keepSlots) {
-  const allowed = MODE_ALLOWED_SLOT_KEYS[mode];
-  const keep = (key) => allowed ? allowed(key) : false;
+  // 【2026-11-16 新增】MODE_ALLOWED_SLOT_KEYS 的白名单判据**不再用于**
+  // 逐 key 清理 state.files（那个通道已移除），但它仍是「本模式渲染了
+  // 哪些槽位」的**唯一真源** —— 提交侧（app.js 的 asset_refs 构建）
+  // 用它过滤「界面上看不见却带上去」的幽灵引用。两边必须同源。
+  //
+  // 【为什么这里不再读它】切模式时槽位状态是**整块**清空的
+  // （state.assetRefs = {}）—— 没有「按 key 逐个清理」这回事了。
+  //
   // 【2026-11-16 审查 B-3 修复 · 同模式重渲染例外】
   // keepSlots = true 时**不清**槽位状态 —— 用于「提交成功后刷新界面」
   // （app.js 里 renderMode() 的那次调用）。
@@ -532,20 +536,13 @@ function resetSlotsForMode(mode, keepSlots) {
   //   同模式重渲染 -> 界面还是同一套槽位 -> 值必须保留（否则连做断）。
   // 两者的区别就是「界面是不是同一套槽位」，用 keepSlots 显式表达。
   if (keepSlots) return;
-  // state.files：只保留白名单内的 key，且把值置空（本地 File 对象
-  // 不能跨模式沿用 —— 那是上一模式的直传文件）。
-  for (const key of Object.keys(state.files || {})) {
-    if (keep(key)) {
-      // 仍然白名单内的 key：也要清 —— 理由见上面的「为什么连同 key 也清」。
-      state.files[key] = null;
-    } else {
-      delete state.files[key];
-    }
-  }
-  // state.assetRefs：整块清掉（素材库引用同样不跨模式沿用）。
+  // 【2026-11-16 新增】state.files（本地直传槽位）**已移除** ——
+  // 媒体必须先入库素材库，槽位里只可能有素材库引用。
+  //
+  // state.assetRefs：整块清掉（素材库引用不跨模式沿用 —— 理由见上面的
+  // 「为什么连同 key 也清」：flf 与 r2v 共用 refvid* / refaud* 槽位名，
+  // 但它们是两个不同面板的槽位）。
   state.assetRefs = {};
-  // state.slotPreviewUrls：本地预览 blob URL 跟着槽位一起失效。
-  state.slotPreviewUrls = {};
   // 音轨来源也要复位 —— 它是「基于当前模式素材」的派生状态。
   state.audioTrackSource = "";
 }
@@ -643,10 +640,9 @@ function renderMode() {
   /**
    * 【2026-11-15 修复③ 交付项 2】打开已填槽位里媒体的预览。
    *
-   * 槽位上记着它引用的素材（state.assetRefs[key]）或本地文件
-   * （state.files[key]），据此找到可播放 / 可放大的地址：
-   *   * 素材库来源 -> /api/assets/<id>/content
-   *   * 本地文件   -> blob: URL（由 fillSlot 记在 slot.dataset.previewUrl）
+   * 【2026-11-16 新增】槽位里只可能是**素材库引用**
+   * （state.assetRefs[key]）—— 本地直传通道已移除，
+   * 所以预览地址恒为 /api/assets/<id>/content。
    *
    * 图片走 lightbox（可缩放），视频 / 音频走媒体预览模态框（可播放）。
    */
@@ -656,45 +652,33 @@ function renderMode() {
     // 槽位 key：从 DOM 顺序拿不到，直接用 dataset（mk 时写入）
     const key = slot.dataset.key || "";
     const ref = key ? (state.assetRefs || {})[key] : null;
-    const localUrl = slot.dataset.previewUrl || "";
-    const url = ref
-      ? `/api/assets/${encodeURIComponent(ref.asset_id)}/content`
-      : localUrl;
-    if (!url) return;
+    if (!ref) return;
+    const url = `/api/assets/${encodeURIComponent(ref.asset_id)}/content`;
     const label = slot.dataset.label || "素材";
     preview.show({
       url,
       kind: kind === "image" ? "image" : kind,
-      name: ref ? (ref.name || label) : label,
-      category: ref ? ref.category : kind,
+      name: ref.name || label,
+      category: ref.category || kind,
     });
   }
 
   /**
    * 【2026-11-16 审查 B-4 修复】按 state 里的值回填一个槽位。
    *
-   * 【三条来源，与 fillSlot / fillFromAsset 严格对齐】
-   *   1) state.assetRefs[key]  -> 素材库来源（缩略图走 asset.preview_url）
-   *   2) state.files[key]      -> 本地直传 File（缩略图走 blob URL）
-   *   3) 都没有                -> 空槽位（保持初始的「+ 标签 + 素材库」形态）
+   * 【来源 —— 现在只有一种】state.assetRefs[key]（素材库引用）。
+   * 本地直传（state.files[key]）通道已移除：媒体必须先入库素材库。
    *
    * 【为什么不能只靠 dataset】slot.dataset.previewUrl 存在 DOM 上，
-   * 重建就丢；state.slotPreviewUrls 才是跨重建的落点。
+   * 重建就丢；state.assetRefs 才是跨重建的落点。
    */
   function restoreSlotContent(slot, key, kind, label) {
     const ref = (state.assetRefs || {})[key];
-    const file = (state.files || {})[key];
-    const localUrl = (state.slotPreviewUrls || {})[key] || "";
-    if (!ref && !file) return;
+    if (!ref) return;
     slot.replaceChildren();
-    let url = "";
-    if (ref) {
-      url = `/api/assets/${encodeURIComponent(ref.asset_id)}/content`;
-    } else if (file) {
-      url = localUrl;
-    }
-    if (url) slot.dataset.previewUrl = url;
-    if (kind === "image" && url) {
+    const url = `/api/assets/${encodeURIComponent(ref.asset_id)}/content`;
+    slot.dataset.previewUrl = url;
+    if (kind === "image") {
       const image = document.createElement("img");
       image.src = url;
       image.alt = label;
@@ -709,13 +693,47 @@ function renderMode() {
     tag.className = "tag";
     tag.textContent = label;
     slot.append(tag);
-    if (ref) {
-      const badge = document.createElement("span");
-      badge.className = "tag asset-badge";
-      badge.textContent = "素材库";
-      slot.append(badge);
-    }
+    const badge = document.createElement("span");
+    badge.className = "tag asset-badge";
+    badge.textContent = "素材库";
+    slot.append(badge);
     slot.classList.add("filled");
+  }
+
+  /**
+   * 【2026-11-16 新增】打开素材库选择器选一个素材填进槽位。
+   *
+   * 【为什么抽成独立函数】原来这段逻辑写在「素材库」按钮的 click 里，
+   * 而「点空槽位」走的是另一个分支（系统文件选择框）。两处各写一份
+   * 必然漂移 —— 现在两条路径共用这一个入口。
+   *
+   * 【类别限定】按槽位类型限定可选类别：
+   *   图片槽 -> categories ["image"]
+   *   视频槽 -> categories ["video"]
+   *   音频槽 -> categories ["audio"]
+   *
+   * onPick(asset) 收到的是素材库返回的完整素材对象
+   * （{id, name, category, preview_url, content_url}）。
+   */
+  function openAssetPickerForSlot(kind, onPick) {
+    if (!window.ASSETLIB || !window.ASSETLIB.openPicker) {
+      alert("素材库模块未加载");
+      return;
+    }
+    window.ASSETLIB.openPicker({
+      categories: [kind], multiple: false, limit: 1,
+      onDone: (ids) => {
+        if (!ids || !ids.length) return;
+        const assetId = ids[0];
+        fetch(`/api/assets/${encodeURIComponent(assetId)}`).then(r => r.json()).then(asset => {
+          onPick({
+            id: asset.id, name: asset.name, category: asset.category,
+            preview_url: asset.preview_url,
+            content_url: `/api/assets/${asset.id}/content`,
+          });
+        }).catch(err => alert("读取素材失败：" + err.message));
+      },
+    });
   }
 
   const mk = (key, label, kind = "image") => {
@@ -727,54 +745,23 @@ function renderMode() {
     slot.dataset.key = key;
     slot.dataset.label = label;
     slot.innerHTML = `+<span class="tag">${label}</span>`;
-    const inp = document.createElement("input");
-    inp.type = "file";
-    // 【2026-11-15】参考视频 / 参考音频槽位：accept 必须按类型收窄，
-    // 否则用户能选一个 .png 塞进「参考视频」槽位 —— 服务端会按
-    // 视频槽位去 ffmpeg 解它，直接失败。
-    inp.accept = kind === "video" ? "video/*"
-      : kind === "audio" ? "audio/*" : "image/*";
-    const fillSlot = (file, previewUrl) => {
-      const url = previewUrl || URL.createObjectURL(file);
-      // 【2026-11-15 修复③ 交付项 2】本地直传的素材也���能预览 ——
-      // 记下 blob 地址，点槽位时用它播放 / 放大。
-      slot.dataset.previewUrl = url;
-      // 【2026-11-16 审查 B-4 修复】预览地址同时存进 state ——
-      // 槽位重建后 DOM 上的 dataset 会丢，state 里的才留得住。
-      state.slotPreviewUrls[key] = url;
-      slot.replaceChildren();
-      if (kind === "image") {
-        const image = document.createElement("img");
-        image.src = url;
-        image.alt = label;
-        slot.append(image);
-      } else {
-        // 视频 / 音频不做缩略图（预览图对素材库条目才有），
-        // 放一个类型徽标，让用户看得见这个槽位放的是什么。
-        const badge = document.createElement("span");
-        badge.className = "tag asset-badge";
-        badge.textContent = kind === "video" ? "视频" : "音频";
-        slot.append(badge);
-      }
-      const tag = document.createElement("span");
-      tag.className = "tag";
-      tag.textContent = label;
-      slot.append(tag);
-      slot.classList.add("filled");
-      state.files[key] = file;
-      delete state.assetRefs[key];
-      // 【2026-11-15 B2 补漏】槽位内容变了 -> 音轨来源下拉要重算。
-      // 本地直传的参考音乐 / 参考视频同样会改变「哪些音轨选项出现」，
-      // 不重算的话下拉会一直停在「只有使用生成的音乐」。
-      if (typeof renderAudioTrackSelect === "function") renderAudioTrackSelect();
-    };
-    // 用素材库里的素材填这个槽位：只存 asset_id，不复制文件
+    // 【2026-11-16 新增】本地直传通道**已移除** —— 媒体必须先入库素材库。
+    //
+    // 【需求原文】首尾帧 / 参考生等功能的图片 / 音频 / 视频引用，
+    // 与「图片编辑」保持一致：外部素材必须先进入素材库，
+    // 界面只能从素材库挑选并引用，不允许功能直接引用外部文件路径。
+    //
+    // 【原来错在哪】这里创建了一个 <input type="file">，点空槽位就弹系统
+    // 文件选择框；选完的文件通过 multipart 的 file_first / file_last /
+    // file_ref / file_refvid / file_refaud 直接提交给服务端 —— 那就是
+    // 「直接引用外部文件路径」。服务端现在也会拦（见
+    // server._reject_external_media_or_raise），但**界面不该再给这个入口**：
+    // 入口在、后端拦 = 用户填完了才被告知不行，体验最差。
+    //
+    // 【现在】点空槽位 = 直接打开素材库选择器；「素材库」按钮同理。
     const fillFromAsset = (asset) => {
       // 素材库来源 -> 预览走 /api/assets/<id>/content（不是 blob）
       delete slot.dataset.previewUrl;
-      // 【2026-11-16 审查 B-4 修复】state 里的旧 blob 地址也要清 ——
-      // 否则重建回填时会拿一个已经失效的 blob URL 当缩略图。
-      delete state.slotPreviewUrls[key];
       slot.replaceChildren();
       if (kind === "image") {
         const image = document.createElement("img");
@@ -790,17 +777,12 @@ function renderMode() {
       badge.textContent = "素材库";
       slot.append(tag, badge);
       slot.classList.add("filled");
-      state.files[key] = null;
       state.assetRefs[key] = {asset_id: asset.id, name: asset.name, category: asset.category};
       // 【2026-11-15 B2 补漏】素材库填入参考音乐 / 参考视频后，
       // 音轨来源下拉必须重算 —— 否则「使用参考音乐作为成片音轨」/
       // 「使用参考视频的背景音乐」这两项**永远不会出现**（实测缺陷）。
       if (typeof renderAudioTrackSelect === "function") renderAudioTrackSelect();
     };
-    inp.addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (file) fillSlot(file);
-    });
     slot.addEventListener("dragover", event => {
       const types = event.dataTransfer.types;
       if (!types.includes("application/x-h3-image") && !types.includes("application/x-h3-asset")) return;
@@ -810,59 +792,57 @@ function renderMode() {
     });
     slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
     slot.addEventListener("drop", async event => {
-      // 优先按 asset_id 引用（素材库拖过来的），无 asset_id 时回退旧的 blob 路径
+      // 【2026-11-16 新增】只接受**素材库**拖过来的引用（application/x-h3-asset）。
+      //
+      // 【原来错在哪】这里还处理 application/x-h3-image（媒体库的生成结果）——
+      // 它把图片 fetch 成 blob 再塞进 state.files，走 multipart 直传。
+      // 现在直传通道已关闭，媒体库的结果**不能**再直接引用。
+      // 用户要用它，必须先「入库素材库」（素材库页右键 -> 添加到素材库），
+      // 再从素材库拖过来 —— 与「图片编辑」完全一致。
       const assetRaw = event.dataTransfer.getData("application/x-h3-asset");
-      if (assetRaw) {
-        event.preventDefault();
-        slot.classList.remove("drag-over");
-        try {
-          const payload = JSON.parse(assetRaw);
-          const resp = await fetch(`/api/assets/${encodeURIComponent(payload.asset_id)}`);
-          if (!resp.ok) throw new Error("素材不存在或已删除");
-          const asset = await resp.json();
-          const version = asset.current_version || {};
-          fillFromAsset({
-            id: asset.id, name: asset.name, category: asset.category,
-            preview_url: asset.preview_url,
-            content_url: asset.content_url || `/api/assets/${asset.id}/content`,
-          });
-        } catch (error) {
-          alert("无法引用这个素材：" + error.message);
+      if (!assetRaw) {
+        if (event.dataTransfer.types.includes("application/x-h3-image")) {
+          event.preventDefault();
+          slot.classList.remove("drag-over");
+          alert("该媒体尚未入库素材库，请先上传到素材库后再引用。\n"
+            + "（在媒体库卡片上右键「添加到素材库」，然后从素材库拖到这里）");
         }
         return;
       }
-      const raw = event.dataTransfer.getData("application/x-h3-image");
-      if (!raw) return;
       event.preventDefault();
       slot.classList.remove("drag-over");
-      slot.classList.add("loading");
       try {
-        const source = JSON.parse(raw);
-        const response = await fetch(source.url, {cache: "no-store"});
-        if (!response.ok) throw new Error("图片读取失败");
-        const blob = await response.blob();
-        const file = new File([blob], source.name || "completed-image.png", {type: blob.type || "image/png"});
-        fillSlot(file, source.url);
+        const payload = JSON.parse(assetRaw);
+        const resp = await fetch(`/api/assets/${encodeURIComponent(payload.asset_id)}`);
+        if (!resp.ok) throw new Error("素材不存在或已删除");
+        const asset = await resp.json();
+        const version = asset.current_version || {};
+        fillFromAsset({
+          id: asset.id, name: asset.name, category: asset.category,
+          preview_url: asset.preview_url,
+          content_url: asset.content_url || `/api/assets/${asset.id}/content`,
+        });
       } catch (error) {
-        alert("无法引用这张图片：" + error.message);
-      } finally {
-        slot.classList.remove("loading");
+        alert("无法引用这个素材：" + error.message);
       }
     });
     slot.addEventListener("click", event => {
       if (event.target.closest(".pick-asset")) return;
       // 【2026-11-15 修复③ 交付项 2】槽位**已填**时 -> 打开媒体预览模态框
-      // （图片可放大、视频/音频可播放）；未填时 -> 打开文件选择器。
+      // （图片可放大、视频/音频可播放）；未填时 -> 打开素材库选择器。
       //
       // 【为什么要这个】参考视频 / 参考音乐填进去之后，槽位只有一个类型徽标
       // （"视频" / "音频"），用户**看不到自己选了什么**、也没法确认内容。
       // 点一下就能看 / 播，是最基本的「确认我选对了」操作。
+      //
+      // 【2026-11-16】未填时打开的是**素材库选择器**（不再是系统文件框）——
+      // 媒体必须先入库素材库。
       if (slot.classList.contains("filled")) {
         event.preventDefault();
         openSlotPreview(slot, kind);
         return;
       }
-      inp.click();
+      openAssetPickerForSlot(kind);
     });
     // 「从素材库选」按钮
     const pickBtn = document.createElement("button");
@@ -872,30 +852,7 @@ function renderMode() {
     pickBtn.title = "从素材库选择一个素材填入这个位置";
     pickBtn.addEventListener("click", event => {
       event.stopPropagation();
-      if (!window.ASSETLIB || !window.ASSETLIB.openPicker) {
-        alert("素材库模块未加载");
-        return;
-      }
-      // 【2026-11-15】按槽位类型限定可选类别：
-      //   图片槽 -> categories ["image"]
-      //   视频槽 -> categories ["video"]   ← 之前**根本没有**这个入口
-      //   音频槽 -> categories ["audio"]
-      // 之前全仓只有 ["image"] / ["audio"] 两种写死值，
-      // 于是「参考视频」在面板上**没有任何入口**（缺口 1）。
-      window.ASSETLIB.openPicker({
-        categories: [kind], multiple: false, limit: 1,
-        onDone: (ids) => {
-          if (!ids || !ids.length) return;
-          const assetId = ids[0];
-          fetch(`/api/assets/${encodeURIComponent(assetId)}`).then(r => r.json()).then(asset => {
-            fillFromAsset({
-              id: asset.id, name: asset.name, category: asset.category,
-              preview_url: asset.preview_url,
-              content_url: `/api/assets/${asset.id}/content`,
-            });
-          }).catch(err => alert("读取素材失败：" + err.message));
-        },
-      });
+      openAssetPickerForSlot(kind, (asset) => fillFromAsset(asset));
     });
     slot.appendChild(pickBtn);
     // 【2026-11-16 审查 B-4 修复】按 state 里已有的值**如实回填**槽位。
@@ -927,7 +884,7 @@ function renderMode() {
     //   refaud0..2 -> 参考音乐 (node schema: ref_audios max=3)
     // 注意：flf **不**有参考图槽位（首尾帧就是它的图条件）。
     $("#uploadTitle").textContent =
-      "上传首帧与尾帧，或从素材库选（首帧 / 尾帧给其中一张即可；"
+      "从素材库选首帧与尾帧（首帧 / 尾帧给其中一张即可；"
       + "参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
     // 【2026-11-15 修复③ 交付项 3】本模式特有素材字段的标题与说明
@@ -949,7 +906,7 @@ function renderMode() {
     //   refvid0..2  -> 参考视频  (node schema: ref_videos max=3)
     //   refaud0..2  -> 参考音乐  (node schema: ref_audios max=3)
     $("#uploadTitle").textContent =
-      "上传参考素材，或从素材库选（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）";
+      "从素材库选参考素材（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）";
     zone.style.display = "block";
     setVideoMediaLabels("参考素材", "参考图 ≤9 · 参考视频 ≤3 · 参考音乐 ≤3");
     for (let i = 0; i < 9; i++) mk("ref" + i, "参考 " + (i + 1));
@@ -1125,13 +1082,11 @@ function audioTrackAvailability() {
       hasRefAudio = true;
     }
   }
-  // 本地上传的参考音频 / 参考视频（不走素材库）也算
-  if (state.files) {
-    for (let i = 0; i < 3; i++) {
-      if (state.files["refaud" + i]) hasRefAudio = true;
-      if (state.files["refvid" + i]) hasVideoAudio = true;
-    }
-  }
+  // 【2026-11-16 新增】本地直传的参考音频 / 参考视频**已不存在**。
+  //
+  // 媒体必须先入库素材库才能引用（与「图片编辑」一致），
+  // 所以这里不再有「state.files 里的本地文件」这一路来源 ——
+  // 音轨素材的判据**只**看 state.assetRefs（素材库引用）。
   return { hasRefAudio, hasVideoAudio };
 }
 
@@ -3174,6 +3129,21 @@ async function onGenerateClick() {
       alert("参考生音乐需要从素材库选择一段参考音频。");
       return;
     }
+    // 【2026-11-16 新增】音乐面板的种子（#musicSeed）同样只允许正整数。
+    //
+    // 【为什么音乐面板要单独校验】它走的是**另一条**提交分支
+    // （musicFd / window.MusicUI.collect()），不经过通用面板那条 ——
+    // 所以共享面板的校验管不到它。校验逻辑与共享面板共用
+    // window.SeedGuard（一份实现），只是取值来源不同。
+    const musicSeedCheck = (window.SeedGuard && typeof window.SeedGuard.validate === "function")
+      ? window.SeedGuard.validate((collected.params || {}).seed)
+      : { ok: true, seed: null, error: "" };
+    if (!musicSeedCheck.ok) {
+      alert(musicSeedCheck.error);
+      return;
+    }
+    // 归一后的种子：留空 -> null（随机），合法 -> 数字。
+    collected.params.seed = musicSeedCheck.seed;
     const musicFd = new FormData();
     musicFd.append("mode", mode);
     // 【提示词历史】音乐面板的原始版 = 增强前的音乐描述。
@@ -3202,6 +3172,23 @@ async function onGenerateClick() {
 
   const prompt = $("#prompt").value.trim();
   if (!prompt) { alert("请填写提示词"); return; }
+  // 【2026-11-16 新增】随机种子：只允许正整数，非法时**提交前**就拦下。
+  //
+  // 【原来错在哪】种子值原样提交 -> 服务端一路不校验 -> worker 里
+  // int(seed) 抛 ValueError -> 用户只看到「生成失败（服务端未能给出具体原因）」。
+  // 现在这里就给出能照着改的中文原因，并且**不发起请求**。
+  //
+  // 【为什么用 window.SeedGuard 而不是就地写正则】音乐面板（#musicSeed）
+  // 与视频面板（#seed）是两个不同的输入框、两处不同的提交路径 ——
+  // 校验逻辑必须**只有一份**，否则两边口径漂移。
+  // 实现见 web/seed-guard.js（与后端 h3studio/seed_guard.py 同口径）。
+  const seedCheck = (window.SeedGuard && typeof window.SeedGuard.validate === "function")
+    ? window.SeedGuard.validate($("#seed").value)
+    : { ok: true, seed: null, error: "" };
+  if (!seedCheck.ok) {
+    alert(seedCheck.error);
+    return;
+  }
   // 图像模式：提示词未增强时先确认
   //   确认 -> 用用户原始提示词继续生成；取消/关闭 -> 中止本次生成（不自动开始增强）
   if (IMAGE_MODES.includes(mode) && currentPromptLevel() === 0) {
@@ -3226,7 +3213,10 @@ async function onGenerateClick() {
     // 基线里挂一个写死的 state.steps（恒 4）只会让「没人负责」的模式
     // 悄悄用错步数 —— 那正是 B-11 实测到的「面板 50 / 提交 4」。
     model: state.model,
-    seed: $("#seed").value.trim() || null,
+    // 【2026-11-16】种子已在上方通过 window.SeedGuard 校验（正整数）。
+    // 这里提交**归一后的**值：留空 -> null（随机），合法 -> 数字。
+    // （原来提交的是原始字符串，后端 int() 再转一次。）
+    seed: seedCheck.seed,
   };
   // 【2026-11-12 修 —— 根因之一】旧实现对**所有模式**无条件写
   //   lora: state.model === "lora" ? state.lora : "none"
@@ -3491,6 +3481,15 @@ async function onGenerateClick() {
     }
     params.ref_images = window.QwenRefs.toPayload();
   }
+  // 【2026-11-16】种子最终归一：放在**所有**模式分支跑完之后。
+  //
+  // 【为什么必须放在这里】视频模式会 Object.assign(params, VIDEO_PANEL.submitParams())，
+  // 而 submitParams() 也会带一个 seed（原始字符串）。若在分支**之前**
+  // 归一，这里会被覆盖回原始字符串 —— 校验就白做了。
+  //
+  // 放在最后 = 「所有分支都跑完，谁也不能改它」。
+  // seedCheck 是提交入口开头那次校验的结果（非法值那时已经 return 了）。
+  params.seed = seedCheck.seed;
   fd.append("params", JSON.stringify(params));
   try {
     // 素材库引用：槽位 -> asset_id，随任务一起提交（服务端按槽位上传到 ComfyUI）
@@ -3575,87 +3574,60 @@ async function onGenerateClick() {
       // 后端放宽的那条能力**永远用不到**。
       //
       // 现在：首帧、尾帧**都不给**才拦；给哪张都放行。
-      const hasFirst = state.files.first || (state.assetRefs && state.assetRefs.first);
-      const hasLast = state.files.last || (state.assetRefs && state.assetRefs.last);
+      //
+      // 【2026-11-16 新增】媒体**只能来自素材库** —— 本地直传通道已移除。
+      // 原来这里还会 fd.append("file_first", ...) / ("file_last", ...)，
+      // 那是「直接引用外部文件路径」。现在只有素材库引用（asset_refs）。
+      const hasFirst = state.assetRefs && state.assetRefs.first;
+      const hasLast = state.assetRefs && state.assetRefs.last;
       if (!hasFirst && !hasLast) {
-        alert("首尾帧模式需要至少提供首帧或尾帧图片（给其中一张即可）。");
+        alert("首尾帧模式需要至少提供首帧或尾帧图片（给其中一张即可）。\n"
+          + "请从素材库选择 —— 素材需先入库素材库再引用。");
         return;
       }
-      if (state.files.first) fd.append("file_first", state.files.first);
-      if (state.files.last) fd.append("file_last", state.files.last);
-      // 【2026-11-15 补齐 —— 缺口 1 的 flf 半边：本地直传参考视频 / 参考音乐】
-      //
-      // 面板在 flf 下渲染了 refvid0..2 / refaud0..2 槽位（音轨三选一的素材），
-      // 那本地直传也必须有对应的提交通道 —— 否则用户选了本地文件就被丢掉，
-      // 而素材库路径（asset_refs）却是通的，两条路行为不一致。
-      //
-      // 服务端接收字段与 r2v 相同：file_refvid / file_refaud。
-      const REF_VIDEO_LIMIT = 3;
-      const REF_AUDIO_LIMIT = 3;
-      const flfRefVids = [];
-      for (let i = 0; i < REF_VIDEO_LIMIT; i++) {
-        const f = state.files["refvid" + i];
-        if (f) flfRefVids.push(f);
-      }
-      const flfRefAuds = [];
-      for (let i = 0; i < REF_AUDIO_LIMIT; i++) {
-        const f = state.files["refaud" + i];
-        if (f) flfRefAuds.push(f);
-      }
-      flfRefVids.forEach(f => fd.append("file_refvid", f));
-      flfRefAuds.forEach(f => fd.append("file_refaud", f));
     } else if (mode === "r2v") {
-      // 【2026-11-15 修 —— 缺口 3：本地直传上限与后端 ≤9 对齐】
+      // 【2026-11-16 新增】参考素材**只能来自素材库**（本地直传通道已移除）。
       //
-      // 【原来错在哪】只提交 ref0 / ref1 / ref2 三张：
-      //   const refs = [state.files.ref0, state.files.ref1, state.files.ref2]
-      // 面板明明渲染了 9 个参考图槽位，但用户放第 4 张时
-      // **提交时被静默丢掉** —— 用户以为 9 张都进去了，实际只有 3 张。
-      // 这就是「不得出现提交被截断」要求指向的那个缺陷。
-      //
-      // 现在：9 个槽位**全部**提交，并按节点真实上限（9）显式校验，
-      // 超了直接报错而不是截断。
+      // 上限与节点真实上限一致（图 9 / 视频 3 / 音乐 3）—— 超了**报错**
+      // 而不是截断（那正是旧实现「提交被截断」的缺陷）。
+      // 现在这些上限由**素材库引用**的条数决定，槽位本身就是按上限渲染的，
+      // 所以正常路径不会超；这里仍保留校验（防止 state 里的残留引用越界）。
       const REF_IMAGE_LIMIT = 9;
       const REF_VIDEO_LIMIT = 3;
       const REF_AUDIO_LIMIT = 3;
-      const refs = [];
-      for (let i = 0; i < REF_IMAGE_LIMIT; i++) {
-        const f = state.files["ref" + i];
-        if (f) refs.push(f);
-      }
-      const refVids = [];
-      for (let i = 0; i < REF_VIDEO_LIMIT; i++) {
-        const f = state.files["refvid" + i];
-        if (f) refVids.push(f);
-      }
-      const refAuds = [];
-      for (let i = 0; i < REF_AUDIO_LIMIT; i++) {
-        const f = state.files["refaud" + i];
-        if (f) refAuds.push(f);
-      }
-      // 素材库来源的参考素材同样算「已提供」
-      const assetSlotSet = new Set(assetRefs.map(r => r.slot));
-      const assetCount = assetSlotSet.size;
-      if (!refs.length && !refVids.length && !refAuds.length && !assetCount) {
-        alert("参考模式至少需要 1 个参考素材（参考图 / 参考视频 / 参考音乐）");
+      // 素材库来源的参考素材（asset_refs）才是「已提供」。
+      //
+      // 【为什么按 slot 分组数而不是数 Set 大小】asset_refs 里每条都是
+      // {asset_id, slot, ordinal}，同一组的多张图**共用一个 slot 名**
+      // （ref_image / ref_video / ref_audio），只是 ordinal 不同。
+      // 用 Set 的大小会把「9 张参考图」算成 1 —— 上限校验就成了摆设。
+      const countBySlot = { ref_image: 0, ref_video: 0, ref_audio: 0 };
+      assetRefs.forEach(r => {
+        if (r && countBySlot[r.slot] !== undefined) {
+          countBySlot[r.slot] += 1;
+        }
+      });
+      const refImageCount = countBySlot.ref_image;
+      const refVideoCount = countBySlot.ref_video;
+      const refAudioCount = countBySlot.ref_audio;
+      if (!refImageCount && !refVideoCount && !refAudioCount) {
+        alert("参考模式至少需要 1 个参考素材（参考图 / 参考视频 / 参考音乐）\n"
+          + "请从素材库选择 —— 素材需先入库素材库再引用。");
         return;
       }
       // 上限显式校验（不静默截断）
-      if (refs.length > REF_IMAGE_LIMIT) {
-        alert(`参考图最多 ${REF_IMAGE_LIMIT} 张，当前 ${refs.length} 张。`);
+      if (refImageCount > REF_IMAGE_LIMIT) {
+        alert(`参考图最多 ${REF_IMAGE_LIMIT} 张，当前 ${refImageCount} 张。`);
         return;
       }
-      if (refVids.length > REF_VIDEO_LIMIT) {
-        alert(`参考视频最多 ${REF_VIDEO_LIMIT} 个，当前 ${refVids.length} 个。`);
+      if (refVideoCount > REF_VIDEO_LIMIT) {
+        alert(`参考视频最多 ${REF_VIDEO_LIMIT} 个，当前 ${refVideoCount} 个。`);
         return;
       }
-      if (refAuds.length > REF_AUDIO_LIMIT) {
-        alert(`参考音乐最多 ${REF_AUDIO_LIMIT} 段，当前 ${refAuds.length} 段。`);
+      if (refAudioCount > REF_AUDIO_LIMIT) {
+        alert(`参考音乐最多 ${REF_AUDIO_LIMIT} 段，当前 ${refAudioCount} 段。`);
         return;
       }
-      refs.forEach(f => fd.append("file_ref", f));
-      refVids.forEach(f => fd.append("file_refvid", f));
-      refAuds.forEach(f => fd.append("file_refaud", f));
     }
     const resp = await fetch("/api/jobs", { method: "POST", body: fd });
     const data = await resp.json();

@@ -632,6 +632,17 @@
       sampler: st.sampler,
       scheduler: st.scheduler,
       format: st.format,
+      // 【2026-11-16】种子：**原样**带出去，由提交入口统一校验。
+      //
+      // 【为什么这里不自己校验】音乐面板的 collect() 是**纯收集**函数 ——
+      // 它不该在这里就把非法值「归一成 null」（= 随机），那样上层
+      // 拿到的就是「随机」，非法值被**静默吞掉**了 —— 用户填了
+      // 「abc」，系统当成「没填」，跑出一个随机结果，用户完全不知情。
+      //
+      // 真正的拦截在 app.js 的音乐提交分支：那里拿这个原值去
+      // window.SeedGuard 校验，非法就报错并**不发起请求**；
+      // 合法则被归一成数字再提交。
+      // 校验实现见 web/seed-guard.js（与后端 h3studio/seed_guard.py 同口径）。
       seed: (($("#musicSeed") || {}).value || "").trim() || null,
       music_temperature: st.temperature,
       music_top_p: st.top_p,

@@ -1485,6 +1485,10 @@
      它**不改**各面板的状态与提交逻辑：输入框只是另一个入口，
      最终仍然写回同一个 range 的 value 并派发 input/change 事件。 -->
 <script src="/static/numeric-slider.js?v=numslider3"></script>
+<!-- 【2026-11-16 新增】随机种子的正整数校验（前端闸门）。
+     必须在 app.js **之前**加载 —— app.js 的提交入口要调 window.SeedGuard。
+     校验口径与后端 h3studio/seed_guard.py 一致。 -->
+<script src="/static/seed-guard.js?v=seedguard1"></script>
 <!-- 【2026-11-15 修复③ 交付项 2】媒体预览模态框。
      图片分支复用 app.js 已有的 lightbox（window.H3Studio.lightboxShow），
      视频 / 音频分支用本模块自己的模态框。 -->

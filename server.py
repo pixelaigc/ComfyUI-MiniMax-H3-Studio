@@ -82,6 +82,8 @@ from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import gen_defaults
 from h3studio import gen_normalize
+from h3studio import seed_guard
+from h3studio import asset_ref_guard
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import docs_static
@@ -3609,6 +3611,25 @@ def _image_model_for_mode(mode: str, params: dict) -> dict | None:
     return model if isinstance(model, dict) else None
 
 
+def _reject_external_media_or_raise(saved_files: dict | None, mode: str) -> None:
+    """
+    拒绝「本地直传」的媒体文件 —— 生成任务的媒体必须来自素材库。
+
+    【需求 —— 2026-11-16】首尾帧 / 参考生等功能的图片 / 音频 / 视频引用，
+    与「图片编辑」保持一致：外部素材必须先进入素材库，
+    界面只能从素材库挑选并引用，不允许功能直接引用外部文件路径。
+
+    【为什么要包一层】asset_ref_guard 抛的是 AssetLibraryError（带 code），
+    但 prepare_job_params 的对外契约是 JobValidationError —— api_create
+    只捕那一个。直接抛 AssetLibraryError 会变成**未捕获异常** ->
+    500 + 堆栈，而不是一条可读的中文原因。
+    """
+    try:
+        asset_ref_guard.reject_external_media(saved_files, mode)
+    except asset_ref_guard.AssetLibraryError as exc:
+        raise JobValidationError(exc.message, code=exc.code) from exc
+
+
 def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                        saved_files: dict | None = None) -> list:
     """
@@ -3629,6 +3650,22 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
 
     if mode not in JOB_MODES:
         raise JobValidationError(f"未知模式 {mode}")
+
+    # 【2026-11-16 新增】随机种子：只允许正整数。
+    #
+    # 【原来错在哪】种子**一路不校验**地流到 worker：
+    #   workflows.py:339  seed = params.get("seed") or random.randint(0, 2**48)
+    #   workflows.py:380  p = {..., "_seed": int(seed), ...}   <- ValueError
+    # worker 捕获后只留一句「生成失败（服务端未能给出具体原因）」——
+    # 用户既不知道自己填错了什么，也不知道该怎么改。
+    #
+    # 【为什么在这里校验】prepare_job_params 是**所有**建任务路径的
+    # 唯一公共点（面板提交 / 内置 Agent create_job / retry_job）——
+    # 在这里拦一次，三条链路同时生效，不会各写一份必然漂移。
+    try:
+        seed_guard.normalize_seed_params(params)
+    except seed_guard.SeedValidationError as exc:
+        raise JobValidationError(exc.message, code=exc.code) from exc
 
     # 【2026-11-11】首尾帧 / 参考生视频的采样参数归一。
     # 这两个模式走旧工作流路径，但采样链路与文生视频相同
@@ -3743,6 +3780,16 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
             and "MiniMaxH3SigmaShift" in _COMFY_NODE_NAMES)
 
     if mode == "flf":
+        # 【2026-11-16 新增】首尾帧 / 参考视频 / 参考音乐**必须来自素材库**。
+        #
+        # 【原来错在哪】flf 接受 file_first / file_last / file_refvid /
+        # file_refaud 四个 multipart 上传通道 —— 即「直接引用外部文件路径」。
+        # 需求（2026-11-16）要求与「图片编辑」一致：外部素材必须先入库
+        # 素材库，界面只能从素材库挑选并引用。
+        #
+        # 【为什么在这里拦而不是只在前端去掉入口】前端挡不住直接调 API
+        # 与内置 Agent 建任务；后端是唯一强制点。
+        _reject_external_media_or_raise(saved_files, mode)
         if saved_files.get("file_first"):
             params["first_frame"] = saved_files["file_first"][0]
         if saved_files.get("file_last"):
@@ -3774,6 +3821,9 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                     "请从素材库选择首帧 / 尾帧，或直接上传图片。",
                     code="frame_required")
     elif mode == "r2v":
+        # 【2026-11-16 新增】参考图 / 参考视频 / 参考音乐**必须来自素材库**
+        # （与「图片编辑」同一套约束）。理由同 flf 分支。
+        _reject_external_media_or_raise(saved_files, mode)
         refs = saved_files.get("file_ref", [])
         # 【2026-11-15】参考视频 / 参考音乐的本地直传通道。
         # （缺口 1：面板补了槽位 -> 服务端必须有对应的接收与上传路径。）
@@ -3811,6 +3861,39 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                     code="ref_too_many")
             if refs:
                 params["ref_images"] = refs
+
+        # 【2026-11-16 新增】**素材库引用**的各组上限也必须校验 ——
+        # 否则「提交被静默截断」那个老缺陷会从**另一条路**回来：
+        # 用户选 10 张参考图（面板有 9 个槽位，但 state 里可能残留更多），
+        # 服务端不报错，worker 上传时按节点上限丢掉第 10 张 ——
+        # 用户以为 10 张都进去了。
+        #
+        # 【为什么放在这里】这是**唯一**能同时看到「素材库引用」与
+        # 「节点上限」的地方（prepare_job_params 是三条建任务路径的公共点）。
+        _ref_counts = {}
+        for _r in (asset_refs or []):
+            if isinstance(_r, dict):
+                _slot = str(_r.get("slot") or "")
+                _ref_counts[_slot] = _ref_counts.get(_slot, 0) + 1
+        _ref_limits = {
+            "ref_image": h3modes.MAX_REF_IMAGES,
+            "ref_video": h3modes.MAX_REF_VIDEOS,
+            "ref_audio": h3modes.MAX_REF_AUDIOS,
+            "ref_video_audio": h3modes.MAX_REF_VIDEOS,
+        }
+        _ref_labels = {
+            "ref_image": "参考图",
+            "ref_video": "参考视频",
+            "ref_audio": "参考音乐",
+            "ref_video_audio": "参考视频背景音",
+        }
+        for _slot, _limit in _ref_limits.items():
+            _count = _ref_counts.get(_slot, 0)
+            if _count > _limit:
+                raise JobValidationError(
+                    f"{_ref_labels.get(_slot, _slot)}最多 {_limit} 个，"
+                    f"当前 {_count} 个。",
+                    code="ref_too_many")
 
     # ---- 音轨三选一（首尾帧 / 参考生视频）----
     #

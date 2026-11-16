@@ -32,7 +32,7 @@ flowchart TD
     P_IMAGE["图像面板 #imagePanel<br/>分辨率档位 / 画面比例 / 输出尺寸 / 生成批次<br/>Z-Image 模型 / 调度器 / 负面提示词<br/>SLG（MOSS 专属）/ 参考图 / LoRA"]
     P_MUSIC["音乐面板 #musicPanel<br/>YuE2 音乐模型 / 音频编码器 / 音乐描述<br/>结构化风格 / 歌词 / 参考音频 / 谱面规划<br/>输出格式 / 种子"]
     P_STITCH["长片拼接面板 #stitchPanel<br/>长片标题 / 简介 / 片段列表（≥2）/ 合成长片"]
-    P_UPLOAD["上传区 #uploadZone<br/>flf 首帧+尾帧 · r2v 参考图×3<br/>i2i / a2a 参考素材必须来自素材库"]
+    P_UPLOAD["素材槽位区 #uploadZone<br/>flf 首帧+尾帧 · r2v 参考图×9<br/>全部媒体必须先入库素材库再引用"]
   end
 
 @MODE_TO_PANEL@
@@ -71,7 +71,7 @@ flowchart TD
   %% ---------- 提交与执行 ----------
   subgraph RUN["④ 提交与执行"]
     direction LR
-    SEED["种子 / 采样参数"]
+    SEED["种子 / 采样参数<br/>种子只接受正整数（留空=随机）"]
     GEN["点「生成」<br/>POST /api/jobs"]
     QUEUE["生成队列<br/>SQLite FIFO · 单 Worker"]
     COMFY["ComfyUI 执行<br/>progress → done / failed"]
