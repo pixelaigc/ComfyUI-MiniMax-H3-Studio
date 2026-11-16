@@ -49,6 +49,37 @@ DEPLOY_FILES=(
   tests/test_agent_contract.py
   tests/test_frontend_assets_hygiene.py
   docs/内置Agent审查报告-20261116.md
+  # 【2026-11-16 修：必须把新增的证据文件也列进来】
+  # 上一轮漏列的后果：live 工作区里这些文件是「已删除」态（索引有、工作区没有），
+  # 部署完整性自检正确拦住了部署（live 工作区与 HEAD 不一致）。
+  # 根因：`git checkout <commit> -- <清单>` 只更新清单内的路径，
+  # 清单外的新增文件不会被带过去。
+  audits/agent_attach_browser.py
+  audits/agent_audit_api_probe.json
+  audits/agent_audit_api_probe.py
+  audits/agent_audit_browser.py
+  audits/agent_retry_probe.py
+  audits/agent_settings_roundtrip.json
+  audits/agent_settings_roundtrip.py
+  audits/agent_tools_live_probe.json
+  audits/agent_tools_live_probe.py
+  audits/agent_tools_live_probe_full.json
+  audits/agent_tools_run_code.json
+  audits/attach_browser2/attach_browser.json
+  audits/attach_browser2/attach_uploaded.png
+  audits/browser_audit3/01_agent_page.png
+  audits/browser_audit3/02_drawer.png
+  audits/browser_audit3/05_stream.png
+  audits/browser_audit3/05b_token.png
+  audits/browser_audit3/08_clarify.png
+  audits/browser_audit3/09_error_retry.png
+  audits/browser_audit3/10_manage.png
+  audits/browser_audit3/15_artifacts.png
+  audits/browser_audit3/browser_audit.json
+  audits/retry_probe3/A_http_500.png
+  audits/retry_probe3/B_sse_error.png
+  audits/retry_probe3/C_sse_done_failed.png
+  audits/retry_probe3/retry_probe.json
 )
 
 echo "=== 0) 现状 ==="
