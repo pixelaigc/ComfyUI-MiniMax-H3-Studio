@@ -1755,6 +1755,88 @@ def list_acceleration_loras(deep_analysis: bool = False) -> list[dict]:
             if item["kind"] == KIND_ACCELERATION]
 
 
+def lora_inventory_by_kind(deep_analysis: bool = False) -> dict:
+    """**一次扫描**得到 Z-Image 族按 kind 分类的清单。
+
+    ⚠️ **为什么需要这个入口（2026-11-16 线上 8190 不可访问的根因）**
+    ---------------------------------------------------------------------------
+    旧代码在 `api_image_loras` 里连着调三个函数：
+
+        available     = list_effect_loras()        # 全量扫描
+        incompatible = list_incompatible_loras()  # 又一次全量扫描
+        acceleration = list_acceleration_loras()   # 又一次全量扫描
+
+    三个函数各自调用 `list_z_image_loras()` —— 也就是**同一份全量目录扫描
+    做了 3 遍**。每次扫描都要：
+
+      1. `comfyui_lora_dirs()` —— 解析 extra_model_paths.yaml
+      2. `cleanup_stale_derived(dirs)` —— 对每个 loras 目录做 glob
+      3. `d.rglob("*.safetensors")` —— 递归遍历（实测本机 700+ 文件）
+      4. 对其中 465 个「文件名无 z-image 线索但 kind=效果类」的文件逐个
+         **同步 open() 读 safetensors 头部**（`_looks_like_z_image_layers`）
+
+    这些**全是同步阻塞调用，且直接跑在 asyncio 事件循环里**。
+    本机 LoRA 目录挂在 `/mnt/usb2t`（USB NTFS via fuseblk）上，
+    冷缓存时单次 stat/open 就要几十毫秒 —— 于是
+
+        /api/image-loras  →  阻塞事件循环 3~150 秒
+        → 同一时刻所有其它 HTTP 请求（含首页 /）全部挂起
+        → http://192.168.3.78:8190/ 表现为「端口在监听但打不开」
+
+    实测（2026-11-16 10:46 现场，py-spy dump 抓到的真实栈）：
+
+        Thread 3462 (idle): "MainThread"
+            getsize (<frozen genericpath>:86)
+            _header_covers_file (h3studio/moss_lora_compat.py:153)
+            read_safetensors_header (h3studio/moss_lora_compat.py:142)
+            _read_safetensors_header (h3studio/loras.py:417)
+            _looks_like_z_image_layers (h3studio/loras.py:442)
+            list_z_image_loras (h3studio/loras.py:1619)
+            list_incompatible_loras (h3studio/loras.py:1748)
+            api_image_loras (server.py:6331)
+
+    注意栈顶是 **`getsize`**（`_header_covers_file` 里的 `os.path.getsize`）
+    —— 说明它卡在**文件系统 stat**，不是 CPU 计算。
+
+    本函数把扫描收敛成**一次**，调用方拿到的三个列表来自同一份快照，
+    既消除 3 倍重复 IO，也让「available / incompatible / acceleration」
+    三个列表**互相自洽**（同一时刻的同一份扫描结果）。
+
+    返回: {"effect": [...], "incompatible": [...], "acceleration": [...]}
+    """
+    return _inventory_by_kind(list_z_image_loras(deep_analysis=deep_analysis))
+
+
+def lora_inventory_by_kind_qwen(deep_analysis: bool = False) -> dict:
+    """Qwen-Image 2.1 族的单次扫描清单（见 `lora_inventory_by_kind`）。
+
+    旧代码在这里调了 3 次扫描函数（available / incompatible / acceleration），
+    同样把事件循环堵死。
+    """
+    return _inventory_by_kind(list_qwen_image_loras(deep_analysis=deep_analysis))
+
+
+def lora_inventory_by_kind_moss(deep_analysis: bool = False) -> dict:
+    """MOSS-Image 族的单次扫描清单（见 `lora_inventory_by_kind`）。"""
+    return _inventory_by_kind(list_moss_image_loras(deep_analysis=deep_analysis))
+
+
+def _inventory_by_kind(items: list[dict]) -> dict:
+    """把一份完整扫描结果按 kind 拆成三份清单。
+
+    抽出来是因为三个族（Z-Image / Qwen-Image 2.1 / MOSS-Image）共用同一套
+    分类口径 —— 分类逻辑只写一遍，避免各族各写各的、慢慢漂移。
+    """
+    effect = [item for item in items if item["kind"] == KIND_EFFECT]
+    return {
+        "effect": effect,
+        "incompatible": [item for item in effect
+                         if not item.get("compatible", True)],
+        "acceleration": [item for item in items
+                         if item["kind"] == KIND_ACCELERATION],
+    }
+
+
 def _read_safetensors_metadata(path: Path) -> dict:
     """只读 safetensors 头部元数据（不加载权重）。"""
     try:

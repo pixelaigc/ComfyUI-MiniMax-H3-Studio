@@ -6291,6 +6291,9 @@ async def api_image_loras(request):
     qwen = lora_registry.is_qwen_base(base)
     moss = lora_registry.is_moss_base(base)
     h3image = lora_registry.is_h3image_base(base)
+    # MOSS 分支的扫描快照 —— 下面 `if moss:` 处复用它（避免二次扫描）。
+    # 显式初始化，让静态检查器看到「所有路径都已定义」。
+    moss_inventory: dict = {}
     if h3image:
         # 【MiniMax-H3-Image：官方暂未发布该模型的 LoRA】
         # 返回**空清单**（而不是掉进 else 分支拿 Z-Image 族的清单 ——
@@ -6300,7 +6303,6 @@ async def api_image_loras(request):
         incompatible = []
         acceleration = []
     elif moss:
-        available = lora_registry.list_moss_effect_loras()
         # 【2026-11-14 需求 15】MOSS-Image 的「已排除」清单**不再下发**。
         #
         # 【为什么不兼容】这批 LoRA（Realistic Snapshot / Kodachrome /
@@ -6319,17 +6321,45 @@ async def api_image_loras(request):
         # LoRA 的条目 —— 否则它们会以「已排除」条目留在用户已选列表里，
         # 仍然出现在界面上（且提交时会被服务端拒绝）。
         incompatible = []
-        acceleration = [item for item in lora_registry.list_moss_image_loras()
-                        if item["kind"] == lora_registry.KIND_ACCELERATION]
+        # MOSS 分支同样要「一次扫描出三份清单」—— 旧代码这里调了两次
+        # list_moss_image_loras()（available + acceleration），每次都是全量
+        # 目录扫描。合并成一次，并走线程（见 else 分支的完整说明）。
+        moss_inventory = await asyncio.to_thread(
+            lora_registry.lora_inventory_by_kind_moss)
+        available = [item for item in moss_inventory["effect"]
+                     if item.get("compatible", True)]
+        acceleration = moss_inventory["acceleration"]
     elif qwen:
-        available = lora_registry.list_qwen_effect_loras()
-        incompatible = lora_registry.list_qwen_incompatible_loras()
-        acceleration = [item for item in lora_registry.list_qwen_image_loras()
-                        if item["kind"] == lora_registry.KIND_ACCELERATION]
+        # ⚠️ 走线程：全量目录扫描是同步阻塞 IO，跑在事件循环里会冻结全站
+        # （见 else 分支的完整说明 —— 2026-11-16 线上 8190 不可访问根因）。
+        inventory = await asyncio.to_thread(
+            lora_registry.lora_inventory_by_kind_qwen)
+        available = [item for item in inventory["effect"]
+                     if item.get("compatible", True)]
+        incompatible = inventory["incompatible"]
+        acceleration = inventory["acceleration"]
     else:
-        available = lora_registry.list_effect_loras()
-        incompatible = lora_registry.list_incompatible_loras()
-        acceleration = lora_registry.list_acceleration_loras()
+        # ⚠️ **必须放在线程里跑**（2026-11-16 线上 8190 不可访问的根因修复）
+        #
+        # 旧代码在这里同步调三个扫描函数：
+        #     available     = list_effect_loras()
+        #     incompatible = list_incompatible_loras()
+        #     acceleration = list_acceleration_loras()
+        # 三个函数各自触发**一次全量目录扫描**（rglob 700+ 文件 + 465 次
+        # 同步读 safetensors 头部），且**直接跑在 asyncio 事件循环里**。
+        # LoRA 目录挂在 USB NTFS(fuseblk) 上，冷缓存时单次 stat 就要几十毫秒
+        # —— 事件循环被冻结 3~150 秒，同期所有 HTTP 请求（含首页 /）全部挂起，
+        # 表现为「端口在监听但页面打不开」。
+        #
+        # 修复两件事：
+        #   1. `asyncio.to_thread` —— 扫描不占事件循环，首页随时可响应
+        #   2. `lora_inventory_by_kind()` —— 三份清单来自**同一次**扫描，
+        #      消掉 3 倍重复 IO，且三份列表互相自洽
+        inventory = await asyncio.to_thread(lora_registry.lora_inventory_by_kind)
+        available = [item for item in inventory["effect"]
+                     if item.get("compatible", True)]
+        incompatible = inventory["incompatible"]
+        acceleration = inventory["acceleration"]
     with db() as conn:
         config = lora_registry.load_config(conn, lora_registry.pref_key_for_base(base))
     # 【2026-11-14 需求 15】MOSS-Image：把「已排除」批次从**已保存配置**里
@@ -6341,8 +6371,14 @@ async def api_image_loras(request):
     # （带一个「文件缺失」标签）。但文件其实**在** —— 只是不兼容。
     # 直接从 config 里剔除，才是真的「不再展示」。
     if moss:
+        # 直接复用上面那次扫描的 incompatible 清单 —— 旧代码这里又调了
+        # 一次 list_moss_incompatible_loras()（= 又一次全量目录扫描，
+        # 同步阻塞事件循环）。改成复用同一份快照，扫描次数从 2 次降到 1 次。
+        #
+        # `moss_inventory` 在 moss 分支一定已赋值（见上），这里给个空默认
+        # 只是为了让静态检查器看到「所有路径都已定义」。
         excluded_names = {item["name"]
-                          for item in lora_registry.list_moss_incompatible_loras()}
+                          for item in (moss_inventory or {}).get("incompatible", [])}
         if excluded_names:
             config = [item for item in config
                       if (item.get("name") or "") not in excluded_names]
@@ -6401,12 +6437,19 @@ async def api_image_loras_save(request):
     pref_key = lora_registry.pref_key_for_base(base)
     qwen = lora_registry.is_qwen_base(base)
     moss = lora_registry.is_moss_base(base)
+    # ⚠️ 走线程 + 单次扫描（同 GET 分支的理由：2026-11-16 线上 8190
+    # 不可访问的根因 —— 全量目录扫描是同步阻塞 IO，跑在事件循环里会冻结全站）。
+    #
+    # 这里只需要「效果类全部条目（含不兼容）」，所以单次扫描后取 effect 即可。
     if moss:
-        all_effect = lora_registry.list_moss_effect_loras(include_incompatible=True)
+        all_effect = (await asyncio.to_thread(
+            lora_registry.lora_inventory_by_kind_moss))["effect"]
     elif qwen:
-        all_effect = lora_registry.list_qwen_effect_loras(include_incompatible=True)
+        all_effect = (await asyncio.to_thread(
+            lora_registry.lora_inventory_by_kind_qwen))["effect"]
     else:
-        all_effect = lora_registry.list_effect_loras(include_incompatible=True)
+        all_effect = (await asyncio.to_thread(
+            lora_registry.lora_inventory_by_kind))["effect"]
     cleaned = []
     for item in items:
         if not isinstance(item, dict):
