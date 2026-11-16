@@ -60,13 +60,39 @@ PID_BEFORE=$(systemctl show h3-studio.service -p MainPID --value)
 echo "重启前 PID=$PID_BEFORE"
 
 # live worktree 的 tracked 必须干净 —— 不干净就说明有人在改，先停手
-DIRTY=$(git -C "$LIVE" status --porcelain | grep -v '^??' || true)
-if [ -n "$DIRTY" ]; then
-  echo "!! live worktree 有 tracked 改动，中止部署："
-  echo "$DIRTY"
+#
+# 【2026-11-17 收窄 —— 只看**本轮要动的文件**】
+# 原来这一条是「整个 live worktree 的 tracked 必须干净」，任何并行任务
+# 改了任何一个文件都会把本轮部署挡下来。
+#
+# 【为什么不收窄不安全】本轮只 checkout DEPLOY_FILES 里的文件
+# （git checkout <commit> -- <清单>）—— 清单外的文件**根本不会被碰**。
+# 所以真正需要拦的是「并行任务正在改**本轮要动的文件**」。
+#
+# 【为什么仍要保留这个检查】如果并行任务正在改本轮要动的文件，
+# checkout 会**覆盖**它未提交的工作 —— 那是真的数据丢失，必须拦。
+# 清单外的改动（本次实测：并行任务在改 scripts/verify_video_param_persist.py
+# 与一份 MOSS 报告）**不受本轮影响**，放行。
+DIRTY_ALL=$(git -C "$LIVE" status --porcelain | grep -v '^??' || true)
+DIRTY_MINE=""
+for f in "${DEPLOY_FILES[@]}"; do
+  if echo "$DIRTY_ALL" | grep -F -- "$f" > /dev/null 2>&1; then
+    DIRTY_MINE="${DIRTY_MINE}
+$f"
+  fi
+done
+if [ -n "$DIRTY_MINE" ]; then
+  echo "!! live worktree 里**本轮要动的文件**有未提交改动，中止部署："
+  echo "$DIRTY_MINE"
+  echo "（并行任务正在改同一批文件 —— 覆盖它会丢工作）"
   exit 1
 fi
-echo "live worktree tracked 干净"
+if [ -n "$DIRTY_ALL" ]; then
+  echo "live worktree 有其它 tracked 改动（**不在**本轮部署清单内，不影响）："
+  echo "$DIRTY_ALL" | head -10
+else
+  echo "live worktree tracked 干净"
+fi
 
 git branch "backup/live-before-assetlibseed-${TS}" local/deploy/qwen-ref-assets-live
 git branch "backup/maintainer-before-assetlibseed-${TS}" local/maintainer
@@ -149,12 +175,21 @@ else
   echo "  !! 缺失 $MISSING 个文件 —— 需要补 checkout"
   exit 1
 fi
-if [ -n "$(git -C "$LIVE" diff --name-only HEAD || true)" ]; then
-  echo "  !! live 工作区与 HEAD 不一致："
-  git -C "$LIVE" diff --name-only HEAD
+# live 工作区与 HEAD 的一致性 —— **只看本轮要动的文件**
+# （并行任务在清单外文件的未提交改动与本轮无关，不该在这里被拦）
+MINE_MISMATCH=""
+for f in "${DEPLOY_FILES[@]}"; do
+  if [ -n "$(git -C "$LIVE" diff --name-only HEAD -- "$f" || true)" ]; then
+    MINE_MISMATCH="${MINE_MISMATCH}
+$f"
+  fi
+done
+if [ -n "$MINE_MISMATCH" ]; then
+  echo "  !! live 工作区与 HEAD 不一致（本轮动的文件）："
+  echo "$MINE_MISMATCH"
   exit 1
 fi
-echo "  live 工作区与 HEAD 完全一致"
+echo "  live 工作区与 HEAD 完全一致（本轮 ${#DEPLOY_FILES[@]} 个文件）"
 
 echo
 echo "=== 5) 重启服务 + 探活 ==="
