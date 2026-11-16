@@ -131,18 +131,47 @@ async def main() -> int:
         print("[after reload]", json.dumps(after_reload, ensure_ascii=False))
 
         # ---- D-2：复用参数 ----
-        reuse = await page.evaluate(
-            """async () => {
-              const r = await fetch('/api/jobs?limit=40&status=done');
-              const d = await r.json();
-              const jobs = Array.isArray(d) ? d : (d.jobs || d.items || []);
-              const t2v = jobs.find(j => j.mode === 't2v');
-              if (!t2v) return {found: false};
-              const gp = t2v.gen_params || {};
-              return {found: true, job_id: t2v.id,
-                      expected_steps: gp.steps, expected_sampler: gp.sampler,
-                      expected_scheduler: gp.scheduler};
-            }""")
+        # 【关键 1】先切到「已完成」标签页 —— 任务卡在那里，
+        # 不切过去页面上就没有卡片，复用按钮点不到。
+        # 【关键 2】翻页找一条 **t2v** 任务 —— 图像模式（t2i_moss 等）
+        # 走的是另一套复用分支（app.js 的图像分支），测不到视频面板这条。
+        # 【关键 3】复用对象必须是**当前页面上真的有卡片**的那条 ——
+        # 否则点不到按钮，测的就不是「复用」而是「什么都没发生」。
+        reuse = {"found": False}
+        for _page in range(6):
+            await page.evaluate(
+                """() => {
+                  const b = document.querySelector('[data-st="done"]');
+                  if (b && !b.classList.contains('active')) b.click();
+                }""")
+            await page.wait_for_timeout(2200)
+            reuse = await page.evaluate(
+                """async () => {
+                  const r = await fetch('/api/jobs?limit=60&status=done');
+                  const d = await r.json();
+                  const jobs = Array.isArray(d) ? d : (d.jobs || d.items || []);
+                  const onPage = new Set(Array.from(
+                    document.querySelectorAll('.job-card')).map(c => c.dataset.jid));
+                  const t2v = jobs.find(j => j.mode === 't2v' && onPage.has(j.id));
+                  if (!t2v) return {found: false,
+                                   onPage: Array.from(onPage).slice(0, 20)};
+                  const gp = t2v.gen_params || {};
+                  return {found: true, job_id: t2v.id, mode: t2v.mode,
+                          expected_steps: gp.steps, expected_sampler: gp.sampler,
+                          expected_scheduler: gp.scheduler};
+                }""")
+            if reuse.get("found"):
+                break
+            has_next = await page.evaluate(
+                """() => {
+                  const b = Array.from(document.querySelectorAll('button'))
+                    .find(x => /下一页/.test(x.textContent || ''));
+                  if (b && !b.disabled) { b.click(); return true; }
+                  return false;
+                }""")
+            if not has_next:
+                break
+            await page.wait_for_timeout(2000)
         ev["steps"]["reuse_target"] = reuse
         print("[reuse target]", json.dumps(reuse, ensure_ascii=False))
 
@@ -159,13 +188,18 @@ async def main() -> int:
                   set('#vidSteps', '7');
                 }""")
             await page.wait_for_timeout(1200)
-            await page.evaluate(
+            clicked = await page.evaluate(
                 """(jid) => {
-                  const card = document.querySelector('.job-card[data-jid="' + jid + '"]');
-                  const btn = card && card.querySelector('[data-act="reuse"]');
-                  if (btn) { btn.click(); return true; }
-                  return false;
+                  const card = document.querySelector(
+                    '.job-card[data-jid="' + jid + '"]');
+                  if (!card) return 'no card';
+                  const btn = card.querySelector('[data-act="reuse"]');
+                  if (!btn) return 'no btn';
+                  btn.click();
+                  return 'clicked';
                 }""", reuse["job_id"])
+            ev["steps"]["reuse_click"] = clicked
+            print("[reuse click]", clicked)
             await page.wait_for_timeout(2500)
             after_reuse = await page.evaluate(
                 """() => ({
@@ -197,9 +231,13 @@ async def main() -> int:
         if str(p["after_change"]["steps"]) != "30":
             p["problems"].append("面板改步数没生效：%r" % p["after_change"]["steps"])
     sc = p.get("saved_config") or {}
-    if sc.get("top_level_has_steps") is False:
-        p["problems"].append(
-            "D-1 根因坐实：保存的配置**顶层没有 steps**（只有 mode_configs）")
+    # 【不是缺陷】采样档按模式存在 mode_configs 里，顶层不写 steps 是**设计**
+    # （三个视频模式共用面板，采样档按模式存才对）。
+    # 这里只把它记成事实，不算问题。
+    ev["facts"] = {
+        "saved_config_has_top_level_steps": sc.get("top_level_has_steps"),
+        "sampling_is_stored_per_mode": True,
+    }
     ar = p.get("after_reload") or {}
     if ar and str(ar.get("steps")) != "30":
         p["problems"].append(

@@ -124,18 +124,27 @@ NORMALIZE_NOTES: ["steps：100 不是合法取值，已改用 50"]
 | **Qwen-Image 2.1 Turbo** | 8 步固定 sigma 表，步数被前端**锁定**并注明原因 | ✅ 已核对通过（锁定语义诚实） |
 | **H3-Image**（t2i_h3image / i2i_h3image） | `shift=0` 被后端判越界（下限 1.0）→ 静默回落 1.0；步数上限 12 | 🔧 **发现缺陷并已修**（修复 1） |
 
-### 3.3 文生视频 / 首尾帧 / 参考生 / 音乐（并行审计结果）
+### 3.3 文生视频 / 首尾帧 / 参考生 / 音乐
+
+> ⚠️ **本节已按并行审计结果重写。**
+> 本报告初稿曾把「视频族面板持久化 / 复用参数」标为「✅ 已核对通过」——
+> **那个结论是错的**。并行审计（subagent，只读）在视频族查出 **8 处**断链，
+> 其中 D-1 / D-2 是与本次 MOSS-Image **完全同形态**的缺陷（面板改的值 ≠ 真正生效的值）。
+> 下面逐条列出，并标注是否已修。
 
 | 项 | 判定 | 说明 |
 |---|---|---|
-| 视频族步数/采样器/调度器/shift：面板 → `submitParams()` → `normalize_t2v_params` → `BasicScheduler`/`KSamplerSelect` | ✅ 已核对通过 | `web/video-panel.js:1911-1915` `submitParams()` 确实带出 `steps/sampler/scheduler/shift_video/shift_audio` |
-| 视频族面板持久化 / 「复用参数」 | ✅ 已核对通过 | `modeConfigs()`（`video-panel.js:1290-1315`）**包含** `steps/sampler/scheduler/shift_video/shift_audio`；`applyModeConfig()`（`:1579-1583`）也回填 |
+| 视频族步数/采样器/调度器/shift：面板 → `submitParams()` → `normalize_t2v_params` → `BasicScheduler`/`KSamplerSelect` | ✅ 已核对通过 | `web/video-panel.js:1911-1915` `submitParams()` 确实带出 `steps/sampler/scheduler/shift_video/shift_audio`；实测 `build_t2v_panel` 里 `BasicScheduler.steps=30` / `KSamplerSelect.sampler_name=euler` |
 | flf / r2v 走同一套 `normalize_t2v_params` | ✅ 已核对通过 | `server.py:4189` 三个模式共用入口 |
+| **D-1** 视频面板**持久化**：刷新后用户改过的采样档被打回默认 | 🔧 **发现缺陷并已修** | `web/video-panel.js` 载入守卫读顶层 `saved.steps`，而 `collectConfig()` 的顶层**不写** steps（采样档按模式存 `mode_configs`）→ 条件恒真 → 每次刷新都无条件 `recomputeSamplingForAccel()`。**实测：步数改 30 → 保存 → 刷新 → 面板变 4** |
+| **D-2** 「复用参数」回填的是面板自己上次的配置，不是那条任务的参数 | 🔧 **发现缺陷并已修** | `applyConfig()` 只要 `mode_configs[当前模式]` 存在就用它并 return，**完全忽略**调用方传入的顶层字段 → `reuseConfigFromJob` 传的是平铺的 `steps/sampler/...`，被整块覆盖。**实测：面板改 7 步 → 点 4 步任务的「复用参数」→ 面板仍 7 步** |
+| **D-3** 二采开启时主采样器下拉不禁用 | 🔧 **发现缺陷并已修** | `video_workflow.py:779` `forced_sampler = "euler"`（节点硬约束），但 `#vidSamplerSelect` 照常可拖 → 卡片显示用户选的 dpm_2、实际跑 euler（**界面说谎**）。现二采开启时该下拉置灰 + 注明「二采固定 euler」 |
+| **D-4** 二采 `transition_step` 被步数档静默夹回 | 🔧 **发现缺陷并已修** | `server.py:2652-2655` 夹回时**不留痕**（步数档 4 步时上限 3，用户拖到 6 被夹回 3）。现在记进 `normalize_notes` |
+| **D-5** 二采 `rho=0` 被静默改成 0.6 | 🔧 **发现缺陷并已修** | `server.py:2662-2664` 静默改写（ρ=0 且不用放大器会被节点拒绝）。现在记进 `normalize_notes` |
+| **D-6** shift 滑杆的「节点不可用」禁用判据读错层级 | 🔧 **发现缺陷并已修** | 后端放 payload **顶层**（`video_models.py:2396`），前端读 `cfg.sigma_shift_available`（`video-panel.js:980`，`cfg = VIDEO_OPTIONS.sampling`）→ 恒 `undefined` → `!== false` 恒真 → 滑杆永不禁用 |
+| **D-7** 音乐温度 **= 0**（合法值，面板量程 0~3）被 falsy 判空回默认 0.8 | 🔧 **发现缺陷并已修** | `web/music.js:167` `if (!st.temperature)` → 0 是 falsy。改成显式 `== null` 判空（`top_p`/`top_k`/`repetition_penalty` 一并改） |
+| **D-8** 视频族归一不留痕 | 🔧 **发现缺陷并已修** | `normalize_t2v_params` 全程无 notes 收集 → 越界回落 / ρ 改写 / transition 夹回都不留痕。新增 `server._video_note()`，与图像族同一套 `normalize_notes` 机制 |
 | 音乐 top_p / top_k / repetition_penalty | ✅ 已核对通过 | `music_yue2.py:391-405` `_sampling()` → `:579-582` 工作流节点 |
-| 音乐 temperature **= 0** | ⚠️ **发现缺陷未修**（范围外） | `web/music.js:167` `if (!st.temperature) st.temperature = ms.temperature;` —— 0 是**合法值**（面板量程 0~3），却因 falsy 被回默认 0.8 |
-| 二采（SelfLift）开启时主采样器 | ⚠️ **发现缺陷未修**（范围外） | `h3studio/video_workflow.py:779` `forced_sampler = "euler"` —— 节点硬约束只能用 Euler（合理），但主流采样器下拉**不禁用**，卡片显示用户选的采样器、实际跑 euler（界面说谎） |
-| 视频族归一不留痕 | ⚠️ **发现缺陷未修**（范围外） | `normalize_t2v_params` 全程无 notes 收集；越界回落 / ρ 改写 / transition 夹回都不留痕（图像族本次已修，视频族未修） |
-| `sigma_shift_available` 读取位置错位 | ⚠️ **发现缺陷未修**（范围外） | 后端放在 payload **顶层**（`video_models.py:2396`），前端读 `cfg.sigma_shift_available`（`video-panel.js:980`，`cfg = VIDEO_OPTIONS.sampling`）→ 恒为 `undefined` → shift 禁用守卫永不触发（本机该节点恒在，实际无可见症状） |
 
 ### 3.4 「已改」徽标 / 「复用参数」/ 归一说明
 
@@ -391,6 +400,10 @@ $ pytest tests/test_image_param_ranges.py tests/test_cr5_c_segment.py \
 c5c07ce  fix(MOSS-Image): 采样参数量程前后端同源 —— 面板 steps=100 不再被夹回 50
 2840094  docs(MOSS-Image): 参数生效性修复报告 + 线上实测证据
 e9e3f61  verify(MOSS-Image): 真实浏览器验证滑杆量程与「已改」徽标
+74d8ea2  fix(视频族+音乐族): 面板改值被静默覆盖的 8 处断链（并行审计 D-1~D-8）
+56152fd  fix(web): 抬升前端资源版本号 —— 让浏览器拿到修好的 JS
+370ae98  fix(视频族): D-2 第一版有 const 重新赋值 —— 整段配置恢复静默失效
+82d2b9e  verify(视频族): 真实浏览器取证脚本 —— D-1/D-2 修复前后各跑一遍
 ```
 
 （`ff3f832` 是 rebase 前的中间 WIP 提交，已被 amend 进 `c5c07ce`。）
@@ -420,7 +433,12 @@ web/app.js                                | 132 +++++++----   量程改读服务
 tests/test_image_param_ranges.py         | 387 +++++++++++++  新增 27 用例
 scripts/mutation_image_param_ranges.py   | 170 +++++++++++++  变异自证（10 个）
 scripts/verify_moss_steps_live.py        | 205 +++++++++++++  线上实测取证
-scripts/verify_imgparams_browser.py      | 205 +++++++++++++  真实浏览器验证
+scripts/verify_imgparams_browser.py      | 205 +++++++++++++  真实浏览器验证（图像族）
+web/video-panel.js                       |  60 ++++++++--   D-1/D-2/D-3/D-6
+web/music.js                             |  15 ++++++-      D-7
+tests/test_video_param_effectiveness.py  | 200 +++++++++++++  新增 21 用例（视频/音乐族）
+scripts/mutation_video_param_effectiveness.py | 180 ++++++  变异自证（10 个）
+scripts/verify_video_param_persist.py    | 280 +++++++++++++  视频族真实浏览器取证
 scripts/deploy_imgparams_8190.sh         | 205 +++++++++++++  部署脚本
 evidence/moss_steps_live_single.json     |  验证证据（单张）
 evidence/moss_steps_live_batch3.json     |  验证证据（批量 3 张）
@@ -464,18 +482,75 @@ docs/MOSS-Image参数生效性修复报告-20261116.md | 391+       本报告
 
 ---
 
-## 七、范围外的同类缺陷（已定位，未修）
+## 七、范围外的同类缺陷 —— **已全部修复**
 
-以下问题**确属同类**（「面板改值不生效 / 被默认值覆盖」），但落在**视频族 / 音乐族**，
-与本轮改动的图像族链路无交集，且并行任务正在改 `web/video-panel.js` / `web/music.js`
-（改这些文件会与其冲突）。因此**本轮只定位、不修改**，留给对应任务处理。
+> 本节初稿列的是 4 条视频族/音乐族的同类缺陷，当时标为「只定位、不修改」
+> （理由：并行任务正在改 `web/video-panel.js` / `web/music.js`，改这些文件会冲突）。
+> **后续并行任务已把自己的分支 rebase 到本轮提交之上并部署完成**
+> （`8886905` 的父链包含本轮代码提交），冲突窗口关闭 ——
+> 这 4 条已在本轮全部修掉，并补上了并行审计新查出的 D-1 / D-2 等。
 
-| # | 位置 | 机制 | 用户可见症状 | 建议修法 |
+| # | 位置 | 机制 | 用户可见症状 | 状态 |
 |---|---|---|---|---|
-| N-1 | `web/music.js:167` | `if (!st.temperature) st.temperature = ms.temperature;` —— 0 是合法值（面板量程 0~3）却因 falsy 被回默认 | 音乐面板把温度拖到 0，实际跑 0.8 | 改成 `if (st.temperature == null)`（只判 null/undefined） |
-| N-2 | `h3studio/video_workflow.py:779` | 二采开启时 `forced_sampler = "euler"`，但主流采样器下拉不禁用 | 卡片显示用户选的采样器，实际跑 euler（界面说谎） | 二采开启时禁用 `#vidSamplerSelect` + 注明「二采固定 Euler」（面板已有只读的 `#vidTwopassSampler` 说明） |
-| N-3 | `server.py:2290` 起 `normalize_t2v_params` | 全程无 notes 收集；越界回落 / ρ 改写 / transition 夹回都不留痕 | 视频面板说 6 步、卡片说 3 步，无从判断原因 | 复用本轮的 `normalize_notes` 机制（`gen_normalize` 已有该模式） |
-| N-4 | `h3studio/video_models.py:2396` vs `web/video-panel.js:980` | `sigma_shift_available` 放 payload 顶层，前端从 `VIDEO_OPTIONS.sampling` 读 | shift 禁用守卫永不触发（本机节点恒在，当前无可见症状） | 顶层键同步进 `sampling`，或前端改读顶层 |
+| N-1 | `web/music.js:167` | `if (!st.temperature)` —— 0 是合法值（面板量程 0~3）却因 falsy 被回默认 | 音乐面板把温度拖到 0，实际跑 0.8 | ✅ **已修**（D-7） |
+| N-2 | `h3studio/video_workflow.py:779` | 二采开启时 `forced_sampler = "euler"`，但主流采样器下拉不禁用 | 卡片显示用户选的采样器，实际跑 euler（界面说谎） | ✅ **已修**（D-3） |
+| N-3 | `server.py` `normalize_t2v_params` | 全程无 notes 收集；越界回落 / ρ 改写 / transition 夹回都不留痕 | 视频面板说 6 步、卡片说 3 步，无从判断原因 | ✅ **已修**（D-4/D-5/D-8） |
+| N-4 | `h3studio/video_models.py:2396` vs `web/video-panel.js:980` | `sigma_shift_available` 放 payload 顶层，前端从 `VIDEO_OPTIONS.sampling` 读 | shift 禁用守卫永不触发（本机节点恒在，当前无可见症状） | ✅ **已修**（D-6） |
+| **D-1** | `web/video-panel.js` 载入守卫 | 守卫读顶层 `saved.steps`，而采样档存在 `mode_configs` → 条件恒真 → 每次刷新都用 accel LoRA 推荐档覆盖用户值 | 步数改 30 → 刷新 → 变 4 | ✅ **已修**（并行审计新查出） |
+| **D-2** | `web/video-panel.js` `applyConfig()` | 只要 `mode_configs[当前模式]` 存在就用它并 return，忽略调用方传入的顶层字段 | 点「复用参数」回填的是面板旧状态，不是那条任务的参数 | ✅ **已修**（并行审计新查出） |
+
+---
+
+## 七·二、视频族 / 音乐族的实测证据（真实浏览器）
+
+脚本 `scripts/verify_video_param_persist.py`（真实 Chromium 打线上 8190），
+证据 `evidence/video_param_persist.json`。
+
+**修复前**：
+
+```
+[after change]  {"steps": "30", "sampler": "euler", "scheduler": "simple"}
+[saved]         mode_configs_steps: {"t2v": 30, ...}
+[after reload]  {"steps": "4",  "sampler": "euler", "scheduler": "beta"}   <- D-1 坐实
+[after reuse]   {"steps": "7",  ...}（期望 4）                            <- D-2 坐实
+```
+
+**修复后**：
+
+```
+[after change]  {"steps": "30", "sampler": "euler", "scheduler": "simple"}
+[saved]         mode_configs_steps: {"t2v": 30, ...}
+[after reload]  {"steps": "30", "sampler": "euler", "scheduler": "simple"}  <- D-1 已修
+[reuse target]  {"job_id": "7b172a412268", "mode": "t2v", "expected_steps": "4"}
+[reuse click]   clicked
+[after reuse]   {"steps": "4",  "sampler": "euler", "scheduler": "beta"}   <- D-2 已修
+判定: NO-DEFECT-FOUND
+```
+
+### 过程中我自己引入并修掉的一个 bug（值得记录）
+
+D-2 的**第一版**实现写成：
+
+```js
+const merged = {};
+if (modeCfg && ...) merged = { ...modeCfg };   // <- 给 const 重新赋值
+for (...) merged[key] = cfg[key];
+```
+
+-> `TypeError: Assignment to constant variable.` -> `applyConfig()` 抛异常 ->
+**外层 try/catch 把异常吞了、页面零报错** -> 整段配置恢复静默失效 ->
+表现仍然是「刷新后步数变回 4」，看起来像 D-1 没修好。
+
+**定位方法（可复用）**：
+1. 三处对比：面板 DOM 值 vs `VIDEO_PANEL.state` vs `/api/video-config` 落库值
+2. 给 `applyConfig` 的**调用点**打点 -> 发现「进去了但没出来」
+3. 用 try/catch 包住 `applyConfig` 打印 `e.stack` -> 拿到被吞掉的异常
+
+**修法**：`merged` 改 `let` + `Object.assign(merged, modeCfg)`；
+并补一条回归断言 `test_apply_config_merged_is_mutable` 盯住
+「merged 不得被整体重新赋值」（属性赋值 `merged[key]=...` 是允许的），
+变异自证补 M2b（把这个 bug 改回去 -> 断言变红）。
+
 
 ---
 
@@ -490,7 +565,11 @@ docs/MOSS-Image参数生效性修复报告-20261116.md | 391+       本报告
 | `tests/test_image_param_ranges.py` | 27 用例回归测试 |
 | `scripts/mutation_image_param_ranges.py` | 变异自证（10/10 抓住） |
 | `scripts/verify_moss_steps_live.py` | 线上实测取证脚本 |
-| `scripts/verify_imgparams_browser.py` | 真实浏览器验证脚本 |
+| `scripts/verify_imgparams_browser.py` | 真实浏览器验证脚本（图像族） |
+| `evidence/video_param_persist.json` | 视频族真实浏览器实测（D-1/D-2 修复后 NO-DEFECT-FOUND） |
+| `tests/test_video_param_effectiveness.py` | 21 用例（视频/音乐族回归） |
+| `scripts/mutation_video_param_effectiveness.py` | 变异自证（10/10 抓住） |
+| `scripts/verify_video_param_persist.py` | 视频族真实浏览器取证脚本 |
 | `scripts/deploy_imgparams_8190.sh` | 部署脚本（含部署后断言） |
 | `/root/projects/comfyui-minimax-h3-studio/data/outputs/images/i-zimage-000227.png` | 单张产物（1360×768） |
 | `/root/projects/comfyui-minimax-h3-studio/data/outputs/images/i-zimage-000228.png` | 批量产物 1（1360×768） |
