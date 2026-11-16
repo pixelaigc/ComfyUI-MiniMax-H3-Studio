@@ -1857,25 +1857,13 @@
         if (cfgResp.ok) {
           const saved = await cfgResp.json();
           applyConfig(saved);
-          // 【2026-11-15 修 AC-1】保存的配置里**没有**采样档
-          // （= 用户从没手动调过）=> 按当前加速 LoRA 的推荐档重算一次，
-          // 否则「不挂加速 LoRA」的首屏仍然是 4 步蒸馏档。
-          // 若保存的配置里带 steps，则那是用户自己的选择，**不覆盖**。
+          // 【2026-11-15 修 AC-1】保存的配置里没有采样档（用户从没手动调过）
+          // => 按当前加速 LoRA 的推荐档重算一次；带了就用用户的，不覆盖。
           //
-          // 【2026-11-16 修 D-1 —— 守卫读错了层级】
-          // 采样档是存在 **mode_configs[当前模式]** 里的（collectConfig() 的
-          // 顶层不写 steps —— 三个视频模式共用面板，采样档按模式存才对）。
-          // 旧实现读的是顶层 `saved.steps` -> 恒为 undefined -> **条件恒真**
-          // -> 每次刷新都无条件调 recomputeSamplingForAccel()，
-          // 把用户改的步数/采样器/调度器覆写成加速 LoRA 的推荐档。
-          //
-          // 实测（修复前，线上真实浏览器）：用户把步数改成 30 -> 保存 ->
-          // 刷新 -> 面板变回 4 步 / euler / beta。
-          // 与 MOSS-Image 那条「前端允许、后端夹回」是同一类形态：
-          // 面板上显示的值与真正生效的值不是一回事。
-          //
-          // 【修法】守卫改读 mode_configs 里的**当前模式**片段；
-          // 老配置（顶层就有 steps）也一并兼容。
+          // 【2026-11-16 修 D-1】采样档存在 mode_configs[当前模式] 里
+          // （顶层不写 steps）-> 守卫必须读那一层；旧实现读顶层 -> 恒真
+          // -> 每次刷新都用推荐档覆盖用户改的值。
+          // 详见 docs/MOSS-Image参数生效性修复报告-20261116.md。
           const savedModeKey = videoState.mode || "t2v";
           const savedModeCfg = (saved.mode_configs
                                && saved.mode_configs[savedModeKey]) || {};
