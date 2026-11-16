@@ -32,6 +32,67 @@
   const state = () => ({ current, capability });
 
   // ------------------------------------------------------------------
+  // 素材回填（首尾帧 / 参考生视频）
+  // ------------------------------------------------------------------
+  // 【为什么需要】
+  // 接续的语义是「接着上一段继续」—— 上一段的参考图 / 参考音乐应该
+  // **自动带过来**，用户只写下一段提示词。
+  // 素材以**素材库引用**（asset_refs）的形态记录在任务参数里，
+  // 回填时按「槽位 -> 面板槽位 key」的映射还原成 state.assetRefs。
+  //
+  // 【映射口径 —— 必须与服务端 / 提交侧一致】
+  // 服务端 slot 名 -> 面板槽位 key：
+  //   first_frame -> first        last_frame  -> last
+  //   ref_image   -> ref0..ref8  ref_video   -> refvid0..2
+  //   ref_audio   -> refaud0..2
+  // 提交侧（app.js 的 SLOT_FOR_KEY / GROUP_OF_KEY）用的是**同一张表**。
+  //
+  // 【为什么按 ordinal 分组】
+  // ref_image 有 9 个槽位、ref_video 3 个、ref_audio 3 个 ——
+  // ordinal 是**组内序号**（服务端 _apply_asset_refs 就是这么排的）。
+  // 还原时按 slot 分组、组内按 ordinal 排序，才不会把「参考图 3」
+  // 填到「参考图 1」的槽位上。
+  const SLOT_KEY_FOR_SERVER_SLOT = {
+    first_frame: "first",
+    last_frame: "last",
+  };
+
+  const SLOT_KEY_GROUP = {
+    ref_image: (ordinal) => "ref" + ordinal,
+    ref_video: (ordinal) => "refvid" + ordinal,
+    ref_audio: (ordinal) => "refaud" + ordinal,
+  };
+
+  /** 素材库引用 -> 面板槽位 key -> {asset_id, name, category}。 */
+  function mapAssetRefsToSlotKeys(refs, mode) {
+    const out = {};
+    if (!Array.isArray(refs) || !refs.length) return out;
+    // 先按 slot 分组，组内按 ordinal 排序。
+    const grouped = {};
+    refs.forEach((item) => {
+      if (!item || !item.asset_id) return;
+      const slot = String(item.slot || "");
+      const ordinal = Number(item.ordinal || 0);
+      if (!grouped[slot]) grouped[slot] = [];
+      grouped[slot].push({ asset_id: item.asset_id, ordinal });
+    });
+    Object.keys(grouped).forEach((slot) => {
+      const list = grouped[slot].sort((a, b) => a.ordinal - b.ordinal);
+      if (SLOT_KEY_FOR_SERVER_SLOT[slot]) {
+        // 首帧 / 尾帧：只取第一个
+        const key = SLOT_KEY_FOR_SERVER_SLOT[slot];
+        out[key] = { asset_id: list[0].asset_id };
+      } else if (SLOT_KEY_GROUP[slot]) {
+        list.forEach((entry) => {
+          const key = SLOT_KEY_GROUP[slot](entry.ordinal);
+          out[key] = { asset_id: entry.asset_id };
+        });
+      }
+    });
+    return out;
+  }
+
+  // ------------------------------------------------------------------
   // 工具
   // ------------------------------------------------------------------
   function esc(s) {
@@ -145,12 +206,15 @@
   function applyToPanel(ctx) {
     const params = ctx.params || {};
     const panel = window.VIDEO_PANEL;
+    // 【2026-11-16】接续支持的模式：t2v / flf / r2v。
+    // 切到**来源任务自己的**模式 —— 硬切 t2v 会让首尾帧 / 参考生
+    // 的产物落到文生视频面板（素材槽位根本不存在）。
+    const mode = String(ctx.mode || "t2v");
 
-    // 切到文生视频面板（接续只对文生视频开放）
     if (typeof window.activateVideoMode === "function") {
-      window.activateVideoMode("t2v");
+      window.activateVideoMode(mode);
     } else if (panel && typeof panel.render === "function") {
-      panel.render();
+      panel.render(mode);
     }
 
     if (panel && typeof panel.applyConfig === "function") {
@@ -173,7 +237,7 @@
         shift_audio: params.shift_audio,
       };
       panel.applyConfig(cfg);
-      if (typeof panel.render === "function") panel.render();
+      if (typeof panel.render === "function") panel.render(mode);
     }
 
     // 时长 / 步数 / 种子在 app.js 的全局 state 里（不在 VIDEO_PANEL 里）
@@ -199,6 +263,24 @@
     const seedInput = document.getElementById("seed");
     if (seedInput) seedInput.value = "";
 
+    // ---- 素材回填（首尾帧 / 参考生视频）----
+    //
+    // 【为什么在这里做】切模式会清空槽位状态（app.js 的
+    // resetSlotsForMode），所以必须在**切完之后**再回填。
+    //
+    // 【回填什么】原始参考图 / 首帧 / 尾帧 / 参考视频 / 参考音乐。
+    // 参考音频回填的是**原始整条** —— 「1s 空白 ⊕ 切片」是服务端
+    // 在生成时按接续时序算出来的，不需要（也不该）在这里造文件。
+    //
+    // 【为什么不在这里 await】applyToPanel 是同步的；素材回填需要
+    // 网络请求。start() 里 await 一次即可（见那里的调用）。
+    //
+    // ---- 音轨来源回填（首尾帧 / 参考生视频）----
+    //
+    // 【为什么必须回填】音轨来源决定「这条链用生成的音乐还是外部
+    // 音轨」，而它是**以链首段为准**的。切模式时音轨下拉会被复位
+    // 成「使用生成的音乐」—— 那会让接续段的音轨与上一段对不上。
+
     // 提示词：接续**不**回填上一段的提示词 —— 用户要写下一段。
     // 但要把提示词框清空并聚焦，明确告诉用户「这里写下一段」。
     const promptBox = document.getElementById("prompt");
@@ -212,6 +294,93 @@
     const contextBox = document.getElementById("continuationPanel");
     if (contextBox && typeof contextBox.scrollIntoView === "function") {
       contextBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  /**
+   * 把上一段的素材（参考图 / 首帧 / 尾帧 / 参考视频 / 参考音乐）
+   * 回填到面板槽位。
+   *
+   * 【为什么走素材库引用】槽位里只可能是素材库引用（本地直传通道
+   * 已关闭，见 app.js 的 mk() 注释）。所以回填的也是 asset_id ——
+   * 前端不需要、也不应该碰 ComfyUI 里的文件。
+   *
+   * 【为什么异步】要按 asset_id 查素材名与类别（填进槽位的标签），
+   * 那是网络请求。
+   */
+  async function applyAssetRefs(ctx, mode) {
+    const refs = ctx.asset_refs;
+    if (!Array.isArray(refs) || !refs.length) return 0;
+    const appState = window.__h3State;
+    if (!appState || !appState.assetRefs) return 0;
+
+    const mapped = mapAssetRefsToSlotKeys(refs, mode);
+    const ids = Object.keys(mapped).map((k) => mapped[k].asset_id);
+    if (!ids.length) return 0;
+
+    // 查素材元数据（名字 / 类别）—— 查不到就跳过那一条（不编造）。
+    const details = {};
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const resp = await fetch(`/api/assets/${encodeURIComponent(id)}`,
+          { cache: "no-store" });
+        if (!resp.ok) return;
+        const asset = await resp.json();
+        details[id] = {
+          asset_id: asset.id,
+          name: asset.name,
+          category: asset.category,
+        };
+      } catch (e) { /* 查不到就跳过 —— 不编造素材信息 */ }
+    }));
+
+    let filled = 0;
+    Object.keys(mapped).forEach((key) => {
+      const info = details[mapped[key].asset_id];
+      if (!info) return;
+      appState.assetRefs[key] = info;
+      filled += 1;
+    });
+
+    // 音轨来源下拉要重算（有没有参考音乐 / 参考视频决定了选项）
+    if (typeof window.renderAudioTrackSelect === "function") {
+      window.renderAudioTrackSelect();
+    }
+    // 重渲染面板，让槽位显示出来。
+    //
+    // 【关键】必须用「保留槽位状态」的那一版 —— renderMode() 内部会
+    // 调 resetSlotsForMode 把 state.assetRefs 整块清空，
+    // 那样刚回填进去的素材就被自己清掉了（实测：槽位为空）。
+    if (typeof window.renderModeKeepSlots === "function") {
+      window.renderModeKeepSlots();
+    } else if (typeof window.renderMode === "function") {
+      window.renderMode();
+    }
+    return filled;
+  }
+
+  /**
+   * 回填音轨来源（首尾帧 / 参考生视频）。
+   *
+   * 【口径 —— 以链首段为准】服务端下发 ctx.audio.track_mode，
+   * 它就是整条链的音轨来源。切模式时前端把它复位了，这里复原。
+   */
+  function applyAudioTrack(ctx, mode) {
+    const audio = ctx.audio || {};
+    const trackMode = String(audio.track_mode || "");
+    if (!trackMode) return;
+    const appState = window.__h3State;
+    if (appState) appState.audioTrackSource = trackMode;
+    const select = document.getElementById("audioTrackSelect");
+    if (select) {
+      // 先确保选项里有它（素材回填后才可能出现），再选中。
+      if (typeof window.renderAudioTrackSelect === "function") {
+        window.renderAudioTrackSelect();
+      }
+      select.value = trackMode;
+    }
+    if (typeof window.renderAudioTrackSelect === "function") {
+      window.renderAudioTrackSelect();
     }
   }
 
@@ -247,6 +416,7 @@
       </div>
       ${total}
       ${rows}
+      ${renderAudioRows(current.audio)}
       <div class="continuation-note">
         提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。
         生成结果会自动拼成完整视频。
@@ -258,6 +428,34 @@
         toast("已清除接续上下文");
       });
     }
+  }
+
+  /**
+   * 音频接续时序的**只读展示**（首尾帧 / 参考生视频）。
+   *
+   * 【为什么必须显示】音画对齐是这套功能里最容易被误解的部分 ——
+   * 用户必须能看见「这一段的参考音频从第几秒接入、前置多少空白」，
+   * 否则「为什么这一段的音画差了一点」无从判断。
+   */
+  function renderAudioRows(audio) {
+    if (!audio || !audio.track_mode) return "";
+    const rows = [];
+    const label = audio.track_mode === "reference" ? "参考音乐"
+      : audio.track_mode === "video_bg" ? "参考视频的音轨" : "生成的音乐";
+    rows.push(`<div class="row"><span>音轨来源</span><b>${esc(label)}</b></div>`);
+    if (audio.track_mode === "reference" || audio.track_mode === "video_bg") {
+      rows.push(`<div class="row"><span>本段音频起点</span>`
+        + `<b>${esc(Number(audio.segment_start || 0).toFixed(3))}s</b></div>`);
+      rows.push(`<div class="row"><span>本段音频时长</span>`
+        + `<b>${esc(Number(audio.segment_duration || 0).toFixed(3))}s</b></div>`);
+      rows.push(`<div class="row"><span>前导空白</span>`
+        + `<b>${esc(Number(audio.lead_blank || 0).toFixed(1))}s</b></div>`);
+    }
+    const notes = (audio.notes || []).map(n =>
+      `<div class="continuation-note">${esc(n)}</div>`).join("");
+    const warns = (audio.warnings || []).map(n =>
+      `<div class="continuation-note">⚠ ${esc(n)}</div>`).join("");
+    return rows.join("") + notes + warns;
   }
 
   function clear() {
@@ -312,8 +510,15 @@
       applyToPanel(ctx);
       current = ctx;
       renderPanel();
+      // 【2026-11-16】素材回填是**异步**的（要按 asset_id 查素材名）——
+      // 等它完成再提示，否则用户看到「已回填」但槽位还是空的。
+      const materialCount = await applyAssetRefs(ctx, String(ctx.mode || "t2v"));
+      applyAudioTrack(ctx, String(ctx.mode || "t2v"));
       const total = ctx.total_seconds ? `，当前累计 ${ctx.total_seconds}s` : "";
-      toast(`已回填接续上下文（${(ctx.summary || []).length} 项${total}）。写下一段提示词即可继续生成。`);
+      const mats = materialCount
+        ? `，已回填 ${materialCount} 项素材` : "";
+      toast(`已回填接续上下文（${(ctx.summary || []).length} 项${total}${mats}）。`
+        + `写下一段提示词即可继续生成。`);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       // 明确的中文提示 —— 不静默失败。

@@ -41,6 +41,9 @@ from __future__ import annotations
 import random
 
 from . import h3_audio_track
+from . import h3_audio_continuation as h3acont
+from . import continuation as cont
+from . import continuation_service as cont_service
 from . import video_models as vmodels
 from . import video_workflow as vworkflow
 from . import frame_expr as frame_expr_mod
@@ -152,7 +155,8 @@ def _ref_image_nodes(p: dict, filenames: list) -> dict:
     return out
 
 
-def _ref_video_nodes(p: dict, filenames: list) -> dict:
+def _ref_video_nodes(p: dict, filenames: list,
+                     skip_frames: int = 0, frame_cap: int = 0) -> dict:
     """参考视频 -> 节点引用（最多 3 个）。
 
     【2026-11-15 修 —— VHS_LoadVideo 的 6 个 required 输入必须显式给】
@@ -177,6 +181,12 @@ def _ref_video_nodes(p: dict, filenames: list) -> dict:
 
     【为什么之前没暴露】参考视频这条路径**从来没有被真实跑过** ——
     线上 24 条 r2v 任务全部只用参考图 + 参考音乐。
+
+    【2026-11-16 接续】skip_frames / frame_cap 用于**音画同步切割**：
+    接续段要取参考视频的 [t_a_start, t_a_end) 那一段 ——
+    视频侧跳 C_n 帧、音频侧从 C_n/24 秒起（见 h3_audio_continuation）。
+    force_rate 必须给 **24**（H3 固定帧率）—— 否则「跳 N 帧」与
+    「从 N/24 秒起」在音频侧就对不上了。
     """
     out = {}
     for index, filename in enumerate(filenames[:MAX_REF_VIDEOS]):
@@ -185,14 +195,17 @@ def _ref_video_nodes(p: dict, filenames: list) -> dict:
             "inputs": {
                 "video": filename,
                 # 【以下 6 项是 VHS_LoadVideo 的 required 输入，必须显式给】
-                # force_rate 0 = 保持原帧率；custom_width/height 0 = 不改尺寸；
+                # force_rate 24 = 归一到 H3 的 24fps（接续段音画同步切割
+                #   的前提：视频侧跳帧数与音频侧秒数必须指向同一时刻）；
+                #   非接续段沿用 0（保持原帧率）。
+                # custom_width/height 0 = 不改尺寸；
                 # frame_load_cap 0 = 不限帧数；skip_first_frames 0 = 从头开始；
                 # select_every_nth 1 = 每帧都取。
-                "force_rate": 0,
+                "force_rate": 24 if skip_frames else 0,
                 "custom_width": 0,
                 "custom_height": 0,
-                "frame_load_cap": 0,
-                "skip_first_frames": 0,
+                "frame_load_cap": int(frame_cap or 0),
+                "skip_first_frames": int(skip_frames or 0),
                 "select_every_nth": 1,
                 "format": "None",
             },
@@ -203,13 +216,33 @@ def _ref_video_nodes(p: dict, filenames: list) -> dict:
     return out
 
 
-def _ref_audio_nodes(p: dict, filenames: list) -> dict:
-    """独立参考音频 -> 节点引用（最多 3 个）。"""
+def _ref_audio_nodes(p: dict, filenames: list,
+                     start_seconds: float = 0.0,
+                     duration: float = 0.0) -> dict:
+    """独立参考音频 -> 节点引用（最多 3 个）。
+
+    【2026-11-16 接续】start_seconds / duration 用于**按偏移切片**：
+    接续段的采样用音频是「1s 空白 ⊕ 原始音频从第 N 秒起的切片」。
+    服务端已经把切好的段音频上传到 ComfyUI input（参数
+    params["segment_audio_file"]），所以这里**不需要**偏移 ——
+    切片已是一个独立的文件。
+
+    但「参考视频的音轨」那一路需要**音画同步切割**：视频侧跳
+    C_n 帧、音频侧从 C_n/24 秒起 —— 两者指向同一时刻。
+    这时 start_seconds / duration 才有用（见 _ref_video_audio_nodes）。
+    """
     out = {}
     for index, filename in enumerate(filenames[:MAX_REF_AUDIOS]):
         node_id = f"136:{401 + index}"
+        inputs: dict = {"audio": filename}
+        if start_seconds > 0:
+            # VHS_LoadAudioUpload 的 start_time 是**秒**（浮点）。
+            # t_a_start(n) = C_n / 24，C_n 是整数帧 -> 无浮点误差。
+            inputs["start_time"] = round(float(start_seconds), 6)
+        if duration > 0:
+            inputs["duration"] = round(float(duration), 6)
         p[node_id] = {
-            "inputs": {"audio": filename},
+            "inputs": inputs,
             "class_type": "VHS_LoadAudioUpload",
             "_meta": {"title": f"加载参考音频 {index + 1}"},
         }
@@ -217,17 +250,84 @@ def _ref_audio_nodes(p: dict, filenames: list) -> dict:
     return out
 
 
-def _ref_video_audio_nodes(p: dict, filenames: list) -> dict:
-    """参考视频的背景音 -> 节点引用（最多 3 个，与视频同序号配对）。"""
+def _ref_video_audio_nodes(p: dict, filenames: list,
+                           start_seconds: float = 0.0,
+                           duration: float = 0.0) -> dict:
+    """参考视频的背景音 -> 节点引用（最多 3 个，与视频同序号配对）。
+
+    【2026-11-16 接续】音画同步切割：
+    视频侧 VHS_LoadVideo.skip_first_frames = C_n（**帧**），
+    音频侧 VHS_LoadAudioUpload.start_time = C_n / 24（**秒**）。
+    参考视频已用 force_rate=24 归一 —— 所以两者严格指向同一时刻，
+    不存在浮点累计误差（C_n 是整数帧）。
+    """
     out = {}
     for index, filename in enumerate(filenames[:MAX_REF_VIDEOS]):
         node_id = f"136:{501 + index}"
+        inputs: dict = {"audio": filename}
+        if start_seconds > 0:
+            inputs["start_time"] = round(float(start_seconds), 6)
+        if duration > 0:
+            inputs["duration"] = round(float(duration), 6)
         p[node_id] = {
-            "inputs": {"audio": filename},
+            "inputs": inputs,
             "class_type": "VHS_LoadAudioUpload",
             "_meta": {"title": f"加载参考视频背景音 {index + 1}"},
         }
         out[f"ref_video_audios.ref_video_audio_{index}"] = [node_id, 0]
+    return out
+
+
+def _continuation_media_slice(params: dict) -> dict:
+    """接续段的**媒体切片参数**（参考视频跳帧 / 音频起点与时长）。
+
+    返回：
+      {
+        "skip_frames":     参考视频要跳的帧数（= C_n，整数帧）,
+        "frame_cap":       参考视频要取的帧数（= 本段交付帧数）,
+        "audio_start":     音频起点（秒）= C_n / 24,
+        "audio_duration":  音频时长（秒）= 本段交付时长,
+        "segment_audio":   采样用段音频文件名（"1s 空白 ⊕ 切片"）,
+        "active":          本段是否真的要切片,
+      }
+
+    【口径 —— 全部来自整数帧】
+    C_n = 上游已累计交付的帧数（口径 B）。
+    t_a_start(n) = C_n / 24 秒，视频侧跳 C_n 帧。
+    两者严格对应，不存在浮点累计误差。
+
+    【什么时候不切片】
+      * 链首段（没有上游）-> 第 1 段用原始素材从 0 开始。
+      * 音轨来源是「生成的音乐」-> 音画同源，不切。
+      * 没有上游的音频偏移信息 -> 不切（保持原样，绝不猜）。
+    """
+    info = cont_service.chain_info(params)
+    out = {"skip_frames": 0, "frame_cap": 0, "audio_start": 0.0,
+           "audio_duration": 0.0, "segment_audio": "", "active": False}
+    if not info:
+        return out
+    if not str(info.get("source_job") or "").strip():
+        return out  # 链首段
+
+    track_mode = str(info.get("audio_track_mode") or "").strip()
+    external = h3acont.is_external_track(track_mode)
+
+    skip_frames = int(info.get("audio_segment_skip_frames") or 0)
+    audio_start = float(info.get("audio_segment_start") or 0.0)
+    audio_duration = float(info.get("audio_segment_duration") or 0.0)
+    segment_audio = str(params.get("segment_audio_file") or "").strip()
+
+    if not external:
+        return out  # 生成音频：不切
+
+    out.update({
+        "skip_frames": max(0, skip_frames),
+        "frame_cap": max(0, int(round(audio_duration * cont.FPS))),
+        "audio_start": max(0.0, audio_start),
+        "audio_duration": max(0.0, audio_duration),
+        "segment_audio": segment_audio,
+        "active": True,
+    })
     return out
 
 
@@ -303,6 +403,73 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
     p["9"] = {"inputs": {"scheduler": scheduler, "steps": steps, "denoise": 1,
                           "model": model_ref},
               "class_type": "BasicScheduler", "_meta": {"title": "调度器"}}
+
+    # ---- 接续（continuation）----
+    #
+    # 【与 t2v 完全同款的接法】见 video_workflow.build_t2v_panel：
+    #   读回上游潜空间 -> 拷贝桥 -> 采样 -> 落盘本段接力棒
+    #   -> decode 后裁钉住区（音画同裁）。
+    # 差别只有一处：条件节点 id（t2v 是 105:104，这里是 136）。
+    #
+    # 【为什么必须在这里接，而不是只放开 mode 白名单】
+    # flf/r2v 以前**不落盘**潜空间。只把模式加进 CONTINUABLE_MODES
+    # 会让「点接续 → 生成」静默退化成普通生成（看起来成功，其实
+    # 没接上）—— 最坏的一种失败。现在：
+    #   * 本段**落盘**接力棒（300:save，输出节点）-> 下一段能读；
+    #   * 续接段**读回**上游（300:load + explicit_path）-> 真的接上。
+    cont_state = vworkflow._continuation_state(params)
+    latent_in_ref = ["136", 1]
+    cond_ref = ["136", 0]
+    trim_ref = None
+
+    if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
+        p["300:load"] = {
+            "inputs": {
+                "run_id": cont_state["source_run_id"],
+                "stage_index": cont_state["source_stage"] + 1,
+                # 精确读上游那一份（每段一个目录 -> 不能按链段号推）。
+                "explicit_path": cont_state["source_path"],
+            },
+            "class_type": "H3RelayLatentLoad",
+            "_meta": {"title": "接续·读回上游潜空间"},
+        }
+        # 外观锚：链首段那份（防长程漂移）。找不到就不接。
+        anchor_latent_ref = None
+        if cont_state["anchor_path"]:
+            p["300:anchor_load"] = {
+                "inputs": {
+                    "run_id": cont_state["anchor_run_id"],
+                    "stage_index": cont_state["anchor_stage"] + 1,
+                    "explicit_path": cont_state["anchor_path"],
+                },
+                "class_type": "H3RelayLatentLoad",
+                "_meta": {"title": "接续·读回链首段潜空间（外观锚）"},
+            }
+            anchor_latent_ref = ["300:anchor_load", 0]
+        p["300:bridge"] = {
+            "inputs": {
+                # 本段的初始 AV latent 来自 T8 条件节点（136 的第 2 路）。
+                "latent": latent_in_ref,
+                "context_frames": cont_state["context_frames"],
+                "context_latent": ["300:load", 0],
+                # hard = 钉住区零重绘（真续接唯一推荐档）。
+                "mask_mode": "hard",
+                "pin_audio": True,
+                "stage_index": cont_state["source_stage"],
+                "run_id": cont_state["source_run_id"],
+                "ref_anchor_latent": anchor_latent_ref,
+                "ref_anchor_stage": -1,
+                "ref_anchor_frames": cont_state["anchor_frames"],
+                # 第 4 路：conditioning 钉帧（管取景/构图）。
+                "conditioning": cond_ref,
+            },
+            "class_type": "H3RelayCopyBridge",
+            "_meta": {"title": "接续·拷贝桥（零重编码潜空间桥）"},
+        }
+        latent_in_ref = ["300:bridge", 0]
+        cond_ref = ["300:bridge", 3]
+        trim_ref = ["300:bridge", 2]
+
     if use_twopass:
         # 二采固定用 Euler（SelfLift 只支持标准 Euler）
         p["17"] = {"inputs": {"sampler_name": "euler"},
@@ -314,17 +481,17 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
         samples_ref = vworkflow._twopass_block(
             p, model_ref, steps, scheduler, sampler, seed,
             float(cfg_value), twopass, width, height, duration,
-            ["136", 1], cond_node_id="136")
+            latent_in_ref, cond_node_id="136")
     else:
         p["17"] = {"inputs": {"sampler_name": sampler}, "class_type": "KSamplerSelect",
                    "_meta": {"title": "采样器"}}
         p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
                    "_meta": {"title": "噪波"}}
-        p["16"] = {"inputs": {"model": model_ref, "conditioning": ["136", 0]},
+        p["16"] = {"inputs": {"model": model_ref, "conditioning": cond_ref},
                    "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
         p["14"] = {"inputs": {"noise": ["15", 0], "guider": ["16", 0],
                                "sampler": ["17", 0], "sigmas": ["9", 0],
-                               "latent_image": ["136", 1]},
+                               "latent_image": latent_in_ref},
                    "class_type": "SamplerCustomAdvanced", "_meta": {"title": "采样"}}
         samples_ref = ["14", 0]
 
@@ -334,10 +501,55 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
     p["23"] = {"inputs": {"samples": samples_ref, "vae": ["24", 0]},
                "class_type": "VAEDecodeAudio", "_meta": {"title": "解码音频"}}
 
-    # ---- 音轨三选一 ----
-    audio_ref = _pick_audio_track(p, params, duration)
+    # ---- 裁重叠：去掉钉住区（音画同裁，保住 A/V 同步）----
+    if trim_ref is not None:
+        p["300:trim"] = {
+            "inputs": {
+                "images": ["10", 0],
+                "audio": ["23", 0],
+                "trim_frames": trim_ref,
+                "fps": 24,
+                "settle_frames": 0,
+                "seam_ghost": 0,
+            },
+            "class_type": "H3RelayTrimAV",
+            "_meta": {"title": "接续·裁重叠（裁掉钉住区，音画同裁）"},
+        }
+        video_images_ref = ["300:trim", 0]
+        video_audio_ref = ["300:trim", 1]
+    else:
+        video_images_ref = ["10", 0]
+        video_audio_ref = ["23", 0]
 
-    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": ["10", 0],
+    # ---- 落盘接力棒 ----
+    # 采样器的输出落盘，供下一段读回。**链首段也要落盘** —— 否则
+    # 「点接续」永远没有接力棒可读（这正是 flf/r2v 以前不能接续的
+    # 根因：它们的工作流里根本没有这个节点）。
+    if cont_state["enabled"]:
+        p["300:save"] = {
+            "inputs": {
+                "latent": samples_ref,
+                "run_id": cont_state["own_run_id"],
+                "stage_index": 0,
+                "note": f"h3studio job {job_id}",
+            },
+            "class_type": "H3RelayLatentSave",
+            "_meta": {"title": "接续·落盘本段潜空间（下一段的接力棒）"},
+        }
+
+    # ---- 音轨三选一 ----
+    #
+    # 【接续段的口径】
+    #  * generated —— H3 采样生成的音频（音画同源），直接用；
+    #  * reference / video_bg —— 外部贴上去的音轨。本段采样时用
+    #    「1s 空白 ⊕ 原始音频切片」（由服务端切好，见 server.py 的
+    #    音频接续时序），成片音轨用「原始参考音频整条」。
+    #    详见 h3studio/h3_audio_continuation.py。
+    audio_ref = _pick_audio_track(p, params, duration,
+                                   video_images_ref=video_images_ref,
+                                   video_audio_ref=video_audio_ref)
+
+    p["91"] = {"inputs": {"fps": 24, "bit_depth": 8, "images": video_images_ref,
                           "audio": audio_ref},
                "class_type": "CreateVideo", "_meta": {"title": "合成视频"}}
     p["92"] = {"inputs": {"filename_prefix": f"h3studio/{params.get('mode', 'video')}_{job_id}",
@@ -361,7 +573,9 @@ def _shift_node(p: dict, model_ref: list, params: dict) -> list:
     return ["139", 0]
 
 
-def _pick_audio_track(p: dict, params: dict, duration: float) -> list:
+def _pick_audio_track(p: dict, params: dict, duration: float,
+                      video_images_ref: list | None = None,
+                      video_audio_ref: list | None = None) -> list:
     """按「音轨三选一」选出成片该贴哪条音轨，返回 CreateVideo 的 audio 引用。
 
     (a) generated —— 用 H3 生成的音频（VAEDecodeAudio 的输出）。
@@ -372,6 +586,16 @@ def _pick_audio_track(p: dict, params: dict, duration: float) -> list:
     外部音轨长度与画面**不一定相等**。直接接上去，CreateVideo 会按
     音轨长度截断画面（或补静音）—— 用户会看到「视频短了一截」。
     所以这里用 TrimAudioDuration 显式裁到画面时长。
+
+    【接续段的特殊处理 —— 音轨来源为「参考音频」时】
+    接续段里，**采样用**的音轨不是原始音频，而是服务端切好的
+    「1s 空白 ⊕ 原始音频从第 N 秒起的切片」（见
+    h3studio/h3_audio_continuation.py 与 server.py 的音频接续时序）。
+    所以：
+      * 段音频文件（params["segment_audio_file"]）直接接进 ref_audios
+        槽位（**不再**从原始音频 Trim）；
+      * 成片音轨仍用**原始参考音频整条**（合并阶段贴，见 server.py），
+        绝不把 1s 空白累加进成片。
     """
     ref_audios = params.get("ref_audios") or []
     ref_video_audios = params.get("ref_video_audios") or []
@@ -379,6 +603,24 @@ def _pick_audio_track(p: dict, params: dict, duration: float) -> list:
         params.get("audio_track_source"),
         has_reference_audio=bool(ref_audios),
         has_reference_video_audio=bool(ref_video_audios))
+
+    # ---- 接续段：段音频（1s 空白 ⊕ 切片）已经是**采样用**的那条 ----
+    #
+    # 【为什么不走 TrimAudioDuration】段音频文件的长度已经是
+    # 「1s 空白 + 本段交付时长」—— 它要**原样**进 DiT 采样。
+    # 再 Trim 一次会把 1s 空白裁掉（正好裁掉），语义就错了。
+    #
+    # 【成片音轨怎么办】成片音轨在**合并阶段**贴「原始参考音频整条」
+    # （server._concat_chain_video），不在这里 —— 这里贴的这条只
+    # 影响**本段视频文件**（段视频的音轨 = 该段该听到的内容）。
+    segment_audio = str(params.get("segment_audio_file") or "").strip()
+    if segment_audio and source in (h3_audio_track.TRACK_REFERENCE,
+                                    h3_audio_track.TRACK_VIDEO_BG):
+        # 段音频替换掉「原始音频」这一路的输入：
+        #  * reference  -> 用段音频（它已经是「1s 空白 ⊕ 切片」）；
+        #  * video_bg   -> 参考视频的音轨也要做音画同步切割 ->
+        #                  服务端把切好的那段放进 segment_audio_file。
+        return _connect_segment_audio(p, params, segment_audio, source)
 
     if source == h3_audio_track.TRACK_REFERENCE and ref_audios:
         node_id = "150:track"
@@ -407,7 +649,42 @@ def _pick_audio_track(p: dict, params: dict, duration: float) -> list:
         return [node_id, 0]
 
     # (a) 生成的音乐 —— H3 与画面一同采样出来的那条
+    # 接续段里，裁重叠节点（300:trim）已经把音频裁过了 —— 必须用
+    # 裁完的那条，否则音画会错位（画面裁了 22 帧、音频没裁）。
+    if video_audio_ref is not None:
+        return video_audio_ref
     return ["23", 0]
+
+
+def _connect_segment_audio(p: dict, params: dict, segment_audio: str,
+                           source: str) -> list:
+    """把「段音频」接进成片音轨。
+
+    【两种来源的接法不同】
+      * reference（独立参考音频）-> 段音频**替换** ref_audios 那一路。
+        但 ref_audios 的槽位在 T8 条件节点（136）里已经接好了
+        （136:401 是第 1 段参考音乐的 LoadAudioUpload）—— 所以这里
+        改接 136:401 的**输入文件**，而不是另开一路。
+      * video_bg（参考视频的音轨）-> 段音频替换 ref_video_audios
+        那一路（136:501）。
+    """
+    # 段音频是 ComfyUI input 里的文件名 -> 直接替换对应槽位的输入。
+    # 注意：**不能**在这里新建 LoadAudioUpload 节点 —— T8 节点的
+    # ref_audios / ref_video_audios 槽位是 autogrow 的，键名必须
+    # 保持 "ref_audios.ref_audio_0" 这种形态。
+    if source == h3_audio_track.TRACK_VIDEO_BG:
+        target = "136:501"
+    else:
+        target = "136:401"
+    node = p.get(target)
+    if not isinstance(node, dict):
+        # 没有这一路（比如用户没给参考音频）-> 回落到生成的音乐。
+        return ["23", 0]
+    node.setdefault("inputs", {})["audio"] = segment_audio
+    node.setdefault("_meta", {})["title"] = (
+        f"加载{'参考视频背景音' if source == h3_audio_track.TRACK_VIDEO_BG else '参考音乐'}"
+        f"（接续段·已切片）")
+    return [target, 0]
 
 
 def build_flf(params: dict) -> dict:
@@ -476,12 +753,20 @@ def build_flf(params: dict) -> dict:
     ref_videos = list(params.get("ref_videos") or [])[:MAX_REF_VIDEOS]
     ref_audios = list(params.get("ref_audios") or [])[:MAX_REF_AUDIOS]
     ref_video_audios = list(params.get("ref_video_audios") or [])[:MAX_REF_VIDEOS]
+    # 【2026-11-16 接续】音画同步切割参数（参考视频跳帧 / 音频偏移）。
+    slice_info = _continuation_media_slice(params)
     if ref_videos:
-        condition_inputs.update(_ref_video_nodes(p, ref_videos))
+        condition_inputs.update(_ref_video_nodes(
+            p, ref_videos,
+            skip_frames=slice_info["skip_frames"],
+            frame_cap=slice_info["frame_cap"]))
     if ref_audios:
         condition_inputs.update(_ref_audio_nodes(p, ref_audios))
     if ref_video_audios:
-        condition_inputs.update(_ref_video_audio_nodes(p, ref_video_audios))
+        condition_inputs.update(_ref_video_audio_nodes(
+            p, ref_video_audios,
+            start_seconds=slice_info["audio_start"],
+            duration=slice_info["audio_duration"]))
 
     # 【2026-11-15 修 —— 线上实测暴露的第二处真实缺陷】
     #
@@ -564,14 +849,22 @@ def build_r2v(params: dict) -> dict:
 
     p: dict = {}
     condition_inputs: dict = {}
+    # 【2026-11-16 接续】音画同步切割参数（参考视频跳帧 / 音频偏移）。
+    slice_info = _continuation_media_slice(params)
     if ref_images:
         condition_inputs.update(_ref_image_nodes(p, ref_images))
     if ref_videos:
-        condition_inputs.update(_ref_video_nodes(p, ref_videos))
+        condition_inputs.update(_ref_video_nodes(
+            p, ref_videos,
+            skip_frames=slice_info["skip_frames"],
+            frame_cap=slice_info["frame_cap"]))
     if ref_audios:
         condition_inputs.update(_ref_audio_nodes(p, ref_audios))
     if ref_video_audios:
-        condition_inputs.update(_ref_video_audio_nodes(p, ref_video_audios))
+        condition_inputs.update(_ref_video_audio_nodes(
+            p, ref_video_audios,
+            start_seconds=slice_info["audio_start"],
+            duration=slice_info["audio_duration"]))
 
     p.update(_build_common(p, params, condition_inputs=condition_inputs,
                             duration=duration, width=width, height=height,

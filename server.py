@@ -124,6 +124,7 @@ from h3studio import reso_label
 from h3studio import ref_api
 from h3studio import ref_images as ref_imgs
 from h3studio import h3_audio_track as h3audio
+from h3studio import h3_audio_continuation as h3acont
 from h3studio import h3_video_size
 from h3studio import h3_video_modes as h3modes
 from h3studio import music_yue2
@@ -1733,6 +1734,21 @@ class Worker:
                                     _track, has_reference_audio=True,
                                     has_reference_video_audio=False))
 
+                # 【2026-11-16 新增】记录**链首段**的原始音轨文件。
+                #
+                # 【为什么必须在 worker 里做】
+                # 原始音轨的 ComfyUI 文件名这时才确定（素材库引用
+                # 要到 _apply_asset_refs 才落成 ref_audios /
+                # ref_video_audios）。而下一段接续时需要：
+                #   * 原始音轨文件（切片用 + 成片贴轨用）
+                #   * 原始音轨总时长（算越界告警）
+                #
+                # 【为什么记「原始整条」而不是「段切片」】
+                # 成片音轨必须是原始整条 —— 每段 1s 空白若被累加
+                # 到成片里，3 段就是 3s 空白，音画必然错位。
+                if mode in ("flf", "r2v"):
+                    await self._record_chain_audio_source(job_id, params)
+
                 # 参考生音乐（a2a）：参考音频已经在上面的 _apply_asset_refs
                 # 里落进 params["ref_audios"]。这里取第一段，转成
                 # SheetSage2AudioToABC 需要的 LoadAudio 输入名。
@@ -1789,6 +1805,22 @@ class Worker:
                     # （构建函数会放行，让 ComfyUI 自己报错）。
                     params["_h3image_nodes_available"] = (
                         None if not probe_ok else nodes_ok)
+
+                # 【2026-11-16 新增】音频接续时序 —— 为接续段切出
+                # 「1s 空白 ⊕ 原始音轨切片」的**采样用**段音频。
+                #
+                # 【为什么在这里做】
+                # 必须在拼工作流**之前**（工作流要引用这个文件名），
+                # 且必须在素材上传**之后**（原始音轨的 ComfyUI 文件名
+                # 这时才确定）。
+                #
+                # 【成片音轨不在这里】成片音轨用「原始参考音频整条」，
+                # 在**合并阶段**贴（_finalize_continuation ->
+                # _concat_chain_video 的 external_audio 参数）。
+                # 两条链路必须分开 —— 否则每段 1s 空白会累积。
+                if mode in ("flf", "r2v"):
+                    await self._prepare_audio_continuation(session, job_id,
+                                                           params)
 
                 # 【2026-11-16 第5轮代码审查 C-10 修 —— 老任务重放的尺寸兜底】
                 #
@@ -1990,6 +2022,137 @@ class Worker:
                 self.current = None
 
 
+    async def _record_chain_audio_source(self, job_id: str,
+                                         params: dict) -> None:
+        """把**原始音轨**记进本段的接续上下文（链首段 / 每一段都记）。
+
+        记的字段（写进 params["continuation"] 并回写 DB）：
+          audio_track_mode       音轨来源（generated / reference / video_bg）
+          audio_source_kind      原始音轨来源（ref_audio / ref_video）
+          audio_source_file      **原始**音轨的 ComfyUI 文件名
+          audio_source_duration  原始音轨总时长（秒）
+
+        【为什么每段都记而不是只记链首段】
+        接续段会继承上游的值（见 _inherit_audio_continuation），
+        但**每一段自己**的记录才是它自己的真相 —— 若某一段的记录
+        丢了（比如老任务没有这个字段），继承链会在那一段断掉。
+        记录「原始整条」而不是「本段切片」——
+        切片是每一段各自算出来的（依赖累计帧数），原始整条才是
+        不变的那个源。
+
+        【为什么不改音轨来源】
+        音轨来源**以链首段为准**（nonebot 同款口径）。所以本段
+        如果自己选了别的来源，记录里保留**继承来的**那个，
+        并在服务端日志里说明 —— 不静默改用户的显式选择，
+        也不让中途改源破坏音画对齐。
+        """
+        info = cont_service.chain_info(params)
+        if not info:
+            return
+        track_mode = str(info.get("audio_track_mode") or "").strip()
+        source_kind = str(info.get("audio_source_kind") or "").strip()
+        source_file = str(info.get("audio_source_file") or "").strip()
+
+        if not track_mode:
+            # 链首段（没有继承）-> 用本段自己的选择。
+            track_mode = h3audio.normalize_track_source(
+                str(params.get("audio_track_source") or "").strip(),
+                has_reference_audio=bool(params.get("ref_audios")),
+                has_reference_video_audio=bool(
+                    params.get("ref_video_audios")))
+            if track_mode == h3audio.TRACK_REFERENCE:
+                source_kind = "ref_audio"
+                refs = list(params.get("ref_audios") or [])
+                source_file = str(refs[0]) if refs else ""
+            elif track_mode == h3audio.TRACK_VIDEO_BG:
+                source_kind = "ref_video"
+                refs = list(params.get("ref_video_audios") or [])
+                source_file = str(refs[0]) if refs else ""
+        elif not source_file:
+            # 续续段继承了音轨来源但没继承文件 -> 从上游补。
+            source_file = str(info.get("audio_source_file") or "").strip()
+
+        if not h3acont.is_external_track(track_mode):
+            return
+
+        duration = info.get("audio_source_duration")
+        if duration is None and source_file:
+            local = _comfy_input_local(source_file)
+            if local is not None:
+                duration = await asyncio.to_thread(_probe_audio_duration, local)
+        try:
+            duration = (None if duration is None else float(duration))
+        except (TypeError, ValueError):
+            duration = None
+
+        state = h3acont.chain_audio_state(
+            track_source=track_mode,
+            source_kind=source_kind,
+            source_file=source_file,
+            source_duration=duration,
+            consumed_frames=int(info.get("audio_consumed_frames") or 0))
+        info.update(state)
+        params["continuation"] = info
+        # 回写 DB —— 下一段的接续上下文就是从 DB 读出来的。
+        with db() as conn:
+            conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                         (json.dumps(params, ensure_ascii=False), job_id))
+        if source_file:
+            print(f"[音频接续] {job_id}: 原始音轨 {source_file}"
+                  f"（{source_kind or track_mode}，{duration}s）")
+
+    async def _prepare_audio_continuation(self, session: ClientSession,
+                                          job_id: str, params: dict) -> None:
+        """接续段的**音频接续时序**（首尾帧 / 参考生视频）。
+
+        做两件事：
+          1. 算出本段的音频时间轴（t_a_start = C_n / 24）；
+          2. 切出「1s 空白 ⊕ 原始音轨切片」并上传到 ComfyUI input，
+             把文件名写进 params["segment_audio_file"]。
+
+        【什么时候不做事】
+          * 链首段（没有上游）-> 不切（第 1 段用原始音轨从 0 开始）。
+          * 音轨来源是「生成的音乐」-> 不切（音画同源）。
+          * 没有上游记录的原始音轨文件 -> **明确报错**（不能静默
+            退化成「用整条原始音频当本段音轨」—— 那会让 1s 空白
+            不存在、且音画错位）。
+
+        【越界提示】原始音轨不够长时，给出中文告警（写进
+        params["continuation"]["audio_warnings"]），并在服务端日志里
+        打印 —— 用户在界面上能通过接续上下文看到。
+        """
+        info = cont_service.chain_info(params)
+        if not info:
+            return
+        track_mode = str(info.get("audio_track_mode") or "").strip()
+        if not h3acont.is_external_track(track_mode):
+            return
+        # 链首段：没有上游 -> 本段就是第 1 段，音轨从 0 开始，不切。
+        if not str(info.get("source_job") or "").strip():
+            return
+
+        source_file = str(info.get("audio_source_file") or "").strip()
+        if not source_file:
+            raise RuntimeError(
+                "接续段缺少原始参考音轨（上游没有记录音轨文件）—— "
+                "无法按接续时序切分音轨。请在上一段重新选择参考音乐，"
+                "或改用「复用参数」重新生成一段。")
+
+        plan = {
+            "source_start": float(info.get("audio_segment_start") or 0.0),
+            "source_duration": float(info.get("audio_segment_duration") or 0.0),
+            "lead_blank": float(info.get("audio_lead_blank")
+                                or h3acont.LEAD_BLANK_SECONDS),
+        }
+        for note in info.get("audio_warnings") or []:
+            print(f"[音频接续] {job_id}: {note}")
+
+        name = await _prepare_segment_audio(session, job_id, params, plan)
+        params["segment_audio_file"] = name
+        print(f"[音频接续] {job_id}: 段音频 {name} "
+              f"(切片 {plan['source_start']:.3f}s + {plan['source_duration']:.3f}s"
+              f"，前导空白 {plan['lead_blank']:.1f}s)")
+
     async def _finalize_continuation(self, job_id: str, mode: str, params: dict,
                                      saved: list[dict]) -> list[dict]:
         """接续收尾：登记本段 + 拼接**完整视频**。
@@ -2003,8 +2166,12 @@ class Worker:
         【为什么拼接失败不影响本段产物】本段视频本身是好的，
         拼接只是附加产物。拼接失败（比如 ffmpeg 不可用）时，
         本段仍然要出现在生成库里 —— 只是没有完整视频。
+
+        【2026-11-16 放开 flf / r2v】原来只有 t2v 走接续收尾。
+        现在三个视频模式都走 —— 落盘坐标、血缘回溯、拼接逻辑
+        全是**同一套**（见 continuation.py / _lineage_segment_rels）。
         """
-        if mode != "t2v":
+        if mode not in ("t2v", "flf", "r2v"):
             return saved
         info = cont_service.chain_info(params)
         if not info:
@@ -2054,7 +2221,24 @@ class Worker:
         if stage <= 0:
             return saved
 
-        full = await asyncio.to_thread(_concat_chain_video, segments, chain_id)
+        # ---- 成片音轨：外部音轨（参考音乐 / 参考视频的音轨）----
+        #
+        # 【为什么成片用「原始参考音频整条」】
+        # 每段采样时用的是「1s 空白 ⊕ 切片」（params["segment_audio_file"]），
+        # 那是「这一段该听到的东西」。成片要的是「整部片子该听到的
+        # 东西」= 原始参考音频整条，长度按合并后视频长。
+        # 若成片也用切片，每段开头的 1s 空白会累积（3 段 = 3s 空白）
+        # → 音画错位。两条链路必须分开。
+        external_audio = ""
+        external_label = ""
+        if h3acont.is_external_track(str(info.get("audio_track_mode") or "")):
+            external_audio = str(info.get("audio_source_file") or "").strip()
+            external_label = ("参考音乐" if str(
+                info.get("audio_source_kind") or "") == "ref_audio"
+                else "参考视频的音轨")
+
+        full = await asyncio.to_thread(_concat_chain_video, segments, chain_id,
+                                       external_audio, external_label)
         if not full:
             return saved
         full_rel = full.relative_to(OUT_DIR).as_posix()
@@ -2887,7 +3071,158 @@ def _lineage_segment_rels(job_id: str) -> list[str]:
     return rels
 
 
-def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
+# ------------------------------------------------------------------
+# 音频续接时序（首尾帧 / 参考生视频专用）
+# ------------------------------------------------------------------
+# 【为什么要有这一层】
+# 「音轨来源三选一」只存在于 flf / r2v。当音轨来源是「参考音频」或
+# 「参考视频的音轨」时，那条音轨是**贴上去**的 —— 它不参与 DiT 采样，
+# 所以音画对齐纯粹是**后处理**问题。
+#
+# 【两条链路必须分开 —— 本节最重要的一条】
+#   * 采样用：1s 空白 ⊕ 原始音频从第 N 秒起的切片（每段一个文件）
+#   * 成片用：原始参考音频**整条**（合并时贴，长度 = 合并后视频长）
+# 若把采样用的切片当成片音轨，每段开头的 1s 空白会**累积**
+# （3 段 = 3s 空白）→ 音画错位。
+#
+# 口径细节见 h3studio/h3_audio_continuation.py（纯函数，可离线单测）。
+
+
+def _probe_audio_duration(path: Path) -> float | None:
+    """音频文件时长（秒）。探测不到返回 None（不猜）。
+
+    用途：算「原始音轨还剩多少秒」-> 越界时给中文提示。
+    """
+    if not FFPROBE or not path.is_file():
+        return None
+    try:
+        raw = subprocess.check_output(
+            [FFPROBE, "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "stream=duration", "-of", "json", str(path)],
+            encoding="utf-8", timeout=20, creationflags=CREATE_NO_WINDOW)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    try:
+        stream = (json.loads(raw).get("streams") or [{}])[0]
+        value = float(stream.get("duration") or 0)
+    except (json.JSONDecodeError, TypeError, ValueError, IndexError):
+        return None
+    return value if value > 0 else None
+
+
+def _comfy_input_local(name: str) -> Path | None:
+    """ComfyUI input 里的文件名 -> 本地绝对路径（找不到返回 None）。
+
+    【为什么要处理子目录】
+    ComfyUI 上传接口返回的是 `subfolder/name` 形态（本项目固定用
+    `h3studio` 子目录），所以同一个文件名可能在 input 顶层，也可能在
+    input/h3studio/ 下 —— 两处都要找。
+    """
+    if not name:
+        return None
+    raw = str(name).replace("\\", "/").strip()
+    parts = [p for p in raw.split("/") if p and p != "."]
+    if not parts:
+        return None
+    filename = parts[-1]
+    roots = (Path("/home/ubuntu/comfyui/input"), Path("/root/ComfyUI/input"))
+    # 先试带子目录的完整相对路径，再试顶层文件名。
+    for root in roots:
+        candidate = root
+        for part in parts:
+            candidate = candidate / part
+        if candidate.is_file():
+            return candidate
+    for root in roots:
+        candidate = root / filename
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _make_segment_audio(source: Path, out_path: Path, *,
+                         start_seconds: float, duration_seconds: float,
+                         lead_blank: float) -> bool:
+    """生成「1s 空白 ⊕ 原始音频切片」这一个**采样用**的段音频文件。
+
+    【为什么用 adelay 而不是拼两个文件】
+    `adelay` 在音频**前面**插入静音（延迟），正好就是「1s 空白 ⊕ 切片」
+    的结构，且只跑一次 ffmpeg。`apad` 是**尾部**补静音，方向相反。
+
+    【为什么切片用 -ss（输入侧）而不是 -ss（输出侧）】
+    输入侧 seek 快且精确；输出侧要解码整条。1s 空白用 adelay 加在
+    **切片之后** —— 于是顺序是「空白 → 切片」，正是题面口径。
+
+    返回 True = 成功；False = 失败（调用方必须报错，不静默）。
+    """
+    if not FFMPEG:
+        return False
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
+    delay_ms = max(0, int(round(float(lead_blank) * 1000)))
+    args = [FFMPEG, "-y", "-ss", f"{max(0.0, float(start_seconds)):.6f}",
+            "-i", str(source), "-t", f"{max(0.0, float(duration_seconds)):.6f}"]
+    if delay_ms > 0:
+        args += ["-af", f"adelay=delays={delay_ms}:all=1"]
+    args += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+             str(out_path)]
+    try:
+        result = subprocess.run(args, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, timeout=300,
+                                creationflags=CREATE_NO_WINDOW)
+    except (subprocess.SubprocessError, OSError):
+        return False
+    if result.returncode != 0 or not out_path.is_file():
+        detail = (result.stderr or b"").decode("utf-8", "ignore")[-300:]
+        print(f"[音频接续] 切段音频失败（{source}）：{detail}")
+        return False
+    return True
+
+
+async def _prepare_segment_audio(session: ClientSession, job_id: str,
+                                  params: dict, plan: dict) -> str:
+    """为接续段准备「1s 空白 ⊕ 切片」的段音频，上传到 ComfyUI input。
+
+    返回 ComfyUI 里的文件名（失败时抛 RuntimeError，带中文原因）。
+
+    【输入来源】
+      * reference -> 原始参考音频（params["continuation"]["audio_source_file"]）
+      * video_bg  -> 参考视频抽出来的音轨（同上字段）
+    """
+    info = cont_service.chain_info(params)
+    source_name = str(info.get("audio_source_file") or "").strip()
+    if not source_name:
+        raise RuntimeError(
+            "接续段缺少原始参考音轨（上游没记录音轨文件）—— "
+            "请改用「复用参数」重新生成一段，或在上一段重新选择参考音乐。")
+    local = _comfy_input_local(source_name)
+    if local is None:
+        raise RuntimeError(
+            f"接续段找不到原始参考音轨文件（{source_name}）—— "
+            f"它可能已被清理。请改用「复用参数」重新生成一段。")
+    out_dir = UPLOAD_DIR / "segment_audio"
+    digest = hashlib.sha256(
+        f"{job_id}:{plan.get('source_start')}:{plan.get('source_duration')}"
+        f":{plan.get('lead_blank')}".encode("utf-8")).hexdigest()[:16]
+    out_path = out_dir / f"seg-{digest}.m4a"
+    if not out_path.exists():
+        ok = await asyncio.to_thread(
+            _make_segment_audio, local, out_path,
+            start_seconds=float(plan.get("source_start") or 0.0),
+            duration_seconds=float(plan.get("source_duration") or 0.0),
+            lead_blank=float(plan.get("lead_blank") or 0.0))
+        if not ok:
+            raise RuntimeError(
+                "切不出接续段的参考音频（ffmpeg 失败）—— "
+                "请检查原始参考音轨是否可读，或改用「复用参数」重新生成一段。")
+    return await comfy_upload_media(session, out_path)
+
+
+def _concat_chain_video(segments: list[str], chain_id: str,
+                        external_audio: str | None = None,
+                        external_audio_label: str = "") -> Path | None:
     """把链上的分段视频按序拼成**完整视频**。返回输出路径（失败返回 None）。
 
     【为什么用 concat demuxer 而不是 filter_complex】
@@ -2897,6 +3232,15 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
 
     【音画同步】分段视频各自已经是音画同裁的（TrimAV 裁重叠时
     音画一起裁），所以直接拼接不会累积 A/V 偏移。
+
+    【external_audio —— 成片音轨用「原始参考音频整条」】
+    当音轨来源是「参考音乐」/「参考视频的音轨」时，那条音轨是**贴上去**的，
+    而且它**不参与采样** —— 每段采样时用的是「1s 空白 ⊕ 切片」。
+    若成片也用切片，每段开头那 1s 空白会累积（3 段 = 3s 空白）→ 音画错位。
+    所以成片必须贴**原始音频整条**，并按合并后视频长度对齐：
+      * 视频长于音轨 -> `-af apad` 补静音；
+      * 视频短于音轨 -> `-shortest` 截断。
+    （与 nonebot 咏唱 h3 的 concat_full_video 同一套参数。）
     """
     if not segments:
         return None
@@ -2911,7 +3255,7 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
             paths.append(candidate)
     if not paths:
         return None
-    if len(paths) == 1:
+    if len(paths) == 1 and not external_audio:
         # 只有一段 —— 完整视频就是它自己
         return paths[0]
     if not FFMPEG:
@@ -2923,6 +3267,15 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
     def quote_concat(path: Path) -> str:
         return str(path).replace("'", "'\\''")
 
+    external_path = None
+    if external_audio:
+        external_path = _comfy_input_local(external_audio)
+        if external_path is None:
+            # 成片音轨文件找不到 -> **明确降级**（用各段自己的音轨），
+            # 不静默失败：打印日志，成片仍然产出。
+            print(f"[接续] 找不到外部音轨 {external_audio}，成片改用各段自己的音轨")
+            external_path = None
+
     try:
         list_path.write_text(
             "\n".join(f"file '{quote_concat(p)}'" for p in paths),
@@ -2932,10 +3285,22 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
               f"force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
               f"setsar=1,fps={cont.FPS},format=yuv420p")
         command = [FFMPEG, "-y", "-f", "concat", "-safe", "0",
-                   "-i", str(list_path), "-vf", vf,
-                   "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-                   "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
-                   "-movflags", "+faststart", str(output_path)]
+                   "-i", str(list_path)]
+        if external_path is not None:
+            # 外部音轨：视频流来自 concat，音频流来自原始参考音频。
+            # -map 0:v -map 1:a
+            command += ["-i", str(external_path)]
+            command += ["-map", "0:v", "-map", "1:a"]
+        else:
+            command += ["-map", "0:v", "-map", "0:a"]
+        command += ["-vf", vf,
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
+        if external_path is not None:
+            # 视频长 -> 补静音；视频短 -> 截断。两者同时给 = 音轨长度
+            # 精确等于合并后视频长度（题面口径）。
+            command += ["-af", "apad", "-shortest"]
+        command += ["-movflags", "+faststart", str(output_path)]
         result = subprocess.run(command, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.PIPE, timeout=600,
                                 creationflags=CREATE_NO_WINDOW)
@@ -2945,6 +3310,10 @@ def _concat_chain_video(segments: list[str], chain_id: str) -> Path | None:
             if output_path.exists():
                 output_path.unlink()
             return None
+        if external_path is not None:
+            print(f"[接续] 成片音轨使用原始参考音频"
+                  f"{('（' + external_audio_label + '）') if external_audio_label else ''}"
+                  f": {external_path.name}")
         return output_path
     except Exception as exc:
         print(f"[接续] 拼接异常: {exc}")
@@ -2964,6 +3333,102 @@ def _continuation_size_mismatch(source_params: dict, target_params: dict) -> str
     那里是纯函数、可离线单测；这里只做一次转发。
     """
     return cont.size_mismatch(source_params, target_params)
+
+
+def _inherit_audio_continuation(*, source_mode: str, source_params: dict,
+                                source_info: dict, segment_total: int,
+                                window: int, chain_total: int) -> dict:
+    """接续段的**音频时序**状态（继承自上游）。
+
+    返回要写进 params["continuation"] 的字段：
+      audio_track_mode        音轨来源（generated / reference / video_bg）
+      audio_source_kind       原始音轨来源（ref_audio / ref_video）
+      audio_source_file       **原始**音轨文件（成片用整条 / 切片用源）
+      audio_source_duration   原始音轨总时长（秒）
+      audio_consumed_frames   到本段为止已消费的原始音轨帧数（口径 B 的 C_n）
+      audio_lead_blank        前导空白（秒）
+      audio_segment_start     本段从原始音轨取的起点（秒）
+      audio_segment_duration  本段切片时长（秒）
+      audio_warnings          [中文提示, ...]
+
+    【口径 —— 为什么 consumed 用 chain_total】
+    C_n = 上游**已累计交付**的帧数。上游的 chain_total_frames 就是
+    这个值（它按「上游已累计 + 上游本段交付」算好，见
+    continuation_service.continuation_state）。
+    而本段**自己**的交付帧数 = segment_total - window。
+    → 下一段的 C_(n+1) = C_n + (segment_total - window)。
+
+    【音轨来源以链首段为准】
+    上游的 params["continuation"] 里已经记着它继承来的音轨状态；
+    链首段自己记的是它自己选的那个。所以「继承上游」= 链首段说了算。
+
+    【t2v 不涉及】t2v 的音轨恒为生成音频（音画同源），不切。
+    """
+    empty: dict = {}
+    if source_mode not in ("flf", "r2v"):
+        return empty
+
+    upstream_info = source_info or {}
+    track_mode = str(upstream_info.get("audio_track_mode") or "").strip()
+    source_kind = str(upstream_info.get("audio_source_kind") or "").strip()
+    source_file = str(upstream_info.get("audio_source_file") or "").strip()
+    source_duration = upstream_info.get("audio_source_duration")
+    try:
+        source_duration = (None if source_duration is None
+                           else float(source_duration))
+    except (TypeError, ValueError):
+        source_duration = None
+    consumed = int(upstream_info.get("audio_consumed_frames") or 0)
+
+    # 链首段（没有上游记录）-> 用**本段自己**的参数推断。
+    if not track_mode:
+        track_mode = str(source_params.get("audio_track_source") or "").strip()
+        track_mode = h3audio.normalize_track_source(
+            track_mode,
+            has_reference_audio=bool(source_params.get("ref_audios")),
+            has_reference_video_audio=bool(
+                source_params.get("ref_video_audios")))
+        if track_mode == h3audio.TRACK_REFERENCE:
+            source_kind = "ref_audio"
+            refs = source_params.get("ref_audios") or []
+            source_file = str(refs[0]) if refs else ""
+        elif track_mode == h3audio.TRACK_VIDEO_BG:
+            source_kind = "ref_video"
+            refs = source_params.get("ref_video_audios") or []
+            source_file = str(refs[0]) if refs else ""
+
+    if not h3acont.is_external_track(track_mode):
+        # 生成音频：音画同源，不切。
+        return {}
+
+    # C_n：上游已累计交付的帧数。
+    # 链首段 -> 0；续接段 -> 上游的 chain_total_frames。
+    if str(upstream_info.get("source_job") or "").strip():
+        consumed = int(chain_total or 0)
+    else:
+        consumed = 0
+
+    plan = h3acont.segment_audio_plan(
+        consumed_frames=consumed,
+        segment_frames=segment_total,
+        context_frames=window,
+        source_duration=source_duration)
+
+    state = h3acont.chain_audio_state(
+        track_source=track_mode,
+        source_kind=source_kind,
+        source_file=source_file,
+        source_duration=source_duration,
+        consumed_frames=consumed)
+    state.update({
+        "audio_segment_start": plan["source_start"],
+        "audio_segment_duration": plan["source_duration"],
+        "audio_segment_offset": plan["segment_start"],
+        "audio_segment_skip_frames": plan["skip_frames"],
+        "audio_sampling_duration": plan["sampling_duration"],
+        "audio_warnings": plan["warnings"],
+    })
+    return state
 
 
 def _prepare_continuation_params(params: dict) -> str:
@@ -3105,6 +3570,28 @@ def _prepare_continuation_params(params: dict) -> str:
                                                      source_params, source_job)
     chain_total = int(upstream_state.get("total_frames") or 0)
 
+    # ---- 音频续接时序（首尾帧 / 参考生视频专用）----
+    #
+    # 【口径】
+    #   t_a_start(n) = C_n / 24，C_n = 上游已累计**交付**的帧数。
+    #   本段交付 = 本段总帧数 - 钉住窗口（钉住区会被裁掉）。
+    #
+    # 【音轨来源以链首段为准】
+    # nonebot 的做法是「整部长视频共用第 1 段的 audio_decision」。
+    # 中途改音轨来源会让前段的采样音频与后段对不上 ——
+    # 所以这里从**上游**继承，而不是看本段前端传了什么。
+    #
+    # 【为什么只有 reference / video_bg 才需要切片】
+    # generated 档音画同源（音频是采样出来的），段内天然同步，不切。
+    audio_state = _inherit_audio_continuation(
+        source_mode=source_mode,
+        source_params=source_params,
+        source_info=source_info,
+        segment_total=segment_total,
+        window=window,
+        chain_total=chain_total,
+    )
+
     params["continuation"] = {
         "chain_id": chain_id,
         "stage_index": stage_index,
@@ -3124,6 +3611,8 @@ def _prepare_continuation_params(params: dict) -> str:
         "chain_total_frames": chain_total,
         "segment_frames": segment_total,
     }
+    # 音频接续状态（首尾帧 / 参考生视频）—— 继承自上游。
+    params["continuation"].update(audio_state)
     return ""
 
 
@@ -3154,9 +3643,9 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
 
     # ---- 接续链的建立 ----
     #
-    # 【为什么每个 t2v 任务都要有链信息】用户需求：「每次生成自动把
+    # 【为什么每个视频任务都要有链信息】用户需求：「每次生成自动把
     # 可接续的潜空间文件落盘保存，与产物记录关联并可在生成库中识别」。
-    # 所以**每一个** t2v 任务都是一条链的第 0 段：它会落盘自己的潜空间，
+    # 所以**每一个**视频任务都是一条链的第 0 段：它会落盘自己的潜空间，
     # 从而可以被继续接续。
     #
     # 链 id = **自己的任务 id**（链首段）。后续段沿用上游的链 id，
@@ -3169,8 +3658,18 @@ def create_job_record(mode: str, params: dict, session_id: str = "") -> str:
     # 写同一个文件 -> 后续接续读到兄弟分支的内容（静默错误内容）。
     # 详见 continuation.segment_run_id。
     #
-    # 二采不建链（潜空间不同源，见 h3studio/continuation.py）。
-    if mode == "t2v":
+    # 【2026-11-16 放开 flf / r2v】原来只有 t2v 建链。
+    # 现在三个视频模式都建 —— 因为 flf / r2v 的工作流里
+    # **真的接了桥**（h3_video_modes._build_common 的 300:save /
+    # 300:load / 300:bridge），潜空间**真的落盘**了。
+    # 只放开模式白名单而不建链 = 接力棒没有落盘坐标 = 点了接续
+    # 会被服务端明确拒绝（而不是静默退化成普通生成）。
+    #
+    # 【二采】二采**照样建链、照样落盘**（工作流里 300:save 不受
+    # 二采开关影响），只是**不读回、不接桥** —— 所以二采段能产出
+    # 接力棒，但不能消费接力棒。这与
+    # h3studio/continuation.py 的模块说明一致。
+    if mode in ("t2v", "flf", "r2v"):
         info = params.get("continuation")
         if not isinstance(info, dict) or not info:
             duration = float(params.get("duration") or 5)
@@ -4385,7 +4884,12 @@ async def api_create(request):
     # 【为什么不信任前端传来的 chain_id / stage_index】前端回填的内容
     # 是**上一段**的链信息，本段是新的一段 —— 段号必须 +1、
     # 接力棒必须指向上一段。这两件事只能由服务端算。
-    if mode == "t2v" and params.get("continuation"):
+    #
+    # 【2026-11-16 放开 flf / r2v】原来只有 t2v 走这条校验。
+    # 现在三个视频模式都走 —— 因为它们的接续链是**同一套**协议
+    # （同一份 h3studio/continuation.py 的坐标与闸门），
+    # 只是工作流拼装分别落在 video_workflow / h3_video_modes。
+    if mode in ("t2v", "flf", "r2v") and params.get("continuation"):
         cont_error = _prepare_continuation_params(params)
         if cont_error:
             return web.json_response({"error": cont_error}, status=400)

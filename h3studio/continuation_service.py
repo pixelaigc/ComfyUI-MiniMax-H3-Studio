@@ -41,6 +41,7 @@ import time
 from pathlib import Path
 
 from . import continuation as cont
+from . import h3_audio_continuation as h3acont
 
 
 # ------------------------------------------------------------------
@@ -601,6 +602,37 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
         "segment_frames": int(info.get("segment_frames") or 0),
     }
 
+    # ---- 音频接续状态（首尾帧 / 参考生视频）----
+    #
+    # 【为什么放在这里下发】前端要显示「本段参考音频从第几秒接入」，
+    # 并把**原始参考图 / 参考音频**回填到槽位。这两件事都需要
+    # 服务端的权威值 —— 前端拿不到 ComfyUI 的音频文件信息。
+    audio_info = _continuation_audio_info(params, info, mode)
+
+    # ---- 素材回填（首尾帧 / 参考生视频）----
+    #
+    # 【为什么要回填素材】接续的语义是「接着上一段继续」——
+    # 上一段的参考图 / 参考音乐应该**自动带过来**，用户只写下一段提示词。
+    # 素材以**素材库引用**（asset_refs）的形态记录，回填时前端按
+    # 槽位映射还原成 state.assetRefs（见 web/continuation.js）。
+    asset_refs = []
+    if mode in ("flf", "r2v"):
+        raw_refs = params.get("asset_refs")
+        if isinstance(raw_refs, list):
+            for item in raw_refs:
+                if not isinstance(item, dict):
+                    continue
+                asset_id = str(item.get("asset_id") or "").strip()
+                slot = str(item.get("slot") or "").strip()
+                if not asset_id or not slot:
+                    continue
+                try:
+                    ordinal = int(item.get("ordinal") or 0)
+                except (TypeError, ValueError):
+                    ordinal = 0
+                asset_refs.append({"asset_id": asset_id, "slot": slot,
+                                   "ordinal": ordinal})
+
     return {
         "ok": True,
         "error": "",
@@ -612,4 +644,54 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
         "context_frames": window,
         "total_frames": state["total_frames"],
         "total_seconds": state["total_seconds"],
+        # 首尾帧 / 参考生视频专用：素材回填 + 音频接续计划
+        "asset_refs": asset_refs,
+        "audio": audio_info,
+    }
+
+
+def _continuation_audio_info(params: dict, info: dict, mode: str) -> dict:
+    """接续上下文的**音频计划**（给前端显示用）。
+
+    返回：
+      {
+        "track_mode":   音轨来源（generated / reference / video_bg）,
+        "source_kind":  原始音轨来源（ref_audio / ref_video）,
+        "source_file":  原始音轨文件（ComfyUI 侧名字）,
+        "source_duration": 原始音轨总时长（秒）,
+        "consumed_frames": 已消费的原始音轨帧数（口径 B 的 C_n）,
+        "lead_blank":   前导空白（秒）,
+        "segment_start": 本段从原始音轨取的起点（秒）,
+        "segment_duration": 本段切片时长（秒）,
+        "warnings":     [中文提示, ...],
+        "notes":        [给人看的一句话说明, ...],
+      }
+
+    【为什么前端要拿到它】用户必须能看见「这一段的参考音频从
+    第 5.167 秒接入，前面有 1 秒空白」—— 否则音画对齐是黑箱。
+    """
+    if mode not in ("flf", "r2v"):
+        return {}
+    track_mode = str(info.get("audio_track_mode") or "").strip()
+    if not track_mode:
+        return {}
+    notes: list[str] = []
+    if h3acont.is_external_track(track_mode):
+        notes.append("本段的参考音轨按接续时序切片接入"
+                     "（已移除前段已使用的部分，前置 1 秒空白）。")
+    else:
+        notes.append("本链的音轨由 H3 与画面一同采样生成（音画同源），"
+                     "不按偏移切片。")
+    return {
+        "track_mode": track_mode,
+        "source_kind": str(info.get("audio_source_kind") or ""),
+        "source_file": str(info.get("audio_source_file") or ""),
+        "source_duration": info.get("audio_source_duration"),
+        "consumed_frames": int(info.get("audio_consumed_frames") or 0),
+        "lead_blank": float(info.get("audio_lead_blank")
+                            or h3acont.LEAD_BLANK_SECONDS),
+        "segment_start": float(info.get("audio_segment_start") or 0.0),
+        "segment_duration": float(info.get("audio_segment_duration") or 0.0),
+        "warnings": list(info.get("audio_warnings") or []),
+        "notes": notes,
     }

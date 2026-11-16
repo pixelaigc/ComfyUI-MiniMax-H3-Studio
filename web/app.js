@@ -597,6 +597,27 @@ function resetSlotsForMode(mode, keepSlots) {
 // 调用完复位 —— 避免「切模式时也误保留」。
 let renderModeKeepSlots = false;
 
+/**
+ * 【2026-11-16 新增】**保留槽位状态**地重渲染模式区。
+ *
+ * 【为什么需要它】renderMode() 内部会调 resetSlotsForMode(mode, false)
+ * —— 那会把 state.assetRefs **整块清空**（槽位状态是「切模式要清」的）。
+ * 接续回填素材后需要重渲染（让槽位显示出缩略图），如果直接调
+ * renderMode()，刚回填进去的素材就被自己清掉了。
+ *
+ * 【为什么不用 renderModeKeepSlots 那个模块级标志】
+ * 那个标志是模块私有的，外部改不了；而这里要的是一个**明确的入口**
+ * —— 「保留状态重渲染」是一个独立的语义，不该靠外部摆标志。
+ */
+function renderModeKeepSlotsRender() {
+  renderModeKeepSlots = true;
+  try {
+    renderMode();
+  } finally {
+    renderModeKeepSlots = false;
+  }
+}
+
 function renderMode() {
   // 模式切换后二次增强的作用对象 chips 状态要跟着刷新
   queueMicrotask(() => { try { renderPromptVersions(); } catch (e) { /* 忽略 */ } });
@@ -7461,10 +7482,12 @@ window.__h3LooksLikePythonTraceback = looksLikePythonTraceback;
 
 // ---------- 接续生成（continuation）----------
 //
-// web/continuation.js 需要访问三样东西：
-//   * state            —— 时长 / 步数在全局 state 里（不在 VIDEO_PANEL 里）
-//   * activateVideoMode —— 切换到文生视频面板
-//   * refreshJobs      —— 回填后刷新卡片（「接续」按钮的显隐依赖卡片数据）
+// web/continuation.js 需要访问这些东西：
+//   * state              —— 时长 / 步数在全局 state 里（不在 VIDEO_PANEL 里）
+//   * activateVideoMode  —— 切到来源任务自己的模式面板（t2v / flf / r2v）
+//   * refreshJobs        —— 回填后刷新卡片（「接续」按钮的显隐依赖卡片数据）
+//   * renderAudioTrackSelect —— 回填音轨来源（首尾帧 / 参考生视频）
+//   * renderMode         —— 素材回填后重渲染槽位
 //
 // 这里集中暴露，避免 continuation.js 去猜内部结构。
 // 【为什么不直接把 continuation.js 合并进 app.js】app.js 已 3800+ 行；
@@ -7473,6 +7496,13 @@ window.__h3LooksLikePythonTraceback = looksLikePythonTraceback;
 window.__h3State = state;
 window.activateVideoMode = activateVideoMode;
 window.refreshJobs = refreshJobs;
+// 【2026-11-16 新增】首尾帧 / 参考生视频的接续要回填素材槽位与音轨来源
+// —— 这两个函数原本是模块级私有的，接续模块用不到就没导出。
+window.renderAudioTrackSelect = renderAudioTrackSelect;
+window.renderMode = renderMode;
+// 【2026-11-16 新增】接续回填素材后要「保留槽位状态」地重渲染 ——
+// 直接调 renderMode() 会把刚回填的素材清掉（resetSlotsForMode）。
+window.renderModeKeepSlots = renderModeKeepSlotsRender;
 
 // 接续能力探测：Relay-Kit 节点在不在。
 //

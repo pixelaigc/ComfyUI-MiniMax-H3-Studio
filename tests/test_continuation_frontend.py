@@ -91,10 +91,15 @@ class TestContinuationFrontend(unittest.TestCase):
 
     def _seed_continuable_job_as(self, job_id):
         """造一条可接续记录（可指定 id —— 见 _seed_continuable_job 的说明）。"""
+        return self._seed_continuable_job_as_mode(job_id, "t2v")
+
+    def _seed_continuable_job_as_mode(self, job_id, mode="t2v",
+                                       extra_params=None, asset_refs=None):
+        """造一条可接续记录（可指定模式 / 附加参数 / 素材引用）。"""
         import sqlite3
         from h3studio import continuation_service as cs
 
-        run_id = cs.chain_run_id(job_id)
+        run_id = cs.segment_run_id(job_id)
         stage = cs.stage_path(run_id, 0)
         stage.parent.mkdir(parents=True, exist_ok=True)
         stage.write_bytes(b"fake-av-latent")
@@ -105,25 +110,50 @@ class TestContinuationFrontend(unittest.TestCase):
             "width": 768, "height": 448,
             "duration": 5, "steps": 4,
             "sampler": "euler", "scheduler": "simple",
-            "gen_type": "t2v",
+            "gen_type": mode,
             "continuation": {
                 "chain_id": job_id, "stage_index": 0,
                 "source_job": "", "source_segment": -1,
+                "latent_run_id": run_id, "latent_stage": 0,
                 "context_frames": 22, "anchor_frames": 22,
                 "chain_total_frames": 0, "segment_frames": 124,
             },
         }
+        if extra_params:
+            params.update(extra_params)
+        if asset_refs is not None:
+            params["asset_refs"] = asset_refs
         with sqlite3.connect(self.server.data_dir / "jobs.db") as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO jobs "
                 "(id, created_at, mode, params, status, progress, outputs) "
                 "VALUES (?,?,?,?,?,?,?)",
-                (job_id, time.time(), "t2v", json.dumps(params, ensure_ascii=False),
+                (job_id, time.time(), mode, json.dumps(params, ensure_ascii=False),
                  "done", 1.0,
                  json.dumps([{"kind": "video",
                               "file": "videos/fake-cont.mp4",
                               "name": "fake-cont.mp4"}], ensure_ascii=False)))
         return job_id
+
+    def _real_asset_ids(self):
+        """素材库里真实存在的（图片 id, 音频 id）。取不到返回 (None, None)。
+
+        【为什么要真实 id】前端回填时要按 id 查素材名与类别 ——
+        编造的 id 查不到，槽位就是空的（那不是回填失败，是库里没这条）。
+        """
+        try:
+            from h3studio import assets as A
+            with A.connect() as conn:
+                image = conn.execute(
+                    "SELECT id FROM assets WHERE category='image' "
+                    "AND deleted_at IS NULL LIMIT 1").fetchone()
+                audio = conn.execute(
+                    "SELECT id FROM assets WHERE category='audio' "
+                    "AND deleted_at IS NULL LIMIT 1").fetchone()
+        except Exception:
+            return None, None
+        return ((image["id"] if image else None),
+                (audio["id"] if audio else None))
 
     def _goto_jobs(self):
         """切到生成库（作品/任务列表）页。"""
@@ -399,6 +429,189 @@ class TestContinuationFrontend(unittest.TestCase):
                          "尺寸不一致时不该发出 /api/jobs 请求")
         self.assertIn("分辨率", result.get("toast", ""),
                       f"拦下时必须给出中文原因，实际: {result.get('toast')!r}")
+
+    # ------------------------------------------------------------
+    # 【2026-11-16 新增】首尾帧 / 参考生视频的接续
+    # ------------------------------------------------------------
+    def test_flf_card_has_continue_button(self):
+        """首尾帧产物的卡片上**要有**「接续」按钮。
+
+        【为什么这条重要】旧实现里 flf/r2v 被服务端直接拒绝
+        （「只有视频类产物支持接续。」—— 那句文案本身就是错的）。
+        """
+        job_id = self._seed_continuable_job_as_mode("contfrontend-flf", "flf")
+        self._goto_jobs()
+        found = self.page.evaluate("""(jid) => {
+          const card = document.querySelector(`.job-card[data-jid="${jid}"]`);
+          if (!card) return {card: false};
+          const btn = card.querySelector('[data-act="continue"]');
+          return {card: true, button: !!btn};
+        }""", job_id)
+        self.assertTrue(found.get("card"), "生成库里没找到首尾帧那条记录")
+        self.assertTrue(found.get("button"),
+                        "首尾帧卡片上应该有「接续」按钮")
+
+    def test_r2v_card_has_continue_button(self):
+        """参考生视频产物的卡片上**要有**「接续」按钮。"""
+        job_id = self._seed_continuable_job_as_mode("contfrontend-r2v", "r2v")
+        self._goto_jobs()
+        found = self.page.evaluate("""(jid) => {
+          const card = document.querySelector(`.job-card[data-jid="${jid}"]`);
+          if (!card) return {card: false};
+          const btn = card.querySelector('[data-act="continue"]');
+          return {card: true, button: !!btn};
+        }""", job_id)
+        self.assertTrue(found.get("card"), "生成库里没找到参考生那条记录")
+        self.assertTrue(found.get("button"),
+                        "参考生卡片上应该有「接续」按钮")
+
+    def test_continue_switches_to_source_mode(self):
+        """点首尾帧产物的「接续」-> 面板切到**首尾帧**（不是文生视频）。
+
+        【为什么】硬切 t2v 会让首尾帧 / 参考生的素材槽位根本不存在
+        —— 用户看不到参考图，也没法追加本段的参考媒体。
+        """
+        job_id = self._seed_continuable_job_as_mode("contfrontend-mode", "flf")
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1800)
+        mode = self.page.evaluate(
+            "() => (window.__h3State && window.__h3State.mode) || ''")
+        self.assertEqual(mode, "flf",
+                         "接续后应切到来源任务自己的模式")
+
+    def test_continue_backfills_asset_slots(self):
+        """接续要**自动回填原始参考素材**（参考图 / 参考音乐）。
+
+        【用户需求】次段自动填入原始参考图 + 修正后的参考音频。
+        """
+        # 用**素材库里真实存在的**素材 id（前端要按 id 查名字/类别）。
+        image_id, audio_id = self._real_asset_ids()
+        if not image_id or not audio_id:
+            self.skipTest("素材库里没有可用的图片 / 音频素材")
+        job_id = self._seed_continuable_job_as_mode(
+            "contfrontend-assets", "r2v",
+            asset_refs=[
+                {"asset_id": image_id, "slot": "ref_image", "ordinal": 0},
+                {"asset_id": audio_id, "slot": "ref_audio", "ordinal": 0},
+            ])
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(2500)
+        slots = self.page.evaluate("""() => {
+          const s = (window.__h3State && window.__h3State.assetRefs) || {};
+          return Object.keys(s);
+        }""")
+        self.assertIn("ref0", slots,
+                      f"参考图槽位没回填（现有：{slots}）")
+        self.assertIn("refaud0", slots,
+                      f"参考音乐槽位没回填（现有：{slots}）")
+
+    def test_continue_restores_audio_track_source(self):
+        """接续要**回填音轨来源**（以链首段为准）。
+
+        【为什么必须回填】切模式会把音轨下拉复位成「使用生成的音乐」——
+        那会让接续段的音轨与上一段对不上。
+
+        【前提】音轨来源选「参考音乐」时，参考音乐**必须**在素材槽位里
+        —— 音轨三选一的可见性判据就是「有没有对应素材」（见
+        h3_audio_track.available_track_sources）。所以这条用例要带
+        一条真实的参考音乐素材引用。
+        """
+        image_id, audio_id = self._real_asset_ids()
+        if not audio_id:
+            self.skipTest("素材库里没有可用的音频素材")
+        job_id = self._seed_continuable_job_as_mode(
+            "contfrontend-audio", "r2v",
+            extra_params={
+                "audio_track_source": "reference",
+                "ref_audios": ["h3studio/orig.m4a"],
+            },
+            asset_refs=[
+                {"asset_id": audio_id, "slot": "ref_audio", "ordinal": 0},
+            ])
+        # 往任务的 continuation 里塞音频接续状态（模拟链首段记录的）
+        import sqlite3
+        with sqlite3.connect(self.server.data_dir / "jobs.db") as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (job_id,)).fetchone()
+            params = json.loads(row[0])
+            params["continuation"].update({
+                "audio_track_mode": "reference",
+                "audio_source_kind": "ref_audio",
+                "audio_source_file": "h3studio/orig.m4a",
+                "audio_source_duration": 60.0,
+                "audio_consumed_frames": 124,
+                "audio_lead_blank": 1.0,
+                "audio_segment_start": 5.166667,
+                "audio_segment_duration": 4.25,
+            })
+            conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                         (json.dumps(params, ensure_ascii=False), job_id))
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(2200)
+        track = self.page.evaluate(
+            "() => (window.__h3State && window.__h3State.audioTrackSource) || ''")
+        self.assertEqual(track, "reference",
+                         "音轨来源没回填（接续必须以链首段为准）")
+
+    def test_continue_panel_shows_audio_timing(self):
+        """接续上下文区要显示**音频接续时序**（起点 / 时长 / 前导空白）。"""
+        job_id = self._seed_continuable_job_as_mode(
+            "contfrontend-audio-panel", "r2v")
+        import sqlite3
+        with sqlite3.connect(self.server.data_dir / "jobs.db") as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (job_id,)).fetchone()
+            params = json.loads(row[0])
+            params["continuation"].update({
+                "audio_track_mode": "reference",
+                "audio_source_kind": "ref_audio",
+                "audio_source_file": "h3studio/orig.m4a",
+                "audio_source_duration": 60.0,
+                "audio_consumed_frames": 124,
+                "audio_lead_blank": 1.0,
+                "audio_segment_start": 5.166667,
+                "audio_segment_duration": 4.25,
+            })
+            conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                         (json.dumps(params, ensure_ascii=False), job_id))
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1800)
+        text = self.page.evaluate("""() => {
+          const p = document.getElementById('continuationPanel');
+          return p ? p.textContent : '';
+        }""")
+        self.assertIn("音轨来源", text, "上下文区应显示音轨来源")
+        self.assertIn("本段音频起点", text, "上下文区应显示音频起点")
+        self.assertIn("前导空白", text, "上下文区应显示前导空白")
+
+    def test_prompt_is_editable_and_enhance_available(self):
+        """提示词**可编辑**且「增强」可用（用户需求）。
+
+        【为什么断言这个】接续把提示词框清空（用户写下一段），
+        所以必须确认用户能写、并且能点增强 —— 而不是被清空成
+        不可编辑状态。
+        """
+        job_id = self._seed_continuable_job_as_mode("contfrontend-enh", "r2v")
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1500)
+        editable = self.page.evaluate("""() => {
+          const t = document.getElementById('prompt');
+          if (!t) return null;
+          t.value = '下一段的提示词';
+          t.dispatchEvent(new Event('input', {bubbles: true}));
+          return {disabled: !!t.disabled, readOnly: !!t.readOnly,
+                  value: t.value};
+        }""")
+        self.assertIsNotNone(editable, "找不到提示词框")
+        self.assertFalse(editable["disabled"], "提示词框不该被禁用")
+        self.assertFalse(editable["readOnly"], "提示词框不该只读")
+        self.assertEqual(editable["value"], "下一段的提示词",
+                         "提示词框应该可以编辑")
 
     def test_no_console_errors_after_interactions(self):
         """整套交互跑完，控制台仍然 0 报错。"""

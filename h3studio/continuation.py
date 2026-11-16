@@ -74,19 +74,28 @@ DEFAULT_CONTEXT_FRAMES = 22
 
 #: 可接续的生成模式。
 #:
-#: 目前**只有 t2v**：接续桥接在 h3studio/video_workflow.py 的
-#: `build_t2v_panel` 里（文生视频新面板）。flf / r2v 走的是
-#: workflows.py 里的旧工作流路径（`_h3_video_workflow` / `build_r2v`），
-#: 那两条路**还没有**接桥 —— 硬说它们可接续会导致点了之后静默
-#: 退化成普通生成（最坏的一种失败：看起来成功，其实没接上）。
+#: **t2v** —— 接续桥接在 h3studio/video_workflow.py 的
+#: `build_t2v_panel` 里（文生视频新面板）。
 #:
-#: 所以这里只列真正接了桥的模式。将来给 flf / r2v 补上桥之后，
-#: 把它们加进这个元组即可（用户需求里写明「未来参考生视频/
-#: 首末帧生视频也应可接续」）。
+#: **flf / r2v** —— 接续桥接在 h3studio/h3_video_modes.py 的
+#: `_build_common` 里（首尾帧 / 参考生视频共用骨架，条件节点是
+#: T8 的 `MiniMaxH3AudioConditioningT8`）。桥接法与 t2v **完全同款**：
+#:   读回上游潜空间 -> 拷贝桥（逐位拷贝尾段 + 噪声掩码）-> 采样
+#:   -> 落盘本段接力棒 -> decode 后裁钉住区。
+#: 差别只在「条件节点 id」不同（t2v 是 105:104，flf/r2v 是 136）。
+#:
+#: ⚠ **不能只加元组就上线**（这是本文件的历史教训）：
+#: 以前 flf/r2v 不落盘潜空间，光把它们加进这个元组会让「点接续 →
+#: 提交 → 生成」**静默退化成普通生成**（看起来成功，其实没接上）——
+#: 最坏的一种失败。现在三件事都已补齐：
+#:   1. flf/r2v 的工作流里真的接了桥（h3_video_modes._build_common）；
+#:   2. flf/r2v 的任务记录里真的建了链 + 分配了落盘目录
+#:      （server.create_job_record）；
+#:   3. 潜空间真的落盘了（Relay-Kit 的 H3RelayLatentSave，输出节点）。
 #:
 #: selflift（二采）是**模式内的开关**，不是独立 mode，
 #: 所以排除逻辑在 mode_supported() 之外还要看 params["twopass"]["enabled"]。
-CONTINUABLE_MODES = ("t2v",)
+CONTINUABLE_MODES = ("t2v", "flf", "r2v")
 
 # ------------------------------------------------------------------
 # 帧数换算（纯函数）
@@ -221,10 +230,24 @@ def selflift_enabled(params: dict) -> bool:
 def mode_supported(mode: str) -> bool:
     """这个生成模式本身支持接续吗。
 
-    目前只支持文生视频系（t2v / flf / r2v）。图像、音乐不支持
-    —— 它们没有 AV latent 概念。
+    目前支持三个视频模式：t2v（文生视频）/ flf（首尾帧）/ r2v（参考生）。
+    图像、音乐不支持 —— 它们没有 AV latent 概念。
     """
     return str(mode or "") in CONTINUABLE_MODES
+
+
+#: 模式 -> 中文名（给用户的文案用）。
+MODE_LABELS = {
+    "t2v": "文生视频",
+    "flf": "首尾帧视频",
+    "r2v": "参考生视频",
+}
+
+
+def mode_label(mode: str) -> str:
+    """模式的中文名。未知模式回显原值（不编造）。"""
+    key = str(mode or "")
+    return MODE_LABELS.get(key, key or "未知模式")
 
 
 # ------------------------------------------------------------------
@@ -278,7 +301,15 @@ def continuation_allowed(mode: str, params: dict) -> tuple[bool, str]:
     不猜。前端拿不到这个原因就只会显示一个空的接续按钮。
     """
     if not mode_supported(mode):
-        return False, "只有视频类产物支持接续。"
+        # 【为什么要按模式区分】
+        # 原来这一条对所有非视频模式都返回「只有视频类产物支持接续。」
+        # —— 但 flf/r2v **就是**视频类产物（它们的旧文案是错的，
+        # 线上实测确实这么拒过）。现在 t2v/flf/r2v 都能接续，
+        # 真正被拒的是图像 / 音乐 / 长片拼接这些**没有 AV latent**
+        # 的模式 —— 文案要说清「是哪一类不支持」，不要笼统。
+        return False, (f"「{mode_label(mode)}」不是视频生成产物，"
+                       f"没有可接续的潜空间 —— 只有文生视频 / 首尾帧 / "
+                       f"参考生视频支持接续。")
     if selflift_enabled(params):
         return False, ("二采（SelfLift 渐进分辨率采样）的潜空间与标准采样路径不同源，"
                        "接续会出现接缝位移 —— 二采产物不支持接续。")
