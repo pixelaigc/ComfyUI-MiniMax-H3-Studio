@@ -107,7 +107,10 @@ git checkout "$MERGE_COMMIT" -- \
   web/index.html \
   scripts/verify_cr5_8190_browser.py \
   scripts/compare_suite_cr5.sh \
+  scripts/cr5_scan_text_candidates.py \
+  scripts/serial_recheck_cr5.sh \
   tests/test_cr5_c_segment.py \
+  tests/test_cr5_text_scanner.py \
   tests/test_visible_text_pollution.py \
   tests/test_frontend_assets_hygiene.py
 git -C "$LIVE" status --porcelain | grep -v '^??' | head -20
