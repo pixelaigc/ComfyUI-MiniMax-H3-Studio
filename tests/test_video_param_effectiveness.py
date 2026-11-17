@@ -247,15 +247,30 @@ class TestD4D5D8NormalizeNotes(unittest.TestCase):
                          "合法值不该产生归一说明")
 
     def test_twopass_transition_clamp_is_noted(self):
-        """D-4：transition_step 被步数档夹回要留痕。"""
+        """D-4：transition_step 被步数档夹回要留痕。
+
+        【2026-11-17 更新】二采 NFE 预算护栏上线后，**步数档夹回的上限从 3 变成 2**。
+
+        旧断言写死 3，编码的是「夹回上限 = 步数档的 sigma 表长度上限」。
+        但 3 恰好是**缺陷档**：steps=4 / transition_step=3 ⇒ SelfLift 把
+        NFE 预算切成「低分辨率 3 步 + 高分辨率 1 步」（ComfyUI 日志
+        `[SelfLift plan]`：low_nfe=3 high_nfe=1 sigma_resume=0.7207），
+        高分辨率二采只剩 1 步预算，收敛不了低分辨率一采定下的色档，
+        ⇒ 段头几帧色档掉档（= 接续点闪烁）。
+
+        护栏把上限压到 2（高分辨率至少拿一半 NFE 预算），
+        实测接续比值 15.372x → 2.996x、段2 内部断点 13.75 → 1.08。
+        所以这里的期望值必须**跟着新契约走**，而不是弱化断言。
+        """
         params = _base_video_params(
             steps=4,
             twopass={"enabled": True, "transition_step": 6, "cfg": 2.0})
         out, err = S.normalize_t2v_params(params, "t2v")
         self.assertEqual(err, "")
         twopass = out.get("twopass") or {}
-        self.assertEqual(twopass.get("transition_step"), 3,
-                         "步数档 4 步时 transition 上限是 3")
+        self.assertEqual(twopass.get("transition_step"), 2,
+                         "步数档 4 步时 transition 上限是 2"
+                         "（高分辨率二采至少要拿一半 NFE 预算，否则段头色档掉档）")
         notes = out.get("normalize_notes") or []
         self.assertTrue(any("transition_step" in n for n in notes),
                         "transition 被夹回必须留归一说明：%s" % notes)
