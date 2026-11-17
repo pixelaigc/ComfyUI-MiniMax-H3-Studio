@@ -187,7 +187,20 @@
   // 取上下文 + 回填
   // ------------------------------------------------------------------
   async function fetchContext(jobId) {
-    const resp = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/continuation`,
+    // 【为什么要带 duration】用户点「接续」时面板上填的时长就是
+    // **下一段**的请求时长。把它传给服务端，服务端才能算出
+    // 「接完这一段之后成片会有多长」（按 1 秒重叠口径 + 实际帧数）。
+    // 不带的话只能算到当前这一段，显示的成片时长会少一段。
+    let nextSeconds = 0;
+    try {
+      const appState = window.__h3State;
+      nextSeconds = Number((appState && appState.duration) || 0);
+    } catch (e) {
+      nextSeconds = 0;
+    }
+    const query = nextSeconds > 0 ? `?duration=${nextSeconds}` : "";
+    const resp = await fetch(
+      `/api/jobs/${encodeURIComponent(jobId)}/continuation${query}`,
       { cache: "no-store" });
     let data = {};
     try { data = await resp.json(); } catch (e) { data = {}; }
@@ -418,6 +431,7 @@
       </div>
       ${total}
       ${rows}
+      ${renderDurationRows(current.duration_plan)}
       ${renderAudioRows(current.audio)}
       <div class="continuation-note">
         提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。
@@ -458,6 +472,49 @@
     const warns = (audio.warnings || []).map(n =>
       `<div class="continuation-note">⚠ ${esc(n)}</div>`).join("");
     return rows.join("") + notes + warns;
+  }
+
+  /**
+   * 成片时长账的**只读展示**（2026-11-17 更正后新增）。
+   *
+   * 【为什么必须显示】用户口径是：
+   *   成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+   * （潜空间接续有 1 秒重叠，来自前段尾部帧，不重复计入）。
+   * 而实测值与这个口径有**小幅差**（H3 的 17k+5 帧网格 + 拷贝桥只接受
+   * 5+17k 合法钉住窗口）。用户必须能看见：
+   *   * 按用户口径算的成片时长；
+   *   * 实测会得到的成片时长；
+   *   * 两者差多少、为什么差。
+   * 否则「我请求 5 秒接续 5 秒，为什么成片是 9.4 秒不是 9 秒」无从判断。
+   *
+   * @param {object} plan 服务端下发的 duration_plan
+   * @param {number} nextSeconds 下一段请求的时长（秒）；用于把
+   *        「再接一段」的预期时长一起算出来
+   */
+  function renderDurationRows(plan) {
+    if (!plan || !plan.segments || !plan.segments.length) return "";
+    const rows = [];
+    const segs = plan.segments.map(s => {
+      const ov = s.overlap_frames
+        ? `（重叠 ${s.overlap_frames} 帧 = ${Number(s.overlap_frames / 24).toFixed(4)}s）`
+        : "";
+      return `第${s.index + 1}段 请求 ${s.requested_seconds}s → 交付 `
+        + `${s.delivered_frames} 帧 = ${Number(s.delivered_seconds).toFixed(4)}s${ov}`;
+    });
+    rows.push(`<div class="row"><span>成片时长（按 1 秒重叠口径）</span>`
+      + `<b>${esc(Number(plan.formula_seconds).toFixed(3))}s</b></div>`);
+    rows.push(`<div class="row"><span>成片时长（实际帧数）</span>`
+      + `<b>${esc(Number(plan.total_seconds).toFixed(4))}s`
+      + `（${esc(plan.total_frames)} 帧）</b></div>`);
+    if (Math.abs(Number(plan.delta_seconds || 0)) > 1e-6) {
+      rows.push(`<div class="row"><span>两者相差</span>`
+        + `<b>${esc(Number(plan.delta_seconds).toFixed(4))}s</b></div>`);
+    }
+    const segList = `<div class="continuation-note">分段：`
+      + esc(segs.join("；")) + `</div>`;
+    const notes = (plan.notes || []).map(n =>
+      `<div class="continuation-note">${esc(n)}</div>`).join("");
+    return rows.join("") + segList + notes;
   }
 
   function clear() {

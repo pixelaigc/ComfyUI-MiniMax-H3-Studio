@@ -202,7 +202,8 @@ def tail_aligned(frame_count: int, window: int) -> bool:
     return (total - steps) % 5 == 0
 
 
-def continuation_frames(frame_count: int, window: int = DEFAULT_CONTEXT_FRAMES) -> dict:
+def continuation_frames(frame_count: int, window: int = DEFAULT_CONTEXT_FRAMES,
+                       is_head: bool = False) -> dict:
     """算清一段接续的**帧数账**。
 
     返回：
@@ -212,16 +213,51 @@ def continuation_frames(frame_count: int, window: int = DEFAULT_CONTEXT_FRAMES) 
         "context_frames":  实际钉住帧数（窗口被吸附过）,
         "context_steps":   钉住区占几个 latent 步,
         "trim_frames":     decode 后要裁掉的帧数（= 钉住帧数）,
-        "delivered_frames":本段交付给用户的帧数（总帧数 - 裁掉）,
+        "delivered_frames":本段交付给用户的帧数（链首段 = 总帧数；续接段 = 总帧数 - 裁掉）,
         "total_seconds":   本段交付时长（秒）,
       }
+
+    【is_head —— 链首段不裁，续接段才裁（2026-11-17 更正）】
+    链首段没有上游、没有重叠区，所以它**交付整段**。
+    续接段的头部是上一段尾部的**重叠**（钉住区），那部分在上一段
+    已经交付过了 —— 裁掉，避免重播。
+
+    【默认值 = False（续接段语义）—— 不能改】
+    这个函数**历史上**就是「算一段续接」的账（永远裁掉钉住区），
+    已有测试与调用方都按这个语义写。默认改成 True 会让
+    「续接段」的账凭空多 22 帧 —— 那正是本轮要消灭的那类漂移。
+    所以：**默认续接段**，链首段要显式传 `is_head=True`。
+    （`continuation_service.continuation_state` 已改成显式传参。）
+
+    【为什么这个参数必须在**这里**而不是调用方自己减】
+    之前「链首段不裁」这条规则散落在 `continuation_service.continuation_state`
+    里（用 `has_source` 判断）。同一个减法被写了两遍，两处一旦漂移
+    就出现「显示值与真实成片对不上」。这里做成**单一真源**：
+    调用方只传「我是不是链首段」，减法只在这里发生。
+
+    【交付帧数与「成片总时长」的关系 —— 用户口径（2026-11-17）】
+    用户口径：成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+    （潜空间接续有 1 秒重叠，重叠部分来自前段尾部帧，不重复计入）。
+
+    实现上的对应：
+      * 段 i 的**总帧数** = align_frame_count(请求时长 × 24)
+        —— H3 只能出 17k+5 网格的帧（请求 5s -> 124 帧 = 5.1667s），
+        这是**模型侧**的硬约束，不是我们的选择；
+      * 续接段**裁掉** = context_frames（默认 22 帧 = 0.9167s）
+        —— 这是**协议侧**的硬约束（Relay-Kit 只认 5+17k 网格的
+        钉住窗口，24 帧会被 relay_core.py:411 直接 raise）。
+      * 所以实测成片 = Σ align(请求帧数) - (续接段数) × 22 帧。
+        与用户公式的差 = 网格余量 + (1 - 22/24) × (段数-1)，
+        **不是**「把请求时长当新增时长直接累加」，也不是「整段截断」。
+        （实测对照见 docs/实现-接续合并时长与跨段提示词增强-20261117.md）
     """
     fc = align_frame_count(int(frame_count))
     win = snap_context_frames(int(window))
     if win <= 0:
         win = 0
     steps = steps_for_frames(win) if win else 0
-    delivered = fc - win if win else fc
+    # 链首段没有重叠区 -> 交付整段；续接段裁掉重叠（钉住区）。
+    delivered = fc - win if (win and not is_head) else fc
     return {
         "frame_count": fc,
         "latent_steps": video_latent_t(fc),
@@ -233,6 +269,145 @@ def continuation_frames(frame_count: int, window: int = DEFAULT_CONTEXT_FRAMES) 
         "delivered_frames": delivered,
         "total_seconds": round(delivered / FPS, 3),
     }
+
+
+# ------------------------------------------------------------------
+# 链级时长账（成片总时长 —— 唯一真源）
+# ------------------------------------------------------------------
+def chain_duration_account(requested_seconds: list[float],
+                           window: int = DEFAULT_CONTEXT_FRAMES) -> dict:
+    """算一条接续链的**成片总时长**（逐段累加）。
+
+    参数
+      requested_seconds  链上**各段**的请求时长（秒），按段序。
+                         链首段在前。
+      window             钉住窗口（帧）；续接段裁掉这么多重叠帧。
+
+    返回
+      {
+        "segments":      [每段的账, ...],
+        "total_frames":  成片总帧数（= 各段交付帧数之和）,
+        "total_seconds": 成片总时长（秒）,
+        "overlap_frames":  每段之间的重叠帧数（= window）,
+        "overlap_seconds": 每段之间的重叠时长（秒）= window / 24,
+        "requested_seconds": 各段请求时长之和,
+        "grid_slack_frames":  网格余量（align 吸附多出来的帧数）,
+        "grid_slack_seconds": 网格余量（秒）,
+        "formula_seconds":     用户口径的成片时长（秒）,
+        "delta_seconds":       实测成片 - 用户口径（秒）,
+        "notes":          [中文说明, ...],
+      }
+
+    【用户口径（2026-11-17 更正 —— 这是权威口径）】
+        潜空间接续存在 1 秒重叠：每接续一段，实际新增时长 =
+        该段请求时长 - 1 秒；重叠的 1 秒来自潜空间续接的前段尾部帧，
+        与前段尾部重合，不重复计入。
+        成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+
+        例：第1段 5s -> 成片 5s
+            接续第2段（请求 5s）-> 成片 = 5 + (5-1) = 9s
+            再接续第3段（请求 8s）-> 成片 = 9 + (8-1) = 16s
+
+    【实测值与用户口径的差 —— 两处都是 H3 的硬约束，不是我们的选择】
+      1. **网格余量**：H3 只能出 17k+5 网格的帧。请求 5s = 120 帧，
+         但模型只能出 124 帧（= 5.1667s）。所以链首段交付比请求多 4 帧。
+         请求 8s = 192 帧 —— 恰好在网格上，无余量。
+      2. **重叠窗口**：Relay-Kit 的拷贝桥只认 5+17k 网格的钉住窗口
+         （5/22/39/56/73/90/107/124）。24 帧（= 1.000s）**不在**网格上，
+         `relay_core.py:411` 会直接 raise：「24 帧不是 H3 的整步续接窗口」。
+         最接近 1 秒的合法窗口是 **22 帧 = 0.9167s**（nonebot 咏唱 h3
+         的 seg1/seg2 同款）。
+
+      于是：
+        实测成片 = Σ align(请求帧数) - (续接段数) × 22 帧
+        与用户口径的差 = 网格余量 + (1 - 22/24) × (段数-1)
+
+      实测对照（真实产物 ffprobe）：
+        5s -> 5s     : 实测 226 帧 = 9.4167s；用户口径 9.0000s（差 +0.4167s）
+        5s -> 5s -> 8s: 实测 396 帧 = 16.5000s；用户口径 16.0000s（差 +0.5000s）
+
+    【为什么不「改实现去凑用户的数字」】
+      要严格命中用户公式，需要 (a) 链首段交付恰好 = 请求帧数、
+      (b) 每续接段恰好扣 24 帧。**两条都做不到**：
+      (a) 120 帧不在 17k+5 网格，H3 生成不出这个长度的段；
+      (b) 24 帧不在 5+17k 合法窗口，拷贝桥会拒绝（raise）。
+      改这两处只能去改第三方节点/模型的网格约束 —— 那是「为凑数字
+      破坏协议」，不是修复。所以这里**如实算出实测值 + 与用户口径的差**，
+      并把差值的中文原因写进 notes，让界面能说清「为什么不是整 9.000 秒」。
+
+    【本函数是唯一真源】
+    之前「链首段不裁」这条规则在 `continuation_service.continuation_state`
+    与 `server._prepare_continuation_params` 各写了一遍（用 `has_source`
+    判断），两处漂移就会让「显示的累计时长」与「真实成片」对不上。
+    现在统一从这里取。
+    """
+    win = snap_context_frames(int(window))
+    if win <= 0:
+        win = 0
+    durations = [float(d) for d in (requested_seconds or [])]
+    segments: list[dict] = []
+    total_frames = 0
+    requested_frames = 0
+    for index, dur in enumerate(durations):
+        want = int(round(dur * FPS))
+        fc = align_frame_count(want)
+        is_head = index == 0
+        # 链首段不裁（没有重叠区）；续接段裁掉重叠。
+        delivered = fc - win if (win and not is_head) else fc
+        total_frames += delivered
+        requested_frames += want
+        segments.append({
+            "index": index,
+            "requested_seconds": dur,
+            "requested_frames": want,
+            "frame_count": fc,
+            "is_head": is_head,
+            "overlap_frames": 0 if is_head else win,
+            "delivered_frames": delivered,
+            "delivered_seconds": round(delivered / FPS, 6),
+            "grid_slack_frames": fc - want,
+        })
+    overlap_frames = win * max(0, len(durations) - 1)
+    grid_slack = total_frames + overlap_frames - requested_frames
+    formula = sum(durations) - max(0, len(durations) - 1) * 1.0
+    actual = total_frames / float(FPS)
+
+    notes: list[str] = []
+    if grid_slack:
+        notes.append(
+            "H3 的段长只能落在 17k+5 帧网格（请求 5 秒实际生成 124 帧 = "
+            f"{124 / FPS:.4f} 秒），整条链因此多出 {grid_slack} 帧"
+            f"（{grid_slack / FPS:.4f} 秒）。这是模型侧的帧长约束。")
+    if win and win != 24:
+        notes.append(
+            f"段与段之间的重叠是 {win} 帧（{win / FPS:.4f} 秒），不是整 1 秒 —— "
+            f"潜空间拷贝桥只接受 5+17k 帧网格的钉住窗口（5/22/39/56/73/90/107/124），"
+            f"24 帧会被节点直接拒绝；{win} 帧是合法窗口里最接近 1 秒的一个。")
+    if abs(actual - formula) > 1e-6:
+        notes.append(
+            f"实测成片 {actual:.4f} 秒，与「各段请求时长之和减去每段 1 秒重叠」"
+            f"（{formula:.4f} 秒）相差 {actual - formula:+.4f} 秒，"
+            f"差值来自上面两条帧网格约束（不是接续丢失了内容）。")
+
+    return {
+        "segments": segments,
+        "total_frames": total_frames,
+        "total_seconds": round(actual, 6),
+        "overlap_frames": win,
+        "overlap_seconds": round(win / float(FPS), 6),
+        "requested_seconds": round(sum(durations), 6),
+        "grid_slack_frames": grid_slack,
+        "grid_slack_seconds": round(grid_slack / float(FPS), 6),
+        "formula_seconds": round(formula, 6),
+        "delta_seconds": round(actual - formula, 6),
+        "notes": notes,
+    }
+
+
+def chain_frames_from_durations(durations: list[float],
+                                window: int = DEFAULT_CONTEXT_FRAMES) -> int:
+    """成片总帧数（薄封装 —— 只关心帧数时用这个）。"""
+    return chain_duration_account(durations, window)["total_frames"]
 
 
 # ------------------------------------------------------------------

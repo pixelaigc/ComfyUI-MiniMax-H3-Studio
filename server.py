@@ -3145,6 +3145,94 @@ def _lineage_prompts(job_id: str) -> list[dict]:
     return out
 
 
+def _lineage_durations(job_id: str) -> list[float]:
+    """本段血缘链上**各段的请求时长**（秒），从链首段到本段，按顺序。
+
+    【为什么需要】用户口径（2026-11-17 更正）：
+        成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+    要算这个，就得知道链上**每段**请求了多少秒。
+
+    【沿用血缘口径】与 `_lineage_segment_rels` / `_lineage_prompts` **完全同源**
+    （沿 `source_job` 指针回溯）—— 兄弟分支不会混进来。
+
+    【每段取自己的那一份】每段任务记录里 `params["duration"]` 就是该段
+    用户请求的时长（秒）。取不到就回落到该段的总帧数折算。
+
+    返回：[5.0, 5.0, 8.0, ...]（段序）
+    """
+    out: list[float] = []
+    seen: set[str] = set()
+    current = job_id
+    for _ in range(512):
+        if not current or current in seen:
+            break
+        seen.add(current)
+        with db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (current,)).fetchone()
+        if not row:
+            break
+        try:
+            params = json.loads(row["params"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            break
+        info = cont_service.chain_info(params)
+        if not info:
+            break
+        duration = params.get("duration")
+        try:
+            seconds = float(duration)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds <= 0:
+            # 回落：按该段的总帧数折算（帧数是权威的）。
+            try:
+                seg_frames = int(info.get("segment_frames") or 0)
+            except (TypeError, ValueError):
+                seg_frames = 0
+            seconds = (seg_frames / float(cont.FPS)) if seg_frames else 0.0
+        out.append(seconds)
+        current = str(info.get("source_job") or "").strip()
+    out.reverse()
+    return out
+
+
+def _chain_duration_plan(job_id: str,
+                         extra_seconds: float | None = None) -> dict:
+    """接续链的**成片时长账**（含本段及之后的段）。
+
+    参数
+      job_id          链上**当前这一段**的任务 id。
+      extra_seconds   若接续完成后**再接一段**（请求 X 秒），
+                      把 X 传进来 —— 于是返回的是「接完这一段之后」的
+                      成片时长账。用户说的「5 秒 → 接续 5 秒 → 成片 9 秒」
+                      就是在点「接续」时**预期**的那个数。
+
+    返回 `cont.chain_duration_account()` 的结果（见那里的字段说明）。
+    """
+    durations = _lineage_durations(job_id)
+    if extra_seconds is not None:
+        try:
+            extra = float(extra_seconds)
+        except (TypeError, ValueError):
+            extra = 0.0
+        if extra > 0:
+            durations = durations + [extra]
+    # 钉住窗口：从当前段的记录里取（与服务端提交侧同源）。
+    window = cont.DEFAULT_CONTEXT_FRAMES
+    with db() as conn:
+        row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                           (job_id,)).fetchone()
+    if row:
+        try:
+            info = cont_service.chain_info(json.loads(row["params"] or "{}"))
+            window = cont.snap_context_frames(int(
+                info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            window = cont.DEFAULT_CONTEXT_FRAMES
+    return cont.chain_duration_account(durations, window)
+
+
 async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
                                        saved: list[dict]) -> list[dict]:
     """接续收尾：登记本段 + 拼接**完整视频**（模块级实现）。
@@ -5797,6 +5885,21 @@ async def api_continuation_context(request):
     # —— 兄弟分支不会混进来。包含**本段自己**（用户点「接续」的
     # 那一段）的那份提示词。
     context["prompt_history"] = _lineage_prompts(jid)
+    # ---- 成片时长账（2026-11-17 更正）----
+    #
+    # 【用户口径】成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+    # （潜空间接续有 1 秒重叠，来自前段尾部帧，不重复计入）。
+    #
+    # 【为什么由服务端下发】前端不知道别的任务 id、也不该自己重算帧网格
+    # 规则 —— 「17k+5 帧网格」与「5+17k 合法钉住窗口」都是协议约束，
+    # 只有服务端算得对。
+    #
+    # 【extra_seconds】把「下一段要请求多少秒」一起算进去 ——
+    # 用户点「接续」时面板上填的时长就是下一段的请求时长，
+    # 于是这里直接给出「接完这一段之后成片会有多长」。
+    # （前端用 ?duration=5 传；不给就只算到当前段。）
+    extra = request.query.get("duration")
+    context["duration_plan"] = _chain_duration_plan(jid, extra_seconds=extra)
     return json_ok(context)
 
 

@@ -516,21 +516,25 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
     # 而旧算法报 204（= 102 + 102）；3 段 ffprobe = 328，旧算法报 306。
     # 视频文件本身是对的（拼接用的是真实分段文件），错的只是这个**显示值**
     # —— 它同时是 chain_total_frames 的来源，所以会一路带偏后面的每一段。
+    #
+    # 【2026-11-17】减法统一交给 `cont.continuation_frames(is_head=...)`
+    # （唯一真源）。这里不再自己写「has_source 就减 window」。
     chain_frames = info.get("chain_total_frames")
     try:
         chain_frames = int(chain_frames)
     except (TypeError, ValueError):
         chain_frames = 0
     seg_frames = int(info.get("segment_frames") or 0)
+    duration = float((params or {}).get("duration") or 0)
     if not seg_frames:
-        duration = float((params or {}).get("duration") or 0)
         seg_frames = cont.align_frame_count(int(round(duration * cont.FPS)))
     window = cont.snap_context_frames(int(info.get("context_frames")
                                           or cont.DEFAULT_CONTEXT_FRAMES))
-    # 只有接续段才裁了钉住区。
+    # 只有接续段才裁了钉住区（链首段没有上游、没重叠）。
     has_source = bool(str(info.get("source_job") or "").strip())
-    if has_source:
-        seg_frames = max(0, seg_frames - window)
+    frames = cont.continuation_frames(seg_frames, window,
+                                       is_head=not has_source)
+    seg_frames = frames["delivered_frames"]
     state["total_frames"] = chain_frames + seg_frames
     state["total_seconds"] = round(state["total_frames"] / cont.FPS, 3)
     return state
