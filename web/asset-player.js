@@ -194,6 +194,32 @@
     return `清单里还没有${label || ""}素材 —— 在素材库里勾选后点「添加到播放器」`;
   }
 
+  /**
+   * 打开时把当前 tab 落到**清单里真的有内容**的那一类。
+   *
+   * 【为什么必须有这一步 —— 2026-11-17 E2E 实测】
+   * 原来 S.mode 恒为初始值 "image"。用户只往清单里加了一个**视频**，
+   * 打开播放器看到的却是「图片播放」页签 + 「清单里还没有图片素材」
+   * —— 明明清单里有 1 个视频，界面却说「清单是空的」。用户会以为
+   * 「添加到播放器」没生效（真实反馈：素材库加不进播放器）。
+   *
+   * 规则（与 tab 的禁用态一致）：
+   *   1. 当前 tab 有内容 -> 保持不动（用户刚切过就打开，尊重他的选择）；
+   *   2. 当前 tab 没内容、但别的 tab 有 -> 切到那个有内容的 tab；
+   *   3. 三个都没内容 -> 保持当前 tab（显示空态提示）。
+   */
+  function pickAvailableMode() {
+    const has = (kind) => (
+      kind === "image" ? PLAYLIST.image.length
+        : kind === "audio" ? PLAYLIST.audio.length
+          : PLAYLIST.video.length) > 0;
+    if (has(S.mode)) return S.mode;
+    if (has("image")) return "image";
+    if (has("audio")) return "audio";
+    if (has("video")) return "video";
+    return S.mode;
+  }
+
   async function open() {
     const overlay = $("#alPlayer");
     if (!overlay) return;
@@ -208,6 +234,8 @@
     S.audioIndex = 0;
     S.videoIndex = 0;
     S.bgIndex = 0;
+    // 清单拉回来之后，把 tab 落到真有内容的那一类（见 pickAvailableMode）。
+    S.mode = pickAvailableMode();
     render();
   }
 
