@@ -157,7 +157,11 @@ STALE_BUMPED = {
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
     #   ac1steps2 新）⇒ 表里的期望值同步到当前线上值，并再升一档到
     #   vparams4，保持「内容变了必须升版号」的口径闭合。
-    "video-panel.js":          ("ac1steps2",    "vparams4"),
+    # 【2026-11-17 晚】并行任务（二采 NFE 预算护栏）又改了 video-panel.js
+    #   并把它升到 vparams5 ⇒ 期望值同步到 vparams5。
+    #   （这张表是「内容变了必须升版号」的关卡；版本号被别人推进时，
+    #     表要跟着走，否则关卡自己变成假红 —— 那正是它之前一直在报红的原因。）
+    "video-panel.js":          ("ac1steps2",    "vparams5"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）

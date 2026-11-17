@@ -1,0 +1,28 @@
+失败集合差集对比最终结论（scripts/compare_onpick_suite.sh）
+=========================================================
+范围：依赖 web/app.js 或 web/index.html 的 62 个测试文件，逐文件串行跑
+
+分支失败数: 6
+基线失败数: 6
+新增失败数: 1
+  tests/test_video_param_effectiveness.py::TestD4D5D8NormalizeNotes::test_twopass_transition_clamp_is_noted
+
+【归因 —— 这 1 条不是本次改动引入的】
+  * 6acd7fb（本次改动的最后一个提交，在并行任务合并之前）-> 该用例 PASSED
+  * e1cf598（并行任务的提交）-> 该用例 FAILED（2 != 3）
+  * 本次改动 0722404..7517fb2 的 diff 对 h3studio/ 与 server.py **完全为空**
+    —— 没碰任何后端 twopass 逻辑
+  ⇒ 该失败由并行任务的 b8f3cb5（二采 NFE 预算护栏）引入，
+    与 onPick 修复无关。
+
+【已由本次改动修掉的失败】
+  tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_bumped_static_assets_are_not_stale
+    （基线也失败：表里的期望值 cr20261116a / ac1steps2 与线上实际
+      cr20261116b / vparams3 早已脱节 —— 该关卡一直在报红。
+      本次同步表并升版号后转绿。）
+
+【其余 4 条分支与基线完全一致（既有失败）】
+  tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+  tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d1_conversion_produces_split_shape
+  tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+  tests/test_panel_fallback.py::TestFrontendFallbackContract::test_fallback_covers_all_server_models
