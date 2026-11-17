@@ -23,6 +23,7 @@ import random
 from . import continuation as cont
 from . import continuation_service as cont_service
 from . import video_models as vmodels
+from . import twopass_budget
 from . import frame_expr as frame_expr_mod
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
@@ -901,6 +902,31 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     transition_step = int(twopass.get("transition_step")
                           or vmodels.VIDEO_TWOPASS["transition_step_default"])
     transition_step = max(1, min(transition_step, max_transition))
+
+    # 【2026-11-17 修：二采 NFE 预算护栏 · 接缝色档残缺陷】
+    #
+    # 【机制】SelfLift 把 sigma 表切成「低分辨率 ts 步 + 高分辨率 (steps-ts) 步」。
+    #   ComfyUI 日志的 `[SelfLift plan]` 行（决定性证据）：
+    #     steps=4 transition_step=3 -> low_nfe=3 high_nfe=1 sigma_resume=0.7207
+    #   ⇒ 默认档 **高分辨率二采只剩 1 步 NFE**（起始 sigma 0.72）。
+    #   低分辨率一采在降采样空间里定下色档/细节档，抬升回来后高分辨率二采
+    #   要同时做「提分辨率 + 收敛色档 + 生成内容」三件事 ——
+    #   1 步预算不够 ⇒ 段头几帧色档+细节档双重掉档（肉眼 = 接续点闪一下）。
+    #
+    # 【为什么在这里也夹一次（不只 server 侧）】
+    #   这是**实际下发给节点的那一行**，是最后一道闸。
+    #   server.normalize_t2v_params 已经夹过一次（并留痕），但工作流构建
+    #   可能被别的入口直接调用（测试 / 其它调用方），在这里再夹一次
+    #   保证**节点永远拿不到「高分辨率 NFE 不足」的 transition_step**。
+    #
+    # 【为什么不改 comfyui-SelfLift 源码】
+    #   transition_step 本来就是 SelfLift 的**公开节点输入**
+    #   （INPUT_TYPES 里就有），高分辨率 NFE = steps - transition_step
+    #   是纯算术，Studio 侧就能算清楚并夹住 —— **零 comfyui 改动**。
+    #   实测：只把 transition_step 从 3 改成 2，接续比值 15.372x -> 2.996x。
+    _budget_transition = twopass_budget.clamp_transition_step(
+        steps + _extra_steps, transition_step)
+    transition_step = max(1, min(_budget_transition, max_transition))
 
     lowres_scale = float(twopass.get("lowres_scale",
                                      vmodels.VIDEO_TWOPASS["lowres_scale_default"]))

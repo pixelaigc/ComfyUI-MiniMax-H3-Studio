@@ -1167,6 +1167,20 @@
       if (videoState.twopass.enabled) {
         bits.push(`一采 ${videoState.twopass.transition_step} 步 @ `
           + `${Number(videoState.twopass.lowres_scale).toFixed(2)}× 分辨率`);
+        // 【2026-11-17】NFE 预算提示：高分辨率二采只剩 1 步时，
+        // 段头会色档掉档（接续点闪烁）。服务端会自动夹到「高分辨率至少
+        // 拿一半预算」，这里提前告诉用户会怎么夹。
+        const _ts = Number(videoState.twopass.transition_step) || 0;
+        const _steps = Number(videoState.steps) || 0;
+        if (_steps > 0 && _ts > 0) {
+          const _high = _steps - _ts;
+          const _maxTs = Math.max(1, _steps - Math.ceil(_steps / 2));
+          if (_ts > _maxTs) {
+            bits.push(`（高分辨率二采只剩 ${_high} 步，`
+              + `服务端会自动把一采步数夹到 ${_maxTs} 步，`
+              + `否则段头会色档掉档＝接续点闪烁）`);
+          }
+        }
         if (Number(videoState.twopass.rho) <= 0
           && videoState.twopass.upscaler_model === "none") {
           bits.push("（ρ=0 且不用放大器会被节点拒绝，服务端会自动把 ρ 提到 0.6）");
