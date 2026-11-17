@@ -4,10 +4,9 @@
 【缺陷（2026-11-15 代码审查发现，Medium）】
 ``h3studio/video_models.py::VIDEO_MAX_PIXELS_MESSAGE`` 把
 「文生视频」「2.0M」**写死**在文案里，但 ``normalize_video_size()``
-是通用的 —— 首尾帧 / 参考生视频的实际上限是 **0.8MP**
-（``max_pixels_for_mode("flf") == 0.8``）。
+是通用的 —— 上限与模式名必须都从参数来。
 
-结果用户做首尾帧时看到的是：
+当时用户做首尾帧时看到的是：
 
     文生视频分辨率上限为 2.0M 像素（838,860 px）。当前请求 1,032,192 px…
 
@@ -15,6 +14,20 @@
 （用户在做首尾帧）。用户没法据此判断该把尺寸调小到多少。
 
 【修法】上限值与模式名都从参数来（``max_pixels`` / 新增的 ``mode``）。
+
+【2026-11-17 更新 —— 首尾帧/参考生的上限本身也变了】
+flf / r2v 的上限原先是 0.8MP（那是把**旧面板**的档位表误当成生成侧
+硬约束），现已对齐 nonebot seg1/seg2 的 ``ResolutionSelector(megapixels=2)``
+放宽到 **2.0MP**。所以：
+  * 本文件里「用 1344×768 触发 flf/r2v 超限」的尺寸**不再超限**
+    -> 改用 2560×1440（3.5MP，三个模式都真超限）；
+  * 文案里的 MP 数从「0.8M」改为「2.0M」；
+  * 但本文件真正要守的不变量**一个字都没变**：
+    「文案里的 MP 数 == 实际生效的上限」且「文案点名该模式」。
+
+【为什么这条不变量依然重要】上限值以后还可能再动。只要文案里的数字
+是**写死**的（而不是从 max_pixels 算出来的），改一次上限就会再次
+出现「句首与括号对不上」的矛盾。
 
 运行：
     python3 -m pytest tests/test_size_limit_message.py -q --tb=short
@@ -34,25 +47,35 @@ from h3studio import video_models as vm  # noqa: E402
 class TestSizeLimitMessage(unittest.TestCase):
     """超限文案必须与实际模式/上限一致。"""
 
+    #: 超限探测用的尺寸（3.5 MP）—— 必须**真超**所有模式的 2.0MP 上限。
+    #: 【2026-11-17 改】原先用 1344×768，那只在 0.8MP 上限时才超限；
+    #: 上限放宽到 2.0MP 后它变成合法尺寸了，必须换更大的。
+    OVER_SIZE = (2560, 1440)
+
     def _message(self, mode):
         max_pixels = vm.max_pixels_for_mode(mode)
         _w, _h, reasons = vm.normalize_video_size(
-            1344, 768, max_pixels=max_pixels, strict_over_limit=True, mode=mode)
-        self.assertTrue(reasons, f"{mode} 的 1344x768 应当触发超限提示")
+            self.OVER_SIZE[0], self.OVER_SIZE[1], max_pixels=max_pixels,
+            strict_over_limit=True, mode=mode)
+        self.assertTrue(reasons,
+                        f"{mode} 的 {self.OVER_SIZE[0]}×{self.OVER_SIZE[1]} "
+                        "应当触发超限提示")
         return reasons[0], max_pixels
 
     def test_flf_message_states_flf_limit(self):
         msg, max_pixels = self._message("flf")
-        self.assertIn("0.8M", msg,
-                      f"首尾帧的文案没有写实际上限 0.8M：{msg}")
-        self.assertNotIn("2.0M", msg,
-                         f"首尾帧的文案里不该出现 2.0M：{msg}")
+        self.assertIn("2.0M", msg,
+                      f"首尾帧的文案没有写实际上限 2.0M：{msg}")
+        self.assertNotIn("0.8M", msg,
+                         f"首尾帧的文案里不该再出现旧的 0.8M：{msg}")
         self.assertIn("首尾帧", msg,
                       f"首尾帧的文案不该称「文生视频」：{msg}")
 
     def test_r2v_message_states_r2v_limit(self):
         msg, _ = self._message("r2v")
-        self.assertIn("0.8M", msg, f"参考生视频的文案没写 0.8M：{msg}")
+        self.assertIn("2.0M", msg, f"参考生视频的文案没写 2.0M：{msg}")
+        self.assertNotIn("0.8M", msg,
+                         f"参考生视频的文案里不该再出现旧的 0.8M：{msg}")
         self.assertIn("参考生视频", msg,
                       f"参考生视频的文案不该称「文生视频」：{msg}")
 
@@ -146,11 +169,11 @@ class TestSizeLimitMessage(unittest.TestCase):
                           f"{mode} 缺少中文名，错误文案会说得不准")
             self.assertTrue(vm.VIDEO_MODE_LABELS[mode].strip())
         # 每个模式的文案必须**含自己的中文名**（不是泛称「视频」）
-        # 【注意尺寸】t2v 的上限是 2.0MP，1344×768（1.03MP）**不超限** ->
-        # 必须用更大的尺寸才能拿到 t2v 的超限文案。
-        for mode, label, size in (("t2v", "文生视频", (2560, 1440)),
-                                  ("flf", "首尾帧生视频", (1344, 768)),
-                                  ("r2v", "参考生视频", (1344, 768))):
+        # 【2026-11-17】三个模式的上限现在都是 2.0MP，所以统一用
+        # OVER_SIZE(2560×1440 = 3.5MP) 才能拿到超限文案。
+        for mode, label, size in (("t2v", "文生视频", self.OVER_SIZE),
+                                  ("flf", "首尾帧生视频", self.OVER_SIZE),
+                                  ("r2v", "参考生视频", self.OVER_SIZE)):
             max_pixels = vm.max_pixels_for_mode(mode)
             _w, _h, reasons = vm.normalize_video_size(
                 size[0], size[1], max_pixels=max_pixels,
