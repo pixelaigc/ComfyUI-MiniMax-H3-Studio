@@ -147,7 +147,9 @@ VIDEO_MAX_CANVAS_PIXELS = 2 * 1024 * 1024
 #:
 #: 【2026-11-15 代码审查修 —— 文案与实际上限对不上】
 #: 原来这里把「2.0M」「文生视频」**写死**在文案里，但这个函数是通用的，
-#: 首尾帧 / 参考生视频的实际上限是 **0.8MP**（max_pixels_for_mode("flf")=0.8）。
+#: 首尾帧 / 参考生视频的上限（2026-11-17 起与 t2v 同为 2.0MP，
+#: max_pixels_for_mode("flf")=2.0）。【历史】此前是 0.8MP —— 那是把旧面板
+#: 的档位表误当成生成侧硬约束，实测上游节点无面积门禁。
 #: 结果用户做首尾帧时看到的是：
 #:   「文生视频分辨率上限为 2.0M 像素（838,860 px）。当前请求 1,032,192 px…」
 #: —— 括号里是 838,860（=0.8MP），句首却说 2.0M，还称「文生视频」。
@@ -1111,11 +1113,19 @@ def all_size_presets(max_pixels: int | None = None) -> list[dict]:
 #    上限是**工作流侧**的策略 -> 本轮放宽到 2.0M（官方模板 Note 背书
 #    1920x1088 = 2.0 MP 那一行）。
 #
-#  * flf / r2v（老面板）：走 ResolutionSelector（aspect_ratio + megapixels
-#    + multiple=32），档位只有 RES_MP = {544p: 0.4, 768p: 0.8}，
-#    实测最大 0.8 MP -> 1216x672 = 817,152 px。
-#    它们**没有**「手填宽高」这条交互，所以 2.0M 对它们没有意义；
-#    保持原有档位不变（不误放宽）。
+#  * flf / r2v（首尾帧 / 参考生视频）：**2026-11-17 已放宽到 2.0M**。
+#    【原状与错在哪】原注释写「走 ResolutionSelector，档位只有
+#    RES_MP = {544p: 0.4, 768p: 0.8}，没有手填宽高的交互」——
+#    那是**旧面板**（#resSeg 只有两档）的档位表，被误当成了
+#    **生成侧的硬约束**。用户报的现象正是「首尾帧/参考生的最大分辨率
+#    被限制」。
+#    【实测依据】nonebot seg1/seg2 用 ResolutionSelector(megapixels=2)
+#    直接把 2.0 MP 宽高喂给 MiniMaxH3ReferenceToVideo；
+#    我们用的 T8 条件节点 width/height 上限是 MAX_RESOLUTION=16384，
+#    其内部面积策略明写 reference_area_policy=warning_only_no_area_gate
+#    （只警告不拦截），latent 也按请求值原样建立（height//16 × width//16）。
+#    -> 上游根本没有面积门禁，0.8 MP 是我们自己的策略错误。
+#    现在与 t2v 同为 2.0M，与 nonebot seg 口径一致。
 #
 #  * longfilm：拼片模式，不产生新画面 —— 尺寸由被拼的视频决定，
 #    没有独立尺寸约束。
@@ -1129,23 +1139,64 @@ VIDEO_MODE_SIZE_POLICY: dict[str, dict] = {
         "custom_size": True,
         "source": "官方模板 Note 的 2.0 MP 行 = 1920x1088（2,088,960 px）",
     },
+    # 【2026-11-17 放宽 flf / r2v 到 2.0 MP —— 对齐 nonebot seg 机制】
+    #
+    # 【原状与它的错在哪】
+    # 原注释写「flf / r2v 走 ResolutionSelector（aspect_ratio + megapixels
+    # + multiple=32），档位只有 RES_MP = {544p: 0.4, 768p: 0.8}」——
+    # 这是**旧面板**（#resSeg 只有 544p/768p 两档）的档位表，
+    # 被当成了**生成侧的硬约束**。用户报的现象是「首尾帧/参考生面板的
+    # 最大分辨率被限制」。
+    #
+    # 【实测证据 —— 这不是上游节点的能力限制，是我们自己写的策略】
+    #  1) nonebot 的 seg1 / seg2（本项目接续对标的参考实现）用的是：
+    #       node 115  ResolutionSelector{aspect_ratio:"9:16 (Portrait
+    #                    Widescreen)", megapixels: 2, multiple: 32}
+    #       -> node 136  MiniMaxH3ReferenceToVideo.width  <- [115, 0]
+    #       -> node 136  MiniMaxH3ReferenceToVideo.height <- [115, 1]
+    #     即 **megapixels=2（2.0 MP）**，而不是 0.8。
+    #  2) 我们用的条件节点 MiniMaxH3AudioConditioningT8
+    #     （comfyui-minimax-h3-audio-T8/h3_t8/nodes.py:302-303）：
+    #         io.Int.Input("width",  default=1344, min=32, max=MAX_RESOLUTION, step=32)
+    #         io.Int.Input("height", default=768,  min=32, max=MAX_RESOLUTION, step=32)
+    #       MAX_RESOLUTION = 16384（nodes.py:286）—— **没有任何面积门禁**。
+    #  3) 该节点内部的面积策略是显式「只警告不拦截」（conditioning.py:574-577
+    #     与 :604）：`reference_area_policy: "warning_only_no_area_gate"`，
+    #     文案写明「canvas exceeds the 1920x1088 reference area; execution
+    #     remains allowed and VRAM/runtime risk is owned by the user」。
+    #  4) latent 尺寸按请求值原样建立（h3_t8/core.py:88-95 empty_av_latent）：
+    #         video = torch.zeros((1, 24, latent_t, height//16, width//16))
+    #     —— **没有任何降采样/重采样**。
+    #  5) ComfyUI 核心节点 MiniMaxH3ReferenceToVideo / MiniMaxH3ImageToVideo
+    #     同样是 max=nodes.MAX_RESOLUTION(16384)
+    #     （comfy_extras/nodes_minimax_h3.py:145-146 / :280-281）。
+    #
+    # 【结论】上游（ComfyUI 核心节点 + T8 插件 + H3 权重）对画布面积
+    # **没有硬限制**；2.0 MP（1920×1088）本来就是官方模板 Note 背书的档位，
+    # 且 t2v 早已在用。flf/r2v 被卡在 0.8 MP 是**我们自己的策略错误**。
+    #
+    # 【因此的修法】flf / r2v 与 t2v 一样放到 2.0 MP，
+    # 与 nonebot seg1/seg2 的 ResolutionSelector(megapixels=2) 口径一致。
+    # custom_size 也一并放开（面板本来就有「输出尺寸」手填框）。
     "flf": {
-        "max_pixels": int(0.8 * 1024 * 1024),
-        "max_pixels_mp": 0.8,
+        "max_pixels": VIDEO_MAX_CANVAS_PIXELS,
+        "max_pixels_mp": VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024),
         "multiple": VIDEO_SIZE_MULTIPLE,
         "min": VIDEO_SIZE_MIN,
         "max": VIDEO_SIZE_MAX,
-        "custom_size": False,
-        "source": "ResolutionSelector 档位 768p = 0.8 MP（未放宽）",
+        "custom_size": True,
+        "source": ("对齐 nonebot seg1/seg2 的 ResolutionSelector(megapixels=2)"
+                   " -> 2.0 MP = 1920x1088；上游 T8/核心节点无面积门禁"),
     },
     "r2v": {
-        "max_pixels": int(0.8 * 1024 * 1024),
-        "max_pixels_mp": 0.8,
+        "max_pixels": VIDEO_MAX_CANVAS_PIXELS,
+        "max_pixels_mp": VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024),
         "multiple": VIDEO_SIZE_MULTIPLE,
         "min": VIDEO_SIZE_MIN,
         "max": VIDEO_SIZE_MAX,
-        "custom_size": False,
-        "source": "ResolutionSelector 档位 768p = 0.8 MP（未放宽）",
+        "custom_size": True,
+        "source": ("对齐 nonebot seg1/seg2 的 ResolutionSelector(megapixels=2)"
+                   " -> 2.0 MP = 1920x1088；上游 T8/核心节点无面积门禁"),
     },
     "longfilm": {
         "max_pixels": None,

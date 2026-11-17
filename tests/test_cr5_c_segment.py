@@ -167,15 +167,31 @@ class TestC9AgentVideoNormalize(unittest.TestCase):
                       "否则 Agent 走 flf/r2v 时仍按 t2v 的口径判")
 
     def test_flf_uses_flf_area_limit(self):
-        """flf 的面积上限是 0.8MP；按 t2v 判会放行超限尺寸。"""
+        """flf 的面积上限是 2.0MP（2026-11-17 对齐 nonebot seg），与 t2v 同。
+
+        【历史】此前这里断言 flf 是 0.8MP、「1280×960 超 flf 上限必须被拦」。
+        那个 0.8MP 是把**旧面板**的档位表误当成生成侧硬约束 ——
+        实测上游 T8 / 核心节点均无面积门禁（reference_area_policy=
+        warning_only_no_area_gate），nonebot seg1/seg2 用 2.0MP。
+
+        现在这条守的是**真正的上限**：2.0MP 放行、3.5MP 仍被拦，
+        且错误文案点名「首尾帧」。
+        """
         big = {"prompt": "x", "model_key": "fl2va_pruned_int8",
                "width": 1280, "height": 960, "duration": 5}
         _, err_t2v = S.normalize_t2v_params(dict(big), mode="t2v")
         _, err_flf = S.normalize_t2v_params(dict(big), mode="flf")
-        self.assertEqual(err_t2v, "", "1280×960 在 t2v 的 2.0MP 限内")
-        self.assertTrue(err_flf, "1280×960 超 flf 的 0.8MP 上限，必须被拦")
-        self.assertIn("首尾帧", err_flf,
+        self.assertEqual(err_t2v, "", "1280×960 在 2.0MP 限内")
+        self.assertEqual(err_flf, "", "1280×960 在 flf 的 2.0MP 限内，也必须放行")
+
+        # 3.5MP 必须被两个模式同时拦下，且文案点名模式
+        huge = {"prompt": "x", "model_key": "fl2va_pruned_int8",
+                "width": 2560, "height": 1440, "duration": 5}
+        _, err_huge_flf = S.normalize_t2v_params(dict(huge), mode="flf")
+        self.assertTrue(err_huge_flf, "2560×1440 超 2.0MP，必须被拦")
+        self.assertIn("首尾帧", err_huge_flf,
                       "错误文案要说清是首尾帧的上限（口径按 mode）")
+        self.assertIn("2.0M", err_huge_flf, "错误文案必须写出 2.0M 这个上限")
 
     def test_r2v_rejects_fl2va_only_model(self):
         """r2v 必须 Ref2VA 权重；FL2VA-only 权重必须被拦。

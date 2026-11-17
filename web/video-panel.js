@@ -286,8 +286,9 @@
       const [curW, curH] = currentSize();
       const w = (rawW != null && rawW > 0) ? rawW : curW;
       const h = (rawH != null && rawH > 0) ? rawH : curH;
-      // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算
-      // （t2v 放宽到 2.0M；flf / r2v 仍是 0.8MP 档位）。
+      // 【2026-11-11】带上 mode —— 服务端按各模式自己的尺寸策略算。
+      // 【2026-11-17】flf / r2v 也放宽到 2.0M（对齐 nonebot seg1/seg2
+      // 的 ResolutionSelector(megapixels=2)），现与 t2v 同口径。
       const mode = encodeURIComponent(VIDEO_OPTIONS.mode || "t2v");
       const resp = await fetch(
         `/api/video-size?width=${encodeURIComponent(w)}&height=${encodeURIComponent(h)}&mode=${mode}`,
@@ -309,7 +310,8 @@
   /** 当前比例下的合法尺寸预设（服务端下发的清单里筛） */
   function presetsForAspect(aspect) {
     // 【2026-11-15 修复③ 交付项 3】按**当前模式**的面积上限过滤。
-    // flf / r2v 的上限是 0.8MP（服务端 mode_size_policy 下发）——
+    // 【2026-11-17】flf / r2v 的上限已放宽到 2.0MP（服务端
+    // mode_size_policy 下发），与 t2v 同口径。
     // 超出上限的档位**不出现**在下拉里（不是列出来再置灰，
     // 那是「用户能选、选了必然被服务端改写」的假选项）。
     const cap = maxPixels();

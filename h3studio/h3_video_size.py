@@ -29,7 +29,8 @@
     本仓库 ``video_models.video_dimensions`` 是同一套公式；
   * 比例 -> 宽高比（``video_models.VIDEO_ASPECTS``）；
   * 上限按**各模式自己的**面积策略（``video_models.max_pixels_for_mode``）：
-    flf / r2v = 0.8 MP（ResolutionSelector 768p 档），t2v = 2.0 MP；
+    **2026-11-17 起 flf / r2v = t2v = 2.0 MP**（对齐 nonebot seg1/seg2 的
+    ``ResolutionSelector(megapixels=2)``；上游 T8 / 核心节点均无面积门禁）；
   * 宽高必须吸附到 32 的倍数（H3 的 CANVAS_MULTIPLE，节点 schema step=32）。
 
 【为什么不直接把前端改成提交 width/height】
@@ -94,10 +95,9 @@ def dimensions_for(resolution: str | None, aspect: str | None,
     返回 (width, height)。
 
     【为什么不直接用 video_dimensions】那个函数只按公式算，不看上限。
-    flf / r2v 的面积上限是 0.8 MP（比 t2v 的 2.0 MP 小），
-    面板选 768p + 1:1 -> 800×800（0.61MP）在限内；
-    但如果将来档位表放宽，必须在这里按模式上限收口，
-    否则会提交一个工作流跑不动的尺寸。
+    flf / r2v 与 t2v 的面积上限现在**相同**（2.0 MP，2026-11-17 放宽）；
+    但这里仍必须按模式上限收口，否则将来某个模式单独放宽时，
+    会提交一个工作流跑不动的尺寸。
     """
     mp = resolution_to_megapixels(resolution)
     aspect_key = str(aspect or "").strip()

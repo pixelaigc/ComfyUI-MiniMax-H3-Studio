@@ -2519,8 +2519,9 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     在服务端会被静默丢掉（界面说一套、工作流跑另一套）。
 
     mode 决定两处**真实差异**：
-      * 面积上限（t2v = 2.0MP / flf·r2v = 0.8MP，见
-        video_models.mode_size_policy）；
+      * 面积上限（t2v / flf / r2v 均为 2.0MP，见
+        video_models.mode_size_policy —— 2026-11-17 起 flf/r2v 对齐
+        nonebot seg1/seg2 的 ResolutionSelector(megapixels=2)）；
       * 底模通道（r2v 必须用 Ref2VA 权重，见 video_models.model_for_mode）。
     """
     out = dict(params)
@@ -2561,8 +2562,8 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
         max_pixels=video_models.max_pixels_for_mode(vid_mode),
         strict_over_limit=True,
         # 【2026-11-15 代码审查修】把模式传给尺寸归一 ——
-        # 错误文案要说「首尾帧生视频分辨率上限为 0.8M …」，
-        # 而不是写死的「文生视频…2.0M」（首尾帧的实际上限是 0.8MP）。
+        # 错误文案要说「首尾帧生视频分辨率上限为 …」，
+        # 而不是写死的「文生视频…」（各模式上限不同，按 mode 取）。
         mode=vid_mode)
     if width <= 0 or height <= 0:
         return out, "宽高无效：" + ("；".join(reasons) or "请输入数字")
@@ -5193,7 +5194,7 @@ async def api_create(request):
         # （步数 / 采样器 / 调度器 / shift / 加速 LoRA / 效果 LoRA /
         #  注意力 / 二采 / 宽高）在服务端会被静默丢掉。
         #
-        # 【mode 的两处真实差异】面积上限（t2v 2.0MP / flf·r2v 0.8MP）
+        # 【mode 的两处真实差异】面积上限（各模式按 mode_size_policy）
         # 与底模通道（r2v 必须 Ref2VA）—— 都在 normalize_t2v_params 内
         # 按 mode 处理。
         normalized, error = normalize_t2v_params(params, mode=mode)
@@ -7400,7 +7401,7 @@ async def api_video_size(request):
     `mode` 参数决定用哪套约束（需求：各模式按各自工作流的真实约束
     分别处理，不要一刀切套用 2.0M）：
       * mode=t2v（默认）-> 2.0M 上限
-      * mode=flf / r2v  -> 仍走 ResolutionSelector 的 0.8 MP 档位上限
+      * mode=flf / r2v  -> 与 t2v 同为 2.0MP（2026-11-17 对齐 nonebot seg）
       * mode=longfilm   -> 不限（拼片不产生新画面）
     """
     try:
@@ -9056,7 +9057,7 @@ async def prepare_agent_t2v_params(params: dict,
     原来本函数**硬写死** ``normalize_t2v_params(merged)``（mode 默认 "t2v"）。
     于是 Agent 建**首尾帧 / 参考生视频**任务时，归一层跑的是 t2v 的口径：
 
-      * 面积上限按 t2v 的 2.0MP 判（flf / r2v 的真实上限是 0.8MP）
+      * 面积上限按各模式自己的策略判（见 video_models.mode_size_policy）
         -> Agent 建的 flf 任务能被放行到超限尺寸；
       * 底模通道按 t2v 判（r2v 必须 Ref2VA 权重）
         -> Agent 建的 r2v 任务可以选到 FL2VA 权重，「参考没生效」。

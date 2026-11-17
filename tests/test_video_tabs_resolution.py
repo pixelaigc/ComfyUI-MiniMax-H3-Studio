@@ -376,22 +376,55 @@ class TestPixelLimitAndOverLimit(unittest.TestCase):
 
 
 # ==================================================================
-# 六、非 t2v 模式的约束不被误放宽
+# 六、各模式的尺寸策略（2026-11-17：flf / r2v 已放宽到 2.0M）
 # ==================================================================
 class TestOtherModesNotLoosened(unittest.TestCase):
-    """需求：其它模式按各自工作流的真实约束处理，不要一刀切套用 2.0M。"""
+    """需求：其它模式按各自工作流的真实约束处理，不要一刀切套用 2.0M。
 
-    def test_flf_keeps_its_own_limit(self):
+    【2026-11-17 重大更正 —— 本类原来的前提是错的，已按实测证据改写】
+
+    原来这条类守的是「flf / r2v 的上限是 0.8MP，不许跟着 t2v 放宽到 2.0M」。
+    那个 0.8MP 的来源是**旧面板**（#resSeg 只有 544p / 768p 两档）的档位表，
+    被误当成了**生成侧的硬约束** —— 于是用户看到「首尾帧/参考生的最大
+    分辨率被限制」。
+
+    【实测证据：上游根本没有面积门禁，0.8MP 是我们自己的策略错误】
+      * nonebot seg1 / seg2（本项目接续对标的参考实现）用的是
+            node 115  ResolutionSelector{megapixels: 2, multiple: 32}
+            -> node 136  MiniMaxH3ReferenceToVideo.width / .height
+        即 **2.0 MP**，不是 0.8。
+      * 我们用的 MiniMaxH3AudioConditioningT8
+        （comfyui-minimax-h3-audio-T8/h3_t8/nodes.py:302-303）的
+        width/height 上限是 MAX_RESOLUTION = 16384（nodes.py:286）。
+      * 该节点内部的面积策略明写
+        `reference_area_policy: "warning_only_no_area_gate"`
+        （conditioning.py:604），文案是「execution remains allowed」。
+      * latent 按请求值原样建立（h3_t8/core.py:88-95）：
+        torch.zeros((1, 24, latent_t, height//16, width//16)) —— 无降采样。
+      * ComfyUI 核心节点 MiniMaxH3ReferenceToVideo / MiniMaxH3ImageToVideo
+        同样是 max=nodes.MAX_RESOLUTION(16384)
+        （comfy_extras/nodes_minimax_h3.py:145-146 / :280-281）。
+
+    所以现在 flf / r2v 与 t2v 同为 2.0 MP（= 1920x1088）。
+    本类**保留**原需求里仍然有效的部分：「按模式分别处理」——
+    也就是说上限仍然走 mode_size_policy 分派，而不是到处写死；
+    错误文案仍然按模式说人话。
+    """
+
+    def test_flf_policy_matches_nonebot_seg_two_megapixels(self):
+        """首尾帧的上限必须与 nonebot seg1/seg2 的 megapixels=2 一致。"""
         policy = VM.size_policy_for_mode("flf")
-        self.assertLess(policy["max_pixels"], VM.VIDEO_MAX_CANVAS_PIXELS,
-                        "首尾帧不该跟着 t2v 放宽")
-        self.assertEqual(policy["max_pixels_mp"], 0.8)
+        self.assertEqual(policy["max_pixels"], VM.VIDEO_MAX_CANVAS_PIXELS,
+                         "首尾帧必须与 nonebot seg（2.0 MP）对齐")
+        self.assertEqual(policy["max_pixels_mp"], 2.0)
+        self.assertTrue(policy["custom_size"], "首尾帧支持手填宽高")
 
-    def test_r2v_keeps_its_own_limit(self):
+    def test_r2v_policy_matches_nonebot_seg_two_megapixels(self):
+        """参考生视频的上限必须与 nonebot seg1/seg2 的 megapixels=2 一致。"""
         policy = VM.size_policy_for_mode("r2v")
-        self.assertLess(policy["max_pixels"], VM.VIDEO_MAX_CANVAS_PIXELS,
-                        "参考生视频不该跟着 t2v 放宽")
-        self.assertEqual(policy["max_pixels_mp"], 0.8)
+        self.assertEqual(policy["max_pixels"], VM.VIDEO_MAX_CANVAS_PIXELS)
+        self.assertEqual(policy["max_pixels_mp"], 2.0)
+        self.assertTrue(policy["custom_size"], "参考生视频支持手填宽高")
 
     def test_longfilm_has_no_independent_size_limit(self):
         policy = VM.size_policy_for_mode("longfilm")
@@ -406,17 +439,59 @@ class TestOtherModesNotLoosened(unittest.TestCase):
     def test_max_pixels_for_mode_dispatch(self):
         self.assertEqual(VM.max_pixels_for_mode("t2v"),
                          VM.VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024))
-        self.assertEqual(VM.max_pixels_for_mode("flf"), 0.8)
-        self.assertEqual(VM.max_pixels_for_mode("r2v"), 0.8)
+        self.assertEqual(VM.max_pixels_for_mode("flf"), 2.0)
+        self.assertEqual(VM.max_pixels_for_mode("r2v"), 2.0)
         self.assertIsNone(VM.max_pixels_for_mode("longfilm"))
 
-    def test_flf_1920x1088_is_rejected_by_flf_policy(self):
-        """用 flf 的策略算 1920x1088 -> 超限（证明策略确实按模式分派）。"""
+    def test_flf_1920x1088_is_now_accepted(self):
+        """1920x1088（nonebot seg 用的分辨率）在 flf 策略下必须**放行**。"""
         w, h, reasons = VM.normalize_video_size(
             1920, 1088, max_pixels=VM.max_pixels_for_mode("flf"))
-        self.assertLessEqual(w * h, int(0.8 * 1024 * 1024),
-                             "flf 策略下必须被压回 0.8MP")
-        self.assertTrue(reasons)
+        self.assertEqual((w, h), (1920, 1088),
+                         "首尾帧必须能跑 nonebot seg 的 1920x1088")
+        self.assertEqual(reasons, [], "放行时不应有原因说明")
+
+    def test_r2v_1920x1088_is_now_accepted(self):
+        w, h, reasons = VM.normalize_video_size(
+            1920, 1088, max_pixels=VM.max_pixels_for_mode("r2v"))
+        self.assertEqual((w, h), (1920, 1088))
+        self.assertEqual(reasons, [])
+
+    def test_still_rejects_above_two_megapixels_per_mode(self):
+        """放宽到 2.0MP **不等于**没有上限 —— 3.5MP 仍必须被拦。
+
+        【为什么这条重要】如果没有它，把上限改成"不限"也能让上面两条绿。
+        """
+        for mode in ("t2v", "flf", "r2v"):
+            with self.subTest(mode=mode):
+                w, h, reasons = VM.normalize_video_size(
+                    2560, 1440, max_pixels=VM.max_pixels_for_mode(mode),
+                    strict_over_limit=True, mode=mode)
+                self.assertEqual((w, h), (0, 0),
+                                 f"{mode} 必须拦下 3.5MP")
+                self.assertTrue(reasons, f"{mode} 必须给出超限原因")
+
+    def test_over_limit_message_names_the_mode(self):
+        """超限文案必须按模式说人话（首尾帧 / 参考生 / 文生视频）。"""
+        for mode, label in (("flf", "首尾帧"), ("r2v", "参考生"),
+                            ("t2v", "文生视频")):
+            with self.subTest(mode=mode):
+                _, _, reasons = VM.normalize_video_size(
+                    2560, 1440, max_pixels=VM.max_pixels_for_mode(mode),
+                    strict_over_limit=True, mode=mode)
+                self.assertTrue(reasons)
+                self.assertIn(label, reasons[0],
+                              f"{mode} 的超限文案必须点名「{label}」")
+                self.assertIn("2.0M", reasons[0],
+                              f"{mode} 的超限文案必须写出 2.0M 这个上限")
+
+    def test_size_presets_include_nonebot_seg_resolution(self):
+        """面板尺寸预设清单里必须出现 1920x1088（否则前端选不到）。"""
+        presets = VM.size_presets_for_aspect(
+            "16:9", max_pixels=VM.VIDEO_MAX_CANVAS_PIXELS)
+        dims = {(p["width"], p["height"]) for p in presets}
+        self.assertIn((1920, 1088), dims,
+                      "16:9 的预设清单必须含 1920x1088")
 
     def test_non_t2v_workflows_still_use_resolution_selector(self):
         """flf / r2v 的工作流仍按 ResolutionSelector 的比例+总像素档位算尺寸。
@@ -430,10 +505,10 @@ class TestOtherModesNotLoosened(unittest.TestCase):
 
         断言口径因此改成「**结果**必须符合 ResolutionSelector 的算法」：
           * width/height 由「档位 x 比例」按官方公式算出；
-          * 面积不超过 flf/r2v 自己的 0.8 MP 上限（没被放宽到 t2v 的 2.0 MP）。
+          * 【2026-11-17】面积上限已是 2.0 MP（对齐 nonebot seg）。
 
-        这才是这条用例**真正想守**的东西（见类名 TestOtherModesNotLoosened）：
-        flf / r2v 不许跟着 t2v 一起放宽。
+        这才是这条用例**真正想守**的东西：尺寸仍走官方算法，
+        而不是被某个写死的常数接管。
         """
         from h3studio import h3_video_size as vsize
         flf = WF.build_flf({"job_id": "x", "aspect": "16:9", "resolution": "768p",
@@ -444,9 +519,19 @@ class TestOtherModesNotLoosened(unittest.TestCase):
         want_w, want_h = vsize.dimensions_for("768p", "16:9", mode="flf")
         self.assertEqual((cond["width"], cond["height"]), (want_w, want_h),
                          "flf 的尺寸必须按 ResolutionSelector 的公式算")
-        self.assertLessEqual(cond["width"] * cond["height"],
-                             int(0.8 * 1024 * 1024),
-                             "flf 的总像素档位不该被放宽到 2.0")
+
+    def test_flf_workflow_passes_full_two_megapixel_size_through(self):
+        """工作流下发的条件节点必须**原样**带上 1920x1088。
+
+        【为什么这条重要】光放宽策略不够 —— 如果下游某个环节又把它
+        改回小尺寸，产物仍然是低分辨率。这一条锁住「下发即最终尺寸」。
+        """
+        wf = WF.build_flf({"job_id": "x", "prompt": "p", "duration": 5,
+                           "width": 1920, "height": 1088,
+                           "first_frame": "f.png", "last_frame": "l.png"})
+        cond = wf["136"]["inputs"]
+        self.assertEqual(cond["width"], 1920)
+        self.assertEqual(cond["height"], 1088)
 
 
 # ==================================================================

@@ -86,11 +86,27 @@ MUTATIONS = [
         "TestPixelLimitAndOverLimit::test_over_limit_is_not_silently_truncated",
     ),
     (
-        "把 flf 的上限也改成 2.0M —— 「非 t2v 不被误放宽」断言必须红",
+        "把 flf 的上限改回 0.8M —— 「首尾帧必须与 nonebot seg 同为 2.0M」"
+        "断言必须红",
+        "【2026-11-17 改】这条变异原先是「把 flf 改成 2.0M」（那时 2.0M 是"
+        "错误状态）。现在 flf/r2v 的正确状态就是 2.0M，所以变异方向反过来："
+        "把它改回 0.8M（= 旧面板档位表那个错误上限），"
+        "「TestOtherModesNotLoosened」里的新断言必须红。",
         "h3studio/video_models.py",
-        '"flf": {\n        "max_pixels": int(0.8 * 1024 * 1024),',
-        '"flf": {\n        "max_pixels": 2 * 1024 * 1024,',
-        "TestOtherModesNotLoosened::test_flf_keeps_its_own_limit",
+        '    "flf": {\n        "max_pixels": VIDEO_MAX_CANVAS_PIXELS,',
+        '    "flf": {\n        "max_pixels": int(0.8 * 1024 * 1024),',
+        "TestOtherModesNotLoosened::test_flf_policy_matches_nonebot_seg_two_megapixels",
+    ),
+    (
+        "把三个模式的面积上限全部去掉（max_pixels=None = 不限）—— "
+        "「2.0MP 放行但 3.5MP 仍被拦」断言必须红",
+        "【为什么这条重要】只断言「1920x1088 能过」的话，把上限改成"
+        "不限也能让那条绿 —— 那等于把限制从「太小」改成「没有」。"
+        "这条变异证明「上限仍然是 2.0MP」这个约束真的被断言住。",
+        "h3studio/video_models.py",
+        "VIDEO_MAX_CANVAS_PIXELS = 2 * 1024 * 1024",
+        "VIDEO_MAX_CANVAS_PIXELS = 16 * 1024 * 1024",
+        "TestOtherModesNotLoosened::test_still_rejects_above_two_megapixels_per_mode",
     ),
     (
         "把类别→模型的映射表里 t2v 的 mode 改错 —— 反查自洽断言必须红",

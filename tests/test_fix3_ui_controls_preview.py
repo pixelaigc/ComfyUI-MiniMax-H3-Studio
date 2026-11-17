@@ -391,11 +391,19 @@ class TestSharedVideoPanelBackend(unittest.TestCase):
         self.assertIn("Ref2VA", err)
 
     def test_flf_and_t2v_size_limits_differ(self):
-        """flf / r2v 的面积上限是 0.8MP，t2v 是 2.0MP。"""
+        """flf / r2v 的面积上限与 t2v 同为 2.0MP（2026-11-17 对齐 nonebot seg）。
+
+        【历史】此前这里断言 flf/r2v 是 0.8MP、t2v 是 2.0MP。
+        那个 0.8MP 来自**旧面板**的档位表（#resSeg 只有 544p/768p），
+        被误当成生成侧硬约束。实测上游 T8 / 核心节点均无面积门禁
+        （T8 width/height 上限 MAX_RESOLUTION=16384，且
+        reference_area_policy=warning_only_no_area_gate），
+        nonebot seg1/seg2 用的是 ResolutionSelector(megapixels=2)。
+        """
         from h3studio import video_models as vm
         self.assertEqual(vm.max_pixels_for_mode("t2v"), 2.0)
-        self.assertEqual(vm.max_pixels_for_mode("flf"), 0.8)
-        self.assertEqual(vm.max_pixels_for_mode("r2v"), 0.8)
+        self.assertEqual(vm.max_pixels_for_mode("flf"), 2.0)
+        self.assertEqual(vm.max_pixels_for_mode("r2v"), 2.0)
 
     def test_flf_workflow_uses_shared_params(self):
         """build_flf 必须真的用上共享面板提交的参数。"""
