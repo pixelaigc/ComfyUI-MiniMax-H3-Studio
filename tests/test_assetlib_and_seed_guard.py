@@ -414,8 +414,41 @@ class TestFrontendHasNoExternalDirectEntry(unittest.TestCase):
         self.assertNotIn('getData("application/x-h3-image")', APP_JS_CODE)
 
     def test_empty_slot_click_opens_asset_picker(self):
-        """点空槽位 -> 打开素材库选择器（不是系统文件框）。"""
-        self.assertIn("openAssetPickerForSlot(kind)", APP_JS_CODE)
+        """点空槽位 -> 打开素材库选择器（不是系统文件框），且**必须传回调**。
+
+        【2026-11-17 修正】原来这条断言是
+            assertIn("openAssetPickerForSlot(kind)", APP_JS_CODE)
+        —— 它匹配的正是**有缺陷的那一行**（漏传 onPick 回调）。
+        用户点空槽位选完素材，必然报「onPick is not a function」。
+
+        所以这条断言当时不但没守住行为，反而把缺陷**固化**进了测试：
+        修复一改，它就红了，而红的原因恰恰是修复对了。
+
+        现在改成表达真实意图：
+          1. 槽位的 click 处理器里调的是 openAssetPickerForSlot（不是 inp.click()）
+          2. 调用时**带上了回调**（第二个参数不是空的）
+          3. 任何一处调用都不得漏传回调
+        """
+        # 1) 点空槽位走的是素材库选择器，不是系统文件框
+        self.assertIn("openAssetPickerForSlot", APP_JS_CODE)
+        self.assertNotIn("inp.click()", APP_JS_CODE)
+
+        # 2) 每一处调用都必须传回调（函数定义本身除外）
+        import re
+        calls = re.findall(r"openAssetPickerForSlot\(([^)]*)\)", APP_JS_CODE)
+        self.assertTrue(calls, "没找到任何 openAssetPickerForSlot 调用")
+        for call in calls:
+            if call.strip() == "kind, onPick":      # 函数定义本身
+                continue
+            self.assertIn(",", call,
+                          f"openAssetPickerForSlot({call}) 没传 onPick 回调 —— "
+                          f"点空槽位会报 'onPick is not a function'")
+
+        # 3) 槽位 click 处理器里的那处调用必须带回调
+        self.assertIn(
+            "openAssetPickerForSlot(kind, (asset) => fillFromAsset(asset));",
+            APP_JS_CODE,
+            "点空槽位必须传 onPick 回调")
 
     def test_state_files_removed(self):
         """state.files（本地直传槽位）已从 state 里移除。"""
