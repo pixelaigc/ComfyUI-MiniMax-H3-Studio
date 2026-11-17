@@ -217,7 +217,8 @@ def test_continuation_third_segment_total_duration(studio_page, evidence):
     """第三段：5 + 5 + 8 -> 累计 16 秒。"""
     sp = studio_page
     first, _ = _generate_t2v(sp, "e2e 三段链：第一段 5 秒", 5.0)
-    assert first["status"] == "done", f"第一段没跑成功：{first.get('error')}"
+    assert first["status"] == "done", (
+        f"第一段没跑成功：{first.get('error')}（提交体：{_}）")
 
     def continue_from(job_id: str, prompt: str, duration: float):
         sp.goto_tab("done")

@@ -361,9 +361,14 @@ def make_fixtures(target: Path, unique: bool = False) -> dict[str, Path]:
     out["audio"] = wav
 
     mp4 = target / f"e2e-sample{suffix}.mp4"
+    # ⚠ 视频内容也要随 unique 变 —— 素材库按 sha256 去重，
+    #   内容相同就会「复用原素材」（连文件名都是旧的）。
+    #   用 hue 滤镜偏移色相（testsrc 源 + -vf hue=...），
+    #   每份视频的字节都不一样。
+    hue = (sum(ord(c) for c in suffix) % 360) if unique else 0
     subprocess.run(
         ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=96x96:duration=1",
-         "-pix_fmt", "yuv420p", str(mp4)],
+         "-vf", f"hue=h={hue}", "-pix_fmt", "yuv420p", str(mp4)],
         check=True, capture_output=True)
     out["video"] = mp4
 
@@ -455,14 +460,26 @@ class StudioPage:
 
     # -- 提交 ---------------------------------------------------------
     def submit_generation(self) -> None:
-        """点「生成」，必要时过「未增强提示词」闸门。"""
+        """点「生成」，必要时过「未增强提示词」闸门。
+
+        提交失败时把**服务端返回的原因**带进异常信息 —— 否则只能看到
+        一个「400」，定位不到是哪个参数不合法。
+        """
+        errors: list[str] = []
+        self.page.on("response", lambda r: (
+            errors.append(f"HTTP {r.status}") if r.status >= 400 else None))
         self.page.click("#genBtn")
         self.page.wait_for_timeout(1200)
         if self.page.is_visible("#enhanceGateModal"):
             self.ev.step("命中「提示词尚未增强」闸门 -> 点确认生成")
             self.page.click("#enhanceGateConfirm")
-            self.page.wait_for_timeout(1200)
+            self.page.wait_for_timeout(1500)
         self.ev.step("点「生成」")
+        if errors:
+            self.ev.step(f"提交返回错误：{errors}")
+            raise AssertionError(
+                f"提交生成失败：{errors}；页面提示："
+                f"{self.page.inner_text('body')[:300]}")
 
     def last_submitted_params(self) -> dict:
         """取最近一次 POST /api/jobs 提交的 params（从窗口里的钩子读）。"""

@@ -190,8 +190,17 @@ def test_asset_used_by_generation_panel(studio_page, evidence, fixtures_dir):
     assert slot is not None, "没有参考图槽位"
     slot.click()
     sp.page.wait_for_timeout(1500)
-    picker_card = sp.page.query_selector("#alPickerBody .al-card")
-    assert picker_card is not None, "素材库选择器里没有素材"
+    # 选择器是**异步**加载素材的（loadPickerItems -> fetch /api/assets/picker），
+    # 所以要等卡片出现，不能只等弹窗打开。
+    picker_card = None
+    for _ in range(30):
+        picker_card = sp.page.query_selector("#alPickerBody .al-card")
+        if picker_card is not None:
+            break
+        sp.page.wait_for_timeout(500)
+    assert picker_card is not None, (
+        "素材库选择器里没有素材："
+        + sp.page.inner_text("#alPickerBody")[:120])
     picker_card.click()
     sp.page.wait_for_timeout(400)
     sp.click("#alPickerOk")

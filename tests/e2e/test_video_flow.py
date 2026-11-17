@@ -124,8 +124,14 @@ def test_video_audio_track_options_depend_on_material(studio_page, evidence,
     slot.click()
     sp.page.wait_for_timeout(1500)
     assert sp.visible("#alPickerMask"), "素材库选择器没打开"
-    card = sp.page.query_selector("#alPickerBody .al-card")
-    assert card is not None, "素材库选择器里没有素材"
+    card = None
+    for _ in range(30):
+        card = sp.page.query_selector("#alPickerBody .al-card")
+        if card is not None:
+            break
+        sp.page.wait_for_timeout(500)
+    assert card is not None, (
+        "素材库选择器里没有素材：" + sp.page.inner_text("#alPickerBody")[:120])
     card.click()
     sp.page.wait_for_timeout(400)
     sp.click("#alPickerOk")
