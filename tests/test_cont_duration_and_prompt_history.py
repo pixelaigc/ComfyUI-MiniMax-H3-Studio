@@ -114,6 +114,171 @@ class TestResidualHealRunsContinuationFinalize(unittest.TestCase):
                       "接续收尾没有登记本段分段")
 
 
+class TestHealPathProducesMergedVideo(unittest.TestCase):
+    """**行为**测试：自愈路径真的能补出成片（不是只看源码）。
+
+    【为什么要有这条】前面的断言是「源码里有没有这行调用」。
+    但用户真正要的是「成片出来了」。所以这里**真的造两段视频**、
+    **真的跑一遍自愈收尾**，然后核对成片文件存在且时长 = 段1+段2。
+
+    【怎么造数据】
+      * 用 ffmpeg 生成两段**真实**的 124 帧 / 102 帧测试视频；
+      * 造一个临时 jobs 表，段0 -> 段1（source_job 指回段0）；
+      * 把 server 的 OUT_DIR / DATA / db() 指到临时目录；
+      * 跑 `_finalize_residual_with_outputs`（自愈收尾）；
+      * 核对：段1 的 segment_rel 被登记、成片文件存在、
+        成片帧数 == 段0 + 段1。
+    """
+
+    def test_heal_finalize_produces_merged_video(self):
+        """自愈收尾必须真的产出「段0 + 段1」的成片。"""
+        import asyncio
+        import shutil
+        import subprocess
+
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            self.skipTest("本机没有 ffmpeg/ffprobe")
+
+        tmp = Path(tempfile.mkdtemp(prefix="h3heal_cont_"))
+        out_dir = tmp / "outputs"
+        (out_dir / "videos").mkdir(parents=True)
+        data_dir = tmp / "data"
+        data_dir.mkdir(parents=True)
+
+        def make_video(name, frames):
+            path = out_dir / "videos" / name
+            # 【为什么要带音轨】拼接命令用 `-map 0:v -map 0:a` ——
+            # 段落没有音轨时 ffmpeg 会报「Stream map '0:a' matches no
+            # streams」而失败。真实产物**都**有音轨（成片带参考音频或
+            # 生成音频），所以测试数据也要有。
+            #
+            # 【时长要匹配帧数】音视频源都得够长，否则 `-shortest`
+            # 会把视频截到音源长度（1 秒 = 24 帧），成片帧数就不对了。
+            seconds = frames / 24.0 + 0.5
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", "testsrc=size=64x64:rate=24:duration=%.3f" % seconds,
+                 "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=%.3f" % seconds,
+                 "-frames:v", str(frames), "-pix_fmt", "yuv420p",
+                 "-c:a", "aac", "-shortest", str(path)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=120, check=True)
+            return path
+
+        seg0_path = make_video("v-seg0.mp4", 124)
+        seg1_path = make_video("v-seg1.mp4", 102)
+        rel0 = "videos/v-seg0.mp4"
+        rel1 = "videos/v-seg1.mp4"
+
+        # ---- 造 jobs 表 ----
+        db_path = tmp / "jobs.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "CREATE TABLE jobs (id TEXT PRIMARY KEY, mode TEXT, params TEXT,"
+            " status TEXT, progress REAL, outputs TEXT, error TEXT,"
+            " created_at REAL, finished_at REAL)")
+        p0 = {"prompt": "段0", "continuation": {
+            "chain_id": "healchain", "stage_index": 0, "source_job": "",
+            "latent_run_id": "h3studio_sseg0", "segment_frames": 124}}
+        p1 = {"prompt": "段1", "continuation": {
+            "chain_id": "healchain", "stage_index": 1, "source_job": "seg0",
+            "latent_run_id": "h3studio_sseg1", "segment_frames": 124}}
+        conn.execute("INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)",
+                     ("seg0", "t2v", json.dumps(p0), "done", 1.0, "[]", None,
+                      0.0, 0.0))
+        conn.execute("INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)",
+                     ("seg1", "t2v", json.dumps(p1), "running", 0.5, "[]", None,
+                      0.0, 0.0))
+        conn.commit()
+        conn.close()
+
+        # ---- 把 server 指向临时环境 ----
+        saved = (S.db, S.DB_PATH, S.OUT_DIR, S.DATA, S.VIDEO_DIR,
+                 S.IMAGE_DIR, S.AUDIO_DIR)
+        try:
+            def fake_db():
+                c = sqlite3.connect(db_path)
+                c.row_factory = sqlite3.Row
+                return c
+
+            S.db = fake_db
+            S.DB_PATH = db_path
+            S.OUT_DIR = out_dir
+            S.DATA = data_dir
+            # 【为什么也要换这几个】_next_output_path 用的是模块级常量
+            # VIDEO_DIR / IMAGE_DIR / AUDIO_DIR —— 只换 OUT_DIR 不够，
+            # 成片会写到真实仓库的 data/outputs 下去。
+            S.VIDEO_DIR = out_dir / "videos"
+            S.IMAGE_DIR = out_dir / "images"
+            S.AUDIO_DIR = out_dir / "audio"
+
+            # ---- 跑自愈收尾（history_entry 里带段1的视频产物）----
+            # 【形状】ComfyUI history 的 outputs 是 **节点 id -> 输出** 的
+            # 字典（_extract_outputs 遍历 .values()），视频挂在 "videos" 键下。
+            history_entry = {"outputs": {"9": {"videos": [{
+                "filename": "v-seg1.mp4", "subfolder": "videos",
+                "type": "output"}]}}}
+            row = {"id": "seg1", "mode": "t2v",
+                   "params": json.dumps(p1, ensure_ascii=False)}
+
+            # 预置段0 的 segment_rel（模拟段0 正常收尾已登记）
+            with sqlite3.connect(db_path) as c:
+                p0b = dict(p0)
+                p0b["continuation"] = dict(p0["continuation"])
+                p0b["continuation"]["segment_rel"] = rel0
+                c.execute("UPDATE jobs SET params=? WHERE id='seg0'",
+                          (json.dumps(p0b, ensure_ascii=False),))
+
+            # 下载产物这一步会访问 ComfyUI —— 这里直接打桩，
+            # 让它把**已存在的**段1 文件当成下载结果。
+            async def fake_download(session, item):
+                return rel1
+
+            orig_download = S.comfy_download_output
+            S.comfy_download_output = fake_download
+            try:
+                asyncio.run(S._finalize_residual_with_outputs(
+                    "seg1", row, history_entry))
+            finally:
+                S.comfy_download_output = orig_download
+        finally:
+            (S.db, S.DB_PATH, S.OUT_DIR, S.DATA, S.VIDEO_DIR,
+             S.IMAGE_DIR, S.AUDIO_DIR) = saved
+
+        # ---- 核对 ①：段1 的分段被登记 ----
+        with sqlite3.connect(db_path) as c:
+            c.row_factory = sqlite3.Row
+            row1 = c.execute("SELECT params, outputs FROM jobs "
+                             "WHERE id='seg1'").fetchone()
+        params1 = json.loads(row1["params"])
+        cont1 = params1.get("continuation") or {}
+        self.assertEqual(
+            cont1.get("segment_rel"), rel1,
+            "自愈收尾没有登记段1 的分段（continuation.segment_rel）")
+
+        # ---- 核对 ②：成片被产出 ----
+        outputs1 = json.loads(row1["outputs"] or "[]")
+        fulls = [o for o in outputs1 if o.get("is_full")]
+        self.assertEqual(
+            len(fulls), 1,
+            "自愈收尾没有产出完整成片（is_full 条目）：%r" % (outputs1,))
+
+        # ---- 核对 ③：成片帧数 == 段0 + 段1 ----
+        full_path = out_dir / fulls[0]["file"]
+        self.assertTrue(full_path.is_file(),
+                        "成片文件不存在：%s" % full_path)
+        raw = subprocess.check_output(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-count_frames", "-show_entries", "stream=nb_read_frames",
+             "-of", "csv=p=0", str(full_path)], encoding="utf-8", timeout=120)
+        full_frames = int(raw.strip().split(",")[0])
+        self.assertEqual(
+            full_frames, 124 + 102,
+            "成片帧数不对：期望 %d（段0 124 + 段1 102），实际 %d"
+            % (124 + 102, full_frames))
+
+
 class TestLineagePrompts(unittest.TestCase):
     """血缘提示词历史：按 source_job 回溯，兄弟分支隔离。"""
 
