@@ -481,15 +481,27 @@ def build_t2v_panel(params: dict) -> dict:
     #     -> 采样器；采样器的输出**落盘**成下一段的接力棒；
     #     decode 之后经裁重叠（裁掉钉住区）再合成视频。
     #
-    # 【为什么二采不走这条路】见 h3studio/continuation.py 的模块说明：
-    # 二采的潜空间与标准采样路径不同源，接续会位移。服务端在
-    # continuation.continuation_allowed() 里已经拦掉了，这里再兜一次底。
+    # 【二采也走这条路】二采（SelfLift）原来被 `not use_twopass` 排除在外
+    # （旧结论：「二采潜空间与标准路径不同源，接续会位移」）。
+    # 2026-11-17 实测修正：网格对齐没问题、SelfLift 原生支持拷贝桥的
+    # noise_mask —— 二采现在**也**走接续链路。详见下方注释。
     cont_state = _continuation_state(params)
     latent_in_ref = latent_ref
     cond_ref = ["105:104", 0]
     trim_ref = None
 
-    if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
+    # 【为什么二采现在也走这条路】原来这里是 `not use_twopass` ——
+    # 二采路径下接续分支被整体跳过（不读回、不接桥）。
+    # 2026-11-17 实测修正：二采**可以**接续，因为
+    #   (a) 二采落盘的 latent 时间步与 17k+5 网格天然对齐
+    #       （独立复核 4/4 真实落盘样本，tail_aligned 全 True）；
+    #   (b) SelfLiftH3Sampler 原生读 latent 的 noise_mask
+    #       （nodes.py:116-155），且 masked_model() 对**低分辨率段与
+    #       高分辨率段都**装 post-CFG 钉住钩子（nodes.py:280-297）。
+    # 接线姿势照 nonebot minimax_h3_v1.json 的 171 节点：
+    #   SelfLift 消费**拷贝桥的 latent** + **桥第 4 路 conditioning**。
+    # → 二采段现在既落盘接力棒、也能消费接力棒。
+    if cont_state["enabled"] and cont_state["has_source"]:
         # ---- 续接段：读回上游潜空间 -> 拷贝桥 ----
         #
         # 【读回哪一份 —— 这是本段最关键的一根线】
@@ -560,9 +572,20 @@ def build_t2v_panel(params: dict) -> dict:
     if use_twopass:
         # 二采路径的 CFG 来自 twopass.cfg（面板上二采区块里的真控件），
         # 没给才回落到模型默认值。
+        #
+        # 【2026-11-17 接续】cond_ref 在接续段是**拷贝桥第 4 路**
+        # （["300:bridge", 3]）—— 桥第 4 路是把上一段的钉帧
+        # （minimax_keyframes）写进 conditioning 的唯一出口。
+        # 二采采样器必须拿这份，否则二采段就看不到「上一段的画面钉帧」，
+        # 接缝处的取景/构图会漂。
+        # 姿势与 nonebot minimax_h3_v1.json 的 171 节点一致：
+        #   positive = ["322", 3]（桥第 4 路）、
+        #   latent_image = ["322", 0]（桥第 0 路）。
         samples_ref = _twopass_block(p, model_ref, steps, scheduler, sampler, seed,
                                      cfg, twopass, width, height, duration,
-                                     latent_in_ref)
+                                     latent_in_ref,
+                                     cond_node_id="105:104",
+                                     positive_ref=cond_ref)
     else:
         p["15"] = {"inputs": {"noise_seed": int(seed)}, "class_type": "RandomNoise",
                    "_meta": {"title": "噪波"}}
@@ -760,7 +783,8 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
                    sampler: str, seed: int, cfg: float, twopass: dict,
                    width: int, height: int, duration: float,
                    latent_ref: list,
-                   cond_node_id: str = "105:104") -> list:
+                   cond_node_id: str = "105:104",
+                   positive_ref: list | None = None) -> list:
     """二采（SelfLift）采样块。
 
     **硬约束**（实测自 comfyui-SelfLift/nodes.py）：
@@ -775,6 +799,21 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     首尾帧 / 参考生视频是 136（MiniMaxH3AudioConditioningT8）——
     之前这里写死 105:104，给 flf/r2v 接二采就会引用一个**不存在的节点**
     （工作流提交时报 "value not in list"）。
+
+    【2026-11-17 接续】positive_ref 参数化：
+    **positive 走哪一路**由调用方决定：
+      * 非接续段 -> `[cond_node_id, 0]`（直接接条件节点）；
+      * 接续段   -> `["300:bridge", 3]`（**拷贝桥第 4 路**）。
+    桥第 4 路是把上一段的钉帧（minimax_keyframes）写进 conditioning 的
+    唯一出口 —— 二采采样器必须拿这份，否则接缝处的取景/构图会漂。
+    姿势与 nonebot `minimax_h3_v1.json` 的 171 节点完全一致：
+      `positive = ["322", 3]`、`latent_image = ["322", 0]`。
+
+    【为什么 negative 不跟着改】负面条件是 `ConditioningZeroOut`，
+    作用是「把 positive 的引导反向」，零化掉正向引导即可 ——
+    拷贝桥的钉帧是**内容锚**（keyframe latent），不是引导强度，
+    零化它反而是对的（钉帧只该约束构图，不该当引导）。
+    所以 negative 仍然接 `[cond_node_id, 0]`（与 nonebot v1 的 320 一致）。
     """
     forced_sampler = "euler"
     p["17"] = {"inputs": {"sampler_name": forced_sampler}, "class_type": "KSamplerSelect",
@@ -829,7 +868,12 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     sampler_cfg = max(0.0, min(100.0, sampler_cfg))
 
     # 负面条件：H3 的引导器要 positive + negative
-    p["16"] = {"inputs": {"model": model_ref, "conditioning": [cond_node_id, 0]},
+    #
+    # 【2026-11-17 接续】positive 走 positive_ref（接续段 = 拷贝桥第 4 路），
+    # negative 仍走条件节点 —— 桥第 4 路带的是**钉帧**（内容锚），
+    # 零化掉它才是对的（钉帧约束构图，不该当引导）。
+    pos_ref = list(positive_ref) if positive_ref else [cond_node_id, 0]
+    p["16"] = {"inputs": {"model": model_ref, "conditioning": pos_ref},
                "class_type": "BasicGuider", "_meta": {"title": "引导器"}}
     p["320"] = {"inputs": {"conditioning": [cond_node_id, 0]},
                 "class_type": "ConditioningZeroOut", "_meta": {"title": "负面条件"}}
@@ -897,7 +941,11 @@ def _twopass_block(p: dict, model_ref: list, steps: int, scheduler: str,
     p["171"] = {
         "inputs": {
             "model": model_ref,
-            "positive": [cond_node_id, 0],
+            # 【2026-11-17 接续】positive 走 pos_ref（接续段 = 拷贝桥第 4 路）。
+            # latent_image 走 latent_ref（接续段 = 拷贝桥第 0 路）。
+            # 与 nonebot minimax_h3_v1.json 的 171 节点同姿势：
+            #   positive = ["322", 3]、latent_image = ["322", 0]。
+            "positive": pos_ref,
             "negative": ["320", 0],
             "vae": ["105:11", 0],
             "latent_image": latent_ref,

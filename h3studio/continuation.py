@@ -35,13 +35,35 @@ ComfyUI-H3-Relay-Kit 已经把「零重编码 latent 桥」做完了，并且踩
     各 token 的帧跨度与写入位置错位 → 渲染出**整体位移的接缝**。
     段长 17k+5 时，`total_steps - window_steps` 恒为 5 的倍数 ⇒ 天然对齐。
 
-【selflift（二采）为什么不能接续】
-二采走 `SelfLiftH3Sampler`：低分辨率一采 → 抬升 → 高分辨率二采。
-它的输出 latent 是**两段不同分辨率**拼出来的，且节点内部做了
-`seed + 1` 重新加噪，潜空间相位与标准采样路径不同源。
-把这种 latent 当 `context_latent` 喂给拷贝桥，切出来的尾段帧跨度
-与写入位置对不上 —— 表现为整体位移的接缝。
-所以：**二采产物一律不显示「接续」按钮**，后端也直接拒绝。
+【selflift（二采）接续：2026-11-17 实测修正】
+早先这里写的是「二采潜空间不同源、一律不能接续」。**该结论已实测推翻**：
+
+1. **网格对齐没问题**（独立复核，2026-11-17）：
+   直接读线上真实二采任务的落盘潜空间头（safetensors header，不加载权重），
+   4/4 样本的 latent 时间步 T 全部 == `video_latent_t(align_frame_count(时长))`
+   （10s→72、5s→37），且 `tail_aligned(fc, 22)` 全部 True。
+   → 拷贝桥第 3 条硬约束（尾段起始落在 5 步周期边界）**天然满足**。
+   原因：SelfLift 的抬升只改 H/W **不改 T**（`h3_upscaler.py:391`
+   `target_size=(z0_low.shape[2], H, W)` —— T 原样传递），落盘的也是
+   **高分辨率段**（不是两段拼接体）。
+
+2. **SelfLift 原生支持拷贝桥的噪声掩码**：
+   `comfyui-SelfLift/nodes.py:116-155` `_validate_latent_input()` 读
+   `latent_image["noise_mask"]`，接受 `[B,1,T,H,W]` 并按 latent 网格 resize ——
+   与 CopyBridge 输出的 `vmask` 同构；
+   `nodes.py:280-297` `masked_model()` 对**低分辨率段与高分辨率段都**装
+   `_mask_blend_fn` post-CFG 钩子 ⇒ 钉住区零重绘在二采的**两段**都成立。
+   `nodes.py:444-445` 保留区用 `video_anchor`（未抬升的真实内容）还原 ——
+   拷贝区是逐位拷贝内容，不是抬升结果。
+
+3. **接线姿势已有先例**：nonebot `minimax_h3_v1.json` 的 171 节点就是
+   `latent_image <- ["322",0]`、`positive <- ["322",3]`（拷贝桥之后）。
+   本项目照这个姿势接：**SelfLift 消费拷贝桥的 latent + 桥第 4 路 conditioning**。
+
+→ 所以二采**可以**接续，但受**能力探测**约束（见 `continuation_allowed`）：
+必须「上游二采段自己有落盘潜空间」才允许，否则明确拒绝。
+剩余的画质取舍（钉住区是低分辨率抬升出来的 → 可能有清晰度台阶）
+由实测量化，不是格式不兼容问题 —— 见报告 §4.3.1/§4.3.2。
 
 【本模块不做 IO 的部分】
 帧数换算、可用性判定、上下文组装都是**纯函数** —— 不查盘、不连 ComfyUI。
@@ -219,7 +241,10 @@ def continuation_frames(frame_count: int, window: int = DEFAULT_CONTEXT_FRAMES) 
 def selflift_enabled(params: dict) -> bool:
     """这个任务是不是走了二采（SelfLift）路径。
 
-    二采的潜空间不支持接续（见模块 docstring）。
+    二采**可以**接续（2026-11-17 实测修正，见模块 docstring）：
+    网格对齐没问题、SelfLift 原生支持拷贝桥的噪声掩码。
+    但它受**能力探测**约束 —— 上游二采段必须自己有落盘潜空间。
+    那个判定需要查盘，在服务层做（continuation_service.build_continuation_context）。
     """
     twopass = (params or {}).get("twopass")
     if isinstance(twopass, dict) and twopass.get("enabled"):
@@ -299,6 +324,14 @@ def continuation_allowed(mode: str, params: dict) -> tuple[bool, str]:
 
     原因文案是**给用户看的**（直接显示在卡片/提示里），要具体、
     不猜。前端拿不到这个原因就只会显示一个空的接续按钮。
+
+    【关于二采（selflift）】二采**可以**接续（2026-11-17 实测修正）：
+    网格对齐没问题、SelfLift 原生支持拷贝桥的噪声掩码。
+    但它要求「上游二采段自己有落盘潜空间」—— 那是**查盘**判定，
+    放在服务层（continuation_service.build_continuation_context），
+    因为本模块是**纯函数**（不查盘、不连 ComfyUI）。
+    → 本函数对二采**不再无条件拒绝**；真正缺潜空间时，
+    服务层会给出「二采段没有落盘潜空间」的具体原因。
     """
     if not mode_supported(mode):
         # 【为什么要按模式区分】
@@ -310,9 +343,6 @@ def continuation_allowed(mode: str, params: dict) -> tuple[bool, str]:
         return False, (f"「{mode_label(mode)}」不是视频生成产物，"
                        f"没有可接续的潜空间 —— 只有文生视频 / 首尾帧 / "
                        f"参考生视频支持接续。")
-    if selflift_enabled(params):
-        return False, ("二采（SelfLift 渐进分辨率采样）的潜空间与标准采样路径不同源，"
-                       "接续会出现接缝位移 —— 二采产物不支持接续。")
     return True, ""
 
 
@@ -644,6 +674,6 @@ def missing_reason(comfy_output_dir: str | os.PathLike, run_id: str,
     """
     path = stage_file_path(comfy_output_dir, run_id, segment)
     return (f"这段视频的接续潜空间文件已不在（{path}）—— "
-            "可能已被清理，或产物是二采（二采不支持接续）。"
+            "可能已被清理，或这段是本功能上线前生成的。"
             "请改用「复用参数」重新生成一段。")
 

@@ -422,7 +422,19 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
     cond_ref = ["136", 0]
     trim_ref = None
 
-    if cont_state["enabled"] and not use_twopass and cont_state["has_source"]:
+    # 【2026-11-17 接续】二采（selflift）现在**也**走接续链路。
+    # 原来这里是 `not use_twopass` —— 二采路径下整个接续分支被跳过
+    # （不读回、不接桥），二采段只能产出接力棒、不能消费接力棒。
+    # 放开的依据（独立复核，2026-11-17）：
+    #   (a) 二采落盘的 latent 时间步与 17k+5 网格天然对齐
+    #       （4/4 真实落盘样本吻合，tail_aligned 全 True）；
+    #   (b) SelfLiftH3Sampler 原生读 latent 的 noise_mask
+    #       （nodes.py:116-155），且 masked_model() 对**低分辨率段与
+    #       高分辨率段都**装 post-CFG 钉住钩子（nodes.py:280-297）。
+    #   (c) 接线姿势照 nonebot minimax_h3_v1.json 的 171 节点：
+    #       SelfLift 消费**拷贝桥的 latent**（第 0 路）+
+    #       **桥第 4 路 conditioning**。
+    if cont_state["enabled"] and cont_state["has_source"]:
         p["300:load"] = {
             "inputs": {
                 "run_id": cont_state["source_run_id"],
@@ -481,7 +493,11 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
         samples_ref = vworkflow._twopass_block(
             p, model_ref, steps, scheduler, sampler, seed,
             float(cfg_value), twopass, width, height, duration,
-            latent_in_ref, cond_node_id="136")
+            latent_in_ref, cond_node_id="136",
+            # 【2026-11-17 接续】接续段 positive 走**拷贝桥第 4 路**；
+            # 非接续段 cond_ref 还是 ["136", 0]（条件节点直接出）。
+            # 与 nonebot minimax_h3_v1.json 的 171 节点同姿势。
+            positive_ref=cond_ref)
     else:
         p["17"] = {"inputs": {"sampler_name": sampler}, "class_type": "KSamplerSelect",
                    "_meta": {"title": "采样器"}}

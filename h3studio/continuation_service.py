@@ -5,7 +5,7 @@
 【为什么单独一层】
 「能不能接续」这件事要同时看四样东西，散在各处就会自相矛盾：
   1. 任务模式（t2v / flf / r2v）；
-  2. 任务参数（是不是二采）；
+  2. 任务参数（是不是二采 —— 二采**支持**接续，但要求它自己有落盘潜空间）；
   3. 潜空间文件**在不在**（落盘可能被清理）；
   4. 链的段号关系（上一段是第几段）。
 本模块把这四样收成**一个**判定 + **一个**上下文，server.py 只调它。
@@ -490,8 +490,19 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
                            "或潜空间已被清理）—— 请改用「复用参数」重新生成一段。")
         return state
     if not latent_ok:
-        state["reason"] = cont.missing_reason(comfy_output_dir(), run_id,
-                                               latent_stage)
+        # 【二采要说得更具体】二采段缺潜空间的原因与普通段不同：
+        # 二采段照样建链、照样落盘（工作流里 300:save 不受二采开关影响），
+        # 所以「没潜空间」几乎只可能是「这段二采是本功能上线前生成的」
+        # 或「潜空间被清理了」。给具体提示，别让用户以为是「二采不支持接续」。
+        if cont.selflift_enabled(params):
+            state["reason"] = (
+                "这段二采（SelfLift）视频没有找到落盘潜空间 —— "
+                "二采本身支持接续，但接力棒必须真的在盘上。"
+                "这段多半是接续功能上线前生成的（或潜空间已被清理），"
+                "请改用「复用参数」重新生成一段二采，再从那一段接续。")
+        else:
+            state["reason"] = cont.missing_reason(comfy_output_dir(), run_id,
+                                                   latent_stage)
         return state
 
     # 累计帧数：本段交付的帧数 + 之前各段交付的帧数。
