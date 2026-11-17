@@ -112,14 +112,18 @@ def main() -> int:
     failures = []
     for idx, (desc, rel_path, old, new, expect_test) in enumerate(MUTATIONS, 1):
         path = REPO / rel_path
-        backup = path.read_text(encoding="utf-8")
+        # 【二进制读写】server.py 是 CRLF 行尾 —— read_text/write_text 会把
+        #   CRLF 静默转成 LF（2026-11-17 实测：一次变异就改了 9986 行）。
+        backup = path.read_bytes()
+        old_b = old.encode("utf-8")
+        new_b = new.encode("utf-8")
         try:
-            if old not in backup:
+            if old_b not in backup:
                 print(f"[{idx}] ⚠  跳过：找不到原文 → {desc}")
                 failures.append((desc, "SKIPPED: 原文未找到"))
                 continue
             # 只替换**第一处**出现（保证改动最小、可控）
-            path.write_text(backup.replace(old, new, 1), encoding="utf-8")
+            path.write_bytes(backup.replace(old_b, new_b, 1))
             # 只跑**目标断言**（不能 -x，否则别的断言先红会提前中止）
             rc, out = run_one("tests/test_cont_selflift.py::%s" % expect_test)
             caught = rc != 0
@@ -133,12 +137,15 @@ def main() -> int:
                 print(out[-2500:])
                 failures.append((desc, "未被目标断言抓住"))
         finally:
-            path.write_text(backup, encoding="utf-8")
-            # 还原后必须仍然全绿
+            path.write_bytes(backup)
+            # 还原后必须仍然全绿，且内容逐字节一致（行尾守恒）
             rc2, out2 = run_tests("tests/test_cont_selflift.py")
             if rc2 != 0:
                 print(f"      ⚠ 还原后**不绿**！变异残留：\n{out2[-2000:]}")
                 failures.append((desc, "还原后不绿"))
+            if path.read_bytes() != backup:
+                print("      ⚠ 还原后内容与变异前不一致（行尾被改）！")
+                failures.append((desc, "还原后内容不一致"))
 
     print("\n" + "=" * 74)
     if failures:

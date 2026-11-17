@@ -153,6 +153,37 @@ class TestSeamQualityNodeWiring(unittest.TestCase):
         p = vw.build_t2v_panel(_t2v("J2", _TWOPASS, **_cont_params()))
         self.assertEqual(p["300:post"]["inputs"]["match_prev_stats_frames"], 1)
 
+    def test_post_cross_seg_ack_is_true(self):
+        """cross_seg_ack 必须打勾，否则 match_prev 会被节点**自动弃权**。
+
+        节点 tooltip：「【跨段两项的总闸】**确认 guide 是真参照**才打勾。
+        不打勾（默认）⇒ match_prev 与 lowfreq_pull **自动弃权**」+
+        「**真参照只在拷贝桥下成立**」。
+
+        我们的路径就是拷贝桥（300:bridge -> 300:trim），
+        prev_tail 是上段末帧（不是 cond 桥的近似）→ 必须打勾。
+
+        【实测踩到】2026-11-17 第一次上线时忘了打勾，节点自己弃权了
+        （ComfyUI 日志：「自动弃权 —— guide 未确认是真参照」），
+        match_prev **完全没生效**，接续点跳变仍是 19.39（29.52x）。
+        → 这个断言就是为了守住那个「静默无效」。
+        """
+        p = vw.build_t2v_panel(_t2v("J2", _TWOPASS, **_cont_params()))
+        self.assertTrue(p["300:post"]["inputs"]["cross_seg_ack"],
+                        "cross_seg_ack 必须为 True —— 否则 match_prev 被节点"
+                        "自动弃权（静默无效）")
+        for builder, mode in ((hvm.build_flf, "flf"), (hvm.build_r2v, "r2v")):
+            params = _t2v("J2", _TWOPASS, **_cont_params())
+            params["mode"] = mode
+            if mode == "flf":
+                params["first_frame"] = "first.png"
+                params["last_frame"] = "last.png"
+            else:
+                params["ref_images"] = ["ref0.png"]
+            p2 = builder(params)
+            self.assertTrue(p2["300:post"]["inputs"]["cross_seg_ack"],
+                            f"{mode} 的 cross_seg_ack 也必须为 True")
+
     def test_post_does_not_touch_timeline_or_audio(self):
         """300:post 只改画质：帧数守恒、不动音频。
 

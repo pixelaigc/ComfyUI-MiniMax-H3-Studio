@@ -561,6 +561,14 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
                 "match_prev_gain_max": 1.15,
                 "match_prev_offset_max": 0.06,
                 "match_prev_stats_frames": 1,
+                # 【跨段两项的总闸】确认 guide 是**真参照**才打勾。
+                # 节点 tooltip：「不打勾（默认）⇒ match_prev 与 lowfreq_pull
+                # **自动弃权**」+「**真参照只在拷贝桥下成立**」。
+                # 我们的路径**就是拷贝桥**（300:bridge → 300:trim），
+                # prev_tail 就是上段末帧 → 必须打勾。
+                # （2026-11-17 实测踩到：不打勾 -> match_prev 完全没生效，
+                #   ComfyUI 日志会写「自动弃权 —— guide 未确认是真参照」）
+                "cross_seg_ack": True,
                 "lowfreq_pull": 0,
                 "hist_match": 0,
                 "wb_match": 0,

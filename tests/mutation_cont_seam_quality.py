@@ -42,8 +42,8 @@ MUTATIONS = [
     (
         "把 match_prev_stats_frames 从 1 改成 0（旧口径：首帧被推过 guide）",
         "h3studio/video_workflow.py",
-        '                "match_prev_stats_frames": 1,',
-        '                "match_prev_stats_frames": 0,',
+        '                "match_prev_stats_frames": 1,\n                # 其余画质域项保持 0（不动时间轴、不引入额外处理）。',
+        '                "match_prev_stats_frames": 0,\n                # 其余画质域项保持 0（不动时间轴、不引入额外处理）。',
         "test_post_stats_frames_is_one",
     ),
     (
@@ -105,6 +105,22 @@ def run_one(test_id: str) -> tuple[int, str]:
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
+def _read(path: Path) -> bytes:
+    """按**二进制**读文件。
+
+    【为什么必须二进制】server.py 是 CRLF 行尾。`Path.read_text()` +
+    `write_text()` 会把 CRLF 静默转成 LF —— 那是**改了一万行**，
+    还原后 diff 巨大、看起来像「还原后不绿」，其实是行尾被改了。
+    （2026-11-17 实测踩到：变异脚本把 server.py 的 9986 行 CRLF 全变成 LF。）
+    """
+    return path.read_bytes()
+
+
+def _write(path: Path, data: bytes) -> None:
+    """按**二进制**写文件（保持原行尾）。"""
+    path.write_bytes(data)
+
+
 def main() -> int:
     print("=" * 74)
     print("接续点闪烁修复 —— 变异测试（证明断言真能抓住回归）")
@@ -119,13 +135,15 @@ def main() -> int:
     failures = []
     for idx, (desc, rel_path, old, new, expect_test) in enumerate(MUTATIONS, 1):
         path = REPO / rel_path
-        backup = path.read_text(encoding="utf-8")
+        backup = _read(path)
         try:
-            if old not in backup:
+            old_b = old.encode("utf-8")
+            new_b = new.encode("utf-8")
+            if old_b not in backup:
                 print(f"[{idx}] ⚠  跳过：找不到原文 → {desc}")
                 failures.append((desc, "SKIPPED: 原文未找到"))
                 continue
-            path.write_text(backup.replace(old, new, 1), encoding="utf-8")
+            _write(path, backup.replace(old_b, new_b, 1))
             # 只跑**目标断言**
             rc, out = run_one(f"{TEST_FILE}::{expect_test}")
             caught = rc != 0
@@ -139,11 +157,15 @@ def main() -> int:
                 print(out[-2000:])
                 failures.append((desc, "未被目标断言抓住"))
         finally:
-            path.write_text(backup, encoding="utf-8")
+            _write(path, backup)
             rc2, out2 = run_tests()
             if rc2 != 0:
                 print(f"      ⚠ 还原后**不绿**！变异残留：\n{out2[-1500:]}")
                 failures.append((desc, "还原后不绿"))
+            # 行尾守恒：还原后必须与变异前逐字节相同
+            if _read(path) != backup:
+                print(f"      ⚠ 还原后**行尾/内容**与变异前不一致！")
+                failures.append((desc, "还原后内容不一致"))
 
     print("\n" + "=" * 74)
     if failures:
