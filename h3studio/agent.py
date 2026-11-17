@@ -1468,7 +1468,7 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     # 原来只有 t2v 走归一，flf / r2v 的 Agent 任务**完全绕过**：
     #   * 宽高不吸附（面板路径会吸附，Agent 路径不会 -> 同一份需求，
     #     面板跑 736×416、Agent 跑 1344×768 —— 界面说谎的另一种形态）；
-    #   * 面积上限按 t2v 的 2.0MP 判（flf / r2v 的真实上限是 0.8MP）；
+    #   * 面积上限按各模式自己的策略判（见 video_models.mode_size_policy）；
     #   * r2v 的底模通道不校验（可以选到 FL2VA 权重 -> 参考没生效）。
     # 现在三个视频模式**统一**走归一，且**按各自 mode 的口径**判。
     #

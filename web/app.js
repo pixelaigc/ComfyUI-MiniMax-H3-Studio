@@ -2780,7 +2780,7 @@ function legacyVideoSize(resolution, aspect, mode) {
   const scale = Math.sqrt(total / (ratio[0] * ratio[1]));
   let width = Math.max(MULT, Math.round(ratio[0] * scale / MULT) * MULT);
   let height = Math.max(MULT, Math.round(ratio[1] * scale / MULT) * MULT);
-  // 面积上限按模式（flf / r2v = 0.8 MP；t2v = 2.0 MP）
+  // 面积上限按模式（见服务端 mode_size_policy；t2v/flf/r2v 现均为 2.0 MP）
   const maxMp = (mode === "t2v") ? 2.0 : 0.8;
   const limit = maxMp * 1024 * 1024;
   if (width * height > limit) {

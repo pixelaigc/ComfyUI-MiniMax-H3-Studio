@@ -38,7 +38,7 @@
    - 提示里要同时出现「上限」和「当前请求值」
 
 7. **非 minimax / 非 t2v 模式约束不被误放宽**
-   - flf / r2v 仍是 0.8 MP 档位，不跟着 t2v 放宽
+   - 【2026-11-17 更新】flf / r2v 已与 t2v 同为 2.0 MP（对齐 nonebot seg）
    - longfilm 不限（拼片不产生新画面）
 
 运行：python3 -m pytest tests/test_video_tabs_resolution.py -v

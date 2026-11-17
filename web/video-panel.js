@@ -79,7 +79,8 @@
     // 【为什么要有它】首尾帧（flf）/ 参考生视频（r2v）现在**共用**
     // 文生视频（t2v）这一套面板 —— 同一份渲染代码、同一套分块、
     // 同一套控件顺序。区别只在：
-    //   * 尺寸上限（flf / r2v = 0.8MP，t2v = 2.0MP）；
+    //   * 尺寸上限（【2026-11-17】flf / r2v = t2v = 2.0MP，对齐 nonebot
+    //     seg1/seg2 的 ResolutionSelector(megapixels=2)）；
     //   * 可选的底模（r2v 必须用 Ref2VA 权重）；
     //   * 本模式特有的素材字段（首帧 / 尾帧 / 参考图 / 参考视频 / 参考音乐）。
     //
@@ -1233,7 +1234,7 @@
     // 同一套控件顺序，只在必要处多出本模式特有的素材字段。
     //
     // 尺寸策略按 mode 取，不写死（服务端 /api/video-options 的
-    // mode_size_policy 逐模式下发：t2v 2.0MP / flf·r2v 0.8MP）。
+    // mode_size_policy 逐模式下发：t2v / flf / r2v 均为 2.0MP）。
     VIDEO_OPTIONS.mode = mode || videoState.mode || "t2v";
     videoState.mode = VIDEO_OPTIONS.mode;
     if (!optionsReady) return;
@@ -1325,7 +1326,7 @@
         // （0.8MP vs 2.0MP），底模可选集也不同。
         // 存成 per-mode 的一份，回填时按当前模式取 ——
         // 否则切到 flf 看到的是 t2v 的 2.0MP 尺寸（超上限），
-        // 切回 t2v 又变成 flf 的 0.8MP（白白浪费画质）。
+        // 切回 t2v 又被本模式的尺寸上限覆盖（白白浪费画质）。
         mode_configs: modeConfigs(),
       };
   }
@@ -1335,12 +1336,12 @@
    *
    * 【为什么要拆开存】
    * 三个视频模式共用一套面板，但：
-   *   * 尺寸上限不同（t2v 2.0MP / flf·r2v 0.8MP）；
+   *   * 尺寸上限不同（按 mode_size_policy 逐模式取值）；
    *   * 底模可选集不同（r2v 只能用 Ref2VA 权重）；
    *   * 采样默认值不同（跟着实际挂的加速 LoRA 走）。
    * 用**一份**共享配置的话，切换模式会互相污染 ——
    * 在 t2v 选了 1920×1088，切到 flf 就超上限；
-   * 切回 t2v 又被 flf 的 0.8MP 覆盖。
+   * 切回 t2v 又被本模式的尺寸上限覆盖。
    */
   function modeConfigs() {
     const configs = (videoState.modeConfigs && typeof videoState.modeConfigs === "object")
@@ -1409,7 +1410,7 @@
    *   2. 载入**新模式**的配置片段（没有就用默认值）；
    *   3. 按新模式的尺寸上限 / 底模可选集重算。
    *
-   * 【为什么尺寸要重算】flf / r2v 的上限是 0.8MP，t2v 是 2.0MP。
+   * 【为什么尺寸要重算】各模式的上限不同（见 mode_size_policy）。
    * 在 t2v 选了 1920×1088（2.0MP）切到 flf -> 超上限，
    * 服务端会按比例缩回去（面板说的和实际跑的不一样 —— 那正是
    * 「面板说谎」的老毛病）。所以这里**在切模式时就收进上限内**。

@@ -196,8 +196,8 @@ class TestC9AgentVideoNormalize(unittest.TestCase):
     def test_r2v_rejects_fl2va_only_model(self):
         """r2v 必须 Ref2VA 权重；FL2VA-only 权重必须被拦。
 
-        【为什么尺寸取 1344×768】那超了 r2v 的 0.8MP 上限 —— 会先被尺寸检查拦下，
-        看不到通道检查。所以这里用**在限内**的尺寸（960×544），确保测的是通道。
+        【为什么尺寸取 960×544】用**在 2.0MP 限内**的尺寸，确保测的是通道检查
+        而不是尺寸检查（尺寸检查会先拦下超限值，掩盖通道错误）。
         """
         fl2va_only = [k for k, v in vm.VIDEO_MODELS.items()
                       if not v.get("supports_ref2va")]
