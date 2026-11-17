@@ -241,7 +241,10 @@ class TestSelfliftWorkflowBridge(unittest.TestCase):
         self.assertEqual(p["300:trim"]["inputs"]["images"], ["10", 0])
         self.assertEqual(p["300:trim"]["inputs"]["audio"], ["23", 0])
         self.assertEqual(p["300:trim"]["inputs"]["trim_frames"], ["300:bridge", 2])
-        self.assertEqual(p["91"]["inputs"]["images"], ["300:trim", 0])
+        # 【2026-11-17】画面多走一跳「跨段统计匹配」（300:post）：
+        #   它只改画质、不改帧数、不动音频 → 音频仍直接取 300:trim。
+        self.assertEqual(p["300:post"]["inputs"]["images"], ["300:trim", 0])
+        self.assertEqual(p["91"]["inputs"]["images"], ["300:post", 0])
         self.assertEqual(p["91"]["inputs"]["audio"], ["300:trim", 1])
 
     def test_selflift_bridge_reads_upstream_explicit_path(self):

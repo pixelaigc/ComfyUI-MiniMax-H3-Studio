@@ -531,7 +531,46 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
             "class_type": "H3RelayTrimAV",
             "_meta": {"title": "接续·裁重叠（裁掉钉住区，音画同裁）"},
         }
-        video_images_ref = ["300:trim", 0]
+        # ---- 画质域：跨段统计匹配（2026-11-17 修：接续点闪烁）----
+        #
+        # 【为什么需要】用户实测反馈「接续点有一次明显闪烁」。
+        # 取证结论（线上真实产物，帧级证据）：
+        #   · 钉住区**逐位保住**（段2 钉住区 vs 段1 尾 7 步：max 差
+        #     4.8e-7 = float32 舍入）→ 拷贝桥没问题；
+        #   · 但接续点的**色档跳变**：二采 ON 时是段内量级的 29.52x，
+        #     同参数二采 OFF 时只有 5.48x；
+        #   · 机理：SelfLift 的低分辨率段把钉住区内容**降采样**后当锚点
+        #     （nodes.py:299-306），抬升再回高分辨率 -> 新生成区继承了
+        #     低分辨率段的色档，缝头几帧是「低色档过渡区」。
+        #
+        # 【为什么用 H3RelayPost.match_prev】节点 tooltip 明写
+        #   「目标：压『成片缝上的亮度阶跃』」+「真正的用武之地是**拷贝桥**
+        #   （那里 prev_tail 才是真·上段末帧）」—— 我们**就是**拷贝桥路径。
+        #   逐通道 Reinhard 一阶+二阶矩对齐，**帧数守恒、不动音频、零采样开销**。
+        #
+        # 【guide】300:trim 第 4 路 prev_tail = 钉住区末帧（拷贝桥下即上段末帧）。
+        # 【stats_frames=1】节点 tooltip：1 = 与单帧 guide 同口径 ⇒ 首帧被拉向
+        #   guide 且**不会越过它**；0 = 旧口径 ⇒ 首帧被推过 guide、缝上多出
+        #   阶跃（真渲染实测 ×12.6）→ 产线必须给 1。
+        p["300:post"] = {
+            "inputs": {
+                "images": ["300:trim", 0],
+                "guide": ["300:trim", 3],
+                "match_prev": 0.5,
+                "match_prev_frames": 12,
+                "match_prev_gain_max": 1.15,
+                "match_prev_offset_max": 0.06,
+                "match_prev_stats_frames": 1,
+                "lowfreq_pull": 0,
+                "hist_match": 0,
+                "wb_match": 0,
+                "settle_sharpen": 0,
+                "settle_auto": 0,
+            },
+            "class_type": "H3RelayPost",
+            "_meta": {"title": "接续·跨段统计匹配（压缝上的亮度阶跃）"},
+        }
+        video_images_ref = ["300:post", 0]
         video_audio_ref = ["300:trim", 1]
     else:
         video_images_ref = ["10", 0]

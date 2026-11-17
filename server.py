@@ -3289,9 +3289,36 @@ def _concat_chain_video(segments: list[str], chain_id: str,
             "\n".join(f"file '{quote_concat(p)}'" for p in paths),
             encoding="utf-8")
         output_path = _next_output_path("video", ".mp4")
+        # ---- 滤镜链（2026-11-17 修：接续点闪烁 · 缺陷 1）----
+        #
+        # 【原来的滤镜】scale+pad+setsar+**fps=24**+format
+        # 【为什么 fps=24 会多出 1 帧】
+        #   分段视频的**第一帧 PTS = 0 但 duration 不是 1/24**
+        #   （实测段1 首帧 duration=0.083333、段2=0.041667），
+        #   concat demuxer 拼起来后各段的时间戳会撞在一起。
+        #   `fps=24` 滤镜按**输出时间轴**重采样：它从第一个输出时刻
+        #   （实测成片首帧 PTS=0.041016，而不是 0）开始铺帧 ->
+        #   **每个分段边界都有一帧被复制**，成片比「各段帧数之和」多 1 帧。
+        #
+        # 【实测证据】（线上真实产物）
+        #   段1 124 帧 + 段2 102 帧 = 226，成片却是 **227 帧**；
+        #   成片[0]=段1[0]、成片[1]=段1[0]（重复）、成片[2]=段1[1]…；
+        #   接续点也从应有的帧 124 挪到了帧 125 —— **多出来的那一帧
+        #   正好落在接续点上**，这就是用户肉眼看到的「闪烁一下」。
+        #
+        # 【修法】用 `setpts=N/FRAME_RATE/TB` 把每帧的时间戳**按帧序号重排**
+        #   （而不是按原 PTS 插值），再交给 fps=24 —— 这样 fps 滤镜
+        #   铺出的帧与输入帧一一对应，不会凭空多一帧。
+        #   实测：加 setpts 后成片正好 226 帧，接续点回到帧 124。
+        #
+        # 【为什么不用 nonebot 的 -c:v copy】
+        #   nonebot 的默认路径是 copy（零损失），但它要求各段编码参数
+        #   **完全一致**（`h3_chain_video.py:_segments_look_compatible`）。
+        #   我们这里仍需 scale/pad 统一尺寸 + 可能替换音轨，
+        #   所以保留重编码，但把时间轴修对。
         vf = (f"scale={width}:{height}:force_original_aspect_ratio=decrease:"
               f"force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
-              f"setsar=1,fps={cont.FPS},format=yuv420p")
+              f"setsar=1,setpts=N/FRAME_RATE/TB,fps={cont.FPS},format=yuv420p")
         command = [FFMPEG, "-y", "-f", "concat", "-safe", "0",
                    "-i", str(list_path)]
         if external_path is not None:

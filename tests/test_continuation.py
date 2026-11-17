@@ -359,8 +359,16 @@ class TestWorkflowWiring(unittest.TestCase):
         self.assertEqual(p["300:trim"]["inputs"]["audio"], ["23", 0])
         self.assertEqual(p["300:trim"]["inputs"]["trim_frames"], ["300:bridge", 2])
         # 合成视频必须用裁完的画面 + 裁完的音频（红线：音画不同步）
-        self.assertEqual(p["91"]["inputs"]["images"], ["300:trim", 0])
+        #
+        # 【2026-11-17】画面多走一跳「跨段统计匹配」（300:post）——
+        #   它只改画质、不改帧数、不动音频，所以音频仍然直接取 300:trim。
+        #   这里断言的是**整条链**，比只断言一个节点更强：
+        #     91.images ← 300:post ← 300:trim ← 10（解码）
+        self.assertEqual(p["300:post"]["inputs"]["images"], ["300:trim", 0])
+        self.assertEqual(p["91"]["inputs"]["images"], ["300:post", 0])
         self.assertEqual(p["91"]["inputs"]["audio"], ["300:trim", 1])
+        # 跨段统计匹配必须接 guide（钉住区末帧 = 上段末帧）
+        self.assertEqual(p["300:post"]["inputs"]["guide"], ["300:trim", 3])
 
     def test_save_node_takes_sampler_output(self):
         """落盘必须存**采样器的输出**（钉住区之后的完整段）。"""

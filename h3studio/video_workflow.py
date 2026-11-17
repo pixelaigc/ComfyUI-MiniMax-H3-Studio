@@ -623,7 +623,57 @@ def build_t2v_panel(params: dict) -> dict:
             "class_type": "H3RelayTrimAV",
             "_meta": {"title": "接续·裁重叠（裁掉钉住区，音画同裁）"},
         }
-        video_images_ref = ["300:trim", 0]
+        # ---- 画质域：跨段统计匹配（2026-11-17 修：接续点闪烁）----
+        #
+        # 【为什么需要】用户实测反馈「接续点有一次明显闪烁」。
+        # 取证结论（线上真实产物，帧级证据）：
+        #   · 钉住区**逐位保住**（段2 钉住区 vs 段1 尾 7 步：
+        #     max 差 4.8e-7 = float32 舍入）→ 拷贝桥没问题；
+        #   · 但接续点的**色档跳变**：二采 ON 时是段内量级的 **29.52x**，
+        #     同参数二采 OFF 时只有 **5.48x**；
+        #   · 机理：SelfLift 的低分辨率段把钉住区内容**降采样**后当锚点
+        #     （nodes.py:299-306 low_video = interpolate(...)），
+        #     抬升再回高分辨率 -> 新生成区继承了低分辨率段的色档，
+        #     于是缝头几帧是「低色档过渡区」。
+        #
+        # 【为什么用 H3RelayPost.match_prev】节点自己的 tooltip 写着：
+        #   「目标：压『成片缝上的亮度阶跃』」+「真正的用武之地是**拷贝桥**
+        #   （那里 prev_tail 才是真·上段末帧）」—— 我们的路径**就是**拷贝桥。
+        #   它做的是逐通道 Reinhard 式一阶+二阶矩对齐，**帧数守恒、不动音频、
+        #   零采样开销**（relay_core.py:1820 match_prev_stats）。
+        #
+        # 【guide 接哪】300:trim 的**第 4 路** prev_tail = 本段钉住区末帧
+        #   （裁重叠节点把它交接出来）—— 拷贝桥路线下它**就是**上段末帧，
+        #   不是近似。
+        #
+        # 【为什么 stats_frames=1】节点的 tooltip 明确说：
+        #   「1（默认）= 统计量取紧贴缝的那一帧，与 guide（单帧）口径一致
+        #   ⇒ offs 恰是『缝上的阶跃』，首帧按权重被拉向 guide，**不会越过它**；
+        #   0 = 旧口径…首帧被推过 guide，缝上凭空多出一个阶跃
+        #   （2026-09-17 真渲染实测 ×12.6）。**仅作对照档，勿用于产线。**」
+        # → 这里必须显式给 1，不能依赖节点默认值以外的任何取值。
+        p["300:post"] = {
+            "inputs": {
+                "images": ["300:trim", 0],
+                "guide": ["300:trim", 3],
+                # 跨段统计匹配强度：只对齐统计量，不复制姿态 ⇒ 无重影。
+                "match_prev": 0.5,
+                "match_prev_frames": 12,
+                # 护栏：逐通道增益/偏移上限（防把已通过的内容改坏）。
+                "match_prev_gain_max": 1.15,
+                "match_prev_offset_max": 0.06,
+                "match_prev_stats_frames": 1,
+                # 其余画质域项保持 0（不动时间轴、不引入额外处理）。
+                "lowfreq_pull": 0,
+                "hist_match": 0,
+                "wb_match": 0,
+                "settle_sharpen": 0,
+                "settle_auto": 0,
+            },
+            "class_type": "H3RelayPost",
+            "_meta": {"title": "接续·跨段统计匹配（压缝上的亮度阶跃）"},
+        }
+        video_images_ref = ["300:post", 0]
         video_audio_ref = ["300:trim", 1]
     else:
         video_images_ref = ["10", 0]
