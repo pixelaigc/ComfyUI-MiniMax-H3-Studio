@@ -171,12 +171,27 @@ class TestChainBookkeeping(ContinuationServerTestBase):
         self.assertIn("不存在", error)
 
     def test_prepare_continuation_rejects_selflift_source(self):
-        """上游是二采 -> 明确拒绝。"""
+        """上游是二采 -> **不再**因为「二采」被拒（2026-11-17 修正）。
+
+        【为什么改】原先这里断言「上游是二采 -> 明确拒绝」，
+        依据是「二采潜空间不同源」—— **该结论已被实测推翻**：
+        独立复核 4/4 真实落盘样本，latent 时间步全部吻合 17k+5 网格；
+        且 SelfLiftH3Sampler 原生支持拷贝桥的 noise_mask。
+        → 现在二采与普通段走**同一条**校验：上游潜空间文件必须在盘上。
+        本例里上游二采段没有落盘潜空间（`_make_job` 只写任务记录），
+        所以仍会报错 —— 但报错原因必须是「潜空间」而不是「二采」。
+
+        本断言守的是：报错原因**不再**拿「二采」当借口，
+        也不要把「二采」这个理由从文案里拿掉（那会掩盖真实原因）。
+        """
         seg1 = self._make_job("t2v", self._params(twopass={"enabled": True}))
         params = self._params(continuation={"source_job": seg1})
         error = srv._prepare_continuation_params(params)
-        self.assertTrue(error)
-        self.assertIn("二采", error)
+        self.assertTrue(error, "上游潜空间缺失时必须报错")
+        # 原因应指向「潜空间」，而不是拿「二采不支持接续」当理由
+        self.assertIn("潜空间", error)
+        self.assertNotIn("二采不支持接续", error)
+        self.assertNotIn("二采产物不支持接续", error)
 
     def test_prepare_continuation_computes_stage_index(self):
         """服务端自己算段号（前端传什么都不认）。"""

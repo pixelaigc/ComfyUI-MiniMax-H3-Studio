@@ -10,8 +10,13 @@
      → 断言必须检查**工作流里真的有桥节点**。
   2. **接缝整体位移** —— 钉住窗口不在 5+17k 网格上，或段长不对齐
      5 步周期边界。→ 断言帧数换算。
-  3. **二采产物也能接续** —— 用户需求明确排除 selflift。
-     二采潜空间与标准采样不同源，接上去会位移。
+  3. **二采（selflift）接续时没真的走桥** —— 最坏的一种失败。
+     二采的潜空间与标准采样路径是否同源，2026-11-17 独立复核后
+     结论已翻转（4/4 真实落盘样本的 latent 时间步全部吻合 17k+5 网格；
+     且 SelfLiftH3Sampler 原生支持拷贝桥的 noise_mask）。
+     → 二采**可以**接续，但工作流里必须**真的有**桥，且 SelfLift
+     采样器必须消费桥的产物（nonebot v1 姿势：positive=桥第4路、
+     latent_image=桥第0路），否则就是静默退化。
   4. **潜空间缺失时静默失败** —— 用户需求要求「明确中文提示」。
   5. **段号算错** —— 无限接续依赖段号严格 +1。
 
@@ -123,13 +128,24 @@ class TestFrameMath(unittest.TestCase):
 # 可接续性判定
 # ------------------------------------------------------------------
 class TestContinuationAllowed(unittest.TestCase):
-    """selflift 必须被排除 —— 用户需求明确要求。"""
+    """模式闸门 —— 二采（selflift）**不再**被排除（2026-11-17 修正）。"""
 
     def test_selflift_is_excluded(self):
+        """二采（selflift）**不再**被模式闸门排除。
+
+        【2026-11-17 修正】原先这里断言「二采产物不能接续」，
+        依据是「二采潜空间与标准路径不同源」—— **该结论已被实测推翻**：
+        独立复核 4/4 真实落盘样本，latent 时间步全部吻合 17k+5 网格；
+        且 SelfLiftH3Sampler 原生支持拷贝桥的 noise_mask。
+        → 现在二采走**能力探测**：上游二采段自己有落盘潜空间才允许
+        （那是查盘判定，在服务层）。
+
+        本断言守的是「模式闸门不再一刀切拒绝二采」。
+        """
         ok, reason = cont.continuation_allowed("t2v", {"twopass": {"enabled": True}})
-        self.assertFalse(ok, "二采产物不能接续")
-        self.assertIn("二采", reason)
-        self.assertTrue(reason.strip(), "必须给出原因，不能是空串")
+        self.assertTrue(ok,
+                        "二采不应再被模式闸门拒绝，实际原因：%s" % reason)
+        self.assertEqual(reason, "")
 
     def test_normal_t2v_is_allowed(self):
         ok, reason = cont.continuation_allowed("t2v", {"twopass": {"enabled": False}})
@@ -420,14 +436,30 @@ class TestWorkflowWiring(unittest.TestCase):
         self.assertIsNone(p["300:bridge"]["inputs"]["ref_anchor_latent"])
 
     def test_selflift_never_gets_bridge(self):
-        """二采不走接续桥（潜空间不同源）。"""
+        """二采**也**走接续桥（2026-11-17 修正）。
+
+        【为什么改】原先这里断言「二采不走接续桥」，依据是
+        「二采潜空间不同源」—— 该结论已被实测推翻：
+        独立复核 4/4 真实落盘样本，latent 时间步全部吻合 17k+5 网格；
+        且 SelfLiftH3Sampler 原生支持拷贝桥的 noise_mask
+        （`nodes.py:116-155` 读 latent 的 noise_mask，
+        `nodes.py:280-297` masked_model 对两段都装钉住钩子）。
+        接线姿势照 nonebot `minimax_h3_v1.json` 的 171 节点：
+        positive = 桥第 4 路、latent_image = 桥第 0 路。
+
+        本断言守的是「二采接续段**真的**走桥」—— 防止静默退化。
+        """
         params = {**self._base(), "job_id": "J2", "continuation": self._cont()}
         params["twopass"] = {"enabled": True, "transition_step": 3,
                              "lowres_scale": 0.5, "rho": 0.0, "w_min": 0.5,
                              "w_max": 1.0, "upscaler_model": "none", "cfg": 1.0}
         p = vw.build_t2v_panel(params)
-        self.assertNotIn("300:bridge", p, "二采不该接拷贝桥")
-        self.assertNotIn("300:load", p)
+        # 二采接续段必须有桥
+        for nid in ("300:load", "300:bridge", "300:trim", "300:save"):
+            self.assertIn(nid, p, "二采接续段必须有节点 %s" % nid)
+        # SelfLift 采样器必须消费桥的产物（nonebot v1 姿势）
+        self.assertEqual(p["171"]["inputs"]["latent_image"], ["300:bridge", 0])
+        self.assertEqual(p["171"]["inputs"]["positive"], ["300:bridge", 3])
 
     def test_off_grid_context_window_is_snapped(self):
         """非网格窗口必须吸附到网格值（否则节点会 raise）。"""
@@ -452,11 +484,25 @@ class TestServiceState(unittest.TestCase):
         self.assertIn("潜空间", state["reason"])
 
     def test_selflift_state_refused_with_reason(self):
+        """二采段缺潜空间 -> 明确中文原因（2026-11-17 修正）。
+
+        【为什么改】原先这个用例的语境是「二采一律被拒」。
+        现在二采**可以**接续，但要求「上游二采段自己有落盘潜空间」。
+        本例的 continuation 里没有 latent_run_id -> 潜空间不在 ->
+        仍然不能接续，但原因文案必须说清是**缺潜空间**，
+        不能让用户误以为「二采不支持接续」。
+        """
         params = {"twopass": {"enabled": True},
                   "continuation": {"chain_id": "C", "stage_index": 0}}
         state = cs.continuation_state("t2v", params, "J9")
         self.assertFalse(state["can_continue"])
-        self.assertIn("二采", state["reason"])
+        reason = state["reason"]
+        self.assertTrue(reason.strip(), "必须给出原因")
+        # 原因要指向「潜空间」（真实原因）
+        self.assertIn("潜空间", reason)
+        # 不能再说「二采不支持接续」（那个结论已被推翻）
+        self.assertNotIn("二采不支持接续", reason)
+        self.assertNotIn("二采产物不支持接续", reason)
 
     def test_legacy_task_without_chain_is_refused(self):
         """上线前的历史任务没有链信息 -> 不能接续，但要说清楚。"""

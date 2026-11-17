@@ -57,13 +57,21 @@ class TestFlfR2vContinuableModes(unittest.TestCase):
             self.assertTrue(ok, f"{mode} 应该允许接续（实际原因：{reason}）")
             self.assertEqual(reason, "")
 
-    def test_flf_r2v_selflift_still_refused(self):
-        """二采仍然被拒（flf/r2v 也一样）。"""
+    def test_flf_r2v_selflift_not_rejected_by_mode_gate(self):
+        """二采（selflift）**不再**被模式闸门拒绝（2026-11-17 修正）。
+
+        【为什么改】原先断言「二采仍然被拒」，依据是「二采潜空间
+        不同源」—— 该结论已被实测推翻（独立复核 4/4 真实落盘样本，
+        latent 时间步全部吻合 17k+5 网格；且 SelfLiftH3Sampler
+        原生支持拷贝桥的 noise_mask）。
+        → 现在二采走**能力探测**：上游二采段自己有落盘潜空间才允许。
+        """
         for mode in ("flf", "r2v"):
             ok, reason = cont.continuation_allowed(
                 mode, {"twopass": {"enabled": True}})
-            self.assertFalse(ok, f"{mode} 二采不该允许接续")
-            self.assertIn("二采", reason)
+            self.assertTrue(ok,
+                            f"{mode} 二采不应再被模式闸门拒绝，原因：{reason}")
+            self.assertEqual(reason, "")
 
     def test_non_video_reason_names_the_mode(self):
         """非视频模式 -> 中文原因要**点名**是哪一类不支持。
@@ -261,13 +269,21 @@ class TestFlfR2vWorkflowBridge(unittest.TestCase):
         self.assertNotIn("300:anchor_load", p)
         self.assertIsNone(p["300:bridge"]["inputs"]["ref_anchor_latent"])
 
-    def test_selflift_never_gets_bridge(self):
-        """二采不走接续桥（潜空间不同源）。"""
+    def test_selflift_gets_bridge(self):
+        """二采**也**走接续桥（2026-11-17 修正）。
+
+        【为什么改】原先断言「二采不走接续桥」，依据是
+        「二采潜空间不同源」—— 该结论已被实测推翻。
+        本断言守的是「二采接续段**真的**走桥」—— 防止静默退化。
+        """
         params = {**self._base(), "twopass": {"enabled": True}}
         params["continuation"] = self._cont()
         p = h3modes.build_r2v({**params, "ref_images": ["a.png"]})
-        self.assertNotIn("300:bridge", p)
-        self.assertNotIn("300:load", p)
+        for nid in ("300:load", "300:bridge", "300:trim", "300:save"):
+            self.assertIn(nid, p, "二采接续段必须有节点 %s" % nid)
+        # SelfLift 采样器必须消费桥的产物（nonebot v1 姿势）
+        self.assertEqual(p["171"]["inputs"]["latent_image"], ["300:bridge", 0])
+        self.assertEqual(p["171"]["inputs"]["positive"], ["300:bridge", 3])
 
     def test_off_grid_context_window_is_snapped(self):
         """非网格窗口必须吸附到网格值（否则节点会 raise）。"""
