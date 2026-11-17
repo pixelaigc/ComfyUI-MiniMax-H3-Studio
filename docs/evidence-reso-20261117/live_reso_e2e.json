@@ -1,0 +1,96 @@
+{
+  "target": "1920x1088",
+  "nonebot_seg_reference": "ResolutionSelector{megapixels:2, multiple:32}",
+  "results": [
+    {
+      "mode": "r2v",
+      "ok": false,
+      "job_id": "eaf93df7b86b",
+      "status": "done",
+      "params": {
+        "prompt": "一位少女站在日式教室讲台前，镜头缓慢推近，薄荷绿短发，粉色背心，细腻光影",
+        "width": 1920,
+        "height": 1088,
+        "duration": 5.0,
+        "seed": 20261117,
+        "aspect": "16:9",
+        "model_key": "hybrid_fl2va_ref2va",
+        "resolution": "1088p",
+        "accel_lora": "minimax_h3_turbo_4step_ema_ckpt850",
+        "accel_lora_strength": 1.0,
+        "accel_lora_loader": "MiniMaxH3TurboLoRA",
+        "accel_loras": [
+          {
+            "key": "minimax_h3_turbo_4step_ema_ckpt850",
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "strength": 1.0,
+            "enabled": true
+          }
+        ],
+        "fixed_accel_lora": "minimax_h3_turbo_4step_ema_ckpt850",
+        "effect_loras": [],
+        "attention": "default",
+        "twopass": {
+          "enabled": false
+        },
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "cfg": 1.0,
+        "shift_video": 12.0,
+        "shift_audio": 3.0,
+        "use_sigma_shift": true,
+        "sigma_shift_available": true,
+        "audio_track_source": "generated",
+        "asset_refs": [
+          {
+            "asset_id": "asset_52c6cd73fd17",
+            "slot": "ref_image",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_4a21fea5d205",
+            "slot": "ref_video",
+            "ordinal": 0
+          }
+        ],
+        "gen_type": "r2v",
+        "continuation": {
+          "chain_id": "eaf93df7b86b",
+          "stage_index": 0,
+          "source_job": "",
+          "source_segment": -1,
+          "latent_run_id": "h3studio_seaf93df7b86b",
+          "latent_stage": 0,
+          "context_frames": 22,
+          "anchor_frames": 22,
+          "chain_total_frames": 0,
+          "segment_frames": 124,
+          "segment_rel": "videos/v-h3-studio-000501.mp4"
+        },
+        "ref_images": [
+          "h3studio/b1ff9c8ea3a780ba__clipboard_pasted.png"
+        ],
+        "ref_videos": [
+          "h3studio/3b9237b6a425d6ad__v1.mp4_6f794ba6.webm"
+        ],
+        "job_id": "eaf93df7b86b",
+        "mode": "r2v",
+        "artifact_model_file": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
+        "artifact_loras": [
+          {
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "loader": "MiniMaxH3TurboLoRA"
+          }
+        ],
+        "fixed_accel_strength": 1.0
+      },
+      "probe": {
+        "error": "没有产物路径"
+      },
+      "path": null
+    }
+  ]
+}
