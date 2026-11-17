@@ -91,6 +91,7 @@ from h3studio import prompt_history as ph
 from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
 from h3studio import video_models
+from h3studio import twopass_budget
 from h3studio import job_meta
 from h3studio import artifact_meta
 from h3studio import continuation as cont
@@ -2888,6 +2889,47 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
                         max(1, min(transition, max_transition)),
                         "（上限受当前步数档的 sigma 表长度限制）")
             transition = max(1, min(transition, max_transition))
+        # 【2026-11-17 修：二采 NFE 预算护栏 · 接缝色档残缺陷】
+        #
+        # 【缺陷】二采接续链在段2/段1 交界处有一次肉眼可见的闪烁。
+        #   受控复现（线上真实产物，老提示词+老种子）：接续比值 15.372x，
+        #   而非二采对照只有 1.622x。
+        #
+        # 【重新取证的结论 —— 与上一轮归因方向不同】
+        #   上一轮把断点当成「拼接点跳变」；本轮用独立测量器拆开量后发现：
+        #   断点在**段2 自己内部**（段2 第 0 帧 -> 第 1 帧，RGB L1 差 13.75），
+        #   不在拼接点。所以上一轮加的「拼接 setpts + match_prev」打不中要害。
+        #
+        # 【机制】ComfyUI 日志的 `[SelfLift plan]` 行（决定性证据）：
+        #   steps=4 transition_step=3 -> low_nfe=3 high_nfe=1 sigma_resume=0.7207
+        #   steps=7 transition_step=5 -> low_nfe=4 high_nfe=5 sigma_resume=0.5868
+        #   SelfLift 把 NFE 预算切成「低分辨率 ts 步 + 高分辨率 (steps-ts) 步」。
+        #   默认档 steps=4 + transition_step=3 ⇒ **高分辨率二采只剩 1 步 NFE**，
+        #   而这 1 步的起始 sigma 高达 0.72。
+        #   低分辨率一采在**降采样空间**里定下了色档与细节档；抬升回来后，
+        #   高分辨率二采要同时做「提分辨率 + 收敛色档 + 生成内容」三件事，
+        #   1 步预算不够 ⇒ 段头几帧色档+细节档双重掉档（肉眼 = 闪一下）。
+        #   空间高频指纹佐证：旧档段2 帧0..3 高频只有段中段的 15%。
+        #
+        # 【修法（Studio 侧，零 comfyui 改动）】
+        #   SelfLift 的 transition_step **就是**公开的节点输入，它同时决定
+        #   高分辨率还剩几步 NFE（纯算术：high_nfe = steps - transition_step）。
+        #   所以在 Studio 侧把它夹到「高分辨率至少拿一半预算」即可 ——
+        #   **不需要**改第三方节点源码（实测 ts=2 后：15.372x -> 2.996x，
+        #   段2 内部断点 13.75 -> 1.08，高频比 0.899 -> 1.108）。
+        #
+        # 【代价与留痕】夹取是有损的（一采步数变少 = 低分辨率提速收益变小），
+        #   所以**必须留痕**，让用户看得见「一采步数被从 3 改成 2」。
+        _budget_steps = steps + (extra_steps if refine_enabled else 0)
+        _budget_transition = twopass_budget.clamp_transition_step(
+            _budget_steps, transition)
+        if _budget_transition != transition:
+            _video_note(
+                out, "twopass.transition_step", transition, _budget_transition,
+                "（高分辨率二采至少要拿一半的 NFE 预算："
+                + twopass_budget.describe(_budget_steps, _budget_transition)
+                + "；否则段头会色档掉档 = 接续点闪烁）")
+            transition = _budget_transition
         lowres = float(twopass.get("lowres_scale")
                        or video_models.VIDEO_TWOPASS["lowres_scale_default"])
         lowres = max(0.25, min(1.0, lowres))
