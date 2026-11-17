@@ -782,6 +782,21 @@ function renderMode() {
    * （{id, name, category, preview_url, content_url}）。
    */
   function openAssetPickerForSlot(kind, onPick) {
+    // 【2026-11-17 修复】onPick 是**必填**回调。
+    //
+    // 【原来错在哪】调用方漏传 onPick 时，这里不报错、照常打开弹窗，
+    // 用户选完素材点「确定使用」才在 onDone 里炸 TypeError；
+    // 而且那个 TypeError 被 .catch() 吞掉后弹出「读取素材失败：
+    // onPick is not a function」—— 提示指向「读取素材」，
+    // 真实失败点却是「回调没传」，排查方向被带偏。
+    //
+    // 【现在】缺回调就在**打开弹窗之前**拦下来（用户不会白选一遍），
+    // 并报明确错误。
+    if (typeof onPick !== "function") {
+      console.error("[素材库选择] 缺少 onPick 回调，无法打开选择器", {kind});
+      alert("素材库选择器调用有误（缺少回调），请刷新页面重试。");
+      return;
+    }
     if (!window.ASSETLIB || !window.ASSETLIB.openPicker) {
       alert("素材库模块未加载");
       return;
@@ -908,7 +923,7 @@ function renderMode() {
         openSlotPreview(slot, kind);
         return;
       }
-      openAssetPickerForSlot(kind);
+      openAssetPickerForSlot(kind, (asset) => fillFromAsset(asset));
     });
     // 「从素材库选」按钮
     const pickBtn = document.createElement("button");
