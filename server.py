@@ -234,6 +234,11 @@ def load_config():
     data_env = os.environ.get("H3STUDIO_DATA_DIR")
     if data_env:
         cfg["data_dir"] = data_env
+    # ComfyUI 地址：独立测试实例要指向**受控的假 ComfyUI**（E2E 用）。
+    # 不加这个覆盖，隔离实例只能连真 ComfyUI（会真占 GPU、耗时不可控）。
+    comfy_env = os.environ.get("H3STUDIO_COMFY_URL")
+    if comfy_env:
+        cfg["comfyui_url"] = comfy_env
     return cfg
 
 
