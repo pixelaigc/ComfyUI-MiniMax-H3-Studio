@@ -859,11 +859,50 @@ def clamp_max_tokens(value, merged_params: dict | None = None) -> int:
     return max(MAX_TOKENS_FLOOR, min(val, ceiling))
 
 
-def build_messages(spec: dict, original: str, language: str = "auto") -> list:
-    """构造统一消息格式（system + user）。"""
+def build_messages(spec: dict, original: str, language: str = "auto",
+                   history: list | None = None) -> list:
+    """构造统一消息格式（system + user）。
+
+    【history —— 跨段提示词历史（2026-11-17 新增）】
+    接续生成时，用户写的是**本段**的新内容，但要求「基于全部提示词
+    做专业增强，以保证跨段内容一致性」。所以这里把此前各段的提示词
+    作为**上下文**一并交给模型，而 `original` 仍是**本段**要扩写的
+    原文（模型要输出的对象是它，不是历史）。
+
+    约定：
+      * `history` 是 `[{"stage": int, "prompt": str}, ...]`（按段号顺序）；
+      * 只有**非空**历史才注入 —— 普通单段增强的提示词完全不变；
+      * 历史里的**本段**（stage 与当前段号相同的那条）由调用方
+        负责剔除 —— 这里只负责把「更早的段」原样带上；
+      * 历史与原文之间用明确分隔，避免模型把多段内容当成一段来扩写。
+    """
     original = (original or "").strip()
     user_text = spec["user_template"].replace("{original}", original)
     user_text = user_text.replace("{prompt}", original)
+    if history:
+        lines = []
+        for item in history:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("prompt") or "").strip()
+            if not text:
+                continue
+            try:
+                stage = int(item.get("stage", 0))
+            except (TypeError, ValueError):
+                stage = 0
+            lines.append(f"【第{stage + 1}段】{text}")
+        if lines:
+            # 【为什么放在原文**前面**】模型读到最后才输出，
+            # 把「前情」放前面、「本段原文」放最后，模型更容易
+            # 把两者区分开，不会把多段内容糊成一段。
+            user_text = (
+                "以下是同一条视频**此前各段**的提示词（用于保持跨段一致性，"
+                "人物/场景/风格/剧情要素必须延续）：\n"
+                + "\n".join(lines)
+                + "\n\n现在请基于以上全部段落内容，增强**下面这一段**的提示词。"
+                + "\n\n【当前段原文】\n" + user_text
+            )
     if language and language != "auto":
         user_text += f"\n\n请用{language}输出。"
     return [

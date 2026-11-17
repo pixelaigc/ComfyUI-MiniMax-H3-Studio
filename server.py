@@ -400,6 +400,24 @@ async def _finalize_residual_with_outputs(job_id: str, row: dict,
 
     失败也不抛 —— 收尾失败就把任务标成 failed（附带原因），
     绝不能让这一行继续挂在「运行中」。
+
+    【2026-11-17 修复：自愈路径必须补跑接续收尾】
+    实测缺陷（用户 19:00 反馈）：5 秒视频点「接续」再生成 5 秒，
+    结果只得到 **4 秒**的一段视频，没有 9 秒成片。
+    取证（线上 DB 全量对拍，2026-11-17）：
+      * 22 条接续链里，**2 条** stage1 没有成片（is_full 缺失），
+        且这 2 条的 stage1 **全部**落在「服务重启」窗口内
+        （19:09:21 / 20:34:02）—— 重启打断的正是 stage1 的运行；
+      * 另外 **20 条**没被重启打断的链，stage1 **全部**有成片。
+    根因：服务重启时 worker 协程被杀掉，`_finalize_continuation`
+    根本没跑 —— 这条路径只下载产物、标 status='done'，**不登记分段、
+    不拼完整视频**。于是：
+      * 本段分段文件**没被登记**（continuation.segment_rel = None）；
+      * 成片**没被拼接**（没有 is_full 条目）；
+      * 用户看到的就是「只有一段 4.25 秒的视频」。
+    （4.25 秒 = 124 帧总长减去 22 帧钉住区 = 本段真正新生成的帧数 ——
+     也就是说潜空间接续**本身是成功的**，只是成片没拼出来。）
+    修法：自愈收尾也走一遍 `_finalize_continuation`（登记分段 + 拼成片）。
     """
     if not history_entry:
         with db() as conn:
@@ -441,6 +459,32 @@ async def _finalize_residual_with_outputs(job_id: str, row: dict,
                 "WHERE id=? AND status='running'",
                 (reason, time.time(), job_id))
         return
+
+    # 【2026-11-17 修复】接续段：自愈路径也要跑接续收尾。
+    #
+    # 【为什么必须在这里补】服务重启会杀掉 worker 协程，
+    # `_finalize_continuation`（登记分段 + 拼完整视频）来不及跑。
+    # 不补的话，接续段只会留下一段「自己那一小段」视频，
+    # 没有完整成片 —— 用户看到的就是「5 秒接续 5 秒只得到 4 秒」。
+    #
+    # 【为什么不会重复跑】`_finalize_continuation` 幂等：
+    #   * 登记分段 = 写本段自己的 continuation.segment_rel（同值覆写）；
+    #   * 拼成片 = 按血缘重新拼一遍，产出**新的**成片文件
+    #     （旧成片文件留在盘上，不影响正确性）。
+    # 若该段已经跑过正常收尾（segment_rel 已登记），重跑只会
+    # 多出一个内容相同的成片文件 —— 不改变用户看到的结果。
+    mode = str(row.get("mode") or "")
+    params = {}
+    try:
+        params = json.loads(row.get("params") or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        params = {}
+    try:
+        saved = await _finalize_continuation_impl(job_id, mode, params, saved)
+    except Exception as ce:
+        # 拼接失败**不影响**本段产物 —— 与正常收尾路径同口径。
+        print(f"[自愈] 任务 {job_id} 接续收尾失败（不影响本段产物）: {ce}")
+
     with db() as conn:
         conn.execute(
             "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? "
@@ -488,6 +532,27 @@ async def _adopt_residual_running(job_id: str, row: dict) -> None:
                         saved.append({"kind": item["kind"], "file": fname,
                                       "name": item["filename"]})
                     annotate_outputs_with_size(saved)
+
+                    # 【2026-11-17 修复】接续段：接管路径也要跑接续收尾。
+                    #
+                    # 【为什么必须补】服务重启会杀掉 worker 协程，
+                    # `_finalize_continuation`（登记分段 + 拼完整视频）
+                    # 来不及跑。接管路径原来只下载产物、标 done ——
+                    # 于是接续段只剩「自己那一小段」视频，没有完整成片
+                    # （用户实测：5 秒接续 5 秒只得到 4 秒）。
+                    mode = str(row.get("mode") or "")
+                    params = {}
+                    try:
+                        params = json.loads(row.get("params") or "{}")
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        params = {}
+                    try:
+                        saved = await _finalize_continuation_impl(
+                            job_id, mode, params, saved)
+                    except Exception as ce:
+                        print(f"[自愈] 任务 {job_id} 接续收尾失败"
+                              f"（不影响本段产物）: {ce}")
+
                     with db() as conn:
                         conn.execute(
                             "UPDATE jobs SET status='done', progress=1, outputs=?, "
@@ -2158,100 +2223,14 @@ class Worker:
                                      saved: list[dict]) -> list[dict]:
         """接续收尾：登记本段 + 拼接**完整视频**。
 
-        用户需求第 6 条：「最终媒体库中得到的是**完整视频**
-        （上一段 + 本段完整长度）」。所以每接续一段，都要产出
-        一个包含**整条链**的完整视频。
-
-        返回加了「完整视频」条目的产物列表。
-
-        【为什么拼接失败不影响本段产物】本段视频本身是好的，
-        拼接只是附加产物。拼接失败（比如 ffmpeg 不可用）时，
-        本段仍然要出现在生成库里 —— 只是没有完整视频。
-
-        【2026-11-16 放开 flf / r2v】原来只有 t2v 走接续收尾。
-        现在三个视频模式都走 —— 落盘坐标、血缘回溯、拼接逻辑
-        全是**同一套**（见 continuation.py / _lineage_segment_rels）。
+        【委托给模块级实现】本方法曾是 Worker 的实例方法，但它体内
+        **没有任何 `self.` 引用**。而「服务重启自愈」路径
+        （`_finalize_residual_with_outputs`）在**模块级函数**里，
+        没有 Worker 实例可用 —— 所以真正的实现提到模块级
+        `_finalize_continuation_impl`，这里只做一层薄委托。
+        （2026-11-17 修「5 秒接续 5 秒只得到 4 秒」时引入。）
         """
-        if mode not in ("t2v", "flf", "r2v"):
-            return saved
-        info = cont_service.chain_info(params)
-        if not info:
-            return saved
-
-        video = next((o for o in saved if o.get("kind") == "video"), None)
-        if not video:
-            return saved
-
-        chain_id = str(info.get("chain_id") or "")
-        try:
-            stage = int(info.get("stage_index", 0))
-        except (TypeError, ValueError):
-            stage = 0
-        if not chain_id:
-            return saved
-
-        # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
-        segment_rel = str(video.get("file") or "")
-
-        # 【本段潜空间被重写后，清掉同坐标的旧指纹副本】
-        # 本段刚跑完 -> `H3RelayLatentSave` 重新写了 `stage_00000.safetensors`
-        # -> 内容变了 -> 旧指纹副本（内容指纹已过期）不再对应任何有效内容。
-        # 不清会随每次重跑堆积一份 4.8MB 的死副本。
-        try:
-            own_run_id, own_stage = cont.latent_coords(info)
-            if own_run_id:
-                removed = cont_service.cleanup_fingerprint_copies(own_run_id,
-                                                                  own_stage)
-                if removed:
-                    print(f"[接续] 清理本段旧指纹副本 {removed} 个 "
-                          f"({own_run_id}/stage_{own_stage:05d})")
-        except Exception as ce:
-            print(f"[worker] 清理指纹副本失败（不影响本段产物）: {ce}")
-
-        # 把本段记到**自己**的任务记录里（不再往链首段的共享账本里塞 ——
-        # 共享账本会让兄弟分支互相污染，见 _record_segment_rel 的说明）。
-        await asyncio.to_thread(_record_segment_rel, job_id, segment_rel)
-
-        # 拼完整视频用**血缘**（沿 source_job 回溯）：本段 -> 上游 -> ...
-        # 兄弟分支不会混进来。
-        segments = await asyncio.to_thread(_lineage_segment_rels, job_id)
-        if segment_rel and segment_rel not in segments:
-            segments.append(segment_rel)
-
-        # 只有**续接段**才需要拼完整视频（第 0 段本身就是完整视频）
-        if stage <= 0:
-            return saved
-
-        # ---- 成片音轨：外部音轨（参考音乐 / 参考视频的音轨）----
-        #
-        # 【为什么成片用「原始参考音频整条」】
-        # 每段采样时用的是「1s 空白 ⊕ 切片」（params["segment_audio_file"]），
-        # 那是「这一段该听到的东西」。成片要的是「整部片子该听到的
-        # 东西」= 原始参考音频整条，长度按合并后视频长。
-        # 若成片也用切片，每段开头的 1s 空白会累积（3 段 = 3s 空白）
-        # → 音画错位。两条链路必须分开。
-        external_audio = ""
-        external_label = ""
-        if h3acont.is_external_track(str(info.get("audio_track_mode") or "")):
-            external_audio = str(info.get("audio_source_file") or "").strip()
-            external_label = ("参考音乐" if str(
-                info.get("audio_source_kind") or "") == "ref_audio"
-                else "参考视频的音轨")
-
-        full = await asyncio.to_thread(_concat_chain_video, segments, chain_id,
-                                       external_audio, external_label)
-        if not full:
-            return saved
-        full_rel = full.relative_to(OUT_DIR).as_posix()
-        annotate_outputs_with_size([{"kind": "video", "file": full_rel,
-                                     "name": full.name}])
-        # 完整视频放在产物列表**前面** —— 生成库卡片取第一个视频显示，
-        # 用户看到的第一眼就该是完整视频。
-        out = [{"kind": "video", "file": full_rel, "name": full.name,
-                "is_full": True}]
-        out.extend(saved)
-        print(f"[worker] 接续完整视频: {full_rel} ({len(segments)} 段拼接)")
-        return out
+        return await _finalize_continuation_impl(job_id, mode, params, saved)
 
     def _has_batches(self, job_id: str) -> bool:
         with db() as conn:
@@ -3111,6 +3090,160 @@ def _lineage_segment_rels(job_id: str) -> list[str]:
         current = str(info.get("source_job") or "").strip()
     rels.reverse()
     return rels
+
+
+def _lineage_prompts(job_id: str) -> list[dict]:
+    """本段的**血缘提示词**列表（从链首段到本段，按顺序）。
+
+    【为什么需要】用户需求（2026-11-17）：接续时点「增强」，
+    要把**此前所有段落的提示词**一并提供给增强模型 —— 否则
+    第 4 段的增强结果只知道第 4 段写了什么，跨段人物/场景/剧情
+    要素会丢，跨段一致性无从保证。
+
+    【沿用血缘口径】与 `_lineage_segment_rels` **完全同源**：
+    沿 `source_job` 指针回溯。所以兄弟分支不会被混进来
+    （B1 链的历史里不会有 B2）。
+
+    【每段只取自己的那一份】每段任务记录里 `params["prompt"]`
+    就是该段用户写（或增强后）的提示词 —— 直接读，不重算。
+
+    返回：[{"stage": 段号, "job_id": 任务 id, "prompt": 提示词}, ...]
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    current = job_id
+    for _ in range(512):
+        if not current or current in seen:
+            break
+        seen.add(current)
+        with db() as conn:
+            row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                               (current,)).fetchone()
+        if not row:
+            break
+        try:
+            params = json.loads(row["params"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            break
+        info = cont_service.chain_info(params)
+        if not info:
+            break
+        prompt = str(params.get("prompt") or "").strip()
+        if prompt:
+            try:
+                stage = int(info.get("stage_index", 0))
+            except (TypeError, ValueError):
+                stage = 0
+            out.append({"stage": stage, "job_id": current, "prompt": prompt})
+        current = str(info.get("source_job") or "").strip()
+    out.reverse()
+    return out
+
+
+async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
+                                       saved: list[dict]) -> list[dict]:
+    """接续收尾：登记本段 + 拼接**完整视频**（模块级实现）。
+
+    用户需求第 6 条：「最终媒体库中得到的是**完整视频**
+    （上一段 + 本段完整长度）」。所以每接续一段，都要产出
+    一个包含**整条链**的完整视频。
+
+    返回加了「完整视频」条目的产物列表。
+
+    【为什么拼接失败不影响本段产物】本段视频本身是好的，
+    拼接只是附加产物。拼接失败（比如 ffmpeg 不可用）时，
+    本段仍然要出现在生成库里 —— 只是没有完整视频。
+
+    【2026-11-16 放开 flf / r2v】原来只有 t2v 走接续收尾。
+    现在三个视频模式都走 —— 落盘坐标、血缘回溯、拼接逻辑
+    全是**同一套**（见 continuation.py / _lineage_segment_rels）。
+
+    【2026-11-17 提到模块级】原来是 `Worker._finalize_continuation`
+    实例方法，但体内**没有任何 `self.` 引用**。而「服务重启自愈」
+    路径是模块级函数、没有 Worker 实例 —— 修「5 秒接续 5 秒
+    只得到 4 秒」时必须让自愈路径也能调它，故提取到模块级。
+    Worker 侧保留同名方法做薄委托（见 Worker._finalize_continuation）。
+    """
+    if mode not in ("t2v", "flf", "r2v"):
+        return saved
+    info = cont_service.chain_info(params)
+    if not info:
+        return saved
+
+    video = next((o for o in saved if o.get("kind") == "video"), None)
+    if not video:
+        return saved
+
+    chain_id = str(info.get("chain_id") or "")
+    try:
+        stage = int(info.get("stage_index", 0))
+    except (TypeError, ValueError):
+        stage = 0
+    if not chain_id:
+        return saved
+
+    # 本段的**分段**视频（未拼接）相对 OUT_DIR 的路径
+    segment_rel = str(video.get("file") or "")
+
+    # 【本段潜空间被重写后，清掉同坐标的旧指纹副本】
+    # 本段刚跑完 -> `H3RelayLatentSave` 重新写了 `stage_00000.safetensors`
+    # -> 内容变了 -> 旧指纹副本（内容指纹已过期）不再对应任何有效内容。
+    # 不清会随每次重跑堆积一份 4.8MB 的死副本。
+    try:
+        own_run_id, own_stage = cont.latent_coords(info)
+        if own_run_id:
+            removed = cont_service.cleanup_fingerprint_copies(own_run_id,
+                                                              own_stage)
+            if removed:
+                print(f"[接续] 清理本段旧指纹副本 {removed} 个 "
+                      f"({own_run_id}/stage_{own_stage:05d})")
+    except Exception as ce:
+        print(f"[worker] 清理指纹副本失败（不影响本段产物）: {ce}")
+
+    # 把本段记到**自己**的任务记录里（不再往链首段的共享账本里塞 ——
+    # 共享账本会让兄弟分支互相污染，见 _record_segment_rel 的说明）。
+    await asyncio.to_thread(_record_segment_rel, job_id, segment_rel)
+
+    # 拼完整视频用**血缘**（沿 source_job 回溯）：本段 -> 上游 -> ...
+    # 兄弟分支不会混进来。
+    segments = await asyncio.to_thread(_lineage_segment_rels, job_id)
+    if segment_rel and segment_rel not in segments:
+        segments.append(segment_rel)
+
+    # 只有**续接段**才需要拼完整视频（第 0 段本身就是完整视频）
+    if stage <= 0:
+        return saved
+
+    # ---- 成片音轨：外部音轨（参考音乐 / 参考视频的音轨）----
+    #
+    # 【为什么成片用「原始参考音频整条」】
+    # 每段采样时用的是「1s 空白 ⊕ 切片」（params["segment_audio_file"]），
+    # 那是「这一段该听到的东西」。成片要的是「整部片子该听到的
+    # 东西」= 原始参考音频整条，长度按合并后视频长。
+    # 若成片也用切片，每段开头的 1s 空白会累积（3 段 = 3s 空白）
+    # → 音画错位。两条链路必须分开。
+    external_audio = ""
+    external_label = ""
+    if h3acont.is_external_track(str(info.get("audio_track_mode") or "")):
+        external_audio = str(info.get("audio_source_file") or "").strip()
+        external_label = ("参考音乐" if str(
+            info.get("audio_source_kind") or "") == "ref_audio"
+            else "参考视频的音轨")
+
+    full = await asyncio.to_thread(_concat_chain_video, segments, chain_id,
+                                   external_audio, external_label)
+    if not full:
+        return saved
+    full_rel = full.relative_to(OUT_DIR).as_posix()
+    annotate_outputs_with_size([{"kind": "video", "file": full_rel,
+                                 "name": full.name}])
+    # 完整视频放在产物列表**前面** —— 生成库卡片取第一个视频显示，
+    # 用户看到的第一眼就该是完整视频。
+    out = [{"kind": "video", "file": full_rel, "name": full.name,
+            "is_full": True}]
+    out.extend(saved)
+    print(f"[worker] 接续完整视频: {full_rel} ({len(segments)} 段拼接)")
+    return out
 
 
 # ------------------------------------------------------------------
@@ -5637,6 +5770,17 @@ async def api_continuation_context(request):
         "video_name": (video or {}).get("name", ""),
         "prompt_preview": str(params.get("prompt") or "")[:80],
     }
+    # ---- 血缘提示词历史（2026-11-17 新增）----
+    #
+    # 【为什么需要】用户需求：接续时点「增强」要把**此前所有段落**
+    # 的提示词一并提供给增强模型，保证跨段内容一致性。
+    # 前端要能拿到这些历史 -> 必须由服务端下发（前端不知道别的
+    # 任务 id，也无权自己查 DB）。
+    #
+    # 【口径】沿 `source_job` 血缘回溯，与拼接口径**完全同源**
+    # —— 兄弟分支不会混进来。包含**本段自己**（用户点「接续」的
+    # 那一段）的那份提示词。
+    context["prompt_history"] = _lineage_prompts(jid)
     return json_ok(context)
 
 
@@ -7889,6 +8033,70 @@ async def api_enhancer_save(request):
     return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
 
 
+def _safe_int(value, default: int = 0) -> int:
+    """把任意外部输入安全地转成 int（非法值回落 default）。
+
+    用于 `/api/enhance` 的 `stage` 字段 —— 那是**前端传来的**，
+    可能是 None / 字符串 / 浮点，任何一种都不能让增强请求崩掉。
+    """
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_prompt_history(raw, current_stage: int = 0) -> list[dict]:
+    """规整前端传来的跨段提示词历史。
+
+    输入（前端从接续上下文原样透传）：
+      [{"stage": int, "prompt": str}, ...]  或  ["提示词", ...]
+
+    输出：`[{"stage": int, "prompt": str}, ...]`，已剔除**本段自己**
+    （stage == current_stage）、空提示词、脏数据。
+
+    【为什么剔除本段】`original` 已经是本段原文了。本段再进历史，
+    模型会看到两遍同一段，容易把「本段」误当成「前情」，
+    或者把两段内容糊成一段来扩写。
+
+    【为什么容错】前端是外部输入：字段缺失、类型不对、字符串数组
+    都可能出现。**不能**因为历史格式脏就把整个增强请求搞挂 ——
+    历史只是**增强质量**的加分项，不是必需项。
+    任何异常都退回空历史（行为退化成单段增强，与今天一致）。
+    """
+    out: list[dict] = []
+    if not isinstance(raw, list):
+        return out
+    for item in raw:
+        stage = None
+        explicit_stage = False
+        text = ""
+        if isinstance(item, dict):
+            text = str(item.get("prompt") or "").strip()
+            try:
+                stage = int(item.get("stage"))
+                explicit_stage = True
+            except (TypeError, ValueError):
+                stage = None
+        elif isinstance(item, str):
+            # 容错：前端若只传了字符串数组，就按顺序当作段号递增。
+            # 【注意】这种形态**没有**可信段号 -> 不套用「剔除本段」
+            # 规则（套了会把第一条误删）。宁可多带一条上下文，
+            # 也不能把整份历史丢掉。
+            text = item.strip()
+        if not text:
+            continue
+        if stage is None:
+            stage = len(out)
+        if explicit_stage and stage == current_stage:
+            continue
+        out.append({"stage": stage, "prompt": text})
+    # 按段号排序 —— 前端若乱序传，也要保证「前情在前」。
+    out.sort(key=lambda item: item["stage"])
+    return out
+
+
 async def api_enhance(request):
     """
     POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
@@ -7970,7 +8178,19 @@ async def api_enhance(request):
 
 
     validate_mode = spec.get("validate_mode", "pe")
-    messages = enh.build_messages(spec, original, params.get("language", "auto"))
+    # ---- 跨段提示词历史（2026-11-17 新增）----
+    #
+    # 接续生成时，用户要求「把此前所有段落的提示词一并提供给增强模型」。
+    # 前端把接续上下文里的 `prompt_history` 传上来，服务端在这里
+    # **剔除本段自己**（stage == 当前段号）——只把「更早的段」当上下文。
+    #
+    # 【为什么剔除本段】`original` 已经是本段原文了；把本段再塞进
+    # 历史会让模型看到两遍同一段，容易把「本段」误当成「前情」。
+    history = _normalize_prompt_history(payload.get("prompt_history"),
+                                         current_stage=_safe_int(
+                                             payload.get("stage")))
+    messages = enh.build_messages(spec, original, params.get("language", "auto"),
+                                   history=history)
 
     # 并发闸门：抢不到就立刻 429，**不排队**。
     # 理由见 ENHANCE_CONCURRENCY 上方的注释（本机 llama.cpp total_slots=1，

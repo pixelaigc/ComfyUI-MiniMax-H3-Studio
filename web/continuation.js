@@ -572,6 +572,28 @@
     checkSubmitConsistency,
     renderPanel,
     state,
+    // 【2026-11-17 新增】跨段提示词历史（供「增强」用）。
+    //
+    // 用户需求：接续时点「增强」要把**此前所有段落**的提示词一并
+    // 提供给增强模型，保证跨段内容一致性。
+    //
+    // 【为什么由前端转交而不是前端自己去查】前端不知道其它任务的
+    // id，也无权访问 DB —— 历史必须由服务端在接续上下文里下发。
+    //
+    // 【返回什么】`[{stage, prompt}, ...]`（按段号顺序，含本段自己）。
+    // 增强菜单拿到后会剔除本段再传给 /api/enhance。
+    promptHistory() {
+      if (!current) return [];
+      const list = current.prompt_history;
+      if (!Array.isArray(list)) return [];
+      return list
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({
+          stage: Number(item.stage || 0),
+          prompt: String(item.prompt || "").trim(),
+        }))
+        .filter((item) => item.prompt);
+    },
     // 供验收脚本直接读（证明「点接续 -> 上下文真的回填了」）
     _debug: {
       get current() { return current; },

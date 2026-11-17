@@ -1602,6 +1602,9 @@
         spec_id: "video-director",
         mode_ctx: enhanceCurrentMode(),
         model_key: enhanceCurrentModelKey(),
+        // 【2026-11-17】跨段提示词历史（接续时带上此前各段的提示词）。
+        // 非接续模式 -> 空数组 -> 服务端行为与今天完全一致。
+        prompt_history: continuationPromptHistory(),
       });
       const enhanced = d.enhanced || "";
       if (!enhanced) throw new Error("本地模型返回了空结果");
@@ -1626,6 +1629,35 @@
       btn.disabled = false;
       text.textContent = originalLabel;
       updateActionButtons();
+    }
+  }
+
+  /**
+   * 当前接续上下文里的**跨段提示词历史**（2026-11-17 新增）。
+   *
+   * 【为什么需要】用户需求：接续时点「增强」要把**此前所有段落**的
+   * 提示词一并提供给增强模型 —— 否则第 4 段的增强结果只知道第 4 段
+   * 写了什么，跨段人物/场景/剧情要素会丢，跨段一致性无从保证。
+   *
+   * 【数据来源】服务端在接续上下文里下发（前端不知道其它任务的 id，
+   * 也无权访问 DB）。这里从 `window.Continuation.promptHistory()` 取。
+   *
+   * 【返回什么】`[{stage, prompt}, ...]` —— **含本段自己**（用户点
+   * 「接续」的那一段）。服务端会剔除本段，所以前端原样传即可。
+   *
+   * 【不在接续模式时返回空数组】普通单段增强的行为**完全不变** ——
+   * 不能因为多了这个功能就把所有增强请求都带上无关上下文。
+   */
+  function continuationPromptHistory() {
+    try {
+      const cont = window.Continuation;
+      if (!cont || typeof cont.promptHistory !== "function") return [];
+      const list = cont.promptHistory();
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      // 历史只是增强质量的加分项 —— 取不到就退化成单段增强，
+      // 绝不能因为它把「增强」整个搞挂。
+      return [];
     }
   }
 
@@ -1660,6 +1692,9 @@
         spec_id: methodSpecId(method) || currentSpecId(),
         mode_ctx: enhanceCurrentMode(),
         model_key: enhanceCurrentModelKey(),
+        // 【2026-11-17】跨段提示词历史（接续时带上此前各段的提示词）。
+        // 非接续模式 -> 空数组 -> 服务端行为与今天完全一致。
+        prompt_history: continuationPromptHistory(),
       });
       provState.lastEnhance = d;
       // 只有**单独**跑普通增强时才清标记；多选时由 run() 统一设置，
