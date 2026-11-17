@@ -127,12 +127,17 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
             },
         }
         with sqlite3.connect(self.server.data_dir / "jobs.db") as conn:
-            for jid, params in ((seg0, p0), (seg1, p1)):
+            # 【为什么 created_at 要错开】生成库按 created_at DESC 排、
+            # 每页 12 条。两条用同一个 time.time() 时**顺序不确定** ——
+            # seg0 可能排在 seg1 前面，seg1 就被挤到第 2 页，
+            # 测试点不到它的卡片。错开 1 秒让 seg1 稳定地更新。
+            for offset, (jid, params) in enumerate(
+                    ((seg1, p1), (seg0, p0))):
                 conn.execute(
                     "INSERT OR REPLACE INTO jobs "
                     "(id, created_at, mode, params, status, progress, outputs)"
                     " VALUES (?,?,?,?,?,?,?)",
-                    (jid, time.time(), "t2v",
+                    (jid, time.time() - offset * 60, "t2v",
                      json.dumps(params, ensure_ascii=False),
                      "done", 1.0,
                      json.dumps([{"kind": "video",
@@ -146,7 +151,16 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
         self.page.wait_for_timeout(500)
         self.page.evaluate("() => { if (window.refreshJobs) "
                            "window.refreshJobs(); }")
-        self.page.wait_for_timeout(1500)
+        # 【为什么等 2500ms】生成库是**分页**渲染（每页 12 条）+ 异步拉取。
+        # 只等 1500ms 时卡片还没渲染出来，点不到「接续」按钮。
+        # （实测：等 1500ms -> 找不到卡片；等 2500ms -> 卡片与按钮都在。）
+        self.page.wait_for_timeout(2500)
+        # 再等一下「卡片真的出现」，而不是靠固定时间赌
+        try:
+            self.page.wait_for_selector(
+                '.job-card[data-jid="prompthistseg1"]', timeout=15000)
+        except Exception:                              # noqa: BLE001
+            pass
 
     # ------------------------------------------------------------ 测试
     def test_continuation_context_includes_prompt_history(self):
