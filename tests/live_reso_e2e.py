@@ -177,6 +177,11 @@ def run_one(mode: str, img_asset: dict, vid_asset: dict) -> dict:
         "seed": 20261117,
         "aspect": "16:9",
     }
+    if mode == "r2v":
+        # r2v 必须用 Ref2VA 通道的权重（服务端会拦 FL2VA-only）。
+        # 选 hybrid_fl2va_ref2va —— 与 nonebot seg1/seg2 用的
+        # minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors 同款。
+        params["model_key"] = "hybrid_fl2va_ref2va"
     # 首尾帧/参考图的来源**只走 asset_refs**（素材库强制引用契约）——
     # 不再另外传 *_asset_id 参数，避免两套来源打架。
 
