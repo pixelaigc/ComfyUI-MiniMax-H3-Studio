@@ -1504,7 +1504,7 @@
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
      用户拿到旧文件。continuation.js 是 maintainer 侧新增的脚本（文生视频
      接续生成），其内容本次合并未变，沿用已上线的 continuation1 即可。 -->
-<script src="/static/video-panel.js?v=vparams3"></script>
+<script src="/static/video-panel.js?v=vparams4"></script>
 <!-- 效果 LoRA 选择器（H3 文生视频面板）——
      必须在 video-panel.js **之后**加载：它的 render 入口被 video-panel
      调用（window.VIDEO_EFFECT_LORA）。 -->
@@ -1542,7 +1542,7 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=cr20261116b"></script>
+<script src="/static/app.js?v=cr20261116c"></script>
 <script src="/static/providers.js?v=cr20261115b"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
