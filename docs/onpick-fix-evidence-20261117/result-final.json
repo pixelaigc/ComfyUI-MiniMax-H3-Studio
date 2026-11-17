@@ -1,71 +1,71 @@
 {
   "base": "http://127.0.0.1:8190",
-  "timestamp": "20261117-205941",
+  "timestamp": "20261117-214141",
   "entries": [
     {
       "mode": "r2v",
       "label": "参考 1",
       "category": "image",
-      "picker_cards": 193,
+      "picker_cards": 198,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": true,
       "has_badge": true,
       "slot_text": "参考 1|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考1-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考1-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考1-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考1-filled.png"
     },
     {
       "mode": "r2v",
       "label": "参考 2",
       "category": "image",
-      "picker_cards": 193,
+      "picker_cards": 198,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": true,
       "has_badge": true,
       "slot_text": "参考 2|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考2-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考2-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考2-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考2-filled.png"
     },
     {
       "mode": "r2v",
       "label": "参考 9",
       "category": "image",
-      "picker_cards": 193,
+      "picker_cards": 198,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": true,
       "has_badge": true,
       "slot_text": "参考 9|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考9-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考9-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考9-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考9-filled.png"
     },
     {
       "mode": "r2v",
       "label": "参考视频 1",
       "category": "video",
-      "picker_cards": 191,
+      "picker_cards": 194,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考视频 1|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考视频1-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考视频1-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考视频1-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考视频1-filled.png"
     },
     {
       "mode": "r2v",
       "label": "参考视频 3",
       "category": "video",
-      "picker_cards": 191,
+      "picker_cards": 194,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考视频 3|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考视频3-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考视频3-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考视频3-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考视频3-filled.png"
     },
     {
       "mode": "r2v",
@@ -77,8 +77,8 @@
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考音乐 1|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考音乐1-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考音乐1-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考音乐1-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考音乐1-filled.png"
     },
     {
       "mode": "r2v",
@@ -90,47 +90,47 @@
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考音乐 3|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考音乐3-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考音乐3-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考音乐3-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考音乐3-filled.png"
     },
     {
       "mode": "flf",
       "label": "首帧",
       "category": "image",
-      "picker_cards": 193,
+      "picker_cards": 198,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": true,
       "has_badge": true,
       "slot_text": "首帧|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-首帧-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-首帧-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-首帧-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-首帧-filled.png"
     },
     {
       "mode": "flf",
       "label": "尾帧",
       "category": "image",
-      "picker_cards": 194,
+      "picker_cards": 198,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": true,
       "has_badge": true,
       "slot_text": "尾帧|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-尾帧-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-尾帧-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-尾帧-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-尾帧-filled.png"
     },
     {
       "mode": "flf",
       "label": "参考视频 1",
       "category": "video",
-      "picker_cards": 191,
+      "picker_cards": 194,
       "alerts": [],
       "slot_filled": true,
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考视频 1|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-参考视频1-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-参考视频1-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-参考视频1-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-参考视频1-filled.png"
     },
     {
       "mode": "flf",
@@ -142,8 +142,8 @@
       "has_thumb": false,
       "has_badge": true,
       "slot_text": "参考音乐 1|素材库",
-      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-参考音乐1-picker.png",
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/flf-参考音乐1-filled.png"
+      "picker_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-参考音乐1-picker.png",
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/flf-参考音乐1-filled.png"
     },
     {
       "mode": "r2v",
@@ -151,13 +151,13 @@
       "category": "image",
       "path": "素材库按钮",
       "alerts": [],
-      "picker_cards": 194,
-      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941/r2v-参考1-素材库按钮-filled.png"
+      "picker_cards": 198,
+      "filled_shot": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141/r2v-参考1-素材库按钮-filled.png"
     }
   ],
   "console_errors": [],
   "page_errors": [],
   "console_error_count": 0,
   "page_error_count": 0,
-  "out_dir": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-205941"
+  "out_dir": "/root/projects/h3studio-fix-onpick/evidence/onpick-live-20261117-214141"
 }
