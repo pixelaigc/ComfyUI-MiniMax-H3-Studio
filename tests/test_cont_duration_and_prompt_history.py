@@ -278,6 +278,167 @@ class TestHealPathProducesMergedVideo(unittest.TestCase):
             "成片帧数不对：期望 %d（段0 124 + 段1 102），实际 %d"
             % (124 + 102, full_frames))
 
+    def test_rerun_keeps_segment_rel_and_does_not_double_length(self):
+        """**重跑**必须保持分段登记不变，且成片长度**不翻倍**。
+
+        【缺陷背景 —— 线上实测抓到】
+        首次运行：saved = [分段] -> segment_rel = 分段，产出成片。
+        重跑时：  saved = [成片(is_full), 分段] -> 原实现取 saved[0]
+                  = 成片 -> segment_rel 被**覆盖成成片路径**。
+        再接下一段时，拼接链 = 段0 + 成片 + 段2 -> **长度翻倍**。
+
+        【为什么这条断言能抓住回归】
+        去掉 `not o.get("is_full")` -> 重跑后 segment_rel 变成成片
+        -> 本断言的「分段登记不变」失败。
+        """
+        import asyncio
+        import shutil
+        import subprocess
+
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            self.skipTest("本机没有 ffmpeg/ffprobe")
+
+        tmp = Path(tempfile.mkdtemp(prefix="h3rerun_cont_"))
+        out_dir = tmp / "outputs"
+        (out_dir / "videos").mkdir(parents=True)
+        data_dir = tmp / "data"
+        data_dir.mkdir(parents=True)
+
+        def make_video(name, frames):
+            path = out_dir / "videos" / name
+            seconds = frames / 24.0 + 0.5
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", "testsrc=size=64x64:rate=24:duration=%.3f" % seconds,
+                 "-f", "lavfi",
+                 "-i", "sine=frequency=440:duration=%.3f" % seconds,
+                 "-frames:v", str(frames), "-pix_fmt", "yuv420p",
+                 "-c:a", "aac", "-shortest", str(path)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=120, check=True)
+            return path
+
+        make_video("v-seg0.mp4", 124)
+        make_video("v-seg1.mp4", 102)
+        rel0 = "videos/v-seg0.mp4"
+        rel1 = "videos/v-seg1.mp4"
+
+        db_path = tmp / "jobs.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "CREATE TABLE jobs (id TEXT PRIMARY KEY, mode TEXT, params TEXT,"
+            " status TEXT, progress REAL, outputs TEXT, error TEXT,"
+            " created_at REAL, finished_at REAL)")
+        p0 = {"prompt": "段0", "continuation": {
+            "chain_id": "rerunchain", "stage_index": 0, "source_job": "",
+            "latent_run_id": "h3studio_sseg0", "segment_frames": 124,
+            "segment_rel": rel0}}
+        p1 = {"prompt": "段1", "continuation": {
+            "chain_id": "rerunchain", "stage_index": 1, "source_job": "seg0",
+            "latent_run_id": "h3studio_sseg1", "segment_frames": 124}}
+        conn.execute("INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)",
+                     ("seg0", "t2v", json.dumps(p0), "done", 1.0, "[]", None,
+                      0.0, 0.0))
+        conn.execute("INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)",
+                     ("seg1", "t2v", json.dumps(p1), "running", 0.5, "[]", None,
+                      0.0, 0.0))
+        conn.commit()
+        conn.close()
+
+        saved = (S.db, S.DB_PATH, S.OUT_DIR, S.DATA, S.VIDEO_DIR,
+                 S.IMAGE_DIR, S.AUDIO_DIR)
+        try:
+            def fake_db():
+                c = sqlite3.connect(db_path)
+                c.row_factory = sqlite3.Row
+                return c
+
+            S.db = fake_db
+            S.DB_PATH = db_path
+            S.OUT_DIR = out_dir
+            S.DATA = data_dir
+            S.VIDEO_DIR = out_dir / "videos"
+            S.IMAGE_DIR = out_dir / "images"
+            S.AUDIO_DIR = out_dir / "audio"
+
+            # ---- 第一次运行 ----
+            first = asyncio.run(S._finalize_continuation_impl(
+                "seg1", "t2v", p1,
+                [{"kind": "video", "file": rel1, "name": "seg1.mp4"}]))
+            with sqlite3.connect(db_path) as c:
+                c.row_factory = sqlite3.Row
+                row1 = c.execute("SELECT params FROM jobs "
+                                 "WHERE id='seg1'").fetchone()
+            rel_after_first = (json.loads(row1["params"])
+                               .get("continuation") or {}).get("segment_rel")
+            self.assertEqual(rel_after_first, rel1,
+                             "第一次运行没有登记本段分段")
+            fulls_first = [o for o in first if o.get("is_full")]
+            self.assertEqual(len(fulls_first), 1, "第一次运行没产出成片")
+
+            # ---- 第二次运行（模拟自愈重跑 / 用户重试）----
+            # saved 里**第一个** video 已经是上一轮的成片。
+            second = asyncio.run(S._finalize_continuation_impl(
+                "seg1", "t2v", p1, first))
+            with sqlite3.connect(db_path) as c:
+                c.row_factory = sqlite3.Row
+                row2 = c.execute("SELECT params FROM jobs "
+                                 "WHERE id='seg1'").fetchone()
+            rel_after_second = (json.loads(row2["params"])
+                                .get("continuation") or {}).get("segment_rel")
+            self.assertEqual(
+                rel_after_second, rel1,
+                "重跑把 segment_rel 覆盖成了 %r —— 成片被当成分段登记，"
+                "下一段的拼接链会混进成片" % rel_after_second)
+
+            # ---- 重跑后的成片长度**不翻倍** ----
+            fulls_second = [o for o in second if o.get("is_full")]
+            self.assertTrue(fulls_second, "重跑没有产出成片")
+            # 取**最新**那个成片（重跑产出的是新文件）
+            newest = max(fulls_second,
+                          key=lambda o: o.get("file", ""))
+            path = out_dir / newest["file"]
+            raw = subprocess.check_output(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-count_frames", "-show_entries", "stream=nb_read_frames",
+                 "-of", "csv=p=0", str(path)], encoding="utf-8", timeout=120)
+            frames = int(raw.strip().split(",")[0])
+            self.assertEqual(
+                frames, 124 + 102,
+                "重跑后的成片帧数不对：期望 %d，实际 %d（翻倍说明拼接链"
+                "混进了成片）" % (124 + 102, frames))
+        finally:
+            (S.db, S.DB_PATH, S.OUT_DIR, S.DATA, S.VIDEO_DIR,
+             S.IMAGE_DIR, S.AUDIO_DIR) = saved
+
+
+    def test_rerun_does_not_overwrite_segment_rel_with_full_video(self):
+        """重跑时 `segment_rel` 不能被**成片路径**覆盖。
+
+        【缺陷背景 —— 线上实测抓到】
+        接续收尾取「本段分段视频」时，原实现取 `saved` 里**第一个**
+        video。首次运行时 saved[0] 就是分段，没问题；但**重跑**
+        （自愈重跑 / 用户重试）时 saved[0] 已经是上一轮的**完整成片**
+        （is_full=True）—— 于是 `segment_rel` 被覆盖成成片路径：
+          * 本段分段登记被冲掉；
+          * 下一段按血缘回溯拿到的是成片 -> 拼接链混进成片
+            -> 成片长度**翻倍**。
+        线上实测抓到：重跑后 segment_rel 由
+        `videos/v-h3-studio-000455.mp4`（分段）变成了
+        `videos/v-h3-studio-000456.mp4`（成片）。
+
+        【为什么这条断言能抓住回归】
+        把 `not o.get("is_full")` 去掉 -> 重跑时取到成片 ->
+        segment_rel 变成成片路径 -> 本断言失败。
+        """
+        src = inspect.getsource(S._finalize_continuation_impl)
+        self.assertIn(
+            'not o.get("is_full")',
+            src,
+            "接续收尾取分段时没有跳过 is_full（成片）—— "
+            "重跑会把 segment_rel 覆盖成成片路径，"
+            "下一段的拼接链会混进成片，成片长度翻倍")
+
 
 class TestLineagePrompts(unittest.TestCase):
     """血缘提示词历史：按 source_job 回溯，兄弟分支隔离。"""

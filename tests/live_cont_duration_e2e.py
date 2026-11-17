@@ -176,11 +176,16 @@ def main() -> int:
 
     base_params = {
         "prompt": "一只橘猫在洒满阳光的旧书桌上走过，镜头缓缓跟随。",
-        "model_key": "minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors",
-        "width": 768, "height": 448,
+        # 【模型 key 必须用服务端认的 key】——线上真实 t2v 任务用的是
+        # "fl2va_pruned_int8"（不是权重文件名）。填权重文件名会被
+        # 服务端拒：「未知的视频模型」。
+        "model_key": "fl2va_pruned_int8",
+        "width": 1280, "height": 736,
         "aspect": "16:9", "resolution": "768p",
         "duration": 5.0,
-        "steps": 30, "sampler": "euler", "scheduler": "simple",
+        # 【步数用 4】——线上真实 t2v 任务就是 4 步（twopass 默认档）。
+        # 用 30 步会让实测跑很久，且不是用户实际的使用档。
+        "steps": 4, "sampler": "euler", "scheduler": "simple",
         "cfg": 1.0, "shift_video": 7.0, "shift_audio": 3.0,
     }
 

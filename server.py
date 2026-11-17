@@ -3160,9 +3160,19 @@ async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
 
     【2026-11-17 提到模块级】原来是 `Worker._finalize_continuation`
     实例方法，但体内**没有任何 `self.` 引用**。而「服务重启自愈」
-    路径是模块级函数、没有 Worker 实例 —— 修「5 秒接续 5 秒
+    路径是模块级函数、没有 Worker 实例可用 —— 修「5 秒接续 5 秒
     只得到 4 秒」时必须让自愈路径也能调它，故提取到模块级。
     Worker 侧保留同名方法做薄委托（见 Worker._finalize_continuation）。
+
+    【2026-11-17 修复：必须跳过 is_full 的条目】
+    本函数要拿的是**本段分段视频**（未拼接的那一段）。
+    原实现取 `saved` 里**第一个** video —— 而重跑（自愈重跑 /
+    用户重试）时 `saved[0]` 已经是**上一轮的完整成片**（is_full=True），
+    于是 `segment_rel` 被**覆盖成成片路径**：
+      * 本段的分段登记被冲掉（成片被当成分段）；
+      * 下一段按血缘回溯时拿到的是成片 -> 拼接链里混进成片
+        -> 成片长度**翻倍**（段1 + 成片 + 段2）。
+    修法：只取**非 is_full** 的第一个 video。
     """
     if mode not in ("t2v", "flf", "r2v"):
         return saved
@@ -3170,7 +3180,8 @@ async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
     if not info:
         return saved
 
-    video = next((o for o in saved if o.get("kind") == "video"), None)
+    video = next((o for o in saved
+                  if o.get("kind") == "video" and not o.get("is_full")), None)
     if not video:
         return saved
 
