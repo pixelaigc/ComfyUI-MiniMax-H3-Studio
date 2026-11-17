@@ -145,10 +145,19 @@ STALE_BUMPED = {
     #   B-11/B-12）⇒ ?v= 必须再升一次（cr20261115c -> cr20261115d）。
     # 【2026-11-16 第 5 轮】app.js 再次改内容（A 段骨架卡文案泄漏修复）
     #   ⇒ ?v= 必须再升一次（cr20261115d -> cr20261116a）。
-    "app.js":                  ("ac1steps1",    "cr20261116a"),
+    # 【2026-11-17 素材库选择回调修复】app.js 再次改内容（点空槽位补传
+    #   onPick 回调 + onPick 必填守卫）⇒ ?v= 必须再升一次
+    #   （cr20261116b -> cr20261116c）。
+    #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按启发式
+    #   新鲜度缓存。app.js 内容变了而 ?v= 不变 ⇒ 老用户浏览器拿到的仍是
+    #   **旧的坏文件**（漏传 onPick 那版），修复等于没上线。
+    "app.js":                  ("cr20261116b", "cr20261116c"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
-    "video-panel.js":          ("ac1steps1",    "ac1steps2"),
+    # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
+    #   ac1steps2 新）⇒ 表里的期望值同步到当前线上值，并再升一档到
+    #   vparams4，保持「内容变了必须升版号」的口径闭合。
+    "video-panel.js":          ("ac1steps2",    "vparams4"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
