@@ -118,6 +118,7 @@ class Evidence:
     console: list[str] = field(default_factory=list)
     page_errors: list[str] = field(default_factory=list)
     network_errors: list[str] = field(default_factory=list)
+    requests: list[str] = field(default_factory=list)
     screenshots: list[str] = field(default_factory=list)
     shots: int = 0
 
@@ -150,6 +151,7 @@ class Evidence:
             "console": self.console,
             "page_errors": self.page_errors,
             "network_errors": self.network_errors,
+            "requests": self.requests,
             "screenshots": self.screenshots,
         }
         path = self.dir / "evidence.json"

@@ -223,6 +223,9 @@ def studio_page(studio, evidence):
     page.on("response", lambda r: (
         evidence.network_errors.append(f"HTTP {r.status} {r.url}")
         if r.status >= 400 else None))
+    # 记录所有请求（调试用：断言「界面到底发了什么」时用）
+    page.on("request", lambda r: evidence.requests.append(
+        f"{r.method} {r.url}"))
 
     # 钩住 POST /api/jobs —— 让用例能断言「界面真正提交了什么」
     page.add_init_script("""
