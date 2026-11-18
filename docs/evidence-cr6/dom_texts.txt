@@ -1,7 +1,7 @@
 OmniStudio
 多模型图像 / 视频 / 音频创作工作台
 v1.00
-生成中
+空闲
 CREATE
 视频
 文生视频
@@ -99,9 +99,9 @@ LightX2V SLA 4 步（768p · 根目录版）
 加速 LoRA 强度
 1.00
 已选「DMAD 4 步（critic 版）」×1.00（核心 LoraLoaderModelOnly加载，工作流里只挂这一枚） 当前底模下另有 2 个加速 LoRA 不适配，已从列表剔除：Turbo 4 步（中文名加速版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）；Turbo 4 步（中文名 EMA 版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）
-当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。
+当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里「只挂这一枚」，你选什么就加载什么。
 208 个层全部命中（实测），不含 AdaLN。
-作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 · 推荐采样器：作者未提供 · 推荐视频 shift：12（作者提供） · 推荐音频 shift：2（作者提供） · 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供） · 出处：/home/ubuntu/comfyui/models/loras/dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」 · 唯一一条作者把**采样参数全写出来**的加速 LoRA：步数 4、video shift 12、**audio shift 2**（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 · 推荐采样器：作者未提供 · 推荐视频 shift：12（作者提供） · 推荐音频 shift：2（作者提供） · 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供） · 出处：/home/ubuntu/comfyui/models/loras/dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」 · 唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
 效果 LoRA
 可多选 · 27 个可用 · 与加速 LoRA 并存
 清空全部
@@ -318,7 +318,7 @@ Z-imagemeinv11
 ↑
 ↓
 触发词
-基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（**建议值**，可在界面自行下调）
+基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
 查看简易说明 ›
 Z-Image-cheongsam-portrait-elegant-1771682839.031556 — 方向：A3 中式/国风人像
 TraditionalChineseStylePortraitPhotography — 方向：A3 中式/国风人像
@@ -502,7 +502,7 @@ Silver Wolf 银狼 v5（HSR）（崩坏：星穹铁道·角色身份） — 崩�
 Sparkle 花火（Honkai: Star Rail）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
 ZIT pack – spooning（侧卧） — EasonnLi 10 件套 pack 成员
 ZIT pack – tits job（乳交 / paizuri） — EasonnLi 10 件套 pack 成员
-turbopussy ZIT v2（私处 / 姿态效果） — 文件名含 turbo 但**不是加速 LoRA** ——
+turbopussy ZIT v2（私处 / 姿态效果） — 文件名含 turbo 但「不是加速 LoRA」 —— 作
 Vintage Comic Style（60–70s 复古漫画） — 丝网印刷质感、粗黑描边 + 半调网点
 鸣潮 · Aemeath（wuwaams）（鸣潮·角色身份） — 鸣潮 · 角色身份
 Brazilian Male Realism v2（巴西男性写实） — 触发词 BRZMLRELSM
@@ -933,7 +933,7 @@ MiniMax-H3-Image 专属，本面板不可用
 一次增强后
 版本历史
 查看产物
-已入队（队列 1）
+生成
 从右侧拖入视频，拖动片段可排序
 长片标题
 简介
@@ -986,102 +986,100 @@ H3-Image 文生图
 48 个
 管理
 生成队列
-运行中 1 · 排队 0　最近完成 11 · 失败 1
+最近完成 12
 明细
-▶
-e2e 素材被引用：参考图里的猫, lms:
-运行中
-取消
 ·
 e2e 运行状态一致性：一只猫
 成功
 e2e 参考生视频：参考图里的猫, lms:
-一位少女站在日式教室讲台前，镜头缓慢推近，薄荷绿短发，粉色背心，细腻光影
-一位少女从低头缓缓抬头看向镜头，镜头缓推至半身，薄荷绿短发，粉色背心，柔和自然光
 e2e 文生视频：一只猫在草地上奔跑
 e2e 批次展开：一只猫
 e2e 批次：一只猫
 e2e 出图闭环：一只猫在草地上奔跑
 e2e 分辨率链路：一只猫在草地上奔跑
+第二段：白衣剑客转身，剑光照亮面部，竹叶纷飞
 第一段：月光下的竹林，黑衣剑客背对镜头，剑未出鞘
-参考生成 · 11/18 11:13
-节点 16/23 · 步 5/9 · 68%
+e2e 提示词不沿用：第一段的提示词标记XYZ
+e2e 三段链：第一段 5 秒
+e2e 接续时长：第二段 5 秒
+Z-IMAGE 文生图 · 11/18 12:39
+11/18 12:39
 模式
-参考生成
 分辨率
-1088p · 1920×1088 · 16:9
-注意力
+768p · 1360×768 · 16:9
 模型
-MiniMax-H3 混合版 · FL2VA+Ref2VA
-DMAD 4 步（critic 版） ×1.00 · minimax_h3_lms_v1.0_r64 ×0.70
+Z-imagemeinv11_10 ×1.00
 步数/CFG
 8 · 1
 尺寸
-随机
+20876450991626
 耗时
-2m28s
-复用参数
-Z-IMAGE 文生图 · 11/18 11:10
-11/18 11:10
-768p · 1360×768 · 16:9
-Z-imagemeinv11_10 ×1.00
-101283061511716
-20s
+14s
 ⬇ 下载
 ↗ 新窗口打开
+复用参数
 ℹ 详情
 删除
-参考生成 · 11/18 10:25
-11/18 10:25
-4m5s
+参考生成 · 11/18 11:55
+11/18 11:55
+参考生成
+1088p · 1920×1088 · 16:9
+注意力
+MiniMax-H3 混合版 · FL2VA+Ref2VA
+DMAD 4 步（critic 版） ×1.00 · minimax_h3_lms_v1.0_r64 ×0.70
+随机
+4m7s
 ⏭ 接续
-Turbo 4 步 · ckpt850 ×1.00
-4 · 1
-20261117
-3m42s
-首尾帧 · 11/18 10:21
-11/18 10:21
-首尾帧
-6s
-文生视频 · 11/18 10:21
+文生视频 · 11/18 11:51
+11/18 11:51
 DMAD 4 步（critic 版） ×1.00
 8s
-4m22s
-Z-IMAGE 文生图 · 11/18 10:20
-11/18 10:20
-17s
+4m6s
+Z-IMAGE 文生图 · 11/18 11:50
+11/18 11:50
+16s
+▶
 批次结果（2/2 完成 · 1360×768）
 ⤢
 #1 完成
-116262030843512
+98115416087136
 #2 完成
-246917075232259
-27s
+32425125720162
+19s
 批次结果（3/3 完成 · 1360×768）
-153693123632057
-31736974782351
+148591183491717
+270994810186595
 #3 完成
-133320126069562
-Z-IMAGE 文生图 · 11/18 10:19
-11/18 10:19
+3690305248080
+Z-IMAGE 文生图 · 11/18 11:48
+11/18 11:48
 1408p · 2560×1408 · 20:11
 2560×1408
-137400406968817
-31s
-267352809134090
-28s
-参考生成 · 11/18 10:16
-11/18 10:16
-✕ 生成失败：ValueError：ref_video_1 must contain at least 48 frames under the official reference policy（出错节点：MiniMaxH3AudioConditioningT8）。详细信息见服务端日志。
-文生视频 · 11/18 10:14
-11/18 10:14
-2m26s
+175471656524970
+20s
+179008938271141
+24s
+文生视频 · 11/18 11:44
+11/18 11:44
+5m19s
+文生视频 · 11/18 11:41
+11/18 11:41
+2m18s
+文生视频 · 11/18 11:39
+11/18 11:39
+2m15s
+文生视频 · 11/18 11:35
+11/18 11:35
+2m17s
+文生视频 · 11/18 11:30
+11/18 11:30
+5m52s
 上一页
 2
 …
-63
+64
 下一页
-共 748 个作品
+共 766 个作品
 资产素材库
 OmniStudio · 多模型创作工作台
 加载中…
@@ -1125,6 +1123,7 @@ Web 上传
 状态为「失败」或「已取消」的任务记录与产物文件。
 将要清理
 正在统计…
+取消
 确认清理
 从素材库选择
 本机硬件参数
@@ -1155,7 +1154,7 @@ H3-Image 官方 PE·图片编辑（参考图条件扩写）
 最大输出 token 上限
 保存模板与参数
 最大输出 token 上限：256 ~ 65536，默认 32768。
-      实际预算按**提示词长度自适应**（普通增强约 1.6 倍、二次增强约 6 倍），
+      实际预算按「提示词长度自适应」（普通增强约 1.6 倍、二次增强约 6 倍），
       这个上限只是天花板 —— 调太大不会让模型多写，只会在真的被截断时多等一次。
 Z-Image 官方 HF Space pe.py（实测 2371 bytes） · 覆盖维度：
 主体
@@ -1575,7 +1574,7 @@ ZenlessZoneZero（绝区零游戏原画风） — 绝区零游戏原画风
 Recommended
 已切换到「t2i_qwen」模式，模板自动回落到「Qwen-Image 2.1 官方 PE·文生图（结构化描述）」
 至少 1 张、最多 10 张（模型官方能力上限 10 张）。
-参考图**强制来自素材库**：先在「素材库」页上传入库，再从这里选择。
+参考图「强制来自素材库」：先在「素材库」页上传入库，再从这里选择。
 当前增强：普通增强（Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y））
 # Edit Prompt Enhancer — General (v2, 精简版)
 
@@ -1670,7 +1669,7 @@ SLG skip layer = 22（官方推荐 22；22/24/26 都有帮助）。关掉 SLG �
 XV 风格 · 人体质感（MOSS-Image）
 基础：MOSS-Image-Base / MOSS-Image-SFT · 上游 __metadata__ recommended_strength = 0.7
 Photo Quality Slider - Moss Image
-基础：MOSS-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（**建议值**，可在界面自行下调）
+基础：MOSS-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
 4MP+ 高分辨率增强 LoHa v0.4（MOSS-Image · 上游最新）
 基础：MOSS-Image-Base / MOSS-Image-SFT · 上游默认强度 1.0
 TJ Realism Aesthetic（Moss v1）
@@ -1788,8 +1787,8 @@ d3style（二次元插画风） — 更大眼睛 + 厚重睫毛、眼下腮红�
 Danbooru 40k（二次元 Danbooru 风格） — 作者未明示强度 → 建议 0.8–1.0（建议值）
 CharRef v2（角色参考图） — 给一张角色图作 Picture 1 + prompt，把
 抹茶（Matcha）画风 — 抹茶（Matcha）画风
-Better Nude v3.0（身体 / 解剖） — 作者 25,514 下载的解剖类 LoRA 的**非加速
-Better Nude v3.0 face（人脸层） — Better Nude v3.0 的**纯人脸**分量，
+Better Nude v3.0（身体 / 解剖） — 作者 25,514 下载的解剖类 LoRA 的「非加速拆
+Better Nude v3.0 face（人脸层） — Better Nude v3.0 的「纯人脸」分量，与主
 Sabikaze（灰青蓝干笔插画） — 灰青蓝低饱和干笔二次元插画（57 张自生成图训练）
 Destripe（去 SFT 垂直色带） — 去 SFT 垂直色带（天空 / 雾 / 墙面 / 影棚背
 PS1 像素风 — PS1 像素风
@@ -1814,8 +1813,6 @@ yomi（画师风格） — 画师个人风格
 已添加 4 个效果 LoRA（配置存在服务端，局域网共用）。
 当前增强：普通增强（MOSS-Image 提示词（官方 MOSS Skill 描述式扩写））
 已切换到「t2i_moss」模式，模板自动回落到「MOSS-Image 提示词（官方 MOSS Skill 描述式扩写）」
-节点 16/23 · 步 6/9 · 71%
-2m39s
 4MP（官方模板默认） · 2720×1536 (4.0MP)
 8MP · 3872×2176 (8.0MP)
 16MP（原生直出上限） · 5472×3072 (16.0MP) · 超限直出
@@ -1824,9 +1821,9 @@ yomi（画师风格） — 画师个人风格
 H3-Image 模型
 MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）
 官方模板：6 步 / cfg 1 / euler / simple / denoise 1。
-H3-Image 是 6 步蒸馏版：步数与 PDD sigma 表绑定，且 guidance 固定 1（无 CFG pass），**负面提示词不生效** —— 要把「不要什么」写进正面提示词里。
+H3-Image 是 6 步蒸馏版：步数与 PDD sigma 表绑定，且 guidance 固定 1（无 CFG pass），「负面提示词不生效」 —— 要把「不要什么」写进正面提示词里。
 锁定
-H3-Image 的 guidance 固定为 1（官方 6 步蒸馏，无 CFG pass）——负面提示词**数学上无效**，已禁用。要把「不要什么」写进正面提示词里（例如「不要出现文字、不要模糊」）。
+H3-Image 的 guidance 固定为 1（官方 6 步蒸馏，无 CFG pass）——负面提示词「数学上无效」，已禁用。要把「不要什么」写进正面提示词里（例如「不要出现文字、不要模糊」）。
 官方暂未发布 H3-Image 的 LoRA
 MiniMax-H3-Image 官方暂未发布 LoRA，本面板已预留 LoRA 入口但暂无可选权重。
 当前增强：普通增强（H3-Image 官方 PE·文生图（画面扩写+比例））

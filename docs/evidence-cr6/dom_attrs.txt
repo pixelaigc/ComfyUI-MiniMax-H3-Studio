@@ -39,9 +39,9 @@ brand-tagline
 brand-version
 top-status
 topStatus
-dot dot-busy
+dot dot-ok
 statusText
-ComfyUI 正在生成（1 个在执行）
+ComfyUI 空闲
 layout
 sidebar-mask
 sidebarMask
@@ -251,7 +251,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
-官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**（h3studio/workflows.py:347-350，lora=='none' 分支），**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
 fl2va_int8
 minimax_h3_fl2va_int8_convrot.safetensors
 ComfyUI 模型列表已收录该权重，可直接选用。
@@ -265,7 +265,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
-官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**（h3studio/workflows.py:347-350，lora=='none' 分支），**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
 fl2va_pruned_w4a8
 minimax_h3_fl2va_pruned_w4a8_mixed.safetensors
 ComfyUI 模型列表已收录该权重，可直接选用。
@@ -279,7 +279,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
-官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**（h3studio/workflows.py:347-350，lora=='none' 分支），**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
 fl2va_bf16
 minimax_h3_fl2va_bf16.safetensors
 ComfyUI 模型列表已收录该权重，可直接选用。
@@ -293,7 +293,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
-官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**（h3studio/workflows.py:347-350，lora=='none' 分支），**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
 vidModelNote
 img-warn
 vidModelWarn
@@ -336,7 +336,7 @@ h3_lightx2v/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors｜推
 推荐音频 shift：3（作者提供）
 推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
 出处：作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p (1344×768) | 6 / 3 | 4 | 4」-> 训练 shift 6/3、蒸馏 NFE 4、推荐推理 NFE 4。采样器：「COMFYUI_SETUP_AND_INFERENCE.md」「set lora_name, steps, shift_video, and shift_audio together to match the model table. Sampler defaults to `euler`.」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」
-**shift 是 6/3（作者规格表），不是 H3 内生的 12/3** —— LightX2V 的 768p 系列与 544p 系列 shift 不同，不能混用。调度器作者未提供；采样器作者写的是「defaults to euler」（默认，不是强制）。
+「shift 是 6/3（作者规格表），不是 H3 内生的 12/3」 —— LightX2V 的 768p 系列与 544p 系列 shift 不同，不能混用。调度器作者未提供；采样器作者写的是「defaults to euler」（默认，不是强制）。
 lightx2v_4step_sla_768p
 minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -348,8 +348,8 @@ minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强�
 推荐视频 shift：6（作者提供）
 推荐音频 shift：3（作者提供）
 推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
-出处：作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「**4-step distillation**」+「**768p FL2V** generation support」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」
-SLA（Sparse-Linear Attention）变体，85% 稀疏率，作者实测 RTX 5090 约 2.5× 加速。**shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）**，不是 H3 内生的 12/3。采样器作者写的是 `training_euler` —— 那是**训练时**的 step update 规则，不是 ComfyUI 的 KSamplerSelect 取值 -> 面板的采样器仍应选 `euler`（见同族 spec 表的「Sampler defaults to euler」）。调度器作者未提供。
+出处：作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「4-step distillation」+「768p FL2V generation support」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」
+SLA（Sparse-Linear Attention）变体，85% 稀疏率，作者实测 RTX 5090 约 2.5× 加速。「shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）」，不是 H3 内生的 12/3。采样器作者写的是 `training_euler` —— 那是「训练时」的 step update 规则，不是 ComfyUI 的 KSamplerSelect 取值 -> 面板的采样器仍应选 `euler`（见同族 spec 表的「Sampler defaults to euler」）。调度器作者未提供。
 lightx2v_8step
 minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -362,7 +362,7 @@ minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors｜推荐强度 1｜加
 推荐音频 shift：3（作者提供）
 推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
 出处：作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 8-step v1.0 | FL2VA / T2VA | 544p mixed aspect ratio | 12 / 3 | 8 | 8 / 4」-> 训练 shift 12/3、蒸馏 NFE 8、推荐推理 NFE 8 或 4。采样器：「COMFYUI_SETUP_AND_INFERENCE.md」「Sampler defaults to `euler`.」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」、training_alpha=8.0、training_scale=0.0625
-作者推荐推理 NFE 是「8 / 4」两档 —— 8 步质量更好，4 步更快；本表给的是 8（质量档）。**shift 是 12/3（544p 系列）**，与 768p 系列的 6/3 不同，不能混用。调度器作者未提供。
+作者推荐推理 NFE 是「8 / 4」两档 —— 8 步质量更好，4 步更快；本表给的是 8（质量档）。「shift 是 12/3（544p 系列）」，与 768p 系列的 6/3 不同，不能混用。调度器作者未提供。
 dmad_4step_critic
 dmad_minimax_h3_4step_full_critic_comfyui.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -375,7 +375,7 @@ dmad_minimax_h3_4step_full_critic_comfyui.safetensors｜推荐强度 1｜加载�
 推荐音频 shift：2（作者提供）
 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供）
 出处：/home/ubuntu/comfyui/models/loras/dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」
-唯一一条作者把**采样参数全写出来**的加速 LoRA：步数 4、video shift 12、**audio shift 2**（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
 speed_slider
 h3/h3_speed_slider_1.1.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -388,7 +388,7 @@ h3/h3_speed_slider_1.1.safetensors｜推荐强度 1｜加载节点：核心 Lora
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 已实测命中目标层）（ComfyUI 模型硬性值）
 出处：/mnt/usb2t/comfyui-models/loras/h3/h3_speed_slider_1.1.md:283-295（「作者提供了什么」表：步数 ❌ 未提供 / 采样器·scheduler ❌ 未提供；strength ±8 最优）+ /home/ubuntu/comfyui/comfy/supported_models.py:970-971
-作者明写：步数、采样器、scheduler、分辨率、CFG **5 项一字未提**。strength 作者给了 ±8（这是「运动幅度」，不是 LoRA 权重强度）。
+作者明写：步数、采样器、scheduler、分辨率、CFG 「5 项一字未提」。strength 作者给了 ±8（这是「运动幅度」，不是 LoRA 权重强度）。
 better_motion
 h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.safetensors｜推荐强度 0.8｜加载节点：核心 LoraLoaderModelOnly
 
@@ -401,7 +401,7 @@ h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.safetensors｜推荐�
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 已实测命中目标层）（ComfyUI 模型硬性值）
 出处：/mnt/usb2t/comfyui-models/loras/h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.md:183-184（「作者提供了什么」表：步数 ✅ 15~30 步 / 采样器·scheduler ❌ 未提供） + /home/ubuntu/comfyui/comfy/supported_models.py:970-971
-作者原话「720x1280 resolution with 15-30 steps」、strength 0.4~0.8。**步数是区间**，本表给出的是区间上界（30）作为推荐档展示，区间本身写在 note 里。采样器/调度器作者未提供。
+作者原话「720x1280 resolution with 15-30 steps」、strength 0.4~0.8。「步数是区间」，本表给出的是区间上界（30）作为推荐档展示，区间本身写在 note 里。采样器/调度器作者未提供。
 lightx2v_4step_v01_comfy
 minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -414,7 +414,7 @@ minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors｜推荐强度 1｜�
 推荐音频 shift：3（作者提供）
 推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
 出处：/mnt/usb2t/comfyui-models/loras/minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors 的 __metadata__：source = 「.../dmd_minimax_h3_t2va4/checkpointing/00000650/gen-base_dit.pt」（DMD 4 步蒸馏）；baked_scale = 「0.125」（peft alpha/r=0.125 baked into lora_B）；converted_layout = 「comfyui_minimax_h3」 + 同族已有条目 lightx2v_4step_768p 的作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p | 6 / 3 | 4 | 4」 -> 同族 768p 档的 shift 6/3 与 NFE 4；采样器「Sampler defaults to `euler`.」
-LightX2V Turbo 4 步 **v0.1 的 comfy 打包版**（源 checkpoint 是 DMD 4 步蒸馏 `dmd_minimax_h3_t2va4`）。作者规格表里 v0.1 与 v1.0 的 768p 档同属一行规格（shift 6/3、NFE 4、采样器默认 euler）-> 逐项沿用**同族已有条目** lightx2v_4step_768p 的已验证来源，不另编。调度器作者未提供。**shift 是 6/3（768p 系列），不是 H3 内生的 12/3。**
+LightX2V Turbo 4 步 「v0.1 的 comfy 打包版」（源 checkpoint 是 DMD 4 步蒸馏 `dmd_minimax_h3_t2va4`）。作者规格表里 v0.1 与 v1.0 的 768p 档同属一行规格（shift 6/3、NFE 4、采样器默认 euler）-> 逐项沿用「同族已有条目」 lightx2v_4step_768p 的已验证来源，不另编。调度器作者未提供。「shift 是 6/3（768p 系列），不是 H3 内生的 12/3。」
 lightx2v_sla_768p_root
 minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
 
@@ -426,8 +426,8 @@ minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强�
 推荐视频 shift：6（作者提供）
 推荐音频 shift：3（作者提供）
 推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
-出处：/mnt/usb2t/comfyui-models/loras/minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors 的 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」；training_rank = 「128」；training_alpha = 「128.0」；training_scale = 「1.0」 + 同族已有条目 lightx2v_4step_sla_768p 的作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）：「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「**4-step distillation**」+「**768p FL2V** generation support」
-与 h3_lightx2v/ 目录里那份**同名同规格**的 SLA 权重（键名形态一致），此处登记**根目录**那一份 —— 它是该目录版之外真实存在的第二份文件。作者模型卡给的规格（4 步蒸馏 / shift 6/3 / 85% 稀疏率 / sage2 / RTX 5090 实测约 2.5× 加速）**与同族已有条目完全相同** -> 逐项沿用同一份已验证来源，不另编。作者写的是 `training_euler`（训练时 step update 规则），不是 ComfyUI 的 KSamplerSelect 取值 -> 面板采样器仍选 `euler`。调度器作者未提供。
+出处：/mnt/usb2t/comfyui-models/loras/minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors 的 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」；training_rank = 「128」；training_alpha = 「128.0」；training_scale = 「1.0」 + 同族已有条目 lightx2v_4step_sla_768p 的作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）：「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「4-step distillation」+「768p FL2V generation support」
+与 h3_lightx2v/ 目录里那份「同名同规格」的 SLA 权重（键名形态一致），此处登记「根目录」那一份 —— 它是该目录版之外真实存在的第二份文件。作者模型卡给的规格（4 步蒸馏 / shift 6/3 / 85% 稀疏率 / sage2 / RTX 5090 实测约 2.5× 加速）「与同族已有条目完全相同」 -> 逐项沿用同一份已验证来源，不另编。作者写的是 `training_euler`（训练时 step update 规则），不是 ComfyUI 的 KSamplerSelect 取值 -> 面板采样器仍选 `euler`。调度器作者未提供。
 compact-field
 vidAccelLoraStrengthField
 compact-label
@@ -453,7 +453,7 @@ vidFixedLoraNote
 推荐音频 shift：2（作者提供）
 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供）
 出处：/home/ubuntu/comfyui/models/loras/dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」
-唯一一条作者把**采样参数全写出来**的加速 LoRA：步数 4、video shift 12、**audio shift 2**（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
 vidEffectLoraField
 vidEffectLoraHint
 vid-lora-clear
@@ -813,7 +813,7 @@ z-image-effects/hentai_quality_studio_z_image_turbo.safetensors
 方向：B1 人像皮肤质感。 基座判定：原生（真 LoRA（，ai-toolkit 训练），170MB；license=apache-2.0，下载 26 / 1 like。）。 触发词：hentai_studio_quality / shiny skin。 来源平台：huggingface。
 z-image-effects/hs.safetensors
 z-image-effects/skin texture Photorealistic style v4.5.safetensors
-方向：B1 人像皮肤质感。 ⚠️ **近似适用**（依据：与 lastremorse 同款同体积（170,127,808 B，文件名 'skin texture Photorealistic style v4.5' 含空格，resolve 直链已 percent-encode（302→200）。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+方向：B1 人像皮肤质感。 ⚠️ 「近似适用」（依据：与 lastremorse 同款同体积（170,127,808 B，文件名 'skin texture Photorealistic style v4.5' 含空格，resolve 直链已 percent-encode（302→200）。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
 z-image-effects/skin texture v2.1.safetensors
 方向：B1 人像皮肤质感。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
 东亚女性人像
@@ -844,7 +844,7 @@ z-image-effects/Z-imagemeinv29_10.safetensors
 方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：beauty。 来源平台：modelscope。
 z-image-effects/Z-imagemeinv41_10.safetensors
 z-image-effects/Z-xhs888.safetensors
-方向：A1 东亚女性·小红书写实。 ⚠️ **近似适用**（依据：无 README / 无 license / 无 base_model tag（质量信号偏弱）；权重结构为标准 LoRA，确为适配器。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+方向：A1 东亚女性·小红书写实。 ⚠️ 「近似适用」（依据：无 README / 无 license / 无 base_model tag（质量信号偏弱）；权重结构为标准 LoRA，确为适配器。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
 z-image-effects/Zmeinv_10.safetensors
 方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image-Turbo@master']；Data.基座关系为 adapter）。 触发词：Zmeinv。 来源平台：modelscope。
 z-image-effects/a5e6b9eee6c7db701896e8fa9c7f817c.safetensors
@@ -887,7 +887,7 @@ z-image-effects/tinger-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
 z-image-effects/tinger-meinv-Z-Image-v1.0_c1-st10000.safetensors
 方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 触发词：tinger。 来源平台：modelscope。
 z-image-effects/xll567.safetensors
-方向：A1 东亚女性·小红书写实。 ⚠️ **近似适用**（依据：与 Asiangirl2 同作者同结构，。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+方向：A1 东亚女性·小红书写实。 ⚠️ 「近似适用」（依据：与 Asiangirl2 同作者同结构，。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
 z-image-effects/yazhou-girl2-Z-Image-Turbo-v1.0_c1-st1000.safetensors
 方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：yazhou。 来源平台：modelscope。
 z-image-effects/yazhou-girl2-Z-Image-v1.0_c1-st1000.safetensors
@@ -929,7 +929,7 @@ z-image-effects/z-image-qngjiu.safetensors
 方向：B2 影棚/摄影感。 基座判定：原生（模型卡头部标注的视觉基座为 Z_IMAGE_TURBO；平台属性记录的视觉基座为 Z_IMAGE_TURBO；基座关系为 adapter（作者 模型卡头部 写 base_model: undefined，但平台 视觉基座 明确标 Z_IMAGE_TURBO））。 触发词：qing。 来源平台：modelscope。
 滑杆 / 方向控制
 z-image-effects/zimage_asianslider.safetensors
-方向：A5 族裔/骨相滑杆。 ⚠️ **近似适用**（依据：体积仅 21.3MB（rank 远小于常见的 32；training step=25 严重欠训，效果可信度低。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+方向：A5 族裔/骨相滑杆。 ⚠️ 「近似适用」（依据：体积仅 21.3MB（rank 远小于常见的 32；training step=25 严重欠训，效果可信度低。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
 其它效果 LoRA
 Kook_Zimage_如梦似幻.safetensors
 梦幻朦胧/柔光滤镜风格，官方 tags 标注为「滤镜lora」。
@@ -1083,7 +1083,7 @@ z-image-effects/new_mecha_klein4b.safetensors
 z-image-effects/nnegrat-linnai.safetensors
 鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``，step 3000 / epoch 49。作者 nnegret；同时带厚涂 2.5D 画风副作用。
 z-image-effects/nnegrat_ZImage-莫宁-2240.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=Image/RentCivit / 免署名=否 / 允许衍生=是。作者把二次元角色重塑为写实 CG，底模 Z-Image-Turbo。同一 Civitai 条目的 `nnegrat_Flux-莫宁-2240.safetensors` 是 Flux 权重（键前缀 `lora_unet_double_blocks_*`），**不属本基座**，不计入。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=Image/RentCivit / 免署名=否 / 允许衍生=是。作者把二次元角色重塑为写实 CG，底模 Z-Image-Turbo。同一 Civitai 条目的 `nnegrat_Flux-莫宁-2240.safetensors` 是 Flux 权重（键前缀 `lora_unet_double_blocks_*`），「不属本基座」，不计入。
 z-image-effects/nnegret_zit_wuwa_chisa_000001120.safetensors
 鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``，step 1120 / epoch 16；体积约为同系列 2 倍。
 z-image-effects/nnegret_zit_wuwa_sigrika_2560.safetensors
@@ -1110,7 +1110,7 @@ EasonnLi 10 件套 pack 成员。触发词 zitrecowg。作者未给强度。
 z-image-effects/rtmi-zimage_10.safetensors
 白底胸像角色卡。角色设定 / 头像素材。
 z-image-effects/silverwolf.safetensors
-崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可受限 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF `license: other` → `license_name: fair-use-academic-noncommercial`（学术/非商用）。ai-toolkit + `zimage_turbo_training_adapter_v2`；HF 标签 `base_model:adapter:Comfy-Org/z_image_turbo`。**非官方/授权不明**（同人二次创作）。HF 侧 dl=0 / likes=0，属新发布条目。
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可受限 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF `license: other` → `license_name: fair-use-academic-noncommercial`（学术/非商用）。ai-toolkit + `zimage_turbo_training_adapter_v2`；HF 标签 `base_model:adapter:Comfy-Org/z_image_turbo`。「非官方/授权不明」（同人二次创作）。HF 侧 dl=0 / likes=0，属新发布条目。
 z-image-effects/sparkle-z-v3.safetensors
 崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重 / 触发词缺失）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（作者字段为空，以平台三元勾选为准）。``，ai-toolkit 训练，step 11000 / epoch 74。
 z-image-effects/spooning.safetensors
@@ -1118,7 +1118,7 @@ EasonnLi 10 件套 pack 成员。触发词 zitsp。作者未给强度。
 z-image-effects/tits-job.safetensors
 EasonnLi 10 件套 pack 成员。触发词 zittitsj。作者未给强度区间。
 z-image-effects/turbopussyzit-v2.safetensors
-文件名含 turbo 但**不是加速 LoRA** —— 作者做的是 NSFW 姿态/部位效果，base_model 标签为 Z-Image-Turbo。触发词 turbopussyzit-v2。
+文件名含 turbo 但「不是加速 LoRA」 —— 作者做的是 NSFW 姿态/部位效果，base_model 标签为 Z-Image-Turbo。触发词 turbopussyzit-v2。
 z-image-effects/vintage_comic_style_lora.safetensors
 丝网印刷质感、粗黑描边 + 半调网点。复古漫画封面。
 z-image-effects/wuwaams_lora_v1.safetensors
@@ -1428,9 +1428,9 @@ moss-layout-intent
 画面意图补充（可选），例如：海报风格，文字要醒目
 mossLayoutViewBtn
 查看上一次的结构化增强产物
-gen-btn queued
+gen-btn
 genBtn
-当前队列 1 个任务（队首正在跑）。点击可继续加入队列。
+提交到生成队列（可连续提交多个任务）
 seedField
 seed
 panel stitch-panel page-hidden
@@ -1454,7 +1454,6 @@ stitch-list
 stitchList
 stitch-summary
 stitchSummary
-gen-btn
 stitchBtn
 jobs-area
 jobsArea
@@ -1519,149 +1518,139 @@ queueToggle
 展开队列明细
 queue-list
 queueList
-queue-item is-running
-ae7288895092
+queue-item is-recent
+6bbabaac15f3
 queue-pos
 queue-label
 queue-prompt
-e2e 素材被引用：参考图里的猫, lms:
-queue-state
-queue-cancel
-queue-item is-recent
-f9681d58b9a8
 e2e 运行状态一致性：一只猫
-adc086294503
+queue-state
+75a48c9e9174
 e2e 参考生视频：参考图里的猫, lms:
-76e1a1501135
-一位少女站在日式教室讲台前，镜头缓慢推近，薄荷绿短发，粉色背心，细腻光影
-ec42ee663530
-一位少女从低头缓缓抬头看向镜头，镜头缓推至半身，薄荷绿短发，粉色背心，柔和自然光
-f7ebe6b45c96
+266f0adb0ed5
 e2e 文生视频：一只猫在草地上奔跑
-afab3b5c1bae
+65fcfe7846de
 e2e 批次展开：一只猫
-bf03f7925070
+2184722555f2
 e2e 批次：一只猫
-1947e944c6d2
+37079de05ea5
 e2e 出图闭环：一只猫在草地上奔跑
-35b6935904da
+8ac15e1cff77
 e2e 分辨率链路：一只猫在草地上奔跑
-7376e1216464
-1ea7afee0091
+513383284a58
+第二段：白衣剑客转身，剑光照亮面部，竹叶纷飞
+45731fe6a5c3
 第一段：月光下的竹林，黑衣剑客背对镜头，剑未出鞘
-b578e839a89e
+1b493897ced7
+e2e 提示词不沿用：第一段的提示词标记XYZ
+2b11b86a55ff
+e2e 三段链：第一段 5 秒
+6393eedf8568
+e2e 接续时长：第二段 5 秒
 jobs-grid
 jobsGrid
 grid-template-columns: repeat(3, minmax(0px, 1fr));
 job-card
-ae7288895092|running|68|节点 16/23 · 步 5/9||
+6bbabaac15f3|done|100|节点 11/11|images/i-zimage-000300.png|
 job-top
-cancel-btn
-cancel
-job-preview
-progress-wrap
-progress-bar
-width:68%
-progress-text
-job-meta
-row
-稀疏视频注意力（预算制） · 速度最快
-row-group gen-params
-MiniMax-H3 混合版 · FL2VA+Ref2VA
-DMAD 4 步（critic 版） ×1.00 · minimax_h3_lms_v1.0_r64 ×0.70
-8 · 1
-1920×1088
-5s
-row prompt-row
-点击查看并复制完整提示词
-job-actions
-reuse
-f9681d58b9a8|done|100|节点 11/11|images/i-zimage-000288.png|
 job-preview has-image
-/files/images/i-zimage-000288.png
+/files/images/i-zimage-000300.png
 点击查看大图；也可拖到左侧参考图、首帧或尾帧位置
-查看大图：i-zimage-000288.png
+查看大图：i-zimage-000300.png
 zoom-hint
 点击查看大图
 M7 2H2v5M9 2h5v5M9 14h5V9M7 14H2V9
 1.6
+job-meta
+row
+row-group gen-params
 Z-Image-Turbo · 官方加速版
 Z-imagemeinv11_10 ×1.00
+8 · 1
 1360×768
-101283061511716
+5s
+20876450991626
+row prompt-row
+点击查看并复制完整提示词
+job-actions
 download
 open-new
 _blank
 noopener
 在新窗口打开原图
+reuse
 detail
 查看完整生成参数
 delete
 danger
 整张卡片可拖到左侧长片拼接区
-adc086294503|done|100|节点 15/23|videos/v-h3-studio-000540.mp4|
-/files/videos/v-h3-studio-000540.mp4
+75a48c9e9174|done|100|节点 22/23|videos/v-h3-studio-000553.mp4|
+job-preview
+/files/videos/v-h3-studio-000553.mp4
 metadata
+稀疏视频注意力（预算制） · 速度最快
+MiniMax-H3 混合版 · FL2VA+Ref2VA
+DMAD 4 步（critic 版） ×1.00 · minimax_h3_lms_v1.0_r64 ×0.70
+1920×1088
 continue
 把这一段的全部配置回填到左侧，接着写下一段提示词继续生成（当前累计 5.167s）
-76e1a1501135|done|100|节点 14/21|videos/v-h3-studio-000539.mp4|
-/files/videos/v-h3-studio-000539.mp4
-默认（PyTorch 稠密注意力） · 速度最慢
-Turbo 4 步 · ckpt850 ×1.00
-4 · 1
-20261117
-ec42ee663530|done|100|节点 2/21|videos/v-h3-studio-000538.mp4|
-/files/videos/v-h3-studio-000538.mp4
+266f0adb0ed5|done|100|节点 10/21|videos/v-h3-studio-000552.mp4|
+/files/videos/v-h3-studio-000552.mp4
 MiniMax-H3 FL2VA · 剪枝 int8（默认）
-f7ebe6b45c96|done|100|节点 17/21|videos/v-h3-studio-000537.mp4|
-/files/videos/v-h3-studio-000537.mp4
 DMAD 4 步（critic 版） ×1.00
 8s
 把这一段的全部配置回填到左侧，接着写下一段提示词继续生成（当前累计 8s）
-afab3b5c1bae|done|100|2/2 批次成功|images/i-zimage-000286.png,images/i-zimage-000287.png|0:done:100:1:,1:done:100:1:
-/files/images/i-zimage-000286.png
-查看大图：i-zimage-000286.png
+65fcfe7846de|done|100|2/2 批次成功|images/i-zimage-000298.png,images/i-zimage-000299.png|0:done:100:1:,1:done:100:1:
+/files/images/i-zimage-000298.png
+查看大图：i-zimage-000298.png
 job-batches-toggle 
 toggle-batches
 caret
 job-batches
 job-batch
-e1ec9bc1decd
+616d5c3b81cc
 job-batch-thumb
 批次 1
 job-batch-foot
 st done
 该批次种子
-696a1c773241
-/files/images/i-zimage-000287.png
+efe24ec6be18
+/files/images/i-zimage-000299.png
 批次 2
-bf03f7925070|done|100|3/3 批次成功|images/i-zimage-000283.png,images/i-zimage-000284.png,images/i-zimage-000285.png|0:done:100:1:,1:done:100:1:,2:done:100:1:
-/files/images/i-zimage-000283.png
-查看大图：i-zimage-000283.png
-f88f61e0b7a8
-f5e209538203
-/files/images/i-zimage-000284.png
-f35f17a2cb37
-/files/images/i-zimage-000285.png
+2184722555f2|done|100|3/3 批次成功|images/i-zimage-000295.png,images/i-zimage-000296.png,images/i-zimage-000297.png|0:done:100:1:,1:done:100:1:,2:done:100:1:
+/files/images/i-zimage-000295.png
+查看大图：i-zimage-000295.png
+c50beabf6388
+af4565193547
+/files/images/i-zimage-000296.png
+d9e79eaaf199
+/files/images/i-zimage-000297.png
 批次 3
-1947e944c6d2|done|100|节点 11/18|images/i-zimage-000282.png|
-/files/images/i-zimage-000282.png
-查看大图：i-zimage-000282.png
+37079de05ea5|done|100|节点 11/18|images/i-zimage-000294.png|
+/files/images/i-zimage-000294.png
+查看大图：i-zimage-000294.png
 2560×1408
-137400406968817
-35b6935904da|done|100|节点 18/18|images/i-zimage-000281.png|
-/files/images/i-zimage-000281.png
-查看大图：i-zimage-000281.png
-267352809134090
-7376e1216464|failed|32|节点 2/21||
-err-text
-1ea7afee0091|done|100|节点 11/21|videos/v-h3-studio-000536.mp4|
-/files/videos/v-h3-studio-000536.mp4
+175471656524970
+8ac15e1cff77|done|100|节点 18/18|images/i-zimage-000293.png|
+/files/images/i-zimage-000293.png
+查看大图：i-zimage-000293.png
+179008938271141
+513383284a58|done|100|节点 13/26|videos/v-h3-studio-000551.mp4,videos/v-h3-studio-000550.mp4|
+/files/videos/v-h3-studio-000551.mp4
+把这一段的全部配置回填到左侧，接着写下一段提示词继续生成（当前累计 9s）
+45731fe6a5c3|done|100|节点 8/21|videos/v-h3-studio-000549.mp4|
+/files/videos/v-h3-studio-000549.mp4
+1b493897ced7|done|100|节点 8/21|videos/v-h3-studio-000548.mp4|
+/files/videos/v-h3-studio-000548.mp4
+2b11b86a55ff|done|100|节点 8/21|videos/v-h3-studio-000547.mp4|
+/files/videos/v-h3-studio-000547.mp4
+6393eedf8568|done|100|节点 13/26|videos/v-h3-studio-000546.mp4,videos/v-h3-studio-000545.mp4|
+/files/videos/v-h3-studio-000546.mp4
 jobs-pagination
 jobsPagination
-<button data-page="0" disabled>上一页</button><button data-page="1" class="active">1</button><button data-page="2" class="">2</button><span class="page-summary">…</span><button data-page="63" class="">63</button><button data-page="2" >下一页</button><span class="page-summary">共 748 个作品</span>
+<button data-page="0" disabled>上一页</button><button data-page="1" class="active">1</button><button data-page="2" class="">2</button><span class="page-summary">…</span><button data-page="64" class="">64</button><button data-page="2" >下一页</button><span class="page-summary">共 766 个作品</span>
 page-summary
-63
+64
 assets-page page-hidden
 assetsPage
 al-head
@@ -2425,26 +2414,26 @@ detailParams
 detail-prompt
 detailPrompt
 document.getElementById('detailModalClose').click()
-/static/qwen-refs.js?v=cr20261115b
+/static/qwen-refs.js?v=cr20261118a
 /static/numeric-slider.js?v=numslider3
 /static/seed-guard.js?v=seedguard1
 /static/media-preview.js?v=mediapreview2
 /static/video-panel-fallback.js?v=cr20261115b
 /static/interaction-guard.js?v=guard1
 /static/music.js?v=fix4temp0
-/static/video-panel.js?v=vparams5
+/static/video-panel.js?v=vparams6
 /static/video-effect-lora.js?v=fix3panel1
-/static/continuation.js?v=cr20261115b
+/static/continuation.js?v=cr20261118a
 /static/generation-queue.js?v=a5truth1
 /static/video-nav.js?v=sidebarfold2
 /static/sidebar-fold.js?v=sidebarfold2
 /static/job-meta.js?v=cr20261115b
-/static/app.js?v=cr20261116c
-/static/providers.js?v=cr20261115b
+/static/app.js?v=cr20261118a
+/static/providers.js?v=cr20261118a
 /static/job-detail.js?v=a5truth1
 /static/assets.js?v=cr20261115b
 /static/asset-player.js?v=cr20261115b
-/static/media-manage.js?v=uxbatch1
+/static/media-manage.js?v=cr20261118a
 /static/moss-layout.js?v=mosslayout2
 /static/flow-docs.js?v=fd1
 /static/enhance-menu-shared.js?v=cr20261115b
@@ -2462,7 +2451,7 @@ agManageBody
 document.getElementById('agManageClose').click()
 agmSave
 /static/prompt-history.js?v=ph4
-/static/agent-manage.js?v=a4gen1
+/static/agent-manage.js?v=cr20261118a
 display: block;
 up-slot
 first
@@ -2524,7 +2513,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/h3_video_modes.py（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）
-Ref2VA 权重（参考生视频专用）**不附作者说明文件** -> 作者未提供采样参数。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值。⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+Ref2VA 权重（参考生视频专用）「不附作者说明文件」 -> 作者未提供采样参数。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值。⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
 ref2va_int8
 minimax_h3_ref2va_int8_convrot.safetensors
 ComfyUI 模型列表已收录该权重，可直接选用。
@@ -2538,7 +2527,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/h3_video_modes.py（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）
-Ref2VA 权重（参考生视频专用 · 未剪枝）**不附作者说明文件**。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，不是作者推荐值；shift 12/3 是 ComfyUI 的模型硬性值。
+Ref2VA 权重（参考生视频专用 · 未剪枝）「不附作者说明文件」。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，不是作者推荐值；shift 12/3 是 ComfyUI 的模型硬性值。
 hybrid_fl2va_ref2va
 minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors
 ComfyUI 模型列表已收录该权重，可直接选用。
@@ -2552,7 +2541,7 @@ ComfyUI 模型列表已收录该权重，可直接选用。
 推荐音频 shift：3（ComfyUI 模型硬性值）
 推荐主模型：作者未提供
 出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3） + /mnt/nvme1t_colorful/comfyui-models/diffusion_models/minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.md:158-172（作者未给出任何采样参数）
-作者（smhfacct）**未给出任何采样参数** —— 其 README 只讲合并原理与变体选型（原文：「本底模作者未给出任何采样参数」）。shift 12/3 是 ComfyUI 模型硬性值；步数/调度器/采样器一律「作者未提供」。
+作者（smhfacct）「未给出任何采样参数」 —— 其 README 只讲合并原理与变体选型（原文：「本底模作者未给出任何采样参数」）。shift 12/3 是 ComfyUI 模型硬性值；步数/调度器/采样器一律「作者未提供」。
 移除已选的 1 个效果 LoRA
 nav-item active
 qwen_image_2.1_bf16
@@ -2585,7 +2574,7 @@ qwen21/bfs_head_v1_qwen_2.1.safetensors
 qwen21-effects/2anime-QwenImage2.1.safetensors
 真人照片 → 二次元动漫化。头像、社交媒体素材。
 qwen21-effects/Amphoreus13_qi_lora_rank32.safetensors
-崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可条款矛盾 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF 标签 `license: mit`，但 README 写 “research and hobbyist communication only — commercial use is strictly prohibited” → **许可自相矛盾，按禁止商用对待**。`ss_network_rank=32`、2508 键、`networks.lora_qwen_image`；训练集约 2450 张同人图。另有 rank16(293,854,912 B) 与 rank256(4,696,896,560 B) 两档。**非官方/授权不明**。
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可条款矛盾 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF 标签 `license: mit`，但 README 写 “research and hobbyist communication only — commercial use is strictly prohibited” → 「许可自相矛盾，按禁止商用对待」。`ss_network_rank=32`、2508 键、`networks.lora_qwen_image`；训练集约 2450 张同人图。另有 rank16(293,854,912 B) 与 rank256(4,696,896,560 B) 两档。「非官方/授权不明」。
 qwen21-effects/Genitalia-Anatomy-2.1-v1.safetensors
 rank 64 / batch 8 / 16,000 步 / 3,689 张训练图 / RTX PRO 6000 96GB。主触发词 zl_private_v1，另可加类别 token zl_uniprivate_v1 / zl_cnprivate_v1 / zl_jpprivate_v1 / zl_krprivate_v1 / zl_maleprivate_v1。作者首选自然语言描述，token 只是「抽屉标签」，模型卡也明确 token 不保证效果。
 qwen21-effects/HonkaiStarRail-3D-qwen2.1_c1-st4000.safetensors
@@ -2593,7 +2582,7 @@ HonkaiStarRail-3D-qwen2.1（崩坏星穹铁道 3D 风格）。【复刻米哈游
 qwen21-effects/NSFW Qwen Lora.safetensors
 作者原作系列的 v1.0（与 HF 转存 SHA256 完全一致）。v1.0 与 v2.0 内容不同：v2.0 体积更小（rank 更低）但作者称画质/解剖/提示词跟随更好。
 qwen21-effects/NSFW Qwen by TheseAlpacas V2.safetensors
-作者原作系列（Civitai 49,137 下载 / 1,065 赞）的 v2.0。作者原话：这些概念（blowjobs / cowgirl / cum / vaginas / anal / penis / doggystyle / missionary / dildo / pussy licking）**不是触发词**，靠自然语言描述命中。⚠️ 镜像站作者在模型卡里写了触发词 nsfw，与 Civitai 原作者 训练词列表为空不一致 —— 建议以不写触发词、纯自然语言描述为主。
+作者原作系列（Civitai 49,137 下载 / 1,065 赞）的 v2.0。作者原话：这些概念（blowjobs / cowgirl / cum / vaginas / anal / penis / doggystyle / missionary / dildo / pussy licking）「不是触发词」，靠自然语言描述命中。⚠️ 镜像站作者在模型卡里写了触发词 nsfw，与 Civitai 原作者 训练词列表为空不一致 —— 建议以不写触发词、纯自然语言描述为主。
 qwen21-effects/Qwen-Image-2.1-Amethyst-Theme-3000.safetensors
 照片 → 紫晶紫色系 / 神秘质感调色。
 qwen21-effects/Qwen-Image-2.1-Clay-Sculpture-Style-3000.safetensors
@@ -2786,14 +2775,14 @@ moss-effects/phone_photography_2025_moss.safetensors
 moss-effects/ral-truskin_moss.safetensors
 方向：自然皮肤写实。 基座判定：原生（MOSS 版本原生）。 触发词：ral-truskin。 来源平台：huggingface。
 moss-effects/realskin_r32_comfy.safetensors
-方向：写实皮肤。 ⚠️ **近似适用**（依据：Base 训 / 双基座）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：@realskin。 来源平台：huggingface。
+方向：写实皮肤。 ⚠️ 「近似适用」（依据：Base 训 / 双基座）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：@realskin。 来源平台：huggingface。
 moss-effects/target-epoch0150-step000150.safetensors
 方向：内容细节强度。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
 moss-effects/ultra_real_moss_v2.safetensors
 方向：去 AI 塑料感 / 皮肤与衣物纹理。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
 moss-effects/Ultra-real-moss.safetensors
 moss-effects/lora_MOSS_mylow_beta01.safetensors
-方向：日系人像 / 街拍写真。 ⚠️ **近似适用**（依据：SFT 适用）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：mylow / low-quality。 来源平台：huggingface。
+方向：日系人像 / 街拍写真。 ⚠️ 「近似适用」（依据：SFT 适用）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：mylow / low-quality。 来源平台：huggingface。
 moss-effects/moss_east_asian_girl_v2.safetensors
 方向：东亚女性写实人像（大眼）。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
 moss-effects/n_h_lora_v1.safetensors
@@ -2807,9 +2796,9 @@ moss/moss_hires_lora_v0.2_qkv_split.safetensors
 moss/moss_hires_lora_v0.3_qkv_split.safetensors
 4 兆像素以上高分辨率 LoHa，官方 Space（hugging-apps/moss-image-hires-lora）用的就是这版，默认首选。204 targets，本机实测 204 patches 命中。
 moss-effects/Cissia_MOSS.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件 16,163,368 B（体积极小，rank 很低）。作者用 Ko-fi/爱发电分发，属付费/赞助生态。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者正文明示：“权重：0.6~1.5”，并说明该 LoRA 含 2 种风格效果。Civitai model 2472021 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件 16,163,368 B（体积极小，rank 很低）。作者用 Ko-fi/爱发电分发，属付费/赞助生态。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者正文明示：“权重：0.6~1.5”，并说明该 LoRA 含 2 种风格效果。Civitai model 2472021 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/Eldreda_Sunbringer_moss_12138.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。**ModelScope 镜像提供可匿名直链**：`https://www.modelscope.cn/models/makimakimakima12138/Eldreda_Sunbringer_moss_12138/resolve/master/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors`（77,720,200 B，SHA256 `aaa0bbcb188c9a45c0746d2bb43f464c3c49f9af27cd8182c5ab76ee0d7168d0`）。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3023439 + mossloras/moss-image-lora-archive 镜像；另有 ModelScope 同权重镜像 makimakimakima12138/Eldreda_Sunbringer_moss_12138（Apache-2.0，ProtectedMode=0）。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。「ModelScope 镜像提供可匿名直链」：`https://www.modelscope.cn/models/makimakimakima12138/Eldreda_Sunbringer_moss_12138/resolve/master/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors`（77,720,200 B，SHA256 `aaa0bbcb188c9a45c0746d2bb43f464c3c49f9af27cd8182c5ab76ee0d7168d0`）。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3023439 + mossloras/moss-image-lora-archive 镜像；另有 ModelScope 同权重镜像 makimakimakima12138/Eldreda_Sunbringer_moss_12138（Apache-2.0，ProtectedMode=0）。
 moss-effects/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors
 绝区零艾尔妲挽昼（Eldreda Sunbringer，MOSS 版）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
 moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors
@@ -2817,7 +2806,7 @@ moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors
 moss-effects/Kodachrome1970s_000002000.safetensors
 柯达 1970s 胶片色（60–70 年代）。复古人像、风光。
 moss-effects/MKAI_Lindvern_Sunbringer_v1_MOSS.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 756 键。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3031595 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 756 键。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3031595 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/MOSS-Image-Animated-LoRA-ComfyUI.safetensors
 人物 / 动物 / 动作场景 / 多变环境的广义 3D 动画角色（非单一风格）。
 moss-effects/MOSS-Image-Anime-LoRA-ComfyUI.safetensors
@@ -2839,15 +2828,15 @@ moss-effects/Moss_danica_v2step400_azusa.safetensors
 moss-effects/MysticXXX-Moss-V1.safetensors
 专门修 body 结构 / 姿态 / 概念落地 —— 作者称底模本体已懂大部分，需要这层来解决「detailed adult work」下的解剖走形。无触发词。作者明示「V1 use with STR 1」。⚠️ 训练基座具体是 Base 还是 SFT 未说明，作者自称 still experimental。
 moss-effects/Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。作者说明针对「铃（Belle）」做了微调以减少角色特征互污染。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016054 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。作者说明针对「铃（Belle）」做了微调以减少角色特征互污染。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016054 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/Remielle.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「蕾米埃尔的lora，用于MOSS Image」。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3041387 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「蕾米埃尔的lora，用于MOSS Image」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3041387 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/Ronova.safetensors
 原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。正文：「若娜瓦（Ronova）原神 Genshin Impact 用于 MOSS Image 的 Lora」。
 moss-effects/Suoming.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 另存在「鸣潮 Lora 合集」3016395 内的 `suoming.safetensors`（145,157,272 B，触发词 `Suoming`）与 `xinyuehu.safetensors`（触发词 `Hsin`），为同系列不同权重。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016542 + mossloras/moss-image-lora-archive 镜像。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 另存在「鸣潮 Lora 合集」3016395 内的 `suoming.safetensors`（145,157,272 B，触发词 `Suoming`）与 `xinyuehu.safetensors`（触发词 `Hsin`），为同系列不同权重。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016542 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/Tribios.safetensors
-崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「缇里西庇俄丝 (Tribios)的Lora，用于MOSS Image」。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3040713 + mossloras/moss-image-lora-archive 镜像。
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「缇里西庇俄丝 (Tribios)的Lora，用于MOSS Image」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3040713 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/Tsaritsa.safetensors
 原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。正文：「Lora，来自 Tsaritsa 冰之女皇/冰神 安娜丝塔夏 原神，用于 MOSS Image」。
 moss-effects/TsaritsaMI.safetensors
@@ -2869,7 +2858,7 @@ moss-effects/chenbin_style_v2_blush_1500step_rank32.safetensors
 moss-effects/darkFantasyStyleMOSS_v1.safetensors
 触发词 darkfantasystyle。作者未明示强度 → 建议 0.8–1.0（建议值）。用 Midjourney v5 训练，风格偏 MJ 而非纯 MOSS 特性。
 moss-effects/dracaene-moss-v1.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`，576 键（56,687,880 B，体积小）。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029457 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`，576 键（56,687,880 B，体积小）。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029457 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/firefly26710_Moss.safetensors
 firefly_MOSS（流萤，崩坏星穹铁道，MOSS 基座）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：HF 页面无 license 字段 —— 未授予任何许可，需向作者确认。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
 moss-effects/gjb_v1_MOSS.safetensors
@@ -2883,7 +2872,7 @@ moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors
 moss-effects/hina_MOSSImageSFT_MixArmor_v1.0_lora.safetensors
 盔甲 / 护甲材质与结构的表现力强化。游戏角色装备。
 moss-effects/lily_lora.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`、756 键。作者自述「1st time trained MOSS lora，testing purpose，pretty unstable to details」。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3011877 + mossloras/moss-image-lora-archive 镜像。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`、756 键。作者自述「1st time trained MOSS lora，testing purpose，pretty unstable to details」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3011877 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/lucia elowen.safetensors
 绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给具体区间）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者自述用 20 张游戏截图训练，「I recommend to use it with a lower strength」，并建议负面词加 `game screenshot, default outfit`。
 moss-effects/lumine_v3_1_s2000.safetensors
@@ -2895,9 +2884,9 @@ moss-effects/mamimi_c1-st6000_comfyui.safetensors
 moss-effects/mitya_v4_s1000.safetensors
 原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡。许可：Civitai 三元许可（author 字段为空）。作者自述「试验版」，已知问题是脸型偏半写实，需在提示词开头加「官方立绘」纠正。
 moss-effects/moss Cantarella.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。作者正文明确：「本模型仅供个人学习、交流与兴趣爱好者测试使用，严禁任何形式的商业用途」。**非官方/授权不明**。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2695787 + mossloras/moss-image-lora-archive 镜像。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。作者正文明确：「本模型仅供个人学习、交流与兴趣爱好者测试使用，严禁任何形式的商业用途」。「非官方/授权不明」。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2695787 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/moss Hsin2.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。**非官方/授权不明**。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2981767 + mossloras/moss-image-lora-archive 镜像。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。「非官方/授权不明」。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2981767 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/moss-image-impressionism-lora.safetensors
 印象派绘画风（松散笔触、光色分解）。
 moss-effects/moss-image-pixelart-16x16.safetensors
@@ -2921,9 +2910,9 @@ moss-effects/moss_image_charref_v2.safetensors
 moss-effects/moss_matcha_style_v1_c1-st1000.safetensors
 抹茶（Matcha）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
 moss-effects/moss_pussy_lora_v3.0.safetensors
-作者 25,514 下载的解剖类 LoRA 的**非加速拆分版**（face loss=0，训练时人脸全部遮罩，只学解剖结构，脸交回底模生成 → 保留人脸多样性）。作者推荐 v3.0 强度 1.0 配 face 0.8。⚠️ 训练基座是 Base，作者推荐 Base 8 步；误配会导致画面过曝。
+作者 25,514 下载的解剖类 LoRA 的「非加速拆分版」（face loss=0，训练时人脸全部遮罩，只学解剖结构，脸交回底模生成 → 保留人脸多样性）。作者推荐 v3.0 强度 1.0 配 face 0.8。⚠️ 训练基座是 Base，作者推荐 Base 8 步；误配会导致画面过曝。
 moss-effects/moss_pussy_lora_v3.0_face.safetensors
-Better Nude v3.0 的**纯人脸**分量，与主体版配套使用（作者推荐 face 0.8 + 主体 1.0）。
+Better Nude v3.0 的「纯人脸」分量，与主体版配套使用（作者推荐 face 0.8 + 主体 1.0）。
 moss-effects/moss_sabikaze_v1.safetensors
 灰青蓝低饱和干笔二次元插画（57 张自生成图训练）。
 moss-effects/moss_sft_destripe_top64_bf16.safetensors
@@ -2937,16 +2926,16 @@ moss-effects/nike.safetensors
 moss-effects/noyu_moss.safetensors
 画师个人风格。
 moss-effects/odette_v5_s2200.safetensors
-原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者推荐「配合 dmd 加速使用，或使用 base 作为底模」，并指出 SFT 底模出图较脏 —— **作者对底模/加速有明确偏好，但本条目本身是效果类**。
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者推荐「配合 dmd 加速使用，或使用 base 作为底模」，并指出 SFT 底模出图较脏 —— 「作者对底模/加速有明确偏好，但本条目本身是效果类」。
 moss-effects/qingxiao.safetensors
-鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 作者正文仅「MOSS Image 的lora模型」。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3039020 + mossloras/moss-image-lora-archive 镜像。
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 作者正文仅「MOSS Image 的lora模型」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3039020 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/samsung_moss.safetensors
 moss-effects/sandrone_mmd_v7_s4100.safetensors
 原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者自述「实验性质，需要搭配 dmd 加速 lora 才能有良好的效果」—— 效果类权重本身可单用，作者建议配加速。
 moss-effects/shuiwu22-moss-image-lora.safetensors
 社区作者 ACCC1380 的 MOSS-Image LoRA。本轮调研清单未收录该条目（元数据未核实），功能与强度未核实 —— 按默认强度 1.0 起步，自行调整。
 moss-effects/silver_wolf_moss.safetensors
-崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空，以平台三元勾选为准）。**视觉核验**：官方示例图为赛博朋克二次元银狼（胸前有 “SILVER” 像素 Logo），角色还原度高。
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空，以平台三元勾选为准）。「视觉核验」：官方示例图为赛博朋克二次元银狼（胸前有 “SILVER” 像素 Logo），角色还原度高。
 moss-effects/style-moss-image-base-epoch-07.safetensors
 玉之けだま（Kedama）画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容
 moss-effects/style-moss-image-base-epoch-10.safetensors
@@ -2954,18 +2943,16 @@ moss-effects/style-moss-image-base-epoch-10.safetensors
 moss-effects/transparent-lora-for-moss-image-v1.safetensors
 透明背景方案（比 alpha 方案更成熟）。需配 trmz/flux2-klein-alpha VAE 才能真出透明通道。
 moss-effects/vesna_v2_s2500.safetensors
-原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者述 Base 与 SFT 底模均可用。**注意**：作者写的 DMD 8–12 步是采样设置，不是必须挂加速 LoRA。
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者述 Base 与 SFT 底模均可用。「注意」：作者写的 DMD 8–12 步是采样设置，不是必须挂加速 LoRA。
 moss-effects/vody_v2_s2500.safetensors
 原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者述 Base 与 SFT 底模均可用。
 moss-effects/wangzhe_moss.safetensors
 2.5D / 3D 角色表现。
 moss-effects/yixuanZzz_v1.safetensors
-绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 作者正文仅 “just for share”。文件内 `base_model=moss_image`、492 键。**非官方/授权不明**。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029119 + mossloras/moss-image-lora-archive 镜像。
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 作者正文仅 “just for share”。文件内 `base_model=moss_image`、492 键。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029119 + mossloras/moss-image-lora-archive 镜像。
 moss-effects/yomistyle_v3.safetensors
 moss-effects/zshfmoss_c1-st1000.safetensors
 咒术（咒术回战向）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
-ae7288895092|running|71|节点 16/23 · 步 6/9||
-width:71%
 4mp
 8mp
 16mp
