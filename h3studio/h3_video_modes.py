@@ -304,7 +304,9 @@ def _continuation_media_slice(params: dict) -> dict:
     """
     info = cont_service.chain_info(params)
     out = {"skip_frames": 0, "frame_cap": 0, "audio_start": 0.0,
-           "audio_duration": 0.0, "segment_audio": "", "active": False}
+           "audio_duration": 0.0, "segment_audio": "", "active": False,
+           # 【2026-11-19】参考视频的「画面」切片（与音轨切片**解耦**）
+           "video_skip_frames": 0, "video_drop": False}
     if not info:
         return out
     if not str(info.get("source_job") or "").strip():
@@ -318,8 +320,45 @@ def _continuation_media_slice(params: dict) -> dict:
     audio_duration = float(info.get("audio_segment_duration") or 0.0)
     segment_audio = str(params.get("segment_audio_file") or "").strip()
 
+    # ---- 参考视频的**画面**切片（独立于音轨来源）----
+    #
+    # 【为什么必须解耦】—— 2026-11-19 在 8190 实测到的真实缺陷
+    # 规范（docs/接续模式深度研究-20261116.md §5.4.3）要求
+    #     第 n 段的参考视频切片 = 参考视频的 [t_a_start(n), t_a_end(n))
+    #     视频侧：skip_first_frames = C_n（= 上游已累计交付帧数）
+    # 原来这里把**视频**切片也绑在 external 上 ⇒ 音轨来源是
+    # 「生成的音乐」时 skip_frames=0 ⇒ **段2 的参考视频从 0 开始喂**。
+    # 而段1 已经用过同一份参考视频（画面已经演化过去）⇒ 段2 的条件
+    # 要求画面回到参考视频开头，与拷贝桥钉住区里「段1 已演化的画面」
+    # **直接冲突** ⇒ 段2 新生成区爆发式跳变。
+    #
+    # 【实测证据】（2026-11-19，同一段1 派生的两个接续段）
+    #   带参考视频：@21 帧 L1=100.78，Δ亮度=+9.01（25.8× 该段中位）
+    #   无参考视频：@21 帧 L1= 95.61，Δ亮度=+1.95（ 3.5× 该段中位）
+    # ⇒ 带参考视频时是**亮度阶跃**（用户看到「闪一下」），
+    #   不带时是亮度连续的**镜头切换**（正常内容，不是缺陷）。
+    #
+    # C_n = 上游已累计交付的帧数（chain_total_frames，服务端权威写入）。
+    C_n = int(info.get("chain_total_frames") or 0)
+    ref_frames = int(info.get("ref_video_frame_count") or 0)
+    if C_n > 0:
+        if ref_frames > 0 and C_n < ref_frames:
+            # 规范 §5.4.3：按 C_n 跳帧 —— 画面接段1 的时间位置。
+            out["video_skip_frames"] = C_n
+        elif ref_frames > 0:
+            # 参考视频**不够长**（内容已用尽）-> 本段不带参考视频。
+            # 【为什么不退回到「从 0 开始喂」】那正是本缺陷本身：
+            # 画面被拉回参考视频开头 -> 与钉住区冲突 -> 亮度阶跃。
+            out["video_drop"] = True
+        else:
+            # 探测不到帧数（老任务 / 探测失败）-> **不猜**，
+            # 保持原样（= 旧行为）。宁可少一个优化，不要引入静默错误。
+            out["video_skip_frames"] = 0
+
     if not external:
-        return out  # 生成音频：不切
+        # 生成音频：**音轨**不切（音画同源）；
+        # 但**画面**切片已经在上面算好了（见上面的注释）。
+        return out
 
     out.update({
         "skip_frames": max(0, skip_frames),
@@ -830,10 +869,22 @@ def build_flf(params: dict) -> dict:
     ref_video_audios = list(params.get("ref_video_audios") or [])[:MAX_REF_VIDEOS]
     # 【2026-11-16 接续】音画同步切割参数（参考视频跳帧 / 音频偏移）。
     slice_info = _continuation_media_slice(params)
+    # 【2026-11-19】与 build_r2v 同款：接续段的参考视频**画面**按 C_n
+    # 跳帧（规范 §5.4.3），且与**音轨**来源解耦。
+    # （flf 的参考视频走 Hybrid 任务类型，同样会与钉住区冲突。）
+    if ref_videos and slice_info["video_drop"]:
+        print("[接续] flf：参考视频内容已用尽（跳过 C_n 帧后为空）"
+              "-> 本段不带参考视频")
+        ref_videos = []
+        # 【必须同步清掉配对的背景音】T8 节点的硬规则：
+        # 「Reference-video soundtrack(s) have no same-numbered video」
+        # —— 参考视频没了，它的背景音也必须一起没。
+        ref_video_audios = []
     if ref_videos:
         condition_inputs.update(_ref_video_nodes(
             p, ref_videos,
-            skip_frames=slice_info["skip_frames"],
+            skip_frames=(slice_info["video_skip_frames"]
+                         or slice_info["skip_frames"]),
             frame_cap=slice_info["frame_cap"]))
     if ref_audios:
         condition_inputs.update(_ref_audio_nodes(p, ref_audios))
@@ -928,10 +979,27 @@ def build_r2v(params: dict) -> dict:
     slice_info = _continuation_media_slice(params)
     if ref_images:
         condition_inputs.update(_ref_image_nodes(p, ref_images))
+    # 【2026-11-19】接续段的参考视频**画面**按 C_n 跳帧（规范 §5.4.3）。
+    #
+    # 【为什么跳帧数用 video_skip_frames 而不是 skip_frames】
+    # skip_frames 是**音轨**切片的产物（只在外部音轨时非零），
+    # video_skip_frames 是**画面**切片的产物（与音轨来源解耦）。
+    # 两者混用会重犯「音轨来源决定了画面切片」这个缺陷。
+    #
+    # 【video_drop】参考视频内容已用尽（C_n >= 参考视频帧数）->
+    # 本段**不带**参考视频（见 _continuation_media_slice 的说明）。
+    if ref_videos and slice_info["video_drop"]:
+        print("[接续] r2v：参考视频内容已用尽（跳过 C_n 帧后为空）"
+              "-> 本段不带参考视频")
+        ref_videos = []
+        # 【必须同步清掉配对的背景音】T8 节点的硬规则：
+        # 「Reference-video soundtrack(s) have no same-numbered video」
+        ref_video_audios = []
     if ref_videos:
         condition_inputs.update(_ref_video_nodes(
             p, ref_videos,
-            skip_frames=slice_info["skip_frames"],
+            skip_frames=(slice_info["video_skip_frames"]
+                         or slice_info["skip_frames"]),
             frame_cap=slice_info["frame_cap"]))
     if ref_audios:
         condition_inputs.update(_ref_audio_nodes(p, ref_audios))

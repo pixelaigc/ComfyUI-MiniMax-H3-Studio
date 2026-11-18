@@ -394,6 +394,109 @@ class TestContinuationFrontend(unittest.TestCase):
                          "接续提交的本段尺寸应与来源段一致")
         self.assertEqual(params.get("height"), 448)
 
+    # ------------------------------------------------------------
+    # 【2026-11-19 新增】flf / r2v 的接续提交体**必须**带 continuation
+    # ------------------------------------------------------------
+    def _capture_submit_payload(self, job_id, mode_label):
+        """点「接续」-> 提交 -> 抓提交体（**不真的发出去**）。"""
+        self._goto_jobs()
+        self.page.click(f'.job-card[data-jid="{job_id}"] [data-act="continue"]')
+        self.page.wait_for_timeout(1800)
+        captured = self.page.evaluate("""async () => {
+          const orig = window.fetch;
+          let captured = null;
+          window.fetch = function (url, opts) {
+            if (opts && opts.method === 'POST'
+                && String(url).includes('/api/jobs')
+                && opts.body instanceof FormData) {
+              const raw = opts.body.get('params');
+              if (raw) captured = JSON.parse(raw);
+              // 【关键】**不真的发出去** —— 真的提交会往库里加一条任务，
+              // 把生成库的分页顶掉（每页 12 条），后面那些按固定 id
+              // 找卡片的测试就会找不到自己的卡片 —— 变成**顺序依赖**
+              // 的假失败。
+              return new Promise(() => {});
+            }
+            return orig.apply(this, arguments);
+          };
+          const t = document.getElementById('prompt');
+          if (t) t.value = 'next segment probe ' + 'MODE';
+          const btn = document.getElementById('genBtn');
+          if (!btn) { window.fetch = orig; return {noButton: true}; }
+          btn.click();
+          await new Promise(r => setTimeout(r, 1800));
+          window.fetch = orig;
+          return {captured};
+        }""".replace("MODE", mode_label))
+        # 【2026-11-19】测试类**共用同一个浏览器页面**。点「接续」会把
+        # 面板切到来源任务的模式（flf / r2v）并挂上接续上下文 ——
+        # 不清掉的话，后面那些按 t2v 假设的用例会被污染（实测：
+        # test_continue_switches_to_source_mode 单独跑绿、跟着跑红）。
+        # ⇒ 抓完载荷立刻复位：清接续上下文 + 切回 t2v。
+        self.page.evaluate("""() => {
+          if (window.Continuation) window.Continuation.clear();
+          if (typeof window.activateVideoMode === 'function') {
+            window.activateVideoMode('t2v');
+          }
+        }""")
+        self.page.wait_for_timeout(600)
+        return (captured or {}).get("captured") or {}
+
+    def test_flf_continuation_submit_carries_continuation(self):
+        """【2026-11-19 修的核心缺陷】首尾帧的接续提交体**必须**带 continuation。
+
+        【原来错在哪】web/app.js 只在 **t2v 分支**里写
+        `params.continuation = ctx.continuation;` —— flf / r2v 分支从不设它。
+        ⇒ 点「接续」-> 面板正确回填 -> 点生成 -> 提交体里**没有**
+        continuation -> 服务端看不到接续 -> 本段退化成**普通生成**。
+
+        【为什么这条断言不是恒真】
+        现有那条 `test_continue_submit_payload_carries_continuation`
+        用的是 **t2v** 模式（`_seed_continuable_job_as` 默认 t2v）——
+        它**抓不到**本缺陷（t2v 一直是好的）。这里补 flf / r2v 两条。
+        """
+        # 【为什么要素材引用】flf / r2v 的提交入口有**素材必填**守卫
+        # （app.js：首尾帧至少给首帧或尾帧 / 参考模式至少 1 个参考素材），
+        # 没有素材就 alert 中止 -> 提交根本不会发生 -> 抓不到载荷。
+        # 接续时这些槽位由「接续回填」填上（continuation.js 的
+        # applyAssetRefs），所以这里也要给素材引用。
+        image_id, _audio_id = self._real_asset_ids()
+        if not image_id:
+            self.skipTest("素材库里没有可用的图片素材")
+        job_id = self._seed_continuable_job_as_mode(
+            "contfrontend-flf-submit", "flf",
+            asset_refs=[
+                {"asset_id": image_id, "slot": "first_frame", "ordinal": 0},
+            ])
+        params = self._capture_submit_payload(job_id, "flf")
+        self.assertTrue(params, "没抓到提交载荷（断言会空转）")
+        self.assertIn(
+            "continuation", params,
+            "首尾帧的接续提交载荷里必须有 continuation"
+            "（缺了它，本段会静默退化成普通生成）")
+        self.assertEqual(
+            params.get("continuation", {}).get("source_job"), job_id,
+            "continuation 必须指向来源任务")
+
+    def test_r2v_continuation_submit_carries_continuation(self):
+        """参考生视频的接续提交体**必须**带 continuation（同上）。"""
+        image_id, _audio_id = self._real_asset_ids()
+        if not image_id:
+            self.skipTest("素材库里没有可用的图片素材")
+        job_id = self._seed_continuable_job_as_mode(
+            "contfrontend-r2v-submit", "r2v",
+            asset_refs=[
+                {"asset_id": image_id, "slot": "ref_image", "ordinal": 0},
+            ])
+        params = self._capture_submit_payload(job_id, "r2v")
+        self.assertTrue(params, "没抓到提交载荷（断言会空转）")
+        self.assertIn(
+            "continuation", params,
+            "参考生视频的接续提交载荷里必须有 continuation")
+        self.assertEqual(
+            params.get("continuation", {}).get("source_job"), job_id,
+            "continuation 必须指向来源任务")
+
     def test_mismatched_size_is_blocked_before_submit(self):
         """【2026-11-12 第三轮】尺寸不一致时**提交前**就拦下。
 

@@ -1957,6 +1957,11 @@ class Worker:
                     await self._prepare_audio_continuation(session, job_id,
                                                            params)
 
+                # 【2026-11-19】参考视频帧数（供接续段做时间轴切片）。
+                # 必须在拼工作流**之前**（工作流要读它决定切片/跳过）。
+                if mode in ("flf", "r2v"):
+                    await self._record_ref_video_frame_count(job_id, params)
+
                 # 【2026-11-16 第5轮代码审查 C-10 修 —— 老任务重放的尺寸兜底】
                 #
                 # 【为什么需要】
@@ -2235,6 +2240,63 @@ class Worker:
         if source_file:
             print(f"[音频接续] {job_id}: 原始音轨 {source_file}"
                   f"（{source_kind or track_mode}，{duration}s）")
+
+    async def _record_ref_video_frame_count(self, job_id: str,
+                                             params: dict) -> None:
+        """把**参考视频的帧数**记进接续上下文（供接续段做时间轴切片）。
+
+        【为什么需要】—— 2026-11-19 实测到的真实缺陷
+        接续段（段2）的参考视频**画面**必须接段1 的时间位置：
+        规范（docs/接续模式深度研究-20261116.md §5.4.3）要求
+            skip_first_frames = C_n（= 上游已累计交付帧数）
+        但 `_continuation_media_slice` 把参考视频的切片**绑在**
+        「音轨来源是外部音轨」这个条件上 —— 音轨来源是「生成的音乐」
+        时 external=False ⇒ skip_frames=0 ⇒ **段2 的参考视频从 0 开始喂**。
+
+        ⇒ 段1 已经用过同一份参考视频（画面已经演化过去），
+          段2 却要求画面回到参考视频的开头 —— 与拷贝桥钉住区里
+          「段1 已演化的画面」**直接冲突** ⇒ 段2 新生成区爆发式跳变。
+
+        【实测证据】（2026-11-19，8190 真实生成）
+          同一段1 派生出两个接续段，唯一差别是参考视频在不在：
+            带参考视频：@21 帧 L1=100.78，Δ亮度=+9.01（25.8× 该段中位）
+            无参考视频：@21 帧 L1= 95.61，Δ亮度=+1.95（ 3.5× 该段中位）
+          ⇒ 带参考视频时是**亮度阶跃**（用户看到「闪一下」），
+            不带时是亮度连续的**镜头切换**（正常内容）。
+
+        【本函数做什么】
+        链首段探测参考视频的真实帧数，写进 params["continuation"]
+        （之后每一段从上游继承）。工作流层据此判断：
+          * 参考视频**够长**（C_n < 帧数）⇒ 按规范跳 C_n 帧（正确切片）
+          * 参考视频**不够长**（C_n >= 帧数）⇒ 内容已用尽，
+            本段**不带**参考视频（否则要么喂空参考报错、
+            要么继续从 0 开始喂 —— 后者就是本缺陷）
+        """
+        info = cont_service.chain_info(params)
+        if not info:
+            return
+        # 已有记录（接续段从上游继承）-> 不用再探测
+        if int(info.get("ref_video_frame_count") or 0) > 0:
+            return
+        videos = list(params.get("ref_videos") or [])
+        if not videos:
+            return
+        frames = 0
+        for name in videos[:1]:
+            local = _comfy_input_local(name)
+            if local is None:
+                continue
+            frames = _probe_video_frame_count(local)
+            break
+        if frames <= 0:
+            return
+        info["ref_video_frame_count"] = int(frames)
+        params["continuation"] = info
+        with db() as conn:
+            conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                         (json.dumps(params, ensure_ascii=False), job_id))
+        print(f"[接续] {job_id}: 参考视频 {frames} 帧"
+              f"（供接续段按 C_n 做时间轴切片）")
 
     async def _prepare_audio_continuation(self, session: ClientSession,
                                           job_id: str, params: dict) -> None:
