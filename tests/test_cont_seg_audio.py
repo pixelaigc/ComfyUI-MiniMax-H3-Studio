@@ -278,9 +278,18 @@ class TestFlfR2vWorkflowBridge(unittest.TestCase):
         【为什么改】原先断言「二采不走接续桥」，依据是
         「二采潜空间不同源」—— 该结论已被实测推翻。
         本断言守的是「二采接续段**真的**走桥」—— 防止静默退化。
+
+        【2026-11-18 改守新契约】接续段**默认**走标准采样
+        （等价 nonebot seg2 —— 二采在接续段会造成段头色档跳变，
+        实测段头断点比 2.58x/4.54x、3 帧亮度降 +4.7/+7.2 灰阶）。
+        要测「二采接续的接线姿势」必须**显式**声明
+        `continuation.allow_twopass=true`。
+        【为什么不删这条断言】接线姿势本身没有错，删了就再也
+        发现不了接线退化。处置见
+        references/merge-deploy-release-continuation.md §2.10。
         """
         params = {**self._base(), "twopass": {"enabled": True}}
-        params["continuation"] = self._cont()
+        params["continuation"] = {**self._cont(), "allow_twopass": True}
         p = h3modes.build_r2v({**params, "ref_images": ["a.png"]})
         for nid in ("300:load", "300:bridge", "300:trim", "300:save"):
             self.assertIn(nid, p, "二采接续段必须有节点 %s" % nid)

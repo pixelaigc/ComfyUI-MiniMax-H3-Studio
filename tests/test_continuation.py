@@ -456,8 +456,19 @@ class TestWorkflowWiring(unittest.TestCase):
         positive = 桥第 4 路、latent_image = 桥第 0 路。
 
         本断言守的是「二采接续段**真的**走桥」—— 防止静默退化。
+
+        【2026-11-18 改守新契约】接续段**默认**走标准采样
+        （等价 nonebot seg2 —— 二采在接续段会造成段头色档跳变，
+        实测段头断点比 2.58x/4.54x、3 帧亮度降 +4.7/+7.2 灰阶）。
+        所以要测「二采接续的接线姿势」必须**显式**声明
+        `continuation.allow_twopass=true`。
+        【为什么不删这条断言】二采接续的接线姿势本身没有错，
+        删了就再也发现不了接线退化。处置见
+        references/merge-deploy-release-continuation.md §2.10：
+        「改守新契约，保持严格性，并加变异证明它还能拒绝旧值」。
         """
-        params = {**self._base(), "job_id": "J2", "continuation": self._cont()}
+        params = {**self._base(), "job_id": "J2",
+                  "continuation": {**self._cont(), "allow_twopass": True}}
         params["twopass"] = {"enabled": True, "transition_step": 3,
                              "lowres_scale": 0.5, "rho": 0.0, "w_min": 0.5,
                              "w_max": 1.0, "upscaler_model": "none", "cfg": 1.0}
