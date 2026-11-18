@@ -28,6 +28,9 @@ BASE = "http://127.0.0.1:8190"
 DATA = Path("/root/projects/comfyui-minimax-h3-studio/data")
 OUTDIR = Path("/root/projects/h3studio-live/docs/evidence-reso-20261117")
 ASSET_DB = "/mnt/usb2t/asset_library/asset_library.db"
+ASSET_ROOT = Path("/mnt/usb2t/asset_library")
+# 上游 T8 的参考视频最小帧数（core.py:31）。素材库里大量 1 秒短片不满足。
+MIN_REF_VIDEO_FRAMES = 48
 
 # nonebot seg1/seg2 的 ResolutionSelector{megapixels: 2, multiple: 32}
 # -> 16:9 下就是 1920x1088
@@ -45,19 +48,51 @@ def http_json(path: str, method: str = "GET", body=None):
 
 
 def pick_assets():
-    """素材库里各挑一个真实素材（图片/视频）。"""
+    """素材库里各挑一个真实素材（图片/视频）。
+
+    【为什么视频要按帧数筛，不能只取最新】
+    上游 MiniMaxH3AudioConditioningT8 的参考视频策略要求
+    **ref_video 至少 48 帧**（core.py:31
+    "ref_video_{index} must contain at least 48 frames under the
+    official reference policy"）。素材库里有大量 1 秒的 e2e-sample
+    短视频（24 帧），若只取「最新一个」，r2v 必被上游拒收
+    （ValueError: ref_video_1 must contain at least 48 frames）。
+    所以这里按 ffprobe 实测帧数筛选，取第一个 >= 48 帧的素材。
+    """
     conn = sqlite3.connect(ASSET_DB)
     conn.row_factory = sqlite3.Row
     try:
         img = conn.execute(
             "SELECT id,name FROM assets WHERE category='image' "
             "AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1").fetchone()
-        vid = conn.execute(
-            "SELECT id,name FROM assets WHERE category='video' "
-            "AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1").fetchone()
+        vid_rows = conn.execute(
+            "SELECT a.id, a.name, v.storage_path FROM assets a "
+            "JOIN asset_versions v ON v.asset_id=a.id "
+            "WHERE a.category='video' AND a.deleted_at IS NULL "
+            "ORDER BY a.created_at DESC").fetchall()
     finally:
         conn.close()
-    return (dict(img) if img else None), (dict(vid) if vid else None)
+
+    vid = None
+    for r in vid_rows:
+        rel = r["storage_path"] or ""
+        full = rel if rel.startswith("/") else str(ASSET_ROOT / rel)
+        if not Path(full).exists():
+            continue
+        try:
+            proc = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-count_frames", "-show_entries", "stream=nb_read_frames",
+                 "-of", "csv=p=0", full],
+                capture_output=True, text=True, timeout=60)
+            frames = proc.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if frames.isdigit() and int(frames) >= MIN_REF_VIDEO_FRAMES:
+            vid = {"id": r["id"], "name": r["name"],
+                   "frames": int(frames), "path": full}
+            break
+    return (dict(img) if img else None), vid
 
 
 def job_row(job_id):
@@ -204,19 +239,34 @@ def run_one(mode: str, img_asset: dict, vid_asset: dict) -> dict:
                 "params": row.get("params")}
 
     # 产物
+    # 【契约】jobs.outputs 里视频条目的字段是 {"kind":"video","file":...}，
+    # **不是** {"type":"video","path":...}。历史上本脚本只认 path，
+    # 导致 flf/r2v 明明跑通却记成 "没有产物路径"（假阴性）。
+    # 这里同时接受 file / path 两种键，file 优先。
     video_out = None
     for o in outputs:
-        if isinstance(o, dict) and (o.get("type") == "video"
-                                    or str(o.get("path", "")).endswith(".mp4")):
+        if not isinstance(o, dict):
+            continue
+        rel = o.get("file") or o.get("path") or ""
+        if o.get("kind") == "video" or o.get("type") == "video" \
+                or str(rel).endswith(".mp4"):
             video_out = o
             break
     if video_out is None:
         for o in outputs:
-            if isinstance(o, dict) and o.get("path"):
+            if isinstance(o, dict) and (o.get("file") or o.get("path")):
                 video_out = o
                 break
 
-    path = (video_out or {}).get("path")
+    rel = (video_out or {}).get("file") or (video_out or {}).get("path")
+    path = str(rel) if rel else ""
+    if path and not path.startswith("/"):
+        # 【契约】jobs.outputs[].file 是相对 **data_dir/outputs** 的路径
+        # （server.py: OUT_DIR = DATA / "outputs"；full_rel 形如
+        #  "videos/v-h3-studio-000535.mp4"）。
+        # 历史脚本误拼成 DATA/rel -> "data/videos/xxx.mp4" -> ffprobe 报
+        # "没有产物路径"（假阴性）。这里按 OUT_DIR 拼。
+        path = str(DATA / "outputs" / path)
     probe = ffprobe(path) if path else {"error": "没有产物路径"}
     print(f"  产物 = {path}")
     print(f"  ffprobe = {json.dumps(probe, ensure_ascii=False)}")
