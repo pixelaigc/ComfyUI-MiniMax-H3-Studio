@@ -860,7 +860,8 @@ def clamp_max_tokens(value, merged_params: dict | None = None) -> int:
 
 
 def build_messages(spec: dict, original: str, language: str = "auto",
-                   history: list | None = None) -> list:
+                   history: list | None = None,
+                   asset_context: str = "") -> list:
     """构造统一消息格式（system + user）。
 
     【history —— 跨段提示词历史（2026-11-17 新增）】
@@ -875,6 +876,21 @@ def build_messages(spec: dict, original: str, language: str = "auto",
       * 历史里的**本段**（stage 与当前段号相同的那条）由调用方
         负责剔除 —— 这里只负责把「更早的段」原样带上；
       * 历史与原文之间用明确分隔，避免模型把多段内容当成一段来扩写。
+
+    【asset_context —— 素材上下文（2026-11-18 新增）】
+    「参考生图 / 首尾帧 / 参考生视频」这类面板里，用户已经从素材库
+    引用了素材。增强模型必须**看到**这些素材，扩写出来的内容才与
+    用户引用的画面相关 —— 否则素材等于白引用。
+
+    `asset_context` 是**文字**部分（素材清单 + 图序语义 + 音频的降级说明），
+    由 h3studio/enhance_assets.py 生成；**图片本体**走 llm.py 的
+    `images` 参数（多模态接口），不在这里。
+
+    约定：
+      * 只有**非空**素材上下文才注入 —— 无素材面板（文生图 / 文生视频）
+        的提示词与改动前**逐字一致**；
+      * 素材上下文放在原文**前面**，与历史的处理一致：让模型先把
+        「素材是什么」读完，再读本段原文。
     """
     original = (original or "").strip()
     user_text = spec["user_template"].replace("{original}", original)
@@ -903,6 +919,18 @@ def build_messages(spec: dict, original: str, language: str = "auto",
                 + "\n\n现在请基于以上全部段落内容，增强**下面这一段**的提示词。"
                 + "\n\n【当前段原文】\n" + user_text
             )
+    asset_context = (asset_context or "").strip()
+    if asset_context:
+        # 【为什么素材上下文也放前面】模型要先知道「图里是什么」，
+        # 才能把原文里的「她」「那件外套」对上号。放在原文前面，
+        # 原文紧随其后，模型读到末尾输出时素材信息还新鲜。
+        user_text = (
+            asset_context
+            + "\n\n请基于以上素材内容，增强**下面这段**提示词。"
+            + "提示词必须与所给素材一致（人物/主体/构图/风格/首尾帧关系），"
+            + "不要臆测素材里没有的细节。"
+            + "\n\n【当前提示词原文】\n" + user_text
+        )
     if language and language != "auto":
         user_text += f"\n\n请用{language}输出。"
     return [
