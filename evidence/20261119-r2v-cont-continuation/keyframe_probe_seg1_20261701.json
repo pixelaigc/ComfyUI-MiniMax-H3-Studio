@@ -1,0 +1,29 @@
+{
+  "note": "第 2 项第四轮：flf「首尾同图」vs「只给首帧」对照 —— 段1（非接续段）",
+  "seed": 20261701,
+  "V_both_frames": {
+    "seg1_job": "25140ba36491",
+    "file": "flf_25140ba36491_00001_.mp4",
+    "condition": "首帧=尾帧=图A（task_type=FL2VA，两端都钉）",
+    "frames": 124,
+    "median_l1": 0.5473,
+    "max_l1": 1.939,
+    "at_frame": 68,
+    "ratio": 3.54,
+    "d_lum": -0.59,
+    "verdict": "无跳变"
+  },
+  "W_first_only": {
+    "seg1_job": "b3d7e06cc7be",
+    "file": "flf_b3d7e06cc7be_00001_.mp4",
+    "condition": "只给首帧=图A（task_type=I2VA，只钉首帧）",
+    "frames": 124,
+    "median_l1": 3.4488,
+    "max_l1": 81.0776,
+    "at_frame": 45,
+    "ratio": 23.51,
+    "d_lum": -46.39,
+    "verdict": "**非接续段自己就有跳变** ⇒ 与接续无关，是 I2VA 的模型行为"
+  },
+  "key_finding": "「尾帧是否给定」才是变量：首尾同图无跳变（1.94），只给首帧在**非接续段**就有跳变（81.08 / Δ亮度 −46.39）。⇒ 上一轮「flf 侧已排除」的结论不成立。"
+}
