@@ -1,0 +1,497 @@
+/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+......F...F..FFFs..............F........................................ [  1%]
+........................................................................ [  3%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+........................................................................ [ 11%]
+........................................................................ [ 13%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 19%]
+........................................................................ [ 21%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+........................................................................ [ 31%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 41%]
+........................................................................ [ 42%]
+........................................................................ [ 44%]
+........................................F......F........................ [ 46%]
+........................................................................ [ 48%]
+.....................................................F.................. [ 50%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+........................................................................ [ 64%]
+....................................................FF.s................ [ 66%]
+........................................................................ [ 68%]
+........................................................................ [ 70%]
+........................................................................ [ 72%]
+........................................................................ [ 74%]
+........................................................................ [ 76%]
+......FF................................................................ [ 78%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+...........................s............................................ [ 84%]
+........................................................................ [ 85%]
+..................................................................F..... [ 87%]
+...........................s.s..s....................................... [ 89%]
+........................................................................ [ 91%]
+........................................................................ [ 93%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+........................s............................................... [ 99%]
+............                                                             [100%]
+=================================== FAILURES ===================================
+_____________________ test_asset_tags_saved_and_filterable _____________________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b20479a690>
+evidence = Evidence(run_id='20261118-181236', case_id='test_asset_tags_saved_and_filterable', root=PosixPath('/root/projects/h3st...90/api/system', 'GET http://127.0.0.1:8190/api/queue', 'GET http://127.0.0.1:8190/api/queue'], screenshots=[], shots=0)
+fixtures_dir = {'audio': PosixPath('/tmp/pytest-of-root/pytest-30/test_asset_tags_saved_and_filt0/e2e-sample-3180152-85077.wav'), 'im...ng'), 'video': PosixPath('/tmp/pytest-of-root/pytest-30/test_asset_tags_saved_and_filt0/e2e-sample-3180152-85077.mp4')}
+
+    def test_asset_tags_saved_and_filterable(studio_page, evidence, fixtures_dir):
+        """上传时打的标签会落库，且能按标签筛选。"""
+        sp = studio_page
+        sp.open()
+        tag = "e2e标签甲"
+        uploaded = _upload_assets(sp, [fixtures_dir["image"]], tags=tag,
+                                  note="带标签的素材")
+        assert uploaded, "带标签的素材没上传成功"
+        # _upload_assets 返回的是网格里的**全部**素材名（网格是共享的），
+        # 这里要的是本次上传的那一个 —— 用文件名精确匹配。
+        mine = [n for n in uploaded if n == fixtures_dir["image"].name]
+>       assert mine, f"本次上传的素材不在网格里：{uploaded}"
+E       AssertionError: 本次上传的素材不在网格里：['e2e-sample-3180152-73946.mp4', 'e2e-sample-3180152-73946.wav', 'e2e-sample-3180152-73946.png', 'e2e-sample-3091408-42080.png', 'v1.mp4_9145ef29.webm', 'clipboard_pasted.png', 'e2e-sample-2707655-1471.wav', 'v1.mp4_e0b82390.webm', 'clipboard_pasted.png', 'e2e-sample-2632898-20853.png', 'e2e-sample-2632898-4906.wav', 'e2e-sample-2707655-82571.mp4', 'e2e-sample-2707655-82571.png', 'i-zimage-000308.png', 'e2e-sample-2707655-75233.png', 'e2e-sample-2707655-90513.png', 'e2e-sample-2707655-24193.mp4', 'e2e-sample-2707655-24193.wav', 'e2e-sample-2632898-31345.png', 'i-zimage-000303.png', 'e2e-sample-2632898-67354.png', 'e2e-sample-2632898-82747.png', 'e2e-sample-2632898-16852.mp4', 'e2e-sample-2632898-16852.wav', 'i-zimage-000301.png', 'v1.mp4_addec1e7.webm', 'v1.mp4_9e8643fc.webm', 'e2e-sample-1503121-45829.png', 'e2e-sample-1503121-38328.png', 'e2e-sample-1503121-71899.mp4', 'e2e-sample-1503121-71899.wav', 'v1.mp4_b5b81970.webm', 'clipboard_pasted.png', 'e2e-sample-1098968-41131.png', 'e2e-sample-1098968-25181.wav', 'e2e-sample-1098968-86910.mp4', 'i-zimage-000289.png', 'e2e-sample-1098968-6846.png', 'e2e-sample-1098968-33229.png', 'e2e-sample-1098968-25782.png', 'e2e-sample-1098968-59780.wav', 'v1.mp4_c107dda8.webm', 'clipboard_pasted.png', 'e2e-sample-628485-34356.png', 'e2e-sample-628485-18589.wav', 'e2e-sample-628485-1251.mp4', 'e2e-sample-628485-1251.png', 'i-zimage-000277.png', 'e2e-sample-628485-3810.png', 'e2e-sample-628485-18600.png', 'e2e-sample-628485-85376.mp4', 'e2e-sample-628485-85376.wav', 'e2e-sample-491882-47492.mp4', 'e2e-sample-491882-47492.png', 'e2e-sample-472188-70318.mp4', 'e2e-sample-472188-70318.png', 'e2e-sample-491882-35649.png', 'e2e-sample-491882-29143.mp4', 'e2e-sample-491882-29143.wav', 'e2e-sample-491882-29143.png']
+E       assert []
+
+tests/e2e/test_asset_flow.py:120: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:14:47] 打开页面 /
+    [18:14:49] 切到页面 #navAssets
+    [18:14:49] 输入 #alUploadTags = 'e2e标签甲'
+    [18:14:49] 输入 #alUploadNote = '带标签的素材'
+__________________ test_player_playlist_from_manual_selection __________________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b1ffc876b0>
+evidence = Evidence(run_id='20261118-181236', case_id='test_player_playlist_from_manual_selection', root=PosixPath('/root/project...page_size=12', 'GET http://127.0.0.1:8190/api/system', 'GET http://127.0.0.1:8190/api/queue'], screenshots=[], shots=0)
+fixtures_dir = {'audio': PosixPath('/tmp/pytest-of-root/pytest-30/test_player_playlist_from_manu0/e2e-sample-3180152-67747.wav'), 'im...ng'), 'video': PosixPath('/tmp/pytest-of-root/pytest-30/test_player_playlist_from_manu0/e2e-sample-3180152-67747.mp4')}
+
+    def test_player_playlist_from_manual_selection(studio_page, evidence,
+                                                   fixtures_dir):
+        """播放器模式：播放列表来自**手动添加**的项，不是当前页全部素材。"""
+        sp = studio_page
+        sp.open()
+        _upload_assets(sp, [fixtures_dir["image"], fixtures_dir["video"]])
+    
+        # 先看一眼播放器（此时应该是空的）
+        sp.click("#alPlayerBtn")
+        sp.page.wait_for_timeout(1200)
+        assert sp.visible("#alPlayer"), "播放器没打开"
+        tabs = sp.page.eval_on_selector_all(
+            "#alPlayerTabs button", "els => els.map(e => e.textContent.trim())")
+        evidence.step(f"初始播放列表标签 = {tabs}")
+>       assert all("0" in t for t in tabs), f"初始播放列表应为空：{tabs}"
+E       AssertionError: 初始播放列表应为空：['图片播放 1', '音频播放 1', '视频播放 1']
+E       assert False
+E        +  where False = all(<generator object test_player_playlist_from_manual_selection.<locals>.<genexpr> at 0x79b1ffcf4040>)
+
+tests/e2e/test_asset_flow.py:283: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:22:50] 打开页面 /
+    [18:22:52] 切到页面 #navAssets
+    [18:23:53] 点击 #alPlayerBtn
+    [18:23:55] 初始播放列表标签 = ['图片播放 1', '音频播放 1', '视频播放 1']
+______________ test_continuation_refills_panel_and_clears_prompt _______________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b204d16c10>
+evidence = Evidence(run_id='20261118-181236', case_id='test_continuation_refills_panel_and_clears_prompt', root=PosixPath('/root/...//127.0.0.1:8190/api/jobs?status=running', 'GET http://127.0.0.1:8190/api/jobs/0b1ae28a8d55'], screenshots=[], shots=0)
+
+    def test_continuation_refills_panel_and_clears_prompt(studio_page, evidence):
+        """点接续 -> 左侧回填配置 + 提示词清空并聚焦。"""
+        sp = studio_page
+        job, _ = _generate_t2v(sp, "e2e 接续回填：第一段", 5.0)
+        assert job["status"] == "done", f"第一段没跑成功：{job.get('error')}"
+    
+        sp.goto_tab("done")
+        button = None
+        for _ in range(30):
+            button = _card_with_continue(sp.page, job["id"])
+            if button is not None:
+                break
+            sp.page.wait_for_timeout(1000)
+>       assert button is not None, "卡片上没有「接续」按钮"
+E       AssertionError: 卡片上没有「接续」按钮
+E       assert None is not None
+
+tests/e2e/test_continuation_flow.py:142: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:28:04] 打开页面 /
+    [18:28:06] 切到创作模式 t2v
+    [18:28:06] 输入 #prompt = 'e2e 接续回填：第一段'
+    [18:28:08] 点「生成」
+    [18:28:12] 切生成库标签 -> done
+_______________ test_continuation_second_segment_total_duration ________________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b2056a7380>
+evidence = Evidence(run_id='20261118-181236', case_id='test_continuation_second_segment_total_duration', root=PosixPath('/root/pr.../127.0.0.1:8190/api/jobs?status=queued', 'GET http://127.0.0.1:8190/api/jobs?status=running'], screenshots=[], shots=0)
+
+    def test_continuation_second_segment_total_duration(studio_page, evidence):
+        """第二段：5 + 5 -> 累计 9 秒（Σ请求时长 −(段数−1)×1）。"""
+        sp = studio_page
+        first, _ = _generate_t2v(sp, "e2e 接续时长：第一段 5 秒", 5.0)
+        assert first["status"] == "done", f"第一段没跑成功：{first.get('error')}"
+        evidence.step(f"第一段累计 = {(first.get('continuation_info') or {}).get('total_seconds')}")
+    
+        # 点接续 -> 写第二段提示词 -> 生成
+        sp.goto_tab("done")
+        button = None
+        for _ in range(30):
+            button = _card_with_continue(sp.page, first["id"])
+            if button is not None:
+                break
+            sp.page.wait_for_timeout(1000)
+        assert button is not None, "卡片上没有「接续」按钮"
+        button.click()
+        sp.page.wait_for_timeout(2500)
+    
+        sp.fill("#prompt", "e2e 接续时长：第二段 5 秒")
+        sp.submit_generation()
+        submitted = sp.last_submitted_params()
+        evidence.step(f"第二段提交体 = {submitted}")
+        params = submitted.get("params") or {}
+        cont = params.get("continuation") or {}
+        evidence.step(f"提交带上的 continuation = {cont}")
+        assert cont, "第二段提交里没有 continuation 上下文"
+        assert cont.get("source_job") == first["id"], (
+            f"continuation.source_job = {cont.get('source_job')}，期望 {first['id']}")
+    
+        second = _wait_job(sp.base_url)
+        evidence.step(f"第二段任务 {second['id']} 状态 = {second['status']}")
+        assert second["status"] == "done", f"第二段没跑成功：{second.get('error')}"
+    
+        info = second.get("continuation_info") or {}
+        total = float(info.get("total_seconds") or 0)
+        frames = int(info.get("total_frames") or 0)
+        expected_frames = _expected_frames([5.0, 5.0])
+        naive = _expected_total([5.0, 5.0])
+        evidence.step(f"第二段累计 = {frames} 帧 / {total}s"
+                      f"（帧级期望 {expected_frames}，题面口径 {naive}s）")
+>       assert frames == expected_frames, (
+            f"累计帧数 {frames} != 期望 {expected_frames}")
+E       AssertionError: 累计帧数 216 != 期望 226
+E       assert 216 == 226
+
+tests/e2e/test_continuation_flow.py:209: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:28:45] 打开页面 /
+    [18:28:47] 切到创作模式 t2v
+    [18:28:47] 输入 #prompt = 'e2e 接续时长：第一段 5 秒'
+    [18:28:48] 点「生成」
+    [18:31:05] 第一段累计 = 5.167
+    [18:31:07] 切生成库标签 -> done
+    [18:31:09] 输入 #prompt = 'e2e 接续时长：第二段 5 秒'
+    [18:31:10] 点「生成」
+    [18:31:10] 第二段提交体 = {'mode': 't2v', 'params': {'prompt': 'e2e 接续时长：第二段 5 秒', 'original_prompt': '', 'resolution': '544p', 'aspect': '16:9', 'duration': 5, 'model': 'lora', 'seed': None, 'model_key': 'fl2va_pruned_int8', 'width': 1344, 'height': 768, 'steps': 8, 'sampler': 'euler', 'scheduler': 'beta', 'shift_video': 12, 'shift_audio': 2, 'accel_loras': [{'key': 'dmad_4step_critic', 'strength': 1, 'enabled': True}], 'accel_lora': 'dmad_4step_critic', 'accel_lora_strength': 1, 'effect_loras': [], 'attention': 'sparse', 'twopass': {'enabled': True, 'transition_step': 4, 'lowres_scale': 0.7, 'rho': 0, 'w_min': 0.5, 'w_max': 1, 'upscaler_model': 'minimax_h3_latent_upscaler_3d_bf16.safetensors', 'cfg': 1, 'sigma_refine': {'enabled': True, 'extra_steps': 1, 'start_at_sigma': 2.5, 'end_at_sigma': 0, 'spacing': 'cosine'}}, 'continuation': {'chain_id': '9fffc25d501b', 'stage_index': 1, 'source_job': '9fffc25d501b', 'source_segment': 0, 'source_latent_run_id': 'h3studio_s9fffc25d501b', 'source_latent_stage': 0, 'source_latent_path': '/home/ubuntu/comfyui/output/relay_kit/h3studio_s9fffc25d501b/stage_00000_01138a0f.safetensors', 'context_frames': 22, 'anchor_frames': 22, 'chain_total_frames': 124, 'segment_frames': 124}}, 'fieldNames': ['mode', 'params']}
+    [18:31:10] 提交带上的 continuation = {'chain_id': '9fffc25d501b', 'stage_index': 1, 'source_job': '9fffc25d501b', 'source_segment': 0, 'source_latent_run_id': 'h3studio_s9fffc25d501b', 'source_latent_stage': 0, 'source_latent_path': '/home/ubuntu/comfyui/output/relay_kit/h3studio_s9fffc25d501b/stage_00000_01138a0f.safetensors', 'context_frames': 22, 'anchor_frames': 22, 'chain_total_frames': 124, 'segment_frames': 124}
+    [18:33:37] 第二段任务 26ea612081f6 状态 = done
+    [18:33:37] 第二段累计 = 216 帧 / 9.0s（帧级期望 226，题面口径 9.0s）
+________________ test_continuation_third_segment_total_duration ________________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b204d28a10>
+evidence = Evidence(run_id='20261118-181236', case_id='test_continuation_third_segment_total_duration', root=PosixPath('/root/pro.../127.0.0.1:8190/api/jobs?status=queued', 'GET http://127.0.0.1:8190/api/jobs?status=running'], screenshots=[], shots=0)
+
+    def test_continuation_third_segment_total_duration(studio_page, evidence):
+        """第三段：5 + 5 + 8 -> 累计 16 秒。"""
+        sp = studio_page
+        first, _ = _generate_t2v(sp, "e2e 三段链：第一段 5 秒", 5.0)
+        assert first["status"] == "done", (
+            f"第一段没跑成功：{first.get('error')}（提交体：{_}）")
+    
+        def continue_from(job_id: str, prompt: str, duration: float):
+            sp.goto_tab("done")
+            button = None
+            for _ in range(30):
+                button = _card_with_continue(sp.page, job_id)
+                if button is not None:
+                    break
+                sp.page.wait_for_timeout(1000)
+            assert button is not None, f"任务 {job_id} 卡片上没有「接续」按钮"
+            button.click()
+            sp.page.wait_for_timeout(2500)
+            sp.page.eval_on_selector(
+                "#duration",
+                "e => { e.value = %s; e.dispatchEvent(new Event('input', {bubbles:true})); }"
+                % duration)
+            sp.page.wait_for_timeout(300)
+            sp.fill("#prompt", prompt)
+            sp.submit_generation()
+            return _wait_job(sp.base_url)
+    
+        second = continue_from(first["id"], "e2e 三段链：第二段 5 秒", 5.0)
+        assert second["status"] == "done", f"第二段没跑成功：{second.get('error')}"
+    
+        third = continue_from(second["id"], "e2e 三段链：第三段 8 秒", 8.0)
+        assert third["status"] == "done", f"第三段没跑成功：{third.get('error')}"
+    
+        info = third.get("continuation_info") or {}
+        total = float(info.get("total_seconds") or 0)
+        frames = int(info.get("total_frames") or 0)
+        expected_frames = _expected_frames([5.0, 5.0, 8.0])
+        naive = _expected_total([5.0, 5.0, 8.0])
+        evidence.step(f"第三段累计 = {frames} 帧 / {total}s"
+                      f"（帧级期望 {expected_frames}，题面口径 {naive}s）")
+>       assert frames == expected_frames, (
+            f"三段累计帧数 {frames} != 期望 {expected_frames}")
+E       AssertionError: 三段累计帧数 384 != 期望 396
+E       assert 384 == 396
+
+tests/e2e/test_continuation_flow.py:256: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:33:40] 打开页面 /
+    [18:33:42] 切到创作模式 t2v
+    [18:33:42] 输入 #prompt = 'e2e 三段链：第一段 5 秒'
+    [18:33:44] 点「生成」
+    [18:34:49] 切生成库标签 -> done
+    [18:34:52] 输入 #prompt = 'e2e 三段链：第二段 5 秒'
+    [18:34:53] 点「生成」
+    [18:37:06] 切生成库标签 -> done
+    [18:37:09] 输入 #prompt = 'e2e 三段链：第三段 8 秒'
+    [18:37:10] 点「生成」
+    [18:41:01] 第三段累计 = 384 帧 / 16.0s（帧级期望 396，题面口径 16.0s）
+________________ test_video_t2v_size_and_model_controls_present ________________
+
+studio_page = <e2e_lib.StudioPage object at 0x79b1fe8f01d0>
+evidence = Evidence(run_id='20261118-181236', case_id='test_video_t2v_size_and_model_controls_present', root=PosixPath('/root/pro...7.0.0.1:8190/api/queue', 'GET http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12'], screenshots=[], shots=0)
+
+    def test_video_t2v_size_and_model_controls_present(studio_page, evidence):
+        """文生视频共享面板：尺寸、模型、采样参数控件都在。"""
+        sp = studio_page
+        sp.open()
+>       sp.goto_mode("t2v")
+
+tests/e2e/test_video_flow.py:185: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <e2e_lib.StudioPage object at 0x79b1fe8f01d0>, mode = 't2v'
+
+    def goto_mode(self, mode: str) -> None:
+        """按 data-mode 切创作模式（视频的两级导航先点类别）。"""
+        if mode in ("t2v", "flf", "r2v", "longfilm"):
+            category = mode
+            head = self.page.query_selector(f'.nav-cat-head[data-category="{category}"]')
+            if head is not None:
+                head.click()
+                self.page.wait_for_timeout(800)
+        item = self.page.query_selector(f'.nav-item[data-mode="{mode}"]')
+        if item is None:
+>           raise AssertionError(f"导航里找不到 mode={mode}")
+E           AssertionError: 导航里找不到 mode=t2v
+
+tests/e2e/e2e_lib.py:408: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    [18:53:59] 打开页面 /
+_________ TestRealMachineFiles.test_d2_not_available_and_incompatible __________
+
+self = <test_d11_defect_a_conversion.TestRealMachineFiles testMethod=test_d2_not_available_and_incompatible>
+
+    def test_d2_not_available_and_incompatible(self):
+        """D2：文件本体损坏 -> 不得出现在可选列表里。"""
+        path = self._resolve(self.D2)
+        if not path:
+            self.skipTest("本机没有该 LoRA")
+        result = mlc.check_moss_compatibility(path)
+>       self.assertFalse(result["compatible"])
+E       AssertionError: True is not false
+
+tests/test_d11_defect_a_conversion.py:267: AssertionError
+_ TestUnusableEntriesNeverCompatible.test_d2_is_not_in_available_and_is_incompatible _
+
+self = <test_d11_moss_lora_final.TestUnusableEntriesNeverCompatible testMethod=test_d2_is_not_in_available_and_is_incompatible>
+
+    def test_d2_is_not_in_available_and_is_incompatible(self):
+        path = lora_registry.resolve_lora(D2)[1]
+        if not path:
+            self.skipTest("本机没有该 LoRA")
+        result = mlc.check_moss_compatibility(path)
+>       self.assertFalse(result["compatible"],
+                         "损坏的权重文件绝不能以 compatible=true 下发")
+E       AssertionError: True is not false : 损坏的权重文件绝不能以 compatible=true 下发
+
+tests/test_d11_moss_lora_final.py:126: AssertionError
+___________ TestOwnerBadgeText.test_registry_owner_values_unchanged ____________
+
+self = <test_enhance_owner_badge.TestOwnerBadgeText testMethod=test_registry_owner_values_unchanged>
+
+    def test_registry_owner_values_unchanged(self):
+        """注册表里的 owner 值不能被悄悄改掉（它们是语义字段）。"""
+        found = set(re.findall(r'owner:\s*"([^"]*)"', self.raw))
+>       self.assertEqual(found, set(EXPECTED_BADGES),
+                         f"owner 取值集合变了：{sorted(found)}")
+E       AssertionError: Items in the first set but not the second:
+E       'MiniMax-H3-Image' : owner 取值集合变了：['MOSS-Image', 'MiniMax-H3-Image', 'Qwen-Image 2.1', 'YuE2 音乐']
+
+tests/test_enhance_owner_badge.py:56: AssertionError
+_ TestRealMachineDamagedFiles.test_real_damaged_files_are_rejected_by_generic_reader _
+
+self = <test_lora_file_integrity.TestRealMachineDamagedFiles testMethod=test_real_damaged_files_are_rejected_by_generic_reader>
+
+    def test_real_damaged_files_are_rejected_by_generic_reader(self):
+        """本机真实损坏文件 -> 通用读取器读不出头。"""
+        found = 0
+        for rel in DAMAGED_SAMPLES:
+            path = _find_damaged(rel)
+            if path is None:
+                continue
+            found += 1
+>           self.assertEqual(
+                lora_registry._read_safetensors_header(path), {},
+                f"{rel} 是损坏文件，通用读取器却读出了头部")
+E           AssertionError: {'__metadata__': {'kohakumoss_algo': 'lora[89377 chars]04]}} != {}
+E           Diff is 201546 characters long. Set self.maxDiff to None to see it. : moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors 是损坏文件，通用读取器却读出了头部
+
+tests/test_lora_file_integrity.py:229: AssertionError
+_ TestRealMachineDamagedFiles.test_real_damaged_files_not_surfaced_as_compatible _
+
+self = <test_lora_file_integrity.TestRealMachineDamagedFiles testMethod=test_real_damaged_files_not_surfaced_as_compatible>
+
+    def test_real_damaged_files_not_surfaced_as_compatible(self):
+        """损坏文件不得出现在任何族的 compatible=true 清单里。"""
+        damaged = {}
+        for rel in DAMAGED_SAMPLES:
+            path = _find_damaged(rel)
+            if path is not None:
+                damaged[str(path)] = rel
+        if not damaged:
+            self.skipTest("本机没有这些损坏样本文件")
+    
+        def _list_for(family: str) -> list[dict]:
+            if family == "Z-Image":
+                return lora_registry.list_effect_loras()
+            if family == "Qwen-Image 2.1":
+                return lora_registry.list_qwen_effect_loras()
+            return lora_registry.list_moss_effect_loras()
+    
+        for family in FAMILIES:
+            for item in _list_for(family):
+                if not item.get("compatible", True):
+                    continue
+                path = item.get("path") or ""
+                if path in damaged:
+>                   self.fail(
+                        f"{family} 清单把损坏文件 {damaged[path]} 以 compatible=true 下发")
+E                   AssertionError: MOSS-Image 清单把损坏文件 moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors 以 compatible=true 下发
+
+tests/test_lora_file_integrity.py:258: AssertionError
+________________ TestRealMachineFiles.test_d2_is_not_compatible ________________
+
+self = <test_moss_lora_damaged_and_partial.TestRealMachineFiles testMethod=test_d2_is_not_compatible>
+
+    def test_d2_is_not_compatible(self):
+        """D2：文件损坏 -> 必须判不兼容。"""
+        path = self._resolve(self.D2)
+        if not path:
+            self.skipTest("本机没有该 LoRA")
+        result = mlc.check_moss_compatibility(path)
+>       self.assertFalse(result["compatible"],
+                         "损坏的权重文件绝不能以 compatible=true 下发")
+E       AssertionError: True is not false : 损坏的权重文件绝不能以 compatible=true 下发
+
+tests/test_moss_lora_damaged_and_partial.py:434: AssertionError
+___________ TestRealMachineFiles.test_d2_not_in_moss_available_list ____________
+
+self = <test_moss_lora_damaged_and_partial.TestRealMachineFiles testMethod=test_d2_not_in_moss_available_list>
+
+    def test_d2_not_in_moss_available_list(self):
+        """D2 不得出现在用户可选列表里。"""
+        path = self._resolve(self.D2)
+        if not path:
+            self.skipTest("本机没有该 LoRA")
+        available = lora_registry.list_moss_effect_loras()
+        names = {item["name"] for item in available}
+>       self.assertNotIn(self.D2, names,
+                         "损坏的 LoRA 不得出现在可选列表里")
+E       AssertionError: 'moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors' unexpectedly found in {'moss-effects/moss_image_charref_v2.safetensors', 'moss-effects/mossps1_c1-st1000.safetensors', 'moss-effects/krealistick_MOSS.safetensors', 'moss-effects/nicegirls_v2_moss.safetensors', 'moss-effects/TsaritsaMI.safetensors', 'moss-effects/luna_style_moss_v1.safetensors', 'moss-effects/moss_image_sft_look_lora.safetensors', 'moss-effects/shuiwu22-moss-image-lora.safetensors', 'moss-effects/moss-image-reality-lora-preview-step73250.safetensors', 'moss-effects/grainscape_moss.safetensors', 'moss-effects/AsianGirlMix-Moss-177p44e.safetensors', 'moss-effects/odette_v5_s2200.safetensors', 'moss-effects/Asian handsome guy.safetensors', 'moss-effects/wangzhe_moss.safetensors', 'moss-effects/C500.safetensors', 'moss-effects/moss_style_v1-comfy(1).safetensors', 'moss-effects/kafgwoman-moss-moss-image-base-epoch-05.safetensors', 'moss-effects/mamimi_c1-st6000_comfyui.safetensors', 'moss-effects/moss_morereal.safetensors', 'moss-effects/moss_realistic_candid_lora.safetensors', 'moss-effects/concept-moss-image-base-epoch-11.safetensors', 'moss-effects/Cissia_MOSS.safetensors', 'moss-effects/moss-image-impressionism-lora.safetensors', 'moss-effects/cinematic-photography-moss-image-sft-epoch-10.safetensors', 'moss-effects/Moss_v1.safetensors', 'moss-effects/betmillustrationstyle-700steps.safetensors', 'moss-effects/cndamiph_Candid_Amateur_iPhone_MOSS_v1.safetensors', 'moss-effects/moss_sabikaze_v1.safetensors', 'moss-effects/Moss_danica_v2step400_azusa.safetensors', 'moss-effects/MKAI_Lindvern_Sunbringer_v1_MOSS.safetensors', 'moss-effects/moss_pussy_lora_v3.0.safetensors', 'moss-effects/yixuanZzz_v1.safetensors', 'moss-effects/MOSS-Image-Anime-LoRA-ComfyUI.safetensors', 'moss-effects/moss_alpha_v1.safetensors', 'moss-effects/MOSS_detailer_v051.safetensors', 'moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors', 'moss-effects/target-epoch0150-step000150.safetensors', 'moss-effects/transparent-lora-for-moss-image-v1.safetensors', 'moss-effects/facediff.safetensors', 'moss-effects/MOSS-Image-Beauty-LoRA-ComfyUI.safetensors', 'moss-effects/zshfmoss_c1-st1000.safetensors', 'moss-effects/PornMaster_Moss_Detail_Slider_V1.safetensors', 'moss-effects/moss-cn-uncle-moss-image-base-2000.safetensors', 'moss-effects/hina_MOSSImageSFT_MixArmor_v1.0_lora.safetensors', 'moss-effects/instagram_aesthetic_moss_v1.safetensors', 'moss-effects/mitya_v4_s1000.safetensors', 'moss-effects/moss_d3style_v1.safetensors', 'moss-effects/lucia elowen.safetensors', 'moss-effects/n_h_lora_v1.safetensors', 'moss-effects/moss_east_asian_girl_v2.safetensors', 'moss-effects/xiaoyuChineseAIWoman_v1.safetensors', 'moss-effects/hina_MOSSImageSFT_AsianMix_v1.0-lora.safetensors', 'moss-effects/Kodachrome1970s_000002000.safetensors', 'moss-effects/helives3d_dora_r64_s00006400_comfy.safetensors', 'moss-effects/qingxiao.safetensors', 'moss-effects/moss_pussy_lora_v3.0_face.safetensors', 'moss-effects/noyu_moss.safetensors', 'moss-effects/men-hanm-epoch-09.safetensors', 'moss-effects/Ultra-real-moss.safetensors', 'moss-effects/lunhuimoss1_c1-st1000.safetensors', 'moss-effects/lily_lora.safetensors', 'moss-effects/lenovo_moss.safetensors', 'moss-effects/silver_wolf_moss.safetensors', 'moss-effects/ViRealismMoss_V1.safetensors', 'moss-effects/BackgroundSharpness_MOSS-sft_v1.safetensors', 'moss-effects/ultra_real_moss_v2.safetensors', 'moss-effects/chenbin_style_v2_blush_1500step_rank32.safetensors', 'moss-effects/MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors', 'moss-effects/MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors', 'moss-effects/nekometaru-moss_c1-st1000.safetensors', 'moss-effects/moss-pixelart-v.0.3.safetensors', 'moss-effects/Remielle.safetensors', 'moss-effects/nelux_Realism_v2.safetensors', 'moss-effects/NexBlend01MossImage.safetensors', 'moss-effects/MOSS-Image-Psychedelic-LoRA-ComfyUI.safetensors', 'moss-effects/MOSS-Image-Animated-LoRA-ComfyUI.safetensors', 'moss-effects/yomistyle_v3.safetensors', 'moss-effects/firefly26710_Moss.safetensors', 'moss-effects/Moss-RealismEnhancer-V1.safetensors', 'moss-effects/moss base_000007750.safetensors', 'moss-effects/mss_photoQuality_-2to2.safetensors', 'moss-effects/Tsaritsa.safetensors', 'moss-effects/MOSS-Image-Gouache-LoRA-ComfyUI.safetensors', 'moss-effects/anime screenscap_mossimage_v1.safetensors', 'moss-effects/Ronova.safetensors', 'moss-effects/Tribios.safetensors', 'moss-effects/MysticXXX-Moss-V1.safetensors', 'moss-effects/moss Cantarella.safetensors', 'moss/moss_hires_lora_v0.3_qkv_split.safetensors', 'moss-effects/moss_sft_destripe_top64_bf16.safetensors', 'moss-effects/betmanimestyle-moss-990steps.safetensors', 'moss-effects/PornMaster_Moss_Realism_slider_V1.safetensors', 'moss-effects/moss Hsin2.safetensors', 'moss-effects/realskin_r32_comfy.safetensors', 'moss-effects/style-moss-image-base-epoch-10.safetensors', 'moss-effects/anireal_moss_lora_v1.safetensors', 'moss-effects/Vesna.safetensors', 'moss/moss_hires_lora_v0.1_qkv_split.safetensors', 'moss-effects/MOSS-Image-NSFW-Uncensored-LoRA-ComfyUI.safetensors', 'moss-effects/lora_MOSS_mylow_beta01.safetensors', 'moss-effects/nike.safetensors', 'moss/moss_hires_lora_v0.4_qkv_split.safetensors', 'moss-effects/Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors', 'moss-effects/asianathman.safetensors', 'moss-effects/blue-archive-style-base-moss-image-base-epoch-10.safetensors', 'moss-effects/gjb_v1_MOSS.safetensors', 'moss-effects/sandrone_mmd_v7_s4100.safetensors', 'moss/moss_hires_lora_v0.2_qkv_split.safetensors', 'moss-effects/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors', 'moss-effects/moss-sharp-v1_000000400.safetensors', 'moss-effects/imagefinish-sft-epoch0150-step000150.safetensors', 'moss-effects/samsung_moss.safetensors', 'moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors', 'moss-effects/Soft Pastel Photography MOSS.safetensors', 'moss-effects/canon_moss.safetensors', 'moss-effects/PhotoSlider_MOSS-sft_v1.safetensors', 'moss-effects/moss_danbooru40k_v1.safetensors', 'moss-effects/RAW_Upscale_MOSS_v1.safetensors', 'moss-effects/moss_base_background_tweaker.safetensors', 'moss-effects/vody_v2_s2500.safetensors', 'moss-effects/phone_photography_2025_moss.safetensors', 'moss-effects/vesna_v2_s2500.safetensors', 'moss-effects/Suoming.safetensors', 'moss-effects/Cinematic_MossSFT_c1-st6000.safetensors', 'moss-effects/moss_r32_v2-comfy.safetensors', 'moss-effects/darkFantasyStyleMOSS_v1.safetensors', 'moss-effects/dracaene-moss-v1.safetensors', 'moss-effects/style-moss-image-base-epoch-07.safetensors', 'moss-effects/ral-truskin_moss.safetensors', 'moss-effects/ohstyle_moss_v1.safetensors', 'moss-effects/kuukiikan_style_moss_v1-step0003200_3314586.safetensors', 'moss-effects/moss_matcha_style_v1_c1-st1000.safetensors', 'moss-effects/naturskinx-moss-image-sft-epoch-08.safetensors', 'moss-effects/lighting-slider-epoch0150-step000450.safetensors', 'moss-effects/Eldreda_Sunbringer_moss_12138.safetensors', 'moss/moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors', 'moss-effects/moss-image-pixelart-16x16.safetensors', 'moss-effects/atmospheric photography.safetensors', 'moss-effects/lumine_v3_1_s2000.safetensors'} : 损坏的 LoRA 不得出现在可选列表里
+
+tests/test_moss_lora_damaged_and_partial.py:445: AssertionError
+___________ TestLoRARegistry.test_scanner_only_returns_z_image_loras ___________
+
+self = <test_studio.TestLoRARegistry testMethod=test_scanner_only_returns_z_image_loras>
+
+    def test_scanner_only_returns_z_image_loras(self):
+        """不能把 285 个 LoRA 全塞进来，只返回 Z-Image 相关的。
+    
+        判据有三条（2026-11-08 扩了一条，2026-11-09 再扩一条）：
+          1. 文件名含 z-image 字样（Z_IMAGE_MARKERS）
+          2. **或** 层结构与 Z-Image 完全对应 —— 实测 `dejpeg_v3.safetensors`
+             文件名毫无 z-image 痕迹，但层结构 100% 命中 Z-Image 底模，
+             实测在 ComfyUI 里 attach 出 180 patches、真实生效。
+             只按文件名过滤会把它整个漏掉（用户根本选不到）。
+          3. **或** 在族专属目录 `z-image-effects/` 下 —— 2026-11-09 接入
+             调研清单的效果 LoRA 时加的：那批文件统一放在这个目录里，
+             目录前缀本身就是族归属的**唯一真相源**
+             （`pytorch_lora_weights.safetensors` 三族同名，靠文件名分不出来）。
+    
+        真正的「不把 285 个都塞进来」由**数量上限**兜底断言。
+        """
+        items = lora_registry.list_z_image_loras()
+        for item in items:
+            lowered = item["name"].lower()
+            by_name = any(m in lowered for m in lora_registry.Z_IMAGE_MARKERS)
+            by_structure = item.get("discovered_by") == "layer_structure"
+            by_effect_dir = item.get("discovered_by") == "effect_dir"
+            self.assertTrue(by_name or by_structure or by_effect_dir,
+                            f"{item['name']} 既不靠文件名也不靠层结构"
+                            "也不靠族目录认定，说明判定条件有漏洞")
+            # 结构兜底找到的，层命中率必须 100%
+            if by_structure and not by_name:
+                self.assertEqual(float(item.get("attention_hit") or 0), 1.0,
+                                 f"{item['name']} 靠层结构认定，注意力命中率必须 100%")
+            # 族目录里的，族归属必须自洽（不能串到别的族）
+            if by_effect_dir:
+                self.assertTrue(item["name"].startswith("z-image-effects/"),
+                                f"{item['name']} 的族目录前缀不对")
+                self.assertEqual(lora_registry.effect_family_of(item["name"]),
+                                 "Z-Image",
+                                 f"{item['name']} 的族判定与所在目录不一致")
+        # 数量兜底：本机总共有 443 个 LoRA，Z-Image 相关的只有个位数。
+        # 2026-11-09 接入通用效果 LoRA 目录后，本族合法条目 35 个；
+        # 2026-11-10 再接入 NSFW 成人向效果类目录 45 个 -> 80 个
+        # （75 个 z-image-effects/ + 4 个既有 + 1 个 z-image/）。
+        # 判据仍然能挡住「把全机 443 个都塞进来」—— 443 >> 120。
+>       self.assertLess(len(items), 120,
+                        f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
+                        "结构兜底的判据放太宽了")
+E       AssertionError: 197 not less than 120 : Z-Image 相关 LoRA 不该有 197 个 —— 结构兜底的判据放太宽了
+
+tests/test_studio.py:74: AssertionError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_asset_flow.py::test_asset_tags_saved_and_filterable - A...
+FAILED tests/e2e/test_asset_flow.py::test_player_playlist_from_manual_selection
+FAILED tests/e2e/test_continuation_flow.py::test_continuation_refills_panel_and_clears_prompt
+FAILED tests/e2e/test_continuation_flow.py::test_continuation_second_segment_total_duration
+FAILED tests/e2e/test_continuation_flow.py::test_continuation_third_segment_total_duration
+FAILED tests/e2e/test_video_flow.py::test_video_t2v_size_and_model_controls_present
+FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+FAILED tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+FAILED tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_are_rejected_by_generic_reader
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_not_surfaced_as_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+FAILED tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras
+14 failed, 3663 passed, 7 skipped in 4222.58s (1:10:22)
+Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x79b206aec690>
+Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x79b1feb73a80>, 202557.098301163)])']
+connector: <aiohttp.connector.TCPConnector object at 0x79b206aec550>
