@@ -65,6 +65,32 @@ class TestFrontendAllowTwopassDefaultOff(unittest.TestCase):
                 window, r"_allowTp\s*=\s*!!",
                 "allow_twopass=true 必须由 allow_continuation 的真值驱动")
 
+    def test_injection_is_after_all_mode_branches(self):
+        """注入点必须在 t2v / flf / r2v **三个分支都结束之后**。
+
+        【为什么这条重要 —— 本轮真的踩过】
+        第一版把注入放在 t2v 分支**之前** ⇒ 被 t2v 分支里的
+        `params.continuation = ctx.continuation;` **覆盖** ⇒
+        allow_twopass 根本传不出去（前端开关形同虚设）。
+        第二版挪到 t2v 分支**内部** ⇒ flf / r2v 走不到
+        （这两个分支本来就不设 params.continuation）。
+        ⇒ 正确位置 = 三个分支之后的公共作用域。
+        """
+        js = _read(APP_JS)
+        inject = js.find("params.continuation = Object.assign")
+        self.assertGreater(inject, 0, "找不到注入点")
+        # t2v 分支里那个会覆盖人的赋值
+        t2v_assign = js.find("params.continuation = ctx.continuation")
+        self.assertGreater(t2v_assign, 0, "找不到 t2v 分支的赋值")
+        flf_branch = js.find('} else if (mode === "flf" || mode === "r2v") {')
+        self.assertGreater(flf_branch, 0, "找不到 flf/r2v 分支")
+        self.assertGreater(
+            inject, t2v_assign,
+            "注入点必须在 t2v 分支的 params.continuation 赋值之后（否则被覆盖）")
+        self.assertGreater(
+            inject, flf_branch,
+            "注入点必须在 flf/r2v 分支之后（否则那两种模式走不到）")
+
     def test_default_path_has_no_allow_twopass(self):
         """默认（未勾选）时提交体里不得出现 allow_twopass=true。
 

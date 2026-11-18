@@ -3390,31 +3390,7 @@ async function onGenerateClick() {
       delete params.loras;
     }
   }
-    // 【2026-11-18 新增】接续段也用二采的**显式放行**标记。
-    //
-    // 【为什么放这里】三个视频模式共用这一个提交出口；
-    // `allow_twopass` 必须跟着 `continuation` 一起走 ——
-    // 服务端读的是 `params["continuation"]["allow_twopass"]`
-    // （h3studio/twopass_policy.py::continuation_allows_twopass）。
-    //
-    // 【默认必须是 false】面板的 `twopass.allow_continuation` 默认 false，
-    // 且只有用户勾了那个带二次确认的开关才可能为 true。
-    // **默认路径因此仍等价 nonebot seg2**（接续段走标准采样）。
-    if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
-      const _tpState = window.VIDEO_PANEL.state || {};
-      const _allowTp = !!(_tpState.twopass
-        && _tpState.twopass.allow_continuation);
-      if (_allowTp && window.Continuation && window.Continuation.state) {
-        const _ctx = window.Continuation.state().current;
-        if (_ctx && _ctx.continuation) {
-          // 只在这里改**副本**，不改 state 里那份（state 是回填用的上下文，
-          // 不能被提交动作污染）。
-          params.continuation = Object.assign({}, _ctx.continuation,
-                                              { allow_twopass: true });
-        }
-      }
-    }
-    if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+  if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
     // 加速 LoRA：把「不挂」**显式表达**出来（与 flf/r2v 分支同一写法）。
@@ -3580,6 +3556,37 @@ async function onGenerateClick() {
         Number(params.width) || 0, Number(params.height) || 0);
     }
   }
+    // 【2026-11-18 新增】接续段也用二采的**显式放行**标记。
+    //
+    // 【为什么放这里】三个视频模式共用这一个提交出口；
+    // `allow_twopass` 必须跟着 `continuation` 一起走 ——
+    // 服务端读的是 `params["continuation"]["allow_twopass"]`
+    // （h3studio/twopass_policy.py::continuation_allows_twopass）。
+    //
+    // 【为什么必须在三个分支之后】
+    //   * 放在 t2v 分支**之前** -> 会被 t2v 分支里的
+    //     `params.continuation = ctx.continuation;` **覆盖**；
+    //   * 放在 t2v 分支**内部** -> flf / r2v 走不到
+    //     （这两个分支本来就不设 params.continuation）。
+    //   => 放在三个分支都结束之后的公共作用域，才是对的。
+    //
+    // 【默认必须是 false】面板的 `twopass.allow_continuation` 默认 false，
+    // 且只有用户勾了那个带二次确认的开关才可能为 true。
+    // **默认路径因此仍等价 nonebot seg2**（接续段走标准采样）。
+    if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+      const _tpState = window.VIDEO_PANEL.state || {};
+      const _allowTp = !!(_tpState.twopass
+        && _tpState.twopass.allow_continuation);
+      if (_allowTp && window.Continuation && window.Continuation.state) {
+        const _ctx = window.Continuation.state().current;
+        if (_ctx && _ctx.continuation) {
+          // 只在这里改**副本**，不改 state 里那份
+          //（state 是回填用的上下文，不能被提交动作污染）。
+          params.continuation = Object.assign({}, _ctx.continuation,
+                                              { allow_twopass: true });
+        }
+      }
+    }
   // 图片编辑的参考图：**必须来自素材库**。
   // 这里只提交素材库条目 ID + 描述 + 标签 + 顺序，
   // 服务端据此把素材库文件上传到 ComfyUI，并按 <imageN> 顺序接线。

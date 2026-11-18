@@ -89,6 +89,20 @@ MUTATIONS = [
         f"{TEST}::TestFrontendAllowTwopassConfirmation::"
         "test_cancel_rolls_back_checkbox_and_state",
     ),
+    (
+        "F7",
+        "【本轮真的踩过的坑】把注入块挪回 t2v 分支**之前** —— "
+        "会被 t2v 分支的 params.continuation = ctx.continuation 覆盖，"
+        "allow_twopass 传不出去（前端开关形同虚设）",
+        APP_JS,
+        # 把注入块**整块**（含其后的空行）挪到 t2v 分支之前。
+        # 判据串是注入块的最后一行 + 其后的空行 —— 用它定位，
+        # 再把整块搬到 t2v 分支的起点之前。
+        "    // 【2026-11-18 新增】接续段也用二采的**显式放行**标记。\r\n",
+        "@@MOVE@@",
+        f"{TEST}::TestFrontendAllowTwopassDefaultOff::"
+        "test_injection_is_after_all_mode_branches",
+    ),
 ]
 
 
@@ -129,8 +143,26 @@ def main() -> int:
                   f"{cnt} 次（应恰好 1 次）—— 变异体已失效")
             failures.append(mid)
             continue
+        if new == "@@MOVE@@":
+            # 把注入块整块挪到 t2v 分支之前（复现本轮真实踩过的坑）
+            block_start = data.find(old_b)
+            assert block_start >= 0, "找不到注入块"
+            # 注入块结束于「公共作用域」之前的那个顶层注释行
+            # （用 UTF-8 字节串找，避免转义层数问题）
+            marker = "  // 图片编辑的参考图".encode("utf-8")
+            block_end = data.find(marker, block_start)
+            assert block_end > block_start, "找不到注入块结尾"
+            block = data[block_start:block_end]
+            rest = data[:block_start] + data[block_end:]
+            # t2v 分支起点
+            t2v_at = rest.find(
+                b'  if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {\r\n')
+            assert t2v_at >= 0, "找不到 t2v 分支"
+            mutated = rest[:t2v_at] + block + rest[t2v_at:]
+        else:
+            mutated = data.replace(old_b, new_b)
         with open(target, "wb") as fh:
-            fh.write(data.replace(old_b, new_b))
+            fh.write(mutated)
         try:
             passed, out = _run_pytest(selector)
         finally:
