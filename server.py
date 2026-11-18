@@ -8514,6 +8514,27 @@ def _normalize_prompt_history(raw, current_stage: int = 0) -> list[dict]:
     return out
 
 
+async def _resolve_enhance_assets(asset_refs):
+    """
+    把「面板当前引用的素材」解析成**服务端可读**的素材上下文。
+
+    【为什么必须由服务端解析、而不是让前端传路径】
+      * 浏览器本地路径服务端**根本读不到** —— 所以服务端的 `images`
+        参数（本地图片路径列表）实际是条死路，前端也从来没有用过它；
+      * 素材库里的素材服务端**本来就读得到**（h3studio/assets.py 管着
+        物理文件）。前端只传 asset_id，服务端自己解析 —— 这也顺带保证
+        「只接受素材库里的素材」，不引入任意文件读取。
+
+    【为什么丢进线程】素材解析要读素材库（SQLite）+ 视频要抽帧
+    （ffmpeg 子进程）—— 都是阻塞操作，直接在事件循环里跑会把
+    整个 Studio 卡住（8190 是单机单进程，事件循环一卡全站无响应）。
+
+    返回 h3studio/enhance_assets.resolve_assets 的结果 dict。
+    素材不可用时抛 EnhanceAssetError（调用方据此如实报错）。
+    """
+    return await asyncio.to_thread(enh_assets.resolve_assets, asset_refs)
+
+
 async def api_enhance(request):
     """
     POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
@@ -8525,8 +8546,8 @@ async def api_enhance(request):
       provider_id 指定 Provider；不给则用默认（要读图则用默认多模态）
       images      可选，本地图片路径列表（需要读图的场景）
       asset_refs  可选，**面板当前引用的素材列表**（素材库 asset_id）
-                  [{"asset_id": "asset_xxx", "slot": "ref_image", "ordinal": 0}, ...]
-                  服务端把它解析成服务端可读的图片（图片直给 / 视频抽帧），
+                  [{"asset_id": "asset_xxx", "slot": "ref_image"}, ...]
+                  服务端解析成服务端可读的图片（图片直给 / 视频抽帧），
                   连同图序语义一起喂给多模态模型。
                   【2026-11-18 修复】此前前端从不传素材，增强模型**看不到**
                   用户引用的素材，扩写结果与素材无关 —— 素材等于白引用。
@@ -8559,22 +8580,14 @@ async def api_enhance(request):
     images = [str(p) for p in images[:4]]
 
     # ---- 素材上下文（2026-11-18 新增）----
-    #
     # 前端把「当前面板已引用的素材」以 asset_refs 传上来，
     # 这里解析成**服务端可读**的图片路径 + 图序语义。
-    #
-    # 【为什么必须在这里解析、而不是让前端传路径】浏览器本地路径
-    # 服务端读不到；而素材库里的素材服务端**本来就读得到**
-    # （h3studio/assets.py 管着物理文件）。所以前端只传 asset_id，
-    # 服务端自己解析 —— 这也顺带保证「只接受素材库里的素材」，
-    # 不引入任意文件读取。
     asset_refs = payload.get("asset_refs")
     asset_context = ""
     asset_summary = {}
     if asset_refs:
         try:
-            resolved_assets = await asyncio.to_thread(
-                enh_assets.resolve_assets, asset_refs)
+            resolved_assets = await _resolve_enhance_assets(asset_refs)
         except enh_assets.EnhanceAssetError as exc:
             # 素材用不了 -> **如实报错**，不静默忽略
             # （静默忽略 = 用户以为素材参与了增强，其实没有）。
