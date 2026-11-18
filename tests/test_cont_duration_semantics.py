@@ -75,35 +75,72 @@ class TestChainDurationAccount(unittest.TestCase):
         self.assertEqual(seg["delivered_frames"], 124,
                          "链首段应交付整段 124 帧")
 
-    def test_two_segments_match_real_artifact(self):
-        """5 秒 -> 接续 5 秒：成片 226 帧（真实产物 ffprobe 实测值）。
+    def test_two_segments_match_user_formula_exactly(self):
+        """5 秒 -> 接续 5 秒：成片必须**精确** 216 帧 = 9.000 秒。
 
-        【为什么锁 226 而不是 216】
-        216 帧 = 9.000 秒是**用户口径**的值；226 帧是**实际产物**的值。
-        两者差 10 帧 = 4 帧网格余量 + 2 帧（22 vs 24 帧重叠）。
-        这里锁的是「实际产物」—— 因为成片文件是这么长的。
+        【2026-11-17 收口】上一轮这条锁的是 226 帧（补偿前的实测值），
+        因为那时成片真的比用户口径长 10 帧。现在成片拼接会做尾裁
+        （server 侧 `_concat_chain_video` 的 `trim_tail_frames`），
+        成片帧数**精确**命中用户口径 —— 这就是用户要求的最终标准。
+
+        真实产物已实测（线上 8190，ffprobe）：
+          v-h3-studio-000454.mp4 -> 216 帧 / 9.000000s
+        """
+        plan = cont.chain_compensation_plan([5.0, 5.0])
+        self.assertEqual(plan["formula_frames"], 216,
+                         "用户口径的成片帧数必须是 216")
+        self.assertEqual(plan["current_frames"], 226,
+                         "补偿前的帧数应是 226（网格余量 8 + 重叠差 2）")
+        self.assertEqual(plan["trim_frames"], 10)
+        self.assertEqual(plan["keep_frames"], [124, 92],
+                         "只裁最后一段尾部：链首段 124 帧一帧不裁")
+        self.assertTrue(plan["exact"])
+        self.assertEqual(plan["residual_frames"], 0)
+
+    def test_chain_duration_account_raw_still_reports_untrimmed(self):
+        """**原始账**（chain_duration_account）仍报告补偿前的 226 帧。
+
+        【为什么要保留这个口径】原始账是「不裁剪时各段交付多少帧」的
+        事实描述；补偿计划是「成片里实际保留多少帧」。
+        两个都要能算，且不能互相污染。
         """
         a = cont.chain_duration_account([5.0, 5.0])
         self.assertEqual(a["total_frames"], 226,
-                         "5s+5s 的成片帧数不对（真实产物 = 226 帧）")
+                         "原始账应是 226 帧（不补偿时的交付帧数之和）")
         self.assertAlmostEqual(a["total_seconds"], 226 / 24, places=6)
 
-    def test_three_segments_match_real_artifact(self):
-        """5 秒 -> 5 秒 -> 8 秒：成片 396 帧。"""
-        a = cont.chain_duration_account([5.0, 5.0, 8.0])
-        self.assertEqual(a["total_frames"], 396,
-                         "5s+5s+8s 的成片帧数不对")
-        self.assertAlmostEqual(a["total_seconds"], 396 / 24, places=6)
+    def test_three_segments_match_user_formula_exactly(self):
+        """5 秒 -> 5 秒 -> 8 秒：成片必须**精确** 384 帧 = 16.000 秒。
 
-    def test_four_segments_match_online_real_chain(self):
-        """5 秒 × 4 段：430 帧 —— 对齐线上真实 4 段链产物。
-
-        【证据来源】线上 DB 里那条 4 段链（chain fec6e25740b9）
-        的成片 `v-h3-studio-000035.mp4`，ffprobe 实测 430 帧。
+        【差额拆解】396 - 384 = 12 帧 = 网格余量 8 + 重叠差 2×2 处。
         """
-        a = cont.chain_duration_account([5.0, 5.0, 5.0, 5.0])
-        self.assertEqual(a["total_frames"], 430,
-                         "4 段链的成片帧数与线上真实产物（430）不符")
+        plan = cont.chain_compensation_plan([5.0, 5.0, 8.0])
+        self.assertEqual(plan["formula_frames"], 384,
+                         "用户口径的成片帧数必须是 384")
+        self.assertEqual(plan["current_frames"], 396)
+        self.assertEqual(plan["trim_frames"], 12)
+        self.assertEqual(plan["keep_frames"], [124, 102, 158],
+                         "只裁最后一段尾部；中间段一帧不裁")
+        self.assertTrue(plan["exact"])
+        self.assertEqual(plan["residual_frames"], 0)
+
+    def test_four_segments_match_user_formula_exactly(self):
+        """5 秒 × 4 段：成片必须**精确** 408 帧 = 17.000 秒。
+
+        【历史】线上那条 4 段链（chain fec6e25740b9）的成片
+        `v-h3-studio-000035.mp4` ffprobe 实测 430 帧 ——
+        那是**补偿前**的产物。收口后必须是 408 帧
+        （用户口径：4×120 - 3×24 = 480 - 72 = 408）。
+        """
+        plan = cont.chain_compensation_plan([5.0, 5.0, 5.0, 5.0])
+        self.assertEqual(plan["formula_frames"], 408,
+                         "4 段链的用户口径成片帧数必须是 408")
+        self.assertTrue(plan["exact"])
+        self.assertEqual(plan["residual_frames"], 0)
+        # 补偿前 = 124 + 102 + 102 + 102 = 430
+        self.assertEqual(plan["current_frames"], 430)
+        self.assertEqual(plan["trim_frames"], 22)
+        self.assertEqual(plan["keep_frames"], [124, 102, 102, 80])
 
     def test_formula_follows_user_spec(self):
         """「按 1 秒重叠口径」的成片时长必须等于用户公式。"""
@@ -310,7 +347,10 @@ class TestChainDurationPlan(unittest.TestCase):
         """extra_seconds 把「下一段」算进去。
 
         场景：链上已有 1 段 5 秒，用户点「接续」且面板时长仍是 5 秒
-        -> 预期成片 = 9 秒（按口径）/ 226 帧（实际）。
+        -> 预期成片 = 9 秒 = **216 帧**（收口后精确命中用户口径）。
+
+        【2026-11-17 收口】这里从 226 改成 216 ——
+        duration_plan 现在返回的是**补偿后**的账（成片真实帧数）。
         """
         rows = [("s0", {"duration": 5.0, "continuation": {
             "chain_id": "c", "stage_index": 0, "source_job": "",
@@ -320,9 +360,17 @@ class TestChainDurationPlan(unittest.TestCase):
             path, lambda: S._chain_duration_plan("s0", extra_seconds=5.0))
         self.assertEqual(len(plan["segments"]), 2,
                          "下一段没被算进时长账")
-        self.assertEqual(plan["total_frames"], 226)
+        self.assertEqual(plan["total_frames"], 216,
+                         "成片帧数必须是 216（用户口径）")
+        self.assertAlmostEqual(plan["total_seconds"], 9.0, places=6)
         self.assertEqual(plan["formula_seconds"], 9.0,
                          "按 1 秒重叠口径的成片时长应为 9 秒")
+        # 补偿前 226 帧的账也保留着（诊断用）
+        self.assertEqual(plan["raw_total_frames"], 226)
+        self.assertTrue(plan["compensation"]["exact"])
+        self.assertEqual(plan["compensation"]["residual_frames"], 0)
+        self.assertEqual(plan["delta_seconds"], 0.0,
+                         "补偿后与用户口径的差必须是 0")
 
     def test_plan_without_extra_covers_current_chain_only(self):
         """不给 extra 时只算到当前段。"""
@@ -364,24 +412,39 @@ class TestFrontendDurationDisplay(unittest.TestCase):
             "renderPanel 没有调用 renderDurationRows —— "
             "成片时长账不会显示给用户")
 
-    def test_continuation_js_shows_formula_and_actual(self):
-        """两个数都要显示 —— 只显示一个，用户无从判断。
+    def test_continuation_js_shows_single_unified_duration(self):
+        """前端只显示**一个**成片时长；残差非 0 时才补充残差说明。
 
-        【为什么 grep 函数体】`formula_seconds` / `total_seconds` 在
-        `renderDurationRows` 的**定义**里也出现 —— 只查整个文件的话，
-        把展示逻辑删了断言仍然会过。所以这里查 `renderDurationRows`
-        的函数体。
+        【2026-11-17 收口】上一轮要求显示两个数（口径值 / 实际值），
+        因为那时成片真的比口径长。现在成片帧数**精确**命中用户口径，
+        并列显示反而让人以为还有差异 —— 所以改成：
+          * 主行：成片时长（= 成片真实帧数 / 24）；
+          * 仅当 `compensation.exact` 为 false 时，才显示残差多少帧/秒。
+
+        【为什么 grep 函数体】`total_seconds` 在 `renderDurationRows`
+        的**定义**里也出现 —— 只查整个文件的话，把展示逻辑删了断言
+        仍然会过。所以这里查 `renderDurationRows` 的函数体。
         """
         js = (REPO / "web" / "continuation.js").read_text(encoding="utf-8")
         start = js.index("function renderDurationRows(")
         end = js.index("\n  function ", start + 10)
         body = js[start:end]
-        self.assertIn("formula_seconds", body,
-                      "前端没显示「按 1 秒重叠口径」的成片时长")
-        self.assertIn("total_seconds", body,
-                      "前端没显示「实际帧数」的成片时长")
-        self.assertIn("delta_seconds", body,
-                      "前端没显示「两者相差多少」")
+        # 主行：只显示一个成片时长
+        self.assertIn("plan.total_seconds", body,
+                      "前端没显示成片时长")
+        self.assertIn("plan.total_frames", body,
+                      "前端没显示成片总帧数")
+        self.assertNotIn("按 1 秒重叠口径", body,
+                         "收口后不该再并列显示「口径值」—— 两个数已精确相等")
+        # 残差提示：只在残差非 0 时出现，且必须写出残差帧数
+        self.assertIn("comp.exact", body,
+                      "前端必须按 compensation.exact 决定是否提示残差")
+        self.assertIn("residual_frames", body,
+                      "残差提示必须写出差多少帧")
+        self.assertIn("comp.residual_frames", body,
+                      "残差提示必须取服务端算好的残差（不是自己重算）")
+        self.assertNotIn("delta_seconds", body,
+                         "收口后不该再显示「两者相差」—— 残差已经是 0")
 
     def test_fetch_passes_next_duration(self):
         """取上下文时要把下一段的请求时长传给服务端。"""

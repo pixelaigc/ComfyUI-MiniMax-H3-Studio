@@ -501,15 +501,25 @@ def chain_compensation_plan(requested_seconds: list[float],
     trim = current - formula
 
     segment_trim = [0] * len(durations)
-    if trim > 0:
+    if trim > 0 and len(durations) >= 2:
         # 只从**最后一段**尾部裁；中间段与链首段一帧不裁。
         segment_trim[-1] = trim
+    elif trim > 0:
+        # 【单段链不裁】单段链没有「成片拼接」这一步 ——
+        # 段文件本身就是最终产物（server 的 _finalize_continuation_impl
+        # 对 stage<=0 直接 return，不调 _concat_chain_video）。
+        # 裁它 = 改写单段视频的文件，而单段视频的时长是
+        # 「H3 的 17k+5 段长网格」决定的（请求 5s -> 124 帧 = 5.1667s），
+        # 那是**所有**视频（不止接续链）都有的模型侧约束，
+        # 不属于「接续成片时长」的收口范围。
+        # 所以这里不裁，并把残差如实报出去（界面会写明来自哪条约束）。
+        pass
     keep = [s["delivered_frames"] - t
             for s, t in zip(account["segments"], segment_trim)]
     residual = sum(keep) - formula
 
     notes: list[str] = []
-    if trim > 0:
+    if trim > 0 and len(durations) >= 2:
         slack_total = sum(int(s["grid_slack_frames"]) for s in account["segments"])
         n_cont = max(0, len(durations) - 1)
         win_gap = (FPS - win) if win else 0
@@ -527,6 +537,17 @@ def chain_compensation_plan(requested_seconds: list[float],
             f"补偿只裁**最后一段的尾部**，前面的段一帧不裁 —— "
             f"接缝（上一段末帧 → 下一段首帧）的连续性完全不受影响，"
             f"也不会丢掉任何一段的内容。")
+    elif trim > 0:
+        # 单段链：残差来自模型侧的段长网格，不属于接续成片的收口范围。
+        notes.append(
+            f"当前只有 1 段，没有「成片拼接」这一步 —— 段文件本身就是产物，"
+            f"所以成片是 {current} 帧（{current / FPS:.4f} 秒），"
+            f"比请求的 {formula} 帧多 {trim} 帧（{trim / FPS:.4f} 秒）。")
+        notes.append(
+            f"这 {trim} 帧来自 H3 的 17k+5 段长网格"
+            f"（请求 {durations[0]:g} 秒 = {int(round(durations[0] * FPS))} 帧，"
+            f"模型只能出 {int(account['segments'][0]['frame_count'])} 帧）—— "
+            f"这是**所有**视频（不止接续链）都有的模型侧约束。")
     elif trim < 0:
         notes.append(
             f"成片比用户口径**短** {abs(trim)} 帧（{abs(trim) / FPS:.4f} 秒）—— "

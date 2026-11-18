@@ -273,10 +273,15 @@ class TestHealPathProducesMergedVideo(unittest.TestCase):
              "-count_frames", "-show_entries", "stream=nb_read_frames",
              "-of", "csv=p=0", str(full_path)], encoding="utf-8", timeout=120)
         full_frames = int(raw.strip().split(",")[0])
+        # 【2026-11-17 收口】成片帧数精确命中用户口径。
+        # 这些合成任务没有 duration 字段 → _lineage_durations 按
+        # segment_frames/24 回落 = 5.1667 秒/段
+        # → 用户口径 = 124 + 124 - 24 = 224 帧
+        # → 补偿前 226 帧，尾裁 2 帧。
         self.assertEqual(
-            full_frames, 124 + 102,
-            "成片帧数不对：期望 %d（段0 124 + 段1 102），实际 %d"
-            % (124 + 102, full_frames))
+            full_frames, 124 + 124 - 24,
+            "成片帧数不对：期望 %d（用户口径 124+124-24），实际 %d"
+            % (124 + 124 - 24, full_frames))
 
     def test_rerun_keeps_segment_rel_and_does_not_double_length(self):
         """**重跑**必须保持分段登记不变，且成片长度**不翻倍**。
@@ -404,9 +409,9 @@ class TestHealPathProducesMergedVideo(unittest.TestCase):
                  "-of", "csv=p=0", str(path)], encoding="utf-8", timeout=120)
             frames = int(raw.strip().split(",")[0])
             self.assertEqual(
-                frames, 124 + 102,
-                "重跑后的成片帧数不对：期望 %d，实际 %d（翻倍说明拼接链"
-                "混进了成片）" % (124 + 102, frames))
+                frames, 124 + 124 - 24,
+                "重跑后的成片帧数不对：期望 %d（用户口径），实际 %d（翻倍说明拼接链"
+                "混进了成片）" % (124 + 124 - 24, frames))
         finally:
             (S.db, S.DB_PATH, S.OUT_DIR, S.DATA, S.VIDEO_DIR,
              S.IMAGE_DIR, S.AUDIO_DIR) = saved

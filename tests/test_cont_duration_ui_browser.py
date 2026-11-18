@@ -145,15 +145,20 @@ class TestDurationPlanUI(unittest.TestCase):
         self.assertAlmostEqual(float(plan.get("formula_seconds")), 9.0,
                                places=6,
                                msg="按 1 秒重叠口径的成片时长应为 9 秒：%r" % plan)
-        # 实际帧数：124 + 102 = 226 帧 = 9.4167 秒
-        self.assertEqual(int(plan.get("total_frames")), 226,
-                         "成片帧数应为 226：%r" % plan)
-        self.assertAlmostEqual(float(plan.get("total_seconds")), 226 / 24,
+        # 【2026-11-17 收口】成片帧数精确命中用户口径 = 216 帧
+        self.assertEqual(int(plan.get("total_frames")), 216,
+                         "成片帧数应为 216：%r" % plan)
+        self.assertAlmostEqual(float(plan.get("total_seconds")), 216 / 24,
                                places=4)
-        # 差值 = 10 帧 = 0.4167 秒
-        self.assertAlmostEqual(float(plan.get("delta_seconds")), 10 / 24,
+        # 补偿后与用户口径的差 = 0
+        self.assertAlmostEqual(float(plan.get("delta_seconds")), 0.0,
                                places=4)
-        self.assertTrue(plan.get("notes"), "没有差值原因说明")
+        # 补偿前 226 帧的账保留着（诊断用）
+        self.assertEqual(int(plan.get("raw_total_frames")), 226)
+        comp = plan.get("compensation") or {}
+        self.assertTrue(comp.get("exact"), "补偿计划必须标记为精确命中")
+        self.assertEqual(int(comp.get("residual_frames")), 0)
+        self.assertTrue(plan.get("notes"), "没有补偿说明")
 
     def test_browser_panel_shows_duration_account(self):
         """真实浏览器：面板上看得见「口径值 / 实际帧数 / 相差 / 分段明细」。"""
@@ -182,22 +187,27 @@ class TestDurationPlanUI(unittest.TestCase):
         self.assertTrue(panel_text, "接续上下文面板没显示")
         print("\n--- 面板文本 ---\n" + panel_text + "\n---")
 
-        self.assertIn("按 1 秒重叠口径", panel_text,
-                      "面板没显示「按 1 秒重叠口径」的成片时长")
-        self.assertIn("实际帧数", panel_text,
-                      "面板没显示「实际帧数」的成片时长")
-        self.assertIn("两者相差", panel_text,
-                      "面板没显示「两者相差」")
+        # 【唯一口径】收口后面板只显示一个「成片时长」
+        self.assertIn("成片时长", panel_text,
+                      "面板没显示「成片时长」")
+        self.assertNotIn("按 1 秒重叠口径", panel_text,
+                         "收口后不该再并列显示「口径值」—— 两个数已精确相等")
+        self.assertNotIn("实际帧数", panel_text,
+                         "收口后不该再并列显示「实际帧数」")
+        self.assertNotIn("两者相差", panel_text,
+                         "收口后残差是 0，不该再显示「两者相差」")
         self.assertIn("9.000", panel_text,
-                      "面板上的口径值不是 9.000 秒")
-        self.assertIn("226", panel_text,
-                      "面板上的成片帧数不是 226")
+                      "面板上的成片时长不是 9.000 秒")
+        self.assertIn("216", panel_text,
+                      "面板上的成片帧数不是 216")
         # 分段明细
         self.assertIn("第1段", panel_text, "面板没有分段明细")
         self.assertIn("第2段", panel_text, "面板没有分段明细")
-        # 差值原因
+        # 补偿说明（说明成片是怎么对齐口径的、补偿来自哪条帧网格约束）
+        self.assertIn("已按用户口径精确对齐", panel_text,
+                      "面板没说清楚成片已按用户口径精确对齐")
         self.assertIn("帧网格", panel_text,
-                      "面板没说清楚差值来自帧网格约束")
+                      "面板没说清楚补偿来自哪条帧网格约束")
 
         shot = self._shoot("01-continuation-duration-plan")
         self.assertTrue(shot.is_file(), "截图没落盘")
