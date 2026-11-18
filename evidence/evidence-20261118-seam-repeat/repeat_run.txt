@@ -1,0 +1,261 @@
+素材: img={'id': 'asset_afb7438fdadf', 'name': 'i-zimage-000301.png'}
+
+======== [flf#1] seed=20261118 段1 提交 ========
+[flf#1] 段1 job=2dce3a442931
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running 节点 1/21
+[flf#1] 段1 -> done 
+[flf#1] 段2 提交
+[flf#1] 段2 job=c3264ca57a71
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 7/26
+      ... running 节点 7/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 11/26
+      ... running 节点 11/26
+[flf#1] 段2 -> done 
+[flf#1] job1 标准采样=False SelfLift=True
+[flf#1] job2 标准采样=True SelfLift=False
+
+======== [flf#2] seed=20261119 段1 提交 ========
+[flf#2] 段1 job=5a4198660c3a
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running None
+      ... running 节点 2/21
+[flf#2] 段1 -> done 
+[flf#2] 段2 提交
+[flf#2] 段2 job=41b7cc9dde0c
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 7/26
+      ... running 节点 7/26
+      ... running 节点 8/26
+      ... running 节点 12/26
+[flf#2] 段2 -> done 
+[flf#2] job1 标准采样=False SelfLift=True
+[flf#2] job2 标准采样=True SelfLift=False
+
+======== [flf#3] seed=20261120 段1 提交 ========
+[flf#3] 段1 job=c431275a6347
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running 节点 1/21
+[flf#3] 段1 -> done 
+[flf#3] 段2 提交
+[flf#3] 段2 job=5059526c4075
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... queued None
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 7/26
+      ... running 节点 7/26
+      ... running 节点 8/26
+      ... running 节点 12/26
+[flf#3] 段2 -> done 
+[flf#3] job1 标准采样=False SelfLift=True
+[flf#3] job2 标准采样=True SelfLift=False
+
+==============================================================================
+flf 接续链复测汇总（等价 L1 口径）
+==============================================================================
+
+flf#1 seed=20261118  job1=2dce3a442931 job2=c3264ca57a71
+  段1 标准采样=False SelfLift=True
+  段2 标准采样=True SelfLift=False
+  段1 头断点比=1.855x  亮度降=-0.389
+  段2 头断点比=1.879x  亮度降=+0.662  饱和度降=-0.0052
+  拼接点 L1=1.6521
+
+flf#2 seed=20261119  job1=5a4198660c3a job2=41b7cc9dde0c
+  段1 标准采样=False SelfLift=True
+  段2 标准采样=True SelfLift=False
+  段1 头断点比=1.660x  亮度降=-0.320
+  段2 头断点比=1.211x  亮度降=+0.303  饱和度降=-0.0021
+  拼接点 L1=1.8081
+
+flf#3 seed=20261120  job1=c431275a6347 job2=5059526c4075
+  段1 标准采样=False SelfLift=True
+  段2 标准采样=True SelfLift=False
+  段1 头断点比=2.755x  亮度降=-0.586
+  段2 头断点比=0.248x  亮度降=-0.991  饱和度降=+0.0046
+  拼接点 L1=1.7055
+
+------------------------------------------------------------------------------
+有效链数 = 3
+段2 头断点比: 各条=+1.8789, +1.2108, +0.2476 | 均值=+1.1124 标准差=0.8201 极差=1.6313 | 门槛1.6: 超标 1/3 条
+段2 3帧亮度降: 各条=+0.6622, +0.3033, -0.9912 | 均值=-0.0086 标准差=0.8697 极差=1.6534 | 门槛0.3: 超标 2/3 条
+拼接点 L1: 各条=+1.6521, +1.8081, +1.7055 | 均值=+1.7219 标准差=0.0793 极差=0.1560
+
+证据目录: /root/projects/h3studio-cont-seg3/evidence/evidence-20261118-seam-repeat/seam-repeat-20261118-163008
