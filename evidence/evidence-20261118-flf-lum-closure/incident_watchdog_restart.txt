@@ -1,0 +1,20 @@
+════ 操作记录：临时停用 comfyui-watchdog.timer（仅本轮采样窗口）════
+  时间: 2026-11-18 21:00:56
+  原因: comfyui-watchdog.timer 每 5 分钟探测 http://127.0.0.1:8188/system_stats（15s 超时），
+        重负载采样期间该探针超时 → 触发 systemctl restart comfyui.service，
+        导致本轮第 3/4/5 条链在采样中被重启打断（证据：/var/log/comfyui-watchdog.log
+        [2026-11-18 20:53:57] probe failed (http=000) - restarting comfyui.service）。
+  原始状态: enabled=enabled active=active
+  操作: systemctl stop comfyui-watchdog.timer
+  恢复: systemctl start comfyui-watchdog.timer（采样结束后立即执行，状态回到 active+enabled）
+
+  被此事件打断的链:
+    flf#3 seed=20261123 段2 job=62d42406a0a9 -> failed（错误：服务重启时本机 ComfyUI 无响应）
+    flf#4 seed=20261124 段1 job=acc6c27c7007 -> failed
+    flf#5 seed=20261125 段1 job=19792e4bc433 -> failed
+
+════ 恢复记录 ════
+  时间: 2026-11-18 22:12（受控跑结束）
+  systemctl start comfyui-watchdog.timer
+  恢复后状态: enabled=enabled active=active（与原始状态一致）
+  说明: 本次仅临时 stop，未修改任何 systemd 单元文件、未改 watchdog 脚本逻辑。

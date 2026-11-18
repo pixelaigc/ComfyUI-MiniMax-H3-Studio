@@ -1,0 +1,80 @@
+{
+  "rows": [
+    {
+      "tag": "flf#1",
+      "seed": 20261121,
+      "job1": "026afae6bd94",
+      "job2": "b9019c6084d0",
+      "full_rel": "videos/v-h3-studio-000657.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000657.mp4",
+        "size_bytes": 4928426,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000655.mp4",
+          "frames": 124,
+          "head_break_ratio": 2.0574780315982677,
+          "lum_drop_3frames": 8.819122314453125
+        },
+        {
+          "rel": "videos/v-h3-studio-000656.mp4",
+          "frames": 102,
+          "head_break_ratio": 0.06495541847157575,
+          "lum_drop_3frames": -0.0339202880859375
+        }
+      ],
+      "seam_L1": 2.90307879447937
+    },
+    {
+      "tag": "flf#2",
+      "seed": 20261122,
+      "job1": "107acf2a5e2b",
+      "job2": "212ca12ffa6e",
+      "full_rel": "videos/v-h3-studio-000660.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000660.mp4",
+        "size_bytes": 5053073,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000658.mp4",
+          "frames": 124,
+          "head_break_ratio": 2.3316345565755734,
+          "lum_drop_3frames": 2.5107421875
+        },
+        {
+          "rel": "videos/v-h3-studio-000659.mp4",
+          "frames": 102,
+          "head_break_ratio": 0.07666755848074484,
+          "lum_drop_3frames": 0.9842376708984375
+        }
+      ],
+      "seam_L1": 2.62349534034729
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "metric": "等价 L1 口径（逐帧 RGB L1 均值差，320x180，numpy 均值）",
+  "sample_rows": [
+    {
+      "origin": "本轮(20261121起)",
+      "tag": "flf#1",
+      "seed": 20261121,
+      "job2": "b9019c6084d0",
+      "job2_prompt_id": "4b63b5a5-986c-4881-8179-18e01be0098b",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 0.06495541847157575,
+      "seg2_lum_drop": -0.0339202880859375,
+      "seam_L1": 2.90307879447937
+    },
+    {
+      "origin": "本轮(20261121起)",
+      "tag": "flf#2",
+      "seed": 20261122,
+      "job2": "212ca12ffa6e",
+      "job2_prompt_id": "12343336-9864-4997-a544-a9fb5d57b2ef",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 0.07666755848074484,
+      "seg2_lum_drop": 0.9842376708984375,
+      "seam_L1": 2.62349534034729
+    },
+    {
+      "origin": "本轮(20261121起)",
+      "tag": "flf#1",
+      "seed": 20261123,
+      "job2": "7b7b36d7ed79",
+      "job2_prompt_id": "db540d73-04bf-4c16-a3ac-b17d6521014b",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 10.987979630592731,
+      "seg2_lum_drop": 0.20430755615234375,
+      "seam_L1": 6.936192035675049
+    },
+    {
+      "origin": "本轮(20261121起)",
+      "tag": "flf#2",
+      "seed": 20261124,
+      "job2": "75bf29d7906b",
+      "job2_prompt_id": "aec7b9be-64ee-4b2d-9e92-af0dd07e3e45",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 0.9953420210446584,
+      "seg2_lum_drop": -0.18878173828125,
+      "seam_L1": 3.301105260848999
+    },
+    {
+      "origin": "本轮(20261121起)",
+      "tag": "flf#3",
+      "seed": 20261125,
+      "job2": "8cb1303c0c64",
+      "job2_prompt_id": "adaa775a-21ab-4ab2-9a6a-acf914821102",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 1.7261217407327785,
+      "seg2_lum_drop": -28.06365203857422,
+      "seam_L1": 5.142679214477539
+    },
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#1",
+      "seed": 20261118,
+      "job2": "c3264ca57a71",
+      "job2_prompt_id": "45c01048-d3c0-40fc-9cdc-d1f627f2f15a",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 1.8788934198695901,
+      "seg2_lum_drop": 0.6622085571289062,
+      "seam_L1": 1.652077555656433
+    },
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#2",
+      "seed": 20261119,
+      "job2": "41b7cc9dde0c",
+      "job2_prompt_id": "f877b3bd-142f-4f0d-a55e-5f711e4898dd",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 1.2107927778918783,
+      "seg2_lum_drop": 0.30333709716796875,
+      "seam_L1": 1.808090329170227
+    },
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#3",
+      "seed": 20261120,
+      "job2": "5059526c4075",
+      "job2_prompt_id": "fdb27246-590c-4d61-b04a-0365df5ee098",
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job2_selflift_count": 0,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 0.24755759643671735,
+      "seg2_lum_drop": -0.9912261962890625,
+      "seam_L1": 1.7055381536483765
+    },
+    {
+      "origin": "更早历史链",
+      "tag": "hist-dcd2581e3482",
+      "seed": null,
+      "job2": "dcd2581e3482",
+      "job2_prompt_id": null,
+      "job2_sampler_nodes": null,
+      "job2_selflift_count": null,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 1.272166412227285,
+      "seg2_lum_drop": 0.7169265747070312,
+      "seam_L1": 1.598171353340149
+    }
+  ],
+  "sample_count": 9,
+  "stats": {
+    "seg2_lum_drop": {
+      "n": 9,
+      "values_raw": [
+        -0.0339202880859375,
+        0.9842376708984375,
+        0.20430755615234375,
+        -0.18878173828125,
+        -28.06365203857422,
+        0.6622085571289062,
+        0.30333709716796875,
+        -0.9912261962890625,
+        0.7169265747070312
+      ],
+      "values_sorted": [
+        -28.06365203857422,
+        -0.9912261962890625,
+        -0.18878173828125,
+        -0.0339202880859375,
+        0.20430755615234375,
+        0.30333709716796875,
+        0.6622085571289062,
+        0.7169265747070312,
+        0.9842376708984375
+      ],
+      "mean": -2.93406253390842,
+      "median": 0.20430755615234375,
+      "std_dev_s": 9.441691852632648,
+      "range": 29.047889709472656,
+      "min": -28.06365203857422,
+      "max": 0.9842376708984375,
+      "sign_pos": 5,
+      "sign_neg": 4,
+      "sign_zero": 0,
+      "over_threshold_0.3": 4,
+      "under_threshold_-0.3": 2
+    },
+    "seg2_head_break_ratio": {
+      "n": 9,
+      "values_raw": [
+        0.06495541847157575,
+        0.07666755848074484,
+        10.987979630592731,
+        0.9953420210446584,
+        1.7261217407327785,
+        1.8788934198695901,
+        1.2107927778918783,
+        0.24755759643671735,
+        1.272166412227285
+      ],
+      "values_sorted": [
+        0.06495541847157575,
+        0.07666755848074484,
+        0.24755759643671735,
+        0.9953420210446584,
+        1.2107927778918783,
+        1.272166412227285,
+        1.7261217407327785,
+        1.8788934198695901,
+        10.987979630592731
+      ],
+      "mean": 2.0511640639719957,
+      "median": 1.2107927778918783,
+      "std_dev_s": 3.419182671124174,
+      "range": 10.923024212121156,
+      "min": 0.06495541847157575,
+      "max": 10.987979630592731,
+      "sign_pos": 9,
+      "sign_neg": 0,
+      "sign_zero": 0,
+      "over_threshold_0.3": 6,
+      "under_threshold_-0.3": 0
+    },
+    "seam_L1": {
+      "n": 9,
+      "values_raw": [
+        2.90307879447937,
+        2.62349534034729,
+        6.936192035675049,
+        3.301105260848999,
+        5.142679214477539,
+        1.652077555656433,
+        1.808090329170227,
+        1.7055381536483765,
+        1.598171353340149
+      ],
+      "values_sorted": [
+        1.598171353340149,
+        1.652077555656433,
+        1.7055381536483765,
+        1.808090329170227,
+        2.62349534034729,
+        2.90307879447937,
+        3.301105260848999,
+        5.142679214477539,
+        6.936192035675049
+      ],
+      "mean": 3.074492004182604,
+      "median": 2.62349534034729,
+      "std_dev_s": 1.8423779773790698,
+      "range": 5.3380206823349,
+      "min": 1.598171353340149,
+      "max": 6.936192035675049,
+      "sign_pos": 9,
+      "sign_neg": 0,
+      "sign_zero": 0,
+      "over_threshold_0.3": 9,
+      "under_threshold_-0.3": 0
+    }
+  },
+  "twopass_on_controls": [
+    {
+      "job": "513383284a58",
+      "mode": "t2v",
+      "twopass": true,
+      "seg2_ratio": 2.5838899474444608,
+      "seg2_lum_drop": 7.2115936279296875,
+      "seam_L1": 2.5116899013519287
+    }
+  ],
+  "all_seg2_standard_sampler": true,
+  "all_seg2_twopass_disabled": true
+}

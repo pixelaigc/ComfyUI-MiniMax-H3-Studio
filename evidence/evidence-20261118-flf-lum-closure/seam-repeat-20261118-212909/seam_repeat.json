@@ -1,0 +1,708 @@
+{
+  "target": "flf 接续链 >=3 条复测：判定 +0.717 是否系统性偏暗",
+  "chains": [
+    {
+      "tag": "flf#1",
+      "seed": 20261126,
+      "job1": "24419cafe36c",
+      "job2": "0c95b4b4f137",
+      "job1_status": "done",
+      "job2_status": "done",
+      "job1_error": null,
+      "job2_error": null,
+      "job1_prompt_id": "3eaaa6f5-ee78-48d8-b248-b27bd6ee91e8",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job1_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job1_3eaaa6f5-ee78-48d8-b248-b27bd6ee91e8.json",
+      "job1_workflow_analysis": {
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "standard_sampler_nodes": {},
+        "selflift_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "selflift_count": 1,
+        "sampler_node_labels": [
+          "171:SelfLiftH3Sampler"
+        ]
+      },
+      "job2_prompt_id": "a26d66ed-b843-435a-ba64-e23226f6bfe2",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job2_a26d66ed-b843-435a-ba64-e23226f6bfe2.json",
+      "job2_workflow_analysis": {
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "standard_sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "selflift_nodes": {},
+        "selflift_count": 0,
+        "sampler_node_labels": [
+          "14:SamplerCustomAdvanced"
+        ]
+      },
+      "seam": {
+        "job": "0c95b4b4f137",
+        "mode": "flf",
+        "twopass": false,
+        "segments": [
+          {
+            "rel": "videos/v-h3-studio-000671.mp4",
+            "frames": 124,
+            "head_break_L1": 0.8893923759460449,
+            "seg_median_L1": 0.5497858822345734,
+            "head_break_ratio": 1.6177068285769003,
+            "lum_drop_3frames": -0.43412017822265625,
+            "sat_drop_3frames": 0.0010331571102142334,
+            "lum_head": 126.8768310546875,
+            "lum_frame3": 127.31095123291016
+          },
+          {
+            "rel": "videos/v-h3-studio-000672.mp4",
+            "frames": 102,
+            "head_break_L1": 0.36830440163612366,
+            "seg_median_L1": 0.4213397055864334,
+            "head_break_ratio": 0.8741269734441628,
+            "lum_drop_3frames": 0.10919189453125,
+            "sat_drop_3frames": -0.0013462603092193604,
+            "lum_head": 126.7933578491211,
+            "lum_frame3": 126.68416595458984
+          }
+        ],
+        "seams": [
+          {
+            "between": [
+              "videos/v-h3-studio-000671.mp4",
+              "videos/v-h3-studio-000672.mp4"
+            ],
+            "seam_L1": 1.5647395849227905
+          }
+        ]
+      }
+    },
+    {
+      "tag": "flf#2",
+      "seed": 20261127,
+      "job1": "6e01f4675843",
+      "job2": "216522708331",
+      "job1_status": "done",
+      "job2_status": "done",
+      "job1_error": null,
+      "job2_error": null,
+      "job1_prompt_id": "98f6d057-f99a-4229-b437-c4812832ecd4",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job1_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job1_98f6d057-f99a-4229-b437-c4812832ecd4.json",
+      "job1_workflow_analysis": {
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "standard_sampler_nodes": {},
+        "selflift_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "selflift_count": 1,
+        "sampler_node_labels": [
+          "171:SelfLiftH3Sampler"
+        ]
+      },
+      "job2_prompt_id": "4b82e19d-6e2e-4cea-bfaf-b6ec694a592d",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job2_4b82e19d-6e2e-4cea-bfaf-b6ec694a592d.json",
+      "job2_workflow_analysis": {
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "standard_sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "selflift_nodes": {},
+        "selflift_count": 0,
+        "sampler_node_labels": [
+          "14:SamplerCustomAdvanced"
+        ]
+      },
+      "seam": {
+        "job": "216522708331",
+        "mode": "flf",
+        "twopass": false,
+        "segments": [
+          {
+            "rel": "videos/v-h3-studio-000674.mp4",
+            "frames": 124,
+            "head_break_L1": 0.8811400532722473,
+            "seg_median_L1": 0.5102893710136414,
+            "head_break_ratio": 1.7267458491677894,
+            "lum_drop_3frames": -0.48200225830078125,
+            "sat_drop_3frames": 0.0018097162246704102,
+            "lum_head": 126.77641296386719,
+            "lum_frame3": 127.25841522216797
+          },
+          {
+            "rel": "videos/v-h3-studio-000675.mp4",
+            "frames": 102,
+            "head_break_L1": 0.2321527749300003,
+            "seg_median_L1": 0.8876736164093018,
+            "head_break_ratio": 0.2615294300049984,
+            "lum_drop_3frames": 0.03746795654296875,
+            "sat_drop_3frames": -2.586841583251953e-05,
+            "lum_head": 126.15553283691406,
+            "lum_frame3": 126.1180648803711
+          }
+        ],
+        "seams": [
+          {
+            "between": [
+              "videos/v-h3-studio-000674.mp4",
+              "videos/v-h3-studio-000675.mp4"
+            ],
+            "seam_L1": 1.8662904500961304
+          }
+        ]
+      }
+    },
+    {
+      "tag": "flf#3",
+      "seed": 20261128,
+      "job1": "af5d630c173a",
+      "job2": "c1620f430e19",
+      "job1_status": "done",
+      "job2_status": "done",
+      "job1_error": null,
+      "job2_error": null,
+      "job1_prompt_id": "e4ecbacf-6f3a-4487-b976-53c4cf298c42",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job1_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job1_e4ecbacf-6f3a-4487-b976-53c4cf298c42.json",
+      "job1_workflow_analysis": {
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "standard_sampler_nodes": {},
+        "selflift_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "selflift_count": 1,
+        "sampler_node_labels": [
+          "171:SelfLiftH3Sampler"
+        ]
+      },
+      "job2_prompt_id": "17db91bb-3743-40de-a083-eab0a968af7d",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job2_17db91bb-3743-40de-a083-eab0a968af7d.json",
+      "job2_workflow_analysis": {
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "standard_sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "selflift_nodes": {},
+        "selflift_count": 0,
+        "sampler_node_labels": [
+          "14:SamplerCustomAdvanced"
+        ]
+      },
+      "seam": {
+        "job": "c1620f430e19",
+        "mode": "flf",
+        "twopass": false,
+        "segments": [
+          {
+            "rel": "videos/v-h3-studio-000677.mp4",
+            "frames": 124,
+            "head_break_L1": 0.9061747789382935,
+            "seg_median_L1": 0.8091753423213959,
+            "head_break_ratio": 1.1198744345553358,
+            "lum_drop_3frames": -0.5171966552734375,
+            "sat_drop_3frames": 0.0013207793235778809,
+            "lum_head": 127.00055694580078,
+            "lum_frame3": 127.51775360107422
+          },
+          {
+            "rel": "videos/v-h3-studio-000678.mp4",
+            "frames": 102,
+            "head_break_L1": 0.7835184931755066,
+            "seg_median_L1": 0.7593258321285248,
+            "head_break_ratio": 1.031860711203734,
+            "lum_drop_3frames": 0.28989410400390625,
+            "sat_drop_3frames": -0.002125769853591919,
+            "lum_head": 126.95072937011719,
+            "lum_frame3": 126.66083526611328
+          }
+        ],
+        "seams": [
+          {
+            "between": [
+              "videos/v-h3-studio-000677.mp4",
+              "videos/v-h3-studio-000678.mp4"
+            ],
+            "seam_L1": 2.0877315998077393
+          }
+        ]
+      }
+    },
+    {
+      "tag": "flf#4",
+      "seed": 20261129,
+      "job1": "c5bbcd944e16",
+      "job2": "a5bcf9f9b409",
+      "job1_status": "done",
+      "job2_status": "done",
+      "job1_error": null,
+      "job2_error": null,
+      "job1_prompt_id": "aeb6bb6a-a8c0-43a7-8612-30e6db98f8c6",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job1_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job1_aeb6bb6a-a8c0-43a7-8612-30e6db98f8c6.json",
+      "job1_workflow_analysis": {
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "standard_sampler_nodes": {},
+        "selflift_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "selflift_count": 1,
+        "sampler_node_labels": [
+          "171:SelfLiftH3Sampler"
+        ]
+      },
+      "job2_prompt_id": "ea32f708-839f-4469-b04b-17a930815623",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job2_ea32f708-839f-4469-b04b-17a930815623.json",
+      "job2_workflow_analysis": {
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "standard_sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "selflift_nodes": {},
+        "selflift_count": 0,
+        "sampler_node_labels": [
+          "14:SamplerCustomAdvanced"
+        ]
+      },
+      "seam": {
+        "job": "a5bcf9f9b409",
+        "mode": "flf",
+        "twopass": false,
+        "segments": [
+          {
+            "rel": "videos/v-h3-studio-000680.mp4",
+            "frames": 124,
+            "head_break_L1": 0.8840856552124023,
+            "seg_median_L1": 0.5327112376689911,
+            "head_break_ratio": 1.6595964055140573,
+            "lum_drop_3frames": -0.4038238525390625,
+            "sat_drop_3frames": 0.0013342201709747314,
+            "lum_head": 126.9044418334961,
+            "lum_frame3": 127.30826568603516
+          },
+          {
+            "rel": "videos/v-h3-studio-000681.mp4",
+            "frames": 102,
+            "head_break_L1": 0.5709548592567444,
+            "seg_median_L1": 0.31116318702697754,
+            "head_break_ratio": 1.8349049086171083,
+            "lum_drop_3frames": 0.67413330078125,
+            "sat_drop_3frames": -0.004005372524261475,
+            "lum_head": 126.8984603881836,
+            "lum_frame3": 126.22432708740234
+          }
+        ],
+        "seams": [
+          {
+            "between": [
+              "videos/v-h3-studio-000680.mp4",
+              "videos/v-h3-studio-000681.mp4"
+            ],
+            "seam_L1": 1.66947340965271
+          }
+        ]
+      }
+    },
+    {
+      "tag": "flf#5",
+      "seed": 20261130,
+      "job1": "471603be7268",
+      "job2": "965b6e0506db",
+      "job1_status": "done",
+      "job2_status": "done",
+      "job1_error": null,
+      "job2_error": null,
+      "job1_prompt_id": "6aeb9bb2-2e9b-4325-80f2-129a3c430d26",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job1_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job1_6aeb9bb2-2e9b-4325-80f2-129a3c430d26.json",
+      "job1_workflow_analysis": {
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "standard_sampler_nodes": {},
+        "selflift_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "selflift_count": 1,
+        "sampler_node_labels": [
+          "171:SelfLiftH3Sampler"
+        ]
+      },
+      "job2_prompt_id": "4b2265cc-5063-459b-a9d7-ab2fcdbffab9",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_workflow_path": "/root/projects/h3studio-flf-lum-20261118/evidence/evidence-20261118-flf-lum-closure/seam-repeat-20261118-212909/workflow_job2_4b2265cc-5063-459b-a9d7-ab2fcdbffab9.json",
+      "job2_workflow_analysis": {
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "standard_sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "selflift_nodes": {},
+        "selflift_count": 0,
+        "sampler_node_labels": [
+          "14:SamplerCustomAdvanced"
+        ]
+      },
+      "seam": {
+        "job": "965b6e0506db",
+        "mode": "flf",
+        "twopass": false,
+        "segments": [
+          {
+            "rel": "videos/v-h3-studio-000683.mp4",
+            "frames": 124,
+            "head_break_L1": 0.9201504588127136,
+            "seg_median_L1": 0.4701591432094574,
+            "head_break_ratio": 1.9571042531077263,
+            "lum_drop_3frames": -0.43125152587890625,
+            "sat_drop_3frames": 0.0014266669750213623,
+            "lum_head": 126.73946380615234,
+            "lum_frame3": 127.17071533203125
+          },
+          {
+            "rel": "videos/v-h3-studio-000684.mp4",
+            "frames": 102,
+            "head_break_L1": 0.23478008806705475,
+            "seg_median_L1": 0.629777193069458,
+            "head_break_ratio": 0.37279865109558025,
+            "lum_drop_3frames": 0.03861236572265625,
+            "sat_drop_3frames": -0.0003084540367126465,
+            "lum_head": 126.6740951538086,
+            "lum_frame3": 126.63548278808594
+          }
+        ],
+        "seams": [
+          {
+            "between": [
+              "videos/v-h3-studio-000683.mp4",
+              "videos/v-h3-studio-000684.mp4"
+            ],
+            "seam_L1": 1.5326330661773682
+          }
+        ]
+      }
+    }
+  ],
+  "generated_at": "20261118-212909",
+  "stats": [
+    {
+      "tag": "flf#1",
+      "seed": 20261126,
+      "seg1_ratio": 1.6177068285769003,
+      "seg2_ratio": 0.8741269734441628,
+      "seg2_lum_drop": 0.10919189453125,
+      "seg2_sat_drop": -0.0013462603092193604,
+      "seam_L1": 1.5647395849227905,
+      "job2": "0c95b4b4f137",
+      "job1_sampler_nodes": [
+        "171:SelfLiftH3Sampler"
+      ],
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job1_selflift_count": 1,
+      "job2_selflift_count": 0,
+      "job1_has_standard_sampler": false,
+      "job2_has_standard_sampler": true,
+      "job1_twopass_in_db": true,
+      "job2_twopass_in_db": false,
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job1_prompt_id": "3eaaa6f5-ee78-48d8-b248-b27bd6ee91e8",
+      "job2_prompt_id": "a26d66ed-b843-435a-ba64-e23226f6bfe2"
+    },
+    {
+      "tag": "flf#2",
+      "seed": 20261127,
+      "seg1_ratio": 1.7267458491677894,
+      "seg2_ratio": 0.2615294300049984,
+      "seg2_lum_drop": 0.03746795654296875,
+      "seg2_sat_drop": -2.586841583251953e-05,
+      "seam_L1": 1.8662904500961304,
+      "job2": "216522708331",
+      "job1_sampler_nodes": [
+        "171:SelfLiftH3Sampler"
+      ],
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job1_selflift_count": 1,
+      "job2_selflift_count": 0,
+      "job1_has_standard_sampler": false,
+      "job2_has_standard_sampler": true,
+      "job1_twopass_in_db": true,
+      "job2_twopass_in_db": false,
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job1_prompt_id": "98f6d057-f99a-4229-b437-c4812832ecd4",
+      "job2_prompt_id": "4b82e19d-6e2e-4cea-bfaf-b6ec694a592d"
+    },
+    {
+      "tag": "flf#3",
+      "seed": 20261128,
+      "seg1_ratio": 1.1198744345553358,
+      "seg2_ratio": 1.031860711203734,
+      "seg2_lum_drop": 0.28989410400390625,
+      "seg2_sat_drop": -0.002125769853591919,
+      "seam_L1": 2.0877315998077393,
+      "job2": "c1620f430e19",
+      "job1_sampler_nodes": [
+        "171:SelfLiftH3Sampler"
+      ],
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job1_selflift_count": 1,
+      "job2_selflift_count": 0,
+      "job1_has_standard_sampler": false,
+      "job2_has_standard_sampler": true,
+      "job1_twopass_in_db": true,
+      "job2_twopass_in_db": false,
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job1_prompt_id": "e4ecbacf-6f3a-4487-b976-53c4cf298c42",
+      "job2_prompt_id": "17db91bb-3743-40de-a083-eab0a968af7d"
+    },
+    {
+      "tag": "flf#4",
+      "seed": 20261129,
+      "seg1_ratio": 1.6595964055140573,
+      "seg2_ratio": 1.8349049086171083,
+      "seg2_lum_drop": 0.67413330078125,
+      "seg2_sat_drop": -0.004005372524261475,
+      "seam_L1": 1.66947340965271,
+      "job2": "a5bcf9f9b409",
+      "job1_sampler_nodes": [
+        "171:SelfLiftH3Sampler"
+      ],
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job1_selflift_count": 1,
+      "job2_selflift_count": 0,
+      "job1_has_standard_sampler": false,
+      "job2_has_standard_sampler": true,
+      "job1_twopass_in_db": true,
+      "job2_twopass_in_db": false,
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job1_prompt_id": "aeb6bb6a-a8c0-43a7-8612-30e6db98f8c6",
+      "job2_prompt_id": "ea32f708-839f-4469-b04b-17a930815623"
+    },
+    {
+      "tag": "flf#5",
+      "seed": 20261130,
+      "seg1_ratio": 1.9571042531077263,
+      "seg2_ratio": 0.37279865109558025,
+      "seg2_lum_drop": 0.03861236572265625,
+      "seg2_sat_drop": -0.0003084540367126465,
+      "seam_L1": 1.5326330661773682,
+      "job2": "965b6e0506db",
+      "job1_sampler_nodes": [
+        "171:SelfLiftH3Sampler"
+      ],
+      "job2_sampler_nodes": [
+        "14:SamplerCustomAdvanced"
+      ],
+      "job1_selflift_count": 1,
+      "job2_selflift_count": 0,
+      "job1_has_standard_sampler": false,
+      "job2_has_standard_sampler": true,
+      "job1_twopass_in_db": true,
+      "job2_twopass_in_db": false,
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job1_prompt_id": "6aeb9bb2-2e9b-4325-80f2-129a3c430d26",
+      "job2_prompt_id": "4b2265cc-5063-459b-a9d7-ab2fcdbffab9"
+    }
+  ]
+}

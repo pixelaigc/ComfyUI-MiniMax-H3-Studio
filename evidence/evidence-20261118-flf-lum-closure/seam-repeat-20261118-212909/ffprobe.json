@@ -1,0 +1,194 @@
+{
+  "rows": [
+    {
+      "tag": "flf#1",
+      "seed": 20261126,
+      "job1": "24419cafe36c",
+      "job2": "0c95b4b4f137",
+      "full_rel": "videos/v-h3-studio-000673.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000673.mp4",
+        "size_bytes": 4035768,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000671.mp4",
+          "frames": 124,
+          "head_break_ratio": 1.6177068285769003,
+          "lum_drop_3frames": -0.43412017822265625
+        },
+        {
+          "rel": "videos/v-h3-studio-000672.mp4",
+          "frames": 102,
+          "head_break_ratio": 0.8741269734441628,
+          "lum_drop_3frames": 0.10919189453125
+        }
+      ],
+      "seam_L1": 1.5647395849227905
+    },
+    {
+      "tag": "flf#2",
+      "seed": 20261127,
+      "job1": "6e01f4675843",
+      "job2": "216522708331",
+      "full_rel": "videos/v-h3-studio-000676.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000676.mp4",
+        "size_bytes": 4730476,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000674.mp4",
+          "frames": 124,
+          "head_break_ratio": 1.7267458491677894,
+          "lum_drop_3frames": -0.48200225830078125
+        },
+        {
+          "rel": "videos/v-h3-studio-000675.mp4",
+          "frames": 102,
+          "head_break_ratio": 0.2615294300049984,
+          "lum_drop_3frames": 0.03746795654296875
+        }
+      ],
+      "seam_L1": 1.8662904500961304
+    },
+    {
+      "tag": "flf#3",
+      "seed": 20261128,
+      "job1": "af5d630c173a",
+      "job2": "c1620f430e19",
+      "full_rel": "videos/v-h3-studio-000679.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000679.mp4",
+        "size_bytes": 4326153,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000677.mp4",
+          "frames": 124,
+          "head_break_ratio": 1.1198744345553358,
+          "lum_drop_3frames": -0.5171966552734375
+        },
+        {
+          "rel": "videos/v-h3-studio-000678.mp4",
+          "frames": 102,
+          "head_break_ratio": 1.031860711203734,
+          "lum_drop_3frames": 0.28989410400390625
+        }
+      ],
+      "seam_L1": 2.0877315998077393
+    },
+    {
+      "tag": "flf#4",
+      "seed": 20261129,
+      "job1": "c5bbcd944e16",
+      "job2": "a5bcf9f9b409",
+      "full_rel": "videos/v-h3-studio-000682.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000682.mp4",
+        "size_bytes": 3895100,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000680.mp4",
+          "frames": 124,
+          "head_break_ratio": 1.6595964055140573,
+          "lum_drop_3frames": -0.4038238525390625
+        },
+        {
+          "rel": "videos/v-h3-studio-000681.mp4",
+          "frames": 102,
+          "head_break_ratio": 1.8349049086171083,
+          "lum_drop_3frames": 0.67413330078125
+        }
+      ],
+      "seam_L1": 1.66947340965271
+    },
+    {
+      "tag": "flf#5",
+      "seed": 20261130,
+      "job1": "471603be7268",
+      "job2": "965b6e0506db",
+      "full_rel": "videos/v-h3-studio-000685.mp4",
+      "full_probe": {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000685.mp4",
+        "size_bytes": 4621563,
+        "nb_frames": "216",
+        "avg_frame_rate": "24/1",
+        "width": 1280,
+        "height": 736,
+        "duration_s": 9.0,
+        "video_duration_s": 9.0,
+        "has_audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": "44100",
+        "audio_channels": 2,
+        "audio_duration_s": 8.969138,
+        "fps_computed": 24.0
+      },
+      "segments": [
+        {
+          "rel": "videos/v-h3-studio-000683.mp4",
+          "frames": 124,
+          "head_break_ratio": 1.9571042531077263,
+          "lum_drop_3frames": -0.43125152587890625
+        },
+        {
+          "rel": "videos/v-h3-studio-000684.mp4",
+          "frames": 102,
+          "head_break_ratio": 0.37279865109558025,
+          "lum_drop_3frames": 0.03861236572265625
+        }
+      ],
+      "seam_L1": 1.5326330661773682
+    }
+  ]
+}

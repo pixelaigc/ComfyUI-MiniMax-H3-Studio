@@ -1,0 +1,317 @@
+{
+  "105:201": {
+    "inputs": {
+      "image": "h3studio/0d1b9537957bdfd0__e2e-sample-3603235-87321.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载首帧"
+    }
+  },
+  "105:202": {
+    "inputs": {
+      "image": "h3studio/0d1b9537957bdfd0__e2e-sample-3603235-87321.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载尾帧"
+    }
+  },
+  "6": {
+    "inputs": {
+      "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "加载DiT"
+    }
+  },
+  "138:0": {
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+      "strength": 1.0,
+      "low_vram": true
+    },
+    "class_type": "MiniMaxH3TurboLoRA",
+    "_meta": {
+      "title": "加速 LoRA·ckpt850"
+    }
+  },
+  "105:11": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "视频 VAE"
+    }
+  },
+  "13": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载文本编码器"
+    }
+  },
+  "24": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "音频 VAE"
+    }
+  },
+  "105:107": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "105:111",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "时长->帧数"
+    }
+  },
+  "105:111": {
+    "inputs": {
+      "value": 5.0
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "时长(秒)"
+    }
+  },
+  "136": {
+    "inputs": {
+      "clip": [
+        "13",
+        0
+      ],
+      "video_vae": [
+        "105:11",
+        0
+      ],
+      "audio_vae": [
+        "24",
+        0
+      ],
+      "prompt": "一位少女站在日式教室讲台前，镜头缓慢推近，薄荷绿短发，粉色背心，细腻光影",
+      "width": 1280,
+      "height": 736,
+      "length": [
+        "105:107",
+        1
+      ],
+      "task_type": "FL2VA",
+      "audio_mode": "native",
+      "ref_image_size": "match",
+      "audio_denoise_strength": 0.35,
+      "add_source_as_reference": true,
+      "prompt_primary_audio_ordinal": 1,
+      "strict_prompt_tags": true,
+      "reference_video_policy": "official_2_to_15s",
+      "first_frame": [
+        "105:201",
+        0
+      ],
+      "last_frame": [
+        "105:202",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3AudioConditioningT8",
+    "_meta": {
+      "title": "H3 条件（首尾帧 / 参考 / 音轨）"
+    }
+  },
+  "9": {
+    "inputs": {
+      "scheduler": "beta",
+      "steps": 4,
+      "denoise": 1.0,
+      "model": [
+        "138:0",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "调度器"
+    }
+  },
+  "17": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "采样器（二采固定 Euler）"
+    }
+  },
+  "16": {
+    "inputs": {
+      "model": [
+        "138:0",
+        0
+      ],
+      "conditioning": [
+        "136",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "引导器"
+    }
+  },
+  "320": {
+    "inputs": {
+      "conditioning": [
+        "136",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "负面条件"
+    }
+  },
+  "171": {
+    "inputs": {
+      "model": [
+        "138:0",
+        0
+      ],
+      "positive": [
+        "136",
+        0
+      ],
+      "negative": [
+        "320",
+        0
+      ],
+      "vae": [
+        "105:11",
+        0
+      ],
+      "latent_image": [
+        "136",
+        1
+      ],
+      "sampler": [
+        "17",
+        0
+      ],
+      "sigmas": [
+        "9",
+        0
+      ],
+      "seed": 20261123,
+      "cfg": 1.0,
+      "transition_step": 2,
+      "lowres_scale": 0.7,
+      "rho": 0.0,
+      "w_min": 0.5,
+      "w_max": 1.0,
+      "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+      "upscaler_unload": true,
+      "return_lowres_latent": false
+    },
+    "class_type": "SelfLiftH3Sampler",
+    "_meta": {
+      "title": "二采（SelfLift 低分辨率一采 + 高分辨率二采）"
+    }
+  },
+  "10": {
+    "inputs": {
+      "samples": [
+        "171",
+        0
+      ],
+      "vae": [
+        "105:11",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "解码视频"
+    }
+  },
+  "23": {
+    "inputs": {
+      "samples": [
+        "171",
+        0
+      ],
+      "vae": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "解码音频"
+    }
+  },
+  "300:save": {
+    "inputs": {
+      "latent": [
+        "171",
+        0
+      ],
+      "run_id": "h3studio_sdc49f228a6b0",
+      "stage_index": 0,
+      "note": "h3studio job dc49f228a6b0"
+    },
+    "class_type": "H3RelayLatentSave",
+    "_meta": {
+      "title": "接续·落盘本段潜空间（下一段的接力棒）"
+    }
+  },
+  "91": {
+    "inputs": {
+      "fps": 24.0,
+      "bit_depth": 8,
+      "images": [
+        "10",
+        0
+      ],
+      "audio": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "合成视频"
+    }
+  },
+  "92": {
+    "inputs": {
+      "filename_prefix": "h3studio/flf_dc49f228a6b0",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "91",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "保存视频"
+    }
+  }
+}
