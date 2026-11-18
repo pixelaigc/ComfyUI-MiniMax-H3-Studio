@@ -1,0 +1,515 @@
+{
+  "files": 44,
+  "base_failed": [
+    "tests/test_cr6_p1_fixes.py::TestNoMarkdownBoldInVisibleStrings::test_frontend_js_has_no_markdown_bold_in_code_strings",
+    "tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible"
+  ],
+  "base_error": [],
+  "branch_failed": [
+    "tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible"
+  ],
+  "branch_error": [],
+  "new_failed": [],
+  "new_error": [],
+  "verdict_pass": true,
+  "skipped": [
+    "live_",
+    "test_a5_running_truth_frontend.py",
+    "test_agent.py",
+    "test_agent_media_av_upload.py",
+    "test_agent_review_fixes.py",
+    "test_agent_session_status_artifacts.py",
+    "test_asset_api.py",
+    "test_asset_picker_onpick.py",
+    "test_assetlib_and_seed_guard.py",
+    "test_audio_analysis.py",
+    "test_b2_audiotrack_refresh.py",
+    "test_c6_detail_recommend.py",
+    "test_cont_duration_ui_browser.py",
+    "test_cont_prompt_history_browser.py",
+    "test_continuation_frontend.py",
+    "test_d11_moss_lora_final.py",
+    "test_d1_model_display.py",
+    "test_effect_lora_frontend.py",
+    "test_enhance_architecture_fixes.py",
+    "test_enhance_assets.py",
+    "test_enhance_menu.py",
+    "test_enhance_multi_select.py",
+    "test_enhance_unify.py",
+    "test_fix3_ui_controls_preview.py",
+    "test_frontend_assets_hygiene.py",
+    "test_h3_panel_tune.py",
+    "test_h3_video_modes_ui.py",
+    "test_job_meta_frontend.py",
+    "test_media_card_detail.py",
+    "test_mediadef_all_types.py",
+    "test_mode_switch_slot_isolation.py",
+    "test_music_yue2.py",
+    "test_panel_fallback.py",
+    "test_prompt_history.py",
+    "test_qwen_pe_enhance.py",
+    "test_qwen_ref_assets.py",
+    "test_responsive_mobile.py",
+    "test_slot_state_reset.py",
+    "test_status_realtime.py",
+    "test_t2v_card_dom.py",
+    "test_t2v_meta_consistency.py",
+    "test_t2v_panel.py",
+    "test_t2v_panel_fix.py",
+    "test_video_tabs_resolution.py",
+    "test_visible_text_pollution.py",
+    "test_yue2_flow_review_fixes.py"
+  ],
+  "per_file": {
+    "base": {
+      "test_a5_running_truth.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_accel_lora_none_not_inverted.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_accel_steps_follow_accel.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_artifact_meta.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_asset_deep_audio.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_audit_fixes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_b1b2_video_modes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_comfy_errors_typesafety.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_concat_frames.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_and_prompt_history.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_exact_frames.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_semantics.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_seam_quality.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_seg_audio.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_selflift.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_branch.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_capability.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_mixed_state.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_retry.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_server.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr5_c_segment.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr5_text_scanner.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr6_p1_fixes.py": {
+        "failed": [
+          "tests/test_cr6_p1_fixes.py::TestNoMarkdownBoldInVisibleStrings::test_frontend_js_has_no_markdown_bold_in_code_strings"
+        ],
+        "error": [],
+        "rc": 1
+      },
+      "test_d11_defect_a_conversion.py": {
+        "failed": [
+          "tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible"
+        ],
+        "error": [],
+        "rc": 1
+      },
+      "test_fix2_media_filter_and_ref_description.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_flf_r2v_size_not_overridden.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_flf_reference_media.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_frontend_defaults.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_h3_effect_lora.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_image_param_ranges.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_image_res_lora.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_lora_ea.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_lora_whitelist_all_modes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_max_tokens.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_model_list_api.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_node_probe_completeness.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_reso_label.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_reuse_resolution_fallback.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_allow_frontend.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_budget.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_seg2_policy.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_video_param_effectiveness.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_video_sampling_params.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      }
+    },
+    "branch": {
+      "test_a5_running_truth.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_accel_lora_none_not_inverted.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_accel_steps_follow_accel.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_artifact_meta.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_asset_deep_audio.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_audit_fixes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_b1b2_video_modes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_comfy_errors_typesafety.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_concat_frames.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_and_prompt_history.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_exact_frames.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_duration_semantics.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_seam_quality.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_seg_audio.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cont_selflift.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_branch.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_capability.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_mixed_state.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_retry.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_continuation_server.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr5_c_segment.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr5_text_scanner.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_cr6_p1_fixes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_d11_defect_a_conversion.py": {
+        "failed": [
+          "tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible"
+        ],
+        "error": [],
+        "rc": 1
+      },
+      "test_fix2_media_filter_and_ref_description.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_flf_r2v_size_not_overridden.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_flf_reference_media.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_frontend_defaults.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_h3_effect_lora.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_image_param_ranges.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_image_res_lora.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_lora_ea.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_lora_whitelist_all_modes.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_max_tokens.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_model_list_api.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_node_probe_completeness.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_reso_label.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_reuse_resolution_fallback.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_allow_frontend.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_budget.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_twopass_seg2_policy.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_video_param_effectiveness.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      },
+      "test_video_sampling_params.py": {
+        "failed": [],
+        "error": [],
+        "rc": 0
+      }
+    }
+  }
+}
