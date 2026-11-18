@@ -100,7 +100,7 @@ H3_IMAGE_MODELS = {
         "schedulers": ["simple"],
         "note": "官方模板：6 步 / cfg 1 / euler / simple / denoise 1。",
         "warn": "H3-Image 是 6 步蒸馏版：步数与 PDD sigma 表绑定，"
-                "且 guidance 固定 1（无 CFG pass），**负面提示词不生效** —— "
+                "且 guidance 固定 1（无 CFG pass），「负面提示词不生效」 —— "
                 "要把「不要什么」写进正面提示词里。",
     },
 }

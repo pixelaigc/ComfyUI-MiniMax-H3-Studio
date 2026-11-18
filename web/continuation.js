@@ -434,7 +434,7 @@
       ${renderDurationRows(current.duration_plan)}
       ${renderAudioRows(current.audio)}
       <div class="continuation-note">
-        提示词未回填 —— 请在下方输入**下一段**的提示词后点生成。
+        提示词未回填 —— 请在下方输入「下一段」的提示词后点生成。
         生成结果会自动拼成完整视频。
       </div>`;
     const clearBtn = document.getElementById("continuationClear");

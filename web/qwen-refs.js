@@ -47,7 +47,7 @@
       //  <image1>, <image2>, ..." -> 多图时占位标记是**强制**的。
       requirePlaceholders: true,
       singleTagAdvice:
-        "只有 1 张参考图：官方 PE-I2I 模板要求单图**不要**用 <imageN> 标签，会以自然表述引用。",
+        "只有 1 张参考图：官方 PE-I2I 模板要求单图「不要」用 <imageN> 标签，会以自然表述引用。",
       multiTagAdvice:
         "图序即语义：第 N 张对应提示词里的 <imageN>，官方 PE-I2I 模板要求多图必须用 <imageN> 引用。",
     },
@@ -587,7 +587,7 @@
     } else {
       parts.push(`至少 1 张、最多 ${cap} 张（模型官方能力上限 ${profile.officialCap} 张）。`);
     }
-    parts.push("参考图**强制来自素材库**：先在「素材库」页上传入库，再从这里选择。");
+    parts.push("参考图「强制来自素材库」：先在「素材库」页上传入库，再从这里选择。");
     if (n >= 2) {
       parts.push(profile.multiTagAdvice);
     }

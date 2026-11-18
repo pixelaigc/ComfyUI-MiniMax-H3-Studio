@@ -151,7 +151,9 @@ STALE_BUMPED = {
     #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按启发式
     #   新鲜度缓存。app.js 内容变了而 ?v= 不变 ⇒ 老用户浏览器拿到的仍是
     #   **旧的坏文件**（漏传 onPick 那版），修复等于没上线。
-    "app.js":                  ("cr20261116b", "cr20261116c"),
+    # 【2026-11-18 第 6 轮审查】app.js 再次改内容（flf/r2v 上限 2.0MP 的
+    #   前端镜像 + 负面提示词提示的 markdown 残留清理）⇒ ?v= 升到 cr20261118a。
+    "app.js":                  ("cr20261116c", "cr20261118a"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
@@ -161,7 +163,18 @@ STALE_BUMPED = {
     #   并把它升到 vparams5 ⇒ 期望值同步到 vparams5。
     #   （这张表是「内容变了必须升版号」的关卡；版本号被别人推进时，
     #     表要跟着走，否则关卡自己变成假红 —— 那正是它之前一直在报红的原因。）
-    "video-panel.js":          ("ac1steps2",    "vparams5"),
+    # 【2026-11-18 第 6 轮审查】video-panel.js 又改了内容（加速 LoRA
+    #   提示里的 markdown 残留清理 + flf/r2v 上限 2.0MP 的文案同步）
+    #   ⇒ ?v= 升到 vparams6。
+    "video-panel.js":          ("vparams5",       "vparams6"),
+    # 【2026-11-18 第 6 轮审查】以下资源的内容在本轮被改过
+    #   （接续面板 markdown 残留 / 参考图提示 / 引擎自检说明 / 清理确认
+    #    / token 预算说明）⇒ ?v= 必须升，否则老用户拿到的仍是旧文件。
+    "continuation.js":         ("cr20261115b", "cr20261118a"),
+    "qwen-refs.js":            ("cr20261115b", "cr20261118a"),
+    "providers.js":            ("cr20261115b", "cr20261118a"),
+    "media-manage.js":         ("uxbatch1",     "cr20261118a"),
+    "agent-manage.js":         ("a4gen1",       "cr20261118a"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
@@ -178,7 +191,10 @@ STALE_BUMPED = {
 NOT_STALE_OK = {
     "style.css":        "cr20261115a",
     "favicon.svg":      "cr20261115a",
-    "media-manage.js":  "uxbatch1",
+    # 【2026-11-18 第 6 轮审查】media-manage.js 原先在这里
+    #   （?v=uxbatch1），但本轮它的内容被改了（清理确认弹窗里的
+    #   markdown 残留清理）⇒ 已升到 cr20261118a 并移入 STALE_BUMPED。
+    #   同一份文件不能同时出现在两张表里（否则这张断言必红）。
 }
 
 

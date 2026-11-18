@@ -1,0 +1,361 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "sampled_at": "2026-11-18T11:16:23+0800",
+  "panels": [
+    {
+      "mode": "t2v",
+      "label": "文生视频",
+      "switched": true,
+      "texts": 2943,
+      "attrs": 7685,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2v.png"
+    },
+    {
+      "mode": "flf",
+      "label": "首尾帧视频",
+      "switched": true,
+      "texts": 2995,
+      "attrs": 7975,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-flf.png"
+    },
+    {
+      "mode": "r2v",
+      "label": "参考生视频",
+      "switched": true,
+      "texts": 2997,
+      "attrs": 7942,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-r2v.png"
+    },
+    {
+      "mode": "t2i",
+      "label": "文生图",
+      "switched": true,
+      "texts": 2959,
+      "attrs": 7830,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i.png"
+    },
+    {
+      "mode": "t2i_qwen",
+      "label": "文生图 Qwen",
+      "switched": true,
+      "texts": 2826,
+      "attrs": 7528,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_qwen.png"
+    },
+    {
+      "mode": "i2i_qwen",
+      "label": "图片编辑 Qwen",
+      "switched": true,
+      "texts": 2828,
+      "attrs": 7528,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-i2i_qwen.png"
+    },
+    {
+      "mode": "t2i_moss",
+      "label": "文生图 MOSS",
+      "switched": true,
+      "texts": 2937,
+      "attrs": 7862,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_moss.png"
+    },
+    {
+      "mode": "t2i_h3image",
+      "label": "文生图 H3-Image",
+      "switched": true,
+      "texts": 2744,
+      "attrs": 7378,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_h3image.png"
+    },
+    {
+      "mode": "i2i_h3image",
+      "label": "图片编辑 H3-Image",
+      "switched": true,
+      "texts": 2744,
+      "attrs": 7378,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-i2i_h3image.png"
+    },
+    {
+      "mode": "t2a",
+      "label": "文生音乐",
+      "switched": true,
+      "texts": 2782,
+      "attrs": 7530,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2a.png"
+    },
+    {
+      "mode": "a2a",
+      "label": "音频编辑",
+      "switched": true,
+      "texts": 2782,
+      "attrs": 7532,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-a2a.png"
+    },
+    {
+      "mode": "longfilm",
+      "label": "长片拼接",
+      "switched": true,
+      "texts": 2772,
+      "attrs": 7527,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-longfilm.png"
+    }
+  ],
+  "sampling": {
+    "texts": 1546,
+    "attrs": 2762
+  },
+  "console_errors": [],
+  "page_errors": [],
+  "text_scan": {
+    "dev:TODO": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:FIXME": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:XXX": {
+      "where": "visible_text",
+      "count": 4,
+      "samples": [
+        "Mystic-XXX V6（成人向风格） — Mystic-XXX 系列的 V6 版本",
+        "Mystic-XXX V7（成人向风格） — 作者未给触发词与强度区间",
+        "Mystic-XXX v4（成人向风格） — 触发词 mystic-xxx-zit-v4",
+        "Mystic XXX V1（成人向结构 / 姿态） — 专门修 body 结构 / 姿态 / 概念落地 —— 作"
+      ]
+    },
+    "dev:HACK": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:DEBUG": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:待实现": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:待办": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:占位符": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:调试": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:内部标识": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:临时方案": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:先这样": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:测试用": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:test-only": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "dev:内部用": {
+      "where": "visible_text",
+      "count": 0,
+      "samples": []
+    },
+    "markdown_bold": {
+      "where": "visible_text",
+      "count": 39,
+      "samples": [
+        "**只挂这一枚**",
+        "**采样参数全写出来**",
+        "**audio shift 2**",
+        "**建议值**",
+        "**不是加速 LoRA**",
+        "**If the frame is divided into regions**",
+        "**If one subject fills the frame**",
+        "**Size.**",
+        "**Observe, don't instruct.**",
+        "**Hedge what you cannot be certain of.**",
+        "**Name colours with a modifier, almost never bare.**",
+        "**Give the material, not just the noun.**"
+      ],
+      "contexts": [
+        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
+        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
+        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
+        "基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（**建议值**，可在界面自行下调）",
+        "turbopussy ZIT v2（私处 / 姿态效果） — 文件名含 turbo 但**不是加速 LoRA** ——",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,"
+      ]
+    }
+  },
+  "attr_scan": {
+    "dev:TODO": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:FIXME": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:XXX": {
+      "where": "attribute_value",
+      "count": 4,
+      "samples": [
+        "z-image-effects/Mystic-XXX-ZIT-V6.safetensors",
+        "Mystic-XXX 系列的 V6 版本。作者未给触发词与强度区间。",
+        "z-image-effects/Mystic-XXX-ZIT-V7.safetensors",
+        "moss-effects/MysticXXX-Moss-V1.safetensors"
+      ]
+    },
+    "dev:HACK": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:DEBUG": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:待实现": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:待办": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:占位符": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:调试": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:内部标识": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:临时方案": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:先这样": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:测试用": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:test-only": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "dev:内部用": {
+      "where": "attribute_value",
+      "count": 0,
+      "samples": []
+    },
+    "markdown_bold": {
+      "where": "attribute_value",
+      "count": 71,
+      "samples": [
+        "**不附作者说明文件**",
+        "**本项目工作流的默认档位**",
+        "**不是作者推荐值**",
+        "**挂了加速 LoRA**",
+        "**不附作者说明文件**",
+        "**本项目工作流的默认档位**",
+        "**不是作者推荐值**",
+        "**挂了加速 LoRA**",
+        "**不附作者说明文件**",
+        "**本项目工作流的默认档位**",
+        "**不是作者推荐值**",
+        "**挂了加速 LoRA**"
+      ],
+      "contexts": [
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
+        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
+        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
+        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
+        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
+        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
+        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
+        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
+        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器"
+      ]
+    }
+  },
+  "title": ""
+}

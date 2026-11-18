@@ -466,7 +466,7 @@ function renderAgentConfig() {
     </div>
     <div class="agent-hint">
       最大输出 token 上限：${ceilMin} ~ ${ceilMax}，默认 ${esc(bounds.default ?? 32768)}。
-      实际预算按**提示词长度自适应**（普通增强约 1.6 倍、二次增强约 6 倍），
+      实际预算按「提示词长度自适应」（普通增强约 1.6 倍、二次增强约 6 倍），
       这个上限只是天花板 —— 调太大不会让模型多写，只会在真的被截断时多等一次。
     </div>
     <div class="agent-dims">${esc(spec.source || "")} · 覆盖维度：${(spec.dimensions || []).map(d =>

@@ -651,7 +651,7 @@
     const meta = videoState.accelLora ? accelMeta(videoState.accelLora) : null;
     if (!meta) {
       box.hidden = false;
-      box.textContent = "当前**不挂**加速 LoRA —— 工作流走标准多步采样"
+      box.textContent = "当前「不挂」加速 LoRA —— 工作流走标准多步采样"
         + "（默认 20 步 / simple 调度器 / res_multistep 采样器）。"
         + "想要 4 步出片，请在上方下拉里选一枚加速 LoRA。";
       box.title = "";
@@ -666,7 +666,7 @@
       : "Turbo 节点加载";
     box.textContent = `当前加速 LoRA：「${meta.display}」`
       + `（${loaderText}，强度 ${Number(videoState.accelLoraStrength).toFixed(2)}）`
-      + `—— 工作流里**只挂这一枚**，你选什么就加载什么。`
+      + `—— 工作流里「只挂这一枚」，你选什么就加载什么。`
       + (meta.note ? `\n${meta.note}` : "")
       + (recText ? `\n作者推荐：${recText.split("\n").join(" · ")}` : "");
   }

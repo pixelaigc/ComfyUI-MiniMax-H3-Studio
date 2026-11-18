@@ -713,6 +713,68 @@ def _job_resolution_info(job_params: dict, outputs: list[dict]) -> dict:
     return reso_label.describe(job_params, actual_size)
 
 
+def _continuation_info_for_row(r, job_params: dict) -> dict:
+    """生成库卡片用的「接续状态」—— 在协议层判定之上补**成片真实长度**。
+
+    【2026-11-18 第 6 轮审查修 —— 显示值 ≠ 真实产物（P1）】
+
+    原实现直接下发 `continuation_service.continuation_state(...)` 的
+    `total_frames` / `total_seconds`。那个值是「链上累计**交付**帧数」
+    （= 各段帧数之和，**不含成片尾裁**），而成片文件在拼接时做了尾裁
+    （`_concat_chain_video` 的 `trim_tail_frames`，目的是让成片帧数精确
+    命中用户口径「Σ请求时长 − (段数−1)×1 秒」）。
+
+    ⇒ 于是卡片/接续面板显示的累计时长**比真实成片长**（正好差尾裁帧数）：
+      线上实测（2026-11-18 尾裁上线后的真实链 e451d93897e6）：
+        显示 continuation_info.total_seconds = 9.417s（226 帧）
+        真实成片 v-h3-studio-000531.mp4 = **216 帧 = 9.000s**
+        差 10 帧 —— 与「尾裁 10 帧」完全吻合。
+
+    【为什么不能直接把 protocol 层的 total_frames 改成尾裁后口径】
+    `continuation_state` 的 `total_frames` 有两个**不可改**的下游：
+      1. `server._prepare_continuation_params` 拿它当**音频偏移** C_n
+         （口径：第 n 段之前已累计交付的帧数）。尾裁只砍**最后一段尾部**，
+         永远不会影响任何一段的**起始**位置 —— 若把 C_n 改成尾裁后的值，
+         后面每一段的参考音频都会偏移。
+      2. 它被写进下一段的 `continuation.chain_total_frames`，继续往后累加
+         （同一理由）。
+    ⇒ 所以**协议层的口径不动**，只在**展示层**补一个「成片真实长度」。
+
+    【口径 —— 尾裁只砍最后一段】
+    尾裁量由 `cont.chain_compensation_plan` 算（与拼接时同一套函数、
+    同一份数据），所以显示值与成片文件**必然一致**。
+    链首段（stage 0）没有成片拼接这一步，不裁。
+    """
+    state = cont_service.continuation_state(r["mode"], job_params, r["id"])
+    try:
+        durations = _lineage_durations(r["id"])
+    except Exception:
+        durations = []
+    if len(durations) >= 2:
+        try:
+            window = cont.snap_context_frames(int(
+                (cont_service.chain_info(job_params) or {}).get("context_frames")
+                or cont.DEFAULT_CONTEXT_FRAMES))
+        except (TypeError, ValueError):
+            window = cont.DEFAULT_CONTEXT_FRAMES
+        try:
+            plan = cont.chain_compensation_plan(durations, window)
+            keep = [int(x) for x in (plan.get("keep_frames") or [])]
+            if keep:
+                final_frames = sum(keep)
+                state["total_frames"] = final_frames
+                state["total_seconds"] = round(final_frames / cont.FPS, 3)
+                # 未尾裁的累计值也留着（诊断用）：它就是 C_n 的来源。
+                state["raw_total_frames"] = int(plan.get("current_frames") or 0)
+                state["raw_total_seconds"] = round(
+                    int(plan.get("current_frames") or 0) / cont.FPS, 3)
+                state["trimmed_frames"] = int(plan.get("trim_frames") or 0)
+        except Exception:
+            # 算不出来就保留协议层的值（不静默给 0，也不让整个列表挂掉）
+            pass
+    return state
+
+
 def row_to_job(r):
     mode = r["mode"]
     job_params = json.loads(r["params"] or "{}")
@@ -753,7 +815,7 @@ def row_to_job(r):
                                           model_info, resolution_info),
         # 【2026-11-12 新增】接续状态（能否被接续 / 为什么不能 / 累计帧数）。
         # 服务端算好下发，前端只渲染 —— 与 model_info 同一纪律。
-        "continuation_info": cont_service.continuation_state(mode, job_params, r["id"]),
+        "continuation_info": _continuation_info_for_row(r, job_params),
         "status": r["status"],
         # 【2026-11-14 A5】prompt_id 必须下发：实时判定「任务是不是真的还在
         # ComfyUI 里跑」**必须**拿它去查 /queue。
@@ -6032,6 +6094,24 @@ async def api_continuation_context(request):
     mode = r["mode"]
     params = json.loads(r["params"] or "{}")
     context = cont_service.build_continuation_context(mode, params, jid)
+    # 【2026-11-18 第 6 轮审查修 —— 显示值 ≠ 真实产物（P1）】
+    # build_continuation_context 的 total_seconds 取自协议层的
+    # continuation_state（累计**交付**帧数，不含成片尾裁），与真实成片
+    # 文件差一个尾裁帧数。这里改用与生成库卡片**同一套**口径
+    # （_continuation_info_for_row），保证「卡片显示」「接续面板显示」
+    # 「真实成片」三者一致。
+    try:
+        _row = {"mode": mode}
+        _state = _continuation_info_for_row(_row, params)
+        context["total_frames"] = _state.get("total_frames", 0)
+        context["total_seconds"] = _state.get("total_seconds", 0)
+        if "raw_total_frames" in _state:
+            context["raw_total_frames"] = _state["raw_total_frames"]
+            context["raw_total_seconds"] = _state["raw_total_seconds"]
+            context["trimmed_frames"] = _state["trimmed_frames"]
+    except Exception:
+        # 算不出来就保留协议层的值（不静默给 0）
+        pass
     # 附带来源信息（前端要显示「接续自哪条产物」）
     outputs = json.loads(r["outputs"] or "[]")
     video = next((o for o in outputs if o.get("kind") == "video"), None)
