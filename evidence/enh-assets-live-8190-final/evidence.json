@@ -1,0 +1,98 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "prompt": "一个女孩站在雪地里回头微笑",
+  "picked_asset": "asset_ea074ab0a3ea",
+  "panel_state": {
+    "mode": "r2v",
+    "assetRefs": {
+      "ref0": {
+        "asset_id": "asset_ea074ab0a3ea",
+        "name": "e2e-sample-3603235-87321.png",
+        "category": "image"
+      }
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:8190/api/enhance",
+      "body": {
+        "prompt": "一个女孩站在雪地里回头微笑",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "r2v",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_ea074ab0a3ea",
+            "slot": "ref_image",
+            "ordinal": 0
+          }
+        ]
+      }
+    }
+  ],
+  "responses": [
+    {
+      "status": 200,
+      "body": {
+        "original": "一个女孩站在雪地里回头微笑",
+        "enhanced": "integrated_multimodal_description: [Shot 1] The video begins with a close-up, slightly angled view of a textured fabric surface featuring a repeating geometric pattern of interlocking cubes in shades of dark blue, gray, light blue, and white. A small section at the bottom left corner reveals a solid, lighter gray area beneath the patterned weave. The camera slowly zooms out with large amplitude at slow speed to reveal the full extent of the fabric texture, maintaining a consistent focus on the intricate 3D optical illusion design throughout the sequence.\n\noverall_soundscape: A soft, low-frequency hum is present, accompanied by subtle rustling sounds suggestive of fabric moving gently in still air. The audio remains quiet and ambient, with no distinct human voices or sharp mechanical noises.\n\nnon_diegetic_music: N/A",
+        "merged": "integrated_multimodal_description: [Shot 1] The video begins with a close-up, slightly angled view of a textured fabric surface featuring a repeating geometric pattern of interlocking cubes in shades of dark blue, gray, light blue, and white. A small section at the bottom left corner reveals a solid, lighter gray area beneath the patterned weave. The camera slowly zooms out with large amplitude at slow speed to reveal the full extent of the fabric texture, maintaining a consistent focus on the intricate 3D optical illusion design throughout the sequence.\n\noverall_soundscape: A soft, low-frequency hum is present, accompanied by subtle rustling sounds suggestive of fabric moving gently in still air. The audio remains quiet and ambient, with no distinct human voices or sharp mechanical noises.\n\nnon_diegetic_music: N/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "video-director",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 1,
+          "asset_count": 1,
+          "notes": [
+            "<image1> = 参考图「e2e-sample-3603235-87321.png」"
+          ],
+          "skipped": [],
+          "has_text_context": false
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {
+            "words": 132,
+            "chars": 826
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 1,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      }
+    }
+  ],
+  "ui_result": {
+    "modal_visible": true,
+    "enhanced": "integrated_multimodal_description: [Shot 1] The video begins with a close-up, slightly angled view of a textured fabric surface featuring a repeating geometric pattern of interlocking cubes in shades of dark blue, gray, light blue, and white. A small section at the bottom left corner reveals a solid, lighter gray area beneath the patterned weave. The camera slowly zooms out with large amplitude at slow speed to reveal the full extent of the fabric texture, maintaining a consistent focus on the intricate 3D optical illusion design throughout the sequence.\n\noverall_soundscape: A soft, low-frequency hum is present, accompanied by subtle rustling sounds suggestive of fabric moving gently in still air. The audio remains quiet and ambient, with no distinct human voices or sharp mechanical noises.\n\nnon_diegetic_music: N/A",
+    "meta": "模型：本机 Qwen 多模态 · 模板：video-director · 采样：sample / 0.7 / top_p 0.9 · max_new_tokens：4096 · 原文 13 字 → 扩写 826 字\n词数约 132\nfinish_reason：stop\n素材上下文：已带 1 张素材图给模型",
+    "hint": "已用「本机 Qwen 多模态」扩写，826 字"
+  },
+  "console_errors": []
+}
