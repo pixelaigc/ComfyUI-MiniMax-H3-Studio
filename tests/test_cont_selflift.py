@@ -79,6 +79,31 @@ def _cont_params(job_id="J2", chain="J1"):
     }
 
 
+def _cont_params_allow_twopass(job_id="J2", chain="J1"):
+    """接续段 + **显式**允许二采。
+
+    【2026-11-18 新增 —— 为什么需要这个构造器】
+    本轮把「接续段默认走标准采样（等价 nonebot seg2）」落成硬契约：
+    二采在接续段会造成段头色档跳变（实测段头断点比 2.58x/4.54x、
+    3 帧亮度降 +4.7/+7.2 灰阶），所以接续段默认禁用二采。
+
+    但**二采接续的接线姿势本身没有错**（拷贝桥 + SelfLift 的配合是
+    nonebot minimax_h3_v1.json 的姿势），不能因为「默认禁用」就把
+    这些接线断言一起删掉 —— 删了就再也发现不了接线退化。
+
+    ⇒ 处置：这些用例改为**显式声明 allow_twopass=true**，
+    继续严格校验二采接续的接线姿势；
+    同时新增 tests/test_twopass_seg2_policy.py 守
+    「默认（不声明）时接续段必须是标准采样」。
+
+    这就是 references/merge-deploy-release-continuation.md §2.10
+    说的「改守新契约，保持严格性，并加变异证明它还能拒绝旧值」。
+    """
+    info = _cont_params(job_id, chain)["continuation"]
+    info["allow_twopass"] = True
+    return {"continuation": info}
+
+
 def _chain_head_params(job_id="J1"):
     """链首段参数：有链信息、但**没有上游**（source_job 为空）。"""
     info = _cont_params(job_id)["continuation"]
@@ -176,8 +201,11 @@ class TestSelfliftWorkflowBridge(unittest.TestCase):
     """二采接续段的工作流里必须**真的有桥**。"""
 
     def _t2v_selflift_cont(self, job_id="J2"):
+        # 【2026-11-18】接续段默认禁用二采（等价 nonebot seg2），
+        # 所以要测「二采接续的接线姿势」必须**显式**声明 allow_twopass。
+        # 详见 _cont_params_allow_twopass 的说明。
         p = _t2v_base(job_id, twopass=_twopass())
-        p.update(_cont_params(job_id))
+        p.update(_cont_params_allow_twopass(job_id))
         return p
 
     def test_selflift_continuation_has_bridge_nodes(self):
@@ -316,7 +344,9 @@ class TestSelfliftF2vModes(unittest.TestCase):
             params["last_frame"] = "last.png"
         else:
             params["ref_images"] = ["ref0.png"]
-        params.update(_cont_params(job_id))
+        # 【2026-11-18】接续段默认禁用二采（等价 nonebot seg2），
+        # 二采接线姿势的用例必须**显式**声明 allow_twopass。
+        params.update(_cont_params_allow_twopass(job_id))
         return params
 
     def _plain_mode_params(self, mode, job_id="J1"):

@@ -47,6 +47,7 @@ from . import continuation_service as cont_service
 from . import video_models as vmodels
 from . import video_workflow as vworkflow
 from . import frame_expr as frame_expr_mod
+from . import twopass_policy
 
 #: T8 条件节点的类名（comfyui-minimax-h3-audio-T8 插件）
 T8_CONDITIONING = "MiniMaxH3AudioConditioningT8"
@@ -398,7 +399,18 @@ def _build_common(p: dict, params: dict, *, condition_inputs: dict,
     # id（105:104）—— 直接接会引用一个不存在的节点。
     # 现在把条件节点 id 参数化传给 _twopass_block（见 video_workflow.py）。
     twopass = params.get("twopass") or {}
-    use_twopass = bool(isinstance(twopass, dict) and twopass.get("enabled"))
+    # 【2026-11-18 接续段默认走标准采样 —— 与 t2v 完全同款】
+    # 【为什么要在这里也兜一层】服务端归一层（server.normalize_t2v_params）
+    # 已经把接续段的二采关掉；这里是**第二道防线**，保证无论谁来调
+    # build_flf / build_r2v，接续段产出的必须是标准 SamplerCustomAdvanced
+    # 等价节点（nonebot minimax_h3_seg2 的姿势），而不是 SelfLift。
+    # 【实测依据】二采 ON 的接续链段头断点比 2.58x / 4.54x、
+    # 3 帧亮度降 +4.7 / +7.2 灰阶；OFF 的 11 条全部 ≤1.58x / ≤+0.26。
+    # 【为什么调统一入口】与 video_workflow / server 归一层**同一个函数**，
+    # 避免两层口径分裂（显式放行口子失效 / 接续段走回 SelfLift）。
+    use_twopass, _tp_disposition = twopass_policy.resolve_effective_twopass(params)
+    if not use_twopass:
+        twopass = {}
 
     p["9"] = {"inputs": {"scheduler": scheduler, "steps": steps, "denoise": 1,
                           "model": model_ref},
