@@ -509,7 +509,7 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
     "turbo_4step_cn": {
         "name": "minimax_h3_turbo_4步加速_comfyui.safetensors",
         "display": "Turbo 4 步（中文名加速版）",
-        "purpose": "官方 Turbo 4 步蒸馏权重的**中文名发行版**，"
+        "purpose": "官方 Turbo 4 步蒸馏权重的「中文名发行版」，"
                    "键名带 diffusion_model. 前缀 —— 与 ckpt850 是同族，"
                    "但必须用核心 LoraLoaderModelOnly 加载。",
         "recommended_strength": 1.0,
@@ -517,9 +517,9 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
         "recommended_scheduler": "beta",
         "recommended_sampler": "euler",
         "note": "518 个层全部命中（实测，键名带 diffusion_model. 前缀）。"
-                "剪枝底模的 AdaLN 层（51 个）**不会**被核心节点重注入 —— "
+                "剪枝底模的 AdaLN 层（51 个）「不会」被核心节点重注入 —— "
                 "核心节点没有 Turbo 节点那套运行期 AdaLN 机制，"
-                "所以它配**未剪枝**底模（int8 / bf16）才是完整命中。",
+                "所以它配「未剪枝」底模（int8 / bf16）才是完整命中。",
     },
     "turbo_4step_cn_ema": {
         "name": "minimax_h3_turbo_4步加速ema_comfyui.safetensors",
@@ -549,7 +549,7 @@ VIDEO_ACCEL_LORA_COMBOS: dict[str, dict] = {
         "name": "minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors",
         "display": "LightX2V SLA 4 步（768p · 根目录版）",
         "purpose": "与 h3_lightx2v/ 目录里那份同名的 SLA 权重"
-                   "（键名形态一致），此处登记**根目录**那一份，"
+                   "（键名形态一致），此处登记「根目录」那一份，"
                    "它才是 h3_lightx2v/ 目录版之外真实存在的第二份。",
         "recommended_strength": 1.0,
         "recommended_steps": 4,

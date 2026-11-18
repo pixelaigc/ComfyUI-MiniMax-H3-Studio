@@ -500,8 +500,38 @@ def chain_compensation_plan(requested_seconds: list[float],
     formula = formula_total_frames(durations)
     trim = current - formula
 
+    # 【2026-11-18 第 6 轮审查修 —— 尾裁不得跨过接缝】
+    #
+    # 【原缺陷】trim = current - formula 无条件全扣到**最后一段**尾部。
+    # 但 trim 可能**超过最后一段自己的交付帧数** —— 那时尾裁会一路吃进
+    # 上一段，把「上一段末帧 → 本段首帧」那个接缝一起裁掉：
+    #   实测（4 段 × 2 秒）：最后一段交付 34 帧，trim 却要 38 帧
+    #   → keep_frames[-1] = -4（负数 = 该段被裁光并啃进上一段）
+    #   → 成片里段2→段3 的接缝消失，画面从段2 中段直接跳到段3 中段。
+    #
+    # 【为什么不是「夹到 last_delivered」而是「完全不裁」】
+    # 夹到 last_delivered 之后：残差 = trim_raw - last_delivered > 0
+    # → **依然命中不了用户口径**，而代价是最后一段被**整个裁光**
+    #   （内容彻底消失，且用户看不到任何提示 —— 静默的内容丢失，
+    #    是本项目最忌的那类失败）。
+    # 所以：**裁不到就不裁** —— 保住每一段的内容与每一个接缝，
+    # 残差如实报出去（前端已有「⚠ 相差 N 帧」的展示位）。
+    #
+    # 【为什么必须保住接缝】接缝连续性是接续功能的**核心价值**
+    # （见本函数 docstring「为什么不改上游」：裁链首段/中间段会让接缝
+    # 跳变从 0.67 涨到 5.8，实测 10.32x）。**绝不能为了凑用户口径的
+    # 数字去破坏接缝或丢内容** —— 宁可成片比口径长几帧并如实报出残差。
+    last_delivered = int(account["segments"][-1]["delivered_frames"]) \
+        if account.get("segments") else 0
+    trim_clamped = False
+    trim_clamped_extra = 0
     segment_trim = [0] * len(durations)
-    if trim > 0 and len(durations) >= 2:
+    if trim > 0 and len(durations) >= 2 and trim > last_delivered:
+        trim_clamped = True
+        trim_clamped_extra = trim - last_delivered
+        # 裁不到目标 -> 一帧都不裁（保住全部内容与全部接缝）。
+        trim = 0
+    elif trim > 0 and len(durations) >= 2:
         # 只从**最后一段**尾部裁；中间段与链首段一帧不裁。
         segment_trim[-1] = trim
     elif trim > 0:
@@ -519,6 +549,14 @@ def chain_compensation_plan(requested_seconds: list[float],
     residual = sum(keep) - formula
 
     notes: list[str] = []
+    if trim_clamped:
+        # 尾裁被夹住 —— 残差如实上报，并说清「为什么不补」。
+        notes.append(
+            f"成片比「各段请求时长之和减去每段 1 秒重叠」多 {residual} 帧"
+            f"（{residual / FPS:.4f} 秒）—— 这 {trim_clamped_extra} 帧「不能」再从"
+            f"最后一段尾部裁：最后一段本身只有 {last_delivered} 帧，"
+            f"再裁就会吃进上一段、把接缝（上一段末帧 → 本段首帧）一起裁掉，"
+            f"画面会在接缝处跳变。「保住接缝优先于凑整秒数」。")
     if trim > 0 and len(durations) >= 2:
         slack_total = sum(int(s["grid_slack_frames"]) for s in account["segments"])
         n_cont = max(0, len(durations) - 1)
@@ -534,7 +572,7 @@ def chain_compensation_plan(requested_seconds: list[float],
                f"潜空间拷贝桥只接受 5+17k 帧网格的钉住窗口，24 帧会被节点拒绝。"
                if win_gap and n_cont else "。"))
         notes.append(
-            f"补偿只裁**最后一段的尾部**，前面的段一帧不裁 —— "
+            f"补偿只裁「最后一段的尾部」，前面的段一帧不裁 —— "
             f"接缝（上一段末帧 → 下一段首帧）的连续性完全不受影响，"
             f"也不会丢掉任何一段的内容。")
     elif trim > 0:
@@ -547,10 +585,10 @@ def chain_compensation_plan(requested_seconds: list[float],
             f"这 {trim} 帧来自 H3 的 17k+5 段长网格"
             f"（请求 {durations[0]:g} 秒 = {int(round(durations[0] * FPS))} 帧，"
             f"模型只能出 {int(account['segments'][0]['frame_count'])} 帧）—— "
-            f"这是**所有**视频（不止接续链）都有的模型侧约束。")
+            f"这是「所有」视频（不止接续链）都有的模型侧约束。")
     elif trim < 0:
         notes.append(
-            f"成片比用户口径**短** {abs(trim)} 帧（{abs(trim) / FPS:.4f} 秒）—— "
+            f"成片比用户口径「短」 {abs(trim)} 帧（{abs(trim) / FPS:.4f} 秒）—— "
             f"这一项无法用裁剪补齐（内容本来就不够）。")
 
     return {
@@ -560,6 +598,12 @@ def chain_compensation_plan(requested_seconds: list[float],
         # 所以这里报 0，而不是「算出来但没地方裁」的 trim。
         "trim_frames": int(sum(segment_trim)),
         "trim_frames_available": max(0, trim),
+        # 【2026-11-18 第 6 轮审查新增】尾裁被夹住时的信息：
+        #   trim_clamped       —— 是否因「会跨接缝」而少裁
+        #   trim_clamped_extra —— 因此少裁了多少帧（= residual 的来源）
+        # 前端据此显示「差多少帧 + 为什么不能补」。
+        "trim_clamped": trim_clamped,
+        "trim_clamped_extra": int(trim_clamped_extra),
         "segment_trim": segment_trim,
         "keep_frames": keep,
         "exact": residual == 0,

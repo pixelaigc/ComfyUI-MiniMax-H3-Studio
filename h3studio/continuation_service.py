@@ -519,6 +519,19 @@ def continuation_state(mode: str, params: dict, job_id: str = "") -> dict:
     #
     # 【2026-11-17】减法统一交给 `cont.continuation_frames(is_head=...)`
     # （唯一真源）。这里不再自己写「has_source 就减 window」。
+    #
+    # 【⚠ 这里的 total_frames 是「链上累计交付帧数」，**不含成片尾裁**】
+    #
+    # 【为什么不能在这里就减掉尾裁】两个下游都依赖它：
+    #   * server._prepare_continuation_params 把它当**音频偏移** C_n
+    #     （口径：第 n 段之前已累计交付的帧数）—— 尾裁只砍**最后一段的
+    #     尾部**，永远不会影响任何一段的**起始**位置，所以 C_n 必须用
+    #     **不尾裁**的累计值。若在这里先减掉，后面每段的音频都会偏移。
+    #   * 它同时被写进下一段的 continuation.chain_total_frames，
+    #     继续往后累加（同样的理由）。
+    #
+    # 【那「成片真实长度」由谁给】见下面的 final_total_frames ——
+    # 那是**给界面显示**用的（成片文件经过尾裁后的真实长度）。
     chain_frames = info.get("chain_total_frames")
     try:
         chain_frames = int(chain_frames)

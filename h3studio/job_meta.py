@@ -644,7 +644,7 @@ def resolve_job_lora(mode: str, params: dict) -> dict:
       1. 视频旧路径（t2v / flf / r2v / longfilm）：
          读 `params["lora"]`，但值必须过 `is_real_lora_key()` 白名单；
          "none" = 明确不用；非法值 = 视为没有。
-         **注意**：`params["lora"]` 缺省时，工作流会走自己的默认
+         「注意」：`params["lora"]` 缺省时，工作流会走自己的默认
          （workflows._h3_video_workflow: `params.get("lora", "ckpt850")`），
          且**确实挂上了** -> 所以这里返回 ckpt850，而不是空。
       2. 视频新面板（params 里有 model_key）：读 `params["accel_loras"]`

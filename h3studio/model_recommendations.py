@@ -227,7 +227,7 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」"
         ),
         note=(
-            "**shift 是 6/3（作者规格表），不是 H3 内生的 12/3** —— "
+            "「shift 是 6/3（作者规格表），不是 H3 内生的 12/3」 —— "
             "LightX2V 的 768p 系列与 544p 系列 shift 不同，不能混用。"
             "调度器作者未提供；采样器作者写的是「defaults to euler」（默认，不是强制）。"
         ),
@@ -248,15 +248,15 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, "
             "video_flow_shift: 6.0, audio_flow_shift: 3.0, "
             "h3_step_update: training_euler }」"
-            " + 「**4-step distillation**」+「**768p FL2V** generation support」"
+            " + 「4-step distillation」+「768p FL2V generation support」"
             " + 本机权重 __metadata__：base_model = "
             "「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」"
         ),
         note=(
             "SLA（Sparse-Linear Attention）变体，85% 稀疏率，作者实测 RTX 5090 约 2.5× 加速。"
-            "**shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）**，"
+            "「shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）」，"
             "不是 H3 内生的 12/3。"
-            "采样器作者写的是 `training_euler` —— 那是**训练时**的 step update 规则，"
+            "采样器作者写的是 `training_euler` —— 那是「训练时」的 step update 规则，"
             "不是 ComfyUI 的 KSamplerSelect 取值 -> 面板的采样器仍应选 `euler`"
             "（见同族 spec 表的「Sampler defaults to euler」）。调度器作者未提供。"
         ),
@@ -283,7 +283,7 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
         note=(
             "作者推荐推理 NFE 是「8 / 4」两档 —— 8 步质量更好，4 步更快；"
             "本表给的是 8（质量档）。"
-            "**shift 是 12/3（544p 系列）**，与 768p 系列的 6/3 不同，不能混用。"
+            "「shift 是 12/3（544p 系列）」，与 768p 系列的 6/3 不同，不能混用。"
             "调度器作者未提供。"
         ),
     )),
@@ -303,8 +303,8 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "LoRA on the T2VA transformer」"
         ),
         note=(
-            "唯一一条作者把**采样参数全写出来**的加速 LoRA："
-            "步数 4、video shift 12、**audio shift 2**（≠ H3 内生的 3）、"
+            "唯一一条作者把「采样参数全写出来」的加速 LoRA："
+            "步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、"
             "分辨率 1344×768、124 帧 @24fps、无 CFG。"
             "采样器 / 调度器作者未写 -> 「作者未提供」。"
         ),
@@ -334,7 +334,7 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "base_model": "comfyui",
         },
         note=(
-            "作者明写：步数、采样器、scheduler、分辨率、CFG **5 项一字未提**。"
+            "作者明写：步数、采样器、scheduler、分辨率、CFG 「5 项一字未提」。"
             "strength 作者给了 ±8（这是「运动幅度」，不是 LoRA 权重强度）。"
         ),
     )),
@@ -364,7 +364,7 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
         },
         note=(
             "作者原话「720x1280 resolution with 15-30 steps」、strength 0.4~0.8。"
-            "**步数是区间**，本表给出的是区间上界（30）作为推荐档展示，"
+            "「步数是区间」，本表给出的是区间上界（30）作为推荐档展示，"
             "区间本身写在 note 里。采样器/调度器作者未提供。"
         ),
     )),
@@ -432,16 +432,16 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "base_model": "author",
         },
         note=(
-            "官方 Turbo 4 步蒸馏权重的**中文名发行版**（源文件 "
+            "官方 Turbo 4 步蒸馏权重的「中文名发行版」（源文件 "
             "minimax_h3_turbo_4步加速.safetensors，由 "
             "convert_minimax_h3_lora_for_comfyui.py 转换）。"
-            "作者写明步数 4 与适用底模，**但没写 scheduler / sampler / shift** "
+            "作者写明步数 4 与适用底模，「但没写 scheduler / sampler / shift」 "
             "-> 那三项如实标「作者未提供 / ComfyUI 模型硬性值」。"
-            "**键名带 diffusion_model. 前缀** -> 必须用核心 "
+            "「键名带 diffusion_model. 前缀」 -> 必须用核心 "
             "LoraLoaderModelOnly 加载（Turbo 节点一个都 patch 不上）。"
             "作者明确写 incompatible_base = pruned_*（AdaLN 输入 8 vs "
             "LoRA 输入 2688）—— 剪枝底模下核心节点没有 Turbo 节点那套"
-            "运行期 AdaLN 重注入机制，**配未剪枝底模**（bf16 / int8_convrot）"
+            "运行期 AdaLN 重注入机制，「配未剪枝底模」（bf16 / int8_convrot）"
             "才是完整命中。"
         ),
     )),
@@ -473,9 +473,9 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "base_model": "author",
         },
         note=(
-            "Turbo 4 步的中文名 **EMA** 权重（源文件 "
+            "Turbo 4 步的中文名 「EMA」 权重（源文件 "
             "minimax_h3_turbo_4步加速ema.safetensors）。"
-            "作者写明的规格与 turbo_4step_cn **同族同值**（步数 4、"
+            "作者写明的规格与 turbo_4step_cn 「同族同值」（步数 4、"
             "适用非剪枝底模、键名带 diffusion_model. 前缀）-> 逐项沿用同一族"
             "的来源，不另编。调度器 / 采样器 / shift 作者未写。"
         ),
@@ -524,13 +524,13 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "base_model": "author",
         },
         note=(
-            "LightX2V Turbo 4 步 **v0.1 的 comfy 打包版**"
+            "LightX2V Turbo 4 步 「v0.1 的 comfy 打包版」"
             "（源 checkpoint 是 DMD 4 步蒸馏 `dmd_minimax_h3_t2va4`）。"
             "作者规格表里 v0.1 与 v1.0 的 768p 档同属一行规格"
             "（shift 6/3、NFE 4、采样器默认 euler）-> 逐项沿用"
-            "**同族已有条目** lightx2v_4step_768p 的已验证来源，不另编。"
+            "「同族已有条目」 lightx2v_4step_768p 的已验证来源，不另编。"
             "调度器作者未提供。"
-            "**shift 是 6/3（768p 系列），不是 H3 内生的 12/3。**"
+            "「shift 是 6/3（768p 系列），不是 H3 内生的 12/3。」"
         ),
     )),
 
@@ -560,7 +560,7 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "{ attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: "
             "{ sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, "
             "audio_flow_shift: 3.0, h3_step_update: training_euler }」"
-            " + 「**4-step distillation**」+「**768p FL2V** generation support」"
+            " + 「4-step distillation」+「768p FL2V generation support」"
         ),
         field_sources={
             # 步数 4：作者模型卡「4-step distillation」
@@ -577,11 +577,11 @@ _ACCEL_LORA_RECOMMENDATIONS: dict[str, dict] = {
             "base_model": "author",
         },
         note=(
-            "与 h3_lightx2v/ 目录里那份**同名同规格**的 SLA 权重"
-            "（键名形态一致），此处登记**根目录**那一份 —— "
+            "与 h3_lightx2v/ 目录里那份「同名同规格」的 SLA 权重"
+            "（键名形态一致），此处登记「根目录」那一份 —— "
             "它是该目录版之外真实存在的第二份文件。"
             "作者模型卡给的规格（4 步蒸馏 / shift 6/3 / 85% 稀疏率 / "
-            "sage2 / RTX 5090 实测约 2.5× 加速）**与同族已有条目完全相同**"
+            "sage2 / RTX 5090 实测约 2.5× 加速）「与同族已有条目完全相同」"
             " -> 逐项沿用同一份已验证来源，不另编。"
             "作者写的是 `training_euler`（训练时 step update 规则），"
             "不是 ComfyUI 的 KSamplerSelect 取值 -> 面板采样器仍选 `euler`。"
@@ -642,12 +642,12 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
         note=(
-            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
-            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」"
             "（h3studio/workflows.py:347-350，lora=='none' 分支），"
-            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值"
             "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
-            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），"
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
@@ -668,12 +668,12 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
         note=(
-            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
-            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」"
             "（h3studio/workflows.py:347-350，lora=='none' 分支），"
-            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值"
             "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
-            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），"
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
@@ -696,9 +696,9 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）"
         ),
         note=(
-            "Ref2VA 权重（参考生视频专用）**不附作者说明文件** -> 作者未提供采样参数。"
+            "Ref2VA 权重（参考生视频专用）「不附作者说明文件」 -> 作者未提供采样参数。"
             "上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，"
-            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值。"
+            "「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值。"
             "⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），"
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
@@ -718,7 +718,7 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）"
         ),
         note=(
-            "Ref2VA 权重（参考生视频专用 · 未剪枝）**不附作者说明文件**。"
+            "Ref2VA 权重（参考生视频专用 · 未剪枝）「不附作者说明文件」。"
             "上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，"
             "不是作者推荐值；shift 12/3 是 ComfyUI 的模型硬性值。"
         ),
@@ -740,12 +740,12 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
         note=(
-            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
-            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」"
             "（h3studio/workflows.py:347-350，lora=='none' 分支），"
-            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值"
             "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
-            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），"
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
@@ -766,12 +766,12 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
         ),
         note=(
-            "官方 fl2va / ref2va 权重**不附作者说明文件** -> 作者未提供采样参数。"
-            "上表的 20 步 / simple / res_multistep 是**本项目工作流的默认档位**"
+            "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。"
+            "上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」"
             "（h3studio/workflows.py:347-350，lora=='none' 分支），"
-            "**不是作者推荐值**；shift 12/3 是 ComfyUI 的模型硬性值"
+            "「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值"
             "（漏挂 MiniMaxH3SigmaShift 画质明显变差）。"
-            "⚠️ euler 是**挂了加速 LoRA** 时的档位（4 步 / beta / euler），"
+            "⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），"
             "与本表（无 LoRA 档）不同，不要混用。"
         ),
     )),
@@ -790,7 +790,7 @@ _MODEL_RECOMMENDATIONS: dict[str, dict] = {
             "（作者未给出任何采样参数）"
         ),
         note=(
-            "作者（smhfacct）**未给出任何采样参数** —— 其 README 只讲合并原理与变体选型"
+            "作者（smhfacct）「未给出任何采样参数」 —— 其 README 只讲合并原理与变体选型"
             "（原文：「本底模作者未给出任何采样参数」）。"
             "shift 12/3 是 ComfyUI 模型硬性值；步数/调度器/采样器一律「作者未提供」。"
         ),

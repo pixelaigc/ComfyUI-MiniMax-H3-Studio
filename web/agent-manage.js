@@ -225,7 +225,7 @@
         ${warn}
         <div class="agm-cap-list">${items}</div>
         <div class="agm-hint">
-          关掉的能力，其工具**不会**出现在给模型的工具清单里
+          关掉的能力，其工具「不会」出现在给模型的工具清单里
           （模型连工具名都看不到，不会反复尝试）。
         </div>
       </div>`;
@@ -283,7 +283,7 @@
           <code>http://127.0.0.1:9898/api/openwebui/tools/search_general</code>；
           局域网其它机器访问本 Studio 时把它改成
           <code>http://192.168.3.78:9898/api/openwebui/tools/search_general</code>。
-          连通性自检会**真发一次请求**，不是只校验 URL 格式。
+          连通性自检会「真发一次请求」，不是只校验 URL 格式。
         </div>
       </div>`;
   }
