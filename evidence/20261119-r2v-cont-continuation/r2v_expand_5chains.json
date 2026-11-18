@@ -1,0 +1,927 @@
+[
+  {
+    "tag": "expand20261201",
+    "seed": 20261201,
+    "seg1_job": "849748c4554a",
+    "seg2_job": "c2ce1c1eb2c0",
+    "ctrl_job": "d21364851007",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_849748c4554a_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.3047,
+      "max_l1": 6.0728,
+      "max_l1_at_frame": 66,
+      "max_l1_ratio": 2.64,
+      "top3": [
+        {
+          "at_frame": 66,
+          "l1": 6.0728,
+          "lum_from": 128.28,
+          "lum_to": 128.55,
+          "d_lum": 0.27
+        },
+        {
+          "at_frame": 69,
+          "l1": 5.9905,
+          "lum_from": 127.91,
+          "lum_to": 128.25,
+          "d_lum": 0.34
+        },
+        {
+          "at_frame": 87,
+          "l1": 5.2892,
+          "lum_from": 129.3,
+          "lum_to": 130.15,
+          "d_lum": 0.85
+        }
+      ],
+      "means_head": [
+        125.22,
+        126.22,
+        126.31,
+        126.42,
+        126.42,
+        126.6,
+        126.59,
+        126.64,
+        126.54,
+        126.72,
+        126.77,
+        126.82
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_c2ce1c1eb2c0_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 2.7554,
+      "max_l1": 57.4343,
+      "max_l1_at_frame": 30,
+      "max_l1_ratio": 20.84,
+      "top3": [
+        {
+          "at_frame": 30,
+          "l1": 57.4343,
+          "lum_from": 131.49,
+          "lum_to": 122.55,
+          "d_lum": -8.94
+        },
+        {
+          "at_frame": 51,
+          "l1": 5.5686,
+          "lum_from": 123.33,
+          "lum_to": 123.26,
+          "d_lum": -0.07
+        },
+        {
+          "at_frame": 72,
+          "l1": 5.0527,
+          "lum_from": 124.24,
+          "lum_to": 124.33,
+          "d_lum": 0.09
+        }
+      ],
+      "means_head": [
+        131.97,
+        132.31,
+        132.09,
+        132.21,
+        132.21,
+        132.48,
+        132.41,
+        132.36,
+        132.11,
+        132.37,
+        132.21,
+        132.26
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_d21364851007_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.34,
+      "max_l1": 5.9741,
+      "max_l1_at_frame": 39,
+      "max_l1_ratio": 1.79,
+      "top3": [
+        {
+          "at_frame": 39,
+          "l1": 5.9741,
+          "lum_from": 119.26,
+          "lum_to": 118.98,
+          "d_lum": -0.28
+        },
+        {
+          "at_frame": 60,
+          "l1": 5.76,
+          "lum_from": 118.38,
+          "lum_to": 118.23,
+          "d_lum": -0.14
+        },
+        {
+          "at_frame": 51,
+          "l1": 5.5861,
+          "lum_from": 118.95,
+          "lum_to": 118.19,
+          "d_lum": -0.75
+        }
+      ],
+      "means_head": [
+        119.22,
+        120.27,
+        120.32,
+        120.48,
+        120.42,
+        120.74,
+        120.45,
+        120.58,
+        120.32,
+        120.59,
+        120.56,
+        120.68
+      ]
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261202,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "849748c4554a",
+        "stage_index": 1,
+        "source_job": "849748c4554a",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s849748c4554a",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s849748c4554a/stage_00000_f4d0c720.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s849748c4554a/stage_00000_f4d0c720.safetensors",
+        "anchor_latent_run_id": "h3studio_s849748c4554a",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_sc2ce1c1eb2c0",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000750.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "expand20261202",
+    "seed": 20261202,
+    "seg1_job": "f5e42d6f628f",
+    "seg2_job": "a53285540f3b",
+    "ctrl_job": "2fc1fd9cc65b",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_f5e42d6f628f_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.5298,
+      "max_l1": 5.7488,
+      "max_l1_at_frame": 39,
+      "max_l1_ratio": 1.63,
+      "top3": [
+        {
+          "at_frame": 39,
+          "l1": 5.7488,
+          "lum_from": 119.49,
+          "lum_to": 119.24,
+          "d_lum": -0.25
+        },
+        {
+          "at_frame": 51,
+          "l1": 5.5918,
+          "lum_from": 119.22,
+          "lum_to": 118.59,
+          "d_lum": -0.63
+        },
+        {
+          "at_frame": 60,
+          "l1": 5.5768,
+          "lum_from": 118.77,
+          "lum_to": 118.67,
+          "d_lum": -0.1
+        }
+      ],
+      "means_head": [
+        118.7,
+        119.78,
+        119.84,
+        120.07,
+        119.89,
+        120.31,
+        120.29,
+        120.48,
+        120.21,
+        120.76,
+        120.73,
+        120.86
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_a53285540f3b_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 2.3314,
+      "max_l1": 52.8571,
+      "max_l1_at_frame": 25,
+      "max_l1_ratio": 22.67,
+      "top3": [
+        {
+          "at_frame": 25,
+          "l1": 52.8571,
+          "lum_from": 111.58,
+          "lum_to": 103.41,
+          "d_lum": -8.17
+        },
+        {
+          "at_frame": 24,
+          "l1": 25.5968,
+          "lum_from": 115.82,
+          "lum_to": 111.58,
+          "d_lum": -4.24
+        },
+        {
+          "at_frame": 51,
+          "l1": 18.4348,
+          "lum_from": 101.83,
+          "lum_to": 100.3,
+          "d_lum": -1.53
+        }
+      ],
+      "means_head": [
+        116.76,
+        116.87,
+        116.83,
+        116.85,
+        116.85,
+        116.91,
+        116.88,
+        116.88,
+        116.74,
+        116.84,
+        116.78,
+        116.79
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_2fc1fd9cc65b_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.0379,
+      "max_l1": 9.883,
+      "max_l1_at_frame": 73,
+      "max_l1_ratio": 4.85,
+      "top3": [
+        {
+          "at_frame": 73,
+          "l1": 9.883,
+          "lum_from": 128.31,
+          "lum_to": 127.29,
+          "d_lum": -1.02
+        },
+        {
+          "at_frame": 88,
+          "l1": 9.4047,
+          "lum_from": 123.52,
+          "lum_to": 122.69,
+          "d_lum": -0.83
+        },
+        {
+          "at_frame": 91,
+          "l1": 9.3314,
+          "lum_from": 122.1,
+          "lum_to": 121.91,
+          "d_lum": -0.19
+        }
+      ],
+      "means_head": [
+        130.06,
+        131.0,
+        131.03,
+        131.07,
+        131.05,
+        131.27,
+        131.26,
+        131.15,
+        131.07,
+        131.27,
+        130.87,
+        130.93
+      ]
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261203,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "f5e42d6f628f",
+        "stage_index": 1,
+        "source_job": "f5e42d6f628f",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_sf5e42d6f628f",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf5e42d6f628f/stage_00000_03f5218a.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sf5e42d6f628f/stage_00000_03f5218a.safetensors",
+        "anchor_latent_run_id": "h3studio_sf5e42d6f628f",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_sa53285540f3b",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000754.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "expand20261203",
+    "seed": 20261203,
+    "seg1_job": "8ade034d90ca",
+    "seg2_job": "2d93f7da3ef5",
+    "ctrl_job": "27040ae5358a",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_8ade034d90ca_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.7564,
+      "max_l1": 12.7173,
+      "max_l1_at_frame": 85,
+      "max_l1_ratio": 3.39,
+      "top3": [
+        {
+          "at_frame": 85,
+          "l1": 12.7173,
+          "lum_from": 127.2,
+          "lum_to": 125.38,
+          "d_lum": -1.81
+        },
+        {
+          "at_frame": 82,
+          "l1": 12.5115,
+          "lum_from": 128.0,
+          "lum_to": 127.56,
+          "d_lum": -0.44
+        },
+        {
+          "at_frame": 91,
+          "l1": 11.8471,
+          "lum_from": 123.12,
+          "lum_to": 123.54,
+          "d_lum": 0.41
+        }
+      ],
+      "means_head": [
+        130.53,
+        131.57,
+        131.61,
+        131.65,
+        131.67,
+        131.78,
+        131.79,
+        131.57,
+        131.57,
+        131.64,
+        131.76,
+        131.81
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_2d93f7da3ef5_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 3.128,
+      "max_l1": 19.4562,
+      "max_l1_at_frame": 54,
+      "max_l1_ratio": 6.22,
+      "top3": [
+        {
+          "at_frame": 54,
+          "l1": 19.4562,
+          "lum_from": 154.5,
+          "lum_to": 155.89,
+          "d_lum": 1.39
+        },
+        {
+          "at_frame": 81,
+          "l1": 16.6837,
+          "lum_from": 145.26,
+          "lum_to": 143.14,
+          "d_lum": -2.13
+        },
+        {
+          "at_frame": 51,
+          "l1": 15.8543,
+          "lum_from": 153.98,
+          "lum_to": 155.06,
+          "d_lum": 1.08
+        }
+      ],
+      "means_head": [
+        118.25,
+        118.63,
+        118.4,
+        118.66,
+        118.6,
+        118.86,
+        118.46,
+        118.47,
+        118.2,
+        118.18,
+        118.06,
+        118.11
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_27040ae5358a_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.1553,
+      "max_l1": 10.0851,
+      "max_l1_at_frame": 109,
+      "max_l1_ratio": 4.68,
+      "top3": [
+        {
+          "at_frame": 109,
+          "l1": 10.0851,
+          "lum_from": 140.16,
+          "lum_to": 141.11,
+          "d_lum": 0.95
+        },
+        {
+          "at_frame": 111,
+          "l1": 9.3784,
+          "lum_from": 141.07,
+          "lum_to": 141.64,
+          "d_lum": 0.57
+        },
+        {
+          "at_frame": 113,
+          "l1": 8.8361,
+          "lum_from": 141.89,
+          "lum_to": 142.86,
+          "d_lum": 0.97
+        }
+      ],
+      "means_head": [
+        139.98,
+        140.6,
+        140.64,
+        140.91,
+        140.93,
+        141.02,
+        141.01,
+        141.09,
+        141.0,
+        141.15,
+        141.22,
+        141.25
+      ]
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261204,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "8ade034d90ca",
+        "stage_index": 1,
+        "source_job": "8ade034d90ca",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s8ade034d90ca",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s8ade034d90ca/stage_00000_12fbbabe.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s8ade034d90ca/stage_00000_12fbbabe.safetensors",
+        "anchor_latent_run_id": "h3studio_s8ade034d90ca",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s2d93f7da3ef5",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000758.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "expand20261204",
+    "seed": 20261204,
+    "seg1_job": "e548de2aba56",
+    "seg2_job": "dd92b70802ab",
+    "ctrl_job": "86b0c3a6ff42",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_e548de2aba56_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.7502,
+      "max_l1": 6.6166,
+      "max_l1_at_frame": 121,
+      "max_l1_ratio": 2.41,
+      "top3": [
+        {
+          "at_frame": 121,
+          "l1": 6.6166,
+          "lum_from": 143.53,
+          "lum_to": 144.31,
+          "d_lum": 0.78
+        },
+        {
+          "at_frame": 118,
+          "l1": 6.5837,
+          "lum_from": 143.32,
+          "lum_to": 144.04,
+          "d_lum": 0.72
+        },
+        {
+          "at_frame": 115,
+          "l1": 6.4805,
+          "lum_from": 141.88,
+          "lum_to": 142.11,
+          "d_lum": 0.22
+        }
+      ],
+      "means_head": [
+        140.26,
+        141.04,
+        141.07,
+        141.15,
+        141.09,
+        141.26,
+        141.21,
+        141.28,
+        141.14,
+        141.38,
+        141.37,
+        141.43
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_dd92b70802ab_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 3.2378,
+      "max_l1": 15.7402,
+      "max_l1_at_frame": 86,
+      "max_l1_ratio": 4.86,
+      "top3": [
+        {
+          "at_frame": 86,
+          "l1": 15.7402,
+          "lum_from": 83.7,
+          "lum_to": 83.28,
+          "d_lum": -0.41
+        },
+        {
+          "at_frame": 18,
+          "l1": 14.3215,
+          "lum_from": 91.78,
+          "lum_to": 93.8,
+          "d_lum": 2.02
+        },
+        {
+          "at_frame": 12,
+          "l1": 14.033,
+          "lum_from": 92.56,
+          "lum_to": 91.36,
+          "d_lum": -1.2
+        }
+      ],
+      "means_head": [
+        95.19,
+        95.39,
+        94.37,
+        96.78,
+        96.35,
+        95.56,
+        96.01,
+        95.28,
+        94.75,
+        94.64,
+        93.55,
+        92.56
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_86b0c3a6ff42_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 1.6609,
+      "max_l1": 8.7618,
+      "max_l1_at_frame": 43,
+      "max_l1_ratio": 5.28,
+      "top3": [
+        {
+          "at_frame": 43,
+          "l1": 8.7618,
+          "lum_from": 113.26,
+          "lum_to": 112.12,
+          "d_lum": -1.14
+        },
+        {
+          "at_frame": 41,
+          "l1": 7.9516,
+          "lum_from": 113.04,
+          "lum_to": 113.47,
+          "d_lum": 0.43
+        },
+        {
+          "at_frame": 30,
+          "l1": 7.385,
+          "lum_from": 116.5,
+          "lum_to": 113.74,
+          "d_lum": -2.76
+        }
+      ],
+      "means_head": [
+        116.13,
+        116.62,
+        116.63,
+        116.82,
+        116.79,
+        116.8,
+        116.68,
+        116.75,
+        116.69,
+        117.26,
+        117.23,
+        117.25
+      ]
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261205,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "e548de2aba56",
+        "stage_index": 1,
+        "source_job": "e548de2aba56",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_se548de2aba56",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se548de2aba56/stage_00000_6a85e90c.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_se548de2aba56/stage_00000_6a85e90c.safetensors",
+        "anchor_latent_run_id": "h3studio_se548de2aba56",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_sdd92b70802ab",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000762.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "expand20261205",
+    "seed": 20261205,
+    "seg1_job": "368b2a70ac7c",
+    "seg2_job": "4ad6529e338f",
+    "ctrl_job": "8aebc4cf9a6e",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_368b2a70ac7c_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 1.5043,
+      "max_l1": 8.9287,
+      "max_l1_at_frame": 42,
+      "max_l1_ratio": 5.94,
+      "top3": [
+        {
+          "at_frame": 42,
+          "l1": 8.9287,
+          "lum_from": 115.11,
+          "lum_to": 113.89,
+          "d_lum": -1.22
+        },
+        {
+          "at_frame": 57,
+          "l1": 8.5254,
+          "lum_from": 112.16,
+          "lum_to": 112.96,
+          "d_lum": 0.8
+        },
+        {
+          "at_frame": 69,
+          "l1": 8.2197,
+          "lum_from": 111.89,
+          "lum_to": 110.78,
+          "d_lum": -1.1
+        }
+      ],
+      "means_head": [
+        119.2,
+        119.68,
+        119.65,
+        119.54,
+        119.51,
+        119.61,
+        119.72,
+        119.76,
+        119.73,
+        120.05,
+        120.04,
+        120.07
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_4ad6529e338f_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 5.8459,
+      "max_l1": 75.8959,
+      "max_l1_at_frame": 11,
+      "max_l1_ratio": 12.98,
+      "top3": [
+        {
+          "at_frame": 11,
+          "l1": 75.8959,
+          "lum_from": 116.78,
+          "lum_to": 163.55,
+          "d_lum": 46.77
+        },
+        {
+          "at_frame": 59,
+          "l1": 24.6454,
+          "lum_from": 150.34,
+          "lum_to": 152.29,
+          "d_lum": 1.95
+        },
+        {
+          "at_frame": 58,
+          "l1": 13.7048,
+          "lum_from": 144.26,
+          "lum_to": 150.34,
+          "d_lum": 6.08
+        }
+      ],
+      "means_head": [
+        115.83,
+        116.18,
+        116.15,
+        116.22,
+        116.44,
+        116.67,
+        116.61,
+        116.68,
+        116.43,
+        116.85,
+        116.78,
+        163.55
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_8aebc4cf9a6e_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 8.8704,
+      "max_l1": 20.1774,
+      "max_l1_at_frame": 74,
+      "max_l1_ratio": 2.27,
+      "top3": [
+        {
+          "at_frame": 74,
+          "l1": 20.1774,
+          "lum_from": 136.17,
+          "lum_to": 136.26,
+          "d_lum": 0.09
+        },
+        {
+          "at_frame": 78,
+          "l1": 17.8874,
+          "lum_from": 131.53,
+          "lum_to": 132.25,
+          "d_lum": 0.71
+        },
+        {
+          "at_frame": 66,
+          "l1": 16.9545,
+          "lum_from": 141.63,
+          "lum_to": 141.69,
+          "d_lum": 0.06
+        }
+      ],
+      "means_head": [
+        148.54,
+        149.51,
+        149.69,
+        149.77,
+        149.93,
+        150.04,
+        150.03,
+        150.08,
+        149.94,
+        150.22,
+        150.27,
+        150.35
+      ]
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261206,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "368b2a70ac7c",
+        "stage_index": 1,
+        "source_job": "368b2a70ac7c",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s368b2a70ac7c",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s368b2a70ac7c/stage_00000_3ec2f233.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s368b2a70ac7c/stage_00000_3ec2f233.safetensors",
+        "anchor_latent_run_id": "h3studio_s368b2a70ac7c",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s4ad6529e338f",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000766.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  }
+]
