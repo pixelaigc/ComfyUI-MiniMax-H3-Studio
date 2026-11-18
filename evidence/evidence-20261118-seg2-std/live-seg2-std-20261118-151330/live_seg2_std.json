@@ -1,0 +1,349 @@
+{
+  "target": "接续段默认走标准采样（等价 nonebot seg2）",
+  "results": [
+    {
+      "tag": "flf",
+      "mode": "flf",
+      "job1": "fd01d6b2489d",
+      "job1_status": "done",
+      "job1_error": null,
+      "job1_outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000558.mp4",
+          "name": "flf_fd01d6b2489d_00001_.mp4",
+          "width": 1280,
+          "height": 736
+        }
+      ],
+      "job1_prompt_id": "a00f4ba2-8886-4db4-92bf-eabcf2c51640",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "continuation_ctx_ok": true,
+      "continuation_ctx_error": "",
+      "job2": "dcd2581e3482",
+      "job2_status": "done",
+      "job2_error": null,
+      "job2_outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000560.mp4",
+          "name": "v-h3-studio-000560.mp4",
+          "is_full": true
+        },
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000559.mp4",
+          "name": "flf_dcd2581e3482_00001_.mp4",
+          "width": 1280,
+          "height": 736
+        }
+      ],
+      "job2_prompt_id": "0c699d66-a05f-4531-a4e0-f33e7056bada",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_continuation": {
+        "chain_id": "fd01d6b2489d",
+        "stage_index": 1,
+        "source_job": "fd01d6b2489d",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_sfd01d6b2489d",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sfd01d6b2489d/stage_00000_85d86cbc.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sfd01d6b2489d/stage_00000_85d86cbc.safetensors",
+        "anchor_latent_run_id": "h3studio_sfd01d6b2489d",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_sdcd2581e3482",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000559.mp4"
+      },
+      "job1_workflow_path": "/root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job1_a00f4ba2-8886-4db4-92bf-eabcf2c51640.json",
+      "job1_workflow_analysis": {
+        "class_types": {
+          "105:201": "LoadImage",
+          "105:202": "LoadImage",
+          "6": "UNETLoader",
+          "138:0": "MiniMaxH3TurboLoRA",
+          "105:11": "VAELoader",
+          "13": "CLIPLoader",
+          "24": "VAELoader",
+          "105:107": "ComfyMathExpression",
+          "105:111": "PrimitiveFloat",
+          "136": "MiniMaxH3AudioConditioningT8",
+          "139": "MiniMaxH3SigmaShift",
+          "9": "BasicScheduler",
+          "17": "KSamplerSelect",
+          "16": "BasicGuider",
+          "320": "ConditioningZeroOut",
+          "171": "SelfLiftH3Sampler",
+          "10": "VAEDecode",
+          "23": "VAEDecodeAudio",
+          "300:save": "H3RelayLatentSave",
+          "91": "CreateVideo",
+          "92": "SaveVideo"
+        },
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "selflift_nodes": [
+          "171"
+        ]
+      },
+      "job2_workflow_path": "/root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job2_0c699d66-a05f-4531-a4e0-f33e7056bada.json",
+      "job2_workflow_analysis": {
+        "class_types": {
+          "105:201": "LoadImage",
+          "105:202": "LoadImage",
+          "6": "UNETLoader",
+          "138:0": "MiniMaxH3TurboLoRA",
+          "105:11": "VAELoader",
+          "13": "CLIPLoader",
+          "24": "VAELoader",
+          "105:107": "ComfyMathExpression",
+          "105:111": "PrimitiveFloat",
+          "136": "MiniMaxH3AudioConditioningT8",
+          "139": "MiniMaxH3SigmaShift",
+          "9": "BasicScheduler",
+          "300:load": "H3RelayLatentLoad",
+          "300:anchor_load": "H3RelayLatentLoad",
+          "300:bridge": "H3RelayCopyBridge",
+          "17": "KSamplerSelect",
+          "15": "RandomNoise",
+          "16": "BasicGuider",
+          "14": "SamplerCustomAdvanced",
+          "10": "VAEDecode",
+          "23": "VAEDecodeAudio",
+          "300:trim": "H3RelayTrimAV",
+          "300:post": "H3RelayPost",
+          "300:save": "H3RelayLatentSave",
+          "91": "CreateVideo",
+          "92": "SaveVideo"
+        },
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "selflift_nodes": []
+      },
+      "probes": {
+        "job1_v-h3-studio-000558.mp4": {
+          "error": "videos/v-h3-studio-000558.mp4: No such file or directory",
+          "is_full": false,
+          "rel": "videos/v-h3-studio-000558.mp4"
+        },
+        "job2_v-h3-studio-000560.mp4": {
+          "error": "videos/v-h3-studio-000560.mp4: No such file or directory",
+          "is_full": true,
+          "rel": "videos/v-h3-studio-000560.mp4"
+        },
+        "job2_v-h3-studio-000559.mp4": {
+          "error": "videos/v-h3-studio-000559.mp4: No such file or directory",
+          "is_full": false,
+          "rel": "videos/v-h3-studio-000559.mp4"
+        }
+      }
+    },
+    {
+      "tag": "r2v",
+      "mode": "r2v",
+      "job1": "1afc1af0643c",
+      "job1_status": "done",
+      "job1_error": null,
+      "job1_outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000562.mp4",
+          "name": "r2v_1afc1af0643c_00001_.mp4",
+          "width": 1280,
+          "height": 736
+        }
+      ],
+      "job1_prompt_id": "1b72ca73-7721-4ac2-bd1e-79386ac5db0a",
+      "job1_twopass_in_db": {
+        "enabled": true,
+        "transition_step": 2,
+        "lowres_scale": 0.7,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_bf16.safetensors",
+        "cfg": 1.0,
+        "sigma_refine": {
+          "enabled": false,
+          "extra_steps": 0,
+          "start_at_sigma": 2.5,
+          "end_at_sigma": 0.0,
+          "spacing": "cosine"
+        }
+      },
+      "job1_normalize_notes": [
+        "twopass.transition_step：4 不是合法取值，已改用 3（上限受当前步数档的 sigma 表长度限制）",
+        "twopass.transition_step：3 不是合法取值，已改用 2（高分辨率二采至少要拿一半的 NFE 预算：一采 2 步（二采 2 步，高分辨率占 50%）；否则段头会色档掉档 = 接续点闪烁）"
+      ],
+      "continuation_ctx_ok": true,
+      "continuation_ctx_error": "",
+      "job2": "1dce6d5594bf",
+      "job2_status": "done",
+      "job2_error": null,
+      "job2_outputs": [
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000564.mp4",
+          "name": "v-h3-studio-000564.mp4",
+          "is_full": true
+        },
+        {
+          "kind": "video",
+          "file": "videos/v-h3-studio-000563.mp4",
+          "name": "r2v_1dce6d5594bf_00001_.mp4",
+          "width": 1280,
+          "height": 736
+        }
+      ],
+      "job2_prompt_id": "3011a5e9-7862-440a-9d8b-f0c3a4e6fe88",
+      "job2_twopass_in_db": {
+        "enabled": false
+      },
+      "job2_normalize_notes": [
+        "接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。"
+      ],
+      "job2_continuation": {
+        "chain_id": "1afc1af0643c",
+        "stage_index": 1,
+        "source_job": "1afc1af0643c",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s1afc1af0643c",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s1afc1af0643c/stage_00000_de6a7a76.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s1afc1af0643c/stage_00000_de6a7a76.safetensors",
+        "anchor_latent_run_id": "h3studio_s1afc1af0643c",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s1dce6d5594bf",
+        "latent_stage": 0,
+        "segment_rel": "videos/v-h3-studio-000563.mp4"
+      },
+      "job1_workflow_path": "/root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job1_1b72ca73-7721-4ac2-bd1e-79386ac5db0a.json",
+      "job1_workflow_analysis": {
+        "class_types": {
+          "136:201": "LoadImage",
+          "136:301": "VHS_LoadVideo",
+          "6": "UNETLoader",
+          "138:0": "MiniMaxH3TurboLoRA",
+          "105:11": "VAELoader",
+          "13": "CLIPLoader",
+          "24": "VAELoader",
+          "105:107": "ComfyMathExpression",
+          "105:111": "PrimitiveFloat",
+          "136": "MiniMaxH3AudioConditioningT8",
+          "139": "MiniMaxH3SigmaShift",
+          "9": "BasicScheduler",
+          "17": "KSamplerSelect",
+          "16": "BasicGuider",
+          "320": "ConditioningZeroOut",
+          "171": "SelfLiftH3Sampler",
+          "10": "VAEDecode",
+          "23": "VAEDecodeAudio",
+          "300:save": "H3RelayLatentSave",
+          "91": "CreateVideo",
+          "92": "SaveVideo"
+        },
+        "sampler_nodes": {
+          "171": "SelfLiftH3Sampler"
+        },
+        "has_standard_sampler": false,
+        "has_selflift": true,
+        "selflift_nodes": [
+          "171"
+        ]
+      },
+      "job2_workflow_path": "/root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job2_3011a5e9-7862-440a-9d8b-f0c3a4e6fe88.json",
+      "job2_workflow_analysis": {
+        "class_types": {
+          "136:201": "LoadImage",
+          "136:301": "VHS_LoadVideo",
+          "6": "UNETLoader",
+          "138:0": "MiniMaxH3TurboLoRA",
+          "105:11": "VAELoader",
+          "13": "CLIPLoader",
+          "24": "VAELoader",
+          "105:107": "ComfyMathExpression",
+          "105:111": "PrimitiveFloat",
+          "136": "MiniMaxH3AudioConditioningT8",
+          "139": "MiniMaxH3SigmaShift",
+          "9": "BasicScheduler",
+          "300:load": "H3RelayLatentLoad",
+          "300:anchor_load": "H3RelayLatentLoad",
+          "300:bridge": "H3RelayCopyBridge",
+          "17": "KSamplerSelect",
+          "15": "RandomNoise",
+          "16": "BasicGuider",
+          "14": "SamplerCustomAdvanced",
+          "10": "VAEDecode",
+          "23": "VAEDecodeAudio",
+          "300:trim": "H3RelayTrimAV",
+          "300:post": "H3RelayPost",
+          "300:save": "H3RelayLatentSave",
+          "91": "CreateVideo",
+          "92": "SaveVideo"
+        },
+        "sampler_nodes": {
+          "14": "SamplerCustomAdvanced"
+        },
+        "has_standard_sampler": true,
+        "has_selflift": false,
+        "selflift_nodes": []
+      },
+      "probes": {
+        "job1_v-h3-studio-000562.mp4": {
+          "error": "videos/v-h3-studio-000562.mp4: No such file or directory",
+          "is_full": false,
+          "rel": "videos/v-h3-studio-000562.mp4"
+        },
+        "job2_v-h3-studio-000564.mp4": {
+          "error": "videos/v-h3-studio-000564.mp4: No such file or directory",
+          "is_full": true,
+          "rel": "videos/v-h3-studio-000564.mp4"
+        },
+        "job2_v-h3-studio-000563.mp4": {
+          "error": "videos/v-h3-studio-000563.mp4: No such file or directory",
+          "is_full": false,
+          "rel": "videos/v-h3-studio-000563.mp4"
+        }
+      }
+    }
+  ]
+}

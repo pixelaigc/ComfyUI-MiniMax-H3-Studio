@@ -1,0 +1,51 @@
+[
+  {
+    "job": "513383284a58",
+    "mode": "t2v",
+    "twopass": true,
+    "segments": [
+      {
+        "rel": "videos/v-h3-studio-000549.mp4",
+        "frames": 124,
+        "head_break_L1": 3.2515740394592285,
+        "seg_median_L1": 3.288310170173645,
+        "head_break_ratio": 0.9888282647276925,
+        "lum_drop_3frames": 2.5052947998046875,
+        "sat_drop_3frames": -0.008033275604248047,
+        "lum_head": 82.54449462890625,
+        "lum_frame3": 80.03919982910156,
+        "sat_head": 0.36866217851638794,
+        "sat_frame3": 0.376695454120636
+      },
+      {
+        "rel": "videos/v-h3-studio-000550.mp4",
+        "frames": 102,
+        "head_break_L1": 4.33971643447876,
+        "seg_median_L1": 1.6795283555984497,
+        "head_break_ratio": 2.5838899474444608,
+        "lum_drop_3frames": 7.2115936279296875,
+        "sat_drop_3frames": -0.09542205929756165,
+        "lum_head": 80.53162384033203,
+        "lum_frame3": 73.32003021240234,
+        "sat_head": 0.37619611620903015,
+        "sat_frame3": 0.4716181755065918
+      }
+    ],
+    "seams": [
+      {
+        "between": [
+          "videos/v-h3-studio-000549.mp4",
+          "videos/v-h3-studio-000550.mp4"
+        ],
+        "seam_L1": 2.5116899013519287
+      }
+    ],
+    "full": {
+      "rel": "videos/v-h3-studio-000551.mp4",
+      "frames": 216,
+      "median_L1": 2.003049850463867,
+      "max_L1": 8.949959754943848,
+      "argmax_L1": 31
+    }
+  }
+]
