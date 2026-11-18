@@ -6100,18 +6100,19 @@ async def api_continuation_context(request):
     # 文件差一个尾裁帧数。这里改用与生成库卡片**同一套**口径
     # （_continuation_info_for_row），保证「卡片显示」「接续面板显示」
     # 「真实成片」三者一致。
-    try:
-        _row = {"mode": mode}
-        _state = _continuation_info_for_row(_row, params)
-        context["total_frames"] = _state.get("total_frames", 0)
-        context["total_seconds"] = _state.get("total_seconds", 0)
-        if "raw_total_frames" in _state:
-            context["raw_total_frames"] = _state["raw_total_frames"]
-            context["raw_total_seconds"] = _state["raw_total_seconds"]
-            context["trimmed_frames"] = _state["trimmed_frames"]
-    except Exception:
-        # 算不出来就保留协议层的值（不静默给 0）
-        pass
+    #
+    # ⚠ **r 必须带 "id"** —— _continuation_info_for_row 用 r["id"] 查血缘。
+    #   漏了它会抛 KeyError，被下面的 except 吞掉 -> 修复**静默不生效**
+    #   （本轮首次部署就踩到了：显示值仍是 226 帧，与真实成片 216 帧不符）。
+    #   ⇒ 所以这里**不吞异常**：算不出来就让请求报错，而不是悄悄给旧值。
+    _row = {"mode": mode, "id": jid}
+    _state = _continuation_info_for_row(_row, params)
+    context["total_frames"] = _state.get("total_frames", 0)
+    context["total_seconds"] = _state.get("total_seconds", 0)
+    if "raw_total_frames" in _state:
+        context["raw_total_frames"] = _state["raw_total_frames"]
+        context["raw_total_seconds"] = _state["raw_total_seconds"]
+        context["trimmed_frames"] = _state["trimmed_frames"]
     # 附带来源信息（前端要显示「接续自哪条产物」）
     outputs = json.loads(r["outputs"] or "[]")
     video = next((o for o in outputs if o.get("kind") == "video"), None)
