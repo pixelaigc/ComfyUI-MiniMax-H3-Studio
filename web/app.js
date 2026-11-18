@@ -3416,32 +3416,6 @@ async function onGenerateClick() {
     params.accel_lora = firstAccel ? firstAccel.key : "";
     params.accel_lora_strength = firstAccel
       ? Number(firstAccel.strength) : 1.0;
-    // 【接续】把接续上下文一起提交（服务端据此校验并算段号）。
-    //
-    // 【为什么这里原样透传而不自己算段号】前端回填的 continuation
-    // 描述的是**上一段**；本段是新的一段，段号必须 +1 —— 那只能由
-    // 服务端按任务记录算（前端改个数字就能让接缝错位）。
-    if (window.Continuation && window.Continuation.state) {
-      const ctx = window.Continuation.state().current;
-      if (ctx && ctx.continuation) {
-        // 【2026-11-12 修】提交前的**最后一道闸**：接续上下文与当前
-        // 面板尺寸必须一致。潜空间桥逐 token 拷贝上一段尾部，latent
-        // 分辨率固定 —— 跨分辨率接续会被 Relay-Kit 直接拒绝
-        // （「拷贝桥禁止跨分辨率：上段 WxH ≠ 本段 WxH」）。
-        //
-        // 用户**自己改尺寸**（手填宽高）也能造成同样的不一致，
-        // 所以「复用参数时清 context」之外还要在这里拦一次。
-        // 不一致就当场提示并中止提交 —— 不浪费一次生成。
-        if (typeof window.Continuation.checkSubmitConsistency === "function") {
-          // 【2026-11-16 审查 B-7 修复】读正式 API，不再读 _debug。
-          const size = typeof window.VIDEO_PANEL.currentSize === "function"
-            ? window.VIDEO_PANEL.currentSize()
-            : null;
-          if (!window.Continuation.checkSubmitConsistency(size)) return;
-        }
-        params.continuation = ctx.continuation;
-      }
-    }
   } else if (mode === "flf" || mode === "r2v") {
     // 【2026-11-15 修复③ 交付项 3】首尾帧 / 参考生视频现在**共用**
     // 文生视频那一套面板，所以参数也走**同一个出口**：
@@ -3554,6 +3528,47 @@ async function onGenerateClick() {
     if (legacySize) {
       params.resolution = legacyTierForPixels(
         Number(params.width) || 0, Number(params.height) || 0);
+    }
+  }
+
+  // 【2026-11-19 修复】接续上下文必须**三个视频模式都提交**。
+  //
+  // 【原来错在哪】`params.continuation = ctx.continuation;` 只写在
+  // **t2v 分支**里。flf / r2v 分支从不设它 ⇒ 用户在界面上点
+  // 「接续」→ 面板正确回填（模式 / 素材 / 音轨 / 尺寸都对）→
+  // 点生成 → 提交体里**没有 continuation** ⇒ 服务端
+  // `_prepare_continuation_params` 看不到接续 ⇒ 本段退化成
+  // **普通生成**（不读回上游潜空间、不接拷贝桥）。
+  //
+  // 【为什么这比「直接报错」更糟】它**不报错** —— 界面照常显示
+  // 「接续上下文」，生成也成功，产出却是一段与上一段毫无关系的
+  // **独立**视频。用户以为在续写，实际拿到两段互不相干的片段。
+  //
+  // 【修法】把接续上下文的提交提到**三个模式分支之外的公共作用域**，
+  // t2v / flf / r2v 共用同一份逻辑（含提交前的分辨率一致性闸）。
+  // 模式白名单与服务端完全一致（server.py 只对
+  // mode in ("t2v", "flf", "r2v") 消费 params["continuation"]）。
+  const _isVideoMode = mode === "t2v" || mode === "flf" || mode === "r2v";
+  if (_isVideoMode && window.Continuation && window.Continuation.state) {
+    const _contCtx = window.Continuation.state().current;
+    if (_contCtx && _contCtx.continuation) {
+      // 【提交前的最后一道闸】接续上下文与当前面板尺寸必须一致。
+      // 潜空间桥逐 token 拷贝上一段尾部，latent 分辨率固定 ——
+      // 跨分辨率接续会被 Relay-Kit 直接拒绝
+      // （「拷贝桥禁止跨分辨率：上段 WxH ≠ 本段 WxH」）。
+      //
+      // 用户**自己改尺寸**（手填宽高）也能造成同样的不一致，
+      // 所以「复用参数时清 context」之外还要在这里拦一次。
+      // 不一致就当场提示并中止提交 —— 不浪费一次生成。
+      if (typeof window.Continuation.checkSubmitConsistency === "function") {
+        // 【2026-11-16 审查 B-7 修复】读正式 API，不再读 _debug。
+        const size = (window.VIDEO_PANEL
+                      && typeof window.VIDEO_PANEL.currentSize === "function")
+          ? window.VIDEO_PANEL.currentSize()
+          : null;
+        if (!window.Continuation.checkSubmitConsistency(size)) return;
+      }
+      params.continuation = _contCtx.continuation;
     }
   }
     // 【2026-11-18 新增】接续段也用二采的**显式放行**标记。
