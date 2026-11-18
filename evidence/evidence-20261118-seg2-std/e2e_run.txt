@@ -1,0 +1,133 @@
+素材: img={'id': 'asset_afb7438fdadf', 'name': 'i-zimage-000301.png'} vid={'id': 'asset_486ce2e0f061', 'name': 'v1.mp4_addec1e7.webm', 'frames': 50}
+
+=== [flf] 段1 提交 ===
+[flf] 段1 job=fd01d6b2489d
+      ... queued 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 
+      ... running 节点 1/21
+[flf] 段1 -> done 
+[flf] 段2 提交 ===
+[flf] 段2 job=dcd2581e3482
+      ... queued 
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 1/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 2/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 4/26 · 步 3/4
+      ... running 节点 7/26
+      ... running 节点 7/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 8/26
+      ... running 节点 12/26
+[flf] 段2 -> done 
+[flf] job1 ComfyUI 工作流 -> /root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job1_a00f4ba2-8886-4db4-92bf-eabcf2c51640.json
+[flf] job1 标准采样=False SelfLift=True 采样节点={'171': 'SelfLiftH3Sampler'}
+[flf] job2 ComfyUI 工作流 -> /root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job2_0c699d66-a05f-4531-a4e0-f33e7056bada.json
+[flf] job2 标准采样=True SelfLift=False 采样节点={'14': 'SamplerCustomAdvanced'}
+[flf] job1_v-h3-studio-000558.mp4: NonexNone 帧=None 时长=Nones full=False
+[flf] job2_v-h3-studio-000560.mp4: NonexNone 帧=None 时长=Nones full=True
+[flf] job2_v-h3-studio-000559.mp4: NonexNone 帧=None 时长=Nones full=False
+
+=== [r2v] 段1 提交 ===
+[r2v] 段1 job=1afc1af0643c
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... queued 
+      ... running 节点 0/21
+      ... running 节点 6/21
+      ... running 节点 6/21
+      ... running 节点 6/21 · 步 1/4
+      ... running 节点 6/21 · 步 2/4
+      ... running 节点 6/21 · 步 2/4
+      ... running 节点 6/21 · 步 3/4
+      ... running 节点 6/21 · 步 3/4
+      ... running 节点 6/21 · 步 3/4
+      ... running 节点 9/21
+      ... running 节点 9/21
+      ... running 节点 11/21
+[r2v] 段1 -> done 
+[r2v] 段2 提交 ===
+[r2v] 段2 job=1dce6d5594bf
+      ... queued 
+      ... running 节点 6/26
+      ... running 节点 6/26
+      ... running 节点 6/26
+      ... running 节点 6/26
+      ... running 节点 6/26
+      ... running 节点 6/26 · 步 1/4
+      ... running 节点 6/26 · 步 1/4
+      ... running 节点 6/26 · 步 1/4
+      ... running 节点 6/26 · 步 1/4
+      ... running 节点 6/26 · 步 2/4
+      ... running 节点 6/26 · 步 2/4
+      ... running 节点 6/26 · 步 2/4
+      ... running 节点 6/26 · 步 2/4
+      ... running 节点 6/26 · 步 2/4
+      ... running 节点 6/26 · 步 3/4
+      ... running 节点 6/26 · 步 3/4
+      ... running 节点 6/26 · 步 3/4
+      ... running 节点 6/26 · 步 3/4
+      ... running 节点 9/26
+      ... running 节点 9/26
+      ... running 节点 10/26
+      ... running 节点 14/26
+[r2v] 段2 -> done 
+[r2v] job1 ComfyUI 工作流 -> /root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job1_1b72ca73-7721-4ac2-bd1e-79386ac5db0a.json
+[r2v] job1 标准采样=False SelfLift=True 采样节点={'171': 'SelfLiftH3Sampler'}
+[r2v] job2 ComfyUI 工作流 -> /root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330/workflow_job2_3011a5e9-7862-440a-9d8b-f0c3a4e6fe88.json
+[r2v] job2 标准采样=True SelfLift=False 采样节点={'14': 'SamplerCustomAdvanced'}
+[r2v] job1_v-h3-studio-000562.mp4: NonexNone 帧=None 时长=Nones full=False
+[r2v] job2_v-h3-studio-000564.mp4: NonexNone 帧=None 时长=Nones full=True
+[r2v] job2_v-h3-studio-000563.mp4: NonexNone 帧=None 时长=Nones full=False
+
+===== 汇总 =====
+  flf: 段1 标准采样=False SelfLift=True | 段2 标准采样=True SelfLift=False
+       段2 落库 twopass = {'enabled': False}
+       段2 归一留痕 = ['接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。']
+  r2v: 段1 标准采样=False SelfLift=True | 段2 标准采样=True SelfLift=False
+       段2 落库 twopass = {'enabled': False}
+       段2 归一留痕 = ['接续段（第 2 段）已按标准采样路径执行（二采已关闭）：二采在接续段会造成段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），标准采样与 nonebot minimax_h3_seg2 等价且无此缺陷。如确需在接续段使用二采，请在提交参数里显式指定 twopass.enabled=true 且 continuation.allow_twopass=true。']
+
+  证据目录: /root/projects/h3studio-cont-seg2/evidence/evidence-20261118-seg2-std/live-seg2-std-20261118-151330

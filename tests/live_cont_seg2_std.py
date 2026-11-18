@@ -279,10 +279,18 @@ def run_chain(tag: str, mode: str, params1: dict, refs1: list,
         for item in outs:
             if item.get("kind") != "video":
                 continue
-            rel = item.get("file") or ""
-            path = Path("/home/ubuntu/comfyui/output") / rel
-            if not path.is_file():
-                path = Path(rel)
+            rel = item.get("file") or item.get("path") or ""
+            # 【契约】outputs[].file 是相对 **data_dir/outputs** 的路径
+            # （server.py: OUT_DIR = DATA / "outputs"）。
+            # ComfyUI 侧的实际产物在 /home/ubuntu/comfyui/output 下，
+            # 两处都试。
+            cands = [
+                Path("/home/ubuntu/comfyui/output") / rel,
+                Path("/home/ubuntu/comfyui/output/outputs") / rel,
+                Path("/root/projects/comfyui-minimax-h3-studio/data/outputs") / rel,
+                Path(rel),
+            ]
+            path = next((c for c in cands if c.is_file()), cands[0])
             key = f"{label}_{Path(rel).name}"
             try:
                 probes[key] = ffprobe(path)
