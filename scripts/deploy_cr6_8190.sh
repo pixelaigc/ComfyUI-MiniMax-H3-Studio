@@ -122,13 +122,16 @@ git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
   | (cd "$LIVE" && xargs -0 git checkout "$MERGE_COMMIT" --)
 echo
 echo "=== 5) 部署后完整性自检 ==="
-MISSING=""
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  if [ ! -e "$LIVE/$f" ]; then MISSING="$MISSING $f"; fi
-done <<< "$CHANGED"
+# 【同样要用 NUL 分隔】`git diff --name-only` 对非 ASCII 路径会加引号，
+# 逐行读回来再 `[ -e "$LIVE/$f" ]` 会因为引号而误判「缺失」。
+git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
+  | (cd "$LIVE" && while IFS= read -r -d '' f; do
+       [ -z "$f" ] && continue
+       [ -e "$f" ] || echo "MISSING:$f"
+     done) > /tmp/cr6_missing.txt
+MISSING=$(cat /tmp/cr6_missing.txt)
 if [ -n "$MISSING" ]; then
-  echo "!! 以下文件部署后缺失：$MISSING"; exit 1
+  echo "!! 以下文件部署后缺失："; echo "$MISSING"; exit 1
 fi
 DIFF=$(cd "$LIVE" && git status --porcelain | grep -v '^??' || true)
 if [ -n "$DIFF" ]; then
