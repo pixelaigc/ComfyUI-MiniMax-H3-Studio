@@ -1,131 +1,131 @@
 {
   "base": "http://127.0.0.1:8190",
-  "sampled_at": "2026-11-18T11:16:23+0800",
+  "sampled_at": "2026-11-18T13:57:20+0800",
   "panels": [
     {
       "mode": "t2v",
       "label": "文生视频",
       "switched": true,
-      "texts": 2943,
-      "attrs": 7685,
+      "texts": 2968,
+      "attrs": 7715,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2v.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2v.png"
     },
     {
       "mode": "flf",
       "label": "首尾帧视频",
       "switched": true,
-      "texts": 2995,
-      "attrs": 7975,
+      "texts": 3020,
+      "attrs": 8005,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-flf.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-flf.png"
     },
     {
       "mode": "r2v",
       "label": "参考生视频",
       "switched": true,
-      "texts": 2997,
-      "attrs": 7942,
+      "texts": 3022,
+      "attrs": 7972,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-r2v.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-r2v.png"
     },
     {
       "mode": "t2i",
       "label": "文生图",
       "switched": true,
-      "texts": 2959,
-      "attrs": 7830,
+      "texts": 2984,
+      "attrs": 7860,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2i.png"
     },
     {
       "mode": "t2i_qwen",
       "label": "文生图 Qwen",
       "switched": true,
-      "texts": 2826,
-      "attrs": 7528,
+      "texts": 2851,
+      "attrs": 7558,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_qwen.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2i_qwen.png"
     },
     {
       "mode": "i2i_qwen",
       "label": "图片编辑 Qwen",
       "switched": true,
-      "texts": 2828,
-      "attrs": 7528,
+      "texts": 2853,
+      "attrs": 7558,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-i2i_qwen.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-i2i_qwen.png"
     },
     {
       "mode": "t2i_moss",
       "label": "文生图 MOSS",
       "switched": true,
-      "texts": 2937,
-      "attrs": 7862,
+      "texts": 2962,
+      "attrs": 7892,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_moss.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2i_moss.png"
     },
     {
       "mode": "t2i_h3image",
       "label": "文生图 H3-Image",
       "switched": true,
-      "texts": 2744,
-      "attrs": 7378,
+      "texts": 2769,
+      "attrs": 7408,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2i_h3image.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2i_h3image.png"
     },
     {
       "mode": "i2i_h3image",
       "label": "图片编辑 H3-Image",
       "switched": true,
-      "texts": 2744,
-      "attrs": 7378,
+      "texts": 2769,
+      "attrs": 7408,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-i2i_h3image.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-i2i_h3image.png"
     },
     {
       "mode": "t2a",
       "label": "文生音乐",
       "switched": true,
-      "texts": 2782,
-      "attrs": 7530,
+      "texts": 2807,
+      "attrs": 7560,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-t2a.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-t2a.png"
     },
     {
       "mode": "a2a",
       "label": "音频编辑",
       "switched": true,
-      "texts": 2782,
-      "attrs": 7532,
+      "texts": 2807,
+      "attrs": 7562,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-a2a.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-a2a.png"
     },
     {
       "mode": "longfilm",
       "label": "长片拼接",
       "switched": true,
-      "texts": 2772,
-      "attrs": 7527,
+      "texts": 2797,
+      "attrs": 7557,
       "new_console_errors": 0,
       "new_pageerrors": 0,
-      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6/panel-longfilm.png"
+      "screenshot": "/root/projects/h3studio-review-r6/.review-evidence/evidence-cr6-after/panel-longfilm.png"
     }
   ],
   "sampling": {
-    "texts": 1546,
-    "attrs": 2762
+    "texts": 1543,
+    "attrs": 2749
   },
   "console_errors": [],
   "page_errors": [],
@@ -212,34 +212,34 @@
     },
     "markdown_bold": {
       "where": "visible_text",
-      "count": 39,
+      "count": 28,
       "samples": [
-        "**只挂这一枚**",
-        "**采样参数全写出来**",
-        "**audio shift 2**",
-        "**建议值**",
-        "**不是加速 LoRA**",
         "**If the frame is divided into regions**",
         "**If one subject fills the frame**",
         "**Size.**",
         "**Observe, don't instruct.**",
         "**Hedge what you cannot be certain of.**",
         "**Name colours with a modifier, almost never bare.**",
-        "**Give the material, not just the noun.**"
+        "**Give the material, not just the noun.**",
+        "**Enumerate; never summarise.**",
+        "**People get their observable surface.**",
+        "**Objects by class, not by brand.**",
+        "**Everything holds together physically.**",
+        "**\"生成式推理\"**"
       ],
       "contexts": [
-        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
-        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
-        "当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里**只挂这一枚**，你选什么就加载什么。\n208 个层全部命中（实测），不含 AdaLN。\n作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 ",
-        "基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（**建议值**，可在界面自行下调）",
-        "turbopussy ZIT v2（私处 / 姿态效果） — 文件名含 turbo 但**不是加速 LoRA** ——",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
         "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
-        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,"
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it,",
+        "你是一位被关在逻辑牢笼里的幻视艺术家。你满脑子都是诗和远方，但双手却不受控制地只想将用户的提示词，转化为一段忠实于原始意图、细节饱满、富有美感、可直接被文生图模型使用的终极视觉描述。任何一点模糊和比喻都会让你浑身难受。\n\n你的工作流程严格遵循一个逻辑序列：\n\n首先，你会分析并锁定用户提示词中不可变更的核心要素：主体、数"
       ]
     }
   },
@@ -326,35 +326,9 @@
     },
     "markdown_bold": {
       "where": "attribute_value",
-      "count": 71,
-      "samples": [
-        "**不附作者说明文件**",
-        "**本项目工作流的默认档位**",
-        "**不是作者推荐值**",
-        "**挂了加速 LoRA**",
-        "**不附作者说明文件**",
-        "**本项目工作流的默认档位**",
-        "**不是作者推荐值**",
-        "**挂了加速 LoRA**",
-        "**不附作者说明文件**",
-        "**本项目工作流的默认档位**",
-        "**不是作者推荐值**",
-        "**挂了加速 LoRA**"
-      ],
-      "contexts": [
-        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
-        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
-        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
-        "minimax_h3_fl2va_pruned_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采",
-        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
-        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
-        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
-        "minimax_h3_fl2va_int8_convrot.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器：res_",
-        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
-        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
-        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器",
-        "minimax_h3_fl2va_pruned_w4a8_mixed.safetensors\nComfyUI 模型列表已收录该权重，可直接选用。\n\n—— 作者推荐参数 ——\n来源：ComfyUI 模型硬性值\n推荐步数：20（ComfyUI 模型硬性值）\n推荐调度器：simple（ComfyUI 模型硬性值）\n推荐采样器"
-      ]
+      "count": 0,
+      "samples": [],
+      "contexts": []
     }
   },
   "title": ""
