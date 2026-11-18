@@ -556,7 +556,10 @@ def chain_compensation_plan(requested_seconds: list[float],
     return {
         "formula_frames": formula,
         "current_frames": current,
-        "trim_frames": max(0, trim),
+        # 【实际会裁的帧数】单段链不裁（没有成片拼接这一步），
+        # 所以这里报 0，而不是「算出来但没地方裁」的 trim。
+        "trim_frames": int(sum(segment_trim)),
+        "trim_frames_available": max(0, trim),
         "segment_trim": segment_trim,
         "keep_frames": keep,
         "exact": residual == 0,
