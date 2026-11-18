@@ -89,6 +89,14 @@ def main():
         page.screenshot(path=str(OUT / "01-picker-open.png"), full_page=False)
 
         # 点第一张素材卡 -> 确定
+        # 【为什么要等卡片真的出现】/api/assets/picker 在本机要几秒
+        # （素材库在 /mnt/usb2t 外接盘，200 条要逐个 stat）。
+        # 卡片没渲染出来时 querySelector 返回 null -> 「素材库里没有可选素材」
+        # 是**假象**，实测第一版脚本就踩了这个。
+        try:
+            page.wait_for_selector("#alPickerBody .al-card", timeout=30000)
+        except Exception as exc:
+            raise SystemExit(f"素材库卡片没渲染出来：{exc}")
         picked = page.evaluate(
             """() => {
               const card = document.querySelector('#alPickerBody .al-card');
