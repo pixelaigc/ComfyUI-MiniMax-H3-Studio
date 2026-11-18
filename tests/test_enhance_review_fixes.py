@@ -307,13 +307,28 @@ class TestEnhanceReviewStatic(unittest.TestCase):
             "不能再用硬编码的 targets().input")
     # ---- 并发闸门 + 超时上限 ----
     def test_enhance_endpoint_has_concurrency_gate(self):
-        """/api/enhance 必须有并发闸门。"""
+        """
+        /api/enhance 必须有并发闸门。
+
+        【2026-11-18 改】原来这里取的是「api_enhance 往后 6000 个字符」
+        这个**任意长度**的窗口。端点体一旦变长（本次修复加了素材上下文
+        解析 + 非多模态 Provider 的提前报错），闸门调用就被挤出窗口 ->
+        用例**假失败**。
+
+        窗口长度与被测行为无关 —— 闸门在不在端点里，跟端点有多长无关。
+        现在按**函数边界**切（到下一个顶层 def 为止），窗口长度不再
+        影响判定，用例也不会因为「代码变长」而误报。
+        """
         server = (REPO / "server.py").read_text(encoding="utf-8")
         self.assertIn("ENHANCE_CONCURRENCY", server)
         self.assertIn("def _enhance_gate()", server)
         self.assertIn("asyncio.Semaphore(ENHANCE_CONCURRENCY)", server)
         idx = server.find("async def api_enhance(")
-        body = server[idx:idx + 6000]
+        self.assertNotEqual(idx, -1, "找不到 api_enhance")
+        # 按函数边界切：从 api_enhance 到下一个顶层 def / async def
+        rest = server[idx + 1:]
+        nxt = re.search(r"^(async def |def )", rest, re.M)
+        body = rest[:nxt.start()] if nxt else rest
         self.assertIn("_enhance_gate()", body, "api_enhance 必须取闸门")
         self.assertIn("async with gate:", body, "api_enhance 必须持有闸门")
         self.assertIn("429", body, "抢不到闸门必须返回 429（不排队）")
