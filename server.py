@@ -3214,10 +3214,23 @@ def _chain_duration_plan(job_id: str,
     所以「点接续时预期的成片时长」= 已有的段 + 即将生成的那一段。
 
       例：链上已有 1 段 5 秒，面板填 5 秒
-        -> 预期成片 = 5 + (5 - 1) = 9 秒（口径）
-        -> 实际 = 124 + 102 = 226 帧 = 9.4167 秒
+        -> 预期成片 = 5 + (5 - 1) = 9 秒 = 216 帧
 
-    返回 `cont.chain_duration_account()` 的结果（见那里的字段说明）。
+    【2026-11-17 收口：返回的是**补偿后**的账（唯一真源）】
+    成片拼接时会做尾裁（`_concat_chain_video` 的 `trim_tail_frames`），
+    让成片帧数**精确**命中用户口径。所以这里返回的
+    `total_frames` / `total_seconds` 就是**成片真实的**帧数与时长，
+    不再是「不补偿时会有多少」。
+
+    但**保留**两个字段用于诊断与界面说明：
+      * `raw_total_frames` —— 不补偿时的帧数；
+      * `compensation`     —— 补偿计划（裁了多少帧、为什么）。
+
+    【为什么面板不再需要显示两个数】
+    上一轮面板并列显示「按 1 秒重叠口径」与「实际帧数」，是因为那时
+    成片**真的**比口径长。现在两者**精确相等**（残差 0 帧），
+    并列显示反而让人以为还有差异 —— 所以前端只显示一个数，
+    仅在残差非 0 时才补充说明（见 `compensation.notes`）。
     """
     durations = _lineage_durations(job_id)
     if extra_seconds is not None:
@@ -3239,7 +3252,37 @@ def _chain_duration_plan(job_id: str,
                 info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
         except (TypeError, ValueError, json.JSONDecodeError):
             window = cont.DEFAULT_CONTEXT_FRAMES
-    return cont.chain_duration_account(durations, window)
+
+    account = cont.chain_duration_account(durations, window)
+    plan = cont.chain_compensation_plan(durations, window)
+    # 补偿后各段在成片里实际保留的帧数。
+    keep = plan.get("keep_frames") or []
+    for index, segment in enumerate(account.get("segments") or []):
+        if index < len(keep):
+            segment["delivered_frames"] = int(keep[index])
+            segment["delivered_seconds"] = round(
+                int(keep[index]) / float(cont.FPS), 6)
+    account["total_frames"] = sum(int(x) for x in keep) if keep else \
+        account["total_frames"]
+    account["total_seconds"] = round(
+        account["total_frames"] / float(cont.FPS), 6)
+    account["formula_seconds"] = round(
+        plan.get("formula_frames", 0) / float(cont.FPS), 6)
+    account["delta_seconds"] = round(
+        account["total_seconds"] - account["formula_seconds"], 6)
+    account["raw_total_frames"] = plan.get("current_frames")
+    account["raw_total_seconds"] = round(
+        (plan.get("current_frames") or 0) / float(cont.FPS), 6)
+    account["compensation"] = plan
+    # notes 用**补偿后**的口径重写（补偿成功后不再需要说「差了多少」）。
+    notes = list(account.get("notes") or [])
+    if plan.get("exact"):
+        notes = [n for n in notes if "相差" not in n]
+        notes.extend(plan.get("notes") or [])
+    else:
+        notes.extend(plan.get("notes") or [])
+    account["notes"] = notes
+    return account
 
 
 async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
@@ -3343,8 +3386,31 @@ async def _finalize_continuation_impl(job_id: str, mode: str, params: dict,
             info.get("audio_source_kind") or "") == "ref_audio"
             else "参考视频的音轨")
 
+    # ---- 成片尾裁量：让成片帧数精确命中用户口径（2026-11-17 收口）----
+    #
+    # 用户口径：成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒。
+    # 不补偿时成片会多出几帧（H3 的 17k+5 段长网格 + 拷贝桥只接受
+    # 5+17k 网格的钉住窗口，22 帧而不是整 1 秒）。
+    #
+    # 补偿**只从最后一段的尾部**裁 —— 前面的段一帧不裁，
+    # 所以接缝（上一段末帧 → 下一段首帧）的连续性完全不受影响。
+    trim_tail_frames = 0
+    try:
+        durations = _lineage_durations(job_id)
+        window = cont.snap_context_frames(int(
+            info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+        plan = cont.chain_compensation_plan(durations, window)
+        trim_tail_frames = int(plan.get("trim_frames") or 0)
+        if trim_tail_frames:
+            print(f"[接续] 成片尾裁计划: 目标 {plan.get('formula_frames')} 帧, "
+                  f"裁 {trim_tail_frames} 帧 (各段保留 {plan.get('keep_frames')})")
+    except Exception as exc:  # 兜底：算不出来就不裁，绝不因此让成片失败
+        print(f"[接续] 尾裁计划计算失败（不裁剪）: {exc}")
+        trim_tail_frames = 0
+
     full = await asyncio.to_thread(_concat_chain_video, segments, chain_id,
-                                   external_audio, external_label)
+                                   external_audio, external_label,
+                                   trim_tail_frames)
     if not full:
         return saved
     full_rel = full.relative_to(OUT_DIR).as_posix()
@@ -3518,7 +3584,8 @@ async def _prepare_segment_audio(session: ClientSession, job_id: str,
 
 def _concat_chain_video(segments: list[str], chain_id: str,
                         external_audio: str | None = None,
-                        external_audio_label: str = "") -> Path | None:
+                        external_audio_label: str = "",
+                        trim_tail_frames: int = 0) -> Path | None:
     """把链上的分段视频按序拼成**完整视频**。返回输出路径（失败返回 None）。
 
     【为什么用 concat demuxer 而不是 filter_complex】
@@ -3537,6 +3604,15 @@ def _concat_chain_video(segments: list[str], chain_id: str,
       * 视频长于音轨 -> `-af apad` 补静音；
       * 视频短于音轨 -> `-shortest` 截断。
     （与 nonebot 咏唱 h3 的 concat_full_video 同一套参数。）
+
+    【trim_tail_frames —— 成片尾裁（2026-11-17 收口）】
+    用户口径（最终标准）：成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒。
+    不补偿时成片会多出几帧（H3 的 17k+5 段长网格 + 拷贝桥只接受
+    5+17k 网格的钉住窗口，22 帧而不是整 1 秒）。
+
+    这里只从**最后一段的尾部**裁掉这么多帧 —— 前面的段一帧不裁，
+    所以接缝（上一段末帧 → 下一段首帧）的连续性完全不受影响。
+    计算见 `h3studio/continuation.py::chain_compensation_plan`。
     """
     if not segments:
         return None
@@ -3604,9 +3680,39 @@ def _concat_chain_video(segments: list[str], chain_id: str,
         #   **完全一致**（`h3_chain_video.py:_segments_look_compatible`）。
         #   我们这里仍需 scale/pad 统一尺寸 + 可能替换音轨，
         #   所以保留重编码，但把时间轴修对。
+        #
+        # 【成片尾裁（2026-11-17 收口）：让成片帧数精确命中用户口径】
+        #   用户口径：成片总帧数 = Σ(各段请求秒数×24) - (段数-1)×24
+        #   （5s→5s = 216 帧；5s→5s→8s = 384 帧）。
+        #
+        #   实现要点（实测踩过的坑）：
+        #   1) 用 **`-frames:v N`** 而不是 `select` 滤镜。
+        #      `select='lt(n\,216)'` 这类写法经 `-vf` 传参时**静默失效**
+        #      —— ffmpeg 退出码 0，但输出 `video:0KiB`（0 帧），
+        #      坑在于「不报错」而不是「报错」。`-frames:v` 是输出选项，
+        #      语义明确、可验证。
+        #   2) `-frames:v` 作用在**滤镜链之后**。滤镜链
+        #      （setpts + fps）把输入帧 1:1 铺开，所以「前 N 帧」
+        #      = concat 输入的前 N 帧。
+        #   3) 只裁**最后一段的尾部**：前面的段一帧不裁，
+        #      接缝（段0 末帧 → 段1 首帧）的连续性才不受影响。
+        #      实测若裁链首段尾部，接缝跳变从 0.67 涨到 5.8（10.32x）。
         vf = (f"scale={width}:{height}:force_original_aspect_ratio=decrease:"
               f"force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
               f"setsar=1,setpts=N/FRAME_RATE/TB,fps={cont.FPS},format=yuv420p")
+        trim_tail = max(0, int(trim_tail_frames or 0))
+        target_frames = 0
+        if trim_tail > 0 and len(paths) >= 2:
+            # 各段帧数（用来算 concat 之后的总帧数）。
+            counts = [_probe_video_frame_count(p) for p in paths]
+            if all(c > 0 for c in counts):
+                total_in = sum(counts)
+                target_frames = total_in - trim_tail
+                print(f"[接续] 成片尾裁 {trim_tail} 帧（用户口径对齐）: "
+                      f"输入 {total_in} 帧 -> 输出 {target_frames} 帧 "
+                      f"= {target_frames / cont.FPS:.4f}s")
+            else:
+                print("[接续] 段帧数探测失败，跳过成片尾裁")
         command = [FFMPEG, "-y", "-f", "concat", "-safe", "0",
                    "-i", str(list_path)]
         if external_path is not None:
@@ -3619,6 +3725,12 @@ def _concat_chain_video(segments: list[str], chain_id: str,
         command += ["-vf", vf,
                     "-c:v", "libx264", "-preset", "medium", "-crf", "18",
                     "-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
+        if target_frames > 0:
+            # 【关键】-frames:v 放在编码参数**之后**、输出文件**之前** ——
+            # 它是「输出选项」，必须紧挨输出文件才生效。
+            # 效果：滤镜链输出前 target_frames 帧，其余丢弃
+            #       ⇒ 成片帧数精确等于用户口径。
+            command += ["-frames:v", str(target_frames)]
         if external_path is not None:
             # 视频长 -> 补静音；视频短 -> 截断。两者同时给 = 音轨长度
             # 精确等于合并后视频长度（题面口径）。
@@ -3633,6 +3745,16 @@ def _concat_chain_video(segments: list[str], chain_id: str,
             if output_path.exists():
                 output_path.unlink()
             return None
+        if target_frames > 0:
+            # 【自检】尾裁后必须**真的**是目标帧数 —— 不符就说明
+            # ffmpeg 的行为与预期不同，绝不静默交付一个不对的成片。
+            actual = _probe_video_frame_count(output_path)
+            if actual and actual != target_frames:
+                print(f"[接续] ⚠ 成片尾裁后帧数不符: 期望 {target_frames} 帧, "
+                      f"实际 {actual} 帧 —— 保留产物但记录异常")
+            else:
+                print(f"[接续] 成片尾裁校验通过: {actual or target_frames} 帧 "
+                      f"= {(actual or target_frames) / cont.FPS:.4f}s")
         if external_path is not None:
             print(f"[接续] 成片音轨使用原始参考音频"
                   f"{('（' + external_audio_label + '）') if external_audio_label else ''}"
@@ -5291,6 +5413,44 @@ def _probe_video_size(path: Path) -> tuple[int, int]:
     width = max(2, int(stream.get("width") or 864)) // 2 * 2
     height = max(2, int(stream.get("height") or 480)) // 2 * 2
     return width, height
+
+
+def _probe_video_frame_count(path: Path) -> int:
+    """这个视频有多少帧（探测不出返回 0）。
+
+    【用途】成片尾裁要按**帧**裁（不是按秒），所以需要各段的真实帧数
+    才能算出 concat 之后的全局帧区间。
+
+    【为什么优先用 nb_frames 而不是 duration×fps】
+    `duration * fps` 会因为容器/流时长的小数误差算出非整数
+    （实测分段视频的 duration 有 0.041667 这类值），
+    用它算区间会差 1 帧 —— 而成片帧数必须**精确**命中用户口径。
+    `nb_frames` 是容器记录的帧数，精确。
+    拿不到 nb_frames 时退回 `nb_read_frames`（要真的解码一遍，慢但准）。
+    """
+    if not FFPROBE:
+        return 0
+    try:
+        raw = subprocess.check_output(
+            [FFPROBE, "-v", "error", "-select_streams", "v:0",
+             "-count_frames",
+             "-show_entries", "stream=nb_frames,nb_read_frames",
+             "-of", "json", str(path)],
+            encoding="utf-8", timeout=60, creationflags=CREATE_NO_WINDOW)
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return 0
+    try:
+        stream = (json.loads(raw).get("streams") or [{}])[0]
+    except (json.JSONDecodeError, IndexError, TypeError):
+        return 0
+    for key in ("nb_frames", "nb_read_frames"):
+        try:
+            value = int(stream.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    return 0
 
 
 async def run_longfilm(job_id: str):

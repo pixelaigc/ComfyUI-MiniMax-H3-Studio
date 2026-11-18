@@ -411,6 +411,140 @@ def chain_frames_from_durations(durations: list[float],
 
 
 # ------------------------------------------------------------------
+# 成片帧数补偿（2026-11-17 收口：成片时长精确命中用户口径）
+# ------------------------------------------------------------------
+def formula_total_frames(requested_seconds: list[float]) -> int:
+    """用户口径的成片总帧数。
+
+        成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
+        成片总帧数 = Σ(各段请求秒数 × 24) - (段数-1) × 24
+
+    例（24fps）：
+      5s → 5s      : 120 + 120 - 24 = 216 帧 = 9.000s
+      5s → 5s → 8s : 120 + 120 + 192 - 48 = 384 帧 = 16.000s
+    """
+    durations = [float(d) for d in (requested_seconds or [])]
+    if not durations:
+        return 0
+    requested_frames = sum(int(round(d * FPS)) for d in durations)
+    return requested_frames - max(0, len(durations) - 1) * FPS
+
+
+def chain_compensation_plan(requested_seconds: list[float],
+                            window: int = DEFAULT_CONTEXT_FRAMES) -> dict:
+    """算一条链的**成片尾裁计划**（让成片帧数精确命中用户口径）。
+
+    返回
+      {
+        "formula_frames":   用户口径的成片总帧数,
+        "current_frames":   不补偿时的成片总帧数,
+        "trim_frames":      需要从**最后一段尾部**裁掉的帧数,
+        "segment_trim":     [每段尾裁帧数]（只有最后一段可能非 0）,
+        "keep_frames":      [每段在成片里保留的帧数],
+        "exact":            补偿后是否**精确**命中用户口径,
+        "residual_frames":  补偿后仍差多少帧（0 = 精确命中）,
+        "notes":            [中文说明, ...],
+      }
+
+    【为什么要补偿 —— 两个独立的差，各自有各自的来源】
+
+      差 1：**网格余量**。H3 的段长只能落在 17k+5 帧网格上
+            （请求 5 秒 = 120 帧，模型只能出 124 帧 = 5.1667s）。
+            每段多生成 align(请求帧) - 请求帧 帧。
+
+      差 2：**重叠差额**。潜空间拷贝桥的钉住窗口只接受 5+17k 网格
+            （5/22/39/…/124），24 帧（= 整 1 秒）不在网格上 ——
+            Relay-Kit `relay_core.py:411` 会直接 raise。
+            生产档用的是 22 帧 = 0.9167s，所以每处重叠比用户以为的
+            **少 2 帧**，成片就多出 2 帧。
+
+      两者相加 = 成片比用户口径多出的帧数。
+
+    【补偿落在哪一端 —— 为什么只裁最后一段的尾部】
+
+      实测（线上真实产物，ffprobe + 逐帧灰度比对）：
+        * 段文件里 TrimAV 已经把**重叠头部** 22 帧裁掉了
+          （段1 文件 = 124 - 22 = 102 帧）；
+        * |段0 末帧 - 段1 首帧| = 0.6685 = **正常相邻帧差**
+          ⇒ 段1[0] 紧接段0 末帧，**接缝连续性成立**。
+
+      ⇒ **裁链首段或中间段的任何一端都会破坏接缝连续性**：
+        - 裁链首段尾部 → 接缝处变成「段0 的倒数第 N 帧 → 段1 首帧」，
+          中间凭空少 N 帧 ⇒ 接缝跳变从 0.67 涨到 5.8（实测 10.32x）；
+        - 裁续接段头部 → 裁掉的是「本段真正的新内容」的开头。
+
+      ⇒ **只裁最后一段的尾部**：
+        - 接缝（段0→段1、段1→段2）**完全不受影响**（那些段的帧一个不裁）；
+        - 被裁掉的是最后一段末尾「超出请求时长」的那几帧 ——
+          它们本来就是 H3 在网格上多生成的，用户没要求过；
+        - 实测：成片前 216 帧与旧 226 帧成片**逐帧一致**（最大差 0.0086）。
+
+    【为什么不改上游】
+      * 差 1 改不了：120 帧不在 17k+5 网格，H3 生成不出这个长度的段；
+      * 差 2 改不了：24 帧不在 5+17k 合法窗口，拷贝桥会 raise
+        （Relay-Kit `relay_core.py:411-419`，报错文案
+        「%d 帧不是 H3 的整步续接窗口」）。
+      所以补偿**只能**在解码后按帧裁剪 —— 而这正是本函数给出的计划。
+    """
+    win = snap_context_frames(int(window))
+    if win <= 0:
+        win = 0
+    durations = [float(d) for d in (requested_seconds or [])]
+    if not durations:
+        return {"formula_frames": 0, "current_frames": 0, "trim_frames": 0,
+                "segment_trim": [], "keep_frames": [], "exact": True,
+                "residual_frames": 0, "notes": []}
+
+    account = chain_duration_account(durations, win)
+    current = int(account["total_frames"])
+    formula = formula_total_frames(durations)
+    trim = current - formula
+
+    segment_trim = [0] * len(durations)
+    if trim > 0:
+        # 只从**最后一段**尾部裁；中间段与链首段一帧不裁。
+        segment_trim[-1] = trim
+    keep = [s["delivered_frames"] - t
+            for s, t in zip(account["segments"], segment_trim)]
+    residual = sum(keep) - formula
+
+    notes: list[str] = []
+    if trim > 0:
+        slack_total = sum(int(s["grid_slack_frames"]) for s in account["segments"])
+        n_cont = max(0, len(durations) - 1)
+        win_gap = (FPS - win) if win else 0
+        notes.append(
+            f"成片帧数已按用户口径精确对齐："
+            f"当前 {current} 帧 -> 目标 {formula} 帧，"
+            f"从最后一段尾部裁掉 {trim} 帧。")
+        notes.append(
+            f"这 {trim} 帧的来源：H3 的 17k+5 段长网格多生成 {slack_total} 帧"
+            + (f"，加上每处重叠窗口是 {win} 帧而不是整 1 秒（少 {win_gap} 帧 × "
+               f"{n_cont} 处 = {win_gap * n_cont} 帧）——"
+               f"潜空间拷贝桥只接受 5+17k 帧网格的钉住窗口，24 帧会被节点拒绝。"
+               if win_gap and n_cont else "。"))
+        notes.append(
+            f"补偿只裁**最后一段的尾部**，前面的段一帧不裁 —— "
+            f"接缝（上一段末帧 → 下一段首帧）的连续性完全不受影响，"
+            f"也不会丢掉任何一段的内容。")
+    elif trim < 0:
+        notes.append(
+            f"成片比用户口径**短** {abs(trim)} 帧（{abs(trim) / FPS:.4f} 秒）—— "
+            f"这一项无法用裁剪补齐（内容本来就不够）。")
+
+    return {
+        "formula_frames": formula,
+        "current_frames": current,
+        "trim_frames": max(0, trim),
+        "segment_trim": segment_trim,
+        "keep_frames": keep,
+        "exact": residual == 0,
+        "residual_frames": residual,
+        "notes": notes,
+    }
+
+
+# ------------------------------------------------------------------
 # 可接续性判定
 # ------------------------------------------------------------------
 def selflift_enabled(params: dict) -> bool:

@@ -475,25 +475,30 @@
   }
 
   /**
-   * 成片时长账的**只读展示**（2026-11-17 更正后新增）。
+   * 成片时长账的**只读展示**（2026-11-17 更正后新增；
+   * 2026-11-17 收口后只显示**一个**数）。
    *
-   * 【为什么必须显示】用户口径是：
-   *   成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒
-   * （潜空间接续有 1 秒重叠，来自前段尾部帧，不重复计入）。
-   * 而实测值与这个口径有**小幅差**（H3 的 17k+5 帧网格 + 拷贝桥只接受
-   * 5+17k 合法钉住窗口）。用户必须能看见：
-   *   * 按用户口径算的成片时长；
-   *   * 实测会得到的成片时长；
-   *   * 两者差多少、为什么差。
-   * 否则「我请求 5 秒接续 5 秒，为什么成片是 9.4 秒不是 9 秒」无从判断。
+   * 【为什么只显示一个数】
+   * 用户口径是：成片总时长 = Σ(各段请求时长) - (段数-1) × 1 秒。
+   * 上一轮面板并列显示「按用户口径算的」和「实测会得到的」两个数，
+   * 是因为那时成片**真的**比口径长（差 +0.4167s / +0.5000s）。
+   * 现在成片拼接会做尾裁（server 侧 `_concat_chain_video` 的
+   * `trim_tail_frames`），成片帧数**精确**命中用户口径
+   * （5s→5s = 216 帧 / 9.000s；5s→5s→8s = 384 帧 / 16.000s），
+   * 两个数**完全相等** —— 并列显示反而会让人以为还有差异。
+   *
+   * 所以现在：
+   *   * 只显示「成片时长」一个数（= 成片真实帧数 / 24）；
+   *   * 若 `compensation.exact` 为 false（残差非 0），
+   *     才额外显示「残差多少帧 / 多少秒」+ **来自哪一条上游硬约束**，
+   *     绝不静默给近似值。
    *
    * @param {object} plan 服务端下发的 duration_plan
-   * @param {number} nextSeconds 下一段请求的时长（秒）；用于把
-   *        「再接一段」的预期时长一起算出来
    */
   function renderDurationRows(plan) {
     if (!plan || !plan.segments || !plan.segments.length) return "";
     const rows = [];
+    const comp = plan.compensation || {};
     const segs = plan.segments.map(s => {
       const ov = s.overlap_frames
         ? `（重叠 ${s.overlap_frames} 帧 = ${Number(s.overlap_frames / 24).toFixed(4)}s）`
@@ -501,14 +506,16 @@
       return `第${s.index + 1}段 请求 ${s.requested_seconds}s → 交付 `
         + `${s.delivered_frames} 帧 = ${Number(s.delivered_seconds).toFixed(4)}s${ov}`;
     });
-    rows.push(`<div class="row"><span>成片时长（按 1 秒重叠口径）</span>`
-      + `<b>${esc(Number(plan.formula_seconds).toFixed(3))}s</b></div>`);
-    rows.push(`<div class="row"><span>成片时长（实际帧数）</span>`
-      + `<b>${esc(Number(plan.total_seconds).toFixed(4))}s`
+    // 【唯一口径】成片时长 = 成片真实帧数 / 24
+    rows.push(`<div class="row"><span>成片时长</span>`
+      + `<b>${esc(Number(plan.total_seconds).toFixed(3))}s`
       + `（${esc(plan.total_frames)} 帧）</b></div>`);
-    if (Math.abs(Number(plan.delta_seconds || 0)) > 1e-6) {
-      rows.push(`<div class="row"><span>两者相差</span>`
-        + `<b>${esc(Number(plan.delta_seconds).toFixed(4))}s</b></div>`);
+    // 残差非 0 时才说残差 —— 并写清来自哪一条上游硬约束
+    if (!comp.exact) {
+      const residual = Number(comp.residual_frames || 0);
+      rows.push(`<div class="row"><span>⚠ 与「请求时长之和 − 每段 1 秒重叠」相差</span>`
+        + `<b>${esc(Math.abs(residual))} 帧`
+        + `（${esc((Math.abs(residual) / 24).toFixed(4))}s）</b></div>`);
     }
     const segList = `<div class="continuation-note">分段：`
       + esc(segs.join("；")) + `</div>`;
