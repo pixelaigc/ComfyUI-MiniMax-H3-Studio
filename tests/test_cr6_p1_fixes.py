@@ -183,6 +183,67 @@ class TestDisplayMatchesRealProduct(unittest.TestCase):
         self.assertIn('"continuation_info": _continuation_info_for_row(',
                       src, "生成库卡片的 continuation_info 必须走展示层入口")
 
+    def test_continuation_context_endpoint_passes_job_id(self):
+        """`/api/jobs/{id}/continuation` 必须把 job id 传给展示层。
+
+        【为什么这条重要 —— 本轮首次部署就踩到了】
+        展示层 `_continuation_info_for_row` 用 `r["id"]` 查血缘。
+        API 侧一度只传了 `{"mode": mode}` -> KeyError ->
+        被外层的 `except Exception` 吞掉 -> **修复静默不生效**
+        （线上显示仍是 226 帧，真实成片 216 帧），而所有测试都绿。
+
+        ⇒ 这条断言锁住「job id 必须传进去」，且**外层不许有吞异常的 except**。
+        """
+        server_py = (REPO / "server.py")
+        if not server_py.exists():
+            self.skipTest("找不到 server.py")
+        src = server_py.read_text(encoding="utf-8", errors="replace")
+        m = re.search(
+            r"async def api_continuation_context\(request\):.*?\n(?=async def |\ndef )",
+            src, re.S)
+        self.assertIsNotNone(m, "找不到 api_continuation_context 的函数体")
+        body = m.group(0)
+        self.assertIn('_row = {"mode": mode, "id": jid}',
+                      body,
+                      "api_continuation_context 必须把 job id 一起传给展示层")
+        # 外层不许有「吞掉异常」的 except（那会让修复静默失效）
+        self.assertNotIn(
+            "except Exception:", body.split("_continuation_info_for_row")[0][-400:]
+            if "_continuation_info_for_row" in body else "",
+            "展示层调用前不许有吞异常的 except（修复会静默失效）")
+
+    def test_display_layer_never_swallows_exceptions(self):
+        """API 侧不许再用「吞异常」把「修复没生效」伪装成「正常返回」。
+
+        【为什么】`_continuation_info_for_row` 内部有一个
+        `except Exception: pass` —— 那是**内部**兜底（协议层算不出来时
+        保留协议层的值），可以接受；但 API 侧**不许**再包一层同样的
+        兜底，否则「修复没生效」会被伪装成「正常返回」。
+
+        【本轮实测踩到】首次部署时 API 侧只传了 `{"mode": mode}`，
+        展示层取 `r["id"]` 抛 KeyError -> 被外层 except 吞掉 ->
+        线上显示仍是 226 帧（真实成片 216 帧），**所有测试都绿**。
+        """
+        server_py = (REPO / "server.py")
+        if not server_py.exists():
+            self.skipTest("找不到 server.py")
+        src = server_py.read_text(encoding="utf-8", errors="replace")
+        m = re.search(
+            r"async def api_continuation_context\(request\):.*?\n(?=async def |\ndef )",
+            src, re.S)
+        self.assertIsNotNone(m, "找不到 api_continuation_context 的函数体")
+        body = m.group(0)
+        call_at = body.find("_continuation_info_for_row(")
+        self.assertGreater(call_at, 0, "API 侧没有调用展示层")
+        # 调用点**之前**（含包裹它的 try）不得出现 except Exception
+        head = body[:call_at]
+        self.assertNotIn(
+            "except Exception:", head,
+            "api_continuation_context 调用展示层之前不许有吞异常的 except"
+            "（那会让修复静默失效 —— 本轮首次部署就踩到了）")
+        idx = src.find('"continuation_info": _continuation_info_for_row(')
+        self.assertGreater(idx, 0, "找不到卡片行的展示层调用")
+
 
 # ==========================================================================
 # R6-3：用户可见文案不得含 markdown 强调残留

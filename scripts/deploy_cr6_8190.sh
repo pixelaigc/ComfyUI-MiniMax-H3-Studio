@@ -27,13 +27,21 @@ systemctl is-active h3-studio.service
 PID_BEFORE=$(systemctl show h3-studio.service -p MainPID --value)
 echo "重启前 PID=$PID_BEFORE"
 
-# 【并发安全】live 必须仍停在本轮开始时看到的状态
-if [ "$LIVE_BEFORE" != "aa0556f7d6ba38a359c1479f360e66f43d384a9d" ]; then
-  echo "!! live 分支已被别人推进（$LIVE_BEFORE != aa0556f...），中止部署"
+# 【并发安全】live 必须仍停在本轮开始时看到的状态。
+# ⚠ 这个 SHA 是**上一轮部署**留下的（本轮第一次部署成功了，合并提交 = f1dcb3f），
+#   本轮第二次部署要把「补传 job id」的修复推上去 —— 所以基线是 f1dcb3f，
+#   不是最初的 aa0556f。
+#   判据仍然是「live/maintainer 与我上次部署后的状态一致」，
+#   别人推进了就会中止。
+EXPECT_LIVE=aa0556f7d6ba38a359c1479f360e66f43d384a9d
+EXPECT_LIVE_AFTER_FIRST_DEPLOY=f1dcb3f1112eb0b66464242de70c974568a1402e
+if [ "$LIVE_BEFORE" != "$EXPECT_LIVE" ] && \
+   [ "$LIVE_BEFORE" != "$EXPECT_LIVE_AFTER_FIRST_DEPLOY" ]; then
+  echo "!! live 分支已被别人推进（$LIVE_BEFORE 既不是 $EXPECT_LIVE 也不是 $EXPECT_LIVE_AFTER_FIRST_DEPLOY），中止部署"
   exit 1
 fi
-if [ "$MAINTAINER_BEFORE" != "aa0556f7d6ba38a359c1479f360e66f43d384a9d" ]; then
-  echo "!! maintainer 已被别人推进（$MAINTAINER_BEFORE != aa0556f...），中止部署"
+if [ "$MAINTAINER_BEFORE" != "$LIVE_BEFORE" ]; then
+  echo "!! maintainer 与 live 不一致（$MAINTAINER_BEFORE vs $LIVE_BEFORE），中止部署"
   exit 1
 fi
 
