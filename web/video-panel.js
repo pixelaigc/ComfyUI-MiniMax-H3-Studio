@@ -99,6 +99,20 @@
     attention: "",
     twopass: {
       enabled: false,
+      // 【2026-11-18 新增】接续段是否**显式**允许二采。
+      //
+      // 【为什么单独一个字段而不是复用 enabled】服务端归一化层
+      // （h3studio/twopass_policy.py）对「接续段」一律禁用二采
+      // —— 二采在接续段会造成段头色档跳变（实测段头断点比
+      // 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶），而 nonebot 的
+      // minimax_h3_seg1/seg2 用的是**标准 SamplerCustomAdvanced**
+      // （无 SelfLift）⇒ 默认路径必须等价 seg2。
+      //
+      // 本字段是「用户明说要在接续段用二采」的唯一入口，
+      // **默认 false**，且前端勾选时要二次确认。
+      // 默认 false 时提交体里**不得**出现 allow_twopass=true
+      // （见 tests/test_twopass_allow_frontend.py）。
+      allow_continuation: false,
       transition_step: 3,
       lowres_scale: 0.5,
       rho: 0.0,
@@ -1042,6 +1056,24 @@
     enabledBox.checked = !!videoState.twopass.enabled;
     enabledBox.disabled = !nodeOk;
     if (body) body.hidden = !videoState.twopass.enabled || !nodeOk;
+
+    // 【2026-11-18】接续段二采的显式放行开关。
+    //
+    // 【什么时候显示】只在「当前确实有接续上下文」时显示 ——
+    // 没有接续上下文时这个开关没有意义（普通段本来就允许二采）。
+    // 【为什么默认隐藏】避免用户在没有接续时误勾一个「看不见效果」的开关。
+    const allowRow = document.getElementById("vidTwopassAllowContinuationRow");
+    const allowBox = document.getElementById("vidTwopassAllowContinuation");
+    const hasContinuation = !!(
+      window.Continuation && window.Continuation.state
+      && window.Continuation.state().current
+      && window.Continuation.state().current.continuation
+    );
+    if (allowRow) allowRow.hidden = !hasContinuation || !videoState.twopass.enabled;
+    if (allowBox) {
+      allowBox.checked = !!videoState.twopass.allow_continuation;
+      allowBox.disabled = !hasContinuation || !nodeOk;
+    }
 
     if (hint) {
       hint.textContent = nodeOk
@@ -2221,9 +2253,50 @@
     if (tpBox) {
       tpBox.addEventListener("change", () => {
         videoState.twopass.enabled = tpBox.checked;
+        // 关掉二采时必须同时关掉「接续段也用二采」——
+        // 否则会留下「二采关着但放行了」的矛盾状态。
+        if (!tpBox.checked) videoState.twopass.allow_continuation = false;
         renderTwopass();
         saveVideoConfig();
       });
+
+    // ---- 【2026-11-18】接续段也用二采：显式开关 + 二次确认 ----
+    //
+    // 【为什么必须二次确认】实测（2026-11-18，13 条链普查）：
+    // 二采 ON 的接续链段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶；
+    // 二采 OFF 的 11 条全部 ≤1.58x、≤+0.26。**无重叠无反例**。
+    // 这是用户能直接看到的缺陷（第 5 秒那一下变了个色调），
+    // 所以必须让用户在点下去之前就知道。
+    const tpAllowBox = document.getElementById("vidTwopassAllowContinuation");
+    if (tpAllowBox) {
+      tpAllowBox.addEventListener("change", () => {
+        if (tpAllowBox.checked) {
+          // 【二次确认】把风险说清楚；用户取消则**回滚复选框**。
+          const ok = confirm(
+            "确定要让接续段也用二采吗？\n\n"
+            + "二采（SelfLift）在接续段会造成段头色档跳变：\n"
+            + "· 实测段头断点比 2.58x–4.54x（二采关闭时 ≤1.58x）\n"
+            + "· 实测 3 帧亮度降 +4.7～+7.2 灰阶（二采关闭时 ≤+0.26）\n"
+            + "· 肉眼表现：接缝处「第 5 秒那一下整个色调跳一下」\n\n"
+            + "默认路径（不勾这个）走标准采样，与 nonebot minimax_h3_seg2 等价，无此缺陷。\n"
+            + "只有在你明确需要接续段的二采提速时才建议勾选。\n\n"
+            + "确定继续？");
+
+          if (!ok) {
+            tpAllowBox.checked = false;
+            videoState.twopass.allow_continuation = false;
+            renderTwopass();
+            saveVideoConfig();
+            return;
+          }
+          videoState.twopass.allow_continuation = true;
+        } else {
+          videoState.twopass.allow_continuation = false;
+        }
+        renderTwopass();
+        saveVideoConfig();
+      });
+    }
 
     // ---- sigma 精修控件（2026-11-13 借鉴 nonebot H3 工作流）----
     const refineBox = document.getElementById("vidSigmaRefineEnabled");

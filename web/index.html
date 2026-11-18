@@ -263,6 +263,19 @@
           <span>开启二采</span>
           <span class="muted" id="vidTwopassHint">低分辨率一采 + 高分辨率二采</span>
         </label>
+        <!-- 【2026-11-18 新增】接续段也用二采：有风险、默认关闭。
+             【为什么需要这条】服务端归一化层拦住接续段的二采（等价 nonebot
+             seg2 的标准采样，实测段头断点比 2.58x–4.54x、3 帧亮度降
+             +4.7～+7.2 灰阶）。但「用户故意要二采」（受控 A/B / 低分辨率档
+             提速收益大于色档代价）这个场景需要一条**显式**入口 ——
+             不能让它「悄悄开着」（那才是 bug）。
+             【默认关】不勾 = 接续段走标准采样（默认路径等价 seg2）。
+             【二次确认】勾选时前端弹确认框，把风险说清楚再放行。 -->
+        <label class="img-toggle" id="vidTwopassAllowContinuationRow" hidden>
+          <input type="checkbox" id="vidTwopassAllowContinuation">
+          <span>接续段也用二采（有风险）</span>
+          <span class="muted" id="vidTwopassAllowContinuationHint">接续段用二采会强制走段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶）；标准采样等价 nonebot minimax_h3_seg2 且无此缺陷</span>
+        </label>
         <div id="vidTwopassBody" hidden>
           <div class="compact-pair">
             <div class="compact-field">

@@ -3390,7 +3390,31 @@ async function onGenerateClick() {
       delete params.loras;
     }
   }
-  if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+    // 【2026-11-18 新增】接续段也用二采的**显式放行**标记。
+    //
+    // 【为什么放这里】三个视频模式共用这一个提交出口；
+    // `allow_twopass` 必须跟着 `continuation` 一起走 ——
+    // 服务端读的是 `params["continuation"]["allow_twopass"]`
+    // （h3studio/twopass_policy.py::continuation_allows_twopass）。
+    //
+    // 【默认必须是 false】面板的 `twopass.allow_continuation` 默认 false，
+    // 且只有用户勾了那个带二次确认的开关才可能为 true。
+    // **默认路径因此仍等价 nonebot seg2**（接续段走标准采样）。
+    if (window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
+      const _tpState = window.VIDEO_PANEL.state || {};
+      const _allowTp = !!(_tpState.twopass
+        && _tpState.twopass.allow_continuation);
+      if (_allowTp && window.Continuation && window.Continuation.state) {
+        const _ctx = window.Continuation.state().current;
+        if (_ctx && _ctx.continuation) {
+          // 只在这里改**副本**，不改 state 里那份（state 是回填用的上下文，
+          // 不能被提交动作污染）。
+          params.continuation = Object.assign({}, _ctx.continuation,
+                                              { allow_twopass: true });
+        }
+      }
+    }
+    if (mode === "t2v" && window.VIDEO_PANEL && window.VIDEO_PANEL.isReady()) {
     // 文生视频新面板：宽高 / 模型 / 加速 LoRA 组合 / 注意力 / 二采 / 采样参数
     Object.assign(params, window.VIDEO_PANEL.submitParams());
     // 加速 LoRA：把「不挂」**显式表达**出来（与 flf/r2v 分支同一写法）。
