@@ -90,6 +90,7 @@ from h3studio import docs_static
 from h3studio import prompt_history as ph
 from h3studio import prompt_history_hooks as ph_hooks
 from h3studio import asset_api
+from h3studio import twopass_policy
 from h3studio import video_models
 from h3studio import twopass_budget
 from h3studio import job_meta
@@ -2864,10 +2865,56 @@ def normalize_t2v_params(params: dict, mode: str = "t2v") -> tuple[dict, str]:
     out["attention"] = attention
 
     # ---- 二采 ----
+    #
+    # 【2026-11-18 新增 —— 接续段默认走标准采样（等价 nonebot seg2）】
+    #
+    # 【为什么必须在**归一化层**做，而不是只在前端把开关关掉】
+    # 前端 `videoState.twopass.enabled` 的默认值确实是 false，但
+    # `/api/video-config`（**服务端持久化**的面板配置）会把用户上次
+    # 勾选的状态在每次页面加载时恢复回来
+    # （web/video-panel.js 的 `applyConfig(saved)`）。
+    # ⇒ 「默认关闭」这个语义**只在服务端归一化层才成立**：
+    # 任何未显式开二采的入参，落到工作流里都必须是标准采样节点。
+    #
+    # 【为什么接续段要禁】
+    # 2026-11-18 实测（13 条链）：二采 ON 的 2 条段头断点比 2.58x / 4.54x、
+    # 3 帧亮度降 +4.7 / +7.2 灰阶；OFF 的 11 条全部 ≤1.58x / ≤+0.26。
+    # 突变落在**段 2 内部 frame0→1**，不在拼接帧 —— 肉眼就是「第 5 秒那一下」。
+    # 而 nonebot `minimax_h3_seg2.json` 用的是**标准 SamplerCustomAdvanced**
+    # （无 SelfLift）⇒ 「等价 seg2」= 接续段默认走标准采样。
+    #
+    # 【可行性】ComfyUI 的标准 SamplerCustomAdvanced **会**读 latent 的
+    # noise_mask 并作为 denoise_mask 传给采样器
+    # （comfy/comfy_extras/nodes_custom_sampler.py:1047-1055）
+    # ⇒ 拷贝桥的钉住区在标准采样路径上照常生效，不会「换回标准就失去钉帧」。
     twopass = params.get("twopass") or {}
     if not isinstance(twopass, dict):
         twopass = {}
     enabled = bool(twopass.get("enabled"))
+    if enabled:
+        # ---- 接续段的二采策略（h3studio/twopass_policy.py）----
+        # 【为什么必须调统一入口（resolve_effective_twopass）而不是各答各的】
+        #   两层各答各的会出现「归一层放行、工作流层禁用」或反过来的分裂
+        #   —— 那会让显式放行口子失效、或让接续段又走回 SelfLift。
+        #   统一入口保证口径一致（另处调用的是同一个函数）。
+        _tp_use, _tp_policy = twopass_policy.resolve_effective_twopass(params)
+        if _tp_policy == "deny":
+            # 接续段禁用二采 -> 强制走标准采样路径。
+            # 【为什么记 normalize_notes】「面板勾了二采但没生效」必须让用户
+            # 看得见，否则会以为是自己操作错了。归一说明由任务详情如实展示。
+            _cont_info = params.get("continuation")
+            _cont_info = _cont_info if isinstance(_cont_info, dict) else {}
+            _stage = _cont_info.get("stage_index")
+            try:
+                _stage = int(_stage) if _stage is not None else None
+            except (TypeError, ValueError):
+                _stage = None
+            out.setdefault("normalize_notes", []).append(
+                twopass_policy.twopass_disabled_note(mode, _stage))
+            enabled = False
+        elif _tp_policy == "warn":
+            out.setdefault("normalize_notes", []).append(
+                twopass_policy.twopass_warn_note(mode))
     if enabled:
         # 同上：只在「探测完整」时才断言缺节点（见上面 attention 的说明）。
         if (_COMFY_PROBE_COMPLETE

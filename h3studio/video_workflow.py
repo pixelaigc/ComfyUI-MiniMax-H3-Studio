@@ -24,6 +24,7 @@ from . import continuation as cont
 from . import continuation_service as cont_service
 from . import video_models as vmodels
 from . import twopass_budget
+from . import twopass_policy
 from . import frame_expr as frame_expr_mod
 
 # 文本编码器 / VAE（实测本机存在，路径见 video_models 的同类说明）
@@ -468,7 +469,21 @@ def build_t2v_panel(params: dict) -> dict:
                "_meta": {"title": "采样器"}}
 
     twopass = params.get("twopass") or {}
-    use_twopass = bool(twopass.get("enabled"))
+    # 【2026-11-18 把「接续段的二采」收到统一入口】
+    # 【为什么要在这两层都做】
+    #   服务端归一层（server.normalize_t2v_params）已经把接续段的二采关掉，
+    #   这里是**第二道防线**：
+    #     * 如果以后加生某条路径绕过归一层（比如内部直接调 build_t2v_panel），
+    #       接续段就可能又偷偷走回 SelfLift -> 段头色档跳变复现；
+    #     * 归一层是「策略」，这里是「不变量」—— 无论谁来调，接续段
+    #       默认产出的必须是标准 SamplerCustomAdvanced 等价节点。
+    # 【为什么必须调**同一个函数**（resolve_effective_twopass）】
+    #   两层各答各的就会出现「归一层放行、工作流层禁用」或反过来的分裂
+    #   —— 那会让显式放行口子失效、或让接续段又走回 SelfLift。
+    #   统一入口保证口径一致。
+    use_twopass, _tp_disposition = twopass_policy.resolve_effective_twopass(params)
+    if not use_twopass:
+        twopass = {}
 
     # ---- 接续（continuation）----
     #
