@@ -636,6 +636,30 @@ function buildEnhanceMeta(d) {
   if (d.finish_reason) {
     html += `<div class="enhance-warn">finish_reason：${esc(d.finish_reason)}</div>`;
   }
+  // 素材上下文回显（2026-11-18）
+  //
+  // 【为什么必须显示】本次缺陷的核心就是「素材被静默丢弃」——
+  // 用户点了增强、看到结果，却完全不知道模型到底看没看到素材。
+  // 这里如实告诉用户：带了几张图、音频是以什么形式提供的、
+  // 哪些素材**没有**参与（以及为什么）。
+  const assetInfo = d.assets;
+  if (assetInfo && assetInfo.asset_count) {
+    const bits = [];
+    if (assetInfo.image_count) {
+      bits.push(`已带 ${assetInfo.image_count} 张素材图给模型`);
+    }
+    if (assetInfo.has_text_context) {
+      bits.push("音频内容以文字形式提供");
+    }
+    const skipped = assetInfo.skipped || [];
+    if (skipped.length) {
+      bits.push("未参与：" + skipped
+        .map(s => `${s.name || s.asset_id}（${s.reason || ""}）`).join("；"));
+    }
+    if (bits.length) {
+      html += `<div class="enhance-warn">素材上下文：${esc(bits.join("；"))}</div>`;
+    }
+  }
   if (d.elements && d.elements.length) {
     html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>
       esc(e.id) + " " + esc(JSON.stringify(e.bbox))).join(" · ")}</div>`;

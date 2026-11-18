@@ -1596,6 +1596,9 @@
     updateActionButtons();
     setHint("正在按 H3 官方三段式写导演稿…", "busy");
     try {
+      // 【2026-11-18】导演稿同样要带素材 ——
+      // 首尾帧 / 参考生视频的导演稿必须基于用户引用的画面写。
+      const assetRefs = collectPanelAssetRefs();
       const d = await apiJSON("POST", "/api/enhance", {
         prompt,
         mode: "replace",
@@ -1605,6 +1608,7 @@
         // 【2026-11-17】跨段提示词历史（接续时带上此前各段的提示词）。
         // 非接续模式 -> 空数组 -> 服务端行为与今天完全一致。
         prompt_history: continuationPromptHistory(),
+        asset_refs: assetRefs,
       });
       const enhanced = d.enhanced || "";
       if (!enhanced) throw new Error("本地模型返回了空结果");
@@ -1661,6 +1665,124 @@
     }
   }
 
+  // ------------------------------------------------------------------
+  // 素材上下文（2026-11-18 修复「增强不带素材」缺陷）
+  // ------------------------------------------------------------------
+  //
+  // 【缺陷原样】用户在「首尾帧 / 参考生视频 / 图片编辑」这类面板里
+  // 已经从素材库引用了素材，填了提示词，点「增强」—— 增强出来的提示词
+  // **完全没有基于素材**。根因：前端调 /api/enhance 时**从不带**素材，
+  // 服务端的 images 参数虽然是死参数（浏览器本地路径服务端也读不到），
+  // 于是模型在增强阶段根本没看过素材。
+  //
+  // 【修法】点「增强」时把**当前面板已引用的素材**一并提交
+  // （asset_refs = [{asset_id, slot, ordinal}]），
+  // 服务端据此解析出服务端可读的图片喂给多模态模型。
+  //
+  // 【为什么只传 asset_id、让服务端解析】浏览器本地路径服务端读不到；
+  // 素材库里的素材服务端本来就读得到。传 id 还顺带保证「只接受素材库
+  // 里的素材」，不引入任意文件读取。
+  //
+  // 【槽位 -> 服务端语义】与出图链路（app.js 的 asset_refs 构建）
+  // **同一套映射** —— 同一个 key 在「出图」和「增强」里必须指同一种
+  // 角色，否则模型看到的「首帧」和实际送进工作流的「首帧」会错位。
+  const SLOT_FOR_KEY = {
+    first: "first_frame",
+    last: "last_frame",
+  };
+
+  /** 槽位 key -> 素材组（图 / 视频 / 音频）。 */
+  function slotGroupOf(key) {
+    if (/^ref\d+$/.test(key)) return "ref_image";
+    if (/^refvid\d+$/.test(key)) return "ref_video";
+    if (/^refaud\d+$/.test(key)) return "ref_audio";
+    return null;
+  }
+
+  /**
+   * 收集**当前面板**已引用的素材。
+   *
+   * @returns {Array<{asset_id, slot, ordinal}>} 无素材时返回空数组
+   *
+   * 【口径与出图链路一致】只收**当前模式渲染出来的**槽位
+   * （app.js 的 MODE_ALLOWED_SLOT_KEYS 是唯一真源）——
+   * 否则会出现「界面上看不见的槽位却带进增强」（幽灵输入）。
+   */
+  function collectPanelAssetRefs() {
+    const out = [];
+    try {
+      if (typeof state === "undefined" || !state) return out;
+      const mode = state.mode || "";
+      const slots = state.assetRefs || {};
+      // Qwen / H3-Image 的「图片编辑」参考图走 window.QwenRefs
+      // （自己的模块，不在 state.assetRefs 里）—— 单独收。
+      const qwenRefs = collectQwenRefAssets(mode);
+      for (const item of qwenRefs) out.push(item);
+
+      // 视频面板（flf / r2v）的槽位在 state.assetRefs 里。
+      // 【为什么要按模式过滤】state.assetRefs 是全局的，切模式时会被整块
+      // 清空，但同一模式内可能残留别的模式的 key（见 app.js 的
+      // MODE_ALLOWED_SLOT_KEYS 注释）—— 提交侧与渲染侧必须同源。
+      const allowed = (typeof MODE_ALLOWED_SLOT_KEYS !== "undefined")
+        ? MODE_ALLOWED_SLOT_KEYS[mode] : null;
+      const groupCounter = {};
+      Object.entries(slots).forEach(([key, item]) => {
+        if (!item || !item.asset_id) return;
+        if (allowed && !allowed(key)) return;
+        const slot = SLOT_FOR_KEY[key] || slotGroupOf(key);
+        if (!slot) return;
+        groupCounter[slot] = (groupCounter[slot] || 0) + 1;
+        out.push({
+          asset_id: item.asset_id,
+          slot,
+          ordinal: groupCounter[slot] - 1,
+        });
+      });
+      return out;
+    } catch (e) {
+      // 素材收集失败 -> 退回空数组（退化成无素材增强）。
+      // 绝不能因为收集异常就把整个增强搞挂。
+      return [];
+    }
+  }
+
+  /**
+   * Qwen / H3-Image 图片编辑模式的参考图（来自 window.QwenRefs）。
+   *
+   * 【为什么单独收】那套参考图在 web/qwen-refs.js 里自己管状态
+   * （强制来自素材库），不在 state.assetRefs 里。
+   */
+  function collectQwenRefAssets(mode) {
+    const out = [];
+    try {
+      if (mode !== "i2i_qwen" && mode !== "i2i_h3image") return out;
+      const refs = window.QwenRefs;
+      if (!refs || typeof refs.getRefs !== "function") return out;
+      const list = refs.getRefs() || [];
+      list.forEach((ref, index) => {
+        if (!ref || !ref.asset_id || ref.missing) return;
+        out.push({
+          asset_id: ref.asset_id,
+          slot: "ref_image",
+          ordinal: index,
+        });
+      });
+      return out;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * 素材回显文案的说明 —— 实际渲染在 web/providers.js 的
+   * buildEnhanceMeta() 里（meta 行是那里统一渲染的）。
+   *
+   * 【为什么放在 providers.js 而不是 enhance-menu.js】meta 行由
+   * buildEnhanceMeta() 统一渲染（多处调用），把素材信息加在那里
+   * 才能保证**每一条**增强路径都带上（普通 / 二次 / 导演稿），
+   * 不会漏掉某条分支。
+   */
+
   // ---- 普通增强（沿用既有 /api/enhance + 模板下拉） ----
   async function runBasic(method, opts) {
     const btn = document.querySelector(targets().btn);
@@ -1684,6 +1806,9 @@
     updateActionButtons();
     setHint(isMusicContext() ? "正在扩写音乐风格描述…" : "正在增强…", "busy");
     try {
+      // 【2026-11-18】当前面板已引用的素材 —— 必须带上，
+      // 否则增强模型看不到素材，扩写结果与用户引用的画面无关。
+      const assetRefs = collectPanelAssetRefs();
       const d = await apiJSON("POST", "/api/enhance", {
         prompt,
         mode: "replace",
@@ -1695,6 +1820,9 @@
         // 【2026-11-17】跨段提示词历史（接续时带上此前各段的提示词）。
         // 非接续模式 -> 空数组 -> 服务端行为与今天完全一致。
         prompt_history: continuationPromptHistory(),
+        // 【2026-11-18】素材上下文（当前面板已引用的素材）。
+        // 无素材面板 -> 空数组 -> 服务端行为与今天完全一致。
+        asset_refs: assetRefs,
       });
       provState.lastEnhance = d;
       // 只有**单独**跑普通增强时才清标记；多选时由 run() 统一设置，
@@ -1771,6 +1899,10 @@
     updateActionButtons();
     setHint("正在逐个物体细化…", "busy");
     try {
+      // 【2026-11-18】二次增强同样要带素材 ——
+      // 「逐个物体细化」必须按素材里**真实存在的物体**来细化，
+      // 看不到素材就只能凭空编。
+      const assetRefs = collectPanelAssetRefs();
       const d = await apiJSON("POST", "/api/enhance", {
         prompt: source,
         mode: "replace",
@@ -1780,6 +1912,7 @@
         spec_id: methodSpecId(method) || refineSpecId(),
         mode_ctx: enhanceCurrentMode(),
         model_key: enhanceCurrentModelKey(),
+        asset_refs: assetRefs,
       });
       // 【2026-11-09】不再写 provState.specId（见 runBasic 的同名注释）
       const refined = d.enhanced || "";

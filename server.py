@@ -75,6 +75,7 @@ from h3studio import h3image as h3img
 from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
+from h3studio import enhance_assets as enh_assets
 from h3studio import moss_layout
 from h3studio import qwen_pe
 from h3studio import h3image_pe
@@ -8523,6 +8524,12 @@ async def api_enhance(request):
       spec_id     模板 id，默认 image
       provider_id 指定 Provider；不给则用默认（要读图则用默认多模态）
       images      可选，本地图片路径列表（需要读图的场景）
+      asset_refs  可选，**面板当前引用的素材列表**（素材库 asset_id）
+                  [{"asset_id": "asset_xxx", "slot": "ref_image", "ordinal": 0}, ...]
+                  服务端把它解析成服务端可读的图片（图片直给 / 视频抽帧），
+                  连同图序语义一起喂给多模态模型。
+                  【2026-11-18 修复】此前前端从不传素材，增强模型**看不到**
+                  用户引用的素材，扩写结果与素材无关 —— 素材等于白引用。
     """
     try:
         payload = await request.json()
@@ -8551,6 +8558,41 @@ async def api_enhance(request):
         images = []
     images = [str(p) for p in images[:4]]
 
+    # ---- 素材上下文（2026-11-18 新增）----
+    #
+    # 前端把「当前面板已引用的素材」以 asset_refs 传上来，
+    # 这里解析成**服务端可读**的图片路径 + 图序语义。
+    #
+    # 【为什么必须在这里解析、而不是让前端传路径】浏览器本地路径
+    # 服务端读不到；而素材库里的素材服务端**本来就读得到**
+    # （h3studio/assets.py 管着物理文件）。所以前端只传 asset_id，
+    # 服务端自己解析 —— 这也顺带保证「只接受素材库里的素材」，
+    # 不引入任意文件读取。
+    asset_refs = payload.get("asset_refs")
+    asset_context = ""
+    asset_summary = {}
+    if asset_refs:
+        try:
+            resolved_assets = await asyncio.to_thread(
+                enh_assets.resolve_assets, asset_refs)
+        except enh_assets.EnhanceAssetError as exc:
+            # 素材用不了 -> **如实报错**，不静默忽略
+            # （静默忽略 = 用户以为素材参与了增强，其实没有）。
+            return web.json_response(
+                {"error": exc.message, "code": exc.code, "degraded": True},
+                status=400)
+        except Exception as exc:
+            return web.json_response(
+                {"error": f"素材上下文解析失败：{type(exc).__name__} {exc}"[:300],
+                 "degraded": True}, status=500)
+        # 素材图片**追加**在显式 images 之后（图序语义按实际顺序编号）
+        for path in (resolved_assets.get("images") or []):
+            if len(images) >= enh_assets.MAX_IMAGES:
+                break
+            images.append(path)
+        asset_context = enh_assets.describe(resolved_assets)
+        asset_summary = enh_assets.summary(resolved_assets)
+
     with db() as conn:
         row = conn.execute(
             "SELECT value FROM model_provider_prefs WHERE key=?",
@@ -8578,6 +8620,19 @@ async def api_enhance(request):
                 return web.json_response({"error": "指定的 Provider 不存在"}, status=404)
             if not item["enabled"]:
                 return web.json_response({"error": "该 Provider 已停用"}, status=400)
+            # 【2026-11-18 新增】显式指定了 Provider，而这次增强**带素材** ——
+            # 若该 Provider 不是多模态，llm.py 会抛「无法读图」。
+            # 但那已经太晚了（用户等了一轮才发现）。这里**提前**给明确提示，
+            # 说明「素材没有参与本次增强」而不是让它静默丢失。
+            if images and not item.get("multimodal"):
+                return web.json_response(
+                    {"error": f"Provider「{item['name']}」未开启多模态能力，"
+                              "无法读取素材，本次增强不会使用已引用的素材。"
+                              "请在「本地模型」页勾选「多模态」，或取消指定 Provider "
+                              "改用默认多模态模型。",
+                     "code": "provider_not_multimodal",
+                     "provider": item["name"], "provider_id": item["id"],
+                     "degraded": True}, status=400)
         else:
             if images:
                 item = prov.resolve_default(conn, "default_multimodal", require_multimodal=True)
@@ -8606,7 +8661,8 @@ async def api_enhance(request):
                                          current_stage=_safe_int(
                                              payload.get("stage")))
     messages = enh.build_messages(spec, original, params.get("language", "auto"),
-                                   history=history)
+                                   history=history,
+                                   asset_context=asset_context)
 
     # 并发闸门：抢不到就立刻 429，**不排队**。
     # 理由见 ENHANCE_CONCURRENCY 上方的注释（本机 llama.cpp total_slots=1，
@@ -8757,6 +8813,10 @@ async def api_enhance(request):
         "provider_id": item["id"],
         "spec_id": spec["id"],
         "used_multimodal": bool(images),
+        # 【素材上下文回显（2026-11-18 新增）】前端据此告诉用户
+        # 「这次增强带上了哪几个素材」—— 否则用户无法确认素材到底
+        # 有没有参与（这正是本次缺陷的核心：素材被静默丢弃）。
+        "assets": asset_summary,
         "validation": validation,
         "elements": elements,
         # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
