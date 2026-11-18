@@ -2780,8 +2780,10 @@ function legacyVideoSize(resolution, aspect, mode) {
   const scale = Math.sqrt(total / (ratio[0] * ratio[1]));
   let width = Math.max(MULT, Math.round(ratio[0] * scale / MULT) * MULT);
   let height = Math.max(MULT, Math.round(ratio[1] * scale / MULT) * MULT);
-  // 面积上限按模式（见服务端 mode_size_policy；t2v/flf/r2v 现均为 2.0 MP）
-  const maxMp = (mode === "t2v") ? 2.0 : 0.8;
+  // 面积上限按模式（见服务端 mode_size_policy）
+  // 【2026-11-17】flf / r2v 已与 t2v 同为 2.0 MP（对齐 nonebot seg1/seg2
+  // 的 ResolutionSelector(megapixels=2)）；上游 T8/核心节点无面积门禁。
+  const maxMp = 2.0;
   const limit = maxMp * 1024 * 1024;
   if (width * height > limit) {
     const s = Math.sqrt(limit / (width * height));

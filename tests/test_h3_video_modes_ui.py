@@ -180,25 +180,61 @@ class TestResolutionSemantics(unittest.TestCase):
         """h3_video_size 必须复用 video_models.video_dimensions（不另写一套）。
 
         【为什么】同一个公式写两处必然走偏 —— 这正是本项目反复踩过的坑。
+
+        【2026-11-17 更新】面积上限从 0.8MP 放宽到 2.0MP
+        （对齐 nonebot seg1/seg2 的 ResolutionSelector(megapixels=2)），
+        所以这里的期望值也要按**当前模式的上限**算，而不是写死 0.8。
         """
         from h3studio import video_models as vmodels
+        limit_mp = vmodels.max_pixels_for_mode("r2v")
         for res, mp in (("544p", 0.4), ("768p", 0.8)):
             for aspect in ("16:9", "9:16", "4:3", "1:1"):
                 want_w, want_h = vmodels.video_dimensions(aspect, mp)
-                limit = 0.8 * 1024 * 1024
+                limit = limit_mp * 1024 * 1024
                 if want_w * want_h > limit:
                     want_w, want_h, _ = vmodels.normalize_video_size(
-                        want_w, want_h, max_pixels=0.8)
+                        want_w, want_h, max_pixels=limit_mp)
                 got_w, got_h = vsize.dimensions_for(res, aspect, mode="r2v")
                 self.assertEqual((got_w, got_h), (want_w, want_h),
                                  f"{res} + {aspect} 与共享算法不一致")
 
     def test_area_cap_applied_for_square_aspect(self):
-        """1:1 + 0.8MP 的原始值超上限 -> 必须按比例缩回上限内。"""
+        """1:1 + 0.8MP 的原始值在上限内 -> 不该被缩。
+
+        【2026-11-17 更新】这条原先断言「1:1 + 0.8MP 超 0.8MP 上限 ->
+        必须缩回」。上限放宽到 2.0MP 后，1:1 + 0.8MP（832×832 = 692,224 px）
+        **在限内**，所以正确行为是**不缩**。
+
+        但「上限机制本身还要在」—— 所以另加一条断言：
+        真正超 2.0MP 的 1:1 值必须被缩回上限内。
+        """
+        from h3studio import video_models as vmodels
+        limit_mp = vmodels.max_pixels_for_mode("r2v")
         width, height = vsize.dimensions_for("768p", "1:1", mode="r2v")
-        self.assertLessEqual(width * height, int(0.8 * 1024 * 1024))
+        self.assertLessEqual(width * height, int(limit_mp * 1024 * 1024))
         self.assertEqual(width % 32, 0)
         self.assertEqual(height % 32, 0)
+        # 0.8MP 的 1:1 现在**在限内** -> 不该被缩
+        self.assertEqual((width, height),
+                         vmodels.video_dimensions("1:1", 0.8),
+                         "1:1 + 0.8MP 在 2.0MP 上限内，不该被缩")
+
+    def test_area_cap_still_applies_above_two_megapixels(self):
+        """真正超 2.0MP 的 1:1 值 -> 必须被缩回上限内。
+
+        【为什么这条重要】上面那条改成「不缩」后，如果上限机制整个坏掉
+        （比如返回 None = 不限），它照样会绿。这条锁住「上限还在生效」。
+        """
+        from h3studio import video_models as vmodels
+        limit_mp = vmodels.max_pixels_for_mode("r2v")
+        # 直接用尺寸归一测「超上限」这条路径（dimensions_for 的档位表
+        # 最高只到 0.8MP，不会超过 2.0MP，所以走 normalize_video_size）。
+        w, h, reasons = vmodels.normalize_video_size(
+            2048, 2048, max_pixels=limit_mp, strict_over_limit=True,
+            mode="r2v")
+        self.assertEqual((w, h), (0, 0), "4.2MP 必须被 r2v 的上限拦下")
+        self.assertTrue(reasons)
+        self.assertIn("2.0M", reasons[0])
 
     def test_apply_size_writes_real_pixels_into_params(self):
         """归一后 params 里必须有真实的 width/height。"""
