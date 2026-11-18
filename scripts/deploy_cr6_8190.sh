@@ -114,8 +114,12 @@ echo "共 $(echo "$CHANGED" | wc -l) 个文件"
 if [ -f "$LIVE/scripts/deploy_cr6_8190.sh" ]; then
   git checkout "$MERGE_COMMIT" -- scripts/deploy_cr6_8190.sh 2>/dev/null || true
 fi
-(cd "$LIVE" && git checkout "$MERGE_COMMIT" -- $(echo "$CHANGED" | tr '\n' ' '))
-
+# 【中文文件名必须用 NUL 分隔传给 git checkout】
+# 用 `$(... tr '\n' ' ')` 会把 "docs/代码审查报告-....md" 这种**带引号**的
+# git 路径原样传下去 -> git 报「路径规格未匹配任何 git 已知文件」。
+# 正确做法：git diff -z + xargs -0。
+git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
+  | (cd "$LIVE" && xargs -0 git checkout "$MERGE_COMMIT" --)
 echo
 echo "=== 5) 部署后完整性自检 ==="
 MISSING=""
