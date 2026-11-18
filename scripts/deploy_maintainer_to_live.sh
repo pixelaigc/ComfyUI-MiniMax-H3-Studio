@@ -27,10 +27,13 @@ cd "$LIVE" || { echo "cd $LIVE 失败"; exit 1; }
 
 echo "═══ 1. 核对工作区本地改动 ═══"
 BLOCKERS=0
-for f in $(git diff --name-only); do
+for f in $(git -c core.quotePath=false diff --name-only); do
   LIVE_MD5=$(md5sum "$f" 2>/dev/null | cut -d' ' -f1)
   MAIN_MD5=$(git show "$MAIN:$f" 2>/dev/null | md5sum | cut -d' ' -f1)
-  if [ "$LIVE_MD5" = "$MAIN_MD5" ]; then
+  if [ -z "$LIVE_MD5" ] || [ -z "$MAIN_MD5" ]; then
+    echo "  [!! 无法计算 md5] $f -> 需人工处理"
+    BLOCKERS=1
+  elif [ "$LIVE_MD5" = "$MAIN_MD5" ]; then
     echo "  [一致] $f -> 恢复给主线接管"
     git checkout -- "$f"
   else
@@ -39,7 +42,7 @@ for f in $(git diff --name-only); do
   fi
 done
 # 未跟踪文件：只处理「主线也有同名文件」的
-for f in $(git ls-files --others --exclude-standard); do
+for f in $(git -c core.quotePath=false ls-files --others --exclude-standard); do
   if git cat-file -e "$MAIN:$f" 2>/dev/null; then
     LIVE_MD5=$(md5sum "$f" 2>/dev/null | cut -d' ' -f1)
     MAIN_MD5=$(git show "$MAIN:$f" | md5sum | cut -d' ' -f1)
@@ -58,9 +61,21 @@ echo "═══ 2. 合并主线 ═══"
 git merge --no-ff "$MAIN" -m "merge(deploy): 回灌 $MAIN" || { echo "合并失败"; exit 3; }
 
 echo "═══ 3. 校验 ═══"
-DIFF=$(git diff "$MAIN" HEAD | wc -l)
-echo "  live vs mainline diff = $DIFF 行"
-[ "$DIFF" != "0" ] && { echo "  !! 内容不一致，停止"; exit 4; }
+# 【口径】**生产代码**必须与主线逐字节一致；docs/ 允许有差异 ——
+# live 可能保留了「只属于线上分支」的历史记录（例如外层复核补记），
+# 那不是「未同步的改动」，而是 live 自己的历史。
+CODE_DIFF=$(git -c core.quotePath=false diff "$MAIN" HEAD --   ':!docs' ':!evidence' ':!audits' | wc -l)
+ALL_DIFF=$(git -c core.quotePath=false diff "$MAIN" HEAD | wc -l)
+echo "  live vs mainline：全量 diff = $ALL_DIFF 行 / 生产代码 diff = $CODE_DIFF 行"
+if [ "$CODE_DIFF" != "0" ]; then
+  echo "  !! 生产代码与主线不一致，停止"
+  git -c core.quotePath=false diff "$MAIN" HEAD -- ':!docs' ':!evidence' ':!audits' | head -40
+  exit 4
+fi
+if [ "$ALL_DIFF" != "0" ]; then
+  echo "  （docs/evidence 有差异 = live 的历史记录，属预期）"
+  git -c core.quotePath=false diff --stat "$MAIN" HEAD
+fi
 
 if [ "$RESTART" = "1" ]; then
   echo "═══ 4. 重启 + 探活 ═══"
