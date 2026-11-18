@@ -48,6 +48,8 @@ DATA = Path("/root/projects/comfyui-minimax-h3-studio/data")
 OUT_ROOT = Path("/root/projects/h3studio-cont-seg3/evidence/evidence-20261118-seam-repeat")
 ASSET_DB = "/mnt/usb2t/asset_library/asset_library.db"
 ASSET_ROOT = Path("/mnt/usb2t/asset_library")
+# 指定素材（用于受控对照：默认取「最新素材」会让不同批次用不同参考图）
+ASSET_ID = os.environ.get("H3STUDIO_ASSET_ID", "").strip()
 
 REPO_DATA_OUT = DATA / "outputs"
 
@@ -96,6 +98,11 @@ def pick_image():
     conn = sqlite3.connect(ASSET_DB)
     conn.row_factory = sqlite3.Row
     try:
+        if ASSET_ID:
+            row = conn.execute(
+                "SELECT id,name FROM assets WHERE id=? AND deleted_at IS NULL",
+                (ASSET_ID,)).fetchone()
+            return row
         return conn.execute(
             "SELECT id,name FROM assets WHERE category='image' "
             "AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1").fetchone()
@@ -148,10 +155,19 @@ def analyze_workflow(wf: dict) -> dict:
     samplers = {nid: ct for nid, ct in cts.items()
                 if ct in ("SamplerCustomAdvanced", "SelfLiftH3Sampler",
                           "KSampler", "KSamplerAdvanced")}
+    selflift_nodes = {nid: ct for nid, ct in cts.items()
+                      if "SelfLift" in (ct or "")}
+    std_nodes = {nid: ct for nid, ct in cts.items()
+                 if ct == "SamplerCustomAdvanced"}
     return {
         "sampler_nodes": samplers,
         "has_standard_sampler": "SamplerCustomAdvanced" in cts.values(),
         "has_selflift": any("SelfLift" in (ct or "") for ct in cts.values()),
+        # 采样节点名（节点 id + class_type）——用于逐条证明走的是哪条采样路径
+        "standard_sampler_nodes": std_nodes,
+        "selflift_nodes": selflift_nodes,
+        "selflift_count": len(selflift_nodes),
+        "sampler_node_labels": [f"{nid}:{ct}" for nid, ct in samplers.items()],
     }
 
 
@@ -258,10 +274,13 @@ def main() -> int:
     ap.add_argument("--chains", type=int, default=3)
     ap.add_argument("--duration", type=float, default=5.0)
     ap.add_argument("--base-seed", type=int, default=20261118)
+    ap.add_argument("--out-root", default=None,
+                    help="证据落盘根目录（默认硬编码 OUT_ROOT）")
     args = ap.parse_args()
 
+    out_root = Path(args.out_root) if args.out_root else OUT_ROOT
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    out_dir = OUT_ROOT / f"seam-repeat-{stamp}"
+    out_dir = out_root / f"seam-repeat-{stamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     img = pick_image()
@@ -381,6 +400,10 @@ def main() -> int:
               f"SelfLift={a1.get('has_selflift')}")
         print(f"  段2 标准采样={a2.get('has_standard_sampler')} "
               f"SelfLift={a2.get('has_selflift')}")
+        print(f"  段1 采样节点={a1.get('sampler_node_labels')} "
+              f"twopass落库={(rec.get('job1_twopass_in_db') or {}).get('enabled')}")
+        print(f"  段2 采样节点={a2.get('sampler_node_labels')} "
+              f"twopass落库={(rec.get('job2_twopass_in_db') or {}).get('enabled')}")
         print(f"  段1 头断点比={s1.get('head_break_ratio'):.3f}x  "
               f"亮度降={s1.get('lum_drop_3frames'):+.3f}")
         print(f"  段2 头断点比={s2.get('head_break_ratio'):.3f}x  "
@@ -395,6 +418,19 @@ def main() -> int:
             "seg2_sat_drop": s2.get("sat_drop_3frames"),
             "seam_L1": seam_l1,
             "job2": rec["job2"],
+            # ---- 本轮新增：采样节点名（节点 id + class_type）----
+            "job1_sampler_nodes": (a1.get("sampler_node_labels") or []),
+            "job2_sampler_nodes": (a2.get("sampler_node_labels") or []),
+            "job1_selflift_count": a1.get("selflift_count"),
+            "job2_selflift_count": a2.get("selflift_count"),
+            "job1_has_standard_sampler": a1.get("has_standard_sampler"),
+            "job2_has_standard_sampler": a2.get("has_standard_sampler"),
+            "job1_twopass_in_db": (rec.get("job1_twopass_in_db") or {}).get("enabled"),
+            "job2_twopass_in_db": (rec.get("job2_twopass_in_db") or {}).get("enabled"),
+            "job1_normalize_notes": rec.get("job1_normalize_notes"),
+            "job2_normalize_notes": rec.get("job2_normalize_notes"),
+            "job1_prompt_id": rec.get("job1_prompt_id"),
+            "job2_prompt_id": rec.get("job2_prompt_id"),
         })
 
     if rows:

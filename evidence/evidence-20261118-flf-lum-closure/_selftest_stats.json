@@ -1,0 +1,150 @@
+{
+  "metric": "等价 L1 口径（逐帧 RGB L1 均值差，320x180，numpy 均值）",
+  "sample_rows": [
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#1",
+      "seed": 20261118,
+      "job2": "c3264ca57a71",
+      "job2_prompt_id": null,
+      "job2_sampler_nodes": null,
+      "job2_selflift_count": null,
+      "job2_twopass_in_db": null,
+      "seg2_ratio": 1.8788934198695901,
+      "seg2_lum_drop": 0.6622085571289062,
+      "seam_L1": 1.652077555656433
+    },
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#2",
+      "seed": 20261119,
+      "job2": "41b7cc9dde0c",
+      "job2_prompt_id": null,
+      "job2_sampler_nodes": null,
+      "job2_selflift_count": null,
+      "job2_twopass_in_db": null,
+      "seg2_ratio": 1.2107927778918783,
+      "seg2_lum_drop": 0.30333709716796875,
+      "seam_L1": 1.808090329170227
+    },
+    {
+      "origin": "上一轮(R1)",
+      "tag": "flf#3",
+      "seed": 20261120,
+      "job2": "5059526c4075",
+      "job2_prompt_id": null,
+      "job2_sampler_nodes": null,
+      "job2_selflift_count": null,
+      "job2_twopass_in_db": null,
+      "seg2_ratio": 0.24755759643671735,
+      "seg2_lum_drop": -0.9912261962890625,
+      "seam_L1": 1.7055381536483765
+    },
+    {
+      "origin": "更早历史链",
+      "tag": "hist-dcd2581e3482",
+      "seed": null,
+      "job2": "dcd2581e3482",
+      "job2_prompt_id": null,
+      "job2_sampler_nodes": null,
+      "job2_selflift_count": null,
+      "job2_twopass_in_db": false,
+      "seg2_ratio": 1.272166412227285,
+      "seg2_lum_drop": 0.7169265747070312,
+      "seam_L1": 1.598171353340149
+    }
+  ],
+  "sample_count": 4,
+  "stats": {
+    "seg2_lum_drop": {
+      "n": 4,
+      "values_raw": [
+        0.6622085571289062,
+        0.30333709716796875,
+        -0.9912261962890625,
+        0.7169265747070312
+      ],
+      "values_sorted": [
+        -0.9912261962890625,
+        0.30333709716796875,
+        0.6622085571289062,
+        0.7169265747070312
+      ],
+      "mean": 0.17281150817871094,
+      "median": 0.4827728271484375,
+      "std_dev_s": 0.7974106812987217,
+      "range": 1.7081527709960938,
+      "min": -0.9912261962890625,
+      "max": 0.7169265747070312,
+      "sign_pos": 3,
+      "sign_neg": 1,
+      "sign_zero": 0,
+      "over_threshold_0.3": 3,
+      "under_threshold_-0.3": 1
+    },
+    "seg2_head_break_ratio": {
+      "n": 4,
+      "values_raw": [
+        1.8788934198695901,
+        1.2107927778918783,
+        0.24755759643671735,
+        1.272166412227285
+      ],
+      "values_sorted": [
+        0.24755759643671735,
+        1.2107927778918783,
+        1.272166412227285,
+        1.8788934198695901
+      ],
+      "mean": 1.1523525516063677,
+      "median": 1.2414795950595816,
+      "std_dev_s": 0.6743604786270513,
+      "range": 1.6313358234328728,
+      "min": 0.24755759643671735,
+      "max": 1.8788934198695901,
+      "sign_pos": 4,
+      "sign_neg": 0,
+      "sign_zero": 0,
+      "over_threshold_0.3": 3,
+      "under_threshold_-0.3": 0
+    },
+    "seam_L1": {
+      "n": 4,
+      "values_raw": [
+        1.652077555656433,
+        1.808090329170227,
+        1.7055381536483765,
+        1.598171353340149
+      ],
+      "values_sorted": [
+        1.598171353340149,
+        1.652077555656433,
+        1.7055381536483765,
+        1.808090329170227
+      ],
+      "mean": 1.6909693479537964,
+      "median": 1.6788078546524048,
+      "std_dev_s": 0.08954256651239811,
+      "range": 0.20991897583007812,
+      "min": 1.598171353340149,
+      "max": 1.808090329170227,
+      "sign_pos": 4,
+      "sign_neg": 0,
+      "sign_zero": 0,
+      "over_threshold_0.3": 4,
+      "under_threshold_-0.3": 0
+    }
+  },
+  "twopass_on_controls": [
+    {
+      "job": "513383284a58",
+      "mode": "t2v",
+      "twopass": true,
+      "seg2_ratio": 2.5838899474444608,
+      "seg2_lum_drop": 7.2115936279296875,
+      "seam_L1": 2.5116899013519287
+    }
+  ],
+  "all_seg2_standard_sampler": true,
+  "all_seg2_twopass_disabled": true
+}
