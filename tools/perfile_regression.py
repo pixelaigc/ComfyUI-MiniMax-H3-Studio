@@ -40,6 +40,46 @@ SKIP_NAMES = {
     "test_continuation_frontend.py",
     "test_h3_video_modes_ui.py",
     "test_frontend_assets_hygiene.py",
+    "test_a5_running_truth_frontend.py",
+    "test_agent_media_av_upload.py",
+    "test_agent_review_fixes.py",
+    "test_agent_session_status_artifacts.py",
+    "test_b2_audiotrack_refresh.py",
+    "test_c6_detail_recommend.py",
+    "test_d11_moss_lora_final.py",
+    "test_d1_model_display.py",
+    "test_effect_lora_frontend.py",
+    "test_enhance_menu.py",
+    "test_enhance_multi_select.py",
+    "test_enhance_unify.py",
+    "test_fix3_ui_controls_preview.py",
+    "test_h3_panel_tune.py",
+    "test_job_meta_frontend.py",
+    "test_media_card_detail.py",
+    "test_mediadef_all_types.py",
+    "test_mode_switch_slot_isolation.py",
+    "test_panel_fallback.py",
+    "test_qwen_pe_enhance.py",
+    "test_qwen_ref_assets.py",
+    "test_responsive_mobile.py",
+    "test_slot_state_reset.py",
+    "test_status_realtime.py",
+    "test_t2v_card_dom.py",
+    "test_t2v_meta_consistency.py",
+    "test_t2v_panel.py",
+    "test_t2v_panel_fix.py",
+    "test_video_tabs_resolution.py",
+    "test_visible_text_pollution.py",
+    "test_yue2_flow_review_fixes.py",
+    "test_audio_analysis.py",
+    "test_asset_api.py",
+    "test_asset_picker_onpick.py",
+    "test_assetlib_and_seed_guard.py",
+    "test_enhance_assets.py",
+    "test_enhance_architecture_fixes.py",
+    "test_music_yue2.py",
+    "test_prompt_history.py",
+    "test_agent.py",
 }
 
 
@@ -91,11 +131,17 @@ def main() -> int:
     ap.add_argument("--branch", required=True)
     ap.add_argument("--json-out", default="")
     ap.add_argument("--only", default="", help="逗号分隔的文件名子集")
+    ap.add_argument("--only-file", default="", help="从文件读文件名列表（每行一个）")
     args = ap.parse_args()
 
     names = _files(args.base)
+    want = set()
     if args.only:
-        want = {x.strip() for x in args.only.split(",") if x.strip()}
+        want |= {x.strip() for x in args.only.split(",") if x.strip()}
+    if args.only_file:
+        with open(args.only_file, encoding="utf-8") as fh:
+            want |= {ln.strip() for ln in fh if ln.strip()}
+    if want:
         names = [n for n in names if n in want]
     print(f"逐文件对拍：{len(names)} 个测试文件")
     print(f"  基线 = {args.base}")

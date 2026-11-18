@@ -153,7 +153,14 @@ STALE_BUMPED = {
     #   **旧的坏文件**（漏传 onPick 那版），修复等于没上线。
     # 【2026-11-18 第 6 轮审查】app.js 再次改内容（flf/r2v 上限 2.0MP 的
     #   前端镜像 + 负面提示词提示的 markdown 残留清理）⇒ ?v= 升到 cr20261118a。
-    "app.js":                  ("cr20261116c", "cr20261118a"),
+    # 【2026-11-19 接续链收口】app.js 再次改内容（接续上下文提交提到三模式
+    #   公共作用域 —— flf/r2v 面板发起接续时必须带 params.continuation，
+    #   否则本段静默退化成普通生成）⇒ ?v= 必须再升一次
+    #   （cr20261118a -> cont20261119a）。
+    #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按启发式
+    #   新鲜度缓存。app.js 内容变了而 ?v= 不变 ⇒ 老用户浏览器拿到的仍是
+    #   **旧 app.js**（不带 continuation 提交的那个版本）⇒ 修复等于没上线。
+    "app.js":                  ("cr20261116c", "cont20261119a"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
