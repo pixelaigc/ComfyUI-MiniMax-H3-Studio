@@ -1,0 +1,65 @@
+{
+  "note": "第 2 项第三轮：跨模式接续对照（分离 task_type 与条件类型）",
+  "seed": 20261601,
+  "variants": {
+    "seg1_r2v": {
+      "job": "b435a7742c2b",
+      "file": "r2v_b435a7742c2b_00001_.mp4",
+      "role": "链首 r2v（参考图A + 参考视频）",
+      "frames": 124,
+      "median_l1": 2.2082,
+      "max_l1": 7.1296,
+      "at": 40,
+      "ratio": 3.23
+    },
+    "seg1_flf": {
+      "job": "cb091e3c57ef",
+      "file": "flf_cb091e3c57ef_00001_.mp4",
+      "role": "链首 flf（首帧=图A）",
+      "frames": 124,
+      "median_l1": 1.8745,
+      "max_l1": 58.818,
+      "at": 44,
+      "ratio": 36.13,
+      "note": "非接续段自身也有 L1=58.8 的跳变（Δ亮度仅 +2.39）"
+    },
+    "T_r2vseg1_flfseg2": {
+      "job": "26d5eec7cdfe",
+      "file": "flf_26d5eec7cdfe_00001_.mp4",
+      "role": "接续段 flf（上游是 r2v）= FL2VA + keyframe",
+      "frames": 102,
+      "median_l1": 1.1492,
+      "max_l1": 87.948,
+      "at": 1,
+      "ratio": 289.77,
+      "d_lum": 32.789,
+      "d_lum_ratio": 289.77,
+      "note": "跳变在 @1 = 钉住区内部"
+    },
+    "S_flfseg1_flfseg2": {
+      "job": "38f4c46faf83",
+      "file": "flf_38f4c46faf83_00001_.mp4",
+      "role": "接续段 flf（上游是 flf）= FL2VA + keyframe",
+      "frames": 102,
+      "median_l1": 1.5716,
+      "max_l1": 62.683,
+      "at": 7,
+      "ratio": 68.19,
+      "d_lum": 16.02,
+      "d_lum_ratio": 68.19
+    },
+    "U_r2v_seg2": {
+      "job": "7dea0014b078",
+      "file": "r2v_7dea0014b078_00001_.mp4",
+      "role": "接续段 r2v（上游是 r2v）= Ref2VA + 语义参考",
+      "frames": 102,
+      "median_l1": 1.1572,
+      "max_l1": 84.084,
+      "at": 6,
+      "ratio": 129.98,
+      "d_lum": 19.189,
+      "d_lum_ratio": 129.98
+    }
+  },
+  "key_finding": "三个接续变体（无论 task_type / 条件类型）都有高 Δ亮度跳变（289.77× / 129.98× / 68.19×）⇒ 跳变不是 r2v 特有，也不是「语义参考」特有；而是**接续链本身的普遍现象**。T 的跳变在 @1（钉住区内部），S/U 在 @6-7。"
+}

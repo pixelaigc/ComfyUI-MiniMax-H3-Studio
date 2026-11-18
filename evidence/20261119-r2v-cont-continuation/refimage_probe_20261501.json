@@ -1,0 +1,156 @@
+{
+  "seg1_job": "d7aea5e7ba1d",
+  "P_same_image": {
+    "job": "a12f0e120984",
+    "seam": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_a12f0e120984_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 1.5542,
+      "max_l1": 97.2618,
+      "max_l1_at_frame": 47,
+      "max_l1_ratio": 62.58,
+      "top3": [
+        {
+          "at_frame": 47,
+          "l1": 97.2618,
+          "lum_from": 118.73,
+          "lum_to": 157.61,
+          "d_lum": 38.88
+        },
+        {
+          "at_frame": 70,
+          "l1": 10.2591,
+          "lum_from": 152.33,
+          "lum_to": 150.2,
+          "d_lum": -2.13
+        },
+        {
+          "at_frame": 58,
+          "l1": 9.6289,
+          "lum_from": 155.46,
+          "lum_to": 153.88,
+          "d_lum": -1.58
+        }
+      ],
+      "means_head": [
+        113.64,
+        114.4,
+        115.03,
+        115.1,
+        115.07,
+        116.1,
+        116.03,
+        116.02,
+        116.31,
+        116.55,
+        116.38,
+        117.0
+      ]
+    }
+  },
+  "Q_other_image": {
+    "job": "f8d646615d38",
+    "seam": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_f8d646615d38_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 1.6733,
+      "max_l1": 54.5879,
+      "max_l1_at_frame": 25,
+      "max_l1_ratio": 32.62,
+      "top3": [
+        {
+          "at_frame": 25,
+          "l1": 54.5879,
+          "lum_from": 117.49,
+          "lum_to": 126.35,
+          "d_lum": 8.85
+        },
+        {
+          "at_frame": 26,
+          "l1": 24.3768,
+          "lum_from": 126.35,
+          "lum_to": 137.84,
+          "d_lum": 11.49
+        },
+        {
+          "at_frame": 27,
+          "l1": 8.8968,
+          "lum_from": 137.84,
+          "lum_to": 142.13,
+          "d_lum": 4.29
+        }
+      ],
+      "means_head": [
+        113.64,
+        114.57,
+        115.19,
+        115.28,
+        115.35,
+        116.08,
+        116.0,
+        116.02,
+        116.19,
+        116.44,
+        116.25,
+        116.75
+      ]
+    }
+  },
+  "R_control": {
+    "job": "afa359da0a78",
+    "seam": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_afa359da0a78_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 0.6744,
+      "max_l1": 7.8353,
+      "max_l1_at_frame": 50,
+      "max_l1_ratio": 11.62,
+      "top3": [
+        {
+          "at_frame": 50,
+          "l1": 7.8353,
+          "lum_from": 104.33,
+          "lum_to": 105.08,
+          "d_lum": 0.75
+        },
+        {
+          "at_frame": 47,
+          "l1": 7.7719,
+          "lum_from": 102.77,
+          "lum_to": 104.24,
+          "d_lum": 1.47
+        },
+        {
+          "at_frame": 41,
+          "l1": 6.1941,
+          "lum_from": 101.26,
+          "lum_to": 101.89,
+          "d_lum": 0.63
+        }
+      ],
+      "means_head": [
+        97.01,
+        97.35,
+        97.87,
+        97.92,
+        97.86,
+        98.13,
+        98.25,
+        98.36,
+        98.48,
+        98.64,
+        98.71,
+        99.01
+      ]
+    }
+  }
+}
