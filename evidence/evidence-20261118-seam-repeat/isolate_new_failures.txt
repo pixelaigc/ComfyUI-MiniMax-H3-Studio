@@ -1,0 +1,32 @@
+════════ tests/e2e/test_asset_flow.py::test_asset_tags_saved_and_filterable ════════
+--- 基线 a977a2f 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 7.76s
+--- 分支 be435c6 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 8.31s
+
+════════ tests/e2e/test_continuation_flow.py::test_continuation_refills_panel_and_clears_prompt ════════
+--- 基线 a977a2f 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 139.59s (0:02:19)
+--- 分支 be435c6 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 125.90s (0:02:05)
+
+════════ tests/e2e/test_video_flow.py::test_video_t2v_size_and_model_controls_present ════════
+--- 基线 a977a2f 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 5.26s
+--- 分支 be435c6 隔离跑 ---
+  import pynvml  # type: ignore[import]
+.                                                                        [100%]
+1 passed in 5.26s
+
+════════════════════════════════════════
+汇总见上（每格 3 行：汇总行 + 失败原因）
