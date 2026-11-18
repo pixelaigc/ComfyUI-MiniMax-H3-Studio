@@ -578,6 +578,36 @@
     renderModelNote();
   }
 
+  /**
+   * 模型权重的**存放位置**（只显示目录名，不显示本机绝对路径）。
+   *
+   * 【为什么要这样】
+   * `location` 来自服务端真源，是**本机磁盘绝对路径**
+   * （如 /mnt/nvme1t_colorful/comfyui-models/diffusion_models）。
+   * 原实现整条渲染成「位置 /mnt/nvme1t_colorful/...」——
+   * 暴露了本机磁盘挂载点与用户名，属于内部实现细节。
+   *
+   * 【保留什么】
+   * 保留**最后一段目录名**（diffusion_models）——
+   * 用户据此仍能分辨「权重放在 diffusion_models 目录」，
+   * 信息没有丢，但本机绝对路径不再出现在界面上。
+   *
+   * 【为什么不放后端洗】
+   * `location` 是**功能数据**（前端/服务端要判断模型在不在本机），
+   * 不是给人看的文案 —— 清洗它会破坏功能判定。
+   * 所以清洗放在**展示层**（这里），且只影响渲染出来的文字。
+   */
+  function modelLocationLabel(location) {
+    const raw = String(location || "").trim();
+    if (!raw) return "";
+    const parts = raw.split("/").filter(Boolean);
+    if (!parts.length) return raw;
+    const last = parts[parts.length - 1];
+    // 非绝对路径（相对路径 / 纯名字）原样返回
+    if (!raw.startsWith("/")) return raw;
+    return last || raw;
+  }
+
   function renderModelNote() {
     const model = currentModel();
     const note = document.getElementById("vidModelNote");
@@ -595,7 +625,7 @@
     if (note) {
       const bits = [model.note || ""];
       if (model.size_mb) bits.push(`本机体积 ${(model.size_mb / 1024).toFixed(1)} GB`);
-      if (model.location) bits.push(`位置 ${model.location}`);
+      if (model.location) bits.push(`位置 ${modelLocationLabel(model.location)}`);
       note.textContent = bits.filter(Boolean).join(" · ");
     }
     // 红字区域：**只显示当前真实状态**。
