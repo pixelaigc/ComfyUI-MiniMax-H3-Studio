@@ -579,10 +579,14 @@ class StudioPage:
 
         `require_enhanced=False` 供「故意测未增强闸门」的场景使用。
         """
-        errors: list[str] = []
-        self.page.on("response", lambda r: (
-            errors.append(f"HTTP {r.status}") if r.status >= 400 else None))
-
+        # 【2026-11-19 修正】错误监听器在**增强之后**才挂。
+        #
+        # 【为什么顺序很重要】增强走的是本地模型，服务端有硬约束校验，
+        # 产物违规时会返回 **502**。如果监听器先挂上，那次 502 会被
+        # 记进 errors —— 然后被当成「提交生成失败」抛出去，
+        # 报的是错因（实测：明明是增强重试后成功了，却报
+        # 「提交生成失败：['HTTP 502']」）。
+        # 提交阶段只该关心**提交本身**的错误。
         if require_enhanced:
             level = self.page.evaluate(
                 "() => (typeof currentPromptLevel === 'function')"
@@ -592,6 +596,10 @@ class StudioPage:
             else:
                 self.ev.step("提示词未增强 -> 先走增强流程")
                 self.enhance_prompt()
+
+        errors: list[str] = []
+        self.page.on("response", lambda r: (
+            errors.append(f"HTTP {r.status}") if r.status >= 400 else None))
 
         self.page.click("#genBtn")
         self.page.wait_for_timeout(1200)
