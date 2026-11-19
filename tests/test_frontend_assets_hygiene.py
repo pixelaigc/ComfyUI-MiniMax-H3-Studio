@@ -179,7 +179,7 @@ STALE_BUMPED = {
     # 【2026-11-19 生成状态缺陷修复】app.js 内容又变（视频不按 30 分钟
     #   判超时 + 「done + 无产物」的明确失败占位）⇒ ?v= 再升一次
     #   （cont20261119a -> genfix20261119a）。
-    "app.js":                  ("cr20261116c", "genfix20261119a"),
+    "app.js":                  ("cr20261116c", "genfix20261119b"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
@@ -216,6 +216,10 @@ STALE_BUMPED = {
     "providers.js":            ("cr20261115b", "enhassets1"),
     "media-manage.js":         ("uxbatch1",     "cr20261118a"),
     "agent-manage.js":         ("a4gen1",       "cr20261118a"),
+    # 【2026-11-19 生成状态缺陷修复】style.css 的内容被改了
+    #   （新增 .job-preview.is-failed 失败占位底色 —— 失败卡片不再
+    #    是一片黑）⇒ ?v= 必须升到 genfix20261119b。
+    "style.css":               ("cr20261115a",  "genfix20261119b"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
