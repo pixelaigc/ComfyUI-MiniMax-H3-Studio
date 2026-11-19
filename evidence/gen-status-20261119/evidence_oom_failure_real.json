@@ -1,0 +1,33 @@
+{
+  "job_id": "5472fd233eeb",
+  "prompt_id": "7c85f604-8f8c-4d86-bebd-167220efc5ca",
+  "reproduced_config": {
+    "mode": "r2v",
+    "width": 1920,
+    "height": 1088,
+    "duration": 15.0,
+    "steps": 8,
+    "model_key": "hybrid_fl2va_ref2va",
+    "asset_refs": [
+      "asset_d706cdfa6101",
+      "asset_13cb1ba4dcd9"
+    ],
+    "note": "与线上历史误报样本 628d92cfc062 / 86db94915467 同配置"
+  },
+  "studio_job": {
+    "status": "failed",
+    "error": "生成失败（服务端未能给出具体原因）。请稍后重试；若反复失败，请查看服务端日志，或改用「复用参数」重新生成一段。",
+    "outputs": []
+  },
+  "comfy_history": {
+    "status_str": null,
+    "completed": null,
+    "outputs_keys": [],
+    "messages": null
+  },
+  "legacy_would_succeed": false,
+  "new_outcome": "pending",
+  "verdict_failed": true,
+  "verdict_no_outputs": true,
+  "captured_at": "2026-11-19 21:12:08"
+}

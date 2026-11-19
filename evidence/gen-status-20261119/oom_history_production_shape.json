@@ -1,0 +1,67 @@
+{
+ "prompt": [
+  11,
+  "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+  {
+   "14": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {},
+    "_meta": {
+     "title": "采样"
+    }
+   }
+  }
+ ],
+ "outputs": {
+  "301": {
+   "text": [
+    "Prompt executed in 12.4 seconds\n"
+   ]
+  }
+ },
+ "status": {
+  "status_str": "error",
+  "completed": false,
+  "messages": [
+   [
+    "execution_start",
+    {
+     "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+     "timestamp": 1795071200000
+    }
+   ],
+   [
+    "execution_cached",
+    {
+     "nodes": [],
+     "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+     "timestamp": 1795071200004
+    }
+   ],
+   [
+    "execution_error",
+    {
+     "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+     "node_id": "14",
+     "node_type": "SamplerCustomAdvanced",
+     "exception_message": "ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).\n\n",
+     "exception_type": "torch.cuda.OutOfMemoryError",
+     "traceback": [],
+     "executed": [
+      "13",
+      "105:107",
+      "17",
+      "6",
+      "136:301",
+      "105:111",
+      "301"
+     ]
+    }
+   ]
+  ]
+ },
+ "meta": {
+  "note": "按 ComfyUI 真实形状重建的生产 OOM 条目。prompt_id / error 文本取自线上误报样本 628d92cfc062；outputs 里只有文本节点 —— 这正是旧逻辑（`if hist.get(\"outputs\")`）误判「成功」的触发条件。",
+  "source_job_id": "628d92cfc062"
+ }
+}
