@@ -205,6 +205,11 @@
       }
       if (truth.timeout_sec) {
         truthRows.push(["运行上限", `${Math.round(truth.timeout_sec / 60)} 分钟`]);
+      } else if (truth.state === "active") {
+        // 【2026-11-19 缺陷 1 修】视频类任务默认**不限时**
+        // （timeout_sec = 0）。这里说清楚「不限时」的含义，
+        // 而不是显示「0 分钟」（那看起来像「上限就是 0 秒」）。
+        truthRows.push(["运行上限", "不限时（仅在 ComfyUI 队列中丢失时判失败）"]);
       }
     }
     const truthGroup = truthRows.length ? group("运行状态", kv(truthRows)) : "";
