@@ -1,0 +1,185 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "sampled_at": "2026-11-19T23:14:58+0800",
+  "panels": [
+    {
+      "mode": "t2v",
+      "label": "文生视频",
+      "switched": true,
+      "visible_texts": 393,
+      "hidden_texts": 2223,
+      "attrs": 7004,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2v.png"
+    },
+    {
+      "mode": "flf",
+      "label": "首尾帧生视频",
+      "switched": true,
+      "visible_texts": 402,
+      "hidden_texts": 2415,
+      "attrs": 7301,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-flf.png"
+    },
+    {
+      "mode": "r2v",
+      "label": "参考生视频",
+      "switched": true,
+      "visible_texts": 434,
+      "hidden_texts": 2412,
+      "attrs": 7400,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-r2v.png"
+    },
+    {
+      "mode": "t2i",
+      "label": "文生图",
+      "switched": true,
+      "visible_texts": 367,
+      "hidden_texts": 2441,
+      "attrs": 7290,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2i.png"
+    },
+    {
+      "mode": "t2i_qwen",
+      "label": "文生图 Qwen",
+      "switched": true,
+      "visible_texts": 360,
+      "hidden_texts": 2315,
+      "attrs": 6991,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2i_qwen.png"
+    },
+    {
+      "mode": "i2i_qwen",
+      "label": "图片编辑 Qwen",
+      "switched": true,
+      "visible_texts": 366,
+      "hidden_texts": 2311,
+      "attrs": 6990,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-i2i_qwen.png"
+    },
+    {
+      "mode": "t2i_moss",
+      "label": "文生图 MOSS",
+      "switched": true,
+      "visible_texts": 407,
+      "hidden_texts": 2379,
+      "attrs": 7319,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2i_moss.png"
+    },
+    {
+      "mode": "t2i_h3image",
+      "label": "文生图 H3-Image",
+      "switched": true,
+      "visible_texts": 358,
+      "hidden_texts": 2236,
+      "attrs": 6838,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2i_h3image.png"
+    },
+    {
+      "mode": "i2i_h3image",
+      "label": "图片编辑 H3-Image",
+      "switched": true,
+      "visible_texts": 364,
+      "hidden_texts": 2230,
+      "attrs": 6837,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-i2i_h3image.png"
+    },
+    {
+      "mode": "t2a",
+      "label": "文生音乐",
+      "switched": true,
+      "visible_texts": 364,
+      "hidden_texts": 2268,
+      "attrs": 6974,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-t2a.png"
+    },
+    {
+      "mode": "a2a",
+      "label": "音频编辑",
+      "switched": true,
+      "visible_texts": 372,
+      "hidden_texts": 2260,
+      "attrs": 6973,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-a2a.png"
+    },
+    {
+      "mode": "longfilm",
+      "label": "长片拼接",
+      "switched": true,
+      "visible_texts": 314,
+      "hidden_texts": 2308,
+      "attrs": 6962,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-longfilm.png"
+    },
+    {
+      "mode": "assets",
+      "label": "素材库",
+      "switched": true,
+      "visible_texts": 232,
+      "hidden_texts": 2701,
+      "attrs": 7690,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-assets.png"
+    },
+    {
+      "mode": "agent",
+      "label": "Agent 对话",
+      "switched": true,
+      "visible_texts": 65,
+      "hidden_texts": 2868,
+      "attrs": 7690,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-agent.png"
+    },
+    {
+      "mode": "jobs",
+      "label": "生成库",
+      "switched": false,
+      "visible_texts": 65,
+      "hidden_texts": 2868,
+      "attrs": 7690,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-dom-visible-audit-v2/panel-jobs.png"
+    }
+  ],
+  "sampling": {
+    "visible_texts": 499,
+    "visible_attrs": 1080,
+    "hidden_texts": 1570
+  },
+  "console_errors": [],
+  "page_errors": [],
+  "dialogs": [],
+  "toasts": [],
+  "titles": [
+    "OmniStudio · 多模型图像 / 视频 / 音频创作工作台"
+  ],
+  "findings": [],
+  "markdown_bold": []
+}
