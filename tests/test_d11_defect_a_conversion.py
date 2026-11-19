@@ -39,6 +39,8 @@
 """
 from __future__ import annotations
 
+import os
+
 import json
 import struct
 import tempfile
@@ -258,17 +260,133 @@ class TestRealMachineFiles(unittest.TestCase):
         names = {i["name"] for i in lora_registry.list_moss_effect_loras()}
         self.assertIn(self.D1, names)
 
-    def test_d2_not_available_and_incompatible(self):
-        """D2：文件本体损坏 -> 不得出现在可选列表里。"""
+    def _is_file_intact(self, path) -> bool:
+        """磁盘文件本体是否**完整**（safetensors 头声明长度 == 实际大小）。
+
+        【为什么需要这个判据】—— 2026-11-19 第 3 轮 B 项的根因
+        本测试原本写死「D2 文件本体损坏 -> 必须 incompatible」。
+        但 D2（hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors）
+        在 **2026-11-15 15:17** 被重新下载修复过：
+
+          当时（36d510b，11-15 06:00）：5,369,856 B / 头部声明需 297,355,184 B
+                                    -> 缺 291,985,328 B（真损坏）
+          现在（11-15 15:17 起）  ：297,355,184 B / 头部声明需 297,355,184 B
+                                    -> 差值 0 B（**已完整**）
+
+        ⇒ 测试的**前提失效**了（不是产品缺陷）：
+          产品现在判 D2 compatible=True / qkv_shape=split /
+          conversion_status=direct / verified=True —— 这**是对的**。
+        ⇒ 断言必须按**文件当前实际状态**自适应，而不是钉死历史状态。
+        """
+        import struct
+        import json as _json
+        try:
+            size = os.path.getsize(path)
+            with open(path, "rb") as fh:
+                n = struct.unpack("<Q", fh.read(8))[0]
+                header = _json.loads(fh.read(n).decode("utf-8"))
+        except Exception:
+            return False
+        max_end = 0
+        for key, val in header.items():
+            if key == "__metadata__":
+                continue
+            if isinstance(val, dict) and "data_offsets" in val:
+                max_end = max(max_end, int(val["data_offsets"][1]))
+        return size == 8 + n + max_end
+
+    def test_d2_state_matches_actual_file_integrity(self):
+        """D2：判定必须与**文件当前实际完整性**一致。
+
+        * 文件完整 -> 必须 compatible 且出现在可选列表里
+          （2026-11-15 15:17 起 D2 已修复，本断言转为这一支）
+        * 文件损坏 -> 必须 incompatible 且**不得**出现在可选列表里
+          （fail closed；本测试原本只覆盖这一支）
+        """
         path = self._resolve(self.D2)
         if not path:
             self.skipTest("本机没有该 LoRA")
         result = mlc.check_moss_compatibility(path)
-        self.assertFalse(result["compatible"])
-        self.assertTrue(result["reason"])
         names = {i["name"] for i in lora_registry.list_moss_effect_loras()}
-        self.assertNotIn(self.D2, names,
-                         "损坏的 LoRA 不得出现在可选列表里")
+        if self._is_file_intact(path):
+            # 文件已修复 -> 产品必须把它当作可用的 LoRA
+            self.assertTrue(result["compatible"],
+                            f"文件已完整，compatible 必须为 True：{result}")
+            self.assertIn(self.D2, names,
+                          "文件已完整的 LoRA 必须出现在可选列表里")
+        else:
+            # 文件仍损坏 -> fail closed
+            self.assertFalse(result["compatible"],
+                             f"文件损坏时 compatible 必须为 False：{result}")
+            self.assertTrue(result["reason"])
+            self.assertNotIn(self.D2, names,
+                             "损坏的 LoRA 不得出现在可选列表里")
+
+    def test_truncated_file_is_incompatible_regardless_of_real_files(self):
+        """**自造**损坏样本 -> 必须 incompatible（不依赖本机任何文件状态）。
+
+        【为什么必须自造】—— 原来那条断言把「回归防护」绑在
+        「本机某个特定文件恰好是坏的」上。D2 在 2026-11-15 被修复后，
+        那条断言就**永远绿**了 —— 真正的防护（损坏文件不得被当成可用）
+        **实际已经失效**：把 fail closed 逻辑改坏，这条测试照样绿。
+
+        本条用**截断副本**造一个必然损坏的文件，锁住真实行为。
+        截断长度取 5,369,856 —— 那是 2026-11-15 实测 D2 损坏时的**真实大小**。
+        """
+        import shutil
+        import tempfile
+        src = self._resolve(self.D2)
+        if not src or not os.path.exists(src):
+            self.skipTest("本机没有该 LoRA，无法造截断副本")
+        tmpdir = tempfile.mkdtemp(prefix="d11_trunc_")
+        try:
+            broken = os.path.join(tmpdir, "truncated.safetensors")
+            with open(src, "rb") as fin, open(broken, "wb") as fout:
+                fout.write(fin.read(5_369_856))
+            result = mlc.check_moss_compatibility(broken)
+            self.assertFalse(result["compatible"],
+                             f"截断文件必须 incompatible：{result}")
+            self.assertTrue(result["reason"],
+                            "截断文件必须给出明确原因")
+            self.assertIn("截断", result["reason"])
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_unreadable_file_is_incompatible(self):
+        """**读不出头部**的文件 -> 必须 incompatible（fail closed 的另一半）。
+
+        【为什么单独一条】—— 2026-11-19 第 3 轮 B 项的变异自证发现：
+        把 `check_moss_compatibility` 里的 `if not detail["ok"]` 分支
+        关掉（= 读不出头部就当兼容），「截断样本」那条**抓不住** ——
+        因为截断文件的头部是**能读出来的**（完整性判定在更内层先拦住），
+        根本走不到那个分支。
+
+        ⇒ 必须另造一个「头部读不出来」的样本：
+          * 空文件（读 8 字节长度就抛）
+          * 非 safetensors 垃圾内容（头部长度字段是垃圾）
+        这两个样本直接命中 `read_safetensors_header_detail` 的异常分支。
+        """
+        import shutil
+        import tempfile
+        tmpdir = tempfile.mkdtemp(prefix="d11_unread_")
+        try:
+            cases = {
+                "empty.safetensors": b"",
+                "garbage.safetensors": b"NOT-A-SAFETENSORS" * 64,
+            }
+            for name, blob in cases.items():
+                p = os.path.join(tmpdir, name)
+                with open(p, "wb") as fh:
+                    fh.write(blob)
+                result = mlc.check_moss_compatibility(p)
+                self.assertFalse(result["compatible"],
+                                 f"{name} 必须 incompatible：{result}")
+                self.assertTrue(result["reason"],
+                                f"{name} 必须给出明确原因")
+                self.assertEqual(0.0, result["attention_hit"],
+                                 f"{name} 的命中率必须是 0，不能是 1.0")
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
