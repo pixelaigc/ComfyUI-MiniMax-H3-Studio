@@ -1,0 +1,2 @@
+worktree=/root/projects/h3studio-review-r7-pristine
+total_files=272 pass=147 fail=18 timeout=4 skip=103

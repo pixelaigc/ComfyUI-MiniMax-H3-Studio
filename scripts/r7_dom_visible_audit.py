@@ -168,8 +168,11 @@ def main() -> int:
         page.on("dialog", lambda d: (dialogs.append(f"{d.type}: {d.message}"),
                                      d.accept()))
 
-        page.goto(BASE, wait_until="networkidle", timeout=60000)
-        page.wait_for_timeout(2500)
+        # 【为什么不用 networkidle】页面常驻一条 SSE（/api/status/stream），
+        # 连接永不 idle ⇒ networkidle 必然 60s 超时。改用 domcontentloaded
+        # + 固定静默期（面板切换逻辑都在 DOMContentLoaded 之后同步跑完）。
+        page.goto(BASE, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(4000)
 
         for key, label in PANELS:
             before_err = len(console_errors)
