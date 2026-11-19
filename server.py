@@ -5155,6 +5155,77 @@ def _reject_external_media_or_raise(saved_files: dict | None, mode: str) -> None
         raise JobValidationError(exc.message, code=exc.code) from exc
 
 
+def _drop_stale_worker_media_params(params: dict, asset_refs: list | None) -> None:
+    """清掉 params 里**与 asset_refs 重复**的媒体旧值（worker 回写的）。
+
+    【背景 —— 2026-11-20】worker 把素材库文件上传到 ComfyUI 后，会把
+    ComfyUI 侧的文件名**写回 params**（server._run 的 flf / r2v 分支），
+    并把整份 params 回写进 jobs 表。Agent 的 retry_job 随后把这份
+    params **整份拷贝**过来重新建任务 —— 于是新任务里同时有：
+      * asset_refs —— 素材库引用（**权威**，能查到真实文件）；
+      * params["first_frame"] = "h3studio/<name>" —— worker 的旧产物
+        （**过期残留**，UPLOAD_DIR 下并不存在这个文件）。
+
+    【原来错在哪（实测复现）】worker 的 flf 分支**先**执行
+    `lp = UPLOAD_DIR / up`（server._run:1841），文件不存在就直接
+    `RuntimeError("找不到上传文件")` —— 走不到后面的
+    _apply_asset_refs。所以**媒体任务的重试今天本来就是坏的**
+    （2026-11-20 线上实测：重放一条已完成 flf 任务的 params ->
+    HTTP 200 建任务 -> failed「找不到上传文件:
+    h3studio/685e6b9292ca0ec9__e2e-sample-4079691-93314.png」）。
+
+    【这里做什么】当 asset_refs 已经声明了某个槽位时，params 里
+    对应的旧值就是**过期残留** —— 删掉它，worker 就会走
+    _apply_asset_refs 从素材库重新取（那条路本来就是对的）。
+    顺带把「重试」从坏修成好。
+
+    【⚠️ 只删「形状上不可能是外部路径」的值 —— 这一条是安全底线】
+    删的判据是 asset_ref_guard._looks_like_comfy_name：**没有 `/`
+    开头、没有 `..`、没有盘符、只有一层子目录**。于是：
+      * worker 的旧值 `h3studio/<name>` -> 被删（重试能跑）；
+      * `/etc/hostname` -> **不被删** -> 留给素材库闸门**明确报错**。
+    如果这里无差别地删，攻击者只要同时带上覆盖同一槽位的
+    asset_refs，就让自己的外部路径被**静默丢弃** —— 那就等于
+    把「明确拒绝」降级成「悄悄忽略」，与需求相悖。
+
+    【为什么只删「asset_refs 覆盖到的槽位」】
+    * 删多了会丢掉**没有**对应素材引用的媒体 —— 那是用户真的
+      填了媒体但没走素材库（= 要报错的情况，不能静默丢）；
+    * 删少了就等于没修（worker 还是会先撞上那个残留值）。
+
+    【为什么不是「删掉所有媒体键」】params["ref_images"] 在 i2i
+    模式下是**元数据**形态（[{asset_id, description}]）—— 那是
+    图片编辑的正规通道，不能碰。
+    """
+    if not isinstance(params, dict) or not asset_refs:
+        return
+    # asset_refs 的 slot -> params 键（与 _ASSET_SLOT_PARAM 同一张表）
+    covered = set()
+    for item in asset_refs:
+        if not isinstance(item, dict):
+            continue
+        slot = str(item.get("slot") or "").strip()
+        key = _ASSET_SLOT_PARAM.get(slot)
+        if key:
+            covered.add(key)
+    if not covered:
+        return
+    for key in covered:
+        value = params.get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, list) and any(isinstance(v, dict) for v in value):
+            # ref_images 的元数据形态（dict）不动 —— 那是图片编辑的正规通道
+            continue
+        items = value if isinstance(value, list) else [value]
+        # ⚠️ 只删「形状上不可能是外部路径」的值（见上面的安全底线）
+        if not all(isinstance(v, str)
+                   and asset_ref_guard._looks_like_comfy_name(v)
+                   for v in items):
+            continue
+        params.pop(key, None)
+
+
 def _image_family_for_mode(mode: str) -> str:
     """取图像模式所属的**模型族** key（决定采样参数的合法量程）。
 
@@ -5215,6 +5286,50 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     # asset_000000000000 提交后返回 200 并建了任务（worker 才去报「素材不存在」）。
     try:
         asset_ref_guard.check_asset_refs(asset_refs)
+    except asset_ref_guard.AssetLibraryError as exc:
+        raise JobValidationError(exc.message, code=exc.code) from exc
+
+    # 【2026-11-20 新增 —— 安全缺陷收口】params JSON 通道的媒体引用
+    # 必须同样过素材库闸门。
+    #
+    # 【原来错在哪（实测复现）】上面的 check_asset_refs 只管
+    # **asset_refs** 通道，reject_external_media 只管 **multipart
+    # 直传**通道 —— **params 这条通道没人管**。于是：
+    #
+    #     POST /api/jobs -F mode=flf -F params={"first_frame":"/etc/hostname"}
+    #
+    # 返回 200 并建了任务；worker 随后把 params["first_frame"] 当成
+    # 「uploads 目录下的相对文件名」拼路径（`lp = UPLOAD_DIR / up`，
+    # 绝对路径会被 Path.__truediv__ **丢弃左侧**），把那个文件
+    # **复制进 ComfyUI 的 input 目录**。ComfyUI 的 /view 端点无鉴权
+    # 且与 8190 一样监听 0.0.0.0 ⇒ 构成完整的「任意本地文件读取」链。
+    #
+    # 【为什么放在这里】prepare_job_params 是**所有**建任务路径的
+    # 唯一公共点（面板提交 / 内置 Agent create_job / retry_job）——
+    # 在这里拦一次，三条链路同时生效，不会各写一份必然漂移。
+    # 放在 check_asset_refs 之后、seed 校验之前：素材引用与种子
+    # 都是「参数合法性」，媒体路径的错比种子的错更该先说。
+    #
+    # 【为什么先清掉「worker 回写的旧值」再校验】
+    # worker 上传素材后会把 ComfyUI 侧的文件名**写回 params**，
+    # 并把整份 params 回写进 jobs 表；Agent 的 retry_job 会把这份
+    # params **整份拷贝**过来重新建任务。那种值长得像
+    # `h3studio/<name>` —— 它是 worker 的产物，不是外部输入。
+    #
+    # 但它**同样不能作为素材来源**：`UPLOAD_DIR / "h3studio/x.png"`
+    # 指向的是 uploads 目录下一个**并不存在**的文件（实测：线上
+    # 53 个这样的值**没有一个**能解析到真实文件），worker 走到那里
+    # 只会报「找不到上传文件」—— 也就是**媒体任务的重试今天本来
+    # 就是坏的**（2026-11-20 实测复现）。
+    #
+    # 所以：asset_refs 才是媒体来源的**权威**通道；当它带了某个
+    # 槽位时，params 里对应的旧值就是**过期残留**，应当清掉，
+    # 让 worker 走 _apply_asset_refs 从素材库重新取。
+    # —— 这一步同时把「重试」从「坏」修成「好」，而不是把闸门
+    # 变成误杀器。
+    _drop_stale_worker_media_params(params, asset_refs)
+    try:
+        asset_ref_guard.check_params_media_references(params)
     except asset_ref_guard.AssetLibraryError as exc:
         raise JobValidationError(exc.message, code=exc.code) from exc
 
