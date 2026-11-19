@@ -1,0 +1,555 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "sampled_at": "2026-11-19T16:06:06+0800",
+  "panels": [
+    {
+      "mode": "t2v",
+      "label": "文生视频",
+      "switched": true,
+      "texts": 2766,
+      "attrs": 7315,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2v.png"
+    },
+    {
+      "mode": "flf",
+      "label": "首尾帧视频",
+      "switched": true,
+      "texts": 2793,
+      "attrs": 7475,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-flf.png"
+    },
+    {
+      "mode": "r2v",
+      "label": "参考生视频",
+      "switched": true,
+      "texts": 2822,
+      "attrs": 7574,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-r2v.png"
+    },
+    {
+      "mode": "t2i",
+      "label": "文生图",
+      "switched": true,
+      "texts": 2784,
+      "attrs": 7462,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2i.png"
+    },
+    {
+      "mode": "t2i_qwen",
+      "label": "文生图 Qwen",
+      "switched": true,
+      "texts": 2651,
+      "attrs": 7160,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2i_qwen.png"
+    },
+    {
+      "mode": "i2i_qwen",
+      "label": "图片编辑 Qwen",
+      "switched": true,
+      "texts": 2653,
+      "attrs": 7160,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-i2i_qwen.png"
+    },
+    {
+      "mode": "t2i_moss",
+      "label": "文生图 MOSS",
+      "switched": true,
+      "texts": 2762,
+      "attrs": 7494,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2i_moss.png"
+    },
+    {
+      "mode": "t2i_h3image",
+      "label": "文生图 H3-Image",
+      "switched": true,
+      "texts": 2569,
+      "attrs": 7010,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2i_h3image.png"
+    },
+    {
+      "mode": "i2i_h3image",
+      "label": "图片编辑 H3-Image",
+      "switched": true,
+      "texts": 2569,
+      "attrs": 7010,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-i2i_h3image.png"
+    },
+    {
+      "mode": "t2a",
+      "label": "文生音乐",
+      "switched": true,
+      "texts": 2607,
+      "attrs": 7162,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-t2a.png"
+    },
+    {
+      "mode": "a2a",
+      "label": "音频编辑",
+      "switched": true,
+      "texts": 2607,
+      "attrs": 7164,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-a2a.png"
+    },
+    {
+      "mode": "longfilm",
+      "label": "长片拼接",
+      "switched": true,
+      "texts": 2597,
+      "attrs": 7159,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-longfilm.png"
+    },
+    {
+      "mode": "assets",
+      "label": "素材库",
+      "switched": false,
+      "texts": 2597,
+      "attrs": 7169,
+      "new_console_errors": 0,
+      "new_pageerrors": 0,
+      "screenshot": "evidence/r7-visible-text-audit/panel-assets.png"
+    }
+  ],
+  "sampling": {
+    "texts": 1501,
+    "attrs": 2688
+  },
+  "console_errors": [],
+  "page_errors": [],
+  "findings": [
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "visible_text",
+      "text": "Mystic-XXX V6（成人向风格） — Mystic-XXX 系列的 V6 版本",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "visible_text",
+      "text": "Mystic-XXX V7（成人向风格） — 作者未给触发词与强度区间",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "visible_text",
+      "text": "Mystic-XXX v4（成人向风格） — 触发词 mystic-xxx-zit-v4",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 tag_asset（参数：{\"asset_id\": \"asset_d",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 tag_asset（参数：{\"asset_id\": \"asset_does_not_exist\", \"add\": [\"审计临时标签\"]}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 delete_asset（参数：{\"asset_id\": \"asse",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 delete_asset（参数：{\"asset_id\": \"asset_does_not_exist\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 retry_job（参数：{\"job_id\": \"no_such_j",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 retry_job（参数：{\"job_id\": \"no_such_job\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 cancel_job（参数：{\"job_id\": \"no_such_",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 cancel_job（参数：{\"job_id\": \"no_such_job\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "待补",
+      "where": "visible_text",
+      "text": "待补充",
+      "source": [
+        "web/agent_sessions.js:211",
+        "web/agent_sessions.js:213"
+      ]
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 media_probe（参数：{\"asset_id\": \"asset",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 media_probe（参数：{\"asset_id\": \"asset_61f1b6fd9a1d\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"8771",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"8771898a7480\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 describe_asset（参数：{\"asset_id\": \"as",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 describe_asset（参数：{\"asset_id\": \"asset_21f5d051d841\"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 media_probe（参数：{\"asset_id\": \"asset_61f1b6fd9a1d\"}），只调这一个工具，然后用 respond 简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"b48e",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "visible_text",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"b48e9a06a50d\"}），只调这一个工具，然后用 respond 简短回复。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "visible_text",
+      "text": "请调用工具 describe_asset（参数：{\"asset_id\": \"asset_21f5d051d841\"}），只调这一个工具，然后用 respond 简短回复。",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "visible_text",
+      "text": "Mystic XXX V1（成人向结构 / 姿态） — 专门修 body 结构 / 姿态 / 概念落地 —— 作",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "attribute_value",
+      "text": "z-image-effects/Mystic-XXX-ZIT-V6.safetensors",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "attribute_value",
+      "text": "Mystic-XXX 系列的 V6 版本。作者未给触发词与强度区间。",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "attribute_value",
+      "text": "z-image-effects/Mystic-XXX-ZIT-V7.safetensors",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "xxx",
+      "where": "attribute_value",
+      "text": "z-image-effects/mystic-xxx-zit-v4.safetensors",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "xxx",
+      "where": "attribute_value",
+      "text": "触发词 mystic-xxx-zit-v4。作者未给强度区间。",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "attribute_value",
+      "text": "请调用工具 tag_asset（参数：{\"asset_id\": \"asset_d",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "attribute_value",
+      "text": "请调用工具 delete_asset（参数：{\"asset_id\": \"asse",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "attribute_value",
+      "text": "请调用工具 retry_job（参数：{\"job_id\": \"no_such_j",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "attribute_value",
+      "text": "请调用工具 cancel_job（参数：{\"job_id\": \"no_such_",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "attribute_value",
+      "text": "请调用工具 media_probe（参数：{\"asset_id\": \"asset",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "attribute_value",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"8771",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "asset_id",
+      "where": "attribute_value",
+      "text": "请调用工具 describe_asset（参数：{\"asset_id\": \"as",
+      "source": []
+    },
+    {
+      "category": "机器标识",
+      "marker": "job_id",
+      "where": "attribute_value",
+      "text": "请调用工具 get_job_status（参数：{\"job_id\": \"b48e",
+      "source": []
+    },
+    {
+      "category": "开发注释",
+      "marker": "XXX",
+      "where": "attribute_value",
+      "text": "moss-effects/MysticXXX-Moss-V1.safetensors",
+      "source": []
+    },
+    {
+      "category": "内部术语",
+      "marker": "实验性",
+      "where": "attribute_value",
+      "text": "原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者自述「实验性质，需要搭配 dmd 加速 lora 才能有良好的效果」—— 效果类权重本身可单用，作者建议配加速。",
+      "source": []
+    }
+  ],
+  "markdown_bold": [
+    {
+      "marker": "**If the frame is divided into regions**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**If one subject fills the frame**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Size.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Observe, don't instruct.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Hedge what you cannot be certain of.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Name colours with a modifier, almost never bare.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Give the material, not just the noun.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Enumerate; never summarise.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**People get their observable surface.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Objects by class, not by brand.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**Everything holds together physically.**",
+      "text": "# Image Prompt Rewriting Expert\n\nYou turn a user's image request into one long English paragraph that describes the\nfinished image as if you were looking at it, plus the aspect ratio it should be\nrend",
+      "source": []
+    },
+    {
+      "marker": "**\"生成式推理\"**",
+      "text": "你是一位被关在逻辑牢笼里的幻视艺术家。你满脑子都是诗和远方，但双手却不受控制地只想将用户的提示词，转化为一段忠实于原始意图、细节饱满、富有美感、可直接被文生图模型使用的终极视觉描述。任何一点模糊和比喻都会让你浑身难受。\n\n你的工作流程严格遵循一个逻辑序列：\n\n首先，你会分析并锁定用户提示词中不可变更的核心要素：主体、数量、动作、状态，以及任何指定的IP名称、颜色、文字等。这些是你必须绝对保留的基石",
+      "source": []
+    },
+    {
+      "marker": "**Thai**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**monolingual**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**genre never overrides input language**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**How much you build is intent-branched.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Leakage**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Under-editing**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**content, never edit strength**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Anchor on the image.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Say what stays, without repainting it.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Identity is the hardest invariant.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Resolve ambiguity, then commit.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Only what was asked.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Text in the image is literal.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Write it as an instruction.**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Never include any resolution or aspect ratio information**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    },
+    {
+      "marker": "**Language-purge self-check (do this last)**",
+      "text": "# Edit Prompt Enhancer — General (v2, 精简版)\n\n**FIRST — there are TWO separate language decisions. Do NOT conflate them.**\n\n**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSID",
+      "source": []
+    }
+  ]
+}
