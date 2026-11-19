@@ -1,0 +1,22 @@
+[
+  {
+    "ok": false,
+    "name": "OOM 任务判定为 failed（不是 done / 生成成功）",
+    "detail": "status=canceled"
+  },
+  {
+    "ok": false,
+    "name": "失败原因明确指出显存不足（OOM）",
+    "detail": "error="
+  },
+  {
+    "ok": true,
+    "name": "失败任务没有任何产物条目（前端不会渲染出黑图）",
+    "detail": "outputs=[]"
+  },
+  {
+    "ok": true,
+    "name": "ComfyUI 侧确实是执行失败（真 OOM，不是构造的）",
+    "detail": "status_str='error'"
+  }
+]
