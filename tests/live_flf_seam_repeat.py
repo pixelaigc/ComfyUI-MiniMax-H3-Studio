@@ -295,6 +295,8 @@ def main() -> int:
         "duration": args.duration,
         "aspect": "16:9",
         "steps": 4, "sampler": "euler", "scheduler": "beta",
+        "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+        "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
         "cfg": 1.0,
         "twopass": {"enabled": True, "transition_step": 4,
                      "lowres_scale": 0.7, "rho": 0.0,

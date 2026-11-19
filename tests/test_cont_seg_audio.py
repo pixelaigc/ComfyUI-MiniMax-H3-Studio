@@ -642,6 +642,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J2", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "ref_audios": ["orig.m4a"],
@@ -666,6 +668,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J2", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "audio_track_source": "generated",
@@ -679,6 +683,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J2", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "ref_videos": ["v.mp4"],
@@ -700,6 +706,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J2", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "ref_videos": ["v.mp4"],
@@ -718,6 +726,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J1", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "ref_videos": ["v.mp4"],
@@ -736,6 +746,8 @@ class TestAudioSliceWiring(unittest.TestCase):
         params = {
             "job_id": "J1", "prompt": "p", "width": 864, "height": 480,
             "duration": 5, "steps": 4, "seed": 1, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "mode": "r2v",
             "ref_images": ["a.png"],
             "ref_audios": ["orig.m4a"],

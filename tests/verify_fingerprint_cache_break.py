@@ -52,7 +52,11 @@ DATA = Path(os.environ.get("H3STUDIO_DATA_DIR", "/tmp/h3t2v-data"))
 OUT = DATA / "outputs"
 
 BP = {"model_key": "fl2va_int8", "width": 768, "height": 448, "duration": 5,
-      "steps": 4, "sampler": "euler", "scheduler": "simple", "seed": 4242}
+      "steps": 4, "sampler": "euler", "scheduler": "beta", "seed": 4242,
+      # 【2026-11-19】4 步是蒸馏档 —— 必须配加速 LoRA，否则跑的是
+      # 「4 步采样非蒸馏权重」这条不存在的路径。
+      "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+      "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],}
 
 
 def get(path):

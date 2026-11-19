@@ -150,6 +150,8 @@ def main():
                                         "fl2va_pruned_w4a8"),
             "width": 768, "height": 448,
             "duration": 5, "steps": 4, "sampler": "euler",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "scheduler": "beta", "seed": 4242,
         }
         job1 = _http_multipart(f"{base}/api/jobs",

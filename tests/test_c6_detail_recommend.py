@@ -115,6 +115,8 @@ _JOB = {
         },
         "lora_recommendation": {
             "steps": 4, "scheduler": "simple", "sampler": "not_provided",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "shift_video": 12.0, "shift_audio": 3.0,
             "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8）",
             "source_kind": "author",

@@ -49,6 +49,8 @@ FRAME_DIR = ROOT / "frames"
 # 对「落盘坐标 / 首帧归属 / 链账本 / 指纹」四项判据没有影响。
 BP = {"model_key": "fl2va_pruned_w4a8", "width": 768, "height": 448,
       "duration": 5, "steps": 4, "sampler": "euler", "scheduler": "beta",
+      "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+      "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
       "seed": 4242}
 
 REPORT: dict = {"steps": [], "ok": True, "failures": []}

@@ -261,6 +261,8 @@ def main() -> int:
             "model_key": "ref2va_pruned_int8",
             "audio_track_source": "video_bg",
             "steps": 4, "sampler": "euler", "scheduler": "beta",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "shift_video": 12.0, "shift_audio": 3.0,
             "resolution": "544p", "aspect": "16:9",
         }
@@ -340,6 +342,8 @@ def main() -> int:
             "model_key": "fl2va_pruned_int8",
             "audio_track_source": "generated",
             "steps": 4, "sampler": "euler", "scheduler": "beta",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "shift_video": 12.0, "shift_audio": 3.0,
             "resolution": "544p", "aspect": "16:9",
         }
