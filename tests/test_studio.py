@@ -66,14 +66,56 @@ class TestLoRARegistry(unittest.TestCase):
                 self.assertEqual(lora_registry.effect_family_of(item["name"]),
                                  "Z-Image",
                                  f"{item['name']} 的族判定与所在目录不一致")
-        # 数量兜底：本机总共有 443 个 LoRA，Z-Image 相关的只有个位数。
-        # 2026-11-09 接入通用效果 LoRA 目录后，本族合法条目 35 个；
-        # 2026-11-10 再接入 NSFW 成人向效果类目录 45 个 -> 80 个
-        # （75 个 z-image-effects/ + 4 个既有 + 1 个 z-image/）。
-        # 判据仍然能挡住「把全机 443 个都塞进来」—— 443 >> 120。
-        self.assertLess(len(items), 120,
-                        f"Z-Image 相关 LoRA 不该有 {len(items)} 个 —— "
+        # 数量兜底：**相对**判据 —— Z-Image 族不得占掉全机的绝大多数。
+        #
+        # 【为什么不再写死一个数字（第 4 轮收口）】
+        # 原来这里是 `assertLess(len(items), 120)`。那个 120 是
+        # 2026-11-10 写死的（当时本族 80 个、全机 443 个）。
+        # 之后**两边都长**：本族合法条目涨到 197
+        # （192 个 z-image-effects/ + 4 个文件名命中 + 1 个层结构兜底），
+        # 全机涨到 712 —— 120 这个数字就**过期**了。
+        #
+        # 【为什么过期的是「断言」而不是「产品」】
+        # 197 个条目**每一个都是合法的**：
+        #   * 192 个来自族专属目录 `z-image-effects/`
+        #     （目录前缀是族归属的**唯一真相源**，见上面的 by_effect_dir 判据）；
+        #   * 4 个文件名命中 z-image marker；
+        #   * 1 个（dejpeg_v3.safetensors）靠层结构兜底，注意力命中率 100%。
+        # 「层结构兜底放太宽」这个失败原因**实测不成立**：
+        # 把粗筛放到最宽（所有效果类全放行）也只有 661 个，
+        # 而真正的兜底命中只有 **1 个** —— 粗筛是有效的。
+        #
+        # 【相对判据的分离度（实测 2026-11-19，本机 712 个）】
+        #   正常（粗筛有效）：197 / 712 = 0.277
+        #   粗筛放太宽：      661 / 712 = 0.928
+        #   全机都塞进来：    712 / 712 = 1.000
+        # ⇒ 阈值取 0.5 能干净地分开（0.277 vs 0.928），
+        #   且**不会**随着素材目录增长而再次过期（两边同比变化）。
+        machine_total = self._machine_lora_count()
+        self.assertGreater(machine_total, 0,
+                           "本机 LoRA 目录扫不到任何文件 —— 测试前提失效")
+        ratio = len(items) / float(machine_total)
+        self.assertLess(ratio, 0.5,
+                        f"Z-Image 相关 LoRA 占了全机的 {ratio:.1%}"
+                        f"（{len(items)}/{machine_total}）—— "
                         "结构兜底的判据放太宽了")
+
+    @staticmethod
+    def _machine_lora_count() -> int:
+        """本机 ComfyUI 会扫描的 loras 目录里，一共有多少个 safetensors。
+
+        【为什么要自己数一遍】
+        断言的判据是「Z-Image 族不得占掉全机的绝大多数」，
+        分母必须是**全机**的真实数量，不能是另一个写死的数字
+        （写死的分母也会过期 —— 这正是原来那个 bug 的形态）。
+        """
+        total = 0
+        for directory in lora_registry.comfyui_lora_dirs():
+            try:
+                total += sum(1 for _ in directory.rglob("*.safetensors"))
+            except OSError:
+                continue
+        return total
 
     def test_resolve_existing_and_missing(self):
         found = lora_registry.list_z_image_loras()

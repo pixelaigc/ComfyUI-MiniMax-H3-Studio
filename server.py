@@ -2278,6 +2278,26 @@ class Worker:
         # 已有记录（接续段从上游继承）-> 不用再探测
         if int(info.get("ref_video_frame_count") or 0) > 0:
             return
+        # 【第 4 轮收口 —— 真实缺陷：失败结果不缓存】
+        # 探测不到帧数时**原来直接 return**，既不写任何标记，
+        # 于是**每次调用都会重新探测**（ffprobe 一次约 3 秒 ——
+        # 实测 32MB / 2 分钟 480P 的参考视频，-count_frames 要真解码一遍）。
+        #
+        # 【为什么这不只是「轻微性能问题」】
+        # 1) worker 的 `_run` 每次跑这个任务都会调一次；任务被重跑 /
+        #    重试时又调一次 ⇒ 每次都是 3 秒的**同步阻塞**子进程。
+        # 2) 更关键：**探测失败时下一段拿不到 ref_video_frame_count**
+        #    ⇒ 工作流层走「探测不到帧数 -> 不猜」的分支
+        #    ⇒ `video_skip_frames = 0` ⇒ **段2 的参考视频从 0 开始喂**
+        #    —— 这正是第 3 轮那个「亮度阶跃」缺陷的触发条件之一。
+        #    所以「不缓存」= 每段都可能重新踩一次同样的坑。
+        #
+        # 【修法：失败也要落一个标记】
+        # 写 `ref_video_frame_count_probe = "failed"`，
+        # 让后续调用**直接返回**、不再重探。
+        # 语义仍然保守：帧数仍然是 0（= 不知道），**不猜**。
+        if info.get("ref_video_frame_count_probe") == "failed":
+            return
         videos = list(params.get("ref_videos") or [])
         if not videos:
             return
@@ -2286,11 +2306,24 @@ class Worker:
             local = _comfy_input_local(name)
             if local is None:
                 continue
-            frames = _probe_video_frame_count(local)
+            # 【为什么走线程】ffprobe 是**同步阻塞**子进程调用
+            # （实测 3 秒），跑在事件循环里会冻结全站 ——
+            # 与 2026-11-16「8190 不可访问」是同一类事故
+            # （那次是 LoRA 扫描，这次是参考视频探测）。
+            # 同文件的音频探测 `_probe_audio_duration` 已经是这个写法。
+            frames = await asyncio.to_thread(_probe_video_frame_count, local)
             break
-        if frames <= 0:
-            return
         info["ref_video_frame_count"] = int(frames)
+        if frames <= 0:
+            # 探测失败 -> **落标记**（这一步就是本轮修复的核心）
+            info["ref_video_frame_count_probe"] = "failed"
+            params["continuation"] = info
+            with db() as conn:
+                conn.execute("UPDATE jobs SET params=? WHERE id=?",
+                             (json.dumps(params, ensure_ascii=False), job_id))
+            print(f"[接续] {job_id}: 参考视频帧数探测失败（已缓存失败标记，"
+                  f"不再重复探测）")
+            return
         params["continuation"] = info
         with db() as conn:
             conn.execute("UPDATE jobs SET params=? WHERE id=?",
@@ -4392,6 +4425,23 @@ def get_job_params(job_id: str) -> dict | None:
     except (json.JSONDecodeError, TypeError):
         params = {}
     return {"mode": row["mode"], "params": params}
+
+
+def refresh_fingerprinted_path(params: dict) -> str:
+    """把 params 里的接力棒读回路径刷新成**当前内容指纹**的副本。
+
+    【为什么需要（第 4 轮收口 —— 真实缺陷）】
+    Agent 的 `retry_job` 把源任务的 params **整份拷贝**过来，
+    `continuation.source_latent_path` 是**上一次**接续时算出来的带指纹副本。
+    Relay-Kit 落盘是**原子写**（os.replace 换 inode）⇒ 旧副本仍指向旧 inode、
+    内容停留在旧版本 ⇒ 上游重跑后 retry 读回**上一版的 latent**（静默错误）。
+
+    面板提交与 Agent create 走 `_prepare_continuation_params`，
+    那条路径本来就会重算；**只有 retry** 会带着旧路径进来。
+
+    实现见 `continuation_service.refresh_fingerprinted_path`（单一真源）。
+    """
+    return cont_service.refresh_fingerprinted_path(params)
 
 
 def list_job_records(status: str | None = None, mode: str | None = None,
