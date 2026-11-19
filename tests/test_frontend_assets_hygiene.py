@@ -173,7 +173,12 @@ STALE_BUMPED = {
     # 【2026-11-18 第 6 轮审查】video-panel.js 又改了内容（加速 LoRA
     #   提示里的 markdown 残留清理 + flf/r2v 上限 2.0MP 的文案同步）
     #   ⇒ ?v= 升到 vparams6。
-    "video-panel.js":          ("vparams5",       "vparams6"),
+    # 【2026-11-19 R2 可见文案】video-panel.js 又改了内容（模型「位置」
+    #   只显示目录名，不再把本机绝对路径 /mnt/nvme1t_colorful/... 显示
+    #   给用户）⇒ ?v= 必须再升一次（vparams6 -> vparams7）。
+    #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按
+    #   启发式新鲜度缓存。内容变了而 ?v= 不变 ⇒ 老用户拿到的仍是旧文件。
+    "video-panel.js":          ("vparams5",       "vparams7"),
     # 【2026-11-18 第 6 轮审查】以下资源的内容在本轮被改过
     #   （接续面板 markdown 残留 / 参考图提示 / 引擎自检说明 / 清理确认
     #    / token 预算说明）⇒ ?v= 必须升，否则老用户拿到的仍是旧文件。
