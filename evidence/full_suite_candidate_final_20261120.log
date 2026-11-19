@@ -1,0 +1,88 @@
+........................................................................ [  1%]
+........................................................................ [  3%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+........................................................................ [ 11%]
+................................................................ [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 16%]
+........................................................................ [ 18%]
+.......................F......................s......................... [ 20%]
+........................................................................ [ 22%]
+........................................................................ [ 24%]
+........................................................................ [ 26%]
+........................................................................ [ 28%]
+......................F.................................... [ 29%]
+........................................................................ [ 31%]
+............................................................... [ 33%]
+........................................................................................................................................... [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 40%]
+............................................................... [ 42%]
+........................................................................ [ 44%]
+............F...............................................................F.......................................F. [ 47%]
+........................................F.............................F......................F.......................................... [ 50%]
+........F............................................................... [ 52%]
+.............................................................................. [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+............................................................................................. [ 64%]
+......................FF.s.............................................. [ 66%]
+................................ [ 67%]
+............................................................... [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+.........................FF........F............................. [ 76%]
+...................................................F.................... [ 78%]
+........................................................................ [ 80%]
+.....................................................s.................. [ 82%]
+........................................................FFF............. [ 84%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+......................................s.s..s............................ [ 89%]
+.................................................................................................. [ 92%]
+........................................................................ [ 94%]
+........................................................................ [ 96%]
+....................... [ 96%]
+...........................................................s....................................... [ 99%]
+....................                                                     [100%]
+=========================== short test summary info ============================
+FAILED tests/test_agent_paste_browser.py::TestPasteInRealBrowser::test_paste_image_creates_real_attachment
+SUBFAILED(mode='r2v', label='参考 1', path='素材库按钮') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_asset_button_fills_slot_without_error
+SUBFAILED(mode='flf', label='首帧', path='素材库按钮') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_asset_button_fills_slot_without_error
+FAILED tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_missing_onpick_is_rejected_before_opening_picker
+SUBFAILED(mode='r2v', label='参考 1', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考 2', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考 9', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考视频 1', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考视频 3', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考音乐 1', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='r2v', label='参考音乐 3', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='flf', label='首帧', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='flf', label='尾帧', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='flf', label='参考视频 1', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+SUBFAILED(mode='flf', label='参考音乐 1', path='点空槽位') tests/test_asset_picker_onpick.py::TestAssetPickerOnPick::test_slot_click_fills_slot_without_error
+FAILED tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+FAILED tests/test_e2e_gen_flow_contract.py::test_a1_four_steps_must_carry_accel_lora
+FAILED tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_no_console_errors
+FAILED tests/test_enhance_menu.py::TestEnhanceMenuBrowser::test_no_console_errors_after_menu_exercise
+FAILED tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_no_console_errors
+FAILED tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_no_console_errors
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_are_rejected_by_generic_reader
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_not_surfaced_as_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+FAILED tests/test_music_flow_browser.py::TestMusicFlowBrowser::test_screenshots_at_three_widths
+FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_desc_tag_renders_placeholder_text
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_remove_middle_drops_dangling_placeholder
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_smart_sort_keeps_placeholders
+31 failed, 3780 passed, 7 skipped, 738 subtests passed in 2441.12s (0:40:41)
+Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7a81e99f3070>
+EXIT=1
