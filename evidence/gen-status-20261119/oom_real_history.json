@@ -1,0 +1,369 @@
+{
+  "prompt": [
+    0,
+    "927c6498-80e4-4a37-9cb1-c70d415d1111",
+    {
+      "105:107": {
+        "inputs": {
+          "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+          "values.a": [
+            "105:111",
+            0
+          ]
+        },
+        "class_type": "ComfyMathExpression",
+        "_meta": {
+          "title": "时长->帧数"
+        }
+      },
+      "105:111": {
+        "inputs": {
+          "value": 15.0
+        },
+        "class_type": "PrimitiveFloat",
+        "_meta": {
+          "title": "时长(秒)"
+        }
+      },
+      "105:11": {
+        "inputs": {
+          "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "视频 VAE"
+        }
+      },
+      "13": {
+        "inputs": {
+          "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+          "type": "minimax",
+          "device": "default"
+        },
+        "class_type": "CLIPLoader",
+        "_meta": {
+          "title": "加载文本编码器"
+        }
+      },
+      "105:104": {
+        "inputs": {
+          "clip": [
+            "13",
+            0
+          ],
+          "vae": [
+            "105:11",
+            0
+          ],
+          "prompt": "integrated_multimodal_description: [Shot 1] The video presents a continuous, uncut single shot with a distinct 90s cinematic film aesthetic, characterized by warm tones, noticeable film grain, and slight vignetting. A wide-angle static shot maintains a consistent full-body view of the subject throughout the entire duration, with absolutely no close-ups or camera movements (no zooming, panning, or tracking). The scene is set in an expansive outdoor public plaza under a clear, intensely blue sky. On the right side of the frame stands a large, modern white architectural structure featuring sweeping, curving staircases and cantilevered platforms. In the background, scattered pedestrians walk across metal barricades and along the architectural structures. \n\nIn the center-left foreground stands an older woman matching the exact appearance of the reference image. She wears a pink short-sleeved top, a loose beige knitted shawl draped over her shoulders, wide-leg textured white cropped trousers, red flat shoes, glasses, and a light-colored beret-style hat. Her hands are lightly clasped together near her chest. As the video progresses, she begins to dance rhythmically in place. She sways her torso from side to side, shifts her weight between her feet, gently steps side-to-side across the wide gray stone paving slabs, and softly rotates her shoulders while keeping her arms close to her body. Her head tilts slightly back as she looks upwards toward the sky. Her movements are fluid but restrained, executed strictly within a small footprint on the plaza floor. The strong sunlight casts sharp, distinct shadows of her moving figure onto the bright ground beside her.\n\noverall_soundscape: Ambient outdoor sound includes faint wind rustling across the open plaza and extremely muffled, distant chatter from background pedestrians walking in the far distance. Soft rhythmic shuffling footsteps can be heard on stone tiles as the woman sways and steps side-to-side during her dance.\n\nnon_diegetic_music: An upbeat 90s pop instrumental track plays continuously, providing a steady, prominent mid-tempo drum beat that heavily dictates the pacing of the woman's rhythmic body movements throughout the scene.",
+          "width": 1920,
+          "height": 1088,
+          "length": [
+            "105:107",
+            1
+          ]
+        },
+        "class_type": "MiniMaxH3ImageToVideo",
+        "_meta": {
+          "title": "H3 条件"
+        }
+      },
+      "6": {
+        "inputs": {
+          "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+          "weight_dtype": "default"
+        },
+        "class_type": "UNETLoader",
+        "_meta": {
+          "title": "加载DiT"
+        }
+      },
+      "138:0": {
+        "inputs": {
+          "model": [
+            "6",
+            0
+          ],
+          "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+          "strength": 1.0,
+          "low_vram": true
+        },
+        "class_type": "MiniMaxH3TurboLoRA",
+        "_meta": {
+          "title": "加速 LoRA·ckpt850"
+        }
+      },
+      "100": {
+        "inputs": {
+          "model": [
+            "138:0",
+            0
+          ],
+          "video_budget": 0.15,
+          "denser_early_late_steps": true
+        },
+        "class_type": "H3SparseAttention",
+        "_meta": {
+          "title": "注意力·稀疏视频注意力（预算制）"
+        }
+      },
+      "101": {
+        "inputs": {
+          "model": [
+            "100",
+            0
+          ],
+          "shift_video": 12.0,
+          "shift_audio": 2.0
+        },
+        "class_type": "MiniMaxH3SigmaShift",
+        "_meta": {
+          "title": "sigma shift（视频/音频）"
+        }
+      },
+      "9": {
+        "inputs": {
+          "scheduler": "beta",
+          "steps": 8,
+          "denoise": 1.0,
+          "model": [
+            "101",
+            0
+          ]
+        },
+        "class_type": "BasicScheduler",
+        "_meta": {
+          "title": "调度器"
+        }
+      },
+      "17": {
+        "inputs": {
+          "sampler_name": "euler"
+        },
+        "class_type": "KSamplerSelect",
+        "_meta": {
+          "title": "采样器"
+        }
+      },
+      "15": {
+        "inputs": {
+          "noise_seed": 116410121288947
+        },
+        "class_type": "RandomNoise",
+        "_meta": {
+          "title": "噪波"
+        }
+      },
+      "16": {
+        "inputs": {
+          "model": [
+            "101",
+            0
+          ],
+          "conditioning": [
+            "105:104",
+            0
+          ]
+        },
+        "class_type": "BasicGuider",
+        "_meta": {
+          "title": "引导器"
+        }
+      },
+      "14": {
+        "inputs": {
+          "noise": [
+            "15",
+            0
+          ],
+          "guider": [
+            "16",
+            0
+          ],
+          "sampler": [
+            "17",
+            0
+          ],
+          "sigmas": [
+            "9",
+            0
+          ],
+          "latent_image": [
+            "105:104",
+            1
+          ]
+        },
+        "class_type": "SamplerCustomAdvanced",
+        "_meta": {
+          "title": "采样"
+        }
+      },
+      "10": {
+        "inputs": {
+          "samples": [
+            "14",
+            0
+          ],
+          "vae": [
+            "105:11",
+            0
+          ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "解码视频"
+        }
+      },
+      "24": {
+        "inputs": {
+          "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "音频 VAE"
+        }
+      },
+      "23": {
+        "inputs": {
+          "samples": [
+            "14",
+            0
+          ],
+          "vae": [
+            "24",
+            0
+          ]
+        },
+        "class_type": "VAEDecodeAudio",
+        "_meta": {
+          "title": "解码音频"
+        }
+      },
+      "300:save": {
+        "inputs": {
+          "latent": [
+            "14",
+            0
+          ],
+          "run_id": "h3studio_s0da3adcecf93",
+          "stage_index": 0,
+          "note": "h3studio job 0da3adcecf93"
+        },
+        "class_type": "H3RelayLatentSave",
+        "_meta": {
+          "title": "接续·落盘本段潜空间（下一段的接力棒）"
+        }
+      },
+      "91": {
+        "inputs": {
+          "fps": 24.0,
+          "bit_depth": 8,
+          "images": [
+            "10",
+            0
+          ],
+          "audio": [
+            "23",
+            0
+          ]
+        },
+        "class_type": "CreateVideo",
+        "_meta": {
+          "title": "合成视频"
+        }
+      },
+      "92": {
+        "inputs": {
+          "filename_prefix": "h3studio/t2v_0da3adcecf93",
+          "format": "auto",
+          "codec": "auto",
+          "video": [
+            "91",
+            0
+          ]
+        },
+        "class_type": "SaveVideo",
+        "_meta": {
+          "title": "保存视频"
+        }
+      }
+    },
+    {
+      "client_id": "h3studio-0da3adcecf93",
+      "create_time": 1795085183817
+    },
+    [
+      "92",
+      "300:save"
+    ]
+  ],
+  "outputs": {
+    "100": {
+      "text": [
+        "Attention: Comfy Kitchen INT8 Sparse\nVideo token order: 1x8x8\nRequested video KV budget: 15.0%\nEarly ramp: starts at 50% KV or higher; targets +12 points/step on average.\nQKV: ConvRot-256 INT8 weights -> 4096-row BF16 chunks -> Kitchen INT8 carrier; output streamed\nEffective density rounds up to a whole KV-tile count at runtime; non-video context and mixed boundary tiles remain dense."
+      ]
+    },
+    "92": {
+      "images": [
+        {
+          "filename": "t2v_0da3adcecf93_00001_.mp4",
+          "subfolder": "h3studio",
+          "type": "output",
+          "metadata": {
+            "kind": "video",
+            "width": 1920,
+            "height": 1088,
+            "duration": 15.083333333333334,
+            "fps": 24.0,
+            "frame_count": 362
+          }
+        }
+      ],
+      "animated": [
+        true
+      ]
+    }
+  },
+  "status": {
+    "status_str": "success",
+    "completed": true,
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "927c6498-80e4-4a37-9cb1-c70d415d1111",
+          "timestamp": 1795085186369
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "927c6498-80e4-4a37-9cb1-c70d415d1111",
+          "timestamp": 1795085186375
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "927c6498-80e4-4a37-9cb1-c70d415d1111",
+          "timestamp": 1795086042152
+        }
+      ]
+    ]
+  },
+  "meta": {
+    "100": {
+      "node_id": "100",
+      "display_node": "100",
+      "parent_node": null,
+      "real_node_id": "100"
+    },
+    "92": {
+      "node_id": "92",
+      "display_node": "92",
+      "parent_node": null,
+      "real_node_id": "92"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "job_id": "9006ca9a1d92",
+  "prompt_id": "d3a047f6-f0f8-4873-b33c-695d9df2c8e1",
+  "studio_job": {
+    "status": "canceled",
+    "error": null,
+    "outputs": []
+  },
+  "comfy_history": {
+    "status_str": "error",
+    "completed": false,
+    "outputs_keys": [],
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "d3a047f6-f0f8-4873-b33c-695d9df2c8e1",
+          "timestamp": 1795081356682
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "d3a047f6-f0f8-4873-b33c-695d9df2c8e1",
+          "timestamp": 1795081356684
+        }
+      ],
+      [
+        "execution_interrupted",
+        {
+          "prompt_id": "d3a047f6-f0f8-4873-b33c-695d9df2c8e1",
+          "node_id": "57:75",
+          "node_type": "KSampler",
+          "executed": [
+            "57:11",
+            "57:30",
+            "57:8",
+            "57:73",
+            "57:71",
+            "57:27",
+            "57:3",
+            "57:72",
+            "57:70",
+            "57:33",
+            "57:28",
+            "57:29",
+            "57:13",
+            "57:76"
+          ],
+          "timestamp": 1795081573361
+        }
+      ]
+    ]
+  },
+  "legacy_would_succeed": false,
+  "verdict_failed": false,
+  "verdict_no_outputs": true,
+  "captured_at": "2026-11-19 17:46:15"
+}

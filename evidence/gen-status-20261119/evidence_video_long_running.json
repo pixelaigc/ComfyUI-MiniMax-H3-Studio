@@ -1,11 +1,11 @@
 {
-  "job_id": "a676a40614a2",
-  "prompt_id": "22878e5e-1647-48c7-9ee6-b940f080aa5c",
+  "job_id": "2263cef4e5b4",
+  "prompt_id": "aea099cf-7b69-443d-9c98-47f862fa37b6",
   "simulated_elapsed_sec": 7200,
   "running_truth": {
     "state": "active",
     "label": "运行中（已确认在 ComfyUI 队列中）",
-    "elapsed_sec": 7205.715210914612,
+    "elapsed_sec": 7200.015024185181,
     "timeout_sec": 0.0,
     "deadline_at": null
   },
@@ -13,11 +13,11 @@
   "queue_running_truth": {
     "state": "active",
     "label": "运行中（已确认在 ComfyUI 队列中）",
-    "elapsed_sec": 7205.716349840164,
+    "elapsed_sec": 7200.017382144928,
     "timeout_sec": 0.0,
     "deadline_at": null
   },
   "verdict_state_is_active": true,
   "verdict_queue_is_active": true,
-  "captured_at": "2026-11-19 22:08:45"
+  "captured_at": "2026-11-20 00:27:36"
 }

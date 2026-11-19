@@ -32,6 +32,6 @@
   {
     "ok": true,
     "name": "失败卡片上显示了明确失败原因（显存不足 / OOM）",
-    "detail": "卡片文本片段='Z-IMAGE 文生图 · 11/19 22:05\\n11/19 22:05\\n✕ 显存不足（ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).）。请降低输出分辨率或时长后重试。\\n复用参数\\nℹ 详情\\n删除'"
+    "detail": "卡片文本片段='Z-IMAGE 文生图 · 11/20 00:26\\n11/20 00:26\\n✕ 显存不足（ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).）。请降低输出分辨率或时长后重试。\\n复用参数\\nℹ 详情\\n删除'"
   }
 ]
