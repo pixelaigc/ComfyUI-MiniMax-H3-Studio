@@ -527,6 +527,10 @@
   function clear() {
     current = null;
     renderPanel();
+    // 【2026-11-19 修】清掉接续上下文后也要重渲染视频面板 ——
+    // 否则「接续段也用二采」开关会**留在界面上**（它是在有上下文时
+    // 才该出现的）。与 start() 里的 rerenderVideoPanel() 是一对。
+    rerenderVideoPanel();
   }
 
   // ------------------------------------------------------------------
@@ -561,9 +565,71 @@
     const sourceId = (current.source || {}).job_id || "";
     current = null;
     renderPanel();
+    // 【2026-11-19 修】同 clear() —— 清掉上下文后重渲染视频面板，
+    // 否则「接续段也用二采」开关会留在界面上。
+    rerenderVideoPanel();
     toast(reason
       || `已清除接续上下文（来源「${sourceId}」）—— 「复用参数」是独立重生成，不与接续混用。`);
     return true;
+  }
+
+  // ------------------------------------------------------------------
+  // 视频面板重渲染（接续上下文的可见性依赖它）
+  // ------------------------------------------------------------------
+  //
+  // 【为什么需要这一层】
+  // 「接续段也用二采」开关（#vidTwopassAllowContinuationRow）的可见性由
+  // web/video-panel.js 的 renderTwopass() 决定，它读的是**接续上下文**：
+  //
+  //     hasContinuation = window.Continuation.state().current?.continuation
+  //     allowRow.hidden = !hasContinuation || !videoState.twopass.enabled
+  //
+  // 而 start() 的执行顺序是：
+  //
+  //     applyToPanel(ctx)   -> VIDEO_PANEL.render() -> renderTwopass()
+  //                            ↑ **此刻 current 还是旧的（null）**
+  //                              => hasContinuation === false => 开关被藏
+  //     current = ctx       -> 现在接续上下文才真正就绪
+  //     renderPanel()       -> 只渲染「接续上下文」只读区，**不碰**视频面板
+  //     applyAssetRefs(...) -> **有**素材时末尾调 renderModeKeepSlots()
+  //                            -> VIDEO_PANEL.render() -> 开关显形
+  //                            **无**素材时**早退**，**不重渲染** => 开关永远藏着
+  //
+  // ⇒ 结果：接续上下文明明已经就绪（面板上「接续上下文」区域都显示了），
+  //   用户却在二采区块里**看不到**「接续段也用二采」这个开关。
+  //
+  // 【实测口径 —— 12 组矩阵（3 模式 × 有/无素材 × 二采开/关）】
+  //   t2v  + 无素材 + 二采开   -> hidden（t2v 本来就没有素材槽位）
+  //   flf  + 无素材 + 二采开   -> hidden  ← 缺陷
+  //   r2v  + 无素材 + 二采开   -> hidden  ← 缺陷
+  //   flf  + 有素材 + 二采开   -> 显形（applyAssetRefs 顺带重渲染了）
+  //   r2v  + 有素材 + 二采开   -> 显形
+  //
+  // 【修法】
+  // 在**接续上下文就绪之后**（current 已赋值、素材已回填）**显式**重渲染
+  // 一次视频面板 —— 让开关的可见性不再依赖「有没有素材」这个副作用。
+  //
+  // 【为什么放在 applyAssetRefs 之后】
+  // 素材回填会调 renderModeKeepSlots()（它自己会重渲染），但那**只在有素材时**
+  // 发生。放在素材回填**之后**统一补一次，两种情况都覆盖，且不会与
+  // 素材回填的那次渲染打架（后者先执行）。
+  //
+  // 【为什么不用 renderModeKeepSlots】
+  // 它会重渲染整个左侧配置区（含槽位 DOM），而这里只需要视频面板那几个
+  // 区块（二采等）跟着接续上下文更新。VIDEO_PANEL.render() 粒度更小、
+  // 不会碰素材槽位（槽位由 app.js 的 renderMode 管）。
+  function rerenderVideoPanel() {
+    const panel = window.VIDEO_PANEL;
+    if (!panel || typeof panel.render !== "function") return;
+    try {
+      panel.render();
+    } catch (e) {
+      // 【为什么吞掉异常】视频面板的渲染本身有逐段 try/catch 保护
+      // （见 video-panel.js 的 renderVideoPanel），这里再兜一层是为了
+      // **不让「开关没显形」这种事把整个接续流程带崩** ——
+      // 接续上下文已经回填成功了，提示语必须照常给用户。
+      console.error("[接续] 视频面板重渲染失败：", e);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -580,6 +646,10 @@
       // 等它完成再提示，否则用户看到「已回填」但槽位还是空的。
       const materialCount = await applyAssetRefs(ctx, String(ctx.mode || "t2v"));
       applyAudioTrack(ctx, String(ctx.mode || "t2v"));
+      // 【2026-11-19 修】接续上下文就绪后**必定**重渲染一次视频面板 ——
+      // 让「接续段也用二采」开关的可见性不再依赖「有没有素材」这个副作用。
+      // （根因与实测口径见 rerenderVideoPanel 的注释。）
+      rerenderVideoPanel();
       const total = ctx.total_seconds ? `，当前累计 ${ctx.total_seconds}s` : "";
       const mats = materialCount
         ? `，已回填 ${materialCount} 项素材` : "";
