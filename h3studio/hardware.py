@@ -226,7 +226,14 @@ def detect_cpu(cpuinfo_text=None, lscpu_text=None, platform_processor=None,
     model = None
     if models:
         model = models[0][0]
-        source = CPUINFO_PATH
+        # 【2026-11-19 第 3 轮 C 项审查修 —— 本机路径泄漏】
+        # 原来这里写 `source = CPUINFO_PATH`（= "/proc/cpuinfo"）。
+        # 该字段会经 /api/hardware 下发，被前端 `web/app.js` 渲染成
+        # 「型号来源 /proc/cpuinfo」—— **本机绝对路径出现在用户界面**。
+        # （与 R2 的「出处」/「位置」同类缺陷：内部实现细节被原样透出。）
+        # 修法：只保留**来源名**（cpuinfo），不保留路径 ——
+        # 「型号是怎么读到的」这个语义没有丢。
+        source = "cpuinfo"
     else:
         if lscpu_text is None:
             rc, out, _ = _run_cmd(["lscpu"])
@@ -255,6 +262,13 @@ def detect_cpu(cpuinfo_text=None, lscpu_text=None, platform_processor=None,
     else:
         # 最终兜底：架构 + 核心数，绝不显示「未知」
         name = f"{machine or '未知架构'} 架构 · {logical_cores} 核"
+
+    # 【2026-11-19 第 3 轮 C 项审查】出口兜底：source **绝不能**是路径。
+    # 加这一层是因为「来源名」是自由文本，将来加新取值时很容易又写成
+    # 某个 /proc/... 或 /sys/... 路径 —— 而这个字段是**直接显示**给用户的。
+    # 兜底判据：以 / 开头 = 路径 -> 只保留最后一段的文件名（去扩展名）。
+    if source and source.startswith("/"):
+        source = os.path.basename(source.rstrip("/")) or "unknown"
 
     return {
         "name": name,
