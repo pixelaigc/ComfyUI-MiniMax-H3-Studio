@@ -1,0 +1,417 @@
+OmniStudio
+多模型图像 / 视频 / 音频创作工作台
+v1.00
+空闲
+CREATE
+视频
+文生视频
+▾
+minimax-h3 文生视频
+首尾帧生视频
+minimax-h3 首尾帧生视频
+参考生视频
+minimax-h3 参考生视频
+长片拼接
+minimax-h3 长片拼接
+文生图
+Z-IMAGE 文生图
+Qwen-Image 2.1
+MOSS-Image
+H3-Image
+图片编辑
+Qwen 图片编辑
+H3-Image 图片编辑
+音乐
+文生音乐
+参考生音乐
+素材
+素材库
+智能
+内置 Agent
+系统
+交互流程图
+本地模型配置
+硬件参数
+释放显存
+尺寸预设
+H3 原生画布内
+官方档位 2MP · 1088×1920（上限 2.0M 像素（2,097,152 px），本项在限内）
+输出尺寸
+1088×1920
+×
+自动
+1.99 MP · 上限 2.0M 像素（2,097,152 px）
+画面比例
+用于自动算尺寸
+1:1
+2:3
+3:2
+3:4
+4:3
+9:16
+16:9
+21:9
+MiniMax-H3 模型
+本机已安装
+清单来源：ComfyUI 模型列表 API（152 个扩散模型 / 735 个 LoRA）
+剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 diffusion_models
+已确认在 ComfyUI 模型列表中可用。
+加速 LoRA
+单选 · 工作流只挂你选的那枚 · 按主模型适配过滤
+加速 LoRA 强度
+1.00
+已选「DMAD 4 步（critic 版）」×1.00（核心 LoraLoaderModelOnly加载，工作流里只挂这一枚） 当前底模下另有 2 个加速 LoRA 不适配，已从列表剔除：Turbo 4 步（中文名加速版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）；Turbo 4 步（中文名 EMA 版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）
+当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里「只挂这一枚」，你选什么就加载什么。
+208 个层全部命中（实测），不含 AdaLN。
+作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 · 推荐采样器：作者未提供 · 推荐视频 shift：12（作者提供） · 推荐音频 shift：2（作者提供） · 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供） · 出处：dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」 · 唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+效果 LoRA
+可多选 · 27 个可用 · 与加速 LoRA 并存
+添加
+未添加效果 LoRA。可选本机已安装的 H3 效果 LoRA（27 个）—— 在上面的搜索框里按名称 / 功能 / 触发词筛选，可多选。
+注意力机制
+生成加速
+只保留一部分视频注意力连接：video_budget 越低越快，但提示词贴合度与运动细节会掉。没有「安全值」，每条提示词要自己试。
+开启二采
+低分辨率一采 + 高分辨率二采
+一采步数
+4
+一采分辨率
+0.70
+修正比例 ρ
+0.00
+潜空间放大器
+—
+二采 CFG
+1.0
+仅二采生效
+二采采样器
+固定 Euler
+sigma 精修
+低噪段加密采样（借鉴 nonebot H3 工作流）
+加密步数
+1
+起始 sigma
+2.50
+插值曲线
+二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。总步数不变，提速来自一采的面积更小。H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，可能超出训练分布 —— 出糊就把它调大。 一采 4 步 @ 0.70× 分辨率 二采固定用 Euler 采样器（SelfLift 只支持标准 Euler）。
+采样参数
+与生图面板同级
+采样步数
+8
+已改
+CFG
+H3 固定
+shift（视频）
+12.00
+推荐
+shift（音频）
+2.00
+采样器
+二采固定 euler
+调度器
+步数 8 → BasicScheduler.steps · 采样器 euler → KSamplerSelect.sampler_name · 调度器 beta → BasicScheduler.scheduler · shift 12.00 / 2.00 → MiniMaxH3SigmaShift
+H3 标准采样路径固定 CFG=1.0：官方工作流用的是 BasicGuider（只有 model + conditioning，没有 cfg 槽位），H3 的音视频潜变量是单流条件化，没有负面分支。只有开启二采时 CFG 才可调（SelfLiftH3Sampler 自带 cfg 槽位）。
+时长
+5s
+上限 60 秒
+提示词
+历史
+增强
+当前增强：普通增强（视频导演提示词（MiniMax-H3 官方三段式））
+已切换到「t2v」模式，模板自动回落到「视频导演提示词（MiniMax-H3 官方三段式）」
+版本历史
+生成
+种子
+留空随机
+全部
+进行中
+已完成
+长片
+失败
+已取消
+生成类型
+全部类型
+首尾帧生成
+参考图生成
+Qwen-Image 2.1 文生图
+Qwen-Image 2.1 图片编辑
+MOSS-Image 文生图
+H3-Image 文生图
+其它生成
+重置
+每页
+管理
+生成队列
+最近完成 7 · 失败 1
+明细
+参考生成 · 11/19 16:20
+11/19 16:20
+模式
+参考生成
+分辨率
+1088p · 1920×1088 · 16:9
+注意力
+稀疏视频注意力（预算制） · 速度最快
+模型
+MiniMax-H3 混合版 · FL2VA+Ref2VA
+LoRA
+DMAD 4 步（critic 版） ×1.00 · Minimax H3真实电影质感 ×0.70
+euler
+beta
+步数/CFG
+8 · 1
+尺寸
+1920×1088
+随机
+耗时
+5m35s
+integrated_multimodal_description: [Shot 1] Aerial drone footage, bright midday
+⬇ 下载
+⏭ 接续
+复用参数
+ℹ 详情
+删除
+参考生成 · 11/19 15:52
+11/19 15:52
+63s
+10m25s
+15m42s
+参考生成 · 11/19 15:28
+11/19 15:28
+✕ 任务运行超过 30 分钟仍未完成，已判定为超时失败。本机 ComfyUI 可能仍在占用显卡，请先在 ComfyUI 界面确认队列状态，再重新提交生成。
+DMAD 4 步（critic 版） ×1.00
+15s
+19m56s
+integrated_multimodal_description: [Shot 1] The camera is a static, wide-angle l
+参考生成 · 11/19 15:01
+11/19 15:01
+20m13s
+integrated_multimodal_description: [Shot 1] The video presents a continuous, unc
+参考生成 · 11/19 14:53
+11/19 14:53
+18s
+参考生成 · 11/19 14:50
+11/19 14:50
+20s
+23s
+素材详情
+官方档位 0.98MP · 1344×768（上限 2.0M 像素（2,097,152 px），本项在限内）
+1344×768
+0.98 MP · 上限 2.0M 像素（2,097,152 px）
+首尾帧素材
+首帧 / 尾帧任给其一 · 参考视频 ≤3 · 参考音乐 ≤3
+从素材库选首帧与尾帧（首帧 / 尾帧给其中一张即可；参考视频最多 3 个 / 参考音乐最多 3 段）
++
+首帧
+尾帧
+参考视频 1
+参考视频 2
+参考视频 3
+参考音乐 1
+参考音乐 2
+参考音乐 3
+成片音轨
+三选一 · 没有对应素材的选项不出现
+音轨由 H3 与画面一同采样生成，音画天然同步。
+步数 8 → BasicScheduler.steps · 采样器 euler → KSamplerSelect.sampler_name · 调度器 simple → BasicScheduler.scheduler · shift 12.00 / 2.00 → MiniMaxH3SigmaShift
+参考素材
+参考图 ≤9 · 参考视频 ≤3 · 参考音乐 ≤3
+从素材库选参考素材（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）
+参考 1
+参考 2
+参考 3
+参考 4
+参考 5
+参考 6
+参考 7
+参考 8
+参考 9
+把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。 · 本机体积 20.5 GB · 位置 diffusion_models
+已确认在 ComfyUI 模型列表中可用。 参考通道（Ref2VA）在文生视频面板里不暴露。
+清空全部
+●
+Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA
+推荐强度
+adaln 空转 50
+↑
+↓
+触发词
+修掉 H3 的四种"AI 味"，做出真实电影摄影质感。
+「Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA」×0.70 效果 LoRA 与加速 LoRA 并列共存（加速改采样语义，效果改画面风格）。 效果 LoRA 走 ComfyUI 核心节点 LoraLoaderModelOnly —— 它的键名带 diffusion_model. 前缀，MiniMaxH3TurboLoRA 节点对它会「0 weights patched」静默失效（实测）。
+分辨率档位
+总像素
+图像模式
+1360×768
+1.00 MP
+生成批次
+一次出几张
+1 张
+2 张
+3 张
+4 张
+5 张
+每批次使用独立种子，结果分别成图；单个批次失败不影响其余批次。
+Z-Image 模型
+官方模板 image_z_image_turbo.json：8 步 / cfg 1 / res_multistep / simple / shift 3。
+Turbo 的 CFG 必须=1（此时负面提示词被跳过、不跑第二遍前向），且不要用 karras / exponential 调度器（8 步下会崩图）。
+shift
+3.0
+Z-imagemeinv11
+基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
+查看简易说明 ›
+已添加 1 个效果 LoRA（配置存在服务端，局域网共用）。 加速/蒸馏类 2 个由工作流固定使用（不列出）。
+当前增强：普通增强（图像提示词（Z-Image 官方 PE））
+已切换到「t2i」模式，模板自动回落到「图像提示词（Z-Image 官方 PE）」
+Qwen-Image 2.1 模型
+官方 README 默认参数：40 步 / cfg 1 / euler / simple。
+官方 PE 文本编码器自带提示词扩写（提示词会被重写得更详细）；想自己控制最终提示词，可先用「增强」下拉里的「qwen21图片官方增强PE」扩写一次并写回提示词框，写回后出图不再二次扩写。
+40
+0.69
+推荐/自动
+负面提示词
+Base 建议填写
+当前 CFG=1：ComfyUI 会跳过 uncond 分支，负面提示词数学上无效（已置灰）。官方路径就是 cfg=1；要启用负面提示词请把 CFG 调到 1 以上。
+未添加效果 LoRA。可选本机已安装的效果类 Qwen-Image 2.1 LoRA（67 个）。 强度 0 表示关闭。
+当前增强：普通增强（Qwen-Image 2.1 官方 PE·文生图（结构化描述））
+已切换到「t2i_qwen」模式，模板自动回落到「Qwen-Image 2.1 官方 PE·文生图（结构化描述）」
+参考图
+最多 10 张
++ 从素材库添加
+按匹配度排序
+至少 1 张、最多 10 张（模型官方能力上限 10 张）。
+参考图「强制来自素材库」：先在「素材库」页上传入库，再从这里选择。
+当前增强：普通增强（Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y））
+MOSS-Image 模型
+官方 USERGUIDE：50 步 / cfg 3 / euler / sgm_uniform / shift 5 / SLG 22。
+Base 未经过 CFG 等推理参数的后训练或蒸馏，推理参数需自己配对；官方推荐步数 >= 50，CFG 3.0~6.0。
+50
+5.0
+MOSS-Image 未蒸馏，CFG>1 时负面提示词生效。官方 USERGUIDE 推荐 CFG 3.0，并给出一组实测有效的负面标签（nsfw, worst quality, bad anatomy, watermark, jpeg artifact）。
+SLG skip layer
+MOSS-Image 专属
+22（官方推荐）
+24
+26
+关闭
+SLG skip layer = 22（官方推荐 22；22/24/26 都有帮助）。关掉 SLG 画面会更写实，但部分细节会崩。
+XV 风格 · 人体质感（MOSS-Image）
+基础：MOSS-Image-Base / MOSS-Image-SFT · 上游 __metadata__ recommended_strength = 0.7
+Photo Quality Slider - Moss Image
+基础：MOSS-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
+4MP+ 高分辨率增强 LoHa v0.4（MOSS-Image · 上游最新）
+基础：MOSS-Image-Base / MOSS-Image-SFT · 上游默认强度 1.0
+TJ Realism Aesthetic（Moss v1）
+0.90
+基础：MOSS-Image · 0.8–1.0（取值见 recommended_strength）
+已添加 4 个效果 LoRA（配置存在服务端，局域网共用）。
+当前增强：普通增强（MOSS-Image 提示词（官方 MOSS Skill 描述式扩写））
+已切换到「t2i_moss」模式，模板自动回落到「MOSS-Image 提示词（官方 MOSS Skill 描述式扩写）」
+2720×1536
+3.98 MP
+H3-Image 模型
+官方模板：6 步 / cfg 1 / euler / simple / denoise 1。
+H3-Image 是 6 步蒸馏版：步数与 PDD sigma 表绑定，且 guidance 固定 1（无 CFG pass），「负面提示词不生效」 —— 要把「不要什么」写进正面提示词里。
+6
+锁定
+MiniMax-H3-Image 官方暂未发布 LoRA，本面板已预留 LoRA 入口但暂无可选权重。
+当前增强：普通增强（H3-Image 官方 PE·文生图（画面扩写+比例））
+已切换到「t2i_h3image」模式，模板自动回落到「H3-Image 官方 PE·文生图（画面扩写+比例）」
+最多 16 张
+至少 1 张、最多 16 张（模型官方能力上限 16 张）。
+当前增强：普通增强（H3-Image 官方 PE·图片编辑（参考图条件扩写））
+YuE2 音乐模型
+官方 BF16 原精度版（3.63B 参数，628 个 BF16 张量），音质与生成稳定性都优于量化版。本机这份由 m-a-p/YuE2-3B（官方原始 BF16 权重）+ m-a-p/YuE2-Vae 转换为 ComfyUI 原生单文件布局而来，数值与官方版逐字节一致。本机已就绪（models/checkpoints/）。
+音乐描述
+生成风格+歌词
+当前增强：YuE2 结构化风格 + 歌词
+用本地模型生成结构化风格与歌词
+结构化风格
+Style Fields · 对齐第三方 YuE2StylePrompt
+展开
+歌词
+Lyrics · 可留空（留空 = 纯器乐）
+只写要被唱出来的字，用
+[Verse]
+/
+[Chorus]
+[Bridge]
+[Outro]
+标段落。留空则生成纯器乐（无歌词与人声）。参考生音乐时，歌词的句式与字数越接近原曲，越贴合原旋律。
+谱面规划
+ABC Planning · 音乐生成前的乐谱规划
+完整谱面（旋律+和弦）
+仅旋律（适合翻唱）
+完整谱面：先规划「旋律 + 和弦」，再据此生成音乐 —— 文生音乐推荐这个。
+32
+官方模板 32 步 · 越大越慢
+官方模板 1.0 · CFG=1 表示不做负向引导
+输出格式
+FLAC
+MP3
+OPUS
+FLAC 无损、体积大（本机默认）；MP3 体积小、通用；OPUS 压缩率最高。三种格式都是 48 kHz 立体声。
+同一个种子 + 同一组参数 = 同一首曲子，便于微调对比。
+高级采样参数（音乐 / 谱面两组）
+温度
+top_p
+0.95
+top_k
+100
+重复惩罚
+1.20
+以上 4 项是
+音乐生成阶段
+的采样参数，会真实写进工作流的
+YuE2GenerateMusic
+节点（温度 / top_p / top_k / 重复惩罚），可以自由调整。官方节点默认值：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2。谱面（ABC）规划阶段另有一组独立参数（温度 0.7 / top_p 0.9 / top_k 30 / 重复惩罚 1.005），本面板
+不开放
+调整 —— 它固定用官方推荐值。改动这些值会改变曲子的「随机性」，一般保持默认即可。
+音频编码器
+SheetSage2 · 参考音频转乐谱用
+Comfy-Org/YuE2 官方音频编码器 SheetSage2（BF16）。参考生音乐时，它把参考音频转成 ABC 乐谱 —— 只提取旋律线，不含和弦符号，原曲的编曲与和声由 YuE2 依据风格描述重新生成。
+参考音频
+从素材库选 1 段
+尚未选择参考音频
++ 从素材库选择
+从素材库选 1 段音频（wav/mp3/flac/m4a/ogg）。这段音频只用来提取旋律线，原曲的编曲和人声不会被沿用；音频越短，转谱越快。
+参考生音乐固定用「仅旋律」谱面：SheetSage2 从参考音频只转出旋律线，不含和弦符号，伴奏与和声由 YuE2 依据风格描述重新生成。这就是官方 cover 模板的做法。
+已切换到「longfilm」模式，模板自动回落到「视频导演提示词（MiniMax-H3 官方三段式）」
+资产素材库
+OmniStudio · 多模型创作工作台
+加载中…
+多选
+查看回收站
+只看被引用的
+▶ 播放器模式
+上传素材
+图片
+音频
+文档
+工作流
+其它
+按标签筛选 ▾
+把图片 / 视频 / 音频拖到这里上传
+，或点右上角「上传素材」。
+原文件原样保留，不做二次转码。
+☰
+内置多模态 Agent
+用一句话说清创作意图，Agent 自己查素材、选模式、组装参数，最后下发成可执行的生成任务。
+当前：请调用工具 remember_preference（参数：{"key": "au（4 条）
+新会话
+本次会话产物
+⚙ 管理
+我
+请调用工具 remember_preference（参数：{"key": "audit_probe_pref", "value": "v1"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+Agent
+完成
+已更新偏好记忆 audit_probe_pref = v1（该键此前已存在，本次为覆盖写入，未新建）。
+工具调用（2）
+✓
+remember_preference
+结果
+ok
+respond
+📎 媒体
+上传的图片 / 音频 / 视频会入库素材库后交给 Agent（也可以直接 Ctrl+V 粘贴）
+发送
+Enter 发送 · Shift+Enter 换行 · 本地模型多步处理较慢，完整链路约 1~5 分钟，处理期间下方会显示当前进度

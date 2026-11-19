@@ -168,6 +168,13 @@ class TestApplyToParams(unittest.TestCase):
         为什么这样断言：读侧（job_meta.resolve_job_lora / 前端）现在
         读的是 `accel_loras` / `fixed_accel_lora`；只写新字段的话
         读侧还是猜 -> 还是误显示。
+
+        【2026-11-19 第 7 轮审查】旧读侧字段现在写的是**目录 key**
+        （`ckpt850`），不是权重文件名 ——
+        工作流层（video_models.resolve_accel_lora_slot）认的是 key；
+        写权重名会让 retry 出来的工作流**一枚加速 LoRA 都不挂**
+        （静默降级成「8 步采样的非蒸馏权重」）。详见
+        tests/test_r7_review_fixes.py::ArtifactAccelKeyTest。
         """
         params: dict = {"prompt": "x"}
         extracted = artifact_meta.extract_from_workflow({
@@ -184,12 +191,10 @@ class TestApplyToParams(unittest.TestCase):
         artifact_list = params["artifact_loras"]
         self.assertEqual("minimax_h3_turbo_4step_ema_ckpt850",
                          artifact_list[0]["name"])
-        # 旧读侧字段也要有真实值
-        self.assertEqual("minimax_h3_turbo_4step_ema_ckpt850",
-                         params["fixed_accel_lora"])
+        # 旧读侧字段也要有真实值（**目录 key**）
+        self.assertEqual("ckpt850", params["fixed_accel_lora"])
         accel_list = params["accel_loras"]
-        self.assertEqual("minimax_h3_turbo_4step_ema_ckpt850",
-                         accel_list[0]["key"])
+        self.assertEqual("ckpt850", accel_list[0]["key"])
         self.assertAlmostEqual(0.65, accel_list[0]["strength"])
 
     def test_workflow_without_lora_records_explicit_empty_list(self):

@@ -134,10 +134,36 @@ class TestFrontendAllowTwopassChineseLabel(unittest.TestCase):
         self.assertIn("有风险", html,
                       "标签必须明确标注「有风险」")
 
-    def test_hint_mentions_seg2_equivalent(self):
+    def test_hint_mentions_standard_sampling_equivalent(self):
+        """提示必须说明默认路径走**标准采样**（且无此缺陷）。
+
+        【2026-11-19 第 7 轮审查改口径】
+        原来的断言是「提示必须写出 nonebot minimax_h3_seg2」——
+        那是把**第三方插件的内部实现名**写进用户界面。
+        第 7 轮 B5 已把这类内部黑话清掉（nonebot / 节点类名），
+        断言必须跟着改成守**用户能懂的语义**，而不是守某个黑话词。
+
+        语义要求：提示里仍要说清「默认路径走标准采样、无此缺陷」。
+        """
         html = _read(INDEX_HTML)
-        self.assertIn("minimax_h3_seg2", html,
-                      "提示必须说明默认路径等价 nonebot minimax_h3_seg2")
+        self.assertIn("标准采样", html,
+                      "提示必须说明默认路径走标准采样")
+        self.assertIn("无此缺陷", html,
+                      "提示必须说明标准采样路径无此缺陷")
+        # 反向：**提示文案本身**不得出现内部黑话。
+        # 【为什么只查这一行而不是整个文件】index.html 里别处还有
+        # HTML 注释提到 nonebot（注释不渲染、不进 DOM 可见文本）。
+        # 「用户可见文案」这条纪律由 tests/test_r7_review_fixes.py 的
+        # AST 抽取器（scripts/r7_extract_visible_strings.cjs）统一守。
+        hint = ""
+        marker = 'id="vidTwopassAllowContinuationHint"'
+        if marker in html:
+            start = html.index(marker)
+            end = html.index("</span>", start)
+            hint = html[start:end]
+        self.assertTrue(hint, "找不到提示文案元素")
+        self.assertNotIn("nonebot", hint,
+                         "nonebot 是第三方插件名，不该出现在用户界面文案里")
 
     def test_confirm_dialog_states_the_numbers(self):
         js = _read(PANEL_JS)

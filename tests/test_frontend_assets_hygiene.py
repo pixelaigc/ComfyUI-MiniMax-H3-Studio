@@ -220,6 +220,11 @@ STALE_BUMPED = {
     #   （新增 .job-preview.is-failed 失败占位底色 —— 失败卡片不再
     #    是一片黑）⇒ ?v= 必须升到 genfix20261119b。
     "style.css":               ("cr20261115a",  "genfix20261119b"),
+    # 【2026-11-19 生成状态缺陷修复】generation-queue.js / job-detail.js
+    #   的内容也被改了（超时阈值 <=0 视为「不限时」；不限时任务的说明
+    #   文案）⇒ ?v= 必须升。
+    "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
+    "job-detail.js":           ("a5truth1",      "genfix20261119a"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
