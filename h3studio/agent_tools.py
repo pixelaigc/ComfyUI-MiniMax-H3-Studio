@@ -337,6 +337,37 @@ def register(agent_mod, create_job_handler):
         if asset_refs:
             params["asset_refs"] = asset_refs
 
+        # 【第 4 轮收口 —— 真实缺陷】重试接续段时**必须刷新接力棒的读回路径**。
+        #
+        # retry_job 把源任务的 params **整份拷贝**过来，
+        # `continuation.source_latent_path` 是**上一次**接续时算出来的
+        # 带指纹副本路径。Relay-Kit 落盘是**原子写**（os.replace 换 inode），
+        # 所以旧副本仍指向**旧 inode**、内容停留在旧版本。
+        #
+        # ⇒ 上游被重跑后，retry 会拿着旧路径读回**上一版的 latent**
+        #   （静默错误：不报错、画面接错、界面全程显示成功）。
+        #
+        # 【为什么放在这里而不是 prepare_job_params】
+        # prepare_job_params 是三条建任务路径的公共点，但**只有 retry**
+        # 会带着「上一段已经算好的 source_latent_path」进来；
+        # 面板提交与 Agent create 走的是 _prepare_continuation_params，
+        # 那条路径本来就会重算（ensure_fingerprinted_copy）。
+        # 放在 retry 这一处 = 改动面最小，且不碰面板/新任务的既有语义。
+        #
+        # 【失败不阻断】刷新失败（源潜空间已被清理等）时保留原路径，
+        # 由 worker 按「潜空间不在」明确报错 —— 不在这里静默改语义。
+        refreshed = getattr(server, "refresh_fingerprinted_path", None)
+        if refreshed is not None:
+            try:
+                new_path = refreshed(params)
+            except Exception:  # noqa: BLE001 —— 刷新失败不阻断重试
+                new_path = ""
+            if new_path:
+                cont_info = params.get("continuation")
+                if isinstance(cont_info, dict):
+                    cont_info["source_latent_path"] = new_path
+                    params["continuation"] = cont_info
+
         new_id = agent_mod._create_job_record(ctx, mode, params)
         entry = {
             "job_id": new_id,

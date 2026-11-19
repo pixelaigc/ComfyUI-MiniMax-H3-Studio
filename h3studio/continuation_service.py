@@ -371,6 +371,50 @@ def ensure_fingerprinted_copy(run_id: str, stage_index: int) -> Path:
     return dst
 
 
+def refresh_fingerprinted_path(params: dict) -> str:
+    """把 params 里的**接力棒读回路径**刷新成当前内容指纹的副本。
+
+    【为什么需要这个函数 —— 第 4 轮收口（真实缺陷）】
+    「重试」路径（Agent 的 retry_job 工具 / 面板的「复用参数」）会把源任务的
+    params **整份拷贝**过来。params 里的 `continuation.source_latent_path`
+    是**上一次**接续时算出来的带指纹副本路径。
+
+    而 Relay-Kit 的落盘是**原子写**（`save_file(tmp)` + `os.replace(tmp, path)`
+    —— 见 comfyui-H3-Relay-Kit/relay_core.py::save_av_latent），
+    原子替换意味着**换 inode** ⇒ 之前建的**硬链接副本仍指向旧 inode**，
+    内容停留在旧版本。
+
+    ⇒ 上游一旦被重跑，retry 就会拿着**旧路径**去读，
+      读到的是**上一版的 latent**（静默错误：不报错、画面接错）。
+
+    【为什么这个函数是幂等的】
+    `ensure_fingerprinted_copy` 本身幂等（副本已存在且大小一致就复用），
+    所以重复调用只会把路径刷新成「当前内容指纹」那一份。
+
+    【为什么不改变别的语义】
+    只改 `source_latent_path` 这一个字段 —— 段号 / 链 id / 接力棒坐标
+    （`source_latent_run_id` / `source_latent_stage`）**不动**
+    （那是「重跑这一段」的语义，见第 3 轮报告 §3.3）。
+
+    返回刷新后的路径；无法刷新时**原样返回**（不猜、不抛错）。
+    """
+    info = params.get("continuation")
+    if not isinstance(info, dict) or not info:
+        return ""
+    run_id = str(info.get("source_latent_run_id") or "").strip()
+    if not run_id:
+        return ""
+    try:
+        stage = int(info.get("source_latent_stage", 0))
+    except (TypeError, ValueError):
+        stage = 0
+    try:
+        path = ensure_fingerprinted_copy(run_id, max(0, stage))
+    except OSError:
+        return str(info.get("source_latent_path") or "")
+    return str(path)
+
+
 def cleanup_fingerprint_copies(run_id: str, stage_index: int) -> int:
     """清掉同坐标下**非当前指纹**的旧副本（防止无限堆积）。
 
