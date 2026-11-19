@@ -1,0 +1,2 @@
+worktree=/root/projects/h3studio-review-r7
+total_files=281 pass=149 fail=17 timeout=4 skip=111
