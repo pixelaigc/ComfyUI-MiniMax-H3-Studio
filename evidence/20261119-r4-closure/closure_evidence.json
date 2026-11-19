@@ -1,0 +1,127 @@
+{
+  "round": "第4轮收口（2026-11-19）—— 第3轮遗留的 4 项可执行项",
+  "quota_gate": {
+    "file": "/root/.hermes-web-ui/.ekko/workspace/default/person-main-505e35f9-2826-4d4c-af53-d3dc5de6f957/quota/minimax_quota_latest.json",
+    "remaining_percent_5h": 77,
+    "sampled_at": "2026-11-19 07:40:32",
+    "verdict": "通过（>=20%）"
+  },
+  "target1_zimage_lora_count": {
+    "claim": "test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras 失败：197 not less than 120",
+    "verdict": "断言过期（既有失败 / 环境差异）—— **不是**产品缺陷",
+    "clean_baseline_check": {
+      "baseline_commit": "91f5060",
+      "baseline_worktree": "/tmp/wsbase",
+      "baseline_result": "FAILED: 197 not less than 120（与分支侧完全相同）",
+      "candidate_commit": "7c580c5",
+      "candidate_result": "FAILED: 197 not less than 120（与基线完全相同）"
+    },
+    "composition_measured": {
+      "total_returned": 197,
+      "by_discovered_by": {
+        "filename": 4,
+        "layer_structure": 1,
+        "effect_dir": 192
+      },
+      "by_top_dir": {
+        "(root)": 4,
+        "z-image": 1,
+        "z-image-effects": 192
+      },
+      "by_kind": {
+        "effect": 195,
+        "acceleration": 2
+      },
+      "all_compatible": true,
+      "all_attention_hit_1.0": true,
+      "in_lora_catalog": "197/197 全部在目录里（无一编造）",
+      "effect_dir_family_mismatch": 0
+    },
+    "machine_wide": {
+      "total_safetensors_in_lora_dirs": 712,
+      "lora_dirs": [
+        "/home/ubuntu/comfyui/models/loras",
+        "/mnt/usb2t/comfyui-models/loras"
+      ],
+      "other_families": {
+        "qwen21": 67,
+        "moss": 143
+      }
+    },
+    "broken_filter_scenario_measured": {
+      "note": "把层结构粗筛放到最宽（所有效果类全放行）",
+      "total": 661,
+      "ratio_of_machine": 0.928
+    },
+    "correct_ratio_of_machine": 0.277,
+    "separation_verdict": "阈值 0.5 干净分开（0.277 vs 0.928），且随素材目录增长不会再次过期",
+    "product_code_changed": 0,
+    "fix": "tests/test_studio.py：写死的 assertLess(len(items), 120) -> 相对判据 len(items)/machine_total < 0.5（分母现场数全机 safetensors）",
+    "mutation_proof": {
+      "mutation": "关掉层结构粗筛（_looks_like_z_image_layers 恒真）",
+      "result": "RED: 0.9283707865168539 not less than 0.5（661/712）",
+      "log": "/tmp/r3_mutation_zimage.log"
+    },
+    "severity": "低（测试断言过期，不影响产品行为）"
+  },
+  "target2_retry_fingerprint": {
+    "claim": "retry_job 重试接续段时，source_latent_path 的指纹副本不刷新",
+    "verdict": "**真实缺陷**（静默错误）",
+    "mechanism": {
+      "relay_kit_write": "save_file(tmp) + os.replace(tmp, path) —— 原子写 => **换 inode**",
+      "fingerprint_copy": "ensure_fingerprinted_copy 用 os.link 建硬链接 => 副本指向**旧 inode**，内容停留在旧版本",
+      "normal_path_ok": "_prepare_continuation_params 每次都重算（ensure_fingerprinted_copy）",
+      "broken_path": "Agent 的 retry_job 把源任务 params 整份拷贝，**不经过** _prepare_continuation_params"
+    },
+    "probe_measured": {
+      "script": "evidence/20261119-r4-closure/target2_retry_fingerprint_probe.py",
+      "same_inode_after_atomic_write": false,
+      "stale_copy_head": "VERSION-ONEVERSION-ONEVERSION-",
+      "source_head_after_rerun": "VERSION-TWO-NEW-INODEVERSION-T",
+      "new_continuation_path": "stage_00000_c9f9481b.safetensors（正确）",
+      "retry_path": "stage_00000_7cd33ac5.safetensors（**旧**）",
+      "retry_reads_stale_latent": true
+    },
+    "fix": {
+      "h3studio/continuation_service.py": "新增 refresh_fingerprinted_path(params) —— 单一真源",
+      "server.py": "新增同名模块级入口（Agent 的 ctx.server 就是 server 模块）",
+      "h3studio/agent_tools.py": "retry_job 在建任务前刷新 continuation.source_latent_path",
+      "semantics_preserved": "只改 source_latent_path；段号/链 id/接力棒坐标不动（「重跑这一段」语义保持）",
+      "failure_handling": "刷新失败不阻断重试，保留原路径，由 worker 明确报错"
+    },
+    "regression_tests": "tests/test_r4_retry_fingerprint_and_ref_probe.py（RetryFingerprintRefreshTest 5 条 + RetryJobToolRefreshTest 1 条，含端到端行为级断言）",
+    "mutation_proof": {
+      "M1": "关掉 retry_job 的刷新调用 -> RED: retry 沿用了旧指纹路径（行为级红，不是 AttributeError）"
+    },
+    "severity": "中（静默接错段画面；不报错、界面全程显示成功）"
+  },
+  "target3_ref_frame_count_cache": {
+    "claim": "_record_ref_video_frame_count 探测不到帧数时不缓存失败结果",
+    "verdict": "**真实缺陷**",
+    "probe_measured": {
+      "script": "evidence/20261119-r4-closure/target3_ref_frame_count_probe.py",
+      "probe_calls_for_3_invocations": 3,
+      "ref_video_frame_count_in_params": null,
+      "db_row_written": false,
+      "success_case_probe_calls": 1,
+      "ffprobe_cost_seconds_per_probe": 3.0,
+      "ffprobe_measured_on": "32MB / 2 分钟 480P 参考视频（-count_frames 要真解码一遍）"
+    },
+    "downstream_impact": {
+      "note": "失败 -> 下一段拿不到 ref_video_frame_count -> 工作流走「不猜」分支 -> video_skip_frames=0 -> 段2 参考视频从 0 开始喂",
+      "relation": "第3轮那个「亮度阶跃」缺陷的触发条件之一",
+      "inheritance_checked": "scripts/target3_inheritance_probe.py：段2 的 continuation **不继承** ref_video_frame_count（_prepare_continuation_params 重建字典）"
+    },
+    "fix": {
+      "server.py": "失败时落 ref_video_frame_count_probe='failed' 标记并写回 DB；后续调用直接返回，不再重探",
+      "server.py_2": "ffprobe 探测挪到 asyncio.to_thread（不再阻塞事件循环）",
+      "semantics_preserved": "帧数仍然是 0（= 不知道），**不猜**；标记作用域只限这一份参考视频"
+    },
+    "regression_tests": "tests/test_r4_retry_fingerprint_and_ref_probe.py（RefVideoFrameCountCacheTest 5 条）",
+    "mutation_proof": {
+      "M2": "关掉失败标记生效 -> RED: 探测失败后仍在重复探测（3 次）",
+      "M3": "把 ffprobe 放回事件循环 -> RED: 在探测进行的窗口内一次都没调度"
+    },
+    "severity": "中（每段重探 3 秒同步阻塞 + 触发段2 画面跳变条件）"
+  }
+}
