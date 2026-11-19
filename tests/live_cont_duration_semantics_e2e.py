@@ -181,6 +181,8 @@ BASE_PARAMS = {
     "width": 1280, "height": 736,
     "aspect": "16:9", "resolution": "768p",
     "steps": 4, "sampler": "euler", "scheduler": "simple",
+    "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+    "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
     "cfg": 1.0, "shift_video": 7.0, "shift_audio": 3.0,
 }
 

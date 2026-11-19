@@ -460,19 +460,155 @@ class StudioPage:
     def visible(self, selector: str) -> bool:
         return self.page.is_visible(selector)
 
+    # -- 增强 ---------------------------------------------------------
+    def enhance_prompt(self, timeout: float = 240.0,
+                       attempts: int = 3) -> str:
+        """走一遍「提示词增强」，把增强结果**写回提示词框**，返回增强后的文本。
+
+        【为什么这是必做步骤 —— 2026-11-19 用户实测反馈】
+        原实现是「点生成 -> 撞到『提示词尚未增强』闸门 -> 点确认生成」，
+        也就是**绕过**增强直接生成。这测的是一条用户根本不会走的路径。
+        既定使用流程是：写提示词 -> 增强 -> 用增强后的提示词生成。
+
+        【失败必须显式报错 —— 但允许重试】
+        增强失败（请求没发出 / 弹窗没出现 / 结果为空 / 写回失败）
+        一律抛错 —— **绝不静默跳过**。静默跳过 = 测试跑的是
+        「没增强」的路径，却看起来通过了。
+
+        【为什么允许重试（attempts）】
+        增强走的是**本地大模型**，而服务端有**硬约束校验**
+        （h3studio/skills/prompt-enhancer/scripts/validate.py）：
+        产物里出现质量元标签（"高清" / "8K"）、Compel 权重语法
+        （"(S1)"）等会被**拒收**（HTTP 502 + 提示条说明原因）。
+        这是**模型产物的随机性**，不是功能缺陷 —— 现实里用户看到
+        「扩写结果违反硬约束」就是**再点一次「增强」**。
+        所以这里按用户的真实行为重试；重试全部失败才报错。
+
+        【返回什么】提示词框里**写回之后**的内容（= 增强结果）。
+        """
+        last_error = ""
+        for attempt in range(1, max(1, int(attempts)) + 1):
+            try:
+                return self._enhance_once(timeout)
+            except AssertionError as exc:
+                last_error = str(exc)
+                self.ev.step(f"第 {attempt} 次增强失败：{last_error[:160]}")
+                # 失败后界面会停在「没结果」的状态；再点一次前把提示条清掉
+                self.page.wait_for_timeout(1500)
+        raise AssertionError(
+            f"增强连续 {attempts} 次都没成功（最后一次：{last_error}）—— "
+            f"增强是必做步骤，不能跳过。")
+
+    def _enhance_once(self, timeout: float) -> str:
+        """跑**一次**增强并写回。失败抛 AssertionError（由上层重试）。"""
+        captured: list[dict] = []
+        self.page.on("request", lambda req: captured.append({
+            "url": req.url, "method": req.method, "body": req.post_data or ""})
+            if req.method == "POST" and "/api/enhance" in req.url else None)
+
+        before = self.value("#prompt")
+        if not (before or "").strip():
+            raise AssertionError("提示词框是空的 —— 增强前必须先写提示词")
+
+        self.page.click("#enhanceBtn")
+        self.ev.step("点「增强」")
+
+        # 等请求发出（增强要等本地模型，可能要几十秒）
+        for _ in range(int(timeout)):
+            if captured:
+                break
+            self.page.wait_for_timeout(1000)
+        if not captured:
+            hint = ""
+            try:
+                hint = self.page.inner_text("#enhanceHint")
+            except Exception:
+                pass
+            raise AssertionError(
+                f"增强没有发出请求（等了 {timeout}s）；提示条：{hint!r}")
+
+        # 等结果弹窗
+        for _ in range(int(timeout)):
+            if self.page.is_visible("#enhanceModal"):
+                break
+            self.page.wait_for_timeout(1000)
+        if not self.page.is_visible("#enhanceModal"):
+            hint = ""
+            try:
+                hint = self.page.inner_text("#enhanceHint")
+            except Exception:
+                pass
+            raise AssertionError(
+                f"增强结果弹窗没出现；提示条：{hint!r}")
+
+        result = (self.value("#enhanceResult") or "").strip()
+        if not result:
+            raise AssertionError("增强结果为空 —— 增强没有真正产出内容")
+        if result == before.strip():
+            raise AssertionError(
+                f"增强结果与原文相同（没有真的增强）：{result[:120]!r}")
+        self.ev.step(f"增强结果长度 = {len(result)}")
+
+        # 写回提示词框（「替换提示词框」）
+        self.page.click("#enhanceReplace")
+        self.page.wait_for_timeout(1200)
+        after = (self.value("#prompt") or "").strip()
+        if not after:
+            raise AssertionError("点「替换提示词框」后提示词框是空的 —— 写回失败")
+        if after == before.strip():
+            raise AssertionError(
+                f"点「替换提示词框」后提示词框内容没变（写回失败）：{after[:120]!r}")
+        self.ev.step(f"增强后提示词长度 = {len(after)}")
+        return after
+
     # -- 提交 ---------------------------------------------------------
-    def submit_generation(self) -> None:
-        """点「生成」，必要时过「未增强提示词」闸门。
+    def submit_generation(self, *, require_enhanced: bool = True) -> None:
+        """点「生成」。
+
+        【2026-11-19 修正】原来的实现是「点生成 -> 撞到『提示词尚未
+        增强』闸门 -> 点确认生成」—— 那是**绕过**增强的路径，不符合
+        既定使用流程。现在默认**先增强再提交**：
+
+          1. 若提示词还没被标记为「已增强」-> 先走一遍增强（写回提示词框）；
+          2. 再点生成；
+          3. 若仍然命中「未增强」闸门 -> **显式报错**（说明标记没生效），
+             不再点「确认生成」放行。
 
         提交失败时把**服务端返回的原因**带进异常信息 —— 否则只能看到
         一个「400」，定位不到是哪个参数不合法。
+
+        `require_enhanced=False` 供「故意测未增强闸门」的场景使用。
         """
+        # 【2026-11-19 修正】错误监听器在**增强之后**才挂。
+        #
+        # 【为什么顺序很重要】增强走的是本地模型，服务端有硬约束校验，
+        # 产物违规时会返回 **502**。如果监听器先挂上，那次 502 会被
+        # 记进 errors —— 然后被当成「提交生成失败」抛出去，
+        # 报的是错因（实测：明明是增强重试后成功了，却报
+        # 「提交生成失败：['HTTP 502']」）。
+        # 提交阶段只该关心**提交本身**的错误。
+        if require_enhanced:
+            level = self.page.evaluate(
+                "() => (typeof currentPromptLevel === 'function')"
+                " ? currentPromptLevel() : -1")
+            if level != 0:
+                self.ev.step(f"提示词已是「已增强」（level={level}），跳过增强")
+            else:
+                self.ev.step("提示词未增强 -> 先走增强流程")
+                self.enhance_prompt()
+
         errors: list[str] = []
         self.page.on("response", lambda r: (
             errors.append(f"HTTP {r.status}") if r.status >= 400 else None))
+
         self.page.click("#genBtn")
         self.page.wait_for_timeout(1200)
         if self.page.is_visible("#enhanceGateModal"):
+            if require_enhanced:
+                # 增强过还撞闸门 = 增强没被标记 -> 显式报错，不放行。
+                raise AssertionError(
+                    "提示词已经过增强，提交时仍然命中「提示词尚未增强」闸门 —— "
+                    "增强的写回/标记链路有问题（不放行，这条路径已作废）。")
             self.ev.step("命中「提示词尚未增强」闸门 -> 点确认生成")
             self.page.click("#enhanceGateConfirm")
             self.page.wait_for_timeout(1500)

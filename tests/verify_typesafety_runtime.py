@@ -299,6 +299,8 @@ def main():
                    {"prompt": "a swordsman in a bamboo forest",
                     "model_key": "fl2va_int8", "width": 768, "height": 448,
                     "duration": 5, "steps": 4, "sampler": "euler",
+                    "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+                    "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
                     "scheduler": "simple", "seed": 4242})
     jid = job.get("id") or job.get("job_id")
     print(f"任务 = {jid}", flush=True)
@@ -346,6 +348,8 @@ def main():
     job2 = post_job(base, "t2v",
                     {"prompt": "b", "model_key": "fl2va_int8",
                      "width": 768, "height": 448, "duration": 5, "steps": 4,
+                     "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+                     "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
                      "sampler": "euler", "scheduler": "simple", "seed": 4243})
     jid2 = job2.get("id") or job2.get("job_id")
     j2 = wait_job(base, jid2)
@@ -365,6 +369,8 @@ def main():
     job3 = post_job(base, "t2v",
                     {"prompt": "c", "model_key": "fl2va_int8",
                      "width": 768, "height": 448, "duration": 5, "steps": 4,
+                     "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+                     "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
                      "sampler": "euler", "scheduler": "simple", "seed": 4244})
     jid3 = job3.get("id") or job3.get("job_id")
     j3 = wait_job(base, jid3)

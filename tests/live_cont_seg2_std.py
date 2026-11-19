@@ -330,6 +330,8 @@ def main() -> int:
         "seed": 20261118,
         "aspect": "16:9",
         "steps": 4, "sampler": "euler", "scheduler": "beta",
+        "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+        "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
         "cfg": 1.0,
         # 【关键】入参**显式开二采** —— 用来证明「即使入参开了，
         # 接续段也必须走标准采样」（这是本轮的核心不变量）。

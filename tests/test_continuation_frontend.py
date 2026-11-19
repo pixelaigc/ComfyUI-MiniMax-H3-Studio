@@ -105,10 +105,12 @@ class TestContinuationFrontend(unittest.TestCase):
         stage.write_bytes(b"fake-av-latent")
 
         params = {
-            "prompt": "接续测试提示词",
+            "prompt": "一只橘猫在旧书桌上走过",
             "model_key": "fl2va_int8",
             "width": 768, "height": 448,
             "duration": 5, "steps": 4,
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "sampler": "euler", "scheduler": "simple",
             "gen_type": mode,
             "continuation": {
@@ -238,8 +240,10 @@ class TestContinuationFrontend(unittest.TestCase):
         import sqlite3
         job_id = "contselflift1"
         params = {
-            "prompt": "二采测试", "model_key": "fl2va_int8",
+            "prompt": "一只橘猫从窗台跳到书桌上", "model_key": "fl2va_int8",
             "width": 768, "height": 448, "duration": 5, "steps": 4,
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "gen_type": "t2v",
             "twopass": {"enabled": True},
             "continuation": {

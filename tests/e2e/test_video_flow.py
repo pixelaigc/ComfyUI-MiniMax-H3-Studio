@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import pytest
+import gen_flow  # noqa: E402
 
 
 def _slot(page, key: str):
@@ -40,7 +41,7 @@ def test_video_t2v_panel_and_submit(studio_page, evidence):
     evidence.step(f"时长标签 = {sp.text('#durVal')}")
     assert "8" in sp.text("#durVal"), f"时长标签没同步：{sp.text('#durVal')}"
 
-    sp.fill("#prompt", "e2e 文生视频：一只猫在草地上奔跑")
+    sp.fill("#prompt", gen_flow.prompt_text("t2v_cat_grass"))
     sp.submit_generation()
     submitted = sp.last_submitted_params()
     evidence.step(f"提交 = {submitted}")
@@ -165,7 +166,7 @@ def test_video_r2v_submit_carries_asset_refs(studio_page, evidence, fixtures_dir
     sp.click("#alPickerOk")
     sp.page.wait_for_timeout(900)
 
-    sp.fill("#prompt", "e2e 参考生视频：参考图里的猫")
+    sp.fill("#prompt", gen_flow.prompt_text("r2v_ref_cat"))
     sp.submit_generation()
     submitted = sp.last_submitted_params()
     evidence.step(f"提交字段 = {submitted.get('fieldNames')}")

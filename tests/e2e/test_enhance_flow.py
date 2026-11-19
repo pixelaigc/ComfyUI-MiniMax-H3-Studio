@@ -31,6 +31,7 @@ import time
 import urllib.request
 
 import pytest
+import gen_flow  # noqa: E402
 
 #: 「携带上文」的字段名候选（不同实现可能叫法不同）。
 CONTEXT_FIELD_CANDIDATES = (
@@ -139,13 +140,20 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
     sp = studio_page
     sp.open()
 
+    # 【2026-11-19】提示词改成**对模型有意义**的中性描述 ——
+    # 原来的「第一段：」「第二段：」是测试占位词，对模型毫无意义。
     segment_prompts = [
-        "第一段：月光下的竹林，黑衣剑客背对镜头，剑未出鞘",
-        "第二段：白衣剑客转身，剑光照亮面部，竹叶纷飞",
-        "第三段：两人对峙，剑锋相交，镜头缓慢推近",
+        gen_flow.prompt_text("t2v_swordsman_bamboo"),
+        gen_flow.prompt_text("t2v_swordsman_turn"),
+        gen_flow.prompt_text("t2v_swordsman_stand"),
     ]
 
-    def generate_segment(prompt: str, duration: float = 5.0) -> dict:
+    def generate_segment(prompt: str, duration: float = 5.0) -> tuple[dict, str]:
+        """生成一段，返回 (任务, **实际提交**的提示词)。
+
+        【2026-11-19】提交的是**增强后**的提示词（既定流程），
+        所以断言历史时要拿这一份，而不是原文。
+        """
         sp.goto_mode("t2v")
         sp.page.eval_on_selector(
             "#duration",
@@ -154,11 +162,15 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
         sp.page.wait_for_timeout(300)
         sp.fill("#prompt", prompt)
         sp.submit_generation()
+        submitted_prompt = (sp.last_submitted_params().get("params")
+                            or {}).get("prompt") or ""
         job = _wait_job(sp.base_url)
         assert job["status"] == "done", f"任务没跑成功：{job.get('error')}"
-        return job
+        return job, submitted_prompt
 
-    def continue_from(job_id: str, prompt: str, duration: float = 5.0) -> dict:
+    def continue_from(job_id: str, prompt: str,
+                       duration: float = 5.0) -> tuple[dict, str]:
+        """接续一段，返回 (任务, **实际提交**的提示词)。"""
         sp.goto_tab("done")
         button = None
         for _ in range(30):
@@ -177,18 +189,20 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
         sp.page.wait_for_timeout(300)
         sp.fill("#prompt", prompt)
         sp.submit_generation()
+        submitted_prompt = (sp.last_submitted_params().get("params")
+                            or {}).get("prompt") or ""
         job = _wait_job(sp.base_url)
         assert job["status"] == "done", f"接续段没跑成功：{job.get('error')}"
-        return job
+        return job, submitted_prompt
 
     # 第 1 段
-    first = generate_segment(segment_prompts[0])
+    first, prompt_1 = generate_segment(segment_prompts[0])
     evidence.step(f"第 1 段 {first['id']} 完成")
     # 第 2 段（接续第 1 段）
-    second = continue_from(first["id"], segment_prompts[1])
+    second, prompt_2 = continue_from(first["id"], segment_prompts[1])
     evidence.step(f"第 2 段 {second['id']} 完成")
     # 第 3 段（接续第 2 段）—— 这一段点增强时，应当带上第 1、2 段
-    third = continue_from(second["id"], segment_prompts[2])
+    third, prompt_3 = continue_from(second["id"], segment_prompts[2])
     evidence.step(f"第 3 段 {third['id']} 完成")
 
     # 此时接续上下文挂着第 2 段的来源 —— 再点一次接续拿到第 3 段的血脉
@@ -217,9 +231,16 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
     evidence.step(f"接续上下文里的 promptHistory = {history}")
     assert history, "接续上下文没有下发 prompt_history"
     carried = [item["prompt"] for item in history]
-    for text in segment_prompts[:2]:
-        assert text in carried, (
-            f"接续上下文里缺此前段落的提示词：{text!r}（现有 {carried}）")
+    # 【2026-11-19】按**实际提交的提示词**（= 增强后的那一份）判定。
+    #
+    # 【为什么不再断言原文】修正后的真实流程是「写提示词 -> 增强 -> 生成」，
+    # 所以落库的 params["prompt"] 是**增强后**的那一份（服务端
+    # _lineage_prompts 读的就是 params["prompt"]）。
+    # 断言原文在历史里，等于断言「用户没走增强」—— 那正是本次要修掉的路径。
+    for index, expected in ((0, prompt_1), (1, prompt_2)):
+        assert any(expected[:40] in text for text in carried), (
+            f"接续上下文里缺第 {index + 1} 段的提示词"
+            f"（该段实际提交 {expected[:60]!r}；现有 {carried}）")
 
     # 点增强 -> 请求体必须带上这些历史
     captured = _capture_enhance(sp.page)
@@ -233,22 +254,42 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
     assert context_fields, (
         f"增强请求里没有「上文」字段（现有字段：{sorted(keys)}）")
 
-    # 字段在，也要真的带上此前段落的提示词
-    payload = ""
+    # 字段在，也要真的带上此前段落的提示词。
+    #
+    # 【2026-11-19 修正判据】原来是把上下文字段**拼成一个大字符串**
+    # 再做子串匹配 —— 但 json.dumps 会把换行转义成 \n，于是原文里的
+    # 换行位置与序列化后的不一致，子串匹配会**假失败**。
+    # 现在改成「按列表项逐条比」。
+    carried_prompts: list[str] = []
     for key in context_fields:
         value = body.get(key)
         if isinstance(value, str):
-            payload += value
-        elif isinstance(value, (list, dict)):
-            payload += json.dumps(value, ensure_ascii=False)
-    for text in segment_prompts[:2]:
-        assert text in payload, (
-            f"增强请求没有携带此前段落的提示词（缺：{text!r}）。"
-            f"当前请求体字段：{sorted(keys)}")
+            carried_prompts.append(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    text = item.get("prompt")
+                    if isinstance(text, str):
+                        carried_prompts.append(text)
+                elif isinstance(item, str):
+                    carried_prompts.append(item)
+        elif isinstance(value, dict):
+            text = value.get("prompt")
+            if isinstance(text, str):
+                carried_prompts.append(text)
+            else:
+                carried_prompts.append(json.dumps(value, ensure_ascii=False))
+    evidence.step(f"增强请求里带上的提示词条数 = {len(carried_prompts)}")
+    for index, expected in ((0, prompt_1), (1, prompt_2)):
+        assert any(expected[:60] in text for text in carried_prompts), (
+            f"增强请求没有携带第 {index + 1} 段的提示词"
+            f"（该段实际提交 {expected[:60]!r}）。"
+            f"当前请求体字段：{sorted(keys)}；"
+            f"带上的提示词：{[t[:60] for t in carried_prompts]}")
     # 前端是**原样**把接续上下文的 prompt_history 传上去的（含本段自己），
     # 剔除本段是**服务端**的职责（server.py:_normalize_prompt_history）。
     # 所以这里断言「历史完整传上去了」，剔除由服务端那条用例守住。
-    assert segment_prompts[2] in payload, (
+    assert any(prompt_3[:60] in text for text in carried_prompts), (
         "历史里应有本段（前端原样传，剔除由服务端负责）："
-        f"{payload[:200]}")
+        f"{[t[:60] for t in carried_prompts]}")
     evidence.screenshot(sp.page, "enhance-with-history")

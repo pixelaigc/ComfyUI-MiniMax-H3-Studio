@@ -1,0 +1,15 @@
+[
+  {"id": "p0", "step": "第0步 额度闸门：remaining_percent_5h=77% ≥ 20%，闸门开", "status": "completed"},
+  {"id": "p1", "step": "现场核实：git status/branch/worktree/log + 线上数据位置（主仓 data/ + 外挂盘素材库）", "status": "completed"},
+  {"id": "p2", "step": "新建独立 worktree /root/projects/h3studio-fix-e2e-flow（分支 local/feature/fix-e2e-gen-flow）", "status": "completed"},
+  {"id": "p3", "step": "取证：量出 E2E/线上面板真实提交的 steps 与加速 LoRA 状态", "status": "completed"},
+  {"id": "p4", "step": "A-1 新增共享生成助手 tests/e2e/gen_flow.py（提示词表/加速LoRA选取/参数组装）", "status": "completed"},
+  {"id": "p5", "step": "A-2 修正全部测试/脚本的生成参数：4步带加速LoRA + 中性提示词 + 必做增强", "status": "completed"},
+  {"id": "p6", "step": "A-3 三条防回归断言（A1/A2 静态扫描 + A3 真浏览器），并做变异测试验证断言会红", "status": "completed"},
+  {"id": "p7", "step": "B-1 清理前备份清单/文件列表/数据库快照到 evidence-20261119-cleanup/", "status": "completed"},
+  {"id": "p8", "step": "B-2 执行清理（素材库+生成库），保护 2 条用户产出素材", "status": "completed"},
+  {"id": "p9", "step": "B-3 清理后自检：列表接口空、目录无残留、线上六接口 200", "status": "completed"},
+  {"id": "p10", "step": "回归：E2E 全量 + 非 E2E 全量，与基线对拍（新增失败 0 / 新增 ERROR 0）", "status": "in_progress"},
+  {"id": "p11", "step": "部署：合并到 local/maintainer + 同步线上 worktree + 六接口 200", "status": "pending"},
+  {"id": "p12", "step": "交付报告 docs/第4轮收口报告-测试流程修正与素材库清理-20261119.md", "status": "pending"}
+]

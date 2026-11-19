@@ -95,6 +95,8 @@ def main():
         params = {
             "prompt": prompt, "model_key": "fl2va_int8",
             "width": w, "height": h, "duration": 5, "steps": 4,
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "sampler": "euler", "scheduler": "simple", "seed": seed,
         }
         jid = http_multipart(f"{base}/api/jobs",

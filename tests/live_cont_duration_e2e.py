@@ -186,6 +186,8 @@ def main() -> int:
         # 【步数用 4】——线上真实 t2v 任务就是 4 步（twopass 默认档）。
         # 用 30 步会让实测跑很久，且不是用户实际的使用档。
         "steps": 4, "sampler": "euler", "scheduler": "simple",
+        "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+        "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
         "cfg": 1.0, "shift_video": 7.0, "shift_audio": 3.0,
     }
 
