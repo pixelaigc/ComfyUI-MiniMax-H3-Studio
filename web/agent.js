@@ -600,6 +600,12 @@
           }).join("")
         : "";
       const error = job.error ? `<div class="ag-job-error">${esc(job.error)}</div>` : "";
+      // 【2026-11-19 缺陷 2 修 —— 防御层】
+      // status='done' 但**没有产物** -> 明确提示，不留一个空缩略图位
+      // （空位在深色背景上看起来就是「生成成功 + 全黑图」）。
+      const noOutput = (status === "done" && !outputs.length)
+        ? `<div class="ag-job-error">⚠ 生成结束但没有产物文件（无法预览）。</div>`
+        : "";
       const progress = (status === "running" || status === "queued") && job.progress_text
         ? `<span class="ag-job-progress">${esc(job.progress_text)}</span>` : "";
       const modeLabel = media ? media.modeLabel(mode) : (job.label || mode || "");
@@ -630,6 +636,7 @@
           ).join("")}</div>` : ""}
         ${progress}
         ${error}
+        ${noOutput}
         ${noteHtml}
         ${limitHtml}
         ${thumb ? `<div class="ag-job-thumbs">${thumb}</div>` : ""}
@@ -2024,13 +2031,20 @@
 
   const JOB_POLL_INTERVAL = 3000;
   const JOB_TERMINAL = ["done", "failed", "canceled"];
-  // 轮询的**硬终止条件**（2026-11-10 补）：
+  // 轮询的**硬终止条件**：
   //   1. 全部任务进终态 -> 停（原有逻辑）
-  //   2. 超过 JOB_POLL_MAX_MS -> 停（原来**没有**这条：任务卡永远停在
-  //      「排队中/运行中」，页面一直每 3 秒打一次 /api/jobs/{id}）
-  //   3. 连续 JOB_POLL_MAX_ERRORS 次查询失败 -> 停（后端挂了不该无限轮询）
+  //   2. 连续 JOB_POLL_MAX_ERRORS 次查询失败 -> 停（后端挂了不该无限轮询）
   // 停止时把超时的任务标成「状态未知（已停止轮询）」，不假装它还在跑。
-  const JOB_POLL_MAX_MS = 30 * 60 * 1000;   // 30 分钟
+  //
+  // 【2026-11-19 缺陷 1 修】**删掉了「超过 30 分钟就停」这条**。
+  //
+  // 【为什么】视频任务跑很久是正常现象（用户明确要求：跑 1 天也不该
+  // 判失败）。原来这里 30 分钟一到就把任务卡标成「状态未知」并停止轮询 ——
+  // 用户看到的是「Agent 建的任务状态不明」，而服务端其实还在正常跑。
+  //
+  // 【兜底还在吗】在 —— 「连续查询失败」那条与任务跑多久无关，
+  // 后端进程挂了照样会停。
+  const JOB_POLL_MAX_MS = 0;                 // 0 = 不按运行时长终止轮询
   const JOB_POLL_MAX_ERRORS = 12;            // 连续 12 次失败（约 36 秒）
 
   function startJobPolling(msg) {
@@ -2049,8 +2063,13 @@
   async function pollJobs() {
     const ids = [...jobPoll.ids];
     if (!ids.length) { stopJobPolling(); return; }
-    // ---- 终止条件 2：超时 ----
-    if (jobPoll.startedAt && Date.now() - jobPoll.startedAt > JOB_POLL_MAX_MS) {
+    // ---- 终止条件 2：运行时长上限 ----
+    // 【2026-11-19 缺陷 1 修】JOB_POLL_MAX_MS 默认 0 = **不按运行时长停**。
+    // 视频任务跑很久是正常现象，前端擅自放弃会让用户看到永远停在
+    // 「排队中/运行中」的任务卡。真正的超时判定由服务端按媒体类型给出。
+    if (JOB_POLL_MAX_MS > 0
+        && jobPoll.startedAt
+        && Date.now() - jobPoll.startedAt > JOB_POLL_MAX_MS) {
       markPollingTimedOut();
       stopJobPolling();
       renderMessages();

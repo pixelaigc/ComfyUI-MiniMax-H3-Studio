@@ -598,6 +598,10 @@
       const isImage = kind === "image";
       // 图片产物：缩略图可点 -> 打开大图查看器（复用 app.js 已有的 lightbox）。
       // 视频/音频：缩略图本身是播放器，点它会开始播放，**不做**预览绑定。
+      // 【2026-11-19 缺陷 2 修 —— 防御层】
+      // status='done' 但**没有产物** -> 显示明确的失败占位，
+      // 不留一个空缩略图位（深色背景上看起来就是「全黑图」）。
+      const doneWithoutOutput = (job.status === "done" && !outputs.length);
       const thumb = url
         ? (isVideo
             ? `<video class="ag-artifact-thumb is-video" src="${esc(url)}" muted preload="metadata"></video>`
@@ -608,7 +612,9 @@
                           title="点击查看大图">
                    <img class="ag-artifact-thumb" src="${esc(url)}" alt="${esc(job.id)}" loading="lazy">
                  </button>`)
-        : `<div class="ag-artifact-thumb"></div>`;
+        : (doneWithoutOutput
+            ? `<div class="ag-artifact-thumb is-failed" title="生成结束但没有产物文件">⚠</div>`
+            : `<div class="ag-artifact-thumb"></div>`);
       const prompt = job.params && job.params.prompt ? String(job.params.prompt) : "";
       const status = job.status || "queued";
       const label = job.gen_type_label || job.mode || "任务";
