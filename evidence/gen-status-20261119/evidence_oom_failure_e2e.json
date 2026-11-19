@@ -1,5 +1,5 @@
 {
-  "job_id": "b30c57b47128",
+  "job_id": "ec2945a2f428",
   "mode": "t2i",
   "replayed_history": {
     "status_str": "error",
@@ -55,5 +55,5 @@
   "new_outcome": "failed",
   "verdict_failed": true,
   "verdict_no_outputs": true,
-  "captured_at": "2026-11-20 00:26:28"
+  "captured_at": "2026-11-20 01:26:17"
 }
