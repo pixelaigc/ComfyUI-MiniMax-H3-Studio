@@ -1,0 +1,22 @@
+=== 候选独有失败的隔离复跑取证（2026-11-20）===
+
+[基线树 72075b7] tests/e2e/test_asset_flow.py::test_player_playlist_from_manual_selection
+  BASE 第1次: FAILED  1 failed in 7.78s
+  BASE 第2次: FAILED  1 failed in 68.26s
+  BASE 第3次: FAILED  1 failed in 68.38s
+  => 基线树 3/3 同样失败 ⇒ **既有失败**，不是本轮引入
+
+[两棵树] tests/test_enhance_architecture_fixes.py::TestCrossModeTemplateBrowser::test_no_console_errors
+  BASE 第1次: 1 passed in 6.99s
+  BASE 第2次: 1 passed in 5.37s
+  BASE 第3次: 1 passed in 8.20s
+  CAND 第1次: 1 passed in 7.02s
+  CAND 第2次: 1 passed in 4.96s
+  CAND 第3次: 1 passed in 7.72s
+  CAND 第4次: 1 passed in 8.20s
+  => 两树隔离复跑全绿；测试文件 md5 两树相同(f89ac90667a832dfc38241ea15e5a916)
+     ⇒ **浏览器 flake**（全量并行负载下才现形），不是回归
+
+=== 结论 ===
+候选独有失败 2 条 ⇒ 隔离复跑后判定：0 条真实回归
+本轮新增失败 = 0
