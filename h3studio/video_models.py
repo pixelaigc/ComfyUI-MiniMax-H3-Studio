@@ -796,7 +796,7 @@ VIDEO_TWOPASS = {
     "sigma_refine_start_at_sigma_default": 2.5,
     "sigma_refine_end_at_sigma_default": 0.0,
     "sigma_refine_spacing_default": "cosine",
-    "note": "二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。"
+    "note": "二采 = 低分辨率一采 + 高分辨率二采。"
             "总步数不变，提速来自一采的面积更小。"
             "H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，"
             "可能超出训练分布 —— 出糊就把它调大。",
@@ -879,10 +879,10 @@ VIDEO_SHIFT_DEFAULT_AUDIO = 3.0
 #: 面板用这个值做**只读说明**，不是可调控件。
 VIDEO_CFG_FIXED = 1.0
 VIDEO_CFG_FIXED_REASON = (
-    "H3 标准采样路径固定 CFG=1.0：官方工作流用的是 BasicGuider"
-    "（只有 model + conditioning，没有 cfg 槽位），"
+    "H3 标准采样路径固定 CFG=1.0：标准引导器"
+    "只接受模型与条件，没有 cfg 槽位，"
     "H3 的音视频潜变量是单流条件化，没有负面分支。"
-    "只有开启二采时 CFG 才可调（SelfLiftH3Sampler 自带 cfg 槽位）。"
+    "只有开启二采时 CFG 才可调（二采节点自带 cfg 槽位）。"
 )
 
 

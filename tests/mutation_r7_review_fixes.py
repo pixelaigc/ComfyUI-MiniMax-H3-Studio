@@ -145,6 +145,34 @@ MUTATIONS = [
         f"{TEST}::FrontendVisibleTextHygieneTest::"
         "test_no_comfy_node_class_names_in_user_visible_strings",
     ),
+    # ---- 第 7 轮追加：后端发给前端的说明文案（M12/M13/M14）----
+    (
+        "M12",
+        "把「（SelfLift）」写回后端 twopass.note（= 第 7 轮漏修的缺陷本体）",
+        VM,
+        '    "note": "二采 = 低分辨率一采 + 高分辨率二采。"\n',
+        '    "note": "二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。"\n',
+        f"{TEST}::BackendVisibleTextHygieneTest::"
+        "test_backend_note_has_no_node_class_names",
+    ),
+    (
+        "M13",
+        "把 BasicGuider / SelfLiftH3Sampler 写回后端 CFG 说明文案",
+        VM,
+        '    "H3 标准采样路径固定 CFG=1.0：标准引导器"\n',
+        '    "H3 标准采样路径固定 CFG=1.0：官方工作流用的是 BasicGuider"\n',
+        f"{TEST}::BackendVisibleTextHygieneTest::"
+        "test_backend_note_has_no_node_class_names",
+    ),
+    (
+        "M14",
+        "把「潜空间放大器」写回 web/index.html 的可见标签（= 第 7 轮漏修的缺陷本体）",
+        ROOT / "web" / "index.html",
+        '<div class="compact-label"><span>放大器模型</span>',
+        '<div class="compact-label"><span>潜空间放大器</span>',
+        f"{TEST}::BackendVisibleTextHygieneTest::"
+        "test_frontend_html_has_no_internal_jargon",
+    ),
 ]
 
 
@@ -172,6 +200,11 @@ def main() -> int:
     backups: dict[str, bytes] = {}
     for p in targets:
         backups[str(p)] = p.read_bytes()
+    # 【重要】所有 MUTATIONS 的目标文件都要备份 —— 否则 finally 里的
+    # restore 会因 KeyError 崩掉，把已写入的变异体留在磁盘上。
+    for entry in MUTATIONS:
+        t = entry[2]
+        backups.setdefault(str(t), t.read_bytes())
 
     failures = []
     try:

@@ -451,5 +451,95 @@ class FrontendVisibleTextHygieneTest(unittest.TestCase):
                          "「出处」/「说明」里夹带了源码片段: {offenders}")
 
 
+class BackendVisibleTextHygieneTest(unittest.TestCase):
+    """【第 7 轮追加】后端返回给前端的**说明文案**也不得含内部黑话。
+
+    【为什么单独一个类】
+    上一版的 `FrontendVisibleTextHygieneTest` 只扫 `web/` 的**静态**字符串。
+    但后端也会把说明文案发给前端渲染（`/api/video-options` 的
+    `cfg_fixed_reason`、`twopass.note` …）—— 那些**不在 web/ 里**，
+    静态扫描抓不到 ⇒ 第 7 轮第一轮就漏掉了 3 条，部署后 DOM 复审才抓到。
+
+    【判定口径】
+    只查**会被用户看到的文案**：
+      * 后端模块里的中文展示文案（VIDEO_TWOPASS["note"] /
+        VIDEO_CFG_FIXED_REASON / recommendations 的 source+note）
+      * `node_available("SelfLiftH3Sampler")` 这类**节点类名参数**不算 ——
+        前端拿去查本机节点可用性，不会显示给用户
+    """
+
+    #: 会显示给用户的节点类名黑话
+    NODE_CLASS_NAMES = ("BasicScheduler", "KSamplerSelect",
+                        "SamplerCustomAdvanced", "SelfLiftH3Sampler",
+                        "MiniMaxH3SigmaShift", "BasicGuider", "SelfLift")
+    #: 内部术语
+    JARGON = ("潜空间放大器", "nonebot")
+
+    def _backend_user_facing_strings(self) -> list[tuple[str, str]]:
+        """收集后端会发给前端、且**会被显示**的文案。"""
+        from h3studio import video_models as vm
+        out: list[tuple[str, str]] = []
+        out.append(("VIDEO_TWOPASS.note", str(vm.VIDEO_TWOPASS.get("note") or "")))
+        out.append(("VIDEO_CFG_FIXED_REASON", str(vm.VIDEO_CFG_FIXED_REASON or "")))
+        # 面板配置里所有会直接渲染的字符串字段
+        for field in ("cfg_fixed_reason", "note", "hint", "tip", "desc",
+                      "description", "label", "title"):
+            val = vm.VIDEO_TWOPASS.get(field)
+            if isinstance(val, str):
+                out.append((f"VIDEO_TWOPASS.{field}", val))
+        return [(k, v) for k, v in out if v]
+
+    def test_backend_note_has_no_node_class_names(self):
+        """后端说明文案不得出现 ComfyUI 节点类名。"""
+        offenders = [(k, t) for k, t in self._backend_user_facing_strings()
+                     if any(n in t for n in self.NODE_CLASS_NAMES)]
+        self.assertFalse(
+            offenders,
+            "后端发给前端的说明文案里出现了节点类名: "
+            f"{[(k, t[:120]) for k, t in offenders]}")
+
+    def test_backend_note_has_no_internal_jargon(self):
+        """后端说明文案不得出现内部术语（潜空间放大器 / nonebot）。"""
+        offenders = [(k, t) for k, t in self._backend_user_facing_strings()
+                     if any(j in t for j in self.JARGON)]
+        self.assertFalse(
+            offenders,
+            "后端发给前端的说明文案里出现了内部术语: "
+            f"{[(k, t[:120]) for k, t in offenders]}")
+
+    def test_frontend_html_has_no_internal_jargon(self):
+        """web/ 的静态 HTML 文本也不得出现「潜空间放大器」这类内部术语。"""
+        idx = ROOT / "web" / "index.html"
+        raw = idx.read_text(encoding="utf-8")
+        # 剥离 HTML 注释块后再查（注释不是用户可见文案）
+        import re as _re
+        stripped = _re.sub(r"<!--.*?-->", "", raw, flags=_re.S)
+        for term in self.JARGON:
+            self.assertNotIn(
+                term, stripped,
+                f"web/index.html 的可见文本里出现了内部术语 {term!r}")
+
+    def test_backend_payload_really_reaches_frontend(self):
+        """护栏：确认上面查的这些文案**真的会**发给前端。
+
+        【为什么】如果这些字段其实没被任何接口返回，那上面的断言就是
+        「对着一段死代码断言」—— 修复它也不会改变用户看到的界面。
+        这条断言锁住「它们确实在载荷里」。
+        """
+        from h3studio import video_models as vm
+        payload = vm.options_payload()
+        self.assertIsInstance(payload, dict)
+        blob = json.dumps(payload, ensure_ascii=False, default=str)
+        self.assertIn("cfg_fixed_reason", blob,
+                      "/api/video-options 载荷里没有 cfg_fixed_reason —— "
+                      "上面的断言就只是在检查死代码")
+        self.assertIn("twopass", blob)
+        # 载荷里的这些文案同样不得含黑话（端到端口径）
+        offenders = [(k, t) for k, t in self._backend_user_facing_strings()
+                     if any(n in t for n in self.NODE_CLASS_NAMES)
+                     or any(j in t for j in self.JARGON)]
+        self.assertFalse(offenders, f"载荷文案仍含黑话: {offenders}")
+
+
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
