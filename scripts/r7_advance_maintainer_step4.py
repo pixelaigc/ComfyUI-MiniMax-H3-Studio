@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R7 第四步推进：把 `local/maintainer` 从 `207e9fa` 推到 `08e4448`。
+"""R7 第五步推进：把 `local/maintainer` 从 `08e4448` 推到 `12248b6`。
 
 【与 step3 的差别】
 - step3 的「落地后核验」判据写错（把「对方删除意图 ∩ 主线 tree」当成
@@ -24,8 +24,8 @@ import subprocess
 
 WT = "/root/projects/h3studio-cont-seam-hires"
 REPO = "/root/projects/h3studio-review-r7"
-OLD = "207e9fa"
-NEW = "08e4448"
+OLD = "08e4448"
+NEW = "12248b6"
 BASE = "fcb6057"
 MAIN = "local/maintainer"
 ORIGINAL_INDEX = "/tmp/r7_shared_index_before.bak"
