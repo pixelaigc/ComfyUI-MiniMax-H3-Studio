@@ -38,6 +38,8 @@ no CFG`，所以那一档的 audio shift 是**作者提供的 2**，不是内生
 
 from __future__ import annotations
 
+import re
+
 
 #: 「作者未提供」的哨兵值。
 #: 用一个**显式的字符串常量**而不是 None —— 前端要能区分
@@ -94,6 +96,96 @@ def _rec(steps=None, scheduler=None, sampler=None,
     }
 
 
+#: 【R2 用户可见文案清洗】本机绝对路径前缀。
+#:
+#: 【为什么要清洗】
+#: `source` 字段是「可追溯溯源」，会原样渲染到前端（video-panel.js 的
+#: 「出处：」、job-meta.js 的「出处：」）。但溯源文本里写的是
+#: **本机绝对路径 + 源码行号 + 代码片段**，例如：
+#:   /home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 …）
+#:   /mnt/usb2t/comfyui-models/loras/h3/h3_speed_slider_1.1.md:283-295（…）
+#:
+#: 这属于**内部实现细节**：用户看到的是「这台机器的目录布局」，
+#: 既不是作者推荐的一部分，也不是用户能操作的东西 —— 但暴露了
+#: 本机用户名（ubuntu）、磁盘分区挂载（/mnt/usb2t）、以及源码行号。
+#:
+#: 【清洗规则 —— 保留溯源语义，只去掉路径前缀】
+#:   /home/ubuntu/comfyui/comfy/supported_models.py:969-972（…）
+#:     -> supported_models.py:969-972（…）
+#:   /mnt/usb2t/comfyui-models/loras/h3/h3_speed_slider_1.1.md:283-295（…）
+#:     -> h3_speed_slider_1.1.md:283-295（…）
+#:
+#: 也就是：**保留文件名 + 行号 + 括号里的说明**，只砍掉「到文件为止」的那段
+#: 目录路径。溯源能力不丢（还能定位到哪个文件第几行），
+#: 但本机目录结构不再出现在界面上。
+#:
+#: 【不动的那些】
+#:  * 不含本机路径的溯源文本（作者 README 摘录、模型卡片段、
+#:    官方模板 Note 行）—— 那些本来就没有路径，原样保留。
+#:  * `source_kind` / `field_sources` —— 那是**类别**，不是路径。
+#:  * `note` —— 单独的补充说明字段，不含路径。
+#:
+#: 【为什么放在数据出口（_normalize）而不是前端】
+#: 前端有 2 个渲染点（web/video-panel.js、web/job-meta.js），
+#: 改前端要改两处、必然漂移；而且 job_meta 的摘要也是从同一份
+#: `_normalize` 出来的。放在这里 = **一个收口点覆盖全部 19 处 source**。
+_LOCAL_PATH_PREFIXES = (
+    "/home/ubuntu/comfyui/",
+    "/home/ubuntu/",
+    "/mnt/usb2t/comfyui-models/",
+    "/mnt/usb2t/",
+    "/mnt/nvme1t_colorful/comfyui-models/",
+    "/mnt/nvme1t_colorful/",
+)
+
+#: 溯源文本里「本机路径 → 文件名」的匹配。
+#:
+#: 【关键：必须锚定在已知本机前缀上】
+#: 不能写成「任意 /a/b 形态」—— 那会把正常文案里的斜杠也吃掉：
+#:   "作者规格表（ModelTC/MiniMax-H3-Turbo README…）" 里的 "/"
+#:   "shift 12 / audio_shift 3" 里的 "/"
+#: 一旦被吃，就变成 "ModelTCMinimax-H3-Turbo" / "shift 123"。
+#:
+#: 所以这里用 `(?P<abs>/(?:home/ubuntu|mnt/usb2t|mnt/nvme1t_colorful)/...)`
+#: **锚定本机绝对路径前缀**，其余文本一律不碰。
+_LOCAL_PATH_RE = re.compile(
+    r"(?P<abs>/(?:home/ubuntu|mnt/usb2t|mnt/nvme1t_colorful)"
+    r"(?:/[A-Za-z0-9_.\-\u4e00-\u9fff]+)*)"
+    r"(?P<anchor>:\d+(?:-\d+)?)?"
+)
+
+
+def _public_source(source: str) -> str:
+    """把溯源文本里的**本机绝对路径**换成可读定位（保留文件名+行号）。
+
+    【契约】
+      * 不含本机绝对路径的文本 -> **原样返回**（一个字符都不改）。
+      * 含本机绝对路径 -> 路径部分只保留**最后一段文件名**（含行号后缀），
+        目录层级全部丢弃；括号说明等其余内容原样保留。
+      * 空值 -> 空字符串。
+
+    【为什么保留文件名不整条删掉】
+    「出处」的价值就是可追溯（哪个文件、第几行）。
+    只砍目录层级，既保住了溯源，又不暴露本机目录布局与用户名。
+
+    【为什么不能泛化成「任意 /a/b」】
+    见上面 _LOCAL_PATH_RE 的说明 —— 会吃掉正常文案里的斜杠
+    （ModelTC/MiniMax-H3-Turbo、shift 12 / audio_shift 3）。
+    """
+    if not source or not isinstance(source, str):
+        return ""
+
+    def _shrink(m: "re.Match[str]") -> str:
+        path = m.group("abs")
+        anchor = m.group("anchor") or ""
+        base = path.rsplit("/", 1)[-1]
+        if not base:
+            return m.group(0)
+        return base + anchor
+
+    return _LOCAL_PATH_RE.sub(_shrink, source)
+
+
 def _normalize(rec: dict) -> dict:
     """把 None 的字段统一成 NOT_PROVIDED 哨兵。
 
@@ -117,6 +209,10 @@ def _normalize(rec: dict) -> dict:
             field_sources[field] = (
                 NOT_PROVIDED if out[field] == NOT_PROVIDED else whole)
     out["field_sources"] = field_sources
+    # 【R2】清洗「出处」里的本机绝对路径（见 _public_source 的说明）。
+    # 只动 source，不动 source_kind / field_sources / note。
+    if isinstance(out.get("source"), str):
+        out["source"] = _public_source(out["source"])
     return out
 
 
