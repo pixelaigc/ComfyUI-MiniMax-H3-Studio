@@ -174,12 +174,43 @@ class TestDetectCPU(unittest.TestCase):
             physical_cores=3, logical_cores=3)
         self.assertIn("Intel(R) Core(TM) Ultra 9 285K", info["name"])
         self.assertEqual(info["model"], "Intel(R) Core(TM) Ultra 9 285K")
-        self.assertEqual(info["source"], hw.CPUINFO_PATH)
+        # 【2026-11-19 第 3 轮 C 项审查修】
+        # 原来断言 `hw.CPUINFO_PATH`（= "/proc/cpuinfo"）—— 那条断言
+        # **锁死了路径泄漏**：source 会经 /api/hardware 下发，被前端
+        # web/app.js 渲染成「型号来源 /proc/cpuinfo」。
+        # 现在 source 只保留**来源名**，语义（怎么读到的型号）不丢。
+        self.assertEqual(info["source"], "cpuinfo")
         self.assertEqual(info["cores"], 3)
         self.assertEqual(info["threads"], 3)
         self.assertEqual(info["architecture"], "x86_64")
         self.assertEqual(info["vendor"], "GenuineIntel")
         self.assertFalse(info["heterogeneous"])
+
+    def test_source_is_never_a_path(self):
+        """source **绝不能**是本机路径（它会被原样显示给用户）。
+
+        【为什么这条要独立存在】
+        `source` 是自由文本字段 —— 将来加新取值时很容易又写成
+        某个 /proc/... 或 /sys/... 路径。而这个字段是**直接显示**在
+        「硬件信息」面板里的（web/app.js 的「型号来源」行）。
+
+        判据：无论走哪条分支，source 都不能以 "/" 开头。
+        """
+        cases = [
+            # cpuinfo 命中
+            dict(cpuinfo_text=X86_CPUINFO, lscpu_text=LSCPU_EN),
+            # lscpu 命中
+            dict(cpuinfo_text="", lscpu_text=LSCPU_EN),
+            # platform 兜底
+            dict(cpuinfo_text="", lscpu_text="", platform_processor=""),
+            # 全空兜底
+            dict(cpuinfo_text="", lscpu_text="", platform_processor=""),
+        ]
+        for kw in cases:
+            info = hw.detect_cpu(**kw)
+            src = str(info.get("source") or "")
+            self.assertFalse(src.startswith("/"),
+                             f"source 不能是路径：{src!r}（参数 {kw}）")
 
     def test_falls_back_to_lscpu_when_cpuinfo_missing(self):
         info = hw.detect_cpu(

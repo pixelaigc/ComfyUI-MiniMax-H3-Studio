@@ -1,0 +1,39 @@
+{
+  "note": "第3轮回归对拍中出现的 4 条「新增失败」的环境差异取证",
+  "finding": "4 条全部是环境差异，不是本轮改动引入。证据：用同一个 commit（91f5060，零本轮改动）的干净 worktree 复跑，报错完全相同。",
+  "cases": [
+    {
+      "files": "tests/test_continuation_retry.py (3 条)",
+      "root_cause": "测试直接用 srv.db()（真库），不自己建表。分支 worktree 是新建的，data/jobs.db 是 0 字节空库（无 jobs 表）⇒ sqlite3.OperationalError: no such table: jobs",
+      "branch_before_fix": "3 failed（OperationalError）",
+      "clean_baseline_91f5060_before_fix": "3 failed（完全相同）",
+      "after_copying_baseline_db": "分支 3 passed / 干净基线 3 passed（两边都绿）",
+      "conclusion": "环境差异（新 worktree 无库表），非本轮引入"
+    },
+    {
+      "files": "tests/test_studio.py::TestLoRARegistry::test_scanner_only_returns_z_image_loras",
+      "root_cause": "断言 Z-Image 族 LoRA 数量 < 120；本机实际 197 个（素材库目录内容随时间增加）",
+      "branch": "FAILED: 197 not less than 120",
+      "clean_baseline_91f5060": "FAILED: 197 not less than 120（完全相同）",
+      "conclusion": "既有失败（本机素材目录变化），与本轮无关"
+    }
+  ],
+  "db_state": {
+    "branch_worktree_before": [
+      "jobs",
+      "job_batches",
+      "model_providers",
+      "model_provider_prefs",
+      "prompt_history",
+      "sqlite_sequence"
+    ],
+    "baseline_wsbase": [
+      "jobs",
+      "job_batches",
+      "model_providers",
+      "model_provider_prefs",
+      "prompt_history",
+      "sqlite_sequence"
+    ]
+  }
+}

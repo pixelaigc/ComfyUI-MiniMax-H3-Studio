@@ -4710,6 +4710,38 @@ def get_job_status_payload(job_id: str) -> dict | None:
     return payload
 
 
+def _terminate_longfilm_process(job_id: str) -> bool:
+    """终止本任务的 longfilm 外部进程（ffmpeg）。
+
+    【为什么提取成公共办法】—— 2026-11-19 第 3 轮审查发现
+    longfilm **不经过** ComfyUI，是 asyncio.create_subprocess_exec
+    起的 **ffmpeg 子进程**（server.py:5665）。
+    原来两个取消实现的处理机制不一致：
+      * api_cancel（HTTP 面板）—— **有** longfilm 分支；
+      * cancel_job_record（Agent 的 cancel_job 工具走到）—— **没有**。
+    ⇒ 后果：Agent 走的那条路径**只**把 DB 状态改成 canceled，
+    **ffmpeg 进程继续跑到结束**。
+    实测危害：
+      * ffmpeg 合成一段长片可能耗到几分钟；
+      * 用户以为「已终止」，实际是资源还在流。
+
+    【为什么不写两处】—— 两份实现必然漂移（这正是本缺陷的成因）。
+    这里只留一个实现，两边都调。
+
+    返回 True = 有一个在跑的进程被终止。
+    """
+    process = LONGFILM_PROCESSES.get(job_id)
+    if process is None:
+        return False
+    try:
+        if process.returncode is None:
+            process.terminate()
+    except ProcessLookupError:
+        # 进程已终止（我们能终止过）—— 不是错误。
+        pass
+    return True
+
+
 async def cancel_job_record(job_id: str) -> dict:
     """
     取消一个任务（供 Agent 的 cancel_job 工具用）。
@@ -4728,6 +4760,27 @@ async def cancel_job_record(job_id: str) -> dict:
             # 已经结束了 —— 不是错误，直接告诉模型当前状态
             return {"job_id": job_id, "status": r["status"], "ok": True,
                     "message": f"任务已是「{r['status']}」状态，无需取消"}
+        mode = r["mode"]
+        if mode == "longfilm":
+            # 【2026-11-19 第 3 轮 C 项审查修 —— 补 longfilm 分支】
+            # longfilm **不经过 ComfyUI**，是 asyncio.create_subprocess_exec
+            # 起的 ffmpeg 子进程。原实现这里没有 longfilm 分支
+            # => Agent 的 cancel_job 只把 DB 状态改成 canceled，
+            # **ffmpeg 进程继续跑到结束**（用户以为已终止，实际还在烧 CPU）。
+            # 与 api_cancel 对齐（共用 _terminate_longfilm_process）。
+            terminated = _terminate_longfilm_process(job_id)
+            with db() as conn:
+                conn.execute(
+                    "UPDATE jobs SET status='canceled', finished_at=? "
+                    "WHERE id=? AND status IN ('queued','running')",
+                    (time.time(), job_id))
+                status = conn.execute(
+                    "SELECT status FROM jobs WHERE id=?",
+                    (job_id,)).fetchone()["status"]
+            return {"job_id": job_id, "status": status, "ok": True,
+                    "terminated_process": terminated,
+                    "message": "已取消长片合成" if terminated
+                               else "已取消长片合成（进程已结束）"}
         pid = r["prompt_id"]
         if pid:
             try:
@@ -6322,9 +6375,10 @@ async def api_cancel(request):
             return json_ok({"status": r["status"]})
         pid = r["prompt_id"]
         if r["mode"] == "longfilm":
-            process = LONGFILM_PROCESSES.get(jid)
-            if process and process.returncode is None:
-                process.terminate()
+            # 【2026-11-19 第 3 轮 C 项审查】改用共用的
+            # _terminate_longfilm_process —— 与 Agent 的 cancel_job 走
+            # **同一套**实现（原来两边各写一份，是本缺陷的成因）。
+            _terminate_longfilm_process(jid)
             with db() as conn:
                 conn.execute("UPDATE jobs SET status='canceled', finished_at=? WHERE id=? AND status IN ('queued','running')",
                              (time.time(), jid))

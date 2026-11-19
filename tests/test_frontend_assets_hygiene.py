@@ -121,17 +121,30 @@ class TestNoHtmlCommentInAnyJsTemplate(unittest.TestCase):
 STALE_BUMPED = {
     "assets.css":              ("uxbatch1",     "cr20261115b"),
     "responsive.css":          ("agentpower1",  "cr20261115b"),
-    "qwen-refs.js":            ("fix3preview1", "cr20261115b"),
+    # 【2026-11-19 第 3 轮 A 项】qwen-refs.js 的旧条目 ("fix3preview1", …)
+    #   同样被下面第 6 轮的 ("cr20261115b", "cr20261118a") 覆盖（隐藏条目）。
     "video-panel-fallback.js": ("vpfb1",        "cr20261115b"),
-    "continuation.js":         ("continuation1", "cr20261115b"),
+    # 【2026-11-19 第 3 轮 A 项】continuation.js 的旧条目 ("continuation1", …)
+    #   同样被下面第 6 轮的 ("cr20261115b", "cr20261118a") 覆盖（隐藏条目）。
     "job-meta.js":             ("jobmeta3",     "cr20261115b"),
-    "providers.js":            ("h3image1",     "cr20261115b"),
+    # 【2026-11-19 第 3 轮 A 项】providers.js 的旧条目 ("h3image1", …)
+    #   曾被后面第 6 轮的 ("cr20261115b", "cr20261118a") **覆盖** ——
+    #   Python dict 字面量后写覆盖先写 ⇒ 前一条是**隐藏条目**。
+    #   已把信息并入下面的生效条目，此处只留注释（见下方 providers.js 条目）。
     "assets.js":               ("uxbatch1",     "cr20261115b"),
     "asset-player.js":         ("uxbatch1",     "cr20261115b"),
     "enhance-menu-shared.js":  ("shared2",      "cr20261115b"),
     # 【2026-11-16 S5】enhance-menu.js 内容又变了（director 补显式
     # write 契约声明）⇒ ?v= 必须再升一次（cr20261115b -> cr20261116b）。
-    "enhance-menu.js":         ("uxbatch1",     "cr20261116b"),
+    # 【2026-11-19 第 3 轮 A 项】表过期 —— commit 59707f5
+    #   「fix(enhance): 提示词增强必须把已引用素材传给模型」**合法地**改了
+    #   enhance-menu.js 的内容（三条增强路径都提交当前面板已引用的素材）
+    #   并把 ?v= 从 cr20261116b 升到 enhassets1，**但没同步这张表**
+    #   ⇒ 本条一直在报假红。
+    #   判定：**表过期，不是真漂移** —— enhassets1 是正确的当前值，
+    #   且 enhance-menu.js 的内容确实变了（必须保留这个新版本号）。
+    #   ⇒ 同步表：旧值取**直接前值** cr20261116b，新值取当前 enhassets1。
+    "enhance-menu.js":         ("cr20261116b", "enhassets1"),
     "music-enhance.js":        ("uxbatch1",     "cr20261115b"),
     # 【2026-11-16 内置 Agent 审查】agent.js 内容又变了（SSE 失败路径
     #   保留「重试」入口的修复）⇒ ?v= 必须再升一次
@@ -184,7 +197,14 @@ STALE_BUMPED = {
     #    / token 预算说明）⇒ ?v= 必须升，否则老用户拿到的仍是旧文件。
     "continuation.js":         ("cr20261115b", "cr20261118a"),
     "qwen-refs.js":            ("cr20261115b", "cr20261118a"),
-    "providers.js":            ("cr20261115b", "cr20261118a"),
+    # 【2026-11-19 第 3 轮 A 项】providers.js 同属 commit 59707f5 的
+    #   「表过期」—— 该 commit 改了 providers.js 的内容（增强结果 meta 行
+    #   显示素材上下文）并把 ?v= 从 cr20261118a 升到 enhassets1，
+    #   但没同步这张表 ⇒ 一直报假红。
+    #   判定：**表过期，不是真漂移** —— enhassets1 是正确的当前值。
+    #   旧值取**直接前值** cr20261115b（cr20261118a 是它上一版的中间态，
+    #   已被 enhassets1 取代）。
+    "providers.js":            ("cr20261115b", "enhassets1"),
     "media-manage.js":         ("uxbatch1",     "cr20261118a"),
     "agent-manage.js":         ("a4gen1",       "cr20261118a"),
 }
@@ -237,6 +257,60 @@ class TestStaticAssetVersionBump(unittest.TestCase):
             elif cur != new_v:
                 bad.append(f"{fname}: ?v= 是 {cur}，期望 {new_v}")
         self.assertEqual([], bad, "静态资源版本号问题：\n  " + "\n  ".join(bad))
+
+    def test_stale_bumped_table_has_no_duplicate_keys(self):
+        """STALE_BUMPED 表里**不得有重复 key**。
+
+        【为什么要有这条】—— 2026-11-19 第 3 轮 A 项查出的真实根因
+        Python dict 字面量是**后写覆盖先写**。表里曾同时存在
+            "providers.js":    ("h3image1",     "cr20261115b"),
+            "providers.js":    ("cr20261115b", "cr20261118a"),
+        前一条被**静默覆盖** —— 它既不生效、也不报错，
+        只在「读源码的人」眼里还在。这是**隐藏条目**：
+        表看起来有 21 条，实际生效只有 18 条。
+        而且它会让「旧值」不再是真的最初旧值（口径被破坏）。
+
+        判据：从**源码文本**里正则抓出所有 `"文件名": (` 出现，
+        任何出现 >1 次的文件名都算违规。
+        （不能只查 dict —— dict 里已经看不到重复了。）
+        """
+        src = (REPO / "tests" / "test_frontend_assets_hygiene.py").read_text(
+            encoding="utf-8")
+        blk = src[src.index("STALE_BUMPED = {"):]
+        blk = blk[:blk.index("\n}") + 2]
+        names = re.findall(r'"([^"]+)"\s*:\s*\(', blk)
+        counts = {}
+        for n in names:
+            counts[n] = counts.get(n, 0) + 1
+        dups = {k: v for k, v in counts.items() if v > 1}
+        self.assertEqual({}, dups,
+                         f"STALE_BUMPED 表里有重复 key（后写覆盖先写 = 隐藏条目）: {dups}")
+
+    def test_stale_bumped_table_matches_index_html(self):
+        """表的**生效条目**必须与 index.html 里的实际 ?v= 一致。
+
+        【为什么要有这条】—— 2026-11-19 第 3 轮 A 项的真实故障模式
+        commit 59707f5 合法地改了 enhance-menu.js / providers.js 的内容
+        并把 ?v= 升到 enhassets1，**但没同步这张表** ⇒
+        `test_bumped_static_assets_are_not_stale` 报假红，
+        而这条测试（表 vs 实际）能**直接指出不一致在哪个文件**。
+
+        本测试不依赖 git 历史（别的 worktree / CI 上可复现），
+        只读 index.html 与表 —— 与既有断言同一口径。
+        """
+        html = self._index_html()
+        actual = {}
+        for m in re.finditer(
+                r'(?:src|href)="/static/([^"?]+)(?:\?v=([^"\'\s>]*))?', html):
+            actual[m.group(1)] = m.group(2)
+        mismatch = []
+        for fname, (_old_v, new_v) in sorted(STALE_BUMPED.items()):
+            cur = actual.get(fname)
+            if cur != new_v:
+                mismatch.append(f"{fname}: 表期望 {new_v}，index.html 实际 {cur}")
+        self.assertEqual([], mismatch,
+                         "STALE_BUMPED 表与 index.html 的 ?v= 不一致：\n  "
+                         + "\n  ".join(mismatch))
 
     def test_bumped_assets_still_exist(self):
         """清单里的资源文件必须真实存在（防止清单本身写错）。"""
