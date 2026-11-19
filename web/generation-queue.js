@@ -115,6 +115,9 @@
       fromTruth !== undefined && fromTruth !== null && fromTruth !== ""
         ? fromTruth
         : job.running_timeout_sec);
+    // 【2026-11-19 缺陷 1 修】上限 <= 0 = **不限时**（视频类默认如此）。
+    // 返回 null -> truthOf() 不做超时判定 -> 卡片显示「运行中」，
+    // 而不是「已超时」。
     if (!Number.isFinite(value) || value <= 0) return null;
     return value;
   }
@@ -245,7 +248,7 @@
     // 用户一眼能点开看到发生了什么。
     const stateTitle = isRunningLike && truth.state !== "running"
       ? ` title="${esc(truth.state === "timeout"
-          ? "已超过运行上限仍未完成"
+          ? "已超过运行上限仍未完成（上限由服务端按生成类型决定）"
           : (truth.state === "lost"
               ? "ComfyUI 队列与历史中已无该任务（可能被取消或丢失）"
               : "暂时无法确认任务是否仍在运行"))}"`

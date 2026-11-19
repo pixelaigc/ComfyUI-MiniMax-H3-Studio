@@ -118,7 +118,14 @@ COMFY_UNREACHABLE_REASON = ("服务重启时本机 ComfyUI 无响应，无法确
 
 
 def timeout_reason(timeout_sec: float) -> str:
-    """超时的中文原因（把秒数换算成分钟，用户看得懂）。"""
+    """超时的中文原因（把秒数换算成分钟，用户看得懂）。
+
+    【2026-11-19 缺陷 1 修】本函数保留为**兼容入口** —— 真正的策略
+    在 `job_timeout.timeout_reason`（它按媒体类型区分，且上限可配置）。
+
+    【口径纪律】文案里的分钟数**必须**来自实际传入的阈值，
+    不得写死 —— 上限可配置后，写死的话术会与真实行为对不上。
+    """
     try:
         minutes = max(1, int(round(float(timeout_sec) / 60.0)))
     except (TypeError, ValueError):
