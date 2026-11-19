@@ -301,7 +301,56 @@ def apply() -> dict:
                     pass
     report["asset_removed_files"] = removed
     report["asset_freed_bytes"] = freed
+
+    # ---- 5. 保护名单的预览图：清文件时一并删了 -> **重新生成** ----
+    #
+    # 【为什么必须补】素材卡片的缩略图走 /api/assets/{id}/preview，
+    # 读的是 asset_versions.preview_path 指向的文件。清理时 previews/
+    # 整个目录被清空，而保护名单的行还在（preview_path 还指着那个路径）
+    # -> 接口返回 404。素材本身（originals/）是完好的，只是缩略图没了。
+    # 这里用**生产代码路径**（media_probe.make_image_preview）重建。
+    report["protected_previews_regenerated"] = _rebuild_previews()
     return report
+
+
+def _rebuild_previews() -> list[dict]:
+    """给保护名单的素材重建缩略图（用生产代码路径）。"""
+    out: list[dict] = []
+    if not ASSET_DB.exists():
+        return out
+    try:
+        sys.path.insert(0, str(REPO))
+        from h3studio import assets as A
+        from h3studio import media_probe
+    except Exception as exc:
+        return [{"error": f"导入生产模块失败：{exc}"}]
+    conn = sqlite3.connect(f"file:{ASSET_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    rows = list(conn.execute(
+        "SELECT asset_id, storage_path FROM asset_versions"))
+    conn.close()
+    write = sqlite3.connect(str(ASSET_DB))
+    for row in rows:
+        asset_id = row["asset_id"]
+        if asset_id not in PROTECT_ASSET_IDS:
+            continue
+        source = ASSET_ROOT / row["storage_path"]
+        if not source.is_file():
+            continue
+        rel = A.preview_relpath(asset_id, ".jpg")
+        dest = A.resolve_inside(ASSET_ROOT, rel)
+        written = False
+        if dest is not None:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            written = bool(media_probe.make_image_preview(source, dest))
+        if written:
+            write.execute(
+                "UPDATE asset_versions SET preview_path=? WHERE asset_id=?",
+                (rel, asset_id))
+        out.append({"asset_id": asset_id, "preview": rel, "written": written})
+    write.commit()
+    write.close()
+    return out
 
 
 def verify() -> dict:

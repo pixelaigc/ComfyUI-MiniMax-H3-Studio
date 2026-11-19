@@ -254,23 +254,42 @@ def test_enhance_carries_previous_segment_prompts(studio_page, evidence):
     assert context_fields, (
         f"增强请求里没有「上文」字段（现有字段：{sorted(keys)}）")
 
-    # 字段在，也要真的带上此前段落的提示词
-    payload = ""
+    # 字段在，也要真的带上此前段落的提示词。
+    #
+    # 【2026-11-19 修正判据】原来是把上下文字段**拼成一个大字符串**
+    # 再做子串匹配 —— 但 json.dumps 会把换行转义成 \n，于是原文里的
+    # 换行位置与序列化后的不一致，子串匹配会**假失败**。
+    # 现在改成「按列表项逐条比」。
+    carried_prompts: list[str] = []
     for key in context_fields:
         value = body.get(key)
         if isinstance(value, str):
-            payload += value
-        elif isinstance(value, (list, dict)):
-            payload += json.dumps(value, ensure_ascii=False)
+            carried_prompts.append(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    text = item.get("prompt")
+                    if isinstance(text, str):
+                        carried_prompts.append(text)
+                elif isinstance(item, str):
+                    carried_prompts.append(item)
+        elif isinstance(value, dict):
+            text = value.get("prompt")
+            if isinstance(text, str):
+                carried_prompts.append(text)
+            else:
+                carried_prompts.append(json.dumps(value, ensure_ascii=False))
+    evidence.step(f"增强请求里带上的提示词条数 = {len(carried_prompts)}")
     for index, expected in ((0, prompt_1), (1, prompt_2)):
-        assert any(expected[:40] in text for text in payload), (
+        assert any(expected[:60] in text for text in carried_prompts), (
             f"增强请求没有携带第 {index + 1} 段的提示词"
             f"（该段实际提交 {expected[:60]!r}）。"
-            f"当前请求体字段：{sorted(keys)}")
+            f"当前请求体字段：{sorted(keys)}；"
+            f"带上的提示词：{[t[:60] for t in carried_prompts]}")
     # 前端是**原样**把接续上下文的 prompt_history 传上去的（含本段自己），
     # 剔除本段是**服务端**的职责（server.py:_normalize_prompt_history）。
     # 所以这里断言「历史完整传上去了」，剔除由服务端那条用例守住。
-    assert any(prompt_3[:40] in text for text in payload), (
+    assert any(prompt_3[:60] in text for text in carried_prompts), (
         "历史里应有本段（前端原样传，剔除由服务端负责）："
-        f"{payload[:200]}")
+        f"{[t[:60] for t in carried_prompts]}")
     evidence.screenshot(sp.page, "enhance-with-history")
