@@ -1,0 +1,39 @@
+{
+  "note": "C-1（longfilm 取消不终止 ffmpeg）的**线上双向实证**",
+  "method": "在 live 服务进程内起真实 longfilm 任务（真实 ffmpeg 子进程），分别用「修复前的 cancel_job_record（monkeypatch 模拟 91f5060）」与「线上已部署的 cancel_job_record」取消，对比 ffmpeg 进程存活情况。",
+  "before_fix_simulated": {
+    "job_id": "4e783a955029",
+    "result": {
+      "job_id": "4e783a955029",
+      "status": "canceled",
+      "ok": true
+    },
+    "ffmpeg_pid": 2832272,
+    "process_alive_after_cancel": true,
+    "ps": "2832272 /usr/bin/ffmpeg -y -f concat -safe 0 -i .../concat-4e783a955029.txt ... -c:v libx264 ... v-l-000005.mp4",
+    "verdict": "❌ 缺陷复现 —— DB 状态是 canceled，但 ffmpeg 进程仍在跑（用户以为已取消，实际还在烧 CPU）"
+  },
+  "after_fix_deployed": {
+    "job_id": "f38794ccc624",
+    "result": {
+      "job_id": "f38794ccc624",
+      "status": "canceled",
+      "ok": true,
+      "terminated_process": true,
+      "message": "已取消长片合成"
+    },
+    "ffmpeg_pid": 2829936,
+    "process_alive_after_cancel": false,
+    "ffmpeg_returncode": 255,
+    "verdict": "✅ 修复生效 —— ffmpeg 进程被终止（进程消失，returncode=255 = SIGTERM）"
+  },
+  "http_path_control": {
+    "note": "对照：HTTP 的 api_cancel 路径（面板取消）在修复前后都正常 —— 它本来就有 longfilm 分支。实测 ffmpeg pid 2828277 -> 取消后进程消失。",
+    "job_id": "d6fb81d910b4",
+    "result": {
+      "status": "canceled"
+    },
+    "process_alive_after_cancel": false
+  },
+  "unit_test_evidence": "tests/test_cancel_longfilm_process.py（5 条）+ 2 轮变异自证"
+}
