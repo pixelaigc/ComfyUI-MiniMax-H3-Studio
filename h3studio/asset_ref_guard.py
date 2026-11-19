@@ -57,34 +57,39 @@ asset_refs（asset_id）。**params 这条通道没覆盖** —— 而它是**�
 
 params 里的媒体值只有两种**合法**形态：
 
-  1. **素材库引用** —— 值是 `asset_<12 位 hex>`，走 asset_refs 通道
-     （由 check_asset_refs 查库）。params 里出现 asset_id 形态的值，
+  1. **素材库引用** —— 值是 `asset_<12 位 hex>`，但它必须走
+     **asset_refs** 通道（由 check_asset_refs 查库）。直接写进 params
      说明调用方把引用写错了位置 —— 同样拒绝并说清怎么改。
 
-  2. **worker 回写的 ComfyUI 文件名** —— 形如 `h3studio/<name>.png`
-     或纯 `<name>.png`。这是 worker 在素材上传成功后写回 params 的
-     **内部状态**，不是外部输入。
+  2. **i2i 的 ref_images 元数据** —— `[{asset_id, description}]`，
+     dict 形态，由 normalize_refs 归一、由 check_asset_refs 查库。
 
-其余一切（绝对路径、`..` 穿越、符号链接、任意其它相对路径）一律拒绝。
+**其余一切字符串一律拒绝**：绝对路径、`..` 穿越、符号链接、
+ComfyUI input 直引、任意其它相对路径。
 
-【为什么按「形状」判而不是按「路径在不在白名单目录」判】
+【为什么按「形状」判而不是按「路径长不在白名单目录」判】
 「resolve() 后必须落在 UPLOAD_DIR 内」这种写法有两个致命问题：
   * **符号链接**：UPLOAD_DIR 里的软链指向 /etc/shadow 时，resolve()
     之后路径已经出了 UPLOAD_DIR —— 判据本身是对的，但前提是
     「UPLOAD_DIR 里只可能有我们自己写进去的文件」；而 params 通道
     恰恰能往这个前提上塞东西；
   * **TOCTOU**：判定通过之后、worker 真正读文件之前，文件可以被替换。
-按值形状判（只接受 asset_id 形态或 ComfyUI 命名形态）**根本不给
+按值形状判（只接受 asset_id 形态或元数据形态）**根本不给
 外部路径进入的机会** —— 不存在「路径解析」这一步，也就没有
 符号链接与竞态窗口。
 
-【为什么允许「ComfyUI 文件名」形态而不要求 params 里一律只放 asset_id】
-worker 会把素材库文件上传到 ComfyUI 后，把 ComfyUI 侧的文件名**写回
-params**（server._run 的 flf / r2v 分支），并把整份 params 回写进
-jobs 表（agent 的 retry_job 会把这份 params 整份拷贝过来重新建任务）。
-如果闸门连这种形态也拒，**重试既有任务会被误杀**（已上线的功能）。
-所以这里放行「ComfyUI 命名形态」—— 它是 worker 自己的产物，
-不是外部输入；外部输入无法凭空造出这种名字。
+【为什么 worker 回写的 ComfyUI 文件名也要拒】
+worker 上传素材后会把 ComfyUI 侧的文件名**写回 params**（并整份
+回写进 jobs 表），Agent 的 retry_job 会把这份 params 整份拷贝过来
+重新建任务。那种值形如 `h3studio/<name>` —— 它既不是素材库引用，
+也**不是**有效的素材来源（`UPLOAD_DIR / "h3studio/x.png"` 指向的
+文件并不存在 —— 实测线上 53 个这样的值**没有一个**能解析到真实
+文件，worker 走到那里只会报「找不到上传文件」）。
+
+所以它在 params 通道里**没有合法存在理由**，一律拒绝；重试那条
+路由 server._drop_stale_worker_media_params 在校验**之前**把这类
+过期残留清掉（前提是 asset_refs 声明了同一槽位），改走素材库 ——
+于是「重试」从坏变好，而不是被闸门误杀。
 """
 
 from __future__ import annotations
@@ -285,13 +290,16 @@ PARAM_MEDIA_KEYS = {
 #: 素材库 id 的形状：`asset_` + 12 位 hex（见 assets.new_asset_id）。
 _ASSET_ID_RE = re.compile(r"^asset_[0-9a-f]{12}$")
 
-#: ComfyUI 文件名的形状。
+#: ComfyUI 文件名的形状（**只用于判断「这是 worker 的旧产物」**）。
+#:
+#: 【它不是「合法输入」】params 通道里这种形态一律被拒（见
+#: check_params_media_references）。本函数唯一的用途是让
+#: server._drop_stale_worker_media_params 能**认出**过期残留并清掉。
 #:
 #: 【为什么不限制字符集为 ASCII】素材库里的原始文件名可以含中文
 #: （入库时存成 `<fingerprint>__<原文件名>`），上传到 ComfyUI 后的
-#: 返回名就会带中文 —— 用 ASCII 白名单会把**合法素材**误杀。
-#: 所以这里只禁「路径语义」的东西（分隔符 / `..` / 绝对路径），
-#: 不禁文件名本身的字符。
+#: 返回名就会带中文 —— 用 ASCII 白名单会把**合法素材**误认成
+#: 「外部路径」。
 #:
 #: 【为什么只允许一层子目录】本项目上传固定用 `h3studio/` 子目录
 #: （server.comfy_upload_image: data.add_field("subfolder", "h3studio")），
@@ -400,27 +408,3 @@ def check_params_media_references(params: dict | None) -> None:
                 f"{_describe_media_value(value)}）。"
                 f"请先在「素材库」页上传并入库，再从素材库选择{label}。",
                 code="media_must_come_from_library")
-
-
-def check_params_media_references_with_paths(params: dict | None,
-                                             media_keys=None) -> None:
-    """同上，但额外接受**显式传入**的键集合（测试与特殊场景用）。
-
-    【为什么不直接用 PARAM_MEDIA_KEYS】PARAM_MEDIA_KEYS 是**唯一
-    真源**；这个函数只是把「用哪些键」参数化，方便单测针对
-    单个键做断言，不复制一份键表（避免漂移）。
-    """
-    if not isinstance(params, dict):
-        return
-    if media_keys is None:
-        check_params_media_references(params)
-        return
-    subset = {k: v for k, v in PARAM_MEDIA_KEYS.items() if k in set(media_keys)}
-    saved = dict(PARAM_MEDIA_KEYS)
-    try:
-        PARAM_MEDIA_KEYS.clear()
-        PARAM_MEDIA_KEYS.update(subset)
-        check_params_media_references(params)
-    finally:
-        PARAM_MEDIA_KEYS.clear()
-        PARAM_MEDIA_KEYS.update(saved)

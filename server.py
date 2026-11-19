@@ -5314,7 +5314,7 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     # worker 上传素材后会把 ComfyUI 侧的文件名**写回 params**，
     # 并把整份 params 回写进 jobs 表；Agent 的 retry_job 会把这份
     # params **整份拷贝**过来重新建任务。那种值长得像
-    # `h3studio/<name>` —— 它是 worker 的产物，不是外部输入。
+    # `h3studio/<name>` —— 它是 worker 的旧产物，不是外部输入。
     #
     # 但它**同样不能作为素材来源**：`UPLOAD_DIR / "h3studio/x.png"`
     # 指向的是 uploads 目录下一个**并不存在**的文件（实测：线上
@@ -5327,6 +5327,13 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
     # 让 worker 走 _apply_asset_refs 从素材库重新取。
     # —— 这一步同时把「重试」从「坏」修成「好」，而不是把闸门
     # 变成误杀器。
+    #
+    # 【⚠️ 安全底线】_drop_stale_worker_media_params **只删「形状上
+    # 不可能是外部路径」的值**（无 `/` 开头、无 `..`、无盘符、只有
+    # 一层子目录）。`/etc/hostname` 不被删 —— 它留给下面的闸门
+    # **明确报错**。否则攻击者只要同时带上覆盖同一槽位的
+    # asset_refs，就让自己的外部路径被静默丢弃 —— 那等于把
+    # 「明确拒绝」降级成「悄悄忽略」，与需求相悖。
     _drop_stale_worker_media_params(params, asset_refs)
     try:
         asset_ref_guard.check_params_media_references(params)
