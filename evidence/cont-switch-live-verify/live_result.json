@@ -1,0 +1,20 @@
+{
+  "results": {
+    "f0dd73c54532": {
+      "row_exists": true,
+      "row_hidden": false,
+      "row_has_box": true,
+      "has_current": true,
+      "twopass_enabled": true,
+      "box_disabled": false,
+      "mode": "r2v",
+      "job_id": "f0dd73c54532"
+    }
+  },
+  "after_clear": {
+    "row_hidden": true,
+    "has_current": false
+  },
+  "js_errors": [],
+  "dialogs": []
+}
