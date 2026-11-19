@@ -1,0 +1,4 @@
+tests/test_enhance_menu.py
+tests/test_enhance_multi_select.py
+tests/test_responsive_mobile.py
+tests/test_studio.py

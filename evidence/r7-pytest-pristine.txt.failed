@@ -1,0 +1,48 @@
+tests/test_agent_paste_browser.py
+FAILED tests/test_agent_paste_browser.py::TestPasteInRealBrowser::test_paste_image_creates_real_attachment
+tests/test_continuation_retry.py
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_continuation_segment_also_gets_its_own_dir
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_keeps_the_source_latent_file_untouched
+FAILED tests/test_continuation_retry.py::RetryLatentCoordTest::test_retry_of_a_job_does_not_reuse_the_source_latent_dir
+tests/test_d11_moss_lora_final.py
+FAILED tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+tests/test_e2e_gen_flow_contract.py
+FAILED tests/test_e2e_gen_flow_contract.py::test_a1_four_steps_must_carry_accel_lora
+tests/test_enhance_owner_badge.py
+FAILED tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+tests/test_enhance_review_fixes.py
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_disabled_item_has_only_unavailable_reason
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_menu_restored_to_original_parent_on_close
+FAILED tests/test_enhance_review_fixes.py::TestEnhanceReviewBrowser::test_no_console_errors
+tests/test_enhance_unify.py
+FAILED tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_current_method_shown
+FAILED tests/test_enhance_unify.py::TestEnhanceUnifyBrowser::test_moss_panel_has_structured_enhance
+tests/test_frontend_assets_hygiene.py
+FAILED tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_bumped_static_assets_are_not_stale
+FAILED tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_stale_bumped_table_matches_index_html
+tests/test_frontend_defaults.py
+FAILED tests/test_frontend_defaults.py::TestStartupFaultIsolation::test_job_list_still_loads_despite_startup_error
+tests/test_lora_file_integrity.py
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_are_rejected_by_generic_reader
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_not_surfaced_as_compatible
+tests/test_moss_lora_damaged_and_partial.py
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+tests/test_page_size.py
+FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+FAILED tests/test_page_size.py::TestPageSize::test_columns_change_with_width
+FAILED tests/test_page_size.py::TestPageSize::test_filters_still_work - playw...
+FAILED tests/test_page_size.py::TestPageSize::test_total_pages_follows_page_size
+tests/test_qwen_refs_browser.py
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_desc_tag_renders_placeholder_text
+FAILED tests/test_qwen_refs_browser.py::TestQwenRefsBrowser::test_smart_sort_keeps_placeholders
+tests/verify_final_acceptance.py
+ERROR tests/verify_final_acceptance.py - playwright._impl._errors.Error: Page...
+tests/verify_menu_not_clipped.py
+ERROR tests/verify_menu_not_clipped.py - playwright._impl._errors.Error: Page...
+tests/verify_pe_multiselect_live.py
+ERROR tests/verify_pe_multiselect_live.py - FileExistsError: [Errno 17] File ...
+tests/verify_pe_real_gen.py
+ERROR tests/verify_pe_real_gen.py - KeyError: 'qw:26'
+tests/verify_sigma_refine_schema.py
+ERROR tests/verify_sigma_refine_schema.py - urllib.error.URLError: <urlopen e...
