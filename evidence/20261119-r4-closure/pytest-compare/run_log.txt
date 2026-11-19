@@ -1,0 +1,455 @@
+== 分支新增测试文件（只跑分支）==
+tests/test_cancel_longfilm_process.py
+=== 并行跑 baseline 与分支（JOBS=8）===
+=== DIFF (branch vs baseline) ===
+2,5d1
+<   test_cr6_p1_fixes :: FAILED tests/test_cr6_p1_fixes.py::TestNoMarkdownBoldInVisibleStrings::test_frontend_js_has_no_markdown_bold_in_code_strings
+<   test_cr6_p1_fixes :: FAILED tests/test_cr6_p1_fixes.py::TestNoMarkdownBoldInVisibleStrings::test_frontend_js_has_no_markdown_bold_in_code_strings
+<   test_d11_defect_a_conversion :: FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+<   test_d11_defect_a_conversion :: FAILED tests/test_d11_defect_a_conversion.py::TestRealMachineFiles::test_d2_not_available_and_incompatible
+20d15
+<   test_frontend_assets_hygiene :: FAILED tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_bumped_static_assets_are_not_stale
+31,50c26,32
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RefVideoFrameCountCacheTest::test_failed_probe_is_cached_and_not_retried
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RefVideoFrameCountCacheTest::test_failed_probe_writes_a_marker_to_db
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RefVideoFrameCountCacheTest::test_failure_marker_does_not_block_a_later_success
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryFingerprintRefreshTest::test_refresh_does_not_touch_segment_identity
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryFingerprintRefreshTest::test_refresh_is_idempotent
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryFingerprintRefreshTest::test_refresh_returns_empty_when_no_continuation
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryFingerprintRefreshTest::test_refresh_survives_missing_source_file
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryFingerprintRefreshTest::test_retry_refreshes_the_fingerprint_copy_after_upstream_rerun
+<   test_r4_retry_fingerprint_and_ref_probe :: FAILED tests/test_r4_retry_fingerprint_and_ref_probe.py::RetryJobToolRefreshTest::test_retry_job_tool_writes_the_refreshed_path_into_the_new_job
+< FAIL test_asset_picker_onpick :: 1 failed, 2 passed in 114.73s (0:01:54)
+< FAIL test_cr6_p1_fixes :: 1 failed, 11 passed in 0.10s
+< FAIL test_cr6_p1_fixes :: 1 failed, 11 passed in 0.13s
+< FAIL test_d11_defect_a_conversion :: 1 failed, 15 passed in 2.63s
+< FAIL test_d11_defect_a_conversion :: 1 failed, 15 passed in 2.66s
+< FAIL test_d11_moss_lora_final :: 1 failed, 13 passed in 10.04s
+< FAIL test_d11_moss_lora_final :: 1 failed, 13 passed in 10.47s
+< FAIL test_effect_lora_frontend :: 1 failed, 9 passed in 74.08s (0:01:14)
+< FAIL test_enhance_architecture_fixes :: 2 failed, 26 passed in 76.92s (0:01:16)
+< FAIL test_enhance_assets :: 1 failed, 20 passed in 62.50s (0:01:02)
+< FAIL test_enhance_multi_select :: 2 failed, 18 passed in 136.18s (0:02:16)
+---
+> FAIL test_asset_picker_onpick :: 1 failed, 2 passed in 114.35s (0:01:54)
+> FAIL test_d11_moss_lora_final :: 1 failed, 13 passed in 10.01s
+> FAIL test_d11_moss_lora_final :: 1 failed, 13 passed in 10.32s
+> FAIL test_effect_lora_frontend :: 1 failed, 9 passed in 71.14s (0:01:11)
+> FAIL test_enhance_architecture_fixes :: 2 failed, 26 passed in 76.91s (0:01:16)
+> FAIL test_enhance_assets :: 1 failed, 20 passed in 62.46s (0:01:02)
+> FAIL test_enhance_multi_select :: 2 failed, 18 passed in 136.16s (0:02:16)
+53,56c35,37
+< FAIL test_enhance_review_fixes :: 1 failed, 22 passed in 80.38s (0:01:20)
+< FAIL test_enhance_unify :: 3 failed, 17 passed in 111.23s (0:01:51)
+< FAIL test_frontend_assets_hygiene :: 1 failed, 11 passed in 0.04s
+< FAIL test_frontend_defaults :: 1 failed, 14 passed in 75.54s (0:01:15)
+---
+> FAIL test_enhance_review_fixes :: 1 failed, 22 passed in 79.86s (0:01:19)
+> FAIL test_enhance_unify :: 3 failed, 17 passed in 111.17s (0:01:51)
+> FAIL test_frontend_defaults :: 1 failed, 14 passed in 75.63s (0:01:15)
+58,60c39,41
+< FAIL test_lora_file_integrity :: 2 failed, 9 passed, 1 skipped in 6.45s
+< FAIL test_moss_image :: 2 failed, 45 passed in 41.67s
+< FAIL test_moss_lora_damaged_and_partial :: 2 failed, 21 passed in 6.97s
+---
+> FAIL test_lora_file_integrity :: 2 failed, 9 passed, 1 skipped in 6.94s
+> FAIL test_moss_image :: 2 failed, 45 passed in 41.16s
+> FAIL test_moss_lora_damaged_and_partial :: 2 failed, 21 passed in 6.98s
+62,63c43
+< FAIL test_qwen_refs_browser :: 3 failed in 91.29s (0:01:31)
+< FAIL test_r4_retry_fingerprint_and_ref_probe :: 9 failed, 2 passed in 0.44s
+---
+> FAIL test_qwen_refs_browser :: 3 failed in 91.25s (0:01:31)
+66,67c46,47
+< PASS test_a23_player :: 31 passed in 0.28s
+< PASS test_a23_player :: 31 passed in 0.32s
+---
+> PASS test_a23_player :: 31 passed in 0.30s
+> PASS test_a23_player :: 31 passed in 0.33s
+69,70c49,50
+< PASS test_a4_gen_defaults :: 47 passed in 0.29s
+< PASS test_a5_running_truth :: 43 passed in 0.24s
+---
+> PASS test_a4_gen_defaults :: 47 passed in 0.27s
+> PASS test_a5_running_truth :: 43 passed in 0.25s
+72,73c52,53
+< PASS test_a5_running_truth_frontend :: 7 passed in 0.17s
+< PASS test_a5_running_truth_frontend :: 7 passed in 0.19s
+---
+> PASS test_a5_running_truth_frontend :: 7 passed in 0.18s
+> PASS test_a5_running_truth_frontend :: 7 passed in 0.18s
+78,94c58,74
+< PASS test_accel_steps_follow_accel :: 20 passed in 0.76s
+< PASS test_accel_steps_follow_accel :: 20 passed in 33.99s
+< PASS test_agent :: 42 passed in 43.70s
+< PASS test_agent :: 42 passed in 63.34s (0:01:03)
+< PASS test_agent_backend_enh :: 109 passed in 76.21s (0:01:16)
+< PASS test_agent_backend_enh :: 109 passed in 98.93s (0:01:38)
+< PASS test_agent_contract :: 33 passed in 161.75s (0:02:41)
+< PASS test_agent_contract :: 33 passed in 192.89s (0:03:12)
+< PASS test_agent_fabricated_job_fix :: 31 passed in 52.65s
+< PASS test_agent_fabricated_job_fix :: 31 passed in 54.85s
+< PASS test_agent_frontend_enh :: 34 passed in 25.30s
+< PASS test_agent_frontend_enh :: 34 passed in 25.31s
+< PASS test_agent_injection_key_path :: 16 passed in 0.14s
+< PASS test_agent_injection_key_path :: 16 passed in 0.14s
+< PASS test_agent_layout_browser :: 8 passed in 24.90s
+< PASS test_agent_layout_browser :: 8 passed in 25.10s
+< PASS test_agent_legacy_fixes :: 28 passed in 0.14s
+---
+> PASS test_accel_steps_follow_accel :: 20 passed in 0.75s
+> PASS test_accel_steps_follow_accel :: 20 passed in 34.10s
+> PASS test_agent :: 42 passed in 115.05s (0:01:55)
+> PASS test_agent :: 42 passed in 28.05s
+> PASS test_agent_backend_enh :: 109 passed in 111.50s (0:01:51)
+> PASS test_agent_backend_enh :: 109 passed in 50.90s
+> PASS test_agent_contract :: 33 passed in 150.74s (0:02:30)
+> PASS test_agent_contract :: 33 passed in 178.84s (0:02:58)
+> PASS test_agent_fabricated_job_fix :: 31 passed in 86.23s (0:01:26)
+> PASS test_agent_fabricated_job_fix :: 31 passed in 90.13s (0:01:30)
+> PASS test_agent_frontend_enh :: 34 passed in 25.29s
+> PASS test_agent_frontend_enh :: 34 passed in 25.57s
+> PASS test_agent_injection_key_path :: 16 passed in 0.16s
+> PASS test_agent_injection_key_path :: 16 passed in 0.17s
+> PASS test_agent_layout_browser :: 8 passed in 24.94s
+> PASS test_agent_layout_browser :: 8 passed in 24.96s
+> PASS test_agent_legacy_fixes :: 28 passed in 0.13s
+96,109c76,89
+< PASS test_agent_media_av_upload :: 61 passed in 4.65s
+< PASS test_agent_media_av_upload :: 61 passed in 5.16s
+< PASS test_agent_media_semantics_backend :: 87 passed in 1.47s
+< PASS test_agent_media_semantics_backend :: 87 passed in 1.51s
+< PASS test_agent_media_semantics_frontend :: 21 passed in 0.56s
+< PASS test_agent_media_semantics_frontend :: 21 passed in 0.59s
+< PASS test_agent_media_upload :: 66 passed in 14.43s
+< PASS test_agent_media_upload :: 66 passed in 14.60s
+< PASS test_agent_oneshot_e2e :: 5 passed in 13.06s
+< PASS test_agent_oneshot_e2e :: 5 passed in 50.96s
+< PASS test_agent_paste_browser :: 14 passed in 115.11s (0:01:55)
+< PASS test_agent_paste_browser :: 14 passed in 195.12s (0:03:15)
+< PASS test_agent_power :: 45 passed in 31.52s
+< PASS test_agent_power :: 45 passed in 32.72s
+---
+> PASS test_agent_media_av_upload :: 61 passed in 4.42s
+> PASS test_agent_media_av_upload :: 61 passed in 5.30s
+> PASS test_agent_media_semantics_backend :: 87 passed in 1.52s
+> PASS test_agent_media_semantics_backend :: 87 passed in 1.65s
+> PASS test_agent_media_semantics_frontend :: 21 passed in 0.49s
+> PASS test_agent_media_semantics_frontend :: 21 passed in 0.62s
+> PASS test_agent_media_upload :: 66 passed in 18.25s
+> PASS test_agent_media_upload :: 66 passed in 19.04s
+> PASS test_agent_oneshot_e2e :: 5 passed in 14.16s
+> PASS test_agent_oneshot_e2e :: 5 passed in 43.51s
+> PASS test_agent_paste_browser :: 14 passed in 117.62s (0:01:57)
+> PASS test_agent_paste_browser :: 14 passed in 193.00s (0:03:12)
+> PASS test_agent_power :: 45 passed in 25.90s
+> PASS test_agent_power :: 45 passed in 36.51s
+113c93
+< PASS test_agent_provider_timeout_budget :: 9 passed in 0.08s
+---
+> PASS test_agent_provider_timeout_budget :: 9 passed in 0.06s
+115c95
+< PASS test_agent_review_fixes :: 20 passed in 0.18s
+---
+> PASS test_agent_review_fixes :: 20 passed in 0.17s
+118,122c98,102
+< PASS test_agent_session_mgmt :: 23 passed in 0.38s
+< PASS test_agent_session_mgmt :: 23 passed in 1.05s
+< PASS test_agent_session_search_cascade :: 26 passed in 0.29s
+< PASS test_agent_session_search_cascade :: 26 passed in 0.34s
+< PASS test_agent_session_status_artifacts :: 35 passed in 0.06s
+---
+> PASS test_agent_session_mgmt :: 23 passed in 0.45s
+> PASS test_agent_session_mgmt :: 23 passed in 0.51s
+> PASS test_agent_session_search_cascade :: 26 passed in 0.22s
+> PASS test_agent_session_search_cascade :: 26 passed in 0.23s
+> PASS test_agent_session_status_artifacts :: 35 passed in 0.07s
+124,128c104,107
+< PASS test_agent_stream_sse :: 11 passed in 110.31s (0:01:50)
+< PASS test_agent_stream_sse :: 11 passed in 45.56s
+< PASS test_agent_tool_status_fix :: 24 passed in 42.37s
+< PASS test_agent_tool_status_fix :: 24 passed in 96.62s (0:01:36)
+< PASS test_artifact_meta :: 35 passed in 0.22s
+---
+> PASS test_agent_stream_sse :: 11 passed in 110.80s (0:01:50)
+> PASS test_agent_stream_sse :: 11 passed in 70.85s (0:01:10)
+> PASS test_agent_tool_status_fix :: 24 passed in 58.51s
+> PASS test_agent_tool_status_fix :: 24 passed in 65.96s (0:01:05)
+129a109
+> PASS test_artifact_meta :: 35 passed in 0.27s
+131,138c111,118
+< PASS test_asset_api :: 19 passed in 0.19s
+< PASS test_asset_deep_audio :: 32 passed in 8.28s
+< PASS test_asset_deep_audio :: 32 passed in 8.30s
+< PASS test_asset_library :: 40 passed in 2.13s
+< PASS test_asset_library :: 40 passed in 2.41s
+< PASS test_asset_picker_onpick :: 3 passed in 145.60s (0:02:25)
+< PASS test_assetlib_and_seed_guard :: 52 passed in 0.43s
+< PASS test_assetlib_and_seed_guard :: 52 passed in 3.98s
+---
+> PASS test_asset_api :: 19 passed in 0.20s
+> PASS test_asset_deep_audio :: 32 passed in 8.26s
+> PASS test_asset_deep_audio :: 32 passed in 8.62s
+> PASS test_asset_library :: 40 passed in 2.14s
+> PASS test_asset_library :: 40 passed in 2.38s
+> PASS test_asset_picker_onpick :: 3 passed in 146.37s (0:02:26)
+> PASS test_assetlib_and_seed_guard :: 52 passed in 0.41s
+> PASS test_assetlib_and_seed_guard :: 52 passed in 3.86s
+141,142c121,122
+< PASS test_b1b2_video_modes :: 24 passed in 1.14s
+< PASS test_b1b2_video_modes :: 24 passed in 1.14s
+---
+> PASS test_b1b2_video_modes :: 24 passed in 1.11s
+> PASS test_b1b2_video_modes :: 24 passed in 1.11s
+145,148c125,129
+< PASS test_batches_collapse :: 12 passed in 29.12s
+< PASS test_batches_collapse :: 12 passed in 32.86s
+< PASS test_c6_detail_recommend :: 17 passed in 0.26s
+< PASS test_c6_detail_recommend :: 17 passed in 0.36s
+---
+> PASS test_batches_collapse :: 12 passed in 30.15s
+> PASS test_batches_collapse :: 12 passed in 34.23s
+> PASS test_c6_detail_recommend :: 17 passed in 0.22s
+> PASS test_c6_detail_recommend :: 17 passed in 0.27s
+> PASS test_cancel_longfilm_process :: 5 passed in 0.14s
+151,156c132,138
+< PASS test_comfy_errors_typesafety :: 40 passed in 6.23s
+< PASS test_comfy_errors_typesafety :: 40 passed in 7.51s
+< PASS test_cont_concat_frames :: 5 passed in 5.34s
+< PASS test_cont_concat_frames :: 5 passed in 5.95s
+< PASS test_cont_duration_and_prompt_history :: 22 passed in 3.16s
+< PASS test_cont_duration_and_prompt_history :: 22 passed in 3.36s
+---
+> PASS test_comfy_errors_typesafety :: 40 passed in 6.25s
+> PASS test_comfy_errors_typesafety :: 40 passed in 7.50s
+> PASS test_cont_concat_frames :: 5 passed in 5.50s
+> PASS test_cont_concat_frames :: 5 passed in 5.88s
+> PASS test_cont_duration_and_prompt_history :: 22 passed in 3.13s
+> PASS test_cont_duration_and_prompt_history :: 22 passed in 3.38s
+> PASS test_cont_duration_exact_frames :: 12 passed in 2.56s
+158,170c140,151
+< PASS test_cont_duration_exact_frames :: 12 passed in 2.64s
+< PASS test_cont_duration_semantics :: 23 passed in 0.10s
+< PASS test_cont_duration_semantics :: 23 passed in 0.10s
+< PASS test_cont_duration_ui_browser :: 3 passed in 19.82s
+< PASS test_cont_duration_ui_browser :: 3 passed in 19.91s
+< PASS test_cont_prompt_history_browser :: 2 passed in 11.09s
+< PASS test_cont_prompt_history_browser :: 2 passed in 14.24s
+< PASS test_cont_seam_quality :: 13 passed in 10.24s
+< PASS test_cont_seam_quality :: 13 passed in 5.83s
+< PASS test_cont_seg_audio :: 46 passed in 3.74s
+< PASS test_cont_seg_audio :: 46 passed in 5.34s
+< PASS test_cont_selflift :: 33 passed in 0.12s
+< PASS test_cont_selflift :: 33 passed in 2.92s
+---
+> PASS test_cont_duration_semantics :: 23 passed in 0.09s
+> PASS test_cont_duration_semantics :: 23 passed in 0.09s
+> PASS test_cont_duration_ui_browser :: 3 passed in 14.92s
+> PASS test_cont_duration_ui_browser :: 3 passed in 14.97s
+> PASS test_cont_prompt_history_browser :: 2 passed in 11.10s
+> PASS test_cont_prompt_history_browser :: 2 passed in 13.94s
+> PASS test_cont_seam_quality :: 13 passed in 10.26s
+> PASS test_cont_seam_quality :: 13 passed in 5.88s
+> PASS test_cont_seg_audio :: 46 passed in 3.71s
+> PASS test_cont_seg_audio :: 46 passed in 5.41s
+> PASS test_cont_selflift :: 33 passed in 0.13s
+> PASS test_cont_selflift :: 33 passed in 2.86s
+174,175c155,156
+< PASS test_continuation_branch :: 15 passed in 0.20s
+< PASS test_continuation_capability :: 5 passed in 4.69s
+---
+> PASS test_continuation_branch :: 15 passed in 0.22s
+> PASS test_continuation_capability :: 5 passed in 4.17s
+177,178c158,159
+< PASS test_continuation_frontend :: 24 passed in 74.28s (0:01:14)
+< PASS test_continuation_frontend :: 24 passed in 77.81s (0:01:17)
+---
+> PASS test_continuation_frontend :: 24 passed in 75.09s (0:01:15)
+> PASS test_continuation_frontend :: 24 passed in 76.68s (0:01:16)
+182,186c163,167
+< PASS test_continuation_mixed_state :: 17 passed in 0.09s
+< PASS test_continuation_retry :: 15 passed in 0.09s
+< PASS test_continuation_retry :: 15 passed in 0.09s
+< PASS test_continuation_server :: 13 passed in 3.80s
+< PASS test_continuation_server :: 13 passed in 4.23s
+---
+> PASS test_continuation_mixed_state :: 17 passed in 0.10s
+> PASS test_continuation_retry :: 15 passed in 0.12s
+> PASS test_continuation_retry :: 15 passed in 0.12s
+> PASS test_continuation_server :: 13 passed in 3.86s
+> PASS test_continuation_server :: 13 passed in 4.40s
+190c171
+< PASS test_cr5_c_segment :: 30 passed in 1.44s
+---
+> PASS test_cr5_c_segment :: 30 passed in 1.96s
+192,194c173,179
+< PASS test_cr5_text_scanner :: 10 passed in 0.51s
+< PASS test_d11_moss_lora_frontend :: 4 passed in 22.94s
+< PASS test_d11_moss_lora_frontend :: 4 passed in 6.38s
+---
+> PASS test_cr5_text_scanner :: 10 passed in 0.36s
+> PASS test_cr6_p1_fixes :: 12 passed in 0.22s
+> PASS test_cr6_p1_fixes :: 12 passed in 0.30s
+> PASS test_d11_defect_a_conversion :: 18 passed in 3.26s
+> PASS test_d11_defect_a_conversion :: 18 passed in 3.33s
+> PASS test_d11_moss_lora_frontend :: 4 passed in 20.19s
+> PASS test_d11_moss_lora_frontend :: 4 passed in 5.55s
+196,200c181,186
+< PASS test_d1_model_display :: 8 passed in 0.04s
+< PASS test_d2_lora_display :: 11 passed in 1.03s
+< PASS test_d2_lora_display :: 11 passed in 1.06s
+< PASS test_d3_recommendation_gap :: 10 passed in 14.12s
+< PASS test_d3_recommendation_gap :: 10 passed in 7.21s
+---
+> PASS test_d1_model_display :: 8 passed in 0.03s
+> PASS test_d2_lora_display :: 11 passed in 1.02s
+> PASS test_d2_lora_display :: 11 passed in 1.08s
+> PASS test_d3_recommendation_gap :: 10 passed in 14.25s
+> PASS test_d3_recommendation_gap :: 10 passed in 7.20s
+> PASS test_d4_loader_display :: 11 passed in 0.08s
+202,207c188,192
+< PASS test_d4_loader_display :: 11 passed in 0.09s
+< PASS test_docs_static :: 12 passed in 0.08s
+< PASS test_docs_static :: 12 passed in 0.08s
+< PASS test_enhance_architecture_fixes :: 28 passed in 28.10s
+< PASS test_enhance_assets :: 21 passed in 49.86s
+< PASS test_enhance_system_echo :: 32 passed in 0.24s
+---
+> PASS test_docs_static :: 12 passed in 0.07s
+> PASS test_docs_static :: 12 passed in 0.07s
+> PASS test_enhance_architecture_fixes :: 28 passed in 28.29s
+> PASS test_enhance_assets :: 21 passed in 50.00s
+> PASS test_enhance_system_echo :: 32 passed in 0.25s
+209c194
+< PASS test_fix3_ui_controls_preview :: 32 passed in 74.71s (0:01:14)
+---
+> PASS test_fix3_ui_controls_preview :: 32 passed in 74.70s (0:01:14)
+212,219c197,205
+< PASS test_flf_reference_media :: 22 passed in 1.94s
+< PASS test_flow_diagram :: 14 passed in 0.24s
+< PASS test_flow_docs_ui :: 7 passed in 47.31s
+< PASS test_gen_queue :: 10 passed in 50.30s
+< PASS test_h3_effect_lora :: 42 passed in 62.51s (0:01:02)
+< PASS test_h3_panel_tune :: 60 passed in 70.15s (0:01:10)
+< PASS test_h3_video_modes_ui :: 47 passed in 57.95s
+< PASS test_hardware :: 34 passed in 0.03s
+---
+> PASS test_flf_reference_media :: 22 passed in 2.01s
+> PASS test_flow_diagram :: 14 passed in 0.27s
+> PASS test_flow_docs_ui :: 7 passed in 47.70s
+> PASS test_frontend_assets_hygiene :: 14 passed in 0.03s
+> PASS test_gen_queue :: 10 passed in 48.82s
+> PASS test_h3_effect_lora :: 42 passed in 62.55s (0:01:02)
+> PASS test_h3_panel_tune :: 60 passed in 70.06s (0:01:10)
+> PASS test_h3_video_modes_ui :: 47 passed in 57.94s
+> PASS test_hardware :: 35 passed in 0.04s
+221,234c207,220
+< PASS test_image_res_lora :: 24 passed in 37.56s
+< PASS test_job_meta_c_fix :: 32 passed in 1.11s
+< PASS test_job_meta_frontend :: 9 passed in 0.26s
+< PASS test_labc_base_verdict :: 10 passed in 0.08s
+< PASS test_labc_cleanup_stale_derived :: 8 passed in 0.02s
+< PASS test_lora_catalog_conflicts :: 7 passed in 0.03s
+< PASS test_lora_ea :: 18 passed in 0.13s
+< PASS test_lora_effects :: 22 passed in 30.96s
+< PASS test_lora_mihoyo :: 25 passed in 5.64s
+< PASS test_lora_mihoyo_char_mech :: 24 passed in 7.34s
+< PASS test_lora_nsfw :: 13 passed in 2.44s
+< PASS test_lora_whitelist_all_modes :: 25 passed in 1.41s
+< PASS test_max_tokens :: 84 passed in 0.20s
+< PASS test_media_card_detail :: 29 passed in 1.66s
+---
+> PASS test_image_res_lora :: 24 passed in 34.96s
+> PASS test_job_meta_c_fix :: 32 passed in 1.27s
+> PASS test_job_meta_frontend :: 9 passed in 0.27s
+> PASS test_labc_base_verdict :: 10 passed in 0.06s
+> PASS test_labc_cleanup_stale_derived :: 8 passed in 0.07s
+> PASS test_lora_catalog_conflicts :: 7 passed in 0.19s
+> PASS test_lora_ea :: 18 passed in 0.15s
+> PASS test_lora_effects :: 22 passed in 29.66s
+> PASS test_lora_mihoyo :: 25 passed in 5.93s
+> PASS test_lora_mihoyo_char_mech :: 24 passed in 7.24s
+> PASS test_lora_nsfw :: 13 passed in 2.47s
+> PASS test_lora_whitelist_all_modes :: 25 passed in 1.40s
+> PASS test_max_tokens :: 84 passed in 0.32s
+> PASS test_media_card_detail :: 29 passed in 1.62s
+236,247c222,233
+< PASS test_mode_switch_slot_isolation :: 8 passed in 0.27s
+< PASS test_model_list_api :: 45 passed in 7.69s
+< PASS test_moss_layout :: 52 passed in 0.07s
+< PASS test_music_yue2 :: 65 passed, 2 skipped in 82.40s (0:01:22)
+< PASS test_node_probe_completeness :: 6 passed in 121.96s (0:02:01)
+< PASS test_output_path_traversal :: 5 passed in 0.05s
+< PASS test_panel_fallback :: 24 passed in 3.34s
+< PASS test_pe_externalize :: 28 passed in 0.03s
+< PASS test_prompt_history :: 41 passed in 0.16s
+< PASS test_prompt_history_dirtyloop :: 2 passed in 0.27s
+< PASS test_qwen_image :: 37 passed, 1 skipped in 57.13s
+< PASS test_qwen_ref_assets :: 37 passed in 0.13s
+---
+> PASS test_mode_switch_slot_isolation :: 8 passed in 0.25s
+> PASS test_model_list_api :: 45 passed in 7.65s
+> PASS test_moss_layout :: 52 passed in 0.06s
+> PASS test_music_yue2 :: 65 passed, 2 skipped in 65.14s (0:01:05)
+> PASS test_node_probe_completeness :: 6 passed in 122.03s (0:02:02)
+> PASS test_output_path_traversal :: 5 passed in 0.04s
+> PASS test_panel_fallback :: 24 passed in 3.38s
+> PASS test_pe_externalize :: 28 passed in 0.04s
+> PASS test_prompt_history :: 41 passed in 0.15s
+> PASS test_prompt_history_dirtyloop :: 2 passed in 0.11s
+> PASS test_qwen_image :: 37 passed, 1 skipped in 57.19s
+> PASS test_qwen_ref_assets :: 37 passed in 0.23s
+249c235,236
+< PASS test_r2_visible_text :: 14 passed in 0.02s
+---
+> PASS test_r2_visible_text :: 14 passed in 0.03s
+> PASS test_r4_retry_fingerprint_and_ref_probe :: 11 passed in 0.62s
+251,253c238,240
+< PASS test_reso_label :: 29 passed in 19.13s
+< PASS test_reuse_resolution_fallback :: 7 passed in 0.16s
+< PASS test_sidebar_fold :: 12 passed in 143.05s (0:02:23)
+---
+> PASS test_reso_label :: 29 passed in 19.10s
+> PASS test_reuse_resolution_fallback :: 7 passed in 0.17s
+> PASS test_sidebar_fold :: 12 passed in 142.56s (0:02:22)
+256,262c243,249
+< PASS test_status_realtime :: 20 passed in 18.22s
+< PASS test_studio_server_cleanup :: 4 passed in 0.96s
+< PASS test_t2v_card_dom :: 12 passed in 0.22s
+< PASS test_t2v_meta_consistency :: 27 passed in 1.28s
+< PASS test_t2v_panel :: 44 passed in 9.95s
+< PASS test_t2v_panel_fix :: 40 passed in 2.83s
+< PASS test_twopass_allow_frontend :: 15 passed in 0.09s
+---
+> PASS test_status_realtime :: 20 passed in 18.29s
+> PASS test_studio_server_cleanup :: 4 passed in 0.74s
+> PASS test_t2v_card_dom :: 12 passed in 0.23s
+> PASS test_t2v_meta_consistency :: 27 passed in 1.19s
+> PASS test_t2v_panel :: 44 passed in 9.98s
+> PASS test_t2v_panel_fix :: 40 passed in 2.99s
+> PASS test_twopass_allow_frontend :: 15 passed in 0.03s
+264c251
+< PASS test_twopass_seg2_policy :: 23 passed in 0.17s
+---
+> PASS test_twopass_seg2_policy :: 23 passed in 0.18s
+266,272c253,259
+< PASS test_video_param_effectiveness :: 21 passed in 0.11s
+< PASS test_video_sampling_params :: 50 passed in 71.18s (0:01:11)
+< PASS test_video_tabs_resolution :: 63 passed in 54.51s
+< PASS test_visible_text_pollution :: 17 passed, 1 skipped in 5.47s
+< PASS test_yue2_enum_dedup :: 11 passed in 10.06s
+< PASS test_yue2_flow_review_fixes :: 22 passed in 0.06s
+< PASS test_yue2_schema :: 26 passed in 7.96s
+---
+> PASS test_video_param_effectiveness :: 21 passed in 70.60s (0:01:10)
+> PASS test_video_sampling_params :: 50 passed in 71.23s (0:01:11)
+> PASS test_video_tabs_resolution :: 63 passed in 54.45s
+> PASS test_visible_text_pollution :: 17 passed, 1 skipped in 5.53s
+> PASS test_yue2_enum_dedup :: 11 passed in 14.79s
+> PASS test_yue2_flow_review_fixes :: 22 passed in 0.07s
+> PASS test_yue2_schema :: 26 passed in 7.26s
+=== baseline 失败项: 39 ===
+=== branch   失败项: 25 ===
+=== baseline TIMEOUT: 5 ===
+=== branch   TIMEOUT: 5 ===
+COMPARE_EXIT=0

@@ -1,0 +1,19 @@
+[接续] 15f0e7d6cb51: 参考视频帧数探测失败（已缓存失败标记，不再重复探测）
+{
+  "live_root": "/root/projects/h3studio-live",
+  "live_server_py": "/root/projects/h3studio-live/server.py",
+  "target2_live": {
+    "path_before_refresh": "stage_00000_f242f0f8.safetensors",
+    "path_after_refresh": "stage_00000_2ef98328.safetensors",
+    "path_changed": true,
+    "refreshed_content_head": "LIVE-VERSION-TWOLIVE-VER",
+    "source_content_head": "LIVE-VERSION-TWOLIVE-VER",
+    "refreshed_matches_source": true
+  },
+  "target3_live": {
+    "probe_calls_for_3_invocations": 1,
+    "marker_in_params": "failed",
+    "marker_in_db": "failed",
+    "frame_count_still_zero": true
+  }
+}
