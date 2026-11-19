@@ -1,0 +1,23 @@
+{
+  "job_id": "cdb7b229527a",
+  "prompt_id": "6db5cc95-72f5-4903-88b7-33d49c050c16",
+  "simulated_elapsed_sec": 7200,
+  "running_truth": {
+    "state": "active",
+    "label": "运行中（已确认在 ComfyUI 队列中）",
+    "elapsed_sec": 7200.014887332916,
+    "timeout_sec": 0.0,
+    "deadline_at": null
+  },
+  "job_status": "running",
+  "queue_running_truth": {
+    "state": "active",
+    "label": "运行中（已确认在 ComfyUI 队列中）",
+    "elapsed_sec": 7200.015820264816,
+    "timeout_sec": 0.0,
+    "deadline_at": null
+  },
+  "verdict_state_is_active": true,
+  "verdict_queue_is_active": true,
+  "captured_at": "2026-11-20 01:26:43"
+}

@@ -1,0 +1,46 @@
+═══ 前置检查 ═══
+  [PASS] ComfyUI 健康（8188 可用）: GET /queue 200
+═══ 提交复现线上 OOM 配置的 r2v 任务 (1920x1088 / 15.0s / ref_image+ref_audio) ═══
+  任务已提交: 5472fd233eeb
+  [21:00:26] queued|
+  [21:06:11] running|
+  [21:12:08] failed|生成失败（服务端未能给出具体原因）。请稍后重试；若反复失败，请查看服务端日志，或改用「复用参数」重新生成一段。
+  任务终态: status=failed
+  error    = 生成失败（服务端未能给出具体原因）。请稍后重试；若反复失败，请查看服务端日志，或改用「复用参数」重新生成一段。
+  outputs  = []
+  [PASS] OOM 任务判定为 failed（不是 done / 生成成功）: status=failed
+  [FAIL] 失败原因明确指出显存不足（OOM）: error=生成失败（服务端未能给出具体原因）。请稍后重试；若反复失败，请查看服务端日志，或改用「复用参数」重新生成一段。
+  [PASS] 失败任务没有任何产物条目（前端不会渲染出黑图）: outputs=[]
+  !! 取 ComfyUI history 失败: <urlopen error [Errno 111] Connection refused>
+  ComfyUI 侧: status_str=None outputs_keys=[]
+  [FAIL] ComfyUI 侧确实是执行失败（真 OOM，不是构造的）: status_str=None
+  【原缺陷触发条件】ComfyUI outputs 非空 = False （keys=[]）
+     旧逻辑（只看 outputs 非空）-> 会判「成功」
+     新逻辑 -> outcome='pending' failed=False
+  [FAIL] 同一条 history：旧逻辑会误判成功，新逻辑判失败（判定顺序修复生效）: legacy_succeed=False new_outcome=pending
+  证据已存: /root/projects/h3s-merge-20261119/evidence/gen-status-20261119/evidence_oom_failure_real.json
+
+═══ 真实浏览器截图 ═══
+Traceback (most recent call last):
+  File "/root/projects/h3s-merge-20261119/scripts/evidence_oom_failure_real.py", line 291, in <module>
+    sys.exit(main())
+  File "/root/projects/h3s-merge-20261119/scripts/evidence_oom_failure_real.py", line 237, in main
+    subprocess_shot(job_id)
+  File "/root/projects/h3s-merge-20261119/scripts/evidence_oom_failure_real.py", line 259, in subprocess_shot
+    page.goto(f"{BASE}/", wait_until="networkidle")
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/sync_api/_generated.py", line 9362, in goto
+    self._sync(
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/_impl/_page.py", line 552, in goto
+    return await self._main_frame.goto(**locals_to_params(locals()))
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/_impl/_frame.py", line 153, in goto
+    await self._channel.send(
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+  File "/root/.pyenv/versions/3.10.12/lib/python3.10/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://127.0.0.1:8190/", waiting until "networkidle"
+

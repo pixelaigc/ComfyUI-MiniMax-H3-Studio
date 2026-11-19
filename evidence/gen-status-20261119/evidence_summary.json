@@ -1,0 +1,42 @@
+[
+  {
+    "ok": true,
+    "name": "线上库里存在「done + 空产物 + 有错误」的误报样本（修复前）",
+    "detail": "找到 3 条"
+  },
+  {
+    "ok": true,
+    "name": "视频类上限 = 0（不限时，跑 1 天也不判失败）",
+    "detail": "by_media={'image': 1800.0, 'video': 0.0, 'audio': 1800.0, 'other': 1800.0}"
+  },
+  {
+    "ok": true,
+    "name": "图像类仍保留可配置上限",
+    "detail": "image=1800.0, audio=1800.0"
+  },
+  {
+    "ok": true,
+    "name": "真实 OOM 的 history 被判定为失败",
+    "detail": "outcome=failed, failed=True"
+  },
+  {
+    "ok": false,
+    "name": "旧逻辑会误判成功、而新逻辑判失败（差异被证实）",
+    "detail": "legacy_success=False, new_failed=True"
+  },
+  {
+    "ok": false,
+    "name": "视频任务跑 7200 秒仍判定为 active（进行中）",
+    "detail": "state=lost, elapsed_sec=7217.8072872161865, timeout_sec=0.0"
+  },
+  {
+    "ok": true,
+    "name": "视频任务状态仍是 running（未被判失败）",
+    "detail": "status=running"
+  },
+  {
+    "ok": false,
+    "name": "队列面板里这条视频任务也是 active",
+    "detail": "running_truth={\"state\": \"lost\", \"label\": \"已丢失（ComfyUI 队列与历史中都没有该任务）\", \"elapsed_sec\": 7217.879707098007, \"timeout_sec\": 0.0, \"deadline_at\": null}"
+  }
+]

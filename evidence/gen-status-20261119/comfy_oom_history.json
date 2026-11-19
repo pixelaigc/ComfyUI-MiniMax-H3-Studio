@@ -1,0 +1,155 @@
+{
+  "prompt": [
+    11,
+    "bd766562-9464-4bbb-810c-205b494ee8c5",
+    {
+      "1": {
+        "class_type": "EmptyLatentImage",
+        "inputs": {
+          "width": 4096,
+          "height": 4096,
+          "batch_size": 1
+        }
+      },
+      "2": {
+        "class_type": "KSampler",
+        "inputs": {
+          "seed": 12345,
+          "steps": 1,
+          "cfg": 1.0,
+          "sampler_name": "euler",
+          "scheduler": "simple",
+          "denoise": 1.0,
+          "model": [
+            "3",
+            0
+          ],
+          "positive": [
+            "4",
+            0
+          ],
+          "negative": [
+            "5",
+            0
+          ],
+          "latent_image": [
+            "1",
+            0
+          ]
+        }
+      },
+      "3": {
+        "class_type": "CheckpointLoaderSimple",
+        "inputs": {
+          "ckpt_name": "DavidAU-Qwen3.8-27B-TWIN-TURBO-709-ULTRA-HERETIC/model-00001-of-00012.safetensors"
+        }
+      },
+      "4": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "text": "a cat",
+          "clip": [
+            "3",
+            1
+          ]
+        }
+      },
+      "5": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "text": "blurry",
+          "clip": [
+            "3",
+            1
+          ]
+        }
+      },
+      "6": {
+        "class_type": "VAEDecode",
+        "inputs": {
+          "samples": [
+            "2",
+            0
+          ],
+          "vae": [
+            "3",
+            2
+          ]
+        }
+      },
+      "7": {
+        "class_type": "SaveImage",
+        "inputs": {
+          "filename_prefix": "evidence_oom",
+          "images": [
+            "6",
+            0
+          ]
+        }
+      }
+    },
+    {
+      "create_time": 1795081216305
+    },
+    [
+      "7"
+    ]
+  ],
+  "outputs": {},
+  "status": {
+    "status_str": "error",
+    "completed": false,
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "bd766562-9464-4bbb-810c-205b494ee8c5",
+          "timestamp": 1795081218793
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "bd766562-9464-4bbb-810c-205b494ee8c5",
+          "timestamp": 1795081218797
+        }
+      ],
+      [
+        "execution_error",
+        {
+          "prompt_id": "bd766562-9464-4bbb-810c-205b494ee8c5",
+          "node_id": "3",
+          "node_type": "CheckpointLoaderSimple",
+          "executed": [],
+          "exception_message": "ERROR: Could not detect model type of: /mnt/usb2t/hf-models/DavidAU-Qwen3.8-27B-TWIN-TURBO-709-ULTRA-HERETIC/model-00001-of-00012.safetensors\n\n",
+          "exception_type": "RuntimeError",
+          "traceback": [
+            "  File \"/home/ubuntu/comfyui/execution.py\", line 556, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"/home/ubuntu/comfyui/execution.py\", line 353, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"/home/ubuntu/comfyui/execution.py\", line 327, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n",
+            "  File \"/home/ubuntu/comfyui/execution.py\", line 315, in process_inputs\n    result = f(**inputs)\n",
+            "  File \"/home/ubuntu/comfyui/nodes.py\", line 641, in load_checkpoint\n    out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, embedding_directory=folder_paths.get_folder_paths(\"embeddings\"))\n",
+            "  File \"/home/ubuntu/comfyui/comfy/sd.py\", line 2294, in load_checkpoint_guess_config\n    raise RuntimeError(\"ERROR: Could not detect model type of: {}\\n{}\".format(ckpt_path, model_detection_error_hint(ckpt_path, sd)))\n"
+          ],
+          "current_inputs": {
+            "ckpt_name": [
+              "DavidAU-Qwen3.8-27B-TWIN-TURBO-709-ULTRA-HERETIC/model-00001-of-00012.safetensors"
+            ]
+          },
+          "current_outputs": [
+            "2",
+            "5",
+            "4",
+            "3",
+            "6",
+            "7",
+            "1"
+          ],
+          "timestamp": 1795081218841
+        }
+      ]
+    ]
+  },
+  "meta": {}
+}

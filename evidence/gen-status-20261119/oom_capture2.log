@@ -1,0 +1,9 @@
+═══ 拼装真实 r2v 工作流（线上生产参数）═══
+  上传参考素材到 ComfyUI input ...
+  ref_image = h3studio/07030bb3e6d74ca4__05b5c8366102dd99e242bdcc60140df1.jpg
+  ref_audio = h3studio_ref_13cb1ba4dcd9.mp3
+  节点数: 21
+═══ 提交到 ComfyUI ═══
+  prompt_id = c6e79e89-5eaa-4fa9-9245-f31a302119dc
+═══ 等待执行落定 ═══
+  !! 30 分钟内没落定
