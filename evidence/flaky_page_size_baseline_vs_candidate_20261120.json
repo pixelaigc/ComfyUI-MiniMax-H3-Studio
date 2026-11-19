@@ -1,0 +1,15 @@
+{
+  "test": "tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size",
+  "runs": 8,
+  "candidate_branch_local_feature_fix_gen_status_defects": {
+    "passed": 4,
+    "failed": 4,
+    "total": 8
+  },
+  "baseline_branch_fcb6057": {
+    "passed": 3,
+    "failed": 5,
+    "total": 8
+  },
+  "conclusion": "该用例在**基线（未改动）**上同样大量失败（5/8），候选侧 4/8 —— 属仓库既有的时序 flake，不是本次改动引入。该用例断言「2 秒实时刷新不刷掉每页数量」，与超时策略 / 成功判定无关。"
+}
