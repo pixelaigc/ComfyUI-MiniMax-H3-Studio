@@ -1,0 +1,60 @@
+{
+ "source_seam_json": "/root/projects/h3s-resume-cand/evidence/evidence-20261120-resume-flf/seam-repeat-20261120-014936/seam_repeat.json",
+ "rows": [
+  {
+   "tag": "flf#1",
+   "seed": 20261131,
+   "job1": "b627a87754d2",
+   "job2": "599ebf05b2c7",
+   "seg1_job2_std_sampler": true,
+   "seg2_job2_std_sampler": true,
+   "seg1_selflift": true,
+   "seg2_selflift": false,
+   "A_seam_lum_delta": 0.223968505859375,
+   "B_seg2_lum_drop_3f": 63.862918853759766,
+   "C_seg2_head_break_ratio": 0.7505765557289124,
+   "D_seam_L1": 3.7137210369110107,
+   "A_seam_sat_delta": -0.0036335885524749756,
+   "seg1_lum_last": 127.38316345214844,
+   "seg2_lum_first": 127.60713195800781
+  },
+  {
+   "tag": "flf#2",
+   "seed": 20261132,
+   "job1": "d2ce3c237b0a",
+   "job2": "ca51337f340d",
+   "seg1_job2_std_sampler": true,
+   "seg2_job2_std_sampler": true,
+   "seg1_selflift": true,
+   "seg2_selflift": false,
+   "A_seam_lum_delta": -0.715057373046875,
+   "B_seg2_lum_drop_3f": 7.8507537841796875,
+   "C_seg2_head_break_ratio": 1.9781227111816406,
+   "D_seam_L1": 3.021898031234741,
+   "A_seam_sat_delta": -0.0033069849014282227,
+   "seg1_lum_last": 128.8163299560547,
+   "seg2_lum_first": 128.1012725830078
+  },
+  {
+   "tag": "flf#3",
+   "seed": 20261133,
+   "job1": "2e7e22025c94",
+   "job2": "9de095f2f5dc",
+   "seg1_job2_std_sampler": true,
+   "seg2_job2_std_sampler": true,
+   "seg1_selflift": true,
+   "seg2_selflift": false,
+   "A_seam_lum_delta": -13.975151062011719,
+   "B_seg2_lum_drop_3f": 14.592857360839844,
+   "C_seg2_head_break_ratio": 1.6648132801055908,
+   "D_seam_L1": 23.5649471282959,
+   "A_seam_sat_delta": -0.0152970552444458,
+   "seg1_lum_last": 128.4619140625,
+   "seg2_lum_first": 114.48676300048828
+  }
+ ],
+ "verdict_systematic_dark_bias": false,
+ "metric_A_mean": -4.822079976399739,
+ "metric_A_sign_pos": 1,
+ "metric_A_sign_neg": 2
+}
