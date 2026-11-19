@@ -1250,7 +1250,7 @@
           && videoState.twopass.upscaler_model === "none") {
           bits.push("（ρ=0 且不用放大器会被节点拒绝，服务端会自动把 ρ 提到 0.6）");
         }
-        bits.push("二采固定用 Euler 采样器（SelfLift 只支持标准 Euler）。");
+        bits.push("二采固定用 Euler 采样器（只支持标准 Euler）。");
       }
       note.textContent = bits.filter(Boolean).join(" ");
     }
@@ -2304,7 +2304,7 @@
           // 【二次确认】把风险说清楚；用户取消则**回滚复选框**。
           const ok = confirm(
             "确定要让接续段也用二采吗？\n\n"
-            + "二采（SelfLift）在接续段会造成段头色档跳变：\n"
+            + "二采在接续段会造成段头色档跳变：\n"
             + "· 实测段头断点比 2.58x–4.54x（二采关闭时 ≤1.58x）\n"
             + "· 实测 3 帧亮度降 +4.7～+7.2 灰阶（二采关闭时 ≤+0.26）\n"
             + "· 肉眼表现：接缝处「第 5 秒那一下整个色调跳一下」\n\n"
