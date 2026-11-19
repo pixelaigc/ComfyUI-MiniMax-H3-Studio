@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg?v=cr20261115a" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=cr20261115a">
+<link rel="stylesheet" href="/static/style.css?v=genfix20261119a">
 <link rel="stylesheet" href="/static/assets.css?v=cr20261115b">
 <link rel="stylesheet" href="/static/responsive.css?v=cr20261115b">
 </head>
@@ -274,7 +274,7 @@
         <label class="img-toggle" id="vidTwopassAllowContinuationRow" hidden>
           <input type="checkbox" id="vidTwopassAllowContinuation">
           <span>接续段也用二采（有风险）</span>
-          <span class="muted" id="vidTwopassAllowContinuationHint">接续段用二采会强制走段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶）；标准采样等价 nonebot minimax_h3_seg2 且无此缺陷</span>
+          <span class="muted" id="vidTwopassAllowContinuationHint">接续段用二采会强制走段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶）；标准采样路径无此缺陷</span>
         </label>
         <div id="vidTwopassBody" hidden>
           <div class="compact-pair">
@@ -1528,7 +1528,7 @@
      window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— generation-queue.js 改了（新增「运行真相」兜底：已超时 / 状态未知 / 已丢失），
      必须破缓存，否则用户拿到的还是旧文件（永远显示「运行中」）。 -->
-<script src="/static/generation-queue.js?v=a5truth1"></script>
+<script src="/static/generation-queue.js?v=genfix20261119a"></script>
 <script src="/static/video-nav.js?v=sidebarfold2"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
@@ -1555,11 +1555,11 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=cont20261119a"></script>
+<script src="/static/app.js?v=genfix20261119a"></script>
 <script src="/static/providers.js?v=enhassets1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
-<script src="/static/job-detail.js?v=a5truth1"></script>
+<script src="/static/job-detail.js?v=genfix20261119a"></script>
 <script src="/static/assets.js?v=cr20261115b"></script>
 <!-- 素材库播放器模式（2026-11-14 需求 14） -->
 <script src="/static/asset-player.js?v=cr20261115b"></script>
@@ -1584,7 +1584,12 @@
 <!-- agent-media.js 必须在 agent.js **之前**：agent.js 的任务卡渲染要用
      AgentMedia 判定「实际生效参数」与静默回落（视频分辨率 / 音乐时长） -->
 <script src="/static/agent-media.js?v=h3image1"></script>
-<script src="/static/agent.js?v=cr20261116b"></script>
+<!-- 【2026-11-19 生成状态缺陷修复】升版号到 genfix20261119a ——
+     app.js / agent.js / agent_sessions.js / generation-queue.js /
+     job-detail.js / style.css 都改了（视频任务不再按 30 分钟判超时；
+     OOM/failed 不再误报「生成成功」+ 全黑预览）。
+     必须破缓存，否则用户拿到的还是旧 JS。 -->
+<script src="/static/agent.js?v=genfix20261119a"></script>
 <script src="/static/agent_sessions.js?v=cr20261115b"></script>
 <!-- 内置 Agent「agent 管理」模态框（2026-11-13 审查目标 4/5）
      能力开关 / 搜索引擎配置 + 连通性自检 / 文生视频默认参数 / 步数上限 -->

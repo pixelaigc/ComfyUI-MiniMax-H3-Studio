@@ -3146,13 +3146,25 @@ document.addEventListener("keydown", event => {
 // 保留 pendingJobs 只是为了在「任务结束」时刷新一次任务列表 ——
 // 队列面板每 1 秒自己会刷，但任务列表是 2 秒一轮，节奏不同。
 const pendingJobs = new Set();
-const JOB_POLL_MAX_MS = 30 * 60 * 1000;
+// 【2026-11-19 缺陷 1 修】前端轮询**不再**有 30 分钟硬上限。
+//
+// 【原来错在哪】这里原来写死 `30 * 60 * 1000`：
+// 视频任务跑够 30 分钟 -> 前端**主动停止轮询** -> 卡片永远停在
+// 「生成中」-> 用户以为卡死了，而服务端其实还在跑（或者刚被服务端
+// 判超时失败）。前端与后端各有一个 30 分钟阈值，行为还不一致。
+//
+// 【现在】轮询只由**任务终态**终止（done / failed / canceled）。
+// 「后端挂了」的兜底交给下面的「连续查询失败」判定 —— 那与任务
+// 跑多久**无关**，所以长视频任务不会被前端提前放弃。
+// 真正的「超时」判定由**服务端**按媒体类型给出（视频类默认不限时）。
+const JOB_POLL_MAX_MS = 0;   // 0 = 不按运行时长终止轮询
 let jobPollStartedAt = 0;
 
 function trackJob(jobId) {
   if (!jobId) return;
   pendingJobs.add(jobId);
   if (!jobPollStartedAt) jobPollStartedAt = Date.now();
+  jobPollErrors = 0;
   // genBusy 只表示「本会话还有任务没到终态」——
   // **不参与按钮的禁用判断**（见 updateActionButtons 的说明）。
   state.genBusy = true;
@@ -3161,26 +3173,53 @@ function trackJob(jobId) {
   pollPendingJobs();
 }
 
+// 【2026-11-19 缺陷 1 修】连续查询失败计数。
+//
+// 【为什么需要它】前端原来的兜底是「30 分钟后停止轮询」——
+// 那条被移除后，「后端彻底挂了」这条路径就没有兜底了。
+// 现在改成：**连续 N 次查询失败**才放弃（与任务跑多久无关）。
+//
+// 【为什么是 12 次】每 1.5 秒一次 -> 12 次约 18 秒。后端进程重启
+// （systemctl restart）通常在 10 秒内恢复，18 秒足够熬过一次重启。
+const JOB_POLL_MAX_ERRORS = 12;
+let jobPollErrors = 0;
+
 async function pollPendingJobs() {
   if (!pendingJobs.size) {
     jobPollStartedAt = 0;
+    jobPollErrors = 0;
     state.genBusy = false;
     return;
   }
-  // 安全上限：极端情况下（后端不回写状态）也不要永久挂着轮询
-  if (Date.now() - jobPollStartedAt > JOB_POLL_MAX_MS) {
+  // 【2026-11-19 缺陷 1 修】不再按运行时长停止轮询。
+  // 【为什么】视频任务跑很久是正常现象，前端擅自放弃会让用户看到
+  // 一个永远停在「生成中」的卡片，而服务端可能还在正常跑。
+  // 兜底改成「连续查询失败」——那与任务跑多久无关。
+  if (JOB_POLL_MAX_MS > 0 && Date.now() - jobPollStartedAt > JOB_POLL_MAX_MS) {
     pendingJobs.clear();
     jobPollStartedAt = 0;
     state.genBusy = false;
     return;
   }
+  let sawError = false;
   for (const id of [...pendingJobs]) {
     try {
       const resp = await fetch(`/api/jobs/${id}`, {cache: "no-store"});
-      if (!resp.ok) continue;
+      if (!resp.ok) { sawError = true; continue; }
       const job = await resp.json();
       if (!["queued", "running"].includes(job.status)) pendingJobs.delete(id);
-    } catch (e) { /* 网络抖动则下一轮再试 */ }
+    } catch (e) {
+      sawError = true;   /* 网络抖动则下一轮再试 */
+    }
+  }
+  // 【2026-11-19 缺陷 1 修】连续失败才放弃轮询（与运行时长无关）。
+  jobPollErrors = sawError ? jobPollErrors + 1 : 0;
+  if (jobPollErrors >= JOB_POLL_MAX_ERRORS) {
+    pendingJobs.clear();
+    jobPollStartedAt = 0;
+    jobPollErrors = 0;
+    state.genBusy = false;
+    return;
   }
   state.genBusy = pendingJobs.size > 0;
   if (pendingJobs.size) setTimeout(pollPendingJobs, 1500);
@@ -4801,6 +4840,23 @@ function jobCard(job) {
     preview = `<div class="progress-wrap"><div class="err-text">✕ ${friendlyError(job.error)}</div></div>`;
   } else if (job.status === "canceled") {
     preview = `<div class="progress-wrap"><div class="progress-text">已取消</div></div>`;
+  } else if (job.status === "done") {
+    // 【2026-11-19 缺陷 2 修 —— 防御层】
+    //
+    // 【为什么要有这一层】服务端已经保证「失败不标 done」了，但前端
+    // 不能假设服务端**永远**是对的（老库里就有历史脏数据、别的分支
+    // 可能写进 done + 空 outputs）。
+    //
+    // 【原来错在哪】status='done' 且 outputs=[] 时，上面所有分支都不匹配
+    // -> `preview` 是空串 -> 渲染出一个**空的** .job-preview 容器
+    // -> 它的背景色是 #0d0f12（近黑）-> 用户看到的就是「生成成功 +
+    // 一张全黑图」。这正是用户报的「预览图全黑」。
+    //
+    // 【现在】明确显示「无产物」提示，而不是留一个黑框。
+    preview = `<div class="progress-wrap">
+      <div class="err-text">⚠ 生成结束但没有产物文件（无法预览）。<br>
+      如需重试，请点击「复用参数」重新生成。</div>
+    </div>`;
   }
 
   const topRight = runningOrQueued

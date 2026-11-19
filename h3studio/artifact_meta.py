@@ -366,14 +366,28 @@ def apply_to_params(params: dict, extracted: dict,
     # 两者写同一个值 -> 显示层读到的就是真实挂载的那枚，不会猜错。
     first = loras[0]
     strength = first.get("strength")
-    params["accel_loras"] = [{
-        "key": first.get("name") or "",
-        "name": first.get("name") or "",
-        "strength": strength if strength is not None else 1.0,
-        "enabled": True,
-    }]
-    params["fixed_accel_lora"] = first.get("name") or ""
-    params["accel_lora"] = first.get("name") or ""
+    # ---- [2026-11-19 第 7 轮审查] F5 ----
+    # 这里原来写的是**权重文件名**（如 dmad_minimax_h3_4step_full_critic_comfyui）。
+    # 但工作流层认的是**目录 key**（dmad_4step_critic / ckpt850 ——
+    # VIDEO_ACCEL_LORAS 里的那件），拿权重名去查 accel_lora_meta(key)
+    # 返回 None -> 加速 LoRA 链**空编**（重试时把模型上挂着的那枚
+    # LoRA 悄悄摘掉了，而且**没有任何报错**）。
+    #
+    # [修法] 只写**认得出目录 key 的**值：
+    #   * 认得出 -> 写 key（工作流层认得）；
+    #   * 认不出 -> **不覆盖**已有槽位（提交时写进去的本来就是正确 key；
+    #     写成权重名只会让工作流**默默忘掉**挂着的那枚 LoRA）。
+    slot_key = lora_key_for_weight(str(first.get("raw_name")
+                                        or first.get("name") or ""))
+    if slot_key:
+        params["accel_loras"] = [{
+            "key": slot_key,
+            "name": first.get("name") or "",
+            "strength": strength if strength is not None else 1.0,
+            "enabled": True,
+        }]
+        params["fixed_accel_lora"] = slot_key
+        params["accel_lora"] = slot_key
     if strength is not None:
         params["accel_lora_strength"] = strength
         params["fixed_accel_strength"] = strength

@@ -113,6 +113,21 @@ from h3studio import comfy_errors
 #      -> history 里没有、队列里也没有 -> worker 永远等下去。
 # 判定逻辑放在纯函数模块里（可离线穷举），server.py 只负责取数。
 from h3studio import running_truth
+# 【2026-11-19 缺陷 1 修】生成任务的**运行上限**策略（按媒体类型区分）。
+#
+# 【为什么要有这一层】原来只有一个全局阈值 `running_timeout_sec`
+# （默认 30 分钟），对**所有**任务一视同仁 —— 视频任务跑得久是正常现象，
+# 却会被硬判「超时失败」。策略层把「上限多久」变成纯函数，
+# 视频类默认不限时（0），图像 / 音频保留可配置上限。
+from h3studio import job_timeout
+# 【2026-11-19 缺陷 2 修】ComfyUI 执行结果的**成功判定**（纯函数层）。
+#
+# 【为什么要有这一层】worker 原来先看 `hist.get("outputs")` 非空再判失败 ——
+# 而 ComfyUI 在 OOM / 节点报错时 outputs 里**也会有**已执行完节点的输出
+# （实测只有文本节点）-> 取不出媒体 -> saved=[] -> 任务被标 done
+# -> 前端显示「生成成功」+ 全黑预览。判定层把顺序纠正过来：
+# **失败优先于产物**，且产物必须真实存在且非空。
+from h3studio import gen_outcome
 # 【2026-11-13 合并说明】model_recommendations（h3-model-meta 分支）：
 # 主模型 / 加速 LoRA 的作者推荐参数元数据（步数/调度器/采样器/音视频 shift）。
 # 与上面的 continuation / comfy_errors 是**互不相关的独立模块**，
@@ -202,7 +217,15 @@ DEFAULT_CONFIG = {
     # 【2026-11-14 A5】单个任务的运行上限（秒）。
     # 超过它就判定为「超时失败」并给出中文原因 —— 不再无限期「运行中」。
     # 0 = 不限制（不推荐：会退回「永远运行中」的旧行为）。
-    "running_timeout_sec": running_truth.DEFAULT_TIMEOUT_SEC,
+    #
+    # 【2026-11-19 缺陷 1 修】这个值现在是**图像 / 音频类**的上限；
+    # 视频类用下面的 `running_timeout_video_sec`（默认 0 = 不限时）。
+    "running_timeout_sec": job_timeout.DEFAULT_TIMEOUT_SEC,
+    # 【2026-11-19 缺陷 1 修】视频类任务的运行上限（秒）。
+    # **默认 0 = 不按运行时长判失败** —— 视频跑很久是正常现象，
+    # 即使跑一天也不该被判失败（用户明确要求）。
+    # 「任务丢失」判定与时长无关，所以视频任务不会卡成「永远运行中」。
+    "running_timeout_video_sec": job_timeout.VIDEO_TIMEOUT_SEC,
     # 【2026-11-14 A5】「刚提交」的宽限期（秒）：
     # 提交后这段时间内不判定「任务已丢失」（ComfyUI 可能还没把它放进队列）。
     "running_lost_grace_sec": running_truth.DEFAULT_LOST_GRACE_SEC,
@@ -266,11 +289,49 @@ def _cfg_float(key: str, default: float) -> float:
 
 
 #: 任务运行上限（秒）。0 = 不限制（不推荐 —— 会退回「永远运行中」）。
+#:
+#: 【2026-11-19 缺陷 1 修】这个常量现在是**图像 / 音频类**的上限。
+#: 视频类走 `RUNNING_TIMEOUT_VIDEO_SEC`（默认 0 = 不按时长判失败）。
 RUNNING_TIMEOUT_SEC = _cfg_float("running_timeout_sec",
-                                running_truth.DEFAULT_TIMEOUT_SEC)
+                                job_timeout.DEFAULT_TIMEOUT_SEC)
+#: 【2026-11-19 缺陷 1 修】视频类任务的运行上限（秒）。
+#:
+#: 【默认 0 = 不按运行时长判失败】用户明确要求：「视频任务运行很久是
+#: 正常现象，即使跑 1 天也不应被判失败」。
+#:
+#: 【为什么这样安全】「丢失」判定（ComfyUI 队列与 history 都没有）与
+#: 时长**无关** —— 视频任务要么在队列里（继续等）、要么被 ComfyUI 丢掉
+#: （明确失败），不会卡成「永远运行中」。
+RUNNING_TIMEOUT_VIDEO_SEC = _cfg_float("running_timeout_video_sec",
+                                       job_timeout.VIDEO_TIMEOUT_SEC)
 #: 「刚提交」的宽限期（秒）：这段时间内不判定「任务已丢失」。
 RUNNING_LOST_GRACE_SEC = _cfg_float("running_lost_grace_sec",
                                     running_truth.DEFAULT_LOST_GRACE_SEC)
+
+
+def timeout_sec_for_media(media: str) -> float:
+    """媒体类型 -> 该类任务的运行上限（秒）。0 = 不按时长判失败。
+
+    【为什么要有这个函数】缺陷 1 的根因是「所有任务共用一个 30 分钟阈值」。
+    视频类必须单独走 `RUNNING_TIMEOUT_VIDEO_SEC`（默认 0），
+    否则视频跑到 30 分钟就被硬判失败。
+
+    【口径】media 取自 `job_timeout.media_of_mode`（image / video / audio / other）。
+    """
+    return job_timeout.timeout_for_media(
+        media,
+        image_timeout_sec=RUNNING_TIMEOUT_SEC,
+        video_timeout_sec=RUNNING_TIMEOUT_VIDEO_SEC)
+
+
+def timeout_sec_for_mode(mode: str) -> float:
+    """任务 mode -> 运行上限（秒）。视频类默认不限时。"""
+    return timeout_sec_for_media(job_timeout.media_of_mode(mode))
+
+
+def timeout_reason_for(timeout_sec: float, media: str = job_timeout.MEDIA_OTHER) -> str:
+    """生成超时的中文原因（文案与阈值一致，不写死分钟数）。"""
+    return job_timeout.timeout_reason(timeout_sec, media)
 
 #: worker 多久查一次 ComfyUI 的 /queue（秒）。
 #:
@@ -451,20 +512,31 @@ async def _finalize_residual_with_outputs(job_id: str, row: dict,
                  f"ComfyUI 已完成该任务，但产物未能取回，请重新提交生成。",
                  time.time(), job_id))
         return
-    status_info, is_error, malformed = _history_status(history_entry)
-    if is_error or malformed or not saved:
-        if is_error:
-            reason = _comfy_error_message(status_info)
-        elif malformed:
-            reason = comfy_errors.MALFORMED_STATUS_REASON
-        else:
-            reason = ("服务重启后回收产物失败：ComfyUI 未返回任何产物，"
-                      "请重新提交生成。")
+    # 【2026-11-19 缺陷 2 修】与 worker **同一套**判定（失败优先）。
+    # 这一条路径原来虽然也判 is_error，但**先下载产物、后判失败** ——
+    # OOM 场景下 ComfyUI 的 outputs 里只有文本节点，下载得到空列表，
+    # 靠 `not saved` 兜底才判失败。现在统一走 gen_outcome，
+    # 口径与 worker / 批次 / 接管路径**完全一致**。
+    outcome = gen_outcome.history_outcome(history_entry)
+    if outcome["failed"]:
+        reason = outcome["reason"]
+        if not reason:
+            reason = _comfy_error_message(outcome["status_info"])
         with db() as conn:
             conn.execute(
                 "UPDATE jobs SET status='failed', error=?, finished_at=? "
                 "WHERE id=? AND status='running'",
                 (reason, time.time(), job_id))
+        return
+    # 【2026-11-19 缺陷 2 修】产物必须真实存在且非空（0 字节 = 全黑预览）。
+    real_ok, problems = gen_outcome.outputs_are_real(saved, OUT_DIR)
+    if not real_ok:
+        print(f"[自愈] 任务 {job_id} 产物校验失败: {problems}")
+        with db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                "WHERE id=? AND status='running'",
+                (gen_outcome.missing_output_reason(problems), time.time(), job_id))
         return
 
     # 【2026-11-17 修复】接续段：自愈路径也要跑接续收尾。
@@ -506,15 +578,21 @@ async def _adopt_residual_running(job_id: str, row: dict) -> None:
     起一个后台协程，等 ComfyUI 出结果后收尾；同样有超时上限。
     它**不占用 worker 的串行队列**（worker 只处理 status='queued'），
     所以不会挡住其它任务。
+
+    【2026-11-19 缺陷 1 修】上限按**媒体类型**取：视频类默认 0
+    （不按时长判失败）—— 视频跑很久是正常现象。
     """
     prompt_id = row.get("prompt_id") or ""
     started_at = row.get("started_at") or time.time()
+    # 【2026-11-19 缺陷 1 修】按媒体类型取上限（视频类默认不限时）。
+    job_media = job_timeout.media_of_mode(str(row.get("mode") or ""))
+    adopt_timeout_sec = timeout_sec_for_media(job_media)
     try:
         async with ClientSession(timeout=HTTP_TIMEOUT) as session:
-            deadline = started_at + (RUNNING_TIMEOUT_SEC or 1e9)
+            deadline = started_at + (adopt_timeout_sec or 1e9)
             while True:
                 if time.time() > deadline:
-                    reason = running_truth.timeout_reason(RUNNING_TIMEOUT_SEC)
+                    reason = timeout_reason_for(adopt_timeout_sec, job_media)
                     with db() as conn:
                         conn.execute(
                             "UPDATE jobs SET status='failed', error=?, finished_at=? "
@@ -531,13 +609,41 @@ async def _adopt_residual_running(job_id: str, row: dict) -> None:
                 hist = await comfy_history(session, prompt_id)
                 if not hist:
                     continue
-                if hist.get("outputs"):
+                # 【2026-11-19 缺陷 2 修】与 worker **同一套**判定：
+                # 失败优先于产物（OOM 时 outputs 里也会有已执行完节点的输出）。
+                outcome = gen_outcome.history_outcome(hist)
+                if outcome["failed"]:
+                    reason = outcome["reason"]
+                    if not reason:
+                        reason = _comfy_error_message(outcome["status_info"])
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
+                            "WHERE id=? AND status='running'",
+                            (reason, time.time(), job_id))
+                    return
+                if outcome["pending"]:
+                    # status 还没落定 -> 还在跑，继续等。
+                    continue
+                if True:
                     outs = _extract_outputs(hist)
                     saved = []
                     for item in outs:
                         fname = await comfy_download_output(session, item)
                         saved.append({"kind": item["kind"], "file": fname,
                                       "name": item["filename"]})
+                    # 【2026-11-19 缺陷 2 修】产物必须真实存在且非空。
+                    real_ok, problems = gen_outcome.outputs_are_real(
+                        saved, OUT_DIR)
+                    if not real_ok:
+                        print(f"[自愈] 任务 {job_id} 产物校验失败: {problems}")
+                        with db() as conn:
+                            conn.execute(
+                                "UPDATE jobs SET status='failed', error=?, "
+                                "finished_at=? WHERE id=? AND status='running'",
+                                (gen_outcome.missing_output_reason(problems),
+                                 time.time(), job_id))
+                        return
                     annotate_outputs_with_size(saved)
 
                     # 【2026-11-17 修复】接续段：接管路径也要跑接续收尾。
@@ -567,22 +673,6 @@ async def _adopt_residual_running(job_id: str, row: dict) -> None:
                             (json.dumps(saved, ensure_ascii=False),
                              time.time(), job_id))
                     print(f"[自愈] 接管的任务 {job_id} 已完成，回收 {len(saved)} 个产物")
-                    return
-                status_info, is_error, malformed = _history_status(hist)
-                if malformed:
-                    with db() as conn:
-                        conn.execute(
-                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
-                            "WHERE id=? AND status='running'",
-                            (comfy_errors.MALFORMED_STATUS_REASON,
-                             time.time(), job_id))
-                    return
-                if is_error:
-                    with db() as conn:
-                        conn.execute(
-                            "UPDATE jobs SET status='failed', error=?, finished_at=? "
-                            "WHERE id=? AND status='running'",
-                            (_comfy_error_message(status_info), time.time(), job_id))
                     return
     except asyncio.CancelledError:
         raise
@@ -843,11 +933,13 @@ def row_to_job(r):
             status=r["status"],
             started_at=(r["started_at"] if "started_at" in r.keys() else None),
             now=time.time(),
-            timeout_sec=RUNNING_TIMEOUT_SEC,
+            # 【2026-11-19 缺陷 1 修】上限按**媒体类型**取：视频类默认 0
+            # （不按时长判失败），图像 / 音频保留可配置上限。
+            timeout_sec=timeout_sec_for_mode(mode),
         ),
         # 运行上限（秒）也单独下发一份 —— 前端队列面板要显示「上限」，
         # 且老前端（不认识 running_truth）也能用它做最朴素的兜底。
-        "running_timeout_sec": RUNNING_TIMEOUT_SEC,
+        "running_timeout_sec": timeout_sec_for_mode(mode),
         # 【2026-11-11】卡片显示用的分辨率 / 比例标签（服务端算好的唯一真源）
         "resolution_info": resolution_info,
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
@@ -2040,7 +2132,7 @@ class Worker:
                 # 后面所有任务全部排队等着，用户看到的是「整个队列不动了」。
                 #
                 # 现在加两道闸：
-                #   * 超时上限（RUNNING_TIMEOUT_SEC，默认 30 分钟）-> 明确失败；
+                #   * 超时上限（按媒体类型；视频类默认 0 = 不限时）-> 明确失败；
                 #   * 队列核查（/queue）-> prompt_id 既不在 running 也不在 pending、
                 #     且 history 里也没有 -> 判定「任务已丢失」-> 明确失败。
                 try:
@@ -2051,6 +2143,11 @@ class Worker:
                     run_started_at = (started_row["started_at"]
                                       if started_row and started_row["started_at"]
                                       else time.time())
+                    # 【2026-11-19 缺陷 1 修】本次运行的**上限**按媒体类型取。
+                    # 视频类默认 0 = 不按时长判失败（跑一天也不判失败）；
+                    # 图像 / 音频保留可配置上限（跑满基本等于卡死）。
+                    job_media = job_timeout.media_of_mode(mode)
+                    run_timeout_sec = timeout_sec_for_media(job_media)
                     # 队列核查的节流：不必每轮轮询都打一次 /queue
                     # （history 每 1.5 秒查一次已经够密了，/queue 稍后再查）。
                     next_queue_check = 0.0
@@ -2071,38 +2168,80 @@ class Worker:
                             # 「把失败原因翻译给用户」的错误处理路径上，
                             # 结果用户只看到一句 Python 异常文本。
                             # 详见 comfy_errors.coerce_status_info。
-                            status_info, is_error, malformed = _history_status(hist)
-                            if hist.get("outputs"):
-                                outs = _extract_outputs(hist)
-                                saved = []
-                                for item in outs:
-                                    fname = await comfy_download_output(session, item)
-                                    saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
-                                # 【2026-11-11】记录产物的**实际像素尺寸**。
-                                # 卡片要显示真实输出，而不是请求值（请求值可能
-                                # 被画布上限 / 放大链 / 模型限制改写过）。
-                                annotate_outputs_with_size(saved)
-                                # 【2026-11-12 新增】接续：把本段登记进链，
-                                # 并拼接出**完整视频**（上一段 + 本段）。
-                                # 失败**不影响**本段本身的产物 —— 拼接是附加产物。
-                                try:
-                                    saved = await self._finalize_continuation(
-                                        job_id, mode, params, saved)
-                                except Exception as ce:
-                                    print(f"[worker] 接续拼接失败（不影响本段产物）: {ce}")
-                                with db() as conn:
-                                    conn.execute(
-                                        "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
-                                        (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
-                                print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
-                                return
-                            if malformed:
-                                # 形状超预期 -> **快速失败**，别挂死。
-                                raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
-                            if is_error:
-                                raise RuntimeError(_comfy_error_message(status_info))
-                            # history 有记录但既没产物也不是错误 -> 继续等
-                            # （ComfyUI 还在跑，status 还没落定）。
+                            #
+                            # 【2026-11-19 缺陷 2 修 —— 判定顺序】
+                            #
+                            # 【原来错在哪】旧顺序是：
+                            #     if hist.get("outputs"):   <- 先看 outputs 非空
+                            #         ... 标 status='done'
+                            #     if is_error:              <- 失败判定在后面
+                            # 而 ComfyUI 在执行失败（OOM / 节点报错）时
+                            # **也会**往 outputs 里塞已执行完节点的输出 ——
+                            # 实测 OOM 的 history 是：
+                            #     status.status_str = 'error'
+                            #     outputs = {'301': {'text': [...]}}   <- 文本节点
+                            # `hist.get("outputs")` 非空 -> 走成功分支 ->
+                            # `_extract_outputs` 取不出媒体 -> saved=[] ->
+                            # 任务被标成 done + outputs=[] ->
+                            # 前端显示「生成成功」+ 空白（黑）预览。
+                            #
+                            # 【修法】**失败判定必须优先于产物判定**。
+                            # status 说失败就是失败，outputs 里有什么都不算数。
+                            outcome = gen_outcome.history_outcome(hist)
+                            if outcome["failed"]:
+                                # status 说失败（OOM / 节点报错 / 没产物）
+                                # -> **必须判失败**。
+                                reason = outcome["reason"]
+                                if not reason:
+                                    reason = _comfy_error_message(
+                                        outcome["status_info"])
+                                raise RuntimeError(reason)
+                            if outcome["pending"]:
+                                # ComfyUI 的 status 还没落定（status=None）
+                                # -> **还在跑**，继续等下一轮。
+                                # ⚠ 这一条必须保留：把「还在跑」误判成失败
+                                # 会把正常的长视频任务直接判死（缺陷 1 的同类坑）。
+                                continue
+                            # 到这里：status 成功，且**确实有媒体产物**。
+                            outs = _extract_outputs(hist)
+                            saved = []
+                            for item in outs:
+                                fname = await comfy_download_output(session, item)
+                                saved.append({"kind": item["kind"], "file": fname, "name": item["filename"]})
+                            # 【2026-11-19 缺陷 2 修 —— 产物必须真实存在】
+                            # ComfyUI 报「有输出」不等于文件真的下下来了。
+                            # 下载中断 -> 0 字节文件 -> 前端显示全黑 / 播不出来。
+                            # 所以这里校验**文件存在且非空**，不通过就判失败。
+                            real_ok, problems = gen_outcome.outputs_are_real(
+                                saved, OUT_DIR)
+                            if not real_ok:
+                                print(f"[worker] 任务 {job_id} 产物校验失败: {problems}")
+                                raise RuntimeError(
+                                    gen_outcome.missing_output_reason(problems))
+                            # 【2026-11-11】记录产物的**实际像素尺寸**。
+                            # 卡片要显示真实输出，而不是请求值（请求值可能
+                            # 被画布上限 / 放大链 / 模型限制改写过）。
+                            annotate_outputs_with_size(saved)
+                            # 【2026-11-12 新增】接续：把本段登记进链，
+                            # 并拼接出**完整视频**（上一段 + 本段）。
+                            # 失败**不影响**本段本身的产物 —— 拼接是附加产物。
+                            try:
+                                saved = await self._finalize_continuation(
+                                    job_id, mode, params, saved)
+                            except Exception as ce:
+                                print(f"[worker] 接续拼接失败（不影响本段产物）: {ce}")
+                            with db() as conn:
+                                conn.execute(
+                                    "UPDATE jobs SET status='done', progress=1, outputs=?, finished_at=? WHERE id=? AND status='running'",
+                                    (json.dumps(saved, ensure_ascii=False), time.time(), job_id))
+                            print(f"[worker] 任务 {job_id} 完成: {len(saved)} 个文件")
+                            return
+                            # 【2026-11-19 缺陷 2 修】上面 `history_outcome`
+                            # 已经把「畸形 / 失败 / 无产物」三种情况全部判掉了，
+                            # 所以这里**不再有**「既没产物也不是错误」的分支 ——
+                            # 那种情况（ComfyUI 还在跑、status 还没落定）
+                            # 由 history_outcome 的 NO_OUTPUT 判定覆盖：
+                            # 它会给出明确的失败原因，而不是静默继续等。
 
                         # ---- history 里没有结果 ----
                         #
@@ -2123,23 +2262,27 @@ class Worker:
                         if now >= next_queue_check:
                             next_queue_check = now + QUEUE_CHECK_INTERVAL
                             state, reason = await resolve_running_state(
-                                session, prompt_id, run_started_at, False)
+                                session, prompt_id, run_started_at, False,
+                                timeout_sec=run_timeout_sec)
                             if state == running_truth.STATE_LOST:
                                 print(f"[worker] 任务 {job_id} 在 ComfyUI 队列中已消失，"
                                       f"判定为丢失: {reason}")
                                 raise RuntimeError(reason)
                             if state == running_truth.STATE_TIMEOUT:
                                 print(f"[worker] 任务 {job_id} 超过运行上限"
-                                      f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                                      f"（{run_timeout_sec:.0f}s），判定为超时")
                                 raise RuntimeError(reason)
-                        elif (RUNNING_TIMEOUT_SEC > 0
-                              and now - run_started_at > RUNNING_TIMEOUT_SEC):
+                        elif (run_timeout_sec > 0
+                              and now - run_started_at > run_timeout_sec):
                             # 超时判定**不依赖**队列 —— 队列读不到（ComfyUI 无响应）
                             # 时也必须能超时退出，否则又会变成「永远运行中」。
+                            #
+                            # 【2026-11-19 缺陷 1 修】`run_timeout_sec` 按**媒体类型**
+                            # 取值：视频类默认 0（不按时长判失败），图像 / 音频保留上限。
                             print(f"[worker] 任务 {job_id} 超过运行上限"
-                                  f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                                  f"（{run_timeout_sec:.0f}s），判定为超时")
                             raise RuntimeError(
-                                running_truth.timeout_reason(RUNNING_TIMEOUT_SEC))
+                                timeout_reason_for(run_timeout_sec, job_media))
                 finally:
                     ws_task.cancel()
                     try:
@@ -2540,6 +2683,12 @@ class Worker:
                                      batch_id=batch_id))
             # 【A5】批次任务的轮询循环同样需要超时上限与「队列核查」——
             # 否则一个批次卡住 = 整个任务永远「运行中」（与单张任务同病）。
+            #
+            # 【2026-11-19 缺陷 1 修】上限按**媒体类型**取（批次目前只用于
+            # 图像模式，所以实际走图像上限；写成通用形式是为了将来新增
+            # 视频批次时不会又落回「所有任务共用一个阈值」）。
+            batch_media = job_timeout.media_of_mode(mode)
+            batch_timeout_sec = timeout_sec_for_media(batch_media)
             batch_started_at = time.time()
             next_queue_check = 0.0
             try:
@@ -2556,21 +2705,33 @@ class Worker:
                         raise RuntimeError("批次已取消")
                     hist = await comfy_history(session, prompt_id)
                     if hist:
-                        if hist.get("outputs"):
-                            outs = _extract_outputs(hist)
-                            saved = []
-                            for item in outs:
-                                fname = await comfy_download_output(session, item)
-                                saved.append({"kind": item["kind"], "file": fname,
-                                              "name": item["filename"]})
-                            return saved
-                        # 【2026-11-13 修】同上文：status 类型免疫。
-                        status_info, is_error, malformed = _history_status(hist)
-                        if malformed:
-                            # 形状超预期 -> **快速失败**，别挂死。
-                            raise RuntimeError(comfy_errors.MALFORMED_STATUS_REASON)
-                        if is_error:
-                            raise RuntimeError(_comfy_error_message(status_info))
+                        # 【2026-11-19 缺陷 2 修】与单任务路径**同一套**判定：
+                        # 失败优先于产物（OOM 时 ComfyUI 的 outputs 里也会有
+                        # 已执行完节点的输出，只看「outputs 非空」会误判成功）。
+                        outcome = gen_outcome.history_outcome(hist)
+                        if outcome["failed"]:
+                            reason = outcome["reason"]
+                            if not reason:
+                                reason = _comfy_error_message(
+                                    outcome["status_info"])
+                            raise RuntimeError(reason)
+                        if outcome["pending"]:
+                            # status 还没落定 -> 还在跑，继续等。
+                            continue
+                        outs = _extract_outputs(hist)
+                        saved = []
+                        for item in outs:
+                            fname = await comfy_download_output(session, item)
+                            saved.append({"kind": item["kind"], "file": fname,
+                                          "name": item["filename"]})
+                        # 【2026-11-19 缺陷 2 修】产物必须真实存在且非空。
+                        real_ok, problems = gen_outcome.outputs_are_real(
+                            saved, OUT_DIR)
+                        if not real_ok:
+                            print(f"[worker] 批次 {batch_id} 产物校验失败: {problems}")
+                            raise RuntimeError(
+                                gen_outcome.missing_output_reason(problems))
+                        return saved
 
                     # ---- history 里没有结果 -> 判定「是否真的还在跑」----
                     # 同 Worker._run 的 A5 逻辑：队列里也没有 = 任务已丢失；
@@ -2579,21 +2740,22 @@ class Worker:
                     if now >= next_queue_check:
                         next_queue_check = now + QUEUE_CHECK_INTERVAL
                         state, reason = await resolve_running_state(
-                            session, prompt_id, batch_started_at, False)
+                            session, prompt_id, batch_started_at, False,
+                            timeout_sec=batch_timeout_sec, media=batch_media)
                         if state == running_truth.STATE_LOST:
                             print(f"[worker] 批次 {batch_id} 在 ComfyUI 队列中已消失，"
                                   f"判定为丢失: {reason}")
                             raise RuntimeError(reason)
                         if state == running_truth.STATE_TIMEOUT:
                             print(f"[worker] 批次 {batch_id} 超过运行上限"
-                                  f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                                  f"（{batch_timeout_sec:.0f}s），判定为超时")
                             raise RuntimeError(reason)
-                    elif (RUNNING_TIMEOUT_SEC > 0
-                          and now - batch_started_at > RUNNING_TIMEOUT_SEC):
+                    elif (batch_timeout_sec > 0
+                          and now - batch_started_at > batch_timeout_sec):
                         print(f"[worker] 批次 {batch_id} 超过运行上限"
-                              f"（{RUNNING_TIMEOUT_SEC:.0f}s），判定为超时")
+                              f"（{batch_timeout_sec:.0f}s），判定为超时")
                         raise RuntimeError(
-                            running_truth.timeout_reason(RUNNING_TIMEOUT_SEC))
+                            timeout_reason_for(batch_timeout_sec, batch_media))
             finally:
                 ws_task.cancel()
                 try:
@@ -4211,17 +4373,35 @@ def _prepare_continuation_params(params: dict) -> str:
     chain_id = source_chain or source_job
 
     # 钉住窗口 / 外观锚帧数：必须落在 5+17k 网格上
-    window = cont.snap_context_frames(
-        int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    # ---- [2026-11-19 第 7 轮审查] ----
+    # F3：畸形的 context_frames / anchor_frames 不得把 HTTP 打成 500。
+    #
+    # [原因] 这两行直接 int()，一个字段不对（前端传了字符串 / 数组）
+    # 就直接 ValueError —— 用户点「生成」，服务端直接 500，
+    # 用户既不知道自己填错了什么，也不知道该怎么改。
+    #
+    # —— 修法 —— 字段不对 -> 回退到默认值（接续上下文的钉住窗口必须
+    # 对齐；对不齐就回退到默认值，不猜）。
+    try:
+        window = cont.snap_context_frames(
+            int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    except (TypeError, ValueError):
+        window = 0
     if not window:
         window = cont.DEFAULT_CONTEXT_FRAMES
-    anchor = cont.snap_context_frames(
-        int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    try:
+        anchor = cont.snap_context_frames(
+            int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    except (TypeError, ValueError):
+        anchor = 0
     if not anchor:
         anchor = cont.DEFAULT_CONTEXT_FRAMES
 
     # 本段总帧数（17k+5 网格）与本段交付帧数（总帧数 - 钉住帧数）
-    duration = float(params.get("duration") or 5)
+    try:
+        duration = float(params.get("duration") or 5)
+    except (TypeError, ValueError):
+        duration = 5.0
     segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
 
     # 累计帧数：上游已累计的 + 本段交付的。
@@ -4276,6 +4456,37 @@ def _prepare_continuation_params(params: dict) -> str:
     }
     # 音频接续状态（首尾帧 / 参考生视频）—— 继承自上游。
     params["continuation"].update(audio_state)
+
+    # ---- [2026-11-19 第 7 轮审查] ----
+    #
+    # F1：显式放行标记（allow_twopass）不能丢。
+    #
+    # [原因] 用户在前端勾选「接续段也用二采」（并二次确认）后，
+    # 前端把 allow_twopass=true 放进提交的 continuation。本段重建
+    # continuation 时只写固定的一组字段，**没有**带上它 ——
+    # 用户显式勾选（并确认过）的接续段二采被**静默丢弃**。
+    #
+    # [为什么必须保留] 只有 info 里的 allow_twopass 才算是用户显式
+    # 放行；服务端策略层（h3studio/twopass_policy.py）正是读这个键
+    # 决定「deny」还是「warn」的。丢了它 = 用户勾了等于没勾。
+    if info.get("allow_twopass") is True:
+        params["continuation"]["allow_twopass"] = True
+
+    # F2：参考视频帧数必须继承 —— 第 2 段要按 C_n 跳帧。
+    #
+    # [为什么必须继承] 参考视频带检出的帧数在**上游那一段**里 ——
+    # 不继承就没法跳帧；参考视频又从 0 开始喂（2026-11-19 实测的
+    # 「段头跳变」修复在真实接续链上等于没生效）。
+    # 参考视频帧数来自**上游那一段**的 continuation（worker 探测直接
+    # 写进 continuation 字段的）—— 不依赖前端，前端不会带这个字段。
+    try:
+        upstream_ref_frames = int(
+            source_info.get("ref_video_frame_count") or 0)
+    except (TypeError, ValueError):
+        upstream_ref_frames = 0
+    if upstream_ref_frames > 0:
+        params["continuation"]["ref_video_frame_count"] = \
+            upstream_ref_frames
     return ""
 
 
@@ -5921,7 +6132,9 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
                 status=status,
                 started_at=row["started_at"],
                 now=now,
-                timeout_sec=RUNNING_TIMEOUT_SEC,
+                # 【2026-11-19 缺陷 1 修】上限按**媒体类型**取
+                # （视频类默认 0 = 不按时长判失败）。
+                timeout_sec=timeout_sec_for_mode(row["mode"]),
             ),
         })
     recent = []
@@ -5978,13 +6191,18 @@ async def api_queue(request):
             status=item["status"],
             started_at=item.get("started_at"),
             now=now,
-            timeout_sec=RUNNING_TIMEOUT_SEC,
+            # 【2026-11-19 缺陷 1 修】按媒体类型取上限（视频类默认不限时）。
+            timeout_sec=timeout_sec_for_mode(item.get("mode")),
             live_state=state,
         )
         if not live_state and state:
             live_state = state
     snapshot["running_state"] = live_state
-    snapshot["running_timeout_sec"] = RUNNING_TIMEOUT_SEC
+    # 【2026-11-19 缺陷 1 修】队列级上限按**当前运行中任务**的媒体类型取
+    # （视频类默认 0 = 不限时）。队列里没有运行中任务时给图像类的默认值。
+    snapshot["running_timeout_sec"] = timeout_sec_for_mode(
+        next((i.get("mode") for i in snapshot["items"]
+              if i.get("status") == "running"), ""))
     return json_ok(snapshot)
 
 
@@ -6097,7 +6315,8 @@ async def api_list(request):
             status=job["status"],
             started_at=job.get("started_at"),
             now=now,
-            timeout_sec=RUNNING_TIMEOUT_SEC,
+            # 【2026-11-19 缺陷 1 修】按媒体类型取上限（视频类默认不限时）。
+            timeout_sec=timeout_sec_for_mode(job.get("mode")),
             live_state=state,
         )
         if not live_state and state:
@@ -6107,7 +6326,11 @@ async def api_list(request):
                     "running": WORKER.current,
                     # 【A5】实时判定结果（空串 = 没有运行中的任务 / 判定不了）。
                     "running_state": live_state or "",
-                    "running_timeout_sec": RUNNING_TIMEOUT_SEC})
+                    # 【2026-11-19 缺陷 1 修】按**当前运行中任务**的媒体类型取
+                    # （视频类默认 0 = 不限时）。
+                    "running_timeout_sec": timeout_sec_for_mode(
+                        next((j.get("mode") for j in jobs
+                              if j.get("status") == "running"), ""))})
 
 
 async def api_get(request):
@@ -6125,7 +6348,8 @@ async def api_get(request):
             status=job["status"],
             started_at=job.get("started_at"),
             now=time.time(),
-            timeout_sec=RUNNING_TIMEOUT_SEC,
+            # 【2026-11-19 缺陷 1 修】按媒体类型取上限（视频类默认不限时）。
+            timeout_sec=timeout_sec_for_mode(job.get("mode")),
             live_state=live_state,
         )
     return json_ok(job)
@@ -6938,7 +7162,8 @@ async def live_state_for_job(row, now: float | None = None,
         queue_ids=queue_ids,
         now=now if now is not None else time.time(),
         started_at=data.get("started_at"),
-        timeout_sec=RUNNING_TIMEOUT_SEC,
+        # 【2026-11-19 缺陷 1 修】按媒体类型取上限（视频类默认不限时）。
+        timeout_sec=timeout_sec_for_mode(data.get("mode")),
         grace_sec=RUNNING_LOST_GRACE_SEC,
     )
 
@@ -6975,7 +7200,9 @@ async def live_states_for_jobs(rows, now: float | None = None) -> dict:
 
 
 async def resolve_running_state(session, prompt_id: str, started_at: float | None,
-                                history_present: bool) -> tuple[str, str]:
+                                history_present: bool,
+                                timeout_sec: float | None = None,
+                                media: str = job_timeout.MEDIA_OTHER) -> tuple[str, str]:
     """判定「这个声称在运行的任务」**真实**处于什么状态。
 
     返回 `(state, reason)`：
@@ -6985,22 +7212,26 @@ async def resolve_running_state(session, prompt_id: str, started_at: float | Non
     【为什么 history_present 由调用方传进来】
     history 的取数在 worker 的轮询循环里（它已经在查了），再查一次
     是白白多一次 HTTP 往返。这里只负责**队列**那一份的取数 + 判定。
+
+    【2026-11-19 缺陷 1 修】`timeout_sec` 由调用方按**媒体类型**传入
+    （视频类默认 0 = 不按时长判失败）。不传则退回全局默认上限。
     """
     queue_ids = await fetch_comfy_queue_ids(session)
+    limit = RUNNING_TIMEOUT_SEC if timeout_sec is None else float(timeout_sec)
     state = running_truth.classify(
         prompt_id=prompt_id,
         history_present=history_present,
         queue_ids=queue_ids,
         now=time.time(),
         started_at=started_at,
-        timeout_sec=RUNNING_TIMEOUT_SEC,
+        timeout_sec=limit,
         grace_sec=RUNNING_LOST_GRACE_SEC,
     )
     reason = ""
     if state == running_truth.STATE_LOST:
         reason = running_truth.LOST_REASON
     elif state == running_truth.STATE_TIMEOUT:
-        reason = running_truth.timeout_reason(RUNNING_TIMEOUT_SEC)
+        reason = timeout_reason_for(limit, media)
     return state, reason
 
 
@@ -7053,6 +7284,39 @@ async def api_system(request):
         "build_fingerprint": BUILD_FINGERPRINT,
         "features": SERVER_FEATURES,
         "started_at": SERVER_STARTED_AT,
+    })
+
+
+async def api_timeout_policy(request):
+    """GET /api/timeout-policy —— 当前生效的「运行上限」策略。
+
+    【为什么要有这个接口 —— 2026-11-19 缺陷 1 修】
+    上限从「一个全局 30 分钟」变成「按媒体类型区分 + 可配置」之后，
+    用户需要一个地方**看得见**当前生效值（否则只能去翻 config.json）。
+    这也符合本项目「配置由服务端算好下发、前端不自己猜」的既有纪律。
+
+    返回：
+        {
+          "image_timeout_sec": ...,   # 图像 / 音频类上限（0 = 不限时）
+          "video_timeout_sec": ...,   # 视频类上限（默认 0 = 不限时）
+          "by_media": {"image": ..., "video": ..., "audio": ..., "other": ...},
+          "lost_grace_sec": ...,
+          "note": 中文说明（默认行为的解释）
+        }
+    """
+    by_media = {}
+    for media in (job_timeout.MEDIA_IMAGE, job_timeout.MEDIA_VIDEO,
+                  job_timeout.MEDIA_AUDIO, job_timeout.MEDIA_OTHER):
+        by_media[media] = timeout_sec_for_media(media)
+    return json_ok({
+        "image_timeout_sec": RUNNING_TIMEOUT_SEC,
+        "video_timeout_sec": RUNNING_TIMEOUT_VIDEO_SEC,
+        "by_media": by_media,
+        "lost_grace_sec": RUNNING_LOST_GRACE_SEC,
+        "note": ("视频类任务默认**不按运行时长判失败**（跑 1 天也仍然是「进行中」）；"
+                 "只有当任务从 ComfyUI 队列与历史中消失时才会判定失败。"
+                 "图像 / 音频类保留运行上限，可在 config.json 里用 "
+                 "running_timeout_sec / running_timeout_video_sec 调整。"),
     })
 
 
@@ -10738,6 +11002,8 @@ def make_app():
     app.router.add_get("/api/media/manage", api_media_manage)
     app.router.add_post("/api/media/manage", api_media_manage)
     app.router.add_get("/api/system", api_system)
+    # 【2026-11-19 缺陷 1 修】运行上限策略的只读查询（前端展示用）。
+    app.router.add_get("/api/timeout-policy", api_timeout_policy)
     app.router.add_get("/api/status/stream", api_status_stream)
     app.router.add_get("/api/hardware", api_hardware)
     app.router.add_post("/api/gpu/power-limit", api_gpu_power_limit)

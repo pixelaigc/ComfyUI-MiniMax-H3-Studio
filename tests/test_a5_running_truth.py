@@ -549,6 +549,7 @@ class WorkerPollingTest(unittest.TestCase):
         self._orig_refresh = srv.refresh_comfy_node_names
         self._orig_interval = srv.CFG["poll_interval"]
         self._orig_timeout = srv.RUNNING_TIMEOUT_SEC
+        self._orig_video_timeout = srv.RUNNING_TIMEOUT_VIDEO_SEC
         self.tmp = tempfile.mkdtemp(prefix="h3-a5-worker-")
         srv.DB_PATH = Path(self.tmp) / "jobs.db"
         srv.OUT_DIR = Path(self.tmp) / "outputs"
@@ -566,6 +567,7 @@ class WorkerPollingTest(unittest.TestCase):
         srv.refresh_comfy_node_names = self._orig_refresh
         srv.CFG["poll_interval"] = self._orig_interval
         srv.RUNNING_TIMEOUT_SEC = self._orig_timeout
+        srv.RUNNING_TIMEOUT_VIDEO_SEC = self._orig_video_timeout
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _make_job(self, mode="t2v"):
@@ -575,8 +577,11 @@ class WorkerPollingTest(unittest.TestCase):
                          (1000.0, job_id))
         return job_id
 
-    def _run_worker(self, job_id, history_result, queue_ids):
-        """跑一次 worker._run（外部依赖全部换成桩）。"""
+    def _run_worker(self, job_id, history_result, queue_ids, mode="t2v"):
+        """跑一次 worker._run（外部依赖全部换成桩）。
+
+        `mode` 决定走哪条上限策略（视频类不限时 / 图像类有上限）。
+        """
         async def _fake_submit(session, workflow, client_id=None):
             return "pid-probe"
 
@@ -595,7 +600,7 @@ class WorkerPollingTest(unittest.TestCase):
         srv.fetch_comfy_queue_ids = _fake_queue_ids
 
         worker = srv.Worker()
-        job_row = {"id": job_id, "mode": "t2v",
+        job_row = {"id": job_id, "mode": mode,
                    "params": json.dumps({"prompt": "a5 probe", "duration": 5})}
         asyncio.run(worker._run(job_row))
 
@@ -615,8 +620,13 @@ class WorkerPollingTest(unittest.TestCase):
         self.assertNotIn("object has no attribute", error)
 
     def test_worker_times_out_and_fails(self):
-        """【红线 2】超过运行上限 -> 判失败（带分钟数的中文原因）。"""
-        job_id = self._make_job()
+        """【红线 2】超过运行上限 -> 判失败（带分钟数的中文原因）。
+
+        【2026-11-19 缺陷 1 修后的口径】这条红线对**图像类**仍然成立。
+        视频类不再因运行时长判失败（见 tests/test_gen_status_defects.py
+        的「视频任务跑超 30 分钟仍为 active」用例）。
+        """
+        job_id = self._make_job(mode="t2i")
         # started_at 固定在 1000.0 —— 把上限调到「已经超了」。
         srv.RUNNING_TIMEOUT_SEC = 0.001
         # 让「现在」远超 started_at：直接把上限设成 1 秒，
@@ -625,9 +635,32 @@ class WorkerPollingTest(unittest.TestCase):
         with srv.db() as conn:
             conn.execute("UPDATE jobs SET started_at=? WHERE id=?",
                          (_time.time() - 3600, job_id))
-        status, error = self._run_worker(job_id, None, {"pid-probe"})
+        status, error = self._run_worker(job_id, None, {"pid-probe"}, mode="t2i")
         self.assertEqual(status, "failed", "超时必须判失败")
         self.assertIn("超时", error)
+
+    def test_worker_video_not_failed_by_duration(self):
+        """【2026-11-19 缺陷 1 修】视频任务超时长**不**判失败。
+
+        worker 的轮询循环里有一条「超上限 -> 抛错」的分支。
+        视频类上限为 0 时，这条分支**不能**触发 ——
+        否则跑久的视频任务会被判「超时失败」（用户报的缺陷 1）。
+        """
+        job_id = self._make_job(mode="t2v")
+        srv.RUNNING_TIMEOUT_SEC = 0.001     # 图像类上限调到极小
+        srv.RUNNING_TIMEOUT_VIDEO_SEC = 0.0  # 视频类不限时
+        import time as _time
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET started_at=? WHERE id=?",
+                         (_time.time() - 3600, job_id))
+        # 先把任务标成 canceled，让 worker 下一轮读到就收尾
+        # （断言的是「它没被超时杀掉」）。
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='canceled' WHERE id=?", (job_id,))
+        status, error = self._run_worker(job_id, None, {"pid-probe"}, mode="t2v")
+        self.assertEqual(status, "canceled",
+                         "视频任务在队列里跑很久不能被判成超时失败")
+        self.assertNotIn("超时", error)
 
     def test_worker_keeps_running_while_task_is_in_queue(self):
         """任务还在队列里 -> 继续等（不能误杀正在跑的任务）。
@@ -678,8 +711,14 @@ class ApiPayloadTest(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_row_to_job_carries_running_truth(self):
-        """row_to_job 必须带 running_truth / running_timeout_sec / started_at。"""
-        job_id = srv.create_job_record("t2v", {"prompt": "x", "duration": 5})
+        """row_to_job 必须带 running_truth / running_timeout_sec / started_at。
+
+        【2026-11-19 缺陷 1 修后的口径】上限是**按媒体类型**的：
+          * 图像类 -> 上限非 0（跑满判失败，本机秒级 ~ 分钟级完成）；
+          * 视频类 -> 上限 0（**不按运行时长判失败**，跑 1 天也算进行中）。
+        两条都要断言 —— 只测一条会让「上限整体消失」这种回归溜过去。
+        """
+        job_id = srv.create_job_record("t2i", {"prompt": "x", "duration": 5})
         with srv.db() as conn:
             conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
                          (time.time(), job_id))
@@ -690,11 +729,35 @@ class ApiPayloadTest(unittest.TestCase):
         self.assertEqual(job["running_truth"]["state"],
                          running_truth.STATE_ACTIVE,
                          "刚启动的任务应判定为 active")
-        self.assertGreater(job["running_timeout_sec"], 0)
+        self.assertGreater(job["running_timeout_sec"], 0,
+                           "图像类任务必须带一个非 0 的运行上限")
+
+    def test_row_to_job_video_timeout_is_unlimited(self):
+        """【2026-11-19 缺陷 1 修】视频类任务的 running_timeout_sec = 0。
+
+        这条是缺陷 1 的**前端可见面**：前端队列面板读
+        `running_truth.timeout_sec` / `running_timeout_sec` 来决定
+        显不显示「已超时」。视频类必须是 0（= 不限时），否则前端
+        会把跑了很久的视频显示成「已超时」。
+        """
+        job_id = srv.create_job_record("t2v", {"prompt": "x", "duration": 5})
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
+                         (time.time(), job_id))
+            row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        job = srv.row_to_job(row)
+        self.assertEqual(job["running_timeout_sec"], 0,
+                         "视频类任务必须是不限时（0），否则会回到 30 分钟误判")
+        self.assertEqual(job["running_truth"]["timeout_sec"], 0)
 
     def test_row_to_job_running_truth_reflects_timeout(self):
-        """超限的 running -> running_truth.state = timeout（前端据此兜底）。"""
-        job_id = srv.create_job_record("t2v", {"prompt": "x", "duration": 5})
+        """超限的 running -> running_truth.state = timeout（前端据此兜底）。
+
+        【2026-11-19 缺陷 1 修后的口径】这条红线对**图像类**仍然成立
+        （跑满上限 = 卡死 -> 必须让用户看见「已超时」）。
+        视频类没有时长上限，所以改用图像类来验证这条红线。
+        """
+        job_id = srv.create_job_record("t2i", {"prompt": "x", "duration": 5})
         with srv.db() as conn:
             conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
                          (time.time() - 7200, job_id))
@@ -705,6 +768,23 @@ class ApiPayloadTest(unittest.TestCase):
                          running_truth.STATE_TIMEOUT,
                          "超限的 running 必须被标成 timeout，"
                          "否则前端会永远显示「运行中」")
+
+    def test_row_to_job_video_over_limit_stays_active(self):
+        """【2026-11-19 缺陷 1 修】视频类超了「时长」也不判 timeout。
+
+        这是缺陷 1 的**直接断言**：一条跑了 2 小时的视频任务，
+        running_truth.state 必须是 active（进行中），不是 timeout。
+        """
+        job_id = srv.create_job_record("t2v", {"prompt": "x", "duration": 5})
+        with srv.db() as conn:
+            conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
+                         (time.time() - 7200, job_id))
+            row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        job = srv.row_to_job(row)
+        self.assertEqual(job["running_truth"]["state"],
+                         running_truth.STATE_ACTIVE,
+                         "视频任务跑了 2 小时仍应是「进行中」，"
+                         "不能被判成「已超时失败」")
 
     def test_all_running_rows_get_live_judgement(self):
         """【A5 核心场景】残留 running 可能有**多条** -> 每一条都要判定。

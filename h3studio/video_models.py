@@ -2110,6 +2110,43 @@ def _is_known_accel_lora_key(key: str) -> bool:
     return False
 
 
+def _normalize_accel_key(value: str) -> str:
+    """把「任意形态」的加速 LoRA 标识归一到**目录 key**。
+
+    形态（按顺序尝试）：
+      1. 已经是目录 key（ckpt850 / dmad_4step_critic …）-> 原样；
+      2. 完整权重文件名（含目录前缀与扩展名）-> 反查清单；
+      3. 裸权重名（无扩展名）-> 反查清单（存量落库数据的实际形态）。
+
+    归一不到 -> **原样返回**（调用方据此判断「认不出」）。
+    与显示层 job_meta._accel_lora_key_for_any_form 同口径。
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if accel_lora_meta(text):
+        return text
+    try:
+        from . import artifact_meta as _am
+    except Exception:
+        return text
+    try:
+        key = _am.lora_key_for_weight(text)
+        if key:
+            return key
+        cleaned = _am._clean_weight_name(text)
+        for table in (VIDEO_ACCEL_LORAS, VIDEO_ACCEL_LORA_COMBOS):
+            for cand_key, meta in table.items():
+                if not isinstance(meta, dict):
+                    continue
+                name = str(meta.get("name") or "")
+                if name and _am._clean_weight_name(name) == cleaned:
+                    return cand_key
+    except Exception:
+        return text
+    return text
+
+
 def resolve_accel_lora_slot(params: dict,
                             include_fixed_fallback: bool = True
                             ) -> tuple[str, float]:
@@ -2152,6 +2189,20 @@ def resolve_accel_lora_slot(params: dict,
         key = str(raw or "").strip()
         if not key:
             return "", 1.0
+        # ---- [2026-11-19 第 7 轮审查] F7 ----
+        # 归一「权重名形态」的 key -> 目录 key。
+        #
+        # [为什么必须] 产物回写（artifact_meta.apply_to_params）与更早的
+        # 存量落库数据里，`accel_lora` 存的是**权重文件名**
+        # （如 dmad_minimax_h3_4step_full_critic_comfyui），
+        # 而这里认的是**目录 key**（dmad_4step_critic）。
+        # 认不出 -> accel_lora_meta(key) 返回 None -> 加速 LoRA 链**空编**
+        # （工作流里一枚都不挂），但 steps 仍是蒸馏档
+        # => 8 步采样的非蒸馏权重 = 「一条不存在的路径」，且不报错。
+        #
+        # [与显示层同口径] 显示层 job_meta._accel_lora_key_for_any_form
+        # 早就做了这件事 —— 工作流层没做，两边口径不一致。
+        key = _normalize_accel_key(key)
         meta = accel_lora_meta(key) or {}
         strength = params.get("accel_lora_strength")
         if strength is None:

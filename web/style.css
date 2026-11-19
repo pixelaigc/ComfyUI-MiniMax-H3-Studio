@@ -2566,6 +2566,14 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; line-height: 1;
 }
+/* 【2026-11-19 缺陷 2 修】失败占位：生成结束但没有产物文件。
+   原来这里是一个**空**的 .ag-artifact-thumb（浅灰底），在深色面板上
+   看起来像「一张全黑图」。现在明确显示 ⚠ 标识。 */
+.ag-artifact-thumb.is-failed {
+  background: #3a1f22; color: #ff8a8e;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; line-height: 1;
+}
 /* 缩略图外面包一层 button（为了可点击看大图）。
    button 有浏览器默认样式（边框/背景/内边距）必须清掉，
    否则缩略图会带一圈灰边。 */
