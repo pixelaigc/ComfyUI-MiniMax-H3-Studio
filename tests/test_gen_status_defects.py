@@ -213,6 +213,10 @@ class VideoJobNotTimedOutTest(unittest.TestCase):
         self._orig_out = srv.OUT_DIR
         self._orig_comfy = srv.COMFY
         self._orig_submit = srv.comfy_submit
+        # 【2026-11-20】这两个也会被 _run_worker 换成假实现，必须一起还原
+        # （srv 是共享模块，不还原会污染后续用例）。
+        self._orig_history = srv.comfy_history
+        self._orig_queue_ids = srv.fetch_comfy_queue_ids
         self._orig_refresh = srv.refresh_comfy_node_names
         self._orig_interval = srv.CFG["poll_interval"]
         self._orig_timeout = srv.RUNNING_TIMEOUT_SEC
@@ -231,6 +235,15 @@ class VideoJobNotTimedOutTest(unittest.TestCase):
         srv.COMFY = self._orig_comfy
         srv.comfy_submit = self._orig_submit
         srv.refresh_comfy_node_names = self._orig_refresh
+        # 【2026-11-20 修 —— 跨用例污染】_run_worker 会把 comfy_history /
+        # fetch_comfy_queue_ids 换成假实现。不还原的话，**后面**的用例
+        # （tests/test_a5_running_truth.py 的 ServerQueueProbeTest）会读到
+        # 我们留下的假实现 —— 症状是那边报
+        #   'pid-probe' is not None / 'lost' != 'active'
+        # 看起来像「别的模块坏了」，实际是本文件漏了还原。
+        # （srv 是**共享的 server 模块**，monkeypatch 必须成对还原。）
+        srv.comfy_history = self._orig_history
+        srv.fetch_comfy_queue_ids = self._orig_queue_ids
         srv.CFG["poll_interval"] = self._orig_interval
         srv.RUNNING_TIMEOUT_SEC = self._orig_timeout
         srv.RUNNING_TIMEOUT_VIDEO_SEC = self._orig_video_timeout
@@ -440,6 +453,10 @@ class WorkerOOMRegressionTest(unittest.TestCase):
         self._orig_out = srv.OUT_DIR
         self._orig_comfy = srv.COMFY
         self._orig_submit = srv.comfy_submit
+        # 【2026-11-20】这两个也会被 _run_worker 换成假实现，必须一起还原
+        # （srv 是共享模块，不还原会污染后续用例）。
+        self._orig_history = srv.comfy_history
+        self._orig_queue_ids = srv.fetch_comfy_queue_ids
         self._orig_refresh = srv.refresh_comfy_node_names
         self._orig_interval = srv.CFG["poll_interval"]
         self.tmp = tempfile.mkdtemp(prefix="h3-oom-")
@@ -456,6 +473,11 @@ class WorkerOOMRegressionTest(unittest.TestCase):
         srv.COMFY = self._orig_comfy
         srv.comfy_submit = self._orig_submit
         srv.refresh_comfy_node_names = self._orig_refresh
+        # 【2026-11-20 修 —— 跨用例污染】_run_worker_with_history 会把
+        # comfy_history / fetch_comfy_queue_ids 换成假实现，不还原会污染
+        # 后续用例（srv 是共享的 server 模块）。
+        srv.comfy_history = self._orig_history
+        srv.fetch_comfy_queue_ids = self._orig_queue_ids
         srv.CFG["poll_interval"] = self._orig_interval
         shutil.rmtree(self.tmp, ignore_errors=True)
 
