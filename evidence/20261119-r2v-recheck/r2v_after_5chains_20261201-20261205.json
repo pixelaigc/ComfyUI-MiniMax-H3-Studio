@@ -1,0 +1,1592 @@
+[
+  {
+    "tag": "after20261201",
+    "seed": 20261201,
+    "seg1_job": "8f57033d0077",
+    "seg2_job": "499f3df10424",
+    "ctrl_job": "28461591341b",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_8f57033d0077_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.3047,
+      "max_l1": 6.0728,
+      "max_l1_at_frame": 66,
+      "max_l1_ratio": 2.64,
+      "top3": [
+        {
+          "at_frame": 66,
+          "l1": 6.0728,
+          "lum_from": 128.28,
+          "lum_to": 128.55,
+          "d_lum": 0.27
+        },
+        {
+          "at_frame": 69,
+          "l1": 5.9905,
+          "lum_from": 127.91,
+          "lum_to": 128.25,
+          "d_lum": 0.34
+        },
+        {
+          "at_frame": 87,
+          "l1": 5.2892,
+          "lum_from": 129.3,
+          "lum_to": 130.15,
+          "d_lum": 0.85
+        }
+      ],
+      "means_head": [
+        125.22,
+        126.22,
+        126.31,
+        126.42,
+        126.42,
+        126.6,
+        126.59,
+        126.64,
+        126.54,
+        126.72,
+        126.77,
+        126.82
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_499f3df10424_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 1.6281,
+      "max_l1": 58.2731,
+      "max_l1_at_frame": 31,
+      "max_l1_ratio": 35.79,
+      "top3": [
+        {
+          "at_frame": 31,
+          "l1": 58.2731,
+          "lum_from": 129.83,
+          "lum_to": 125.37,
+          "d_lum": -4.46
+        },
+        {
+          "at_frame": 34,
+          "l1": 4.6364,
+          "lum_from": 125.88,
+          "lum_to": 125.65,
+          "d_lum": -0.22
+        },
+        {
+          "at_frame": 46,
+          "l1": 4.3148,
+          "lum_from": 125.59,
+          "lum_to": 124.49,
+          "d_lum": -1.1
+        }
+      ],
+      "means_head": [
+        131.95,
+        132.29,
+        132.04,
+        132.17,
+        132.15,
+        132.41,
+        132.39,
+        132.34,
+        132.05,
+        132.3,
+        132.16,
+        132.19
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_28461591341b_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.34,
+      "max_l1": 5.9741,
+      "max_l1_at_frame": 39,
+      "max_l1_ratio": 1.79,
+      "top3": [
+        {
+          "at_frame": 39,
+          "l1": 5.9741,
+          "lum_from": 119.26,
+          "lum_to": 118.98,
+          "d_lum": -0.28
+        },
+        {
+          "at_frame": 60,
+          "l1": 5.76,
+          "lum_from": 118.38,
+          "lum_to": 118.23,
+          "d_lum": -0.14
+        },
+        {
+          "at_frame": 51,
+          "l1": 5.5861,
+          "lum_from": 118.95,
+          "lum_to": 118.19,
+          "d_lum": -0.75
+        }
+      ],
+      "means_head": [
+        119.22,
+        120.27,
+        120.32,
+        120.48,
+        120.42,
+        120.74,
+        120.45,
+        120.58,
+        120.32,
+        120.59,
+        120.56,
+        120.68
+      ]
+    },
+    "seg1_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "8f57033d0077",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 124,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 1,
+      "chain_id": "8f57033d0077",
+      "source_job": "8f57033d0077",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": true,
+        "chain_total_frames": 124,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "ctrl_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "28461591341b",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_comfy": {
+      "found": true,
+      "prompt_id": "1976b75a-22b2-4610-ac36-539406960e9c",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 24
+    },
+    "seg1_comfy": {
+      "found": true,
+      "prompt_id": "7a38267b-6c60-474e-a423-5a6b0b6a8e1b",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "ctrl_comfy": {
+      "found": true,
+      "prompt_id": "1da0f5d4-a9de-4916-a9ff-e8ab9028460e",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261202,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "8f57033d0077",
+        "stage_index": 1,
+        "source_job": "8f57033d0077",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s8f57033d0077",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s8f57033d0077/stage_00000_4b68b041.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s8f57033d0077/stage_00000_4b68b041.safetensors",
+        "anchor_latent_run_id": "h3studio_s8f57033d0077",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s499f3df10424",
+        "latent_stage": 0,
+        "ref_video_frame_count": 50,
+        "segment_rel": "videos/v-h3-studio-000834.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "after20261202",
+    "seed": 20261202,
+    "seg1_job": "ac45151699b2",
+    "seg2_job": "649d5636ba3a",
+    "ctrl_job": "148cf8918627",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_ac45151699b2_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.5298,
+      "max_l1": 5.7488,
+      "max_l1_at_frame": 39,
+      "max_l1_ratio": 1.63,
+      "top3": [
+        {
+          "at_frame": 39,
+          "l1": 5.7488,
+          "lum_from": 119.49,
+          "lum_to": 119.24,
+          "d_lum": -0.25
+        },
+        {
+          "at_frame": 51,
+          "l1": 5.5918,
+          "lum_from": 119.22,
+          "lum_to": 118.59,
+          "d_lum": -0.63
+        },
+        {
+          "at_frame": 60,
+          "l1": 5.5768,
+          "lum_from": 118.77,
+          "lum_to": 118.67,
+          "d_lum": -0.1
+        }
+      ],
+      "means_head": [
+        118.7,
+        119.78,
+        119.84,
+        120.07,
+        119.89,
+        120.31,
+        120.29,
+        120.48,
+        120.21,
+        120.76,
+        120.73,
+        120.86
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_649d5636ba3a_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 3.3103,
+      "max_l1": 90.1197,
+      "max_l1_at_frame": 21,
+      "max_l1_ratio": 27.22,
+      "top3": [
+        {
+          "at_frame": 21,
+          "l1": 90.1197,
+          "lum_from": 116.12,
+          "lum_to": 91.79,
+          "d_lum": -24.33
+        },
+        {
+          "at_frame": 63,
+          "l1": 20.8533,
+          "lum_from": 85.3,
+          "lum_to": 76.35,
+          "d_lum": -8.96
+        },
+        {
+          "at_frame": 54,
+          "l1": 18.1314,
+          "lum_from": 95.93,
+          "lum_to": 94.29,
+          "d_lum": -1.63
+        }
+      ],
+      "means_head": [
+        116.83,
+        116.93,
+        116.91,
+        116.93,
+        116.93,
+        116.99,
+        116.96,
+        116.96,
+        116.84,
+        116.94,
+        116.89,
+        116.9
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_148cf8918627_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.0379,
+      "max_l1": 9.883,
+      "max_l1_at_frame": 73,
+      "max_l1_ratio": 4.85,
+      "top3": [
+        {
+          "at_frame": 73,
+          "l1": 9.883,
+          "lum_from": 128.31,
+          "lum_to": 127.29,
+          "d_lum": -1.02
+        },
+        {
+          "at_frame": 88,
+          "l1": 9.4047,
+          "lum_from": 123.52,
+          "lum_to": 122.69,
+          "d_lum": -0.83
+        },
+        {
+          "at_frame": 91,
+          "l1": 9.3314,
+          "lum_from": 122.1,
+          "lum_to": 121.91,
+          "d_lum": -0.19
+        }
+      ],
+      "means_head": [
+        130.06,
+        131.0,
+        131.03,
+        131.07,
+        131.05,
+        131.27,
+        131.26,
+        131.15,
+        131.07,
+        131.27,
+        130.87,
+        130.93
+      ]
+    },
+    "seg1_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "ac45151699b2",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 124,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 1,
+      "chain_id": "ac45151699b2",
+      "source_job": "ac45151699b2",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": true,
+        "chain_total_frames": 124,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "ctrl_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "148cf8918627",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_comfy": {
+      "found": true,
+      "prompt_id": "6aa5ba7c-36eb-4c24-a67c-a2d15877fff9",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 24
+    },
+    "seg1_comfy": {
+      "found": true,
+      "prompt_id": "6e8e6af8-822c-48e6-a63a-90eac599d9d3",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "ctrl_comfy": {
+      "found": true,
+      "prompt_id": "2a406833-e1f2-4fb5-8fa2-8afa850c6d48",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261203,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "ac45151699b2",
+        "stage_index": 1,
+        "source_job": "ac45151699b2",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_sac45151699b2",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sac45151699b2/stage_00000_c7d23526.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_sac45151699b2/stage_00000_c7d23526.safetensors",
+        "anchor_latent_run_id": "h3studio_sac45151699b2",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s649d5636ba3a",
+        "latent_stage": 0,
+        "ref_video_frame_count": 50,
+        "segment_rel": "videos/v-h3-studio-000838.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "after20261203",
+    "seed": 20261203,
+    "seg1_job": "506ccbf9d0b1",
+    "seg2_job": "5e1e9465866e",
+    "ctrl_job": "96b0ec5977e7",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_506ccbf9d0b1_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 3.7564,
+      "max_l1": 12.7173,
+      "max_l1_at_frame": 85,
+      "max_l1_ratio": 3.39,
+      "top3": [
+        {
+          "at_frame": 85,
+          "l1": 12.7173,
+          "lum_from": 127.2,
+          "lum_to": 125.38,
+          "d_lum": -1.81
+        },
+        {
+          "at_frame": 82,
+          "l1": 12.5115,
+          "lum_from": 128.0,
+          "lum_to": 127.56,
+          "d_lum": -0.44
+        },
+        {
+          "at_frame": 91,
+          "l1": 11.8471,
+          "lum_from": 123.12,
+          "lum_to": 123.54,
+          "d_lum": 0.41
+        }
+      ],
+      "means_head": [
+        130.53,
+        131.57,
+        131.61,
+        131.65,
+        131.67,
+        131.78,
+        131.79,
+        131.57,
+        131.57,
+        131.64,
+        131.76,
+        131.81
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_5e1e9465866e_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 2.4622,
+      "max_l1": 70.2783,
+      "max_l1_at_frame": 54,
+      "max_l1_ratio": 28.54,
+      "top3": [
+        {
+          "at_frame": 54,
+          "l1": 70.2783,
+          "lum_from": 130.96,
+          "lum_to": 150.12,
+          "d_lum": 19.16
+        },
+        {
+          "at_frame": 56,
+          "l1": 18.6162,
+          "lum_from": 148.33,
+          "lum_to": 149.04,
+          "d_lum": 0.72
+        },
+        {
+          "at_frame": 12,
+          "l1": 17.9712,
+          "lum_from": 120.79,
+          "lum_to": 122.74,
+          "d_lum": 1.95
+        }
+      ],
+      "means_head": [
+        118.24,
+        118.68,
+        118.5,
+        118.81,
+        118.59,
+        118.81,
+        118.89,
+        118.89,
+        119.63,
+        120.28,
+        123.1,
+        120.79
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_96b0ec5977e7_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.1553,
+      "max_l1": 10.0851,
+      "max_l1_at_frame": 109,
+      "max_l1_ratio": 4.68,
+      "top3": [
+        {
+          "at_frame": 109,
+          "l1": 10.0851,
+          "lum_from": 140.16,
+          "lum_to": 141.11,
+          "d_lum": 0.95
+        },
+        {
+          "at_frame": 111,
+          "l1": 9.3784,
+          "lum_from": 141.07,
+          "lum_to": 141.64,
+          "d_lum": 0.57
+        },
+        {
+          "at_frame": 113,
+          "l1": 8.8361,
+          "lum_from": 141.89,
+          "lum_to": 142.86,
+          "d_lum": 0.97
+        }
+      ],
+      "means_head": [
+        139.98,
+        140.6,
+        140.64,
+        140.91,
+        140.93,
+        141.02,
+        141.01,
+        141.09,
+        141.0,
+        141.15,
+        141.22,
+        141.25
+      ]
+    },
+    "seg1_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "506ccbf9d0b1",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 124,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 1,
+      "chain_id": "506ccbf9d0b1",
+      "source_job": "506ccbf9d0b1",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": true,
+        "chain_total_frames": 124,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "ctrl_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "96b0ec5977e7",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_comfy": {
+      "found": true,
+      "prompt_id": "6a34c384-be41-412b-98aa-a0fec8959abc",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 24
+    },
+    "seg1_comfy": {
+      "found": true,
+      "prompt_id": "c5bebe7f-6d29-43a5-93fa-227cec773e1f",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "ctrl_comfy": {
+      "found": true,
+      "prompt_id": "def52436-3ae3-49de-a96a-a023c12bd2c2",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261204,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "506ccbf9d0b1",
+        "stage_index": 1,
+        "source_job": "506ccbf9d0b1",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s506ccbf9d0b1",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s506ccbf9d0b1/stage_00000_3ed260bb.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s506ccbf9d0b1/stage_00000_3ed260bb.safetensors",
+        "anchor_latent_run_id": "h3studio_s506ccbf9d0b1",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s5e1e9465866e",
+        "latent_stage": 0,
+        "ref_video_frame_count": 50,
+        "segment_rel": "videos/v-h3-studio-000842.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "after20261204",
+    "seed": 20261204,
+    "seg1_job": "7d3e5525f285",
+    "seg2_job": "111265fb9eec",
+    "ctrl_job": "9dd500595f26",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_7d3e5525f285_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 2.7502,
+      "max_l1": 6.6166,
+      "max_l1_at_frame": 121,
+      "max_l1_ratio": 2.41,
+      "top3": [
+        {
+          "at_frame": 121,
+          "l1": 6.6166,
+          "lum_from": 143.53,
+          "lum_to": 144.31,
+          "d_lum": 0.78
+        },
+        {
+          "at_frame": 118,
+          "l1": 6.5837,
+          "lum_from": 143.32,
+          "lum_to": 144.04,
+          "d_lum": 0.72
+        },
+        {
+          "at_frame": 115,
+          "l1": 6.4805,
+          "lum_from": 141.88,
+          "lum_to": 142.11,
+          "d_lum": 0.22
+        }
+      ],
+      "means_head": [
+        140.26,
+        141.04,
+        141.07,
+        141.15,
+        141.09,
+        141.26,
+        141.21,
+        141.28,
+        141.14,
+        141.38,
+        141.37,
+        141.43
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_111265fb9eec_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 2.5761,
+      "max_l1": 11.6993,
+      "max_l1_at_frame": 6,
+      "max_l1_ratio": 4.54,
+      "top3": [
+        {
+          "at_frame": 6,
+          "l1": 11.6993,
+          "lum_from": 98.77,
+          "lum_to": 98.76,
+          "d_lum": -0.01
+        },
+        {
+          "at_frame": 12,
+          "l1": 11.3955,
+          "lum_from": 94.53,
+          "lum_to": 93.08,
+          "d_lum": -1.46
+        },
+        {
+          "at_frame": 9,
+          "l1": 11.143,
+          "lum_from": 97.34,
+          "lum_to": 96.32,
+          "d_lum": -1.01
+        }
+      ],
+      "means_head": [
+        98.56,
+        98.61,
+        97.71,
+        99.82,
+        99.49,
+        98.77,
+        98.76,
+        97.95,
+        97.34,
+        96.32,
+        95.49,
+        94.53
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_9dd500595f26_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 1.6609,
+      "max_l1": 8.7618,
+      "max_l1_at_frame": 43,
+      "max_l1_ratio": 5.28,
+      "top3": [
+        {
+          "at_frame": 43,
+          "l1": 8.7618,
+          "lum_from": 113.26,
+          "lum_to": 112.12,
+          "d_lum": -1.14
+        },
+        {
+          "at_frame": 41,
+          "l1": 7.9516,
+          "lum_from": 113.04,
+          "lum_to": 113.47,
+          "d_lum": 0.43
+        },
+        {
+          "at_frame": 30,
+          "l1": 7.385,
+          "lum_from": 116.5,
+          "lum_to": 113.74,
+          "d_lum": -2.76
+        }
+      ],
+      "means_head": [
+        116.13,
+        116.62,
+        116.63,
+        116.82,
+        116.79,
+        116.8,
+        116.68,
+        116.75,
+        116.69,
+        117.26,
+        117.23,
+        117.25
+      ]
+    },
+    "seg1_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "7d3e5525f285",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 124,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 1,
+      "chain_id": "7d3e5525f285",
+      "source_job": "7d3e5525f285",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": true,
+        "chain_total_frames": 124,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "ctrl_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "9dd500595f26",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      }
+    },
+    "seg2_comfy": {
+      "found": true,
+      "prompt_id": "309d7014-0c3a-48a3-96de-4a1098d789ad",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 24
+    },
+    "seg1_comfy": {
+      "found": true,
+      "prompt_id": "aa615a78-cc72-486c-9df0-3aad4262a650",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "ctrl_comfy": {
+      "found": true,
+      "prompt_id": "574f2bf2-7635-4712-b869-4bb8e6805a47",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261205,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "7d3e5525f285",
+        "stage_index": 1,
+        "source_job": "7d3e5525f285",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s7d3e5525f285",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s7d3e5525f285/stage_00000_9e91bf3c.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s7d3e5525f285/stage_00000_9e91bf3c.safetensors",
+        "anchor_latent_run_id": "h3studio_s7d3e5525f285",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s111265fb9eec",
+        "latent_stage": 0,
+        "ref_video_frame_count": 50,
+        "segment_rel": "videos/v-h3-studio-000846.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  },
+  {
+    "tag": "after20261205",
+    "seed": 20261205,
+    "seg1_job": "838c11df13f9",
+    "seg2_job": "09ce9f6db98f",
+    "ctrl_job": "ce32cfcfd933",
+    "seg1": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_838c11df13f9_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 1.5043,
+      "max_l1": 8.9287,
+      "max_l1_at_frame": 42,
+      "max_l1_ratio": 5.94,
+      "top3": [
+        {
+          "at_frame": 42,
+          "l1": 8.9287,
+          "lum_from": 115.11,
+          "lum_to": 113.89,
+          "d_lum": -1.22
+        },
+        {
+          "at_frame": 57,
+          "l1": 8.5254,
+          "lum_from": 112.16,
+          "lum_to": 112.96,
+          "d_lum": 0.8
+        },
+        {
+          "at_frame": 69,
+          "l1": 8.2197,
+          "lum_from": 111.89,
+          "lum_to": 110.78,
+          "d_lum": -1.1
+        }
+      ],
+      "means_head": [
+        119.2,
+        119.68,
+        119.65,
+        119.54,
+        119.51,
+        119.61,
+        119.72,
+        119.76,
+        119.73,
+        120.05,
+        120.04,
+        120.07
+      ]
+    },
+    "seg2": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_09ce9f6db98f_00001_.mp4",
+      "frames": 102,
+      "width": 1280,
+      "height": 736,
+      "duration": 4.25,
+      "median_l1": 4.8081,
+      "max_l1": 23.6954,
+      "max_l1_at_frame": 11,
+      "max_l1_ratio": 4.93,
+      "top3": [
+        {
+          "at_frame": 11,
+          "l1": 23.6954,
+          "lum_from": 115.97,
+          "lum_to": 132.31,
+          "d_lum": 16.34
+        },
+        {
+          "at_frame": 14,
+          "l1": 23.4201,
+          "lum_from": 155.63,
+          "lum_to": 171.93,
+          "d_lum": 16.31
+        },
+        {
+          "at_frame": 12,
+          "l1": 19.4075,
+          "lum_from": 132.31,
+          "lum_to": 144.06,
+          "d_lum": 11.76
+        }
+      ],
+      "means_head": [
+        115.63,
+        115.96,
+        115.81,
+        115.94,
+        116.0,
+        116.14,
+        116.0,
+        116.03,
+        115.94,
+        116.24,
+        115.97,
+        132.31
+      ]
+    },
+    "ctrl": {
+      "path": "/mnt/usb2t_toshiba/comfyui/output/h3studio/r2v_ce32cfcfd933_00001_.mp4",
+      "frames": 124,
+      "width": 1280,
+      "height": 736,
+      "duration": 5.166667,
+      "median_l1": 8.8704,
+      "max_l1": 20.1774,
+      "max_l1_at_frame": 74,
+      "max_l1_ratio": 2.27,
+      "top3": [
+        {
+          "at_frame": 74,
+          "l1": 20.1774,
+          "lum_from": 136.17,
+          "lum_to": 136.26,
+          "d_lum": 0.09
+        },
+        {
+          "at_frame": 78,
+          "l1": 17.8874,
+          "lum_from": 131.53,
+          "lum_to": 132.25,
+          "d_lum": 0.71
+        },
+        {
+          "at_frame": 66,
+          "l1": 16.9545,
+          "lum_from": 141.63,
+          "lum_to": 141.69,
+          "d_lum": 0.06
+        }
+      ],
+      "means_head": [
+        148.54,
+        149.51,
+        149.69,
+        149.77,
+        149.93,
+        150.04,
+        150.03,
+        150.08,
+        149.94,
+        150.22,
+        150.27,
+        150.35
+      ]
+    },
+    "seg1_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      },
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "838c11df13f9",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      }
+    },
+    "seg2_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 124,
+      "video_drop": null,
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": true,
+        "chain_total_frames": 124,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      },
+      "segment_frames": 124,
+      "stage_index": 1,
+      "chain_id": "838c11df13f9",
+      "source_job": "838c11df13f9",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      }
+    },
+    "ctrl_fields": {
+      "continuation_present": true,
+      "ref_video_frame_count": 50,
+      "chain_total_frames": 0,
+      "video_drop": null,
+      "video_drop_recomputed": {
+        "applicable": true,
+        "video_skip_frames": 0,
+        "video_drop": false,
+        "chain_total_frames": 0,
+        "ref_video_frame_count": 50,
+        "audio_skip_frames": 0,
+        "audio_active": false
+      },
+      "segment_frames": 124,
+      "stage_index": 0,
+      "chain_id": "ce32cfcfd933",
+      "source_job": "",
+      "ref_videos_in_params": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ],
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      }
+    },
+    "seg2_comfy": {
+      "found": true,
+      "prompt_id": "2f293c13-4ef7-45b6-bcb2-60f5dc5ade31",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 24
+    },
+    "seg1_comfy": {
+      "found": true,
+      "prompt_id": "abd3da3d-970a-4388-97db-de70c6c7211f",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "ctrl_comfy": {
+      "found": true,
+      "prompt_id": "238bdfd0-8f8a-4742-bb9e-82c4b5331cfd",
+      "sampler_nodes": [
+        {
+          "id": "17",
+          "class_type": "KSamplerSelect",
+          "title": "采样器"
+        },
+        {
+          "id": "14",
+          "class_type": "SamplerCustomAdvanced",
+          "title": "采样"
+        }
+      ],
+      "has_selflift": false,
+      "total_nodes": 20
+    },
+    "seg2_params": {
+      "model_key": "hybrid_fl2va_ref2va",
+      "width": 1280,
+      "height": 736,
+      "duration": 5.0,
+      "steps": 4,
+      "seed": 20261206,
+      "audio_track_source": "generated",
+      "twopass": {
+        "enabled": false
+      },
+      "continuation": {
+        "chain_id": "838c11df13f9",
+        "stage_index": 1,
+        "source_job": "838c11df13f9",
+        "source_segment": 0,
+        "source_latent_run_id": "h3studio_s838c11df13f9",
+        "source_latent_stage": 0,
+        "source_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s838c11df13f9/stage_00000_e7a436e9.safetensors",
+        "anchor_latent_path": "/home/ubuntu/comfyui/output/relay_kit/h3studio_s838c11df13f9/stage_00000_e7a436e9.safetensors",
+        "anchor_latent_run_id": "h3studio_s838c11df13f9",
+        "anchor_latent_stage": 0,
+        "context_frames": 22,
+        "anchor_frames": 22,
+        "chain_total_frames": 124,
+        "segment_frames": 124,
+        "latent_run_id": "h3studio_s09ce9f6db98f",
+        "latent_stage": 0,
+        "ref_video_frame_count": 50,
+        "segment_rel": "videos/v-h3-studio-000850.mp4"
+      },
+      "ref_videos": [
+        "h3studio/4aea2714065156c8__v1.mp4_addec1e7.webm"
+      ]
+    }
+  }
+]
