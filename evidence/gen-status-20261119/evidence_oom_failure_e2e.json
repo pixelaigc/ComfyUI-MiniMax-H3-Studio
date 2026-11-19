@@ -1,0 +1,59 @@
+{
+  "job_id": "e7cbe0bc9be9",
+  "mode": "t2i",
+  "replayed_history": {
+    "status_str": "error",
+    "completed": false,
+    "outputs_keys": [
+      "301"
+    ],
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+          "timestamp": 1795071200000
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+          "timestamp": 1795071200004
+        }
+      ],
+      [
+        "execution_error",
+        {
+          "prompt_id": "4e8e6b0a-9cd8-4171-92ca-041a7abe1b39",
+          "node_id": "14",
+          "node_type": "SamplerCustomAdvanced",
+          "exception_message": "ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).\n\n",
+          "exception_type": "torch.cuda.OutOfMemoryError",
+          "traceback": [],
+          "executed": [
+            "13",
+            "105:107",
+            "17",
+            "6",
+            "136:301",
+            "105:111",
+            "301"
+          ]
+        }
+      ]
+    ],
+    "source": "/root/projects/h3s-merge-20261119/evidence/gen-status-20261119/oom_history_production_shape.json"
+  },
+  "studio_job": {
+    "status": "failed",
+    "error": "显存不足（ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).）。请降低输出分辨率或时长后重试。",
+    "outputs": []
+  },
+  "legacy_would_succeed": true,
+  "new_outcome": "failed",
+  "verdict_failed": true,
+  "verdict_no_outputs": true,
+  "captured_at": "2026-11-19 22:05:12"
+}

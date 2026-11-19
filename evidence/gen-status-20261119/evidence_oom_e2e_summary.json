@@ -1,0 +1,37 @@
+[
+  {
+    "ok": true,
+    "name": "OOM 任务判定为 failed（不是 done / 生成成功）",
+    "detail": "status=failed"
+  },
+  {
+    "ok": true,
+    "name": "失败原因明确指出显存不足 / OOM（不是「未能给出具体原因」）",
+    "detail": "error=显存不足（ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).）。请降低输出分辨率或时长后重试。"
+  },
+  {
+    "ok": true,
+    "name": "失败任务没有任何产物条目（前端不会渲染出黑图）",
+    "detail": "outputs=[]"
+  },
+  {
+    "ok": true,
+    "name": "同一条 history：旧逻辑误判成功，新逻辑判失败（判定顺序修复生效）",
+    "detail": "legacy_success=True new_outcome=failed"
+  },
+  {
+    "ok": true,
+    "name": "前端对「结束但无产物」有明确失败占位文案（不是空黑框）",
+    "detail": "app.js/agent.js 均含 '没有产物文件'"
+  },
+  {
+    "ok": true,
+    "name": "失败卡片里没有 <img>/<video>（不会显示全黑预览图）",
+    "detail": "媒体元素数=0"
+  },
+  {
+    "ok": true,
+    "name": "失败卡片上显示了明确失败原因（显存不足 / OOM）",
+    "detail": "卡片文本片段='Z-IMAGE 文生图 · 11/19 22:05\\n11/19 22:05\\n✕ 显存不足（ERROR: Allocation on device 0 would exceed allowed memory. (out of memory).）。请降低输出分辨率或时长后重试。\\n复用参数\\nℹ 详情\\n删除'"
+  }
+]
