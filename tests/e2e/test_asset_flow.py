@@ -19,6 +19,7 @@ import time
 import urllib.request
 
 import pytest
+import gen_flow  # noqa: E402
 
 
 def _api(base: str, path: str):
@@ -212,7 +213,7 @@ def test_asset_used_by_generation_panel(studio_page, evidence, fixtures_dir):
     evidence.step(f"槽位 class = {filled}")
     assert "filled" in filled, f"槽位没被标记为已填：{filled}"
 
-    sp.fill("#prompt", "e2e 素材被引用：参考图里的猫")
+    sp.fill("#prompt", gen_flow.prompt_text("r2v_ref_cat"))
     sp.submit_generation()
     submitted = sp.last_submitted_params()
     evidence.step(f"提交字段 = {submitted.get('fieldNames')}")
@@ -229,7 +230,7 @@ def test_media_right_click_adds_to_asset_library(studio_page, evidence):
     sp = studio_page
     sp.open()
     sp.goto_mode("t2i")
-    sp.fill("#prompt", "e2e 右键入库：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
     job = sp.wait_for_job(timeout=240)
     assert job["status"] == "done", f"任务没跑成功：{job.get('error')}"
@@ -311,7 +312,7 @@ def test_asset_batch_and_non_batch_media_cards(studio_page, evidence):
 
     # 非批次：一次出 1 张
     sp.goto_mode("t2i")
-    sp.fill("#prompt", "e2e 非批次：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
     single = sp.wait_for_job(timeout=240)
     assert single["status"] == "done", f"非批次任务没跑成功：{single.get('error')}"
@@ -322,7 +323,7 @@ def test_asset_batch_and_non_batch_media_cards(studio_page, evidence):
     chips = sp.page.query_selector_all("#imgBatchChips button")
     chips[1].click()
     sp.page.wait_for_timeout(300)
-    sp.fill("#prompt", "e2e 批次：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
     batched = sp.wait_for_job(timeout=240)
     assert batched["status"] == "done", f"批次任务没跑成功：{batched.get('error')}"

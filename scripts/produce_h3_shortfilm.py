@@ -124,6 +124,8 @@ def submit_shot(index: int, cn: str, en: str, duration: float) -> str:
             "model_key": "ref2va_pruned_int8",
             "audio_track_source": "reference",
             "steps": 4, "sampler": "euler", "scheduler": "beta",
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
         },
         "asset_refs": [
             {"asset_id": REF_IMAGE_ASSET, "slot": "ref_image", "ordinal": 0},

@@ -27,6 +27,7 @@ import time
 import urllib.request
 
 import pytest
+import gen_flow  # noqa: E402
 
 FPS = 24
 CONTEXT_FRAMES = 22
@@ -184,7 +185,7 @@ def test_continuation_second_segment_total_duration(studio_page, evidence):
     button.click()
     sp.page.wait_for_timeout(2500)
 
-    sp.fill("#prompt", "e2e 接续时长：第二段 5 秒")
+    sp.fill("#prompt", gen_flow.prompt_text("t2v_cat_desk"))
     sp.submit_generation()
     submitted = sp.last_submitted_params()
     evidence.step(f"第二段提交体 = {submitted}")
@@ -284,7 +285,7 @@ def test_continuation_workflow_uses_relay_bridge(studio_page, evidence, studio):
     assert button is not None, "卡片上没有「接续」按钮"
     button.click()
     sp.page.wait_for_timeout(2500)
-    sp.fill("#prompt", "e2e 接续工作流：第二段")
+    sp.fill("#prompt", gen_flow.prompt_text("t2v_cat_grass"))
     sp.submit_generation()
     second = _wait_job(sp.base_url)
     assert second["status"] == "done", f"第二段没跑成功：{second.get('error')}"

@@ -79,6 +79,8 @@ class BranchTestBase(unittest.TestCase):
     def _params(self, **extra):
         base = {"prompt": "p", "model_key": "fl2va_int8", "width": 768,
                 "height": 448, "duration": 5, "steps": 4, "sampler": "euler",
+                "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+                "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
                 "scheduler": "simple"}
         base.update(extra)
         return base

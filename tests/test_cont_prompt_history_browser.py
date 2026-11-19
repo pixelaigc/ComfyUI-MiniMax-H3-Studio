@@ -97,10 +97,12 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
         stage1.write_bytes(b"fake-av-latent")
 
         p0 = {
-            "prompt": "第1段：橘猫在洒满阳光的旧书桌上走过，镜头缓缓跟随。",
+            "prompt": "一只橘猫在洒满阳光的旧书桌上走过，镜头缓缓跟随。",
             "model_key": "fl2va_int8",
             "width": 768, "height": 448,
             "duration": 5, "steps": 4,
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "sampler": "euler", "scheduler": "simple",
             "gen_type": "t2v",
             "continuation": {
@@ -112,10 +114,12 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
             },
         }
         p1 = {
-            "prompt": "第2段：橘猫跳下书桌，钻进纸箱里。",
+            "prompt": "橘猫跳下书桌，钻进纸箱里，纸箱微微晃动。",
             "model_key": "fl2va_int8",
             "width": 768, "height": 448,
             "duration": 5, "steps": 4,
+            "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+            "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
             "sampler": "euler", "scheduler": "simple",
             "gen_type": "t2v",
             "continuation": {
@@ -178,11 +182,13 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
         self.assertGreaterEqual(len(history), 2,
                                 "prompt_history 段数不对：%r" % (history,))
         prompts = [h.get("prompt", "") for h in history]
+        # 【2026-11-19】断言按**提示词内容**判定，不再按「第1段 / 第2段」
+        # 这种测试占位词 —— 那些词对模型毫无意义（用户 2026-11-19 实测反馈）。
         self.assertTrue(
-            any("第1段" in p for p in prompts),
+            any("旧书桌上走过" in p for p in prompts),
             "prompt_history 里没有前一段的提示词：%r" % (prompts,))
         self.assertTrue(
-            any("第2段" in p for p in prompts),
+            any("纸箱里" in p for p in prompts),
             "prompt_history 里没有本段的提示词：%r" % (prompts,))
         # 段号必须按顺序
         stages = [h.get("stage") for h in history]
@@ -246,7 +252,7 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
             """() => {
               const box = document.querySelector('#prompt');
               if (box) {
-                box.value = '第3段：橘猫从纸箱里探出头。';
+                box.value = '橘猫从纸箱里探出头，好奇地张望。';
                 box.dispatchEvent(new Event('input', {bubbles: true}));
               }
             }""")
@@ -285,12 +291,13 @@ class TestContPromptHistoryBrowser(unittest.TestCase):
                                 "增强请求里的 prompt_history 是空的")
         prompts = [str(x.get("prompt", "")) for x in ph
                    if isinstance(x, dict)]
+        # 【2026-11-19】同上：按提示词内容判定，不用「第X段」占位词。
         self.assertTrue(
-            any("第1段" in p for p in prompts),
+            any("旧书桌上走过" in p for p in prompts),
             "增强请求里没有前序段落的提示词（跨段一致性会丢）：%r"
             % (prompts,))
         self.assertTrue(
-            any("第2段" in p for p in prompts),
+            any("纸箱里" in p for p in prompts),
             "增强请求里没有本段来源段的提示词：%r" % (prompts,))
 
 

@@ -14,6 +14,7 @@ import time
 import urllib.request
 
 import pytest
+import gen_flow  # noqa: E402
 
 
 def _api(base: str, path: str):
@@ -113,7 +114,7 @@ def test_running_card_is_consistent_with_comfyui(studio_page, evidence, studio):
     sp = studio_page
     sp.open()
     sp.goto_mode("t2i")
-    sp.fill("#prompt", "e2e 运行状态一致性：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
 
     # 提交后卡片应进入「排队中 / 运行中」

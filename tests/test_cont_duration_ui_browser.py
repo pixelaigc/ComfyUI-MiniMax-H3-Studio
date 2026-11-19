@@ -89,9 +89,11 @@ class TestDurationPlanUI(unittest.TestCase):
         stage = cs.stage_path(run_id, 0)
         stage.parent.mkdir(parents=True, exist_ok=True)
         stage.write_bytes(b"fake-av-latent")
-        p0 = {"prompt": "第1段：橘猫在旧书桌上走过。",
+        p0 = {"prompt": "一只橘猫在洒满阳光的旧书桌上走过，镜头缓缓跟随。",
               "model_key": "fl2va_int8", "width": 768, "height": 448,
               "duration": 5, "steps": 4, "sampler": "euler",
+              "accel_lora": "ckpt850", "accel_lora_strength": 1.0,
+              "accel_loras": [{"key": "ckpt850", "strength": 1.0, "enabled": True}],
               "scheduler": "simple", "gen_type": "t2v",
               "continuation": {
                   "chain_id": seg0, "stage_index": 0, "source_job": "",

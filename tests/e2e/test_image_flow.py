@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 
 import pytest
+import gen_flow  # noqa: E402
 
 
 def test_image_resolution_input_accepts_and_snaps(studio_page, evidence):
@@ -83,7 +84,7 @@ def test_image_submit_sends_snapped_size(studio_page, evidence):
     sp.goto_mode("t2i")
     sp.type_and_commit("#imgWidth", "2560")
     sp.type_and_commit("#imgHeight", "1400")
-    sp.fill("#prompt", "e2e 分辨率链路：一只猫在草地上奔跑")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
 
     submitted = sp.last_submitted_params()
@@ -102,7 +103,7 @@ def test_image_output_matches_requested_size(studio_page, evidence):
     sp.goto_mode("t2i")
     sp.type_and_commit("#imgWidth", "2560")
     sp.type_and_commit("#imgHeight", "1400")
-    sp.fill("#prompt", "e2e 出图闭环：一只猫在草地上奔跑")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
 
     job = sp.wait_for_job(timeout=240)
@@ -128,7 +129,7 @@ def test_image_batch_count_submitted(studio_page, evidence):
     assert len(chips) >= 3, f"批次 chip 数量异常：{len(chips)}"
     chips[2].click()
     sp.page.wait_for_timeout(400)
-    sp.fill("#prompt", "e2e 批次：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
 
     submitted = sp.last_submitted_params()
@@ -147,7 +148,7 @@ def test_image_batch_result_expands_in_ui(studio_page, evidence):
     chips = sp.page.query_selector_all("#imgBatchChips button")
     chips[1].click()
     sp.page.wait_for_timeout(300)
-    sp.fill("#prompt", "e2e 批次展开：一只猫")
+    sp.fill("#prompt", gen_flow.prompt_text("t2i_cat_grass"))
     sp.submit_generation()
 
     job = sp.wait_for_job(timeout=240)
