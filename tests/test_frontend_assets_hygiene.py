@@ -186,13 +186,13 @@ STALE_BUMPED = {
     #   的 ?v= 统一升到 genfix20261119a。
     #   ⇒ 表要跟着走，否则这张断言自己变成假红（它已经报过 2 轮假红）。
     #   旧值取**直接前值**（各文件自己的上一个版本号）。
-    "app.js":                  ("cont20261119a", "genfix20261119a"),
+    "app.js":                  ("cont20261119a", "genfix20261119b"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
     # 【2026-11-19 第 7 轮审查】并行任务 76eac36 改了 style.css 的内容
     #   （生成状态修复的样式）⇒ ?v= 升到 genfix20261119a。
-    "style.css":               ("cr20261115a",   "genfix20261119a"),
+    "style.css":               ("cr20261115a",   "genfix20261119b"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
