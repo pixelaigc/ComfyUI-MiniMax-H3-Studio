@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniStudio · 多模型图像 / 视频 / 音频创作工作台</title>
 <link rel="icon" href="/static/favicon.svg?v=cr20261115a" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=genfix20261119a">
+<link rel="stylesheet" href="/static/style.css?v=genfix20261119b">
 <link rel="stylesheet" href="/static/assets.css?v=cr20261115b">
 <link rel="stylesheet" href="/static/responsive.css?v=cr20261115b">
 </head>
@@ -1555,7 +1555,7 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=genfix20261119a"></script>
+<script src="/static/app.js?v=genfix20261119b"></script>
 <script src="/static/providers.js?v=enhassets1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
@@ -1590,7 +1590,7 @@
      OOM/failed 不再误报「生成成功」+ 全黑预览）。
      必须破缓存，否则用户拿到的还是旧 JS。 -->
 <script src="/static/agent.js?v=genfix20261119a"></script>
-<script src="/static/agent_sessions.js?v=cr20261115b"></script>
+<script src="/static/agent_sessions.js?v=genfix20261119a"></script>
 <!-- 内置 Agent「agent 管理」模态框（2026-11-13 审查目标 4/5）
      能力开关 / 搜索引擎配置 + 连通性自检 / 文生视频默认参数 / 步数上限 -->
 <div class="prompt-modal" id="agManageModal" hidden>

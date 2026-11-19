@@ -4821,6 +4821,17 @@ function jobCard(job) {
     : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`;
 
   let preview = "";
+  // 【2026-11-19 缺陷 2 修 —— 失败占位的底色】
+  //
+  // 【为什么需要这个标记】`.job-preview` 的默认背景是 #0d0f12（近黑），
+  // 尺寸是 16:9 的 padding-bottom 盒子。失败任务即使**渲染了错误文案**，
+  // 用户看到的仍是一大片近黑背景 + 中间几行红字 —— 视觉上就是
+  // 「一张全黑图」。实测截图（evidence/gen-status-20261119/
+  // oom-failed-card-e2e.png）里，vision 判定预览区「为全黑」。
+  //
+  // 【现在】失败 / 取消 / 无产物这三种状态给预览区加 is-failed，
+  // 由 CSS 换成明确的错误底色（暗红）+ 斜纹，不再像一张「图」。
+  let previewState = "";
   const video = (job.outputs || []).find(o => o.kind === "video");
   const image = (job.outputs || []).find(o => o.kind === "image");
   const audio = (job.outputs || []).find(o => o.kind === "audio");
@@ -4837,8 +4848,10 @@ function jobCard(job) {
       <div class="progress-text">${pctText}</div>
     </div>`;
   } else if (job.status === "failed") {
+    previewState = " is-failed";
     preview = `<div class="progress-wrap"><div class="err-text">✕ ${friendlyError(job.error)}</div></div>`;
   } else if (job.status === "canceled") {
+    previewState = " is-failed";
     preview = `<div class="progress-wrap"><div class="progress-text">已取消</div></div>`;
   } else if (job.status === "done") {
     // 【2026-11-19 缺陷 2 修 —— 防御层】
@@ -4853,6 +4866,7 @@ function jobCard(job) {
     // 一张全黑图」。这正是用户报的「预览图全黑」。
     //
     // 【现在】明确显示「无产物」提示，而不是留一个黑框。
+    previewState = " is-failed";
     preview = `<div class="progress-wrap">
       <div class="err-text">⚠ 生成结束但没有产物文件（无法预览）。<br>
       如需重试，请点击「复用参数」重新生成。</div>
@@ -4866,7 +4880,7 @@ function jobCard(job) {
   card.dataset.jid = job.id;
   card.innerHTML = `
     <div class="job-top"><span>${job.mode === "longfilm" ? "长片 · " + escapeHtml(p.title || "未命名") : info.name} · ${fmtTime(job.created_at)}</span>${topRight}</div>
-    <div class="job-preview">${preview}</div>
+    <div class="job-preview${previewState}">${preview}</div>
     ${job.status === "failed" ? "" : `<div class="job-meta">
       ${job.mode === "longfilm" ? `
       <div class="row"><span>标题</span><b>${escapeHtml(p.title || "未命名")}</b></div>

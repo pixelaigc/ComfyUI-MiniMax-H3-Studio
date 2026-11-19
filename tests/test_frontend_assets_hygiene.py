@@ -152,7 +152,13 @@ STALE_BUMPED = {
     # 口径与 enhance-menu.js 一致：记「最初的旧值」与「当前最新值」。
     # 【2026-11-19 第 7 轮审查】agent.js 再次改内容（并行任务 76eac36
     #   的生成状态修复）⇒ ?v= 升到 genfix20261119a（见下方生效条目）。
-    "agent_sessions.js":       ("agtsess2",     "cr20261115b"),
+    # 【2026-11-19 生成状态缺陷修复】agent_sessions.js 的内容也被改过
+    #   （76eac36：「done + 无产物」显示明确失败占位，而不是空黑框）
+    #   ⇒ ?v= 必须升到 genfix20261119a。
+    #   【为什么这条必须有】/static/* 没有 Cache-Control，浏览器按启发式
+    #   新鲜度缓存。内容变了而 ?v= 不变 ⇒ 老用户拿到的仍是旧文件，
+    #   修复等于没上线。
+    "agent_sessions.js":       ("agtsess2",     "genfix20261119a"),
     # app.js 承载第 3 轮的 Critical B-2 修复（提交 c6676e6 改了它 +35 行），
     # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
     # 【2026-11-16 第 4 轮】app.js 再次改内容（B-3/B-4/B-6/B-7/B-9/B-10/
@@ -180,13 +186,13 @@ STALE_BUMPED = {
     #   的 ?v= 统一升到 genfix20261119a。
     #   ⇒ 表要跟着走，否则这张断言自己变成假红（它已经报过 2 轮假红）。
     #   旧值取**直接前值**（各文件自己的上一个版本号）。
-    "app.js":                  ("cont20261119a", "genfix20261119a"),
+    "app.js":                  ("cont20261119a", "genfix20261119b"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
     # 【2026-11-19 第 7 轮审查】并行任务 76eac36 改了 style.css 的内容
     #   （生成状态修复的样式）⇒ ?v= 升到 genfix20261119a。
-    "style.css":               ("cr20261115a",   "genfix20261119a"),
+    "style.css":               ("cr20261115a",   "genfix20261119b"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
