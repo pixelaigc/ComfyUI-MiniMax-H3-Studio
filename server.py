@@ -4211,17 +4211,35 @@ def _prepare_continuation_params(params: dict) -> str:
     chain_id = source_chain or source_job
 
     # 钉住窗口 / 外观锚帧数：必须落在 5+17k 网格上
-    window = cont.snap_context_frames(
-        int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    # ---- [2026-11-19 第 7 轮审查] ----
+    # F3：畸形的 context_frames / anchor_frames 不得把 HTTP 打成 500。
+    #
+    # [原因] 这两行直接 int()，一个字段不对（前端传了字符串 / 数组）
+    # 就直接 ValueError —— 用户点「生成」，服务端直接 500，
+    # 用户既不知道自己填错了什么，也不知道该怎么改。
+    #
+    # —— 修法 —— 字段不对 -> 回退到默认值（接续上下文的钉住窗口必须
+    # 对齐；对不齐就回退到默认值，不猜）。
+    try:
+        window = cont.snap_context_frames(
+            int(info.get("context_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    except (TypeError, ValueError):
+        window = 0
     if not window:
         window = cont.DEFAULT_CONTEXT_FRAMES
-    anchor = cont.snap_context_frames(
-        int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    try:
+        anchor = cont.snap_context_frames(
+            int(info.get("anchor_frames") or cont.DEFAULT_CONTEXT_FRAMES))
+    except (TypeError, ValueError):
+        anchor = 0
     if not anchor:
         anchor = cont.DEFAULT_CONTEXT_FRAMES
 
     # 本段总帧数（17k+5 网格）与本段交付帧数（总帧数 - 钉住帧数）
-    duration = float(params.get("duration") or 5)
+    try:
+        duration = float(params.get("duration") or 5)
+    except (TypeError, ValueError):
+        duration = 5.0
     segment_total = cont.align_frame_count(int(round(duration * cont.FPS)))
 
     # 累计帧数：上游已累计的 + 本段交付的。
@@ -4276,6 +4294,37 @@ def _prepare_continuation_params(params: dict) -> str:
     }
     # 音频接续状态（首尾帧 / 参考生视频）—— 继承自上游。
     params["continuation"].update(audio_state)
+
+    # ---- [2026-11-19 第 7 轮审查] ----
+    #
+    # F1：显式放行标记（allow_twopass）不能丢。
+    #
+    # [原因] 用户在前端勾选「接续段也用二采」（并二次确认）后，
+    # 前端把 allow_twopass=true 放进提交的 continuation。本段重建
+    # continuation 时只写固定的一组字段，**没有**带上它 ——
+    # 用户显式勾选（并确认过）的接续段二采被**静默丢弃**。
+    #
+    # [为什么必须保留] 只有 info 里的 allow_twopass 才算是用户显式
+    # 放行；服务端策略层（h3studio/twopass_policy.py）正是读这个键
+    # 决定「deny」还是「warn」的。丢了它 = 用户勾了等于没勾。
+    if info.get("allow_twopass") is True:
+        params["continuation"]["allow_twopass"] = True
+
+    # F2：参考视频帧数必须继承 —— 第 2 段要按 C_n 跳帧。
+    #
+    # [为什么必须继承] 参考视频带检出的帧数在**上游那一段**里 ——
+    # 不继承就没法跳帧；参考视频又从 0 开始喂（2026-11-19 实测的
+    # 「段头跳变」修复在真实接续链上等于没生效）。
+    # 参考视频帧数来自**上游那一段**的 continuation（worker 探测直接
+    # 写进 continuation 字段的）—— 不依赖前端，前端不会带这个字段。
+    try:
+        upstream_ref_frames = int(
+            source_info.get("ref_video_frame_count") or 0)
+    except (TypeError, ValueError):
+        upstream_ref_frames = 0
+    if upstream_ref_frames > 0:
+        params["continuation"]["ref_video_frame_count"] = \
+            upstream_ref_frames
     return ""
 
 

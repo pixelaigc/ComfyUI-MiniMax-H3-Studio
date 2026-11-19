@@ -672,6 +672,15 @@ def build_continuation_context(mode: str, params: dict, job_id: str) -> dict:
         # 累计帧数（用于算拼接后的总长）
         "chain_total_frames": state["total_frames"],
         "segment_frames": int(info.get("segment_frames") or 0),
+        # ---- [2026-11-19 第 7 轮审查] F4 ----
+        # 参考视频的实际帧数一起下发（接续段要按 C_n 跳帧）。
+        #
+        # [为什么必须下发] 不下发 -> 第 2 段的参考视频仍然从 0 开始喂
+        # （2026-11-19 里实测的「段头跳变」修复在真实接续链上等于没生效）。
+        # 参考视频帧数来自**上游那一段**的 continuation（worker 探测直接
+        # 写进 continuation 字段的）—— 不依赖前端，前端不会带这个字段。
+        "ref_video_frame_count": int(
+            info.get("ref_video_frame_count") or 0),
     }
 
     # ---- 音频接续状态（首尾帧 / 参考生视频）----

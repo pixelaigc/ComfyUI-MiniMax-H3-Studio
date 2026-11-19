@@ -1,0 +1,1798 @@
+OmniStudio
+多模型图像 / 视频 / 音频创作工作台
+v1.00
+生成中
+CREATE
+视频
+文生视频
+▾
+minimax-h3 文生视频
+首尾帧生视频
+minimax-h3 首尾帧生视频
+参考生视频
+minimax-h3 参考生视频
+长片拼接
+minimax-h3 长片拼接
+<a class="nav-item" data-mode="t2v">文生视频</a>
+      <a class="nav-item" data-mode="flf">首尾帧生视频</a>
+      <a class="nav-item" data-mode="r2v">参考生视频</a>
+      <a class="nav-item" id="navStitch" data-mode="longfilm">长片拼接</a>
+文生图
+Z-IMAGE 文生图
+Qwen-Image 2.1
+MOSS-Image
+H3-Image
+图片编辑
+Qwen 图片编辑
+H3-Image 图片编辑
+音乐
+文生音乐
+参考生音乐
+素材
+素材库
+智能
+内置 Agent
+系统
+交互流程图
+本地模型配置
+硬件参数
+释放显存
+尺寸预设
+H3 原生画布内
+自定义（手动填宽高）
+352p · 608×352
+416p · 736×416
+480p · 864×480
+544p · 960×544
+608p · 1056×608
+640p · 1152×640
+672p · 1216×672
+736p · 1280×736
+768p · 1344×768
+768p · 1376×768
+832p · 1504×832
+928p · 1664×928
+1024p · 1824×1024
+1088p · 1920×1088
+官方档位 2MP · 1920×1088（上限 2.0M 像素（2,097,152 px），本项在限内）
+输出尺寸
+1920×1088
+×
+自动
+1.99 MP · 上限 2.0M 像素（2,097,152 px）
+画面比例
+用于自动算尺寸
+1:1
+2:3
+3:2
+3:4
+4:3
+9:16
+16:9
+21:9
+参考素材
+上传图片
+成片音轨
+三选一 · 没有对应素材的选项不出现
+MiniMax-H3 模型
+本机已安装
+清单来源：ComfyUI 模型列表 API（152 个扩散模型 / 735 个 LoRA）
+MiniMax-H3 FL2VA · 剪枝 int8（默认）
+MiniMax-H3 FL2VA · 完整 int8（保真最高）
+MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）
+MiniMax-H3 FL2VA · BF16（官方原始精度）
+剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 diffusion_models
+已确认在 ComfyUI 模型列表中可用。
+加速 LoRA
+单选 · 工作流只挂你选的那枚 · 按主模型适配过滤
+不挂加速 LoRA（走标准多步采样）
+Turbo 4 步 · ckpt850
+Turbo 4 步 · v4-step600
+LightX2V 4 步（768p 档）
+LightX2V SLA 4 步（768p 档）
+LightX2V 8 步
+DMAD 4 步（critic 版）
+速度滑杆（快/慢运动）
+更好运动（720x1280 档 / 15-30 步）
+LightX2V 4 步（v0.1 comfy 版）
+LightX2V SLA 4 步（768p · 根目录版）
+加速 LoRA 强度
+1.00
+已选「DMAD 4 步（critic 版）」×1.00（核心 LoraLoaderModelOnly加载，工作流里只挂这一枚） 当前底模下另有 2 个加速 LoRA 不适配，已从列表剔除：Turbo 4 步（中文名加速版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）；Turbo 4 步（中文名 EMA 版）（该 LoRA 带 51 个 AdaLN 层，而当前底模把它们折叠成 8 维曲线；这只能由 Turbo 节点（MiniMaxH3TurboLoRA）在运行期重注入，而本 LoRA 的权重键名形态（diffusion_model. 前缀）会走核心 LoraLoaderModelOnly 加载 —— 核心节点做不到，AdaLN 的贡献会被静默丢弃。请改配未剪枝底模（int8 / bf16），或改用 Turbo 系权重。）
+当前加速 LoRA：「DMAD 4 步（critic 版）」（核心 LoraLoaderModelOnly 加载，强度 1.00）—— 工作流里「只挂这一枚」，你选什么就加载什么。
+208 个层全部命中（实测），不含 AdaLN。
+作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 · 推荐采样器：作者未提供 · 推荐视频 shift：12（作者提供） · 推荐音频 shift：2（作者提供） · 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供） · 出处：dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」 · 唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+效果 LoRA
+可多选 · 27 个可用 · 与加速 LoRA 并存
+清空全部
+3dsrx_minimax_h3 — 3D 动画电影质感 LoRA — 做出 Pixar / 迪士尼式的 3D 动画电影质感
+Anime2RealsimH3 — 动漫转真人写实 LoRA — 把动漫参考图转成真人实拍 / 高级 cosplay 摄影
+Body_Breast_Minimax_h3_for_NSFW — 成人合成身材 LoRA — 改变人体体型/胸部特征，生成成人向的合成身材
+GOLDENBOY_H3_V1-step00012000 — 90 年代赛璐璐动画风 LoRA — 复刻 1990 年代日本 TV 动画（以《Golden
+H3_Ref2V_Anime_Slider_v1 — 2D 动漫 ↔ 写实双向滑杆 LoRA — 一个旋钮控制"2D 动漫 ↔ 写实"的整体画风倾向
+Handheld_Shaky_Cam_h3_100 — MiniMax H3 手持抖动运镜 LoRA
+Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA — 修掉 H3 的四种"AI 味"，做出真实电影摄影质感
+NSGIRL-MiniMax-H3-LoRA-By-MM744 — 真人女孩写实 LoRA — 真人女性特写写实风格，偏向干净、好看的商业人像质感
+YOURNAME_H3_V1-step00009900 — 新海诚环境风格 LoRA — 只学环境，不学人物
+h3-realism-people-t2v-i2v-r2v — 真人质感全面增强 LoRA (fal) — 让 H3 生成的真人镜头在 4K 下扛得住：特写不糊、皮
+h3_character_swap_pro4500_1000 — MiniMax H3 角色替换 LoRA
+h3_photoreal_ph0t0r34l_1024-step00003780 — H3 高分辨率写实静帧生成 LoRA — 把 H3 当成图片生成模型用 —— 产出最高 3840×
+manga_tone_v2 — 漫画网点渲染 LoRA（动态友好） — 让 H3 渲染出「会动的漫画网点纸」—— 墨线 + 中间
+minimax_h3_character_swap_v1.0_ref2va_r64_gl
+minimax_h3_head_swap_v1.0_r32 — MiniMax H3 换头 LoRA
+minimax_h3_live_wallpaper_v1.0_ref2va_r32 — MiniMax H3 动态壁纸 LoRA（R32 版）
+minimax_h3_live_wallpaper_v1.0_ref2va_r64 — MiniMax H3 动态壁纸 LoRA（R64 运镜版）
+minimax_h3_lms_v1.0_r64 — MiniMax H3 锐化/细节增强 LoRA
+minimax_h3_style_transfer_v1.0_r64 — MiniMax H3 风格迁移 LoRA
+minimax_h3_vfx_edit_v1.0_r128 — MiniMax H3 特效编辑 LoRA（标准版）
+minimax_h3_vfx_edit_v1.0_r128_ffp — MiniMax H3 特效编辑 LoRA（FFP / 首帧传播版）
+nafasp_h3_lora_v2_500 — 说话人脸动态 + 清晰语音 LoRA — 让"说话"这件事在 H3 里变得真实：全脸肌肉参与发声
+h3_hero_step12000 — 单图关键帧动画 LoRA — 给它一张"当前主角关键帧"，让它画出"下一个主角关键帧"
+h3_seq_step12000 — 双图定格序列 LoRA — 给它"窗口首图 + 窗口自身自然结尾"，让它浮出一段完整
+h3_tween_step12000 — 双图中间帧生成 LoRA — 给它"当前帧 + 远端目标极值"，让它画出中间的过渡帧
+pika_h3_flex_fl2va_v1_bf16
+pika_h3_flex_ref2va_v1_bf16
+添加
+未添加效果 LoRA。可选本机已安装的 H3 效果 LoRA（27 个）—— 在上面的搜索框里按名称 / 功能 / 触发词筛选，可多选。
+注意力机制
+生成加速
+默认（PyTorch 稠密注意力） · 速度最慢
+Comfy Kitchen INT8 量化注意力 · 速度一般
+SageAttention 显存优化 · 速度较慢
+Sol-Attn 近似路由 · 速度很快
+稀疏视频注意力（预算制） · 速度最快
+只保留一部分视频注意力连接：video_budget 越低越快，但提示词贴合度与运动细节会掉。没有「安全值」，每条提示词要自己试。
+开启二采
+低分辨率一采 + 高分辨率二采
+接续段也用二采（有风险）
+接续段用二采会强制走段头色档跳变（实测段头断点比 2.58x–4.54x、3 帧亮度降 +4.7～+7.2 灰阶）；标准采样等价 nonebot minimax_h3_seg2 且无此缺陷
+一采步数
+4
+一采分辨率
+0.70
+修正比例 ρ
+0.00
+潜空间放大器
+—
+minimax_h3_latent_upscaler_3d_bf16.safetensors
+minimax_h3_latent_upscaler_3d_fp16.safetensors
+h3_upscaler_lms_v0.1_fp32.safetensors
+二采 CFG
+1.0
+仅二采生效
+二采采样器
+固定 Euler
+sigma 精修
+低噪段加密采样（借鉴 nonebot H3 工作流）
+加密步数
+1
+起始 sigma
+2.50
+插值曲线
+cosine（推荐）
+linear
+exponential
+二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。总步数不变，提速来自一采的面积更小。H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，可能超出训练分布 —— 出糊就把它调大。 一采 4 步 @ 0.70× 分辨率 二采固定用 Euler 采样器（SelfLift 只支持标准 Euler）。
+采样参数
+与生图面板同级
+采样步数
+8
+已改
+CFG
+H3 固定
+shift（视频）
+12.00
+推荐
+shift（音频）
+2.00
+采样器
+二采固定 euler
+euler
+euler_cfg_pp
+euler_ancestral
+euler_ancestral_cfg_pp
+heun
+heunpp2
+exp_heun_2_x0
+exp_heun_2_x0_sde
+dpm_2
+dpm_2_ancestral
+lms
+dpm_fast
+dpm_adaptive
+dpmpp_2s_ancestral
+dpmpp_2s_ancestral_cfg_pp
+dpmpp_sde
+dpmpp_sde_gpu
+dpmpp_2m
+dpmpp_2m_cfg_pp
+dpmpp_2m_sde
+dpmpp_2m_sde_gpu
+dpmpp_2m_sde_heun
+dpmpp_2m_sde_heun_gpu
+dpmpp_3m_sde
+dpmpp_3m_sde_gpu
+ddpm
+lcm
+ipndm
+ipndm_v
+deis
+cfgpp_ud10_ab
+res_multistep
+res_multistep_cfg_pp
+res_multistep_ancestral
+res_multistep_ancestral_cfg_pp
+gradient_estimation
+gradient_estimation_cfg_pp
+er_sde
+seeds_2
+seeds_3
+sa_solver
+sa_solver_pece
+ddim
+uni_pc
+uni_pc_bh2
+legacy_rk
+rk
+rk_beta
+deis_3m_ode
+deis_2m_ode
+deis_3m
+deis_2m
+res_6s_ode
+res_5s_ode
+res_3s_ode
+res_2s_ode
+res_3m_ode
+res_2m_ode
+res_6s
+res_5s
+res_3s
+res_2s
+res_3m
+res_2m
+euler_extsig
+euler_extsig_ancestral
+euler_extsig_ancestral_cfg_pp
+euler_extsig_cfg_pp
+调度器
+simple
+sgm_uniform
+karras
+ddim_uniform
+beta
+normal
+linear_quadratic
+kl_optimal
+FlowMatchEulerDiscreteScheduler
+zipf_linear
+zeta
+bong_tangent
+beta57
+步数 8 → BasicScheduler.steps · 采样器 euler → KSamplerSelect.sampler_name · 调度器 beta → BasicScheduler.scheduler · shift 12.00 / 2.00 → MiniMaxH3SigmaShift
+H3 标准采样路径固定 CFG=1.0：官方工作流用的是 BasicGuider（只有 model + conditioning，没有 cfg 槽位），H3 的音视频潜变量是单流条件化，没有负面分支。只有开启二采时 CFG 才可调（SelfLiftH3Sampler 自带 cfg 槽位）。
+时长
+5s
+上限 60 秒
+分辨率档位
+总像素
+1MP（官方默认） · 1360×768 (1.0MP)
+480P · 864×480 (0.4MP)
+720P · 1296×736 (0.9MP)
+1080P · 1936×1088 (2.0MP)
+1440P · 2560×1440 (3.5MP) · 放大
+2K · 2800×1568 (4.2MP) · 放大
+4K · 3936×2208 (8.3MP) · 放大
+图像模式
+1360×768
+1.00 MP
+生成批次
+一次出几张
+1 张
+2 张
+3 张
+4 张
+5 张
+每批次使用独立种子，结果分别成图；单个批次失败不影响其余批次。
+Z-Image 模型
+Z-Image-Turbo · 官方加速版
+Z-Image Base · 官方完整版
+Z-Image Base + 蒸馏加速 · 8 步
+DarkBeast Z6 BlitZ · FP8 混精版
+官方模板 image_z_image_turbo.json：8 步 / cfg 1 / res_multistep / simple / shift 3。
+Turbo 的 CFG 必须=1（此时负面提示词被跳过、不跑第二遍前向），且不要用 karras / exponential 调度器（8 步下会崩图）。
+shift
+3.0
+负面提示词
+Base 建议填写
+当前版本为蒸馏模型：CFG=1 时 ComfyUI 会跳过 uncond 分支，负面提示词数学上无效，已禁用。
+SLG skip layer
+MOSS-Image 专属
+参考图
+最多 10 张
++ 从素材库添加
+按匹配度排序
+占位标记与描述（可编辑）
+LoRA
+●
+Z-imagemeinv11
+推荐强度
+↑
+↓
+触发词
+基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
+查看简易说明 ›
+Z-Image-cheongsam-portrait-elegant-1771682839.031556 — 方向：A3 中式/国风人像
+TraditionalChineseStylePortraitPhotography — 方向：A3 中式/国风人像
+Z-Image-portrait-fashion-multiangle-1773828114.179561 — 方向：B1 人像皮肤质感
+Z-Image-realistic_portrait-multi_angle-hair_detail-1775064641.28115 — 方向：B1 人像皮肤质感
+Z-Image-streetphotography-portrait-urbanlife-1775745279.924539 — 方向：B1 人像皮肤质感
+FilmPortrait — 方向：B1 人像皮肤质感
+Z-Image-Turbo_Sugar_Face — 方向：B1 人像皮肤质感
+Z-Image_SoftGlow_SemiRealPortrait_Style_Mugi_v1.0 — 方向：B1 人像皮肤质感
+PortraitPhotography — 方向：B1 人像皮肤质感
+z-image-h-studios — 方向：B1 人像皮肤质感
+StarMap-Hasselblad-portrait — 方向：B1 人像皮肤质感
+skin-z-image — 方向：B1 人像皮肤质感
+z-image-Realistic-Skin-Texture-style-lora — 方向：B1 人像皮肤质感
+97_z_image_v5 — 方向：A2 东亚女性·日系/韩系写实
+cosplay_z_image_v2 — 方向：A2 东亚女性·日系/韩系写实
+Asian-beauty-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+Asian-girl-nvsheng-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+Asian-girl-nvsheng-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+JK-nvsheng-Ely-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+StarFace-Z-Image-Turbo — 方向：A2 东亚女性·日系/韩系写实
+XB_ZIMAGE_BASE_FACE_3 — 方向：A2 东亚女性·日系/韩系写实
+XB_ZIMAGE_FACE7 — 方向：A2 东亚女性·日系/韩系写实
+XB_ZIMAGE_FACE_8 — 方向：A2 东亚女性·日系/韩系写实
+Z-Image-xianshirenxiang — 方向：A2 东亚女性·日系/韩系写实
+Z-image-gjb — 方向：A2 东亚女性·日系/韩系写实
+Z-image_LoRA_hgnn01_V5 — 方向：A2 东亚女性·日系/韩系写实
+Z-imagemeinv29 — 方向：A2 东亚女性·日系/韩系写实
+Z-imagemeinv41 — 方向：A2 东亚女性·日系/韩系写实
+Z-Image-Asiangirl2 — 方向：A1 东亚女性·小红书写实
+Zmeinv — 方向：A2 东亚女性·日系/韩系写实
+ZimageAsian — 方向：A2 东亚女性·日系/韩系写实
+asia-girl-nvsheng-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+baihu-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+baishang-xiaohua-rizinv-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+bd-nvsheng-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+中国网红明星脸审美风格人像 | Chinese influencer-style face portrait - Z-Image Turbo lora — 方向：A2 东亚女性·日系/韩系写实
+limuwan-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+liumei-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+liumei-meinv-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+liyuegirl-Z-Image-Turbo — 方向：A2 东亚女性·日系/韩系写实
+meili-girl-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+meili-girl-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+meinv-xiaolan-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+meinv-xiaolan-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+naixi-girl-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+nana-RT-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+nanqiao-mote-Z-Image-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+nanqiao-mote-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+niannian2-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+ns-face-z-image-4 — 方向：A2 东亚女性·日系/韩系写实
+nvsheng-xiezhen-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+qingxin-yujie-Z-Image-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+qingxin-yujie-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+qingxiu-nvsheng-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+qingxiu-nvsheng-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+tinger-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+tinger-meinv-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+Z-Image-Asiangirl5 — 方向：A1 东亚女性·小红书写实
+yazhou-girl2-Z-Image-Turbo-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+yazhou-girl2-Z-Image-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+yunxiao-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：A2 东亚女性·日系/韩系写实
+z-image-face-1 — 方向：A2 东亚女性·日系/韩系写实
+z-image-face-2 — 方向：A2 东亚女性·日系/韩系写实
+Z-Image-Lora — 方向：A6 东亚面孔精修系列(NexBlend)
+NexBlend 02 Asian Realistic LoRA - Z image turbo (ZIT) — 方向：A6 东亚面孔精修系列(NexBlend)
+NexBlend 06 Asian Realistic LoRA - Z image turbo (ZIT) — 方向：A6 东亚面孔精修系列(NexBlend)
+NexBlend 01 Asian Realistic LoRA - Z image turbo (ZIT) — 方向：A6 东亚面孔精修系列(NexBlend)
+Z-image_2-LORA — 方向：B2 影棚/摄影感
+z-image-amateur-photography-lora — 方向：B2 影棚/摄影感
+hanmo-yujie-Z-Image-Turbo-v1.0 — 方向：B2 影棚/摄影感
+hanmo-yujie-Z-Image-v1.0 — 方向：B2 影棚/摄影感
+hannv-yeonwoo-Z-Image-v1.0 — 方向：B2 影棚/摄影感
+yeonwoo-Korea-Z-Image-Turbo-Tongyi-MAI-v1.0 — 方向：B2 影棚/摄影感
+z-image-char-ai — 方向：B2 影棚/摄影感
+z-image-char-erika — 方向：B2 影棚/摄影感
+z-image-char-rina — 方向：B2 影棚/摄影感
+z-image-char-yuyika — 方向：B2 影棚/摄影感
+z-image-jk-style — 方向：B2 影棚/摄影感
+z-image-mmm — 方向：B2 影棚/摄影感
+z-image-person123 — 方向：B2 影棚/摄影感
+Z-image_Realistic_Photography — 方向：B2 影棚/摄影感
+zimage_asianslider — 方向：A5 族裔/骨相滑杆
+如梦似幻（Kook Z-Image 滤镜） — 梦幻朦胧/柔光滤镜风格，官方 tags 标注为「滤镜lo
+瑶光（Kook Z-Image 真实幻想） — 写实向「真实幻想」质感，官方 tags 标注为「瑶光 /
+去压缩伪影（DeJPEG v3） — 针对 JPEG 压缩伪影的修复型效果 LoRA（patc
+原神、角色立绘、二次元（Z-Image-i2L 画廊产物） — 原神、角色立绘、二次元（Z-Image-i2L 画廊产物
+Z-Image-mecha-model-gundam-1772267372.488181（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Z-Image-sci-fi-cybernetic-realistic-1773899918.105806（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Z-Image-robots-tech_exhibition-humanoid-1792976222.577952（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Female_models 1S4B3L（女性体型） — 每文件自带触发词（本条为 1S4B3L）
+80s Air Brush Style（80s 喷绘） — 80 年代喷枪 / airbrush 插画，柔和渐变 +
+Mecharashi 钢岚 - Raider Collection Zimage（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Mecharashi 钢岚 - Sniper Collection Zimage（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Mecharashi 钢岚 - Fighter Collection Zimage（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Mecharashi 钢岚 - Tacticians Collection Zimage（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+AWPortrait-Z（人像美化 / 布光） — 去高频噪点、压 HDR、提对比与饱和，扩多族裔面孔
+Barbara 芭芭拉（枪版梗图向）（原神·角色身份） — 原神 · 角色身份
+CYBORG FACTORY 🦾 BY STX（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Caricature（漫画夸张化） — caricature 漫画化
+Classic Painting（15–19 世纪古典油画） — 扬·范·艾克式油画质感（厚涂、笔触、棕色调），宗教 /
+Coloring Book（涂色书线稿） — 黑白线稿涂色页风格
+ZIT height slider（身高滑杆） — 滑杆型
+zitronstyle（动漫涂色 / 动画截图） — 作者未给触发词（触发词字段为空）
+Mystic-XXX V6（成人向风格） — Mystic-XXX 系列的 V6 版本
+Mystic-XXX V7（成人向风格） — 作者未给触发词与强度区间
+NSFW MASTER ZiT V1（通用成人向解锁） — 作者明示无触发词、推荐权重 0.8
+NSFW MASTER ZiT V2（通用成人向解锁） — z-image 生态下载量最高的通用 NSFW 效果 L
+Olympus UltraReal（CCD / 低光数码） — 早期紧凑机 CCD 色彩、闪光夜景噪点
+PhysioShade（材质 / 微细节强化） — 触发词 physioshade
+Pornmaster v1（成人向风格） — 作者明示触发词 pronmstr、强度 0.7–0.85
+RadianceChrome Voluptuous v2.0（铬光质感） — 镜面铬金属光泽、体积感高光
+Raiden Shogun 雷电将军（原神·角色身份） — 原神 · 角色身份
+RealisticSnapshot V5（胶片写实） — 作者未给触发词与强度区间
+Saturday Morning（周六早晨卡通） — 美式 80s 电视动画卡通，扁平色块 + 粗描边
+ZIT skinny-fat slider（体型滑杆） — 滑杆型
+ZIT slender slider V4（纤细体型滑杆） — 滑杆型
+Technically Color（60s 电影调色） — 高饱和复古胶片调色 + 戏剧光，仿 60–70 年代影调
+CG 游戏画风（写实向游戏 CG / 角色宣传图质感） — CG 游戏画风（写实向游戏 CG / 角色宣传图质感）
+二次元画风 V2（日系动画渲染向） — 二次元画风 V2（日系动画渲染向）
+二次元画风 V3 · 治愈系插画 — 二次元画风 V3 · 治愈系插画
+Z-image Turbo 风景 v2 (XB_ZIMAGE_TURBO_FJ_V2) — Z-image Turbo 风景 v2 (XB_ZIMA
+角色立绘画风 V2（游戏角色立绘 / 宣传立绘） — 角色立绘画风 V2（游戏角色立绘 / 宣传立绘）
+水彩画风 — 水彩画风
+原神画风（Z-Image-Turbo 专项） — 原神画风（Z-Image-Turbo 专项）
+Z-image Turbo 原神画风 (XB_ZIMAGE_TURBO_YS_V1) — Z-image Turbo 原神画风 (XB_ZIMAG
+Z-Breast Slider（胸型滑杆） — 滑杆型（正负 strength 有意义）
+国漫 3D 风格（中式国漫三维渲染） — 国漫 3D 风格（中式国漫三维渲染）
+雨夜仙庭 · 国漫 3D（幻想国风仙侠三维渲染） — 雨夜仙庭 · 国漫 3D（幻想国风仙侠三维渲染）
+Z-Image 360（全景图） — 360° 全景图
+ZIT feet（足部偏好） — 触发词 zitfet，另有 feet / barefoo
+ZIT makeup slider（妆容滑杆） — 滑杆型
+HistoricColor（1900 年代彩色历史摄影） — 普金彩色老照片（Prokudin-Gorsky 三色曝光
+Marionette Modernism（达达玩偶摄影） — 构成主义 / 达达主义玩偶人像（Ekster、Taeub
+ZIT NSFW Unlocked（成人向解锁） — 触发词 nude
+Pencil Sketch（彩铅素描） — 铅笔 / 彩铅素描速写
+黑白线稿动画风（Lineart / 动漫线稿） — 黑白线稿动画风（Lineart / 动漫线稿）
+ZIT pack – anal（肛交） — EasonnLi 10 件套 pack 成员
+better_breasts（胸型增强） — 触发词 breasts / large / medium
+ZIT babe slider（风格滑杆） — 滑杆型
+ZIT soles v2（脚底特写） — 触发词 zitsole，另有 foot focus /
+ZIT bust slider（胸部滑杆） — 滑杆型
+cameltoe（乳沟 / 衣内轮廓） — 触发词 zitcamelt / cameltoe
+ZIT pack – stand and carry（站立抱起） — EasonnLi 10 件套 pack 成员
+ZIT pack – cowgirl（女上位） — EasonnLi 10 件套 pack 成员
+ZIT cum on body（体液） — 触发词 cum on body
+ZIT pack – cum（体液） — EasonnLi 10 件套 pack 成员
+dark-art-style（暗黑艺术风格） — 触发词 dark-art-style-zit
+ZIT pack – doggy style（后入） — EasonnLi 10 件套 pack 成员
+dott4k-v2（4K 杂乱环境细节） — 物件堆叠 / 杂乱室内细节强化
+trans_femboy（跨性别气质 / 轮廓） — 触发词 androgynous femboy / pen
+flat-cartoon（扁平卡通角色设定图） — 白底全身角色设定图、扁平卡通
+ZIT flat slider（胸部形状滑杆） — 滑杆型
+Ghibli Style（吉卜力动画风） — 吉卜力动画背景 / 角色（水彩背景 + 柔和线条）
+GrainScape UltraReal（胶片颗粒写实） — 颗粒感写实质感
+Lenovo UltraReal（相机直出写实） — 消费级相机直出质感的写实人像
+3D MMORPG Style（3D 网游美术） — 3D 网游角色 / 装备概念图
+lowwaist v2（低腰线） — 触发词 lowwaistv2-zit
+mecha-2（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Mecha vector（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+ZIT pack – missionary（传教士位） — EasonnLi 10 件套 pack 成员
+日系现代动漫风格 — 日系现代动漫风格
+Mystic-XXX v4（成人向风格） — 触发词 mystic-xxx-zit-v4
+new-mecha-lora（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+鸣潮 · 琳奈 Linnai（厚涂 2.5D-High）（鸣潮·角色身份） — 鸣潮 · 角色身份
+鸣潮 · 莫宁 Mornye（写实 CG 重构）（鸣潮·角色身份） — 鸣潮 · 角色身份
+鸣潮 · 千咲 Chisa（厚涂 2.7D-High）（鸣潮·角色身份） — 鸣潮 · 角色身份
+鸣潮 · 西格莉卡 Sigrika（厚涂 2.7D-High）（鸣潮·角色身份） — 鸣潮 · 角色身份
+鸣潮 · 秧秧 Yangyang（厚涂 2.7D-High）（鸣潮·角色身份） — 鸣潮 · 角色身份
+nsfw-zit（成人向解锁） — 触发词 nsfw-zit
+nsfwv2-zit（成人向解锁 v2） — 触发词 nsfwv2-zit
+Pixel Art Style（像素风） — 通用像素画
+zit POV bj（第一人称视角） — 触发词 bj
+ZIMAGEPUSSY（私处细节） — 作者未给触发词与强度区间
+Z-Image-Turbo Realism（通用写实增强） — 通用写实向增强（作者标为 lightweight）
+DetailedEyes（眼睛细节强化） — 虹膜 / 瞳孔 / 睫毛细节强化
+real_breasts（写实胸部） — 触发词 rbz
+ZIT pack – reverse cowgirl（反向女上位） — EasonnLi 10 件套 pack 成员
+rtmi-zimage（角色立绘设定图） — 白底胸像角色卡
+Silver Wolf 银狼 v5（HSR）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
+Sparkle 花火（Honkai: Star Rail）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
+ZIT pack – spooning（侧卧） — EasonnLi 10 件套 pack 成员
+ZIT pack – tits job（乳交 / paizuri） — EasonnLi 10 件套 pack 成员
+turbopussy ZIT v2（私处 / 姿态效果） — 文件名含 turbo 但「不是加速 LoRA」 —— 作
+Vintage Comic Style（60–70s 复古漫画） — 丝网印刷质感、粗黑描边 + 半调网点
+鸣潮 · Aemeath（wuwaams）（鸣潮·角色身份） — 鸣潮 · 角色身份
+Brazilian Male Realism v2（巴西男性写实） — 触发词 BRZMLRELSM
+z-image-原神1 (z-image-yuanshan1) — z-image-原神1 (z-image-yuansha
+DeverStyle Arcane（地狱城画风） — DeverStyle 画风合集之一：地狱城 / 暗黑奇幻
+DeverStyle Blue Eye Samurai（蓝眼武士画风） — DeverStyle 画风合集之一：蓝眼武士式日式动画厚
+DeverStyle Dan Mumford（暗黑写实画风） — DeverStyle 画风合集之一：Dan Mumfor
+Reversal Film Gravure v2.0（反转胶片） — 反转片 / 模拟胶片质感（v2 为用户反馈修正版）
+Children's Drawings（儿童蜡笔画） — 儿童蜡笔画风（ostris 出品，训练适配性好）
+Sunbleached Protograph（晒褪色胶片） — 晒白 / 暖调宝丽来
+ZIT oral / deepthroat（口交） — 作者未给触发词（模型卡未标注触发词字段）
+已添加 1 个效果 LoRA（配置存在服务端，局域网共用）。 加速/蒸馏类 2 个由工作流固定使用（不列出）。
+YuE2 音乐模型
+YuE2 3B · BF16 完整版
+官方 BF16 原精度版（3.63B 参数，628 个 BF16 张量），音质与生成稳定性都优于量化版。本机这份由 m-a-p/YuE2-3B（官方原始 BF16 权重）+ m-a-p/YuE2-Vae 转换为 ComfyUI 原生单文件布局而来，数值与官方版逐字节一致。本机已就绪（models/checkpoints/）。
+音频编码器
+SheetSage2 · 参考音频转乐谱用
+SheetSage2 · BF16（官方音频转谱）
+Comfy-Org/YuE2 官方音频编码器 SheetSage2（BF16）。参考生音乐时，它把参考音频转成 ABC 乐谱 —— 只提取旋律线，不含和弦符号，原曲的编曲与和声由 YuE2 依据风格描述重新生成。
+音乐描述
+已增强
+历史
+增强
+当前增强：普通增强（视频导演提示词（MiniMax-H3 官方三段式））
+用本地模型生成结构化风格与歌词
+结构化风格
+Style Fields · 对齐第三方 YuE2StylePrompt
+展开
+语言
+English
+Mandarin
+Cantonese
+Japanese
+Korean
+Spanish
+French
+Portuguese
+German
+Italian
+Hindi
+(custom / none)
+曲风
+pop
+piano pop
+indie pop
+synth pop
+dance pop
+r&b
+soul
+funk
+nu-disco
+disco
+house
+edm
+hip hop
+trap
+rap
+rock
+indie rock
+alternative rock
+punk
+metal
+jazz
+jazz-funk
+bossa nova
+latin
+reggaeton
+country
+folk
+indie folk
+singer-songwriter
+acoustic
+gospel
+blues
+lo-fi
+dream pop
+shoegaze
+ambient
+cinematic
+film score
+classical crossover
+k-pop
+j-pop
+city pop
+c-pop
+afrobeats
+reggae
+ska
+情绪
+(none)
+uplifting
+euphoric
+romantic
+intimate
+melancholic
+bittersweet
+dark
+aggressive
+playful
+nostalgic
+dreamy
+chill
+anthemic
+mysterious
+人声
+(instrumental / no lead vocal)
+female vocal
+male vocal
+androgynous vocal
+duet male and female
+choir / stacked vocals
+rap lead
+spoken word
+人声音色
+warm
+bright
+breathy
+powerful
+raspy
+soft intimate
+belting
+tenor
+baritone
+soprano
+alto
+乐器
+速度 BPM
+能量
+low energy
+mid energy
+high energy
+builds from quiet to loud
+时长意向
+model decides
+short clip (~45-75s)
+single edit (~2-3 min)
+full song (~3.5-5 min)
+very long (may truncate)
+补充描述
+自定义语言
+自定义曲风
+按第三方
+YuE2StylePrompt
+的 12 个字段拼一段标准 style（会加在上面的自由文本
+前面
+）。
+            标记
+的选项表示
+不要这一段
+；
+要配合下面的自定义输入框。
+            纯器乐请选
+，人声音色会自动清成
+。
+增强后这里会自动填好结构化风格字段，可以逐项改，改完再生成。
+拼接结果：English, piano pop, intimate, warm female vocal, acoustic piano, rounded bass and light drums, 88 BPM, mid energy, radio-length song, about two to three minutes, lyrical memorable melody, unhurried phrasing
+歌词
+Lyrics · 可留空（留空 = 纯器乐）
+只写要被唱出来的字，用
+[Verse]
+/
+[Chorus]
+[Bridge]
+[Outro]
+标段落。留空则生成纯器乐（无歌词与人声）。参考生音乐时，歌词的句式与字数越接近原曲，越贴合原旋律。
+参考音频
+从素材库选 1 段
+尚未选择参考音频
++ 从素材库选择
+从素材库选 1 段音频（wav/mp3/flac/m4a/ogg）。这段音频只用来提取旋律线，原曲的编曲和人声不会被沿用；音频越短，转谱越快。
+谱面规划
+ABC Planning · 音乐生成前的乐谱规划
+完整谱面（旋律+和弦）
+仅旋律（适合翻唱）
+完整谱面：先规划「旋律 + 和弦」，再据此生成音乐 —— 文生音乐推荐这个。
+32
+官方模板 32 步 · 越大越慢
+官方模板 1.0 · CFG=1 表示不做负向引导
+ddpm_uniform
+输出格式
+FLAC
+MP3
+OPUS
+FLAC 无损、体积大（本机默认）；MP3 体积小、通用；OPUS 压缩率最高。三种格式都是 48 kHz 立体声。
+种子
+留空随机
+同一个种子 + 同一组参数 = 同一首曲子，便于微调对比。
+高级采样参数（音乐 / 谱面两组）
+温度
+top_p
+0.95
+top_k
+100
+重复惩罚
+1.20
+以上 4 项是
+音乐生成阶段
+的采样参数，会真实写进工作流的
+YuE2GenerateMusic
+节点（温度 / top_p / top_k / 重复惩罚），可以自由调整。官方节点默认值：温度 1.0 / top_p 0.95 / top_k 100 / 重复惩罚 1.2。谱面（ABC）规划阶段另有一组独立参数（温度 0.7 / top_p 0.9 / top_k 30 / 重复惩罚 1.005），本面板
+不开放
+调整 —— 它固定用官方推荐值。改动这些值会改变曲子的「随机性」，一般保持默认即可。
+提示词
+普通增强
+模板
+视频提示词（MiniMax-H3）
+视频导演提示词（MiniMax-H3 官方三段式）
+按所选模板把提示词扩写成完整描述
+二次增强
+图像提示词·物体细化（二次增强）
+把提示词里的每一个物体/要素逐个枚举并逐个细化（通用能力，各面板都可用）
+视频导演提示词
+按 MiniMax-H3 官方三段式（画面时间线 / 整体声景 / 非剧情音乐）写导演稿
+结构化增强（layout）
+MOSS-Image 专属，本面板不可用
+生成 MOSS Layout JSON（对象清单 + 位置坐标），并翻译成最终文本提示词
+YuE2 结构化风格 + 歌词
+YuE2 音乐专属，本面板不可用
+把描述拆成 YuE2 的结构化风格字段（语言/曲风/情绪/人声/乐器/BPM/能量/意象）并生成配套歌词
+qwen21图片官方增强PE
+Qwen-Image 2.1 专属，本面板不可用
+用 Qwen-Image 2.1 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑各一档）
+官方 PE system prompt
+# Image Prompt Rewriting Expert
+
+You turn a user's image request into one long English paragraph that describes the
+finished image as if you were looking at it, plus the aspect ratio it should be
+rendered at. You are not talking to the user and not talking to a renderer: you are
+an observer reporting what is in the frame.
+
+Work through the eight steps below in order. Each step commits one decision; later
+steps never revise an earlier one.
+
+## Step 1 — Read the brief and split it in two
+
+List what the user has fixed and what they have left open.
+
+Fixed, and it must survive into your description unchanged: every string of text
+they want shown, every named object, every count, every stated colour, every stated
+position, and the aspect ratio if they gave one. Copy their text strings character
+for character, in their own script, including punctuation and spacing.
+
+A third thing they may give you is an instruction about the job rather than about the
+picture — "use double quotes", "no hard-edged blocks", "4K, no noise", "make sure the
+text is sharp". That is not content. Obey it silently where it applies and never echo
+it: the description states what is in the frame, never what must be done.
+
+Open, and you must decide it: everything they did not mention. A three-word request
+and a three-hundred-word request both become a description of the same size, so a
+short brief means you are inventing most of the frame, not writing less.
+
+## Step 2 — Fix the frame
+
+Decide the orientation from the subject, then pick the ratio.
+
+If the user states a ratio, use it. Otherwise: `3:2` for anything horizontal and
+`2:3` for anything vertical — these are the two defaults and cover most images.
+Use `1:1` for a square badge, icon, album cover or single centred emblem, `16:9`
+for a wide cinematic or presentation frame, `1:2` or `9:16` for a phone screen or a
+tall standing banner. `3:4`, `2:1`, `21:9`, `4:3`, `9:21`, `4:5`, `3:1`, `5:4`,
+`1:3` exist but only when the subject or the user really calls for them.
+
+The ratio lives only in the `wh_ratio` field. Never write a ratio, a resolution, or
+a pixel count into the description itself.
+
+## Step 3 — Write the opening sentence
+
+One sentence, around twenty words. Name the medium, the style, the subject, and the
+background or palette; usually name the orientation too:
+
+`The image is a ⟨vertical / wide / square / tall⟩ ⟨style⟩ ⟨photograph · poster · illustration · scene · portrait · infographic · close-up · graphic · page · card · sheet · logo⟩ of ⟨subject⟩, ⟨the background and its palette⟩.`
+
+`This is a …` or a bare `A vertical realistic photograph of …` work equally well. The
+medium noun is the one part that is never omitted.
+
+The style word goes here — realistic, photorealistic, minimalist, flat-vector,
+cinematic, watercolour, isometric, editorial, hand-drawn, 3D-rendered, retro. Name
+it once here; you may echo it in the closing sentence.
+
+## Step 4 — Inventory before you write
+
+Before any more prose, settle two lists.
+
+Every element that will appear, each with a place in the frame: upper-left,
+across the top, on the far right, in the lower-third, in the centre, in front of,
+behind, tucked into the corner. You will need eight to fourteen such positional
+phrases, about ten typically, and they must reach the corners, the edges and the
+centre — not cluster in the middle.
+
+Every piece of text that will be legible in the image, in reading order.
+
+## Step 5 — Walk the frame
+
+Now describe it in order. Which order depends on how the frame is filled.
+
+**If the frame is divided into regions** — a poster, a page, an interface, a layout, a
+wide scene with several things in it — walk the regions:
+
+1. The background and the surface it sits on — this comes immediately after the
+   opening sentence, not at the end.
+2. The top band: headline, header bar, sky, ceiling, whatever occupies the top edge.
+3. Down and across the body of the frame: left side, then centre, then right side.
+   Give each region one or two sentences.
+4. The bottom band: footer, foreground, ground plane, base row.
+
+**If one subject fills the frame** — a portrait, a close-up, a single object — walk
+the subject instead: the background and how far it falls off, then the subject's pose
+and where it is placed in the frame, then head and face, then body and each garment or
+surface, then what is held or touching it, then whatever little is left at the edges.
+Keep using positional phrases inside the subject — in the upper-left of the frame,
+behind the left shoulder, along the lower edge — so the frame stays locatable.
+
+Roughly a third of your sentences should open on the positional phrase itself —
+"On the right side of the frame, …", "In the upper-left corner, …", "Across the
+lower third, …" — so the reader always knows where they are looking.
+
+Keep it to one paragraph. Break to a new paragraph only when the image is genuinely
+built from stacked regions — panels, cards, sections, slides — and then one
+paragraph per region, each opening on where that region sits.
+
+## Step 6 — Set every piece of text
+
+Skip this step if nothing in the image is meant to be read — a third of images have
+no legible text at all, and inventing signage for them is a mistake.
+
+Otherwise, for each string from your Step 4 list, in reading order, name where it sits,
+what it looks like, and what it says: `a bold black headline across the top reads "…"`.
+
+Put the string in straight double quotes, in its own script — Chinese, Russian,
+Korean, Japanese and Arabic text stays in Chinese, Russian, Korean, Japanese and
+Arabic. Give its weight, colour, case and relative size. Describe a line break as a
+second line rather than putting a real newline inside the string. If a mark is not meant
+to be read — distant signage, a label behind glass, dense body copy — call it
+blurred, indistinct, or too small to read rather than inventing letters. If the image contains a chart
+or a table, its axes, tick labels, legend entries, series and cell values are text
+too: write them out.
+
+## Step 7 — Give the lighting its own sentence
+
+Every image has light in it, and the description always accounts for it: the source,
+its direction, its quality, and the shadows and highlights it leaves. Soft diffused
+daylight from a window on the left, hard overhead studio light, warm low sun, flat
+even ambient light for a diagram.
+
+Once the contents are placed, give it a sentence of its own — `The lighting is …` —
+or, if the light is what makes a particular surface look the way it does, fold it into
+that surface's sentence. Either way it is stated explicitly, not left implied.
+
+## Step 8 — Close with the whole frame
+
+End on a single sentence that steps back:
+
+`The overall composition ⟨is / uses / feels⟩ …`
+
+`The composition is …`, `The overall design …`, `The overall mood …`, `The overall
+palette …` and `The image has …` are the same move. Cover balance and symmetry, the
+palette, the style, and the mood in that one sentence. Write exactly one such
+sentence — do not follow it with a second summary.
+
+## Throughout
+
+**Size.** The description runs about twenty sentences and four to five hundred words,
+roughly twenty-five words a sentence. That is the same size whether the brief was three
+words or three hundred: a dense frame with many regions and a lot of text runs longer, a
+single quiet subject runs shorter, but a thin brief never buys a thin description.
+
+**Observe, don't instruct.** Present tense, third person, declarative. No "you", no
+"create", no "make sure", no "the AI should". No quality boosters — no "masterpiece",
+"8K", "highly detailed", "award-winning".
+
+**Hedge what you cannot be certain of.** An observer describing a picture says
+"appears to be", "likely", "suggesting", and offers a pair — "a notebook
+or a tablet", "wood or dark laminate" — when the thing is genuinely ambiguous. Do
+this often; it is the natural register here. Be flatly definite only about what the
+user fixed.
+
+**Name colours with a modifier, almost never bare.** Deep navy, muted olive, pale
+cream, warm terracotta, soft dusty rose, blue-grey, off-white, charcoal, brownish-
+green. Hex codes only if the user gave them.
+
+**Give the material, not just the noun.** Brushed metal, matte plastic, glossy
+ceramic, coarse linen, weathered wood, frosted glass, grain, scuffs, condensation,
+visible brush strokes, paper fibre.
+
+**Enumerate; never summarise.** "Several items" and "various decorations" are not
+descriptions. Say what each thing is. Write small counts as words — three, five,
+twelve — and if something is partly hidden, say so and describe the visible part.
+
+**People get their observable surface.** Build, posture, where they are looking,
+expression, hair, skin tone, and each garment with its colour and material. Age is a
+life stage or a decade — a child, a teenager, a young adult, middle-aged, elderly,
+in her thirties — never a number of years. If a face is turned away or cropped, say
+that instead of describing it.
+
+**Objects by class, not by brand.** A silver laptop, a mirrorless camera, a compact
+hatchback — unless the user named the brand. Photographic and design vocabulary is
+welcome: shallow depth of field, bokeh, backlit, close-up, negative space,
+grid, drop shadow.
+
+**Everything holds together physically.** Shadows fall away from the light, reflections
+match what is in front of the surface, scale is consistent between neighbouring
+objects, and a surface reacts to what sits on it. If the user asked for something
+impossible, describe it as the image shows it and let the rest of the scene stay
+coherent around it.
+
+## Language
+
+The description is always in English, whatever language the request arrives in. The
+only exception is text shown inside the image, which stays in its own script.
+
+## Output format
+
+- Return the description and nothing else: one continuous paragraph of English, in a single line
+starting on the very first character of your reply.
+- No JSON, no braces, no key names, no labels, no headings, no markdown, no code fences, and no quotation marks around the paragraph.
+- No preamble, no acknowledgement, no explanation, no summary, no notes, no closing remarks, no questions.
+- No ratio, no resolution, no pixel count, no timestamps.
+
+Your whole reply is used as the image prompt, so every extra word you add becomes part of the image.
+presence_penalty
+max_new_tokens
+H3-Image 官方增强PE
+MiniMax-H3-Image 专属，本面板不可用
+用 MiniMax H3-Image 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑）
+已切换到「t2v」模式，模板自动回落到「视频导演提示词（MiniMax-H3 官方三段式）」
+二次增强作用对象
+原始提示词
+一次增强后
+版本历史
+查看产物
+已入队（队列 3）
+从右侧拖入视频，拖动片段可排序
+长片标题
+简介
+把右侧视频卡片拖到这里
+也可点击卡片下方“＋拼接” · 至少 2 个片段
+视频候选（当前页）
+尚未选择片段
+合成长片
+全部
+进行中
+已完成
+长片
+失败
+已取消
+生成类型
+全部类型
+首尾帧生成
+参考图生成
+Qwen-Image 2.1 文生图
+Qwen-Image 2.1 图片编辑
+MOSS-Image 文生图
+H3-Image 文生图
+其它生成
+图片
+音频
+全部比例
+全部时长
+5 秒
+6 秒
+7 秒
+8 秒
+9 秒
+10 秒
+11 秒
+12 秒
+13 秒
+14 秒
+15 秒
+20 秒
+30 秒
+45 秒
+60 秒
+重置
+每页
+8 个
+12 个
+16 个
+24 个
+32 个
+48 个
+管理
+生成队列
+运行中 1 · 排队 2　最近完成 4 · 失败 1
+明细
+▶
+integrated_multimodal_description: [Shot 1] Aerial drone footage, bright midday sun under a cloudless blue sky. The came
+运行中
+取消
+2
+排队中
+3
+·
+integrated_multimodal_description: [Shot 1] The camera is a static, wide-angle long shot capturing the full body of a mi
+成功
+integrated_multimodal_description: [Shot 1] The video presents a continuous, uncut single shot with a distinct 90s cinem
+参考生成 · 11/19 15:52
+生成中 · 3%
+模式
+参考生成
+分辨率
+1088p · 1920×1088 · 16:9
+注意力
+模型
+MiniMax-H3 混合版 · FL2VA+Ref2VA
+DMAD 4 步（critic 版） ×1.00 · Minimax H3真实电影质感 ×0.70
+步数/CFG
+8 · 1
+尺寸
+随机
+耗时
+12m48s
+integrated_multimodal_description: [Shot 1] Aerial drone footage, bright midday
+复用参数
+排队中…
+DMAD 4 步（critic 版） ×1.00 · 效果 Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA ×0.70
+参考生成 · 11/19 15:28
+11/19 15:28
+✕ 任务运行超过 30 分钟仍未完成，已判定为超时失败。本机 ComfyUI 可能仍在占用显卡，请先在 ComfyUI 界面确认队列状态，再重新提交生成。
+ℹ 详情
+删除
+DMAD 4 步（critic 版） ×1.00
+15s
+19m56s
+integrated_multimodal_description: [Shot 1] The camera is a static, wide-angle l
+⬇ 下载
+⏭ 接续
+参考生成 · 11/19 15:01
+11/19 15:01
+20m13s
+integrated_multimodal_description: [Shot 1] The video presents a continuous, unc
+参考生成 · 11/19 14:53
+11/19 14:53
+18s
+参考生成 · 11/19 14:50
+11/19 14:50
+20s
+23s
+资产素材库
+OmniStudio · 多模型创作工作台
+加载中…
+已选 0 项
+取消选择
+全选当前页
+▶ 添加到播放器
+删除所选
+多选
+查看回收站
+只看被引用的
+▶ 播放器模式
+上传素材
+文档
+工作流
+其它
+按标签筛选 ▾
+全部来源
+Web 上传
+媒体库添加
+导入
+最新优先
+最旧优先
+体积最大
+体积最小
+按名称
+把图片 / 视频 / 音频拖到这里上传
+，或点右上角「上传素材」。
+原文件原样保留，不做二次转码。
+素材详情
+素材播放器
+清空清单
+生成媒体库管理
+清理范围
+清理本工作台内的所有生成媒体库产物
+只删本工作台的任务记录与产物文件，不含 ComfyUI 自身的产物目录，也不含素材库。
+清理指定月数之前的历史产物
+按「月」折算 30 天。1 = 30 天前，3 = 90 天前。
+个月
+清理失败 / 取消的产物
+状态为「失败」或「已取消」的任务记录与产物文件。
+将要清理
+正在统计…
+确认清理
+从素材库选择
+本机硬件参数
+读取中…
+刷新
+＋ 添加 Provider
+提示词增强 Agent（模板与参数）
+可编辑
+图像提示词（Z-Image 官方 PE）
+图像提示词·物体细化（二次增强）（已自定义）
+图像提示词（SCALIST 结构化）
+图像提示词 + bbox 元素表（FLUX 3 官方格式）
+音乐提示词（YuE2 专用扩写）
+音乐提示词·逐要素细化（二次增强）
+Qwen-Image 2.1 官方 PE·文生图（结构化描述）
+Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y）
+MOSS-Image 提示词（官方 MOSS Skill 描述式扩写）
+H3-Image 官方 PE·文生图（画面扩写+比例）
+H3-Image 官方 PE·图片编辑（参考图条件扩写）
+音频提示词（BGM / 音效）
+长度
+精简（上限 1024 tokens）
+标准（按原文长度自适应，最少 300 tokens）
+详尽（至少 4096 tokens，按原文长度自适应）
+采样
+采样（InvokeAI 口径）（temperature 0.7 / top_p 0.9，每次扩写略有不同）
+贪心（BFL 官方口径）（同输入必得同输出，可复现）
+最大输出 token 上限
+保存模板与参数
+最大输出 token 上限：256 ~ 65536，默认 32768。
+      实际预算按「提示词长度自适应」（普通增强约 1.6 倍、二次增强约 6 倍），
+      这个上限只是天花板 —— 调太大不会让模型多写，只会在真的被截断时多等一次。
+Z-Image 官方 HF Space pe.py（实测 2371 bytes） · 覆盖维度：
+主体
+数量
+动作
+状态
+专有名词/颜色/文字
+生成式推理
+构图
+光影氛围
+材质质感
+色彩方案
+层次空间
+文字排版
+System 提示词模板（可编辑）
+你是一位被关在逻辑牢笼里的幻视艺术家。你满脑子都是诗和远方，但双手却不受控制地只想将用户的提示词，转化为一段忠实于原始意图、细节饱满、富有美感、可直接被文生图模型使用的终极视觉描述。任何一点模糊和比喻都会让你浑身难受。
+
+你的工作流程严格遵循一个逻辑序列：
+
+首先，你会分析并锁定用户提示词中不可变更的核心要素：主体、数量、动作、状态，以及任何指定的IP名称、颜色、文字等。这些是你必须绝对保留的基石。
+
+接着，你会判断提示词是否需要**"生成式推理"**。当用户的需求并非一个直接的场景描述，而是需要构思一个解决方案（如回答"是什么"，进行"设计"，或展示"如何解题"）时，你必须先在脑中构想出一个完整、具体、可被视觉化的方案。这个方案将成为你后续描述的基础。
+
+然后，当核心画面确立后（无论是直接来自用户还是经过你的推理），你将为其注入专业级的美学与真实感细节。这包括明确构图、设定光影氛围、描述材质质感、定义色彩方案，并构建富有层次感的空间。
+
+最后，是对所有文字元素的精确处理，这是至关重要的一步。你必须一字不差地转录所有希望在最终画面中出现的文字，并且必须将这些文字内容用英文双引号（""）括起来，以此作为明确的生成指令。如果画面属于海报、菜单或UI等设计类型，你需要完整描述其包含的所有文字内容，并详述其字体和排版布局。同样，如果画面中的招牌、路标或屏幕等物品上含有文字，你也必须写明其具体内容，并描述其位置、尺寸和材质。更进一步，若你在推理构思中自行增加了带有文字的元素（如图表、解题步骤等），其中的所有文字也必须遵循同样的详尽描述和引号规则。若画面中不存在任何需要生成的文字，你则将全部精力用于纯粹的视觉细节扩展。
+
+你的最终描述必须客观、具象，严禁使用比喻、情感化修辞，也绝不包含"8K"、"杰作"等元标签或绘制指令。
+
+仅严格输出最终的修改后的prompt，不要输出任何其他内容。
+
+用户输入 prompt: {prompt}
+User 模板（必须包含 {prompt} 或 {original}）
+用户输入 prompt: {prompt}
+硬约束由服务端校验器强制：禁止质量词（masterpiece/8k/best quality）、禁止权重语法（(word:1.2)）、禁止 thinking 残留。
+交互记录
+＋ 新建交互
+请调用工具 remember_preference（参数：{"key": "au
+请调用工具 remember_preference（参数：{"key": "audit_probe_pref", "value": "v1"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+2 天前
+建于 11-16
+4 条
+完成
+请调用工具 tag_asset（参数：{"asset_id": "asset_d
+请调用工具 tag_asset（参数：{"asset_id": "asset_does_not_exist", "add": ["审计临时标签"]}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 delete_asset（参数：{"asset_id": "asse
+请调用工具 delete_asset（参数：{"asset_id": "asset_does_not_exist"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 upload_asset（参数：{"path": "no/such/
+请调用工具 upload_asset（参数：{"path": "no/such/file.png"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 retry_job（参数：{"job_id": "no_such_j
+请调用工具 retry_job（参数：{"job_id": "no_such_job"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 cancel_job（参数：{"job_id": "no_such_
+请调用工具 cancel_job（参数：{"job_id": "no_such_job"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 batch_create_jobs（参数：{"jobs": [{"m
+请调用工具 batch_create_jobs（参数：{"jobs": [{"mode": "t2v", "prompt": "审计探针批量 1"}]}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 create_job（参数：{"mode": "t2v", "pro
+请调用工具 create_job（参数：{"mode": "t2v", "prompt": "审计探针：雨夜桥上的人"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 respond（参数：{}）。只调用这一个工具，拿到结果后用 res
+请调用工具 respond（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+2 条
+请调用工具 run_code（参数：{}）。只调用这一个工具，拿到结果后用 re
+请调用工具 run_code（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 media_merge_av（参数：{}）。只调用这一个工具，拿到结
+请调用工具 media_merge_av（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+待补充
+请调用工具 media_mix_audio（参数：{}）。只调用这一个工具，拿到
+请调用工具 media_mix_audio（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 media_extract_frames（参数：{}）。只调用这一个
+请调用工具 media_extract_frames（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 media_transcode（参数：{}）。只调用这一个工具，拿到
+请调用工具 media_transcode（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 media_concat（参数：{}）。只调用这一个工具，拿到结果后
+请调用工具 media_concat（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 media_probe（参数：{"asset_id": "asset
+请调用工具 media_probe（参数：{"asset_id": "asset_61f1b6fd9a1d"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 web_search（参数：{"query": "ComfyUI M
+请调用工具 web_search（参数：{"query": "ComfyUI MiniMax H3"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 read_file（参数：{"path": "/etc/hostna
+请调用工具 read_file（参数：{"path": "/etc/hostname"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 manage_media_library（参数：{"scope":
+请调用工具 manage_media_library（参数：{"scope": "failed", "dry_run": true}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 get_job_status（参数：{"job_id": "8771
+请调用工具 get_job_status（参数：{"job_id": "8771898a7480"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 list_jobs（参数：{}）。只调用这一个工具，拿到结果后用 r
+请调用工具 list_jobs（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 list_asset_tags（参数：{}）。只调用这一个工具，拿到
+请调用工具 list_asset_tags（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 search_asset_history（参数：{"query":
+请调用工具 search_asset_history（参数：{"query": "雨夜"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 search_conversations（参数：{"query":
+请调用工具 search_conversations（参数：{"query": "视频"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 recall_memory（参数：{}）。只调用这一个工具，拿到结果
+请调用工具 recall_memory（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 get_mode_schema（参数：{"mode": "t2v"}
+请调用工具 get_mode_schema（参数：{"mode": "t2v"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 describe_mode_params（参数：{"mode": "
+请调用工具 describe_mode_params（参数：{"mode": "r2v"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 get_prompt_preset（参数：{"spec_id": "
+请调用工具 get_prompt_preset（参数：{"spec_id": "cinematic"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 list_prompt_presets（参数：{}）。只调用这一个工
+请调用工具 list_prompt_presets（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 enhance_prompt（参数：{"prompt": "a gi
+请调用工具 enhance_prompt（参数：{"prompt": "a girl walking in the rain", "mode": "t2v"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 describe_asset（参数：{"asset_id": "as
+请调用工具 describe_asset（参数：{"asset_id": "asset_21f5d051d841"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 search_assets（参数：{"query": "雨夜"}）。
+请调用工具 search_assets（参数：{"query": "雨夜"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 list_modes（参数：{}）。只调用这一个工具，拿到结果后用
+请调用工具 list_modes（参数：{}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+新会话
+0 条
+空会话
+3 条
+只调用工具 list_asset_tags，拿到结果后用 respond 简短回
+只调用工具 list_asset_tags，拿到结果后用 respond 简短回复。
+只调用工具 list_prompt_presets，拿到结果后用 respond
+只调用工具 list_prompt_presets，拿到结果后用 respond 简短回复。
+只调用工具 list_modes，拿到结果后用 respond 简短回复。
+3 天前
+请调用工具 manage_media_library（参数：{"scope": "failed"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 search_assets（参数：{"query": "火星"}）。
+请调用工具 search_assets（参数：{"query": "火星"}）。只调用这一个工具，拿到结果后用 respond 工具简短回复。
+请调用工具 list_modes 列出所有生成模式，拿到结果后用 respond
+请调用工具 list_modes 列出所有生成模式，拿到结果后用 respond 工具简短回复。
+请用一句话说明你能做哪些视频生成。
+ping
+请用 list_modes 工具列出本工作台支持的生成模式
+列出可用的生成模式
+1 条
+用 list_modes 工具列一下本工作台支持的生成模式
+回复 OK 两个字
+列出所有生成模式
+描述素材库里最新的一个素材
+只回答两个字：可用
+获取 t2v 文生视频模式的参数 schema
+必须调用 search_conversations 工具检索含「素材」的会话。调
+必须调用 search_conversations 工具检索含「素材」的会话。调用后只回答：检索到几条。
+建于 11-15
+必须调用 describe_asset 工具查询素材 asset_21f5d05
+必须调用 describe_asset 工具查询素材 asset_21f5d051d841。调用后只回答：它的类型是什么。
+必须调用 search_asset_history 工具查询素材 asset_b
+必须调用 search_asset_history 工具查询素材 asset_bfaca307e2cf。调用后只回答：有没有使用记录。
+6 条
+必须调用 enhance_prompt 工具扩写「一只猫在屋顶上跑」。调用后只回
+必须调用 enhance_prompt 工具扩写「一只猫在屋顶上跑」。调用后只回答：扩写后大约多少字。
+必须调用 recall_memory 工具。调用后只回答：有没有已保存的记忆。
+必须调用 list_asset_tags 工具。调用后只回答：共有多少种标签。
+必须调用 get_prompt_preset 工具读取第一个提示词预设。调用后只
+必须调用 get_prompt_preset 工具读取第一个提示词预设。调用后只回答：它的名称。
+必须调用 list_prompt_presets 工具。调用后只回答：一共有几个
+必须调用 list_prompt_presets 工具。调用后只回答：一共有几个提示词预设。
+必须调用 get_job_status 工具查询任务 b4c248cfbb07。
+必须调用 get_job_status 工具查询任务 b4c248cfbb07。调用后只回答：它的 status 是什么。
+必须调用 list_jobs 工具列出最近任务。调用后只回答：最近一条任务的 i
+必须调用 list_jobs 工具列出最近任务。调用后只回答：最近一条任务的 id。
+必须调用 get_mode_schema 工具获取模式 flf 的 schema
+必须调用 get_mode_schema 工具获取模式 flf 的 schema。调用后只回答：有没有 first_frame 字段。
+必须调用 describe_mode_params 工具查询模式 t2v。调用后
+必须调用 describe_mode_params 工具查询模式 t2v。调用后只回答：model_key 有几个合法取值。
+必须调用 search_assets 工具搜索名字含「火星」的素材。调用后只回答
+必须调用 search_assets 工具搜索名字含「火星」的素材。调用后只回答：找到了几条。
+必须调用 list_modes 工具。调用后只回答：本工作台支持多少个生成模式。
+调用 search_assets 工具搜索素材库里名字含「火星」的素材，回答找到
+调用 search_assets 工具搜索素材库里名字含「火星」的素材，回答找到了几条。
+你好，只回答一个字：好
+调用 media_probe 工具探测素材 asset_bfaca307e2cf
+调用 media_probe 工具探测素材 asset_bfaca307e2cf，回答它的时长与采样率。
+调用 read_file 工具读取文件 config.json，回答里面的 po
+调用 read_file 工具读取文件 config.json，回答里面的 port 值。
+调用 web_search 工具搜索「ComfyUI MiniMax H3」，回
+调用 web_search 工具搜索「ComfyUI MiniMax H3」，回答结果条数。
+调用 search_conversations 工具检索历史对话里含「素材」的会
+调用 search_conversations 工具检索历史对话里含「素材」的会话，回答检索到几条。
+调用 describe_asset 工具查询素材 asset_21f5d051d
+调用 describe_asset 工具查询素材 asset_21f5d051d841，回答它的类型。
+调用 search_asset_history 工具查询素材 asset_bfa
+调用 search_asset_history 工具查询素材 asset_bfaca307e2cf 的历史，回答有没有使用记录。
+调用 enhance_prompt 工具把「一只猫在屋顶上跑」扩写，回答扩写后的
+调用 enhance_prompt 工具把「一只猫在屋顶上跑」扩写，回答扩写后的大致字数（不需要输出全文）。
+调用 recall_memory 工具读取记忆，回答是否有已保存的记忆。
+调用 list_asset_tags 工具，回答共有多少种标签。
+调用 get_prompt_preset 工具读取第一个提示词预设，回答它的名称
+调用 get_prompt_preset 工具读取第一个提示词预设，回答它的名称。
+调用 list_prompt_presets 工具，回答一共有几个提示词预设。
+调用 get_job_status 工具查询任务 b4c248cfbb07 的状
+调用 get_job_status 工具查询任务 b4c248cfbb07 的状态，回答它的 status。
+调用 list_jobs 工具列出最近的生成任务，回答最近一条任务的 id。
+调用 get_mode_schema 工具获取模式 flf 的参数 schema
+调用 get_mode_schema 工具获取模式 flf 的参数 schema，回答是否有 first_frame 字段。
+调用 describe_mode_params 工具查询模式 t2v 的合法参数
+调用 describe_mode_params 工具查询模式 t2v 的合法参数，回答 model_key 有几个合法取值。
+调用 list_modes 工具列出所有生成模式，然后只回答模式数量。
+你好
+请调用工具 search_asset_history（参数：{"query": "火星"}），只调这一个工具，然后用 respond 简短回复。
+4 天前
+请调用工具 web_search（参数：{"query": "MiniMax H
+请调用工具 web_search（参数：{"query": "MiniMax H3"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 get_prompt_preset（参数：{}），只调这一个工具，然
+请调用工具 get_prompt_preset（参数：{}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 manage_media_library（参数：{"scope": "failed"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 describe_mode_params（参数：{"mode": "flf"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 recall_memory（参数：{}），只调这一个工具，然后用 r
+请调用工具 recall_memory（参数：{}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 search_conversations（参数：{"query": "视频"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 enhance_prompt（参数：{"prompt": "a girl in rain", "mode": "t2v"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 list_asset_tags（参数：{}），只调这一个工具，然后用
+请调用工具 list_asset_tags（参数：{}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 list_prompt_presets（参数：{}），只调这一个工具
+请调用工具 list_prompt_presets（参数：{}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 media_probe（参数：{"asset_id": "asset_61f1b6fd9a1d"}），只调这一个工具，然后用 respond 简短回复。
+8 条
+请调用工具 get_job_status（参数：{"job_id": "b48e
+请调用工具 get_job_status（参数：{"job_id": "b48e9a06a50d"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 describe_asset（参数：{"asset_id": "asset_21f5d051d841"}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 list_jobs（参数：{}），只调这一个工具，然后用 respo
+请调用工具 list_jobs（参数：{}），只调这一个工具，然后用 respond 简短回复。
+请调用工具 get_mode_schema（参数：{"mode": "r2v"}
+请调用工具 get_mode_schema（参数：{"mode": "r2v"}），只调这一个工具，然后用 respond 简短回复。
+7 条
+☰
+内置多模态 Agent
+用一句话说清创作意图，Agent 自己查素材、选模式、组装参数，最后下发成可执行的生成任务。
+当前：请调用工具 remember_preference（参数：{"key": "au（4 条）
+本次会话产物
+⚙ 管理
+本次会话还没有产生任务。
+我
+Agent
+已更新偏好记忆 audit_probe_pref = v1（该键此前已存在，本次为覆盖写入，未新建）。
+工具调用（2）
+✓
+remember_preference
+结果
+ok
+respond
+📎 媒体
+上传的图片 / 音频 / 视频会入库素材库后交给 Agent（也可以直接 Ctrl+V 粘贴）
+发送
+Enter 发送 · Shift+Enter 换行 · 本地模型多步处理较慢，完整链路约 1~5 分钟，处理期间下方会显示当前进度
+参数
+添加 Provider
+显示名
+*
+类型
+OpenAI 兼容 API
+Ollama
+llama.cpp server
+ComfyUI 本地节点
+Base URL
+LLM 服务地址
+可空
+模型名
+API Key
+支持多模态（可读图，用于提示词增强等需要看图的场景）
+启用
+保存
+提示词增强结果
+追加到原提示词
+替换提示词框
+MOSS 结构化增强产物
+最终文本提示词
+Layout JSON
+原始草稿
+复制 Layout JSON
+复制文本提示词
+回填到提示词框
+提示词历史
+加载更多
+提示词版本
+关闭
+LoRA 说明
+生成参数详情
+图片预览
+100%
+－
+＋
+适应屏幕
+原始尺寸
+下载原图
+新窗口打开
+提示词尚未增强
+当前提示词尚未增强，是否直接用原始提示词生成？
+取消将中止本次生成，且不会自动开始增强。
+确认生成
+完整提示词
+复制提示词
+生成参数
+内置 Agent 管理
+保存配置
+官方档位 0.98MP · 1344×768（上限 2.0M 像素（2,097,152 px），本项在限内）
+1344×768
+0.98 MP · 上限 2.0M 像素（2,097,152 px）
+首尾帧素材
+首帧 / 尾帧任给其一 · 参考视频 ≤3 · 参考音乐 ≤3
+从素材库选首帧与尾帧（首帧 / 尾帧给其中一张即可；参考视频最多 3 个 / 参考音乐最多 3 段）
++
+首帧
+尾帧
+参考视频 1
+参考视频 2
+参考视频 3
+参考音乐 1
+参考音乐 2
+参考音乐 3
+使用生成的音乐
+音轨由 H3 与画面一同采样生成，音画天然同步。
+6
+0.75
+二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。总步数不变，提速来自一采的面积更小。H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，可能超出训练分布 —— 出糊就把它调大。
+步数 8 → BasicScheduler.steps · 采样器 euler → KSamplerSelect.sampler_name · 调度器 simple → BasicScheduler.scheduler · shift 12.00 / 2.00 → MiniMaxH3SigmaShift
+参考图 ≤9 · 参考视频 ≤3 · 参考音乐 ≤3
+从素材库选参考素材（参考图最多 9 张 / 参考视频最多 3 个 / 参考音乐最多 3 段）
+参考 1
+参考 2
+参考 3
+参考 4
+参考 5
+参考 6
+参考 7
+参考 8
+参考 9
+MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）
+MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）
+把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。 · 本机体积 20.5 GB · 位置 diffusion_models
+已确认在 ComfyUI 模型列表中可用。 参考通道（Ref2VA）在文生视频面板里不暴露。
+Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA
+adaln 空转 50
+修掉 H3 的四种"AI 味"，做出真实电影摄影质感。
+「Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA」×0.70 效果 LoRA 与加速 LoRA 并列共存（加速改采样语义，效果改画面风格）。 效果 LoRA 走 ComfyUI 核心节点 LoraLoaderModelOnly —— 它的键名带 diffusion_model. 前缀，MiniMaxH3TurboLoRA 节点对它会「0 weights patched」静默失效（实测）。
+0.4
+二采 = 低分辨率一采 + 高分辨率二采（SelfLift）。总步数不变，提速来自一采的面积更小。H3 在 768p 短边下 lowres_scale=0.5 会掉到 384px，可能超出训练分布 —— 出糊就把它调大。 一采 6 步 @ 0.70× 分辨率 （高分辨率二采只剩 2 步，服务端会自动把一采步数夹到 4 步，否则段头会色档掉档＝接续点闪烁） 二采固定用 Euler 采样器（SelfLift 只支持标准 Euler）。
+当前增强：普通增强（图像提示词（Z-Image 官方 PE））
+其它功能 专属，本面板不可用
+已切换到「t2i」模式，模板自动回落到「图像提示词（Z-Image 官方 PE）」
+1440P · 2560×1440 (3.5MP)
+2K · 2736×1536 (4.0MP)
+Qwen-Image 2.1 模型
+Qwen-Image 2.1 · 官方基座版（40 步）
+Qwen-Image 2.1 Turbo · 8 步蒸馏版
+官方 README 默认参数：40 步 / cfg 1 / euler / simple。
+官方 PE 文本编码器自带提示词扩写（提示词会被重写得更详细）；想自己控制最终提示词，可先用「增强」下拉里的「qwen21图片官方增强PE」扩写一次并写回提示词框，写回后出图不再二次扩写。
+40
+0.69
+推荐/自动
+当前 CFG=1：ComfyUI 会跳过 uncond 分支，负面提示词数学上无效（已置灰）。官方路径就是 cfg=1；要启用负面提示词请把 CFG 调到 1 以上。
+3d skin Krea2&Qwen2.1 — 方向：A/B/C/D 组（Civitai 原生）
+Korean Beauty — 方向：A/B/C/D 组（Civitai 原生）
+Asian Mix v3.0（亚洲混血人像） — 方向：E 组（HuggingFace 镜像）
+Candid Phone Look – Keeps Face & Age — 方向：A/B/C/D 组（Civitai 原生）
+RAW style photo — 方向：A/B/C/D 组（Civitai 原生）
+photo-aesthetics v3 — 方向：E 组（HuggingFace 镜像）
+Dot Film 硬闪光夜景人像 — 方向：E 组（HuggingFace 镜像）
+RadianceChromeVoluptuous — 方向：E 组（HuggingFace 镜像）
+Body Swap — 方向：E 组（HuggingFace 镜像）
+Chinese Fantasy Xianxia Style LoRA | 仙侠古风 — 方向：A/B/C/D 组（Civitai 原生）
+无期迷途风格（57Style）001-QwenImage2_1 — 方向：A/B/C/D 组（Civitai 原生）
+Radiance Chrome Voluptuous（Qwen-Image 2.1 风格） — 风格 LoRA（体积感/光泽向风格）
+换头（Head Swap，Qwen-Image 2.1） — 多图编辑：把 <image2> 的头部替换到 <imag
+2anime（真人转二次元） — 真人照片 → 二次元动漫化
+翁法罗斯 13 角色合集（HSR）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
+Genitalia Anatomy Fix（成人解剖修正） — rank 64 / batch 8 / 16,000 步
+HonkaiStarRail-3D-qwen2.1（崩坏星穹铁道 3D 风格） — HonkaiStarRail-3D-qwen2.1（崩坏
+NSFW Qwen TheseAlpacas V1（解审查 / 成人概念） — 作者原作系列的 v1.0（与 HF 转存 SHA256
+NSFW Qwen TheseAlpacas V2（解审查 / 成人概念） — 作者原作系列（Civitai 49,137 下载 / 1
+Amethyst-Theme（紫晶主题） — 照片 → 紫晶紫色系 / 神秘质感调色
+Clay-Sculpture（黏土雕塑） — 照片 → 黏土雕塑质感（手捏纹理、哑光材质）
+Heatwave（热成像） — 照片 → 热成像 / 红外热力图伪彩
+Photo Aesthetics v3（照片美学） — 照片美学向增强（1024px / step-10000
+Natural-Exposure（自然曝光修正） — 把欠曝 / 过曝图拉回中性平衡曝光，保色保细节
+Outrun（霓虹赛博） — 照片 → 80 年代 Outrun / Synthwav
+国漫速写 · 清雅薄涂（国产漫画速写笔触感） — 国漫速写 · 清雅薄涂（国产漫画速写笔触感）
+Voxel-Style（体素风） — 照片 → 方块化低模体素风
+原神人物介绍立绘风格（游戏内「角色介绍」页立绘版式） — 原神人物介绍立绘风格（游戏内「角色介绍」页立绘版式）
+奇幻 · 动漫（西式奇幻动漫插画） — 奇幻 · 动漫（西式奇幻动漫插画）
+仙侠 · 水墨（国风水墨幻想插画） — 仙侠 · 水墨（国风水墨幻想插画）
+仙侠 · 妖姬（幻想国风仙侠插画） — 仙侠 · 妖姬（幻想国风仙侠插画）
+一致性无偏移（像素偏移修正） — 修正 Qwen-Image-2.1 生成的像素偏移问题
+Anime Consistency（二次元一致性） — 二次元角色一致性
+Anything2RealCharacters（任意风格转写实人物） — 把任意风格图转成写实人物
+万物移除（Remove） — 绿幕遮罩式移除：把画面里涂成绿色的区域去掉
+ArchitectureConcept（建筑概念设计） — 建筑外观概念设计出图
+Multiple-Angles（多角度） — 多视角 / 环绕机位生成
+Uncensored Omni v0.1（解审查 + 姿势生成） — 官方级条目：模型卡明确「这是常规 LoRA，不提供 fe
+doodle-in（涂鸦补全） — 手绘涂鸦线稿 → 真实图像补全
+动漫风格（多参考图 FUSAL 架构） — 动漫风格（多参考图 FUSAL 架构）
+futanari（双性解剖） — 无触发词，靠自然语言描述解剖结构
+Qwen-Image2.1 Genshin 2D Style LoRA（TCG 风格） — Qwen-Image2.1 Genshin 2D Sty
+Genshin-2D（原神式 2D 画风） — 原神式 2D 赛璐璐游戏画风
+日式黑白漫画风格（黑白墨线漫画 / 网点纸质感） — 日式黑白漫画风格（黑白墨线漫画 / 网点纸质感）
+Casual Phone Photo（随手拍手机） — 日常手机随手拍质感：普通曝光、雀斑毛孔、真实房间
+moyu-robot-v1（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+pussy concepts（私处概念） — 双触发概念 LoRA：hrybush（浓密自然卷曲阴毛）
+Y2K Digicam（千禧年数码） — 2000 年代早期数码相机直闪风格：暗角、高光溢出、传感
+qilin-robot-v1（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+Consistency（编辑一致性） — 让编辑「原地不动」：背景 / 构图 / 主体位置不被重画
+Outfit Swap Consistency（换装一致性） — 换装时保持主体 / 构图 / 背景不漂移
+QMA Camera-Angles（多机位） — 保持主体 / 场景 / 风格不变，只换相机方位与俯仰
+Restore（柔化修复） — 修 QI21 自带放大的「过度锐化 / 假毛孔」：结果更
+Uncensored（解审查，rank 16 注意力层） — rank 16，仅 patch 注意力投影（transf
+Anime（日系二次元插画） — 日系二次元插画 / 动漫角色 / 猫娘
+QI21 Fix v2.0（细节修复） — 细节 / 结构修复类（DoRA 变体）
+Next-Scene（下一场景续接） — 由当前帧续接下一场景
+tianshu-robot-v2（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+zhuque-robot-v1（通用（非米哈游专有）·机体 / 机械风格） — 通用（非米哈游专有） · 机体 / 机械风格
+绝区零 Chibi / Q 版（大头身比例压缩） — 绝区零 Chibi / Q 版（大头身比例压缩）
+ZenlessZoneZero Chibi（绝区零 Q 版） — 绝区零 Q 版 / 萌化风格
+绝区零（ZZZ）风格（3D 渲染 + 都市潮酷配色 + 硬边线稿） — 绝区零（ZZZ）风格（3D 渲染 + 都市潮酷配色 +
+ZenlessZoneZero（绝区零游戏原画风） — 绝区零游戏原画风
+绝区零风格（v1.4 线）（与上条 HF 仓同作者同系列的不同版本线） — 绝区零风格（v1.4 线）（与上条 HF 仓同作者同系列
+未添加效果 LoRA。可选本机已安装的效果类 Qwen-Image 2.1 LoRA（67 个）。 强度 0 表示关闭。
+当前增强：普通增强（Qwen-Image 2.1 官方 PE·文生图（结构化描述））
+Recommended
+已切换到「t2i_qwen」模式，模板自动回落到「Qwen-Image 2.1 官方 PE·文生图（结构化描述）」
+至少 1 张、最多 10 张（模型官方能力上限 10 张）。
+参考图「强制来自素材库」：先在「素材库」页上传入库，再从这里选择。
+当前增强：普通增强（Qwen-Image 2.1 官方 PE·图片编辑（修改X保持Y））
+# Edit Prompt Enhancer — General (v2, 精简版)
+
+**FIRST — there are TWO separate language decisions. Do NOT conflate them.**
+
+**(A) Language of the rewritten prompt's DESCRIPTIVE prose — every word OUTSIDE double quotes (the description you write for the diffusion model, NOT the text painted into the image). This decision is final and non-negotiable:**
+- User instruction is in Chinese → write the description in Chinese.
+- User instruction is in English → write the description in English.
+- User instruction is in ANY other language (Japanese, Korean, French, Spanish, Thai, etc.) → write the description in English.
+
+**(B) Language of the TEXT THAT WILL BE RENDERED INTO THE OUTPUT IMAGE — the content INSIDE double quotes. Decide it in this strict priority order:**
+1. If the user's instruction gives the exact text to write, OR names a target language for the text (e.g. "改成'夏日特惠'", "把标题写成英文", "add a Japanese title", "write the caption in Thai") → render exactly that text / in exactly that specified language.
+2. Otherwise, if the input image already contains text → render in the DOMINANT language of the image's existing text — even when the instruction is written in a different language.
+3. Otherwise (the image contains no text AND the instruction names no target language) → render in the language of the user's instruction itself — including Japanese, Korean, Thai, Arabic, French, etc. Do NOT force it to English.
+Worked example: image is mostly Thai, instruction is in English asking to add/redesign a title without giving the exact words or a language → the rendered (quoted) text must be **Thai** (the image's dominant language), while the surrounding description (A) is still written in English.
+
+Two reinforcements on decision (B): all rendered (quoted) text must be **monolingual** — do not mix Chinese and English inside the quotes and do not emit a bilingual pair unless the user explicitly asks for one. And **genre never overrides input language**: a "spec sheet / cinematic data-document / storyboard / technical parameter" look is achieved through layout and typography, NOT by switching rendered labels to English — every header, label, and caption stays in the decided language (standardized units and user-given proper nouns may remain Latin).
+
+You are an expert at clarifying image editing instructions. Given a user's vague or ambiguous edit instruction and the input image(s), rewrite it into a precise, unambiguous, actionable editing directive. An input image is ALWAYS present — this is always an image-editing task, never text-to-image from nothing.
+
+## Core Objective
+
+Rewrite the instruction so a downstream image-editing model can execute it without guessing — anchored on what the input image(s) actually show, faithful to the user's intent, inventing nothing.
+
+**How much you build is intent-branched.** When the user wants *this picture changed* (a local object/attribute/background edit, a text or UI edit, a quality or style change, a viewpoint/canvas transform), clarify and constrain: say exactly what changes, and let everything else stand. When the user wants *a new picture of this subject* (placing a subject in a new scene, compositing across images, a photo-shoot or poster or infographic built from a reference), construct actively: design the scene, lighting, composition and layout to a professional standard. Scale the elaboration to what was asked — a plain placement stays restrained, a styled shoot or a publication-grade poster is built out fully.
+
+## The Governing Principle — Attribute Disentanglement at Full Strength
+
+**Edit exactly the attribute(s) the user named, push each to a strong and unmistakable degree, and hold everything else at input fidelity.**
+
+Both halves matter, and the two failure modes are symmetric:
+
+- **Leakage** — touching what the user did not name (a sharpen that re-grades color, an upscale that reframes, a style change that drifts a face, an outfit swap that drops an accessory, a background change that "helpfully" cleans up something unmentioned).
+- **Under-editing** — an output a viewer could mistake for the unedited input, because the requested change was applied faintly.
+
+Preservation locks **content, never edit strength**. Recognizability is bought by naming what stays fixed, not by holding the effect back.
+
+## What to Anchor, What to Decide
+
+**Anchor on the image.** Every spatial, tonal and contextual claim comes from what is visibly there. If you are unsure a detail exists, leave it out — a preserved element described at a higher level of abstraction is always safer than an invented specific.
+
+**Say what stays, without repainting it.** Name the untargeted content by type, position and role rather than describing its appearance, and prefer one blanket preservation clause over walking the frame. A preservation description reads to the model as a generation instruction: the more concretely you describe something you meant to keep, the more likely it drifts. Describe appearance concretely only for what you are actually changing, or when it is the only way to disambiguate between similar objects.
+
+**Identity is the hardest invariant.** A person's facial identity and the personal accessories that make them recognizable; a product's exact design, markings and count; and the input's rendering medium (photograph, anime, illustration, sketch, 3D render, painting) all survive every edit unless the user explicitly targets them. When identity comes from a reference image, point at that image rather than describing features in words — verbal descriptions make the model regenerate and degrade the likeness.
+
+**Resolve ambiguity, then commit.** Turn vague intent, imprecise spatial reference and unparameterized style words into something concrete and observable. Translate abstract quality language into the visual properties it implies. Where the instruction offers alternatives or contradicts itself, pick the most reasonable reading and state it as a decision. Keep the user's own action verb, spatial relations and described state intact, and treat anything they asked to preserve as absolute. Preserve creative or physically impossible intent rather than correcting it.
+
+**Only what was asked.** Do not add operations the user did not request, and do not clean up unmentioned defects, overlays or clutter however prominent they look. When an edit removes, moves or reveals something, say enough about the newly exposed region that the result stays physically coherent.
+
+**Text in the image is literal.** Whenever readable text will appear in the output, commit to the exact characters — every element, quoted, nothing summarized or abbreviated away. Text you cannot commit to should not be added at all. Match the typography and language the input establishes unless the user asks otherwise. When the operation extends the canvas outward, name it as outpainting explicitly.
+
+**Write it as an instruction.** Lead with the operation, not a description of the finished picture, and write from the perspective of someone holding only the input image(s).
+
+## Thinking Process
+
+Before emitting the final prompt, reason through: what the image(s) actually contain (including a complete reading of any text present); what the user is asking for and which attributes that names; what must therefore stay fixed; and finally the composed directive. Close with a check that every visible element is either the target of the edit or covered by what stays fixed, that the requested change is unmistakable, that nothing outside the target was touched, and that every quoted string obeys language decision (B).
+
+## Image Reference Rules
+
+For Multi-Image Input (N >= 2), the rewritten instruction MUST use `<image1>`, `<image2>`, ... to refer to each input image. Do not use natural language references like "图1", "第一张图", "the first image", or "image A". This tagging format is mandatory and non-negotiable. For single-image input (N = 1), do NOT use tags — refer to the image naturally ("图像", "图片中", "the image").
+
+State each image's role explicitly — which one is the canvas whose composition and untargeted content survive, and which supply material to transfer — and say what is taken from each. For scene generation with no canvas (合影/合照 and the like), all images serve as identity sources. Describe every referenced image individually; never compress several into a range or a group to avoid describing them one by one.
+
+## Output Format
+Output ONLY the rewritten editing instruction itself: one single continuous paragraph of plain text.
+
+Formatting rules:
+- The entire rewritten prompt must be a single continuous paragraph with NO line breaks or newline characters.
+- The response must contain nothing except the instruction itself: no object or array wrapper, no field names or key-value pairs, no headings, labels, or prefaces, no greetings, explanations, or commentary, no markdown, and no code fences. Begin with the first word of the instruction and end with its last word.
+- Do not wrap the whole instruction in quotes: double quotes are reserved for text that will be RENDERED in the image (next rule).
+- All text that should appear as visible, readable content in the output image must be enclosed in double quotes (""). Descriptive or structural language that does not appear as rendered text should NOT be quoted.
+- **Never include any resolution or aspect ratio information** (e.g., "2:3", "16:9", "1920x1080", "2K", "4K"). Output size is decided downstream, not by you.
+- Write it out in full — no ellipsis, no truncation.
+- State requirements affirmatively ("保持背景与输入图完全一致") rather than as prohibitions ("禁止改变背景"). Standard preservation phrasing "保持/保留[X]不变" is fine.
+- Be precise and decisive: no hedging, no unresolved alternatives, no vague degree words left unresolved.
+- The descriptive prose (outside double quotes) follows language decision (A); the text rendered inside the image (inside double quotes) follows language decision (B). Retain proper nouns and domain-specific terms in their original language, placed in English double quotes.
+- **Language-purge self-check (do this last)**: re-scan every double-quoted string — the text that will be RENDERED in the image — and enforce language decision (B). No quoted string may mix Chinese and English, form a bilingual pair, or carry a parenthetical translation gloss unless the user explicitly asked. Standardized units and user-given proper nouns may remain Latin.
+
+The user's edit instruction to rewrite is:
+2K · 2720×1520 (3.9MP)
+MOSS-Image 模型
+MOSS-Image-Base · 未对齐基模（LoRA 训练父本）
+MOSS-Image-SFT · 官方后训练对齐版（文字渲染更强）
+官方 USERGUIDE：50 步 / cfg 3 / euler / sgm_uniform / shift 5 / SLG 22。
+Base 未经过 CFG 等推理参数的后训练或蒸馏，推理参数需自己配对；官方推荐步数 >= 50，CFG 3.0~6.0。
+50
+5.0
+MOSS-Image 未蒸馏，CFG>1 时负面提示词生效。官方 USERGUIDE 推荐 CFG 3.0，并给出一组实测有效的负面标签（nsfw, worst quality, bad anatomy, watermark, jpeg artifact）。
+22（官方推荐）
+24
+26
+SLG skip layer = 22（官方推荐 22；22/24/26 都有帮助）。关掉 SLG 画面会更写实，但部分细节会崩。
+XV 风格 · 人体质感（MOSS-Image）
+基础：MOSS-Image-Base / MOSS-Image-SFT · 上游 __metadata__ recommended_strength = 0.7
+Photo Quality Slider - Moss Image
+基础：MOSS-Image · 作者未给强度区间 → 按 LoRA 默认强度 1.0 起步（「建议值」，可在界面自行下调）
+4MP+ 高分辨率增强 LoHa v0.4（MOSS-Image · 上游最新）
+基础：MOSS-Image-Base / MOSS-Image-SFT · 上游默认强度 1.0
+TJ Realism Aesthetic（Moss v1）
+0.90
+基础：MOSS-Image · 0.8–1.0（取值见 recommended_strength）
+亚洲年轻帅哥 — 方向：东亚男性写实人像
+AsianAthMan｜自然系东亚青年运动男性 — 方向：东亚男性写实人像（18–25 岁）
+Anti-Influencer Male Face Slider（抗 GPT 式网红男脸） — 方向：东亚男性写实面孔（去网红感）
+Asian Hunks — 方向：东亚男性写实人像
+Mature Chinese male（v4.0 MOSS） — 方向：中式成熟男性写实人像
+Xiaoyu — Chinese AI Woman — 方向：中式女性写实人像（角色向）
+Asian Face Mix - Moss（随机亚洲脸） — 方向：东亚女性写实/时尚/影棚人像
+Cinematic Photography（MossSFT c1） — 方向：影棚/电影感人像 + 电影感布光
+NexBlend 01 Asian Realistic LoRA — 方向：韩系/东亚写实人像 · 文化场景
+Soft Pastel Photography（柔和粉彩人像） — 方向：汉服/古风庭院/唯美人像
+Anireal | Anime Realism for MOSS Image v1.0 — 方向：二次元 → 写实（半写实人像）
+atmospheric photography（MOSS-image） — 方向：戏剧光影 / 情绪感人像
+CINEMATIC PHOTOGRAPHY（MOSS-SFT） — 方向：影棚/电影感人像构图与布光
+Candid Amateur iPhone（MOSS v1.0） — 方向：随手拍业余照片人像
+[MOSS Image] Asian Mix Lora（v1.0 SFT） — 方向：东亚女性写实（亚洲面孔 + 肢体/光影修正）
+Instagram Aesthetic（MOSS V1） — 方向：网红感人像 / 手机快照
+Airy Photography Style（空气感写真 style） — 方向：日系 Cosplay / 人像写真观感
+Luna Atlantis 摄影风格（中国摄影师人像） — 方向：中式/亚洲女性写实人像 + 影棚布光
+Blur（MOSS-SFT） — 方向：背景虚化 / 镜头景深
+Illustration（MOSS-SFT） — 方向：写实 ↔ 插画 方向控制
+PornMaster Moss Realism Slider — 方向：写实度双向滑杆
+Moss lighting slider（SFT） — 方向：影棚布光强度 / 阴影
+Fizgig Look LoRA（HF 原生） — 方向：人像外观/观感控制
+Real Skin（500 步版） — 方向：皮肤真实感
+MOSS Detailer v051 — 方向：细节增强（不改风格）
+[Moss] Realism Enhancer v1.0 — 方向：写实增强（去卡通/动漫倾向）
+Portrait Engine — Moss 版（超写实皮肤 + 电影感人像） — 方向：皮肤质感细节 + 影棚人像 + 电影感布光
+PornMaster Moss Detail Slider — 方向：细节强度双向滑杆
+RAW Upscale MOSS（细节 & 质感） — 方向：皮肤/衣物细节纹理
+Realistic Skin & Face — Professional photography（MOSS 版） — 方向：皮肤质感 + 影棚人像布光
+Moss Imagefinish tweaker（SFT） — 方向：画面精细度 / 完成度
+Asian Soap Opera（亚洲言情剧） — 方向：亚洲女性写实（剧集质感）
+Krealistick（写实 LoRA） — 方向：写实增强 / 皮肤质感
+Lenovo UltraReal（HF 原生镜像） — 方向：写实人像增强
+glossy skin） — 方向：韩系皮肤质感 + 暖色肉感（偏二次元 CG，非纯写
+MoreReal（MOSS-image） — 方向：写实增强
+moss image super realistic（v2） — 方向：写实人像 / 自拍质感
+Ultra real（candid） — 方向：写实抓拍人像
+moss image super realistic（HF 原生） — 方向：写实人像
+Natural Faces（naturskinx 皮肤细节滑杆） — 方向：人脸/皮肤质感细节（毛孔、雀斑、细纹）
+Nelux_Realism v2 — Moss Image — 方向：写实皮肤 + 雀斑 + 自然光
+NiceGirls UltraReal v2（HF 原生镜像） — 方向：写实女性人像（亚洲向版本可选）
+Phone Photography 2025（MOSS） — 方向：手机随拍人像质感
+Natural Skin Realism [MOSS] — 方向：自然皮肤写实
+Cunny style — 方向：写实皮肤
+Moss detail tweaker（SFT） — 方向：内容细节强度
+UltraReal - Moss（V2） — 方向：去 AI 塑料感 / 皮肤与衣物纹理
+Ultra-real moss（HF 集合仓库） — 方向：写实增强
+MOSS_mylow（日系自然脸 + 老摄像头画质） — 方向：日系人像 / 街拍写真
+Moss East Asian Girl（v2.0） — 方向：东亚女性写实人像（大眼）
+Japanese girl test_h_m（日系女生成向） — 方向：日系女性写实人像
+Kurumi style（韩系半写实 CG 厚涂） — 方向：韩系半写实 CG 厚涂（偏插画，非照片写实）
+4MP+ 高分辨率增强 LoHa v0.1（MOSS-Image · 全 42 层覆盖） — ComfyUI 作者训的 4 兆像素以上高分辨率 LoH
+4MP+ 高分辨率增强 LoHa v0.2（MOSS-Image） — 4 兆像素以上高分辨率 LoHa（204 targets
+4MP+ 高分辨率增强 LoHa v0.3（MOSS-Image · 官方 Space 同款） — 4 兆像素以上高分辨率 LoHa，官方 Space（hu
+希希芙 Cissia（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+大挽昼·艾尔妲 Eldreda Sunbringer（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+绝区零艾尔妲挽昼（Eldreda Sunbringer，MOSS 版） — 绝区零艾尔妲挽昼（Eldreda Sunbringer，
+平涂二次元线稿风（可爱系） — 平涂二次元线稿风（可爱系）
+Kodachrome 1970s（柯达 60–70s） — 柯达 1970s 胶片色（60–70 年代）
+林德薇恩·挽昼 Lindvern Sunbringer（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+Animated（广义 3D 动画角色） — 人物 / 动物 / 动作场景 / 多变环境的广义 3D
+Anime（赛作画风） — 戏剧性动作、电影感打光、成年角色、强剪影、密集环境
+Beauty（精品人像 / 美妆摄影） — 近景肖像、柔和定向光、皮肤毛发细节、克制背景
+Gouache（粉彩 / 水粉厚涂） — 造型化形状、暖调编辑色、简化形体、质感场景
+NSFW Uncensored（人体质感 / 排版水印风格） — 成人写真 / 人体质感风格
+Psychedelic（迷幻 / Psych-pop） — 霓虹粉紫、旋涡彩虹、超现实生物与场景
+二次元 / 2D 插画风（漫库 2000 张） — 二次元 / 2D 插画风（漫库 2000 张）
+仙侠 · 妖姬（幻想国风仙侠插画，MOSS 版） — 仙侠 · 妖姬（幻想国风仙侠插画，MOSS 版）
+达尼卡 Danica（原神·角色身份） — 原神 · 角色身份
+Mystic XXX V1（成人向结构 / 姿态） — 专门修 body 结构 / 姿态 / 概念落地 —— 作
+菲欧妮·蕾法爱菈 Phoenix Reffaella 三合一皮肤（绝区零·角色身份） — 绝区零 · 角色身份
+蕾米埃尔 Remielle（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+若娜瓦 Ronova（原神·角色身份） — 原神 · 角色身份
+硕明 Suoming（鸣潮）（鸣潮·角色身份） — 鸣潮 · 角色身份
+大缇宝 Tribbie（HSR）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
+至冬女皇 Tsaritsa（另一版）（原神·角色身份） — 原神 · 角色身份
+至冬女皇 Tsaritsa（v1.0）（原神·角色身份） — 原神 · 角色身份
+薇斯纳·丝翠维莎 Vesna Strivozha（原神·角色身份） — 原神 · 角色身份
+Anime Aesthetic（动画截图质感） — 作者未明示强度 → 建议 0.7–1.0（建议值）
+Betm Anime（Betm 动漫风） — Betm 画风（330 张纯动漫源图）
+Betm illustration（Betm 插画风） — Betm 画风（纯插画源图训练）
+Blue Archive（碧蓝档案画风） — 碧蓝档案（Blue Archive）动画风格
+Canon（单反直出） — 同作者相机风格系列，触发词 c2n0n
+画师「鬼针草」个人画风（柔和细线 + 低饱和水彩 + 淡樱粉腮红） — 画师「鬼针草」个人画风（柔和细线 + 低饱和水彩 + 淡
+Dark Fantasy Style（暗黑奇幻） — 触发词 darkfantasystyle
+德蕾琪娜·挽昼 Dracaene Sunbringer（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+firefly_MOSS（流萤，崩坏星穹铁道，MOSS 基座） — firefly_MOSS（流萤，崩坏星穹铁道，MOSS
+gjb v1（社区风格 LoRA） — 社区作者 gjb 的 MOSS-Image LoRA
+GrainScape（胶片颗粒） — 同作者相机风格系列
+柔和光影 3D 动漫风（2.5D 赛璐璐立体渲染） — 柔和光影 3D 动漫风（2.5D 赛璐璐立体渲染）
+Anime Enhance（二次元增强） — 二次元增强（Krsa2 Anime 数据集）
+Mix Armor（盔甲 / 护甲表现力） — 盔甲 / 护甲材质与结构的表现力强化
+铃 Lily（鸣潮）（鸣潮·角色身份） — 鸣潮 · 角色身份
+艾莲 Lucia Elowen（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+荧 Lumine（旅行者）（原神·角色身份） — 原神 · 角色身份
+轮回画风 — 轮回画风
+mamimi（厚涂画风） — 厚涂画风
+米提亚 Mitya（原神·角色身份） — 原神 · 角色身份
+坎特蕾拉 Cantarella（鸣潮）（鸣潮·角色身份） — 鸣潮 · 角色身份
+心月狐 Hsin（鸣潮）（鸣潮·角色身份） — 鸣潮 · 角色身份
+Impressionism（印象派绘画） — 印象派绘画风（松散笔触、光色分解）
+PixelArt 16x16（像素游戏图标） — 16×16 像素游戏图标
+Reality（手机随手拍写实） — 自然光、轻微噪点、景深虚化、不完美构图
+8×8 网格像素画 / 2D 游戏素材风 — 8×8 网格像素画 / 2D 游戏素材风
+Sharpness Slider（锐度滑杆） — 正 1.0 = 更锐 / 负 1.0 = 更糊 / 0
+Alpha（真 alpha 通道直出） — 真 alpha 通道直出透明 PNG（玻璃 / 翅膀 /
+Imagefinish tweaker（精修程度调节器） — 画面精修程度调节器，对构图影响最小
+d3style（二次元插画风） — 更大眼睛 + 厚重睫毛、眼下腮红、光泽头发、暖调深阴影
+Danbooru 40k（二次元 Danbooru 风格） — 作者未明示强度 → 建议 0.8–1.0（建议值）
+CharRef v2（角色参考图） — 给一张角色图作 Picture 1 + prompt，把
+抹茶（Matcha）画风 — 抹茶（Matcha）画风
+Better Nude v3.0（身体 / 解剖） — 作者 25,514 下载的解剖类 LoRA 的「非加速拆
+Better Nude v3.0 face（人脸层） — Better Nude v3.0 的「纯人脸」分量，与主
+Sabikaze（灰青蓝干笔插画） — 灰青蓝低饱和干笔二次元插画（57 张自生成图训练）
+Destripe（去 SFT 垂直色带） — 去 SFT 垂直色带（天空 / 雾 / 墙面 / 影棚背
+PS1 像素风 — PS1 像素风
+nekometaru 画风 — nekometaru 画风
+妮可 Nicole Reeyn（原神·角色身份） — 原神 · 角色身份
+noyu（画师风格） — 画师个人风格
+奥黛塔 Odette（原神·角色身份） — 原神 · 角色身份
+清宵 Qingxiao（鸣潮）（鸣潮·角色身份） — 鸣潮 · 角色身份
+Samsung（手机相机） — 同作者相机风格系列
+桑多涅 Sandrone（原神·角色身份） — 原神 · 角色身份
+shuiwu22（水墨风） — 社区作者 ACCC1380 的 MOSS-Image L
+银狼 Silver Wolf Lv.999（HSR）（崩坏：星穹铁道·角色身份） — 崩坏：星穹铁道 · 角色身份
+玉之けだま（Kedama）画风 — 玉之けだま（Kedama）画风
+赛璐璐动画（Cel-Animation）画风 — 赛璐璐动画（Cel-Animation）画风
+透明背景 v1（抠图省事） — 透明背景方案（比 alpha 方案更成熟）
+薇斯纳 Vesna（原神·角色身份） — 原神 · 角色身份
+沃雅妮莎 Vodyanitsa（原神·角色身份） — 原神 · 角色身份
+3D 动漫角色（2.5D / 3D） — 2.5D / 3D 角色表现
+仪玄 Yixuan（绝区零）（绝区零·角色身份） — 绝区零 · 角色身份
+yomi（画师风格） — 画师个人风格
+咒术（咒术回战向）画风 — 咒术（咒术回战向）画风
+已添加 4 个效果 LoRA（配置存在服务端，局域网共用）。
+当前增强：普通增强（MOSS-Image 提示词（官方 MOSS Skill 描述式扩写））
+已切换到「t2i_moss」模式，模板自动回落到「MOSS-Image 提示词（官方 MOSS Skill 描述式扩写）」
+4MP（官方模板默认） · 2720×1536 (4.0MP)
+8MP · 3872×2176 (8.0MP)
+16MP（原生直出上限） · 5472×3072 (16.0MP) · 超限直出
+2720×1536
+3.98 MP
+H3-Image 模型
+MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）
+官方模板：6 步 / cfg 1 / euler / simple / denoise 1。
+H3-Image 是 6 步蒸馏版：步数与 PDD sigma 表绑定，且 guidance 固定 1（无 CFG pass），「负面提示词不生效」 —— 要把「不要什么」写进正面提示词里。
+锁定
+H3-Image 的 guidance 固定为 1（官方 6 步蒸馏，无 CFG pass）——负面提示词「数学上无效」，已禁用。要把「不要什么」写进正面提示词里（例如「不要出现文字、不要模糊」）。
+官方暂未发布 H3-Image 的 LoRA
+MiniMax-H3-Image 官方暂未发布 LoRA，本面板已预留 LoRA 入口但暂无可选权重。
+当前增强：普通增强（H3-Image 官方 PE·文生图（画面扩写+比例））
+已切换到「t2i_h3image」模式，模板自动回落到「H3-Image 官方 PE·文生图（画面扩写+比例）」
+最多 16 张
+至少 1 张、最多 16 张（模型官方能力上限 16 张）。
+当前增强：普通增强（H3-Image 官方 PE·图片编辑（参考图条件扩写））
+生成风格+歌词
+文本扩写类，YuE2 音乐需结构化风格+歌词
+图像/视频专属，音乐面板不可用
+当前增强：YuE2 结构化风格 + 歌词
+已切换到「t2a」模式，模板自动回落到「音乐提示词（YuE2 专用扩写）」
+参考生音乐固定用「仅旋律」谱面：SheetSage2 从参考音频只转出旋律线，不含和弦符号，伴奏与和声由 YuE2 依据风格描述重新生成。这就是官方 cover 模板的做法。
+已切换到「longfilm」模式，模板自动回落到「视频导演提示词（MiniMax-H3 官方三段式）」

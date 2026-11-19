@@ -1040,11 +1040,11 @@
     [svEl, saEl].forEach(el => { if (el) el.disabled = !shiftAvailable; });
     if (svHint) {
       svHint.textContent = shiftAvailable ? svHint.textContent : "节点不可用";
-      svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+      svHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 shift 节点";
     }
     if (saHint) {
       saHint.textContent = shiftAvailable ? saHint.textContent : "节点不可用";
-      saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 MiniMaxH3SigmaShift 节点";
+      saHint.title = shiftAvailable ? "" : "本机 ComfyUI 没有 shift 节点";
     }
 
     // ---- CFG：标准路径是**只读说明**（H3 没有 CFG 槽位）----
@@ -1062,11 +1062,11 @@
     const note = document.getElementById("vidSamplingNote");
     if (note) {
       const bits = [
-        `步数 ${videoState.steps} → BasicScheduler.steps`,
-        `采样器 ${videoState.sampler || "—"} → KSamplerSelect.sampler_name`,
-        `调度器 ${videoState.scheduler || "—"} → BasicScheduler.scheduler`,
+        `步数 ${videoState.steps}`,
+        `采样器 ${videoState.sampler || "—"}`,
+        `调度器 ${videoState.scheduler || "—"}`,
         `shift ${Number(videoState.shiftVideo).toFixed(2)} / `
-          + `${Number(videoState.shiftAudio).toFixed(2)} → MiniMaxH3SigmaShift`,
+          + `${Number(videoState.shiftAudio).toFixed(2)}`,
       ];
       note.textContent = bits.join(" · ");
     }
@@ -1108,7 +1108,7 @@
     if (hint) {
       hint.textContent = nodeOk
         ? "低分辨率一采 + 高分辨率二采"
-        : "本机 ComfyUI 没有 SelfLiftH3Sampler 节点，不可用";
+        : "本机 ComfyUI 没有二采节点，不可用";
     }
 
     // 潜空间放大器下拉
@@ -1173,7 +1173,7 @@
     const refineHint = document.getElementById("vidSigmaRefineHint");
     if (refineHint) {
       refineHint.textContent = refineOk
-        ? "低噪段加密采样（借鉴 nonebot H3 工作流）"
+        ? "低噪段加密采样"
         : "本机 ComfyUI 没有 H3SigmaRefiner 节点，不可用";
     }
     const refineSteps = document.getElementById("vidSigmaRefineSteps");
@@ -1218,13 +1218,13 @@
     if (mainSampler) {
       mainSampler.disabled = twopassOn;
       mainSampler.title = twopassOn
-        ? "二采（SelfLift）只支持标准 Euler 采样器 —— 开启二采时实际使用 euler"
+        ? "二采只支持标准 Euler 采样器 —— 开启二采时实际使用 euler"
         : "";
     }
     const mainSamplerHint = document.getElementById("vidSamplerHint");
     if (mainSamplerHint && twopassOn) {
       mainSamplerHint.textContent = "二采固定 euler";
-      mainSamplerHint.title = "二采（SelfLift）节点只支持标准 Euler 采样器";
+      mainSamplerHint.title = "二采节点只支持标准 Euler 采样器";
     }
 
     if (note) {
@@ -2308,7 +2308,7 @@
             + "· 实测段头断点比 2.58x–4.54x（二采关闭时 ≤1.58x）\n"
             + "· 实测 3 帧亮度降 +4.7～+7.2 灰阶（二采关闭时 ≤+0.26）\n"
             + "· 肉眼表现：接缝处「第 5 秒那一下整个色调跳一下」\n\n"
-            + "默认路径（不勾这个）走标准采样，与 nonebot minimax_h3_seg2 等价，无此缺陷。\n"
+            + "默认路径（不勾这个）走标准采样，无此缺陷。\n"
             + "只有在你明确需要接续段的二采提速时才建议勾选。\n\n"
             + "确定继续？");
 
