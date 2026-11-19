@@ -150,8 +150,11 @@ STALE_BUMPED = {
     #   保留「重试」入口的修复）⇒ ?v= 必须再升一次
     #   （cr20261115b -> cr20261116b）。漏升 = 老缓存用户拿不到修复。
     # 口径与 enhance-menu.js 一致：记「最初的旧值」与「当前最新值」。
-    "agent.js":                ("agent4",       "cr20261116b"),
-    "agent_sessions.js":       ("agtsess2",     "cr20261115b"),
+    # 【2026-11-19 生成状态缺陷修复】agent.js / agent_sessions.js 的内容
+    #   又被改过（视频任务不再按 30 分钟判超时；「done + 无产物」显示
+    #   明确失败占位而不是空黑框）⇒ ?v= 必须再升一次。
+    "agent.js":                ("agent4",       "genfix20261119a"),
+    "agent_sessions.js":       ("agtsess2",     "genfix20261119a"),
     # app.js 承载第 3 轮的 Critical B-2 修复（提交 c6676e6 改了它 +35 行），
     # 但那个提交没升它的 ?v= ⇒ 浏览器拿到的仍是旧 app.js，修复不生效。
     # 【2026-11-16 第 4 轮】app.js 再次改内容（B-3/B-4/B-6/B-7/B-9/B-10/
@@ -173,7 +176,10 @@ STALE_BUMPED = {
     #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按启发式
     #   新鲜度缓存。app.js 内容变了而 ?v= 不变 ⇒ 老用户浏览器拿到的仍是
     #   **旧 app.js**（不带 continuation 提交的那个版本）⇒ 修复等于没上线。
-    "app.js":                  ("cr20261116c", "cont20261119a"),
+    # 【2026-11-19 生成状态缺陷修复】app.js 内容又变（视频不按 30 分钟
+    #   判超时 + 「done + 无产物」的明确失败占位）⇒ ?v= 再升一次
+    #   （cont20261119a -> genfix20261119a）。
+    "app.js":                  ("cr20261116c", "genfix20261119a"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
@@ -195,7 +201,10 @@ STALE_BUMPED = {
     # 【2026-11-18 第 6 轮审查】以下资源的内容在本轮被改过
     #   （接续面板 markdown 残留 / 参考图提示 / 引擎自检说明 / 清理确认
     #    / token 预算说明）⇒ ?v= 必须升，否则老用户拿到的仍是旧文件。
-    "continuation.js":         ("cr20261115b", "cr20261118a"),
+    # 【2026-11-19】continuation.js 的 ?v= 早已被推进到 contsw20261119a
+    #   （commit 0f8d5a7 升的版号），但这张表没同步 ⇒ 一直报假红。
+    #   判定：**表过期，不是真漂移** —— 同步到实际值。
+    "continuation.js":         ("cr20261115b", "contsw20261119a"),
     "qwen-refs.js":            ("cr20261115b", "cr20261118a"),
     # 【2026-11-19 第 3 轮 A 项】providers.js 同属 commit 59707f5 的
     #   「表过期」—— 该 commit 改了 providers.js 的内容（增强结果 meta 行
@@ -221,11 +230,11 @@ STALE_BUMPED = {
 # ⇒ app.js 已改到 STALE_BUMPED；NOT_STALE_OK 里只留「本轮及之后
 #    内容确实没再变过」的资源。判定仍然用 git 历史 + 内容 diff 实测。
 NOT_STALE_OK = {
-    "style.css":        "cr20261115a",
     "favicon.svg":      "cr20261115a",
-    # 【2026-11-18 第 6 轮审查】media-manage.js 原先在这里
-    #   （?v=uxbatch1），但本轮它的内容被改了（清理确认弹窗里的
-    #   markdown 残留清理）⇒ 已升到 cr20261118a 并移入 STALE_BUMPED。
+    # 【2026-11-19 生成状态缺陷修复】style.css 原先在这里
+    #   （?v=cr20261115a），但本轮它的内容被改了（新增
+    #   .ag-artifact-thumb.is-failed 失败占位样式）⇒ 已升到
+    #   genfix20261119a 并移入 STALE_BUMPED。
     #   同一份文件不能同时出现在两张表里（否则这张断言必红）。
 }
 
