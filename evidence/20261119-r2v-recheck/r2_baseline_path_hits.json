@@ -1,0 +1,13 @@
+{
+  "baseline_abs_path_hits": 18,
+  "baseline_location_abs_hits": 2,
+  "baseline_source_abs_hits": 16,
+  "samples": [
+    "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 AdaLN 输入压到 8 维，Turbo LoRA 的 AdaLN 部分由ComfyUI-MiniMax-H3-Turbo 在运行期重新注入。 · 本机体积 20.5 GB · 位置 /mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+    "作者推荐：来源：作者提供 · 推荐步数：4（作者提供） · 推荐调度器：作者未提供 · 推荐采样器：作者未提供 · 推荐视频 shift：12（作者提供） · 推荐音频 shift：2（作者提供） · 推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供） · 出处：/home/ubuntu/comfyui/models/loras/dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」 · 唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。",
+    "把文生视频与参考生成合进一个权重的剪枝 int8 版（20.9 GB）。Turbo LoRA 259 个层里 208 个直接命中、51 个 AdaLN 由运行期注入。 · 本机体积 20.5 GB · 位置 /mnt/nvme1t_colorful/comfyui-models/diffusion_models",
+    "出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）",
+    "出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）",
+    "出处：/home/ubuntu/comfyui/comfy/supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）"
+  ]
+}

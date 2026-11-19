@@ -1,0 +1,2935 @@
+zh-CN
+UTF-8
+viewport
+width=device-width, initial-scale=1.0
+icon
+/static/favicon.svg?v=cr20261115a
+image/svg+xml
+stylesheet
+/static/style.css?v=cr20261115a
+/static/assets.css?v=cr20261115b
+/static/responsive.css?v=cr20261115b
+topbar
+nav-toggle
+navToggle
+button
+打开导航菜单
+false
+sidebar
+0 0 24 24
+true
+M4 7h16M4 12h16M4 17h16
+brand
+logo
+0 0 64 64
+M21 14 L21 50 L40 32 Z
+#fff
+.95
+M40 32 L56 19
+none
+.92
+4.5
+round
+M40 32 L56 32
+.72
+M40 32 L56 45
+.52
+brand-name
+brand-tagline
+brand-version
+top-status
+topStatus
+dot dot-ok
+statusText
+ComfyUI 空闲
+layout
+sidebar-mask
+sidebarMask
+nav-label
+nav-scroll
+navScroll
+nav-group
+video
+navVideoCategories
+nav-categories
+nav-cat active
+t2v
+group
+文生视频
+nav-cat-head active
+category
+文生视频（1 个模型）
+nav-cat-label
+nav-cat-toggle
+收起「文生视频」下的模型
+收起子项
+nav-cat-models
+nav-item nav-model-item active
+h3_t2v
+MiniMax-H3 文生视频（新面板：宽高直填 / 模型可选 / 加速 LoRA / 注意力机制 / 二采）。
+nav-cat
+flf
+首尾帧生视频
+nav-cat-head
+首尾帧生视频（1 个模型）
+收起「首尾帧生视频」下的模型
+nav-item nav-model-item
+h3_flf
+MiniMax-H3 首尾帧生视频：给首帧 + 尾帧，模型补中间。
+r2v
+参考生视频
+参考生视频（1 个模型）
+收起「参考生视频」下的模型
+h3_r2v
+MiniMax-H3 参考生视频：给参考图 / 参考视频 / 参考音频。
+longfilm
+长片拼接
+长片拼接（1 个模型）
+收起「长片拼接」下的模型
+h3_longfilm
+把 ≥2 个已完成的视频任务拼成一支长片。
+image
+nav-item
+t2i
+0 0 16 16
+15
+1.5
+13
+2
+currentColor
+1.4
+5.5
+M2.5 12l3.5-3.5 2.5 2.5 3-4 2 2.5
+t2i_qwen
+M11.4 3.2l.85 1.75 1.75.85-1.75.85-.85 1.75-.85-1.75-1.75-.85 1.75-.85z
+t2i_moss
+M9.6 2.2h4.2v4.2
+1.3
+t2i_h3image
+M11 2.2l1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1z
+image-edit
+i2i_qwen
+1.2
+9
+5
+M9.6 11.5h4.8M12 9.1v4.8
+i2i_h3image
+M11.8 2.2l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z
+music
+t2a
+M6 12.5a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM6 13V3l7-1.5V11
+10.7
+12.2
+1.7
+a2a
+M2 8.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0zM8 8.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0z
+M8 8.5h0M1.5 12h13
+assets
+navAssets
+agent
+navAgent
+8
+6.2
+5.6
+6.4
+1.05
+10.4
+M5.4 10.2c1.6 1.1 3.6 1.1 5.2 0
+system
+navFlowDocs
+查看交互流程图与说明文档
+2.5
+9.5
+M9.4 9.5v5.5M11.6 11.2h3.2M11.6 13.3h2.2
+navProviders
+4
+1
+11.5
+navSystem
+M5 13.5h6M8 10.5v3
+M3.5 7.5l2-2 1.5 2.5 2-3 2 2.5
+sidebar-foot
+unloadBtn
+释放 GPU 显存
+panel-mask
+panelMask
+panel
+videoPanel
+
+stale-backend-banner
+staleVideoBanner
+field
+field-label
+muted
+img-select
+vidSizePresetSelect
+9:16_0.2
+352×608 · 0.2MP
+9:16_0.3
+416×736 · 0.3MP
+9:16_0.4
+480×864 · 0.4MP
+9:16_0.5
+544×960 · 0.5MP
+9:16_0.6
+608×1056 · 0.6MP
+9:16_0.7
+640×1152 · 0.7MP
+9:16_0.8
+672×1216 · 0.8MP
+9:16_0.9
+736×1280 · 0.9MP
+9:16_0.98
+768×1344 · 0.98MP
+9:16_1.0
+768×1376 · 1MP
+9:16_1.2
+832×1504 · 1.2MP
+9:16_1.5
+928×1664 · 1.5MP
+9:16_1.8
+1024×1824 · 1.8MP
+9:16_2.0
+1088×1920 · 2MP
+img-note
+vidSizePresetNote
+vidSizeHint
+img-tag hidden
+vidSizeMode
+img-size-row
+number
+vidWidth
+32
+宽度（像素，必须是 32 的倍数）
+img-x
+vidHeight
+高度（像素，必须是 32 的倍数）
+img-reset
+vidSizeReset
+恢复为按比例自动计算的尺寸
+vidSizeNote
+img-note img-size-adjust
+vidSizeAdjust
+chips
+vidAspectChips
+1:1
+2:3
+3:2
+3:4
+4:3
+9:16
+active
+16:9
+21:9
+vidMediaField
+display:none
+vidMediaLabel
+vidMediaHint
+upload-zone
+uploadZone
+uploadTitle
+upload-title
+upload-row
+uploadRow
+vidMediaNote
+audioTrackField
+audioTrackSelect
+audioTrackNote
+vidModelLabel
+vidModelSourceNote
+vidModelSelect
+fl2va_pruned_int8
+minimax_h3_fl2va_pruned_int8_convrot.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+fl2va_int8
+minimax_h3_fl2va_int8_convrot.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+fl2va_pruned_w4a8
+minimax_h3_fl2va_pruned_w4a8_mixed.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+fl2va_bf16
+minimax_h3_fl2va_bf16.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（default_steps = 4 if lora != 'none' else 20；default_scheduler = 'beta' if lora != 'none' else 'simple'；default_sampler = 'euler' if lora != 'none' else 'res_multistep'）
+官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，lora=='none' 分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+vidModelNote
+img-warn
+vidModelWarn
+vidAccelLoraSelect
+ckpt850
+minimax_h3_turbo_4step_ema_ckpt850.safetensors｜推荐强度 1｜加载节点：Turbo 节点
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：simple（作者提供）
+推荐采样器：作者未提供
+推荐视频 shift：12（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）（作者提供）
+出处：README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）
+作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。
+v4step600
+minimax_h3_turbo_v4_step600_ema.safetensors｜推荐强度 1｜加载节点：Turbo 节点
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：simple（作者提供）
+推荐采样器：作者未提供
+推荐视频 shift：12（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）（作者提供）
+出处：README.md:76-88（同族 Turbo LoRA，步数 4~8、strength 1.0、scheduler=simple） + supported_models.py:970-971（shift 12/3 内生值）
+与 ckpt850 同族的另一枚 EMA 权重，作者给出的用法完全一致。
+lightx2v_4step_768p
+h3_lightx2v/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：euler（作者提供）
+推荐视频 shift：6（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
+出处：作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p (1344×768) | 6 / 3 | 4 | 4」-> 训练 shift 6/3、蒸馏 NFE 4、推荐推理 NFE 4。采样器：「COMFYUI_SETUP_AND_INFERENCE.md」「set lora_name, steps, shift_video, and shift_audio together to match the model table. Sampler defaults to `euler`.」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」
+「shift 是 6/3（作者规格表），不是 H3 内生的 12/3」 —— LightX2V 的 768p 系列与 544p 系列 shift 不同，不能混用。调度器作者未提供；采样器作者写的是「defaults to euler」（默认，不是强制）。
+lightx2v_4step_sla_768p
+minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：training_euler（作者提供）
+推荐视频 shift：6（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
+出处：作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「4-step distillation」+「768p FL2V generation support」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」
+SLA（Sparse-Linear Attention）变体，85% 稀疏率，作者实测 RTX 5090 约 2.5× 加速。「shift 是 6/3（作者给的 video_flow_shift / audio_flow_shift）」，不是 H3 内生的 12/3。采样器作者写的是 `training_euler` —— 那是「训练时」的 step update 规则，不是 ComfyUI 的 KSamplerSelect 取值 -> 面板的采样器仍应选 `euler`（见同族 spec 表的「Sampler defaults to euler」）。调度器作者未提供。
+lightx2v_8step
+minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：8（作者提供）
+推荐调度器：作者未提供
+推荐采样器：euler（作者提供）
+推荐视频 shift：12（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
+出处：作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 8-step v1.0 | FL2VA / T2VA | 544p mixed aspect ratio | 12 / 3 | 8 | 8 / 4」-> 训练 shift 12/3、蒸馏 NFE 8、推荐推理 NFE 8 或 4。采样器：「COMFYUI_SETUP_AND_INFERENCE.md」「Sampler defaults to `euler`.」 + 本机权重 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」、training_alpha=8.0、training_scale=0.0625
+作者推荐推理 NFE 是「8 / 4」两档 —— 8 步质量更好，4 步更快；本表给的是 8（质量档）。「shift 是 12/3（544p 系列）」，与 768p 系列的 6/3 不同，不能混用。调度器作者未提供。
+dmad_4step_critic
+dmad_minimax_h3_4step_full_critic_comfyui.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：作者未提供
+推荐视频 shift：12（作者提供）
+推荐音频 shift：2（作者提供）
+推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供）
+出处：dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」
+唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+speed_slider
+h3/h3_speed_slider_1.1.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：作者未提供
+推荐调度器：作者未提供
+推荐采样器：作者未提供
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 已实测命中目标层）（ComfyUI 模型硬性值）
+出处：h3_speed_slider_1.1.md:283-295（「作者提供了什么」表：步数 ❌ 未提供 / 采样器·scheduler ❌ 未提供；strength ±8 最优）+ supported_models.py:970-971
+作者明写：步数、采样器、scheduler、分辨率、CFG 「5 项一字未提」。strength 作者给了 ±8（这是「运动幅度」，不是 LoRA 权重强度）。
+better_motion
+h3/h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.safetensors｜推荐强度 0.8｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：30（作者提供）
+推荐调度器：作者未提供
+推荐采样器：作者未提供
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：MiniMax-H3（bf16 / int8_convrot / pruned_int8 已实测命中目标层）（ComfyUI 模型硬性值）
+出处：h3_better_motion_720x1280_w0.4-0.8_s15-30_vpakarinen_v1.md:183-184（「作者提供了什么」表：步数 ✅ 15~30 步 / 采样器·scheduler ❌ 未提供） + supported_models.py:970-971
+作者原话「720x1280 resolution with 15-30 steps」、strength 0.4~0.8。「步数是区间」，本表给出的是区间上界（30）作为推荐档展示，区间本身写在 note 里。采样器/调度器作者未提供。
+lightx2v_4step_v01_comfy
+minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：euler（作者提供）
+推荐视频 shift：6（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
+出处：minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors 的 __metadata__：source = 「.../dmd_minimax_h3_t2va4/checkpointing/00000650/gen-base_dit.pt」（DMD 4 步蒸馏）；baked_scale = 「0.125」（peft alpha/r=0.125 baked into lora_B）；converted_layout = 「comfyui_minimax_h3」 + 同族已有条目 lightx2v_4step_768p 的作者规格表（ModelTC/Minimax-H3-Turbo README「1. Model specs」）：「FL2VA Turbo 4-step v1.0 768p | FL2VA / T2VA | 768p | 6 / 3 | 4 | 4」 -> 同族 768p 档的 shift 6/3 与 NFE 4；采样器「Sampler defaults to `euler`.」
+LightX2V Turbo 4 步 「v0.1 的 comfy 打包版」（源 checkpoint 是 DMD 4 步蒸馏 `dmd_minimax_h3_t2va4`）。作者规格表里 v0.1 与 v1.0 的 768p 档同属一行规格（shift 6/3、NFE 4、采样器默认 euler）-> 逐项沿用「同族已有条目」 lightx2v_4step_768p 的已验证来源，不另编。调度器作者未提供。「shift 是 6/3（768p 系列），不是 H3 内生的 12/3。」
+lightx2v_sla_768p_root
+minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors｜推荐强度 1｜加载节点：核心 LoraLoaderModelOnly
+
+—— 作者推荐参数 ——
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：euler（作者提供）
+推荐视频 shift：6（作者提供）
+推荐音频 shift：3（作者提供）
+推荐主模型：Comfy-Org/MiniMax-H3（minimax_h3_fl2va_bf16.safetensors）（作者提供）
+出处：minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors 的 __metadata__：base_model = 「Comfy-Org/MiniMax-H3 minimax_h3_fl2va_bf16.safetensors」；training_rank = 「128」；training_alpha = 「128.0」；training_scale = 「1.0」 + 同族已有条目 lightx2v_4step_sla_768p 的作者模型卡（HF lightx2v/Minimax-h3-Turbo-SLA）：「Key SLA-related settings in this configuration include: { attn_type: dynamic_sparse_attn, dynamic_sparse_attn_setting: { sparsity_ratio: 0.85, operator: sage2 }, video_flow_shift: 6.0, audio_flow_shift: 3.0, h3_step_update: training_euler }」 + 「4-step distillation」+「768p FL2V generation support」
+与 h3_lightx2v/ 目录里那份「同名同规格」的 SLA 权重（键名形态一致），此处登记「根目录」那一份 —— 它是该目录版之外真实存在的第二份文件。作者模型卡给的规格（4 步蒸馏 / shift 6/3 / 85% 稀疏率 / sage2 / RTX 5090 实测约 2.5× 加速）「与同族已有条目完全相同」 -> 逐项沿用同一份已验证来源，不另编。作者写的是 `training_euler`（训练时 step update 规则），不是 ComfyUI 的 KSamplerSelect 取值 -> 面板采样器仍选 `euler`。调度器作者未提供。
+compact-field
+vidAccelLoraStrengthField
+compact-label
+vidAccelLoraStrengthVal
+range
+vidAccelLoraStrength
+0
+0.05
+双击可输入数值
+text
+num-input
+decimal
+off
+数值输入（与滑杆联动，可直接键入）
+vidAccelLoraNote
+img-accel-note
+vidFixedLoraNote
+来源：作者提供
+推荐步数：4（作者提供）
+推荐调度器：作者未提供
+推荐采样器：作者未提供
+推荐视频 shift：12（作者提供）
+推荐音频 shift：2（作者提供）
+推荐主模型：MiniMax-H3（T2VA transformer 的 LoRA）（作者提供）
+出处：dmad_minimax_h3_4step_full_critic_comfyui.safetensors 的 __metadata__：sampling = 「4 steps, video shift 12, audio shift 2, re-noise step rule, 1344x768, 124 frames at 24 fps, no CFG」；model = 「DMAD 4-step student of MiniMax-H3 (text-to-audio-video), LoRA on the T2VA transformer」
+唯一一条作者把「采样参数全写出来」的加速 LoRA：步数 4、video shift 12、「audio shift 2」（≠ H3 内生的 3）、分辨率 1344×768、124 帧 @24fps、无 CFG。采样器 / 调度器作者未写 -> 「作者未提供」。
+vidEffectLoraField
+vidEffectLoraHint
+vid-lora-clear
+vidEffectLoraClear
+vidEffectLoraList
+img-lora-list
+img-lora-add vid-lora-add-row
+vidEffectLoraSearch
+img-input
+搜索效果 LoRA（名称 / 功能 / 触发词）
+vidEffectLoraSelect
+0.8
+h3/3dsrx_minimax_h3.safetensors
+做出 Pixar / 迪士尼式的 3D 动画电影质感。
+h3/Anime2Realsim__H3.safetensors
+把动漫参考图转成真人实拍 / 高级 cosplay 摄影质感，同时保留角色的辨识特征。
+h3/Body_Breast_Minimax_h3_for_NSFW.safetensors
+改变人体体型/胸部特征，生成成人向的合成身材。
+h3/GOLDENBOY_H3_V1-step00012000.safetensors
+复刻 1990 年代日本 TV 动画（以《Golden Boy》为例）的赛璐璐质感。
+h3/H3_Ref2V_Anime_Slider_v1.safetensors
+一个旋钮控制"2D 动漫 ↔ 写实"的整体画风倾向。
+h3/Handheld_Shaky_Cam_h3_100.safetensors
+h3/Minimax H3真实电影质感.safetensors
+修掉 H3 的四种"AI 味"，做出真实电影摄影质感。
+h3/NSGIRL-MiniMax-H3-LoRA-By-MM744.safetensors
+真人女性特写写实风格，偏向干净、好看的商业人像质感。
+h3/YOURNAME_H3_V1-step00009900.safetensors
+只学环境，不学人物。 把新海诚作品的空镜/场景质感单独抽出来。
+h3/h3-realism-people-t2v-i2v-r2v.safetensors
+让 H3 生成的真人镜头在 4K 下扛得住：特写不糊、皮肤有毛孔、微表情连贯、电影感布光。
+h3/h3_character_swap_pro4500_1000.safetensors
+h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors
+把 H3 当成图片生成模型用 —— 产出最高 3840×2176 的写实静帧。
+h3/manga_tone_v2.safetensors
+让 H3 渲染出「会动的漫画网点纸」—— 墨线 + 中间调网点，而且运镜和动作下网点不糊。
+h3/minimax_h3_character_swap_v1.0_ref2va_r64_gl.safetensors
+h3/minimax_h3_head_swap_v1.0_r32.safetensors
+h3/minimax_h3_live_wallpaper_v1.0_ref2va_r32.safetensors
+h3/minimax_h3_live_wallpaper_v1.0_ref2va_r64.safetensors
+h3/minimax_h3_lms_v1.0_r64.safetensors
+h3/minimax_h3_style_transfer_v1.0_r64.safetensors
+h3/minimax_h3_vfx_edit_v1.0_r128.safetensors
+h3/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors
+h3/nafasp_h3_lora_v2_500.safetensors
+让"说话"这件事在 H3 里变得真实：全脸肌肉参与发声 + 英文语音清晰。
+h3_keyframe/h3_hero_step12000.safetensors
+给它一张"当前主角关键帧"，让它画出"下一个主角关键帧"。
+h3_keyframe/h3_seq_step12000.safetensors
+给它"窗口首图 + 窗口自身自然结尾"，让它浮出一段完整的定格动画序列。
+h3_keyframe/h3_tween_step12000.safetensors
+给它"当前帧 + 远端目标极值"，让它画出中间的过渡帧 —— 而且只推进一小步。
+minimax/pika_h3_flex_fl2va_v1_bf16.safetensors
+minimax/pika_h3_flex_ref2va_v1_bf16.safetensors
+vidEffectLoraAdd
+vidEffectLoraNote
+img-lora-excluded
+vidEffectLoraExcluded
+vidAttentionSelect
+default
+不做任何 patch。速度基准，最稳。
+kitchen
+ComfyUI 内建的 INT8 量化稠密注意力，只支持 Nvidia / AMD。省显存、略掉精度，速度提升有限但最稳。
+sage
+KJNodes 的 SageAttention patch，覆盖 H3 自注意力，降峰值显存。需要较新的 sageattention（本机已装）。
+sol
+按阈值把部分 block 走近似路径：tau 越高越快、保真越低（论文默认 1.0，本机调优值 1.3）。文本/条件 KV 仍走精确路径。
+sparse
+只保留一部分视频注意力连接：video_budget 越低越快，但提示词贴合度与运动细节会掉。没有「安全值」，每条提示词要自己试。
+vidAttentionNote
+vidTwopassField
+img-toggle
+checkbox
+vidTwopassEnabled
+vidTwopassHint
+vidTwopassAllowContinuationRow
+vidTwopassAllowContinuation
+vidTwopassAllowContinuationHint
+vidTwopassBody
+compact-pair
+vidTransitionVal
+vidTransition
+6
+3
+vidLowresVal
+vidLowres
+0.25
+0.5
+vidRhoVal
+vidRho
+vidUpscalerHint
+vidUpscalerSelect
+minimax_h3_latent_upscaler_3d_bf16.safetensors
+minimax_h3_latent_upscaler_3d_fp16.safetensors
+h3_upscaler_lms_v0.1_fp32.safetensors
+vidTwopassCfgVal
+vidTwopassCfg
+10
+0.1
+vidTwopassCfgHint
+vidTwopassSamplerHint
+vidTwopassSampler
+euler
+switch-label
+vidSigmaRefineEnabled
+vidSigmaRefineHint
+vidSigmaRefineStepsVal
+vidSigmaRefineSteps
+vidSigmaRefineStartVal
+vidSigmaRefineStart
+vidSigmaRefineSpacing
+cosine
+linear
+exponential
+vidTwopassNote
+vidSamplingField
+vidStepsVal
+vidSteps
+50
+vidStepsHint
+vidCfgVal
+vidCfg
+1.0
+vidCfgHint
+vidShiftVideoVal
+vidShiftVideo
+0.01
+100
+12
+vidShiftVideoHint
+vidShiftAudioVal
+vidShiftAudio
+vidShiftAudioHint
+vidSamplerHint
+二采（SelfLift）节点只支持标准 Euler 采样器
+vidSamplerSelect
+二采（SelfLift）只支持标准 Euler 采样器 —— 开启二采时实际使用 euler
+euler_cfg_pp
+euler_ancestral
+euler_ancestral_cfg_pp
+heun
+heunpp2
+exp_heun_2_x0
+exp_heun_2_x0_sde
+dpm_2
+dpm_2_ancestral
+lms
+dpm_fast
+dpm_adaptive
+dpmpp_2s_ancestral
+dpmpp_2s_ancestral_cfg_pp
+dpmpp_sde
+dpmpp_sde_gpu
+dpmpp_2m
+dpmpp_2m_cfg_pp
+dpmpp_2m_sde
+dpmpp_2m_sde_gpu
+dpmpp_2m_sde_heun
+dpmpp_2m_sde_heun_gpu
+dpmpp_3m_sde
+dpmpp_3m_sde_gpu
+ddpm
+lcm
+ipndm
+ipndm_v
+deis
+cfgpp_ud10_ab
+res_multistep
+res_multistep_cfg_pp
+res_multistep_ancestral
+res_multistep_ancestral_cfg_pp
+gradient_estimation
+gradient_estimation_cfg_pp
+er_sde
+seeds_2
+seeds_3
+sa_solver
+sa_solver_pece
+ddim
+uni_pc
+uni_pc_bh2
+legacy_rk
+rk
+rk_beta
+deis_3m_ode
+deis_2m_ode
+deis_3m
+deis_2m
+res_6s_ode
+res_5s_ode
+res_3s_ode
+res_2s_ode
+res_3m_ode
+res_2m_ode
+res_6s
+res_5s
+res_3s
+res_2s
+res_3m
+res_2m
+euler_extsig
+euler_extsig_ancestral
+euler_extsig_ancestral_cfg_pp
+euler_extsig_cfg_pp
+vidSchedulerHint
+vidSchedulerSelect
+simple
+sgm_uniform
+karras
+ddim_uniform
+beta
+normal
+linear_quadratic
+kl_optimal
+FlowMatchEulerDiscreteScheduler
+zipf_linear
+zeta
+bong_tangent
+beta57
+vidSamplingNote
+vidCfgFixedNote
+durField
+durVal
+duration
+60
+imagePanel
+display: none;
+staleBackendBanner
+imgResHint
+imgResSelect
+1mp
+480p
+720p
+1080p
+1440p
+2k
+4k
+imgSizeNote
+imgAspectChips
+1:1 (Square)
+2:3 (Portrait Photo)
+3:2 (Photo)
+3:4 (Portrait Standard)
+4:3 (Standard)
+9:16 (Portrait Widescreen)
+16:9 (Widescreen)
+21:9 (Ultrawide)
+imgSizeHint
+imgSizeMode
+imgWidth
+16
+宽度（像素，必须是 16 的倍数）
+imgHeight
+高度（像素，必须是 16 的倍数）
+imgSizeReset
+恢复为档位自动计算的尺寸
+imgSizeManualNote
+imgSizeAdjust
+imgBatchHint
+imgBatchChips
+imgModelLabel
+imgModelHint
+imgModelSelect
+z_image_turbo_bf16
+z_image_bf16
+z_image_base_distill
+darkbeast_z6_blitz_fp8
+imgModelNote
+imgModelWarn
+imgAccelNote
+imgH3ImageNote
+imgStepsVal
+imgSteps
+imgStepsHint
+imgCfgVal
+imgCfg
+imgCfgHint
+imgShiftVal
+imgShift
+7
+imgShiftHint
+imgSamplerHint
+imgSamplerSelect
+imgSchedulerHint
+imgSchedulerSelect
+imgUpscaleParamWarn
+imgNegField
+imgNegative
+当前设置下负面提示词不生效（见下方说明）
+opacity: 0.55;
+imgNegNote
+imgSlgField
+imgSlgChips
+imgSlgNote
+imgRefField
+imgRefHint
+img-ref-list
+imgRefList
+img-ref-actions
+img-ref-add
+imgRefAdd
+img-ref-sort
+imgRefSort
+按与提示词的匹配度、标签相关度、入库时间给出建议顺序（本地启发式，不调用模型）
+imgRefNote
+img-ref-detail
+imgRefDetail
+imgRefMarkerNote
+imgRefDescList
+img-ref-desc-list
+imgLoraField
+imgLoraHint
+imgLoraList
+img-lora-item   
+img-lora-head
+img-lora-btn toggle
+停用
+img-lora-name
+z-image-effects/Z-imagemeinv11_10.safetensors
+img-lora-tag rec
+img-lora-btn up
+上移
+img-lora-btn down
+下移
+img-lora-btn del
+删除
+img-lora-slider
+strength
+强度 0-1.5，0 表示关闭 · 双击可输入数值
+img-lora-strength
+img-lora-trigger
+lora-trigger-label
+该 LoRA 贡献的触发词，会自动追加到提示词末尾
+lora-trigger-input
+beauty
+自动追加到最终提示词；可编辑或删除
+img-lora-meta
+img-lora-info-btn
+background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:10px;font-family:inherit
+img-lora-add
+imgLoraSelect
+中式 / 东方风格
+z-image-effects/1771682836.319042-be045720-b91f-48dc-b4d3-0f747047fa9e.safetensors
+方向：A3 中式/国风人像。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 QWEN_IMAGE_20_B）。 来源平台：modelscope。
+z-image-effects/Z-image绝对国风人像摄影.safetensors
+方向：A3 中式/国风人像。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+皮肤 / 质感
+z-image-effects/1773828100.877327-22cbd40f-a74b-4fac-afd5-fcd43b2a8923.safetensors
+方向：B1 人像皮肤质感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 QWEN_IMAGE_20_B）。 来源平台：modelscope。
+z-image-effects/1775064636.154282-49270eb1-6bdb-401d-b9a5-66ba79fef6cd.safetensors
+z-image-effects/1775745276.230173-e847ac7e-df8b-4be4-9741-ae0f56c76166.safetensors
+z-image-effects/FilmPortrait_10.safetensors
+方向：B1 人像皮肤质感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+z-image-effects/Z-Image-Turbo_Sugar_Face_10.safetensors
+方向：B1 人像皮肤质感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+z-image-effects/Z-Image_SoftGlow_SemiRealPortrait_Style_v1.0_c1-st8000.safetensors
+方向：B1 人像皮肤质感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：SoftGlow_SemiRealPortrait_Style。 来源平台：modelscope。
+z-image-effects/Z-image绝对真人像写真_comfyui.safetensors
+z-image-effects/hentai_quality_studio_z_image_turbo.safetensors
+方向：B1 人像皮肤质感。 基座判定：原生（真 LoRA（，ai-toolkit 训练），170MB；license=apache-2.0，下载 26 / 1 like。）。 触发词：hentai_studio_quality / shiny skin。 来源平台：huggingface。
+z-image-effects/hs.safetensors
+z-image-effects/skin texture Photorealistic style v4.5.safetensors
+方向：B1 人像皮肤质感。 ⚠️ 「近似适用」（依据：与 lastremorse 同款同体积（170,127,808 B，文件名 'skin texture Photorealistic style v4.5' 含空格，resolve 直链已 percent-encode（302→200）。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+z-image-effects/skin texture v2.1.safetensors
+方向：B1 人像皮肤质感。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+东亚女性人像
+z-image-effects/97_z_image_v5_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：97。 来源平台：modelscope。
+z-image-effects/97_z_image_v5_25_comfyui.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（平台标注的基座模型为 ZImageTurbo）。 来源平台：civitai。
+z-image-effects/Asian-beauty-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+z-image-effects/Asian-girl-nvsheng-Z-Image-Turbo-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：nvsheng。 来源平台：modelscope。
+z-image-effects/Asian-girl-nvsheng-Z-Image-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：nvsheng。 来源平台：modelscope。
+z-image-effects/JK-nvsheng-Ely-Z-Image-Turbo-v1.0_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：jknv。 来源平台：modelscope。
+z-image-effects/StarFace1.0-Z-Image-Turbo.safetensors
+z-image-effects/XB_ZIMAGE_BASE_FACE_3_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+z-image-effects/XB_ZIMAGE_FACE7_10.safetensors
+z-image-effects/XB_ZIMAGE_FACE_8_10.safetensors
+z-image-effects/Z-Image-xianshirenxiang_25.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image@master']；Data.基座关系为 adapter）。 来源平台：modelscope。
+z-image-effects/Z-image-gjb_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：gjb。 来源平台：modelscope。
+z-image-effects/Z-image_LoRA_hgnn01_V5_c2-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：hgnn01。 来源平台：modelscope。
+z-image-effects/Z-imagemeinv29_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：beauty。 来源平台：modelscope。
+z-image-effects/Z-imagemeinv41_10.safetensors
+z-image-effects/Z-xhs888.safetensors
+方向：A1 东亚女性·小红书写实。 ⚠️ 「近似适用」（依据：无 README / 无 license / 无 base_model tag（质量信号偏弱）；权重结构为标准 LoRA，确为适配器。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+z-image-effects/Zmeinv_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image-Turbo@master']；Data.基座关系为 adapter）。 触发词：Zmeinv。 来源平台：modelscope。
+z-image-effects/a5e6b9eee6c7db701896e8fa9c7f817c.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（唯一同时具备 README + 显式 base_model:adapter:Tongyi-MAI/Z-Image-Turbo tag + 触发词的条目；权重为 kohya 格式 LoRA（标准 LoRA 权重 命名，含 alpha），140MB 真适配器。）。 触发词：Ana。 来源平台：huggingface。
+z-image-effects/asia-girl-nvsheng-Z-Image-v1.0_c1-st1000.safetensors
+z-image-effects/baihu-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image-Turbo@master']；Data.基座关系为 adapter）。 来源平台：modelscope。
+z-image-effects/baishang-xiaohua-rizinv-Z-Image-v1.0_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image@master']；Data.基座关系为 adapter）。 触发词：baihua。 来源平台：modelscope。
+z-image-effects/bd-nvsheng-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/cnstar_facelora_v1.safetensors
+z-image-effects/limuwan-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/liumei-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/liumei-meinv-Z-Image-v1.0_c1-st10000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 触发词：liumei。 来源平台：modelscope。
+z-image-effects/liyuegirl-Z-Image-Turbo_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：liyuegirl。 来源平台：modelscope。
+z-image-effects/meili-girl-Z-Image-Turbo-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：meili。 来源平台：modelscope。
+z-image-effects/meili-girl-Z-Image-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：meili。 来源平台：modelscope。
+z-image-effects/meinv-xiaolan-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/meinv-xiaolan-Z-Image-v1.0_c1-st10000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 触发词：xiaolan。 来源平台：modelscope。
+z-image-effects/naixi-girl-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/nana-RT-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/nanqiao-mote-Z-Image-Tongyi-MAI-v1.0_20.safetensors
+z-image-effects/nanqiao-mote-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/niannian2-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/ns-face-z-image-4_c1-st1000.safetensors
+z-image-effects/nvsheng-xiezhen-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/qingxin-yujie-Z-Image-Tongyi-MAI-v1.0_20.safetensors
+z-image-effects/qingxin-yujie-Z-Image-Turbo-v1.0_10.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image-Turbo@master']；Data.基座关系为 adapter）。 触发词：yujie。 来源平台：modelscope。
+z-image-effects/qingxiu-nvsheng-Z-Image-Turbo-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：qingxiu。 来源平台：modelscope。
+z-image-effects/qingxiu-nvsheng-Z-Image-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：qingxiu。 来源平台：modelscope。
+z-image-effects/tinger-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/tinger-meinv-Z-Image-v1.0_c1-st10000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 触发词：tinger。 来源平台：modelscope。
+z-image-effects/xll567.safetensors
+方向：A1 东亚女性·小红书写实。 ⚠️ 「近似适用」（依据：与 Asiangirl2 同作者同结构，。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+z-image-effects/yazhou-girl2-Z-Image-Turbo-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：yazhou。 来源平台：modelscope。
+z-image-effects/yazhou-girl2-Z-Image-v1.0_c1-st1000.safetensors
+方向：A2 东亚女性·日系/韩系写实。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：yazhou。 来源平台：modelscope。
+z-image-effects/yunxiao-meinv-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+z-image-effects/z-image-face-1_10.safetensors
+z-image-effects/z-image-face-2_10.safetensors
+东亚面孔精修
+z-image-effects/K2 Dichen Lachman (vrtlDichenLachman).safetensors
+方向：A6 东亚面孔精修系列(NexBlend)。 基座判定：原生（下载量 335853 / 174 like，本批唯一有真实社区体量的条目，license=apache-2.0。架构混杂：1502 个 ZI 是 z-image 架构（权重结构为标准 LoRA，键名结构已核对），2 个 K2 是 Krea-2 架构（权重结构为标准 LoRA，键名结构已核对，元数据标注的架构为 Krea-2/lora）——K2 两个不能直接挂到本机 z-image 基座上。按体积排序的主文件恰好是 K2 架构文件，故另附 架构示例文件 供选型。）。 触发词：vrtlShinJaeEun / vrtlYunjinKim。 来源平台：huggingface。
+z-image-effects/NexBlend Asian 02 Face ZIT.safetensors
+方向：A6 东亚面孔精修系列(NexBlend)。 基座判定：原生（平台标注的基座模型为 ZImageTurbo）。 触发词：nexblend。 来源平台：civitai。
+z-image-effects/NexBlend Asian 06 ZIT.safetensors
+z-image-effects/NexBlend Asian Face 01 ZIT.safetensors
+方向：A6 东亚面孔精修系列(NexBlend)。 基座判定：原生（平台标注的基座模型为 ZImageTurbo）。 来源平台：civitai。
+影棚 / 摄影感
+z-image-effects/Z-image_2-LORA_c1-st8000.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 来源平台：modelscope。
+z-image-effects/gta6_amateur_photography_zimagebase_v2.safetensors
+方向：B2 影棚/摄影感。ComfyUI 需支持 LoKR 的加载器（如 kohya/ComfyUI-LoRA-Loader 带 LoKR），标准 LoRA loader 可能直接报 key 不匹配。文件名含 zimagebase 字样，暗示基座为 Z-Image Base。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+z-image-effects/hanmo-yujie-Z-Image-Turbo-v1.0_c1-st1000.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：hanmo。 来源平台：modelscope。
+z-image-effects/hanmo-yujie-Z-Image-v1.0_c1-st1000.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：hanmo。 来源平台：modelscope。
+z-image-effects/hannv-yeonwoo-Z-Image-v1.0_c1-st1000.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image']; 视觉基座为 Z_IMAGE_TURBO）。 触发词：hannv。 来源平台：modelscope。
+z-image-effects/yeonwoo-Korea-Z-Image-Turbo-Tongyi-MAI-v1.0_10.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（基座模型为 ['Tongyi-MAI/Z-Image-Turbo']; 视觉基座为 Z_IMAGE_TURBO）。 来源平台：modelscope。
+z-image-effects/z-image-char-ai_10.safetensors
+z-image-effects/z-image-char-erika_10.safetensors
+z-image-effects/z-image-char-rina_10.safetensors
+z-image-effects/z-image-char-yuyika_10.safetensors
+z-image-effects/z-image-jk-style_10.safetensors
+z-image-effects/z-image-mmm_10.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image@master']；Data.基座关系为 adapter）。 来源平台：modelscope。
+z-image-effects/z-image-person123_c1-st10000.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（模型卡头部标注的视觉基座为 None；基座模型为 ['Tongyi-MAI/Z-Image']；Data.基座关系为 adapter）。 触发词：id_21year_old_woman。 来源平台：modelscope。
+z-image-effects/z-image-qngjiu.safetensors
+方向：B2 影棚/摄影感。 基座判定：原生（模型卡头部标注的视觉基座为 Z_IMAGE_TURBO；平台属性记录的视觉基座为 Z_IMAGE_TURBO；基座关系为 adapter（作者 模型卡头部 写 base_model: undefined，但平台 视觉基座 明确标 Z_IMAGE_TURBO））。 触发词：qing。 来源平台：modelscope。
+滑杆 / 方向控制
+z-image-effects/zimage_asianslider.safetensors
+方向：A5 族裔/骨相滑杆。 ⚠️ 「近似适用」（依据：体积仅 21.3MB（rank 远小于常见的 32；training step=25 严重欠训，效果可信度低。）—— 非该基座原生训练，效果与兼容性未在本机验证。 来源平台：huggingface。
+其它效果 LoRA
+Kook_Zimage_如梦似幻.safetensors
+梦幻朦胧/柔光滤镜风格，官方 tags 标注为「滤镜lora」。
+Kook_Zimage_瑶光.safetensors
+写实向「真实幻想」质感，官方 tags 标注为「瑶光 / 真实幻想」。
+dejpeg_v3.safetensors
+针对 JPEG 压缩伪影的修复型效果 LoRA（patch UNet 主干层）。
+z-image-effects/1770636596.687291-4bd6f72c-5a2d-454a-b88c-14d459b72909.safetensors
+原神、角色立绘、二次元（Z-Image-i2L 画廊产物）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/1772267368.452525-015b06cb-f04c-4f0f-abfb-b6356a2e446c.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：ModelScope。触发词未标注。许可：Apache License 2.0。
+z-image-effects/1773899915.1415-697784e8-9c2e-443c-9ae5-1a524765f848.safetensors
+z-image-effects/1792976219.699888-1e31568e-3a1c-4ceb-b34e-9a332209fe6b.safetensors
+z-image-effects/1S4B3L.safetensors
+每文件自带触发词（本条为 1S4B3L）。作者明示强度 0.9–1.1，并要求 prompt 里必须写 'a woman' 以避免出男性。
+z-image-effects/80s_air_brush_style_v2_z_image_turbo.safetensors
+80 年代喷枪 / airbrush 插画，柔和渐变 + 复古海报感。
+z-image-effects/AF_Mecharashi_AlenaVera_ZIT.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image、RentCivit、Rent、Sell、SellMerge / 免署名=是 / 允许衍生=是。
+z-image-effects/AF_Mecharashi_AudreyBluecher_ZIT.safetensors
+z-image-effects/AF_Mecharashi_AynisNewman_ZIT.safetensors
+z-image-effects/AF_Mecharashi_RosaDiazJudgment_ZIT.safetensors
+z-image-effects/AWPortrait-Z.safetensors
+去高频噪点、压 HDR、提对比与饱和，扩多族裔面孔。写实人像首选。
+z-image-effects/BarbaraGun_ZIT.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=RentCivit / 免署名=是 / 允许衍生=否。作者 CitronLegacy；``，step 400 / epoch 35。属「枪版芭芭拉」梗图向角色 LoRA。
+z-image-effects/CYBORG FACTORY 🦾 BY STX_epoch_13.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：Civitai。触发词来源：上游模型卡。许可：Civitai 三元许可：可商用=RentCivit / 免署名=是 / 允许衍生=是。
+z-image-effects/Caricature_01.safetensors
+caricature 漫画化。头像 / 表情包。
+z-image-effects/Classic_Painting_Z_Image_Turbo_v1_renderartist_1750.safetensors
+扬·范·艾克式油画质感（厚涂、笔触、棕色调），宗教 / 肖像题材。
+z-image-effects/Coloring_Book_Z_Image_Turbo_v1_renderartist_2000.safetensors
+黑白线稿涂色页风格。儿童线稿 / printable 素材。
+z-image-effects/HeightSlider.safetensors
+滑杆型。作者未给区间。
+z-image-effects/MoonlightCAT_ZIT.safetensors
+作者未给触发词（触发词字段为空）。示例 prompt 为 'masterpiece, best quality, anime coloring, anime screencap'。
+z-image-effects/Mystic-XXX-ZIT-V6.safetensors
+Mystic-XXX 系列的 V6 版本。作者未给触发词与强度区间。
+z-image-effects/Mystic-XXX-ZIT-V7.safetensors
+作者未给触发词与强度区间。
+z-image-effects/NSFW_master_ZIT_000008766.safetensors
+作者明示无触发词、推荐权重 0.8。⚠️ 同作者的 FLUX 版同名文件不是同一基座，不可混用。
+z-image-effects/NSFW_master_ZIT_000017532.safetensors
+z-image 生态下载量最高的通用 NSFW 效果 LoRA（作者明示无触发词，靠自然语言描述命中）。⚠️ 同作者的 FLUX 版同名文件不是同一基座，不可混用。
+z-image-effects/Olympus.safetensors
+早期紧凑机 CCD 色彩、闪光夜景噪点。夜景 / 怀旧数码。
+z-image-effects/PhysioShade_LoraZIT_Enhancer.safetensors
+触发词 physioshade。作者明示两档：通用自然 0.7–0.85，材质与微细节最大影响 0.85–1.0。
+z-image-effects/Pornmaster_v1_000043500.safetensors
+作者明示触发词 pronmstr、强度 0.7–0.85，另附 SHIFT 2.5 / 16–30 步 / Euler Beta / 1–1.1MP 分辨率。
+z-image-effects/RadianceChromeVoluptuous_z-image_turbo_v2.0.safetensors
+镜面铬金属光泽、体积感高光。金属 / 未来感人物。
+z-image-effects/RaidenShogun_raw3000.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可：可商用=RentCivit / 免署名=是 / 允许衍生=是。``。
+z-image-effects/RealisticSnapshot-Zimage-Turbov5.safetensors
+z-image-effects/Saturday_Morning_Z_Image_Turbo_v1_renderartist_1500.safetensors
+美式 80s 电视动画卡通，扁平色块 + 粗描边。
+z-image-effects/SkinnyFatSlider-ZIT.safetensors
+z-image-effects/Slender_Slider_V4-ZIT.safetensors
+z-image-effects/Technically_Color_Z_Image_Turbo_v1_renderartist_2000.safetensors
+高饱和复古胶片调色 + 戏剧光，仿 60–70 年代影调。
+z-image-effects/XB_ZIMAGE_TURBO_CG_16.safetensors
+CG 游戏画风（写实向游戏 CG / 角色宣传图质感）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_ECY_V2_16.safetensors
+二次元画风 V2（日系动画渲染向）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_ECY_V3_c1-st10000.safetensors
+二次元画风 V3 · 治愈系插画。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_FJ_V2_20.safetensors
+Z-image Turbo 风景 v2 (XB_ZIMAGE_TURBO_FJ_V2)。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_LHHF_V2_10.safetensors
+角色立绘画风 V2（游戏角色立绘 / 宣传立绘）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_SC_10.safetensors
+水彩画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_YS_V1_10.safetensors
+原神画风（Z-Image-Turbo 专项）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`；但该 LoRA 以原神角色美术为训练素材，是风格模仿，权重许可 ≠ 原神美术素材的商用授权，商用前需自行评估版权风险。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/XB_ZIMAGE_TURBO_YS_V1_20.safetensors
+Z-image Turbo 原神画风 (XB_ZIMAGE_TURBO_YS_V1)。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 B】。触发词未标注。许可：Apache License 2.0（ModelScope `License` 字段 + 模型卡头部 `license:`）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/Z-Breast-Slider.safetensors
+滑杆型（正负 strength 有意义）。作者未给区间。
+z-image-effects/Z-Image-Turbo_Style_GuoMan3D_Mugi_v2.0_c1-st8000.safetensors
+国漫 3D 风格（中式国漫三维渲染）。【非米哈游 IP（风格族邻接替代条目）；魔搭申请制（实测可直下）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/Z-Image-Turbo_Style_RainyImmortalCourtyard_3DGuoMan_Mugi_v1.0_c1-st10000.safetensors
+雨夜仙庭 · 国漫 3D（幻想国风仙侠三维渲染）。【非米哈游 IP（风格族邻接替代条目）；魔搭申请制（实测可直下）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/Z-Image_360.safetensors
+360° 全景图。VR 看房 / 虚拟看房 / 全景插画。
+z-image-effects/ZIT feet.safetensors
+触发词 zitfet，另有 feet / barefoot / soles 等 20 余个辅助标签。作者明示强度 1。
+z-image-effects/ZIT_Makeup_Slider_v1.safetensors
+z-image-effects/ZImage1HST.safetensors
+普金彩色老照片（Prokudin-Gorsky 三色曝光），复古纪实。
+z-image-effects/ZImageDadadoll_000003600.safetensors
+构成主义 / 达达主义玩偶人像（Ekster、Taeuber-Arp 风格）。
+z-image-effects/Z_Image_NSFW_Unlocked_V1.safetensors
+触发词 nude。作者未给强度区间。
+z-image-effects/Zimage_pencil_sketch.safetensors
+铅笔 / 彩铅素描速写。手绘稿、概念草图。
+z-image-effects/[ZImage.Turbo]LineArt_Redmond.safetensors
+黑白线稿动画风（Lineart / 动漫线稿）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/anal.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitan。作者未给强度。
+z-image-effects/b3tterbreast.safetensors
+触发词 breasts / large / medium / small。作者明示强度 0.7–0.9。
+z-image-effects/babe_loraholic.safetensors
+z-image-effects/bare feet soles v2.safetensors
+触发词 zitsole，另有 foot focus / soles / toes 等辅助标签。作者明示强度 1。
+z-image-effects/bust_slider.safetensors
+z-image-effects/cameltoe.safetensors
+触发词 zitcamelt / cameltoe。作者明示强度 1。
+z-image-effects/carry.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitstanding。作者未给强度。
+z-image-effects/cowgirl.safetensors
+EasonnLi 10 件套 pack 成员。该版本 训练词列表为空。作者未给强度。
+z-image-effects/cum on body Z.safetensors
+触发词 cum on body。作者未给强度区间。
+z-image-effects/cum.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitcum。作者未给强度。
+z-image-effects/dark-art-style-zit.safetensors
+触发词 dark-art-style-zit。作者未给强度区间。
+z-image-effects/doggy.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitdos。作者未给强度。
+z-image-effects/dott-v2-zimage_10.safetensors
+物件堆叠 / 杂乱室内细节强化。场景概念图。
+z-image-effects/femboy_ZIT_.safetensors
+触发词 androgynous femboy / penis / bulge。作者未给强度区间。
+z-image-effects/flat-cartoon-zimage_10.safetensors
+白底全身角色设定图、扁平卡通。角色立绘 / 设定稿。
+z-image-effects/flat.safetensors
+z-image-effects/ghibli_zimage_finetune.safetensors
+吉卜力动画背景 / 角色（水彩背景 + 柔和线条）。
+z-image-effects/grainscape_zimage.safetensors
+颗粒感写实质感。街拍 / 胶片风。
+z-image-effects/lenovo_z.safetensors
+消费级相机直出质感的写实人像。
+z-image-effects/lostark_v1.safetensors
+3D 网游角色 / 装备概念图。游戏立项、角色设计。
+z-image-effects/lowwaistv2-zit.safetensors
+触发词 lowwaistv2-zit。作者未给强度区间。
+z-image-effects/mecha-2_c1-st1000.safetensors
+z-image-effects/mechaVector_v1.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可：可商用= / 免署名=是 / 允许衍生=否。
+z-image-effects/missionary.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitmissi；训练词本身即最优 prompt 模板。作者未给强度。
+z-image-effects/modern_anime_z_image_comfyui.safetensors
+日系现代动漫风格。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/mystic-xxx-zit-v4.safetensors
+触发词 mystic-xxx-zit-v4。作者未给强度区间。
+z-image-effects/new_mecha_klein4b.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：HuggingFace。触发词未标注。许可：未标注。
+z-image-effects/nnegrat-linnai.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``，step 3000 / epoch 49。作者 nnegret；同时带厚涂 2.5D 画风副作用。
+z-image-effects/nnegrat_ZImage-莫宁-2240.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=Image/RentCivit / 免署名=否 / 允许衍生=是。作者把二次元角色重塑为写实 CG，底模 Z-Image-Turbo。同一 Civitai 条目的 `nnegrat_Flux-莫宁-2240.safetensors` 是 Flux 权重（键前缀 `lora_unet_double_blocks_*`），「不属本基座」，不计入。
+z-image-effects/nnegret_zit_wuwa_chisa_000001120.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``，step 1120 / epoch 16；体积约为同系列 2 倍。
+z-image-effects/nnegret_zit_wuwa_sigrika_2560.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。文件内 ``。
+z-image-effects/nnegret_zit_wuwa_yangyang_2240.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``，step 1120 / epoch 20。
+z-image-effects/nsfw-zit.safetensors
+触发词 nsfw-zit。作者未给强度区间。
+z-image-effects/nsfwv2-zit.safetensors
+触发词 nsfwv2-zit。作者未给强度区间。
+z-image-effects/pixel_art_style_z_image_turbo.safetensors
+通用像素画。游戏资产、8/16-bit 场景与图标。
+z-image-effects/pov_bj_01.safetensors
+触发词 bj。作者未给强度区间。
+z-image-effects/pussy-zimage-v1_000026000.safetensors
+z-image-effects/pytorch_lora_weights.safetensors
+通用写实向增强（作者标为 lightweight）。提升材质与光影真实度。
+z-image-effects/qinglong_detailedeye_z-imageV2comfy.safetensors
+虹膜 / 瞳孔 / 睫毛细节强化。人像特写。
+z-image-effects/real breast epo 7-zit-gmr.safetensors
+触发词 rbz。作者未给强度区间。
+z-image-effects/reverse-cowgirl.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitrecowg。作者未给强度。
+z-image-effects/rtmi-zimage_10.safetensors
+白底胸像角色卡。角色设定 / 头像素材。
+z-image-effects/silverwolf.safetensors
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可受限 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF `license: other` → `license_name: fair-use-academic-noncommercial`（学术/非商用）。ai-toolkit + `zimage_turbo_training_adapter_v2`；HF 标签 `base_model:adapter:Comfy-Org/z_image_turbo`。「非官方/授权不明」（同人二次创作）。HF 侧 dl=0 / likes=0，属新发布条目。
+z-image-effects/sparkle-z-v3.safetensors
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重 / 触发词缺失）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（作者字段为空，以平台三元勾选为准）。``，ai-toolkit 训练，step 11000 / epoch 74。
+z-image-effects/spooning.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zitsp。作者未给强度。
+z-image-effects/tits-job.safetensors
+EasonnLi 10 件套 pack 成员。触发词 zittitsj。作者未给强度区间。
+z-image-effects/turbopussyzit-v2.safetensors
+文件名含 turbo 但「不是加速 LoRA」 —— 作者做的是 NSFW 姿态/部位效果，base_model 标签为 Z-Image-Turbo。触发词 turbopussyzit-v2。
+z-image-effects/vintage_comic_style_lora.safetensors
+丝网印刷质感、粗黑描边 + 半调网点。复古漫画封面。
+z-image-effects/wuwaams_lora_v1.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。``（作者沿用默认名）。标题里的 “z-image-turbo” 指底模，不是加速 LoRA。
+z-image-effects/z-image-turbo-brazilian-male-realism-lora-v2-bf16.safetensors
+触发词 BRZMLRELSM。作者明示 0.5–1.0：越接近 0.5 越接近基座，越接近 1.0 干预越强。
+z-image-effects/z-image-yuanshan1_c1-st6000.safetensors
+z-image-原神1 (z-image-yuanshan1)。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache-2.0（README「开源协议：Apache-2.0」）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+z-image-effects/z_image_arcane_v1.safetensors
+DeverStyle 画风合集之一：地狱城 / 暗黑奇幻。IP 风格化。
+z-image-effects/z_image_blue_eye_samurai.safetensors
+DeverStyle 画风合集之一：蓝眼武士式日式动画厚涂。
+z-image-effects/z_image_dan-mumford_style.safetensors
+DeverStyle 画风合集之一：Dan Mumford 式暗黑史诗插画。
+z-image-effects/z_image_turbo_ReversalFilmGravure_v2.0.safetensors
+反转片 / 模拟胶片质感（v2 为用户反馈修正版）。
+z-image-effects/z_image_turbo_childrens_drawings.safetensors
+儿童蜡笔画风（ostris 出品，训练适配性好）。手作 / 童趣插画。
+z-image-effects/zimageturbo_Sunbleach_Photograph_Style_Lora_TAV2_000002500_(recommended).safetensors
+晒白 / 暖调宝丽来。作者指定 2500 步档为推荐档。
+z-image-effects/zit-deepthroat-31epoc-k3nk.safetensors
+作者未给触发词（模型卡未标注触发词字段）。
+imgLoraAdd
+imgLoraNote
+imgLoraExcluded
+musicPanel
+musicModelHint
+musicModelSelect
+yue2_3b_bf16
+musicModelNote
+musicModelWarn
+musicEncoderField
+musicEncoderSelect
+sheetsage2_bf16
+musicEncoderNote
+field prompt-field
+musicPromptField
+prompt-badge
+musicPromptBadge
+ph-open-btn
+查看这个面板用过的历史提示词
+musicPrompt
+一首关于雨夜告别的日语慢歌，钢琴加弦乐，副歌要爆发
+prompt-enhance-bar
+enhance-split
+musicEnhanceSplit
+enhance-btn enhance-btn-main
+musicEnhanceBtn
+调用本地模型生成结构化风格与歌词
+M8 1.5l1.6 3.9 4.4.4-3.3 2.9 1 4.3L8 10.9l-3.7 2.1 1-4.3L2 5.8l4.4-.4z
+musicEnhanceBtnText
+enhance-btn enhance-btn-caret
+musicEnhanceMenuBtn
+menu
+选择增强方式
+11
+M4 6l4 4 4-4
+1.8
+enhance-menu
+musicEnhanceMenu
+enhance-current
+musicEnhanceCurrent
+enhance-applied-params
+musicEnhanceAppliedParams
+enhance-hint
+musicEnhanceHint
+musicStyleStructField
+musicStyleFieldsToggle
+music-toggle
+musicStyleFields
+music-sf-grid
+musicStyleFieldsGrid
+music-sf-item
+music-sf-label
+musicSF_language
+English
+Mandarin
+Cantonese
+Japanese
+Korean
+Spanish
+French
+Portuguese
+German
+Italian
+Hindi
+(custom / none)
+musicSF_genre
+pop
+piano pop
+indie pop
+synth pop
+dance pop
+r&b
+soul
+funk
+nu-disco
+disco
+house
+edm
+hip hop
+trap
+rap
+rock
+indie rock
+alternative rock
+punk
+metal
+jazz
+jazz-funk
+bossa nova
+latin
+reggaeton
+country
+folk
+indie folk
+singer-songwriter
+acoustic
+gospel
+blues
+lo-fi
+dream pop
+shoegaze
+ambient
+cinematic
+film score
+classical crossover
+k-pop
+j-pop
+city pop
+c-pop
+afrobeats
+reggae
+ska
+musicSF_mood
+(none)
+uplifting
+euphoric
+romantic
+intimate
+melancholic
+bittersweet
+dark
+aggressive
+playful
+nostalgic
+dreamy
+chill
+anthemic
+mysterious
+musicSF_vocal
+(instrumental / no lead vocal)
+female vocal
+male vocal
+androgynous vocal
+duet male and female
+choir / stacked vocals
+rap lead
+spoken word
+musicSF_vocal_color
+warm
+bright
+breathy
+powerful
+raspy
+soft intimate
+belting
+tenor
+baritone
+soprano
+alto
+musicSF_instruments
+musicSF_tempo_bpm
+220
+musicSF_energy
+low energy
+mid energy
+high energy
+builds from quiet to loud
+musicSF_length_hint
+model decides
+short clip (~45-75s)
+single edit (~2-3 min)
+full song (~3.5-5 min)
+very long (may truncate)
+musicSF_extra
+musicSF_custom_language
+musicSF_custom_genre
+musicStyleStructNote
+musicStyleFieldsPreview
+musicLyrics
+[Verse]
+Morning light across the window
+City waking down below
+
+[Chorus]
+Run with me into the sunlight
+Leave the shadows far behind
+musicRefField
+musicRefBox
+musicRefPick
+musicRefNote
+musicModeHint
+musicPlanChips
+full
+melody
+musicPlanNote
+musicStepsVal
+musicSteps
+musicCfgVal
+musicCfg
+musicSamplerSelect
+ddpm_uniform
+musicSchedulerSelect
+musicFormatChips
+flac
+mp3
+opus
+musicSeed
+随机
+musicAdvancedBox
+margin-top:8px
+musicTempVal
+musicTemp
+musicTopPVal
+musicTopP
+0.95
+musicTopKVal
+musicTopK
+500
+musicRepVal
+musicRep
+musicAdvNote
+continuation-panel
+continuationPanel
+promptField
+promptEnhancedBadge
+prompt
+描述画面…支持多镜头分镜写法
+enhanceSplit
+enhanceBtn
+按所选模板把提示词扩写成完整描述
+enhanceBtnText
+enhanceMenuBtn
+enhanceMenu
+enhance-menu-item checked
+basic
+enhance-menu-check
+enhance-menu-label
+普通增强
+enhance-menu-spec-wrap
+enhance-menu-spec-row
+该项使用的增强模板
+enhance-menu-spec-label
+enhance-menu-spec
+video-director
+enhance-menu-hint
+enhance-menu-item
+refine
+把提示词里的每一个物体/要素逐个枚举并逐个细化（通用能力，各面板都可用）
+二次增强
+director
+按 MiniMax-H3 官方三段式（画面时间线 / 整体声景 / 非剧情音乐）写导演稿
+视频导演提示词
+enhance-menu-item unavailable
+生成 MOSS Layout JSON（对象清单 + 位置坐标），并翻译成最终文本提示词
+结构化增强（layout）
+enhance-menu-badge why
+yue2_struct
+把描述拆成 YuE2 的结构化风格字段（语言/曲风/情绪/人声/乐器/BPM/能量/意象）并生成配套歌词
+YuE2 结构化风格 + 歌词
+qwen_pe
+用 Qwen-Image 2.1 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑各一档）
+qwen21图片官方增强PE
+enhance-menu-fields
+enhance-menu-field-row
+enhance-menu-field-label
+官方 PE 扩写所用的指令原文。编辑后，扩写与出图共用这一份文本。
+enhance-menu-field
+systemPrompt
+官方 PE 档位参数：文生图 1.5 / 图片编辑 0。选中即自动套用，可再改。
+presencePenalty
+官方 PE 档位参数：文生图 16256 / 图片编辑 24000。不能压到 4096（会静默返回空串）。
+maxNewTokens
+16256
+h3image_pe
+用 MiniMax H3-Image 官方 PE 权重与官方 system prompt 扩写（文生图 / 图片编辑）
+H3-Image 官方增强PE
+enhanceCurrent
+enhanceAppliedParams
+enhance-hint ok
+enhanceHint
+prompt-refine-bar
+refineBar
+refine-target-group
+refineTargetGroup
+refine-label
+refineTargetChips
+还没有一次增强的结果
+refine-history-btn
+promptVersionBtn
+查看原始 / 一次增强 / 二次增强 各版本
+prompt-refine-bar moss-layout-bar
+mossLayoutBar
+mossLayoutIntent
+moss-layout-intent
+画面意图补充（可选），例如：海报风格，文字要醒目
+mossLayoutViewBtn
+查看上一次的结构化增强产物
+gen-btn
+genBtn
+提交到生成队列（可连续提交多个任务）
+seedField
+seed
+panel stitch-panel page-hidden
+stitchPanel
+stitch-heading
+longfilmTitle
+120
+例如：敦煌飞天舞蹈短片
+longfilmIntro
+1000
+简单介绍这部长片的内容
+stitch-drop
+stitchDrop
+stitch-candidates-wrap
+stitchCandidatesWrap
+stitch-candidates-head
+stitchCandidatesCount
+stitch-candidates
+stitchCandidates
+stitch-list
+stitchList
+stitch-summary
+stitchSummary
+stitchBtn
+jobs-area
+jobsArea
+jobs-head
+jobs-tabs
+all
+done
+failed
+canceled
+jobs-tabs jobs-type-tabs
+genTypeTabs
+tabs-label
+首尾帧生成
+参考图生成
+Z-IMAGE 文生图
+Qwen-Image 2.1 文生图
+Qwen-Image 2.1 图片编辑
+MOSS-Image 文生图
+H3-Image 文生图
+H3-Image 图片编辑
+文生音乐
+参考生音乐
+__other__
+其它生成
+jobs-tools
+doneFilters
+search-box
+m10.5 10.5 3 3
+doneSearch
+search
+搜索提示词、任务 ID
+doneMedia
+作品类型
+audio
+doneAspect
+画面比例
+doneDuration
+作品时长
+14
+20
+30
+45
+filter-reset
+doneFilterReset
+jobs-tools page-size-tools
+page-size-label
+pageSizeSelect
+每页作品数
+24
+48
+mediaManageBtn
+清理本工作台的生成媒体库产物
+queue-panel
+queuePanel
+生成队列
+queue-head
+queue-title
+queue-summary
+queueSummary
+queue-toggle
+queueToggle
+展开队列明细
+queue-list
+queueList
+queue-item is-recent
+ce32cfcfd933
+queue-pos
+queue-label
+queue-prompt
+教室里的日常，少女走上讲台（接续段）
+queue-state
+09ce9f6db98f
+838c11df13f9
+教室里的日常，少女走上讲台
+9dd500595f26
+111265fb9eec
+7d3e5525f285
+96b0ec5977e7
+5e1e9465866e
+506ccbf9d0b1
+148cf8918627
+649d5636ba3a
+ac45151699b2
+jobs-grid
+jobsGrid
+grid-template-columns: repeat(3, minmax(0px, 1fr));
+job-card
+整张卡片可拖到左侧长片拼接区
+ce32cfcfd933|done|100|节点 9/20|videos/v-h3-studio-000852.mp4|
+job-top
+job-preview
+/files/videos/v-h3-studio-000852.mp4
+metadata
+job-meta
+row
+默认（PyTorch 稠密注意力） · 速度最慢
+row-group gen-params
+MiniMax-H3 混合版 · FL2VA+Ref2VA
+未使用 LoRA
+4 · 1
+1280×736
+5s
+20261206
+row prompt-row
+点击查看并复制完整提示词
+job-actions
+download
+continue
+把这一段的全部配置回填到左侧，接着写下一段提示词继续生成（当前累计 5.167s）
+reuse
+detail
+查看完整生成参数
+delete
+danger
+09ce9f6db98f|done|100|节点 13/24|videos/v-h3-studio-000851.mp4,videos/v-h3-studio-000850.mp4|
+/files/videos/v-h3-studio-000851.mp4
+把这一段的全部配置回填到左侧，接着写下一段提示词继续生成（当前累计 9s）
+838c11df13f9|done|100|节点 9/20|videos/v-h3-studio-000849.mp4|
+/files/videos/v-h3-studio-000849.mp4
+20261205
+9dd500595f26|done|100|节点 9/20|videos/v-h3-studio-000848.mp4|
+/files/videos/v-h3-studio-000848.mp4
+111265fb9eec|done|100|节点 13/24|videos/v-h3-studio-000847.mp4,videos/v-h3-studio-000846.mp4|
+/files/videos/v-h3-studio-000847.mp4
+7d3e5525f285|done|100|节点 9/20|videos/v-h3-studio-000845.mp4|
+/files/videos/v-h3-studio-000845.mp4
+20261204
+96b0ec5977e7|done|100|节点 9/20|videos/v-h3-studio-000844.mp4|
+/files/videos/v-h3-studio-000844.mp4
+5e1e9465866e|done|100|节点 13/24|videos/v-h3-studio-000843.mp4,videos/v-h3-studio-000842.mp4|
+/files/videos/v-h3-studio-000843.mp4
+506ccbf9d0b1|done|100|节点 9/20|videos/v-h3-studio-000841.mp4|
+/files/videos/v-h3-studio-000841.mp4
+20261203
+148cf8918627|done|100|节点 9/20|videos/v-h3-studio-000840.mp4|
+/files/videos/v-h3-studio-000840.mp4
+649d5636ba3a|done|100|节点 14/24|videos/v-h3-studio-000839.mp4,videos/v-h3-studio-000838.mp4|
+/files/videos/v-h3-studio-000839.mp4
+ac45151699b2|done|100|节点 20/20|videos/v-h3-studio-000837.mp4|
+/files/videos/v-h3-studio-000837.mp4
+20261202
+jobs-pagination
+jobsPagination
+<button data-page="0" disabled>上一页</button><button data-page="1" class="active">1</button><button data-page="2" class="">2</button><span class="page-summary">…</span><button data-page="87" class="">87</button><button data-page="2" >下一页</button><span class="page-summary">共 1043 个作品</span>
+page-summary
+87
+assets-page page-hidden
+assetsPage
+al-head
+al-title
+al-title-sub
+al-sub
+alStats
+al-actions
+al-selbar
+alSelBar
+al-selcount
+alSelCount
+al-btn
+alSelClear
+alSelAll
+alSelPlayer
+al-btn danger
+alSelDelete
+alMultiToggle
+alTrashBtn
+alRefBtn
+alPlayerBtn
+al-btn primary
+alUploadBtn
+M8 11V3m0 0L5 6m3-3 3 3M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10
+file
+alFileInput
+image/*,video/*,audio/*,.json,.md,.txt,.srt,.vtt
+al-toolbar
+alSearch
+搜索名称、标签、备注或分析文本
+al-chips
+alCatChips
+al-chip active
+al-chip 
+doc
+workflow
+other
+al-tagpick
+alTagPick
+alTagToggle
+al-tagpick-menu
+alTagMenu
+alSource
+来源
+upload
+job_output
+import
+comfy_workflow
+alSort
+排序
+created_desc
+created_asc
+size_desc
+size_asc
+name_asc
+al-drop
+alDrop
+al-upload-opts
+al-input
+alUploadTags
+上传时打标签（逗号分隔），例：原神中的角色雷神三视图
+alUploadNote
+备注（可选），例：第1集定妆照
+al-uploads
+alUploads
+al-grid
+alGrid
+alPager
+al-drawer-mask
+alDrawerMask
+al-drawer
+alDrawer
+素材详情
+al-drawer-head
+al-drawer-close
+alDrawerClose
+关闭
+al-drawer-body
+alDrawerBody
+al-player-overlay
+alPlayer
+al-player-panel
+dialog
+素材播放器
+al-player-head
+al-player-tabs
+alPlayerTabs
+alPlayerClear
+alPlayerClose
+al-player-body
+alPlayerBody
+al-player-note
+alPlayerNote
+prompt-modal
+mediaManageModal
+prompt-dialog detail-dialog
+mediaManageTitle
+prompt-dialog-head
+mediaManageClose
+detail-body
+detail-section
+detail-section-title
+mg-scope-list
+mgScopeList
+mg-scope
+radio
+mgScope
+older
+mgMonths
+要清理多少个月之前的历史产物
+mg-unit
+mg-preview
+mgPreview
+prompt-dialog-actions
+document.getElementById('mediaManageClose').click()
+mgRunBtn
+al-picker-mask
+alPickerMask
+al-picker
+选择素材
+al-picker-head
+al-picker-tools
+flex:1 1 200px
+alPickerSearch
+搜索素材名称
+al-picker-body
+alPickerBody
+al-picker-foot
+alPickerFoot
+al-context
+alContext
+ctx-menu
+mediaContext
+system-page page-hidden
+systemPage
+sys-head
+sys-title
+sys-sub
+sysSub
+sys-refresh
+sysRefresh
+sys-grid
+sysGrid
+system-page providers-page page-hidden
+providersPage
+provSub
+provRefresh
+prov-toolbar
+prov-defaults
+provDefaults
+prov-add-btn
+provAddBtn
+prov-list
+provList
+sys-card prov-card
+sys-card-title
+badge
+prov-agent
+provAgent
+agent-row
+agent-field
+agentSpec
+image-refine
+image-scalist
+image-bbox
+yue2-style
+music-refine
+qwen21-pe-t2i
+qwen21-pe-i2i
+moss-image
+h3image-pe-t2i
+h3image-pe-i2i
+agentLength
+short
+medium
+long
+agentSampling
+sample
+greedy
+agentMaxTokens
+256
+65536
+32768
+agent-save
+agentSave
+agent-hint
+agent-dims
+agent-dim
+agent-field block
+agentSys
+agentUser
+agent-page page-hidden
+agentPage
+ag-drawer-backdrop
+agDrawerBackdrop
+ag-drawer
+agDrawer
+ag-drawer-head
+ag-drawer-title
+ag-drawer-close
+agDrawerClose
+关闭会话列表
+ag-drawer-new
+agDrawerNew
+ag-session-search
+agSessionSearch
+搜索会话…
+搜索会话
+ag-session-list
+agSessionList
+ag-session-item
+0694cc2bd5b8482d
+请调用工具 remember_preference（参数：{"key": "au
+ag-session-item-title
+ag-session-item-preview
+ag-session-item-meta
+ag-session-item-time
+ag-session-item-created
+ag-session-item-count
+ag-session-status ag-badge ag-badge-ok
+ag-session-del
+delete-session
+删除这个交互
+a1ce373f620c4184
+请调用工具 tag_asset（参数：{"asset_id": "asset_d
+5117036a05ad474f
+请调用工具 delete_asset（参数：{"asset_id": "asse
+aeaec80bf75640e0
+请调用工具 upload_asset（参数：{"path": "no/such/
+00caa2ff57cd4825
+请调用工具 retry_job（参数：{"job_id": "no_such_j
+ac03daa70843463f
+请调用工具 cancel_job（参数：{"job_id": "no_such_
+d9eb2bbe4b4f4f99
+请调用工具 batch_create_jobs（参数：{"jobs": [{"m
+ag-session-item-arts
+该会话创建的任务数（每个任务产出一个作品）
+cccb36470dc845be
+请调用工具 create_job（参数：{"mode": "t2v", "pro
+b0359e22d0d64d06
+请调用工具 respond（参数：{}）。只调用这一个工具，拿到结果后用 res
+d085f403114d4010
+请调用工具 run_code（参数：{}）。只调用这一个工具，拿到结果后用 re
+00a167497ece4319
+请调用工具 media_merge_av（参数：{}）。只调用这一个工具，拿到结
+ag-session-status ag-badge ag-badge-warn
+db97019433ff497c
+请调用工具 media_mix_audio（参数：{}）。只调用这一个工具，拿到
+51ed60c0f65340ba
+请调用工具 media_extract_frames（参数：{}）。只调用这一个
+1639f8e5a0454bde
+请调用工具 media_transcode（参数：{}）。只调用这一个工具，拿到
+a26371686e034b6b
+请调用工具 media_concat（参数：{}）。只调用这一个工具，拿到结果后
+159acef5d52549a2
+请调用工具 media_probe（参数：{"asset_id": "asset
+c7b5a6b6b0384528
+请调用工具 web_search（参数：{"query": "ComfyUI M
+bacc303c068840cb
+请调用工具 read_file（参数：{"path": "/etc/hostna
+0a08df57407a43d5
+请调用工具 manage_media_library（参数：{"scope":
+5d5b07beb71a41ce
+请调用工具 get_job_status（参数：{"job_id": "8771
+3798e7879e9e4614
+请调用工具 list_jobs（参数：{}）。只调用这一个工具，拿到结果后用 r
+b9cb0747eecd4704
+请调用工具 list_asset_tags（参数：{}）。只调用这一个工具，拿到
+30a9b7e059e6472a
+请调用工具 search_asset_history（参数：{"query":
+8728bab060274220
+请调用工具 search_conversations（参数：{"query":
+97c005b00f334905
+请调用工具 recall_memory（参数：{}）。只调用这一个工具，拿到结果
+89dfd5771a714ba9
+请调用工具 get_mode_schema（参数：{"mode": "t2v"}
+6b89d1245df44dd4
+请调用工具 describe_mode_params（参数：{"mode": "
+db6ec8e7c1a845a7
+请调用工具 get_prompt_preset（参数：{"spec_id": "
+8c00852e7ade400c
+请调用工具 list_prompt_presets（参数：{}）。只调用这一个工
+00702d6d14d3476f
+请调用工具 enhance_prompt（参数：{"prompt": "a gi
+337d3a3c603e4236
+请调用工具 describe_asset（参数：{"asset_id": "as
+9765178035ce4523
+请调用工具 search_assets（参数：{"query": "雨夜"}）。
+e5fdfde67af444ea
+请调用工具 list_modes（参数：{}）。只调用这一个工具，拿到结果后用
+f58dbd3f38884daf
+新会话
+ag-session-status ag-badge ag-badge-empty
+b0029d2c3c9c429e
+f46d3f32e4084c1a
+5032e576164d4348
+cd59ca5a778d433d
+750a04bdee734ab4
+fa59140fb37f4f2a
+10563f5124174c98
+c8866e89de884167
+028f653b75fe4c38
+111a8b76589c4500
+016cb67b711948c3
+daed5b57331e4828
+e8056778710646af
+014b60b1591b4652
+58272a11e5de45ff
+898efda4306645e9
+5d7022c241594cd1
+1e06646e8b33413e
+85423680f46b4623
+113938fb81dd4fb4
+3957730ad6b149f3
+cf50739f97d04ee2
+e6e84f6b8eb349ca
+830aa2620a164a85
+8924570412534f29
+46dc38e18c1d4d7d
+d4389f43405b4870
+6372a3c61ff44a2b
+8c2e4e63452a425a
+59e8c437b1ca4c24
+94837667cb804959
+90b47204c1684db7
+3108dc3f74734ed8
+1782d96524b54f8d
+c6628ca961e34914
+4133805472d148e3
+c57b1a5471d4477d
+2ecd6d7043a54b1d
+f90f133e9c0940fc
+2143b330daa24796
+d50bd500dc03423d
+235cfbebcc914345
+e70abf0d145e4b9a
+869ea858fb124a48
+3f441a68f8544c09
+只调用工具 list_asset_tags，拿到结果后用 respond 简短回
+41c10054382d4fd4
+只调用工具 list_prompt_presets，拿到结果后用 respond
+f1589917bbae44fe
+只调用工具 list_modes，拿到结果后用 respond 简短回复。
+b2c98a13b2b94c36
+accept-c-tool-get_job_status-1794791639
+accept-c-tool-describe_asset-1794791595
+accept-c-tool-media_probe-1794791575
+accept-c-tool-manage_media_library-1794791529
+accept-c-tool-recall_memory-1794791491
+accept-c-tool-list_prompt_presets-1794791280
+accept-c-tool-list_jobs-1794791154
+accept-c-tool-describe_mode_params-1794790863
+accept-c-tool-get_mode_schema-1794790799
+accept-c-tool-list_asset_tags-1794790755
+accept-c-tool-search_assets-1794790684
+请调用工具 search_assets（参数：{"query": "火星"}）。
+accept-c-tool-list_modes-1794790647
+accept-c9-tool-1794789930-2
+请调用工具 list_modes 列出所有生成模式，拿到结果后用 respond
+accept-c9-tool-1794789847-1
+accept-c9-ping-1794789747-3
+请用一句话说明你能做哪些视频生成。
+accept-c9-ping-1794789732-2
+accept-c9-ping-1794789625-1
+67caed49b35f4d67
+ping
+74a501629df34df6
+64f9e41d40bc4983
+8bda10dc8ed94fad
+c78dbfd413314163
+请用 list_modes 工具列出本工作台支持的生成模式
+ab0dd266767c4239
+4794053b07a941d5
+efb34350e9d9443a
+762b6cde49e945db
+ff2090342f2d4286
+列出可用的生成模式
+ag-session-status ag-badge ag-badge-bad
+8d78ab979b884c3e
+3f8ac3fc3ec74ce0
+fa0f02755ec14f96
+f7e700989bed4582
+32ffca5d3a414a10
+731b3369d2394848
+0a37e07ca0184fd6
+50d88bac5b48415c
+e752cbda45844454
+7e999452f51046ba
+c9c0da1b60af418f
+0bd780e7611a4a60
+c778e80c85054697
+6307d73c55bc4397
+用 list_modes 工具列一下本工作台支持的生成模式
+76227211264e4714
+0f0ee15d82ad459c
+f5613b3497bf4021
+3bc43f76f9194359
+959fd53846704b74
+c80d126b6bb14c7a
+98756165db7c47d3
+d36180441d6f4ec8
+70ee50da4e56431b
+回复 OK 两个字
+ba86c88d81dc4aa5
+d4b10e07bbb84286
+列出所有生成模式
+05227812828948c8
+7c2bb98dffa44df0
+aae8e674aad446de
+描述素材库里最新的一个素材
+7ec35db8a3e14641
+只回答两个字：可用
+ff11537421db4c46
+获取 t2v 文生视频模式的参数 schema
+230f0769fd254de3
+e636d5baa16d4170
+bb80283b4afb4fb9
+必须调用 search_conversations 工具检索含「素材」的会话。调
+2bc2a7147c944ee4
+必须调用 describe_asset 工具查询素材 asset_21f5d05
+cf3072afcd6c4b92
+必须调用 search_asset_history 工具查询素材 asset_b
+a19cdc6b26ba43c7
+必须调用 enhance_prompt 工具扩写「一只猫在屋顶上跑」。调用后只回
+9fe1162e4caf4fe8
+必须调用 recall_memory 工具。调用后只回答：有没有已保存的记忆。
+7f1b7691b04843e6
+必须调用 list_asset_tags 工具。调用后只回答：共有多少种标签。
+5f93c9e623c44ae2
+必须调用 get_prompt_preset 工具读取第一个提示词预设。调用后只
+d586ae04208d472b
+必须调用 list_prompt_presets 工具。调用后只回答：一共有几个
+5c95ad162e264b31
+必须调用 get_job_status 工具查询任务 b4c248cfbb07。
+e283f036122e49d9
+必须调用 list_jobs 工具列出最近任务。调用后只回答：最近一条任务的 i
+035805a3d2cc4789
+必须调用 get_mode_schema 工具获取模式 flf 的 schema
+9c339c999fba4d5d
+必须调用 describe_mode_params 工具查询模式 t2v。调用后
+864c34bb6b0044c0
+必须调用 search_assets 工具搜索名字含「火星」的素材。调用后只回答
+8d735d25d24848c1
+必须调用 list_modes 工具。调用后只回答：本工作台支持多少个生成模式。
+d58f41b0bd6545f9
+调用 search_assets 工具搜索素材库里名字含「火星」的素材，回答找到
+58de12d9e1674eb4
+你好，只回答一个字：好
+536dab8282b64858
+调用 media_probe 工具探测素材 asset_bfaca307e2cf
+9014a279a5304694
+调用 read_file 工具读取文件 config.json，回答里面的 po
+36e67f3b73544f34
+调用 web_search 工具搜索「ComfyUI MiniMax H3」，回
+9a1d4ec3de7c4cc0
+调用 search_conversations 工具检索历史对话里含「素材」的会
+fddaffba99054d2a
+调用 describe_asset 工具查询素材 asset_21f5d051d
+073ceb66f5644362
+调用 search_asset_history 工具查询素材 asset_bfa
+42ab851271934728
+调用 enhance_prompt 工具把「一只猫在屋顶上跑」扩写，回答扩写后的
+de3e2606ec3c4672
+调用 recall_memory 工具读取记忆，回答是否有已保存的记忆。
+b5eef29fa8994625
+调用 list_asset_tags 工具，回答共有多少种标签。
+5d18cfc8b2434b6a
+调用 get_prompt_preset 工具读取第一个提示词预设，回答它的名称
+cffe2d04d44f44f4
+调用 list_prompt_presets 工具，回答一共有几个提示词预设。
+10ce739346044f9b
+调用 get_job_status 工具查询任务 b4c248cfbb07 的状
+a02be5e80e46402a
+调用 list_jobs 工具列出最近的生成任务，回答最近一条任务的 id。
+6e2106f03bdd45b0
+调用 get_mode_schema 工具获取模式 flf 的参数 schema
+bc8cffd6ddaf494e
+调用 describe_mode_params 工具查询模式 t2v 的合法参数
+f4fd73be95754121
+调用 list_modes 工具列出所有生成模式，然后只回答模式数量。
+fd0584e22f2a4180
+你好
+r4-c2-9-0
+r4-c2-8-0
+请调用工具 web_search（参数：{"query": "MiniMax H
+r4-c2-7-0
+请调用工具 get_prompt_preset（参数：{}），只调这一个工具，然
+r4-c2-6-0
+r4-c2-5-0
+r4-c2-4-0
+请调用工具 recall_memory（参数：{}），只调这一个工具，然后用 r
+r4-c2-3-0
+r4-c2-2-0
+r4-c2-1-0
+请调用工具 list_asset_tags（参数：{}），只调这一个工具，然后用
+r4-c2-0-0
+请调用工具 list_prompt_presets（参数：{}），只调这一个工具
+r4-c-mp-retry
+r4-c-7
+r4-c-16
+r4-c-15
+r4-c-14
+r4-c-13
+r4-c-12
+r4-c-11
+r4-c-10
+r4-c-9
+r4-c-8
+r4-c-6
+r4-c-5
+请调用工具 get_job_status（参数：{"job_id": "b48e
+r4-c-4
+r4-c-3
+请调用工具 list_jobs（参数：{}），只调这一个工具，然后用 respo
+r4-c-2
+请调用工具 get_mode_schema（参数：{"mode": "r2v"}
+ag-drawer-foot
+agSessionFoot
+ag-head
+ag-menu
+agMenu
+会话列表
+ag-head-text
+ag-title
+ag-sub
+ag-current-session
+agCurrentSession
+ag-head-actions
+ag-new
+agNew
+ag-artifacts-btn
+agArtifactsBtn
+查看本次会话产生的所有任务
+ag-manage-btn
+agManageBtn
+能力开关 / 搜索引擎 / 默认参数 / 步数上限
+ag-artifacts
+agArtifacts
+ag-artifacts-head
+ag-artifacts-title
+ag-artifacts-close
+agArtifactsClose
+关闭产物面板
+ag-artifacts-body
+agArtifactsBody
+ag-artifacts-empty
+ag-messages
+agMessages
+ag-msg ag-msg-user
+ag-msg-role
+ag-msg-body
+ag-bubble-text
+ag-msg ag-msg-bot
+ag-badge ag-badge-ok
+ag-block ag-tools
+0694cc2bd5b8482d-m1-tools
+ag-block-title
+ag-tool-list
+ag-tool ag-tool-ok
+0694cc2bd5b8482d-m1-tool-0
+ag-tool-head
+ag-tool-state
+ag-tool-name
+ag-tool-meta
+ag-tool-body
+ag-tool-result
+ag-tool-label
+0694cc2bd5b8482d-m1-tool-1
+ag-composer
+ag-status
+agStatus
+ag-attachments
+agAttachments
+ag-attach-row
+ag-attach-btn
+agAttachBtn
+上传参考素材（图片最多 9 张，音频/视频最多 4 个）
+agAttachInput
+image/png,image/jpeg,image/webp,image/bmp,image/gif,
+                      audio/wav,audio/mpeg,audio/mp3,audio/flac,audio/x-flac,
+                      audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/opus,
+                      video/mp4,video/webm,video/quicktime,video/x-matroska,
+                      video/x-msvideo
+ag-attach-hint
+agAttachHint
+ag-input-row
+agInput
+例：素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5 秒 16:9 的视频
+ag-send
+agSend
+ag-hint-line
+panel-fab
+panelFab
+打开参数面板
+M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0
+18
+17
+provModal
+prompt-dialog prov-dialog
+provModalTitle
+provModalClose
+prov-form
+provForm
+prov-field
+provName
+例如：本机 Qwen 多模态
+provType
+openai
+ollama
+llamacpp
+comfyui
+provUrl
+例如：http://127.0.0.1:5000
+300
+provLlmUrlField
+provLlmUrl
+ComfyUI 节点内部去连的 LLM 地址，留空 = 与 Base URL 相同
+provModel
+例如：qwen3.8-flash-next-iq3_xxs
+password
+provKey
+留空表示无需鉴权
+200
+provKeyHint
+prov-hint
+prov-check
+provMultimodal
+provEnabled
+prov-form-err
+provFormErr
+provCancel
+primary
+provSave
+enhanceModal
+prompt-dialog
+enhanceModalTitle
+enhanceModalClose
+enhance-meta
+enhanceMeta
+enhanceResult
+enhanceCancel
+enhanceAppend
+enhanceReplace
+mossLayoutModal
+prompt-dialog prompt-dialog-wide
+mossLayoutTitle
+mossLayoutClose
+mossLayoutMeta
+moss-layout-tabs
+draft
+mossLayoutPrompt
+mossLayoutJson
+mossLayoutDraft
+moss-layout-hint
+mossLayoutHint
+mossLayoutCancel
+mossLayoutCopyJson
+mossLayoutCopyPrompt
+mossLayoutApply
+ph-popover
+phPopover
+ph-head
+phTitle
+ph-count
+phCount
+phClose
+ph-list
+phList
+ph-foot
+phMore
+promptVersionModal
+promptVersionTitle
+promptVersionClose
+version-list
+promptVersionList
+promptVersionDone
+fdModal
+prompt-dialog fd-dialog
+fdTitle
+fdClose
+fd-body
+fdBody
+fd-stage
+fdStage
+fd-stage-close
+fdStageClose
+关闭大图
+fdStageImg
+流程图大图
+fdDone
+loraInfoModal
+loraInfoTitle
+loraInfoClose
+lora-info
+loraInfoBody
+loraInfoDone
+job-detail-modal
+jobDetailModal
+job-detail-backdrop
+jobDetailBackdrop
+job-detail-panel
+jobDetailTitle
+jobDetailPanel
+job-detail-head
+job-detail-x
+jobDetailClose
+关闭（Esc）
+job-detail-body
+jobDetailBody
+lightbox
+lightbox-bar
+lightbox-info
+lightbox-title
+lightboxTitle
+lightbox-dim
+lightboxDim
+lightbox-zoom
+lightboxZoom
+lightbox-tools
+lightboxZoomOut
+缩小（- 键）
+缩小
+lightboxZoomIn
+放大（+ 键）
+放大
+lightboxFit
+适应屏幕（0 键）
+lightboxActual
+原始尺寸（1 键）
+lightboxDownload
+下载原图
+lightboxOpenNew
+_blank
+noopener
+在新窗口打开原图
+lightboxClose
+lightbox-x
+lightbox-stage
+lightboxStage
+lightboxImage
+生成结果大图
+enhanceGateModal
+prompt-dialog gate-dialog
+enhanceGateTitle
+enhanceGateClose
+gate-body
+enhanceGateCancel
+enhanceGateConfirm
+promptModal
+promptModalTitle
+promptModalClose
+promptModalText
+document.getElementById('promptModalClose').click()
+promptCopy
+detailModal
+detailModalTitle
+detailModalClose
+detailModalBody
+detail-preview
+detailPreview
+detail-kv
+detailParams
+detail-prompt
+detailPrompt
+document.getElementById('detailModalClose').click()
+/static/qwen-refs.js?v=cr20261118a
+/static/numeric-slider.js?v=numslider3
+/static/seed-guard.js?v=seedguard1
+/static/media-preview.js?v=mediapreview2
+/static/video-panel-fallback.js?v=cr20261115b
+/static/interaction-guard.js?v=guard1
+/static/music.js?v=fix4temp0
+/static/video-panel.js?v=vparams7
+/static/video-effect-lora.js?v=fix3panel1
+/static/continuation.js?v=cr20261118a
+/static/generation-queue.js?v=a5truth1
+/static/video-nav.js?v=sidebarfold2
+/static/sidebar-fold.js?v=sidebarfold2
+/static/job-meta.js?v=cr20261115b
+/static/app.js?v=cont20261119a
+/static/providers.js?v=enhassets1
+/static/job-detail.js?v=a5truth1
+/static/assets.js?v=cr20261115b
+/static/asset-player.js?v=cr20261115b
+/static/media-manage.js?v=cr20261118a
+/static/moss-layout.js?v=mosslayout2
+/static/flow-docs.js?v=fd1
+/static/enhance-menu-shared.js?v=cr20261115b
+/static/enhance-menu.js?v=enhassets1
+/static/music-enhance.js?v=cr20261115b
+/static/agent-media.js?v=h3image1
+/static/agent.js?v=cr20261116b
+/static/agent_sessions.js?v=cr20261115b
+agManageModal
+prompt-dialog agm-dialog
+agManageTitle
+agManageClose
+agm-body
+agManageBody
+document.getElementById('agManageClose').click()
+agmSave
+/static/prompt-history.js?v=ph4
+/static/agent-manage.js?v=cr20261118a
+16:9_0.2
+608×352 · 0.2MP
+16:9_0.3
+736×416 · 0.3MP
+16:9_0.4
+864×480 · 0.4MP
+16:9_0.5
+960×544 · 0.5MP
+16:9_0.6
+1056×608 · 0.6MP
+16:9_0.7
+1152×640 · 0.7MP
+16:9_0.8
+1216×672 · 0.8MP
+16:9_0.9
+1280×736 · 0.9MP
+16:9_0.98
+1344×768 · 0.98MP
+16:9_1.0
+1376×768 · 1MP
+16:9_1.2
+1504×832 · 1.2MP
+16:9_1.5
+1664×928 · 1.5MP
+16:9_1.8
+1824×1024 · 1.8MP
+16:9_2.0
+1920×1088 · 2MP
+display: block;
+up-slot
+first
+首帧
+tag
+pick-asset
+从素材库选择一个素材填入这个位置
+last
+尾帧
+refvid0
+参考视频 1
+refvid1
+参考视频 2
+refvid2
+参考视频 3
+refaud0
+参考音乐 1
+refaud1
+参考音乐 2
+refaud2
+参考音乐 3
+ref0
+参考 1
+ref1
+参考 2
+ref2
+参考 3
+ref3
+参考 4
+ref4
+参考 5
+ref5
+参考 6
+ref6
+参考 7
+ref7
+参考 8
+ref8
+参考 9
+ref2va_pruned_int8
+minimax_h3_ref2va_pruned_int8_convrot.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/h3_video_modes.py（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）
+Ref2VA 权重（参考生视频专用）「不附作者说明文件」 -> 作者未提供采样参数。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值。⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。
+ref2va_int8
+minimax_h3_ref2va_int8_convrot.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：20（ComfyUI 模型硬性值）
+推荐调度器：simple（ComfyUI 模型硬性值）
+推荐采样器：res_multistep（ComfyUI 模型硬性值）
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/h3_video_modes.py（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）
+Ref2VA 权重（参考生视频专用 · 未剪枝）「不附作者说明文件」。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，不是作者推荐值；shift 12/3 是 ComfyUI 的模型硬性值。
+hybrid_fl2va_ref2va
+minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors
+ComfyUI 模型列表已收录该权重，可直接选用。
+
+—— 作者推荐参数 ——
+来源：ComfyUI 模型硬性值
+推荐步数：作者未提供
+推荐调度器：作者未提供
+推荐采样器：作者未提供
+推荐视频 shift：12（ComfyUI 模型硬性值）
+推荐音频 shift：3（ComfyUI 模型硬性值）
+推荐主模型：作者未提供
+出处：supported_models.py:969-972（shift 12 / audio_shift 3） + minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.md:158-172（作者未给出任何采样参数）
+作者（smhfacct）「未给出任何采样参数」 —— 其 README 只讲合并原理与变体选型（原文：「本底模作者未给出任何采样参数」）。shift 12/3 是 ComfyUI 模型硬性值；步数/调度器/采样器一律「作者未提供」。
+nav-item active
+qwen_image_2.1_bf16
+qwen_image_2.1_turbo_bf16
+官方用 dynamic shifting 按图像 token 数自动算 mu（base_shift 0.5 → max_shift 0.9，1024×1024 对应 mu≈0.69）。ComfyUI 固化的是 1024×1024 拟合值，非 1024 分辨率下为近似值。
+qwen21-effects/Bnn3d-qwen2.1_c1-st3000.safetensors
+方向：A/B/C/D 组（Civitai 原生）。 基座判定：原生（Civitai baseModel=Qwen 2.1；注意力层命中 128/128=1.0，全层 224/224，超出 block32 共 0 个）。 来源平台：civitai。
+qwen21-effects/KoreanWoman_qwen21_c1-st6000.safetensors
+qwen21-effects/Qwen21-亚洲hina_QwenImage2.1_asianMix_Lora_v3.0-rank64.safetensors
+方向：E 组（HuggingFace 镜像）。 基座判定：原生。 来源平台：huggingface。
+qwen21-effects/Qwen21_CandidPhone_v1.safetensors
+方向：A/B/C/D 组（Civitai 原生）。 基座判定：原生（Civitai baseModel=Qwen 2.1；注意力层命中 128/128=1.0，全层 192/192，超出 block32 共 0 个）。 触发词：cndphoto。 来源平台：civitai。
+qwen21-effects/change_to_raw_photo_v3_qi21.safetensors
+方向：A/B/C/D 组（Civitai 原生）。 基座判定：原生（Civitai baseModel=Qwen 2.1；注意力层命中 128/128=1.0，全层 192/192，超出 block32 共 0 个）。 触发词：Change to RAW photo。 来源平台：civitai。
+qwen21-effects/checkpoints-1024px-step-10000-pytorch_lora_weights.safetensors
+qwen21-effects/dot-film-v0.1-qwen-image-2.1-step1000.safetensors
+qwen21-effects/dot-film-v0.1-qwen-image-2.1-step500.safetensors
+qwen21-effects/dot-film-v0.1-qwen-image-2.1-step750.safetensors
+其它
+qwen21-effects/RadianceChromeVoluptuous_QwenImage2.1_v1.0.safetensors
+qwen21-effects/bfs_body_swap_selective_magenta_v1.0_qwen_2.1.safetensors
+qwen21-effects/bfs_body_swap_v1.0_qwen_2.1.safetensors
+qwen21-effects/xianxia_gufeng_meixue.safetensors
+qwen21-effects/五七风格（yul57style001）Qwen2_1.safetensors
+方向：A/B/C/D 组（Civitai 原生）。 基座判定：原生（Civitai baseModel=Qwen 2.1；注意力层命中 128/128=1.0，全层 224/224，超出 block32 共 0 个）。 触发词：yul57style001。 来源平台：civitai。
+qwen21/RadianceChromeVoluptuous_QwenImage2.1_v1.0.safetensors
+风格 LoRA（体积感/光泽向风格）。上游 metadata 里没有触发词标注。
+qwen21/bfs_head_v1_qwen_2.1.safetensors
+多图编辑：把 <image2> 的头部替换到 <image1> 上，保留图1的光线/环境/背景与头部朝向、表情。官方图片编辑工作流固定用强度 1.0。
+qwen21-effects/2anime-QwenImage2.1.safetensors
+真人照片 → 二次元动漫化。头像、社交媒体素材。
+qwen21-effects/Amphoreus13_qi_lora_rank32.safetensors
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（许可条款矛盾 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：HF 标签 `license: mit`，但 README 写 “research and hobbyist communication only — commercial use is strictly prohibited” → 「许可自相矛盾，按禁止商用对待」。`ss_network_rank=32`、2508 键、`networks.lora_qwen_image`；训练集约 2450 张同人图。另有 rank16(293,854,912 B) 与 rank256(4,696,896,560 B) 两档。「非官方/授权不明」。
+qwen21-effects/Genitalia-Anatomy-2.1-v1.safetensors
+rank 64 / batch 8 / 16,000 步 / 3,689 张训练图 / RTX PRO 6000 96GB。主触发词 zl_private_v1，另可加类别 token zl_uniprivate_v1 / zl_cnprivate_v1 / zl_jpprivate_v1 / zl_krprivate_v1 / zl_maleprivate_v1。作者首选自然语言描述，token 只是「抽屉标签」，模型卡也明确 token 不保证效果。
+qwen21-effects/HonkaiStarRail-3D-qwen2.1_c1-st4000.safetensors
+HonkaiStarRail-3D-qwen2.1（崩坏星穹铁道 3D 风格）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 B】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/NSFW Qwen Lora.safetensors
+作者原作系列的 v1.0（与 HF 转存 SHA256 完全一致）。v1.0 与 v2.0 内容不同：v2.0 体积更小（rank 更低）但作者称画质/解剖/提示词跟随更好。
+qwen21-effects/NSFW Qwen by TheseAlpacas V2.safetensors
+作者原作系列（Civitai 49,137 下载 / 1,065 赞）的 v2.0。作者原话：这些概念（blowjobs / cowgirl / cum / vaginas / anal / penis / doggystyle / missionary / dildo / pussy licking）「不是触发词」，靠自然语言描述命中。⚠️ 镜像站作者在模型卡里写了触发词 nsfw，与 Civitai 原作者 训练词列表为空不一致 —— 建议以不写触发词、纯自然语言描述为主。
+qwen21-effects/Qwen-Image-2.1-Amethyst-Theme-3000.safetensors
+照片 → 紫晶紫色系 / 神秘质感调色。
+qwen21-effects/Qwen-Image-2.1-Clay-Sculpture-Style-3000.safetensors
+照片 → 黏土雕塑质感（手捏纹理、哑光材质）。手办 / 微缩场景 / 儿童绘本风。
+qwen21-effects/Qwen-Image-2.1-Heatwave-3000.safetensors
+照片 → 热成像 / 红外热力图伪彩。工业检测、科幻界面。
+qwen21-effects/Qwen-Image-2.1-LoRA-photo-aesthetics-v3.safetensors
+照片美学向增强（1024px / step-10000 checkpoint）。训练用 REPA projector，推理不需要。
+qwen21-effects/Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors
+把欠曝 / 过曝图拉回中性平衡曝光，保色保细节。室内暗光 / 逆光照片修整。
+qwen21-effects/Qwen-Image-2.1-Outrun-3000.safetensors
+照片 → 80 年代 Outrun / Synthwave：霓虹洋红青、复古未来、高对比。
+qwen21-effects/Qwen-Image-2.1-Style_ChineseManhuaSketch_ThinPaint_Mugi_v1.0_c1-st10000.safetensors
+国漫速写 · 清雅薄涂（国产漫画速写笔触感）。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/Qwen-Image-2.1-Voxel-Style-3000.safetensors
+照片 → 方块化低模体素风。像素游戏场景 / 低模资产。
+qwen21-effects/Qwen-Image-2.1-lora-yuanshen-lihui_c1-st7000.safetensors
+原神人物介绍立绘风格（游戏内「角色介绍」页立绘版式）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：未标注。ModelScope 无 license 字段（作者未填）→ 授权不明，商用风险高。非官方：训练素材为原神角色立绘。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/Qwen-Image-2.1_Style_Fantasy_Anime_Mugi_v1.1_c1-st10000.safetensors
+奇幻 · 动漫（西式奇幻动漫插画）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/Qwen-Image-2.1_Style_XianXia_Ink_Mugi_v1.0_c1-st10000.safetensors
+仙侠 · 水墨（国风水墨幻想插画）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/Qwen-Image-2.1_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors
+仙侠 · 妖姬（幻想国风仙侠插画）。【非米哈游 IP（风格族邻接替代条目）；魔搭申请制（实测可直下）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/Qwen2.1 一致性无偏移_GH_V1.0.safetensors
+修正 Qwen-Image-2.1 生成的像素偏移问题。
+qwen21-effects/Qwen2.1_Anime_consistency.safetensors
+二次元角色一致性。⚠️ 作者标为 Experimental，输出稳定性不保证。
+qwen21-effects/Qwen2.1_Anything2RealCharacters.safetensors
+把任意风格图转成写实人物。
+qwen21-effects/Qwen2.1_万物移除Remove_GH.safetensors
+绿幕遮罩式移除：把画面里涂成绿色的区域去掉。
+qwen21-effects/QwenImage2.1_ArchitectureConcept_T2I_1.0.safetensors
+建筑外观概念设计出图。早期方案探索 / 效果汇报。
+qwen21-effects/angles_full_qwen21_multiple_angles_v1_qwen21_multiple_angles_v1.safetensors
+多视角 / 环绕机位生成。多角度参考图、3D 资产预览（需输入图）。
+qwen21-effects/chatrlabs-omni-lora-v0.1-bf16.safetensors
+官方级条目：模型卡明确「这是常规 LoRA，不提供 few-step 蒸馏」，且明确「不是兼容更早的 Qwen-Image / 2512 / Edit-2511」。不添加 prompt filter、不加 safety checker。作者推荐 35 步 / CFG 5.0 / 输出约 1MP / 启用 KV cache；negative prompt 必须是单个空格（空或缺省会关掉 true CFG）。
+qwen21-effects/doodle_in_lora_qwen21.safetensors
+手绘涂鸦线稿 → 真实图像补全。inpaint / sketch2image。
+qwen21-effects/fusal-qwen-image-2.1-v2-exact-r80.safetensors
+动漫风格（多参考图 FUSAL 架构）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：other。HF `license: other` + `license_name: qwen-research` —— 继承 Qwen-Image-2.1 的研究许可，非 Apache-2.0，商用受限。【实测】已核验 SHA256（huggingface）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/futa_qwen21_v1_000001000.safetensors
+无触发词，靠自然语言描述解剖结构。作者推荐参数：LoraLoaderModelOnly 0.5–1.0、ModelSamplingAuraFlow shift 3.0、CLIPLoader type qwen_image、Euler/simple、CFG 4.0、30–40 步；必须配 negative prompt（testicles, balls, scrotum, fused genitals, merged anatomy…）。
+qwen21-effects/genshintcg_style_st3500.safetensors
+Qwen-Image2.1 Genshin 2D Style LoRA（TCG 风格）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 B】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0（HF `license:` 标签）。【实测】已核验 SHA256（huggingface）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/genshintcg_style_st4000.safetensors
+原神式 2D 赛璐璐游戏画风。角色立绘 / 游戏宣传图。
+qwen21-effects/japanese_bw_manga_v1.3_c1-st6000.safetensors
+日式黑白漫画风格（黑白墨线漫画 / 网点纸质感）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/lbxstyle-qwen-image-2.1-step-1890.safetensors
+日常手机随手拍质感：普通曝光、雀斑毛孔、真实房间。生活流 / 街拍 / vlog 感。
+qwen21-effects/moyu-robot-v1_c1-st1000.safetensors
+通用（非米哈游专有） · 机体 / 机械风格。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。来源平台：ModelScope。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。
+qwen21-effects/pussy_concepts_qwen_image_2.1.safetensors
+双触发概念 LoRA：hrybush（浓密自然卷曲阴毛）/ inniepussy（剃光紧闭型），建议放 prompt 开头。训练数据小（75 hairy + 36 innie），模型卡自述「Results are not 100% perfect」。
+qwen21-effects/pytorch_lora_weights.safetensors
+2000 年代早期数码相机直闪风格：暗角、高光溢出、传感器色偏。Y2K 氛围 / 复古快照。
+qwen21-effects/qilin-robot-v1_c1-st1000.safetensors
+qwen21-effects/qwen-image-2.1-consistency.safetensors
+让编辑「原地不动」：背景 / 构图 / 主体位置不被重画。局部改色、换装、局部替换。
+qwen21-effects/qwen-image-2.1-outfit-swap.safetensors
+换装时保持主体 / 构图 / 背景不漂移。
+qwen21-effects/qwen-image-2.1-qma-camera-angles.safetensors
+保持主体 / 场景 / 风格不变，只换相机方位与俯仰。机位方案、分镜角度。
+qwen21-effects/qwen-image-2.1-restore.safetensors
+修 QI21 自带放大的「过度锐化 / 假毛孔」：结果更柔、更少脑补。老照片 / 小图放大 / 视频截帧。
+qwen21-effects/qwen-image-2.1-uncensored-lora.safetensors
+rank 16，仅 patch 注意力投影（transformer_blocks.N.attn.{to_q,to_k,to_v,to_out.0}，s，bf16）。作者自述这是 abenzerps 那份的镜像，原仓库本轮未直接核实。
+qwen21-effects/qwen-image2.1-lora-Anime_c1-st8000.safetensors
+日系二次元插画 / 动漫角色 / 猫娘。
+qwen21-effects/qwen2.1-detail-fix-2.0.safetensors
+细节 / 结构修复类（DoRA 变体）。小图放大的结构校正。
+qwen21-effects/qwen21_next_scene_v1.safetensors
+由当前帧续接下一场景。分镜预览、短剧 AI 预演（需输入图）。
+qwen21-effects/tianshu-robot-v2_c1-st1000.safetensors
+qwen21-effects/zhuque-robot-v1_c1-st1000.safetensors
+qwen21-effects/zzz_chibi_v2_st2500.safetensors
+绝区零 Chibi / Q 版（大头身比例压缩）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；魔搭申请制（实测可直下）；清单可信度 B】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0。ModelScope `apache-2.0`（作者自填）。非官方：原作美术属米哈游《绝区零》。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/zzz_chibi_v2_st3000.safetensors
+绝区零 Q 版 / 萌化风格。头像、贴纸。
+qwen21-effects/zzz_style_v1.7_4000.safetensors
+绝区零（ZZZ）风格（3D 渲染 + 都市潮酷配色 + 硬边线稿）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 A】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0。HF `license: apache-2.0` + ModelScope `apache-2.0`（作者自填）。非官方：README 致谢「原作美术：米哈游《绝区零》美术团队」。【实测】已核验 SHA256（huggingface）；ComfyUI 权重键名匹配 命中率 100%
+qwen21-effects/zzz_style_v1.7_4500.safetensors
+绝区零游戏原画风。角色 / 宣传图。
+qwen21-effects/zzz_v1.4_step3000.safetensors
+绝区零风格（v1.4 线）（与上条 HF 仓同作者同系列的不同版本线）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；魔搭申请制（实测可直下）；清单可信度 B】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0。ModelScope `apache-2.0`（作者自填）。非官方：原作美术属米哈游《绝区零》。【实测】已核验 SHA256（modelscope）；ComfyUI 权重键名匹配 命中率 100%
+enhance-menu-badge rec
+24000
+moss_image_base
+moss_image_sft
+extra fingers, poorly drawn hands, deformed, disfigured
+22
+26
+moss/moss_xvstyle_nsfw_uncensored_1024_w0.7_s30_axiomofmind_v1.safetensors
+0.7
+moss_xvstyle
+moss-effects/mss_photoQuality_-2to2.safetensors
+（上游未标注触发词）
+moss/moss_hires_lora_v0.4_qkv_split.safetensors
+moss-effects/ViRealismMoss_V1.safetensors
+0.9
+virealism
+东亚男性人像
+moss-effects/Asian handsome guy.safetensors
+方向：东亚男性写实人像。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/asianathman.safetensors
+方向：东亚男性写实人像（18–25 岁）。 基座判定：原生（MOSS 版本原生）。 触发词：asianathman。 来源平台：huggingface。
+moss-effects/facediff.safetensors
+方向：东亚男性写实面孔（去网红感）。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/men-hanm-epoch-09.safetensors
+方向：东亚男性写实人像。 基座判定：原生（MOSS 版本原生）。 触发词：ZHMAN。 来源平台：huggingface。
+moss-effects/moss-cn-uncle-moss-image-base-2000.safetensors
+方向：中式成熟男性写实人像。 基座判定：原生（基础模型原生）。 来源平台：huggingface。
+moss-effects/xiaoyuChineseAIWoman_v1.safetensors
+方向：中式女性写实人像（角色向）。 基座判定：原生（基础模型原生）。 来源平台：huggingface。
+moss-effects/AsianGirlMix-Moss-177p44e.safetensors
+方向：东亚女性写实/时尚/影棚人像。 基座判定：原生（MOSS 版本原生）。 触发词：Asian Girl / asian woman / asian girl。 来源平台：huggingface。
+moss-effects/Cinematic_MossSFT_c1-st6000.safetensors
+方向：影棚/电影感人像 + 电影感布光。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/NexBlend01MossImage.safetensors
+方向：韩系/东亚写实人像 · 文化场景。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/Soft Pastel Photography MOSS.safetensors
+方向：汉服/古风庭院/唯美人像。 基座判定：原生（SFT 版本原生）。 触发词：Soft pastel photography style。 来源平台：huggingface。
+moss-effects/anireal_moss_lora_v1.safetensors
+方向：二次元 → 写实（半写实人像）。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/atmospheric photography.safetensors
+方向：戏剧光影 / 情绪感人像。 基座判定：原生（MOSS 版本原生）。 触发词：atmospheric photography。 来源平台：huggingface。
+moss-effects/cinematic-photography-moss-image-sft-epoch-10.safetensors
+方向：影棚/电影感人像构图与布光。 基座判定：原生（SFT 版本原生）。 触发词：cinematic photo style。 来源平台：huggingface。
+moss-effects/cndamiph_Candid_Amateur_iPhone_MOSS_v1.safetensors
+方向：随手拍业余照片人像。 基座判定：原生（MOSS 版本原生）。 触发词：cndamiph。 来源平台：huggingface。
+moss-effects/hina_MOSSImageSFT_AsianMix_v1.0-lora.safetensors
+方向：东亚女性写实（亚洲面孔 + 肢体/光影修正）。 基座判定：原生（SFT 版本原生）。 触发词：asian woman。 来源平台：huggingface。
+moss-effects/instagram_aesthetic_moss_v1.safetensors
+方向：网红感人像 / 手机快照。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/kuukiikan_style_moss_v1-step0003200_3314586.safetensors
+方向：日系 Cosplay / 人像写真观感。 基座判定：原生（MOSS 版本原生）。 触发词：kuukiikan_style。 来源平台：huggingface。
+moss-effects/luna_style_moss_v1.safetensors
+方向：中式/亚洲女性写实人像 + 影棚布光。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/BackgroundSharpness_MOSS-sft_v1.safetensors
+方向：背景虚化 / 镜头景深。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/PhotoSlider_MOSS-sft_v1.safetensors
+方向：写实 ↔ 插画 方向控制。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/PornMaster_Moss_Realism_slider_V1.safetensors
+方向：写实度双向滑杆。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/lighting-slider-epoch0150-step000450.safetensors
+方向：影棚布光强度 / 阴影。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/moss_image_sft_look_lora.safetensors
+方向：人像外观/观感控制。 基座判定：原生（基础模型原生）。 来源平台：huggingface。
+moss-effects/C500.safetensors
+方向：皮肤真实感。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/MOSS_detailer_v051.safetensors
+方向：细节增强（不改风格）。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/Moss-RealismEnhancer-V1.safetensors
+方向：写实增强（去卡通/动漫倾向）。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/Moss_v1.safetensors
+方向：皮肤质感细节 + 影棚人像 + 电影感布光。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/PornMaster_Moss_Detail_Slider_V1.safetensors
+方向：细节强度双向滑杆。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/RAW_Upscale_MOSS_v1.safetensors
+方向：皮肤/衣物细节纹理。 基座判定：原生（基础模型训练）。 触发词：raw test upscale。 来源平台：huggingface。
+moss-effects/concept-moss-image-base-epoch-11.safetensors
+方向：皮肤质感 + 影棚人像布光。 基座判定：原生（基础模型原生）。 来源平台：huggingface。
+moss-effects/imagefinish-sft-epoch0150-step000150.safetensors
+方向：画面精细度 / 完成度。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/kafgwoman-moss-moss-image-base-epoch-05.safetensors
+方向：亚洲女性写实（剧集质感）。 基座判定：原生（基础模型原生）。 触发词：kafgwoman / bwdcone / zpxlegs。 来源平台：huggingface。
+moss-effects/krealistick_MOSS.safetensors
+方向：写实增强 / 皮肤质感。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/lenovo_moss.safetensors
+方向：写实人像增强。 基座判定：原生（MOSS 版本原生）。 触发词：l3n0v0。 来源平台：huggingface。
+moss-effects/moss base_000007750.safetensors
+方向：韩系皮肤质感 + 暖色肉感（偏二次元 CG，非纯写实）。 基座判定：原生（MOSS 版本原生）。 触发词：@browndust / glossy skin。 来源平台：huggingface。
+moss-effects/moss_morereal.safetensors
+方向：写实增强。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/moss_r32_v2-comfy.safetensors
+方向：写实人像 / 自拍质感。 基座判定：原生（基础模型原生）。 来源平台：huggingface。
+moss-effects/moss_realistic_candid_lora.safetensors
+方向：写实抓拍人像。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/moss_style_v1-comfy(1).safetensors
+方向：写实人像。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/naturskinx-moss-image-sft-epoch-08.safetensors
+方向：人脸/皮肤质感细节（毛孔、雀斑、细纹）。 基座判定：原生（SFT 版本原生）。 触发词：naturskinx。 来源平台：huggingface。
+moss-effects/nelux_Realism_v2.safetensors
+方向：写实皮肤 + 雀斑 + 自然光。 基座判定：原生（MOSS 版本原生）。 触发词：nelux。 来源平台：huggingface。
+moss-effects/nicegirls_v2_moss.safetensors
+方向：写实女性人像（亚洲向版本可选）。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/phone_photography_2025_moss.safetensors
+方向：手机随拍人像质感。 基座判定：原生（MOSS 版本原生）。 触发词：This is a candid photograph taken with a smartphone of。 来源平台：huggingface。
+moss-effects/ral-truskin_moss.safetensors
+方向：自然皮肤写实。 基座判定：原生（MOSS 版本原生）。 触发词：ral-truskin。 来源平台：huggingface。
+moss-effects/realskin_r32_comfy.safetensors
+方向：写实皮肤。 ⚠️ 「近似适用」（依据：Base 训 / 双基座）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：@realskin。 来源平台：huggingface。
+moss-effects/target-epoch0150-step000150.safetensors
+方向：内容细节强度。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/ultra_real_moss_v2.safetensors
+方向：去 AI 塑料感 / 皮肤与衣物纹理。 基座判定：原生（MOSS 版本原生）。 来源平台：huggingface。
+moss-effects/Ultra-real-moss.safetensors
+moss-effects/lora_MOSS_mylow_beta01.safetensors
+方向：日系人像 / 街拍写真。 ⚠️ 「近似适用」（依据：SFT 适用）—— 非该基座原生训练，效果与兼容性未在本机验证。 触发词：mylow / low-quality。 来源平台：huggingface。
+moss-effects/moss_east_asian_girl_v2.safetensors
+方向：东亚女性写实人像（大眼）。 基座判定：原生（SFT 版本原生）。 来源平台：huggingface。
+moss-effects/n_h_lora_v1.safetensors
+方向：日系女性写实人像。 基座判定：原生（MOSS 版本原生）。 触发词：n_h。 来源平台：huggingface。
+moss-effects/ohstyle_moss_v1.safetensors
+方向：韩系半写实 CG 厚涂（偏插画，非照片写实）。 基座判定：原生（MOSS 版本原生）。 触发词：ohstyle,。 来源平台：huggingface。
+moss/moss_hires_lora_v0.1_qkv_split.safetensors
+ComfyUI 作者训的 4 兆像素以上高分辨率 LoHa。v0.1 覆盖最广（全 42 层 × 全 4 target，本机实测 252 patches 全命中）。作者配方：er_sde / simple / 25 步 / CFG 4.0 / shift 5 / SLG 关闭。
+moss/moss_hires_lora_v0.2_qkv_split.safetensors
+4 兆像素以上高分辨率 LoHa（204 targets：ffn_up_gate 全 42 层 + qkv 全 42 层 + o 21 层 + ffn_down 15 层，本机实测 204 patches 命中）。与 v0.3 同 target 集但权重不同。
+moss/moss_hires_lora_v0.3_qkv_split.safetensors
+4 兆像素以上高分辨率 LoHa，官方 Space（hugging-apps/moss-image-hires-lora）用的就是这版，默认首选。204 targets，本机实测 204 patches 命中。
+moss-effects/Cissia_MOSS.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件 16,163,368 B（体积极小，rank 很低）。作者用 Ko-fi/爱发电分发，属付费/赞助生态。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者正文明示：“权重：0.6~1.5”，并说明该 LoRA 含 2 种风格效果。Civitai model 2472021 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/Eldreda_Sunbringer_moss_12138.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。「ModelScope 镜像提供可匿名直链」：`https://www.modelscope.cn/models/makimakimakima12138/Eldreda_Sunbringer_moss_12138/resolve/master/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors`（77,720,200 B，SHA256 `aaa0bbcb188c9a45c0746d2bb43f464c3c49f9af27cd8182c5ab76ee0d7168d0`）。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3023439 + mossloras/moss-image-lora-archive 镜像；另有 ModelScope 同权重镜像 makimakimakima12138/Eldreda_Sunbringer_moss_12138（Apache-2.0，ProtectedMode=0）。
+moss-effects/Eldreda_Sunbringer_moss_12138_c1-st6000.safetensors
+绝区零艾尔妲挽昼（Eldreda Sunbringer，MOSS 版）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/Flat Color Anime Lineart Style-dora_1600.safetensors
+平涂二次元线稿风（可爱系）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 A】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容
+moss-effects/Kodachrome1970s_000002000.safetensors
+柯达 1970s 胶片色（60–70 年代）。复古人像、风光。
+moss-effects/MKAI_Lindvern_Sunbringer_v1_MOSS.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 756 键。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3031595 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/MOSS-Image-Animated-LoRA-ComfyUI.safetensors
+人物 / 动物 / 动作场景 / 多变环境的广义 3D 动画角色（非单一风格）。
+moss-effects/MOSS-Image-Anime-LoRA-ComfyUI.safetensors
+戏剧性动作、电影感打光、成年角色、强剪影、密集环境。
+moss-effects/MOSS-Image-Beauty-LoRA-ComfyUI.safetensors
+近景肖像、柔和定向光、皮肤毛发细节、克制背景。编辑感 beauty 摄影。
+moss-effects/MOSS-Image-Gouache-LoRA-ComfyUI.safetensors
+造型化形状、暖调编辑色、简化形体、质感场景。粉彩厚涂插画。
+moss-effects/MOSS-Image-NSFW-Uncensored-LoRA-ComfyUI.safetensors
+成人写真 / 人体质感风格。⚠️ 单独用触发词时底模会把 moss 拆成「苔藓」，必须搭配完整画面描述。
+moss-effects/MOSS-Image-Psychedelic-LoRA-ComfyUI.safetensors
+霓虹粉紫、旋涡彩虹、超现实生物与场景。
+moss-effects/MOSS-Image-SFT-lora-Anime_c1-st8000.safetensors
+二次元 / 2D 插画风（漫库 2000 张）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
+moss-effects/MOSS-Image-SFT_Style_XianXia_YaoJi_Mugi_v1.0_c1-st10000.safetensors
+仙侠 · 妖姬（幻想国风仙侠插画，MOSS 版）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/Moss_danica_v2step400_azusa.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重区间）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可：可商用=RentCivit / 免署名=是 / 允许衍生=否。archive 内另有 v1.0 权重 `Moss_danica_v1_azusa.safetensors`（99,146,968 B）。
+moss-effects/MysticXXX-Moss-V1.safetensors
+专门修 body 结构 / 姿态 / 概念落地 —— 作者称底模本体已懂大部分，需要这层来解决「detailed adult work」下的解剖走形。无触发词。作者明示「V1 use with STR 1」。⚠️ 训练基座具体是 Base 还是 SFT 未说明，作者自称 still experimental。
+moss-effects/Phoenix_Reffaella_3_in_1_Outfit_moss_LoRA_12138.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=openmoss/MOSS-Image-SFT`。作者说明针对「铃（Belle）」做了微调以减少角色特征互污染。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016054 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/Remielle.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「蕾米埃尔的lora，用于MOSS Image」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3041387 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/Ronova.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。正文：「若娜瓦（Ronova）原神 Genshin Impact 用于 MOSS Image 的 Lora」。
+moss-effects/Suoming.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 另存在「鸣潮 Lora 合集」3016395 内的 `suoming.safetensors`（145,157,272 B，触发词 `Suoming`）与 `xinyuehu.safetensors`（触发词 `Hsin`），为同系列不同权重。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3016542 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/Tribios.safetensors
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 正文：「缇里西庇俄丝 (Tribios)的Lora，用于MOSS Image」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3040713 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/Tsaritsa.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。正文：「Lora，来自 Tsaritsa 冰之女皇/冰神 安娜丝塔夏 原神，用于 MOSS Image」。
+moss-effects/TsaritsaMI.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（视觉/触发词在正文 / 作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可：可商用=Image/RentCivit/Rent/Sell/SellMerge / 免署名=是 / 允许衍生=是。作者自述「my first try into making a character lora」。
+moss-effects/Vesna.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。与 3025068「薇斯纳」为不同作者/不同权重的两条。
+moss-effects/anime screenscap_mossimage_v1.safetensors
+作者未明示强度 → 建议 0.7–1.0（建议值）。作者描述极简（Stable / Work good with turbo lora）。
+moss-effects/betmanimestyle-moss-990steps.safetensors
+Betm 画风（330 张纯动漫源图）。擅长增强扁平动漫质感。
+moss-effects/betmillustrationstyle-700steps.safetensors
+Betm 画风（纯插画源图训练）。擅长增强皮肤真实感与质感。
+moss-effects/blue-archive-style-base-moss-image-base-epoch-10.safetensors
+碧蓝档案（Blue Archive）动画风格。作者标注「以下配置是建议非最优」。
+moss-effects/canon_moss.safetensors
+同作者相机风格系列，触发词 c2n0n。作者未明示强度 → 建议 0.7–1.0（建议值）。
+moss-effects/chenbin_style_v2_blush_1500step_rank32.safetensors
+画师「鬼针草」个人画风（柔和细线 + 低饱和水彩 + 淡樱粉腮红）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；清单可信度 A】。触发词未标注。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。⚠️ 版权敏感：这是对特定画师个人风格的复刻，该画师本人（非米哈游）才是著作权人；即使作者写了 Apache-2.0，也未取得画师授权，商用风险高。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
+moss-effects/darkFantasyStyleMOSS_v1.safetensors
+触发词 darkfantasystyle。作者未明示强度 → 建议 0.8–1.0（建议值）。用 Midjourney v5 训练，风格偏 MJ 而非纯 MOSS 特性。
+moss-effects/dracaene-moss-v1.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`，576 键（56,687,880 B，体积小）。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029457 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/firefly26710_Moss.safetensors
+firefly_MOSS（流萤，崩坏星穹铁道，MOSS 基座）。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：HF 页面无 license 字段 —— 未授予任何许可，需向作者确认。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
+moss-effects/gjb_v1_MOSS.safetensors
+社区作者 gjb 的 MOSS-Image LoRA。本轮调研清单未收录该条目（调研快照里没有它的元数据），功能与强度未核实 —— 按默认强度 1.0 起步，自行调整。
+moss-effects/grainscape_moss.safetensors
+同作者相机风格系列。作者未明示强度 → 建议 0.7–1.0（建议值）。
+moss-effects/helives3d_dora_r64_s00006400_comfy.safetensors
+柔和光影 3D 动漫风（2.5D 赛璐璐立体渲染）。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：mit。HF `license: mit`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
+moss-effects/hina_MOSSImageBase_animeEnhance_v1.0-lora.safetensors
+二次元增强（Krsa2 Anime 数据集）。⚠️ 作者警告 SFT 上可能出现肢体异常。
+moss-effects/hina_MOSSImageSFT_MixArmor_v1.0_lora.safetensors
+盔甲 / 护甲材质与结构的表现力强化。游戏角色装备。
+moss-effects/lily_lora.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=MOSS-Image`、756 键。作者自述「1st time trained MOSS lora，testing purpose，pretty unstable to details」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3011877 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/lucia elowen.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给具体区间）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者自述用 20 张游戏截图训练，「I recommend to use it with a lower strength」，并建议负面词加 `game screenshot, default outfit`。
+moss-effects/lumine_v3_1_s2000.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词来源：上游模型卡。许可：Civitai 三元许可（author 字段为空）。衣服/靴子/头花拆为独立标记（traveler dress / traveler white thigh boots / fudi dress…）。
+moss-effects/lunhuimoss1_c1-st1000.safetensors
+轮回画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/mamimi_c1-st6000_comfyui.safetensors
+厚涂画风。作者称 5–6k 步比 8k 步效果好（本条即 6000 步档）。
+moss-effects/mitya_v4_s1000.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡。许可：Civitai 三元许可（author 字段为空）。作者自述「试验版」，已知问题是脸型偏半写实，需在提示词开头加「官方立绘」纠正。
+moss-effects/moss Cantarella.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。作者正文明确：「本模型仅供个人学习、交流与兴趣爱好者测试使用，严禁任何形式的商业用途」。「非官方/授权不明」。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2695787 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/moss Hsin2.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 文件内 `base_model=moss_image`、492 键。「非官方/授权不明」。来源平台：Civitai。触发词来源：权重头部 标签频次元数据。许可：作者未给区间。Civitai model 2981767 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/moss-image-impressionism-lora.safetensors
+印象派绘画风（松散笔触、光色分解）。
+moss-effects/moss-image-pixelart-16x16.safetensors
+16×16 像素游戏图标。512×512 / 50 步 / guidance 3。
+moss-effects/moss-image-reality-lora-preview-step73250.safetensors
+自然光、轻微噪点、景深虚化、不完美构图。亚洲面孔专项优化。
+moss-effects/moss-pixelart-v.0.3.safetensors
+8×8 网格像素画 / 2D 游戏素材风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词来源：权重头部 标签频次元数据。许可：apache-2.0。HF `license: apache-2.0`（作者自填）。【实测】已核验 SHA256（huggingface）；MOSS 底模层键比对：兼容
+moss-effects/moss-sharp-v1_000000400.safetensors
+正 1.0 = 更锐 / 负 1.0 = 更糊 / 0 = 原模型。无触发词、不需改 prompt。⚠️ 模型卡明确：对 SFT 效果弱、对 SFT+Turbo 几乎无效（SFT 本身已过滤模糊）—— 用 SFT 时可能几乎看不出变化。
+moss-effects/moss_alpha_v1.safetensors
+真 alpha 通道直出透明 PNG（玻璃 / 翅膀 / 宝石半透）。需配 alpha VAE。
+moss-effects/moss_base_background_tweaker.safetensors
+画面精修程度调节器，对构图影响最小。⚠️ 支持负权重：正=更精细、负=更弱化。
+moss-effects/moss_d3style_v1.safetensors
+更大眼睛 + 厚重睫毛、眼下腮红、光泽头发、暖调深阴影。
+moss-effects/moss_danbooru40k_v1.safetensors
+作者未明示强度 → 建议 0.8–1.0（建议值）。⚠️ 许可 CC-BY-NC-4.0 —— 显著严于基座的 Apache-2.0（非商用）。模型卡近乎空白，无第三方验证。
+moss-effects/moss_image_charref_v2.safetensors
+给一张角色图作 Picture 1 + prompt，把该角色（脸 / 发 / 服装 / 画风）画进新场景。
+moss-effects/moss_matcha_style_v1_c1-st1000.safetensors
+抹茶（Matcha）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/moss_pussy_lora_v3.0.safetensors
+作者 25,514 下载的解剖类 LoRA 的「非加速拆分版」（face loss=0，训练时人脸全部遮罩，只学解剖结构，脸交回底模生成 → 保留人脸多样性）。作者推荐 v3.0 强度 1.0 配 face 0.8。⚠️ 训练基座是 Base，作者推荐 Base 8 步；误配会导致画面过曝。
+moss-effects/moss_pussy_lora_v3.0_face.safetensors
+Better Nude v3.0 的「纯人脸」分量，与主体版配套使用（作者推荐 face 0.8 + 主体 1.0）。
+moss-effects/moss_sabikaze_v1.safetensors
+灰青蓝低饱和干笔二次元插画（57 张自生成图训练）。
+moss-effects/moss_sft_destripe_top64_bf16.safetensors
+去 SFT 垂直色带（天空 / 雾 / 墙面 / 影棚背景上的竖条纹）。1024px 用 1.5 更好。
+moss-effects/mossps1_c1-st1000.safetensors
+PS1 像素风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词来源：权重头部 trigger_word。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/nekometaru-moss_c1-st1000.safetensors
+nekometaru 画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+moss-effects/nike.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词来源：上游模型卡（取首段触发词）。许可：Civitai 三元许可（author 字段为空）。文件名为 `nike.safetensors`，与角色名拼写不一致，实际触发词是 `nike`。
+moss-effects/noyu_moss.safetensors
+画师个人风格。
+moss-effects/odette_v5_s2200.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者推荐「配合 dmd 加速使用，或使用 base 作为底模」，并指出 SFT 底模出图较脏 —— 「作者对底模/加速有明确偏好，但本条目本身是效果类」。
+moss-effects/qingxiao.safetensors
+鸣潮 · 角色身份。【非米哈游 IP（邻接替代条目）；原作 IP 归各自版权方所有，权重许可 ≠ 原作授权；社区二次创作 / 非官方授权】。清单可信度 作者正文仅「MOSS Image 的lora模型」。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3039020 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/samsung_moss.safetensors
+moss-effects/sandrone_mmd_v7_s4100.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者自述「实验性质，需要搭配 dmd 加速 lora 才能有良好的效果」—— 效果类权重本身可单用，作者建议配加速。
+moss-effects/shuiwu22-moss-image-lora.safetensors
+社区作者 ACCC1380 的 MOSS-Image LoRA。本轮调研清单未收录该条目（元数据未核实），功能与强度未核实 —— 按默认强度 1.0 起步，自行调整。
+moss-effects/silver_wolf_moss.safetensors
+崩坏：星穹铁道 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空，以平台三元勾选为准）。「视觉核验」：官方示例图为赛博朋克二次元银狼（胸前有 “SILVER” 像素 Logo），角色还原度高。
+moss-effects/style-moss-image-base-epoch-07.safetensors
+玉之けだま（Kedama）画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容
+moss-effects/style-moss-image-base-epoch-10.safetensors
+赛璐璐动画（Cel-Animation）画风。【非米哈游 IP（风格族邻接替代条目）；清单可信度 B】。触发词未标注。许可：Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。Civitai 三元许可：免署名=是 / 可商用=Image、RentCivit、Rent、Sell、SellMerge / 允许衍生=是。【实测】已核验 SHA256（civitai）；MOSS 底模层键比对：兼容
+moss-effects/transparent-lora-for-moss-image-v1.safetensors
+透明背景方案（比 alpha 方案更成熟）。需配 trmz/flux2-klein-alpha VAE 才能真出透明通道。
+moss-effects/vesna_v2_s2500.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 B（作者明示权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者述 Base 与 SFT 底模均可用。「注意」：作者写的 DMD 8–12 步是采样设置，不是必须挂加速 LoRA。
+moss-effects/vody_v2_s2500.safetensors
+原神 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 C（作者未给权重）。来源平台：Civitai。触发词未标注。许可：Civitai 三元许可（author 字段为空）。作者述 Base 与 SFT 底模均可用。
+moss-effects/wangzhe_moss.safetensors
+2.5D / 3D 角色表现。
+moss-effects/yixuanZzz_v1.safetensors
+绝区零 · 角色身份。【复刻米哈游 IP（原作美术版权归米哈游，权重许可 ≠ 原作授权）；社区二次创作 / 非官方授权】。清单可信度 作者正文仅 “just for share”。文件内 `base_model=moss_image`、492 键。「非官方/授权不明」。来源平台：Civitai。触发词未标注。许可：作者未给区间。Civitai model 3029119 + mossloras/moss-image-lora-archive 镜像。
+moss-effects/yomistyle_v3.safetensors
+moss-effects/zshfmoss_c1-st1000.safetensors
+咒术（咒术回战向）画风。【非米哈游 IP（风格族邻接替代条目）；社区小作者 / 参数不全；清单可信度 C】。触发词未标注。许可：Apache License 2.0。ModelScope `Apache License 2.0`（作者自填）。【实测】已核验 SHA256（modelscope）；MOSS 底模层键比对：兼容
+4mp
+8mp
+16mp
+h3_image_pruned_int8
+H3-Image 的 guidance 固定为 1、步数与 PDD sigma 表绑定，不能修改
+参考音频转谱固定产出仅旋律谱面，无法附加和弦符号
