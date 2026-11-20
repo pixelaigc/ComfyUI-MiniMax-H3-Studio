@@ -1,0 +1,398 @@
+{
+  "gen_defaults": {
+    "flf": {
+      "model_key": "fl2va_pruned_int8",
+      "aspect": "16:9",
+      "resolution": "768p",
+      "megapixels": 0.8,
+      "resolution_percent": 100.0,
+      "duration": 5.0,
+      "lora": "ckpt850",
+      "lora_strength": 1.0,
+      "precision": "int8",
+      "steps": 4,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "r2v": {
+      "model_key": "ref2va_pruned_int8",
+      "aspect": "16:9",
+      "resolution": "768p",
+      "megapixels": 0.8,
+      "resolution_percent": 100.0,
+      "duration": 5.0,
+      "lora": "ckpt850",
+      "lora_strength": 1.0,
+      "precision": "int8",
+      "steps": 4,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    }
+  },
+  "gen_defaults_spec": {
+    "flf": [
+      {
+        "name": "model_key",
+        "label": "底模",
+        "type": "enum",
+        "default": "fl2va_pruned_int8",
+        "min": null,
+        "max": null,
+        "note": "首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。",
+        "options": [
+          {
+            "value": "fl2va_pruned_int8",
+            "label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）"
+          },
+          {
+            "value": "fl2va_int8",
+            "label": "MiniMax-H3 FL2VA · 完整 int8（保真最高）"
+          },
+          {
+            "value": "fl2va_pruned_w4a8",
+            "label": "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）"
+          },
+          {
+            "value": "fl2va_bf16",
+            "label": "MiniMax-H3 FL2VA · BF16（官方原始精度）"
+          }
+        ]
+      },
+      {
+        "name": "resolution",
+        "label": "分辨率档位",
+        "type": "enum",
+        "default": "768p",
+        "min": null,
+        "max": null,
+        "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+        "options": [
+          {
+            "value": "288p",
+            "label": "288p · 704×288（21:9）"
+          },
+          {
+            "value": "352p",
+            "label": "352p · 352×608（9:16）"
+          },
+          {
+            "value": "384p",
+            "label": "384p · 384×576（2:3）"
+          },
+          {
+            "value": "416p",
+            "label": "416p · 416×736（9:16）"
+          },
+          {
+            "value": "448p",
+            "label": "448p · 448×448（1:1）"
+          },
+          {
+            "value": "480p",
+            "label": "480p · 480×640（3:4）"
+          },
+          {
+            "value": "512p",
+            "label": "512p · 1216×512（21:9）"
+          },
+          {
+            "value": "544p",
+            "label": "544p · 544×800（2:3）"
+          },
+          {
+            "value": "576p",
+            "label": "576p · 576×576（1:1）"
+          },
+          {
+            "value": "608p",
+            "label": "608p · 608×1056（9:16）"
+          },
+          {
+            "value": "640p",
+            "label": "640p · 640×640（1:1）"
+          },
+          {
+            "value": "672p",
+            "label": "672p · 672×928（3:4）"
+          },
+          {
+            "value": "704p",
+            "label": "704p · 704×1056（2:3）"
+          },
+          {
+            "value": "736p",
+            "label": "736p · 736×736（1:1）"
+          },
+          {
+            "value": "768p",
+            "label": "768p · 768×1344（9:16）"
+          },
+          {
+            "value": "800p",
+            "label": "800p · 800×800（1:1）"
+          },
+          {
+            "value": "832p",
+            "label": "832p · 832×1248（2:3）"
+          },
+          {
+            "value": "864p",
+            "label": "864p · 864×864（1:1）"
+          },
+          {
+            "value": "896p",
+            "label": "896p · 896×1184（3:4）"
+          },
+          {
+            "value": "928p",
+            "label": "928p · 928×928（1:1）"
+          },
+          {
+            "value": "960p",
+            "label": "960p · 960×960（1:1）"
+          },
+          {
+            "value": "1024p",
+            "label": "1024p · 1024×1024（1:1）"
+          },
+          {
+            "value": "1088p",
+            "label": "1088p · 1088×1440（3:4）"
+          },
+          {
+            "value": "1120p",
+            "label": "1120p · 1120×1120（1:1）"
+          },
+          {
+            "value": "1184p",
+            "label": "1184p · 1184×1760（2:3）"
+          },
+          {
+            "value": "1248p",
+            "label": "1248p · 1248×1248（1:1）"
+          },
+          {
+            "value": "1376p",
+            "label": "1376p · 1376×1376（1:1）"
+          },
+          {
+            "value": "1440p",
+            "label": "1440p · 1440×1440（1:1）"
+          }
+        ]
+      },
+      {
+        "name": "megapixels",
+        "label": "MP 预算（百万像素）",
+        "type": "number",
+        "default": 0.4,
+        "min": 0.01,
+        "max": 2.0,
+        "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+        "options": null
+      },
+      {
+        "name": "resolution_percent",
+        "label": "MP 预算百分比（%）",
+        "type": "number",
+        "default": 100.0,
+        "min": 1.0,
+        "max": 200.0,
+        "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+        "options": null
+      },
+      {
+        "name": "duration",
+        "label": "时长（秒）",
+        "type": "number",
+        "default": 5.0,
+        "min": 2.0,
+        "max": 60.0,
+        "note": "",
+        "options": null
+      }
+    ],
+    "r2v": [
+      {
+        "name": "model_key",
+        "label": "底模",
+        "type": "enum",
+        "default": "ref2va_pruned_int8",
+        "min": null,
+        "max": null,
+        "note": "参考生视频必须用支持 Ref2VA 的权重 —— FL2VA 权重没有参考通道，用它等于「参考没生效」。",
+        "options": [
+          {
+            "value": "ref2va_pruned_int8",
+            "label": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）"
+          },
+          {
+            "value": "ref2va_int8",
+            "label": "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）"
+          },
+          {
+            "value": "hybrid_fl2va_ref2va",
+            "label": "MiniMax-H3 混合版 · FL2VA+Ref2VA"
+          }
+        ]
+      },
+      {
+        "name": "resolution",
+        "label": "分辨率档位",
+        "type": "enum",
+        "default": "768p",
+        "min": null,
+        "max": null,
+        "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+        "options": [
+          {
+            "value": "288p",
+            "label": "288p · 704×288（21:9）"
+          },
+          {
+            "value": "352p",
+            "label": "352p · 352×608（9:16）"
+          },
+          {
+            "value": "384p",
+            "label": "384p · 384×576（2:3）"
+          },
+          {
+            "value": "416p",
+            "label": "416p · 416×736（9:16）"
+          },
+          {
+            "value": "448p",
+            "label": "448p · 448×448（1:1）"
+          },
+          {
+            "value": "480p",
+            "label": "480p · 480×640（3:4）"
+          },
+          {
+            "value": "512p",
+            "label": "512p · 1216×512（21:9）"
+          },
+          {
+            "value": "544p",
+            "label": "544p · 544×800（2:3）"
+          },
+          {
+            "value": "576p",
+            "label": "576p · 576×576（1:1）"
+          },
+          {
+            "value": "608p",
+            "label": "608p · 608×1056（9:16）"
+          },
+          {
+            "value": "640p",
+            "label": "640p · 640×640（1:1）"
+          },
+          {
+            "value": "672p",
+            "label": "672p · 672×928（3:4）"
+          },
+          {
+            "value": "704p",
+            "label": "704p · 704×1056（2:3）"
+          },
+          {
+            "value": "736p",
+            "label": "736p · 736×736（1:1）"
+          },
+          {
+            "value": "768p",
+            "label": "768p · 768×1344（9:16）"
+          },
+          {
+            "value": "800p",
+            "label": "800p · 800×800（1:1）"
+          },
+          {
+            "value": "832p",
+            "label": "832p · 832×1248（2:3）"
+          },
+          {
+            "value": "864p",
+            "label": "864p · 864×864（1:1）"
+          },
+          {
+            "value": "896p",
+            "label": "896p · 896×1184（3:4）"
+          },
+          {
+            "value": "928p",
+            "label": "928p · 928×928（1:1）"
+          },
+          {
+            "value": "960p",
+            "label": "960p · 960×960（1:1）"
+          },
+          {
+            "value": "1024p",
+            "label": "1024p · 1024×1024（1:1）"
+          },
+          {
+            "value": "1088p",
+            "label": "1088p · 1088×1440（3:4）"
+          },
+          {
+            "value": "1120p",
+            "label": "1120p · 1120×1120（1:1）"
+          },
+          {
+            "value": "1184p",
+            "label": "1184p · 1184×1760（2:3）"
+          },
+          {
+            "value": "1248p",
+            "label": "1248p · 1248×1248（1:1）"
+          },
+          {
+            "value": "1376p",
+            "label": "1376p · 1376×1376（1:1）"
+          },
+          {
+            "value": "1440p",
+            "label": "1440p · 1440×1440（1:1）"
+          }
+        ]
+      },
+      {
+        "name": "megapixels",
+        "label": "MP 预算（百万像素）",
+        "type": "number",
+        "default": 0.4,
+        "min": 0.01,
+        "max": 2.0,
+        "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+        "options": null
+      },
+      {
+        "name": "resolution_percent",
+        "label": "MP 预算百分比（%）",
+        "type": "number",
+        "default": 100.0,
+        "min": 1.0,
+        "max": 200.0,
+        "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+        "options": null
+      },
+      {
+        "name": "duration",
+        "label": "时长（秒）",
+        "type": "number",
+        "default": 5.0,
+        "min": 2.0,
+        "max": 60.0,
+        "note": "",
+        "options": null
+      }
+    ]
+  }
+}
