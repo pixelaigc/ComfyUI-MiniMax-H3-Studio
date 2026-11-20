@@ -16,10 +16,12 @@ Agent 后端增强 **第二轮**的回归测试。
    必被服务端拦下。本轮按 mode 的槽位计划分派。
 
 3. **按族校验分辨率 / 时长**
-   视频分辨率只有 544p/768p（传 1080p 静默落 768p）；
+   【2026-11-20 更新】视频分辨率档位是**真实预设并集**（短边像素标签，
+   2.0MP 画布内），不再是旧面板的 544p/768p；1080p 这种「非档位名」
+   仍会被拦，但 allowed 给出的是真实全集。
    图像分辨率按族有各自的 MP 上下限（t2i 3.0 / t2i_qwen 4.2 / t2i_moss 4.0-0.25）；
-   音乐时长字段是 max_duration（4~360，默认 60），传 duration 会被静默忽略；
-   视频 duration 后端不限但 Agent 侧要卡 5~15（面板可复现区间）。
+   音乐时长字段是 max_duration（4~900，默认 900），传 duration 会被静默忽略；
+   视频 duration 后端上限 60 秒，Agent 侧按同一真源卡（面板可复现区间）。
 
 4. **负面提示词支持矩阵**
    只在 t2i_moss 与 t2i+Z-Image Base 真正生效；Qwen 族需 cfg>1；
@@ -216,9 +218,22 @@ class TestModeInventory(_Base):
         self.assertEqual(by_mode["i2i_qwen"].get("slots"), "ref_image")
 
     def test_list_modes_gives_video_resolutions(self):
-        """视频分辨率只有 544p/768p。"""
+        """
+        【2026-11-20 修】视频分辨率不再只有 544p/768p。
+
+        真实策略是 2.0 MP 画布（video_models.VIDEO_MODE_SIZE_POLICY）
+        + 32 对齐 + 可自定义宽高。列表里的档位是**真实预设并集**
+        （短边像素标签），不是旧面板的两个下拉项。
+        原来这里断言 "544p,768p" —— 等于把用户指出的那句假话
+        钉死在测试里。
+        """
         result = self.call("list_modes", {})
-        self.assertEqual(result["video_resolutions"], "544p,768p")
+        tiers = (result.get("video_resolution_note") or "")
+        self.assertIn("480p", tiers)
+        self.assertNotIn("只有 544p", tiers)
+        # 完整档位清单由 get_mode_schema 按需提供
+        schema = agent_schema.mode_schema("t2v")
+        self.assertIn("480p", schema["params"]["resolution"]["values"])
 
     def test_list_modes_negative_prompt_effectiveness(self):
         """负面提示词是否生效必须如实告诉模型。"""
@@ -383,14 +398,23 @@ class TestPerFamilyResolutionValidation(_Base):
     """分辨率按族校验 —— 拒绝非法值而不是静默回落。"""
 
     def test_video_1080p_is_rejected(self):
-        """视频只有 544p/768p —— 传 1080p 会静默落 768p，必须拦。"""
+        """
+        【2026-11-20 修】1080p 不是**视频档位名**（视频档位是短边像素标签），
+        但「合法档位集合」不再等于 wf.RES_MP。
+
+        1080p 仍然要被拦（视频没有叫 1080p 的档位），但 allowed
+        必须是**真实档位全集**（含 480p），而不是 {544p, 768p}。
+        """
         issues = agent_schema.validate_params("t2v", {"resolution": "1080p"})
         self.assertTrue(issues)
         self.assertEqual(issues[0].field, "resolution")
-        self.assertEqual(issues[0].allowed, list(wf.RES_MP.keys()))
+        self.assertEqual(issues[0].allowed,
+                         agent_schema.mode_resolutions("t2v"))
+        self.assertIn("480p", issues[0].allowed)
 
     def test_video_valid_resolutions_pass(self):
-        for tier in wf.RES_MP:
+        """视频的**全部真实档位**都必须通过校验（含 480p）。"""
+        for tier in agent_schema.mode_resolutions("t2v"):
             issues = agent_schema.validate_params("t2v", {"resolution": tier})
             self.assertEqual(issues, [], tier)
 

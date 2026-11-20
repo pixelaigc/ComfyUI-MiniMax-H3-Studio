@@ -432,7 +432,14 @@ class TestAgentModeOptions(unittest.TestCase):
                          "不该有硬编码时长白名单")
         self.assertEqual(result["video_duration_range"],
                          [int(vm.VIDEO_DURATION_MIN), int(vm.VIDEO_DURATION_MAX)])
-        self.assertEqual(result["music_duration_range"], [4, 360])
+        # 【2026-11-20 修】音乐时长必须从 music_yue2 真源取。
+        # 原来这里写死 [4, 360] —— 但 YuE2 节点 schema 的上限是
+        # **900 秒**（music_yue2.YUE2_MAX_DURATION = 900.0），
+        # 360 是更早一版遗留的数字。写死 = 下次改真源这里必挂。
+        from h3studio import music_yue2
+        self.assertEqual(result["music_duration_range"],
+                         [int(music_yue2.YUE2_MIN_DURATION),
+                          int(music_yue2.YUE2_MAX_DURATION)])
         # 每个模式条目里也不能再有白名单式的 durations
         for entry in result["modes"]:
             self.assertNotIn("durations", entry)

@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# 部署「Agent 能力自述真实化 + 媒体后处理补齐 + 多步请求一气呵成」到 8190
+# （2026-11-20）
+#
+# 与既有 deploy_*.sh 同纪律：
+#   * git commit-tree + update-ref（不切分支、不碰 live 的未跟踪文件）
+#   * 只精确 checkout 本次改动的文件
+#   * 只重启 h3-studio.service
+#   * 合并前重新核实 live 现状（并发安全）
+#   * 部署后完整性自检（逐个核文件在位 + 工作区与 HEAD 一致）
+set -euo pipefail
+
+REPO=/root/projects/comfyui-minimax-h3-studio
+LIVE=/root/projects/h3studio-live
+BRANCH=local/feature/agent-cap-truth
+PORT=8190
+TS=$(date +%Y%m%d-%H%M%S)
+
+cd "$REPO"
+
+echo "=== 0) 现状 ==="
+MAINTAINER_BEFORE=$(git rev-parse local/maintainer)
+LIVE_BEFORE=$(git rev-parse local/deploy/qwen-ref-assets-live)
+echo "maintainer = $MAINTAINER_BEFORE"
+echo "live       = $LIVE_BEFORE"
+echo "审查分支    = $(git rev-parse "$BRANCH")"
+systemctl is-active h3-studio.service
+PID_BEFORE=$(systemctl show h3-studio.service -p MainPID --value)
+echo "重启前 PID=$PID_BEFORE"
+
+# 【并发安全】live 必须仍停在本轮开始时看到的状态。
+EXPECT_LIVE=bf5ef98119f91d1610efbecddf6d4d07d05301e9
+if [ "$LIVE_BEFORE" != "$EXPECT_LIVE" ]; then
+  echo "!! live 分支已被别人推进（$LIVE_BEFORE != $EXPECT_LIVE），中止部署"
+  exit 1
+fi
+# 【maintainer 与 live 的关系】live 是「含 maintainer 的合并提交」，
+# 所以两者**不是**同一个 commit（live 的父提交才是 maintainer）。
+# 判据用**祖先关系**：maintainer 必须是 live 的祖先，否则说明
+# maintainer 被别人推进过而 live 没回灌 —— 那时合并会覆盖别人的工作。
+if ! git merge-base --is-ancestor "$MAINTAINER_BEFORE" "$LIVE_BEFORE"; then
+  echo "!! maintainer 不是 live 的祖先（$MAINTAINER_BEFORE vs $LIVE_BEFORE），中止部署"
+  exit 1
+fi
+echo "maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）"
+
+# 【live 工作区干净性】只允许**未跟踪**文件存在；有 tracked 改动就中止
+LIVE_DIRTY=$(cd "$LIVE" && git status --porcelain | grep -v '^??' || true)
+if [ -n "$LIVE_DIRTY" ]; then
+  echo "!! live 工作区有 tracked 改动，中止部署："
+  echo "$LIVE_DIRTY"
+  exit 1
+fi
+echo "live 工作区：无 tracked 改动（只有未跟踪的证据文件）"
+
+git branch "backup/live-before-agentcap-${TS}" local/deploy/qwen-ref-assets-live
+git branch "backup/maintainer-before-agentcap-${TS}" local/maintainer
+echo "回滚点：backup/live-before-agentcap-${TS} / backup/maintainer-before-agentcap-${TS}"
+
+echo
+echo "=== 1) 预演合并 ==="
+git merge-tree --write-tree local/deploy/qwen-ref-assets-live "$BRANCH" > /tmp/agentcap_mergetree.txt
+if grep -q '<<<<<<<' /tmp/agentcap_mergetree.txt; then
+  echo "!! 冲突，中止"; exit 1
+fi
+echo "无冲突"
+
+echo
+echo "=== 2) 造合并提交 ==="
+MERGE_TREE=$(cat /tmp/agentcap_mergetree.txt)
+MERGE_COMMIT=$(git commit-tree "$MERGE_TREE" \
+  -p local/deploy/qwen-ref-assets-live \
+  -p "$BRANCH" \
+  -F - <<'MSG'
+fix(agent): 能力自述改为读真实配置 + 补齐媒体后处理 + 多步请求一气呵成
+
+【用户报的两个缺陷】
+1) Agent 对能力的陈述过时且与真实能力脱节 ——
+   它说「视频分辨率只有 544p / 768p，请求 480p 实际按 768p 生成」。
+2) 用户要求「合并音视频」时，Agent 没有一气呵成完成，需要用户中间催促。
+
+【根因】能力事实硬编码在系统提示词 / list_modes 返回 / create_job schema
+三处且各写一份 —— 必然漂移。服务端早已放宽（视频 2.0MP 画布 + 32 对齐 +
+可自定义宽高；视频时长 2~60 秒；音乐时长 4~900 秒默认 900；
+视频底模 7 个 / 注意力 5 种 / 加速 LoRA 12 枚 —— Agent 完全不知道）。
+更糟：Agent 侧校验器用旧白名单，会把合法的 480p 当成非法值拦下。
+
+【目标 B】新增 h3studio/agent_capability.py 作为单一真源，全部从服务端
+真实配置派生；SYSTEM_PROMPT 改成模板 + 运行时渲染；list_modes /
+get_mode_schema / create_job schema 全部改派生；validate_params 的视频
+分辨率校验不再用旧白名单；size_policy_for_mode 面积上限改为实时派生。
+
+【目标 C】新增 4 个 ffmpeg 工具（真实调用，产物入素材库可被后续引用）：
+media_extract_audio / media_trim / media_normalize_audio /
+media_replace_audio（真正「替换」音轨，原来的 mix_audio(replace=True)
+是「把原音混进去」不是替换）。
+
+【目标 D】删除提示词里「工具调用预算是 8 次」与「关键参数缺失不要硬着头皮
+做」的强制反问引导；澄清式 respond 不再收尾（编排层继续把能做完的做完）；
+新增无进展检测（事实指纹连续 6 步不变 -> 收尾）；工具结果裁剪改为结构化
+裁剪（旧实现头尾拼接会产出语法非法的 JSON，实测 7 例 5 例解析失败）。
+
+【回归】新增 tests/test_agent_capability_truth.py（53 项）；更新 3 个
+锁死了过时事实的既有断言。
+MSG
+)
+echo "合并提交 = $MERGE_COMMIT"
+
+echo
+echo "=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）==="
+git update-ref refs/heads/local/maintainer "$MERGE_COMMIT" "$MAINTAINER_BEFORE"
+git update-ref refs/heads/local/deploy/qwen-ref-assets-live "$MERGE_COMMIT" "$LIVE_BEFORE"
+echo "maintainer = $(git rev-parse local/maintainer)"
+echo "live       = $(git rev-parse local/deploy/qwen-ref-assets-live)"
+
+echo
+echo "=== 4) 精确 checkout 本次改动的文件到 live ==="
+CHANGED=$(git diff --name-only "$LIVE_BEFORE" "$MERGE_COMMIT")
+echo "$CHANGED" | sed 's/^/  /'
+echo "共 $(echo "$CHANGED" | wc -l) 个文件"
+# 【中文文件名必须用 NUL 分隔传给 git checkout】
+git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
+  | (cd "$LIVE" && xargs -0 git checkout "$MERGE_COMMIT" --)
+echo
+
+echo "=== 5) 部署后完整性自检 ==="
+git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
+  | (cd "$LIVE" && while IFS= read -r -d '' f; do
+       [ -z "$f" ] && continue
+       [ -e "$f" ] || echo "MISSING:$f"
+     done) > /tmp/agentcap_missing.txt
+MISSING=$(cat /tmp/agentcap_missing.txt)
+if [ -n "$MISSING" ]; then
+  echo "!! 以下文件部署后缺失："; echo "$MISSING"; exit 1
+fi
+DIFF=$(cd "$LIVE" && git status --porcelain | grep -v '^??' || true)
+if [ -n "$DIFF" ]; then
+  echo "!! live 工作区与 HEAD 不一致："; echo "$DIFF"; exit 1
+fi
+echo "完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）"
+
+echo
+echo "=== 6) 重启服务 ==="
+systemctl restart h3-studio.service
+sleep 6
+systemctl is-active h3-studio.service
+PID_AFTER=$(systemctl show h3-studio.service -p MainPID --value)
+echo "重启后 PID=$PID_AFTER（原 $PID_BEFORE）"
+
+echo
+echo "=== 7) 探活 ==="
+for p in "/" "/api/jobs" "/api/image-options" "/api/generation-types" "/api/enhancer" "/api/agent/settings"; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}${p}")
+  echo "  $p -> $code"
+  [ "$code" = "200" ] || { echo "!! $p 返回 $code"; exit 1; }
+done
+
+echo
+echo "=== 8) 服务日志尾部 ==="
+journalctl -u h3-studio.service --since "-3min" --no-pager | tail -20
+
+echo
+echo "=== 部署完成 ==="
+echo "merge commit = $MERGE_COMMIT"
+echo "回滚点：backup/live-before-agentcap-${TS} / backup/maintainer-before-agentcap-${TS}"

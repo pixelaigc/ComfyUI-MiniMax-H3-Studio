@@ -22,6 +22,10 @@ agent.py 是编排器，agent_tools.py 是「项目内能力」（素材/任务/
   media_extract_frames    抽帧（ffmpeg）                  能力：media_tools
   media_mix_audio         混音（ffmpeg）                  能力：media_tools
   media_merge_av          音视频合流（ffmpeg）             能力：media_tools
+  media_extract_audio     抽取音轨（ffmpeg）               能力：media_tools
+  media_trim              时长裁剪/截取片段（ffmpeg）      能力：media_tools
+  media_normalize_audio   响度归一（ffmpeg）              能力：media_tools
+  media_replace_audio     替换音轨（ffmpeg）              能力：media_tools
 """
 from __future__ import annotations
 
@@ -46,6 +50,10 @@ TOOL_CAPABILITIES: dict[str, str] = {
     "media_extract_frames": "media_tools",
     "media_mix_audio": "media_tools",
     "media_merge_av": "media_tools",
+    "media_extract_audio": "media_tools",
+    "media_trim": "media_tools",
+    "media_normalize_audio": "media_tools",
+    "media_replace_audio": "media_tools",
 }
 
 
@@ -360,6 +368,135 @@ def register(agent_mod) -> None:
             return await agent_media_tools.op_merge_av(
                 str(args.get("video_asset_id") or ""),
                 str(args.get("audio_asset_id") or ""))
+        except agent_media_tools.MediaToolError as exc:
+            raise AgentError(exc.message, status=exc.status,
+                             code=exc.code) from exc
+
+    # ------------------------------------------------------------ 抽取音轨
+
+    @tool(
+        "media_extract_audio",
+        "从视频素材里抽出音轨，得到一个独立的音频素材。真实调用 ffmpeg，"
+        "产物入素材库并返回新的 asset_id（可再被合并/混音引用）。",
+        _schema({
+            "asset_id": {"type": "string", "description": "视频素材 ID"},
+            "output_format": {"type": "string",
+                              "description": "音频格式：m4a（默认）/ mp3 / wav / "
+                                             "flac / opus"},
+            "start_sec": {"type": "number",
+                          "description": "起始秒数，默认 0"},
+            "duration_sec": {"type": "number",
+                             "description": "截取多少秒（留空 = 抽到结尾）"},
+        }, ["asset_id"]),
+    )
+    async def _tool_media_extract_audio(ctx, args: dict) -> dict:
+        _require(ctx, "media_tools")
+        duration = args.get("duration_sec")
+        try:
+            duration = float(duration) if duration is not None else None
+        except (TypeError, ValueError):
+            duration = None
+        try:
+            return await agent_media_tools.op_extract_audio(
+                str(args.get("asset_id") or ""),
+                str(args.get("output_format") or "m4a"),
+                float(args.get("start_sec") or 0.0),
+                duration)
+        except agent_media_tools.MediaToolError as exc:
+            raise AgentError(exc.message, status=exc.status,
+                             code=exc.code) from exc
+
+    # ------------------------------------------------------------ 时长裁剪
+
+    @tool(
+        "media_trim",
+        "按时长裁剪 / 截取视频片段（真实调用 ffmpeg，精确到帧）。"
+        "产物入素材库并返回新的 asset_id。",
+        _schema({
+            "asset_id": {"type": "string", "description": "素材 ID"},
+            "start_sec": {"type": "number",
+                          "description": "从第几秒开始截（默认 0）"},
+            "duration_sec": {"type": "number",
+                             "description": "截多少秒（留空 = 截到结尾）"},
+            "output_name": {"type": "string",
+                            "description": "产物名称（留空自动命名）"},
+        }, ["asset_id"]),
+    )
+    async def _tool_media_trim(ctx, args: dict) -> dict:
+        _require(ctx, "media_tools")
+        duration = args.get("duration_sec")
+        try:
+            duration = float(duration) if duration is not None else None
+        except (TypeError, ValueError):
+            duration = None
+        try:
+            return await agent_media_tools.op_trim(
+                str(args.get("asset_id") or ""),
+                float(args.get("start_sec") or 0.0),
+                duration,
+                str(args.get("output_name") or ""))
+        except agent_media_tools.MediaToolError as exc:
+            raise AgentError(exc.message, status=exc.status,
+                             code=exc.code) from exc
+
+    # ------------------------------------------------------------ 响度归一
+
+    @tool(
+        "media_normalize_audio",
+        "把音视频的音轨做响度归一（EBU R128 / loudnorm）。"
+        "用于「原声 + 背景音乐」合并前后统一响度，避免爆音或听不清。"
+        "真实调用 ffmpeg，产物入素材库并返回新的 asset_id。",
+        _schema({
+            "asset_id": {"type": "string", "description": "素材 ID"},
+            "target_lufs": {"type": "number",
+                            "description": "目标响度（LUFS），"
+                                           "默认 -14（范围 -40 ~ -5）"},
+            "max_true_peak": {"type": "number",
+                               "description": "最大真峰值（dBTP），默认 -1.5"},
+        }, ["asset_id"]),
+    )
+    async def _tool_media_normalize_audio(ctx, args: dict) -> dict:
+        _require(ctx, "media_tools")
+        try:
+            return await agent_media_tools.op_normalize_audio(
+                str(args.get("asset_id") or ""),
+                float(args.get("target_lufs") if args.get("target_lufs")
+                      is not None else -14.0),
+                float(args.get("max_true_peak")
+                      if args.get("max_true_peak") is not None else -1.5))
+        except agent_media_tools.MediaToolError as exc:
+            raise AgentError(exc.message, status=exc.status,
+                             code=exc.code) from exc
+
+    # ------------------------------------------------------------ 替换音轨
+
+    @tool(
+        "media_replace_audio",
+        "把视频的原音轨**替换**成另一段音频（原声被去掉，不是混合）。"
+        "真实调用 ffmpeg，产物入素材库并返回新的 asset_id。",
+        _schema({
+            "video_asset_id": {"type": "string", "description": "视频素材 ID"},
+            "audio_asset_id": {"type": "string", "description": "音频素材 ID"},
+            "keep_original": {"type": "boolean",
+                              "description": "true = 保留原声并与新音轨并排混合；"
+                                             "false（默认）= 原声彻底去掉"},
+            "volume": {"type": "number",
+                       "description": "新音轨音量系数（0~4，默认 1.0）"},
+        }, ["video_asset_id", "audio_asset_id"]),
+    )
+    async def _tool_media_replace_audio(ctx, args: dict) -> dict:
+        _require(ctx, "media_tools")
+        try:
+            volume = float(args.get("volume")
+                           if args.get("volume") is not None else 1.0)
+        except (TypeError, ValueError):
+            volume = 1.0
+        try:
+            return await agent_media_tools.op_replace_audio(
+                str(args.get("video_asset_id") or ""),
+                str(args.get("audio_asset_id") or ""),
+                agent_mod._as_bool(args.get("keep_original")),
+                volume)
         except agent_media_tools.MediaToolError as exc:
             raise AgentError(exc.message, status=exc.status,
                              code=exc.code) from exc
