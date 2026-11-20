@@ -315,6 +315,38 @@ class TestBothPathsConsumeDefaults(unittest.TestCase):
             "flf", params, defaults, explicit=("megapixels",), overridable=())
         self.assertEqual(float(params["megapixels"]), 1.0)
 
+    def test_explicit_percent_suppresses_default_megapixels(self):
+        """【缺陷回归】显式给了百分比，就**不能**再套管理页默认的 MP 预算。
+
+        「MP 预算」与「MP 预算百分比」是同一件事的两种写法，
+        而 plan_size 的优先级是 megapixels > percent。
+        如果两个都进 params，用户的百分比会被无视 ——
+        线上实测：提交 resolution_percent=50，落库却是管理页默认的
+        0.8 MP（1216×672），而不是 50% × 2.0MP = 1.0 MP。
+        """
+        defaults = {"flf": {"megapixels": 0.8, "resolution_percent": 100.0}}
+        params = {"prompt": "x", "resolution_percent": 50}
+        gen_defaults.merge_into_params(
+            "flf", params, defaults, explicit=("resolution_percent",),
+            overridable=())
+        self.assertNotIn("megapixels", params,
+                         f"管理页默认的 megapixels 不该把用户的百分比盖掉：{params}")
+        self.assertEqual(float(params["resolution_percent"]), 50.0)
+        # 换算后应当是 50% × 2.0MP = 1.0 MP
+        width, height, _ = size_spec.plan_size(
+            "flf", "16:9", megapixels=params.get("megapixels"),
+            percent=params.get("resolution_percent"))
+        self.assertEqual((width, height), (1376, 768))
+
+    def test_explicit_megapixels_suppresses_default_percent(self):
+        """反过来：显式给了 MP 预算，就不套管理页默认的百分比。"""
+        defaults = {"flf": {"megapixels": 0.8, "resolution_percent": 100.0}}
+        params = {"prompt": "x", "megapixels": 0.4}
+        gen_defaults.merge_into_params(
+            "flf", params, defaults, explicit=("megapixels",), overridable=())
+        self.assertNotIn("resolution_percent", params, params)
+        self.assertEqual(float(params["megapixels"]), 0.4)
+
     def test_video_size_layer_consumes_mp_percent(self):
         """服务端尺寸归一层（flf/r2v 权威入口）吃 MP 预算。"""
         params = {"aspect": "16:9", "megapixels": 0.4}

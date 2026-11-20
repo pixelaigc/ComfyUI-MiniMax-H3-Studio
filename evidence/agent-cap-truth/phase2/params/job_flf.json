@@ -1,18 +1,19 @@
 {
   "label": "flf",
-  "job_id": "e4a1e5a6dee7",
+  "job_id": "71e232884711",
   "created": {
-    "id": "e4a1e5a6dee7",
+    "id": "71e232884711",
     "status": "queued",
     "batch_count": 1
   },
   "db_row": {
-    "id": "e4a1e5a6dee7",
+    "id": "71e232884711",
     "mode": "flf",
     "status": "queued",
     "params": {
       "prompt": "线上验证：首尾帧默认参数落库",
-      "asset_id": "asset_b8a8ee54bcee",
+      "asset_id": "asset_f65943f4f221",
+      "model_key": "fl2va_pruned_int8",
       "aspect": "16:9",
       "resolution": "672p",
       "megapixels": 0.779,
@@ -32,7 +33,6 @@
         "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
       ],
       "seed": null,
-      "model_key": "fl2va_pruned_int8",
       "accel_lora": "ckpt850",
       "accel_lora_strength": 1.0,
       "accel_lora_loader": "MiniMaxH3TurboLoRA",
@@ -55,18 +55,18 @@
       "audio_track_source": "generated",
       "asset_refs": [
         {
-          "asset_id": "asset_b8a8ee54bcee",
+          "asset_id": "asset_f65943f4f221",
           "slot": "first_frame",
           "ordinal": 0
         }
       ],
       "gen_type": "flf",
       "continuation": {
-        "chain_id": "e4a1e5a6dee7",
+        "chain_id": "71e232884711",
         "stage_index": 0,
         "source_job": "",
         "source_segment": -1,
-        "latent_run_id": "h3studio_se4a1e5a6dee7",
+        "latent_run_id": "h3studio_s71e232884711",
         "latent_stage": 0,
         "context_frames": 22,
         "anchor_frames": 22,
