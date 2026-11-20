@@ -191,7 +191,15 @@ STALE_BUMPED = {
     #   ⇒ ?v= 必须再升一次（genfix20261119b -> refctx1）。
     #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按
     #   启发式新鲜度缓存。内容变了而 ?v= 不变 ⇒ 老用户拿到的仍是旧文件。
-    "app.js":                  ("genfix20261119b", "refctx1"),
+    # 【2026-11-20 生成媒体库收藏】app.js 的内容又被改过
+    #   （提交后不再跳标签 + 右键菜单加收藏项 + 卡片顶栏 ★ 标识 +
+    #    收藏视图标签与批量工具条）
+    #   ⇒ ?v= 必须再升一次（refctx1 -> fav20261120c）。
+    #   【顺带】新增的 favorites.js / favorites.css 也要登记在这张表里 ——
+    #   它们的内容变了而 ?v= 不变，同样是「老用户拿到的仍是旧文件」。
+    "app.js":                  ("refctx1",        "fav20261120c"),
+    "favorites.js":            ("fav20261120b",   "fav20261120c"),
+    "favorites.css":           ("fav20261120b",   "fav20261120c"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),

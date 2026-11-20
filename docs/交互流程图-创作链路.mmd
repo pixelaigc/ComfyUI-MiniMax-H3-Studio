@@ -116,7 +116,7 @@ flowchart TD
   subgraph OUT["⑤ 生成库（媒体库）"]
     direction LR
     LIB["任务卡片<br/>状态标签 + 生成类型标签"]
-    ACTS["卡片动作：`add-asset`、`add-stitch`、`cancel`、`continue`<br/>`delete`、`detail`、`download`、`open-new`<br/>`prompt`、`reuse`、`toggle-batches`"]
+    ACTS["卡片动作：`add-asset`、`add-stitch`、`cancel`、`continue`<br/>`delete`、`detail`、`download`、`favorite`<br/>`open-new`、`prompt`、`reuse`、`toggle-batches`"]
     DETAIL["ℹ 详情模态框<br/>完整生成参数 + 作者推荐参数"]
     REUSE["复用参数<br/>回填模式/模型/尺寸/LoRA/采样参数"]
     CONT["⏭ 接续<br/>GET /api/jobs/{id}/continuation"]

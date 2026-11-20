@@ -151,7 +151,15 @@ eval(grab('function showCreate() {', '\n}'));
 eval(grab('function showStitch() {', '\n}'));
 
 // ---- 真源码：refreshJobs 里拼 query 的那段 ----
-const qSrc = grab('if (["done", "all"].includes(status)) {', '\n      }');
+// 【为什么用正则而不是字面量】这段的 includes 列表会随功能演进变长
+// （收藏功能加了 "favorites"）—— 写死字面量会让这条断言在**任何**改动
+// 后失效，而且报的是「找不到标记」这种看不出意图的错。
+// 改成正则：只要「按状态分页的那段」还在就过，具体清单不关心。
+const qSrc = (() => {
+  const m = /if \(\[[^\]]*\]\.includes\(status\)\) \{[\s\S]*?\n      \}/.exec(src);
+  return m ? m[0] : '';
+})();
+if (!qSrc) throw new Error('找不到 refreshJobs 里按状态分页的那段（includes(status) 的 if 块）');
 // 把 query 构造抠出来单独跑：它依赖 URLSearchParams（node 内置）与 state
 const built = (function (state, tab) {
   const query = new URLSearchParams({ status: 'done' });
