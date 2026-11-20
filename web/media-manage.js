@@ -83,7 +83,10 @@
           <b>${esc(info.files)}</b> 个产物文件
         </div>
         <div class="mg-note">只影响本工作台（不含 ComfyUI 自身的产物目录，不含素材库）。
-          正在运行 / 排队中的任务不会被清理。</div>`;
+          正在运行 / 排队中的任务不会被清理。
+          ${info.skipped_favorited
+            ? `<br><b>已跳过 ${esc(info.skipped_favorited)} 条已收藏的产物</b>（收藏受保护，不会被清理）。`
+            : ""}</div>`;
     } catch (e) {
       box.innerHTML = `<div class="mg-stat error">统计失败：${esc(e.message)}</div>`;
     }
@@ -118,6 +121,10 @@
         `删除任务记录 ${r.deleted_jobs} 条\n` +
         `删除产物文件 ${r.deleted_files} 个\n` +
         (r.skipped_running ? `跳过进行中的任务 ${r.skipped_running} 条\n` : "") +
+        // 【2026-11-20 需求 4】如实报告「因为收藏而跳过」的数量 ——
+        // 用户需要知道为什么某些东西还在。
+        (r.skipped_favorited
+          ? `跳过已收藏的产物 ${r.skipped_favorited} 条（收藏受保护）\n` : "") +
         (r.deleted_batches ? `删除批次记录 ${r.deleted_batches} 条` : ""));
       close();
       // 让列表刷新 —— 走 app.js 的公开入口

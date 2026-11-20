@@ -38,6 +38,25 @@ CLEANABLE_STATUS = ("done", "failed", "canceled")
 FAILED_STATUS = ("failed", "canceled")
 
 
+def _favorited_ids(conn) -> set[str]:
+    """取当前**已收藏**的任务 id 集合。
+
+    【为什么要在这里取，而不是让调用方传进来】
+    清理有**三个**调用方（HTTP 接口 / 内置 Agent 的管理工具 / 单测），
+    每一个都传一遍收藏集合 = 三份口径，必然漂移。
+    这里直接从同一个 conn 读 —— preview() 与 cleanup() 用的是**同一个函数**，
+    所以「预览说删 3 条、真删 5 条」这种事不会发生。
+
+    【老库兼容】收藏表可能不存在（没跑过 init_db）—— 查不到就当「没有收藏」，
+    清理行为与加收藏之前**完全一致**。
+    """
+    try:
+        rows = conn.execute("SELECT job_id FROM job_favorites").fetchall()
+    except Exception:
+        return set()
+    return {str(r[0]) for r in rows}
+
+
 def _outputs_of(row) -> list[dict]:
     """把 outputs 列（JSON 文本）解成列表；坏了就当空。"""
     try:
@@ -85,10 +104,16 @@ def preview(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
 
     scope: all | older | failed
     months: scope=older 时的月数（按 30 天/月折算）
+
+    【2026-11-20 新增】**已收藏的卡片一律跳过** ——
+    不清记录、不删产物文件、不影响文件索引。
+    预览里的 `skipped_favorited` 告诉用户「有多少条因为被收藏而保住了」。
     """
     cutoff = time.time() - max(0, int(months)) * 30 * 86400
+    favorited = _favorited_ids(conn)
     rows = conn.execute("SELECT id, status, outputs, created_at FROM jobs").fetchall()
     matched = []
+    skipped_favorited = 0
     for row in rows:
         status = row["status"]
         if status not in CLEANABLE_STATUS:
@@ -100,6 +125,10 @@ def preview(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
             created = row["created_at"] or 0
             if created >= cutoff:
                 continue
+        # 【收藏保护】命中清理范围，但被收藏 -> 跳过。
+        if str(row["id"]) in favorited:
+            skipped_favorited += 1
+            continue
         matched.append({
             "id": row["id"],
             "status": status,
@@ -112,6 +141,7 @@ def preview(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
         "jobs": len(matched),
         "files": sum(m["files"] for m in matched),
         "sample": matched[:20],
+        "skipped_favorited": skipped_favorited,
     }
 
 
@@ -120,13 +150,18 @@ def cleanup(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
 
     【口径与 preview() 完全一致】两边用同一个筛选函数，
     不存在「预览说 3 条、真删 5 条」这种事。
+
+    【2026-11-20 新增】已收藏的卡片**跳过**（记录、文件、文件索引全不动）。
+    取消收藏后，该卡片重新纳入清理范围 —— 下一次调用就会删它。
     """
     cutoff = time.time() - max(0, int(months)) * 30 * 86400
+    favorited = _favorited_ids(conn)
     rows = conn.execute("SELECT id, status, outputs, created_at FROM jobs").fetchall()
     deleted_jobs = 0
     deleted_files = 0
     deleted_batches = 0
     skipped_running = 0
+    skipped_favorited = 0
     for row in rows:
         status = row["status"]
         jid = row["id"]
@@ -141,6 +176,15 @@ def cleanup(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
             created = row["created_at"] or 0
             if created >= cutoff:
                 continue
+        # 【收藏保护】与 preview() 同一个判据 —— 已收藏的一律不动。
+        #
+        # 【为什么这里必须是「跳过」而不是「延迟删」】
+        # 延迟删需要一个额外的待删队列表，且会让用户困惑
+        # （「我明明收藏了，怎么还是没了」）。跳过是**可预期**的语义：
+        # 收藏 = 「别动它」。
+        if str(jid) in favorited:
+            skipped_favorited += 1
+            continue
         # 批次产物：先收批次里的 outputs（它们的文件不在 jobs.outputs 里）
         batch_rows = conn.execute(
             "SELECT id, outputs FROM job_batches WHERE job_id=?", (jid,)).fetchall()
@@ -150,6 +194,11 @@ def cleanup(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
         deleted_files += _delete_files(out_dir, _outputs_of(row))
         conn.execute("DELETE FROM job_batches WHERE job_id=?", (jid,))
         conn.execute("DELETE FROM jobs WHERE id=?", (jid,))
+        # 任务没了 -> 收藏标记成了孤儿行，顺带清掉（防收藏视图出现死条目）。
+        try:
+            conn.execute("DELETE FROM job_favorites WHERE job_id=?", (jid,))
+        except Exception:
+            pass   # 老库没有收藏表 —— 不阻断既有清理语义
         deleted_jobs += 1
         # 每个任务还有一个以 job id 命名的目录
         shutil.rmtree(out_dir / jid, ignore_errors=True)
@@ -160,6 +209,7 @@ def cleanup(conn, out_dir: Path, scope: str = "all", months: int = 0) -> dict:
         "deleted_batches": deleted_batches,
         "deleted_files": deleted_files,
         "skipped_running": skipped_running,
+        "skipped_favorited": skipped_favorited,
     }
 
 
