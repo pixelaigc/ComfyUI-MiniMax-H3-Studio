@@ -1,0 +1,94 @@
+=== 0) 现状 ===
+maintainer = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+live       = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+审查分支    = d3468ce9a1e245611dcaba3a04c9ef64caba9879
+active
+重启前 PID=3821450
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-221251 / backup/maintainer-before-agentcap-20261120-221251
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 57d7ccfbf8fac5fc017777f7aed0f20724aa9fab
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 57d7ccfbf8fac5fc017777f7aed0f20724aa9fab
+live       = 57d7ccfbf8fac5fc017777f7aed0f20724aa9fab
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_4.txt
+  evidence/agent-cap-truth/phase2/ffprobe/ffprobe_summary.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_${pair##*:}.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_0bbea594c379.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_71e232884711.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_e4a1e5a6dee7.json
+  evidence/agent-cap-truth/phase2/ffprobe/r2v_d7b3f83c8312.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_after_css_fix.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_baseline.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_live.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_after_css_fix.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_detail.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_flf_expanded.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_r2v_expanded.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_flf_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_r2v_AFTER.png
+  h3studio/agent_schema.py
+  h3studio/gen_defaults.py
+  scripts/deploy_deftruth_8190.sh
+  server.py
+共 21 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_4.txt
+  evidence/agent-cap-truth/phase2/ffprobe/ffprobe_summary.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_${pair##*:}.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_0bbea594c379.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_71e232884711.json
+  evidence/agent-cap-truth/phase2/ffprobe/flf_e4a1e5a6dee7.json
+  evidence/agent-cap-truth/phase2/ffprobe/r2v_d7b3f83c8312.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_after_css_fix.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_baseline.json
+  evidence/agent-cap-truth/phase2/spec/375px_detail_live.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_after_css_fix.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_detail.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_flf_expanded.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_r2v_expanded.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_flf_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_r2v_AFTER.png
+  h3studio/agent_schema.py
+  h3studio/gen_defaults.py
+  scripts/deploy_deftruth_8190.sh
+  server.py
+共 21 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+Warning: The unit file, source configuration file or drop-ins of h3-studio.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+active
+重启后 PID=67632（原 3821450）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 22:12:51 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 22:12:51 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 22:12:51 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 22:12:51 ubuntu systemd[1]: h3-studio.service: Consumed 1min 58.659s CPU time, 1020.3M memory peak.
+11月 20 22:12:51 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 57d7ccfbf8fac5fc017777f7aed0f20724aa9fab
+回滚点：backup/live-before-agentcap-20261120-221251 / backup/maintainer-before-agentcap-20261120-221251
