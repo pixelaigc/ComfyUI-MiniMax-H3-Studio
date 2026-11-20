@@ -1034,6 +1034,30 @@ async def op_replace_audio(video_asset_id: str, audio_asset_id: str,
         final = await _probe(out_path)
         name = _safe_output_name(f"{video_entry['name']}_replaced", ".mp4")
         registered = _register_output(out_path, name, "video")
+        # 【2026-11-20 新增 —— 如实回报音轨实际长度与补静音情况】
+        #
+        # 【为什么必须回报】实测：Agent 合并「6 秒视频 + 2 秒音频」后
+        # 在结论里说「2 秒之后是无声段」—— **说错了**：
+        # 工具内部补了静音（apad），音轨实际 5.99 秒。
+        # 模型看不到 apad，只能按**输入**音频的 2 秒推断 ->
+        # 向用户描述了一个不存在的现象。
+        #
+        # 现在把音轨实际时长、音轨比视频短多少、补了多少静音都报出来，
+        # 模型据此就能说对。
+        video_dur = float(video_info.get("duration") or 0.0)
+        audio_dur = float(audio_info.get("duration") or 0.0)
+        out_audio_dur = float(final.get("duration") or 0.0)
+        padded = False
+        if video_dur > 0 and out_audio_dur > audio_dur + 0.3:
+            padded = True
+        note = ""
+        if padded:
+            note = (f"音频比视频短（{audio_dur:.1f} 秒 vs {video_dur:.1f} 秒），"
+                    f"已自动补静音到 {out_audio_dur:.1f} 秒，"
+                    f"成片尾部是静音而不是断音。")
+        elif video_dur > 0 and out_audio_dur < video_dur - 0.3:
+            note = (f"音轨只到 {out_audio_dur:.1f} 秒"
+                    f"（视频 {video_dur:.1f} 秒），尾部无音。")
         return {
             "operation": "replace_audio",
             "video_input": video_entry["asset_id"],
@@ -1042,6 +1066,11 @@ async def op_replace_audio(video_asset_id: str, audio_asset_id: str,
             "volume": gain,
             "output": registered,
             "duration_sec": final["duration"],
+            "video_duration_sec": video_dur,
+            "input_audio_duration_sec": audio_dur,
+            "output_audio_duration_sec": out_audio_dur,
+            "audio_padded": padded,
+            "note": note,
         }
 
 
