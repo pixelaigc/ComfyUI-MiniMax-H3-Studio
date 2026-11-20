@@ -509,6 +509,24 @@
         removeAt(Number(btn.dataset.del));
       });
     });
+    // 【2026-11-20 参考素材右键移除】右键缩略图 -> 菜单里选「移除」。
+    //
+    // 【为什么必须走 removeAt 而不是直接 splice】removeAt 做了三件事：
+    //   1. 移除条目；
+    //   2. 重新编号（后续条目前移，不留空洞）；
+    //   3. 同步提示词里的占位标记（被移除那条的标记删掉，
+    //      其余按「旧槽位 -> 新槽位」单遍重写）。
+    // 直接 splice 就会留下悬空的 <imageN> —— 编号与实际插槽彻底错位。
+    //
+    // 【菜单本体在 web/ref-context-menu.js】三个模块共用一份实现，
+    // 这里只提供「移除」的语义。
+    if (window.RefContextMenu && typeof window.RefContextMenu.attach === "function") {
+      box.querySelectorAll(".img-ref-item").forEach(item => {
+        window.RefContextMenu.attach(item, () => {
+          removeAt(Number(item.dataset.idx));
+        }, "移除这张参考图");
+      });
+    }
     // 【2026-11-15 修复③ 交付项 2】点击已添加的媒体条目 -> 弹出预览模态框。
     //
     // 【为什么图片编辑类能力要这个】从素材库添加素材后，用户**看不到**素材

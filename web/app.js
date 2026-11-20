@@ -817,6 +817,46 @@ function renderMode() {
     });
   }
 
+  /**
+   * 【2026-11-20 参考素材右键移除】移除某个槽位里的素材。
+   *
+   * 【为什么不能只是 delete state.assetRefs[key]】
+   * 三件事必须同时做，缺一件就是缺陷：
+   *   1. 素材本身从 state.assetRefs 里去掉；
+   *   2. **同组**后面的素材前移（保持编号连续）——
+   *      否则「参考 1 / 参考 3」这种空洞编号会让送进模型的
+   *      第 2 张图对不上界面上的「参考 3」，而且 T8 节点会直接
+   *      报「<Picture 2> is not connected」（strict 模式硬失败）；
+   *   3. 提示词里的占位标记同步重写（被移除那条的标记删掉，
+   *      其余按「旧序号 -> 新序号」单遍替换，不留悬空引用）。
+   *
+   * 【纯逻辑在 web/ref-slots.js】那里是**可单测**的一份实现；
+   * 这里只做「取前后快照 -> 调纯逻辑 -> 重渲染」。
+   */
+  function removeSlotAsset(key) {
+    const api = window.RefSlots;
+    if (!api || typeof api.applyRemoval !== "function") {
+      alert("参考素材移除模块未加载，请刷新页面重试。");
+      return;
+    }
+    // 先算清楚「谁被移除、谁前移、序号怎么变」，再改状态。
+    const plan = api.planRemoval(state.mode, state.assetRefs, state.audioTrackSource, key);
+    if (!plan) return;
+    api.applyRemoval(state.assetRefs, key);
+    // 提示词里的占位标记必须跟着重排 —— 被移除那条的标记删掉，
+    // 其余按新序号重写（T8 的 strict 模式对悬空标记是硬失败）。
+    const promptBox = $("#prompt");
+    if (promptBox) {
+      promptBox.value = api.rewriteTags(promptBox.value, plan);
+    }
+    // 音轨来源下拉要重算（参考音乐 / 参考视频背景音的可见性判据）。
+    renderAudioTrackSelect();
+    // 重渲染槽位（编号徽标 / 缩略图 / 徽标全部按新顺序重画）。
+    // 【必须保留槽位状态】否则 resetSlotsForMode 会把刚移走的结果
+    // 连同剩下的素材一起清掉。
+    renderModeKeepSlotsRender();
+  }
+
   const mk = (key, label, kind = "image") => {
     const slot = document.createElement("div");
     slot.className = "up-slot";
@@ -947,6 +987,26 @@ function renderMode() {
     //   * 提交时 state 里却**带着**那个值（幽灵输入）。
     // 现在重建时按 state 回填，界面与提交**始终一致**。
     restoreSlotContent(slot, key, kind, label);
+    // 【2026-11-20 参考素材右键移除】已填的槽位 -> 右键出菜单，选「移除」。
+    //
+    // 【为什么必须有这个入口】视频面板的素材槽位（首帧 / 尾帧 /
+    // 参考图 / 参考视频 / 参考音乐）**原本没有任何移除入口** ——
+    // 填满后想换掉其中一条，只能去素材库删素材，或者切模式清空整块。
+    //
+    // 【为什么只在已填时挂】空槽位右键没有「移除」的对象 ——
+    // 菜单项要么禁用要么不出现。不挂比挂一个空菜单干净。
+    if (window.RefContextMenu && typeof window.RefContextMenu.attach === "function") {
+      window.RefContextMenu.attach(slot, () => {
+        removeSlotAsset(key);
+      }, "移除这个参考素材", () => {
+        // 只有**已填**的槽位才有「可移除的素材」。
+        // 空槽位右键不弹菜单（弹一个点不动的「移除」是假动作）。
+        // 【为什么直接读 state 而不是看 DOM 的 filled class】
+        // state.assetRefs 是**唯一真源**（界面与提交都读它），
+        // DOM 的 filled class 只是它的投影 —— 两处都可能不同步。
+        return !!((state.assetRefs || {})[key] || {}).asset_id;
+      });
+    }
     row.appendChild(slot);
   };
   if (mode === "flf") {

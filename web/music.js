@@ -456,6 +456,21 @@
       if (event.target.closest("button")) return;
       previewBtn.click();
     });
+    // 【2026-11-20 参考素材右键移除】右键这条参考音频 -> 菜单里选「移除」。
+    //
+    // 【为什么加这个】参考生音乐的参考音频是**一条**素材（不是列表），
+    // 之前只有卡片上那个「移除」小按钮 —— 那个按钮很容易被当成
+    // 别的按钮点掉（卡片上的按钮挤在一条窄条里）。
+    // 右键菜单是「明确针对这一条」的入口。
+    //
+    // 【语义】参考音频没有编号语义（只有一条），也没有占位标记
+    // 需要同步 —— 所以移除就是 refAudio = null + 重渲染。
+    if (window.RefContextMenu && typeof window.RefContextMenu.attach === "function") {
+      window.RefContextMenu.attach(card, () => {
+        refAudio = null;
+        renderRefAudio();
+      }, "移除这个参考音频");
+    }
     box.appendChild(card);
     if (note) note.textContent = "已选：" + (refAudio.name || refAudio.asset_id)
       + "（仅提取旋律线；成曲时长由歌词段落与 BPM 决定）";

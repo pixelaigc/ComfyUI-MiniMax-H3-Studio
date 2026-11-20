@@ -1103,6 +1103,9 @@
   <!-- 媒体库（生成结果）右键菜单 -->
   <div class="ctx-menu" id="mediaContext"></div>
 
+  <!-- 已添加的参考素材条目右键菜单（移除入口） -->
+  <div class="ctx-menu" id="refContextMenu"></div>
+
   <!-- 硬件参数页 -->
   <main class="system-page page-hidden" id="systemPage">
     <div class="sys-head">
@@ -1490,7 +1493,7 @@
 <!-- 【2026-11-14 合并说明】qwen-refs.js 版本号取 h3image1 —— 该分支改了
      qwen-refs.js（H3-Image 参考图占位语法隔离），必须升版号破缓存；
      mainline 一侧的 refs1 会让用户拿到旧文件。 -->
-<script src="/static/qwen-refs.js?v=cr20261118a"></script>
+<script src="/static/qwen-refs.js?v=refctx1"></script>
 <!-- 【2026-11-15 修复③ 交付项 1】滑杆 + 数值直输共用组件。
      必须**先于** app.js / video-panel.js / music.js 加载 —— 它在
      DOMContentLoaded 时扫描全部 range 并装上数字输入框，
@@ -1509,9 +1512,18 @@
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=cr20261115b"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
+<!-- 【2026-11-20 参考素材右键移除】已添加的参考素材条目的右键菜单。
+     必须在 qwen-refs.js / app.js **之前**加载 —— 那两个模块在渲染
+     参考素材条目时要调 window.RefContextMenu.attach()。
+     本模块只管菜单的显示 / 定位 / 关闭，「移除」的具体语义由调用方给。 -->
+<script src="/static/ref-context-menu.js?v=refctx1"></script>
+<!-- 【2026-11-20 参考素材右键移除】视频面板素材槽位的「同组前移 +
+     提示词占位标记重写」纯逻辑。必须在 app.js **之前**加载 ——
+     app.js 的 removeSlotAsset() 要调 window.RefSlots。 -->
+<script src="/static/ref-slots.js?v=refslots1"></script>
 <!-- music.js 必须在 app.js **之前**：app.js 末尾的 boot() 是同步调用，
      window.MusicUI 不存在时会跳过音乐清单加载 -->
-<script src="/static/music.js?v=fix4temp0"></script>
+<script src="/static/music.js?v=refctx1"></script>
 <!-- 【2026-11-13 合并说明】video-panel.js 版本号取 h3-model-meta 一侧的
      videopanel2 —— 该分支改了 video-panel.js（作者推荐参数注释 + sigma 精修），
      必须升版号才能破掉浏览器缓存；maintainer 一侧的 videopanel1 会导致
@@ -1555,7 +1567,7 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=genfix20261119b"></script>
+<script src="/static/app.js?v=refctx1"></script>
 <script src="/static/providers.js?v=enhassets1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
