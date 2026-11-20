@@ -1,0 +1,74 @@
+=== 0) 现状 ===
+maintainer = 9f74dd79640eb880bd75bd149fcb67d43897c9f3
+live       = 9f74dd79640eb880bd75bd149fcb67d43897c9f3
+审查分支    = 800cd4dec24d77bcab1b1d69f550357225b907af
+active
+重启前 PID=450774
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-234057 / backup/maintainer-before-agentcap-20261120-234057
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+live       = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_5.txt
+  evidence/agent-cap-truth/phase2/regression/FAILED_DIFF.md
+  evidence/agent-cap-truth/phase2/regression/rerun_after_fixes.txt
+  evidence/agent-cap-truth/phase2/regression/rerun_both_fail.txt
+  "evidence/agent-cap-truth/phase2/report/\344\272\244\344\273\230\346\212\245\345\221\212.md"
+  scripts/alternate_rerun.sh
+  scripts/base_rerun3.sh
+  scripts/deploy_deftruth_8190.sh
+  scripts/make_regression_diff.py
+  scripts/rerun_both_fail.sh
+  scripts/rerun_failed_after_fixes.sh
+共 11 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_5.txt
+  evidence/agent-cap-truth/phase2/regression/FAILED_DIFF.md
+  evidence/agent-cap-truth/phase2/regression/rerun_after_fixes.txt
+  evidence/agent-cap-truth/phase2/regression/rerun_both_fail.txt
+  "evidence/agent-cap-truth/phase2/report/\344\272\244\344\273\230\346\212\245\345\221\212.md"
+  scripts/alternate_rerun.sh
+  scripts/base_rerun3.sh
+  scripts/deploy_deftruth_8190.sh
+  scripts/make_regression_diff.py
+  scripts/rerun_both_fail.sh
+  scripts/rerun_failed_after_fixes.sh
+共 11 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+Warning: The unit file, source configuration file or drop-ins of h3-studio.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+active
+重启后 PID=497678（原 450774）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 23:40:57 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 23:40:57 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 23:40:57 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 23:40:57 ubuntu systemd[1]: h3-studio.service: Consumed 10.993s CPU time, 699.6M memory peak.
+11月 20 23:40:57 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+回滚点：backup/live-before-agentcap-20261120-234057 / backup/maintainer-before-agentcap-20261120-234057
