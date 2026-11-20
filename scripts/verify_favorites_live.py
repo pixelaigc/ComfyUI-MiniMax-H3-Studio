@@ -178,7 +178,8 @@ def main():
             """() => {
                 const c = document.querySelector(
                     '#jobsGrid .job-card[data-jid] .job-preview img,'
-                    + ' #jobsGrid .job-card[data-jid] .job-preview video');
+                    + ' #jobsGrid .job-card[data-jid] .job-preview video,'
+                    + ' #jobsGrid .job-card[data-jid] .job-preview audio');
                 const card = c ? c.closest('.job-card[data-jid]') : null;
                 return card ? card.dataset.jid : null;
             }""")
@@ -208,7 +209,20 @@ def main():
         ev.step("② %s" % ("PASS" if ok2 else "FAIL"))
 
         # 再右键 -> 「取消收藏」
-        page.click('.job-card[data-jid="%s"] .job-preview img' % jid, button="right")
+        # 【为什么要重新 query 而不是复用旧的 handle】
+        # 收藏后会触发一次列表刷新，卡片节点被**重建** ——
+        # 旧的 ElementHandle 会「Element is not attached to the DOM」。
+        # 每次都按选择器重新查。
+        page.wait_for_function(
+            """(jid) => {
+                const c = document.querySelector(`.job-card[data-jid="${jid}"]`);
+                return !!(c && c.querySelector(
+                    '.job-preview img, .job-preview video, .job-preview audio'));
+            }""", arg=jid, timeout=WAIT_TIMEOUT)
+        page.click('.job-card[data-jid="%s"] .job-preview img,'
+                   '.job-card[data-jid="%s"] .job-preview video,'
+                   '.job-card[data-jid="%s"] .job-preview audio'
+                   % (jid, jid, jid), button="right")
         page.wait_for_timeout(800)
         btn2 = page.query_selector('#mediaContext button[data-act="favorite"]')
         ev.step("再次右键文案 = %r（应为「取消收藏」）"
@@ -291,7 +305,16 @@ def main():
             timeout=WAIT_TIMEOUT)
         page.wait_for_timeout(1000)
         # 右键要打在**媒体元素**上（既有行为：菜单挂在 img/video/audio 上）
-        page.click('.job-card[data-jid="%s"] .job-preview img' % jid, button="right")
+        page.wait_for_function(
+            """(jid) => {
+                const c = document.querySelector(`.job-card[data-jid="${jid}"]`);
+                return !!(c && c.querySelector(
+                    '.job-preview img, .job-preview video, .job-preview audio'));
+            }""", arg=jid, timeout=WAIT_TIMEOUT)
+        page.click('.job-card[data-jid="%s"] .job-preview img,'
+                   '.job-card[data-jid="%s"] .job-preview video,'
+                   '.job-card[data-jid="%s"] .job-preview audio'
+                   % (jid, jid, jid), button="right")
         page.wait_for_timeout(800)
         btn3 = page.query_selector('#mediaContext button[data-act="favorite"]')
         ev.step("右键文案 = %r" % (btn3.inner_text().strip() if btn3 else None))
