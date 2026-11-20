@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO=/root/projects/comfyui-minimax-h3-studio
 LIVE=/root/projects/h3studio-live
-BRANCH=local/feature/favorites-20261120
+BRANCH=local/feature/favorites-v2-20261120
 PORT=8190
 TS=$(date +%Y%m%d-%H%M%S)
 
