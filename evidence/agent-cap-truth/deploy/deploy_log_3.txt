@@ -1,0 +1,53 @@
+=== 0) 现状 ===
+maintainer = c028691a9db830afe5874add1cd0ce746281caf2
+live       = c028691a9db830afe5874add1cd0ce746281caf2
+审查分支    = ea24107082f58bb99c53a123b302d2a6e882f1be
+active
+重启前 PID=2834480
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-173148 / backup/maintainer-before-agentcap-20261120-173148
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 9e6839ca7c6da34092b8de318160fdfbb8274063
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 9e6839ca7c6da34092b8de318160fdfbb8274063
+live       = 9e6839ca7c6da34092b8de318160fdfbb8274063
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  scripts/deploy_agent_cap_8190.sh
+共 1 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  scripts/deploy_agent_cap_8190.sh
+共 1 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+active
+重启后 PID=2985931（原 2834480）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 17:31:49 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 17:31:49 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 17:31:49 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 17:31:49 ubuntu systemd[1]: h3-studio.service: Consumed 1min 6.887s CPU time, 610.1M memory peak.
+11月 20 17:31:49 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 9e6839ca7c6da34092b8de318160fdfbb8274063
+回滚点：backup/live-before-agentcap-20261120-173148 / backup/maintainer-before-agentcap-20261120-173148
