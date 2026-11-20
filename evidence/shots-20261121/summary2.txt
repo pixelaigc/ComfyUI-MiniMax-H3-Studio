@@ -1,0 +1,144 @@
+########## 真实重叠（排除祖先/后代）##########
+--- 10-narrow375-main
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}}
+--- 10b-narrow375-panel
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}}
+--- 11-narrow375-media-all
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}}
+--- 11-narrow375-media-done
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}}
+    {'PAGE': {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}}
+--- 11-narrow375-media-favorites
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 15093, 'pctOfSmaller': 27, 'aRect': [0, 812, 375, 715], 'bRect': [12, 695, 351, 160]}}
+--- 12-narrow375-drawer
+    {'PAGE': {'a': 'sidebar', 'b': 'jobsArea', 'overlapPx': 230400, 'pctOfSmaller': 100, 'aRect': [0, 44, 300, 768], 'bRect': [0, 44, 375, 768]}}
+    {'PAGE': {'a': 'sidebar', 'b': 'jobsHead', 'overlapPx': 161856, 'pctOfSmaller': 82, 'aRect': [0, 44, 300, 768], 'bRect': [12, 56, 351, 562]}}
+    {'PAGE': {'a': 'sidebar', 'b': 'jobsTabs', 'overlapPx': 26496, 'pctOfSmaller': 82, 'aRect': [0, 44, 300, 768], 'bRect': [12, 56, 351, 92]}}
+    {'PAGE': {'a': 'sidebar', 'b': 'jobsGrid', 'overlapPx': 33696, 'pctOfSmaller': 60, 'aRect': [0, 44, 300, 768], 'bRect': [12, 695, 351, 160]}}
+    {'PAGE': {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 15093, 'pctOfSmaller': 27, 'aRect': [0, 812, 375, 715], 'bRect': [12, 695, 351, 160]}}
+
+########## 对比度不足（跨页去重，按 selector）##########
+unique selectors with low contrast: 59
+   1.59 (need 3) fs=24 w=400 div.up-slot  color=rgb(196, 202, 210) bg=rgb(250,251,252)  :: +首帧素材库  pages=4 eg=02-mode-flf
+   1.65 (need 4.5) fs=14.5 w=700 button#stitchBtn.gen-btn  color=rgb(255, 255, 255) bg=rgb(196,202,210)  :: 合成长片  pages=2 eg=02-mode-longfilm
+      2 (need 4.5) fs=12.5 w=400 button  color=rgba(16, 16, 16, 0.3) bg=rgb(255,255,255)  :: 完整谱面（旋律+和弦）  pages=49 eg=01-main-default
+      2 (need 4.5) fs=12 w=400 div.err-text  color=rgb(255, 156, 160) bg=rgb(255,255,255)  :: ✕ 服务重启前该任务处于「运行中」，但本机 ComfyUI 的队列与  pages=2 eg=03-media-tab-failed
+    2.8 (need 4.5) fs=9.5 w=400 span.img-lora-tag  color=rgb(138, 145, 156) bg=rgb(238,241,245)  :: adaln 空转 50  pages=2 eg=02-mode-r2v
+   2.86 (need 4.5) fs=10.5 w=600 span.prov-badge  color=rgb(138, 145, 156) bg=rgb(242,243,246)  :: 多模态  pages=2 eg=08-providers-page
+    2.9 (need 4.5) fs=10.5 w=400 span.badge.right  color=rgb(255, 255, 255) bg=rgb(47,172,113)  :: 引用 4  pages=3 eg=04-assets-page
+   2.93 (need 4.5) fs=11 w=600 span.tabs-label  color=rgb(138, 145, 156) bg=rgb(244,246,248)  :: 生成类型  pages=49 eg=01-main-default
+   2.94 (need 4.5) fs=11.5 w=400 span.page-summary  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: …  pages=36 eg=01-main-default
+   2.94 (need 4.5) fs=14 w=400 div.empty-hint  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 当前没有排队或生成中的任务  pages=12 eg=03-media-tab-active
+   2.94 (need 4.5) fs=11.5 w=400 span#favToolsCount.fav-tools-count  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 未选择  pages=5 eg=03-media-tab-favorites
+   2.94 (need 4.5) fs=11.5 w=400 span.al-title-sub  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: OmniStudio · 多模型创作工作台  pages=3 eg=04-assets-page
+   2.94 (need 4.5) fs=12 w=400 div#alStats.al-sub  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 共 99 个素材 · 53.1 MB · 音频 2 · 图片 42   pages=3 eg=04-assets-page
+   2.94 (need 4.5) fs=13 w=400 p  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 用一句话说清你的创作意图，Agent 会自己查素材、选模式、组装参数  pages=3 eg=05-agent-page
+   2.94 (need 4.5) fs=12 w=400 p.ag-hint  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 例：「素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5 秒  pages=3 eg=05-agent-page
+   2.94 (need 4.5) fs=12 w=400 div#sysSub.sys-sub  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 读取中…  pages=1 eg=07-system-page
+   2.94 (need 4.5) fs=12 w=400 div#provSub.sys-sub  color=rgb(138, 145, 156) bg=rgb(245,246,248)  :: 共 1 个 Provider · 默认：本机 Qwen 多模态  pages=2 eg=08-providers-page
+   2.99 (need 4.5) fs=11 w=400 div.agent-hint  color=rgb(138, 145, 156) bg=rgb(247,248,250)  :: 最大输出 token 上限：256 ~ 65536，默认 32768  pages=2 eg=08-providers-page
+   3.07 (need 4.5) fs=9 w=400 small#imgStepsHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=22 eg=01-main-default
+   3.07 (need 4.5) fs=9 w=400 small#imgCfgHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=22 eg=01-main-default
+   3.07 (need 4.5) fs=9 w=400 small#imgShiftHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=22 eg=01-main-default
+   3.07 (need 4.5) fs=9 w=400 small#imgSamplerHint  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=22 eg=01-main-default
+   3.07 (need 4.5) fs=10 w=400 span.lora-trigger-label  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 触发词  pages=18 eg=01-main-default
+   3.07 (need 4.5) fs=10 w=400 div.img-lora-meta  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强  pages=18 eg=01-main-default
+   3.07 (need 4.5) fs=9 w=400 small  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 留空随机  pages=38 eg=01-main-default
+   3.07 (need 4.5) fs=12 w=400 span#queueSummary.queue-summary  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 最近完成 12  pages=41 eg=01-main-default
+   3.07 (need 4.5) fs=9 w=400 small#vidStepsHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 已改  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=9 w=400 small#vidCfgHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: H3 固定  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=9 w=400 small#vidShiftVideoHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=9 w=400 small#vidShiftAudioHint.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=9 w=400 small#vidSamplerHint  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=9 w=400 small#vidSchedulerHint  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 推荐  pages=16 eg=02-mode-t2v
+   3.07 (need 4.5) fs=11 w=400 span  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 也可点击卡片下方“＋拼接” · 至少 2 个片段  pages=7 eg=02-mode-longfilm
+   3.07 (need 4.5) fs=12 w=400 button#imgRefAdd.img-ref-add  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: + 从素材库添加  pages=4 eg=02-mode-i2i_qwen
+   3.07 (need 4.5) fs=12 w=400 button#imgRefSort.img-ref-sort  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 按匹配度排序  pages=4 eg=02-mode-i2i_qwen
+   3.07 (need 4.5) fs=9 w=400 small.muted  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: 官方模板 32 步 · 越大越慢  pages=4 eg=02-mode-t2a
+   3.07 (need 4.5) fs=12 w=400 button#musicRefPick.img-ref-add  color=rgb(138, 145, 156) bg=rgb(250,251,252)  :: + 从素材库选择  pages=2 eg=02-mode-a2a
+   3.18 (need 4.5) fs=12 w=400 span.brand-tagline  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: 多模型图像 / 视频 / 音频创作工作台  pages=24 eg=02-mode-longfilm
+   3.18 (need 4.5) fs=12 w=400 span.brand-version  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: v1.00  pages=19 eg=02-mode-longfilm
+   3.18 (need 4.5) fs=13 w=400 span#statusText  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: 空闲  pages=14 eg=02-mode-longfilm
+   3.18 (need 4.5) fs=10 w=400 div.nav-label  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: CREATE  pages=14 eg=02-mode-longfilm
+   3.18 (need 4.5) fs=11 w=600 button.nav-group  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: 视频  pages=12 eg=02-mode-longfilm
+   3.18 (need 4.5) fs=10 w=400 button.nav-cat-toggle  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: ▾  pages=10 eg=04-assets-page
+   3.18 (need 4.5) fs=12.5 w=400 button#unloadBtn  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: 释放显存  pages=9 eg=04-assets-page
+   3.18 (need 4.5) fs=12 w=400 button.al-chip  color=rgb(138, 145, 156) bg=rgb(255,255,255)  :: 图片  pages=3 eg=04-assets-page
+
+########## 文本溢出容器（scrollWidth>clientWidth，跨页去重）##########
+unique clipped containers: 5
+  dx=  258 (25->283) ovx=hidden ws=nowrap te=ellipsis  span.img-lora-name :: Minimax H3真实电影质感 — 去 AI 味电影质感 LoRA  pages=8 eg=02-mode-r2v
+  dx=  164 (277->441) ovx=hidden ws=nowrap te=ellipsis  div.img-lora-meta :: 基础：Z-Image · 作者未给强度区间 → 按 LoRA 默认强度   pages=14 eg=01-main-default
+  dx=  132 (67->199) ovx=hidden ws=nowrap te=ellipsis  b :: MiniMax-H3 FL2VA · 剪枝 int8（默认）  pages=35 eg=01-main-default
+  dx=   80 (85->165) ovx=hidden ws=nowrap te=ellipsis  span :: MiniMax-H3 FL2VA · 剪枝 int8（默认）  pages=6 eg=02-mode-longfilm
+  dx=   32 (153->185) ovx=hidden ws=nowrap te=ellipsis  div.al-name :: v6s.mp4_replaced_a5993e34.mp4  pages=3 eg=04-assets-page
+
+########## 触控目标 <44px（跨页去重）##########
+unique small targets: 125
+  13x15  input#vidTwopassAllowContinuation ::   pages=18 eg=02-mode-t2v
+  15x15  input#vidTwopassEnabled ::   pages=18 eg=02-mode-t2v
+  13x22  button#alDrawerClose.al-drawer-close :: ×  pages=8 eg=04-assets-page
+  13x26  button#fdClose :: ×  pages=1 eg=09-flowdocs-page
+  24x16  a.fd-link :: SVG  pages=1 eg=09-flowdocs-page
+  24x24  button.img-lora-btn.toggle :: ●  pages=20 eg=01-main-default
+  24x24  button.img-lora-btn.up :: ↑  pages=20 eg=01-main-default
+  24x24  button.img-lora-btn.down :: ↓  pages=20 eg=01-main-default
+  24x24  button.img-lora-btn.del :: ×  pages=20 eg=01-main-default
+  41x18  button.pick-asset :: 素材库  pages=4 eg=02-mode-flf
+  27x29  button#enhanceMenuBtn.enhance-btn.enhance-btn-caret ::   pages=27 eg=01-main-default
+  27x29  button#musicEnhanceMenuBtn.enhance-btn.enhance-btn-caret ::   pages=4 eg=02-mode-t2a
+  41x21  button.ph-open-btn :: 历史  pages=40 eg=01-main-default
+  66x15  button.img-lora-info-btn :: 查看简易说明 ›  pages=18 eg=01-main-default
+  32x32  button.nav-cat-toggle :: ▾  pages=58 eg=01-main-default
+  32x32  button :: 2  pages=54 eg=01-main-default
+  32x32  button.active :: 1  pages=52 eg=01-main-default
+  52x22  input.num-input ::   pages=46 eg=01-main-default
+  34x34  button#agMenu.ag-menu :: ☰  pages=3 eg=05-agent-page
+  58x21  button#promptVersionBtn.refine-history-btn :: 版本历史  pages=27 eg=01-main-default
+  48x27  button.al-chip.active :: 全部  pages=3 eg=04-assets-page
+  48x27  button.al-chip :: 图片  pages=3 eg=04-assets-page
+  36x36  button#navToggle.nav-toggle ::   pages=9 eg=10-narrow375-main
+  47x28  button.danger :: 删除  pages=2 eg=08-providers-page
+  45x32  button#imgSizeReset.img-reset :: 自动  pages=22 eg=01-main-default
+  45x32  button#imgLoraAdd.img-reset :: 添加  pages=20 eg=01-main-default
+  45x32  button#vidSizeReset.img-reset :: 自动  pages=20 eg=02-mode-t2v
+  45x32  button#vidEffectLoraAdd.img-reset :: 添加  pages=18 eg=02-mode-t2v
+  45x32  button#queueToggle.queue-toggle :: 明细  pages=3 eg=02-mode-longfilm
+  44x34  button#doneFilterReset.filter-reset :: 重置  pages=3 eg=02-mode-longfilm
+  44x34  button#mediaManageBtn.filter-reset :: 管理  pages=3 eg=02-mode-longfilm
+  41x38  button#musicStyleFieldsToggle.music-toggle :: 展开  pages=4 eg=02-mode-t2a
+  114x14  a :: 📁 打开全部文档目录  pages=1 eg=09-flowdocs-page
+  64x27  button#agAttachBtn.ag-attach-btn :: 📎 媒体  pages=3 eg=05-agent-page
+  65x29  button#enhanceBtn.enhance-btn.enhance-btn-main :: 增强  pages=36 eg=01-main-default
+  62x31  button#agNew.ag-new :: 新会话  pages=3 eg=05-agent-page
+  55x35  button#alMultiToggle.al-btn :: 多选  pages=3 eg=04-assets-page
+  64x31  button#agManageBtn.ag-manage-btn :: ⚙ 管理  pages=3 eg=05-agent-page
+  59x35  button#sysRefresh.sys-refresh :: 刷新  pages=1 eg=07-system-page
+  59x35  button#provRefresh.sys-refresh :: 刷新  pages=2 eg=08-providers-page
+  57x38  button#vidEffectLoraClear.vid-lora-clear :: 清空全部  pages=2 eg=02-mode-r2v
+  61x37  button#fdDone :: 关闭  pages=1 eg=09-flowdocs-page
+  68x34  button#favSelectAllBtn.filter-reset :: 全选本页  pages=1 eg=06-favorites-page
+  68x34  button#favClearSelBtn.filter-reset :: 清空选择  pages=1 eg=06-favorites-page
+  69x34  select#pageSizeSelect :: 8 个12 个16 个24 个32 个48 个  pages=3 eg=02-mode-longfilm
+  170x14  input#doneSearch ::   pages=3 eg=02-mode-longfilm
+  66x37  button#agSend.ag-send :: 发送  pages=3 eg=05-agent-page
+  87x30  select#alSort :: 最新优先 最旧优先 体积最大 体积最小 按名称  pages=3 eg=04-assets-page
+  99x30  select#alSource :: 全部来源 Web 上传 媒体库添加 导入 工作流  pages=3 eg=04-assets-page
+  89x34  select#doneMedia :: 全部类型 视频 图片 音频  pages=3 eg=02-mode-longfilm
+  89x34  select#doneAspect :: 全部比例 16:9 9:16 4:3 3:4 1:1  pages=3 eg=02-mode-longfilm
+  89x34  select#doneDuration :: 全部时长 5 秒 6 秒 7 秒 8 秒 9 秒 10   pages=3 eg=02-mode-longfilm
+  98x31  button#agArtifactsBtn.ag-artifacts-btn :: 本次会话产物  pages=3 eg=05-agent-page
+  96x32  input#vidEffectLoraSearch.img-input ::   pages=20 eg=02-mode-t2v
+  92x34  button#favBatchUnfavBtn.filter-reset.fav-danger :: 批量取消收藏  pages=1 eg=06-favorites-page
+
+########## nav-scroll 溢出 ##########
+   01-main-default {'scrollW': 169, 'clientW': 169, 'scrollH': 1022, 'clientH': 750}
+   02-mode-r2v {'scrollW': 169, 'clientW': 169, 'scrollH': 1041, 'clientH': 750}
+   10-narrow375-main {'scrollW': 279, 'clientW': 279, 'scrollH': 1124, 'clientH': 662}

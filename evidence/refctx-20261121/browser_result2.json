@@ -1,0 +1,131 @@
+{
+  "qwen_api": {
+    "hasQwenRefs": true,
+    "fns": [
+      "getRefs",
+      "setRefs",
+      "clear",
+      "count",
+      "openLibraryPicker",
+      "addAssets",
+      "removeAt",
+      "smartSort",
+      "move",
+      "reindexPrompt",
+      "buildPromptPreview",
+      "validate",
+      "toPayload",
+      "render",
+      "setProfile",
+      "maxRefs",
+      "placeholderFor",
+      "parsePlaceholders",
+      "renumber"
+    ]
+  },
+  "qwen_add": {
+    "ids": [
+      "asset_971a71830dea",
+      "asset_6bb6ee9324a4"
+    ]
+  },
+  "qwen_items": {
+    "count": 2,
+    "items": [
+      {
+        "idx": "0",
+        "badge": "1",
+        "hasDelBtn": true
+      },
+      {
+        "idx": "1",
+        "badge": "2",
+        "hasDelBtn": true
+      }
+    ]
+  },
+  "qwen_before": {
+    "count": 2,
+    "refs": [
+      "asset_971a71830dea",
+      "asset_6bb6ee9324a4"
+    ],
+    "prompt": ""
+  },
+  "qwen_menu": {
+    "exists": true,
+    "open": true,
+    "rect": {
+      "x": 253,
+      "y": 1047,
+      "w": 180,
+      "h": 45
+    },
+    "visible": true,
+    "buttons": [
+      {
+        "text": "移除这张参考图",
+        "act": "remove-ref"
+      }
+    ]
+  },
+  "qwen_btn_text": "移除这张参考图",
+  "qwen_after": {
+    "count": 1,
+    "refs": [
+      "asset_6bb6ee9324a4"
+    ],
+    "prompt": "A= B=<image1>",
+    "badges": [
+      "1"
+    ],
+    "menuStillOpen": false
+  },
+  "empty_slot_found": true,
+  "empty_slot_filled_class": "up-slot",
+  "empty_slot_menu": {
+    "exists": true,
+    "open": false,
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "visible": false,
+    "buttons": [
+      {
+        "text": "移除这张参考图",
+        "act": "remove-ref"
+      }
+    ]
+  },
+  "music": {
+    "panelFound": true,
+    "cards_before": 0,
+    "api": {
+      "hasMusicUI": true,
+      "fns": [
+        "render",
+        "collect",
+        "promptValue",
+        "isMusicMode",
+        "loadOptions",
+        "bind",
+        "getState",
+        "getOptions",
+        "setMode",
+        "getCurrentMode",
+        "getStyleFields",
+        "setStyleFields",
+        "getLyrics",
+        "setLyrics",
+        "setHint",
+        "setBusy",
+        "markEnhanced"
+      ]
+    }
+  },
+  "console_errors": [],
+  "console_error_count": 0
+}

@@ -1,0 +1,2271 @@
+PAGES: 58
+
+########## 横向溢出汇总 ##########
+
+--- 01-main-default [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 01b-main-panel-detail [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 01c-main-topbar-sidebar [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2v [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2v-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-flf [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-flf-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-r2v [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-r2v-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-longfilm [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-longfilm-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_qwen [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_qwen-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_moss [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_moss-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_h3image [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2i_h3image-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-i2i_qwen [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-i2i_qwen-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-i2i_h3image [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-i2i_h3image-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2a [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-t2a-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-a2a [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 02-mode-a2a-panel [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-all [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-all-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-active [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-active-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-done [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-done-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-longfilm [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-longfilm-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-failed [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-failed-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-canceled [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-canceled-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-favorites [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 03-media-tab-favorites-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 04-assets-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 04b-assets-grid [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 05-agent-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 05b-agent-body [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 06-favorites-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 07-system-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 08-providers-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 09-flowdocs-page [ok] docSW=1440 innerW=1440 bodySW=1440
+    aside#alDrawer.al-drawer  right=1900 w=460 overR=460 overL=-1440 :: 素材详情 ×
+    div.al-drawer-head  right=1900 w=459 overR=460 overL=-1441 :: 素材详情 ×
+    div#alDrawerBody.al-drawer-body  right=1900 w=459 overR=460 overL=-1441 :: 
+    b  right=1511 w=56 overR=71 overL=-1455 :: 素材详情
+    button#alDrawerClose.al-drawer-close  right=1886 w=13 overR=446 overL=-1873 :: ×
+
+--- 10-narrow375-main [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 10b-narrow375-panel [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 11-narrow375-media-all [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 11-narrow375-media-active [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 11-narrow375-media-done [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 11-narrow375-media-favorites [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 12-narrow375-drawer [ok] docSW=375 innerW=375 bodySW=375
+
+--- 13-narrow375-assets [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+--- 14-narrow375-agent [ok] docSW=375 innerW=375 bodySW=375
+    nav#sidebar.sidebar  right=0 w=300 overR=-375 overL=300 :: CREATE 视频 文生视频▾minimax-h3 文生视频首尾
+    div.nav-label  right=-11 w=279 overR=-386 overL=290 :: CREATE
+    div#navScroll.nav-scroll  right=-11 w=279 overR=-386 overL=290 :: 视频 文生视频▾minimax-h3 文生视频首尾帧生视频▾mi
+    button.nav-group  right=-11 w=279 overR=-386 overL=290 :: 视频
+    div#navVideoCategories.nav-categories  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频首尾帧生视频▾minim
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 文生视频▾minimax-h3 文生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 文生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 首尾帧生视频▾minimax-h3 首尾帧生视频
+    div.nav-cat-models  right=-11 w=279 overR=-386 overL=290 :: minimax-h3 首尾帧生视频
+    div.nav-cat  right=-11 w=279 overR=-386 overL=290 :: 参考生视频▾minimax-h3 参考生视频
+
+
+########## 重叠汇总 ##########
+
+--- 01-main-default
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 01b-main-panel-detail
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 01c-main-topbar-sidebar
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2v
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2v-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-flf
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-flf-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-r2v
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-r2v-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-longfilm
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-longfilm-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_qwen
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_qwen-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_moss
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_moss-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_h3image
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2i_h3image-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-i2i_qwen
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-i2i_qwen-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-i2i_h3image
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-i2i_h3image-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2a
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-t2a-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-a2a
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 02-mode-a2a-panel
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 2059]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-all
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-all-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-active
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-active-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-done
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-done-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 533280, 'pctOfSmaller': 68, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 1991]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-longfilm
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-longfilm-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-failed
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 202070, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 230]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-failed-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 202070, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 230]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-canceled
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-canceled-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 134640, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 294, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 153], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-favorites
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 175120, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 199]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 340, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 199], 'bRect': [540, 60, 477, 39]}
+
+--- 03-media-tab-favorites-grid
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 175120, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 880, 199]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 123200, 'pctOfSmaller': 100, 'aRect': [520, 44, 920, 856], 'bRect': [540, 340, 880, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [540, 60, 880, 199], 'bRect': [540, 60, 477, 39]}
+
+--- 06-favorites-page
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 185130, 'pctOfSmaller': 100, 'aRect': [190, 44, 1250, 856], 'bRect': [210, 60, 1210, 153]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [190, 44, 1250, 856], 'bRect': [210, 60, 477, 39]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 169400, 'pctOfSmaller': 100, 'aRect': [190, 44, 1250, 856], 'bRect': [210, 294, 1210, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 18607, 'pctOfSmaller': 100, 'aRect': [210, 60, 1210, 153], 'bRect': [210, 60, 477, 39]}
+
+--- 10-narrow375-main
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 180414, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 514]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 57915, 'pctOfSmaller': 20, 'aRect': [0, 44, 375, 768], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 514], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}
+
+--- 10b-narrow375-panel
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 180414, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 514]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 57915, 'pctOfSmaller': 20, 'aRect': [0, 44, 375, 768], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 514], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}
+
+--- 11-narrow375-media-all
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 180414, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 514]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 57915, 'pctOfSmaller': 20, 'aRect': [0, 44, 375, 768], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 514], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}
+
+--- 11-narrow375-media-active
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 147420, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 420]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 49140, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 553, 351, 140]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 420], 'bRect': [12, 56, 351, 92]}
+
+--- 11-narrow375-media-done
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 250806, 'pctOfSmaller': 94, 'aRect': [0, 812, 375, 715], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 180414, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 514]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 57915, 'pctOfSmaller': 20, 'aRect': [0, 44, 375, 768], 'bRect': [12, 647, 351, 2990]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 514], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'genBtn', 'overlapPx': 15435, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2593, 343, 45]}
+   PAGE-OVERLAP {'a': 'jobsGrid', 'b': 'promptField', 'overlapPx': 113533, 'pctOfSmaller': 100, 'aRect': [12, 647, 351, 2990], 'bRect': [16, 2244, 343, 331]}
+
+--- 11-narrow375-media-favorites
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 15093, 'pctOfSmaller': 27, 'aRect': [0, 812, 375, 715], 'bRect': [12, 695, 351, 160]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 197262, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 562]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 41067, 'pctOfSmaller': 73, 'aRect': [0, 44, 375, 768], 'bRect': [12, 695, 351, 160]}
+   PAGE-OVERLAP {'a': 'jobsHead', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [12, 56, 351, 562], 'bRect': [12, 56, 351, 92]}
+
+--- 12-narrow375-drawer
+   PAGE-OVERLAP {'a': 'sidebar', 'b': 'jobsArea', 'overlapPx': 230400, 'pctOfSmaller': 100, 'aRect': [0, 44, 300, 768], 'bRect': [0, 44, 375, 768]}
+   PAGE-OVERLAP {'a': 'sidebar', 'b': 'jobsHead', 'overlapPx': 161856, 'pctOfSmaller': 82, 'aRect': [0, 44, 300, 768], 'bRect': [12, 56, 351, 562]}
+   PAGE-OVERLAP {'a': 'sidebar', 'b': 'jobsTabs', 'overlapPx': 26496, 'pctOfSmaller': 82, 'aRect': [0, 44, 300, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'sidebar', 'b': 'jobsGrid', 'overlapPx': 33696, 'pctOfSmaller': 60, 'aRect': [0, 44, 300, 768], 'bRect': [12, 695, 351, 160]}
+   PAGE-OVERLAP {'a': 'panel', 'b': 'jobsGrid', 'overlapPx': 15093, 'pctOfSmaller': 27, 'aRect': [0, 812, 375, 715], 'bRect': [12, 695, 351, 160]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsHead', 'overlapPx': 197262, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 562]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsTabs', 'overlapPx': 32292, 'pctOfSmaller': 100, 'aRect': [0, 44, 375, 768], 'bRect': [12, 56, 351, 92]}
+   PAGE-OVERLAP {'a': 'jobsArea', 'b': 'jobsGrid', 'overlapPx': 41067, 'pctOfSmaller': 73, 'aRect': [0, 44, 375, 768], 'bRect': [12, 695, 351, 160]}
+
+
+########## 对比度不足汇总 ##########
+
+--- 01-main-default  count=304
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 01b-main-panel-detail  count=304
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 01c-main-topbar-sidebar  count=304
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2v  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2v-panel  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-flf  count=320
+    div.up-slot ratio=1.59 (need 3) fs=24 w=400 color=rgb(196, 202, 210) bg=rgb(250,251,252) :: +首帧素材库
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+
+--- 02-mode-flf-panel  count=320
+    div.up-slot ratio=1.59 (need 3) fs=24 w=400 color=rgb(196, 202, 210) bg=rgb(250,251,252) :: +首帧素材库
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+
+--- 02-mode-r2v  count=337
+    div.up-slot ratio=1.59 (need 3) fs=24 w=400 color=rgb(196, 202, 210) bg=rgb(250,251,252) :: +参考 1素材库
+
+--- 02-mode-r2v-panel  count=337
+    div.up-slot ratio=1.59 (need 3) fs=24 w=400 color=rgb(196, 202, 210) bg=rgb(250,251,252) :: +参考 1素材库
+
+--- 02-mode-longfilm  count=284
+    button#stitchBtn.gen-btn ratio=1.65 (need 4.5) fs=14.5 w=700 color=rgb(255, 255, 255) bg=rgb(196,202,210) :: 合成长片
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-longfilm-panel  count=284
+    button#stitchBtn.gen-btn ratio=1.65 (need 4.5) fs=14.5 w=700 color=rgb(255, 255, 255) bg=rgb(196,202,210) :: 合成长片
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i  count=316
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i-panel  count=316
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_qwen  count=318
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_qwen-panel  count=318
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_moss  count=330
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_moss-panel  count=330
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_h3image  count=307
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2i_h3image-panel  count=307
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-i2i_qwen  count=322
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-i2i_qwen-panel  count=322
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-i2i_h3image  count=311
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-i2i_h3image-panel  count=311
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2a  count=312
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-t2a-panel  count=312
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-a2a  count=319
+    button ratio=2 (need 4.5) fs=12.5 w=400 color=rgba(16, 16, 16, 0.3) bg=rgb(255,255,255) :: 完整谱面（旋律+和弦）
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 02-mode-a2a-panel  count=319
+    button ratio=2 (need 4.5) fs=12.5 w=400 color=rgba(16, 16, 16, 0.3) bg=rgb(255,255,255) :: 完整谱面（旋律+和弦）
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-all  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-all-grid  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-active  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-active-grid  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-done  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-done-grid  count=309
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-longfilm  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-longfilm-grid  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-failed  count=91
+    div.err-text ratio=2 (need 4.5) fs=12 w=400 color=rgb(255, 156, 160) bg=rgb(255,255,255) :: ✕ 服务重启前该任务处于「运行中」，但本机 ComfyUI 的队
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-failed-grid  count=91
+    div.err-text ratio=2 (need 4.5) fs=12 w=400 color=rgb(255, 156, 160) bg=rgb(255,255,255) :: ✕ 服务重启前该任务处于「运行中」，但本机 ComfyUI 的队
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-canceled  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-canceled-grid  count=86
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-favorites  count=91
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 03-media-tab-favorites-grid  count=91
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 04-assets-page  count=217
+    span.badge.right ratio=2.9 (need 4.5) fs=10.5 w=400 color=rgb(255, 255, 255) bg=rgb(47,172,113) :: 引用 4
+    span.al-title-sub ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: OmniStudio · 多模型创作工作台
+    div#alStats.al-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个素材 · 53.1 MB · 音频 2 · 图片 4
+    span.page-summary ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个 · 第 1/2 页
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 04b-assets-grid  count=217
+    span.badge.right ratio=2.9 (need 4.5) fs=10.5 w=400 color=rgb(255, 255, 255) bg=rgb(47,172,113) :: 引用 4
+    span.al-title-sub ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: OmniStudio · 多模型创作工作台
+    div#alStats.al-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个素材 · 53.1 MB · 音频 2 · 图片 4
+    span.page-summary ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个 · 第 1/2 页
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 05-agent-page  count=27
+    p ratio=2.94 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 用一句话说清你的创作意图，Agent 会自己查素材、选模式、组装
+    p.ag-hint ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 例：「素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 05b-agent-body  count=27
+    p ratio=2.94 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 用一句话说清你的创作意图，Agent 会自己查素材、选模式、组装
+    p.ag-hint ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 例：「素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 06-favorites-page  count=49
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 07-system-page  count=20
+    div#sysSub.sys-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 读取中…
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 08-providers-page  count=45
+    span.prov-badge ratio=2.86 (need 4.5) fs=10.5 w=600 color=rgb(138, 145, 156) bg=rgb(242,243,246) :: 多模态
+    div#provSub.sys-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 1 个 Provider · 默认：本机 Qwen 多模态
+    div.agent-hint ratio=2.99 (need 4.5) fs=11 w=400 color=rgb(138, 145, 156) bg=rgb(247,248,250) :: 最大输出 token 上限：256 ~ 65536，默认 327
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 09-flowdocs-page  count=58
+    span.prov-badge ratio=2.86 (need 4.5) fs=10.5 w=600 color=rgb(138, 145, 156) bg=rgb(242,243,246) :: 多模态
+    div#provSub.sys-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 1 个 Provider · 默认：本机 Qwen 多模态
+    div.agent-hint ratio=2.99 (need 4.5) fs=11 w=400 color=rgb(138, 145, 156) bg=rgb(247,248,250) :: 最大输出 token 上限：256 ~ 65536，默认 327
+    span.brand-tagline ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 多模型图像 / 视频 / 音频创作工作台
+    span.brand-version ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 10-narrow375-main  count=303
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 10b-narrow375-panel  count=303
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 11-narrow375-media-all  count=303
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 进行中
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 11-narrow375-media-active  count=80
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 11-narrow375-media-done  count=303
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 11-narrow375-media-favorites  count=85
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 12-narrow375-drawer  count=85
+    button ratio=2.73 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(236,238,241) :: 全部
+    span.tabs-label ratio=2.93 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 生成类型
+    button ratio=2.93 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(244,246,248) :: 文生视频
+
+--- 13-narrow375-assets  count=214
+    span.badge.right ratio=2.9 (need 4.5) fs=10.5 w=400 color=rgb(255, 255, 255) bg=rgb(47,172,113) :: 引用 4
+    span.al-title-sub ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: OmniStudio · 多模型创作工作台
+    div#alStats.al-sub ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个素材 · 53.1 MB · 音频 2 · 图片 4
+    span.page-summary ratio=2.94 (need 4.5) fs=11.5 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 共 99 个 · 第 1/2 页
+    span.brand-version ratio=3.18 (need 4.5) fs=11 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+--- 14-narrow375-agent  count=24
+    p ratio=2.94 (need 4.5) fs=13 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 用一句话说清你的创作意图，Agent 会自己查素材、选模式、组装
+    p.ag-hint ratio=2.94 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(245,246,248) :: 例：「素材库里有没有雨夜的素材？有的话用它做参考图，生成一段 5
+    span.brand-version ratio=3.18 (need 4.5) fs=11 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: v1.00
+    span#statusText ratio=3.18 (need 4.5) fs=12 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ComfyUI 未连接
+    div.nav-label ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: CREATE
+    button.nav-group ratio=3.18 (need 4.5) fs=11 w=600 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: 视频
+    button.nav-cat-toggle ratio=3.18 (need 4.5) fs=10 w=400 color=rgb(138, 145, 156) bg=rgb(255,255,255) :: ▾
+
+
+########## 小触控目标汇总 ##########
+
+--- 01-main-default  count=156
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 01b-main-panel-detail  count=156
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 01c-main-topbar-sidebar  count=156
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2v  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2v-panel  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-flf  count=161
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head.active 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-flf-panel  count=161
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head.active 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-r2v  count=175
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head.active 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+    button#unloadBtn 157x35 :: 释放显存
+
+--- 02-mode-r2v-panel  count=175
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head.active 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+    button#unloadBtn 157x35 :: 释放显存
+
+--- 02-mode-longfilm  count=67
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head.active 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-longfilm-panel  count=67
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head.active 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i  count=108
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i-panel  count=108
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_qwen  count=108
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_qwen-panel  count=108
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_moss  count=121
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_moss-panel  count=121
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_h3image  count=100
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2i_h3image-panel  count=100
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-i2i_qwen  count=110
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-i2i_qwen-panel  count=110
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-i2i_h3image  count=102
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-i2i_h3image-panel  count=102
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2a  count=93
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-t2a-panel  count=93
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-a2a  count=95
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 02-mode-a2a-panel  count=95
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-all  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-all-grid  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-active  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-active-grid  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-done  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-done-grid  count=152
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-longfilm  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-longfilm-grid  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-failed  count=85
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-failed-grid  count=85
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-canceled  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-canceled-grid  count=82
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-favorites  count=90
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 03-media-tab-favorites-grid  count=90
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 04-assets-page  count=43
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 04b-assets-grid  count=43
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 05-agent-page  count=26
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 05b-agent-body  count=26
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 06-favorites-page  count=52
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item.active 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 07-system-page  count=21
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 08-providers-page  count=32
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 09-flowdocs-page  count=46
+    button.nav-group 169x32 :: 视频
+    button.nav-cat-head.active 135x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 文生视频
+    button.nav-cat-head 135x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-cat-head 135x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 参考生视频
+    button.nav-cat-head 135x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 155x31 :: minimax-h3 长片拼接
+    button.nav-group 169x32 :: 文生图
+    button.nav-group 169x32 :: 图片编辑
+    button.nav-group 169x32 :: 音乐
+    button.nav-group 169x32 :: 素材
+    button.nav-group 169x32 :: 智能
+    button.nav-group 169x32 :: 系统
+
+--- 10-narrow375-main  count=157
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 10b-narrow375-panel  count=157
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 11-narrow375-media-all  count=157
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 11-narrow375-media-active  count=87
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 11-narrow375-media-done  count=157
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 11-narrow375-media-favorites  count=95
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 12-narrow375-drawer  count=95
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 13-narrow375-assets  count=43
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+--- 14-narrow375-agent  count=27
+    button#navToggle.nav-toggle 36x36 :: 
+    button.nav-group 279x34 :: 视频
+    button.nav-cat-head 245x36 :: 文生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 文生视频
+    button.nav-cat-head 245x36 :: 首尾帧生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 首尾帧生视频
+    button.nav-cat-head 245x36 :: 参考生视频
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 参考生视频
+    button.nav-cat-head 245x36 :: 长片拼接
+    button.nav-cat-toggle 32x32 :: ▾
+    button.nav-item.nav-model-item 265x40 :: minimax-h3 长片拼接
+    button.nav-group 279x34 :: 文生图
+    button.nav-group 279x34 :: 图片编辑
+    button.nav-group 279x34 :: 音乐
+    button.nav-group 279x34 :: 素材
+
+
+########## console errors ##########
+
+
+########## perPageOptions ##########
+None

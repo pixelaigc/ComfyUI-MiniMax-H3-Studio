@@ -1,0 +1,145 @@
+{
+  "slots": [
+    {
+      "key": "first",
+      "filled": false
+    },
+    {
+      "key": "last",
+      "filled": false
+    },
+    {
+      "key": "refvid0",
+      "filled": false
+    },
+    {
+      "key": "refvid1",
+      "filled": false
+    },
+    {
+      "key": "refvid2",
+      "filled": false
+    },
+    {
+      "key": "refaud0",
+      "filled": false
+    },
+    {
+      "key": "refaud1",
+      "filled": false
+    },
+    {
+      "key": "refaud2",
+      "filled": false
+    }
+  ],
+  "setup": {
+    "ids": [
+      "asset_fa99e11b5f44",
+      "asset_d88cdf616bd6"
+    ]
+  },
+  "before": {
+    "refs": [
+      [
+        "first",
+        "asset_fa99e11b5f44"
+      ],
+      [
+        "last",
+        "asset_d88cdf616bd6"
+      ]
+    ],
+    "prompt": "F=<Picture 1> L=<Picture 2>",
+    "slots": [
+      {
+        "key": "first",
+        "filled": true
+      },
+      {
+        "key": "last",
+        "filled": true
+      },
+      {
+        "key": "refvid0",
+        "filled": false
+      },
+      {
+        "key": "refvid1",
+        "filled": false
+      },
+      {
+        "key": "refvid2",
+        "filled": false
+      },
+      {
+        "key": "refaud0",
+        "filled": false
+      },
+      {
+        "key": "refaud1",
+        "filled": false
+      },
+      {
+        "key": "refaud2",
+        "filled": false
+      }
+    ]
+  },
+  "menu": {
+    "exists": true,
+    "open": true,
+    "visible": true,
+    "buttons": [
+      {
+        "text": "移除这个参考素材",
+        "act": "remove-ref"
+      }
+    ]
+  },
+  "after": {
+    "refs": [
+      [
+        "last",
+        "asset_d88cdf616bd6"
+      ]
+    ],
+    "prompt": "F= L=<Picture 1>",
+    "slots": [
+      {
+        "key": "first",
+        "filled": false
+      },
+      {
+        "key": "last",
+        "filled": true
+      },
+      {
+        "key": "refvid0",
+        "filled": false
+      },
+      {
+        "key": "refvid1",
+        "filled": false
+      },
+      {
+        "key": "refvid2",
+        "filled": false
+      },
+      {
+        "key": "refaud0",
+        "filled": false
+      },
+      {
+        "key": "refaud1",
+        "filled": false
+      },
+      {
+        "key": "refaud2",
+        "filled": false
+      }
+    ]
+  },
+  "console_errors": [],
+  "console_error_count": 0
+}
