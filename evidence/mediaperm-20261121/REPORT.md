@@ -499,11 +499,41 @@ $ pytest tests/test_mediaperm_perf.py tests/test_h3_effect_lora.py tests/test_ef
 
 证据截图：`01-r2v-three-refs-filled` / `02-rightclick-menu-open` / `03-after-remove` / `04-qwen-ref-rightclick` / `05-qwen-after-remove` / `06-empty-slot-no-menu` / `09-music-ref-audio-filled` / `10-music-ref-rightclick` / `11-music-after-remove` / `12-before-submit-remove` / `13-after-submit-captured` / `14-flf-two-frames-filled` / `15-flf-rightclick-first-frame` / `16-flf-after-remove`
 
-> 该任务顺带发现 `tests/test_ref_context_remove.py` 存在**环境性 flaky**（`-v` 全过、默认参数下 2 条失败，多次复跑时好时坏）—— **不是产品缺陷**。
+> 该任务顺带发现 `tests/test_ref_context_remove.py` 存在**偶发 flaky**（9 轮里 2 轮失败，7 轮 `19 passed`）。
+>
+> ⚠️ **该任务初稿把根因写成「2 秒轮询 -> networkidle **永远**达不到 -> 必然超时」—— 经实测是错的，本轮已订正**：
+> - 实测 `networkidle` 在本机 **2.6~5.6 秒**就能达成（4/4 轮成功），**不是**「永远达不到」，也**不是**「必然 30 秒超时」。
+> - **真实触发条件**（隔离实例实测）：
+>
+>   | 轮次 | `/api/music-options` | `/api/video-options` |
+>   |---|---|---|
+>   | 1（冷缓存） | **5051.8ms** | 539.5ms |
+>   | 2 | **0.7ms** | 687.3ms |
+>   | 3 | **0.7ms** | 654.3ms |
+>
+>   ⇒ `/api/music-options` **冷缓存**要 **5.05 秒**（内部同步拉 ComfyUI `/object_info`，本机实测 **6.28 秒**），
+>   而 `/api/video-options` 每次约 **0.65 秒**（`refresh_comfy_node_names`，6 个节点并发探测 + 60 秒缓存）。
+>   首屏这两个慢请求与前端每 2 秒的 `/api/jobs` 轮询**首尾相接**时，Chromium 的
+>   「网络空闲 500ms 窗口」会被反复打断 -> `networkidle` 在 30 秒内确实可能凑不齐 -> `page.goto` 超时。
+>   超时后 Playwright 的 asyncio loop 状态被污染 -> 后续用例连带报 "Sync API inside the asyncio loop"。
+>
+> ⇒ **它不是纯测试脚手架问题：根因在服务端**（首屏两个接口各拉一遍 ComfyUI 观测接口，冷缓存时首屏被拖到 5+ 秒）。
+> 这与本轮修掉的第 3 条根因（**ComfyUI 观测接口没有缓存**）**属于同一类**。
+> 两处**已有**缓解：`yue2_schema` 的 `/object_info` 缓存 TTL **900 秒**、`refresh_comfy_node_names` 的节点名缓存 TTL **60 秒**。
+> 残留的是**冷缓存首屏的一次性成本**（首次约 5 秒，之后 <1ms）。
+>
+> **本轮不修**：① 它不在用户报的症状（「卡片列表慢」）路径上；
+> ② 真要修需要跨 `h3studio/music_yue2.py` / `h3studio/yue2_schema.py` / `server.py` 三处
+> 做「首屏预热 + 跨端点共享 `/object_info` 快照」，属于**新功能级**改动，超出本轮
+> 「只修无冲突的服务端成因」范围；③ 建议列入下一轮（见 §8 建议顺序）。
+>
+> **注**：修复该测试 flaky 本身只需把 `tests/test_ref_context_remove.py:389` 的
+> `wait_until="networkidle"` 改成 `domcontentloaded` + `wait_for_selector` ——
+> 但那是**测试脚手架**改动，且该文件由并发任务领域覆盖，本轮不动。
 
 ### D. 视觉 / 响应式问题清单（只记录，不改）
 
-独立报告：`evidence/shots-20261121/visual-findings.md`（**96 张截图** + `measurements.json` 58 个页面的 JS 测量）
+独立报告：`evidence/shots-20261121/visual-findings.md`（**92 张截图** + `measurements.json` 58 个页面的 JS 测量）
 
 **关键前置事实**：本应用**只有浅色主题**（`web/style.css:2-6`：`--bg:#f5f6f8; --panel:#fff; --text:#1a1d21; --muted:#8a919c; --border:#e6e8ec; --accent:#4f6ef7`；全仓无 `prefers-color-scheme` / `data-theme` / 主题切换 JS）。
 ⇒ **「暗色可读性」不适用**；本清单的对比度问题全是**浅色主题内部**的对比度不足。
@@ -572,6 +602,7 @@ $ pytest tests/test_video_sampling_params.py -q
 | **F2** 视频整文件下载 | 同上 | 服务端 `/files` 对 `Range` 请求**只回前 N 字节**（`preload=metadata` 只需头部），或出 poster 图 | 第 2 优先（属**静态资源服务路径**，可独立做） |
 | **F3** `/files` 用 `no-cache` | 服务端 `files_handler`（可改，但收益小 —— 304 只花 1.9ms） | 改成 `Cache-Control: private, max-age=…` + 保留 ETag | 第 3 优先 |
 | **F4** 无缩略图 | 需要新服务端能力（新建缩略图缓存目录） | 服务端生成并缓存缩略图（首屏只拉缩略图） | 第 4 优先（工作量最大，收益也最大） |
+| **S4** 首屏 `/api/music-options` **冷缓存 5.05 秒**（内部同步拉 ComfyUI `/object_info`，本机 6.28s）+ `/api/video-options` 每次 0.65s | 跨 `h3studio/music_yue2.py` / `h3studio/yue2_schema.py` / `server.py` 三处做「跨端点共享 `/object_info` 快照 + 首屏预热」，属**新功能级**改动，超出本轮范围 | 与本轮修掉的第 3 条根因**同类**（ComfyUI 观测接口无共享缓存）。已有缓解：`/object_info` 缓存 TTL 900s、节点名缓存 TTL 60s —— 残留只是**冷启动的一次性成本** | **第 5 优先**（连带修掉 `test_ref_context_remove` 的偶发 flaky） |
 
 ---
 
