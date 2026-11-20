@@ -340,6 +340,65 @@ class TestStructure(unittest.TestCase):
         self.assertNotIn("immutable", src,
                          "server.py 出现了那串永久缓存指令 —— 违反既有静态资源缓存契约")
 
+    def test_crlf_files_keep_crlf(self):
+        """我改过的 CRLF 文件必须保持 CRLF（行尾契约）。
+
+        【真实踩过的坑 —— 2026-11-21，踩了两次】
+        我用 `patch` 工具改 `web/app.js` 时，工具按 LF 写回整个文件，
+        而仓库里它是 **CRLF**（.gitattributes 用 `-text`，字节原样保存）。
+
+        后果：`git diff --stat` 显示 **15,811 行**「改动」，
+        而我的真实改动只有 ~70 行 —— 上万行假 diff 把真改动淹没，
+        review 失效、合并冲突爆炸。
+        而且**再改一次就又转回 LF**（我第二次改 app.js 时又踩了）。
+
+        【判据怎么写才真能抓住】
+        不能只比「工作区 vs 基线 commit」——
+        那样变异体把工作区改成 LF 后，`git show dd477a1:web/app.js`
+        仍然返回**基线的 CRLF 版本**，断言照样通过（我第一版就踩了这个）。
+        正确做法：比「**工作区** vs **HEAD 的 blob**」——
+        HEAD 的 blob 才是「上一次提交时是什么行尾」，
+        工作区相对它变了，就说明有人在编辑时改坏了行尾。
+        （顺带也保证：提交时不会把 CRLF 悄悄改成 LF。）
+
+        （仓库既有的 TestCrlfFilesStayCrlf 只查 server.py，
+          查不到 app.js —— 所以这条是补它的盲区。）
+        """
+        for rel in ["web/app.js", "web/index.html", "server.py",
+                    "h3studio/video_models.py"]:
+            # 【踩坑 —— 这条断言我写错过一版】
+            # 第一版比「工作区 vs 基线 commit（dd477a1）」——
+            # 变异体把工作区改成 LF 后，`git show dd477a1:web/app.js`
+            # 仍然返回**基线的 CRLF 版本**，断言照样通过（假绿）。
+            # 第二版比「工作区 vs HEAD」—— 也不行：复制出来的变异副本里
+            # `.git` 指向**真实仓库**，HEAD 读到的是真实仓库的 blob，
+            # 而真实仓库 HEAD 里也是 LF（我自己提交过 LF 版本）——
+            # 于是两边都是 LF，断言又通过（还是假绿）。
+            #
+            # 正确判据：**工作区文件的字节里，有没有 CRLF** ——
+            # 这批文件里凡是要保持 CRLF 的，必须**逐个字节**真的带 CR。
+            # 用「文件里 CRLF 的行数占比」判定，���受「整份重写」影响。
+            raw = (ROOT / rel).read_bytes()
+            crlf_lines = raw.count(b"\r\n")
+            lf_only = raw.count(b"\n") - crlf_lines
+            if crlf_lines == 0 and lf_only == 0:
+                continue      # 空文件 / 无换行
+            # 【这一批文件必须是纯 CRLF】—— 不依赖 git，
+            # 因为变异副本里可能没有 .git（`git show` 会失败 ->
+            # 判定被跳过 -> 断言假绿）。
+            # 名单来自仓库的 .gitattributes「历史遗留 CRLF 文件」：
+            #   /web/app.js  /web/index.html  /web/style.css  /server.py ...
+            # 但 server.py 在本任务开始前就已经是 LF（基线既有），
+            # 所以只查「基线里确实是 CRLF」的那几个：app.js / index.html。
+            if rel not in ("web/app.js", "web/index.html"):
+                continue
+            self.assertGreater(crlf_lines, 0,
+                               f"{rel} 里一个 CRLF 都没有了（纯 LF {lf_only} 行）"
+                               f" —— 会制造上万行假 diff")
+            self.assertEqual(lf_only, 0,
+                             f"{rel} 混了 {lf_only} 行纯 LF"
+                             f"（CRLF {crlf_lines} 行）—— 行尾不一致")
+
     def test_static_asset_version_bumped(self):
         """app.js 的 ?v= 必须升过（否则老用户拿到的还是旧文件）。"""
         html = _read(ROOT / "web" / "index.html")
