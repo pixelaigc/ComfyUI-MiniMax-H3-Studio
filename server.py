@@ -9900,6 +9900,47 @@ def _resolve_total_timeout() -> float:
                      min(agent_settings.TOTAL_TIMEOUT_MAX, value)))
 
 
+def _resolution_tier_megapixels(tier: str, aspect: str = "16:9") -> float | None:
+    """
+    短边档位标签 -> 总像素 MP（**按指定比例**反查）。
+
+    【为什么需要（2026-11-20）】Agent 路径要用**用户传的档位**换算宽高，
+    但视频的档位名是**短边像素**（480p / 768p / 1088p ...），
+    不是 MP 数（0.4 / 0.8 / 0.98 ...）——
+    ``workflows.RES_MP`` 那张表只有旧面板的两个键（544p / 768p），
+    覆盖不了真实档位集。
+
+    【为什么必须结合 aspect —— 实测数据】
+    同一个短边在不同比例下对应**不同**的 MP：
+      * 480p：16:9 -> 0.4MP（864x480）、4:3 -> 0.3MP（640x480）、21:9 -> 0.5MP
+      * 768p：16:9 -> 0.98MP（1344x768）
+      * 1088p：16:9 -> 2.0MP（1920x1088）
+    而且**档位集合本身按比例不同**：
+      * 4:3 的预设里**没有** 768p（有 672p/736p/800p/832p/864p...）
+      * 21:9 的预设里**没有** 1440p（最高 896p）
+    所以「用户说 768p + 4:3」在**该比例下没有这个档位**。
+
+    【查不到时怎么办 —— 不跨比例兜底】
+    跨比例兜底会让「768p + 4:3」静默变成 864p（实测）——
+    那是**静默改写用户请求**，正是本任务要消灭的东西。
+    查不到就返回 None，由调用方**明确报错**（说明该比例下的真实档位集）。
+    """
+    text = str(tier or "").strip()
+    if not text:
+        return None
+    if text.endswith("p"):
+        text = text[:-1]
+    if not text.isdigit():
+        return None
+    short = int(text)
+    preferred = str(aspect or "").strip()
+    for preset in video_models.size_presets_for_aspect(preferred or "16:9"):
+        if int(preset.get("short_edge") or 0) == short:
+            return float(preset.get("megapixels") or 0.0) or None
+    # 该比例下没有这个档位 -> 不跨比例兜底（会静默改写用户请求）
+    return None
+
+
 def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
     """
     把「agent 管理」里的文生视频默认参数套进 params（**不覆盖已给的**）。
@@ -9931,7 +9972,37 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
     if out.get("duration") in (None, ""):
         out["duration"] = defaults.get("duration") or video_models.VIDEO_DURATION_DEFAULT
     if not out.get("width") or not out.get("height"):
-        mp = defaults.get("megapixels") or video_models.VIDEO_DEFAULT_MP
+        # 【2026-11-20 修 —— 用户/模型传的 resolution 档位被忽略】
+        #
+        # 【原来错在哪（实测复现）】
+        #   传 resolution="480p" -> 实际 width=1376 height=768
+        #   传 resolution="768p" -> 实际 width=1376 height=768
+        #   什么都不传             -> 实际 width=1376 height=768
+        # 三个结果**完全一样** —— 因为下面这段只读 ``defaults["megapixels"]``，
+        # 从来不看用户传的 ``resolution``。
+        #
+        # 【为什么这是真缺陷而不是「无害的默认值」】
+        # 用户明确说了「要 480p」，服务端却跑 1.0MP（1376x768）——
+        # 界面显示的和产物不是一回事，正是本任务要消灭的「说谎」。
+        # 而且它与用户报的原话是同一个家族：「请求 480p 实际按 768p 生成」
+        # （方向相反：那次是档位被面板门禁吃掉，这次是档位被默认值盖掉）。
+        #
+        # 【修法】档位优先：用 ``resolution`` 换算 MP；
+        # 换算不到（未知档位）才回落到默认 megapixels。
+        tier = str(out.get("resolution") or "").strip()
+        mp = None
+        if tier:
+            mp = _resolution_tier_megapixels(tier, str(out.get("aspect") or "16:9"))
+            if mp is None:
+                # 【2026-11-20】该比例下没有这个档位 -> **不写宽高**，
+                # 也不回落到默认 megapixels（那会静默改写用户请求）。
+                # 留空 -> 由 prepare_agent_t2v_params 明确报错并给出
+                # 该比例下的真实档位集。
+                out.pop("resolution", None)
+                out["_invalid_resolution_tier"] = tier
+                return out
+        if mp is None:
+            mp = defaults.get("megapixels") or video_models.VIDEO_DEFAULT_MP
         width, height = video_models.video_dimensions(str(out["aspect"]), mp)
         out["width"] = width
         out["height"] = height
@@ -9989,6 +10060,44 @@ async def prepare_agent_t2v_params(params: dict,
         settings = agent_settings.load(conn)
     defaults = settings.get("t2v_defaults") or {}
     merged = _merge_t2v_defaults(params, defaults)
+
+    # 【2026-11-20 新增 —— 档位在该比例下不存在时明确报错】
+    #
+    # 【为什么必须在这里拦】
+    # 档位集合**按比例不同**（实测）：
+    #   4:3 的预设里没有 768p（有 672p/736p/800p/832p/864p...）
+    #   21:9 的预设里没有 1440p（最高 896p）
+    # 跨比例兜底会让「768p + 4:3」静默变成 864p —— 那是**静默改写
+    # 用户请求**，正是本任务要消灭的东西。
+    #
+    # 所以：换算不到 -> 明确报错，并给出**该比例下的真实档位集**，
+    # 让模型能一次改对（而不是拿一个说不清的尺寸去跑）。
+    invalid_tier = str(merged.pop("_invalid_resolution_tier", "") or "").strip()
+    if invalid_tier:
+        aspect_key = str(merged.get("aspect") or "16:9")
+        allowed = sorted({
+            int(p.get("short_edge") or 0)
+            for p in video_models.size_presets_for_aspect(aspect_key)
+            if int(p.get("short_edge") or 0) > 0})
+        allowed_txt = "、".join(f"{v}p" for v in allowed)
+        return merged, (
+            f"分辨率档位「{invalid_tier}」在画面比例 {aspect_key} 下不存在"
+            f"（档位集合按比例不同）。该比例下可用的档位：{allowed_txt}。"
+            f"请改用其中之一，或直接给 width/height。")
+    tier = str(merged.get("resolution") or "").strip()
+    if tier and not merged.get("width"):
+        mp = _resolution_tier_megapixels(tier, str(merged.get("aspect") or "16:9"))
+        if mp is None:
+            aspect_key = str(merged.get("aspect") or "16:9")
+            allowed = sorted({
+                int(p.get("short_edge") or 0)
+                for p in video_models.size_presets_for_aspect(aspect_key)
+                if int(p.get("short_edge") or 0) > 0})
+            allowed_txt = "、".join(f"{v}p" for v in allowed)
+            return merged, (
+                f"分辨率档位「{tier}」在画面比例 {aspect_key} 下不存在"
+                f"（档位集合按比例不同）。该比例下可用的档位：{allowed_txt}。"
+                f"请改用其中之一，或直接给 width/height。")
     # 【强制刷新节点清单】
     #
     # 【为什么必须 force=True】refresh_comfy_node_names 默认会复用 60 秒缓存，
