@@ -264,6 +264,70 @@ class TestToolResultClippingKeepsJsonValid(unittest.TestCase):
         self.assertLessEqual(len(clipped), agent_mod.TOOL_RESULT_LIMIT)
 
 
+class TestMergeAvReportsAudioFacts(unittest.TestCase):
+    """
+    【2026-11-20 新增】合并工具必须**如实回报**音轨实际长度。
+
+    【实测过的真实误述】Agent 合并「6 秒视频 + 2 秒音频」后在结论里说
+    「2 秒之后是无声段」—— **说错了**：工具内部 apad 补了静音，
+    音轨实际 5.99 秒。模型看不到 apad，只能按输入音频的 2 秒推断。
+
+    修法：工具结果里回报音轨实际时长与是否补了静音，
+    并让工具结果摘要带上它（模型看得到）。
+    """
+
+    def test_replace_audio_reports_padded_audio(self):
+        import asyncio as _aio
+        import subprocess as _sp
+        import tempfile as _tf
+        from h3studio import asset_repo
+        from h3studio import asset_service
+        from h3studio import assets as store
+
+        tmp = Path(_tf.mkdtemp(prefix="agent-cap-report-"))
+        try:
+            video = tmp / "v6s.mp4"
+            audio = tmp / "a2s.mp3"
+            _sp.check_call([
+                "ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                "testsrc=size=320x240:rate=25:duration=6", "-c:v", "libx264",
+                "-preset", "veryfast", "-pix_fmt", "yuv420p", "-an", str(video)],
+                stderr=_sp.DEVNULL)
+            _sp.check_call([
+                "ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                "sine=frequency=440:duration=2", "-c:a", "libmp3lame",
+                str(audio)], stderr=_sp.DEVNULL)
+            with store.connect() as conn:
+                vid = asset_service.register_asset(
+                    conn, source_path=video, filename=video.name,
+                    category="video", source="agent_cap_test",
+                    creator="test")["asset"]["id"]
+                aud = asset_service.register_asset(
+                    conn, source_path=audio, filename=audio.name,
+                    category="audio", source="agent_cap_test",
+                    creator="test")["asset"]["id"]
+            try:
+                result = _aio.run(agent_media_tools.op_replace_audio(vid, aud))
+                self.assertTrue(result["audio_padded"],
+                                "音轨比视频短时必须标记已补静音")
+                self.assertGreater(result["output_audio_duration_sec"],
+                                   result["input_audio_duration_sec"] + 0.3)
+                self.assertIn("补静音", result["note"])
+                # 工具结果摘要里必须带上这条事实（模型看得到）
+                summary = agent_mod._tool_result_summary(
+                    "media_replace_audio", result, True)
+                self.assertIn("补静音", summary)
+            finally:
+                for aid in (vid, aud):
+                    try:
+                        with store.connect() as conn:
+                            asset_repo.purge(conn, aid)
+                    except Exception:
+                        pass
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestResolutionTierIsHonoured(unittest.TestCase):
     """
     【2026-11-20 新增】Agent 传的 resolution 档位必须**原样生效**。

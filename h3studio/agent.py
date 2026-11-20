@@ -3185,7 +3185,14 @@ def _tool_result_summary(name: str, result, ok: bool) -> str:
                 "media_merge_av", "media_extract_audio", "media_trim",
                 "media_normalize_audio", "media_replace_audio"):
         output = result.get("output") or {}
-        return f"已生成：{output.get('name')}（{output.get('asset_id')}）"
+        base_text = f"已生成：{output.get('name')}（{output.get('asset_id')}）"
+        # 【2026-11-20】把工具自己算出的事实（如「音轨已补静音到 N 秒」）
+        # 放进摘要 —— 否则模型只能按**输入**推断，会向用户描述不存在的现象
+        # （实测：说「2 秒之后是无声段」，实际已补静音到 6 秒）。
+        note = str(result.get("note") or "").strip()
+        if note:
+            return f"{base_text}；{note}"[:300]
+        return base_text
     if name == "media_extract_frames":
         return f"已抽取 {result.get('frame_count', 0)} 帧"
     return "已完成"
