@@ -82,6 +82,7 @@ from h3studio import h3image_pe
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import gen_defaults
+from h3studio import size_spec
 from h3studio import gen_normalize
 from h3studio import seed_guard
 from h3studio import asset_ref_guard
@@ -9989,9 +9990,21 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
         #
         # 【修法】档位优先：用 ``resolution`` 换算 MP；
         # 换算不到（未知档位）才回落到默认 megapixels。
+        #
+        # 【2026-11-20 续 —— 统一为「MP 预算 × 百分比」】
+        # 用户要求「无论生成什么媒体，都是用百万分辨率 + 百分比模式」。
+        # 现在统一走 ``size_spec.plan_size``（**同一份**换算实现）：
+        #   1. 显式 megapixels（MP 预算）优先；
+        #   2. 否则 resolution_percent（该模式真实上限的百分比）；
+        #   3. 否则 resolution 档位反查；
+        #   4. 都��给 -> 用管理页的默认 MP 预算。
+        # 超上限时**自动缩到上限并给出原因**（写进 size_adjust_reasons），
+        # 不静默改写 —— 用户能看到「原始请求值 -> 生效值 -> 原因」。
         tier = str(out.get("resolution") or "").strip()
+        want_mp = out.get("megapixels")
+        want_pct = out.get("resolution_percent")
         mp = None
-        if tier:
+        if want_mp in (None, "") and want_pct in (None, "") and tier:
             mp = _resolution_tier_megapixels(tier, str(out.get("aspect") or "16:9"))
             if mp is None:
                 # 【2026-11-20】该比例下没有这个档位 -> **不写宽高**，
@@ -10001,11 +10014,30 @@ def _merge_t2v_defaults(params: dict, defaults: dict) -> dict:
                 out.pop("resolution", None)
                 out["_invalid_resolution_tier"] = tier
                 return out
-        if mp is None:
-            mp = defaults.get("megapixels") or video_models.VIDEO_DEFAULT_MP
-        width, height = video_models.video_dimensions(str(out["aspect"]), mp)
-        out["width"] = width
-        out["height"] = height
+        spec_w, spec_h, spec_reasons = size_spec.plan_size(
+            "t2v",
+            aspect=str(out.get("aspect") or "16:9"),
+            megapixels=want_mp,
+            percent=want_pct,
+            resolution=tier if mp is None else None,
+            width=out.get("width"),
+            height=out.get("height"),
+        )
+        if spec_w > 0 and spec_h > 0:
+            out["width"] = spec_w
+            out["height"] = spec_h
+            # 【2026-11-20】把**生效**的 MP 写回 —— 让「请求值 vs 生效值」
+            # 可对比（Agent 的 _collect_adjustments 据此回报差异）。
+            out["megapixels"] = round(
+                spec_w * spec_h / (1024 * 1024), 3)
+            if spec_reasons:
+                out["size_adjust_reasons"] = spec_reasons
+        else:
+            if mp is None:
+                mp = defaults.get("megapixels") or video_models.VIDEO_DEFAULT_MP
+            width, height = video_models.video_dimensions(str(out["aspect"]), mp)
+            out["width"] = width
+            out["height"] = height
     # 【2026-11-14 需求 A4】通用采样字段：用户（模型）显式给了的值优先，
     # 没给的才用默认值。
     #

@@ -1246,11 +1246,27 @@ def size_policy_for_mode(mode: str) -> dict:
 
 
 def max_pixels_for_mode(mode: str) -> float | None:
-    """某模式的面积上限（单位：MP）。None = 不限。"""
-    policy = VIDEO_MODE_SIZE_POLICY.get((mode or "").strip())
-    if not policy:
-        return VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024)
-    return policy.get("max_pixels_mp")
+    """
+    某模式的面积上限（单位：MP）。None = 不限。
+
+    【2026-11-20 修 —— 改为复用 size_policy_for_mode】
+    原来这里直接读 ``VIDEO_MODE_SIZE_POLICY[mode]["max_pixels_mp"]`` ——
+    那是**导入期快照**（模块 import 时算好的字面量）。
+    而 ``size_policy_for_mode`` 已经改成了**实时派生**
+    （每次调用都从 ``VIDEO_MAX_CANVAS_PIXELS`` 重算）。
+
+    于是同一真源出现了**两套行为**：
+      * 改 ``VIDEO_MAX_CANVAS_PIXELS`` -> ``size_policy_for_mode`` 立刻生效；
+      * 但 ``max_pixels_for_mode`` 仍然报旧值。
+    凡是走后者的地方（``h3_video_size.dimensions_for`` /
+    ``size_spec.mode_max_megapixels`` / 面积上限校验）都会拿到过期的上限 ——
+    正是本任务要消灭的「能力自述与真实能力脱节」的同一个家族。
+
+    现在统一走 ``size_policy_for_mode``，**只有一份**行为。
+    """
+    policy = size_policy_for_mode(mode)
+    value = policy.get("max_pixels_mp")
+    return float(value) if value is not None else None
 
 
 # ------------------------------------------------------------------
