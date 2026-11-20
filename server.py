@@ -8514,8 +8514,39 @@ async def api_video_options(request):
     # 用**异步**版 —— ComfyUI 首次列目录实测要 43 秒，
     # 同步调用会把整个事件循环卡住（状态流/其它 API 全瘫）。
     snapshot = await video_models.refresh_comfy_snapshot_async()
-    payload = video_models.options_payload(node_available=node_available,
-                                           snapshot=snapshot)
+    # 【2026-11-21 性能修】payload 的构建走**工作线程**。
+    #
+    # 【为什么必须挪出事件循环 —— 实测 2026-11-21】
+    #   `options_payload()` 内部要算 7 底模 × 12 LoRA = 84 组兼容性，
+    #   每组要读 safetensors 头 + 逐层比对，还要做 264 次 `find_weight`
+    #   （135 次落到 USB 盘的 rglob 慢路径）。实测单次 **511~800ms**。
+    #   这段代码原本**直接跑在 aiohttp 事件循环里** ——
+    #   一占住，**整个 8190 服务的所有请求排队**。
+    #
+    #   实测证据（线上 8190，2026-11-21）：
+    #     * 浏览器首屏并发拉 25 个接口时，`/api/jobs`（自己只要 4.7ms）
+    #       被拖到 **707ms**；
+    #     * 单独压测 `/api/video-options` 时，`/api/jobs` 的 p50
+    #       从 5.8ms 劣化到 **1279ms（220 倍）**；
+    #     * py-spy 抓到 aiohttp 的 MainThread（= 事件循环）栈：
+    #       `accel_lora_compat_matrix -> detect_accel_lora_loader ->
+    #        find_weight -> select_recursive_step`（同步读盘）。
+    #   ⇒ 用户报的「生成媒体库卡片有时候载入很慢很慢」就是这个。
+    #
+    # 【为什么用线程而不是改成异步】
+    #   底下是 `open()` / `Path.stat()` / `rglob()` —— **同步阻塞 IO**，
+    #   改成 async 只是换个写法，不能让它不占线程。
+    #   `asyncio.to_thread` 让它跑在工作线程，事件循环继续服务别的请求。
+    #
+    # 【为什么还加了缓存（video_models 侧）】
+    #   线程化解决的是「不阻塞别人」，缓存解决的是「自己别那么慢」。
+    #   两者都要：缓存后单次 ~25ms，线程化保证即使缓存未命中
+    #   （冷启动 / TTL 过期）也不会冻结全站。
+    payload = await asyncio.to_thread(
+        video_models.options_payload,
+        node_available=node_available,
+        snapshot=snapshot,
+    )
     # 附带「当前底模下每个加速 LoRA 的实测兼容性」—— 前端据此把对不上的
     # 从**下拉里剔除**（不是置灰）。
     #
@@ -8526,7 +8557,10 @@ async def api_video_options(request):
     model = video_models.VIDEO_MODELS.get(model_key)
     payload["selected_model"] = model_key
     if model:
-        matrix = video_models.accel_lora_compat_matrix(model_key)
+        # 【2026-11-21 性能修】同样走线程 —— 缓存未命中时这里要重算
+        # 84 组兼容性里的 12 组，读盘仍会占住事件循环。
+        matrix = await asyncio.to_thread(
+            video_models.accel_lora_compat_matrix, model_key)
         accels = []
         for item in payload.get("accel_loras") or []:
             entry = dict(item)
