@@ -420,13 +420,34 @@ _DISCOVER_CACHE: dict[str, tuple[float, list[dict]]] = {}
 #: 缓存有效期（秒）。
 _DISCOVER_CACHE_TTL = 60.0
 
+#: 缓存的**代次**（generation）。每次失效 +1。
+#:
+#: 【为什么需要代次而不是只清缓存】`job_meta` 里有一张**派生**映射
+#: （名字 -> 显示名，见 job_meta._effect_lora_display_map），它是由
+#: 本模块的扫描结果构建的。如果本模块的缓存被作废而派生映射不知道，
+#: 派生映射会继续用**旧的**显示名 —— 装完新 LoRA 后卡片上还是旧名。
+#:
+#: 代次机制：派生映射记录「构建时看到的代次」；代次一变，
+#: 派生映射自动作废重建。这样**任何**一条作废路径都能级联，
+#: 不依赖调用方记得去刷第二层缓存。
+_DISCOVER_GENERATION = {"n": 0}
+
+
+def effect_lora_cache_generation() -> int:
+    """当前缓存代次（供派生缓存比对）。"""
+    return _DISCOVER_GENERATION["n"]
+
 
 def invalidate_effect_lora_cache() -> None:
     """主动作废 discover_effect_loras 的结果缓存。
 
     装完 / 替换 LoRA 后调用，让下拉立刻反映新文件。
+
+    【2026-11-21】同时**推进代次** —— 让所有**派生**缓存
+    （job_meta 的「名字 -> 显示名」映射）自动失效重建。
     """
     _DISCOVER_CACHE.clear()
+    _DISCOVER_GENERATION["n"] += 1
 
 
 def discover_effect_loras(model_key: str | None = None) -> list[dict]:
