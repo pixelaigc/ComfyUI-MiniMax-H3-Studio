@@ -27,7 +27,7 @@ agent.py 已经 1000+ 行，是「编排器」。本模块是**纯函数层**：
 每个数字都必须能在本仓库里找到出处，否则就是骗模型。
 
 【替代方案而不是拒绝】
-用户说「做一个 30 秒的竖屏视频」，30 秒超出视频面板的 5~15 秒。
+用户说「做一个 90 秒的竖屏视频」，90 秒超出视频模式的 2~60 秒上限。
 正确做法**不是**回一句「不支持」，而是给出**可执行的替代方案**：
     * 30 秒拆成 3 段 10 秒（视频模式支持多段续接）
     * 或者改用 10 秒
@@ -60,8 +60,16 @@ from . import video_models
 VIDEO_DURATION_MIN = 2
 VIDEO_DURATION_MAX = 60
 
-#: 视频分辨率档位（对应 ComfyUI ResolutionSelector 的 megapixels）。
-#: 来源：workflows.RES_MP
+#: 视频分辨率档位的**兜底**集合（旧面板的 544p / 768p）。
+#:
+#: 【2026-11-20 更新 —— 它不再是真源】
+#: 视频的真实分辨率表达方式是「短边像素档位全集」+「自定义宽高」，
+#: 见 ``_video_size_tiers()`` 与 ``mode_schema`` 的 resolution 段
+#: （真源是 ``video_models.VIDEO_MODE_SIZE_POLICY``，2.0 MP 画布）。
+#:
+#: 旧面板的 ``#resSeg`` 只有 544p / 768p 两个下拉项，那是**界面**的遗留，
+#: 不是生成侧的硬约束 —— 继续拿它当真源会让 Agent 拒绝合法的 480p。
+#: 这个常量现在只作**异常兜底**用（真源导入失败时）。
 VIDEO_RESOLUTIONS = tuple(wf.RES_MP.keys())
 
 #: 视频 LoRA 取值。来源：workflows.LORAS + "none"（官方工作流的无 LoRA 档）
@@ -569,7 +577,8 @@ def mode_defaults(mode: str) -> dict:
     解析出的是**视频**默认值：
         mode_defaults("t2a") == {'lora':'ckpt850', 'resolution':'768p', 'duration':5.0}
     多余键 = ['duration', 'lora', 'resolution']
-    但音乐模式**没有**这三个参数（真实参数是 max_duration，4~360）。
+    但音乐模式**没有**这三个参数（真实参数是 max_duration，
+    区间 4~900 —— 见 music_yue2.YUE2_MIN/MAX_DURATION）。
     get_mode_schema 是模型**主动调用**的工具 —— 看到 `duration: 5.0`
     会以为音乐时长是 5 秒，于是传 duration=5（被静默忽略）
     或传 max_duration=5（合法但与用户意图不符）。
@@ -1589,12 +1598,13 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
 
     # --- 视频 duration 硬上限 ---
     #
-    # 后端 `float(params.get("duration", 5))` 不设限 —— 但面板滑块只有 5~15 秒，
+    # 后端 `float(params.get("duration", 5))` 不设限 —— 但视频模式的服务端
+    # 上限是 VIDEO_DURATION_MAX（60 秒，2026-11-12 放宽），
     # 用户没法复现超范围的任务，且帧数换算会让实际时长偏离预期。
-    # 所以 Agent 侧按**面板可复现区间**卡。
+    # 所以 Agent 侧按**同一个真源区间**卡。
     #
     # 注意：上面的通用区间检查已经用 mode_duration_range() 卡了同一件事
-    # （VIDEO_DURATION_MIN/MAX 就是 5/15）。这里**不再重复报一条** ——
+    # （VIDEO_DURATION_MIN/MAX = 2/60）。这里**不再重复报一条** ——
     # 重复报会让模型看到两条几乎一样的错误，反而困惑。
     # 这段只在「通用检查没覆盖」时兜底（未来改了区间常量也不会漏）。
     if is_video_mode(mode) and duration is not None:
