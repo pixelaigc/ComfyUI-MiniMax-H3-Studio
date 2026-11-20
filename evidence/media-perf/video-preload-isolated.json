@@ -1,0 +1,262 @@
+{
+  "A_metadata_only": {
+    "mode": "A_metadata_only",
+    "count": 7,
+    "bytes": 7340032,
+    "mb": 7.0,
+    "video_meta": [
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 9.916667,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      }
+    ],
+    "detail": [
+      {
+        "url": "iles/videos/v-h3-studio-000128.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000127.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000126.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000125.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000124.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000123.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000128.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": null
+      }
+    ]
+  },
+  "B_metadata_poster": {
+    "mode": "B_metadata_poster",
+    "count": 6,
+    "bytes": 5924864,
+    "mb": 5.65,
+    "video_meta": [
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 9.916667,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      },
+      {
+        "dur": 5.167,
+        "w": 1216,
+        "h": 672,
+        "rs": 4
+      }
+    ],
+    "detail": [
+      {
+        "url": "iles/videos/v-h3-studio-000128.mp4",
+        "bytes": 911360,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000127.mp4",
+        "bytes": 819200,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000126.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000125.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000124.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      },
+      {
+        "url": "iles/videos/v-h3-studio-000123.mp4",
+        "bytes": 1048576,
+        "status": 206,
+        "failed": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  "C_none_poster": {
+    "mode": "C_none_poster",
+    "count": 0,
+    "bytes": 0,
+    "mb": 0.0,
+    "video_meta": [
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      }
+    ],
+    "detail": []
+  },
+  "D_none_noposter": {
+    "mode": "D_none_noposter",
+    "count": 0,
+    "bytes": 0,
+    "mb": 0.0,
+    "video_meta": [
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      },
+      {
+        "dur": NaN,
+        "w": 0,
+        "h": 0,
+        "rs": 0
+      }
+    ],
+    "detail": []
+  }
+}

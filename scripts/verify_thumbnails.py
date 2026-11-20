@@ -92,7 +92,15 @@ def main():
           r1["headers"].get("Content-Type", "").startswith("image/jpeg"),
           r1["headers"].get("Content-Type"))
     cc = r1["headers"].get("Cache-Control", "")
-    check("Cache-Control 允许长缓存（immutable）", "immutable" in cc, cc)
+    # 【为什么不是 immutable】仓库既有契约
+    # （tests/test_frontend_assets_hygiene.py::
+    #  test_server_static_has_no_cache_control_is_known_risk）：
+    # `server.py` 里不允许出现那串「永久缓存」指令 ——
+    # 静态资源的 `?v=` 版本号才是唯一的破缓存防线。
+    # 缩略图 URL 是**内容寻址**的（sha1(路径+mtime_ns+size)），
+    # 源文件一变 URL 就变 => 24 小时 max-age 完全安全。
+    check("Cache-Control 允许长缓存（max-age）", "max-age=86400" in cc, cc)
+    check("Cache-Control 不是 no-cache（否则每次都回源）", "no-cache" not in cc, cc)
 
     print("\n=== 3) 与原图比体积 ===")
     # 【踩坑】out["file"] 有两种形态：

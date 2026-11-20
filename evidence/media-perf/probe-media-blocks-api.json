@@ -1,0 +1,84 @@
+{
+  "media_urls": [
+    "/files/81eeded9039b/images/i-zimage-000166.png",
+    "/files/1f5438fbfdf8/videos/v-h3-studio-000128.mp4",
+    "/files/b4c72b114492/videos/v-h3-studio-000127.mp4",
+    "/files/447342960f72/videos/v-h3-studio-000126.mp4",
+    "/files/6807b2f5bb69/videos/v-h3-studio-000125.mp4",
+    "/files/349cc6b7a5cd/videos/v-h3-studio-000124.mp4",
+    "/files/349cc6b7a5cd/videos/v-h3-studio-000123.mp4",
+    "/files/ade416d85fb7/videos/v-h3-studio-000122.mp4",
+    "/files/0b07eaa9804a/videos/v-h3-studio-000121.mp4",
+    "/files/f162a29e03f6/videos/v-h3-studio-000120.mp4",
+    "/files/9121091f8d71/videos/v-h3-studio-000119.mp4",
+    "/files/a7730f55f9fe/videos/v-h3-studio-000118.mp4",
+    "/files/99ee1412cfd9/videos/v-h3-studio-000117.mp4",
+    "/files/99ee1412cfd9/videos/v-h3-studio-000116.mp4"
+  ],
+  "A_idle": {
+    "n": 20,
+    "p50": 4.7,
+    "p90": 10.6,
+    "p99": 12.3,
+    "min": 3.5,
+    "max": 12.3,
+    "mean": 5.5
+  },
+  "B_with_media": {
+    "n": 1,
+    "p50": 12.7,
+    "p90": 12.7,
+    "p99": 12.7,
+    "min": 12.7,
+    "max": 12.7,
+    "mean": 12.7
+  },
+  "B_media_bytes_total": 0,
+  "C_immediately_after_media": {
+    "first_after_ms": 13.4,
+    "wall_ms": 13.5
+  },
+  "D_series_30": {
+    "samples": [
+      7.7,
+      5.0,
+      12.8,
+      5.2,
+      11.5,
+      6.4,
+      4.2,
+      4.2,
+      4.2,
+      9.1,
+      12.0,
+      6.3,
+      5.3,
+      8.5,
+      4.5,
+      5.2,
+      5.4,
+      5.4,
+      8.6,
+      14.4,
+      9.3,
+      4.8,
+      4.1,
+      10.0,
+      4.0,
+      4.1,
+      6.3,
+      4.2,
+      8.0,
+      6.0
+    ],
+    "stats": {
+      "n": 30,
+      "p50": 5.7,
+      "p90": 11.5,
+      "p99": 14.4,
+      "min": 4.0,
+      "max": 14.4,
+      "mean": 6.9
+    }
+  }
+}

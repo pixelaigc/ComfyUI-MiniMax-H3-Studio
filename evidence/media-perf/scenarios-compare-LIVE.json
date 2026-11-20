@@ -1,0 +1,1147 @@
+{
+  "before": {
+    "open": {
+      "scenario": "open",
+      "base": "http://127.0.0.1:8915",
+      "warmup_ms": 15405.6,
+      "tt_first_card_ms": 792.0,
+      "api_jobs_count": 7,
+      "media_files_count": 1,
+      "media_files_bytes": 1299806,
+      "thumb_count": 0,
+      "thumb_bytes": 0,
+      "total_media_bytes": 1299806,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/before/open.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=queued",
+          "t": 58.6,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=running",
+          "t": 58.9,
+          "bytes": 8613,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 559.2,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=queued",
+          "t": 559.4,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=running",
+          "t": 559.4,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 707.6,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000167.png",
+          "t": 755.0,
+          "bytes": 1299806,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 1558.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 2558.4,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 2571.2,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 2571.3,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 3558.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 4559.7,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 4559.8,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 5561.0,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 5561.1,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    },
+    "page2": {
+      "scenario": "page2",
+      "base": "http://127.0.0.1:8915",
+      "warmup_ms": 5179.6,
+      "tt_first_card_ms": 1437.3,
+      "api_jobs_count": 7,
+      "media_files_count": 27,
+      "media_files_bytes": 31987864,
+      "thumb_count": 0,
+      "thumb_bytes": 0,
+      "total_media_bytes": 31987864,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/before/page2.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=queued",
+          "t": 58.8,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=running",
+          "t": 58.9,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 709.5,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 795.8,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 796.0,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 796.0,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=2&page_size=12",
+          "t": 1359.4,
+          "bytes": 86087,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000164.png",
+          "t": 1403.2,
+          "bytes": 1491775,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000165.png",
+          "t": 1403.2,
+          "bytes": 1432922,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000162.png",
+          "t": 1403.3,
+          "bytes": 5545483,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000161.png",
+          "t": 1403.3,
+          "bytes": 9970619,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/images/i-zimage-000160.png",
+          "t": 1403.4,
+          "bytes": 1214972,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1404.7,
+          "bytes": 265919,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000115.mp4",
+          "t": 1404.8,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000114.mp4",
+          "t": 1405.3,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000113.mp4",
+          "t": 1405.7,
+          "bytes": 196608,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000112.mp4",
+          "t": 1405.9,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000110.mp4",
+          "t": 1406.1,
+          "bytes": 855743,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000109.mp4",
+          "t": 1406.3,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000111.mp4",
+          "t": 1406.6,
+          "bytes": 1445567,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1696.5,
+          "bytes": 196608,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000113.mp4",
+          "t": 1697.0,
+          "bytes": 131072,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1701.1,
+          "bytes": 196608,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000113.mp4",
+          "t": 1701.4,
+          "bytes": 131072,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000112.mp4",
+          "t": 1702.2,
+          "bytes": 196608,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000115.mp4",
+          "t": 1702.3,
+          "bytes": 131072,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1702.7,
+          "bytes": 262144,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000113.mp4",
+          "t": 1703.3,
+          "bytes": 458752,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000112.mp4",
+          "t": 1704.8,
+          "bytes": 262144,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000115.mp4",
+          "t": 1706.1,
+          "bytes": 131072,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1706.7,
+          "bytes": 131072,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000112.mp4",
+          "t": 1710.0,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000115.mp4",
+          "t": 1710.1,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/files/videos/v-h3-studio-000117.mp4",
+          "t": 1710.1,
+          "bytes": 1048576,
+          "status": 206,
+          "type": "Media"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 1790.8,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 2791.8,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=2&page_size=12",
+          "t": 2791.9,
+          "bytes": 86087,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 3792.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 3792.7,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 4791.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=2&page_size=12",
+          "t": 4791.4,
+          "bytes": 86087,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 5794.9,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    },
+    "refresh": {
+      "scenario": "refresh",
+      "base": "http://127.0.0.1:8915",
+      "warmup_ms": 5564.0,
+      "tt_first_card_ms": 3425.0,
+      "api_jobs_count": 10,
+      "media_files_count": 0,
+      "media_files_bytes": 0,
+      "thumb_count": 0,
+      "thumb_bytes": 0,
+      "total_media_bytes": 0,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/before/refresh.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=queued",
+          "t": 56.5,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=running",
+          "t": 56.6,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 414.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=queued",
+          "t": 414.4,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=running",
+          "t": 414.5,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 414.5,
+          "bytes": 1566,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 735.8,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 1412.7,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 2414.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 2415.9,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 3380.1,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 3419.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 3419.7,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 4412.9,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 4413.0,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 5414.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 6413.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 6413.3,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/system",
+          "t": 6413.5,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 7412.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/queue",
+          "t": 8413.8,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8915/api/jobs?status=done&page=1&page_size=12",
+          "t": 8414.0,
+          "bytes": 92353,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    }
+  },
+  "after": {
+    "open": {
+      "scenario": "open",
+      "base": "http://127.0.0.1:8190",
+      "warmup_ms": 3601.0,
+      "tt_first_card_ms": 812.4,
+      "api_jobs_count": 7,
+      "media_files_count": 0,
+      "media_files_bytes": 0,
+      "thumb_count": 0,
+      "thumb_bytes": 0,
+      "total_media_bytes": 0,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/after/open.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 73.8,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 73.9,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 346.9,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 347.1,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 347.2,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 722.0,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 1346.4,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 2346.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 2347.7,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 2347.8,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 3346.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 4346.5,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 4346.7,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 5346.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 5346.4,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    },
+    "page2": {
+      "scenario": "page2",
+      "base": "http://127.0.0.1:8190",
+      "warmup_ms": 3323.6,
+      "tt_first_card_ms": 1425.4,
+      "api_jobs_count": 8,
+      "media_files_count": 0,
+      "media_files_bytes": 0,
+      "thumb_count": 12,
+      "thumb_bytes": 320989,
+      "total_media_bytes": 320989,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/after/page2.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 63.4,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 63.6,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 577.2,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 577.4,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 577.5,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 710.7,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=2&page_size=12",
+          "t": 1346.3,
+          "bytes": 87243,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/081a601fa6fe20da433148007a26b0e582b7e233.jpg",
+          "t": 1396.8,
+          "bytes": 23425,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/45ce30cd20c73b04dda7e9b72b3e75d60ba5a4c5.jpg",
+          "t": 1397.6,
+          "bytes": 23600,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/160b0642755e99b520f51ac3e1c28127a6999afa.jpg",
+          "t": 1398.6,
+          "bytes": 19742,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/3f30af2a31096425998753287d9a2fc65b1c4720.jpg",
+          "t": 1398.6,
+          "bytes": 14577,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/13ba9d7174ef832768777933cda7f15538f5dce3.jpg",
+          "t": 1398.7,
+          "bytes": 39864,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/c80e9e896441b77139eb81f1d705ba28171e0fcf.jpg",
+          "t": 1398.7,
+          "bytes": 15517,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/40f8740562741369b22428047c58629dcb8f44db.jpg",
+          "t": 1399.5,
+          "bytes": 8123,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/64f2f5471a75dc728b7a237ab6a4a7221ae2b219.jpg",
+          "t": 1399.6,
+          "bytes": 17058,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/4c299b517d559c80d594703465c601c46d85154f.jpg",
+          "t": 1399.6,
+          "bytes": 24786,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/50a999cd89c5777eaf562e769e998c204815d25d.jpg",
+          "t": 1399.7,
+          "bytes": 37886,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/9b55b10defdf8d2c81a9b2328181b2bff5bca57c.jpg",
+          "t": 1399.7,
+          "bytes": 55269,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/thumb/05542c10b3016fa600d28e2d0b667590db4d4fc2.jpg",
+          "t": 1399.7,
+          "bytes": 41142,
+          "status": 200,
+          "type": "Image"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 1577.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 2578.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=2&page_size=12",
+          "t": 2579.4,
+          "bytes": 87243,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 2579.5,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 3577.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 4577.2,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=2&page_size=12",
+          "t": 4579.0,
+          "bytes": 87243,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 5577.4,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 5577.6,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    },
+    "refresh": {
+      "scenario": "refresh",
+      "base": "http://127.0.0.1:8190",
+      "warmup_ms": 3383.6,
+      "tt_first_card_ms": 3439.5,
+      "api_jobs_count": 10,
+      "media_files_count": 0,
+      "media_files_bytes": 0,
+      "thumb_count": 0,
+      "thumb_bytes": 0,
+      "total_media_bytes": 0,
+      "console_errors": 1,
+      "page_state": {
+        "active_tab": "done",
+        "cards": 12,
+        "scroll_top": 0
+      },
+      "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/scenarios/after/refresh.png",
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 74.2,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 74.5,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 507.6,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+          "t": 507.7,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=running",
+          "t": 507.8,
+          "bytes": 122,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 730.6,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 1506.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 2505.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 2505.2,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 2505.2,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 3427.9,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 3504.8,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 4505.1,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 4505.7,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 5505.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 5505.6,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 6505.3,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 6505.4,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 7504.7,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/queue",
+          "t": 8537.9,
+          "bytes": 2788,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+          "t": 8538.0,
+          "bytes": 93237,
+          "status": 200,
+          "type": "Fetch"
+        },
+        {
+          "url": "http://127.0.0.1:8190/api/system",
+          "t": 8538.0,
+          "bytes": 1567,
+          "status": 200,
+          "type": "Fetch"
+        }
+      ]
+    }
+  }
+}

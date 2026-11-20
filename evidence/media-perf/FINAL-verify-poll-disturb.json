@@ -1,0 +1,72 @@
+{
+  "before": {
+    "active_tab": "done",
+    "area_scroll_top": 247,
+    "page_scroll_top": 0,
+    "page_size": "24",
+    "search": "h3",
+    "card_count": 24,
+    "first_card_marker": "3bc7904fecff|done|100|节点 1/20 · 步 2/4|videos/v-h3-studio-000154.mp4||fav0",
+    "first_card_src": "/files/videos/v-h3-studio-000154.mp4",
+    "first_card_poster": "/api/thumb/ba6f1e309c5f3e164e7c2942d0faa3ee13cecc8b.jpg"
+  },
+  "after": {
+    "active_tab": "done",
+    "area_scroll_top": 247,
+    "page_scroll_top": 0,
+    "page_size": "24",
+    "search": "h3",
+    "card_count": 24,
+    "marker_survived": true,
+    "first_card_src": "/files/videos/v-h3-studio-000154.mp4",
+    "first_card_poster": "/api/thumb/ba6f1e309c5f3e164e7c2942d0faa3ee13cecc8b.jpg"
+  },
+  "console_errors": [],
+  "results": [
+    {
+      "name": "当前标签没被重置",
+      "pass": true,
+      "detail": "done -> done"
+    },
+    {
+      "name": "列表滚动位置没被重置",
+      "pass": true,
+      "detail": "247 -> 247"
+    },
+    {
+      "name": "页面滚动位置没被重置",
+      "pass": true,
+      "detail": "0 -> 0"
+    },
+    {
+      "name": "每页数量下拉没被重置",
+      "pass": true,
+      "detail": "24 -> 24"
+    },
+    {
+      "name": "搜索框没被清空",
+      "pass": true,
+      "detail": "'h3' -> 'h3'"
+    },
+    {
+      "name": "卡片数量没变",
+      "pass": true,
+      "detail": "24 -> 24"
+    },
+    {
+      "name": "卡片 DOM 没被整体重建（节点身份保留）",
+      "pass": true,
+      "detail": "标记节点还在 = 增量更新，不是整库重建"
+    },
+    {
+      "name": "卡片媒体 URL 没变（所以不会重新下载）",
+      "pass": true,
+      "detail": "src ideos/v-h3-studio-000154.mp4 -> ideos/v-h3-studio-000154.mp4"
+    },
+    {
+      "name": "控制台无 JS 错误",
+      "pass": true,
+      "detail": "0 个: []"
+    }
+  ]
+}
