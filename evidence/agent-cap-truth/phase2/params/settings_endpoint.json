@@ -1,0 +1,150 @@
+{
+  "flf_stored": {
+    "aspect": "16:9",
+    "resolution": "768p",
+    "megapixels": 0.8,
+    "resolution_percent": 100.0,
+    "duration": 5.0,
+    "lora": "ckpt850",
+    "lora_strength": 1.0,
+    "precision": "int8",
+    "steps": 4,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "shift_video": 12.0,
+    "shift_audio": 3.0
+  },
+  "r2v_stored": {
+    "aspect": "16:9",
+    "resolution": "768p",
+    "megapixels": 0.8,
+    "resolution_percent": 100.0,
+    "duration": 5.0,
+    "lora": "ckpt850",
+    "lora_strength": 1.0,
+    "precision": "int8",
+    "steps": 4,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "shift_video": 12.0,
+    "shift_audio": 3.0
+  },
+  "flf_spec_fields": {
+    "resolution": {
+      "type": "enum",
+      "default": "768p",
+      "max": null,
+      "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+      "options": [
+        "288p",
+        "352p",
+        "384p",
+        "416p",
+        "448p",
+        "480p",
+        "512p",
+        "544p",
+        "576p",
+        "608p",
+        "640p",
+        "672p",
+        "704p",
+        "736p",
+        "768p",
+        "800p",
+        "832p",
+        "864p",
+        "896p",
+        "928p",
+        "960p",
+        "1024p",
+        "1088p",
+        "1120p",
+        "1184p",
+        "1248p",
+        "1376p",
+        "1440p"
+      ]
+    },
+    "megapixels": {
+      "type": "number",
+      "default": 0.4,
+      "max": 2.0,
+      "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+      "options": []
+    },
+    "resolution_percent": {
+      "type": "number",
+      "default": 100.0,
+      "max": 200.0,
+      "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+      "options": []
+    },
+    "duration": {
+      "type": "number",
+      "default": 5.0,
+      "max": 60.0,
+      "note": "",
+      "options": []
+    }
+  },
+  "r2v_spec_fields": {
+    "resolution": {
+      "type": "enum",
+      "default": "768p",
+      "max": null,
+      "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+      "options": [
+        "288p",
+        "352p",
+        "384p",
+        "416p",
+        "448p",
+        "480p",
+        "512p",
+        "544p",
+        "576p",
+        "608p",
+        "640p",
+        "672p",
+        "704p",
+        "736p",
+        "768p",
+        "800p",
+        "832p",
+        "864p",
+        "896p",
+        "928p",
+        "960p",
+        "1024p",
+        "1088p",
+        "1120p",
+        "1184p",
+        "1248p",
+        "1376p",
+        "1440p"
+      ]
+    },
+    "megapixels": {
+      "type": "number",
+      "default": 0.4,
+      "max": 2.0,
+      "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+      "options": []
+    },
+    "resolution_percent": {
+      "type": "number",
+      "default": 100.0,
+      "max": 200.0,
+      "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+      "options": []
+    },
+    "duration": {
+      "type": "number",
+      "default": 5.0,
+      "max": 60.0,
+      "note": "",
+      "options": []
+    }
+  }
+}
