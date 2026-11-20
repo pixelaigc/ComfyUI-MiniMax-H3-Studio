@@ -186,7 +186,12 @@ STALE_BUMPED = {
     #   的 ?v= 统一升到 genfix20261119a。
     #   ⇒ 表要跟着走，否则这张断言自己变成假红（它已经报过 2 轮假红）。
     #   旧值取**直接前值**（各文件自己的上一个版本号）。
-    "app.js":                  ("cont20261119a", "genfix20261119b"),
+    # 【2026-11-20 参考素材右键移除】app.js 的内容又被改过
+    #   （视频面板素材槽位接右键移除 + 同组前移 + 占位标记重写）
+    #   ⇒ ?v= 必须再升一次（genfix20261119b -> refctx1）。
+    #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按
+    #   启发式新鲜度缓存。内容变了而 ?v= 不变 ⇒ 老用户拿到的仍是旧文件。
+    "app.js":                  ("genfix20261119b", "refctx1"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
@@ -215,7 +220,13 @@ STALE_BUMPED = {
     #   （接续面板 markdown 残留 / 参考图提示 / 引擎自检说明 / 清理确认
     #    / token 预算说明）⇒ ?v= 必须升，否则老用户拿到的仍是旧文件。
     "continuation.js":         ("cr20261118a", "contsw20261119a"),
-    "qwen-refs.js":            ("cr20261115b", "cr20261118a"),
+    # 【2026-11-20 参考素材右键移除】qwen-refs.js 的内容被改过
+    #   （参考图条目接上右键菜单 -> 复用 removeAt 的重编号 + 占位清理）
+    #   ⇒ ?v= 必须升，否则老用户拿到的仍是旧文件（右键菜单不生效）。
+    "qwen-refs.js":            ("cr20261118a", "refctx1"),
+    # 【2026-11-20 参考素材右键移除】music.js 的内容被改过
+    #   （参考音频条目接右键菜单）⇒ ?v= 必须升（原值 fix4temp0）。
+    "music.js":                ("fix4temp0",     "refctx1"),
     # 【2026-11-19 第 3 轮 A 项】providers.js 同属 commit 59707f5 的
     #   「表过期」—— 该 commit 改了 providers.js 的内容（增强结果 meta 行
     #   显示素材上下文）并把 ?v= 从 cr20261118a 升到 enhassets1，
