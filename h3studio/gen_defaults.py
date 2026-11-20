@@ -152,6 +152,7 @@ def _video_new_panel_fields() -> list:
     """t2v：新面板路径（video_workflow.build_t2v_panel）的真实参数。"""
     vm = _vm()
     wf = _wf()
+    from . import size_spec
     model_meta = vm.VIDEO_MODELS.get(vm.VIDEO_DEFAULT_MODEL) or {}
     attention_options = [
         (key, meta.get("label") or key)
@@ -173,8 +174,13 @@ def _video_new_panel_fields() -> list:
               "dmad = dmad_minimax_h3_4step_full_critic（4 步蒸馏）"),
         _enum("aspect", "画面比例", aspect_options, "16:9",
               "取值与 ComfyUI ResolutionSelector 的下拉一一对应"),
-        _num("megapixels", "总像素（MP）", 0.4, 0.2, 2.0, 0.1,
+        _num("megapixels", "MP 预算（百万像素）",
+             vm.VIDEO_DEFAULT_MP, 0.01, 2.0, 0.01,
+             "该模式真实上限 2.0 MP；100% = 上限。"
              "按比例换算宽高（宽高再对齐到 32 的倍数）"),
+        _num("resolution_percent", "MP 预算百分比（%）", 100.0,
+             size_spec.PERCENT_MIN, size_spec.PERCENT_MAX, 1.0,
+             "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP"),
         _num("duration", "时长（秒）", 5.0, 2.0, 60.0, 1.0,
              "服务端上限 60 秒（= 1440 帧），超限直接报错不静默截断"),
         _int("steps", "采样步数", int(model_meta.get("steps", 4)), 1, 50,
@@ -193,20 +199,77 @@ def _video_new_panel_fields() -> list:
 
 
 def _video_legacy_fields() -> list:
-    """flf / r2v：旧工作流路径（_h3_video_workflow / build_r2v）的真实参数。"""
+    """
+    flf / r2v：旧工作流路径（_h3_video_workflow / build_r2v）的真实参数。
+
+    【2026-11-20 修 —— 分辨率不再是「544p / 768p 两档」】
+    原来这里写的是 ``wf.RES_MP.keys()``（{"544p": 0.4, "768p": 0.8}），
+    默认值写死 ``"768p"``，note 写死「544p = 0.4MP / 768p = 0.8MP」。
+
+    **那不是真实能力，是旧界面（``#resSeg``）的两档遗留。**
+    真实约束见 ``video_models.VIDEO_MODE_SIZE_POLICY``：
+    flf / r2v 的面积上限与 t2v **同为 2.0 MP**（2026-11-17 放宽，
+    对齐 nonebot seg1/seg2 的 ``ResolutionSelector(megapixels=2)``），
+    且 ``custom_size: True``（面板本来就有「输出尺寸」手填框）。
+
+    所以：
+      * ``resolution`` 的选项改为**按比例派生**的真实短边档位
+        （``video_models.size_presets_for_aspect``，各 mode 的面积上限
+        会把超限组合直接过滤掉 —— 不是列出来再置灰）；
+      * 表达方式统一为**「MP 预算 × 百分比」**
+        （``megapixels`` + ``resolution_percent``，见 ``size_spec``）；
+      * 旧档位字符串仍然作为**可选输入**保留 —— 存量库里存的就是它，
+        迁移期两种写法都要能用（``size_spec.resolve_megapixels`` 能反查）。
+    """
     vm = _vm()
     wf = _wf()
+    from . import size_spec
+
     aspect_options = [(key, key) for key in wf.ASPECT_MAP.keys()]
     precision_options = sorted(
         {key for entry in wf.UNET.values() if isinstance(entry, dict)
          for key in entry.keys()})
     lora_options = [("none", "none（官方无加速档）")] + [
         (key, key) for key in wf.LORAS.keys()]
+
+    # 【真实档位】按 flf / r2v 自己的面积上限派生（两者同为 2.0 MP）。
+    # 取所有比例的短边档位并集 —— 与 ``agent_capability.video_size_tiers``
+    # 同源，避免两处再漂移。
+    tier_labels: dict[str, str] = {}
+    for aspect_key in vm.VIDEO_ASPECTS:
+        for preset in vm.size_presets_for_aspect(aspect_key):
+            short = int(preset.get("short_edge") or 0)
+            if short <= 0:
+                continue
+            label = f"{short}p"
+            # 同一个短边在不同比例下像素不同 -> 标签里带一个代表比例的尺寸
+            if label not in tier_labels:
+                tier_labels[label] = (
+                    f"{label} · {preset['width']}×{preset['height']}"
+                    f"（{aspect_key}）")
+    resolution_options = [(key, tier_labels[key])
+                          for key in sorted(tier_labels,
+                                            key=lambda k: int(k[:-1]))]
+
+    cap = size_spec.mode_max_megapixels("flf")
+    # 【默认 MP 取工作流内置真源】与 t2v 同一口径
+    # （``video_models.VIDEO_DEFAULT_MP``）—— 避免「同一个工作台里
+    # t2v 默认 0.4 MP、flf 默认 1.0 MP」这种无来由的差异。
+    # 存量库里已配过的 flf/r2v 走迁移（保留用户配过的 0.8 MP 等值），
+    # 不受这里影响。
+    default_mp = vm.VIDEO_DEFAULT_MP
+    default_pct = size_spec.default_percent()
+
     return [
         _enum("aspect", "画面比例", aspect_options, "16:9", ""),
-        _enum("resolution", "分辨率档位",
-              [(key, key) for key in wf.RES_MP.keys()], "768p",
-              "544p = 0.4MP / 768p = 0.8MP"),
+        _enum("resolution", "分辨率档位", resolution_options, "768p",
+              f"按该模式的真实面积上限（{cap} MP）派生；"
+              f"也可以直接填下面的 MP 预算 × 百分比"),
+        _num("megapixels", "MP 预算（百万像素）", default_mp, 0.01, cap, 0.01,
+             f"该模式真实上限 {cap} MP；100% = 上限。宽高按比例换算并对齐 32"),
+        _num("resolution_percent", "MP 预算百分比（%）", default_pct,
+             size_spec.PERCENT_MIN, size_spec.PERCENT_MAX, 1.0,
+             f"相对该模式真实上限（{cap} MP）的百分比；100% = {cap} MP"),
         _num("duration", "时长（秒）", 5.0, 2.0, 60.0, 1.0, ""),
         _enum("lora", "加速 LoRA 档", lora_options, "ckpt850",
               "none / ckpt850 / v4step600"),
@@ -229,6 +292,7 @@ def _image_fields(kind: str) -> list:
     """图像模式的字段表。kind ∈ z / qwen / moss / h3image"""
     wf = _wf()
     vm = _vm()
+    from . import size_spec
     if kind == "z":
         table = wf.Z_IMAGE_MODELS
         tiers = wf.Z_IMAGE_RES_TIERS
@@ -270,10 +334,36 @@ def _image_fields(kind: str) -> list:
         aspects = [(key, key) for key in h3i.H3_IMAGE_NATIVE_SIZES]
         extra = []
     meta = table.get(default_model) or {}
+    # 【2026-11-20 修 —— 图片族也统一成「MP 预算 × 百分比」】
+    # 原来图片族只有「分辨率档位」枚举（1mp / 480p / 720p / 2k / 4k …），
+    # 每个 mode 一张**独立的表**（Z / QWEN / MOSS / H3_IMAGE），
+    # 同一档位名在不同族下的 MP 值还不一样（4k：Z=8.3MP、QWEN/MOSS=4.0MP）。
+    # 现在统一用「MP 预算 + 百分比」表达，档位仍然保留（存量兼容 +
+    # 各族的官方档位表确实有意义），但**上界**由真实档位表派生。
+    #
+    # 【默认 MP 取「默认档位」的 MP，而不是族上限】
+    # 否则管理页会显示「MP 预算 8.3」（= 上限），
+    # 而实际生效的是默认档位 1mp（= 1.0 MP）—— 又是「面板说一套、
+    # 产物另一套」。默认档位的 MP 才是**用户真正会拿到的**那个值。
+    mp_cap = 0.0
+    for value in (tiers or {}).values():
+        if isinstance(value, (int, float)):
+            mp_cap = max(mp_cap, float(value))
+    mp_cap = round(mp_cap, 3) if mp_cap else 1.0
+    default_mp = (tiers or {}).get(default_tier)
+    if not isinstance(default_mp, (int, float)):
+        default_mp = mp_cap
+    default_mp = round(float(default_mp), 3)
     fields = [
         _enum("model", "模型版本", _model_options(table), default_model, ""),
         _enum("resolution", "分辨率档位", [(key, key) for key in tiers],
               default_tier, ""),
+        _num("megapixels", "MP 预算（百万像素）", default_mp, 0.01, mp_cap, 0.01,
+             f"该族真实上限 {mp_cap} MP（来自该族的真实档位表）；100% = 上限。"
+             f"默认 {default_mp} MP = 默认档位 {default_tier}"),
+        _num("resolution_percent", "MP 预算百分比（%）", 100.0,
+             size_spec.PERCENT_MIN, size_spec.PERCENT_MAX, 1.0,
+             f"相对该族真实上限（{mp_cap} MP）的百分比；100% = {mp_cap} MP"),
         _enum("aspect", "画面比例", aspects, "16:9", ""),
         _int("steps", "采样步数", int(meta.get("steps", 8)), 1, 150,
              "该模型版本的官方推荐步数"),
@@ -516,11 +606,25 @@ def normalize_field(field: dict, raw) -> object:
 
 
 def normalize_mode(mode: str, raw) -> dict:
-    """某模式的默认参数归一（返回该模式的**完整**字段集）。"""
+    """
+    某模式的默认参数归一（返回该模式的**完整**字段集）。
+
+    【2026-11-20 顺序调整 —— 先迁移再归一】
+    原来直接对 raw 做字段归一。改成：
+      1. **先迁移**尺寸表达（把旧档位反查成 MP 预算）—— 见
+         ``migrate_size_expression``；
+      2. 再按字段表归一（缺失字段补默认值）。
+
+    【为什么必须先迁移】``megapixels`` 在迁移后**已经存在于 raw 里**，
+    而归一阶段对「raw 里没有的字段」会填**字段默认值**（1.0 MP）。
+    顺序反了的话，存量库里只有 ``resolution="768p"`` 的记录会被填成
+    1.0 MP —— 那是**编造**了用户从没配过的值（768p 在 16:9 下是 0.8 MP）。
+    """
     fields, supported = _mode_fields(mode)
     if not supported:
         return {}
     source = raw if isinstance(raw, dict) else {}
+    source = migrate_size_expression(mode, source)
     out: dict = {}
     for field in fields:
         name = field["name"]
@@ -542,6 +646,77 @@ def normalize_gen_defaults(raw) -> dict:
         values = normalize_mode(mode, source.get(mode))
         if values:
             out[mode] = values
+    return out
+
+
+# ------------------------------------------------------------------ 存量迁移
+
+
+def migrate_size_expression(mode: str, values: dict) -> dict:
+    """
+    把**存量**默认参数迁移到「MP 预算 × 百分比」表达。
+
+    【为什么需要迁移】
+    存量库里存的是旧表达：
+      * 视频旧面板（flf / r2v）：``resolution`` = "544p" / "768p"
+        （那两档是旧界面 ``#resSeg`` 的遗留，不是真实能力上限）；
+      * 视频新面板（t2v）：``megapixels`` = 0.4 / 1.0（有 MP，但**没有百分比**）；
+      * 图片族：``resolution`` = "1mp" / "480p" / "2k" …（各族的独立表）。
+
+    迁移后的统一表达是 **MP 预算 + 百分比**。迁移规则：
+
+      1. 存量里**已有** ``megapixels`` -> 保留（它就是 MP 预算）；
+         缺的 ``resolution_percent`` 补 100（= 该模式真实上限的百分比
+         语义下，100% 意味着「用满这个 MP 预算」，不改变原有像素）；
+      2. 存量里**只有** ``resolution`` 档位、没有 ``megapixels``
+         -> 用 ``size_spec`` 把档位反查成 MP 预算写进 ``megapixels``，
+         ``resolution_percent`` 补 100；
+      3. 档位反查不到（脏值）-> ``megapixels`` 留空，由字段默认值兜底。
+
+    【为什么在**读取时**迁移而不是只做一次性脚本】
+    一次性脚本会漏掉：别的机器上的库、手工导入的库、以及未来从旧版本
+    升级的库。读取时迁移 = 任何来源的存量数据都会自动变成新表达，
+    且**幂等**（迁移后再迁移不会变）。
+    """
+    if not isinstance(values, dict) or not values:
+        return values
+    out = dict(values)
+    try:
+        from . import size_spec
+    except Exception:
+        return out
+
+    # 已经有 MP 预算 -> 只补百分比
+    if out.get("megapixels") not in (None, ""):
+        if out.get("resolution_percent") in (None, ""):
+            out["resolution_percent"] = size_spec.default_percent()
+        return out
+
+    # 只有档位 -> 反查 MP
+    tier = out.get("resolution")
+    if tier in (None, ""):
+        return out
+    aspect = str(out.get("aspect") or "16:9")
+    # 【视频族优先旧口径】存量档位字符串是旧口径（544p=0.4 / 768p=0.8），
+    # 必须按旧口径反查，否则用户已有的 1216×672 会变成 1344×768。
+    mp = size_spec.legacy_tier_megapixels(tier)
+    if mp is None:
+        mp = size_spec.tier_to_megapixels(mode, tier)
+    if mp is None:
+        mp = size_spec.video_tier_megapixels(tier, aspect)
+    if mp is None:
+        return out
+    out["megapixels"] = round(float(mp), 3)
+    out["resolution_percent"] = size_spec.default_percent()
+    return out
+
+
+def migrate_all_gen_defaults(raw) -> dict:
+    """对整份 ``gen_defaults`` 做尺寸表达迁移（幂等）。"""
+    source = raw if isinstance(raw, dict) else {}
+    out: dict = {}
+    for mode, values in source.items():
+        out[mode] = migrate_size_expression(mode, values)
     return out
 
 

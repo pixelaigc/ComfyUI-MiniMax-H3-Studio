@@ -810,17 +810,18 @@ async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
         # 按需查询（那是模型主动调的工具）；这里只给「能不能自定义 + 上限」
         # 这两个**模型最容易猜错**的事实。
         "video_resolution_note": (
-            f"视频可给短边档位（如 480p/768p）也可直接给 width/height"
-            f"（{cap.video_size_policy('t2v').get('multiple')} 的倍数，"
-            f"总像素 ≤ {cap.video_size_policy('t2v').get('max_pixels_mp')} MP）；"
-            f"完整档位与底模清单用 get_mode_schema 查。"),
+            f"分辨率用 **megapixels（MP 预算）× resolution_percent（%）**："
+            f"上限 {cap.video_size_policy('t2v').get('max_pixels_mp')} MP，"
+            f"100% = 用满。也可给 width/height"
+            f"（{cap.video_size_policy('t2v').get('multiple')} 的倍数）"
+            f"或短边档位（如 480p = 0.4MP）。超上限自动缩放并说明原因。"
+            f"完整清单用 get_mode_schema 查。"),
         "music_duration_range": list(cap.music_duration_range()),
         "music_duration_default": cap.music_default_duration(),
         "notes": ("比例通用；视频时长用 duration；"
                   "音乐时长用 max_duration（不是 duration）；"
                   "negative_ok=false 表示负面提示词没用；"
-                  "f=图像族（模型/档位清单用 get_mode_schema 查）；"
-                  "拿不准用 get_mode_schema。"),
+                  "f=图像族；拿不准用 get_mode_schema。"),
     }
 
 
@@ -1106,12 +1107,23 @@ def _explicit_args(args: dict) -> set:
         "max_duration": {"type": "number",
                          "description": "音乐时长上限（秒），**仅音乐模式**。"},
         "resolution": {"type": "string",
-                       "description": "分辨率档位（短边像素，如 480p / 768p）。"},
+                       "description": "分辨率档位（短边像素，如 480p / 768p）。"
+                                      "仅作显示标签；建议改用 megapixels + "
+                                      "resolution_percent。"},
+        "megapixels": {"type": "number",
+                       "description": "MP 预算（百万像素）。视频/图像模式通用。"
+                                      "该模式的真实上限用 get_mode_schema 查；"
+                                      "宽高按 aspect 换算并自动对齐到 32 的倍数，"
+                                      "超上限会自动缩到可用值并说明原因。"},
+        "resolution_percent": {"type": "number",
+                               "description": "MP 预算百分比（%）。相对该模式"
+                                              "真实上限的百分比，100% = 用满上限。"
+                                              "与 megapixels 二选一。"},
         "width": {"type": "integer",
-                  "description": "视频输出宽度（像素）。与 resolution 二选一；"
+                  "description": "视频输出宽度（像素）。与 megapixels 二选一；"
                                  "必须是 32 的倍数且总像素不超模式上限。"},
         "height": {"type": "integer",
-                   "description": "视频输出高度（像素）。与 resolution 二选一；"
+                   "description": "视频输出高度（像素）。与 megapixels 二选一；"
                                   "必须是 32 的倍数且总像素不超模式上限。"},
         "model": {"type": "string",
                   "description": "模型版本（图像模式）。"
@@ -1192,6 +1204,24 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     resolution = str(args.get("resolution") or "").strip()
     if resolution:
         params["resolution"] = resolution
+    # 【2026-11-20 新增 —— MP 预算 × 百分比（用户指定的统一表达）】
+    #
+    # 【为什么 Agent 必须能直接给这两个】
+    # 用户要求「无论生成什么媒体，都是用百万分辨率 + 百分比模式」。
+    # 档位字符串是**显示标签**，同一短边在不同比例下面积不同
+    # （480p：16:9 = 0.40 MP、4:3 = 0.30 MP、21:9 = 0.50 MP），
+    # 拿它当参数算不准。MP 预算 + 百分比才是无歧义的表达。
+    #
+    # 【为什么不在这里就算宽高】换算要按**该 mode 的真实上限**与比例做，
+    # 那是服务端归一层的职责（``size_spec.plan_size``）。
+    # 这里只**透传**，由 ``prepare_job_params`` /
+    # ``h3_video_size.apply_size`` 统一算 —— 两条路径同一份实现。
+    for field in ("megapixels", "resolution_percent"):
+        if args.get(field) is not None:
+            try:
+                params[field] = float(args[field])
+            except (TypeError, ValueError):
+                raise AgentError(f"{field} 必须是数字")
     # 【2026-11-20 新增 —— 显式宽高】
     #
     # 【为什么必须支持】视频的真实分辨率表达方式是「短边档位」**或**
@@ -1727,6 +1757,28 @@ def _collect_adjustments(mode: str, args: dict, params: dict) -> list[dict]:
     if requested_res and effective_res and requested_res != effective_res:
         _add("resolution", requested_res, effective_res,
              "服务端按实际生效像素反算出的档位标签")
+
+    # --- MP 预算 / 百分比（2026-11-20 统一表达）---
+    #
+    # 【为什么必须回报】用户给的是「MP 预算 × 百分比」，
+    # 服务端可能因为超上限而**自动下调**（用户明确要求的行为）。
+    # 不回报的话，模型会按请求值向用户复述 ⇒ 用户看到的与产物不是一回事
+    # —— 正是本任务要消灭的那类缺陷。
+    for field in ("megapixels", "resolution_percent"):
+        requested = args.get(field)
+        effective = params.get(field)
+        if requested is None or effective is None:
+            continue
+        try:
+            if abs(float(requested) - float(effective)) < 1e-9:
+                continue
+        except (TypeError, ValueError):
+            continue
+        reasons = params.get("size_adjust_reasons")
+        reason = "服务端按该模式的真实上限归一后的生效值"
+        if isinstance(reasons, list) and reasons:
+            reason = "；".join(str(r) for r in reasons)
+        _add(field, requested, effective, reason)
 
     # --- 时长 ---
     duration_field = agent_schema.mode_duration_field(mode)

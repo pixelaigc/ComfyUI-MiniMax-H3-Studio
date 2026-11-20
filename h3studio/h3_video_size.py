@@ -98,6 +98,11 @@ def dimensions_for(resolution: str | None, aspect: str | None,
     flf / r2v 与 t2v 的面积上限现在**相同**（2.0 MP，2026-11-17 放宽）；
     但这里仍必须按模式上限收口，否则将来某个模式单独放宽时，
     会提交一个工作流跑不动的尺寸。
+
+    【2026-11-20 —— 新增「MP 预算 × 百分比」入口】
+    用户要求「无论生成什么媒体，都是用百万分辨率 + 百分比模式」。
+    所以额外提供 :func:`dimensions_for_spec`；本函数保持**旧档位语义**
+    不变（老任务重放必须得到同样的像素）。
     """
     mp = resolution_to_megapixels(resolution)
     aspect_key = str(aspect or "").strip()
@@ -117,6 +122,36 @@ def dimensions_for(resolution: str | None, aspect: str | None,
     return width, height
 
 
+def dimensions_for_spec(mode: str,
+                         aspect: str | None = None,
+                         megapixels: float | None = None,
+                         percent: float | None = None,
+                         resolution: str | None = None,
+                         width: int | None = None,
+                         height: int | None = None,
+                         ) -> tuple[int, int, list[str]]:
+    """
+    「MP 预算 × 百分比」-> (width, height, 调整原因)。
+
+    【为什么薄封装到 size_spec】换算公式（MP -> 宽高、32 对齐、超限缩放）
+    已经在 ``h3studio/size_spec.py`` 里统一实现，本模块只做**接线**：
+    让 flf / r2v 的服务端归一层也能吃这套表达，而不是只有管理页能填。
+
+    【优先级】显式 width/height > megapixels > percent > resolution 档位。
+    与 ``size_spec.plan_size`` 完全一致（同一份实现，不会有第二套规则）。
+    """
+    from . import size_spec
+    return size_spec.plan_size(
+        mode,
+        aspect=aspect or DEFAULT_ASPECT,
+        megapixels=megapixels,
+        percent=percent,
+        resolution=resolution,
+        width=width,
+        height=height,
+    )
+
+
 def resolve_size(params: dict, mode: str) -> tuple[int, int, list[str]]:
     """给一个任务的 params 算出**最终生效**的宽高。
 
@@ -131,8 +166,39 @@ def resolve_size(params: dict, mode: str) -> tuple[int, int, list[str]]:
     【为什么优先级 1 在前】面板会同时提交 width/height 与档位/比例，
     两者的语义**应当一致**；真不一致时以 width/height 为准 ——
     因为它才是工作流真正读的值（h3_video_modes.build_* 只读这两个键）。
+
+    【2026-11-20 —— 新增 MP 预算 × 百分比】
+    params 里出现 ``megapixels`` / ``resolution_percent`` 时走
+    ``size_spec.plan_size``（**同一份**换算实现，不另造规则）：
+      * ``megapixels``（MP 预算）优先于 ``resolution_percent``；
+      * 两者都没有时，仍按旧档位语义算（老任务重放像素不变）。
     """
     notes: list[str] = []
+
+    # 【2026-11-20 新表达】MP 预算 / 百分比 —— 走 size_spec 统一实现
+    has_spec = (params.get("megapixels") not in (None, "")
+                or params.get("resolution_percent") not in (None, ""))
+    if has_spec:
+        spec_w, spec_h, spec_notes = dimensions_for_spec(
+            mode,
+            aspect=params.get("aspect"),
+            megapixels=params.get("megapixels"),
+            percent=params.get("resolution_percent"),
+            resolution=params.get("resolution"),
+            width=params.get("width"),
+            height=params.get("height"),
+        )
+        if spec_w > 0 and spec_h > 0:
+            notes.extend(spec_notes)
+            # 【2026-11-20】把**生效**的 MP 预算写回 params ——
+            # 这样「用户请求的 MP」与「实际生效的 MP」可对比，
+            # Agent 的 ``_collect_adjustments`` 才能回报差异。
+            effective_mp = spec_w * spec_h / (1024 * 1024)
+            params["megapixels"] = round(effective_mp, 3)
+            return spec_w, spec_h, notes
+        # 算不出来 -> 落回旧档位语义（notes 里已带原因）
+        notes.extend(spec_notes)
+
     raw_w = params.get("width")
     raw_h = params.get("height")
 
@@ -146,7 +212,7 @@ def resolve_size(params: dict, mode: str) -> tuple[int, int, list[str]]:
     width = _as_int(raw_w)
     height = _as_int(raw_h)
     if width and height:
-        # 已有真实宽高 -> 仍然过一遍该模式的上限（可能超限）
+        # 已有真实宽高 -> 过一遍该模式的上限（可能超限）+ **32 对齐**
         max_pixels = vmodels.max_pixels_for_mode(mode)
         if max_pixels:
             limit = max_pixels * 1024 * 1024
@@ -161,6 +227,40 @@ def resolve_size(params: dict, mode: str) -> tuple[int, int, list[str]]:
                     width, height = snapped_w, snapped_h
                 else:
                     notes.extend(reasons)
+        # 【2026-11-20 修 —— 显式宽高也必须吸附到 32 的倍数】
+        #
+        # 【原来错在哪（实测复现）】显式宽高只过了**面积上限**检查，
+        # 没做 32 对齐 —— 提交 1900×1000 就原样跑 1900×1000。
+        # 但 H3 的 CANVAS_MULTIPLE = 32、节点 schema step = 32、
+        # latent 网格 = width//16 —— **非 32 倍数的宽高会得到不对齐的
+        # latent 网格**，产物与面板显示对不上。
+        # 这正是本项目反复修的「界面说谎」家族：面板写 1900，
+        # 产物实际不是那个尺寸。
+        #
+        # 【为什么必须在这里吸附，而不是留给工作流】
+        # ``normalize_video_size`` 是服务端权威的吸附器（与 /api/video-size
+        # 同口径）。在这里调用 = 两条建任务路径（面板提交 / Agent 自建）
+        # 拿到的是**同一套**吸附结果。
+        multiple = vmodels.VIDEO_SIZE_MULTIPLE
+        aligned_w = max(multiple, int(round(width / multiple)) * multiple)
+        aligned_h = max(multiple, int(round(height / multiple)) * multiple)
+        if aligned_w != width:
+            notes.append(
+                f"宽度 {width} 不是 {multiple} 的倍数 -> 已吸附到 {aligned_w}")
+            width = aligned_w
+        if aligned_h != height:
+            notes.append(
+                f"高度 {height} 不是 {multiple} 的倍数 -> 已吸附到 {aligned_h}")
+            height = aligned_h
+        # 单边上限（节点 schema max = 16384）
+        if width > vmodels.VIDEO_SIZE_MAX:
+            notes.append(
+                f"宽度 {width} 超过上限 {vmodels.VIDEO_SIZE_MAX} -> 已钳到上限")
+            width = vmodels.VIDEO_SIZE_MAX
+        if height > vmodels.VIDEO_SIZE_MAX:
+            notes.append(
+                f"高度 {height} 超过上限 {vmodels.VIDEO_SIZE_MAX} -> 已钳到上限")
+            height = vmodels.VIDEO_SIZE_MAX
         return width, height, notes
 
     if width or height:

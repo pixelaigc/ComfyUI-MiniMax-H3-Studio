@@ -1020,7 +1020,7 @@ def mode_schema(mode: str) -> dict:
             "max": policy.get("max"),
             "multiple": policy.get("multiple"),
             "source": "video_models.VIDEO_MODE_SIZE_POLICY",
-            "note": "直接给像素宽高时用它；与 resolution 二选一。",
+            "note": "直接给像素宽高时用它；与 megapixels 二选一。",
         }
         schema["params"]["height"] = {
             "type": "integer",
@@ -1028,7 +1028,48 @@ def mode_schema(mode: str) -> dict:
             "max": policy.get("max"),
             "multiple": policy.get("multiple"),
             "source": "video_models.VIDEO_MODE_SIZE_POLICY",
-            "note": "直接给像素宽高时用它；与 resolution 二选一。",
+            "note": "直接给像素宽高时用它；与 megapixels 二选一。",
+        }
+        # 【2026-11-20 新增 —— MP 预算 × 百分比（用户指定的统一表达）】
+        #
+        # 【为什么不只留 resolution 档位】用户要求「无论生成什么媒体，
+        #  都是用百万分辨率 + 百分比模式」。档位是**显示标签**，
+        # 同一短边在不同比例下面积不同（480p：16:9=0.40MP、4:3=0.30MP），
+        # 拿它当参数会算不准。
+        #
+        # 【为什么这两个字段是真源派生】上限来自
+        # ``video_models.VIDEO_MODE_SIZE_POLICY``（面积上限实时派生），
+        # 百分比区间来自 ``size_spec.PERCENT_MIN/MAX``，
+        # 与管理页面板用的是**同一份**实现（``size_spec.plan_size``）。
+        from . import size_spec as _ss
+        schema["params"]["megapixels"] = {
+            "type": "number",
+            "unit": "megapixel",
+            "min": _ss.MP_MIN,
+            "max": policy.get("max_pixels_mp"),
+            "step": 0.01,
+            "default": (defaults.get("megapixels")
+                        if defaults.get("megapixels") not in (None, "")
+                        else _ss.default_megapixels(mode)),
+            "source": "video_models.VIDEO_MODE_SIZE_POLICY（实时派生的面积上限）",
+            "note": (f"MP 预算（百万像素），该模式真实上限 "
+                     f"{policy.get('max_pixels_mp')} MP。"
+                     f"宽高按 aspect 换算并自动对齐到 "
+                     f"{policy.get('multiple')} 的倍数。"),
+        }
+        schema["params"]["resolution_percent"] = {
+            "type": "number",
+            "unit": "percent",
+            "min": _ss.PERCENT_MIN,
+            "max": _ss.PERCENT_MAX,
+            "step": 1,
+            "default": (defaults.get("resolution_percent")
+                        if defaults.get("resolution_percent") not in (None, "")
+                        else _ss.default_percent()),
+            "source": "size_spec.PERCENT_MIN/MAX",
+            "note": (f"相对该模式真实上限（{policy.get('max_pixels_mp')} MP）"
+                     f"的百分比；100% = 用满上限。"
+                     f"与 megapixels 二选一（给了 megapixels 就以它为准）。"),
         }
     elif resolutions:
         schema["params"]["resolution"] = {
@@ -1491,6 +1532,72 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                         suggestions=[{"action": "use",
                                       "params": {"resolution": _smallest_allowed_tier(mode, low_mp)},
                                       "reason": f"改用 {mode} 支持的最小档位"}]))
+
+    # --- MP 预算 × 百分比（2026-11-20 用户指定的统一表达）---
+    #
+    # 【为什么单独校验】档位是显示标签，MP 预算 + 百分比才是无歧义的
+    # 表达（同一短边在不同比例下面积不同）。这两个字段**直接决定**
+    # 产物像素，所以值非法时必须在**建任务前**拦下并说明。
+    #
+    # 【为什么不静默夹区间】用户明确说「自动调整到适合的值上」——
+    # 那是**超上限**时的行为（服务端缩放 + 给原因）；
+    # 而「负数」「非数字」是**非法输入**，必须报错，不能夹成别的值。
+    from . import size_spec as _ss
+    mp_cap = _ss.mode_max_megapixels(mode)
+    raw_mp = params.get("megapixels")
+    if raw_mp is not None:
+        try:
+            mp_value = float(raw_mp)
+        except (TypeError, ValueError):
+            issues.append(ValidationIssue(
+                "megapixels", "MP 预算必须是数字",
+                code="invalid_megapixels"))
+        else:
+            if mp_value <= 0:
+                issues.append(ValidationIssue(
+                    "megapixels",
+                    f"MP 预算 {mp_value} 必须大于 0",
+                    code="invalid_megapixels"))
+            elif mp_cap is not None and mp_value > mp_cap + 1e-9:
+                # 超上限：**不拦**（服务端会自动缩到上限并说明原因），
+                # 但要**如实告诉模型**它会被缩 —— 否则模型会对用户说谎。
+                issues.append(ValidationIssue(
+                    "megapixels",
+                    f"MP 预算 {mp_value} 超过 {mode} 的真实上限 {mp_cap} MP，"
+                    f"服务端会自动缩到 {mp_cap} MP 并说明调整原因",
+                    code="megapixels_over_limit",
+                    suggestions=[{"action": "use",
+                                  "params": {"megapixels": mp_cap},
+                                  "reason": f"直接用该模式的上限 {mp_cap} MP"}]))
+    raw_pct = params.get("resolution_percent")
+    if raw_pct is not None:
+        try:
+            pct_value = float(raw_pct)
+        except (TypeError, ValueError):
+            issues.append(ValidationIssue(
+                "resolution_percent", "MP 预算百分比必须是数字",
+                code="invalid_resolution_percent"))
+        else:
+            if pct_value <= 0:
+                issues.append(ValidationIssue(
+                    "resolution_percent",
+                    f"MP 预算百分比 {pct_value} 必须大于 0",
+                    code="invalid_resolution_percent"))
+            elif pct_value > _ss.PERCENT_MAX + 1e-9:
+                issues.append(ValidationIssue(
+                    "resolution_percent",
+                    f"MP 预算百分比 {pct_value}% 超过上限 "
+                    f"{_ss.PERCENT_MAX}%（服务端会夹到上限）",
+                    code="resolution_percent_out_of_range",
+                    suggestions=[{"action": "use",
+                                  "params": {"resolution_percent": _ss.PERCENT_MAX},
+                                  "reason": f"改用上限 {_ss.PERCENT_MAX}%"}]))
+            elif mp_cap is None and mode in wf.BUILDERS:
+                # 该模式没有尺寸概念（音乐等）-> 传了就是误填
+                issues.append(ValidationIssue(
+                    "resolution_percent",
+                    f"{mode} 没有画面尺寸概念，不接受 resolution_percent",
+                    code="resolution_percent_not_applicable"))
 
     # --- 时长 ---
     duration_field = mode_duration_field(mode)
