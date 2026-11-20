@@ -1,0 +1,59 @@
+=== tests/test_agent_backend_enh.py ===
+........................................................................ [ 66%]
+.....................................                                    [100%]
+109 passed in 56.26s
+
+=== tests/test_agent_fabricated_job_fix.py ===
+...............................                                          [100%]
+31 passed in 54.32s
+
+=== tests/test_enhance_review_fixes.py ===
+    - ['[视频面板] 载入清单失败: Failed to fetch', '[视频面板] 载入清单失败: Failed to fetch']
+    + [] : console 报错：['[视频面板] 载入清单失败: Failed to fetch', '[视频面板] 载入清单失败: Failed to fetch']
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch', '[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 49.56s
+
+=== tests/test_music_yue2.py ===
+=================================== FAILURES ===================================
+E   Failed: Timeout (>120.0s) from pytest-timeout.
+/root/projects/h3s-deftruth/tests/test_music_yue2.py:477: Failed: Timeout (>120.0s) from pytest-timeout.
+1 failed, 66 passed in 152.91s (0:02:32)
+
+=== tests/test_video_sampling_params.py ===
+..................................................                       [100%]
+50 passed in 7.68s
+
+DONE
+=== tests/test_music_yue2.py (单独复跑 #2) ===
+...................................................................      [100%]
+67 passed in 16.13s
+
+=== tests/test_enhance_review_fixes.py (单独复跑 #2) ===
+    + [] : console 报错：['[视频面板] 载入清单失败: Failed to fetch']
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 44.51s
+=== 交替验证：test_enhance_review_fixes.py（改动版 / 基线 各两轮）===
+--- h3s-deftruth ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch', '[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 45.11s
+--- h3s-base-truth ---
+.......................                                                [100%]
+23 passed, 2 subtests passed in 39.40s
+--- h3s-deftruth ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 39.88s
+--- h3s-base-truth ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch', '[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 52.60s
+DONE
+=== 基线工作树单独跑 3 轮（test_enhance_review_fixes.py）===
+--- base round 1 ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 40.48s
+--- base round 2 ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 45.17s
+--- base round 3 ---
+/root/.pyenv/versions/3.10.12/lib/python3.10/unittest/case.py:675: AssertionError: Lists differ: ['[视频面板] 载入清单失败: Failed to fetch'] != []
+1 failed, 22 passed, 2 subtests passed in 41.90s
+DONE-BASE3
