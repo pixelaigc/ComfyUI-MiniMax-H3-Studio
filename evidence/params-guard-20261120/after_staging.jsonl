@@ -1,0 +1,10 @@
+{"label": "after", "case": "abs_etc_hostname", "http": 400, "accepted": false, "error": "首帧不能直接引用外部文件路径（收到：/etc/hostname）。请先在「素材库」页上传并入库，再从素材库选择首帧。", "code": "media_must_come_from_library", "job_id": null}
+{"label": "after", "case": "abs_tmp_canary", "http": 400, "accepted": false, "error": "首帧不能直接引用外部文件路径（收到：/tmp/params-probe-6dFEzy/canary.txt）。请先在「素材库」页上传并入库，再从素材库选择首帧。", "code": "media_must_come_from_library", "job_id": null}
+{"label": "after", "case": "dotdot_traversal", "http": 400, "accepted": false, "error": "首帧不能直接引用外部文件路径（收到：../../../../../../../../etc/hostname）。请先在「素材库」页上传并入库，再从素材库选择首帧。", "code": "media_must_come_from_library", "job_id": null}
+{"label": "after", "case": "symlink", "http": 400, "accepted": false, "error": "首帧不能直接引用外部文件路径（收到：/tmp/params-probe-6dFEzy/link-to-canary.txt）。请先在「素材库」页上传并入库，再从素材库选择首帧。", "code": "media_must_come_from_library", "job_id": null}
+{"label": "after", "case": "comfy_input_direct", "http": 400, "accepted": false, "error": "首帧不能直接引用外部文件路径（收到：h3studio/5293d88df5d86cad__upload_05.wav）。请先在「素材库」页上传并入库，再从素材库选择首帧。", "code": "media_must_come_from_library", "job_id": null}
+{"label": "after", "case": "library_asset_ok", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "22cf98349b3f"}
+{"label": "after", "case": "seed_negative", "http": 400, "accepted": false, "error": "种子必须大于 0：-5 不是正整数。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "after", "case": "seed_zero", "http": 400, "accepted": false, "error": "种子必须大于 0：0 不是正整数。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "after", "case": "seed_nonnumeric", "http": 400, "accepted": false, "error": "种子只能是正整数：'abc' 不是数字。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "after", "case": "__comfy_input_diff__", "input_dir": "/home/ubuntu/comfyui/input/h3studio", "new_files": [], "new_file_count": 0}

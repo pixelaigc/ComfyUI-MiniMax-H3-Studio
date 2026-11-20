@@ -1,0 +1,10 @@
+{"label": "before", "case": "abs_etc_hostname", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "9dfd000c5702"}
+{"label": "before", "case": "abs_tmp_canary", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "9b99cc13370e"}
+{"label": "before", "case": "dotdot_traversal", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "d28e99894931"}
+{"label": "before", "case": "symlink", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "db00ff492a5b"}
+{"label": "before", "case": "comfy_input_direct", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "7abf2086f1cb"}
+{"label": "before", "case": "library_asset_ok", "http": 200, "accepted": true, "error": null, "code": null, "job_id": "aed9e0b10bb7"}
+{"label": "before", "case": "seed_negative", "http": 400, "accepted": false, "error": "种子必须大于 0：-5 不是正整数。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "before", "case": "seed_zero", "http": 400, "accepted": false, "error": "种子必须大于 0：0 不是正整数。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "before", "case": "seed_nonnumeric", "http": 400, "accepted": false, "error": "种子只能是正整数：'abc' 不是数字。请填一个大于 0 的整数，或留空随机。", "code": null, "job_id": null}
+{"label": "before", "case": "__comfy_input_diff__", "input_dir": "/home/ubuntu/comfyui/input/h3studio", "new_files": ["hostname"], "new_file_count": 1}
