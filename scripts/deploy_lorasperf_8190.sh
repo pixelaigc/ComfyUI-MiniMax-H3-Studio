@@ -125,7 +125,9 @@ echo "=== 4) 精确 checkout 到 live worktree ==="
 cd "$LIVE"
 git checkout "$MERGE_COMMIT" -- $(echo "$CHANGED" | tr '\n' ' ')
 echo "已 checkout:"
-git status --short | grep -v '^??' | sed 's/^/  /'
+# ⚠️ `grep -v` 无匹配时返回 1 —— 在 `set -e` 下会**中止整个脚本**。
+# 所以这里必须加 `|| true`。
+git status --short | grep -v '^??' || true
 
 echo
 echo "=== 5) 重启服务 ==="
