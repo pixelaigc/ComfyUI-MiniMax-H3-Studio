@@ -20,6 +20,8 @@ import json
 import os
 import re
 import sqlite3
+import threading
+import time
 from pathlib import Path
 
 from . import lora_damping
@@ -1437,7 +1439,8 @@ def _list_loras_for_base(markers, unet_path, base_label, family=None,
                 # 目录没登记的条目也如实给出结论，不再一律「未标注」。
                 # 不可用 / 不适配的条目如实显示不可用 —— 绝不兜底成「原生」。
                 "base_verdict": _resolve_base_verdict(info, compat),
-                "metadata": meta,
+                # ⚠️ 超长噪声字段在这里截断（见 METADATA_FIELD_MAX_BYTES）。
+                "metadata": _trim_metadata(meta),
             })
     return found
 
@@ -1699,7 +1702,10 @@ def list_z_image_loras(deep_analysis: bool = False) -> list[dict]:
                 # 目录没登记的条目也如实给出结论，不再一律「未标注」。
                 # 不可用 / 不适配的条目如实显示不可用 —— 绝不兜底成「原生」。
                 "base_verdict": _resolve_base_verdict(info, compat),
-                "metadata": meta,
+                # ⚠️ 超长噪声字段在这里截断（见 METADATA_FIELD_MAX_BYTES）。
+                # 原始 `meta` 仍用于上面的 `base` 兜底判定 —— 截断只作用于
+                # **下发给前端的那一份**，不影响扫描语义。
+                "metadata": _trim_metadata(meta),
             })
     return found
 
@@ -1804,7 +1810,8 @@ def lora_inventory_by_kind(deep_analysis: bool = False) -> dict:
 
     返回: {"effect": [...], "incompatible": [...], "acceleration": [...]}
     """
-    return _inventory_by_kind(list_z_image_loras(deep_analysis=deep_analysis))
+    return _cached_inventory(
+        "Z-Image", deep_analysis, list_z_image_loras)
 
 
 def lora_inventory_by_kind_qwen(deep_analysis: bool = False) -> dict:
@@ -1813,12 +1820,14 @@ def lora_inventory_by_kind_qwen(deep_analysis: bool = False) -> dict:
     旧代码在这里调了 3 次扫描函数（available / incompatible / acceleration），
     同样把事件循环堵死。
     """
-    return _inventory_by_kind(list_qwen_image_loras(deep_analysis=deep_analysis))
+    return _cached_inventory(
+        "Qwen-Image 2.1", deep_analysis, list_qwen_image_loras)
 
 
 def lora_inventory_by_kind_moss(deep_analysis: bool = False) -> dict:
     """MOSS-Image 族的单次扫描清单（见 `lora_inventory_by_kind`）。"""
-    return _inventory_by_kind(list_moss_image_loras(deep_analysis=deep_analysis))
+    return _cached_inventory(
+        "MOSS-Image", deep_analysis, list_moss_image_loras)
 
 
 def _inventory_by_kind(items: list[dict]) -> dict:
@@ -1837,6 +1846,157 @@ def _inventory_by_kind(items: list[dict]) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# 扫描结果缓存（2026-11-21 线上实测引入）
+# ---------------------------------------------------------------------------
+#
+# 【为什么需要缓存 —— 现场实测数据】
+# 2026-11-21 05:0x 线上实测（`curl -w %{time_total}`，连打 5 次）：
+#
+#     GET /api/image-loras            -> 0.88 / 0.79 / 0.87 / 0.76 / 0.77 秒
+#     GET /api/image-loras?base=Qwen  -> 0.05 秒
+#     GET /api/image-loras?base=MOSS  -> 0.72 秒
+#
+# 也就是说**每个页面首屏都要等 0.8 秒**才能拿到 LoRA 清单。
+# 浏览器对同一 host 只有 **6 条并发连接**（HTTP/1.1），首屏并发拉
+# /api/system、/api/enhancer、/api/image-loras、/api/jobs 等多个接口时，
+# 这条 0.8 秒的请求会**占掉一条连接**；更重要的是 `web/favorites.js`
+# 的注释已经实测记录了「POST /favorite 实测要 0.7~17 秒」——
+# 根因就是首屏的 /api/image-loras 把连接占满。
+#
+# 【缓存的边界 —— 必须诚实】
+# 缓存的是**只读派生数据**（目录里有哪些 LoRA、每个的兼容性结论），
+# **不缓存任何用户配置**（用户选中的 LoRA 存在 jobs.db 里，走
+# `load_config` / `save_config`，与本缓存无关）。
+#
+# 【失效判据 = 目录指纹，不是 TTL】
+# 只用 TTL 的话，装完新 LoRA 最多要等 TTL 才出现在下拉里。
+# 所以这里用**目录指纹**做 key：所有 loras 目录下每个 .safetensors 的
+# (路径, mtime_ns, size)。指纹变了（装/删/替换了 LoRA）-> 缓存自动作废。
+#
+# 实测指纹成本：**0.032 秒**（712 个文件，rglob + stat），
+# 相对扫描本身（约 0.7~1.0 秒）是 4% —— 用 4% 的成本换掉 90% 的重复扫描，
+# 划算。指纹也**不依赖 TTL**，所以装完 LoRA 立刻可见（不需要等 60 秒）。
+#
+# 【并发安全】
+# 指纹检查 + 扫描之间可能有竞态（两个线程同时发现缓存失效 -> 各扫一次）。
+# 这是**良性竞态**：多扫一次只是慢，不会返回错数据（扫描是纯读）。
+# 扫描完成后写入缓存时**再校验一次指纹**，指纹已变就**不写**缓存
+# （避免把一份「扫描期间的旧快照」当成新快照存进去）。
+
+#: 扫描缓存的**最长存活时间**（秒）。
+#:
+#: 【为什么要 TTL 上限，签名已经变了也要过期】
+#: 目录指纹覆盖了「文件增删改」，但覆盖不到「模型目录配置变了」
+#: （比如 extra_model_paths.yaml 被编辑，loras 目录换了一个）。
+#: 那种情况下指纹一样但扫描结果应该不同。
+#: TTL 上限保证最坏情况下 60 秒内一定重新扫一次 —— 代价可忽略
+#: （指纹 0.03s），换来的是「配置变了最迟 60 秒生效」这个确定上界。
+SCAN_CACHE_TTL_SECONDS = 60.0
+
+#: 扫描缓存：key = (族, deep_analysis)，value = (到期时间戳, 指纹, 清单)
+_SCAN_CACHE: dict[tuple, tuple[float, tuple, dict]] = {}
+
+#: 扫描缓存的锁（防止同一时刻多线程各扫一遍）。
+#:
+#: 用 `threading.Lock` 而不是 `RLock` —— 没有重入需求。
+#: ⚠️ 锁**只保护缓存字典本身**，不包住扫描（扫描在锁外做，
+#: 否则扫描期间所有请求都会排队等锁 —— 那就等于没优化）。
+_SCAN_CACHE_LOCK = threading.Lock()
+
+
+def _lora_dir_signature() -> tuple:
+    """本机所有 loras 目录的**指纹**（用于扫描缓存的失效判据）。
+
+    指纹 = 每个 .safetensors 的 (相对路径, mtime_ns, size) 排序后的元组。
+
+    ⚠️ **不读文件内容** —— 只 stat。实测 712 个文件约 0.032 秒。
+    文件内容变了（但 mtime/size 没变）不会被发现 —— 这在实践中不成立：
+    任何写入都会更新 mtime。
+    """
+    dirs = comfyui_lora_dirs()
+    entries: list[tuple] = []
+    for d in dirs:
+        try:
+            candidates = sorted(d.rglob("*.safetensors"))
+        except Exception:
+            continue
+        for path in candidates:
+            try:
+                st = path.stat()
+            except OSError:
+                continue
+            entries.append((str(path), st.st_mtime_ns, st.st_size))
+    return (tuple(str(d) for d in dirs), tuple(entries))
+
+
+def _cached_inventory(family: str, deep_analysis: bool, scan_fn) -> dict:
+    """带缓存的族清单入口。
+
+    scan_fn: 该族的扫描函数（`list_z_image_loras` 等），签名
+             `scan_fn(deep_analysis=...)`。
+
+    返回的 dict 与 `lora_inventory_by_kind*` 的返回结构一致
+    （effect / incompatible / acceleration 三个键）。
+
+    ⚠️ **返回的列表是副本** —— 调用方拿到的是新 list，
+    但**条目 dict 是同一批对象**（浅拷贝）。
+    缓存里存的就是这一批条目，所以调用方**不得修改条目内容**
+    （现有调用方都只读；`api_image_loras` 只做列表推导，不改条目）。
+
+    ⚠️ **缓存 key 里含 scan_fn 本身**（函数对象）
+    —— 这样「测试把 list_z_image_loras 换成假的」这类替换会**自动换 key**，
+    不会命中旧缓存（否则测试会拿到上一次的扫描结果而误判通过/失败）。
+    """
+    key = (family, scan_fn, bool(deep_analysis))
+    now = time.monotonic()
+
+    def _snapshot(src: dict) -> dict:
+        """取一份**列表副本**（条目 dict 共享 —— 调用方只读条目）。"""
+        return {
+            "effect": list(src["effect"]),
+            "incompatible": list(src["incompatible"]),
+            "acceleration": list(src["acceleration"]),
+        }
+
+    # 1) 先看缓存里有没有「没过期且指纹没变」的条目
+    signature = _lora_dir_signature()
+    with _SCAN_CACHE_LOCK:
+        entry = _SCAN_CACHE.get(key)
+        if entry is not None:
+            expires_at, cached_signature, cached = entry
+            if (cached_signature == signature
+                    and now < expires_at):
+                return _snapshot(cached)
+
+    # 2) 缓存不命中 -> 真扫一次（**在锁外**）
+    items = scan_fn(deep_analysis=deep_analysis)
+    result = _inventory_by_kind(items)
+
+    # 3) 写回缓存前**再校验一次指纹** —— 扫描期间目录变了就
+    #    不写（否则会把「扫描开始时的旧快照」当成最新快照存进去）
+    with _SCAN_CACHE_LOCK:
+        current = _lora_dir_signature()
+        if current == signature:
+            # ⚠️ 存进缓存的必须是**副本** —— 否则调用方往返回的列表里
+            # 塞东西就会污染缓存（实测变异测试抓到：缓存命中时
+            # 拿到的是同一个 list 对象）。
+            _SCAN_CACHE[key] = (now + SCAN_CACHE_TTL_SECONDS,
+                                 signature, _snapshot(result))
+    return result
+
+
+def invalidate_lora_scan_cache() -> None:
+    """主动作废 LoRA 扫描缓存。
+
+    装完 / 替换 / 删除 LoRA 后调用，让下拉立刻反映真实文件。
+    （正常情况下目录指纹变化会自动失效；这个入口是给
+    「文件没变但结论变了」的场合用的显式闸门。）
+    """
+    with _SCAN_CACHE_LOCK:
+        _SCAN_CACHE.clear()
+
+
 def _read_safetensors_metadata(path: Path) -> dict:
     """只读 safetensors 头部元数据（不加载权重）。"""
     try:
@@ -1847,6 +2007,68 @@ def _read_safetensors_metadata(path: Path) -> dict:
         return header.get("__metadata__") or {}
     except Exception:
         return {}
+
+
+#: safetensors `__metadata__` 里**单个字段**的长度上限（字节）。
+#:
+#: 【为什么要有这个上限 —— 2026-11-21 线上实测】
+#: 实测 `z-image-effects/zit-deepthroat-31epoc-k3nk.safetensors` 的
+#: `__metadata__["_"]` 是一个 **5,668,456 字节**的字符串（训练时写进去的
+#: 随机噪声标记）。它让 `/api/image-loras` 的响应体从 226 KB 涨到
+#: **6.1 MB**，且扫描时要 JSON 解析这一坨（实测单次 json.loads 约 0.43 秒
+#: —— 占了整个扫描耗时的一半以上）。
+#:
+#: 【这个字段没有任何消费者】
+#: 全仓检索（前端 `web/*.js`、后端 `server.py` / `h3studio/**`、
+#: 测试 `tests/**`、取证脚本 `scripts/**`）对 LoRA 条目的 `metadata`
+#: 字段**零引用** —— 前端 `imgLoraMeta()` 只取条目上的具名字段
+#: （display / scene / trigger / group / base_verdict …），
+#: `metadata` 里的 `modelspec.architecture` / `ss_base_model_version`
+#: 只在**扫描内部**用于兜底 `base` 字段（见 list_*_loras），
+#: 那两个键由本上限**单独保留**（见 `_METADATA_KEEP_KEYS`）。
+#:
+#: 【所以上限是安全的】
+#: 只截断「没有任何消费者」的超长噪声字段，保留全部**短字段**
+#: （modelspec.architecture / ss_base_model_version / author / time 等）
+#: —— 它们才是有语义的部分。
+#:
+#: 超过上限的字段不删除，而是截断并**显式标记**：
+#:   {"_truncated": True, "_original_length": 5668456, "_": "<前 4KB>…"}
+#: 这样「被截断了」是**可观测的事实**，而不是静默丢数据。
+METADATA_FIELD_MAX_BYTES = 4096
+
+#: `__metadata__` 里**必须原样保留**的键（哪怕很长）。
+#:
+#: 理由：这两个键参与扫描内部的 `base` 兜底判定 ——
+#: `info.get("base") or meta.get("modelspec.architecture")
+#:  or meta.get("ss_base_model_version") or "Z-Image"`
+#: 截断它们会让 `base` 显示成错误值。
+_METADATA_KEEP_KEYS = ("modelspec.architecture", "ss_base_model_version")
+
+
+def _trim_metadata(meta: dict | None) -> dict | None:
+    """截断 `__metadata__` 里的超长噪声字段（见 METADATA_FIELD_MAX_BYTES）。
+
+    只处理**单个字段超长**的情况；短字段原样保留。
+    超长字段截断后加 `_truncated` / `_original_length` 两个标记，
+    让「被截断」成为可观测事实。
+    """
+    if not isinstance(meta, dict) or not meta:
+        return meta
+    out: dict = {}
+    for key, value in meta.items():
+        if key in _METADATA_KEEP_KEYS:
+            out[key] = value
+            continue
+        if isinstance(value, str) and len(value.encode("utf-8")) > METADATA_FIELD_MAX_BYTES:
+            out[key] = {
+                "_truncated": True,
+                "_original_length": len(value.encode("utf-8")),
+                "_": value[:METADATA_FIELD_MAX_BYTES],
+            }
+            continue
+        out[key] = value
+    return out
 
 
 def resolve_lora(name: str) -> tuple[str, Path | None]:
