@@ -4987,11 +4987,20 @@ function jobCard(job) {
     // （假的），如果骨架也渲染选择框，「全选本页」会把这些**假 id** 一起选中，
     // 然后批量取消收藏请求里就带上了根本不存在的 id。
     // 骨架本来就不是真实卡片，不该有任何可交互控件。
+    //
+    // 【为什么 label 上不能写 onclick="return false"】—— 实测点不动：
+    // label 的 onclick 返回 false 会**取消默认行为**，而复选框的勾选
+    // 正是靠默认行为完成的 —— 结果是点击被吞掉，勾选框永远是未选中。
+    // （素材库那个选择框也有同样的问题，见 assets.js 的同类标记。）
+    // 正确做法：让事件**冒泡**到卡片的 click 处理器即可 ——
+    // 卡片处理器本来就把 `input` 排除在「打开详情」之外（见 jobCard 的
+    // closest("button, a, .job-preview, ..., input, ...")，不会误开详情框。
     const isSkeleton = !!job.is_skeleton;
     const favSelect = (state.tab === "favorites" && !isSkeleton)
-      ? `<label class="fav-sel-wrap" title="选中后可批量取消收藏" onclick="return false;">`
+      ? `<label class="fav-sel-wrap" title="选中后可批量取消收藏">`
         + `<input type="checkbox" class="fav-sel" data-jid="${escapeHtml(job.id)}"`
-        + `${state.favSelected.has(job.id) ? " checked" : ""}></label>`
+        + `${state.favSelected.has(job.id) ? " checked" : ""}`
+        + ` aria-label="选择该产物"></label>`
       : "";
 
   card.dataset.jid = job.id;

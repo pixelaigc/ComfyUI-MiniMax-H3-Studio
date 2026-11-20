@@ -666,6 +666,26 @@ class TestFavoritesBrowser(unittest.TestCase):
             timeout=WAIT_TIMEOUT)
         self.page.wait_for_timeout(400)
 
+        # 【勾选框必须真的能勾上】
+        # 这一条不是走过场 —— 之前 label 上写了 onclick="return false"，
+        # 结果点击被吞掉、勾选框永远是未选中（浏览器实测确认：
+        # label 的 onclick 返回 false 会取消默认行为，而复选框的勾选
+        # 正是靠默认行为完成的）。
+        # 「全选本页」当时看起来能用，其实它走的是 JS 直接改状态，
+        # 绕过了「点勾选框」这条路 —— 缺陷被掩盖了。
+        # 所以这里**手动点**一个勾选框，断言它的 checked 真的变了。
+        box = self.page.query_selector("#jobsGrid .fav-sel")
+        self.assertIsNotNone(box, "收藏视图应有勾选框")
+        self.page.click("#jobsGrid .fav-sel")
+        self.page.wait_for_timeout(400)
+        self.assertTrue(
+            self.page.evaluate(
+                "() => document.querySelector('#jobsGrid .fav-sel').checked"),
+            "点勾选框后 checked 没变成 true —— 勾选框点不动")
+        self.assertIn("已选 1 项",
+                      self.page.inner_text("#favToolsCount"),
+                      "勾选后计数没更新")
+
         # 全选本页
         self.page.click("#favSelectAllBtn")
         self.page.wait_for_timeout(400)
