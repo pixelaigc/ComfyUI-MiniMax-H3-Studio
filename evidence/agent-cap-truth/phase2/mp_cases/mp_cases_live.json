@@ -7,7 +7,7 @@
       "requested": {
         "megapixels": 0.4
       },
-      "job_id": "d2dd302684ef",
+      "job_id": "5cafec507f37",
       "effective_width": 864,
       "effective_height": 480,
       "effective_megapixels": 0.396,
@@ -23,7 +23,7 @@
       "requested": {
         "megapixels": 0.41
       },
-      "job_id": "fbc703a2bd71",
+      "job_id": "9fd3c1a1686c",
       "effective_width": 864,
       "effective_height": 480,
       "effective_megapixels": 0.396,
@@ -39,7 +39,7 @@
       "requested": {
         "megapixels": 4.0
       },
-      "job_id": "5a4ade451da2",
+      "job_id": "4ade6ef35a7e",
       "effective_width": 1920,
       "effective_height": 1088,
       "effective_megapixels": 1.992,
@@ -57,13 +57,14 @@
       "requested": {
         "resolution_percent": 50
       },
-      "job_id": "aa739f4995f4",
-      "effective_width": 1216,
-      "effective_height": 672,
-      "effective_megapixels": 0.779,
-      "effective_resolution": "672p",
+      "job_id": "7bfb3941629b",
+      "effective_width": 1376,
+      "effective_height": 768,
+      "effective_megapixels": 1.008,
+      "effective_resolution": "768p",
       "size_adjust_reasons": [
-        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+        "按 50.0% 的 MP 预算换算：2.0 MP × 50.0% = 1.000 MP",
+        "flf 尺寸：MP 预算 1.000 MP + 比例 16:9 -> 1376×768"
       ],
       "status": "queued"
     },
@@ -73,13 +74,16 @@
       "requested": {
         "resolution_percent": 150
       },
-      "job_id": "575d3e16207b",
-      "effective_width": 1216,
-      "effective_height": 672,
-      "effective_megapixels": 0.779,
-      "effective_resolution": "672p",
+      "job_id": "fc5b7a04036b",
+      "effective_width": 1920,
+      "effective_height": 1088,
+      "effective_megapixels": 1.992,
+      "effective_resolution": "1088p",
       "size_adjust_reasons": [
-        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+        "按 150.0% 的 MP 预算换算：2.0 MP × 150.0% = 3.000 MP",
+        "flf 尺寸：MP 预算 3.000 MP + 比例 16:9 -> 2368×1344",
+        "总像素 3.035 MP 超过 flf 上限 2.0 MP -> 已缩到 1920×1088",
+        "总像素 3.04MP 超过上限 2.0MP → 按比例缩到 1920×1088"
       ],
       "status": "queued"
     }

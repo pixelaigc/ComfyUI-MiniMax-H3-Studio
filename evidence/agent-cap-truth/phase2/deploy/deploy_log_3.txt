@@ -1,0 +1,85 @@
+=== 0) 现状 ===
+maintainer = 3c6f8138699de986de6c5ceebafe5e987a1b6abe
+live       = 3c6f8138699de986de6c5ceebafe5e987a1b6abe
+审查分支    = eed1865d6095f3fc3c87cbf89562995ab4a717e4
+active
+重启前 PID=3754602
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-203133 / backup/maintainer-before-agentcap-20261120-203133
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+live       = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_2.txt
+  evidence/agent-cap-truth/phase2/mp_cases/mp_cases_live.json
+  evidence/agent-cap-truth/phase2/params/job_flf.json
+  evidence/agent-cap-truth/phase2/params/job_r2v.json
+  evidence/agent-cap-truth/phase2/params/live_verify.json
+  evidence/agent-cap-truth/phase2/params/settings_endpoint.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_AFTER.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_flf_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_r2v_AFTER.png
+  h3studio/gen_defaults.py
+  scripts/deploy_deftruth_8190.sh
+  scripts/verify_live_mp_cases.py
+  tests/test_agent_defaults_truth.py
+共 14 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_2.txt
+  evidence/agent-cap-truth/phase2/mp_cases/mp_cases_live.json
+  evidence/agent-cap-truth/phase2/params/job_flf.json
+  evidence/agent-cap-truth/phase2/params/job_r2v.json
+  evidence/agent-cap-truth/phase2/params/live_verify.json
+  evidence/agent-cap-truth/phase2/params/settings_endpoint.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_375px_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_AFTER.json
+  evidence/agent-cap-truth/phase2/spec/agent_manage_flf_AFTER.png
+  evidence/agent-cap-truth/phase2/spec/agent_manage_r2v_AFTER.png
+  h3studio/gen_defaults.py
+  scripts/deploy_deftruth_8190.sh
+  scripts/verify_live_mp_cases.py
+  tests/test_agent_defaults_truth.py
+共 14 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+Warning: The unit file, source configuration file or drop-ins of h3-studio.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+active
+重启后 PID=3761097（原 3754602）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 20:30:01 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 20:30:01 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 20:30:01 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 20:30:01 ubuntu systemd[1]: h3-studio.service: Consumed 3.354s CPU time, 380.7M memory peak.
+11月 20 20:30:01 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 20:31:33 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 20:31:33 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 20:31:33 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 20:31:33 ubuntu systemd[1]: h3-studio.service: Consumed 4.831s CPU time, 501.4M memory peak, 108K memory swap peak.
+11月 20 20:31:33 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+回滚点：backup/live-before-agentcap-20261120-203133 / backup/maintainer-before-agentcap-20261120-203133

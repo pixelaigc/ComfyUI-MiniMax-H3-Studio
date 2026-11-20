@@ -2457,13 +2457,20 @@ select.enhance-menu-spec:focus { outline: none; border-color: var(--accent); }
   border-bottom: 1px solid var(--border); padding-bottom: 6px;
 }
 .agm-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.agm-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.agm-field.wide { flex: 1 1 260px; min-width: 200px; }
+.agm-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px;
+  /* 【2026-11-20 修 —— 375px 下长标签把区块撑破】
+     flex 子项默认 min-width:auto（= 内容宽度），select 的长 option 文本
+     （如「MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）」）
+     会把 flex 容器撑到溢出。min-width:0 让它可以收缩到容器宽度。 */
+  min-width: 0; max-width: 100%; }
+.agm-field.wide { flex: 1 1 260px; min-width: 200px; max-width: 100%; }
 .agm-field > span { color: var(--muted); }
 .agm-field input, .agm-field select {
   padding: 6px 8px; font-size: 12px; font-family: inherit;
   border: 1px solid var(--border); border-radius: 6px; background: #fff;
   color: var(--text);
+  /* 【2026-11-20】控件本身也不能超过容器宽度（否则长 option 撑破布局） */
+  width: 100%; max-width: 100%; box-sizing: border-box;
 }
 .agm-field input:disabled { background: #f4f5f7; color: var(--muted); }
 .agm-hint { font-size: 11px; color: var(--muted); line-height: 1.55; }
