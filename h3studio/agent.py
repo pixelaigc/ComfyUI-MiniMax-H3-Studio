@@ -1843,10 +1843,22 @@ async def _tool_respond(ctx: AgentContext, args: dict) -> dict:
     # 澄清式提问：把问题单独记下来，让前端能显示「需要你补充」而不是
     # 一段混在结论里的话。问题会随会话历史落库，下一轮可续。
     if ctx.respond_payload["needs_clarification"]:
-        # 澄清式 respond 现在**不收尾**（见编排层的说明）——
-        # 所以问题先记到 pending_clarification；
-        # 只有当模型**最终**用 respond 收尾时，才会转成 clarification。
+        # 【2026-11-20】澄清式 respond **不收尾**（让模型继续把能做的做完）——
+        # 所以问题记到 pending_clarification。
+        #
+        # 【但 ctx.clarification 的语义不变】既有契约（测试
+        # test_respond_with_needs_clarification_sets_status /
+        # test_respond_with_string_true_is_clarification）断言
+        # ctx.clarification 里就是那个问题 —— 所以两处都写：
+        #   * ctx.clarification      -> 「本轮提出的澄清问题」（契约字段）
+        #   * ctx.pending_clarification -> 「尚未收尾的澄清问题」（编排用）
+        # 收尾状态判定用 pending_clarification + clarified_then_progressed。
+        ctx.clarification = summary
         ctx.pending_clarification = summary
+        # 【2026-11-20】提问本身**不写进 ctx.answer** ——
+        # ctx.answer 是「给用户的主答案」。澄清问题单独存在
+        # ctx.pending_clarification，收尾时作为「附带确认项」给用户。
+        # （模型若后续给出真正结论，那个结论才是主答案。）
         # 选项没给时，从**真实能力表**兜底推断可执行的候选。
         #
         # 【为什么要有兜底】模型经常不填 clarify_options（实测第一轮
@@ -4142,7 +4154,16 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                          "模型只做了口头承诺，没有真正调用任何工具，"
                          "已拦截（本次没有创建任何任务）。"))
                 if content:
-                    ctx.answer = content
+                    # 【2026-11-20】澄清式 respond 不收尾后，模型会继续走。
+                    # 这一轮如果它给出了**真正的结论**（比如「已合并完成」），
+                    # 那个结论才是给用户的主答案 —— 覆盖掉之前的澄清问题
+                    # （澄清问题已单独存在 ctx.pending_clarification 里，
+                    # 收尾时会作为「附带确认项」给用户）。
+                    #
+                    # 【例外】content 为空时不能把已有答案冲掉
+                    # （澄清问题本身就是本轮唯一的输出）。
+                    if (content or "").strip() or not ctx.answer:
+                        ctx.answer = content
                     # 已经逐 token 推过增量 -> 不再补整段（否则前端重复渲染）
                     if not response.get("_streamed"):
                         _event("token", {"text": content})
@@ -4592,8 +4613,18 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
             # 附带问题仍然要给用户看（他要确认那个默认值对不对）
             if ctx.pending_clarification and not ctx.clarification:
                 ctx.clarification = ctx.pending_clarification
+            # 【2026-11-20】澄清问题在「有进展」时**降级**为附带确认项：
+            # 它仍然出现在 result["clarification"] 里（用户看得到），
+            # 但**不再**决定 status（status = completed）。
+            result["clarification_is_followup"] = bool(ctx.clarification)
         else:
             result["status"] = "needs_clarification"
+            # 【2026-11-20】没有实质进展时，用户看到的**主答案**
+            # 就是那个问题本身（模型这一轮只说了这句话）。
+            if ctx.pending_clarification:
+                result["answer"] = ctx.pending_clarification
+            if not result.get("answer"):
+                result["answer"] = ctx.answer or ""
     if ctx.clarification:
         result["clarification"] = ctx.clarification
     # 澄清快捷选项 + 提示（前端契约：clarify_options / clarify_hint）

@@ -524,6 +524,15 @@ class TestNewMediaToolsReal(unittest.TestCase):
         from h3studio import asset_service
         from h3studio import assets as asset_store
         cls.assets = {}
+        #: 本类测试创建的全部素材 id（含**产物**）—— tearDownClass 要清干净。
+        #:
+        #: 【为什么必须清（2026-11-20 实测踩到的坑）】
+        #: 素材库是**共享**的（线上服务同一个库）。测试往里塞十几个
+        #: 产物后，其它测试（比如 test_agent_paste_browser 断言
+        #: 「素材库里有 clipboard_pasted_xxx」）会因为**列表前 20 条
+        #: 被测试素材占满**而失败 —— 那不是它的 bug，是**我们污染了现场**。
+        #: 所以：记录所有创建的 id，tearDownClass 里逐个 purge。
+        cls.created: list[str] = []
         for key, path in cls.media.items():
             with asset_store.connect() as conn:
                 result = asset_service.register_asset(
@@ -531,10 +540,38 @@ class TestNewMediaToolsReal(unittest.TestCase):
                     category="audio" if key.startswith("a") else "video",
                     source="agent_cap_test", creator="test")
             cls.assets[key] = result["asset"]["id"]
+            cls.created.append(result["asset"]["id"])
 
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
+        cls._purge_created()
+
+    @classmethod
+    def _purge_created(cls):
+        """把本类测试创建的全部素材（含产物）从共享素材库里清掉。"""
+        from h3studio import asset_repo
+        from h3studio import assets as asset_store
+        for asset_id in list(getattr(cls, "created", [])):
+            try:
+                with asset_store.connect() as conn:
+                    asset_repo.purge(conn, asset_id)
+            except Exception:
+                # 素材被引用（check_references）就 purge 不掉 ——
+                # 那时只能标记删除，不能硬删。静默继续（清理是尽力而为）。
+                try:
+                    with asset_store.connect() as conn:
+                        conn.execute(
+                            "UPDATE assets SET deleted_at=datetime('now') "
+                            "WHERE id=?", (asset_id,))
+                        conn.commit()
+                except Exception:
+                    pass
+
+    def _track(self, asset_id: str) -> str:
+        """登记一个新产物 id（供 tearDownClass 清理）。"""
+        self.created.append(asset_id)
+        return asset_id
 
     def _assert_in_library(self, asset_id: str) -> Path:
         """产物必须真的在素材库里（能解析到真实文件）。"""
@@ -558,6 +595,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
             self.assets["v1"], "m4a"))
         output = result["output"]
         self.assertTrue(output["asset_id"])
+        self._track(output["asset_id"])
         self.assertEqual(output["category"], "audio")
         path = self._assert_in_library(output["asset_id"])
         self.assertTrue(path.name.endswith(".m4a"), path.name)
@@ -588,6 +626,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
         result = asyncio.run(agent_media_tools.op_trim(
             self.assets["v1"], start_sec=1.0, duration_sec=2.0))
         output = result["output"]
+        self._track(output["asset_id"])
         path = self._assert_in_library(output["asset_id"])
         self.assertGreater(path.stat().st_size, 0)
         # 4 秒素材从第 1 秒截 2 秒 -> 产物约 2 秒
@@ -598,6 +637,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
         """请求时长超出素材长度 -> 截到素材末尾，并**标记** clipped。"""
         result = asyncio.run(agent_media_tools.op_trim(
             self.assets["v1"], start_sec=1.0, duration_sec=100.0))
+        self._track(result["output"]["asset_id"])
         self.assertTrue(result["clipped_to_source"])
         self.assertAlmostEqual(result["duration_sec"], 3.0, delta=0.6)
 
@@ -619,6 +659,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
         result = asyncio.run(agent_media_tools.op_normalize_audio(
             self.assets["v1"], target_lufs=-14.0))
         output = result["output"]
+        self._track(output["asset_id"])
         path = self._assert_in_library(output["asset_id"])
         self.assertGreater(path.stat().st_size, 1000)
         self.assertAlmostEqual(result["duration_sec"], 4.0, delta=0.6)
@@ -648,6 +689,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
         result = asyncio.run(agent_media_tools.op_replace_audio(
             self.assets["v1"], self.assets["a1"]))
         output = result["output"]
+        self._track(output["asset_id"])
         path = self._assert_in_library(output["asset_id"])
         self.assertGreater(path.stat().st_size, 1000)
         # 视频 4 秒 / 音频 2 秒 -> apad 补静音后 -shortest 截到视频长度
@@ -665,6 +707,7 @@ class TestNewMediaToolsReal(unittest.TestCase):
         result = asyncio.run(agent_media_tools.op_replace_audio(
             self.assets["v1"], self.assets["a1"], keep_original=True))
         output = result["output"]
+        self._track(output["asset_id"])
         path = self._assert_in_library(output["asset_id"])
         probe = json.loads(subprocess.check_output([
             FFPROBE, "-v", "error", "-print_format", "json",
