@@ -5254,6 +5254,76 @@ def _image_family_for_mode(mode: str) -> str:
         gen_normalize.DEFAULT_PARAM_RANGES_FAMILY
 
 
+def apply_gen_defaults_and_size(mode: str, params: dict) -> dict:
+    """
+    把「管理页默认参数」套进 params，并解析出最终生效的宽高。
+
+    **就地修改** params，返回同一个对象。
+
+    【为什么抽成独立函数】它必须在**两个时机**都跑：
+      1. ``api_create`` 里 ``normalize_t2v_params`` **之前** ——
+         归一层第一件事就是校验 width/height，没有宽高直接 400，
+         所以尺寸必须在归一前算出来；
+      2. ``prepare_job_params`` 里 —— 那是**所有**建任务路径的公共点
+         （面板提交 / Agent create_job / retry_job），
+         放这里三条链路同时生效，不会各写一份必然漂移。
+
+    两处跑同一份实现 = 结果一致（幂等：已经是合法宽高就原样通过）。
+
+    【三层优先级】用户/模型**显式传的值** > 管理页默认值 >
+    工作流内置默认值。
+
+    【t2v 例外】t2v 的默认参数走服务端专用路径
+    （``_merge_t2v_defaults``，它还要把 model_key / attention /
+    accel_lora 转成工作流专用的形状），不能在这里重复套。
+
+    返回 dict：``{"defaults_applied": [...], "size_reasons": [...]}``
+    """
+    out: dict = {"defaults_applied": [], "size_reasons": []}
+    if mode not in JOB_MODES:
+        return out
+
+    # ---- 1) 管理页默认参数 ----
+    if mode != "t2v":
+        try:
+            conn = db()
+            try:
+                _settings = agent_settings.load(conn)
+            finally:
+                conn.close()
+            _gd = (_settings.get("gen_defaults") or {}).get(mode)
+            if isinstance(_gd, dict) and _gd:
+                # 【显式值 = 本次请求里带了非空的字段】
+                _explicit = {k for k, v in params.items()
+                             if v not in (None, "")}
+                out["defaults_applied"] = gen_defaults.merge_into_params(
+                    mode, params, {mode: _gd}, explicit=_explicit,
+                    overridable=())
+        except Exception:
+            # 套默认参数失败**不能阻断建任务** ——
+            # 少几个默认值只是「用了工作流内置值」，总比任务建不出来好。
+            pass
+
+    # ---- 2) 尺寸解析（MP 预算 × 百分比 -> 宽高）----
+    if mode in ("t2v", "flf", "r2v"):
+        _spec_w, _spec_h, _spec_notes = size_spec.plan_size(
+            mode,
+            aspect=str(params.get("aspect") or "16:9"),
+            megapixels=params.get("megapixels"),
+            percent=params.get("resolution_percent"),
+            resolution=params.get("resolution"),
+            width=params.get("width"),
+            height=params.get("height"),
+        )
+        if _spec_w > 0 and _spec_h > 0:
+            params["width"] = _spec_w
+            params["height"] = _spec_h
+            if _spec_notes:
+                params["size_adjust_reasons"] = _spec_notes
+                out["size_reasons"] = _spec_notes
+    return out
+
+
 def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
                        saved_files: dict | None = None) -> list:
     """
@@ -5274,6 +5344,26 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
 
     if mode not in JOB_MODES:
         raise JobValidationError(f"未知模式 {mode}")
+
+    # 【2026-11-20 新增 —— 面板提交路径也套「管理页默认参数」+ 解析尺寸】
+    #
+    # 【原来错在哪（实测复现）】「内置 Agent 管理」里配的默认参数
+    # （gen_defaults）**只有 Agent 路径会套**（``agent.py`` 里的
+    # ``gen_defaults.merge_into_params``）。
+    # 面板提交（POST /api/jobs）**完全不套** —— 也就是说用户在管理页
+    # 配的默认时长 / 默认 MP 预算 / 默认采样参数，对面板点「生成」
+    # **没有任何作用**。
+    #
+    # 这正是用户要求的「保存的默认参数必须对『面板提交』与
+    # 『内置 Agent 自建 job』两条路径都真实生效」里**缺失的那一半**。
+    #
+    # 【为什么放在 prepare_job_params】它是**所有**建任务路径的公共点
+    # （面板提交 / Agent create_job / retry_job）—— 放这里，三条链路
+    # 同时生效，不会各写一份必然漂移。
+    #
+    # 【与 api_create 里的同一处调用是幂等的】两处跑同一份实现
+    # （``apply_gen_defaults_and_size``）—— 已经是合法宽高就原样通过。
+    apply_gen_defaults_and_size(mode, params)
 
     # 【2026-11-16 新增】素材引用必须是**素材库里已入库**的素材。
     #
@@ -5914,6 +6004,26 @@ async def api_create(request):
             # 处理，会把 .mp4 改名成 .png）—— 这里原样落盘。
             fname = await save_uploaded_media(part)
             saved_files.setdefault(part.name, []).append(fname)
+
+    # 【2026-11-20 新增 —— 先解析尺寸，再做视频归一】
+    #
+    # 【原来错在哪（实测复现）】``normalize_t2v_params`` 的第一件事就是
+    # 校验 width/height（「宽高无效：宽高必须数字」-> 400）。
+    # 而 flf / r2v 的宽高是**后面**的 ``prepare_job_params`` ->
+    # ``h3_video_size.apply_size`` 才算出来的。
+    # 于是「不传宽高、只传 resolution / megapixels」的提交
+    # （内置 Agent 自建 job、旧客户端、只有档位没有像素的调用方）
+    # **在建任务之前**就被 400 挡掉 —— 尺寸解析根本没机会跑。
+    #
+    # 【为什么这在本轮特别重要】
+    # 「保存的默认参数」里存的是 **MP 预算 + 百分比**，不是像素宽高。
+    # 面板提交路径若不先解析尺寸，就**永远用不上**这份默认值 ——
+    # 而用户要的正是「默认参数对两条路径都生效」。
+    #
+    # 【同一份实现】``apply_gen_defaults_and_size``（内含
+    # ``size_spec.plan_size``）—— 与 Agent 路径、与
+    # ``h3_video_size.apply_size`` 同一套换算规则。
+    apply_gen_defaults_and_size(str(mode or ""), params)
 
     # 文生视频新面板：服务端校验并归一全部参数。
     # 这一段是**唯一**的参数入口 —— 前端传什么都不认，只认这里算出来的值。
