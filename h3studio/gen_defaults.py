@@ -924,6 +924,30 @@ def merge_into_params(mode: str, params: dict, defaults: dict,
     target = params if isinstance(params, dict) else {}
     effective = dict(values)
 
+    # 【2026-11-20 —— MP 预算与百分比**只能有一个生效值】】
+    #
+    # 【为什么必须在这里裁】
+    # 「MP 预算」与「MP 预算百分比」是**同一件事的两种写法**，
+    # 而 ``size_spec.plan_size`` 的优先级是 megapixels > percent。
+    # 于是会出现：用户显式给了 ``resolution_percent=50``，
+    # 但管理页默认值里的 ``megapixels=0.8`` 被套了进来
+    # -> params 里两个都有 -> megapixels 胜出 -> **用户的 50% 被无视**。
+    #
+    # 【线上实测复现】提交 ``resolution_percent=50``，
+    # 落库却是 1216×672（= 管理页默认的 0.8 MP），
+    # 而不是 50% x 2.0MP = 1.0 MP 的 1376×768。
+    #
+    # 【修法】用户显式给了哪一个，就**只保留那一个**：
+    #   * 显式给了 percent -> 不填管理页默认的 megapixels；
+    #   * 显式给了 megapixels -> 不填管理页默认的 percent。
+    # 没显式给任何一个 -> 两个都按管理页默认填（自洽：预算 + 100%）。
+    _size_modes = ("t2v", "flf", "r2v") + tuple(_IMAGE_FAMILIES.keys())
+    if mode in _size_modes:
+        if "resolution_percent" in explicit and "megapixels" not in explicit:
+            effective.pop("megapixels", None)
+        elif "megapixels" in explicit and "resolution_percent" not in explicit:
+            effective.pop("resolution_percent", None)
+
     # 【先定最终模型版本】采样参数要跟着**实际生效**的模型走，
     # 所以必须先算出「这次到底用哪个模型」：
     #   * 用户这次显式传了 model -> 用用户的；

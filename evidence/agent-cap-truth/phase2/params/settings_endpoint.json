@@ -1,5 +1,6 @@
 {
   "flf_stored": {
+    "model_key": "fl2va_pruned_int8",
     "aspect": "16:9",
     "resolution": "768p",
     "megapixels": 0.8,
@@ -15,6 +16,7 @@
     "shift_audio": 3.0
   },
   "r2v_stored": {
+    "model_key": "ref2va_pruned_int8",
     "aspect": "16:9",
     "resolution": "768p",
     "megapixels": 0.8,

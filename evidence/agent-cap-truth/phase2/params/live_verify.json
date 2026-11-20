@@ -1,0 +1,314 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "steps": [
+    {
+      "label": "flf",
+      "job_id": "71e232884711",
+      "created": {
+        "id": "71e232884711",
+        "status": "queued",
+        "batch_count": 1
+      },
+      "db_row": {
+        "id": "71e232884711",
+        "mode": "flf",
+        "status": "queued",
+        "params": {
+          "prompt": "线上验证：首尾帧默认参数落库",
+          "asset_id": "asset_f65943f4f221",
+          "model_key": "fl2va_pruned_int8",
+          "aspect": "16:9",
+          "resolution": "672p",
+          "megapixels": 0.779,
+          "resolution_percent": 100.0,
+          "duration": 5.0,
+          "lora": "ckpt850",
+          "lora_strength": 1.0,
+          "precision": "int8",
+          "steps": 4,
+          "sampler": "euler",
+          "scheduler": "beta",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "width": 1216,
+          "height": 672,
+          "size_adjust_reasons": [
+            "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+          ],
+          "seed": null,
+          "accel_lora": "ckpt850",
+          "accel_lora_strength": 1.0,
+          "accel_lora_loader": "MiniMaxH3TurboLoRA",
+          "accel_loras": [
+            {
+              "key": "ckpt850",
+              "strength": 1.0,
+              "enabled": true
+            }
+          ],
+          "fixed_accel_lora": "ckpt850",
+          "effect_loras": [],
+          "attention": "default",
+          "twopass": {
+            "enabled": false
+          },
+          "cfg": 1.0,
+          "use_sigma_shift": true,
+          "sigma_shift_available": true,
+          "audio_track_source": "generated",
+          "asset_refs": [
+            {
+              "asset_id": "asset_f65943f4f221",
+              "slot": "first_frame",
+              "ordinal": 0
+            }
+          ],
+          "gen_type": "flf",
+          "continuation": {
+            "chain_id": "71e232884711",
+            "stage_index": 0,
+            "source_job": "",
+            "source_segment": -1,
+            "latent_run_id": "h3studio_s71e232884711",
+            "latent_stage": 0,
+            "context_frames": 22,
+            "anchor_frames": 22,
+            "chain_total_frames": 0,
+            "segment_frames": 124
+          }
+        }
+      }
+    },
+    {
+      "label": "r2v",
+      "job_id": "d7b3f83c8312",
+      "created": {
+        "id": "d7b3f83c8312",
+        "status": "queued",
+        "batch_count": 1
+      },
+      "db_row": {
+        "id": "d7b3f83c8312",
+        "mode": "r2v",
+        "status": "queued",
+        "params": {
+          "prompt": "线上验证：参考生默认参数落库",
+          "asset_id": "asset_09cbfb7e04c9",
+          "model_key": "ref2va_pruned_int8",
+          "aspect": "16:9",
+          "resolution": "672p",
+          "megapixels": 0.779,
+          "resolution_percent": 100.0,
+          "duration": 5.0,
+          "lora": "ckpt850",
+          "lora_strength": 1.0,
+          "precision": "int8",
+          "steps": 4,
+          "sampler": "euler",
+          "scheduler": "beta",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "width": 1216,
+          "height": 672,
+          "size_adjust_reasons": [
+            "r2v 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+          ],
+          "seed": null,
+          "accel_lora": "ckpt850",
+          "accel_lora_strength": 1.0,
+          "accel_lora_loader": "MiniMaxH3TurboLoRA",
+          "accel_loras": [
+            {
+              "key": "ckpt850",
+              "strength": 1.0,
+              "enabled": true
+            }
+          ],
+          "fixed_accel_lora": "ckpt850",
+          "effect_loras": [],
+          "attention": "default",
+          "twopass": {
+            "enabled": false
+          },
+          "cfg": 1.0,
+          "use_sigma_shift": true,
+          "sigma_shift_available": true,
+          "audio_track_source": "generated",
+          "asset_refs": [
+            {
+              "asset_id": "asset_09cbfb7e04c9",
+              "slot": "ref_video",
+              "ordinal": 0
+            }
+          ],
+          "gen_type": "r2v",
+          "continuation": {
+            "chain_id": "d7b3f83c8312",
+            "stage_index": 0,
+            "source_job": "",
+            "source_segment": -1,
+            "latent_run_id": "h3studio_sd7b3f83c8312",
+            "latent_stage": 0,
+            "context_frames": 22,
+            "anchor_frames": 22,
+            "chain_total_frames": 0,
+            "segment_frames": 124
+          }
+        }
+      }
+    }
+  ],
+  "settings_endpoint": {
+    "flf_stored": {
+      "model_key": "fl2va_pruned_int8",
+      "aspect": "16:9",
+      "resolution": "768p",
+      "megapixels": 0.8,
+      "resolution_percent": 100.0,
+      "duration": 5.0,
+      "lora": "ckpt850",
+      "lora_strength": 1.0,
+      "precision": "int8",
+      "steps": 4,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "r2v_stored": {
+      "model_key": "ref2va_pruned_int8",
+      "aspect": "16:9",
+      "resolution": "768p",
+      "megapixels": 0.8,
+      "resolution_percent": 100.0,
+      "duration": 5.0,
+      "lora": "ckpt850",
+      "lora_strength": 1.0,
+      "precision": "int8",
+      "steps": 4,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "flf_spec_fields": {
+      "resolution": {
+        "type": "enum",
+        "default": "768p",
+        "max": null,
+        "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+        "options": [
+          "288p",
+          "352p",
+          "384p",
+          "416p",
+          "448p",
+          "480p",
+          "512p",
+          "544p",
+          "576p",
+          "608p",
+          "640p",
+          "672p",
+          "704p",
+          "736p",
+          "768p",
+          "800p",
+          "832p",
+          "864p",
+          "896p",
+          "928p",
+          "960p",
+          "1024p",
+          "1088p",
+          "1120p",
+          "1184p",
+          "1248p",
+          "1376p",
+          "1440p"
+        ]
+      },
+      "megapixels": {
+        "type": "number",
+        "default": 0.4,
+        "max": 2.0,
+        "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+        "options": []
+      },
+      "resolution_percent": {
+        "type": "number",
+        "default": 100.0,
+        "max": 200.0,
+        "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+        "options": []
+      },
+      "duration": {
+        "type": "number",
+        "default": 5.0,
+        "max": 60.0,
+        "note": "",
+        "options": []
+      }
+    },
+    "r2v_spec_fields": {
+      "resolution": {
+        "type": "enum",
+        "default": "768p",
+        "max": null,
+        "note": "按该模式的真实面积上限（2.0 MP）派生；也可以直接填下面的 MP 预算 × 百分比",
+        "options": [
+          "288p",
+          "352p",
+          "384p",
+          "416p",
+          "448p",
+          "480p",
+          "512p",
+          "544p",
+          "576p",
+          "608p",
+          "640p",
+          "672p",
+          "704p",
+          "736p",
+          "768p",
+          "800p",
+          "832p",
+          "864p",
+          "896p",
+          "928p",
+          "960p",
+          "1024p",
+          "1088p",
+          "1120p",
+          "1184p",
+          "1248p",
+          "1376p",
+          "1440p"
+        ]
+      },
+      "megapixels": {
+        "type": "number",
+        "default": 0.4,
+        "max": 2.0,
+        "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32",
+        "options": []
+      },
+      "resolution_percent": {
+        "type": "number",
+        "default": 100.0,
+        "max": 200.0,
+        "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP",
+        "options": []
+      },
+      "duration": {
+        "type": "number",
+        "default": 5.0,
+        "max": 60.0,
+        "note": "",
+        "options": []
+      }
+    }
+  },
+  "ref_video_asset": "asset_09cbfb7e04c9"
+}

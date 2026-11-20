@@ -1,0 +1,87 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "cases": [
+    {
+      "key": "A_legal_pass_through",
+      "label": "megapixels=0.4（合法值原样放行）",
+      "requested": {
+        "megapixels": 0.4
+      },
+      "job_id": "d2dd302684ef",
+      "effective_width": 864,
+      "effective_height": 480,
+      "effective_megapixels": 0.396,
+      "effective_resolution": "480p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.400 MP + 比例 16:9 -> 864×480"
+      ],
+      "status": "queued"
+    },
+    {
+      "key": "B_snap_to_32",
+      "label": "megapixels=0.41（换算后吸附到 32 的倍数）",
+      "requested": {
+        "megapixels": 0.41
+      },
+      "job_id": "fbc703a2bd71",
+      "effective_width": 864,
+      "effective_height": 480,
+      "effective_megapixels": 0.396,
+      "effective_resolution": "480p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.410 MP + 比例 16:9 -> 864×480"
+      ],
+      "status": "queued"
+    },
+    {
+      "key": "C_over_cap_auto_reduced",
+      "label": "megapixels=4.0（超 2.0MP 上限，自动下调）",
+      "requested": {
+        "megapixels": 4.0
+      },
+      "job_id": "5a4ade451da2",
+      "effective_width": 1920,
+      "effective_height": 1088,
+      "effective_megapixels": 1.992,
+      "effective_resolution": "1088p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 4.000 MP + 比例 16:9 -> 2720×1536",
+        "总像素 3.984 MP 超过 flf 上限 2.0 MP -> 已缩到 1920×1088",
+        "总像素 3.98MP 超过上限 2.0MP → 按比例缩到 1920×1088"
+      ],
+      "status": "queued"
+    },
+    {
+      "key": "D_percent_50",
+      "label": "resolution_percent=50（真实上限的 50%）",
+      "requested": {
+        "resolution_percent": 50
+      },
+      "job_id": "aa739f4995f4",
+      "effective_width": 1216,
+      "effective_height": 672,
+      "effective_megapixels": 0.779,
+      "effective_resolution": "672p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ],
+      "status": "queued"
+    },
+    {
+      "key": "E_percent_150_over_cap",
+      "label": "resolution_percent=150（超上限，自动下调）",
+      "requested": {
+        "resolution_percent": 150
+      },
+      "job_id": "575d3e16207b",
+      "effective_width": 1216,
+      "effective_height": 672,
+      "effective_megapixels": 0.779,
+      "effective_resolution": "672p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ],
+      "status": "queued"
+    }
+  ]
+}
