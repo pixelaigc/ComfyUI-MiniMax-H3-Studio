@@ -264,6 +264,132 @@ class TestToolResultClippingKeepsJsonValid(unittest.TestCase):
         self.assertLessEqual(len(clipped), agent_mod.TOOL_RESULT_LIMIT)
 
 
+class TestResolutionTierIsHonoured(unittest.TestCase):
+    """
+    【2026-11-20 新增】Agent 传的 resolution 档位必须**原样生效**。
+
+    【原缺陷（实测复现）】
+    ``server._merge_t2v_defaults`` 在缺 width/height 时只读
+    ``defaults["megapixels"]``，**从不看用户传的 resolution**：
+        传 resolution="480p" -> 实际 1376x768
+        传 resolution="768p" -> 实际 1376x768
+        什么都不传          -> 实际 1376x768
+    三个结果完全一样 —— 用户明确要的档位被**静默丢弃**。
+    这与用户报的原话（请求 480p 实际按 768p 生成）是同一个家族。
+    """
+
+    def _prepare(self, **params):
+        import asyncio as _aio
+        import server as srv
+        base = {"prompt": "x", "aspect": "16:9", "duration": 5}
+        base.update(params)
+        return _aio.run(srv.prepare_agent_t2v_params(base, mode="t2v"))
+
+    def test_480p_is_honoured(self):
+        merged, err = self._prepare(resolution="480p")
+        self.assertEqual(err, "")
+        self.assertEqual((merged["width"], merged["height"]), (864, 480))
+        self.assertEqual(merged["resolution"], "480p")
+
+    def test_768p_is_honoured(self):
+        merged, err = self._prepare(resolution="768p")
+        self.assertEqual(err, "")
+        self.assertEqual((merged["width"], merged["height"]), (1344, 768))
+
+    def test_1088p_is_honoured(self):
+        merged, err = self._prepare(resolution="1088p")
+        self.assertEqual(err, "")
+        self.assertEqual((merged["width"], merged["height"]), (1920, 1088))
+
+    def test_portrait_480p_is_honoured(self):
+        merged, err = self._prepare(resolution="480p", aspect="9:16")
+        self.assertEqual(err, "")
+        self.assertEqual((merged["width"], merged["height"]), (480, 864))
+
+    def test_tier_absent_for_aspect_is_rejected_not_silently_changed(self):
+        """该比例下没有这个档位 -> **明确报错**，不静默变成别的档位。"""
+        merged, err = self._prepare(resolution="768p", aspect="4:3")
+        self.assertTrue(err, "4:3 下没有 768p，必须报错而不是静默改写")
+        self.assertIn("不存在", err)
+        # 错误信息里要给出该比例下的真实档位集（模型能一次改对）
+        self.assertIn("4:3", err)
+        self.assertIn("p", err)
+
+    def test_panel_path_unaffected(self):
+        """面板路径（总是提交 width/height）不受影响。"""
+        import asyncio as _aio
+        import server as srv
+        merged, err = srv.normalize_t2v_params(
+            {"prompt": "x", "aspect": "16:9", "duration": 5,
+             "width": 864, "height": 480}, mode="t2v")
+        self.assertEqual(err, "")
+        self.assertEqual((merged["width"], merged["height"]), (864, 480))
+
+
+class TestMergeAvPadsShortAudio(unittest.TestCase):
+    """【2026-11-20 新增】音轨短于视频时要补静音（否则尾部画面没声音）。"""
+
+    def test_short_audio_is_padded_to_video_length(self):
+        import asyncio as _aio
+        import json as _json
+        import subprocess as _sp
+        import tempfile as _tf
+        from h3studio import asset_repo
+        from h3studio import asset_service
+        from h3studio import assets as store
+
+        tmp = Path(_tf.mkdtemp(prefix="agent-cap-apad-"))
+        try:
+            video = tmp / "v4s.mp4"
+            audio = tmp / "a2s.mp3"
+            # 视频 4 秒（**不带音频**，避免 -shortest 把视频也截短）
+            _sp.check_call([
+                "ffmpeg", "-y", "-v", "error",
+                "-f", "lavfi", "-i", "testsrc=size=320x240:rate=25:duration=4",
+                "-c:v", "libx264", "-preset", "veryfast",
+                "-pix_fmt", "yuv420p", "-an", str(video)],
+                stderr=_sp.DEVNULL)
+            _sp.check_call([
+                "ffmpeg", "-y", "-v", "error",
+                "-f", "lavfi", "-i", "sine=frequency=660:duration=2",
+                "-c:a", "libmp3lame", str(audio)], stderr=_sp.DEVNULL)
+            with store.connect() as conn:
+                vid = asset_service.register_asset(
+                    conn, source_path=video, filename=video.name,
+                    category="video", source="agent_cap_test",
+                    creator="test")["asset"]["id"]
+                aud = asset_service.register_asset(
+                    conn, source_path=audio, filename=audio.name,
+                    category="audio", source="agent_cap_test",
+                    creator="test")["asset"]["id"]
+            try:
+                result = _aio.run(agent_media_tools.op_merge_av(vid, aud))
+                out_id = result["output"]["asset_id"]
+                with store.connect() as conn:
+                    version = asset_repo.current_version(conn, out_id)
+                path = store.resolve_inside(store.library_root(),
+                                           version["storage_path"])
+                probe = _json.loads(_sp.check_output([
+                    "ffprobe", "-v", "error", "-print_format", "json",
+                    "-show_streams", str(path)]))
+                streams = {s["codec_type"]: s for s in probe["streams"]}
+                self.assertIn("audio", streams)
+                audio_dur = float(streams["audio"].get("duration") or 0)
+                video_dur = float(streams["video"].get("duration") or 0)
+                # 音轨必须被补到接近视频长（原来是 2 秒，视频 4 秒）
+                self.assertGreater(audio_dur, video_dur - 0.3,
+                                   f"音轨没补静音：audio={audio_dur} video={video_dur}")
+            finally:
+                for aid in (vid, aud):
+                    try:
+                        with store.connect() as conn:
+                            asset_repo.purge(conn, aid)
+                    except Exception:
+                        pass
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestClarificationDoesNotStopExecution(unittest.TestCase):
     """
     目标 D：**澄清式 respond 不收尾**。
