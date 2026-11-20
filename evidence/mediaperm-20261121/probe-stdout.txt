@@ -1,0 +1,260 @@
+{
+  "marks": {
+    "domcontentloaded": 0.345,
+    "first_card": 0.374,
+    "networkidle": 3.167,
+    "card_count": 12
+  },
+  "media_elements": {
+    "cards": 12,
+    "imgs": 0,
+    "videos": 12,
+    "audios": 0
+  },
+  "api_jobs_requests": 7,
+  "api_jobs_detail": [
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.113
+      },
+      "t_rel": 1.053
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.211
+      },
+      "t_rel": 2.433
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.486
+      },
+      "t_rel": 3.226
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=running",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.339
+      },
+      "t_rel": 3.227
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.321
+      },
+      "t_rel": 3.484
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.14
+      },
+      "t_rel": 3.736
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.26
+      },
+      "t_rel": 4.347
+    }
+  ],
+  "files_requests": 12,
+  "files_total_ms": -6.0,
+  "files_bytes_est": 25812905,
+  "files_sample_headers": {
+    "cache-control": "no-cache",
+    "etag": "\"18e9ccd0ff8988f9-160efa\"",
+    "last-modified": "Fri, 20 Nov 2026 16:12:05 GMT",
+    "content-length": "1445626",
+    "content-type": "video/mp4",
+    "accept-ranges": "bytes"
+  },
+  "other_requests": 63,
+  "other_breakdown": {
+    "document http://127.0.0.1:8190/": 1,
+    "stylesheet http://127.0.0.1:8190/static/favorites.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/responsive.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/style.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/assets.css": 1,
+    "script http://127.0.0.1:8190/static/numeric-slider.js": 1,
+    "script http://127.0.0.1:8190/static/qwen-refs.js": 1,
+    "script http://127.0.0.1:8190/static/seed-guard.js": 1,
+    "script http://127.0.0.1:8190/static/ref-context-menu.js": 1,
+    "script http://127.0.0.1:8190/static/media-preview.js": 1,
+    "script http://127.0.0.1:8190/static/interaction-guard.js": 1,
+    "script http://127.0.0.1:8190/static/ref-slots.js": 1,
+    "script http://127.0.0.1:8190/static/music.js": 1,
+    "script http://127.0.0.1:8190/static/video-panel-fallback.js": 1,
+    "script http://127.0.0.1:8190/static/generation-queue.js": 1,
+    "script http://127.0.0.1:8190/static/video-panel.js": 1,
+    "script http://127.0.0.1:8190/static/video-effect-lora.js": 1,
+    "script http://127.0.0.1:8190/static/job-meta.js": 1,
+    "script http://127.0.0.1:8190/static/continuation.js": 1,
+    "script http://127.0.0.1:8190/static/sidebar-fold.js": 1,
+    "script http://127.0.0.1:8190/static/job-detail.js": 1,
+    "script http://127.0.0.1:8190/static/media-manage.js": 1,
+    "script http://127.0.0.1:8190/static/app.js": 1,
+    "script http://127.0.0.1:8190/static/assets.js": 1,
+    "script http://127.0.0.1:8190/static/providers.js": 1,
+    "script http://127.0.0.1:8190/static/asset-player.js": 1,
+    "script http://127.0.0.1:8190/static/favorites.js": 1,
+    "script http://127.0.0.1:8190/static/music-enhance.js": 1,
+    "script http://127.0.0.1:8190/static/moss-layout.js": 1,
+    "script http://127.0.0.1:8190/static/flow-docs.js": 1,
+    "script http://127.0.0.1:8190/static/agent-media.js": 1,
+    "script http://127.0.0.1:8190/static/enhance-menu-shared.js": 1,
+    "script http://127.0.0.1:8190/static/prompt-history.js": 1,
+    "script http://127.0.0.1:8190/static/agent-manage.js": 1,
+    "script http://127.0.0.1:8190/static/agent.js": 1,
+    "script http://127.0.0.1:8190/static/agent_sessions.js": 1,
+    "script http://127.0.0.1:8190/static/video-nav.js": 1,
+    "script http://127.0.0.1:8190/static/enhance-menu.js": 1,
+    "fetch http://127.0.0.1:8190/api/image-options": 1,
+    "fetch http://127.0.0.1:8190/api/video-categories": 1,
+    "fetch http://127.0.0.1:8190/api/video-options": 1,
+    "fetch http://127.0.0.1:8190/api/generation-types": 1,
+    "fetch http://127.0.0.1:8190/api/music-options": 1,
+    "fetch http://127.0.0.1:8190/api/queue": 5,
+    "eventsource http://127.0.0.1:8190/api/status/stream": 1,
+    "fetch http://127.0.0.1:8190/api/enhancer": 1,
+    "fetch http://127.0.0.1:8190/api/agent/sessions": 1,
+    "fetch http://127.0.0.1:8190/api/video-config": 1,
+    "fetch http://127.0.0.1:8190/api/system": 2,
+    "fetch http://127.0.0.1:8190/api/continuation/state": 1,
+    "fetch http://127.0.0.1:8190/api/video-effect-loras": 3,
+    "fetch http://127.0.0.1:8190/api/agent/sessions/f024afca93d844fa": 1,
+    "fetch http://127.0.0.1:8190/api/image-loras": 4
+  },
+  "tab_results": {
+    "active": {
+      "elapsed": 0.236,
+      "cards": 0
+    },
+    "done": {
+      "elapsed": 0.239,
+      "cards": 12
+    },
+    "all": {
+      "elapsed": 0.254,
+      "cards": 12
+    }
+  },
+  "page_results": [
+    {
+      "page": 1,
+      "elapsed": 0.307,
+      "cards": 12
+    },
+    {
+      "page": 2,
+      "elapsed": 0.304,
+      "cards": 12
+    },
+    {
+      "page": 3,
+      "elapsed": 0.302,
+      "cards": 12
+    }
+  ],
+  "gen_type_buttons": [
+    {
+      "key": "全部类型",
+      "html": "<button data-type=\"\" class=\"active\">全部类型</button>"
+    },
+    {
+      "key": "文生视频",
+      "html": "<button data-type=\"t2v\" class=\"\" title=\"文生视频\">文生视频</button>"
+    },
+    {
+      "key": "首尾帧生成",
+      "html": "<button data-type=\"flf\" class=\"\" title=\"首尾帧生成\">首尾帧生成</button>"
+    },
+    {
+      "key": "参考图生成",
+      "html": "<button data-type=\"r2v\" class=\"\" title=\"参考图生成\">参考图生成</button>"
+    },
+    {
+      "key": "Z-IMAGE 文生图",
+      "html": "<button data-type=\"t2i\" class=\"\" title=\"Z-IMAGE 文生图\">Z-IMAGE 文生图</button>"
+    },
+    {
+      "key": "Qwen-Image 2.1 文生图",
+      "html": "<button data-type=\"t2i_qwen\" class=\"\" title=\"Qwen-Image 2.1 文生图\">Qwen-Image 2.1 文生图</button>"
+    },
+    {
+      "key": "Qwen-Image 2.1 图片编辑",
+      "html": "<button data-type=\"i2i_qwen\" class=\"\" title=\"Qwen-Image 2.1 图片编辑\">Qwen-Image 2.1 图片编辑</button>"
+    },
+    {
+      "key": "MOSS-Image 文生图",
+      "html": "<button data-type=\"t2i_moss\" class=\"\" title=\"MOSS-Image 文生图\">MOSS-Image 文生图</button>"
+    },
+    {
+      "key": "H3-Image 文生图",
+      "html": "<button data-type=\"t2i_h3image\" class=\"\" title=\"H3-Image 文生图\">H3-Image 文生图</button>"
+    },
+    {
+      "key": "H3-Image 图片编辑",
+      "html": "<button data-type=\"i2i_h3image\" class=\"\" title=\"H3-Image 图片编辑\">H3-Image 图片编辑</button>"
+    },
+    {
+      "key": "文生音乐",
+      "html": "<button data-type=\"t2a\" class=\"\" title=\"文生音乐\">文生音乐</button>"
+    },
+    {
+      "key": "参考生音乐",
+      "html": "<button data-type=\"a2a\" class=\"\" title=\"参考生音乐\">参考生音乐</button>"
+    },
+    {
+      "key": "长片拼接",
+      "html": "<button data-type=\"longfilm\" class=\"\" title=\"长片拼接\">长片拼接</button>"
+    },
+    {
+      "key": "其它生成",
+      "html": "<button data-type=\"__other__\" class=\"\" title=\"其它生成\">其它生成</button>"
+    }
+  ],
+  "files_breakdown": {
+    "media": 12
+  }
+}

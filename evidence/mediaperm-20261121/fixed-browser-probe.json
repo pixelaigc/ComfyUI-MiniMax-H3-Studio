@@ -1,0 +1,30 @@
+{
+  "marks": {
+    "dcl": 0.118,
+    "first_card": 0.182,
+    "networkidle": 5.611,
+    "cards": 12
+  },
+  "api": [
+    {
+      "url": "http://127.0.0.1:8211/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "total_ms": -0.2
+    },
+    {
+      "url": "http://127.0.0.1:8211/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "total_ms": -1002.5
+    },
+    {
+      "url": "http://127.0.0.1:8211/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "total_ms": -0.1
+    }
+  ],
+  "files_count": 12,
+  "files_total_ms": -1.3
+}

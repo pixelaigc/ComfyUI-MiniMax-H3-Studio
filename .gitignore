@@ -93,3 +93,10 @@ evidence/e2e/
 /evidence/favorites-live-*/
 /evidence/favorites-dom-assert-*/
 /evidence/favorites-batch-live-*/
+# ------------------------------------------------------------------
+# 2026-11-21 生成媒体库载入慢取证产物（批量截图不入库，报告与指标入库）
+/evidence/mediaperm-20261121/shots/
+/evidence/mediaperm-20261121/live-after/
+/evidence/shots-20261121/shots/
+/evidence/refctx-20261121/*.png
+/evidence/mediaperm-20261121/*.png
