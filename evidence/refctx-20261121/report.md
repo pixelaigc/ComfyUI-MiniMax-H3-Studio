@@ -284,7 +284,26 @@ playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
 playwright._impl._errors.Error: It looks like you are using Playwright Sync API inside the asyncio loop.
 ```
 
-**根因（已定位到源码）**：`tests/test_ref_context_remove.py:389` 用 `wait_until="networkidle"` 打开页面，但 H3 Studio 每 2 秒轮询一次任务列表（`web/app.js` 的 `setInterval(scheduleRefresh("jobs", refreshJobs), 2000)`），**networkidle 永远达不到** → 30 秒超时。超时后 Playwright 的 asyncio loop 状态被污染，后续用例连带报 "Sync API inside the asyncio loop"。
+**根因（已定位到源码）**：`tests/test_ref_context_remove.py:389` 用 `wait_until="networkidle"` 打开页面。
+
+> ⚠️ **2026-11-21 复核订正**：本报告初稿写的根因是「每 2 秒轮询任务列表 -> networkidle **永远**达不到 -> 必然 30 秒超时」。**这个说法经实测是错的**，特此订正：
+> - 实测 `networkidle` 在本机 **2.6~5.6 秒**就能达成（4/4 轮成功），**不是**「永远达不到」；
+> - 9 轮里 **7 轮是 `19 passed`**，只有 RUN 1 / RUN 8 失败 —— 是**偶发**，不是**必然**。
+>
+> **真实触发条件**（实测定位）：前端首屏会并发拉 `/api/video-options` 与 `/api/music-options`，
+> 后者内部同步拉 ComfyUI `/object_info`（`h3studio/music_yue2.py:221-241` ->
+> `music_style.style_options_async()`，timeout 10s）。
+> 实测本机 `/object_info` 响应 **6.28 秒**（`curl -o /dev/null -w`），
+> 隔离实例里 `/api/music-options` 实测 **5791ms**、`/api/video-options` **907ms**。
+> 当这两个慢请求（合计 >6s）与前端每 2 秒的 `/api/jobs` 轮询**首尾相接**时，
+> Chromium 判定「网络不空闲」的 500ms 窗口会被反复打断 ->
+> `networkidle` 在 30 秒内确实可能凑不齐 -> `page.goto` 超时。
+> 超时后 Playwright 的 asyncio loop 状态被污染，后续用例连带报
+> "Sync API inside the asyncio loop"。
+>
+> ⇒ 所以它**不是**纯测试脚手架问题：**根因在服务端**（首屏两个慢接口把 ComfyUI `/object_info` 拉了多次，
+> 且 `/api/music-options` 与 `/api/video-options` 各拉一遍）。这与本轮
+> 「生成媒体库载入慢」修掉的第 3 条根因（**ComfyUI 观测接口没有缓存**）是**同一类**问题。
 
 **判定：这是测试脚手架的竞态，不是产品缺陷。** 依据：
 1. 失败是**随机**的（同一份代码、同一台机器，19 passed / 5 failed 交替出现）；
