@@ -1,0 +1,1038 @@
+{
+ "total_files": 169,
+ "failed_files": [
+  "tests/test_agent_paste_browser.py",
+  "tests/test_asset_picker_onpick.py",
+  "tests/test_continuation_retry.py",
+  "tests/test_d11_moss_lora_final.py",
+  "tests/test_e2e_gen_flow_contract.py",
+  "tests/test_enhance_architecture_fixes.py",
+  "tests/test_enhance_menu.py",
+  "tests/test_enhance_owner_badge.py",
+  "tests/test_enhance_review_fixes.py",
+  "tests/test_enhance_unify.py",
+  "tests/test_lora_file_integrity.py",
+  "tests/test_moss_lora_damaged_and_partial.py",
+  "tests/test_music_flow_browser.py",
+  "tests/test_page_size.py",
+  "tests/test_qwen_pe_enhance.py",
+  "tests/test_qwen_refs_browser.py",
+  "tests/test_ref_context_remove.py"
+ ],
+ "results": {
+  "tests/test_8190_eventloop_not_blocked.py": {
+   "rc": 0,
+   "summary": "8 passed in 0.39s",
+   "seconds": 0.6,
+   "output_tail": "........                                                                 [100%]\n8 passed in 0.39s"
+  },
+  "tests/test_a23_player.py": {
+   "rc": 0,
+   "summary": "31 passed in 0.24s",
+   "seconds": 0.5,
+   "output_tail": "...............................                                          [100%]\n31 passed in 0.24s"
+  },
+  "tests/test_a4_gen_defaults.py": {
+   "rc": 0,
+   "summary": "47 passed in 0.23s",
+   "seconds": 0.5,
+   "output_tail": "...............................................                          [100%]\n47 passed in 0.23s"
+  },
+  "tests/test_a5_running_truth.py": {
+   "rc": 0,
+   "summary": "46 passed in 0.20s",
+   "seconds": 0.4,
+   "output_tail": "..............................................                           [100%]\n46 passed in 0.20s"
+  },
+  "tests/test_a5_running_truth_frontend.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.19s",
+   "seconds": 0.4,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.19s"
+  },
+  "tests/test_accel_lora_loader_aware.py": {
+   "rc": 0,
+   "summary": "12 passed in 0.37s",
+   "seconds": 0.6,
+   "output_tail": "............                                                             [100%]\n12 passed in 0.37s"
+  },
+  "tests/test_accel_lora_none_not_inverted.py": {
+   "rc": 0,
+   "summary": "10 passed in 0.02s",
+   "seconds": 0.3,
+   "output_tail": "..........                                                               [100%]\n10 passed in 0.02s"
+  },
+  "tests/test_accel_steps_follow_accel.py": {
+   "rc": 0,
+   "summary": "20 passed in 0.76s",
+   "seconds": 1.0,
+   "output_tail": "....................                                                     [100%]\n20 passed in 0.76s"
+  },
+  "tests/test_agent.py": {
+   "rc": 0,
+   "summary": "42 passed in 11.64s",
+   "seconds": 11.9,
+   "output_tail": "..........................................                               [100%]\n42 passed in 11.64s"
+  },
+  "tests/test_agent_backend_enh.py": {
+   "rc": 0,
+   "summary": "109 passed in 13.46s",
+   "seconds": 13.7,
+   "output_tail": "........................................................................ [ 66%]\n.....................................                                    [100%]\n109 passed in 13.46s"
+  },
+  "tests/test_agent_contract.py": {
+   "rc": 0,
+   "summary": "33 passed in 45.84s",
+   "seconds": 46.1,
+   "output_tail": ".................................                                        [100%]\n33 passed in 45.84s"
+  },
+  "tests/test_agent_fabricated_job_fix.py": {
+   "rc": 0,
+   "summary": "31 passed in 8.32s",
+   "seconds": 8.6,
+   "output_tail": "...............................                                          [100%]\n31 passed in 8.32s"
+  },
+  "tests/test_agent_frontend_enh.py": {
+   "rc": 0,
+   "summary": "34 passed in 26.20s",
+   "seconds": 26.5,
+   "output_tail": "..................................                                       [100%]\n34 passed in 26.20s"
+  },
+  "tests/test_agent_injection_key_path.py": {
+   "rc": 0,
+   "summary": "16 passed in 0.12s",
+   "seconds": 0.4,
+   "output_tail": "................                                                         [100%]\n16 passed in 0.12s"
+  },
+  "tests/test_agent_layout_browser.py": {
+   "rc": 0,
+   "summary": "8 passed, 8 subtests passed in 25.45s",
+   "seconds": 25.7,
+   "output_tail": "........                                                         [100%]\n8 passed, 8 subtests passed in 25.45s"
+  },
+  "tests/test_agent_legacy_fixes.py": {
+   "rc": 0,
+   "summary": "28 passed in 0.15s",
+   "seconds": 0.4,
+   "output_tail": "............................                                             [100%]\n28 passed in 0.15s"
+  },
+  "tests/test_agent_media_av_upload.py": {
+   "rc": 0,
+   "summary": "61 passed in 2.74s",
+   "seconds": 3.0,
+   "output_tail": ".............................................................            [100%]\n61 passed in 2.74s"
+  },
+  "tests/test_agent_media_semantics_backend.py": {
+   "rc": 0,
+   "summary": "87 passed in 1.21s",
+   "seconds": 1.5,
+   "output_tail": "........................................................................ [ 82%]\n...............                                                          [100%]\n87 passed in 1.21s"
+  },
+  "tests/test_agent_media_semantics_frontend.py": {
+   "rc": 0,
+   "summary": "21 passed in 0.50s",
+   "seconds": 0.8,
+   "output_tail": ".....................                                                    [100%]\n21 passed in 0.50s"
+  },
+  "tests/test_agent_media_upload.py": {
+   "rc": 0,
+   "summary": "66 passed in 5.12s",
+   "seconds": 5.4,
+   "output_tail": "..................................................................       [100%]\n66 passed in 5.12s"
+  },
+  "tests/test_agent_oneshot_e2e.py": {
+   "rc": 0,
+   "summary": "5 passed in 15.19s",
+   "seconds": 16.8,
+   "output_tail": ".....                                                                    [100%]\n5 passed in 15.19s\nUnclosed client session\nclient_session: <aiohttp.client.ClientSession object at 0x7ee11eb500a0>\nUnclosed connector\nconnections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7ee11eb689e0>, 370373.815307547)])']\nconnector: <aiohttp.connector.TCPConnector object at 0x7ee11eb52560>"
+  },
+  "tests/test_agent_paste_browser.py": {
+   "rc": 1,
+   "summary": "1 failed, 13 passed in 11.16s",
+   "seconds": 11.4,
+   "output_tail": ".............F                                                           [100%]\n1 failed, 13 passed in 11.16s"
+  },
+  "tests/test_agent_power.py": {
+   "rc": 0,
+   "summary": "44 passed, 1 skipped in 52.23s",
+   "seconds": 52.5,
+   "output_tail": "......................s......................                            [100%]\n44 passed, 1 skipped in 52.23s"
+  },
+  "tests/test_agent_prompt_history_hook.py": {
+   "rc": 0,
+   "summary": "11 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "...........                                                              [100%]\n11 passed in 0.05s"
+  },
+  "tests/test_agent_provider_timeout_budget.py": {
+   "rc": 0,
+   "summary": "9 passed in 0.04s",
+   "seconds": 0.3,
+   "output_tail": ".........                                                                [100%]\n9 passed in 0.04s"
+  },
+  "tests/test_agent_review_fixes.py": {
+   "rc": 0,
+   "summary": "20 passed in 0.15s",
+   "seconds": 0.4,
+   "output_tail": "....................                                                     [100%]\n20 passed in 0.15s"
+  },
+  "tests/test_agent_session_frontend.py": {
+   "rc": 0,
+   "summary": "27 passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": "...........................                                              [100%]\n27 passed in 0.03s"
+  },
+  "tests/test_agent_session_mgmt.py": {
+   "rc": 0,
+   "summary": "23 passed in 0.27s",
+   "seconds": 0.5,
+   "output_tail": ".......................                                                  [100%]\n23 passed in 0.27s"
+  },
+  "tests/test_agent_session_search_cascade.py": {
+   "rc": 0,
+   "summary": "26 passed in 0.15s",
+   "seconds": 0.4,
+   "output_tail": "..........................                                               [100%]\n26 passed in 0.15s"
+  },
+  "tests/test_agent_session_status_artifacts.py": {
+   "rc": 0,
+   "summary": "35 passed in 0.04s",
+   "seconds": 0.3,
+   "output_tail": "...................................                                      [100%]\n35 passed in 0.04s"
+  },
+  "tests/test_agent_stream_sse.py": {
+   "rc": 0,
+   "summary": "11 passed in 14.23s",
+   "seconds": 14.5,
+   "output_tail": "...........                                                              [100%]\n11 passed in 14.23s"
+  },
+  "tests/test_agent_tool_status_fix.py": {
+   "rc": 0,
+   "summary": "24 passed in 15.88s",
+   "seconds": 16.1,
+   "output_tail": "........................                                                 [100%]\n24 passed in 15.88s"
+  },
+  "tests/test_artifact_meta.py": {
+   "rc": 0,
+   "summary": "35 passed in 0.21s",
+   "seconds": 0.5,
+   "output_tail": "...................................                                      [100%]\n35 passed in 0.21s"
+  },
+  "tests/test_asset_api.py": {
+   "rc": 0,
+   "summary": "19 passed in 0.15s",
+   "seconds": 0.4,
+   "output_tail": "...................                                                      [100%]\n19 passed in 0.15s"
+  },
+  "tests/test_asset_deep_audio.py": {
+   "rc": 0,
+   "summary": "32 passed in 7.84s",
+   "seconds": 8.1,
+   "output_tail": "................................                                         [100%]\n32 passed in 7.84s"
+  },
+  "tests/test_asset_library.py": {
+   "rc": 0,
+   "summary": "40 passed in 1.76s",
+   "seconds": 2.0,
+   "output_tail": "........................................                                 [100%]\n40 passed in 1.76s"
+  },
+  "tests/test_asset_picker_onpick.py": {
+   "rc": -9,
+   "summary": "[TIMEOUT after 300s]",
+   "seconds": 300.1,
+   "output_tail": ".F\n[TIMEOUT after 300s]"
+  },
+  "tests/test_assetlib_and_seed_guard.py": {
+   "rc": 0,
+   "summary": "52 passed in 0.38s",
+   "seconds": 0.6,
+   "output_tail": "....................................................                     [100%]\n52 passed in 0.38s"
+  },
+  "tests/test_audit_fixes.py": {
+   "rc": 0,
+   "summary": "36 passed in 0.08s",
+   "seconds": 0.3,
+   "output_tail": "....................................                                     [100%]\n36 passed in 0.08s"
+  },
+  "tests/test_b1b2_video_modes.py": {
+   "rc": 0,
+   "summary": "24 passed in 0.82s",
+   "seconds": 1.1,
+   "output_tail": "........................                                                 [100%]\n24 passed in 0.82s"
+  },
+  "tests/test_b2_audiotrack_refresh.py": {
+   "rc": 0,
+   "summary": "4 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "....                                                                     [100%]\n4 passed in 0.05s"
+  },
+  "tests/test_batches_collapse.py": {
+   "rc": 0,
+   "summary": "12 passed in 28.16s",
+   "seconds": 28.4,
+   "output_tail": "............                                                             [100%]\n12 passed in 28.16s"
+  },
+  "tests/test_c6_detail_recommend.py": {
+   "rc": 0,
+   "summary": "17 passed in 0.29s",
+   "seconds": 0.5,
+   "output_tail": ".................                                                        [100%]\n17 passed in 0.29s"
+  },
+  "tests/test_cancel_longfilm_process.py": {
+   "rc": 0,
+   "summary": "5 passed in 0.13s",
+   "seconds": 0.4,
+   "output_tail": ".....                                                                    [100%]\n5 passed in 0.13s"
+  },
+  "tests/test_comfy_errors.py": {
+   "rc": 0,
+   "summary": "22 passed, 9 subtests passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": "......................                                          [100%]\n22 passed, 9 subtests passed in 0.03s"
+  },
+  "tests/test_comfy_errors_typesafety.py": {
+   "rc": 0,
+   "summary": "40 passed in 6.20s",
+   "seconds": 6.5,
+   "output_tail": "........................................                                 [100%]\n40 passed in 6.20s"
+  },
+  "tests/test_cont_concat_frames.py": {
+   "rc": 0,
+   "summary": "5 passed in 4.66s",
+   "seconds": 4.9,
+   "output_tail": ".....                                                                    [100%]\n5 passed in 4.66s"
+  },
+  "tests/test_cont_duration_and_prompt_history.py": {
+   "rc": 0,
+   "summary": "22 passed in 2.73s",
+   "seconds": 3.0,
+   "output_tail": "......................                                                   [100%]\n22 passed in 2.73s"
+  },
+  "tests/test_cont_duration_exact_frames.py": {
+   "rc": 0,
+   "summary": "12 passed, 5 subtests passed in 2.30s",
+   "seconds": 2.6,
+   "output_tail": "............                                                        [100%]\n12 passed, 5 subtests passed in 2.30s"
+  },
+  "tests/test_cont_duration_semantics.py": {
+   "rc": 0,
+   "summary": "23 passed in 0.07s",
+   "seconds": 0.3,
+   "output_tail": ".......................                                                  [100%]\n23 passed in 0.07s"
+  },
+  "tests/test_cont_duration_ui_browser.py": {
+   "rc": 0,
+   "summary": "3 passed in 14.94s",
+   "seconds": 15.2,
+   "output_tail": "...                                                                      [100%]\n3 passed in 14.94s"
+  },
+  "tests/test_cont_prompt_history_browser.py": {
+   "rc": 0,
+   "summary": "2 passed in 11.17s",
+   "seconds": 11.4,
+   "output_tail": "..                                                                       [100%]\n2 passed in 11.17s"
+  },
+  "tests/test_cont_seam_quality.py": {
+   "rc": 0,
+   "summary": "13 passed in 0.14s",
+   "seconds": 0.4,
+   "output_tail": ".............                                                            [100%]\n13 passed in 0.14s"
+  },
+  "tests/test_cont_seg_audio.py": {
+   "rc": 0,
+   "summary": "46 passed in 0.72s",
+   "seconds": 1.0,
+   "output_tail": "..............................................                           [100%]\n46 passed in 0.72s"
+  },
+  "tests/test_cont_selflift.py": {
+   "rc": 0,
+   "summary": "33 passed in 0.14s",
+   "seconds": 0.4,
+   "output_tail": ".................................                                        [100%]\n33 passed in 0.14s"
+  },
+  "tests/test_continuation.py": {
+   "rc": 0,
+   "summary": "41 passed in 0.12s",
+   "seconds": 0.4,
+   "output_tail": ".........................................                                [100%]\n41 passed in 0.12s"
+  },
+  "tests/test_continuation_branch.py": {
+   "rc": 0,
+   "summary": "15 passed in 0.16s",
+   "seconds": 0.4,
+   "output_tail": "...............                                                          [100%]\n15 passed in 0.16s"
+  },
+  "tests/test_continuation_capability.py": {
+   "rc": 0,
+   "summary": "5 passed in 4.69s",
+   "seconds": 5.0,
+   "output_tail": ".....                                                                    [100%]\n5 passed in 4.69s"
+  },
+  "tests/test_continuation_frontend.py": {
+   "rc": 0,
+   "summary": "24 passed in 74.15s (0:01:14)",
+   "seconds": 74.4,
+   "output_tail": "........................                                                 [100%]\n24 passed in 74.15s (0:01:14)"
+  },
+  "tests/test_continuation_frontend_params.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.03s"
+  },
+  "tests/test_continuation_mixed_state.py": {
+   "rc": 0,
+   "summary": "17 passed in 0.06s",
+   "seconds": 0.3,
+   "output_tail": ".................                                                        [100%]\n17 passed in 0.06s"
+  },
+  "tests/test_continuation_retry.py": {
+   "rc": 1,
+   "summary": "3 failed, 12 passed in 0.06s",
+   "seconds": 0.3,
+   "output_tail": "FFF............                                                          [100%]\n3 failed, 12 passed in 0.06s"
+  },
+  "tests/test_continuation_server.py": {
+   "rc": 0,
+   "summary": "13 passed in 3.31s",
+   "seconds": 3.6,
+   "output_tail": ".............                                                            [100%]\n13 passed in 3.31s"
+  },
+  "tests/test_continuation_switch_visibility.py": {
+   "rc": 0,
+   "summary": "6 passed, 9 subtests passed in 34.80s",
+   "seconds": 35.1,
+   "output_tail": "......                                                          [100%]\n6 passed, 9 subtests passed in 34.80s"
+  },
+  "tests/test_coverage_cross_script.py": {
+   "rc": 0,
+   "summary": "10 passed in 0.02s",
+   "seconds": 0.3,
+   "output_tail": "..........                                                               [100%]\n10 passed in 0.02s"
+  },
+  "tests/test_cr5_c_segment.py": {
+   "rc": 0,
+   "summary": "30 passed in 1.46s",
+   "seconds": 1.7,
+   "output_tail": "..............................                                           [100%]\n30 passed in 1.46s"
+  },
+  "tests/test_cr5_text_scanner.py": {
+   "rc": 0,
+   "summary": "10 passed in 0.31s",
+   "seconds": 0.5,
+   "output_tail": "..........                                                               [100%]\n10 passed in 0.31s"
+  },
+  "tests/test_cr6_p1_fixes.py": {
+   "rc": 0,
+   "summary": "12 passed in 0.24s",
+   "seconds": 0.5,
+   "output_tail": "............                                                             [100%]\n12 passed in 0.24s"
+  },
+  "tests/test_d11_defect_a_conversion.py": {
+   "rc": 0,
+   "summary": "18 passed in 5.00s",
+   "seconds": 5.2,
+   "output_tail": "..................                                                       [100%]\n18 passed in 5.00s"
+  },
+  "tests/test_d11_moss_lora_final.py": {
+   "rc": 1,
+   "summary": "1 failed, 13 passed in 12.79s",
+   "seconds": 13.3,
+   "output_tail": "......F.......                                                           [100%]\n1 failed, 13 passed in 12.79s"
+  },
+  "tests/test_d11_moss_lora_frontend.py": {
+   "rc": 0,
+   "summary": "4 passed in 9.16s",
+   "seconds": 9.4,
+   "output_tail": "....                                                                     [100%]\n4 passed in 9.16s"
+  },
+  "tests/test_d1_model_display.py": {
+   "rc": 0,
+   "summary": "8 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "........                                                                 [100%]\n8 passed in 0.05s"
+  },
+  "tests/test_d2_lora_display.py": {
+   "rc": 0,
+   "summary": "11 passed in 1.12s",
+   "seconds": 2.2,
+   "output_tail": "...........                                                              [100%]\n11 passed in 1.12s"
+  },
+  "tests/test_d3_recommendation_gap.py": {
+   "rc": 0,
+   "summary": "10 passed in 6.78s",
+   "seconds": 7.0,
+   "output_tail": "..........                                                               [100%]\n10 passed in 6.78s"
+  },
+  "tests/test_d4_loader_display.py": {
+   "rc": 0,
+   "summary": "11 passed in 0.11s",
+   "seconds": 0.3,
+   "output_tail": "...........                                                              [100%]\n11 passed in 0.11s"
+  },
+  "tests/test_docs_static.py": {
+   "rc": 0,
+   "summary": "12 passed, 26 subtests passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "............                                   [100%]\n12 passed, 26 subtests passed in 0.05s"
+  },
+  "tests/test_e2e_gen_flow_contract.py": {
+   "rc": 1,
+   "summary": "1 failed, 4 passed in 0.12s",
+   "seconds": 0.4,
+   "output_tail": "F....                                                                    [100%]\n1 failed, 4 passed in 0.12s"
+  },
+  "tests/test_effect_lora_frontend.py": {
+   "rc": 0,
+   "summary": "10 passed in 39.11s",
+   "seconds": 40.4,
+   "output_tail": "..........                                                               [100%]\n10 passed in 39.11s"
+  },
+  "tests/test_enhance_architecture_fixes.py": {
+   "rc": 1,
+   "summary": "1 failed, 27 passed in 21.65s",
+   "seconds": 21.9,
+   "output_tail": ".........................F..                                             [100%]\n1 failed, 27 passed in 21.65s"
+  },
+  "tests/test_enhance_assets.py": {
+   "rc": 0,
+   "summary": "21 passed in 19.83s",
+   "seconds": 20.1,
+   "output_tail": ".....................                                                    [100%]\n21 passed in 19.83s"
+  },
+  "tests/test_enhance_menu.py": {
+   "rc": 1,
+   "summary": "1 failed, 23 passed in 117.76s (0:01:57)",
+   "seconds": 118.0,
+   "output_tail": "..................F.....                                                 [100%]\n1 failed, 23 passed in 117.76s (0:01:57)"
+  },
+  "tests/test_enhance_multi_select.py": {
+   "rc": 0,
+   "summary": "20 passed in 78.61s (0:01:18)",
+   "seconds": 78.9,
+   "output_tail": "....................                                                     [100%]\n20 passed in 78.61s (0:01:18)"
+  },
+  "tests/test_enhance_owner_badge.py": {
+   "rc": 1,
+   "summary": "1 failed, 6 passed, 6 subtests passed in 0.02s",
+   "seconds": 0.3,
+   "output_tail": "....F..                                                            [100%]\n1 failed, 6 passed, 6 subtests passed in 0.02s"
+  },
+  "tests/test_enhance_review_fixes.py": {
+   "rc": 1,
+   "summary": "1 failed, 22 passed, 2 subtests passed in 39.14s",
+   "seconds": 39.4,
+   "output_tail": "....................F..                                                [100%]\n1 failed, 22 passed, 2 subtests passed in 39.14s"
+  },
+  "tests/test_enhance_system_echo.py": {
+   "rc": 0,
+   "summary": "32 passed in 0.26s",
+   "seconds": 0.5,
+   "output_tail": "................................                                         [100%]\n32 passed in 0.26s"
+  },
+  "tests/test_enhance_unify.py": {
+   "rc": 1,
+   "summary": "1 failed, 19 passed in 59.96s",
+   "seconds": 60.2,
+   "output_tail": "................F...                                                     [100%]\n1 failed, 19 passed in 59.96s"
+  },
+  "tests/test_fix2_media_filter_and_ref_description.py": {
+   "rc": 0,
+   "summary": "24 passed in 0.08s",
+   "seconds": 0.3,
+   "output_tail": "........................                                                 [100%]\n24 passed in 0.08s"
+  },
+  "tests/test_fix3_ui_controls_preview.py": {
+   "rc": 0,
+   "summary": "32 passed in 0.16s",
+   "seconds": 0.4,
+   "output_tail": "................................                                         [100%]\n32 passed in 0.16s"
+  },
+  "tests/test_fl_f_lum_closure.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.05s"
+  },
+  "tests/test_flf_r2v_size_not_overridden.py": {
+   "rc": 0,
+   "summary": "4 passed, 4 subtests passed in 0.19s",
+   "seconds": 0.5,
+   "output_tail": "....                                                                 [100%]\n4 passed, 4 subtests passed in 0.19s"
+  },
+  "tests/test_flf_reference_media.py": {
+   "rc": 0,
+   "summary": "22 passed in 1.52s",
+   "seconds": 1.8,
+   "output_tail": "......................                                                   [100%]\n22 passed in 1.52s"
+  },
+  "tests/test_flow_diagram.py": {
+   "rc": 0,
+   "summary": "14 passed, 200 subtests passed in 0.24s",
+   "seconds": 0.5,
+   "output_tail": "..............   [100%]\n14 passed, 200 subtests passed in 0.24s"
+  },
+  "tests/test_flow_docs_ui.py": {
+   "rc": 0,
+   "summary": "7 passed, 6 subtests passed in 17.73s",
+   "seconds": 18.0,
+   "output_tail": ".......                                                            [100%]\n7 passed, 6 subtests passed in 17.73s"
+  },
+  "tests/test_frontend_assets_hygiene.py": {
+   "rc": 0,
+   "summary": "14 passed in 0.04s",
+   "seconds": 0.3,
+   "output_tail": "..............                                                           [100%]\n14 passed in 0.04s"
+  },
+  "tests/test_frontend_defaults.py": {
+   "rc": 0,
+   "summary": "15 passed in 23.33s",
+   "seconds": 23.6,
+   "output_tail": "...............                                                          [100%]\n15 passed in 23.33s"
+  },
+  "tests/test_gen_queue.py": {
+   "rc": 0,
+   "summary": "10 passed in 50.87s",
+   "seconds": 51.2,
+   "output_tail": "..........                                                               [100%]\n10 passed in 50.87s"
+  },
+  "tests/test_gen_status_defects.py": {
+   "rc": 0,
+   "summary": "34 passed in 0.26s",
+   "seconds": 0.5,
+   "output_tail": "..................................                                       [100%]\n34 passed in 0.26s"
+  },
+  "tests/test_grid_flash.py": {
+   "rc": 0,
+   "summary": "10 passed in 48.88s",
+   "seconds": 49.1,
+   "output_tail": "..........                                                               [100%]\n10 passed in 48.88s"
+  },
+  "tests/test_h3_effect_lora.py": {
+   "rc": 0,
+   "summary": "42 passed in 2.41s",
+   "seconds": 3.7,
+   "output_tail": "..........................................                               [100%]\n42 passed in 2.41s"
+  },
+  "tests/test_h3_panel_tune.py": {
+   "rc": 0,
+   "summary": "60 passed in 9.30s",
+   "seconds": 9.6,
+   "output_tail": "............................................................             [100%]\n60 passed in 9.30s"
+  },
+  "tests/test_h3_video_modes_ui.py": {
+   "rc": 0,
+   "summary": "47 passed in 0.82s",
+   "seconds": 1.1,
+   "output_tail": "...............................................                          [100%]\n47 passed in 0.82s"
+  },
+  "tests/test_hardware.py": {
+   "rc": 0,
+   "summary": "35 passed in 0.06s",
+   "seconds": 0.3,
+   "output_tail": "...................................                                      [100%]\n35 passed in 0.06s"
+  },
+  "tests/test_image_param_ranges.py": {
+   "rc": 0,
+   "summary": "27 passed in 0.08s",
+   "seconds": 0.3,
+   "output_tail": "...........................                                              [100%]\n27 passed in 0.08s"
+  },
+  "tests/test_image_res_lora.py": {
+   "rc": 0,
+   "summary": "24 passed in 19.83s",
+   "seconds": 20.3,
+   "output_tail": "........................                                                 [100%]\n24 passed in 19.83s"
+  },
+  "tests/test_job_meta_c_fix.py": {
+   "rc": 0,
+   "summary": "32 passed, 51 subtests passed in 1.10s",
+   "seconds": 2.2,
+   "output_tail": ".......................... [ 81%]\n......                                                              [100%]\n32 passed, 51 subtests passed in 1.10s"
+  },
+  "tests/test_job_meta_frontend.py": {
+   "rc": 0,
+   "summary": "9 passed in 0.28s",
+   "seconds": 0.5,
+   "output_tail": ".........                                                                [100%]\n9 passed in 0.28s"
+  },
+  "tests/test_labc_base_verdict.py": {
+   "rc": 0,
+   "summary": "10 passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": "..........                                                               [100%]\n10 passed in 0.03s"
+  },
+  "tests/test_labc_cleanup_stale_derived.py": {
+   "rc": 0,
+   "summary": "8 passed in 0.04s",
+   "seconds": 0.3,
+   "output_tail": "........                                                                 [100%]\n8 passed in 0.04s"
+  },
+  "tests/test_lora_catalog_conflicts.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.03s",
+   "seconds": 0.2,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.03s"
+  },
+  "tests/test_lora_ea.py": {
+   "rc": 0,
+   "summary": "18 passed in 0.10s",
+   "seconds": 0.3,
+   "output_tail": "..................                                                       [100%]\n18 passed in 0.10s"
+  },
+  "tests/test_lora_effects.py": {
+   "rc": 0,
+   "summary": "22 passed in 22.71s",
+   "seconds": 23.2,
+   "output_tail": "......................                                                   [100%]\n22 passed in 22.71s"
+  },
+  "tests/test_lora_file_integrity.py": {
+   "rc": 1,
+   "summary": "2 failed, 9 passed, 1 skipped in 5.23s",
+   "seconds": 5.5,
+   "output_tail": ".......FF.s.                                                             [100%]\n2 failed, 9 passed, 1 skipped in 5.23s"
+  },
+  "tests/test_lora_mihoyo.py": {
+   "rc": 0,
+   "summary": "25 passed in 4.67s",
+   "seconds": 4.9,
+   "output_tail": ".........................                                                [100%]\n25 passed in 4.67s"
+  },
+  "tests/test_lora_mihoyo_char_mech.py": {
+   "rc": 0,
+   "summary": "24 passed in 6.35s",
+   "seconds": 6.6,
+   "output_tail": "........................                                                 [100%]\n24 passed in 6.35s"
+  },
+  "tests/test_lora_nsfw.py": {
+   "rc": 0,
+   "summary": "13 passed in 2.42s",
+   "seconds": 2.6,
+   "output_tail": ".............                                                            [100%]\n13 passed in 2.42s"
+  },
+  "tests/test_lora_whitelist_all_modes.py": {
+   "rc": 0,
+   "summary": "25 passed, 49 subtests passed in 1.16s",
+   "seconds": 2.2,
+   "output_tail": "......................... [100%]\n25 passed, 49 subtests passed in 1.16s"
+  },
+  "tests/test_max_tokens.py": {
+   "rc": 0,
+   "summary": "84 passed, 2 warnings in 0.12s",
+   "seconds": 0.4,
+   "output_tail": "........................................................................ [ 85%]\n............                                                             [100%]\n=============================== warnings summary ===============================\ntests/test_max_tokens.py:803\n  /root/projects/h3s-baseline/tests/test_max_tokens.py:803: DeprecationWarning: invalid escape sequence '\\-'\n    \"\"\"\ntests/test_max_tokens.py:824\n  /root/projects/h3s-baseline/tests/test_max_tokens.py:824: DeprecationWarning: invalid escape sequence '\\d'\n    \"\"\"\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n84 passed, 2 warnings in 0.12s"
+  },
+  "tests/test_media_card_detail.py": {
+   "rc": 0,
+   "summary": "29 passed in 1.25s",
+   "seconds": 2.3,
+   "output_tail": ".............................                                            [100%]\n29 passed in 1.25s"
+  },
+  "tests/test_mediadef_all_types.py": {
+   "rc": 0,
+   "summary": "9 passed in 0.07s",
+   "seconds": 0.3,
+   "output_tail": ".........                                                                [100%]\n9 passed in 0.07s"
+  },
+  "tests/test_mode_switch_slot_isolation.py": {
+   "rc": 0,
+   "summary": "8 passed in 0.22s",
+   "seconds": 0.5,
+   "output_tail": "........                                                                 [100%]\n8 passed in 0.22s"
+  },
+  "tests/test_model_list_api.py": {
+   "rc": 0,
+   "summary": "45 passed in 7.08s",
+   "seconds": 7.3,
+   "output_tail": ".............................................                            [100%]\n45 passed in 7.08s"
+  },
+  "tests/test_moss_image.py": {
+   "rc": 0,
+   "summary": "47 passed in 36.10s",
+   "seconds": 36.4,
+   "output_tail": "...............................................                          [100%]\n47 passed in 36.10s"
+  },
+  "tests/test_moss_layout.py": {
+   "rc": 0,
+   "summary": "52 passed in 0.07s",
+   "seconds": 0.3,
+   "output_tail": "....................................................                     [100%]\n52 passed in 0.07s"
+  },
+  "tests/test_moss_lora_damaged_and_partial.py": {
+   "rc": 1,
+   "summary": "2 failed, 21 passed, 7 subtests passed in 5.83s",
+   "seconds": 6.3,
+   "output_tail": "....................FF.                                           [100%]\n2 failed, 21 passed, 7 subtests passed in 5.83s"
+  },
+  "tests/test_music_flow_browser.py": {
+   "rc": 1,
+   "summary": "1 failed, 9 passed in 81.87s (0:01:21)",
+   "seconds": 82.1,
+   "output_tail": ".......F..                                                               [100%]\n1 failed, 9 passed in 81.87s (0:01:21)"
+  },
+  "tests/test_music_yue2.py": {
+   "rc": 0,
+   "summary": "67 passed in 10.84s",
+   "seconds": 11.1,
+   "output_tail": "...................................................................      [100%]\n67 passed in 10.84s"
+  },
+  "tests/test_node_probe_completeness.py": {
+   "rc": 0,
+   "summary": "6 passed in 6.19s",
+   "seconds": 6.4,
+   "output_tail": "......                                                                   [100%]\n6 passed in 6.19s"
+  },
+  "tests/test_output_path_traversal.py": {
+   "rc": 0,
+   "summary": "5 passed in 0.09s",
+   "seconds": 0.3,
+   "output_tail": ".....                                                                    [100%]\n5 passed in 0.09s"
+  },
+  "tests/test_page_size.py": {
+   "rc": 1,
+   "summary": "1 failed, 21 passed in 81.10s (0:01:21)",
+   "seconds": 81.3,
+   "output_tail": "F.....................                                                   [100%]\n1 failed, 21 passed in 81.10s (0:01:21)"
+  },
+  "tests/test_panel_fallback.py": {
+   "rc": 0,
+   "summary": "24 passed in 3.34s",
+   "seconds": 3.6,
+   "output_tail": "........................                                                 [100%]\n24 passed in 3.34s"
+  },
+  "tests/test_params_channel_asset_guard.py": {
+   "rc": 0,
+   "summary": "35 passed in 0.11s",
+   "seconds": 0.4,
+   "output_tail": "...................................                                      [100%]\n35 passed in 0.11s"
+  },
+  "tests/test_pe_externalize.py": {
+   "rc": 0,
+   "summary": "28 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "............................                                             [100%]\n28 passed in 0.05s"
+  },
+  "tests/test_prompt_history.py": {
+   "rc": 0,
+   "summary": "41 passed in 0.13s",
+   "seconds": 0.4,
+   "output_tail": ".........................................                                [100%]\n41 passed in 0.13s"
+  },
+  "tests/test_prompt_history_dirtyloop.py": {
+   "rc": 0,
+   "summary": "2 passed in 0.09s",
+   "seconds": 0.3,
+   "output_tail": "..                                                                       [100%]\n2 passed in 0.09s"
+  },
+  "tests/test_qwen_image.py": {
+   "rc": 0,
+   "summary": "37 passed, 1 skipped in 9.84s",
+   "seconds": 10.1,
+   "output_tail": ".............................s........                                   [100%]\n37 passed, 1 skipped in 9.84s"
+  },
+  "tests/test_qwen_pe_enhance.py": {
+   "rc": 1,
+   "summary": "1 failed, 28 passed in 77.90s (0:01:17)",
+   "seconds": 78.2,
+   "output_tail": "...................F.........                                            [100%]\n1 failed, 28 passed in 77.90s (0:01:17)"
+  },
+  "tests/test_qwen_ref_assets.py": {
+   "rc": 0,
+   "summary": "37 passed in 0.08s",
+   "seconds": 0.3,
+   "output_tail": ".....................................                                    [100%]\n37 passed in 0.08s"
+  },
+  "tests/test_qwen_refs_browser.py": {
+   "rc": 1,
+   "summary": "3 failed in 91.17s (0:01:31)",
+   "seconds": 91.4,
+   "output_tail": "FFF                                                                      [100%]\n3 failed in 91.17s (0:01:31)"
+  },
+  "tests/test_qwen_refs_profile.py": {
+   "rc": 0,
+   "summary": "4 passed in 0.05s",
+   "seconds": 0.3,
+   "output_tail": "....                                                                     [100%]\n4 passed in 0.05s"
+  },
+  "tests/test_r2_visible_text.py": {
+   "rc": 0,
+   "summary": "14 passed in 0.04s",
+   "seconds": 0.3,
+   "output_tail": "..............                                                           [100%]\n14 passed in 0.04s"
+  },
+  "tests/test_r4_retry_fingerprint_and_ref_probe.py": {
+   "rc": 0,
+   "summary": "11 passed in 0.59s",
+   "seconds": 0.8,
+   "output_tail": "...........                                                              [100%]\n11 passed in 0.59s"
+  },
+  "tests/test_r7_review_fixes.py": {
+   "rc": 0,
+   "summary": "25 passed in 1.01s",
+   "seconds": 1.3,
+   "output_tail": ".........................                                                [100%]\n25 passed in 1.01s"
+  },
+  "tests/test_ref_context_remove.py": {
+   "rc": 1,
+   "summary": "5 failed, 14 passed in 30.94s",
+   "seconds": 31.2,
+   "output_tail": "..............FFFFF                                                      [100%]\n5 failed, 14 passed in 30.94s"
+  },
+  "tests/test_ref_video_continuation_slice.py": {
+   "rc": 0,
+   "summary": "11 passed in 0.14s",
+   "seconds": 0.4,
+   "output_tail": "...........                                                              [100%]\n11 passed in 0.14s"
+  },
+  "tests/test_reso_label.py": {
+   "rc": 0,
+   "summary": "29 passed in 0.11s",
+   "seconds": 0.4,
+   "output_tail": ".............................                                            [100%]\n29 passed in 0.11s"
+  },
+  "tests/test_responsive_mobile.py": {
+   "rc": 0,
+   "summary": "17 passed in 124.02s (0:02:04)",
+   "seconds": 124.3,
+   "output_tail": ".................                                                        [100%]\n17 passed in 124.02s (0:02:04)"
+  },
+  "tests/test_reuse_resolution_fallback.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.16s",
+   "seconds": 0.4,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.16s"
+  },
+  "tests/test_sidebar_fold.py": {
+   "rc": 0,
+   "summary": "12 passed in 97.35s (0:01:37)",
+   "seconds": 97.6,
+   "output_tail": "............                                                             [100%]\n12 passed in 97.35s (0:01:37)"
+  },
+  "tests/test_size_limit_message.py": {
+   "rc": 0,
+   "summary": "7 passed in 0.02s",
+   "seconds": 0.3,
+   "output_tail": ".......                                                                  [100%]\n7 passed in 0.02s"
+  },
+  "tests/test_slot_state_reset.py": {
+   "rc": 0,
+   "summary": "6 passed in 0.14s",
+   "seconds": 0.4,
+   "output_tail": "......                                                                   [100%]\n6 passed in 0.14s"
+  },
+  "tests/test_status_realtime.py": {
+   "rc": 0,
+   "summary": "20 passed in 18.72s",
+   "seconds": 19.0,
+   "output_tail": "....................                                                     [100%]\n20 passed in 18.72s"
+  },
+  "tests/test_studio.py": {
+   "rc": 0,
+   "summary": "47 passed, 3 skipped in 139.93s (0:02:19)",
+   "seconds": 140.5,
+   "output_tail": "....................................s.s..s........                       [100%]\n47 passed, 3 skipped in 139.93s (0:02:19)"
+  },
+  "tests/test_studio_server_cleanup.py": {
+   "rc": 0,
+   "summary": "4 passed in 0.74s",
+   "seconds": 1.0,
+   "output_tail": "....                                                                     [100%]\n4 passed in 0.74s"
+  },
+  "tests/test_t2v_card_dom.py": {
+   "rc": 0,
+   "summary": "12 passed in 0.25s",
+   "seconds": 0.5,
+   "output_tail": "............                                                             [100%]\n12 passed in 0.25s"
+  },
+  "tests/test_t2v_meta_consistency.py": {
+   "rc": 0,
+   "summary": "27 passed in 1.20s",
+   "seconds": 2.3,
+   "output_tail": "...........................                                              [100%]\n27 passed in 1.20s"
+  },
+  "tests/test_t2v_panel.py": {
+   "rc": 0,
+   "summary": "44 passed in 1.53s",
+   "seconds": 1.8,
+   "output_tail": "............................................                             [100%]\n44 passed in 1.53s"
+  },
+  "tests/test_t2v_panel_fix.py": {
+   "rc": 0,
+   "summary": "40 passed, 262 subtests passed in 2.79s",
+   "seconds": 3.0,
+   "output_tail": ".......................... [ 65%]\n..............                                                           [100%]\n40 passed, 262 subtests passed in 2.79s"
+  },
+  "tests/test_twopass_allow_frontend.py": {
+   "rc": 0,
+   "summary": "15 passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": "...............                                                          [100%]\n15 passed in 0.03s"
+  },
+  "tests/test_twopass_allow_wiring.py": {
+   "rc": 0,
+   "summary": "8 passed in 0.03s",
+   "seconds": 0.3,
+   "output_tail": "........                                                                 [100%]\n8 passed in 0.03s"
+  },
+  "tests/test_twopass_budget.py": {
+   "rc": 0,
+   "summary": "17 passed in 0.07s",
+   "seconds": 0.3,
+   "output_tail": ".................                                                        [100%]\n17 passed in 0.07s"
+  },
+  "tests/test_twopass_seg2_policy.py": {
+   "rc": 0,
+   "summary": "23 passed in 0.16s",
+   "seconds": 0.4,
+   "output_tail": ".......................                                                  [100%]\n23 passed in 0.16s"
+  },
+  "tests/test_video_panel_model_dom.py": {
+   "rc": 0,
+   "summary": "11 passed in 0.43s",
+   "seconds": 0.7,
+   "output_tail": "...........                                                              [100%]\n11 passed in 0.43s"
+  },
+  "tests/test_video_param_effectiveness.py": {
+   "rc": 0,
+   "summary": "21 passed in 0.09s",
+   "seconds": 0.3,
+   "output_tail": ".....................                                                    [100%]\n21 passed in 0.09s"
+  },
+  "tests/test_video_sampling_params.py": {
+   "rc": 0,
+   "summary": "50 passed in 2.84s",
+   "seconds": 3.1,
+   "output_tail": "..................................................                       [100%]\n50 passed in 2.84s"
+  },
+  "tests/test_video_tabs_resolution.py": {
+   "rc": 0,
+   "summary": "63 passed, 88 subtests passed in 0.76s",
+   "seconds": 1.0,
+   "output_tail": "....................... [ 36%]\n........................................                                                                  [100%]\n63 passed, 88 subtests passed in 0.76s"
+  },
+  "tests/test_visible_text_pollution.py": {
+   "rc": 0,
+   "summary": "17 passed, 1 skipped in 6.60s",
+   "seconds": 6.8,
+   "output_tail": ".................s                                                       [100%]\n17 passed, 1 skipped in 6.60s"
+  },
+  "tests/test_yue2_enum_dedup.py": {
+   "rc": 0,
+   "summary": "11 passed, 6 subtests passed in 4.06s",
+   "seconds": 4.3,
+   "output_tail": "...........                                                        [100%]\n11 passed, 6 subtests passed in 4.06s"
+  },
+  "tests/test_yue2_flow_review_fixes.py": {
+   "rc": 0,
+   "summary": "22 passed in 0.08s",
+   "seconds": 0.3,
+   "output_tail": "......................                                                   [100%]\n22 passed in 0.08s"
+  },
+  "tests/test_yue2_schema.py": {
+   "rc": 0,
+   "summary": "26 passed in 4.78s",
+   "seconds": 5.0,
+   "output_tail": "..........................                                               [100%]\n26 passed in 4.78s"
+  }
+ }
+}

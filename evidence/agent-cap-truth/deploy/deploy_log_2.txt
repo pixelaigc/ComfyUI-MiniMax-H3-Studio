@@ -1,0 +1,65 @@
+=== 0) 现状 ===
+maintainer = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+live       = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+审查分支    = 68020ca9def9c5d2acbcad0305c9b225312128f4
+active
+重启前 PID=2789713
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-165210 / backup/maintainer-before-agentcap-20261120-165210
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = c028691a9db830afe5874add1cd0ce746281caf2
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = c028691a9db830afe5874add1cd0ce746281caf2
+live       = c028691a9db830afe5874add1cd0ce746281caf2
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  h3studio/agent.py
+  h3studio/agent_schema.py
+共 2 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+active
+重启后 PID=2834480（原 2789713）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 16:50:08 ubuntu python[2789713]:     return await handler(request)
+11月 20 16:50:08 ubuntu python[2789713]:            ^^^^^^^^^^^^^^^^^^^^^^
+11月 20 16:50:08 ubuntu python[2789713]:   File "/root/projects/h3studio-live/server.py", line 5881, in api_create
+11月 20 16:50:08 ubuntu python[2789713]:     reader = await request.multipart()
+11月 20 16:50:08 ubuntu python[2789713]:              ^^^^^^^^^^^^^^^^^^^^^^^^^
+11月 20 16:50:08 ubuntu python[2789713]:   File "/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/aiohttp/web_request.py", line 725, in multipart
+11月 20 16:50:08 ubuntu python[2789713]:     return MultipartReader(
+11月 20 16:50:08 ubuntu python[2789713]:         self._headers,
+11月 20 16:50:08 ubuntu python[2789713]:     ...<4 lines>...
+11月 20 16:50:08 ubuntu python[2789713]:         max_size_error_cls=HTTPRequestEntityTooLarge,
+11月 20 16:50:08 ubuntu python[2789713]:     )
+11月 20 16:50:08 ubuntu python[2789713]:   File "/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/aiohttp/multipart.py", line 692, in __init__
+11月 20 16:50:08 ubuntu python[2789713]:     assert self._mimetype.type == "multipart", "multipart/* content type expected"
+11月 20 16:50:08 ubuntu python[2789713]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11月 20 16:50:08 ubuntu python[2789713]: AssertionError: multipart/* content type expected
+11月 20 16:52:10 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 16:52:10 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 16:52:10 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 16:52:10 ubuntu systemd[1]: h3-studio.service: Consumed 22.666s CPU time, 506.1M memory peak.
+11月 20 16:52:10 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = c028691a9db830afe5874add1cd0ce746281caf2
+回滚点：backup/live-before-agentcap-20261120-165210 / backup/maintainer-before-agentcap-20261120-165210

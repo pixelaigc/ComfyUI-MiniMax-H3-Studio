@@ -1,0 +1,63 @@
+=== 0) 现状 ===
+maintainer = 9e6839ca7c6da34092b8de318160fdfbb8274063
+live       = 9e6839ca7c6da34092b8de318160fdfbb8274063
+审查分支    = 22c9177c508c4b345c94896a5228aff7129d3c5b
+active
+重启前 PID=2985931
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-174604 / backup/maintainer-before-agentcap-20261120-174604
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 5b7a8e99ca131d9a410adcc463712404b4d02478
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 5b7a8e99ca131d9a410adcc463712404b4d02478
+live       = 5b7a8e99ca131d9a410adcc463712404b4d02478
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.mmd"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.png"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.svg"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\346\264\276\347\224\237\346\270\205\345\215\225.md"
+  scripts/deploy_agent_cap_8190.sh
+  scripts/gen_flow.py
+共 6 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.mmd"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.png"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\345\206\205\347\275\256Agent.svg"
+  "docs/\344\272\244\344\272\222\346\265\201\347\250\213\345\233\276-\346\264\276\347\224\237\346\270\205\345\215\225.md"
+  scripts/deploy_agent_cap_8190.sh
+  scripts/gen_flow.py
+共 6 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+active
+重启后 PID=3052094（原 2985931）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 17:46:04 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 17:46:04 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 17:46:04 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 17:46:04 ubuntu systemd[1]: h3-studio.service: Consumed 23.931s CPU time, 393.2M memory peak.
+11月 20 17:46:04 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 5b7a8e99ca131d9a410adcc463712404b4d02478
+回滚点：backup/live-before-agentcap-20261120-174604 / backup/maintainer-before-agentcap-20261120-174604

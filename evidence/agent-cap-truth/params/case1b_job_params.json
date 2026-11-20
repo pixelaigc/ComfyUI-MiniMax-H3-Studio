@@ -1,0 +1,23 @@
+{
+ "id": "72af410a9bad",
+ "mode": "t2v",
+ "status": "done",
+ "params": {
+  "width": 864,
+  "height": 480,
+  "resolution": "480p",
+  "duration": 6.0,
+  "aspect": "16:9",
+  "model_key": "fl2va_pruned_int8",
+  "attention": "default",
+  "accel_lora": "ckpt850",
+  "accel_lora_strength": 1.0,
+  "steps": 4,
+  "sampler": "euler",
+  "scheduler": "beta",
+  "shift_video": 12.0,
+  "shift_audio": 3.0,
+  "size_adjust_reasons": null,
+  "seed": null
+ }
+}

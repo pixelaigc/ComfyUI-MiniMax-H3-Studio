@@ -1,0 +1,60 @@
+=== 0) 现状 ===
+maintainer = b9a6424af65f982efc69bec31effb67be17c9259
+live       = bf5ef98119f91d1610efbecddf6d4d07d05301e9
+审查分支    = 797bb8b37746e17220fb0b962ba08c831433542c
+active
+重启前 PID=2170520
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-164443 / backup/maintainer-before-agentcap-20261120-164443
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+live       = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  h3studio/agent.py
+  h3studio/agent_capability.py
+  h3studio/agent_extra_tools.py
+  h3studio/agent_media_tools.py
+  h3studio/agent_schema.py
+  h3studio/video_models.py
+  scripts/deploy_agent_cap_8190.sh
+  scripts/run_pytest_per_file.py
+  tests/test_agent.py
+  tests/test_agent_backend_enh.py
+  tests/test_agent_capability_truth.py
+  tests/test_agent_media_semantics_backend.py
+共 12 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+active
+重启后 PID=2789713（原 2170520）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 16:44:43 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 16:44:43 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 16:44:43 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 16:44:43 ubuntu systemd[1]: h3-studio.service: Consumed 9min 24.027s CPU time, 1.7G memory peak.
+11月 20 16:44:43 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+回滚点：backup/live-before-agentcap-20261120-164443 / backup/maintainer-before-agentcap-20261120-164443
