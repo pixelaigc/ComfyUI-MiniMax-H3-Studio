@@ -1,0 +1,18 @@
+=== 变异测试：每条断言必须咬人 ===
+  ✓ 咬人    M1 find_weight 缓存被删  -> test_find_weight_is_memoized 失败
+  ✓ 咬人    M2 兼容性矩阵缓存被删  -> test_compat_matrix_is_cached 失败
+  ✓ 咬人    M3 options_payload 回到事件循环  -> test_video_options_payload_runs_off_event_loop 失败
+  ✓ 咬人    M4 accel_lora_compat_matrix 回到事件循环  -> test_video_options_payload_runs_off_event_loop 失败
+  ✓ 咬人    M5 列表接口又生成缩略图  -> test_list_api_does_not_generate_thumbnails 失败
+  ✓ 咬人    M6 缩略图 key 校验放宽（路径穿越）  -> test_thumb_endpoint_is_lazy_and_path_safe 失败
+  ✓ 咬人    M7 卡片图片去掉懒加载  -> test_card_image_uses_lazy_loading 失败
+  ✓ 咬人    M8 卡片视频 preload 改回 metadata  -> test_card_video_uses_preload_none 失败
+  ✓ 咬人    M9 卡片视频去掉 poster  -> test_card_video_has_poster_when_thumb_available 失败
+  ✓ 咬人    M10 大图改成用缩略图  -> test_lightbox_still_uses_original_image 失败
+  ✓ 咬人    M11 app.js ?v= 没升  -> test_static_asset_version_bumped 失败
+  ✓ 咬人    M13 批次缩略图 URL 算到守卫外面（重现渲染崩溃）  -> test_batch_thumbnail_guards_undefined_output 失败
+  ✓ 咬人    M14 缩略图又发永久缓存指令  -> test_no_immutable_cache_header_in_server 失败
+  ✓ 咬人    M12 缩略图缓存键不含 size（内容换了键不变）  -> test_cache_key_changes_with_content 失败
+  ✓ 咬人    M15 app.js 行尾被改成 LF（制造上万行假 diff）  -> test_crlf_files_keep_crlf 失败
+
+=== 汇总：15/15 咬人 ===
