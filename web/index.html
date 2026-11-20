@@ -11,7 +11,7 @@
      独立文件而不是并进 style.css —— 收藏是一整块独立功能，
      单独一个文件改它时不会把 140KB 的 style.css 卷进 diff。
      版本号 fav20261120a。 -->
-<link rel="stylesheet" href="/static/favorites.css?v=fav20261120a">
+<link rel="stylesheet" href="/static/favorites.css?v=fav20261120b">
 <link rel="stylesheet" href="/static/responsive.css?v=cr20261115b">
 </head>
 <body>
@@ -1608,7 +1608,7 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=refctx1"></script>
+<script src="/static/app.js?v=fav20261120b"></script>
 <script src="/static/providers.js?v=enhassets1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
@@ -1622,7 +1622,7 @@
      必须**后于** app.js：它要用 window.__h3State（app.js 末尾才挂上）
      与 window.H3Studio.showFavorites（左侧导航入口）。
      版本号 fav20261120a —— 破了缓存才能拿到新文件。 -->
-<script src="/static/favorites.js?v=fav20261120a"></script>
+<script src="/static/favorites.js?v=fav20261120b"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <!-- 【2026-11-15 D12】交互流程图入口模块。
      必须**先于** app.js 加载：它只依赖 DOMContentLoaded 与自己的 fetch，

@@ -76,6 +76,19 @@
       toast("收藏失败：任务 id 为空", "err");
       return false;
     }
+    // 【先本地生效，再等服务端】
+    //
+    // 【为什么不能等服务端回来才改界面】实测线上一次 POST /favorite 要
+    // 0.7~17 秒（浏览器对同一 host 只有 6 条并发连接，页面后台的
+    // /api/image-loras 要扫本机 LoRA 目录，会把连接占满）。
+    // 等服务端回来再刷新，用户会盯着卡片等好几秒才看到 ★ 出现 ——
+    // 看起来像「点了没反应」。
+    //
+    // 所以这里**先**把卡片上的 ★ 改掉（乐观更新），
+    // 服务端回来后**再**刷新列表对齐真值。
+    // 【失败会回滚】请求失败时把 ★ 改回去，并给出明确提示 ——
+    // 不能让界面显示「已收藏」而服务端其实没有。
+    applyBadge(id, favorited);
     try {
       const r = await api("/api/jobs/" + encodeURIComponent(id) + "/favorite", {
         method: "POST",
@@ -91,8 +104,34 @@
     } catch (e) {
       // 【失败态要有明确提示】不能静默失败 ——
       // 用户点了没反应就会以为功能坏了。
+      applyBadge(id, !favorited);   // 回滚乐观更新
       toast("收藏操作失败：" + (e.message || e), "err");
       return false;
+    }
+  }
+
+  /**
+   * 就地更新某张卡片上的 ★ 标识（乐观更新）。
+   *
+   * 【为什么不就地更新右键菜单的文案】菜单在点完按钮后就关掉了，
+   * 下次右键会重新按最新的 job 对象渲染 —— 那时文案自然是对的。
+   */
+  function applyBadge(jobId, favorited) {
+    const card = document.querySelector(
+      '.job-card[data-jid="' + String(jobId).replace(/"/g, '\\"') + '"]');
+    if (!card) return;
+    const top = card.querySelector(".job-top-right");
+    if (!top) return;
+    let badge = top.querySelector(".job-fav-badge");
+    if (favorited && !badge) {
+      badge = document.createElement("span");
+      badge.className = "job-fav-badge";
+      badge.setAttribute("title", "已收藏（清理时会被跳过）");
+      badge.setAttribute("aria-label", "已收藏");
+      badge.textContent = "★";
+      top.insertBefore(badge, top.firstChild);
+    } else if (!favorited && badge) {
+      badge.remove();
     }
   }
 
