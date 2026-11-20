@@ -153,6 +153,14 @@ const state = {
   vidShiftVideo: 12.0,
   vidShiftAudio: 3.0,
   donePage: 1,
+  // 【2026-11-20 需求 2/3/5】收藏视图的本地状态。
+  //
+  // 【favSelected 是什么】收藏视图里被「勾选」的任务 id 集合 ——
+  // 用于批量取消收藏。它是**纯前端**的选择态（不是业务状态），
+  // 真正的收藏关系在服务端的 job_favorites 表里。
+  favSelected: new Set(),
+  // 收藏视图里是否处于「批量选择模式」。
+  favMultiMode: false,
   // 每页作品数（可配置，持久化在 localStorage）
   pageSize: loadPageSize(),
   doneFilters: { keyword: "", media: "", aspect: "", duration: "" },
@@ -3362,7 +3370,15 @@ async function onGenerateClick() {
       const data = await resp.json();
       if (!resp.ok) { alert(data.error || "提交失败"); return; }
       trackJob(data.id);
-      state.tab = "active";
+      // 【2026-11-20 需求 1】**不再**把标签切到「进行中」。
+      //
+      // 【原来错在哪】提交成功后硬写 state.tab = "active" ——
+      // 用户明明选的是「已完成」/「全部」/某个生成类型/收藏，
+      // 点一次「生成」就被拽到「进行中」，筛选条件被悄悄改掉。
+      //
+      // 【为什么现在直接不改】保持用户当前所选标签与筛选**就是**需求。
+      // 新任务在它所属的标签下照常出现（status=all / active 都收 queued），
+      // 轮询与状态一致性校验也照旧跑 —— 这里只去掉「改标签」这一步。
       renderTabs();
       refreshJobs();
     } catch (e) {
@@ -3900,7 +3916,10 @@ async function onGenerateClick() {
     } finally {
       renderModeKeepSlots = false;
     }
-    state.tab = "active";
+    // 【2026-11-20 需求 1】**不再**把标签切到「进行中」——
+    // 保持用户当前所选标签与筛选不变（全部 / 进行中 / 已完成 /
+    // 生成类型标签 / 收藏）。新任务在它所属的标签下照常出现，
+    // 轮询与状态一致性校验不受影响。
     renderTabs();
     refreshJobs();
   } catch (e) {
@@ -3981,11 +4000,28 @@ async function loadGenerationTypes() {
 function renderTabs() {
   $$(".jobs-tabs button[data-st]").forEach(b =>
     b.classList.toggle("active", b.dataset.st === state.tab));
-  $("#doneFilters").hidden = !["done", "all"].includes(state.tab);
+  // 【2026-11-20 需求 3】收藏标签也用筛选条（搜索 / 作品类型 / 比例 / 时长）
+  // —— 收藏视图沿用生成媒体库既有的筛选交互。
+  $("#doneFilters").hidden = !["done", "all", "favorites"].includes(state.tab);
+  renderFavTools();
+}
+
+// 【2026-11-20 需求 5】收藏视图的批量管理条。
+//
+// 【为什么委托给 web/favorites.js】那一块逻辑（选中态、全选、清空、
+// 批量请求）与收藏模块是一体的 —— 放在 app.js 里会多出一份「收藏状态」。
+// 这里只做一层薄转发，app.js 不持有任何收藏业务状态。
+function renderFavTools() {
+  if (window.FAVORITES && typeof window.FAVORITES.renderTools === "function") {
+    window.FAVORITES.renderTools();
+  }
 }
 $$(".jobs-tabs button[data-st]").forEach(b => b.addEventListener("click", () => {
   state.tab = b.dataset.st;
-  if (["done", "longfilm", "all"].includes(state.tab)) state.donePage = 1;
+  if (["done", "longfilm", "all", "favorites"].includes(state.tab)) state.donePage = 1;
+  // 【2026-11-20 需求 5】离开收藏视图时清掉选择态 ——
+  // 选择的 id 属于上一个视图的语境，留着会在新视图里误选。
+  if (state.tab !== "favorites") state.favSelected.clear();
   showCreate();
   renderTabs();
   refreshJobs();
@@ -4937,9 +4973,30 @@ function jobCard(job) {
     ? `<button class="cancel-btn" data-act="cancel">取消</button>`
     : `<span>${fmtTime(job.created_at)}</span>`;
 
+  // 【2026-11-20 需求 2】已收藏标识 + 收藏视图里的批量选择框。
+  //
+  // 【为什么收藏标识放在卡片顶栏】顶栏是卡片上唯一「一直在」的位置 ——
+  // 预览区会被大图盖住、底部操作条有 5~7 个按钮挤在一起。
+  // ★ 标记 + title 说明，缩略图上一眼能看见「这张是留着的」。
+  const favBadge = job.favorited
+    ? `<span class="job-fav-badge" title="已收藏（清理时会被跳过）" aria-label="已收藏">★</span>`
+    : "";
+  // 【收藏视图的选择框】只在收藏视图里出现 —— 其它视图不该有复选框。
+    //
+    // 【骨架卡不能带选择框 —— 2026-11-20 修】骨架的 id 是 `__skeleton__N`
+    // （假的），如果骨架也渲染选择框，「全选本页」会把这些**假 id** 一起选中，
+    // 然后批量取消收藏请求里就带上了根本不存在的 id。
+    // 骨架本来就不是真实卡片，不该有任何可交互控件。
+    const isSkeleton = !!job.is_skeleton;
+    const favSelect = (state.tab === "favorites" && !isSkeleton)
+      ? `<label class="fav-sel-wrap" title="选中后可批量取消收藏" onclick="return false;">`
+        + `<input type="checkbox" class="fav-sel" data-jid="${escapeHtml(job.id)}"`
+        + `${state.favSelected.has(job.id) ? " checked" : ""}></label>`
+      : "";
+
   card.dataset.jid = job.id;
   card.innerHTML = `
-    <div class="job-top"><span>${job.mode === "longfilm" ? "长片 · " + escapeHtml(p.title || "未命名") : info.name} · ${fmtTime(job.created_at)}</span>${topRight}</div>
+    <div class="job-top"><span class="job-top-left">${favSelect}<span>${job.mode === "longfilm" ? "长片 · " + escapeHtml(p.title || "未命名") : info.name} · ${fmtTime(job.created_at)}</span></span><span class="job-top-right">${favBadge}${topRight}</span></div>
     <div class="job-preview${previewState}">${preview}</div>
     ${job.status === "failed" ? "" : `<div class="job-meta">
       ${job.mode === "longfilm" ? `
@@ -5426,8 +5483,18 @@ function bindMediaContextMenu(card, job) {
     const label = payload.batch_id
       ? `批次 #${(payload.batch_index ?? 0) + 1} 的结果`
       : "这个结果";
+    // 【2026-11-20 需求 2】收藏入口。
+    //
+    // 【为什么收藏是「任务级」而不是「文件级」】
+    // 批次卡片与批次缩略图都指向**同一个任务**（job.id）——
+    // 收藏的对象是「这个产物条目」，对应生成媒体库里的一张卡片。
+    // 所以无论用户右键的是批次缩略图还是卡片预览图，
+    // 收藏的都是同一个 job.id，标识也出现在同一张卡片上。
+    const favLabel = job.favorited ? "取消收藏" : "添加到收藏";
     menu.innerHTML = `
       <button data-act="add-asset">添加到素材库（${label}）</button>
+      <div class="ctx-sep"></div>
+      <button data-act="favorite" class="${job.favorited ? "" : "fav-add"}">${favLabel}</button>
       <div class="ctx-sep"></div>
       <button data-act="download">下载原文件</button>`;
     menu.classList.add("open");
@@ -5450,6 +5517,14 @@ function bindMediaContextMenu(card, job) {
             });
           } else {
             alert("素材库模块未加载");
+          }
+        } else if (btn.dataset.act === "favorite") {
+          // 【取消收藏 ≠ 删除产物】这里只改收藏标记，产物文件一律不动。
+          // 真正的请求在 web/favorites.js（收藏逻辑的唯一实现处）。
+          if (window.FAVORITES && typeof window.FAVORITES.toggleFavorite === "function") {
+            await window.FAVORITES.toggleFavorite(job.id, !job.favorited);
+          } else {
+            alert("收藏模块未加载");
           }
         } else if (btn.dataset.act === "download" && payload.file) {
           const a = document.createElement("a");
@@ -5985,7 +6060,10 @@ function jobSig(j) {
     .map(b => `${b.idx}:${b.status}:${Math.round((b.progress || 0) * 100)}:${(b.outputs || []).length}:${b.error || ""}`)
     .join(",");
   return [j.id, j.status, Math.round((j.progress || 0) * 100), j.progress_text || "",
-    (j.outputs || []).map(o => o.file).join(","), batchSig].join("|");
+    (j.outputs || []).map(o => o.file).join(","), batchSig,
+    // 【2026-11-20 需求 2】收藏状态进签名 —— 收藏/取消收藏后卡片要重建，
+    // 否则 ★ 标识不会更新（增量渲染只换签名变了的节点）。
+    j.favorited ? "fav1" : "fav0"].join("|");
 }
 
 let jobsRequest = 0;
@@ -6273,7 +6351,7 @@ function renderDonePagination(total, currentPage) {
   // 「全部」也要分页：否则「全部类型」名义下只显示最新 8 条（可能全是同一类），
   // 其余分类翻不到，与「全部类型」的语义不符。
   const pageSize = state.pageSize;
-  if (!["done", "longfilm", "all"].includes(state.tab) || total <= pageSize) {
+  if (!["done", "longfilm", "all", "favorites"].includes(state.tab) || total <= pageSize) {
     pager.hidden = true;
     pager.innerHTML = "";
     return;
@@ -6343,15 +6421,24 @@ async function refreshJobs() {
   }
   try {
     // 「全部」= 不按状态过滤；其余标签各自过滤
+    //
+    // 【2026-11-20 需求 2/3】「收藏」标签**不按状态过滤** ——
+    // 收藏里可能混着已完成 / 失败 / 进行中的条目，用户在收藏视图
+    // 想看到的是「我留下的全部东西」，不是「我留下的已完成的东西」。
+    // 所以它复用 status="all" 的口径，再叠加 favorites=1 子查询。
     const statuses = tab === "all" ? ["all"]
       : tab === "active" ? ["queued", "running"]
+      : tab === "favorites" ? ["all"]
       : [tab === "longfilm" ? "done" : tab];
     const groups = await Promise.all(statuses.map(async status => {
       const query = new URLSearchParams({status});
       // 生成类型筛选（与状态叠加，服务端按 mode 过滤）
       if (state.genType) query.set("gen_type", state.genType);
+      // 【2026-11-20 需求 2/3】收藏筛选：服务端按 job_favorites 子查询过滤。
+      // 「收藏」标签**不按状态过滤**（收藏里可能混着已完成 / 失败 / 进行中）。
+      if (tab === "favorites") query.set("favorites", "1");
       // 「已完成」「全部」都走服务端筛选 + 分页；「全部」不按状态过滤但保留筛选条件
-      if (["done", "all"].includes(status)) {
+      if (["done", "all", "favorites"].includes(status)) {
         query.set("page", state.donePage);
         query.set("page_size", state.pageSize);
         if (tab === "longfilm") query.set("media", "longfilm");
@@ -6442,6 +6529,8 @@ async function refreshJobs() {
             failed: "暂无失败的任务",
             canceled: "暂无已取消的任务",
             all: "暂无任务",
+            // 【2026-11-20 需求 3】收藏视图的空态文案要说清怎么才能有收藏。
+            favorites: "还没有收藏的产物。在卡片上右键 →「添加到收藏」即可留住它。",
           };
           grid.innerHTML = '<div class="empty-hint">'
             + (EMPTY_TEXT[tab] || EMPTY_TEXT.all) + '</div>';
@@ -6888,6 +6977,44 @@ $("#unloadBtn").addEventListener("click", async () => {
   await fetch("/api/unload", { method: "POST" });
 });
 
+// ---------- 收藏视图（2026-11-20 需求 3）----------
+//
+// 【落点说明】左侧「收藏」入口进入的**就是**生成媒体库的「收藏」标签
+// （state.tab = "favorites"）—— 不是另开一个页面。
+//
+// 【为什么不新开一个页面】需求要求「沿用生成媒体库既有的卡片交互
+// （查看、打开详情模态框、右键、筛选/搜索、分页），并保留类型区分」。
+// 另开页面 = 这些交互要重写一遍 = 两套实现必然漂移。
+// 复用同一个标签 = 卡片、详情模态框、右键菜单、筛选条、分页全是**同一份**代码，
+// 类型区分（图片/视频/音频）也天然保留。
+//
+// 【参数面板要不要显示】收藏视图是**看**产物的地方，不是创作的地方 ——
+// 所以左侧参数面板收起，只留生成媒体库（与「素材库」页的做法一致）。
+function showFavorites() {
+  state.page = "create";
+  state.tab = "favorites";
+  state.donePage = 1;
+  // 切换视图时清掉选择态 —— 选择的 id 属于上一个视图的语境。
+  state.favSelected.clear();
+  // 导航高亮：清掉所有选中项，只点亮「收藏」入口。
+  $$(".nav-item").forEach(x => x.classList.remove("active"));
+  const nav = $("#navFavorites");
+  if (nav) nav.classList.add("active");
+  syncVideoNavActive();
+  // 生成媒体库可见；参数面板与长片拼接页收起（收藏是「看」不是「做」）。
+  showPage($("#jobsArea"), true);
+  showPage($("#panel"), false);
+  showPage($("#stitchPanel"), false);
+  showPage($("#systemPage"), false);
+  showPage($("#providersPage"), false);
+  showPage($("#assetsPage"), false);
+  showPage($("#agentPage"), false);
+  renderTabs();
+  refreshJobs();
+  closePanelDrawerOnPageChange();
+  updateResponsiveChrome();
+}
+
 // ---------- 硬件参数页 ----------
 function showCreate() {
   state.page = "create";
@@ -7305,6 +7432,8 @@ window.BREAKPOINTS = BREAKPOINTS;
 window.H3Studio = Object.assign(window.H3Studio || {}, {
   locateJobInLibrary,
   lightboxShow,
+  // 【2026-11-20 需求 3】收藏视图入口（左侧「收藏」导航项用）。
+  showFavorites,
   // 【2026-11-15 修② · 媒体库类型过滤串台】页面切换通知。
   //
   // 【为什么需要这个入口 —— 2026-11-15 修②】

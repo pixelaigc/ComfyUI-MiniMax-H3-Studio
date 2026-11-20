@@ -150,6 +150,7 @@ from h3studio import music_yue2
 from h3studio import music_style
 from h3studio import yue2_schema
 from h3studio import media_cleanup
+from h3studio import favorites
 from h3studio import agent as agent_mod
 from h3studio import agent_memory
 from h3studio import agent_sessions
@@ -422,6 +423,14 @@ def init_db():
         _ensure_jobs_session_column(conn)
         # 迁移可能刚补上这一列 -> 让列名判断重新算一次
         _JOBS_HAS_SESSION_COL.pop(str(DB_PATH), None)
+        # 【2026-11-20 新增】生成媒体库「收藏」表。
+        #
+        # 【为什么是新建表而不是给 jobs 加列】
+        #   * jobs 表是「任务记录」，收藏是**用户对产物的标记** —— 生命周期不同；
+        #   * 加列要改所有 INSERT jobs 的地方（散落在 server.py / agent / 脚本里），
+        #     漏一处就丢标记；独立表只有一处写入点；
+        #   * 独立表**向后兼容**：老库不需要迁移，现有记录一条都不动。
+        favorites.ensure_table(conn)
 
 
 # ------------------------------------------------------------------
@@ -6488,6 +6497,18 @@ async def api_list(request):
     if status and status != "all":
         conditions.append("status=?")
         args.append(status)
+    # 【2026-11-20 新增】「只看收藏」筛选。
+    #
+    # 【为什么用子查询而不是先查收藏表再回表】
+    # 收藏视图要和既有标签**叠加**（状态 + 生成类型 + 作品类型 + 搜索 + 分页），
+    # 子查询天然与其它条件 AND 组合，不用在前端做二次过滤 ——
+    # 二次过滤会破坏分页（先取全量再过滤，页内条数就不准了）。
+    only_favorites = request.query.get("favorites", "").strip().lower()
+    if only_favorites in ("1", "true", "yes"):
+        conditions.append("id IN (SELECT job_id FROM job_favorites)")
+    elif only_favorites not in ("", "0", "false", "no"):
+        return web.json_response(
+            {"error": "favorites 只能是 1/0"}, status=400)
     media = request.query.get("media", "").strip()
     if media in ("image", "video", "audio"):
         # 媒体维度按「生成类型注册表」的 media 字段推导，而不是硬编码 mode 列表 ——
@@ -6566,6 +6587,15 @@ async def api_list(request):
         job = row_to_job(r)
         job["batches"] = batches_of(r["id"])
         jobs.append(job)
+    # 【2026-11-20 新增】每条任务的收藏标记。
+    #
+    # 【为什么要下发这个字段】卡片右上角要显示「已收藏」标识，
+    # 右键菜单也要据此显示「添加到收藏」还是「取消收藏」。
+    # 服务端一次批量查（不 N+1），前端直接读 job.favorited。
+    with db() as conn:
+        fav_ids = favorites.favorite_ids(conn, [j["id"] for j in jobs])
+    for job in jobs:
+        job["favorited"] = job["id"] in fav_ids
     # 【2026-11-14 A5】给「正在跑」的**那些**补上**实时**判定。
     #
     # 【为什么要「那些」而不是「那一条」—— A5 的核心场景】
@@ -6616,6 +6646,11 @@ async def api_get(request):
         return web.json_response({"error": "not found"}, status=404)
     job = row_to_job(r)
     job["batches"] = batches_of(jid)
+    # 【2026-11-20 新增】单条查询也要带收藏标记 ——
+    # 列表接口（api_list）带了，这里不带的话，同一个任务在两个接口里
+    # 的收藏状态会不一致（前端详情模态框读的就是这个接口）。
+    with db() as conn:
+        job["favorited"] = favorites.is_favorited(conn, jid)
     # 【2026-11-14 A5】详情接口也要能区分「真的在跑」与「卡住的 running」。
     if job.get("status") == "running":
         live_state = await live_state_for_job(job)
@@ -6628,6 +6663,105 @@ async def api_get(request):
             live_state=live_state,
         )
     return json_ok(job)
+
+
+# ------------------------------------------------------------------
+# 生成媒体库「收藏」（2026-11-20 新增需求）
+# ------------------------------------------------------------------
+#
+# 【接口清单】
+#   POST /api/jobs/{id}/favorite        {"favorited": true|false}
+#       -> 收藏 / 取消收藏**单个**任务
+#   POST /api/jobs/favorite/batch       {"job_ids": [...], "favorited": false}
+#       -> **批量**取消收藏 / 批量收藏
+#   GET  /api/jobs/favorites            -> 收藏总数（收藏视图的计数徽标）
+#
+# 【语义纪律 —— 与「删除产物」严格区分】
+#   取消收藏 = **只**解除收藏标记。任务记录、产物文件、文件索引一律不动。
+#   删除产物 = 既有删除语义（DELETE /api/jobs/{id}），会删记录与文件。
+#   两者是**不同的接口**（本文件的 favorite 接口 vs 既有的 delete 接口），
+#   前端也用不同的按钮文案与二次确认 —— 绝不共用一个入口。
+
+
+async def api_job_favorite(request):
+    """POST /api/jobs/{id}/favorite —— 收藏 / 取消收藏单个任务。
+
+    【为什么用 POST 而不是 PUT/DELETE】
+    语义是「设成某个状态」，两种方向都要支持（幂等切换），
+    POST + body 里的 favorited 布尔最直白，也与既有风格一致。
+    """
+    jid = request.match_info["id"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    favorited = bool(body.get("favorited", True))
+    with db() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM jobs WHERE id=?", (jid,)).fetchone()
+        if not exists:
+            # 收藏一个不存在的任务 = 无意义（收藏视图里会出现死条目）。
+            return web.json_response({"error": "任务不存在"}, status=404)
+        favorites.ensure_table(conn)
+        state = favorites.set_favorite(conn, jid, favorited)
+        total = favorites.count(conn)
+    return json_ok({"id": jid, "favorited": state, "total": total})
+
+
+async def api_jobs_favorite_batch(request):
+    """POST /api/jobs/favorite/batch —— 批量收藏 / 批量取消收藏。
+
+    body: {"job_ids": ["id1", "id2"], "favorited": false}
+
+    【为什么要批量接口而不是前端循环调单个】
+    收藏视图一次可能选中几十张 —— 前端循环 = 几十个 HTTP 往返，
+    而且中途失败会留下「一半成功一半失败」的中间态。
+    一个接口一次提交，返回逐个 id 的最终状态，语义清楚。
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    ids = body.get("job_ids")
+    if not isinstance(ids, list):
+        return web.json_response(
+            {"error": "job_ids 必须是数组"}, status=400)
+    ids = [str(i).strip() for i in ids if str(i or "").strip()]
+    if not ids:
+        return web.json_response({"error": "没有选中任何卡片"}, status=400)
+    favorited = bool(body.get("favorited", False))
+    results = {}
+    with db() as conn:
+        favorites.ensure_table(conn)
+        known: set[str] = set()
+        # 分批查 —— SQLite 的绑定变量上限是 999，一次塞进去会报
+        # "too many SQL variables"。超过 500 个 id 时分批。
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            known.update(str(r[0]) for r in conn.execute(
+                "SELECT id FROM jobs WHERE id IN (%s)"
+                % ",".join("?" * len(chunk)), chunk).fetchall())
+        for jid in ids:
+            if jid not in known:
+                results[jid] = "not_found"
+                continue
+            state = favorites.set_favorite(conn, jid, favorited)
+            results[jid] = "favorited" if state else "unfavorited"
+        total = favorites.count(conn)
+    return json_ok({"results": results, "total": total,
+                    "favorited": favorited})
+
+
+async def api_favorites_count(request):
+    """GET /api/jobs/favorites —— 收藏总数 + 收藏 id 列表。
+
+    【为什么要给 id 列表】收藏视图要能对「哪些 id 已收藏」做本地判定
+    （例如批量选择时全选 / 取消全选）。
+    """
+    with db() as conn:
+        favorites.ensure_table(conn)
+        ids = sorted(favorites.favorite_ids(conn))
+    return json_ok({"total": len(ids), "ids": ids})
 
 
 # ------------------------------------------------------------------
@@ -6956,6 +7090,17 @@ async def api_delete(request):
         if r["status"] in ("queued", "running"):
             return web.json_response({"error": "请先取消再删除"}, status=400)
         conn.execute("DELETE FROM jobs WHERE id=?", (jid,))
+        # 【2026-11-20 新增】删除任务时顺带清掉它的收藏标记。
+        #
+        # 【为什么要清】任务没了，收藏标记就成了**孤儿行** ——
+        # 留着的话「收藏视图」里会留下一条点开是 404 的死条目。
+        #
+        # 【注意语义边界】这里删的是**标记**，不是产物文件；
+        # 产物文件的删除走下面既有的删除逻辑，与「取消收藏」是两件事。
+        try:
+            favorites.remove_for_job(conn, jid)
+        except Exception:
+            pass   # 收藏表可能还没建（老库）—— 不阻断既有删除语义
     for output in json.loads(r["outputs"] or "[]"):
         relative = output.get("file", "")
         if "/" not in relative:
@@ -11413,6 +11558,12 @@ def make_app():
     app.router.add_get("/api/continuation/state", api_continuation_state)
     app.router.add_post("/api/jobs/{id}/cancel", api_cancel)
     app.router.add_delete("/api/jobs/{id}", api_delete)
+    # 【2026-11-20 新增】生成媒体库「收藏」。
+    # 【路由顺序】/api/jobs/favorite/batch 必须**先于** /api/jobs/{id}/favorite
+    # 注册 —— aiohttp 按注册顺序匹配，`{id}` 会把 "favorite" 当成 id 吃掉。
+    app.router.add_post("/api/jobs/favorite/batch", api_jobs_favorite_batch)
+    app.router.add_get("/api/jobs/favorites", api_favorites_count)
+    app.router.add_post("/api/jobs/{id}/favorite", api_job_favorite)
     # 生成媒体库「管理」（2026-11-14 需求 11 / 12）
     app.router.add_get("/api/media/manage", api_media_manage)
     app.router.add_post("/api/media/manage", api_media_manage)
