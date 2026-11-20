@@ -6193,6 +6193,49 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
 
 async def api_create(request):
     """POST /api/jobs  (multipart: mode, params(JSON), files[])"""
+    # 【2026-11-21 修 —— 缺 Content-Type 校验导致真 500】
+    #
+    # 【原来错在哪（线上实测复现）】下面直接 ``await request.multipart()``，
+    # 而 aiohttp 的 MultipartReader 构造函数要求请求头里有 Content-Type：
+    #   * 完全没有 Content-Type  -> ``KeyError: 'Content-Type'``
+    #   * Content-Type 不是 multipart/* -> ``AssertionError: multipart/* content type expected``
+    #   * 是 multipart/form-data 但没有 boundary -> ``ValueError: boundary missed ...``
+    # 三种情况都会**抛异常而不是返回 4xx** —— aiohttp 的默认错误处理把它
+    # 变成 **HTTP 500「Server got itself in trouble」**。
+    #
+    # 【为什么要修】500 意味着「服务端崩了」，会误导排查方向（去查
+    # ComfyUI / GPU / 队列），而真实原因只是调用方发错了请求头 —— 这是
+    # **客户端可自己纠正**的问题，应该回 415 / 400 并把该带什么头说清楚。
+    # 线上 24 小时日志里的 10 条异常（7 条 AssertionError + 2 条 boundary
+    # + 1 条 KeyError）**全部**来自这一处。
+    #
+    # 【为什么不是 400 而是 415】415 Unsupported Media Type 的语义就是
+    # 「请求体格式不对」。同时**不能**把 multipart 之外的格式（比如
+    # application/json）悄悄转成能处理 —— 提交路径要的就是文件流，
+    # 静默降级会让「文件没带上」这类问题更晚暴露、更难查。
+    ctype = (request.headers.get("Content-Type") or "").strip()
+    if not ctype:
+        return web.json_response(
+            {"error": "缺少 Content-Type 请求头：本接口只接受 "
+                      "multipart/form-data（提交生成任务要带文件流）",
+             "code": "content_type_required"},
+            status=415)
+    main_ctype = ctype.split(";", 1)[0].strip().lower()
+    if not main_ctype.startswith("multipart/"):
+        return web.json_response(
+            {"error": f"不支持的 Content-Type：{main_ctype or '(空)'}；"
+                      "本接口只接受 multipart/form-data",
+             "code": "unsupported_media_type"},
+            status=415)
+    # multipart/* 但没带 boundary -> aiohttp 会抛 ValueError -> 500。
+    # 这里自己先查掉，避免把客户端错误伪装成服务端错误。
+    if main_ctype == "multipart/form-data" and "boundary=" not in ctype.lower():
+        return web.json_response(
+            {"error": "Content-Type 缺少 boundary 参数："
+                      "multipart/form-data 必须带 boundary",
+             "code": "content_type_invalid"},
+            status=400)
+
     reader = await request.multipart()
     mode = None
     params = {}
