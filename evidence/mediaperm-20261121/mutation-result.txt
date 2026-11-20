@@ -1,0 +1,48 @@
+### M1 显示函数改回直接调扫盘                             PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestEffectLoraNoRescan::test_effect_lora_display_does_not_call_discover_directly
+       FAILED tests/test_mediaperm_perf.py::TestEffectLoraNoRescan::test_effect_lora_display_uses_map_lookup
+       2 failed, 15 passed in 4.81s
+### M2 白名单改回直接调扫盘                              PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestEffectLoraNoRescan::test_in_lora_registry_does_not_call_discover_directly
+       1 failed, 16 passed in 5.00s
+### M3 映射不记忆化（每次重建）                            PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestEffectLoraNoRescan::test_display_map_is_memoized
+       FAILED tests/test_mediaperm_perf.py::TestScanNotOnEventLoop::test_warm_helper_is_callable
+       2 failed, 15 passed in 6.94s
+### M4 预热改成直接同步调用（回到事件循环）                      PASS(断言变红)
+       /usr/lib/python3.13/unittest/case.py:732: AssertionError: 'asyncio.to_thread(job_meta.warm_effect_lora_display_map)' not found in '# -*- coding: utf-8
+       FAILED tests/test_mediaperm_perf.py::TestScanNotOnEventLoop::test_api_list_warms_map_via_to_thread
+       FAILED tests/test_mediaperm_perf.py::TestApiListSqlCount::test_batches_sql_count_is_one
+### M5 预热挪到 row_to_job 之后（顺序错）                 PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestScanNotOnEventLoop::test_api_list_warms_map_via_to_thread
+       1 failed, 16 passed in 5.91s
+### M6 /history 不缓存（查过也重查）                     PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestHistoryCache::test_history_miss_is_short_cached
+       FAILED tests/test_mediaperm_perf.py::TestHistoryCache::test_history_present_is_cached
+       2 failed, 15 passed in 5.02s
+### M7 /history miss 也永久缓存（任务永远显示运行中）          PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestHistoryCache::test_history_miss_is_short_cached
+       1 failed, 16 passed in 5.03s
+### M8 /history 异常被缓存成 False                   PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestHistoryCache::test_history_exception_is_not_cached
+       1 failed, 16 passed in 5.21s
+### M9 批次改回每条查一次（N+1）                          PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestApiListSqlCount::test_batches_sql_count_is_one
+       1 failed, 16 passed in 3.12s
+### M10 血缘回溯重新查本段 params（多一次查询）                PASS(断言变红)
+       FAILED tests/test_mediaperm_perf.py::TestApiListSqlCount::test_lineage_reuses_caller_params
+       1 failed, 16 passed in 5.60s
+
+=== 变异测试汇总 ===
+  M1 显示函数改回直接调扫盘                             PASS(断言变红)
+  M2 白名单改回直接调扫盘                              PASS(断言变红)
+  M3 映射不记忆化（每次重建）                            PASS(断言变红)
+  M4 预热改成直接同步调用（回到事件循环）                      PASS(断言变红)
+  M5 预热挪到 row_to_job 之后（顺序错）                 PASS(断言变红)
+  M6 /history 不缓存（查过也重查）                     PASS(断言变红)
+  M7 /history miss 也永久缓存（任务永远显示运行中）          PASS(断言变红)
+  M8 /history 异常被缓存成 False                   PASS(断言变红)
+  M9 批次改回每条查一次（N+1）                          PASS(断言变红)
+  M10 血缘回溯重新查本段 params（多一次查询）                PASS(断言变红)
+
+咬人失败（断言没变红）的变异：0 条

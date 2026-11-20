@@ -849,7 +849,9 @@ def _continuation_info_for_row(r, job_params: dict) -> dict:
     """
     state = cont_service.continuation_state(r["mode"], job_params, r["id"])
     try:
-        durations = _lineage_durations(r["id"])
+        # 【2026-11-21 性能修】把本段的 params 传下去 ——
+        # 血缘回溯本来就要读它，调用方手里已经有了，不必再查一次库。
+        durations = _lineage_durations(r["id"], own_params=job_params)
     except Exception:
         durations = []
     if len(durations) >= 2:
@@ -969,7 +971,12 @@ def batches_of(job_id: str) -> list[dict]:
     with db() as conn:
         rows = conn.execute(
             "SELECT * FROM job_batches WHERE job_id=? ORDER BY idx", (job_id,)).fetchall()
-    return [{
+    return [_batch_row_to_dict(r) for r in rows]
+
+
+def _batch_row_to_dict(r) -> dict:
+    """job_batches 的一行 -> 批次字典（batches_of / batches_map 共用）。"""
+    return {
         "id": r["id"],
         "idx": r["idx"],
         "seed": r["seed"],
@@ -979,7 +986,37 @@ def batches_of(job_id: str) -> list[dict]:
         "error": r["error"],
         "outputs": json.loads(r["outputs"] or "[]"),
         "elapsed": (r["finished_at"] or time.time()) - r["started_at"] if r["started_at"] else None,
-    } for r in rows]
+    }
+
+
+def batches_map(job_ids: list[str]) -> dict[str, list[dict]]:
+    """**一次**查询取回多条任务的批次，返回 {job_id: [批次, ...]}。
+
+    【为什么需要它 —— 2026-11-21 生成媒体库性能修】
+    `batches_of()` 是**每条任务一次**查询。列表接口一次返回 100 条
+    -> 100 次 SELECT（实测 SQL 计数：page_size=100 时 213 条 SQL，
+    其中 100 条是 `SELECT * FROM job_batches WHERE job_id=?`）。
+    任务多了以后这条 N+1 就是列表接口的主要固定成本。
+
+    【口径与 batches_of 完全一致】同一张表、同样的字段、同样的
+    `ORDER BY idx`、同样的 `elapsed` 计算 —— 只是把 N 次查询
+    合并成 1 次（`WHERE job_id IN (...)`）。
+    """
+    if not job_ids:
+        return {}
+    out: dict[str, list[dict]] = {}
+    # 分批查（SQLite 变量数有上限，1000 是稳妥值）
+    chunk = 900
+    for i in range(0, len(job_ids), chunk):
+        part = job_ids[i:i + chunk]
+        marks = ",".join("?" * len(part))
+        with db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM job_batches WHERE job_id IN (%s) ORDER BY job_id, idx"
+                % marks, part).fetchall()
+        for r in rows:
+            out.setdefault(r["job_id"], []).append(_batch_row_to_dict(r))
+    return out
 
 
 # ------------------------------------------------------------------ ComfyUI client
@@ -3523,7 +3560,52 @@ def _lineage_prompts(job_id: str) -> list[dict]:
     return out
 
 
-def _lineage_durations(job_id: str) -> list[float]:
+#: 血缘链时长的**请求级**缓存（job_id -> 各段时长）。
+#:
+#: 【为什么需要它 —— 2026-11-21 生成媒体库性能修】
+#: `_lineage_durations()` 沿 `source_job` 指针回溯，每回溯一段查一次库。
+#: 而 `row_to_job()` 对**每条**任务都调它 —— 于是列表接口 100 条
+#: = 100 次起步的查询（实测：20 行 -> 23 条 `SELECT params FROM jobs
+#: WHERE id=?`，其中大部分来自血缘回溯）。
+#:
+#: 【为什么不用全局缓存】血缘是**会变**的（接续链在跑的时候段状态
+#: 会更新），全局缓存会给出陈旧的累计时长。
+#: 请求级缓存的生命周期只有**一次列表请求** —— 同一批返回的行
+#: 看到的是**同一份快照**，这是列表接口应有的语义。
+#:
+#: 【怎么用】`api_list` 在开始构建前调 `_LINEAGE_CACHE.begin()`，
+#: 请求结束后调 `_LINEAGE_CACHE.end()`（或用 with 语句）。
+_LINEAGE_CACHE: dict = {"active": False, "map": {}}
+
+
+class _LineageRequestCache:
+    """血缘时长的请求级缓存（见 _LINEAGE_CACHE 的说明）。"""
+
+    def __init__(self):
+        self._state = _LINEAGE_CACHE
+
+    def begin(self) -> None:
+        self._state["active"] = True
+        self._state["map"] = {}
+
+    def end(self) -> None:
+        self._state["active"] = False
+        self._state["map"] = {}
+
+    def get(self, job_id: str):
+        if not self._state["active"]:
+            return None
+        return self._state["map"].get(job_id)
+
+    def put(self, job_id: str, value) -> None:
+        if self._state["active"]:
+            self._state["map"][job_id] = value
+
+
+_LINEAGE = _LineageRequestCache()
+
+
+def _lineage_durations(job_id: str, own_params: dict | None = None) -> list[float]:
     """本段血缘链上**各段的请求时长**（秒），从链首段到本段，按顺序。
 
     【为什么需要】用户口径（2026-11-17 更正）：
@@ -3537,41 +3619,60 @@ def _lineage_durations(job_id: str) -> list[float]:
     用户请求的时长（秒）。取不到就回落到该段的总帧数折算。
 
     返回：[5.0, 5.0, 8.0, ...]（段序）
+
+    【2026-11-21 性能修】
+      * `own_params`：调用方（`row_to_job`）**手里已经有本段的 params**
+        —— 不必再查一次库。传进来就省一次查询。
+      * 请求级缓存：同一次列表请求里，同一个 job_id 的血缘只回溯一次。
     """
+    # 请求级缓存命中则直接返回
+    cached = _LINEAGE.get(job_id)
+    if cached is not None:
+        return cached
     out: list[float] = []
     seen: set[str] = set()
     current = job_id
-    for _ in range(512):
-        if not current or current in seen:
-            break
-        seen.add(current)
-        with db() as conn:
-            row = conn.execute("SELECT params FROM jobs WHERE id=?",
-                               (current,)).fetchone()
-        if not row:
-            break
-        try:
-            params = json.loads(row["params"] or "{}")
-        except (TypeError, ValueError, json.JSONDecodeError):
-            break
-        info = cont_service.chain_info(params)
-        if not info:
-            break
-        duration = params.get("duration")
-        try:
-            seconds = float(duration)
-        except (TypeError, ValueError):
-            seconds = 0.0
-        if seconds <= 0:
-            # 回落：按该段的总帧数折算（帧数是权威的）。
+    # 【2026-11-21 性能修】原来每回溯一段就 `with db() as conn` ——
+    # 也就是**每段开一次 SQLite 连接**。列表接口 100 条 -> 最多 100 次
+    # 连接建立/关闭（实测：SQLite 连接建立占这批查询里相当可观的一部分）。
+    # 现在**复用一条连接**（只读，不写 —— 连接本身不持有状态）。
+    with db() as conn:
+        for _ in range(512):
+            if not current or current in seen:
+                break
+            seen.add(current)
+            # 【2026-11-21 性能修】本段的 params 调用方已经有了 -> 不必再查。
+            if current == job_id and own_params is not None:
+                params = own_params
+            else:
+                row = conn.execute("SELECT params FROM jobs WHERE id=?",
+                                   (current,)).fetchone()
+                if not row:
+                    break
+                try:
+                    params = json.loads(row["params"] or "{}")
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    break
+            info = cont_service.chain_info(params)
+            if not info:
+                break
+            duration = params.get("duration")
             try:
-                seg_frames = int(info.get("segment_frames") or 0)
+                seconds = float(duration)
             except (TypeError, ValueError):
-                seg_frames = 0
-            seconds = (seg_frames / float(cont.FPS)) if seg_frames else 0.0
-        out.append(seconds)
-        current = str(info.get("source_job") or "").strip()
+                seconds = 0.0
+            if seconds <= 0:
+                # 回落：按该段的总帧数折算（帧数是权威的）。
+                try:
+                    seg_frames = int(info.get("segment_frames") or 0)
+                except (TypeError, ValueError):
+                    seg_frames = 0
+                seconds = (seg_frames / float(cont.FPS)) if seg_frames else 0.0
+            out.append(seconds)
+            current = str(info.get("source_job") or "").strip()
     out.reverse()
+    # 写回请求级缓存（供同一请求内的其它调用复用）
+    _LINEAGE.put(job_id, out)
     return out
 
 
@@ -6582,11 +6683,43 @@ async def api_list(request):
             "SELECT * FROM jobs" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
             [*args, page_size, offset],
         ).fetchall()
-    jobs = []
-    for r in rows:
-        job = row_to_job(r)
-        job["batches"] = batches_of(r["id"])
-        jobs.append(job)
+    # 【2026-11-21 性能修】**先把效果 LoRA 映射预热好**，再进 row_to_job。
+    #
+    # 【为什么必须在进 row_to_job 之前】`row_to_job()` -> `summarize()`
+    # -> `_effect_lora_display()` 会查「名字 -> 显示名」映射。
+    # 映射**首次**构建要扫全盘 712 个 safetensors（实测 377~980ms）。
+    # 如果在 row_to_job 里面第一次触发，那次扫盘就跑在 **aiohttp 事件
+    # 循环**里 —— 整个 8190 服务被冻住（与 2026-11-16「整站不可访问」
+    # 同类的故障），用户看到的就是「有时候载入很慢很慢」。
+    #
+    # 【怎么避开】`asyncio.to_thread` 把扫盘丢到工作线程，
+    # 事件循环继续跑其它请求；扫盘完成后映射进缓存，
+    # row_to_job 里就是毫秒级的查表。
+    #
+    # 【代价】命中缓存时这一步几乎免费（一次 dict 查找）。
+    await asyncio.to_thread(job_meta.warm_effect_lora_display_map)
+    # 【2026-11-21 性能修】开启血缘的**请求级**缓存 ——
+    # 同一次请求里同一个 job_id 的血缘只回溯一次（见 _LINEAGE_CACHE）。
+    _LINEAGE.begin()
+    try:
+        jobs = []
+        for r in rows:
+            job = row_to_job(r)
+            jobs.append(job)
+    finally:
+        _LINEAGE.end()
+    # 【2026-11-21 性能修】批次**一次性**取回，不再每条任务查一次。
+    #
+    # 【原来的问题】`job["batches"] = batches_of(r["id"])` 在循环里 ——
+    # 每条任务一次 SELECT。列表接口一次 100 条 = 100 次查询
+    # （实测 SQL 计数 213 -> 修后 113）。
+    #
+    # 【口径不变】batches_map 与 batches_of 取同一张表、同样的字段
+    # 与排序，只是把 N 次查询合并成 1 次。没有批次的任务拿到的仍是
+    # 空列表（`batches_map` 里没出现的 key 就是空）。
+    _bm = batches_map([j["id"] for j in jobs])
+    for job in jobs:
+        job["batches"] = _bm.get(job["id"], [])
     # 【2026-11-20 新增】每条任务的收藏标记。
     #
     # 【为什么要下发这个字段】卡片右上角要显示「已收藏」标识，
@@ -7526,6 +7659,65 @@ async def fetch_comfy_queue_ids(session) -> set[str] | None:
 _LIVE_STATE_CACHE: dict = {"at": 0.0, "ids": None}
 
 
+#: ComfyUI `/history/{prompt_id}` 查询结果的缓存（prompt_id -> (取数时间, 有无结果)）。
+#:
+#: 【为什么需要它 —— 2026-11-21 生成媒体库「有时候载入很慢很慢」实测根因之一】
+#:   `/queue` 有 3 秒缓存（见 LIVE_STATE_CACHE_TTL），但 `/history` **没有**。
+#:   `live_state_for_job()` 对**每一条 running 任务**各查一次 /history。
+#:   实测（隔离实例 + 假 ComfyUI，见
+#:   evidence/mediaperm-20261121/）：/history 慢 2 秒时，
+#:   **每一次** /api/jobs 请求都要等 2 秒 —— 而且**每次都不命中缓存**
+#:   （前端每 2 秒轮询一次，于是每 2 秒就有一轮 2 秒的阻塞）。
+#:
+#: 【为什么 ComfyUI 忙的时候 /history 会慢】ComfyUI 正在跑模型时，
+#:   它的 HTTP 处理要排队 —— 实测本机 /object_info 满载时 8.9 秒、
+#:   /queue 5.2 秒。这段时间里 /api/jobs 也被拖住（同一个事件循环）。
+#:
+#: 【缓存语义】只缓存「**查得到没有**」这个布尔事实：
+#:   * 查到了（history_present=True）-> **永久缓存**。
+#:     任务已经出现在 history 里，就永远在（ComfyUI 的 history 不删）。
+#:   * 查不到（False）-> 短缓存（3 秒），因为任务可能**正要**写进 history。
+#:
+#: 【正确性】判定口径不变：
+#:   `running_truth.classify(prompt_id, history_present, queue_ids, ...)`
+#:   用的是「history 有没有这条」，不是「history 里的内容」。
+#:   缓存的是这个布尔值，语义完全等价。
+_HISTORY_PRESENT_CACHE: dict[str, tuple[float, bool]] = {}
+
+#: 「查不到」时的缓存有效期（秒）。
+#:
+#: 【为什么取 3 秒】与 /queue 的缓存同量级 —— 任务刚跑完的那一瞬间
+#: 查不到 history 是正常的，3 秒内重查即可；3 秒之后仍未出现，
+#: 说明它确实还没写进 history。
+_HISTORY_MISS_TTL = 3.0
+
+
+async def comfy_history_present(session: ClientSession, prompt_id: str) -> bool:
+    """ComfyUI 的 history 里**有没有**这条 prompt_id（带缓存）。
+
+    返回 True = 有（任务已经跑完，结果已在 history 里）。
+    返回 False = 没有（还在跑 / 从没提交过 / 读不到）。
+    """
+    if not prompt_id:
+        return False
+    cached = _HISTORY_PRESENT_CACHE.get(prompt_id)
+    if cached is not None:
+        at, present = cached
+        if present:
+            # 出现过就**永久**缓存 —— ComfyUI 的 history 不删条目。
+            return True
+        if (time.time() - at) < _HISTORY_MISS_TTL:
+            return False
+    try:
+        hist = await comfy_history(session, prompt_id)
+    except Exception:
+        # 读不到（ComfyUI 超时 / 不可达）-> 不写缓存（下次重试）。
+        return False
+    present = bool(hist)
+    _HISTORY_PRESENT_CACHE[prompt_id] = (time.time(), present)
+    return present
+
+
 async def live_comfy_queue_ids(force: bool = False) -> set[str] | None:
     """取 ComfyUI 队列里的 prompt_id 集合（带短缓存）。
 
@@ -7560,6 +7752,11 @@ async def live_state_for_job(row, now: float | None = None,
 
     【成本】一次 /queue（走缓存）+ 一次 /history/{prompt_id}。
     `queue_ids` 可以由调用方传入以复用同一次 /queue 取数。
+
+    【2026-11-21 性能修】/history 改走 `comfy_history_present()`（带缓存）。
+    原来每次都真查 ComfyUI —— ComfyUI 忙时（实测 /object_info 8.9 秒）
+    列表接口被拖到同一量级。缓存的是「history 有没有这条」这个布尔事实，
+    判定口径完全不变。
     """
     if str(row["status"] if isinstance(row, dict) else "") != "running":
         return None
@@ -7570,10 +7767,9 @@ async def live_state_for_job(row, now: float | None = None,
     history_present = False
     try:
         async with ClientSession(timeout=ClientTimeout(total=5)) as session:
-            hist = await comfy_history(session, prompt_id)
-        history_present = bool(hist)
+            history_present = await comfy_history_present(session, prompt_id)
     except Exception:
-        hist = None
+        history_present = False
     if queue_ids is None:
         queue_ids = await live_comfy_queue_ids()
     return running_truth.classify(

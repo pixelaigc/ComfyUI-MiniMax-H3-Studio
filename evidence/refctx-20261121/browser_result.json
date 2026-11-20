@@ -1,0 +1,305 @@
+{
+  "module_loaded": {
+    "hasRefContextMenu": true,
+    "hasAttach": true,
+    "menuElExists": true,
+    "menuElId": "refContextMenu",
+    "scriptTags": [
+      "/static/ref-context-menu.js?v=refctx1",
+      "/static/ref-slots.js?v=refslots1"
+    ]
+  },
+  "r2v_slots_before_fill": [
+    {
+      "key": "ref0",
+      "filled": false
+    },
+    {
+      "key": "ref1",
+      "filled": false
+    },
+    {
+      "key": "ref2",
+      "filled": false
+    },
+    {
+      "key": "ref3",
+      "filled": false
+    },
+    {
+      "key": "ref4",
+      "filled": false
+    },
+    {
+      "key": "ref5",
+      "filled": false
+    },
+    {
+      "key": "ref6",
+      "filled": false
+    },
+    {
+      "key": "ref7",
+      "filled": false
+    },
+    {
+      "key": "ref8",
+      "filled": false
+    },
+    {
+      "key": "refvid0",
+      "filled": false
+    },
+    {
+      "key": "refvid1",
+      "filled": false
+    },
+    {
+      "key": "refvid2",
+      "filled": false
+    },
+    {
+      "key": "refaud0",
+      "filled": false
+    },
+    {
+      "key": "refaud1",
+      "filled": false
+    },
+    {
+      "key": "refaud2",
+      "filled": false
+    }
+  ],
+  "fill_result": {
+    "ids": [
+      "asset_971a71830dea",
+      "asset_6bb6ee9324a4",
+      "asset_af06007eed9a"
+    ],
+    "refs": {
+      "ref0": {
+        "asset_id": "asset_971a71830dea",
+        "name": "A.png",
+        "category": "image"
+      },
+      "ref1": {
+        "asset_id": "asset_6bb6ee9324a4",
+        "name": "B.png",
+        "category": "image"
+      },
+      "ref2": {
+        "asset_id": "asset_af06007eed9a",
+        "name": "C.png",
+        "category": "image"
+      }
+    }
+  },
+  "dom_before": {
+    "assetRefs": {
+      "ref0": {
+        "asset_id": "asset_971a71830dea",
+        "name": "A.png",
+        "category": "image"
+      },
+      "ref1": {
+        "asset_id": "asset_6bb6ee9324a4",
+        "name": "B.png",
+        "category": "image"
+      },
+      "ref2": {
+        "asset_id": "asset_af06007eed9a",
+        "name": "C.png",
+        "category": "image"
+      }
+    },
+    "refKeys": [
+      "ref0",
+      "ref1",
+      "ref2"
+    ],
+    "prompt": "A=<Picture 1> B=<Picture 2> C=<Picture 3>",
+    "slots": [
+      {
+        "key": "ref0",
+        "filled": true
+      },
+      {
+        "key": "ref1",
+        "filled": true
+      },
+      {
+        "key": "ref2",
+        "filled": true
+      },
+      {
+        "key": "ref3",
+        "filled": false
+      },
+      {
+        "key": "ref4",
+        "filled": false
+      },
+      {
+        "key": "ref5",
+        "filled": false
+      },
+      {
+        "key": "ref6",
+        "filled": false
+      },
+      {
+        "key": "ref7",
+        "filled": false
+      },
+      {
+        "key": "ref8",
+        "filled": false
+      },
+      {
+        "key": "refvid0",
+        "filled": false
+      },
+      {
+        "key": "refvid1",
+        "filled": false
+      },
+      {
+        "key": "refvid2",
+        "filled": false
+      },
+      {
+        "key": "refaud0",
+        "filled": false
+      },
+      {
+        "key": "refaud1",
+        "filled": false
+      },
+      {
+        "key": "refaud2",
+        "filled": false
+      }
+    ]
+  },
+  "slot_box_ref1": {
+    "x": 313,
+    "y": 445.75,
+    "width": 86,
+    "height": 86
+  },
+  "menu_state": {
+    "exists": true,
+    "open": true,
+    "classes": "ctx-menu open",
+    "rect": {
+      "x": 356,
+      "y": 488,
+      "w": 180,
+      "h": 45
+    },
+    "visible": true,
+    "buttons": [
+      {
+        "text": "移除这个参考素材",
+        "act": "remove-ref",
+        "cls": "danger"
+      }
+    ]
+  },
+  "remove_btn_present": true,
+  "remove_btn_text": "移除这个参考素材",
+  "dom_after": {
+    "assetRefs": {
+      "ref0": {
+        "asset_id": "asset_971a71830dea",
+        "name": "A.png",
+        "category": "image"
+      },
+      "ref1": {
+        "asset_id": "asset_af06007eed9a",
+        "name": "C.png",
+        "category": "image"
+      }
+    },
+    "refKeys": [
+      "ref0",
+      "ref1"
+    ],
+    "refIds": [
+      "asset_971a71830dea",
+      "asset_af06007eed9a"
+    ],
+    "prompt": "A=<Picture 1> B= C=<Picture 2>",
+    "slots": [
+      {
+        "key": "ref0",
+        "filled": true
+      },
+      {
+        "key": "ref1",
+        "filled": true
+      },
+      {
+        "key": "ref2",
+        "filled": false
+      },
+      {
+        "key": "ref3",
+        "filled": false
+      },
+      {
+        "key": "ref4",
+        "filled": false
+      },
+      {
+        "key": "ref5",
+        "filled": false
+      },
+      {
+        "key": "ref6",
+        "filled": false
+      },
+      {
+        "key": "ref7",
+        "filled": false
+      },
+      {
+        "key": "ref8",
+        "filled": false
+      },
+      {
+        "key": "refvid0",
+        "filled": false
+      },
+      {
+        "key": "refvid1",
+        "filled": false
+      },
+      {
+        "key": "refvid2",
+        "filled": false
+      },
+      {
+        "key": "refaud0",
+        "filled": false
+      },
+      {
+        "key": "refaud1",
+        "filled": false
+      },
+      {
+        "key": "refaud2",
+        "filled": false
+      }
+    ],
+    "menuStillOpen": false
+  },
+  "qwen": {
+    "qwenRefsPresent": false,
+    "refItemsBefore": [],
+    "error": "Error: Page.evaluate: TypeError: window.QwenRefs.add is not a function\n    at eval (eval at evaluate (:370:30), <anonymous>:9:48)\n    at async <anonymous>:396:30"
+  },
+  "console_errors": [],
+  "console_error_count": 0
+}

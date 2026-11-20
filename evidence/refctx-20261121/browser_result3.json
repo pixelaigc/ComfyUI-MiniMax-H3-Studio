@@ -1,0 +1,533 @@
+{
+  "containers": {
+    "audioTrackField": {
+      "tag": "DIV",
+      "cls": "field",
+      "childCount": 3,
+      "visible": false
+    },
+    "audioTrackSelect": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 0,
+      "visible": false
+    },
+    "audioTrackNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineEnabled": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineHint": {
+      "tag": "SPAN",
+      "cls": "muted",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineStepsVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineSteps": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineStartVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineStart": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidSigmaRefineSpacing": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 3,
+      "visible": false
+    },
+    "vidShiftAudioVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidShiftAudio": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": false
+    },
+    "vidShiftAudioHint": {
+      "tag": "SMALL",
+      "cls": "muted",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefField": {
+      "tag": "DIV",
+      "cls": "field",
+      "childCount": 5,
+      "visible": false
+    },
+    "imgRefHint": {
+      "tag": "SPAN",
+      "cls": "muted",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefList": {
+      "tag": "DIV",
+      "cls": "img-ref-list",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefAdd": {
+      "tag": "BUTTON",
+      "cls": "img-ref-add",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefSort": {
+      "tag": "BUTTON",
+      "cls": "img-ref-sort",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefDetail": {
+      "tag": "DETAILS",
+      "cls": "img-ref-detail",
+      "childCount": 3,
+      "visible": false
+    },
+    "imgRefMarkerNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "imgRefDescList": {
+      "tag": "DIV",
+      "cls": "img-ref-desc-list",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicPanel": {
+      "tag": "DIV",
+      "cls": "",
+      "childCount": 12,
+      "visible": true
+    },
+    "musicModelHint": {
+      "tag": "SPAN",
+      "cls": "muted",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicModelSelect": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicModelNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicModelWarn": {
+      "tag": "DIV",
+      "cls": "img-warn",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicEncoderField": {
+      "tag": "DIV",
+      "cls": "field",
+      "childCount": 3,
+      "visible": true
+    },
+    "musicEncoderSelect": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicEncoderNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicPromptField": {
+      "tag": "DIV",
+      "cls": "field prompt-field",
+      "childCount": 3,
+      "visible": true
+    },
+    "musicPromptBadge": {
+      "tag": "SPAN",
+      "cls": "prompt-badge",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicPrompt": {
+      "tag": "TEXTAREA",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicEnhanceSplit": {
+      "tag": "DIV",
+      "cls": "enhance-split",
+      "childCount": 3,
+      "visible": true
+    },
+    "musicEnhanceBtn": {
+      "tag": "BUTTON",
+      "cls": "enhance-btn enhance-btn-main",
+      "childCount": 2,
+      "visible": true
+    },
+    "musicEnhanceBtnText": {
+      "tag": "SPAN",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicEnhanceMenuBtn": {
+      "tag": "BUTTON",
+      "cls": "enhance-btn enhance-btn-caret",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicEnhanceMenu": {
+      "tag": "DIV",
+      "cls": "enhance-menu",
+      "childCount": 7,
+      "visible": false
+    },
+    "musicEnhanceCurrent": {
+      "tag": "SPAN",
+      "cls": "enhance-current",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicEnhanceAppliedParams": {
+      "tag": "SPAN",
+      "cls": "enhance-applied-params",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicEnhanceHint": {
+      "tag": "SPAN",
+      "cls": "enhance-hint",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicStyleStructField": {
+      "tag": "DIV",
+      "cls": "field",
+      "childCount": 2,
+      "visible": true
+    },
+    "musicStyleFieldsToggle": {
+      "tag": "BUTTON",
+      "cls": "music-toggle",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicStyleFields": {
+      "tag": "DIV",
+      "cls": "",
+      "childCount": 4,
+      "visible": false
+    },
+    "musicStyleFieldsGrid": {
+      "tag": "DIV",
+      "cls": "music-sf-grid",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicStyleStructNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicStyleFieldsPreview": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": false
+    },
+    "musicLyrics": {
+      "tag": "TEXTAREA",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicRefField": {
+      "tag": "DIV",
+      "cls": "field",
+      "childCount": 4,
+      "visible": true
+    },
+    "musicRefBox": {
+      "tag": "DIV",
+      "cls": "img-ref-list",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicRefPick": {
+      "tag": "BUTTON",
+      "cls": "img-ref-add",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicRefNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicModeHint": {
+      "tag": "SPAN",
+      "cls": "muted",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicPlanChips": {
+      "tag": "DIV",
+      "cls": "chips",
+      "childCount": 2,
+      "visible": true
+    },
+    "musicPlanNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicStepsVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicSteps": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicCfgVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicCfg": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicSamplerSelect": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicSchedulerSelect": {
+      "tag": "SELECT",
+      "cls": "img-select",
+      "childCount": 1,
+      "visible": true
+    },
+    "musicFormatChips": {
+      "tag": "DIV",
+      "cls": "chips",
+      "childCount": 3,
+      "visible": true
+    },
+    "musicSeed": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicAdvancedBox": {
+      "tag": "DETAILS",
+      "cls": "img-ref-detail",
+      "childCount": 4,
+      "visible": true
+    },
+    "musicTempVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicTemp": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicTopPVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicTopP": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicTopKVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicTopK": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicRepVal": {
+      "tag": "B",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicRep": {
+      "tag": "INPUT",
+      "cls": "",
+      "childCount": 0,
+      "visible": true
+    },
+    "musicAdvNote": {
+      "tag": "DIV",
+      "cls": "img-note",
+      "childCount": 3,
+      "visible": true
+    },
+    "refineBar": {
+      "tag": "DIV",
+      "cls": "prompt-refine-bar",
+      "childCount": 2,
+      "visible": false
+    },
+    "refineTargetGroup": {
+      "tag": "SPAN",
+      "cls": "refine-target-group",
+      "childCount": 2,
+      "visible": false
+    },
+    "refineTargetChips": {
+      "tag": "DIV",
+      "cls": "chips",
+      "childCount": 2,
+      "visible": false
+    },
+    "alRefBtn": {
+      "tag": "BUTTON",
+      "cls": "al-btn",
+      "childCount": 0,
+      "visible": false
+    },
+    "refContextMenu": {
+      "tag": "DIV",
+      "cls": "ctx-menu",
+      "childCount": 0,
+      "visible": false
+    },
+    "sysRefresh": {
+      "tag": "BUTTON",
+      "cls": "sys-refresh",
+      "childCount": 0,
+      "visible": false
+    },
+    "provRefresh": {
+      "tag": "BUTTON",
+      "cls": "sys-refresh",
+      "childCount": 0,
+      "visible": false
+    }
+  },
+  "audio_assets": [
+    {
+      "id": "asset_029bfc8ec7dd",
+      "name": "a1.mp3"
+    },
+    {
+      "id": "asset_13cb1ba4dcd9",
+      "name": "ComfyUI_temp_cqrqz_00001.mp3"
+    }
+  ],
+  "picker_entry": [
+    {
+      "text": "参考生视频",
+      "id": null,
+      "cls": "nav-cat-head"
+    },
+    {
+      "text": "minimax-h3 参考生视频",
+      "id": null,
+      "cls": "nav-item nav-model-item"
+    },
+    {
+      "text": "+ 从素材库添加",
+      "id": "imgRefAdd",
+      "cls": "img-ref-add"
+    },
+    {
+      "text": "+ 从素材库选择",
+      "id": "musicRefPick",
+      "cls": "img-ref-add"
+    },
+    {
+      "text": "参考图生成",
+      "id": null,
+      "cls": ""
+    },
+    {
+      "text": "参考生音乐",
+      "id": null,
+      "cls": ""
+    },
+    {
+      "text": "音频",
+      "id": null,
+      "cls": "al-chip "
+    }
+  ],
+  "console_errors": [],
+  "console_error_count": 0
+}

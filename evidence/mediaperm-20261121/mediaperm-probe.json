@@ -1,0 +1,1983 @@
+{
+  "marks": {
+    "domcontentloaded": 0.345,
+    "first_card": 0.374,
+    "networkidle": 3.167,
+    "card_count": 12
+  },
+  "media_elements": {
+    "cards": 12,
+    "imgs": 0,
+    "videos": 12,
+    "audios": 0
+  },
+  "api_jobs_requests": 7,
+  "api_jobs_detail": [
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.113
+      },
+      "t_rel": 1.053
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.211
+      },
+      "t_rel": 2.433
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.486
+      },
+      "t_rel": 3.226
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=running",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.339
+      },
+      "t_rel": 3.227
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.321
+      },
+      "t_rel": 3.484
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.14
+      },
+      "t_rel": 3.736
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.26
+      },
+      "t_rel": 4.347
+    }
+  ],
+  "files_requests": 12,
+  "files_total_ms": -6.0,
+  "files_bytes_est": 25812905,
+  "files_sample_headers": {
+    "cache-control": "no-cache",
+    "etag": "\"18e9ccd0ff8988f9-160efa\"",
+    "last-modified": "Fri, 20 Nov 2026 16:12:05 GMT",
+    "content-length": "1445626",
+    "content-type": "video/mp4",
+    "accept-ranges": "bytes"
+  },
+  "other_requests": 63,
+  "other_breakdown": {
+    "document http://127.0.0.1:8190/": 1,
+    "stylesheet http://127.0.0.1:8190/static/favorites.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/responsive.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/style.css": 1,
+    "stylesheet http://127.0.0.1:8190/static/assets.css": 1,
+    "script http://127.0.0.1:8190/static/numeric-slider.js": 1,
+    "script http://127.0.0.1:8190/static/qwen-refs.js": 1,
+    "script http://127.0.0.1:8190/static/seed-guard.js": 1,
+    "script http://127.0.0.1:8190/static/ref-context-menu.js": 1,
+    "script http://127.0.0.1:8190/static/media-preview.js": 1,
+    "script http://127.0.0.1:8190/static/interaction-guard.js": 1,
+    "script http://127.0.0.1:8190/static/ref-slots.js": 1,
+    "script http://127.0.0.1:8190/static/music.js": 1,
+    "script http://127.0.0.1:8190/static/video-panel-fallback.js": 1,
+    "script http://127.0.0.1:8190/static/generation-queue.js": 1,
+    "script http://127.0.0.1:8190/static/video-panel.js": 1,
+    "script http://127.0.0.1:8190/static/video-effect-lora.js": 1,
+    "script http://127.0.0.1:8190/static/job-meta.js": 1,
+    "script http://127.0.0.1:8190/static/continuation.js": 1,
+    "script http://127.0.0.1:8190/static/sidebar-fold.js": 1,
+    "script http://127.0.0.1:8190/static/job-detail.js": 1,
+    "script http://127.0.0.1:8190/static/media-manage.js": 1,
+    "script http://127.0.0.1:8190/static/app.js": 1,
+    "script http://127.0.0.1:8190/static/assets.js": 1,
+    "script http://127.0.0.1:8190/static/providers.js": 1,
+    "script http://127.0.0.1:8190/static/asset-player.js": 1,
+    "script http://127.0.0.1:8190/static/favorites.js": 1,
+    "script http://127.0.0.1:8190/static/music-enhance.js": 1,
+    "script http://127.0.0.1:8190/static/moss-layout.js": 1,
+    "script http://127.0.0.1:8190/static/flow-docs.js": 1,
+    "script http://127.0.0.1:8190/static/agent-media.js": 1,
+    "script http://127.0.0.1:8190/static/enhance-menu-shared.js": 1,
+    "script http://127.0.0.1:8190/static/prompt-history.js": 1,
+    "script http://127.0.0.1:8190/static/agent-manage.js": 1,
+    "script http://127.0.0.1:8190/static/agent.js": 1,
+    "script http://127.0.0.1:8190/static/agent_sessions.js": 1,
+    "script http://127.0.0.1:8190/static/video-nav.js": 1,
+    "script http://127.0.0.1:8190/static/enhance-menu.js": 1,
+    "fetch http://127.0.0.1:8190/api/image-options": 1,
+    "fetch http://127.0.0.1:8190/api/video-categories": 1,
+    "fetch http://127.0.0.1:8190/api/video-options": 1,
+    "fetch http://127.0.0.1:8190/api/generation-types": 1,
+    "fetch http://127.0.0.1:8190/api/music-options": 1,
+    "fetch http://127.0.0.1:8190/api/queue": 5,
+    "eventsource http://127.0.0.1:8190/api/status/stream": 1,
+    "fetch http://127.0.0.1:8190/api/enhancer": 1,
+    "fetch http://127.0.0.1:8190/api/agent/sessions": 1,
+    "fetch http://127.0.0.1:8190/api/video-config": 1,
+    "fetch http://127.0.0.1:8190/api/system": 2,
+    "fetch http://127.0.0.1:8190/api/continuation/state": 1,
+    "fetch http://127.0.0.1:8190/api/video-effect-loras": 3,
+    "fetch http://127.0.0.1:8190/api/agent/sessions/f024afca93d844fa": 1,
+    "fetch http://127.0.0.1:8190/api/image-loras": 4
+  },
+  "tab_results": {
+    "active": {
+      "elapsed": 0.236,
+      "cards": 0
+    },
+    "done": {
+      "elapsed": 0.239,
+      "cards": 12
+    },
+    "all": {
+      "elapsed": 0.254,
+      "cards": 12
+    }
+  },
+  "page_results": [
+    {
+      "page": 1,
+      "elapsed": 0.307,
+      "cards": 12
+    },
+    {
+      "page": 2,
+      "elapsed": 0.304,
+      "cards": 12
+    },
+    {
+      "page": 3,
+      "elapsed": 0.302,
+      "cards": 12
+    }
+  ],
+  "gen_type_buttons": [
+    {
+      "key": "全部类型",
+      "html": "<button data-type=\"\" class=\"active\">全部类型</button>"
+    },
+    {
+      "key": "文生视频",
+      "html": "<button data-type=\"t2v\" class=\"\" title=\"文生视频\">文生视频</button>"
+    },
+    {
+      "key": "首尾帧生成",
+      "html": "<button data-type=\"flf\" class=\"\" title=\"首尾帧生成\">首尾帧生成</button>"
+    },
+    {
+      "key": "参考图生成",
+      "html": "<button data-type=\"r2v\" class=\"\" title=\"参考图生成\">参考图生成</button>"
+    },
+    {
+      "key": "Z-IMAGE 文生图",
+      "html": "<button data-type=\"t2i\" class=\"\" title=\"Z-IMAGE 文生图\">Z-IMAGE 文生图</button>"
+    },
+    {
+      "key": "Qwen-Image 2.1 文生图",
+      "html": "<button data-type=\"t2i_qwen\" class=\"\" title=\"Qwen-Image 2.1 文生图\">Qwen-Image 2.1 文生图</button>"
+    },
+    {
+      "key": "Qwen-Image 2.1 图片编辑",
+      "html": "<button data-type=\"i2i_qwen\" class=\"\" title=\"Qwen-Image 2.1 图片编辑\">Qwen-Image 2.1 图片编辑</button>"
+    },
+    {
+      "key": "MOSS-Image 文生图",
+      "html": "<button data-type=\"t2i_moss\" class=\"\" title=\"MOSS-Image 文生图\">MOSS-Image 文生图</button>"
+    },
+    {
+      "key": "H3-Image 文生图",
+      "html": "<button data-type=\"t2i_h3image\" class=\"\" title=\"H3-Image 文生图\">H3-Image 文生图</button>"
+    },
+    {
+      "key": "H3-Image 图片编辑",
+      "html": "<button data-type=\"i2i_h3image\" class=\"\" title=\"H3-Image 图片编辑\">H3-Image 图片编辑</button>"
+    },
+    {
+      "key": "文生音乐",
+      "html": "<button data-type=\"t2a\" class=\"\" title=\"文生音乐\">文生音乐</button>"
+    },
+    {
+      "key": "参考生音乐",
+      "html": "<button data-type=\"a2a\" class=\"\" title=\"参考生音乐\">参考生音乐</button>"
+    },
+    {
+      "key": "长片拼接",
+      "html": "<button data-type=\"longfilm\" class=\"\" title=\"长片拼接\">长片拼接</button>"
+    },
+    {
+      "key": "其它生成",
+      "html": "<button data-type=\"__other__\" class=\"\" title=\"其它生成\">其它生成</button>"
+    }
+  ],
+  "all_requests": [
+    {
+      "t_rel": 0.247,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/",
+      "status": 200,
+      "type": "document",
+      "timing": {
+        "dns": 0,
+        "connect": 0.12599999999999997,
+        "send": 0,
+        "wait": 0,
+        "total": -0.668
+      },
+      "headers": {
+        "cache-control": "no-cache, must-revalidate",
+        "etag": "\"18e9ca8732c8fac0-18e5f\"",
+        "last-modified": "Fri, 20 Nov 2026 15:30:09 GMT",
+        "content-length": "101983",
+        "content-type": "text/html",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.253,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/favorites.css?v=fav20261120c",
+      "status": 200,
+      "type": "stylesheet",
+      "timing": {
+        "dns": 0,
+        "connect": 0.488,
+        "send": 0,
+        "wait": 0,
+        "total": -0.586
+      },
+      "headers": {
+        "etag": "\"18e9c8e689150f67-eff\"",
+        "last-modified": "Fri, 20 Nov 2026 15:00:19 GMT",
+        "content-length": "3839",
+        "content-type": "text/css",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.253,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/responsive.css?v=cr20261115b",
+      "status": 200,
+      "type": "stylesheet",
+      "timing": {
+        "dns": 0,
+        "connect": 0.38699999999999996,
+        "send": 0,
+        "wait": 0,
+        "total": -0.509
+      },
+      "headers": {
+        "etag": "\"18e800e86bdd026f-5ead\"",
+        "last-modified": "Sat, 14 Nov 2026 19:44:10 GMT",
+        "content-length": "24237",
+        "content-type": "text/css",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.255,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/style.css?v=genfix20261119b",
+      "status": 200,
+      "type": "stylesheet",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.094
+      },
+      "headers": {
+        "etag": "\"18e9c1397724fdcf-239cc\"",
+        "last-modified": "Fri, 20 Nov 2026 12:39:40 GMT",
+        "content-length": "145868",
+        "content-type": "text/css",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.255,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/assets.css?v=cr20261115b",
+      "status": 200,
+      "type": "stylesheet",
+      "timing": {
+        "dns": 0,
+        "connect": 0.627,
+        "send": 0,
+        "wait": 0,
+        "total": -0.706
+      },
+      "headers": {
+        "etag": "\"18e7f7db350e2580-53d6\"",
+        "last-modified": "Sat, 14 Nov 2026 16:58:18 GMT",
+        "content-length": "21462",
+        "content-type": "text/css",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.256,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/numeric-slider.js?v=numslider3",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0.5599999999999999,
+        "send": 0,
+        "wait": 0,
+        "total": -0.605
+      },
+      "headers": {
+        "etag": "\"18e83709b0c36ef0-2e02\"",
+        "last-modified": "Sun, 15 Nov 2026 12:16:07 GMT",
+        "content-length": "11778",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.256,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/qwen-refs.js?v=refctx1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0.28900000000000003,
+        "send": 0,
+        "wait": 0,
+        "total": -0.436
+      },
+      "headers": {
+        "etag": "\"18e9acb07dd98ddd-6bf0\"",
+        "last-modified": "Fri, 20 Nov 2026 06:23:21 GMT",
+        "content-length": "27632",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.256,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/seed-guard.js?v=seedguard1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -1.987
+      },
+      "headers": {
+        "etag": "\"18e887e7e7b084f0-1602\"",
+        "last-modified": "Mon, 16 Nov 2026 12:58:02 GMT",
+        "content-length": "5634",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.258,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/ref-context-menu.js?v=refctx1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -2.836
+      },
+      "headers": {
+        "etag": "\"18e9acb07dd98ddd-1638\"",
+        "last-modified": "Fri, 20 Nov 2026 06:23:21 GMT",
+        "content-length": "5688",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.258,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/media-preview.js?v=mediapreview2",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -2.472
+      },
+      "headers": {
+        "etag": "\"18e83709b0b42cac-2a28\"",
+        "last-modified": "Sun, 15 Nov 2026 12:16:07 GMT",
+        "content-length": "10792",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.262,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/interaction-guard.js?v=guard1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -2.86
+      },
+      "headers": {
+        "etag": "\"18e63455a511e800-2c63\"",
+        "last-modified": "Sun, 08 Nov 2026 23:04:04 GMT",
+        "content-length": "11363",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.262,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/ref-slots.js?v=refslots1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -3.072
+      },
+      "headers": {
+        "etag": "\"18e9acb07dd98ddd-3e75\"",
+        "last-modified": "Fri, 20 Nov 2026 06:23:21 GMT",
+        "content-length": "15989",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.263,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/music.js?v=refctx1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -2.991
+      },
+      "headers": {
+        "etag": "\"18e9acb07dca4b99-8890\"",
+        "last-modified": "Fri, 20 Nov 2026 06:23:21 GMT",
+        "content-length": "34960",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.263,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/video-panel-fallback.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -2.28
+      },
+      "headers": {
+        "etag": "\"18e8fc3a27cc5f03-8e4c\"",
+        "last-modified": "Wed, 18 Nov 2026 00:29:39 GMT",
+        "content-length": "36428",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.29,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/generation-queue.js?v=genfix20261119a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -5.018
+      },
+      "headers": {
+        "etag": "\"18e968d2e3a45f9e-3bbf\"",
+        "last-modified": "Thu, 19 Nov 2026 09:39:42 GMT",
+        "content-length": "15295",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.291,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/video-panel.js?v=vparams7",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -4.644
+      },
+      "headers": {
+        "etag": "\"18e9908a91eb98cf-1b503\"",
+        "last-modified": "Thu, 19 Nov 2026 21:47:32 GMT",
+        "content-length": "111875",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.291,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/video-effect-lora.js?v=fix3panel1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -4.789
+      },
+      "headers": {
+        "etag": "\"18e7ea37ec1ba1f8-5f75\"",
+        "last-modified": "Sat, 14 Nov 2026 12:48:23 GMT",
+        "content-length": "24437",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.296,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/job-meta.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -6.406
+      },
+      "headers": {
+        "etag": "\"18e80c6099474e18-3436\"",
+        "last-modified": "Sat, 14 Nov 2026 23:14:21 GMT",
+        "content-length": "13366",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.296,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/continuation.js?v=contsw20261119a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -5.046
+      },
+      "headers": {
+        "etag": "\"18e961fe5805004a-86e2\"",
+        "last-modified": "Thu, 19 Nov 2026 07:34:32 GMT",
+        "content-length": "34530",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.296,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/sidebar-fold.js?v=sidebarfold2",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -5.238
+      },
+      "headers": {
+        "etag": "\"18e7a239d30954f5-2f90\"",
+        "last-modified": "Fri, 13 Nov 2026 14:49:06 GMT",
+        "content-length": "12176",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.297,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/job-detail.js?v=genfix20261119a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -8.635
+      },
+      "headers": {
+        "etag": "\"18e968d2e3a45f9e-3b23\"",
+        "last-modified": "Thu, 19 Nov 2026 09:39:42 GMT",
+        "content-length": "15139",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.297,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/media-manage.js?v=cr20261118a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -8.967
+      },
+      "headers": {
+        "etag": "\"18e9c8e689150f67-1bf6\"",
+        "last-modified": "Fri, 20 Nov 2026 15:00:19 GMT",
+        "content-length": "7158",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.297,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/app.js?v=fav20261120c",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -8.7
+      },
+      "headers": {
+        "etag": "\"18e9ca8732c8fac0-60d28\"",
+        "last-modified": "Fri, 20 Nov 2026 15:30:09 GMT",
+        "content-length": "396584",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.297,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/assets.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -9.034
+      },
+      "headers": {
+        "etag": "\"18e865502bbdf9c8-fbeb\"",
+        "last-modified": "Mon, 16 Nov 2026 02:24:07 GMT",
+        "content-length": "64491",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/providers.js?v=enhassets1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -8.667
+      },
+      "headers": {
+        "etag": "\"18e924d6bc287f22-8aa6\"",
+        "last-modified": "Wed, 18 Nov 2026 12:53:52 GMT",
+        "content-length": "35494",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/asset-player.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -9.002
+      },
+      "headers": {
+        "etag": "\"18e8e77a56fa1c94-7477\"",
+        "last-modified": "Tue, 17 Nov 2026 18:09:25 GMT",
+        "content-length": "29815",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/favorites.js?v=fav20261120c",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -10.165
+      },
+      "headers": {
+        "etag": "\"18e9ca034ed4878e-321d\"",
+        "last-modified": "Fri, 20 Nov 2026 15:20:43 GMT",
+        "content-length": "12829",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/music-enhance.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -11.147
+      },
+      "headers": {
+        "etag": "\"18e7ead7ee90769a-37d0\"",
+        "last-modified": "Sat, 14 Nov 2026 12:59:50 GMT",
+        "content-length": "14288",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/moss-layout.js?v=mosslayout2",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -10.614
+      },
+      "headers": {
+        "etag": "\"18e63b8f405e3800-200b\"",
+        "last-modified": "Mon, 09 Nov 2026 01:16:28 GMT",
+        "content-length": "8203",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/flow-docs.js?v=fd1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -10.587
+      },
+      "headers": {
+        "etag": "\"18e800e86bcdc02a-1cab\"",
+        "last-modified": "Sat, 14 Nov 2026 19:44:10 GMT",
+        "content-length": "7339",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.298,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/agent-media.js?v=h3image1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -11.331
+      },
+      "headers": {
+        "etag": "\"18e7b0abfb575a7b-4cca\"",
+        "last-modified": "Fri, 13 Nov 2026 19:13:50 GMT",
+        "content-length": "19658",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.299,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/enhance-menu-shared.js?v=cr20261115b",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -11.218
+      },
+      "headers": {
+        "etag": "\"18e6d1f4bd02567e-336d\"",
+        "last-modified": "Tue, 10 Nov 2026 23:12:31 GMT",
+        "content-length": "13165",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.299,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/prompt-history.js?v=ph4",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -13.828
+      },
+      "headers": {
+        "etag": "\"18e6d1f4bd1198c2-411d\"",
+        "last-modified": "Tue, 10 Nov 2026 23:12:31 GMT",
+        "content-length": "16669",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.299,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/agent-manage.js?v=cr20261118a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -14.437
+      },
+      "headers": {
+        "etag": "\"18e90dfad5183e09-6cda\"",
+        "last-modified": "Wed, 18 Nov 2026 05:54:58 GMT",
+        "content-length": "27866",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.299,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/agent.js?v=genfix20261119a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -13.606
+      },
+      "headers": {
+        "etag": "\"18e968d2e385db16-1cc03\"",
+        "last-modified": "Thu, 19 Nov 2026 09:39:42 GMT",
+        "content-length": "117763",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.299,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/agent_sessions.js?v=genfix20261119a",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -14.222
+      },
+      "headers": {
+        "etag": "\"18e968d2e385db16-b587\"",
+        "last-modified": "Thu, 19 Nov 2026 09:39:42 GMT",
+        "content-length": "46471",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.306,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/video-nav.js?v=sidebarfold2",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -5.267
+      },
+      "headers": {
+        "etag": "\"18e7a239d3189739-40f3\"",
+        "last-modified": "Fri, 13 Nov 2026 14:49:06 GMT",
+        "content-length": "16627",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.306,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/static/enhance-menu.js?v=enhassets1",
+      "status": 200,
+      "type": "script",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -11.201
+      },
+      "headers": {
+        "etag": "\"18e924d6bc193cdd-1a634\"",
+        "last-modified": "Wed, 18 Nov 2026 12:53:52 GMT",
+        "content-length": "108084",
+        "content-type": "text/javascript",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.332,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/image-options",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.24
+      },
+      "headers": {
+        "content-length": "14938",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 0.333,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-categories",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.198
+      },
+      "headers": {
+        "content-length": "3406",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.023,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-options",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.167
+      },
+      "headers": {
+        "content-length": "110929",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.023,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/generation-types",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.05
+      },
+      "headers": {
+        "content-length": "2701",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.053,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.113
+      },
+      "headers": {
+        "content-length": "94129",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.055,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/music-options",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.073
+      },
+      "headers": {
+        "content-length": "4594",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.057,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/queue",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -697.108
+      },
+      "headers": {
+        "content-length": "2017",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.057,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/status/stream",
+      "status": 200,
+      "type": "eventsource",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -717.895
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "content-type": "text/event-stream"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.066,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/enhancer",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -718.547
+      },
+      "headers": {
+        "content-length": "137969",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.095,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/agent/sessions?limit=200",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -711.308
+      },
+      "headers": {
+        "content-length": "102855",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.109,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000127.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.071
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9ccd0ff8988f9-160efa\"",
+        "last-modified": "Fri, 20 Nov 2026 16:12:05 GMT",
+        "content-length": "1445626",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.11,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-config",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -34.393
+      },
+      "headers": {
+        "content-length": "2470",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.11,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/system",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.196
+      },
+      "headers": {
+        "content-length": "1564",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.113,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/continuation/state",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -697.233
+      },
+      "headers": {
+        "content-length": "172",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.12,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000128.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.134
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9ccf1b735828c-2224c0\"",
+        "last-modified": "Fri, 20 Nov 2026 16:14:26 GMT",
+        "content-length": "2237632",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.121,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000126.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.596
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9ccaf4ff452ea-228e34\"",
+        "last-modified": "Fri, 20 Nov 2026 16:09:40 GMT",
+        "content-length": "2264628",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.125,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000125.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.572
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cc8eff7ccc4a-2eab9b\"",
+        "last-modified": "Fri, 20 Nov 2026 16:07:22 GMT",
+        "content-length": "3058587",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.125,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000124.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.548
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cc6ea4eae8a0-2ca4fe\"",
+        "last-modified": "Fri, 20 Nov 2026 16:05:03 GMT",
+        "content-length": "2925822",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.128,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000122.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.128
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cc4c64758889-13493d\"",
+        "last-modified": "Fri, 20 Nov 2026 16:02:35 GMT",
+        "content-length": "1263933",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.129,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000121.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.069
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cc2cdf2daed2-1696a9\"",
+        "last-modified": "Fri, 20 Nov 2026 16:00:20 GMT",
+        "content-length": "1480361",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.137,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000120.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.076
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cc0ca65fe8d9-23408e\"",
+        "last-modified": "Fri, 20 Nov 2026 15:58:02 GMT",
+        "content-length": "2310286",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.147,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000119.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -1.812
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cbebff0daa43-1bdb96\"",
+        "last-modified": "Fri, 20 Nov 2026 15:55:41 GMT",
+        "content-length": "1825686",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.147,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000118.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -1.42
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cbaacea4f406-131291\"",
+        "last-modified": "Fri, 20 Nov 2026 15:51:01 GMT",
+        "content-length": "1249937",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.147,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000117.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.446
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cb8a875b7808-33103c\"",
+        "last-modified": "Fri, 20 Nov 2026 15:48:43 GMT",
+        "content-length": "3346492",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.271,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-effect-loras?model=fl2va_pruned_int8",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -8.085
+      },
+      "headers": {
+        "content-length": "23157",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.271,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/agent/sessions/f024afca93d844fa",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -1.522
+      },
+      "headers": {
+        "content-length": "75",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.328,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-effect-loras?model=fl2va_pruned_int8",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -82.909
+      },
+      "headers": {
+        "content-length": "23157",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.331,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/queue",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.093
+      },
+      "headers": {
+        "content-length": "2017",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.367,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/video-effect-loras?model=fl2va_pruned_int8",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -149.629
+      },
+      "headers": {
+        "content-length": "23157",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.368,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/files/videos/v-h3-studio-000115.mp4",
+      "status": 206,
+      "type": "media",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.086
+      },
+      "headers": {
+        "cache-control": "no-cache",
+        "etag": "\"18e9cb69b937f72b-24ae4b\"",
+        "last-modified": "Fri, 20 Nov 2026 15:46:22 GMT",
+        "content-length": "2403915",
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 1.964,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/image-loras?base=Z-Image",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.057
+      },
+      "headers": {
+        "content-length": "6149820",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 2.036,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/image-loras?base=Qwen-Image%202.1",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.108
+      },
+      "headers": {
+        "content-length": "129979",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 2.337,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/queue",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.32
+      },
+      "headers": {
+        "content-length": "2017",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 2.433,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.211
+      },
+      "headers": {
+        "content-length": "94129",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 2.644,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/image-loras?base=MOSS-Image",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.114
+      },
+      "headers": {
+        "content-length": "3829723",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 2.664,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/image-loras?base=H3-Image",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.164
+      },
+      "headers": {
+        "content-length": "71",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.226,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=queued",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.486
+      },
+      "headers": {
+        "content-length": "122",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.227,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=running",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.339
+      },
+      "headers": {
+        "content-length": "122",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.332,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/queue",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.355
+      },
+      "headers": {
+        "content-length": "2017",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.34,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/system",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.21
+      },
+      "headers": {
+        "content-length": "1564",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.484,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=done&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.321
+      },
+      "headers": {
+        "content-length": "94129",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 3.736,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.14
+      },
+      "headers": {
+        "content-length": "94129",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 4.333,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/queue",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.341
+      },
+      "headers": {
+        "content-length": "2017",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    },
+    {
+      "t_rel": 4.347,
+      "method": "GET",
+      "url": "http://127.0.0.1:8190/api/jobs?status=all&page=1&page_size=12",
+      "status": 200,
+      "type": "fetch",
+      "timing": {
+        "dns": 0,
+        "connect": 0,
+        "send": 0,
+        "wait": 0,
+        "total": -0.26
+      },
+      "headers": {
+        "content-length": "94129",
+        "content-type": "application/json; charset=utf-8"
+      },
+      "from_cache": null
+    }
+  ],
+  "files_breakdown": {
+    "media": 12
+  }
+}

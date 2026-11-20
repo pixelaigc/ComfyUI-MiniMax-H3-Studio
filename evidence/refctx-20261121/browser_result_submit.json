@@ -1,0 +1,63 @@
+{
+  "setup": {
+    "ids": [
+      "asset_971a71830dea",
+      "asset_6bb6ee9324a4"
+    ]
+  },
+  "before": {
+    "refs": [
+      [
+        "ref0",
+        "asset_971a71830dea"
+      ],
+      [
+        "ref1",
+        "asset_6bb6ee9324a4"
+      ]
+    ]
+  },
+  "menu": {
+    "open": true,
+    "buttons": [
+      {
+        "text": "移除这个参考素材",
+        "act": "remove-ref"
+      }
+    ]
+  },
+  "after_remove": {
+    "refs": [
+      [
+        "ref0",
+        "asset_6bb6ee9324a4"
+      ]
+    ]
+  },
+  "captured": {
+    "hasBody": true,
+    "kind": "FormData",
+    "entries": []
+  },
+  "assertion": {
+    "removedId": "asset_971a71830dea",
+    "keptId": "asset_6bb6ee9324a4",
+    "stillInState": [
+      "asset_6bb6ee9324a4"
+    ],
+    "removedStillInState": false,
+    "keptStillInState": true,
+    "removedInPayloadText": false,
+    "keptInPayloadText": true,
+    "payloadKeys": {
+      "mode": "r2v",
+      "params": "{\"prompt\":\"测试提示词\",\"original_prompt\":\"\",\"resolution\":\"1088p\",\"aspect\":\"16:9\",\"duration\":5,\"model\":\"lora\",\"seed\":null,\"model_key\":\"hybrid_fl2va_ref2va\",\"width\":1920,\"height\":1088,\"steps\":8,\"sampler\":\"euler\",\"scheduler\":\"beta\",\"shift_video\":12,\"shift_audio\":2,\"accel_loras\":[{\"key\":\"dmad_4step_critic\",\"strength\":1,\"enabled\":true}],\"accel_lora\":\"dmad_4step_critic\",\"accel_lora_strength\":1,\"effect_loras\":[{\"name\":\"h3/Minimax H3真实电影质感.safetensors\",\"strength\":0.7,\"enabled\":true,\"trigger\":\"DY\"}],\"attention\":\"sparse\",\"twopass\":{\"enabled\":false,\"transition_step\":6,\"lowres_scale\":0.7,\"rho\":0,\"w_min\":0.5,\"w_max\":1,\"upscaler_model\":\"minimax_h3_latent_upscaler_3d_bf16.safetensors\",\"cfg\":0.4,\"sigma_refine\":{\"enabled\":true,\"extra_steps\":1,\"start_at_sigma\":2.5,\"end_at_sigma\":0,\"spacing\":\"cosine\"}},\"lora\":\"dmad_4step_critic\",\"lora_strength\":1,\"audio_track_source\":\"\"}",
+      "asset_refs": "[{\"asset_id\":\"asset_6bb6ee9324a4\",\"slot\":\"ref_image\",\"ordinal\":0}]"
+    }
+  },
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "console_error_count": 2
+}
