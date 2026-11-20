@@ -1,0 +1,151 @@
+{
+  "idle_baseline": {
+    "n": 20,
+    "p50": 5.8,
+    "p90": 11.9,
+    "max": 19.9,
+    "mean": 7.8
+  },
+  "concurrency": 4,
+  "cases": {
+    "image-loras(Z-Image)": {
+      "path": "/api/image-loras?base=Z-Image",
+      "concurrent_endpoint_ms": 3645.1,
+      "jobs_under_load": {
+        "n": 45,
+        "p50": 49.4,
+        "p90": 65.1,
+        "max": 515.0,
+        "mean": 62.6
+      },
+      "p50_slowdown_x": 8.5
+    },
+    "image-loras(MOSS)": {
+      "path": "/api/image-loras?base=MOSS-Image",
+      "concurrent_endpoint_ms": 2952.9,
+      "jobs_under_load": {
+        "n": 21,
+        "p50": 115.3,
+        "p90": 174.5,
+        "max": 218.4,
+        "mean": 122.9
+      },
+      "p50_slowdown_x": 19.9
+    },
+    "image-loras(Qwen)": {
+      "path": "/api/image-loras?base=Qwen-Image%202.1",
+      "concurrent_endpoint_ms": 212.4,
+      "jobs_under_load": {
+        "n": 4,
+        "p50": 37.1,
+        "p90": 58.0,
+        "max": 58.0,
+        "mean": 35.7
+      },
+      "p50_slowdown_x": 6.4
+    },
+    "video-options": {
+      "path": "/api/video-options",
+      "concurrent_endpoint_ms": 1593.0,
+      "jobs_under_load": {
+        "n": 2,
+        "p50": 1279.2,
+        "p90": 2550.4,
+        "max": 2550.4,
+        "mean": 1279.2
+      },
+      "p50_slowdown_x": 220.6
+    },
+    "image-options": {
+      "path": "/api/image-options",
+      "concurrent_endpoint_ms": 10.3,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 6.4,
+        "p90": 6.4,
+        "max": 6.4,
+        "mean": 6.4
+      },
+      "p50_slowdown_x": 1.1
+    },
+    "music-options": {
+      "path": "/api/music-options",
+      "concurrent_endpoint_ms": 4.9,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 5.2,
+        "p90": 5.2,
+        "max": 5.2,
+        "mean": 5.2
+      },
+      "p50_slowdown_x": 0.9
+    },
+    "generation-types": {
+      "path": "/api/generation-types",
+      "concurrent_endpoint_ms": 5.0,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 5.0,
+        "p90": 5.0,
+        "max": 5.0,
+        "mean": 5.0
+      },
+      "p50_slowdown_x": 0.9
+    },
+    "system": {
+      "path": "/api/system",
+      "concurrent_endpoint_ms": 14.4,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 6.9,
+        "p90": 6.9,
+        "max": 6.9,
+        "mean": 6.9
+      },
+      "p50_slowdown_x": 1.2
+    },
+    "agent/sessions": {
+      "path": "/api/agent/sessions?limit=200",
+      "concurrent_endpoint_ms": 13.1,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 10.1,
+        "p90": 10.1,
+        "max": 10.1,
+        "mean": 10.1
+      },
+      "p50_slowdown_x": 1.7
+    },
+    "video-effect-loras": {
+      "path": "/api/video-effect-loras?model=fl2va_pruned_int8",
+      "concurrent_endpoint_ms": 253.0,
+      "jobs_under_load": {
+        "n": 2,
+        "p50": 131.7,
+        "p90": 257.6,
+        "max": 257.6,
+        "mean": 131.7
+      },
+      "p50_slowdown_x": 22.7
+    },
+    "video-config": {
+      "path": "/api/video-config",
+      "concurrent_endpoint_ms": 6.0,
+      "jobs_under_load": {
+        "n": 1,
+        "p50": 5.7,
+        "p90": 5.7,
+        "max": 5.7,
+        "mean": 5.7
+      },
+      "p50_slowdown_x": 1.0
+    }
+  },
+  "idle_after": {
+    "n": 20,
+    "p50": 4.6,
+    "p90": 4.9,
+    "max": 7.7,
+    "mean": 4.7
+  }
+}

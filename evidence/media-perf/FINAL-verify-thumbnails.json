@@ -1,0 +1,68 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "list_ms": 26.074992958456278,
+  "with_thumb": 14,
+  "total_media": 14,
+  "results": [
+    {
+      "name": "产物带 thumb 字段",
+      "pass": true,
+      "detail": "14/14 个媒体产物有 thumb（列表接口 26ms）"
+    },
+    {
+      "name": "缩略图 200",
+      "pass": true,
+      "detail": "status=200 bytes=22266"
+    },
+    {
+      "name": "Content-Type 是 image/jpeg",
+      "pass": true,
+      "detail": "image/jpeg"
+    },
+    {
+      "name": "Cache-Control 允许长缓存（max-age）",
+      "pass": true,
+      "detail": "public, max-age=86400"
+    },
+    {
+      "name": "Cache-Control 不是 no-cache（否则每次都回源）",
+      "pass": true,
+      "detail": "public, max-age=86400"
+    },
+    {
+      "name": "缩略图显著小于原图",
+      "pass": true,
+      "detail": "原 1899602B -> 缩略 22266B（85.3x）"
+    },
+    {
+      "name": "第二次仍 200 且字节一致",
+      "pass": true,
+      "detail": "200 22266B"
+    },
+    {
+      "name": "非法路径 /api/thumb/notahash.jpg -> 404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "非法路径 /api/thumb/../../etc/passwd -> 404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "非法路径 /api/thumb/0123456789abcdef0123456789abcdef01234567.jpg -> 404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "非法路径 /api/thumb/short.jpg -> 404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "非法路径 /api/thumb/0123456789abcdef0123456789abcdef01234567.png -> 404",
+      "pass": true,
+      "detail": "status=404"
+    }
+  ]
+}

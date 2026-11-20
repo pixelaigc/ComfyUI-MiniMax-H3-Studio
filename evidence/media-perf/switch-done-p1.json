@@ -1,0 +1,154 @@
+{
+  "scenario": "switch",
+  "tab": "done",
+  "page": 1,
+  "marks": {
+    "domcontentloaded": 312.4,
+    "js_ready": 332.0,
+    "after_tab_click": 60.9,
+    "tt_skeleton_ms": 3.8,
+    "tt_first_card_ms": 789.6,
+    "tt_all_cards_ms": 791.1,
+    "tt_media_ready_ms": 72.8,
+    "tt_networkidle_ms": 1733.6
+  },
+  "page_state": {
+    "active_tab": "done",
+    "card_count": 12,
+    "scroll_top": 0,
+    "media_bytes_hint": null
+  },
+  "api_jobs": [
+    {
+      "query": "status=all&page=1&page_size=12",
+      "ms": 632.5,
+      "bytes": -1,
+      "status": 200
+    },
+    {
+      "query": "status=done&page=1&page_size=12",
+      "ms": 588.6,
+      "bytes": -1,
+      "status": 200
+    },
+    {
+      "query": "status=done&page=1&page_size=12",
+      "ms": 33.70000000000027,
+      "bytes": -1,
+      "status": 200
+    }
+  ],
+  "api_jobs_count": 3,
+  "media_count": 12,
+  "media_total_bytes": 0,
+  "media_peak_concurrency": 12,
+  "media_bytes_by_ext": {
+    "png": 0,
+    "mp4": 0
+  },
+  "media_count_by_ext": {
+    "png": 1,
+    "mp4": 11
+  },
+  "media_range_headers": [
+    {
+      "path": "://127.0.0.1:8190/files/images/i-zimage-000166.png",
+      "range": null,
+      "bytes": -1,
+      "status": 200,
+      "content_range": null,
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000128.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-2237631/2237632",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000127.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-1445625/1445626",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000126.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-2264627/2264628",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000125.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-3058586/3058587",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000124.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-2925821/2925822",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000122.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-1263932/1263933",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000121.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-1480360/1480361",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000120.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-2310285/2310286",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000119.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-1825685/1825686",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000118.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-1249936/1249937",
+      "cache_control": "no-cache"
+    },
+    {
+      "path": "127.0.0.1:8190/files/videos/v-h3-studio-000117.mp4",
+      "range": "bytes=0-",
+      "bytes": 0,
+      "status": 206,
+      "content_range": "bytes 0-3346491/3346492",
+      "cache_control": "no-cache"
+    }
+  ],
+  "other_count": 60,
+  "console_errors": [],
+  "screenshot": "/root/projects/h3s-favorites/scripts/../evidence/media-perf/switch-done-p1.png"
+}

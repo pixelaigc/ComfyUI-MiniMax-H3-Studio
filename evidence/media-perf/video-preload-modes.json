@@ -1,0 +1,210 @@
+{
+  "A_metadata_only": {
+    "mode": "A_metadata_only",
+    "count": 12,
+    "bytes": 11614972,
+    "mb": 11.08,
+    "marks": {
+      "inject_to_end_ms": 6000.1
+    },
+    "detail": [
+      {
+        "url": "8912/files/videos/v-h3-studio-000128.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000127.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000126.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000125.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000124.mp4",
+        "bytes": 200383,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000123.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000122.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000121.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000120.mp4",
+        "bytes": 986815,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000119.mp4",
+        "bytes": 1117887,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000118.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000117.mp4",
+        "bytes": 921279,
+        "status": 206
+      }
+    ]
+  },
+  "B_metadata_poster": {
+    "mode": "B_metadata_poster",
+    "count": 12,
+    "bytes": 12652223,
+    "mb": 12.07,
+    "marks": {
+      "inject_to_end_ms": 6000.1
+    },
+    "detail": [
+      {
+        "url": "8912/files/videos/v-h3-studio-000128.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000127.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000126.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000125.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000124.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000123.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000122.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000121.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000120.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000119.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000118.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000117.mp4",
+        "bytes": 1117887,
+        "status": 206
+      }
+    ]
+  },
+  "C_none_poster": {
+    "mode": "C_none_poster",
+    "count": 11,
+    "bytes": 8043260,
+    "mb": 7.67,
+    "marks": {
+      "inject_to_end_ms": 6000.1
+    },
+    "detail": [
+      {
+        "url": "8912/files/videos/v-h3-studio-000128.mp4",
+        "bytes": 659135,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000127.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000126.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000125.mp4",
+        "bytes": 396991,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000124.mp4",
+        "bytes": 659135,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000122.mp4",
+        "bytes": 622592,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000121.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000120.mp4",
+        "bytes": 1048576,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000119.mp4",
+        "bytes": 491520,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000118.mp4",
+        "bytes": 622592,
+        "status": 206
+      },
+      {
+        "url": "8912/files/videos/v-h3-studio-000117.mp4",
+        "bytes": 396991,
+        "status": 206
+      }
+    ]
+  }
+}
