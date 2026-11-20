@@ -667,12 +667,26 @@ def _lookup_lora_meta(name: str) -> dict:
     底模族不同，LoRA 不通用，但元信息（触发词 / 推荐强度 / 兼容性）是同一套
     语义。之前只查 Z-Image 族，导致 MOSS / Qwen 的 LoRA 查不到元信息 ——
     表现为「上游标注的触发词不会被自动追加进提示词」。
+
+    ⚠️ **必须走带缓存的入口**（`lora_inventory_by_kind*`）——
+    2026-11-21 线上实测：旧写法（直接调三个 `list_*_loras`）每次调用要
+    **2.2 秒**（三次全量目录扫描，各扫 700+ 文件 + 读 safetensors 头）。
+    而这个函数在**每个工作流构建点**都会被调（`workflows.py` 的
+    Z-Image / Qwen / MOSS 三处），一次任务提交就是 3 × 2.2s。
+    ⇒ 现在走缓存入口：首次约 0.8s，之后约 0.01s（目录指纹没变时）。
     """
     if not name:
         return {}
-    for item in (lora_registry.list_z_image_loras()
-                 + lora_registry.list_qwen_image_loras()
-                 + lora_registry.list_moss_image_loras()):
+    # ⚠️ **必须取「效果类 + 加速类」的并集** —— 只取 effect 会漏掉加速类，
+    # 而调用方正是靠 `meta["kind"] == KIND_ACCELERATION` 判断
+    # 「这是加速 LoRA，不能当可选效果 LoRA 用」（workflows.py 三处）。
+    # 漏掉加速类 = 那道闸门失效 = 用户能把蒸馏加速 LoRA 当效果 LoRA 挂上去。
+    for item in (lora_registry.lora_inventory_by_kind()["effect"]
+                 + lora_registry.lora_inventory_by_kind()["acceleration"]
+                 + lora_registry.lora_inventory_by_kind_qwen()["effect"]
+                 + lora_registry.lora_inventory_by_kind_qwen()["acceleration"]
+                 + lora_registry.lora_inventory_by_kind_moss()["effect"]
+                 + lora_registry.lora_inventory_by_kind_moss()["acceleration"]):
         if item["name"] == name or Path(item["name"]).name == Path(name).name:
             return item
     return {}
