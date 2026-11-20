@@ -192,6 +192,50 @@ class TestEffectLoraNoRescan(unittest.TestCase):
         self.assertEqual(got, "手写显示名",
                          "必须命中传入的映射，不得走别的路径")
 
+    def test_display_map_invalidates_with_registry_cache(self):
+        """底层缓存被作废时，派生映射**必须**跟着重建。
+
+        【为什么这条重要】`job_meta` 的显示名映射是
+        `h3_effect_loras.discover_effect_loras()` 的**派生物**。
+        如果底层缓存作废了（装完新 LoRA）而派生映射不知道，
+        卡片上会继续显示**旧**显示名 —— 这是「显示错」的缺陷。
+
+        【怎么测】把 `discover_effect_loras` 换成可控的假实现：
+          * 第一次返回 [{name: A, display: 旧名}]
+          * 调用 `invalidate_effect_lora_cache()`（推进代次）
+          * 第二次返回 [{name: A, display: 新名}]
+        然后断言映射里的 A 变成了**新名**。
+
+        【为什么不自指】期望值是**手写的** "新名"。
+        """
+        from h3studio import job_meta
+        from h3studio import h3_effect_loras as effect_registry
+
+        state = {"display": "旧名"}
+        real = effect_registry.discover_effect_loras
+
+        def fake(*a, **kw):
+            return [{"name": "A.safetensors", "path": "/nonexistent/A.safetensors",
+                     "display": state["display"]}]
+
+        effect_registry.discover_effect_loras = fake
+        try:
+            effect_registry.invalidate_effect_lora_cache()
+            first = job_meta._effect_lora_display_map()
+            self.assertEqual(first.get("A.safetensors"), "旧名")
+
+            # 装了新 LoRA -> 底层缓存作废（代次推进）+ 显示名变了
+            state["display"] = "新名"
+            effect_registry.invalidate_effect_lora_cache()
+            second = job_meta._effect_lora_display_map()
+            self.assertEqual(second.get("A.safetensors"), "新名",
+                             "底层缓存作废后派生映射必须重建，"
+                             "否则装完新 LoRA 卡片上还显示旧名")
+        finally:
+            effect_registry.discover_effect_loras = real
+            effect_registry.invalidate_effect_lora_cache()
+            job_meta.invalidate_effect_lora_display_cache()
+
 
 # ------------------------------------------------------------------
 # 断言 2：扫盘不得跑在事件循环里

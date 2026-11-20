@@ -247,8 +247,11 @@ def _fixed_accel_lora_display(key: str) -> str:
 #:   请求级记忆化把 100 次降到 1 次，两层缓存各司其职。
 #:
 #: 【安全性】映射只由**只读**派生数据构成（权重名 + 同名 .md 标题），
-#:   不缓存任何用户配置。失效最坏后果是「显示名退回文件名」。
-_EFFECT_LORA_DISPLAY_CACHE: dict = {"at": 0.0, "map": None}
+#: 不缓存任何用户配置。失效最坏后果是「显示名退回文件名」。
+#:
+#: 【字段】`gen` = 构建时看到的 `h3_effect_loras` 缓存代次。
+#: 代次一变 -> 映射自动作废（见 `_effect_lora_display_map`）。
+_EFFECT_LORA_DISPLAY_CACHE: dict = {"at": 0.0, "map": None, "gen": -1}
 
 #: 映射的缓存有效期（秒）。
 #:
@@ -283,9 +286,15 @@ def invalidate_effect_lora_display_cache() -> None:
     【为什么需要它】`h3_effect_loras.invalidate_effect_lora_cache()`
     刷的是**扫盘结果**缓存；本映射是**它的派生物**，必须一起刷，
     否则装完新 LoRA 后 5 分钟内显示名还是旧的。
+
+    【2026-11-21】现在其实**不必**手工调用了 ——
+    `h3_effect_loras` 的缓存代次一变，本映射会自动重建
+    （见 `_effect_lora_display_map`）。本函数保留给「只想刷这一层」
+    的调用方使用。
     """
     _EFFECT_LORA_DISPLAY_CACHE["at"] = 0.0
     _EFFECT_LORA_DISPLAY_CACHE["map"] = None
+    _EFFECT_LORA_DISPLAY_CACHE["gen"] = -1
 
 
 def _effect_lora_display_map() -> dict[str, str]:
@@ -301,11 +310,22 @@ def _effect_lora_display_map() -> dict[str, str]:
 
     【缓存】模块级 + TTL 300 秒（见 _EFFECT_LORA_DISPLAY_TTL 的说明）。
     失效最坏后果：显示名退回「权重文件名」—— 不编造、不报错。
+
+    【代次级联】`h3_effect_loras.invalidate_effect_lora_cache()` 推进
+    缓存代次；本映射记录的代次与之不一致时**自动重建** ——
+    这样装完新 LoRA 后不需要谁来记得刷这层缓存。
     """
     now = time.time()
     cached = _EFFECT_LORA_DISPLAY_CACHE.get("map")
     at = _EFFECT_LORA_DISPLAY_CACHE.get("at") or 0.0
-    if cached is not None and (now - at) < _EFFECT_LORA_DISPLAY_TTL:
+    gen = -1
+    try:
+        from . import h3_effect_loras as effect_registry
+        gen = effect_registry.effect_lora_cache_generation()
+    except Exception:
+        gen = -1
+    if (cached is not None and (now - at) < _EFFECT_LORA_DISPLAY_TTL
+            and _EFFECT_LORA_DISPLAY_CACHE.get("gen") == gen):
         return cached
     out: dict[str, str] = {}
     try:
@@ -326,6 +346,7 @@ def _effect_lora_display_map() -> dict[str, str]:
         out = {}
     _EFFECT_LORA_DISPLAY_CACHE["at"] = now
     _EFFECT_LORA_DISPLAY_CACHE["map"] = out
+    _EFFECT_LORA_DISPLAY_CACHE["gen"] = gen
     return out
 
 
