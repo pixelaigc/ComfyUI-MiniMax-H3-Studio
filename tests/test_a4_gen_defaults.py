@@ -114,14 +114,55 @@ class TestGenDefaultsSpec(unittest.TestCase):
             self.assertIn(name, fields, f"t2v 丢了历史字段 {name}")
 
     def test_flf_and_r2v_have_no_attention_field(self):
-        """旧工作流路径没有注意力机制 —— 不能给出「配了但不生效」的控件。"""
+        """旧工作流路径没有注意力机制 —— 不能给出「配了但不生效」的控件。
+
+        【2026-11-20 修正 —— model_key 断言反了】
+        原来这里断言 flf / r2v **没有** ``model_key`` 字段。
+        那条断言把 ``model_key`` 与 ``attention`` / ``accel_lora``
+        混为一谈了 —— 它的理由是「旧工作流路径没有注意力机制」，
+        而 ``model_key`` 跟注意力机制毫无关系。
+
+        **实测事实**：``h3studio/h3_video_modes.py`` 的
+        ``build_flf`` / ``build_r2v`` **确实读** ``params["model_key"]``
+        （``model_for_mode(mode, params.get("model_key"))``）——
+        所以它不是「配了不生效」的假控件，而是**真实生效**的参数。
+
+        更要命的是**没有它 r2v 直接提交失败**（线上实测 400）：
+        ``normalize_t2v_params`` 取 ``params["model_key"]`` 落空 ->
+        回落到 ``VIDEO_DEFAULT_MODEL``（FL2VA 权重）-> 校验失败：
+        「模型『MiniMax-H3 FL2VA · 剪枝 int8（默认）』不支持参考生成
+        （Ref2VA）通道」。
+
+        所以现在 flf / r2v **有** ``model_key`` 字段，且选项按 mode
+        过滤（flf 只列 FL2VA 系、r2v 只列支持 Ref2VA 的权重）——
+        见 ``test_flf_and_r2v_model_options_follow_mode``。
+        """
         for mode in ("flf", "r2v"):
             names = {f["name"] for f in gen_defaults.spec()[mode]["fields"]}
             self.assertNotIn("attention", names)
             self.assertNotIn("accel_lora", names)
-            self.assertNotIn("model_key", names)
             self.assertIn("lora", names)
             self.assertIn("resolution", names)
+
+    def test_flf_and_r2v_model_options_follow_mode(self):
+        """底模选项按 mode 过滤：flf 只能 FL2VA 系，r2v 只能 Ref2VA 系。
+
+        【为什么必须分】FL2VA 权重没有 Ref2VA 通道（用它做参考生成
+        等于「参考没生效」）；Ref2VA 专用权重没有 I2VA 通道
+        （用它做首尾帧同样不对）。
+        """
+        for mode, need_ref2va in (("flf", False), ("r2v", True)):
+            fields = {f["name"]: f
+                      for f in gen_defaults.spec()[mode]["fields"]}
+            self.assertIn("model_key", fields, mode)
+            options = {o["value"] for o in fields["model_key"]["options"]}
+            self.assertTrue(options, mode)
+            for key in options:
+                meta = vm.VIDEO_MODELS.get(key)
+                self.assertIsNotNone(meta, f"{mode}: {key} 不在真实模型表里")
+                self.assertEqual(bool(meta.get("supports_ref2va")),
+                                 need_ref2va,
+                                 f"{mode}: {key} 的 Ref2VA 支持性与模式不符")
 
     def test_image_modes_sampler_pool_comes_from_model_tables(self):
         """图像模式的采样器清单必须来自该族模型表。"""

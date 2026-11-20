@@ -198,7 +198,7 @@ def _video_new_panel_fields() -> list:
     ]
 
 
-def _video_legacy_fields() -> list:
+def _video_legacy_fields(mode: str = "flf") -> list:
     """
     flf / r2v：旧工作流路径（_h3_video_workflow / build_r2v）的真实参数。
 
@@ -207,9 +207,9 @@ def _video_legacy_fields() -> list:
     默认值写死 ``"768p"``，note 写死「544p = 0.4MP / 768p = 0.8MP」。
 
     **那不是真实能力，是旧界面（``#resSeg``）的两档遗留。**
-    真实约束见 ``video_models.VIDEO_MODE_SIZE_POLICY``：
-    flf / r2v 的面积上限与 t2v **同为 2.0 MP**（2026-11-17 放宽，
-    对齐 nonebot seg1/seg2 的 ``ResolutionSelector(megapixels=2)``），
+    真实约束见 ``video_models.VIDEO_MODE_SIZE_POLICY``：flf / r2v 的
+    面积上限与 t2v **同为 2.0 MP**（2026-11-17 放宽，对齐 nonebot
+    seg1/seg2 的 ``ResolutionSelector(megapixels=2)``），
     且 ``custom_size: True``（面板本来就有「输出尺寸」手填框）。
 
     所以：
@@ -220,6 +220,21 @@ def _video_legacy_fields() -> list:
         （``megapixels`` + ``resolution_percent``，见 ``size_spec``）；
       * 旧档位字符串仍然作为**可选输入**保留 —— 存量库里存的就是它，
         迁移期两种写法都要能用（``size_spec.resolve_megapixels`` 能反查）。
+
+    【2026-11-20 续 —— 底模字段（r2v 的真缺陷）】
+    原来 flf / r2v 的字段表**没有底模**。于是 r2v 提交时
+    ``normalize_t2v_params`` 取 ``params["model_key"]`` 落空 ->
+    回落到 ``VIDEO_DEFAULT_MODEL``（FL2VA 权重）-> 校验失败：
+    「模型『MiniMax-H3 FL2VA · 剪枝 int8（默认）』不支持参考生成（Ref2VA）
+    通道」-> **线上实测 400**。
+
+    而 ``h3_video_modes.build_flf / build_r2v`` **确实读**
+    ``params["model_key"]``（``model_for_mode(mode, params.get("model_key"))``），
+    所以这不是「配了不生效」的假控件 —— 加上是**真实生效**的。
+
+    底模选项按 mode 过滤：
+      * flf -> FL2VA 系（它有 I2VA / FL2VA / L2VA 任务类型）；
+      * r2v -> **只列支持 Ref2VA 的权重**（FL2VA 权重没有 Ref2VA 通道）。
     """
     vm = _vm()
     wf = _wf()
@@ -231,6 +246,30 @@ def _video_legacy_fields() -> list:
          for key in entry.keys()})
     lora_options = [("none", "none（官方无加速档）")] + [
         (key, key) for key in wf.LORAS.keys()]
+
+    # ---- 底模（按 mode 过滤）----
+    need_ref2va = (mode == "r2v")
+    model_options = []
+    for key, meta in vm.VIDEO_MODELS.items():
+        supports = bool(meta.get("supports_ref2va"))
+        if need_ref2va and not supports:
+            continue
+        if not need_ref2va and supports:
+            # FL2VA 模式不用 Ref2VA 专用权重（那类权重没有 I2VA 通道）
+            continue
+        model_options.append((key, meta.get("label") or key))
+    if need_ref2va:
+        default_model = "ref2va_pruned_int8"
+        for key in ("ref2va_pruned_int8", "ref2va_int8",
+                    "hybrid_fl2va_ref2va"):
+            if key in vm.VIDEO_MODELS:
+                default_model = key
+                break
+        model_note = ("参考生视频必须用支持 Ref2VA 的权重 —— "
+                      "FL2VA 权重没有参考通道，用它等于「参考没生效」。")
+    else:
+        default_model = vm.VIDEO_DEFAULT_MODEL
+        model_note = "首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。"
 
     # 【真实档位】按 flf / r2v 自己的面积上限派生（两者同为 2.0 MP）。
     # 取所有比例的短边档位并集 —— 与 ``agent_capability.video_size_tiers``
@@ -251,7 +290,7 @@ def _video_legacy_fields() -> list:
                           for key in sorted(tier_labels,
                                             key=lambda k: int(k[:-1]))]
 
-    cap = size_spec.mode_max_megapixels("flf")
+    cap = size_spec.mode_max_megapixels(mode)
     # 【默认 MP 取工作流内置真源】与 t2v 同一口径
     # （``video_models.VIDEO_DEFAULT_MP``）—— 避免「同一个工作台里
     # t2v 默认 0.4 MP、flf 默认 1.0 MP」这种无来由的差异。
@@ -261,6 +300,7 @@ def _video_legacy_fields() -> list:
     default_pct = size_spec.default_percent()
 
     return [
+        _enum("model_key", "底模", model_options, default_model, model_note),
         _enum("aspect", "画面比例", aspect_options, "16:9", ""),
         _enum("resolution", "分辨率档位", resolution_options, "768p",
               f"按该模式的真实面积上限（{cap} MP）派生；"
@@ -426,7 +466,7 @@ def _mode_fields(mode: str) -> tuple[list, bool]:
     if mode == "t2v":
         return _video_new_panel_fields(), True
     if mode in ("flf", "r2v"):
-        return _video_legacy_fields(), True
+        return _video_legacy_fields(mode), True
     if mode == "t2i":
         return _image_fields("z"), True
     if mode in ("t2i_qwen", "i2i_qwen"):
