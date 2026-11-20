@@ -1,0 +1,68 @@
+=== 0) 现状 ===
+maintainer = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+live       = 9c5fbf807282ae7b36e8041de5fc127a2bb3eb80
+审查分支    = abe09f47417b3cf2dbc2bff2c234a909432d6165
+active
+重启前 PID=3761097
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-203938 / backup/maintainer-before-agentcap-20261120-203938
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+live       = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  evidence/agent-cap-truth/phase2/audit/claimed-vs-actual-phase2.md
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_3.txt
+  evidence/agent-cap-truth/phase2/mp_cases/mp_cases_live.json
+  "evidence/agent-cap-truth/phase2/report/\344\272\244\344\273\230\346\212\245\345\221\212.md"
+  evidence/agent-cap-truth/phase2/spec/settings_endpoint_AFTER.json
+  scripts/deploy_deftruth_8190.sh
+  scripts/make_regression_diff.py
+  web/style.css
+共 8 个差异文件
+
+--- 实际 checkout 的文件（新增/修改）---
+  evidence/agent-cap-truth/phase2/audit/claimed-vs-actual-phase2.md
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_3.txt
+  evidence/agent-cap-truth/phase2/mp_cases/mp_cases_live.json
+  "evidence/agent-cap-truth/phase2/report/\344\272\244\344\273\230\346\212\245\345\221\212.md"
+  evidence/agent-cap-truth/phase2/spec/settings_endpoint_AFTER.json
+  scripts/deploy_deftruth_8190.sh
+  scripts/make_regression_diff.py
+  web/style.css
+共 8 个文件
+
+=== 5) 部署后完整性自检 ===
+完整性自检通过（文件全部在位 + 工作区与 HEAD 一致）
+
+=== 6) 重启服务 ===
+Warning: The unit file, source configuration file or drop-ins of h3-studio.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+active
+重启后 PID=3821450（原 3761097）
+
+=== 7) 探活 ===
+  / -> 200
+  /api/jobs -> 200
+  /api/image-options -> 200
+  /api/generation-types -> 200
+  /api/enhancer -> 200
+  /api/agent/settings -> 200
+
+=== 8) 服务日志尾部 ===
+11月 20 20:39:39 ubuntu systemd[1]: Stopping h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190)...
+11月 20 20:39:39 ubuntu systemd[1]: h3-studio.service: Deactivated successfully.
+11月 20 20:39:39 ubuntu systemd[1]: Stopped h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+11月 20 20:39:39 ubuntu systemd[1]: h3-studio.service: Consumed 17.503s CPU time, 637.9M memory peak.
+11月 20 20:39:39 ubuntu systemd[1]: Started h3-studio.service - ComfyUI-MiniMax-H3 Studio (local web workbench, port 8190).
+
+=== 部署完成 ===
+merge commit = 1c8579a218a0fe322c9e03a8beca62a8c5e1c4e5
+回滚点：backup/live-before-agentcap-20261120-203938 / backup/maintainer-before-agentcap-20261120-203938

@@ -893,9 +893,17 @@ def apply_model_sampling(mode: str, values: dict, model=None) -> dict:
 _LORA_FREE_VIDEO = {"steps": 20, "sampler": "res_multistep",
                     "scheduler": "simple"}
 
+#: 采样类字段（面板提交路径**不套**这些 —— 见 merge_into_params 的
+#: skip_sampling 说明与 server._SAMPLING_ONLY_FIELDS）。
+_SAMPLING_FIELDS = frozenset({
+    "sampler", "scheduler", "steps",
+    "shift_video", "shift_audio",
+})
+
 
 def merge_into_params(mode: str, params: dict, defaults: dict,
-                      explicit=(), model=None, overridable=()) -> list:
+                      explicit=(), model=None, overridable=(),
+                      skip_sampling=False) -> list:
     """
     把某模式的默认参数合进 params。
 
@@ -970,6 +978,24 @@ def merge_into_params(mode: str, params: dict, defaults: dict,
             for key, value in _LORA_FREE_VIDEO.items():
                 if key not in explicit:
                     effective[key] = value
+    # 【2026-11-20 —— skip_sampling：面板提交路径不写采样类字段】
+    #
+    # 【为什么需要】上面那段是「管理页把 lora 换成 none 时，
+    # 采样档位要跟着换」（20 步 / res_multistep / simple）——
+    # 那是**管理页显式配置**的语义。
+    #
+    # 但面板提交路径（老客户端重放）有另一条契约（2026-11-12 定）：
+    # **客户端没传 sampler / scheduler 时服务端不写回** ——
+    # 工作流会按 lora 自己选档，服务端写回等于改老任务的画质。
+    # 实测守卫：tests/test_video_sampling_params.py::
+    #   test_B2_legacy_client_without_sampler_keeps_workflow_default
+    #
+    # 两条规则冲突时：**面板提交路径听老契约**（skip_sampling=True），
+    # Agent 路径听管理页语义（默认 False）——
+    # Agent 是在**主动建任务**，不是在重放老任务。
+    if skip_sampling:
+        for _k in _SAMPLING_FIELDS:
+            effective.pop(_k, None)
 
     # 【图像模式】用户显式选了别的模型版本 -> 采样参数跟随该模型的官方值
     if mode in _IMAGE_FAMILIES:

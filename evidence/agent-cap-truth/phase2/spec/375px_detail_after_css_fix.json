@@ -1,0 +1,70 @@
+{
+  "console_errors": [],
+  "blocks": {
+    "t2v": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "flf": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "r2v": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "t2i": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "t2i_qwen": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "i2i_qwen": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "t2i_moss": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "t2i_h3image": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "i2i_h3image": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "t2a": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "a2a": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    },
+    "longfilm": {
+      "scrollWidth": 341,
+      "clientWidth": 341,
+      "overflow": false
+    }
+  },
+  "page": {
+    "scrollWidth": 375,
+    "clientWidth": 375
+  },
+  "shot": "/root/projects/h3s-deftruth/evidence/agent-cap-truth/phase2/spec/agent_manage_375px_after_css_fix.png"
+}

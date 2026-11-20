@@ -1,0 +1,139 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "console_errors": [],
+  "blocks": {
+    "flf": {
+      "t2v": {
+        "scrollWidth": 351,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "flf": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "r2v": {
+        "scrollWidth": 351,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "t2i": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2i_qwen": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "i2i_qwen": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2i_moss": {
+        "scrollWidth": 352,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "t2i_h3image": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "i2i_h3image": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2a": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "a2a": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "longfilm": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      }
+    },
+    "r2v": {
+      "t2v": {
+        "scrollWidth": 351,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "flf": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "r2v": {
+        "scrollWidth": 351,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "t2i": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2i_qwen": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "i2i_qwen": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2i_moss": {
+        "scrollWidth": 352,
+        "clientWidth": 341,
+        "overflow": true
+      },
+      "t2i_h3image": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "i2i_h3image": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "t2a": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "a2a": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      },
+      "longfilm": {
+        "scrollWidth": 341,
+        "clientWidth": 341,
+        "overflow": false
+      }
+    }
+  },
+  "page": {
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflow": false
+  },
+  "shots": [
+    "/root/projects/h3s-deftruth/evidence/agent-cap-truth/phase2/spec/agent_manage_375px_flf_expanded.png",
+    "/root/projects/h3s-deftruth/evidence/agent-cap-truth/phase2/spec/agent_manage_375px_r2v_expanded.png"
+  ]
+}

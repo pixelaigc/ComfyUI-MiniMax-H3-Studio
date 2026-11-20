@@ -399,6 +399,15 @@ def mode_param_keys(mode: str) -> set[str]:
         # 也会打破 test_mode_param_keys_match_mode_schema_params。
         keys.update({"width", "height", "model_key", "attention",
                      "accel_lora"})
+        # 【2026-11-20 新增 —— MP 预算 × 百分比】
+        #
+        # 【为什么必须加】用户要求「无论生成什么媒体，都是用百万分辨率
+        # + 百分比模式」，mode_schema 的视频段已经展开了 megapixels /
+        # resolution_percent（上限实时派生）。
+        # 而 mode_param_keys 是 mode_schema 的**键集合单一真源** ——
+        # 两边不一致会让 mode_defaults 的白名单过滤丢掉这两个参数，
+        # 也会打破 test_mode_param_keys_match_mode_schema_params。
+        keys.update({"megapixels", "resolution_percent"})
     if mode_requires_refs(mode):
         keys.add("asset_id")
     return keys

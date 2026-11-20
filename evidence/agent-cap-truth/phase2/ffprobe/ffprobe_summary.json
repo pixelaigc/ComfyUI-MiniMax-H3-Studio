@@ -1,0 +1,214 @@
+[
+  {
+    "job_id": "71e232884711",
+    "mode": "flf",
+    "status": "done",
+    "params": {
+      "width": 1216,
+      "height": 672,
+      "megapixels": 0.779,
+      "duration": 5.0,
+      "resolution": "672p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ]
+    },
+    "outputs": [
+      {
+        "kind": "video",
+        "file": "videos/v-h3-studio-000148.mp4",
+        "name": "flf_71e232884711_00001_.mp4",
+        "width": 1216,
+        "height": 672
+      }
+    ],
+    "ffprobe": [
+      {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000148.mp4",
+        "size_bytes": 1201305,
+        "probe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1216,
+              "height": 672,
+              "duration": "5.166667",
+              "nb_frames": "124"
+            },
+            {
+              "codec_type": "audio",
+              "duration": "5.167000",
+              "nb_frames": "163"
+            }
+          ],
+          "format": {
+            "duration": "5.167000",
+            "size": "1201305"
+          }
+        },
+        "matches_params": true
+      }
+    ]
+  },
+  {
+    "job_id": "0bbea594c379",
+    "mode": "flf",
+    "status": "done",
+    "params": {
+      "width": 1216,
+      "height": 672,
+      "megapixels": 0.779,
+      "duration": 5.0,
+      "resolution": "672p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ]
+    },
+    "outputs": [
+      {
+        "kind": "video",
+        "file": "videos/v-h3-studio-000145.mp4",
+        "name": "flf_0bbea594c379_00001_.mp4",
+        "width": 1216,
+        "height": 672
+      }
+    ],
+    "ffprobe": [
+      {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000145.mp4",
+        "size_bytes": 1010716,
+        "probe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1216,
+              "height": 672,
+              "duration": "5.166667",
+              "nb_frames": "124"
+            },
+            {
+              "codec_type": "audio",
+              "duration": "5.167000",
+              "nb_frames": "163"
+            }
+          ],
+          "format": {
+            "duration": "5.167000",
+            "size": "1010716"
+          }
+        },
+        "matches_params": true
+      }
+    ]
+  },
+  {
+    "job_id": "e4a1e5a6dee7",
+    "mode": "flf",
+    "status": "done",
+    "params": {
+      "width": 1216,
+      "height": 672,
+      "megapixels": 0.779,
+      "duration": 5.0,
+      "resolution": "672p",
+      "size_adjust_reasons": [
+        "flf 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ]
+    },
+    "outputs": [
+      {
+        "kind": "video",
+        "file": "videos/v-h3-studio-000147.mp4",
+        "name": "flf_e4a1e5a6dee7_00001_.mp4",
+        "width": 1216,
+        "height": 672
+      }
+    ],
+    "ffprobe": [
+      {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000147.mp4",
+        "size_bytes": 1080306,
+        "probe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1216,
+              "height": 672,
+              "duration": "5.166667",
+              "nb_frames": "124"
+            },
+            {
+              "codec_type": "audio",
+              "duration": "5.167000",
+              "nb_frames": "163"
+            }
+          ],
+          "format": {
+            "duration": "5.167000",
+            "size": "1080306"
+          }
+        },
+        "matches_params": true
+      }
+    ]
+  },
+  {
+    "job_id": "d7b3f83c8312",
+    "mode": "r2v",
+    "status": "done",
+    "params": {
+      "width": 1216,
+      "height": 672,
+      "megapixels": 0.779,
+      "duration": 5.0,
+      "resolution": "672p",
+      "size_adjust_reasons": [
+        "r2v 尺寸：MP 预算 0.800 MP + 比例 16:9 -> 1216×672"
+      ]
+    },
+    "outputs": [
+      {
+        "kind": "video",
+        "file": "videos/v-h3-studio-000149.mp4",
+        "name": "r2v_d7b3f83c8312_00001_.mp4",
+        "width": 1216,
+        "height": 672
+      }
+    ],
+    "ffprobe": [
+      {
+        "path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000149.mp4",
+        "size_bytes": 2661362,
+        "probe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1216,
+              "height": 672,
+              "duration": "5.166667",
+              "nb_frames": "124"
+            },
+            {
+              "codec_type": "audio",
+              "duration": "5.167000",
+              "nb_frames": "163"
+            }
+          ],
+          "format": {
+            "duration": "5.167000",
+            "size": "2661362"
+          }
+        },
+        "matches_params": true
+      }
+    ]
+  }
+]
