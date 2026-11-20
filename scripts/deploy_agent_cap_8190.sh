@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO=/root/projects/comfyui-minimax-h3-studio
 LIVE=/root/projects/h3studio-live
-BRANCH=local/feature/agent-cap-truth
+BRANCH=tmp/agent-cap-truth
 PORT=8190
 TS=$(date +%Y%m%d-%H%M%S)
 
@@ -29,7 +29,7 @@ PID_BEFORE=$(systemctl show h3-studio.service -p MainPID --value)
 echo "重启前 PID=$PID_BEFORE"
 
 # 【并发安全】live 必须仍停在本轮开始时看到的状态。
-EXPECT_LIVE=bf5ef98119f91d1610efbecddf6d4d07d05301e9
+EXPECT_LIVE=3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
 if [ "$LIVE_BEFORE" != "$EXPECT_LIVE" ]; then
   echo "!! live 分支已被别人推进（$LIVE_BEFORE != $EXPECT_LIVE），中止部署"
   exit 1
@@ -115,16 +115,48 @@ echo "live       = $(git rev-parse local/deploy/qwen-ref-assets-live)"
 
 echo
 echo "=== 4) 精确 checkout 本次改动的文件到 live ==="
-CHANGED=$(git diff --name-only "$LIVE_BEFORE" "$MERGE_COMMIT")
-echo "$CHANGED" | sed 's/^/  /'
-echo "共 $(echo "$CHANGED" | wc -l) 个文件"
+# 【只 checkout「新增/修改」的文件 —— 绝不 checkout「删除」的文件】
+#
+# 【为什么必须过滤删除（2026-11-20 实测差点踩坑）】
+# `git checkout <commit> -- <path>` 对一个在 <commit> 里**不存在**的路径
+# 会**真的删掉** live 工作区里的那个文件。
+# 而 `git diff --name-only LIVE_BEFORE MERGE_COMMIT` 会把
+# 「live 有、合并后没有」的路径也列进来 —— 那是**删除类**变更。
+#
+# 【本轮的实际情形】live 分支比 maintainer 多了一个交付文档
+# （docs/参考素材右键移除-交付说明-20261120.md）。它在合并提交里
+# **仍然存在**（不是删除），但如果用「live_before vs 合并提交」的
+# 差异清单去 checkout，一旦清单里混进真正的删除项就会误删。
+#
+# 修法：把清单拆成「新增/修改」与「删除」两类，只 checkout 前者；
+# 删除类**不 checkout**（live 上保留原文件，由人工确认后再处理），
+# 并在日志里明确列出来。
+CHANGED_ALL=$(git diff --name-only "$LIVE_BEFORE" "$MERGE_COMMIT")
+echo "$CHANGED_ALL" | sed 's/^/  /'
+echo "共 $(echo "$CHANGED_ALL" | wc -l) 个差异文件"
+
+# 只保留「在合并提交里存在」的路径（= 新增或修改）
+CHANGED_KEEP=$(git diff --name-only --diff-filter=d "$LIVE_BEFORE" "$MERGE_COMMIT")
+# 被删除的路径（合并提交里已不存在）—— 不 checkout，只报告
+DELETED=$(git diff --name-only --diff-filter=D "$LIVE_BEFORE" "$MERGE_COMMIT")
+if [ -n "$DELETED" ]; then
+  echo
+  echo "--- 以下路径在合并提交里已删除：**不 checkout**（避免误删 live 文件）---"
+  echo "$DELETED" | sed 's/^/  SKIP-DEL: /'
+fi
+
+echo
+echo "--- 实际 checkout 的文件（新增/修改）---"
+echo "$CHANGED_KEEP" | sed 's/^/  /'
+echo "共 $(echo "$CHANGED_KEEP" | wc -l) 个文件"
 # 【中文文件名必须用 NUL 分隔传给 git checkout】
-git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
-  | (cd "$LIVE" && xargs -0 git checkout "$MERGE_COMMIT" --)
+git diff --name-only -z --diff-filter=d "$LIVE_BEFORE" "$MERGE_COMMIT" \
+  | (cd "$LIVE" && xargs -0 -r git checkout "$MERGE_COMMIT" --)
 echo
 
 echo "=== 5) 部署后完整性自检 ==="
-git diff --name-only -z "$LIVE_BEFORE" "$MERGE_COMMIT" \
+# 只核对「新增/修改」的那批（删除类不在 checkout 范围内）
+git diff --name-only -z --diff-filter=d "$LIVE_BEFORE" "$MERGE_COMMIT" \
   | (cd "$LIVE" && while IFS= read -r -d '' f; do
        [ -z "$f" ] && continue
        [ -e "$f" ] || echo "MISSING:$f"
