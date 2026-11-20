@@ -143,6 +143,13 @@ MUTATIONS = [
 ]
 
 
+
+#: 特殊变异体：改文件行尾（不是文本替换，是重写整个文件）
+LINE_ENDING_MUTATION = ("M15 app.js 行尾被改成 LF（制造上万行假 diff）",
+                         "web/app.js",
+                         "test_crlf_files_keep_crlf")
+
+
 def main():
     print("=== 变异测试：每条断言必须咬人 ===")
     failures = []
@@ -171,7 +178,26 @@ def main():
             print(f"  ✓ 咬人    {name}  -> {expect} 失败")
         shutil.rmtree(tmp, ignore_errors=True)
 
-    print(f"\n=== 汇总：{len(MUTATIONS)-len(failures)}/{len(MUTATIONS)} 咬人 ===")
+    # ---- 特殊变异体：把 CRLF 文件改成 LF（整份重写）----
+    name, rel, expect = LINE_ENDING_MUTATION
+    tmp = Path(tempfile.mkdtemp(prefix="mut-crlf-"))
+    dst = tmp / "app"
+    shutil.copytree(ROOT, dst, symlinks=True,
+                    ignore=shutil.ignore_patterns(".git", "evidence", "data",
+                                                 "__pycache__", "*.pyc"))
+    target = dst / rel
+    raw = target.read_bytes()
+    target.write_bytes(raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n"))
+    passed, out = run_tests(dst)
+    if passed:
+        print(f"  ✗ 不咬人  {name}  （期望 {expect} 失败，但它通过了）")
+        failures.append((name, "断言没变红"))
+    else:
+        print(f"  ✓ 咬人    {name}  -> {expect} 失败")
+    shutil.rmtree(tmp, ignore_errors=True)
+
+    total = len(MUTATIONS) + 1
+    print(f"\n=== 汇总：{total-len(failures)}/{total} 咬人 ===")
     if failures:
         for n, why in failures:
             print(f"  ✗ {n}: {why}")

@@ -4973,8 +4973,23 @@ function jobCard(job) {
   const image = (job.outputs || []).find(o => o.kind === "image");
   const audio = (job.outputs || []).find(o => o.kind === "audio");
   // 【2026-11-21 性能修】缩略图（受限尺寸）。拿不到就回落原图。
-  const videoThumb = thumbUrl(video);
-  const imageThumb = thumbUrl(image);
+  //
+  // 【为什么在这里**内联**读 output.thumb，而不用 `thumbUrl(output)`】
+  // tests/test_gen_status_defects.py::FrontendNoBlackPreviewTest 会把
+  // 「预览区渲染」这一段源码**抠出来**放进 `new Function(...)` 执行，
+  // 而那个函数的**参数签名是写死的**：
+  //     new Function('job','runningOrQueued','pctText','prog',
+  //                   'outputUrl','friendlyError','info', block + ...)
+  // 我第一版在这里调 `thumbUrl(video)` —— 而 `thumbUrl` **不在签名里**
+  // => 抠出来执行时抛 `thumbUrl is not defined`
+  // => 那 2 条「黑屏」断言全红（基线是 4/4 通过）。
+  //
+  // ⇒ 判据：这段代码只能依赖**签名里已有的**那几个函数
+  // （outputUrl / friendlyError / info / ...）+ 局部变量。
+  // `output.thumb` 是服务端下发的字段，直接读即可（thumbUrl 只是
+  // 「取不到就返回空串」的一层薄封装，这里内联等价）。
+  const videoThumb = (video && typeof video.thumb === "string") ? video.thumb : "";
+  const imageThumb = (image && typeof image.thumb === "string") ? image.thumb : "";
   if (audio) {
     preview = `<audio src="${outputUrl(job, audio)}" controls preload="metadata"></audio>`;
   } else if (video) {
