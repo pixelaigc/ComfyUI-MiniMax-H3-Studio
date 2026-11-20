@@ -1,0 +1,37 @@
+=== 0) 现状 ===
+maintainer = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+live       = e18c0b47d7520bdd5cdb9bf5fdc6fe01cf8706bb
+审查分支    = 7113836a780a45021365d3eeb5a45a5c3b260502
+active
+重启前 PID=497678
+maintainer 是 live 的祖先（live 是含 maintainer 的合并提交）
+live 工作区：无 tracked 改动（只有未跟踪的证据文件）
+回滚点：backup/live-before-agentcap-20261120-234125 / backup/maintainer-before-agentcap-20261120-234125
+
+=== 1) 预演合并 ===
+无冲突
+
+=== 2) 造合并提交 ===
+合并提交 = b29b64e3d2cd75adbb15c97b1c5e005c233b40ca
+
+=== 3) 更新分支指针（不切分支、不碰 live 未跟踪文件）===
+maintainer = b29b64e3d2cd75adbb15c97b1c5e005c233b40ca
+live       = b29b64e3d2cd75adbb15c97b1c5e005c233b40ca
+
+=== 4) 精确 checkout 本次改动的文件到 live ===
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_final.txt
+  evidence/agent-cap-truth/phase2/ffprobe/flf_${pair##*:}.json
+  scripts/deploy_deftruth_8190.sh
+共 3 个差异文件
+
+--- 以下路径在合并提交里已删除：**不 checkout**（避免误删 live 文件）---
+  SKIP-DEL: evidence/agent-cap-truth/phase2/ffprobe/flf_${pair##*:}.json
+
+--- 实际 checkout 的文件（新增/修改）---
+  evidence/agent-cap-truth/phase2/deploy/deploy_log_final.txt
+  scripts/deploy_deftruth_8190.sh
+共 2 个文件
+
+=== 5) 部署后完整性自检 ===
+!! live 工作区与 HEAD 不一致：
+A  evidence/agent-cap-truth/phase2/ffprobe/flf_${pair##*:}.json
