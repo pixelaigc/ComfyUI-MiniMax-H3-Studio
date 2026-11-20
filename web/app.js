@@ -4419,6 +4419,33 @@ function outputUrl(job, output) {
   return "/files/" + path.split("/").map(encodeURIComponent).join("/");
 }
 
+// 【2026-11-21 性能修】卡片的**受限尺寸缩略图** URL。
+//
+// 【为什么需要 —— 实测 2026-11-21】
+// 卡片原本直接引用原始产物。CDP `Network.dataReceived` 实测一页 12 张卡
+// 拉了 **8.75MB** 媒体字节，其中 11 个视频占 **7.81MB**
+// （Chrome 对 `<video preload="metadata">` 发 `Range: bytes=0-`，
+//  aiohttp 的 FileResponse 对 `bytes=0-` 返回**整个文件**）；
+// 图片原图 1.1MB~9.5MB。
+//
+// 【缩略图实测】图片 ~30ms / 视频 ~140ms，产物 14~43KB
+//   ⇒ 一页媒体字节 8.75MB -> ~0.3MB（约 30 倍）。
+//
+// 【thumb 从哪来】服务端在 `GET /api/jobs` 里给每条产物补了 `thumb` 字段
+// （见 server.py 的 `_attach_thumb_urls`）。生成失败就没有这个字段
+// -> 这里返回空串 -> 调用方回落引用原图（功能不降级）。
+//
+// 【重要：只影响「看得见的那张图」，不影响播放 / 放大 / 下载】
+//   * 视频卡片：缩略图当 poster，`<video>` 仍然指向**原视频**
+//     —— 播放体验不受影响。
+//   * 图片卡片：缩略图当卡片预览；点开大图（lightbox）仍用**原图**
+//     —— 放大看图的清晰度不受影响。
+function thumbUrl(output) {
+  if (!output) return "";
+  const t = output.thumb;
+  return typeof t === "string" && t ? t : "";
+}
+
 // ---------- 生成结果图片查看器（lightbox） ----------
 // 纯前端 + 现有 /files 路由，局域网所有客户端一致生效，历史图片同样适用。
 const LIGHTBOX_MIN_SCALE = 0.05;
@@ -4727,8 +4754,13 @@ function renderJobBatches(job) {
                         queued: "排队中", canceled: "已取消"}[batch.status] || batch.status;
     // 批次失败时即使残留了旧产物也不展示图 —— 状态优先，避免「失败却显示成图」
     const failed = batch.status === "failed";
+    // 【2026-11-21 性能修】批次缩略图用受限尺寸缩略图 + 懒加载。
+    //   批次产物也是原图（1.1MB~9.5MB）—— 展开的批次一次可能十几张。
+    //   点开大图仍用**原图**（见下面 openLightbox 用 outputUrl）。
+    const batchThumb = thumbUrl(out);
+    const batchSrc = batchThumb || outputUrl(job, out);
     const thumb = out && !failed
-      ? `<div class="job-batch-thumb"><img src="${outputUrl(job, out)}" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
+      ? `<div class="job-batch-thumb"><img src="${batchSrc}" loading="lazy" decoding="async" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
       : `<div class="job-batch-thumb ${failed ? "failed" : ""}">${
           failed ? friendlyError(batch.error).slice(0, 60)
           : batch.status === "running" ? `${Math.round((batch.progress || 0) * 100)}%`
@@ -4931,12 +4963,47 @@ function jobCard(job) {
   const video = (job.outputs || []).find(o => o.kind === "video");
   const image = (job.outputs || []).find(o => o.kind === "image");
   const audio = (job.outputs || []).find(o => o.kind === "audio");
+  // 【2026-11-21 性能修】缩略图（受限尺寸）。拿不到就回落原图。
+  const videoThumb = thumbUrl(video);
+  const imageThumb = thumbUrl(image);
   if (audio) {
     preview = `<audio src="${outputUrl(job, audio)}" controls preload="metadata"></audio>`;
   } else if (video) {
-    preview = `<video src="${outputUrl(job, video)}" controls preload="metadata"></video>`;
+    // 【2026-11-21 性能修】poster 用缩略图，src 仍是原视频。
+    //
+    // 【为什么这样能省下 7.81MB —— 实测 2026-11-21】
+    //   原来 `<video src=... preload="metadata">`：Chrome 会发
+    //   `Range: bytes=0-`，而 aiohttp 的 FileResponse 对 `bytes=0-`
+    //   返回**整个文件**（Content-Range: bytes 0-2237631/2237632）。
+    //
+    //   **隔离实测**（scripts/measure_video_preload_isolated.py，
+    //   6 个视频，CDP `Network.dataReceived` 累计真实传输字节）：
+    //     A. preload="metadata"                  -> 7.00 MB（时长拿到 6/6）
+    //     B. preload="metadata" + poster        -> 5.65 MB（时长拿到 6/6）
+    //     C. preload="none"    + poster         -> **0 字节**（时长拿到 0/6）
+    //     D. preload="none"    无 poster        -> 0 字节
+    //   ⇒ **只有 `preload="none"` 才真的不拉**（poster 只影响显示，
+    //     不阻止 Chrome 去预取视频本体）。
+    //
+    // 【为什么用 "none" 不会坏功能】
+    //   * 卡片有 `controls` —— 用户点播放时浏览器**按需**拉视频，
+    //     体验与原来一致（只是开始播放前多一个加载动作）。
+    //   * 卡片上显示的「时长」来自 `params`（服务端下发），
+    //     **不是**从 `<video>.duration` 读的 —— 见 jobCard 的 durationRow。
+    //   * 有 poster -> 播放前显示的是缩略图（用户能看到画面）。
+    //   * 「添加到长片拼接」用的是 `source.url`（原视频）+ `params.duration`
+    //     —— 与 `<video>` 元素无关，不受影响。
+    //
+    // 【降级】没有 thumb 时不写 poster -> 仍是缩略图空白但功能一致。
+    const posterAttr = videoThumb ? ` poster="${videoThumb}"` : "";
+    preview = `<video src="${outputUrl(job, video)}"${posterAttr} controls preload="none"></video>`;
   } else if (image) {
-    preview = `<img src="${outputUrl(job, image)}">
+    // 【2026-11-21 性能修】卡片预览用缩略图 + 懒加载。
+    //   * `loading="lazy"` —— 视口外的卡片不下载；
+    //   * `decoding="async"` —— 解码不阻塞主线程；
+    //   * 点开大图（lightbox）仍用**原图**（见 lightboxShow 的调用点）。
+    const src = imageThumb || outputUrl(job, image);
+    preview = `<img src="${src}" loading="lazy" decoding="async" data-orig-src="${outputUrl(job, image)}">
       <span class="zoom-hint" title="点击查看大图"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2H2v5M9 2h5v5M9 14h5V9M7 14H2V9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`;
   } else if (runningOrQueued) {
     preview = `<div class="progress-wrap">
