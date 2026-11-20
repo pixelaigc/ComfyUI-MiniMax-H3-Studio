@@ -28,7 +28,7 @@ flowchart TB
   A_RESULT --> A_SESS_ART
   A_TOOLS -.-> A_MEMORY
 
-  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 33 个）"]
+  subgraph TOOLS["Agent 工具（派生自 h3studio/agent.py 的 TOOLS，共 37 个）"]
     direction LR
     subgraph TG1["素材类"]
       direction TB
@@ -89,6 +89,10 @@ flowchart TB
       T_media_extract_frames["正在抽帧<br/><code>media_extract_frames</code>"]
       T_media_mix_audio["正在混音<br/><code>media_mix_audio</code>"]
       T_media_merge_av["正在音视频合流<br/><code>media_merge_av</code>"]
+      T_media_extract_audio["正在抽取音轨<br/><code>media_extract_audio</code>"]
+      T_media_trim["正在裁剪片段<br/><code>media_trim</code>"]
+      T_media_normalize_audio["正在归一响度<br/><code>media_normalize_audio</code>"]
+      T_media_replace_audio["正在替换音轨<br/><code>media_replace_audio</code>"]
     end
   end
 

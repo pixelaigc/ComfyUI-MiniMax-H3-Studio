@@ -29,7 +29,7 @@ PID_BEFORE=$(systemctl show h3-studio.service -p MainPID --value)
 echo "重启前 PID=$PID_BEFORE"
 
 # 【并发安全】live 必须仍停在本轮开始时看到的状态。
-EXPECT_LIVE=3d4c7b018e0566d667f8292b6f28b6e2f1ba6293
+EXPECT_LIVE=c028691a9db830afe5874add1cd0ce746281caf2
 if [ "$LIVE_BEFORE" != "$EXPECT_LIVE" ]; then
   echo "!! live 分支已被别人推进（$LIVE_BEFORE != $EXPECT_LIVE），中止部署"
   exit 1
