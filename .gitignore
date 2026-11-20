@@ -91,3 +91,5 @@ evidence/e2e/
 
 # 取证截图不入库（体积大 + 与线上数据绑定）
 /evidence/favorites-live-*/
+/evidence/favorites-dom-assert-*/
+/evidence/favorites-batch-live-*/
