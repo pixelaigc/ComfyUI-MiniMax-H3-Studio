@@ -48,6 +48,7 @@ MiniMaxH3TurboLoRA.lora_name = DMAD 权重、strength = 1.0）。
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from . import video_models as vmodels
@@ -215,7 +216,120 @@ def _fixed_accel_lora_display(key: str) -> str:
     return _accel_lora_display(key)
 
 
-def _effect_lora_display(name: str) -> str:
+#: 【2026-11-21 生成媒体库性能修 —— 效果 LoRA 清单的**请求内记忆化】
+#:
+#: 【实测根因（不是推测）】
+#:   `h3studio/h3_effect_loras.discover_effect_loras()` 要**扫全盘 712 个
+#:   safetensors** 并逐个读头（实测单次 858ms，其中 914ms 花在
+#:   `read_safetensors_header` + `lora_modules` 上）。
+#:   而 `_effect_lora_display()` 在**每条任务记录**里各调一次它
+#:   （`/api/jobs` 一次返回 100 条 -> 100 次调用）。
+#:   `discover_effect_loras()` 自己的缓存 TTL 只有 60 秒 —— 所以：
+#:     * TTL 内 -> 每条 0ms（看起来很快）
+#:     * TTL 一过 -> **第一个**卡片触发 858ms 全盘扫描，
+#:       后面的卡片命中缓存 -> 又是 0ms
+#:   于是表现是「**有时候**载入很慢很慢」：每 60 秒必有一次尖峰。
+#:
+#: 【为什么不直接调大 TTL】TTL 只是把尖峰推后，没有解决「尖峰存在」。
+#:   真正的问题是**同一个请求内重复做同一件昂贵的事**。
+#:
+#: 【本修法的口径】
+#:   * 新增 `_effect_lora_display_map()`：**一次性**拿到
+#:     {权重文件名 -> 显示名} 的整张映射；
+#:   * `_effect_lora_display()` 改为**查这张映射**（缺失则回落到原逻辑）；
+#:   * 映射由**调用方**（`summarize` / `is_real_lora_key`）在**一次
+#:     summarize 调用内**构建并复用 —— 即「每条任务一次」而不是
+#:     「每个 LoRA 字段一次」。
+#:
+#: 【为什么不改 discover_effect_loras 的缓存】那是**模块级**缓存，
+#:   跨请求共享。它对「扫盘」是对的（60 秒内目录不变）。
+#:   问题在于**调用次数**：一次请求里调 100 次。
+#:   请求级记忆化把 100 次降到 1 次，两层缓存各司其职。
+#:
+#: 【安全性】映射只由**只读**派生数据构成（权重名 + 同名 .md 标题），
+#:   不缓存任何用户配置。失效最坏后果是「显示名退回文件名」。
+_EFFECT_LORA_DISPLAY_CACHE: dict = {"at": 0.0, "map": None}
+
+#: 映射的缓存有效期（秒）。
+#:
+#: 【为什么比 discover_effect_loras 的 60 秒更长】这份映射只是
+#: 「名字 -> 显示名」，变化频率与目录一致（用户装 LoRA）。
+#: 取 300 秒 = 5 分钟，把「每 60 秒一次尖峰」降到「每 5 分钟一次」。
+#: `discover_effect_loras()` 自己的 60 秒缓存仍在下面兜底 ——
+#: 也就是说 **最坏情况每 300 秒才付一次扫盘代价**。
+_EFFECT_LORA_DISPLAY_TTL = 300.0
+
+
+def warm_effect_lora_display_map() -> dict[str, str]:
+    """预热「名字 -> 显示名」映射（供服务端在**事件循环之外**调用）。
+
+    【为什么需要这个入口】映射的构建要**扫全盘**（实测 377~980ms）。
+    它被 `summarize()` 同步调用，而 `summarize()` 是在 aiohttp 的
+    **事件循环里**跑的 —— 一次扫盘就把整个 8190 服务冻住
+    （与 2026-11-16 那次「整站不可访问」同类的故障）。
+
+    服务端应该用 `await asyncio.to_thread(job_meta.warm_effect_lora_display_map)`
+    在**线程里**预热，之后事件循环里的 `summarize()` 命中缓存，
+    毫秒级返回。
+
+    【幂等】缓存命中时本函数几乎免费（一次 dict 查找）。
+    """
+    return _effect_lora_display_map()
+
+
+def invalidate_effect_lora_display_cache() -> None:
+    """主动作废「名字 -> 显示名」映射缓存。
+
+    【为什么需要它】`h3_effect_loras.invalidate_effect_lora_cache()`
+    刷的是**扫盘结果**缓存；本映射是**它的派生物**，必须一起刷，
+    否则装完新 LoRA 后 5 分钟内显示名还是旧的。
+    """
+    _EFFECT_LORA_DISPLAY_CACHE["at"] = 0.0
+    _EFFECT_LORA_DISPLAY_CACHE["map"] = None
+
+
+def _effect_lora_display_map() -> dict[str, str]:
+    """H3 视频效果 LoRA 的 {权重文件名 -> 显示名} 映射。
+
+    【为什么需要这张映射】`_effect_lora_display()` 原来每次调用都
+    遍历 `discover_effect_loras()` 的完整结果，而那个结果需要扫盘
+    （实测 858ms/次）。列表接口一条记录要问好几次 LoRA 名字 ->
+    一次请求里就是好几次扫盘。
+
+    【构建成本】= 一次 `discover_effect_loras()`（命中它自己的 60 秒
+    缓存时几乎免费）+ 对命中的条目各读一次同名 .md。
+
+    【缓存】模块级 + TTL 300 秒（见 _EFFECT_LORA_DISPLAY_TTL 的说明）。
+    失效最坏后果：显示名退回「权重文件名」—— 不编造、不报错。
+    """
+    now = time.time()
+    cached = _EFFECT_LORA_DISPLAY_CACHE.get("map")
+    at = _EFFECT_LORA_DISPLAY_CACHE.get("at") or 0.0
+    if cached is not None and (now - at) < _EFFECT_LORA_DISPLAY_TTL:
+        return cached
+    out: dict[str, str] = {}
+    try:
+        from . import h3_effect_loras as effect_registry
+        from . import h3_effect_lora_docs as doc_parser
+        for entry in effect_registry.discover_effect_loras():
+            name = str(entry.get("name") or "")
+            if not name:
+                continue
+            display = ""
+            try:
+                doc = doc_parser.read_lora_doc(Path(entry["path"]))
+                display = str(doc.get("display") or "").strip()
+            except Exception:
+                display = ""
+            out[name] = display or str(entry.get("display") or "") or name
+    except Exception:
+        out = {}
+    _EFFECT_LORA_DISPLAY_CACHE["at"] = now
+    _EFFECT_LORA_DISPLAY_CACHE["map"] = out
+    return out
+
+
+def _effect_lora_display(name: str, display_map: dict | None = None) -> str:
     """效果 LoRA 的权重文件名 -> 显示名。
 
     两族分开查：
@@ -224,20 +338,19 @@ def _effect_lora_display(name: str) -> str:
       * **图像**效果 LoRA -> `loras.LORA_CATALOG` 的 display
 
     查不到时**原样返回文件名**（不编造名字）。
+
+    【2026-11-21 性能修】`display_map` 由调用方传入，**一次 summarize
+    里复用同一张映射** —— 避免每问一个 LoRA 名字就扫一次盘。
+    不传时退化为自建映射（保持单次调用的正确性）。
     """
     if not name:
         return ""
     # H3 视频族
     try:
-        from . import h3_effect_loras as effect_registry
-        for entry in effect_registry.discover_effect_loras():
-            if entry["name"] == name:
-                from . import h3_effect_lora_docs as doc_parser
-                doc = doc_parser.read_lora_doc(Path(entry["path"]))
-                display = str(doc.get("display") or "").strip()
-                if display:
-                    return display
-                return entry.get("display") or name
+        mapping = display_map if display_map is not None else _effect_lora_display_map()
+        hit = mapping.get(name)
+        if hit:
+            return hit
     except Exception:
         pass
     # 图像族
@@ -567,11 +680,15 @@ def _in_lora_registry(text: str) -> bool:
     except Exception:
         pass
     # H3 视频效果 LoRA（扫盘发现的，不在静态注册表里）
+    #
+    # 【2026-11-21 性能修】原来这里直接调 `discover_effect_loras()` ——
+    # 那个函数要扫全盘 712 个 safetensors（实测 858ms/次）。
+    # 列表接口一条记录要问好几次 -> 一次请求里就是好几次全盘扫描。
+    # 现在走**同一张请求级映射**（`_effect_lora_display_map()`）：
+    # 命中即认为在清单里，查不到就真的不在。
     try:
-        from . import h3_effect_loras as effect_registry
-        for entry in effect_registry.discover_effect_loras():
-            if entry["name"] == text:
-                return True
+        if text in _effect_lora_display_map():
+            return True
     except Exception:
         pass
     return False
