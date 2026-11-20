@@ -5254,11 +5254,32 @@ def _image_family_for_mode(mode: str) -> str:
         gen_normalize.DEFAULT_PARAM_RANGES_FAMILY
 
 
+#: 面板提交路径**不套**的默认参数字段（采样类）。
+#:
+#: 【为什么】``normalize_t2v_params`` 里 flf / r2v 有一条 2026-11-12
+#: 定下的契约：**客户端没传 sampler / scheduler 时服务端不写回** ——
+#: 因为工作流会按 ``lora`` 自己选档（有加速 LoRA -> euler/beta；
+#: 无 -> res_multistep/simple）。服务端写回就等于**改老任务的画质**。
+#:
+#: 【实测守卫】``tests/test_video_sampling_params.py::
+#:   test_B2_legacy_client_without_sampler_keeps_workflow_default``
+#: 断言 ``"sampler" not in params``。
+#:
+#: 【Agent 路径不受影响】Agent 走 ``agent.py`` 自己的
+#: ``merge_into_params``（带 ``overridable=builtin_filled``），
+#: 本来就该带采样参数 —— 模型是在**主动建任务**，不是「老客户端重放」。
+_SAMPLING_ONLY_FIELDS = frozenset({
+    "sampler", "scheduler", "steps",
+    "shift_video", "shift_audio",
+})
+
+
 def apply_gen_defaults_and_size(mode: str, params: dict) -> dict:
     """
     把「管理页默认参数」套进 params，并解析出最终生效的宽高。
 
-    **就地修改** params，返回同一个对象。
+    **就地修改** params，返回同一个对象.
+
 
     【为什么抽成独立函数】它必须在**两个时机**都跑：
       1. ``api_create`` 里 ``normalize_t2v_params`` **之前** ——
@@ -5293,12 +5314,33 @@ def apply_gen_defaults_and_size(mode: str, params: dict) -> dict:
                 conn.close()
             _gd = (_settings.get("gen_defaults") or {}).get(mode)
             if isinstance(_gd, dict) and _gd:
+                # 【2026-11-20 —— 采样类字段**不套**（既有契约）】
+                #
+                # 【为什么】``server.py`` 里 flf / r2v 的归一有一条
+                # 2026-11-12 定下的契约：**客户端没传 sampler / scheduler 时
+                # 服务端不写回** —— 因为工作流会按 ``lora`` 自己选档
+                # （有加速 LoRA -> euler/beta；无 -> res_multistep/simple）。
+                # 服务端写回就等于**改老任务的画质**。
+                #
+                # 【实测回归】``tests/test_video_sampling_params.py::
+                #   test_B2_legacy_client_without_sampler_keeps_workflow_default``
+                # 断言 ``"sampler" not in params``。套了默认参数就会挂。
+                #
+                # 【为什么 Agent 路径不受影响】Agent 路径走
+                # ``agent.py`` 自己的 ``merge_into_params``（带
+                # ``overridable=builtin_filled``），本来就该带采样参数 ——
+                # 模型是在**主动建任务**，不是「老客户端重放」。
+                #
+                # 所以：**面板提交路径不套采样类字段**，其余（比例 /
+                # MP 预算 / 百分比 / 时长 / 底模 / LoRA 档 / 精度 …）照套。
+                _gd = {k: v for k, v in _gd.items()
+                       if k not in _SAMPLING_ONLY_FIELDS}
                 # 【显式值 = 本次请求里带了非空的字段】
                 _explicit = {k for k, v in params.items()
                              if v not in (None, "")}
                 out["defaults_applied"] = gen_defaults.merge_into_params(
                     mode, params, {mode: _gd}, explicit=_explicit,
-                    overridable=())
+                    overridable=(), skip_sampling=True)
         except Exception:
             # 套默认参数失败**不能阻断建任务** ——
             # 少几个默认值只是「用了工作流内置值」，总比任务建不出来好。
