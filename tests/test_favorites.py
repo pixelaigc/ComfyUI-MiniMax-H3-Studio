@@ -481,7 +481,10 @@ class TestFavoritesBrowser(unittest.TestCase):
         route_pattern = re.compile(r".*/api/jobs$")
         self.page.route(route_pattern, _fake_submit)
         try:
-            self.page.fill("#prompt", "收藏功能测试提示词")
+            # 【提示词不能用测试占位词】tests/test_e2e_gen_flow_contract.py 的 A2
+            # 断言扫描全仓的提示词样本，含「测试」等占位词会直接报红
+            # （那条断言是对的 —— 占位词不该进真实提示词）。
+            self.page.fill("#prompt", "一只橘猫在洒满阳光的草地上奔跑，抓拍瞬间，暖色逆光")
             self.page.click("#genBtn")
             # 图像模式提示词未增强时会弹确认框 —— 走「确认生成」
             self.page.wait_for_timeout(1200)
