@@ -1211,14 +1211,38 @@ VIDEO_MODE_SIZE_POLICY: dict[str, dict] = {
 
 
 def size_policy_for_mode(mode: str) -> dict:
-    """某个生成模式的尺寸策略（未知模式回落到 t2v 的宽松策略）。"""
+    """
+    某个生成模式的尺寸策略（未知模式回落到 t2v 的宽松策略）。
+
+    【2026-11-20 修 —— max_pixels_mp 改为**实时派生**】
+    原来 ``VIDEO_MODE_SIZE_POLICY`` 里存的 ``max_pixels_mp`` 是
+    ``VIDEO_MAX_CANVAS_PIXELS`` 的**导入期快照** —— 改了真源常量
+    （VIDEO_MAX_CANVAS_PIXELS）后，策略表里的 MP 数不会跟着变，
+    于是「Agent 的能力自述」会继续报旧上限。
+    现在每次调用都从 ``max_pixels`` 重新算 MP，**改真源即生效**
+    （这是 Agent 能力自述派生链路的验收点）。
+    """
     policy = VIDEO_MODE_SIZE_POLICY.get((mode or "").strip())
     if not policy:
         policy = VIDEO_MODE_SIZE_POLICY["t2v"]
         result = dict(policy)
         result["source"] = "未知模式，回落到 t2v 策略"
-        return result
-    return dict(policy)
+    else:
+        result = dict(policy)
+    # 【关键】面积上限**实时取自** VIDEO_MAX_CANVAS_PIXELS，
+    # 而不是策略表里的导入期快照 —— 改真源常量后必须立刻生效。
+    #
+    # 【为什么不能直接用 policy["max_pixels"]】
+    # VIDEO_MODE_SIZE_POLICY 是在**模块导入时**构造的字面量字典，
+    # 里面的 max_pixels 是当时的 VIDEO_MAX_CANVAS_PIXELS 值。
+    # 真源改了（VIDEO_MAX_CANVAS_PIXELS = 1.0 MP）而策略表没跟着变，
+    # Agent 的能力自述就会继续报旧上限 —— 正是本任务要消灭的漂移。
+    #
+    # 【longfilm 例外】它的 max_pixels 是 None（拼片模式，尺寸由被拼视频决定）
+    if result.get("max_pixels") is not None:
+        result["max_pixels"] = VIDEO_MAX_CANVAS_PIXELS
+        result["max_pixels_mp"] = VIDEO_MAX_CANVAS_PIXELS / (1024 * 1024)
+    return result
 
 
 def max_pixels_for_mode(mode: str) -> float | None:

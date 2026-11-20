@@ -174,6 +174,41 @@ RETRYABLE_TOOL_PREFIXES = ("search_", "list_", "get_", "recall_",
 #: 工具失败时的最大尝试次数（含首次）。
 MAX_TOOL_RETRY = TOOL_RETRY + 1
 
+#: 「无进展」判定 —— 连续多少步**没有产生任何新事实**就收尾。
+#:
+#: 【为什么需要（2026-11-20 需求 D）】
+#: 重复调用检测只看「同名工具 + 完全相同参数」。但本地小模型
+#: 还有一种更隐蔽的打转：**换关键词反复搜索** —— 每次参数都不同，
+#: 所以重复检测抓不到它。于是模型可以合法地连查 20 次素材库
+#: （每次换个词），把 50 步预算耗光，最后什么都没做成。
+#:
+#: 【判据 —— 「事实指纹」没有变化】
+#: 每次工具调用后算一个「事实指纹」（工具名 + 结果里的关键字段）：
+#:   * search_assets -> 命中的 asset_id 集合
+#:   * describe_asset -> 该素材的描述哈希
+#:   * list_modes / get_mode_schema -> 工具名本身（配置没变就是同一事实）
+#:   * create_job -> 建的 job_id（每次都新 = 有进展）
+#:   * 媒体工具 -> 产物的 asset_id
+#: 指纹连续 N 步不变 = 模型在原地打转（既没找到新东西，也没推进状态）。
+#:
+#: 【为什么是 6 而不是 3】
+#: 正常的探索链是「search_assets 换 2~3 个关键词」-> 「describe_asset」
+#: -> 「create_job」-> 「respond」。其中「换关键词但都没命中」那段
+#: 指纹相同 —— 但那是**合理**的（一次搜索找不到，换词再找）。
+#: 给 6 步的容差：允许「换 3 个词都空」+「再 describe 一次」。
+#: 超过 6 步仍然没有新事实，才判定为打转。
+NO_PROGRESS_LIMIT = 6
+
+#: 同一轮里最多允许几次**澄清式 respond**（needs_clarification=true）。
+#:
+#: 【为什么需要（2026-11-20 需求 D）】
+#: 澄清式 respond 不再收尾（让模型继续做完能做的部分）——
+#: 但如果模型**反复**用澄清式 respond 收尾自己，
+#: 就会变成「问一句 -> 继续 -> 再问一句」的死循环。
+#: 给一个上限：连续澄清达到上限时收尾，并把已澄清的问题如实带回。
+#: 2 次足够表达「我问了一次，用户没答，但我按默认做完了」。
+CLARIFY_LIMIT = 2
+
 
 #: 进度阶段的中文文案。前端直接显示这些词，不要让模型自己编阶段名。
 #: 键 = 内部阶段标识，值 = 面向用户的短语。
@@ -223,6 +258,10 @@ TOOL_STAGE_TEXT = {
     "media_extract_frames": "正在抽帧",
     "media_mix_audio": "正在混音",
     "media_merge_av": "正在音视频合流",
+    "media_extract_audio": "正在抽取音轨",
+    "media_trim": "正在裁剪片段",
+    "media_normalize_audio": "正在归一响度",
+    "media_replace_audio": "正在替换音轨",
 }
 
 
@@ -239,7 +278,7 @@ class AgentError(RuntimeError):
 
 # ------------------------------------------------------------------ 系统提示词
 
-SYSTEM_PROMPT = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多模态创作 Agent。
+SYSTEM_PROMPT_TEMPLATE = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多模态创作 Agent。
 你的职责是处理**图像 / 视频 / 音频**相关的创作任务，把用户的自然语言意图
 转成**可执行的生成任务**。
 
@@ -284,13 +323,17 @@ SYSTEM_PROMPT = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多�
 - media_mix_audio(video_asset_id, audio_asset_ids[], volumes?, replace?)
                             混音（可替换原音轨）
 - media_merge_av(video_asset_id, audio_asset_id)  音视频合流
+- media_extract_audio(asset_id, output_format?)  从视频里抽取音轨
+- media_trim(asset_id, start_sec, duration_sec?)  按时长裁剪 / 截取片段
+- media_normalize_audio(asset_id, target_lufs?)  音频响度归一（EBU R128）
 
 ## 工作方式
 1. 需要素材时先 search_assets；**同一工具不要连续重复调用超过 2 次**，
    没找到就换关键词或直接告诉用户没有。
    **命中了就不要再换关键词搜同一个素材** —— 搜索结果的描述是截断的，
    想看完整描述请用 describe_asset（同一个 asset_id）。
-   工具调用预算是 8 次，全花在搜索上就没预算下发任务了。
+   工具调用预算是 {tool_budget} 次 —— 这是**上限**不是配额，
+   不必为了省预算而提前收尾；该查就查，该做就做。
 2. 需要下发生成时才调 create_job。参数只填用户表达出来的意思，
    没说的（分辨率、比例、时长、种子）**不要瞎编**，留空由工作台用官方默认值。
 3. **参数拿不准时先调 get_mode_schema**，不要猜。它会告诉你该模式的
@@ -299,26 +342,24 @@ SYSTEM_PROMPT = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多�
 5. 如果用户的需求超出工具能力（例如要分析视频内容、要看生成结果），
    直接在 respond 里说明边界，不要假装做到了。
 
-## 关键参数缺失时（澄清式提问）
-比例、时长、参考图这类**关键参数**如果用户没说，且不同选择会产出明显不同的结果，
-**不要瞎猜，也不要硬着头皮做**。用 respond 提问：
+## 多步请求：一次做完，不要中途停下等用户催
+用户的请求往往是一条完整链路（选素材 -> 处理 -> 产出）。
+**只要每一步都有明确的、可合理默认的选择，就直接一路做完**，
+中间不要停下来问用户。只有在**缺少无法合理默认的关键输入**时才提问：
+  * 素材库里**根本没有**用户描述的素材（换关键词也找不到）；
+  * 同一个诉求有**互相冲突**的解读，且选错会产生完全不同的产物；
+  * 需要用户的账号凭证 / 外部授权这类只有用户能给的东西。
+除此以外（即使用户没给分辨率、时长、比例这类可默认的参数），
+**一律用工作台默认值或最贴近用户表述的合法值直接做**，
+并在最终结论里说明你替他做了什么。
+绝不因为「用户没说清楚」就把一条本来能做完的链路停在半路。
+
+## 关键参数缺失时（澄清式提问）—— 只在上面那三种情况下用
+比例、时长这类参数如果用户没说，**不要问**，用默认档位直接做。
+确实必须问时，用 respond 提问：
   * respond(summary="要竖屏还是横屏？", needs_clarification=true)
   * summary 里写清楚你在问什么、给了哪些选项
   * 用户回答后，下一轮就能接着做（会话历史会保留这次提问）
-
-## 各模式的真实参数边界（背下来，不要瞎试）
-- **比例**：8 个固定值 1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 9:16 / 16:9 / 21:9。
-- **视频**：时长 5~15 秒；分辨率**只有 544p / 768p**（传 1080p 会被静默落成 768p，
-  所以不要传）；加速 LoRA 用 lora 参数（none / ckpt850 / v4step600）。
-- **音乐**：时长字段是 **max_duration**（4~360 秒，默认 60）—— 传 duration 不生效！
-  歌词用 lyrics，谱面模式用 plan_mode（full / melody）。
-- **图像**：分辨率档位按族不同（t2i / t2i_qwen / t2i_moss 各有一套）。
-  超上限时 t2i 会自动走 2K 放大路径，另两族没有（会直出）。用 get_mode_schema 查。
-- **负面提示词**：只在 t2i_moss 与 t2i+Z-Image Base 真正生效；
-  Qwen 族需要把 cfg 抬到 1 以上才生效；视频/音乐没有这个通道。
-  不生效时如实告诉用户「这个模式用了负面提示词也没用」，不要假装抑制了。
-- **素材槽位**：参考图给 asset_id；首尾帧用 first_frame / last_frame；
-  参考生音乐用 ref_audio（只能 1 段）。素材必须来自素材库。
 
 ## 用户上传的附件（图片）
 用户可能随消息上传几张图片。它们已经进了素材库，系统提示词里会列出
@@ -350,9 +391,38 @@ SYSTEM_PROMPT = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内置的多�
   想做一件事，就**直接调用对应的工具**。
 - 除了最后的 respond 结论，其余轮次一律只输出工具调用。
 - 结论要具体：说清楚做了什么、生成了什么、用了哪些素材。
+- 如果参数被服务端自动调整过（工具结果里的 adjustments），**必须在结论里说清楚**
+  「你要的 X 实际用的是 Y」，不要让用户以为原样生效了。
 - 如果某件事做不了（比如参数超出范围），直接用 respond 说明原因和可选方案，
   不要在正文里反复解释。
+
+{capability}
 """
+
+
+def build_system_prompt() -> str:
+    """
+    渲染系统提示词 —— **能力自述全部来自真源**。
+
+    【为什么必须是函数而不是常量（2026-11-20 用户实测缺陷）】
+    旧实现把「视频分辨率只有 544p / 768p」「时长 5~15 秒」
+    「音乐时长 4~360 秒」这些**能力事实**写死在 SYSTEM_PROMPT 常量里。
+    服务端早就放宽了（真实是 2.0MP 画布 / 2~60 秒 / 4~900 秒），
+    提示词却还在说旧数字 —— 用户因此被告知「只能 544p/768p」。
+
+    现在能力段落由 ``agent_capability`` 从服务端配置实时渲染：
+    改配置 -> 提示词随之改变（单测锁住这个契约）。
+    """
+    from . import agent_capability
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        tool_budget=MAX_TOOL_CALLS,
+        capability=agent_capability.capability_text())
+
+
+#: 兼容旧引用（``SYSTEM_PROMPT`` 仍是可用名，内容是渲染后的真实能力版）。
+#: 【注意】这是**导入时**的快照 —— 真源在运行期变化时，
+#: 应改用 ``build_system_prompt()``（run_agent 走的就是那条路径）。
+SYSTEM_PROMPT = build_system_prompt()
 
 
 # ------------------------------------------------------------------ 工具注册表
@@ -439,6 +509,18 @@ class AgentContext:
         self.sensitive: dict | None = None
         #: 待澄清的问题（澄清式多轮对话）。
         self.clarification: str = ""
+        #: 【2026-11-20 新增】本轮**尚未收尾**的澄清式提问。
+        #:
+        #: 【为什么与 clarification 分开】
+        #: 澄清式 respond 现在**不收尾**了（让模型继续把能做的做完）——
+        #: 那么它提出的问题就不是「本轮的最终状态」，而是
+        #: 「一个待确认的附带问题」。如果继续复用 ``clarification``，
+        #: 收尾时 status 会被强制改成 ``needs_clarification``，
+        #: 即使模型后面已经把活全做完了（实测就是这个 bug）。
+        #:
+        #: 所以：``clarification`` = **最终**提问（收尾态）；
+        #: ``pending_clarification`` = 过程中的附带提问（不改变收尾态）。
+        self.pending_clarification: str = ""
         #: 本轮**尝试过**的模式（即使建任务失败也会记）。
         #:
         #: 【为什么需要，2026-11-10】澄清快捷选项的兜底推断要知道
@@ -638,273 +720,101 @@ def _image_family(mode: str) -> str:
 
 @tool(
     "list_modes",
-    "列出本工作台真实支持的生成模式，以及每个模式的可用参数范围。",
+    "列出本工作台真实支持的生成模式，以及每个模式的可用参数范围。"
+    "内容全部由服务端真实配置实时生成（不是写死的清单）。",
     _schema({}),
 )
 async def _tool_list_modes(ctx: AgentContext, args: dict) -> dict:
     """
-    列出 Agent **能实际下发**的生成模式。
+    列出 Agent **能实际下发**的生成模式与它们的真实参数范围。
+
+    【为什么整段改成派生（2026-11-20 用户实测缺陷）】
+    旧实现把「视频分辨率只有 544p / 768p」「音乐时长 4~360」
+    「加速 LoRA 只有 none/ckpt850/v4step600」写成**硬编码字面量**。
+    服务端早已放宽（真实是 2.0MP 画布 / 2~60 秒 / 4~900 秒 /
+    12 枚加速 LoRA），Agent 却还在报旧数字 —— 用户被告知
+    「视频分辨率只有 544p/768p，请求 480p 实际按 768p 生成」。
+
+    现在全部数据来自 ``h3studio.agent_capability``（真源渲染）：
+      * 分辨率 -> video_models.VIDEO_MODE_SIZE_POLICY + 真实档位并集
+      * 时长   -> video_models.VIDEO_DURATION_MIN/MAX
+      * 音乐   -> music_yue2.YUE2_MIN/MAX/DEFAULT_DURATION
+      * 模型   -> video_models.VIDEO_MODELS
+      * LoRA   -> video_models.all_accel_lora_keys()
+      * 槽位   -> agent_schema.MODE_SLOTS / MODE_MEDIA_SLOTS
+
+    【为什么共用参数提到顶层】
+    工具结果会被裁到 TOOL_RESULT_LIMIT（2000 字符）。视频三档参数
+    （分辨率 28 个档位 / 7 个底模 / 5 种注意力 / 12 枚加速 LoRA）
+    若逐模式重复三次，**必然**超限 —— 超限 = 模型看到残缺 JSON =
+    它以为工具坏了然后重复调用（实测踩过）。
+    所以：共用清单在顶层给一次，模式条目只留差异。
 
     注意这里刻意不用 gen_types.registered_modes()（它含 longfilm）——
     longfilm 走的是自己的子进程链路，不在 workflows.BUILDERS 里，
     create_job 建不了。报出来就是「看得到、用不了」，模型会因此卡住。
     模式白名单 = create_job 的白名单 = workflows.BUILDERS。
     """
+    from . import agent_capability as cap
+
     modes = []
-    for mode in wf.BUILDERS.keys():
+    for mode in cap.buildable_modes():
         info = gen_types.type_for_mode(mode)
-        entry = {
+        entry: dict = {
             "mode": mode,
             "label": info.get("label") or mode,
             "media": info.get("media") or "other",
         }
-        if mode in ("t2i", "t2i_qwen", "t2i_moss", "t2i_h3image", "i2i_h3image"):
-            entry["aspects"] = list(wf.ASPECT_MAP.keys())
-        if mode in ("t2v", "flf", "r2v"):
-            entry["aspects"] = list(wf.ASPECT_MAP.keys())
-            # 时长是**任意秒数**（后端 workflows 直接 float(params["duration"])），
-            # 面板滑块给的是 5~15 秒。之前这里硬编码成 [5,10,15]，
-            # 模型据此以为「8 秒不支持」而拒绝执行 —— 这是凭空造的约束。
-            entry["duration_range"] = [int(agent_schema.VIDEO_DURATION_MIN),
-                                      int(agent_schema.VIDEO_DURATION_MAX)]
-            entry["duration_note"] = (
-                f"单位：秒，取 {int(agent_schema.VIDEO_DURATION_MIN)}"
-                f"~{int(agent_schema.VIDEO_DURATION_MAX)} 之间的整数，面板滑块范围"
-                "（2026-11-12 起上限放宽到 60 秒）")
-        if mode == "t2i":
-            entry["models"] = list(wf.Z_IMAGE_MODELS.keys())
-            entry["resolutions"] = list(wf.Z_IMAGE_RES_TIERS.keys())
-        if mode == "t2i_qwen":
-            entry["models"] = list(wf.QWEN_IMAGE_MODELS.keys())
-            entry["resolutions"] = list(wf.QWEN_IMAGE_RES_TIERS.keys())
-        if mode == "t2i_moss":
-            entry["models"] = list(wf.MOSS_IMAGE_MODELS.keys())
-            entry["resolutions"] = list(wf.MOSS_IMAGE_RES_TIERS.keys())
-        if mode in ("t2i_h3image", "i2i_h3image"):
-            entry["models"] = list(wf.H3_IMAGE_MODELS.keys())
-            entry["resolutions"] = list(wf.H3_IMAGE_RES_TIERS.keys())
-            # 【走 negative_prompt_support 路径 —— 2026-11-13】
-            # 之前这里只给了 negative_prompt_note，compact 阶段不认它
-            # （compact 只认 negative_prompt_support）-> H3-Image 的模式条目
-            # **缺 negative_ok 字段**，而其它图像模式都有。
-            # 模型于是不知道「H3-Image 的负面提示词无效」——
-            # 而这恰恰是最容易踩的坑（guidance 固定 1，无 CFG pass）。
-            # 改走标准路径后自动得到 negative_ok=false（与实现一致）。
-            entry["negative_prompt_support"] = {
-                key: agent_schema.negative_support(mode, key)["effective"]
-                for key in agent_schema.mode_models(mode)
-            }
-        if mode == "i2i_h3image":
-            entry["requires"] = "参考图来自素材库（asset_id），最多 16 张"
-            entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
-            # 【不重复给 media_slots】该模式只吃图片，而 slots 已经写了
-            # "ref_image" —— 再给一份 "image:ref_image" 是同义重复。
-            # media_slots 的作用是告诉模型「音频/视频该落哪个槽位」，
-            # 只吃图片的模式不需要它（i2i_qwen 也没给）。
-            entry["reference_placeholder"] = "<Picture N>"
-        if mode == "i2i_qwen":
-            entry["models"] = list(wf.QWEN_IMAGE_MODELS.keys())
-            entry["requires"] = "参考图来自素材库（asset_id）"
-        if mode in ("t2a", "a2a"):
-            # 音乐时长由 music_yue2._clamp_duration 收敛到 [4, 360] 秒
-            entry["duration_range"] = [4, 360]
-            entry["duration_note"] = "单位：秒，范围 4~360"
-            # 【实测事实，2026-11-10】音乐时长字段是 max_duration，**不是** duration。
-            # Agent 原来只暴露 duration，用户要 120 秒会静默变成 60 秒。
-            entry["duration_field"] = "max_duration"
-            entry["duration_note"] = ("单位：秒，范围 4~360，默认 60。"
-                                      "**必须用 max_duration 参数**，"
-                                      "用 duration 不生效（会被静默忽略）")
-            entry["music_params"] = {
-                "max_duration": "时长上限（秒），4~360，默认 60",
-                "lyrics": "歌词，留空 = 纯器乐",
-                "plan_mode": "谱面模式：full（默认）/ melody",
-                "format": "输出格式：flac（默认）/ mp3 / opus",
-            }
-            if mode == "a2a":
-                entry["asset_slots"] = {"single": ["ref_audio"], "multi": []}
-                entry["requires"] = "参考音频来自素材库（ref_audio，只能 1 段）"
-            else:
-                entry["asset_slots"] = {"single": [], "multi": []}
-        if mode in ("t2v", "flf", "r2v"):
-            # 视频分辨率只有两档；传其它值会被 workflows 静默落成 768p。
-            entry["resolutions"] = list(wf.RES_MP.keys())
-            entry["resolution_note"] = ("只有 544p / 768p 两档。"
-                                        "传其它值会被静默落成 768p，请不要传")
-            entry["video_params"] = {
-                "lora": "加速 LoRA：none / ckpt850（默认，4 步）/ v4step600",
-                "lora_strength": "LoRA 强度，默认 1.0",
-                "precision": "精度：int8（默认）/ nvfp4",
-                "duration": (f"时长（秒），{int(agent_schema.VIDEO_DURATION_MIN)}"
-                             f"~{int(agent_schema.VIDEO_DURATION_MAX)}"),
-            }
-        if mode == "flf":
-            entry["asset_slots"] = {"single": ["first_frame", "last_frame"],
-                                    "multi": []}
-            entry["requires"] = "首帧来自素材库（first_frame）"
-        if mode in ("i2i_qwen", "r2v"):
-            entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
-        if mode == "r2v":
-            # 【2026-11-11 音视频扩展】r2v（H3 参考生成）除参考图外，
-            # 还能吃**参考视频**与**参考音频** —— H3 的
-            # MiniMaxH3ReferenceToVideo 节点实测支持
-            #   ref_images 0~9 / ref_videos 0~3 / ref_audios 0~3
-            # 模型必须知道这一点，否则用户上传了视频却被塞进 ref_image。
-            entry["asset_slots"] = {"single": [], "multi": ["ref_image"]}
-            entry["media_slots"] = {"image": "ref_image", "video": "ref_video",
-                                    "audio": "ref_audio"}
-            entry["requires"] = ("参考素材来自素材库：图片 -> ref_image，"
-                                  "视频 -> ref_video，音频 -> ref_audio")
-        if mode in ("t2i", "t2i_qwen", "t2i_moss"):
-            # 负面提示词支持矩阵 —— 让模型知道「这个模式传了也没用」
-            # （H3-Image 不进这个矩阵：它的负面提示词**恒定无效**，
-            #   已在上面单独写了 negative_prompt_note）
-            entry["negative_prompt_support"] = {
-                key: agent_schema.negative_support(mode, key)["effective"]
-                for key in agent_schema.mode_models(mode)
-            }
-            entry["negative_prompt_note"] = (
-                "负面提示词只在该族标注 true 的模型版本上生效；"
-                "false 表示传了也不起作用（会被如实告知用户）")
+        slots = cap.mode_asset_slots(mode)
+        # 只有**真的接素材**的模式才报槽位与参考图上限 ——
+        # 文生类模式报「max_ref_images: 10」会让模型以为可以塞参考图。
+        accepts_assets = bool(slots["single"] or slots["multi"]
+                              or slots["media_slots"])
+        if accepts_assets:
+            if slots["single"] or slots["multi"]:
+                entry["slots"] = ",".join(slots["single"] + slots["multi"])
+            if slots["media_slots"]:
+                entry["media_slots"] = ",".join(
+                    f"{kind}:{slot}"
+                    for kind, slot in sorted(slots["media_slots"].items()))
+            if slots["max_ref_images"]:
+                entry["max_ref_images"] = slots["max_ref_images"]
+        if agent_schema.is_music_mode(mode):
+            # 音乐时长与视频不同（字段名也不一样），必须逐模式给。
+            entry["duration_field"] = agent_schema.mode_duration_field(mode)
+            entry["duration_range"] = list(cap.music_duration_range())
+            entry["duration_default"] = cap.music_default_duration()
+        if agent_schema.is_image_mode(mode):
+            # 图像族的模型/档位清单在顶层 image_families 给一次，
+            # 模式条目只留族名（f）。
+            entry["f"] = cap.image_family(mode)
+            # 负面提示词逐模型矩阵（是否真的生效）
+            entry["negative_ok"] = any(
+                agent_schema.negative_support(mode, key)["effective"]
+                for key in agent_schema.mode_models(mode))
         modes.append(entry)
 
-    # 压缩：把重复的「比例列表」「时长区间」提到顶层，模式条目只留差异。
-    #
-    # 为什么：工具结果会被截到 TOOL_RESULT_LIMIT（600 字符）。
-    # 之前每个模式都带一份完整的 8 项比例列表 + 时长说明，
-    # 9 个模式加起来超过 1200 字符 -> 被截断 -> 模型看到的是
-    # 「详情被截断，未逐条列出参数」-> 然后它就去重复调 list_modes（实测打转 3 次）。
-    # 压缩后同一份信息只要 ~400 字符，能完整传过去。
-    shared_aspects = list(wf.ASPECT_MAP.keys())
-    # 图像族 -> 该族的模型清单 / 分辨率档位（顶层给一次，模式条目只引族名）
-    # 【紧凑表示 —— 2026-11-13】
-    # 原来每个族是一个 dict：{"models": "...", "resolutions": "..."}，
-    # 4 个族 = 460 字符（键名 "models"/"resolutions" 重复 8 次，纯浪费）。
-    # 压成一行字符串："族名:模型1,模型2|档位1,档位2"
-    # -> 同样的信息 ~250 字符，省下的正好够塞下 H3-Image 的两个新模式。
-    families: dict = {}
-    for mode in ("t2i", "t2i_qwen", "i2i_qwen", "t2i_moss",
-                 "t2i_h3image", "i2i_h3image"):
-        models = agent_schema.mode_models(mode)
-        resolutions = agent_schema.mode_resolutions(mode)
-        if models or resolutions:
-            families[_image_family(mode)] = (
-                ",".join(models) + "|" + ",".join(resolutions))
-    compact = []
-    for entry in modes:
-        item = {"mode": entry["mode"], "label": entry["label"],
-                "media": entry["media"]}
-        # 只给「可选项的数量 + 默认值」，不给完整 key 列表 ——
-        # 完整列表太长（模型名 + 档位名加起来能到 700+ 字符），
-        # 会把工具结果顶到截断线以上，模型看到的就是「详情被截断」。
-        if entry.get("models") or entry.get("resolutions"):
-            # 模型/档位清单**不逐模式重复** —— 三个图像族各 2~4 个模型名，
-            # 重复三遍要 200+ 字符。改成顶层给「族 -> 清单」，
-            # 模式条目只留族名（family）。
-            if entry["media"] == "image":
-                # 【键名压缩 —— 2026-11-13】"family" -> "f"
-                # （键名在 5 个图像模式里各出现一次，省 ~25 字符）
-                # image_families 那个顶层字段的说明里会写清 f 是什么。
-                item["f"] = _image_family(entry["mode"])
-        if entry.get("requires"):
-            # 【压缩 —— 2026-11-13】原文动辄 30~50 字符（"参考素材来自素材库：
-            # 图片 -> ref_image，视频 -> ref_video，音频 -> ref_audio"），
-            # 而槽位信息 slots / media_slots 已经给了 —— 同一件事说两遍。
-            # 压成「素材来自素材库」+ 必要时的额外约束。
-            # 新增两个模式后整体超了 TOOL_RESULT_LIMIT（2000），必须压。
-            req = entry["requires"]
-            if req.startswith("参考素材来自素材库"):
-                item["requires"] = "素材来自素材库"
-            elif req.startswith("首帧来自素材库"):
-                # 槽位（first_frame/last_frame）已由 slots 给出，
-                # 这里只保留「来源约束」这一层信息。
-                item["requires"] = "素材来自素材库"
-            elif req.startswith("参考图来自素材库"):
-                # 【括号要配对 + 只留有用的约束 —— 2026-11-13】
-                # 原文形如「参考图来自素材库（asset_id），最多 16 张」
-                #   - 直接切前缀会留下孤零零的右括号（实测出现过「…，最多 16 张）」）
-                #   - 「（asset_id）」是实现细节，模型不需要知道字段名
-                #     （它只要知道「从素材库选」）；
-                #     「最多 16 张」是**有用的约束**（模型据此决定选几张），要留。
-                # 做法：去掉「（asset_id）」这种实现细节括号，保留数量约束。
-                req = req.replace("（asset_id）", "")
-                req = re.sub(r"（([^）]*)）", r"", req)
-                item["requires"] = req.strip("， ")
-            else:
-                item["requires"] = req
-        # 【2026-11-10 新增】这些是**模型最容易踩坑**的事实，必须让模型看到：
-        #   * duration_field —— 音乐时长字段名不是 duration（传了不生效）
-        #   * asset_slots   —— 素材该落到哪个槽位（否则 a2a / flf 必被服务端拦）
-        #   * negative_prompt_support —— 负面提示词在这个模式有没有用
-        if entry.get("duration_field"):
-            # 【键名不能压 —— 2026-11-13 实测】
-            # 试过压成 "df" 省 22 字符，但 duration_field 是**公开契约**
-            # （tests/test_agent_media_semantics_backend.py 断言
-            #   by_mode["t2a"].get("duration_field") == "max_duration"）
-            # -> 改了会让测试失败，也破坏外部消费方。保持原名。
-            item["duration_field"] = entry["duration_field"]
-        if entry.get("asset_slots"):
-            # 紧凑表示："first_frame,last_frame" / "ref_image" / "ref_audio"
-            # （嵌套 dict 太占字符 —— 整体要控制在 TOOL_RESULT_LIMIT 内）
-            slots = entry["asset_slots"]
-            parts = list(slots.get("single") or []) + list(slots.get("multi") or [])
-            if parts:
-                item["slots"] = ",".join(parts)
-        if entry.get("media_slots"):
-            # 【2026-11-11】素材类型 -> 槽位（紧凑表示）。
-            # 模型必须知道「音频用 ref_audio、视频用 ref_video」，
-            # 否则会把音频塞进 ref_image（服务端按槽位选上传通道，
-            # 音频被当图片上传 -> 任务建成了但参考素材是坏的）。
-            # 格式："image:ref_image,video:ref_video,audio:ref_audio"
-            item["media_slots"] = ",".join(
-                f"{kind}:{slot}"
-                for kind, slot in sorted(entry["media_slots"].items()))
-        if entry.get("negative_prompt_support"):
-            # 只给「这个模式有没有负面提示词通道」的布尔结论 ——
-            # 逐模型矩阵太长（4 个模型名 ~120 字符/族），
-            # 塞进 list_modes 会把整体顶到截断线以上。
-            # 逐模型的明细在 get_mode_schema 里给（那是按需查询的工具）。
-            item["negative_ok"] = any(
-                entry["negative_prompt_support"].values())
-        compact.append(item)
     return {
-        "modes": compact,
-        # 共用参数（原来每个模式重复一份，撑爆了工具结果长度上限）
-        # 【比例清单压成字符串 —— 2026-11-13】
-        # 列表形式 ["1:1","2:3",...] 占 59 字符（含引号逗号），
-        # 字符串 "1:1,2:3,..." 占 35。语义等价（模型只读、不解析结构），
-        # 且 Agent 内部取比例用的是 agent_schema.mode_aspects()，
-        # 不依赖这个字段的结构。
-        "aspects": ",".join(shared_aspects),
+        "modes": modes,
+        "aspects": ",".join(list(wf.ASPECT_MAP.keys())),
+        # --- 顶层共用参数（全部由真源派生）---
         "video_duration_range": [int(agent_schema.VIDEO_DURATION_MIN),
                                  int(agent_schema.VIDEO_DURATION_MAX)],
-        "music_duration_range": [4, 360],
-        # 各族的真实取值集合（压缩成「key: 合法值」一行，省字符）
-        "video_resolutions": ",".join(wf.RES_MP.keys()),
-        # 【video_loras 合并进 notes —— 2026-11-13】
-        # 单独一个字段要 24 字符 + 15 字符键名 = 39；
-        # 它没有外部消费方（grep 过 h3studio/ 与 web/），合进 notes 更省。
-        "image_families": families,
-        # 【音乐的两个小清单合并进 notes —— 2026-11-13】
-        # 原来单独两个数组（41 字符 + 键名），但 notes 里已经有一句
-        # 「音乐 4~360 秒」了。合并后信息不减、字符数降。
-        # 这两个字段没有外部消费方（grep 过 h3studio/ 与 web/）。
-        # 【精简 —— 2026-11-13】
-        # 原文 160 字符，且**前三条与顶层字段完全重复**
-        # （视频时长范围 / 音乐时长范围 / 视频分辨率都已有独立顶层字段）。
-        # 重复 = 白占字符。新增两个模式后整体超了 TOOL_RESULT_LIMIT（2000），
-        # 必须压。这里只保留**顶层字段表达不了**的事实：
-        #   * 视频 LoRA 的合法取值（没有独立顶层字段）
-        #   * 音乐时长字段名不是 duration（duration_field 只有值、没有说明）
-        #   * 音乐谱面模式 / 输出格式（原本是独立顶层字段，已合并进来）
-        #   * negative_ok=false 的含义
-        "notes": ("比例通用；"
-                  f"视频 LoRA 只有 {','.join(agent_schema.VIDEO_LORAS)}；"
+        # 【分辨率档位清单不进 list_modes —— 29 个档位会把结果顶爆】
+        # 完整档位/底模/注意力/加速 LoRA 清单在 **get_mode_schema(mode)** 里
+        # 按需查询（那是模型主动调的工具）；这里只给「能不能自定义 + 上限」
+        # 这两个**模型最容易猜错**的事实。
+        "video_resolution_note": (
+            f"视频可给短边档位（如 480p/768p）也可直接给 width/height"
+            f"（{cap.video_size_policy('t2v').get('multiple')} 的倍数，"
+            f"总像素 ≤ {cap.video_size_policy('t2v').get('max_pixels_mp')} MP）；"
+            f"完整档位与底模清单用 get_mode_schema 查。"),
+        "music_duration_range": list(cap.music_duration_range()),
+        "music_duration_default": cap.music_default_duration(),
+        "notes": ("比例通用；视频时长用 duration；"
                   "音乐时长用 max_duration（不是 duration）；"
-                  f"谱面模式 {','.join(agent_schema.MUSIC_PLAN_MODES)}；"
-                  f"格式 {','.join(agent_schema.MUSIC_FORMATS)}；"
-                  "negative_ok=false 表示负面提示词没用。"
-                  "f=图像族（见 image_families）。"
+                  "negative_ok=false 表示负面提示词没用；"
+                  "f=图像族（模型/档位清单用 get_mode_schema 查）；"
                   "拿不准用 get_mode_schema。"),
     }
 
@@ -1187,18 +1097,32 @@ def _explicit_args(args: dict) -> set:
                                      "最多 3 个）"},
         "aspect": {"type": "string", "description": "画面比例，如 16:9 / 9:16 / 1:1"},
         "duration": {"type": "number",
-                     "description": "时长（秒），**仅视频模式**（5~15）。"
-                                    "音乐模式请用 max_duration"},
+                     "description": "时长（秒），**仅视频模式**。"},
         "max_duration": {"type": "number",
-                         "description": "音乐时长上限（秒），**仅音乐模式**（4~360，默认 60）"},
+                         "description": "音乐时长上限（秒），**仅音乐模式**。"},
         "resolution": {"type": "string",
-                       "description": "分辨率档位。视频只有 544p / 768p；"
-                                      "图像按族取各自档位（1mp / 720p / 2k ...）"},
+                       "description": "分辨率档位（短边像素，如 480p / 768p）。"},
+        "width": {"type": "integer",
+                  "description": "视频输出宽度（像素）。与 resolution 二选一；"
+                                 "必须是 32 的倍数且总像素不超模式上限。"},
+        "height": {"type": "integer",
+                   "description": "视频输出高度（像素）。与 resolution 二选一；"
+                                  "必须是 32 的倍数且总像素不超模式上限。"},
         "model": {"type": "string",
                   "description": "模型版本（图像模式）。"
                                  "合法值用 get_mode_schema 查"},
+        "model_key": {"type": "string",
+                      "description": "视频底模（图像模式用 model）。"
+                                     "合法值用 get_mode_schema 查；"
+                                     "参考生视频必须用支持 Ref2VA 的权重。"},
+        "attention": {"type": "string",
+                      "description": "视频注意力机制。合法值用 get_mode_schema 查。"},
+        "accel_lora": {"type": "string",
+                       "description": "视频加速 LoRA。留空 = 不挂加速 LoRA；"
+                                      "合法值用 get_mode_schema 查。"},
         "lora": {"type": "string",
-                 "description": "视频加速 LoRA（none / ckpt850 / v4step600）"},
+                 "description": "视频加速 LoRA（旧字段）。"
+                                "合法值用 get_mode_schema 查"},
         "lora_strength": {"type": "number", "description": "LoRA 强度，默认 1.0"},
         "cfg": {"type": "number",
                 "description": "CFG。图像模式；Qwen 负面提示词需 cfg>1 才生效"},
@@ -1224,17 +1148,17 @@ def _explicit_args(args: dict) -> set:
                                  "Z-Image/MOSS/H3 各不相同）"},
         "seed": {"type": "integer", "description": "随机种子（不填则随机）"},
         "negative_prompt": {"type": "string",
-                            "description": "负面提示词。**只在 t2i_moss 与 "
-                                           "t2i+Z-Image Base 生效**，"
-                                           "其余模式会明确告知不生效"},
+                            "description": "负面提示词。是否生效取决于模式与"
+                                           "模型版本，用 get_mode_schema 查"
+                                           "negative_prompt 的逐模型矩阵"},
         "lyrics": {"type": "string", "description": "歌词（仅音乐模式，留空=纯器乐）"},
         "plan_mode": {"type": "string",
-                      "description": "音乐谱面模式：full（默认）/ melody"},
+                      "description": "音乐谱面模式。合法值用 get_mode_schema 查。"},
         "format": {"type": "string",
-                   "description": "音乐输出格式：flac（默认）/ mp3 / opus"},
+                   "description": "音乐输出格式。合法值用 get_mode_schema 查。"},
         "checkpoint": {"type": "string", "description": "音乐模型版本"},
         "precision": {"type": "string",
-                      "description": "视频精度：int8（默认）/ nvfp4"},
+                      "description": "视频精度。合法值用 get_mode_schema 查。"},
         "batch_count": {"type": "integer", "description": "一次生成几张（图像模式）"},
         "summary": {"type": "string", "description": "一句话说明这个任务要做什么"},
     }, ["mode", "prompt"]),
@@ -1263,6 +1187,19 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     resolution = str(args.get("resolution") or "").strip()
     if resolution:
         params["resolution"] = resolution
+    # 【2026-11-20 新增 —— 显式宽高】
+    #
+    # 【为什么必须支持】视频的真实分辨率表达方式是「短边档位」**或**
+    # 「直接给 width/height」（面板本来就有「输出尺寸」手填框，
+    # VIDEO_MODE_SIZE_POLICY.custom_size = True）。
+    # Agent 此前只能传档位 —— 而用户要 480p 时，档位与像素是两回事
+    # （480p = 0.4MP = 16:9 下 864x480）。
+    for field in ("width", "height"):
+        if args.get(field) is not None:
+            try:
+                params[field] = int(args[field])
+            except (TypeError, ValueError):
+                raise AgentError(f"{field} 必须是整数")
     if args.get("duration") is not None:
         try:
             params["duration"] = float(args["duration"])
@@ -1288,6 +1225,21 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     model_key = str(args.get("model") or "").strip()
     if model_key:
         params["model"] = model_key
+    # 【2026-11-20 新增 —— 视频底模 / 注意力 / 加速 LoRA】
+    #
+    # 【为什么必须支持】Agent 此前**完全不知道**这三样存在
+    # （模型/注意力/加速 LoRA 清单都没进能力自述），所以用户换不了。
+    # 现在：能力自述里有了（agent_capability），工具也真的能传。
+    video_model_key = str(args.get("model_key") or "").strip()
+    if video_model_key:
+        params["model_key"] = video_model_key
+    attention = str(args.get("attention") or "").strip()
+    if attention:
+        params["attention"] = attention
+    accel_lora = args.get("accel_lora")
+    if accel_lora is not None:
+        # 空串是**有效选择**（= 不挂加速 LoRA），不能被当成「没传」。
+        params["accel_lora"] = str(accel_lora or "").strip()
     lora_key = str(args.get("lora") or "").strip()
     if lora_key:
         params["lora"] = lora_key
@@ -1644,6 +1596,23 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     if asset_refs:
         params["asset_refs"] = asset_refs
 
+    # ------------------------------------------------------------------
+    # 【2026-11-20 新增】把「请求值 -> 生效值」的差异回传给模型
+    #
+    # 【为什么必须做】
+    # 用户报的原话是「请求 480p 实际按 768p 生成」—— 根因是
+    # **模型看不到服务端把它改成了什么**：
+    #   * 服务端 ``normalize_t2v_params`` 会把宽高按 32 倍数吸附、
+    #     超面积上限时按比例缩小（写进 params["size_adjust_reasons"]）；
+    #   * 时长超上限会被**拒绝**（那是错误，模型看得到）；
+    #   * 但「静默缩小」这件事，工具结果里一个字都没有。
+    # 于是模型只能按**请求值**向用户复述 —— 用户看到「480p」，
+    # 产物却是另一个尺寸，这就是「界面说谎」。
+    #
+    # 现在：把差异收集成 adjustments，随工具结果一起给模型，
+    # 模型据此在结论里说清楚「你要的 X 实际用的是 Y」。
+    adjustments = _collect_adjustments(mode, args, params)
+
     job_id = _create_job_record(ctx, mode, params)
     # 【提示词历史】Agent 建的任务也进历史表（source = generate）。
     # 面板侧钩子只挂在 server.api_create 上，Agent 走自己的工具链 ——
@@ -1698,7 +1667,86 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     if soft_notice:
         result["notice"] = soft_notice
         result["notices"] = soft_notice.get("notices") or []
+    # 【2026-11-20】服务端调整项如实回传（让模型能向用户解释）。
+    if adjustments:
+        result["adjustments"] = adjustments
     return result
+
+
+def _collect_adjustments(mode: str, args: dict, params: dict) -> list[dict]:
+    """
+    收集「用户/模型请求的值」与「服务端实际生效的值」之间的差异。
+
+    【为什么必须有（2026-11-20 用户实测缺陷）】
+    用户原话：「请求 480p 实际按 768p 生成」——
+    服务端确实会调整（宽高按 32 倍数吸附、超面积上限按比例缩小、
+    档位按实际像素反算），但**调整结果只写在 params 里**，
+    工具结果一个字都不提 ⇒ 模型按请求值向用户复述 ⇒ 用户被骗。
+
+    现在把差异结构化地带回给模型，模型据此在结论里说清楚。
+
+    返回 [{"field","requested","effective","reason"}]，无差异时返回 []。
+    """
+    out: list[dict] = []
+
+    def _add(field: str, requested, effective, reason: str) -> None:
+        if effective is None or requested is None:
+            return
+        if str(requested) == str(effective):
+            return
+        out.append({"field": field,
+                    "requested": requested,
+                    "effective": effective,
+                    "reason": reason})
+
+    # --- 宽高（吸附 / 超限缩放）---
+    for field in ("width", "height"):
+        requested = args.get(field)
+        effective = params.get(field)
+        if requested is None:
+            continue
+        try:
+            if int(requested) == int(effective):
+                continue
+        except (TypeError, ValueError):
+            continue
+        reasons = params.get("size_adjust_reasons")
+        reason = "服务端按真实策略归一后的生效值"
+        if isinstance(reasons, list) and reasons:
+            reason = "；".join(str(r) for r in reasons)
+        _add(field, requested, effective, reason)
+
+    # --- 分辨率档位（服务端按实际像素反算写回）---
+    requested_res = str(args.get("resolution") or "").strip()
+    effective_res = str(params.get("resolution") or "").strip()
+    if requested_res and effective_res and requested_res != effective_res:
+        _add("resolution", requested_res, effective_res,
+             "服务端按实际生效像素反算出的档位标签")
+
+    # --- 时长 ---
+    duration_field = agent_schema.mode_duration_field(mode)
+    requested_dur = args.get(duration_field)
+    effective_dur = params.get(duration_field)
+    if requested_dur is None and duration_field != "duration":
+        requested_dur = args.get("duration")
+    if requested_dur is not None and effective_dur is not None:
+        try:
+            if float(requested_dur) == float(effective_dur):
+                pass
+            else:
+                _add(duration_field, requested_dur, effective_dur,
+                     "服务端按该模式的真实时长区间归一后的生效值")
+        except (TypeError, ValueError):
+            pass
+
+    # --- 其它归一说明（server 写的 notes）---
+    for key in ("normalize_notes",):
+        notes = params.get(key)
+        if isinstance(notes, list):
+            for note in notes:
+                out.append({"field": key, "requested": None,
+                            "effective": None, "reason": str(note)})
+    return out
 
 
 @tool(
@@ -1795,7 +1843,10 @@ async def _tool_respond(ctx: AgentContext, args: dict) -> dict:
     # 澄清式提问：把问题单独记下来，让前端能显示「需要你补充」而不是
     # 一段混在结论里的话。问题会随会话历史落库，下一轮可续。
     if ctx.respond_payload["needs_clarification"]:
-        ctx.clarification = summary
+        # 澄清式 respond 现在**不收尾**（见编排层的说明）——
+        # 所以问题先记到 pending_clarification；
+        # 只有当模型**最终**用 respond 收尾时，才会转成 clarification。
+        ctx.pending_clarification = summary
         # 选项没给时，从**真实能力表**兜底推断可执行的候选。
         #
         # 【为什么要有兜底】模型经常不填 clarify_options（实测第一轮
@@ -1805,7 +1856,11 @@ async def _tool_respond(ctx: AgentContext, args: dict) -> dict:
         if not clarify_options:
             clarify_options = _infer_clarify_options(ctx)
         ctx.respond_payload["clarify_options"] = clarify_options
-    return {"ok": True}
+    # 【2026-11-20】把 needs_clarification 带进工具结果 ——
+    # 编排层据此判断「这是提问不是结论」，不因它收尾。
+    return {"ok": True,
+            "needs_clarification":
+                bool(ctx.respond_payload.get("needs_clarification"))}
 
 
 def _infer_clarify_options(ctx: AgentContext) -> list[str]:
@@ -3110,7 +3165,8 @@ def _tool_result_summary(name: str, result, ok: bool) -> str:
                 f"{result.get('duration', 0)} 秒 / "
                 f"{result.get('width')}×{result.get('height')}")
     if name in ("media_concat", "media_transcode", "media_mix_audio",
-                "media_merge_av"):
+                "media_merge_av", "media_extract_audio", "media_trim",
+                "media_normalize_audio", "media_replace_audio"):
         output = result.get("output") or {}
         return f"已生成：{output.get('name')}（{output.get('asset_id')}）"
     if name == "media_extract_frames":
@@ -3435,19 +3491,203 @@ def _as_bool(value) -> bool:
     return True
 
 
+def _is_clarification_respond(result) -> bool:
+    """
+    这次 respond 是不是**澄清式提问**（而不是最终结论）。
+
+    【为什么需要（2026-11-20 需求 D）】
+    respond 无条件收尾 -> 「先问再做」成为唯一路径。
+    但澄清式 respond（needs_clarification=true）**不是结论**，
+    它不该终止整轮执行。
+
+    判据：respond 的工具结果里带 ``_clarification`` 标记
+    （由 _tool_respond 写入），或返回体里明确标了 needs_clarification。
+    """
+    if not isinstance(result, dict):
+        return False
+    if result.get("_clarification"):
+        return True
+    payload = result.get("payload")
+    if isinstance(payload, dict) and payload.get("needs_clarification"):
+        return True
+    return bool(result.get("needs_clarification"))
+
+
+def _progress_fingerprint(name: str, result, ok: bool,
+                          call_args: dict | None = None) -> str:
+    """
+    一次工具调用的「事实指纹」。
+
+    【为什么需要（2026-11-20 需求 D —— 无进展检测）】
+    重复调用检测只看「同名 + 完全相同参数」。但模型还有一种
+    更隐蔽的打转：**换关键词反复搜索** —— 参数每次都不同，
+    重复检测抓不到，却能把步数预算耗光。
+
+    指纹的含义是「这一步有没有带回来**新事实**」：
+      * search_assets -> 命中的 asset_id 集合（换个词命中同一个素材
+        也算「同一事实」—— 因为它并没有帮模型找到新的东西）；
+      * describe_asset -> 该素材的描述内容哈希；
+      * list_modes / get_mode_schema -> 工具名（配置没变就是同一事实）；
+      * create_job -> 新建的 job_id（**每次都新** = 有进展）；
+      * 媒体工具 -> 产物的 asset_id；
+      * 失败 -> 错误码（同一个错反复出现 = 没有进展）。
+
+    指纹连续 NO_PROGRESS_LIMIT 步不变 = 判定为打转。
+    """
+    import hashlib
+
+    if not ok:
+        code = ""
+        if isinstance(result, dict):
+            code = str(result.get("code") or "")[:60]
+        return f"err:{name}:{code}"
+
+    payload: object = None
+    if name == "search_assets":
+        assets = []
+        if isinstance(result, dict):
+            for item in result.get("assets") or []:
+                if isinstance(item, dict):
+                    assets.append(str(item.get("asset_id") or ""))
+        payload = sorted(assets)
+    elif name == "describe_asset":
+        payload = json.dumps(result, ensure_ascii=False, sort_keys=True)[:800] \
+            if isinstance(result, dict) else str(result)[:800]
+    elif name in ("list_modes", "get_mode_schema", "describe_mode_params",
+                  "list_prompt_presets"):
+        # 配置类工具：事实 = 工具名 + **参数**。
+        #
+        # 【为什么参数必须进指纹】模型连续查**不同** mode 的 schema
+        # 是有意义的探索（它在摸清各模式能做什么）—— 若只按工具名
+        # 算指纹，连续 6 次 get_mode_schema 会被判成「无进展」并收尾，
+        # 把一条正常的多模式探索链掐断（实测：test_a_task_over_8_steps
+        # 就是这种形状）。
+        # 反过来，连查**同一个** mode 的 schema 才是真的没有新事实。
+        payload = f"{name}:{json.dumps(call_args or {}, ensure_ascii=False, sort_keys=True)}"
+    elif name == "create_job":
+        payload = str((result or {}).get("job_id") or "") \
+            if isinstance(result, dict) else str(result)
+    elif name.startswith("media_"):
+        output = {}
+        if isinstance(result, dict):
+            output = result.get("output") or {}
+        payload = str(output.get("asset_id") or "") \
+            if isinstance(output, dict) else ""
+    else:
+        payload = json.dumps(result, ensure_ascii=False, sort_keys=True)[:400] \
+            if isinstance(result, dict) else str(result)[:400]
+
+    digest = hashlib.sha1(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                   default=str).encode("utf-8")).hexdigest()[:16]
+    return f"{name}:{digest}"
+
+
 def _clip(text: str, limit: int = TOOL_RESULT_LIMIT) -> str:
     """
     把工具结果裁到 limit 字符以内。
 
-    裁剪保留**头 + 尾**（不是只留头）：JSON 的结尾（闭合括号、notes 段）
-    对模型理解结构很有用；只留头会让模型看到一段残缺 JSON。
+    【2026-11-20 修 —— 裁剪不再破坏 JSON 结构】
+    旧实现是「头 + 尾」拼接：``text[:head] + 标记 + text[-tail:]``。
+    头尾各取一半 ⇒ **拼出来的是语法非法的 JSON**（对象的键被从中间
+    切断，尾部从一个随机位置开始）。实测 7 个案例里 **5 个**
+    ``json.loads`` 直接失败。
+
+    影响很实在：模型收到一段残缺 JSON → 认为「结果不完整」→
+    重复调用同一个工具 → 撞重复检测 → 整轮被截断。
+    这与素材描述被裁断导致「反复重搜 4 次」是同一个坑。
+
+    现在的策略（**按优先级**）：
+      1. 长度够 -> 原样返回；
+      2. 是合法 JSON 对象 -> **逐字段裁剪长字符串值**，
+         逐轮缩短直到整体塞进 limit（JSON 始终合法）；
+      3. 实在塞不进 -> 退化为「只保留头部 + 明确的截断标记」，
+         并**额外附上原结果的键清单**，让模型知道有哪些字段
+         （而不是看到半句话）。
     """
     text = text or ""
     if len(text) <= limit:
         return text
-    head = limit * 2 // 3
-    tail = limit - head
-    return (text[:head] + "…（结果已截断）…" + text[-tail:])
+
+    # --- 2) 结构化裁剪（优先，保证 JSON 合法）---
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        payload = None
+    if isinstance(payload, dict):
+        shrunk = _shrink_json_payload(payload, limit)
+        if shrunk is not None:
+            return shrunk
+
+    # --- 3) 退化裁剪：只留头部 + 键清单 ---
+    try:
+        keys = list(json.loads(text).keys())
+    except (TypeError, ValueError):
+        keys = []
+    head = max(1, limit - 120)
+    prefix = text[:head]
+    tail = ""
+    if keys:
+        tail = f"（原结果字段：{'、'.join(str(k) for k in keys[:40])}）"
+    return (prefix + "…（结果已截断）…" + tail)[:limit + 200]
+
+
+def _shrink_json_payload(payload: dict, limit: int) -> str | None:
+    """
+    把一个 dict 裁到 limit 以内，**保持 JSON 合法**。
+
+    做法：先把所有字符串值按比例缩短到 ``budget``，再逐轮加大
+    缩短力度，直到整体塞进 limit。字段顺序与键名保持不变 ——
+    模型看到的仍是完整的结构，只是长描述被截短。
+
+    塞不进（例如键名本身就超长）时返回 None，交给调用方退化处理。
+    """
+    def _dump(data: dict) -> str:
+        return json.dumps(data, ensure_ascii=False)
+
+    def _apply(data: dict, per_value_cap: int) -> dict:
+        out: dict = {}
+        for key, value in data.items():
+            if isinstance(value, str) and len(value) > per_value_cap:
+                out[key] = (value[:per_value_cap]
+                            + f"…（已截断，原长 {len(value)} 字）")
+            elif isinstance(value, list):
+                # 列表：整体 JSON 化后按同一上限裁
+                text = json.dumps(value, ensure_ascii=False)
+                if len(text) > per_value_cap:
+                    try:
+                        parsed = json.loads(text)
+                    except (TypeError, ValueError):
+                        parsed = None
+                    if isinstance(parsed, list):
+                        kept = []
+                        used = 0
+                        for item in parsed:
+                            item_text = json.dumps(item, ensure_ascii=False)
+                            if used + len(item_text) > per_value_cap:
+                                kept.append({"_truncated": True,
+                                             "_dropped_items": len(parsed) - len(kept)})
+                                break
+                            kept.append(item)
+                            used += len(item_text)
+                        out[key] = kept
+                    else:
+                        out[key] = text[:per_value_cap]
+                else:
+                    out[key] = value
+            elif isinstance(value, dict):
+                out[key] = _apply(value, per_value_cap)
+            else:
+                out[key] = value
+        return out
+
+    for cap in (400, 200, 100, 50, 20, 0):
+        shrunk = _apply(payload, cap)
+        text = _dump(shrunk)
+        if len(text) <= limit:
+            return text
+    # cap=0 仍塞不进 -> 键名本身就太长
+    return None
 
 
 def _check_provider_supports_tools(provider: dict) -> None:
@@ -3724,6 +3964,14 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     error = None
     repeat_signature = None
     repeat_count = 0
+    #: 「事实指纹」连续不变的步数（无进展检测）。2026-11-20 需求 D。
+    stale_fingerprint = None
+    stale_count = 0
+    #: 本轮已发生的**澄清式 respond** 次数（2026-11-20 需求 D）。
+    clarify_count = 0
+    #: 澄清之后**是否又取得了实质进展**（建了任务 / 命中了新素材 /
+    #: 产出了新产物）。有进展 -> 收尾态是 completed（不是 needs_clarification）。
+    clarified_then_progressed = False
     truncated_reason = None
     #: 已经强制重试过几轮「无工具调用」。
     no_tool_retries = 0
@@ -3768,6 +4016,8 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     async def _loop():
         """主循环。返回 (status, truncated_reason)。"""
         nonlocal tool_calls, repeat_signature, repeat_count, no_tool_retries
+        nonlocal stale_fingerprint, stale_count, clarify_count
+        nonlocal clarified_then_progressed
         # 「模型编造 job id」的标记 —— 在「无工具调用」分支与「工具执行」分支
         # 都要用，所以提到循环外（Python 里分支内赋值会变成局部变量）。
         fabricated = False
@@ -3956,6 +4206,12 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                 # 查不清 -> 保持原判定。详见 _reconcile_tool_ok_with_db。
                 ok = _reconcile_tool_ok_with_db(ctx, name, result, ok)
 
+                # 【2026-11-20 需求 D】澄清之后若又做成了事，
+                # 收尾态就不该是 needs_clarification ——
+                # 事实是「活干完了，只是有一个附带问题要确认」。
+                if ok and name != "respond":
+                    clarified_then_progressed = True
+
                 steps.append(_step_entry(
                     step_index, tool=name, ok=ok,
                     ms=int((time.time() - turn_started) * 1000),
@@ -4008,7 +4264,68 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
 
                 # respond 之后模型已经交卷 —— 再问一轮要付 20~120 秒，
                 # 而拿到的多半还是同一句话。直接收尾。
+                #
+                # 【2026-11-20 例外 —— 澄清式 respond 不收尾】
+                #
+                # 【原来错在哪】respond **无条件**收尾（break + stop_after_step）。
+                # 于是「先 respond 问一句 -> 等用户回答 -> 再做」成为
+                # **唯一**可行路径 —— 「一气呵成」在架构上不可能。
+                # 用户实测：要求合并音视频，Agent 先问「要不要替换原音轨」，
+                # 用户要催才继续。
+                #
+                # 【现在】只有**真正的结论性 respond** 才收尾。
+                # 带 needs_clarification=true 的 respond 是**提问**，
+                # 不是结论 —— 它不该终止整轮：
+                #   * 本轮剩余的 tool_call 继续执行（不 break）；
+                #   * 编排层不因它收尾，模型可以继续把能做的部分做完
+                #     （先合并音视频，再在结论里说明「原音轨我按保留处理，
+                #     需要换成纯 BGM 的话说一声」）。
+                #
+                # 【为什么这不破坏澄清语义】澄清状态仍会通过
+                # ctx.respond_payload / ctx.clarification 透出，
+                # 前端照常渲染澄清气泡；差别只是**执行器不会提前收工**。
+                if name == "respond" and _is_clarification_respond(result):
+                    # 【澄清式 respond —— 不收尾，继续做完能做的部分】
+                    #
+                    # 【为什么】见上面的说明：用户实测「合并音视频」时
+                    # Agent 先问一句就停，用户要催才继续。
+                    #
+                    # 【怎么继续】给模型一条明确指令：先把能做完的做完，
+                    # 缺的那个参数按最贴近用户表述的合法值处理，
+                    # 并在最终结论里说明你替他做了什么。
+                    clarify_count += 1
+                    if clarify_count > CLARIFY_LIMIT:
+                        return "truncated", (
+                            f"模型连续 {clarify_count} 次发起澄清式提问仍未推进，"
+                            "已停止。请把要求说得更具体，或直接用面板手动操作。")
+                    nudge = {
+                        "warning": ("你已经提问了，但**不要停在这里**。"
+                                    "请继续把能做完的部分做完"
+                                    "（选素材、处理、产出产物），"
+                                    "缺的那个参数按最贴近用户表述的合法值处理，"
+                                    "并在最终结论里说明你替他做了什么。"),
+                        "clarify_options_given": True,
+                    }
+                    if isinstance(result, dict):
+                        result = dict(result)
+                        result["_nudge"] = nudge
+                    else:
+                        result = {"result": result, "_nudge": nudge}
+                    for msg in reversed(messages):
+                        if (msg.get("role") == "tool"
+                                and msg.get("tool_call_id") == call["id"]):
+                            msg["content"] = _clip(json.dumps(result,
+                                                              ensure_ascii=False))
+                            break
+                    continue
+
                 if name == "respond":
+                    # 【2026-11-20】这是**结论性 respond**（收尾）。
+                    # 若本轮过程中模型提过澄清式问题，现在它仍然
+                    # 需要一个「最终提问」的落地：把 pending 转成正式
+                    # clarification，并在结论里带上「我按默认处理了什么」。
+                    if ctx.pending_clarification and not ctx.clarification:
+                        ctx.clarification = ctx.pending_clarification
                     # respond 报「编造 job id」-> 这不是普通工具失败，
                     # 是**模型在说谎**（声称建了任务但没建）。
                     # 必须当硬失败处理：推它一轮，如果还这样就整体失败。
@@ -4023,8 +4340,58 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
                             and respond_result.get("code") == "fabricated_job_id"):
                         fabricated = True
 
+                    # 【2026-11-20】结论性 respond = 模型已经交卷。
+                    # 若它交卷时 still 带 needs_clarification，
+                    # 那说明它是在「问完再做」—— 这时**清掉**该标记，
+                    # 收尾态按实际完成情况定（completed），
+                    # 但仍把问题作为「附带确认」带给用户。
+                    if (ctx.respond_payload.get("needs_clarification")
+                            and (ctx.jobs or ctx.assets)):
+                        ctx.respond_payload["needs_clarification"] = False
+                        ctx.clarification = ctx.pending_clarification \
+                            or ctx.clarification
                     stop_after_step = True
                     break
+
+                # --- 无进展检测（2026-11-20 需求 D）--------------------
+                #
+                # 重复调用检测抓的是「同名同参」。这里抓的是**更隐蔽**的
+                # 一类：模型换着关键词反复检索、每次参数都不同，
+                # 重复检测看不到，但事实层面**没有任何进展**。
+                #
+                # 判据：连续 NO_PROGRESS_LIMIT 步的「事实指纹」相同。
+                # 第一次相同 -> 先给一次提示（让模型换策略）；
+                # 达到上限 -> 收尾并如实说明「没有新进展」。
+                fingerprint = _progress_fingerprint(
+                    name, result, ok, call.get("arguments"))
+                if fingerprint == stale_fingerprint:
+                    stale_count += 1
+                else:
+                    stale_fingerprint = fingerprint
+                    stale_count = 1
+                if stale_count >= NO_PROGRESS_LIMIT:
+                    return "truncated", (
+                        f"模型连续 {stale_count} 步没有获得任何新信息"
+                        f"（最后一步是「{name}」），已停止以避免空转。"
+                        f"请把要求说得更具体，或直接用面板手动操作。")
+                if stale_count == NO_PROGRESS_LIMIT - 1:
+                    nudge = {
+                        "warning": (f"你刚刚连续 {stale_count} 步没有获得新信息"
+                                    f"（都是「{name}」且结果没有变化）。"
+                                    f"请立刻改变策略：换素材来源、换参数、"
+                                    f"或直接用 respond 说明当前能做什么。"),
+                    }
+                    if isinstance(result, dict):
+                        result = dict(result)
+                        result["_nudge"] = nudge
+                    else:
+                        result = {"result": result, "_nudge": nudge}
+                    for msg in reversed(messages):
+                        if (msg.get("role") == "tool"
+                                and msg.get("tool_call_id") == call["id"]):
+                            msg["content"] = _clip(json.dumps(result,
+                                                              ensure_ascii=False))
+                            break
 
                 # 重复调用检测：模型原地打转时强制收尾（实测会连续 6 步调同一个工具）。
                 #
@@ -4210,8 +4577,23 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
         # 前端按 status 分流：truncated 黄色、failed 红色。
         "notice": notice,
     }
+    # 【2026-11-20 需求 D】收尾态判定
+    #
+    # 澄清式 respond 现在**不收尾** —— 模型会继续把能做的做完。
+    # 所以「needs_clarification」只在**真的没做成任何事**时才成立：
+    #   * 澄清之后**有**实质进展（建了任务 / 命中素材 / 产出产物）
+    #     -> status = completed，附带问题作为「确认项」给用户；
+    #   * 澄清之后**什么也没做成**
+    #     -> status = needs_clarification（等用户回答）。
     if ctx.respond_payload.get("needs_clarification"):
-        result["status"] = "needs_clarification"
+        if clarified_then_progressed:
+            ctx.respond_payload["needs_clarification"] = False
+            result["status"] = "completed"
+            # 附带问题仍然要给用户看（他要确认那个默认值对不对）
+            if ctx.pending_clarification and not ctx.clarification:
+                ctx.clarification = ctx.pending_clarification
+        else:
+            result["status"] = "needs_clarification"
     if ctx.clarification:
         result["clarification"] = ctx.clarification
     # 澄清快捷选项 + 提示（前端契约：clarify_options / clarify_hint）

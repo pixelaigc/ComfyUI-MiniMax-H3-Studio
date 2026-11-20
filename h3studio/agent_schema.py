@@ -156,6 +156,28 @@ def _ref_image_range() -> tuple[int, int]:
 REF_IMAGE_MIN, REF_IMAGE_MAX = _ref_image_range()
 
 
+def _music_default_is_max() -> bool:
+    """音乐默认时长是否等于上限（YuE2 节点 schema 上限 900 秒）。"""
+    try:
+        from . import music_yue2
+        return (float(music_yue2.YUE2_DEFAULT_DURATION)
+                >= float(music_yue2.YUE2_MAX_DURATION))
+    except Exception:
+        return True
+
+
+def _server_max_batch_count() -> int:
+    """服务端真实的一次生成张数上限（避免在这里写死一个过时数字）。"""
+    try:
+        from . import gen_defaults
+        value = gen_defaults.MAX_BATCH_COUNT
+        if value:
+            return int(value)
+    except Exception:
+        pass
+    return 5
+
+
 # ------------------------------------------------------------------ 模式分类
 
 #: 各模式的媒体类型（来自 gen_types 注册表，**不硬编码**）
@@ -206,13 +228,46 @@ def mode_models(mode: str) -> list[str]:
 
 
 def mode_resolutions(mode: str) -> list[str]:
-    """该模式合法的分辨率档位集合（来自真实常量表）。"""
+    """
+    该模式合法的分辨率档位集合（来自真实常量表）。
+
+    【2026-11-20 修 —— 视频不再是「544p / 768p」两档】
+    视频的真实分辨率表达方式见 ``_video_size_tiers()`` 与
+    ``mode_schema`` 的 resolution 段（档位全集 + 自定义宽高 + 面积上限）。
+    这里的 ``VIDEO_RESOLUTIONS``（workflows.RES_MP）是**旧面板**的
+    两个下拉档位，不是生成侧硬约束 —— 继续用它会让 Agent 拒绝
+    合法的 480p 请求（用户实测报出的缺陷）。
+    """
     entry = _IMAGE_MODEL_TABLES.get(mode)
     if entry:
         return list(_table(entry[1]).keys())
     if is_video_mode(mode):
-        return list(VIDEO_RESOLUTIONS)
+        return _video_size_tiers()
     return []
+
+
+def _video_size_tiers() -> list[str]:
+    """
+    视频真实可选的**短边像素档位**（全集，来自真实预设并集）。
+
+    来源：``video_models.size_presets_for_aspect`` 对全部比例求并集 ——
+    即面板下拉里真实存在的那些档位。
+    """
+    try:
+        from . import video_models as vm
+    except Exception:
+        return list(VIDEO_RESOLUTIONS)
+    tiers: set[int] = set()
+    for aspect in vm.VIDEO_ASPECTS:
+        for preset in vm.size_presets_for_aspect(aspect):
+            try:
+                tiers.add(int(preset.get("short_edge") or 0))
+            except (TypeError, ValueError):
+                continue
+    tiers.discard(0)
+    if not tiers:
+        return list(VIDEO_RESOLUTIONS)
+    return [f"{value}p" for value in sorted(tiers)]
 
 
 def mode_aspects(mode: str) -> list[str]:
@@ -326,6 +381,16 @@ def mode_param_keys(mode: str) -> set[str]:
     if is_video_mode(mode):
         keys.add("precision")
         keys.add("lora_strength")
+        # 【2026-11-20 新增 —— 与 mode_schema 的视频段保持一致】
+        #
+        # 【为什么必须加】mode_schema 的视频段现在展开了
+        # width / height / model_key / attention / accel_lora
+        # （真实能力：自定义宽高 + 7 个底模 + 5 种注意力 + 12 枚加速 LoRA）。
+        # 而 mode_param_keys 是 mode_schema 的**键集合单一真源**
+        # —— 两边不一致会让 mode_defaults 的白名单过滤丢掉这些参数，
+        # 也会打破 test_mode_param_keys_match_mode_schema_params。
+        keys.update({"width", "height", "model_key", "attention",
+                     "accel_lora"})
     if mode_requires_refs(mode):
         keys.add("asset_id")
     return keys
@@ -912,13 +977,56 @@ def mode_schema(mode: str) -> dict:
         }
 
     resolutions = mode_resolutions(mode)
-    if resolutions:
+    if is_video_mode(mode):
+        # 【2026-11-20 修 —— 视频分辨率的**真实表达方式**】
+        #
+        # 【原来错在哪】这里给的是 ``workflows.RES_MP``（544p / 768p），
+        # 那是**旧面板**的两个下拉档位，不是生成侧的硬约束。
+        # 服务端真实策略是 ``video_models.VIDEO_MODE_SIZE_POLICY``：
+        #   * 面积上限 2.0 MP（1920x1088，官方模板背书）
+        #   * 宽高必须是 32 的倍数
+        #   * custom_size = True（面板本来就有「输出尺寸」手填框）
+        # 所以「视频只有 544p/768p」这句话从 2026-11-17 起就是**假话**，
+        # 而模型会照着它拒绝用户的 480p 请求（用户实测报出的缺陷）。
+        #
+        # 现在给的是**完整表达方式**：档位清单 + 自定义宽高 + 面积上限。
+        from . import video_models as _vm
+        policy = _vm.size_policy_for_mode(mode)
+        tiers = _video_size_tiers()
+        schema["params"]["resolution"] = {
+            "type": "string",
+            "values": tiers,
+            "default": defaults.get("resolution", ""),
+            "source": ("video_models.VIDEO_MODE_SIZE_POLICY + "
+                       "size_presets_for_aspect（真实档位全集）"),
+            "note": (f"可给短边档位（如 480p = 0.4MP），"
+                     f"也可直接给 width/height（{policy.get('multiple')} 的倍数，"
+                     f"单边 {policy.get('min')}~{policy.get('max')}，"
+                     f"总像素 ≤ {policy.get('max_pixels_mp')} MP）。"
+                     f"超上限会按比例缩小并说明，不会静默改写。"),
+        }
+        schema["params"]["width"] = {
+            "type": "integer",
+            "min": policy.get("min"),
+            "max": policy.get("max"),
+            "multiple": policy.get("multiple"),
+            "source": "video_models.VIDEO_MODE_SIZE_POLICY",
+            "note": "直接给像素宽高时用它；与 resolution 二选一。",
+        }
+        schema["params"]["height"] = {
+            "type": "integer",
+            "min": policy.get("min"),
+            "max": policy.get("max"),
+            "multiple": policy.get("multiple"),
+            "source": "video_models.VIDEO_MODE_SIZE_POLICY",
+            "note": "直接给像素宽高时用它；与 resolution 二选一。",
+        }
+    elif resolutions:
         schema["params"]["resolution"] = {
             "type": "string",
             "values": resolutions,
             "default": defaults.get("resolution", resolutions[0]),
-            "source": "workflows.*_RES_TIERS" if is_image_mode(mode)
-                      else "workflows.RES_MP",
+            "source": "workflows.*_RES_TIERS",
         }
 
     duration_range = mode_duration_range(mode)
@@ -931,9 +1039,11 @@ def mode_schema(mode: str) -> dict:
             "max": duration_range[1],
             "step": 1,
             "default": defaults.get(field, duration_range[0]),
-            "source": ("web/index.html#duration 滑块区间"
+            "source": ("video_models.VIDEO_DURATION_MIN/MAX"
+                       "（服务端唯一真相源）"
                        if is_video_mode(mode)
-                       else "h3studio.music_yue2._clamp_duration"),
+                       else "music_yue2.YUE2_MIN/MAX_DURATION"
+                            "（服务端唯一真相源）"),
         }
 
     loras = mode_loras(mode)
@@ -960,7 +1070,7 @@ def mode_schema(mode: str) -> dict:
         schema["params"]["batch_count"] = {
             "type": "integer",
             "min": 1,
-            "max": 4,
+            "max": _server_max_batch_count(),
             "default": 1,
             "source": "server.MAX_BATCH_COUNT",
         }
@@ -1029,8 +1139,10 @@ def mode_schema(mode: str) -> dict:
             "min": MUSIC_DURATION_MIN,
             "max": MUSIC_DURATION_MAX,
             "step": 1,
-            "default": 60,
-            "source": "h3studio.music_yue2._clamp_duration",
+            "default": (MUSIC_DURATION_MAX
+                        if _music_default_is_max() else 60),
+            "source": "music_yue2.YUE2_MIN/MAX/DEFAULT_DURATION"
+                      "（服务端唯一真相源）",
         }
         schema["params"]["plan_mode"] = {
             "type": "string",
@@ -1059,6 +1171,7 @@ def mode_schema(mode: str) -> dict:
 
     # --- 视频专属 ---
     if is_video_mode(mode):
+        from . import video_models as _vm
         schema["params"]["precision"] = {
             "type": "string",
             "values": list(VIDEO_PRECISIONS),
@@ -1071,6 +1184,37 @@ def mode_schema(mode: str) -> dict:
             "max": 2.0,
             "default": 1.0,
             "source": "workflows._h3_video_workflow",
+        }
+        # 【2026-11-20 新增 —— 底模 / 注意力 / 加速 LoRA】
+        #
+        # 【为什么必须给】Agent 此前**完全不知道**这三样存在：
+        #   * 底模有 7 个（fl2va / ref2va / 混合版），r2v 必须用 Ref2VA 权重；
+        #   * 注意力机制有 5 种（default/kitchen/sage/sol/sparse）；
+        #   * 加速 LoRA 有 12 枚（而 Agent 只知道旧的 3 个）。
+        # 模型看不到 = 用户换不了，也解释不了「为什么换了底模」。
+        schema["params"]["model_key"] = {
+            "type": "string",
+            "values": list(_vm.VIDEO_MODELS.keys()),
+            "default": _vm.VIDEO_DEFAULT_MODEL,
+            "source": "video_models.VIDEO_MODELS",
+            "note": ("参考生视频（r2v）必须用支持 Ref2VA 的权重："
+                     + ", ".join(k for k, v in _vm.VIDEO_MODELS.items()
+                                 if v.get("supports_ref2va"))),
+        }
+        schema["params"]["attention"] = {
+            "type": "string",
+            "values": [k for k in _vm.VIDEO_ATTENTION_MODES
+                       if k not in _vm.VIDEO_REMOVED_ATTENTION_MODES],
+            "default": _vm.VIDEO_DEFAULT_ATTENTION,
+            "source": "video_models.VIDEO_ATTENTION_MODES",
+        }
+        schema["params"]["accel_lora"] = {
+            "type": "string",
+            "values": _vm.all_accel_lora_keys(),
+            "default": "",
+            "source": "video_models.all_accel_lora_keys()",
+            "note": ("空串 = 不挂加速 LoRA（走标准多步采样）。"
+                     "服务端会校验该 LoRA 与底模的兼容性。"),
         }
 
     # --- 素材槽位计划（Agent 按它分派 asset_refs 的 slot）---
@@ -1274,6 +1418,17 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
     if resolution:
         allowed = mode_resolutions(mode)
         if allowed and str(resolution) not in allowed:
+            # 【2026-11-20 修 —— 视频档位不再用旧白名单】
+            #
+            # 【原来错在哪】视频的 ``allowed`` 来自 ``workflows.RES_MP``
+            # = {544p, 768p}（旧面板的两个下拉档位）。于是用户要 480p
+            # 会被 Agent **自己拦下**并报「不是合法取值」——
+            # 而 480p（0.4MP）完全在真实 2.0MP 画布内。
+            #
+            # 现在视频的 allowed 来自 ``_video_size_tiers()``
+            # （真实预设并集），480p 合法。
+            #
+            # 图像模式不变（族表是真实约束）。
             issues.append(ValidationIssue(
                 "resolution",
                 f"分辨率档位「{resolution}」不是 {mode} 的合法取值",
@@ -1281,7 +1436,7 @@ def validate_params(mode: str, params: dict) -> list[ValidationIssue]:
                 suggestions=_suggest_enum("resolution", str(resolution),
                                           allowed, mode),
                 code="invalid_resolution"))
-        else:
+        elif is_image_mode(mode):
             # 档位名合法，但**该族可能超出直出 MP 上限**。
             #
             # 【实测事实，2026-11-10】

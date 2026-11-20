@@ -271,9 +271,25 @@ class TestParamValidation(_Base):
         self.assertEqual(issues[0].allowed, list(wf.Z_IMAGE_MODELS.keys()))
 
     def test_invalid_resolution_for_mode(self):
+        """
+        【2026-11-20 修】视频的合法分辨率集合不再是 ``wf.RES_MP``。
+
+        RES_MP（544p / 768p）是**旧面板**的两个下拉档位，不是生成侧的
+        硬约束 —— 真实策略是 2.0 MP 画布 + 32 对齐 + 可自定义宽高
+        （video_models.VIDEO_MODE_SIZE_POLICY）。
+        原来这里断言 allowed == RES_MP.keys()，等于把「视频只有两档」
+        这句**假话**钉死在测试里 —— Agent 因此拒绝用户的 480p 请求
+        （用户实测报出的缺陷）。
+        """
         issues = agent_schema.validate_params("t2v", {"resolution": "4k"})
         self.assertTrue(issues)
-        self.assertEqual(issues[0].allowed, list(wf.RES_MP.keys()))
+        self.assertEqual(issues[0].allowed,
+                         agent_schema.mode_resolutions("t2v"))
+        # 480p 必须合法（真实 0.4MP，在 2.0MP 画布内）-> 无问题
+        self.assertIn("480p", issues[0].allowed)
+        self.assertEqual(
+            agent_schema.validate_params("t2v", {"resolution": "480p"}), [],
+            "480p 是真实合法档位，不该被拦（用户实测报出的缺陷）")
 
     def test_invalid_lora(self):
         issues = agent_schema.validate_params("t2v", {"lora": "nope"})
