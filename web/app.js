@@ -5490,7 +5490,15 @@ function bindMediaContextMenu(card, job) {
     // 收藏的对象是「这个产物条目」，对应生成媒体库里的一张卡片。
     // 所以无论用户右键的是批次缩略图还是卡片预览图，
     // 收藏的都是同一个 job.id，标识也出现在同一张卡片上。
-    const favLabel = job.favorited ? "取消收藏" : "添加到收藏";
+    //
+    // 【为什么这里现读 DOM 而不是只用闭包里的 job.favorited】
+    // 收藏是**乐观更新**的（点完立刻出现 ★，不等服务端往返 ——
+    // 实测线上 POST 最慢要 17 秒）。闭包里的 job 对象是那次渲染时的快照，
+    // 收藏完再右键仍会显示「添加到收藏」—— 与界面上的 ★ 自相矛盾。
+    // 所以这里以 DOM 上的 ★ 为准（DOM 才是用户看到的当前状态）。
+    const cardEl = card;
+    const hasBadge = !!(cardEl && cardEl.querySelector(".job-fav-badge"));
+    const favLabel = hasBadge ? "取消收藏" : "添加到收藏";
     menu.innerHTML = `
       <button data-act="add-asset">添加到素材库（${label}）</button>
       <div class="ctx-sep"></div>
@@ -5521,8 +5529,15 @@ function bindMediaContextMenu(card, job) {
         } else if (btn.dataset.act === "favorite") {
           // 【取消收藏 ≠ 删除产物】这里只改收藏标记，产物文件一律不动。
           // 真正的请求在 web/favorites.js（收藏逻辑的唯一实现处）。
+          //
+          // 【目标状态 = 当前状态的取反】
+          // 当前状态从 DOM 上的 ★ 读（不是闭包里的 job.favorited ——
+          // 那是渲染时的快照，乐观更新后就不准了）。
+          // 现在**没有**★ -> 目标 = 收藏（true）；**有**★ -> 目标 = 取消（false）。
+          const hasBadge = !!(card && card.querySelector(".job-fav-badge"));
+          const target = !hasBadge;
           if (window.FAVORITES && typeof window.FAVORITES.toggleFavorite === "function") {
-            await window.FAVORITES.toggleFavorite(job.id, !job.favorited);
+            await window.FAVORITES.toggleFavorite(job.id, target);
           } else {
             alert("收藏模块未加载");
           }
