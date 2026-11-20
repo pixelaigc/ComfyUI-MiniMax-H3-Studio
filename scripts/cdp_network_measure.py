@@ -35,6 +35,8 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--shot", default=None)
     ap.add_argument("--settle-ms", type=int, default=8000)
+    ap.add_argument("--warmup", action="store_true",
+                    help="先预热慢接口（避免冷启动污染测量）")
     args = ap.parse_args()
 
     reqs = {}          # requestId -> rec
@@ -77,15 +79,59 @@ def main():
                 rec["encoded"] = ev.get("encodedDataLength", 0)
                 rec["t_end"] = round((time.perf_counter() - t0) * 1000.0, 1)
 
+        def on_data(ev):
+            # Network.dataReceived —— **线上真实传输的字节数**。
+            # loadingFinished 只在请求正常结束时才给 encodedDataLength；
+            # 被浏览器主动取消的请求（视频拿够 metadata 就 abort）拿不到 ——
+            # 而那部分字节是**真的传了**的。这里逐块累计，不漏。
+            rec = reqs.get(ev["requestId"])
+            if rec:
+                rec["encoded"] = rec.get("encoded", 0) + ev.get("dataLength", 0)
+                rec["chunks"] = rec.get("chunks", 0) + 1
+
+        def on_failed_cdp(ev):
+            rec = reqs.get(ev["requestId"])
+            if rec:
+                rec["cdp_failed"] = ev.get("errorText", "")
+
         cdp.on("Network.requestWillBeSent", on_req)
         cdp.on("Network.responseReceived", on_resp)
         cdp.on("Network.loadingFinished", on_finish)
+        cdp.on("Network.dataReceived", on_data)
+        cdp.on("Network.loadingFailed", on_failed_cdp)
 
         pg.on("console", lambda m: console.append({"type": m.type, "text": m.text}))
 
         pg.goto(args.base + "/", wait_until="domcontentloaded", timeout=180000)
         pg.wait_for_function("() => typeof window.refreshJobs === 'function'", timeout=180000)
         marks = {"js_ready": round((time.perf_counter() - t0) * 1000.0, 1)}
+
+        # 【为什么要预热】**冷启动会污染测量**。
+        # 隔离实例刚起时，/api/music-options 会同步拉 ComfyUI /object_info
+        # （实测冷缓存 5~6 秒），把整个事件循环占住 —— 于是**所有**并发请求
+        # 一起排到 11 秒后（实测：12 个 /api/thumb 全部 11376ms）。
+        # 那测的是「冷启动」，不是「媒体库性能」。
+        #
+        # 线上 8190 是常驻服务（缓存早就热了）—— 用户遇到的是热态。
+        # 所以：**先把这些慢接口各打一遍预热，再开始计时**。
+        if args.warmup:
+            warm_started = time.perf_counter()
+            for ep in ["/api/music-options", "/api/video-options", "/api/image-options",
+                       "/api/image-loras?base=Z-Image", "/api/image-loras?base=MOSS-Image",
+                       "/api/image-loras?base=Qwen-Image%202.1", "/api/system",
+                       "/api/generation-types", "/api/agent/state"]:
+                try:
+                    pg.evaluate(
+                        """async (u) => { try { await fetch(u); } catch (e) {} }""",
+                        args.base + ep,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+            marks["warmup_ms"] = round((time.perf_counter() - warm_started) * 1000.0, 1)
+            # 预热完再重置计时基准，让后续统计只算「热态」
+            reqs.clear()
+            order.clear()
+            t0 = time.perf_counter()
 
         if args.scenario == "switch":
             tc = time.perf_counter()
@@ -165,14 +211,19 @@ def main():
     print("  /api/jobs:")
     for r in api:
         if "/api/jobs" in r["url"]:
-            dur = (r["t_end"] - r["t_start"]) if r["t_end"] else None
+            dur = (r["t_end"] - r["t_start"]) if r["t_end"] else -1
             print(f"      {dur:>8.1f}ms  {r['encoded']:>8}B  t={r['t_start']:>8}ms  "
                   f"?{r['url'].split('?')[1][:70] if '?' in r['url'] else ''}")
+    print("  最慢的 10 个 API（任意端点）:")
+    for r in sorted(api, key=lambda x: -((x["t_end"] - x["t_start"]) if x["t_end"] else 0))[:10]:
+        dur = (r["t_end"] - r["t_start"]) if r["t_end"] else -1
+        print(f"      {dur:>8.1f}ms  {r['encoded']:>8}B  t={r['t_start']:>8}ms  "
+              f"{r['url'].split('/')[-1][:26]:<26} ?{r['query'] if 'query' in r else ''}"[:150])
     print("  媒体明细:")
     for r in sorted(media, key=lambda x: -(x["encoded"])):
-        dur = (r["t_end"] - r["t_start"]) if r["t_end"] else None
+        dur = (r["t_end"] - r["t_start"]) if r["t_end"] else -1
         print(f"      {dur:>8.1f}ms  {r['encoded']:>9}B  range={r['headers'].get('range')}  "
-              f"{r['url'].split('?')[0][-45:]}")
+              f"failed={r.get('cdp_failed') or '-'}  {r['url'].split('?')[0][-45:]}")
     print(f"  控制台错误: {len([c for c in console if c['type']=='error'])}")
 
     out = {
