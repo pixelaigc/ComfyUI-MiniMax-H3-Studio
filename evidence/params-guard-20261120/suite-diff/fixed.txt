@@ -1,0 +1,3 @@
+tests/test_continuation_frontend.py::TestContinuationFrontend::test_no_console_errors_after_interactions
+tests/test_continuation_frontend.py::TestContinuationFrontend::test_no_console_errors_on_load
+tests/test_continuation_frontend.py::TestContinuationFrontend::test_no_unexpected_failed_requests
