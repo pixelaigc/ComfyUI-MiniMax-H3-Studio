@@ -4757,10 +4757,19 @@ function renderJobBatches(job) {
     // 【2026-11-21 性能修】批次缩略图用受限尺寸缩略图 + 懒加载。
     //   批次产物也是原图（1.1MB~9.5MB）—— 展开的批次一次可能十几张。
     //   点开大图仍用**原图**（见下面 openLightbox 用 outputUrl）。
-    const batchThumb = thumbUrl(out);
-    const batchSrc = batchThumb || outputUrl(job, out);
+    //
+    // 【踩坑 —— 这两行必须在 `out && !failed` 守卫**之内**】
+    //   原来写成：
+    //       const batchThumb = thumbUrl(out);
+    //       const batchSrc = batchThumb || outputUrl(job, out);   <-- 守卫外面
+    //   而 `outputUrl(job, output)` 内部读 `output.file` ——
+    //   当某个批次**没有产物**（out === undefined）时直接抛
+    //   `Cannot read properties of undefined (reading 'file')`
+    //   ⇒ 整个 jobCard 渲染中断 ⇒ **整个媒体库一片空白**
+    //   （实测：'任务列表读取失败，正在重试…'，0 张卡片）
+    //   ⇒ 必须先判 `out` 存在再算 URL。
     const thumb = out && !failed
-      ? `<div class="job-batch-thumb"><img src="${batchSrc}" loading="lazy" decoding="async" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
+      ? `<div class="job-batch-thumb"><img src="${thumbUrl(out) || outputUrl(job, out)}" loading="lazy" decoding="async" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`
       : `<div class="job-batch-thumb ${failed ? "failed" : ""}">${
           failed ? friendlyError(batch.error).slice(0, 60)
           : batch.status === "running" ? `${Math.round((batch.progress || 0) * 100)}%`

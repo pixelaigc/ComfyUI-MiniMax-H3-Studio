@@ -119,6 +119,22 @@ MUTATIONS = [
      "app.js?v=fav20261120c",
      "test_static_asset_version_bumped"),
 
+    ("M13 批次缩略图 URL 算到守卫外面（重现渲染崩溃）",
+     "web/app.js",
+     """    const thumb = out && !failed
+      ? `<div class="job-batch-thumb"><img src="${thumbUrl(out) || outputUrl(job, out)}" loading="lazy" decoding="async" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`""",
+     """    const batchThumb = thumbUrl(out);
+    const batchSrc = batchThumb || outputUrl(job, out);
+    const thumb = out && !failed
+      ? `<div class="job-batch-thumb"><img src="${batchSrc}" loading="lazy" decoding="async" alt="批次 ${batch.idx + 1}"><span class="zoom-hint">⤢</span></div>`""",
+     "test_batch_thumbnail_guards_undefined_output"),
+
+    ("M14 缩略图又发永久缓存指令",
+     "server.py",
+     "        \"Cache-Control\": \"public, max-age=86400\",",
+     "        \"Cache-Control\": \"public, max-age=86400, immutable\",",
+     "test_no_immutable_cache_header_in_server"),
+
     ("M12 缩略图缓存键不含 size（内容换了键不变）",
      "h3studio/thumbnails.py",
      """        raw = f"{Path(src).resolve()}|{st.st_mtime_ns}|{st.st_size}\"""",
