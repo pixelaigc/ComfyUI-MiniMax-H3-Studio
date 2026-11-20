@@ -1087,7 +1087,7 @@ async def _attach_thumb_urls(jobs: list[dict]) -> None:
                 # 记「键 -> 源文件」索引（`/api/thumb` 要靠它反查源文件）
                 _remember_thumb_source(key, full)
                 # URL 里带 k=<键>：源文件换了内容 -> 键变 -> URL 变 ->
-                # 浏览器不会拿旧缓存（这是「immutable」缓存的前提）。
+                # 浏览器不会拿旧缓存（URL 是内容寻址的，源文件变了 URL 就变）。
                 out["thumb"] = f"/api/thumb/{key}.jpg"
 
 
@@ -11782,11 +11782,32 @@ async def thumb_handler(request):
 
 
 def _thumb_response(path: Path):
-    """缩略图响应 —— 内容**不可变**（key 含 mtime/size，内容变了 key 就变）
-    -> 可以长期缓存。"""
+    """缩略图响应。
+
+    【缓存策略 —— 为什么不用「永久缓存」那串指令】
+    缩略图 URL 是**内容寻址**的（`/api/thumb/<sha1(path+mtime+size)>.jpg`）：
+    源文件一变，key 就变，URL 就变 —— 所以**同一 URL 的内容永远不会变**，
+    理论上该打那串「永久缓存」指令。
+
+    但仓库里有一条既有契约（tests/test_frontend_assets_hygiene.py::
+    test_server_static_has_no_cache_control_is_known_risk）：
+    **`server.py` 里不允许出现那串「永久缓存」指令** —— 因为静态资源的
+    `?v=` 版本号才是唯一的破缓存防线，那串指令会让浏览器永久缓存旧 URL。
+
+    那条契约针对的是 `/static/*`（带 `?v=` 的版本化资源），
+    而缩略图是 `/api/thumb/*`（内容寻址）—— 两者机制不同。
+    但**不为一条缩略图去改既有契约**（改测试让自己变绿 = 假绿），
+    所以这里退一步：**去掉那串指令，只保留 `max-age=86400`**。
+
+    【代价有多大】几乎为零：
+      * URL 内容寻址 -> 源文件变了就是新 URL，浏览器必然重新取；
+      * 24 小时内不会重新取（max-age）；
+      * 就算过期了要重验，也是 `If-None-Match` -> 304 / 0 字节 / ~2ms。
+    实测：带与不带那串指令，浏览器拿到的字节数完全一样。
+    """
     return web.FileResponse(path, headers={
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=86400, immutable",
+        "Cache-Control": "public, max-age=86400",
     })
 
 

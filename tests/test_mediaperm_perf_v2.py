@@ -208,8 +208,8 @@ class TestStructure(unittest.TestCase):
                       f"卡片图片没有懒加载：{tag}")
         self.assertIn('decoding="async"', tag,
                       f"卡片图片没有异步解码：{tag}")
-        # 批次缩略图也要
-        anchor2 = '<img src="${batchSrc}"'
+        # 批次缩略图也要（URL 内联在模板里，锚点跟着实际写法走）
+        anchor2 = '<img src="${thumbUrl(out) || outputUrl(job, out)}"'
         idx2 = src.find(anchor2)
         self.assertNotEqual(idx2, -1, "找不到批次缩略图的图片标签")
         tag2 = src[idx2:src.find(">", idx2) + 1]
@@ -284,6 +284,61 @@ class TestStructure(unittest.TestCase):
         # 且不能是「优先缩略图」的回落写法
         self.assertNotIn("||", sm.group(1),
                          "source.url 用了 || 回落 —— 可能优先取缩略图")
+
+    def test_batch_thumbnail_guards_undefined_output(self):
+        """批次缩略图：**没有产物**的批次不得让整张卡片渲染崩溃。
+
+        【真实踩过的坑 —— 2026-11-21】
+        我第一版写成：
+            const batchThumb = thumbUrl(out);
+            const batchSrc = batchThumb || outputUrl(job, out);   <-- 在守卫外面
+        而 `outputUrl(job, output)` 内部读 `output.file` ——
+        某个批次**没有产物**（out === undefined）时直接抛
+        `Cannot read properties of undefined (reading 'file')`
+        ⇒ jobCard 渲染中断 ⇒ **整个媒体库一片空白**
+        （实测：'任务列表读取失败，正在重试…'，0 张卡片）。
+
+        ⇒ 判据：算 batchSrc 的地方**必须在 `out` 存在之后**。
+        """
+        src = _read(APP_JS)
+        idx = src.find("renderJobBatches")
+        self.assertNotEqual(idx, -1, "找不到 renderJobBatches")
+        body = src[idx:idx + 3000]
+        # 找批次缩略图那段
+        thumb_idx = body.find("job-batch-thumb")
+        self.assertNotEqual(thumb_idx, -1, "找不到批次缩略图渲染")
+        # 往前看 600 字符 —— 那才是算 URL 的地方
+        window = body[max(0, thumb_idx - 600):thumb_idx + 300]
+        # 出现 outputUrl(job, out) 的地方，必须在 `out &&` 之后
+        guard_idx = window.find("out && !failed")
+        self.assertNotEqual(guard_idx, -1,
+                            "批次缩略图不在 `out && !failed` 守卫内")
+        url_idx = window.find("outputUrl(job, out)")
+        self.assertNotEqual(url_idx, -1, "找不到批次缩略图的 URL 计算")
+        self.assertGreater(url_idx, guard_idx,
+                           "outputUrl(job, out) 出现在守卫**之前** —— "
+                           "没有产物的批次会让整张卡片渲染崩溃")
+        # 且守卫本身必须在**算 URL 之前**就短路掉 undefined 的 out
+        self.assertIn("thumbUrl(out)", window,
+                      "批次缩略图没用 thumbUrl —— 没走缩略图就等于没修")
+
+    def test_no_immutable_cache_header_in_server(self):
+        """server.py 里不允许出现 `immutable`。
+
+        【为什么这条重要】仓库既有契约
+        （test_frontend_assets_hygiene.py::
+        test_server_static_has_no_cache_control_is_known_risk）：
+        静态资源的 `?v=` 版本号是**唯一**的破缓存防线 ——
+        服务端一旦发 `immutable`，浏览器会永久缓存旧 URL 的内容。
+
+        ⇒ 我第一版给缩略图加 `immutable` 时，这条断言变红了。
+        处置：**去掉 `immutable`，保留 `max-age`**（缩略图 URL 是内容寻址的，
+        源文件一变 URL 就变，所以 24 小时缓存完全安全），
+        而不是去改这条既有契约让自己变绿 —— 那是假绿。
+        """
+        src = _read(SERVER)
+        self.assertNotIn("immutable", src,
+                         "server.py 出现了那串永久缓存指令 —— 违反既有静态资源缓存契约")
 
     def test_static_asset_version_bumped(self):
         """app.js 的 ?v= 必须升过（否则老用户拿到的还是旧文件）。"""
