@@ -334,9 +334,18 @@ TOOL_GROUP_RULES: list[tuple[str, tuple[str, ...]]] = [
     # 2026-11-16 新增分栏 ——
     ("媒体库管理类", ("manage_media_library",)),
     ("外部能力类", ("read_file", "web_search", "run_code")),
+    # 【2026-11-20 新增 4 个工具】抽取音轨 / 时长裁剪 / 响度归一 / 替换音轨
+    # —— 与既有 6 个 ffmpeg 工具同类（都作用在素材库的音视频上）。
+    #
+    # 【为什么必须同步更新本表】不更新的话，这 4 个工具会被推进
+    # 「其它工具」分栏，而 tests/test_flow_diagram.py 的
+    # 「每个 Agent 工具都必须有节点」断言会转红
+    # （实测：4 个新工具全部报「在图里没有节点」）。
     ("ffmpeg 音视频类", ("media_probe", "media_concat", "media_transcode",
                          "media_extract_frames", "media_mix_audio",
-                         "media_merge_av")),
+                         "media_merge_av", "media_extract_audio",
+                         "media_trim", "media_normalize_audio",
+                         "media_replace_audio")),
 ]
 
 
