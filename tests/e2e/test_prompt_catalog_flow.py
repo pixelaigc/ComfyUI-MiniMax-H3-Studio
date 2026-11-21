@@ -403,14 +403,19 @@ def test_free_input_joins_the_assembly_and_is_not_blocked(studio_page, evidence)
     assert parts == ["一只戴护目镜的柯基犬", "远景是雾中的高压电塔"], \
         f"纯自定义没有进组装：{parts}"
 
-    # 2) 词库选项 + 自定义混合（自定义排在同槽位词库选项之后）
+    # 2) 词库选项 + 自定义混合：自定义按**它自己子类的槽位**插入，
+    #    排在同槽位词库选项之后 —— 不是简单追加到末尾。
+    #    （主体的自定义在 subject 槽 = 第 1 位；风格的自定义在 style 槽、
+    #      排在风格词库选项之后；远景的自定义在 scene 槽。）
     _pick(sp, evidence, "1.1 动漫 / 二次元", "赛璐璐动画")
     _type_custom(sp, evidence, "1.1 动漫 / 二次元", "复古漫画网点")
     parts = _parts(sp)
     evidence.step(f"词库 + 自定义混合的组装结果：{parts}")
-    assert parts == ["赛璐璐动画", "复古漫画网点",
-                     "一只戴护目镜的柯基犬", "远景是雾中的高压电塔"], \
-        f"混合组装不对：{parts}"
+    assert parts == ["一只戴护目镜的柯基犬",      # subject（自定义）
+                     "赛璐璐动画",                  # style（词库）
+                     "复古漫画网点",                # style（自定义，同槽位在词库之后）
+                     "远景是雾中的高压电塔",        # scene
+                     ], f"混合组装不对：{parts}"
 
     # 3) 自定义内容不被校验拦掉：带数字/英文/标点的自由文本照样进组装
     _type_custom(sp, evidence, "7.1 自然光时段与天气光", "逆光, 85mm f/1.4 的浅景深光斑")
@@ -753,19 +758,70 @@ def test_narrow_screen_constraints(studio_page, evidence, width):
     # 4) 【新约束】窄断点下「省略」与「自行输入」都可用
     #    取真实点击证据：一个词库下拉、一个自行输入框都必须
     #    elementFromPoint 命中自己（没被遮挡），并且真的能改值。
+    #
+    # 【为什么要重新点 FAB】上面第 3 步点了顶栏汉堡开左侧导航抽屉 ——
+    # 那一下会把底部参数抽屉收掉（app.js 的互斥逻辑）。
+    # 真人路径本来就是：看完导航 → 再点浮钮回到参数面板。照做一遍。
+    # （设计面板在第 1 步已经打开过，这里不能再点 #pcOpenBtn —— 那会把它收起。）
+    fab2 = sp.page.query_selector(".panel-fab")
+    if fab2 is not None:
+        fab2.click()
+        sp.page.wait_for_timeout(900)
+
     usability = sp.page.evaluate("""() => {
       const out = {groups: 0, selectHit: null, customHit: null, missingSkip: []};
       const vw = window.innerWidth;
       const groups = Array.from(document.querySelectorAll('#pcGroups .pc-group'));
       out.groups = groups.length;
+      /**
+       * 把元素滚到可见位置 —— 逐层滚它自己的滚动容器。
+       *
+       * 【为什么不能只滚 .panel 或用 scrollIntoView】实测（320/375/390/430）：
+       *   参数面板是 position:fixed 的底部抽屉（.panel overflow-y:auto），
+       *   面板内部还有一层 .pc-groups（max-height:46vh; overflow-y:auto）。
+       *   scrollIntoView 只滚了外层、元素 rect 停在 top=1076（视口 760）；
+       *   只滚 .panel 也不够 —— 元素在 .pc-groups 这一层里还是看不见。
+       *   于是断言拿到的是「元素在视口外」而不是「被谁遮挡」，等于没测。
+       *   真人路径是：抽屉滚 + 分组列表滚。这里照做一遍。
+       */
+      const scrollIntoViewHere = (el) => {
+        // 每次只滚**最近的一层**滚动容器，然后重新测量，迭代收敛。
+        // （一次遍历全链会算错：滚完内层后外层的 rect 已经变了。）
+        for (let step = 0; step < 8; step++) {
+          const er = el.getBoundingClientRect();
+          const vh = window.innerHeight, vw = window.innerWidth;
+          if (er.top >= 4 && er.bottom <= vh - 4 && er.left >= 0 && er.right <= vw) return;
+          let node = el.parentElement;
+          let scrolled = false;
+          while (node) {
+            const cs = getComputedStyle(node);
+            if (/(auto|scroll)/.test(cs.overflowY) && node.scrollHeight > node.clientHeight) {
+              const nr = node.getBoundingClientRect();
+              const mid = nr.top + Math.min(nr.height, vh) / 2;
+              node.scrollTop += (er.top - mid);
+              scrolled = true;
+              break;
+            }
+            node = node.parentElement;
+          }
+          if (!scrolled) return;   // 没有可滚的容器了（真不可见）
+        }
+      };
       const hit = (el) => {
-        el.scrollIntoView({block: 'center'});
+        scrollIntoViewHere(el);
         const r = el.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
         if (r.width <= 0 || r.height <= 0) return 'zero-size';
         if (r.right > vw + 1 || r.left < -1) return 'offscreen@' + Math.round(r.right);
-        const e = document.elementFromPoint(r.left + Math.min(6, r.width / 2),
-                                            r.top + r.height / 2);
-        return e && (el.contains(e) || e.contains(el)) ? 'OK' : (e.id || e.className || e.tagName);
+        if (r.top < -1 || r.bottom > vh + 1) {
+          return 'not-in-viewport@' + Math.round(r.top) + '..' + Math.round(r.bottom);
+        }
+        // 取元素自身范围内的点（夹到视口内），elementFromPoint 才有效
+        const x = Math.max(1, Math.min(vw - 1, r.left + Math.min(6, r.width / 2)));
+        const y = Math.max(1, Math.min(vh - 1, r.top + r.height / 2));
+        const e = document.elementFromPoint(x, y);
+        if (!e) return 'null-point@' + x + ',' + y;
+        return (el.contains(e) || e.contains(el)) ? 'OK' : (e.id || e.className || e.tagName);
       };
       for (const g of groups) {
         const sel = g.querySelector('select[data-select]');

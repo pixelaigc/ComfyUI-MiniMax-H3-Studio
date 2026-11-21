@@ -35,6 +35,20 @@ def pick(page, label, prefix):
     return r
 
 
+def type_custom(page, label, text):
+    """在某个分组的「自行输入」里键入内容（模拟真人打字）。"""
+    r = page.evaluate("""([label, text]) => {
+      const inp = Array.from(document.querySelectorAll('#pcGroups [data-custom]'))
+        .find(x => x.getAttribute('aria-label') === label + ' 自行输入');
+      if (!inp) return 'NO_INPUT';
+      inp.value = text;
+      inp.dispatchEvent(new Event('input', {bubbles: true}));
+      return 'OK';
+    }""", [label, text])
+    page.wait_for_timeout(250)
+    return r
+
+
 def open_designer(page):
     page.wait_for_selector("#pcOpenBtn", timeout=30000)
     page.evaluate("""() => {
@@ -75,6 +89,8 @@ with sync_playwright() as pw:
     open_designer(page)
     for label, opt in PICKS:
         pick(page, label, opt)
+    # 【自行输入】词库选项 + 自定义内容混合（截图要拍到这个入口）
+    type_custom(page, "4.2 前景", "压在画面下缘的旧报纸")
     # 滚到预览区
     page.evaluate("""() => {
       const p = document.querySelector('#panel');
