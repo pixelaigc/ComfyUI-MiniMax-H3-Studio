@@ -131,7 +131,19 @@ def test_catalog_api_serves_full_catalog(studio, evidence):
 
 @pytest.mark.parametrize("mode", TEXT2IMAGE_MODES)
 def test_designer_entry_reachable_in_every_text2image_mode(studio_page, evidence, mode):
-    """4 个文生图 mode 下入口都可达，且共用同一个 #prompt。"""
+    """4 个文生图 mode 下入口都可达，且共用同一个 #prompt。
+
+    【这一条要覆盖的不只是「入口看得见」】任务书要求 4 个 mode 都要能用，
+    所以这里逐项判定：
+      1) 入口面板与按钮可见；
+      2) 分组可折叠 + 搜索可用；
+      3) 选项可选 / 可跳过（默认「不指定」）；
+      4) 全跳过不产生垃圾片段；
+      5) 组装顺序正确（主体→造型→风格→场景→构图→光→色→氛围→质量→负向）；
+      6) 写回 #prompt 的「覆盖 / 追加」二选一；
+      7) 冲突提示可见；
+      8) 增强按钮仍正常。
+    """
     sp = studio_page
     sp.open()
     sp.goto_mode(mode)
@@ -144,7 +156,93 @@ def test_designer_entry_reachable_in_every_text2image_mode(studio_page, evidence
     groups = sp.page.eval_on_selector_all(
         "#pcGroups .pc-group", "els => els.length")
     evidence.step(f"{mode} 下分组数 = {groups}")
-    assert groups >= 40, f"{mode} 下分组太少：{groups}"
+    assert groups >= 45, f"{mode} 下分组太少：{groups}"
+
+    # 2) 折叠 + 搜索
+    sp.page.click("#pcGroups .pc-group-head")
+    sp.page.wait_for_timeout(350)
+    collapsed = sp.page.evaluate("""() => {
+      const g = document.querySelector('#pcGroups .pc-group');
+      return {cls: g.className, hidden: g.querySelector('.pc-group-body').hidden};
+    }""")
+    assert collapsed["cls"].endswith("collapsed") and collapsed["hidden"] is True, \
+        f"{mode} 下分组没进折叠态：{collapsed}"
+    sp.page.click("#pcGroups .pc-group-head")
+    sp.page.wait_for_timeout(350)
+    sp.page.fill("#pcSearch", "金发")
+    sp.page.wait_for_timeout(600)
+    hit_groups = sp.page.eval_on_selector_all(
+        "#pcGroups .pc-group-name", "els => els.map(e => e.textContent)")
+    evidence.step(f"{mode} 下搜索「金发」命中分组：{hit_groups}")
+    assert len(hit_groups) == 1 and "发型" in hit_groups[0], \
+        f"{mode} 下搜索没过滤到唯一分组：{hit_groups}"
+    sp.page.fill("#pcSearch", "")
+    sp.page.wait_for_timeout(500)
+
+    # 3) 默认就是「不指定」；4) 全跳过不产生垃圾片段
+    _clear_picks(sp)
+    defaults = sp.page.evaluate("""() => Array.from(
+      document.querySelectorAll('#pcGroups select[data-select]')).map(s => ({
+        label: s.getAttribute('aria-label'),
+        text: s.options[s.selectedIndex].textContent.trim()}))""")
+    bad = [d for d in defaults if d["text"] != "不指定"]
+    assert not bad, f"{mode} 下默认项不是「不指定」：{bad[:3]}"
+    assert _parts(sp) == [], f"{mode} 下全跳过仍产生了片段：{_parts(sp)}"
+
+    # 5) 组装顺序
+    for label, opt in [("3.0 主体类别（顶层，决定后面哪些子维度可用）", "人物（单人）"),
+                       ("3.3 发型与发色", "长直发"),
+                       ("1.1 动漫 / 二次元", "赛璐璐动画"),
+                       ("4.1 场景类型", "森林"),
+                       ("5.A 经典构图", "三分法"),
+                       ("7.1 自然光时段与天气光", "黄金时刻"),
+                       ("8.1 氛围与情绪", "宁静")]:
+        r = _pick(sp, evidence, label, opt)
+        assert r == "OK", f"{mode} 下选 {label}/{opt} 失败：{r}"
+    parts = _parts(sp)
+    evidence.step(f"{mode} 下组装结果：{parts}")
+    assert parts == ["人物（单人）", "长直发", "赛璐璐动画", "森林",
+                     "三分法", "黄金时刻", "宁静"], \
+        f"{mode} 下组装顺序不对：{parts}"
+
+    # 6) 写回 #prompt 的「覆盖 / 追加」二选一
+    sp.page.evaluate("""() => {
+      const p = document.querySelector('#prompt');
+      p.value = '用户自己写的描述';
+      p.dispatchEvent(new Event('input', {bubbles: true}));
+    }""")
+    sp.page.wait_for_timeout(300)
+    sp.page.click("#pcWriteBtn")
+    sp.page.wait_for_timeout(600)
+    choice = sp.page.evaluate("""() => {
+      const ow = document.querySelector('#pcOverwrite');
+      const ap = document.querySelector('#pcAppend');
+      return {overwrite: !!ow, append: !!ap,
+              prompt: document.querySelector('#prompt').value};
+    }""")
+    evidence.step(f"{mode} 下写回选择区：{choice}")
+    assert choice["overwrite"] and choice["append"], f"{mode} 下没有覆盖/追加二选一"
+    assert choice["prompt"] == "用户自己写的描述", f"{mode} 下用户文本被静默改写"
+    sp.page.click("#pcOverwrite")
+    sp.page.wait_for_timeout(600)
+    written = sp.value("#prompt")
+    assert written.startswith("人物（单人）"), f"{mode} 下覆盖结果不对：{written}"
+
+    # 7) 冲突提示可见
+    _clear_picks(sp)
+    _pick(sp, evidence, "1.1 动漫 / 二次元", "赛璐璐动画")
+    _pick(sp, evidence, "1.2 写实摄影", "真实摄影")
+    conflict = sp.page.evaluate("""() => ({
+      hidden: document.querySelector('#pcConflicts').hidden,
+      text: document.querySelector('#pcConflicts').innerText})""")
+    evidence.step(f"{mode} 下冲突提示：{conflict['text'][:120]}")
+    assert conflict["hidden"] is False, f"{mode} 下冲突提示不可见"
+    assert "冲突" in conflict["text"], f"{mode} 下冲突提示没有说明"
+
+    # 8) 增强按钮仍正常
+    for sel in ("#enhanceBtn", "#enhanceMenuBtn"):
+        assert sp.page.eval_on_selector(sel, "e => e.disabled") is False, \
+            f"{mode} 下 {sel} 被禁用"
     evidence.screenshot(sp.page, f"designer-{mode}")
 
 
