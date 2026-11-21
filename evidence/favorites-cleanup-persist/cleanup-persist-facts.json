@@ -1,0 +1,138 @@
+{
+ "04_previews": {
+  "all": {
+   "jobs": 400,
+   "files": 473,
+   "skipped_favorited": 12
+  },
+  "older": {
+   "jobs": 0,
+   "files": 0,
+   "skipped_favorited": 0
+  },
+  "failed": {
+   "jobs": 0,
+   "files": 0,
+   "skipped_favorited": 0
+  }
+ },
+ "04_preview_all_0m": {
+  "jobs": 400,
+  "files": 473,
+  "skipped_favorited": 12
+ },
+ "04_db_before": 12,
+ "04_files_before": 12,
+ "04_missing_before": 0,
+ "04_isolated": {
+  "tmp_dir": "/tmp/h3s-favcleanup-846p10io",
+  "instance_ready": true,
+  "iso_db_favorites_before": 12,
+  "iso_files_before": 12,
+  "all_1m": {
+   "preview": {
+    "jobs": 400,
+    "files": 473,
+    "skipped_favorited": 12
+   },
+   "execute": {
+    "skipped_favorited": 12
+   },
+   "execute_raw_keys": [
+    "scope",
+    "months",
+    "deleted_jobs",
+    "deleted_batches",
+    "deleted_files",
+    "skipped_running",
+    "skipped_favorited"
+   ],
+   "favorites_before": 12,
+   "favorites_after": 12,
+   "favorites_lost": [],
+   "fav_files_missing_after": 0
+  },
+  "all_0m": {
+   "preview": {
+    "jobs": 0,
+    "files": 0,
+    "skipped_favorited": 12
+   },
+   "execute": {
+    "skipped_favorited": 12
+   },
+   "execute_raw_keys": [
+    "scope",
+    "months",
+    "deleted_jobs",
+    "deleted_batches",
+    "deleted_files",
+    "skipped_running",
+    "skipped_favorited"
+   ],
+   "favorites_before": 12,
+   "favorites_after": 12,
+   "favorites_lost": [],
+   "fav_files_missing_after": 0
+  },
+  "failed_6m": {
+   "preview": {
+    "jobs": 0,
+    "files": 0,
+    "skipped_favorited": 0
+   },
+   "execute": {
+    "skipped_favorited": 0
+   },
+   "execute_raw_keys": [
+    "scope",
+    "months",
+    "deleted_jobs",
+    "deleted_batches",
+    "deleted_files",
+    "skipped_running",
+    "skipped_favorited"
+   ],
+   "favorites_before": 12,
+   "favorites_after": 12,
+   "favorites_lost": [],
+   "fav_files_missing_after": 0
+  },
+  "after_unfavorite_reenters_cleanup": {
+   "victim": "1cde1ad54d81",
+   "still_favorited": true,
+   "preview_jobs_all_0m": 1,
+   "skipped_favorited_after": 11
+  }
+ },
+ "05_tab": "all",
+ "05_target_favorited_card": "e4f27f1357c9",
+ "05_menu_items": {
+  "items": [
+   {
+    "act": "add-asset",
+    "text": "添加到素材库（这个结果）"
+   },
+   {
+    "act": "favorite",
+    "text": "取消收藏"
+   },
+   {
+    "act": "download",
+    "text": "下载原文件"
+   }
+  ]
+ },
+ "05_db_has_target_after": false,
+ "05_db_count": 10,
+ "P_persistence": {
+  "service_active": "active",
+  "nrestarts": "0",
+  "db_before_restart": 10,
+  "db_after_restart": 10,
+  "same_set": true,
+  "api_total_after_restart": 10,
+  "files_missing_after_restart": 0,
+  "files_total_after_restart": 10
+ }
+}

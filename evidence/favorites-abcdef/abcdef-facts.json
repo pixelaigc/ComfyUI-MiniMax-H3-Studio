@@ -1,0 +1,286 @@
+{
+ "02_before": {
+  "db_favorites": 14,
+  "unfavorited_card": "16e87a8f429b"
+ },
+ "02_context_menu": {
+  "items": [
+   {
+    "act": "add-asset",
+    "text": "添加到素材库（这个结果）"
+   },
+   {
+    "act": "favorite",
+    "text": "添加到收藏"
+   },
+   {
+    "act": "download",
+    "text": "下载原文件"
+   }
+  ]
+ },
+ "02_after_click": {
+  "menuHidden": false,
+  "toast": null
+ },
+ "02_after": {
+  "db_favorites": 15,
+  "new_in_db": true
+ },
+ "03_nav_present": true,
+ "03_favorites_view": {
+  "activeTab": "favorites",
+  "activeType": "",
+  "cards": 12,
+  "favoritedCards": 12,
+  "favCheckboxes": 12,
+  "searchVisible": true,
+  "pageSize": null
+ },
+ "03_detail_open": true,
+ "03_type_filter": [
+  {
+   "type": "",
+   "text": "全部类型"
+  },
+  {
+   "type": "t2v",
+   "text": "文生视频"
+  },
+  {
+   "type": "flf",
+   "text": "首尾帧生成"
+  },
+  {
+   "type": "r2v",
+   "text": "参考图生成"
+  },
+  {
+   "type": "t2i",
+   "text": "Z-IMAGE 文生图"
+  },
+  {
+   "type": "t2i_qwen",
+   "text": "Qwen-Image 2.1 文生图"
+  },
+  {
+   "type": "i2i_qwen",
+   "text": "Qwen-Image 2.1 图片编辑"
+  },
+  {
+   "type": "t2i_moss",
+   "text": "MOSS-Image 文生图"
+  },
+  {
+   "type": "t2i_h3image",
+   "text": "H3-Image 文生图"
+  },
+  {
+   "type": "i2i_h3image",
+   "text": "H3-Image 图片编辑"
+  },
+  {
+   "type": "t2a",
+   "text": "文生音乐"
+  },
+  {
+   "type": "a2a",
+   "text": "参考生音乐"
+  },
+  {
+   "type": "longfilm",
+   "text": "长片拼接"
+  },
+  {
+   "type": "__other__",
+   "text": "其它生成"
+  }
+ ],
+ "04_db_before": 15,
+ "04_manage_preview": {
+  "scope": "all",
+  "months": 1,
+  "jobs": 397,
+  "files": 470,
+  "sample": [
+   {
+    "id": "80ca48915a2c",
+    "status": "done",
+    "created_at": 1794669820.4316235,
+    "files": 1
+   },
+   {
+    "id": "9b5a32ce13df",
+    "status": "done",
+    "created_at": 1794677613.155235,
+    "files": 1
+   },
+   {
+    "id": "99ee1412cfd9",
+    "status": "done",
+    "created_at": 1794677613.1587753,
+    "files": 2
+   },
+   {
+    "id": "a7730f55f9fe",
+    "status": "done",
+    "created_at": 1794677613.1635854,
+    "files": 1
+   },
+   {
+    "id": "9121091f8d71",
+    "status": "done",
+    "created_at": 1794677613.1661892,
+    "files": 1
+   },
+   {
+    "id": "f162a29e03f6",
+    "status": "done",
+    "created_at": 1794677613.1701875,
+    "files": 1
+   },
+   {
+    "id": "0b07eaa9804a",
+    "status": "done",
+    "created_at": 1794677613.1732857,
+    "files": 1
+   },
+   {
+    "id": "ade416d85fb7",
+    "status": "done",
+    "created_at": 1794720354.6641517,
+    "files": 1
+   },
+   {
+    "id": "349cc6b7a5cd",
+    "status": "done",
+    "created_at": 1794720354.6686342,
+    "files": 2
+   },
+   {
+    "id": "6807b2f5bb69",
+    "status": "done",
+    "created_at": 1794720354.6737676,
+    "files": 1
+   },
+   {
+    "id": "447342960f72",
+    "status": "done",
+    "created_at": 1794720354.6768138,
+    "files": 1
+   },
+   {
+    "id": "b4c72b114492",
+    "status": "done",
+    "created_at": 1794720354.6801865,
+    "files": 1
+   },
+   {
+    "id": "1f5438fbfdf8",
+    "status": "done",
+    "created_at": 1794720354.6836812,
+    "files": 1
+   },
+   {
+    "id": "9ccd8b9403cb",
+    "status": "done",
+    "created_at": 1794669820.4114578,
+    "files": 2
+   },
+   {
+    "id": "fe4344385a84",
+    "status": "done",
+    "created_at": 1794669820.4164102,
+    "files": 1
+   },
+   {
+    "id": "c06df3c38ea2",
+    "status": "done",
+    "created_at": 1794669820.4221776,
+    "files": 1
+   },
+   {
+    "id": "39b321fdff69",
+    "status": "done",
+    "created_at": 1794059947.809438,
+    "files": 1
+   },
+   {
+    "id": "60f2181fd1de",
+    "status": "done",
+    "created_at": 1794060851.3992932,
+    "files": 1
+   },
+   {
+    "id": "e1e1e485dcae",
+    "status": "done",
+    "created_at": 1794103631.8449395,
+    "files": 1
+   },
+   {
+    "id": "16e6dbac17ce",
+    "status": "done",
+    "created_at": 1794103854.913113,
+    "files": 1
+   }
+  ],
+  "skipped_favorited": 15
+ },
+ "06_selected": 3,
+ "06_batch_bar": {
+  "found": true,
+  "hidden": false,
+  "visible": true,
+  "text": "已选 3 项 全选本页 清空选择 批量取消收藏",
+  "buttons": [
+   {
+    "id": "favSelectAllBtn",
+    "text": "全选本页"
+   },
+   {
+    "id": "favClearSelBtn",
+    "text": "清空选择"
+   },
+   {
+    "id": "favBatchUnfavBtn",
+    "text": "批量取消收藏"
+   }
+  ]
+ },
+ "06_batch_result": {
+  "clicked": "批量取消收藏",
+  "db_before": 15,
+  "db_after": 12,
+  "removed": 3,
+  "dialogs": [
+   {
+    "type": "confirm",
+    "message": "确认取消收藏这 3 个条目？\n\n这只解除收藏标记，生成文件与任务记录都会保留。\n（要删除产物请用卡片上的「删除」按钮）"
+   }
+  ]
+ },
+ "01_tab_before_submit": {
+  "activeTab": "done",
+  "activeType": "",
+  "cards": 12,
+  "favoritedCards": 0,
+  "favCheckboxes": 0,
+  "searchVisible": true,
+  "pageSize": null
+ },
+ "01_submit_button": {
+  "text": "生成",
+  "visible": true,
+  "disabled": false
+ },
+ "01_tab_after_submit": {
+  "activeTab": "done",
+  "activeType": "",
+  "cards": 12,
+  "favoritedCards": 0,
+  "favCheckboxes": 0,
+  "searchVisible": true,
+  "pageSize": null
+ },
+ "01_tab_unchanged": true
+}
