@@ -1,0 +1,55 @@
+{
+  "S1_initial": {
+    "fabVisible": true,
+    "fabRect": {
+      "top": 752,
+      "left": 275,
+      "w": 86,
+      "h": 44
+    },
+    "sidebarOverlap": null,
+    "panelOverlap": null,
+    "cardTextOverlap": [
+      {
+        "text": "模式参考生成\n      \n      ",
+        "cls": "job-meta",
+        "w": 86,
+        "h": 12
+      },
+      {
+        "text": "分辨率1088p · 1920×1088",
+        "cls": "row",
+        "w": 67,
+        "h": 2
+      },
+      {
+        "text": "分辨率",
+        "cls": "",
+        "w": 67,
+        "h": 2
+      }
+    ],
+    "cardMediaOverlap": [
+      {
+        "w": 86,
+        "h": 32
+      }
+    ]
+  },
+  "S2_sidebar_open": {
+    "fabVisible": false,
+    "fabRect": null,
+    "sidebarOverlap": null,
+    "panelOverlap": null,
+    "cardTextOverlap": [],
+    "cardMediaOverlap": []
+  },
+  "S3_panel_open": {
+    "fabVisible": false,
+    "fabRect": null,
+    "sidebarOverlap": null,
+    "panelOverlap": null,
+    "cardTextOverlap": [],
+    "cardMediaOverlap": []
+  }
+}

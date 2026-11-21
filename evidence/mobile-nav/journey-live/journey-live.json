@@ -1,0 +1,357 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "errors": [],
+  "steps": [
+    {
+      "step": 1,
+      "name": "initial",
+      "note": "初始态：生成媒体库可见",
+      "shot": "live-01-initial.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "Z-IMAGE 文生图",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "name": "type-picker-open",
+      "note": "打开生成类型选择抽屉（新增标题行 + × 按钮）",
+      "shot": "live-02-type-picker-open.png",
+      "state": {
+        "drawerOpen": true,
+        "panelOpen": false,
+        "fabVisible": false,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "Z-IMAGE 文生图",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "name": "after-dynamic-type",
+      "note": "进入「文生视频」（动态项）—— 抽屉应自动收起",
+      "shot": "live-03-after-dynamic-type.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "minimax-h3 文生视频",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 4,
+      "name": "back-to-type-picker",
+      "note": "返回生成类型选择（抽屉可再次打开）",
+      "shot": "live-04-back-to-type-picker.png",
+      "state": {
+        "drawerOpen": true,
+        "panelOpen": false,
+        "fabVisible": false,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "minimax-h3 文生视频",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 5,
+      "name": "after-static-type",
+      "note": "切换到「Z-IMAGE 文生图」（静态项）",
+      "shot": "live-05-after-static-type.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "Z-IMAGE 文生图",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 6,
+      "name": "media-library",
+      "note": "生成媒体库：卡片可见",
+      "shot": "live-06-media-library.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "Z-IMAGE 文生图",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 7,
+      "name": "drawer-scrolled-to-favorites",
+      "note": "抽屉滚到底，「收藏」入口可见",
+      "shot": "live-07-drawer-scrolled-to-favorites.png",
+      "state": {
+        "drawerOpen": true,
+        "panelOpen": false,
+        "fabVisible": false,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "Z-IMAGE 文生图",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 8,
+      "name": "favorites-view",
+      "note": "进入「收藏」视图",
+      "shot": "live-08-favorites-view.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": false,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 2,
+        "favBadgeCount": 2,
+        "activeTab": "favorites",
+        "activeNav": "收藏",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "off-viewport"
+        },
+        "favButton": {
+          "ok": false,
+          "why": "off-viewport"
+        }
+      }
+    },
+    {
+      "step": 9,
+      "name": "card-detail",
+      "note": "打开卡片详情模态框",
+      "shot": "live-09-card-detail.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 2,
+        "activeTab": "all",
+        "activeNav": "收藏",
+        "detailOpen": true,
+        "hamburger": {
+          "ok": false,
+          "why": "checked",
+          "hitId": "detailModal"
+        },
+        "firstCard": {
+          "ok": false,
+          "why": "checked",
+          "hitId": ""
+        },
+        "favButton": {
+          "ok": false,
+          "why": "checked",
+          "hitId": "detailParams"
+        }
+      }
+    },
+    {
+      "step": 10,
+      "name": "favorited-card",
+      "note": "点「☆ 收藏」→ ★ 出现",
+      "shot": "live-10-favorited-card.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": true,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 12,
+        "favBadgeCount": 1,
+        "activeTab": "all",
+        "activeNav": "收藏",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "favButton": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        }
+      }
+    },
+    {
+      "step": 11,
+      "name": "favorites-view-with-item",
+      "note": "收藏视图里能看到刚收藏的那张",
+      "shot": "live-11-favorites-view-with-item.png",
+      "state": {
+        "drawerOpen": false,
+        "panelOpen": false,
+        "fabVisible": false,
+        "toggleVisible": true,
+        "drawerCloseVisible": true,
+        "cardCount": 1,
+        "favBadgeCount": 1,
+        "activeTab": "favorites",
+        "activeNav": "收藏",
+        "detailOpen": false,
+        "hamburger": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "firstCard": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        },
+        "favButton": {
+          "ok": true,
+          "why": "checked",
+          "hitId": ""
+        }
+      }
+    }
+  ]
+}

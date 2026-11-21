@@ -1,0 +1,38 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "card_index": 0,
+  "job_id": "e8f1e63611b1",
+  "media_tag": "VIDEO",
+  "button_before": {
+    "found": true,
+    "text": "☆ 收藏",
+    "rect": {
+      "top": 824,
+      "left": 97,
+      "w": 84,
+      "h": 40
+    },
+    "inViewport": false,
+    "hitIsSelf": false,
+    "hitTag": null
+  },
+  "click_ok": true,
+  "badge_count_after": 2,
+  "button_after": {
+    "text": "★ 取消收藏",
+    "on": true,
+    "pressed": "true"
+  },
+  "server_favorites_count": 2,
+  "server_has_this_job": true,
+  "server_settled": true,
+  "badge_count_after_toggle_off": 1,
+  "server_favorites_after_toggle_off": 1,
+  "server_still_has_this_job": false,
+  "server_settled_off": true,
+  "errors": []
+}

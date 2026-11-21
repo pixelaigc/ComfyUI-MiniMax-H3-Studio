@@ -127,9 +127,15 @@ def main():
         snap(page, "initial", "初始态：生成媒体库可见")
 
         # ② 打开「生成类型选择」
-        page.click("#navToggle", timeout=6000)
-        page.wait_for_timeout(700)
-        snap(page, "type-picker-open", "打开生成类型选择抽屉（新增标题行 + × 按钮）")
+        try:
+            page.click("#navToggle", timeout=6000)
+            page.wait_for_timeout(700)
+            snap(page, "type-picker-open", "打开生成类型选择抽屉（新增标题行 + × 按钮）")
+        except Exception as e:
+            # 【取证脚本要能跑完「修前」的现场】
+            # 修前的死路会让某一步直接点不动 —— 那是**证据**，
+            # 不能让脚本异常退出（那样就没有后续截图了）。
+            snap(page, "type-picker-open-FAILED", "点汉堡失败：%s" % str(e)[:120])
 
         # ③ 进入某个生成类型（动态渲染的视频项）
         page.evaluate("""() => {
@@ -140,16 +146,20 @@ def main():
         snap(page, "after-dynamic-type", "进入「文生视频」（动态项）—— 抽屉应自动收起")
 
         # ④ 返回「生成类型选择」
-        page.click("#navToggle", timeout=6000)
-        page.wait_for_timeout(700)
-        snap(page, "back-to-type-picker", "返回生成类型选择（抽屉可再次打开）")
+        try:
+            page.click("#navToggle", timeout=6000)
+            page.wait_for_timeout(700)
+            snap(page, "back-to-type-picker", "返回生成类型选择（抽屉可再次打开）")
+        except Exception as e:
+            snap(page, "back-to-type-picker-FAILED",
+                 "返回类型选择失败：%s" % str(e)[:120])
 
         # ⑤ 切换另一个类型（静态项：Z-IMAGE 文生图）
         # 【为什么要先滚进视口】抽屉里的「文生图」分组在视频分组下方，
         # 375×812 下它在视口外 —— Playwright 的 click 会因为
         # "element is outside of the viewport" 而超时。
         # 这不是缺陷（用户可以滚），但取证脚本要模拟真实操作。
-        page.evaluate("""() => {
+        page.evaluate("""(i) => {
           const el = document.querySelector('#sidebar .nav-item[data-mode="t2i"]');
           if (!el) return;
           const s = document.querySelector('#navScroll');
@@ -158,9 +168,13 @@ def main():
           s.scrollTop += (r.top - sr.top) - sr.height / 3;
         }""")
         page.wait_for_timeout(500)
-        page.click('#sidebar .nav-item[data-mode="t2i"]', timeout=6000)
-        page.wait_for_timeout(1200)
-        snap(page, "after-static-type", "切换到「Z-IMAGE 文生图」（静态项）")
+        try:
+            page.click('#sidebar .nav-item[data-mode="t2i"]', timeout=6000)
+            page.wait_for_timeout(1200)
+            snap(page, "after-static-type", "切换到「Z-IMAGE 文生图」（静态项）")
+        except Exception as e:
+            snap(page, "after-static-type-FAILED",
+                 "切换类型失败：%s" % str(e)[:120])
 
         # ⑥ 打开生成媒体库（滚到卡片）
         page.evaluate("""() => {
@@ -171,17 +185,20 @@ def main():
         snap(page, "media-library", "生成媒体库：卡片可见")
 
         # ⑦ 打开「收藏」栏
-        page.click("#navToggle", timeout=6000)
-        page.wait_for_timeout(600)
-        page.evaluate("""() => {
-          const s = document.querySelector('#navScroll');
-          s.scrollTop = s.scrollHeight;
-        }""")
-        page.wait_for_timeout(600)
-        snap(page, "drawer-scrolled-to-favorites", "抽屉滚到底，「收藏」入口可见")
-        page.click("#navFavorites", timeout=6000)
-        page.wait_for_timeout(1800)
-        snap(page, "favorites-view", "进入「收藏」视图")
+        try:
+            page.click("#navToggle", timeout=6000)
+            page.wait_for_timeout(600)
+            page.evaluate("""() => {
+              const s = document.querySelector('#navScroll');
+              s.scrollTop = s.scrollHeight;
+            }""")
+            page.wait_for_timeout(600)
+            snap(page, "drawer-scrolled-to-favorites", "抽屉滚到底，「收藏」入口可见")
+            page.click("#navFavorites", timeout=6000)
+            page.wait_for_timeout(1800)
+            snap(page, "favorites-view", "进入「收藏」视图")
+        except Exception as e:
+            snap(page, "favorites-view-FAILED", "进收藏视图失败：%s" % str(e)[:120])
 
         # ⑧ 回到「全部」标签并打开卡片详情
         page.evaluate("""() => {
@@ -221,46 +238,56 @@ def main():
         page.wait_for_timeout(700)
 
         # ⑨ 收藏一张卡
-        idx = page.evaluate("""() => {
-          const cards = Array.from(
-            document.querySelectorAll('#jobsGrid .job-card[data-jid]'));
-          for (let i = 0; i < cards.length; i++) {
-            if (cards[i].querySelector('[data-act="favorite-toggle"]')) return i;
-          }
-          return -1;
-        }""")
-        if idx >= 0:
-            page.evaluate("""(i) => {
+        try:
+            idx = page.evaluate("""() => {
               const cards = Array.from(
                 document.querySelectorAll('#jobsGrid .job-card[data-jid]'));
-              const b = cards[i].querySelector('[data-act="favorite-toggle"]');
-              if (!b) return;
-              const area = document.querySelector('#jobsArea');
-              const br = b.getBoundingClientRect();
-              const ar = area.getBoundingClientRect();
-              area.scrollTop += (br.top - ar.top) - ar.height / 3;
-            }""", idx)
-            page.wait_for_timeout(700)
-            jid = page.evaluate(
-                "(i) => document.querySelectorAll('#jobsGrid .job-card[data-jid]')[i].dataset.jid", idx)
-            btn = page.query_selector(
-                '#jobsGrid .job-card[data-jid="%s"] [data-act="favorite-toggle"]' % jid)
-            if btn:
-                btn.click(timeout=6000)
-            page.wait_for_timeout(2500)
-        snap(page, "favorited-card", "点「☆ 收藏」→ ★ 出现")
+              for (let i = 0; i < cards.length; i++) {
+                if (cards[i].querySelector('[data-act="favorite-toggle"]')) return i;
+              }
+              return -1;
+            }""")
+            if idx >= 0:
+                page.evaluate("""(i) => {
+                  const cards = Array.from(
+                    document.querySelectorAll('#jobsGrid .job-card[data-jid]'));
+                  const b = cards[i].querySelector('[data-act="favorite-toggle"]');
+                  if (!b) return;
+                  const area = document.querySelector('#jobsArea');
+                  const br = b.getBoundingClientRect();
+                  const ar = area.getBoundingClientRect();
+                  area.scrollTop += (br.top - ar.top) - ar.height / 3;
+                }""", idx)
+                page.wait_for_timeout(700)
+                jid = page.evaluate(
+                    "(i) => document.querySelectorAll('#jobsGrid .job-card[data-jid]')[i].dataset.jid",
+                    idx)
+                btn = page.query_selector(
+                    '#jobsGrid .job-card[data-jid="%s"] [data-act="favorite-toggle"]' % jid)
+                if btn:
+                    btn.click(timeout=6000)
+                page.wait_for_timeout(2500)
+                snap(page, "favorited-card", "点「☆ 收藏」→ ★ 出现")
+            else:
+                snap(page, "favorited-card-SKIPPED", "没有带收藏按钮的卡（修前：卡片上根本没有这个按钮）")
+        except Exception as e:
+            snap(page, "favorited-card-FAILED", "收藏失败：%s" % str(e)[:120])
 
         # ⑩ 收藏视图里能看到它
-        page.click("#navToggle", timeout=6000)
-        page.wait_for_timeout(600)
-        page.evaluate("""() => {
-          const s = document.querySelector('#navScroll');
-          s.scrollTop = s.scrollHeight;
-        }""")
-        page.wait_for_timeout(500)
-        page.click("#navFavorites", timeout=6000)
-        page.wait_for_timeout(1800)
-        snap(page, "favorites-view-with-item", "收藏视图里能看到刚收藏的那张")
+        try:
+            page.click("#navToggle", timeout=6000)
+            page.wait_for_timeout(600)
+            page.evaluate("""() => {
+              const s = document.querySelector('#navScroll');
+              s.scrollTop = s.scrollHeight;
+            }""")
+            page.wait_for_timeout(500)
+            page.click("#navFavorites", timeout=6000)
+            page.wait_for_timeout(1800)
+            snap(page, "favorites-view-with-item", "收藏视图里能看到刚收藏的那张")
+        except Exception as e:
+            snap(page, "favorites-view-with-item-FAILED",
+                 "回收藏视图失败：%s" % str(e)[:120])
 
         browser.close()
 
