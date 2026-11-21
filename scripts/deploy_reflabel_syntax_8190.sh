@@ -29,7 +29,7 @@ echo "重启前 PID=$PID_BEFORE"
 
 # 【并发安全】live 必须仍停在本轮开始时看到的状态。
 # 别人推进了就中止 —— 绝不覆盖别人的工作。
-EXPECT_LIVE=b5783054ce3a373a0c53445d8fa960cc275dba18
+EXPECT_LIVE=35a7d52e869b5374d0330d3e9a00fb5d67aa24c8
 if [ "$LIVE_BEFORE" != "$EXPECT_LIVE" ]; then
   echo "!! live 分支已被别人推进（$LIVE_BEFORE != $EXPECT_LIVE），中止部署"
   exit 1
