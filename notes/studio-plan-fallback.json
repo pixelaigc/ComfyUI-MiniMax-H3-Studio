@@ -1,0 +1,22 @@
+{
+  "context_id": "1ac5b978-80c1-43d3-bb21-bf9ba11b4907",
+  "profile": "coding",
+  "updated_at": "2026-11-21 22:40 +0800",
+  "note": "Studio 任务卡无法通过 MCP 更新：broker 注入 item 键导致 schema 校验失败；profile token 与 context credential 均已失效（与 AGENTS.md 记录一致）。进度以本文件 + notes/ 为准。",
+  "plan": [
+    {"id": "quota", "step": "读取额度快照（只读，不新建采样）", "status": "completed"},
+    {"id": "recover", "step": "现场恢复并落档 notes/creative-prompt-state.md", "status": "completed"},
+    {"id": "narrow-fix", "step": "(a) 窄屏 320/375/390/430 全部通过（4 passed）", "status": "completed"},
+    {"id": "full-test", "step": "(b) 全量对拍：本分支 55 失败 vs 基线 51 失败，唯一差异项已复跑证伪", "status": "completed"},
+    {"id": "new-e2e", "step": "(c) E2E 21 passed + 三组组装样本 + 桌面/375px 截图", "status": "completed"},
+    {"id": "data-audit", "step": "(d) 数据对账：871 逐条保留 / 166 项 Danbooru 标注", "status": "completed"},
+    {"id": "merge-deploy", "step": "(e) 合并 local/maintainer 并部署 8190，线上探活 200 + 面板实测可用", "status": "completed"}
+  ],
+  "deliverable": {
+    "branch": "local/feature/creative-prompt-design",
+    "merged_into": "local/maintainer",
+    "live_head": "0d0d7dc379a3176de3df3ca774561588435cde9f",
+    "baseline_head": "97e729486b0b925bfb85d4cc5efb038ad1895c60",
+    "rollback": "git update-ref refs/heads/local/maintainer 97e729486b0b925bfb85d4cc5efb038ad1895c60 && git update-ref refs/heads/local/deploy/qwen-ref-assets-live 97e729486b0b925bfb85d4cc5efb038ad1895c60 && cd /root/projects/h3studio-live && git reset --mixed HEAD && git checkout -- . && systemctl restart h3-studio.service"
+  }
+}
