@@ -406,6 +406,15 @@ class TestServerRejectsLocalUpload(unittest.TestCase):
         class FakeRequest:
             def __init__(self, parts):
                 self._parts = parts
+                # 【2026-11-21 补】api_create 现在会先校验 Content-Type
+                # （错请求头必须回 4xx 而不是 500 —— 线上实测过）。
+                # 所以这个替身必须**像真实请求一样**带上 Content-Type，
+                # 否则 api_create 会把它判成「没带 Content-Type」-> 415，
+                # 根本走不到本用例要验证的「file_ref 必须来自素材库」那条分支。
+                # 这里给的是**合法**的 multipart/form-data + boundary，
+                # 边界串与下面 multipart() 里实际产出的分隔线一致。
+                self.headers = {"Content-Type":
+                                "multipart/form-data; boundary=----fakeboundary"}
 
             async def multipart(self):
                 async def gen():
