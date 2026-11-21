@@ -10265,7 +10265,11 @@ async def api_enhance(request):
         # 用户能一眼看出「第几张图被引用了」。
         "reference_labels": {
             "expected": list(asset_labels),
-            "found": enh_assets.extract_reference_labels(enhanced),
+            # 【必须传方言】不传就走默认 H3 方言 -> Qwen 面板的
+            # `<image1>` 会被漏掉，回显成「模型未写出标签」——
+            # 而模型其实写了（回显里说没写 = 假消息，比不说更糟）。
+            "found": enh_assets.extract_reference_labels(
+                enhanced, label_dialect),
         },
         "validation": validation,
         "elements": elements,

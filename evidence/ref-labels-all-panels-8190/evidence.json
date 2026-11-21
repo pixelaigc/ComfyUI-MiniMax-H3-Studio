@@ -1,0 +1,779 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "results": {
+    "flf": {
+      "title": "首尾帧生视频",
+      "dialect": "h3",
+      "assets": [
+        "asset_054f65ceccf2",
+        "asset_1f6d1e58069f"
+      ],
+      "expected_asset_count": 2,
+      "panel_filled_count": 2,
+      "panel_state": {
+        "mode": "flf",
+        "assetRefs": {
+          "first": {
+            "asset_id": "asset_054f65ceccf2",
+            "name": "v2.mp4_frame3_ce2f62f6.mp4",
+            "category": "image"
+          },
+          "last": {
+            "asset_id": "asset_1f6d1e58069f",
+            "name": "v2.mp4_frame2_65d70cbe.mp4",
+            "category": "image"
+          }
+        },
+        "qwenRefs": []
+      },
+      "request_body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "flf",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "first_frame",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "last_frame",
+            "ordinal": 0
+          }
+        ]
+      },
+      "request_asset_refs": [
+        {
+          "asset_id": "asset_054f65ceccf2",
+          "slot": "first_frame",
+          "ordinal": 0
+        },
+        {
+          "asset_id": "asset_1f6d1e58069f",
+          "slot": "last_frame",
+          "ordinal": 0
+        }
+      ],
+      "response_body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "subject_definitions:\n<Picture 1> is the first-frame anchor of the generated video: a centered circular multicolor test-pattern composition with vertical stripes (cyan, magenta, blue, yellow, green) inside an oval/rounded boundary, black side margins, and a horizontal rainbow gradient bar crossing the lower third; on the right edge there is a white bracket-like glyph containing two small black squares stacked vertically.\n<Picture 2> is the last-frame anchor of the generated video: the same centered circular multicolor test-pattern composition with vertical stripes and black side margins, but the right-edge glyph changes to a solid black rectangular block (no visible internal squares), and the lower horizontal bar shifts its gradient arrangement while still spanning the full width.\n\nsummary:\n[keyframe completion] The task is to generate a short video that begins exactly at <Picture 1> and ends exactly at <Picture 2>, performing a slow push-out from the circular test-pattern subject toward a wider framing while keeping the main subject consistent (same layout, colors, and right-edge glyph area) so the visual identity remains stable across the motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame matches <Picture 1> exactly: circular multicolor stripes, black side margins, lower rainbow bar, and right-edge bracket-with-squares glyph are all present at 00:00.000.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final frame matches <Picture 2> exactly: same circular multicolor composition with black side margins, but the right-edge element becomes a solid black rectangle and the lower bar gradient arrangement differs as specified.\n\ndetailed_description:\nThe target video is in a clean, flat graphic style resembling broadcast test-pattern imagery, with hard-edged color blocks, no textures, no lighting effects, and no camera shake; motion is limited to a slow outward zoom/pull-back that reveals more of the surrounding black margins while keeping the central circular pattern and its colors consistent.\n[Shot 1] At 00:00.000 the shot begins from <Picture 1>: a centered oval-shaped multicolor test pattern fills most of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, and green, bounded by black regions on the left and right; a horizontal rainbow gradient bar crosses the lower third of the frame; on the right edge sits a white bracket-like outline containing two stacked small black squares. From this exact starting state, the camera slowly pushes out (zooms backward) over several seconds: the circular multicolor subject remains centered and unchanged in structure and color order, while the visible black side margins gradually widen as the framing expands outward; the lower rainbow bar stays aligned across the full width but its gradient hues subtly reposition to match the evolving frame edges. Near the end of the motion, the right-edge glyph transitions from the bracket-with-two-squares form into a solid black rectangular block on the same right-side position. At 00:15.000 the shot ends on <Picture 2>: the same circular multicolor composition with black side margins and full-width lower gradient bar, now featuring the solid black rectangle at the right edge instead of the bracket-with-squares glyph.\n\noverall_soundscape:\nN/A (no audio content is provided or implied by the reference frames).\n\nnon_diegetic_music:\nN/A",
+        "merged": "subject_definitions:\n<Picture 1> is the first-frame anchor of the generated video: a centered circular multicolor test-pattern composition with vertical stripes (cyan, magenta, blue, yellow, green) inside an oval/rounded boundary, black side margins, and a horizontal rainbow gradient bar crossing the lower third; on the right edge there is a white bracket-like glyph containing two small black squares stacked vertically.\n<Picture 2> is the last-frame anchor of the generated video: the same centered circular multicolor test-pattern composition with vertical stripes and black side margins, but the right-edge glyph changes to a solid black rectangular block (no visible internal squares), and the lower horizontal bar shifts its gradient arrangement while still spanning the full width.\n\nsummary:\n[keyframe completion] The task is to generate a short video that begins exactly at <Picture 1> and ends exactly at <Picture 2>, performing a slow push-out from the circular test-pattern subject toward a wider framing while keeping the main subject consistent (same layout, colors, and right-edge glyph area) so the visual identity remains stable across the motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame matches <Picture 1> exactly: circular multicolor stripes, black side margins, lower rainbow bar, and right-edge bracket-with-squares glyph are all present at 00:00.000.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final frame matches <Picture 2> exactly: same circular multicolor composition with black side margins, but the right-edge element becomes a solid black rectangle and the lower bar gradient arrangement differs as specified.\n\ndetailed_description:\nThe target video is in a clean, flat graphic style resembling broadcast test-pattern imagery, with hard-edged color blocks, no textures, no lighting effects, and no camera shake; motion is limited to a slow outward zoom/pull-back that reveals more of the surrounding black margins while keeping the central circular pattern and its colors consistent.\n[Shot 1] At 00:00.000 the shot begins from <Picture 1>: a centered oval-shaped multicolor test pattern fills most of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, and green, bounded by black regions on the left and right; a horizontal rainbow gradient bar crosses the lower third of the frame; on the right edge sits a white bracket-like outline containing two stacked small black squares. From this exact starting state, the camera slowly pushes out (zooms backward) over several seconds: the circular multicolor subject remains centered and unchanged in structure and color order, while the visible black side margins gradually widen as the framing expands outward; the lower rainbow bar stays aligned across the full width but its gradient hues subtly reposition to match the evolving frame edges. Near the end of the motion, the right-edge glyph transitions from the bracket-with-two-squares form into a solid black rectangular block on the same right-side position. At 00:15.000 the shot ends on <Picture 2>: the same circular multicolor composition with black side margins and full-width lower gradient bar, now featuring the solid black rectangle at the right edge instead of the bracket-with-squares glyph.\n\noverall_soundscape:\nN/A (no audio content is provided or implied by the reference frames).\n\nnon_diegetic_music:\nN/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "h3-ref-director",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<Picture 1> = 首帧「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<Picture 2> = 尾帧「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "dialect": "h3"
+        },
+        "reference_labels": {
+          "expected": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "found": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ]
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "长度偏长（约 550 词，建议 60-350 词）"
+          ],
+          "stats": {
+            "words": 550,
+            "chars": 3439
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      },
+      "reference_labels": {
+        "expected": [
+          "<Picture 1>",
+          "<Picture 2>"
+        ],
+        "found": [
+          "<Picture 1>",
+          "<Picture 2>"
+        ]
+      },
+      "ui_meta": "模型：本机 Qwen 多模态 · 模板：h3-ref-director · 采样：sample / 0.7 / top_p 0.9 · max_new_tokens：4096 · 原文 18 字 → 扩写 3439 字\n⚠ 长度偏长（约 550 词，建议 60-350 词）\n词数约 550\nfinish_reason：stop\n素材上下文：已带 2 张素材图给模型\n参考标签：<Picture 1>、<Picture 2>（已全部标注）",
+      "ui_enhanced_head": "subject_definitions:\n<Picture 1> is the first-frame anchor of the generated video: a centered circular multicolor test-pattern composition with vertical stripes (cyan, magenta, blue, yellow, green) inside an oval/rounded boundary, black side margins, and a horizontal rainbow gradient bar crossing the lower third; on the right edge there is a white bracket-like glyph containing two small black squa",
+      "console_errors": []
+    },
+    "r2v": {
+      "title": "参考生视频",
+      "dialect": "h3",
+      "assets": [
+        "asset_054f65ceccf2",
+        "asset_1f6d1e58069f"
+      ],
+      "expected_asset_count": 2,
+      "panel_filled_count": 2,
+      "panel_state": {
+        "mode": "r2v",
+        "assetRefs": {
+          "ref0": {
+            "asset_id": "asset_054f65ceccf2",
+            "name": "v2.mp4_frame3_ce2f62f6.mp4",
+            "category": "image"
+          },
+          "ref1": {
+            "asset_id": "asset_1f6d1e58069f",
+            "name": "v2.mp4_frame2_65d70cbe.mp4",
+            "category": "image"
+          }
+        },
+        "qwenRefs": []
+      },
+      "request_body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "r2v",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "ref_image",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "ref_image",
+            "ordinal": 1
+          }
+        ]
+      },
+      "request_asset_refs": [
+        {
+          "asset_id": "asset_054f65ceccf2",
+          "slot": "ref_image",
+          "ordinal": 0
+        },
+        {
+          "asset_id": "asset_1f6d1e58069f",
+          "slot": "ref_image",
+          "ordinal": 1
+        }
+      ],
+      "response_body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "subject_definitions:\n<Picture 1> is a frame showing a small dark rectangular object positioned on the right side of a large circular target chart composed of vertical colored stripes (cyan, magenta, blue, yellow, green, red). The object has white markings. A horizontal rainbow gradient bar intersects the lower third of the image. This serves as the starting keyframe for the video.\n<Picture 2> is a frame showing the same large circular target chart with identical vertical colored stripes (cyan, magenta, blue, yellow, green, red). The small dark rectangular object on the right side now appears slightly smaller and further to the right, indicating a change in camera distance or zoom. The horizontal rainbow gradient bar intersects the lower third of the image. This serves as the ending keyframe for the video.\n\nsummary:\n[keyframe completion] The task is to generate a continuous shot starting from <Picture 1> and ending at <Picture 2>. The camera performs a slow pull-back (zoom out) or dolly-out movement, maintaining consistency of the colorful target chart while shifting perspective relative to the small dark object on the right.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The initial composition, including the specific positioning and appearance of the dark object and the color chart layout, is exactly as shown in the reference image.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final composition matches the reference image, showing the target chart with the object appearing smaller/shifted due to the camera movement described in the prompt.\n\ndetailed_description:\nThe video features a static graphic design style with high-contrast geometric shapes and saturated colors.\n[Shot 1] The shot begins exactly from <Picture 1>. A large circular test pattern fills the majority of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, green, and red. To the right of this circle, a small dark rectangular object with white markings sits against a black background. A horizontal bar displaying a rainbow gradient cuts across the lower section of the frame. As the video progresses, the camera slowly pulls back or zooms out gradually from this initial position. The large circular chart remains visually consistent in its color structure and layout throughout the movement. The small dark object on the right appears to shrink slightly relative to the frame as the field of view widens. By the end of the clip, the composition converges precisely onto <Picture 2>, where the dark object is positioned slightly further into the negative space on the right side, completing the requested pull-back motion.\n\noverall_soundscape:\nN/A (Silent visual sequence)\n\nnon_diegetic_music:\nN/A",
+        "merged": "subject_definitions:\n<Picture 1> is a frame showing a small dark rectangular object positioned on the right side of a large circular target chart composed of vertical colored stripes (cyan, magenta, blue, yellow, green, red). The object has white markings. A horizontal rainbow gradient bar intersects the lower third of the image. This serves as the starting keyframe for the video.\n<Picture 2> is a frame showing the same large circular target chart with identical vertical colored stripes (cyan, magenta, blue, yellow, green, red). The small dark rectangular object on the right side now appears slightly smaller and further to the right, indicating a change in camera distance or zoom. The horizontal rainbow gradient bar intersects the lower third of the image. This serves as the ending keyframe for the video.\n\nsummary:\n[keyframe completion] The task is to generate a continuous shot starting from <Picture 1> and ending at <Picture 2>. The camera performs a slow pull-back (zoom out) or dolly-out movement, maintaining consistency of the colorful target chart while shifting perspective relative to the small dark object on the right.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The initial composition, including the specific positioning and appearance of the dark object and the color chart layout, is exactly as shown in the reference image.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final composition matches the reference image, showing the target chart with the object appearing smaller/shifted due to the camera movement described in the prompt.\n\ndetailed_description:\nThe video features a static graphic design style with high-contrast geometric shapes and saturated colors.\n[Shot 1] The shot begins exactly from <Picture 1>. A large circular test pattern fills the majority of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, green, and red. To the right of this circle, a small dark rectangular object with white markings sits against a black background. A horizontal bar displaying a rainbow gradient cuts across the lower section of the frame. As the video progresses, the camera slowly pulls back or zooms out gradually from this initial position. The large circular chart remains visually consistent in its color structure and layout throughout the movement. The small dark object on the right appears to shrink slightly relative to the frame as the field of view widens. By the end of the clip, the composition converges precisely onto <Picture 2>, where the dark object is positioned slightly further into the negative space on the right side, completing the requested pull-back motion.\n\noverall_soundscape:\nN/A (Silent visual sequence)\n\nnon_diegetic_music:\nN/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "h3-ref-director",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<Picture 1> = 参考图「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<Picture 2> = 参考图「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "dialect": "h3"
+        },
+        "reference_labels": {
+          "expected": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "found": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ]
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "长度偏长（约 438 词，建议 60-350 词）"
+          ],
+          "stats": {
+            "words": 438,
+            "chars": 2754
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      },
+      "reference_labels": {
+        "expected": [
+          "<Picture 1>",
+          "<Picture 2>"
+        ],
+        "found": [
+          "<Picture 1>",
+          "<Picture 2>"
+        ]
+      },
+      "ui_meta": "模型：本机 Qwen 多模态 · 模板：h3-ref-director · 采样：sample / 0.7 / top_p 0.9 · max_new_tokens：4096 · 原文 18 字 → 扩写 2754 字\n⚠ 长度偏长（约 438 词，建议 60-350 词）\n词数约 438\nfinish_reason：stop\n素材上下文：已带 2 张素材图给模型\n参考标签：<Picture 1>、<Picture 2>（已全部标注）",
+      "ui_enhanced_head": "subject_definitions:\n<Picture 1> is a frame showing a small dark rectangular object positioned on the right side of a large circular target chart composed of vertical colored stripes (cyan, magenta, blue, yellow, green, red). The object has white markings. A horizontal rainbow gradient bar intersects the lower third of the image. This serves as the starting keyframe for the video.\n<Picture 2> is a",
+      "console_errors": []
+    },
+    "i2i_qwen": {
+      "title": "参考生图（Qwen）",
+      "dialect": "qwen",
+      "assets": [
+        "asset_054f65ceccf2",
+        "asset_1f6d1e58069f"
+      ],
+      "expected_asset_count": 2,
+      "panel_filled_count": 2,
+      "panel_state": {
+        "mode": "i2i_qwen",
+        "assetRefs": {},
+        "qwenRefs": [
+          "asset_054f65ceccf2",
+          "asset_1f6d1e58069f"
+        ]
+      },
+      "request_body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "qwen21-pe-i2i",
+        "mode_ctx": "i2i_qwen",
+        "model_key": "qwen_image_2.1_bf16",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "ref_image",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "ref_image",
+            "ordinal": 1
+          }
+        ]
+      },
+      "request_asset_refs": [
+        {
+          "asset_id": "asset_054f65ceccf2",
+          "slot": "ref_image",
+          "ordinal": 0
+        },
+        {
+          "asset_id": "asset_1f6d1e58069f",
+          "slot": "ref_image",
+          "ordinal": 1
+        }
+      ],
+      "response_body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "将<image1>作为起始帧、<image2>作为结束帧生成一段平滑过渡动画：画面主体为一个由青色、品红色、蓝色、黄色、绿色、红色竖条组成的圆形彩色测试图案，下方有一条横向彩虹渐变条带，右侧有一个黑色像素风格小图标；在保持该主体图形完全一致的前提下，镜头从<image1>中右侧的黑色像素图标缓慢拉远至<image2>中的状态——即右侧的黑色像素图标由两个白色方块轮廓的形态平滑变形为一个完整的实心矩形并带有两条白色横线细节，同时整体构图、色彩分布与背景位置保持不变，仅实现该局部图标的形变过渡。",
+        "merged": "将<image1>作为起始帧、<image2>作为结束帧生成一段平滑过渡动画：画面主体为一个由青色、品红色、蓝色、黄色、绿色、红色竖条组成的圆形彩色测试图案，下方有一条横向彩虹渐变条带，右侧有一个黑色像素风格小图标；在保持该主体图形完全一致的前提下，镜头从<image1>中右侧的黑色像素图标缓慢拉远至<image2>中的状态——即右侧的黑色像素图标由两个白色方块轮廓的形态平滑变形为一个完整的实心矩形并带有两条白色横线细节，同时整体构图、色彩分布与背景位置保持不变，仅实现该局部图标的形变过渡。",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "qwen21-pe-i2i",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<image1> = 参考图「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<image2> = 参考图「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<image1>",
+            "<image2>"
+          ],
+          "dialect": "qwen"
+        },
+        "reference_labels": {
+          "expected": [
+            "<image1>",
+            "<image2>"
+          ],
+          "found": []
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "用户原文的核心要素可能丢失：镜头从女孩慢慢推向远景、从女、女孩、孩慢、慢慢、慢推、推向、向远、远景、保持主体一致、持主、体一"
+          ],
+          "stats": {
+            "words": 136,
+            "chars": 248
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": 1.0,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": true,
+          "reason": "",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      },
+      "reference_labels": {
+        "expected": [
+          "<image1>",
+          "<image2>"
+        ],
+        "found": []
+      },
+      "ui_meta": "模型：本机 Qwen 多模态 · 模板：qwen21-pe-i2i · 采样：sample / 0.7 / top_p 0.9 · max_new_tokens：4096 · 原文 18 字 → 扩写 248 字\n⚠ 用户原文的核心要素可能丢失：镜头从女孩慢慢推向远景、从女、女孩、孩慢、慢慢、慢推、推向、向远、远景、保持主体一致、持主、体一\n词数约 136\n原文要素保留率 100%（2/2 项）\nfinish_reason：stop\n素材上下文：已带 2 张素材图给模型\n参考标签：<image1>、<image2>（模型未写出：<image1>、<image2>）",
+      "ui_enhanced_head": "将<image1>作为起始帧、<image2>作为结束帧生成一段平滑过渡动画：画面主体为一个由青色、品红色、蓝色、黄色、绿色、红色竖条组成的圆形彩色测试图案，下方有一条横向彩虹渐变条带，右侧有一个黑色像素风格小图标；在保持该主体图形完全一致的前提下，镜头从<image1>中右侧的黑色像素图标缓慢拉远至<image2>中的状态——即右侧的黑色像素图标由两个白色方块轮廓的形态平滑变形为一个完整的实心矩形并带有两条白色横线细节，同时整体构图、色彩分布与背景位置保持不变，仅实现该局部图标的形变过渡。",
+      "console_errors": []
+    },
+    "t2v": {
+      "title": "无素材面板（回归对照）",
+      "request_body": {
+        "prompt": "一只猫在窗台上打哈欠",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "t2v",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": []
+      },
+      "request_asset_refs": [],
+      "ui_meta": "模型：本机 Qwen 多模态 · 模板：video-director · 采样：sample / 0.7 / top_p 0.9 · max_new_tokens：4096 · 原文 10 字 → 扩写 978 字\n词数约 165\nfinish_reason：stop",
+      "ui_enhanced_head": "integrated_multimodal_description: [Shot 1] Static Shot. A tabby cat with short fur sits on a wooden windowsill inside a room during daytime. Soft natural light enters from the left, illuminating the texture of the wood grain and the cat's whiskers. The cat looks directly at the camera with relaxed "
+    }
+  },
+  "console_errors": [],
+  "all_requests": [
+    {
+      "url": "http://127.0.0.1:8190/api/enhance",
+      "body_raw": "{\"prompt\":\"镜头从女孩慢慢推向远景，保持主体一致\",\"mode\":\"replace\",\"spec_id\":\"video-director\",\"mode_ctx\":\"flf\",\"model_key\":\"lora\",\"prompt_history\":[],\"asset_refs\":[{\"asset_id\":\"asset_054f65ceccf2\",\"slot\":\"first_frame\",\"ordinal\":0},{\"asset_id\":\"asset_1f6d1e58069f\",\"slot\":\"last_frame\",\"ordinal\":0}]}",
+      "body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "flf",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "first_frame",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "last_frame",
+            "ordinal": 0
+          }
+        ]
+      }
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/enhance",
+      "body_raw": "{\"prompt\":\"镜头从女孩慢慢推向远景，保持主体一致\",\"mode\":\"replace\",\"spec_id\":\"video-director\",\"mode_ctx\":\"r2v\",\"model_key\":\"lora\",\"prompt_history\":[],\"asset_refs\":[{\"asset_id\":\"asset_054f65ceccf2\",\"slot\":\"ref_image\",\"ordinal\":0},{\"asset_id\":\"asset_1f6d1e58069f\",\"slot\":\"ref_image\",\"ordinal\":1}]}",
+      "body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "r2v",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "ref_image",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "ref_image",
+            "ordinal": 1
+          }
+        ]
+      }
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/enhance",
+      "body_raw": "{\"prompt\":\"镜头从女孩慢慢推向远景，保持主体一致\",\"mode\":\"replace\",\"spec_id\":\"qwen21-pe-i2i\",\"mode_ctx\":\"i2i_qwen\",\"model_key\":\"qwen_image_2.1_bf16\",\"prompt_history\":[],\"asset_refs\":[{\"asset_id\":\"asset_054f65ceccf2\",\"slot\":\"ref_image\",\"ordinal\":0},{\"asset_id\":\"asset_1f6d1e58069f\",\"slot\":\"ref_image\",\"ordinal\":1}]}",
+      "body": {
+        "prompt": "镜头从女孩慢慢推向远景，保持主体一致",
+        "mode": "replace",
+        "spec_id": "qwen21-pe-i2i",
+        "mode_ctx": "i2i_qwen",
+        "model_key": "qwen_image_2.1_bf16",
+        "prompt_history": [],
+        "asset_refs": [
+          {
+            "asset_id": "asset_054f65ceccf2",
+            "slot": "ref_image",
+            "ordinal": 0
+          },
+          {
+            "asset_id": "asset_1f6d1e58069f",
+            "slot": "ref_image",
+            "ordinal": 1
+          }
+        ]
+      }
+    },
+    {
+      "url": "http://127.0.0.1:8190/api/enhance",
+      "body_raw": "{\"prompt\":\"一只猫在窗台上打哈欠\",\"mode\":\"replace\",\"spec_id\":\"video-director\",\"mode_ctx\":\"t2v\",\"model_key\":\"lora\",\"prompt_history\":[],\"asset_refs\":[]}",
+      "body": {
+        "prompt": "一只猫在窗台上打哈欠",
+        "mode": "replace",
+        "spec_id": "video-director",
+        "mode_ctx": "t2v",
+        "model_key": "lora",
+        "prompt_history": [],
+        "asset_refs": []
+      }
+    }
+  ],
+  "all_responses": [
+    {
+      "status": 200,
+      "body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "subject_definitions:\n<Picture 1> is the first-frame anchor of the generated video: a centered circular multicolor test-pattern composition with vertical stripes (cyan, magenta, blue, yellow, green) inside an oval/rounded boundary, black side margins, and a horizontal rainbow gradient bar crossing the lower third; on the right edge there is a white bracket-like glyph containing two small black squares stacked vertically.\n<Picture 2> is the last-frame anchor of the generated video: the same centered circular multicolor test-pattern composition with vertical stripes and black side margins, but the right-edge glyph changes to a solid black rectangular block (no visible internal squares), and the lower horizontal bar shifts its gradient arrangement while still spanning the full width.\n\nsummary:\n[keyframe completion] The task is to generate a short video that begins exactly at <Picture 1> and ends exactly at <Picture 2>, performing a slow push-out from the circular test-pattern subject toward a wider framing while keeping the main subject consistent (same layout, colors, and right-edge glyph area) so the visual identity remains stable across the motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame matches <Picture 1> exactly: circular multicolor stripes, black side margins, lower rainbow bar, and right-edge bracket-with-squares glyph are all present at 00:00.000.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final frame matches <Picture 2> exactly: same circular multicolor composition with black side margins, but the right-edge element becomes a solid black rectangle and the lower bar gradient arrangement differs as specified.\n\ndetailed_description:\nThe target video is in a clean, flat graphic style resembling broadcast test-pattern imagery, with hard-edged color blocks, no textures, no lighting effects, and no camera shake; motion is limited to a slow outward zoom/pull-back that reveals more of the surrounding black margins while keeping the central circular pattern and its colors consistent.\n[Shot 1] At 00:00.000 the shot begins from <Picture 1>: a centered oval-shaped multicolor test pattern fills most of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, and green, bounded by black regions on the left and right; a horizontal rainbow gradient bar crosses the lower third of the frame; on the right edge sits a white bracket-like outline containing two stacked small black squares. From this exact starting state, the camera slowly pushes out (zooms backward) over several seconds: the circular multicolor subject remains centered and unchanged in structure and color order, while the visible black side margins gradually widen as the framing expands outward; the lower rainbow bar stays aligned across the full width but its gradient hues subtly reposition to match the evolving frame edges. Near the end of the motion, the right-edge glyph transitions from the bracket-with-two-squares form into a solid black rectangular block on the same right-side position. At 00:15.000 the shot ends on <Picture 2>: the same circular multicolor composition with black side margins and full-width lower gradient bar, now featuring the solid black rectangle at the right edge instead of the bracket-with-squares glyph.\n\noverall_soundscape:\nN/A (no audio content is provided or implied by the reference frames).\n\nnon_diegetic_music:\nN/A",
+        "merged": "subject_definitions:\n<Picture 1> is the first-frame anchor of the generated video: a centered circular multicolor test-pattern composition with vertical stripes (cyan, magenta, blue, yellow, green) inside an oval/rounded boundary, black side margins, and a horizontal rainbow gradient bar crossing the lower third; on the right edge there is a white bracket-like glyph containing two small black squares stacked vertically.\n<Picture 2> is the last-frame anchor of the generated video: the same centered circular multicolor test-pattern composition with vertical stripes and black side margins, but the right-edge glyph changes to a solid black rectangular block (no visible internal squares), and the lower horizontal bar shifts its gradient arrangement while still spanning the full width.\n\nsummary:\n[keyframe completion] The task is to generate a short video that begins exactly at <Picture 1> and ends exactly at <Picture 2>, performing a slow push-out from the circular test-pattern subject toward a wider framing while keeping the main subject consistent (same layout, colors, and right-edge glyph area) so the visual identity remains stable across the motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame matches <Picture 1> exactly: circular multicolor stripes, black side margins, lower rainbow bar, and right-edge bracket-with-squares glyph are all present at 00:00.000.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final frame matches <Picture 2> exactly: same circular multicolor composition with black side margins, but the right-edge element becomes a solid black rectangle and the lower bar gradient arrangement differs as specified.\n\ndetailed_description:\nThe target video is in a clean, flat graphic style resembling broadcast test-pattern imagery, with hard-edged color blocks, no textures, no lighting effects, and no camera shake; motion is limited to a slow outward zoom/pull-back that reveals more of the surrounding black margins while keeping the central circular pattern and its colors consistent.\n[Shot 1] At 00:00.000 the shot begins from <Picture 1>: a centered oval-shaped multicolor test pattern fills most of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, and green, bounded by black regions on the left and right; a horizontal rainbow gradient bar crosses the lower third of the frame; on the right edge sits a white bracket-like outline containing two stacked small black squares. From this exact starting state, the camera slowly pushes out (zooms backward) over several seconds: the circular multicolor subject remains centered and unchanged in structure and color order, while the visible black side margins gradually widen as the framing expands outward; the lower rainbow bar stays aligned across the full width but its gradient hues subtly reposition to match the evolving frame edges. Near the end of the motion, the right-edge glyph transitions from the bracket-with-two-squares form into a solid black rectangular block on the same right-side position. At 00:15.000 the shot ends on <Picture 2>: the same circular multicolor composition with black side margins and full-width lower gradient bar, now featuring the solid black rectangle at the right edge instead of the bracket-with-squares glyph.\n\noverall_soundscape:\nN/A (no audio content is provided or implied by the reference frames).\n\nnon_diegetic_music:\nN/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "h3-ref-director",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<Picture 1> = 首帧「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<Picture 2> = 尾帧「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "dialect": "h3"
+        },
+        "reference_labels": {
+          "expected": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "found": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ]
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "长度偏长（约 550 词，建议 60-350 词）"
+          ],
+          "stats": {
+            "words": 550,
+            "chars": 3439
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "subject_definitions:\n<Picture 1> is a frame showing a small dark rectangular object positioned on the right side of a large circular target chart composed of vertical colored stripes (cyan, magenta, blue, yellow, green, red). The object has white markings. A horizontal rainbow gradient bar intersects the lower third of the image. This serves as the starting keyframe for the video.\n<Picture 2> is a frame showing the same large circular target chart with identical vertical colored stripes (cyan, magenta, blue, yellow, green, red). The small dark rectangular object on the right side now appears slightly smaller and further to the right, indicating a change in camera distance or zoom. The horizontal rainbow gradient bar intersects the lower third of the image. This serves as the ending keyframe for the video.\n\nsummary:\n[keyframe completion] The task is to generate a continuous shot starting from <Picture 1> and ending at <Picture 2>. The camera performs a slow pull-back (zoom out) or dolly-out movement, maintaining consistency of the colorful target chart while shifting perspective relative to the small dark object on the right.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The initial composition, including the specific positioning and appearance of the dark object and the color chart layout, is exactly as shown in the reference image.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final composition matches the reference image, showing the target chart with the object appearing smaller/shifted due to the camera movement described in the prompt.\n\ndetailed_description:\nThe video features a static graphic design style with high-contrast geometric shapes and saturated colors.\n[Shot 1] The shot begins exactly from <Picture 1>. A large circular test pattern fills the majority of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, green, and red. To the right of this circle, a small dark rectangular object with white markings sits against a black background. A horizontal bar displaying a rainbow gradient cuts across the lower section of the frame. As the video progresses, the camera slowly pulls back or zooms out gradually from this initial position. The large circular chart remains visually consistent in its color structure and layout throughout the movement. The small dark object on the right appears to shrink slightly relative to the frame as the field of view widens. By the end of the clip, the composition converges precisely onto <Picture 2>, where the dark object is positioned slightly further into the negative space on the right side, completing the requested pull-back motion.\n\noverall_soundscape:\nN/A (Silent visual sequence)\n\nnon_diegetic_music:\nN/A",
+        "merged": "subject_definitions:\n<Picture 1> is a frame showing a small dark rectangular object positioned on the right side of a large circular target chart composed of vertical colored stripes (cyan, magenta, blue, yellow, green, red). The object has white markings. A horizontal rainbow gradient bar intersects the lower third of the image. This serves as the starting keyframe for the video.\n<Picture 2> is a frame showing the same large circular target chart with identical vertical colored stripes (cyan, magenta, blue, yellow, green, red). The small dark rectangular object on the right side now appears slightly smaller and further to the right, indicating a change in camera distance or zoom. The horizontal rainbow gradient bar intersects the lower third of the image. This serves as the ending keyframe for the video.\n\nsummary:\n[keyframe completion] The task is to generate a continuous shot starting from <Picture 1> and ending at <Picture 2>. The camera performs a slow pull-back (zoom out) or dolly-out movement, maintaining consistency of the colorful target chart while shifting perspective relative to the small dark object on the right.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The initial composition, including the specific positioning and appearance of the dark object and the color chart layout, is exactly as shown in the reference image.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The final composition matches the reference image, showing the target chart with the object appearing smaller/shifted due to the camera movement described in the prompt.\n\ndetailed_description:\nThe video features a static graphic design style with high-contrast geometric shapes and saturated colors.\n[Shot 1] The shot begins exactly from <Picture 1>. A large circular test pattern fills the majority of the frame, composed of vertical stripes in cyan, magenta, blue, yellow, green, and red. To the right of this circle, a small dark rectangular object with white markings sits against a black background. A horizontal bar displaying a rainbow gradient cuts across the lower section of the frame. As the video progresses, the camera slowly pulls back or zooms out gradually from this initial position. The large circular chart remains visually consistent in its color structure and layout throughout the movement. The small dark object on the right appears to shrink slightly relative to the frame as the field of view widens. By the end of the clip, the composition converges precisely onto <Picture 2>, where the dark object is positioned slightly further into the negative space on the right side, completing the requested pull-back motion.\n\noverall_soundscape:\nN/A (Silent visual sequence)\n\nnon_diegetic_music:\nN/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "h3-ref-director",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<Picture 1> = 参考图「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<Picture 2> = 参考图「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "dialect": "h3"
+        },
+        "reference_labels": {
+          "expected": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ],
+          "found": [
+            "<Picture 1>",
+            "<Picture 2>"
+          ]
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "长度偏长（约 438 词，建议 60-350 词）"
+          ],
+          "stats": {
+            "words": 438,
+            "chars": 2754
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "original": "镜头从女孩慢慢推向远景，保持主体一致",
+        "enhanced": "将<image1>作为起始帧、<image2>作为结束帧生成一段平滑过渡动画：画面主体为一个由青色、品红色、蓝色、黄色、绿色、红色竖条组成的圆形彩色测试图案，下方有一条横向彩虹渐变条带，右侧有一个黑色像素风格小图标；在保持该主体图形完全一致的前提下，镜头从<image1>中右侧的黑色像素图标缓慢拉远至<image2>中的状态——即右侧的黑色像素图标由两个白色方块轮廓的形态平滑变形为一个完整的实心矩形并带有两条白色横线细节，同时整体构图、色彩分布与背景位置保持不变，仅实现该局部图标的形变过渡。",
+        "merged": "将<image1>作为起始帧、<image2>作为结束帧生成一段平滑过渡动画：画面主体为一个由青色、品红色、蓝色、黄色、绿色、红色竖条组成的圆形彩色测试图案，下方有一条横向彩虹渐变条带，右侧有一个黑色像素风格小图标；在保持该主体图形完全一致的前提下，镜头从<image1>中右侧的黑色像素图标缓慢拉远至<image2>中的状态——即右侧的黑色像素图标由两个白色方块轮廓的形态平滑变形为一个完整的实心矩形并带有两条白色横线细节，同时整体构图、色彩分布与背景位置保持不变，仅实现该局部图标的形变过渡。",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "qwen21-pe-i2i",
+        "used_multimodal": true,
+        "assets": {
+          "image_count": 2,
+          "asset_count": 2,
+          "notes": [
+            "<image1> = 参考图「v2.mp4_frame3_ce2f62f6.mp4」",
+            "<image2> = 参考图「v2.mp4_frame2_65d70cbe.mp4」"
+          ],
+          "skipped": [],
+          "has_text_context": false,
+          "labels": [
+            "<image1>",
+            "<image2>"
+          ],
+          "dialect": "qwen"
+        },
+        "reference_labels": {
+          "expected": [
+            "<image1>",
+            "<image2>"
+          ],
+          "found": []
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [
+            "用户原文的核心要素可能丢失：镜头从女孩慢慢推向远景、从女、女孩、孩慢、慢慢、慢推、推向、向远、远景、保持主体一致、持主、体一"
+          ],
+          "stats": {
+            "words": 136,
+            "chars": 248
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": 1.0,
+          "missing": [],
+          "missing_count": 0,
+          "total": 2,
+          "applicable": true,
+          "reason": "",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "original": "一只猫在窗台上打哈欠",
+        "enhanced": "integrated_multimodal_description: [Shot 1] Static Shot. A tabby cat with short fur sits on a wooden windowsill inside a room during daytime. Soft natural light enters from the left, illuminating the texture of the wood grain and the cat's whiskers. The cat looks directly at the camera with relaxed eyes. Suddenly, the cat opens its mouth wide in a yawn, extending its neck slightly upward. Its tongue is briefly visible as it inhales deeply. The sound of air rushing through the nostrils is audible. After completing the yawn, the cat closes its mouth slowly and blinks once before turning its head toward the window glass on the right side.\n\noverall_soundscape: The environment is quiet with minimal ambient noise, featuring only faint outdoor traffic sounds muffled by the window glass. The dominant sound is the sharp intake of breath from the cat during the yawn followed by a short exhalation. There are no human voices or diegetic music present.\n\nnon_diegetic_music: N/A",
+        "merged": "integrated_multimodal_description: [Shot 1] Static Shot. A tabby cat with short fur sits on a wooden windowsill inside a room during daytime. Soft natural light enters from the left, illuminating the texture of the wood grain and the cat's whiskers. The cat looks directly at the camera with relaxed eyes. Suddenly, the cat opens its mouth wide in a yawn, extending its neck slightly upward. Its tongue is briefly visible as it inhales deeply. The sound of air rushing through the nostrils is audible. After completing the yawn, the cat closes its mouth slowly and blinks once before turning its head toward the window glass on the right side.\n\noverall_soundscape: The environment is quiet with minimal ambient noise, featuring only faint outdoor traffic sounds muffled by the window glass. The dominant sound is the sharp intake of breath from the cat during the yawn followed by a short exhalation. There are no human voices or diegetic music present.\n\nnon_diegetic_music: N/A",
+        "mode": "replace",
+        "provider": "本机 Qwen 多模态",
+        "provider_id": "b17cccaab67d",
+        "spec_id": "video-director",
+        "used_multimodal": false,
+        "assets": {},
+        "reference_labels": {
+          "expected": [],
+          "found": []
+        },
+        "validation": {
+          "ok": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {
+            "words": 165,
+            "chars": 978
+          }
+        },
+        "elements": null,
+        "pe_aspect_ratio": "",
+        "coverage": {
+          "ok": true,
+          "ratio": null,
+          "missing": [],
+          "missing_count": 0,
+          "total": 1,
+          "applicable": false,
+          "reason": "原文与扩写结果使用不同的书写系统，逐字比对无意义",
+          "truncated": false,
+          "truncation_reason": "",
+          "missing_sections": []
+        },
+        "finish_reason": "stop",
+        "params": {
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "max_tokens": 4096,
+          "max_tokens_ceiling": 32768,
+          "sampling": "sample",
+          "length": "long"
+        }
+      }
+    }
+  ]
+}

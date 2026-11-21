@@ -89,6 +89,13 @@ MUTATIONS = [
         '        found_labels = enh_assets.extract_reference_labels(enhanced)',
     ),
     (
+        "服务端**响应回显**的 found 不传方言（2026-11-21 实测踩到）",
+        "server.py",
+        '            "found": enh_assets.extract_reference_labels(\n'
+        '                enhanced, label_dialect),',
+        '            "found": enh_assets.extract_reference_labels(enhanced),',
+    ),
+    (
         "服务端解析素材时不传方言",
         "server.py",
         '            resolved_assets = await _resolve_enhance_assets(\n'

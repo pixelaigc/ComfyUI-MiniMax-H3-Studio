@@ -77,7 +77,7 @@ def pick_asset_from_library(page, index, slot_key):
           if (btn) btn.click();
         }""", slot_key)
     page.wait_for_selector("#alPickerBody .al-card", timeout=60000)
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1200)
     asset_id = page.evaluate(
         """(i) => {
           const cards = document.querySelectorAll('#alPickerBody .al-card');
@@ -87,11 +87,11 @@ def pick_asset_from_library(page, index, slot_key):
           card.click();
           return id;
         }""", index)
-    page.wait_for_timeout(1200)
+    page.wait_for_timeout(1500)
     page.evaluate(
         """() => {
           const btns = [...document.querySelectorAll('#alPickerMask button')];
-          const ok = btns.find(b => /确定|使用|完成/.test(b.textContent || ''));
+          const ok = btns.find(b => /确定|使用|完成|添加|选择/.test(b.textContent || ''));
           if (ok) ok.click();
         }""")
     page.wait_for_timeout(2500)
@@ -101,26 +101,26 @@ def pick_asset_from_library(page, index, slot_key):
 def pick_qwen_refs(page, count):
     """Qwen / H3-Image 图片编辑面板：从素材库挑 count 张参考图。
 
-    那套参考图由 web/qwen-refs.js 自己管状态，不在 state.assetRefs 里。
+    那套参考图由 web/qwen-refs.js 自己管状态（window.QwenRefs），
+    不在 state.assetRefs 里。入口按钮是 `#imgRefAdd`（「+ 从素材库添加」）。
+
+    【为什么要逐张加、且每次都重开选择器】素材库选择器是单选模式
+    —— 点一张就填进当前槽位。Qwen 的参考图是一个列表，所以要点
+    N 次「添加」，每次选不同的那张。
     """
     ids = []
     for i in range(count):
         page.evaluate(
             """() => {
-              const btn = document.querySelector('.qwen-ref-add, #qwenRefAdd, [data-act="qwen-ref-add"]');
+              const btn = document.querySelector('#imgRefAdd');
               if (btn) btn.click();
-              else {
-                const b = [...document.querySelectorAll('button')]
-                  .find(x => /添加参考图|添加图片|\\+ ?参考图/.test(x.textContent || ''));
-                if (b) b.click();
-              }
             }""")
         try:
-            page.wait_for_selector("#alPickerBody .al-card", timeout=20000)
+            page.wait_for_selector("#alPickerBody .al-card", timeout=30000)
         except Exception as exc:
             log(f"  参考图选择器没打开：{exc}")
             break
-        page.wait_for_timeout(600)
+        page.wait_for_timeout(1000)
         aid = page.evaluate(
             """(idx) => {
               const cards = document.querySelectorAll('#alPickerBody .al-card');
@@ -130,14 +130,14 @@ def pick_qwen_refs(page, count):
               card.click();
               return id;
             }""", i)
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(1200)
         page.evaluate(
             """() => {
               const btns = [...document.querySelectorAll('#alPickerMask button')];
               const ok = btns.find(b => /确定|使用|完成|添加|选择/.test(b.textContent || ''));
               if (ok) ok.click();
             }""")
-        page.wait_for_timeout(1200)
+        page.wait_for_timeout(2000)
         if aid:
             ids.append(aid)
     return ids
@@ -149,7 +149,7 @@ def switch_mode(page, mode):
         """(m) => {
           const el = document.querySelector(`.nav-item[data-mode="${m}"]`);
           return !!(el && el.offsetParent !== null);
-        }""", mode, timeout=90000)
+        }""", arg=mode, timeout=90000)
     page.evaluate(
         """(m) => {
           const el = document.querySelector(`.nav-item[data-mode="${m}"]`);
@@ -157,7 +157,7 @@ def switch_mode(page, mode):
         }""", mode)
     page.wait_for_function(
         """(m) => typeof state !== 'undefined' && state.mode === m""",
-        mode, timeout=30000)
+        arg=mode, timeout=30000)
     page.wait_for_timeout(2000)
 
 
@@ -178,14 +178,28 @@ def run_enhance(page, prompt, calls, responses):
           if (!btn) throw new Error('找不到增强按钮');
           btn.click();
         }""")
-    try:
-        page.wait_for_function(
+    # 【为什么用轮询而不是 wait_for_function】wait_for_function 默认按
+    # rAF 轮询，本机多模态模型在 GPU 忙时一次调用可能要几十秒到几分钟；
+    # 轮询能**逐次打印进度**，卡住时能立刻看出是「模型慢」而不是
+    # 「脚本没点到按钮」。
+    deadline = time.time() + 900
+    while time.time() < deadline:
+        page.wait_for_timeout(5000)
+        st = page.evaluate(
             """() => {
               const m = document.querySelector('#enhanceModal');
-              return m && !m.hidden;
-            }""", timeout=600000)
-    except Exception as exc:
-        log(f"  等待增强结果超时：{exc}")
+              const h = document.querySelector('#enhanceHint');
+              return {
+                modal: !!(m && !m.hidden),
+                hint: h ? h.textContent : '',
+              };
+            }""")
+        log(f"  等待增强结果… modal={st['modal']} hint={st['hint'][:60]!r}")
+        if st["modal"]:
+            break
+        if "失败" in st["hint"] or "报错" in st["hint"]:
+            log(f"  增强报错：{st['hint']}")
+            break
     page.wait_for_timeout(1500)
 
     ui = page.evaluate(
@@ -279,6 +293,18 @@ def main():
                     ? window.QwenRefs.getRefs().map(r => r.asset_id) : [],
                 })""")
 
+            # 【为什么要先验面板真的填上了】素材库选择器是单选模式，
+            # 点错/点重了会导致某个槽位没填上 —— 那样后续的「增强请求
+            # 少带素材」是**取证脚本自己的错**，不是产品的错。
+            # 必须先确认面板状态，再解读增强结果。
+            filled = len(panel_state.get("assetRefs") or {})
+            if mode == "i2i_qwen":
+                filled = len(panel_state.get("qwenRefs") or [])
+            log(f"  面板实际填入素材数 = {filled}")
+            if filled != expected_count:
+                log(f"  !! 面板没填满（{filled}/{expected_count}），"
+                    f"本面板取证作废")
+
             ui, panel_calls = run_enhance(
                 page, "镜头从女孩慢慢推向远景，保持主体一致", calls, responses)
             page.screenshot(path=str(OUT / f"{mode}-03-enhance.png"), full_page=False)
@@ -295,6 +321,7 @@ def main():
                 "dialect": dialect,
                 "assets": aids,
                 "expected_asset_count": expected_count,
+                "panel_filled_count": filled,
                 "panel_state": panel_state,
                 "request_body": last_req,
                 "request_asset_refs": last_req.get("asset_refs"),
@@ -366,15 +393,19 @@ if __name__ == "__main__":
         refs = r.get("request_asset_refs")
         n_refs = len(refs or [])
         want = r.get("expected_asset_count") or 0
+        filled = r.get("panel_filled_count")
         rl = r.get("reference_labels") or {}
         expected = rl.get("expected") or []
         found = rl.get("found") or []
         missing = [x for x in expected if x not in found]
         bad = check_dialect(found, dialect)
-        print(f"[{mode}] 请求体素材数={n_refs}（期望 {want}）"
+        print(f"[{mode}] 面板填入={filled}/{want} 请求体素材数={n_refs}"
               f" 期望标签={expected} 实得={found}")
+        if filled is not None and filled != want:
+            print("  !! 面板没填满 —— 取证脚本自身的操作问题，不是产品缺陷")
+            ok = False
         if n_refs != want:
-            print(f"  !! 请求体素材数不符")
+            print("  !! 请求体素材数不符")
             ok = False
         if missing:
             print(f"  !! 响应缺参考标签：{missing}")
