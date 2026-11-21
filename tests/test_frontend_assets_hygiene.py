@@ -227,7 +227,15 @@ STALE_BUMPED = {
     # 【2026-11-21 移动端死路修复】app.js 改了内容
     #   （收抽屉改事件委托 / 长按菜单 / 抽屉关闭按钮 / FAB 随抽屉隐藏）
     # ⇒ ?v= 必须再升一档。
-    "app.js":                  ("mediaperm20261121a", "mobnav20261121a"),
+    # 【2026-11-21 创意内容设计面板】app.js 改了内容
+    # （导出 pushPromptVersion / clearPromptEnhanced 给
+    #  web/prompt-catalog.js 做写回用）⇒ ?v= 必须再升一档
+    # （mobnav20261121a -> cpd20261121a）。
+    # 【为什么不能出现第二个 "app.js" 条目】这张表是 Python dict 字面量，
+    # 后写覆盖先写 ⇒ 第二个条目会把第一个**静默覆盖**（隐藏条目），
+    # 而 test_stale_bumped_table_has_no_duplicate_keys 会因为源码里
+    # 出现两次 "app.js" 而失败。改一次版本号 = 改这一行的两个值。
+    "app.js":                  ("mobnav20261121a", "cpd20261121a"),
     # 【2026-11-21 移动端死路修复】favorites.js / favorites.css 改了内容
     #   （applyBadge 同步卡片底部的收藏按钮；新增 .fav-action 样式）
     # ⇒ ?v= 必须再升一档。
@@ -239,6 +247,13 @@ STALE_BUMPED = {
     # 【2026-11-21 构建版本标识】新增的静态资源
     #   （侧栏底部显示当前部署的 commit 与静态资源版本指纹）
     "build-id.js":             ("",              "buildid20261121a"),
+    # 【2026-11-21 创意内容设计 · 中文优先改造】本轮新增的独立模块
+    #   （自行输入入口 + 中文片段组装 + 英文片段仅作辅助）⇒ 升一档。
+    #   口径与 build-id.js 一致：新增文件没有「旧值」，旧值留空串。
+    # 【2026-11-21 硬互斥可见说明】内容又变了（分组内补可见中文冲突说明）
+    #   ⇒ 再升一档 cpd20261121b -> cpd20261121c。
+    "prompt-catalog.css":      ("",              "cpd20261121c"),
+    "prompt-catalog.js":       ("",              "cpd20261121c"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),

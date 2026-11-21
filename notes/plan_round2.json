@@ -1,0 +1,9 @@
+[
+  {"id": "quota", "step": "读取额度快照（只读，不新建采样）", "status": "completed"},
+  {"id": "recover", "step": "现场恢复：核实分支/提交/数据源/前端模块已到位，写入 notes/creative-prompt-state.md", "status": "in_progress"},
+  {"id": "narrow-fix", "step": "(a) 修完窄屏 320/375/390/430 失败项（elementFromPoint/真实点击证据）", "status": "pending"},
+  {"id": "full-test", "step": "(b) 全量既有 E2E + 单元测试通过，与 mainline 基线失败数对拍", "status": "pending"},
+  {"id": "new-e2e", "step": "(c) 新增浏览器 E2E + 三组组装样本 + 桌面/375px 截图", "status": "pending"},
+  {"id": "data-audit", "step": "(d) 数据对账：871 项 + 166 项 Danbooru 标注", "status": "pending"},
+  {"id": "merge-deploy", "step": "(e) 合并 local/maintainer 并部署 8190 + 线上探活", "status": "pending"}
+]

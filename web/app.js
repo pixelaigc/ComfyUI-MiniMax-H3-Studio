@@ -8300,6 +8300,18 @@ window.renderMode = renderMode;
 // 直接调 renderMode() 会把刚回填的素材清掉（resetSlotsForMode）。
 window.renderModeKeepSlots = renderModeKeepSlotsRender;
 
+// ---------- 「创意内容设计」面板的写回接口 ----------
+//
+// web/prompt-catalog.js（选项目录构造器）要把拼好的内容写回 #prompt，
+// 但独立模块不能直接调 app.js 里的隐式全局函数 ——
+// 所以通过这个窗口把它以明示的接口供给其它模块用。
+//
+// 【级别必须是 level 0】选项目录的结果是「原始提示词」，
+// 不能打「已增强」徽标 —— 否则会绕过 #enhanceGateModal
+// 的「未增强拦截」。
+window.__h3PushPromptVersion = pushPromptVersion;
+window.__h3ClearPromptEnhanced = clearPromptEnhanced;
+
 // 接续能力探测：Relay-Kit 节点在不在。
 //
 // 【为什么不据此决定按钮显隐】按钮显隐完全听服务端的逐任务判定
