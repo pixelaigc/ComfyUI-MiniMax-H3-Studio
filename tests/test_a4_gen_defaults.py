@@ -142,7 +142,19 @@ class TestGenDefaultsSpec(unittest.TestCase):
             self.assertNotIn("attention", names)
             self.assertNotIn("accel_lora", names)
             self.assertIn("lora", names)
-            self.assertIn("resolution", names)
+            # 【2026-11-21 —— resolution 字段已删除（用户驳回）】
+            # 用户原话：「同时存在百万像素和分辨率挡位和比例 …
+            # 全部都是冲突的。和文生视频完全不一样好吧。」
+            # 官方首尾帧模板（minimax_h3_v1.json 节点 115）的尺寸表达是
+            #   ResolutionSelector {aspect_ratio, megapixels, multiple: 32}
+            # —— 只有「比例 + MP 预算」，没有「分辨率档位」。
+            # 于是尺寸唯一表达 = 画面比例 × MP 预算 × 百分比（与 t2v 同一套）。
+            self.assertNotIn(
+                "resolution", names,
+                f"{mode} 又出现了独立的「分辨率档位」字段 —— "
+                f"它会与 MP 预算并列成两套冲突表达：{sorted(names)}")
+            self.assertIn("megapixels", names, mode)
+            self.assertIn("resolution_percent", names, mode)
 
     def test_flf_and_r2v_model_options_follow_mode(self):
         """底模选项按 mode 过滤：flf 只能 FL2VA 系，r2v 只能 Ref2VA 系。

@@ -178,19 +178,33 @@ class TestBothPathsConsumeSavedDefaults(unittest.TestCase):
 
     # ------------------------------------------------------------ 测试
     def test_settings_endpoint_serves_real_derived_defaults(self):
-        """下发接口的默认值由真实配置派生（不是写死的 544p/768p）。"""
+        """下发接口的默认值由真实配置派生，且尺寸表达只有一套。
+
+        【2026-11-21 —— 断言反过来】
+        原来这里断言「resolution 选项不再是 544p/768p 两档、且要多于 5 档」，
+        等于承认该字段该存在。用户驳回的正是它存在：
+        「同时存在百万像素和分辨率挡位和比例 … 全部都是冲突的。」
+        官方首尾帧模板（minimax_h3_v1.json 节点 115）只有
+        ResolutionSelector {aspect_ratio, megapixels, multiple: 32}。
+        所以现在断言：**不得有 resolution 字段**，尺寸只有
+        画面比例 × MP 预算 × 百分比 一套。
+        """
         settings = self._get_settings()
         spec = settings.get("gen_defaults_spec") or {}
         self.assertIn("flf", spec)
         fields = {f["name"]: f for f in spec["flf"]["fields"]}
         self.assertIn("megapixels", fields)
         self.assertIn("resolution_percent", fields)
-        # 分辨率档位不再是两档遗留
-        options = [o["value"] for o in fields["resolution"]["options"]]
-        self.assertNotEqual(options, ["544p", "768p"])
-        self.assertGreater(len(options), 5)
+        self.assertIn("aspect", fields)
+        self.assertNotIn("resolution", fields,
+                         "flf 又出现了独立的分辨率档位字段（与 MP 预算冲突）")
+        # MP 预算的上界来自真实策略，不是写死的数
+        self.assertGreater(float(fields["megapixels"]["max"]), 0.0)
         # note 不再写死旧 MP 口径
-        self.assertNotIn("544p = 0.4MP", fields["resolution"].get("note") or "")
+        for field in fields.values():
+            note = field.get("note") or ""
+            self.assertNotIn("544p = 0.4MP", note, field["name"])
+            self.assertNotIn("768p = 0.8MP", note, field["name"])
 
     def test_saving_defaults_persists_and_is_read_back(self):
         """保存的默认参数能存进去、能读回来。"""

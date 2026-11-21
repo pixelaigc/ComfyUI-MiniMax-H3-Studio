@@ -72,8 +72,24 @@ VIDEO_DURATION_MAX = 60
 #: 这个常量现在只作**异常兜底**用（真源导入失败时）。
 VIDEO_RESOLUTIONS = tuple(wf.RES_MP.keys())
 
-#: 视频 LoRA 取值。来源：workflows.LORAS + "none"（官方工作流的无 LoRA 档）
-VIDEO_LORAS = ("none",) + tuple(wf.LORAS.keys())
+#: 视频 LoRA 取值。
+#:
+#: 【2026-11-21 —— 不再是 workflows.LORAS 硬编码】
+#: 原来这里是 ``("none",) + tuple(wf.LORAS.keys())`` —— 硬编码两枚，
+#: 既不问底模、也不问本机有没有、也不跑兼容性实测。
+#: 于是同一个工作台里两套口径：主生成面板按服务端下发的
+#: ``accel_lora_compat``（逐层实测）按当前底模过滤下拉，
+#: 而 Agent 的校验只认这两枚 —— 用户看到的正是「LORA 模型都不对」。
+#:
+#: 现在与内置 Agent 管理面板**同一个真源**：
+#: ``accel_lora_policy.available_accel_loras(该模式的默认底模)``
+#: = 本机真实存在 + 与该底模逐层实测兼容 + 官方 H3 谱系。
+#: 见 ``mode_loras()``。
+#:
+#: 【为什么还留一个兜底常量】真源要读权重头与 ComfyUI 清单，
+#: 导入失败（离线 / 权重盘未挂）时不能让校验直接放行任意字符串 ——
+#: 那是 2026-11-13 那个 BUG 的成因。兜底只用 workflows.LORAS。
+VIDEO_LORAS_FALLBACK = ("none",) + tuple(wf.LORAS.keys())
 
 #: 视频时长区间（秒）—— **Agent 侧硬校验**。
 #:
@@ -312,11 +328,59 @@ def mode_duration_field(mode: str) -> str:
     return "max_duration" if is_music_mode(mode) else "duration"
 
 
+def mode_default_model(mode: str) -> str:
+    """该模式**真实生效**的默认底模 key（不是猜的）。
+
+    真源 = ``gen_defaults`` 的字段表默认值 —— 它与内置 Agent 管理面板
+    下发的默认参数、以及 ``prepare_job_params`` 的回落值是同一份。
+    """
+    try:
+        from . import gen_defaults as gd
+        key = str((gd.default_values(mode) or {}).get("model_key") or "").strip()
+        if key:
+            return key
+    except Exception:
+        pass
+    try:
+        from . import video_models as vm
+        return str(vm.VIDEO_DEFAULT_MODEL)
+    except Exception:
+        return ""
+
+
 def mode_loras(mode: str) -> list[str]:
-    """该模式合法的 LoRA 取值集合。"""
-    if is_video_mode(mode):
-        return list(VIDEO_LORAS)
-    return []
+    """该模式合法的加速 LoRA 取值集合（真实可用性派生）。
+
+    【2026-11-21 —— 不再硬编码】
+    判据 = ``accel_lora_policy.available_accel_loras(该模式的默认底模)``：
+      * 本机 ComfyUI 的模型清单里真的有这枚权重；
+      * 与该底模**逐层实测**兼容（含「加载节点能不能重注入 AdaLN」）。
+
+    【为什么是「全部实测兼容」而不是「只官方档」】
+    内置 Agent 管理面板的**默认参数**只从官方 H3 turbo 系里选
+    （用户 2026-11-21 的拍板）；但「什么值合法」是另一件事 ——
+    主生成面板允许所有实测兼容的档位，Agent 若把白名单收得比面板还窄，
+    就会拒绝面板本来能提交的值。
+    不兼容的那些（例如给剪枝底模配 ``turbo_4step_cn``）
+    由 ``normalize_t2v_params`` 的兼容性闸门明确拒绝并回传原因
+    —— 见 server.py 的「与当前底模不兼容」分支，不会静默加载。
+
+    【兜底】真源读不到（离线 / 权重盘未挂）时退回 workflows.LORAS，
+    绝不退回「空集合」—— 空集合会让校验整个分支被跳过，
+    于是任意字符串都能落进 params（2026-11-13 那个 BUG 的成因）。
+    """
+    if not is_video_mode(mode):
+        return []
+    try:
+        from . import accel_lora_policy as accel_policy
+        model_key = mode_default_model(mode)
+        available = accel_policy.available_accel_loras(model_key)
+        keys = [str(item["key"]) for item in available if item.get("key")]
+        if keys:
+            return ["none"] + keys
+    except Exception:
+        pass
+    return list(VIDEO_LORAS_FALLBACK)
 
 
 # ------------------------------------------------------------------ 默认值推导
@@ -387,7 +451,6 @@ def mode_param_keys(mode: str) -> set[str]:
         if MUSIC_CHECKPOINTS:
             keys.add("checkpoint")
     if is_video_mode(mode):
-        keys.add("precision")
         keys.add("lora_strength")
         # 【2026-11-20 新增 —— 与 mode_schema 的视频段保持一致】
         #
@@ -1231,12 +1294,22 @@ def mode_schema(mode: str) -> dict:
     # --- 视频专属 ---
     if is_video_mode(mode):
         from . import video_models as _vm
-        schema["params"]["precision"] = {
-            "type": "string",
-            "values": list(VIDEO_PRECISIONS),
-            "default": "int8",
-            "source": "workflows.UNET[*] 的精度键",
-        }
+        # 【2026-11-21 —— 删掉 precision】
+        #
+        # 原来这里给视频模式展开 ``precision``（values = workflows.UNET[*]
+        # 的精度键，default "int8"）。但**两条视频 builder 都不读它**：
+        #   * flf -> ``h3_video_modes.build_flf`` 全文 0 次引用 precision，
+        #     底模由 ``model_key`` 决定（``model_for_mode(...)[unet]``）；
+        #   * t2v 新面板 -> ``video_workflow._resolve_model`` 同样只按
+        #     ``model_key`` 取权重，无 precision 轴。
+        # 只有**旧路径** ``workflows._h3_video_workflow`` 读它，而它
+        # 已经不是 flf / 面板 t2v 的路径了。
+        #
+        # 于是它就是「面板有控件、Agent 有参数、实际什么都不改」的假参数 ——
+        # 用户 2026-11-21 的原话：「还有底模精度 … 全部都是冲突的」。
+        #
+        # 精度实际上**编码在权重文件里**（int8_convrot / bf16 /
+        # pruned_w4a8），选底模就是选精度。
         schema["params"]["lora_strength"] = {
             "type": "number",
             "min": 0.0,

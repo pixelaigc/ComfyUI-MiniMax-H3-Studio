@@ -325,6 +325,20 @@
     const label = field.label || field.name;
     const note = field.note ? ` title="${esc(field.note)}"` : "";
     const type = field.type || "string";
+    // 【只读说明字段（type == "fixed"）】
+    // 服务端明确说「这一项由工作流/模型固定，不可改」——
+    // 那就**不给可编辑控件**。给一个 disabled 的输入框会被理解成
+    // 「灰着但也许能改」，与「不可改」是两种话。
+    // 这里渲染成一行纯文本说明：值是多少、由谁决定。
+    if (type === "fixed" || field.readonly) {
+      const shown = value == null ? (field.default == null ? "" : field.default) : value;
+      return `
+        <div class="agm-field agm-field-fixed">
+          <span>${esc(label)}</span>
+          <b class="agm-fixed-value">${esc(shown)}</b>
+          ${field.note ? `<div class="agm-field-note">${esc(field.note)}</div>` : ""}
+        </div>`;
+    }
     let control = "";
     if (type === "enum") {
       const options = withCurrent(field.options, value)
@@ -483,8 +497,18 @@
     Object.keys(spec).forEach(mode => {
       const info = spec[mode] || {};
       if (!info.supported) return;
-      const values = {};
+      // 【先带上存量值，再用可编辑控件覆盖】
+      //
+      // 【为什么必须先带上】字段表里现在有两类字段**没有可编辑控件**：
+      //   * type == "fixed"（只读说明：采样档位 / sigma shift / 精度）
+      //   * 已经不再作为控件暴露、但存量配置里还躺着的 legacy 字段
+      //     （旧的分辨率档位 / 底模精度 / steps / sampler / shift …）
+      // 如果这里只收集「有控件的字段」，用户点一次「保存配置」就会把
+      // 那些值从配置里**抹掉** —— 用户会以为「我配过的值凭空消失了」。
+      // 用户 2026-11-21 明确要求：只从 UI 移除，不删除已保存的记录。
+      const values = { ...((state.genDefaults || {})[mode] || {}) };
       (info.fields || []).forEach(f => {
+        if (f.type === "fixed" || f.readonly) return;   // 只读说明不提交
         const el = $("#" + CSS.escape(fieldId(mode, f.name)));
         if (!el) return;
         values[f.name] = readField(f, el);
