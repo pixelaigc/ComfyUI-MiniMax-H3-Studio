@@ -229,15 +229,38 @@ def test_designer_entry_reachable_in_every_text2image_mode(studio_page, evidence
     assert written.startswith("人物（单人）"), f"{mode} 下覆盖结果不对：{written}"
 
     # 7) 冲突提示可见
+    #
+    # 【硬互斥 = 阻止，不是横幅】选「赛璐璐动画」后，「真实摄影」被 **禁用**
+    # （物理上不可能同时成立）。原生 <select> 的 title 在移动端不显示 ⇒
+    # 用户必须能在**分组里看到一条可见的中文说明**才知道为什么被拦。
+    # 所以这里断言两件事：
+    #   a) 冲突项确实被禁用（不可选中）；
+    #   b) 分组里有可见的冲突说明（文字含冲突对象与原因）。
     _clear_picks(sp)
     _pick(sp, evidence, "1.1 动漫 / 二次元", "赛璐璐动画")
-    _pick(sp, evidence, "1.2 写实摄影", "真实摄影")
-    conflict = sp.page.evaluate("""() => ({
-      hidden: document.querySelector('#pcConflicts').hidden,
-      text: document.querySelector('#pcConflicts').innerText})""")
-    evidence.step(f"{mode} 下冲突提示：{conflict['text'][:120]}")
-    assert conflict["hidden"] is False, f"{mode} 下冲突提示不可见"
-    assert "冲突" in conflict["text"], f"{mode} 下冲突提示没有说明"
+    conflict = sp.page.evaluate("""() => {
+      const s = Array.from(document.querySelectorAll('#pcGroups select[data-select]'))
+        .find(x => x.getAttribute('aria-label') === '1.2 写实摄影');
+      const o = Array.from(s.options).find(x => x.textContent.trim().startsWith('真实摄影'));
+      const group = s.closest('.pc-group');
+      const note = group.querySelector('.pc-conflict-inline');
+      return {
+        disabled: o.disabled,
+        title: o.title,
+        noteExists: !!note,
+        noteText: note ? note.innerText : '',
+        noteVisible: note ? (note.getBoundingClientRect().height > 0) : false,
+      };
+    }""")
+    evidence.step(f"{mode} 下硬互斥：{conflict}")
+    assert conflict["disabled"] is True, f"{mode} 下冲突项没有被禁用"
+    assert conflict["noteExists"], f"{mode} 下分组里没有可见的冲突说明"
+    assert conflict["noteVisible"], f"{mode} 下冲突说明不可见"
+    assert "冲突" in conflict["noteText"], f"{mode} 下冲突说明没写清原因：{conflict['noteText']}"
+    assert "赛璐璐动画" in conflict["noteText"], \
+        f"{mode} 下冲突说明没写清冲突对象：{conflict['noteText']}"
+    # 被禁用的项不能进提示词
+    assert "真实摄影" not in _preview(sp), f"{mode} 下被禁用的项还是进了提示词"
 
     # 8) 增强按钮仍正常
     for sel in ("#enhanceBtn", "#enhanceMenuBtn"):

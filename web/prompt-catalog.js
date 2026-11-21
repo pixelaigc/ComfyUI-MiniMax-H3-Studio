@@ -544,6 +544,27 @@
           </div>
           <div class="pc-note pc-custom-note">自行输入的内容与上面的选项一起写进提示词；留空即跳过这一项。</div>`;
 
+    // 【硬互斥的可见说明】只把选项 disabled 是不够的 ——
+    // 原生 <select> 的 title 在移动端**根本不显示**（长按才有 tooltip，
+    // 而且触屏上多数浏览器直接不弹）。用户只会看到「这个选项点不动」，
+    // 不知道为什么被拦。
+    // 所以：凡是「因为与当前已选项硬互斥而被禁用」的分组，
+    // 都要在分组里挂一条**可见的中文说明**（不是 tooltip）。
+    const blockedHere = [];
+    (group.items || []).forEach(it => {
+      if (it.is_skip) return;
+      const b = blockedReason(it.id);
+      if (b) blockedHere.push({item: it, blocked: b});
+    });
+    const blockedNote = blockedHere.length ? `
+          <div class="pc-conflict pc-conflict-inline hard">
+            <b>这一组有 ${blockedHere.length} 项与当前选择冲突，已禁用</b>
+            ${blockedHere.map(x => `
+              <div class="pc-conflict-why">「${esc(x.item.label)}」与
+                「${esc(x.blocked.otherNames.join("、"))}」冲突：${esc(x.blocked.rule.reason)}。
+                请先取消「${esc(x.blocked.otherNames.join("、"))}」再选它。</div>`).join("")}
+          </div>` : "";
+
     const guideNote = group.render === "guide"
       ? `<div class="pc-note pc-guide">这一组是**写法对照清单**（保留 / 谨慎 / 淘汰），不是可选项；想自己写画质词请直接用在下面的自行输入里。</div>
           <div class="pc-guide-list">${(group.items || []).map(it => `
@@ -564,6 +585,7 @@
           ${guideNote}
           ${group.render === "guide" ? "" : `<select class="img-select pc-select" data-select="${esc(group.id)}" aria-label="${esc(group.name)}">${options}</select>`}
           ${group.render === "guide" ? "" : selectedHint}${customRow}
+          ${blockedNote}
           ${group.purpose ? `<div class="pc-note pc-purpose">${esc(group.purpose)}</div>` : ""}
         </div>
       </div>`;

@@ -153,6 +153,18 @@
   color: #2f4494;
 }
 
+/* 【分组内的硬互斥说明】原生 select 的 title 在移动端不显示，
+   所以被禁用的选项必须在分组里配一条**可见**的中文说明。 */
+.pc-conflict-inline {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.pc-conflict-inline b {
+  display: block;
+  font-weight: 600;
+}
+
 /* ---------- 分组 ---------- */
 
 .pc-groups {

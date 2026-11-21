@@ -250,8 +250,10 @@ STALE_BUMPED = {
     # 【2026-11-21 创意内容设计 · 中文优先改造】本轮新增的独立模块
     #   （自行输入入口 + 中文片段组装 + 英文片段仅作辅助）⇒ 升一档。
     #   口径与 build-id.js 一致：新增文件没有「旧值」，旧值留空串。
-    "prompt-catalog.css":      ("",              "cpd20261121b"),
-    "prompt-catalog.js":       ("",              "cpd20261121b"),
+    # 【2026-11-21 硬互斥可见说明】内容又变了（分组内补可见中文冲突说明）
+    #   ⇒ 再升一档 cpd20261121b -> cpd20261121c。
+    "prompt-catalog.css":      ("",              "cpd20261121c"),
+    "prompt-catalog.js":       ("",              "cpd20261121c"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
