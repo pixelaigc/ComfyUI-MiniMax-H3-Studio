@@ -1,0 +1,260 @@
+{
+  "id": "1f5b2d41f53f",
+  "created_at": 1795287121.3066008,
+  "mode": "flf",
+  "gen_type": "flf",
+  "gen_type_label": "首尾帧生成",
+  "gen_type_media": "video",
+  "params": {
+    "prompt": "subject_definitions:\n<Picture 1> is the first-frame anchor of the video, showing a flat 2D test-pattern-style composition: black vertical bands on the far left and right edges, a large centered circle filled with vertical stripes in cyan, magenta, blue, yellow, green, red, and cyan, a horizontal multicolor gradient bar crossing the lower portion of the frame, and a small pixelated white-bordered square element positioned near the upper-right interior of the circle.\n<Picture 2> is the last-frame anchor of the video, showing the same test-pattern-style composition but with a wider field of view: the central striped circle appears smaller relative to the frame, the horizontal gradient bar spans more horizontally and shifts its color distribution slightly toward green on the left and orange on the right, and the square element near the upper-right interior of the circle becomes larger and less pixelated in appearance.\n\nsummary:\n[keyframe completion] The target video is a first-frame-to-last-frame interpolation built from <Picture 1> as the opening frame and <Picture 2> as the closing frame. The prompt asks for a slow push-out from a girl-centered view toward a wider distant view while keeping the main subject consistent; because the provided frames are abstract test-pattern graphics rather than photographic people, the generated video must preserve those graphic elements as the consistent “subject” throughout the zoom-out motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame exactly matches <Picture 1>, including the black side bands, the large centered striped circle, the lower horizontal gradient bar, and the small square element inside the upper-right area of the circle.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The ending frame reaches <Picture 2> exactly, with the same overall layout but a wider framing: smaller apparent circle, broader gradient bar, and larger visible square element.\n\ndetailed_description:\nThe target video is a flat 2D abstract motion-graphic sequence that begins from <Picture 1> and slowly pulls outward to reach <Picture 2>, preserving every major graphic element without changing their identities, colors, or relative arrangement.\n\n[Shot 1] The shot begins from <Picture 1>. In the first frame, black vertical bands occupy the far left and right edges. A large centered circle fills most of the frame, containing vertical stripes in cyan, magenta, blue, yellow, green, red, and cyan. A horizontal multicolor gradient bar crosses the lower portion of the composition, with color transitions across its width. A small square element with a white pixelated border sits near the upper-right interior of the circle, close to the red stripe area.\n\nFrom 00:00.000 onward, the camera slowly and continuously zooms outward while keeping <Picture 1>’s composition as the consistent subject. The striped circle remains centered in the frame but gradually decreases in apparent size relative to the full canvas. The black side bands remain fixed at the left and right edges. The horizontal gradient bar stays in the lower portion of the frame, maintaining its continuous rainbow-like color progression while becoming visually broader across the width as the view expands. The square element near the upper-right interior of the circle remains present and identifiable throughout, gradually appearing larger and smoother-edged as it resolves into the state seen in <Picture 2>.\n\nThroughout the motion, no new objects are introduced, no elements disappear, and no colors shift from their original positions. The only change is the progressive widening of the field of view: the central circular pattern recedes in scale, the gradient bar stretches across a wider horizontal area, and the square element near the upper-right portion becomes more prominent. By 00:15.000, the shot ends on <Picture 2>, matching its wider composition exactly: smaller centered striped circle, broader horizontal gradient bar with green tones on the left side and orange tones on the right side, black vertical bands still framing the edges, and the larger square element positioned near the upper-right interior of the circle.\n\noverall_soundscape:\nThere are no diegetic sounds in this abstract graphic sequence; the visual content contains no people, objects producing sound, or environmental audio sources. No dialogue, footsteps, mechanical noise, or ambient background is present.\n\nnon_diegetic_music:\nN/A",
+    "duration": 5.0,
+    "model_key": "fl2va_pruned_int8",
+    "aspect": "16:9",
+    "megapixels": 0.396,
+    "resolution_percent": 100.0,
+    "lora": "ckpt850",
+    "lora_strength": 1.0,
+    "resolution": "480p",
+    "precision": "int8",
+    "width": 864,
+    "height": 480,
+    "size_adjust_reasons": [
+      "flf 尺寸：MP 预算 0.400 MP + 比例 16:9 -> 864×480"
+    ],
+    "seed": null,
+    "accel_lora": "ckpt850",
+    "accel_lora_strength": 1.0,
+    "accel_lora_loader": "MiniMaxH3TurboLoRA",
+    "accel_loras": [
+      {
+        "key": "ckpt850",
+        "name": "minimax_h3_turbo_4step_ema_ckpt850",
+        "strength": 1.0,
+        "enabled": true
+      }
+    ],
+    "fixed_accel_lora": "ckpt850",
+    "effect_loras": [],
+    "attention": "default",
+    "twopass": {
+      "enabled": false
+    },
+    "steps": 4,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "cfg": 1.0,
+    "shift_video": 12.0,
+    "shift_audio": 3.0,
+    "use_sigma_shift": false,
+    "sigma_shift_available": false,
+    "audio_track_source": "generated",
+    "asset_refs": [
+      {
+        "asset_id": "asset_054f65ceccf2",
+        "slot": "first_frame",
+        "ordinal": 0
+      },
+      {
+        "asset_id": "asset_1f6d1e58069f",
+        "slot": "last_frame",
+        "ordinal": 0
+      }
+    ],
+    "gen_type": "flf",
+    "continuation": {
+      "chain_id": "1f5b2d41f53f",
+      "stage_index": 0,
+      "source_job": "",
+      "source_segment": -1,
+      "latent_run_id": "h3studio_s1f5b2d41f53f",
+      "latent_stage": 0,
+      "context_frames": 22,
+      "anchor_frames": 22,
+      "chain_total_frames": 0,
+      "segment_frames": 124,
+      "segment_rel": "videos/v-h3-studio-000224.mp4"
+    },
+    "first_frame": "h3studio/b0834cf42919af48__v2.mp4_frame3_ce2f62f6.mp4",
+    "last_frame": "h3studio/9eb08e6173cc93b8__v2.mp4_frame2_65d70cbe.mp4",
+    "job_id": "1f5b2d41f53f",
+    "mode": "flf",
+    "artifact_model_file": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "artifact_loras": [
+      {
+        "name": "minimax_h3_turbo_4step_ema_ckpt850",
+        "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "strength": 1.0,
+        "loader": "MiniMaxH3TurboLoRA"
+      }
+    ],
+    "fixed_accel_strength": 1.0
+  },
+  "model_info": {
+    "model_key": "fl2va_pruned_int8",
+    "model_label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+    "model_unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "lora_label": "Turbo 4 步 · ckpt850",
+    "lora_strength": 1.0,
+    "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+    "lora_key": "ckpt850",
+    "fixed_lora_label": "Turbo 4 步 · ckpt850",
+    "fixed_lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+    "fixed_lora_key": "ckpt850",
+    "fixed_lora_strength": 1.0,
+    "accel_lora_loader": "MiniMaxH3TurboLoRA",
+    "source": "legacy_video",
+    "attention_key": "default",
+    "attention_label": "默认（PyTorch 稠密注意力）",
+    "attention_speed_label": "速度最慢",
+    "attention_available": true,
+    "steps": 4,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "cfg": 1.0,
+    "shift_video": 12.0,
+    "shift_audio": 3.0,
+    "width": 864,
+    "height": 480,
+    "aspect": "16:9",
+    "resolution": "480p",
+    "duration": 5.0,
+    "seed": null,
+    "twopass": {
+      "enabled": false
+    },
+    "model_recommendation": {
+      "steps": 20,
+      "scheduler": "simple",
+      "sampler": "res_multistep",
+      "shift_video": 12.0,
+      "shift_audio": 3.0,
+      "base_model": "not_provided",
+      "source_kind": "comfyui",
+      "source": "supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）",
+      "note": "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，不挂加速 LoRA 的分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。",
+      "field_sources": {
+        "steps": "comfyui",
+        "scheduler": "comfyui",
+        "sampler": "comfyui",
+        "shift_video": "comfyui",
+        "shift_audio": "comfyui",
+        "base_model": "not_provided"
+      }
+    },
+    "lora_recommendation": {
+      "steps": 4,
+      "scheduler": "simple",
+      "sampler": "not_provided",
+      "shift_video": 12.0,
+      "shift_audio": 3.0,
+      "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+      "source_kind": "author",
+      "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+      "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+      "field_sources": {
+        "steps": "author",
+        "scheduler": "author",
+        "sampler": "not_provided",
+        "shift_video": "author",
+        "shift_audio": "author",
+        "base_model": "author"
+      }
+    },
+    "fixed_lora_recommendation": {
+      "steps": 4,
+      "scheduler": "simple",
+      "sampler": "not_provided",
+      "shift_video": 12.0,
+      "shift_audio": 3.0,
+      "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+      "source_kind": "author",
+      "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+      "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+      "field_sources": {
+        "steps": "author",
+        "scheduler": "author",
+        "sampler": "not_provided",
+        "shift_video": "author",
+        "shift_audio": "author",
+        "base_model": "author"
+      }
+    }
+  },
+  "gen_params": {
+    "model": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+    "steps": "4",
+    "scheduler": "beta",
+    "sampler": "euler",
+    "shift": "视频 12 · 音频 3",
+    "cfg": "1",
+    "seed": "随机",
+    "size": "864×480",
+    "duration": "5s",
+    "lora": "Turbo 4 步 · ckpt850 ×1.00",
+    "attention": "默认（PyTorch 稠密注意力） · 速度最慢",
+    "workflow": "首尾帧生视频（_h3_video_workflow）",
+    "prompt": "subject_definitions:\n<Picture 1> is the first-frame anchor of the video, showing a flat 2D test-pattern-style composition: black vertical bands on the far left and right edges, a large centered circle filled with vertical stripes in cyan, magenta, blue, yellow, green, red, and cyan, a horizontal multicolor gradient bar crossing the lower portion of the frame, and a small pixelated white-bordered square element positioned near the upper-right interior of the circle.\n<Picture 2> is the last-frame anchor of the video, showing the same test-pattern-style composition but with a wider field of view: the central striped circle appears smaller relative to the frame, the horizontal gradient bar spans more horizontally and shifts its color distribution slightly toward green on the left and orange on the right, and the square element near the upper-right interior of the circle becomes larger and less pixelated in appearance.\n\nsummary:\n[keyframe completion] The target video is a first-frame-to-last-frame interpolation built from <Picture 1> as the opening frame and <Picture 2> as the closing frame. The prompt asks for a slow push-out from a girl-centered view toward a wider distant view while keeping the main subject consistent; because the provided frames are abstract test-pattern graphics rather than photographic people, the generated video must preserve those graphic elements as the consistent “subject” throughout the zoom-out motion.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - The opening frame exactly matches <Picture 1>, including the black side bands, the large centered striped circle, the lower horizontal gradient bar, and the small square element inside the upper-right area of the circle.\n<Picture 2> ([Shot 1] last frame): fully_preserved - The ending frame reaches <Picture 2> exactly, with the same overall layout but a wider framing: smaller apparent circle, broader gradient bar, and larger visible square element.\n\ndetailed_description:\nThe target video is a flat 2D abstract motion-graphic sequence that begins from <Picture 1> and slowly pulls outward to reach <Picture 2>, preserving every major graphic element without changing their identities, colors, or relative arrangement.\n\n[Shot 1] The shot begins from <Picture 1>. In the first frame, black vertical bands occupy the far left and right edges. A large centered circle fills most of the frame, containing vertical stripes in cyan, magenta, blue, yellow, green, red, and cyan. A horizontal multicolor gradient bar crosses the lower portion of the composition, with color transitions across its width. A small square element with a white pixelated border sits near the upper-right interior of the circle, close to the red stripe area.\n\nFrom 00:00.000 onward, the camera slowly and continuously zooms outward while keeping <Picture 1>’s composition as the consistent subject. The striped circle remains centered in the frame but gradually decreases in apparent size relative to the full canvas. The black side bands remain fixed at the left and right edges. The horizontal gradient bar stays in the lower portion of the frame, maintaining its continuous rainbow-like color progression while becoming visually broader across the width as the view expands. The square element near the upper-right interior of the circle remains present and identifiable throughout, gradually appearing larger and smoother-edged as it resolves into the state seen in <Picture 2>.\n\nThroughout the motion, no new objects are introduced, no elements disappear, and no colors shift from their original positions. The only change is the progressive widening of the field of view: the central circular pattern recedes in scale, the gradient bar stretches across a wider horizontal area, and the square element near the upper-right portion becomes more prominent. By 00:15.000, the shot ends on <Picture 2>, matching its wider composition exactly: smaller centered striped circle, broader horizontal gradient bar with green tones on the left side and orange tones on the right side, black vertical bands still framing the edges, and the larger square element positioned near the upper-right interior of the circle.\n\noverall_soundscape:\nThere are no diegetic sounds in this abstract graphic sequence; the visual content contains no people, objects producing sound, or environmental audio sources. No dialogue, footsteps, mechanical noise, or ambient background is present.\n\nnon_diegetic_music:\nN/A",
+    "original_prompt": "",
+    "prompt_enhanced": "",
+    "normalize_notes": [],
+    "artifact_loras": [
+      {
+        "name": "minimax_h3_turbo_4step_ema_ckpt850",
+        "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "strength": 1.0,
+        "loader": "MiniMaxH3TurboLoRA"
+      }
+    ]
+  },
+  "continuation_info": {
+    "can_continue": true,
+    "reason": "",
+    "run_id": "h3studio_s1f5b2d41f53f",
+    "latent_stage": 0,
+    "stage_index": 0,
+    "chain_id": "1f5b2d41f53f",
+    "has_latent": true,
+    "latent_exists": true,
+    "context_frames": 22,
+    "total_frames": 124,
+    "total_seconds": 5.167
+  },
+  "status": "done",
+  "prompt_id": "655e1abd-1b5e-46b8-9b21-cdc6712b089a",
+  "progress": 1.0,
+  "progress_text": "节点 20/20",
+  "error": null,
+  "outputs": [
+    {
+      "kind": "video",
+      "file": "videos/v-h3-studio-000224.mp4",
+      "name": "flf_1f5b2d41f53f_00001_.mp4",
+      "width": 864,
+      "height": 480
+    }
+  ],
+  "running_truth": {
+    "state": "",
+    "label": "",
+    "elapsed_sec": null,
+    "timeout_sec": 0.0,
+    "deadline_at": null
+  },
+  "running_timeout_sec": 0.0,
+  "resolution_info": {
+    "width": 864,
+    "height": 480,
+    "tier": "480p",
+    "aspect": "16:9",
+    "pixels": "864×480",
+    "label": "480p · 864×480 · 16:9",
+    "source": "actual",
+    "note": "",
+    "has_size": true
+  },
+  "elapsed": 54.57124185562134,
+  "started_at": 1795287121.3190935,
+  "session_id": "",
+  "batches": [],
+  "favorited": false
+}

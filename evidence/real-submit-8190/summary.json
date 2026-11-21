@@ -1,0 +1,45 @@
+{
+  "job_id": "b13d6e2346d1",
+  "status": "done",
+  "duration_sec_requested": 5,
+  "assets": [
+    "asset_054f65ceccf2",
+    "asset_1f6d1e58069f"
+  ],
+  "enhance_reference_labels": {
+    "expected": [
+      "<Picture 1>",
+      "<Picture 2>"
+    ],
+    "found": [
+      "<Picture 1>",
+      "<Picture 2>",
+      "<Subject 1>"
+    ]
+  },
+  "db_prompt": "subject_definitions:\n<Picture 1> is the exact first frame of the video: a test-card-style composition featuring a large circular area filled with vertical SMPTE-like color bars (cyan, magenta, blue, yellow, green) flanked by black side panels and red curved edges; a white horizontal strip at top-right corner; a rainbow gradient horizontal band crossing the lower portion; and a small pixelated rectangular object on the right edge of the circle resembling a stylized eye or device with two white vertical segments.\n<Picture 2> is the exact last frame of the video: identical composition to <Picture 1> but the small pixelated rectangular object on the right edge has changed slightly — its internal white segments are repositioned, suggesting a subtle animation or state change in that element.\n\nsummary:\n[keyframe completion] The target video begins precisely at <Picture 1> and ends precisely at <Picture 2>. The core task is to create a continuous camera movement from a close-up of the girl (implied by user prompt) pulling back to reveal the full test-card composition seen in both frames, maintaining subject consistency throughout. Since no explicit girl appears in the provided frames, the \"girl\" referenced in the user prompt must be interpreted as an element within or associated with the test card imagery — possibly the pixelated object on the right edge is stylized as a character or avatar representing the girl.\n\nretention_analysis:\n<Picture 1> ([Shot 1] first frame): fully_preserved - serves as the exact opening frame; all color bars, black panels, rainbow band, and initial state of the pixelated object are reproduced identically at t=0.00s.\n<Picture 2> ([Shot 1] last frame): fully_preserved - serves as the exact closing frame; same composition with only minor internal change in the pixelated object's white segments indicating subtle animation progression.\n\ndetailed_description:\nThe target video is in a stylized digital test-card aesthetic with flat vector graphics, high-contrast color blocks, and retro CRT-inspired design language. It features a single continuous shot lasting 10 seconds.\n\n[Shot 1] At 00:00.000, the video begins exactly on <Picture 1>: a close-up centered on the circular region filled with vertical cyan-magenta-blue-yellow-green color bars, framed by black side panels and red curved borders. A horizontal rainbow gradient band crosses the lower third of the frame. On the right edge of the circle sits a small pixelated rectangular object resembling a stylized face or device — this is interpreted as <Subject 1>, a minimalist avatar representing \"the girl\" per user intent. The camera starts tightly framed on this circular element, with <Subject 1> occupying approximately one-fifth of the frame width near center-right.\n\nAt 00:02.500, the camera begins a slow, steady dolly-back movement, gradually revealing more of the surrounding black panels, top white strip, and full horizontal rainbow band. The color bars remain static; only the framing expands. <Subject 1> maintains its position relative to the circle but appears smaller as distance increases.\n\nAt 00:05.000, the full test-card composition is now visible within frame boundaries — black side panels, top-right white strip, bottom rainbow gradient, and entire circular color-bar area are all fully in view. <Subject 1> remains fixed at its original position on the right edge of the circle, unchanged in form except for subtle internal animation: its two white vertical segments begin to shift slightly upward and downward in alternating small increments every ~0.8 seconds, suggesting idle-state animation rather than movement.\n\nAt 00:07.500, camera continues pulling back until it reaches a stable wide shot encompassing the entire graphic composition with slight margins around edges — this matches the framing of <Picture 2>. The pixelated object’s internal white segments have now settled into their final configuration as seen in <Picture 2>: one segment slightly higher than its starting position, the other aligned differently, indicating completed micro-animation cycle.\n\nAt 00:10.000, the shot ends exactly on <Picture 2>, with no further motion. All elements remain static except for the final state of <Subject 1>’s internal segments as defined by <Picture 2>.\n\noverall_soundscape:\nNo diegetic sound events occur; the video is silent throughout. No ambient noise, mechanical sounds, voiceovers, or environmental audio are present. Since no reference audio was provided, there is no source to copy or reference for sound design.\n\nnon_diegetic_music:\nN/A",
+  "db_asset_refs": [
+    {
+      "asset_id": "asset_054f65ceccf2",
+      "slot": "first_frame",
+      "ordinal": 0
+    },
+    {
+      "asset_id": "asset_1f6d1e58069f",
+      "slot": "last_frame",
+      "ordinal": 0
+    }
+  ],
+  "artifact_path": "/root/projects/comfyui-minimax-h3-studio/data/outputs/videos/v-h3-studio-000225.mp4",
+  "artifact_bytes": 365984,
+  "ffprobe": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "codec": "h264",
+    "width": 864,
+    "height": 480,
+    "duration": 5.167,
+    "nb_frames": "124"
+  },
+  "decode_clean": true,
+  "verdict_ok": true
+}
