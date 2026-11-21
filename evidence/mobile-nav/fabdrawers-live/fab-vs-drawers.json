@@ -11,13 +11,13 @@
     "panelOverlap": null,
     "cardTextOverlap": [
       {
-        "text": "模式参考生成\n      \n      ",
+        "text": "模式Z-IMAGE 文生图\n      ",
         "cls": "job-meta",
         "w": 86,
         "h": 12
       },
       {
-        "text": "分辨率1088p · 1920×1088",
+        "text": "分辨率768p · 1360×768 ·",
         "cls": "row",
         "w": 67,
         "h": 2
