@@ -1700,6 +1700,35 @@
   }
 
   /**
+   * 槽位 key -> 槽位序号（用于**按面板顺序**排序）。
+   *
+   * 【为什么必须按面板顺序，而不是对象插入顺序】
+   * 官方 H3 规定 `<Picture N>` 的编号要跟**面板上素材的顺序**一一对应
+   * （用户在界面上看到的第 1 张图 = `<Picture 1>`）。
+   * `state.assetRefs` 是普通对象，键的枚举顺序 = 插入顺序 —— 用户
+   * 先填「尾帧」再填「首帧」的话，枚举顺序就是 last -> first，
+   * 于是 `<Picture 1>` 会被分配给「尾帧」，**标签和面板对不上**。
+   *
+   * 【用哪一份实现】`panelSlotOrder()` 定义在 web/app.js 里 ——
+   * 那是**提交侧**（app.js 的 asset_refs 构建）用的同一份。
+   * 两边必须同源：增强时算出来的 `<Picture 1>` 与真正进工作流的
+   * 第 1 张图要对得上，否则标签比没有标签更糟。
+   */
+  function slotOrder(key) {
+    if (typeof panelSlotOrder === "function") return panelSlotOrder(key);
+    // 兜底（app.js 没加载时的极端情况）：与 app.js 同一套口径
+    if (key === "first") return 10;
+    if (key === "last") return 20;
+    let m = /^ref(\d+)$/.exec(key);
+    if (m) return 10 + parseInt(m[1], 10);
+    m = /^refvid(\d+)$/.exec(key);
+    if (m) return 30 + parseInt(m[1], 10);
+    m = /^refaud(\d+)$/.exec(key);
+    if (m) return 40 + parseInt(m[1], 10);
+    return null;
+  }
+
+  /**
    * 收集**当前面板**已引用的素材。
    *
    * @returns {Array<{asset_id, slot, ordinal}>} 无素材时返回空数组
@@ -1707,6 +1736,9 @@
    * 【口径与出图链路一致】只收**当前模式渲染出来的**槽位
    * （app.js 的 MODE_ALLOWED_SLOT_KEYS 是唯一真源）——
    * 否则会出现「界面上看不见的槽位却带进增强」（幽灵输入）。
+   *
+   * 【顺序 = 面板顺序】见 slotOrder() 的说明：官方 `<Picture N>` 的编号
+   * 必须跟面板上素材的顺序一一对应。
    */
   function collectPanelAssetRefs() {
     const out = [];
@@ -1725,19 +1757,31 @@
       // MODE_ALLOWED_SLOT_KEYS 注释）—— 提交侧与渲染侧必须同源。
       const allowed = (typeof MODE_ALLOWED_SLOT_KEYS !== "undefined")
         ? MODE_ALLOWED_SLOT_KEYS[mode] : null;
-      const groupCounter = {};
+      // 先按「面板槽位顺序」排，再按类别分别编号
+      const picked = [];
       Object.entries(slots).forEach(([key, item]) => {
         if (!item || !item.asset_id) return;
         if (allowed && !allowed(key)) return;
         const slot = SLOT_FOR_KEY[key] || slotGroupOf(key);
         if (!slot) return;
-        groupCounter[slot] = (groupCounter[slot] || 0) + 1;
-        out.push({
-          asset_id: item.asset_id,
-          slot,
-          ordinal: groupCounter[slot] - 1,
-        });
+        const order = slotOrder(key);
+        if (order === null) return;
+        picked.push({key, slot, order, asset_id: item.asset_id});
       });
+      // 面板顺序 = 用户在界面上看到的从上到下顺序
+      picked.sort((a, b) => a.order - b.order);
+
+      // ordinal：**按类别各自**从 0 开始（与服务端分配官方标签的规则一致：
+      // Picture / Video / Audio 各自独立编号）
+      const groupCounter = {};
+      for (const entry of picked) {
+        groupCounter[entry.slot] = (groupCounter[entry.slot] || 0) + 1;
+        out.push({
+          asset_id: entry.asset_id,
+          slot: entry.slot,
+          ordinal: groupCounter[entry.slot] - 1,
+        });
+      }
       return out;
     } catch (e) {
       // 素材收集失败 -> 退回空数组（退化成无素材增强）。

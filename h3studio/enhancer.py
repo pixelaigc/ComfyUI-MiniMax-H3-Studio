@@ -293,6 +293,31 @@ TEMPLATE_SPECS = {
                         "说话人 ID 与台词", "画面文字"],
         "source": "本机官方 skill h3-prompt-writing/references/base-en.txt（实测 2026-11-10）",
     },
+    # 【2026-11-21 新增】参考生视频 / 首尾帧的**参考模式**模板。
+    #
+    # 【为什么需要单独一档】video-director 是 T2VA（三段式，无参考标签）。
+    # 带素材的模式（flf / r2v）必须用官方 Ref2VA 的**六段式**结构
+    # （subject_definitions / summary / retention_analysis /
+    # detailed_description / overall_soundscape / non_diegetic_music），
+    # 并在正文里用 `<Picture N>` / `<Video N>` / `<Audio N>` / `<Subject N>`
+    # 引用素材 —— 没有这些标签，下游模型无法把文字引用和实际送进去的
+    # 素材对上（2026-11-21 线上实测：素材真传了，但输出里 0 个参考标签）。
+    "h3-ref-director": {
+        "id": "h3-ref-director",
+        "label": "参考提示词（MiniMax-H3 官方参考模式 · 带参考标签）",
+        "media": "video",
+        "families": ["minimax_h3"],
+        "template": "h3-ref-director.txt",
+        "validate_mode": "pe",
+        "default_length": "long",
+        "builtin": True,
+        "dimensions": ["subject_definitions", "summary", "retention_analysis",
+                        "detailed_description", "overall_soundscape",
+                        "non_diegetic_music", "参考标签 <Picture N> / <Video N> / <Audio N>"],
+        "source": "本机官方 skill h3-prompt-writing/references/ref-en.txt（实测 2026-11-21）",
+        # 标记为「带素材专用」：服务端在有素材时优先路由到这一档。
+        "reference_mode": True,
+    },
     "audio": {
         "id": "audio",
         "label": "音频提示词（BGM / 音效）",
@@ -562,7 +587,7 @@ def list_specs() -> list:
     """列出全部可用模板（供前端展示）。"""
     specs = []
     for key, spec in TEMPLATE_SPECS.items():
-        specs.append({
+        entry = {
             "id": spec["id"],
             "label": spec["label"],
             "media": spec["media"],
@@ -571,7 +596,14 @@ def list_specs() -> list:
             "dimensions": spec["dimensions"],
             "source": spec["source"],
             "validate_mode": spec["validate_mode"],
-        })
+        }
+        # 【2026-11-21】参考模式标记要跟着模板走 ——
+        # 服务端据此判断「带素材时该用哪一档模板」。
+        # 不带这个字段的话 filter_specs() 的结果里就分不出
+        # 「哪些模板会教模型输出参考标签」。
+        if spec.get("reference_mode"):
+            entry["reference_mode"] = True
+        specs.append(entry)
     return specs
 
 
@@ -924,13 +956,24 @@ def build_messages(spec: dict, original: str, language: str = "auto",
         # 【为什么素材上下文也放前面】模型要先知道「图里是什么」，
         # 才能把原文里的「她」「那件外套」对上号。放在原文前面，
         # 原文紧随其后，模型读到末尾输出时素材信息还新鲜。
-        user_text = (
-            asset_context
-            + "\n\n请基于以上素材内容，增强**下面这段**提示词。"
-            + "提示词必须与所给素材一致（人物/主体/构图/风格/首尾帧关系），"
-            + "不要臆测素材里没有的细节。"
-            + "\n\n【当前提示词原文】\n" + user_text
-        )
+        #
+        # 【2026-11-21】参考模式模板（reference_mode=True）自己已经
+        # 规定了素材清单与参考标签的用法，这里**不再叠加**通用那套
+        # 「请基于以上素材内容增强…」的话术 —— 叠加会让两套指令打架，
+        # 模型更容易忽略标签要求。参考模式只把原文接上去。
+        if spec.get("reference_mode"):
+            user_text = (
+                asset_context
+                + "\n\n【当前提示词原文】\n" + user_text
+            )
+        else:
+            user_text = (
+                asset_context
+                + "\n\n请基于以上素材内容，增强**下面这段**提示词。"
+                + "提示词必须与所给素材一致（人物/主体/构图/风格/首尾帧关系），"
+                + "不要臆测素材里没有的细节。"
+                + "\n\n【当前提示词原文】\n" + user_text
+            )
     if language and language != "auto":
         user_text += f"\n\n请用{language}输出。"
     return [

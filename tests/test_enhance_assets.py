@@ -209,14 +209,20 @@ class TestEnhanceAssetsBackend(unittest.TestCase):
         self.assertTrue(path.is_absolute(), "必须是服务端可读的绝对路径")
 
     def test_multiple_images_keep_order(self):
-        """多张图 -> 按传入顺序（ordinal 语义）。"""
+        """
+        多张图 -> 按传入顺序编号。
+
+        【2026-11-21 更新】标签写法从自创的 `<image1>` 改成 H3 **官方**
+        `<Picture 1>` / `<Picture 2>`（见 h3studio/enhance_assets.py 顶部
+        的官方规范出处）。详见 tests/test_enhance_ref_labels.py。
+        """
         res = ea.resolve_assets([
             {"asset_id": self.img_id, "slot": "ref_image", "ordinal": 0},
             {"asset_id": self.img2_id, "slot": "ref_image", "ordinal": 1},
         ])
         self.assertEqual(len(res["images"]), 2)
-        self.assertIn("image1", res["notes"][0])
-        self.assertIn("image2", res["notes"][1])
+        self.assertIn("<Picture 1>", res["notes"][0])
+        self.assertIn("<Picture 2>", res["notes"][1])
 
     def test_first_frame_slot_is_labelled(self):
         """首帧槽位 -> 提示词里说清楚它是首帧。"""
@@ -370,10 +376,16 @@ class TestEnhanceAssetsFrontendSource(unittest.TestCase):
         self.assertIn("素材上下文", block.group(0))
 
     def test_static_assets_version_bumped(self):
-        """改过的静态资源必须升 ?v=（否则老用户拿不到修复）。"""
+        """
+        改过的静态资源必须升 ?v=（否则老用户拿不到修复）。
+
+        【2026-11-21 更新】版本号随参考标签修复升到 reflabel1
+        （app.js / providers.js / enhance-menu.js 三个都改了）。
+        """
         html = self.read("index.html")
-        self.assertIn("/static/enhance-menu.js?v=enhassets1", html)
-        self.assertIn("/static/providers.js?v=enhassets1", html)
+        for name in ("enhance-menu.js", "providers.js", "app.js"):
+            self.assertIn(f"/static/{name}?v=reflabel1", html,
+                          f"{name} 的 ?v= 没升到 reflabel1")
 
 
 # ------------------------------------------------------------------ 浏览器验证
