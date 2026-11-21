@@ -1,0 +1,236 @@
+{
+ "phone_layout": true,
+ "picker_open": true,
+ "active_mode_after_select": "t2i",
+ "panel_open_after_select": false,
+ "hamburger_hit": {
+  "found": true,
+  "own": 9,
+  "blocked": 0,
+  "other": 0,
+  "blockers": [],
+  "fullyReachable": true
+ },
+ "reached_picker_again": true,
+ "picker_controls": [
+  {
+   "sel": "#navToggle",
+   "found": true,
+   "hitSelf": true,
+   "hitId": ""
+  },
+  {
+   "sel": "#navDrawerClose",
+   "found": true,
+   "hitSelf": true,
+   "hitId": "navDrawerClose"
+  },
+  {
+   "sel": "#navDrawerHead",
+   "found": true,
+   "hitSelf": true,
+   "hitId": "navDrawerHead"
+  }
+ ],
+ "fav_entry_hit_point": {
+  "ok": true,
+  "x": 150,
+  "y": 589,
+  "scrollTop": 407
+ },
+ "favorites_view": {
+  "activeTab": "favorites",
+  "navActive": true,
+  "cards": 12,
+  "checkboxes": 12,
+  "filtersVisible": true
+ },
+ "card_hit": {
+  "found": true,
+  "own": 9,
+  "blocked": 0,
+  "other": 0,
+  "blockers": [],
+  "fullyReachable": true
+ },
+ "detail_open": true,
+ "detail_params": {
+  "steps": true,
+  "scheduler": true,
+  "seed": true
+ },
+ "status_tabs": [
+  {
+   "st": "all",
+   "text": "全部",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "active",
+   "text": "进行中",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "done",
+   "text": "已完成",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "longfilm",
+   "text": "长片",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "failed",
+   "text": "失败",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "canceled",
+   "text": "已取消",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "st": "favorites",
+   "text": "收藏",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  }
+ ],
+ "type_tabs": [
+  {
+   "type": "",
+   "text": "全部类型",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2v",
+   "text": "文生视频",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "flf",
+   "text": "首尾帧生成",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "r2v",
+   "text": "参考图生成",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2i",
+   "text": "Z-IMAGE 文生图",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2i_qwen",
+   "text": "Qwen-Image 2.1 文生图",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "i2i_qwen",
+   "text": "Qwen-Image 2.1 图片编辑",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2i_moss",
+   "text": "MOSS-Image 文生图",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2i_h3image",
+   "text": "H3-Image 文生图",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "i2i_h3image",
+   "text": "H3-Image 图片编辑",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "t2a",
+   "text": "文生音乐",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "a2a",
+   "text": "参考生音乐",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "longfilm",
+   "text": "长片拼接",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  },
+  {
+   "type": "__other__",
+   "text": "其它生成",
+   "visible": true,
+   "inView": true,
+   "hitSelf": true
+  }
+ ],
+ "overlap": [
+  {
+   "sel": "#jobsGrid .job-card[data-jid]",
+   "found": true,
+   "own": 0,
+   "blocked": 0,
+   "fullyReachable": false
+  },
+  {
+   "sel": "#navToggle",
+   "found": true,
+   "own": 9,
+   "blocked": 0,
+   "fullyReachable": true
+  },
+  {
+   "sel": "#panelFab",
+   "found": true,
+   "own": 0,
+   "blocked": 0,
+   "fullyReachable": false
+  }
+ ]
+}
