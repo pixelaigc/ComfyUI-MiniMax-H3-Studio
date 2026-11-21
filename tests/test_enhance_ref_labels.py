@@ -207,6 +207,50 @@ class TestOfficialSpecAlignment(unittest.TestCase):
                         "non_diegetic_music:"):
             self.assertIn(section, prompt, f"参考模板缺字段 {section}")
 
+    # ---- 校验器：官方任务类型前缀不能被当成权重语法 ----
+
+    def _weight_errors(self, text):
+        """跑校验器的权重语法检查，返回错误列表（空 = 通过）。"""
+        import importlib.util
+        path = REPO / "h3studio" / "skills" / "prompt-enhancer" / "scripts" / "validate.py"
+        spec = importlib.util.spec_from_file_location("h3_prompt_validate", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.check_weight_syntax(text, mode="pe")
+
+    def test_official_task_type_prefixes_pass_weight_check(self):
+        """
+        H3 官方**参考模式**的任务类型前缀不能被当成 Z-Image 权重语法。
+
+        【为什么是硬要求】官方 ref-en.txt 规定参考模式的 summary 字段
+        **必须**以方括号任务类型前缀开头（`[keyframe completion] ...`）。
+        校验器原来只放行 `[Shot N]` 与语言标签，于是模型**按官方格式输出**
+        就必然被拒 -> 整单 502「出现提示词权重语法：[keyframe completion]」。
+        """
+        for prefix in ("[keyframe completion]", "[reference generation]",
+                       "[video editing]", "[video continuation]",
+                       "[audio reuse]", "[audio reference]"):
+            errors = self._weight_errors(f"{prefix} The target video ...")
+            self.assertEqual(errors, [],
+                             f"官方任务类型 {prefix} 被误判成权重语法：{errors}")
+
+    def test_official_combined_task_type_passes(self):
+        """官方允许用 ' + ' 组合任务类型 —— 组合形式也必须放行。"""
+        errors = self._weight_errors(
+            "[video editing + reference generation + audio reuse] The target video ...")
+        self.assertEqual(errors, [], f"组合任务类型被误判：{errors}")
+
+    def test_real_weight_syntax_still_rejected(self):
+        """
+        真权重语法**必须继续被拒** —— 放行任务类型不能变成放行一切方括号。
+
+        【为什么】校验器是 Z-Image 图像档的安全网；把它改成「方括号都放过」
+        等于拆掉安全网。
+        """
+        for text in ("a [cat] sitting", "[cat + dog]", "[8K]", "[masterpiece]"):
+            errors = self._weight_errors(text)
+            self.assertTrue(errors, f"真权重语法被放过了：{text}")
+
 
 # ------------------------------------------------------------------ 后端契约
 class TestReferenceLabelBackend(unittest.TestCase):
