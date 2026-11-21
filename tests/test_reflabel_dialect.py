@@ -259,6 +259,46 @@ def test_server_uses_dialect_for_label_validation():
     assert "enh_assets.missing_labels(" in src
 
 
+def test_server_response_found_field_uses_dialect():
+    """【回归：响应回显里的 found 也必须传方言】
+
+    2026-11-21 实测踩到的坑：校验那一处传了方言，但**响应回显**
+    那一处（reference_labels.found）漏传了 —— 于是 Qwen 面板明明
+    写出了 `<image1>`，回显却说「模型未写出：<image1>、<image2>」。
+
+    假消息比不说更糟：用户会以为增强没带参考编号，进而放弃用增强。
+    """
+    src = (ROOT / "server.py").read_text(encoding="utf-8")
+    # 「reference_labels」字典里的 found 必须带方言参数
+    import re
+    block = re.search(
+        r'"reference_labels":\s*\{(.*?)\}', src, re.S)
+    assert block, "server.py 里找不到 reference_labels 响应字段"
+    body = block.group(1)
+    assert "extract_reference_labels(\n                enhanced, label_dialect)" in body \
+        or "extract_reference_labels(enhanced, label_dialect)" in body, \
+        "reference_labels.found 没传方言 —— Qwen 面板会误报「模型未写出标签」"
+
+
+def test_response_found_field_matches_validation_gate():
+    """【一致性】校验用的标签集合 == 回显用的标签集合。
+
+    两者都从同一个 enhanced + 同一个方言算出来 —— 如果一个传方言、
+    另一个不传，就会出现「校验说缺标签、回显说有标签」（或反过来）
+    这种自相矛盾的状态。
+    """
+    from h3studio import enhance_assets as ea
+
+    text = "把 <image1> 的背景换成雪山，参考 <image2> 的构图"
+    found = ea.extract_reference_labels(text, ea.LABEL_DIALECT_QWEN)
+    missing = ea.missing_labels(["<image1>", "<image2>"], found,
+                                ea.LABEL_DIALECT_QWEN)
+    assert found == ["<image1>", "<image2>"]
+    assert missing == []
+    # 换成 H3 方言就找不到了 —— 这正是「回显必须传方言」的原因
+    assert ea.extract_reference_labels(text, ea.LABEL_DIALECT_H3) == []
+
+
 def test_server_resolve_assets_passes_dialect():
     """解析素材时必须把方言传下去。"""
     src = (ROOT / "server.py").read_text(encoding="utf-8")
