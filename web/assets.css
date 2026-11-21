@@ -148,6 +148,35 @@
 }
 .al-card.selected .al-selbox-wrap { background: var(--accent); }
 
+/* ---------- 独立查看入口（2026-11-21） ----------
+   缩略图上的「放大」按钮：点它在**独立窗口**里看这个素材
+   （图片可缩放看原始分辨率 / 视频音频可播放）。
+
+   【为什么常驻可见、不靠 hover 显隐】
+   触屏没有 hover —— 靠 hover 才出现的按钮在手机上永远点不到。
+   需求也明确要求「不得只藏在隐藏入口里」。
+
+   【位置】右上角偏下（top: 30px）：缩略图四角已被
+   「已分析」(左上) / 「引用 N」(右上, top:6px) / 「时长」(右下) /
+   「多选勾选框」(左下) 占满，落在「引用 N」下方不重叠。
+
+   【不遮挡卡片正文】它绝对定位在 .al-thumb 内部（.al-thumb 是
+   overflow:hidden 的相对定位盒），而卡片正文 .al-card-body 在
+   .al-thumb **外面** —— 所以它不可能压到名称 / 类型 / 标签那几行。 */
+.al-view-btn {
+  position: absolute; top: 30px; right: 6px; z-index: 2;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid rgba(255,255,255,.34);
+  background: rgba(0,0,0,.62); color: #fff;
+  border-radius: 7px; cursor: pointer;
+  backdrop-filter: blur(3px);
+  transition: background .15s, border-color .15s;
+}
+.al-view-btn:hover { background: rgba(0,0,0,.82); border-color: rgba(255,255,255,.6); }
+.al-view-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.al-view-btn svg { width: 14px; height: 14px; }
+
 .al-name {
   font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap;

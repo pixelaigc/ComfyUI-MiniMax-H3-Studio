@@ -298,6 +298,103 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
+  // ---------------------------------------------------------------- 独立查看窗口
+
+  /**
+   * 在**独立窗口**（覆盖式查看器）里观察 / 播放单个素材。
+   *
+   * 【为什么复用既有组件，而不是自己写一套】
+   * 生成媒体库早就有这个能力了，它的实现是：
+   *   * 图片 -> app.js 的 #lightbox（可缩放 / 拖拽 / 适应屏幕 / 原始尺寸 /
+   *     滚轮缩放 / 下载 / 新窗口打开 / Esc 关闭）
+   *   * 视频 / 音频 -> web/media-preview.js 的模态框（原生 controls：
+   *     播放 / 暂停 / 静音 / 进度 / 音量）
+   * 那个入口是 `window.MediaPreview.show({url, kind, name})`
+   * （见 web/media-preview.js 的对外 API）。
+   * 素材库**直接调它** —— 于是两边的视觉与操作习惯完全一致
+   * （同一个 lightbox、同一套关闭方式含 Esc），
+   * 而不是另起一个「功能更少、样式还得再对一遍」的互斥实现。
+   *
+   * 【kind 必须显式传】
+   * content_url 是 /api/assets/<id>/content（**没有扩展名**），
+   * 按 URL 猜类型会猜错。素材的 category 是权威值 ——
+   * 这正是 media-preview.js 里 detectKind 的注释写明的那条坑。
+   *
+   * 【不误触发其它动作】
+   * 这个函数**只**打开查看器：不改多选集合、不动播放器清单、
+   * 不引用到生成面板。调用方（卡片 / 抽屉 / 右键菜单）负责
+   * 把自己的事件 stopPropagation 掉。
+   */
+  function openAssetViewer(asset) {
+    if (!asset) return false;
+    const preview = window.MediaPreview;
+    if (!preview || typeof preview.show !== "function") {
+      toast("独立查看器未加载", "err");
+      return false;
+    }
+    // 图片 / 视频 / 音频都有原文件地址；其它类型（文档 / 工作流）没有可播内容。
+    const url = asset.content_url
+      || (asset.id ? `/api/assets/${encodeURIComponent(asset.id)}/content` : "")
+      || asset.preview_url;
+    if (!url) {
+      toast("该素材没有可查看的文件", "err");
+      return false;
+    }
+    return preview.show({
+      url,
+      kind: asset.category,
+      name: asset.name,
+      mime: asset.mime,
+      category: asset.category,
+    });
+  }
+
+  /** 能否在独立窗口里看（图片 / 视频 / 音频）。 */
+  function isViewableAsset(asset) {
+    if (!asset) return false;
+    return asset.category === "image"
+      || asset.category === "video"
+      || asset.category === "audio";
+  }
+
+  /**
+   * 独立查看器当前是否开着。
+   *
+   * 【为什么需要这个判据】
+   * 独立查看器有两套 DOM：图片走 app.js 的 #lightbox，
+   * 视频 / 音频走 media-preview.js 的 #mediaPreviewModal。
+   * 素材库自己的 Esc 处理器必须知道「上面盖着一个查看器」，
+   * 否则按 Esc 会把底下的抽屉一起关掉（见 bindStatic 里的注释）。
+   */
+  function isIndependentViewerOpen() {
+    const lightbox = $("#lightbox");
+    if (lightbox && !lightbox.hidden) return true;
+    const modal = $("#mediaPreviewModal");
+    if (modal && !modal.hidden) return true;
+    return false;
+  }
+
+  /**
+   * 「按 Esc 那一刻，查看器是不是开着」。
+   *
+   * 【为什么不能直接在冒泡阶段查 isIndependentViewerOpen()】
+   * 三个 Escape 监听器都挂在 document 上，而且都是**冒泡**阶段：
+   *   * app.js          —— 监听 #lightbox（图片分支）
+   *   * assets.js       —— 关抽屉 / 选择器 / 右键菜单
+   *   * media-preview.js—— 监听 #mediaPreviewModal（视频/音频分支）
+   * 脚本在 index.html 里的顺序是 media-preview.js(1567) -> app.js(1626)
+   * -> assets.js(1631)，即 **app.js 先注册**。
+   * 冒泡阶段按注册顺序执行 ⇒ app.js 的处理器**先**跑，
+   * 它已经把 `lightbox.hidden = true` 了 —— 等 assets.js 的处理器跑到时
+   * 再去查，得到的已经是「没开」。
+   * ⇒ 结果：用户在图片查看器里按 Esc，抽屉也被一起关掉。
+   *
+   * 【解法】在**捕获阶段**先记一份快照。
+   * 捕获阶段一定早于任何冒泡阶段的监听器（无论注册顺序），
+   * 所以那一刻 lightbox 还开着 —— 快照是准的。
+   */
+  let viewerOpenAtEscape = false;
+
   async function api(path, options = {}) {
     const resp = await fetch(path, options);
     let body = {};
@@ -388,8 +485,30 @@
     // 默认不显示 —— 用户点「多选」按钮进入多选模式后才出现。
     // 放在缩略图左下角，单独一个 .al-selbox-wrap，
     // 避免和卡片的「点开详情」冲突。
+    //
+    // 【独立查看入口 · 2026-11-21】
+    // 缩略图右上角的「放大」按钮 —— 点它在**独立窗口**里看这个素材。
+    //
+    // 【为什么放缩略图上而不是只放抽屉里】
+    // 需求要求「卡片与抽屉两条路径上都可用」，且「不得只藏在隐藏入口里」。
+    // 缩略图上的按钮是**常驻可见**的（不靠 hover 显隐 —— 触屏没有 hover）。
+    //
+    // 【位置为什么不放四角】
+    // 缩略图四个角已被占满：
+    //   左上 .al-thumb .badge      = 「已分析」
+    //   右上 .al-thumb .badge.right= 「引用 N」
+    //   右下 .al-thumb .dur        = 「时长」（视频）
+    //   左下 .al-selbox-wrap       = 「多选勾选框」
+    // ⇒ 放在**右上角偏下**（top: 30px），落在「引用 N」徽章下方，不重叠。
+    const viewBtn = isViewableAsset(asset)
+      ? `<button class="al-view-btn" type="button" data-act="view"
+                 title="在独立窗口查看（放大观察 / 播放）"
+                 aria-label="在独立窗口查看 ${esc(asset.name)}">
+           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2H2v5M9 2h5v5M9 14h5V9M7 14H2V9"
+                 fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+         </button>` : "";
     return `<div class="al-card${state.selected.has(asset.id) ? " selected" : ""}" data-id="${esc(asset.id)}" draggable="true">
-      <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}
+      <div class="al-thumb">${thumbFor(asset)}${analyzed}${inTrash}${refBadge}${badge}${viewBtn}
         ${state.multiMode ? `<label class="al-selbox-wrap" title="选中（可多选后批量删除）" onclick="return false;">
           <input type="checkbox" class="al-selbox" data-sel-id="${esc(asset.id)}"
                  ${state.selected.has(asset.id) ? "checked" : ""}
@@ -498,6 +617,23 @@
       card.dataset.h3Bound = "1";
       const assetId = card.dataset.id;
       card.addEventListener("click", () => openDrawer(assetId));
+      // 【独立查看入口 · 2026-11-21】缩略图上的「放大」按钮。
+      //
+      // 【必须 stopPropagation】否则这个 click 会冒泡到卡片的 click 处理器
+      // -> 顺手把**抽屉也打开**了 —— 用户只想看大图，却多出一个抽屉。
+      //
+      // 【不碰多选】这个按钮不是勾选框，不改 state.selected。
+      // 【不碰播放器】不调 addToPlayer。
+      const viewBtn = card.querySelector(".al-view-btn");
+      if (viewBtn) {
+        viewBtn.addEventListener("click", event => {
+          event.preventDefault();
+          event.stopPropagation();
+          const asset = state.items.find(a => a.id === assetId);
+          if (!asset) return;
+          openAssetViewer(asset);
+        });
+      }
       // 【2026-11-14 需求 13】勾选框：点它只切换选中，**不开详情**。
       // （勾选框在 .al-thumb 里，click 会冒泡到卡片 -> 打开详情抽屉，
       //   所以必须 stopPropagation。）
@@ -784,6 +920,13 @@
       </div>
 
       <div class="al-inline" style="flex-wrap:wrap">
+        ${isViewableAsset(asset) ? `
+        <button class="al-btn primary" id="alViewBtn"
+                title="在独立窗口里放大观察 / 播放（Esc 关闭）">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2H2v5M9 2h5v5M9 14h5V9M7 14H2V9"
+                fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          独立窗口查看
+        </button>` : ""}
         <a class="al-btn" href="${esc(asset.content_url)}" target="_blank" rel="noopener">下载原文件</a>
         <button class="al-btn" id="alRestoreBtn" ${asset.deleted_at ? "" : "hidden"}>还原</button>
         <button class="al-btn danger" id="alDeleteBtn">删除</button>
@@ -870,6 +1013,17 @@
       const node = $(sel);
       if (node) node.addEventListener(event, fn);
     };
+
+    // 【独立查看入口 · 2026-11-21】抽屉里的「独立窗口查看」按钮。
+    // 打开的是**覆盖式查看器**，不是抽屉 —— 抽屉本身保持开着，
+    // 关掉查看器后用户还在详情页（这是抽屉 + 独立窗口并存的常规体验）。
+    //
+    // 【不误触发其它动作】只调 openAssetViewer：
+    // 不改多选集合、不动播放器清单、不引用到生成面板。
+    on("#alViewBtn", "click", event => {
+      event.preventDefault();
+      openAssetViewer(asset);
+    });
 
     on("#alSaveName", "click", async () => {
       const name = $("#alNameInput").value.trim();
@@ -1016,6 +1170,8 @@
     // 添加到播放器清单：播放器只播用户主动挑的条目
     menu.innerHTML = `
       <button data-act="open">查看详情</button>
+      ${asset && isViewableAsset(asset)
+        ? `<button data-act="view">独立窗口查看</button>` : ""}
       <button data-act="copy-id">复制素材 ID</button>
       <button data-act="download">下载原文件</button>
       <div class="ctx-sep"></div>
@@ -1032,6 +1188,9 @@
         menu.classList.remove("open");
         const act = btn.dataset.act;
         if (act === "open") openDrawer(assetId);
+        // 【独立查看入口 · 2026-11-21】右键菜单项。
+        // 只打开查看器 —— 不加入播放器、不删除、不改多选。
+        else if (act === "view" && asset) openAssetViewer(asset);
         else if (act === "copy-id") {
           try { await navigator.clipboard.writeText(assetId); toast("已复制素材 ID", "ok"); }
           catch (e) { toast(assetId); }
@@ -1461,8 +1620,34 @@
       if (ctx && !ctx.contains(event.target)) ctx.classList.remove("open");
     });
 
+    // 【独立查看窗口 · 2026-11-21】捕获阶段先记快照。
+    //
+    // 必须在**捕获阶段**记 —— 冒泡阶段里 app.js 的 lightbox 处理器
+    // 已经把 lightbox 藏起来了，那时再查就晚了（详见
+    // viewerOpenAtEscape 的注释）。
     document.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
+      viewerOpenAtEscape = isIndependentViewerOpen();
+    }, true);
+
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      // 【独立查看窗口 · 2026-11-21】查看器开着时，Esc 只关**查看器**，
+      // 不能顺手把底下的抽屉也关了。
+      //
+      // 【为什么这里必须挡】三个 Escape 监听器都挂在 document 上：
+      //   * app.js          —— 监听 #lightbox（图片分支）
+      //   * media-preview.js—— 监听 #mediaPreviewModal（视频/音频分支）
+      //   * assets.js（本行）—— 关抽屉 / 选择器 / 右键菜单
+      // 它们的注册顺序：app.js 先（脚本靠前）、assets.js 次、
+      // media-preview.js 最后（ensureModal 是**懒加载**的，第一次打开时
+      // 才注册监听器）。所以 Esc 一定会**同时**打到本行。
+      // 不挡的话：用户在查看器里按 Esc -> 查看器关了，抽屉也跟着关了
+      // -> 用户「只是想关掉大图继续看详情」，却连详情页都被踢掉了。
+      //
+      // 【判据】用捕获阶段记下的快照（viewerOpenAtEscape），
+      // 不是此刻再查 —— 此刻查已经晚了一步（app.js 已把 lightbox 关了）。
+      if (viewerOpenAtEscape) return;
       closeDrawer();
       closePicker();
       const menu = $("#alContext");
@@ -1544,5 +1729,11 @@
     // 【A2】播放器清单：对外暴露增删，供其它模块（如媒体库右键）复用。
     addToPlayer,
     removeFromPlayer,
+    // 【2026-11-21 独立查看窗口】对外暴露「在独立窗口看某个素材」。
+    // 素材库自己的三条入口（卡片按钮 / 抽屉按钮 / 右键菜单）都走它，
+    // 导出是为了让别的模块（如 agent 面板）也能用同一套查看体验，
+    // 而不必各自写一份（两份实现必然漂移）。
+    openAssetViewer,
+    isViewableAsset,
   };
 })();

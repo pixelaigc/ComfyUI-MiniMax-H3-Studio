@@ -119,11 +119,21 @@ class TestNoHtmlCommentInAnyJsTemplate(unittest.TestCase):
 # （判据 = 「该资源文件内容相对其 ?v= 引入点是否发生过变化」，
 #   用 git 走历史 + 内容 diff 实测得到，见 docs/audit-evidence/）
 STALE_BUMPED = {
-    "assets.css":              ("uxbatch1",     "cr20261115b"),
+    "assets.css":              ("cr20261115b", "assetview20261121a"),
+    # 【2026-11-21 素材库独立查看窗口】assets.css 改了内容
+    #   （新增 .al-view-btn —— 缩略图上的「放大」入口）
+    #   ⇒ ?v= 必须再升一档。
+    #   【为什么这一步是必须的】/static/* 没有 Cache-Control，浏览器按
+    #   启发式新鲜度缓存。内容变了而 ?v= 不变 ⇒ 老用户拿到的仍是旧文件
+    #   ⇒ 卡片上看不到新入口，功能等于没上线。
     # 【2026-11-21 移动端死路修复】responsive.css 改了内容
     #   （参数抽屉遮罩 inset:0 -> inset:44px 0 0 0 让开顶栏；
     #    新增抽屉标题行样式）⇒ ?v= 必须再升一档。
-    "responsive.css":          ("cr20261115b",  "mobnav20261121a"),
+    "responsive.css":          ("mobnav20261121a", "assetview20261121a"),
+    # 【2026-11-21 素材库独立查看窗口】responsive.css 改了内容
+    #   （窄屏下 .al-view-btn 触控尺寸 + 媒体预览框不溢出 +
+    #    查看器打开时藏掉页面 FAB）
+    #   ⇒ ?v= 必须再升一档。
     # 【2026-11-19 第 3 轮 A 项】qwen-refs.js 的旧条目 ("fix3preview1", …)
     #   同样被下面第 6 轮的 ("cr20261115b", "cr20261118a") 覆盖（隐藏条目）。
     "video-panel-fallback.js": ("vpfb1",        "cr20261115b"),
@@ -134,7 +144,10 @@ STALE_BUMPED = {
     #   曾被后面第 6 轮的 ("cr20261115b", "cr20261118a") **覆盖** ——
     #   Python dict 字面量后写覆盖先写 ⇒ 前一条是**隐藏条目**。
     #   已把信息并入下面的生效条目，此处只留注释（见下方 providers.js 条目）。
-    "assets.js":               ("uxbatch1",     "cr20261115b"),
+    "assets.js":               ("cr20261115b", "assetview20261121a"),
+    # 【2026-11-21 素材库独立查看窗口】assets.js 改了内容
+    #   （卡片 / 抽屉 / 右键菜单三条「独立窗口查看」入口 + Esc 快照守卫）
+    #   ⇒ ?v= 必须再升一档。
     "asset-player.js":         ("uxbatch1",     "cr20261115b"),
     "enhance-menu-shared.js":  ("shared2",      "cr20261115b"),
     # 【2026-11-16 S5】enhance-menu.js 内容又变了（director 补显式

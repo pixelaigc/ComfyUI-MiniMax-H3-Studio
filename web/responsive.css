@@ -391,6 +391,47 @@
   .al-drawer.open { visibility: visible; }
   .al-drawer-close { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
 
+  /* ---------- 4.7b 素材库「独立窗口查看」（2026-11-21） ----------
+     卡片缩略图上的「放大」按钮。手机上按钮要够大才点得准 ——
+     桌面 26px 太小，触屏标准是 40px（--touch-min）。
+     放大到 34px（缩略图在手机上是 132px 起步的方块，34px 仍是边角的
+     小控件，不会盖住缩略图主体）。 */
+  .al-view-btn { width: 34px; height: 34px; top: 32px; right: 6px; }
+  .al-view-btn svg { width: 16px; height: 16px; }
+  /* 抽屉里的「独立窗口查看」按钮占满一行，触控目标够大 */
+  .al-drawer .al-btn.primary { min-height: var(--touch-min); justify-content: center; }
+
+  /* ---------- 4.7c 独立查看窗口在窄屏必须能完整查看与关闭 ----------
+     图片走 app.js 的 #lightbox（z-index 1200），视频/音频走
+     media-preview.js 的 #mediaPreviewModal（z-index 1300）。
+     两者都是 fixed inset:0 的覆盖层，天然铺满视口 ——
+     但窄屏下还有两件事必须保证：
+
+     1) **查看器必须盖住抽屉**：抽屉 .al-drawer 的 z-index 是 901，
+        查看器 1200/1300 更高 —— 顺序本来就对。
+     2) **抽屉的底部操作条 / 页面 FAB 不能盖住查看器**：
+        .panel-fab 的 z-index 是 960（低于 1200）—— 顺序也对。
+        但 body.modal-open 才会锁滚动；查看器打开时必须锁，
+        否则背景页面还能滚。media-preview.js 的 close() 走
+        window.H3Studio.syncModalOpenClass()，而 MODAL_IDS 里
+        **没有** mediaPreviewModal / lightbox ——
+        ⇒ 关掉查看器时会把滚动锁解开，这是既有行为，保持不变。
+     3) **窄屏下媒体预览框不能溢出**：模态框的 padding 在手机上要收紧，
+        让视频/音频控件完整可见。 */
+  .media-preview-modal { padding: 8px; }
+  .media-preview-box { width: 100%; max-height: calc(100vh - 16px); }
+  .media-preview-media,
+  .media-preview-image { max-height: calc(100vh - 76px); }
+  .media-preview-head b { max-width: 100%; }
+  .media-preview-tools #mediaPreviewClose {
+    min-width: 40px; min-height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .media-preview-tools button { min-height: 40px; }
+  /* 独立查看窗口打开时，页面底部的「参数」浮动按钮不能浮在它上面 */
+  body.modal-open .panel-fab { display: none !important; }
+
   /* ---------- 4.8 弹窗：手机上改为底部抽屉形态 ---------- */
   .prompt-modal { padding: 0; align-items: flex-end; }
   /* 弹窗右上角的「×」实测只有 12.9×26px —— 触屏几乎点不准。
