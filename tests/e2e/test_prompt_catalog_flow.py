@@ -759,14 +759,28 @@ def test_narrow_screen_constraints(studio_page, evidence, width):
     #    取真实点击证据：一个词库下拉、一个自行输入框都必须
     #    elementFromPoint 命中自己（没被遮挡），并且真的能改值。
     #
-    # 【为什么要重新点 FAB】上面第 3 步点了顶栏汉堡开左侧导航抽屉 ——
-    # 那一下会把底部参数抽屉收掉（app.js 的互斥逻辑）。
-    # 真人路径本来就是：看完导航 → 再点浮钮回到参数面板。照做一遍。
-    # （设计面板在第 1 步已经打开过，这里不能再点 #pcOpenBtn —— 那会把它收起。）
+    # 【为什么要先 Esc 再点 FAB】上面第 3 步开过左侧导航抽屉。
+    # app.js 的规则是「两个抽屉任何一个开着，FAB 都让位」（updateResponsiveChrome）
+    # ⇒ 此时 FAB 是 hidden，点它必然超时。
+    # 真人路径：Esc 关掉抽屉 → 点「参数」浮钮回参数抽屉。照做一遍。
+    sp.page.keyboard.press("Escape")
+    sp.page.wait_for_timeout(600)
     fab2 = sp.page.query_selector(".panel-fab")
-    if fab2 is not None:
-        fab2.click()
-        sp.page.wait_for_timeout(900)
+    assert fab2 is not None, f"{width}px 下没有参数抽屉的浮动入口"
+    fab2.click()
+    sp.page.wait_for_timeout(900)
+    # 滚到入口按钮；设计面板若已展开就不该再点（那会把它收起）
+    sp.page.evaluate("""() => {
+      const panel = document.querySelector('#panel');
+      const btn = document.querySelector('#pcOpenBtn');
+      if (panel && btn) panel.scrollTop = btn.offsetTop - 80;
+    }""")
+    sp.page.wait_for_timeout(400)
+    expanded = sp.page.eval_on_selector("#pcOpenBtn", "e => e.getAttribute('aria-expanded')")
+    evidence.step(f"{width}px 参数抽屉已回位，设计面板 aria-expanded={expanded}")
+    if expanded != "true":
+        sp.page.click("#pcOpenBtn")
+        sp.page.wait_for_timeout(700)
 
     usability = sp.page.evaluate("""() => {
       const out = {groups: 0, selectHit: null, customHit: null, missingSkip: []};
