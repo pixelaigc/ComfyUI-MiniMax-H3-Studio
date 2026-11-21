@@ -660,6 +660,29 @@ function buildEnhanceMeta(d) {
       html += `<div class="enhance-warn">素材上下文：${esc(bits.join("；"))}</div>`;
     }
   }
+  // 参考标签回显（2026-11-21）
+  //
+  // 【为什么必须显示】2026-11-21 现场复验的核心缺陷就是「增强结果里
+  // 没有参考标签」—— 用户看到的是一段描述素材的文字，却看不出
+  // 「哪句话对应第几张素材」。这里把服务端分配的标签和模型实际写出的
+  // 标签都列出来，用户能一眼核对。
+  const refInfo = d.reference_labels;
+  if (refInfo && (refInfo.expected || []).length) {
+    const expected = refInfo.expected || [];
+    const found = refInfo.found || [];
+    const missing = expected.filter(lb => !found.includes(lb));
+    // 【只转义一次】先把原始文本拼好，最后统一 esc()。
+    // 【为什么不能先 esc() 每个标签再 esc() 整段】那是**双重转义** ——
+    // `<Picture 1>` -> `&lt;Picture 1&gt;` -> `&amp;lt;Picture 1&amp;gt;`
+    // -> 界面上用户看到的是「&lt;Picture 1&gt;」这种乱码般的字面量。
+    let text = `参考标签：${expected.join("、")}`;
+    if (missing.length) {
+      text += `（模型未写出：${missing.join("、")}）`;
+    } else {
+      text += "（已全部标注）";
+    }
+    html += `<div class="enhance-warn">${esc(text)}</div>`;
+  }
   if (d.elements && d.elements.length) {
     html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>
       esc(e.id) + " " + esc(JSON.stringify(e.bbox))).join(" · ")}</div>`;

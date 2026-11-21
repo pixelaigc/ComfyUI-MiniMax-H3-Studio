@@ -9803,6 +9803,49 @@ async def _resolve_enhance_assets(asset_refs):
     return await asyncio.to_thread(enh_assets.resolve_assets, asset_refs)
 
 
+def _reference_spec_for_mode(spec_id: str, mode_ctx: str = "",
+                             model_key: str = "") -> str:
+    """
+    带素材时的模板路由。
+
+    【规则】当前模式下如果有「参考模式」模板（reference_mode=True），
+    就用它 —— 因为只有它会教模型输出官方参考标签
+    （`<Picture N>` / `<Subject N>` / …）。
+
+    【为什么不影响无素材面板】这个函数**只在** `asset_refs` 非空、
+    且素材解析出官方标签时被调用 —— 无素材请求根本不走这条路，
+    提示词与改动前逐字一致。
+
+    【模式不匹配时怎么办】图像模式（参考生图）用的是图像模型族的模板
+    （Qwen / Z-Image / MOSS 的官方 PE），它们的参考标签体系与 H3 视频
+    不同（Qwen 官方 PE-I2I 用 `<imageN>`）。所以：
+      * 视频模式（H3）-> h3-ref-director（官方 `<Picture N>`）；
+      * 图像模式 -> **保持原模板**（各模型族自己的官方 PE 已经处理参考图，
+        且 /api/qwen-pe/expand 走的是官方 PE checkpoint，不是本链路）。
+    """
+    if not mode_ctx:
+        return spec_id
+    media = enh.MODE_MEDIA.get(mode_ctx, "")
+    if media != "video":
+        # 非视频媒体：不动模板（图像模型族有自己的官方参考图体系）。
+        return spec_id
+    available = enh.filter_specs(enh.list_specs(), mode_ctx, model_key)
+    # 【为什么直接读 TEMPLATE_SPECS 而不是用 available 里的字段】
+    # available 是 list_specs() 的投影（给前端展示用的精简字典）。
+    # 就算投影里带了 reference_mode，它也是「展示层」的字段；
+    # 真正的判定依据应该是**模板注册表本身** —— 那是模板能力的唯一真源。
+    ref_ids = [
+        spec.get("id") for spec in enh.TEMPLATE_SPECS.values()
+        if spec.get("reference_mode")
+        and spec.get("id") in [s.get("id") for s in available]
+    ]
+    if ref_ids:
+        # 优先选参考模式模板；用户显式选了别的视频模板也以参考模式为准 ——
+        # 因为「没有参考标签」正是本次要修的缺陷。
+        return ref_ids[0]
+    return spec_id
+
+
 async def api_enhance(request):
     """
     POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
@@ -9847,12 +9890,13 @@ async def api_enhance(request):
         images = []
     images = [str(p) for p in images[:4]]
 
-    # ---- 素材上下文（2026-11-18 新增）----
+    # ---- 素材上下文（2026-11-18 新增 / 2026-11-21 补参考标签）----
     # 前端把「当前面板已引用的素材」以 asset_refs 传上来，
-    # 这里解析成**服务端可读**的图片路径 + 图序语义。
+    # 这里解析成**服务端可读**的图片路径 + 官方参考标签语义。
     asset_refs = payload.get("asset_refs")
     asset_context = ""
     asset_summary = {}
+    asset_labels: list[str] = []
     if asset_refs:
         try:
             resolved_assets = await _resolve_enhance_assets(asset_refs)
@@ -9866,13 +9910,24 @@ async def api_enhance(request):
             return web.json_response(
                 {"error": f"素材上下文解析失败：{type(exc).__name__} {exc}"[:300],
                  "degraded": True}, status=500)
-        # 素材图片**追加**在显式 images 之后（图序语义按实际顺序编号）
+        # 素材图片**追加**在显式 images 之后（官方标签编号按实际顺序编号）
         for path in (resolved_assets.get("images") or []):
             if len(images) >= enh_assets.MAX_IMAGES:
                 break
             images.append(path)
         asset_context = enh_assets.describe(resolved_assets)
         asset_summary = enh_assets.summary(resolved_assets)
+        asset_labels = list(asset_summary.get("labels") or [])
+
+        # 【2026-11-21】带素材 -> 路由到官方**参考模式**模板。
+        #
+        # 【为什么必须换模板】video-director 是 T2VA 三段式，它不教模型
+        # 用参考标签 —— 2026-11-21 线上实测：素材真传了（image_count=2），
+        # 但输出里 `<Picture N>` / `<Subject N>` 一个都没有，模型只是
+        # 「描述了图片」却没「标注哪张图」-> 下游无法把文字和素材对上。
+        # 只有 Ref2VA 六段式模板会强制产出带标签的结果。
+        if asset_labels:
+            spec_id = _reference_spec_for_mode(spec_id, mode_ctx, model_key)
 
     with db() as conn:
         row = conn.execute(
@@ -10062,6 +10117,36 @@ async def api_enhance(request):
              "provider": item["name"], "provider_id": item["id"],
              "degraded": True}, status=502)
 
+    # ---- 参考标签校验（2026-11-21 新增）----
+    #
+    # 【为什么要卡这一关】2026-11-21 线上实测：素材真传了
+    # （used_multimodal=true、image_count=2），但模型输出里
+    # `<Picture N>` / `<Subject N>` **一个都没有** —— 它只是「描述了图片」
+    # 却没「标注哪张图」。这种结果**不能算成功**：下游模型拿到的是
+    # 一段没有引用的文字，无法知道哪句话对应哪张素材。
+    #
+    # 【判定口径】本次分配出去的**每一个**官方标签都必须在输出里出现。
+    # 少一个 -> 502 + 明确原因（不写回提示词框）。
+    # 【为什么不能只查「有没有标签」】模型可能只写 `<Picture 1>` 却漏掉
+    # `<Picture 2>` —— 那样第二张素材还是等于白引用。必须逐个查。
+    if asset_labels:
+        found_labels = enh_assets.extract_reference_labels(enhanced)
+        missing_labels = [lb for lb in asset_labels if lb not in found_labels]
+        if missing_labels:
+            return web.json_response(
+                {"error": f"增强结果缺少参考标签：{'、'.join(missing_labels)}。"
+                          "本次增强带了素材，但模型没有在提示词里标注对应的"
+                          "参考引用 —— 这样下游无法把文字和素材对上，"
+                          "所以没有写回提示词框。"
+                          "请换用更强的多模态模型，或检查该模型是否真的"
+                          "读到了图片。",
+                 "code": "missing_reference_labels",
+                 "missing_labels": missing_labels,
+                 "expected_labels": list(asset_labels),
+                 "found_labels": found_labels,
+                 "provider": item["name"], "provider_id": item["id"],
+                 "degraded": True}, status=502)
+
     # bbox 档：额外抽出 JSON 数组，前端可单独渲染/复制
     elements = None
     if spec.get("validate_mode") == "bbox":
@@ -10098,6 +10183,13 @@ async def api_enhance(request):
         # 「这次增强带上了哪几个素材」—— 否则用户无法确认素材到底
         # 有没有参与（这正是本次缺陷的核心：素材被静默丢弃）。
         "assets": asset_summary,
+        # 【参考标签回显（2026-11-21 新增）】本次分配出去的官方标签 +
+        # 模型实际写出来的标签。前端据此显示「<Picture 1> / <Picture 2>」，
+        # 用户能一眼看出「第几张图被引用了」。
+        "reference_labels": {
+            "expected": list(asset_labels),
+            "found": enh_assets.extract_reference_labels(enhanced),
+        },
         "validation": validation,
         "elements": elements,
         # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）

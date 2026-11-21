@@ -546,6 +546,36 @@ const MODE_ALLOWED_SLOT_KEYS = {
 };
 
 /**
+ * 槽位 key -> **面板顺序**序号（2026-11-21 新增）。
+ *
+ * 【为什么需要它】H3 官方规定参考标签 `<Picture N>` 的编号必须跟
+ * **面板上素材的顺序**一一对应（界面上第 1 张图 = `<Picture 1>`）。
+ * 而 `state.assetRefs` 是普通对象，键的枚举顺序 = **插入顺序** ——
+ * 用户先填「尾帧」再填「首帧」，枚举顺序就是 last -> first，
+ * 于是 `<Picture 1>` 会被分配给「尾帧」，标签和面板对不上。
+ *
+ * 【这一份是唯一真源】**提交侧**（app.js 的 asset_refs 构建）与
+ * **增强侧**（web/enhance-menu.js 的 collectPanelAssetRefs）都必须用
+ * 它 —— 两边顺序不一致的话，增强时算出来的 `<Picture 1>` 和真正进
+ * 工作流的第 1 张图会对不上，比没有标签更糟。
+ *
+ * 口径与上面 renderMode 真正 mk() 出来的槽位顺序严格一致：
+ *   flf -> first(10) / last(20) / refvid0..2(30+i) / refaud0..2(40+i)
+ *   r2v -> ref0..8(10+i) / refvid0..2(30+i) / refaud0..2(40+i)
+ */
+function panelSlotOrder(key) {
+  if (key === "first") return 10;
+  if (key === "last") return 20;
+  let m = /^ref(\d+)$/.exec(key);
+  if (m) return 10 + parseInt(m[1], 10);
+  m = /^refvid(\d+)$/.exec(key);
+  if (m) return 30 + parseInt(m[1], 10);
+  m = /^refaud(\d+)$/.exec(key);
+  if (m) return 40 + parseInt(m[1], 10);
+  return null;
+}
+
+/**
  * 【2026-11-16 审查 B-3 / B-4 / B-12 修复】按模式清空槽位状态。
  *   flf -> first / last / refvid0..2 / refaud0..2
  *   r2v -> ref0..ref8 / refvid0..2 / refaud0..2
@@ -3809,7 +3839,13 @@ async function onGenerateClick() {
     // （见文件上方 MODE_ALLOWED_SLOT_KEYS）—— 渲染侧与提交侧共用一份，
     // 杜绝「界面渲染的槽位」与「提交允许的槽位」两套口径漂移。
     const slotKeyAllowed = MODE_ALLOWED_SLOT_KEYS[mode] || (() => false);
-    const groupCounter = {};
+    // 【2026-11-21】按**面板顺序**收集（不是对象插入顺序）。
+    //
+    // 【为什么必须排序】H3 官方规定 `<Picture N>` 的编号跟面板上素材的
+    // 顺序一一对应。增强侧（web/enhance-menu.js 的 collectPanelAssetRefs）
+    // 与这一侧都用 panelSlotOrder() —— 两边顺序必须一致，
+    // 否则增强时算出来的 `<Picture 1>` 和真正进工作流的第 1 张图对不上。
+    const picked = [];
     Object.entries(state.assetRefs || {}).forEach(([key, item]) => {
       if (!item || !item.asset_id) return;
       // 当前模式不渲染这个槽位 -> 不提交（否则是「看不见却带上去」的幽灵输入）
@@ -3817,13 +3853,21 @@ async function onGenerateClick() {
       const group = GROUP_OF_KEY(key);
       const slot = SLOT_FOR_KEY[key] || group;
       if (!slot) return;
-      groupCounter[slot] = (groupCounter[slot] || 0) + 1;
-      assetRefs.push({
-        asset_id: item.asset_id,
-        slot,
-        ordinal: groupCounter[slot] - 1,
-      });
+      const order = panelSlotOrder(key);
+      if (order === null) return;
+      picked.push({slot, order, asset_id: item.asset_id});
     });
+    picked.sort((a, b) => a.order - b.order);
+    // ordinal 按**类别各自**计数（官方编号规则：Picture / Video / Audio 独立编号）
+    const groupCounter = {};
+    for (const entry of picked) {
+      groupCounter[entry.slot] = (groupCounter[entry.slot] || 0) + 1;
+      assetRefs.push({
+        asset_id: entry.asset_id,
+        slot: entry.slot,
+        ordinal: groupCounter[entry.slot] - 1,
+      });
+    }
     if (assetRefs.length) fd.append("asset_refs", JSON.stringify(assetRefs));
 
     if (mode === "flf") {
