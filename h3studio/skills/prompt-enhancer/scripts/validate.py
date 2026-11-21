@@ -262,6 +262,26 @@ _STRUCTURAL_MARKERS = {
     "english", "chinese", "japanese", "korean", "french", "german", "spanish",
     "italian", "portuguese", "russian", "hindi", "thai", "vietnamese",
     "indonesian", "malay", "arabic",
+    # 【2026-11-21 新增】H3 官方**参考模式**的任务类型前缀。
+    #
+    # 【为什么需要】官方 ref-en.txt 规定参考模式的 summary 字段**必须**以
+    # 方括号任务类型前缀开头：
+    #     [keyframe completion] ...
+    #     [reference generation] ...
+    #     [video editing + reference generation + audio reuse] ...
+    # 这些前缀长得跟 [word] 一模一样 —— 原来被当成权重语法拒收，
+    # 整单 502：「出现提示词权重语法： [keyframe completion]」。
+    # 模型**按官方格式输出就必然带它们**，所以必须放行。
+    #
+    # 【官方词表来源】ref-en.txt 的任务类型表（6 个）：
+    "keyframe completion", "reference generation", "video editing",
+    "video continuation", "audio reuse", "audio reference",
+}
+
+#: 官方任务类型（单词集合）—— 组合形式用 " + " 连接。
+_TASK_TYPES = {
+    "keyframe completion", "reference generation", "video editing",
+    "video continuation", "audio reuse", "audio reference",
 }
 
 _STRUCTURAL_MARKER_RE = re.compile(
@@ -271,19 +291,40 @@ _STRUCTURAL_MARKER_RE = re.compile(
 )
 
 
+def _is_task_type(inner: str) -> bool:
+    """
+    方括号里是不是 H3 官方**任务类型前缀**（可含 " + " 组合）。
+
+    官方格式：`[keyframe completion]` / `[video editing + audio reuse]`。
+    组合项必须**全部**是官方词表里的词 —— 否则不认
+    （否则 "[cat + dog]" 这种真权重语法会被放过）。
+    """
+    text = (inner or "").strip()
+    if not text:
+        return False
+    parts = [p.strip().lower() for p in text.split("+")]
+    if not parts or any(not p for p in parts):
+        return False
+    return all(p in _TASK_TYPES for p in parts)
+
+
 def _is_structural_marker(inner: str) -> bool:
     """
-    方括号里是不是**结构化标记**（H3 镜头编号 / 台词语言标签）而不是权重语法。
+    方括号里是不是**结构化标记**（H3 镜头编号 / 台词语言标签 /
+    官方参考模式的任务类型前缀）而不是权重语法。
 
     这些标记是 MiniMax-H3 官方提示词规范**强制要求**的产物：
       - 「第一个镜头直接写 `[Shot 1]`」
       - 「`<d>` 里面只有语言标签和用户原话」（语言标签形如 `[English]`）
+      - 「参考模式的 summary 以任务类型前缀开头」（形如 `[keyframe completion]`）
     模型不写它们才是格式错误，所以它们绝不能被当成权重语法拒掉。
     """
     text = (inner or "").strip()
     if not text:
         return False
     if _STRUCTURAL_MARKER_RE.match(text):
+        return True
+    if _is_task_type(text):
         return True
     return text.lower() in _STRUCTURAL_MARKERS
 
