@@ -1,0 +1,807 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "results": {
+    "chromium": {
+      "320": {
+        "innerWidth": 320,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": true,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "340": {
+        "innerWidth": 340,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": true,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "360": {
+        "innerWidth": 360,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": true,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "375": {
+        "innerWidth": 375,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": true,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "390": {
+        "innerWidth": 390,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "393": {
+        "innerWidth": 393,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "412": {
+        "innerWidth": 412,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "428": {
+        "innerWidth": 428,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "430": {
+        "innerWidth": 430,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": true,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "500": {
+        "innerWidth": 500,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "600": {
+        "innerWidth": 600,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "699": {
+        "innerWidth": 699,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "700": {
+        "innerWidth": 700,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": true,
+        "jsTablet": true,
+        "cssPhone": true,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "701": {
+        "innerWidth": 701,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": true,
+        "cssPhone": false,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "768": {
+        "innerWidth": 768,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": true,
+        "cssPhone": false,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "900": {
+        "innerWidth": 900,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": true,
+        "cssPhone": false,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "1024": {
+        "innerWidth": 1024,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": true,
+        "cssPhone": false,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "1100": {
+        "innerWidth": 1100,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": true,
+        "cssPhone": false,
+        "cssTablet": true,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "flex",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "fixed",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "1101": {
+        "innerWidth": 1101,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": false,
+        "cssPhone": false,
+        "cssTablet": false,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "problems": []
+      },
+      "1280": {
+        "innerWidth": 1280,
+        "innerHeight": 800,
+        "jsBreakpoints": {
+          "phone": 700,
+          "tablet": 1100
+        },
+        "jsPhone": false,
+        "jsTablet": false,
+        "cssPhone": false,
+        "cssTablet": false,
+        "cssPhone480": false,
+        "cssPhone380": false,
+        "hamburger": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "sidebar": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panel": {
+          "display": "flex",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "fab": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "panelMask": {
+          "display": "none",
+          "position": "static",
+          "visibility": "visible"
+        },
+        "problems": []
+      }
+    }
+  }
+}
