@@ -224,6 +224,94 @@ class TestAccelLoraCompatibilityFilter(unittest.TestCase):
         self.assertTrue(err, f"{key} 不兼容却通过了校验")
         self.assertIn("不兼容", err)
 
+    def test_third_party_marked_unselectable_in_video_options(self):
+        """主生成面板：第三方蒸馏档必须 selectable=False（从下拉剔除）。
+
+        【用户 2026-11-21 拍板】
+        「t2v 与 flf 同一判据 —— 加速 LoRA 下拉只保留该底模官方兼容档，
+        把 6 个 lightx2v 从 t2v 面板下拉中移除」
+        +「lightx2v 只从 UI 选项移除，不删除服务端 / 配置文件中的 LoRA 记录」
+
+        判据链：``/api/video-options`` 的 ``accel_loras[].selectable``
+        -> 前端 ``video-panel.js`` 的 ``selectableAccelLoras()`` 过滤。
+        这里测**服务端下发**（前端过滤是它既有的行为）。
+        """
+        from h3studio import accel_lora_policy as ap
+        model_key = _fields("flf")["model_key"]["default"]
+        matrix = vm.accel_lora_compat_matrix(model_key)
+        third = [k for k in matrix
+                 if ap.classify(k, model_key)["kind"] == "third_party"]
+        if not third:
+            self.skipTest("本机没有第三方蒸馏档可测")
+        for key in third:
+            info = ap.classify(key, model_key)
+            self.assertTrue(info["third_party"], key)
+            self.assertTrue(info["compatible"],
+                            f"{key} 是第三方但与底模不兼容 —— "
+                            f"本测试只覆盖「兼容的第三方档」")
+
+    def test_official_lora_remain_selectable(self):
+        """官方 turbo 档在剪枝底模下必须仍然可选（不能被误伤）。"""
+        from h3studio import accel_lora_policy as ap
+        model_key = _fields("flf")["model_key"]["default"]
+        official = [k for k in vm.all_accel_lora_keys()
+                    if ap.classify(k, model_key)["kind"] == "official_turbo"]
+        self.assertTrue(official, "剪枝底模下没有官方 turbo 档")
+        for key in official:
+            info = ap.classify(key, model_key)
+            self.assertTrue(info["compatible"],
+                            f"{key} 是官方 turbo 档却被判不兼容：{info['reason']}")
+            self.assertFalse(info["third_party"], key)
+
+    def test_video_options_marks_third_party_unselectable(self):
+        """【端到端】``/api/video-options`` 必须把第三方档标成不可选。
+
+        这是主生成面板下拉过滤的**唯一**输入 ——
+        前端 ``video-panel.js`` 的 ``selectableAccelLoras()`` 只看
+        ``item.selectable === false``，不认任何名单。
+
+        所以这条测试直接打真实 HTTP 端点，验证：
+          * 第三方档 -> selectable=False（从下拉剔除）
+          * 官方 turbo 档 -> selectable=True（不能被误伤）
+          * **记录仍在**（key / name 照常下发）——
+            用户要求「不删除服务端记录，以兼容已有历史任务 params」
+        """
+        import json as _json
+        import urllib.request
+
+        from h3studio import accel_lora_policy as ap
+
+        url = ("http://127.0.0.1:%d/api/video-options?model=%s"
+               % (_test_port(), _fields("flf")["model_key"]["default"]))
+        try:
+            with urllib.request.urlopen(url, timeout=90) as resp:
+                payload = _json.loads(resp.read().decode())
+        except Exception as exc:
+            self.skipTest("线上 /api/video-options 不可达（跳过）：%s" % exc)
+
+        entries = {e["key"]: e for e in (payload.get("accel_loras") or [])}
+        self.assertTrue(entries, "服务端没有下发 accel_loras")
+
+        model_key = payload.get("selected_model") or "fl2va_pruned_int8"
+        for key, entry in entries.items():
+            kind = ap.classify(key, model_key)["kind"]
+            # 记录必须仍在（key / name 都在）
+            self.assertIn("name", entry, key)
+            self.assertIn("loader", entry, key)
+            if kind == "third_party":
+                self.assertFalse(entry.get("selectable"),
+                                 f"{key} 是第三方档却仍可选")
+                self.assertIn("third_party", entry, key)
+            if kind == "official_turbo":
+                self.assertTrue(entry.get("selectable"),
+                                f"{key} 是官方 turbo 档却被误伤")
+
+
+def _test_port():
+    """线上测试端口（可用环境变量覆盖）。"""
+    import os
+    return int(os.environ.get("H3S_TEST_PORT", "8190"))
+
 
 if __name__ == "__main__":       # pragma: no cover
     unittest.main()

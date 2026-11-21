@@ -119,6 +119,29 @@ def lora_kind(item: dict) -> str:
     return "other"
 
 
+def classify(key: str, model_key: str) -> dict:
+    """单枚加速 LoRA 在某个底模下的分类（官方 / 第三方 / 其它）。
+
+    返回 {kind, compatible, reason, official_h3, third_party, loader}。
+    供服务端下发 ``selectable`` 时使用 —— 前端据此过滤，**不硬编码名单**。
+    """
+    from . import video_models as vmodels
+
+    meta = vmodels.accel_lora_meta(key) or {}
+    name = meta.get("name") or ""
+    check = (vmodels.accel_lora_compat_matrix(model_key) or {}).get(key, {})
+    prov = weight_provenance(name)
+    item = {
+        "official_h3": prov["official_h3"],
+        "third_party": prov["third_party"],
+        "loader": check.get("loader") or vmodels.detect_accel_lora_loader(name),
+    }
+    item["kind"] = lora_kind(item)
+    item["compatible"] = bool(check.get("compatible"))
+    item["reason"] = check.get("reason") or ""
+    return item
+
+
 def available_accel_loras(model_key: str) -> list[dict]:
     """该底模**真实可用**的加速 LoRA（服务端唯一真源）。
 
