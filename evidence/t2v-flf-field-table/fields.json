@@ -1,0 +1,602 @@
+{
+  "t2v": [
+    {
+      "name": "model_key",
+      "label": "底模",
+      "type": "enum",
+      "default": "fl2va_pruned_int8",
+      "options": [
+        "fl2va_pruned_int8",
+        "fl2va_int8",
+        "fl2va_pruned_w4a8",
+        "fl2va_bf16",
+        "ref2va_pruned_int8",
+        "ref2va_int8",
+        "hybrid_fl2va_ref2va"
+      ],
+      "option_labels": [
+        "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+        "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+        "MiniMax-H3 FL2VA · BF16（官方原始精度）",
+        "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+        "MiniMax-H3 混合版 · FL2VA+Ref2VA"
+      ],
+      "note": "H3 视频底模；本机缺哪个权重由服务端建任务前校验"
+    },
+    {
+      "name": "attention",
+      "label": "注意力机制",
+      "type": "enum",
+      "default": "kitchen",
+      "options": [
+        "default",
+        "kitchen",
+        "sage",
+        "sol",
+        "sparse"
+      ],
+      "option_labels": [
+        "默认（PyTorch 稠密注意力）",
+        "Comfy Kitchen INT8 量化注意力",
+        "SageAttention 显存优化",
+        "Sol-Attn 近似路由",
+        "稀疏视频注意力（预算制）"
+      ],
+      "note": "comfy kitchen = 节点 ModelAttentionBackend（用户 2026-11-13 审查目标 5）"
+    },
+    {
+      "name": "accel_lora",
+      "label": "加速 LoRA 组合",
+      "type": "enum",
+      "default": "dmad_4step_critic",
+      "options": [
+        "lightx2v_4step_768p",
+        "lightx2v_4step_sla_768p",
+        "lightx2v_8step",
+        "dmad_4step_critic",
+        "speed_slider",
+        "better_motion",
+        "turbo_4step_cn",
+        "turbo_4step_cn_ema",
+        "lightx2v_4step_v01_comfy",
+        "lightx2v_sla_768p_root"
+      ],
+      "option_labels": [
+        "LightX2V 4 步（768p 档）",
+        "LightX2V SLA 4 步（768p 档）",
+        "LightX2V 8 步",
+        "DMAD 4 步（critic 版）",
+        "速度滑杆（快/慢运动）",
+        "更好运动（720x1280 档 / 15-30 步）",
+        "Turbo 4 步（中文名加速版）",
+        "Turbo 4 步（中文名 EMA 版）",
+        "LightX2V 4 步（v0.1 comfy 版）",
+        "LightX2V SLA 4 步（768p · 根目录版）"
+      ],
+      "note": "dmad = dmad_minimax_h3_4step_full_critic（4 步蒸馏）"
+    },
+    {
+      "name": "aspect",
+      "label": "画面比例",
+      "type": "enum",
+      "default": "16:9",
+      "options": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "option_labels": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "note": "取值与 ComfyUI ResolutionSelector 的下拉一一对应"
+    },
+    {
+      "name": "megapixels",
+      "label": "MP 预算（百万像素）",
+      "type": "number",
+      "default": 0.4,
+      "options": [],
+      "option_labels": [],
+      "note": "该模式真实上限 2.0 MP；100% = 上限。按比例换算宽高（宽高再对齐到 32 的倍数）"
+    },
+    {
+      "name": "resolution_percent",
+      "label": "MP 预算百分比（%）",
+      "type": "number",
+      "default": 100.0,
+      "options": [],
+      "option_labels": [],
+      "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP"
+    },
+    {
+      "name": "duration",
+      "label": "时长（秒）",
+      "type": "number",
+      "default": 5.0,
+      "options": [],
+      "option_labels": [],
+      "note": "服务端上限 60 秒（= 1440 帧），超限直接报错不静默截断"
+    },
+    {
+      "name": "steps",
+      "label": "采样步数",
+      "type": "integer",
+      "default": 4,
+      "options": [],
+      "option_labels": [],
+      "note": "H3 标准路径的步数（与加速 LoRA 档绑定）"
+    },
+    {
+      "name": "sampler",
+      "label": "采样器",
+      "type": "enum",
+      "default": "euler",
+      "options": [
+        "euler",
+        "euler_cfg_pp",
+        "euler_ancestral",
+        "euler_ancestral_cfg_pp",
+        "heun",
+        "heunpp2",
+        "exp_heun_2_x0",
+        "exp_heun_2_x0_sde",
+        "dpm_2",
+        "dpm_2_ancestral",
+        "lms",
+        "dpm_fast",
+        "dpm_adaptive",
+        "dpmpp_2s_ancestral",
+        "dpmpp_2s_ancestral_cfg_pp",
+        "dpmpp_sde",
+        "dpmpp_sde_gpu",
+        "dpmpp_2m",
+        "dpmpp_2m_cfg_pp",
+        "dpmpp_2m_sde",
+        "dpmpp_2m_sde_gpu",
+        "dpmpp_2m_sde_heun",
+        "dpmpp_2m_sde_heun_gpu",
+        "dpmpp_3m_sde",
+        "dpmpp_3m_sde_gpu",
+        "ddpm",
+        "lcm",
+        "ipndm",
+        "ipndm_v",
+        "deis",
+        "cfgpp_ud10_ab",
+        "res_multistep",
+        "res_multistep_cfg_pp",
+        "res_multistep_ancestral",
+        "res_multistep_ancestral_cfg_pp",
+        "gradient_estimation",
+        "gradient_estimation_cfg_pp",
+        "er_sde",
+        "seeds_2",
+        "seeds_3",
+        "sa_solver",
+        "sa_solver_pece",
+        "ddim",
+        "uni_pc",
+        "uni_pc_bh2",
+        "legacy_rk",
+        "rk",
+        "rk_beta",
+        "deis_3m_ode",
+        "deis_2m_ode",
+        "deis_3m",
+        "deis_2m",
+        "res_6s_ode",
+        "res_5s_ode",
+        "res_3s_ode",
+        "res_2s_ode",
+        "res_3m_ode",
+        "res_2m_ode",
+        "res_6s",
+        "res_5s",
+        "res_3s",
+        "res_2s",
+        "res_3m",
+        "res_2m",
+        "euler_extsig",
+        "euler_extsig_ancestral",
+        "euler_extsig_ancestral_cfg_pp",
+        "euler_extsig_cfg_pp"
+      ],
+      "option_labels": [
+        "euler",
+        "euler_cfg_pp",
+        "euler_ancestral",
+        "euler_ancestral_cfg_pp",
+        "heun",
+        "heunpp2",
+        "exp_heun_2_x0",
+        "exp_heun_2_x0_sde",
+        "dpm_2",
+        "dpm_2_ancestral",
+        "lms",
+        "dpm_fast",
+        "dpm_adaptive",
+        "dpmpp_2s_ancestral",
+        "dpmpp_2s_ancestral_cfg_pp",
+        "dpmpp_sde",
+        "dpmpp_sde_gpu",
+        "dpmpp_2m",
+        "dpmpp_2m_cfg_pp",
+        "dpmpp_2m_sde",
+        "dpmpp_2m_sde_gpu",
+        "dpmpp_2m_sde_heun",
+        "dpmpp_2m_sde_heun_gpu",
+        "dpmpp_3m_sde",
+        "dpmpp_3m_sde_gpu",
+        "ddpm",
+        "lcm",
+        "ipndm",
+        "ipndm_v",
+        "deis",
+        "cfgpp_ud10_ab",
+        "res_multistep",
+        "res_multistep_cfg_pp",
+        "res_multistep_ancestral",
+        "res_multistep_ancestral_cfg_pp",
+        "gradient_estimation",
+        "gradient_estimation_cfg_pp",
+        "er_sde",
+        "seeds_2",
+        "seeds_3",
+        "sa_solver",
+        "sa_solver_pece",
+        "ddim",
+        "uni_pc",
+        "uni_pc_bh2",
+        "legacy_rk",
+        "rk",
+        "rk_beta",
+        "deis_3m_ode",
+        "deis_2m_ode",
+        "deis_3m",
+        "deis_2m",
+        "res_6s_ode",
+        "res_5s_ode",
+        "res_3s_ode",
+        "res_2s_ode",
+        "res_3m_ode",
+        "res_2m_ode",
+        "res_6s",
+        "res_5s",
+        "res_3s",
+        "res_2s",
+        "res_3m",
+        "res_2m",
+        "euler_extsig",
+        "euler_extsig_ancestral",
+        "euler_extsig_ancestral_cfg_pp",
+        "euler_extsig_cfg_pp"
+      ],
+      "note": "本机 ComfyUI KSamplerSelect 的真实 COMBO 清单"
+    },
+    {
+      "name": "scheduler",
+      "label": "调度器",
+      "type": "enum",
+      "default": "beta",
+      "options": [
+        "simple",
+        "sgm_uniform",
+        "karras",
+        "exponential",
+        "ddim_uniform",
+        "beta",
+        "normal",
+        "linear_quadratic",
+        "kl_optimal",
+        "FlowMatchEulerDiscreteScheduler",
+        "zipf_linear",
+        "zeta",
+        "bong_tangent",
+        "beta57"
+      ],
+      "option_labels": [
+        "simple",
+        "sgm_uniform",
+        "karras",
+        "exponential",
+        "ddim_uniform",
+        "beta",
+        "normal",
+        "linear_quadratic",
+        "kl_optimal",
+        "FlowMatchEulerDiscreteScheduler",
+        "zipf_linear",
+        "zeta",
+        "bong_tangent",
+        "beta57"
+      ],
+      "note": "本机 ComfyUI BasicScheduler 的真实 COMBO 清单"
+    },
+    {
+      "name": "shift_video",
+      "label": "视频 sigma shift",
+      "type": "number",
+      "default": 12.0,
+      "options": [],
+      "option_labels": [],
+      "note": "H3 模型内生值 12.0，改动会影响出片"
+    },
+    {
+      "name": "shift_audio",
+      "label": "音频 sigma shift",
+      "type": "number",
+      "default": 3.0,
+      "options": [],
+      "option_labels": [],
+      "note": "H3 模型内生值 3.0"
+    }
+  ],
+  "flf": [
+    {
+      "name": "model_key",
+      "label": "底模",
+      "type": "enum",
+      "default": "fl2va_pruned_int8",
+      "options": [
+        "fl2va_pruned_int8",
+        "fl2va_int8",
+        "fl2va_pruned_w4a8",
+        "fl2va_bf16"
+      ],
+      "option_labels": [
+        "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+        "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+        "MiniMax-H3 FL2VA · BF16（官方原始精度）"
+      ],
+      "note": "首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。精度已经编码在权重文件里，选底模就等于选精度。"
+    },
+    {
+      "name": "aspect",
+      "label": "画面比例",
+      "type": "enum",
+      "default": "16:9",
+      "options": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "option_labels": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "note": "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值"
+    },
+    {
+      "name": "megapixels",
+      "label": "MP 预算（百万像素）",
+      "type": "number",
+      "default": 0.4,
+      "options": [],
+      "option_labels": [],
+      "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32（官方 ResolutionSelector.multiple=32）。这是唯一的尺寸表达 —— 没有「分辨率档位」"
+    },
+    {
+      "name": "resolution_percent",
+      "label": "MP 预算百分比（%）",
+      "type": "number",
+      "default": 100.0,
+      "options": [],
+      "option_labels": [],
+      "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP"
+    },
+    {
+      "name": "duration",
+      "label": "时长（秒）",
+      "type": "number",
+      "default": 5.0,
+      "options": [],
+      "option_labels": [],
+      "note": "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"
+    },
+    {
+      "name": "lora",
+      "label": "加速 LoRA",
+      "type": "enum",
+      "default": "ckpt850",
+      "options": [
+        "none",
+        "ckpt850",
+        "v4step600"
+      ],
+      "option_labels": [
+        "none（不挂加速 LoRA，走标准多步采样）",
+        "Turbo 4 步 · ckpt850",
+        "Turbo 4 步 · v4-step600"
+      ],
+      "note": "只列「本机真实存在 + 与该底模逐层实测兼容 + 官方 H3 谱系」的加速档。第三方蒸馏（LightX2V 等）不在这里 —— 判据来自权重自己的 safetensors metadata 与逐层兼容性实测，不是名单。"
+    },
+    {
+      "name": "lora_strength",
+      "label": "加速 LoRA 强度",
+      "type": "number",
+      "default": 1.0,
+      "options": [],
+      "option_labels": [],
+      "note": "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"
+    },
+    {
+      "name": "sampling_fixed",
+      "label": "采样档位（不可改）",
+      "type": "fixed",
+      "default": 4,
+      "options": [],
+      "option_labels": [],
+      "note": "由所选加速 LoRA 决定：4 步 / euler / beta。换加速 LoRA 档位自动跟着换 —— 手动改步数会把这枚 LoRA 压离它的训练分布。"
+    },
+    {
+      "name": "shift_fixed",
+      "label": "sigma shift（不可改）",
+      "type": "fixed",
+      "default": 12.0,
+      "options": [],
+      "option_labels": [],
+      "note": "视频 12.0 / 音频 3.0 是 H3 模型内生值；官方首尾帧模板用的是 H3SigmaRefiner，不是可填的 sigma shift。"
+    },
+    {
+      "name": "precision_fixed",
+      "label": "底模精度（不可改）",
+      "type": "fixed",
+      "default": "随底模",
+      "options": [],
+      "option_labels": [],
+      "note": "精度已经编码在权重文件里（int8_convrot / bf16 / pruned_w4a8），选上面的底模就等于选精度，这里没有独立的精度参数。"
+    }
+  ],
+  "r2v": [
+    {
+      "name": "model_key",
+      "label": "底模",
+      "type": "enum",
+      "default": "ref2va_pruned_int8",
+      "options": [
+        "ref2va_pruned_int8",
+        "ref2va_int8",
+        "hybrid_fl2va_ref2va"
+      ],
+      "option_labels": [
+        "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+        "MiniMax-H3 混合版 · FL2VA+Ref2VA"
+      ],
+      "note": "参考生视频必须用支持 Ref2VA 的权重 —— FL2VA 权重没有参考通道，用它等于「参考没生效」。"
+    },
+    {
+      "name": "aspect",
+      "label": "画面比例",
+      "type": "enum",
+      "default": "16:9",
+      "options": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "option_labels": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "note": "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值"
+    },
+    {
+      "name": "megapixels",
+      "label": "MP 预算（百万像素）",
+      "type": "number",
+      "default": 0.4,
+      "options": [],
+      "option_labels": [],
+      "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32（官方 ResolutionSelector.multiple=32）。这是唯一的尺寸表达 —— 没有「分辨率档位」"
+    },
+    {
+      "name": "resolution_percent",
+      "label": "MP 预算百分比（%）",
+      "type": "number",
+      "default": 100.0,
+      "options": [],
+      "option_labels": [],
+      "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP"
+    },
+    {
+      "name": "duration",
+      "label": "时长（秒）",
+      "type": "number",
+      "default": 5.0,
+      "options": [],
+      "option_labels": [],
+      "note": "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"
+    },
+    {
+      "name": "lora",
+      "label": "加速 LoRA",
+      "type": "enum",
+      "default": "ckpt850",
+      "options": [
+        "none",
+        "ckpt850",
+        "v4step600"
+      ],
+      "option_labels": [
+        "none（不挂加速 LoRA，走标准多步采样）",
+        "Turbo 4 步 · ckpt850",
+        "Turbo 4 步 · v4-step600"
+      ],
+      "note": "只列「本机真实存在 + 与该底模逐层实测兼容 + 官方 H3 谱系」的加速档。第三方蒸馏（LightX2V 等）不在这里 —— 判据来自权重自己的 safetensors metadata 与逐层兼容性实测，不是名单。"
+    },
+    {
+      "name": "lora_strength",
+      "label": "加速 LoRA 强度",
+      "type": "number",
+      "default": 1.0,
+      "options": [],
+      "option_labels": [],
+      "note": "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"
+    },
+    {
+      "name": "sampling_fixed",
+      "label": "采样档位（不可改）",
+      "type": "fixed",
+      "default": 4,
+      "options": [],
+      "option_labels": [],
+      "note": "由所选加速 LoRA 决定：4 步 / euler / beta。换加速 LoRA 档位自动跟着换 —— 手动改步数会把这枚 LoRA 压离它的训练分布。"
+    },
+    {
+      "name": "shift_fixed",
+      "label": "sigma shift（不可改）",
+      "type": "fixed",
+      "default": 12.0,
+      "options": [],
+      "option_labels": [],
+      "note": "视频 12.0 / 音频 3.0 是 H3 模型内生值；官方首尾帧模板用的是 H3SigmaRefiner，不是可填的 sigma shift。"
+    },
+    {
+      "name": "precision_fixed",
+      "label": "底模精度（不可改）",
+      "type": "fixed",
+      "default": "随底模",
+      "options": [],
+      "option_labels": [],
+      "note": "精度已经编码在权重文件里（int8_convrot / bf16 / pruned_w4a8），选上面的底模就等于选精度，这里没有独立的精度参数。"
+    }
+  ]
+}
