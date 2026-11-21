@@ -1,0 +1,109 @@
+{
+ "initial": {
+  "activeTab": "all",
+  "navActive": false,
+  "navText": "收藏",
+  "cards": 12,
+  "favBadgeNodes": 12,
+  "favCheckboxes": 0,
+  "filtersVisible": true,
+  "batchBar": false
+ },
+ "navFavorites_present": true,
+ "favorites_view": {
+  "activeTab": "favorites",
+  "navActive": true,
+  "navText": "收藏",
+  "cards": 12,
+  "favBadgeNodes": 48,
+  "favCheckboxes": 12,
+  "filtersVisible": true,
+  "batchBar": false
+ },
+ "detail_open": true,
+ "detail_has_params": {
+  "steps": true,
+  "scheduler": true,
+  "seed": true,
+  "sample": " ⬇ 下载原文件 yue2_4af2aeff9a90_00001.flac 生成参数 模型YuE2 3B · BF16 完整版权重文件yue2_3b_bf16.safetensors步数34调度器sgm_uniform采样器dpm_2CFG1种子1079260052宽度未知高度未知分辨率档位未知画面比例未知时长900s"
+ },
+ "ctx_target_kind": "AUDIO",
+ "context_menu": {
+  "found": true,
+  "display": "block",
+  "visible": true,
+  "items": [
+   {
+    "act": "add-asset",
+    "text": "添加到素材库（这个结果）"
+   },
+   {
+    "act": "favorite",
+    "text": "取消收藏"
+   },
+   {
+    "act": "download",
+    "text": "下载原文件"
+   }
+  ]
+ },
+ "status_tabs": [
+  {
+   "st": "all",
+   "text": "全部",
+   "visible": true
+  },
+  {
+   "st": "active",
+   "text": "进行中",
+   "visible": true
+  },
+  {
+   "st": "done",
+   "text": "已完成",
+   "visible": true
+  },
+  {
+   "st": "longfilm",
+   "text": "长片",
+   "visible": true
+  },
+  {
+   "st": "failed",
+   "text": "失败",
+   "visible": true
+  },
+  {
+   "st": "canceled",
+   "text": "已取消",
+   "visible": true
+  },
+  {
+   "st": "favorites",
+   "text": "收藏",
+   "visible": true
+  }
+ ],
+ "nav_items": [
+  "视频",
+  "minimax-h3 文生视频",
+  "minimax-h3 首尾帧生视频",
+  "minimax-h3 参考生视频",
+  "minimax-h3 长片拼接",
+  "文生图",
+  "Z-IMAGE 文生图",
+  "Qwen-Image 2.1",
+  "MOSS-Image",
+  "H3-Image",
+  "图片编辑",
+  "Qwen 图片编辑",
+  "H3-Image 图片编辑",
+  "音乐",
+  "文生音乐",
+  "参考生音乐",
+  "素材",
+  "素材库",
+  "收藏",
+  "智能"
+ ]
+}

@@ -484,6 +484,20 @@ def main():
                 page.wait_for_selector("#jobsGrid .job-card[data-jid]", timeout=60000)
             except Exception as e:
                 print(f"  !! {key} 首屏卡片没出来: {str(e)[:120]}")
+            # 【为什么要等侧栏模式渲染完】视频分类导航是**异步**渲染的
+            # （web/agent.js 的 navVideoCategories）。首屏那一下可能只有
+            # 图片/音乐类模式，t2v 等视频类还没进 DOM。
+            # 实测（/tmp/probe_t2v.py）：1s 后就有 12 个模式、t2v 在列 ——
+            # 说明不是「没有」，只是**没渲染完**，那一腿就被判 skipped。
+            # ⇒ 判据是「等模式数达到注册模式数」。
+            try:
+                page.wait_for_function(
+                    """(n) => document.querySelectorAll(
+                         '#sidebar .nav-item[data-mode],'
+                         + ' #sidebar .nav-model-item[data-mode]').length >= n""",
+                    arg=len(modes), timeout=30000)
+            except Exception:
+                pass  # 数量不足就照常跑，每条腿会各自记 skipped
             page.wait_for_timeout(1500)
 
             vp = {"label": label, "dpr": dpr, "modes": {}}
