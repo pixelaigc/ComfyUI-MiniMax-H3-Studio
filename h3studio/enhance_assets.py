@@ -162,42 +162,130 @@ CATEGORY_LABEL_NAME = {
     "audio": "Audio",
 }
 
+#: **标签语法方言** —— 不同模型族的官方参考标记语法**不是同一套**。
+#:
+#: 【为什么必须区分 —— 2026-11-21 现场复验发现的真实缺陷】
+#: 上一轮把所有面板的参考标签一律写成 `<Picture N>`（H3 官方语法），
+#: 结果**参考生图（Qwen-Image 2.1 图片编辑）被自己修坏了**：
+#:   * 增强输出 `<Picture 1>` / `<Picture 2>`；
+#:   * 但 Qwen 官方 PE-I2I 的占位语法是 `<image1>` / `<image2>`
+#:     （h3studio/ref_images.py 的 PLACEHOLDER_RE = /<image(\d+)>/）；
+#:   * 提交侧 validate_refs() 判「有 2 张参考图，提示词里必须有
+#:     <image1>..<image2> 占位标记」-> HTTP 400 ref_invalid，
+#:     用户「增强完反而提交不了」。
+#:
+#: 【各模型族的官方语法（逐条核实，不是猜）】
+#:   * H3 视频（t2v / flf / r2v / longfilm）
+#:     -> `<Picture N>` / `<Video N>` / `<Audio N>`
+#:        （官方 skill h3-prompt-writing/references/ref-en.txt）；
+#:   * Qwen-Image 2.1 图片编辑（i2i_qwen）
+#:     -> `<imageN>`（小写、无空格）
+#:        （官方 PE-I2I system prompt 原文："the rewritten instruction
+#:        MUST use <image1>, <image2>, ..."）；
+#:   * MiniMax-H3-Image 图片编辑（i2i_h3image）
+#:     -> `<Picture N>`（h3studio/h3image.py 的 H3_IMAGE_PLACEHOLDER；
+#:        该模块明确写了「官方占位标记是 <Picture N>，**不是** Qwen 的
+#:        <imageN>」，且两套语义必须隔离）。
+#:
+#: 【为什么 H3-Image 与 Qwen 必须隔离】h3image.py 的注释原话：
+#: 「Qwen-Image 2.1 的官方 PE-I2I 模板用 <image1>..<imageN>；H3-Image
+#: 的官方文档用 <Picture 1>..<Picture N>。两套标记语法不同，拿 Qwen
+#: 那套来查 H3-Image，会把「用户写了 <Picture 1>」的合法提示词判成
+#: 「缺少 <image1> 占位标记」-> 误拒用户的合法提交。」
+#:
+#: 【方言取值】"h3" -> `<Picture N>` 风格；"qwen" -> `<imageN>` 风格。
+#: 其它模型族（音乐 / 图像文生图）目前没有参考图槽位，走不到这里。
+LABEL_DIALECT_H3 = "h3"
+LABEL_DIALECT_QWEN = "qwen"
 
-def label_for(category: str, index: int) -> str:
+
+def label_for(category: str, index: int, dialect: str = LABEL_DIALECT_H3) -> str:
     """
     某个素材类别的第 index 个（1 基）素材对应的**官方标签**。
 
-    例：label_for("image", 1) -> "<Picture 1>"
+    例（dialect="h3"，H3 官方）：
+        label_for("image", 1) -> "<Picture 1>"
         label_for("video", 1) -> "<Video 1>"
         label_for("audio", 1) -> "<Audio 1>"
+
+    例（dialect="qwen"，Qwen-Image 2.1 官方 PE-I2I）：
+        label_for("image", 1) -> "<image1>"
+        label_for("video", 1) -> "<Video 1>"   （Qwen 没有视频参考）
+
+    【为什么音频/视频在 qwen 方言下不变】Qwen-Image 2.1 只有图片参考
+    槽位，没有视频 / 音频参考；真走到这里的只可能是图片。
     """
     name = CATEGORY_LABEL_NAME.get(category)
     if not name:
         return ""
+    if dialect == LABEL_DIALECT_QWEN:
+        # Qwen 官方语法：小写、**无空格**。
+        if category == "image":
+            return f"<image{index}>"
+        return f"<{name} {index}>"
     return f"<{name} {index}>"
 
 
-def label_pattern() -> str:
+def label_pattern(dialect: str = LABEL_DIALECT_H3) -> str:
     """匹配官方参考标签的正则（供服务端校验输出是否真的带了标签）。"""
     import re
+    if dialect == LABEL_DIALECT_QWEN:
+        # Qwen 官方语法：<image1> / <image2>（小写、无空格）。
+        # 【为什么只认 <imageN>，不认 <Picture N>】Qwen 图片编辑的提交侧
+        # 校验只认 <imageN>（ref_images.PLACEHOLDER_RE）。如果这里把
+        # <Picture N> 也算「找到了」，模型写错方言就会被当成通过 ——
+        # 而真正提交时会被 400 拒掉。宁可现在报错，也不要假通过。
+        # 兼容 <image 1> 这类带空格的变体（只要能对上号就行）。
+        return r"<\s*image\s*\d+\s*>"
     return r"<(?:Subject|Picture|Video|Audio)\s*\d+>"
 
 
-def has_reference_label(text: str) -> bool:
+def normalize_label(tag: str) -> str:
+    """
+    标签归一化 —— 用于**比较**两个标签是不是同一个。
+
+    只去掉标签内部的空白（`<Picture 1>` / `<Picture 1>` -> `<Picture1>`），
+    **保留大小写**（`<Picture1>` 与 `<image1>` 是两个不同的标签 ——
+    它们属于两套官方语法，不能混为一谈）。
+
+    【为什么需要】模型可能写 `<image 1>`（带空格），而我们分配的标签是
+    `<image1>`（Qwen 官方写法，无空格）。直接字符串比较会判「缺标签」，
+    把一次成功的增强误报成失败。
+    """
+    import re
+    return re.sub(r"\s+", "", (tag or "").strip())
+
+
+def has_reference_label(text: str, dialect: str = LABEL_DIALECT_H3) -> bool:
     """文本里有没有官方参考标签。"""
     import re
-    return bool(re.search(label_pattern(), text or ""))
+    return bool(re.search(label_pattern(dialect), text or ""))
 
 
-def extract_reference_labels(text: str) -> list[str]:
+def extract_reference_labels(text: str,
+                            dialect: str = LABEL_DIALECT_H3) -> list[str]:
     """抽出文本里出现的官方参考标签（按出现顺序，去重）。"""
     import re
     out: list[str] = []
-    for match in re.finditer(label_pattern(), text or ""):
+    for match in re.finditer(label_pattern(dialect), text or ""):
         tag = re.sub(r"\s+", " ", match.group(0)).strip()
         if tag not in out:
             out.append(tag)
     return out
+
+
+def missing_labels(expected: list[str], found: list[str],
+                   dialect: str = LABEL_DIALECT_H3) -> list[str]:
+    """
+    期望标签里哪些**没在**输出里出现（归一化后比较）。
+
+    【为什么比较前要归一化】模型写 `<image 1>`（带空格）而我们分配的是
+    `<image1>`（Qwen 官方无空格写法）—— 归一化后两者相等，不会把一次
+    成功的增强误判成「缺标签」。
+    """
+    found_norm = {normalize_label(t) for t in (found or [])}
+    return [lb for lb in (expected or [])
+            if normalize_label(lb) not in found_norm]
 
 
 # ------------------------------------------------------------------ 归一
@@ -314,7 +402,8 @@ def _extract_video_frames(video: Path, work_dir: Path, prefix: str) -> list[str]
         return []
 
 
-def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
+def resolve_assets(refs: list, work_dir: Path | None = None,
+                   dialect: str = LABEL_DIALECT_H3) -> dict:
     """
     把素材引用解析成模型能用的上下文。
 
@@ -326,6 +415,7 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
         "items":  [ {...每个素材的处理结果...} ],
         "skipped": [ {"asset_id", "name", "reason"} ],  # 处理不了的素材（如音频）
         "labels": ["<Picture 1>", ...],     # 本次分配出去的全部官方标签
+        "dialect": "h3" | "qwen",           # 本次用的标签语法方言
       }
 
     行为约定：
@@ -336,11 +426,14 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
       * 视频 -> 抽帧；抽不出帧时如实说明，不假装看过。
       * **每个素材类别各自独立编号**（官方 H3 规则），编号按传入顺序，
         与面板槽位顺序一一对应。
+      * **标签语法按 dialect 走目标模型族的官方写法**（见 LABEL_DIALECT_*）。
+        写错方言 = 下游工作流认不出标记 = 提交被拒（2026-11-21 实测）。
     """
     refs = normalize_refs(refs)
     if not refs:
         return {"images": [], "notes": [], "text_context": "",
-                "items": [], "skipped": [], "labels": []}
+                "items": [], "skipped": [], "labels": [],
+                "dialect": dialect}
 
     if work_dir is None:
         work_dir = A.library_root() / A.DIR_DERIVED / "enhance"
@@ -394,7 +487,7 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
                                     "reason": f"超过单次增强的图片上限（{MAX_IMAGES} 张）"})
                     continue
                 counters["picture"] += 1
-                label = label_for("image", counters["picture"])
+                label = label_for("image", counters["picture"], dialect)
                 images.append(str(item["path"]))
                 notes.append(f"{label} = {slot_label}「{name}」")
                 labels.append(label)
@@ -430,7 +523,7 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
                                   "slot": item["slot"], "kind": "video", "frames": 0})
                     continue
                 counters["video"] += 1
-                label = label_for("video", counters["video"])
+                label = label_for("video", counters["video"], dialect)
                 # 【视频与 <Picture N> 的关系】官方规范里 <Video N> 是
                 # 「整段视频」这个资产；抽出来的帧只是给模型「看」用的
                 # 视觉输入，不是独立的 <Picture N>。
@@ -450,7 +543,7 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
                 # 【降级】LLM 读不了音频 -> 用素材库的分析文本代替。
                 text = _analysis_text(item["conn"], asset_id)
                 counters["audio"] += 1
-                label = label_for("audio", counters["audio"])
+                label = label_for("audio", counters["audio"], dialect)
                 labels.append(label)
                 if text:
                     text = text[:MAX_AUDIO_TEXT_CHARS]
@@ -480,6 +573,7 @@ def resolve_assets(refs: list, work_dir: Path | None = None) -> dict:
         "items": items,
         "skipped": skipped,
         "labels": labels,
+        "dialect": dialect,
     }
 
 
@@ -488,14 +582,18 @@ def describe(resolved: dict) -> str:
     把解析结果渲染成**给模型看的文字上下文**。
 
     这段文字会接在原提示词前面，告诉模型：
-      * 一共给了几张图、每张图对应什么角色（**官方标签** `<Picture N>` /
-        `<Video N>` / `<Audio N>`，编号与面板素材顺序一一对应）；
+      * 一共给了几张图、每张图对应什么角色（**官方标签**，编号与面板
+        素材顺序一一对应）；
       * 音频素材的内容以什么形式提供（或明确说明没提供）。
 
-    【为什么用官方标签而不是自创的 <image1>】
-    H3 官方规范（ref-en.txt）规定参考引用一律用 `<Picture N>` / `<Video N>` /
-    `<Audio N>` / `<Subject N>`。模型按这些标签把文字里的引用和它看到的
-    第 N 个视觉输入对上；用别的写法，标签就对不上，等于没标。
+    【标签写法跟着目标模型族走】H3 视频是 `<Picture N>` / `<Video N>` /
+    `<Audio N>`（官方 ref-en.txt）；Qwen-Image 2.1 图片编辑是 `<imageN>`
+    （官方 PE-I2I）。这里用 notes 里**已经写好的**标签原文 ——
+    不在这里二次拼装，避免两处口径漂移。
+
+    【为什么不能统一写 <Picture N>】2026-11-21 实测：Qwen 图片编辑面板
+    拿到 `<Picture 1>` 后，提交侧 validate_refs() 判「缺少 <image1> 占位
+    标记」-> HTTP 400，**用户增强完反而提交不了**。
 
     没有素材时返回空串 —— 调用方据此判断「不要注入任何东西」，
     保证无素材面板的提示词与改动前**逐字一致**。
@@ -510,6 +608,17 @@ def describe(resolved: dict) -> str:
             "（标签编号已按素材顺序固定，不要另编编号）：\n"
             + "\n".join(f"- {n}" for n in notes)
         )
+        # 【为什么要显式给出标签写法】不同模型族的官方参考标记语法不同
+        # （H3 视频 <Picture N> / Qwen 图片编辑 <imageN>）。模型读的模板里
+        # 可能写着另一种写法，光列标签名不够 —— 必须把「照这个写法抄」
+        # 讲清楚，否则模型会按模板里的旧写法输出，提交时被 400 拒掉。
+        dialect = resolved.get("dialect") or LABEL_DIALECT_H3
+        if dialect == LABEL_DIALECT_QWEN:
+            parts.append(
+                "**标签写法**：本任务的目标模型使用 `<image1>` / `<image2>` "
+                "这种写法（小写 image + 数字，**中间没有空格**）。"
+                "请严格使用上面列出的标签原文，不要改写成 `<Picture 1>` "
+                "或「图1」「第一张图」这类其它写法。")
     text_context = (resolved.get("text_context") or "").strip()
     if text_context:
         parts.append(text_context)
@@ -535,6 +644,8 @@ def summary(resolved: dict) -> dict:
         "has_text_context": bool((resolved.get("text_context") or "").strip()),
         # 本次分配的官方标签（前端回显 + 服务端校验输出用）
         "labels": list(resolved.get("labels") or []),
+        # 本次用的标签语法方言（前端回显，便于用户知道写的是什么标记）
+        "dialect": resolved.get("dialect") or LABEL_DIALECT_H3,
     }
 
 

@@ -9816,7 +9816,7 @@ def _normalize_prompt_history(raw, current_stage: int = 0) -> list[dict]:
     return out
 
 
-async def _resolve_enhance_assets(asset_refs):
+async def _resolve_enhance_assets(asset_refs, dialect: str = ""):
     """
     把「面板当前引用的素材」解析成**服务端可读**的素材上下文。
 
@@ -9834,7 +9834,40 @@ async def _resolve_enhance_assets(asset_refs):
     返回 h3studio/enhance_assets.resolve_assets 的结果 dict。
     素材不可用时抛 EnhanceAssetError（调用方据此如实报错）。
     """
-    return await asyncio.to_thread(enh_assets.resolve_assets, asset_refs)
+    return await asyncio.to_thread(
+        enh_assets.resolve_assets, asset_refs, None,
+        dialect or enh_assets.LABEL_DIALECT_H3)
+
+
+def _label_dialect_for_mode(mode_ctx: str = "") -> str:
+    """
+    当前面板的**参考标签语法方言**（决定用 `<Picture N>` 还是 `<imageN>`）。
+
+    【为什么必须分方言 —— 2026-11-21 现场复验发现的真实缺陷】
+    上一轮把参考标签一律写成 H3 官方的 `<Picture N>`，结果
+    **参考生图（Qwen-Image 2.1 图片编辑）被自己修坏了**：
+      * 增强输出 `<Picture 1>` / `<Picture 2>`；
+      * 但 Qwen 官方 PE-I2I 的占位语法是 `<image1>` / `<image2>`
+        （h3studio/ref_images.py 的 PLACEHOLDER_RE = /<image(\\d+)>/）；
+      * 提交侧 validate_refs() 判「有 2 张参考图，提示词里必须有
+        <image1>..<image2> 占位标记」-> HTTP 400 ref_invalid，
+        用户「增强完反而提交不了」。
+
+    【各方言的官方依据】
+      * i2i_qwen（Qwen-Image 2.1 图片编辑）-> `<imageN>`
+        官方 PE-I2I system prompt 原文："the rewritten instruction MUST
+        use <image1>, <image2>, ..."。
+      * i2i_h3image（MiniMax-H3-Image 图片编辑）-> `<Picture N>`
+        h3studio/h3image.py 的 H3_IMAGE_PLACEHOLDER，并明确写了
+        「官方占位标记是 <Picture N>（**不是** Qwen 的 <imageN>）」，
+        且两套语义必须隔离（拿 Qwen 那套查 H3-Image 会误拒合法提交）。
+      * 其它（H3 视频 flf / r2v / t2v / longfilm）-> `<Picture N>` /
+        `<Video N>` / `<Audio N>`
+        官方 skill h3-prompt-writing/references/ref-en.txt。
+    """
+    if mode_ctx == "i2i_qwen":
+        return enh_assets.LABEL_DIALECT_QWEN
+    return enh_assets.LABEL_DIALECT_H3
 
 
 def _reference_spec_for_mode(spec_id: str, mode_ctx: str = "",
@@ -9931,9 +9964,14 @@ async def api_enhance(request):
     asset_context = ""
     asset_summary = {}
     asset_labels: list[str] = []
+    # 【标签语法方言】跟目标面板的官方参考标记语法走（见
+    # _label_dialect_for_mode）。H3 视频用 <Picture N>；Qwen 图片编辑用
+    # <imageN>（官方 PE-I2I）—— 用错方言会导致「增强完提交被拒」。
+    label_dialect = _label_dialect_for_mode(mode_ctx)
     if asset_refs:
         try:
-            resolved_assets = await _resolve_enhance_assets(asset_refs)
+            resolved_assets = await _resolve_enhance_assets(
+                asset_refs, label_dialect)
         except enh_assets.EnhanceAssetError as exc:
             # 素材用不了 -> **如实报错**，不静默忽略
             # （静默忽略 = 用户以为素材参与了增强，其实没有）。
@@ -10164,8 +10202,13 @@ async def api_enhance(request):
     # 【为什么不能只查「有没有标签」】模型可能只写 `<Picture 1>` 却漏掉
     # `<Picture 2>` —— 那样第二张素材还是等于白引用。必须逐个查。
     if asset_labels:
-        found_labels = enh_assets.extract_reference_labels(enhanced)
-        missing_labels = [lb for lb in asset_labels if lb not in found_labels]
+        found_labels = enh_assets.extract_reference_labels(
+            enhanced, label_dialect)
+        # 【归一化比较】模型可能写 `<image 1>`（带空格）而我们分配的是
+        # `<image1>`（Qwen 官方无空格写法）—— 直接字符串比较会把一次
+        # 成功的增强误报成「缺标签」。
+        missing_labels = enh_assets.missing_labels(
+            asset_labels, found_labels, label_dialect)
         if missing_labels:
             return web.json_response(
                 {"error": f"增强结果缺少参考标签：{'、'.join(missing_labels)}。"
