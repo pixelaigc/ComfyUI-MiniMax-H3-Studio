@@ -37,13 +37,30 @@ MUTATIONS = [
     (
         "MUT1",
         "删掉整段 Content-Type 校验（恢复成缺陷状态：直接 multipart()）",
-        '''    ctype = (request.headers.get("Content-Type") or "").strip()
+        '''    ctype = (getattr(request, "headers", None) or {}).get("Content-Type") or ""
+    ctype = ctype.strip()
     if not ctype:
         return web.json_response(
             {"error": "缺少 Content-Type 请求头：本接口只接受 "
                       "multipart/form-data（提交生成任务要带文件流）",
              "code": "content_type_required"},
-            status=415)''',
+            status=415)
+    main_ctype = ctype.split(";", 1)[0].strip().lower()
+    if not main_ctype.startswith("multipart/"):
+        return web.json_response(
+            {"error": f"不支持的 Content-Type：{main_ctype or '(空)'}；"
+                      "本接口只接受 multipart/form-data",
+             "code": "unsupported_media_type"},
+            status=415)
+    # multipart/* 但没带 boundary -> aiohttp 会抛 ValueError -> 500。
+    # 这里自己先查掉，避免把客户端错误伪装成服务端错误。
+    if main_ctype == "multipart/form-data" and "boundary=" not in ctype.lower():
+        return web.json_response(
+            {"error": "Content-Type 缺少 boundary 参数："
+                      "multipart/form-data 必须带 boundary",
+             "code": "content_type_invalid"},
+            status=400)
+''',
         '''    ctype = (request.headers.get("Content-Type") or "").strip()
     if False:
         return web.json_response(
@@ -73,7 +90,8 @@ MUTATIONS = [
     (
         "MUT5",
         "把校验**真正挪到** request.multipart() 之后（顺序反了 = 形同虚设）",
-        '''    ctype = (request.headers.get("Content-Type") or "").strip()
+        '''    ctype = (getattr(request, "headers", None) or {}).get("Content-Type") or ""
+    ctype = ctype.strip()
     if not ctype:
         return web.json_response(
             {"error": "缺少 Content-Type 请求头：本接口只接受 "
@@ -105,6 +123,13 @@ MUTATIONS = [
             {"error": "x", "code": "content_type_required"},
             status=415)
     mode = None''',
+    ),
+    (
+        "MUT6",
+        "把 getattr 兜底改回 request.headers.get（缺 headers 的请求会 AttributeError）",
+        '''    ctype = (getattr(request, "headers", None) or {}).get("Content-Type") or ""
+    ctype = ctype.strip()''',
+        '''    ctype = (request.headers.get("Content-Type") or "").strip()''',
     ),
 ]
 

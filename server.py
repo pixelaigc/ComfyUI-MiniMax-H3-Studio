@@ -6213,7 +6213,14 @@ async def api_create(request):
     # 「请求体格式不对」。同时**不能**把 multipart 之外的格式（比如
     # application/json）悄悄转成能处理 —— 提交路径要的就是文件流，
     # 静默降级会让「文件没带上」这类问题更晚暴露、更难查。
-    ctype = (request.headers.get("Content-Type") or "").strip()
+    # 【为什么用 getattr 而不是 request.headers.get】
+    # aiohttp 的 Request 一定有 headers，但**测试替身**（FakeRequest）可能没有 ——
+    # 实测 tests/test_qwen_ref_assets.py 的 FakeRequest 只实现了 multipart()。
+    # 直接 request.headers.get 会抛 AttributeError，把「校验请求头」变成
+    # 「制造新崩溃」。用 getattr(..., None) 兜底：缺 headers 当作「没带 Content-Type」
+    # -> 走 415 分支，语义正确且不炸。
+    ctype = (getattr(request, "headers", None) or {}).get("Content-Type") or ""
+    ctype = ctype.strip()
     if not ctype:
         return web.json_response(
             {"error": "缺少 Content-Type 请求头：本接口只接受 "

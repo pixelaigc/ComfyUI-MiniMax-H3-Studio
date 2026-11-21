@@ -241,8 +241,17 @@ class TestApiCreateContentTypeSourceGuard(unittest.TestCase):
             code_lines.append(stripped)
         body = "\n".join(code_lines)
 
-        # 真正读 header 的那一行（不是注释里的字样）
-        read_at = body.find('request.headers.get("Content-Type")')
+        # 真正读 header 的那一行（不是注释里的字样）。
+        # 【为什么用两个候选】实现有两处等价写法：
+        #   request.headers.get("Content-Type")      —— 直取
+        #   getattr(request, "headers", None) ...    —— 兜底（测试替身可能没有 headers）
+        # 两种都必须被认出来，否则「换了写法」会被误判成「校验被删」。
+        read_at = -1
+        for needle in ('request.headers.get("Content-Type")',
+                       'getattr(request, "headers", None)'):
+            pos = body.find(needle)
+            if pos != -1 and (read_at == -1 or pos < read_at):
+                read_at = pos
         self.assertNotEqual(
             read_at, -1,
             "api_create 里找不到真正读取 Content-Type 的代码行"
@@ -254,6 +263,43 @@ class TestApiCreateContentTypeSourceGuard(unittest.TestCase):
             read_at, multipart_at,
             "Content-Type 校验必须**早于** request.multipart()，"
             "否则校验形同虚设（异常已经抛出去了）")
+
+    def test_api_create_tolerates_request_without_headers(self):
+        """**没有** .headers 属性的请求替身不能把 api_create 弄崩。
+
+        【为什么要这条】2026-11-21 A/B 对拍时实测踩到：
+        tests/test_qwen_ref_assets.py 的 FakeRequest 只实现了 multipart()，
+        没有 headers —— 加上 Content-Type 校验后直接 AttributeError，
+        把「校验请求头」变成了「制造新崩溃」。
+        现在 api_create 用 getattr 兜底，缺 headers 当作「没带 Content-Type」
+        -> 走 415 分支（语义正确，不炸）。
+
+        【本用例的作用】把这个兜底行为**钉死**：以后谁把 getattr 改回
+        request.headers.get，这条会立刻变红。
+        """
+        class NoHeadersRequest:
+            def __init__(self):
+                self._parts = []
+
+            async def multipart(self):
+                async def gen():
+                    return
+                    yield  # pragma: no cover
+                return gen()
+
+        async def _run():
+            return await h3server.api_create(NoHeadersRequest())
+
+        try:
+            resp = asyncio.run(_run())
+        except AttributeError as exc:
+            self.fail(f"api_create 在缺 headers 的请求上抛 AttributeError：{exc}")
+        self.assertEqual(resp.status, 415,
+                         "缺 headers 应回 415（当作没带 Content-Type）")
+        body = getattr(resp, "body", None) or b""
+        self.assertTrue(body, "响应必须有 body")
+        payload = json.loads(body.decode())
+        self.assertEqual(payload.get("code"), "content_type_required")
 
     def test_api_create_has_no_bare_multipart_without_check(self):
         """防「校验被摘掉、multipart 又挪到前面」这种组合退化。
