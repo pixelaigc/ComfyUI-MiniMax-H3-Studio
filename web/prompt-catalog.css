@@ -239,6 +239,85 @@
   overflow-wrap: anywhere;
 }
 
+/* ---------- 自行输入（每个维度都有自由文本入口） ---------- */
+
+.pc-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pc-custom {
+  flex: 1 1 120px;
+  min-width: 0;
+  min-height: 34px;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+
+.pc-custom:focus {
+  outline: none;
+  border-color: var(--accent, #4a6cf7);
+}
+
+.pc-custom-clear {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.pc-custom-clear[hidden] { display: none; }
+
+.pc-custom-note {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* ---------- 写法对照清单（8.4 保留 / 谨慎 / 淘汰） ---------- */
+
+.pc-guide { font-size: 10.5px; color: var(--muted); }
+
+.pc-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.pc-guide-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pc-guide-item b { font-weight: 600; }
+
+.pc-guide-item.deprecated b { text-decoration: line-through; color: #b42318; }
+
+/* ---------- 英文片段辅助入口 ---------- */
+
+.pc-copy-en {
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  flex: 0 0 auto;
+}
+
+.pc-copy-en[disabled] { opacity: .5; }
+
 /* ---------- 预览与写回 ---------- */
 
 .pc-preview {

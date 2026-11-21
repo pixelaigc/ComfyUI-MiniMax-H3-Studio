@@ -247,6 +247,11 @@ STALE_BUMPED = {
     # 【2026-11-21 构建版本标识】新增的静态资源
     #   （侧栏底部显示当前部署的 commit 与静态资源版本指纹）
     "build-id.js":             ("",              "buildid20261121a"),
+    # 【2026-11-21 创意内容设计 · 中文优先改造】本轮新增的独立模块
+    #   （自行输入入口 + 中文片段组装 + 英文片段仅作辅助）⇒ 升一档。
+    #   口径与 build-id.js 一致：新增文件没有「旧值」，旧值留空串。
+    "prompt-catalog.css":      ("",              "cpd20261121b"),
+    "prompt-catalog.js":       ("",              "cpd20261121b"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),

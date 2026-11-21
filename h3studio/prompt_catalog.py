@@ -111,6 +111,36 @@ SUB_SLOT = {
     "8.4": "quality",
 }
 
+#: 子类在面板里的呈现方式。
+#:
+#: options = 一个下拉（默认）
+#: guide   = **指导清单**：它不是「写进提示词的片段」，而是「怎么写更好」的
+#:           对照（D8.4 保留 / 谨慎 / 淘汰）。下拉里没有可选项，
+#:           但**仍然提供自由输入**——用户想自己写画质词照样能写。
+GROUP_RENDER = {
+    "8.4": "guide",
+}
+
+#: 自由输入框的中文占位提示（按维度 / 子类给具体例子）。
+#:
+#: 【为什么要有】「自行输入」这个入口如果只写「自定义」，用户不知道
+#: 该写什么、写多细。给一个本维度的中文例子，比空占位有用得多。
+CUSTOM_PLACEHOLDER = {
+    "D1": "例：水墨写意、港风胶片、复古漫画网点",
+    "D2": "例：85mm 人像镜头、低机位仰角、浅景深",
+    "D3": "例：戴渔夫帽的中年男性、穿旧军大衣、左手拄拐",
+    "3.0": "例：一只戴护目镜的柯基、一台老式缝纫机",
+    "D4": "例：雨后菜市场的湿滑地面、窗外是旧式居民楼",
+    "4.2": "例：前景虚化的铁丝网、压在画面下缘的旧报纸",
+    "4.3": "例：中景三五个撑伞的路人",
+    "4.4": "例：远景是雾中的高压电塔",
+    "D5": "例：主体偏左下、大面积留白、镜像对称",
+    "D6": "例：青橙对比调色、整体偏灰的低饱和",
+    "D7": "例：左侧窗户进来的柔光、逆光轮廓发亮",
+    "D8": "例：潮湿闷热的气氛、墙面斑驳起皮",
+    "8.4": "例：85mm f/1.4 拍摄、织物纹理清晰（画质词最多 2 项）",
+}
+
 #: 每个子类的选取上限（调研 B 报告 §1.2「建议选取上限」）。
 #:
 #: 说明：调研里 D4 三层 / D6.4 / D8 氛围材质 等写的是「可多选但各限 1–2 项」。
@@ -455,6 +485,10 @@ GROUP_ORDER = {
 }
 
 
+def _has_cjk(s: str) -> bool:
+    return any("\u4e00" <= c <= "\u9fff" for c in (s or ""))
+
+
 def _ascii_ratio(s: str) -> float:
     if not s:
         return 0.0
@@ -464,8 +498,44 @@ def _ascii_ratio(s: str) -> float:
     return sum(1 for c in letters if ord(c) < 128) / len(letters)
 
 
+def _zh_fragment_for(cn: str, sub_prefix: str, status: str) -> str:
+    """算出这条选项**真正写进提示词**的中文片段（默认输出走这一份）。
+
+    【为什么默认是中文】用户 2026-11-21 的明确要求：
+      「组装成原始提示词时也中文优先：默认输出中文为主的提示词文本。
+       英文片段只作为可选的辅助/增强信息保留。」
+    中文片段的来源 = 调研 B 报告里的**中文显示名**（那份中文说法是调研
+    逐条核过的），不引入任何未核验的英文术语。
+
+    【规则】
+      * 「A / B」并列 → 取第一个（与英文片段同一口径；中文里的「/」
+        多数是同一事物的两个叫法，取第一个不丢语义）。
+      * 括号注释（如「人物（单人）」）**原样保留** —— 它是对主体的限定，
+        不是噪声；改写它等于改写语义。
+      * 显示名里本来就带的拉丁专名（Unreal Engine / Art Deco / Y2K /
+        35mm / Teal & Orange）保留 —— 那是该概念的通用写法，不是
+        「未经核验的英文术语」。
+      * 8.4（保留 / 谨慎 / 淘汰对照）→ 空串：它是**指导清单**不是片段
+        （见 GROUP_RENDER）。
+      * 淘汰项 → 空串。
+    """
+    if sub_prefix == "8.4":
+        return ""
+    if status == "deprecated":
+        return ""
+    frag = (cn or "").strip()
+    if " / " in frag:
+        # 【并列写法取哪一个】取**第一个带中文的**写法。
+        # 与英文片段同一口径（取第一个）不同：中文这边，「IMAX / 宽银幕」
+        # 取第一个会得到纯拉丁「IMAX」，把可用的中文说法丢了。
+        parts = [p.strip() for p in frag.split(" / ") if p.strip()]
+        zh = [p for p in parts if _has_cjk(p)]
+        frag = zh[0] if zh else (parts[0] if parts else "")
+    return frag
+
+
 def _fragment_for(cn: str, en: str, example: str, sub_prefix: str, status: str) -> str:
-    """算出这条选项**真正写进提示词**的英文片段。
+    """算出这条选项的**英文片段**（辅助版本，供「含英文片段版本」/复制用）。
 
     【为什么要单独算】
     * 跳过项（「不指定」）→ 空串（真的不输出，绝不写 "no X"）。
@@ -535,9 +605,17 @@ def build_manifest() -> dict:
                     "status": status,
                     "is_skip": _is_skip(en),
                     # 【片段】这条选项真正写进提示词的那一段。
-                    # 空串 = 这一项不输出（跳过项 / 淘汰项 / 只有中文说明的项）。
-                    "fragment": "" if _is_skip(en) else _fragment_for(
+                    # zh_fragment = **默认**写进提示词的中文片段（中文优先）。
+                    # en_fragment = 英文辅助版本，只在「含英文片段版本」/详情里出现，
+                    #               默认不参与组装。
+                    # 空串 = 这一项不输出（跳过项 / 淘汰项 / 指导清单项）。
+                    "zh_fragment": "" if _is_skip(en) else _zh_fragment_for(
+                        cn, sub_prefix, status),
+                    "en_fragment": "" if _is_skip(en) else _fragment_for(
                         cn, en, example, sub_prefix, status),
+                    # 兼容旧字段名（前端/测试里 `fragment` 一直指默认那份）。
+                    "fragment": "" if _is_skip(en) else _zh_fragment_for(
+                        cn, sub_prefix, status),
                 }
                 if level == "标" and not _is_skip(en):
                     tag_items += 1
@@ -570,6 +648,8 @@ def build_manifest() -> dict:
                     "needs_test": False,
                     "status": "normal",
                     "is_skip": True,
+                    "zh_fragment": "",
+                    "en_fragment": "",
                     "fragment": "",
                 }
                 items.insert(0, skip_entry)
@@ -581,6 +661,10 @@ def build_manifest() -> dict:
             resolver_bind_pending.append((dim_id, sub_prefix, group_id))
             total_groups += 1
             slot = SUB_SLOT.get(sub_prefix) or DIM_SLOT.get(dim_id)
+            if dim_id == "D9":
+                render_mode = "rules"          # D9 是**冲突矩阵**本身，不是可选项
+            else:
+                render_mode = GROUP_RENDER.get(sub_prefix, "options")
             groups.append({
                 "id": group_id,
                 "name": sub["name"],
@@ -590,9 +674,14 @@ def build_manifest() -> dict:
                 "max": GROUP_MAX,
                 # 组内顺序（同一槽位内按它排）
                 "order": GROUP_ORDER.get(dim_id, 0),
-                # D9 是**冲突矩阵**本身（调研原文：9.x「规则项，不进提示词」）
-                # → 它的条目以规则清单呈现，不是可选的下拉项。
-                "render": "rules" if dim_id == "D9" else "options",
+                "render": render_mode,
+                # 【每个维度都允许自行输入】任务书 2026-11-21 新增约束：
+                # 每个维度都要有自由文本入口，自定义项与词库选项一起参与组装。
+                # 词库里没有「可信中文对应说法」的内容，用户自己写 = 合法路径。
+                "allow_custom": dim_id != "D9",
+                # 自定义内容的骨架槽位 = 本组的槽位（写在哪个位置由组决定）
+                "custom_placeholder": CUSTOM_PLACEHOLDER.get(sub_prefix)
+                                      or CUSTOM_PLACEHOLDER.get(dim_id, ""),
                 "items": items,
             })
         dimensions.append({

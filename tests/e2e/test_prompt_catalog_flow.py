@@ -6,12 +6,18 @@
      面板入口都可达；
   2. 分组可折叠 + 搜索过滤可用；
   3. 选项可选择 / 可跳过；「不指定」全跳过时不产生垃圾片段；
-  4. 组装顺序正确（主体 → 造型 → 风格 → 场景 → 构图 → 光 → 色 → 氛围）；
-  5. 写回 #prompt 的「覆盖 / 追加」二选一可见，且不静默丢弃用户文本；
-  6. 冲突提示可见（硬互斥阻止 + 软冲突提示）；
-  7. 写回后「增强」链路仍然正常（按钮可用、徽标为「原始」级别）；
-  8. 窄屏 320 / 375 / 390 / 430 下：面板不横向溢出、
-     顶栏「生成类型选择」始终可点、生成媒体库与收藏栏仍可访问。
+  4. 组装顺序正确（主体 → 造型 → 风格 → 场景 → 构图 → 光 → 色 → 氛围），
+     且**默认是中文**（用户 2026-11-21 要求中文优先）；英文片段只作为
+     辅助版本存在，不参与默认组装与写回；
+  5. **每个分组**都有「不指定」默认项 + 自由文本入口（省略 / 自行输入）；
+     只填部分维度也能正常组装；自定义内容不被 UI 或校验拦掉；
+     用户直接编辑整段提示词时词库不干预，仍走既有增强链路；
+  6. 写回 #prompt 的「覆盖 / 追加」二选一可见，且不静默丢弃用户文本；
+  7. 冲突提示可见（硬互斥阻止 + 软冲突提示）；
+  8. 写回后「增强」链路仍然正常（按钮可用、徽标为「原始」级别）；
+  9. 窄屏 320 / 375 / 390 / 430 下：面板不横向溢出、
+     顶栏「生成类型选择」始终可点、生成媒体库与收藏栏仍可访问、
+     词库下拉与自行输入框 elementFromPoint 命中自己且真的能改值。
 
 【不消耗生成额度】—— 本文件**不点生成**，只验证交互与写回。
 """
@@ -71,9 +77,27 @@ def _pick(sp, evidence, group_label: str, option_prefix: str) -> str:
 def _clear_picks(sp):
     sp.page.evaluate("""() => {
       window.PROMPT_CATALOG.picks.clear();
+      window.PROMPT_CATALOG.customs.clear();
       window.PROMPT_CATALOG.render();
     }""")
     sp.page.wait_for_timeout(300)
+
+
+def _type_custom(sp, evidence, group_label: str, text: str):
+    """在某个分组的「自行输入」里键入内容（模拟真人打字）。"""
+    result = sp.page.evaluate(
+        """([label, text]) => {
+          const inp = Array.from(document.querySelectorAll('#pcGroups [data-custom]'))
+            .find(x => x.getAttribute('aria-label') === label + ' 自行输入');
+          if (!inp) return 'NO_INPUT:' + label;
+          inp.value = text;
+          inp.dispatchEvent(new Event('input', {bubbles: true}));
+          return 'OK';
+        }""",
+        [group_label, text])
+    sp.page.wait_for_timeout(350)
+    evidence.step(f"自行输入 {group_label} → {text!r}（{result}）")
+    return result
 
 
 def _preview(sp) -> str:
@@ -224,15 +248,222 @@ def test_assembly_order_follows_skeleton(studio_page, evidence):
 
     parts = _parts(sp)
     evidence.step(f"组装结果：{parts}")
-    expected = ["1girl", "long_hair", "cel animation", "forest",
-                "rule of thirds", "golden hour", "serene"]
+    # 【中文优先】默认组装的是中文片段（用户 2026-11-21 明确要求）。
+    expected = ["人物（单人）", "长直发", "赛璐璐动画", "森林",
+                "三分法", "黄金时刻", "宁静"]
     assert parts == expected, f"组装顺序不对：{parts} != {expected}"
 
     # 不含权重语法（(x:1.5) 之类）
     text = _preview(sp)
     assert not re.search(r"\(\s*\w+\s*:\s*[\d.]+\s*\)", text), \
         f"拼装结果含权重语法：{text}"
+    # 预览文本必须是中文为主（不是纯英文）
+    zh_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    en_chars = len(re.findall(r"[A-Za-z]", text))
+    evidence.step(f"预览文本：{text!r} 中文字符={zh_chars} 拉丁字符={en_chars}")
+    assert zh_chars > en_chars, f"组装结果不是中文为主：{text!r}"
     evidence.screenshot(sp.page, "assembly-order")
+
+
+def test_english_fragments_are_available_as_auxiliary_only(studio_page, evidence):
+    """英文片段仍保留在数据里，但只作为辅助版本（不参与默认组装）。"""
+    sp = studio_page
+    sp.open()
+    sp.goto_mode("t2i")
+    _open_designer(sp, evidence)
+    _clear_picks(sp)
+
+    _pick(sp, evidence, "3.0 主体类别（顶层，决定后面哪些子维度可用）", "人物（单人）")
+    _pick(sp, evidence, "1.1 动漫 / 二次元", "赛璐璐动画")
+
+    zh_parts = _parts(sp)
+    en_parts = sp.page.evaluate(
+        "() => window.PROMPT_CATALOG.assemble({english: true}).parts")
+    evidence.step(f"默认（中文）={zh_parts}  英文辅助版本={en_parts}")
+    assert zh_parts == ["人物（单人）", "赛璐璐动画"], f"默认组装不是中文：{zh_parts}"
+    assert en_parts == ["1girl", "cel animation"], f"英文辅助版本不对：{en_parts}"
+
+    # 写回 #prompt 的必须是中文版本（英文只走「复制含英文片段版本」）
+    sp.page.click("#pcWriteBtn")
+    sp.page.wait_for_timeout(600)
+    written = sp.value("#prompt")
+    evidence.step(f"写回内容：{written}")
+    assert "人物（单人）" in written and "1girl" not in written, \
+        f"写回的不是中文版本：{written}"
+
+    # 「复制含英文片段版本」按钮存在且可用
+    disabled = sp.page.eval_on_selector("#pcCopyEn", "e => e.disabled")
+    assert disabled is False, "「复制含英文片段版本」按钮不可用"
+    evidence.screenshot(sp.page, "zh-vs-en")
+
+
+def test_every_group_has_skip_and_free_input(studio_page, evidence):
+    """每个可选分组都必须有「不指定」默认项 + 自由文本入口。
+
+    【为什么必须逐组核】用户 2026-11-21 的新约束：
+      「每个维度都必须允许省略，也必须允许自行输入。」
+    只测一两个分组证明不了「每个」—— 必须遍历全部渲染出来的分组。
+    """
+    sp = studio_page
+    sp.open()
+    sp.goto_mode("t2i")
+    _open_designer(sp, evidence)
+
+    state = sp.page.evaluate("""() => {
+      const out = [];
+      document.querySelectorAll('#pcGroups .pc-group').forEach(g => {
+        const gid = g.dataset.group;
+        const name = (g.querySelector('.pc-group-name') || {}).textContent || gid;
+        const sel = g.querySelector('select[data-select]');
+        const inp = g.querySelector('[data-custom]');
+        out.push({
+          gid, name,
+          hasSelect: !!sel,
+          skipOption: sel ? Array.from(sel.options).some(o => o.textContent.trim() === '不指定') : null,
+          defaultIsSkip: sel ? (sel.options[sel.selectedIndex] || {}).textContent.trim() === '不指定' : null,
+          hasFreeInput: !!inp,
+          placeholder: inp ? inp.getAttribute('placeholder') : null,
+        });
+      });
+      return out;
+    }""")
+    evidence.step(f"全部 {len(state)} 个分组的省略/自定义入口")
+
+    assert len(state) >= 45, f"渲染出的分组太少：{len(state)}"
+    noInput = [g for g in state if not g["hasFreeInput"]]
+    assert not noInput, f"这些分组没有自由输入入口：{noInput[:5]}"
+    noSkip = [g for g in state if g["hasSelect"] and not g["skipOption"]]
+    assert not noSkip, f"这些分组没有「不指定」选项：{noSkip[:5]}"
+    badDefault = [g for g in state if g["hasSelect"] and not g["defaultIsSkip"]]
+    assert not badDefault, f"这些分组的默认项不是「不指定」：{badDefault[:5]}"
+    noPlaceholder = [g for g in state if not (g["placeholder"] or "").strip()]
+    assert not noPlaceholder, f"这些分组的自由输入没有中文示例提示：{noPlaceholder[:5]}"
+
+    # 「写法对照清单」那一组（8.4）没有下拉，但必须有自由输入
+    guide = [g for g in state if not g["hasSelect"]]
+    evidence.step(f"无下拉的分组（对照清单）：{[g['gid'] for g in guide]}")
+    assert all(g["hasFreeInput"] for g in guide), "对照清单分组没有自由输入入口"
+    evidence.screenshot(sp.page, "skip-and-custom")
+
+
+def test_partial_fill_only_still_assembles(studio_page, evidence):
+    """只填其中几项（其余全部省略）也能正常组装出可用的原始提示词。"""
+    sp = studio_page
+    sp.open()
+    sp.goto_mode("t2i")
+    _open_designer(sp, evidence)
+    _clear_picks(sp)
+
+    # 只填 2 项：主体 + 光线，其余 43 个分组全停在「不指定」
+    r1 = _pick(sp, evidence, "3.0 主体类别（顶层，决定后面哪些子维度可用）", "人物（单人）")
+    r2 = _pick(sp, evidence, "7.1 自然光时段与天气光", "黄金时刻")
+    assert r1 == "OK" and r2 == "OK"
+
+    parts = _parts(sp)
+    preview = _preview(sp)
+    evidence.step(f"只填 2 项的组装结果：{parts} / {preview!r}")
+    assert parts == ["人物（单人）", "黄金时刻"], f"部分填写的组装结果不对：{parts}"
+    assert preview == "人物（单人）, 黄金时刻", f"预览不对：{preview!r}"
+
+    # 省略的分组不得产生任何片段（不写「无某某」这类否定式）
+    assert "无" not in preview.replace("人物（单人）", ""), "省略项产生了否定式片段"
+
+    # 面板没有卡死：写回按钮仍可用，且能真的写回
+    disabled = sp.page.eval_on_selector("#pcWriteBtn", "e => e.disabled")
+    assert disabled is False, "只填部分维度时写回按钮被禁用了"
+    sp.page.click("#pcWriteBtn")
+    sp.page.wait_for_timeout(600)
+    assert sp.value("#prompt") == "人物（单人）, 黄金时刻", "部分填写写回结果不对"
+
+    # 再省略一级（把光线改回「不指定」）也不破坏后续
+    r3 = _pick(sp, evidence, "7.1 自然光时段与天气光", "不指定")
+    assert r3 == "OK", f"把某一级改回不指定失败：{r3}"
+    parts2 = _parts(sp)
+    evidence.step(f"撤销一级后的组装结果：{parts2}")
+    assert parts2 == ["人物（单人）"], f"撤销一级后结果不对：{parts2}"
+    evidence.screenshot(sp.page, "partial-fill")
+
+
+def test_free_input_joins_the_assembly_and_is_not_blocked(studio_page, evidence):
+    """自行输入的自定义项与词库选项一起参与组装，且不被 UI/校验拦掉。"""
+    sp = studio_page
+    sp.open()
+    sp.goto_mode("t2i")
+    _open_designer(sp, evidence)
+    _clear_picks(sp)
+
+    # 1) 纯自定义（一个词库选项都不选）
+    r = _type_custom(sp, evidence, "3.0 主体类别（顶层，决定后面哪些子维度可用）",
+                    "一只戴护目镜的柯基犬")
+    assert r == "OK", f"自由输入入口不可用：{r}"
+    r = _type_custom(sp, evidence, "4.4 远景 / 背景", "远景是雾中的高压电塔")
+    assert r == "OK"
+    parts = _parts(sp)
+    evidence.step(f"纯自定义的组装结果：{parts}")
+    assert parts == ["一只戴护目镜的柯基犬", "远景是雾中的高压电塔"], \
+        f"纯自定义没有进组装：{parts}"
+
+    # 2) 词库选项 + 自定义混合（自定义排在同槽位词库选项之后）
+    _pick(sp, evidence, "1.1 动漫 / 二次元", "赛璐璐动画")
+    _type_custom(sp, evidence, "1.1 动漫 / 二次元", "复古漫画网点")
+    parts = _parts(sp)
+    evidence.step(f"词库 + 自定义混合的组装结果：{parts}")
+    assert parts == ["赛璐璐动画", "复古漫画网点",
+                     "一只戴护目镜的柯基犬", "远景是雾中的高压电塔"], \
+        f"混合组装不对：{parts}"
+
+    # 3) 自定义内容不被校验拦掉：带数字/英文/标点的自由文本照样进组装
+    _type_custom(sp, evidence, "7.1 自然光时段与天气光", "逆光, 85mm f/1.4 的浅景深光斑")
+    parts = _parts(sp)
+    evidence.step(f"含数字/英文的自定义：{parts}")
+    assert "逆光, 85mm f/1.4 的浅景深光斑" in parts, f"自定义被拦掉了：{parts}"
+
+    # 4) 写回：自定义内容照样进 #prompt，仍可走增强
+    sp.page.click("#pcWriteBtn")
+    sp.page.wait_for_timeout(600)
+    written = sp.value("#prompt")
+    evidence.step(f"写回内容：{written}")
+    assert "一只戴护目镜的柯基犬" in written and "复古漫画网点" in written
+    disabled = sp.page.eval_on_selector("#enhanceBtn", "e => e.disabled")
+    assert disabled is False, "含自定义内容后增强按钮被禁用"
+
+    # 5) 清空 = 真的不输出（不留空片段）
+    sp.page.evaluate("""() => {
+      document.querySelectorAll('#pcGroups [data-custom]').forEach(i => {
+        i.value = '';
+        i.dispatchEvent(new Event('input', {bubbles: true}));
+      });
+    }""")
+    sp.page.wait_for_timeout(500)
+    parts = _parts(sp)
+    evidence.step(f"清空自定义后的组装结果：{parts}")
+    assert "柯基" not in " ".join(parts), "清空自定义后仍残留片段"
+    assert not any(p.strip() == "" for p in parts), f"产生了空片段：{parts}"
+    evidence.screenshot(sp.page, "free-input")
+
+
+def test_direct_prompt_edit_bypasses_catalog(studio_page, evidence):
+    """用户直接编辑整段提示词时，绕过词库直接走原有增强链路。"""
+    sp = studio_page
+    sp.open()
+    sp.goto_mode("t2i")
+    _open_designer(sp, evidence)
+    _clear_picks(sp)
+
+    sp.page.evaluate("""() => {
+      const p = document.querySelector('#prompt');
+      p.value = '港风。90年代香港港口，亚洲年轻女性休闲散步';
+      p.dispatchEvent(new Event('input', {bubbles: true}));
+    }""")
+    sp.page.wait_for_timeout(400)
+
+    # 词库全停在「不指定」→ 预览为空，但用户的文本不受影响、增强按钮可用
+    assert _parts(sp) == [], "词库没选任何项却产生了片段"
+    assert "港风" in sp.value("#prompt"), "用户直接输入的文本被改写了"
+    for sel in ("#enhanceBtn", "#enhanceMenuBtn"):
+        assert sp.page.eval_on_selector(sel, "e => e.disabled") is False, \
+            f"{sel} 被禁用，无法走既有增强链路"
+    evidence.step("直接编辑整段提示词 → 词库不干预，增强链路照常可用")
 
 
 def test_write_back_requires_overwrite_or_append_choice(studio_page, evidence):
@@ -280,7 +511,7 @@ def test_write_back_requires_overwrite_or_append_choice(studio_page, evidence):
     appended = sp.value("#prompt")
     evidence.step(f"追加后：{appended}")
     assert appended.startswith("用户自己写的描述, "), f"追加结果不对：{appended}"
-    assert "1girl" in appended and "cel animation" in appended
+    assert "人物（单人）" in appended and "赛璐璐动画" in appended
 
     # 再来一次 —— 选「覆盖」
     sp.page.evaluate("""() => {
@@ -295,7 +526,7 @@ def test_write_back_requires_overwrite_or_append_choice(studio_page, evidence):
     sp.page.wait_for_timeout(600)
     overwritten = sp.value("#prompt")
     evidence.step(f"覆盖后：{overwritten}")
-    assert overwritten.startswith("1girl, "), f"覆盖结果不对：{overwritten}"
+    assert overwritten.startswith("人物（单人）, "), f"覆盖结果不对：{overwritten}"
     assert "第二段用户文本" not in overwritten, "覆盖没有真正替换用户文本"
     evidence.screenshot(sp.page, "write-back")
 
@@ -362,8 +593,8 @@ def test_soft_conflict_shows_warning(studio_page, evidence):
     assert time_txt["hidden"] is False, "软冲突没有提示"
     assert "提示" in time_txt["text"], "软冲突提示文案不对"
     # 软冲突不阻止 —— 两段都进了提示词
-    assert "golden hour" in time_txt["preview"]
-    assert "softbox" in time_txt["preview"]
+    assert "黄金时刻" in time_txt["preview"]
+    assert "柔光箱" in time_txt["preview"]
 
 
 def test_enhance_chain_still_works_after_write_back(studio_page, evidence):
@@ -379,7 +610,7 @@ def test_enhance_chain_still_works_after_write_back(studio_page, evidence):
     sp.page.wait_for_timeout(600)
     written = sp.value("#prompt")
     evidence.step(f"写回内容：{written}")
-    assert "1girl" in written
+    assert "人物（单人）" in written
 
     # 徽标必须是「原始」级（level 0）—— 不能打「已增强」徽标
     badge = sp.page.evaluate("""() => {
@@ -518,5 +749,59 @@ def test_narrow_screen_constraints(studio_page, evidence, width):
         f"{width}px 下收藏栏不可达：{drawer.get('favHit')}"
     assert drawer.get("navHit") == "navToggle-OK", \
         f"{width}px 下顶栏按钮被抽屉遮挡：{drawer.get('navHit')}"
+
+    # 4) 【新约束】窄断点下「省略」与「自行输入」都可用
+    #    取真实点击证据：一个词库下拉、一个自行输入框都必须
+    #    elementFromPoint 命中自己（没被遮挡），并且真的能改值。
+    usability = sp.page.evaluate("""() => {
+      const out = {groups: 0, selectHit: null, customHit: null, missingSkip: []};
+      const vw = window.innerWidth;
+      const groups = Array.from(document.querySelectorAll('#pcGroups .pc-group'));
+      out.groups = groups.length;
+      const hit = (el) => {
+        el.scrollIntoView({block: 'center'});
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return 'zero-size';
+        if (r.right > vw + 1 || r.left < -1) return 'offscreen@' + Math.round(r.right);
+        const e = document.elementFromPoint(r.left + Math.min(6, r.width / 2),
+                                            r.top + r.height / 2);
+        return e && (el.contains(e) || e.contains(el)) ? 'OK' : (e.id || e.className || e.tagName);
+      };
+      for (const g of groups) {
+        const sel = g.querySelector('select[data-select]');
+        if (sel && out.selectHit === null) out.selectHit = {gid: g.dataset.group, hit: hit(sel)};
+        const inp = g.querySelector('[data-custom]');
+        if (inp && out.customHit === null) out.customHit = {gid: g.dataset.group, hit: hit(inp)};
+        if (out.selectHit && out.customHit) break;
+      }
+      document.querySelectorAll('#pcGroups select[data-select]').forEach(s => {
+        const skip = Array.from(s.options).find(o => o.textContent.trim() === '不指定');
+        if (!skip) out.missingSkip.push(s.dataset.select);
+      });
+      return out;
+    }""")
+    evidence.step(f"{width}px 省略/自定义可用性：{usability}")
+    assert usability["groups"] >= 45, f"{width}px 下分组渲染不全：{usability['groups']}"
+    assert usability["selectHit"] and usability["selectHit"]["hit"] == "OK", \
+        f"{width}px 下词库下拉被遮挡：{usability['selectHit']}"
+    assert usability["customHit"] and usability["customHit"]["hit"] == "OK", \
+        f"{width}px 下自行输入框被遮挡：{usability['customHit']}"
+    assert not usability["missingSkip"], \
+        f"{width}px 下这些分组没有「不指定」：{usability['missingSkip'][:5]}"
+
+    # 真实操作：选词库项 → 自行输入 → 改回「不指定」，三步都要真的生效
+    _clear_picks(sp)
+    pick_ok = _pick(sp, evidence, "3.0 主体类别（顶层，决定后面哪些子维度可用）", "人物（单人）")
+    assert pick_ok == "OK", f"{width}px 下选择词库项失败：{pick_ok}"
+    custom_ok = _type_custom(sp, evidence, "4.4 远景 / 背景", "远景是雾中的高压电塔")
+    assert custom_ok == "OK", f"{width}px 下自行输入失败：{custom_ok}"
+    narrow_parts = _parts(sp)
+    evidence.step(f"{width}px 组装结果：{narrow_parts}")
+    assert narrow_parts == ["人物（单人）", "远景是雾中的高压电塔"], \
+        f"{width}px 下组装不对：{narrow_parts}"
+    skip_ok = _pick(sp, evidence, "3.0 主体类别（顶层，决定后面哪些子维度可用）", "不指定")
+    assert skip_ok == "OK", f"{width}px 下改回「不指定」失败：{skip_ok}"
+    assert _parts(sp) == ["远景是雾中的高压电塔"], \
+        f"{width}px 下省略没有生效：{_parts(sp)}"
 
     evidence.screenshot(sp.page, f"narrow-{width}")

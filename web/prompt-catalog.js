@@ -49,6 +49,7 @@
   let CATALOG = null;          // 目录（来自 GET /api/prompt-catalog）
   let LOAD_ERROR = "";         // 加载失败原因（要如实显示）
   const picks = new Map();     // group_id -> item_id
+  const customs = new Map();   // group_id -> 用户自行输入的文本（与词库选项一起参与组装）
   const collapsed = new Map(); // group_id -> bool（true = 折叠）
   let keyword = "";            // 搜索关键词
   let opened = false;          // 抽屉是否展开
@@ -91,7 +92,17 @@
    */
   function fragmentOf(item) {
     if (!item || item.is_skip) return "";
-    const frag = String(item.fragment == null ? "" : item.fragment).trim();
+    // 【中文优先】默认写进提示词的是中文片段（服务端算好的 zh_fragment）。
+    // 英文片段只在「含英文片段版本」/选项详情里作为辅助信息出现。
+    const frag = String(item.zh_fragment == null ? "" : item.zh_fragment).trim();
+    return frag;
+  }
+
+  /** 英文辅助版本（不参与默认组装，仅供「含英文片段版本」复制）。 */
+  function enFragmentOf(item) {
+    if (!item || item.is_skip) return "";
+    const frag = String(item.en_fragment == null ? item.fragment == null ? "" : item.fragment
+                        : item.en_fragment).trim();
     return frag;
   }
 
@@ -209,8 +220,13 @@
    *
    * 只输出**真实片段**：跳过项不输出；没选就是空串（不产生垃圾片段）；
    * 不含 (x:1.5) 之类权重语法。
+   *
+   * 【用户自行输入的内容一起参与组装】（任务书 2026-11-21 新增约束）
+   * 每个维度都有自由文本入口；自定义项按**它所属子类的骨架槽位**插入，
+   * 排在同槽位的词库选项之后（用户自己写的东西不覆盖词库选项，只追加）。
    */
-  function assemble() {
+  function assemble(opts) {
+    const useEn = !!(opts && opts.english);
     if (!CATALOG) return {text: "", parts: [], bySlot: {}, chosen: []};
     const slotIndex = new Map();
     (CATALOG.slots || []).forEach((s, i) => slotIndex.set(s.key, i));
@@ -222,13 +238,27 @@
       if (!item || item.is_skip) return;
       const group = GROUP_BY_ID.get(groupId);
       if (!group || group.render === "rules") return;
-      const frag = fragmentOf(item);
+      const frag = useEn ? enFragmentOf(item) : fragmentOf(item);
       if (!frag) return;          // 片段为空的选项（淘汰项等）不输出
       chosen.push({
-        groupId, item, group, frag,
+        groupId, item, group, frag, custom: false,
         slot: group.slot || "style",
         slotIdx: slotIndex.has(group.slot) ? slotIndex.get(group.slot) : 99,
         order: group.order == null ? 0 : group.order,
+      });
+    });
+
+    // 自定义内容：与词库选项一起进同槽位，排在词库选项之后（order+1）
+    customs.forEach((text, groupId) => {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) return;
+      const group = GROUP_BY_ID.get(groupId);
+      if (!group || group.render === "rules") return;
+      chosen.push({
+        groupId, item: null, group, frag: trimmed, custom: true,
+        slot: group.slot || "style",
+        slotIdx: slotIndex.has(group.slot) ? slotIndex.get(group.slot) : 99,
+        order: (group.order == null ? 0 : group.order) + 1,
       });
     });
 
@@ -292,7 +322,7 @@
           <span class="muted">${esc(counts.items || 0)} 个可选条目 · ${esc(counts.groups || 0)} 个分组</span>
         </div>
         <div class="pc-note">
-          用下拉列表描述画面内容，组合成一段原始提示词；写回后仍可照常用「增强」「二次增强」。
+          用下拉列表描述画面内容，组合成一段中文为主的原始提示词；每一项都可跳过，也可自行输入；写回后仍可照常用「增强」「二次增强」。
         </div>
         <button type="button" class="pc-open-btn" id="pcOpenBtn" aria-expanded="${opened ? "true" : "false"}">
           ${opened ? "收起设计面板" : "打开设计面板"}
@@ -309,6 +339,7 @@
           <div class="pc-preview-head">
             <span>原始提示词预览</span>
             <span class="muted" id="pcPreviewCount">${assembled.parts.length} 段</span>
+            <button type="button" class="pc-btn ghost pc-copy-en" id="pcCopyEn"${assembled.parts.length ? "" : " disabled"}>复制含英文片段版本</button>
           </div>
           <div class="pc-preview-text" id="pcPreviewText">${assembled.text
             ? esc(assembled.text)
@@ -328,8 +359,31 @@
     if (clearBtn) {
       clearBtn.addEventListener("click", () => {
         picks.clear();
+        customs.clear();      // 「清空」也要清掉自行输入的内容
         pendingWrite = null;
         render();
+      });
+    }
+    // 【英文片段只作为辅助信息保留】默认预览是中文；这里给一份
+    // 「含英文片段版本」的复制入口，不改变写回 #prompt 的内容。
+    const copyEn = $("#pcCopyEn");
+    if (copyEn) {
+      copyEn.addEventListener("click", async () => {
+        const en = assemble({english: true}).text;
+        if (!en) return;
+        copyEn.textContent = "已复制英文版本";
+        try {
+          await navigator.clipboard.writeText(en);
+        } catch (e) {
+          // 剪贴板不可用（非安全上下文 / 旧浏览器）→ 退回可见文本，
+          // 用户仍可手动选中复制，不静默失败
+          const box = $("#pcPreviewText");
+          if (box) box.textContent = en;
+        }
+        setTimeout(() => {
+          const b = $("#pcCopyEn");
+          if (b) b.textContent = "复制含英文片段版本";
+        }, 2200);
       });
     }
     const search = $("#pcSearch");
@@ -477,16 +531,39 @@
       ? `<div class="pc-selected">已选：${esc(effective.label)}${effective.en ? ` · <code>${esc(effective.en)}</code>` : ""}</div>`
       : `<div class="pc-selected muted">未指定（这一项不会写进提示词）</div>`;
 
+    // 【每个维度都允许自行输入】（任务书 2026-11-21 新增约束）
+    // 自定义内容不被 UI 或校验拦掉：不做长度/词汇校验，也不与词库选项互斥。
+    const customText = customs.get(group.id) || "";
+    const customRow = group.allow_custom === false ? "" : `
+          <div class="pc-custom-row">
+            <input type="text" class="pc-custom" data-custom="${esc(group.id)}"
+                   aria-label="${esc(group.name)} 自行输入"
+                   placeholder="${esc(group.custom_placeholder || "自行输入这一项的内容（中文即可）")}"
+                   value="${esc(customText)}">
+            <button type="button" class="pc-clear pc-custom-clear" data-custom-clear="${esc(group.id)}"${customText ? "" : " hidden"}>清除</button>
+          </div>
+          <div class="pc-note pc-custom-note">自行输入的内容与上面的选项一起写进提示词；留空即跳过这一项。</div>`;
+
+    const guideNote = group.render === "guide"
+      ? `<div class="pc-note pc-guide">这一组是**写法对照清单**（保留 / 谨慎 / 淘汰），不是可选项；想自己写画质词请直接用在下面的自行输入里。</div>
+          <div class="pc-guide-list">${(group.items || []).map(it => `
+            <div class="pc-guide-item${it.status === "deprecated" ? " deprecated" : ""}">
+              <b>${esc(it.label)}</b>
+              <span class="muted">${esc(it.example || "")}</span>
+            </div>`).join("")}</div>`
+      : "";
+
     return `
       <div class="pc-group${isCollapsed ? " collapsed" : ""}" data-group="${esc(group.id)}">
         <button type="button" class="pc-group-head" data-toggle="${esc(group.id)}" aria-expanded="${isCollapsed ? "false" : "true"}">
           <span class="pc-group-name">${esc(group.name)}</span>
-          <span class="muted">${esc(dim.name)} · 已选 ${effective ? 1 : 0}</span>
+          <span class="muted">${esc(dim.name)} · 已选 ${effective ? 1 : 0}${customText ? " + 自行输入" : ""}</span>
           <span class="pc-caret" aria-hidden="true">${isCollapsed ? "▸" : "▾"}</span>
         </button>
         <div class="pc-group-body"${isCollapsed ? " hidden" : ""}>
-          <select class="img-select pc-select" data-select="${esc(group.id)}" aria-label="${esc(group.name)}">${options}</select>
-          ${selectedHint}
+          ${guideNote}
+          ${group.render === "guide" ? "" : `<select class="img-select pc-select" data-select="${esc(group.id)}" aria-label="${esc(group.name)}">${options}</select>`}
+          ${group.render === "guide" ? "" : selectedHint}${customRow}
           ${group.purpose ? `<div class="pc-note pc-purpose">${esc(group.purpose)}</div>` : ""}
         </div>
       </div>`;
@@ -529,6 +606,53 @@
         render();
       });
     });
+    // 【自行输入】每个维度的自由文本入口。
+    // 输入即生效（不校验、不拦截），清空 = 跳过这一项。
+    $$("#pcGroups [data-custom]").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const gid = inp.dataset.custom;
+        const text = String(inp.value || "").trim();
+        if (text) customs.set(gid, inp.value);
+        else customs.delete(gid);
+        // 只重算预览/冲突区，不重绘分组 —— 重绘会让输入框失去焦点，
+        // 中文输入法（IME）组字过程中被打断会直接打不了字。
+        refreshPreviewAndConflicts();
+        updateGroupHeadCount(gid);
+      });
+    });
+    $$("#pcGroups [data-custom-clear]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const gid = btn.dataset.customClear;
+        customs.delete(gid);
+        render();
+      });
+    });
+  }
+
+  /** 只更新预览 + 冲突区 + 该组标题的计数（不重绘分组，保住输入焦点）。 */
+  function refreshPreviewAndConflicts() {
+    const conflicts = detectConflicts();
+    const assembled = assemble();
+    renderConflicts(conflicts);
+    renderWriteRow(assembled, conflicts,
+                   assembled.parts.length > 0 && conflicts.hard.length === 0);
+    const previewText = $("#pcPreviewText");
+    if (previewText) {
+      previewText.textContent = assembled.text
+        || "还没有选择任何内容 —— 选中的条目会按「主体 → 造型 → 风格 → 场景 → 构图 → 光 → 色 → 氛围」顺序出现在这里。";
+    }
+    const countEl = $("#pcPreviewCount");
+    if (countEl) countEl.textContent = `${assembled.parts.length} 段`;
+  }
+
+  function updateGroupHeadCount(groupId) {
+    const head = $(`#pcGroups .pc-group[data-group="${groupId}"] .pc-group-head .muted`);
+    if (!head) return;
+    const group = GROUP_BY_ID.get(groupId);
+    const dim = group ? (CATALOG.dimensions.find(d => (d.groups || []).some(g => g.id === groupId)) || {name: ""}) : {name: ""};
+    const hasPick = !!picks.get(groupId);
+    const hasCustom = !!String(customs.get(groupId) || "").trim();
+    head.textContent = `${dim.name} · 已选 ${hasPick ? 1 : 0}${hasCustom ? " + 自行输入" : ""}`;
   }
 
   function showConflictNotice(blocked, item) {
@@ -644,9 +768,11 @@
     detectConflicts,
     blockedReason,
     fragmentOf,
+    enFragmentOf,
     render,
     load,
     get picks() { return picks; },
+    get customs() { return customs; },
     get catalog() { return CATALOG; },
     get opened() { return opened; },
   };

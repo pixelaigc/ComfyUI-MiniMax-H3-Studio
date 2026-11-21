@@ -244,6 +244,173 @@ class TestSlotsAndAssembly(unittest.TestCase):
                         f"{it['id']} 的跳过项示例不得是否定式")
 
 
+class TestChineseFirstFragments(unittest.TestCase):
+    """中文优先：默认写进提示词的必须是中文片段，英文只作辅助。
+
+    【为什么单独一组】用户 2026-11-21 明确要求：
+      「组装成原始提示词时也中文优先……英文片段只作为可选的辅助/增强信息
+       保留……若某个选项没有可信的中文对应说法，宁可保留中文描述并如实标注，
+       也不要塞入未经核验的英文术语。」
+    所以：默认那份（fragment / zh_fragment）必须来自调研的**中文显示名**，
+    不得是英文；英文另存一份（en_fragment），不参与默认组装。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = prompt_catalog.get_manifest()
+
+    def test_items_carry_both_zh_and_en_fragments(self):
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                for it in g["items"]:
+                    self.assertIn("zh_fragment", it, f"{it['id']} 没有中文片段字段")
+                    self.assertIn("en_fragment", it, f"{it['id']} 没有英文片段字段")
+                    # 默认那份必须等于中文片段（前端只读 fragment / zh_fragment）
+                    self.assertEqual(it["fragment"], it["zh_fragment"],
+                                     f"{it['id']} 的默认片段不是中文那份")
+
+    def test_default_fragment_is_chinese_for_every_selectable_item(self):
+        """每个可选项的默认片段都必须带中文（专名除外，见白名单）。"""
+        # 白名单：调研里该概念的通用写法本来就是拉丁（不是「未核验的英文术语」）
+        LATIN_PROPER_NAMES = {"Unreal Engine", "Teal & Orange"}
+        checked = 0
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                if g["render"] == "rules":
+                    continue
+                for it in g["items"]:
+                    if it["is_skip"] or g["render"] == "guide" or it["status"] == "deprecated":
+                        continue
+                    frag = it["zh_fragment"]
+                    self.assertTrue(frag, f"{it['id']}（{it['label']}）没有可输出的中文片段")
+                    if frag in LATIN_PROPER_NAMES:
+                        continue
+                    self.assertTrue(
+                        any("\u4e00" <= c <= "\u9fff" for c in frag),
+                        f"{it['id']}（{it['label']}）的默认片段不是中文：{frag!r}")
+                    checked += 1
+        # 应覆盖的可选项数（逐层扣出来的口径，不是拍脑袋的数）：
+        #   891 总项 - 51 条 D9 规则项（render=rules，不进提示词）
+        #        - 45 显式「不指定」项 - 8 淘汰项（D8.4）
+        #        - 8 条对照清单写法（D8.4 保留/谨慎，render=guide）
+        #        - 2 拉丁专名白名单（Unreal Engine / Teal & Orange）
+        #   = 777
+        self.assertEqual(777, checked,
+                         f"中文片段检查覆盖数变了：{checked}（应为 777）")
+
+    def test_slash_alternatives_keep_the_chinese_wording(self):
+        """「A / B」并列时中文取**带中文的那一个**，不是机械取第一个。
+
+        【真实回归】「IMAX / 宽银幕」机械取第一个会得到纯拉丁「IMAX」，
+        把调研核过的中文说法丢了 —— 与「中文优先」直接冲突。
+        """
+        def frag_of(item_id):
+            for dim in self.m["dimensions"]:
+                for g in dim["groups"]:
+                    for it in g["items"]:
+                        if it["id"] == item_id:
+                            return it
+            raise AssertionError(f"找不到 {item_id}")
+
+        it = frag_of("D1-03-12")          # IMAX / 宽银幕
+        self.assertEqual("宽银幕", it["zh_fragment"],
+                         f"并列写法丢了中文：{it['zh_fragment']!r}")
+        self.assertEqual("IMAX", it["en_fragment"],
+                         f"英文辅助版本应当保留 IMAX：{it['en_fragment']!r}")
+
+        it = frag_of("D1-06-23")          # 田园 / cottagecore
+        self.assertEqual("田园", it["zh_fragment"], it["zh_fragment"])
+        self.assertEqual("cottagecore", it["en_fragment"], it["en_fragment"])
+
+    def test_english_fragments_are_preserved(self):
+        """英文片段一条都不能丢（它仍是「含英文片段版本」与增强链路的数据源）。"""
+        kept = 0
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                for it in g["items"]:
+                    if it["is_skip"]:
+                        continue
+                    if it["en"] and it["status"] != "deprecated" and g["render"] != "rules":
+                        # 8.4 的英文在 example 里（类别名不是片段），不要求 en_fragment==en
+                        if g["sub_prefix"] == "8.4":
+                            continue
+                        self.assertTrue(it["en_fragment"],
+                                        f"{it['id']} 丢了英文片段（原 en={it['en']!r}）")
+                        kept += 1
+        self.assertGreaterEqual(kept, 700, f"英文片段保留得太少：{kept}")
+
+    def test_no_weight_syntax_in_any_fragment(self):
+        """任何片段都不得含 (x:1.5) 之类权重语法（两份都不行）。"""
+        pat = re.compile(r"\(\s*[\w\u4e00-\u9fff]+\s*:\s*[\d.]+\s*\)")
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                for it in g["items"]:
+                    for field in ("zh_fragment", "en_fragment", "fragment"):
+                        self.assertIsNone(
+                            pat.search(it.get(field) or ""),
+                            f"{it['id']}.{field} 含权重语法：{it.get(field)!r}")
+
+
+class TestOmitAndFreeInput(unittest.TestCase):
+    """每个维度都必须允许省略 + 允许自行输入。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = prompt_catalog.get_manifest()
+
+    def test_every_non_rule_group_allows_custom_input(self):
+        """D1–D8 的每个子类都要有自由输入入口（含 8.4 对照清单）。"""
+        bad = []
+        total = 0
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                if dim["id"] == "D9":
+                    continue          # D9 是冲突矩阵，不是提示词维度
+                total += 1
+                if g.get("allow_custom") is not True:
+                    bad.append(f"{dim['id']}/{g['name']}")
+                if not (g.get("custom_placeholder") or "").strip():
+                    bad.append(f"{dim['id']}/{g['name']} 没有中文示例提示")
+        self.assertEqual([], bad, f"这些子类没有自行输入入口：{bad}")
+        self.assertEqual(45, total, "可输入的子类数量应为 45（48 - D9 的 3 个规则组）")
+
+    def test_guide_group_has_no_selectable_items_but_keeps_custom_input(self):
+        """8.4 是「保留 / 谨慎 / 淘汰」对照清单：不进下拉，但用户仍可自己写。"""
+        guide = [g for dim in self.m["dimensions"] for g in dim["groups"]
+                 if g["render"] == "guide"]
+        self.assertEqual(1, len(guide), "对照清单应当只有 8.4 这一组")
+        g = guide[0]
+        self.assertEqual("8.4", g["sub_prefix"])
+        self.assertTrue(g["allow_custom"])
+        # 它的 zh_fragment 全为空（不产生片段），但 en_fragment 保留可参考的写法
+        zh_nonempty = [i for i in g["items"] if i["zh_fragment"]]
+        self.assertEqual([], zh_nonempty, "对照清单不应产生中文片段")
+        en_nonempty = [i for i in g["items"] if i["en_fragment"]]
+        self.assertGreaterEqual(len(en_nonempty), 7,
+                                "对照清单里的「保留」写法示例应当保留为英文辅助信息")
+
+    def test_options_groups_still_have_selectable_items(self):
+        """其余子类仍是可下拉选择的（对照清单不能把词库整体降级）。"""
+        options = [g for dim in self.m["dimensions"] for g in dim["groups"]
+                   if g["render"] == "options"]
+        self.assertEqual(44, len(options), "可下拉的子类应为 44 个")
+        for g in options:
+            selectable = [i for i in g["items"] if not i["is_skip"] and i["zh_fragment"]]
+            self.assertGreaterEqual(len(selectable), 1, f"{g['id']} 没有任何可选项")
+            self.assertTrue(any(i["is_skip"] for i in g["items"]),
+                            f"{g['id']} 没有「不指定」")
+
+    def test_skip_option_emits_nothing_in_either_language(self):
+        for dim in self.m["dimensions"]:
+            for g in dim["groups"]:
+                for it in g["items"]:
+                    if not it["is_skip"]:
+                        continue
+                    self.assertEqual("", it["zh_fragment"])
+                    self.assertEqual("", it["en_fragment"])
+                    self.assertEqual("", it["fragment"])
+
+
 class TestBackendEndpoint(unittest.TestCase):
     """服务端路由与响应结构。"""
 
