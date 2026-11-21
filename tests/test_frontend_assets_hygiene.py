@@ -240,6 +240,9 @@ STALE_BUMPED = {
     #   （applyBadge 同步卡片底部的收藏按钮；新增 .fav-action 样式）
     # ⇒ ?v= 必须再升一档。
     "favorites.js":            ("fav20261120c",   "mobnav20261121a"),
+    # 【2026-11-21 构建版本标识】favorites.css 又改了内容
+    #   （新增 .build-id 样式 —— 侧栏底部的版本号那一行）
+    # ⇒ ?v= 必须再升一档。
     "favorites.css":           ("mobnav20261121a", "buildid20261121a"),
     # 【2026-11-21 构建版本标识】新增的静态资源
     #   （侧栏底部显示当前部署的 commit 与静态资源版本指纹）
