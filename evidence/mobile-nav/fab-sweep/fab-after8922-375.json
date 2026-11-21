@@ -1,0 +1,134 @@
+{
+  "base": "http://127.0.0.1:8922",
+  "viewport": [
+    375,
+    812
+  ],
+  "tag": "after8922",
+  "sweep": {
+    "fabVisible": true,
+    "fabRect": {
+      "t": 752,
+      "l": 277,
+      "w": 84,
+      "h": 44
+    },
+    "maxScroll": 3319,
+    "steps": 24,
+    "overlapCount": 23,
+    "overlapMaxArea": 3330,
+    "overlapSamples": [
+      {
+        "scrollTop": 277,
+        "act": "prompt",
+        "text": "提示词a cinemat",
+        "w": 69,
+        "h": 19,
+        "area": 1313,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 277,
+        "act": "download",
+        "text": "⬇ 下载",
+        "w": 1,
+        "h": 17,
+        "area": 13,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 277,
+        "act": "open-new",
+        "text": "↗ 新窗口打开",
+        "w": 83,
+        "h": 17,
+        "area": 1413,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 415,
+        "act": "delete",
+        "text": "删除",
+        "w": 1,
+        "h": 9,
+        "area": 7,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 415,
+        "act": "favorite-toggle",
+        "text": "☆ 收藏",
+        "w": 83,
+        "h": 9,
+        "area": 752,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 830,
+        "act": "prompt",
+        "text": "提示词a photore",
+        "w": 69,
+        "h": 6,
+        "area": 418,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 830,
+        "act": "download",
+        "text": "⬇ 下载",
+        "w": 1,
+        "h": 30,
+        "area": 22,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 830,
+        "act": "open-new",
+        "text": "↗ 新窗口打开",
+        "w": 83,
+        "h": 30,
+        "area": 2492,
+        "centerSelf": false
+      },
+      {
+        "scrollTop": 1383,
+        "act": "prompt",
+        "text": "提示词integrate",
+        "w": 69,
+        "h": 28,
+        "area": 1964,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1383,
+        "act": "download",
+        "text": "⬇ 下载",
+        "w": 1,
+        "h": 8,
+        "area": 6,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1383,
+        "act": "continue",
+        "text": "⏭ 接续",
+        "w": 83,
+        "h": 8,
+        "area": 627,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1521,
+        "act": "delete",
+        "text": "删除",
+        "w": 1,
+        "h": 18,
+        "area": 14,
+        "centerSelf": true
+      }
+    ],
+    "elementsSeen": 15,
+    "unreachableCount": 0,
+    "unreachable": []
+  }
+}

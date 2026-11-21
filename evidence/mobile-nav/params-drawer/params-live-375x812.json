@@ -1,0 +1,164 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "s0_initial": {
+    "sidebarOpen": false,
+    "panelOpen": false,
+    "panelMaskOpen": false,
+    "panelRect": {
+      "top": 812,
+      "h": 715,
+      "bottom": 1527
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 2,
+    "fabHidden": false,
+    "bodyScrollLocked": false
+  },
+  "s1_open_picker": {
+    "ok": true,
+    "method": "tap"
+  },
+  "s1_select_t2v": {
+    "ok": true,
+    "method": "tap"
+  },
+  "s1_after_type": {
+    "sidebarOpen": false,
+    "panelOpen": false,
+    "panelMaskOpen": false,
+    "panelRect": {
+      "top": 812,
+      "h": 715,
+      "bottom": 1527
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 2,
+    "fabHidden": false,
+    "bodyScrollLocked": false
+  },
+  "s2_tap_fab": {
+    "ok": true,
+    "method": "tap"
+  },
+  "s2_panel_open": {
+    "sidebarOpen": false,
+    "panelOpen": true,
+    "panelMaskOpen": true,
+    "panelRect": {
+      "top": 97,
+      "h": 715,
+      "bottom": 812
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 0,
+    "fabHidden": true,
+    "bodyScrollLocked": false
+  },
+  "s3_tap_hamburger": {
+    "ok": true,
+    "method": "tap"
+  },
+  "s3_after_hamburger": {
+    "sidebarOpen": true,
+    "panelOpen": false,
+    "panelMaskOpen": false,
+    "panelRect": {
+      "top": 812,
+      "h": 715,
+      "bottom": 1527
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 0,
+    "fabHidden": true,
+    "bodyScrollLocked": false
+  },
+  "s4_tap_mask": {
+    "ok": false,
+    "method": "failed",
+    "err": "Page.tap: Timeout 7000ms exceeded.",
+    "diag": {
+      "reason": "zero-size"
+    }
+  },
+  "s4_after_mask": {
+    "sidebarOpen": true,
+    "panelOpen": false,
+    "panelMaskOpen": false,
+    "panelRect": {
+      "top": 812,
+      "h": 715,
+      "bottom": 1527
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 0,
+    "fabHidden": true,
+    "bodyScrollLocked": false
+  },
+  "s5_media_library": {
+    "sidebarOpen": true,
+    "panelOpen": false,
+    "panelMaskOpen": false,
+    "panelRect": {
+      "top": 812,
+      "h": 715,
+      "bottom": 1527
+    },
+    "navToggleHit": {
+      "visible": true,
+      "hitIsSelf": true,
+      "hitTag": "path",
+      "hitId": "",
+      "hitCls": "[object SVGAnimatedString]"
+    },
+    "cardsTotal": 12,
+    "cardsInViewport": 2,
+    "cardsClickable": 0,
+    "fabHidden": true,
+    "bodyScrollLocked": false
+  },
+  "s5_detail_open": "FAIL: Page.tap: Timeout 7000ms exceeded."
+}

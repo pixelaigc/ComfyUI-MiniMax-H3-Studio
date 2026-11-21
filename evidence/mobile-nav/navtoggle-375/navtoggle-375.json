@@ -1,0 +1,362 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "forced_immediate": {
+    "viewport": {
+      "w": 375,
+      "h": 812
+    },
+    "topbar": {
+      "top": 0,
+      "h": 44,
+      "bottom": 44
+    },
+    "navToggle": {
+      "top": 4,
+      "left": 10,
+      "w": 36,
+      "h": 36,
+      "bottom": 40
+    },
+    "sidebar": {
+      "top": 44,
+      "left": -193,
+      "w": 300,
+      "h": 768
+    },
+    "sidebarOpen": true,
+    "sidebarTransform": "matrix(1, 0, 0, 1, -192.639, 0)",
+    "topbarZ": "auto",
+    "navToggleZ": "auto",
+    "overlaps": [],
+    "overlapArea": 0,
+    "drawerCoversTopbar": false
+  },
+  "forced_settled": {
+    "viewport": {
+      "w": 375,
+      "h": 812
+    },
+    "topbar": {
+      "top": 0,
+      "h": 44,
+      "bottom": 44
+    },
+    "navToggle": {
+      "top": 4,
+      "left": 10,
+      "w": 36,
+      "h": 36,
+      "bottom": 40
+    },
+    "sidebar": {
+      "top": 44,
+      "left": 0,
+      "w": 300,
+      "h": 768
+    },
+    "sidebarOpen": true,
+    "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+    "topbarZ": "auto",
+    "navToggleZ": "auto",
+    "overlaps": [],
+    "overlapArea": 0,
+    "drawerCoversTopbar": false
+  },
+  "real_tap_hamburger": "OK",
+  "real_settled": {
+    "viewport": {
+      "w": 375,
+      "h": 812
+    },
+    "topbar": {
+      "top": 0,
+      "h": 44,
+      "bottom": 44
+    },
+    "navToggle": {
+      "top": 4,
+      "left": 10,
+      "w": 36,
+      "h": 36,
+      "bottom": 40
+    },
+    "sidebar": {
+      "top": 44,
+      "left": 0,
+      "w": 300,
+      "h": 768
+    },
+    "sidebarOpen": true,
+    "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+    "topbarZ": "auto",
+    "navToggleZ": "auto",
+    "overlaps": [],
+    "overlapArea": 0,
+    "drawerCoversTopbar": false
+  },
+  "scrolled": [
+    {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "topbar": {
+        "top": 0,
+        "h": 44,
+        "bottom": 44
+      },
+      "navToggle": {
+        "top": 4,
+        "left": 10,
+        "w": 36,
+        "h": 36,
+        "bottom": 40
+      },
+      "sidebar": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "sidebarOpen": true,
+      "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "topbarZ": "auto",
+      "navToggleZ": "auto",
+      "overlaps": [],
+      "overlapArea": 0,
+      "drawerCoversTopbar": false,
+      "scrollFrac": 0.0
+    },
+    {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "topbar": {
+        "top": 0,
+        "h": 44,
+        "bottom": 44
+      },
+      "navToggle": {
+        "top": 4,
+        "left": 10,
+        "w": 36,
+        "h": 36,
+        "bottom": 40
+      },
+      "sidebar": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "sidebarOpen": true,
+      "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "topbarZ": "auto",
+      "navToggleZ": "auto",
+      "overlaps": [
+        {
+          "text": "视频",
+          "cls": "nav-group",
+          "rect": {
+            "top": 9,
+            "left": 10,
+            "w": 279,
+            "h": 34
+          },
+          "overlap": {
+            "w": 36,
+            "h": 31,
+            "area": 1098
+          },
+          "hitIsSelf": false,
+          "hitTag": "STRONG",
+          "hitId": "",
+          "hitCls": ""
+        }
+      ],
+      "overlapArea": 1098,
+      "drawerCoversTopbar": false,
+      "scrollFrac": 0.25
+    },
+    {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "topbar": {
+        "top": 0,
+        "h": 44,
+        "bottom": 44
+      },
+      "navToggle": {
+        "top": 4,
+        "left": 10,
+        "w": 36,
+        "h": 36,
+        "bottom": 40
+      },
+      "sidebar": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "sidebarOpen": true,
+      "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "topbarZ": "auto",
+      "navToggleZ": "auto",
+      "overlaps": [
+        {
+          "text": "minimax-h3 首尾帧生视频",
+          "cls": "nav-item nav-model-item",
+          "rect": {
+            "top": 32,
+            "left": 24,
+            "w": 265,
+            "h": 40
+          },
+          "overlap": {
+            "w": 22,
+            "h": 8,
+            "area": 165
+          },
+          "hitIsSelf": false,
+          "hitTag": "NAV",
+          "hitId": "sidebar",
+          "hitCls": "sidebar open"
+        }
+      ],
+      "overlapArea": 165,
+      "drawerCoversTopbar": false,
+      "scrollFrac": 0.5
+    },
+    {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "topbar": {
+        "top": 0,
+        "h": 44,
+        "bottom": 44
+      },
+      "navToggle": {
+        "top": 4,
+        "left": 10,
+        "w": 36,
+        "h": 36,
+        "bottom": 40
+      },
+      "sidebar": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "sidebarOpen": true,
+      "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "topbarZ": "auto",
+      "navToggleZ": "auto",
+      "overlaps": [
+        {
+          "text": "minimax-h3 参考生视频",
+          "cls": "nav-item nav-model-item",
+          "rect": {
+            "top": -16,
+            "left": 24,
+            "w": 265,
+            "h": 40
+          },
+          "overlap": {
+            "w": 22,
+            "h": 21,
+            "area": 451
+          },
+          "hitIsSelf": false,
+          "hitTag": "HEADER",
+          "hitId": "",
+          "hitCls": "topbar"
+        }
+      ],
+      "overlapArea": 451,
+      "drawerCoversTopbar": false,
+      "scrollFrac": 0.75
+    },
+    {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "topbar": {
+        "top": 0,
+        "h": 44,
+        "bottom": 44
+      },
+      "navToggle": {
+        "top": 4,
+        "left": 10,
+        "w": 36,
+        "h": 36,
+        "bottom": 40
+      },
+      "sidebar": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "sidebarOpen": true,
+      "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "topbarZ": "auto",
+      "navToggleZ": "auto",
+      "overlaps": [
+        {
+          "text": "文生图",
+          "cls": "nav-group",
+          "rect": {
+            "top": -19,
+            "left": 10,
+            "w": 279,
+            "h": 34
+          },
+          "overlap": {
+            "w": 36,
+            "h": 12,
+            "area": 414
+          },
+          "hitIsSelf": false,
+          "hitTag": "HEADER",
+          "hitId": "",
+          "hitCls": "topbar"
+        },
+        {
+          "text": "Z-IMAGE 文生图",
+          "cls": "nav-item active",
+          "rect": {
+            "top": 15,
+            "left": 10,
+            "w": 279,
+            "h": 40
+          },
+          "overlap": {
+            "w": 36,
+            "h": 25,
+            "area": 882
+          },
+          "hitIsSelf": false,
+          "hitTag": "HEADER",
+          "hitId": "",
+          "hitCls": "topbar"
+        }
+      ],
+      "overlapArea": 1296,
+      "drawerCoversTopbar": false,
+      "scrollFrac": 1.0
+    }
+  ]
+}

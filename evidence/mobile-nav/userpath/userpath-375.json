@@ -1,0 +1,6137 @@
+{
+  "before": {
+    "base": "http://127.0.0.1:8921",
+    "viewport": [
+      375,
+      812
+    ],
+    "step0_initial": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step1_open_picker": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step1_after_open": {
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 0,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step1_select_t2v": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step1_after_select": {
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 0,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step2_backish": [
+      {
+        "label": "打开导航菜单",
+        "id": "navToggle",
+        "cls": "nav-toggle",
+        "visible": true,
+        "rect": {
+          "t": 4,
+          "l": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "label": "已取消",
+        "id": null,
+        "cls": "",
+        "visible": true,
+        "rect": {
+          "t": 104,
+          "l": 16,
+          "w": 63,
+          "h": 40
+        }
+      },
+      {
+        "label": "取消选择",
+        "id": "alSelClear",
+        "cls": "al-btn",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "alDrawerClose",
+        "cls": "al-drawer-close",
+        "visible": true,
+        "rect": {
+          "t": 12,
+          "l": 696,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "alPlayerClose",
+        "cls": "al-drawer-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "mediaManageClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭会话列表",
+        "id": "agDrawerClose",
+        "cls": "ag-drawer-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭产物面板",
+        "id": "agArtifactsClose",
+        "cls": "ag-artifacts-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "provModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "provCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "enhanceModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "enhanceCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "mossLayoutClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "mossLayoutCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "phClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptVersionClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptVersionDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "fdClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭大图",
+        "id": "fdStageClose",
+        "cls": "fd-stage-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "fdDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "loraInfoClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "loraInfoDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "jobDetailClose",
+        "cls": "job-detail-x",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "lightboxClose",
+        "cls": "lightbox-x",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "enhanceGateClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "enhanceGateCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "detailModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "agManageClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      }
+    ],
+    "step2_tap_hamburger": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step2_after_hamburger": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step2_reached_picker": false,
+    "step3_media_library": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step4_open_picker": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step4_select_t2i": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step4_after_select": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": null,
+      "favButtonOnCard": false
+    },
+    "step5_has_fav_button": false,
+    "step5_fav_tap": {
+      "ok": false,
+      "method": "tap+click-failed",
+      "tap_error": "Page.tap: Timeout 7000ms exceeded.",
+      "diag": {
+        "ok": false,
+        "reason": "not-found"
+      }
+    },
+    "step5_after": {
+      "badgeCount": 3,
+      "toast": null
+    }
+  },
+  "after": {
+    "base": "http://127.0.0.1:8190",
+    "viewport": [
+      375,
+      812
+    ],
+    "step0_initial": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": -57,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step1_open_picker": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step1_after_open": {
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 0,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": 243,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step1_select_t2v": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step1_after_select": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": -57,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step2_backish": [
+      {
+        "label": "打开导航菜单",
+        "id": "navToggle",
+        "cls": "nav-toggle",
+        "visible": true,
+        "rect": {
+          "t": 4,
+          "l": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "label": "关闭生成类型选择",
+        "id": "navDrawerClose",
+        "cls": "nav-drawer-close",
+        "visible": true,
+        "rect": {
+          "t": 83,
+          "l": -57,
+          "w": 44,
+          "h": 44
+        }
+      },
+      {
+        "label": "已取消",
+        "id": null,
+        "cls": "",
+        "visible": true,
+        "rect": {
+          "t": 104,
+          "l": 16,
+          "w": 63,
+          "h": 40
+        }
+      },
+      {
+        "label": "取消收藏（只解除标记，不删除产物）",
+        "id": null,
+        "cls": "fav-action is-on",
+        "visible": true,
+        "rect": {
+          "t": 2251,
+          "l": 97,
+          "w": 84,
+          "h": 40
+        }
+      },
+      {
+        "label": "取消收藏（只解除标记，不删除产物）",
+        "id": null,
+        "cls": "fav-action is-on",
+        "visible": true,
+        "rect": {
+          "t": 2827,
+          "l": 97,
+          "w": 84,
+          "h": 40
+        }
+      },
+      {
+        "label": "取消收藏（只解除标记，不删除产物）",
+        "id": null,
+        "cls": "fav-action is-on",
+        "visible": true,
+        "rect": {
+          "t": 2827,
+          "l": 278,
+          "w": 84,
+          "h": 40
+        }
+      },
+      {
+        "label": "取消选择",
+        "id": "alSelClear",
+        "cls": "al-btn",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "alDrawerClose",
+        "cls": "al-drawer-close",
+        "visible": true,
+        "rect": {
+          "t": 12,
+          "l": 696,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "alPlayerClose",
+        "cls": "al-drawer-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "mediaManageClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭会话列表",
+        "id": "agDrawerClose",
+        "cls": "ag-drawer-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭产物面板",
+        "id": "agArtifactsClose",
+        "cls": "ag-artifacts-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "provModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "provCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "enhanceModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "enhanceCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "mossLayoutClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "mossLayoutCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "phClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptVersionClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptVersionDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "fdClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭大图",
+        "id": "fdStageClose",
+        "cls": "fd-stage-close",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "fdDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "loraInfoClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "loraInfoDone",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "jobDetailClose",
+        "cls": "job-detail-x",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "lightboxClose",
+        "cls": "lightbox-x",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "enhanceGateClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "取消",
+        "id": "enhanceGateCancel",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "promptModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "detailModalClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": "agManageClose",
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      },
+      {
+        "label": "关闭",
+        "id": null,
+        "cls": "",
+        "visible": false,
+        "rect": {
+          "t": 0,
+          "l": 0,
+          "w": 0,
+          "h": 0
+        }
+      }
+    ],
+    "step2_tap_hamburger": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step2_after_hamburger": {
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 0,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": 243,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step2_reached_picker": true,
+    "step3_forced_close": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step3_media_library": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2v",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": -57,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step4_open_picker": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step4_select_t2i": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step4_after_select": {
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "activeMode": "t2i",
+      "cardsTotal": 12,
+      "cardsInViewport": 2,
+      "cardsClickable": 2,
+      "mediaLibraryVisible": true,
+      "backishControls": [
+        {
+          "label": "打开导航菜单",
+          "id": "navToggle",
+          "cls": "nav-toggle",
+          "visible": true,
+          "rect": {
+            "t": 4,
+            "l": 10,
+            "w": 36,
+            "h": 36
+          }
+        },
+        {
+          "label": "关闭生成类型选择",
+          "id": "navDrawerClose",
+          "cls": "nav-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 83,
+            "l": -57,
+            "w": 44,
+            "h": 44
+          }
+        },
+        {
+          "label": "已取消",
+          "id": null,
+          "cls": "",
+          "visible": true,
+          "rect": {
+            "t": 104,
+            "l": 16,
+            "w": 63,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2251,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 97,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消收藏（只解除标记，不删除产物）",
+          "id": null,
+          "cls": "fav-action is-on",
+          "visible": true,
+          "rect": {
+            "t": 2827,
+            "l": 278,
+            "w": 84,
+            "h": 40
+          }
+        },
+        {
+          "label": "取消选择",
+          "id": "alSelClear",
+          "cls": "al-btn",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alDrawerClose",
+          "cls": "al-drawer-close",
+          "visible": true,
+          "rect": {
+            "t": 12,
+            "l": 696,
+            "w": 40,
+            "h": 40
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "alPlayerClose",
+          "cls": "al-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mediaManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭会话列表",
+          "id": "agDrawerClose",
+          "cls": "ag-drawer-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭产物面板",
+          "id": "agArtifactsClose",
+          "cls": "ag-artifacts-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "provModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "provCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "mossLayoutClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "mossLayoutCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "phClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptVersionDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭大图",
+          "id": "fdStageClose",
+          "cls": "fd-stage-close",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "fdDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "loraInfoDone",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "jobDetailClose",
+          "cls": "job-detail-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "lightboxClose",
+          "cls": "lightbox-x",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "enhanceGateClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "取消",
+          "id": "enhanceGateCancel",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "promptModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "detailModalClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": "agManageClose",
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        },
+        {
+          "label": "关闭",
+          "id": null,
+          "cls": "",
+          "visible": false,
+          "rect": {
+            "t": 0,
+            "l": 0,
+            "w": 0,
+            "h": 0
+          }
+        }
+      ],
+      "drawerTitle": "选择生成类型",
+      "favButtonOnCard": true
+    },
+    "step5_has_fav_button": true,
+    "step5_fav_tap": {
+      "ok": true,
+      "method": "tap"
+    },
+    "step5_after": {
+      "badgeCount": 4,
+      "toast": "已加入收藏"
+    }
+  }
+}

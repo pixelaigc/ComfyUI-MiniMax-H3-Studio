@@ -130,6 +130,12 @@ STALE_BUMPED = {
     #   （参数抽屉遮罩 inset:0 -> inset:44px 0 0 0 让开顶栏；
     #    新增抽屉标题行样式）⇒ ?v= 必须再升一档。
     "responsive.css":          ("mobnav20261121a", "assetview20261121a"),
+    # 【2026-11-21 第二轮复测】responsive.css 又改了内容
+    #   （平板档 ≤1100px 补 .jobs-area padding-bottom:76px ——
+    #    原来那条只写在 ≤700px 那档，而 FAB 在 ≤1100px 就出现，
+    #    ⇒ 768px 下 FAB 压住卡片底部的「☆ 收藏」按钮 79×16px）
+    #   ⇒ ?v= 必须再升一档。
+    "responsive.css":          ("assetview20261121a", "navfix20261121a"),
     # 【2026-11-21 素材库独立查看窗口】responsive.css 改了内容
     #   （窄屏下 .al-view-btn 触控尺寸 + 媒体预览框不溢出 +
     #    查看器打开时藏掉页面 FAB）

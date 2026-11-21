@@ -1,0 +1,59 @@
+{
+  "base": "http://127.0.0.1:8921",
+  "viewport": [
+    375,
+    812
+  ],
+  "cards_initial": {
+    "total": 12,
+    "inViewport": 2,
+    "clickable": 2,
+    "sidebarOpen": false,
+    "panelOpen": false
+  },
+  "A_geom_when_open": {
+    "maskVisible": true,
+    "maskRect": {
+      "top": 0,
+      "h": 812,
+      "left": 0,
+      "w": 375
+    },
+    "panelTop": 97,
+    "panelBottom": 812,
+    "topbarBottom": 44,
+    "maskStripHeight": 53,
+    "firstMaskHitY": 44,
+    "maskZ": "949"
+  },
+  "A_tap_mask_strip": {
+    "ok": true,
+    "x": 187,
+    "y": 46
+  },
+  "A_panel_closed_after_mask": true,
+  "A_cards_after_mask": {
+    "total": 12,
+    "inViewport": 2,
+    "clickable": 2,
+    "sidebarOpen": false,
+    "panelOpen": false
+  },
+  "B_tap_hamburger": "FAIL: Page.tap: Timeout 8000ms exceeded.",
+  "B_state_after_hamburger": {
+    "total": 12,
+    "inViewport": 2,
+    "clickable": 0,
+    "sidebarOpen": false,
+    "panelOpen": true
+  },
+  "B_close_sidebar": "FAIL: Page.tap: Timeout 8000ms exceeded.",
+  "B_cards_after_close": {
+    "total": 12,
+    "inViewport": 2,
+    "clickable": 0,
+    "sidebarOpen": false,
+    "panelOpen": true
+  },
+  "B_detail_open": "FAIL: Page.tap: Timeout 8000ms exceeded."
+}

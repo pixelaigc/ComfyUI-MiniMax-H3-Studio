@@ -1,0 +1,72 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "tap_hamburger": "OK",
+  "before_scroll": {
+    "present": true,
+    "text": "收藏",
+    "rect": {
+      "top": 995,
+      "left": 10,
+      "w": 279,
+      "h": 40,
+      "bottom": 1035
+    },
+    "inViewport": false,
+    "hit": null,
+    "hitIsSelf": false,
+    "navScroll": {
+      "scrollTop": 0,
+      "scrollHeight": 1124,
+      "clientHeight": 606,
+      "maxScroll": 518
+    },
+    "sidebarOpen": true
+  },
+  "scroll": {
+    "ok": true,
+    "before": 0,
+    "scrolledBy": 298,
+    "needed": 298
+  },
+  "after_scroll": {
+    "present": true,
+    "text": "收藏",
+    "rect": {
+      "top": 697,
+      "left": 10,
+      "w": 279,
+      "h": 40,
+      "bottom": 737
+    },
+    "inViewport": true,
+    "hit": {
+      "tag": "A",
+      "id": "navFavorites",
+      "cls": "nav-item",
+      "text": "收藏"
+    },
+    "hitIsSelf": true,
+    "navScroll": {
+      "scrollTop": 298,
+      "scrollHeight": 1124,
+      "clientHeight": 606,
+      "maxScroll": 518
+    },
+    "sidebarOpen": true
+  },
+  "tap_favorites": "OK",
+  "favorites_view": {
+    "sidebarOpen": false,
+    "favTabActive": true,
+    "cards": 8,
+    "favBadges": 8,
+    "favToolsVisible": true,
+    "pageSize": "12"
+  },
+  "detail_in_fav_view": true,
+  "tab_all_in_fav_view": true
+}

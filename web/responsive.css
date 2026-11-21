@@ -180,6 +180,33 @@
      （同仓库其它地方也是这么处理的，见 .jobs-tools[hidden] / .lightbox[hidden]。） */
   .panel-fab[hidden] { display: none; }
 
+  /* ---------- 4.2c 媒体库底部给 FAB 让位（平板档 ≤1100px） ----------
+   *
+   * 【2026-11-21 第二轮复测发现的真缺陷】
+   * FAB 是 position:fixed（高 44px + 底边距 16px = 60px），
+   * z-index 960 高于一切 ⇒ **必然盖住**滚动到它下面的内容。
+   *
+   * 【原来错在哪】
+   * 给 FAB 让位的 `padding-bottom: 76px` 只写在 **≤700px** 那档里，
+   * 而 FAB 是在 **≤1100px**（平板档）就出现的 ——
+   * ⇒ 701~1100px 这一整段**没有让位**。
+   *
+   * 【实测后果（768×1024，elementFromPoint 命中测试）】
+   *   FAB rect = {top:964, left:668, w:86, h:44}
+   *   被压住的元素 = 卡片底部的「☆ 收藏」按钮
+   *     btnRect = {top:940, left:657, w:90, h:40}
+   *     covered = 79×16 px  ← 收藏按钮被盖掉一块
+   *   （375 / 390 那档有 padding-bottom:76px，所以没这个问题。）
+   *
+   * 【为什么这算缺陷】收藏按钮是**移动端唯一的收藏入口**
+   * （视频卡的长按右键菜单被 <video> 原生手势吞掉，唤不出来）——
+   * 它被 FAB 压住就等于「有些卡片收藏不了」。
+   *
+   * 【修法】把让位高度提到 **平板档**（FAB 出现的同一档），
+   * 手机档那条保留（值相同，不冲突）。 */
+  .jobs-area { padding-bottom: 76px; }
+  .jobs-pagination .page-summary { margin-left: 0; }
+
   /* 抽屉内部：多列改单列 */
   .compact-pair { grid-template-columns: 1fr; }
   .cards2 { grid-template-columns: 1fr; }

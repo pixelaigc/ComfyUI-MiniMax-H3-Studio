@@ -1,0 +1,134 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    768,
+    1024
+  ],
+  "tag": "before8190",
+  "sweep": {
+    "fabVisible": true,
+    "fabRect": {
+      "t": 964,
+      "l": 670,
+      "w": 84,
+      "h": 44
+    },
+    "maxScroll": 1758,
+    "steps": 24,
+    "overlapCount": 13,
+    "overlapMaxArea": 3364,
+    "overlapSamples": [
+      {
+        "scrollTop": 0,
+        "act": "favorite-toggle",
+        "text": "☆ 收藏",
+        "w": 77,
+        "h": 16,
+        "area": 1240,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 440,
+        "act": "prompt",
+        "text": "提示词integrate",
+        "w": 61,
+        "h": 30,
+        "area": 1805,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 440,
+        "act": "continue",
+        "text": "⏭ 接续",
+        "w": 77,
+        "h": 6,
+        "area": 493,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 513,
+        "act": "continue",
+        "text": "⏭ 接续",
+        "w": 77,
+        "h": 5,
+        "area": 354,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 513,
+        "act": "detail",
+        "text": "ℹ 详情",
+        "w": 77,
+        "h": 39,
+        "area": 3034,
+        "centerSelf": false
+      },
+      {
+        "scrollTop": 586,
+        "act": "favorite-toggle",
+        "text": "☆ 收藏",
+        "w": 77,
+        "h": 12,
+        "area": 893,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 952,
+        "act": "prompt",
+        "text": "提示词低角度侧面视角，主",
+        "w": 61,
+        "h": 12,
+        "area": 750,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1026,
+        "act": "toggle-batches",
+        "text": "▶ 批次结果（2/2 完",
+        "w": 77,
+        "h": 44,
+        "area": 3364,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1099,
+        "act": "open-new",
+        "text": "↗ 新窗口打开",
+        "w": 77,
+        "h": 12,
+        "area": 901,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1099,
+        "act": "detail",
+        "text": "ℹ 详情",
+        "w": 77,
+        "h": 32,
+        "area": 2486,
+        "centerSelf": false
+      },
+      {
+        "scrollTop": 1172,
+        "act": "favorite-toggle",
+        "text": "☆ 收藏",
+        "w": 77,
+        "h": 19,
+        "area": 1440,
+        "centerSelf": true
+      },
+      {
+        "scrollTop": 1319,
+        "act": "detail",
+        "text": "ℹ 详情",
+        "w": 77,
+        "h": 15,
+        "area": 1188,
+        "centerSelf": true
+      }
+    ],
+    "elementsSeen": 15,
+    "unreachableCount": 0,
+    "unreachable": []
+  }
+}

@@ -1,0 +1,5289 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    390,
+    844
+  ],
+  "headed": false,
+  "browser": "chromium",
+  "context": {
+    "is_mobile": true,
+    "has_touch": true,
+    "device_scale_factor": 2
+  },
+  "types": {
+    "t2v": {
+      "mode": "t2v",
+      "label": "文生视频",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "minimax-h3 文生视频",
+        "cls": "nav-item nav-model-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2v",
+        "text": "minimax-h3 文生视频"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "flf": {
+      "mode": "flf",
+      "label": "首尾帧生成",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "minimax-h3 首尾帧生视频",
+        "cls": "nav-item nav-model-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "flf",
+        "text": "minimax-h3 首尾帧生视频"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "r2v": {
+      "mode": "r2v",
+      "label": "参考图生成",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "minimax-h3 参考生视频",
+        "cls": "nav-item nav-model-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "r2v",
+        "text": "minimax-h3 参考生视频"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "longfilm": {
+      "mode": "longfilm",
+      "label": "长片拼接",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "minimax-h3 长片拼接",
+        "cls": "nav-item nav-model-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "longfilm",
+        "text": "minimax-h3 长片拼接"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3529,
+            "bottom": 4132,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "t2i": {
+      "mode": "t2i",
+      "label": "Z-IMAGE 文生图",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "Z-IMAGE 文生图",
+        "cls": "nav-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2i",
+        "text": "Z-IMAGE 文生图"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "t2i_qwen": {
+      "mode": "t2i_qwen",
+      "label": "Qwen-Image 2.1",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "Qwen-Image 2.1",
+        "cls": "nav-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2i_qwen",
+        "text": "Qwen-Image 2.1"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "t2i_moss": {
+      "mode": "t2i_moss",
+      "label": "MOSS-Image",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "MOSS-Image",
+        "cls": "nav-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2i_moss",
+        "text": "MOSS-Image"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "t2i_h3image": {
+      "mode": "t2i_h3image",
+      "label": "H3-Image",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "H3-Image",
+        "cls": "nav-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2i_h3image",
+        "text": "H3-Image"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 995,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 1035,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    },
+    "t2a": {
+      "mode": "t2a",
+      "label": "文生音乐",
+      "nav_item": {
+        "present": true,
+        "visible": true,
+        "text": "文生音乐",
+        "cls": "nav-item"
+      },
+      "select_tap": {
+        "method": "tap",
+        "ok": true
+      },
+      "after_select_state": {
+        "sidebarOpen": false,
+        "panelOpen": false,
+        "maskOpen": false,
+        "bodyModalOpen": false
+      },
+      "after_select_active_mode": {
+        "mode": "t2a",
+        "text": "文生音乐"
+      },
+      "A1_back_to_type_picker": {
+        "pre_state": {
+          "sidebarOpen": false,
+          "panelOpen": false,
+          "maskOpen": false,
+          "bodyModalOpen": false
+        },
+        "action": "open-sidebar",
+        "hamburger_hit": {
+          "found": true,
+          "rect": {
+            "top": 4,
+            "left": 10,
+            "w": 36,
+            "h": 36,
+            "bottom": 40,
+            "right": 46
+          },
+          "probe": {
+            "x": 28,
+            "y": 22
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "path",
+          "hitId": "",
+          "hitCls": "[object SVGAnimatedString]",
+          "hitText": "",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "tap": {
+          "method": "tap",
+          "ok": true
+        },
+        "sidebar_open_after": true,
+        "drawer_title": "选择生成类型",
+        "close_button_hit": {
+          "found": true,
+          "rect": {
+            "top": 83,
+            "left": 243,
+            "w": 44,
+            "h": 44,
+            "bottom": 127,
+            "right": 287
+          },
+          "probe": {
+            "x": 265,
+            "y": 105
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "navDrawerClose",
+          "hitCls": "nav-drawer-close",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        }
+      },
+      "A1_pass": true,
+      "A2_media_library": {
+        "jobs_area": {
+          "found": true,
+          "rect": {
+            "top": 44,
+            "left": 0,
+            "w": 390,
+            "h": 800,
+            "bottom": 844,
+            "right": 390
+          },
+          "probe": {
+            "x": 195,
+            "y": 444
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "SELECT",
+          "hitId": "doneDuration",
+          "hitCls": "",
+          "hitText": "全部时长\n          5 秒\n          6 秒\n       ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "jobs_grid": {
+          "found": true,
+          "rect": {
+            "top": 603,
+            "left": 12,
+            "w": 366,
+            "h": 3373,
+            "bottom": 3976,
+            "right": 378
+          },
+          "probe": {
+            "x": 195,
+            "y": 843
+          },
+          "inViewport": false,
+          "partiallyInViewport": true,
+          "hitTag": "DIV",
+          "hitId": "jobsGrid",
+          "hitCls": "jobs-grid",
+          "hitText": "Z-IMAGE 文生图 · 11/21 13:48★11/21 13:48\n  ",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "cards": {
+          "total": 12,
+          "visible": 2,
+          "clickable": 2,
+          "detail": [
+            {
+              "jid": "3ccceef793f5",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "f647f715baa8",
+              "inViewport": true,
+              "hitIsSelf": true,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "aa0b4f6a3798",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "b0640291d8f6",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "8eae818d7459",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            },
+            {
+              "jid": "29ddcd8c0b5e",
+              "inViewport": false,
+              "hitIsSelf": false,
+              "hitCls": "row-group gen-params"
+            }
+          ]
+        },
+        "favorites_nav_entry": {
+          "found": true,
+          "rect": {
+            "top": 592,
+            "left": -290,
+            "w": 279,
+            "h": 40,
+            "bottom": 632,
+            "right": -11
+          },
+          "probe": {
+            "x": 0,
+            "y": 612
+          },
+          "inViewport": false,
+          "partiallyInViewport": false,
+          "hitTag": "MAIN",
+          "hitId": "jobsArea",
+          "hitCls": "jobs-area",
+          "hitText": "全部\n        进行中\n        已完成\n        长片\n  ",
+          "hitIsSelf": false,
+          "hitIsAncestor": false
+        }
+      },
+      "A2_pass": true,
+      "A5_overlap_closed": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebar",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": -300,
+            "t": 44,
+            "w": 300,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#panelMask",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        }
+      ],
+      "A5_overlap_closed_total": 0,
+      "A5_drawer_opened_by_real_tap": true,
+      "A5_overlap_drawer_open": [
+        {
+          "control": "#navToggle",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 10,
+            "t": 4,
+            "w": 36,
+            "h": 36
+          },
+          "covered": [],
+          "coveredArea": 0
+        },
+        {
+          "control": "#panelFab",
+          "present": true,
+          "visible": false,
+          "coveredArea": 0,
+          "covered": []
+        },
+        {
+          "control": "#sidebarMask",
+          "present": true,
+          "visible": true,
+          "visible_rect": {
+            "l": 0,
+            "t": 44,
+            "w": 390,
+            "h": 800
+          },
+          "covered": [],
+          "coveredArea": 0
+        }
+      ],
+      "A5_overlap_drawer_total": 0,
+      "A5_pass": true,
+      "A3_detail_modal": {
+        "open": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_visible": true,
+        "legacy_modal_stays_hidden": true,
+        "body_text": "⬇ 下载原文件 t2i_3ccceef793f5_00001_.png 生成参数 模型Z-Image-Turbo · 官方加速版权重文件z_image_turbo_bf16.safetensors步数8调度器simple采样器res_multistepCFG1种子20261121宽度1360高度768分辨率档位1mp画面比例16:9时长未知注意力机制未知工作流名文生图（build_t2i）LoRAZ-imagemeinv11_10 ×1.00创建时间11/21 13:48 主模型推荐参数（作者 / ComfyUI 硬性值）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供加速 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供工作流固定 LoRA 推荐参数（作者）推荐步数：作者未提供推荐调度器：作者未提供推荐采样器：作者未提供推荐视频 shift：作者未提供推荐音频 shift：作者未提供推荐主模型：作者未提供来源类型：作者未提供 完整提示词 a photorealistic portrait of an orange tabby cat running on green grass, golden rim light, shallow depth of field, 85mm lens",
+        "has_params_markers": {
+          "steps": true,
+          "lora": true,
+          "scheduler": true,
+          "seed": true,
+          "sampler": true,
+          "size": true,
+          "prompt": true
+        },
+        "kv_count": 16,
+        "body_overflow": {
+          "scrollHeight": 1440,
+          "clientHeight": 655,
+          "scrollable": true,
+          "maxScroll": 785
+        },
+        "preview_visible": true,
+        "close_hit": {
+          "found": true,
+          "rect": {
+            "top": 80,
+            "left": 336,
+            "w": 40,
+            "h": 40,
+            "bottom": 120,
+            "right": 376
+          },
+          "probe": {
+            "x": 356,
+            "y": 100
+          },
+          "inViewport": true,
+          "partiallyInViewport": true,
+          "hitTag": "BUTTON",
+          "hitId": "detailModalClose",
+          "hitCls": "",
+          "hitText": "×",
+          "hitIsSelf": true,
+          "hitIsAncestor": true
+        },
+        "close": {
+          "method": "tap",
+          "ok": true
+        },
+        "modal_closed_after": true
+      },
+      "A3_pass": true,
+      "A4_filters": {
+        "all": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": -232,
+              "left": 16,
+              "w": 50,
+              "h": 40,
+              "bottom": -192,
+              "right": 66
+            },
+            "probe": {
+              "x": 41,
+              "y": 0
+            },
+            "inViewport": false,
+            "partiallyInViewport": false,
+            "hitTag": "HEADER",
+            "hitId": "",
+            "hitCls": "topbar",
+            "hitText": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+            "hitIsSelf": false,
+            "hitIsAncestor": false
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "active": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 70,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 133
+            },
+            "probe": {
+              "x": 102,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "进行中",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 0
+        },
+        "done": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 60,
+              "left": 137,
+              "w": 63,
+              "h": 40,
+              "bottom": 100,
+              "right": 200
+            },
+            "probe": {
+              "x": 169,
+              "y": 80
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "已完成",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 12
+        },
+        "favorites": {
+          "exists": true,
+          "hit": {
+            "found": true,
+            "rect": {
+              "top": 104,
+              "left": 83,
+              "w": 50,
+              "h": 40,
+              "bottom": 144,
+              "right": 133
+            },
+            "probe": {
+              "x": 108,
+              "y": 124
+            },
+            "inViewport": true,
+            "partiallyInViewport": true,
+            "hitTag": "BUTTON",
+            "hitId": "",
+            "hitCls": "",
+            "hitText": "收藏",
+            "hitIsSelf": true,
+            "hitIsAncestor": true
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 8
+        },
+        "gen_type_tabs": [
+          {
+            "text": "全部类型",
+            "type": "",
+            "cls": "active"
+          },
+          {
+            "text": "文生视频",
+            "type": "t2v",
+            "cls": ""
+          },
+          {
+            "text": "首尾帧生成",
+            "type": "flf",
+            "cls": ""
+          },
+          {
+            "text": "参考图生成",
+            "type": "r2v",
+            "cls": ""
+          },
+          {
+            "text": "Z-IMAGE 文生图",
+            "type": "t2i",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 文生图",
+            "type": "t2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "Qwen-Image 2.1 图片编辑",
+            "type": "i2i_qwen",
+            "cls": ""
+          },
+          {
+            "text": "MOSS-Image 文生图",
+            "type": "t2i_moss",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 文生图",
+            "type": "t2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "H3-Image 图片编辑",
+            "type": "i2i_h3image",
+            "cls": ""
+          },
+          {
+            "text": "文生音乐",
+            "type": "t2a",
+            "cls": ""
+          },
+          {
+            "text": "参考生音乐",
+            "type": "a2a",
+            "cls": ""
+          },
+          {
+            "text": "长片拼接",
+            "type": "longfilm",
+            "cls": ""
+          },
+          {
+            "text": "其它生成",
+            "type": "__other__",
+            "cls": ""
+          }
+        ],
+        "gen_type_tab_count": 14,
+        "gen_type_tab_effect": {
+          "type": "t2v",
+          "hit": {
+            "found": true,
+            "hitIsSelf": true,
+            "hitCls": "",
+            "rect": {
+              "w": 68,
+              "h": 40
+            }
+          },
+          "tap": {
+            "method": "tap",
+            "ok": true
+          },
+          "became_active": true,
+          "card_count": 6
+        },
+        "page_size": {
+          "exists": true,
+          "options": [
+            "8",
+            "12",
+            "16",
+            "24",
+            "32",
+            "48"
+          ],
+          "value": "12",
+          "hitIsSelf": true,
+          "hitCls": "",
+          "hitTag": "SELECT",
+          "rect": {
+            "w": 176,
+            "h": 40
+          }
+        }
+      },
+      "A4_pass": true
+    }
+  },
+  "initial": {
+    "sidebarOpen": false,
+    "panelOpen": false,
+    "maskOpen": false,
+    "bodyModalOpen": false
+  },
+  "initial_cards": 12,
+  "page_errors": []
+}
