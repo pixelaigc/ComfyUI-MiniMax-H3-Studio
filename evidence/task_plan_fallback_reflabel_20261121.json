@@ -1,0 +1,38 @@
+{
+  "note": "Studio 任务卡 fallback —— MCP token 失效，按 AGENTS.md 的降级顺序落地",
+  "reason": "ekko_studio_update_plan 经 tool_call 报 harness 注入 item 键（additionalProperties）；改走 stdio 直连后 tools/list 正常（返回 ekko_studio_update_plan），但 tools/call 返回 Unauthorized —— Web UI 已轮换 token。coding / default 两个 profile 的 .model-run-token 都试过，均 401。",
+  "tried": [
+    "tool_call -> ('item' was unexpected) —— harness 注入，非调用方错误",
+    "stdio tools/list（coding profile token） -> OK，返回 ekko_studio_update_plan",
+    "stdio tools/call（coding profile token） -> Unauthorized",
+    "stdio tools/call（default profile token） -> Unauthorized",
+    "HTTP POST /api/studio/turn-context/plan（Bearer / X-Hermes-Token / +Profile） -> 401 x3"
+  ],
+  "plan": [
+    {"id": "s1", "step": "核实现场：分支拓扑、线上 8190 已部署内容、额度闸门（只读快照 77% ≥20%）", "status": "completed"},
+    {"id": "s2", "step": "核实官方 H3 参考标签规范与现场实现一致（<Picture N>/<Video N>/<Audio N>，按类别独立编号、跟面板顺序一一对应）", "status": "completed"},
+    {"id": "s3", "step": "跑全量 pytest 回归（线上态）+ 与基线对照 diff，钉死既有 flake", "status": "completed"},
+    {"id": "s4", "step": "8190 真实浏览器复验：参考生图/flf/参考生视频三类面板，增强请求体含全部素材 + 响应含参考编号", "status": "completed"},
+    {"id": "s5", "step": "核实 flf/r2v 与 t2v 面板一致性修复落地（尺寸唯一/FL2VA 无 LoRA/无官方加速档留 none 并禁用/固定项只读），产出 t2v-flf 字段对照表", "status": "completed"},
+    {"id": "s6", "step": "合并到 local/maintainer 并部署 8190，留回滚点，产出中文交付报告与证据目录", "status": "completed"}
+  ],
+  "deliverables": {
+    "branch": "local/fix/reflabel-syntax-20261121",
+    "worktree": "/root/projects/h3s-fix-reflabel-syntax",
+    "merge_commit": "2f64acfd6c81e86cbaff981d87d1d1bb0e6e726f",
+    "maintainer": "2f64acfd6c81e86cbaff981d87d1d1bb0e6e726f",
+    "live": "2f64acfd6c81e86cbaff981d87d1d1bb0e6e726f",
+    "rollback_points": [
+      "backup/live-before-reflabelsyntax-20260722-022528",
+      "backup/maintainer-before-reflabelsyntax-20260722-022528",
+      "backup/live-before-reflabelsyntax-20260722-024557",
+      "backup/maintainer-before-reflabelsyntax-20260722-024557",
+      "backup/live-before-reflabelsyntax-20260722-030024",
+      "backup/maintainer-before-reflabelsyntax-20260722-030024"
+    ],
+    "report": "/root/projects/h3s-fix-reflabel-syntax/docs/交付报告-参考标签语法分方言-20261121.md",
+    "evidence_browser": "/root/projects/h3s-fix-reflabel-syntax/evidence/ref-labels-all-panels-8190/",
+    "evidence_real_submit": "/root/projects/h3s-fix-reflabel-syntax/evidence/real-submit-8190/",
+    "evidence_field_table": "/root/projects/h3s-fix-reflabel-syntax/evidence/t2v-flf-field-table/"
+  }
+}
