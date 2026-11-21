@@ -1,0 +1,23 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "target_box": {
+    "x": 13,
+    "y": 380.8125,
+    "width": 168.5,
+    "height": 94.78125
+  },
+  "target_point": {
+    "x": 97.25,
+    "y": 428.203125,
+    "inViewport": true
+  },
+  "contextmenu_fired": 0,
+  "contextmenu_target": null,
+  "ctx_menu_open": false,
+  "ctx_menu_items": [],
+  "contextmenu_fired_on_tap": 0
+}

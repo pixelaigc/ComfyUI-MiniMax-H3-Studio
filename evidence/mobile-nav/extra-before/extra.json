@@ -1,0 +1,35 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "card_preview_found": true,
+  "contextmenu_fired_after_touch": 0,
+  "ctx_menu_open": false,
+  "fab_vs_card": {
+    "fabHidden": false,
+    "fabRect": {
+      "top": 752,
+      "left": 275,
+      "w": 86,
+      "h": 44
+    },
+    "overlappingCards": [
+      {
+        "ovW": 86,
+        "ovH": 44,
+        "cardRect": {
+          "top": 647,
+          "left": 193,
+          "w": 171,
+          "h": 501
+        }
+      }
+    ]
+  },
+  "real_click_favorites": true,
+  "real_click_favorites_error": null,
+  "favorites_tab_active_after": true,
+  "fav_cards": 0
+}

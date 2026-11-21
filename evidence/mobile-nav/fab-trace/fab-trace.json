@@ -1,0 +1,40 @@
+{
+  "fabHiddenAttr": false,
+  "fabDisplay": "flex",
+  "fabVisibility": "visible",
+  "fabOpacity": "1",
+  "fabRect": {
+    "top": 752,
+    "left": 275,
+    "w": 86,
+    "h": 44
+  },
+  "sidebarOpen": true,
+  "log": [
+    {
+      "t": "init",
+      "hidden": false,
+      "display": "flex"
+    },
+    {
+      "t": "mutate",
+      "hidden": false,
+      "display": "flex",
+      "attr": "hidden",
+      "stack": "    at eval (eval at evaluate (:311:30), <anonymous>:11:45) |     at Array.forEach (<anonymous>) |     at MutationObserver.observe.attributes (eval at evaluate (:311:30), <anonymous>:7:18)"
+    },
+    {
+      "t": "mutate",
+      "hidden": false,
+      "display": "flex",
+      "attr": "hidden",
+      "stack": "    at eval (eval at evaluate (:311:30), <anonymous>:11:45) |     at Array.forEach (<anonymous>) |     at MutationObserver.observe.attributes (eval at evaluate (:311:30), <anonymous>:7:18)"
+    },
+    {
+      "t": "sidebar",
+      "open": true,
+      "hidden": false,
+      "display": "flex"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "S1_initial": {
+    "fabVisible": true,
+    "fabRect": {
+      "top": 752,
+      "left": 275,
+      "w": 86,
+      "h": 44
+    },
+    "sidebarOverlap": null,
+    "panelOverlap": null,
+    "cardTextOverlap": [],
+    "cardMediaOverlap": []
+  },
+  "S2_sidebar_open": {
+    "fabVisible": true,
+    "fabRect": {
+      "top": 752,
+      "left": 275,
+      "w": 86,
+      "h": 44
+    },
+    "sidebarOverlap": {
+      "w": 25,
+      "h": 44,
+      "sidebarRect": {
+        "top": 44,
+        "left": 0,
+        "w": 300,
+        "h": 768
+      },
+      "covered": [
+        {
+          "text": "音乐",
+          "cls": "nav-group"
+        },
+        {
+          "text": "文生音乐",
+          "cls": "nav-item"
+        }
+      ]
+    },
+    "panelOverlap": null,
+    "cardTextOverlap": [],
+    "cardMediaOverlap": []
+  },
+  "S3_panel_open": {
+    "fabVisible": false,
+    "fabRect": null,
+    "sidebarOverlap": null,
+    "panelOverlap": null,
+    "cardTextOverlap": [],
+    "cardMediaOverlap": []
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "drawer_closed": {
+    "found": true,
+    "inSidebar": true,
+    "parentChain": [
+      "A#navFavorites.nav-item",
+      "DIV#navScroll.nav-scroll",
+      "NAV#sidebar.sidebar",
+      "DIV.layout",
+      "BODY",
+      "HTML"
+    ],
+    "rect": {
+      "top": 995,
+      "left": -290,
+      "w": 279,
+      "h": 40,
+      "bottom": 1035,
+      "right": -11
+    },
+    "sidebarRect": {
+      "top": 44,
+      "left": -300,
+      "w": 300,
+      "h": 768
+    },
+    "navScrollRect": {
+      "top": 139,
+      "left": -290,
+      "w": 279,
+      "h": 606,
+      "scrollTop": 0,
+      "scrollHeight": 1124,
+      "clientHeight": 606
+    },
+    "sidebarTransform": "matrix(1, 0, 0, 1, -300, 0)",
+    "sidebarOpen": false,
+    "hit": {
+      "x": -150,
+      "y": 1015,
+      "inViewport": false,
+      "hitId": null,
+      "hitCls": null,
+      "hitText": null,
+      "isSelf": false
+    },
+    "vw": 375,
+    "vh": 812
+  },
+  "drawer_open": {
+    "found": true,
+    "inSidebar": true,
+    "parentChain": [
+      "A#navFavorites.nav-item",
+      "DIV#navScroll.nav-scroll",
+      "NAV#sidebar.sidebar",
+      "DIV.layout",
+      "BODY",
+      "HTML"
+    ],
+    "rect": {
+      "top": 995,
+      "left": 10,
+      "w": 279,
+      "h": 40,
+      "bottom": 1035,
+      "right": 289
+    },
+    "sidebarRect": {
+      "top": 44,
+      "left": 0,
+      "w": 300,
+      "h": 768
+    },
+    "navScrollRect": {
+      "top": 139,
+      "left": 10,
+      "w": 279,
+      "h": 606,
+      "scrollTop": 0,
+      "scrollHeight": 1124,
+      "clientHeight": 606
+    },
+    "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+    "sidebarOpen": true,
+    "hit": {
+      "x": 150,
+      "y": 1015,
+      "inViewport": false,
+      "hitId": null,
+      "hitCls": null,
+      "hitText": null,
+      "isSelf": false
+    },
+    "vw": 375,
+    "vh": 812
+  },
+  "drawer_open_scrolled_bottom": {
+    "found": true,
+    "inSidebar": true,
+    "parentChain": [
+      "A#navFavorites.nav-item",
+      "DIV#navScroll.nav-scroll",
+      "NAV#sidebar.sidebar",
+      "DIV.layout",
+      "BODY",
+      "HTML"
+    ],
+    "rect": {
+      "top": 477,
+      "left": 10,
+      "w": 279,
+      "h": 40,
+      "bottom": 517,
+      "right": 289
+    },
+    "sidebarRect": {
+      "top": 44,
+      "left": 0,
+      "w": 300,
+      "h": 768
+    },
+    "navScrollRect": {
+      "top": 139,
+      "left": 10,
+      "w": 279,
+      "h": 606,
+      "scrollTop": 518,
+      "scrollHeight": 1124,
+      "clientHeight": 606
+    },
+    "sidebarTransform": "matrix(1, 0, 0, 1, 0, 0)",
+    "sidebarOpen": true,
+    "hit": {
+      "x": 150,
+      "y": 497,
+      "inViewport": true,
+      "hitId": "navFavorites",
+      "hitCls": "nav-item",
+      "hitText": "收藏",
+      "isSelf": true
+    },
+    "vw": 375,
+    "vh": 812
+  },
+  "real_click_ok": true,
+  "real_click_error": null,
+  "fav_tab_active": true
+}

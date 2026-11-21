@@ -1,0 +1,26 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "panel_open": true,
+  "fab_hidden_when_panel_open": true,
+  "real_click_hamburger": "FAIL: Page.click: Timeout 4000ms exceeded.",
+  "sidebar_open_after_click": false,
+  "real_click_mask": "FAIL: Page.click: Timeout 4000ms exceeded.",
+  "panel_open_after_mask_click": true,
+  "real_click_card": "FAIL: ElementHandle.click: Timeout 4000ms exceeded.",
+  "favorites_in_view_after_scroll": {
+    "rect": {
+      "top": 477,
+      "left": -290,
+      "w": 279,
+      "h": 40
+    },
+    "inViewport": true,
+    "hitId": null,
+    "hitCls": null,
+    "hitIsSelf": false
+  }
+}

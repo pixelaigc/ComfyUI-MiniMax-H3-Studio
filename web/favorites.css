@@ -29,6 +29,21 @@
   flex: 0 0 auto;
 }
 
+/* ---------- 卡片底部的「收藏 / 取消收藏」按钮 ----------
+   【为什么必须有 —— 2026-11-21 实测】
+   右键菜单在移动端唤不出来：<video> 会吞掉所有 touch 事件
+   （连 document 的 capture 都收不到）。这个按钮是纯 DOM 按钮，
+   touch 正常 —— 它是移动端唯一可靠的收藏入口。 */
+.fav-action {
+  flex: 1; border: none; background: transparent; cursor: pointer;
+  font-size: 12px; color: var(--muted); border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.fav-action:hover { background: #f6f7f9; color: var(--text); }
+/* 已收藏态：用强调色（与 ★ 角标同一套），一眼能对上 */
+.fav-action.is-on { color: var(--accent); font-weight: 600; }
+.fav-action.is-on:hover { background: var(--accent-soft); color: var(--accent); }
+
 /* ---------- 收藏视图的选择框 ---------- */
 /* 只在收藏视图出现（state.tab === "favorites" 时才渲染这个 label）。 */
 .fav-sel-wrap {

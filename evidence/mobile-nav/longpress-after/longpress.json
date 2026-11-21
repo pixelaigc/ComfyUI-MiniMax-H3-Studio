@@ -1,0 +1,27 @@
+{
+  "base": "http://127.0.0.1:8917",
+  "viewport": [
+    375,
+    812
+  ],
+  "target_box": {
+    "x": 193.5,
+    "y": 380.84375,
+    "width": 168.5,
+    "height": 94.78125
+  },
+  "target_point": {
+    "x": 277.75,
+    "y": 428.234375,
+    "inViewport": true
+  },
+  "contextmenu_fired": 0,
+  "contextmenu_target": null,
+  "ctx_menu_open": true,
+  "ctx_menu_items": [
+    "添加到素材库（这个结果）",
+    "添加到收藏",
+    "下载原文件"
+  ],
+  "contextmenu_fired_on_tap": 0
+}

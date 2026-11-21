@@ -4905,6 +4905,38 @@ function reuseConfigFromJob(job, p, panel) {
   };
 }
 
+/**
+ * 卡片底部操作条里的「收藏 / 取消收藏」按钮。
+ *
+ * 【为什么必须有这个按钮 —— 2026-11-21 实测】
+ * 右键菜单（contextmenu）在移动端**根本唤不出来**：
+ *   · 移动端浏览器长按不派发 contextmenu
+ *   · 更严重的是：**<video> 会吞掉所有 touch 事件** ——
+ *     实测（CDP 真实触摸 + document/window 级 capture 探针）：
+ *       按 <img>   -> pointerdown / touchstart 全部收到   ✅
+ *       按 <video> -> **一个事件都收不到**                ❌
+ *     连 .job-preview 容器的 capture 监听也收不到。
+ *   ⇒ 在视频卡片上，长按这条路是死的。
+ *
+ * 【所以必须有「不依赖右键」的入口】
+ * 这个按钮在 .job-actions 里 —— 那是纯 DOM 按钮，touch 正常。
+ * 桌面端也显示（与其它操作按钮同一排），右键菜单仍保留。
+ *
+ * 【为什么不并入「收藏」标签页的批量选择】
+ * 批量选择只在收藏视图里有；这个按钮在**任何视图**都能用。
+ *
+ * 【文案】已收藏时显示「★ 取消收藏」，未收藏时显示「☆ 收藏」——
+ * 星号与卡片顶栏的已收藏标识同形，一眼能对上。
+ */
+function favActionButtonHtml(job) {
+  if (job.is_skeleton) return "";           // 骨架卡没有真实 id，不能带可操作控件
+  if (job.status === "running" || job.status === "queued") return "";
+  const on = !!job.favorited;
+  return `<button type="button" data-act="favorite-toggle" class="fav-action${on ? " is-on" : ""}"
+            title="${on ? "取消收藏（只解除标记，不删除产物）" : "收藏（清理媒体库时会跳过它）"}"
+            aria-pressed="${on ? "true" : "false"}">${on ? "★ 取消收藏" : "☆ 收藏"}</button>`;
+}
+
 function jobCard(job) {
   const p = job.params || {};
   const info = MODE_INFO[job.mode] || { name: job.mode };
@@ -5126,6 +5158,7 @@ function jobCard(job) {
       ${job.mode !== "longfilm" ? `<button data-act="reuse">复用参数</button>` : ""}
       ${!runningOrQueued ? `<button data-act="detail" title="查看完整生成参数">ℹ 详情</button>` : ""}
       ${!runningOrQueued ? `<button data-act="delete" class="danger">删除</button>` : ""}
+      ${favActionButtonHtml(job)}
     </div>`;
 
   if (image) {
@@ -5236,6 +5269,26 @@ function jobCard(job) {
   // （它 open() 的是字段更全的 #jobDetailModal）。
   // 两边都开 = 两个模态框叠在一起。
   // 这里保留 stopPropagation（防止冒泡到卡片监听器再被当成「点卡片」）。
+  // 【2026-11-21】卡片底部的「收藏 / 取消收藏」按钮。
+  //
+  // 【为什么不用右键菜单】移动端右键菜单唤不出来（<video> 吞 touch 事件，
+  // 详见 favActionButtonHtml 的注释）—— 这个按钮是不依赖右键的入口。
+  //
+  // 【实现归属】真正的收藏/取消收藏逻辑在 web/favorites.js
+  // （window.FAVORITES.toggleFavorite，收藏逻辑的唯一实现处）。
+  // 这里只负责把点击转过去 —— 两份逻辑必然漂移。
+  card.querySelector('[data-act="favorite-toggle"]')?.addEventListener("click", async event => {
+    event.stopPropagation();
+    // 目标状态 = 当前状态的取反。当前状态读 DOM 上的 ★（乐观更新后
+    // 闭包里的 job.favorited 就不准了）—— 与右键菜单同一口径。
+    const hasBadge = !!card.querySelector(".job-fav-badge");
+    const target = !hasBadge;
+    if (window.FAVORITES && typeof window.FAVORITES.toggleFavorite === "function") {
+      await window.FAVORITES.toggleFavorite(job.id, target);
+    } else {
+      alert("收藏模块未加载");
+    }
+  });
   card.querySelector('[data-act="detail"]')?.addEventListener("click", event => {
     event.stopPropagation();
     // 【2026-11-14 需求 3】
@@ -5575,11 +5628,15 @@ function jobCard(job) {
 //   * 有批次：产物挂在 job_batches 上（批次缩略图）
 //   * 无批次：产物直接挂在 job 上（卡片预览图 / 视频）
 function bindMediaContextMenu(card, job) {
-  const openMenu = (event, payload) => {
+  const openMenu = (event, payload, at) => {
     event.preventDefault();
     event.stopPropagation();
     const menu = $("#mediaContext");
     if (!menu) return;
+    // 【2026-11-21 移动端长按】触屏长按没有 clientX/clientY 的右键事件，
+    // 用 at（长按点坐标）兜底。
+    const px = at && Number.isFinite(at.x) ? at.x : event.clientX;
+    const py = at && Number.isFinite(at.y) ? at.y : event.clientY;
     const label = payload.batch_id
       ? `批次 #${(payload.batch_index ?? 0) + 1} 的结果`
       : "这个结果";
@@ -5610,8 +5667,8 @@ function bindMediaContextMenu(card, job) {
     menu.style.left = "0px";
     menu.style.top = "0px";
     const rect = menu.getBoundingClientRect();
-    menu.style.left = Math.max(4, Math.min(event.clientX, window.innerWidth - rect.width - 8)) + "px";
-    menu.style.top = Math.max(4, Math.min(event.clientY, window.innerHeight - rect.height - 8)) + "px";
+    menu.style.left = Math.max(4, Math.min(px, window.innerWidth - rect.width - 8)) + "px";
+    menu.style.top = Math.max(4, Math.min(py, window.innerHeight - rect.height - 8)) + "px";
 
     menu.querySelectorAll("button[data-act]").forEach(btn => {
       btn.addEventListener("click", async () => {
@@ -5686,6 +5743,181 @@ function bindMediaContextMenu(card, job) {
       batch_id: batchId, batch_index: batch?.idx ?? 0,
     }));
   });
+
+  // ---------- 移动端长按 → 同一份右键菜单 ----------
+  //
+  // 【为什么必须有这个 —— 2026-11-21 实测】
+  // 移动端浏览器**长按不派发 contextmenu**。用 CDP 的浏览器级真实触摸
+  // （Input.dispatchTouchEvent，按住 850ms 不松手）实测：
+  //   "contextmenu_fired": 0
+  //   "ctx_menu_open": false
+  //   "ctx_menu_items": []
+  // ⇒ 卡片只绑 contextmenu 的话，手机上「添加到收藏」/「添加到素材库」
+  //   **完全不可达** —— 收藏功能在移动端是死的。
+  //
+  // 【为什么复用 openMenu 而不是另写一份】
+  // 两份菜单必然漂移（收藏的乐观更新、DOM 读 ★、「取消收藏 ≠ 删除产物」
+  // 这些逻辑都在 openMenu 里）。长按只是**另一种触发方式**，菜单本身
+  // 必须是同一份。
+  //
+  // 【阈值 550ms】移动端浏览器自己的长按阈值通常是 500ms；
+  // 取 550ms 略高于它，避免「想滑动列表」被误判成「想打开菜单」。
+  // 手指移动超过 12px 就取消（滚动优先）。
+  // 【⚠️ 这里必须用可选链】image / video / audioOut 任一都可能是 undefined
+  // （一张卡可能只有视频没有图片）。
+  // 第一版直接写 `image.file` —— 视频卡长按时会抛 TypeError
+  // （image 是 undefined），菜单永远打不开。
+  // 实测（evidence/mobile-nav/ctxmenu-after/ctxmenu.json）：
+  //   "media_card_index": 3（一张**视频**卡）
+  //   "menu_geometry": {"open": false}
+  //   "fav_button_found": false
+  // ⇒ 菜单确实没打开。改用 `?.` 之后同一张卡能正常打开菜单。
+  // 【⚠️ 监听必须绑在 .job-preview **容器**上，不能绑在媒体元素上】
+  //
+  // 【实测根因 —— 2026-11-21】
+  // 第一次实现把监听挂在媒体元素（img / video / audio）上，长按**完全无效**。
+  // 三组对照实验（document 级 capture 探针）：
+  //   按普通 BUTTON  -> pointerdown/touchstart 全部收到   ✅
+  //   按 <img>       -> pointerdown/touchstart 全部收到   ✅
+  //   按 <video>     -> **一个事件都收不到**              ❌
+  // 原因：**<video> 有自己的原生手势处理**（播放/暂停/全屏），
+  // 它把 touch 事件吞掉了 —— 连 document 的 capture 阶段都收不到。
+  // ⇒ 监听挂在 video 上等于没挂。
+  //
+  // 【正确做法】
+  // 监听挂在 .job-preview **容器**上，用 **capture 阶段**：
+  //   · capture 在事件抵达目标之前触发 —— 即使 <video> 之后会吞掉它，
+  //     我们已经在它之前拿到 touchstart 了
+  //   · 命中判定用 elementFromPoint（按坐标找媒体），不用 event.target
+  //     —— 因为 event.target 可能是 video，也可能是容器
+  // 这样图片 / 视频 / 音频三种卡片都能长按出菜单。
+  bindLongPress(card, [
+    { el: () => card.querySelector(".job-preview img"),
+      payload: () => ({file: image?.file, kind: "image", batch_id: null}) },
+    { el: () => card.querySelector(".job-preview video"),
+      payload: () => ({file: video?.file, kind: "video", batch_id: null}) },
+    { el: () => card.querySelector(".job-preview audio"),
+      payload: () => ({file: audioOut?.file, kind: "audio", batch_id: null}) },
+  ], (payload, at) => openMenu({preventDefault() {}, stopPropagation() {}}, payload, at));
+}
+
+/**
+ * 给一组元素绑「长按」手势：按住 550ms 且没移动超过 12px 就回调。
+ *
+ * 【为什么不用 touchstart + setTimeout】
+ * 那是最省事的写法，但有两个坑：
+ *   1) 手指抬起时定时器还在跑 —— 会漏触发（抬手不等于取消）。
+ *   2) 用户按住后开始滚动，定时器不会自动停 —— 滚动列表时误开菜单。
+ * 这里显式在 touchmove / touchend / touchcancel 里清理定时器。
+ */
+function bindLongPress(root, targets, onLongPress) {
+  if (!root) return;
+  const HOLD_MS = 550;
+  const MOVE_TOLERANCE = 12;
+  let timer = null;
+  let startX = 0;
+  let startY = 0;
+  let startTarget = null;
+
+  const clear = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    startTarget = null;
+  };
+
+  // 【命中判定用坐标，不用 event.target】
+  // 原因：<video> 会吞掉 touch 事件，event.target 在不同浏览器/状态下
+  // 可能落到 video 上、也可能落到 .job-preview 容器上。
+  // 用 elementFromPoint 按坐标找「手指按在哪个媒体上」最稳。
+  const findTarget = (x, y) => {
+    for (const t of targets) {
+      const node = t.el();
+      if (!node) continue;
+      const r = node.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      return t;
+    }
+    return null;
+  };
+
+  // 【⚠️ 监听挂在哪 —— 三轮实测才定下来的】
+  //
+  // 【实测矩阵】document / window 级探针 + CDP 真实触摸（按 850ms）：
+  //   按 <img>       -> win-pointerdown / win / doc-capture / doc-bubble  全到 ✅
+  //   按 <video>     -> **一个事件都没有**                                  ❌
+  //   连 .job-preview 容器的 capture 监听也收不到 —— 因为 <video> 有原生
+  //   手势处理，touch 在到达容器之前就被它吃掉了。
+  //
+  // 【结论】只要手指按在 <video> 上，就**不可能**用 touch 事件做长按。
+  //
+  // 【所以用 pointerdown —— 它在 <video> 上是收得到的】
+  //   实测 win-pointerdown target=VIDEO ✅（touch 收不到，pointer 收得到）
+  //   pointer 事件统一了鼠标/触摸/手写笔，Chrome 在触摸设备上
+  //   pointerType === 'touch'。
+  //
+  // 【为什么不会让桌面端也弹出移动端菜单】
+  //   判据是 `e.pointerType === 'touch'` —— 桌面鼠标是 'mouse'，直接排除。
+  //   桌面端右键菜单仍走 contextmenu，两条路径互不干扰。
+  //
+  // 【为什么不用 pointerup 判定「松手」】
+  //   长按判定只需要 touchstart 的时刻 + 后续的移动/抬起。
+  //   pointerup / pointercancel 用于清理定时器。
+  const host = root.querySelector(".job-preview") || root;
+
+  // 【pointerType 过滤】只有真触摸才进长按逻辑
+  const isTouchPointer = (event) => event.pointerType === "touch";
+
+  // 【pointerdown 必须挂在 document 上 —— 挂在容器上收不到】
+  // 实测：<video> 是 pointerdown 的 target，而 **pointer 事件不冒泡到
+  // 非捕获阶段的祖先**…… 实际上 pointerdown 是会冒泡的，但当 target 是
+  // <video> 时，Chrome 把它标记为「已被视频控件消费」，
+  // 事件在到达 .job-preview 的监听器之前就被截断了。
+  // 唯一稳定拿到它的位置是 **window / document 的捕获阶段** ——
+  // 实测 win-pointerdown target=VIDEO 确实到了。
+  //
+  // 【为什么不会误触发别的卡片】
+  // 命中判定用坐标 + 每个卡片自己的媒体元素矩形（findTarget），
+  // 只有「坐标落在本卡的媒体上」才算数。
+  // 而且每张卡都会注册一个 document 监听 —— 坐标只可能命中一张卡的媒体。
+  const beginHold = (event) => {
+    if (!isTouchPointer(event)) return;
+    if (event.button != null && event.button !== 0) return;
+    startX = event.clientX;
+    startY = event.clientY;
+    startTarget = findTarget(startX, startY);
+    if (!startTarget) { clear(); return; }
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      const target = startTarget;
+      startTarget = null;
+      if (!target) return;
+      const payload = target.payload();
+      if (!payload || !payload.file) return;
+      onLongPress(payload, {x: startX, y: startY});
+    }, HOLD_MS);
+  };
+
+  document.addEventListener("pointerdown", beginHold, {passive: true, capture: true});
+
+  // 【移动判定 + 收尾也走 pointer】
+  // pointermove 超过容差 = 用户在滚动列表，不是想开菜单。
+  // pointerup / pointercancel 负责清定时器 —— 否则「按住 550ms 内松手」
+  // 仍会误开菜单。
+  //
+  // 【为什么不用 touchmove/touchend】
+  // <video> 收不到 touch 事件（实测）—— 挂在 touch 上的清理逻辑
+  // 在视频卡上永远不触发，定时器就清不掉，「按住 200ms 松手」
+  // 也会误开菜单。pointer 在三种媒体上都能收到，统一用它。
+  document.addEventListener("pointermove", event => {
+    if (!timer || !isTouchPointer(event)) return;
+    if (Math.abs(event.clientX - startX) > MOVE_TOLERANCE
+        || Math.abs(event.clientY - startY) > MOVE_TOLERANCE) {
+      clear();
+    }
+  }, {passive: true, capture: true});
+  document.addEventListener("pointerup", clear, {passive: true, capture: true});
+  document.addEventListener("pointercancel", clear, {passive: true, capture: true});
 }
 
 function openPromptModal(prompt, title) {
@@ -7547,6 +7779,18 @@ window.BREAKPOINTS = BREAKPOINTS;
 window.H3Studio = Object.assign(window.H3Studio || {}, {
   locateJobInLibrary,
   lightboxShow,
+  // 【2026-11-21 移动端死路修复】把「同步响应式 chrome（FAB 显隐）」
+  // 暴露成一个窄接口。
+  //
+  // 【为什么需要】FAB 的显隐判据集中在 updateResponsiveChrome()，
+  // 但有几处代码会**直接摘掉**抽屉的 .open 类（不经过
+  // setPanelOpen / setSidebarOpen），那些路径不会通知它
+  // —— 结果就是抽屉关了、FAB 还藏着，用户再也打不开参数面板。
+  //
+  // 【为什么暴露而不是让调用方自己算】判据必须只有一份。
+  // 外部（含回归测试）只管「状态变了，麻烦同步一下」，
+  // 不自己复制「什么时候该显示 FAB」这套规则。
+  refreshResponsiveChrome: () => updateResponsiveChrome(),
   // 【2026-11-20 需求 3】收藏视图入口（左侧「收藏」导航项用）。
   showFavorites,
   // 【2026-11-15 修② · 媒体库类型过滤串台】页面切换通知。
@@ -7613,6 +7857,23 @@ function setSidebarOpen(open) {
   sidebar.classList.toggle("open", open);
   if (mask) mask.classList.toggle("open", open);
   if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  // 【2026-11-21 移动端死路修复】侧栏抽屉打开时把「参数」浮动按钮藏掉。
+  //
+  // 【为什么必须藏】FAB 是 position:fixed（z-index 960），**高于**
+  // 侧栏抽屉（z-index 940）。实测（evidence/mobile-nav/fabdrawers-before/
+  // fab-vs-drawers.json → S2_sidebar_open）：
+  //   sidebarOverlap: {"w": 25, "h": 44,
+  //                     "covered": [{"text":"音乐","cls":"nav-group"},
+  //                                 {"text":"文生音乐","cls":"nav-item"}]}
+  // ⇒ FAB 实打实压在抽屉里的导航项上 —— 违反需求 B4
+  //   「导航控件不得遮挡抽屉内容」，而且用户想点那个导航项时
+  //   手指命中的是 FAB，不是那个项。
+  //
+  // 【显隐判据只在 updateResponsiveChrome 一处】这里不自己写规则，
+  // 只调它 —— 两处各写一套必然漂移（第一版就踩了这个坑：
+  // 这里藏了，随后 updateResponsiveChrome 无条件 fab.hidden=false
+  // 又把它放出来了，实测 overlap 依旧是 25×44）。
+  updateResponsiveChrome();
 }
 
 // 当前「可折叠参数面板」—— 创作页是 #panel，长片拼接页是 #stitchPanel。
@@ -7632,26 +7893,60 @@ function setPanelOpen(open) {
   if (!panel) return;
   panel.classList.toggle("open", open);
   if (mask) mask.classList.toggle("open", open);
-  // 抽屉打开时把悬浮「参数」按钮藏掉：
-  //  .panel-fab 的 z-index(960) 必须高于抽屉本体(950) 才能保证**可点**
-  //  （实测 390px 下按钮被抽屉里溢出的滑块挡住 -> 完全点不动），
-  //  但这样一来按钮就会浮在打开的抽屉上面，盖住面板内容。
-  //  所以：关闭时显示（唯一作用是打开抽屉），打开时隐藏。
-  const fab = $("#panelFab");
-  if (fab && window.innerWidth <= BREAKPOINTS.tablet) {
-    fab.hidden = !!open;
-  }
+  // 【2026-11-21 移动端死路修复】FAB 的显隐**只由 updateResponsiveChrome 决定**。
+  //
+  // 【原来错在哪】这里原来自己写了一套规则：
+  //     if (fab && window.innerWidth <= BREAKPOINTS.tablet) fab.hidden = !!open;
+  // 而 updateResponsiveChrome 里又写了一套（无条件 fab.hidden = false）。
+  // 两套规则打架 —— 具体后果是：打开侧栏抽屉时
+  // setSidebarOpen → setPanelOpen(false)（顺带把 FAB 放出来）
+  // → updateResponsiveChrome（此时 .open 类还没加/还没被读到）也放出来。
+  //
+  // 【实测证据】evidence/mobile-nav/fab-trace/fab-trace.json：
+  //   fabHiddenAttr: False, fabDisplay: flex, sidebarOpen: True
+  //   日志里有两条 {"t":"mutate","attr":"hidden"} —— hidden 属性被反复改写，
+  //   最终值是 false ⇒ FAB 仍然显示，仍然压在抽屉导航项上
+  //   （fabdrawers-after 测得 sidebarOverlap 25×44，压住
+  //    「Qwen 图片编辑 / H3-Image 图片编辑」两个导航项）。
+  //
+  // 【现在】这里只管抽屉本身的开合，FAB 的显隐统一交给
+  // updateResponsiveChrome（它同时看两个抽屉的状态）。
+  updateResponsiveChrome();
 }
 
 // 浮动「参数」按钮：只在**参数面板处于抽屉模式**时出现。
 // 抽屉模式的断点是 tablet（≤1100px）—— 平板上参数区也收进了底部抽屉，
 // 所以按钮在平板同样要显示；桌面端参数区常驻，不需要按钮。
+//
+// 【2026-11-21 移动端死路修复】FAB 的显隐现在是**唯一的判据集中点**。
+//
+// 【原来错在哪】这个函数无条件 `fab.hidden = false` —— 于是任何别处
+//（比如 setSidebarOpen 里）把 FAB 藏起来的意图，都会被下一次
+// updateResponsiveChrome() 覆盖掉。
+// 实测后果（evidence/mobile-nav/fabdrawers-after/fab-vs-drawers.json
+// → S2_sidebar_open）：
+//   sidebarOverlap: {"w": 25, "h": 44,
+//                     "covered": [{"text":"Qwen 图片编辑","cls":"nav-item"},
+//                                 {"text":"H3-Image 图片编辑","cls":"nav-item"}]}
+// ⇒ FAB 仍然压在侧栏抽屉的导航项上（需求 B4：导航控件不得遮挡抽屉内容）。
+//
+// 【现在的规则】FAB 只在「参数抽屉模式 + 两个抽屉都关着」时显示：
+//   · 参数抽屉开着 → 藏（否则它浮在抽屉内容上面，app.js:setPanelOpen 的原注释）
+//   · 侧栏抽屉开着 → 藏（否则它浮在导航项上面，压住「音乐 / 文生音乐」）
+// 桌面端参数区常驻 → 永远藏（drawerMode 为 false）。
 function updateResponsiveChrome() {
   const fab = $("#panelFab");
   if (!fab) return;
   const panel = activePanel();
   const drawerMode = window.innerWidth <= BREAKPOINTS.tablet;
   if (!drawerMode || !panel) {
+    fab.hidden = true;
+    return;
+  }
+  // 【2026-11-21】两个抽屉任何一个开着，FAB 都必须让位。
+  const sidebarOpen = !!($("#sidebar") && $("#sidebar").classList.contains("open"));
+  const panelOpen = panel.classList.contains("open");
+  if (sidebarOpen || panelOpen) {
     fab.hidden = true;
     return;
   }
@@ -7673,6 +7968,18 @@ function closePanelDrawerOnPageChange() {
   if (panel) panel.classList.remove("open");
   const mask = $("#panelMask");
   if (mask) mask.classList.remove("open");
+  // 【2026-11-21 移动端死路修复】**必须**同步 FAB 的显隐。
+  //
+  // 【原来错在哪】这里直接摘掉 .open 类，但没有通知 updateResponsiveChrome。
+  // 而 FAB 的 hidden 是在「抽屉开着」时被设成 true 的 ——
+  // 直接摘类不会把它设回 false。
+  // ⇒ 抽屉一关，FAB 就**永远不回来**了 —— 手机上再也打不开参数面板。
+  //
+  // 【实测】tests/test_mobile_nav_flow.py
+  //   test_hamburger_clickable_while_param_drawer_open 的 390px 子用例
+  //   报 "ElementHandle.click: Timeout 6000ms exceeded. element is not visible"
+  //   —— 点 FAB 打不开，因为它还藏着。
+  updateResponsiveChrome();
 }
 
 function initResponsive() {
@@ -7688,6 +7995,26 @@ function initResponsive() {
   const sidebarMask = $("#sidebarMask");
   if (sidebarMask) sidebarMask.addEventListener("click", () => setSidebarOpen(false));
 
+  // 【2026-11-21 移动端死路修复】抽屉里的「×」关闭按钮。
+  //
+  // 【为什么必须有这个显式入口】实测（evidence/mobile-nav/matrix-before/
+  // matrix.json）：DOM 里**不存在**任何语义为「返回/关闭」的控件
+  // （backish 字段全状态为空数组）。抽屉只能靠点遮罩或点汉堡关闭，
+  // 而这两个在某些状态下都不可靠：
+  //   · 参数抽屉的遮罩 `inset:0` 盖住顶栏 → 汉堡按钮命中的是遮罩（点不动）
+  //   · 抽屉常开时再点汉堡是「关」不是「开」→ 用户想回类型选择却越点越乱
+  // ⇒ 必须给一个**明示**、**始终可点**的退路。
+  //
+  // 【为什么不用「返回类型选择」这个文案】抽屉本身就是类型选择界面，
+  // 「关闭」更准确 —— 关掉抽屉就回到媒体库，正是用户要的。
+  const drawerClose = $("#navDrawerClose");
+  if (drawerClose) {
+    drawerClose.addEventListener("click", event => {
+      event.stopPropagation();
+      setSidebarOpen(false);
+    });
+  }
+
   const panelMask = $("#panelMask");
   if (panelMask) panelMask.addEventListener("click", () => setPanelOpen(false));
 
@@ -7697,20 +8024,52 @@ function initResponsive() {
       const panel = activePanel();
       if (!panel) return;
       const open = !panel.classList.contains("open");
-      panel.classList.toggle("open", open);
-      const mask = $("#panelMask");
-      if (mask) mask.classList.toggle("open", open);
-      // 打开抽屉时把 FAB 藏掉（它会浮在抽屉上方挡住面板内容，
-      // 原因见 setPanelOpen 里的注释）。
-      fab.hidden = open;
+      // 【2026-11-21 移动端死路修复】这里原来自己复制了一份开合逻辑
+      // （classList.toggle + fab.hidden = open），是 FAB 显隐规则的
+      // **第三份**实现。前两份（setPanelOpen / updateResponsiveChrome）
+      // 已经在打架 —— 实测 390px 下点 FAB 会报 "element is not visible"，
+      // 因为上一处把 FAB 藏了而这里没同步。
+      // ⇒ 现在统一走 setPanelOpen：它负责开合 + 通知 updateResponsiveChrome。
+      setPanelOpen(open);
+      // 打开抽屉时关掉侧栏抽屉（两个抽屉不叠在一起）
       if (open) setSidebarOpen(false);
     });
   }
 
   // 点导航项后自动收起侧栏（窄屏）：选完模式就该看到内容，而不是被抽屉挡住
-  $$(".nav-item").forEach(item => item.addEventListener("click", () => {
-    if (isPhoneViewport()) setSidebarOpen(false);
-  }));
+  //
+  // 【2026-11-21 移动端死路修复】从「逐个 .nav-item 绑 click」改成
+  // **在 #sidebar 上事件委托**。
+  //
+  // 【原来错在哪】
+  //   $$(".nav-item").forEach(item => item.addEventListener("click", ...))
+  // 这一行在 initResponsive()（启动时）求值 —— 只给**当时已存在**的
+  // .nav-item 绑。而视频模型项是 web/video-nav.js 在 /api/video-categories
+  // 返回之后才动态创建的（item.className = "nav-item nav-model-item"），
+  // 绑不上。
+  //
+  // 【实测后果 —— evidence/mobile-nav/deep-before/deep.json】
+  //   "static_item_closes_drawer": true      ← 静态项（Z-IMAGE 等）正常
+  //   "dynamic_video_item_closes_drawer": false  ← 动态项（t2v/flf/r2v/longfilm）不收
+  //   "drawer_open_after_dynamic": true
+  // ⇒ 点「文生视频」后抽屉**常开**，盖住整个媒体库；
+  //   而抽屉常开时再点汉堡是「关抽屉」不是「开抽屉」，
+  //   用户想回类型选择却越点越乱 —— 这正是用户报的
+  //   「选择某个生成类型后，就无法回到生成类型选择，也无法看到生成媒体库」。
+  //
+  // 【为什么用委托而不是给动态项补绑】
+  //   委托绑一次就够，以后 video-nav.js 再加新模型项也自动生效。
+  //   判定用 closest('.nav-item') —— 视频类别标题 .nav-cat-head 不是
+  //   .nav-item（它是 .nav-cat-head），点它**不该**收抽屉
+  //   （它只是切类别，用户可能接着选模型）。
+  const sidebarEl = $("#sidebar");
+  if (sidebarEl) {
+    sidebarEl.addEventListener("click", event => {
+      const item = event.target.closest(".nav-item");
+      if (!item) return;
+      if (isPhoneViewport()) setSidebarOpen(false);
+    });
+  }
 
   // Esc 关闭抽屉
   document.addEventListener("keydown", event => {

@@ -121,17 +121,34 @@
       '.job-card[data-jid="' + String(jobId).replace(/"/g, '\\"') + '"]');
     if (!card) return;
     const top = card.querySelector(".job-top-right");
-    if (!top) return;
-    let badge = top.querySelector(".job-fav-badge");
-    if (favorited && !badge) {
-      badge = document.createElement("span");
-      badge.className = "job-fav-badge";
-      badge.setAttribute("title", "已收藏（清理时会被跳过）");
-      badge.setAttribute("aria-label", "已收藏");
-      badge.textContent = "★";
-      top.insertBefore(badge, top.firstChild);
-    } else if (!favorited && badge) {
-      badge.remove();
+    if (top) {
+      let badge = top.querySelector(".job-fav-badge");
+      if (favorited && !badge) {
+        badge = document.createElement("span");
+        badge.className = "job-fav-badge";
+        badge.setAttribute("title", "已收藏（清理时会被跳过）");
+        badge.setAttribute("aria-label", "已收藏");
+        badge.textContent = "★";
+        top.insertBefore(badge, top.firstChild);
+      } else if (!favorited && badge) {
+        badge.remove();
+      }
+    }
+    // 【2026-11-21】同步卡片底部的「收藏 / 取消收藏」按钮。
+    //
+    // 【为什么必须一起更新】那个按钮是移动端**唯一**能用的收藏入口
+    // （<video> 会吞掉 touch 事件，长按右键菜单在视频卡上唤不出来 ——
+    // 详见 web/app.js 的 favActionButtonHtml 注释）。
+    // 如果乐观更新只改 ★ 不改按钮，用户会看到「按钮说未收藏、角标说已收藏」
+    // 的自相矛盾状态，而且再点一次按钮会做出相反的事。
+    const btn = card.querySelector('[data-act="favorite-toggle"]');
+    if (btn) {
+      btn.classList.toggle("is-on", !!favorited);
+      btn.setAttribute("aria-pressed", favorited ? "true" : "false");
+      btn.setAttribute("title", favorited
+        ? "取消收藏（只解除标记，不删除产物）"
+        : "收藏（清理媒体库时会跳过它）");
+      btn.textContent = favorited ? "★ 取消收藏" : "☆ 收藏";
     }
   }
 

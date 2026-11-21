@@ -1,0 +1,65 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "binding_audit": {
+    "total": 18,
+    "static": 14,
+    "dynamicVideoModel": 4,
+    "dynamicOther": 0,
+    "sample": [
+      {
+        "tag": "BUTTON",
+        "mode": "t2v",
+        "cls": "nav-item nav-model-item"
+      },
+      {
+        "tag": "BUTTON",
+        "mode": "flf",
+        "cls": "nav-item nav-model-item"
+      },
+      {
+        "tag": "BUTTON",
+        "mode": "r2v",
+        "cls": "nav-item nav-model-item"
+      },
+      {
+        "tag": "BUTTON",
+        "mode": "longfilm",
+        "cls": "nav-item nav-model-item"
+      },
+      {
+        "tag": "A",
+        "mode": "t2i",
+        "cls": "nav-item active"
+      },
+      {
+        "tag": "A",
+        "mode": "t2i_qwen",
+        "cls": "nav-item"
+      }
+    ]
+  },
+  "static_item_closes_drawer": true,
+  "dynamic_video_item_closes_drawer": false,
+  "drawer_open_after_dynamic": true,
+  "can_reopen_after_dynamic": false,
+  "favorites_reachable_after_scroll": {
+    "inViewport": true,
+    "hitIsSelf": false,
+    "rect": {
+      "top": 477,
+      "left": -290
+    }
+  },
+  "cdp_longpress": {
+    "x": 277.75,
+    "y": 1247.796875
+  },
+  "contextmenu_fired_after_real_longpress": 0,
+  "contextmenu_target": null,
+  "ctx_menu_open_after_longpress": false,
+  "ctx_menu_items": []
+}

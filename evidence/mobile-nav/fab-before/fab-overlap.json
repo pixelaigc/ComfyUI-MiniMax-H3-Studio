@@ -1,0 +1,50 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "positions": [
+    {
+      "fabHidden": false,
+      "fabRect": {
+        "top": 752,
+        "left": 275,
+        "w": 86,
+        "h": 44
+      },
+      "textOverlaps": [],
+      "mediaOverlaps": [],
+      "scrollFrac": 0.0
+    },
+    {
+      "fabHidden": false,
+      "fabRect": {
+        "top": 752,
+        "left": 275,
+        "w": 86,
+        "h": 44
+      },
+      "textOverlaps": [],
+      "mediaOverlaps": [
+        {
+          "ovW": 86,
+          "ovH": 43
+        }
+      ],
+      "scrollFrac": 0.5
+    },
+    {
+      "fabHidden": false,
+      "fabRect": {
+        "top": 752,
+        "left": 275,
+        "w": 86,
+        "h": 44
+      },
+      "textOverlaps": [],
+      "mediaOverlaps": [],
+      "scrollFrac": 1.0
+    }
+  ]
+}

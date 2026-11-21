@@ -126,7 +126,25 @@
     flex: 0 0 auto;
   }
   .panel-mask {
-    position: fixed; inset: 0; background: rgba(18, 22, 30, .42);
+    /* 【2026-11-21 移动端死路修复】inset 从 0 改成 **让开顶栏**。
+     *
+     * 【原来错在哪】`inset: 0` 让遮罩从视口顶（y=0）铺满。
+     * 顶栏 .topbar 只有 44px 高且**没有 z-index**（style.css:20），
+     * 所以 z-index:949 的遮罩整块压在顶栏上面。
+     * ⇒ 参数抽屉一打开，用户点汉堡按钮（顶栏左侧，唯一能回到
+     *   「生成类型选择」的入口）命中的是遮罩而不是按钮 → **点不动**。
+     *   点遮罩本身也不行：抽屉本体（z-index 950）盖住了遮罩的上半部分。
+     *   这是一个物理死路 —— 抽屉开着就出不去。
+     *
+     * 【实测证据】evidence/mobile-nav/decisive-before/decisive.json
+     *   "real_click_hamburger": "FAIL: Page.click: Timeout 4000ms exceeded."
+     *   （Playwright 的 click 走真实命中测试，Timeout = 手指命中遮罩）
+     *
+     * 【怎么修】遮罩只盖**顶栏以下**的区域（inset: 44px 0 0 0），
+     * 顶栏因此始终可点 —— 抽屉开着时也能一键回到类型选择。
+     * 顶栏下方那一条（0~44px）保持透明，看不到任何视觉变化。
+     */
+    position: fixed; inset: 44px 0 0 0; background: rgba(18, 22, 30, .42);
     z-index: 949; display: none;
   }
   .panel-mask.open { display: block; }
@@ -240,6 +258,35 @@
   /* 抽屉里的导航项要够大才好点 */
   .nav-item { min-height: var(--touch-min); padding: 10px 12px; font-size: 14px; }
   .nav-group { padding-top: 14px; }
+
+  /* ---------- 4.2b 抽屉标题行（2026-11-21 移动端死路修复） ----------
+   *
+   * 【为什么需要】实测：DOM 里**没有任何**语义为「返回/关闭」的控件
+   * （matrix-before/matrix.json 的 backish 字段全状态为空数组）。
+   * 抽屉只能靠点遮罩或点汉堡关闭，而这两个在某些状态下都不可靠
+   * （参数抽屉的遮罩 `inset:0` 盖住顶栏 → 汉堡点不动）。
+   * ⇒ 抽屉一旦停在打开态，用户没有**明示**退路。
+   *
+   * 【桌面端不显示】桌面端侧栏常驻，没有「关闭」概念。
+   * 基础规则写在 style.css 里用 display:none，这里只管 ≤700px 的显示。
+   */
+  .nav-drawer-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 0 0 6px; padding: 0 2px 4px;
+  }
+  .nav-drawer-title {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    letter-spacing: .02em;
+  }
+  .nav-drawer-close {
+    /* 44px —— 触屏最小点击尺寸（与 .nav-toggle 同规格），
+     * 不能用 20px 的小 ×，那在手机上点不准。 */
+    width: 44px; height: 44px; flex: 0 0 44px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    border-radius: 10px; font-size: 22px; line-height: 1; cursor: pointer;
+  }
+  .nav-drawer-close:active { background: #f2f3f6; }
 
   /* ---------- 4.3 内容区：单列全宽 ---------- */
   .layout { flex-direction: column; }

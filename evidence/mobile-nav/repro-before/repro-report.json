@@ -1,0 +1,3161 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewports": {
+    "phone-375": {
+      "width": 375,
+      "height": 812,
+      "errors": [],
+      "steps": {
+        "S0_initial": {
+          "vw": 375,
+          "vh": 812,
+          "scrollW": 375,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 768,
+              "bottom": 812,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 812,
+              "left": 0,
+              "w": 375,
+              "h": 715,
+              "bottom": 1527,
+              "right": 375
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 375,
+              "h": 768,
+              "bottom": 812,
+              "right": 375
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 752,
+              "left": 275,
+              "w": 86,
+              "h": 44,
+              "bottom": 796,
+              "right": 361
+            },
+            "hit": {
+              "x": 318,
+              "y": 774,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 580,
+              "left": 12,
+              "w": 351,
+              "h": 3296,
+              "bottom": 3876,
+              "right": 363
+            }
+          },
+          "cardCount": 0,
+          "firstCard": null,
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 351,
+              "h": 92,
+              "bottom": 148,
+              "right": 363
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 351,
+              "h": 270,
+              "bottom": 428,
+              "right": 363
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 530,
+              "left": 46,
+              "w": 168,
+              "h": 40,
+              "bottom": 570,
+              "right": 214
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 375,
+          "innerW": 375
+        },
+        "S1_sidebar_open": {
+          "vw": 375,
+          "vh": 812,
+          "scrollW": 375,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 300,
+              "h": 768,
+              "bottom": 812,
+              "right": 300
+            }
+          },
+          "sidebarMask": {
+            "visible": true
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 812,
+              "left": 0,
+              "w": 375,
+              "h": 715,
+              "bottom": 1527,
+              "right": 375
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 375,
+              "h": 768,
+              "bottom": 812,
+              "right": 375
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 752,
+              "left": 275,
+              "w": 86,
+              "h": 44,
+              "bottom": 796,
+              "right": 361
+            },
+            "hit": {
+              "x": 318,
+              "y": 774,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 580,
+              "left": 12,
+              "w": 351,
+              "h": 3296,
+              "bottom": 3876,
+              "right": 363
+            }
+          },
+          "cardCount": 0,
+          "firstCard": null,
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 351,
+              "h": 92,
+              "bottom": 148,
+              "right": 363
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 351,
+              "h": 270,
+              "bottom": 428,
+              "right": 363
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 530,
+              "left": 46,
+              "w": 168,
+              "h": 40,
+              "bottom": 570,
+              "right": 214
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": 10,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": 289
+            }
+          },
+          "docScrollW": 375,
+          "innerW": 375
+        },
+        "S2_after_type_pick": {
+          "vw": 375,
+          "vh": 812,
+          "scrollW": 375,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 300,
+              "h": 768,
+              "bottom": 812,
+              "right": 300
+            }
+          },
+          "sidebarMask": {
+            "visible": true
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 812,
+              "left": 0,
+              "w": 375,
+              "h": 715,
+              "bottom": 1527,
+              "right": 375
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 375,
+              "h": 768,
+              "bottom": 812,
+              "right": 375
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 752,
+              "left": 275,
+              "w": 86,
+              "h": 44,
+              "bottom": 796,
+              "right": 361
+            },
+            "hit": {
+              "x": 318,
+              "y": 774,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 580,
+              "left": 12,
+              "w": 351,
+              "h": 3296,
+              "bottom": 3876,
+              "right": 363
+            }
+          },
+          "cardCount": 0,
+          "firstCard": null,
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 351,
+              "h": 92,
+              "bottom": 148,
+              "right": 363
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 351,
+              "h": 270,
+              "bottom": 428,
+              "right": 363
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 530,
+              "left": 46,
+              "w": 168,
+              "h": 40,
+              "bottom": 570,
+              "right": 214
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": 10,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": 289
+            }
+          },
+          "docScrollW": 375,
+          "innerW": 375
+        },
+        "S3_reopen_sidebar": {
+          "vw": 375,
+          "vh": 812,
+          "scrollW": 375,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 768,
+              "bottom": 812,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 812,
+              "left": 0,
+              "w": 375,
+              "h": 715,
+              "bottom": 1527,
+              "right": 375
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 375,
+              "h": 768,
+              "bottom": 812,
+              "right": 375
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 752,
+              "left": 275,
+              "w": 86,
+              "h": 44,
+              "bottom": 796,
+              "right": 361
+            },
+            "hit": {
+              "x": 318,
+              "y": 774,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 580,
+              "left": 12,
+              "w": 351,
+              "h": 3296,
+              "bottom": 3876,
+              "right": 363
+            }
+          },
+          "cardCount": 0,
+          "firstCard": null,
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 351,
+              "h": 92,
+              "bottom": 148,
+              "right": 363
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 351,
+              "h": 270,
+              "bottom": 428,
+              "right": 363
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 530,
+              "left": 46,
+              "w": 168,
+              "h": 40,
+              "bottom": 570,
+              "right": 214
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 375,
+          "innerW": 375
+        },
+        "S4_panel_open": {
+          "vw": 375,
+          "vh": 812,
+          "scrollW": 375,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 768,
+              "bottom": 812,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 97,
+              "left": 0,
+              "w": 375,
+              "h": 715,
+              "bottom": 812,
+              "right": 375
+            },
+            "hit": {
+              "x": 188,
+              "y": 455,
+              "tag": "DIV",
+              "id": null,
+              "cls": "field-label",
+              "text": "MiniMax-H3 模型 本机已安装",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 375,
+              "h": 768,
+              "bottom": 812,
+              "right": 375
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 647,
+              "left": 12,
+              "w": 351,
+              "h": 2942,
+              "bottom": 3589,
+              "right": 363
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 647,
+            "left": 12,
+            "w": 171,
+            "h": 466,
+            "bottom": 1113,
+            "right": 183
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 351,
+              "h": 92,
+              "bottom": 148,
+              "right": 363
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 351,
+              "h": 270,
+              "bottom": 428,
+              "right": 363
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 530,
+              "left": 46,
+              "w": 168,
+              "h": 40,
+              "bottom": 570,
+              "right": 214
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 375,
+          "innerW": 375
+        },
+        "S5_scroll_bottom": {
+          "scrollTop": 2913,
+          "scrollH": 3681,
+          "clientH": 768
+        }
+      },
+      "picked_type": "#sidebar .nav-item[data-mode=\"t2v\"]",
+      "can_reopen_sidebar": false,
+      "reopen_error": null
+    },
+    "phone-390": {
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "steps": {
+        "S0_initial": {
+          "vw": 390,
+          "vh": 844,
+          "scrollW": 390,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 800,
+              "bottom": 844,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 844,
+              "left": 0,
+              "w": 390,
+              "h": 743,
+              "bottom": 1587,
+              "right": 390
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 390,
+              "h": 800,
+              "bottom": 844,
+              "right": 390
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 784,
+              "left": 290,
+              "w": 86,
+              "h": 44,
+              "bottom": 828,
+              "right": 376
+            },
+            "hit": {
+              "x": 333,
+              "y": 806,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 603,
+              "left": 12,
+              "w": 366,
+              "h": 2968,
+              "bottom": 3571,
+              "right": 378
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 603,
+            "left": 12,
+            "w": 178,
+            "h": 470,
+            "bottom": 1073,
+            "right": 190
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 366,
+              "h": 92,
+              "bottom": 148,
+              "right": 378
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 366,
+              "h": 226,
+              "bottom": 384,
+              "right": 378
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 486,
+              "left": 46,
+              "w": 176,
+              "h": 40,
+              "bottom": 526,
+              "right": 222
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 390,
+          "innerW": 390
+        },
+        "S1_sidebar_open": {
+          "vw": 390,
+          "vh": 844,
+          "scrollW": 390,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 300,
+              "h": 800,
+              "bottom": 844,
+              "right": 300
+            }
+          },
+          "sidebarMask": {
+            "visible": true
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 844,
+              "left": 0,
+              "w": 390,
+              "h": 743,
+              "bottom": 1587,
+              "right": 390
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 390,
+              "h": 800,
+              "bottom": 844,
+              "right": 390
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 784,
+              "left": 290,
+              "w": 86,
+              "h": 44,
+              "bottom": 828,
+              "right": 376
+            },
+            "hit": {
+              "x": 333,
+              "y": 806,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 603,
+              "left": 12,
+              "w": 366,
+              "h": 2968,
+              "bottom": 3571,
+              "right": 378
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 603,
+            "left": 12,
+            "w": 178,
+            "h": 470,
+            "bottom": 1073,
+            "right": 190
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 366,
+              "h": 92,
+              "bottom": 148,
+              "right": 378
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 366,
+              "h": 226,
+              "bottom": 384,
+              "right": 378
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 486,
+              "left": 46,
+              "w": 176,
+              "h": 40,
+              "bottom": 526,
+              "right": 222
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": 10,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": 289
+            }
+          },
+          "docScrollW": 390,
+          "innerW": 390
+        },
+        "S2_after_type_pick": {
+          "vw": 390,
+          "vh": 844,
+          "scrollW": 390,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 300,
+              "h": 800,
+              "bottom": 844,
+              "right": 300
+            }
+          },
+          "sidebarMask": {
+            "visible": true
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 844,
+              "left": 0,
+              "w": 390,
+              "h": 743,
+              "bottom": 1587,
+              "right": 390
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 390,
+              "h": 800,
+              "bottom": 844,
+              "right": 390
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 784,
+              "left": 290,
+              "w": 86,
+              "h": 44,
+              "bottom": 828,
+              "right": 376
+            },
+            "hit": {
+              "x": 333,
+              "y": 806,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 603,
+              "left": 12,
+              "w": 366,
+              "h": 2968,
+              "bottom": 3571,
+              "right": 378
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 603,
+            "left": 12,
+            "w": 178,
+            "h": 470,
+            "bottom": 1073,
+            "right": 190
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 366,
+              "h": 92,
+              "bottom": 148,
+              "right": 378
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 366,
+              "h": 226,
+              "bottom": 384,
+              "right": 378
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 486,
+              "left": 46,
+              "w": 176,
+              "h": 40,
+              "bottom": 526,
+              "right": 222
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": 10,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": 289
+            }
+          },
+          "docScrollW": 390,
+          "innerW": 390
+        },
+        "S3_reopen_sidebar": {
+          "vw": 390,
+          "vh": 844,
+          "scrollW": 390,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "path",
+              "id": null,
+              "cls": "",
+              "text": "",
+              "isTarget": true
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 800,
+              "bottom": 844,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 844,
+              "left": 0,
+              "w": 390,
+              "h": 743,
+              "bottom": 1587,
+              "right": 390
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 390,
+              "h": 800,
+              "bottom": 844,
+              "right": 390
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 784,
+              "left": 290,
+              "w": 86,
+              "h": 44,
+              "bottom": 828,
+              "right": 376
+            },
+            "hit": {
+              "x": 333,
+              "y": 806,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 603,
+              "left": 12,
+              "w": 366,
+              "h": 2968,
+              "bottom": 3571,
+              "right": 378
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 603,
+            "left": 12,
+            "w": 178,
+            "h": 470,
+            "bottom": 1073,
+            "right": 190
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 366,
+              "h": 92,
+              "bottom": 148,
+              "right": 378
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 366,
+              "h": 226,
+              "bottom": 384,
+              "right": 378
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 486,
+              "left": 46,
+              "w": 176,
+              "h": 40,
+              "bottom": 526,
+              "right": 222
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 390,
+          "innerW": 390
+        },
+        "S4_panel_open": {
+          "vw": 390,
+          "vh": 844,
+          "scrollW": 390,
+          "navToggle": {
+            "visible": true,
+            "rect": {
+              "top": 4,
+              "left": 10,
+              "w": 36,
+              "h": 36,
+              "bottom": 40,
+              "right": 46
+            },
+            "hit": {
+              "x": 28,
+              "y": 22,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": -300,
+              "w": 300,
+              "h": 800,
+              "bottom": 844,
+              "right": 0
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 101,
+              "left": 0,
+              "w": 390,
+              "h": 743,
+              "bottom": 844,
+              "right": 390
+            },
+            "hit": {
+              "x": 195,
+              "y": 473,
+              "tag": "DIV",
+              "id": null,
+              "cls": "field-label",
+              "text": "MiniMax-H3 模型 本机已安装",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 390,
+              "h": 800,
+              "bottom": 844,
+              "right": 390
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 603,
+              "left": 12,
+              "w": 366,
+              "h": 2968,
+              "bottom": 3571,
+              "right": 378
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 603,
+            "left": 12,
+            "w": 178,
+            "h": 470,
+            "bottom": 1073,
+            "right": 190
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 56,
+              "left": 12,
+              "w": 366,
+              "h": 92,
+              "bottom": 148,
+              "right": 378
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 158,
+              "left": 12,
+              "w": 366,
+              "h": 226,
+              "bottom": 384,
+              "right": 378
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 486,
+              "left": 46,
+              "w": 176,
+              "h": 40,
+              "bottom": 526,
+              "right": 222
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 939,
+              "left": -290,
+              "w": 279,
+              "h": 40,
+              "bottom": 979,
+              "right": -11
+            }
+          },
+          "docScrollW": 390,
+          "innerW": 390
+        },
+        "S5_scroll_bottom": {
+          "scrollTop": 2863,
+          "scrollH": 3663,
+          "clientH": 800
+        }
+      },
+      "picked_type": "#sidebar .nav-item[data-mode=\"t2v\"]",
+      "can_reopen_sidebar": false,
+      "reopen_error": null
+    },
+    "tablet-768": {
+      "width": 768,
+      "height": 1024,
+      "errors": [],
+      "steps": {
+        "S0_initial": {
+          "vw": 768,
+          "vh": 1024,
+          "scrollW": 768,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 160,
+              "h": 980,
+              "bottom": 1024,
+              "right": 160
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 1024,
+              "left": 0,
+              "w": 768,
+              "h": 901,
+              "bottom": 1925,
+              "right": 768
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 160,
+              "w": 608,
+              "h": 980,
+              "bottom": 1024,
+              "right": 768
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 964,
+              "left": 668,
+              "w": 86,
+              "h": 44,
+              "bottom": 1008,
+              "right": 754
+            },
+            "hit": {
+              "x": 711,
+              "y": 986,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 447,
+              "left": 180,
+              "w": 568,
+              "h": 1988,
+              "bottom": 2435,
+              "right": 748
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 447,
+            "left": 180,
+            "w": 181,
+            "h": 470,
+            "bottom": 917,
+            "right": 361
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 180,
+              "w": 477,
+              "h": 48,
+              "bottom": 108,
+              "right": 657
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 124,
+              "left": 180,
+              "w": 568,
+              "h": 138,
+              "bottom": 262,
+              "right": 748
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 326,
+              "left": 629,
+              "w": 69,
+              "h": 40,
+              "bottom": 366,
+              "right": 698
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 1023,
+              "left": 10,
+              "w": 139,
+              "h": 40,
+              "bottom": 1063,
+              "right": 149
+            }
+          },
+          "docScrollW": 768,
+          "innerW": 768
+        },
+        "S1_sidebar_open": {
+          "vw": 768,
+          "vh": 1024,
+          "scrollW": 768,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 160,
+              "h": 980,
+              "bottom": 1024,
+              "right": 160
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 1024,
+              "left": 0,
+              "w": 768,
+              "h": 901,
+              "bottom": 1925,
+              "right": 768
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 160,
+              "w": 608,
+              "h": 980,
+              "bottom": 1024,
+              "right": 768
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 964,
+              "left": 668,
+              "w": 86,
+              "h": 44,
+              "bottom": 1008,
+              "right": 754
+            },
+            "hit": {
+              "x": 711,
+              "y": 986,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 447,
+              "left": 180,
+              "w": 568,
+              "h": 1988,
+              "bottom": 2435,
+              "right": 748
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 447,
+            "left": 180,
+            "w": 181,
+            "h": 470,
+            "bottom": 917,
+            "right": 361
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 180,
+              "w": 477,
+              "h": 48,
+              "bottom": 108,
+              "right": 657
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 124,
+              "left": 180,
+              "w": 568,
+              "h": 138,
+              "bottom": 262,
+              "right": 748
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 326,
+              "left": 629,
+              "w": 69,
+              "h": 40,
+              "bottom": 366,
+              "right": 698
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 1023,
+              "left": 10,
+              "w": 139,
+              "h": 40,
+              "bottom": 1063,
+              "right": 149
+            }
+          },
+          "docScrollW": 768,
+          "innerW": 768
+        },
+        "S2_after_type_pick": {
+          "vw": 768,
+          "vh": 1024,
+          "scrollW": 768,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 160,
+              "h": 980,
+              "bottom": 1024,
+              "right": 160
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 1024,
+              "left": 0,
+              "w": 768,
+              "h": 901,
+              "bottom": 1925,
+              "right": 768
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 160,
+              "w": 608,
+              "h": 980,
+              "bottom": 1024,
+              "right": 768
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 964,
+              "left": 668,
+              "w": 86,
+              "h": 44,
+              "bottom": 1008,
+              "right": 754
+            },
+            "hit": {
+              "x": 711,
+              "y": 986,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 447,
+              "left": 180,
+              "w": 568,
+              "h": 1988,
+              "bottom": 2435,
+              "right": 748
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 447,
+            "left": 180,
+            "w": 181,
+            "h": 470,
+            "bottom": 917,
+            "right": 361
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 180,
+              "w": 477,
+              "h": 48,
+              "bottom": 108,
+              "right": 657
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 124,
+              "left": 180,
+              "w": 568,
+              "h": 138,
+              "bottom": 262,
+              "right": 748
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 326,
+              "left": 629,
+              "w": 69,
+              "h": 40,
+              "bottom": 366,
+              "right": 698
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 1023,
+              "left": 10,
+              "w": 139,
+              "h": 40,
+              "bottom": 1063,
+              "right": 149
+            }
+          },
+          "docScrollW": 768,
+          "innerW": 768
+        },
+        "S3_reopen_sidebar": {
+          "vw": 768,
+          "vh": 1024,
+          "scrollW": 768,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 160,
+              "h": 980,
+              "bottom": 1024,
+              "right": 160
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 1024,
+              "left": 0,
+              "w": 768,
+              "h": 901,
+              "bottom": 1925,
+              "right": 768
+            },
+            "hit": null
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 160,
+              "w": 608,
+              "h": 980,
+              "bottom": 1024,
+              "right": 768
+            }
+          },
+          "panelFab": {
+            "visible": true,
+            "rect": {
+              "top": 964,
+              "left": 668,
+              "w": 86,
+              "h": 44,
+              "bottom": 1008,
+              "right": 754
+            },
+            "hit": {
+              "x": 711,
+              "y": 986,
+              "tag": "SPAN",
+              "id": null,
+              "cls": "",
+              "text": "参数",
+              "isTarget": true
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 447,
+              "left": 180,
+              "w": 568,
+              "h": 1988,
+              "bottom": 2435,
+              "right": 748
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 447,
+            "left": 180,
+            "w": 181,
+            "h": 470,
+            "bottom": 917,
+            "right": 361
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 180,
+              "w": 477,
+              "h": 48,
+              "bottom": 108,
+              "right": 657
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 124,
+              "left": 180,
+              "w": 568,
+              "h": 138,
+              "bottom": 262,
+              "right": 748
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 326,
+              "left": 629,
+              "w": 69,
+              "h": 40,
+              "bottom": 366,
+              "right": 698
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 1023,
+              "left": 10,
+              "w": 139,
+              "h": 40,
+              "bottom": 1063,
+              "right": 149
+            }
+          },
+          "docScrollW": 768,
+          "innerW": 768
+        },
+        "S4_panel_open": {
+          "vw": 768,
+          "vh": 1024,
+          "scrollW": 768,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 160,
+              "h": 980,
+              "bottom": 1024,
+              "right": 160
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": true,
+            "rect": {
+              "top": 123,
+              "left": 0,
+              "w": 768,
+              "h": 901,
+              "bottom": 1024,
+              "right": 768
+            },
+            "hit": {
+              "x": 384,
+              "y": 573,
+              "tag": "DIV",
+              "id": "vidModelWarn",
+              "cls": "img-warn",
+              "text": "已确认在 ComfyUI 模型列表中可用。",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 160,
+              "w": 608,
+              "h": 980,
+              "bottom": 1024,
+              "right": 768
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "DIV",
+              "id": "panelMask",
+              "cls": "panel-mask open",
+              "text": "",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 447,
+              "left": 180,
+              "w": 568,
+              "h": 1988,
+              "bottom": 2435,
+              "right": 748
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 447,
+            "left": 180,
+            "w": 181,
+            "h": 470,
+            "bottom": 917,
+            "right": 361
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 180,
+              "w": 477,
+              "h": 48,
+              "bottom": 108,
+              "right": 657
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 124,
+              "left": 180,
+              "w": 568,
+              "h": 138,
+              "bottom": 262,
+              "right": 748
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 326,
+              "left": 629,
+              "w": 69,
+              "h": 40,
+              "bottom": 366,
+              "right": 698
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 1023,
+              "left": 10,
+              "w": 139,
+              "h": 40,
+              "bottom": 1063,
+              "right": 149
+            }
+          },
+          "docScrollW": 768,
+          "innerW": 768
+        },
+        "S5_scroll_bottom": {
+          "scrollTop": 1491,
+          "scrollH": 2471,
+          "clientH": 980
+        }
+      },
+      "picked_type": "#sidebar .nav-item[data-mode=\"t2v\"]",
+      "can_reopen_sidebar": false,
+      "reopen_error": "navToggle 不可见"
+    },
+    "desktop-1280": {
+      "width": 1280,
+      "height": 900,
+      "errors": [],
+      "steps": {
+        "S0_initial": {
+          "vw": 1280,
+          "vh": 900,
+          "scrollW": 1280,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 190,
+              "h": 856,
+              "bottom": 900,
+              "right": 190
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 190,
+              "w": 330,
+              "h": 856,
+              "bottom": 900,
+              "right": 520
+            },
+            "hit": {
+              "x": 355,
+              "y": 472,
+              "tag": "DIV",
+              "id": "imgModelNote",
+              "cls": "img-note",
+              "text": "官方模板 image_z_image_turbo.json：8 步 / cfg ",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 520,
+              "w": 760,
+              "h": 856,
+              "bottom": 900,
+              "right": 1280
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 294,
+              "left": 540,
+              "w": 720,
+              "h": 3030,
+              "bottom": 3324,
+              "right": 1260
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 294,
+            "left": 540,
+            "w": 353,
+            "h": 499,
+            "bottom": 793,
+            "right": 893
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 540,
+              "w": 477,
+              "h": 39,
+              "bottom": 99,
+              "right": 1017
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 115,
+              "left": 540,
+              "w": 720,
+              "h": 52,
+              "bottom": 167,
+              "right": 1260
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 179,
+              "left": 1141,
+              "w": 69,
+              "h": 34,
+              "bottom": 213,
+              "right": 1210
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 861,
+              "left": 10,
+              "w": 169,
+              "h": 36,
+              "bottom": 897,
+              "right": 179
+            }
+          },
+          "docScrollW": 1280,
+          "innerW": 1280
+        },
+        "S1_sidebar_open": {
+          "vw": 1280,
+          "vh": 900,
+          "scrollW": 1280,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 190,
+              "h": 856,
+              "bottom": 900,
+              "right": 190
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 190,
+              "w": 330,
+              "h": 856,
+              "bottom": 900,
+              "right": 520
+            },
+            "hit": {
+              "x": 355,
+              "y": 472,
+              "tag": "DIV",
+              "id": "imgModelNote",
+              "cls": "img-note",
+              "text": "官方模板 image_z_image_turbo.json：8 步 / cfg ",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 520,
+              "w": 760,
+              "h": 856,
+              "bottom": 900,
+              "right": 1280
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 294,
+              "left": 540,
+              "w": 720,
+              "h": 3030,
+              "bottom": 3324,
+              "right": 1260
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 294,
+            "left": 540,
+            "w": 353,
+            "h": 499,
+            "bottom": 793,
+            "right": 893
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 540,
+              "w": 477,
+              "h": 39,
+              "bottom": 99,
+              "right": 1017
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 115,
+              "left": 540,
+              "w": 720,
+              "h": 52,
+              "bottom": 167,
+              "right": 1260
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 179,
+              "left": 1141,
+              "w": 69,
+              "h": 34,
+              "bottom": 213,
+              "right": 1210
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 861,
+              "left": 10,
+              "w": 169,
+              "h": 36,
+              "bottom": 897,
+              "right": 179
+            }
+          },
+          "docScrollW": 1280,
+          "innerW": 1280
+        },
+        "S2_after_type_pick": {
+          "vw": 1280,
+          "vh": 900,
+          "scrollW": 1280,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 190,
+              "h": 856,
+              "bottom": 900,
+              "right": 190
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 190,
+              "w": 330,
+              "h": 856,
+              "bottom": 900,
+              "right": 520
+            },
+            "hit": {
+              "x": 355,
+              "y": 472,
+              "tag": "DIV",
+              "id": "vidModelNote",
+              "cls": "img-note",
+              "text": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 ",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 520,
+              "w": 760,
+              "h": 856,
+              "bottom": 900,
+              "right": 1280
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 294,
+              "left": 540,
+              "w": 720,
+              "h": 3030,
+              "bottom": 3324,
+              "right": 1260
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 294,
+            "left": 540,
+            "w": 353,
+            "h": 499,
+            "bottom": 793,
+            "right": 893
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 540,
+              "w": 477,
+              "h": 39,
+              "bottom": 99,
+              "right": 1017
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 115,
+              "left": 540,
+              "w": 720,
+              "h": 52,
+              "bottom": 167,
+              "right": 1260
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 179,
+              "left": 1141,
+              "w": 69,
+              "h": 34,
+              "bottom": 213,
+              "right": 1210
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 861,
+              "left": 10,
+              "w": 169,
+              "h": 36,
+              "bottom": 897,
+              "right": 179
+            }
+          },
+          "docScrollW": 1280,
+          "innerW": 1280
+        },
+        "S3_reopen_sidebar": {
+          "vw": 1280,
+          "vh": 900,
+          "scrollW": 1280,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 190,
+              "h": 856,
+              "bottom": 900,
+              "right": 190
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 190,
+              "w": 330,
+              "h": 856,
+              "bottom": 900,
+              "right": 520
+            },
+            "hit": {
+              "x": 355,
+              "y": 472,
+              "tag": "DIV",
+              "id": "vidModelNote",
+              "cls": "img-note",
+              "text": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 ",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 520,
+              "w": 760,
+              "h": 856,
+              "bottom": 900,
+              "right": 1280
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 294,
+              "left": 540,
+              "w": 720,
+              "h": 3030,
+              "bottom": 3324,
+              "right": 1260
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 294,
+            "left": 540,
+            "w": 353,
+            "h": 499,
+            "bottom": 793,
+            "right": 893
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 540,
+              "w": 477,
+              "h": 39,
+              "bottom": 99,
+              "right": 1017
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 115,
+              "left": 540,
+              "w": 720,
+              "h": 52,
+              "bottom": 167,
+              "right": 1260
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 179,
+              "left": 1141,
+              "w": 69,
+              "h": 34,
+              "bottom": 213,
+              "right": 1210
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 861,
+              "left": 10,
+              "w": 169,
+              "h": 36,
+              "bottom": 897,
+              "right": 179
+            }
+          },
+          "docScrollW": 1280,
+          "innerW": 1280
+        },
+        "S4_panel_open": {
+          "vw": 1280,
+          "vh": 900,
+          "scrollW": 1280,
+          "navToggle": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "sidebar": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 0,
+              "w": 190,
+              "h": 856,
+              "bottom": 900,
+              "right": 190
+            }
+          },
+          "sidebarMask": {
+            "visible": false
+          },
+          "panel": {
+            "visible": true,
+            "open": false,
+            "rect": {
+              "top": 44,
+              "left": 190,
+              "w": 330,
+              "h": 856,
+              "bottom": 900,
+              "right": 520
+            },
+            "hit": {
+              "x": 355,
+              "y": 472,
+              "tag": "DIV",
+              "id": "vidModelNote",
+              "cls": "img-note",
+              "text": "剪枝版 int8（20.9 GB），H3 Turbo 4 步的常规选择。剪枝把 ",
+              "isTarget": true
+            }
+          },
+          "jobsArea": {
+            "visible": true,
+            "rect": {
+              "top": 44,
+              "left": 520,
+              "w": 760,
+              "h": 856,
+              "bottom": 900,
+              "right": 1280
+            }
+          },
+          "panelFab": {
+            "visible": false,
+            "rect": {
+              "top": 0,
+              "left": 0,
+              "w": 0,
+              "h": 0,
+              "bottom": 0,
+              "right": 0
+            },
+            "hit": {
+              "x": 0,
+              "y": 0,
+              "tag": "HEADER",
+              "id": null,
+              "cls": "topbar",
+              "text": "OmniStudio\n      多模型图像 / 视频 / 音频创作工作台\n  ",
+              "isTarget": false
+            }
+          },
+          "jobsGrid": {
+            "visible": true,
+            "rect": {
+              "top": 294,
+              "left": 540,
+              "w": 720,
+              "h": 3030,
+              "bottom": 3324,
+              "right": 1260
+            }
+          },
+          "cardCount": 12,
+          "firstCard": {
+            "top": 294,
+            "left": 540,
+            "w": 353,
+            "h": 499,
+            "bottom": 793,
+            "right": 893
+          },
+          "statusTabs": {
+            "visible": true,
+            "rect": {
+              "top": 60,
+              "left": 540,
+              "w": 477,
+              "h": 39,
+              "bottom": 99,
+              "right": 1017
+            }
+          },
+          "typeTabs": {
+            "visible": true,
+            "rect": {
+              "top": 115,
+              "left": 540,
+              "w": 720,
+              "h": 52,
+              "bottom": 167,
+              "right": 1260
+            },
+            "count": 14
+          },
+          "pageSize": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 179,
+              "left": 1141,
+              "w": 69,
+              "h": 34,
+              "bottom": 213,
+              "right": 1210
+            }
+          },
+          "navFavorites": {
+            "present": true,
+            "visible": true,
+            "rect": {
+              "top": 861,
+              "left": 10,
+              "w": 169,
+              "h": 36,
+              "bottom": 897,
+              "right": 179
+            }
+          },
+          "docScrollW": 1280,
+          "innerW": 1280
+        },
+        "S5_scroll_bottom": {
+          "scrollTop": 2496,
+          "scrollH": 3352,
+          "clientH": 856
+        }
+      },
+      "picked_type": "#sidebar .nav-item[data-mode=\"t2v\"]",
+      "can_reopen_sidebar": false,
+      "reopen_error": "navToggle 不可见"
+    }
+  }
+}

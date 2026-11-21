@@ -1,0 +1,965 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "viewport": [
+    375,
+    812
+  ],
+  "steps": {
+    "P0_initial": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "panel": {
+        "box": {
+          "top": 812,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 1527,
+          "right": 375,
+          "visible": true
+        },
+        "open": false
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "DIV",
+        "id": null,
+        "cls": "progress-wrap",
+        "text": "生成中 · 3%"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 466
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P1_after_static_t2i": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "panel": {
+        "box": {
+          "top": 812,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 1527,
+          "right": 375,
+          "visible": true
+        },
+        "open": false
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "DIV",
+        "id": null,
+        "cls": "progress-wrap",
+        "text": "生成中 · 3%"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 466
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P2_after_dynamic_t2v": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": 0,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 300,
+          "visible": true
+        },
+        "open": true
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 44,
+          "left": 0,
+          "w": 375,
+          "h": 768,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": false
+      },
+      "panel": {
+        "box": {
+          "top": 812,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 1527,
+          "right": 375,
+          "visible": true
+        },
+        "open": false
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "A",
+        "id": null,
+        "cls": "nav-item",
+        "text": "Qwen 图片编辑"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 466
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": 10,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": 289,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P3_after_longfilm": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "panel": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": false
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "VIDEO",
+        "id": null,
+        "cls": "",
+        "text": ""
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 530
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P4_panel_open": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "DIV",
+          "id": "panelMask",
+          "cls": "panel-mask open",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": true
+      },
+      "panel": {
+        "box": {
+          "top": 97,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 375,
+          "h": 812,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "DIV",
+        "id": null,
+        "cls": "compact-field",
+        "text": "采样步数8\n          \n          推荐"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 530
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P4b_after_reopen_attempt": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "DIV",
+          "id": "panelMask",
+          "cls": "panel-mask open",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": true
+      },
+      "panel": {
+        "box": {
+          "top": 97,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 375,
+          "h": 812,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "DIV",
+        "id": null,
+        "cls": "compact-field",
+        "text": "采样步数8\n          \n          推荐"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 530
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    },
+    "P5_favorites_nav": {
+      "vw": 375,
+      "vh": 812,
+      "navToggle": {
+        "box": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36,
+          "bottom": 40,
+          "right": 46,
+          "visible": true
+        },
+        "hit": {
+          "x": 28,
+          "y": 22,
+          "tag": "DIV",
+          "id": "panelMask",
+          "cls": "panel-mask open",
+          "text": ""
+        }
+      },
+      "sidebar": {
+        "box": {
+          "top": 44,
+          "left": -300,
+          "w": 300,
+          "h": 768,
+          "bottom": 812,
+          "right": 0,
+          "visible": true
+        },
+        "open": false
+      },
+      "sidebarMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 0,
+          "h": 0,
+          "bottom": 0,
+          "right": 0,
+          "visible": false
+        },
+        "open": true
+      },
+      "panel": {
+        "box": {
+          "top": 97,
+          "left": 0,
+          "w": 375,
+          "h": 715,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "panelMask": {
+        "box": {
+          "top": 0,
+          "left": 0,
+          "w": 375,
+          "h": 812,
+          "bottom": 812,
+          "right": 375,
+          "visible": true
+        },
+        "open": true
+      },
+      "jobsArea": {
+        "top": 44,
+        "left": 0,
+        "w": 375,
+        "h": 768,
+        "bottom": 812,
+        "right": 375,
+        "visible": true
+      },
+      "cardCount": 12,
+      "cardHit": {
+        "x": 97,
+        "y": 707,
+        "tag": "DIV",
+        "id": null,
+        "cls": "compact-field",
+        "text": "采样步数8\n          \n          推荐"
+      },
+      "cardRect": {
+        "top": 647,
+        "left": 12,
+        "w": 171,
+        "h": 530
+      },
+      "navFavorites": {
+        "top": 939,
+        "left": -290,
+        "w": 279,
+        "h": 40,
+        "bottom": 979,
+        "right": -11,
+        "visible": true
+      },
+      "navFavoritesHit": null,
+      "genTypeTabs": {
+        "top": 158,
+        "left": 12,
+        "w": 351,
+        "h": 270,
+        "bottom": 428,
+        "right": 363,
+        "visible": true
+      },
+      "statusTabs": {
+        "top": 56,
+        "left": 12,
+        "w": 351,
+        "h": 92,
+        "bottom": 148,
+        "right": 363,
+        "visible": true
+      },
+      "pageSize": {
+        "top": 530,
+        "left": 46,
+        "w": 168,
+        "h": 40,
+        "bottom": 570,
+        "right": 214,
+        "visible": true
+      },
+      "backish": [],
+      "stateMode": null,
+      "statePage": null,
+      "stateTab": null
+    }
+  },
+  "P3_longfilm_clicked": true,
+  "P4b_reopen_sidebar_with_panel_open": false,
+  "P4b_error": "ElementHandle.click: Timeout 2500ms exceeded.\nCall log:\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - elemen",
+  "errors": []
+}

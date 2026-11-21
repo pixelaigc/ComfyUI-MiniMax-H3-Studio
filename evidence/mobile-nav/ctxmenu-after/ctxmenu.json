@@ -1,0 +1,17 @@
+{
+  "base": "http://127.0.0.1:8917",
+  "viewport": [
+    375,
+    812
+  ],
+  "media_card_index": 2,
+  "touch_point": {
+    "x": 97.25,
+    "y": 427.796875
+  },
+  "menu_geometry": {
+    "open": false
+  },
+  "fav_button_found": false,
+  "errors": []
+}

@@ -1,0 +1,1090 @@
+{
+  "base": "http://127.0.0.1:8917",
+  "viewport": [
+    375,
+    812
+  ],
+  "errors": [],
+  "matrix": {
+    "S0-initial": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "all",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "job-top",
+          "text": "文生视频 · 11/21 08:06取消"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 501
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": -150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "genTypeTabs",
+          "cls": "jobs-tabs jobs-type-tabs",
+          "text": "生成类型全部类型文生视频首尾帧生成参考图生成Z-IMAGE "
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "jobs-tabs",
+          "text": "全部\n        进行中\n        已完成\n   "
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "SELECT",
+          "id": "pageSizeSelect",
+          "cls": "",
+          "text": "8 个12 个16 个24 个32 个48 个"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S1-drawer-open": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "all",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item",
+          "text": "H3-Image"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 501
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": 150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "id": null,
+          "cls": "nav-item nav-model-item",
+          "text": "minimax-h3 首尾帧生视频"
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "navDrawerHead",
+          "cls": "nav-drawer-head",
+          "text": "选择生成类型\n      ×"
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item active",
+          "text": "Z-IMAGE 文生图"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S2-after-static-t2i": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "all",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "job-top",
+          "text": "文生视频 · 11/21 08:06取消"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 501
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": -150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "genTypeTabs",
+          "cls": "jobs-tabs jobs-type-tabs",
+          "text": "生成类型全部类型文生视频首尾帧生成参考图生成Z-IMAGE "
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "jobs-tabs",
+          "text": "全部\n        进行中\n        已完成\n   "
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "SELECT",
+          "id": "pageSizeSelect",
+          "cls": "",
+          "text": "8 个12 个16 个24 个32 个48 个"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S3-after-dynamic-t2v": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "all",
+      "activeModeNav": "minimax-h3 文生视频",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "job-top",
+          "text": "文生视频 · 11/21 08:06取消"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 501
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": -150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "genTypeTabs",
+          "cls": "jobs-tabs jobs-type-tabs",
+          "text": "生成类型全部类型文生视频首尾帧生成参考图生成Z-IMAGE "
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "jobs-tabs",
+          "text": "全部\n        进行中\n        已完成\n   "
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "SELECT",
+          "id": "pageSizeSelect",
+          "cls": "",
+          "text": "8 个12 个16 个24 个32 个48 个"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S4-after-category-head": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "all",
+      "activeModeNav": "minimax-h3 首尾帧生视频",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item",
+          "text": "H3-Image"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 501
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": 150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "id": null,
+          "cls": "nav-item nav-model-item active",
+          "text": "minimax-h3 首尾帧生视频"
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "navDrawerHead",
+          "cls": "nav-drawer-head",
+          "text": "选择生成类型\n      ×"
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item",
+          "text": "Z-IMAGE 文生图"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S5-after-longfilm": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "done",
+      "activeModeNav": "minimax-h3 长片拼接",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "job-top",
+          "text": "参考生成 · 11/21 07:5211/21 07:52"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 565
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": -150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "genTypeTabs",
+          "cls": "jobs-tabs jobs-type-tabs",
+          "text": "生成类型全部类型文生视频首尾帧生成参考图生成Z-IMAGE "
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": null,
+          "cls": "jobs-tabs",
+          "text": "全部\n        进行中\n        已完成\n   "
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "SELECT",
+          "id": "pageSizeSelect",
+          "cls": "",
+          "text": "8 个12 个16 个24 个32 个48 个"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S6-panel-drawer-open": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": false,
+      "sidebarMaskOpen": false,
+      "panelOpen": true,
+      "panelMaskOpen": true,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "done",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "INPUT",
+          "id": "imgSteps",
+          "cls": "",
+          "text": ""
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 565
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": -150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "imgAspectChips",
+          "cls": "chips",
+          "text": "1:12:33:23:44:39:1616:921:9"
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "id": "panel",
+          "cls": "panel open",
+          "text": "尺寸预设 H3 原生画布内\n        自定义（手动填宽"
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "SELECT",
+          "id": "imgModelSelect",
+          "cls": "img-select",
+          "text": "Z-Image-Turbo · 官方加速版Z-Image B"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S7-toggle-hamburger-while-panel-open": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "done",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item",
+          "text": "H3-Image"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 565
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": 150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "id": null,
+          "cls": "nav-item nav-model-item",
+          "text": "minimax-h3 首尾帧生视频"
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "navDrawerHead",
+          "cls": "nav-drawer-head",
+          "text": "选择生成类型\n      ×"
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item active",
+          "text": "Z-IMAGE 文生图"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    },
+    "S8-after-panel-closed": {
+      "vw": 375,
+      "vh": 812,
+      "sidebarOpen": true,
+      "sidebarMaskOpen": true,
+      "panelOpen": false,
+      "panelMaskOpen": false,
+      "jobsAreaHidden": false,
+      "cardCount": 12,
+      "activeTab": "done",
+      "activeModeNav": "Z-IMAGE 文生图",
+      "G1_hamburger": {
+        "ok": true,
+        "why": "hit-self",
+        "at": {
+          "x": 28,
+          "y": 22
+        },
+        "hit": {
+          "tag": "path",
+          "id": null,
+          "cls": "",
+          "text": ""
+        },
+        "targetRect": {
+          "top": 4,
+          "left": 10,
+          "w": 36,
+          "h": 36
+        }
+      },
+      "G2_media_card": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 97,
+          "y": 687
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item",
+          "text": "H3-Image"
+        },
+        "cardRect": {
+          "top": 647,
+          "left": 12,
+          "w": 171,
+          "h": 565
+        }
+      },
+      "G3_favorites_nav": {
+        "ok": false,
+        "why": "off-viewport",
+        "at": {
+          "x": 150,
+          "y": 1015
+        }
+      },
+      "G4_type_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 293
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "id": null,
+          "cls": "nav-item nav-model-item",
+          "text": "minimax-h3 首尾帧生视频"
+        },
+        "targetRect": {
+          "top": 158,
+          "left": 12,
+          "w": 351,
+          "h": 270
+        }
+      },
+      "G5_status_tabs": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 188,
+          "y": 102
+        },
+        "hit": {
+          "tag": "DIV",
+          "id": "navDrawerHead",
+          "cls": "nav-drawer-head",
+          "text": "选择生成类型\n      ×"
+        },
+        "targetRect": {
+          "top": 56,
+          "left": 12,
+          "w": 351,
+          "h": 92
+        }
+      },
+      "G6_page_size": {
+        "ok": false,
+        "why": "covered-by",
+        "at": {
+          "x": 130,
+          "y": 550
+        },
+        "hit": {
+          "tag": "A",
+          "id": null,
+          "cls": "nav-item active",
+          "text": "Z-IMAGE 文生图"
+        },
+        "targetRect": {
+          "top": 530,
+          "left": 46,
+          "w": 168,
+          "h": 40
+        }
+      }
+    }
+  }
+}

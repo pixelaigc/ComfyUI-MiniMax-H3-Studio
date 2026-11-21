@@ -76,6 +76,13 @@ body {
 }
 .nav-scroll::-webkit-scrollbar-thumb:hover { background: #b7bec8; }
 .nav-label { font-size: 10px; letter-spacing: .12em; color: var(--muted); padding: 4px 10px 8px; }
+/* 【2026-11-21 移动端死路修复】抽屉标题行（标题 + 关闭按钮）。
+   桌面端侧栏常驻，没有「关闭」概念 —— 这里默认隐藏，
+   由 responsive.css 在 ≤700px 时改成 display:flex。
+   【为什么不能只在 responsive.css 里写 display:flex】
+   那样桌面端就完全没有这条规则 —— 元素会按默认的 block 显示出来。
+   必须在这里给一个 display:none 的基础值。 */
+.nav-drawer-head { display: none; }
 /* 分组标题现在是**可点击的折叠按钮**（2026-11-13）：
    文案仍是纯文本（::after 画箭头，不进 textContent —— 既有测试
    用 .nav-group 的 textContent 当分组名，箭头混进去会打破断言）。 */

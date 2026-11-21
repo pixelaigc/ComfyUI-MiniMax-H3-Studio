@@ -120,7 +120,10 @@ class TestNoHtmlCommentInAnyJsTemplate(unittest.TestCase):
 #   用 git 走历史 + 内容 diff 实测得到，见 docs/audit-evidence/）
 STALE_BUMPED = {
     "assets.css":              ("uxbatch1",     "cr20261115b"),
-    "responsive.css":          ("agentpower1",  "cr20261115b"),
+    # 【2026-11-21 移动端死路修复】responsive.css 改了内容
+    #   （参数抽屉遮罩 inset:0 -> inset:44px 0 0 0 让开顶栏；
+    #    新增抽屉标题行样式）⇒ ?v= 必须再升一档。
+    "responsive.css":          ("cr20261115b",  "mobnav20261121a"),
     # 【2026-11-19 第 3 轮 A 项】qwen-refs.js 的旧条目 ("fix3preview1", …)
     #   同样被下面第 6 轮的 ("cr20261115b", "cr20261118a") 覆盖（隐藏条目）。
     "video-panel-fallback.js": ("vpfb1",        "cr20261115b"),
@@ -200,15 +203,23 @@ STALE_BUMPED = {
     # 【2026-11-21 生成媒体库性能修】app.js 的内容又被改过
     #   （卡片走受限尺寸缩略图 + <img loading="lazy"> + 视频 poster）
     #   ⇒ ?v= 必须再升一次（fav20261120c -> mediaperm20261121a）。
-    "app.js":                  ("fav20261120c",   "mediaperm20261121a"),
-    "favorites.js":            ("fav20261120b",   "fav20261120c"),
-    "favorites.css":           ("fav20261120b",   "fav20261120c"),
+    # 【2026-11-21 移动端死路修复】app.js 改了内容
+    #   （收抽屉改事件委托 / 长按菜单 / 抽屉关闭按钮 / FAB 随抽屉隐藏）
+    # ⇒ ?v= 必须再升一档。
+    "app.js":                  ("mediaperm20261121a", "mobnav20261121a"),
+    # 【2026-11-21 移动端死路修复】favorites.js / favorites.css 改了内容
+    #   （applyBadge 同步卡片底部的收藏按钮；新增 .fav-action 样式）
+    # ⇒ ?v= 必须再升一档。
+    "favorites.js":            ("fav20261120c",   "mobnav20261121a"),
+    "favorites.css":           ("fav20261120c",   "mobnav20261121a"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
     # 【2026-11-19 第 7 轮审查】并行任务 76eac36 改了 style.css 的内容
     #   （生成状态修复的样式）⇒ ?v= 升到 genfix20261119a。
-    "style.css":               ("cr20261115a",   "genfix20261119b"),
+    # 【2026-11-21 移动端死路修复】style.css 改了内容
+    #   （新增 .nav-drawer-head 基础规则 display:none）⇒ ?v= 必须再升一档。
+    "style.css":               ("genfix20261119b", "mobnav20261121a"),
     # video-panel.js 改内容（B-5：submitParams 不再裸引用 app.js 全局 state）
     # ⇒ ?v= 必须升（ac1steps1 -> ac1steps2）。
     # 【2026-11-17】video-panel.js 此前 ?v= 已是 vparams3（比表里的
