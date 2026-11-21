@@ -376,10 +376,16 @@ class TestEnhanceAssetsFrontendSource(unittest.TestCase):
         self.assertIn("素材上下文", block.group(0))
 
     def test_static_assets_version_bumped(self):
-        """改过的静态资源必须升 ?v=（否则老用户拿不到修复）。"""
+        """
+        改过的静态资源必须升 ?v=（否则老用户拿不到修复）。
+
+        【2026-11-21 更新】版本号随参考标签修复升到 reflabel1
+        （app.js / providers.js / enhance-menu.js 三个都改了）。
+        """
         html = self.read("index.html")
-        self.assertIn("/static/enhance-menu.js?v=enhassets1", html)
-        self.assertIn("/static/providers.js?v=enhassets1", html)
+        for name in ("enhance-menu.js", "providers.js", "app.js"):
+            self.assertIn(f"/static/{name}?v=reflabel1", html,
+                          f"{name} 的 ?v= 没升到 reflabel1")
 
 
 # ------------------------------------------------------------------ 浏览器验证

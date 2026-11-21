@@ -531,8 +531,38 @@ class TestReferenceLabelBrowser(unittest.TestCase):
                                          body=json.dumps(payload, ensure_ascii=False)))
 
     def _switch_mode(self, mode):
-        self.page.click(f'.nav-item[data-mode="{mode}"]')
+        """
+        切到某个生成模式。
+
+        【为什么要等这么久】2026-11-21 起视频模式的导航项不再写死在
+        index.html 里 —— 它们由 web/video-nav.js 从 `GET /api/video-categories`
+        **异步渲染**到 `#navVideoCategories`（index.html 里那几条只是
+        <noscript> 兜底）。
+
+        而 app.js 的 boot() 是 `fn()` **不 await** 的（既有实现，见
+        commit d46dd9f —— 不是本次改动引入的），所以视频导航要等
+        `/api/video-categories` 返回后才出现。测试实例里这个接口要走
+        本机 ComfyUI 的模型探测，实测 **15~20 秒**才渲染完。
+        所以这里必须显式等到导航项出现，而不是固定 sleep。
+        """
+        self.page.wait_for_function(
+            """(m) => {
+              const el = document.querySelector(`.nav-item[data-mode="${m}"]`);
+              return !!(el && el.offsetParent !== null);
+            }""",
+            arg=mode, timeout=60000)
+        self.page.evaluate(
+            """(m) => {
+              const el = document.querySelector(`.nav-item[data-mode="${m}"]`);
+              if (el) el.click();
+            }""", mode)
         self.page.wait_for_timeout(900)
+        # 确认模式真的切过去了（动态导航点完不一定会切）
+        self.page.wait_for_function(
+            """(m) => {
+              try { return typeof state !== 'undefined' && state.mode === m; }
+              catch (e) { return false; }
+            }""", arg=mode, timeout=8000)
 
     def _set_prompt(self, text="一个女孩站在雪地里"):
         self.page.evaluate(
