@@ -493,3 +493,255 @@ def test_hamburger_clickable_while_params_drawer_open(page):
     assert page.evaluate(
         "() => document.querySelector('#sidebar').classList.contains('open')"
     ), "参数抽屉开着时点汉堡没能打开侧栏"
+
+
+# ---------------------------------------------------------------- T9
+# 【2026-11-21 第二轮用户反馈】「选择某个生成类型后，就无法回到生成类型
+# 选择，也无法看到生成媒体库。」上一轮的守卫只测了「进入收藏栏」（T8 在
+# test_mobile_nav_flow.py），**没有测从收藏栏退回去** —— 而「回不去」正是
+# 用户报的现象。下面三条补上这段。
+
+
+def _open_drawer_and_reach_favorites(pg):
+    """打开类型选择抽屉并把「收藏」入口滚进可视区（侧栏项在折叠线下方）。"""
+    pg.tap("#navToggle", timeout=8000)
+    pg.wait_for_timeout(900)
+    assert pg.evaluate(
+        "() => document.querySelector('#sidebar').classList.contains('open')"
+    ), "汉堡没能打开类型选择抽屉"
+    pg.evaluate("""() => {
+        const el = document.querySelector('#navFavorites');
+        const sc = document.querySelector('#navScroll');
+        if (el && sc) el.scrollIntoView({block: 'nearest'});
+    }""")
+    pg.wait_for_timeout(400)
+
+
+def test_favorites_view_is_not_a_dead_end(browser, live_server):
+    """选类型 → 进收藏栏 → **能退回类型选择** → **还能再选一次类型**。
+
+    【这条锁住什么】用户报的是「回不去」。收藏栏是新入口，如果它把
+    state.page / 抽屉状态设成了不可逆的组合，用户就卡在收藏视图里。
+    判据用 elementFromPoint 真实命中，不用被祖先裁剪的矩形相交。
+    """
+    ctx = browser.new_context(viewport={"width": 375, "height": 812},
+                             is_mobile=True, has_touch=True, device_scale_factor=2)
+    try:
+        pg = ctx.new_page()
+        pg.goto(live_server + "/", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_selector("#jobsGrid .job-card[data-jid]", timeout=45000)
+        pg.wait_for_timeout(1800)
+
+        # ① 选一个生成类型
+        _open_drawer_and_reach_favorites(pg)
+        pg.tap('.nav-item[data-mode="t2v"], .nav-model-item[data-mode="t2v"]',
+              timeout=8000)
+        pg.wait_for_timeout(900)
+        assert pg.evaluate(
+            """() => { const a = document.querySelector(
+                 '.nav-item.active,.nav-model-item.active');
+               return a && a.dataset.mode === 't2v'; }"""
+        ), "选 t2v 后没有成为当前类型"
+
+        # ② 进收藏栏
+        _open_drawer_and_reach_favorites(pg)
+        # 真实命中：命中的必须是入口本身
+        hit = pg.evaluate(
+            """() => { const t = document.querySelector('#navFavorites');
+               const b = t.getBoundingClientRect();
+               const x = Math.round(b.left + b.width/2), y = Math.round(b.top + b.height/2);
+               const e = document.elementFromPoint(x, y);
+               return {self: e ? (e === t || t.contains(e)) : false,
+                       hitId: e ? e.id : null}; }""")
+        assert hit["self"], f"「收藏」入口被挡住，命中的是 {hit['hitId']}"
+        pg.tap("#navFavorites", timeout=8000)
+        pg.wait_for_timeout(1400)
+        assert pg.evaluate(
+            "() => (document.querySelector('.jobs-tabs button[data-st].active')"
+            "||{}).dataset?.st || ''") == "favorites", "没能进入收藏视图"
+        # 【补断言 · 2026-11-21 变异测试发现】左侧「收藏」入口必须高亮。
+        # 变异测试 M1（让入口不再走 showFavorites、落进兜底分支）**没被 G1 抓住**，
+        # 因为兜底分支也切了标签 —— 两条路径的可观察差别只有「导航高亮」：
+        #   showFavorites() 里有 `$$(".nav-item").forEach(remove active)` +
+        #   `nav.classList.add("active")`；兜底分支**没有**这两句。
+        # ⇒ 这条断言正是「命名该行为的那条断言」。
+        assert pg.evaluate(
+            "() => document.querySelector('#navFavorites').classList.contains('active')"
+        ), "进入收藏视图后左侧「收藏」入口没有高亮"
+
+        # ③ 从收藏栏退回类型选择（这条就是用户报的那一步）
+        pg.tap("#navToggle", timeout=8000)
+        pg.wait_for_timeout(900)
+        assert pg.evaluate(
+            "() => document.querySelector('#sidebar').classList.contains('open')"
+        ), "在收藏视图里点汉堡没能打开类型选择 —— 这正是用户报的死路"
+
+        # ④ 而且能真的再选一次另一个类型（不是只能看不能动）
+        pg.evaluate("""() => {
+            const el = document.querySelector('.nav-item[data-mode="t2i"],'
+                     + '.nav-model-item[data-mode="t2i"]');
+            const sc = document.querySelector('#navScroll');
+            if (el && sc) el.scrollIntoView({block: 'nearest'});
+        }""")
+        pg.wait_for_timeout(400)
+        pg.tap('.nav-item[data-mode="t2i"], .nav-model-item[data-mode="t2i"]',
+              timeout=8000)
+        pg.wait_for_timeout(900)
+        mode = pg.evaluate(
+            """() => { const a = document.querySelector(
+                 '.nav-item.active,.nav-model-item.active');
+               return a ? a.dataset.mode : null; }""")
+        assert mode == "t2i", f"从收藏栏退出后无法再选生成类型，当前={mode!r}"
+
+        # ⑤ 媒体库仍可见可点
+        cards = pg.evaluate(
+            """() => { const cs = document.querySelectorAll(
+                 '#jobsGrid .job-card[data-jid]');
+               let n = 0;
+               for (const c of cs) {
+                 const b = c.getBoundingClientRect();
+                 if (b.bottom <= 0 || b.top >= innerHeight) continue;
+                 const x = Math.round(Math.min(innerWidth-1, Math.max(0, b.left+b.width/2)));
+                 const y = Math.round(Math.min(innerHeight-1, Math.max(0, b.top+b.height/2)));
+                 const t = document.elementFromPoint(x, y);
+                 if (t && (t === c || c.contains(t))) n++;
+               }
+               return n; }""")
+        assert cards > 0, "从收藏栏退出后媒体库卡片一张都点不到"
+    finally:
+        ctx.close()
+
+
+def test_favorites_entry_reachable_at_tablet_768(browser, live_server):
+    """768 平板档（侧栏常驻、无汉堡）下「收藏」入口必须可达。
+
+    【为什么单独测 768】上一轮全矩阵最大竖屏是 430×932，768×1024 只测了
+    3 个模式。768 是平板档：侧栏常驻、没有汉堡，导航可达性走的是另一条代码路径。
+    """
+    ctx = browser.new_context(viewport={"width": 768, "height": 1024},
+                             is_mobile=True, has_touch=True, device_scale_factor=2)
+    try:
+        pg = ctx.new_page()
+        pg.goto(live_server + "/", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_selector("#jobsGrid .job-card[data-jid]", timeout=45000)
+        pg.wait_for_timeout(1800)
+
+        # 侧栏应常驻（不是 fixed 抽屉）
+        layout = pg.evaluate(
+            """() => { const sb = document.querySelector('#sidebar');
+               const b = sb.getBoundingClientRect();
+               return {visible: b.width > 0 && b.height > 0,
+                       position: getComputedStyle(sb).position,
+                       isPhone: window.BREAKPOINTS
+                         ? innerWidth <= window.BREAKPOINTS.phone
+                         : matchMedia('(max-width: 700px)').matches}; }""")
+        assert layout["visible"], "768 下侧栏不可见"
+        assert not layout["isPhone"], "768 被判成手机档（断点串了）"
+
+        # 收藏入口在**某个滚动位置**可点（可达性，不是首屏必须可见）
+        res = pg.evaluate(
+            """() => {
+              const el = document.querySelector('#navFavorites');
+              if (!el) return {found: false};
+              const sc = document.querySelector('#navScroll');
+              const max = sc ? sc.scrollHeight - sc.clientHeight : 0;
+              for (let pos = 0; pos <= max; pos += Math.max(40, max / 12)) {
+                if (sc) sc.scrollTop = pos;
+                const b = el.getBoundingClientRect();
+                if (b.bottom <= 0 || b.top >= innerHeight) continue;
+                const cx = Math.round(b.left + b.width/2);
+                const cy = Math.round(b.top + b.height/2);
+                const t = document.elementFromPoint(cx, cy);
+                if (t && (t === el || t.contains(t)))
+                  return {found: true, reachable: true, scrollTop: pos};
+              }
+              if (sc) sc.scrollTop = max;
+              const b = el.getBoundingClientRect();
+              const cx = Math.round(b.left + b.width/2);
+              const cy = Math.round(b.top + b.height/2);
+              const t = document.elementFromPoint(cx, cy);
+              return {found: true,
+                      reachable: !!(t && (t === el || t.contains(t))),
+                      hitId: t ? t.id : null, scrollTop: max};
+            }""")
+        assert res.get("found"), "768 下没有 #navFavorites 入口"
+        assert res.get("reachable"), f"768 下收藏入口在任何滚动位置都点不到：{res}"
+
+        # 而且要真能进入收藏视图
+        pg.tap("#navFavorites", timeout=8000)
+        pg.wait_for_timeout(1400)
+        assert pg.evaluate(
+            "() => (document.querySelector('.jobs-tabs button[data-st].active')"
+            "||{}).dataset?.st || ''") == "favorites", "768 下点收藏入口没能进入收藏视图"
+    finally:
+        ctx.close()
+
+
+def test_favorites_view_card_opens_detailModal(browser, live_server):
+    """收藏视图里点卡片开的必须是既有的 #detailModal（同一份实现）。
+
+    【为什么要有这条】需求要求收藏视图「沿用生成媒体库既有的卡片交互」。
+    如果它自己另起一个模态框，两套实现必然漂移（详情参数、右键、播放器都会分叉）。
+    上一轮的判据已修正过一次：活的模态框是 #detailModal，不是 .job-detail-modal。
+    """
+    ctx = browser.new_context(viewport={"width": 390, "height": 844},
+                             is_mobile=True, has_touch=True, device_scale_factor=2)
+    try:
+        pg = ctx.new_page()
+        pg.goto(live_server + "/", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_selector("#jobsGrid .job-card[data-jid]", timeout=45000)
+        pg.wait_for_timeout(1800)
+
+        # 保证收藏视图非空：拿库里已有的一条收藏（没有就先用接口收藏一条）
+        favs = pg.evaluate(
+            """async () => {
+              const r = await fetch('/api/jobs?status=all&favorites=1&page=1&page_size=1');
+              const d = await r.json();
+              return {total: d.total || 0, id: (d.jobs || [])[0]?.id || null}; }""")
+        if not favs["id"]:
+            any_id = pg.evaluate(
+                """async () => { const r = await fetch('/api/jobs?status=all'
+                   + '&page=1&page_size=1'); const d = await r.json();
+                   return (d.jobs || [])[0]?.id || null; }""")
+            assert any_id, "库里没有任何产物，测试无意义"
+            pg.evaluate(
+                """async (id) => { const r = await fetch('/api/jobs/' + id + '/favorite',
+                   {method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({favorited: true})});
+                   return r.status; }""", any_id)
+            pg.wait_for_timeout(800)
+            favs["id"] = any_id
+
+        pg.evaluate("() => window.H3Studio.showFavorites()")
+        pg.wait_for_timeout(1500)
+        assert pg.evaluate(
+            "() => (document.querySelector('.jobs-tabs button[data-st].active')"
+            "||{}).dataset?.st || ''") == "favorites", "没能进入收藏视图"
+
+        pg.wait_for_function(
+            "(jid) => !!document.querySelector(`.job-card[data-jid=\"${jid}\"]`)",
+            arg=favs["id"], timeout=30000)
+
+        # 真实命中点卡片
+        pg.evaluate(
+            """(jid) => { const c = document.querySelector(
+                 `.job-card[data-jid=\"${jid}\"]`);
+               if (c) c.scrollIntoView({block: 'center'}); }""", favs["id"])
+        pg.wait_for_timeout(500)
+        pg.tap(f'.job-card[data-jid="{favs["id"]}"]', timeout=8000)
+        pg.wait_for_timeout(1000)
+
+        opened = pg.evaluate(
+            """() => { const m = document.querySelector('#detailModal');
+               if (!m || m.hasAttribute('hidden')) return false;
+               const b = m.getBoundingClientRect();
+               return b.width > 0 && b.height > 0; }""")
+        assert opened, "收藏视图里点卡片没有打开 #detailModal"
+
+        body = pg.evaluate(
+            """() => { const b = document.querySelector('#detailModalBody');
+               return b ? String(b.textContent || '').replace(/\\s+/g, ' ') : ''; }""")
+        assert ("步数" in body) or ("steps" in body.lower()), \
+            "收藏视图的详情模态框没有真实参数（步数）—— 不是同一份实现"
+    finally:
+        ctx.close()
