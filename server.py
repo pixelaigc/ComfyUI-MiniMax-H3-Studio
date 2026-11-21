@@ -89,6 +89,7 @@ from h3studio import asset_ref_guard
 from h3studio import hardware as hw
 from h3studio import assets as asset_store
 from h3studio import docs_static
+from h3studio import prompt_catalog
 from h3studio import prompt_history as ph
 from h3studio import thumbnails as thumb_service
 from h3studio import prompt_history_hooks as ph_hooks
@@ -8460,6 +8461,27 @@ async def _h3_image_options_payload() -> dict:
     }
 
 
+async def api_prompt_catalog(request):
+    """GET /api/prompt-catalog —— 「创意内容设计」选项目录。
+
+    【为什么走服务端下发】既有纪律：所有「清单类」数据都由服务端给
+    （/api/image-options、/api/image-loras、/api/enhancer、/api/docs/flows）。
+    前端不硬编码清单 ⇒ 版本可控、可单测、增量更新不用重发前端。
+
+    【响应结构】
+      version        目录内容 sha256 前 12 位（内容变了就变）
+      slots          拼装骨架顺序（主体 → 造型 → 风格 → 场景 → 构图 → 光 → 色 → 氛围 → 质量 → 负向）
+      dimensions[]   维度 → groups[]（子类）→ items[]（选项）
+      conflicts[]    冲突矩阵（hard 硬互斥 / soft 软冲突 / cap 数量上限）
+      counts         规模统计（前端可以显示「共 N 项」）
+
+    【冲突规则里的 id 是真实选项 id】—— 前端据此禁用/提示，
+    规则引用了已删项会在服务端构建期直接报错，不会静默失效。
+    """
+    manifest = prompt_catalog.get_manifest()
+    return json_ok(manifest)
+
+
 async def api_image_options(request):
     """GET /api/image-options —— 图像面板可选项（含每个模型版本的推荐参数）"""
     tiers = []
@@ -12108,6 +12130,8 @@ def make_app():
     app.router.add_post("/api/gpu/power-limit", api_gpu_power_limit)
     app.router.add_post("/api/unload", api_unload)
     app.router.add_get("/api/image-options", api_image_options)
+    # 「创意内容设计」选项目录（文生图提示词构造器）
+    app.router.add_get("/api/prompt-catalog", api_prompt_catalog)
     app.router.add_get("/api/music-options", api_music_options)
     app.router.add_post("/api/music-enhance", api_music_enhance)
 
