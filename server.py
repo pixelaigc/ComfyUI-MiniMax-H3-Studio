@@ -79,6 +79,8 @@ from h3studio import enhance_assets as enh_assets
 from h3studio import moss_layout
 from h3studio import qwen_pe
 from h3studio import h3image_pe
+# 【2026-11-21】构建版本标识（让用户能自己确认手机在跑哪一版）
+from h3studio import build_info as buildinfo
 from h3studio import loras as lora_registry
 from h3studio import gen_types
 from h3studio import gen_defaults
@@ -9041,6 +9043,28 @@ async def api_generation_types(request):
     })
 
 
+async def api_version(request):
+    """GET /api/version —— 当前部署的构建版本标识
+
+    【为什么需要这个接口】
+    2026-11-21 用户在移动端报「选完生成类型回不去 / 看不到生成媒体库」，
+    而在 8190 上怎么测都复现不了。真正的卡点是：
+    **无法确认用户手机上的页面是不是当前这版代码** ——
+    没有版本标识时，排查只能靠猜（是不是缓存了？是不是访问了别的端口？）。
+
+    【给什么】
+      commit    —— 部署目录所在 commit 短哈希（最权威）
+      assets    —— index.html 里各静态资源的 ?v= 版本号（前端实际拿到的）
+      assets_id —— 上面那批版本号的指纹（UI 上显示用，短）
+      built_at  —— 服务进程启动时刻（能看出服务是不是刚重启过）
+      served_from —— 服务实际所在目录（能看出是不是跑在 live worktree）
+
+    【为什么 assets 要单独给】
+    commit 变了但某个静态资源的 ?v= 没变 ⇒ 浏览器仍可能用旧文件。
+    「commit 是新的、assets 是旧的」本身就是一条可观测的异常。
+    """
+    return web.json_response(buildinfo.build_info())
+
 async def api_image_loras(request):
     """GET /api/image-loras —— 本机实际存在的 Z-Image LoRA 清单 + 当前配置
 
@@ -12122,6 +12146,7 @@ def make_app():
     app.router.add_get("/api/video-size", api_video_size)
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)
+    app.router.add_get("/api/version", api_version)
     app.router.add_get("/api/generation-types", api_generation_types)
     # 提示词历史（各功能面板的提示词留痕）
     app.router.add_get("/api/prompt-history", api_prompt_history_list)
