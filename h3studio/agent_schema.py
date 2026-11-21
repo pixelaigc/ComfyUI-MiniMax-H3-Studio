@@ -57,19 +57,35 @@ from . import video_models
 #: 面板滑块已同步放宽到 2~60（web/index.html 的 #duration），
 #: 服务端上限也是 60（video_models.VIDEO_DURATION_MAX）——
 #: **服务端是唯一真相源**，这里从它取值，避免三处各写一个数字。
-VIDEO_DURATION_MIN = 2
-VIDEO_DURATION_MAX = 60
+#:
+#: 【2026-11-22 修 —— 之前是「注释说从它取值，代码却写死 2/60」】
+#: 这两个常量原本是**字面量** ``2`` / ``60``。注释声称「服务端是唯一
+#: 真相源，这里从它取值」—— 但代码没取。于是真源改了
+#: （video_models.VIDEO_DURATION_MIN/MAX）而这里**不动** ⇒
+#: Agent 的能力自述会继续报旧的时长区间（同一类「自述说谎」缺陷）。
+#: 现在真正从 video_models 取值，改真源即生效。
+try:
+    from . import video_models as _vm_duration
+    VIDEO_DURATION_MIN = int(_vm_duration.VIDEO_DURATION_MIN)
+    VIDEO_DURATION_MAX = int(_vm_duration.VIDEO_DURATION_MAX)
+except Exception:  # pragma: no cover - 真源不可用时的异常兜底
+    VIDEO_DURATION_MIN = 2
+    VIDEO_DURATION_MAX = 60
 
 #: 视频分辨率档位的**兜底**集合（旧面板的 544p / 768p）。
 #:
-#: 【2026-11-20 更新 —— 它不再是真源】
+#: 【2026-11-22 —— 已不再被任何正常路径使用，仅保留名字给外部引用】
 #: 视频的真实分辨率表达方式是「短边像素档位全集」+「自定义宽高」，
 #: 见 ``_video_size_tiers()`` 与 ``mode_schema`` 的 resolution 段
 #: （真源是 ``video_models.VIDEO_MODE_SIZE_POLICY``，2.0 MP 画布）。
 #:
 #: 旧面板的 ``#resSeg`` 只有 544p / 768p 两个下拉项，那是**界面**的遗留，
 #: 不是生成侧的硬约束 —— 继续拿它当真源会让 Agent 拒绝合法的 480p。
-#: 这个常量现在只作**异常兜底**用（真源导入失败时）。
+#:
+#: 【为什么不能拿它当降级兜底】降级回这个集合 = 重新宣称
+#: 「视频只有 544p/768p」—— 正是用户报的那个已被证伪的说法。
+#: 所以 ``_video_size_tiers()`` 的降级路径返回**空列表**（不谎报），
+#: 本常量只作历史兼容标识，**不要**再拿它渲染能力自述。
 VIDEO_RESOLUTIONS = tuple(wf.RES_MP.keys())
 
 #: 视频 LoRA 取值。
@@ -159,13 +175,20 @@ def _video_precisions() -> list:
 VIDEO_PRECISIONS = _video_precisions()
 
 #: 音乐时长区间（秒）。来源：music_yue2 的 _clamp_duration 上下限。
+#:
+#: 【2026-11-22 修 —— 兜底值是过时的 360】
+#: 原来的 except 分支返回 ``(4, 360)``。那是**旧上限** —— 服务端真实
+#: 上限早已放宽到 900 秒（music_yue2.YUE2_MAX_DURATION = 900）。
+#: 于是「music_yue2 导入失败」时，Agent 会宣称「音乐最长 360 秒」——
+#: 又是同一类「自述说谎」。兜底必须跟真源一致（宁可与真源相同，
+#: 也不能报一个更小的假上限）。
 def _music_duration_range() -> tuple[int, int]:
     try:
         from . import music_yue2
         return (int(music_yue2.YUE2_MIN_DURATION),
                 int(music_yue2.YUE2_MAX_DURATION))
     except Exception:
-        return (4, 360)
+        return (4, 900)
 
 MUSIC_DURATION_MIN, MUSIC_DURATION_MAX = _music_duration_range()
 
@@ -276,21 +299,45 @@ def _video_size_tiers() -> list[str]:
 
     来源：``video_models.size_presets_for_aspect`` 对全部比例求并集 ——
     即面板下拉里真实存在的那些档位。
+
+    【2026-11-22 修 —— 降级路径不再说旧话】
+    原来的兜底是 ``return list(VIDEO_RESOLUTIONS)``，而
+    ``VIDEO_RESOLUTIONS`` = ``workflows.RES_MP.keys()`` = 旧面板的
+    (544p, 768p)。也就是说：**只要 video_models 导入失败**，
+    Agent 的能力自述就退回到「只有 544p/768p」—— 正是用户报的那个
+    缺陷，只是走了一条更隐蔽的路（正常路径永不触发 ⇒ 测不出来）。
+
+    现在降级时返回**空列表**（= 不谎报任何档位）并让上层显式说明
+    「档位清单暂时不可用，请用 get_mode_schema」；宁可少说，
+    也不能说一个错的档位集合。
     """
     try:
         from . import video_models as vm
+        # 【为什么要把取属性也放进 try】只把 import 放进 try 不够 ——
+        # ``from . import X`` 在 X 已存在但内容不可用时**不会**抛
+        # ImportError（拿到的可能是个 None 或残缺模块），
+        # 真正的 AttributeError 会发生在后面的属性访问上。
+        # 整段包起来 ⇒ 任何「真源不可用」都统一走降级。
+        aspects = list(vm.VIDEO_ASPECTS)
+        presets_for = vm.size_presets_for_aspect
     except Exception:
-        return list(VIDEO_RESOLUTIONS)
+        # 【为什么不回退到 RES_MP】那个集合是**旧面板**的遗留，
+        # 回退过去等于重新说「只有 544p/768p」这个已被证伪的说法。
+        return []
     tiers: set[int] = set()
-    for aspect in vm.VIDEO_ASPECTS:
-        for preset in vm.size_presets_for_aspect(aspect):
+    for aspect in aspects:
+        try:
+            presets = presets_for(aspect)
+        except Exception:
+            continue
+        for preset in presets or []:
             try:
                 tiers.add(int(preset.get("short_edge") or 0))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, AttributeError):
                 continue
     tiers.discard(0)
     if not tiers:
-        return list(VIDEO_RESOLUTIONS)
+        return []
     return [f"{value}p" for value in sorted(tiers)]
 
 

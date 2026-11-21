@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-11-22",
+  "audit_scope": "内置 Agent 系统提示词 + 37 个工具的描述与返回内容 vs 服务端真实配置",
+  "truth_sources": {
+    "video_size": "h3studio/video_models.py VIDEO_MODE_SIZE_POLICY (max_pixels_mp 实时派生自 VIDEO_MAX_CANVAS_PIXELS)",
+    "video_duration": "h3studio/video_models.py VIDEO_DURATION_MIN/MAX",
+    "video_models": "h3studio/video_models.py VIDEO_MODELS",
+    "accel_lora": "h3studio/video_models.py all_accel_lora_keys()",
+    "attention": "h3studio/video_models.py VIDEO_ATTENTION_MODES",
+    "music": "h3studio/music_yue2.py YUE2_MIN/MAX/DEFAULT_DURATION",
+    "modes": "h3studio/workflows.py BUILDERS",
+    "slots": "h3studio/agent_schema.py MODE_SLOTS / MODE_MEDIA_SLOTS / REF_IMAGE_MAX",
+    "job_validation": "server.py prepare_job_params（面板与 Agent 共同入口）"
+  },
+  "summary": {
+    "total_dimensions": 16,
+    "consistent": 12,
+    "inconsistent_to_fix": 2,
+    "residual": 2
+  },
+  "rows": [
+    {
+      "dimension": "视频分辨率档位",
+      "agent_claims": "系统提示词渲染出「短边档位 288p…1440p（28 档），仅作显示标签」；list_modes 给「megapixels×resolution_percent，上限 2.0 MP」",
+      "actual": "真源 video_models.VIDEO_MODE_SIZE_POLICY: max_pixels_mp=2.0, multiple=32, custom_size=True；agent_schema.mode_resolutions('t2v') 实际返回 28 档，含 480p",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "h3studio/agent_capability.py:252 video_capability_text() 实时渲染；实测输出「当前 2.0 MP」+ 28 档含 480p"
+    },
+    {
+      "dimension": "视频分辨率旧白名单",
+      "agent_claims": "agent_schema.VIDEO_RESOLUTIONS = tuple(wf.RES_MP.keys()) = ('544p','768p') 仍存在于代码中，注释说是「兜底」",
+      "actual": "真源 workflows.RES_MP 仍是旧的 {'544p': 0.4, '768p': 0.8}（旧面板遗留）；VIDEO_RESOLUTIONS 仅在真源导入失败时兜底，正常路径走 _video_size_tiers()",
+      "verdict": "⚠️ 残留（降级路径仍可能说旧话）",
+      "evidence": "h3studio/agent_schema.py:73 VIDEO_RESOLUTIONS；mode_resolutions() 正常路径不返回它，但若 import 失败会退回 544p/768p"
+    },
+    {
+      "dimension": "视频时长",
+      "agent_claims": "系统提示词：「2~60 秒（整数）。超上限会被明确拒绝并给出上限值」",
+      "actual": "真源 video_models.VIDEO_DURATION_MIN/MAX = [2.0, 60.0]；agent_schema.mode_duration_range('t2v') = [2, 60]",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.video_capability_text() 渲染 f\"{_fmt_range(duration)} 秒\""
+    },
+    {
+      "dimension": "视频底模",
+      "agent_claims": "系统提示词列 7 个 model_key",
+      "actual": "真源 video_models.VIDEO_MODELS = ['fl2va_bf16', 'fl2va_int8', 'fl2va_pruned_int8', 'fl2va_pruned_w4a8', 'hybrid_fl2va_ref2va', 'ref2va_int8', 'ref2va_pruned_int8']",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.video_models_list() 实时取 VIDEO_MODELS"
+    },
+    {
+      "dimension": "加速 LoRA",
+      "agent_claims": "系统提示词列 12 枚 + none",
+      "actual": "真源 video_models.all_accel_lora_keys() = 12 枚",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.video_accel_loras()"
+    },
+    {
+      "dimension": "音乐时长",
+      "agent_claims": "系统提示词：「max_duration（不是 duration），范围 4~900 秒，默认 900 秒」",
+      "actual": "真源 music_yue2.YUE2_MIN/MAX/DEFAULT = {'min': 4.0, 'max': 900.0, 'default': 900.0}",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.music_capability_text()"
+    },
+    {
+      "dimension": "图像分辨率（按族）",
+      "agent_claims": "系统提示词按 z_image / qwen_image / moss_image / h3_image 分族给档位",
+      "actual": "真源 agent_schema.mode_resolutions：t2i=7 档(含4k)、t2i_qwen/i2i_qwen/t2i_moss=6 档、t2i_h3image/i2i_h3image=3 档(4/8/16mp)",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.image_capability_text() 用 agent_schema.mode_resolutions(mode)"
+    },
+    {
+      "dimension": "可下发模式清单",
+      "agent_claims": "list_modes 返回 11 个模式 = workflows.BUILDERS",
+      "actual": "真源 workflows.BUILDERS = ['a2a', 'flf', 'i2i_h3image', 'i2i_qwen', 'r2v', 't2a', 't2i', 't2i_h3image', 't2i_moss', 't2i_qwen', 't2v']（11 个，含 a2a/t2a，无 longfilm）",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.buildable_modes() = list(wf.BUILDERS.keys())；longfilm 走子进程链路，create_job 建不了，刻意不报"
+    },
+    {
+      "dimension": "素材槽位 / 参考图上限",
+      "agent_claims": "list_modes 逐模式给 slots / media_slots / max_ref_images",
+      "actual": "真源 agent_schema.MODE_SLOTS / MODE_MEDIA_SLOTS / REF_IMAGE_MAX（按 mode 派生）",
+      "verdict": "✅ 一致（已修）",
+      "evidence": "agent_capability.mode_asset_slots(mode)"
+    },
+    {
+      "dimension": "【缺口 1】运行时能力自述用导入期快照",
+      "agent_claims": "run_agent 构造 messages 时用 SYSTEM_PROMPT（模块导入时 build_system_prompt() 的快照）",
+      "actual": "build_system_prompt() 是动态的（实测：改 VIDEO_MAX_CANVAS_PIXELS 后立即变化），但运行期走的是快照 ⇒ 真源在运行期变化时，Agent 自述不变",
+      "verdict": "❌ 不一致（本次修复）",
+      "evidence": "h3studio/agent.py:3919 messages=[{'role':'system','content': SYSTEM_PROMPT}]；agent.py:3992 记忆注入处同样用 SYSTEM_PROMPT"
+    },
+    {
+      "dimension": "【缺口 2】面板提交与 Agent 建任务的默认参数不共源（历史缺陷，已由前序 session 修）",
+      "agent_claims": "create_job 走 server.prepare_job_params",
+      "actual": "prepare_job_params 是三条建任务路径的公共点，且内部调 apply_gen_defaults_and_size(mode, params) ⇒ 面板与 Agent 同一套",
+      "verdict": "✅ 已同源",
+      "evidence": "server.py:5554 prepare_job_params；agent.py:1603 prepare = getattr(ctx.server,'prepare_job_params')"
+    },
+    {
+      "dimension": "【缺口 3】请求值→生效值差异未回传（历史缺陷，已由前序 session 修）",
+      "agent_claims": "create_job 结果带 adjustments",
+      "actual": "agent.py:_collect_adjustments 收集 width/height/resolution 的 requested→effective→reason，随工具结果回传",
+      "verdict": "✅ 已修",
+      "evidence": "agent.py:1650 adjustments = _collect_adjustments(mode, args, params)"
+    },
+    {
+      "dimension": "【缺口 4】工具清单缺 media_replace_audio / media_normalize_audio",
+      "agent_claims": "系统提示词工具清单列出 media_probe/concat/transcode/extract_frames/mix_audio/merge_av/extract_audio/trim/normalize_audio —— **没有 media_replace_audio**",
+      "actual": "真实工具注册表共 37 个工具，含 media_replace_audio（工具描述：「替换音轨」）",
+      "verdict": "❌ 不一致（本次修复）",
+      "evidence": "h3studio/agent_extra_tools.py:TOOL_CAPABILITIES 含 media_replace_audio；agent.py SYSTEM_PROMPT_TEMPLATE 工具清单未列"
+    },
+    {
+      "dimension": "【缺口 5】编排上限",
+      "agent_claims": "MAX_STEPS/工具上限/超时/护栏",
+      "actual": "MAX_STEPS=50、MAX_TOOL_CALLS=120、TOTAL_TIMEOUT=2400.0s、STEP_TIMEOUT=482.9s、REPEAT_LIMIT=3、NO_PROGRESS_LIMIT=6",
+      "verdict": "✅ 已达标（≥50 步 + 三类护栏齐全）",
+      "evidence": "h3studio/agent.py:70/109/115/155/205；server.py 允许用户在管理页调低 max_steps"
+    },
+    {
+      "dimension": "【缺口 6】能力问答回答空壳",
+      "agent_claims": "线上实测 /api/agent/chat 问「现在视频支持哪些分辨率和时长」→ answer 仅「…我已按真实配置逐项核对完毕」，**不列任何具体值**",
+      "actual": "工具确实调了 get_mode_schema×3 + list_modes，但模型没把值写进结论",
+      "verdict": "⚠️ 自述正确但回答不落地（本次修复：提示词要求逐项给出取值）",
+      "evidence": "线上实测 session=audit-cap-20261122，steps=4，answer 无具体数值"
+    },
+    {
+      "dimension": "【缺口 7】ffmpeg 媒体后处理",
+      "agent_claims": "工具清单含 10 个 media_* 工具",
+      "actual": "实测 op_merge_av 真实产出 asset_35eabe389cff（2.0s，vp9 视频 + aac 音轨），产物入素材库可被后续工具引用",
+      "verdict": "✅ 能力已具备（本次补测与补文档）",
+      "evidence": "ffprobe: duration=2.000000, streams=[video vp9 320x240, audio aac 44100]"
+    }
+  ]
+}

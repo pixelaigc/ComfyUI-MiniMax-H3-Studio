@@ -1,0 +1,26 @@
+--- M1_runtime_snapshot ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestRuntimeCapabilityTruth::test_run_agent_uses_runtime_rendered_prompt_not_import_snapshot
+1 failed, 22 passed in 0.12s
+--- M2_tool_list_drop ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestPromptToolListMatchesRegistry::test_all_media_tools_listed
+FAILED tests/test_agent_capability_runtime_truth.py::TestPromptToolListMatchesRegistry::test_every_registered_tool_is_named_in_prompt
+FAILED tests/test_agent_capability_runtime_truth.py::TestPromptToolListMatchesRegistry::test_media_replace_audio_is_listed
+3 failed, 20 passed in 0.13s
+--- M3_stale_whitelist_fallback ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestNoStaleWhitelistFallback::test_video_size_tiers_degrades_to_empty_not_old_whitelist
+1 failed, 22 passed in 0.13s
+--- M4_music_fallback_old_360 ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestNoStaleWhitelistFallback::test_music_duration_fallback_is_not_the_old_360
+FAILED tests/test_agent_capability_runtime_truth.py::TestNoStaleWhitelistFallback::test_music_duration_fallback_matches_real_truth
+2 failed, 21 passed in 0.12s
+--- M5_duration_const_hardcoded ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestNoStaleWhitelistFallback::test_agent_schema_duration_constants_derive_from_truth
+1 failed, 22 passed in 0.12s
+--- M6_music_range_snapshot ---
+FAILED tests/test_agent_capability_runtime_truth.py::TestRuntimeCapabilityTruth::test_capability_text_reflects_music_duration_change
+1 failed, 22 passed in 0.12s
+=== restore verify ===
+ h3studio/agent.py            | 57 ++++++++++++++++++++++++++++++++++---
+ h3studio/agent_capability.py | 37 ++++++++++++++++++++----
+ h3studio/agent_schema.py     | 67 +++++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 142 insertions(+), 19 deletions(-)
