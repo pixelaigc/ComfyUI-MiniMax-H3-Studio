@@ -200,6 +200,34 @@ def test_build_id_script_degrades_without_throwing():
         assert bad not in src, f"build-id.js 里不该有 {bad}"
 
 
+@pytest.fixture(scope="module")
+def browser():
+    """本文件自带的 chromium fixture —— 不依赖别的测试文件。
+
+    【为什么要自带】这个 fixture 原本只定义在
+    tests/test_mobile_nav_regression_guards.py 里。
+    pytest 的 fixture 是**按模块可见**的：全量跑（两个文件都加载）时能拿到，
+    但**单独跑这个文件**时会报 `fixture 'browser' not found` ⇒ 该文件无法独立复跑。
+    实测：`pytest tests/test_build_id_marker.py` → 1 error；
+          `pytest tests/test_build_id_marker.py tests/test_mobile_nav_regression_guards.py` → 全过。
+    ⇒ 每个用了 browser 的文件都该自带一份（或提到 conftest.py）。
+    """
+    from playwright.sync_api import sync_playwright  # noqa: F401
+    chromium = None
+    for _c in sorted(Path.home().joinpath(
+            ".cache/ms-playwright").glob("chromium-*/chrome-linux64/chrome"),
+            reverse=True):
+        chromium = str(_c)
+        break
+    if not chromium or not Path(chromium).exists():
+        pytest.skip("chromium 不可用")
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(executable_path=chromium, headless=True,
+                               args=["--no-sandbox"])
+        yield b
+        b.close()
+
+
 def test_version_marker_visible_in_narrow_viewport(browser, live_server):
     """窄视口（375×667）下版本号必须**看得见**（在视口内 + 命中自身）。"""
     from playwright.sync_api import sync_playwright  # noqa: F401

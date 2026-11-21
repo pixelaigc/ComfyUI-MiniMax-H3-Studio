@@ -1,0 +1,92 @@
+{
+ "started_at": "2026-11-21 20:28:44",
+ "cases": [
+  {
+   "guard": "G1_favorites_not_dead_end",
+   "phase": "baseline",
+   "passed": true,
+   "seconds": 42.6
+  },
+  {
+   "guard": "G2_768_favorites_entry_reachable",
+   "phase": "baseline",
+   "passed": true,
+   "seconds": 32.0
+  },
+  {
+   "guard": "G3_fav_card_opens_detailModal",
+   "phase": "baseline",
+   "passed": true,
+   "seconds": 60.9
+  },
+  {
+   "guard": "G1_favorites_not_dead_end",
+   "mutation": "M1_收藏入口不再切视图",
+   "file": "web/favorites.js",
+   "why": "让左侧「收藏」入口不再调用 showFavorites（落进兜底分支的旧路径）",
+   "applied": true,
+   "bites": true,
+   "seconds": 19.3,
+   "tail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n/root/projects/h3s-favorites/tests/test_mobile_nav_regression_guards.py:568: AssertionError: 进入收藏视图后左侧「收藏」入口没有高亮\n=========================== short test summary info ============================\nFAILED tests/test_mobile_nav_regression_guards.py::test_favorites_view_is_not_a_dead_end\n1 failed in 17.51s\n/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+  },
+  {
+   "guard": "G1_favorites_not_dead_end",
+   "mutation": "M1_收藏入口不再切视图",
+   "phase": "revert",
+   "passed": true,
+   "seconds": 27.3
+  },
+  {
+   "guard": "G1_favorites_not_dead_end",
+   "mutation": "M2_汉堡不再打开侧栏",
+   "file": "web/app.js",
+   "why": "汉堡点不动 ⇒ 从收藏视图回不到类型选择",
+   "applied": true,
+   "bites": true,
+   "seconds": 10.8,
+   "tail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n/root/projects/h3s-favorites/tests/test_mobile_nav_regression_guards.py:509: AssertionError: 汉堡没能打开类型选择抽屉\n=========================== short test summary info ============================\nFAILED tests/test_mobile_nav_regression_guards.py::test_favorites_view_is_not_a_dead_end\n1 failed in 7.06s\n/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+  },
+  {
+   "guard": "G1_favorites_not_dead_end",
+   "mutation": "M2_汉堡不再打开侧栏",
+   "phase": "revert",
+   "passed": true,
+   "seconds": 16.1
+  },
+  {
+   "guard": "G2_768_favorites_entry_reachable",
+   "mutation": "M3_768下收藏入口被移出滚动区",
+   "file": "web/index.html",
+   "why": "收藏入口 display:none ⇒ 768 下点不到",
+   "applied": true,
+   "bites": true,
+   "seconds": 14.4,
+   "tail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/playwright/_impl/_connection.py:636: playwright._impl._errors.TimeoutError: Page.tap: Timeout 8000ms exceeded.\n=========================== short test summary info ============================\nFAILED tests/test_mobile_nav_regression_guards.py::test_favorites_entry_reachable_at_tablet_768\n1 failed in 12.54s\n/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+  },
+  {
+   "guard": "G2_768_favorites_entry_reachable",
+   "mutation": "M3_768下收藏入口被移出滚动区",
+   "phase": "revert",
+   "passed": true,
+   "seconds": 32.8
+  },
+  {
+   "guard": "G3_fav_card_opens_detailModal",
+   "mutation": "M4_收藏视图卡片不开详情",
+   "file": "web/app.js",
+   "why": "收藏视图点卡片不开详情模态框",
+   "applied": true,
+   "bites": true,
+   "seconds": 11.6,
+   "tail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n/root/projects/h3s-favorites/tests/test_mobile_nav_regression_guards.py:739: AssertionError: 收藏视图里点卡片没有打开 #detailModal\n=========================== short test summary info ============================\nFAILED tests/test_mobile_nav_regression_guards.py::test_favorites_view_card_opens_detailModal\n1 failed in 9.73s\n/home/ubuntu/comfyui/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+  },
+  {
+   "guard": "G3_fav_card_opens_detailModal",
+   "mutation": "M4_收藏视图卡片不开详情",
+   "phase": "revert",
+   "passed": true,
+   "seconds": 28.6
+  }
+ ],
+ "finished_at": "2026-11-21 20:33:40"
+}
