@@ -128,25 +128,20 @@ STALE_BUMPED = {
     #   ⇒ 卡片上看不到新入口，功能等于没上线。
     # 【2026-11-21 移动端死路修复】responsive.css 改了内容
     #   （参数抽屉遮罩 inset:0 -> inset:44px 0 0 0 让开顶栏；
-    #    新增抽屉标题行样式）⇒ ?v= 必须再升一档。
+    #    新增抽屉标题行样式）
     # 【2026-11-21 第二轮复测】responsive.css 又改了内容
     #   （平板档 ≤1100px 补 .jobs-area padding-bottom:76px ——
     #    原来那条只写在 ≤700px 那档，而 FAB 在 ≤1100px 就出现，
     #    ⇒ 768px 下 FAB 压住卡片底部的「☆ 收藏」按钮 79×16px）
-    #   ⇒ ?v= 必须再升一档。
     # 【2026-11-21 素材库独立查看窗口】responsive.css 改了内容
     #   （窄屏下 .al-view-btn 触控尺寸 + 媒体预览框不溢出 +
     #    查看器打开时藏掉页面 FAB）
-    #   ⇒ ?v= 必须再升一档。
-    # 【2026-11-21 修表内重复 key】这里原来有**三条**responsive.css 条目
-    #   （mobnav20261121a->assetview20261121a、
-    #    assetview20261121a->navfix20261121a、以及第三条）。
-    #   Python dict 字面量后写覆盖先写 ⇒ 前两条是**隐藏条目**，
-    #   而 test_stale_bumped_table_has_no_duplicate_keys 会因源码里
-    #   出现多次 "responsive.css" 而失败（该失败在合并前的基线上就存在，
-    #   本机 live worktree 上同样复现 —— 不是本轮引入的）。
-    #   修法：合并成**一条**（生效值仍是最后那条 navfix20261121a）。
-    "responsive.css":          ("assetview20261121a", "navfix20261121a"),
+    # ⇒ ?v= 一路升到 navfix20261121a。
+    #   【为什么要合并成一条】Python dict 字面量是**后写覆盖先写** ——
+    #   原来这里有 3 条 responsive.css，只有最后一条生效，
+    #   前两条是**隐藏条目**（表看起来有 N 条，实际生效少 2 条）。
+    #   既有测试 test_stale_bumped_table_has_no_duplicate_keys 会红。
+    "responsive.css":          ("mobnav20261121a", "navfix20261121a"),
     # 【2026-11-19 第 3 轮 A 项】qwen-refs.js 的旧条目 ("fix3preview1", …)
     #   同样被下面第 6 轮的 ("cr20261115b", "cr20261118a") 覆盖（隐藏条目）。
     "video-panel-fallback.js": ("vpfb1",        "cr20261115b"),
@@ -245,14 +240,10 @@ STALE_BUMPED = {
     #   （applyBadge 同步卡片底部的收藏按钮；新增 .fav-action 样式）
     # ⇒ ?v= 必须再升一档。
     "favorites.js":            ("fav20261120c",   "mobnav20261121a"),
-    "favorites.css":           ("fav20261120c",   "mobnav20261121a"),
-    # 【2026-11-21 创意内容设计面板】新增 web/prompt-catalog.js / .css。
-    # 【为什么它们不在这张表里】这张表的语义是「内容变过 ⇒ 必须升版号」，
-    # 记的是**旧值 → 新值**。新文件首次上线没有旧版本（不存在旧缓存），
-    # 而 test_new_version_is_not_shared_with_old 又要求新旧值不同 ——
-    # 硬塞进表里只能造一条假条目。它的版本号由
-    # test_every_static_ref_has_version_param（每个 /static/ 引用都必须
-    # 带 ?v=）与 test_static_ref_points_to_existing_file 两条守住。
+    "favorites.css":           ("mobnav20261121a", "buildid20261121a"),
+    # 【2026-11-21 构建版本标识】新增的静态资源
+    #   （侧栏底部显示当前部署的 commit 与静态资源版本指纹）
+    "build-id.js":             ("",              "buildid20261121a"),
     "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
