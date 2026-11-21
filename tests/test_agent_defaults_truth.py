@@ -38,41 +38,59 @@ from h3studio import workflows as wf                  # noqa: E402
 class TestDefaultParamsFromRealConfig(unittest.TestCase):
     """默认参数必须由**真实配置**派生，改配置即改默认值。"""
 
-    def test_flf_r2v_resolution_options_not_legacy_two_tiers(self):
-        """flf / r2v 的分辨率选项不得再是旧的 544p / 768p 两档。"""
+    def test_flf_r2v_have_no_resolution_tier_field(self):
+        """flf / r2v 不得再有独立的「分辨率档位」字段（尺寸表达必须唯一）。
+
+        【2026-11-21 —— 用户驳回后改的断言】
+        原来这三条测试断言的是「resolution 选项不能只是旧的 544p/768p 两档」，
+        并且要求它「远多于两档」。那等于**默认了该字段应该存在**。
+
+        用户看到的是：
+            画面比例 16:9 ＋ 分辨率档位「768p·768×1344 (9:16)」
+            ＋ MP 预算 0.8 ＋ MP 百分比 100
+        —— 档位标签自带 9:16，与所选 16:9 直接矛盾；三套尺寸表达同时存在。
+        原话：「同时存在百万像素和分辨率挡位和比例 … 全部都是冲突的。」
+
+        官方首尾帧模板（nonebot workflows/minimax_h3_v1.json 节点 115）的
+        尺寸表达只有一处：
+            ResolutionSelector {aspect_ratio, megapixels, multiple: 32}
+        —— 比例 + MP 预算，没有「档位」。所以这里断言反过来：
+        **不得有 resolution 字段**，尺寸表达只能是 比例 × MP 预算 × 百分比。
+        """
         for mode in ("flf", "r2v"):
             fields, supported = gen_defaults._mode_fields(mode)
             self.assertTrue(supported, mode)
-            field = next(f for f in fields if f["name"] == "resolution")
-            values = [o["value"] for o in field["options"]]
-            self.assertNotEqual(
-                values, ["544p", "768p"],
-                f"{mode} 仍在用旧的两档遗留：{values}")
-            # 真实档位应当远多于两档（2.0 MP 上限下有十几档）
-            self.assertGreater(len(values), 5, f"{mode} 档位过少：{values}")
+            names = [f["name"] for f in fields]
+            self.assertNotIn("resolution", names,
+                             f"{mode} 仍有独立的分辨率档位字段：{names}")
+            self.assertIn("aspect", names, mode)
+            self.assertIn("megapixels", names, mode)
+            self.assertIn("resolution_percent", names, mode)
+            # 【为什么还要断言「只有一个尺寸数值字段族」】
+            # 「唯一表达」不是「删掉一个字段」就行 —— 如果再冒出第四个
+            # （比如 width/height 又回到默认参数里），冲突会以另一种形式回来。
+            size_fields = [n for n in names
+                           if n in ("resolution", "width", "height",
+                                    "short_edge", "size_preset")]
+            self.assertEqual(size_fields, [],
+                             f"{mode} 出现了档位/宽高类的第二套尺寸表达：{size_fields}")
 
-    def test_flf_r2v_options_are_subset_of_real_presets(self):
-        """选项里的每个档位都必须是真实预设里出现过的短边。"""
-        real = set()
-        for aspect in vm.VIDEO_ASPECTS:
-            for preset in vm.size_presets_for_aspect(aspect):
-                real.add(int(preset["short_edge"]))
+    def test_flf_r2v_aspect_options_are_the_real_selector_values(self):
+        """画面比例的取值 = 官方 ResolutionSelector 的那一份（不是另一张表）。"""
         for mode in ("flf", "r2v"):
             fields, _ = gen_defaults._mode_fields(mode)
-            field = next(f for f in fields if f["name"] == "resolution")
-            for option in field["options"]:
-                short = int(str(option["value"]).rstrip("p"))
-                self.assertIn(short, real,
-                              f"{mode} 档位 {option['value']} 不在真实预设里")
+            field = next(f for f in fields if f["name"] == "aspect")
+            values = {o["value"] for o in field["options"]}
+            self.assertEqual(values, set(vm.VIDEO_ASPECTS.keys()), mode)
 
     def test_note_no_longer_mentions_legacy_mp_mapping(self):
-        """note 不得再写死「544p = 0.4MP / 768p = 0.8MP」这种旧口径。"""
+        """任何字段的 note 都不得再写死「544p = 0.4MP / 768p = 0.8MP」旧口径。"""
         for mode in ("flf", "r2v"):
             fields, _ = gen_defaults._mode_fields(mode)
-            field = next(f for f in fields if f["name"] == "resolution")
-            note = field.get("note") or ""
-            self.assertNotIn("544p = 0.4MP", note)
-            self.assertNotIn("768p = 0.8MP", note)
+            for field in fields:
+                note = field.get("note") or ""
+                self.assertNotIn("544p = 0.4MP", note, f"{mode}/{field['name']}")
+                self.assertNotIn("768p = 0.8MP", note, f"{mode}/{field['name']}")
 
     def test_max_megapixels_follows_real_policy(self):
         """MP 预算字段的上界必须等于该 mode 的**真实**面积上限。"""

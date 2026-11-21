@@ -913,9 +913,26 @@ class TestModeSchemaExposure(_Base):
             self.assertIn(name, schema["params"], name)
 
     def test_video_schema_has_video_params(self):
+        """视频模式的 Agent schema 暴露真实生效的参数。
+
+        【2026-11-21 —— precision 已移除】
+        原来这里断言视频 schema 里**有** ``precision``。
+        但两条视频 builder 都不读 ``params["precision"]``：
+          * flf -> ``h3_video_modes.build_flf`` 全文 0 次引用；
+          * t2v 新面板 -> ``video_workflow._resolve_model`` 只按
+            ``model_key`` 取权重。
+        精度已经编码在底模权重文件里（int8_convrot / bf16 / pruned_w4a8），
+        选 model_key 就是选精度 —— ``precision`` 是「有参数、无消费」的
+        假参数。用户 2026-11-21 的原话：「还有底模精度 … 全部都是冲突的」。
+
+        这条断言现在反过来锁住它**不出现**。
+        """
         schema = agent_schema.mode_schema("t2v")
-        self.assertIn("precision", schema["params"])
+        self.assertNotIn("precision", schema["params"],
+                         "precision 不是视频的真实参数（精度编码在底模里）")
         self.assertIn("lora_strength", schema["params"])
+        self.assertIn("model_key", schema["params"])
+        self.assertIn("accel_lora", schema["params"])
 
     def test_image_schema_has_negative_matrix(self):
         schema = agent_schema.mode_schema("t2i")

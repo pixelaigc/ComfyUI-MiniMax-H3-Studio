@@ -280,8 +280,12 @@ def video_capability_text() -> str:
         f"- **视频底模**（model_key）：{', '.join(m['key'] for m in models)}。"
         f"参考生视频（r2v）必须用支持 Ref2VA 的权重：{', '.join(ref2va)}。"
         f"- **注意力机制**（attention）：{', '.join(a['key'] for a in attention)}。"
+        f"- **精度**：**没有独立的 precision 参数** —— 精度已经编码在"
+        f"底模权重文件里（int8_convrot / bf16 / pruned_w4a8），"
+        f"选底模（model_key）就等于选精度。"
         f"- **加速 LoRA**：{', '.join(accel)}（另有 none = 不用加速）。"
-        f"- **精度**（precision）：{', '.join(agent_schema.VIDEO_PRECISIONS)}。"
+        f"只列与该底模**实测兼容**的那些；"
+        f"不兼容的会在提交时被明确拒绝并说明原因，不会静默加载。"
         f"- **采样器 / 调度器**：sampler {len(video_samplers())} 种、"
         f"scheduler {len(video_schedulers())} 种，用 get_mode_schema 看清单。"
     )
@@ -410,7 +414,14 @@ def modes_summary() -> list[dict]:
             entry["models"] = [m["key"] for m in video_models_list()]
             entry["attention"] = [a["key"] for a in video_attention_modes()]
             entry["accel_loras"] = video_accel_loras()
-            entry["precisions"] = list(agent_schema.VIDEO_PRECISIONS)
+            # 【2026-11-21 —— 不再有 precisions】
+            # 精度不是独立参数：它编码在底模权重文件里
+            # （int8_convrot / bf16 / pruned_w4a8），选 model_key 就是选精度。
+            # 两条视频 builder 都不读 params["precision"] ——
+            # 它是「有参数、无消费」的假参数。
+            entry["precision_note"] = (
+                "精度编码在底模权重里，选 model_key 即选精度；"
+                "没有独立的 precision 参数。")
         if agent_schema.is_image_mode(mode):
             entry["models"] = agent_schema.mode_models(mode)
             entry["resolutions"] = agent_schema.mode_resolutions(mode)
