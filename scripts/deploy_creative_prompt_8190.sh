@@ -124,6 +124,13 @@ for f in $CHANGED; do
   git show "$MERGE_COMMIT:$f" > "$LIVE/$f"
   echo "  -> $f"
 done
+# 【为什么要 git reset --mixed】上面是用 `git show > 文件` 写的文件，
+# **没有刷新 live worktree 的 git index** —— 于是 index 里还是旧版本，
+# `git status` 会把每个文件报成 "D"（index 有、工作区没有），
+# 部署后自检会误判成「部署失败」。
+# `git reset --mixed HEAD` 只刷新 index、不动工作区文件内容 ——
+# 正是这里要的语义（文件已经是新内容了）。
+cd "$LIVE" && git reset --mixed HEAD >/dev/null && cd "$REPO"
 
 echo
 echo "=== 5) 重启服务 ==="
@@ -140,8 +147,11 @@ echo "重启后 PID=$PID_AFTER（原 $PID_BEFORE）"
 
 echo
 echo "=== 6) 部署后自检 ==="
+# 【判据】`git diff --quiet -- <file>` 返回 0 = 工作区与 HEAD **无差异** = 一致。
+# 原脚本把两个分支写反了（写成「不一致时报 OK」），于是把一致的报成
+# 「与 HEAD 不一致」、把不一致的报成「OK」—— 判据完全颠倒。
 for f in $CHANGED; do
-  if ! git -C "$LIVE" diff --quiet -- "$f" 2>/dev/null; then
+  if git -C "$LIVE" diff --quiet -- "$f" 2>/dev/null; then
     echo "  [OK] $f 与 HEAD 一致"
   else
     echo "  [!!] $f 与 HEAD 不一致"
