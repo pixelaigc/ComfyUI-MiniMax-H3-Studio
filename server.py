@@ -8741,9 +8741,43 @@ async def api_video_options(request):
             # 前端提示里要显示它（用错节点 = 静默失效），
             # 而「AdaLN 能否运行期重注入」也取决于它。
             entry["loader"] = check.get("loader") or entry.get("loader", "")
+            # 【2026-11-21 用户拍板 —— 加速 LoRA 下拉只保留「官方兼容档」】
+            #
+            # 用户原话：「t2v 与 flf 同一判据 —— 加速 LoRA 下拉只保留该底模
+            # 官方兼容档，把 6 个 lightx2v 从 t2v 面板下拉中移除」
+            # +「lightx2v 只从 UI 选项移除，**不删除服务端 / 配置文件中的
+            # LoRA 记录**，以兼容已有历史任务 params 与已保存预设的加载与展示」。
+            #
+            # 【实现方式 —— 数据驱动，前端零改动】
+            # 前端 ``video-panel.js`` 的 ``selectableAccelLoras()`` 已经按
+            # ``item.selectable === false`` 把条目**从下拉里剔除**（不是置灰）。
+            # 所以这里只要把「第三方蒸馏」标成不可选，前端自动就滤掉了 ——
+            # **不需要在 web/app.js 里硬编码任何名单**。
+            #
+            # 【判据从哪来】``accel_lora_policy.classify`` 读**权重自己的
+            # safetensors metadata**（``base_model: Comfy-Org`` = 第三方
+            # 重打包 / 蒸馏；``MiniMax-H3`` = 官方谱系），
+            # 不是按文件名猜。
+            #
+            # 【为什么仍保留记录】``entry`` 本身照常下发（含 key / 名称 / 强度），
+            # 只是 selectable=False —— 历史任务的 params、已保存的预设、
+            # 显示层的名称解析都不受影响。
+            try:
+                from h3studio import accel_lora_policy as _accel_policy
+                _kind = _accel_policy.classify(item["key"], model_key)["kind"]
+            except Exception:
+                _kind = "other"
+            entry["accel_kind"] = _kind
+            entry["third_party"] = (_kind == "third_party")
             # 不适配当前底模的**不出现**在下拉里（前端据此过滤）
-            entry["selectable"] = bool(entry["compatible"]) and \
-                entry.get("available", True)
+            entry["selectable"] = (bool(entry["compatible"])
+                                   and entry.get("available", True)
+                                   and not entry["third_party"])
+            if entry["third_party"]:
+                entry["selectable_reason"] = (
+                    "第三方蒸馏档（权重 metadata 声明 base_model=Comfy-Org），"
+                    "按用户 2026-11-21 拍板只从下拉移除；服务端记录保留，"
+                    "历史任务 params 与已保存预设仍可正常加载与展示。")
             accels.append(entry)
         payload["accel_loras"] = accels
         payload["fixed_accel_loras"] = accels
