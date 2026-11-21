@@ -1,0 +1,31 @@
+{
+  "incident": "git object store corruption in /root/projects/comfyui-minimax-h3-studio",
+  "detected_at": "2026-11-22 06:26 CST",
+  "root_cause": "concurrent agent's deploy_favleg_8190.sh created merge commit via `git commit-tree` + `git update-ref`; the commit object 01d1c3df53df6a6576cada822995a20426ae47e4 was later deleted from the object store (not in any pack), leaving local/maintainer + live HEAD dangling. The script also left two 0-byte backup ref files (interrupted write).",
+  "impact": "local/maintainer unreadable; live worktree HEAD unreadable; fsck errors",
+  "recovery": {
+    "method": "rebuilt the merge commit from the surviving branch local/feature/favorites-v2-20260720 (dcaee23) whose tree b7b9521f2271d172448940cac7d05b53aa0c7bb5 is byte-identical to the live worktree tree (verified via `git write-tree` on live index)",
+    "rebuilt_commit": "167ec40a38b42c8638c8320ff026327bba054ea4",
+    "tree": "b7b9521f2271d172448940cac7d05b53aa0c7bb5",
+    "parents": [
+      "d068ae4db66cd90f039137ccaf77697b013d1544",
+      "dcaee23a2ddc98fda1ec605cc93ec8a63bab2dc9"
+    ],
+    "message": "byte-identical to deploy_favleg_8190.sh template (substituting $BRANCH/$BRANCH_HEAD)",
+    "refs_restored": [
+      "refs/heads/local/maintainer",
+      "refs/heads/local/deploy/qwen-ref-assets-live"
+    ],
+    "zero_byte_backup_refs_removed": [
+      "refs/heads/backup/live-before-favleg-20261122-040609",
+      "refs/heads/backup/maintainer-before-favleg-20261122-040609"
+    ]
+  },
+  "verification": {
+    "all_heads_resolve": true,
+    "live_tree_equals_maintainer_tree": true,
+    "live_service_http": 200,
+    "journal_errors_last_5min": 0
+  },
+  "content_loss": "NONE — recovered tree is byte-identical to the live deployment's actual files"
+}

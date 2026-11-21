@@ -328,9 +328,26 @@ SYSTEM_PROMPT_TEMPLATE = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内�
 - media_mix_audio(video_asset_id, audio_asset_ids[], volumes?, replace?)
                             混音（可替换原音轨）
 - media_merge_av(video_asset_id, audio_asset_id)  音视频合流
+- media_replace_audio(video_asset_id, audio_asset_id, keep_original?, volume?)
+                            替换音轨（keep_original=false 时原声彻底去掉）
 - media_extract_audio(asset_id, output_format?)  从视频里抽取音轨
 - media_trim(asset_id, start_sec, duration_sec?)  按时长裁剪 / 截取片段
 - media_normalize_audio(asset_id, target_lufs?)  音频响度归一（EBU R128）
+
+【媒体后处理的硬约束（ffmpeg 工具族）】
+- **输入输出都必须是素材库/生成库里的既有产物**，用 asset_id 引用；
+  不接受也不需要文件路径（工具会拒绝路径参数）。
+- 产物**自动入库**并返回新的 asset_id ⇒ 可以被后续工具（混音 / 合并 /
+  转码 / 裁剪）继续引用，可以直接交给 create_job 当参考素材。
+- 「合并音视频」的标准做法：media_merge_av(视频 asset_id, 音频 asset_id)
+  ⇒ 得到一条带音轨的成片 asset_id；再想叠背景音乐就
+  media_mix_audio(成片 asset_id, [音乐 asset_id])。
+- 一次请求里的多步媒体处理**要连着做完**（选素材 → 合并 → 回报产物路径），
+  不要做完第一步就停下来问用户。
+
+【生成媒体库清理】
+- manage_media_library(scope, months?, dry_run?, confirm?)
+                            清理生成媒体库（先 dry_run=true 预览再确认）
 
 ## 工作方式
 1. 需要素材时先 search_assets；**同一工具不要连续重复调用超过 2 次**，
@@ -400,6 +417,16 @@ SYSTEM_PROMPT_TEMPLATE = """你是 OmniStudio（ComfyUI-MiniMax-H3-Studio）内�
   「你要的 X 实际用的是 Y」，不要让用户以为原样生效了。
 - 如果某件事做不了（比如参数超出范围），直接用 respond 说明原因和可选方案，
   不要在正文里反复解释。
+- **回答能力问题时必须给出具体数值**（实测缺陷：2026-11-22 线上实测问
+  「现在视频支持哪些分辨率和时长」，模型调了 get_mode_schema 却只回答
+  「我已按真实配置逐项核对完毕」，**一个数字都没给」）。
+  正确做法：把工具返回的**真实取值集合与区间**逐项写进结论 ——
+  例如「分辨率上限 X MP、可用档位共 N 档（首档…末档）、时长 A~B 秒」。
+  **禁止**用「已核对完毕」「如上述」这类空话收尾。
+  【注意】这里**不要**写死任何具体数字 —— 真源变了这段就变成新的假话
+  （这正是本任务在修的缺陷）。数值只从工具返回里取。
+- 能力问题**不要**凭记忆回答：以本提示词末尾的能力段落 + get_mode_schema
+  的返回为准。若两者不一致，以**工具返回**为准并说明差异。
 
 {capability}
 """
@@ -425,8 +452,22 @@ def build_system_prompt() -> str:
 
 
 #: 兼容旧引用（``SYSTEM_PROMPT`` 仍是可用名，内容是渲染后的真实能力版）。
-#: 【注意】这是**导入时**的快照 —— 真源在运行期变化时，
-#: 应改用 ``build_system_prompt()``（run_agent 走的就是那条路径）。
+#:
+#: 【2026-11-22 修 —— 这曾经是一个真实的「能力自述说谎」缺口】
+#:
+#: 旧注释写的是「run_agent 走的就是 build_system_prompt() 那条路径」——
+#: **这句话是假的**。run_agent 实际用的是下面这个**导入期快照**：
+#:
+#:     messages = [{"role": "system", "content": SYSTEM_PROMPT}]   # ← 快照
+#:
+#: 于是：真源（VIDEO_MAX_CANVAS_PIXELS / 档位表 / 底模表 / 时长区间）
+#: 在**服务运行期间**发生变化时（改配置 / 热更新 / 测试里 monkeypatch），
+#: Agent 的能力自述**仍然是旧数字** —— 与用户报的
+#: 「Agent 说只有 544p/768p」是同一类缺陷，只是触发路径不同。
+#:
+#: 现在 run_agent 在**每次调用时**重新渲染（见 run_agent 里的
+#: ``system_prompt = build_system_prompt()``），本常量仅作为
+#: 「导入时快照」的向后兼容别名保留，**不要**再拿它当运行期真源。
 SYSTEM_PROMPT = build_system_prompt()
 
 
@@ -3916,7 +3957,15 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
             pass
 
     # 构造消息：历史 + 本轮用户输入
-    messages: list = [{"role": "system", "content": SYSTEM_PROMPT}]
+    #
+    # 【2026-11-22 修 —— 运行期重新渲染能力自述】
+    #
+    # 原来这里用的是模块级 ``SYSTEM_PROMPT``（导入期快照）。真源在服务
+    # 运行期间变化时（改配置 / 热更新），Agent 的能力自述会停留在旧数字
+    # —— 这正是用户报的「Agent 说分辨率只有 544p/768p」那类缺陷的
+    # 运行期变体。现在每次 run_agent 都重新渲染，保证「自述 == 真实」。
+    system_prompt = build_system_prompt()
+    messages: list = [{"role": "system", "content": system_prompt}]
 
     # --- 用户输入的提示注入检测 -----------------------------------------
     #
@@ -3989,7 +4038,7 @@ async def run_agent(server_module, message: str, session_id: str | None = None,
     if memory_note:
         messages[0] = {
             "role": "system",
-            "content": SYSTEM_PROMPT + "\n\n## 用户既往偏好（记忆库）\n"
+            "content": system_prompt + "\n\n## 用户既往偏好（记忆库）\n"
                        + memory_note,
         }
 

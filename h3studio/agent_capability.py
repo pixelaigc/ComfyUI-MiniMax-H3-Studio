@@ -178,9 +178,24 @@ def video_schedulers() -> list[str]:
 
 
 def music_duration_range() -> tuple[int, int]:
-    """音乐时长区间（秒）。来源：music_yue2。"""
-    return (int(agent_schema.MUSIC_DURATION_MIN),
-            int(agent_schema.MUSIC_DURATION_MAX))
+    """
+    音乐时长区间（秒）。来源：music_yue2。
+
+    【2026-11-22 修 —— 运行期也要跟真源走】
+    原来读的是 ``agent_schema.MUSIC_DURATION_MIN/MAX`` —— 那是**导入期
+    的快照**（``_music_duration_range()`` 在模块导入时算好的字面量）。
+    于是真源 ``music_yue2.YUE2_MAX_DURATION`` 在运行期变化时，
+    Agent 的能力自述仍报旧上限（同样是「自述说谎」）。
+
+    现在每次调用都**直接从 music_yue2 取**；取不到才回落快照。
+    """
+    try:
+        from . import music_yue2
+        return (int(music_yue2.YUE2_MIN_DURATION),
+                int(music_yue2.YUE2_MAX_DURATION))
+    except Exception:
+        return (int(agent_schema.MUSIC_DURATION_MIN),
+                int(agent_schema.MUSIC_DURATION_MAX))
 
 
 def music_default_duration() -> int:
@@ -263,6 +278,19 @@ def video_capability_text() -> str:
     sample = video_tier_pixels("480p")
     if sample:
         tier_sample = f"（例如 480p = {sample[0]}×{sample[1]}）"
+    # 【2026-11-22 —— 档位清单不可用时不谎报】
+    # 真源导入失败时 video_size_tiers() 返回空列表。此时**不能**说
+    # 「短边档位（）」这种假话，也不能回退到旧的 544p/768p 白名单
+    # —— 那正是被用户证伪的旧说法。这里明说「清单暂不可用」，
+    # 让模型转而用 get_mode_schema（该工具自己也会给出真实集合）。
+    if tiers:
+        tier_line = (
+            f"短边档位（{', '.join(tiers)}）{tier_sample}"
+            f"仅作显示标签，用 get_mode_schema 看当前真实可用集合。")
+    else:
+        tier_line = ("短边档位清单当前不可用 —— "
+                     "用 get_mode_schema(mode) 取该模式的真实档位集合，"
+                     "不要凭记忆报档位名。")
     return (
         f"- **视频分辨率**：统一用 **megapixels（MP 预算）× resolution_percent"
         f"（百分比）** 表达 —— megapixels 是该模式的真实面积上限"
@@ -273,8 +301,7 @@ def video_capability_text() -> str:
         f"换算后宽高会自动对齐到 {policy.get('multiple')} 的倍数；"
         f"超出真实上限时**自动缩到可用值并说明调整原因**"
         f"（原始请求值 → 生效值 → 原因），不会静默改写。"
-        f"短边档位（{', '.join(tiers)}）{tier_sample}"
-        f"仅作显示标签，用 get_mode_schema 看当前真实可用集合。"
+        f"{tier_line}"
         f"- **视频时长**：{_fmt_range(duration)} 秒（整数）。"
         f"超上限会被明确拒绝并给出上限值。"
         f"- **视频底模**（model_key）：{', '.join(m['key'] for m in models)}。"
