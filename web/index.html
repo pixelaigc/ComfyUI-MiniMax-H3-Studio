@@ -11,7 +11,7 @@
      独立文件而不是并进 style.css —— 收藏是一整块独立功能，
      单独一个文件改它时不会把 140KB 的 style.css 卷进 diff。
      版本号 fav20261120a。 -->
-<link rel="stylesheet" href="/static/favorites.css?v=mobnav20261121a">
+<link rel="stylesheet" href="/static/favorites.css?v=buildid20261121a">
 <link rel="stylesheet" href="/static/responsive.css?v=navfix20261121a">
 <link rel="stylesheet" href="/static/prompt-catalog.css?v=cpd20261121a">
 </head>
@@ -35,6 +35,24 @@
       <span class="brand-version">v1.00</span>
     </span>
   </div>
+  <!-- 【2026-11-21】构建版本标识【让用户自行确认手机在跑哪一版】
+       【为什么在顶栏 level（.brand 之后）】
+       · 侧栏在窄屏是收起的抽屉，放那儿得先点汉堡才看得到 ——
+         而「确认自己跑的是哪一版」应当**不用任何交互**就能看到；
+       · 放进 .brand-name 内也不行：.brand-name 的内容
+         （strong 79px + v1.00 27px）已超过 320px 下分给它的宽度，
+         版本号作为最后一个子项被挤成 w=0（实测）。
+       · 作为 .brand 的兄弟节点时，.brand 是 flex:1 1 auto 会抢空间，
+         导致版本号与 v1.00 视觉重叠（实测 320px 重叠 213px²，
+         vision_analyze 复核截图也看到了重叠）。
+       ⇒ 修法见 favorites.css：窄屏下 .brand 改成 flex:0 1 auto
+         + overflow:hidden，让它自己先收，把位置让给版本号。
+       【只显示 commit 短哈希】320px 下顶栏富余仅 ~33px；
+         完整信息（静态资源指纹 / 服务启动时间 / 部署目录）
+         在系统页「构建版本」卡片里。 -->
+  <span class="build-id build-id-top" id="buildId" title="构建版本">
+    <span class="build-id-value" id="buildIdValue">…</span>
+  </span>
   <div class="top-status" id="topStatus">
     <span class="dot dot-ok"></span><span id="statusText">空闲</span>
   </div>
@@ -1173,6 +1191,15 @@
       <button class="sys-refresh" id="sysRefresh">刷新</button>
     </div>
     <div class="sys-grid" id="sysGrid"></div>
+    <!-- 【2026-11-21】构建版本明细卡片。
+         【为什么放在系统页】顶栏只放得下 commit 短哈希
+         （实测 320px 下顶栏富余仅 ~33px），
+         完整信息（静态资源版本指纹 / 服务启动时间 / 部署目录）放这里。
+         【不新增导航分组】系统页是既有页面，不动左侧 7 个顶层分组。 -->
+    <div class="sys-card build-id-card">
+      <div class="sys-card-title">构建版本</div>
+      <div class="build-id-detail" id="buildIdDetail">读取中…</div>
+    </div>
   </main>
   <!-- 本地模型配置页 -->
   <main class="system-page providers-page page-hidden" id="providersPage">
@@ -1639,6 +1666,11 @@
      与 window.H3Studio.showFavorites（左侧导航入口）。
      版本号 fav20261120a —— 破了缓存才能拿到新文件。 -->
 <script src="/static/favorites.js?v=mobnav20261121a"></script>
+<!-- 【2026-11-21】构建版本标识【让用户自行确认手机在跑哪一版】
+     来源：GET /api/version（服务端 h3studio/build_info.py）。
+     反映部署目录的真实 git 规格。
+     版本号 buildid20261121a。 -->
+<script src="/static/build-id.js?v=buildid20261121a"></script>
 <script src="/static/moss-layout.js?v=mosslayout2"></script>
 <script src="/static/prompt-catalog.js?v=cpd20261121a"></script>
 <!-- 【2026-11-15 D12】交互流程图入口模块。

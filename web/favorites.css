@@ -95,3 +95,130 @@
 .fav-toast.err { background: rgba(200,50,55,.96); }
 .fav-toast.ok { background: rgba(38,150,90,.96); }
 .fav-toast.warn { background: rgba(196,132,32,.96); }
+
+/* ------------------------------------------------------------------
+   构建版本标识（2026-11-21）
+   ------------------------------------------------------------------
+   【位置】顶栏里，品牌区与状态灯之间。
+   【为什么不在侧栏底部】侧栏在窄屏是抽屉（默认收起、translateX(-100%)），
+   放那儿用户得先点汉堡才看得到 —— 而「确认自己跑的是哪一版」
+   恰恰应该**不用任何交互**就能看到。
+   【视觉约定】沿用 .brand-version 的写法：var(--muted)、11px 左右、
+   不抢焦点；等宽字体让哈希值对齐。
+   【宽度上限】实测顶栏富余空间：320px 下 71px、375px 下 126px、
+   430px 下 181px ⇒ 给 96px 上限，窄屏上截断显示（省略号），
+   完整信息在 title 提示里（悬停/长按可见）。 */
+/* 在 .brand-name 内部（display:flex）——
+   【为什么 flex-shrink 要最大】
+   .brand-name 的其它子项（strong / .brand-version）都是
+   white-space:nowrap 且 flex-shrink:1 —— 空间不够时它们**不肯缩**，
+   内容就溢出盒子、视觉上压到别人身上。
+   ⇒ 给版本号 flex-shrink:20（远大于 1），
+   空间不够时**先把它压扁**（overflow:hidden + ellipsis），
+   品牌名与 v1.00 完整保留。
+   【实测踩过的坑】第一版作为顶栏兄弟节点 + margin-left:auto，
+   320px 下与 v1.00 重叠 213px²（vision_analyze 也看到了重叠）。 */
+.build-id {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 【为什么 flex-basis 不能是 0】
+     .brand-name 是 display:flex；它的子项默认 flex-basis:auto
+     ⇒ 内容宽度就是基准，flex-shrink 只在**溢出时**才生效。
+     但 .brand-name 本身有 min-width:0，.brand 也有 min-width:0，
+     所以它应该能缩 —— 实测 320px 下版本号被压到 w=0，
+     说明 .brand-name 的**内容**（strong 79px + v1.00 27px + gap）
+     已经超过分配给它的宽度，版本号作为最后一个子项被挤没了。
+     ⇒ 修法：把版本号挪到**顶栏 level**（.brand 之后、.top-status 之前），
+     并给 .brand 加 overflow:hidden 让它自己先收。
+     —— 见 .build-id-top。 */
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 62px;
+  margin: 0;
+}
+
+/* 顶栏 level：.brand 之后、.top-status 之前。
+   .brand 是 flex:1 1 auto 会抢空间 —— 窄屏下改成 flex:0 1 auto，
+   让它先收（配合 overflow:hidden 截断品牌名），把位置让给版本号。 */
+.build-id-top {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 62px;
+  margin: 0;
+}
+.build-id-label { flex: 0 0 auto; opacity: .75; }
+.build-id-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  opacity: .9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 取不到版本号时（老服务 / 接口 404）显示成灰色，不报错 */
+.build-id.is-unknown .build-id-value { opacity: .5; }
+
+/* 窄屏更省空间：品牌副标题本来就收起了，版本号反而可以多留一点 */
+@media (max-width: 700px) {
+  .build-id { max-width: 62px; }
+}
+
+
+/* 系统页「构建版本」卡片 —— 完整信息 */
+.build-id-card { margin-top: 14px; }
+.build-id-detail { display: flex; flex-direction: column; gap: 6px; }
+.build-id-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.build-id-k {
+  flex: 0 0 auto;
+  min-width: 84px;
+  color: var(--muted);
+}
+.build-id-v {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+
+/* ------------------------------------------------------------------
+   顶栏在窄屏要让出位置给版本号（2026-11-21）
+   ------------------------------------------------------------------
+   【实测】320px 视口下顶栏各部分占位：
+     汉堡 36 + 内边距 20 + logo 26 + gap 8 + strong 79 + v1.00 27
+     + gap 8 + 状态灯 39 + 内边距 20 = 263 ⇒ 富余仅 ~57px，
+     而 .brand 是 flex:1 1 auto ⇒ 它会把这 57px 全吃掉。
+
+   【后果】版本号（.build-id-top，作为 .brand 的兄弟节点）
+     被 .brand 的盒子盖住 ⇒ 与 v1.00 **视觉重叠** 213px²
+     （vision_analyze 在复核截图里看到了这个重叠）。
+
+   【修法】窄屏下 .brand 改成 flex:0 1 auto + overflow:hidden
+     ⇒ 空间不够时**品牌区自己先收**（品牌名被截断），
+     把位置让给版本号。
+     【为什么品牌名可以牺牲】品牌图标还在，
+     而版本号是本轮要解决的核心诉求（用户确认自己跑的是哪一版）。
+     桌面端（>700px）**完全不受影响**（这条只写在 ≤700px 断点里）。 */
+@media (max-width: 700px) {
+  .topbar .brand {
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+  .topbar .brand-name { flex: 0 1 auto; overflow: hidden; }
+  .topbar .brand-name strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+}
