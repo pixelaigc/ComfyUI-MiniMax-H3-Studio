@@ -70,6 +70,47 @@ class FakeState:
         with self.lock:
             return self.polls.get(pid, 0) > self.hold_polls
 
+    def queue_snapshot(self) -> dict:
+        """按**真实 ComfyUI 的单执行槽语义**返回队列。
+
+        【2026-11-22 缺陷修 —— 为什么必须改这里】
+        原来的实现永远返回 `{"queue_running": [], "queue_pending": []}` ——
+        也就是「ComfyUI 侧永远没有任何任务在队列里」。
+
+        这**不忠实**于真实 ComfyUI。真实实现（本机 ComfyUI 0.37
+        `execution.py:1376` `get_current_queue_volatile` +
+        `server.py:1157` `get_queue`）是：
+
+            running = [x for x in self.currently_running.values()]
+            queued  = copy.copy(self.queue)
+            return (running, queued)
+
+        => **正在执行的那一条在 `queue_running`，其余在 `queue_pending`**，
+        且 `queue_running` 恒定**至多 1 条**（单执行槽）。
+
+        【为什么这个忠实度很重要 —— 2026-11-22 缺陷的判定层根因】
+        服务端现在按 `/queue` 的两个队列区分「执行中」与「排队中」。
+        如果测试替身永远说「队列是空的」，那服务端只能把所有任务
+        都判成 pending —— 于是「提交 3 个任务 -> 只有 1 个运行中」
+        这条断言根本没法验证（它会看到 0 个运行中）。
+
+        【本替身的语义】
+          * 队首（最早提交、且未完成）的那条 -> `queue_running`（executing）
+          * 其余未完成的 -> `queue_pending`（排队中）
+          * 已完成的 -> 两个队列里都没有（进了 history）
+        """
+        with self.lock:
+            pending = [pid for pid in self.submitted
+                       if self.polls.get(pid, 0) <= self.hold_polls]
+            running = pending[:1]      # 单执行槽：至多 1 条
+            waiting = pending[1:]
+            return {
+                "queue_running": [[0, pid, {}, {"client_id": "fake"}, []]
+                                  for pid in running],
+                "queue_pending": [[0, pid, {}, {"client_id": "fake"}, []]
+                                  for pid in waiting],
+            }
+
 
 STATE = FakeState()
 
@@ -105,7 +146,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/queue":
-            self._send(200, {"queue_running": [], "queue_pending": []})
+            # 【2026-11-22 缺陷修】忠实模拟真实 ComfyUI 的单执行槽语义
+            # （executing 在 queue_running，其余在 queue_pending）。
+            self._send(200, STATE.queue_snapshot())
             return
         if path == "/system_stats":
             self._send(200, {"system": {"os": "linux"}, "devices": []})

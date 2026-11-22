@@ -5029,9 +5029,37 @@ function jobCard(job) {
   const stepsRow = jm ? escapeHtml(jm.stepsText(job)) : "—";
   const durationRow = jm ? escapeHtml(jm.durationText(job)) : "—";
   const seedRow = jm ? escapeHtml(jm.seedText(job)) : "随机";
-  const prog = job.status === "queued" ? 0 : (job.status === "running" ? Math.min(job.progress || 0.03, 0.98) : 1);
-  const pctText = job.status === "queued" ? "排队中…"
-    : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`;
+  // 【2026-11-22 缺陷修 —— 进度只属于唯一 executing 的任务】
+  //
+  // 【为什么不能只看 job.status】
+  // 服务端已按 ComfyUI /queue 把执行态收敛成「至多 1 条 executing」，
+  // 并下发 exec_state / exec_label / exec_position。
+  // 但前端**必须**按 exec_state 判定，而不是按 job.status ——
+  // 因为 job.status 在老服务端（或收敛失败）时仍可能是多条 running。
+  //
+  // 【口径】
+  //   executing -> 显示进度百分比（唯一允许有进度的那条）
+  //   pending   -> 显示「排队中 · 第 N 位」（**不带**百分比）
+  //   unknown   -> 显示「状态未知」
+  //   无 exec_state（老服务端）-> 退回按 job.status 判定（兼容）
+  const execState = String(job.exec_state || "");
+  const execLabel = String(job.exec_label || "");
+  const execPosition = job.exec_position;
+  const isExecuting = execState
+    ? execState === "executing"
+    : job.status === "running";
+  const isQueued = execState
+    ? execState === "pending"
+    : job.status === "queued";
+  const prog = isExecuting ? Math.min(job.progress || 0.03, 0.98)
+    : (isQueued ? 0 : 1);
+  // 【排队文案】有队列序号就显示「第 N 位」；没有则退回「排队中…」。
+  const queueText = execPosition
+    ? `排队中 · 第 ${execPosition} 位`
+    : (execLabel || "排队中…");
+  const pctText = isQueued ? queueText
+    : (execState === "unknown" ? (execLabel || "状态未知")
+      : `${(job.progress_text || "生成中")} · ${Math.round(prog * 100)}%`);
 
   let preview = "";
   // 【2026-11-19 缺陷 2 修 —— 失败占位的底色】

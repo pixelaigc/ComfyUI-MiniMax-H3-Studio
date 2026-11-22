@@ -180,8 +180,19 @@
     // 摘要：一眼看清「跑了几个 / 排着几个」
     const parts = [];
     if (total) {
-      const running = items.filter(i => i.status === "running").length;
-      parts.push(running ? `运行中 ${running} · 排队 ${total - running}` : `排队 ${total}`);
+      // 【2026-11-22 缺陷修 —— 运行中计数只认 exec_state】
+      //
+      // 【原来错在哪】`items.filter(i => i.status === "running").length`
+      // 数的是**声明**（DB 的 status）。多实例竞争时 DB 里会有多条
+      // status='running'，但 ComfyUI 是单执行槽 —— 实际只有 1 个在跑。
+      // 于是摘要显示「运行中 2 · 排队 2」（用户 2026-11-22 截图）。
+      //
+      // 【现在】服务端已按 ComfyUI /queue 收敛，下发 exec_state：
+      //   executing（至多 1 条）/ pending / unknown。
+      // 前端只数 exec_state === 'executing' -> 必然 ∈ {0, 1}。
+      const running = items.filter(i => execStateOf(i) === "executing").length;
+      const queued = total - running;
+      parts.push(running ? `运行中 ${running} · 排队 ${queued}` : `排队 ${queued}`);
       // 【A5】有状态异常时在摘要里点出来 —— 队列面板是用户最常看的位置。
       const abnormal = items.filter(i => {
         const t = truthOf(i);
@@ -226,21 +237,57 @@
     toggle.setAttribute("title", detailExpanded ? "收起队列明细" : "展开队列明细");
   }
 
+  /**
+   * 取一条队列项的**执行态**（服务端收敛后的单一真源）。
+   *
+   * 【为什么必须有这个函数 —— 2026-11-22 缺陷修】
+   * 服务端下发 `exec_state`：
+   *   "executing" —— 唯一正在执行的（ComfyUI 单执行槽）
+   *   "pending"   —— 排队中（带 exec_position = 第几位）
+   *   "unknown"   —— ComfyUI 读不到，判定不了
+   *
+   * 老服务端没有这个字段 -> 退回按 status 判定（兼容，不回退既有能力）。
+   */
+  function execStateOf(item) {
+    const state = String((item && item.exec_state) || "");
+    if (state) return state;
+    if (!item) return "";
+    return item.status === "running" ? "executing" : "pending";
+  }
+
   function itemHtml(item, inQueue) {
     // 【A5】状态文案按「真实判定」来，而不是只看 job.status。
     // 终态（done/failed/canceled）沿用老文案；running 走 truthOf()。
     const truth = truthOf(item);
-    const isRunningLike = truth.state === "running" || truth.state === "timeout"
-      || truth.state === "unknown" || truth.state === "lost";
+    // 【2026-11-22 缺陷修 —— 执行态优先】
+    //
+    // 服务端已把执行态收敛成「至多 1 条 executing」。
+    // 队列条目必须按 exec_state 判定「运行中 vs 排队中」——
+    // 否则多条 DB running 会全部显示成「运行中」。
+    const execState = inQueue ? execStateOf(item) : "";
+    const isExecuting = inQueue && execState === "executing";
+    const isRunningLike = isExecuting
+      || truth.state === "timeout" || truth.state === "unknown"
+      || truth.state === "lost";
     const cls = inQueue
       ? (isRunningLike ? "is-running" : "is-queued")
       : "is-recent";
-    const stateText = inQueue && isRunningLike
-      ? truth.text
+    // 【2026-11-22 缺陷修 —— 排队项显示「第 N 位」】
+    // 位置取 exec_position（服务端按 ComfyUI 队列算出的真实位置），
+    // 没有则退回 item.position（Studio 库里的 FIFO 位置）。
+    const execPosition = item.exec_position != null && item.exec_position !== ""
+      ? Number(item.exec_position) : null;
+    const stateText = inQueue
+      ? (isExecuting
+          ? (execState === "executing" ? "运行中" : truth.text)
+          : (execState === "pending"
+              ? (execPosition ? `排队中 · 第 ${execPosition} 位` : "排队中")
+              : (execState === "unknown" ? "状态未知"
+                  : (QUEUE_STATE_TEXT[item.status] || item.status || ""))))
       : (QUEUE_STATE_TEXT[item.status] || item.status || "");
     // 排队中的显示「第 N 位」；运行中的显示 ▶；终态显示 ·
     const posText = inQueue
-      ? (isRunningLike ? "▶" : String(item.position || ""))
+      ? (isRunningLike ? "▶" : String(execPosition || item.position || ""))
       : "·";
     const title = item.prompt || "";
     const cancelable = inQueue;   // 终态任务不能取消
