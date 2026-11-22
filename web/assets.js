@@ -1702,6 +1702,14 @@
   }
 
   function startLiveRefresh() {
+    // 【2026-11-22 请求风暴修】用带抖动/退避/页面不可见暂停的调度器。
+    // 老写法是裸 setInterval(liveRefreshTick, 4000)。
+    if (window.H3Poll) {
+      if (window.__assetLiveTimer) window.__assetLiveTimer.stop();
+      window.__assetLiveTimer = window.H3Poll("assets-live", liveRefreshTick,
+                                              LIVE_REFRESH_MS);
+      return;
+    }
     if (window.__assetLiveTimer) return;
     window.__assetLiveTimer = setInterval(liveRefreshTick, LIVE_REFRESH_MS);
   }
