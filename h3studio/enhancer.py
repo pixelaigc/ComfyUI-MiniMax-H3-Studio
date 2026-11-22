@@ -512,6 +512,21 @@ SAMPLING_PRESETS = {
 # 后端实际能力：llama.cpp server 的 n_ctx=262144，本机 VRGDG_LocalLLM 节点
 # 的 max_tokens 字段上限是 262144 —— 所以 65536 也是后端允许的。
 MAX_TOKENS_CEILING = 32768
+
+# 【2026-11-10】「无限制」输出预算的哨兵值。
+#
+# 当 Provider 配了「提示词长度上限 = 无限制」时：
+#   * 输入长度不校验
+#   * 输出 max_tokens 不设人为上限 -> 传 UNLIMITED_MAX_TOKENS
+#
+# 后端（llama.cpp）会把它夹到自己的上下文窗口（n_ctx），
+# 那是**物理上限**，绕不过去 —— 所以本模块不静默截断，
+# 而是把「实际生效值 + 被谁夹的」如实回给前端。
+#
+# 用 -1 是 llama.cpp / Ollama 的原生约定（n_predict=-1 = 不限），
+# 不是魔法负数 —— 负数在别的后端可能是别的含义，
+# 所以 llm.py 里会把 -1 转成该后端认识的表示。
+UNLIMITED_MAX_TOKENS = -1
 # 允许的取值范围（前端输入框也要用同一套边界）
 MAX_TOKENS_FLOOR = 256
 MAX_TOKENS_MAX = 65536
@@ -754,9 +769,11 @@ def get_spec(spec_id: str, overrides: dict | None = None) -> dict:
 
 
 def resolve_params(params: dict | None, overrides: dict | None = None,
-                   spec: dict | None = None, original: str = "") -> dict:
+                   spec: dict | None = None, original: str = "",
+                   unlimited_output: bool = False) -> dict:
     """
     合并参数：内置默认 <- 用户保存的覆盖 <- 本次请求传入。
+
     采样档优先于裸 temperature/top_p。
 
     【输出预算口径】max_tokens **按输入长度自适应**，不再由固定值决定：
@@ -768,6 +785,10 @@ def resolve_params(params: dict | None, overrides: dict | None = None,
     spec 给了的话，用它的 validate_mode 决定放大倍数
     （pe 单段 caption / refine 逐物体枚举 / bbox·scalist 结构化）。
     original 传了才会做长度自适应；没传就退化成「按模板口径的保底预算」。
+
+    unlimited_output=True 时（Provider 配了「提示词长度上限 = 无限制」）：
+      * max_tokens 不受用户 ceiling 约束，取 UNLIMITED_MAX_TOKENS
+      * 长度档的 floor/cap 也一并让位（用户选了「无限制」就不该再被档位压回去）
     """
     params = params or {}
     overrides = overrides or {}
@@ -804,8 +825,14 @@ def resolve_params(params: dict | None, overrides: dict | None = None,
         length = merged.get("length", "medium")
     merged["length"] = length
 
-    merged["max_tokens"] = adaptive_max_tokens(
-        original, spec=spec, length=length, merged_params=merged)
+    if unlimited_output:
+        # 无限制：输出预算交给后端/模型的物理能力决定
+        merged["max_tokens"] = UNLIMITED_MAX_TOKENS
+        merged["max_tokens_unlimited"] = True
+    else:
+        merged["max_tokens"] = adaptive_max_tokens(
+            original, spec=spec, length=length, merged_params=merged)
+        merged["max_tokens_unlimited"] = False
 
     if merged.get("language") not in ("auto", "zh", "en"):
         merged["language"] = "auto"

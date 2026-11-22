@@ -35,12 +35,74 @@ MAX_URL = 300
 MAX_MODEL = 120
 MAX_KEY = 200
 
+# ------------------------------------------------------------------ 提示词长度上限
+#
+# 【2026-11-10 新增】每个 Provider 可配「提示词长度上限」，
+# 支持「无限制」。这是**输入**长度限制（提交给模型的原文能有多长），
+# 与「输出 token 上限」（enhancer.max_tokens_ceiling）是两件事。
+#
+# 取值语义（列里存字符串，语义靠这三个常量区分）：
+#   "unlimited"  —— 无限制：不校验输入长度，输出 max_tokens 也不设上限，
+#                   交给后端/模型的物理能力决定
+#   "4000"       —— 上限 4000 字（**默认值**，保持老配置兼容）
+#   "8000"       —— 上限 8000 字
+#   "20000"      —— 上限 20000 字
+#   "50000"      —— 上限 50000 字
+#
+# 为什么用字符串枚举而不是整数 0：
+#   0 在直觉上像「无限制」，但也像「非法/未设置」——
+#   用显式的 "unlimited" 杜绝歧义，也避免「魔法负数」。
+#
+# 老配置（未含该列的 Provider）走 DEFAULT_PROMPT_LIMIT —— 4000 字，
+# 与改动前的硬编码上限完全一致，不破坏现有行为。
+PROMPT_LIMIT_UNLIMITED = "unlimited"
+DEFAULT_PROMPT_LIMIT = "4000"
+PROMPT_LIMIT_CHOICES = ("unlimited", "4000", "8000", "20000", "50000")
+#: 各取值对应的「实际最大字数」。unlimited -> None（表示不限）
+PROMPT_LIMIT_VALUES = {
+    "unlimited": None,
+    "4000": 4000,
+    "8000": 8000,
+    "20000": 20000,
+    "50000": 50000,
+}
+#: 给前端下拉用的说明（与 /api/providers 一起下发，前端不硬编码）
+PROMPT_LIMIT_LABELS = {
+    "unlimited": "无限制（交给后端/模型决定）",
+    "4000": "4000 字（默认，兼容旧行为）",
+    "8000": "8000 字",
+    "20000": "20000 字",
+    "50000": "50000 字",
+}
+
 # ------------------------------------------------------------------ 校验
 
 
 def _clean(value, limit):
     """去空白 + 截断，任何类型都安全。"""
     return str(value if value is not None else "").strip()[:limit]
+
+
+def _normalize_limit(value) -> str:
+    """
+    把 DB 里的 prompt_limit 归一成合法取值。
+
+    非法/空/NULL -> 默认 4000（老配置的兼容路径）。
+    """
+    text = str(value if value is not None else "").strip().lower()
+    if text in PROMPT_LIMIT_CHOICES:
+        return text
+    return DEFAULT_PROMPT_LIMIT
+
+
+def prompt_limit_max_chars(prompt_limit) -> int | None:
+    """
+    取值 -> 实际最大字数。None = 无限制。
+
+    这是**唯一**的取值解析入口 —— 后端各处的长度校验都用它，
+    避免各处各写一套判断（那正是「一处放开另一层又砍」的来源）。
+    """
+    return PROMPT_LIMIT_VALUES.get(_normalize_limit(prompt_limit))
 
 
 def normalize_provider(payload: dict) -> dict:
@@ -96,6 +158,15 @@ def normalize_provider(payload: dict) -> dict:
     enabled = payload.get("enabled")
     enabled = 0 if enabled in (False, 0, "0", "false", "no") else 1
 
+    # 提示词长度上限（新增字段）。缺失/空 -> 默认 4000（兼容老配置）。
+    prompt_limit = _clean(payload.get("prompt_limit"), 20).lower()
+    if not prompt_limit:
+        prompt_limit = DEFAULT_PROMPT_LIMIT
+    if prompt_limit not in PROMPT_LIMIT_CHOICES:
+        raise ValueError(
+            f"不支持的提示词长度上限 {prompt_limit}，"
+            f"可选：{'、'.join(PROMPT_LIMIT_CHOICES)}")
+
     return {
         "id": _clean(payload.get("id"), 40) or uuid.uuid4().hex[:12],
         "name": name,
@@ -108,6 +179,7 @@ def normalize_provider(payload: dict) -> dict:
         "api_key": api_key,
         "multimodal": multimodal,
         "enabled": enabled,
+        "prompt_limit": prompt_limit,
         "created_at": time.time(),
     }
 
@@ -135,6 +207,8 @@ def _row_to_provider(row) -> dict:
         "api_key_masked": masked,
         "multimodal": bool(row["multimodal"]),
         "enabled": bool(row["enabled"]),
+        # 老行可能是 NULL（迁移前建的表）-> 归一到默认
+        "prompt_limit": _normalize_limit(row["prompt_limit"]),
         "created_at": row["created_at"],
     }
 
@@ -154,6 +228,7 @@ def ensure_tables(conn: sqlite3.Connection):
             api_key TEXT DEFAULT '',
             multimodal INTEGER DEFAULT 0,
             enabled INTEGER DEFAULT 1,
+            prompt_limit TEXT DEFAULT '4000',
             created_at REAL
         );
         CREATE TABLE IF NOT EXISTS model_provider_prefs (
@@ -174,6 +249,17 @@ def ensure_tables(conn: sqlite3.Connection):
     if "proxy_base_url" not in columns:
         conn.execute("ALTER TABLE model_providers "
                      "ADD COLUMN proxy_base_url TEXT DEFAULT ''")
+    # 提示词长度上限（2026-11-10 新增）。
+    # 老 Provider 没这一列 -> 补上后默认 4000（与改动前的硬编码上限一致），
+    # 老配置升级不报错、不改变行为。
+    if "prompt_limit" not in columns:
+        conn.execute("ALTER TABLE model_providers "
+                     "ADD COLUMN prompt_limit TEXT DEFAULT '4000'")
+        # 已经是 NULL 的历史行（ADD COLUMN DEFAULT 会填 '4000'，
+        # 但 SQLite 对已有行可能写 NULL）统一归一
+        conn.execute("UPDATE model_providers SET prompt_limit=? "
+                     "WHERE prompt_limit IS NULL OR prompt_limit=''",
+                     (DEFAULT_PROMPT_LIMIT,))
 
 
 def list_providers(conn: sqlite3.Connection) -> list:
@@ -205,6 +291,7 @@ def get_provider_full(conn: sqlite3.Connection, provider_id: str):
         "api_key": row["api_key"] or "",
         "multimodal": bool(row["multimodal"]),
         "enabled": bool(row["enabled"]),
+        "prompt_limit": _normalize_limit(row["prompt_limit"]),
     }
 
 
@@ -212,12 +299,13 @@ def insert_provider(conn: sqlite3.Connection, data: dict) -> dict:
     conn.execute(
         "INSERT INTO model_providers "
         "(id,name,type,base_url,llm_base_url,use_proxy,proxy_base_url,"
-        "model,api_key,multimodal,enabled,created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "model,api_key,multimodal,enabled,prompt_limit,created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (data["id"], data["name"], data["type"], data["base_url"],
          data.get("llm_base_url", ""), data.get("use_proxy", 0),
          data.get("proxy_base_url", ""), data["model"],
-         data["api_key"], data["multimodal"], data["enabled"], data["created_at"]))
+         data["api_key"], data["multimodal"], data["enabled"],
+         _normalize_limit(data.get("prompt_limit")), data["created_at"]))
     return _row_to_provider(get_provider(conn, data["id"]))
 
 
@@ -229,12 +317,13 @@ def update_provider(conn: sqlite3.Connection, provider_id: str, data: dict) -> d
     api_key = current["api_key"] if data["api_key"] is None else data["api_key"]
     conn.execute(
         "UPDATE model_providers SET name=?, type=?, base_url=?, llm_base_url=?, "
-        "use_proxy=?, proxy_base_url=?, model=?, api_key=?, multimodal=?, enabled=? "
-        "WHERE id=?",
+        "use_proxy=?, proxy_base_url=?, model=?, api_key=?, multimodal=?, enabled=?, "
+        "prompt_limit=? WHERE id=?",
         (data["name"], data["type"], data["base_url"],
          data.get("llm_base_url", "") or "", data.get("use_proxy", 0),
          data.get("proxy_base_url", "") or "", data["model"], api_key,
-         data["multimodal"], data["enabled"], provider_id))
+         data["multimodal"], data["enabled"],
+         _normalize_limit(data.get("prompt_limit")), provider_id))
     return _row_to_provider(get_provider(conn, provider_id))
 
 

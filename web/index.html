@@ -1339,6 +1339,20 @@
         <input type="password" id="provKey" placeholder="留空表示无需鉴权" maxlength="200" autocomplete="off">
         <small id="provKeyHint" class="prov-hint"></small>
       </label>
+      <label class="prov-field">
+        <span>提示词长度上限 <em>可空</em></span>
+        <select id="provPromptLimit">
+          <option value="unlimited">无限制（交给后端/模型决定）</option>
+          <option value="4000">4000 字（默认，兼容旧行为）</option>
+          <option value="8000">8000 字</option>
+          <option value="20000">20000 字</option>
+          <option value="50000">50000 字</option>
+        </select>
+        <small id="provPromptLimitHint" class="prov-hint">
+          输入提示词的长度上限。选「无限制」后不再拦截超长提示词，
+          输出 token 上限也一并放开，由后端/模型的物理能力决定。
+        </small>
+      </label>
       <label class="prov-check">
         <input type="checkbox" id="provMultimodal">
         <span>支持多模态（可读图，用于提示词增强等需要看图的场景）</span>
