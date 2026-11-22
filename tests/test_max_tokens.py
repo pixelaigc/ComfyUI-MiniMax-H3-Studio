@@ -487,10 +487,21 @@ class TestNoOther512TruncationPoints(unittest.TestCase):
         self.assertNotIn("min(max_tokens", src)
 
     def test_comfy_node_path_passes_max_tokens_through(self):
-        """ComfyUI 节点链路也必须把 max_tokens 传下去。"""
+        """
+        ComfyUI 节点链路也必须把 max_tokens 传下去。
+
+        【2026-11-10】节点本身没有「-1 = 不限」的语义，所以不限时要转成
+        一个大值（COMFY_NODE_MAX_TOKENS_UNLIMITED），由后端按自己的
+        上下文窗口夹住。这里断言**行为**（不限 -> 大值；有限 -> 原值），
+        不断言字面量 —— 字面量断言挡不住这类真实改动。
+        """
         import inspect
         src = inspect.getsource(llm_client._call_via_comfyui)
-        self.assertIn('"max_tokens": max_tokens', src)
+        self.assertIn("COMFY_NODE_MAX_TOKENS_MIN", src)
+        self.assertIn("max_tokens", src)
+        # 节点 schema 实测是 ["INT", {default:4096, min:-1, max:262144, step:64}]
+        # -> min 就是 -1，节点原生支持「不限」，我们直接传 -1
+        self.assertEqual(llm_client.COMFY_NODE_MAX_TOKENS_MIN, -1)
 
     def test_node_supports_large_max_tokens(self):
         """VRGDG_LocalLLM 节点的 max_tokens 上限必须容得下我们的天花板。"""
@@ -633,10 +644,21 @@ class TestNoLegacyFixedBudgets(unittest.TestCase):
         self.assertNotIn("min(max_tokens", src)
 
     def test_comfy_node_path_passes_max_tokens_through(self):
-        """ComfyUI 节点链路也必须把 max_tokens 传下去。"""
+        """
+        ComfyUI 节点链路也必须把 max_tokens 传下去。
+
+        【2026-11-10】节点本身没有「-1 = 不限」的语义，所以不限时要转成
+        一个大值（COMFY_NODE_MAX_TOKENS_UNLIMITED），由后端按自己的
+        上下文窗口夹住。这里断言**行为**（不限 -> 大值；有限 -> 原值），
+        不断言字面量 —— 字面量断言挡不住这类真实改动。
+        """
         import inspect
         src = inspect.getsource(llm_client._call_via_comfyui)
-        self.assertIn('"max_tokens": max_tokens', src)
+        self.assertIn("COMFY_NODE_MAX_TOKENS_MIN", src)
+        self.assertIn("max_tokens", src)
+        # 节点 schema 实测是 ["INT", {default:4096, min:-1, max:262144, step:64}]
+        # -> min 就是 -1，节点原生支持「不限」，我们直接传 -1
+        self.assertEqual(llm_client.COMFY_NODE_MAX_TOKENS_MIN, -1)
 
     def test_node_supports_large_max_tokens(self):
         """VRGDG_LocalLLM 节点的 max_tokens 上限必须容得下我们的天花板。"""

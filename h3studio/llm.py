@@ -100,6 +100,11 @@ def compute_timeout(max_tokens: int) -> float:
         mt = int(max_tokens)
     except (TypeError, ValueError):
         mt = 1024
+    if mt < 0:
+        # 无限制（UNLIMITED_MAX_TOKENS = -1）：
+        # token 数未知，按封顶算 —— 反正生成多久由模型自己收尾决定，
+        # 这里只是「别太早掐断」。
+        return MAX_TIMEOUT
     est = BASE_TIMEOUT + max(0, mt) * PER_TOKEN_TIMEOUT
     return max(MIN_TIMEOUT, min(est, MAX_TIMEOUT))
 
@@ -260,6 +265,60 @@ def _extract_ollama_finish_reason(body: dict) -> str:
 # ------------------------------------------------------------------ 连通性
 
 
+async def probe_context_limit(provider: dict) -> dict:
+    """
+    探测后端的**物理**上下文上限（不可绕过的那个）。
+
+    「无限制」只能解除**我们自己的**人为限制；
+    后端本身的上限（llama.cpp 的 n_ctx / vLLM 的 max_model_len）
+    是物理事实，绕不过去 —— 所以必须探测出来，如实回给前端显示，
+    绝不静默截断。
+
+    返回 {"limit": int|None, "source": str, "detail": str}：
+      - limit=None  -> 探测不到（不代表无限，只是未知）
+      - source      -> "llamacpp-n_ctx" / "openai-meta" / "unknown"
+    """
+    ptype = provider.get("type")
+    base = (provider.get("base_url") or "").rstrip("/")
+    name = provider.get("name") or provider.get("id")
+    unknown = {"limit": None, "source": "unknown",
+               "detail": "未能探测到后端的上下文上限（不等于无限）"}
+    if not base:
+        return unknown
+    timeout = ClientTimeout(total=10, connect=5)
+    try:
+        async with ClientSession(timeout=timeout) as session:
+            # llama.cpp server：/props 给 n_ctx
+            try:
+                async with session.get(f"{base}/props") as resp:
+                    if resp.status == 200:
+                        body = await resp.json()
+                        n_ctx = ((body.get("default_generation_settings") or {})
+                                 .get("n_ctx"))
+                        if n_ctx:
+                            return {"limit": int(n_ctx), "source": "llamacpp-n_ctx",
+                                    "detail": f"后端上下文窗口 n_ctx={int(n_ctx)}"
+                                              "（llama.cpp 的物理上限，输出最多这么多）"}
+            except Exception:
+                pass
+            # OpenAI 兼容：/v1/models 里有时带 meta.n_ctx
+            try:
+                async with session.get(f"{base}/v1/models") as resp:
+                    if resp.status == 200:
+                        body = await resp.json()
+                        for item in (body.get("data") or []):
+                            n_ctx = ((item.get("meta") or {}).get("n_ctx"))
+                            if n_ctx:
+                                return {"limit": int(n_ctx), "source": "openai-meta",
+                                        "detail": f"后端上下文窗口 n_ctx={int(n_ctx)}"
+                                                  "（物理上限，输出最多这么多）"}
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return unknown
+
+
 async def check_provider(provider: dict, session: ClientSession | None = None) -> dict:
     """
     连通性探测。返回 {"ok": bool, "detail": str, "models": [...]}。
@@ -364,6 +423,13 @@ async def call_provider_full(provider: dict, messages: list, images: list | None
     temperature = float(options.get("temperature", 0.7))
     max_tokens = int(options.get("max_tokens", 1024))
     top_p = float(options.get("top_p", 0.95))
+    # 【2026-11-10】「无限制」= max_tokens 为负数（-1）。
+    #   各后端对「不限」的原生表示不一样，逐个转译：
+    #     llama.cpp / OpenAI 兼容 : 传 -1（llama.cpp 的 n_predict=-1 = 不限）
+    #     Ollama                  : 传 -1（num_predict=-1 = 不限）
+    #     ComfyUI 节点            : 节点没有「不限」语义 -> 传一个很大的值，
+    #                                由后端自己夹到上下文窗口
+    unlimited = max_tokens < 0
 
     if images and not provider.get("multimodal"):
         raise ProviderError(
@@ -379,6 +445,7 @@ async def call_provider_full(provider: dict, messages: list, images: list | None
                     "model": model,
                     "messages": _messages_to_ollama(messages, images),
                     "stream": False,
+                    # Ollama 的 num_predict=-1 = 不限生成（原生约定）
                     "options": {"temperature": temperature, "top_p": top_p,
                                 "num_predict": max_tokens},
                 }
@@ -406,6 +473,8 @@ async def call_provider_full(provider: dict, messages: list, images: list | None
                 "messages": _messages_to_openai(messages, images),
                 "temperature": temperature,
                 "top_p": top_p,
+                # 不限时传 -1（llama.cpp 的 n_predict=-1 = 不限）；
+                # OpenAI 兼容层收到 -1 也会当成「不限」处理。
                 "max_tokens": max_tokens,
                 "stream": False,
             }
@@ -818,6 +887,17 @@ def _comfy_thinking_safe_prompts(user_prompt: str, system_prompt: str):
     return prompt, system
 
 
+# ComfyUI 本地 LLM 节点的 max_tokens 下限。
+#
+# 【实测】节点的 schema 是 ["INT", {default:4096, min:-1, max:262144, step:64}]
+# —— min 就是 -1，也就是说**节点原生支持 -1 = 不限**。
+# 所以这里直接传 -1，不用「传一个很大的值再让节点夹」的绕法。
+#
+# 上限 max=262144 与本机 llama.cpp 的 n_ctx 一致；
+# 真正能生成多少仍由后端决定（见 probe_context_limit）。
+COMFY_NODE_MAX_TOKENS_MIN = -1
+
+
 async def _call_via_comfyui(session: ClientSession, provider: dict, messages: list,
                             images: list | None, temperature: float, top_p: float,
                             max_tokens: int) -> str:
@@ -879,7 +959,9 @@ async def _call_via_comfyui(session: ClientSession, provider: dict, messages: li
                 "system_prompt": node_system,
                 "temperature": temperature,
                 "top_p": top_p,
-                "max_tokens": max_tokens,
+                # 无限制 -> 传 -1（节点的 min 就是 -1 = 不限，原生支持）
+                "max_tokens": (COMFY_NODE_MAX_TOKENS_MIN
+                               if max_tokens < 0 else max_tokens),
                 "request_timeout_sec": 300,
             },
             "class_type": COMFY_LLM_NODE,

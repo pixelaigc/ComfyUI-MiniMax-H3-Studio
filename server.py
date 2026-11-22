@@ -8452,9 +8452,6 @@ async def api_music_enhance(request):
     base = str(payload.get("base") or "").strip()
     if not original and not base:
         return web.json_response({"error": "请先输入要增强的描述"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "描述过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2a").strip()
     if mode not in ("t2a", "a2a"):
         mode = "t2a"
@@ -8477,6 +8474,11 @@ async def api_music_enhance(request):
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
     # 【2026-11-10 修复】先在**线程池**里把枚举取一次（见 yue2_schema 的说明），
     # 再把它同时喂给 build_system_prompt() 和 normalize_and_validate()。
     # 原来两处各自调 get_enums()，各自**同步阻塞**事件循环最长 10 秒；
@@ -8491,10 +8493,14 @@ async def api_music_enhance(request):
         {"role": "user", "content": user_prompt},
     ]
     try:
+        # 输出预算：无限制时交给后端/模型决定（-1），
+        # 否则沿用本条路线原本的 4000（音乐结构化增强的产出体量稳定）。
+        music_max_tokens = (enh.UNLIMITED_MAX_TOKENS
+                            if limit_info["prompt_limit_unlimited"] else 4000)
         raw = await llm_client.call_provider(
             item, messages,
             options={"temperature": 0.7, "top_p": 0.95,
-                     "max_tokens": 4000, "do_sample": True})
+                     "max_tokens": music_max_tokens, "do_sample": True})
     except llm_client.ProviderError as exc:
         return web.json_response(
             {"error": str(exc), "provider": item["name"],
@@ -9814,9 +9820,21 @@ async def api_providers_list(request):
     with db() as conn:
         items = prov.list_providers(conn)
         prefs = prov.prefs_snapshot(conn)
+    # 【2026-11-10】提示词长度上限的可选项 —— 前端下拉直接用这份，
+    # 不在前端硬编码取值（新增选项只改服务端这一处）。
+    for item in items:
+        limit = item.get("prompt_limit") or prov.DEFAULT_PROMPT_LIMIT
+        item["prompt_limit_label"] = prov.PROMPT_LIMIT_LABELS.get(limit, limit)
+        item["prompt_limit_max_chars"] = prov.prompt_limit_max_chars(limit)
+        item["prompt_limit_unlimited"] = (item["prompt_limit_max_chars"] is None)
     return json_ok({"providers": items, **prefs,
                     "types": [{"value": k, "label": v}
-                              for k, v in prov.PROVIDER_TYPE_LABELS.items()]})
+                              for k, v in prov.PROVIDER_TYPE_LABELS.items()],
+                    "prompt_limit_choices": [
+                        {"value": v, "label": prov.PROMPT_LIMIT_LABELS[v],
+                         "max_chars": prov.PROMPT_LIMIT_VALUES[v]}
+                        for v in prov.PROMPT_LIMIT_CHOICES],
+                    "prompt_limit_default": prov.DEFAULT_PROMPT_LIMIT})
 
 
 async def api_providers_create(request):
@@ -10216,6 +10234,73 @@ def _reference_spec_for_mode(spec_id: str, mode_ctx: str = "",
     return spec_id
 
 
+# ------------------------------------------------------------------ 提示词长度上限
+#
+# 【2026-11-10】每个 Provider 可配「提示词长度上限」，支持「无限制」。
+# 这是**输入**长度限制（提交给模型的原文能有多长）。
+#
+# 【为什么要集中成一个函数】
+# 改动前有 **5 处**硬编码 `if len(original) > 4000`，分别散在
+# api_enhance / api_moss_layout / api_qwen_pe_expand /
+# api_h3image_pe_expand / api_music_enhance。
+# 如果只在一处放开、另一处还砍，就会出现用户说的
+# 「提示词过长（上限 4000 字）」换个入口又冒出来。
+# 现在所有入口统一走 _prompt_limit_guard()。
+def _resolve_prompt_limit(provider: dict | None) -> tuple[str, int | None]:
+    """
+    取本次请求生效的「提示词长度上限」。
+
+    返回 (取值字符串, 实际最大字数)：
+      - ("unlimited", None) -> 无限制
+      - ("4000", 4000)      -> 上限 4000 字
+
+    provider 为 None（还没解析出 Provider）时用全局默认。
+    """
+    limit = (provider or {}).get("prompt_limit") or prov.DEFAULT_PROMPT_LIMIT
+    limit = prov._normalize_limit(limit)
+    return limit, prov.prompt_limit_max_chars(limit)
+
+
+def _default_prompt_limit() -> tuple[str, int | None]:
+    """
+    没指定 Provider 的入口（如官方 PE 扩写）用的上限。
+
+    规则：**按默认 Provider 的配置走** —— 用户在「本地模型」页把默认
+    Provider 设成「无限制」，官方 PE 扩写这条路也跟着放开。
+    找不到默认 Provider -> 回到全局默认 4000 字。
+    """
+    try:
+        with db() as conn:
+            item = prov.resolve_default(conn, "default")
+    except Exception:
+        item = None
+    return _resolve_prompt_limit(item)
+
+
+def _prompt_limit_guard(original: str, provider: dict | None) -> tuple[dict | None, dict]:
+    """
+    提示词长度校验。
+
+    返回 (错误响应 or None, 生效信息)。
+    生效信息会回给前端，让 UI 能显示「实际生效值 + 原因」，
+    而不是让用户猜。
+    """
+    if provider is None:
+        limit, max_chars = _default_prompt_limit()
+    else:
+        limit, max_chars = _resolve_prompt_limit(provider)
+    info = {
+        "prompt_limit": limit,
+        "prompt_limit_max_chars": max_chars,
+        "prompt_limit_unlimited": max_chars is None,
+    }
+    if max_chars is not None and len(original) > max_chars:
+        return web.json_response(
+            {"error": f"提示词过长（上限 {max_chars} 字）",
+             **info}, status=400), info
+    return None, info
+
+
 async def api_enhance(request):
     """
     POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
@@ -10241,9 +10326,6 @@ async def api_enhance(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = payload.get("mode") or "replace"
     if mode not in ("replace", "append"):
         return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
@@ -10319,7 +10401,6 @@ async def api_enhance(request):
     # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
     #   原实现不传 original -> 只能拿到固定 300 -> 长提示词必被硬切
     #   （审查实测：普通增强 10 次有 6 次被切，成功率仅 40%）。
-    params = enh.resolve_params(payload.get("params"), saved, spec, original=original)
 
     # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
     with db() as conn:
@@ -10358,6 +10439,18 @@ async def api_enhance(request):
                         {"error": "尚未配置可用的本地模型 Provider。"
                                  "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
+    # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
+    #   unlimited_output：Provider 配了「无限制」-> 输出也不设人为上限。
+    params = enh.resolve_params(
+        payload.get("params"), saved, spec, original=original,
+        unlimited_output=limit_info["prompt_limit_unlimited"])
+
+
 
     validate_mode = spec.get("validate_mode", "pe")
     # ---- 跨段提示词历史（2026-11-17 新增）----
@@ -10393,10 +10486,15 @@ async def api_enhance(request):
         #   （审查实测：普通增强 10 次有 6 次被 300 硬切，成功率仅 40%。
         #    预算自适应后这一步基本不会触发；这里是最后一道保险。）
         budget = params["max_tokens"]
-        ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
-        attempts = [budget]
-        if ceiling > budget:
-            attempts.append(ceiling)
+        if params.get("max_tokens_unlimited"):
+            # 无限制：只跑一次。输出预算已交给后端/模型，
+            # 再用 ceiling 重跑没有意义（ceiling 比 budget 小）。
+            attempts = [budget]
+        else:
+            ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
+            attempts = [budget]
+            if ceiling > budget:
+                attempts.append(ceiling)
 
         last = None
         # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
@@ -10550,6 +10648,26 @@ async def api_enhance(request):
                 {"original_prompt": original, "prompt": enhanced,
                  "model_key": model_key},
                 source=ph.SOURCE_ENHANCE)
+    # 【2026-11-10】把「实际生效的长度限制」回给前端：
+    #   prompt_limit            —— 用户配的取值（unlimited / 4000 / …）
+    #   prompt_limit_max_chars  —— 实际生效的最大字数（unlimited -> null）
+    #   backend_context_limit   —— 后端的物理上限（探测得到；探测不到为 null）
+    #   limit_note              —— 人类可读的说明，前端直接显示
+    limit_note = ""
+    backend_ctx = None
+    if limit_info["prompt_limit_unlimited"]:
+        # 无限制：探测后端物理上限，如实告诉用户「实际最多能到多少」
+        probe = await llm_client.probe_context_limit(item)
+        backend_ctx = probe.get("limit")
+        if backend_ctx:
+            limit_note = ("已解除长度限制；后端物理上限 "
+                          f"{backend_ctx} tokens（{probe.get('detail','')}）")
+        else:
+            limit_note = ("已解除长度限制；未能探测到后端物理上限，"
+                          "实际由模型自身能力决定")
+    else:
+        limit_note = (f"提示词长度上限 {limit_info['prompt_limit_max_chars']} 字"
+                      "（可在「本地模型」页按 Provider 调整）")
     return json_ok({
         "original": original,
         "enhanced": enhanced,
@@ -10558,6 +10676,11 @@ async def api_enhance(request):
         "provider": item["name"],
         "provider_id": item["id"],
         "spec_id": spec["id"],
+        "prompt_limit": limit_info["prompt_limit"],
+        "prompt_limit_max_chars": limit_info["prompt_limit_max_chars"],
+        "prompt_limit_unlimited": limit_info["prompt_limit_unlimited"],
+        "backend_context_limit": backend_ctx,
+        "limit_note": limit_note,
         "used_multimodal": bool(images),
         # 【素材上下文回显（2026-11-18 新增）】前端据此告诉用户
         # 「这次增强带上了哪几个素材」—— 否则用户无法确认素材到底
@@ -10626,9 +10749,6 @@ async def api_moss_layout(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     intent = str(payload.get("intent") or "").strip()
     if len(intent) > 1000:
         return web.json_response({"error": "画面意图过长（上限 1000 字）"}, status=400)
@@ -10668,6 +10788,12 @@ async def api_moss_layout(request):
                 return web.json_response(
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
 
     messages = moss_layout.build_messages(original, width, height, intent)
     try:
@@ -10752,14 +10878,18 @@ async def api_qwen_pe_expand(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2i_qwen").strip()
     if mode not in ("t2i_qwen", "i2i_qwen"):
         return web.json_response(
             {"error": "官方 PE 扩写只适用于 Qwen-Image 2.1 的文生图 / 图片编辑模式"}, status=400)
     is_edit = mode == "i2i_qwen"
+
+    # 【2026-11-10】提示词长度校验 —— 这条路没有 provider_id，
+    # 按**默认 Provider** 的配置取（见 _default_prompt_limit）。
+    limit_err, limit_info = _prompt_limit_guard(original, None)
+    if limit_err is not None:
+        return limit_err
+
 
     # 参考图：素材库来源，与出图链路同一套约束（顺序即 <imageN> 顺序）。
     # 这里要的是**能直接喂给 ComfyUI LoadImage 的文件名**，
@@ -10853,14 +10983,18 @@ async def api_h3image_pe_expand(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2i_h3image").strip()
     if mode not in ("t2i_h3image", "i2i_h3image"):
         return web.json_response(
             {"error": "H3-Image 官方 PE 扩写只适用于文生图 / 图片编辑模式"}, status=400)
     is_edit = mode == "i2i_h3image"
+
+    # 【2026-11-10】提示词长度校验 —— 这条路没有 provider_id，
+    # 按**默认 Provider** 的配置取（见 _default_prompt_limit）。
+    limit_err, limit_info = _prompt_limit_guard(original, None)
+    if limit_err is not None:
+        return limit_err
+
 
     # 参考图：素材库来源，顺序严格保持（= <imageN> 顺序）。
     # 只上传、**不登记** asset_refs —— 扩写只是读一次图，不是出图任务。

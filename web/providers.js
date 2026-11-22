@@ -170,6 +170,8 @@ async function loadProviders() {
     provState.types = d.types || [];
     provState.defaultId = d.default_provider_id;
     provState.defaultMmId = d.default_multimodal_provider_id;
+    // 提示词长度上限的可选项 —— 服务端下发，前端不硬编码
+    applyPromptLimitChoices(d.prompt_limit_choices, d.prompt_limit_default);
     renderProviders();
     const def = provState.providers.find(p => p.id === provState.defaultId);
     sub.textContent = provState.providers.length
@@ -196,6 +198,12 @@ function renderProviders() {
       if (isMmDefault) badges.push(`<span class="prov-badge mm">默认多模态</span>`);
       if (p.multimodal) badges.push(`<span class="prov-badge">多模态</span>`);
       if (!p.enabled) badges.push(`<span class="prov-badge off">已停用</span>`);
+      // 提示词长度上限 —— 一眼可见，不用点进编辑才知道
+      if (p.prompt_limit_unlimited) {
+        badges.push(`<span class="prov-badge unlimited">长度无限制</span>`);
+      } else if (p.prompt_limit_max_chars) {
+        badges.push(`<span class="prov-badge limit">长度 ≤${esc(p.prompt_limit_max_chars)} 字</span>`);
+      }
       return `
       <div class="prov-item${p.enabled ? "" : " disabled"}">
         <div class="prov-item-main">
@@ -295,10 +303,44 @@ function openProvModal(p) {
     ? "为保护密钥，列表不显示明文。留空即保持原密钥不变。" : "";
   $("#provMultimodal").checked = p ? p.multimodal : false;
   $("#provEnabled").checked = p ? p.enabled : true;
+  // 提示词长度上限：老 Provider 没这字段 -> 用服务端下发的默认值
+  $("#provPromptLimit").value = p && p.prompt_limit
+    ? p.prompt_limit
+    : (provState.promptLimitDefault || "4000");
+  updatePromptLimitHint();
   $("#provFormErr").hidden = true;
   toggleLlmUrlField();
   $("#provModal").hidden = false;
   setTimeout(() => $("#provName").focus(), 30);
+}
+
+// 提示词长度上限的说明文字 —— 跟着当前取值变，
+// 避免用户选了「无限制」却不知道后端还有物理上限。
+function updatePromptLimitHint() {
+  const el = $("#provPromptLimit");
+  const hint = $("#provPromptLimitHint");
+  if (!el || !hint) return;
+  const v = el.value;
+  if (v === "unlimited") {
+    hint.textContent =
+      "不拦截超长提示词，输出 token 上限也一并放开。"
+      + "实际仍受后端/模型物理上限约束（运行后界面会显示实际生效值）。";
+  } else {
+    hint.textContent =
+      `输入提示词超过 ${v} 字会被服务端拒绝。`
+      + "想要任意长度就选「无限制」。";
+  }
+}
+
+// 用服务端下发的可选项填充下拉（前端不硬编码取值，新增选项只改服务端）
+function applyPromptLimitChoices(choices, fallback) {
+  const sel = $("#provPromptLimit");
+  if (!sel) return;
+  provState.promptLimitChoices = choices || [];
+  provState.promptLimitDefault = fallback || "4000";
+  if (!choices || !choices.length) return;
+  sel.innerHTML = choices.map(c =>
+    `<option value="${esc(c.value)}">${esc(c.label)}</option>`).join("");
 }
 
 // ComfyUI 类型才需要单独填「LLM 服务地址」
@@ -307,6 +349,7 @@ function toggleLlmUrlField() {
   $("#provLlmUrlField").style.display = isComfy ? "" : "none";
 }
 $("#provType").addEventListener("change", toggleLlmUrlField);
+$("#provPromptLimit").addEventListener("change", updatePromptLimitHint);
 
 function closeProvModal() {
   $("#provModal").hidden = true;
@@ -328,6 +371,7 @@ $("#provSave").addEventListener("click", async () => {
     api_key: $("#provKey").value.trim(),
     multimodal: $("#provMultimodal").checked,
     enabled: $("#provEnabled").checked,
+    prompt_limit: $("#provPromptLimit").value,
   };
   errBox.hidden = true;
   // 前端先做一遍必填校验，后端还会再校验一次
@@ -682,6 +726,14 @@ function buildEnhanceMeta(d) {
       text += "（已全部标注）";
     }
     html += `<div class="enhance-warn">${esc(text)}</div>`;
+  }
+  // 【2026-11-10】实际生效的长度限制 —— 无限制时也要说清后端物理上限，
+  // 不能让用户以为「无限制 = 真的无限」。
+  if (d.limit_note) {
+    html += `<div class="enhance-warn">长度限制：${esc(d.limit_note)}</div>`;
+  }
+  if (d.prompt_limit_unlimited && d.backend_context_limit) {
+    html += `<div class="enhance-warn">后端物理上下文上限：${esc(d.backend_context_limit)} tokens</div>`;
   }
   if (d.elements && d.elements.length) {
     html += `<div class="enhance-elems">bbox 元素：${d.elements.map(e =>

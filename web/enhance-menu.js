@@ -1987,7 +1987,10 @@
       document.querySelector("#enhanceResult").value = refined;
       document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
       document.querySelector("#enhanceModal").hidden = false;
-      setHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字`, "ok");
+      // 把「实际生效的长度限制」一并显示 —— 选了「无限制」时
+      // 用户需要看到后端实际的上限是多少（物理上限，绕不过去）。
+      const limitTail = d.limit_note ? ` · ${d.limit_note}` : "";
+      setHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字${limitTail}`, "ok");
       return { expanded: refined, meta: buildEnhanceMeta(d) };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;

@@ -830,6 +830,9 @@ body.modal-open { overflow: hidden; }
 .prov-badge.default { background: var(--accent-soft); color: var(--accent); }
 .prov-badge.mm { background: #e8f6ee; color: #1f8a52; }
 .prov-badge.off { background: #fbeaea; color: var(--danger); }
+/* 提示词长度上限徽标 —— 「无限制」用强调色，限额用中性色 */
+.prov-badge.unlimited { background: #fff2e0; color: #b96a12; }
+.prov-badge.limit { background: #eef1f5; color: #5a6472; }
 
 .prov-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .prov-item-actions button {
