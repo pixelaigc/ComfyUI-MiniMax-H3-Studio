@@ -224,6 +224,45 @@ async def _run_h3image_pe(ctx, prompt: str, mode: str,
     return body
 
 
+async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) -> bool:
+    """
+    尝试走 hermes 增强通道（对齐 nonebot 咏唱h3）。
+
+    返回 True = 增强成功，plan.prompt 已经是最终提示词（调用方应直接返回）。
+    返回 False = 没走成（通道未开 / hermes 不可用 / 失败）——
+        **失败原因写进 plan.notices**，然后调用方继续走本地 Provider 通道。
+
+    【失败纪律】与 nonebot 一致：**不编造**。
+    hermes 挂了就说挂了，并如实记进 notices —— 媒体库里必须能看出
+    这次用的是原文还是增强后的提示词。
+    """
+    from . import hermes_enhance
+
+    try:
+        saved = _load_overrides(ctx)
+        cfg = hermes_enhance.resolve_config(saved)
+        if not cfg.get("enabled"):
+            return False          # 通道没开 -> 静默走本地 Provider（不是错误）
+        media = hermes_enhance.media_for_mode(mode)
+        if media not in hermes_enhance.HERMES_MEDIA_SPECS:
+            return False
+        result = await hermes_enhance.enhance(
+            original, media, saved=saved, validate=True)
+        text = (result.enhanced or "").strip()
+        if not text:
+            plan.notices.append("hermes 增强返回空内容，用原始提示词生成")
+            return False
+        plan.prompt = text
+        plan.enhanced = True
+        plan.extra_params["enhance_engine"] = "hermes"
+        plan.extra_params["enhance_profile"] = result.profile
+        return True
+    except Exception as exc:  # noqa: BLE001 —— 任何失败都要如实记录
+        plan.notices.append(
+            f"hermes 增强失败（{exc}），本次用原始提示词生成")
+        return False
+
+
 async def enhance_for_mode(ctx, mode: str, original: str,
                            ref_images: list[str] | None = None) -> EnhancePlan:
     """给某个模式生成**最终提示词**。
@@ -237,6 +276,18 @@ async def enhance_for_mode(ctx, mode: str, original: str,
     plan.prompt = original
     if not original:
         plan.notices.append("没有提示词")
+        return plan
+
+    # ---- 0) hermes 增强通道（对齐 nonebot 咏唱h3）----
+    #
+    # 【为什么放在最前面】nonebot 的工作流是「**先增强、再进生成**」——
+    # 增强是生成的前置步骤，不是生成之后的补充。本模块保持同一顺序：
+    # 开了 hermes 通道且跑成功 -> 直接用 hermes 的产物当最终提示词。
+    #
+    # 【与 nonebot 一致的失败纪律】hermes 不可用 -> **如实记 notice**，
+    # 继续用原始提示词走本地 Provider 通道（不编造、不假装增强过）。
+    hermes_done = await _try_hermes_enhance(ctx, mode, original, plan)
+    if hermes_done:
         return plan
 
     # ---- 1) 模型专用 PE（先跑 PE，再跑文本增强）----
