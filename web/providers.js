@@ -547,6 +547,15 @@ function renderHermesConfig() {
     </div>`;
   }).join("");
 
+  // 【默认状态回显】服务端把「当前生效值」和「出厂默认值」一起下发，
+  // 这里明确告诉用户「现在是什么状态、默认是什么」——
+  // 否则用户看到开关勾着，却不知道这是默认还是自己开的。
+  const cur = h.enabled ? "已启用" : "已停用";
+  const isDefault = !!h.is_default;
+  const stateText = isDefault
+    ? `${cur}（当前为<b>出厂默认</b>，未手动改过）`
+    : `${cur}（已手动设置，与出厂默认不同）`;
+
   return `
   <div class="agent-hermes-block">
     <div class="agent-hermes-head">
@@ -557,10 +566,20 @@ function renderHermesConfig() {
       </label>
     </div>
     <div class="agent-hint">
+      当前状态：${stateText}。出厂默认是<b>启用</b>（2026-11-22 起），
+      可以随时取消勾选停用 —— 停用后「增强」下拉里的 <b>hermes 增强</b>
+      会如实报错提示，不会静默换成别的通道。
+    </div>
+    <div class="agent-hint">
       启用后，「增强」下拉里的 <b>hermes 增强</b> 会调本机 hermes CLI
       （hermes --profile &lt;profile&gt; chat --query-file … --skills … --oneshot --cli --yolo），
       用下面的 skill 白名单与提示词模板把用户输入扩写成专业提示词 ——
       与 nonebot 插件「咏唱h3」的调用方式完全一致。
+      <br>
+      <b>带参考图时走三段式</b>（与 nonebot 一致）：
+      阶段1 初稿 → 阶段2 <b>程序跑 VLM 扫描参考图</b>（物件/服装/光照/调色板，
+      再经规则交叉核对）→ 阶段3 把初稿与已核实清单合成最终提示词。
+      扫描用本机「本地模型配置」里的默认多模态 Provider；扫描失败会如实告知并降级用初稿。
     </div>
     <div class="agent-row">
       <label class="agent-field">

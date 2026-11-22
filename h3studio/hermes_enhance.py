@@ -62,6 +62,13 @@ DEFAULT_HERMES_BIN = "/usr/local/bin/hermes"
 #: 本工作台的三条能力（图像/视频/音频）也正是多媒体创作 —— 所以默认同款。
 DEFAULT_PROFILE = "media"
 
+#: hermes 增强通道是否**默认启用**。
+#:
+#: 【2026-11-22 用户拍板】默认开。
+#: 之前默认关是为了「不改变现有行为」；现在用户明确要求默认启用，
+#: 并且仍然可以手动关闭（存 enabled=false 即生效）。
+DEFAULT_ENABLED = True
+
 #: hermes 根目录（用于校验 profile 是否真实存在）
 HERMES_ROOT = Path("/root/.hermes/profiles")
 
@@ -212,6 +219,10 @@ class HermesResult:
     issues: list = field(default_factory=list)
     #: 是否走了「不编造」的兜底
     degraded: bool = False
+    #: 走到哪一步："draft"（初稿/降级）或 "synth"（三段式合成完成）
+    stage: str = "synth"
+    #: 阶段2 的 VLM 扫描结果摘要（items / costume / 词数 / 原始返回）
+    scan: dict = field(default_factory=dict)
 
 
 # ------------------------------------------------------------------ 配置解析
@@ -223,7 +234,7 @@ def resolve_config(saved: dict | None = None) -> dict:
     合成 hermes 通道的运行配置。
 
     配置项（都可以在「本地模型配置」页改）：
-      hermes.enabled        是否启用 hermes 增强通道（默认 **关**）
+      hermes.enabled        是否启用 hermes 增强通道（**默认开**）
       hermes.binary        hermes 可执行文件路径
       hermes.profile       profile 名（默认 media）
       hermes.timeout       单次调用超时秒数
@@ -236,7 +247,10 @@ def resolve_config(saved: dict | None = None) -> dict:
     cfg = cfg or {}
 
     out = {
-        "enabled": bool(cfg.get("enabled", False)),
+        # 【2026-11-22 用户拍板】默认**开**。
+        # 之前默认关是为了「不改变现有行为」，现在用户明确要求默认启用。
+        # 仍然可以手动关闭 —— 只要用户显式存了 enabled=false 就生效。
+        "enabled": bool(cfg.get("enabled", DEFAULT_ENABLED)),
         "binary": str(cfg.get("binary") or DEFAULT_HERMES_BIN),
         "profile": str(cfg.get("profile") or DEFAULT_PROFILE),
         "timeout": _safe_int(cfg.get("timeout"), DEFAULT_TIMEOUT),
@@ -345,7 +359,9 @@ def get_media_spec(media: str, saved: dict | None = None) -> dict:
 
 def build_query(spec: dict, original: str, *, asset_context: str = "",
                 prompt_history: list | None = None,
-                duration_seconds: float | None = None) -> str:
+                duration_seconds: float | None = None,
+                enhancement_section: str = "",
+                draft_prompt: str = "") -> str:
     """
     构造发给 hermes 的任务描述。
 
@@ -357,15 +373,37 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
       4. 素材位置
     本模块在此之上多了「跨段提示词历史」与「时长」两块（nonebot 在
     `_build_hermes_director_query` 里也有 duration_seconds，见 4392 行）。
+
+    【三段式的两个额外块】
+      enhancement_section  阶段2 产出的「已核实素材事实」节（nonebot 4343-4344）
+      draft_prompt         阶段1 产出的初稿（nonebot 4336-4340）
+    两者都非空 = **合成阶段**（nonebot 4281-4290）；都空 = **初稿阶段**。
     """
     parts: list[str] = []
     original = (original or "").strip()
 
     # 1. 详细任务
-    parts.append(
-        "# 详细任务\n"
-        + (spec.get("system_prompt") or "").strip()
-    )
+    #
+    # 【合成阶段 vs 初稿阶段的措辞差异 —— 与 nonebot 4281-4301 逐字对齐】
+    # 初稿阶段：让 hermes 展开，但**暂时不写满**背景小物件（那一步由程序补）
+    # 合成阶段：让它把（用户要求 + 初稿 + 已核实物品清单）合成最终稿
+    if draft_prompt:
+        parts.append(
+            "# 详细任务 (合成阶段)\n"
+            "下面给你三样东西: (a) 用户的一句话要求, (b) 一份**初稿 prompt**, "
+            "(c) 一份**已核实的素材物品清单** (由程序扫描参考图得到, 是硬事实)。\n"
+            "请把 (a) + (b) + (c) **合成**成最终 prompt: 直接输出最终成品, "
+            "不要输出初稿, 不要输出对比, 不要输出说明。"
+        )
+    else:
+        parts.append(
+            "# 详细任务 (初稿阶段)\n"
+            + (spec.get("system_prompt") or "").strip()
+            + "\n这一版是**初稿**, 后面还有程序化的物品扫描与增强环节, 所以:\n"
+            "- 画面里的**主体和主要场景元素**要写清楚 (人物外观/服装/道具/环境);\n"
+            "- 暂时**不需要**把每个背景小物件写到极细 —— 那一步由后续程序补;\n"
+            "- 但**不要偷懒省略主体**: 主体细节写不全会直接影响最终成片。"
+        )
 
     # 2. 可参考的 skill
     skills = spec.get("skills") or ""
@@ -375,7 +413,7 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
             "以下是 hermes 客户端已装好的 skill（本次已通过 --skills 白名单加载），"
             "你可以根据任务需要调用/参考：\n"
             + "\n".join(f"  - `{s.strip()}`" for s in skills.split(",") if s.strip())
-            + "\n**用法**: 按上面「详细任务」的要求成稿，严格遵守「输出格式」。"
+            + "\n**用法**: 先按上面「详细任务」的要求成稿，严格遵守「输出格式」。"
         )
 
     # 3. 用户的一句话要求
@@ -385,7 +423,17 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
                               .replace("{original}", original)
                  + "\n```")
 
-    # 3b. 跨段提示词历史（接续生成时带上此前各段）
+    # 3b. 初稿（仅合成阶段）—— nonebot 4336-4340
+    if draft_prompt:
+        parts.append(
+            "\n# 初稿 prompt (阶段1 产出, 请在其基础上增强, 不要推倒重来)\n"
+            "```\n" + draft_prompt.strip() + "\n```")
+
+    # 3c. 已核实物品清单（仅合成阶段）—— nonebot 4343-4344
+    if enhancement_section:
+        parts.append(enhancement_section)
+
+    # 3d. 跨段提示词历史（接续生成时带上此前各段）
     if prompt_history:
         lines = []
         for item in prompt_history:
@@ -400,6 +448,22 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
     # 4. 素材位置（服务端解析出来的素材上下文）
     if asset_context:
         parts.append("\n# 素材上下文\n" + asset_context.strip())
+
+    # 4b. 省时指令（仅合成阶段 + 有参考图）—— nonebot 4370-4377
+    #
+    # 【为什么】合成阶段时参考图里的**每一个物件**已经被程序扫描 + 交叉核对
+    # 过了。此时 hermes 再去 vision_analyze 读图：
+    #   - 慢：本地 VLM 端点被同机其它 agent 会话共用，实测排队 20+ 分钟
+    #   - 无益：读出来的结果不可能比已核实清单更准，反而可能引入新错误
+    # 所以明确告诉它**不要读图**，直接用清单。
+    if draft_prompt and enhancement_section and asset_context:
+        parts.append(
+            "\n# 省时指令 (重要)\n"
+            "**不要用 vision_analyze 读参考图**。参考图里的每一个物件已经被程序扫描并"
+            "交叉核对过, 完整的物品/服装/光照/调色板事实就在上面的『已核实素材事实』节里。\n"
+            "直接依据那一节 + 初稿合成最终 prompt。\n"
+            "只有当某一处事实**明显缺失**时才可以读图, 且最多读一张。"
+        )
 
     # 5. 时间轴事实
     if duration_seconds:
@@ -506,16 +570,31 @@ def _run_cli(binary: str, profile: str, query_path: str, skills: str,
 async def enhance(original: str, media: str, *, saved: dict | None = None,
                    asset_context: str = "", prompt_history: list | None = None,
                    duration_seconds: float | None = None,
-                   validate: bool = True) -> HermesResult:
+                   validate: bool = True,
+                   scan_images: list | None = None,
+                   conn=None) -> HermesResult:
     """
     走 hermes CLI 做提示词增强（图像 / 视频 / 音频三条链路共用）。
 
-    与 nonebot 咏唱h3 一致的流程：
+    【三段式 —— 与 nonebot 咏唱h3 完全一致】
+    nonebot h3_interactive.py:3731-3743 定义的编排：
+
+        阶段1 初稿      hermes 从一句话 + 素材写出初稿
+        阶段2 物品扫描  **程序**跑 VLM 扫参考图 → 物件清单 + 服装 + 光照 + 调色板
+                        → 规则交叉核对（KNOWN_TRUTH 覆写 / 零否定 / 分层密度）
+        阶段3 合成      hermes 拿到（初稿 + 已核实物品清单）合成最终 prompt
+
+    降级（nonebot h3_interactive.py:3905-3953 逐条对齐）：
+      * 阶段1 失败          -> 抛错（nonebot 走不编造兜底；本实现直接报错，
+                               不产出半成品 —— 更严格）
+      * 阶段2 扫描失败/无图  -> **用初稿**（不阻断用户）
+      * 阶段3 合成失败      -> **用初稿**（不阻断用户）
+
+    单轮调用内部（nonebot 3783-3872 同款）：
       1. 构造 query（4~6 块结构）
       2. 写临时文件 → `hermes chat --query-file ... --oneshot --cli --yolo`
       3. 抠 Hermes 框拿答案
       4. 校验（可选）：不过就**回灌 issues** 重跑一次（最多 2 次）
-      5. 全失败 → 抛 HermesEnhanceError（**不编造**）
 
     失败时抛异常（而不是返回假结果）—— 调用方负责降级并如实告知用户。
     """
@@ -544,9 +623,92 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
             f"hermes profile「{profile}」不存在（目录：{HERMES_ROOT / profile}）",
             reason="profile_not_found", detail=profile)
 
-    query = build_query(spec, original, asset_context=asset_context,
-                         prompt_history=prompt_history,
-                         duration_seconds=duration_seconds)
+    command = (f"hermes --profile {profile} chat --query-file <tmp>.txt "
+               f"--skills {spec.get('skills', '')} --oneshot --cli --yolo")
+
+    # ================= 阶段 1: 初稿 =================
+    # nonebot h3_interactive.py:3874-3897
+    draft_query = build_query(spec, original, asset_context=asset_context,
+                              prompt_history=prompt_history,
+                              duration_seconds=duration_seconds)
+    draft = await _hermes_once(draft_query, spec, binary, profile, cfg,
+                                original, media, validate, command)
+
+    # ================= 阶段 2: 物品扫描 + 增强（程序做）=================
+    # nonebot h3_interactive.py:3905-3936
+    #
+    # 【关键】这一段是**程序**做的，不是 LLM 在脑内想象：
+    #   * VLM 读文字会错 -> 必须有覆写表裁决（KNOWN_TRUTH）
+    #   * 「找出所有物品」需要穷举 -> LLM 会漏
+    #   * 描述密度要按占比分层 -> 确定性规则
+    enhancement_section = ""
+    scan_info: dict = {}
+    if scan_images:
+        try:
+            from . import item_scan
+            scan = await item_scan.scan_reference(list(scan_images), conn=conn)
+            if scan:
+                strength = item_scan.build_strength_block(scan)  # shot_tier=None
+                enhancement_section = item_scan.render_enhancement_section(
+                    scan, strength)
+                scan_info = {
+                    "ok": True,
+                    "items": len(strength.get("items") or []),
+                    "costume": len(strength.get("costume") or []),
+                    "subject_words": strength.get("subject_words", 0),
+                    "background_words": strength.get("background_words", 0),
+                    "raw": scan.get("raw", ""),
+                    "text": strength.get("text", ""),
+                }
+            else:
+                scan_info = {"ok": False, "reason": "VLM 扫描失败（不可达或解析失败）"}
+        except Exception as exc:  # noqa: BLE001 —— 扫描失败不阻断用户
+            scan_info = {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
+
+    if not enhancement_section:
+        # nonebot h3_interactive.py:3934-3936 —— 无增强内容就直接用初稿
+        return HermesResult(
+            ok=True, enhanced=draft, original=original,
+            profile=profile, skills=spec.get("skills", ""),
+            command=command, raw=draft, attempts=1,
+            issues=[], stage="draft", scan=scan_info)
+
+    # ================= 阶段 3: 合成 =================
+    # nonebot h3_interactive.py:3938-3959
+    synth_query = build_query(spec, original, asset_context=asset_context,
+                              prompt_history=prompt_history,
+                              duration_seconds=duration_seconds,
+                              enhancement_section=enhancement_section,
+                              draft_prompt=draft)
+    try:
+        final = await _hermes_once(synth_query, spec, binary, profile, cfg,
+                                    original, media, validate, command)
+    except HermesEnhanceError as exc:
+        # nonebot h3_interactive.py:3945-3947 —— 合成失败降级用初稿
+        return HermesResult(
+            ok=True, enhanced=draft, original=original,
+            profile=profile, skills=spec.get("skills", ""),
+            command=command, raw=draft, attempts=1,
+            issues=[f"合成阶段失败，已降级用初稿：{exc}"],
+            stage="draft", scan=scan_info)
+
+    return HermesResult(
+        ok=True, enhanced=final, original=original,
+        profile=profile, skills=spec.get("skills", ""),
+        command=command, raw=final, attempts=1,
+        issues=[], stage="synth", scan=scan_info)
+
+
+async def _hermes_once(query: str, spec: dict, binary: str, profile: str,
+                       cfg: dict, original: str, media: str,
+                       validate: bool, command: str) -> str:
+    """
+    跑一轮 hermes CLI（含 1 次 issues 回灌重试），返回增强后的文本。
+
+    nonebot h3_interactive.py:3783-3872 的 `_hermes_once()` 等价实现。
+    失败抛 HermesEnhanceError。
+    """
+    import subprocess
 
     # ---- 写 query 临时文件（nonebot 同款：NamedTemporaryFile + delete=False）----
     fd, query_path = tempfile.mkstemp(prefix="h3studio_hermes_", suffix=".txt")
@@ -561,8 +723,6 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
         raise HermesEnhanceError(
             f"写 hermes query 文件失败：{exc}", reason="query_write_failed") from exc
 
-    command = (f"hermes --profile {profile} chat --query-file <tmp>.txt "
-               f"--skills {spec.get('skills', '')} --oneshot --cli --yolo")
     last_issues: list[str] = []
     attempt = 0
 
@@ -617,11 +777,7 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
                         fh.write(query + _retry_note(issues))
                     continue
 
-            return HermesResult(
-                ok=True, enhanced=text.strip(), original=original,
-                profile=profile, skills=spec.get("skills", ""),
-                command=command, raw=text, attempts=attempt,
-                issues=last_issues)
+            return text.strip()
 
         # 【理论上到不了这里】循环内每条失败分支要么 raise、要么 continue，
         # 而最后一次 attempt 一定 raise。留这一行纯粹是为了满足类型检查，

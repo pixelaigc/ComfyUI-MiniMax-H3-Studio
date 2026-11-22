@@ -9826,6 +9826,9 @@ def _hermes_config_payload(saved: dict) -> dict:
         }
     return {
         "enabled": cfg["enabled"],
+        # 【默认状态回显】前端据此显示「当前为出厂默认 / 已手动设置」。
+        # 判据：用户**从未显式存过** enabled 字段 -> 就是出厂默认。
+        "is_default": not _hermes_enabled_explicitly(saved),
         "binary": cfg["binary"],
         "profile": cfg["profile"],
         "timeout": cfg["timeout"],
@@ -9833,7 +9836,22 @@ def _hermes_config_payload(saved: dict) -> dict:
         "media_specs": media_specs,
         "default_profile": hermes_enhance.DEFAULT_PROFILE,
         "default_binary": hermes_enhance.DEFAULT_HERMES_BIN,
+        "default_enabled": hermes_enhance.DEFAULT_ENABLED,
     }
+
+
+def _hermes_enabled_explicitly(saved: dict) -> bool:
+    """
+    用户是否**显式**设置过 enabled。
+
+    【为什么需要区分】2026-11-22 起 hermes 通道**默认启用**。
+    前端要能回显「现在是出厂默认」还是「用户手动改过」——
+    所以必须区分「用户显式存了 true/false」与「压根没存过这个字段」。
+    """
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "enabled" in cfg
 
 
 async def api_enhancer_save(request):
@@ -10172,7 +10190,8 @@ def _reference_spec_for_mode(spec_id: str, mode_ctx: str = "",
 
 
 async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
-                                 saved, asset_context, asset_summary):
+                                 saved, asset_context, asset_summary,
+                                 scan_images=None):
     """
     hermes 增强通道（对齐 nonebot 插件「咏唱h3」的增强方式）。
 
@@ -10216,12 +10235,16 @@ async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
         duration = None
 
     try:
-        result = await hermes_enhance.enhance(
-            original, media, saved=saved,
-            asset_context=asset_context,
-            prompt_history=history,
-            duration_seconds=duration,
-            validate=bool(payload.get("validate", True)))
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=history,
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
     except hermes_enhance.HermesEnhanceError as exc:
         # 【不编造】hermes 不可用 -> 如实报错。调用方（前端）据此提示用户，
         # 或者让用户改用本地 Provider 通道重试。
@@ -10270,6 +10293,8 @@ async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
         "spec_id": f"hermes-{media}",
         "used_multimodal": False,
         "assets": asset_summary,
+        "scan": result.scan,
+        "stage": result.stage,
         "reference_labels": {"expected": [], "found": []},
         "validation": {"ok": True, "errors": [], "warnings": [],
                        "stats": {}},
@@ -10338,6 +10363,7 @@ async def api_hermes_enhance(request):
     asset_refs = payload.get("asset_refs")
     asset_context = ""
     asset_summary = {}
+    scan_images: list[str] = []
     if asset_refs:
         try:
             resolved = await _resolve_enhance_assets(
@@ -10348,6 +10374,9 @@ async def api_hermes_enhance(request):
                 status=400)
         asset_context = enh_assets.describe(resolved)
         asset_summary = enh_assets.summary(resolved)
+        # 【阶段2 的输入】参考图的**服务端本地路径** —— VLM 扫描要真正读这些图。
+        # 外部无法指定任意路径（只能给素材库 asset_id，服务端自己解析）。
+        scan_images = [str(p) for p in (resolved.get("images") or [])]
 
     duration = payload.get("duration")
     try:
@@ -10363,14 +10392,18 @@ async def api_hermes_enhance(request):
              "code": "hermes_disabled", "degraded": True}, status=400)
 
     try:
-        result = await hermes_enhance.enhance(
-            original, media, saved=saved,
-            asset_context=asset_context,
-            prompt_history=_normalize_prompt_history(
-                payload.get("prompt_history"),
-                current_stage=_safe_int(payload.get("stage"))),
-            duration_seconds=duration,
-            validate=bool(payload.get("validate", True)))
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=_normalize_prompt_history(
+                    payload.get("prompt_history"),
+                    current_stage=_safe_int(payload.get("stage"))),
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
     except hermes_enhance.HermesEnhanceError as exc:
         return web.json_response(
             {"error": str(exc), "code": exc.reason, "detail": exc.detail[:500],
@@ -10402,6 +10435,11 @@ async def api_hermes_enhance(request):
         "provider": f"hermes:{result.profile}",
         "provider_id": "",
         "assets": asset_summary,
+        # 【三段式 · 阶段2 扫描结果】回显给前端：
+        # 用户要能看见「这次扫描出几个物件 / 多少词 / 用的是哪些 skill」，
+        # 否则无法确认参考图到底有没有参与增强。
+        "scan": result.scan,
+        "stage": result.stage,
         "degraded": False,
     })
 
@@ -10567,6 +10605,8 @@ async def api_enhance(request):
     asset_context = ""
     asset_summary = {}
     asset_labels: list[str] = []
+    # 【阶段2 的输入】hermes 通道三段式扫描用的参考图本地路径
+    asset_images: list[str] = []
     # 【标签语法方言】跟目标面板的官方参考标记语法走（见
     # _label_dialect_for_mode）。H3 视频用 <Picture N>；Qwen 图片编辑用
     # <imageN>（官方 PE-I2I）—— 用错方言会导致「增强完提交被拒」。
@@ -10590,6 +10630,8 @@ async def api_enhance(request):
             if len(images) >= enh_assets.MAX_IMAGES:
                 break
             images.append(path)
+        # 【阶段2 的输入】hermes 通道的三段式扫描要用这些图。
+        asset_images = [str(p) for p in (resolved_assets.get("images") or [])]
         asset_context = enh_assets.describe(resolved_assets)
         asset_summary = enh_assets.summary(resolved_assets)
         asset_labels = list(asset_summary.get("labels") or [])
@@ -10627,7 +10669,8 @@ async def api_enhance(request):
     if engine == "hermes":
         return await _api_enhance_via_hermes(
             payload, original, mode, mode_ctx, model_key,
-            saved, asset_context, asset_summary)
+            saved, asset_context, asset_summary,
+            scan_images=asset_images)
 
     spec = enh.get_spec(spec_id, saved)
     # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。

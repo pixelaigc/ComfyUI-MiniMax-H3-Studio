@@ -40,12 +40,24 @@ from h3studio import hermes_enhance as he  # noqa: E402
 class TestResolveConfig(unittest.TestCase):
 
     def test_defaults_when_not_configured(self):
-        """没配置时：通道默认**关**（不改变现有行为），profile 默认 media。"""
+        """
+        没配置时：通道默认**开**（2026-11-22 用户拍板），profile 默认 media。
+
+        之前默认关是为了「不改变现有行为」；现在用户明确要求默认启用。
+        仍然可以手动关闭 —— 见 test_explicit_false_disables。
+        """
         cfg = he.resolve_config(None)
-        self.assertFalse(cfg["enabled"])
+        self.assertTrue(cfg["enabled"])
         self.assertEqual(cfg["profile"], "media")
         self.assertEqual(cfg["binary"], "/usr/local/bin/hermes")
         self.assertEqual(cfg["timeout"], 1800)
+
+    def test_default_enabled_constant(self):
+        self.assertTrue(he.DEFAULT_ENABLED)
+
+    def test_explicit_false_disables(self):
+        """显式存 false 必须生效（仍可手动关闭）。"""
+        self.assertFalse(he.resolve_config({"hermes": {"enabled": False}})["enabled"])
 
     def test_reads_saved_overrides(self):
         saved = {"hermes": {"enabled": True, "profile": "ops", "timeout": 300}}
@@ -61,8 +73,10 @@ class TestResolveConfig(unittest.TestCase):
         self.assertEqual(cfg2["timeout"], 1800)
 
     def test_missing_hermes_key_is_safe(self):
-        """老的保存数据里没有 hermes 段 —— 不能崩。"""
-        self.assertFalse(he.resolve_config({"specs": {}, "params": {}})["enabled"])
+        """老的保存数据里没有 hermes 段 —— 不能崩，且取默认值（启用）。"""
+        cfg = he.resolve_config({"specs": {}, "params": {}})
+        self.assertTrue(cfg["enabled"])
+        self.assertEqual(cfg["profile"], "media")
 
 
 # ------------------------------------------------------------------ 三条链路
@@ -418,11 +432,30 @@ class TestServerContract(unittest.TestCase):
         self.assertEqual(status, 400)
 
     def test_hermes_enhance_disabled_returns_400(self):
-        """通道默认关 -> 必须**如实报错**（不是静默走别的通道）。"""
-        status, body = self._post("/api/hermes-enhance",
-                                   {"prompt": "一只猫", "media": "image"})
-        self.assertEqual(status, 400)
-        self.assertEqual(body.get("code"), "hermes_disabled")
+        """
+        通道被**手动关闭**时 -> 必须**如实报错**（不是静默走别的通道）。
+
+        【2026-11-22】通道改成默认启用，所以这条用例必须**先关掉**再测。
+        """
+        import urllib.request
+        put = urllib.request.Request(
+            f"{self.base}/api/enhancer",
+            data=json.dumps({"hermes": {"enabled": False}}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}, method="PUT")
+        with urllib.request.urlopen(put, timeout=60) as resp:
+            resp.read()
+        try:
+            status, body = self._post("/api/hermes-enhance",
+                                       {"prompt": "一只猫", "media": "image"})
+            self.assertEqual(status, 400)
+            self.assertEqual(body.get("code"), "hermes_disabled")
+        finally:
+            put2 = urllib.request.Request(
+                f"{self.base}/api/enhancer",
+                data=json.dumps({"hermes": {"enabled": True}}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}, method="PUT")
+            with urllib.request.urlopen(put2, timeout=60) as resp:
+                resp.read()
 
     def test_hermes_test_endpoint_reports_state(self):
         status, body = self._post("/api/hermes-test", {"media": "image"})
@@ -432,13 +465,18 @@ class TestServerContract(unittest.TestCase):
             self.assertIn(key, body)
 
     def test_enhance_endpoint_accepts_engine_hermes(self):
-        """/api/enhance 带 engine=hermes 时应路由到 hermes 通道。"""
+        """
+        /api/enhance 带 engine=hermes 时应路由到 hermes 通道。
+
+        【2026-11-22】通道默认启用，所以「路由生效」的判据从
+        「返回 hermes_disabled」变成「**不是** Provider 通道的错误」。
+        """
         status, body = self._post("/api/enhance", {
             "prompt": "一只猫", "mode": "replace", "mode_ctx": "t2i",
             "engine": "hermes"})
-        # 通道默认关 -> 400 + hermes_disabled（证明路由生效了）
-        self.assertEqual(status, 400)
-        self.assertEqual(body.get("code"), "hermes_disabled")
+        self.assertNotEqual(body.get("code"), "hermes_disabled")
+        err = str(body.get("error") or "")
+        self.assertNotIn("尚未配置可用的本地模型 Provider", err)
 
     def test_enhance_endpoint_default_engine_is_provider(self):
         """
