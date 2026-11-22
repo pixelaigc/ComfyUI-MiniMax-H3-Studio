@@ -19,6 +19,8 @@
 | `pytest tests/ -q` 全量耗时 | **942.57s (15m42s)** | **53.83s (0m54s)** | `testgov/timing_full_raw.txt` |
 | 默认集用例数 | 4344 | 2178 passed / 2143 skipped | 同上 |
 | 线上 jobs 表被测试污染 | **3 条**（`x`/`next`） | **0 条** | 已在 00:02 清理 |
+| 媒体库无主产物文件（§5.7） | **2 个**（`v-h3-studio-000254/000255.mp4`） | **0 个**（移入 `backup/orphan-media-20261123-0130/`，未删） | §5.7 逐秒/逐帧对拍 |
+| 媒体目录逃逸护栏（§5.8） | 无 | `server.py` 启动即检查 + 4 条护栏自测 | `28 passed`（原 24 + 新 4） |
 
 ---
 
@@ -530,3 +532,123 @@ evidence/reqstorm-20261122/
 3. **不得**在 `/root/projects/h3studio-live` 线上 worktree 跑 pytest；
 4. 需要跑 live / e2e 用例时：显式 `--run-live` + `--e2e-isolated`，
    且必须先确认目标是隔离实例。
+
+### 5.7 残留的两个无主视频文件（000254 / 000255）—— 来源定死
+
+**现象**：清理 3 条测试记录后，媒体库目录里仍有两个文件没有任何任务记录认领：
+
+```
+v-h3-studio-000254.mp4  1081500 B  mtime 2026-11-22 21:33:08.705  124 帧 = 5.1667s
+v-h3-studio-000255.mp4  2486485 B  mtime 2026-11-22 21:33:10.179  238 帧 = 9.9167s
+```
+
+（帧数/时长由 `ffprobe` 实测，非推算。）
+
+**线上库对这两个文件的引用 = 0**（四张表逐一查，2026-11-23 01:26）：
+
+```
+jobs 0 | job_batches 0 | job_favorites 0 | prompt_history 0
+```
+
+**写入方（定死）**：一个「隔离实例」——它的 `data_dir` 是临时目录，
+但那个临时目录里的 `outputs` 是**指向线上媒体库的符号链接**：
+
+```
+$ ls -l /tmp/h3len-test/outputs
+lrwxrwxrwx 1 root root 53 Nov 22 21:31 /tmp/h3len-test/outputs ->
+    /root/projects/comfyui-minimax-h3-studio/data/outputs
+
+$ grep -E 'port|data_dir' /tmp/h3len-base/config.json
+  "port": 8197,
+  "comfyui_url": "http://127.0.0.1:8188",
+  "data_dir": "/tmp/h3len-test",
+```
+
+它的 `jobs.db` 是线上库在 **21:15:57** 的**快照副本**
+（`stat` 的 birth = `2026-11-22 21:15:57.451`，与 `/tmp/h3len-run2` 的时刻一致），
+副本里带着当时还污染着线上库的 3 条测试行（`x` ×3、`next` ×1）。
+
+**逐秒、逐帧吻合**（副本库 vs 磁盘文件）：
+
+```
+$ sqlite3 /tmp/h3len-test/jobs.db "select finished_at, outputs from jobs
+      where id='f0c0f07edebe';"
+finished_at = 1795354390.67317  -> 2026-11-22 21:33:10
+outputs = [{"file": "videos/v-h3-studio-000255.mp4", "is_full": true},
+           {"file": "videos/v-h3-studio-000254.mp4", "name": "t2v_f0c0f07edebe_00001_.mp4"}]
+continuation.segment_rel = "videos/v-h3-studio-000254.mp4"
+prompt = "next"     prompt_id = e86bb41c-…（与线上原记录完全相同）
+```
+
+- 000254 = 本段（实测 124 帧，ComfyUI 产物名 `t2v_f0c0f07edebe_00001_.mp4`）
+- 000255 = 接续成片（实测 238 帧，`is_full`，由 `_finalize_continuation_impl` 拼接产出）
+- 文件 mtime 21:33:08.705 / 21:33:10.179 与副本里 `finished_at` 21:33:10 **同一秒**
+
+**代码路径（行号 = 21:33 实际运行的线上部署 `/root/projects/h3studio-live/server.py`；
+本分支加了 53 行启动检查后，同名函数行号 +53）**：
+
+| 步骤 | 位置（线上部署行号） |
+|---|---|
+| 实例启动时做「残留 running」自愈 | `server.py:12713` → `_heal_residual_running()` `server.py:705` |
+| 捞出 `status='running'` 的行 | `_residual_running_rows()` `server.py:472` |
+| 副本里那条 job 在快照时刻是 `running`（它 21:16:21 才在线上跑完）→ 被**接管** | `_adopt_residual_running()` `server.py:591`，下载在 `server.py:648` |
+| 下载产物 → 分配新文件名 | `comfy_download_output()` `server.py:1512` → `_next_output_path()` `server.py:1491` |
+| 接续收尾：登记本段 + 拼完整视频（产出 `is_full`） | `_finalize_continuation_impl()` `server.py:3852`，被 `server.py:578`（`_finalize_residual_with_outputs`）与 `server.py:679`（`_adopt_residual_running`）调用 |
+
+**为什么文件名是 000254/000255**：`_next_output_path` 取「目录里现有最高编号 + 1」。
+21:33 时线上 `videos/` 里最高是 `000253`（000250-000253 直到 11-23 00:02 才被删），
+所以新分配正好是 000254、000255。**编号本身就是「写进了线上媒体库」的证据。**
+
+**为什么线上永远看不到这两条卡片**：产物写进了线上媒体库，
+任务行写进了副本库 —— **产物与记录分属两处**，线上没有任何一行能认领它们。
+写库护栏（§5.6 第 2 层）只看得见「行写进线上库」，看不见「文件写进线上媒体库」。
+
+**处置（可回滚，未删）**：先复制并核对 md5，一致后移入隔离目录。
+
+```
+$ cp -a v-h3-studio-000254.mp4 <隔离目录>/   # md5 45a6a6a2112e9d5c456cc7f065479f09 两侧一致
+$ cp -a v-h3-studio-000255.mp4 <隔离目录>/   # md5 71af6469d01731599dd61c0a2ca8641a 两侧一致
+$ mv v-h3-studio-000254.mp4 v-h3-studio-000255.mp4 <隔离目录>/
+
+隔离目录：/root/projects/h3studio-live/backup/orphan-media-20261123-0130/
+线上媒体库：videos/ 61 个文件，最高编号回到 000249（用户内容零改动）
+线上 jobs 表：104 行（未变）
+```
+
+**是否仍在产生**：否。当前存活的 Studio 实例只有 8190（生产，`data_dir` = 线上目录），
+没有任何实例的 `outputs` 是指向线上媒体库的符号链接（全目录扫描，2026-11-23 01:31）。
+
+### 5.8 防复发：媒体目录不得逃出 data_dir（本轮新增）
+
+**1) `server.py` 启动即检查**（`_assert_data_dir_self_contained()`，`server.py:380`）：
+`OUT_DIR` / `UPLOAD_DIR` 解析后必须仍在 `DATA` 解析后的目录之内，否则启动失败并打印真实指向。
+`DATA` 自己是指向线上的符号链接时**放行** —— 那是「行与产物同源」的显式选择，
+该不该用线上目录由写库护栏与静态扫描判断，不由这条检查判断。
+
+**2) `scripts/run_isolated.sh` 默认值改掉**：不传 `data_dir` 时不再默认用线上目录，
+改为新建 `/tmp/h3s-iso-data-*`；并拒绝不存在的 / 符号链接形式的 `data_dir`。
+
+**3) 护栏自测**（`tests/test_guardrail.py` 新增 4 条，1 负例 + 3 对照）：
+
+| 用例 | 场景 | 期望 |
+|---|---|---|
+| `test_data_dir_guard_rejects_outputs_symlink_escaping` | **事故本身**：`outputs` → 线上媒体库 | 退出码 ≠ 0，报错含「符号链接」与真实越界目标 |
+| `test_data_dir_guard_allows_fully_isolated_data_dir` | 真目录 data_dir | 放行，且 server 自建媒体目录 |
+| `test_data_dir_guard_allows_whole_data_dir_symlink` | 整个 data_dir 显式指向线上 | 放行 |
+| `test_data_dir_guard_allows_production_data_dir` | 线上生产配置 | 放行（不得把 8190 拦挂） |
+
+**实测**（仓库 runner = `/home/ubuntu/comfyui/venv/bin/python3 -m pytest`，pytest 8.4.2）：
+
+```
+新增 4 条：          4 passed, 24 deselected in 0.92s
+完整护栏文件：      28 passed in 20.57s        （原 24 + 新 4）
+肇事的 test_continuation_retry.py： 15 passed in 0.13s
+每次运行后独立 data_dir 内容：空（未写线上）
+```
+
+> ⚠ **工具坑（实测，值得记住）**：用 hermes venv 的 `python3`（**pytest 9.1.1**）跑本仓库测试，
+> 会在**加载 conftest 阶段**直接崩：
+> `PluginValidationError: … pytest_collect_file … Argument(s) {'path'} are declared in the hookimpl but can not be found in the hookspec`
+> （`conftest.py:673`，pytest 9 已移除该参数）。本仓库的实际 runner 是
+> `/home/ubuntu/comfyui/venv/bin/python3`（**pytest 8.4.2**）。同一份 conftest，
+> 换个解释器就是「全部测试跑不起来」——别把它误判成代码坏了。

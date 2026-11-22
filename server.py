@@ -376,6 +376,59 @@ DB_PATH = DATA / "jobs.db"
 for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
+
+def _assert_data_dir_self_contained() -> None:
+    """【2026-11-23 事故】媒体目录不得通过符号链接逃出 data_dir。
+
+    【事故】线上媒体库凭空多了两个视频文件
+    `v-h3-studio-000254.mp4` / `v-h3-studio-000255.mp4`，
+    而线上 `jobs` 表里**没有任何一行**引用它们 —— 也就是
+    「产物落到了用户的媒体库，但任务记录不在用户的库里」。
+
+    【根因（逐秒对拍取证）】某个「隔离实例」的 `data_dir` 是临时目录，
+    但那个临时目录里的 `outputs` 是一条**符号链接**，指向线上媒体库：
+
+        /tmp/h3len-test/outputs -> /root/projects/comfyui-minimax-h3-studio/data/outputs
+
+    它的 `jobs.db` 是线上库的**副本**（字节数与清理前的线上备份完全相同）。
+    副本里那条提示词为 `next` 的接续任务 `f0c0f07edebe` 的
+    `finished_at = 2026-11-22 21:33:10`，产物登记为
+    `v-h3-studio-000255.mp4`（is_full，238 帧 = 9.9167s）与
+    `v-h3-studio-000254.mp4`（124 帧 = 5.1667s）——
+    与这两个文件在磁盘上的 mtime（21:33:10 / 21:33:08）和
+    ffprobe 实测（238 帧 / 124 帧）**逐秒、逐帧吻合**。
+
+    【为什么这种配置一定会出错】
+    产物与任务记录**分属两个库**：文件写进线上媒体库，
+    行写进临时库。于是线上侧看到的永远是「无主的文件」，
+    没有任何一行能把它认领、清理或去重。
+    「隔离」只隔离了 DB，媒体目录没隔离 —— 这正是最容易漏的一半。
+
+    【这条检查做什么】
+    `OUT_DIR` / `UPLOAD_DIR` 解析后必须仍在 `DATA` 解析后的目录之内。
+    不满足就**启动即失败**并说明真实指向 —— 配置错了要当场响，
+    不能等它往用户的媒体库里写文件。
+    （`DATA` 自己是指向线上的符号链接时**放行**：那是显式选用线上目录，
+    由写库护栏与静态扫描负责。）
+    """
+    base = DATA.resolve()
+    escaped = []
+    for configured in (OUT_DIR, UPLOAD_DIR):
+        real = configured.resolve()
+        if real != base and base not in real.parents:
+            escaped.append(f"  {configured} -> {real}")
+    if escaped:
+        raise RuntimeError(
+            "配置错误：媒体目录通过符号链接逃出了 data_dir，产物会写进"
+            "另一个数据目录（任务记录与产物将分属两处，媒体库会出现无主文件）。\n"
+            f"data_dir: {DATA} (解析为 {base})\n"
+            "越界的目录:\n" + "\n".join(escaped) + "\n"
+            "修法：让 data_dir 与媒体目录同源 —— 要么整个 data_dir 指向目标目录，"
+            "要么把 outputs 换成真实目录（cp/rsync），不要用符号链接。")
+
+
+_assert_data_dir_self_contained()
+
 # ------------------------------------------------------------------ DB
 def db():
     conn = sqlite3.connect(DB_PATH)
