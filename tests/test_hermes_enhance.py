@@ -521,6 +521,83 @@ class TestNormalizeHermesConfig(unittest.TestCase):
         self.assertIn('add_post("/api/hermes-test"', src)
 
 
+# ------------------------------------------------------------------ Agent 路径隔离
+class TestAgentPathIsolation(unittest.TestCase):
+    """
+    Agent **自动**增强路径必须与界面「增强」按钮**分开**。
+
+    【为什么这是一条硬约束 —— 2026-11-22 实测踩到】
+    界面「增强」按钮是用户**主动点**的，等 hermes 的 40 秒没问题。
+    但 Agent 建任务是**自动**跑的（create_job / batch_create_jobs），
+    每次建任务都要等一次 hermes CLI：
+
+      基线 local/maintainer @ e11ac1f：TestJobTools 跑 **1.18 秒**
+      改成「默认启用」后：同一组用例 **400 秒跑不完**
+
+    所以 Agent 路径用**独立的** `hermes.agent_enabled` 开关（默认关）。
+    这条用例锁住它 —— 防止有人把两个开关合并成一个。
+    """
+
+    def test_agent_enabled_defaults_to_false(self):
+        """Agent 路径默认**关**（界面路径默认开）。"""
+        cfg = he.resolve_config(None)
+        self.assertTrue(cfg["enabled"])          # 界面路径：默认开
+        self.assertFalse(cfg["agent_enabled"])  # Agent 路径：默认关
+
+    def test_agent_enabled_can_be_turned_on(self):
+        cfg = he.resolve_config({"hermes": {"agent_enabled": True}})
+        self.assertTrue(cfg["agent_enabled"])
+
+    def test_agent_and_ui_switches_are_independent(self):
+        """关掉界面通道不影响 Agent 开关的取值（两者独立存）。"""
+        cfg = he.resolve_config({"hermes": {"enabled": False,
+                                            "agent_enabled": True}})
+        self.assertFalse(cfg["enabled"])
+        self.assertTrue(cfg["agent_enabled"])
+
+    def test_agent_path_skips_hermes_by_default(self):
+        """默认配置下，Agent 路径**不会**去调 hermes。"""
+        import asyncio
+        from h3studio import agent_enhance as ae
+        plan = ae.EnhancePlan(mode="t2i", spec_id="image")
+        result = asyncio.run(ae._try_hermes_enhance(None, "t2i", "一只猫", plan))
+        self.assertFalse(result, "默认配置下 Agent 路径不应走 hermes")
+        self.assertFalse(plan.enhanced, "没走 hermes 就不该标记成已增强")
+        self.assertEqual(plan.notices, [],
+                         "默认关掉不是错误，不应记 notice")
+
+    def test_agent_path_uses_hermes_when_explicitly_enabled(self):
+        """显式打开 agent_enabled 时，Agent 路径才走 hermes。"""
+        import asyncio
+        from h3studio import agent_enhance as ae
+        from h3studio import hermes_enhance as he_mod
+
+        orig_resolve = he_mod.resolve_config
+        orig_enhance = he_mod.enhance
+
+        def fake_resolve(saved=None):
+            cfg = orig_resolve(saved)
+            cfg["agent_enabled"] = True
+            return cfg
+
+        async def fake_enhance(*a, **k):
+            return he_mod.HermesResult(
+                ok=True, enhanced="增强后的提示词", original="一只猫")
+
+        he_mod.resolve_config = fake_resolve
+        he_mod.enhance = fake_enhance
+        try:
+            plan = ae.EnhancePlan(mode="t2i", spec_id="image")
+            result = asyncio.run(
+                ae._try_hermes_enhance(None, "t2i", "一只猫", plan))
+        finally:
+            he_mod.resolve_config = orig_resolve
+            he_mod.enhance = orig_enhance
+        self.assertTrue(result, "显式打开后应走 hermes")
+        self.assertEqual(plan.prompt, "增强后的提示词")
+        self.assertTrue(plan.enhanced)
+
+
 # ------------------------------------------------------------------ 并行任务兼容
 class TestParallelTaskCompatibility(unittest.TestCase):
     """

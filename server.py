@@ -9829,6 +9829,11 @@ def _hermes_config_payload(saved: dict) -> dict:
         # 【默认状态回显】前端据此显示「当前为出厂默认 / 已手动设置」。
         # 判据：用户**从未显式存过** enabled 字段 -> 就是出厂默认。
         "is_default": not _hermes_enabled_explicitly(saved),
+        # 【Agent 自动增强路径的独立开关，默认关】
+        # 界面「增强」是用户主动点的；Agent 建任务是自动跑的（每次多等 ~40 秒）。
+        # 实测：基线 TestJobTools 1.18 秒 -> Agent 也走 hermes 后 400 秒跑不完。
+        "agent_enabled": cfg["agent_enabled"],
+        "agent_is_default": not _hermes_agent_enabled_explicitly(saved),
         "binary": cfg["binary"],
         "profile": cfg["profile"],
         "timeout": cfg["timeout"],
@@ -9837,6 +9842,7 @@ def _hermes_config_payload(saved: dict) -> dict:
         "default_profile": hermes_enhance.DEFAULT_PROFILE,
         "default_binary": hermes_enhance.DEFAULT_HERMES_BIN,
         "default_enabled": hermes_enhance.DEFAULT_ENABLED,
+        "default_agent_enabled": hermes_enhance.DEFAULT_AGENT_ENABLED,
     }
 
 
@@ -9852,6 +9858,14 @@ def _hermes_enabled_explicitly(saved: dict) -> bool:
     if not isinstance(cfg, dict):
         return False
     return "enabled" in cfg
+
+
+def _hermes_agent_enabled_explicitly(saved: dict) -> bool:
+    """用户是否**显式**设置过 agent_enabled（Agent 自动增强路径）。"""
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "agent_enabled" in cfg
 
 
 async def api_enhancer_save(request):
@@ -9931,6 +9945,11 @@ def _normalize_hermes_config(raw: dict, previous: dict | None) -> dict:
 
     out: dict = {
         "enabled": bool(raw.get("enabled", default["enabled"])),
+        # Agent 自动增强路径的独立开关（默认关）。
+        # 前端不传这个字段时 -> 沿用已存的值（没存过 -> 出厂默认 False）。
+        "agent_enabled": bool(raw.get("agent_enabled",
+                                       default.get("agent_enabled",
+                                                   hermes_enhance.DEFAULT_AGENT_ENABLED))),
         "binary": default["binary"],
         "profile": default["profile"],
         "timeout": default["timeout"],

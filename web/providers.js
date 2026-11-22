@@ -564,6 +564,10 @@ function renderHermesConfig() {
         <input type="checkbox" id="hermesEnabled"${h.enabled ? " checked" : ""}>
         <span>启用</span>
       </label>
+      <label class="img-toggle" title="Agent 建任务时也走 hermes 增强（默认关：每次建任务会多等约 40 秒）">
+        <input type="checkbox" id="hermesAgentEnabled"${h.agent_enabled ? " checked" : ""}>
+        <span>Agent 自动增强也走 hermes</span>
+      </label>
     </div>
     <div class="agent-hint">
       当前状态：${stateText}。出厂默认是<b>启用</b>（2026-11-22 起），
@@ -580,6 +584,11 @@ function renderHermesConfig() {
       阶段1 初稿 → 阶段2 <b>程序跑 VLM 扫描参考图</b>（物件/服装/光照/调色板，
       再经规则交叉核对）→ 阶段3 把初稿与已核实清单合成最终提示词。
       扫描用本机「本地模型配置」里的默认多模态 Provider；扫描失败会如实告知并降级用初稿。
+      <br>
+      <b>关于「Agent 自动增强」</b>：界面上的「增强」按钮是用户主动点的，等一会儿没问题；
+      但 Agent 建任务是自动跑的，每建一个任务就会多等一次 hermes（约 40 秒），
+      批量建任务时尤其明显。所以这两条路径分成两个开关：
+      上面的「启用」管界面按钮（默认开），「Agent 自动增强也走 hermes」管 Agent（默认关）。
     </div>
     <div class="agent-row">
       <label class="agent-field">
@@ -617,6 +626,7 @@ function collectHermesConfig() {
   const mediaSpecs = h.mediaSpecs || {};
   const out = {
     enabled: !!(($("#hermesEnabled") || {}).checked),
+    agent_enabled: !!(($("#hermesAgentEnabled") || {}).checked),
     binary: (($("#hermesBinary") || {}).value || "").trim(),
     profile: (($("#hermesProfile") || {}).value || "").trim(),
     timeout: Number((($("#hermesTimeout") || {}).value) || 1800),

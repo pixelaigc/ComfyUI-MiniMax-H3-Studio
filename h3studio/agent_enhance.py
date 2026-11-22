@@ -235,14 +235,34 @@ async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) 
     【失败纪律】与 nonebot 一致：**不编造**。
     hermes 挂了就说挂了，并如实记进 notices —— 媒体库里必须能看出
     这次用的是原文还是增强后的提示词。
+
+    【为什么 Agent 路径要**单独**一个开关（2026-11-22 实测踩到）】
+    界面上「增强」按钮走的是 /api/hermes-enhance —— 用户**主动点了**，
+    等 40 秒是预期内的。
+    但 Agent 建任务（create_job / batch_create_jobs）是**自动**跑的，
+    每次建任务都要等一次 hermes CLI（实测 ~40 秒/次）：
+      * `tests/test_agent_backend_enh.py::TestJobTools` 在基线
+        （local/maintainer @ e11ac1f）跑 **1.18 秒**；
+        改成默认启用后**跑不完**（实测 400 秒超时）。
+      * 批量建 2 个任务 = 2 次 hermes = ~80 秒，用户干等。
+    所以 Agent 自动增强路径用**独立的** `hermes.agent_enabled` 开关
+    （**默认关**），与界面的 `hermes.enabled`（默认开）分开：
+      * `hermes.enabled`        -> 界面「增强」按钮走 hermes（用户主动点的）
+      * `hermes.agent_enabled`  -> Agent 自动增强也走 hermes（**默认关**）
+    Agent 路径默认仍走本地 Provider 通道 —— 那也是「增强路线」，
+    满足仓库既有要求（agent.py:1681-1687），且不引入 40 秒延迟。
     """
     from . import hermes_enhance
 
     try:
         saved = _load_overrides(ctx)
         cfg = hermes_enhance.resolve_config(saved)
+        # 界面通道开关（默认开）**不是** Agent 路径的开关 ——
+        # Agent 路径看 agent_enabled（默认关）。
+        if not cfg.get("agent_enabled"):
+            return False          # Agent 自动增强不走 hermes（不是错误）
         if not cfg.get("enabled"):
-            return False          # 通道没开 -> 静默走本地 Provider（不是错误）
+            return False          # 主通道都被关了 -> 也不走
         media = hermes_enhance.media_for_mode(mode)
         if media not in hermes_enhance.HERMES_MEDIA_SPECS:
             return False

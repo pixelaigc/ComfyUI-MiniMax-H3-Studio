@@ -69,6 +69,15 @@ DEFAULT_PROFILE = "media"
 #: 并且仍然可以手动关闭（存 enabled=false 即生效）。
 DEFAULT_ENABLED = True
 
+#: **Agent 自动增强路径**是否走 hermes 通道（默认**关**）。
+#:
+#: 【为什么单独一个开关】界面「增强」按钮是用户**主动点**的，等 40 秒没问题；
+#: Agent 建任务是**自动**跑的 —— 实测（2026-11-22）：
+#:   基线 local/maintainer @ e11ac1f：TestJobTools 跑 **1.18 秒**
+#:   改成默认启用后：同一组用例 **400 秒跑不完**（每次建任务等一次 hermes CLI）
+#: 所以 Agent 路径必须**默认关**，由用户按需单独打开。
+DEFAULT_AGENT_ENABLED = False
+
 #: hermes 根目录（用于校验 profile 是否真实存在）
 HERMES_ROOT = Path("/root/.hermes/profiles")
 
@@ -251,6 +260,12 @@ def resolve_config(saved: dict | None = None) -> dict:
         # 之前默认关是为了「不改变现有行为」，现在用户明确要求默认启用。
         # 仍然可以手动关闭 —— 只要用户显式存了 enabled=false 就生效。
         "enabled": bool(cfg.get("enabled", DEFAULT_ENABLED)),
+        # 【Agent 自动增强路径的独立开关，默认**关**】
+        # 界面「增强」按钮是用户主动点的，等 40 秒没问题；
+        # Agent 建任务是自动跑的，每建一个任务就多等 40 秒
+        # （实测：基线 1.18 秒 -> 默认启用后 400 秒跑不完）。
+        # 所以这两条路径用**两个**开关，互不影响。
+        "agent_enabled": bool(cfg.get("agent_enabled", DEFAULT_AGENT_ENABLED)),
         "binary": str(cfg.get("binary") or DEFAULT_HERMES_BIN),
         "profile": str(cfg.get("profile") or DEFAULT_PROFILE),
         "timeout": _safe_int(cfg.get("timeout"), DEFAULT_TIMEOUT),
