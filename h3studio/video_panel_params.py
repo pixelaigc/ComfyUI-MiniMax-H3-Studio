@@ -362,19 +362,38 @@ def model_fields(mode: str) -> list[dict]:
     """
     底模下拉（三个面板共用同一份清单与同一套过滤规则）。
 
-    过滤规则：
-      * r2v -> 只列支持 Ref2VA 通道的权重（FL2VA 权重没有参考通道）；
-      * flf / t2v -> 只列 FL2VA 系权重。
+    【过滤规则 —— 按 mode】
+      * r2v -> 只列**支持 Ref2VA 通道**的权重。
+        FL2VA 权重没有参考通道，用它做参考生成等于「参考没生效」
+        （``video_models.model_for_mode`` 的注释与实现）。
+      * flf -> 只列 **FL2VA 系**权重（保持既有行为）。
+      * t2v -> 列**全部**登记的权重。
+
+    【为什么 t2v 不过滤】``video_workflow.build_t2v_panel`` 直接用
+    ``params["model_key"]`` 取权重（``model = VIDEO_MODELS[key]``），
+    **任何**登记的权重都能跑 —— 包括 Ref2VA 系（它同样有 FL2VA 通道）。
+    而 t2v 的字段表**原来**就是列全部的（``_model_options(vm.VIDEO_MODELS)``），
+    这次统一时不该把它收窄 —— 收窄 = 「面板能选的东西变少了」，
+    那是**回退**，不是修复。
+
+    【为什么 flf 保持过滤】虽然 ``h3_video_modes.build_flf`` 事实上
+    也能加载 Ref2VA 权重（实测 ``model_for_mode("flf", "ref2va_*")``
+    会原样返回它），但**既有面板口径**就是「首尾帧用 FL2VA 系权重」，
+    注释写明理由是「那类权重没有 I2VA 通道」。
+    统一面板时**不动**这条既有口径 —— 改它属于本任务范围外的行为变更。
     """
     from . import video_models as vm
 
     need_ref2va = (mode == "r2v")
+    #: t2v 列出全部登记权重（保持既有行为）；flf / r2v 按模式过滤。
+    list_all = (mode == "t2v")
     options = []
     for key, meta in vm.VIDEO_MODELS.items():
         supports = bool(meta.get("supports_ref2va"))
         if need_ref2va and not supports:
             continue
-        if not need_ref2va and supports:
+        if not list_all and not need_ref2va and supports:
+            # FL2VA 模式不用 Ref2VA 专用权重（那类权重没有 I2VA 通道）
             continue
         options.append((key, meta.get("label") or key))
 

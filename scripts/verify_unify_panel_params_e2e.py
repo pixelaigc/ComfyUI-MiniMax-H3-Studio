@@ -199,14 +199,24 @@ def check_panel_specs():
 
 # ------------------------------------------------------------------ 真实任务
 def submit_and_wait(mode, params, media=None):
-    """提交一个真实任务并等它跑完，返回 (job_id, submit_payload)。"""
-    fields = {"mode": mode, "prompt": PROMPT}
-    for key, value in (params or {}).items():
-        if value is None:
-            continue
-        fields[key] = str(value)
+    """提交一个真实任务并等它跑完，返回 (job_id, submit_payload)。
+
+    【提交格式 —— 与面板真实提交完全同款】
+      * 参数全部走 ``params`` 这一个 JSON 字段（multipart 的
+        ``part.name == "params"``），**不是**一个个独立字段；
+      * 素材走 ``asset_refs`` 字段（``[{"asset_id", "slot", "ordinal"}]``）
+        —— 槽位名与服务端一致：
+          flf -> ``first_frame`` / ``last_frame``
+          r2v -> ``ref_image``（ordinal 从 1 开始）；
+      * 宽高**不传** —— 由服务端按「比例 × MP 预算 × 百分比」算出
+        （这正是本轮要验证的那条链）。
+    """
+    _p = dict(params or {})
+    _p.setdefault("prompt", PROMPT)
+    fields = {"mode": mode,
+              "params": json.dumps(_p, ensure_ascii=False)}
     if media:
-        fields.update(media)
+        fields["asset_refs"] = json.dumps(media, ensure_ascii=False)
 
     st, resp = _post_multipart(fields)
     if st != 200:
@@ -352,8 +362,10 @@ def main():
 
     runs = {}
     runs["t2v"] = run_mode("t2v", dict(base))
-    runs["flf"] = run_mode("flf", dict(base), {"first_frame": REF_IMAGE})
-    runs["r2v"] = run_mode("r2v", dict(base), {"ref_images": REF_IMAGE})
+    runs["flf"] = run_mode("flf", dict(base), [
+        {"asset_id": REF_IMAGE, "slot": "first_frame", "ordinal": 1}])
+    runs["r2v"] = run_mode("r2v", dict(base), [
+        {"asset_id": REF_IMAGE, "slot": "ref_image", "ordinal": 1}])
     report["runs"] = runs
 
     # ---- 四栏对拍结论 ----

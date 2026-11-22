@@ -556,7 +556,45 @@ def _norm_enum(field: dict, raw) -> object:
             if str(o.get("value")) == text:
                 return o.get("value")
         return text
+    # 【2026-11-22 修 —— 存量值不得被静默丢弃】
+    #
+    # 【问题】加速 LoRA 的下拉按「本机实测兼容性 + 非第三方蒸馏」过滤
+    # （与主生成面板 ``/api/video-options`` 的 ``selectable`` 同口径）。
+    # 于是管理页里**已经存着**的某个 key（例：用户之前选过
+    # ``lightx2v_4step_768p``，那版下拉里它还在）会在新一轮归一里
+    # 落进「不在 allowed 里」-> **回落成默认值** —— 用户配的值**凭空消失**，
+    # 且没有任何提示。
+    #
+    # 【用户 2026-11-21 的原话】
+    #   「只从 UI 选项移除，**不删除服务端 / 配置文件中的记录**，
+    #    以兼容已有历史任务 params 与已保存预设的加载与展示」
+    #
+    # 【修法】值虽然不在**当前下拉**里，但它仍然是**真实存在的加速 LoRA**
+    # -> 原样保留。只在它连「真实 LoRA 都不是」时才回落默认值。
+    #   （面板渲染时它不在下拉里，但配置**不丢**，
+    #     这正是用户要的那条纪律。）
+    if _is_real_accel_lora_key(text):
+        return text
     return field.get("default")
+
+
+def _is_real_accel_lora_key(text: str) -> bool:
+    """这个字符串是不是**本机真实存在**的加速 LoRA key。
+
+    判据用 ``video_models`` 的登记表（``VIDEO_ACCEL_LORAS`` +
+    ``VIDEO_ACCEL_LORA_COMBOS``）—— 那两张表就是「本机真实加速档」
+    的唯一真源，与「当前下拉里有没有它」是**两件事**。
+    """
+    if not text or text == "none":
+        return False
+    try:
+        from . import video_models as vm
+    except Exception:
+        return False
+    try:
+        return text in vm.all_accel_lora_keys()
+    except Exception:
+        return False
 
 
 def _norm_number(field: dict, raw) -> object:
