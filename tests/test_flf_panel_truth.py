@@ -87,41 +87,94 @@ class TestSizeExpressionUniqueness(unittest.TestCase):
 
 
 class TestFixedItemsNotEditable(unittest.TestCase):
-    """第 2 条：官方固定项不得作为可编辑控件暴露。"""
+    """第 2 条：只有**确实不可改**的项才作为只读说明出现。
+
+    【2026-11-22 修正 —— 这一类的契约变了】
+    2026-11-21 那一轮把「采样档位 / sigma shift」做成了只读说明，
+    理由是「官方模板用的是 H3SigmaRefiner，不是可填的 sigma shift」。
+    那个理由只对**官方 nonebot 模板**成立，对**本工作台自己的 builder**
+    不成立 —— ``h3studio/h3_video_modes.py`` 里：
+
+      * ``_sampling_defaults()`` 读 ``params["steps"] / ["sampler"] /
+        ["scheduler"]``（第 135-137 行），``_build_common()`` 写进
+        ``BasicScheduler``（第 454 行）与 ``KSamplerSelect``（第 553 行）；
+      * ``_shift_node()`` 读 ``params["shift_video"] / ["shift_audio"]``
+        并插 ``MiniMaxH3SigmaShift`` 节点（第 675-686 行）。
+
+    ⇒ **后端一直支持这五项**，面板不给控件才是缺陷
+    （用户 2026-11-22 原话：「该配置的不能配置」）。
+
+    所以本类现在断言的是：
+      * 采样五项（steps / sampler / scheduler / shift_video / shift_audio）
+        在 flf / r2v 上是**可编辑**控件；
+      * **底模精度**仍然不可改（精度编码在权重里），且 note 写清原因。
+    """
 
     def test_no_editable_precision(self):
         """底模精度不得是可编辑字段（精度编码在权重文件里）。"""
-        for mode in ("flf", "r2v"):
+        for mode in ("flf", "r2v", "t2v"):
             names = set(_fields(mode))
             self.assertNotIn("precision", names,
                              f"{mode} 又有可编辑的底模精度：{names}")
 
-    def test_sampling_and_shift_are_readonly_facts(self):
-        """采样档位 / sigma shift 只能作为**只读说明**出现。"""
-        for mode in ("flf", "r2v"):
-            fields = _fields(mode)
-            for name in ("sampling_fixed", "shift_fixed"):
-                self.assertIn(name, fields, f"{mode} 缺只读说明 {name}")
-                self.assertEqual(fields[name]["type"], "fixed", name)
-                self.assertTrue(fields[name].get("readonly"), name)
+    def test_sampling_params_are_editable_on_all_video_modes(self):
+        """采样五项在三个视频面板上**都必须是可编辑控件**。
 
-    def test_editable_sampling_fields_removed(self):
-        """steps / sampler / scheduler / shift_* 不得再是可编辑字段。
-
-        【为什么】``server.py`` 的 ``_SAMPLING_ONLY_FIELDS`` 决定了
-        **面板提交路径本来就不套**这些字段 —— 面板给了控件，
-        用户改了却完全不起作用（server.py:5455-5458）。
-        暴露它们 = 「配了但不生效」的假控件。
+        【用户 2026-11-22 原话】
+        「不还是和文生视频不一样吗。。？你到底在改啥呢，该配置的不能配置，
+          该有的没有」
         """
-        for mode in ("flf", "r2v"):
+        editable = ("steps", "sampler", "scheduler",
+                    "shift_video", "shift_audio")
+        for mode in ("t2v", "flf", "r2v"):
+            fields = _fields(mode)
+            for name in editable:
+                self.assertIn(name, fields, f"{mode} 缺可编辑的 {name}")
+                self.assertNotEqual(
+                    fields[name].get("type"), "fixed",
+                    f"{mode} 的 {name} 仍是只读 —— 后端 "
+                    "h3_video_modes._sampling_defaults / _shift_node "
+                    "一直支持它")
+                self.assertFalse(fields[name].get("readonly"),
+                                 f"{mode} 的 {name} 被标成 readonly")
+
+    def test_sampling_params_have_real_combo_ranges(self):
+        """采样器 / 调度器的取值必须来自本机 ComfyUI 的真实 COMBO 清单。"""
+        from h3studio import video_models as vm
+        for mode in ("t2v", "flf", "r2v"):
+            fields = _fields(mode)
+            samplers = {o["value"] for o in fields["sampler"]["options"]}
+            schedulers = {o["value"] for o in fields["scheduler"]["options"]}
+            self.assertEqual(samplers, set(vm.VIDEO_SAMPLERS), mode)
+            self.assertEqual(schedulers, set(vm.VIDEO_SCHEDULERS), mode)
+            steps = fields["steps"]
+            self.assertEqual(steps["min"], vm.VIDEO_STEPS_MIN, mode)
+            self.assertEqual(steps["max"], vm.VIDEO_STEPS_MAX, mode)
+
+    def test_precision_readonly_states_the_reason(self):
+        """唯一保留的只读项（底模精度）必须在 note 里写清**为什么**不可改。"""
+        for mode in ("flf", "r2v", "t2v"):
+            fields = _fields(mode)
+            self.assertIn("precision_fixed", fields, mode)
+            item = fields["precision_fixed"]
+            self.assertEqual(item["type"], "fixed", mode)
+            self.assertTrue(item.get("readonly"), mode)
+            note = item.get("note") or ""
+            # 必须点明「上游没有这个节点 / 换精度 = 换权重」
+            self.assertTrue(
+                ("节点" in note) or ("权重" in note),
+                f"{mode} 的底模精度只读说明没写清原因：{note!r}")
+
+    def test_no_legacy_sampling_fixed_fields(self):
+        """上一版的两个只读项（sampling_fixed / shift_fixed）不得再出现。"""
+        for mode in ("t2v", "flf", "r2v"):
             names = set(_fields(mode))
-            for fake in ("steps", "sampler", "scheduler",
-                         "shift_video", "shift_audio"):
-                self.assertNotIn(fake, names,
-                                 f"{mode} 仍有不可生效的可编辑字段 {fake}")
+            for legacy in ("sampling_fixed", "shift_fixed"):
+                self.assertNotIn(legacy, names,
+                                 f"{mode} 仍有上一版的只读项 {legacy}")
 
     def test_fixed_fields_are_not_written_into_params(self):
-        """只读说明字段绝不能被写进 params。"""
+        """只读说明字段绝不能被写进 params（含历史遗留的那些键）。"""
         params = {"prompt": "x", "duration": 5.0}
         gen_defaults.merge_into_params(
             "flf", params,

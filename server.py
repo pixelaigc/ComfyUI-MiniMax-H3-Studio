@@ -5722,6 +5722,24 @@ def prepare_job_params(mode: str, params: dict, asset_refs: list | None = None,
         elif safe_lora != str(raw_lora).strip():
             params["lora"] = safe_lora
 
+    # ---- 【2026-11-22 新增】遗留 lora 别名与「已选加速 LoRA」对齐 ----
+    #
+    # 【用户原话（本轮）】
+    # 「文生视频，我选的模型+LORA组合，和生成的记录的模型+LORA组合，不一样」
+    #
+    # 【为什么服务端也要做一遍（Agent 路径已经做过了）】
+    #   两条建任务路径都必须得到**同一份** params：
+    #     * Agent 路径 -> ``h3studio/agent.py`` 的 ``_sync_legacy_lora_alias``；
+    #     * 面板提交   -> 这里。
+    #   只在一边做 = 两边的落库记录不一致 —— 正是「同一件事两套记录」。
+    #
+    # 【判据与工作流换算链同口径】
+    #   ``"accel_lora" in params``（键存在即用户显式选择，空串 = 明确「不挂」），
+    #   与 ``video_models.resolve_accel_lora_slot`` 完全一致。
+    if mode in ("t2v", "flf", "r2v"):
+        from h3studio.agent import _sync_legacy_lora_alias
+        _sync_legacy_lora_alias(params)
+
     # 【2026-11-13 修 —— `params["loras"]` 数组同样要过白名单】
     # 图像模式的 LoRA 入口是 `params["loras"]`（[{name, strength, trigger}]）。
     # 它的 `name` 同样**没有落库校验** —— Agent 把提示词字段名塞进去时，
@@ -7159,7 +7177,26 @@ async def api_artifact_meta(request):
         "width": _int_or_none(width),
         "height": _int_or_none(height),
         "duration": gen_params.get("duration") or None,
-        "resolution": job_params.get("resolution") or None,
+        # ---- 分辨率：取**真实产物**反算的档位，不是请求里的档位串 ----
+        #
+        # 【用户原话（本轮）】
+        # 「右侧生成库里，分辨率的尺寸显示，和我实际跑的不一样」
+        #
+        # 【实测根因（2026-11-22 复现线上落库）】
+        #   params["resolution"] 是**请求时的档位字符串**（"768p"），
+        #   而实际产物是 **1216×672**（= 0.8 MP 换算出来的）——
+        #   768p 在 16:9 下是 1344×768，**不是**同一个尺寸。
+        #   旧实现直接把 params["resolution"] 下发，
+        #   于是详情弹窗里「分辨率 = 1216×672」「分辨率档位 = 768p」
+        #   **两行自相矛盾**，而「档位」那行是假的。
+        #
+        # 【修法】
+        #   档位一律由**真实像素**反算（``reso_label.tier_for_pixels``）
+        #   —— 与 ``resolution_info`` / 卡片显示用同一份公式。
+        #   拿不到像素时才退回请求里的档位串（老任务），并如实标明。
+        "resolution": (reso_label.tier_for_pixels(width, height)
+                       if width and height
+                       else (job_params.get("resolution") or None)),
         "aspect": job_params.get("aspect") or None,
         "attention": gen_params.get("attention") or None,
         "workflow": gen_params.get("workflow") or None,
@@ -8989,6 +9026,62 @@ async def api_video_size(request):
         "max_pixels": (int(max_pixels * 1024 * 1024)
                        if max_pixels else None),
         "max_pixels_mp": max_pixels,
+    })
+
+
+async def api_video_size_plan(request):
+    """GET /api/video-size-plan —— 「MP 预算 × 百分比」-> 真实宽高。
+
+    【为什么需要这个接口】
+    内置 Agent 管理页的三个视频面板（文生视频 / 首尾帧 / 参考生视频）
+    现在共用**同一套**尺寸表达：**画面比例 × MP 预算 × 百分比**
+    （见 ``h3studio/video_panel_params.py`` 的 ``size_fields``）。
+
+    面板上还有一个**只读**的「生效像素」派生项，让用户当场核对
+    「我填的预算 = 多少像素」。它必须随用户改预算而**实时更新** ——
+    而换算公式在服务端（``size_spec.plan_size``，与建任务路径同一份），
+    所以需要一个查询接口。
+
+    【为什么不前端自己算】前端算 = 第二份公式 = 必然漂移。
+    面板下拉里显示的像素必须与服务端建任务时用的**完全一致**。
+
+    参数：mode / aspect / megapixels / percent
+    返回：{width, height, megapixels, reasons, label}
+    """
+    try:
+        mode = str(request.query.get("mode") or "t2v").strip()
+        aspect = str(request.query.get("aspect") or "16:9").strip()
+        megapixels = request.query.get("megapixels")
+        percent = request.query.get("percent")
+
+        def _num(value):
+            if value in (None, ""):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        width, height, reasons = size_spec.plan_size(
+            mode,
+            aspect=aspect,
+            megapixels=_num(megapixels),
+            percent=_num(percent),
+        )
+    except Exception as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+
+    effective_mp = None
+    if width > 0 and height > 0:
+        effective_mp = round(width * height / (1024 * 1024), 3)
+    return json_ok({
+        "mode": mode,
+        "aspect": aspect,
+        "width": width,
+        "height": height,
+        "megapixels": effective_mp,
+        "label": f"{width}×{height}" if width and height else "",
+        "reasons": reasons,
     })
 
 
@@ -12341,6 +12434,7 @@ def make_app():
     app.router.add_get("/api/video-categories", api_video_categories)
     app.router.add_get("/api/comfy-models", api_comfy_models)
     app.router.add_get("/api/video-size", api_video_size)
+    app.router.add_get("/api/video-size-plan", api_video_size_plan)
     app.router.add_get("/api/video-config", api_video_config)
     app.router.add_put("/api/video-config", api_video_config)
     app.router.add_get("/api/version", api_version)

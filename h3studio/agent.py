@@ -1114,6 +1114,53 @@ def _explicit_args(args: dict) -> set:
     return out
 
 
+def _sync_legacy_lora_alias(params: dict) -> dict:
+    """让遗留的 ``params["lora"]`` 与**已选**的加速 LoRA 保持一致。
+
+    【为什么需要】—— 用户 2026-11-22 原话：
+      「文生视频，我选的模型+LORA组合，和生成的记录的模型+LORA组合，不一样」
+
+    【根因】
+    ``agent_schema.mode_defaults("t2v")`` 里有一项
+    ``lora = "ckpt850"``（那是**解析工作流源码**得到的「参数留空时的
+    默认值」：``workflows._h3_video_workflow`` 里
+    ``params.get("lora", "ckpt850")``）。它被填进 params 之后，
+    params 里就**同时**躺着：
+      * ``accel_lora = "dmad_4step_critic"`` —— 用户真正选的那枚；
+      * ``lora = "ckpt850"`` —— 工作流源码默认值。
+
+    显示层（``job_meta.resolve_job_lora`` → ``resolve_accel_lora_slot``）
+    认的是 ``"accel_lora" in params``，所以显示 dmad（对）；
+    而遗留读侧（老卡片 / 导出 / Agent 自述）读 ``params["lora"]``，
+    读到 ckpt850（错）⇒ **同一任务两处显示不同的 LoRA**。
+
+    【修法】
+    已经显式选了加速 LoRA 时（``accel_lora`` **键存在**，
+    含空串 = 明确「不挂」），把遗留别名同步过去 ——
+    一份记录只能说一件事。
+
+    【为什么用「键存在」而不是「值非空」】
+    ``video_models.resolve_accel_lora_slot`` 的显式意图判据就是
+    ``"accel_lora" in params``（空串 = 有效的「不挂」）。
+    这里必须**与它同口径**，否则两处又会分裂。
+
+    就地修改并返回同一个 params。
+    """
+    if not isinstance(params, dict):
+        return params
+    if "accel_lora" not in params:
+        return params
+    slot = str(params.get("accel_lora") or "").strip()
+    # 「不挂」用字面量 "none" 表示（与前端 app.js 的既有写法一致）
+    params["lora"] = slot if slot else "none"
+    if params.get("accel_lora_strength") is not None:
+        try:
+            params["lora_strength"] = float(params["accel_lora_strength"])
+        except (TypeError, ValueError):
+            pass
+    return params
+
+
 @tool(
     "create_job",
     "创建一个生成任务并放进 ComfyUI 队列。任务会出现在工作台的「生成」列表里。"
@@ -1566,6 +1613,35 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
         params[key] = value
         defaults_applied.append(key)
         builtin_filled.add(key)
+
+    # ---- 【2026-11-22 新增】清掉与「已选加速 LoRA」矛盾的遗留 lora 字段 ----
+    #
+    # 【用户原话（本轮）】
+    # 「文生视频，我选的模型+LORA组合，和生成的记录的模型+LORA组合，不一样」
+    #
+    # 【实测根因（2026-11-22 复现线上落库）】
+    #   agent_schema.mode_defaults("t2v") = {'lora': 'ckpt850', 'resolution': '768p', ...}
+    #   —— 那是**解析工作流源码**得到的「参数留空时的默认值」
+    #      （workflows._h3_video_workflow: `lora = params.get("lora", "ckpt850")`）。
+    #   上面那段循环把 ``params["lora"] = "ckpt850"`` 填了进去，
+    #   而**同一时刻** params 里已经有用户真正选的那枚：
+    #       params["accel_lora"] = "dmad_4step_critic"
+    #       params["accel_loras"] = [{"key": "dmad_4step_critic", ...}]
+    #   ⇒ 落库记录里**同时躺着两枚互相矛盾的 LoRA**。
+    #
+    # 【为什么显示层会露出这个矛盾】
+    #   job_meta.resolve_job_lora 走 ``video_models.resolve_accel_lora_slot``：
+    #   它的第一条判据是 **``"accel_lora" in params``**（键存在即用户显式选择），
+    #   所以显示层给出 dmad_4step_critic —— 这一半是对的。
+    #   但 ``params["lora"]`` 这条**遗留读侧**（老卡片 / 老导出 / Agent 自述）
+    #   读到的却是 ckpt850 —— 另一半是错的。
+    #   ⇒ 同一个任务，两个地方显示不同的 LoRA。
+    #
+    # 【修法】见 ``_sync_legacy_lora_alias``（抽成独立函数，便于单测钉住）。
+    if mode in ("t2v", "flf", "r2v"):
+        _sync_legacy_lora_alias(params)
+        if "lora" in builtin_filled:
+            builtin_filled.discard("lora")
 
     # ------------------------------------------------------------------
     # 【2026-11-14 需求 A4】管理页里「每个生成类型分别配置的默认参数」

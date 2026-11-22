@@ -335,7 +335,7 @@
       return `
         <div class="agm-field agm-field-fixed">
           <span>${esc(label)}</span>
-          <b class="agm-fixed-value">${esc(shown)}</b>
+          <b class="agm-fixed-value" id="${esc(fieldId(mode, field.name))}">${esc(shown)}</b>
           ${field.note ? `<div class="agm-field-note">${esc(field.note)}</div>` : ""}
         </div>`;
     }
@@ -588,6 +588,73 @@
         const id = btn.getAttribute("data-eng-del");
         state.engines = (state.engines || []).filter(e => e.id !== id);
         render();
+      });
+    });
+    bindDerivedPixels();
+  }
+
+  // ------------------------------------------------------------------
+  // 「生效像素」只读派生项 —— 随 MP 预算 / 百分比 / 比例实时更新
+  //
+  // 【为什么需要】三个视频面板共用「画面比例 × MP 预算 × 百分比」
+  // 这一套尺寸表达（服务端字段表，见 h3studio/video_panel_params.py）。
+  // 「生效像素」是这套表达的**派生结果**，用户改预算时必须立刻看到
+  // 「我填的 0.8 MP 到底等于多少像素」—— 否则又是一处「面板说一套、
+  // 产物另一套」。
+  //
+  // 【为什么走服务端】换算公式在 ``size_spec.plan_size``（与建任务路径
+  // **同一份**）。前端自己算 = 第二份公式 = 必然漂移。
+  // 端点：``GET /api/video-size-plan?mode=&aspect=&megapixels=&percent=``
+  //
+  // 【为什么只在本地改、不落库】派生项是 ``type == "fixed"``，
+  // 服务端不会把它写进 params（它由其它三项算出）。
+  function bindDerivedPixels() {
+    const spec = state.genSpec || {};
+    Object.keys(spec).forEach(mode => {
+      const info = spec[mode] || {};
+      const names = (info.fields || []).map(f => f.name);
+      if (!names.includes("derived_pixels")) return;
+      if (!names.includes("megapixels")) return;
+
+      const controls = ["aspect", "megapixels", "resolution_percent"]
+        .map(n => $("#" + CSS.escape(fieldId(mode, n))))
+        .filter(Boolean);
+      if (!controls.length) return;
+
+      let timer = null;
+      const refresh = () => {
+        const aspectEl = $("#" + CSS.escape(fieldId(mode, "aspect")));
+        const mpEl = $("#" + CSS.escape(fieldId(mode, "megapixels")));
+        const pctEl = $("#" + CSS.escape(fieldId(mode, "resolution_percent")));
+        const outEl = $("#" + CSS.escape(fieldId(mode, "derived_pixels")));
+        if (!outEl) return;
+        const aspect = aspectEl ? aspectEl.value : "16:9";
+        const megapixels = mpEl ? mpEl.value : "";
+        const percent = pctEl ? pctEl.value : "";
+        if (megapixels === "" && percent === "") {
+          outEl.textContent = "—";
+          return;
+        }
+        const url = "/api/video-size-plan"
+          + "?mode=" + encodeURIComponent(mode)
+          + "&aspect=" + encodeURIComponent(aspect)
+          + "&megapixels=" + encodeURIComponent(megapixels)
+          + "&percent=" + encodeURIComponent(percent);
+        fetch(url).then(r => r.json()).then(d => {
+          if (!d || d.error) {
+            outEl.textContent = "—";
+            return;
+          }
+          outEl.textContent = d.label || "—";
+        }).catch(() => { outEl.textContent = "—"; });
+      };
+
+      controls.forEach(el => {
+        const evt = (el.tagName === "SELECT") ? "change" : "input";
+        el.addEventListener(evt, () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(refresh, 200);
+        });
       });
     });
   }

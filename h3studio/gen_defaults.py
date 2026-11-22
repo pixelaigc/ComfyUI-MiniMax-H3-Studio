@@ -162,197 +162,139 @@ def _union_schedulers(table: dict) -> list:
 
 
 def _video_new_panel_fields() -> list:
-    """t2v：新面板路径（video_workflow.build_t2v_panel）的真实参数。"""
+    """t2v：新面板路径（video_workflow.build_t2v_panel）的真实参数。
+
+    【2026-11-22 —— 与 flf / r2v 改为**同一份真源**】
+
+    原来三个视频面板各写一份字段表（t2v 一份、flf 一份、r2v 一份），
+    于是必然漂移（采样控件只在 t2v 有、LoRA 清单两套、尺寸口径两套）。
+    现在三者全部从 ``h3studio.video_panel_params`` 派生 ——
+    同一份采样控件、同一份 LoRA 清单、同一套尺寸口径。
+
+    【t2v 独有的两项】
+      * **注意力机制** —— 对应 ``video_workflow.build_t2v_panel`` 里
+        真实存在的 ``ModelAttentionBackend`` 节点。flf / r2v 的工作流
+        （``h3_video_modes``）里**没有**这个节点，所以那一项只给 t2v
+        （给了 flf/r2v 就是假控件）。
+      * **加速 LoRA 的字段名** —— t2v 用 ``accel_lora``（单选槽位），
+        flf / r2v 用 ``lora``（历史字段名，工作流两处都认）。
+        字段名不同是**读侧**的历史包袱，不是「面板不一致」。
+    """
     vm = _vm()
-    wf = _wf()
-    from . import size_spec
-    model_meta = vm.VIDEO_MODELS.get(vm.VIDEO_DEFAULT_MODEL) or {}
+    from . import video_panel_params as vpp
+
     attention_options = [
         (key, meta.get("label") or key)
         for key, meta in vm.VIDEO_ATTENTION_MODES.items()
         if key not in vm.VIDEO_REMOVED_ATTENTION_MODES
     ]
-    accel_options = [
-        (key, meta.get("display") or key)
-        for key, meta in vm.VIDEO_ACCEL_LORA_COMBOS.items()
-    ]
-    aspect_options = [(key, key) for key in vm.VIDEO_ASPECTS.keys()]
-    return [
-        _enum("model_key", "底模", _model_options(vm.VIDEO_MODELS),
-              vm.VIDEO_DEFAULT_MODEL,
-              "H3 视频底模；本机缺哪个权重由服务端建任务前校验"),
+
+    model_fields = vpp.model_fields("t2v")
+    default_model = model_fields[0]["default"]
+
+    # ---- 加速 LoRA：与 flf / r2v **同一份清单**（同一真源）----
+    lora_options = vpp.accel_lora_option_pairs(default_model)
+    default_lora = vpp.accel_lora_default(default_model)
+    lora_note = ("与首尾帧 / 参考生视频面板**同一份清单**：本机真实存在 + "
+                 "与该底模逐层实测兼容 + 非第三方蒸馏"
+                 "（判据来自权重自己的 safetensors metadata，不是名单）。"
+                 "显示名取自权重登记表，不自造名称。")
+
+    fields: list = []
+    fields.extend(model_fields)
+    fields.append(
         _enum("attention", "注意力机制", attention_options, "kitchen",
-              "comfy kitchen = 节点 ModelAttentionBackend（用户 2026-11-13 审查目标 5）"),
-        _enum("accel_lora", "加速 LoRA 组合", accel_options, "dmad_4step_critic",
-              "dmad = dmad_minimax_h3_4step_full_critic（4 步蒸馏）"),
-        _enum("aspect", "画面比例", aspect_options, "16:9",
-              "取值与 ComfyUI ResolutionSelector 的下拉一一对应"),
-        _num("megapixels", "MP 预算（百万像素）",
-             vm.VIDEO_DEFAULT_MP, 0.01, 2.0, 0.01,
-             "该模式真实上限 2.0 MP；100% = 上限。"
-             "按比例换算宽高（宽高再对齐到 32 的倍数）"),
-        _num("resolution_percent", "MP 预算百分比（%）", 100.0,
-             size_spec.PERCENT_MIN, size_spec.PERCENT_MAX, 1.0,
-             "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP"),
+              "comfy kitchen = 节点 ModelAttentionBackend"
+              "（用户 2026-11-13 审查目标 5）"))
+    fields.append(
+        _enum("accel_lora", "加速 LoRA组合", lora_options, default_lora,
+              lora_note))
+    fields.extend(vpp.size_fields("t2v"))
+    fields.append(
         _num("duration", "时长（秒）", 5.0, 2.0, 60.0, 1.0,
-             "服务端上限 60 秒（= 1440 帧），超限直接报错不静默截断"),
-        _int("steps", "采样步数", int(model_meta.get("steps", 4)), 1, 50,
-             "H3 标准路径的步数（与加速 LoRA 档绑定）"),
-        _enum("sampler", "采样器", _sampler_options(vm.VIDEO_SAMPLERS),
-              model_meta.get("sampler", "euler"),
-              "本机 ComfyUI KSamplerSelect 的真实 COMBO 清单"),
-        _enum("scheduler", "调度器", _sampler_options(vm.VIDEO_SCHEDULERS),
-              model_meta.get("scheduler", "beta"),
-              "本机 ComfyUI BasicScheduler 的真实 COMBO 清单"),
-        _num("shift_video", "视频 sigma shift", vm.VIDEO_SHIFT_DEFAULT_VIDEO,
-             0.01, 100.0, 0.01, "H3 模型内生值 12.0，改动会影响出片"),
-        _num("shift_audio", "音频 sigma shift", vm.VIDEO_SHIFT_DEFAULT_AUDIO,
-             0.01, 100.0, 0.01, "H3 模型内生值 3.0"),
-    ]
+             "服务端上限 60 秒（= 1440 帧），超限直接报错不静默截断"))
+    # ---- 采样参数：与 flf / r2v **同名同义** ----
+    fields.extend(vpp.sampling_fields(default_lora))
+    fields.append(vpp.precision_readonly_field())
+    return fields
 
 
 def _video_legacy_fields(mode: str = "flf") -> list:
     """flf / r2v：首尾帧 / 参考生视频的真实参数。
 
-    【2026-11-21 重写 —— 与「文生视频」面板同一语义，不再是另一套】
+    【2026-11-22 重写 —— 与「文生视频」面板**完全同构**】
 
-    用户驳回的原话：「同时存在百万像素和分辨率挡位和比例，还有底模精度，
-    全部都是冲突的。和文生视频完全不一样好吧。」
+    用户驳回的原话（本轮）：
+    「不还是和文生视频不一样吗。。？你到底在改啥呢，该配置的不能配置，该有的没有」
 
-    逐条对照**官方首尾帧工作流**（nonebot `workflows/minimax_h3_v1.json`，
-    `h3_executor.py:199-231` 明确 fl2va 走这个模板）后，结论是：
+    【上一轮为什么改错了】
+    2026-11-21 那一轮把采样档位 / sigma shift 改成了**只读说明**
+    （``_fixed``），理由是「官方模板用的是 H3SigmaRefiner，不是可填的
+    sigma shift」。那个理由只对**官方 nonebot 模板**成立，
+    对**本工作台自己的 builder** 不成立 —— 本仓库的
+    ``h3studio/h3_video_modes.py`` 里：
 
-      * 官方模板的尺寸表达**只有一套**：
-        `ResolutionSelector {aspect_ratio, megapixels, multiple: 32}`
-        —— 比例 + MP 预算，**没有「分辨率档位」这个东西**。
-        所以这里删掉 ``resolution``（那 28 档是我们自己派生出来又和
-        MP 预算并列展示的第三套表达，正是用户说的冲突）。
-        尺寸唯一表达 = **画面比例 × MP 预算 × 百分比**（与 t2v 同一套，
-        同一个 ``size_spec.plan_size``）。
+      * ``_sampling_defaults()`` 读 ``params["steps"] / ["sampler"] /
+        ["scheduler"]``（第 135-137 行），
+      * ``_build_common()`` 把它们写进 ``BasicScheduler``（第 454 行）与
+        ``KSamplerSelect``（第 553 行），
+      * ``_shift_node()`` 读 ``params["shift_video"] / ["shift_audio"]``
+        并插 ``MiniMaxH3SigmaShift`` 节点（第 675-686 行）。
 
-      * 官方模板**没有**「底模精度」控件：精度已经编码在权重文件里
-        （`minimax_h3_fl2va_int8_convrot` / `_bf16` / `_pruned_w4a8`），
-        选底模就选了精度。``precision`` 在 ``server.py`` 里
-        **一次都没有被读**（实测 grep 零命中）—— 它是假控件，删掉。
+    ⇒ **后端一直支持这五项**，只是面板没给控件。
+    上一轮把「官方模板没有这个节点」当成了「本工作台不可配」，
+    于是给用户的是「采样档位（不可改）/ sigma shift（不可改）」——
+    正是用户说的「该配置的不能配置」。
 
-      * 官方模板的采样档位是**跟着那枚加速 LoRA 走的固定值**
-        （v1.json: `BasicScheduler {scheduler: simple, steps: 7}` +
-        `SelfLiftH3Sampler {cfg: 1, transition_step: 5}`；
-        我们的 builder 按实际挂的 LoRA 选 4 步 / 20 步档）。
-        用户改 steps 会把它压离那枚 LoRA 的训练分布。
-        改成**只读说明**（``_fixed``）：告诉用户值是多少、由谁决定，
-        不给可编辑控件。
+    【这一版的做法】
+    三个面板（t2v / flf / r2v）的字段表全部改为从
+    ``h3studio.video_panel_params`` 这一份真源派生：
+      * 采样参数（步数 / 采样器 / 调度器 / 视频+音频 sigma shift）
+        —— 五个都**可编辑**，取值来自本机 ComfyUI 真实 COMBO；
+      * 加速 LoRA —— 与 t2v **同一份清单、同一套命名**
+        （含「不挂」这一项）；
+      * 尺寸 —— 同一套「画面比例 × MP 预算 × 百分比」，
+        外加一个**只读**的「生效像素」派生项；
+      * 底模精度 —— 保留为**唯一**的只读说明项，note 里写清
+        「精度不是工作流槽位，换精度 = 换权重 = 换底模」。
 
-      * 官方模板**没有** sigma shift 节点（v1.json 用的是
-        `H3SigmaRefiner`，不是 `MiniMaxH3SigmaShift`）——
-        12.0 / 3.0 是模型内生值。同样改成只读说明。
-
-    【加速 LoRA：改为真实兼容性派生】
-    原来这里的选项是 ``workflows.LORAS.keys()`` —— 硬编码两枚，
-    既不问底模、也不问本机有没有、也不跑兼容性实测。
-    主生成面板早就消费服务端下发的 ``accel_lora_compat``
-    （逐层实测）按当前底模过滤下拉 —— 同一个工作台两套口径，
-    这就是用户看到「LORA 模型都不对」的原因。
-
-    现在唯一真源是 ``h3studio/accel_lora_policy``：
-      * 本机 ComfyUI 清单里真的有这枚权重；
-      * 逐层兼容性实测通过（含「加载节点能不能重注入 AdaLN」）；
-      * 官方谱系 / 第三方蒸馏由**权重自己的 safetensors metadata** 判定
-        （`base_model: MiniMax-H3` vs `Comfy-Org`），不是猜名字。
+    只有 t2v 独有「注意力机制」（那是 ``video_workflow.build_t2v_panel``
+    独有的节点），flf / r2v 的工作流里**没有**这个节点 ——
+    那一项不给（给了就是假控件）。
     """
-    vm = _vm()
-    from . import size_spec
-    from . import accel_lora_policy as accel_policy
+    from . import video_panel_params as vpp
 
-    aspect_options = [(key, key) for key in vm.VIDEO_ASPECTS.keys()]
+    # ---- 底模 ----
+    model_fields = vpp.model_fields(mode)
+    default_model = model_fields[0]["default"]
 
-    # ---- 底模（按 mode 过滤）----
-    need_ref2va = (mode == "r2v")
-    model_options = []
-    for key, meta in vm.VIDEO_MODELS.items():
-        supports = bool(meta.get("supports_ref2va"))
-        if need_ref2va and not supports:
-            continue
-        if not need_ref2va and supports:
-            # FL2VA 模式不用 Ref2VA 专用权重（那类权重没有 I2VA 通道）
-            continue
-        model_options.append((key, meta.get("label") or key))
-    if need_ref2va:
-        default_model = "ref2va_pruned_int8"
-        for key in ("ref2va_pruned_int8", "ref2va_int8",
-                    "hybrid_fl2va_ref2va"):
-            if key in vm.VIDEO_MODELS:
-                default_model = key
-                break
-        model_note = ("参考生视频必须用支持 Ref2VA 的权重 —— "
-                      "FL2VA 权重没有参考通道，用它等于「参考没生效」。")
-    else:
-        default_model = vm.VIDEO_DEFAULT_MODEL
-        model_note = ("首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。"
-                      "精度已经编码在权重文件里，选底模就等于选精度。")
+    # ---- 加速 LoRA：与 t2v 同一份清单（同一真源）----
+    lora_options = vpp.accel_lora_option_pairs(default_model)
+    default_lora = vpp.accel_lora_default(default_model)
+    lora_meta = _vm().accel_lora_meta(default_lora) or {}
+    default_strength = float(lora_meta.get("recommended_strength") or 1.0)
+    lora_note = ("与文生视频面板**同一份清单**：本机真实存在 + 与该底模"
+                 "逐层实测兼容 + 非第三方蒸馏（判据来自权重自己的 "
+                 "safetensors metadata，不是名单）。"
+                 "显示名取自权重登记表，不自造名称。")
 
-    # ---- 加速 LoRA：按该底模的真实可用性派生 ----
-    available = accel_policy.available_accel_loras(default_model)
-    official_turbo = [item for item in available
-                      if accel_policy.lora_kind(item) == "official_turbo"]
-    pool = official_turbo or available
-    lora_options = [("none", "none（不挂加速 LoRA，走标准多步采样）")]
-    for item in pool:
-        lora_options.append((item["key"], item["display"]))
-    default_lora = "none"
-    default_strength = 1.0
-    if official_turbo:
-        # 默认取官方 turbo 系里「与这个底模完整命中」的那枚
-        # （matched == total 优先；剪枝底模上 turbo 系靠运行期重注入）
-        default_lora = official_turbo[0]["key"]
-        default_strength = float(official_turbo[0].get("recommended_strength")
-                                or 1.0)
-    lora_note = ("只列「本机真实存在 + 与该底模逐层实测兼容 + 官方 H3 谱系」的加速档。"
-                 "第三方蒸馏（LightX2V 等）不在这里 —— 判据来自权重自己的 "
-                 "safetensors metadata 与逐层兼容性实测，不是名单。")
-
-    cap = size_spec.mode_max_megapixels(mode)
-    default_mp = vm.VIDEO_DEFAULT_MP
-    default_pct = size_spec.default_percent()
-
-    # ---- 只读说明：工作流固定的采样档位 ----
-    lora_meta = vm.accel_lora_meta(default_lora) or {}
-    fixed_steps = int(lora_meta.get("recommended_steps")
-                      or vm.VIDEO_STEPS_WITHOUT_ACCEL)
-    fixed_sampler = (lora_meta.get("recommended_sampler")
-                     or vm.VIDEO_SAMPLER_WITHOUT_ACCEL)
-    fixed_scheduler = (lora_meta.get("recommended_scheduler")
-                       or vm.VIDEO_SCHEDULER_WITHOUT_ACCEL)
-
-    return [
-        _enum("model_key", "底模", model_options, default_model, model_note),
-        _enum("aspect", "画面比例", aspect_options, "16:9",
-              "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值"),
-        _num("megapixels", "MP 预算（百万像素）", default_mp, 0.01, cap, 0.01,
-             f"该模式真实上限 {cap} MP；100% = 上限。"
-             "宽高按比例换算并对齐 32（官方 ResolutionSelector.multiple=32）。"
-             "这是唯一的尺寸表达 —— 没有「分辨率档位」"),
-        _num("resolution_percent", "MP 预算百分比（%）", default_pct,
-             size_spec.PERCENT_MIN, size_spec.PERCENT_MAX, 1.0,
-             f"相对该模式真实上限（{cap} MP）的百分比；100% = {cap} MP"),
+    fields: list = []
+    fields.extend(model_fields)
+    fields.extend(vpp.size_fields(mode))
+    fields.append(
         _num("duration", "时长（秒）", 5.0, 2.0, 60.0, 1.0,
-             "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"),
-        _enum("lora", "加速 LoRA", lora_options, default_lora, lora_note),
-        _num("lora_strength", "加速 LoRA 强度", default_strength, 0.0, 2.0, 0.05,
-             "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"),
-        _fixed("sampling_fixed", "采样档位（不可改）", fixed_steps,
-               f"由所选加速 LoRA 决定：{fixed_steps} 步 / {fixed_sampler} / "
-               f"{fixed_scheduler}。换加速 LoRA 档位自动跟着换 —— "
-               "手动改步数会把这枚 LoRA 压离它的训练分布。"),
-        _fixed("shift_fixed", "sigma shift（不可改）",
-               vm.VIDEO_SHIFT_DEFAULT_VIDEO,
-               f"视频 {vm.VIDEO_SHIFT_DEFAULT_VIDEO} / 音频 "
-               f"{vm.VIDEO_SHIFT_DEFAULT_AUDIO} 是 H3 模型内生值；"
-               "官方首尾帧模板用的是 H3SigmaRefiner，不是可填的 sigma shift。"),
-        _fixed("precision_fixed", "底模精度（不可改）", "随底模",
-               "精度已经编码在权重文件里（int8_convrot / bf16 / pruned_w4a8），"
-               "选上面的底模就等于选精度，这里没有独立的精度参数。"),
-    ]
+             "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"))
+    fields.append(
+        _enum("lora", "加速 LoRA", lora_options, default_lora, lora_note))
+    fields.append(
+        _num("lora_strength", "加速 LoRA 强度", default_strength, 0.0, 2.0,
+             0.05,
+             "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"))
+    # ---- 采样参数：与文生视频**同名同义**，全部可编辑 ----
+    fields.extend(vpp.sampling_fields(default_lora))
+    # ---- 唯一保留的只读说明项（且写清「为什么不可改」）----
+    fields.append(vpp.precision_readonly_field())
+    return fields
 
 
 def _image_fields(kind: str) -> list:
@@ -986,6 +928,21 @@ _SAMPLING_FIELDS = frozenset({
     "shift_video", "shift_audio",
 })
 
+#: **历史上出现过的**只读说明字段名。
+#:
+#: 【为什么需要这张静态清单】2026-11-21 那一轮把采样档位 / sigma shift
+#: 做成了只读项，字段名是 ``sampling_fixed`` / ``shift_fixed``；
+#: 2026-11-22 那一轮把它们改成**可编辑**（后端一直支持），字段名不再存在。
+#: 管理页的**存量配置**里还躺着那两个键 —— 它们是「只读说明」的残留，
+#: 绝不能被写进 params（``merge_into_params`` 会裁掉它们）。
+#:
+#: 【为什么不能靠「当前字段表」推导】当前字段表里已经没有这两个名字了，
+#: 靠它裁不到存量脏值。
+_LEGACY_FIXED_FIELD_NAMES = frozenset({
+    "sampling_fixed",   # 2026-11-21 的「采样档位（不可改）」
+    "shift_fixed",      # 2026-11-21 的「sigma shift（不可改）」
+})
+
 
 def merge_into_params(mode: str, params: dict, defaults: dict,
                       explicit=(), model=None, overridable=(),
@@ -1048,10 +1005,64 @@ def merge_into_params(mode: str, params: dict, defaults: dict,
     # 如果不裁，``default_values()`` 会把它们当普通默认值填进 params ——
     # 于是「面板上明确写着不可改」的值反而变成了服务端主动写入的值，
     # 把「工作流按实际 LoRA 自己选档」这条真实行为覆盖掉了。
+    #
+    # 【2026-11-22 补 —— 必须连**历史遗留**的只读键一起清】
+    #   原来这里只清「当前字段表里 type == fixed 的那些」。但管理页的
+    #   **存量配置**里躺着上一版的 ``sampling_fixed`` / ``shift_fixed``
+    #   （上一轮那两个只读项的名字）。字段表改了名，它们就成了
+    #   「不在白名单里的普通键」-> 被原样写进 params。
+    #   ⇒ params 里会多出 ``sampling_fixed: 4`` 这种**谁都不读**的垃圾键，
+    #   而它的值 4 与真实的 steps 4 巧合相同 —— 看起来「正常」，
+    #   实际是两条不同的来源，容易再次漂移。
+    #   所以这里用**静态清单**把历史上出现过的只读键全部裁掉。
     fixed_names = {f["name"] for f in _mode_fields(mode)[0]
                    if f.get("type") == "fixed"}
+    fixed_names |= _LEGACY_FIXED_FIELD_NAMES
     for _k in fixed_names:
         effective.pop(_k, None)
+
+    # ---- 【2026-11-22 新增】清掉**与面板口径冲突**的遗留字段 ----
+    #
+    # 【用户原话（本轮）】
+    # 「LORA模型都不对，并切同时存在百万像素和分辨率挡位和比例，还有底模精度，
+    #   全部都是冲突的。和文生视频完全不一样好吧」
+    #
+    # 【实测冲突链（2026-11-22 复现）】
+    #   管理页存量配置 flf = {megapixels: 0.8, resolution: "768p",
+    #                        precision: "int8", steps: 4, ...}
+    #   -> merge_into_params 把 megapixels / resolution / precision 全套进 params
+    #   -> h3_video_size.apply_size 按 megapixels 算出 **1216×672**（0.8 MP）
+    #   -> 但 params["resolution"] 仍然是 **"768p"**（= 1344×768）
+    #   -> 任务详情弹窗「分辨率档位」显示 768p、「分辨率」显示 1216×672
+    #   -> **同一个任务两个尺寸**，且档位那个是假的。
+    #
+    # 【为什么这些字段必须在这里被清掉，而不是「留着不显示」】
+    #   * ``resolution`` —— 尺寸口径已收敛为「比例 × MP 预算 × 百分比」；
+    #     官方模板的 ResolutionSelector 也只有比例 + MP 预算。
+    #     留着它 = 留着一个**与实际像素矛盾**的档位串（而且它会一路
+    #     落库、显示、导出）。
+    #   * ``precision`` —— 精度编码在权重文件里，选底模即选精度；
+    #     server.py 里 ``precision`` **一次都没有被读**（实测 grep 零命中），
+    #     它是纯装饰。
+    #
+    # 【为什么不能删用户「显式传的值」】
+    #   显式值是**用户这次的意图**，优先级最高 —— 不能被管理页默认值
+    #   覆盖或删除。所以这里只清 ``effective``（管理页默认值），
+    #   不动 ``target``（本次请求）里用户已经显式给的值。
+    #   但「档位」与「MP 预算」同时存在就会矛盾 —— 所以即便用户显式传了
+    #   ``resolution``，在**已有 MP 预算口径**（megapixels 或 percent）
+    #   的情况下也要让档位让位（MP 预算是新口径，档位是旧口径）。
+    if mode in ("t2v", "flf", "r2v"):
+        # 旧口径「分辨率档位」与新口径「MP 预算」不能并存。
+        # 有新口径（显式给了 megapixels / percent，或管理页配了）-> 档位让位。
+        has_new_size = ("megapixels" in effective
+                        or "resolution_percent" in effective
+                        or "megapixels" in explicit
+                        or "resolution_percent" in explicit)
+        if has_new_size:
+            effective.pop("resolution", None)
+        # 底模精度：编码在权重里，没有独立参数
+        effective.pop("precision", None)
 
     # 【先定最终模型版本】采样参数要跟着**实际生效**的模型走，
     # 所以必须先算出「这次到底用哪个模型」：
