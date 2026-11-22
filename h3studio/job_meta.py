@@ -51,6 +51,7 @@ import json
 import time
 from pathlib import Path
 
+from . import reso_label
 from . import video_models as vmodels
 
 
@@ -1624,6 +1625,31 @@ def _generation_params(params: dict) -> dict:
     twopass = params.get("twopass")
     if isinstance(twopass, dict) and twopass:
         out["twopass"] = twopass
+
+    # ---- 【2026-11-22 新增】分辨率档位一律由**真实像素**反算 ----
+    #
+    # 【用户原话（本轮）】
+    # 「右侧生成库里，分辨率的尺寸显示，和我实际跑的不一样」
+    #
+    # 【为什么这里要覆盖 params["resolution"]】
+    #   params["resolution"] 是**请求时的档位字符串**。而档位是**短边像素**
+    #   的命名（``reso_label._tier_label`` = min(w, h)）——
+    #   「768p」在 16:9 下是 1344×768，但同一枚「768p」标签在别的比例下
+    #   是别的尺寸；更常见的是：MP 预算算出来的尺寸与请求时记的档位
+    #   **根本不是一回事**（实测：请求 768p，实际产物 1216×672 = 672p）。
+    #
+    #   于是「分辨率 = 1216×672」「分辨率档位 = 768p」两行自相矛盾，
+    #   而档位那行是**假的**（它描述的是一个没发生的请求）。
+    #
+    # 【修法 —— 与卡片 / 详情弹窗同一份公式】
+    #   有真实像素 -> 由像素反算档位（``reso_label.tier_for_pixels``）；
+    #   没有像素（老任务 / 未记录）-> 保留请求里的档位串，**如实**呈现。
+    _w = out.get("width")
+    _h = out.get("height")
+    if _w and _h:
+        _tier = reso_label.tier_for_pixels(_w, _h)
+        if _tier:
+            out["resolution"] = _tier
     return out
 
 

@@ -94,15 +94,49 @@ class TestGenDefaultsSpec(unittest.TestCase):
                              f"{mode} 的字段名重复：{names}")
 
     def test_t2v_fields_match_real_video_registry(self):
-        """t2v 的取值必须来自 video_models 的真实注册表。"""
+        """t2v 的取值必须来自 video_models 的真实注册表。
+
+        【2026-11-22 修正 —— 加速 LoRA 的断言口径变了】
+        原来断言 ``accel_lora`` 的选项 **等于** ``VIDEO_ACCEL_LORA_COMBOS``
+        的全部 key。那张表里含**第三方蒸馏**（LightX2V 系）。
+
+        但 2026-11-21 用户已拍板：「t2v 与 flf 同一判据 —— 加速 LoRA 下拉
+        只保留该底模官方兼容档，把 6 个 lightx2v 从 t2v 面板下拉中移除」
+        —— 主生成面板的 ``/api/video-options`` 就是这么做的
+        （``selectable = compatible and available and not third_party``）。
+
+        本轮把三个面板的清单统一到**同一份真源**
+        （``h3studio/video_panel_params.py``），那份真源用的就是
+        「compatible + available + 非第三方」这个口径。
+
+        所以这里改成断言：
+          * 选项**都来自真实登记表**（没有一个自造 key）；
+          * 第三方蒸馏**不在**选项里（与主生成面板同口径）；
+          * 「不挂」这一项在（它是有效的选择）。
+        """
         fields = {f["name"]: f for f in gen_defaults.spec()["t2v"]["fields"]}
         models = {o["value"] for o in fields["model_key"]["options"]}
         self.assertEqual(models, set(vm.VIDEO_MODELS.keys()))
         attentions = {o["value"] for o in fields["attention"]["options"]}
         self.assertEqual(attentions, set(vm.VIDEO_ATTENTION_MODES.keys())
                          - set(vm.VIDEO_REMOVED_ATTENTION_MODES.keys()))
+
         accels = {o["value"] for o in fields["accel_lora"]["options"]}
-        self.assertEqual(accels, set(vm.VIDEO_ACCEL_LORA_COMBOS.keys()))
+        real = set(vm.all_accel_lora_keys())
+        self.assertTrue(accels - {"none"},
+                        "加速 LoRA 下拉里一个真实档位都没有")
+        for key in accels - {"none"}:
+            self.assertIn(key, real,
+                          f"{key} 不在真实加速 LoRA 登记表里（自造名称）")
+        # 第三方蒸馏不得进下拉（与主生成面板 /api/video-options 同口径）
+        from h3studio import accel_lora_policy as policy
+        model_key = fields["model_key"]["default"]
+        for key in accels - {"none"}:
+            self.assertFalse(
+                policy.classify(key, model_key)["third_party"],
+                f"{key} 是第三方蒸馏档，不该出现在下拉里")
+        # 「不挂」是有效选项
+        self.assertIn("none", accels)
 
     def test_t2v_keeps_legacy_field_names(self):
         """老配置项的 6 个字段必须原样保留（兼容要求）。"""
