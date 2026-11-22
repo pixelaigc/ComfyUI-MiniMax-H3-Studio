@@ -1435,7 +1435,7 @@ def find_weight(name: str, kind: str = "diffusion_models") -> Path | None:
     return found
 
 
-def model_available(model_key: str) -> bool:
+def model_available(model_key: str, snapshot=None) -> bool:
     """底模在本机是否可用（**以 ComfyUI 的模型列表为准**）。
 
     【2026-11-11 改造】原来这里只扫盘（`find_weight`），跟 ComfyUI 的
@@ -1451,13 +1451,21 @@ def model_available(model_key: str) -> bool:
     所以不会出现「下拉显示 A、提交用 B」。
 
     见 h3studio/comfy_models.py 的模块说明。
+
+    【2026-11-22】新增 `snapshot` 参数：调用方若已**异步**刷新过
+    ComfyUI 模型清单快照，传进来即可**避免同步 urllib 打 8188**
+    —— 那在 aiohttp 事件循环里会把整个服务端卡住。
     """
-    return model_status(model_key) == "available"
+    return model_status(model_key, snapshot) == "available"
 
 
-def lora_available(name: str) -> bool:
-    """加速 LoRA 在本机是否可用（同样以 ComfyUI 的 `/models/loras` 为准）。"""
-    return _lora_available(name, comfy_snapshot())
+def lora_available(name: str, snapshot=None) -> bool:
+    """加速 LoRA 在本机是否可用（同样以 ComfyUI 的 `/models/loras` 为准）。
+
+    【2026-11-22】新增 `snapshot` 参数（理由同 `model_available`）：
+    传进来即复用已预热的快照，不触发同步 HTTP。
+    """
+    return _lora_available(name, snapshot if snapshot is not None else comfy_snapshot())
 
 
 # ------------------------------------------------------------------
@@ -1622,6 +1630,23 @@ def comfy_snapshot(base_url: str | None = None,
 def comfy_snapshot_error() -> str:
     """最近一次拿 ComfyUI 清单失败的原因（没有则空串）。"""
     return _SNAPSHOT.error if _SNAPSHOT is not None else ""
+
+
+def cached_comfy_snapshot() -> ComfyModelSnapshot | None:
+    """**只读**当前缓存的快照 —— **绝不触发网络请求**。
+
+    【为什么需要这个】
+    `comfy_snapshot()` 会按 TTL 决定要不要**重新拉** —— 拉的那次是
+    **同步 urllib**，在 aiohttp 事件循环里会把整个服务端卡住
+    （ComfyUI 冷启动时 `/models/diffusion_models` 要递归扫盘，实测数十秒）。
+
+    而「先异步预热快照、再构造默认值」这个模式，需要一个
+    **保证不发网络请求**的方式拿到快照：调用方已经用
+    `refresh_comfy_snapshot_async()` 刷新过了，这里只取缓存值。
+    缓存没有时返回 None —— 调用方退回原来的降级路径（扫盘口径），
+    行为与修复前一致，不会 500。
+    """
+    return _SNAPSHOT
 
 
 def reset_comfy_snapshot() -> None:

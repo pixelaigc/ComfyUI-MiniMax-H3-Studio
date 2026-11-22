@@ -59,6 +59,38 @@ def _vm():
     return video_models
 
 
+async def warm_comfy_snapshot() -> None:
+    """**先把 ComfyUI 模型清单快照拉好**，再让调用方构造默认值。
+
+    【为什么必须有这一步】
+    `default_gen_defaults()` -> `_video_new_panel_fields()` ->
+    `vpp.accel_lora_option_pairs()` -> `vm.lora_available()` ->
+    `vm.comfy_snapshot()`，而 `comfy_snapshot()` 走的是
+    `refresh_comfy_snapshot()` —— **同步 urllib**。
+
+    在 aiohttp 的事件循环里，同步 urllib 会**阻塞整个服务端**：
+    ComfyUI 的 `/models/diffusion_models` 首次调用要递归扫所有
+    extra_model_paths 目录（实测数十秒），而 ComfyUI 刚重启、
+    正在加载节点时更慢。那段时间里 8190 的**所有**请求一起挂起 ——
+    表现就是「服务 active + 端口在监听，但整站打不开」。
+
+    快照本身**有 20 秒 TTL 缓存**。所以正确做法不是把整段默认值
+    构造丢进线程（那只是把阻塞挪个地方，线程照样卡住），
+    而是：**先用异步版刷新一次快照**（`refresh_comfy_snapshot_async`，
+    走 aiohttp，不阻塞事件循环），**之后**再构造默认值 ——
+    此时 `comfy_snapshot()` 命中缓存，纯内存操作，零阻塞。
+
+    【失败怎么办】拉不到不抛异常 —— 快照带 error，
+    `comfy_snapshot()` 返回 None，`lora_available()` 退回扫盘口径。
+    这正是原来的降级行为，不会因为预热失败就让接口 500。
+    """
+    try:
+        from . import video_models
+        await video_models.refresh_comfy_snapshot_async()
+    except Exception:  # noqa: BLE001 —— 预热失败不能拖垮接口
+        pass
+
+
 def _my():
     from . import music_yue2
     return music_yue2
@@ -161,7 +193,7 @@ def _union_schedulers(table: dict) -> list:
     return seen
 
 
-def _video_new_panel_fields() -> list:
+def _video_new_panel_fields(snapshot=None) -> list:
     """t2v：新面板路径（video_workflow.build_t2v_panel）的真实参数。
 
     【2026-11-22 —— 与 flf / r2v 改为**同一份真源**】
@@ -193,8 +225,8 @@ def _video_new_panel_fields() -> list:
     default_model = model_fields[0]["default"]
 
     # ---- 加速 LoRA：与 flf / r2v **同一份清单**（同一真源）----
-    lora_options = vpp.accel_lora_option_pairs(default_model)
-    default_lora = vpp.accel_lora_default(default_model)
+    lora_options = vpp.accel_lora_option_pairs(default_model, snapshot)
+    default_lora = vpp.accel_lora_default(default_model, snapshot)
     lora_note = ("与首尾帧 / 参考生视频面板**同一份清单**：本机真实存在 + "
                  "与该底模逐层实测兼容 + 非第三方蒸馏"
                  "（判据来自权重自己的 safetensors metadata，不是名单）。"
@@ -219,7 +251,7 @@ def _video_new_panel_fields() -> list:
     return fields
 
 
-def _video_legacy_fields(mode: str = "flf") -> list:
+def _video_legacy_fields(mode: str = "flf", snapshot=None) -> list:
     """flf / r2v：首尾帧 / 参考生视频的真实参数。
 
     【2026-11-22 重写 —— 与「文生视频」面板**完全同构**】
@@ -269,8 +301,8 @@ def _video_legacy_fields(mode: str = "flf") -> list:
     default_model = model_fields[0]["default"]
 
     # ---- 加速 LoRA：与 t2v 同一份清单（同一真源）----
-    lora_options = vpp.accel_lora_option_pairs(default_model)
-    default_lora = vpp.accel_lora_default(default_model)
+    lora_options = vpp.accel_lora_option_pairs(default_model, snapshot)
+    default_lora = vpp.accel_lora_default(default_model, snapshot)
     lora_meta = _vm().accel_lora_meta(default_lora) or {}
     default_strength = float(lora_meta.get("recommended_strength") or 1.0)
     lora_note = ("与文生视频面板**同一份清单**：本机真实存在 + 与该底模"
@@ -430,12 +462,16 @@ def _music_fields(with_audio_encoder: bool) -> list:
 
 
 #: 模式 -> 字段表构造器（惰性，避免模块级就把工作流全拉进来）
-def _mode_fields(mode: str) -> tuple[list, bool]:
-    """返回 (字段表, 是否支持配置)。不支持的模式返回 ([], False)。"""
+def _mode_fields(mode: str, snapshot=None) -> tuple[list, bool]:
+    """返回 (字段表, 是否支持配置)。不支持的模式返回 ([], False)。
+
+    【2026-11-22】`snapshot` 透传给字段表构造器 —— 让加速 LoRA 清单
+    复用已预热的 ComfyUI 快照，避免同步 urllib 打 8188。
+    """
     if mode == "t2v":
-        return _video_new_panel_fields(), True
+        return _video_new_panel_fields(snapshot), True
     if mode in ("flf", "r2v"):
-        return _video_legacy_fields(mode), True
+        return _video_legacy_fields(mode, snapshot), True
     if mode == "t2i":
         return _image_fields("z"), True
     if mode in ("t2i_qwen", "i2i_qwen"):
@@ -491,11 +527,14 @@ MODE_NOTES = {
 # ------------------------------------------------------------------ 规格表
 
 
-def spec() -> dict:
-    """全部模式的字段规格（mode -> {fields, supported, note}）。"""
+def spec(snapshot=None) -> dict:
+    """全部模式的字段规格（mode -> {fields, supported, note}）。
+
+    【2026-11-22】`snapshot` 透传（见 `_mode_fields` 的说明）。
+    """
     out: dict = {}
     for mode in _all_modes():
-        fields, supported = _mode_fields(mode)
+        fields, supported = _mode_fields(mode, snapshot)
         out[mode] = {
             "fields": fields,
             "supported": supported,
@@ -516,20 +555,26 @@ def _all_modes() -> list:
     return modes
 
 
-def default_values(mode: str) -> dict:
-    """该模式的**内置默认值**（各字段的 default）。"""
-    fields, supported = _mode_fields(mode)
+def default_values(mode: str, snapshot=None) -> dict:
+    """该模式的**内置默认值**（各字段的 default）。
+
+    【2026-11-22】`snapshot` 透传（见 `_mode_fields` 的说明）。
+    """
+    fields, supported = _mode_fields(mode, snapshot)
     if not supported:
         return {}
     return {f["name"]: f.get("default") for f in fields
             if f.get("default") is not None}
 
 
-def default_gen_defaults() -> dict:
-    """全部模式的内置默认值（写库时的初始状态）。"""
+def default_gen_defaults(snapshot=None) -> dict:
+    """全部模式的内置默认值（写库时的初始状态）。
+
+    【2026-11-22】`snapshot` 透传（见 `_mode_fields` 的说明）。
+    """
     out: dict = {}
     for mode in _all_modes():
-        values = default_values(mode)
+        values = default_values(mode, snapshot)
         if values:
             out[mode] = values
     return out
@@ -1169,19 +1214,21 @@ def merge_into_params(mode: str, params: dict, defaults: dict,
 # ------------------------------------------------------------------ 前端载荷
 
 
-def spec_payload() -> dict:
+def spec_payload(snapshot=None) -> dict:
     """
     给前端「agent 管理」页的规格载荷。
 
     每个模式一项：中文标签 + 字段表（含合法取值清单）+ 当前生效值。
     前端**不硬编码**任何取值集合 —— 下拉选项全部来自这里。
+
+    【2026-11-22】`snapshot` 透传（见 `_mode_fields` 的说明）。
     """
     try:
         from . import gen_types
     except Exception:
         gen_types = None
     out: dict = {}
-    for mode, info in spec().items():
+    for mode, info in spec(snapshot).items():
         label = mode
         media = "other"
         category = ""

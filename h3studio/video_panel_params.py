@@ -155,7 +155,7 @@ def sampling_defaults_for_lora(lora_key: str | None) -> dict:
 # ------------------------------------------------------------------ 加速 LoRA 真源
 
 
-def accel_lora_options(model_key: str) -> list[dict]:
+def accel_lora_options(model_key: str, snapshot=None) -> list[dict]:
     """
     某个底模下**本机真实可用**的加速 LoRA 清单（三个面板共用同一份）。
 
@@ -171,6 +171,10 @@ def accel_lora_options(model_key: str) -> list[dict]:
 
     返回 [{key, display, name, steps, kind, loader, compatible, reason, ...}]，
     ``display`` 直接取既有 registry 的 display（**不自造名称**）。
+
+    【2026-11-22】新增 `snapshot` 参数：传进来即复用已预热的
+    ComfyUI 快照，**不再触发同步 urllib 打 8188**（那会卡住
+    aiohttp 事件循环里的整个服务端）。
     """
     from . import accel_lora_policy as policy
     from . import video_models as vm
@@ -183,7 +187,7 @@ def accel_lora_options(model_key: str) -> list[dict]:
         if not name:
             continue
         check = matrix.get(key) or {}
-        if not vm.lora_available(name):
+        if not vm.lora_available(name, snapshot):
             continue
         if not check.get("compatible"):
             continue
@@ -207,23 +211,26 @@ def accel_lora_options(model_key: str) -> list[dict]:
     return out
 
 
-def accel_lora_option_pairs(model_key: str) -> list[tuple[str, str]]:
-    """加速 LoRA 下拉选项 [(value, label), ...]，含「不挂」这一项。"""
+def accel_lora_option_pairs(model_key: str, snapshot=None) -> list[tuple[str, str]]:
+    """加速 LoRA 下拉选项 [(value, label), ...]，含「不挂」这一项。
+
+    【2026-11-22】新增 `snapshot` 参数（理由同 `accel_lora_options`）。
+    """
     pairs: list[tuple[str, str]] = [
         ("none", "none（不挂加速 LoRA，走标准多步采样）")]
-    for item in accel_lora_options(model_key):
+    for item in accel_lora_options(model_key, snapshot):
         pairs.append((item["key"], item["display"]))
     return pairs
 
 
-def accel_lora_default(model_key: str) -> str:
+def accel_lora_default(model_key: str, snapshot=None) -> str:
     """
     该底模下的默认加速 LoRA 档位。
 
     与 ``gen_defaults._video_legacy_fields`` 的原口径一致：
     优先取「官方 turbo 系里与该底模完整命中的那枚」；没有就退到第一枚可用档。
     """
-    items = accel_lora_options(model_key)
+    items = accel_lora_options(model_key, snapshot)
     official = [it for it in items if it["kind"] == "official_turbo"]
     pool = official or items
     return pool[0]["key"] if pool else "none"

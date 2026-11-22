@@ -37,6 +37,13 @@ _OFFICIAL_BASE_MARKERS = ("minimax-h3", "minimax h3")
 #: 第三方蒸馏/重打包的标记（出现在文件名或 metadata.source 里）
 _THIRD_PARTY_MARKERS = ("lightx2v", "comfy-org")
 
+#: 权重来源判定的进程内缓存（name -> provenance dict）。
+#:
+#: 【2026-11-22】权重 metadata 是文件的静态属性，运行期不变；
+#: 缓存它是为了避免在 USB 盘上对同一枚权重反复 stat/rglob
+#: （每次 30~90ms，一次面板构造要跑十几轮）。
+_PROVENANCE_CACHE: dict = {}
+
 
 def _read_metadata(path) -> dict:
     """读 safetensors 头部里的 __metadata__（只读前几 KB，不加载权重）。"""
@@ -67,7 +74,29 @@ def weight_provenance(name: str) -> dict:
     返回 {official_h3, third_party, base_model, reason}。
     读不到文件 / 读不到 metadata -> 三个标志都为 False，reason 说明原因
     （**不猜**：没有证据就不宣称它是官方档）。
+
+    【2026-11-22】加进程内缓存。
+    原实现每次调用都要走 `resolve_lora()` -> `comfyui_lora_dirs()`（对每个
+    LoRA 根目录做 `is_dir` stat）+ `_rel_to_lora_dir()`（遍历 + `rglob`），
+    而 LoRA 根目录之一在 **USB 盘**上。单次 30~90ms，而一次
+    `accel_lora_options()` 会对 12 枚候选各调一次，
+    `accel_lora_default()` / `_video_legacy_fields()` 还会再轮 ——
+    累加数秒。而这些函数跑在 **aiohttp 事件循环**里（同步调用），
+    于是整个 8190 服务端被卡住。
+
+    权重 metadata 是**文件的静态属性**，运行期不会变 ——
+    缓存是安全的。缓存键是权重名；查不到（None）也缓存，
+    避免对不存在的文件反复扫盘。
     """
+    if name in _PROVENANCE_CACHE:
+        return _PROVENANCE_CACHE[name]
+    result = _weight_provenance_uncached(name)
+    _PROVENANCE_CACHE[name] = result
+    return result
+
+
+def _weight_provenance_uncached(name: str) -> dict:
+    """`weight_provenance` 的真实实现（不带缓存）。"""
     from . import loras as lora_registry
 
     resolved, path = lora_registry.resolve_lora(name)

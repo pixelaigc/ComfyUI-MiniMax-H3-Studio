@@ -13120,10 +13120,33 @@ async def api_agent_session_delete(request):
                     "cleared_job_refs": cleared_jobs})
 
 
+def _comfy_snapshot_obj():
+    """取**已缓存**的 ComfyUI 模型清单快照（**绝不触发网络请求**）。
+
+    【2026-11-22】配合 `gen_defaults.warm_comfy_snapshot()` 使用：
+    先异步（aiohttp，不阻塞事件循环）刷新一次快照，再用这个函数
+    只读取缓存值。缓存没有时返回 None —— 调用方退回原来的
+    降级路径，行为与修复前一致。
+
+    为什么不直接用 `video_models.comfy_snapshot()`：那个函数在
+    缓存过期时会**同步 urllib** 去打 8188，在 aiohttp 事件循环里
+    会把整个服务端卡住（ComfyUI 冷启动时尤其明显）。
+    """
+    try:
+        return video_models.cached_comfy_snapshot()
+    except Exception:
+        return None
+
+
 async def api_agent_tools(request):
     """GET /api/agent/tools —— 列出 Agent 的工具清单（调试 / 前端展示用）。"""
+    # 【2026-11-22】先异步预热 ComfyUI 快照 —— 否则下面的
+    # `agent_settings.snapshot()` 会经 defaults() -> gen_defaults ->
+    # lora_available() -> **同步 urllib 打 8188**，在事件循环里
+    # 把整个服务端卡住（ComfyUI 冷启动时尤其明显）。
+    await gen_defaults.warm_comfy_snapshot()
     with db() as conn:
-        snapshot = agent_settings.snapshot(conn)
+        snapshot = agent_settings.snapshot(conn, _comfy_snapshot_obj())
     capabilities = agent_settings.normalize_capabilities(
         snapshot["settings"].get("capabilities"))
     specs = []
@@ -13241,8 +13264,13 @@ async def api_agent_settings(request):
       ffmpeg_path            ffmpeg 可执行文件路径（留空 = 用 PATH）
     """
     if request.method == "GET":
+        # 【2026-11-22】先异步预热 ComfyUI 快照 —— 否则
+        # `agent_settings.snapshot()` 会经 defaults() -> gen_defaults ->
+        # lora_available() -> **同步 urllib 打 8188**，在事件循环里
+        # 把整个服务端卡住（ComfyUI 冷启动时尤其明显）。
+        await gen_defaults.warm_comfy_snapshot()
         with db() as conn:
-            snapshot = agent_settings.snapshot(conn)
+            snapshot = agent_settings.snapshot(conn, _comfy_snapshot_obj())
         settings = snapshot["settings"]
         return json_ok({
             "settings": settings,
@@ -13257,7 +13285,7 @@ async def api_agent_settings(request):
             "gen_defaults": settings.get("gen_defaults") or {},
             # 字段规格（合法取值清单 + 类型 + 区间）——
             # 前端**不硬编码**任何取值集合，全部从这里来。
-            "gen_defaults_spec": gen_defaults.spec_payload(),
+            "gen_defaults_spec": gen_defaults.spec_payload(_comfy_snapshot_obj()),
             "limits": {
                 "max_steps": agent_mod.MAX_STEPS,
                 "max_steps_cap": agent_settings.MAX_STEPS_HARD_CAP,
@@ -13309,7 +13337,7 @@ async def api_agent_settings(request):
                     # 前端据此刷新界面（归一后的值可能与提交值不同，
                     # 比如越界的时长被夹回区间）。
                     "gen_defaults": saved.get("gen_defaults") or {},
-                    "gen_defaults_spec": gen_defaults.spec_payload()})
+                    "gen_defaults_spec": gen_defaults.spec_payload(_comfy_snapshot_obj())})
 
 
 async def api_agent_settings_test_engine(request):
