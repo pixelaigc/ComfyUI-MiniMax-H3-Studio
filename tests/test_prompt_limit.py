@@ -226,8 +226,19 @@ class TestNoRemainingHardGuards(unittest.TestCase):
     #: 所有会吃「原始提示词」的入口 —— 都必须走统一的提示词长度校验。
     #: （rebase 到新 maintainer 后，入口从 3 个增加到 5 个：
     #:  多了 api_music_enhance 与 api_h3image_pe_expand）
+    #: 【2026-11-22 合并 hermes 增强通道后再增 2 个】
+    #:  api_hermes_enhance（独立 hermes 增强入口）
+    #:  _api_enhance_via_hermes（/api/enhance 的 engine=hermes 分流）
+    #: 这两个走的是 _enhance_prompt_limit_guard —— 它是 _prompt_limit_guard
+    #: 的**委派垫片**（能力探测式），内部最终仍转调 _prompt_limit_guard，
+    #: 所以口径与其它 5 个入口完全一致。
+    #: 【口径说明】调用点计数用 "_prompt_limit_guard(" 作子串匹配，
+    #: 因此 _enhance_prompt_limit_guard(original) 也会被计入 ——
+    #: 这正是「唯一真源」得以成立的原因：全部 7 个入口最终都落到
+    #: 同一个 _prompt_limit_guard 判定上。
     GUARDED_ENDPOINTS = ("api_enhance", "api_moss_layout", "api_qwen_pe_expand",
-                         "api_music_enhance", "api_h3image_pe_expand")
+                         "api_music_enhance", "api_h3image_pe_expand",
+                         "api_hermes_enhance", "_api_enhance_via_hermes")
 
     def test_all_guards_go_through_single_helper(self):
         src = self._server_src()
@@ -244,6 +255,25 @@ class TestNoRemainingHardGuards(unittest.TestCase):
             j = src.index("\nasync def ", i + 10)
             self.assertIn("_prompt_limit_guard(", src[i:j],
                           "%s 必须走统一的提示词长度校验" % fn)
+
+    def test_enhance_shim_only_delegates(self):
+        """【2026-11-22 合并期补】增强入口的垫片**不得**自己持有上限判定。
+
+        【为什么补这条】
+        prompt-enhance 分支原本带了一份「能力探测式」兜底：_prompt_limit_guard
+        不存在时退回硬编码的 4000 判定。max-token 分支的契约明确禁止
+        server.py 里再出现 `if len(original) > <数字>:` —— 两者互斥。
+        合并后的正确形态：垫片**只做委派**，把「唯一真源」还给
+        _prompt_limit_guard。
+        """
+        src = self._server_src()
+        i = src.index("def _enhance_prompt_limit_guard(")
+        j = src.index("\ndef ", i + 10)
+        body = src[i:j]
+        self.assertNotRegex(body, r"if len\(original\) > \d+:",
+                            "增强垫片不得自己持有硬编码上限判定")
+        # 必须仍然委派到 _prompt_limit_guard（能力探测式）
+        self.assertIn('globals().get("_prompt_limit_guard")', body)
 
     def test_guard_is_after_provider_resolution(self):
         """校验必须在 Provider 解析之后 —— 上限是按 Provider 配的。"""

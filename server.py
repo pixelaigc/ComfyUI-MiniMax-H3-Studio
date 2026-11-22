@@ -10643,37 +10643,44 @@ def _normalize_hermes_config(raw: dict, previous: dict | None) -> dict:
 
 def _enhance_prompt_limit_guard(original: str):
     """
-    提示词长度上限守卫（**能力探测式**，与并行的
-    「本地模型配置 → 提示词长度上限（含「无限制」选项）」任务兼容）。
+    增强入口的提示词长度守卫 —— **统一委派**给 _prompt_limit_guard。
 
-    【为什么要有这个】
-    并行任务把「提示词长度上限」从**硬编码 4000** 改成了 **Provider 级配置**
-    （可选 4000 / 8000 / 20000 / 50000 / unlimited），并在 server.py 里
-    引入了 `_resolve_prompt_limit()` / `_prompt_limit_guard()`。
-    本分支基于 local/maintainer（那条任务还没合入），如果这里继续写死 4000，
-    两条分支合并后会出现「同一个入口，一处放开一处还砍」。
+    【为什么要有这个垫片】
+    「提示词长度上限」是 **Provider 级配置**（4000 / 8000 / 20000 / 50000 /
+    unlimited），唯一判定入口是 _prompt_limit_guard。
+    本函数存在的意义是给「增强类」入口一个语义明确的调用名，
+    并且在 _prompt_limit_guard 尚未定义时（极早期启动阶段）安全退化。
 
-    【本函数的兼容策略】
-      * 服务端**已有** _prompt_limit_guard -> 直接用它（并行任务合入后自动生效）
-      * 没有 -> 退回本分支原有的 4000 硬上限（合并前的行为，逐字不变）
+    【为什么不自己写一份上限判定】
+    【2026-11-22 合并期的真实教训】prompt-enhance 分支原本带了一份
+    「能力探测式」兜底：_prompt_limit_guard 不存在时退回硬编码的 4000。
+    但 max-token 分支的契约明确要求：
+      * server.py 里**不得**再出现 `if len(original) > <数字>:` 这种硬编码判定
+        （test_no_hardcoded_4000_guard_left）；
+      * 所有吃提示词的入口必须**各调一次**同一个 _prompt_limit_guard
+        （test_all_guards_go_through_single_helper）。
+    两条契约是**互斥**的：只要这里留一份独立的上限判定，
+    「唯一真源」就被破坏了 —— 那正是「一处放开、另一处还砍」的老问题。
+    所以这里只做**委派**，不再持有任何自己的上限逻辑。
+
+    【兜底口径】
+    _prompt_limit_guard 拿不到 Provider 时走 _default_prompt_limit()
+    -> 按**默认 Provider** 的配置算（默认 4000，与改动前行为一致）。
+    真要保留「上限 4000 字」这条提示语，也只能由
+    _prompt_limit_guard 统一产出，不能在本函数里另写一份。
 
     返回 (错误响应 or None, 生效信息 dict)。
     """
     guard = globals().get("_prompt_limit_guard")
     if callable(guard):
         try:
-            err, info = guard(original, None)
-            return err, info
+            return guard(original, None)
         except Exception:
-            # 守卫自身出错**不能**把增强入口搞挂 —— 退回硬上限
+            # 守卫自身出错**不能**把增强入口搞挂 —— 放行，让上层正常走
             pass
-    if len(original) > 4000:
-        return web.json_response(
-            {"error": "提示词过长（上限 4000 字）",
-             "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
-             "prompt_limit_unlimited": False}, status=400), {
-            "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
-            "prompt_limit_unlimited": False}
+    # 理论上到不了这里（_prompt_limit_guard 在本模块里定义）。
+    # 真到了，说明模块初始化顺序异常 —— **放行**而不是拦，
+    # 因为「误杀合法请求」比「漏拦一次超长提示词」更糟。
     return None, {"prompt_limit": "4000", "prompt_limit_max_chars": 4000,
                   "prompt_limit_unlimited": False}
 
