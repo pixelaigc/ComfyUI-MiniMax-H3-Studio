@@ -1694,7 +1694,10 @@ async def _tool_create_job(ctx: AgentContext, args: dict) -> dict:
     try:
         from . import agent_enhance
         enhance_plan = await agent_enhance.enhance_for_mode(
-            ctx, mode, prompt, ref_images=None)
+            ctx, mode, prompt, ref_images=None,
+            # 【C 项】把本次任务的素材引用交给增强管线 —— Agent 路径也要
+            # 拿到媒体上下文（nonebot 侧的增强链路本来就带着素材）。
+            asset_refs=asset_refs)
         if enhance_plan and enhance_plan.prompt:
             params["prompt"] = enhance_plan.prompt
             # 用户原始提示词也记一份 —— 媒体库/提示词历史要能看到

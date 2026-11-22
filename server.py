@@ -10913,7 +10913,7 @@ def _prompt_limit_guard(original: str, provider: dict | None) -> tuple[dict | No
     return None, info
 async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
                                  saved, asset_context, asset_summary,
-                                 scan_images=None):
+                                 scan_images=None, media_paths=None):
     """
     hermes 增强通道（对齐 nonebot 插件「咏唱h3」的增强方式）。
 
@@ -10928,6 +10928,10 @@ async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
 
     三条能力（图像 / 视频 / 音频）按 media 路由到各自的 skill 白名单与
     提示词模板 —— 见 h3studio/hermes_enhance.py 的 HERMES_MEDIA_SPECS。
+
+    【A 项 + D 项】`media_paths` 是素材的**本地绝对路径**
+    （图 / 整段视频 / 音频），会写进 hermes query 的「素材位置」块 ——
+    与 nonebot h3_interactive.py:4346-4361 逐字对齐。
     """
     # 【提示词长度上限】hermes 通道**解析不出 Provider**（没有 provider_id），
     # 所以用「默认 Provider 的上限」口径（_enhance_prompt_limit_guard 内部
@@ -10983,6 +10987,8 @@ async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
                 validate=bool(payload.get("validate", True)),
                 # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
                 scan_images=scan_images,
+                # 【A 项 + D 项】媒体绝对路径 -> hermes query 的「素材位置」块
+                media_paths=media_paths,
                 conn=conn)
     except hermes_enhance.HermesEnhanceError as exc:
         # 【不编造】hermes 不可用 -> 如实报错。调用方（前端）据此提示用户，
@@ -11103,6 +11109,9 @@ async def api_hermes_enhance(request):
     asset_context = ""
     asset_summary = {}
     scan_images: list[str] = []
+    # 【A 项 + D 项】媒体绝对路径（图 / 整段视频 / 音频）—— 写进 hermes
+    # query 的「素材位置」块（nonebot h3_interactive.py:4346-4361 同款）。
+    media_paths: dict = {}
     if asset_refs:
         try:
             resolved = await _resolve_enhance_assets(
@@ -11116,6 +11125,9 @@ async def api_hermes_enhance(request):
         # 【阶段2 的输入】参考图的**服务端本地路径** —— VLM 扫描要真正读这些图。
         # 外部无法指定任意路径（只能给素材库 asset_id，服务端自己解析）。
         scan_images = [str(p) for p in (resolved.get("images") or [])]
+        # 【A/D】素材的绝对路径（含**整段视频**原文件，不是只有抽帧）。
+        # collect_media_paths 内部已做存在性校验。
+        media_paths = enh_assets.collect_media_paths(resolved)
 
     duration = payload.get("duration")
     try:
@@ -11142,6 +11154,8 @@ async def api_hermes_enhance(request):
                 validate=bool(payload.get("validate", True)),
                 # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
                 scan_images=scan_images,
+                # 【A 项 + D 项】媒体绝对路径 -> hermes query 的「素材位置」块
+                media_paths=media_paths,
                 conn=conn)
     except hermes_enhance.HermesEnhanceError as exc:
         return web.json_response(
@@ -11339,6 +11353,8 @@ async def api_enhance(request):
     asset_labels: list[str] = []
     # 【阶段2 的输入】hermes 通道三段式扫描用的参考图本地路径
     asset_images: list[str] = []
+    # 【A 项 + D 项】媒体绝对路径（图 / 整段视频 / 音频）
+    asset_media_paths: dict = {}
     # 【标签语法方言】跟目标面板的官方参考标记语法走（见
     # _label_dialect_for_mode）。H3 视频用 <Picture N>；Qwen 图片编辑用
     # <imageN>（官方 PE-I2I）—— 用错方言会导致「增强完提交被拒」。
@@ -11366,6 +11382,8 @@ async def api_enhance(request):
         asset_images = [str(p) for p in (resolved_assets.get("images") or [])]
         asset_context = enh_assets.describe(resolved_assets)
         asset_summary = enh_assets.summary(resolved_assets)
+        # 【A/D】素材绝对路径（含**整段视频**原文件，不是只有抽帧）。
+        asset_media_paths = enh_assets.collect_media_paths(resolved_assets)
         asset_labels = list(asset_summary.get("labels") or [])
 
         # 【2026-11-21】带素材 -> 路由到官方**参考模式**模板。
@@ -11402,7 +11420,9 @@ async def api_enhance(request):
         return await _api_enhance_via_hermes(
             payload, original, mode, mode_ctx, model_key,
             saved, asset_context, asset_summary,
-            scan_images=asset_images)
+            scan_images=asset_images,
+            # 【A 项 + D 项】媒体绝对路径 -> hermes query 的「素材位置」块
+            media_paths=asset_media_paths)
 
     spec = enh.get_spec(spec_id, saved)
     # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
