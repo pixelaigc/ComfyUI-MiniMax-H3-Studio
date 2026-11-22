@@ -242,19 +242,35 @@ def submit_and_wait(mode, params, media=None):
                     "fields": fields, "job": last}
 
 
-def comfy_prompt_json(job_id):
-    """从 ComfyUI 的 /history 取**实际提交**的 prompt JSON。"""
+def comfy_prompt_json(prompt_id, job_id=""):
+    """从 ComfyUI 的 /history 取**实际提交**的 prompt JSON。
+
+    【为什么用 prompt_id 而不是 job_id】
+    任务落库时 worker 会把 ComfyUI 的 ``prompt_id`` 写进 jobs 表的
+    ``prompt_id`` 列（server.py:935 下发）。那是**唯一精确**的关联键 ——
+    用 job_id 去猜（切 uuid 后缀匹配）会在历史里有多条相似任务时**匹配错**
+    （实测就匹配错过一次，导致「工作流里没有采样参数」的假阴性）。
+
+    拿不到 prompt_id 时才退回「按 job_id 的 uuid 尾部匹配」。
+    """
     st, hist = _get(COMFY + "/history", timeout=120)
     if st != 200:
         return None
-    # job_id 形如 h3-<uuid>；ComfyUI 的 prompt_id 是 uuid
+    hist = hist or {}
+    if prompt_id and prompt_id in hist:
+        prompt = (hist[prompt_id] or {}).get("prompt") or []
+        if isinstance(prompt, list) and len(prompt) >= 3:
+            return prompt[2]
+        return prompt
+    # 兜底：按 job_id 的 uuid 尾部匹配（只在没有 prompt_id 时用）
     tail = (job_id or "").split("-")[-1]
-    for pid, entry in (hist or {}).items():
-        if tail and tail in pid:
-            prompt = (entry or {}).get("prompt") or []
-            if isinstance(prompt, list) and len(prompt) >= 3:
-                return prompt[2]
-            return prompt
+    if tail:
+        for pid, entry in hist.items():
+            if tail in pid:
+                prompt = (entry or {}).get("prompt") or []
+                if isinstance(prompt, list) and len(prompt) >= 3:
+                    return prompt[2]
+                return prompt
     return None
 
 
@@ -321,7 +337,9 @@ def run_mode(mode, params, media=None):
     result["record_gen_params"] = row.get("gen_params")
     result["status"] = row.get("status")
 
-    prompt = comfy_prompt_json(job_id)
+    prompt_id = str(row.get("prompt_id") or "")
+    result["comfy_prompt_id"] = prompt_id
+    prompt = comfy_prompt_json(prompt_id, job_id)
     result["comfy_prompt_json"] = prompt
     result["comfy_sampling"] = extract_sampling_from_prompt(prompt)
 
@@ -360,12 +378,16 @@ def main():
             "accel_lora": "ckpt850", "accel_lora_strength": 1.0}
     base.update(sampling)
 
+    # 只跑指定的 mode（命令行第 4+ 个参数）；默认三个都跑。
+    # 【为什么需要】GPU 被其它任务占满时，全量跑会超时（timeout 2400s）。
+    wanted = sys.argv[3:] or list(VIDEO_MODES)
+    MEDIA = {
+        "flf": [{"asset_id": REF_IMAGE, "slot": "first_frame", "ordinal": 1}],
+        "r2v": [{"asset_id": REF_IMAGE, "slot": "ref_image", "ordinal": 1}],
+    }
     runs = {}
-    runs["t2v"] = run_mode("t2v", dict(base))
-    runs["flf"] = run_mode("flf", dict(base), [
-        {"asset_id": REF_IMAGE, "slot": "first_frame", "ordinal": 1}])
-    runs["r2v"] = run_mode("r2v", dict(base), [
-        {"asset_id": REF_IMAGE, "slot": "ref_image", "ordinal": 1}])
+    for mode in wanted:
+        runs[mode] = run_mode(mode, dict(base), MEDIA.get(mode))
     report["runs"] = runs
 
     # ---- 四栏对拍结论 ----
