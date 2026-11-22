@@ -8264,6 +8264,11 @@ async def api_music_enhance(request):
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
     # 【2026-11-10 修复】先在**线程池**里把枚举取一次（见 yue2_schema 的说明），
     # 再把它同时喂给 build_system_prompt() 和 normalize_and_validate()。
     # 原来两处各自调 get_enums()，各自**同步阻塞**事件循环最长 10 秒；
@@ -8278,10 +8283,14 @@ async def api_music_enhance(request):
         {"role": "user", "content": user_prompt},
     ]
     try:
+        # 输出预算：无限制时交给后端/模型决定（-1），
+        # 否则沿用本条路线原本的 4000（音乐结构化增强的产出体量稳定）。
+        music_max_tokens = (enh.UNLIMITED_MAX_TOKENS
+                            if limit_info["prompt_limit_unlimited"] else 4000)
         raw = await llm_client.call_provider(
             item, messages,
             options={"temperature": 0.7, "top_p": 0.95,
-                     "max_tokens": 4000, "do_sample": True})
+                     "max_tokens": music_max_tokens, "do_sample": True})
     except llm_client.ProviderError as exc:
         return web.json_response(
             {"error": str(exc), "provider": item["name"],

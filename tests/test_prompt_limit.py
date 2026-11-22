@@ -217,18 +217,29 @@ class TestNoRemainingHardGuards(unittest.TestCase):
     def test_no_hardcoded_4000_guard_left(self):
         src = self._server_src()
         self.assertNotIn("if len(original) > 4000:", src)
+        # 也不该有别的字面量上限（避免以后又写死一个 8000/20000）
+        import re
+        self.assertIsNone(
+            re.search(r"if len\(original\) > \d+:", src),
+            "提示词长度上限必须来自 Provider 配置，不能再硬编码")
+
+    #: 所有会吃「原始提示词」的入口 —— 都必须走统一的提示词长度校验。
+    #: （rebase 到新 maintainer 后，入口从 3 个增加到 5 个：
+    #:  多了 api_music_enhance 与 api_h3image_pe_expand）
+    GUARDED_ENDPOINTS = ("api_enhance", "api_moss_layout", "api_qwen_pe_expand",
+                         "api_music_enhance", "api_h3image_pe_expand")
 
     def test_all_guards_go_through_single_helper(self):
         src = self._server_src()
-        # 长度校验只有这一个入口：1 处定义 + 3 处调用（不含注释里的提及）
+        # 长度校验只有这一个入口：1 处定义 + N 处调用（不含注释里的提及）
         calls = [ln for ln in src.splitlines()
                  if "_prompt_limit_guard(" in ln
                  and not ln.strip().startswith("#")
                  and not ln.strip().startswith("def ")]
-        self.assertEqual(len(calls), 3,
-                         "三个 endpoint 各调一次，实际：%s" % calls)
-        # 且三个 endpoint 都调用了它
-        for fn in ("api_enhance", "api_moss_layout", "api_qwen_pe_expand"):
+        self.assertEqual(len(calls), len(self.GUARDED_ENDPOINTS),
+                         "每个吃提示词的 endpoint 各调一次，实际：%s" % calls)
+        # 且每个 endpoint 都调用了它
+        for fn in self.GUARDED_ENDPOINTS:
             i = src.index("async def %s(" % fn)
             j = src.index("\nasync def ", i + 10)
             self.assertIn("_prompt_limit_guard(", src[i:j],
