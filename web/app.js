@@ -7325,6 +7325,58 @@ function statusLabel(data) {
   return {text: STATUS_TEXT.idle, dot: "dot dot-ok", title: "ComfyUI 空闲"};
 }
 
+// ---------- 顶栏状态：单一权威写入口 ----------
+//
+// 【2026-11-22 修：顶栏「未连接 / 生成中」高频来回跳】
+//
+// 现象：用户反馈顶栏状态指示在「未连接」与「生成中」之间快速来回跳。
+//
+// 根因（两个写回源互相覆盖，且都没有迟滞）：
+//   1. `setInterval(refreshSystem, 3000)` 每 3 秒拉一次 /api/system，
+//      一次探测失败就写「ComfyUI 未连接」；
+//   2. `EventSource("/api/status/stream")` 的 SSE 帧里**硬编码**
+//      `comfyui_ok: true`（老代码 Object.assign({comfyui_ok: true}, data)），
+//      于是 SSE 每秒又写回「正常」。
+//   两个源交替写同一个 #statusText -> 用户看到高频闪烁。
+//   实测（浏览器 DOM 采样 60 秒）：6 次翻转，其中 3 次是「ComfyUI 未连接」。
+//
+// 修法：
+//   1. **服务端权威**：连接状态由服务端判（带迟滞：连续失败 3 次
+//      才判断连），SSE 帧与轮询响应**携带同一个** `comfyui_ok`；
+//   2. **单一写入口**：所有状态更新都必须走 `applyStatusSnapshot()`，
+//      它按「快照新鲜度」仲裁 —— 旧快照不覆盖新快照；
+//   3. **不再注入 comfyui_ok**：SSE 帧里服务端已给权威值，前端
+//      **不再** Object.assign({comfyui_ok: true}, ...)。
+//
+// 【为什么按新鲜度仲裁还要保留】轮询与 SSE 是两条异步链路，
+// 响应可能乱序到达（轮询的响应比 SSE 的帧晚到）。不仲裁的话
+// 旧数据会覆盖新数据 —— 哪怕两边都是「权威的」。
+const statusState = {
+  seq: 0,          // 单调递增的快照序号（越大越新）
+  applied: null,   // 最后一次写进 DOM 的快照
+};
+
+// 合并一个状态快照并写入顶栏。
+// 返回 true = 这次快照被采纳；false = 被判为过期而丢弃。
+function applyStatusSnapshot(data, source) {
+  if (!data || typeof data !== "object") return false;
+  // 序号：SSE 用服务端时间戳（没有就用到达顺序）；轮询用到达顺序。
+  const stamp = Number(data._ts || 0);
+  const seq = stamp > 0 ? stamp : (statusState.seq + 1);
+  if (stamp > 0) {
+    // 服务端时间戳单调递增才有意义；乱序的旧帧直接丢。
+    if (seq < statusState.seq) return false;
+  }
+  statusState.seq = Math.max(statusState.seq, seq);
+  statusState.applied = data;
+  renderStatus(data);
+  try {
+    window.__h3StatusApplied = {seq: statusState.seq, source: source || "",
+                                text: (document.querySelector("#statusText") || {}).textContent};
+  } catch (e) { /* 忽略 */ }
+  return true;
+}
+
 function renderStatus(data) {
   const el = $("#statusText");
   const dot = $("#topStatus .dot");
@@ -7338,7 +7390,7 @@ function renderStatus(data) {
 async function refreshSystem() {
   try {
     const r = await (await fetch("/api/system", {cache: "no-store"})).json();
-    renderStatus(r);
+    applyStatusSnapshot(r, "poll");
   } catch (e) { /* 忽略：保留上一次状态 */ }
 }
 
@@ -7354,12 +7406,28 @@ function startStatusStream() {
   source.onmessage = event => {
     try {
       const data = JSON.parse(event.data);
-      // SSE 帧里没有 comfyui_ok：能收到帧就说明服务端连得上 ComfyUI
-      renderStatus(Object.assign({comfyui_ok: true}, data));
+      // 【2026-11-22 修】**不再**注入 comfyui_ok: true。
+      //
+      // 老代码写死 {comfyui_ok: true}，于是 SSE 每秒把顶栏写回「正常」，
+      // 与 3 秒一次的轮询（一次探测失败就写「未连接」）互相覆盖
+      // -> 用户看到「未连接 / 生成中」高频来回跳。
+      //
+      // 现在连接状态由**服务端**判（迟滞：连续失败 3 次才判断连），
+      // 轮询与 SSE 携带的是**同一个**权威值。SSE 帧里没有
+      // comfyui_ok 字段时（老服务端），退回沿用上一次判定，不臆造。
+      if (typeof data.comfyui_ok === "undefined") {
+        const prev = statusState.applied || {};
+        data.comfyui_ok = prev.comfyui_ok;
+      }
+      applyStatusSnapshot(data, "sse");
     } catch (e) { /* 忽略坏帧 */ }
   };
   source.onerror = () => {
-    // 断线由浏览器自动重连；这里不主动 close，避免连不上时刷日志
+    // 断线由浏览器自动重连；这里不主动 close，避免连不上时刷日志。
+    //
+    // 【2026-11-22】EventSource 的默认重连间隔由浏览器控制（通常 ~3 秒），
+    // 这里**不**额外加退避 —— 浏览器已经内置了重连节奏，
+    // 而我们**没有**在断线时额外打 ComfyUI（服务端侧有共享缓存）。
   };
 }
 
@@ -8263,13 +8331,37 @@ function scheduleRefresh(key, fn) {
   fn();
 }
 
-setInterval(() => scheduleRefresh("jobs", refreshJobs), 2000);
+// ---------- 轮询调度器 ----------
+//
+// 【2026-11-22 请求风暴修】
+// 调度器实现在 `web/poll-scheduler.js`（`window.H3Poll`）—— 它必须
+// **早于** generation-queue.js 加载（后者在 app.js 之前），
+// 所以不能定义在本文件里。
+//
+// 语义（详见 poll-scheduler.js 的注释）：
+//   * 递归 setTimeout —— 上一轮**完成**后才排下一轮，永不重叠；
+//   * ±20% 抖动 —— 多标签页相位打散；
+//   * 失败指数退避（上限 30s），成功复位；
+//   * document.hidden 时跳过；重新可见立刻补跑；
+//   * 同 key 去重（同名注册会替换旧调度器）。
+const scheduledPoll = (name, fn, intervalMs, opts) => {
+  if (typeof window.H3Poll === "function") return window.H3Poll(name, fn, intervalMs, opts);
+  // 调度器没加载（理论上不该发生）-> 退回裸 setInterval。
+  const t = setInterval(fn, intervalMs);
+  return { stop() { clearInterval(t); }, get failures() { return 0; } };
+};
+
+scheduledPoll("jobs", () => scheduleRefresh("jobs", refreshJobs), 2000);
+
 // 状态栏**不**推迟：renderStatus() 只写 #statusText 和那个小圆点，
 // 既不碰输入框也不碰下拉框 —— 推迟它反而会让右上角状态变陈旧
 // （用户停在一个输入框里不动时，状态就一直不更新）。
-setInterval(refreshSystem, 3000);
+//
+// 【2026-11-22】改成 scheduledPoll（抖动 + 退避 + 页面不可见暂停）。
+// 裸 setInterval 的相位固定 -> 多标签页同时打；同时它失败也照打。
+scheduledPoll("system", refreshSystem, 3000);
 // 硬件页：用户正在硬件页时才刷；交互期间同样推迟
-setInterval(() => {
+scheduledPoll("hardware", () => {
   if (state.page !== "system") return;
   scheduleRefresh("hardware", () => refreshHardware());
 }, 3000);

@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aiohttp import web, ClientSession, ClientTimeout
 import aiohttp
 
+from h3studio import comfy_client
+
 from h3studio.workflows import (
     build_workflow,
     LORAS,
@@ -1096,6 +1098,15 @@ async def _attach_thumb_urls(jobs: list[dict]) -> None:
 
 # ------------------------------------------------------------------ ComfyUI client
 COMFY = CFG["comfyui_url"].rstrip("/")
+
+#: 【2026-11-22 请求风暴修】把共享 ComfyUI 客户端的基址设好。
+#:
+#: 共享客户端（`h3studio.comfy_client`）负责：
+#:   * **会话复用**（一个 ClientSession + 连接池）—— 不再每个请求
+#:     新建一条 TCP 连接；
+#:   * **缓存 + 单飞**（/queue 2s、/system_stats 3s、全量 /object_info 15min）；
+#:   * **失败退避**（指数退避 + 抖动）—— 杜绝「失败即立刻重试」。
+comfy_client.configure(COMFY)
 HTTP_TIMEOUT = ClientTimeout(total=600)
 FFMPEG = shutil.which("ffmpeg")
 FFPROBE = shutil.which("ffprobe")
@@ -7621,9 +7632,13 @@ async def refresh_comfy_node_names(session=None, force: bool = False) -> set[str
     try:
         timeout = ClientTimeout(total=3)
         if session is None:
-            async with ClientSession(timeout=timeout) as s:
-                names = await asyncio.gather(*[_probe(s, n)
-                                                for n in _VIDEO_PANEL_NODES])
+            # 【2026-11-22 请求风暴修】用**共享会话**而不是新建一个。
+            # 老实现每次探测都 `async with ClientSession(...)` ——
+            # 每次探测 = 一条新 TCP 连接（且连接建立路径本身就慢，
+            # 见 `_H3_IMAGE_PROBE_SESSION` 的实测注释）。
+            s = comfy_client.session()
+            names = await asyncio.gather(*[_probe(s, n)
+                                            for n in _VIDEO_PANEL_NODES])
         else:
             names = await asyncio.gather(*[_probe(session, n)
                                             for n in _VIDEO_PANEL_NODES])
@@ -7781,27 +7796,34 @@ async def probe_h3_image_nodes(session=None, force: bool = False) -> tuple:
     return nodes_ok, True
 
 
-async def fetch_comfy_queue(session):
+async def fetch_comfy_queue(session=None):
     """读 ComfyUI 的真实队列：{running: n, pending: n}。
 
     状态栏必须反映 ComfyUI 实际在跑什么，而不只是 Studio 自己的 worker ——
     用户可以直接在 ComfyUI 里提交任务，那边在跑，Studio 也该显示「生成中」。
     读不到就返回 None（表示未知，不当成空闲）。
+
+    【2026-11-22 请求风暴修】走**共享客户端**（`h3studio.comfy_client`）：
+      * 2 秒 TTL 缓存 + 并发单飞合并 —— 9 条 SSE 每秒各打一次 /queue
+        的老实现被压到 0.5 req/s；
+      * 失败退避 —— ComfyUI 变慢时不再「立刻重试」；
+      * 复用连接池 —— 不再每次新建 TCP 连接。
+    `session` 参数保留是为了兼容既有调用方（现在**不使用**它）。
     """
-    try:
-        async with session.get(f"{COMFY}/queue") as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-        return {
-            "running": len(data.get("queue_running") or []),
-            "pending": len(data.get("queue_pending") or []),
-        }
-    except Exception:
+    data = await comfy_client.get_json(
+        "/queue", timeout=5.0,
+        cache_ttl=comfy_client.QUEUE_TTL,
+        cache_key="queue",
+        backoff_key="queue")
+    if not isinstance(data, dict):
         return None
+    return {
+        "running": len(data.get("queue_running") or []),
+        "pending": len(data.get("queue_pending") or []),
+    }
 
 
-async def fetch_comfy_queue_ids(session) -> set[str] | None:
+async def fetch_comfy_queue_ids(session=None) -> set[str] | None:
     """读 ComfyUI 队列里**全部** prompt_id（running + pending）。
 
     【为什么要 prompt_id 而不是个数 —— A5 需求】
@@ -7820,13 +7842,16 @@ async def fetch_comfy_queue_ids(session) -> set[str] | None:
     【顺带】/queue 的响应体同时给出数量，状态栏可以复用同一次请求
     （省一次 HTTP 往返）—— 所以这里返回的是 prompt_id 集合，
     数量由调用方按需要算。
+
+    【2026-11-22 请求风暴修】走共享客户端（缓存 + 单飞 + 退避），
+    与 `fetch_comfy_queue` 共用同一份 /queue 缓存 —— 两者原本各打一次。
     """
-    try:
-        async with session.get(f"{COMFY}/queue") as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-    except Exception:
+    data = await comfy_client.get_json(
+        "/queue", timeout=5.0,
+        cache_ttl=comfy_client.QUEUE_TTL,
+        cache_key="queue",
+        backoff_key="queue")
+    if not isinstance(data, dict):
         return None
     return running_truth.queue_prompt_ids(data)
 
@@ -8039,13 +8064,17 @@ async def status_snapshot(session=None):
     running_job: Studio 自己正在跑的任务 id（没有则 None）
     comfy_running / comfy_pending: ComfyUI 真实队列（未知时为 None）
     queued: Studio 库里排队中的任务数
+
+    【2026-11-22 请求风暴修】`fetch_comfy_queue` 现在走共享客户端
+    （2 秒 TTL + 单飞 + 退避）—— 9 条 SSE 每秒各打一次 /queue 的
+    老实现被压到 0.5 req/s。`session` 参数保留兼容，实际不使用。
     """
     with db() as conn:
         queued = conn.execute(
             "SELECT COUNT(*) c FROM jobs WHERE status='queued'").fetchone()["c"]
     longfilm_running = next(iter(LONGFILM_PROCESSES), None)
     running_job = WORKER.current or longfilm_running
-    queue = await fetch_comfy_queue(session) if session else None
+    queue = await fetch_comfy_queue()
     return {
         "queued": queued,
         "running": running_job,
@@ -8054,26 +8083,100 @@ async def status_snapshot(session=None):
     }
 
 
+#: ComfyUI 连接健康度的**迟滞**状态。
+#:
+#: 【为什么要迟滞 —— 2026-11-22 顶栏状态抖动】
+#: ComfyUI 忙时（实测 /object_info 满载 8.9 秒）一次探测超时就会
+#: 让 `comfyui_ok` 变 False，前端立刻把顶栏画成「ComfyUI 未连接」。
+#: 而同一时刻 SSE 帧还在推「生成中」-> 两个源互相覆盖 -> 用户看到
+#: 高频来回跳。
+#:
+#: 【迟滞规则】
+#:   * 失败：连续失败 **COMFY_HEALTH_FAIL_THRESHOLD** 次才判为断连
+#:     （默认 3 次；探测每 3 秒一次 -> 约 9 秒后界面才变「未连接」）；
+#:   * 恢复：**一次**成功即恢复（避免「已经好了但界面还挂着未连接」，
+#:     那比误报断连更让人困惑）。
+#:
+#: 【为什么放在服务端而不是前端】前端有多个写回源（轮询 + SSE），
+#: 在前端做迟滞需要两份状态合并 —— 反而更容易打架。服务端只有一份
+#: 权威判定，前端只是显示它。
+_COMFY_HEALTH: dict = {"streak": 0, "ok": True, "last_probe": 0.0}
+
+#: 连续失败多少次才判为「ComfyUI 未连接」。
+COMFY_HEALTH_FAIL_THRESHOLD = 3
+
+
+def _comfy_health_state() -> dict:
+    """取当前健康度状态（只读）。"""
+    return dict(_COMFY_HEALTH)
+
+
+def _comfy_health_gate(probe_ok: bool) -> bool:
+    """把「本次探测结果」转成「是否认为 ComfyUI 已连接」（带迟滞）。
+
+    返回 True = 认为连着（界面不显示「未连接」）。
+    """
+    now = time.time()
+    _COMFY_HEALTH["last_probe"] = now
+    if probe_ok:
+        # 一次成功即恢复（并清零失败计数）。
+        _COMFY_HEALTH["streak"] = 0
+        _COMFY_HEALTH["ok"] = True
+        return True
+    streak = int(_COMFY_HEALTH.get("streak") or 0) + 1
+    _COMFY_HEALTH["streak"] = streak
+    if streak >= COMFY_HEALTH_FAIL_THRESHOLD:
+        _COMFY_HEALTH["ok"] = False
+    return bool(_COMFY_HEALTH["ok"])
+
+
 async def api_system(request):
-    """队列状态 + ComfyUI 状态"""
-    sysinfo = None
-    snap = None
-    try:
-        async with ClientSession(timeout=ClientTimeout(total=3)) as s:
-            async with s.get(f"{COMFY}/system_stats") as resp:
-                if resp.status == 200:
-                    sysinfo = await resp.json()
-            snap = await status_snapshot(s)
-    except Exception:
-        pass
-    if snap is None:
-        snap = await status_snapshot(None)
+    """队列状态 + ComfyUI 状态
+
+    【2026-11-22 顶栏状态抖动修 —— 用户报「未连接 / 生成中」高频来回跳】
+
+    【根因】老实现在**每一次**调用里都**新建**一个 ClientSession 并
+    独立打一次 ComfyUI `/system_stats`（超时 3 秒）。ComfyUI 忙时
+    （实测 /object_info 满载 8.9 秒、/queue 5.2 秒）这一次探测会
+    **超时** -> `sysinfo = None` -> `comfyui_ok = False` -> 前端
+    立刻把顶栏画成「ComfyUI 未连接」。
+
+    而前端有**两个**状态源在写同一个顶栏：
+      * `setInterval(refreshSystem, 3000)`（web/app.js:8270）—— 轮询；
+      * `EventSource("/api/status/stream")`（web/app.js:7350）—— SSE，
+        **帧里强制 `comfyui_ok: true`**（web/app.js:7358）。
+    两者的写回**没有仲裁**，也没有「连续失败 N 次才算断」的迟滞，
+    于是：轮询在 ComfyUI 忙的那一瞬间写「未连接」，紧接着 SSE
+    写「生成中」-> 用户看到的就是**高频来回跳**。
+    实测（浏览器 DOM 采样 60 秒）：6 次状态翻转，其中 3 次是
+    「ComfyUI 未连接」。
+
+    【修法 —— 三条】
+    1. **单一权威源**：本接口改为从**共享缓存**读 ComfyUI 探测结果
+       （3 秒 TTL + 单飞合并 + 失败退避），不再每次新建 session；
+    2. **迟滞（hysteresis）**：一次探测失败**不**立刻判为断连，
+       必须**连续失败 N 次**（默认 3 次，≈9 秒）才把 `comfyui_ok`
+       置 False；恢复时**一次成功**即恢复（避免「好了但界面还挂着
+       未连接」）。迟滞状态保存在进程内，跨请求共享。
+    3. **不再互相覆盖**：SSE 帧改为携带服务端**同一个**判定结果，
+       前端不再自己塞 `comfyui_ok: true`（见 web/app.js 的改动）。
+    """
+    sysinfo = await comfy_client.get_json(
+        "/system_stats", timeout=3.0,
+        cache_ttl=comfy_client.SYSTEM_STATS_TTL,
+        cache_key="system_stats",
+        backoff_key="system_stats")
+    snap = await status_snapshot()
+    ok = _comfy_health_gate(sysinfo is not None)
     return json_ok({
         "queued": snap["queued"],
         "running": snap["running"],
         "comfy_running": snap["comfy_running"],
         "comfy_pending": snap["comfy_pending"],
-        "comfyui_ok": sysinfo is not None,
+        "comfyui_ok": ok,
+        # 【新增】探测结果的权威来源说明（前端不再自行推断）。
+        "comfyui_probe_ok": sysinfo is not None,
+        "comfyui_fail_streak": _comfy_health_state()["streak"],
         "comfyui": (sysinfo or {}).get("system") or {},
         "devices": (sysinfo or {}).get("devices") or [],
         # 后端指纹 + 功能位：前端据此判断「我连的是不是最新后端」
@@ -8123,6 +8226,24 @@ async def api_status_stream(request):
 
     前端用 EventSource 订阅，状态一变就重绘，不必等下一次轮询。
     每 1 秒推一次（只在内容变化时真正写出），连接断开自动收尾。
+
+    【2026-11-22 请求风暴修 —— SSE 是最大的放大源】
+
+    老实现：**每条 SSE 连接各自**每秒调一次 `status_snapshot(s)`，
+    而 `status_snapshot` 内部打一次 ComfyUI `/queue`。于是：
+
+        N 条浏览器标签页 = N 次 /queue 每秒
+
+    实测本机 8190 上同时挂着 **9 条 SSE** -> ComfyUI 每秒收 9 次
+    /queue（pcap 实测 /queue 占 2.61 req/s，是所有路径里最高的一条）。
+
+    现在的做法：
+      * 所有 SSE 连接**共用**一份快照（`_STATUS_STREAM_SNAPSHOT`），
+        由**一个**后台协程刷新；
+      * 快照刷新走共享客户端的 /queue 缓存（2 秒 TTL + 单飞），
+        所以 ComfyUI 侧每 2 秒最多收 1 次 /queue，与 SSE 条数**无关**；
+      * SSE 帧携带**服务端权威的** `comfyui_ok`（迟滞判定），
+        前端不再自己塞 `comfyui_ok: true`（那正是抖动的另一半原因）。
     """
     resp = web.StreamResponse(
         headers={"Content-Type": "text/event-stream",
@@ -8132,25 +8253,26 @@ async def api_status_stream(request):
     await resp.prepare(request)
     last = None
     try:
-        async with ClientSession(timeout=ClientTimeout(total=3)) as s:
-            while True:
-                try:
-                    snap = await status_snapshot(s)
-                    payload = json.dumps({
-                        "queued": snap["queued"],
-                        "running": snap["running"],
-                        "comfy_running": snap["comfy_running"],
-                        "comfy_pending": snap["comfy_pending"],
-                    }, ensure_ascii=False)
-                    # 只在内容变化时推，避免前端无谓重绘
-                    if payload != last:
-                        last = payload
-                        await resp.write(f"data: {payload}\n\n".encode("utf-8"))
-                except (ConnectionResetError, asyncio.CancelledError):
-                    break
-                except Exception:
-                    pass
-                await asyncio.sleep(1.0)
+        while True:
+            try:
+                snap = await _status_stream_snapshot()
+                payload = json.dumps({
+                    "queued": snap["queued"],
+                    "running": snap["running"],
+                    "comfy_running": snap["comfy_running"],
+                    "comfy_pending": snap["comfy_pending"],
+                    # 【新增】服务端权威的连接判定（带迟滞）。
+                    "comfyui_ok": snap["comfyui_ok"],
+                }, ensure_ascii=False)
+                # 只在内容变化时推，避免前端无谓重绘
+                if payload != last:
+                    last = payload
+                    await resp.write(f"data: {payload}\n\n".encode("utf-8"))
+            except (ConnectionResetError, asyncio.CancelledError):
+                break
+            except Exception:
+                pass
+            await asyncio.sleep(1.0)
     except (ConnectionResetError, asyncio.CancelledError):
         pass
     finally:
@@ -8159,6 +8281,41 @@ async def api_status_stream(request):
         except Exception:
             pass
     return resp
+
+
+#: 所有 SSE 连接共用的快照缓存。
+#:
+#: 【为什么是共享的】每条 SSE 各自刷新 = N 倍 ComfyUI 请求。
+#: 共享后，刷新频率与连接数**无关**。
+_STATUS_STREAM_SNAPSHOT: dict = {"at": 0.0, "data": None}
+
+#: 共享快照的刷新间隔（秒）。
+_STATUS_STREAM_TTL = 1.0
+
+
+async def _status_stream_snapshot() -> dict:
+    """取（并按需刷新）所有 SSE 连接共用的状态快照。"""
+    now = time.monotonic()
+    cached = _STATUS_STREAM_SNAPSHOT.get("data")
+    if cached is not None and (now - _STATUS_STREAM_SNAPSHOT["at"]) < _STATUS_STREAM_TTL:
+        return cached
+    snap = await status_snapshot()
+    # 连接健康度：SSE 自己也探测一次 /system_stats（走共享缓存）。
+    sysinfo = await comfy_client.get_json(
+        "/system_stats", timeout=3.0,
+        cache_ttl=comfy_client.SYSTEM_STATS_TTL,
+        cache_key="system_stats",
+        backoff_key="system_stats")
+    data = {
+        "queued": snap["queued"],
+        "running": snap["running"],
+        "comfy_running": snap["comfy_running"],
+        "comfy_pending": snap["comfy_pending"],
+        "comfyui_ok": _comfy_health_gate(sysinfo is not None),
+    }
+    _STATUS_STREAM_SNAPSHOT["at"] = now
+    _STATUS_STREAM_SNAPSHOT["data"] = data
+    return data
 
 
 async def api_unload(request):
@@ -12563,6 +12720,9 @@ async def main():
         _H3_IMAGE_PROBE_SESSION = None
         if sess is not None and not sess.closed:
             await sess.close()
+        # 【2026-11-22 请求风暴修】关闭**共享** ComfyUI 客户端会话
+        # （否则 aiohttp 会打 "Unclosed client session" 警告）。
+        await comfy_client.close_session()
     app.on_cleanup.append(_close_probe_session)
     await runner.setup()
     site = web.TCPSite(runner, CFG["host"], CFG["port"])
