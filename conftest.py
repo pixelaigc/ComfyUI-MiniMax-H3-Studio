@@ -752,6 +752,8 @@ def pytest_runtest_setup(item):
     这是最危险的一类：作者忘了加标记 -> 用例**静悄悄地**打线上 ->
     污染用户媒体库。护栏在这里把它变成一次响亮的失败。
     """
+    _install_db_tracker()
+    _CURRENT_ITEM.clear()
     path = Path(str(item.fspath))
     rel = _rel_to_repo(path)
     has_live_marker = item.get_closest_marker("live") is not None
@@ -867,42 +869,31 @@ def _guard_live_data_dir(tmp_path_factory):
 # 就看一眼它的 `DB_PATH` 指向哪里 —— 指向线上就 fail-fast。
 
 
-def _server_module():
-    """拿到已被 import 的 server 模块（没 import 就返回 None）。"""
-    import sys
-    return sys.modules.get("server")
-
-
 def pytest_runtest_teardown(item, nextitem):
-    """【写库护栏】测试结束后核对：server.DB_PATH 没有指向线上。
+    """【写库护栏】这个用例期间真的往线上库写过东西 -> fail-fast。
 
-    【为什么放在 teardown 而不是 setup】
-    setup 时 `server` 可能**还没被 import**（import 发生在用例体内）。
-    teardown 时它一定已经在了 —— 这时才能看到真实的 DB_PATH。
+    【判据 —— 「实际打开过的库」而不是「当前 DB_PATH」】
+    这里**不能**只看 `server.DB_PATH` 当前指向哪里 ——
+    unittest 风格的用例在 `tearDown()` 里已经把 DB_PATH 复原回线上了，
+    而 pytest 的 teardown hook 跑在 `tearDown()` **之后**，
+    于是「复原成线上」反而会被误判成「写进了线上」
+    （实测踩到：29 个 ERROR "previous item was not torn down properly"）。
 
-    【判据】
-    · server 模块没被 import -> 无关紧要，放行；
-    · DB_PATH 不在线上数据目录 -> 放行（正常的隔离用例）；
-    · DB_PATH 指向线上 -> fail-fast，并报出是哪条用例干的。
+    正确判据是「**这个用例期间实际打开过哪个库**」——
+    由 `_maybe_wrap_server()` 给 `server.db()` 套的记录器收集。
 
-    【为什么用 teardown 而不是 setup 报】
-    setup 时读到的 DB_PATH 可能还是「默认值」，而用例体里才被改成
-    线上；teardown 读到的是**最终状态**，能抓到真正的漏网之鱼。
+    【为什么这样才拦得住「间接指向线上」】
+    那个肇事的测试文件里**没有任何线上 URL / 线上路径字面量** ——
+    它写的是 `srv.DB_PATH`（一个由 config.json 决定的模块常量）。
+    静态扫描看不见这种「间接指向」，只有运行时才看得见。
     """
-    mod = _server_module()
-    if mod is None:
-        return
-    db_path = getattr(mod, "DB_PATH", None)
-    if db_path is None:
-        return
-    try:
-        p = str(db_path)
-    except Exception:  # noqa: BLE001
-        return
-    if not _LIVE_PATH_RE.search(p):
+    tracked = list(_CURRENT_ITEM)
+    _CURRENT_ITEM.clear()
+    live_writes = [str(p) for p in tracked if _LIVE_PATH_RE.search(str(p))]
+    if not live_writes:
         return
     pytest.fail(
-        f"\n[护栏] 测试往**线上任务库**写了记录：{p}\n"
+        f"\n[护栏] 测试往**线上任务库**写了记录：{live_writes}\n"
         f"       用例：{item.nodeid}\n"
         f"       这条用例 import 了 server 模块，但没把 server.DB_PATH\n"
         f"       重定向到临时目录 -> create_job_record() 写进了用户\n"
@@ -910,3 +901,94 @@ def pytest_runtest_teardown(item, nextitem):
         f"       修法：在 setUp 里把 server.DB_PATH 指向 tmp 目录，\n"
         f"             并在 tearDown 里复原。",
         pytrace=False)
+
+
+#: 当前用例期间，server.db() 打开过的库路径。
+#: 每条用例开始时清空，结束时读取。
+_CURRENT_ITEM: list = []
+
+#: 记录器是否已安装（只装一次）。
+_DB_TRACKER_INSTALLED: list = []
+
+
+def _server_module():
+    """拿到已被 import 的 server 模块（没 import 就返回 None）。"""
+    import sys
+    return sys.modules.get("server")
+
+
+def _maybe_wrap_server() -> None:
+    """如果 server 模块已经 import 了，给它的 db() 套上记录器。"""
+    mod = _server_module()
+    if mod is None:
+        return
+    original = getattr(mod, "db", None)
+    if original is None or getattr(original, "_h3_tracked", False):
+        return
+
+    def _tracked_db(*args, **kwargs):
+        conn = original(*args, **kwargs)
+        path = getattr(mod, "DB_PATH", None)
+        if path is not None:
+            _CURRENT_ITEM.append(path)
+        return conn
+
+    setattr(_tracked_db, "_h3_tracked", True)
+    setattr(_tracked_db, "_h3_original", original)
+    mod.db = _tracked_db
+
+
+#: sqlite3.connect 的原始实现（被记录器包一层）。
+_SQLITE_CONNECT_ORIG = None
+
+
+def _install_db_tracker() -> None:
+    """装上「谁打开了线上库」的记录器。
+
+    【为什么需要它 —— 对应真实事故】
+    线上媒体库出现了 3 条提示词为 `x` / `next` 的文生视频卡片。
+    根因：`tests/test_continuation_retry.py` 的 `setUp` 只隔离了
+    `OUT_DIR`，**没隔离 `DB_PATH`** -> `create_job_record()`
+    直接把任务写进了线上 jobs 表。
+
+    那个文件里**没有任何线上字面量** —— 静态扫描看不见这种
+    「间接指向线上」。所以必须有运行时检查。
+
+    【为什么盯 sqlite3.connect 而不是 server.db】
+    `server.db()` 是在**模块顶层** import 时就被 import 好的普通函数；
+    用例在**函数体内** import server 之后**立刻**调
+    `create_job_record()` -> 内部 `db()` -> `sqlite3.connect(DB_PATH)`，
+    这中间没有任何「下一次 import」事件给钩子用
+    （实测：包 server.db 的方案在 body 里 import 的场景下抓不到）。
+
+    而 `sqlite3.connect` 是**所有** sqlite 访问的唯一入口 ——
+    在它上面套一层，就能抓到「任何用例打开了线上库」，
+    不管它是通过 server.db() 还是别的路径。
+    这比盯某个模块函数更底层、更可靠。
+
+    【代价与安全性】
+    · 只**记录**不阻断 —— 记录器不改变 connect 的行为；
+    · 只在测试进程里生效（pytest 的 conftest 里）；
+    · 记录的是路径字符串，不写任何数据。
+    """
+    global _SQLITE_CONNECT_ORIG
+    if _DB_TRACKER_INSTALLED:
+        return
+    _DB_TRACKER_INSTALLED.append(True)
+
+    import sqlite3
+
+    _SQLITE_CONNECT_ORIG = sqlite3.connect
+
+    def _tracked_connect(database, *args, **kwargs):
+        try:
+            db_path = str(database)
+        except Exception:  # noqa: BLE001
+            db_path = ""
+        if db_path and db_path != ":memory:":
+            _CURRENT_ITEM.append(db_path)
+        orig = _SQLITE_CONNECT_ORIG
+        assert orig is not None, "sqlite3.connect 记录器状态异常"
+        return orig(database, *args, **kwargs)
+
+    sqlite3.connect = _tracked_connect

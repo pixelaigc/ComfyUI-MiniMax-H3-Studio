@@ -259,18 +259,33 @@ def test_write_guard_detects_live_db_path(guarded_pytester):
     于是它会先被**静态扫描**护栏拦下（那也拦对了，但拦的是另一条）。
     加 `# guard-exempt:` 让静态扫描放行它，
     这样测到的才是**写库护栏**本身。
+
+    【为什么用真的 sqlite3.connect】
+    写库护栏盯的是 `sqlite3.connect`（所有 sqlite 访问的唯一入口），
+    所以这个伪造用例必须真的走一次 connect 才算触发 ——
+    只改 `server.DB_PATH` 而不碰 sqlite3，护栏看不见。
     """
     guarded_pytester.makepyfile(
         test_write_rogue="""
         # guard-exempt: 这个伪造用例必须写线上路径才能触发写库护栏
+        import sqlite3
         import sys
         import types
 
         def test_writes_to_live_db():
-            # 伪造一个 server 模块，DB_PATH 指向线上
+            # 伪造一个 server 模块：DB_PATH 指向线上
             mod = types.ModuleType("server")
             mod.DB_PATH = "/root/projects/comfyui-minimax-h3-studio/data/jobs.db"
+
+            def db():
+                # server.db() 的真实行为就是 sqlite3.connect(DB_PATH)
+                return sqlite3.connect(mod.DB_PATH)
+
+            mod.db = db
             sys.modules["server"] = mod
+            # 真的走一次 db() -> sqlite3.connect(线上路径)
+            conn = mod.db()
+            conn.close()
             assert mod.DB_PATH
         """)
     result = guarded_pytester.runpytest_subprocess("-p", "no:cacheprovider")
