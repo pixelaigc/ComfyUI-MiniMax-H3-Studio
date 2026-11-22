@@ -51,6 +51,24 @@ logger = logging.getLogger("h3studio.yue2_schema")
 COMFY_OBJECT_INFO_URL = "http://127.0.0.1:8188/object_info"
 OBJECT_INFO_TTL = 900.0  # 15 分钟缓存，避免每次生成都打 ComfyUI
 
+#: 【2026-11-22 请求风暴修】**失败**后的缓存有效期（秒）。
+#:
+#: 【为什么必须有它 —— 现场实测的放大环】
+#: 老实现的缓存**只在成功时更新**（except 分支只更新 `_cache["data"]`，
+#: **不更新 `_cache["at"]`**）。于是：
+#:   1. ComfyUI 忙 -> 拉全量 /object_info 超时；
+#:   2. 缓存**没**被标记为新鲜 -> 下次调用**立刻**再拉一次全量；
+#:   3. 全量 /object_info 实测 **37.5 MB / 3~10 秒**（7129 个节点）；
+#:   4. 于是每次失败都产生一次 37 MB 的拉取 -> ComfyUI 侧 CPU/带宽被打满。
+#: 现场证据：journal 里 16 次「拉 http://127.0.0.1:8188/object_info 失败，
+#: 用静态兜底枚举」，且 pcap 里 3 条**并发**的全量 /object_info 连接
+#: （各 16~29 MB，耗时 7~15 秒）。
+#:
+#: 【修法】失败时**也**写缓存（用兜底值），TTL 用一个**短**的
+#: OBJECT_INFO_FAIL_TTL —— 既杜绝「失败即立刻重试」，又保证 ComfyUI
+#: 恢复后很快能用上真枚举（不必等满 15 分钟）。
+OBJECT_INFO_FAIL_TTL = 60.0
+
 STYLE_NODE = "YuE2StylePrompt"
 LYRICS_NODE = "YuE2LyricsTemplate"
 
@@ -143,13 +161,47 @@ SECTION_TAG_RE = re.compile(r"^\[[^\]\n]{1,30}\]\s*$", re.M)
 INSTRUMENTAL_TAG_RE = re.compile(r"^\[instrumental[^\]]*\]$", re.I)
 LYRICS_FENCE_RE = re.compile(r"^\s*`{3,}\s*$", re.M)
 
-_cache = {"at": 0.0, "data": dict(STATIC_ENUMS)}
+_cache = {"at": 0.0, "data": dict(STATIC_ENUMS), "ttl": OBJECT_INFO_TTL}
 _cache_lock = threading.Lock()
 
 
 # ==================== schema 拉取 ====================
 
 def _fetch_enums(timeout: float = 10.0) -> dict:
+    """拉权威枚举。
+
+    【2026-11-22 请求风暴修】改用**按节点名**问，不再拉全量。
+
+    老实现拉的是全量 `/object_info` —— 实测 **37.5 MB / 3~10 秒**
+    （本机 7129 个节点）。而这里只需要 2 个节点的 8 个枚举字段：
+      * `YuE2StylePrompt` 的 7 个 COMBO；
+      * `YuE2LyricsTemplate` 的 template。
+
+    ComfyUI 支持按节点名问：`/object_info/<ClassName>` —— 实测
+    1.2 KB / 1 ms。改成按节点名问之后：
+
+      * 传输量从 37.5 MB 降到 ~2.5 KB（**15000 倍**）；
+      * 单次耗时从 3~10 秒降到 ~2 ms；
+      * 不再因为 ComfyUI 忙而超时 -> 不再有「失败即重试」的放大环。
+
+    【兼容】按节点名问是 ComfyUI 0.37+ 的能力。若本机版本不支持
+    （返回 404 / 不含该节点），**回落到**全量拉取（保留原路径），
+    保证老版本上功能不坏。
+    """
+    # --- 优先：按节点名问（便宜且快）---
+    try:
+        out = {}
+        style = _fetch_node_input(STYLE_NODE, timeout=timeout)
+        for k in ("language", "genre", "mood", "vocal", "vocal_color",
+                  "energy", "length_hint"):
+            out[k] = list(style[k][0])
+        lyrics = _fetch_node_input(LYRICS_NODE, timeout=timeout)
+        out["template"] = list(lyrics["template"][0])
+        return out
+    except Exception as exc:  # noqa: BLE001
+        logger.info("[yue2_schema] 按节点名问失败，回落到全量 /object_info: %s", exc)
+
+    # --- 回落：全量（老路径，保留）---
     with urllib.request.urlopen(COMFY_OBJECT_INFO_URL, timeout=timeout) as r:
         oi = json.loads(r.read())
     out = {}
@@ -159,6 +211,18 @@ def _fetch_enums(timeout: float = 10.0) -> dict:
         out[k] = list(sp[k][0])
     out["template"] = list(oi[LYRICS_NODE]["input"]["required"]["template"][0])
     return out
+
+
+def _fetch_node_input(node_name: str, timeout: float = 10.0) -> dict:
+    """问单个节点的 `input.required` 字典（ComfyUI 的按名查询接口）。"""
+    url = f"{COMFY_OBJECT_INFO_URL.rsplit('/', 1)[0]}/{node_name}"
+    with urllib.request.urlopen(url, timeout=timeout) as r:
+        data = json.loads(r.read())
+    if not isinstance(data, dict) or node_name not in data:
+        raise RuntimeError(f"ComfyUI 没有节点 {node_name}")
+    required = ((data[node_name] or {}).get("input") or {}).get("required") or {}
+    return required
+
 
 
 async def get_enums_async(force: bool = False) -> dict:
@@ -183,24 +247,45 @@ async def get_enums_async(force: bool = False) -> dict:
 
 
 def get_enums(force: bool = False) -> dict:
-    """返回权威枚举。优先运行时拉 ComfyUI，失败/超时用静态兜底（永不抛异常）。"""
+    """返回权威枚举。优先运行时拉 ComfyUI，失败/超时用静态兜底（永不抛异常）。
+
+    【2026-11-22 请求风暴修 —— 失败也要写缓存】
+
+    老实现在 except 分支里**只更新 `_cache["data"]`**，**不更新
+    `_cache["at"]`** —— 于是「缓存没被标记为新鲜」-> 下次调用**立刻**
+    再拉一次全量 /object_info（37.5 MB）。ComfyUI 一忙，就形成
+    「失败 -> 立刻重试 -> 再失败 -> 再重试」的放大环。
+
+    现场证据（2026-11-22）：journal 里 16 次
+    「拉 http://127.0.0.1:8188/object_info 失败，用静态兜底枚举」，
+    且 pcap 抓到 3 条**并发**的全量 /object_info 连接。
+
+    修法：失败时**也**写缓存（值=兜底），TTL 用短的
+    `OBJECT_INFO_FAIL_TTL`（60 秒）—— 既杜绝立即重试，
+    又保证 ComfyUI 恢复后 1 分钟内能用上真枚举。
+    """
     with _cache_lock:
-        fresh = (time.monotonic() - _cache["at"]) < OBJECT_INFO_TTL
+        ttl = float(_cache.get("ttl") or OBJECT_INFO_TTL)
+        fresh = (time.monotonic() - _cache["at"]) < ttl
         if fresh and not force:
             return _cache["data"]
     try:
         live = _fetch_enums()
-        with _cache_lock:
-            _cache["at"] = time.monotonic()
-            _cache["data"] = live
-        return live
     except Exception as e:  # noqa: BLE001
         logger.warning("[yue2_schema] 拉 %s 失败，用静态兜底枚举: %s",
                        COMFY_OBJECT_INFO_URL, e)
         with _cache_lock:
             if not _cache["at"]:
                 _cache["data"] = dict(STATIC_ENUMS)
+            # 【关键】失败**也**标记缓存为新鲜（短 TTL）—— 杜绝立即重试。
+            _cache["at"] = time.monotonic()
+            _cache["ttl"] = OBJECT_INFO_FAIL_TTL
             return _cache["data"]
+    with _cache_lock:
+        _cache["at"] = time.monotonic()
+        _cache["data"] = live
+        _cache["ttl"] = OBJECT_INFO_TTL
+        return live
 
 
 # ==================== 归一化 ====================

@@ -78,6 +78,7 @@ from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import enhance_assets as enh_assets
+from h3studio import hermes_enhance
 from h3studio import moss_layout
 from h3studio import qwen_pe
 from h3studio import h3image_pe
@@ -120,6 +121,7 @@ from h3studio import comfy_errors
 #      -> history 里没有、队列里也没有 -> worker 永远等下去。
 # 判定逻辑放在纯函数模块里（可离线穷举），server.py 只负责取数。
 from h3studio import running_truth
+from h3studio import exec_slot
 # 【2026-11-19 缺陷 1 修】生成任务的**运行上限**策略（按媒体类型区分）。
 #
 # 【为什么要有这一层】原来只有一个全局阈值 `running_timeout_sec`
@@ -376,6 +378,59 @@ DB_PATH = DATA / "jobs.db"
 for d in (DATA, OUT_DIR, UPLOAD_DIR, VIDEO_DIR, IMAGE_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
+
+def _assert_data_dir_self_contained() -> None:
+    """【2026-11-23 事故】媒体目录不得通过符号链接逃出 data_dir。
+
+    【事故】线上媒体库凭空多了两个视频文件
+    `v-h3-studio-000254.mp4` / `v-h3-studio-000255.mp4`，
+    而线上 `jobs` 表里**没有任何一行**引用它们 —— 也就是
+    「产物落到了用户的媒体库，但任务记录不在用户的库里」。
+
+    【根因（逐秒对拍取证）】某个「隔离实例」的 `data_dir` 是临时目录，
+    但那个临时目录里的 `outputs` 是一条**符号链接**，指向线上媒体库：
+
+        /tmp/h3len-test/outputs -> /root/projects/comfyui-minimax-h3-studio/data/outputs
+
+    它的 `jobs.db` 是线上库的**副本**（字节数与清理前的线上备份完全相同）。
+    副本里那条提示词为 `next` 的接续任务 `f0c0f07edebe` 的
+    `finished_at = 2026-11-22 21:33:10`，产物登记为
+    `v-h3-studio-000255.mp4`（is_full，238 帧 = 9.9167s）与
+    `v-h3-studio-000254.mp4`（124 帧 = 5.1667s）——
+    与这两个文件在磁盘上的 mtime（21:33:10 / 21:33:08）和
+    ffprobe 实测（238 帧 / 124 帧）**逐秒、逐帧吻合**。
+
+    【为什么这种配置一定会出错】
+    产物与任务记录**分属两个库**：文件写进线上媒体库，
+    行写进临时库。于是线上侧看到的永远是「无主的文件」，
+    没有任何一行能把它认领、清理或去重。
+    「隔离」只隔离了 DB，媒体目录没隔离 —— 这正是最容易漏的一半。
+
+    【这条检查做什么】
+    `OUT_DIR` / `UPLOAD_DIR` 解析后必须仍在 `DATA` 解析后的目录之内。
+    不满足就**启动即失败**并说明真实指向 —— 配置错了要当场响，
+    不能等它往用户的媒体库里写文件。
+    （`DATA` 自己是指向线上的符号链接时**放行**：那是显式选用线上目录，
+    由写库护栏与静态扫描负责。）
+    """
+    base = DATA.resolve()
+    escaped = []
+    for configured in (OUT_DIR, UPLOAD_DIR):
+        real = configured.resolve()
+        if real != base and base not in real.parents:
+            escaped.append(f"  {configured} -> {real}")
+    if escaped:
+        raise RuntimeError(
+            "配置错误：媒体目录通过符号链接逃出了 data_dir，产物会写进"
+            "另一个数据目录（任务记录与产物将分属两处，媒体库会出现无主文件）。\n"
+            f"data_dir: {DATA} (解析为 {base})\n"
+            "越界的目录:\n" + "\n".join(escaped) + "\n"
+            "修法：让 data_dir 与媒体目录同源 —— 要么整个 data_dir 指向目标目录，"
+            "要么把 outputs 换成真实目录（cp/rsync），不要用符号链接。")
+
+
+_assert_data_dir_self_contained()
+
 # ------------------------------------------------------------------ DB
 def db():
     conn = sqlite3.connect(DB_PATH)
@@ -437,6 +492,72 @@ def init_db():
         #     漏一处就丢标记；独立表只有一处写入点；
         #   * 独立表**向后兼容**：老库不需要迁移，现有记录一条都不动。
         favorites.ensure_table(conn)
+        # 【2026-11-22 缺陷修】生成队列的**执行槽租约表**。
+        #
+        # 【为什么需要这张表 —— 现场取证】
+        # 同一台机器上可以同时跑**多个** h3studio 实例（8190 线上 / 8290 验收 /
+        # 临时 UI 实例），它们**共享同一个 data/jobs.db**。
+        # 而 `Worker._next_queued()` 的 SQL 是
+        #     SELECT ... WHERE status='queued' LIMIT 1
+        # —— **没有任何跨进程互斥**。两个实例同时执行这条 SQL 会各自取到
+        # 不同的 queued 行、各自置成 running -> DB 里出现**两条** running。
+        # 现场实测（2026-11-22 17:01）：
+        #     ComfyUI /queue: queue_running=1, queue_pending=1
+        #     Studio DB:     running=2, queued=1
+        # -> 前端按 DB 的 status 计数 -> 显示「运行中 2」。
+        #
+        # 【租约表的语义】
+        # 一行 = 「当前执行槽被哪个 job 占用」。取任务时在**同一个
+        # BEGIN IMMEDIATE 事务**里做「查租约 + 占租约 + 置 running」，
+        # SQLite 的写锁保证跨进程互斥 -> **同一 data_dir 下任一时刻
+        # 最多 1 条 running 记录**。
+        #
+        # 【为什么不复用 jobs.status 当锁】
+        # jobs.status 是**业务状态**（要展示给用户、要被 worker 推进），
+        # 拿它当锁会把「展示」与「互斥」耦合在一起 —— worker 崩溃时
+        # 锁会一直不放。独立租约表 + 明确的持有者标识（pid + job id）
+        # 才能在重启后被安全回收。
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS exec_slot (
+                slot TEXT PRIMARY KEY,          -- 固定 'default'（单执行槽）
+                job_id TEXT,                    -- 占用执行槽的 job id
+                owner TEXT,                     -- 持有者标识（pid@boot_id）
+                acquired_at REAL,               -- 占槽时刻（epoch 秒）
+                heartbeat_at REAL               -- 最近一次心跳（epoch 秒）
+            );
+            """)
+
+
+#: 执行槽的固定名字（ComfyUI 单执行槽 -> 全局只有一个）。
+EXEC_SLOT_NAME = "default"
+
+#: 租约的**存活上限**（秒）。超过它就认为持有者已经死了（进程被 kill /
+# 机器重启），租约可被回收。
+#
+# 【为什么需要】进程被 SIGKILL 时不会执行任何清理代码，租约会一直留在
+# 表里 -> 整个队列永久卡住。worker 每轮都会刷新心跳，所以正常运行时
+# 心跳永远新鲜；只有真正死掉的持有者才会超时。
+EXEC_SLOT_LEASE_TTL = 120.0
+
+
+def exec_slot_owner() -> str:
+    """本进程的执行槽持有者标识。
+
+    【为什么要 pid + boot_id 两个成分】
+    pid 会被复用（进程退出后，下一个进程可能拿到同一个 pid）。
+    `boot_id` 取自 `/proc/sys/kernel/random/boot_id`（同一次开机不变），
+    再拼上进程启动时刻 -> 「pid + 启动时刻」在同一次开机内唯一，
+    跨开机也不会撞（boot_id 不同）。
+    """
+    boot_id = ""
+    try:
+        boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(
+            encoding="utf-8").strip()
+    except (OSError, ValueError):
+        boot_id = ""
+    started = SERVER_STARTED_AT or time.time()
+    return f"{os.getpid()}@{boot_id or 'noboot'}@{started:.3f}"
 
 
 # ------------------------------------------------------------------
@@ -1944,14 +2065,122 @@ class Worker:
                 await asyncio.sleep(2.0)
 
     def _next_queued(self):
-        with db() as conn:
-            r = conn.execute("SELECT * FROM jobs WHERE status='queued' AND mode!='longfilm' ORDER BY created_at LIMIT 1").fetchone()
+        """取下一个要跑的任务 —— **跨进程**原子地占住执行槽。
+
+        【2026-11-22 缺陷修 —— 这是「运行中 2」的治本点】
+
+        原来的实现是：
+            SELECT * FROM jobs WHERE status='queued' ... LIMIT 1
+            UPDATE jobs SET status='running' ...
+
+        它只保证**进程内**串行。同一台机器上跑着多个 h3studio 实例
+        （8190 线上 / 8290 验收 / 临时 UI 实例）且**共享同一个
+        data/jobs.db** 时，两个实例会各自取到不同的 queued 行、
+        各自置成 running -> DB 里出现**两条** running
+        -> 前端按 status 计数 -> 显示「运行中 2」。
+        而 ComfyUI 是单执行槽 —— 第二条实际只是躺在 ComfyUI 的
+        queue_pending 里。
+
+        【现在的做法】
+        在**同一个 `BEGIN IMMEDIATE` 事务**里做四件事：
+          1. 读执行槽租约；
+          2. 租约被**活着**的其它进程持有 -> 直接返回 None（等）；
+          3. 租约空闲 / 持有者已死（心跳超时）-> 回收租约；
+          4. 取队首 queued -> 占租约 -> 置 running。
+
+        `BEGIN IMMEDIATE` 会立刻拿 SQLite 的**写锁**（RESERVED 锁），
+        而写锁是**跨进程**的 —— 所以两个实例不可能同时进入第 4 步。
+        这就是「同一 data_dir 下任一时刻最多 1 条 running」的保证。
+
+        【为什么不用 `jobs.status` 直接当锁】
+        jobs.status 是**业务状态**（要展示、要被 worker 推进）。
+        当锁会有两个问题：
+          * worker 被 SIGKILL 时 status 永远停在 'running' -> 队列永久卡死；
+          * 「展示状态」与「互斥状态」耦合，任何一处逻辑改动都可能
+            破坏另一处。独立租约表 + 心跳才能安全回收。
+        """
+        owner = exec_slot_owner()
+        now = time.time()
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.row_factory = sqlite3.Row
+        try:
+            # 【关键】IMMEDIATE：立刻拿写锁 -> 跨进程互斥。
+            conn.execute("BEGIN IMMEDIATE")
+            slot = conn.execute(
+                "SELECT job_id, owner, heartbeat_at FROM exec_slot WHERE slot=?",
+                (EXEC_SLOT_NAME,)).fetchone()
+            if slot is not None:
+                holder = slot["owner"] or ""
+                heartbeat = slot["heartbeat_at"] or 0.0
+                # 租约还新鲜（心跳在 TTL 内）-> 别的进程正占着执行槽。
+                # 【口径】owner 相同 = 本进程自己占的（重入）-> 允许继续。
+                if holder != owner and (now - heartbeat) < EXEC_SLOT_LEASE_TTL:
+                    conn.execute("ROLLBACK")
+                    return None
+                # 租约过期（持有者已死）-> 回收。
+                if holder != owner:
+                    print(f"[执行槽] 回收过期租约（原持有者 {holder}，"
+                          f"心跳 {now - heartbeat:.0f} 秒前）")
+            r = conn.execute(
+                "SELECT * FROM jobs WHERE status='queued' AND mode!='longfilm' "
+                "ORDER BY created_at LIMIT 1").fetchone()
             if not r:
+                conn.execute("ROLLBACK")
                 return None
-            conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
-                         (time.time(), r["id"]))
+            # 占租约 + 置 running —— 同一个事务，原子。
+            conn.execute(
+                "INSERT INTO exec_slot (slot, job_id, owner, acquired_at, heartbeat_at) "
+                "VALUES (?,?,?,?,?) ON CONFLICT(slot) DO UPDATE SET "
+                "job_id=excluded.job_id, owner=excluded.owner, "
+                "acquired_at=excluded.acquired_at, heartbeat_at=excluded.heartbeat_at",
+                (EXEC_SLOT_NAME, r["id"], owner, now, now))
+            conn.execute(
+                "UPDATE jobs SET status='running', started_at=? WHERE id=?",
+                (now, r["id"]))
+            conn.execute("COMMIT")
             self.current = r["id"]
             return dict(r)
+        except Exception as exc:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            print(f"[执行槽] 取任务失败: {exc}")
+            return None
+        finally:
+            conn.close()
+
+    def _release_slot(self, job_id: str) -> None:
+        """释放执行槽（任务结束 / 失败 / 取消时调用）。
+
+        【为什么必须释放】不释放的话，执行槽会被这个已结束的任务
+        一直占着（直到租约 TTL 到期）-> 后面所有任务排队不动。
+        """
+        owner = exec_slot_owner()
+        try:
+            with db() as conn:
+                conn.execute(
+                    "DELETE FROM exec_slot WHERE slot=? AND job_id=? AND owner=?",
+                    (EXEC_SLOT_NAME, job_id, owner))
+        except Exception as exc:
+            print(f"[执行槽] 释放租约失败: {exc}")
+
+    def _heartbeat_slot(self, job_id: str) -> None:
+        """刷新执行槽租约的心跳（worker 每轮轮询时调一次）。
+
+        【为什么需要】租约 TTL 是 120 秒。worker 跑长任务时（比如 10 分钟
+        的视频）必须持续刷新心跳，否则别的实例会以为持有者已死、
+        抢走执行槽 -> 又出现「两条 running」。
+        """
+        owner = exec_slot_owner()
+        try:
+            with db() as conn:
+                conn.execute(
+                    "UPDATE exec_slot SET heartbeat_at=? WHERE slot=? AND job_id=? "
+                    "AND owner=?",
+                    (time.time(), EXEC_SLOT_NAME, job_id, owner))
+        except Exception as exc:
+            print(f"[执行槽] 刷新心跳失败: {exc}")
 
     async def _run(self, job_row):
         job_id = job_row["id"]
@@ -2286,6 +2515,12 @@ class Worker:
                     next_queue_check = 0.0
                     while True:
                         await asyncio.sleep(CFG["poll_interval"])
+                        # 【2026-11-22 缺陷修】刷新执行槽租约心跳。
+                        #
+                        # 【为什么每轮都要刷】租约 TTL 是 120 秒。长视频任务
+                        # 可能跑十几分钟，不持续刷新心跳的话，别的实例会
+                        # 以为持有者已死 -> 抢走执行槽 -> 又出现「两条 running」。
+                        self._heartbeat_slot(job_id)
                         # 检查取消
                         with db() as conn:
                             st = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -2436,6 +2671,12 @@ class Worker:
         finally:
             if self.current == job_id:
                 self.current = None
+            # 【2026-11-22 缺陷修】释放执行槽租约。
+            #
+            # 【为什么必须在这里释放】不释放的话，执行槽会被这个**已结束**
+            # 的任务一直占着（直到租约 TTL 120 秒到期）-> 后面所有任务
+            # 排队不动。放在 finally 里 = 成功 / 失败 / 取消三条路径都会释放。
+            self._release_slot(job_id)
 
 
     async def _record_chain_audio_source(self, job_id: str,
@@ -2827,6 +3068,8 @@ class Worker:
             try:
                 while True:
                     await asyncio.sleep(CFG["poll_interval"])
+                    # 【2026-11-22 缺陷修】批次路径也要刷新执行槽心跳。
+                    self._heartbeat_slot(job_id)
                     with db() as conn:
                         st = conn.execute("SELECT status FROM jobs WHERE id=?",
                                           (job_id,)).fetchone()
@@ -6598,7 +6841,85 @@ async def api_longfilm_create(request):
 QUEUE_VIEW_LIMIT = 50
 
 
-def queue_snapshot(recent_limit: int = 12) -> dict:
+async def collect_exec_states(rows) -> dict:
+    """按 ComfyUI `/queue` 把任务收敛成**唯一**的执行态。
+
+    【这是「运行中 2」的判定层修复 —— 2026-11-22】
+
+    输入 `rows` 是 jobs 表里 status IN ('queued','running') 的行
+    （每行至少有 id / prompt_id / created_at / status）。
+
+    返回：
+        {job_id: {"state": "executing"|"pending"|"unknown",
+                  "position": int|None,
+                  "label": "运行中" | "排队中 · 第 N 位" | "状态未知"}}
+
+    【口径 —— ComfyUI 是单执行槽，任一时刻 executing 至多 1 个】
+    所以返回的 `executing` **至多一条**。其余全部是 `pending`。
+    这就是验收口径 B：「任意时刻全局运行中数量 == ComfyUI 实际
+    executing 数量（0 或 1）」。
+
+    【为什么用 prompt_id 精确匹配，而不是靠 DB 的 status】
+    DB 的 status 是**声明**（多实例竞争时会同时出现多条 running）；
+    ComfyUI 的 /queue 是**观测**（真相）。必须以观测为准。
+
+    【ComfyUI 读不到时怎么办】
+    全部标 `unknown` —— **不猜**谁在跑。
+    把「读不到」当成「A 在跑」会让 B 也被显示成排队，用户看到的
+    仍然是错的；而直接说「未知」是诚实的。
+    （与 running_truth 的同一纪律：读不到 != 队列为空。）
+    """
+    declared_running = []
+    declared_queued = []
+    for row in rows:
+        data = dict(row)
+        jid = str(data.get("id") or "")
+        if not jid:
+            continue
+        if str(data.get("status") or "") == "running":
+            declared_running.append({
+                "id": jid,
+                "prompt_id": str(data.get("prompt_id") or ""),
+                "created_at": data.get("created_at") or 0.0,
+            })
+        else:
+            declared_queued.append(jid)
+
+    queue_running = None
+    queue_pending = None
+    try:
+        payload = await fetch_comfy_queue_payload()
+    except Exception:
+        payload = None
+    if payload is not None:
+        queue_running, queue_pending = exec_slot.split_queue_prompt_ids(payload)
+
+    merged = exec_slot.reconcile_by_prompt(
+        declared_running=declared_running,
+        declared_queued=declared_queued,
+        queue_running=queue_running,
+        queue_pending=queue_pending,
+    )
+
+    result: dict = {}
+    for jid in merged["executing"]:
+        result[jid] = {"state": exec_slot.STATE_EXECUTING,
+                       "position": None,
+                       "label": exec_slot.executing_label()}
+    for jid in merged["pending"]:
+        pos = merged["positions"].get(jid)
+        result[jid] = {"state": exec_slot.STATE_PENDING,
+                       "position": pos,
+                       "label": exec_slot.queue_position_label(pos)}
+    for jid in merged["unknown"]:
+        result[jid] = {"state": exec_slot.STATE_UNKNOWN,
+                       "position": None,
+                       "label": "状态未知"}
+    return result
+
+
+def queue_snapshot(recent_limit: int = 12,
+                   exec_states: dict | None = None) -> dict:
     """
     生成队列的**只读快照** —— 队列顺序 + 每条任务的状态 + 待处理计数。
 
@@ -6636,6 +6957,23 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
     【为什么 recent 只取刚跑完的有限条】
     队列面板要能看到「成功 / 失败」，但不能把整个任务库都拉出来
     （生成库里可能有几百条历史）。取最近 N 条终态任务即可。
+
+    【2026-11-22 缺陷修 —— exec_states 参数】
+    `exec_states` 是**服务端按 ComfyUI /queue 收敛后的执行态**：
+        {job_id: {"state": "executing"|"pending"|"unknown",
+                  "position": 2,           # pending 的队列位置（1 = 下一个就跑）
+                  "label": "排队中 · 第 2 位"}}
+
+    传入时，items[] 里的 `status` 会**按执行态**改写：
+      * executing -> "running"（唯一的那条）
+      * pending   -> "queued"（其余全部）
+    并且每条都带上 `exec_state` / `exec_position` / `exec_label` 字段。
+
+    【为什么 status 要按执行态改写，而不是原样透出 DB 的 status】
+    DB 的 status='running' 只是**声明**（可能是多实例竞争留下的残留）。
+    ComfyUI 的 /queue 才是**观测**（单执行槽，executing 至多 1 个）。
+    前端要显示的是观测结果 —— 所以服务端在这里就把两者**对齐**，
+    前端不需要（也不应该）自己再判一次。
     """
     with db() as conn:
         rows = conn.execute(
@@ -6647,9 +6985,19 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
     running_mode = ""
     pending = 0
     now = time.time()
+    exec_states = exec_states or {}
     for index, row in enumerate(rows, start=1):
         job_params = json.loads(row["params"] or "{}")
         status = row["status"]
+        # 【2026-11-22 缺陷修】按执行态改写 status（见上面的说明）。
+        info = exec_states.get(row["id"]) or {}
+        exec_state = str(info.get("state") or "")
+        exec_position = info.get("position")
+        exec_label = str(info.get("label") or "")
+        if exec_state == exec_slot.STATE_EXECUTING:
+            status = "running"
+        elif exec_state in (exec_slot.STATE_PENDING, exec_slot.STATE_UNKNOWN):
+            status = "queued"
         if status == "running":
             running_id = row["id"]
             running_mode = row["mode"] or ""
@@ -6659,6 +7007,9 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
             "id": row["id"],
             "mode": row["mode"],
             "status": status,
+            # 【2026-11-22 缺陷修】原始的 DB 状态保留一份（诊断用）。
+            # 前端**不要**用它做「运行中」计数 —— 那正是本缺陷的根因。
+            "db_status": row["status"],
             "position": index,
             "created_at": row["created_at"],
             "label": gen_types.type_for_mode(row["mode"])["label"],
@@ -6667,6 +7018,10 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
             # 这里先给**本地判定**（零 IO）；实时判定由 api_queue 补上。
             "started_at": row["started_at"],
             "prompt_id": row["prompt_id"] or "",
+            # 【2026-11-22 缺陷修】执行态（单一真源）。
+            "exec_state": exec_state,
+            "exec_position": exec_position,
+            "exec_label": exec_label,
             "running_truth": running_truth.job_running_truth(
                 status=status,
                 started_at=row["started_at"],
@@ -6713,8 +7068,21 @@ async def api_queue(request):
     【2026-11-14 A5】对「运行中」的那一条补上**实时**判定 ——
     队列面板是这个工作台里最直观的「在不在跑」的展示位，
     它必须说真话（真在跑 / 已丢失 / 已超时 / 判定不了）。
+
+    【2026-11-22 缺陷修 —— 执行态收敛】
+    先按 ComfyUI `/queue` 收敛出**唯一**的执行态（collect_exec_states），
+    再据此生成快照 —— 于是 items[] 里至多一条 status='running'，
+    其余全是 'queued'（带队列序号）。
+    摘要里的「运行中 N · 排队 M」因此必然满足 N ∈ {0, 1}。
     """
-    snapshot = queue_snapshot()
+    # 【2026-11-22 缺陷修】先收敛执行态（读 ComfyUI /queue）。
+    with db() as conn:
+        exec_rows = conn.execute(
+            "SELECT id, status, created_at, prompt_id FROM jobs "
+            "WHERE status IN ('queued','running') AND mode!='longfilm' "
+            "ORDER BY created_at ASC").fetchall()
+    exec_states = await collect_exec_states(exec_rows)
+    snapshot = queue_snapshot(exec_states=exec_states)
     items = snapshot["items"]
     if len(items) > QUEUE_VIEW_LIMIT:
         snapshot["items"] = items[:QUEUE_VIEW_LIMIT]
@@ -6919,6 +7287,37 @@ async def api_list(request):
     now = time.time()
     live_map = await live_states_for_jobs(jobs, now=now)
     live_state = ""
+    # 【2026-11-22 缺陷修 —— 生成库卡片的执行态收敛】
+    #
+    # 【这是用户截图里「运行中 2 · 排队 2」的直接来源】
+    # 卡片按 job.status 判定「运行中」，而 DB 的 status 是**声明**。
+    # 多实例竞争时会出现**两条** status='running'，但 ComfyUI 是
+    # 单执行槽 —— 其中一条实际躺在 ComfyUI 的 queue_pending 里。
+    #
+    # 这里按 ComfyUI /queue 收敛：
+    #   * 唯一 executing 的那条 -> status='running'（带进度）
+    #   * 其余全部 -> status='queued'（显示「排队中 · 第 N 位」）
+    # 于是**任意时刻全局运行中数量 == ComfyUI 实际 executing 数量**。
+    exec_states = await collect_exec_states([
+        {"id": j.get("id"), "status": j.get("status"),
+         "created_at": j.get("created_at"), "prompt_id": j.get("prompt_id")}
+        for j in jobs if j.get("status") in ("queued", "running")
+    ])
+    for job in jobs:
+        jid = job.get("id")
+        info = exec_states.get(jid)
+        if not info:
+            continue
+        exec_state = str(info.get("state") or "")
+        job["exec_state"] = exec_state
+        job["exec_position"] = info.get("position")
+        job["exec_label"] = str(info.get("label") or "")
+        # 保留原始 DB 状态（诊断用）—— 前端**不要**用它做运行中计数。
+        job["db_status"] = job.get("status")
+        if exec_state == exec_slot.STATE_EXECUTING:
+            job["status"] = "running"
+        elif exec_state in (exec_slot.STATE_PENDING, exec_slot.STATE_UNKNOWN):
+            job["status"] = "queued"
     for job in jobs:
         if job.get("status") != "running":
             continue
@@ -6969,6 +7368,30 @@ async def api_get(request):
             timeout_sec=timeout_sec_for_mode(job.get("mode")),
             live_state=live_state,
         )
+    # 【2026-11-22 缺陷修 —— 单条查询也要收敛执行态】
+    #
+    # 【为什么不能漏掉这里】前端的 `pollPendingJobs` 轮询的是
+    # `GET /api/jobs/{id}`（单条），不是列表接口 —— 如果这里不收敛，
+    # 轮询到的单条仍然可能是 status='running'，卡片照样显示「运行中」。
+    if job.get("status") in ("queued", "running"):
+        exec_states = await collect_exec_states([{
+            "id": job.get("id"),
+            "status": job.get("status"),
+            "created_at": job.get("created_at"),
+            "prompt_id": job.get("prompt_id"),
+        }])
+        info = exec_states.get(job.get("id"))
+        if info:
+            exec_state = str(info.get("state") or "")
+            job["exec_state"] = exec_state
+            job["exec_position"] = info.get("position")
+            job["exec_label"] = str(info.get("label") or "")
+            job["db_status"] = job.get("status")
+            if exec_state == exec_slot.STATE_EXECUTING:
+                job["status"] = "running"
+            elif exec_state in (exec_slot.STATE_PENDING,
+                                exec_slot.STATE_UNKNOWN):
+                job["status"] = "queued"
     return json_ok(job)
 
 
@@ -7823,6 +8246,40 @@ async def fetch_comfy_queue(session=None):
     }
 
 
+async def fetch_comfy_queue_payload(session=None) -> dict | None:
+    """读 ComfyUI `/queue` 的**原始响应**（读不到返回 None）。
+
+    【为什么与 fetch_comfy_queue_ids 分开】
+    `fetch_comfy_queue_ids` 只返回 prompt_id 的**合并集合**
+    （running + pending 混在一起）—— 那正是本缺陷的判定层根因：
+    「在 pending 里排队」与「在 running 里执行」被同等对待。
+
+    这个函数返回**原始 payload**，让调用方用
+    `exec_slot.split_queue_prompt_ids()` 精确区分两者。
+
+    【为什么返回 None 而不是空 dict】
+    None = 读不到（ComfyUI 不可达 / 超时）；
+    {}   = 读到了但队列确实是空的。
+    两者含义完全不同，判定层必须能区分。
+
+    【2026-11-22 请求风暴修】同样走**共享客户端**（2 秒 TTL 缓存 +
+    并发单飞合并 + 失败退避），与 fetch_comfy_queue /
+    fetch_comfy_queue_ids 共用同一份 /queue 缓存。
+    【为什么不能直接用原始 session.get()】
+    原实现每次都新建 TCP 连接且无缓存 —— 9 条 SSE 每秒各打一次
+    /queue，正是「8190 对 ComfyUI(8188) 请求风暴」的来源之一。
+    这里必须走 comfy_client，否则请求风暴修会被这个新函数绕过。
+    """
+    data = await comfy_client.get_json(
+        "/queue", timeout=5.0,
+        cache_ttl=comfy_client.QUEUE_TTL,
+        cache_key="queue",
+        backoff_key="queue")
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
 async def fetch_comfy_queue_ids(session=None) -> set[str] | None:
     """读 ComfyUI 队列里**全部** prompt_id（running + pending）。
 
@@ -8399,9 +8856,6 @@ async def api_music_enhance(request):
     base = str(payload.get("base") or "").strip()
     if not original and not base:
         return web.json_response({"error": "请先输入要增强的描述"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "描述过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2a").strip()
     if mode not in ("t2a", "a2a"):
         mode = "t2a"
@@ -8424,6 +8878,11 @@ async def api_music_enhance(request):
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
     # 【2026-11-10 修复】先在**线程池**里把枚举取一次（见 yue2_schema 的说明），
     # 再把它同时喂给 build_system_prompt() 和 normalize_and_validate()。
     # 原来两处各自调 get_enums()，各自**同步阻塞**事件循环最长 10 秒；
@@ -8438,10 +8897,14 @@ async def api_music_enhance(request):
         {"role": "user", "content": user_prompt},
     ]
     try:
+        # 输出预算：无限制时交给后端/模型决定（-1），
+        # 否则沿用本条路线原本的 4000（音乐结构化增强的产出体量稳定）。
+        music_max_tokens = (enh.UNLIMITED_MAX_TOKENS
+                            if limit_info["prompt_limit_unlimited"] else 4000)
         raw = await llm_client.call_provider(
             item, messages,
             options={"temperature": 0.7, "top_p": 0.95,
-                     "max_tokens": 4000, "do_sample": True})
+                     "max_tokens": music_max_tokens, "do_sample": True})
     except llm_client.ProviderError as exc:
         return web.json_response(
             {"error": str(exc), "provider": item["name"],
@@ -9242,25 +9705,7 @@ async def api_video_size_plan(request):
     })
 
 
-def _comfy_snapshot_obj():
-    """取**已缓存**的 ComfyUI 模型清单快照（**绝不触发网络请求**）。
-
-    【2026-11-22】配合 `gen_defaults.warm_comfy_snapshot()` 使用：
-    先异步（aiohttp，不阻塞事件循环）刷新一次快照，再用这个函数
-    只读取缓存值。缓存没有时返回 None —— 调用方退回原来的
-    降级路径，行为与修复前一致。
-
-    为什么不直接用 `video_models.comfy_snapshot()`：那个函数在
-    缓存过期时会**同步 urllib** 去打 8188，在 aiohttp 事件循环里
-    会把整个服务端卡住（ComfyUI 冷启动时尤其明显）。
-    """
-    try:
-        return video_models.cached_comfy_snapshot()
-    except Exception:
-        return None
-
-
-def _video_model_available(model: dict, snapshot=None) -> bool:
+def _video_model_available(model: dict) -> bool:
     """某个视频模型项在本机是否真的可用。
 
     t2v / flf / r2v 都要 H3 底模权重落盘；longfilm 只拼已完成的视频，
@@ -9268,12 +9713,6 @@ def _video_model_available(model: dict, snapshot=None) -> bool:
 
     返回 False 时前端会把该模型项置为不可选（并在类别无任何可用模型时
     禁用整个类别 + 提示）—— 这正是需求的回退规则③。
-
-    【2026-11-22】新增 `snapshot` 参数：调用方若已经**异步**刷新过
-    ComfyUI 模型清单快照，就把它传进来 —— 这样本函数走
-    `model_status(key, snapshot)`，**不再触发同步 urllib 打 8188**。
-    在 aiohttp 事件循环里，那个同步调用会把整个服务端卡住
-    （ComfyUI 冷启动时 `/models/diffusion_models` 要扫盘数十秒）。
     """
     mode = (model.get("mode") or "").strip()
     if mode == "longfilm":
@@ -9287,7 +9726,7 @@ def _video_model_available(model: dict, snapshot=None) -> bool:
     # H3 底模：任一登记的权重在本机就算可用
     try:
         for key in video_models.VIDEO_MODELS:
-            if video_models.model_available(key, snapshot):
+            if video_models.model_available(key):
                 return True
     except Exception:
         return False
@@ -9309,13 +9748,6 @@ async def api_video_categories(request):
     r2v / longfilm）**一个字都没改**，类别只是给它们套了一层分组视图。
     `legacy_modes` 字段给出「mode -> 类别」的桥，老链接照样能定位面板。
     """
-    # 【2026-11-22】先异步预热 ComfyUI 快照 —— 否则下面的
-    # `_video_model_available()` -> `model_available()` -> `comfy_snapshot()`
-    # 会走**同步 urllib 打 8188**，在事件循环里把整个服务端卡住
-    # （ComfyUI 冷启动时尤其明显）。
-    await gen_defaults.warm_comfy_snapshot()
-    _snap = _comfy_snapshot_obj()
-
     categories = video_categories.list_categories()
     models = video_categories.list_models()
 
@@ -9324,10 +9756,10 @@ async def api_video_categories(request):
     #   * t2v / flf / r2v：依赖 H3 底模权重在本机（实测 check）
     #   * longfilm：拼片链路不依赖 H3 权重（它只拼已完成的视频）
     for model in models:
-        model["available"] = _video_model_available(model, _snap)
+        model["available"] = _video_model_available(model)
     for cat in categories:
         for model in cat["models"]:
-            model["available"] = _video_model_available(model, _snap)
+            model["available"] = _video_model_available(model)
 
     return json_ok({
         "categories": categories,
@@ -9792,9 +10224,21 @@ async def api_providers_list(request):
     with db() as conn:
         items = prov.list_providers(conn)
         prefs = prov.prefs_snapshot(conn)
+    # 【2026-11-10】提示词长度上限的可选项 —— 前端下拉直接用这份，
+    # 不在前端硬编码取值（新增选项只改服务端这一处）。
+    for item in items:
+        limit = item.get("prompt_limit") or prov.DEFAULT_PROMPT_LIMIT
+        item["prompt_limit_label"] = prov.PROMPT_LIMIT_LABELS.get(limit, limit)
+        item["prompt_limit_max_chars"] = prov.prompt_limit_max_chars(limit)
+        item["prompt_limit_unlimited"] = (item["prompt_limit_max_chars"] is None)
     return json_ok({"providers": items, **prefs,
                     "types": [{"value": k, "label": v}
-                              for k, v in prov.PROVIDER_TYPE_LABELS.items()]})
+                              for k, v in prov.PROVIDER_TYPE_LABELS.items()],
+                    "prompt_limit_choices": [
+                        {"value": v, "label": prov.PROMPT_LIMIT_LABELS[v],
+                         "max_chars": prov.PROMPT_LIMIT_VALUES[v]}
+                        for v in prov.PROMPT_LIMIT_CHOICES],
+                    "prompt_limit_default": prov.DEFAULT_PROMPT_LIMIT})
 
 
 async def api_providers_create(request):
@@ -9973,6 +10417,10 @@ async def api_enhancer_config(request):
         "refine_spec_by_media": dict(enh.REFINE_SPEC_BY_MEDIA),
         # 模式 -> 「二次增强」模板 id（前端直接取，不用自己推）
         "refine_specs": {m: enh.refine_spec_for_mode(m) for m in enh.MODE_MEDIA},
+        # ---- hermes 增强通道（对齐 nonebot 咏唱h3）----
+        # 前端「本地模型配置」页据此渲染 hermes 开关 / profile / 超时 /
+        # 三条能力的 skill 白名单与提示词模板。
+        "hermes": _hermes_config_payload(saved),
     }
     if mode:
         filtered = enh.filter_specs(specs, mode, model_key)
@@ -9981,6 +10429,75 @@ async def api_enhancer_config(request):
         payload["mode_specs"] = filtered
         payload["default_spec_id"] = enh.default_spec_for_mode(mode, specs, model_key)
     return json_ok(payload)
+
+
+def _hermes_config_payload(saved: dict) -> dict:
+    """
+    hermes 增强通道的下发给前端的配置（不含任何密钥）。
+
+    结构：
+      enabled / binary / profile / timeout
+      profiles          本机真实存在的 profile 清单（前端下拉用）
+      media_specs       三条能力各自的 skill 白名单 + 提示词模板（可编辑）
+    """
+    cfg = hermes_enhance.resolve_config(saved)
+    media_specs = {}
+    for media in ("image", "video", "audio"):
+        try:
+            spec = hermes_enhance.get_media_spec(media, saved)
+        except hermes_enhance.HermesEnhanceError:
+            continue
+        media_specs[media] = {
+            "media": media,
+            "label": spec.get("label", media),
+            "profile": spec.get("profile", cfg["profile"]),
+            "skills": spec.get("skills", ""),
+            "system_prompt": spec.get("system_prompt", ""),
+            "user_template": spec.get("user_template", ""),
+        }
+    return {
+        "enabled": cfg["enabled"],
+        # 【默认状态回显】前端据此显示「当前为出厂默认 / 已手动设置」。
+        # 判据：用户**从未显式存过** enabled 字段 -> 就是出厂默认。
+        "is_default": not _hermes_enabled_explicitly(saved),
+        # 【Agent 自动增强路径的独立开关，默认关】
+        # 界面「增强」是用户主动点的；Agent 建任务是自动跑的（每次多等 ~40 秒）。
+        # 实测：基线 TestJobTools 1.18 秒 -> Agent 也走 hermes 后 400 秒跑不完。
+        "agent_enabled": cfg["agent_enabled"],
+        "agent_is_default": not _hermes_agent_enabled_explicitly(saved),
+        "binary": cfg["binary"],
+        "profile": cfg["profile"],
+        "timeout": cfg["timeout"],
+        "profiles": hermes_enhance.available_profiles(),
+        "media_specs": media_specs,
+        "default_profile": hermes_enhance.DEFAULT_PROFILE,
+        "default_binary": hermes_enhance.DEFAULT_HERMES_BIN,
+        "default_enabled": hermes_enhance.DEFAULT_ENABLED,
+        "default_agent_enabled": hermes_enhance.DEFAULT_AGENT_ENABLED,
+    }
+
+
+def _hermes_enabled_explicitly(saved: dict) -> bool:
+    """
+    用户是否**显式**设置过 enabled。
+
+    【为什么需要区分】2026-11-22 起 hermes 通道**默认启用**。
+    前端要能回显「现在是出厂默认」还是「用户手动改过」——
+    所以必须区分「用户显式存了 true/false」与「压根没存过这个字段」。
+    """
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "enabled" in cfg
+
+
+def _hermes_agent_enabled_explicitly(saved: dict) -> bool:
+    """用户是否**显式**设置过 agent_enabled（Agent 自动增强路径）。"""
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "agent_enabled" in cfg
+
 
 async def api_enhancer_save(request):
     """PUT /api/enhancer —— 保存用户可编辑的模板覆盖 + 参数"""
@@ -10029,8 +10546,143 @@ async def api_enhancer_save(request):
                 ceiling = enh.MAX_TOKENS_CEILING
             saved["params"]["max_tokens_ceiling"] = max(
                 enh.MAX_TOKENS_FLOOR, min(ceiling, enh.MAX_TOKENS_MAX))
+        # ---- hermes 增强通道配置（对齐 nonebot 咏唱h3）----
+        hermes_payload = payload.get("hermes")
+        if isinstance(hermes_payload, dict):
+            saved["hermes"] = _normalize_hermes_config(hermes_payload, saved.get("hermes"))
         prov.set_pref(conn, "enhancer", json.dumps(saved, ensure_ascii=False))
     return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
+
+
+def _normalize_hermes_config(raw: dict, previous: dict | None) -> dict:
+    """
+    规整前端传来的 hermes 配置（存进 model_provider_prefs 的 "enhancer" key）。
+
+    【为什么单独规整】这些值会**直接进 subprocess 的 argv**（binary / profile）
+    或者决定调哪个 skill —— 必须夹一道，不能让前端传任意字符串就变成
+    「以某个参数调 hermes」。
+
+    规则：
+      enabled     -> bool
+      binary      -> 必须是绝对路径且存在可执行文件（否则回落默认）
+      profile     -> 必须在 /root/.hermes/profiles 下真实存在（否则回落默认）
+      timeout     -> 夹到 [60, 3600]
+      skills      -> 每条 media 一份白名单，只保留 [a-z0-9_-] 与逗号
+      templates   -> 每条 media 一份 system prompt（限长）
+      user_templates -> 每条 media 一份 user 模板（必须含 {prompt} 或 {original}）
+    """
+    previous = previous if isinstance(previous, dict) else {}
+    default = hermes_enhance.resolve_config(previous)
+
+    out: dict = {
+        "enabled": bool(raw.get("enabled", default["enabled"])),
+        # Agent 自动增强路径的独立开关（默认关）。
+        # 前端不传这个字段时 -> 沿用已存的值（没存过 -> 出厂默认 False）。
+        "agent_enabled": bool(raw.get("agent_enabled",
+                                       default.get("agent_enabled",
+                                                   hermes_enhance.DEFAULT_AGENT_ENABLED))),
+        "binary": default["binary"],
+        "profile": default["profile"],
+        "timeout": default["timeout"],
+        "skills": {},
+        "templates": {},
+        "user_templates": {},
+    }
+
+    binary = str(raw.get("binary") or "").strip()
+    if binary.startswith("/") and os.path.isfile(binary) and os.access(binary, os.X_OK):
+        out["binary"] = binary
+
+    profile = str(raw.get("profile") or "").strip()
+    if profile and hermes_enhance.profile_exists(profile):
+        out["profile"] = profile
+
+    try:
+        timeout = int(raw.get("timeout"))
+    except (TypeError, ValueError):
+        timeout = default["timeout"]
+    if timeout is None:
+        timeout = default["timeout"]
+    out["timeout"] = max(60, min(3600, timeout))
+
+    # skill 白名单：只允许 [a-z0-9_-] 和逗号（防注入到 CLI 参数里的怪字符）
+    # 规整规则复用 h3studio/hermes_enhance.sanitize_skills（唯一真源）。
+    skills = raw.get("skills")
+    if isinstance(skills, dict):
+        for media, value in skills.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            clean = hermes_enhance.sanitize_skills(str(value or ""))
+            if clean:
+                out["skills"][media] = clean
+
+    templates = raw.get("templates")
+    if isinstance(templates, dict):
+        for media, value in templates.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            text = str(value or "").strip()
+            if text:
+                out["templates"][media] = text[:20000]
+
+    user_templates = raw.get("user_templates")
+    if isinstance(user_templates, dict):
+        for media, value in user_templates.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            text = str(value or "").strip()
+            if not text:
+                continue
+            if "{prompt}" not in text and "{original}" not in text:
+                # 缺占位符 -> 拒绝这一条（保留内置模板）
+                continue
+            out["user_templates"][media] = text[:2000]
+
+    return out
+
+
+def _enhance_prompt_limit_guard(original: str):
+    """
+    增强入口的提示词长度守卫 —— **统一委派**给 _prompt_limit_guard。
+
+    【为什么要有这个垫片】
+    「提示词长度上限」是 **Provider 级配置**（4000 / 8000 / 20000 / 50000 /
+    unlimited），唯一判定入口是 _prompt_limit_guard。
+    本函数存在的意义是给「增强类」入口一个语义明确的调用名，
+    并且在 _prompt_limit_guard 尚未定义时（极早期启动阶段）安全退化。
+
+    【为什么不自己写一份上限判定】
+    【2026-11-22 合并期的真实教训】prompt-enhance 分支原本带了一份
+    「能力探测式」兜底：_prompt_limit_guard 不存在时退回硬编码的 4000。
+    但 max-token 分支的契约明确要求：
+      * server.py 里**不得**再出现 `if len(original) > <数字>:` 这种硬编码判定
+        （test_no_hardcoded_4000_guard_left）；
+      * 所有吃提示词的入口必须**各调一次**同一个 _prompt_limit_guard
+        （test_all_guards_go_through_single_helper）。
+    两条契约是**互斥**的：只要这里留一份独立的上限判定，
+    「唯一真源」就被破坏了 —— 那正是「一处放开、另一处还砍」的老问题。
+    所以这里只做**委派**，不再持有任何自己的上限逻辑。
+
+    【兜底口径】
+    _prompt_limit_guard 拿不到 Provider 时走 _default_prompt_limit()
+    -> 按**默认 Provider** 的配置算（默认 4000，与改动前行为一致）。
+    真要保留「上限 4000 字」这条提示语，也只能由
+    _prompt_limit_guard 统一产出，不能在本函数里另写一份。
+
+    返回 (错误响应 or None, 生效信息 dict)。
+    """
+    guard = globals().get("_prompt_limit_guard")
+    if callable(guard):
+        try:
+            return guard(original, None)
+        except Exception:
+            # 守卫自身出错**不能**把增强入口搞挂 —— 放行，让上层正常走
+            pass
+    # 理论上到不了这里（_prompt_limit_guard 在本模块里定义）。
+    # 真到了，说明模块初始化顺序异常 —— **放行**而不是拦，
+    # 因为「误杀合法请求」比「漏拦一次超长提示词」更糟。
+    return None, {"prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+                  "prompt_limit_unlimited": False}
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -10194,6 +10846,446 @@ def _reference_spec_for_mode(spec_id: str, mode_ctx: str = "",
     return spec_id
 
 
+# ------------------------------------------------------------------ 提示词长度上限
+#
+# 【2026-11-10】每个 Provider 可配「提示词长度上限」，支持「无限制」。
+# 这是**输入**长度限制（提交给模型的原文能有多长）。
+#
+# 【为什么要集中成一个函数】
+# 改动前有 **5 处**硬编码 `if len(original) > 4000`，分别散在
+# api_enhance / api_moss_layout / api_qwen_pe_expand /
+# api_h3image_pe_expand / api_music_enhance。
+# 如果只在一处放开、另一处还砍，就会出现用户说的
+# 「提示词过长（上限 4000 字）」换个入口又冒出来。
+# 现在所有入口统一走 _prompt_limit_guard()。
+def _resolve_prompt_limit(provider: dict | None) -> tuple[str, int | None]:
+    """
+    取本次请求生效的「提示词长度上限」。
+
+    返回 (取值字符串, 实际最大字数)：
+      - ("unlimited", None) -> 无限制
+      - ("4000", 4000)      -> 上限 4000 字
+
+    provider 为 None（还没解析出 Provider）时用全局默认。
+    """
+    limit = (provider or {}).get("prompt_limit") or prov.DEFAULT_PROMPT_LIMIT
+    limit = prov._normalize_limit(limit)
+    return limit, prov.prompt_limit_max_chars(limit)
+
+
+def _default_prompt_limit() -> tuple[str, int | None]:
+    """
+    没指定 Provider 的入口（如官方 PE 扩写）用的上限。
+
+    规则：**按默认 Provider 的配置走** —— 用户在「本地模型」页把默认
+    Provider 设成「无限制」，官方 PE 扩写这条路也跟着放开。
+    找不到默认 Provider -> 回到全局默认 4000 字。
+    """
+    try:
+        with db() as conn:
+            item = prov.resolve_default(conn, "default")
+    except Exception:
+        item = None
+    return _resolve_prompt_limit(item)
+
+
+def _prompt_limit_guard(original: str, provider: dict | None) -> tuple[dict | None, dict]:
+    """
+    提示词长度校验。
+
+    返回 (错误响应 or None, 生效信息)。
+    生效信息会回给前端，让 UI 能显示「实际生效值 + 原因」，
+    而不是让用户猜。
+    """
+    if provider is None:
+        limit, max_chars = _default_prompt_limit()
+    else:
+        limit, max_chars = _resolve_prompt_limit(provider)
+    info = {
+        "prompt_limit": limit,
+        "prompt_limit_max_chars": max_chars,
+        "prompt_limit_unlimited": max_chars is None,
+    }
+    if max_chars is not None and len(original) > max_chars:
+        return web.json_response(
+            {"error": f"提示词过长（上限 {max_chars} 字）",
+             **info}, status=400), info
+    return None, info
+async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
+                                 saved, asset_context, asset_summary,
+                                 scan_images=None):
+    """
+    hermes 增强通道（对齐 nonebot 插件「咏唱h3」的增强方式）。
+
+    流程与 nonebot **完全一致**：
+      1. 先增强（hermes CLI + 特定 profile + 特定 skill 白名单 + 提示词模板）
+      2. 增强结果才落到提示词字段（replace / append 两种落地策略）
+
+    失败处理与 nonebot 同款纪律：
+      * hermes 不可用 / 超时 / 输出不合法 -> **如实报错**（502 + degraded），
+        **绝不**拿原文冒充增强结果，也**绝不**编造一段模板文案；
+      * 校验不过 -> 回灌 issues 重跑一次（nonebot 同样最多 2 次尝试）。
+
+    三条能力（图像 / 视频 / 音频）按 media 路由到各自的 skill 白名单与
+    提示词模板 —— 见 h3studio/hermes_enhance.py 的 HERMES_MEDIA_SPECS。
+    """
+    # 【提示词长度上限】hermes 通道**解析不出 Provider**（没有 provider_id），
+    # 所以用「默认 Provider 的上限」口径（_enhance_prompt_limit_guard 内部
+    # 会自动转调 _prompt_limit_guard(original, None) -> _default_prompt_limit()）。
+    #
+    # 【为什么守卫放在这里而不是 api_enhance 开头】
+    # api_enhance 的 provider 通道在解析出具体 Provider 后会用
+    # _prompt_limit_guard(original, item) 校验 —— 那是**更精确**的口径
+    # （用户显式选了某个 Provider 时按该 Provider 的上限算）。
+    # 若在 api_enhance 开头再加一道默认口径的守卫，用户选了
+    # 「上限 50000 的 Provider」也会被默认 Provider 的 4000 先拦下来
+    # —— 那就回到了「同一个入口，一处放开一处还砍」的老问题。
+    # 所以：provider 通道用精确口径（解析后校验），
+    #     hermes 通道用默认口径（无 Provider 可解析，只能用默认）。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
+
+    cfg = hermes_enhance.resolve_config(saved)
+    if not cfg["enabled"]:
+        return web.json_response(
+            {"error": "hermes 增强通道未启用。请在「本地模型配置 → 增强 Agent」"
+                      "里打开 hermes 增强开关。",
+             "code": "hermes_disabled", "degraded": True}, status=400)
+
+    media = hermes_enhance.media_for_mode(mode_ctx)
+    if not media:
+        return web.json_response(
+            {"error": f"无法判断模式「{mode_ctx}」属于哪种媒体，"
+                      "hermes 增强只覆盖图像 / 视频 / 音频三条链路。",
+             "code": "unknown_media", "degraded": True}, status=400)
+    if media not in hermes_enhance.HERMES_MEDIA_SPECS:
+        return web.json_response(
+            {"error": f"媒体类型「{media}」没有对应的 hermes 增强配置。",
+             "code": "unknown_media", "degraded": True}, status=400)
+
+    history = _normalize_prompt_history(payload.get("prompt_history"),
+                                        current_stage=_safe_int(
+                                            payload.get("stage")))
+    duration = payload.get("duration")
+    try:
+        duration = float(duration) if duration not in (None, "") else None
+    except (TypeError, ValueError):
+        duration = None
+
+    try:
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=history,
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
+    except hermes_enhance.HermesEnhanceError as exc:
+        # 【不编造】hermes 不可用 -> 如实报错。调用方（前端）据此提示用户，
+        # 或者让用户改用本地 Provider 通道重试。
+        return web.json_response(
+            {"error": str(exc), "code": exc.reason, "detail": exc.detail[:500],
+             "engine": "hermes", "media": media, "profile": cfg["profile"],
+             "degraded": True}, status=502)
+    except Exception as exc:  # noqa: BLE001 —— 任何异常都要如实报出来
+        return web.json_response(
+            {"error": f"hermes 增强异常：{type(exc).__name__} {exc}"[:300],
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    enhanced = result.enhanced or ""
+    if not enhanced:
+        return web.json_response(
+            {"error": "hermes 返回了空内容，未做修改",
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    merged = enh.merge_result(original, enhanced, mode)
+
+    # 提示词历史留痕（与本地 Provider 通道同款）
+    _ph_panel = mode_ctx or ""
+    if _ph_panel:
+        try:
+            with db() as conn:
+                ph_hooks.record_prompt_history(
+                    conn, _ph_panel,
+                    {"original_prompt": original, "prompt": enhanced,
+                     "model_key": model_key},
+                    source=ph.SOURCE_ENHANCE)
+        except Exception:
+            # 留痕失败**不能**让增强失败（增强产物是主要目的）
+            pass
+
+    return json_ok({
+        "original": original,
+        "enhanced": enhanced,
+        "merged": merged,
+        "mode": mode,
+        "engine": "hermes",
+        "media": media,
+        "profile": result.profile,
+        "skills": result.skills,
+        "command": result.command,
+        "attempts": result.attempts,
+        "spec_id": f"hermes-{media}",
+        "used_multimodal": False,
+        "assets": asset_summary,
+        "scan": result.scan,
+        "stage": result.stage,
+        "reference_labels": {"expected": [], "found": []},
+        "validation": {"ok": True, "errors": [], "warnings": [],
+                       "stats": {}},
+        "elements": None,
+        "provider": f"hermes:{result.profile}",
+        "provider_id": "",
+        "params": {},
+        "degraded": False,
+    })
+
+
+async def api_hermes_enhance(request):
+    """
+    POST /api/hermes-enhance —— hermes 提示词增强（图像 / 视频 / 音频三能力统一入口）
+
+    这是 /api/enhance 的 **engine=hermes** 特化入口：
+      * 显式收 media（image / video / audio），不靠 mode 推导 —— 三条链路
+        各自选自己的 skill 白名单与提示词模板；
+      * 素材（asset_refs）仍由**服务端**解析（外部无法指定任意路径）；
+      * 失败一律 4xx/5xx + 可读原因 + degraded=true，**不返回半成品**。
+
+    body:
+      prompt      要增强的原文
+      media       image | video | audio
+      mode        replace | append（落地策略，默认 replace）
+      asset_refs  可选，素材库 asset_id 列表
+      duration    可选，目标时长（秒）
+      validate    可选，默认 true
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    # 【提示词长度上限】与 /api/enhance 走**同一个**守卫（能力探测式）——
+    # 两条入口的长度口径必须一致，否则会出现「换个入口上限又变了」。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
+
+    media = str(payload.get("media") or "").strip().lower()
+    if media not in hermes_enhance.HERMES_MEDIA_SPECS:
+        return web.json_response(
+            {"error": f"media 只能是 image / video / audio（收到「{media}」）",
+             "code": "unknown_media"}, status=400)
+
+    mode = payload.get("mode") or "replace"
+    if mode not in ("replace", "append"):
+        return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+
+    # 素材解析（服务端自己读，前端只给 asset_id）
+    asset_refs = payload.get("asset_refs")
+    asset_context = ""
+    asset_summary = {}
+    scan_images: list[str] = []
+    if asset_refs:
+        try:
+            resolved = await _resolve_enhance_assets(
+                asset_refs, _label_dialect_for_mode(""))
+        except enh_assets.EnhanceAssetError as exc:
+            return web.json_response(
+                {"error": exc.message, "code": exc.code, "degraded": True},
+                status=400)
+        asset_context = enh_assets.describe(resolved)
+        asset_summary = enh_assets.summary(resolved)
+        # 【阶段2 的输入】参考图的**服务端本地路径** —— VLM 扫描要真正读这些图。
+        # 外部无法指定任意路径（只能给素材库 asset_id，服务端自己解析）。
+        scan_images = [str(p) for p in (resolved.get("images") or [])]
+
+    duration = payload.get("duration")
+    try:
+        duration = float(duration) if duration not in (None, "") else None
+    except (TypeError, ValueError):
+        duration = None
+
+    cfg = hermes_enhance.resolve_config(saved)
+    if not cfg["enabled"]:
+        return web.json_response(
+            {"error": "hermes 增强通道未启用。请在「本地模型配置 → 增强 Agent」"
+                      "里打开 hermes 增强开关。",
+             "code": "hermes_disabled", "degraded": True}, status=400)
+
+    try:
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=_normalize_prompt_history(
+                    payload.get("prompt_history"),
+                    current_stage=_safe_int(payload.get("stage"))),
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
+    except hermes_enhance.HermesEnhanceError as exc:
+        return web.json_response(
+            {"error": str(exc), "code": exc.reason, "detail": exc.detail[:500],
+             "engine": "hermes", "media": media, "profile": cfg["profile"],
+             "degraded": True}, status=502)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"hermes 增强异常：{type(exc).__name__} {exc}"[:300],
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    enhanced = result.enhanced or ""
+    if not enhanced:
+        return web.json_response(
+            {"error": "hermes 返回了空内容，未做修改",
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    return json_ok({
+        "original": original,
+        "enhanced": enhanced,
+        "merged": enh.merge_result(original, enhanced, mode),
+        "mode": mode,
+        "engine": "hermes",
+        "media": media,
+        "profile": result.profile,
+        "skills": result.skills,
+        "command": result.command,
+        "attempts": result.attempts,
+        "issues": result.issues,
+        "provider": f"hermes:{result.profile}",
+        "provider_id": "",
+        "assets": asset_summary,
+        # 【三段式 · 阶段2 扫描结果】回显给前端：
+        # 用户要能看见「这次扫描出几个物件 / 多少词 / 用的是哪些 skill」，
+        # 否则无法确认参考图到底有没有参与增强。
+        "scan": result.scan,
+        "stage": result.stage,
+        "degraded": False,
+    })
+
+
+async def api_hermes_test(request):
+    """
+    POST /api/hermes-test —— 只测 hermes 通道是否可用（不跑真实增强）
+
+    跑一次极短的一次性询问，确认：二进制在不在、profile 在不在、
+    skill 白名单能不能加载、能不能拿到模型回复。
+
+    body:
+      profile  可选，覆盖配置的 profile
+      skills   可选，覆盖配置的 skill 白名单
+      media    可选，image | video | audio（决定默认白名单）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+    cfg = hermes_enhance.resolve_config(saved)
+
+    profile = str(payload.get("profile") or cfg["profile"]).strip()
+    media = str(payload.get("media") or "image").strip().lower()
+    skills = str(payload.get("skills") or "").strip()
+    if not skills:
+        try:
+            skills = hermes_enhance.get_media_spec(media, saved).get("skills", "")
+        except hermes_enhance.HermesEnhanceError:
+            skills = ""
+
+    binary = cfg["binary"]
+    import shutil as _shutil
+    if not (os.path.isfile(binary) and os.access(binary, os.X_OK)):
+        binary = _shutil.which("hermes") or binary
+
+    report = {
+        "binary": binary,
+        "binary_exists": os.path.isfile(binary) and os.access(binary, os.X_OK),
+        "profile": profile,
+        "profile_exists": hermes_enhance.profile_exists(profile),
+        "skills": skills,
+        "timeout": cfg["timeout"],
+    }
+    if not report["binary_exists"]:
+        report["ok"] = False
+        report["error"] = f"找不到 hermes 可执行文件：{binary}"
+        return json_ok(report)
+    if not report["profile_exists"]:
+        report["ok"] = False
+        report["error"] = f"profile「{profile}」不存在"
+        return json_ok(report)
+
+    import subprocess
+    import tempfile as _tempfile
+    fd, qpath = _tempfile.mkstemp(prefix="h3studio_hermes_test_", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("只回复两个字：就绪。不要做别的事。")
+        cmd = [binary]
+        if profile:
+            cmd += ["--profile", profile]
+        cmd += ["chat", "--query-file", qpath]
+        if skills:
+            cmd += ["--skills", skills]
+        cmd += ["--oneshot", "--cli", "--yolo"]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=min(cfg["timeout"], 180),
+                                  stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            report["ok"] = False
+            report["error"] = "hermes 调用超时"
+            return json_ok(report)
+        except FileNotFoundError:
+            report["ok"] = False
+            report["error"] = f"hermes 可执行文件不存在：{binary}"
+            return json_ok(report)
+        report["returncode"] = proc.returncode
+        answer = ""
+        try:
+            answer = hermes_enhance._extract_answer(proc.stdout or "",
+                                                     proc.stderr or "")
+        except Exception as exc:
+            report["error"] = f"解析 hermes 输出失败：{exc}"
+        report["answer"] = answer[:500]
+        report["stdout_tail"] = (proc.stdout or "")[-800:]
+        report["ok"] = bool(answer) and proc.returncode == 0
+        if not report["ok"] and not report.get("error"):
+            report["error"] = f"hermes 返回码 {proc.returncode}"
+        return json_ok(report)
+    finally:
+        try:
+            os.unlink(qpath)
+        except OSError:
+            pass
+
 async def api_enhance(request):
     """
     POST /api/enhance —— 提示词增强（迷你 Agent 调用本地模型）
@@ -10210,6 +11302,9 @@ async def api_enhance(request):
                   连同图序语义一起喂给多模态模型。
                   【2026-11-18 修复】此前前端从不传素材，增强模型**看不到**
                   用户引用的素材，扩写结果与素材无关 —— 素材等于白引用。
+      engine      可选，"provider"（默认，走本地 Provider）| "hermes"
+                  （走 hermes CLI —— 对齐 nonebot 咏唱h3 的做法）。
+      duration    可选，目标时长（秒），视频链路用。
     """
     try:
         payload = await request.json()
@@ -10219,9 +11314,6 @@ async def api_enhance(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = payload.get("mode") or "replace"
     if mode not in ("replace", "append"):
         return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
@@ -10245,6 +11337,8 @@ async def api_enhance(request):
     asset_context = ""
     asset_summary = {}
     asset_labels: list[str] = []
+    # 【阶段2 的输入】hermes 通道三段式扫描用的参考图本地路径
+    asset_images: list[str] = []
     # 【标签语法方言】跟目标面板的官方参考标记语法走（见
     # _label_dialect_for_mode）。H3 视频用 <Picture N>；Qwen 图片编辑用
     # <imageN>（官方 PE-I2I）—— 用错方言会导致「增强完提交被拒」。
@@ -10268,6 +11362,8 @@ async def api_enhance(request):
             if len(images) >= enh_assets.MAX_IMAGES:
                 break
             images.append(path)
+        # 【阶段2 的输入】hermes 通道的三段式扫描要用这些图。
+        asset_images = [str(p) for p in (resolved_assets.get("images") or [])]
         asset_context = enh_assets.describe(resolved_assets)
         asset_summary = enh_assets.summary(resolved_assets)
         asset_labels = list(asset_summary.get("labels") or [])
@@ -10293,11 +11389,25 @@ async def api_enhance(request):
         except Exception:
             saved = {}
 
+    # ---- hermes 增强通道（对齐 nonebot 咏唱h3）----
+    #
+    # 【路由口径】engine 显式传 "hermes" 才走这条路；不传就走原来的
+    # 本地 Provider 通道（**行为不变**，老客户端不受影响）。
+    #
+    # 【为什么按 media 分三条链路】图像 / 视频 / 音频的提示词规范完全不同
+    # （H3 视频要三段式 Context IR，音乐要结构化风格字段）—— 所以三条链路
+    # 各配一套 skill 白名单 + 提示词模板（h3studio/hermes_enhance.py）。
+    engine = str(payload.get("engine") or "provider").strip().lower()
+    if engine == "hermes":
+        return await _api_enhance_via_hermes(
+            payload, original, mode, mode_ctx, model_key,
+            saved, asset_context, asset_summary,
+            scan_images=asset_images)
+
     spec = enh.get_spec(spec_id, saved)
     # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
     #   原实现不传 original -> 只能拿到固定 300 -> 长提示词必被硬切
     #   （审查实测：普通增强 10 次有 6 次被切，成功率仅 40%）。
-    params = enh.resolve_params(payload.get("params"), saved, spec, original=original)
 
     # 选 Provider：显式指定 > 默认多模态（有图时） > 默认
     with db() as conn:
@@ -10336,6 +11446,18 @@ async def api_enhance(request):
                         {"error": "尚未配置可用的本地模型 Provider。"
                                  "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
 
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
+    # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
+    #   unlimited_output：Provider 配了「无限制」-> 输出也不设人为上限。
+    params = enh.resolve_params(
+        payload.get("params"), saved, spec, original=original,
+        unlimited_output=limit_info["prompt_limit_unlimited"])
+
+
 
     validate_mode = spec.get("validate_mode", "pe")
     # ---- 跨段提示词历史（2026-11-17 新增）----
@@ -10371,10 +11493,15 @@ async def api_enhance(request):
         #   （审查实测：普通增强 10 次有 6 次被 300 硬切，成功率仅 40%。
         #    预算自适应后这一步基本不会触发；这里是最后一道保险。）
         budget = params["max_tokens"]
-        ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
-        attempts = [budget]
-        if ceiling > budget:
-            attempts.append(ceiling)
+        if params.get("max_tokens_unlimited"):
+            # 无限制：只跑一次。输出预算已交给后端/模型，
+            # 再用 ceiling 重跑没有意义（ceiling 比 budget 小）。
+            attempts = [budget]
+        else:
+            ceiling = enh.clamp_max_tokens(enh.MAX_TOKENS_CEILING, params)
+            attempts = [budget]
+            if ceiling > budget:
+                attempts.append(ceiling)
 
         last = None
         # 【JSON 契约解包出来的画面比例】（2026-11-15 修复①）
@@ -10528,6 +11655,26 @@ async def api_enhance(request):
                 {"original_prompt": original, "prompt": enhanced,
                  "model_key": model_key},
                 source=ph.SOURCE_ENHANCE)
+    # 【2026-11-10】把「实际生效的长度限制」回给前端：
+    #   prompt_limit            —— 用户配的取值（unlimited / 4000 / …）
+    #   prompt_limit_max_chars  —— 实际生效的最大字数（unlimited -> null）
+    #   backend_context_limit   —— 后端的物理上限（探测得到；探测不到为 null）
+    #   limit_note              —— 人类可读的说明，前端直接显示
+    limit_note = ""
+    backend_ctx = None
+    if limit_info["prompt_limit_unlimited"]:
+        # 无限制：探测后端物理上限，如实告诉用户「实际最多能到多少」
+        probe = await llm_client.probe_context_limit(item)
+        backend_ctx = probe.get("limit")
+        if backend_ctx:
+            limit_note = ("已解除长度限制；后端物理上限 "
+                          f"{backend_ctx} tokens（{probe.get('detail','')}）")
+        else:
+            limit_note = ("已解除长度限制；未能探测到后端物理上限，"
+                          "实际由模型自身能力决定")
+    else:
+        limit_note = (f"提示词长度上限 {limit_info['prompt_limit_max_chars']} 字"
+                      "（可在「本地模型」页按 Provider 调整）")
     return json_ok({
         "original": original,
         "enhanced": enhanced,
@@ -10536,6 +11683,11 @@ async def api_enhance(request):
         "provider": item["name"],
         "provider_id": item["id"],
         "spec_id": spec["id"],
+        "prompt_limit": limit_info["prompt_limit"],
+        "prompt_limit_max_chars": limit_info["prompt_limit_max_chars"],
+        "prompt_limit_unlimited": limit_info["prompt_limit_unlimited"],
+        "backend_context_limit": backend_ctx,
+        "limit_note": limit_note,
         "used_multimodal": bool(images),
         # 【素材上下文回显（2026-11-18 新增）】前端据此告诉用户
         # 「这次增强带上了哪几个素材」—— 否则用户无法确认素材到底
@@ -10604,9 +11756,6 @@ async def api_moss_layout(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     intent = str(payload.get("intent") or "").strip()
     if len(intent) > 1000:
         return web.json_response({"error": "画面意图过长（上限 1000 字）"}, status=400)
@@ -10646,6 +11795,12 @@ async def api_moss_layout(request):
                 return web.json_response(
                     {"error": "尚未配置可用的本地模型 Provider。"
                              "请先在「本地模型」页添加并启用一个 Provider。"}, status=400)
+
+    # 【2026-11-10】提示词长度校验 —— 上限按**本次实际使用的 Provider** 取。
+    limit_err, limit_info = _prompt_limit_guard(original, item)
+    if limit_err is not None:
+        return limit_err
+
 
     messages = moss_layout.build_messages(original, width, height, intent)
     try:
@@ -10730,14 +11885,18 @@ async def api_qwen_pe_expand(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2i_qwen").strip()
     if mode not in ("t2i_qwen", "i2i_qwen"):
         return web.json_response(
             {"error": "官方 PE 扩写只适用于 Qwen-Image 2.1 的文生图 / 图片编辑模式"}, status=400)
     is_edit = mode == "i2i_qwen"
+
+    # 【2026-11-10】提示词长度校验 —— 这条路没有 provider_id，
+    # 按**默认 Provider** 的配置取（见 _default_prompt_limit）。
+    limit_err, limit_info = _prompt_limit_guard(original, None)
+    if limit_err is not None:
+        return limit_err
+
 
     # 参考图：素材库来源，与出图链路同一套约束（顺序即 <imageN> 顺序）。
     # 这里要的是**能直接喂给 ComfyUI LoadImage 的文件名**，
@@ -10831,14 +11990,18 @@ async def api_h3image_pe_expand(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
-
     mode = str(payload.get("mode") or "t2i_h3image").strip()
     if mode not in ("t2i_h3image", "i2i_h3image"):
         return web.json_response(
             {"error": "H3-Image 官方 PE 扩写只适用于文生图 / 图片编辑模式"}, status=400)
     is_edit = mode == "i2i_h3image"
+
+    # 【2026-11-10】提示词长度校验 —— 这条路没有 provider_id，
+    # 按**默认 Provider** 的配置取（见 _default_prompt_limit）。
+    limit_err, limit_info = _prompt_limit_guard(original, None)
+    if limit_err is not None:
+        return limit_err
+
 
     # 参考图：素材库来源，顺序严格保持（= <imageN> 顺序）。
     # 只上传、**不登记** asset_refs —— 扩写只是读一次图，不是出图任务。
@@ -11957,6 +13120,24 @@ async def api_agent_session_delete(request):
                     "cleared_job_refs": cleared_jobs})
 
 
+def _comfy_snapshot_obj():
+    """取**已缓存**的 ComfyUI 模型清单快照（**绝不触发网络请求**）。
+
+    【2026-11-22】配合 `gen_defaults.warm_comfy_snapshot()` 使用：
+    先异步（aiohttp，不阻塞事件循环）刷新一次快照，再用这个函数
+    只读取缓存值。缓存没有时返回 None —— 调用方退回原来的
+    降级路径，行为与修复前一致。
+
+    为什么不直接用 `video_models.comfy_snapshot()`：那个函数在
+    缓存过期时会**同步 urllib** 去打 8188，在 aiohttp 事件循环里
+    会把整个服务端卡住（ComfyUI 冷启动时尤其明显）。
+    """
+    try:
+        return video_models.cached_comfy_snapshot()
+    except Exception:
+        return None
+
+
 async def api_agent_tools(request):
     """GET /api/agent/tools —— 列出 Agent 的工具清单（调试 / 前端展示用）。"""
     # 【2026-11-22】先异步预热 ComfyUI 快照 —— 否则下面的
@@ -12653,6 +13834,9 @@ def make_app():
     app.router.add_get("/api/enhancer", api_enhancer_config)
     app.router.add_put("/api/enhancer", api_enhancer_save)
     app.router.add_post("/api/enhance", api_enhance)
+    # hermes 增强通道（对齐 nonebot 咏唱h3）：图像 / 视频 / 音频三能力统一入口
+    app.router.add_post("/api/hermes-enhance", api_hermes_enhance)
+    app.router.add_post("/api/hermes-test", api_hermes_test)
     # MOSS-Image 结构化（layout）增强 —— 外部复现 MossPrompt 节点的能力
     app.router.add_post("/api/moss-layout", api_moss_layout)
     # Qwen-Image 2.1 官方 PE 扩写（「增强」下拉里的 qwen21图片官方增强PE）

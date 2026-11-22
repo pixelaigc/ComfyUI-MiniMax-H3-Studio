@@ -193,21 +193,27 @@ DEFAULT_T2V_DEFAULTS = {
 #: 真正零引用的只有 ``default_t2v_defaults()``（老结构的函数式包装），
 #: 那个已在本轮删除 —— DEFAULT_T2V_DEFAULTS 常量本身保留
 #: （tests/test_agent_power.py 仍在引用它，且它是对外承诺的兼容镜像）。
-def default_t2v_mirror() -> dict:
-    return dict(gen_defaults.default_values("t2v"))
+def default_t2v_mirror(snapshot=None) -> dict:
+    """【2026-11-22】`snapshot` 透传（复用已预热的 ComfyUI 快照）。"""
+    return dict(gen_defaults.default_values("t2v", snapshot))
 
 
 #: 默认配置全量。
-def defaults() -> dict:
+def defaults(snapshot=None) -> dict:
+    """【2026-11-22】`snapshot` 透传（复用已预热的 ComfyUI 快照）。
+
+    不传时行为与原来完全一致（内部自取快照）；传了就复用调用方
+    已经**异步**刷新好的快照，从而**不触发同步 urllib 打 8188**。
+    """
     return {
         "max_steps": MAX_STEPS_HARD_CAP,
         "capabilities": dict(DEFAULT_CAPABILITIES),
         "search_engines": [dict(e) for e in DEFAULT_SEARCH_ENGINES],
         # 【2026-11-14 需求 A4】按生成类型分别配置的默认参数。
-        "gen_defaults": gen_defaults.default_gen_defaults(),
+        "gen_defaults": gen_defaults.default_gen_defaults(snapshot),
         # 兼容镜像：老结构（t2v_defaults）。读取时它**优先**于
         # gen_defaults["t2v"]；写入时两者同步。
-        "t2v_defaults": default_t2v_mirror(),
+        "t2v_defaults": default_t2v_mirror(snapshot),
         "file_roots": [],
         "code_exec_timeout_sec": 30,
         "ffmpeg_path": "",
@@ -333,9 +339,12 @@ def normalize_file_roots(raw) -> list[str]:
     return out
 
 
-def normalize(payload: dict | None) -> dict:
-    """把前端提交的配置归一成合法形状（非法项回落默认值，不整体拒绝）。"""
-    base = defaults()
+def normalize(payload: dict | None, snapshot=None) -> dict:
+    """把前端提交的配置归一成合法形状（非法项回落默认值，不整体拒绝）。
+
+    【2026-11-22】`snapshot` 透传给 `defaults()`（见那里的说明）。
+    """
+    base = defaults(snapshot)
     if not isinstance(payload, dict):
         return base
     try:
@@ -420,20 +429,23 @@ def normalize(payload: dict | None) -> dict:
 # ------------------------------------------------------------------ 持久化
 
 
-def load(conn) -> dict:
-    """从 model_provider_prefs 读配置（读不到/坏了都回默认值）。"""
+def load(conn, snapshot=None) -> dict:
+    """从 model_provider_prefs 读配置（读不到/坏了都回默认值）。
+
+    【2026-11-22】`snapshot` 透传（见 `defaults()` 的说明）。
+    """
     try:
         row = conn.execute("SELECT value FROM model_provider_prefs WHERE key=?",
                            (PREF_KEY,)).fetchone()
     except Exception:
-        return defaults()
+        return defaults(snapshot)
     if not row or not row["value"]:
-        return defaults()
+        return defaults(snapshot)
     try:
         raw = json.loads(row["value"])
     except (TypeError, ValueError):
-        return defaults()
-    return normalize(raw)
+        return defaults(snapshot)
+    return normalize(raw, snapshot)
 
 
 def save(conn, payload: dict) -> dict:
@@ -501,9 +513,13 @@ def capability_state(settings: dict | None) -> dict:
     return out
 
 
-def snapshot(conn) -> dict:
-    """给 Agent 运行期用的一次性快照（读配置 + 派生依赖路径）。"""
-    settings = load(conn)
+def snapshot(conn, comfy_snapshot=None) -> dict:
+    """给 Agent 运行期用的一次性快照（读配置 + 派生依赖路径）。
+
+    【2026-11-22】`comfy_snapshot` 透传（ComfyUI 模型清单快照）。
+    调用方若已**异步**刷新过就传进来，避免同步 urllib 打 8188。
+    """
+    settings = load(conn, comfy_snapshot)
     return {
         "settings": settings,
         "ffmpeg_path": ffmpeg_path(settings),

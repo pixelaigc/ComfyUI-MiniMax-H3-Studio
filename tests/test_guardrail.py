@@ -568,6 +568,88 @@ def test_guard_blocks_live_data_dir_env(guarded_pytester, monkeypatch):
 
 
 # --------------------------------------------------------------------------
+# 5b. 媒体目录护栏：outputs 不得用符号链接逃出 data_dir
+# --------------------------------------------------------------------------
+#
+# 【这条护栏对应的真实事故（用户 2026-11-22 发现，2026-11-23 定死）】
+# 线上媒体库出现了两个没有任何任务记录认领的视频文件
+# `v-h3-studio-000254.mp4` / `v-h3-studio-000255.mp4`。
+# 肇事的「隔离实例」把 `data_dir` 指到临时目录（DB 隔离了），
+# 但那个临时目录里的 `outputs` 是**指向线上媒体库的符号链接** ——
+# 于是产物写进了用户的媒体库，任务记录写进了临时库。
+# 写库护栏拦的是「行写进线上库」，这一半（文件写进线上媒体库）
+# 它看不见，所以 `server.py` 需要自己的启动检查。
+
+#: 线上媒体库（事故里被符号链接指向的目标）。
+_LIVE_OUTPUTS = _LIVE_DATA_DIR + "/outputs"
+
+
+def _import_server_with_data_dir(data_dir: str) -> tuple[int, str]:
+    """在**子进程**里用给定 data_dir import server，返回 (退出码, stderr)。
+
+    【为什么用子进程】`server` 的数据目录是 import 时定下的模块常量，
+    同一个 pytest 进程里 import 两次会互相污染（还会把线上库的
+    连接与后台任务留在测试进程里）。子进程干净、可复现。
+    """
+    import subprocess
+    import sys
+
+    env = dict(os.environ)
+    env["H3STUDIO_DATA_DIR"] = data_dir
+    env["H3STUDIO_PORT"] = "8901"  # 不碰线上 8190
+    proc = subprocess.run(
+        [sys.executable, "-c", "import server"],
+        cwd=str(_REPO), env=env,
+        capture_output=True, text=True, timeout=120)
+    return proc.returncode, (proc.stderr or "")
+
+
+def test_data_dir_guard_rejects_outputs_symlink_escaping(tmp_path):
+    """【负例 = 事故本身】outputs 是指向线上媒体库的符号链接 -> 启动即失败。
+
+    这条断言的**期望值不来自被测函数**：它断言的是「进程退出码非 0」
+    且报错里出现真实的越界指向（符号链接目标）。
+    """
+    bad = tmp_path / "iso"
+    bad.mkdir()
+    (bad / "outputs").symlink_to(_LIVE_OUTPUTS)
+    code, err = _import_server_with_data_dir(str(bad))
+    assert code != 0, (
+        "媒体目录逃逸护栏没拦住「outputs 是指向线上媒体库的符号链接」:\n" + err)
+    assert "符号链接" in err, f"报错没说明真实原因:\n{err}"
+    assert _LIVE_OUTPUTS in err, f"报错没指出越界目标:\n{err}"
+
+
+def test_data_dir_guard_allows_fully_isolated_data_dir(tmp_path):
+    """【对照 1】data_dir 是真目录、outputs 也是真目录 -> 放行。"""
+    good = tmp_path / "iso-real"
+    good.mkdir()
+    code, err = _import_server_with_data_dir(str(good))
+    assert code == 0, f"护栏误伤了完全隔离的 data_dir:\n{err}"
+    assert (good / "outputs" / "videos").is_dir(), "server 没建自己的媒体目录"
+
+
+def test_data_dir_guard_allows_whole_data_dir_symlink(tmp_path):
+    """【对照 2】整个 data_dir 是指向线上的符号链接 -> 放行（显式选线上）。
+
+    【为什么放行】那是「整套数据（行 + 产物）都在同一个目录」，
+    不会出现「产物与记录分属两处」。是否该用线上目录由
+    写库护栏与静态扫描判断，不由这条检查判断。
+    """
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    (outer / "data").symlink_to(_LIVE_DATA_DIR)
+    code, err = _import_server_with_data_dir(str(outer / "data"))
+    assert code == 0, f"护栏误伤了「整个 data_dir 显式指向线上」:\n{err}"
+
+
+def test_data_dir_guard_allows_production_data_dir():
+    """【对照 3】线上生产配置本身必须通过（不得把 8190 拦挂）。"""
+    code, err = _import_server_with_data_dir(_LIVE_DATA_DIR)
+    assert code == 0, f"护栏误伤了线上生产 data_dir:\n{err}"
+
+
+# --------------------------------------------------------------------------
 # 6. 报告头：必须说明本次跑的是哪一档
 # --------------------------------------------------------------------------
 

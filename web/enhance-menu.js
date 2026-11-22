@@ -80,6 +80,32 @@
       write: { kind: "text" },
     },
     {
+      // 【2026-11-22 新增】hermes 增强通道（对齐 nonebot 插件「咏唱h3」）。
+      //
+      // 【它是什么】nonebot 咏唱h3 的提示词增强**不是**调本地模型端点，
+      // 而是用 hermes 调一个「特定 profile + 特定提示词」，把用户的输入
+      // 处理成专业完美的提示词（`hermes chat --query-file … --skills …`）。
+      // 这一项把同款做法接进本工作台，**图像 / 视频 / 音频三条链路都可用**。
+      //
+      // 【与其它增强方式的差别】其它方式走本项目的本地 Provider（llm.py）；
+      // 这一项走 hermes CLI（服务端 h3studio/hermes_enhance.py 封装）。
+      // 两条通道互不干扰，由请求的 engine 字段区分。
+      id: "hermes",
+      label: "hermes 增强（对齐咏唱h3）",
+      hint: "用本机 hermes（特定 profile + skill 白名单 + 提示词模板）把提示词扩写成专业版本",
+      // 三条能力都可用（图像 / 视频 / 音频）
+      modes: [],
+      specId: "",
+      busyFlag: "enhance",
+      buttonText: "hermes 增强",
+      kind: "hermes",
+      // 【写回契约 · 文本路线】产物是一段文本，写回当前面板的文本输入框。
+      write: { kind: "text" },
+      // 【为什么没有 owner 字段】owner 只用于「本面板不可用」的徽标。
+      // hermes 增强在**所有**面板都可用（图像 / 视频 / 音频三条链路），
+      // 所以永远不会走 unavailableReason —— 不需要 owner。
+    },
+    {
       id: "director",
       label: "视频导演提示词",
       hint: "按 MiniMax-H3 官方三段式（画面时间线 / 整体声景 / 非剧情音乐）写导演稿",
@@ -1546,6 +1572,9 @@
     if (method.id === "refine") {
       return runRefine(method, opts);
     }
+    if (method.id === "hermes") {
+      return runHermes(method, opts);
+    }
     if (method.id === "director") {
       return runDirector(method, opts);
     }
@@ -1571,6 +1600,73 @@
     }
     await music.run({});
     return { expanded: "", meta: "" };
+  }
+
+  // ---- hermes 增强（对齐 nonebot 咏唱h3）----
+  //
+  // 走 POST /api/hermes-enhance（服务端 h3studio/hermes_enhance.py）：
+  //   hermes --profile <profile> chat --query-file <tmp>.txt
+  //          --skills <白名单> --oneshot --cli --yolo
+  // 三条能力（图像 / 视频 / 音频）按 media 各自选自己的 skill 白名单与
+  // 提示词模板 —— 与 nonebot 的调用方式完全一致。
+  //
+  // 【失败处理】hermes 不可用 -> 如实报错（**不编造**），提示用户可以
+  // 改用「普通增强」（本地 Provider 通道）。
+  async function runHermes(method, opts) {
+    const btn = document.querySelector("#enhanceBtn");
+    const text = document.querySelector("#enhanceBtnText");
+    const prompt = (opts && opts.input !== undefined)
+      ? String(opts.input || "").trim()
+      : (currentInputValue() || "").trim();
+    if (!prompt) {
+      setHint("请先输入要增强的提示词", "error");
+      return null;
+    }
+    const media = currentMedia();
+    if (!media) {
+      setHint("当前模式没有对应的媒体类型，无法走 hermes 增强", "error");
+      return null;
+    }
+    btn.disabled = true;
+    const originalLabel = text.textContent;
+    text.textContent = "hermes 增强中…";
+    promptEnhance.busy = true;
+    updateActionButtons();
+    setHint("正在调用 hermes 增强…", "busy");
+    try {
+      const d = await apiJSON("POST", "/api/hermes-enhance", {
+        prompt,
+        media,
+        mode: "replace",
+        asset_refs: collectPanelAssetRefs(),
+        prompt_history: continuationPromptHistory(),
+      });
+      const enhanced = d.enhanced || "";
+      if (!enhanced) throw new Error("hermes 返回了空结果");
+      if (opts && opts.collect) {
+        return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+      }
+      document.querySelector("#enhanceResult").value = enhanced;
+      document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
+      document.querySelector("#enhanceModal").hidden = false;
+      pushPromptVersion(0, prompt, "原始提示词");
+      pushPromptVersion(1, enhanced,
+        `hermes 增强（profile：${d.profile || "-"}）`, "hermes-" + media);
+      setHint(`hermes 增强完成（profile：${d.profile || "-"}）：${enhanced.length} 字`, "ok");
+      return { expanded: enhanced, meta: buildEnhanceMeta(d) };
+    } catch (e) {
+      const detail = e.payload && e.payload.error ? e.payload.error : e.message;
+      setHint(`hermes 增强失败：${detail}`, "error");
+      alert("hermes 增强失败\n\n" + detail
+        + "\n\nhermes 通道可在「本地模型配置 → 增强 Agent」里测试连通性；"
+        + "也可以改用「普通增强」（走本地模型）。");
+      return null;
+    } finally {
+      promptEnhance.busy = false;
+      btn.disabled = false;
+      text.textContent = originalLabel;
+      updateActionButtons();
+    }
   }
 
   // ---- 视频导演提示词（H3 官方三段式） ----
@@ -1987,7 +2083,10 @@
       document.querySelector("#enhanceResult").value = refined;
       document.querySelector("#enhanceMeta").innerHTML = buildEnhanceMeta(d);
       document.querySelector("#enhanceModal").hidden = false;
-      setHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字`, "ok");
+      // 把「实际生效的长度限制」一并显示 —— 选了「无限制」时
+      // 用户需要看到后端实际的上限是多少（物理上限，绕不过去）。
+      const limitTail = d.limit_note ? ` · ${d.limit_note}` : "";
+      setHint(`二次增强完成（${d.provider}）：逐个物体细化 ${refined.length} 字${limitTail}`, "ok");
       return { expanded: refined, meta: buildEnhanceMeta(d) };
     } catch (e) {
       const detail = e.payload && e.payload.error ? e.payload.error : e.message;

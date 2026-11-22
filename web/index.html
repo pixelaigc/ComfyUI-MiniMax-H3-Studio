@@ -1339,6 +1339,20 @@
         <input type="password" id="provKey" placeholder="留空表示无需鉴权" maxlength="200" autocomplete="off">
         <small id="provKeyHint" class="prov-hint"></small>
       </label>
+      <label class="prov-field">
+        <span>提示词长度上限 <em>可空</em></span>
+        <select id="provPromptLimit">
+          <option value="unlimited">无限制（交给后端/模型决定）</option>
+          <option value="4000">4000 字（默认，兼容旧行为）</option>
+          <option value="8000">8000 字</option>
+          <option value="20000">20000 字</option>
+          <option value="50000">50000 字</option>
+        </select>
+        <small id="provPromptLimitHint" class="prov-hint">
+          输入提示词的长度上限。选「无限制」后不再拦截超长提示词，
+          输出 token 上限也一并放开，由后端/模型的物理能力决定。
+        </small>
+      </label>
       <label class="prov-check">
         <input type="checkbox" id="provMultimodal">
         <span>支持多模态（可读图，用于提示词增强等需要看图的场景）</span>
@@ -1627,7 +1641,7 @@
      window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— generation-queue.js 改了（新增「运行真相」兜底：已超时 / 状态未知 / 已丢失），
      必须破缓存，否则用户拿到的还是旧文件（永远显示「运行中」）。 -->
-<script src="/static/generation-queue.js?v=genfix20261122b"></script>
+<script src="/static/generation-queue.js?v=exectrue20261122a"></script>
 <script src="/static/video-nav.js?v=sidebarfold2"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
@@ -1654,8 +1668,8 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=reqstorm20261122b"></script>
-<script src="/static/providers.js?v=reflabel1"></script>
+<script src="/static/app.js?v=exectrue20261122a"></script>
+<script src="/static/providers.js?v=exectrue20261122a"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
 <script src="/static/job-detail.js?v=genfix20261119a"></script>
@@ -1687,7 +1701,7 @@
 <!-- 【2026-11-16 S5】升 enhance-menu.js 的 ?v= 到 cr20261116b ——
      S5 给 director 条目补了显式 write 契约声明（行为不变，
      但内容变了）⇒ 必须破缓存，否则老用户拿到的还是旧文件。 -->
-<script src="/static/enhance-menu.js?v=reflabel1"></script>
+<script src="/static/enhance-menu.js?v=exectrue20261122a"></script>
 <!-- music-enhance.js 必须**后于** enhance-menu.js：前者要用后者导出的
      window.EnhanceMenuShared（共用菜单组件），拿不到就会报错。 -->
 <script src="/static/music-enhance.js?v=cr20261115b"></script>
@@ -1724,6 +1738,6 @@
      版本号必须随内容变化递增 —— 静态资源被浏览器缓存时，
      旧版面板会一直用旧的慢端点（实测表现为「读取中…」卡住）。
      2026-11-14 需求 A4：新增「按生成类型配置默认参数」区块。 -->
-<script src="/static/agent-manage.js?v=cr20261118a"></script>
+<script src="/static/agent-manage.js?v=unify20261122a"></script>
 </body>
 </html>
