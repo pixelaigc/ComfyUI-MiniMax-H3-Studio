@@ -1,0 +1,186 @@
+{
+ "session_id": "e2e-case2-merge-r2",
+ "status": "completed",
+ "answer": "已完成合并，成片已入库。\n\n**产物**\n- 素材名：v4s.mp4_av_0d07e5e2.mp4_av_05e46473.mp4（asset_id: asset_4651cca47e3e）\n- 访问路径：/api/assets/asset_4651cca47e3e/content（预览：/api/assets/asset_4651cca47e3e/preview）\n- 时长：**1.88 秒**（成片以视频轨为准；音频 a1.mp3 长 2.04s，超出部分被截掉）\n- 画面：320×240，h264 / yuv420p / 25fps；音轨：aac，44100Hz 单声道；容器 mov；大小 47,437 字节\n\n**说明**\n- 视频用的是「v4s.mp4_av_0d07e5e2.mp4」（asset_48b637f51af2）。素材库里另有一条同名副本「…_av_05e46473.mp4」，我选了原始那条作为输入。\n- 合并结果与已有的 asset_4651cca47e3e 内容完全一致，服务端做了去重（duplicated=true），直接复用了这条已入库产物，没有产生重复文件。\n- 原视频本身带一条 aac 音轨；合流后输出以 a1.mp3 作为音轨（原声未保留）。若你想保留原声并与 a1.mp3 并排混合，我可以用 media_replace_audio(keep_original=true) 再做一版。",
+ "jobs": [],
+ "assets": [
+  {
+   "asset_id": "asset_4651cca47e3e",
+   "name": "v4s.mp4_av_0d07e5e2.mp4_av_05e46473.mp4",
+   "category": "video",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_48b637f51af2",
+   "name": "v4s.mp4_av_0d07e5e2.mp4",
+   "category": "video",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_aedccf180dec",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_9fa691d238ff",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_828184adb383",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_8bd037667a89",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_7de046ad7ddf",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_42d01b14795a",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_ac335b664f7a",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  },
+  {
+   "asset_id": "asset_9be636b22e5a",
+   "name": "a1.mp3",
+   "category": "audio",
+   "tags": [],
+   "description": "【素材描述】\n",
+   "analyzed": false
+  }
+ ],
+ "attachments": [],
+ "prompt": null,
+ "steps": [
+  {
+   "step": 1,
+   "tool": "search_assets",
+   "ok": true,
+   "ms": 29029,
+   "args": "{\"query\": \"v4s.mp4_av_0d07e5e2\", \"category\": \"video\"}",
+   "summary": "找到 2 条结果",
+   "call_id": "call_b80434e1d7b849e68f307895",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 1,
+   "tool": "search_assets",
+   "ok": true,
+   "ms": 29030,
+   "args": "{\"query\": \"a1.mp3\", \"category\": \"audio\"}",
+   "summary": "找到 25 条结果",
+   "call_id": "call_f6fffff78ee04e3c863aa245",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 2,
+   "tool": "media_probe",
+   "ok": true,
+   "ms": 2941,
+   "args": "{\"asset_id\": \"asset_48b637f51af2\"}",
+   "summary": "已探测 v4s.mp4_av_0d07e5e2.mp4：2.0 秒 / 320×240",
+   "call_id": "call_ecba8e18472049b7a8fc2493",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 3,
+   "tool": "media_probe",
+   "ok": true,
+   "ms": 4029,
+   "args": "{\"asset_id\": \"asset_aedccf180dec\"}",
+   "summary": "已探测 a1.mp3：2.037551 秒 / 0×0",
+   "call_id": "call_6d7ac56749924c37b1053f5f",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 4,
+   "tool": "media_merge_av",
+   "ok": true,
+   "ms": 4641,
+   "args": "{\"video_asset_id\": \"asset_48b637f51af2\", \"audio_asset_id\": \"asset_aedccf180dec\"}",
+   "summary": "已生成：v4s.mp4_av_0d07e5e2.mp4_av_05e46473.mp4（asset_4651cca47e3e）",
+   "call_id": "call_b234a3dc9f8d4b68a2412c24",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 5,
+   "tool": "media_probe",
+   "ok": true,
+   "ms": 4379,
+   "args": "{\"asset_id\": \"asset_4651cca47e3e\"}",
+   "summary": "已探测 v4s.mp4_av_0d07e5e2.mp4_av_05e46473.mp4：1.88 秒 / 320×240",
+   "call_id": "call_32edb20d7d634ff2b15bbfa5",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 6,
+   "tool": "respond",
+   "ok": true,
+   "ms": 24790,
+   "args": "{\"summary\": \"已完成合并，成片已入库。\\n\\n**产物**\\n- 素材名：v4s.mp4_av_0d07e5e2.mp4…（已截断，原长 620 字）\", \"asset_ids\": [\"asset_4651cca47e3e\", \"asset_48b637f51af2\", {\"_truncated\": true, \"_dropped_items\": 1}]}",
+   "summary": "已给出结论",
+   "call_id": "call_514c4e420d7247e6846b5c8f",
+   "note": "",
+   "error": null
+  }
+ ],
+ "usage": {
+  "steps": 7,
+  "tool_calls": 7,
+  "elapsed_ms": 69813
+ },
+ "provider": {
+  "name": "本机 Qwen 多模态",
+  "model": "qwen3.8-flash-next-iq3_xxs"
+ },
+ "error": null,
+ "notice": "",
+ "clarify_options": [],
+ "clarify_hint": "",
+ "memory": {
+  "used": true
+ },
+ "provider_name": "本机 Qwen 多模态"
+}

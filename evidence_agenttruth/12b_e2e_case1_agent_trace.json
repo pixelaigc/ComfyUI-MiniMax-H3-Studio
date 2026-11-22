@@ -1,0 +1,182 @@
+{
+ "session_id": "e2e-case1-480p-r2",
+ "status": "truncated",
+ "answer": "已创建 1 个生成任务，可在左侧「生成」列表查看进度。",
+ "jobs": [
+  {
+   "job_id": "ad875270cc35",
+   "mode": "t2v",
+   "label": "文生视频",
+   "prompt": "integrated_multimodal_description: [Shot 1] A cinematic low-angle tracking shot captures a tabby cat sprinting across a lush green lawn under bright, warm sunlight. The camera stays close to the ground, moving parallel to the cat's path at fast speed with slight handheld shake to mimic a dynamic pursuit. Individual strands of fur on the cat's tail and flank ripple visibly in the wind, catching rim light from the sun behind it. Motion blur streaks the background grass and distant trees, while the cat itself remains sharp and focused as its paws dig into the turf, kicking up tiny clumps of dirt and blades of grass with each stride. Sunlight filters through nearby foliage, casting dappled shadows that shift rapidly across the cat's body as it runs from left to right across the frame. The camera maintains a steady lateral truck movement, keeping the cat centered in the lower third of the composition, emphasizing the texture of the grass and the fluidity of the animal's movement.\n\noverall_soundscape: Rapid rhythmic thumping of paws hitting soft ground, rustling grass stems brushing against fur, sharp panting breaths from the running cat, distant birdsong faintly audible beneath the immediate motion sounds, wind rushing through blades of grass creating a continuous low-frequency whoosh.\n\nnon_diegetic_music: A driving orchestral track with fast staccato strings and light percussion builds intensity as the cat sprints, maintaining a steady tempo that matches the animal's gait while gradually swelling in volume to heighten the sense of momentum and cinematic urgency.",
+   "original_prompt": "一只猫在草地上奔跑，阳光下的绿色草坪，低角度跟拍镜头，毛发细节清晰，动态模糊自然，电影感画面",
+   "prompt_enhanced": true,
+   "enhance_notices": [],
+   "defaults_applied": [
+    "lora"
+   ],
+   "params": {
+    "prompt": "integrated_multimodal_description: [Shot 1] A cinematic low-angle tracking shot captures a tabby cat sprinting across a lush green lawn under bright, warm sunlight. The camera stays close to the ground, moving parallel to the cat's path at fast speed with slight handheld shake to mimic a dynamic pursuit. Individual strands of fur on the cat's tail and flank ripple visibly in the wind, catching rim light from the sun behind it. Motion blur streaks the background grass and distant trees, while the cat itself remains sharp and focused as its paws dig into the turf, kicking up tiny clumps of dirt and blades of grass with each stride. Sunlight filters through nearby foliage, casting dappled shadows that shift rapidly across the cat's body as it runs from left to right across the frame. The camera maintains a steady lateral truck movement, keeping the cat centered in the lower third of the composition, emphasizing the texture of the grass and the fluidity of the animal's movement.\n\noverall_soundscape: Rapid rhythmic thumping of paws hitting soft ground, rustling grass stems brushing against fur, sharp panting breaths from the running cat, distant birdsong faintly audible beneath the immediate motion sounds, wind rushing through blades of grass creating a continuous low-frequency whoosh.\n\nnon_diegetic_music: A driving orchestral track with fast staccato strings and light percussion builds intensity as the cat sprints, maintaining a steady tempo that matches the animal's gait while gradually swelling in volume to heighten the sense of momentum and cinematic urgency.",
+    "aspect": "16:9",
+    "resolution": "480p",
+    "duration": 5.0,
+    "model_key": "fl2va_pruned_int8",
+    "attention": "sparse",
+    "accel_loras": [
+     {
+      "key": "dmad_4step_critic",
+      "strength": 1.0,
+      "enabled": true
+     }
+    ],
+    "width": 864,
+    "height": 480,
+    "steps": 8,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "shift_video": 12.0,
+    "shift_audio": 2.0,
+    "seed": null,
+    "accel_lora": "dmad_4step_critic",
+    "accel_lora_strength": 1.0,
+    "accel_lora_loader": "LoraLoaderModelOnly",
+    "fixed_accel_lora": "dmad_4step_critic",
+    "effect_loras": [],
+    "twopass": {
+     "enabled": false
+    },
+    "cfg": 1.0,
+    "use_sigma_shift": true,
+    "sigma_shift_available": true,
+    "lora": "ckpt850",
+    "original_prompt": "一只猫在草地上奔跑，阳光下的绿色草坪，低角度跟拍镜头，毛发细节清晰，动态模糊自然，电影感画面",
+    "prompt_enhanced": true,
+    "gen_type": "t2v",
+    "continuation": {
+     "chain_id": "ad875270cc35",
+     "stage_index": 0,
+     "source_job": "",
+     "source_segment": -1,
+     "latent_run_id": "h3studio_sad875270cc35",
+     "latent_stage": 0,
+     "context_frames": 22,
+     "anchor_frames": 22,
+     "chain_total_frames": 0,
+     "segment_frames": 124
+    }
+   },
+   "asset_refs": [],
+   "status": "queued",
+   "summary": "480p 文生视频：猫在草地上奔跑，5 秒"
+  }
+ ],
+ "assets": [],
+ "attachments": [],
+ "prompt": null,
+ "steps": [
+  {
+   "step": 1,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 25968,
+   "args": "{\"mode\": \"t2v\"}",
+   "summary": "已返回 t2v 的参数 schema",
+   "call_id": "call_4f18e80e7b20436fb8e9c1d0",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 2,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 582,
+   "args": "{\"mode\": \"t2v\"}",
+   "summary": "已返回 t2v 的参数 schema",
+   "call_id": "call_9c8835ee5b2f4a6484ca0904",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 2,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 583,
+   "args": "{\"mode\": \"t2v\"}",
+   "summary": "",
+   "call_id": "",
+   "note": "重复调用，已给出纠偏提示",
+   "error": null
+  },
+  {
+   "step": 3,
+   "tool": "create_job",
+   "ok": true,
+   "ms": 49392,
+   "args": "{\"mode\": \"t2v\", \"prompt\": \"一只猫在草地上奔跑，阳光下的绿色草坪，低角度跟拍镜头，毛发细节清晰，动态模糊自然，电影感画面\", \"resolution\": \"480p\", \"duration\": 5, \"aspect\": \"16:9\", \"summary\": \"480p 文生视频：猫在草地上奔跑，5 秒\"}",
+   "summary": "已创建任务 ad875270cc35（t2v）",
+   "call_id": "call_0ff6cca901204f1db90bfd59",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 4,
+   "tool": "get_job_status",
+   "ok": true,
+   "ms": 16154,
+   "args": "{\"job_id\": \"ad875270cc35\"}",
+   "summary": "任务 ad875270cc35 状态 running（节点 14/20 · 步 2/8）",
+   "call_id": "call_0a1df87de91a48febcdaa660",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 5,
+   "tool": "get_job_status",
+   "ok": true,
+   "ms": 11346,
+   "args": "{\"job_id\": \"ad875270cc35\"}",
+   "summary": "任务 ad875270cc35 状态 running（节点 14/20 · 步 7/8）",
+   "call_id": "call_422c0c4f330d425b986b2e2b",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 5,
+   "tool": "get_job_status",
+   "ok": true,
+   "ms": 11347,
+   "args": "{\"job_id\": \"ad875270cc35\"}",
+   "summary": "",
+   "call_id": "",
+   "note": "重复调用，已给出纠偏提示",
+   "error": null
+  },
+  {
+   "step": 6,
+   "tool": "get_job_status",
+   "ok": true,
+   "ms": 6512,
+   "args": "{\"job_id\": \"ad875270cc35\"}",
+   "summary": "任务 ad875270cc35 状态 running（节点 17/20）",
+   "call_id": "call_9da9543cbafe4b029636fcae",
+   "note": "",
+   "error": null
+  }
+ ],
+ "usage": {
+  "steps": 8,
+  "tool_calls": 6,
+  "elapsed_ms": 109960
+ },
+ "provider": {
+  "name": "本机 Qwen 多模态",
+  "model": "qwen3.8-flash-next-iq3_xxs"
+ },
+ "error": "模型重复调用同一工具「get_job_status」3 次且参数完全相同，已停止以避免空转。请把话说得更具体，或直接用面板手动下发任务。",
+ "notice": "模型重复调用同一工具「get_job_status」3 次且参数完全相同，已停止以避免空转。请把话说得更具体，或直接用面板手动下发任务。",
+ "clarify_options": [],
+ "clarify_hint": "",
+ "memory": {
+  "used": true
+ },
+ "provider_name": "本机 Qwen 多模态"
+}
