@@ -300,7 +300,20 @@ STALE_BUMPED = {
     #   已被 enhassets1 取代）。
     "providers.js":            ("cr20261115b", "enhassets1"),
     "media-manage.js":         ("uxbatch1",     "cr20261118a"),
-    "agent-manage.js":         ("a4gen1",       "cr20261118a"),
+    # 【2026-11-22 三面板参数统一】agent-manage.js 的内容变了
+    #   （三个视频面板的采样/LoRA/尺寸口径统一到同一份真源：
+    #    flf / r2v 补齐可编辑的采样步数 / 采样器 / 调度器 / 视频+音频
+    #    sigma shift；「生效像素（只读派生）」随比例×MP×百分比实时更新）
+    #   ⇒ ?v= 必须再升一档。
+    #   【为什么这一步是必须的 —— 这就是用户 2026-11-22 截图里
+    #     「flf / r2v 还是『采样档位（不可改）』」的直接原因】
+    #   /static/* 没有 Cache-Control，浏览器按启发式新鲜度缓存。
+    #   内容改了而 ?v= 不变 ⇒ 老用户浏览器拿到的仍是**旧的 agent-manage.js**
+    #   ⇒ 服务端 /api/agent/settings 已经返回新规格，页面却仍按旧字段渲染
+    #   ⇒ 「修复等于没上线」。实测：8190 的 API 与 Playwright 取到的 DOM
+    #   已经是新版（可编辑采样控件），但用户手机上的旧缓存仍是旧版。
+    #   旧值取**直接前值** cr20261118a。
+    "agent-manage.js":         ("cr20261118a", "unify20261122a"),
 }
 
 # 相对「内容最后改动时刻」已经同步、不需要再升的资源（本轮实测为 ok）
