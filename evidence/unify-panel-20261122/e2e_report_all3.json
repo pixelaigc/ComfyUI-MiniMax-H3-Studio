@@ -1,0 +1,2066 @@
+{
+  "base": "http://127.0.0.1:8290",
+  "comfy": "http://127.0.0.1:8188",
+  "started_at": 1795334721.6624954,
+  "panel_spec_check": {
+    "ok": true,
+    "modes": {
+      "t2v": {
+        "label": "文生视频",
+        "field_names": [
+          "model_key",
+          "attention",
+          "accel_lora",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "derived_pixels",
+          "duration",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio",
+          "precision_fixed"
+        ],
+        "editable": [
+          "model_key",
+          "attention",
+          "accel_lora",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "duration",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio"
+        ],
+        "readonly": [
+          "derived_pixels",
+          "precision_fixed"
+        ],
+        "sampler_options": [
+          "euler",
+          "euler_cfg_pp",
+          "euler_ancestral",
+          "euler_ancestral_cfg_pp",
+          "heun",
+          "heunpp2",
+          "exp_heun_2_x0",
+          "exp_heun_2_x0_sde",
+          "dpm_2",
+          "dpm_2_ancestral",
+          "lms",
+          "dpm_fast",
+          "dpm_adaptive",
+          "dpmpp_2s_ancestral",
+          "dpmpp_2s_ancestral_cfg_pp",
+          "dpmpp_sde",
+          "dpmpp_sde_gpu",
+          "dpmpp_2m",
+          "dpmpp_2m_cfg_pp",
+          "dpmpp_2m_sde",
+          "dpmpp_2m_sde_gpu",
+          "dpmpp_2m_sde_heun",
+          "dpmpp_2m_sde_heun_gpu",
+          "dpmpp_3m_sde",
+          "dpmpp_3m_sde_gpu",
+          "ddpm",
+          "lcm",
+          "ipndm",
+          "ipndm_v",
+          "deis",
+          "cfgpp_ud10_ab",
+          "res_multistep",
+          "res_multistep_cfg_pp",
+          "res_multistep_ancestral",
+          "res_multistep_ancestral_cfg_pp",
+          "gradient_estimation",
+          "gradient_estimation_cfg_pp",
+          "er_sde",
+          "seeds_2",
+          "seeds_3",
+          "sa_solver",
+          "sa_solver_pece",
+          "ddim",
+          "uni_pc",
+          "uni_pc_bh2",
+          "legacy_rk",
+          "rk",
+          "rk_beta",
+          "deis_3m_ode",
+          "deis_2m_ode",
+          "deis_3m",
+          "deis_2m",
+          "res_6s_ode",
+          "res_5s_ode",
+          "res_3s_ode",
+          "res_2s_ode",
+          "res_3m_ode",
+          "res_2m_ode",
+          "res_6s",
+          "res_5s",
+          "res_3s",
+          "res_2s",
+          "res_3m",
+          "res_2m",
+          "euler_extsig",
+          "euler_extsig_ancestral",
+          "euler_extsig_ancestral_cfg_pp",
+          "euler_extsig_cfg_pp"
+        ],
+        "scheduler_options": [
+          "simple",
+          "sgm_uniform",
+          "karras",
+          "exponential",
+          "ddim_uniform",
+          "beta",
+          "normal",
+          "linear_quadratic",
+          "kl_optimal",
+          "FlowMatchEulerDiscreteScheduler",
+          "zipf_linear",
+          "zeta",
+          "bong_tangent",
+          "beta57"
+        ],
+        "accel_lora_options": [
+          [
+            "none",
+            "none（不挂加速 LoRA，走标准多步采样）"
+          ],
+          [
+            "ckpt850",
+            "Turbo 4 步 · ckpt850"
+          ],
+          [
+            "v4step600",
+            "Turbo 4 步 · v4-step600"
+          ],
+          [
+            "better_motion",
+            "更好运动（720x1280 档 / 15-30 步）"
+          ],
+          [
+            "dmad_4step_critic",
+            "DMAD 4 步（critic 版）"
+          ],
+          [
+            "speed_slider",
+            "速度滑杆（快/慢运动）"
+          ]
+        ],
+        "saved_defaults": {
+          "model_key": "fl2va_pruned_int8",
+          "attention": "sparse",
+          "accel_lora": "dmad_4step_critic",
+          "aspect": "16:9",
+          "megapixels": 1.0,
+          "resolution_percent": 100.0,
+          "duration": 5.0,
+          "steps": 8,
+          "sampler": "euler",
+          "scheduler": "beta",
+          "shift_video": 12.0,
+          "shift_audio": 2.0
+        }
+      },
+      "flf": {
+        "label": "首尾帧生成",
+        "field_names": [
+          "model_key",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "derived_pixels",
+          "duration",
+          "lora",
+          "lora_strength",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio",
+          "precision_fixed"
+        ],
+        "editable": [
+          "model_key",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "duration",
+          "lora",
+          "lora_strength",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio"
+        ],
+        "readonly": [
+          "derived_pixels",
+          "precision_fixed"
+        ],
+        "sampler_options": [
+          "euler",
+          "euler_cfg_pp",
+          "euler_ancestral",
+          "euler_ancestral_cfg_pp",
+          "heun",
+          "heunpp2",
+          "exp_heun_2_x0",
+          "exp_heun_2_x0_sde",
+          "dpm_2",
+          "dpm_2_ancestral",
+          "lms",
+          "dpm_fast",
+          "dpm_adaptive",
+          "dpmpp_2s_ancestral",
+          "dpmpp_2s_ancestral_cfg_pp",
+          "dpmpp_sde",
+          "dpmpp_sde_gpu",
+          "dpmpp_2m",
+          "dpmpp_2m_cfg_pp",
+          "dpmpp_2m_sde",
+          "dpmpp_2m_sde_gpu",
+          "dpmpp_2m_sde_heun",
+          "dpmpp_2m_sde_heun_gpu",
+          "dpmpp_3m_sde",
+          "dpmpp_3m_sde_gpu",
+          "ddpm",
+          "lcm",
+          "ipndm",
+          "ipndm_v",
+          "deis",
+          "cfgpp_ud10_ab",
+          "res_multistep",
+          "res_multistep_cfg_pp",
+          "res_multistep_ancestral",
+          "res_multistep_ancestral_cfg_pp",
+          "gradient_estimation",
+          "gradient_estimation_cfg_pp",
+          "er_sde",
+          "seeds_2",
+          "seeds_3",
+          "sa_solver",
+          "sa_solver_pece",
+          "ddim",
+          "uni_pc",
+          "uni_pc_bh2",
+          "legacy_rk",
+          "rk",
+          "rk_beta",
+          "deis_3m_ode",
+          "deis_2m_ode",
+          "deis_3m",
+          "deis_2m",
+          "res_6s_ode",
+          "res_5s_ode",
+          "res_3s_ode",
+          "res_2s_ode",
+          "res_3m_ode",
+          "res_2m_ode",
+          "res_6s",
+          "res_5s",
+          "res_3s",
+          "res_2s",
+          "res_3m",
+          "res_2m",
+          "euler_extsig",
+          "euler_extsig_ancestral",
+          "euler_extsig_ancestral_cfg_pp",
+          "euler_extsig_cfg_pp"
+        ],
+        "scheduler_options": [
+          "simple",
+          "sgm_uniform",
+          "karras",
+          "exponential",
+          "ddim_uniform",
+          "beta",
+          "normal",
+          "linear_quadratic",
+          "kl_optimal",
+          "FlowMatchEulerDiscreteScheduler",
+          "zipf_linear",
+          "zeta",
+          "bong_tangent",
+          "beta57"
+        ],
+        "accel_lora_options": [
+          [
+            "none",
+            "none（不挂加速 LoRA，走标准多步采样）"
+          ],
+          [
+            "ckpt850",
+            "Turbo 4 步 · ckpt850"
+          ],
+          [
+            "v4step600",
+            "Turbo 4 步 · v4-step600"
+          ],
+          [
+            "better_motion",
+            "更好运动（720x1280 档 / 15-30 步）"
+          ],
+          [
+            "dmad_4step_critic",
+            "DMAD 4 步（critic 版）"
+          ],
+          [
+            "speed_slider",
+            "速度滑杆（快/慢运动）"
+          ]
+        ],
+        "saved_defaults": {
+          "model_key": "fl2va_pruned_int8",
+          "aspect": "16:9",
+          "megapixels": 0.8,
+          "resolution_percent": 100.0,
+          "duration": 5.0,
+          "lora": "ckpt850",
+          "lora_strength": 1.0,
+          "steps": 4,
+          "sampler": "euler",
+          "scheduler": "beta",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "resolution": "768p",
+          "precision": "int8"
+        }
+      },
+      "r2v": {
+        "label": "参考图生成",
+        "field_names": [
+          "model_key",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "derived_pixels",
+          "duration",
+          "lora",
+          "lora_strength",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio",
+          "precision_fixed"
+        ],
+        "editable": [
+          "model_key",
+          "aspect",
+          "megapixels",
+          "resolution_percent",
+          "duration",
+          "lora",
+          "lora_strength",
+          "steps",
+          "sampler",
+          "scheduler",
+          "shift_video",
+          "shift_audio"
+        ],
+        "readonly": [
+          "derived_pixels",
+          "precision_fixed"
+        ],
+        "sampler_options": [
+          "euler",
+          "euler_cfg_pp",
+          "euler_ancestral",
+          "euler_ancestral_cfg_pp",
+          "heun",
+          "heunpp2",
+          "exp_heun_2_x0",
+          "exp_heun_2_x0_sde",
+          "dpm_2",
+          "dpm_2_ancestral",
+          "lms",
+          "dpm_fast",
+          "dpm_adaptive",
+          "dpmpp_2s_ancestral",
+          "dpmpp_2s_ancestral_cfg_pp",
+          "dpmpp_sde",
+          "dpmpp_sde_gpu",
+          "dpmpp_2m",
+          "dpmpp_2m_cfg_pp",
+          "dpmpp_2m_sde",
+          "dpmpp_2m_sde_gpu",
+          "dpmpp_2m_sde_heun",
+          "dpmpp_2m_sde_heun_gpu",
+          "dpmpp_3m_sde",
+          "dpmpp_3m_sde_gpu",
+          "ddpm",
+          "lcm",
+          "ipndm",
+          "ipndm_v",
+          "deis",
+          "cfgpp_ud10_ab",
+          "res_multistep",
+          "res_multistep_cfg_pp",
+          "res_multistep_ancestral",
+          "res_multistep_ancestral_cfg_pp",
+          "gradient_estimation",
+          "gradient_estimation_cfg_pp",
+          "er_sde",
+          "seeds_2",
+          "seeds_3",
+          "sa_solver",
+          "sa_solver_pece",
+          "ddim",
+          "uni_pc",
+          "uni_pc_bh2",
+          "legacy_rk",
+          "rk",
+          "rk_beta",
+          "deis_3m_ode",
+          "deis_2m_ode",
+          "deis_3m",
+          "deis_2m",
+          "res_6s_ode",
+          "res_5s_ode",
+          "res_3s_ode",
+          "res_2s_ode",
+          "res_3m_ode",
+          "res_2m_ode",
+          "res_6s",
+          "res_5s",
+          "res_3s",
+          "res_2s",
+          "res_3m",
+          "res_2m",
+          "euler_extsig",
+          "euler_extsig_ancestral",
+          "euler_extsig_ancestral_cfg_pp",
+          "euler_extsig_cfg_pp"
+        ],
+        "scheduler_options": [
+          "simple",
+          "sgm_uniform",
+          "karras",
+          "exponential",
+          "ddim_uniform",
+          "beta",
+          "normal",
+          "linear_quadratic",
+          "kl_optimal",
+          "FlowMatchEulerDiscreteScheduler",
+          "zipf_linear",
+          "zeta",
+          "bong_tangent",
+          "beta57"
+        ],
+        "accel_lora_options": [
+          [
+            "none",
+            "none（不挂加速 LoRA，走标准多步采样）"
+          ],
+          [
+            "ckpt850",
+            "Turbo 4 步 · ckpt850"
+          ],
+          [
+            "v4step600",
+            "Turbo 4 步 · v4-step600"
+          ],
+          [
+            "better_motion",
+            "更好运动（720x1280 档 / 15-30 步）"
+          ],
+          [
+            "dmad_4step_critic",
+            "DMAD 4 步（critic 版）"
+          ],
+          [
+            "speed_slider",
+            "速度滑杆（快/慢运动）"
+          ]
+        ],
+        "saved_defaults": {
+          "model_key": "ref2va_pruned_int8",
+          "aspect": "16:9",
+          "megapixels": 0.8,
+          "resolution_percent": 100.0,
+          "duration": 5.0,
+          "lora": "ckpt850",
+          "lora_strength": 1.0,
+          "steps": 4,
+          "sampler": "euler",
+          "scheduler": "beta",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "resolution": "768p",
+          "precision": "int8"
+        }
+      }
+    },
+    "checks": {
+      "sampling_editable_on_all": true,
+      "sampler_options_identical": true,
+      "scheduler_options_identical": true,
+      "accel_lora_list_identical": true,
+      "no_conflicting_size_fields": true,
+      "precision_is_readonly_with_reason": true
+    }
+  },
+  "runs": {
+    "t2v": {
+      "mode": "t2v",
+      "submitted_params": {
+        "duration": 2,
+        "aspect": "16:9",
+        "megapixels": 0.4,
+        "resolution_percent": 100.0,
+        "accel_lora": "ckpt850",
+        "accel_lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25
+      },
+      "media": {},
+      "job_id": "04b7204594a2",
+      "submit_info": {
+        "status": 200,
+        "submit_response": {
+          "id": "04b7204594a2",
+          "status": "queued",
+          "batch_count": 1
+        },
+        "fields": {
+          "mode": "t2v",
+          "params": "{\"duration\": 2, \"aspect\": \"16:9\", \"megapixels\": 0.4, \"resolution_percent\": 100.0, \"accel_lora\": \"ckpt850\", \"accel_lora_strength\": 1.0, \"steps\": 8, \"sampler\": \"dpm_2\", \"scheduler\": \"karras\", \"shift_video\": 7.5, \"shift_audio\": 1.25, \"prompt\": \"参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推\"}"
+        }
+      },
+      "record_params": {
+        "model_key": "fl2va_pruned_int8",
+        "accel_lora": "ckpt850",
+        "accel_loras": [
+          {
+            "key": "ckpt850",
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "strength": 1.0,
+            "enabled": true
+          }
+        ],
+        "lora": "ckpt850",
+        "lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "megapixels": 0.4,
+        "resolution_percent": 100.0,
+        "resolution": "480p"
+      },
+      "record_model_info": {
+        "model_key": "fl2va_pruned_int8",
+        "model_label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "model_unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "lora_label": "Turbo 4 步 · ckpt850",
+        "lora_strength": 1.0,
+        "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "lora_key": "ckpt850",
+        "fixed_lora_label": "Turbo 4 步 · ckpt850",
+        "fixed_lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "fixed_lora_key": "ckpt850",
+        "fixed_lora_strength": 1.0,
+        "accel_lora_loader": "MiniMaxH3TurboLoRA",
+        "effect_lora_labels": [],
+        "source": "t2v_panel",
+        "attention_key": "default",
+        "attention_label": "默认（PyTorch 稠密注意力）",
+        "attention_speed_label": "速度最慢",
+        "attention_available": true,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "cfg": 1.0,
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "aspect": "16:9",
+        "resolution": "480p",
+        "duration": 2.0,
+        "seed": null,
+        "twopass": {
+          "enabled": false
+        },
+        "model_recommendation": {
+          "steps": 20,
+          "scheduler": "simple",
+          "sampler": "res_multistep",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "not_provided",
+          "source_kind": "comfyui",
+          "source": "supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）",
+          "note": "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，不挂加速 LoRA 的分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。",
+          "field_sources": {
+            "steps": "comfyui",
+            "scheduler": "comfyui",
+            "sampler": "comfyui",
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            "base_model": "not_provided"
+          }
+        },
+        "lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        },
+        "fixed_lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        }
+      },
+      "record_resolution_info": {
+        "width": 864,
+        "height": 480,
+        "tier": "480p",
+        "aspect": "16:9",
+        "pixels": "864×480",
+        "label": "480p · 864×480 · 16:9",
+        "source": "actual",
+        "note": "",
+        "has_size": true
+      },
+      "record_gen_params": {
+        "model": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "steps": "8",
+        "scheduler": "karras",
+        "sampler": "dpm_2",
+        "shift": "视频 7.5 · 音频 1.25",
+        "cfg": "1",
+        "seed": "随机",
+        "size": "864×480",
+        "duration": "2s",
+        "lora": "Turbo 4 步 · ckpt850 ×1.00",
+        "attention": "默认（PyTorch 稠密注意力） · 速度最慢",
+        "workflow": "文生视频（_h3_video_workflow）",
+        "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+        "original_prompt": "",
+        "prompt_enhanced": "",
+        "normalize_notes": [],
+        "artifact_loras": [
+          {
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "loader": "MiniMaxH3TurboLoRA"
+          }
+        ]
+      },
+      "status": "done",
+      "comfy_prompt_id": "ecf448d6-4559-416b-9572-ec82a1c96291",
+      "comfy_prompt_json": {
+        "105:107": {
+          "inputs": {
+            "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+            "values.a": [
+              "105:111",
+              0
+            ]
+          },
+          "class_type": "ComfyMathExpression",
+          "_meta": {
+            "title": "时长->帧数"
+          }
+        },
+        "105:111": {
+          "inputs": {
+            "value": 2.0
+          },
+          "class_type": "PrimitiveFloat",
+          "_meta": {
+            "title": "时长(秒)"
+          }
+        },
+        "105:11": {
+          "inputs": {
+            "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "视频 VAE"
+          }
+        },
+        "13": {
+          "inputs": {
+            "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "type": "minimax",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "加载文本编码器"
+          }
+        },
+        "105:104": {
+          "inputs": {
+            "clip": [
+              "13",
+              0
+            ],
+            "vae": [
+              "105:11",
+              0
+            ],
+            "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+            "width": 864,
+            "height": 480,
+            "length": [
+              "105:107",
+              1
+            ]
+          },
+          "class_type": "MiniMaxH3ImageToVideo",
+          "_meta": {
+            "title": "H3 条件"
+          }
+        },
+        "6": {
+          "inputs": {
+            "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "加载DiT"
+          }
+        },
+        "138:0": {
+          "inputs": {
+            "model": [
+              "6",
+              0
+            ],
+            "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "low_vram": true
+          },
+          "class_type": "MiniMaxH3TurboLoRA",
+          "_meta": {
+            "title": "加速 LoRA·ckpt850"
+          }
+        },
+        "100": {
+          "inputs": {
+            "model": [
+              "138:0",
+              0
+            ],
+            "shift_video": 7.5,
+            "shift_audio": 1.25
+          },
+          "class_type": "MiniMaxH3SigmaShift",
+          "_meta": {
+            "title": "sigma shift（视频/音频）"
+          }
+        },
+        "9": {
+          "inputs": {
+            "scheduler": "karras",
+            "steps": 8,
+            "denoise": 1.0,
+            "model": [
+              "100",
+              0
+            ]
+          },
+          "class_type": "BasicScheduler",
+          "_meta": {
+            "title": "调度器"
+          }
+        },
+        "17": {
+          "inputs": {
+            "sampler_name": "dpm_2"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "采样器"
+          }
+        },
+        "15": {
+          "inputs": {
+            "noise_seed": 85397554716087
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "噪波"
+          }
+        },
+        "16": {
+          "inputs": {
+            "model": [
+              "100",
+              0
+            ],
+            "conditioning": [
+              "105:104",
+              0
+            ]
+          },
+          "class_type": "BasicGuider",
+          "_meta": {
+            "title": "引导器"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise": [
+              "15",
+              0
+            ],
+            "guider": [
+              "16",
+              0
+            ],
+            "sampler": [
+              "17",
+              0
+            ],
+            "sigmas": [
+              "9",
+              0
+            ],
+            "latent_image": [
+              "105:104",
+              1
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "采样"
+          }
+        },
+        "10": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "105:11",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "解码视频"
+          }
+        },
+        "24": {
+          "inputs": {
+            "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "音频 VAE"
+          }
+        },
+        "23": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "24",
+              0
+            ]
+          },
+          "class_type": "VAEDecodeAudio",
+          "_meta": {
+            "title": "解码音频"
+          }
+        },
+        "300:save": {
+          "inputs": {
+            "latent": [
+              "14",
+              0
+            ],
+            "run_id": "h3studio_s04b7204594a2",
+            "stage_index": 0,
+            "note": "h3studio job 04b7204594a2"
+          },
+          "class_type": "H3RelayLatentSave",
+          "_meta": {
+            "title": "接续·落盘本段潜空间（下一段的接力棒）"
+          }
+        },
+        "91": {
+          "inputs": {
+            "fps": 24.0,
+            "bit_depth": 8,
+            "images": [
+              "10",
+              0
+            ],
+            "audio": [
+              "23",
+              0
+            ]
+          },
+          "class_type": "CreateVideo",
+          "_meta": {
+            "title": "合成视频"
+          }
+        },
+        "92": {
+          "inputs": {
+            "filename_prefix": "h3studio/t2v_04b7204594a2",
+            "format": "auto",
+            "codec": "auto",
+            "video": [
+              "91",
+              0
+            ]
+          },
+          "class_type": "SaveVideo",
+          "_meta": {
+            "title": "保存视频"
+          }
+        }
+      },
+      "comfy_sampling": {
+        "basic_scheduler": {
+          "steps": 8,
+          "scheduler": "karras"
+        },
+        "ksampler_select": {
+          "sampler_name": "dpm_2"
+        },
+        "sigma_shift": {
+          "shift_video": 7.5,
+          "shift_audio": 1.25
+        },
+        "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+      },
+      "product": {
+        "file": "videos/v-h3-studio-000235.mp4",
+        "stored_width": 864,
+        "stored_height": 480,
+        "ffprobe": {
+          "width": 864,
+          "height": 480,
+          "codec": "h264",
+          "nb_frames": "56",
+          "duration": "2.333333"
+        }
+      }
+    },
+    "flf": {
+      "mode": "flf",
+      "submitted_params": {
+        "duration": 2,
+        "aspect": "16:9",
+        "megapixels": 0.4,
+        "resolution_percent": 100.0,
+        "accel_lora": "ckpt850",
+        "accel_lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25
+      },
+      "media": [
+        {
+          "asset_id": "asset_ef9b20ebf8db",
+          "slot": "first_frame",
+          "ordinal": 1
+        }
+      ],
+      "job_id": "b94a5cd337fa",
+      "submit_info": {
+        "status": 200,
+        "submit_response": {
+          "id": "b94a5cd337fa",
+          "status": "queued",
+          "batch_count": 1
+        },
+        "fields": {
+          "mode": "flf",
+          "params": "{\"duration\": 2, \"aspect\": \"16:9\", \"megapixels\": 0.4, \"resolution_percent\": 100.0, \"accel_lora\": \"ckpt850\", \"accel_lora_strength\": 1.0, \"steps\": 8, \"sampler\": \"dpm_2\", \"scheduler\": \"karras\", \"shift_video\": 7.5, \"shift_audio\": 1.25, \"prompt\": \"参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推\"}",
+          "asset_refs": "[{\"asset_id\": \"asset_ef9b20ebf8db\", \"slot\": \"first_frame\", \"ordinal\": 1}]"
+        }
+      },
+      "record_params": {
+        "model_key": "fl2va_pruned_int8",
+        "accel_lora": "ckpt850",
+        "accel_loras": [
+          {
+            "key": "ckpt850",
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "strength": 1.0,
+            "enabled": true
+          }
+        ],
+        "lora": "ckpt850",
+        "lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "megapixels": 0.396,
+        "resolution_percent": 100.0,
+        "resolution": "480p"
+      },
+      "record_model_info": {
+        "model_key": "fl2va_pruned_int8",
+        "model_label": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "model_unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "lora_label": "Turbo 4 步 · ckpt850",
+        "lora_strength": 1.0,
+        "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "lora_key": "ckpt850",
+        "fixed_lora_label": "Turbo 4 步 · ckpt850",
+        "fixed_lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "fixed_lora_key": "ckpt850",
+        "fixed_lora_strength": 1.0,
+        "accel_lora_loader": "MiniMaxH3TurboLoRA",
+        "source": "legacy_video",
+        "attention_key": "default",
+        "attention_label": "默认（PyTorch 稠密注意力）",
+        "attention_speed_label": "速度最慢",
+        "attention_available": true,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "cfg": 1.0,
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "aspect": "16:9",
+        "resolution": "480p",
+        "duration": 2.0,
+        "seed": null,
+        "twopass": {
+          "enabled": false
+        },
+        "model_recommendation": {
+          "steps": 20,
+          "scheduler": "simple",
+          "sampler": "res_multistep",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "not_provided",
+          "source_kind": "comfyui",
+          "source": "supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/workflows.py:347-350（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）",
+          "note": "官方 fl2va / ref2va 权重「不附作者说明文件」 -> 作者未提供采样参数。上表的 20 步 / simple / res_multistep 是「本项目工作流的默认档位」（h3studio/workflows.py:347-350，不挂加速 LoRA 的分支），「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值（漏挂 MiniMaxH3SigmaShift 画质明显变差）。⚠️ euler 是「挂了加速 LoRA」 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。",
+          "field_sources": {
+            "steps": "comfyui",
+            "scheduler": "comfyui",
+            "sampler": "comfyui",
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            "base_model": "not_provided"
+          }
+        },
+        "lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        },
+        "fixed_lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        }
+      },
+      "record_resolution_info": {
+        "width": 864,
+        "height": 480,
+        "tier": "480p",
+        "aspect": "16:9",
+        "pixels": "864×480",
+        "label": "480p · 864×480 · 16:9",
+        "source": "actual",
+        "note": "",
+        "has_size": true
+      },
+      "record_gen_params": {
+        "model": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+        "steps": "8",
+        "scheduler": "karras",
+        "sampler": "dpm_2",
+        "shift": "视频 7.5 · 音频 1.25",
+        "cfg": "1",
+        "seed": "随机",
+        "size": "864×480",
+        "duration": "2s",
+        "lora": "Turbo 4 步 · ckpt850 ×1.00",
+        "attention": "默认（PyTorch 稠密注意力） · 速度最慢",
+        "workflow": "首尾帧生视频（_h3_video_workflow）",
+        "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+        "original_prompt": "",
+        "prompt_enhanced": "",
+        "normalize_notes": [],
+        "artifact_loras": [
+          {
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "loader": "MiniMaxH3TurboLoRA"
+          }
+        ]
+      },
+      "status": "done",
+      "comfy_prompt_id": "56f4b208-fe14-4a65-86b1-0e35975bd1c4",
+      "comfy_prompt_json": {
+        "105:201": {
+          "inputs": {
+            "image": "h3studio/1340147a65e6d028__e2e-sample-3561685-52885.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "加载首帧"
+          }
+        },
+        "6": {
+          "inputs": {
+            "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "加载DiT"
+          }
+        },
+        "138:0": {
+          "inputs": {
+            "model": [
+              "6",
+              0
+            ],
+            "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "low_vram": true
+          },
+          "class_type": "MiniMaxH3TurboLoRA",
+          "_meta": {
+            "title": "加速 LoRA·ckpt850"
+          }
+        },
+        "105:11": {
+          "inputs": {
+            "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "视频 VAE"
+          }
+        },
+        "13": {
+          "inputs": {
+            "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "type": "minimax",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "加载文本编码器"
+          }
+        },
+        "24": {
+          "inputs": {
+            "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "音频 VAE"
+          }
+        },
+        "105:107": {
+          "inputs": {
+            "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+            "values.a": [
+              "105:111",
+              0
+            ]
+          },
+          "class_type": "ComfyMathExpression",
+          "_meta": {
+            "title": "时长->帧数"
+          }
+        },
+        "105:111": {
+          "inputs": {
+            "value": 2.0
+          },
+          "class_type": "PrimitiveFloat",
+          "_meta": {
+            "title": "时长(秒)"
+          }
+        },
+        "136": {
+          "inputs": {
+            "clip": [
+              "13",
+              0
+            ],
+            "video_vae": [
+              "105:11",
+              0
+            ],
+            "audio_vae": [
+              "24",
+              0
+            ],
+            "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+            "width": 864,
+            "height": 480,
+            "length": [
+              "105:107",
+              1
+            ],
+            "task_type": "I2VA",
+            "audio_mode": "native",
+            "ref_image_size": "match",
+            "audio_denoise_strength": 0.35,
+            "add_source_as_reference": true,
+            "prompt_primary_audio_ordinal": 1,
+            "strict_prompt_tags": true,
+            "reference_video_policy": "official_2_to_15s",
+            "first_frame": [
+              "105:201",
+              0
+            ]
+          },
+          "class_type": "MiniMaxH3AudioConditioningT8",
+          "_meta": {
+            "title": "H3 条件（首尾帧 / 参考 / 音轨）"
+          }
+        },
+        "139": {
+          "inputs": {
+            "model": [
+              "138:0",
+              0
+            ],
+            "shift_video": 7.5,
+            "shift_audio": 1.25
+          },
+          "class_type": "MiniMaxH3SigmaShift",
+          "_meta": {
+            "title": "sigma shift（视频/音频）"
+          }
+        },
+        "9": {
+          "inputs": {
+            "scheduler": "karras",
+            "steps": 8,
+            "denoise": 1.0,
+            "model": [
+              "139",
+              0
+            ]
+          },
+          "class_type": "BasicScheduler",
+          "_meta": {
+            "title": "调度器"
+          }
+        },
+        "17": {
+          "inputs": {
+            "sampler_name": "dpm_2"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "采样器"
+          }
+        },
+        "15": {
+          "inputs": {
+            "noise_seed": 240360483683014
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "噪波"
+          }
+        },
+        "16": {
+          "inputs": {
+            "model": [
+              "139",
+              0
+            ],
+            "conditioning": [
+              "136",
+              0
+            ]
+          },
+          "class_type": "BasicGuider",
+          "_meta": {
+            "title": "引导器"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise": [
+              "15",
+              0
+            ],
+            "guider": [
+              "16",
+              0
+            ],
+            "sampler": [
+              "17",
+              0
+            ],
+            "sigmas": [
+              "9",
+              0
+            ],
+            "latent_image": [
+              "136",
+              1
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "采样"
+          }
+        },
+        "10": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "105:11",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "解码视频"
+          }
+        },
+        "23": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "24",
+              0
+            ]
+          },
+          "class_type": "VAEDecodeAudio",
+          "_meta": {
+            "title": "解码音频"
+          }
+        },
+        "300:save": {
+          "inputs": {
+            "latent": [
+              "14",
+              0
+            ],
+            "run_id": "h3studio_sb94a5cd337fa",
+            "stage_index": 0,
+            "note": "h3studio job b94a5cd337fa"
+          },
+          "class_type": "H3RelayLatentSave",
+          "_meta": {
+            "title": "接续·落盘本段潜空间（下一段的接力棒）"
+          }
+        },
+        "91": {
+          "inputs": {
+            "fps": 24.0,
+            "bit_depth": 8,
+            "images": [
+              "10",
+              0
+            ],
+            "audio": [
+              "23",
+              0
+            ]
+          },
+          "class_type": "CreateVideo",
+          "_meta": {
+            "title": "合成视频"
+          }
+        },
+        "92": {
+          "inputs": {
+            "filename_prefix": "h3studio/flf_b94a5cd337fa",
+            "format": "auto",
+            "codec": "auto",
+            "video": [
+              "91",
+              0
+            ]
+          },
+          "class_type": "SaveVideo",
+          "_meta": {
+            "title": "保存视频"
+          }
+        }
+      },
+      "comfy_sampling": {
+        "basic_scheduler": {
+          "steps": 8,
+          "scheduler": "karras"
+        },
+        "ksampler_select": {
+          "sampler_name": "dpm_2"
+        },
+        "sigma_shift": {
+          "shift_video": 7.5,
+          "shift_audio": 1.25
+        },
+        "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+      },
+      "product": {
+        "file": "videos/v-h3-studio-000237.mp4",
+        "stored_width": 864,
+        "stored_height": 480,
+        "ffprobe": {
+          "width": 864,
+          "height": 480,
+          "codec": "h264",
+          "nb_frames": "56",
+          "duration": "2.333008"
+        }
+      }
+    },
+    "r2v": {
+      "mode": "r2v",
+      "submitted_params": {
+        "duration": 2,
+        "aspect": "16:9",
+        "megapixels": 0.4,
+        "resolution_percent": 100.0,
+        "accel_lora": "ckpt850",
+        "accel_lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25
+      },
+      "media": [
+        {
+          "asset_id": "asset_ef9b20ebf8db",
+          "slot": "ref_image",
+          "ordinal": 1
+        }
+      ],
+      "job_id": "e0ebcc617a59",
+      "submit_info": {
+        "status": 200,
+        "submit_response": {
+          "id": "e0ebcc617a59",
+          "status": "queued",
+          "batch_count": 1
+        },
+        "fields": {
+          "mode": "r2v",
+          "params": "{\"duration\": 2, \"aspect\": \"16:9\", \"megapixels\": 0.4, \"resolution_percent\": 100.0, \"accel_lora\": \"ckpt850\", \"accel_lora_strength\": 1.0, \"steps\": 8, \"sampler\": \"dpm_2\", \"scheduler\": \"karras\", \"shift_video\": 7.5, \"shift_audio\": 1.25, \"prompt\": \"参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推\"}",
+          "asset_refs": "[{\"asset_id\": \"asset_ef9b20ebf8db\", \"slot\": \"ref_image\", \"ordinal\": 1}]"
+        }
+      },
+      "record_params": {
+        "model_key": "ref2va_pruned_int8",
+        "accel_lora": "ckpt850",
+        "accel_loras": [
+          {
+            "key": "ckpt850",
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "strength": 1.0,
+            "enabled": true
+          }
+        ],
+        "lora": "ckpt850",
+        "lora_strength": 1.0,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "megapixels": 0.396,
+        "resolution_percent": 100.0,
+        "resolution": "480p"
+      },
+      "record_model_info": {
+        "model_key": "ref2va_pruned_int8",
+        "model_label": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "model_unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+        "lora_label": "Turbo 4 步 · ckpt850",
+        "lora_strength": 1.0,
+        "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "lora_key": "ckpt850",
+        "fixed_lora_label": "Turbo 4 步 · ckpt850",
+        "fixed_lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+        "fixed_lora_key": "ckpt850",
+        "fixed_lora_strength": 1.0,
+        "accel_lora_loader": "MiniMaxH3TurboLoRA",
+        "source": "legacy_video",
+        "attention_key": "default",
+        "attention_label": "默认（PyTorch 稠密注意力）",
+        "attention_speed_label": "速度最慢",
+        "attention_available": true,
+        "steps": 8,
+        "sampler": "dpm_2",
+        "scheduler": "karras",
+        "cfg": 1.0,
+        "shift_video": 7.5,
+        "shift_audio": 1.25,
+        "width": 864,
+        "height": 480,
+        "aspect": "16:9",
+        "resolution": "480p",
+        "duration": 2.0,
+        "seed": null,
+        "twopass": {
+          "enabled": false
+        },
+        "model_recommendation": {
+          "steps": 20,
+          "scheduler": "simple",
+          "sampler": "res_multistep",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "not_provided",
+          "source_kind": "comfyui",
+          "source": "supported_models.py:969-972（shift 12 / audio_shift 3，H3 模型内生采样设置，量化/pruned 不改） + 本项目工作流档位：h3studio/h3_video_modes.py（不挂加速 LoRA 时 = 20 步 / simple / res_multistep）",
+          "note": "Ref2VA 权重（参考生视频专用）「不附作者说明文件」 -> 作者未提供采样参数。上表 20 步 / simple / res_multistep 是本项目工作流的默认档位，「不是作者推荐值」；shift 12/3 是 ComfyUI 的模型硬性值。⚠️ euler 是挂了加速 LoRA 时的档位（4 步 / beta / euler），与本表（无 LoRA 档）不同，不要混用。",
+          "field_sources": {
+            "steps": "comfyui",
+            "scheduler": "comfyui",
+            "sampler": "comfyui",
+            "shift_video": "comfyui",
+            "shift_audio": "comfyui",
+            "base_model": "not_provided"
+          }
+        },
+        "lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        },
+        "fixed_lora_recommendation": {
+          "steps": 4,
+          "scheduler": "simple",
+          "sampler": "not_provided",
+          "shift_video": 12.0,
+          "shift_audio": 3.0,
+          "base_model": "MiniMax-H3（bf16 / int8_convrot / pruned_int8 / pruned_fp8 全部变体）",
+          "source_kind": "author",
+          "source": "README.md:76-88（步数 4~8 推荐、strength 1.0、scheduler=simple、base model 兼容全部变体） + example_workflows/minimax_h3_t2v_turbo.json（BasicScheduler=simple/6） + supported_models.py:970-971（shift 12/3 内生值）",
+          "note": "作者原话：「4 steps is the recommended minimum; 4-8 is the useful range. Keep strength at 1.0. Keep the scheduler on simple.」作者未指定具体采样器 -> 采样器一栏为「作者未提供」。",
+          "field_sources": {
+            "steps": "author",
+            "scheduler": "author",
+            "sampler": "not_provided",
+            "shift_video": "author",
+            "shift_audio": "author",
+            "base_model": "author"
+          }
+        }
+      },
+      "record_resolution_info": {
+        "width": 864,
+        "height": 480,
+        "tier": "480p",
+        "aspect": "16:9",
+        "pixels": "864×480",
+        "label": "480p · 864×480 · 16:9",
+        "source": "actual",
+        "note": "",
+        "has_size": true
+      },
+      "record_gen_params": {
+        "model": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+        "steps": "8",
+        "scheduler": "karras",
+        "sampler": "dpm_2",
+        "shift": "视频 7.5 · 音频 1.25",
+        "cfg": "1",
+        "seed": "随机",
+        "size": "864×480",
+        "duration": "2s",
+        "lora": "Turbo 4 步 · ckpt850 ×1.00",
+        "attention": "默认（PyTorch 稠密注意力） · 速度最慢",
+        "workflow": "参考图生视频（build_r2v）",
+        "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+        "original_prompt": "",
+        "prompt_enhanced": "",
+        "normalize_notes": [],
+        "artifact_loras": [
+          {
+            "name": "minimax_h3_turbo_4step_ema_ckpt850",
+            "raw_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "loader": "MiniMaxH3TurboLoRA"
+          }
+        ]
+      },
+      "status": "done",
+      "comfy_prompt_id": "64a8347b-9a4b-40d7-af49-b5acac7194cd",
+      "comfy_prompt_json": {
+        "136:201": {
+          "inputs": {
+            "image": "h3studio/1340147a65e6d028__e2e-sample-3561685-52885.png"
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "加载参考图 1"
+          }
+        },
+        "6": {
+          "inputs": {
+            "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+            "weight_dtype": "default"
+          },
+          "class_type": "UNETLoader",
+          "_meta": {
+            "title": "加载DiT"
+          }
+        },
+        "138:0": {
+          "inputs": {
+            "model": [
+              "6",
+              0
+            ],
+            "lora_name": "minimax_h3_turbo_4step_ema_ckpt850.safetensors",
+            "strength": 1.0,
+            "low_vram": true
+          },
+          "class_type": "MiniMaxH3TurboLoRA",
+          "_meta": {
+            "title": "加速 LoRA·ckpt850"
+          }
+        },
+        "105:11": {
+          "inputs": {
+            "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "视频 VAE"
+          }
+        },
+        "13": {
+          "inputs": {
+            "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "type": "minimax",
+            "device": "default"
+          },
+          "class_type": "CLIPLoader",
+          "_meta": {
+            "title": "加载文本编码器"
+          }
+        },
+        "24": {
+          "inputs": {
+            "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+          },
+          "class_type": "VAELoader",
+          "_meta": {
+            "title": "音频 VAE"
+          }
+        },
+        "105:107": {
+          "inputs": {
+            "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+            "values.a": [
+              "105:111",
+              0
+            ]
+          },
+          "class_type": "ComfyMathExpression",
+          "_meta": {
+            "title": "时长->帧数"
+          }
+        },
+        "105:111": {
+          "inputs": {
+            "value": 2.0
+          },
+          "class_type": "PrimitiveFloat",
+          "_meta": {
+            "title": "时长(秒)"
+          }
+        },
+        "136": {
+          "inputs": {
+            "clip": [
+              "13",
+              0
+            ],
+            "video_vae": [
+              "105:11",
+              0
+            ],
+            "audio_vae": [
+              "24",
+              0
+            ],
+            "prompt": "参数一致性验证：一只猫在窗边慢慢转头，暖色调，镜头缓推",
+            "width": 864,
+            "height": 480,
+            "length": [
+              "105:107",
+              1
+            ],
+            "task_type": "Ref2VA",
+            "audio_mode": "native",
+            "ref_image_size": "match",
+            "audio_denoise_strength": 0.35,
+            "add_source_as_reference": true,
+            "prompt_primary_audio_ordinal": 1,
+            "strict_prompt_tags": true,
+            "reference_video_policy": "official_2_to_15s",
+            "ref_images.ref_image_0": [
+              "136:201",
+              0
+            ]
+          },
+          "class_type": "MiniMaxH3AudioConditioningT8",
+          "_meta": {
+            "title": "H3 条件（首尾帧 / 参考 / 音轨）"
+          }
+        },
+        "139": {
+          "inputs": {
+            "model": [
+              "138:0",
+              0
+            ],
+            "shift_video": 7.5,
+            "shift_audio": 1.25
+          },
+          "class_type": "MiniMaxH3SigmaShift",
+          "_meta": {
+            "title": "sigma shift（视频/音频）"
+          }
+        },
+        "9": {
+          "inputs": {
+            "scheduler": "karras",
+            "steps": 8,
+            "denoise": 1.0,
+            "model": [
+              "139",
+              0
+            ]
+          },
+          "class_type": "BasicScheduler",
+          "_meta": {
+            "title": "调度器"
+          }
+        },
+        "17": {
+          "inputs": {
+            "sampler_name": "dpm_2"
+          },
+          "class_type": "KSamplerSelect",
+          "_meta": {
+            "title": "采样器"
+          }
+        },
+        "15": {
+          "inputs": {
+            "noise_seed": 229207547982961
+          },
+          "class_type": "RandomNoise",
+          "_meta": {
+            "title": "噪波"
+          }
+        },
+        "16": {
+          "inputs": {
+            "model": [
+              "139",
+              0
+            ],
+            "conditioning": [
+              "136",
+              0
+            ]
+          },
+          "class_type": "BasicGuider",
+          "_meta": {
+            "title": "引导器"
+          }
+        },
+        "14": {
+          "inputs": {
+            "noise": [
+              "15",
+              0
+            ],
+            "guider": [
+              "16",
+              0
+            ],
+            "sampler": [
+              "17",
+              0
+            ],
+            "sigmas": [
+              "9",
+              0
+            ],
+            "latent_image": [
+              "136",
+              1
+            ]
+          },
+          "class_type": "SamplerCustomAdvanced",
+          "_meta": {
+            "title": "采样"
+          }
+        },
+        "10": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "105:11",
+              0
+            ]
+          },
+          "class_type": "VAEDecode",
+          "_meta": {
+            "title": "解码视频"
+          }
+        },
+        "23": {
+          "inputs": {
+            "samples": [
+              "14",
+              0
+            ],
+            "vae": [
+              "24",
+              0
+            ]
+          },
+          "class_type": "VAEDecodeAudio",
+          "_meta": {
+            "title": "解码音频"
+          }
+        },
+        "300:save": {
+          "inputs": {
+            "latent": [
+              "14",
+              0
+            ],
+            "run_id": "h3studio_se0ebcc617a59",
+            "stage_index": 0,
+            "note": "h3studio job e0ebcc617a59"
+          },
+          "class_type": "H3RelayLatentSave",
+          "_meta": {
+            "title": "接续·落盘本段潜空间（下一段的接力棒）"
+          }
+        },
+        "91": {
+          "inputs": {
+            "fps": 24.0,
+            "bit_depth": 8,
+            "images": [
+              "10",
+              0
+            ],
+            "audio": [
+              "23",
+              0
+            ]
+          },
+          "class_type": "CreateVideo",
+          "_meta": {
+            "title": "合成视频"
+          }
+        },
+        "92": {
+          "inputs": {
+            "filename_prefix": "h3studio/r2v_e0ebcc617a59",
+            "format": "auto",
+            "codec": "auto",
+            "video": [
+              "91",
+              0
+            ]
+          },
+          "class_type": "SaveVideo",
+          "_meta": {
+            "title": "保存视频"
+          }
+        }
+      },
+      "comfy_sampling": {
+        "basic_scheduler": {
+          "steps": 8,
+          "scheduler": "karras"
+        },
+        "ksampler_select": {
+          "sampler_name": "dpm_2"
+        },
+        "sigma_shift": {
+          "shift_video": 7.5,
+          "shift_audio": 1.25
+        },
+        "unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+      },
+      "product": {
+        "file": "videos/v-h3-studio-000239.mp4",
+        "stored_width": 864,
+        "stored_height": 480,
+        "ffprobe": {
+          "width": 864,
+          "height": 480,
+          "codec": "h264",
+          "nb_frames": "56",
+          "duration": "2.333333"
+        }
+      }
+    }
+  },
+  "verdict": {
+    "t2v": {
+      "steps_match": true,
+      "scheduler_match": true,
+      "sampler_match": true,
+      "shift_video_match": true,
+      "shift_audio_match": true,
+      "record_steps_match": true,
+      "record_sampler_match": true,
+      "record_scheduler_match": true,
+      "record_lora_consistent": true,
+      "card_size_matches_product": true,
+      "ok": true
+    },
+    "flf": {
+      "steps_match": true,
+      "scheduler_match": true,
+      "sampler_match": true,
+      "shift_video_match": true,
+      "shift_audio_match": true,
+      "record_steps_match": true,
+      "record_sampler_match": true,
+      "record_scheduler_match": true,
+      "record_lora_consistent": true,
+      "card_size_matches_product": true,
+      "ok": true
+    },
+    "r2v": {
+      "steps_match": true,
+      "scheduler_match": true,
+      "sampler_match": true,
+      "shift_video_match": true,
+      "shift_audio_match": true,
+      "record_steps_match": true,
+      "record_sampler_match": true,
+      "record_scheduler_match": true,
+      "record_lora_consistent": true,
+      "card_size_matches_product": true,
+      "ok": true
+    }
+  },
+  "ok": true
+}

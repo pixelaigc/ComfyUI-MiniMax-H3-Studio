@@ -1,0 +1,25 @@
+job: 042153a2055d mode: r2v status: done
+--- RECORD params ---
+   model_key = 'ref2va_pruned_int8'
+   accel_lora = 'ckpt850'
+   lora = 'ckpt850'
+   steps = 8
+   sampler = 'dpm_2'
+   scheduler = 'karras'
+   shift_video = 7.5
+   shift_audio = 1.25
+   width = 864
+   height = 480
+   megapixels = 0.396
+   resolution_percent = 100.0
+   resolution = '480p'
+   precision = None
+   ref_images = ['h3studio/1340147a65e6d028__e2e-sample-3561685-52885.png']
+--- CARD ---
+   resolution_info: {"width": 864, "height": 480, "tier": "480p", "aspect": "16:9", "pixels": "864×480", "label": "480p · 864×480 · 16:9", "source": "actual", "note": "", "has_size": true}
+   lora_label: Turbo 4 步 · ckpt850
+   gen_params.lora: Turbo 4 步 · ckpt850 ×1.00
+   gen_params.size: 864×480
+--- PRODUCT ffprobe ---
+   file: videos/v-h3-studio-000233.mp4 stored: 864 x 480
+   ffprobe: { "programs": [ ], "stream_groups": [ ], "streams": [ { "codec_name": "h264", "width": 864, "height": 480 } ], "format": { "duration": "2.333333" } }

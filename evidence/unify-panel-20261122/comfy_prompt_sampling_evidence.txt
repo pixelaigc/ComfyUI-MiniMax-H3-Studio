@@ -1,0 +1,25 @@
+=== ComfyUI prompt JSON 里配的采样参数（karras/dpm_2 那批）===
+  prompt_id=bb9554a8-5c65-4036-b510-d06907c7a41e
+     BasicScheduler  = {"steps": 8, "scheduler": "karras"}
+     KSamplerSelect  = 'dpm_2'
+     SigmaShift      = {"v": 7.5, "a": 1.25}
+     UNETLoader      = 'minimax_h3_fl2va_pruned_int8_convrot.safetensors'
+     task_type(T8)   = None
+  prompt_id=6006743e-bba7-4d93-97f9-52a02333c294
+     BasicScheduler  = {"steps": 8, "scheduler": "karras"}
+     KSamplerSelect  = 'dpm_2'
+     SigmaShift      = {"v": 7.5, "a": 1.25}
+     UNETLoader      = 'minimax_h3_fl2va_pruned_int8_convrot.safetensors'
+     task_type(T8)   = None
+  prompt_id=648aa413-6620-442d-882f-205f668b31fb
+     BasicScheduler  = {"steps": 8, "scheduler": "karras"}
+     KSamplerSelect  = 'dpm_2'
+     SigmaShift      = {"v": 7.5, "a": 1.25}
+     UNETLoader      = 'minimax_h3_fl2va_pruned_int8_convrot.safetensors'
+     task_type(T8)   = 'I2VA'
+  prompt_id=b5e705fa-1a61-47bc-9c6f-6bbbb1edd883
+     BasicScheduler  = {"steps": 8, "scheduler": "karras"}
+     KSamplerSelect  = 'dpm_2'
+     SigmaShift      = {"v": 7.5, "a": 1.25}
+     UNETLoader      = 'minimax_h3_ref2va_pruned_int8_convrot.safetensors'
+     task_type(T8)   = 'Ref2VA'

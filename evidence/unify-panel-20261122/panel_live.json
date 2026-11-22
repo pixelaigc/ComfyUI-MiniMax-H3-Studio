@@ -1,0 +1,2458 @@
+{
+  "base": "http://127.0.0.1:8190",
+  "tag": "live",
+  "console_errors": [],
+  "shots": [
+    {
+      "mode": "t2v",
+      "opened": true,
+      "path": "/root/projects/h3studio-live/evidence/unify-panel-20261122/panel_t2v_live.png"
+    },
+    {
+      "mode": "flf",
+      "opened": true,
+      "path": "/root/projects/h3studio-live/evidence/unify-panel-20261122/panel_flf_live.png"
+    },
+    {
+      "mode": "r2v",
+      "opened": true,
+      "path": "/root/projects/h3studio-live/evidence/unify-panel-20261122/panel_r2v_live.png"
+    },
+    {
+      "mode": "all3",
+      "path": "/root/projects/h3studio-live/evidence/unify-panel-20261122/panel_all3_live.png"
+    },
+    {
+      "mode": "375px",
+      "path": "/root/projects/h3studio-live/evidence/unify-panel-20261122/panel_375px_live.png"
+    }
+  ],
+  "panels": {
+    "t2v": {
+      "fields": [
+        {
+          "label": "底模",
+          "kind": "select",
+          "value": "fl2va_pruned_int8",
+          "editable": true,
+          "options": [
+            "fl2va_pruned_int8",
+            "fl2va_int8",
+            "fl2va_pruned_w4a8",
+            "fl2va_bf16",
+            "ref2va_pruned_int8",
+            "ref2va_int8",
+            "hybrid_fl2va_ref2va"
+          ],
+          "optionLabels": [
+            "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+            "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+            "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+            "MiniMax-H3 FL2VA · BF16（官方原始精度）",
+            "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+            "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+            "MiniMax-H3 混合版 · FL2VA+Ref2VA"
+          ],
+          "selectedLabel": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+          "note": "首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。精度已经编码在权重文件里，选底模就等于选精度。"
+        },
+        {
+          "label": "注意力机制",
+          "kind": "select",
+          "value": "sparse",
+          "editable": true,
+          "options": [
+            "default",
+            "kitchen",
+            "sage",
+            "sol",
+            "sparse"
+          ],
+          "optionLabels": [
+            "默认（PyTorch 稠密注意力）",
+            "Comfy Kitchen INT8 量化注意力",
+            "SageAttention 显存优化",
+            "Sol-Attn 近似路由",
+            "稀疏视频注意力（预算制）"
+          ],
+          "selectedLabel": "稀疏视频注意力（预算制）",
+          "note": "comfy kitchen = 节点 ModelAttentionBackend（用户 2026-11-13 审查目标 5）"
+        },
+        {
+          "label": "加速 LoRA 组合",
+          "kind": "select",
+          "value": "dmad_4step_critic",
+          "editable": true,
+          "options": [
+            "none",
+            "ckpt850",
+            "v4step600",
+            "better_motion",
+            "dmad_4step_critic",
+            "speed_slider"
+          ],
+          "optionLabels": [
+            "none（不挂加速 LoRA，走标准多步采样）",
+            "Turbo 4 步 · ckpt850",
+            "Turbo 4 步 · v4-step600",
+            "更好运动（720x1280 档 / 15-30 步）",
+            "DMAD 4 步（critic 版）",
+            "速度滑杆（快/慢运动）"
+          ],
+          "selectedLabel": "DMAD 4 步（critic 版）",
+          "note": "与首尾帧 / 参考生视频面板**同一份清单**：本机真实存在 + 与该底模逐层实测兼容 + 非第三方蒸馏（判据来自权重自己的 safetensors metadata，不是名单）。显示名取自权重登记表，不自造名称。"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值；与 MP 预算一起换算出真实宽高（对齐 32）。"
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32 —— 这是唯一的尺寸表达，没有独立的「分辨率档位」。"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP。"
+        },
+        {
+          "label": "生效像素（只读派生）",
+          "kind": "fixed",
+          "value": "864×480",
+          "note": "由「画面比例 × MP 预算 × 百分比」换算出的真实宽高（对齐 32 的倍数）。它是**派生结果**，不是可写维度 —— 改上面三项它就跟着变。"
+        },
+        {
+          "label": "时长（秒）",
+          "kind": "number",
+          "value": "5",
+          "editable": true,
+          "note": "服务端上限 60 秒（= 1440 帧），超限直接报错不静默截断"
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "8",
+          "editable": true,
+          "note": "与文生视频面板同一控件、同一区间。推荐值随所选加速 LoRA 档位变化（4 步档 / 20 步标准多步档）。"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "selectedLabel": "euler",
+          "note": "本机 ComfyUI KSamplerSelect 的真实 COMBO 清单。"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "beta",
+          "editable": true,
+          "options": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "optionLabels": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "selectedLabel": "beta",
+          "note": "本机 ComfyUI BasicScheduler 的真实 COMBO 清单。"
+        },
+        {
+          "label": "视频 sigma shift",
+          "kind": "number",
+          "value": "12",
+          "editable": true,
+          "note": "H3 模型内生值 12.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_video 槽位。"
+        },
+        {
+          "label": "音频 sigma shift",
+          "kind": "number",
+          "value": "2",
+          "editable": true,
+          "note": "H3 模型内生值 3.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_audio 槽位。"
+        },
+        {
+          "label": "底模精度（随底模，不可改）",
+          "kind": "fixed",
+          "value": "随底模",
+          "note": "精度**不是工作流里的槽位**，而是权重文件自身的量化格式（int8_convrot / bf16 / pruned_w4a8）。上游没有「精度」节点可填 —— 换精度 = 换权重 = 换上面的底模。选底模即选精度，这里没有独立的精度参数。"
+        }
+      ],
+      "note": "新面板路径：底模 / 注意力机制 / 加速 LoRA 组合都是**真实生效**的（工作流里会出现对应节点与权重）。"
+    },
+    "flf": {
+      "fields": [
+        {
+          "label": "底模",
+          "kind": "select",
+          "value": "fl2va_pruned_int8",
+          "editable": true,
+          "options": [
+            "fl2va_pruned_int8",
+            "fl2va_int8",
+            "fl2va_pruned_w4a8",
+            "fl2va_bf16"
+          ],
+          "optionLabels": [
+            "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+            "MiniMax-H3 FL2VA · 完整 int8（保真最高）",
+            "MiniMax-H3 FL2VA · 剪枝 w4a8（最省显存）",
+            "MiniMax-H3 FL2VA · BF16（官方原始精度）"
+          ],
+          "selectedLabel": "MiniMax-H3 FL2VA · 剪枝 int8（默认）",
+          "note": "首尾帧用 FL2VA 系权重（它有 I2VA / FL2VA / L2VA 通道）。精度已经编码在权重文件里，选底模就等于选精度。"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值；与 MP 预算一起换算出真实宽高（对齐 32）。"
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "0.8",
+          "editable": true,
+          "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32 —— 这是唯一的尺寸表达，没有独立的「分辨率档位」。"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP。"
+        },
+        {
+          "label": "生效像素（只读派生）",
+          "kind": "fixed",
+          "value": "864×480",
+          "note": "由「画面比例 × MP 预算 × 百分比」换算出的真实宽高（对齐 32 的倍数）。它是**派生结果**，不是可写维度 —— 改上面三项它就跟着变。"
+        },
+        {
+          "label": "时长（秒）",
+          "kind": "number",
+          "value": "5",
+          "editable": true,
+          "note": "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"
+        },
+        {
+          "label": "加速 LoRA",
+          "kind": "select",
+          "value": "ckpt850",
+          "editable": true,
+          "options": [
+            "none",
+            "ckpt850",
+            "v4step600",
+            "better_motion",
+            "dmad_4step_critic",
+            "speed_slider"
+          ],
+          "optionLabels": [
+            "none（不挂加速 LoRA，走标准多步采样）",
+            "Turbo 4 步 · ckpt850",
+            "Turbo 4 步 · v4-step600",
+            "更好运动（720x1280 档 / 15-30 步）",
+            "DMAD 4 步（critic 版）",
+            "速度滑杆（快/慢运动）"
+          ],
+          "selectedLabel": "Turbo 4 步 · ckpt850",
+          "note": "与文生视频面板**同一份清单**：本机真实存在 + 与该底模逐层实测兼容 + 非第三方蒸馏（判据来自权重自己的 safetensors metadata，不是名单）。显示名取自权重登记表，不自造名称。"
+        },
+        {
+          "label": "加速 LoRA 强度",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "4",
+          "editable": true,
+          "note": "与文生视频面板同一控件、同一区间。推荐值随所选加速 LoRA 档位变化（4 步档 / 20 步标准多步档）。"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "selectedLabel": "euler",
+          "note": "本机 ComfyUI KSamplerSelect 的真实 COMBO 清单。"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "beta",
+          "editable": true,
+          "options": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "optionLabels": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "selectedLabel": "beta",
+          "note": "本机 ComfyUI BasicScheduler 的真实 COMBO 清单。"
+        },
+        {
+          "label": "视频 sigma shift",
+          "kind": "number",
+          "value": "12",
+          "editable": true,
+          "note": "H3 模型内生值 12.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_video 槽位。"
+        },
+        {
+          "label": "音频 sigma shift",
+          "kind": "number",
+          "value": "3",
+          "editable": true,
+          "note": "H3 模型内生值 3.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_audio 槽位。"
+        },
+        {
+          "label": "底模精度（随底模，不可改）",
+          "kind": "fixed",
+          "value": "随底模",
+          "note": "精度**不是工作流里的槽位**，而是权重文件自身的量化格式（int8_convrot / bf16 / pruned_w4a8）。上游没有「精度」节点可填 —— 换精度 = 换权重 = 换上面的底模。选底模即选精度，这里没有独立的精度参数。"
+        }
+      ],
+      "note": "首尾帧用 FL2VA 系权重。尺寸只有一套表达：画面比例 × MP 预算 × 百分比（与文生视频同一套，上限按该模式的真实面积上限）。采样档位与 sigma shift 由所选加速 LoRA 与模型内生值决定，标注为不可改；精度已经编码在权重文件里，选底模即选精度。加速 LoRA 只列本机真实存在、与该底模逐层实测兼容、且属于官方 H3 谱系的档位。"
+    },
+    "r2v": {
+      "fields": [
+        {
+          "label": "底模",
+          "kind": "select",
+          "value": "ref2va_pruned_int8",
+          "editable": true,
+          "options": [
+            "ref2va_pruned_int8",
+            "ref2va_int8",
+            "hybrid_fl2va_ref2va"
+          ],
+          "optionLabels": [
+            "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+            "MiniMax-H3 Ref2VA · 完整 int8（参考生视频·保真最高）",
+            "MiniMax-H3 混合版 · FL2VA+Ref2VA"
+          ],
+          "selectedLabel": "MiniMax-H3 Ref2VA · 剪枝 int8（参考生视频）",
+          "note": "参考生视频必须用支持 Ref2VA 的权重 —— FL2VA 权重没有参考通道，用它等于「参考没生效」。"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": "与官方工作流的 ResolutionSelector.aspect_ratio 同一取值；与 MP 预算一起换算出真实宽高（对齐 32）。"
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "0.8",
+          "editable": true,
+          "note": "该模式真实上限 2.0 MP；100% = 上限。宽高按比例换算并对齐 32 —— 这是唯一的尺寸表达，没有独立的「分辨率档位」。"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该模式真实上限（2.0 MP）的百分比；100% = 2.0 MP。"
+        },
+        {
+          "label": "生效像素（只读派生）",
+          "kind": "fixed",
+          "value": "864×480",
+          "note": "由「画面比例 × MP 预算 × 百分比」换算出的真实宽高（对齐 32 的倍数）。它是**派生结果**，不是可写维度 —— 改上面三项它就跟着变。"
+        },
+        {
+          "label": "时长（秒）",
+          "kind": "number",
+          "value": "5",
+          "editable": true,
+          "note": "服务端上限 60 秒（= 1440 帧 @ 24fps），超限直接报错不静默截断"
+        },
+        {
+          "label": "加速 LoRA",
+          "kind": "select",
+          "value": "ckpt850",
+          "editable": true,
+          "options": [
+            "none",
+            "ckpt850",
+            "v4step600",
+            "better_motion",
+            "dmad_4step_critic",
+            "speed_slider"
+          ],
+          "optionLabels": [
+            "none（不挂加速 LoRA，走标准多步采样）",
+            "Turbo 4 步 · ckpt850",
+            "Turbo 4 步 · v4-step600",
+            "更好运动（720x1280 档 / 15-30 步）",
+            "DMAD 4 步（critic 版）",
+            "速度滑杆（快/慢运动）"
+          ],
+          "selectedLabel": "Turbo 4 步 · ckpt850",
+          "note": "与文生视频面板**同一份清单**：本机真实存在 + 与该底模逐层实测兼容 + 非第三方蒸馏（判据来自权重自己的 safetensors metadata，不是名单）。显示名取自权重登记表，不自造名称。"
+        },
+        {
+          "label": "加速 LoRA 强度",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "官方首尾帧模板用的是 0.7（minimax_h3_v1.json 节点 333）"
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "4",
+          "editable": true,
+          "note": "与文生视频面板同一控件、同一区间。推荐值随所选加速 LoRA 档位变化（4 步档 / 20 步标准多步档）。"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m",
+            "euler_extsig",
+            "euler_extsig_ancestral",
+            "euler_extsig_ancestral_cfg_pp",
+            "euler_extsig_cfg_pp"
+          ],
+          "selectedLabel": "euler",
+          "note": "本机 ComfyUI KSamplerSelect 的真实 COMBO 清单。"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "beta",
+          "editable": true,
+          "options": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "optionLabels": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "FlowMatchEulerDiscreteScheduler",
+            "zipf_linear",
+            "zeta",
+            "bong_tangent",
+            "beta57"
+          ],
+          "selectedLabel": "beta",
+          "note": "本机 ComfyUI BasicScheduler 的真实 COMBO 清单。"
+        },
+        {
+          "label": "视频 sigma shift",
+          "kind": "number",
+          "value": "12",
+          "editable": true,
+          "note": "H3 模型内生值 12.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_video 槽位。"
+        },
+        {
+          "label": "音频 sigma shift",
+          "kind": "number",
+          "value": "3",
+          "editable": true,
+          "note": "H3 模型内生值 3.0；对应工作流里的 MiniMaxH3SigmaShift 节点 shift_audio 槽位。"
+        },
+        {
+          "label": "底模精度（随底模，不可改）",
+          "kind": "fixed",
+          "value": "随底模",
+          "note": "精度**不是工作流里的槽位**，而是权重文件自身的量化格式（int8_convrot / bf16 / pruned_w4a8）。上游没有「精度」节点可填 —— 换精度 = 换权重 = 换上面的底模。选底模即选精度，这里没有独立的精度参数。"
+        }
+      ],
+      "note": "参考生视频必须用支持 Ref2VA 通道的权重。尺寸只有一套表达：画面比例 × MP 预算 × 百分比（与文生视频同一套）。采样档位与 sigma shift 由所选加速 LoRA 与模型内生值决定，标注为不可改；精度已经编码在权重文件里，选底模即选精度。加速 LoRA 只列本机真实存在、与该底模逐层实测兼容、且属于官方 H3 谱系的档位。"
+    },
+    "t2i": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "z_image_turbo_bf16",
+          "editable": true,
+          "options": [
+            "z_image_turbo_bf16",
+            "z_image_bf16",
+            "z_image_base_distill",
+            "darkbeast_z6_blitz_fp8"
+          ],
+          "optionLabels": [
+            "Z-Image-Turbo · 官方加速版",
+            "Z-Image Base · 官方完整版",
+            "Z-Image Base + 蒸馏加速 · 8 步",
+            "DarkBeast Z6 BlitZ · FP8 混精版"
+          ],
+          "selectedLabel": "Z-Image-Turbo · 官方加速版",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "1mp",
+          "editable": true,
+          "options": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k",
+            "4k"
+          ],
+          "optionLabels": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k",
+            "4k"
+          ],
+          "selectedLabel": "1mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "该族真实上限 8.3 MP（来自该族的真实档位表）；100% = 上限。默认 1.0 MP = 默认档位 1mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（8.3 MP）的百分比；100% = 8.3 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "9",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "res_multistep",
+          "editable": true,
+          "options": [
+            "res_multistep",
+            "euler",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "exponential",
+            "res_2s",
+            "res_3s",
+            "ddim"
+          ],
+          "optionLabels": [
+            "res_multistep",
+            "euler",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "exponential",
+            "res_2s",
+            "res_3s",
+            "ddim"
+          ],
+          "selectedLabel": "res_multistep",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "simple",
+          "editable": true,
+          "options": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "optionLabels": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "selectedLabel": "simple",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        },
+        {
+          "label": "shift",
+          "kind": "number",
+          "value": "3",
+          "editable": true,
+          "note": "该模型版本的官方值"
+        },
+        {
+          "label": "负面提示词（默认）",
+          "kind": "text",
+          "value": "",
+          "editable": true,
+          "note": "留空 = 不加负面提示词"
+        }
+      ],
+      "note": "Z-Image：模型版本决定步数/CFG/采样器的推荐档。"
+    },
+    "t2i_qwen": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "qwen_image_2.1_bf16",
+          "editable": true,
+          "options": [
+            "qwen_image_2.1_bf16",
+            "qwen_image_2.1_turbo_bf16"
+          ],
+          "optionLabels": [
+            "Qwen-Image 2.1 · 官方基座版（40 步）",
+            "Qwen-Image 2.1 Turbo · 8 步蒸馏版"
+          ],
+          "selectedLabel": "Qwen-Image 2.1 · 官方基座版（40 步）",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "1mp",
+          "editable": true,
+          "options": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "optionLabels": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "selectedLabel": "1mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "该族真实上限 4.0 MP（来自该族的真实档位表）；100% = 上限。默认 1.0 MP = 默认档位 1mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（4.0 MP）的百分比；100% = 4.0 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "40",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "uni_pc"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "uni_pc"
+          ],
+          "selectedLabel": "euler",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "simple",
+          "editable": true,
+          "options": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "optionLabels": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "selectedLabel": "simple",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        },
+        {
+          "label": "shift",
+          "kind": "number",
+          "value": "0.69",
+          "editable": true,
+          "note": "该模型版本的官方值"
+        },
+        {
+          "label": "负面提示词（默认）",
+          "kind": "text",
+          "value": "",
+          "editable": true,
+          "note": "留空 = 不加负面提示词"
+        }
+      ],
+      "note": "Qwen-Image 2.1：cfg=1 时负面提示词不生效（要生效需 cfg>1）。"
+    },
+    "i2i_qwen": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "qwen_image_2.1_bf16",
+          "editable": true,
+          "options": [
+            "qwen_image_2.1_bf16",
+            "qwen_image_2.1_turbo_bf16"
+          ],
+          "optionLabels": [
+            "Qwen-Image 2.1 · 官方基座版（40 步）",
+            "Qwen-Image 2.1 Turbo · 8 步蒸馏版"
+          ],
+          "selectedLabel": "Qwen-Image 2.1 · 官方基座版（40 步）",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "1mp",
+          "editable": true,
+          "options": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "optionLabels": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "selectedLabel": "1mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "该族真实上限 4.0 MP（来自该族的真实档位表）；100% = 上限。默认 1.0 MP = 默认档位 1mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（4.0 MP）的百分比；100% = 4.0 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "40",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "uni_pc"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "uni_pc"
+          ],
+          "selectedLabel": "euler",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "simple",
+          "editable": true,
+          "options": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "optionLabels": [
+            "simple",
+            "beta",
+            "sgm_uniform",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "selectedLabel": "simple",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        },
+        {
+          "label": "shift",
+          "kind": "number",
+          "value": "0.69",
+          "editable": true,
+          "note": "该模型版本的官方值"
+        },
+        {
+          "label": "负面提示词（默认）",
+          "kind": "text",
+          "value": "",
+          "editable": true,
+          "note": "留空 = 不加负面提示词"
+        }
+      ],
+      "note": "Qwen-Image 2.1 图片编辑：参考图必须来自素材库。"
+    },
+    "t2i_moss": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "moss_image_base",
+          "editable": true,
+          "options": [
+            "moss_image_base",
+            "moss_image_sft"
+          ],
+          "optionLabels": [
+            "MOSS-Image-Base · 未对齐基模（LoRA 训练父本）",
+            "MOSS-Image-SFT · 官方后训练对齐版（文字渲染更强）"
+          ],
+          "selectedLabel": "MOSS-Image-Base · 未对齐基模（LoRA 训练父本）",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "1mp",
+          "editable": true,
+          "options": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "optionLabels": [
+            "1mp",
+            "480p",
+            "720p",
+            "1080p",
+            "1440p",
+            "2k"
+          ],
+          "selectedLabel": "1mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "该族真实上限 4.0 MP（来自该族的真实档位表）；100% = 上限。默认 1.0 MP = 默认档位 1mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（4.0 MP）的百分比；100% = 4.0 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "50",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler",
+            "euler_cfg_pp",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "er_sde",
+            "res_multistep"
+          ],
+          "optionLabels": [
+            "euler",
+            "euler_cfg_pp",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "dpm_2",
+            "heun",
+            "er_sde",
+            "res_multistep"
+          ],
+          "selectedLabel": "euler",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "sgm_uniform",
+          "editable": true,
+          "options": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "optionLabels": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic"
+          ],
+          "selectedLabel": "sgm_uniform",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "3",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        },
+        {
+          "label": "shift",
+          "kind": "number",
+          "value": "5",
+          "editable": true,
+          "note": "该模型版本的官方值"
+        },
+        {
+          "label": "负面提示词（默认）",
+          "kind": "text",
+          "value": "",
+          "editable": true,
+          "note": "留空 = 不加负面提示词"
+        },
+        {
+          "label": "SLG 单层（uncond 分支）",
+          "kind": "text",
+          "value": "22",
+          "editable": true,
+          "note": "官方推荐 22（0-indexed）；关掉 SLG 画面更写实但细节会崩"
+        },
+        {
+          "label": "SLG 双层",
+          "kind": "text",
+          "value": "",
+          "editable": true,
+          "note": "官方默认留空"
+        }
+      ],
+      "note": "MOSS-Image：SLG 层数与官方推荐一致（22 / 空）。"
+    },
+    "t2i_h3image": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "h3_image_pruned_int8",
+          "editable": true,
+          "options": [
+            "h3_image_pruned_int8"
+          ],
+          "optionLabels": [
+            "MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）"
+          ],
+          "selectedLabel": "MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "4mp",
+          "editable": true,
+          "options": [
+            "4mp",
+            "8mp",
+            "16mp"
+          ],
+          "optionLabels": [
+            "4mp",
+            "8mp",
+            "16mp"
+          ],
+          "selectedLabel": "4mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "4",
+          "editable": true,
+          "note": "该族真实上限 16.0 MP（来自该族的真实档位表）；100% = 上限。默认 4.0 MP = 默认档位 4mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（16.0 MP）的百分比；100% = 16.0 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "4:3",
+            "3:4",
+            "3:2",
+            "2:3",
+            "16:9",
+            "9:16",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "4:3",
+            "3:4",
+            "3:2",
+            "2:3",
+            "16:9",
+            "9:16",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "6",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler"
+          ],
+          "optionLabels": [
+            "euler"
+          ],
+          "selectedLabel": "euler",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "simple",
+          "editable": true,
+          "options": [
+            "simple"
+          ],
+          "optionLabels": [
+            "simple"
+          ],
+          "selectedLabel": "simple",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        }
+      ],
+      "note": "H3-Image：6 步蒸馏版，guidance 固定 1（无负面提示词通道）。"
+    },
+    "i2i_h3image": {
+      "fields": [
+        {
+          "label": "模型版本",
+          "kind": "select",
+          "value": "h3_image_pruned_int8",
+          "editable": true,
+          "options": [
+            "h3_image_pruned_int8"
+          ],
+          "optionLabels": [
+            "MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）"
+          ],
+          "selectedLabel": "MiniMax-H3-Image · 官方 6 步蒸馏版（INT8）",
+          "note": ""
+        },
+        {
+          "label": "分辨率档位",
+          "kind": "select",
+          "value": "4mp",
+          "editable": true,
+          "options": [
+            "4mp",
+            "8mp",
+            "16mp"
+          ],
+          "optionLabels": [
+            "4mp",
+            "8mp",
+            "16mp"
+          ],
+          "selectedLabel": "4mp",
+          "note": ""
+        },
+        {
+          "label": "MP 预算（百万像素）",
+          "kind": "number",
+          "value": "4",
+          "editable": true,
+          "note": "该族真实上限 16.0 MP（来自该族的真实档位表）；100% = 上限。默认 4.0 MP = 默认档位 4mp"
+        },
+        {
+          "label": "MP 预算百分比（%）",
+          "kind": "number",
+          "value": "100",
+          "editable": true,
+          "note": "相对该族真实上限（16.0 MP）的百分比；100% = 16.0 MP"
+        },
+        {
+          "label": "画面比例",
+          "kind": "select",
+          "value": "16:9",
+          "editable": true,
+          "options": [
+            "1:1",
+            "4:3",
+            "3:4",
+            "3:2",
+            "2:3",
+            "16:9",
+            "9:16",
+            "21:9"
+          ],
+          "optionLabels": [
+            "1:1",
+            "4:3",
+            "3:4",
+            "3:2",
+            "2:3",
+            "16:9",
+            "9:16",
+            "21:9"
+          ],
+          "selectedLabel": "16:9",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "6",
+          "editable": true,
+          "note": "该模型版本的官方推荐步数"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "euler",
+          "editable": true,
+          "options": [
+            "euler"
+          ],
+          "optionLabels": [
+            "euler"
+          ],
+          "selectedLabel": "euler",
+          "note": "该族模型表里出现过的采样器"
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "simple",
+          "editable": true,
+          "options": [
+            "simple"
+          ],
+          "optionLabels": [
+            "simple"
+          ],
+          "selectedLabel": "simple",
+          "note": "该族模型表里出现过的调度器"
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "cfg=1 时 ComfyUI 跳过 uncond，负面提示词不生效"
+        },
+        {
+          "label": "一次生成张数",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": "服务端上限 5 张"
+        }
+      ],
+      "note": "H3-Image 图片编辑：参考图必须来自素材库。"
+    },
+    "t2a": {
+      "fields": [
+        {
+          "label": "音乐模型",
+          "kind": "select",
+          "value": "yue2_3b_bf16",
+          "editable": true,
+          "options": [
+            "yue2_3b_bf16"
+          ],
+          "optionLabels": [
+            "YuE2 3B · BF16 完整版"
+          ],
+          "selectedLabel": "YuE2 3B · BF16 完整版",
+          "note": ""
+        },
+        {
+          "label": "谱面模式",
+          "kind": "select",
+          "value": "full",
+          "editable": true,
+          "options": [
+            "full",
+            "melody"
+          ],
+          "optionLabels": [
+            "full",
+            "melody"
+          ],
+          "selectedLabel": "full",
+          "note": "full = 全曲谱 / melody = 单旋律线"
+        },
+        {
+          "label": "输出格式",
+          "kind": "select",
+          "value": "flac",
+          "editable": true,
+          "options": [
+            "flac",
+            "mp3",
+            "opus"
+          ],
+          "optionLabels": [
+            "flac",
+            "mp3",
+            "opus"
+          ],
+          "selectedLabel": "flac",
+          "note": ""
+        },
+        {
+          "label": "时长上限（秒）",
+          "kind": "number",
+          "value": "900",
+          "editable": true,
+          "note": "默认 900 = 让模型自然生成到结束标记"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "dpm_2",
+          "editable": true,
+          "options": [
+            "dpm_2",
+            "euler",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "ddim",
+            "heun",
+            "ddpm_uniform"
+          ],
+          "optionLabels": [
+            "dpm_2",
+            "euler",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "ddim",
+            "heun",
+            "ddpm_uniform"
+          ],
+          "selectedLabel": "dpm_2",
+          "note": ""
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "sgm_uniform",
+          "editable": true,
+          "options": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic",
+            "ddim_uniform"
+          ],
+          "optionLabels": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic",
+            "ddim_uniform"
+          ],
+          "selectedLabel": "sgm_uniform",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "32",
+          "editable": true,
+          "note": ""
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": ""
+        },
+        {
+          "label": "歌词结构模板",
+          "kind": "text",
+          "value": "V-C-V-C-bridge-C",
+          "editable": true,
+          "note": "留空 = 纯器乐"
+        }
+      ],
+      "note": "YuE2 文生音乐：风格描述仍由提示词/结构化字段给出。"
+    },
+    "a2a": {
+      "fields": [
+        {
+          "label": "音乐模型",
+          "kind": "select",
+          "value": "yue2_3b_bf16",
+          "editable": true,
+          "options": [
+            "yue2_3b_bf16"
+          ],
+          "optionLabels": [
+            "YuE2 3B · BF16 完整版"
+          ],
+          "selectedLabel": "YuE2 3B · BF16 完整版",
+          "note": ""
+        },
+        {
+          "label": "谱面模式",
+          "kind": "select",
+          "value": "full",
+          "editable": true,
+          "options": [
+            "full",
+            "melody"
+          ],
+          "optionLabels": [
+            "full",
+            "melody"
+          ],
+          "selectedLabel": "full",
+          "note": "full = 全曲谱 / melody = 单旋律线"
+        },
+        {
+          "label": "输出格式",
+          "kind": "select",
+          "value": "flac",
+          "editable": true,
+          "options": [
+            "flac",
+            "mp3",
+            "opus"
+          ],
+          "optionLabels": [
+            "flac",
+            "mp3",
+            "opus"
+          ],
+          "selectedLabel": "flac",
+          "note": ""
+        },
+        {
+          "label": "时长上限（秒）",
+          "kind": "number",
+          "value": "900",
+          "editable": true,
+          "note": "默认 900 = 让模型自然生成到结束标记"
+        },
+        {
+          "label": "采样器",
+          "kind": "select",
+          "value": "dpm_2",
+          "editable": true,
+          "options": [
+            "dpm_2",
+            "euler",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "ddim",
+            "heun",
+            "ddpm_uniform"
+          ],
+          "optionLabels": [
+            "dpm_2",
+            "euler",
+            "res_multistep",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "dpmpp_3m_sde",
+            "ddim",
+            "heun",
+            "ddpm_uniform"
+          ],
+          "selectedLabel": "dpm_2",
+          "note": ""
+        },
+        {
+          "label": "调度器",
+          "kind": "select",
+          "value": "sgm_uniform",
+          "editable": true,
+          "options": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic",
+            "ddim_uniform"
+          ],
+          "optionLabels": [
+            "sgm_uniform",
+            "simple",
+            "beta",
+            "normal",
+            "karras",
+            "exponential",
+            "linear_quadratic",
+            "ddim_uniform"
+          ],
+          "selectedLabel": "sgm_uniform",
+          "note": ""
+        },
+        {
+          "label": "采样步数",
+          "kind": "number",
+          "value": "32",
+          "editable": true,
+          "note": ""
+        },
+        {
+          "label": "CFG",
+          "kind": "number",
+          "value": "1",
+          "editable": true,
+          "note": ""
+        },
+        {
+          "label": "歌词结构模板",
+          "kind": "text",
+          "value": "V-C-V-C-bridge-C",
+          "editable": true,
+          "note": "留空 = 纯器乐"
+        },
+        {
+          "label": "参考音频编码器",
+          "kind": "select",
+          "value": "sheetsage2_bf16",
+          "editable": true,
+          "options": [
+            "sheetsage2_bf16"
+          ],
+          "optionLabels": [
+            "SheetSage2 · BF16（官方音频转谱）"
+          ],
+          "selectedLabel": "SheetSage2 · BF16（官方音频转谱）",
+          "note": "SheetSage2：把参考音频转成 ABC 乐谱"
+        }
+      ],
+      "note": "YuE2 参考生音乐：参考音频必须来自素材库。"
+    },
+    "longfilm": {
+      "fields": [],
+      "note": "长片拼接只拼接**已完成的视频**，没有可调的生成参数。"
+    }
+  },
+  "overflow_375": {
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflow": false
+  },
+  "assertions": {
+    "t2v_sampling_editable": true,
+    "flf_sampling_editable": true,
+    "r2v_sampling_editable": true,
+    "sampling_labels_identical": true,
+    "accel_lora_options_identical": true,
+    "t2v_no_resolution_tier": true,
+    "t2v_no_editable_precision": true,
+    "flf_no_resolution_tier": true,
+    "flf_no_editable_precision": true,
+    "r2v_no_resolution_tier": true,
+    "r2v_no_editable_precision": true,
+    "t2v_readonly_is_precision_and_derived": true,
+    "flf_readonly_is_precision_and_derived": true,
+    "r2v_readonly_is_precision_and_derived": true,
+    "t2v_size_fields_present": true,
+    "flf_size_fields_present": true,
+    "r2v_size_fields_present": true,
+    "console_errors_zero": true,
+    "no_horizontal_overflow_375": true
+  },
+  "shot_errors": [
+    "'ElementHandle' object has no attribute 'textContent'",
+    "'ElementHandle' object has no attribute 'textContent'",
+    "'ElementHandle' object has no attribute 'textContent'"
+  ],
+  "sampling_labels": {
+    "t2v": [
+      "视频 sigma shift",
+      "调度器",
+      "采样器",
+      "采样步数",
+      "音频 sigma shift"
+    ],
+    "flf": [
+      "视频 sigma shift",
+      "调度器",
+      "采样器",
+      "采样步数",
+      "音频 sigma shift"
+    ],
+    "r2v": [
+      "视频 sigma shift",
+      "调度器",
+      "采样器",
+      "采样步数",
+      "音频 sigma shift"
+    ]
+  },
+  "accel_lora_options": {
+    "t2v": [
+      "none",
+      "ckpt850",
+      "v4step600",
+      "better_motion",
+      "dmad_4step_critic",
+      "speed_slider"
+    ],
+    "flf": [
+      "none",
+      "ckpt850",
+      "v4step600",
+      "better_motion",
+      "dmad_4step_critic",
+      "speed_slider"
+    ],
+    "r2v": [
+      "none",
+      "ckpt850",
+      "v4step600",
+      "better_motion",
+      "dmad_4step_critic",
+      "speed_slider"
+    ]
+  },
+  "t2v_readonly_labels": [
+    "生效像素（只读派生）",
+    "底模精度（随底模，不可改）"
+  ],
+  "flf_readonly_labels": [
+    "生效像素（只读派生）",
+    "底模精度（随底模，不可改）"
+  ],
+  "r2v_readonly_labels": [
+    "生效像素（只读派生）",
+    "底模精度（随底模，不可改）"
+  ],
+  "all_passed": true,
+  "t2v_field_labels": [
+    "底模",
+    "注意力机制",
+    "加速 LoRA 组合",
+    "画面比例",
+    "MP 预算（百万像素）",
+    "MP 预算百分比（%）",
+    "生效像素（只读派生）",
+    "时长（秒）",
+    "采样步数",
+    "采样器",
+    "调度器",
+    "视频 sigma shift",
+    "音频 sigma shift",
+    "底模精度（随底模，不可改）"
+  ],
+  "flf_field_labels": [
+    "底模",
+    "画面比例",
+    "MP 预算（百万像素）",
+    "MP 预算百分比（%）",
+    "生效像素（只读派生）",
+    "时长（秒）",
+    "加速 LoRA",
+    "加速 LoRA 强度",
+    "采样步数",
+    "采样器",
+    "调度器",
+    "视频 sigma shift",
+    "音频 sigma shift",
+    "底模精度（随底模，不可改）"
+  ],
+  "r2v_field_labels": [
+    "底模",
+    "画面比例",
+    "MP 预算（百万像素）",
+    "MP 预算百分比（%）",
+    "生效像素（只读派生）",
+    "时长（秒）",
+    "加速 LoRA",
+    "加速 LoRA 强度",
+    "采样步数",
+    "采样器",
+    "调度器",
+    "视频 sigma shift",
+    "音频 sigma shift",
+    "底模精度（随底模，不可改）"
+  ]
+}

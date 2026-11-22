@@ -1,0 +1,26 @@
+=== 提交/记录 params ===
+  model_key = 'fl2va_pruned_int8'
+  accel_lora = 'ckpt850'
+  accel_loras = [{'key': 'ckpt850', 'name': 'minimax_h3_turbo_4step_ema_ckpt850', 'strength': 1.0, 'enabled': True}]
+  lora = 'ckpt850'
+  lora_strength = 1.0
+  steps = 8
+  sampler = 'dpm_2'
+  scheduler = 'karras'
+  shift_video = 7.5
+  shift_audio = 1.25
+  width = 864
+  height = 480
+  megapixels = 0.4
+  resolution_percent = 100.0
+  resolution = '480p'
+  precision = None
+
+=== 卡片 resolution_info ===
+  {"width": 864, "height": 480, "tier": "480p", "aspect": "16:9", "pixels": "864×480", "label": "480p · 864×480 · 16:9", "source": "actual", "note": "", "has_size": true}
+=== 卡片 model_info.lora_label ===
+  Turbo 4 步 · ckpt850
+=== gen_params.lora ===
+  Turbo 4 步 · ckpt850 ×1.00
+=== gen_params.size ===
+  864×480

@@ -1,0 +1,309 @@
+{
+  "ok": false,
+  "modes": {
+    "t2v": {
+      "label": "文生视频",
+      "field_names": [
+        "model_key",
+        "attention",
+        "accel_lora",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "steps",
+        "sampler",
+        "scheduler",
+        "shift_video",
+        "shift_audio"
+      ],
+      "editable": [
+        "model_key",
+        "attention",
+        "accel_lora",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "steps",
+        "sampler",
+        "scheduler",
+        "shift_video",
+        "shift_audio"
+      ],
+      "readonly": [],
+      "sampler_options": [
+        "euler",
+        "euler_cfg_pp",
+        "euler_ancestral",
+        "euler_ancestral_cfg_pp",
+        "heun",
+        "heunpp2",
+        "exp_heun_2_x0",
+        "exp_heun_2_x0_sde",
+        "dpm_2",
+        "dpm_2_ancestral",
+        "lms",
+        "dpm_fast",
+        "dpm_adaptive",
+        "dpmpp_2s_ancestral",
+        "dpmpp_2s_ancestral_cfg_pp",
+        "dpmpp_sde",
+        "dpmpp_sde_gpu",
+        "dpmpp_2m",
+        "dpmpp_2m_cfg_pp",
+        "dpmpp_2m_sde",
+        "dpmpp_2m_sde_gpu",
+        "dpmpp_2m_sde_heun",
+        "dpmpp_2m_sde_heun_gpu",
+        "dpmpp_3m_sde",
+        "dpmpp_3m_sde_gpu",
+        "ddpm",
+        "lcm",
+        "ipndm",
+        "ipndm_v",
+        "deis",
+        "cfgpp_ud10_ab",
+        "res_multistep",
+        "res_multistep_cfg_pp",
+        "res_multistep_ancestral",
+        "res_multistep_ancestral_cfg_pp",
+        "gradient_estimation",
+        "gradient_estimation_cfg_pp",
+        "er_sde",
+        "seeds_2",
+        "seeds_3",
+        "sa_solver",
+        "sa_solver_pece",
+        "ddim",
+        "uni_pc",
+        "uni_pc_bh2",
+        "legacy_rk",
+        "rk",
+        "rk_beta",
+        "deis_3m_ode",
+        "deis_2m_ode",
+        "deis_3m",
+        "deis_2m",
+        "res_6s_ode",
+        "res_5s_ode",
+        "res_3s_ode",
+        "res_2s_ode",
+        "res_3m_ode",
+        "res_2m_ode",
+        "res_6s",
+        "res_5s",
+        "res_3s",
+        "res_2s",
+        "res_3m",
+        "res_2m",
+        "euler_extsig",
+        "euler_extsig_ancestral",
+        "euler_extsig_ancestral_cfg_pp",
+        "euler_extsig_cfg_pp"
+      ],
+      "scheduler_options": [
+        "simple",
+        "sgm_uniform",
+        "karras",
+        "exponential",
+        "ddim_uniform",
+        "beta",
+        "normal",
+        "linear_quadratic",
+        "kl_optimal",
+        "FlowMatchEulerDiscreteScheduler",
+        "zipf_linear",
+        "zeta",
+        "bong_tangent",
+        "beta57"
+      ],
+      "accel_lora_options": [
+        [
+          "lightx2v_4step_768p",
+          "LightX2V 4 步（768p 档）"
+        ],
+        [
+          "lightx2v_4step_sla_768p",
+          "LightX2V SLA 4 步（768p 档）"
+        ],
+        [
+          "lightx2v_8step",
+          "LightX2V 8 步"
+        ],
+        [
+          "dmad_4step_critic",
+          "DMAD 4 步（critic 版）"
+        ],
+        [
+          "speed_slider",
+          "速度滑杆（快/慢运动）"
+        ],
+        [
+          "better_motion",
+          "更好运动（720x1280 档 / 15-30 步）"
+        ],
+        [
+          "turbo_4step_cn",
+          "Turbo 4 步（中文名加速版）"
+        ],
+        [
+          "turbo_4step_cn_ema",
+          "Turbo 4 步（中文名 EMA 版）"
+        ],
+        [
+          "lightx2v_4step_v01_comfy",
+          "LightX2V 4 步（v0.1 comfy 版）"
+        ],
+        [
+          "lightx2v_sla_768p_root",
+          "LightX2V SLA 4 步（768p · 根目录版）"
+        ]
+      ],
+      "saved_defaults": {
+        "model_key": "fl2va_pruned_int8",
+        "attention": "sparse",
+        "accel_lora": "dmad_4step_critic",
+        "aspect": "16:9",
+        "megapixels": 1.0,
+        "resolution_percent": 100.0,
+        "duration": 5.0,
+        "steps": 8,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "shift_video": 12.0,
+        "shift_audio": 2.0
+      }
+    },
+    "flf": {
+      "label": "首尾帧生成",
+      "field_names": [
+        "model_key",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "lora",
+        "lora_strength",
+        "sampling_fixed",
+        "shift_fixed",
+        "precision_fixed"
+      ],
+      "editable": [
+        "model_key",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "lora",
+        "lora_strength"
+      ],
+      "readonly": [
+        "sampling_fixed",
+        "shift_fixed",
+        "precision_fixed"
+      ],
+      "sampler_options": [],
+      "scheduler_options": [],
+      "accel_lora_options": [
+        [
+          "none",
+          "none（不挂加速 LoRA，走标准多步采样）"
+        ],
+        [
+          "ckpt850",
+          "Turbo 4 步 · ckpt850"
+        ],
+        [
+          "v4step600",
+          "Turbo 4 步 · v4-step600"
+        ]
+      ],
+      "saved_defaults": {
+        "model_key": "fl2va_pruned_int8",
+        "aspect": "16:9",
+        "megapixels": 0.8,
+        "resolution_percent": 100.0,
+        "duration": 5.0,
+        "lora": "ckpt850",
+        "lora_strength": 1.0,
+        "resolution": "768p",
+        "precision": "int8",
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "shift_video": 12,
+        "shift_audio": 3
+      }
+    },
+    "r2v": {
+      "label": "参考图生成",
+      "field_names": [
+        "model_key",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "lora",
+        "lora_strength",
+        "sampling_fixed",
+        "shift_fixed",
+        "precision_fixed"
+      ],
+      "editable": [
+        "model_key",
+        "aspect",
+        "megapixels",
+        "resolution_percent",
+        "duration",
+        "lora",
+        "lora_strength"
+      ],
+      "readonly": [
+        "sampling_fixed",
+        "shift_fixed",
+        "precision_fixed"
+      ],
+      "sampler_options": [],
+      "scheduler_options": [],
+      "accel_lora_options": [
+        [
+          "none",
+          "none（不挂加速 LoRA，走标准多步采样）"
+        ],
+        [
+          "ckpt850",
+          "Turbo 4 步 · ckpt850"
+        ],
+        [
+          "v4step600",
+          "Turbo 4 步 · v4-step600"
+        ]
+      ],
+      "saved_defaults": {
+        "model_key": "ref2va_pruned_int8",
+        "aspect": "16:9",
+        "megapixels": 0.8,
+        "resolution_percent": 100.0,
+        "duration": 5.0,
+        "lora": "ckpt850",
+        "lora_strength": 1.0,
+        "resolution": "768p",
+        "precision": "int8",
+        "steps": 4,
+        "sampler": "euler",
+        "scheduler": "beta",
+        "shift_video": 12,
+        "shift_audio": 3
+      }
+    }
+  },
+  "checks": {
+    "sampling_editable_on_all": false,
+    "sampler_options_identical": false,
+    "scheduler_options_identical": false,
+    "accel_lora_list_identical": false,
+    "no_conflicting_size_fields": true,
+    "precision_is_readonly_with_reason": false
+  }
+}
