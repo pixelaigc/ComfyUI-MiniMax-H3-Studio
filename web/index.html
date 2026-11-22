@@ -1596,6 +1596,9 @@
 <!-- 视频面板的静态兜底清单（后端不可达时用，保证下拉不为空） -->
 <script src="/static/video-panel-fallback.js?v=cr20261115b"></script>
 <script src="/static/interaction-guard.js?v=guard1"></script>
+<!-- 【2026-11-22 请求风暴修】轮询调度器（抖动 + 退避 + 页面不可见暂停 + 永不重叠）。
+     必须**早于** generation-queue.js 与 app.js —— 两者都用它注册轮询。 -->
+<script src="/static/poll-scheduler.js?v=reqstorm20261122a"></script>
 <!-- 【2026-11-20 参考素材右键移除】已添加的参考素材条目的右键菜单。
      必须在 qwen-refs.js / app.js **之前**加载 —— 那两个模块在渲染
      参考素材条目时要调 window.RefContextMenu.attach()。
@@ -1624,7 +1627,7 @@
      window.GenerationQueue.pendingCount 来算「生成」按钮的文案。 -->
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— generation-queue.js 改了（新增「运行真相」兜底：已超时 / 状态未知 / 已丢失），
      必须破缓存，否则用户拿到的还是旧文件（永远显示「运行中」）。 -->
-<script src="/static/generation-queue.js?v=genfix20261119a"></script>
+<script src="/static/generation-queue.js?v=genfix20261122b"></script>
 <script src="/static/video-nav.js?v=sidebarfold2"></script>
 <!-- 左侧栏折叠 + 独立滚动（2026-11-13）。
      必须**早于** app.js：app.js 启动时会调 VideoNav.render()，
@@ -1651,12 +1654,12 @@
      video-panel.js 改了（B-5：submitParams 不再裸引用 app.js 的全局 state，
      时长改读本模块的 videoState.duration）。
      必须破缓存 —— 否则老用户拿到的还是旧文件，修复不生效。 -->
-<script src="/static/app.js?v=reflabel1"></script>
+<script src="/static/app.js?v=reqstorm20261122b"></script>
 <script src="/static/providers.js?v=reflabel1"></script>
 <!-- 【2026-11-14 A5】升版号到 a5truth1 —— job-detail.js 详情框新增
      「运行状态」分组（真的在跑 / 已超时 / 已丢失 / 状态未知）。 -->
 <script src="/static/job-detail.js?v=genfix20261119a"></script>
-<script src="/static/assets.js?v=assetview20261121a"></script>
+<script src="/static/assets.js?v=assetview20261122b"></script>
 <!-- 素材库播放器模式（2026-11-14 需求 14） -->
 <script src="/static/asset-player.js?v=cr20261115b"></script>
 <!-- 生成媒体库「管理」（2026-11-14 需求 11） -->

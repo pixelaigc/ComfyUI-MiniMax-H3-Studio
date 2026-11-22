@@ -324,7 +324,15 @@
     applyDetailState();
     refresh();
     // 队列比任务列表变化更快 —— 1 秒一次
-    setInterval(() => refresh(), 1000);
+    //
+    // 【2026-11-22 请求风暴修】改用带抖动/退避的调度器。
+    // 老写法是裸 setInterval(refresh, 1000)：多标签页相位相同、
+    // 慢响应时请求重叠、失败也照打。
+    if (window.H3Poll) {
+      window.H3Poll("generation-queue", refresh, 1000);
+    } else {
+      setInterval(() => refresh(), 1000);
+    }
   }
 
   // ------------------------------------------------------------------ 对外接口
