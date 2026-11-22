@@ -9973,6 +9973,43 @@ def _normalize_hermes_config(raw: dict, previous: dict | None) -> dict:
     return out
 
 
+def _enhance_prompt_limit_guard(original: str):
+    """
+    提示词长度上限守卫（**能力探测式**，与并行的
+    「本地模型配置 → 提示词长度上限（含「无限制」选项）」任务兼容）。
+
+    【为什么要有这个】
+    并行任务把「提示词长度上限」从**硬编码 4000** 改成了 **Provider 级配置**
+    （可选 4000 / 8000 / 20000 / 50000 / unlimited），并在 server.py 里
+    引入了 `_resolve_prompt_limit()` / `_prompt_limit_guard()`。
+    本分支基于 local/maintainer（那条任务还没合入），如果这里继续写死 4000，
+    两条分支合并后会出现「同一个入口，一处放开一处还砍」。
+
+    【本函数的兼容策略】
+      * 服务端**已有** _prompt_limit_guard -> 直接用它（并行任务合入后自动生效）
+      * 没有 -> 退回本分支原有的 4000 硬上限（合并前的行为，逐字不变）
+
+    返回 (错误响应 or None, 生效信息 dict)。
+    """
+    guard = globals().get("_prompt_limit_guard")
+    if callable(guard):
+        try:
+            err, info = guard(original, None)
+            return err, info
+        except Exception:
+            # 守卫自身出错**不能**把增强入口搞挂 —— 退回硬上限
+            pass
+    if len(original) > 4000:
+        return web.json_response(
+            {"error": "提示词过长（上限 4000 字）",
+             "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+             "prompt_limit_unlimited": False}, status=400), {
+            "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+            "prompt_limit_unlimited": False}
+    return None, {"prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+                  "prompt_limit_unlimited": False}
+
+
 def _safe_int(value, default: int = 0) -> int:
     """把任意外部输入安全地转成 int（非法值回落 default）。
 
@@ -10270,8 +10307,11 @@ async def api_hermes_enhance(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+    # 【提示词长度上限】与 /api/enhance 走**同一个**守卫（能力探测式）——
+    # 两条入口的长度口径必须一致，否则会出现「换个入口上限又变了」。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
 
     media = str(payload.get("media") or "").strip().lower()
     if media not in hermes_enhance.HERMES_MEDIA_SPECS:
@@ -10498,8 +10538,11 @@ async def api_enhance(request):
     original = str(payload.get("prompt") or "").strip()
     if not original:
         return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
-    if len(original) > 4000:
-        return web.json_response({"error": "提示词过长（上限 4000 字）"}, status=400)
+    # 【提示词长度上限】能力探测式守卫 —— 与并行的「长度上限可配置 +
+    # 无限制选项」任务兼容（那条任务合入后自动走它的 Provider 级规则）。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
 
     mode = payload.get("mode") or "replace"
     if mode not in ("replace", "append"):

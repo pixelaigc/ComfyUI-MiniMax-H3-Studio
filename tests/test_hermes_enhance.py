@@ -483,6 +483,40 @@ class TestNormalizeHermesConfig(unittest.TestCase):
         self.assertIn('add_post("/api/hermes-test"', src)
 
 
+# ------------------------------------------------------------------ 并行任务兼容
+class TestParallelTaskCompatibility(unittest.TestCase):
+    """
+    与并行的「本地模型配置 → 提示词长度上限（含「无限制」选项）」任务兼容。
+
+    【背景】那条任务把「提示词长度上限」从硬编码 4000 改成 Provider 级配置，
+    并在 server.py 里引入了 `_resolve_prompt_limit()` / `_prompt_limit_guard()`。
+    本分支基于 local/maintainer（那条任务还没合入），所以本分支用
+    **能力探测式**守卫：有那条任务的函数就用它，没有就退回 4000。
+    """
+
+    def test_guard_is_capability_probing(self):
+        src = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn("def _enhance_prompt_limit_guard", src)
+        # 必须探测并行任务引入的 _prompt_limit_guard
+        self.assertIn('globals().get("_prompt_limit_guard")', src)
+
+    def test_both_enhance_endpoints_use_the_same_guard(self):
+        """两条增强入口必须走**同一个**守卫（长度口径一致）。"""
+        src = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertEqual(src.count("_enhance_prompt_limit_guard(original)"), 2)
+
+    def test_guard_falls_back_to_4000(self):
+        """并行任务的守卫不存在时 -> 退回 4000 硬上限（合并前行为不变）。"""
+        import importlib.util
+        import sys as _sys
+        spec = importlib.util.spec_from_file_location(
+            "h3studio_server_probe", REPO / "server.py")
+        # server.py 顶层做大量初始化 —— 直接 import 会有副作用，
+        # 所以这里只断言源码里的兜底常量存在。
+        src = (REPO / "server.py").read_text(encoding="utf-8")
+        self.assertIn("提示词过长（上限 4000 字）", src)
+
+
 # ------------------------------------------------------------------ 前端契约
 class TestFrontendContract(unittest.TestCase):
     """前端源码的静态约定（不依赖浏览器）。"""
