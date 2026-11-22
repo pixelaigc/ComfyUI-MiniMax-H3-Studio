@@ -149,6 +149,18 @@ with sync_playwright() as pw:
     p.wait_for_timeout(1500)
     p.wait_for_function(
         "()=>!!document.querySelector('#jobsGrid .job-card[data-jid]')", timeout=30000)
+    # 【为什么要再等一次】收藏视图是异步渲染的：`wait_for_selector` 只保证
+    # 「卡片出现了」，而**导航高亮**是 showFavorites() 里同步做的 —— 但它
+    # 发生在 refreshJobs() 之前，采样过早会读到 navActive=null。
+    # 实测（/tmp/probe_nav.py）：等卡片出现后再读，线上 navActive=true、
+    # nav 的 class 是 'nav-item active'。⇒ 判据 = 等到高亮出现或超时。
+    try:
+        p.wait_for_function(
+            "()=>document.querySelector('#navFavorites')"
+            "?.classList.contains('active')", timeout=10000)
+        facts["03_nav_highlight_waited"] = True
+    except Exception:
+        facts["03_nav_highlight_waited"] = False
     facts["03_favorites_view"] = p.evaluate(TAB_STATE)
     facts["03_detail_open"] = False
     p.screenshot(path=str(OUT / "03-1-favorites-view.png"))

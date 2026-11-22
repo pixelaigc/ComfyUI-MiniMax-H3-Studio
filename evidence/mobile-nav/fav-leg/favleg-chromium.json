@@ -2,4396 +2,18 @@
  "base": "http://127.0.0.1:8190",
  "tag": "final",
  "engine": "chromium",
- "started_at": "2026-11-22 06:23:58",
+ "started_at": "2026-11-22 08:01:18",
  "viewports": {
-  "375x667": {
-   "label": "iPhone SE2/8 竖屏",
-   "dpr": 2,
-   "modes": {
-    "t2v": {
-     "mode": "t2v",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "skipped": "该 mode 不在侧栏 DOM 里"
-    },
-    "flf": {
-     "mode": "flf",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "skipped": "该 mode 不在侧栏 DOM 里"
-    },
-    "r2v": {
-     "mode": "r2v",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "skipped": "该 mode 不在侧栏 DOM 里"
-    },
-    "longfilm": {
-     "mode": "longfilm",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "skipped": "该 mode 不在侧栏 DOM 里"
-    },
-    "t2i": {
-     "mode": "t2i",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 72,
-       "x": 150,
-       "y": 598
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": false,
-     "fav_cards_wait_err": "Page.wait_for_function: Timeout 30000ms exceeded.",
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 0,
-      "cardsInViewport": 0,
-      "cardsClickable": 0,
-      "favBadgeNodes": 0,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": false
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": false,
-      "method": "failed",
-      "blocker": {
-       "reason": "not-found"
-      },
-      "active_mode_after": null
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 0,
-      "clickable": 0
-     },
-     "params_drawer_exits": {
-      "fab_open": false,
-      "exit_via_hamburger": {
-       "ok": false,
-       "reason": "参数抽屉没打开"
-      },
-      "exit_via_mask": {
-       "ok": false,
-       "reason": "参数抽屉没打开"
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 695,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 1260
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": -189,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": -149
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 597,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 637
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 0,
-       "blocked": 9,
-       "other": 0,
-       "blocker": {
-        "id": "sidebar",
-        "cls": "sidebar open"
-       },
-       "fullyReachable": false
-      }
-     ],
-     "pass": false
-    },
-    "t2i_qwen": {
-     "mode": "t2i_qwen",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_qwen",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 0,
-      "cardsClickable": 0,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_view_after_scroll": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "i2i_qwen": {
-     "mode": "i2i_qwen",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "i2i_qwen",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i_moss": {
-     "mode": "t2i_moss",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_moss",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i_h3image": {
-     "mode": "t2i_h3image",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_h3image",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "i2i_h3image": {
-     "mode": "i2i_h3image",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "i2i_h3image",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2a": {
-     "mode": "t2a",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2a",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "a2a": {
-     "mode": "a2a",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "a2a",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 407,
-       "x": 150,
-       "y": 589
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 4
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 188,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 171,
-        "h": 565,
-        "b": 609
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 607,
-        "l": 275,
-        "w": 86,
-        "h": 44,
-        "b": 651
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 209,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 995,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1035
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    }
-   }
-  },
-  "667x375": {
-   "label": "375 的横屏 667x375",
-   "dpr": 2,
-   "modes": {
-    "t2v": {
-     "mode": "t2v",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2v",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 0,
-      "cardsClickable": 0,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_view_after_scroll": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2i"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": -121,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": -81
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 665,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 705
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "flf": {
-     "mode": "flf",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "flf",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "r2v": {
-     "mode": "r2v",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "r2v",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "longfilm": {
-     "mode": "longfilm",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "longfilm",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i": {
-     "mode": "t2i",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i_qwen": {
-     "mode": "t2i_qwen",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_qwen",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "i2i_qwen": {
-     "mode": "i2i_qwen",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "i2i_qwen",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i_moss": {
-     "mode": "t2i_moss",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_moss",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2i_h3image": {
-     "mode": "t2i_h3image",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2i_h3image",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "i2i_h3image": {
-     "mode": "i2i_h3image",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "i2i_h3image",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "t2a": {
-     "mode": "t2a",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "t2a",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    },
-    "a2a": {
-     "mode": "a2a",
-     "is_phone_layout": true,
-     "open_picker": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "picker_open": true,
-     "select_type": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "active_mode": "a2a",
-     "back_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "reached_picker": true,
-     "fav_entry_tap": {
-      "ok": true,
-      "method": "touchscreen.tap@hit-point",
-      "blocker": {
-       "ok": true,
-       "scrollTop": 690,
-       "x": 150,
-       "y": 306
-      },
-      "neededScroll": true
-     },
-     "fav_cards_waited": true,
-     "favorites_view": {
-      "activeTab": "favorites",
-      "navActive": true,
-      "cardsTotal": 12,
-      "cardsInViewport": 4,
-      "cardsClickable": 4,
-      "favBadgeNodes": 48,
-      "emptyText": null,
-      "filtersVisible": true
-     },
-     "favorites_detail": {
-      "attempted": true,
-      "tap_ok": true,
-      "detail_open": true,
-      "has_params": {
-       "steps": true,
-       "scheduler": true,
-       "seed": true
-      }
-     },
-     "fav_exit_via_hamburger": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null
-     },
-     "fav_exit_reached_picker": true,
-     "reselect_after_fav": {
-      "ok": true,
-      "method": "tap",
-      "blocker": null,
-      "active_mode_after": "t2v"
-     },
-     "library_after_fav_exit": {
-      "cardsTotal": 12,
-      "clickable": 3
-     },
-     "params_drawer_exits": {
-      "fab_open": true,
-      "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
-      },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
-      "exit_via_drawer_x": {
-       "ok": true,
-       "method": "tap"
-      },
-      "exit_via_mask": {
-       "ok": true,
-       "tap": {
-        "x": 334,
-        "y": 44
-       },
-       "panel_closed": true
-      }
-     },
-     "overlap_closed": [
-      {
-       "sel": "#jobsGrid .job-card[data-jid]",
-       "found": true,
-       "rect": {
-        "t": 43,
-        "l": 12,
-        "w": 153,
-        "h": 556,
-        "b": 599
-       },
-       "inViewport": true,
-       "sampled": 6,
-       "own": 6,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "rect": {
-        "t": 315,
-        "l": 567,
-        "w": 86,
-        "h": 44,
-        "b": 359
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      }
-     ],
-     "overlap_drawer_open": [
-      {
-       "sel": "#sidebar .nav-item",
-       "found": true,
-       "rect": {
-        "t": 203,
-        "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 243
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
-       "sel": "#navFavorites",
-       "found": true,
-       "rect": {
-        "t": 989,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 1029
-       },
-       "inViewport": false,
-       "sampled": 0,
-       "own": 0,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": false
-      }
-     ],
-     "pass": true
-    }
-   }
-  },
-  "390x844": {
-   "label": "iPhone 12/13/14 竖屏",
+  "932x430": {
+   "label": "横屏 932x430（430px 短高度）",
    "dpr": 3,
    "modes": {
     "t2v": {
      "mode": "t2v",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -4402,8 +24,7 @@
      "active_mode": "t2v",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -4411,9 +32,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -4421,20 +42,20 @@
      "favorites_view": {
       "activeTab": "favorites",
       "navActive": true,
-      "cardsTotal": 11,
-      "cardsInViewport": 2,
-      "cardsClickable": 2,
-      "favBadgeNodes": 44,
+      "cardsTotal": 10,
+      "cardsInViewport": 4,
+      "cardsClickable": 4,
+      "favBadgeNodes": 40,
       "emptyText": null,
       "filtersVisible": true
      },
      "favorites_view_after_scroll": {
       "activeTab": "favorites",
       "navActive": true,
-      "cardsTotal": 11,
+      "cardsTotal": 10,
       "cardsInViewport": 4,
       "cardsClickable": 4,
-      "favBadgeNodes": 44,
+      "favBadgeNodes": 40,
       "emptyText": null,
       "filtersVisible": true
      },
@@ -4450,8 +71,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -4461,18 +81,20 @@
       "active_mode_after": "t2i"
      },
      "library_after_fav_exit": {
-      "cardsTotal": 11,
+      "cardsTotal": 10,
       "clickable": 4
      },
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -4480,7 +102,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -4491,15 +113,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -4508,30 +130,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -4547,40 +162,22 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": -15,
+        "t": -167,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 25
+        "w": 125,
+        "h": 50,
+        "b": -117
        },
-       "inViewport": true,
-       "sampled": 6,
+       "inViewport": false,
+       "sampled": 0,
        "own": 0,
-       "blocked": 0,
-       "other": 6,
-       "blocker": null,
-       "fullyReachable": true
-      },
-      {
-       "sel": "#navToggle",
-       "found": true,
-       "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
        "blocked": 0,
        "other": 0,
        "blocker": null,
-       "fullyReachable": true
+       "fullyReachable": false
       },
       {
-       "sel": "#panelFab",
+       "sel": "#navToggle",
        "found": true,
        "zeroSize": true,
        "rect": {
@@ -4591,24 +188,39 @@
        }
       },
       {
-       "sel": "#navFavorites",
+       "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 771,
-        "l": 10,
-        "w": 279,
-        "h": 40,
-        "b": 811
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
-       "own": 0,
-       "blocked": 9,
+       "own": 9,
+       "blocked": 0,
        "other": 0,
-       "blocker": {
-        "id": "sidebar",
-        "cls": "sidebar open"
+       "blocker": null,
+       "fullyReachable": true
+      },
+      {
+       "sel": "#navFavorites",
+       "found": true,
+       "rect": {
+        "t": 705,
+        "l": 10,
+        "w": 139,
+        "h": 40,
+        "b": 745
        },
+       "inViewport": false,
+       "sampled": 0,
+       "own": 0,
+       "blocked": 0,
+       "other": 0,
+       "blocker": null,
        "fullyReachable": false
       }
      ],
@@ -4616,11 +228,10 @@
     },
     "flf": {
      "mode": "flf",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -4631,8 +242,7 @@
      "active_mode": "flf",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -4640,9 +250,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -4669,8 +279,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -4686,12 +295,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -4699,7 +310,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -4710,15 +321,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -4727,30 +338,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -4766,11 +370,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -4783,12 +387,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -4799,25 +414,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -4832,11 +436,10 @@
     },
     "r2v": {
      "mode": "r2v",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -4847,8 +450,7 @@
      "active_mode": "r2v",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -4856,9 +458,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -4885,8 +487,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -4902,12 +503,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -4915,7 +518,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -4926,15 +529,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -4943,30 +546,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -4982,11 +578,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -4999,12 +595,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5015,25 +622,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -5048,11 +644,10 @@
     },
     "longfilm": {
      "mode": "longfilm",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -5063,8 +658,7 @@
      "active_mode": "longfilm",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -5072,9 +666,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -5101,8 +695,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -5118,12 +711,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -5131,7 +726,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -5142,15 +737,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -5159,30 +754,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5198,11 +786,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -5215,12 +803,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5231,25 +830,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -5264,11 +852,10 @@
     },
     "t2i": {
      "mode": "t2i",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -5279,8 +866,7 @@
      "active_mode": "t2i",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -5288,9 +874,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -5317,8 +903,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -5334,12 +919,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -5347,7 +934,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -5358,15 +945,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -5375,30 +962,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5414,11 +994,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -5431,12 +1011,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5447,25 +1038,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -5480,11 +1060,10 @@
     },
     "t2i_qwen": {
      "mode": "t2i_qwen",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -5495,8 +1074,7 @@
      "active_mode": "t2i_qwen",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -5504,9 +1082,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -5533,8 +1111,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -5550,12 +1127,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -5563,7 +1142,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -5574,15 +1153,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -5591,30 +1170,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5630,11 +1202,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -5647,12 +1219,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5663,25 +1246,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -5696,11 +1268,10 @@
     },
     "i2i_qwen": {
      "mode": "i2i_qwen",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -5711,8 +1282,7 @@
      "active_mode": "i2i_qwen",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -5720,9 +1290,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -5749,8 +1319,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -5766,12 +1335,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -5779,7 +1350,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -5790,15 +1361,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -5807,30 +1378,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5846,11 +1410,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -5863,12 +1427,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -5879,25 +1454,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -5912,11 +1476,10 @@
     },
     "t2i_moss": {
      "mode": "t2i_moss",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -5927,8 +1490,7 @@
      "active_mode": "t2i_moss",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -5936,9 +1498,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -5965,8 +1527,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -5982,12 +1543,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -5995,7 +1558,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -6006,15 +1569,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -6023,30 +1586,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6062,11 +1618,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -6079,12 +1635,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6095,25 +1662,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -6128,11 +1684,10 @@
     },
     "t2i_h3image": {
      "mode": "t2i_h3image",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -6143,8 +1698,7 @@
      "active_mode": "t2i_h3image",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -6152,9 +1706,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -6181,8 +1735,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -6198,12 +1751,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -6211,7 +1766,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -6222,15 +1777,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -6239,30 +1794,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6278,11 +1826,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -6295,12 +1843,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6311,25 +1870,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -6344,11 +1892,10 @@
     },
     "i2i_h3image": {
      "mode": "i2i_h3image",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -6359,8 +1906,7 @@
      "active_mode": "i2i_h3image",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -6368,9 +1914,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -6397,8 +1943,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -6414,12 +1959,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -6427,7 +1974,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -6438,15 +1985,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -6455,30 +2002,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6494,11 +2034,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -6511,12 +2051,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6527,25 +2078,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -6560,11 +2100,10 @@
     },
     "t2a": {
      "mode": "t2a",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -6575,8 +2114,7 @@
      "active_mode": "t2a",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -6584,9 +2122,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -6613,8 +2151,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -6630,12 +2167,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -6643,7 +2182,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -6654,15 +2193,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -6671,30 +2210,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6710,11 +2242,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -6727,12 +2259,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6743,25 +2286,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -6776,11 +2308,10 @@
     },
     "a2a": {
      "mode": "a2a",
-     "is_phone_layout": true,
+     "is_phone_layout": false,
      "open_picker": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "picker_open": true,
      "select_type": {
@@ -6791,8 +2322,7 @@
      "active_mode": "a2a",
      "back_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "reached_picker": true,
      "fav_entry_tap": {
@@ -6800,9 +2330,9 @@
       "method": "touchscreen.tap@hit-point",
       "blocker": {
        "ok": true,
-       "scrollTop": 224,
-       "x": 150,
-       "y": 772
+       "scrollTop": 675,
+       "x": 80,
+       "y": 349
       },
       "neededScroll": true
      },
@@ -6829,8 +2359,7 @@
      },
      "fav_exit_via_hamburger": {
       "ok": true,
-      "method": "tap",
-      "blocker": null
+      "method": "sidebar-always-visible"
      },
      "fav_exit_reached_picker": true,
      "reselect_after_fav": {
@@ -6846,12 +2375,14 @@
      "params_drawer_exits": {
       "fab_open": true,
       "exit_via_hamburger": {
-       "ok": true,
-       "method": "tap",
-       "blocker": null
+       "ok": false,
+       "method": "failed",
+       "blocker": {
+        "reason": "zero-size"
+       }
       },
-      "panel_closed_after_hamburger": true,
-      "sidebar_open_after_hamburger": true,
+      "panel_closed_after_hamburger": false,
+      "sidebar_open_after_hamburger": false,
       "exit_via_drawer_x": {
        "ok": true,
        "method": "tap"
@@ -6859,7 +2390,7 @@
       "exit_via_mask": {
        "ok": true,
        "tap": {
-        "x": 195,
+        "x": 466,
         "y": 44
        },
        "panel_closed": true
@@ -6870,15 +2401,15 @@
        "sel": "#jobsGrid .job-card[data-jid]",
        "found": true,
        "rect": {
-        "t": 44,
-        "l": 12,
-        "w": 178,
-        "h": 570,
-        "b": 614
+        "t": 43,
+        "l": 180,
+        "w": 174,
+        "h": 565,
+        "b": 608
        },
        "inViewport": true,
-       "sampled": 9,
-       "own": 9,
+       "sampled": 6,
+       "own": 6,
        "blocked": 0,
        "other": 0,
        "blocker": null,
@@ -6887,30 +2418,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
-       },
-       "inViewport": true,
-       "sampled": 9,
-       "own": 9,
-       "blocked": 0,
-       "other": 0,
-       "blocker": null,
-       "fullyReachable": true
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
       },
       {
        "sel": "#panelFab",
        "found": true,
        "rect": {
-        "t": 784,
-        "l": 290,
+        "t": 370,
+        "l": 832,
         "w": 86,
         "h": 44,
-        "b": 828
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6926,11 +2450,11 @@
        "sel": "#sidebar .nav-item",
        "found": true,
        "rect": {
-        "t": 209,
+        "t": 83,
         "l": 24,
-        "w": 265,
-        "h": 40,
-        "b": 249
+        "w": 125,
+        "h": 50,
+        "b": 133
        },
        "inViewport": true,
        "sampled": 9,
@@ -6943,12 +2467,23 @@
       {
        "sel": "#navToggle",
        "found": true,
+       "zeroSize": true,
        "rect": {
-        "t": 4,
-        "l": 10,
-        "w": 36,
-        "h": 36,
-        "b": 40
+        "t": 0,
+        "l": 0,
+        "w": 0,
+        "h": 0
+       }
+      },
+      {
+       "sel": "#panelFab",
+       "found": true,
+       "rect": {
+        "t": 370,
+        "l": 832,
+        "w": 86,
+        "h": 44,
+        "b": 414
        },
        "inViewport": true,
        "sampled": 9,
@@ -6959,25 +2494,14 @@
        "fullyReachable": true
       },
       {
-       "sel": "#panelFab",
-       "found": true,
-       "zeroSize": true,
-       "rect": {
-        "t": 0,
-        "l": 0,
-        "w": 0,
-        "h": 0
-       }
-      },
-      {
        "sel": "#navFavorites",
        "found": true,
        "rect": {
-        "t": 995,
+        "t": 955,
         "l": 10,
-        "w": 279,
+        "w": 139,
         "h": 40,
-        "b": 1035
+        "b": 995
        },
        "inViewport": false,
        "sampled": 0,
@@ -6992,5 +2516,6 @@
     }
    }
   }
- }
+ },
+ "finished_at": "2026-11-22 08:08:09"
 }

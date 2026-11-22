@@ -1,0 +1,84 @@
+{
+ "base": "http://127.0.0.1:8190",
+ "engine": "chromium",
+ "viewports": {
+  "375x667": {
+   "ok": 12,
+   "total": 12
+  },
+  "667x375": {
+   "ok": 12,
+   "total": 12
+  },
+  "390x844": {
+   "ok": 12,
+   "total": 12
+  },
+  "844x390": {
+   "ok": 12,
+   "total": 12
+  },
+  "768x1024": {
+   "ok": 12,
+   "total": 12
+  },
+  "1024x768": {
+   "ok": 12,
+   "total": 12
+  },
+  "430x932": {
+   "ok": 12,
+   "total": 12
+  },
+  "932x430": {
+   "ok": 12,
+   "total": 12
+  }
+ },
+ "total_ok": 96,
+ "total_all": 96,
+ "legs_parsed_from_log": 96,
+ "fail_legs_in_log": 0,
+ "assertions_last_viewport": {
+  "picker_open": {
+   "total": 12,
+   "failed": 0
+  },
+  "reached_picker": {
+   "total": 12,
+   "failed": 0
+  },
+  "fav_cards_waited": {
+   "total": 12,
+   "failed": 0
+  },
+  "fav_exit_reached_picker": {
+   "total": 12,
+   "failed": 0
+  },
+  "select_type": {
+   "total": 12,
+   "failed": 0
+  },
+  "fav_entry_tap": {
+   "total": 12,
+   "failed": 0
+  },
+  "reselect_after_fav": {
+   "total": 12,
+   "failed": 0
+  },
+  "fav_cards_total": {
+   "total": 12,
+   "failed": 0
+  },
+  "detail_open": {
+   "total": 12,
+   "failed": 0
+  },
+  "params_fab_open": {
+   "total": 12,
+   "failed": 0
+  }
+ }
+}
