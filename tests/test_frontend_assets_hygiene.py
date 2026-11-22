@@ -152,7 +152,7 @@ STALE_BUMPED = {
     #   曾被后面第 6 轮的 ("cr20261115b", "cr20261118a") **覆盖** ——
     #   Python dict 字面量后写覆盖先写 ⇒ 前一条是**隐藏条目**。
     #   已把信息并入下面的生效条目，此处只留注释（见下方 providers.js 条目）。
-    "assets.js":               ("cr20261115b", "assetview20261121a"),
+    "assets.js":               ("assetview20261121a", "assetview20261122b"),
     # 【2026-11-21 素材库独立查看窗口】assets.js 改了内容
     #   （卡片 / 抽屉 / 右键菜单三条「独立窗口查看」入口 + Esc 快照守卫）
     #   ⇒ ?v= 必须再升一档。
@@ -168,7 +168,7 @@ STALE_BUMPED = {
     #   判定：**表过期，不是真漂移** —— enhassets1 是正确的当前值，
     #   且 enhance-menu.js 的内容确实变了（必须保留这个新版本号）。
     #   ⇒ 同步表：旧值取**直接前值** cr20261116b，新值取当前 enhassets1。
-    "enhance-menu.js":         ("cr20261116b", "enhassets1"),
+    "enhance-menu.js":         ("enhassets1",   "exectrue20261122a"),
     "music-enhance.js":        ("uxbatch1",     "cr20261115b"),
     # 【2026-11-16 内置 Agent 审查】agent.js 内容又变了（SSE 失败路径
     #   保留「重试」入口的修复）⇒ ?v= 必须再升一次
@@ -235,7 +235,7 @@ STALE_BUMPED = {
     # 后写覆盖先写 ⇒ 第二个条目会把第一个**静默覆盖**（隐藏条目），
     # 而 test_stale_bumped_table_has_no_duplicate_keys 会因为源码里
     # 出现两次 "app.js" 而失败。改一次版本号 = 改这一行的两个值。
-    "app.js":                  ("mobnav20261121a", "cpd20261121a"),
+    "app.js":                  ("cpd20261121a",  "exectrue20261122a"),
     # 【2026-11-21 移动端死路修复】favorites.js / favorites.css 改了内容
     #   （applyBadge 同步卡片底部的收藏按钮；新增 .fav-action 样式）
     # ⇒ ?v= 必须再升一档。
@@ -254,7 +254,7 @@ STALE_BUMPED = {
     #   ⇒ 再升一档 cpd20261121b -> cpd20261121c。
     "prompt-catalog.css":      ("",              "cpd20261121c"),
     "prompt-catalog.js":       ("",              "cpd20261121c"),
-    "generation-queue.js":     ("a5truth1",      "genfix20261119a"),
+    "generation-queue.js":     ("genfix20261122b", "exectrue20261122a"),
     "job-detail.js":           ("a5truth1",      "genfix20261119a"),
     "agent.js":                ("cr20261116b",   "genfix20261119a"),
     # 【2026-11-19 第 7 轮审查】并行任务 76eac36 改了 style.css 的内容
@@ -298,7 +298,7 @@ STALE_BUMPED = {
     #   判定：**表过期，不是真漂移** —— enhassets1 是正确的当前值。
     #   旧值取**直接前值** cr20261115b（cr20261118a 是它上一版的中间态，
     #   已被 enhassets1 取代）。
-    "providers.js":            ("cr20261115b", "enhassets1"),
+    "providers.js":            ("enhassets1",   "exectrue20261122a"),
     "media-manage.js":         ("uxbatch1",     "cr20261118a"),
     # 【2026-11-22 三面板参数统一】agent-manage.js 的内容变了
     #   （三个视频面板的采样/LoRA/尺寸口径统一到同一份真源：

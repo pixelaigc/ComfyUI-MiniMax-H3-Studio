@@ -121,6 +121,7 @@ from h3studio import comfy_errors
 #      -> history 里没有、队列里也没有 -> worker 永远等下去。
 # 判定逻辑放在纯函数模块里（可离线穷举），server.py 只负责取数。
 from h3studio import running_truth
+from h3studio import exec_slot
 # 【2026-11-19 缺陷 1 修】生成任务的**运行上限**策略（按媒体类型区分）。
 #
 # 【为什么要有这一层】原来只有一个全局阈值 `running_timeout_sec`
@@ -491,6 +492,72 @@ def init_db():
         #     漏一处就丢标记；独立表只有一处写入点；
         #   * 独立表**向后兼容**：老库不需要迁移，现有记录一条都不动。
         favorites.ensure_table(conn)
+        # 【2026-11-22 缺陷修】生成队列的**执行槽租约表**。
+        #
+        # 【为什么需要这张表 —— 现场取证】
+        # 同一台机器上可以同时跑**多个** h3studio 实例（8190 线上 / 8290 验收 /
+        # 临时 UI 实例），它们**共享同一个 data/jobs.db**。
+        # 而 `Worker._next_queued()` 的 SQL 是
+        #     SELECT ... WHERE status='queued' LIMIT 1
+        # —— **没有任何跨进程互斥**。两个实例同时执行这条 SQL 会各自取到
+        # 不同的 queued 行、各自置成 running -> DB 里出现**两条** running。
+        # 现场实测（2026-11-22 17:01）：
+        #     ComfyUI /queue: queue_running=1, queue_pending=1
+        #     Studio DB:     running=2, queued=1
+        # -> 前端按 DB 的 status 计数 -> 显示「运行中 2」。
+        #
+        # 【租约表的语义】
+        # 一行 = 「当前执行槽被哪个 job 占用」。取任务时在**同一个
+        # BEGIN IMMEDIATE 事务**里做「查租约 + 占租约 + 置 running」，
+        # SQLite 的写锁保证跨进程互斥 -> **同一 data_dir 下任一时刻
+        # 最多 1 条 running 记录**。
+        #
+        # 【为什么不复用 jobs.status 当锁】
+        # jobs.status 是**业务状态**（要展示给用户、要被 worker 推进），
+        # 拿它当锁会把「展示」与「互斥」耦合在一起 —— worker 崩溃时
+        # 锁会一直不放。独立租约表 + 明确的持有者标识（pid + job id）
+        # 才能在重启后被安全回收。
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS exec_slot (
+                slot TEXT PRIMARY KEY,          -- 固定 'default'（单执行槽）
+                job_id TEXT,                    -- 占用执行槽的 job id
+                owner TEXT,                     -- 持有者标识（pid@boot_id）
+                acquired_at REAL,               -- 占槽时刻（epoch 秒）
+                heartbeat_at REAL               -- 最近一次心跳（epoch 秒）
+            );
+            """)
+
+
+#: 执行槽的固定名字（ComfyUI 单执行槽 -> 全局只有一个）。
+EXEC_SLOT_NAME = "default"
+
+#: 租约的**存活上限**（秒）。超过它就认为持有者已经死了（进程被 kill /
+# 机器重启），租约可被回收。
+#
+# 【为什么需要】进程被 SIGKILL 时不会执行任何清理代码，租约会一直留在
+# 表里 -> 整个队列永久卡住。worker 每轮都会刷新心跳，所以正常运行时
+# 心跳永远新鲜；只有真正死掉的持有者才会超时。
+EXEC_SLOT_LEASE_TTL = 120.0
+
+
+def exec_slot_owner() -> str:
+    """本进程的执行槽持有者标识。
+
+    【为什么要 pid + boot_id 两个成分】
+    pid 会被复用（进程退出后，下一个进程可能拿到同一个 pid）。
+    `boot_id` 取自 `/proc/sys/kernel/random/boot_id`（同一次开机不变），
+    再拼上进程启动时刻 -> 「pid + 启动时刻」在同一次开机内唯一，
+    跨开机也不会撞（boot_id 不同）。
+    """
+    boot_id = ""
+    try:
+        boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(
+            encoding="utf-8").strip()
+    except (OSError, ValueError):
+        boot_id = ""
+    started = SERVER_STARTED_AT or time.time()
+    return f"{os.getpid()}@{boot_id or 'noboot'}@{started:.3f}"
 
 
 # ------------------------------------------------------------------
@@ -1998,14 +2065,122 @@ class Worker:
                 await asyncio.sleep(2.0)
 
     def _next_queued(self):
-        with db() as conn:
-            r = conn.execute("SELECT * FROM jobs WHERE status='queued' AND mode!='longfilm' ORDER BY created_at LIMIT 1").fetchone()
+        """取下一个要跑的任务 —— **跨进程**原子地占住执行槽。
+
+        【2026-11-22 缺陷修 —— 这是「运行中 2」的治本点】
+
+        原来的实现是：
+            SELECT * FROM jobs WHERE status='queued' ... LIMIT 1
+            UPDATE jobs SET status='running' ...
+
+        它只保证**进程内**串行。同一台机器上跑着多个 h3studio 实例
+        （8190 线上 / 8290 验收 / 临时 UI 实例）且**共享同一个
+        data/jobs.db** 时，两个实例会各自取到不同的 queued 行、
+        各自置成 running -> DB 里出现**两条** running
+        -> 前端按 status 计数 -> 显示「运行中 2」。
+        而 ComfyUI 是单执行槽 —— 第二条实际只是躺在 ComfyUI 的
+        queue_pending 里。
+
+        【现在的做法】
+        在**同一个 `BEGIN IMMEDIATE` 事务**里做四件事：
+          1. 读执行槽租约；
+          2. 租约被**活着**的其它进程持有 -> 直接返回 None（等）；
+          3. 租约空闲 / 持有者已死（心跳超时）-> 回收租约；
+          4. 取队首 queued -> 占租约 -> 置 running。
+
+        `BEGIN IMMEDIATE` 会立刻拿 SQLite 的**写锁**（RESERVED 锁），
+        而写锁是**跨进程**的 —— 所以两个实例不可能同时进入第 4 步。
+        这就是「同一 data_dir 下任一时刻最多 1 条 running」的保证。
+
+        【为什么不用 `jobs.status` 直接当锁】
+        jobs.status 是**业务状态**（要展示、要被 worker 推进）。
+        当锁会有两个问题：
+          * worker 被 SIGKILL 时 status 永远停在 'running' -> 队列永久卡死；
+          * 「展示状态」与「互斥状态」耦合，任何一处逻辑改动都可能
+            破坏另一处。独立租约表 + 心跳才能安全回收。
+        """
+        owner = exec_slot_owner()
+        now = time.time()
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.row_factory = sqlite3.Row
+        try:
+            # 【关键】IMMEDIATE：立刻拿写锁 -> 跨进程互斥。
+            conn.execute("BEGIN IMMEDIATE")
+            slot = conn.execute(
+                "SELECT job_id, owner, heartbeat_at FROM exec_slot WHERE slot=?",
+                (EXEC_SLOT_NAME,)).fetchone()
+            if slot is not None:
+                holder = slot["owner"] or ""
+                heartbeat = slot["heartbeat_at"] or 0.0
+                # 租约还新鲜（心跳在 TTL 内）-> 别的进程正占着执行槽。
+                # 【口径】owner 相同 = 本进程自己占的（重入）-> 允许继续。
+                if holder != owner and (now - heartbeat) < EXEC_SLOT_LEASE_TTL:
+                    conn.execute("ROLLBACK")
+                    return None
+                # 租约过期（持有者已死）-> 回收。
+                if holder != owner:
+                    print(f"[执行槽] 回收过期租约（原持有者 {holder}，"
+                          f"心跳 {now - heartbeat:.0f} 秒前）")
+            r = conn.execute(
+                "SELECT * FROM jobs WHERE status='queued' AND mode!='longfilm' "
+                "ORDER BY created_at LIMIT 1").fetchone()
             if not r:
+                conn.execute("ROLLBACK")
                 return None
-            conn.execute("UPDATE jobs SET status='running', started_at=? WHERE id=?",
-                         (time.time(), r["id"]))
+            # 占租约 + 置 running —— 同一个事务，原子。
+            conn.execute(
+                "INSERT INTO exec_slot (slot, job_id, owner, acquired_at, heartbeat_at) "
+                "VALUES (?,?,?,?,?) ON CONFLICT(slot) DO UPDATE SET "
+                "job_id=excluded.job_id, owner=excluded.owner, "
+                "acquired_at=excluded.acquired_at, heartbeat_at=excluded.heartbeat_at",
+                (EXEC_SLOT_NAME, r["id"], owner, now, now))
+            conn.execute(
+                "UPDATE jobs SET status='running', started_at=? WHERE id=?",
+                (now, r["id"]))
+            conn.execute("COMMIT")
             self.current = r["id"]
             return dict(r)
+        except Exception as exc:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            print(f"[执行槽] 取任务失败: {exc}")
+            return None
+        finally:
+            conn.close()
+
+    def _release_slot(self, job_id: str) -> None:
+        """释放执行槽（任务结束 / 失败 / 取消时调用）。
+
+        【为什么必须释放】不释放的话，执行槽会被这个已结束的任务
+        一直占着（直到租约 TTL 到期）-> 后面所有任务排队不动。
+        """
+        owner = exec_slot_owner()
+        try:
+            with db() as conn:
+                conn.execute(
+                    "DELETE FROM exec_slot WHERE slot=? AND job_id=? AND owner=?",
+                    (EXEC_SLOT_NAME, job_id, owner))
+        except Exception as exc:
+            print(f"[执行槽] 释放租约失败: {exc}")
+
+    def _heartbeat_slot(self, job_id: str) -> None:
+        """刷新执行槽租约的心跳（worker 每轮轮询时调一次）。
+
+        【为什么需要】租约 TTL 是 120 秒。worker 跑长任务时（比如 10 分钟
+        的视频）必须持续刷新心跳，否则别的实例会以为持有者已死、
+        抢走执行槽 -> 又出现「两条 running」。
+        """
+        owner = exec_slot_owner()
+        try:
+            with db() as conn:
+                conn.execute(
+                    "UPDATE exec_slot SET heartbeat_at=? WHERE slot=? AND job_id=? "
+                    "AND owner=?",
+                    (time.time(), EXEC_SLOT_NAME, job_id, owner))
+        except Exception as exc:
+            print(f"[执行槽] 刷新心跳失败: {exc}")
 
     async def _run(self, job_row):
         job_id = job_row["id"]
@@ -2340,6 +2515,12 @@ class Worker:
                     next_queue_check = 0.0
                     while True:
                         await asyncio.sleep(CFG["poll_interval"])
+                        # 【2026-11-22 缺陷修】刷新执行槽租约心跳。
+                        #
+                        # 【为什么每轮都要刷】租约 TTL 是 120 秒。长视频任务
+                        # 可能跑十几分钟，不持续刷新心跳的话，别的实例会
+                        # 以为持有者已死 -> 抢走执行槽 -> 又出现「两条 running」。
+                        self._heartbeat_slot(job_id)
                         # 检查取消
                         with db() as conn:
                             st = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -2490,6 +2671,12 @@ class Worker:
         finally:
             if self.current == job_id:
                 self.current = None
+            # 【2026-11-22 缺陷修】释放执行槽租约。
+            #
+            # 【为什么必须在这里释放】不释放的话，执行槽会被这个**已结束**
+            # 的任务一直占着（直到租约 TTL 120 秒到期）-> 后面所有任务
+            # 排队不动。放在 finally 里 = 成功 / 失败 / 取消三条路径都会释放。
+            self._release_slot(job_id)
 
 
     async def _record_chain_audio_source(self, job_id: str,
@@ -2881,6 +3068,8 @@ class Worker:
             try:
                 while True:
                     await asyncio.sleep(CFG["poll_interval"])
+                    # 【2026-11-22 缺陷修】批次路径也要刷新执行槽心跳。
+                    self._heartbeat_slot(job_id)
                     with db() as conn:
                         st = conn.execute("SELECT status FROM jobs WHERE id=?",
                                           (job_id,)).fetchone()
@@ -6652,7 +6841,85 @@ async def api_longfilm_create(request):
 QUEUE_VIEW_LIMIT = 50
 
 
-def queue_snapshot(recent_limit: int = 12) -> dict:
+async def collect_exec_states(rows) -> dict:
+    """按 ComfyUI `/queue` 把任务收敛成**唯一**的执行态。
+
+    【这是「运行中 2」的判定层修复 —— 2026-11-22】
+
+    输入 `rows` 是 jobs 表里 status IN ('queued','running') 的行
+    （每行至少有 id / prompt_id / created_at / status）。
+
+    返回：
+        {job_id: {"state": "executing"|"pending"|"unknown",
+                  "position": int|None,
+                  "label": "运行中" | "排队中 · 第 N 位" | "状态未知"}}
+
+    【口径 —— ComfyUI 是单执行槽，任一时刻 executing 至多 1 个】
+    所以返回的 `executing` **至多一条**。其余全部是 `pending`。
+    这就是验收口径 B：「任意时刻全局运行中数量 == ComfyUI 实际
+    executing 数量（0 或 1）」。
+
+    【为什么用 prompt_id 精确匹配，而不是靠 DB 的 status】
+    DB 的 status 是**声明**（多实例竞争时会同时出现多条 running）；
+    ComfyUI 的 /queue 是**观测**（真相）。必须以观测为准。
+
+    【ComfyUI 读不到时怎么办】
+    全部标 `unknown` —— **不猜**谁在跑。
+    把「读不到」当成「A 在跑」会让 B 也被显示成排队，用户看到的
+    仍然是错的；而直接说「未知」是诚实的。
+    （与 running_truth 的同一纪律：读不到 != 队列为空。）
+    """
+    declared_running = []
+    declared_queued = []
+    for row in rows:
+        data = dict(row)
+        jid = str(data.get("id") or "")
+        if not jid:
+            continue
+        if str(data.get("status") or "") == "running":
+            declared_running.append({
+                "id": jid,
+                "prompt_id": str(data.get("prompt_id") or ""),
+                "created_at": data.get("created_at") or 0.0,
+            })
+        else:
+            declared_queued.append(jid)
+
+    queue_running = None
+    queue_pending = None
+    try:
+        payload = await fetch_comfy_queue_payload()
+    except Exception:
+        payload = None
+    if payload is not None:
+        queue_running, queue_pending = exec_slot.split_queue_prompt_ids(payload)
+
+    merged = exec_slot.reconcile_by_prompt(
+        declared_running=declared_running,
+        declared_queued=declared_queued,
+        queue_running=queue_running,
+        queue_pending=queue_pending,
+    )
+
+    result: dict = {}
+    for jid in merged["executing"]:
+        result[jid] = {"state": exec_slot.STATE_EXECUTING,
+                       "position": None,
+                       "label": exec_slot.executing_label()}
+    for jid in merged["pending"]:
+        pos = merged["positions"].get(jid)
+        result[jid] = {"state": exec_slot.STATE_PENDING,
+                       "position": pos,
+                       "label": exec_slot.queue_position_label(pos)}
+    for jid in merged["unknown"]:
+        result[jid] = {"state": exec_slot.STATE_UNKNOWN,
+                       "position": None,
+                       "label": "状态未知"}
+    return result
+
+
+def queue_snapshot(recent_limit: int = 12,
+                   exec_states: dict | None = None) -> dict:
     """
     生成队列的**只读快照** —— 队列顺序 + 每条任务的状态 + 待处理计数。
 
@@ -6690,6 +6957,23 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
     【为什么 recent 只取刚跑完的有限条】
     队列面板要能看到「成功 / 失败」，但不能把整个任务库都拉出来
     （生成库里可能有几百条历史）。取最近 N 条终态任务即可。
+
+    【2026-11-22 缺陷修 —— exec_states 参数】
+    `exec_states` 是**服务端按 ComfyUI /queue 收敛后的执行态**：
+        {job_id: {"state": "executing"|"pending"|"unknown",
+                  "position": 2,           # pending 的队列位置（1 = 下一个就跑）
+                  "label": "排队中 · 第 2 位"}}
+
+    传入时，items[] 里的 `status` 会**按执行态**改写：
+      * executing -> "running"（唯一的那条）
+      * pending   -> "queued"（其余全部）
+    并且每条都带上 `exec_state` / `exec_position` / `exec_label` 字段。
+
+    【为什么 status 要按执行态改写，而不是原样透出 DB 的 status】
+    DB 的 status='running' 只是**声明**（可能是多实例竞争留下的残留）。
+    ComfyUI 的 /queue 才是**观测**（单执行槽，executing 至多 1 个）。
+    前端要显示的是观测结果 —— 所以服务端在这里就把两者**对齐**，
+    前端不需要（也不应该）自己再判一次。
     """
     with db() as conn:
         rows = conn.execute(
@@ -6701,9 +6985,19 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
     running_mode = ""
     pending = 0
     now = time.time()
+    exec_states = exec_states or {}
     for index, row in enumerate(rows, start=1):
         job_params = json.loads(row["params"] or "{}")
         status = row["status"]
+        # 【2026-11-22 缺陷修】按执行态改写 status（见上面的说明）。
+        info = exec_states.get(row["id"]) or {}
+        exec_state = str(info.get("state") or "")
+        exec_position = info.get("position")
+        exec_label = str(info.get("label") or "")
+        if exec_state == exec_slot.STATE_EXECUTING:
+            status = "running"
+        elif exec_state in (exec_slot.STATE_PENDING, exec_slot.STATE_UNKNOWN):
+            status = "queued"
         if status == "running":
             running_id = row["id"]
             running_mode = row["mode"] or ""
@@ -6713,6 +7007,9 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
             "id": row["id"],
             "mode": row["mode"],
             "status": status,
+            # 【2026-11-22 缺陷修】原始的 DB 状态保留一份（诊断用）。
+            # 前端**不要**用它做「运行中」计数 —— 那正是本缺陷的根因。
+            "db_status": row["status"],
             "position": index,
             "created_at": row["created_at"],
             "label": gen_types.type_for_mode(row["mode"])["label"],
@@ -6721,6 +7018,10 @@ def queue_snapshot(recent_limit: int = 12) -> dict:
             # 这里先给**本地判定**（零 IO）；实时判定由 api_queue 补上。
             "started_at": row["started_at"],
             "prompt_id": row["prompt_id"] or "",
+            # 【2026-11-22 缺陷修】执行态（单一真源）。
+            "exec_state": exec_state,
+            "exec_position": exec_position,
+            "exec_label": exec_label,
             "running_truth": running_truth.job_running_truth(
                 status=status,
                 started_at=row["started_at"],
@@ -6767,8 +7068,21 @@ async def api_queue(request):
     【2026-11-14 A5】对「运行中」的那一条补上**实时**判定 ——
     队列面板是这个工作台里最直观的「在不在跑」的展示位，
     它必须说真话（真在跑 / 已丢失 / 已超时 / 判定不了）。
+
+    【2026-11-22 缺陷修 —— 执行态收敛】
+    先按 ComfyUI `/queue` 收敛出**唯一**的执行态（collect_exec_states），
+    再据此生成快照 —— 于是 items[] 里至多一条 status='running'，
+    其余全是 'queued'（带队列序号）。
+    摘要里的「运行中 N · 排队 M」因此必然满足 N ∈ {0, 1}。
     """
-    snapshot = queue_snapshot()
+    # 【2026-11-22 缺陷修】先收敛执行态（读 ComfyUI /queue）。
+    with db() as conn:
+        exec_rows = conn.execute(
+            "SELECT id, status, created_at, prompt_id FROM jobs "
+            "WHERE status IN ('queued','running') AND mode!='longfilm' "
+            "ORDER BY created_at ASC").fetchall()
+    exec_states = await collect_exec_states(exec_rows)
+    snapshot = queue_snapshot(exec_states=exec_states)
     items = snapshot["items"]
     if len(items) > QUEUE_VIEW_LIMIT:
         snapshot["items"] = items[:QUEUE_VIEW_LIMIT]
@@ -6973,6 +7287,37 @@ async def api_list(request):
     now = time.time()
     live_map = await live_states_for_jobs(jobs, now=now)
     live_state = ""
+    # 【2026-11-22 缺陷修 —— 生成库卡片的执行态收敛】
+    #
+    # 【这是用户截图里「运行中 2 · 排队 2」的直接来源】
+    # 卡片按 job.status 判定「运行中」，而 DB 的 status 是**声明**。
+    # 多实例竞争时会出现**两条** status='running'，但 ComfyUI 是
+    # 单执行槽 —— 其中一条实际躺在 ComfyUI 的 queue_pending 里。
+    #
+    # 这里按 ComfyUI /queue 收敛：
+    #   * 唯一 executing 的那条 -> status='running'（带进度）
+    #   * 其余全部 -> status='queued'（显示「排队中 · 第 N 位」）
+    # 于是**任意时刻全局运行中数量 == ComfyUI 实际 executing 数量**。
+    exec_states = await collect_exec_states([
+        {"id": j.get("id"), "status": j.get("status"),
+         "created_at": j.get("created_at"), "prompt_id": j.get("prompt_id")}
+        for j in jobs if j.get("status") in ("queued", "running")
+    ])
+    for job in jobs:
+        jid = job.get("id")
+        info = exec_states.get(jid)
+        if not info:
+            continue
+        exec_state = str(info.get("state") or "")
+        job["exec_state"] = exec_state
+        job["exec_position"] = info.get("position")
+        job["exec_label"] = str(info.get("label") or "")
+        # 保留原始 DB 状态（诊断用）—— 前端**不要**用它做运行中计数。
+        job["db_status"] = job.get("status")
+        if exec_state == exec_slot.STATE_EXECUTING:
+            job["status"] = "running"
+        elif exec_state in (exec_slot.STATE_PENDING, exec_slot.STATE_UNKNOWN):
+            job["status"] = "queued"
     for job in jobs:
         if job.get("status") != "running":
             continue
@@ -7023,6 +7368,30 @@ async def api_get(request):
             timeout_sec=timeout_sec_for_mode(job.get("mode")),
             live_state=live_state,
         )
+    # 【2026-11-22 缺陷修 —— 单条查询也要收敛执行态】
+    #
+    # 【为什么不能漏掉这里】前端的 `pollPendingJobs` 轮询的是
+    # `GET /api/jobs/{id}`（单条），不是列表接口 —— 如果这里不收敛，
+    # 轮询到的单条仍然可能是 status='running'，卡片照样显示「运行中」。
+    if job.get("status") in ("queued", "running"):
+        exec_states = await collect_exec_states([{
+            "id": job.get("id"),
+            "status": job.get("status"),
+            "created_at": job.get("created_at"),
+            "prompt_id": job.get("prompt_id"),
+        }])
+        info = exec_states.get(job.get("id"))
+        if info:
+            exec_state = str(info.get("state") or "")
+            job["exec_state"] = exec_state
+            job["exec_position"] = info.get("position")
+            job["exec_label"] = str(info.get("label") or "")
+            job["db_status"] = job.get("status")
+            if exec_state == exec_slot.STATE_EXECUTING:
+                job["status"] = "running"
+            elif exec_state in (exec_slot.STATE_PENDING,
+                                exec_slot.STATE_UNKNOWN):
+                job["status"] = "queued"
     return json_ok(job)
 
 
@@ -7875,6 +8244,40 @@ async def fetch_comfy_queue(session=None):
         "running": len(data.get("queue_running") or []),
         "pending": len(data.get("queue_pending") or []),
     }
+
+
+async def fetch_comfy_queue_payload(session=None) -> dict | None:
+    """读 ComfyUI `/queue` 的**原始响应**（读不到返回 None）。
+
+    【为什么与 fetch_comfy_queue_ids 分开】
+    `fetch_comfy_queue_ids` 只返回 prompt_id 的**合并集合**
+    （running + pending 混在一起）—— 那正是本缺陷的判定层根因：
+    「在 pending 里排队」与「在 running 里执行」被同等对待。
+
+    这个函数返回**原始 payload**，让调用方用
+    `exec_slot.split_queue_prompt_ids()` 精确区分两者。
+
+    【为什么返回 None 而不是空 dict】
+    None = 读不到（ComfyUI 不可达 / 超时）；
+    {}   = 读到了但队列确实是空的。
+    两者含义完全不同，判定层必须能区分。
+
+    【2026-11-22 请求风暴修】同样走**共享客户端**（2 秒 TTL 缓存 +
+    并发单飞合并 + 失败退避），与 fetch_comfy_queue /
+    fetch_comfy_queue_ids 共用同一份 /queue 缓存。
+    【为什么不能直接用原始 session.get()】
+    原实现每次都新建 TCP 连接且无缓存 —— 9 条 SSE 每秒各打一次
+    /queue，正是「8190 对 ComfyUI(8188) 请求风暴」的来源之一。
+    这里必须走 comfy_client，否则请求风暴修会被这个新函数绕过。
+    """
+    data = await comfy_client.get_json(
+        "/queue", timeout=5.0,
+        cache_ttl=comfy_client.QUEUE_TTL,
+        cache_key="queue",
+        backoff_key="queue")
+    if not isinstance(data, dict):
+        return None
+    return data
 
 
 async def fetch_comfy_queue_ids(session=None) -> set[str] | None:
