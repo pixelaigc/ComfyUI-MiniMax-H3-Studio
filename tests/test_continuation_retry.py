@@ -66,8 +66,35 @@ class RetryLatentCoordTest(unittest.TestCase):
         self.out.mkdir(parents=True, exist_ok=True)
         self._orig_out = srv.OUT_DIR
         srv.OUT_DIR = self.out
+        # ---- 【2026-11-22 修：DB 隔离 —— 防止污染线上任务库】----
+        #
+        # 【事故记录 —— 用户 2026-11-22 发现】
+        # 本文件原先只隔离了 `OUT_DIR`，**没有隔离 `DB_PATH`** ->
+        # `srv.create_job_record()` 把任务直接写进了**线上**
+        # `/root/projects/comfyui-minimax-h3-studio/data/jobs.db`。
+        # 实测污染：线上媒体库里出现 3 条提示词为 `x` / `next` 的
+        # 文生视频卡片（id 575dcb24209d / f0c0f07edebe / b853d427c1f2，
+        # created_at 全部落在 21:12:29 的 20 毫秒内，
+        # chain_id / stage_index 与本文件的 _make_job 调用一一对应）。
+        # 已用线上 DELETE /api/jobs/{id} 清除（107 -> 104 条），
+        # 4 个媒体文件由该接口一并清理。
+        #
+        # 【为什么必须隔离 DB_PATH，而不只是设 H3STUDIO_DATA_DIR】
+        # `server` 模块在 **import 时**就把 `DB_PATH = DATA / "jobs.db"`
+        # 算成了模块级常量。这里 `import server as srv` 发生在文件
+        # 顶部 —— 那时 `H3STUDIO_DATA_DIR` 还没设，DB_PATH 已经指向
+        # 线上了。所以这里**直接改模块属性**（并复原），
+        # 这是唯一对「已 import 的模块」可靠的做法。
+        self._orig_db_path = srv.DB_PATH
+        self._orig_db_dir = srv.DATA
+        srv.DATA = Path(self.tmp) / "studio"
+        srv.DB_PATH = srv.DATA / "jobs.db"
+        srv.DATA.mkdir(parents=True, exist_ok=True)
+        srv.init_db()
 
     def tearDown(self):
+        srv.DB_PATH = self._orig_db_path
+        srv.DATA = self._orig_db_dir
         srv.OUT_DIR = self._orig_out
         shutil.rmtree(self.tmp, ignore_errors=True)
 

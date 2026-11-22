@@ -209,6 +209,102 @@ def test_scan_detects_real_code_reference(tmp_path):
         f"代码里真的引用线上路径却没命中：{hits}")
 
 
+def test_scan_ignores_trailing_comment(tmp_path):
+    """【补充】**行尾注释**里的线上路径 -> 也不算命中。
+
+    【为什么这条要单独测】
+    事故修复时在 `test_continuation_retry.py` 里写了这么一行注释：
+        `# `/root/projects/comfyui-minimax-h3-studio/data/jobs.db`。`
+    第一版扫描器只删「整行都是注释」的行 -> 行尾注释里的线上路径
+    被算成命中 -> 这条**安全**的用例被误判成 live。
+    所以「按 tokenize 的精确列区间切注释」必须有回归测试。
+    """
+    trailing = tmp_path / "test_trailing.py"
+    trailing.write_text(
+        "def test_x():\n"
+        "    x = 1  # 复盘用的线上路径 /root/projects/comfyui-minimax-h3-studio/data\n"
+        "    assert x == 1\n",
+        encoding="utf-8")
+    assert _guard()._scan_file_for_live_endpoints(trailing) == [], (
+        "行尾注释里的线上路径被误判成命中")
+
+
+def test_continuation_retry_is_not_scanned_as_live():
+    """【回归】修复后的 test_continuation_retry.py 不得被判成 live。
+
+    它必须在默认集里跑（它是有效且快的回归保护），
+    而且它现在把 DB_PATH 指到了临时目录 —— 是安全的。
+    """
+    path = _REPO / "tests" / "test_continuation_retry.py"
+    assert path.exists()
+    hits = _guard()._scan_file_for_live_endpoints(path)
+    assert hits == [], (
+        f"test_continuation_retry.py 被判成 live（{hits}）—— "
+        f"它已把 DB_PATH 指向临时目录，是安全的，应该留在默认集里")
+
+
+def test_write_guard_detects_live_db_path(guarded_pytester):
+    """【写库护栏】server.DB_PATH 指向线上 -> 测试结束后必须报错。
+
+    【这条护栏对应真实事故】
+    `tests/test_continuation_retry.py` 原先只隔离 OUT_DIR，
+    没隔离 DB_PATH -> create_job_record() 把任务写进了线上
+    jobs 表（用户媒体库里出现了 3 条 `x` / `next` 卡片）。
+
+    那个文件里**没有任何线上字面量** —— 静态扫描看不见这种
+    「间接指向」。所以必须有运行时检查。
+
+    【为什么要写 guard-exempt】
+    这个伪造的用例**必须**在代码里写线上路径才能触发写库护栏 ——
+    于是它会先被**静态扫描**护栏拦下（那也拦对了，但拦的是另一条）。
+    加 `# guard-exempt:` 让静态扫描放行它，
+    这样测到的才是**写库护栏**本身。
+    """
+    guarded_pytester.makepyfile(
+        test_write_rogue="""
+        # guard-exempt: 这个伪造用例必须写线上路径才能触发写库护栏
+        import sys
+        import types
+
+        def test_writes_to_live_db():
+            # 伪造一个 server 模块，DB_PATH 指向线上
+            mod = types.ModuleType("server")
+            mod.DB_PATH = "/root/projects/comfyui-minimax-h3-studio/data/jobs.db"
+            sys.modules["server"] = mod
+            assert mod.DB_PATH
+        """)
+    result = guarded_pytester.runpytest_subprocess("-p", "no:cacheprovider")
+    assert result.ret != 0, "写库护栏没拦住指向线上 jobs.db 的用例"
+    out = result.stdout.str()
+    # 护栏在 teardown 阶段报 -> pytest 归类为 ERROR（不是 FAILED）
+    result.stdout.fnmatch_lines(["*护栏*"])
+    result.stdout.fnmatch_lines(["*线上任务库*"])
+    assert ("1 failed" in out) or ("1 error" in out), (
+        f"护栏没有让用例失败:\n{out}")
+
+
+def test_write_guard_allows_isolated_db_path(guarded_pytester):
+    """【对照】server.DB_PATH 指向临时目录 -> 放行。"""
+    guarded_pytester.makepyfile(
+        test_write_ok="""
+        import sys
+        import tempfile
+        import types
+        from pathlib import Path
+
+        def test_writes_to_tmp_db():
+            tmp = Path(tempfile.mkdtemp())
+            mod = types.ModuleType("server")
+            mod.DB_PATH = str(tmp / "jobs.db")
+            sys.modules["server"] = mod
+            assert mod.DB_PATH
+        """)
+    result = guarded_pytester.runpytest_subprocess("-p", "no:cacheprovider")
+    assert result.ret == 0, (
+        f"写库护栏误伤了指向临时目录的用例:\n{result.stdout.str()}")
+    result.stdout.fnmatch_lines(["*1 passed*"])
+
+
 def test_guard_exempt_detection(tmp_path):
     """``# guard-exempt:`` 声明必须能被识别（护栏自测文件靠它豁免）。"""
     plain = tmp_path / "test_plain.py"

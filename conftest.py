@@ -379,20 +379,31 @@ def _strip_comments_and_docstrings(text: str) -> str:
         return text
 
     # --- 1. 用 tokenize 去掉注释 ---
-    no_comments = []
+    # 【为什么要处理「行尾注释」】
+    # 只按「整行都是注释」来删是不够的 ——
+    # `p = Path("/root/.../live/jobs.db")  # 线上库` 这种**行尾注释**
+    # 里的线上路径会让扫描器误判。
+    # tokenize 能给出每个 COMMENT token 的**精确列范围**，
+    # 所以这里按「切掉该行的 [start_col, end_col) 区间」处理。
     try:
+        import io
+        import tokenize
+        lines = text.splitlines(keepends=True)
+        cuts: dict[int, list[tuple[int, int]]] = {}
         for tok in tokenize.generate_tokens(io.StringIO(text).readline):
-            if tok.type == tokenize.COMMENT:
+            if tok.type != tokenize.COMMENT:
                 continue
-            no_comments.append(tok)
-        # tokenize 不能直接还原源码，改用「按行删注释」的方式：
-        # 收集每个注释 token 的起止行，把那些行整行去掉。
-        comment_lines = {tok.start[0] for tok in no_comments
-                         if tok.type == tokenize.COMMENT}
-        lines = text.splitlines()
-        kept = [ln for i, ln in enumerate(lines, 1)
-                if i not in comment_lines]
-        code = "\n".join(kept)
+            cuts.setdefault(tok.start[0], []).append(
+                (tok.start[1], tok.end[1]))
+        if cuts:
+            out = []
+            for lineno, ln in enumerate(lines, 1):
+                for start_col, end_col in reversed(cuts.get(lineno, [])):
+                    ln = ln[:start_col] + ln[end_col:]
+                out.append(ln)
+            code = "".join(out)
+        else:
+            code = text
     except Exception:  # noqa: BLE001
         code = text
 
@@ -835,3 +846,67 @@ def _guard_live_data_dir(tmp_path_factory):
             f"       请改成一个临时目录（例：$(mktemp -d)）。",
             pytrace=False)
     yield
+
+
+# --------------------------------------------------------------------------
+# 5b. 写库护栏：测试**不得**往线上 jobs 表写记录
+# --------------------------------------------------------------------------
+#
+# 【事故背景 —— 用户 2026-11-22 发现】
+# 线上媒体库出现了 3 条提示词为 `x` / `next` 的文生视频卡片。
+# 根因：`tests/test_continuation_retry.py` 的 `setUp` 只隔离了
+# `OUT_DIR`，**没隔离 `DB_PATH`** -> `srv.create_job_record()`
+# 直接把任务写进了线上 `/root/projects/.../data/jobs.db`。
+#
+# 【为什么这条护栏与「静态扫描」互补】
+# 那个文件里**没有**任何线上 URL / 线上 data_dir 字面量 ——
+# 它写的是 `srv.DB_PATH`（一个由 config.json 决定的模块常量）。
+# 静态扫描看不见这种「间接指向线上」。
+#
+# 所以这里做**运行时**检查：测试进程如果 import 了 `server` 模块，
+# 就看一眼它的 `DB_PATH` 指向哪里 —— 指向线上就 fail-fast。
+
+
+def _server_module():
+    """拿到已被 import 的 server 模块（没 import 就返回 None）。"""
+    import sys
+    return sys.modules.get("server")
+
+
+def pytest_runtest_teardown(item, nextitem):
+    """【写库护栏】测试结束后核对：server.DB_PATH 没有指向线上。
+
+    【为什么放在 teardown 而不是 setup】
+    setup 时 `server` 可能**还没被 import**（import 发生在用例体内）。
+    teardown 时它一定已经在了 —— 这时才能看到真实的 DB_PATH。
+
+    【判据】
+    · server 模块没被 import -> 无关紧要，放行；
+    · DB_PATH 不在线上数据目录 -> 放行（正常的隔离用例）；
+    · DB_PATH 指向线上 -> fail-fast，并报出是哪条用例干的。
+
+    【为什么用 teardown 而不是 setup 报】
+    setup 时读到的 DB_PATH 可能还是「默认值」，而用例体里才被改成
+    线上；teardown 读到的是**最终状态**，能抓到真正的漏网之鱼。
+    """
+    mod = _server_module()
+    if mod is None:
+        return
+    db_path = getattr(mod, "DB_PATH", None)
+    if db_path is None:
+        return
+    try:
+        p = str(db_path)
+    except Exception:  # noqa: BLE001
+        return
+    if not _LIVE_PATH_RE.search(p):
+        return
+    pytest.fail(
+        f"\n[护栏] 测试往**线上任务库**写了记录：{p}\n"
+        f"       用例：{item.nodeid}\n"
+        f"       这条用例 import 了 server 模块，但没把 server.DB_PATH\n"
+        f"       重定向到临时目录 -> create_job_record() 写进了用户\n"
+        f"       的真实媒体库（会在「生成媒体库」里出现无意义卡片）。\n"
+        f"       修法：在 setUp 里把 server.DB_PATH 指向 tmp 目录，\n"
+        f"             并在 tearDown 里复原。",
+        pytrace=False)
