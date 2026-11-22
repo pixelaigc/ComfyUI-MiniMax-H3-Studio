@@ -1,0 +1,44 @@
+{
+ "produced_asset_id": "asset_4651cca47e3e",
+ "produced_path": "/mnt/usb2t/asset_library/originals/46/35/4635959189d2407a__v4s.mp4_av_0d07e5e2.mp4_av_05e46473.mp4",
+ "ffprobe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_type": "video",
+    "width": 320,
+    "height": 240,
+    "duration": "1.880000"
+   },
+   {
+    "index": 1,
+    "codec_name": "aac",
+    "codec_type": "audio",
+    "sample_rate": "44100",
+    "channels": 1,
+    "duration": "1.857007"
+   }
+  ],
+  "format": {
+   "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+   "duration": "1.880000",
+   "size": "47437"
+  }
+ },
+ "has_audio_track": true,
+ "duration_sec": 1.88,
+ "agent_tool_sequence": [
+  "search_assets(video)",
+  "search_assets(audio)",
+  "media_probe(video)",
+  "media_probe(audio)",
+  "media_merge_av",
+  "media_probe(output)",
+  "respond"
+ ],
+ "clarify_asked": false,
+ "one_shot": true
+}

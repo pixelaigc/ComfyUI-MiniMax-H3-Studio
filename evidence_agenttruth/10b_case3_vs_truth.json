@@ -1,0 +1,156 @@
+{
+ "case": "能力问答",
+ "real_truth": {
+  "VIDEO_DURATION": [
+   2.0,
+   60.0
+  ],
+  "VIDEO_MODE_SIZE_POLICY": {
+   "t2v": {
+    "max_pixels_mp": 2.0,
+    "multiple": 32,
+    "min": 32,
+    "max": 16384,
+    "custom_size": true
+   },
+   "flf": {
+    "max_pixels_mp": 2.0,
+    "multiple": 32,
+    "min": 32,
+    "max": 16384,
+    "custom_size": true
+   },
+   "r2v": {
+    "max_pixels_mp": 2.0,
+    "multiple": 32,
+    "min": 32,
+    "max": 16384,
+    "custom_size": true
+   },
+   "longfilm": {
+    "max_pixels_mp": null,
+    "multiple": 32,
+    "min": 32,
+    "max": 16384,
+    "custom_size": false
+   }
+  },
+  "VIDEO_MODELS": [
+   "fl2va_bf16",
+   "fl2va_int8",
+   "fl2va_pruned_int8",
+   "fl2va_pruned_w4a8",
+   "hybrid_fl2va_ref2va",
+   "ref2va_int8",
+   "ref2va_pruned_int8"
+  ],
+  "VIDEO_ATTENTION_MODES": [
+   "default",
+   "kitchen",
+   "sage",
+   "sol",
+   "sparse"
+  ],
+  "music": {
+   "min": 4.0,
+   "max": 900.0,
+   "default": 900.0
+  },
+  "t2v_resolutions": [
+   "288p",
+   "352p",
+   "384p",
+   "416p",
+   "448p",
+   "480p",
+   "512p",
+   "544p",
+   "576p",
+   "608p",
+   "640p",
+   "672p",
+   "704p",
+   "736p",
+   "768p",
+   "800p",
+   "832p",
+   "864p",
+   "896p",
+   "928p",
+   "960p",
+   "1024p",
+   "1088p",
+   "1120p",
+   "1184p",
+   "1248p",
+   "1376p",
+   "1440p"
+  ],
+  "BUILDERS_modes": [
+   "a2a",
+   "flf",
+   "i2i_h3image",
+   "i2i_qwen",
+   "r2v",
+   "t2a",
+   "t2i",
+   "t2i_h3image",
+   "t2i_moss",
+   "t2i_qwen",
+   "t2v"
+  ]
+ },
+ "checks": [
+  {
+   "name": "时长 2~60 秒",
+   "pass": true,
+   "real": "[2.0, 60.0]"
+  },
+  {
+   "name": "面积上限 2.0 MP",
+   "pass": true,
+   "real": "2.0"
+  },
+  {
+   "name": "480p 在档位里",
+   "pass": true,
+   "real": "True"
+  },
+  {
+   "name": "28 档",
+   "pass": true,
+   "real": "28"
+  },
+  {
+   "name": "音乐 4~900",
+   "pass": true,
+   "real": "{'min': 4.0, 'max': 900.0, 'default': 900.0}"
+  },
+  {
+   "name": "不含旧断言「只有 544p」",
+   "pass": true,
+   "real": "True"
+  },
+  {
+   "name": "不含「已按真实配置逐项核对完毕」空壳",
+   "pass": true,
+   "real": "True"
+  },
+  {
+   "name": "7 个底模全列",
+   "pass": true,
+   "real": "7"
+  },
+  {
+   "name": "5 种注意力全列",
+   "pass": true,
+   "real": "5"
+  },
+  {
+   "name": "宽高 32 倍数",
+   "pass": true,
+   "real": "32"
+  }
+ ],
+ "all_pass": true
+}

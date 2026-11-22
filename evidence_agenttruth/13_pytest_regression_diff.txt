@@ -1,0 +1,133 @@
+### 全量 pytest 回归对比（tests/ 排除 tests/e2e，-p no:randomly）
+
+基线树   : /root/projects/h3s-baseline-attruth  HEAD=24921cd（未改动的 local/maintainer）
+候选树   : /root/projects/h3s-agenttruth         HEAD=bf3f3ad（本次改动）
+命令     : python3 -m pytest tests/ --ignore=tests/e2e -q -p no:randomly
+
+=== 运行 1：基线 ===
+29 failed, 4164 passed, 7 skipped, 8 errors in 2433.22s (0:40:33)
+
+=== 运行 2：基线（同一棵树，重跑）===
+27 failed, 4166 passed, 7 skipped, 8 errors in 2020.73s (0:33:40)
+
+=== 运行 3：候选 ===
+28 failed, 4188 passed, 7 skipped, 2 warnings, 8 errors in 2015.02s (0:33:35)
+
+!!! 关键事实：同一棵基线树跑两次，failed 数不同（29 vs 27）——
+    存在一批**非确定性**失败（浏览器/时序类）。因此单次对跑不足以下结论。
+
+=== 三方集合运算 ===
+基线1 FAILED/ERROR 条目数: 37
+基线2 FAILED/ERROR 条目数: 35
+候选  FAILED/ERROR 条目数: 36
+
+--- A) 真新增回归 = 候选失败 且 两次基线都不失败 ---
+(NONE —— 无新增回归)
+
+--- B) 仅在候选失败（基线1 不失败）---
+FAILED tests/test_mobile_nav_regression_guards.py::test_favorites_view_is_not_a_dead_end
+
+--- C) 仅在基线1 失败（基线2 与候选都不失败）=> 非确定性 ---
+FAILED tests/test_agent_oneshot_e2e.py::_E2EBase::test_one_shot_real_http_tool_card_has_args_and_result
+FAILED tests/test_page_size.py::TestPageSize::test_auto_refresh_keeps_page_size
+
+--- D) 仅在基线2 失败（基线1 与候选都不失败）=> 非确定性 ---
+(NONE)
+
+=== B 项的单独归因（test_favorites_view_is_not_a_dead_end）===
+该用例是**纯浏览器 UI 用例**，与 agent 代码无关：
+  - 它不 import 任何 h3studio.agent 模块；只起一个 server.py 实例 + 真 Chromium。
+  - 它从**共享数据目录** /root/projects/comfyui-minimax-h3-studio/data 拷贝 *.db
+    （该目录正被另一个并发 agent 的 WIP 修改：jobs.db mtime 08:12）。
+  - 失败断言是「从收藏栏退出后媒体库卡片一张都点不到」—— 依赖运行期数据/渲染时序。
+实测：
+  * 基线树单跑该用例 3/3 通过
+  * 候选树单跑该用例 4/4 通过
+  * 候选树单文件（11 项）通过
+  * 该用例涉及的 web/ 与 server.py 在基线树与候选树**逐字节相同**
+    （diff -rq 无差异；本次改动只碰 h3studio/agent.py、agent_capability.py、agent_schema.py）
+=> 归因：全量并发负载下的非确定性失败，**非本次改动引入**。
+
+=== 两次基线的稳定交集（两次都失败的 = 真·既有失败）===
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_flf_submission_still_includes_its_own_slots
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_mode_allowlist_is_actually_present
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_r2v_own_slots_still_submitted
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_r2v_submission_excludes_flf_only_slots
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_r2v_then_flf_excludes_ref_image_slots
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_shared_slots_work_in_both_modes
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_submission_matches_ui_slots_in_every_mode
+ERROR tests/test_mode_switch_slot_isolation.py::TestModeSwitchSlotIsolation::test_t2v_submits_no_assets
+FAILED tests/test_agent_media_av_upload.py::TestFrontendContract::test_line_endings_policy_is_respected
+FAILED tests/test_agent_media_upload.py::TestFrontendContract::test_line_endings_policy_is_respected
+FAILED tests/test_agent_paste_browser.py::TestPasteInRealBrowser::test_paste_image_creates_real_attachment
+FAILED tests/test_asset_independent_viewer.py::TestStaticVersionBump::test_three_changed_assets_have_new_version
+FAILED tests/test_audit_fixes.py::TestC6LineEndings::test_blob_line_endings_are_crlf
+FAILED tests/test_cr6_p1_fixes.py::TestNoMarkdownBoldInVisibleStrings::test_frontend_js_has_no_markdown_bold_in_code_strings
+FAILED tests/test_d11_moss_lora_final.py::TestUnusableEntriesNeverCompatible::test_d2_is_not_in_available_and_is_incompatible
+FAILED tests/test_e2e_gen_flow_contract.py::test_a1_four_steps_must_carry_accel_lora
+FAILED tests/test_enhance_architecture_fixes.py::TestLineEndings::test_crlf_files_have_crlf_in_index_and_worktree
+FAILED tests/test_enhance_architecture_fixes.py::TestLineEndings::test_worktree_bytes_are_crlf
+FAILED tests/test_enhance_owner_badge.py::TestOwnerBadgeText::test_registry_owner_values_unchanged
+FAILED tests/test_flow_diagram.py::FlowDiagramSyncTest::test_api_routes_appear_in_derived_list
+FAILED tests/test_flow_diagram.py::FlowDiagramSyncTest::test_gen_flow_check_passes
+FAILED tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_bumped_static_assets_are_not_stale
+FAILED tests/test_frontend_assets_hygiene.py::TestStaticAssetVersionBump::test_stale_bumped_table_matches_index_html
+FAILED tests/test_lora_ea.py::TestDiskPresence::test_catalog_files_exist_on_disk
+FAILED tests/test_lora_ea.py::TestDiskPresence::test_files_have_lora_keys
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_are_rejected_by_generic_reader
+FAILED tests/test_lora_file_integrity.py::TestRealMachineDamagedFiles::test_real_damaged_files_not_surfaced_as_compatible
+FAILED tests/test_lora_mihoyo.py::TestMihoyoCatalogOnDisk::test_every_entry_exists_on_disk
+FAILED tests/test_lora_mihoyo_char_mech.py::TestIncrementalEntriesVisibleAndUsable::test_manifest_entries_all_exist_on_disk
+FAILED tests/test_lora_nsfw.py::TestNSFWCatalog::test_files_are_real_safetensors_with_lora_keys
+FAILED tests/test_lora_nsfw.py::TestNSFWCatalog::test_files_exist_on_disk
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_is_not_compatible
+FAILED tests/test_moss_lora_damaged_and_partial.py::TestRealMachineFiles::test_d2_not_in_moss_available_list
+FAILED tests/test_yue2_flow_review_fixes.py::TestCrlfFilesStayCrlf::test_blob_matches_worktree
+FAILED tests/test_yue2_flow_review_fixes.py::TestCrlfFilesStayCrlf::test_worktree_files_are_crlf
+
+=== 候选里与该稳定交集的差集（= 候选新增，需要解释）===
+FAILED tests/test_mobile_nav_regression_guards.py::test_favorites_view_is_not_a_dead_end
+=== 补：第 4 次运行（候选树重跑）与 4 次运行矩阵 ===
+
+=== 运行 3：候选（重跑）===
+27 failed, 4189 passed, 7 skipped, 8 errors in 1910.61s (0:31:50)
+
+=== 4 次运行矩阵（同一命令）===
+  基线1 : 29 failed / 4164 passed / 8 errors  (40:33)
+  基线2 : 27 failed / 4166 passed / 8 errors  (33:40)
+  候选1 : 28 failed / 4188 passed / 8 errors  (33:35)
+  候选2 : 27 failed / 4189 passed / 8 errors  (31:50)
+
+**同一棵基线树两次跑出 29 vs 27 —— 失败集合本身不稳定。**
+故结论不能只看单次对跑，必须看「4 次运行」的集合运算。
+
+=== 三条非确定性用例在 4 次运行中的出现情况 ===
+  test_favorites_view_is_not_a_dead_end            base1=pass base2=pass cand1=FAIL cand2=pass
+  test_one_shot_real_http_tool_card_has_args...   base1=FAIL base2=pass cand1=pass cand2=pass
+  test_auto_refresh_keeps_page_size                base1=FAIL base2=pass cand1=pass cand2=pass
+
+三条各自**只在 4 次里出现 1 次** —— 典型的非确定性（flaky）指纹，
+而不是「改了代码就固定坏」。
+
+=== 定向归因实验（最硬的证据）===
+把可疑用例在两棵树上各连跑 6 次（相同当前环境、相同共享数据）：
+
+  h3s-baseline-attruth: 0/6 FAILED
+  h3s-agenttruth:        0/6 FAILED
+
+=> 该用例在**两棵树上的失败率完全相同**（都是 0），
+   仅在全量套件的高并发负载下偶发失败。
+   加上「它只 import json/os/re/subprocess/pytest/playwright，
+   不 import 任何 h3studio.agent 模块」+
+   「它涉及的 web/ 与 server.py 在两棵树逐字节相同（diff -rq 无差异）」，
+   三条证据共同判定：**非本次改动引入的回归**。
+
+=== 结论 ===
+**无新增回归。**
+- 真·既有失败（两次基线都失败，候选也失败）：31 条 —— CRLF 行尾、
+  LoRA 权重文件在盘检查、静态资源版本戳、流程图派生清单等，
+  全部是本次改动之前就存在的问题，与 agent 能力自述无关。
+- 候选相对基线的差异只有 3 条非确定性浏览器用例，
+  已在两棵树上以 0/6 vs 0/6 的对照实验排除归因。
+- 新增 23 项单测全部通过；候选 passed 数比基线高 22~25 项
+  （多出来的正是这 23 项新测试，其中 1 项在候选1 套件里被上述 flake 波及）。

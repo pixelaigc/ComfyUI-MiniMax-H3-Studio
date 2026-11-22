@@ -1,0 +1,83 @@
+{
+ "session_id": "e2e-case3-capability",
+ "status": "completed",
+ "answer": "视频侧共 3 个模式：文生视频（t2v）、首尾帧生成（flf）、参考图生成（r2v）。三者的分辨率与时长策略完全一致，以下数值全部取自服务端真实配置（video_models.VIDEO_MODE_SIZE_POLICY / VIDEO_DURATION_MIN、MAX）。\n\n【时长】\n- 范围：2 ~ 60 秒，步长 1（整数秒）；默认 5 秒。超过 60 秒会被明确拒绝并提示上限。\n\n【画面比例】8 档\n1:1、2:3、3:2、3:4、4:3、9:16、16:9、21:9（默认 16:9）\n\n【分辨率 —— 面积上限】\n- 统一以 megapixels（MP 预算）表达：0.01 ~ 2.0 MP，步长 0.01，默认 1.0 MP。\n- 也可用 resolution_percent：1% ~ 200%，默认 100%（100% = 用满 2.0 MP）。与 megapixels 二选一，给了 megapixels 就以它为准。\n- 也可直接给 width/height：必须是 32 的倍数，单边 32 ~ 16384 像素，总像素 ≤ 2.0 MP。换算后会自动对齐到 32 的倍数；超上限会按比例缩小并说明原因，不会静默改写。\n\n【分辨率 —— 短边档位（共 28 档，仅作显示标签）】\n288p, 352p, 384p, 416p, 448p, 480p, 512p, 544p, 576p, 608p, 640p, 672p, 704p, 736p, 768p（默认）, 800p, 832p, 864p, 896p, 928p, 960p, 1024p, 1088p, 1120p, 1184p, 1248p, 1376p, 1440p\n（例：480p ≈ 864×480 ≈ 0.4 MP）\n\n【补充】\n- 精度没有独立参数，已编码在底模权重里（model_key：fl2va_pruned_int8 / fl2va_int8 / fl2va_pruned_w4a8 / fl2va_bf16 / ref2va_pruned_int8 / ref2va_int8 / hybrid_fl2va_ref2va）；r2v 必须用支持 Ref2VA 的权重。\n- 注意力机制可选：default、kitchen、sage、sol、sparse。\n- 加速 LoRA 可选（含 none = 不挂）：ckpt850、v4step600、lightx2v_4step_768p、lightx2v_4step_sla_768p、lightx2v_8step、dmad_4step_critic、speed_slider、better_motion、turbo_4step_cn、turbo_4step_cn_ema、lightx2v_4step_v01_comfy、lightx2v_sla_768p_root；只列与该底模实测兼容的，不兼容会在提交时明确拒绝。\n- 顺带说明：音乐模式的时长字段是 max_duration（4~900 秒，默认 900），与视频 duration 不是同一参数。\n\n需要我按某个具体档位/时长直接下发一条测试任务吗？（你既往偏好是 16:9，我会沿用。）",
+ "jobs": [],
+ "assets": [],
+ "attachments": [],
+ "prompt": null,
+ "steps": [
+  {
+   "step": 1,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 16242,
+   "args": "{\"mode\": \"t2v\"}",
+   "summary": "已返回 t2v 的参数 schema",
+   "call_id": "call_a8a516947cc242a4b00a7dd7",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 2,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 20138,
+   "args": "{\"mode\": \"t2v\", \"field\": \"resolution\"}",
+   "summary": "已返回 t2v 的参数 schema",
+   "call_id": "call_641715366c7b4b5492e94c27",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 2,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 20222,
+   "args": "{\"mode\": \"flf\"}",
+   "summary": "已返回 flf 的参数 schema",
+   "call_id": "call_5935d4553f8740919b460c40",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 3,
+   "tool": "get_mode_schema",
+   "ok": true,
+   "ms": 9940,
+   "args": "{\"mode\": \"r2v\"}",
+   "summary": "已返回 r2v 的参数 schema",
+   "call_id": "call_b0ebc5ece9b341099c6b69ce",
+   "note": "",
+   "error": null
+  },
+  {
+   "step": 4,
+   "tool": "respond",
+   "ok": true,
+   "ms": 20220,
+   "args": "{\"summary\": \"视频侧共 3 个模式：文生视频（t2v）、首尾帧生成（flf）、参考图生成（r2v）。三者的分辨率与时长策略完全一致，以下数值全部取自服务端真实配置（video_models.VIDEO_MODE_S…（已截断，原长 1354 字）\"}",
+   "summary": "已给出结论",
+   "call_id": "call_e5a972deffc4493aab75ae6a",
+   "note": "",
+   "error": null
+  }
+ ],
+ "usage": {
+  "steps": 5,
+  "tool_calls": 5,
+  "elapsed_ms": 66627
+ },
+ "provider": {
+  "name": "本机 Qwen 多模态",
+  "model": "qwen3.8-flash-next-iq3_xxs"
+ },
+ "error": null,
+ "notice": "",
+ "clarify_options": [],
+ "clarify_hint": "",
+ "memory": {
+  "used": true
+ },
+ "provider_name": "本机 Qwen 多模态"
+}

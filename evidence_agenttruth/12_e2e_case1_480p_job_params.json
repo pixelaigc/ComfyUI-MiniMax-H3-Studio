@@ -1,0 +1,69 @@
+{
+ "case": "用例1：请求 480p 视频生成",
+ "job_id": "ad875270cc35",
+ "status": "done",
+ "agent_requested": {
+  "mode": "t2v",
+  "resolution": "480p",
+  "duration": 5
+ },
+ "landed_params": {
+  "resolution": "480p",
+  "width": 864,
+  "height": 480,
+  "duration": 5.0,
+  "aspect": "16:9",
+  "model_key": "fl2va_pruned_int8",
+  "attention": "sparse",
+  "accel_lora": "dmad_4step_critic",
+  "steps": 8
+ },
+ "output_file": "/mnt/usb2t_toshiba/comfyui/output/h3studio/t2v_ad875270cc35_00001_.mp4",
+ "output_meta": {
+  "kind": "video",
+  "file": "videos/v-h3-studio-000212.mp4",
+  "name": "t2v_ad875270cc35_00001_.mp4",
+  "width": 864,
+  "height": 480,
+  "thumb": "/api/thumb/5222c3ff568f8faa28fd249a5c2fe22e36f007ef.jpg"
+ },
+ "ffprobe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_type": "video",
+    "width": 864,
+    "height": 480,
+    "r_frame_rate": "24/1",
+    "duration": "5.166667"
+   },
+   {
+    "index": 1,
+    "codec_name": "aac",
+    "codec_type": "audio",
+    "sample_rate": "32000",
+    "channels": 2,
+    "r_frame_rate": "0/0",
+    "duration": "5.167000"
+   }
+  ],
+  "format": {
+   "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+   "duration": "5.167000",
+   "size": "2490503"
+  }
+ },
+ "actual_video_resolution": [
+  864,
+  480
+ ],
+ "actual_duration_sec": 5.167,
+ "has_audio": true,
+ "verdict_480p_honored": true,
+ "verdict_not_768p": true,
+ "agent_answer": "已创建 1 个生成任务，可在左侧「生成」列表查看进度。",
+ "note": "Agent 传 resolution='480p' -> 服务端解析为 width=864 height=480（16:9 下 0.4MP），产物 ffprobe 实测 864x480；未升到 768p。"
+}
