@@ -25,6 +25,16 @@ const provState = {
   // 「二次增强」按媒体类型用不同模板（服务端 refine_specs / refine_spec_by_media 下发）
   refineSpecs: {},        // { t2i: "image-refine", t2a: "music-refine", ... }
   refineSpecByMedia: {},  // { image: "image-refine", audio: "music-refine", ... }
+  // 【2026-11-22 新增】hermes 增强通道（对齐 nonebot 咏唱h3）
+  // 服务端 /api/enhancer 的 "hermes" 字段原样存这里。
+  hermes: {
+    enabled: false,
+    binary: "",
+    profile: "",
+    timeout: 1800,
+    profiles: [],
+    mediaSpecs: {},
+  },
 };
 
 // 当前工作模式
@@ -429,6 +439,11 @@ async function loadAgentConfig() {
     // 「二次增强」的模板按媒体类型选 —— 服务端下发，前端不硬编码
     provState.refineSpecs = d.refine_specs || {};
     provState.refineSpecByMedia = d.refine_spec_by_media || {};
+    // 【2026-11-22】hermes 增强通道配置（对齐 nonebot 咏唱h3）
+    provState.hermes = Object.assign(
+      { enabled: false, binary: "", profile: "", timeout: 1800,
+        profiles: [], mediaSpecs: {} },
+      d.hermes || {});
     // 默认选官方 PE 档（image）
     if (!provState.specId || !provState.agent.specs.find(s => s.id === provState.specId)) {
       provState.specId = "image";
@@ -523,13 +538,201 @@ function renderAgentConfig() {
       <span>User 模板（必须包含 {prompt} 或 {original}）</span>
       <textarea id="agentUser" rows="3">${esc(userText)}</textarea>
     </label>
-    <div class="agent-hint">硬约束由服务端校验器强制：禁止质量词（masterpiece/8k/best quality）、禁止权重语法（(word:1.2)）、禁止 thinking 残留。</div>`;
+    <div class="agent-hint">硬约束由服务端校验器强制：禁止质量词（masterpiece/8k/best quality）、禁止权重语法（(word:1.2)）、禁止 thinking 残留。</div>
+    ${renderHermesConfig()}`;
 
   $("#agentSpec").addEventListener("change", e => {
     provState.specId = e.target.value;
     renderAgentConfig();
   });
   $("#agentSave").addEventListener("click", saveAgentConfig);
+  bindHermesConfig();
+}
+
+/**
+ * hermes 增强通道配置块（2026-11-22 新增，对齐 nonebot 咏唱h3）。
+ *
+ * 【设计口径】这一块与上面的「模板 + 参数」是**并列**的两条增强通道：
+ *   * 上面的模板 -> 走本地 Provider（本项目自己的 llama.cpp / vLLM 端点）
+ *   * 这里的 hermes -> 走 hermes CLI + 特定 profile + 特定 skill 白名单
+ * 前端只负责渲染与保存；**真正跑哪条由请求的 engine 字段决定**。
+ */
+function renderHermesConfig() {
+  const h = provState.hermes || {};
+  const profiles = h.profiles || [];
+  const mediaSpecs = h.mediaSpecs || {};
+  const profileOpts = profiles.map(p =>
+    `<option value="${esc(p.id)}"${p.id === h.profile ? " selected" : ""}>${esc(p.id)}</option>`
+  ).join("");
+  const profileSel = profileOpts
+    ? `<select id="hermesProfile">${profileOpts}</select>`
+    : `<input type="text" id="hermesProfile" value="${esc(h.profile || "")}">`;
+
+  const mediaBlocks = ["image", "video", "audio"].map(media => {
+    const s = mediaSpecs[media] || {};
+    const label = s.label || media;
+    return `
+    <div class="agent-hermes-media">
+      <div class="agent-hermes-media-title">${esc(label)}（${esc(media)}）</div>
+      <label class="agent-field block">
+        <span>skill 白名单（逗号分隔 · 传给 hermes --skills）</span>
+        <input type="text" id="hermesSkills_${esc(media)}"
+               value="${esc(s.skills || "")}">
+      </label>
+      <label class="agent-field block">
+        <span>增强提示词模板（system prompt）</span>
+        <textarea id="hermesTpl_${esc(media)}" rows="6">${esc(s.system_prompt || "")}</textarea>
+      </label>
+      <label class="agent-field block">
+        <span>User 模板（必须包含 {prompt} 或 {original}）</span>
+        <input type="text" id="hermesUserTpl_${esc(media)}"
+               value="${esc(s.user_template || "")}">
+      </label>
+    </div>`;
+  }).join("");
+
+  // 【默认状态回显】服务端把「当前生效值」和「出厂默认值」一起下发，
+  // 这里明确告诉用户「现在是什么状态、默认是什么」——
+  // 否则用户看到开关勾着，却不知道这是默认还是自己开的。
+  const cur = h.enabled ? "已启用" : "已停用";
+  const isDefault = !!h.is_default;
+  const stateText = isDefault
+    ? `${cur}（当前为<b>出厂默认</b>，未手动改过）`
+    : `${cur}（已手动设置，与出厂默认不同）`;
+
+  return `
+  <div class="agent-hermes-block">
+    <div class="agent-hermes-head">
+      <b>hermes 增强通道（对齐 nonebot 咏唱h3）</b>
+      <label class="img-toggle">
+        <input type="checkbox" id="hermesEnabled"${h.enabled ? " checked" : ""}>
+        <span>启用</span>
+      </label>
+      <label class="img-toggle" title="Agent 建任务时也走 hermes 增强（默认关：每次建任务会多等约 40 秒）">
+        <input type="checkbox" id="hermesAgentEnabled"${h.agent_enabled ? " checked" : ""}>
+        <span>Agent 自动增强也走 hermes</span>
+      </label>
+    </div>
+    <div class="agent-hint">
+      当前状态：${stateText}。出厂默认是<b>启用</b>（2026-11-22 起），
+      可以随时取消勾选停用 —— 停用后「增强」下拉里的 <b>hermes 增强</b>
+      会如实报错提示，不会静默换成别的通道。
+    </div>
+    <div class="agent-hint">
+      启用后，「增强」下拉里的 <b>hermes 增强</b> 会调本机 hermes CLI
+      （hermes --profile &lt;profile&gt; chat --query-file … --skills … --oneshot --cli --yolo），
+      用下面的 skill 白名单与提示词模板把用户输入扩写成专业提示词 ——
+      与 nonebot 插件「咏唱h3」的调用方式完全一致。
+      <br>
+      <b>带参考图时走三段式</b>（与 nonebot 一致）：
+      阶段1 初稿 → 阶段2 <b>程序跑 VLM 扫描参考图</b>（物件/服装/光照/调色板，
+      再经规则交叉核对）→ 阶段3 把初稿与已核实清单合成最终提示词。
+      扫描用本机「本地模型配置」里的默认多模态 Provider；扫描失败会如实告知并降级用初稿。
+      <br>
+      <b>关于「Agent 自动增强」</b>：界面上的「增强」按钮是用户主动点的，等一会儿没问题；
+      但 Agent 建任务是自动跑的，每建一个任务就会多等一次 hermes（约 40 秒），
+      批量建任务时尤其明显。所以这两条路径分成两个开关：
+      上面的「启用」管界面按钮（默认开），「Agent 自动增强也走 hermes」管 Agent（默认关）。
+    </div>
+    <div class="agent-row">
+      <label class="agent-field">
+        <span>profile</span>
+        ${profileSel}
+      </label>
+      <label class="agent-field">
+        <span>hermes 可执行文件</span>
+        <input type="text" id="hermesBinary" value="${esc(h.binary || "")}">
+      </label>
+      <label class="agent-field">
+        <span>超时（秒）</span>
+        <input type="number" id="hermesTimeout" min="60" max="3600" step="60"
+               value="${esc(h.timeout || 1800)}">
+      </label>
+      <button class="agent-save" id="hermesSave">保存 hermes 配置</button>
+      <button class="agent-save" id="hermesTest">测试连通性</button>
+    </div>
+    <div class="agent-hint" id="hermesTestOut">测试会跑一次极短的 hermes 询问（不产生任何媒体）。</div>
+    ${mediaBlocks}
+  </div>`;
+}
+
+/** 绑定 hermes 配置块的交互（保存 / 测试）。 */
+function bindHermesConfig() {
+  const saveBtn = $("#hermesSave");
+  if (saveBtn) saveBtn.addEventListener("click", saveHermesConfig);
+  const testBtn = $("#hermesTest");
+  if (testBtn) testBtn.addEventListener("click", testHermesChannel);
+}
+
+/** 收集 hermes 配置块里的值（与服务端 _normalize_hermes_config 同形）。 */
+function collectHermesConfig() {
+  const h = provState.hermes || {};
+  const mediaSpecs = h.mediaSpecs || {};
+  const out = {
+    enabled: !!(($("#hermesEnabled") || {}).checked),
+    agent_enabled: !!(($("#hermesAgentEnabled") || {}).checked),
+    binary: (($("#hermesBinary") || {}).value || "").trim(),
+    profile: (($("#hermesProfile") || {}).value || "").trim(),
+    timeout: Number((($("#hermesTimeout") || {}).value) || 1800),
+    skills: {},
+    templates: {},
+    user_templates: {},
+  };
+  ["image", "video", "audio"].forEach(media => {
+    const s = mediaSpecs[media] || {};
+    const skills = (($("#hermesSkills_" + media) || {}).value || "").trim();
+    const tpl = (($("#hermesTpl_" + media) || {}).value || "").trim();
+    const userTpl = (($("#hermesUserTpl_" + media) || {}).value || "").trim();
+    if (skills) out.skills[media] = skills;
+    if (tpl) out.templates[media] = tpl;
+    if (userTpl) out.user_templates[media] = userTpl;
+  });
+  return out;
+}
+
+async function saveHermesConfig() {
+  const btn = $("#hermesSave");
+  const payload = collectHermesConfig();
+  btn.disabled = true;
+  btn.textContent = "保存中…";
+  try {
+    await apiJSON("PUT", "/api/enhancer", { hermes: payload });
+    btn.textContent = "已保存 ✓";
+    await loadAgentConfig();
+  } catch (e) {
+    alert("保存 hermes 配置失败：" + e.message);
+    btn.textContent = "保存 hermes 配置";
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { if (btn) btn.textContent = "保存 hermes 配置"; }, 1600);
+  }
+}
+
+async function testHermesChannel() {
+  const btn = $("#hermesTest");
+  const out = $("#hermesTestOut");
+  btn.disabled = true;
+  btn.textContent = "测试中…";
+  if (out) { out.textContent = "正在跑一次 hermes 一次性询问…"; out.className = "agent-hint"; }
+  try {
+    const h = provState.hermes || {};
+    const media = currentMedia() || "image";
+    const d = await apiJSON("POST", "/api/hermes-test", {
+      profile: (($("#hermesProfile") || {}).value || h.profile || "").trim(),
+      media,
+    });
+    if (out) {
+      out.className = d.ok ? "agent-hint" : "enhance-warn";
+      out.textContent = d.ok
+        ? `连通正常 · profile=${d.profile} · skills=${d.skills || "（无）"} · 回复：${d.answer || ""}`
+        : `连通失败：${d.error || "未知原因"}`;
+    }
+  } catch (e) {
+    if (out) { out.className = "enhance-warn"; out.textContent = "测试失败：" + e.message; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "测试连通性";
+  }
 }
 
 async function saveAgentConfig() {

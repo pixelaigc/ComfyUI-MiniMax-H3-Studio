@@ -78,6 +78,7 @@ from h3studio import providers as prov
 from h3studio import llm as llm_client
 from h3studio import enhancer as enh
 from h3studio import enhance_assets as enh_assets
+from h3studio import hermes_enhance
 from h3studio import moss_layout
 from h3studio import qwen_pe
 from h3studio import h3image_pe
@@ -10013,6 +10014,10 @@ async def api_enhancer_config(request):
         "refine_spec_by_media": dict(enh.REFINE_SPEC_BY_MEDIA),
         # 模式 -> 「二次增强」模板 id（前端直接取，不用自己推）
         "refine_specs": {m: enh.refine_spec_for_mode(m) for m in enh.MODE_MEDIA},
+        # ---- hermes 增强通道（对齐 nonebot 咏唱h3）----
+        # 前端「本地模型配置」页据此渲染 hermes 开关 / profile / 超时 /
+        # 三条能力的 skill 白名单与提示词模板。
+        "hermes": _hermes_config_payload(saved),
     }
     if mode:
         filtered = enh.filter_specs(specs, mode, model_key)
@@ -10021,6 +10026,75 @@ async def api_enhancer_config(request):
         payload["mode_specs"] = filtered
         payload["default_spec_id"] = enh.default_spec_for_mode(mode, specs, model_key)
     return json_ok(payload)
+
+
+def _hermes_config_payload(saved: dict) -> dict:
+    """
+    hermes 增强通道的下发给前端的配置（不含任何密钥）。
+
+    结构：
+      enabled / binary / profile / timeout
+      profiles          本机真实存在的 profile 清单（前端下拉用）
+      media_specs       三条能力各自的 skill 白名单 + 提示词模板（可编辑）
+    """
+    cfg = hermes_enhance.resolve_config(saved)
+    media_specs = {}
+    for media in ("image", "video", "audio"):
+        try:
+            spec = hermes_enhance.get_media_spec(media, saved)
+        except hermes_enhance.HermesEnhanceError:
+            continue
+        media_specs[media] = {
+            "media": media,
+            "label": spec.get("label", media),
+            "profile": spec.get("profile", cfg["profile"]),
+            "skills": spec.get("skills", ""),
+            "system_prompt": spec.get("system_prompt", ""),
+            "user_template": spec.get("user_template", ""),
+        }
+    return {
+        "enabled": cfg["enabled"],
+        # 【默认状态回显】前端据此显示「当前为出厂默认 / 已手动设置」。
+        # 判据：用户**从未显式存过** enabled 字段 -> 就是出厂默认。
+        "is_default": not _hermes_enabled_explicitly(saved),
+        # 【Agent 自动增强路径的独立开关，默认关】
+        # 界面「增强」是用户主动点的；Agent 建任务是自动跑的（每次多等 ~40 秒）。
+        # 实测：基线 TestJobTools 1.18 秒 -> Agent 也走 hermes 后 400 秒跑不完。
+        "agent_enabled": cfg["agent_enabled"],
+        "agent_is_default": not _hermes_agent_enabled_explicitly(saved),
+        "binary": cfg["binary"],
+        "profile": cfg["profile"],
+        "timeout": cfg["timeout"],
+        "profiles": hermes_enhance.available_profiles(),
+        "media_specs": media_specs,
+        "default_profile": hermes_enhance.DEFAULT_PROFILE,
+        "default_binary": hermes_enhance.DEFAULT_HERMES_BIN,
+        "default_enabled": hermes_enhance.DEFAULT_ENABLED,
+        "default_agent_enabled": hermes_enhance.DEFAULT_AGENT_ENABLED,
+    }
+
+
+def _hermes_enabled_explicitly(saved: dict) -> bool:
+    """
+    用户是否**显式**设置过 enabled。
+
+    【为什么需要区分】2026-11-22 起 hermes 通道**默认启用**。
+    前端要能回显「现在是出厂默认」还是「用户手动改过」——
+    所以必须区分「用户显式存了 true/false」与「压根没存过这个字段」。
+    """
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "enabled" in cfg
+
+
+def _hermes_agent_enabled_explicitly(saved: dict) -> bool:
+    """用户是否**显式**设置过 agent_enabled（Agent 自动增强路径）。"""
+    cfg = (saved or {}).get("hermes")
+    if not isinstance(cfg, dict):
+        return False
+    return "agent_enabled" in cfg
+
 
 async def api_enhancer_save(request):
     """PUT /api/enhancer —— 保存用户可编辑的模板覆盖 + 参数"""
@@ -10069,8 +10143,136 @@ async def api_enhancer_save(request):
                 ceiling = enh.MAX_TOKENS_CEILING
             saved["params"]["max_tokens_ceiling"] = max(
                 enh.MAX_TOKENS_FLOOR, min(ceiling, enh.MAX_TOKENS_MAX))
+        # ---- hermes 增强通道配置（对齐 nonebot 咏唱h3）----
+        hermes_payload = payload.get("hermes")
+        if isinstance(hermes_payload, dict):
+            saved["hermes"] = _normalize_hermes_config(hermes_payload, saved.get("hermes"))
         prov.set_pref(conn, "enhancer", json.dumps(saved, ensure_ascii=False))
     return json_ok({"ok": True, "params": enh.resolve_params(None, saved)})
+
+
+def _normalize_hermes_config(raw: dict, previous: dict | None) -> dict:
+    """
+    规整前端传来的 hermes 配置（存进 model_provider_prefs 的 "enhancer" key）。
+
+    【为什么单独规整】这些值会**直接进 subprocess 的 argv**（binary / profile）
+    或者决定调哪个 skill —— 必须夹一道，不能让前端传任意字符串就变成
+    「以某个参数调 hermes」。
+
+    规则：
+      enabled     -> bool
+      binary      -> 必须是绝对路径且存在可执行文件（否则回落默认）
+      profile     -> 必须在 /root/.hermes/profiles 下真实存在（否则回落默认）
+      timeout     -> 夹到 [60, 3600]
+      skills      -> 每条 media 一份白名单，只保留 [a-z0-9_-] 与逗号
+      templates   -> 每条 media 一份 system prompt（限长）
+      user_templates -> 每条 media 一份 user 模板（必须含 {prompt} 或 {original}）
+    """
+    previous = previous if isinstance(previous, dict) else {}
+    default = hermes_enhance.resolve_config(previous)
+
+    out: dict = {
+        "enabled": bool(raw.get("enabled", default["enabled"])),
+        # Agent 自动增强路径的独立开关（默认关）。
+        # 前端不传这个字段时 -> 沿用已存的值（没存过 -> 出厂默认 False）。
+        "agent_enabled": bool(raw.get("agent_enabled",
+                                       default.get("agent_enabled",
+                                                   hermes_enhance.DEFAULT_AGENT_ENABLED))),
+        "binary": default["binary"],
+        "profile": default["profile"],
+        "timeout": default["timeout"],
+        "skills": {},
+        "templates": {},
+        "user_templates": {},
+    }
+
+    binary = str(raw.get("binary") or "").strip()
+    if binary.startswith("/") and os.path.isfile(binary) and os.access(binary, os.X_OK):
+        out["binary"] = binary
+
+    profile = str(raw.get("profile") or "").strip()
+    if profile and hermes_enhance.profile_exists(profile):
+        out["profile"] = profile
+
+    try:
+        timeout = int(raw.get("timeout"))
+    except (TypeError, ValueError):
+        timeout = default["timeout"]
+    if timeout is None:
+        timeout = default["timeout"]
+    out["timeout"] = max(60, min(3600, timeout))
+
+    # skill 白名单：只允许 [a-z0-9_-] 和逗号（防注入到 CLI 参数里的怪字符）
+    # 规整规则复用 h3studio/hermes_enhance.sanitize_skills（唯一真源）。
+    skills = raw.get("skills")
+    if isinstance(skills, dict):
+        for media, value in skills.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            clean = hermes_enhance.sanitize_skills(str(value or ""))
+            if clean:
+                out["skills"][media] = clean
+
+    templates = raw.get("templates")
+    if isinstance(templates, dict):
+        for media, value in templates.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            text = str(value or "").strip()
+            if text:
+                out["templates"][media] = text[:20000]
+
+    user_templates = raw.get("user_templates")
+    if isinstance(user_templates, dict):
+        for media, value in user_templates.items():
+            if media not in ("image", "video", "audio"):
+                continue
+            text = str(value or "").strip()
+            if not text:
+                continue
+            if "{prompt}" not in text and "{original}" not in text:
+                # 缺占位符 -> 拒绝这一条（保留内置模板）
+                continue
+            out["user_templates"][media] = text[:2000]
+
+    return out
+
+
+def _enhance_prompt_limit_guard(original: str):
+    """
+    提示词长度上限守卫（**能力探测式**，与并行的
+    「本地模型配置 → 提示词长度上限（含「无限制」选项）」任务兼容）。
+
+    【为什么要有这个】
+    并行任务把「提示词长度上限」从**硬编码 4000** 改成了 **Provider 级配置**
+    （可选 4000 / 8000 / 20000 / 50000 / unlimited），并在 server.py 里
+    引入了 `_resolve_prompt_limit()` / `_prompt_limit_guard()`。
+    本分支基于 local/maintainer（那条任务还没合入），如果这里继续写死 4000，
+    两条分支合并后会出现「同一个入口，一处放开一处还砍」。
+
+    【本函数的兼容策略】
+      * 服务端**已有** _prompt_limit_guard -> 直接用它（并行任务合入后自动生效）
+      * 没有 -> 退回本分支原有的 4000 硬上限（合并前的行为，逐字不变）
+
+    返回 (错误响应 or None, 生效信息 dict)。
+    """
+    guard = globals().get("_prompt_limit_guard")
+    if callable(guard):
+        try:
+            err, info = guard(original, None)
+            return err, info
+        except Exception:
+            # 守卫自身出错**不能**把增强入口搞挂 —— 退回硬上限
+            pass
+    if len(original) > 4000:
+        return web.json_response(
+            {"error": "提示词过长（上限 4000 字）",
+             "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+             "prompt_limit_unlimited": False}, status=400), {
+            "prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+            "prompt_limit_unlimited": False}
+    return None, {"prompt_limit": "4000", "prompt_limit_max_chars": 4000,
+                  "prompt_limit_unlimited": False}
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -10299,7 +10501,380 @@ def _prompt_limit_guard(original: str, provider: dict | None) -> tuple[dict | No
             {"error": f"提示词过长（上限 {max_chars} 字）",
              **info}, status=400), info
     return None, info
+async def _api_enhance_via_hermes(payload, original, mode, mode_ctx, model_key,
+                                 saved, asset_context, asset_summary,
+                                 scan_images=None):
+    """
+    hermes 增强通道（对齐 nonebot 插件「咏唱h3」的增强方式）。
 
+    流程与 nonebot **完全一致**：
+      1. 先增强（hermes CLI + 特定 profile + 特定 skill 白名单 + 提示词模板）
+      2. 增强结果才落到提示词字段（replace / append 两种落地策略）
+
+    失败处理与 nonebot 同款纪律：
+      * hermes 不可用 / 超时 / 输出不合法 -> **如实报错**（502 + degraded），
+        **绝不**拿原文冒充增强结果，也**绝不**编造一段模板文案；
+      * 校验不过 -> 回灌 issues 重跑一次（nonebot 同样最多 2 次尝试）。
+
+    三条能力（图像 / 视频 / 音频）按 media 路由到各自的 skill 白名单与
+    提示词模板 —— 见 h3studio/hermes_enhance.py 的 HERMES_MEDIA_SPECS。
+    """
+    # 【提示词长度上限】hermes 通道**解析不出 Provider**（没有 provider_id），
+    # 所以用「默认 Provider 的上限」口径（_enhance_prompt_limit_guard 内部
+    # 会自动转调 _prompt_limit_guard(original, None) -> _default_prompt_limit()）。
+    #
+    # 【为什么守卫放在这里而不是 api_enhance 开头】
+    # api_enhance 的 provider 通道在解析出具体 Provider 后会用
+    # _prompt_limit_guard(original, item) 校验 —— 那是**更精确**的口径
+    # （用户显式选了某个 Provider 时按该 Provider 的上限算）。
+    # 若在 api_enhance 开头再加一道默认口径的守卫，用户选了
+    # 「上限 50000 的 Provider」也会被默认 Provider 的 4000 先拦下来
+    # —— 那就回到了「同一个入口，一处放开一处还砍」的老问题。
+    # 所以：provider 通道用精确口径（解析后校验），
+    #     hermes 通道用默认口径（无 Provider 可解析，只能用默认）。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
+
+    cfg = hermes_enhance.resolve_config(saved)
+    if not cfg["enabled"]:
+        return web.json_response(
+            {"error": "hermes 增强通道未启用。请在「本地模型配置 → 增强 Agent」"
+                      "里打开 hermes 增强开关。",
+             "code": "hermes_disabled", "degraded": True}, status=400)
+
+    media = hermes_enhance.media_for_mode(mode_ctx)
+    if not media:
+        return web.json_response(
+            {"error": f"无法判断模式「{mode_ctx}」属于哪种媒体，"
+                      "hermes 增强只覆盖图像 / 视频 / 音频三条链路。",
+             "code": "unknown_media", "degraded": True}, status=400)
+    if media not in hermes_enhance.HERMES_MEDIA_SPECS:
+        return web.json_response(
+            {"error": f"媒体类型「{media}」没有对应的 hermes 增强配置。",
+             "code": "unknown_media", "degraded": True}, status=400)
+
+    history = _normalize_prompt_history(payload.get("prompt_history"),
+                                        current_stage=_safe_int(
+                                            payload.get("stage")))
+    duration = payload.get("duration")
+    try:
+        duration = float(duration) if duration not in (None, "") else None
+    except (TypeError, ValueError):
+        duration = None
+
+    try:
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=history,
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
+    except hermes_enhance.HermesEnhanceError as exc:
+        # 【不编造】hermes 不可用 -> 如实报错。调用方（前端）据此提示用户，
+        # 或者让用户改用本地 Provider 通道重试。
+        return web.json_response(
+            {"error": str(exc), "code": exc.reason, "detail": exc.detail[:500],
+             "engine": "hermes", "media": media, "profile": cfg["profile"],
+             "degraded": True}, status=502)
+    except Exception as exc:  # noqa: BLE001 —— 任何异常都要如实报出来
+        return web.json_response(
+            {"error": f"hermes 增强异常：{type(exc).__name__} {exc}"[:300],
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    enhanced = result.enhanced or ""
+    if not enhanced:
+        return web.json_response(
+            {"error": "hermes 返回了空内容，未做修改",
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    merged = enh.merge_result(original, enhanced, mode)
+
+    # 提示词历史留痕（与本地 Provider 通道同款）
+    _ph_panel = mode_ctx or ""
+    if _ph_panel:
+        try:
+            with db() as conn:
+                ph_hooks.record_prompt_history(
+                    conn, _ph_panel,
+                    {"original_prompt": original, "prompt": enhanced,
+                     "model_key": model_key},
+                    source=ph.SOURCE_ENHANCE)
+        except Exception:
+            # 留痕失败**不能**让增强失败（增强产物是主要目的）
+            pass
+
+    return json_ok({
+        "original": original,
+        "enhanced": enhanced,
+        "merged": merged,
+        "mode": mode,
+        "engine": "hermes",
+        "media": media,
+        "profile": result.profile,
+        "skills": result.skills,
+        "command": result.command,
+        "attempts": result.attempts,
+        "spec_id": f"hermes-{media}",
+        "used_multimodal": False,
+        "assets": asset_summary,
+        "scan": result.scan,
+        "stage": result.stage,
+        "reference_labels": {"expected": [], "found": []},
+        "validation": {"ok": True, "errors": [], "warnings": [],
+                       "stats": {}},
+        "elements": None,
+        "provider": f"hermes:{result.profile}",
+        "provider_id": "",
+        "params": {},
+        "degraded": False,
+    })
+
+
+async def api_hermes_enhance(request):
+    """
+    POST /api/hermes-enhance —— hermes 提示词增强（图像 / 视频 / 音频三能力统一入口）
+
+    这是 /api/enhance 的 **engine=hermes** 特化入口：
+      * 显式收 media（image / video / audio），不靠 mode 推导 —— 三条链路
+        各自选自己的 skill 白名单与提示词模板；
+      * 素材（asset_refs）仍由**服务端**解析（外部无法指定任意路径）；
+      * 失败一律 4xx/5xx + 可读原因 + degraded=true，**不返回半成品**。
+
+    body:
+      prompt      要增强的原文
+      media       image | video | audio
+      mode        replace | append（落地策略，默认 replace）
+      asset_refs  可选，素材库 asset_id 列表
+      duration    可选，目标时长（秒）
+      validate    可选，默认 true
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"error": "请求格式错误"}, status=400)
+
+    original = str(payload.get("prompt") or "").strip()
+    if not original:
+        return web.json_response({"error": "请先输入要增强的提示词"}, status=400)
+    # 【提示词长度上限】与 /api/enhance 走**同一个**守卫（能力探测式）——
+    # 两条入口的长度口径必须一致，否则会出现「换个入口上限又变了」。
+    limit_error, limit_info = _enhance_prompt_limit_guard(original)
+    if limit_error is not None:
+        return limit_error
+
+    media = str(payload.get("media") or "").strip().lower()
+    if media not in hermes_enhance.HERMES_MEDIA_SPECS:
+        return web.json_response(
+            {"error": f"media 只能是 image / video / audio（收到「{media}」）",
+             "code": "unknown_media"}, status=400)
+
+    mode = payload.get("mode") or "replace"
+    if mode not in ("replace", "append"):
+        return web.json_response({"error": "mode 只能是 replace 或 append"}, status=400)
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+
+    # 素材解析（服务端自己读，前端只给 asset_id）
+    asset_refs = payload.get("asset_refs")
+    asset_context = ""
+    asset_summary = {}
+    scan_images: list[str] = []
+    if asset_refs:
+        try:
+            resolved = await _resolve_enhance_assets(
+                asset_refs, _label_dialect_for_mode(""))
+        except enh_assets.EnhanceAssetError as exc:
+            return web.json_response(
+                {"error": exc.message, "code": exc.code, "degraded": True},
+                status=400)
+        asset_context = enh_assets.describe(resolved)
+        asset_summary = enh_assets.summary(resolved)
+        # 【阶段2 的输入】参考图的**服务端本地路径** —— VLM 扫描要真正读这些图。
+        # 外部无法指定任意路径（只能给素材库 asset_id，服务端自己解析）。
+        scan_images = [str(p) for p in (resolved.get("images") or [])]
+
+    duration = payload.get("duration")
+    try:
+        duration = float(duration) if duration not in (None, "") else None
+    except (TypeError, ValueError):
+        duration = None
+
+    cfg = hermes_enhance.resolve_config(saved)
+    if not cfg["enabled"]:
+        return web.json_response(
+            {"error": "hermes 增强通道未启用。请在「本地模型配置 → 增强 Agent」"
+                      "里打开 hermes 增强开关。",
+             "code": "hermes_disabled", "degraded": True}, status=400)
+
+    try:
+        with db() as conn:
+            result = await hermes_enhance.enhance(
+                original, media, saved=saved,
+                asset_context=asset_context,
+                prompt_history=_normalize_prompt_history(
+                    payload.get("prompt_history"),
+                    current_stage=_safe_int(payload.get("stage"))),
+                duration_seconds=duration,
+                validate=bool(payload.get("validate", True)),
+                # 【三段式 · 阶段2】带参考图时先做 VLM 物品扫描
+                scan_images=scan_images,
+                conn=conn)
+    except hermes_enhance.HermesEnhanceError as exc:
+        return web.json_response(
+            {"error": str(exc), "code": exc.reason, "detail": exc.detail[:500],
+             "engine": "hermes", "media": media, "profile": cfg["profile"],
+             "degraded": True}, status=502)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"hermes 增强异常：{type(exc).__name__} {exc}"[:300],
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    enhanced = result.enhanced or ""
+    if not enhanced:
+        return web.json_response(
+            {"error": "hermes 返回了空内容，未做修改",
+             "engine": "hermes", "media": media, "degraded": True}, status=502)
+
+    return json_ok({
+        "original": original,
+        "enhanced": enhanced,
+        "merged": enh.merge_result(original, enhanced, mode),
+        "mode": mode,
+        "engine": "hermes",
+        "media": media,
+        "profile": result.profile,
+        "skills": result.skills,
+        "command": result.command,
+        "attempts": result.attempts,
+        "issues": result.issues,
+        "provider": f"hermes:{result.profile}",
+        "provider_id": "",
+        "assets": asset_summary,
+        # 【三段式 · 阶段2 扫描结果】回显给前端：
+        # 用户要能看见「这次扫描出几个物件 / 多少词 / 用的是哪些 skill」，
+        # 否则无法确认参考图到底有没有参与增强。
+        "scan": result.scan,
+        "stage": result.stage,
+        "degraded": False,
+    })
+
+
+async def api_hermes_test(request):
+    """
+    POST /api/hermes-test —— 只测 hermes 通道是否可用（不跑真实增强）
+
+    跑一次极短的一次性询问，确认：二进制在不在、profile 在不在、
+    skill 白名单能不能加载、能不能拿到模型回复。
+
+    body:
+      profile  可选，覆盖配置的 profile
+      skills   可选，覆盖配置的 skill 白名单
+      media    可选，image | video | audio（决定默认白名单）
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM model_provider_prefs WHERE key=?",
+            ("enhancer",)).fetchone()
+    saved = {}
+    if row:
+        try:
+            saved = json.loads(row["value"] or "{}")
+        except Exception:
+            saved = {}
+    cfg = hermes_enhance.resolve_config(saved)
+
+    profile = str(payload.get("profile") or cfg["profile"]).strip()
+    media = str(payload.get("media") or "image").strip().lower()
+    skills = str(payload.get("skills") or "").strip()
+    if not skills:
+        try:
+            skills = hermes_enhance.get_media_spec(media, saved).get("skills", "")
+        except hermes_enhance.HermesEnhanceError:
+            skills = ""
+
+    binary = cfg["binary"]
+    import shutil as _shutil
+    if not (os.path.isfile(binary) and os.access(binary, os.X_OK)):
+        binary = _shutil.which("hermes") or binary
+
+    report = {
+        "binary": binary,
+        "binary_exists": os.path.isfile(binary) and os.access(binary, os.X_OK),
+        "profile": profile,
+        "profile_exists": hermes_enhance.profile_exists(profile),
+        "skills": skills,
+        "timeout": cfg["timeout"],
+    }
+    if not report["binary_exists"]:
+        report["ok"] = False
+        report["error"] = f"找不到 hermes 可执行文件：{binary}"
+        return json_ok(report)
+    if not report["profile_exists"]:
+        report["ok"] = False
+        report["error"] = f"profile「{profile}」不存在"
+        return json_ok(report)
+
+    import subprocess
+    import tempfile as _tempfile
+    fd, qpath = _tempfile.mkstemp(prefix="h3studio_hermes_test_", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("只回复两个字：就绪。不要做别的事。")
+        cmd = [binary]
+        if profile:
+            cmd += ["--profile", profile]
+        cmd += ["chat", "--query-file", qpath]
+        if skills:
+            cmd += ["--skills", skills]
+        cmd += ["--oneshot", "--cli", "--yolo"]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=min(cfg["timeout"], 180),
+                                  stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            report["ok"] = False
+            report["error"] = "hermes 调用超时"
+            return json_ok(report)
+        except FileNotFoundError:
+            report["ok"] = False
+            report["error"] = f"hermes 可执行文件不存在：{binary}"
+            return json_ok(report)
+        report["returncode"] = proc.returncode
+        answer = ""
+        try:
+            answer = hermes_enhance._extract_answer(proc.stdout or "",
+                                                     proc.stderr or "")
+        except Exception as exc:
+            report["error"] = f"解析 hermes 输出失败：{exc}"
+        report["answer"] = answer[:500]
+        report["stdout_tail"] = (proc.stdout or "")[-800:]
+        report["ok"] = bool(answer) and proc.returncode == 0
+        if not report["ok"] and not report.get("error"):
+            report["error"] = f"hermes 返回码 {proc.returncode}"
+        return json_ok(report)
+    finally:
+        try:
+            os.unlink(qpath)
+        except OSError:
+            pass
 
 async def api_enhance(request):
     """
@@ -10317,6 +10892,9 @@ async def api_enhance(request):
                   连同图序语义一起喂给多模态模型。
                   【2026-11-18 修复】此前前端从不传素材，增强模型**看不到**
                   用户引用的素材，扩写结果与素材无关 —— 素材等于白引用。
+      engine      可选，"provider"（默认，走本地 Provider）| "hermes"
+                  （走 hermes CLI —— 对齐 nonebot 咏唱h3 的做法）。
+      duration    可选，目标时长（秒），视频链路用。
     """
     try:
         payload = await request.json()
@@ -10349,6 +10927,8 @@ async def api_enhance(request):
     asset_context = ""
     asset_summary = {}
     asset_labels: list[str] = []
+    # 【阶段2 的输入】hermes 通道三段式扫描用的参考图本地路径
+    asset_images: list[str] = []
     # 【标签语法方言】跟目标面板的官方参考标记语法走（见
     # _label_dialect_for_mode）。H3 视频用 <Picture N>；Qwen 图片编辑用
     # <imageN>（官方 PE-I2I）—— 用错方言会导致「增强完提交被拒」。
@@ -10372,6 +10952,8 @@ async def api_enhance(request):
             if len(images) >= enh_assets.MAX_IMAGES:
                 break
             images.append(path)
+        # 【阶段2 的输入】hermes 通道的三段式扫描要用这些图。
+        asset_images = [str(p) for p in (resolved_assets.get("images") or [])]
         asset_context = enh_assets.describe(resolved_assets)
         asset_summary = enh_assets.summary(resolved_assets)
         asset_labels = list(asset_summary.get("labels") or [])
@@ -10396,6 +10978,21 @@ async def api_enhance(request):
             saved = json.loads(row["value"] or "{}")
         except Exception:
             saved = {}
+
+    # ---- hermes 增强通道（对齐 nonebot 咏唱h3）----
+    #
+    # 【路由口径】engine 显式传 "hermes" 才走这条路；不传就走原来的
+    # 本地 Provider 通道（**行为不变**，老客户端不受影响）。
+    #
+    # 【为什么按 media 分三条链路】图像 / 视频 / 音频的提示词规范完全不同
+    # （H3 视频要三段式 Context IR，音乐要结构化风格字段）—— 所以三条链路
+    # 各配一套 skill 白名单 + 提示词模板（h3studio/hermes_enhance.py）。
+    engine = str(payload.get("engine") or "provider").strip().lower()
+    if engine == "hermes":
+        return await _api_enhance_via_hermes(
+            payload, original, mode, mode_ctx, model_key,
+            saved, asset_context, asset_summary,
+            scan_images=asset_images)
 
     spec = enh.get_spec(spec_id, saved)
     # 【审查返修】预算按**原文长度**自适应（不再由固定 300/512 决定）。
@@ -12799,6 +13396,9 @@ def make_app():
     app.router.add_get("/api/enhancer", api_enhancer_config)
     app.router.add_put("/api/enhancer", api_enhancer_save)
     app.router.add_post("/api/enhance", api_enhance)
+    # hermes 增强通道（对齐 nonebot 咏唱h3）：图像 / 视频 / 音频三能力统一入口
+    app.router.add_post("/api/hermes-enhance", api_hermes_enhance)
+    app.router.add_post("/api/hermes-test", api_hermes_test)
     # MOSS-Image 结构化（layout）增强 —— 外部复现 MossPrompt 节点的能力
     app.router.add_post("/api/moss-layout", api_moss_layout)
     # Qwen-Image 2.1 官方 PE 扩写（「增强」下拉里的 qwen21图片官方增强PE）
