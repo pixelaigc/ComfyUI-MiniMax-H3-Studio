@@ -207,7 +207,7 @@ def _video_new_panel_fields() -> list:
               "comfy kitchen = 节点 ModelAttentionBackend"
               "（用户 2026-11-13 审查目标 5）"))
     fields.append(
-        _enum("accel_lora", "加速 LoRA组合", lora_options, default_lora,
+        _enum("accel_lora", "加速 LoRA 组合", lora_options, default_lora,
               lora_note))
     fields.extend(vpp.size_fields("t2v"))
     fields.append(
