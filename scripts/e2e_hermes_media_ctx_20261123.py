@@ -66,8 +66,13 @@ if [ -n "$QF" ] && [ -f "$QF" ]; then
   cp "$QF" "{QUERY_DUMP}/q-$IDX.txt"
   echo "$QF" > "{QUERY_DUMP}/q-$IDX.path"
 fi
-"{REAL_HERMES}" "$@" > "{STDOUT_DUMP}/o-$IDX.txt" 2> "{STDOUT_DUMP}/e-$IDX.txt"
-RC=$?
+# 【关键】wrapper 必须用 `tee` 而不是 `>` 重定向 —— 服务端
+# `_run_cli` 用的是 `capture_output=True`，它捕获的是 **wrapper 的 stdout**。
+# 如果 wrapper 把 hermes 的 stdout 重定向到文件，服务端就收到**空输出**
+# -> _extract_answer 解析失败 -> 502（实测踩到：rc=0、文件里有完整答案，
+# 但服务端说「hermes 返回空内容」）。
+"{REAL_HERMES}" "$@" 2> >(tee "{STDOUT_DUMP}/e-$IDX.txt" >&2) | tee "{STDOUT_DUMP}/o-$IDX.txt"
+RC=${{PIPESTATUS[0]}}
 echo "$RC" > "{STDOUT_DUMP}/o-$IDX.rc"
 exit $RC
 """, encoding="utf-8")
