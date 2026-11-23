@@ -34,10 +34,16 @@ if [ "${LIVE_FULL:0:7}" != "$EXPECT_LIVE" ]; then
   echo "!! live 分支已被别人推进（$LIVE_FULL 不是 $EXPECT_LIVE 前缀），中止部署"
   exit 1
 fi
-if [ "$MAINTAINER_BEFORE" != "$LIVE_BEFORE" ]; then
-  echo "!! maintainer 与 live 不一致（$MAINTAINER_BEFORE vs $LIVE_BEFORE），中止部署"
+# 【maintainer 与 live 的关系】
+# 本轮开始时 live **领先** maintainer（deploy 分支是 maintainer 的超集，
+# 多了「回灌 local/maintainer」那次合并）。所以不能要求两者相等 ——
+# 要求的是：maintainer 必须是 live 的祖先（live 包含 maintainer）。
+# 否则合并会把别人的提交冲掉。
+if ! git merge-base --is-ancestor "$MAINTAINER_BEFORE" "$LIVE_BEFORE"; then
+  echo "!! maintainer ($MAINTAINER_BEFORE) 不是 live ($LIVE_BEFORE) 的祖先，中止部署"
   exit 1
 fi
+echo "maintainer 是 live 的祖先 ✅（live 领先：$(git rev-list --count "$MAINTAINER_BEFORE".."$LIVE_BEFORE") 个提交）"
 
 # 【live 工作区干净性】只允许未跟踪文件存在；有 tracked 改动就中止
 LIVE_DIRTY=$(cd "$LIVE" && git status --porcelain | grep -v '^??' || true)
