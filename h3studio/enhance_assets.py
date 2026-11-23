@@ -128,6 +128,18 @@ VIDEO_FRAME_INTERVAL = 1.0
 #: （素材库的分析文本），给不了就明确标注「音频未参与」。
 MAX_AUDIO_TEXT_CHARS = 2000
 
+#: 音频数值化分析的**最大音频时长**（秒）—— 与 nonebot h3_audio_features.py
+#: 的 ANALYSIS_MAX_SECONDS 同口径（600s）。
+#:
+#: 【为什么要有上限】音频数值分析是纯 CPU 活，但 librosa 的
+#: chroma_cqt / melspectrogram 对长音频是 O(n) 且常数不小 —— 不设上限
+#: 会让「点一次增强」等好几分钟，变成新的阻塞点。
+MAX_AUDIO_ANALYSIS_SECONDS = 600.0
+
+#: 音频数值化分析的**最短音频时长**（秒）—— 低于它没有节拍/段落可言。
+#: 与 nonebot ANALYSIS_MIN_SECONDS（1.0s）同口径。
+MIN_AUDIO_ANALYSIS_SECONDS = 1.0
+
 
 class EnhanceAssetError(RuntimeError):
     """素材上下文解析失败。message 面向用户，直接可读。"""
@@ -390,6 +402,96 @@ def _analysis_text(conn, asset_id: str) -> str:
     return (analysis.get("text") or "").strip()
 
 
+def analyze_audio_numeric(path: Path) -> dict:
+    """
+    音频数值化分析（B 项 —— 对齐 nonebot「咏唱参考生音乐」的 librosa 口径）。
+
+    忠实走 h3studio/audio_features.py（nonebot h3_audio_features.py 的忠实
+    移植）：BPM / 节拍 / 调式 / 能量 / 频谱 / 质感 / 人声代理 / 段落切分 /
+    风格族推断。
+
+    【为什么需要】nonebot 把参考音频的**绝对路径 + 这份结构化数值**一起
+    写进 hermes query（h3_yue2_remix.py:1326-1336），让 hermes 纯文本推理
+    就能拿到 BPM / 调式 / 段落结构。本仓库原先只给「素材库分析文本」，
+    口径更弱 —— 素材库分析是自然语言描述，不是可核对的硬数值。
+
+    【失败纪律】任何失败都**降级**，不抛异常、不阻断用户：
+    返回 `{"ok": False, "reason": ...}`，调用方据此如实告知。
+
+    【为什么不让 hermes 自己去读音频】nonebot 的教训（h3_audio_features.py
+    1-21 行）：旧实现把音频渲染成 spectrogram/chromagram PNG 喂给 hermes 的
+    vision_analyze，实测 3 次视觉 ≈ 8 分钟纯等待，把整轮拖爆。音频的这些
+    属性全是可用 librosa 直接算的数值，图片只是多余的中间层。
+    """
+    try:
+        if not path or not path.is_file():
+            return {"ok": False, "reason": f"音频文件不存在：{path}"}
+        size = path.stat().st_size
+        if size <= 0:
+            return {"ok": False, "reason": "音频文件为空"}
+        from h3studio import audio_features as AF
+        feats = AF.analyze_audio_numeric(str(path))
+        if not feats.get("analysis_ok"):
+            return {
+                "ok": False,
+                "reason": "音频数值分析不可用",
+                "degraded": list(feats.get("degraded") or []),
+                "summary_zh": feats.get("summary_zh") or "",
+            }
+        return {
+            "ok": True,
+            "features": feats,
+            "summary_zh": feats.get("summary_zh") or "",
+            "block": AF.features_to_prompt_block(feats),
+            "elapsed_sec": feats.get("elapsed_sec"),
+        }
+    except Exception as exc:  # noqa: BLE001 —— 音频分析失败不能阻断增强
+        return {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
+
+
+def collect_media_paths(resolved: dict) -> dict:
+    """
+    收集要写进 hermes query 的**媒体绝对路径**（A 项 + D 项）。
+
+    返回:
+        {"images": [...], "videos": [...], "audios": [...]}
+
+    【对齐 nonebot】nonebot h3_interactive.py:4346-4361 的「# 素材位置」块
+    逐条写 `参考图N: <绝对路径>` / `参考视频N: <绝对路径>` / `参考音频N: <绝对路径>`，
+    并注明「供 hermes 用 vision_analyze / ffprobe 读」。本函数是它的
+    数据源等价物。
+
+    【D 项：视频给整段 mp4 路径，不是只给抽帧】
+    nonebot 给的是整段视频路径，hermes 可以 ffprobe 拿时长/分辨率，
+    也能自己抽帧。本仓库原先只把抽帧结果交给 VLM 扫描，hermes 侧看不到
+    视频本体 —— 少了「时长锚点」和「整体时序结构」这两个信息。
+
+    【存在性校验】路径必须是**真实存在**的本地绝对路径。素材库文件可能
+    在解析后被删除/移动 —— 这种情况下宁可不写（hermes 会自己去探，
+    拿到不存在的路径只会浪费一轮工具调用），也不能写一个假路径。
+    """
+    out = {"images": [], "videos": [], "audios": []}
+    items = (resolved or {}).get("items") or []
+    for item in items:
+        kind = item.get("kind")
+        path = item.get("path")
+        if not path:
+            continue
+        try:
+            p = Path(path)
+            if not p.is_absolute() or not p.is_file():
+                continue
+        except Exception:
+            continue
+        if kind == "image":
+            out["images"].append(str(p))
+        elif kind == "video":
+            out["videos"].append(str(p))
+        elif kind == "audio":
+            out["audios"].append(str(p))
+    return out
+
+
 def _extract_video_frames(video: Path, work_dir: Path, prefix: str) -> list[str]:
     """抽帧 -> 交给模型的图片路径列表。失败返回空列表（不抛）。"""
     try:
@@ -432,6 +534,8 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
     refs = normalize_refs(refs)
     if not refs:
         return {"images": [], "notes": [], "text_context": "",
+                "audio_numeric_context": "", "audio_numeric_block": "",
+                "audio_numeric_degraded": [],
                 "items": [], "skipped": [], "labels": [],
                 "dialect": dialect}
 
@@ -441,6 +545,10 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
     images: list[str] = []
     notes: list[str] = []
     text_parts: list[str] = []
+    # 【B 项】音频数值特征的三个累加器
+    audio_numeric_blocks: list[str] = []
+    audio_numeric_details: list[dict] = []
+    audio_numeric_degraded: list[dict] = []
     items: list[dict] = []
     skipped: list[dict] = []
     labels: list[str] = []
@@ -493,7 +601,10 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
                 labels.append(label)
                 items.append({"asset_id": asset_id, "name": name, "category": category,
                               "slot": item["slot"], "kind": "image",
-                              "label": label, "ordinal": counters["picture"] - 1})
+                              "label": label, "ordinal": counters["picture"] - 1,
+                              # 【A 项】原图绝对路径 —— 写进 hermes query 的
+                              # 「素材位置」块，让 hermes 自己 vision_analyze。
+                              "path": str(item["path"])})
                 continue
 
             if category == "video":
@@ -536,7 +647,11 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
                 items.append({"asset_id": asset_id, "name": name, "category": category,
                               "slot": item["slot"], "kind": "video", "frames": added,
                               "label": label, "ordinal": counters["video"] - 1,
-                              "frame_image_range": [first_frame_index, len(images)]})
+                              "frame_image_range": [first_frame_index, len(images)],
+                              # 【D 项】**整段视频**的绝对路径 —— 不是抽帧。
+                              # nonebot 给的是原视频路径（h3_interactive.py:4354-4355），
+                              # hermes 可以 ffprobe 拿时长/分辨率，也能自己抽帧。
+                              "path": str(item["path"])})
                 continue
 
             if category == "audio":
@@ -558,7 +673,29 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
                 items.append({"asset_id": asset_id, "name": name, "category": category,
                               "slot": item["slot"], "kind": "audio",
                               "label": label, "ordinal": counters["audio"] - 1,
-                              "text_context": bool(text)})
+                              "text_context": bool(text),
+                              # 【A 项 + B 项】音频绝对路径 + librosa 数值特征。
+                              "path": str(item["path"])})
+                # 【B 项】librosa 数值化分析（BPM / 调式 / 段落 / 能量 / 频谱）。
+                #
+                # 【为什么放在 resolve_assets 里】数值分析是**纯 CPU 阻塞活**
+                # （librosa chroma_cqt + melspectrogram），必须由调用方放到
+                # 线程里跑 —— resolve_assets 本身就是被 asyncio.to_thread
+                # 包着调用的（server.py:_resolve_enhance_assets），所以
+                # 放在这里天然不阻塞事件循环。
+                #
+                # 【失败不阻断】分析失败只是少一份数值，素材库分析文本仍可用。
+                numeric = analyze_audio_numeric(item["path"])
+                if numeric.get("ok"):
+                    audio_numeric_blocks.append(
+                        f"【{label} = {slot_label}「{name}」的音频数值特征"
+                        f"（程序本地用 librosa/ffprobe 算出，是硬事实）】\n"
+                        f"{numeric.get('summary_zh') or ''}")
+                    audio_numeric_details.append(numeric)
+                else:
+                    audio_numeric_degraded.append(
+                        {"asset_id": asset_id, "name": name,
+                         "reason": numeric.get("reason") or "音频数值分析失败"})
                 continue
 
             skipped.append({"asset_id": asset_id, "name": name,
@@ -570,6 +707,14 @@ def resolve_assets(refs: list, work_dir: Path | None = None,
         "images": images,
         "notes": notes,
         "text_context": "\n\n".join(text_parts),
+        # 【B 项】音频数值特征（中文摘要块）
+        "audio_numeric_context": "\n\n".join(audio_numeric_blocks),
+        # 【B 项】完整数值 JSON 块（nonebot features_to_prompt_block 同款）
+        "audio_numeric_block": "\n\n".join(
+            (d.get("block") or "") for d in audio_numeric_details if d.get("block")
+        ),
+        # 【B 项】降级明细（如实告知，不静默吞掉）
+        "audio_numeric_degraded": audio_numeric_degraded,
         "items": items,
         "skipped": skipped,
         "labels": labels,
@@ -622,6 +767,21 @@ def describe(resolved: dict) -> str:
     text_context = (resolved.get("text_context") or "").strip()
     if text_context:
         parts.append(text_context)
+    # 【B 项】音频数值特征（BPM / 调式 / 段落 / 能量 / 频谱）——
+    # nonebot 的「咏唱参考生音乐」也是把这份 librosa 数值注入 hermes query
+    # （h3_yue2_remix.py:1334-1336）。它是**硬事实**，比自然语言描述更可核对。
+    audio_numeric = (resolved.get("audio_numeric_context") or "").strip()
+    if audio_numeric:
+        parts.append(audio_numeric)
+    # 【B 项】降级明细要如实告知（不能静默吞掉「分析失败」）
+    degraded = resolved.get("audio_numeric_degraded") or []
+    if degraded:
+        detail = "；".join(
+            f"{d.get('name') or d.get('asset_id')}"
+            f"（{d.get('reason')}）" for d in degraded)
+        parts.append(
+            f"【注意】以下音频的**数值化分析未成功**，"
+            f"你只能依据上面的文字描述，不要臆测具体 BPM / 调式 / 段落：{detail}。")
     skipped = resolved.get("skipped") or []
     if skipped:
         detail = "；".join(
@@ -642,6 +802,13 @@ def summary(resolved: dict) -> dict:
         "notes": list(resolved.get("notes") or []),
         "skipped": list(resolved.get("skipped") or []),
         "has_text_context": bool((resolved.get("text_context") or "").strip()),
+        # 【B 项】音频数值特征是否可用 + 降级明细
+        "has_audio_numeric": bool(
+            (resolved.get("audio_numeric_context") or "").strip()),
+        "audio_numeric_degraded": list(
+            resolved.get("audio_numeric_degraded") or []),
+        # 【A/D 项】本次分派出去的媒体绝对路径（供服务端写进 hermes query）
+        "media_paths": collect_media_paths(resolved),
         # 本次分配的官方标签（前端回显 + 服务端校验输出用）
         "labels": list(resolved.get("labels") or []),
         # 本次用的标签语法方言（前端回显，便于用户知道写的是什么标记）

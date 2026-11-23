@@ -432,11 +432,25 @@ class TestThreeStageQuery(unittest.TestCase):
         self.assertIn("内容ABC", q)
 
     def test_time_saving_note_only_in_synth_with_assets(self):
-        """nonebot :4370-4377 —— 合成阶段 + 有素材才注入「不要读图」。"""
-        q_draft = he.build_query(self.spec, "x", asset_context="有素材")
+        """nonebot :4370-4377 —— 合成阶段 + 有参考图才注入「不要读图」。
+
+        【2026-11-22 更新】nonebot 的判定条件是
+        `draft_prompt and enhancement_section and materials and materials.images`
+        —— 最后一项是「**有参考图**」（materials.images），不是「有素材」。
+        本实现原先用 asset_context 当代理，现改为直接看 media_paths 的
+        图片数（语义与 nonebot 完全一致）。
+
+        背景：nonebot 的阶段2 只在 `img_n > 0` 时才扫图（h3_interactive.py:3914），
+        所以 enhancement_section 非空 **蕴含** 必然有参考图 —— 两个条件等价。
+        但我们这条链路上 enhancement_section 也可能来自别的来源，用
+        media_paths.images 判定更直接、更贴近 nonebot 原文。
+        """
+        q_draft = he.build_query(self.spec, "x", asset_context="有素材",
+                                 media_paths={"images": ["/abs/a.png"]})
         self.assertNotIn("省时指令", q_draft)
 
         q_synth = he.build_query(self.spec, "x", asset_context="有素材",
+                                 media_paths={"images": ["/abs/a.png"]},
                                  draft_prompt="d",
                                  enhancement_section="# 已核实素材事实")
         self.assertIn("# 省时指令", q_synth)
@@ -445,6 +459,7 @@ class TestThreeStageQuery(unittest.TestCase):
     def test_no_scan_section_means_no_time_saving_note(self):
         """没有扫描结果 -> 不能说「已经扫描过了」（那是说谎）。"""
         q = he.build_query(self.spec, "x", asset_context="有素材",
+                           media_paths={"images": ["/abs/a.png"]},
                            draft_prompt="d")
         self.assertNotIn("省时指令", q)
 

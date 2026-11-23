@@ -224,7 +224,8 @@ async def _run_h3image_pe(ctx, prompt: str, mode: str,
     return body
 
 
-async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) -> bool:
+async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan,
+                              asset_refs: list | None = None) -> bool:
     """
     尝试走 hermes 增强通道（对齐 nonebot 咏唱h3）。
 
@@ -235,6 +236,16 @@ async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) 
     【失败纪律】与 nonebot 一致：**不编造**。
     hermes 挂了就说挂了，并如实记进 notices —— 媒体库里必须能看出
     这次用的是原文还是增强后的提示词。
+
+    【C 项：媒体上下文】Agent 路径也要拿到素材上下文 ——
+    nonebot 侧的增强链路本来就带着素材（参考图/视频/音频路径）。
+    本实现把 `asset_context`（标签语义 + 音频数值）与 `media_paths`
+    （本地绝对路径）一起传下去，与界面「增强」按钮走**同一条**口径。
+
+    【为什么媒体解析放在开关检查**之后**】素材解析要抽视频帧（ffmpeg）
+    + 跑 librosa 音频数值分析 —— 是**秒级**的阻塞活。如果每次建任务
+    （哪怕 hermes 通道是关的）都解析一遍素材，Agent 建任务会凭空多几秒。
+    所以先看开关，**确定要走 hermes 了**才解析素材。
 
     【为什么 Agent 路径要**单独**一个开关（2026-11-22 实测踩到）】
     界面上「增强」按钮走的是 /api/hermes-enhance —— 用户**主动点了**，
@@ -266,8 +277,27 @@ async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) 
         media = hermes_enhance.media_for_mode(mode)
         if media not in hermes_enhance.HERMES_MEDIA_SPECS:
             return False
+
+        # 【C 项】确认要走 hermes 了，才解析媒体上下文（避免无谓开销）
+        asset_context = ""
+        media_paths: dict = {}
+        scan_images: list[str] = []
+        if asset_refs:
+            try:
+                resolved = await _resolve_agent_media(ctx, asset_refs, mode)
+                asset_context = resolved.get("asset_context") or ""
+                media_paths = resolved.get("media_paths") or {}
+                scan_images = resolved.get("scan_images") or []
+            except Exception as exc:  # noqa: BLE001 —— 媒体解析失败不阻断
+                plan.notices.append(
+                    f"素材上下文解析失败（{exc}），本次增强未使用素材")
+
         result = await hermes_enhance.enhance(
-            original, media, saved=saved, validate=True)
+            original, media, saved=saved, validate=True,
+            # 【C 项】媒体上下文 —— 与界面「增强」按钮同款
+            asset_context=asset_context,
+            media_paths=media_paths,
+            scan_images=scan_images)
         text = (result.enhanced or "").strip()
         if not text:
             plan.notices.append("hermes 增强返回空内容，用原始提示词生成")
@@ -283,12 +313,61 @@ async def _try_hermes_enhance(ctx, mode: str, original: str, plan: EnhancePlan) 
         return False
 
 
+async def _resolve_agent_media(ctx, asset_refs: list, mode: str) -> dict:
+    """
+    解析 Agent 任务引用的素材 -> 媒体上下文（C 项）。
+
+    返回:
+        {
+          "asset_context": str,   # 标签语义 + 音频数值特征（给 hermes 的文字）
+          "media_paths":   dict,  # {"images": [...], "videos": [...], "audios": [...]}
+          "scan_images":   list,  # 参考图本地路径（阶段2 VLM 扫描用）
+        }
+
+    【为什么走服务端自己的解析】素材解析要读素材库（SQLite）+ 视频抽帧
+    （ffmpeg）+ 音频数值分析（librosa）—— 全是阻塞活，必须放线程里跑。
+    这里复用服务端已有的 `enhance_assets.resolve_assets`，与界面「增强」
+    按钮**同一条**解析路径 —— 两边口径不能漂移。
+
+    【标签方言】跟目标面板的官方参考标记语法走（H3 视频 `<Picture N>` /
+    Qwen 图片编辑 `<imageN>`），与 server.py 的 `_label_dialect_for_mode`
+    同款逻辑。
+    """
+    from . import enhance_assets as enh_assets
+
+    def _dialect() -> str:
+        # 与 server.py:_label_dialect_for_mode 保持同款判定。
+        try:
+            if mode in ("i2i_qwen",):
+                return enh_assets.LABEL_DIALECT_QWEN
+        except Exception:
+            pass
+        return enh_assets.LABEL_DIALECT_H3
+
+    resolved = await asyncio.to_thread(
+        enh_assets.resolve_assets, asset_refs, None, _dialect())
+    return {
+        "asset_context": enh_assets.describe(resolved),
+        "media_paths": enh_assets.collect_media_paths(resolved),
+        "scan_images": [str(p) for p in (resolved.get("images") or [])],
+    }
+
+
 async def enhance_for_mode(ctx, mode: str, original: str,
-                           ref_images: list[str] | None = None) -> EnhancePlan:
-    """给某个模式生成**最终提示词**。
+                           ref_images: list[str] | None = None,
+                           asset_refs: list | None = None) -> EnhancePlan:
+    """
+    给某个模式生成**最终提示词**。
 
     返回的 plan.prompt 就是应该写进工作流与媒体库记录的提示词。
     增强失败时不抛异常 —— 降级到原始提示词，并在 notices 里如实说明。
+
+    【C 项】`asset_refs` = 本次任务引用的素材（asset_id + 槽位）。
+    Agent 路径据此解析出：
+      * asset_context —— 标签语义 + 音频数值特征（B 项）
+      * media_paths   —— 素材的本地绝对路径（A/D 项）
+      * scan_images   —— 参考图路径（阶段2 VLM 扫描用）
+    解析失败**不阻断** —— 降级为无媒体上下文的纯文本增强，并记 notice。
     """
     original = (original or "").strip()
     plan = plan_for_mode(mode)
@@ -306,7 +385,12 @@ async def enhance_for_mode(ctx, mode: str, original: str,
     #
     # 【与 nonebot 一致的失败纪律】hermes 不可用 -> **如实记 notice**，
     # 继续用原始提示词走本地 Provider 通道（不编造、不假装增强过）。
-    hermes_done = await _try_hermes_enhance(ctx, mode, original, plan)
+    #
+    # 【C 项】asset_refs 传进去 -> hermes 通道能拿到媒体上下文。
+    # （素材解析本身在 _try_hermes_enhance 内部、开关检查之后才做，
+    #   所以 hermes 通道关闭时不会有任何额外开销。）
+    hermes_done = await _try_hermes_enhance(
+        ctx, mode, original, plan, asset_refs=asset_refs)
     if hermes_done:
         return plan
 

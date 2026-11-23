@@ -376,7 +376,8 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
                 prompt_history: list | None = None,
                 duration_seconds: float | None = None,
                 enhancement_section: str = "",
-                draft_prompt: str = "") -> str:
+                draft_prompt: str = "",
+                media_paths: dict | None = None) -> str:
     """
     构造发给 hermes 的任务描述。
 
@@ -393,6 +394,16 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
       enhancement_section  阶段2 产出的「已核实素材事实」节（nonebot 4343-4344）
       draft_prompt         阶段1 产出的初稿（nonebot 4336-4340）
     两者都非空 = **合成阶段**（nonebot 4281-4290）；都空 = **初稿阶段**。
+
+    【A 项 + D 项】`media_paths` = {"images": [...], "videos": [...],
+    "audios": [...]}，是**本地绝对路径**列表。第 4 块「素材位置」会把它们
+    逐条写进去 —— 格式与 nonebot h3_interactive.py:4346-4361 **逐字对齐**，
+    包括那句「供 hermes 用 vision_analyze / ffprobe 读」。
+
+    【安全口径：不传 base64 / 不传二进制】与 nonebot 同一口径 ——
+    只给**路径**，由 hermes 自己去读。绝对路径来自素材库解析结果
+    （enhance_assets.collect_media_paths），不是用户任意输入，且写入前
+    已做存在性校验。
     """
     parts: list[str] = []
     original = (original or "").strip()
@@ -460,9 +471,38 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
                 "\n# 前情提要（此前各段的提示词，仅作上下文参考，"
                 "本次输出**不要**重复罗列）\n" + "\n".join(lines))
 
-    # 4. 素材位置（服务端解析出来的素材上下文）
+    # 4. 素材上下文（服务端解析出来的素材上下文 —— 标签语义）
     if asset_context:
         parts.append("\n# 素材上下文\n" + asset_context.strip())
+
+    # 4a. 素材位置（**本地绝对路径**）—— nonebot h3_interactive.py:4346-4361
+    #
+    # 【A 项 + D 项】nonebot 咏唱h3 把参考图/参考视频/参考音频的绝对路径
+    # 逐条写进 query，并注明「供 hermes 用 vision_analyze / ffprobe 读」。
+    # hermes 本身能读图、能探视频 —— 阶段1（初稿）没有已核实清单，
+    # **正是最需要它自己看图**的时候。
+    #
+    # 【为什么不传 base64 / 二进制】与 nonebot 同一安全口径：只给路径。
+    # 路径由服务端从素材库解析（外部无法指定任意路径），且写入前已做
+    # 存在性校验（enhance_assets.collect_media_paths）。
+    #
+    # 【D 项】视频给**整段 mp4** 路径（不是抽帧）—— hermes 可以 ffprobe
+    # 拿时长/分辨率，也能自己抽帧。
+    mp = media_paths or {}
+    mp_images = [str(p) for p in (mp.get("images") or [])]
+    mp_videos = [str(p) for p in (mp.get("videos") or [])]
+    mp_audios = [str(p) for p in (mp.get("audios") or [])]
+    if mp_images or mp_videos or mp_audios:
+        parts.append(
+            "\n# 素材位置\n"
+            "**严格用以下编号格式列出 (供 hermes 用 vision_analyze / ffprobe 读)**:"
+        )
+        for i, p in enumerate(mp_images, 1):
+            parts.append(f"  - 参考图{i}: {p}")
+        for i, p in enumerate(mp_videos, 1):
+            parts.append(f"  - 参考视频{i}: {p}")
+        for i, p in enumerate(mp_audios, 1):
+            parts.append(f"  - 参考音频{i}: {p}")
 
     # 4b. 省时指令（仅合成阶段 + 有参考图）—— nonebot 4370-4377
     #
@@ -471,7 +511,12 @@ def build_query(spec: dict, original: str, *, asset_context: str = "",
     #   - 慢：本地 VLM 端点被同机其它 agent 会话共用，实测排队 20+ 分钟
     #   - 无益：读出来的结果不可能比已核实清单更准，反而可能引入新错误
     # 所以明确告诉它**不要读图**，直接用清单。
-    if draft_prompt and enhancement_section and asset_context:
+    #
+    # 【与 nonebot 的判定条件逐字对齐】nonebot 是
+    # `if draft_prompt and enhancement_section and materials and materials.images`
+    # —— 即「合成阶段 + 有参考图」。本实现用 media_paths 里的图片数判断，
+    # 语义完全一致（nonebot 的 materials.images 就是参考图集合）。
+    if draft_prompt and enhancement_section and mp_images:
         parts.append(
             "\n# 省时指令 (重要)\n"
             "**不要用 vision_analyze 读参考图**。参考图里的每一个物件已经被程序扫描并"
@@ -587,6 +632,7 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
                    duration_seconds: float | None = None,
                    validate: bool = True,
                    scan_images: list | None = None,
+                   media_paths: dict | None = None,
                    conn=None) -> HermesResult:
     """
     走 hermes CLI 做提示词增强（图像 / 视频 / 音频三条链路共用）。
@@ -610,6 +656,11 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
       2. 写临时文件 → `hermes chat --query-file ... --oneshot --cli --yolo`
       3. 抠 Hermes 框拿答案
       4. 校验（可选）：不过就**回灌 issues** 重跑一次（最多 2 次）
+
+    【A 项 + D 项】`media_paths` = {"images": [...], "videos": [...],
+    "audios": [...]}（本地绝对路径）会被写进 query 的「素材位置」块，
+    格式与 nonebot h3_interactive.py:4346-4361 逐字对齐。阶段1 让 hermes
+    自己 vision_analyze / ffprobe 读素材；阶段3 仍禁止读图（省时指令）。
 
     失败时抛异常（而不是返回假结果）—— 调用方负责降级并如实告知用户。
     """
@@ -643,9 +694,13 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
 
     # ================= 阶段 1: 初稿 =================
     # nonebot h3_interactive.py:3874-3897
+    #
+    # 【A 项】阶段1 把媒体绝对路径给 hermes —— 它要自己 vision_analyze /
+    # ffprobe 看素材才能写出「看过图」的初稿（nonebot 同款）。
     draft_query = build_query(spec, original, asset_context=asset_context,
                               prompt_history=prompt_history,
-                              duration_seconds=duration_seconds)
+                              duration_seconds=duration_seconds,
+                              media_paths=media_paths)
     draft = await _hermes_once(draft_query, spec, binary, profile, cfg,
                                 original, media, validate, command)
 
@@ -690,11 +745,16 @@ async def enhance(original: str, media: str, *, saved: dict | None = None,
 
     # ================= 阶段 3: 合成 =================
     # nonebot h3_interactive.py:3938-3959
+    #
+    # 【A 项】合成阶段**仍然**把路径给 hermes（nonebot 同款 —— 路径块是
+    # 无条件注入的，4346-4361 不区分阶段），但省时指令会明确禁止它读图。
+    # 这样与 nonebot 的行为完全一致：路径在，禁令也在。
     synth_query = build_query(spec, original, asset_context=asset_context,
                               prompt_history=prompt_history,
                               duration_seconds=duration_seconds,
                               enhancement_section=enhancement_section,
-                              draft_prompt=draft)
+                              draft_prompt=draft,
+                              media_paths=media_paths)
     try:
         final = await _hermes_once(synth_query, spec, binary, profile, cfg,
                                     original, media, validate, command)
